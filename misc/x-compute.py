@@ -1456,9 +1456,9 @@ if "summ" in CAPS:
 	smp = pipeline("summarization", model="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", device=0, torch_dtype=torch.float16)
 	print(smp)
 
-	def summarise(s, min_length=128, max_length=192, rm=True, do_sample=True):
+	def summarise(s1, min_length=128, max_length=192, rm=True, do_sample=True):
 		with torch.autocast("cuda"):
-			s2 = smp(s1, max_length=Ml, min_length=ml, do_sample=do_sample, truncation=True)[0]["summary_text"]
+			s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 		if rm:
 			return re.sub(r"(?:in )?(?:the|this|some)? *(?:article|essay|page|study|text|report|topic)[s, ]*(?:also mentions|we discuss|we look at|is about|includes|is based on)? *", "", s2, flags=re.I)
 		return s2
@@ -1478,6 +1478,10 @@ if "class" in CAPS:
 		offload_folder="cache",
 		resume_download=True,
 	)
+	try:
+		M = exllama_set_max_input_length(M, 4096)
+	except ValueError:
+		traceback.print_exc()
 	print(M)
 
 	def moe_class(prompt, mocked={}):
@@ -1525,14 +1529,14 @@ if "class" in CAPS:
 				with torch.no_grad():
 					res = model.generate(
 						inputs=tokens,
-						temperature=temperature,
+						temperature=temperature * 2 / 3,
 						top_k=round(top_p * 120),
 						top_p=top_p,
 						repetition_penalty=(frequency_penalty + presence_penalty) / 4 + 1,
 						max_new_tokens=max_tokens,
 						do_sample=True,
 					)
-					torch.cuda.empty_cache()
+					# torch.cuda.empty_cache()
 			except RuntimeError as e:
 				if "probability tensor" in str(ex).lower():
 					print(repr(ex))
@@ -1834,14 +1838,14 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 					with torch.no_grad():
 						res = model.generate(
 							inputs=tokens,
-							temperature=temperature,
+							temperature=temperature * 2 / 3,
 							top_k=round(top_p * 120),
 							top_p=top_p,
 							repetition_penalty=(frequency_penalty + presence_penalty) / 4 + 1,
 							max_new_tokens=max_tokens,
 							do_sample=True,
 						)
-						torch.cuda.empty_cache()
+						# torch.cuda.empty_cache()
 				except RuntimeError as e:
 					if "probability tensor" in str(ex).lower():
 						print(repr(ex))
@@ -1907,7 +1911,7 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 					with torch.no_grad():
 						res = model.generate(
 							inputs=tokens,
-							temperature=temperature,
+							temperature=temperature * 2 / 3,
 							top_k=round(top_p * 120),
 							top_p=top_p,
 							repetition_penalty=(frequency_penalty + presence_penalty) / 4 + 1,
@@ -1919,7 +1923,7 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 					if "probability tensor" in str(ex).lower():
 						print(repr(ex))
 						ex = e
-						torch.cuda.empty_cache()
+						# torch.cuda.empty_cache()
 						continue
 					raise
 				break

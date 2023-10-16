@@ -296,11 +296,11 @@ def split_prompt(prompt, limit=75, aggressive=False):
 			if "\n\n" in prompt:
 				spl = prompt.split("\n\n")
 				half = len(spl) + 1 >> 1
-				prompt, prompt2 = "\n\n".join(spl[:half]).rstrip(), "\n\n".join(spl[half:]).lstrip()
+				prompt, prompt2 = "\n\n".join(spl[:half]).rstrip(), "\n\n".join(spl[half:]).lstrip(" ,.")
 			elif "\n" in prompt:
 				spl = prompt.split("\n")
 				half = len(spl) + 1 >> 1
-				prompt, prompt2 = "\n".join(spl[:half]).rstrip(), "\n".join(spl[half:]).lstrip()
+				prompt, prompt2 = "\n".join(spl[:half]).rstrip(), "\n".join(spl[half:]).lstrip(" .")
 			elif "." in prompt:
 				spl = prompt.split(".")
 				half = len(spl) + 1 >> 1

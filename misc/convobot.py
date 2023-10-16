@@ -535,6 +535,8 @@ class Bot:
 						shutil.rmdir(m)
 					import subprocess
 					subprocess.run(args, cwd=f)
+				if fail:
+					return
 				req = 10
 			elif model == "mythalion-13b":
 				m = "TheBloke/Mythalion-13B-GPTQ"
@@ -602,9 +604,9 @@ class Bot:
 					offload_folder="cache",
 					resume_download=True,
 				)
-				if model.config.max_position_embeddings < limit:
+				if model.config.max_position_embeddings < limit * 2:
 					try:
-						model = exllama_set_max_input_length(model, limit)
+						model = exllama_set_max_input_length(model, limit * 2)
 					except:
 						print_exc()
 				mfut.set_result(model)

@@ -450,7 +450,7 @@ class UpdateExec(Database):
 						f = CompatFile(output.encode("utf-8"), filename="message.txt")
 						await bot.send_with_file(channel, "Response over 24,000 characters.", file=f, reference=message)
 					elif len(output) > 1993:
-						bot.send_as_embeds(channel, output, md=code_md)
+						bot.send_as_embeds(channel, output, md=code_md, reference=message)
 					else:
 						await send_with_reply(channel, message, self.prepare_string(output, fmt=""))
 				except:
@@ -700,7 +700,7 @@ class UpdateExec(Database):
 					url = await asyncio.wait_for(wrap_future(self.temp[url], shield=True), timeout=12)
 				except (KeyError, T1):
 					if url not in self.temp:
-						self.temp[url] = concurrent.futures.Future()
+						self.temp[url] = Future()
 					fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
 					if "." not in fn:
 						fn += ".webp"

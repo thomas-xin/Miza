@@ -1,3 +1,5 @@
+import os
+os.environ["IS_BOT"] = ""
 try:
 	from common import *
 except ModuleNotFoundError:
@@ -362,7 +364,7 @@ def estimate_life():
 
 # estimate_life_after = lambda t: time.sleep(t) or estimate_life()
 
-# create_future_ex(estimate_life_after, 10)
+# esubmit(estimate_life_after, 10)
 
 geo_sem = Semaphore(90, 256, rate_limit=60)
 geo_count = 0
@@ -824,7 +826,7 @@ transform: translate(-50%, -50%);
 					raise KeyError
 		except KeyError:
 			if waiter:
-				return create_future_ex(self._concat, urls, on, pn)
+				return esubmit(self._concat, urls, on, pn)
 			return self._peek(urls, on, pn, name, download, mime)
 		if waiter:
 			return fut
@@ -993,7 +995,7 @@ transform: translate(-50%, -50%);
 
 				if len(futs) > 1:
 					yield from futs.pop(0).result()
-				fut = create_future_ex(get_chunk, u, headers, start, end, pos, ns, big)
+				fut = esubmit(get_chunk, u, headers, start, end, pos, ns, big)
 				futs.append(fut)
 				pos = 0
 				start = 0
@@ -1020,7 +1022,7 @@ transform: translate(-50%, -50%);
 					yield temp
 			b = b"".join(b)
 			print("PreCat", urls[0], resp, len(b))
-		fut = create_future_ex(self._concat, urls, on, pn)
+		fut = esubmit(self._concat, urls, on, pn)
 		self.serving[on] = fut
 		yield from self.wconcat(on, pn, name, download, mime, fut, start=len(b))
 
@@ -1058,7 +1060,7 @@ transform: translate(-50%, -50%);
 				bsize = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 				fs = pos + bsize
 				f.truncate(fs)
-				fut = create_future_ex(self.chunk_into, resp, on, pos)
+				fut = esubmit(self.chunk_into, resp, on, pos)
 				fut.buf = bsize
 				futs.append(fut)
 				pos = fs
@@ -1069,7 +1071,7 @@ transform: translate(-50%, -50%);
 		try:
 			os.rename(on, pn)
 		except PermissionError:
-			create_future_ex(self.rename_after, on, pn)
+			esubmit(self.rename_after, on, pn)
 
 	def rename_after(self, on, pn):
 		try:
@@ -1174,7 +1176,7 @@ transform: translate(-50%, -50%);
 			return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
 		if b or inference in (None, "None", "none", "null", ""):
 			return b""
-		self.ecdc_running[out] = concurrent.futures.Future()
+		self.ecdc_running[out] = Future()
 		try:
 			t = ts_us()
 			fn = f"cache/{t}"
@@ -1215,7 +1217,7 @@ transform: translate(-50%, -50%);
 		else:
 			f = open(out, "rb")
 			return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt}", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".wav")
-		self.ecdc_running[out] = concurrent.futures.Future()
+		self.ecdc_running[out] = Future()
 		try:
 			t = ts_us()
 			fn = f"cache/{t}.ecdc"
@@ -1619,7 +1621,7 @@ transform: translate(-50%, -50%);
 	@cp.expose
 	@hostmap
 	def get_ip(self, *args, **kwargs):
-		create_future_ex(app.get_ip_ex)
+		esubmit(app.get_ip_ex)
 		data = orjson.dumps(dict(
 			remote=true_ip(),
 			host=getattr(self, "ip", "127.0.0.1"),
@@ -1689,7 +1691,7 @@ transform: translate(-50%, -50%);
 					f.write(s)
 				return self.merge(name=name, index=1)
 			if mfs > 512 * 1048576:
-				fut = create_future_ex(shutil.copyfileobj, cp.request.body.fp, f, 65536)
+				fut = esubmit(shutil.copyfileobj, cp.request.body.fp, f, 65536)
 				try:
 					info = cdict(self.chunking[n])
 				except KeyError:
@@ -1712,7 +1714,7 @@ transform: translate(-50%, -50%);
 					for i in range(5):
 						ft = n + str(xi - 5 + i)
 						if ft not in self.chunking:
-							self.chunking[ft] = concurrent.futures.Future()
+							self.chunking[ft] = Future()
 						while ft in self.chunking:
 							try:
 								self.chunking[ft].result(timeout=720)
@@ -1762,7 +1764,7 @@ transform: translate(-50%, -50%);
 	def update_merge(self):
 		d = self.chunking.copy()
 		for k, v in tuple(d.items()):
-			if isinstance(v, concurrent.futures.Future):
+			if isinstance(v, Future):
 				d.pop(k)
 		with self.merge_sem:
 			b = orjson.dumps(d)
@@ -1906,7 +1908,7 @@ transform: translate(-50%, -50%);
 				resp = None
 				try:
 					proc = psutil.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
-					fut = create_future_ex(proc.wait, timeout=8)
+					fut = esubmit(proc.wait, timeout=8)
 					res = fut.result(timeout=8)
 					resp = proc.stdout.read()
 				except:
@@ -1999,14 +2001,14 @@ transform: translate(-50%, -50%);
 				))
 			print(args)
 			proc = psutil.Popen(args, stdin=subprocess.DEVNULL)
-			fut = create_future_ex(proc.wait, timeout=120)
+			fut = esubmit(proc.wait, timeout=120)
 			try:
 				fut.result(timeout=120)
 			except concurrent.futures.TimeoutError:
 				if proc.is_running() and os.path.exists(fo) and os.path.getsize(fo):
 					fut = None
 			if not fut:
-				fut = create_future_ex(proc.wait, timeout=3600)
+				fut = esubmit(proc.wait, timeout=3600)
 				fut.result(timeout=3600)
 		assert os.path.exists(fo) and os.path.getsize(fo) and os.path.getsize(fo) < size
 		name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
@@ -2248,7 +2250,7 @@ transform: translate(-50%, -50%);
 			raise PermissionError
 		if self.replace_fut and not self.replace_fut.done():
 			return
-		self.replace_fut = create_future_ex(self.update_replacers)
+		self.replace_fut = esubmit(self.update_replacers)
 
 	def update_replacers(self):
 		if not os.path.exists("saves/filehost/-1.txt") or not os.path.getsize("saves/filehost/-1.txt"):
@@ -2558,7 +2560,7 @@ alert("File successfully deleted. Returning to home.");
 			mpdata[ip][3] = min(mpdata[ip][3], t - 60)
 		if not self.mpdata_updated:
 			self.mpdata_updated = True
-			create_future_ex(self.mpdata_update)
+			esubmit(self.mpdata_update)
 		cp.response.headers.update(HEADERS)
 		try:
 			resp = self.mpresponse.pop(ip)
@@ -2658,7 +2660,7 @@ alert("File successfully deleted. Returning to home.");
 			t = utc()
 			if t - ins_time >= 30:
 				self.mpimg.clear()
-				self.ins_wait = concurrent.futures.Future()
+				self.ins_wait = Future()
 				k = self.mpact.keys()
 				data = [deque() for i in range(len(next(reversed(self.mpact.values()))))]
 				for i in range(min(k), max(k) + 1):
@@ -2782,7 +2784,7 @@ alert("File successfully deleted. Returning to home.");
 		t = ts_us()
 		while t in RESPONSES:
 			t += 1
-		RESPONSES[t] = fut = concurrent.futures.Future()
+		RESPONSES[t] = fut = Future()
 		if not isinstance(s, (bytes, memoryview)):
 			s = s.encode("utf-8")
 		sys.__stderr__.buffer.write(f"!{t}\x7f".encode("ascii") + s + b"\n")
@@ -2841,7 +2843,7 @@ alert("File successfully deleted. Returning to home.");
 		t = ts_us()
 		while t in RESPONSES:
 			t += 1
-		RESPONSES[t] = fut = concurrent.futures.Future()
+		RESPONSES[t] = fut = Future()
 		send(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}", escape=False)
 		j, after = fut.result(timeout=max(1, float(timeout)))
 		RESPONSES.pop(t, None)
@@ -2923,10 +2925,10 @@ if __name__ == "__main__":
 	send(f"Webserver starting on port {PORT}, with PID {pid} and parent PID {ppid}...")
 	proc = psutil.Process(pid)
 	parent = psutil.Process(ppid)
-	create_thread(ensure_parent, proc, parent)
+	tsubmit(ensure_parent, proc, parent)
 	app = Server()
 	self = server = cp.Application(app, "/", config)
-	create_thread(app.mp_activity)
-	create_future_ex(app.get_ip_ex)
+	tsubmit(app.mp_activity)
+	esubmit(app.get_ip_ex)
 	cp.quickstart(server, "/", config)
 	# waitress.serve(server, threads=128, host=ADDRESS, port=PORT, url_scheme="https")

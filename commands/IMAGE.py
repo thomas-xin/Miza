@@ -927,7 +927,7 @@ class Orbit(Command):
 
 
 class Pet(Command):
-	name = ["PatGIF", "Pat", "PetGIF"]
+	name = ["PetPet", "Attack", "PatGIF", "Pat", "PetGIF"]
 	description = "Creates a .gif image from applying the Petpet generator to the supplied image."
 	usage = "<0:url> <1:squish(0.1)>? <2:duration(0.25)>?"
 	example = ("pet https://mizabot.xyz/favicon", "pet https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 3")
@@ -1684,7 +1684,7 @@ class Art(Command):
 			force = False
 		else:
 			force = True
-		if sdxl and "r" not in flags and prompt.count(" ") < 48:
+		if sdxl and "r" not in flags and (not force or prompt.count(" ") < 48):
 			oprompt = prompt
 			uid = user.id
 			temp = oprompt.replace('"""', "'''")
@@ -1714,13 +1714,24 @@ class Art(Command):
 				premium=premium,
 			)
 			out = await process_image("CBAU", "$", [inputs], cap="agpt", timeout=20)
+			stop = [
+				"cannot fulfil",
+				"cannot assist",
+				"can't fulfil",
+				"can't assist",
+			]
+			if any(s in out for s in stop):
+				out = ""
 			if out and out[0] == out[-1] == '"' and not oprompt[0] == oprompt[-1] == '"':
 				try:
 					out = orjson.loads(out)
 				except orjson.JSONDecodeError:
 					pass
 			out = out.replace("Dall·E", "art")
-			prompt = (nprompt or oprompt) + ".\n\n" + out.strip()
+			if out:
+				prompt = (nprompt or oprompt) + ".\n\n" + out.strip()
+			else:
+				prompt = nprompt or oprompt
 		req = prompt
 		print("PROMPT:", prompt)
 		if url:

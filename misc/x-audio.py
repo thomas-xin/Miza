@@ -1,3 +1,5 @@
+import os
+os.environ["IS_BOT"] = ""
 try:
 	from common import *
 except ModuleNotFoundError:
@@ -55,7 +57,7 @@ async def respond(s):
 	# send("%" + as_str(c))
 	if c == b"ytdl.update()":
 		with tracebacksuppressor:
-			await create_future(update_cache)
+			await asubmit(update_cache)
 		res = "None"
 	elif c:
 		res = None
@@ -72,9 +74,9 @@ async def respond(s):
 				except SyntaxError:
 					pass
 				else:
-					resp = await create_future(eval, code, client._globals)
+					resp = await asubmit(eval, code, client._globals)
 				if code is None:
-					resp = await create_future(exec, c, client._globals)
+					resp = await asubmit(exec, c, client._globals)
 		except Exception as ex:
 			traceback.print_exc()
 			s = f"bot.audio.returns[{k}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))"
@@ -91,13 +93,13 @@ async def respond(s):
 				res = repr(str(resp))
 	s = f"bot.audio.returns[{k}].set_result({res})"
 	# send("%" + as_str(s))
-	create_future_ex(submit, s)
+	esubmit(submit, s)
 
 async def communicate():
 	send("Audio client successfully connected.")
 	while True:
 		with tracebacksuppressor:
-			s = await create_future(sys.stdin.buffer.readline)
+			s = await asubmit(sys.stdin.buffer.readline)
 			if not s:
 				break
 			if s.startswith(b"~"):
@@ -141,7 +143,7 @@ def _get_duration(filename, _timeout=12):
 	resp = None
 	try:
 		proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
-		fut = create_future_ex(proc.wait, timeout=_timeout)
+		fut = esubmit(proc.wait, timeout=_timeout)
 		res = fut.result(timeout=_timeout)
 		resp = proc.stdout.read().split()
 	except:
@@ -220,7 +222,7 @@ class AudioPlayer(discord.AudioSource):
 	async def join(cls, channel):
 		channel = client.get_channel(verify_id(channel))
 		self = cls(channel.guild)
-		players[channel.guild.id] = concurrent.futures.Future()
+		players[channel.guild.id] = Future()
 		send(self, channel)
 		try:
 			if not self.vc:
@@ -265,7 +267,7 @@ class AudioPlayer(discord.AudioSource):
 			self.listening = False
 			self.listener.result()
 		self.listening = True
-		self.listener = create_future_ex(self._listen)
+		self.listener = esubmit(self._listen)
 		return self.listener
 
 	def __getattr__(self, k):
@@ -285,12 +287,12 @@ class AudioPlayer(discord.AudioSource):
 			if not self.queue:
 				raise
 		return getattr(self.queue[0][0], k)
-	
+
 	def after(self, *args):
 		if not self.queue or not self.queue[0]:
 			return
 		entry = self.queue.popleft()
-		create_future_ex(entry[0].close)
+		esubmit(entry[0].close)
 		after = entry[1]
 		if callable(after):
 			after()
@@ -314,10 +316,10 @@ class AudioPlayer(discord.AudioSource):
 		if not out and self.queue:
 			with tracebacksuppressor(StopIteration):
 				entry = self.queue.popleft()
-				create_future_ex(entry[0].close)
+				esubmit(entry[0].close)
 				after = entry[1]
 				if callable(after):
-					create_future_ex(after)
+					esubmit(after)
 				if not self.queue:
 					return self.emptyopus
 				out = self.queue[0][0].read()
@@ -329,7 +331,7 @@ class AudioPlayer(discord.AudioSource):
 		if not self.queue:
 			self.queue.append(None)
 		elif self.queue[0]:
-			create_future_ex(self.queue[0][0].close)
+			esubmit(self.queue[0][0].close)
 		self.queue[0] = (source, after)
 		with tracebacksuppressor(RuntimeError, discord.ClientException):
 			self.vc.play(self, after=self.after)
@@ -357,10 +359,10 @@ class AudioPlayer(discord.AudioSource):
 	def skip(self):
 		if self.queue:
 			entry = self.queue.popleft()
-			create_future_ex(entry[0].close)
+			esubmit(entry[0].close)
 			after = entry[1]
 			if callable(after):
-				create_future_ex(after)
+				esubmit(after)
 
 	def clear(self):
 		for entry in tuple(self.queue):
@@ -400,8 +402,8 @@ class AudioFile:
 	def __init__(self, fn, stream=None, wasfile=False):
 		self.file = fn
 		self.proc = None
-		self.streaming = concurrent.futures.Future()
-		self.readable = concurrent.futures.Future()
+		self.streaming = Future()
+		self.readable = Future()
 		if stream is not None:
 			self.streaming.set_result(stream)
 		self.stream = stream
@@ -835,7 +837,7 @@ class BufferedAudioReader(discord.AudioSource):
 			self.pos += self.speed
 			return b
 		if self.full:
-			fut = create_future_ex(next, self.packet_iter, b"")
+			fut = esubmit(next, self.packet_iter, b"")
 			try:
 				out = fut.result(timeout=0.8)
 			except concurent.futures.TimeoutError:
@@ -869,7 +871,7 @@ class BufferedAudioReader(discord.AudioSource):
 	@tracebacksuppressor
 	def start(self):
 		# Run loading loop in parallel thread obviously
-		create_future_ex(self.run, timeout=86400)
+		esubmit(self.run, timeout=86400)
 		self.buffer = None
 		self.buffer = self.read()
 		return self

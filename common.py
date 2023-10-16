@@ -114,7 +114,8 @@ __setloop__()
 
 emptyfut = fut_nop = asyncio.Future(loop=eloop)
 fut_nop.set_result(None)
-newfut = nullfut = concurrent.futures.Future()
+Future = concurrent.futures.Future
+newfut = nullfut = Future()
 newfut.set_result(None)
 
 def as_fut(obj):
@@ -149,7 +150,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 		self.passive = 0
 		self.rate_limit = rate_limit
 		self.rate_bin = deque()
-		self.fut = concurrent.futures.Future()
+		self.fut = Future()
 		self.fut.set_result(None)
 		self.last = last
 		self.trace = trace and inspect.stack()[1]
@@ -2414,7 +2415,7 @@ async def proc_distribute(proc):
 				except (T0, T1, T2):
 					pass
 				else:
-					proc.fut = concurrent.futures.Future()
+					proc.fut = Future()
 				tasks = bot.distribute(proc.caps, {}, {})
 				if not tasks:
 					await asyncio.sleep(1 / 6)
@@ -2712,7 +2713,7 @@ async def sub_submit(cap, command, _timeout=12):
 	bot = BOT[0]
 	ex2 = RuntimeError("Maximum compute attempts exceeded.")
 	for i in range(3):
-		task = concurrent.futures.Future()
+		task = Future()
 		task.cap = cap
 		task.command = command
 		task.timeout = _timeout
@@ -2765,7 +2766,7 @@ async def _sub_submit(proc, command, _timeout=12):
 	ts = ts_us()
 	while ts in PROC_RESP:
 		ts += 1
-	PROC_RESP[ts] = fut = concurrent.futures.Future()
+	PROC_RESP[ts] = fut = Future()
 	comm = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
 	s = f"~{ts}~".encode("ascii") + base64.b64encode(comm.encode("utf-8")) + b"\n"
 	sem = proc.sem
@@ -2911,7 +2912,10 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
 
 	shutdown = lambda self, wait=True: [exc.shutdown(wait) for exc in self.pools].append(self.pools.clear())
 
-pthreads = ProcessPoolExecutor(4)
+if os.environ.get("IS_BOT"):
+	pthreads = ProcessPoolExecutor(4)
+else:
+	pthreads = ThreadPoolExecutor(4, initializer=__setloop__)
 bthreads = ThreadPoolExecutor(32, initializer=__setloop__)
 athreads = concurrent.futures.exc_worker = MultiThreadPool(pool_count=2, thread_count=64, initializer=__setloop__)
 athreads.pools.append(import_exc)
@@ -3046,7 +3050,7 @@ def convert_fut(fut):
 	try:
 		ret = asyncio.run_coroutine_threadsafe(fut, loop=loop)
 	except:
-		ret = concurrent.futures.Future()
+		ret = Future()
 		loop.create_task(_await_fut(fut, ret))
 	return ret
 
@@ -3692,7 +3696,7 @@ def proxy_download(url, fn=None, refuse_html=True, timeout=720):
 	try:
 		fut = downloading[url]
 	except KeyError:
-		downloading[url] = fut = concurrent.futures.Future()
+		downloading[url] = fut = Future()
 	else:
 		return fut.result(timeout=timeout)
 	o_url = url

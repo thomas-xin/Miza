@@ -164,8 +164,9 @@ def get_best_video(entry):
 
 
 # Joins a voice channel and returns the associated audio player.
-async def auto_join(guild, channel, user, bot, preparing=False, vc=None):
-	if not getattr(user, "voice", None):
+async def auto_join(guild, channel, user, bot, preparing=False, vc=None, ignore=False):
+	user = guild._members.get(user.id) or user
+	if not ignore and not getattr(user, "voice", None):
 		g = vc.guild if vc else guild
 		perm = bot.get_perms(user, g)
 		if perm < 1:
@@ -266,6 +267,7 @@ class CustomAudio(collections.abc.Hashable):
 	next = None
 	timeout = 0
 	seek_pos = 0
+	last_play = 0
 	ts = None
 	player = None
 
@@ -275,7 +277,7 @@ class CustomAudio(collections.abc.Hashable):
 		self.bot = bot
 		self.stats = cdict(self.defaults)
 		self.text = text
-		self.fut = concurrent.futures.Future()
+		self.fut = Future()
 		self.acsi = None
 		self.args = []
 		self.queue = AudioQueue()
@@ -377,7 +379,7 @@ class CustomAudio(collections.abc.Hashable):
 		if self.source:
 			esubmit(self.acsi.clear_source)
 		self.source = None
-	
+
 	def clear_next(self):
 		if self.next:
 			esubmit(self.acsi.clear_next)
@@ -431,6 +433,7 @@ class CustomAudio(collections.abc.Hashable):
 				if src:
 					# Only stop and replace audio source when the next one is buffered successfully and readable
 					self.acsi.play(src, after=self.queue.advance)
+					self.last_play = utc()
 		else:
 			self.stop()
 
@@ -465,7 +468,7 @@ class CustomAudio(collections.abc.Hashable):
 			return await_fut(send_with_react(self.text, *args, file=f, reacts="❎", **kwargs))
 
 	# Kills this audio player, stopping audio playback. Will cause bot to leave voice upon next update event.
-	def kill(self, reason=None, initiator=None, wait=False):
+	def kill(self, reason=None, initiator=None, wait=False, remove=True):
 		if self.acsi:
 			with tracebacksuppressor(AttributeError):
 				self.acsi.kill()
@@ -481,6 +484,8 @@ class CustomAudio(collections.abc.Hashable):
 		if wait:
 			while self.guild.me.voice:
 				await_fut(self.guild.change_voice_state(channel=None))
+		if remove:
+			self.bot.data.audio.pop(self.channel.id, None)
 
 	# Update event, ensures audio is playing correctly and moves, leaves, or rejoins voice when necessary.
 	@tracebacksuppressor
@@ -742,7 +747,7 @@ class AudioQueue(alist):
 		self.playlist = None
 		self.sem = Semaphore(1, 0)
 		self.sem2 = Semaphore(1, 0)
-		self.wait = concurrent.futures.Future()
+		self.wait = Future()
 		if auds:
 			self.auds = auds
 			self.bot = auds.bot
@@ -1037,10 +1042,10 @@ class AudioFileLink:
 	def __init__(self, fn, stream=None, wasfile=None):
 		self.fn = self.file = fn
 		self.stream = stream
-		self.streaming = concurrent.futures.Future()
+		self.streaming = Future()
 		if stream:
 			self.streaming.set_result(stream)
-		self.readable = concurrent.futures.Future()
+		self.readable = Future()
 		if wasfile:
 			self.readable.set_result(self)
 			self.started = True
@@ -1065,7 +1070,7 @@ class AudioFileLink:
 		try:
 			self.streaming.set_result(stream)
 		except concurrent.futures.InvalidStateError:
-			self.streaming = concurrent.futures.Future()
+			self.streaming = Future()
 			self.streaming.set_result(stream)
 		self.live = live
 		self.seekable = seekable
@@ -1248,7 +1253,7 @@ class AudioClientSubInterface:
 		key = ts_us()
 		if after:
 			self.afters[key] = after
-			return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}], after=lambda *args: esubmit('VOICE.ACSI.after({key})'))")
+			return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}], after=lambda *args: submit('VOICE.ACSI.after({key})'))")
 		return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}])")
 
 	def connect(self, reconnect=True, timeout=60):
@@ -1741,7 +1746,7 @@ class AudioDownloader:
 
 		while True:
 			for i, e in enumerate(entries):
-				if isinstance(e, concurrent.futures.Future):
+				if isinstance(e, Future):
 					entries = entries[:i] + e.result() + entries[i + 1:]
 					break
 			else:
@@ -3272,7 +3277,7 @@ class Queue(Command):
 		ytdl.bot = bot
 		argv += " ".join(best_url(a) for a in message.attachments)
 		if not argv:
-			auds = await auto_join(guild, channel, user, bot)
+			auds = await auto_join(guild, channel, user, bot, ignore=True)
 			q = auds.queue
 			v = "v" in flags
 			if not v and len(q) and auds.paused & 1 and "p" in name:
@@ -3411,7 +3416,7 @@ class Queue(Command):
 			return
 		user = await bot.fetch_user(u_id)
 		guild = message.guild
-		auds = await auto_join(guild, None, user, bot)
+		auds = await auto_join(guild, None, user, bot, ignore=True)
 		q = auds.queue
 		last = max(0, len(q) - 10)
 		if reaction is not None:
@@ -5548,7 +5553,7 @@ class Transcribe(Command):
 			if not name or not url:
 				raise FileNotFoundError(500, argv)
 			url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
-			fn = await asubmit(ytdl.download_file, entries[0], fmt="opus")
+			fn, out = await asubmit(ytdl.download_file, entries[0], fmt="opus")
 			fni = fn.rsplit(".", 1)[0] + ".webm"
 			if bot.is_trusted(guild) >= 2:
 				for uid in bot.data.trusted[guild.id]:
@@ -5764,7 +5769,7 @@ class UpdateAudio(Database):
 				reason += " Apologies for any inconvenience! 🎵"
 			else:
 				reason = ""
-			await asubmit(auds.kill, reason=css_md(reason) if reason else None)
+			await asubmit(auds.kill, reason=css_md(reason) if reason else None, remove=False)
 
 	# Restores all audio players from temporary database when applicable
 	async def _bot_ready_(self, bot, **void):

@@ -3,6 +3,8 @@
 
 #!/usr/bin/python3
 
+import os
+os.environ["IS_BOT"] = "1"
 import common
 from common import *
 import h2
@@ -67,7 +69,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		roles=False,
 		replied_user=False,
 	)
-	connect_ready = concurrent.futures.Future()
+	connect_ready = Future()
 	socket_responses = deque(maxlen=256)
 	try:
 		shards = int(sys.argv[1])
@@ -1067,6 +1069,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			tup = self.data.attachments.get(a_id)
 			if is_url(tup):
 				return tup
+			if not tup:
+				return "https://mizabot.xyz/u/ECKzxzSEEEY"
 			c_id, m_id = tup
 		else:
 			c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
@@ -1581,9 +1585,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				async def recaption(h, p1, p2, fut, tup):
 					p3 = await fut
 					p1, p2, p3 = sorted((p1, p2, p3), key=len)
-					tup = (tup[0], p2, p3, best)
+					tup = ("Image", p2, p3, best)
 					if len(p1) > 7 and " " in p1 and p1.isascii():
-						tup = (tup[0], p3, p2 + "\n" + p1, best)
+						tup = ("Image", p3, p2 + "\n" + p1, best)
 					print("BEST:", tup)
 					self.analysed[h] = tup
 
@@ -2932,9 +2936,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		try:
 			audio_players = len(self.audio.players)
 		except:
-			audio_players = active_audio_players = "N/A"
+			audio_players = active_audio_players = playing_audio_players = "N/A"
 		else:
 			active_audio_players = sum(bool(auds.queue and not auds.paused) for auds in self.audio.players.values())
+			playing_audio_players = sum(auds.is_playing() for auds in self.audio.players.values())
 		files = os.listdir("misc")
 		for f in files:
 			path = "misc/" + f
@@ -2969,6 +2974,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				"Active commands": self.command_semaphore.active,
 				"Connected voice channels": audio_players,
 				"Active audio players": active_audio_players,
+				"Playing audio players": playing_audio_players,
 				"Total data transmitted": bot.total_bytes,
 				"Hosted storage": bot.total_hosted,
 				"System time": datetime.datetime.now(),
@@ -3139,8 +3145,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return True
 
 	def reload(self, mod=None):
-		sub_kill()
 		if not mod:
+			sub_kill()
 			modload = deque()
 			files = [i for i in os.listdir("commands") if is_code(i) and i.rsplit(".", 1)[0] in self.active_categories]
 			for f in files:
@@ -3148,7 +3154,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			esubmit(self.start_audio_client)
 			create_task(self.create_main_website())
 			return all(fut.result() for fut in modload)
-		create_task(self.create_main_website())
 		return self.get_module(mod + ".py")
 
 	# Loads all modules in the commands folder and initializes bot commands and databases.
@@ -6256,7 +6261,7 @@ class AudioClientInterface:
 				self.proc.ionice(psutil.IOPRIO_HIGH)
 			else:
 				self.proc.ionice(psutil.IOPRIO_CLASS_RT, value=7)
-		self.fut = concurrent.futures.Future()
+		self.fut = Future()
 
 	__bool__ = lambda self: self.written
 
@@ -6279,7 +6284,7 @@ class AudioClientInterface:
 			s = b"!" + s
 		out = (b"~", orjson.dumps(key), b"~", base64.b85encode(s), b"\n")
 		b = b"".join(out)
-		self.returns[key] = concurrent.futures.Future()
+		self.returns[key] = Future()
 		try:
 			await wrap_future(self.fut)
 			self.proc.stdin.write(b)
@@ -6338,7 +6343,7 @@ class AudioClientInterface:
 			s = b"!" + s
 		out = (b"~", orjson.dumps(key), b"~", base64.b85encode(s), b"\n")
 		b = b"".join(out)
-		self.returns[key] = concurrent.futures.Future()
+		self.returns[key] = Future()
 		try:
 			self.fut.result()
 			self.proc.stdin.write(b)

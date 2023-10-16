@@ -1362,25 +1362,39 @@ def map_model(cname, model, premium):
 
 MockFunctions = [
 	[None, "Placeholder (Do not choose this!)"],
-	[None, "Providing real-world assistance or advice"],
-	[False, "Describe a roleplay or fictional scenario (Choose this if user is roleplaying!)"],
-	["stable_diffusion", "Create or edit a picture or art"],
-	["reminder", "Set alarm or reminder"],
-	["wolfram_alpha", "Math or calculator"],
+	[None, "Providing advice, real-world assistance, or formal conversation"],
+	["roleplay", "Describe a roleplay or fictional scenario (Choose this if user is roleplaying!)"],
+	["art", "Create or edit a picture or art"],
+	["remind", "Set alarm or reminder"],
+	["math", "Math or calculator"],
 	["play", "Play or pause music, or change audio settings"],
 	[None, "None of the above or don't understand (Continues as normal)"],
 ]
 
 Functions = dict(
-	web_search={
-		"name": "web_search",
+	browse={
+		"name": "browse",
 		"description": "Searches internet browser, or visits given URL. Please search for results in the US when location is relevant!",
 		"parameters": {
 			"type": "object",
 			"properties": {
 				"query": {
 					"type": "string",
-					"description": "Query, e.g. Who won the 2024 world cup?",
+					"description": "Query, eg. Who won the 2024 world cup?",
+				},
+			},
+			"required": ["query"],
+		},
+	},
+	sympy={
+		"name": "sympy",
+		"description": "Queries the Sympy algebraic library. Faster than Wolfram Alpha for simple math questions.",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"query": {
+					"type": "string",
+					"description": "Query, eg. factorint(57336415063790604359)",
 				},
 			},
 			"required": ["query"],
@@ -1388,30 +1402,30 @@ Functions = dict(
 	},
 	wolfram_alpha={
 		"name": "wolfram_alpha",
-		"description": "Queries Wolfram Alpha. Must use for advanced maths questions.",
+		"description": "Queries Wolfram Alpha. Must use for advanced math questions.",
 		"parameters": {
 			"type": "object",
 			"properties": {
 				"query": {
 					"type": "string",
-					"description": "Question, e.g. solve(x^3-6x^2+12)",
+					"description": "Query, eg. Real solutions for x^3-6x^2+12",
 				},
 			},
 			"required": ["query"],
 		},
 	},
-	stable_diffusion={
-		"name": "stable_diffusion",
-		"description": "Creates an image of the input query. Please be descriptive!!",
+	dalle={
+		"name": "dalle",
+		"description": "Creates an image of the input caption. Please be descriptive!!",
 		"parameters": {
 			"type": "object",
 			"properties": {
-				"query": {
+				"prompt": {
 					"type": "string",
-					"description": "Prompt, e.g. Brilliant view of a futuristic city in an alien world, skyline, spaceships, 4k raytraced",
+					"description": "Prompt, eg. Brilliant view of a futuristic city in an alien world, glowing spaceships, 4k fantasy art",
 				},
 			},
-			"required": ["query"],
+			"required": ["prompt"],
 		},
 	},
 	reminder={
@@ -1422,11 +1436,11 @@ Functions = dict(
 			"properties": {
 				"message": {
 					"type": "string",
-					"description": "Message, e.g. Remember to take your meds!",
+					"description": "Message, eg. Remember to take your meds!",
 				},
 				"delay": {
 					"type": "string",
-					"description": "Delay, e.g. 3 days 16 hours 3.9 seconds",
+					"description": "Delay, eg. 3 days 3.9 seconds",
 				},
 			},
 			"required": ["message", "delay"],
@@ -1440,7 +1454,7 @@ Functions = dict(
 			"properties": {
 				"query": {
 					"type": "string",
-					"description": "Name or URL, e.g. Rick Astley - Never gonna give you up",
+					"description": "Name or URL, eg. Rick Astley - Never gonna give you up",
 				},
 			},
 			"required": ["query"],
@@ -1458,7 +1472,7 @@ Functions = dict(
 				},
 				"value": {
 					"type": ["number", "string"],
-					"description": "New value percentage, e.g. 300",
+					"description": "New value percentage, eg. 300",
 				},
 			},
 			"required": ["mode", "value"],
@@ -1489,7 +1503,7 @@ Functions = dict(
 			"properties": {
 				"range": {
 					"type": "boolean",
-					"description": "Python indexing syntax, e.g. 0 or 1:6",
+					"description": "Python indexing syntax, eg. 0 or 1:6",
 				},
 			},
 			"required": ["range"],
@@ -1524,7 +1538,11 @@ async def summarise(q, min_length=128, max_length=192):
 				futs.append(create_task(tik_decode_a(e1)))
 				continue
 			s1 = await tik_decode_a(e1)
-			fut = create_task(process_image("summarise", "$", [s1.strip(), mt - 32, mt, bool(start)], cap="summ", timeout=20))
+			s1 = s1.strip()
+			if sum(c.isascii() for c in s1) / len(s1) > 0.75:
+				fut = create_task(process_image("summarise", "$", [s1, mt - 32, mt, bool(start)], cap="summ", timeout=20))
+			else:
+				fut = asubmit(lim_tokens(s1, mt))
 			futs.append(fut)
 		s2 = []
 		for fut in futs:
@@ -1602,19 +1620,15 @@ async def cut_to(messages, limit=1024):
 	count = 0
 	for i, m in reversed(tuple(enumerate(messages))):
 		c = await tcount(m_repr(m))
-		if c + count > limit / 4:
+		if c + count > limit / 5:
 			break
-		mes.append(message)
+		mes.append(m)
+		count += c
 	summ = "Summary of prior conversation:\n"
-	s = "\n\n".join(m_str(m) for m in messages[:i][::-1])
+	s = "\n\n".join(m_str(m) for m in (messages[:i][::-1]))
 	c = await tcount(summ + s)
 	if c + count <= limit / 2:
 		return messages
-	for j in range(i // 2):
-		i -= 1
-		m = messages.pop(0)
-		mes.insert(0, m)
-		s += f"\n\n{m_str(m)}"
 	ml = round_random(limit / 4)
 	Ml = round_random(limit / 3)
 	s2 = await summarise(s, min_length=ml, max_length=Ml)
@@ -1631,12 +1645,11 @@ def to_msg(k, v, n=None):
 	if k == n:
 		role = "assistant"
 		k = n
+	elif k == "<|system|>":
+		role = "system"
 	else:
 		role = "user"
-	m = cdict(
-		role=role,
-		content=v,
-	)
+	m = cdict(role=role)
 	if not k.isascii() or not k.isalnum():
 		k = k.replace("/", "-")
 		k2 = k.translate(_ntrans)
@@ -1653,6 +1666,7 @@ def to_msg(k, v, n=None):
 			v = orig_k + ": " + v
 	if k:
 		m.name = lim_str(k, 48)
+	m.content = v
 	return m
 
 def chat_structure(history, refs, u, q, name="", personality="", nsfw=False, start=""):
@@ -1697,10 +1711,7 @@ def chat_structure(history, refs, u, q, name="", personality="", nsfw=False, sta
 	return messages
 
 def instruct_structure(messages):
-	ins = []
-	for m in messages:
-		s = f"{m_name(m)}: {m.content}"
-		ins.append(s)
+	ins = map(m_str, messages)
 	return "### Instruction:\n" + "\n\n".join(ins) + "\n\n### Response:"
 
 
@@ -1863,6 +1874,7 @@ class Ask(Command):
 				reset = False
 				if caid:
 					caid.pop("ids", None)
+					caid.pop("history", None)
 				print(channel, "mismatch", m.id)#, caid)
 			ignores.add(m.id)
 		if len(self.visited) > 256:
@@ -1935,7 +1947,7 @@ class Ask(Command):
 				model = caid.model
 			if model == "auto":
 				if premium < 2:
-					model = "xwin"
+					model = "emerhyst"
 				elif premium < 4:
 					model = "gpt3"
 				else:
@@ -1943,7 +1955,7 @@ class Ask(Command):
 		if model.startswith("gpt4") and premium < 4:
 			model = "gpt3"
 		if model.startswith("gpt3") and premium < 2:
-			model = "xwin"
+			model = "emerhyst"
 		model = model or "gpt3"
 		# emb_futs = []
 
@@ -1977,9 +1989,9 @@ class Ask(Command):
 						continue
 					temp = mapd[k].copy()
 					while len(temp):
-						name, content = temp[:2]
+						ename, econtent = temp[:2]
 						temp = temp[2:]
-						history.insert(0, (name, content))
+						history.insert(0, (ename, econtent))
 					ignores.add(ki)
 			summary = caid and caid.get("summary")
 			if reset is not None:
@@ -1996,9 +2008,14 @@ class Ask(Command):
 			data = bot.data.users.get(u.id, {})
 			oai = data.get("trial") and data.get("openai_key")
 			vc = bool(getattr(user, "voice", False)) | bool(bot.audio.players.get(getattr(guild, "id", None))) * 2
+			nsfw = bot.is_nsfw(channel)
+			extensions = premium >= 2
+			chatcompletion = ("gpt-4", "gpt-3.5-turbo")
+			instructcompletion = ("gpt-3.5-turbo-instruct", "text-davinci-003", "text-curie-001")
+			chatcc = ("gpt4", "gpt3")
 
-			messages = chat_structure(history, refs, user.name, q, name=bot_name, personality=personality, nsfw=bot.is_nsfw(channel))
-			history.append((user.name, q))
+			messages = chat_structure(history, refs, name, q, name=bot_name, personality=personality, nsfw=nsfw)
+			history.append((name, q))
 			# print("Messages:", messages)
 			length = await count_to(messages)
 			blocked = set()
@@ -2008,9 +2025,9 @@ class Ask(Command):
 				blocked.update(("audio", "astate", "askip"))
 			else:
 				blocked.update(("audio", "astate", "askip", "play"))
-			extensions = premium >= 2
-			chatcompletion = ("gpt-4", "gpt-3.5-turbo")
-			chatcc = ("gpt4", "gpt3")
+			if model not in chatcc:
+				blocked.add("roleplay")
+			fut = create_task(cut_to(messages, 4000))
 			if extensions and "class" in bot.caps:
 				mocked = {}
 				prompt = ""
@@ -2032,38 +2049,53 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 ''' + prompt
 					prompt += f"\n### Response:\n{bot_name}: I choose option"
 					k = await process_image("moe_class", "$", [prompt, mocked], cap="class", timeout=25)
-					if k is False or k is None and model not in chatcc:
+					if k == "roleplay" or k is None and model not in chatcc:
+						if model == "gpt3" and length >= 192:
+							model = "emerhyst"
 						blocked.update(Functions)
 						extensions = False
 					elif k is None:
-						blocked.update(("audio", "astate", "askip", "reminder"))
+						blocked.update(("sympy", "audio", "astate", "askip", "reminder"))
+					elif k == "art":
+						blocked.update(("browse", "sympy", "wolfram_alpha", "audio", "astate", "askip", "reminder"))
+					elif k == "remind":
+						blocked.update(("browse", "sympy", "wolfram_alpha", "dalle", "audio", "astate", "askip"))
+					elif k == "math":
+						blocked.update(("dalle", "play", "audio", "astate", "askip", "reminder"))
 					elif k == "play":
-						blocked.update(("web_search", "wolfram_alpha", "stable_diffusion", "reminder"))
+						blocked.update(("browse", "sympy", "wolfram_alpha", "dalle", "reminder"))
 					else:
 						rem = set(Functions)
 						rem.discard(k)
 						blocked.update(rem)
 						extensions = k not in blocked
+			skipping = None
+			messages = await fut
+			length = await count_to(messages)
 			openai.api_key = AUTH["openai_key"]
 			target_model = model
 			text = ""
 			ex = RuntimeError("Maximum attempts exceeded.")
-			print("Chat", model, u, q, extensions)
+			print("Chat", model, name, q, extensions)
 			for attempts in range(12):
 				if hasattr(message, "simulated"):
 					curr_message = message
 				else:
 					curr_message = await bot.fetch_message(message.id, channel)
 				if getattr(message, "deleted", None) or getattr(curr_message, "deleted", None):
-					break
-				if attempts > 1:
-					await asyncio.sleep(attempts * 2)
+					return
+				if attempts > 3:
+					await asyncio.sleep((attempts - 2) ** 2)
 					print("ATT", attempts)
 				if len(text) < 8:
 					text = ""
 				model = target_model
 				limit = 2000
 				cm = cm2 = None
+				if attempts == 11:
+					model = "text-davinci-003"
+					limit = 2000
+					cm = 200
 				if not model or attempts >= 7:
 					model = choice((
 						"mythalion-13b",
@@ -2081,10 +2113,10 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 				elif attempts >= 6:
 					model = "mythalion-13b"
 					limit = 2000
-				elif premium < 2 or attempts >= 5:
+				elif premium < 2 or attempts in (2, 4):
 					model = "emerhyst-20b"
 					limit = 4000
-				elif attempts >= 4:
+				elif attempts in (3, 5):
 					model = "gpt-3.5-turbo-instruct"
 					limit = 4000
 					cm = 15
@@ -2094,40 +2126,73 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					cm = 15
 				else:
 					model = "gpt-4"
-					limit = 8000
+					limit = 6000
 					cm = 300
 					cm2 = 600
 				if text:
 					extensions = False
-				if not extensions and model in ("gpt-3.5-turbo",) and length >= 192 and attempts < 2:
-					if premium >= 2 and length:
-						model = "emerhyst-20b"
-						limit = 4000
-						cm = 20
-					else:
-						model = "mythalion-13b"
-						limit = 2000
-						cm = 0
 				if cm is None:
 					cm = 0
 				if cm2 is None:
 					cm2 = cm
+				used = ufull = await cut_to(messages, limit)
+				if skipping:
+					used = ufull[skipping:]
+				length = await count_to(used)
 				intended = None
 				if model in chatcompletion or extensions and not attempts:
 					orig_model = model
 					if model not in chatcompletion:
 						model = "gpt-3.5-turbo"
+					elif model == "gpt-4" and len(ufull) > 5 and length > 384:
+						ms = ufull[-1]
+						prompt = 'The following is a conversation with numbered messages:\n\n"""'
+						for i, m in enumerate(ufull[:-1], 1):
+							prompt += f"\n{i}. {m_str(m)}\n"
+						i += 1
+						prompt += f'"""\n\n# Instruction:\n"""\n{i}. {m_str(ms)}\n"""\n\nAssume you are joining the conversation as {bot_name}. Which number represents the first message relevant to the instruction question? (Provide only the number, not an actual reply! If there are none relevant, respond with "-1").\n\n### Response:'
+						print("Context prompt:", prompt)
+						data = dict(
+							model="gpt-3.5-turbo-instruct",
+							prompt=prompt,
+							temperature=0.5,
+							max_tokens=32,
+							top_p=0.5,
+							frequency_penalty=0,
+							presence_penalty=0,
+							user=str(hash(name)),
+						)
+						try:
+							response = await openai.Completion.acreate(**data, timeout=60)
+						except openai.InvalidRequestError:
+							raise
+						except Exception as e:
+							ex = e
+							print_exc()
+						else:
+							print("Context response:", response.choices[0].text)
+							num = regexp(r"-?[0-9]+").findall(response.choices[0].text)
+							if num and num[0]:
+								num = int(num[0]) - 1
+								if num > 0 and num < len(ufull) - 1:
+									skipping = num
+									used = ufull[skipping:]
+									length = await count_to(used)
+								else:
+									skipping = len(ufull) - 1
+									used = [ms]
+									length = await count_to(used)
 					functions = [v for k, v in Functions.items() if k not in blocked]
-					print(f"{model} prompt:", messages)
+					print(f"{model} prompt:", used)
 					data = cdict(
 						model=model,
-						messages=messages,
+						messages=used,
 						temperature=temperature,
 						max_tokens=min(4096, limit - length - 768),
 						top_p=1,
 						frequency_penalty=0.6,
 						presence_penalty=0.8,
-						user=str(hash(user.name)),
+						user=str(hash(name)),
 					)
 					if functions:
 						data.functions = functions
@@ -2150,10 +2215,22 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							print("Function mismatch:", target_model, orig_model, model)
 							continue
 						text = m["content"] if m["content"] else ""
-						text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", user.name).replace("<|user|>", user.name)
+						text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
 						if not text or len(text) >= 2 and text[-1] in ": aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
 							redo = True
 							continue
+						if premium >= 2:
+							stop = [
+								"cannot fulfil",
+								"cannot assist",
+								"can't fulfil",
+								"can't assist",
+							]
+							if any(s in text for s in stop):
+								text = ""
+								redo = True
+								target_model = "emerhyst"
+								continue
 						text = text.strip()
 						break
 					try:
@@ -2167,24 +2244,46 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						argv = ""
 					name = fc["name"]
 					res = text or ""
-					if name == "web_search":
-						print(f"Web Search:", argv)
+					if name == "browse":
+						print("Browse query:", argv)
 						res = await process_image("BOT.browse", "$", [argv], cap="browse", timeout=60)
 						if res:
 							c = await tcount(res)
-							if c > 800:
-								res = await summarise(q=q + "\n" + res, max_length=768, min_length=384)
+							if c > 1200:
+								res = await summarise(q=q + "\n" + res, max_length=1296, min_length=1024)
 								res = res.replace("\n", ". ").replace(": ", " -")
 							res = res.strip()
-							messages = [messages[0], messages[-1]]
+							if len(messages) > 2:
+								messages = [messages[0], messages[-2], messages[-1]]
+							else:
+								messages = [messages[0], messages[-1]]
 							messages.append(cdict(m))
 							messages.append(cdict(role="function", name=name, content=res))
 							length = await count_to(messages)
 							print("New prompt:", messages)
 							continue
-					elif name == "wolfram_alpha":
-						print(f"Wolfram Alpha query:", argv)
-						print(f"Web Search:", argv)
+					elif name == "sympy":
+						print("Sympy query:", argv)
+						res = await bot.solve_math(argv)
+						res = res[0]
+						if res:
+							c = await tcount(res)
+							if c > 512:
+								res = await summarise(q=q + "\n" + res, max_length=500, min_length=384)
+								res = res.replace("\n", ". ").replace(": ", " -")
+							res = res.strip()
+							if len(messages) > 2:
+								messages = [messages[0], messages[-2], messages[-1]]
+							else:
+								messages = [messages[0], messages[-1]]
+							messages.append(cdict(m))
+							messages.append(cdict(role="function", name=name, content=res))
+							length = await count_to(messages)
+							print("New prompt:", messages)
+							continue
+						name = "wolfram_alpha"
+					if name == "wolfram_alpha":
+						print("Wolfram Alpha query:", argv)
 						res = await process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60)
 						if res:
 							c = await tcount(res)
@@ -2192,15 +2291,18 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								res = await summarise(q=q + "\n" + res, max_length=500, min_length=384)
 								res = res.replace("\n", ". ").replace(": ", " -")
 							res = res.strip()
-							messages = [messages[0], messages[-1]]
+							if len(messages) > 2:
+								messages = [messages[0], messages[-2], messages[-1]]
+							else:
+								messages = [messages[0], messages[-1]]
 							messages.append(cdict(m))
 							messages.append(cdict(role="function", name=name, content=res))
 							length = await count_to(messages)
 							print("New prompt:", messages)
 							continue
-					elif name == "stable_diffusion":
-						print("Stable Diffusion query:", argv)
-						call = {"func": "stablediffusion", "argv": argv, "comment": res}
+					elif name == "dalle":
+						print("Art query:", argv)
+						call = {"func": "art", "argv": argv, "comment": res}
 					elif name == "reminder":
 						argv = args["message"] + " in " + args["delay"]
 						print("Reminder query:", argv)
@@ -2264,7 +2366,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					else:
 						mresp = response
 					break
-				prompt = instruct_structure(messages)
+				prompt = instruct_structure(used)
 				prompt += f"\n{bot_name}:"
 				if text:
 					prompt += " " + text
@@ -2275,12 +2377,12 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					temperature=temperature,
 					max_tokens=min(1024, limit - length - 64),
 					top_p=1,
-					stop=[f"{user.name}:"],
+					stop=[f"{name}:"],
 					frequency_penalty=0.8,
 					presence_penalty=0.4,
-					user=str(hash(user.name)),
+					user=str(hash(name)),
 				)
-				if model in ("gpt-3.5-turbo-instruct", "text-davinci-003"):
+				if model in instructcompletion:
 					try:
 						response = await openai.Completion.acreate(**data, timeout=60)
 					except openai.InvalidRequestError:
@@ -2291,6 +2393,18 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						continue
 					print(response)
 					text = response.choices[0].text
+					if premium >= 2:
+						stop = [
+							"cannot fulfil",
+							"cannot assist",
+							"can't fulfil",
+							"can't assist",
+						]
+						if any(s in text for s in stop):
+							text = ""
+							redo = True
+							target_model = "emerhyst"
+							continue
 				elif model in GPTQ:
 					if "gptq" not in bot.caps:
 						target_model = "gpt3"
@@ -2318,7 +2432,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						continue
 				else:
 					raise FileNotFoundError(f"Unable to find model \"{model}\".")
-				text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", user.name).replace("<|user|>", user.name)
+				text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
 				if not text or len(text) >= 2 and text[-1] in ": aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
 					redo = True
 					continue
@@ -2354,7 +2468,10 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 				# emb.description = (
 					# f"Uh-oh, it appears your API key or credit was blocked! Please make sure your payment methods are functional, or purchase a consistent subscription [here]({bot.kofi_url})!"
 				# )
-		out = out or mresp.content
+		out = out or mresp and mresp.content
+		history = [m_str(m).split(":", 1) for m in used[1:] if m.get("role") != "system"]
+		if used[0].get("role") != "system" or used[0].content.startswith("Summary "):
+			history.insert(0, m_str(used[0]).split(":", 1))
 		history.append((bot_name, out))
 		print("Result:", out)
 		code = "\xad"
@@ -2418,14 +2535,6 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 		else:
 			caid = {}
 		mresp.replaceable = False
-		hist = bot.data.chat_histories.get(channel.id, ())
-		if isinstance(hist, dict):
-			mi2 = hist.get("last_message_id")
-			if mi2:
-				with tracebacksuppressor:
-					m2 = await bot.fetch_message(mi2, channel)
-					if m2:
-						await self.remove_reacts(m2)
 		# while emb_futs:
 		#     await emb_futs.pop(0)
 		# Syntax: Summary, Jailbroken
@@ -2436,10 +2545,18 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 		caid = bot.data.chat_histories.get(channel.id, None)
 		if not isinstance(caid, dict):
 			caid = {}
+		elif caid:
+			mi2 = caid.get("last_message_id")
+			if mi2:
+				with tracebacksuppressor:
+					m2 = await bot.fetch_message(mi2, channel)
+					if m2:
+						await self.remove_reacts(m2)
 		if caic:
-			caid.update(dict(summary=caic[0], jailbroken=caic[1], model=caic[2], last_message_id=mresp.id))
+			caid.update(dict(summary=caic[0], jailbroken=caic[1], model=caic[2]))
 			caid["long_mem"] = max(long_mem, caid.get("long_mem", 0) * 63 / 64)
 		caid["history"] = history
+		caid["last_message_id"] = mresp.id
 		bot.data.chat_histories[channel.id] = caid
 		# elif caic is None:
 			# bot.data.chat_histories.pop(channel.id, None)
@@ -2511,10 +2628,13 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 			print("Redoing", channel)
 			bot.data.chat_histories.get(channel.id, {}).pop("ids", None)
 			bot.data.chat_histories.get(channel.id, {}).pop("last_message_id", None)
+			bot.data.chat_embeddings.get(channel.id, {}).pop(message.id, None)
+			bot.data.chat_mappings.get(channel.id, {}).pop(message.id, None)
 			colour = await bot.get_colour(bot.user)
 			emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
 			emb.set_author(**get_author(bot.user))
 			create_task(message.edit(embed=emb))
+			create_task(self.remove_reacts(message))
 			await message.add_reaction("❎")
 			if m:
 				await bot.process_message(m)
@@ -2533,6 +2653,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 			emb = discord.Embed(colour=colour, description=css_md("[The conversation has been reset.]"))
 			emb.set_author(**get_author(bot.user))
 			create_task(message.edit(embed=emb))
+			create_task(self.remove_reacts(message))
 			await message.add_reaction("❎")
 			return
 
@@ -2560,6 +2681,8 @@ class UpdateChatHistories(Database):
 		print("Editing", channel)
 		bot.data.chat_histories.get(channel.id, {}).pop("ids", None)
 		bot.data.chat_histories.get(channel.id, {}).pop("last_message_id", None)
+		bot.data.chat_embeddings.get(channel.id, {}).pop(message.id, None)
+		bot.data.chat_mappings.get(channel.id, {}).pop(message.id, None)
 		colour = await bot.get_colour(bot.user)
 		emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
 		emb.set_author(**get_author(bot.user))
@@ -2586,10 +2709,13 @@ class UpdateChatHistories(Database):
 		print("Deleting", channel)
 		bot.data.chat_histories.get(channel.id, {}).pop("ids", None)
 		bot.data.chat_histories.get(channel.id, {}).pop("last_message_id", None)
+		bot.data.chat_embeddings.get(channel.id, {}).pop(message.id, None)
+		bot.data.chat_mappings.get(channel.id, {}).pop(message.id, None)
 		colour = await bot.get_colour(bot.user)
 		emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
 		emb.set_author(**get_author(bot.user))
 		create_task(message.edit(embed=emb))
+		create_task(self.remove_reacts(message))
 		await message.add_reaction("❎")
 
 class UpdateChatMappings(Database):
