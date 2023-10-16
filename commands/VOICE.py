@@ -757,10 +757,14 @@ class AudioQueue(alist):
 			self.acsi = auds.acsi
 			self.wait.set_result(auds)
 
-	def announce_play(self, e):
+	def announce_play(self, e=None):
 		auds = self.auds
 		if not auds.stats.quiet:
-			if utc() - self.lastsent > 1 and e.get("u_id") != self.bot.id:
+			if not e:
+				if not auds.queue:
+					return
+				e = auds.queue[0]
+			if utc() - self.lastsent > 1 and not e.get("noannounce"):
 				try:
 					u = self.bot.cache.users[e.u_id]
 					name = u.display_name
@@ -837,7 +841,7 @@ class AudioQueue(alist):
 
 	# Advances queue when applicable, taking into account loop/repeat/shuffle settings.
 	def advance(self, looped=True, repeated=True, shuffled=True):
-		print("Advance:", self.auds)
+		# print("Advance:", self.auds)
 		self.auds.source = self.auds.next
 		self.auds.next = None
 		q = self
@@ -1247,7 +1251,7 @@ class AudioClientSubInterface:
 		key = ts_us()
 		if after:
 			self.afters[key] = after
-			return esubmit(self.bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}],after=lambda *args: esubmit('VOICE.ACSI.after({key})'))")
+			return esubmit(self.bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}],after=lambda *args: submit('VOICE.ACSI.after({key})'))")
 		return esubmit(self.bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}])")
 
 	def play(self, src, after=None):
@@ -4051,7 +4055,7 @@ class Dump(Command):
 	rate_limit = (1, 2)
 	slash = True
 
-	async def __call__(self, guild, channel, user, bot, perm, name, argv, flags, message, vc=None, **void):
+	async def __call__(self, guild, channel, user, bot, perm, name, argv, flags, message, vc=None, noannouncefirst=False, **void):
 		auds = await auto_join(guild, channel, user, bot, vc=vc)
 		# ~save is the same as ~dump without an argument
 		if argv == "" and not message.attachments or name in ("save", "export"):
@@ -4115,6 +4119,8 @@ class Dump(Command):
 					d["stats"][k] = bool(v)
 				elif isinstance(v, str):
 					d["stats"][k] = mpf(v)
+		if noannouncefirst:
+			d["queue"][0]["noannounce"] = True
 		if "a" not in flags:
 			# Basic dump, replaces current queue
 			if auds.queue:
@@ -5839,7 +5845,7 @@ class UpdateAudio(Database):
 						loading = stats != CustomAudio.defaults
 					if loading:
 						print("Auto-loading queue of", len(argv["queue"]), "items to", guild)
-						create_task(dump(guild, channel, user, bot, perm, name, argv, flags, message, vc=vc))
+						create_task(dump(guild, channel, user, bot, perm, name, argv, flags, message, vc=vc, noannouncefirst=True))
 		# self.data.clear()
 
 

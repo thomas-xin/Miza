@@ -25,8 +25,8 @@ if ADDRESS == "0.0.0.0":
 SAMPLE_RATE = 48000
 
 
-def send(*args, escape=True):
-	s = " ".join(str(i) for i in args)
+def send(*args, sep=" ", end="\n", escape=True):
+	s = sep.join(str(i) for i in args) + end
 	if escape:
 		s = "\x00" + s
 	if s:
@@ -34,6 +34,7 @@ def send(*args, escape=True):
 			s += "\n"
 		sys.__stdout__.buffer.write(s.encode("utf-8"))
 		sys.__stdout__.flush()
+print = send
 
 @tracebacksuppressor
 def request(s):
@@ -296,7 +297,7 @@ class AudioPlayer(discord.AudioSource):
 		after = entry[1]
 		if callable(after):
 			after()
-		print(self, self.queue, after)
+		sys.stderr.write(f"After {self} {self.queue} {after}\n")
 		if self.queue:
 			with tracebacksuppressor(RuntimeError, discord.ClientException):
 				self.vc.play(self, after=self.after)
@@ -322,6 +323,7 @@ class AudioPlayer(discord.AudioSource):
 				after = entry[1]
 				if callable(after):
 					esubmit(after)
+				sys.stderr.write(f"After2 {self} {self.queue} {after}\n")
 				if not self.queue:
 					return self.emptyopus
 				out = self.queue[0][0].read()

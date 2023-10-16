@@ -1577,27 +1577,27 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				tup = ("Text", p1, p2, False)
 		else:
 			tup = ("Image", p1, p2, best)
-		if best:
-			try:
-				p3 = await asyncio.wait_for(asyncio.shield(fut), timeout=20)
-			except (T0, T1, T2):
+		# if best:
+			# try:
+				# p3 = await asyncio.wait_for(asyncio.shield(fut), timeout=20)
+			# except (T0, T1, T2):
 
-				async def recaption(h, p1, p2, fut, tup):
-					p3 = await fut
-					p1, p2, p3 = sorted((p1, p2, p3), key=len)
-					tup = ("Image", p2, p3, best)
-					if len(p1) > 7 and " " in p1 and p1.isascii():
-						tup = ("Image", p3, p2 + "\n" + p1, best)
-					print("BEST:", tup)
-					self.analysed[h] = tup
+				# async def recaption(h, p1, p2, fut, tup):
+					# p3 = await fut
+					# p1, p2, p3 = sorted((p1, p2, p3), key=len)
+					# tup = ("Image", p2, p3, best)
+					# if len(p1) > 7 and " " in p1 and p1.isascii():
+						# tup = ("Image", p3, p2 + "\n" + p1, best)
+					# print("BEST:", tup)
+					# self.analysed[h] = tup
 
-				create_task(recaption(h, p1, p2, fut, tup))
-			else:
-				p1, p2, p3 = sorted((p1, p2, p3), key=len)
-				tup = (tup[0], p2, p3, best)
-				if len(p1) > 7 and " " in p1 and p1.isascii():
-					tup = (tup[0], p3, p2 + "\n" + p1, best)
-				print("BEST:", tup)
+				# create_task(recaption(h, p1, p2, fut, tup))
+			# else:
+				# p1, p2, p3 = sorted((p1, p2, p3), key=len)
+				# tup = (tup[0], p2, p3, best)
+				# if len(p1) > 7 and " " in p1 and p1.isascii():
+					# tup = (tup[0], p3, p2 + "\n" + p1, best)
+				# print("BEST:", tup)
 		self.analysed[h] = tup
 		while len(self.analysed) > 65536:
 			self.analysed.pop(next(iter(self.analysed)))
@@ -2972,9 +2972,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			},
 			"misc": {
 				"Active commands": self.command_semaphore.active,
-				"Connected voice channels": audio_players,
-				"Active audio players": active_audio_players,
-				"Playing audio players": playing_audio_players,
+				"Voice (Conn|Act|Stream)": f"{audio_players}|{active_audio_players}|{playing_audio_players}",
 				"Total data transmitted": bot.total_bytes,
 				"Hosted storage": bot.total_hosted,
 				"System time": datetime.datetime.now(),

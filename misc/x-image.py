@@ -77,6 +77,11 @@ def rainbow_gif2(image, duration):
 		except EOFError:
 			break
 		total += max(image.info.get("duration", 0), 50)
+	fps = f / total * 1000
+	if fps < 24:
+		step = fps / 24
+		image = ImageSequence(*ImageOpIterator(image, step=step))
+		f = len(image)
 	length = f
 	loops = total / duration / 1000
 	scale = 1
@@ -167,14 +172,63 @@ def rainbow_gif(image, duration):
 	return dict(duration=1000 / fps * count, count=count, frames=rainbow_gif_iterator(image))
 
 
+def pet_gif2(image, squeeze, duration):
+	total = 0
+	for f in range(2147483648):
+		try:
+			image.seek(f)
+		except EOFError:
+			break
+		total += max(image.info.get("duration", 0), 50)
+	fps = f / total * 1000
+	if fps < 24:
+		step = fps / 24
+		image = ImageSequence(*ImageOpIterator(image, step=step))
+		f = len(image)
+	length = f
+	loops = total / duration / 1000
+	scale = 1
+	while abs(loops * scale) < 1:
+		scale *= 2
+		if length * scale >= 64:
+			loops = 1 if loops >= 0 else -1
+			break
+	loops = round(loops * scale) / scale
+	if abs(loops) < 1:
+		loops = 1 if loops >= 0 else -1
+	pet = get_image("https://mizabot.xyz/u/EBjYrqCEUDw")
+	count = len(pet._images)
+	iters = round(length * scale / count)
+
+	def pet_gif_iterator(image):
+		lastpet = 0
+		for f in range(length * scale):
+			image.seek(f % length)
+			w, h = image.width * 2.5, image.height * 2.5
+			if w < 256 and h < 256:
+				w, h = max_size(w, h, 256, force=True)
+			w, h = round_random(w), round_random(h)
+			im = Image.new("RGBA", (w, h))
+			sqr = (1 - cos(f / length / scale * iters * tau)) * 2.5
+			wm = 0.8 + sqr * 0.02
+			hm = 0.8 - sqr * 0.05
+			ox = (1 - wm) * 0.5 + 0.1
+			oy = (1 - hm) - 0.08
+			im.paste(image.resize((round_random(wm * w), round_random(hm * h)), resample=Resampling.LANCZOS), (round_random(ox * w), round_random(oy * h)))
+			lastpet = max(round_random(f / length / scale * loops * count), lastpet)
+			pet2 = pet._images[lastpet % count].resize((w, h), resample=Resampling.LANCZOS)
+			im.paste(pet2, mask=pet2)
+			yield im.resize((round(w / 2), round(h / 2)), resample=Resampling.LANCZOS)
+
+	return dict(duration=total * scale, count=length * scale, frames=pet_gif_iterator(image))
+
 def pet_gif(image, squeeze, duration):
 	try:
 		image.seek(1)
 	except EOFError:
 		image.seek(0)
 	else:
-		raise NotImplementedError("Animations currently not not supported.")
-		return spin_gif2(image, duration)
+		return pet_gif2(image, squeeze, duration)
 	pet = get_image("https://mizabot.xyz/u/EBjYrqCEUDw")
 	count = len(pet._images)
 
@@ -206,6 +260,11 @@ def spin_gif2(image, duration):
 		except EOFError:
 			break
 		total += max(image.info.get("duration", 0), 50)
+	fps = f / total * 1000
+	if fps < 24:
+		step = fps / 24
+		image = ImageSequence(*ImageOpIterator(image, step=step))
+		f = len(image)
 	length = f
 	loops = total / duration / 1000
 	scale = 1
@@ -277,6 +336,11 @@ def orbit_gif2(image, orbitals, duration, extras):
 		except EOFError:
 			break
 		total += max(image.info.get("duration", 0), 50)
+	fps = f / total * 1000
+	if fps < 24:
+		step = fps / 24
+		image = ImageSequence(*ImageOpIterator(image, step=step))
+		f = len(image)
 	length = f
 	loops = total / duration / 1000
 	scale = 1
@@ -453,6 +517,11 @@ def scroll_gif2(image, direction, duration):
 			break
 		dur = max(image.info.get("duration", 0), 50)
 		total += dur
+	fps = f / total * 1000
+	if fps < 24:
+		step = fps / 24
+		image = ImageSequence(*ImageOpIterator(image, step=step))
+		f = len(image)
 	count = f
 
 	def scroll_gif_iterator(image):
@@ -512,6 +581,11 @@ def magik_gif2(image, cell_count, grid_distance, iterations):
 		except EOFError:
 			break
 		total += max(image.info.get("duration", 0), 50)
+	fps = f / total * 1000
+	if fps < 24:
+		step = fps / 24
+		image = ImageSequence(*ImageOpIterator(image, step=step))
+		f = len(image)
 	length = f
 	loops = total / 2 / 1000
 	scale = 1

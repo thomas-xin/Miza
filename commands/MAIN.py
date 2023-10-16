@@ -1871,15 +1871,15 @@ class UpdateMessages(Database):
 
 	async def _destroy_(self, **void):
 		self.closed = True
-		self.hue += 128
-		col = colour2raw(hue2colour(self.hue))
-		msg = "Offline 😔"
-		for c_id, data in self.data.items():
-			with tracebacksuppressor(SemaphoreOverflowError):
-				channel = await self.bot.fetch_channel(c_id)
-				for m_id, v in data.items():
-					async with self.semaphore:
-						await eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id, msg=msg, colour=col)
+		# self.hue += 128
+		# col = colour2raw(hue2colour(self.hue))
+		# msg = "Offline 😔"
+		# for c_id, data in self.data.items():
+			# with tracebacksuppressor(SemaphoreOverflowError):
+				# channel = await self.bot.fetch_channel(c_id)
+				# for m_id, v in data.items():
+					# async with self.semaphore:
+						# await eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id, msg=msg, colour=col)
 
 
 

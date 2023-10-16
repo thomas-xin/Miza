@@ -2172,11 +2172,12 @@ def round_random(x):
 		y += 1
 	return y
 
-def ImageOpIterator(image, step, operation, ts, args):
+def ImageOpIterator(image, step=1, operation=None, ts=0, args=()):
 	# Attempt to perform operation on all individual frames of .gif images
 	fl = 0
 	for i in range(2147483648):
 		f = max(fl, round_random(i * step))
+		fl = f
 		np.random.seed(ts & 4294967295)
 		globals()["CURRENT_FRAME"] = i
 		try:
@@ -2187,16 +2188,21 @@ def ImageOpIterator(image, step, operation, ts, args):
 			temp = image.convert("RGBA")
 		elif str(image.mode) != "RGBA":
 			temp = image.convert("RGBA")
-		else:
+		elif operation:
 			temp = image
-		func = getattr(temp, operation, None)
-		temp.load()
-		if func is None:
-			func = operation if callable(operation) else eval(operation)
-			res = func(temp, *args)
 		else:
-			res = func(*args)
-		yield res
+			temp = image.convert("RGBA")
+		temp.load()
+		if operation:
+			func = getattr(temp, operation, None)
+			if func is None:
+				func = operation if callable(operation) else eval(operation)
+				res = func(temp, *args)
+			else:
+				res = func(*args)
+			yield res
+		else:
+			yield temp
 
 def ImageIterator(image):
 	for i in range(2147483648):
