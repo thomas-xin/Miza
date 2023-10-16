@@ -386,7 +386,10 @@ class CustomAudio(collections.abc.Hashable):
 		self.next = None
 
 	def reset(self, start=True):
-		self.acsi.clear()
+		try:
+			self.acsi.clear()
+		except (AttributeError, TypeError):
+			pass
 		self.source = self.next = None
 		if start:
 			self.queue.update_load()
@@ -834,6 +837,7 @@ class AudioQueue(alist):
 
 	# Advances queue when applicable, taking into account loop/repeat/shuffle settings.
 	def advance(self, looped=True, repeated=True, shuffled=True):
+		print("Advance:", self.auds)
 		self.auds.source = self.auds.next
 		self.auds.next = None
 		q = self
@@ -863,7 +867,7 @@ class AudioQueue(alist):
 				e.skips = ()
 				ytdl.get_stream(e)
 				q.appendleft(e)
-		elif self.auds.source:
+		else:
 			self.announce_play(self[0])
 		self.update_load()
 
@@ -887,7 +891,7 @@ class AudioQueue(alist):
 			if len(items) > self.maxitems:
 				items = astype(items, (list, alist))[:self.maxitems]
 			if not self:
-				self.auds.clear_source()
+				self.auds.reset(start=False)
 			if position == -1 or not self:
 				self.extend(items)
 			else:
@@ -1394,6 +1398,7 @@ class AudioDownloader:
 						if dur:
 							d["duration"] = dur
 						return d
+				raise TypeError("Unsupported URL.")
 			if ":" in url:
 				url = url.rsplit("/", 1)[-1].split("v=", 1)[-1].split("&", 1)[0]
 			webpage_url = f"https://www.youtube.com/watch?v={url}"
@@ -5833,7 +5838,7 @@ class UpdateAudio(Database):
 						stats.update(argv.get("stats", {}))
 						loading = stats != CustomAudio.defaults
 					if loading:
-						print("auto-loading queue of", len(argv["queue"]), "items to", guild)
+						print("Auto-loading queue of", len(argv["queue"]), "items to", guild)
 						create_task(dump(guild, channel, user, bot, perm, name, argv, flags, message, vc=vc))
 		# self.data.clear()
 

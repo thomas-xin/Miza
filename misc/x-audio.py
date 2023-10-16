@@ -289,7 +289,6 @@ class AudioPlayer(discord.AudioSource):
 		return getattr(self.queue[0][0], k)
 
 	def after(self, *args):
-		print(self, self.queue, after)
 		if not self.queue or not self.queue[0]:
 			return
 		entry = self.queue.popleft()
@@ -297,6 +296,7 @@ class AudioPlayer(discord.AudioSource):
 		after = entry[1]
 		if callable(after):
 			after()
+		print(self, self.queue, after)
 		if self.queue:
 			with tracebacksuppressor(RuntimeError, discord.ClientException):
 				self.vc.play(self, after=self.after)
@@ -306,6 +306,7 @@ class AudioPlayer(discord.AudioSource):
 			if self.silent:
 				self.vc.pause()
 			self.silent = True
+			self.queue.clear()
 			return self.emptyopus * 3
 		out = b""
 		try:
@@ -336,15 +337,22 @@ class AudioPlayer(discord.AudioSource):
 		self.queue[0] = (source, after)
 		with tracebacksuppressor(RuntimeError, discord.ClientException):
 			self.vc.play(self, after=self.after)
+		if not self.is_playing():
+			with suppress():
+				self.vc.resume()
 
 	def enqueue(self, source, after=None):
 		if not self.queue:
-			return self.play(source, after=after)
-		if len(self.queue) < 2:
-			self.queue.append(None)
+			self.play(source, after=after)
 		else:
-			self.queue[1][0].close()
-		self.queue[1] = (source, after)
+			if len(self.queue) < 2:
+				self.queue.append(None)
+			else:
+				self.queue[1][0].close()
+			self.queue[1] = (source, after)
+		if not self.is_playing():
+			with suppress():
+				self.vc.resume()
 
 	def clear_source(self):
 		if self.queue:
