@@ -2646,7 +2646,7 @@ def spec2cap():
 		if c > 100000 and v > 3 * 1073741824 and ffmpeg:
 			caps.append("video")
 			caps.append("ecdc")
-		if c > 400000 and v > 11 * 1073741824 and (v > 29 * 1073741824 or "class" not in done):
+		if DC > 1 and c > 400000 and v > 11 * 1073741824 and (v > 29 * 1073741824 or "class" not in done):
 			caps.append("class")
 			done.append("class")
 			v -= 11 * 1073741824

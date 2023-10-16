@@ -289,6 +289,7 @@ class AudioPlayer(discord.AudioSource):
 		return getattr(self.queue[0][0], k)
 
 	def after(self, *args):
+		print(self, self.queue, after)
 		if not self.queue or not self.queue[0]:
 			return
 		entry = self.queue.popleft()
@@ -564,6 +565,7 @@ class AudioFile:
 			self.readable.set_exception(ex)
 			raise
 		self.readable.set_result(self)
+		self.live = False
 		return self
 
 	# Touch the file to update its cache time.

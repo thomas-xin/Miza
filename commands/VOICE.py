@@ -781,7 +781,7 @@ class AudioQueue(alist):
 			source = None
 			with self.sem:
 				with tracebacksuppressor:
-					source = ytdl.get_stream(e, force=True)
+					source = ytdl.get_stream(e, force=True, asap=2)
 			if self.sem.is_busy():
 				self.sem.wait()
 			if not source:
@@ -1160,7 +1160,7 @@ class AudioClientSubInterface:
 		else:
 			auds = None
 		if guild.me and guild.me.voice:
-			c_id = bot.audio.submit(f"getattr(getattr(client.get_guild({guild.id}).voice_client, 'channel', None), 'id', None)")
+			c_id = bot.audio.submit(f"getattr(getattr(client.get_guild({guild.id}).voice_client,'channel',None),'id',None)")
 			if c_id:
 				self = cls(auds)
 				self.guild = guild
@@ -1243,7 +1243,7 @@ class AudioClientSubInterface:
 		key = ts_us()
 		if after:
 			self.afters[key] = after
-			return esubmit(self.bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}], after=lambda *args: esubmit('VOICE.ACSI.after({key})'))")
+			return esubmit(self.bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}],after=lambda *args: esubmit('VOICE.ACSI.after({key})'))")
 		return esubmit(self.bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}])")
 
 	def play(self, src, after=None):
@@ -1253,11 +1253,11 @@ class AudioClientSubInterface:
 		key = ts_us()
 		if after:
 			self.afters[key] = after
-			return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}], after=lambda *args: submit('VOICE.ACSI.after({key})'))")
+			return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}],after=lambda *args: submit('VOICE.ACSI.after({key})'))")
 		return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}])")
 
 	def connect(self, reconnect=True, timeout=60):
-		return create_task(self.bot.audio.asubmit(f"!await AP.from_guild({self.guild.id}).connect(reconnect={reconnect}, timeout={timeout})"))
+		return create_task(self.bot.audio.asubmit(f"!await AP.from_guild({self.guild.id}).connect(reconnect={reconnect},timeout={timeout})"))
 
 	async def disconnect(self, force=False):
 		await self.bot.audio.asubmit(f"!await AP.from_guild({self.guild.id}).disconnect(force={force})")
@@ -1270,10 +1270,28 @@ class AudioClientSubInterface:
 		await self.bot.audio.asubmit(f"!await AP.from_guild({self.guild.id}).move_to(client.get_channel({channel.id}))")
 		self.channel = channel
 
+	def is_connected(self):
+		try:
+			return self._is_connected()
+		except (AttributeError, TypeError):
+			return False
+
+	def is_paused(self):
+		try:
+			return self._is_paused()
+		except (AttributeError, TypeError):
+			return False
+
+	def is_playing(self):
+		try:
+			return self._is_playing()
+		except (AttributeError, TypeError):
+			return False
+
 ACSI = AudioClientSubInterface
 
-for attr in ("read", "skip", "stop", "pause", "resume", "clear_source", "clear_next", "clear", "kill", "is_connected", "is_paused", "is_playing"):
-	setattr(ACSI, attr, eval("""lambda self: self.bot.audio.submit(f"AP.from_guild({self.guild.id}).""" + f"""{attr}()")"""))
+for attr in ("read", "skip", "stop", "pause", "resume", "clear_source", "clear_next", "clear", "kill", "_is_connected", "_is_paused", "_is_playing"):
+	setattr(ACSI, attr, eval("""lambda self: self.bot.audio.submit(f"AP.from_guild({self.guild.id}).""" + f"""{attr.lstrip('_')}()")"""))
 
 
 # Manages all audio searching and downloading.
@@ -2506,9 +2524,11 @@ class AudioDownloader:
 			if type(download) is str:
 				live = False
 			else:
-				live = not entry.get("duration") or entry["duration"] > 960
+				live = not entry.get("duration") or entry["duration"] > 960 or asap > 1
 			seekable = not entry.get("duration") or entry["duration"] < inf
 			cf = isnan(entry.get("duration") or nan) or not (stream.startswith("https://cf-hls-media.sndcdn.com/") or is_youtube_stream(stream))
+			if asap > 1 and not f.proc:
+				esubmit(f.load, check_fmt=cf, webpage_url=entry["url"], live=False, seekable=seekable, duration=entry.get("duration"), asap=False)
 			try:
 				f.load(stream, check_fmt=cf, webpage_url=entry["url"], live=live, seekable=seekable, duration=entry.get("duration"), asap=asap)
 			except:
