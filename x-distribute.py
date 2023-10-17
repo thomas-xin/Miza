@@ -22,20 +22,26 @@ with open("auth.json", "rb") as f:
 compute_load = AUTH.get("compute_load") or []
 
 IS_MAIN = False
+FIRST_LOAD = True
 # Spec requirements:
 # ytdl											anything with internet
 # math			CPU >1							multithreading support
 # image			FFMPEG, CPU >3, RAM >6GB		multiprocessing support
+# browse		Windows, CPU >1, RAM >3GB		webdriver support
 # caption		CPU >5, RAM >14GB				cpu inference
 # agpt			CPU >1, RAM >22GB				(planned) reliability
 # video			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
 # ecdc			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
+# summ			GPU >200k, VRAM >4GB			RTX2060, T4, RTX3050, RTX3060m, A16
+# class			GPU >400k, VRAM >11GB			V100, RTX3060, A2000, RTX4070
 # sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
 # sdxl			GPU >400k, VRAM >9GB			GTX1080ti, RTX2080ti, RTX3060, RTX3080, A2000
 # sdxlr			GPU >400k, VRAM >15GB			V100, RTX3090, A4000, RTX4080, L4
-# gptq			GPU >700k, VRAM >59GB			2xV100, 6xRTX3080, 3xRTX3090, 2xA6000, 2xA40, A100, 3xRTX4090, 2xL6000, 2xL40
+# gptq			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
 def spec2cap():
-	caps = [[], "ytdl"]
+	caps = [[], "ytdl", "ytdl2"]
+	if not IS_MAIN:
+		caps.append("remote")
 	cc = psutil.cpu_count()
 	ram = psutil.virtual_memory().total
 	try:
@@ -44,7 +50,7 @@ def spec2cap():
 		ffmpeg = False
 	else:
 		ffmpeg = True
-	done = set()
+	done = []
 	try:
 		import pynvml
 		pynvml.nvmlInit()
@@ -56,8 +62,8 @@ def spec2cap():
 	cut = 0
 	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(rrams, COMPUTE_POT)):
 		vram = sum(rrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
-		if vram > 59 * 1073741824:
-			cut = 60 * 1073741824
+		if vram > 44 * 1073741824:
+			cut = 44 * 1073741824
 			did = []
 			for i in COMPUTE_ORDER:
 				v = rrams[i]
@@ -68,10 +74,15 @@ def spec2cap():
 					did.append(i)
 				else:
 					break
+			if FIRST_LOAD:
+				yield [[], "load", "gptq"]
+				globals()["FIRST_LOAD"] = False
 			yield [did, "agpt", "gptq"]
-			done.add("gptq")
+			done.append("gptq")
 	if cc > 1:
 		caps.append("math")
+		if os.name == "nt" and ram > 3 * 1073741824:
+			caps.append("browse")
 		if cc > 3 and ram > 6 * 1073741824 and ffmpeg:
 			caps.append("image")
 		if cc > 5 and ram > 14 * 1073741824:
@@ -96,32 +107,40 @@ def spec2cap():
 		if c > 100000 and v > 3 * 1073741824 and ffmpeg:
 			caps.append("video")
 			caps.append("ecdc")
+		if DC > 1 and c > 400000 and v > 11 * 1073741824 and (v > 29 * 1073741824 or "class" not in done):
+			caps.append("class")
+			done.append("class")
+			v -= 11 * 1073741824
+		if c > 200000 and v > 4 * 1073741824 and (v > 19 * 1073741824 or done.count("summ") <= DC / 2):
+			caps.append("summ")
+			done.append("summ")
+			v -= 2 * 1073741824
 		if c > 400000 and v > 15 * 1073741824:
-			if "sdxlr" not in done or c <= 600000 or "sd" in done:
-				caps.append("sdxlr")
-				caps.append("sdxl")
-				done.add("sdxlr")
-				v -= 15 * 1073741824
-		elif c > 400000 and IS_MAIN and "sdxlr" not in done and vrams[i] > 15 * 1073741824:
+			caps.append("sdxlr")
+			caps.append("sdxl")
+			# done.append("sdxlr")
+			done.append("sdxl")
+			v -= 15 * 1073741824
+		elif c > 400000 and IS_MAIN and vrams[i] > 15 * 1073741824:
 			caps.append("sdxlr")
 			caps.append("ngptq")
-			done.add("sdxlr")
+			# done.append("sdxlr")
 			v = 0
 		elif c > 400000 and v > 9 * 1073741824:
 			# if "sdxl" not in done or c <= 600000:
 			caps.append("sdxl")
 			caps.append("sd")
-			done.add("sdxl")
+			done.append("sdxl")
 			v -= 9 * 1073741824
-		elif c > 400000 and IS_MAIN and "sdxl" not in done and vrams[i] > 9 * 1073741824:
+		elif c > 400000 and IS_MAIN and "sdxl" not in done and vrams[i] > 9 * 1073741824 and "class" not in caps:
 			caps.append("sdxl")
 			caps.append("ngptq")
-			done.add("sdxl")
+			done.append("sdxl")
 			v = 0
 		elif c > 200000 and v > 5 * 1073741824:
 			if "sd" not in done or c <= 600000:
 				caps.append("sd")
-				done.add("sd")
+				done.append("sd")
 				v -= 5 * 1073741824
 		# if v <= 4 * 1073741824:
 			# v = 0
@@ -218,8 +237,8 @@ def task_submit(proc, command, _timeout=12):
 
 def update_resps(proc):
 	def func():
+		print(proc, "starting...")
 		while True:
-			print(proc, "starting...")
 			try:
 				if not proc.is_running():
 					return
@@ -233,7 +252,7 @@ def update_resps(proc):
 			except:
 				print_exc()
 			s = b.rstrip()
-			# print(proc, s)
+			print(proc, s)
 			try:
 				if s and s[:1] == b"$":
 					s, r = s.split(b"~", 1)
@@ -278,8 +297,7 @@ def update_tasks(proc):
 				data = ()
 				print_exc()
 				time.sleep(10)
-			else:
-				resps.clear()
+			resps.clear()
 			# if data:
 				# print(data)
 			for task in data:
@@ -287,7 +305,7 @@ def update_tasks(proc):
 				new_tasks.setdefault(cap, []).append(task)
 			tasks = []
 			for cap in proc.caps:
-				tasks.extend(new_tasks.get(cap, ()))
+				tasks.extend(new_tasks.pop(cap, ()))
 			if not tasks:
 				if proc.waiting:
 					proc.waiting.result()
