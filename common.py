@@ -2582,8 +2582,8 @@ FIRST_LOAD = True
 def spec2cap():
 	try:
 		from multiprocessing import shared_memory
-		globals["MEM_LOCK"] = shared_memory.SharedMemory(name="X-DISTRIBUTE", create=True, size=1)
-	except:
+		globals()["MEM_LOCK"] = shared_memory.SharedMemory(name="X-DISTRIBUTE", create=True, size=1)
+	except FileExistsError:
 		return
 	caps = [[], "ytdl"]
 	if not IS_MAIN:
