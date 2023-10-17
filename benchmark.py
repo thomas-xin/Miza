@@ -127,18 +127,6 @@ if not is_sub:
 	import json
 	keep = True
 	if __name__ != "__main__" and os.path.exists("auth.json"):
-		with open("auth.json", "rb") as f:
-			try:
-				data = json.load(f)
-			except:
-				data = {}
-		compute_load = data.get("compute_load")
-		compute_order = data.get("compute_order")
-		if compute_load is not None and compute_order is not None and len(compute_load) == len(compute_order) == DC:
-			print(srgb(0, 255, 0, "No benchmark required, skipping..."))
-			keep = False
-
-	if keep:
 		try:
 			import cpuinfo, psutil
 			if DC:
@@ -187,6 +175,18 @@ if not is_sub:
 		# 			import traceback
 		# 			print(srgb(255, 0, 0, traceback.format_exc()), end="")
 
+		with open("auth.json", "rb") as f:
+			try:
+				data = json.load(f)
+			except:
+				data = {}
+		compute_load = data.get("compute_load")
+		compute_order = data.get("compute_order")
+		if compute_load is not None and compute_order is not None and len(compute_load) == len(compute_order) == DC:
+			print(srgb(0, 255, 0, "No benchmark required, skipping..."))
+			keep = False
+
+	if keep:
 		compute_queue = []
 		compute_order = []
 
