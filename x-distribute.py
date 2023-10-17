@@ -39,7 +39,7 @@ FIRST_LOAD = True
 # sdxlr			GPU >400k, VRAM >15GB			V100, RTX3090, A4000, RTX4080, L4
 # gptq			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
 def spec2cap():
-	caps = [[], "ytdl", "ytdl2"]
+	caps = [[], "ytdl"]
 	if not IS_MAIN:
 		caps.append("remote")
 	cc = psutil.cpu_count()

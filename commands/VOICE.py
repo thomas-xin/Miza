@@ -2760,8 +2760,13 @@ class AudioDownloader:
 				ts = ts_us()
 			if rename and os.path.exists(rename) and os.path.getsize(rename):
 				return rename, rename
+			enough = False
 			if len(urls) == 1 and fmt in ("opus", "pcm", "wav", "mp3", "ogg") and is_youtube_url(urls[0]):
 				url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
+				info = self.search(url)
+				if info and info[0] and info[0].get("duration") and info[0]["duration"] < 3600:
+					enough = True
+			if enough:
 				h = shash(url)
 				fn = "cache/~" + h + ".webm"
 				out2 = "cache/~" + h + ".opus"
