@@ -39,6 +39,11 @@ FIRST_LOAD = True
 # sdxlr			GPU >400k, VRAM >15GB			V100, RTX3090, A4000, RTX4080, L4
 # gptq			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
 def spec2cap():
+	try:
+		from multiprocessing import shared_memory
+		globals["MEM_LOCK"] = shared_memory.SharedMemory(name="X-DISTRIBUTE", create=True, size=1)
+	except:
+		return
 	caps = [[], "ytdl"]
 	if not IS_MAIN:
 		caps.append("remote")
@@ -151,6 +156,9 @@ def spec2cap():
 COMPUTE_POT = compute_load.copy()
 DC = benchmark.DC
 CAPS = list(spec2cap())
+print(CAPS)
+if not CAPS:
+	raise SystemExit
 
 req = [
 	"filetype",

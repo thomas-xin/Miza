@@ -235,7 +235,7 @@ if not is_sub:
 		mem = psutil.virtual_memory().total
 			# mems.append(mem)
 		if __name__ == "__main__":
-			args = [sys.executable, sys.argv[0], "cpu", info["brand_raw"], str(info["count"]), str(mem)]
+			args = [sys.executable, __file__, "cpu", info["brand_raw"], str(info["count"]), str(mem)]
 			if INT:
 				args.append("-i")
 			print(args)
@@ -249,7 +249,7 @@ if not is_sub:
 				info = pynvml.nvmlDeviceGetHandleByIndex(i)
 				mem = torch.cuda.get_device_properties(i).total_memory
 				# mems.append(mem)
-				args = [sys.executable, sys.argv[0], f"cuda:{i}", pynvml.nvmlDeviceGetName(info), str(pynvml.nvmlDeviceGetNumGpuCores(info)), str(mem)]
+				args = [sys.executable, __file__, f"cuda:{i}", pynvml.nvmlDeviceGetName(info), str(pynvml.nvmlDeviceGetNumGpuCores(info)), str(mem)]
 				if INT:
 					args.append("-i")
 				print(args)
