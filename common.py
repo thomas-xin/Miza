@@ -2581,6 +2581,8 @@ FIRST_LOAD = True
 # gptq			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
 def spec2cap():
 	caps = [[], "ytdl"]
+	if not IS_MAIN:
+		caps.append("remote")
 	cc = psutil.cpu_count()
 	ram = psutil.virtual_memory().total
 	try:
