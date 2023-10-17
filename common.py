@@ -1576,9 +1576,9 @@ def get_author(user, u_id=None):
 		else:
 			bot.data.exec.cproxy(url)
 	if u_id:
-		name = f"{user} ({user.id})"
+		name = f"{user.display_name} ({user.id})"
 	else:
-		name = str(user)
+		name = str(user.display_name)
 	return cdict(name=name, icon_url=url, url=url)
 
 # Finds emojis and user mentions in a string.

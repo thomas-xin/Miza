@@ -1363,7 +1363,7 @@ def map_model(cname, model, premium):
 MockFunctions = [
 	[None, "Placeholder (Do not choose this!)"],
 	[None, "Providing advice, real-world assistance, or formal conversation"],
-	["roleplay", "Describe a roleplay or fictional scenario (Choose this if user is roleplaying!)"],
+	["roleplay", "Describe a roleplay or fictional scenario"],
 	["art", "Create or edit a picture or art"],
 	["remind", "Set alarm or reminder"],
 	["math", "Math or calculator"],
@@ -2027,7 +2027,7 @@ class Ask(Command):
 				blocked.update(("audio", "astate", "askip", "play"))
 			if model not in chatcc:
 				blocked.add("roleplay")
-			fut = create_task(cut_to(messages, 4000))
+			fut = create_task(cut_to(messages, 3000))
 			if extensions and "class" in bot.caps:
 				mocked = {}
 				prompt = ""
@@ -2189,7 +2189,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						messages=used,
 						temperature=temperature,
 						max_tokens=min(4096, limit - length - 768),
-						top_p=1,
+						top_p=0.9,
 						frequency_penalty=0.6,
 						presence_penalty=0.8,
 						user=str(hash(name)),
@@ -2376,7 +2376,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					prompt=prompt,
 					temperature=temperature,
 					max_tokens=min(1024, limit - length - 64),
-					top_p=1,
+					top_p=0.9,
 					stop=[f"{name}:"],
 					frequency_penalty=0.8,
 					presence_penalty=0.4,
@@ -2392,7 +2392,9 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						print_exc()
 						continue
 					print(response)
-					text = response.choices[0].text
+					if text:
+						text += " "
+					text += response.choices[0].text
 					if premium >= 2:
 						stop = [
 							"cannot fulfil",
@@ -2410,10 +2412,12 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						target_model = "gpt3"
 						continue
 					try:
+						if text:
+							text += " "
 						if model == "mythalion-13b" and "class" in bot.caps:
-							text = await process_image("GPTQm", "$", [data], cap="class", timeout=300)
+							text += await process_image("GPTQm", "$", [data], cap="class", timeout=300)
 						else:
-							text = await process_image("GPTQ", "$", [data], cap="gptq", timeout=600)
+							text += await process_image("GPTQ", "$", [data], cap="gptq", timeout=600)
 					except Exception as e:
 						ex = e
 						print_exc()
@@ -2424,7 +2428,9 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						target_model = "gpt3"
 						continue
 					try:
-						text = await process_image("BNB", "$", [data], cap="bnb", timeout=600)
+						if text:
+							text += " "
+						text += await process_image("BNB", "$", [data], cap="bnb", timeout=600)
 					except Exception as e:
 						ex = e
 						print_exc()
@@ -2687,6 +2693,7 @@ class UpdateChatHistories(Database):
 		emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
 		emb.set_author(**get_author(bot.user))
 		create_task(message.edit(embed=emb))
+		create_task(self.bot.commands.ask[0].remove_reacts(message))
 		await message.add_reaction("❎")
 
 	async def _delete_(self, message, **void):
@@ -2715,7 +2722,7 @@ class UpdateChatHistories(Database):
 		emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
 		emb.set_author(**get_author(bot.user))
 		create_task(message.edit(embed=emb))
-		create_task(self.remove_reacts(message))
+		create_task(self.bot.commands.ask[0].remove_reacts(message))
 		await message.add_reaction("❎")
 
 class UpdateChatMappings(Database):

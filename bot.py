@@ -2939,7 +2939,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			audio_players = active_audio_players = playing_audio_players = "N/A"
 		else:
 			active_audio_players = sum(bool(auds.queue and not auds.paused) for auds in self.audio.players.values())
-			playing_audio_players = sum(auds.is_playing() for auds in self.audio.players.values())
+			playing_audio_players = sum(auds.is_playing() for auds in self.audio.players.values() if auds.is_playing)
 		files = os.listdir("misc")
 		for f in files:
 			path = "misc/" + f
@@ -3040,7 +3040,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				"Disk usage": byte_scale(disk_usage) + "B/" + byte_scale(disk_max) + "B",
 				"Network usage": byte_scale(network_usage) + "bps",
 				"Power usage": f"{round(power_usage, 3)} W/{round(power_max, 3)} W",
-				"Temperature": f"{round(temp_usage, 3)} °C",
+				"Internal Temperature": f"{round(temp_usage, 3)} °C",
 			},
 			"Discord info": discord_stats,
 			"Misc info": misc_stats,

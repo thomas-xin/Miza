@@ -600,11 +600,12 @@ class Avatar(Command):
 							raise StopIteration         
 					else:
 						u = user
-					name = str(u)
+					name = getattr(u, "name", None) or str(u)
 					url = await self.bot.get_proxy_url(u, force=True)
 					colour = await self.bot.get_colour(u)
+					url2 = await self.bot.get_proxy_url(str(u.avatar), force=True)
 					emb = discord.Embed(colour=colour)
-					emb.set_thumbnail(url=url)
+					emb.set_thumbnail(url=url2)
 					emb.set_image(url=url)
 					emb.set_author(name=name, icon_url=url, url=url)
 					emb.description = f"{sqr_md(name)}({url})"
@@ -792,7 +793,7 @@ class Info(Command):
 							u = bot.user
 					u = await bot.fetch_user_member(u.id, guild)
 					member = guild.get_member(u.id)
-					name = str(u)
+					name = getattr(u, "name", None) or str(u)
 					url = await bot.get_proxy_url(u, force=True)
 					st = deque()
 					if u.id == bot.id:

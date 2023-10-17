@@ -670,6 +670,7 @@ class UpdateExec(Database):
 		out = [None] * len(urls)
 		files = [None] * len(urls)
 		sendable = [c_id for c_id, flag in self.data.items() if flag & 16]
+		bot = self.bot
 		for i, url in enumerate(urls):
 			if isinstance(url, (bytes, memoryview)):
 				files[i] = cdict(fut=as_fut(url), filename="untitled.webp")
@@ -678,15 +679,18 @@ class UpdateExec(Database):
 				continue
 			try:
 				uhu = uhash(url)
-				out[i] = self.bot.data.proxies[uhu]
+				out[i] = bot.data.proxies[uhu]
 				if not out[i]:
 					raise KeyError
+				if is_discord_attachment(out[i]):
+					with tracebacksuppressor:
+						out[i] = bot.preserve_attachment(out[i])
 				if force or not xrand(16):
 
 					def verify(url, uhu):
 						with reqs.next().head(url, stream=True) as resp:
 							if resp.status_code not in range(200, 400):
-								self.bot.data.proxies.pop(uhu, None)
+								bot.data.proxies.pop(uhu, None)
 
 					if force:
 						await asubmit(verify, out[i], uhu)
@@ -709,7 +713,6 @@ class UpdateExec(Database):
 					files[i] = cdict(fut=asubmit(reqs.next().get, url, stream=True), filename=fn, url=url)
 				else:
 					out[i] = url
-		bot = self.bot
 		failed = [None] * len(urls)
 		for i, fut in enumerate(files):
 			if not fut:
@@ -743,12 +746,16 @@ class UpdateExec(Database):
 					if not message.attachments[c].size:
 						url = urls[i]
 					else:
-						url = str(message.attachments[c].url)
+						try:
+							url = bot.preserve_attachment(message.attachments[c].id)
+						except:
+							print_exc()
+							url = str(message.attachments[c].url)
 					try:
-						self.bot.data.proxies[uhash(urls[i])] = out[i] = url
+						bot.data.proxies[uhash(urls[i])] = out[i] = url
 					except IndexError:
 						break
-					# self.bot.data.proxies.update(0)
+					# bot.data.proxies.update(0)
 					with suppress(KeyError, RuntimeError):
 						self.temp.pop(urls[i]).set_result(out[i])
 					c += 1
