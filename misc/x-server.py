@@ -867,6 +867,7 @@ transform: translate(-50%, -50%);
 
 	@cp.expose(("u"))
 	def unproxy(self, id=None, url=None, mid=None, **kwargs):
+		true_ip()
 		if id == "u" and url:
 			id = url
 		if id:
