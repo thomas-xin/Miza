@@ -110,7 +110,7 @@ if len(sys.argv) > 6:
 else:
 	IT = 0
 
-if CAPS.intersection(("image", "caption", "sd", "sdxl", "sdxlr")):
+if CAPS.intersection(("image", "caption", "video", "sd", "sdxl", "sdxlr")):
 	import zipfile, blend_modes
 	try:
 		# This module apparently does not exist on Linux
