@@ -11,7 +11,7 @@ for i in range(3):
 	else:
 		break
 
-from collections2 import *
+# from collections2 import *
 MIZAAC = ""
 GPTQ = False
 BNB = False
