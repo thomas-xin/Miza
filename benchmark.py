@@ -130,17 +130,15 @@ if not is_sub:
 		try:
 			import cpuinfo, psutil
 			if DC:
-				import torch
-				if not torch.cuda.is_available():
+				import torch, torchvision
+				if not torch.cuda.is_available() or not torchvision._HAS_OPS:
 					raise ImportError
 		except ImportError:
 			subprocess.run([sys.executable, "-m", "pip", "install", "py-cpuinfo", "--upgrade", "--user"])
 			subprocess.run([sys.executable, "-m", "pip", "install", "psutil", "--upgrade", "--user"])
 			if DC:
-				subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--index-url", "https://download.pytorch.org/whl/cu118", "--upgrade", "--user"])
+				subprocess.run([sys.executable, "-m", "pip", "install", "torch", "torchaudio", "torchvision", "--index-url", "https://download.pytorch.org/whl/cu118", "--upgrade", "--user"])
 				import torch
-			# else:
-			# 	subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--upgrade", "--user"])
 			import cpuinfo, psutil
 
 		try:
