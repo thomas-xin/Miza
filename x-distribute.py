@@ -15,6 +15,11 @@ if not os.path.exists("auth.json"):
 if os.path.exists("x-compute.py"):
 	sys.path.append("..")
 
+if len(sys.argv) > 1:
+	API = sys.argv.pop(1)
+else:
+	API = "https://api.mizabot.xyz"
+
 import benchmark, json, psutil, subprocess
 
 with open("auth.json", "rb") as f:
@@ -211,7 +216,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 new_tasks = {}
 procs = []
 PROC_RESP = {}
-FORWARD = "https://api.mizabot.xyz/distribute"
+FORWARD = f"{API}/distribute"
 
 def task_submit(proc, command, _timeout=12):
 	ts = time.time_ns() // 1000
@@ -296,7 +301,7 @@ def update_tasks(proc):
 					verify=False
 				)
 				data = resp.content
-				# resp = session.get(f"https://api.mizabot.xyz/distribute?caps=[{proc.cap}]&resp={resp}")
+				# resp = session.get(f"{API}/distribute?caps=[{proc.cap}]&resp={resp}")
 				resp.raise_for_status()
 				data = resp.json()
 			except:
@@ -500,7 +505,7 @@ try:
 		data = ()
 		try:
 			resp = session.post(
-				"https://api.mizabot.xyz/distribute",
+				f"{API}/distribute",
 				data=dict(
 					caps=orjson.dumps(caps),
 					stat=stat,
@@ -509,7 +514,7 @@ try:
 			)
 			FORWARD = resp.url
 			data = resp.content
-			# resp = session.get(f"https://api.mizabot.xyz/distribute?caps={caps}&stat={stat}")
+			# resp = session.get(f"{API}/distribute?caps={caps}&stat={stat}")
 			resp.raise_for_status()
 			data = resp.json()
 			if nex:
