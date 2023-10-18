@@ -372,7 +372,9 @@ try:
 	up_old = ioc.bytes_sent
 	down_old = ioc.bytes_recv
 	ot = time.time() - 1
-	while True:
+	import itertools
+	for i in itertools.count(0):
+		# print(i)
 		ip = "<IP>"
 		t = time.time()
 		ioc = psutil.net_io_counters()
@@ -408,8 +410,8 @@ try:
 				dinfo[p.mountpoint] = psutil.disk_usage(p.mountpoint)
 			except OSError:
 				pass
-		ram_name = "RAM"
-		if os.name == "nt" and globals().get("WMI") is not False:
+		ram_name = globals().get("RAM_NAME") or "RAM"
+		if ram_name == "RAM" and os.name == "nt" and globals().get("WMI") is not False:
 			if not globals().get("WMI"):
 				try:
 					import wmi
@@ -443,7 +445,7 @@ try:
 					}[ram_type]
 				except KeyError:
 					ram_class = "DDR" + str(max(1, ceil(math.log2(ram_speed / 250))))
-				ram_name = f"{ram_class}-{ram_speed}"
+				ram_name = globals()["RAM_NAME"] = f"{ram_class}-{ram_speed}"
 		stats = orjson.dumps(dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
 			gpu={f"{ip}-{i}": dict(
@@ -519,6 +521,7 @@ try:
 			data = ()
 			print_exc()
 			time.sleep(20)
+			session = requests.Session()
 		# if data:
 			# print(data)
 		for task in data:
