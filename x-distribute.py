@@ -319,6 +319,8 @@ def update_tasks(proc):
 				# resp = session.get(f"{API}/distribute?caps=[{proc.cap}]&resp={resp}")
 				resp.raise_for_status()
 				data = resp.json()
+				if isinstance(data, dict):
+					data = data.get("tasks", ())
 			except:
 				if data:
 					print(resp.text)
@@ -393,7 +395,7 @@ try:
 	ot = time.time() - 1
 	import itertools
 	for i in itertools.count(0):
-		# print(i)
+		print(i)
 		next_delay = 5
 		ip = "<IP>"
 		t = time.time()
