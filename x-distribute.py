@@ -215,8 +215,8 @@ subs = {
 	"misc/convobot.py": "https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/convobot.py",
 	"misc/imagebot.py": "https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/imagebot.py",
 	"misc/x-compute.py": "https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/x-compute.py",
-	"misc/x-math.py": "https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/x-compute.py",
-	"misc/x-image.py": "https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/x-compute.py",
+	"misc/x-math.py": "https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/x-math.py",
+	"misc/x-image.py": "https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/x-image.py",
 }
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=len(subs))
 for k, v in subs.items():
