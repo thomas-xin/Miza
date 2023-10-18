@@ -221,7 +221,7 @@ subs = {
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=len(subs))
 for k, v in subs.items():
 	fut = exc.submit(session.get, v)
-	subs[k] = v
+	subs[k] = fut
 for k, v in subs.items():
 	with v.result() as resp:
 		with open(k, "wb") as f:
