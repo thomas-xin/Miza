@@ -2839,8 +2839,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		# with tracebacksuppressor(asyncio.TimeoutError, asyncio.CancelledError):
 		# 	ip = await fut
 		t = utc()
-		ram_name = "RAM"
-		if os.name == "nt" and globals().get("WMI") is not False:
+		ram_name = globals().get("RAM_NAME") or "RAM"
+		if ram_name == "RAM" and os.name == "nt" and globals().get("WMI") is not False:
 			if not globals().get("WMI"):
 				try:
 					import wmi
@@ -2874,7 +2874,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					}[ram_type]
 				except KeyError:
 					ram_class = "DDR" + str(max(1, ceil(math.log2(ram_speed / 250))))
-				ram_name = f"{ram_class}-{ram_speed}"
+				ram_name = globals()["RAM_NAME"] = f"{ram_class}-{ram_speed}"
 		return dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
 			gpu={f"{ip}-{i}": dict(

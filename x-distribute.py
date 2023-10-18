@@ -211,7 +211,22 @@ from math import *
 session = requests.Session()
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# exc = concurrent.futures.ThreadPoolExecutor(max_workers=4 + benchmark.DC)
+subs = {
+	"misc/convobot.py": "https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/convobot.py",
+	"misc/imagebot.py": "https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/imagebot.py",
+	"misc/x-compute.py": "https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/x-compute.py",
+	"misc/x-math.py": "https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/x-compute.py",
+	"misc/x-image.py": "https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/x-compute.py",
+}
+exc = concurrent.futures.ThreadPoolExecutor(max_workers=len(subs))
+for k, v in subs.items():
+	fut = exc.submit(session.get, v)
+	subs[k] = v
+for k, v in subs.items():
+	with v.result() as resp:
+		with open(k, "wb") as f:
+			f.write(resp.content)
+exc.shutdown(wait=True)
 
 new_tasks = {}
 procs = []
@@ -360,14 +375,13 @@ for di, *caps in CAPS:
 	start_proc(di, caps)
 	time.sleep(1)
 try:
-	import time, requests, orjson, base64, cpuinfo
+	import time, orjson, base64, cpuinfo
 	class Self:
 		_cpuinfo = None
 		ip_time = 0
 		up_bps = 0
 		down_bps = 0
 	self = Self()
-	session = requests.Session()
 
 	nex = None
 	caps = []

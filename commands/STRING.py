@@ -2259,6 +2259,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								messages = [messages[0], messages[-1]]
 							messages.append(cdict(m))
 							messages.append(cdict(role="function", name=name, content=res))
+							skipping = 0
 							length = await count_to(messages)
 							print("New prompt:", messages)
 							continue
@@ -2278,6 +2279,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								messages = [messages[0], messages[-1]]
 							messages.append(cdict(m))
 							messages.append(cdict(role="function", name=name, content=res))
+							skipping = 0
 							length = await count_to(messages)
 							print("New prompt:", messages)
 							continue
@@ -2297,6 +2299,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								messages = [messages[0], messages[-1]]
 							messages.append(cdict(m))
 							messages.append(cdict(role="function", name=name, content=res))
+							skipping = 0
 							length = await count_to(messages)
 							print("New prompt:", messages)
 							continue
