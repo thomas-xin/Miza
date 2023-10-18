@@ -375,6 +375,7 @@ try:
 	import itertools
 	for i in itertools.count(0):
 		# print(i)
+		next_delay = 5
 		ip = "<IP>"
 		t = time.time()
 		ioc = psutil.net_io_counters()
@@ -522,8 +523,9 @@ try:
 			print_exc()
 			time.sleep(20)
 			session = requests.Session()
-		# if data:
-			# print(data)
+		if isinstance(data, dict):
+			next_delay = data.get("next_delay", 5)
+			data = data.get("tasks", ())
 		for task in data:
 			cap = task[1]
 			new_tasks.setdefault(cap, []).append(task)
@@ -535,7 +537,7 @@ try:
 					except:
 						pass
 					# proc.waiting = None
-		time.sleep(5)
+		time.sleep(next_delay)
 except:
 	print_exc()
 finally:
