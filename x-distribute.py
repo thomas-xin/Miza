@@ -17,7 +17,7 @@ if os.path.exists("x-compute.py"):
 
 if "-d" in sys.argv:
 	debug = True
-	sys.argv.pop("-d")
+	sys.argv.remove("-d")
 else:
 	debug = False
 if len(sys.argv) > 1:
