@@ -455,7 +455,6 @@ def true_ip():
 	return ip
 
 
-
 class Server:
 
 	serving = {}
@@ -2661,7 +2660,10 @@ alert("File successfully deleted. Returning to home.");
 	@cp.expose
 	@hostmap
 	def status(self, interval=None):
-		true_ip()
+		if interval:
+			true_ip()
+		else:
+			cp.request.no_log = True
 		status = self.bot_exec(f"bot.status(interval={interval})")
 		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
