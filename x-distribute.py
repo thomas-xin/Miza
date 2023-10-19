@@ -30,8 +30,12 @@ import benchmark, json, psutil, subprocess
 with open("auth.json", "rb") as f:
 	AUTH = json.load(f)
 compute_load = AUTH.get("compute_load") or []
-compute_caps = [] if not torch.cuda.is_available() else [[torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor] for i in range(torch.cuda.device_count())]
 compute_order = AUTH.get("compute_order") or []
+if compute_load and compute_order:
+	import torch.cuda
+	compute_caps = [[torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor] for i in range(torch.cuda.device_count())]
+else:
+	compute_caps = []
 
 IS_MAIN = False
 FIRST_LOAD = True
