@@ -15,6 +15,11 @@ if not os.path.exists("auth.json"):
 if os.path.exists("x-compute.py"):
 	sys.path.append("..")
 
+if "-d" in sys.argv:
+	debug = True
+	sys.argv.pop("-d")
+else:
+	debug = False
 if len(sys.argv) > 1:
 	API = sys.argv.pop(1)
 else:
@@ -403,7 +408,8 @@ try:
 	ot = time.time() - 1
 	import itertools
 	for i in itertools.count(0):
-		print(i)
+		if debug:
+			print(i)
 		next_delay = 5
 		ip = "<IP>"
 		t = time.time()
