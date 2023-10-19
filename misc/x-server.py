@@ -2650,10 +2650,11 @@ alert("File successfully deleted. Returning to home.");
 		caps = orjson.dumps(caps).decode("ascii")
 		stat = orjson.dumps(stat).decode("utf-8", "replace")
 		resp = repr(resp)
-		tasks = self.bot_exec(f"bot.distribute({caps},{stat},{resp},{repr(ip)})")
+		tasks, shards = self.bot_exec(f"(bot.distribute({caps},{stat},{resp},{repr(ip)}),len(bot.status_data.system['cpu']))")
+		data = dict(tasks=tasks, next_delay=max(1, shards - 1))
 		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
-		return orjson.dumps(tasks)
+		return orjson.dumps(data)
 
 	def ensure_mpins(self):
 		try:
