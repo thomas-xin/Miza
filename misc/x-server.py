@@ -132,6 +132,56 @@ def communicate(self):
 	return False
 cheroot.server.HTTPConnection.communicate = communicate
 
+def access(self):
+	request = cp.serving.request
+	if getattr(request, "no_log", None):
+		return
+	remote = request.remote
+	response = cp.serving.response
+	outheaders = response.headers
+	inheaders = request.headers
+	if response.output_status is None:
+		status = '-'
+	else:
+		status = response.output_status.split(b' ', 1)[0]
+		status = status.decode('ISO-8859-1')
+
+	atoms = {'h': remote.name or remote.ip,
+			 'l': '-',
+			 'u': getattr(request, 'login', None) or '-',
+			 't': self.time(),
+			 'r': request.request_line,
+			 's': status,
+			 'b': dict.get(outheaders, 'Content-Length', '') or '-',
+			 'f': dict.get(inheaders, 'Referer', ''),
+			 'a': dict.get(inheaders, 'User-Agent', ''),
+			 'o': dict.get(inheaders, 'Host', '-'),
+			 'i': request.unique_id,
+			 'z': cp._cplogging.LazyRfc3339UtcTime(),
+			 }
+	for k, v in atoms.items():
+		if not isinstance(v, str):
+			v = str(v)
+		v = v.replace('"', '\\"').encode('utf8')
+		# Fortunately, repr(str) escapes unprintable chars, \n, \t, etc
+		# and backslash for us. All we have to do is strip the quotes.
+		v = repr(v)[2:-1]
+
+		# in python 3.0 the repr of bytes (as returned by encode)
+		# uses double \'s.  But then the logger escapes them yet, again
+		# resulting in quadruple slashes.  Remove the extra one here.
+		v = v.replace('\\\\', '\\')
+
+		# Escape double-quote.
+		atoms[k] = v
+
+	try:
+		self.access_log.log(
+			logging.INFO, self.access_log_format.format(**atoms))
+	except Exception:
+		self(traceback=True)
+cp._cplogging.LogManager.access = access
+
 def process_headers(self):
 	headers = self.headers
 	for name, value in self.header_list:
@@ -2543,6 +2593,7 @@ alert("File successfully deleted. Returning to home.");
 				mpdata[ip][3] = min(mpdata[ip][3], t - 60)
 			cp.response.status = 450
 			return ""
+		cp.request.no_log = True
 		if ip not in mpdata:
 			mpdata[ip] = [0,] * 4
 		d = t - mpdata[ip][1]
@@ -2647,6 +2698,8 @@ alert("File successfully deleted. Returning to home.");
 					resp[k] = evalex(v[4:])
 				elif v.startswith("RES:"):
 					resp[k] = v[4:]
+		if not resp:
+			cp.request.no_log = True
 		caps = orjson.dumps(caps).decode("ascii")
 		stat = orjson.dumps(stat).decode("utf-8", "replace")
 		resp = repr(resp)
@@ -2806,6 +2859,7 @@ alert("File successfully deleted. Returning to home.");
 	def command(self, content="", input="", timeout=420, redirect=""):
 		ip = true_ip()
 		if "\x7f" in content and ip in ("127.0.0.1", ADDRESS, getattr(self, "ip", None)):
+			cp.request.no_log = True
 			t, after = content.split("\x7f", 1)
 			t = int(t)
 			after = float(after)

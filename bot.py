@@ -403,6 +403,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if self.server and is_strict_running(self.server):
 			with suppress():
 				force_kill(self.server)
+		bot.server_init = False
 		if os.path.exists("misc/x-server.py") and PORT:
 			print("Starting webserver...")
 			self.server = psutil.Popen([python, "x-server.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE, bufsize=65536)
@@ -3948,7 +3949,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				except TypeError:
 					out = repr(dict(result=output))
 		# print(url, out)
-		await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False, timeout=16)
+		try:
+			await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False, timeout=16)
+		except aiohttp.client_exceptions.ClientConnectorError:
+			if self.server_init and self.server and is_strict_running(self.server):
+				await asubmit(self.start_webserver)
+			print_exc()
 
 	async def load_guild_http(self, guild):
 		_members = {}
