@@ -293,7 +293,8 @@ def update_resps(proc):
 			except:
 				print_exc()
 			s = b.rstrip()
-			print(proc, s)
+			if debug:
+				print(proc, s)
 			try:
 				if s and s[:1] == b"$":
 					s, r = s.split(b"~", 1)
