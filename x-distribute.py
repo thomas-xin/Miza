@@ -30,6 +30,8 @@ import benchmark, json, psutil, subprocess
 with open("auth.json", "rb") as f:
 	AUTH = json.load(f)
 compute_load = AUTH.get("compute_load") or []
+compute_caps = [] if not torch.cuda.is_available() else [[torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor] for i in range(torch.cuda.device_count()]
+compute_order = AUTH.get("compute_order") or []
 
 IS_MAIN = False
 FIRST_LOAD = True
@@ -368,7 +370,7 @@ def update_tasks(proc):
 	return func
 
 def start_proc(di, caps):
-	args = [python, "misc/x-compute.py", ",".join(map(str, di)), ",".join(caps)]
+	args = [python, "misc/x-compute.py", ",".join(map(str, di)), ",".join(caps), json.dumps(compute_load), json.dumps(compute_caps), json.dumps(compute_order)]
 	print(args)
 	proc = psutil.Popen(
 		args,
