@@ -1766,7 +1766,7 @@ class Ask(Command):
 				tup = tup[2:]
 				inp.append(f"{name}: {content}")
 			if not em:
-				data = await process_image("embedding", "$", ["\n".join(inp)], cap="caption", timeout=10)
+				data = await process_image("embedding", "$", ["\n".join(inp)], cap="summ", timeout=10)
 				em = base64.b64encode(data).decode("ascii")
 			mapd[s] = orig
 			embd[s] = em
@@ -1972,7 +1972,7 @@ class Ask(Command):
 			await ignore_embedding(message.id)
 			orig_tup = (name, q)
 			if embd:
-				data = await process_image("embedding", "$", [f"{name}: {q}"], cap="caption", timeout=5)
+				data = await process_image("embedding", "$", [f"{name}: {q}"], cap="summ", timeout=5)
 				em = base64.b64encode(data).decode("ascii")
 				objs = list(embd.items())
 				keys = [t[0] for t in objs]
@@ -2096,7 +2096,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					model = "text-davinci-003"
 					limit = 2000
 					cm = 200
-				if not model or attempts >= 7:
+				if not model or attempts >= 8:
 					model = choice((
 						"mythalion-13b",
 						"emerhyst-20b",
@@ -2110,10 +2110,10 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					model = data.get("name") or model
 					limit = data.get("limit") or limit
 					cm = data.get("cm") or cm
-				elif attempts >= 6:
+				elif attempts >= 7:
 					model = "mythalion-13b"
 					limit = 2000
-				elif premium < 2 or attempts in (2, 4):
+				elif premium < 2 or attempts in (4, 6):
 					model = "emerhyst-20b"
 					limit = 4000
 				elif attempts in (3, 5):

@@ -2800,7 +2800,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			prompt = [i, task.cap, task.command, task.timeout]
 			prompts.append(prompt)
 		t = utc()
-		for k, v in self.caps.items():
+		for k, v in tuple(self.caps.items()):
 			if t - v > 720:
 				self.caps.pop(k)
 		return prompts

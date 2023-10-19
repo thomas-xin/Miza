@@ -2569,7 +2569,7 @@ FIRST_LOAD = True
 # math			CPU >1							multithreading support
 # image			FFMPEG, CPU >3, RAM >6GB		multiprocessing support
 # browse		Windows, CPU >1, RAM >3GB		webdriver support
-# caption		CPU >5, RAM >14GB				cpu inference
+# caption		Tesseract, CPU >5, RAM >14GB	cpu inference
 # agpt			CPU >1, RAM >22GB				(planned) reliability
 # video			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
 # ecdc			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
@@ -2584,6 +2584,8 @@ def spec2cap():
 		from multiprocessing import shared_memory
 		globals()["MEM_LOCK"] = shared_memory.SharedMemory(name="X-DISTRIBUTE", create=True, size=1)
 	except FileExistsError:
+		if IS_MAIN:
+			raise
 		return
 	caps = [[], "ytdl"]
 	if not IS_MAIN:
@@ -2596,6 +2598,12 @@ def spec2cap():
 		ffmpeg = False
 	else:
 		ffmpeg = True
+	try:
+		subprocess.run("tesseract")
+	except FileNotFoundError:
+		tesseract = False
+	else:
+		tesseract = True
 	done = []
 	try:
 		import pynvml
@@ -2631,7 +2639,7 @@ def spec2cap():
 			caps.append("browse")
 		if cc > 3 and ram > 6 * 1073741824 and ffmpeg:
 			caps.append("image")
-		if cc > 5 and ram > 14 * 1073741824:
+		if cc > 5 and ram > 14 * 1073741824 and tesseract:
 			caps.append("caption")
 		if AUTH.get("discord_token") and cc > 1 and ram > 22 * 1073741824:
 			caps.append("agpt")
@@ -2640,7 +2648,7 @@ def spec2cap():
 		caps = [[], "ytdl", "math"]
 		if ram > 14 * 1073741824 and ffmpeg:
 			caps.append("image")
-		if ram > 46 * 1073741824:
+		if ram > 46 * 1073741824 and tesseract:
 			caps.append("caption")
 		if AUTH.get("discord_token") and not cut and cc > 3 and ram > 46 * 1073741824:
 			caps.append("agpt")
@@ -2712,6 +2720,7 @@ def proc_start():
 		globals()["DC"] = 0
 	with tracebacksuppressor:
 		caps = list(spec2cap())
+	print("CAPS:", caps)
 	for n, (di, *caps) in enumerate(caps):
 		create_task(start_proc(n, di, caps))
 		time.sleep(1)
