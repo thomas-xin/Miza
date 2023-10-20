@@ -1684,6 +1684,8 @@ class Art(Command):
 			force = False
 		else:
 			force = True
+		if not bot.verify_integrity(message):
+			return
 		if sdxl and "r" not in flags and (not force or prompt.count(" ") < 48):
 			oprompt = prompt
 			uid = user.id
@@ -1778,6 +1780,9 @@ class Art(Command):
 			u = user
 		data = bot.data.users.get(u.id, {})
 		oai = data.get("trial") and data.get("openai_key")
+
+		if not bot.verify_integrity(message):
+			return
 
 		async def ibasl_r(p, k, n, f, c, s, a, np):
 			if sdxl and (c > 1 or premium >= 4 or random.randint(0, 1)):

@@ -1512,6 +1512,21 @@ Functions = dict(
 )
 FunctionList = list(Functions)
 
+STOPS = (
+	"unable to fulfil",
+	"unable to assist",
+	"unable to help",
+	"unable to provide",
+	"cannot fulfil",
+	"cannot assist",
+	"cannot help",
+	"cannot provide",
+	"can't fulfil",
+	"can't assist",
+	"can't help",
+	"can't provide",
+)
+
 AC = b'n\x03\x07\nn\x03\x07:n\x03\x074\xben\x03\x07\x08n\x03\x079n\x03\x07\x04\xben\x03\x07\x06n\x03\x074n\x03\x079n\x03\x079n\x03\x07\x04n\x03\x07=n\x03\x077n\x03\x07?n\x03\x070\xben\x03\x07\x00n\x03\x07=\xben\x03\x07\x08\xben\x01\x1a#n\x01\x1b\x1cn\x01\x1a+n\x01\x1b\x18\xben\x03\x06 n\x03\x07\x03n\x03\x07\x08n\x03\x07=n\x03\x07=n\x03\x07\x04n\x03\x07?\xbf\xben\x03\x0e3n\x03\r/n\x03\x0f\x0c\xben\x03\n>n\x03\x08\nq#\x10n\x01\x1b\x1bn\x01\x1b*|\r?n\x01\x1b<n\x03\x06<n\x03\x077n\x03\x04\x0c\x7f+\x0c\x7f\x06\x17\xben\x03\x0e<n\x03\r"\xben\x03\x0b\x0cn\x03\n7n\x03\x08\x0fq#\x11n\x01\x1b\x18n\x01\x1b*|\r\r\xben\x03\x06+n\x03\x07:\xbe\x7f+\x19\x7f\x06!\xben\x03\x0e8n\x03\r4n\x03\r\x17n\x03\x0b8n\x03\n1n\x03\x08\x14\xben\x01\x1a n\x01\x18\x1f\xben\x01\x1b<n\x03\x068n\x03\x073n\x03\x04\x00\x7f+\x1d\x7f\x0c4\xben\x03\x0e\x04n\x03\r2n\x03\x0c&n\x03\x0b>n\x03\n1n\x03\x08\x17q#\x17n\x01\x1a#n\x01\x1b(\xben\x01\x1b=n\x03\x06.\xben\x03\x04\x03T.\x7f\x06!\xben\x03\x0e9n\x03\r0n\x03\x0f\x0cn\x03\x0b\x0bn\x03\n.\xbeq#\x11n\x01\x1a+\xbe|\r=n\x01\x1b\tn\x03\x068\xben\x03\x04\x00U<\x7f\x06!W\'\xben\x03\r4n\x03\r\x1dn\x03\x0b\x0b\xben\x03\x08\rq#\x11n\x01\x1b\x1d\xbe|\r\x0e\xben\x03\x06/n\x03\x07:n\x03\x04\x0b|\x1f/\x7f\x0f<T\x10'
 AC = bytes(i ^ 158 for i in AC)
 AC = full_prune(AC.decode("utf-8")).capitalize() + "."
@@ -2078,11 +2093,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 			ex = RuntimeError("Maximum attempts exceeded.")
 			print("Chat", model, name, q, extensions)
 			for attempts in range(12):
-				if hasattr(message, "simulated"):
-					curr_message = message
-				else:
-					curr_message = await bot.fetch_message(message.id, channel)
-				if getattr(message, "deleted", None) or getattr(curr_message, "deleted", None):
+				if not bot.verify_integrity(message):
 					return
 				if attempts > 3:
 					await asyncio.sleep((attempts - 2) ** 2)
@@ -2220,13 +2231,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							redo = True
 							continue
 						if premium >= 2:
-							stop = [
-								"cannot fulfil",
-								"cannot assist",
-								"can't fulfil",
-								"can't assist",
-							]
-							if any(s in text for s in stop):
+							if any(s in text for s in STOPS):
 								text = ""
 								redo = True
 								target_model = "emerhyst"
@@ -2399,13 +2404,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						text += " "
 					text += response.choices[0].text
 					if premium >= 2:
-						stop = [
-							"cannot fulfil",
-							"cannot assist",
-							"can't fulfil",
-							"can't assist",
-						]
-						if any(s in text for s in stop):
+						if any(s in text for s in STOPS):
 							text = ""
 							redo = True
 							target_model = "emerhyst"

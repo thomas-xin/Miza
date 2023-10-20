@@ -16,6 +16,7 @@ if not hasattr(time, "time_ns"):
 deque = collections.deque
 
 getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
+print = lambda *args, sep=" ", end="\n": sys.stdout.buffer.write(f"~print({repr(sep.join(map(str, args)))},end={repr(end)})\n".encode("utf-8"))
 
 
 def as_str(s):

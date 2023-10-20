@@ -1651,6 +1651,7 @@ transform: translate(-50%, -50%);
 	@cp.expose(("favicon", "favicon.ico"))
 	@hostmap
 	def favicon_ico(self, *args, **kwargs):
+		true_ip()
 		data, mime = fetch_static("icon.ico")
 		cp.response.headers.update(CHEADERS)
 		cp.response.headers["Content-Type"] = mime

@@ -2248,6 +2248,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			m_id = int(message)
 		return self.cache.deleted.get(m_id, False)
 
+	async def verify_integrity(self, message):
+		if self.is_deleted(message):
+			return False
+		if hasattr(message, "simulated"):
+			curr_message = message
+		else:
+			curr_message = await self.fetch_message(message.id, message.channel)
+		if getattr(message, "deleted", None) or getattr(curr_message, "deleted", None):
+			return False
+		return True
+
 	# Logs if a message has been deleted.
 	def log_delete(self, message, no_log=False):
 		if not message:
@@ -4907,6 +4918,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			edited_at = None
 			jump_url = "https://discord.com/channels/-1/-1/-1"
 			is_system = lambda self: None
+			slash = None
 
 			@property
 			def created_at(self):

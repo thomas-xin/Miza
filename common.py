@@ -1473,7 +1473,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 			message = M(state=bot._state, channel=channel, data=eval_json(resp))
 			if ephemeral:
 				message.id = reference.id
-				message.slash = reference.slash
+				message.slash = getattr(reference, "slash", None)
 			for a in message.attachments:
 				print("<attachment>", a.url)
 			return message

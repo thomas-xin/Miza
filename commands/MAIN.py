@@ -490,12 +490,8 @@ class Loop(Command):
 		self.active.add(channel.id)
 		try:
 			for i in range(iters):
-				if hasattr(message, "simulated"):
-					curr_message = message
-				else:
-					curr_message = await bot.fetch_message(message.id, channel)
-				if getattr(message, "deleted", None) or getattr(curr_message, "deleted", None):
-					break
+				if not bot.verify_integrity(message):
+					return
 				loop = i < iters - 1
 				t = utc()
 				# Calls process_message with the argument containing the looped command.
