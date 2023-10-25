@@ -1072,7 +1072,7 @@ class Status(Command):
 		if not hasattr(bot, "bitrate"):
 			return
 		emb = discord.Embed(colour=colour or rand_colour())
-		url = await self.bot.get_proxy_url(self.bot.user)
+		url = best_url(bot.user)
 		emb.set_author(name="Status", url=bot.webserver, icon_url=url)
 		emb.timestamp = utc_dt()
 		if msg is None:
@@ -1862,7 +1862,7 @@ class UpdateMessages(Database):
 						self.data.pop(c_id)
 					else:
 						for m_id, v in data.items():
-							if t - v.t >= 3:
+							if t - v.t >= 4:
 								v.t = t
 								create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_, channel=channel, m_id=m_id, colour=col))
 

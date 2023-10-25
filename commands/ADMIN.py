@@ -1090,7 +1090,7 @@ class StarBoard(Command):
 					data.update(guild.id)
 				return ini_md(f"Starboard reposting is currently disabled in {sqr_md(channel)}.")
 			emojis = []
-			for e_data, (count, c_id, *disabled) in zip(selected, map(data[guild.id].get, selected)):
+			for e_data, (count, c_id, *extra) in zip(selected, map(data[guild.id].get, selected)):
 				try:
 					e_id = int(e_data)
 				except:
@@ -1128,10 +1128,10 @@ class StarBoard(Command):
 					continue
 				channels.append(c)
 				for k in selected:
-					count, c_id2, *disabled = data[guild.id][k]
-					if not disabled:
-						disabled = [set()]
-					disabled = disabled[0]
+					count, c_id2, *extra = data[guild.id][k]
+					if not extra:
+						extra = [set()]
+					disabled = extra[0]
 					if "d" in flags:
 						disabled.add(c_id)
 					else:
@@ -1165,7 +1165,7 @@ class StarBoard(Command):
 		else:
 			count = 1
 		boards = data.setdefault(guild.id, {})
-		boards[emoji] = (count, channel.id, set())
+		boards[emoji] = (count, channel.id, set([channel.id]))
 		data.update(guild.id)
 		return ini_md(f"Successfully added starboard to {sqr_md(channel)}, with trigger {sqr_md(emoji)}: {sqr_md(count)}.")
 
@@ -1211,7 +1211,8 @@ class StarBoard(Command):
 			content += f"{len(curr)} starboard triggers currently assigned for {str(guild).replace('`', '')}:```*"
 
 			def disp(t):
-				s = f"×{t[0]} -> {sqr_md(bot.get_channel(t[1]))}"
+				disabled = ",".join(map(str, sorted(t[2])))
+				s = f"×{t[0]} -> {sqr_md(bot.get_channel(t[1]))} ![{disabled}]"
 				if len(t) > 2:
 					s += ", excludes " + ", ".join(sqr_md(bot.get_channel(i)) for i in t[2])
 				return s

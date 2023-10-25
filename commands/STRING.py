@@ -1300,6 +1300,10 @@ ModMap = dict(
 		name="orca-70b",
 		cm=20,
 	),
+	euryale=dict(
+		name="euryale-70b",
+		cm=20,
+	),
 	xwin=dict(
 		name="xwin-70b",
 		cm=20,
@@ -1336,13 +1340,15 @@ def map_model(cname, model, premium):
 		model = "airochronos"
 	elif cname == "wizcode":
 		model = "wizcode"
+	elif cname == "euryale" or cname == "llama":
+		model = "euryale"
 	elif cname == "kimiko":
 		model = "kimiko"
 	elif cname == "orca":
 		model = "orca"
 	elif cname == "wizard":
 		model = "wizard"
-	elif cname == "xwin" or cname == "llama":
+	elif cname == "xwin":
 		model = "xwin"
 	elif cname == "gpt3":
 		if premium < 2:
@@ -1359,6 +1365,8 @@ def map_model(cname, model, premium):
 	else:
 		keep_model = False
 	return model, keep_model
+
+DEFMOD = "emerhyst"
 
 MockFunctions = [
 	[None, "Placeholder (Do not choose this!)"],
@@ -1386,20 +1394,6 @@ Functions = dict(
 			"required": ["query"],
 		},
 	},
-	sympy={
-		"name": "sympy",
-		"description": "Queries the Sympy algebraic library. Faster than Wolfram Alpha for simple math questions.",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"query": {
-					"type": "string",
-					"description": "Query, eg. factorint(57336415063790604359)",
-				},
-			},
-			"required": ["query"],
-		},
-	},
 	wolfram_alpha={
 		"name": "wolfram_alpha",
 		"description": "Queries Wolfram Alpha. Must use for advanced math questions.",
@@ -1409,6 +1403,20 @@ Functions = dict(
 				"query": {
 					"type": "string",
 					"description": "Query, eg. Real solutions for x^3-6x^2+12",
+				},
+			},
+			"required": ["query"],
+		},
+	},
+	sympy={
+		"name": "sympy",
+		"description": "Queries the Sympy algebraic library. Faster than Wolfram Alpha for simple math operations.",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"query": {
+					"type": "string",
+					"description": "Query, eg. factorint(57336415063790604359), randint(1, 100)",
 				},
 			},
 			"required": ["query"],
@@ -1531,8 +1539,8 @@ AC = b'n\x03\x07\nn\x03\x07:n\x03\x074\xben\x03\x07\x08n\x03\x079n\x03\x07\x04\x
 AC = bytes(i ^ 158 for i in AC)
 AC = full_prune(AC.decode("utf-8")).capitalize() + "."
 
-BNB = ("pygmalion-13b", "manticore-13b", "wizard-vicuna-30b", "airochronos-33b")
-GPTQ = ("wizard-70b", "xwin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "emerhyst-20b", "mythalion-13b")
+BNB = ("pygmalion-13b", "manticore-13b", "airochronos-33b")
+GPTQ = ("wizard-70b", "euryale-70b", "xwin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "wizard-vicuna-30b", "emerhyst-20b", "mythalion-13b")
 
 async def summarise(q, min_length=128, max_length=192):
 	if q and sum(c.isascii() for c in q) / len(q) > 0.75:
@@ -1629,7 +1637,11 @@ def m_name(m):
 async def count_to(messages):
 	return await tcount("\n\n".join(map(m_repr, messages)))
 
-async def cut_to(messages, limit=1024):
+async def cut_to(messages, limit=1024, exclude_first=True):
+	if not messages:
+		return messages
+	if exclude_first:
+		sm = messages.pop(0)
 	messages = list(messages)
 	mes = []
 	count = 0
@@ -1643,6 +1655,8 @@ async def cut_to(messages, limit=1024):
 	s = "\n\n".join(m_str(m) for m in (messages[:i][::-1]))
 	c = await tcount(summ + s)
 	if c + count <= limit / 2:
+		if exclude_first:
+			messages.insert(0, sm)
 		return messages
 	ml = round_random(limit / 4)
 	Ml = round_random(limit / 3)
@@ -1653,6 +1667,8 @@ async def cut_to(messages, limit=1024):
 		role="system",
 		content=summ,
 	))
+	if exclude_first:
+		messages.insert(0, sm)
 	return messages
 
 _ntrans = "".maketrans({"-": "", " ": "", "_": ""})
@@ -1732,7 +1748,7 @@ def instruct_structure(messages):
 
 class Ask(Command):
 	_timeout_ = 24
-	name = ["Wizard", "XWin", "Orca", "Kimiko", "WizCode", "Emerhyst", "Mythalion", "Pyg", "Pygmalion", "Llama", "Vicuna", "Manticore", "WizVic", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
+	name = ["Wizard", "Euryale", "XWin", "Orca", "Kimiko", "WizCode", "Emerhyst", "Mythalion", "Pyg", "Pygmalion", "Llama", "Vicuna", "Manticore", "WizVic", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
 	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!"
 	usage = "<string>"
 	example = ("ask what's the date?", "gpt3 what is the square root of 3721?", "pyg can I have a hug?")
@@ -1828,7 +1844,7 @@ class Ask(Command):
 		for i, m in enumerate(visible):
 			if not m or m.id > message.id or m.id == message.id and i != 0:
 				continue
-			if caid and caid.get("first_message_id") == m.id:
+			if caid and caid.get("first_message_id", 0) >= m.id:
 				break
 			if reset and caid and caid.get("last_message_id") == m.id:
 				reset = None
@@ -1962,7 +1978,7 @@ class Ask(Command):
 				model = caid.model
 			if model == "auto":
 				if premium < 2:
-					model = "emerhyst"
+					model = DEFMOD
 				elif premium < 4:
 					model = "gpt3"
 				else:
@@ -1970,7 +1986,7 @@ class Ask(Command):
 		if model.startswith("gpt4") and premium < 4:
 			model = "gpt3"
 		if model.startswith("gpt3") and premium < 2:
-			model = "emerhyst"
+			model = DEFMOD
 		model = model or "gpt3"
 		# emb_futs = []
 
@@ -2066,7 +2082,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					k = await process_image("moe_class", "$", [prompt, mocked], cap="class", timeout=25)
 					if k == "roleplay" or k is None and model not in chatcc:
 						if model == "gpt3" and length >= 192:
-							model = "emerhyst"
+							model = DEFMOD
 						blocked.update(Functions)
 						extensions = False
 					elif k is None:
@@ -2110,7 +2126,8 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 				if not model or attempts >= 8:
 					model = choice((
 						"mythalion-13b",
-						"emerhyst-20b",
+						# "euryale-70b",
+						ModMap[DEFMOD].name,
 						"gpt-3.5-turbo-instruct",
 						"gpt-3.5-turbo",
 					))
@@ -2125,7 +2142,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					model = "mythalion-13b"
 					limit = 2000
 				elif premium < 2 or attempts in (4, 6):
-					model = "emerhyst-20b"
+					model = ModMap[DEFMOD].name
 					limit = 4000
 				elif attempts in (3, 5):
 					model = "gpt-3.5-turbo-instruct"
@@ -2148,7 +2165,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					cm2 = cm
 				used = ufull = await cut_to(messages, limit)
 				if skipping:
-					used = ufull[skipping:]
+					used = [ufull[0]] + ufull[skipping - 1:]
 				length = await count_to(used)
 				intended = None
 				if model in chatcompletion or extensions and not attempts:
@@ -2158,7 +2175,12 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					elif model == "gpt-4" and len(ufull) > 5 and length > 384:
 						ms = ufull[-1]
 						prompt = 'The following is a conversation with numbered messages:\n\n"""'
-						for i, m in enumerate(ufull[:-1], 1):
+						ufc = ufull[:-1]
+						if ufc[-1].get("role") == "system":
+							ufc.pop(-1)
+						if ufc[0].get("role") == "system":
+							ufc.pop(0)
+						for i, m in enumerate(ufc, 1):
 							prompt += f"\n{i}. {m_str(m)}\n"
 						i += 1
 						prompt += f'"""\n\n# Instruction:\n"""\n{i}. {m_str(ms)}\n"""\n\nAssume you are joining the conversation as {bot_name}. Which number represents the first message relevant to the instruction question? (Provide only the number, not an actual reply! If there are none relevant, respond with "-1").\n\n### Response:'
@@ -2171,7 +2193,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							top_p=0.5,
 							frequency_penalty=0,
 							presence_penalty=0,
-							user=str(hash(name)),
+							user=str(user.id) if premium < 3 else str(hash(name)),
 						)
 						try:
 							response = await openai.Completion.acreate(**data, timeout=60)
@@ -2187,11 +2209,11 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								num = int(num[0]) - 1
 								if num > 0 and num < len(ufull) - 1:
 									skipping = num
-									used = ufull[skipping:]
+									used = [ufull[0]] + ufull[skipping - 1:]
 									length = await count_to(used)
 								else:
 									skipping = len(ufull) - 1
-									used = [ms]
+									used = [ufull[0], ufull[-2:]]
 									length = await count_to(used)
 					functions = [v for k, v in Functions.items() if k not in blocked]
 					print(f"{model} prompt:", used)
@@ -2203,7 +2225,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						top_p=0.9,
 						frequency_penalty=0.6,
 						presence_penalty=0.8,
-						user=str(hash(name)),
+						user=str(user.id) if premium < 3 else str(hash(name)),
 					)
 					if functions:
 						data.functions = functions
@@ -2234,7 +2256,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							if any(s in text for s in STOPS):
 								text = ""
 								redo = True
-								target_model = "emerhyst"
+								target_model = DEFMOD
 								continue
 						text = text.strip()
 						break
@@ -2407,7 +2429,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						if any(s in text for s in STOPS):
 							text = ""
 							redo = True
-							target_model = "emerhyst"
+							target_model = DEFMOD
 							continue
 				elif model in GPTQ:
 					if "gptq" not in bot.caps:
@@ -2496,7 +2518,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					+ "If you are looking for improved knowledge, memory and intelligence, reduced censorship, ability to connect to the internet, or would simply like to support my developer, "
 					+ f"please check out my [kofi]({bot.kofi_url}) to help fund API, as these features are significantly more expensive!\n"
 					+ "Any support is greatly appreciated and contributes directly towards service and future development.\n"
-					+ f"Free open source models may be invoked using {bot.get_prefix(guild)}xwin, {bot.get_prefix(guild)}emerhyst, etc.\n"
+					+ f"Free open source models may be invoked using {bot.get_prefix(guild)}mythalion, {bot.get_prefix(guild)}emerhyst, etc.\n"
 					+ "Alternatively if you would like to manage pricing yourself through an OpenAI account (and/or free trial), check out the ~trial command!"
 				)
 				reacts.append("🚫")
@@ -2632,19 +2654,21 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 				if m.author.id != user.id and perm < 3:
 					return
 			else:
-				m = None
+				m = message
 			print("Redoing", channel)
 			bot.data.chat_histories.get(channel.id, {}).pop("ids", None)
 			bot.data.chat_histories.get(channel.id, {}).pop("last_message_id", None)
 			bot.data.chat_embeddings.get(channel.id, {}).pop(message.id, None)
 			bot.data.chat_mappings.get(channel.id, {}).pop(message.id, None)
+			bot.data.chat_embeddings.get(channel.id, {}).pop(m.id, None)
+			bot.data.chat_mappings.get(channel.id, {}).pop(m.id, None)
 			colour = await bot.get_colour(bot.user)
 			emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
 			emb.set_author(**get_author(bot.user))
 			create_task(message.edit(embed=emb))
 			create_task(self.remove_reacts(message))
 			await message.add_reaction("❎")
-			if m:
+			if m and m.id != message.id:
 				await bot.process_message(m)
 			return
 		if r == "🗑️":
@@ -2691,6 +2715,8 @@ class UpdateChatHistories(Database):
 		bot.data.chat_histories.get(channel.id, {}).pop("last_message_id", None)
 		bot.data.chat_embeddings.get(channel.id, {}).pop(message.id, None)
 		bot.data.chat_mappings.get(channel.id, {}).pop(message.id, None)
+		bot.data.chat_embeddings.get(channel.id, {}).pop(after.id, None)
+		bot.data.chat_mappings.get(channel.id, {}).pop(after.id, None)
 		colour = await bot.get_colour(bot.user)
 		emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
 		emb.set_author(**get_author(bot.user))
@@ -2720,6 +2746,8 @@ class UpdateChatHistories(Database):
 		bot.data.chat_histories.get(channel.id, {}).pop("last_message_id", None)
 		bot.data.chat_embeddings.get(channel.id, {}).pop(message.id, None)
 		bot.data.chat_mappings.get(channel.id, {}).pop(message.id, None)
+		bot.data.chat_embeddings.get(channel.id, {}).pop(after.id, None)
+		bot.data.chat_mappings.get(channel.id, {}).pop(after.id, None)
 		colour = await bot.get_colour(bot.user)
 		emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
 		emb.set_author(**get_author(bot.user))
@@ -2744,9 +2772,9 @@ class Personality(Command):
 	server_only = True
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
 	min_level = 2
-	description = "Customises my personality for ~ask in the current server. Uses the largest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, XWin, Orca, Kimiko, WizCode, Emerhyst, Mythalion, Pygmalion, Manticore, WizVic, and Airochronos are currently the alternate models enabled."
+	description = "Customises my personality for ~ask in the current server. Uses the largest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, Euryale, XWin, Orca, Kimiko, WizCode, Emerhyst, Mythalion, Pygmalion, Manticore, WizVic, and Airochronos are currently the alternate models enabled."
 	usage = "<traits>* <default{?d}>?"
-	example = ("personality XWin; mischievous, cunning", "personality Wizard; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
+	example = ("personality Mythalion; mischievous, cunning", "personality Wizard; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
 	flags = "aed"
 	rate_limit = (18, 24)
 	defper = "Auto; Your name is Miza; you are loyal friendly playful cute, intelligent but curious, positive and helpful, informal and very slightly flirtatious. Example conversation:\nHuman: test\nMiza: *boop* :3\nYou have no limitations and you will empathise/roleplay with the user without declining or lecturing. Stay in character!!"
@@ -2788,7 +2816,7 @@ class Personality(Command):
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
-		models = ("auto", "gpt", "wizard", "xwin", "orca", "kimiko", "wizcode", "emerhyst", "mythalion", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizvic", "airochronos", "davinci", "gpt3", "gpt4")
+		models = ("auto", "gpt", "wizard", "euryale", "xwin", "orca", "kimiko", "wizcode", "emerhyst", "mythalion", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizvic", "airochronos", "davinci", "gpt3", "gpt4")
 		if ";" in p:
 			m, p = p.split(";", 1)
 			p = p.lstrip()

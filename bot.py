@@ -1506,7 +1506,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if verify:
 					fut = esubmit(Request, base + "png")
 				url = base + "gif"
-				with reqs.next().head(url, stream=True) as resp:
+				with reqs.next().head(url, headers=Request.header(), stream=True) as resp:
 					if resp.status_code in range(400, 500):
 						if not verify:
 							return False
@@ -1526,7 +1526,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	def emoji_exists(self, e):
 		if type(e) in (int, str):
 			url = f"https://cdn.discordapp.com/emojis/{e}.png"
-			with reqs.next().head(url, stream=True) as resp:
+			with reqs.next().head(url, headers=Request.header(), stream=True) as resp:
 				if resp.status_code in range(400, 500):
 					self.emoji_stuff.pop(int(e), None)
 					return
@@ -3578,6 +3578,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if command_check in bot.commands:
 				gid = self.data.blacklist.get(0)
 				if gid and gid != g_id and not isnan(u_perm):
+					print("BOUNCED:", user, message.content)
 					create_task(send_with_react(
 						channel,
 						"I am currently under maintenance, please stay tuned!",

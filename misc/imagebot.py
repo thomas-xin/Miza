@@ -323,7 +323,7 @@ def split_prompt(prompt, limit=75, aggressive=False):
 	while "," in prompt2 and ".." in lim_tokens(prompt2, limit) and ".." not in lim_tokens(prompt, limit):
 		spl = prompt2.split(",", 1)
 		prompt, prompt2 = prompt + ", " + spl[0], spl[1].lstrip()
-	return prompt.strip(" ,"), prompt2.strip(" ,")
+	return prompt.strip(" ,."), prompt2.strip(" ,.")
 
 
 class Bot:
@@ -624,7 +624,7 @@ class Bot:
 	safety_checkers = {}
 	# device, dtype = determine_cuda(0)
 	# gen = torch.Generator(f"cuda:{device}" if device >= 0 else "cpu").manual_seed(time.time_ns() - 1)
-	def art_stablediffusion_local(self, prompt, kwargs=None, aspect_ratio=0, negative_prompt=None, model="stabilityai/stable-diffusion-xl-base-1.0", fail_unless_gpu=True, nsfw=False, count=1, sdxl=False):
+	def art_stablediffusion_local(self, prompt, kwargs=None, aspect_ratio=0, negative_prompt=None, model="stabilityai/stable-diffusion-xl-base-1.0", fail_unless_gpu=True, nsfw=False, count=1, sdxl=False, z=False):
 		from diffusers import StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusionXLInpaintPipeline, StableDiffusionImageVariationPipeline
 		from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
 		if not kwargs.get("--init-image"):
@@ -670,7 +670,7 @@ class Bot:
 					dtype = torch.float32
 		# if dtype is torch.float16:
 		# 	dtype = torch.bfloat16
-		images = self.art_stablediffusion_sub(pf, model, prompt, kwargs, count, aspect_ratio, negative_prompt, device, dtype, nsfw, fail_unless_gpu, sdxl=sdxl)
+		images = self.art_stablediffusion_sub(pf, model, prompt, kwargs, count, aspect_ratio, negative_prompt, device, dtype, nsfw, fail_unless_gpu, sdxl=sdxl, z=z)
 		out = []
 		for im in images:
 			b = io.BytesIO()
@@ -687,11 +687,13 @@ class Bot:
 		except:
 			print_exc()
 
+	vae = None
 	loading = None
 	neg_prompt = "blurry, distorted, disfigured, bad anatomy, poorly drawn, low quality, ugly"
-	def art_stablediffusion_sub(self, pf, model, prompt, kwargs, count, aspect_ratio=0, negative_prompt=None, device=-1, dtype=torch.float32, nsfw=False, fail_unless_gpu=True, sdxl=False):
+	def art_stablediffusion_sub(self, pf, model, prompt, kwargs, count, aspect_ratio=0, negative_prompt=None, device=-1, dtype=torch.float32, nsfw=False, fail_unless_gpu=True, sdxl=False, z=False):
 		from diffusers import DPMSolverMultistepScheduler, StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusionXLInpaintPipeline, StableDiffusionImageVariationPipeline
 		from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline
+		from diffusers.models import AutoencoderKL
 		cia = torch.cuda.is_available()
 		models = self.models.setdefault(device, {})
 		checkers = self.safety_checkers.setdefault(device, {})
@@ -703,6 +705,7 @@ class Bot:
 			self.loading.result()
 		with torch.no_grad():
 			torch.cuda.empty_cache()
+		spare = torch.cuda.get_device_properties(device).total_memory > 15 * 1073741824
 		if not pipe:
 			try:
 				self.loading = concurrent.futures.Future()
@@ -710,6 +713,9 @@ class Bot:
 				if sdxl:
 					kw["use_safetensors"] = True
 					kw["variant"] = "fp16"
+					if not self.vae:
+						self.vae = AutoencoderKL.from_pretrained("stabilityai/sdxl-vae", torch_dtype=dtype, use_safetensors=True)
+					kw["vae"] = self.vae
 				try:
 					if fail_unless_gpu and (device < 0 or not models.get((f2, model), True)):
 						return
@@ -717,18 +723,17 @@ class Bot:
 					if device >= 0:
 						if os.name != "nt":
 							pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
-						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-						try:
-							# compute_order = globals().get("COMPUTE_ORDER") or (0,)
-							# di = int(sys.argv[1]) - 3 if len(sys.argv) > 1 else 0
-							# if compute_order.index(di) >= len(compute_order) / 2:
-								# raise AttributeError
-							pipe.enable_model_cpu_offload(gpu_id=device)
-						except AttributeError:
-							pipe.enable_attention_slicing()
-							pipe = pipe.to(f"cuda:{device}")
-						if sdxl:
+						pipe.enable_attention_slicing()
+						if sdxl and spare:
 							pipe.enable_vae_tiling()
+						try:
+							if 1 or spare:
+								pipe.enable_model_cpu_offload(gpu_id=device)
+							else:
+								pipe.enable_sequential_cpu_offload(gpu_id=device)
+						except AttributeError:
+							pipe = pipe.to(f"cuda:{device}")
+						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 				except Exception as ex:
 					if isinstance(ex, RuntimeError):
 						if sdxl:
@@ -768,11 +773,13 @@ class Bot:
 			if not isinstance(b, str):
 				b = io.BytesIO(b)
 			mask = Image.open(b)
-		output_type = "latent" if sdxl > 1 else "pil"
+		output_type = "latent" if sdxl > 1 and spare else "pil"
 		kw = {}
 		if sdxl:
-			kw = dict(output_type=output_type, denoising_end=0.8)
-			ms = 1024# if sdxl > 1 else 768
+			kw = dict(output_type=output_type)
+			ms = 1024
+			if not z:
+				kw["denoising_end"] = 0.8
 			if aspect_ratio != 0:
 				x, y = max_size(aspect_ratio, 1, ms, force=True)
 			elif im:
@@ -802,6 +809,8 @@ class Bot:
 				kw["negative_prompt_2"] = [negs[not i] for i in neg_indices]
 		else:
 			true_prompt = [prompt] * count
+		# if not spare:
+			# pipe.enable_model_cpu_offload(gpu_id=device)
 		if f2 in (StableDiffusionInpaintPipeline, StableDiffusionXLInpaintPipeline):
 			data = pipe(
 				true_prompt,
@@ -839,6 +848,8 @@ class Bot:
 				guidance_scale=float(kwargs.get("--guidance-scale", 9.9)),
 				**kw,
 			)
+		# if not spare:
+			# pipe.enable_sequential_cpu_offload(gpu_id=device)
 		# print(data, data.images)
 		if data is None or not len(data.images):
 			exc.submit(self.conc_clear_cache)
@@ -860,17 +871,21 @@ class Bot:
 			images.append(im)
 		if not images and all(nsfw_content_detected):
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
-		if images and output_type == "latent":
+		if 0 and images and output_type == "latent":
 			vae = pipe.vae
 			text_encoder_2 = pipe.text_encoder_2
+		else:
+			vae = text_encoder_2 = None
+		if images and sdxl > 1:
 			images = self.art_stablediffusion_refine(original_prompt, images, negative_prompt=negative_prompt, vae=vae, text_encoder_2=text_encoder_2, fail_unless_gpu=fail_unless_gpu, device=device, dtype=dtype, orig_size=max_size(*kw.get("target_size", (1024, 1024)), 1024))
 			# random.shuffle(images)
 		elif not self.loading or self.loading.done():
 			self.loading = exc.submit(self.conc_clear_cache)
 		return images
 
-	def art_stablediffusion_refine(self, prompt, images, negative_prompt=None, vae=None, text_encoder_2=None, fail_unless_gpu=False, device=0, dtype=torch.bfloat16, steps=48, orig_size=(1024, 1024), upscale=False):
+	def art_stablediffusion_refine(self, prompt, images, negative_prompt=None, vae=None, text_encoder_2=None, fail_unless_gpu=False, device=0, dtype=torch.float16, steps=48, orig_size=(1024, 1024), upscale=False):
 		from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
+		from diffusers.models import AutoencoderKL
 		if isinstance(images, (bytes, memoryview)):
 			images = [Image.open(io.BytesIO(images))]
 			if orig_size != images[0].size:
@@ -898,12 +913,17 @@ class Bot:
 			self.loading.result()
 		with torch.no_grad():
 			torch.cuda.empty_cache()
+		spare = torch.cuda.get_device_properties(device).total_memory > 15 * 1073741824
 		if not pipe:
 			try:
 				self.loading = concurrent.futures.Future()
 				kw = {}
 				if vae:
 					kw["vae"] = vae
+				else:
+					if not self.vae:
+						self.vae = AutoencoderKL.from_pretrained("stabilityai/sdxl-vae", torch_dtype=dtype, use_safetensors=True)
+					kw["vae"] = self.vae
 				if text_encoder_2:
 					kw["text_encoder_2"] = text_encoder_2
 				try:
@@ -913,18 +933,17 @@ class Bot:
 					if device >= 0:
 						if os.name != "nt":
 							pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
-						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+						pipe.enable_attention_slicing()
+						if spare:
+							pipe.enable_vae_tiling()
 						try:
-							# compute_order = globals().get("COMPUTE_ORDER") or (0,)
-							# di = int(sys.argv[1]) - 3 if len(sys.argv) > 1 else 0
-							# if compute_order.index(di) >= len(compute_order) / 2:
-								# raise AttributeError
-							pipe.enable_model_cpu_offload(gpu_id=device)
+							if spare:
+								pipe.enable_model_cpu_offload(gpu_id=device)
+							else:
+								pipe.enable_sequential_cpu_offload(gpu_id=device)
 						except AttributeError:
 							pipe = pipe.to(f"cuda:{device}")
-						pipe.enable_attention_slicing()
-						if True:
-							pipe.enable_vae_tiling()
+						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 				except Exception as ex:
 					if isinstance(ex, RuntimeError):
 						raise
@@ -970,10 +989,14 @@ class Bot:
 			kw["negative_prompt"] = [negs[i] for i in neg_indices]
 			kw["negative_prompt_2"] = [negs[not i] for i in neg_indices]
 		print("KW:", kw)
+		# if not spare:
+			# pipe.enable_model_cpu_offload(gpu_id=device)
 		data = pipe(
 			image=images,
 			**kw,
 		)
+		# if not spare:
+			# pipe.enable_sequential_cpu_offload(gpu_id=device)
 		images = []
 		for im in data.images:
 			p = np.sum(im.resize((32, 32)).convert("L"))

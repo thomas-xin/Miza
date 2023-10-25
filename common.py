@@ -13,6 +13,7 @@ if cachedir:
 	os.environ["TRANSFORMERS_CACHE"] = f"{cachedir}/huggingface/transformers"
 	os.environ["HF_DATASETS_CACHE"] = f"{cachedir}/huggingface/datasets"
 
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 MultiAutoImporter(
 	"psutil",
 	"subprocess",
@@ -1575,10 +1576,9 @@ def get_author(user, u_id=None):
 			url = url2
 		else:
 			bot.data.exec.cproxy(url)
+	name = getattr(user, "display_name", None) or user.name
 	if u_id:
-		name = f"{user.display_name} ({user.id})"
-	else:
-		name = str(user.display_name)
+		name = f"{name} ({user.id})"
 	return cdict(name=name, icon_url=url, url=url)
 
 # Finds emojis and user mentions in a string.
@@ -2577,7 +2577,7 @@ FIRST_LOAD = True
 # class			GPU >400k, VRAM >11GB			V100, RTX3060, A2000, RTX4070
 # sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
 # sdxl			GPU >400k, VRAM >9GB			GTX1080ti, RTX2080ti, RTX3060, RTX3080, A2000
-# sdxlr			GPU >400k, VRAM >15GB			V100, RTX3090, A4000, RTX4080, L4
+# sdxlr			GPU >400k, VRAM >11GB			V100, RTX3090, A4000, RTX4080, L4
 # gptq			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
 def spec2cap():
 	try:
@@ -2614,6 +2614,7 @@ def spec2cap():
 		rrams = []
 	vrams = tuple(rrams)
 	cut = 0
+	did = ()
 	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(rrams, COMPUTE_POT)):
 		vram = sum(rrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
 		if vram > 44 * 1073741824:
@@ -2629,8 +2630,8 @@ def spec2cap():
 				else:
 					break
 			if FIRST_LOAD:
-				yield [[], "load", "gptq"]
 				globals()["FIRST_LOAD"] = False
+				yield [[], "load", "gptq"]
 			yield [did, "agpt", "gptq"]
 			done.append("gptq")
 	if cc > 1:
@@ -2665,10 +2666,6 @@ def spec2cap():
 			caps.append("class")
 			done.append("class")
 			v -= 11 * 1073741824
-		if c > 200000 and v > 4 * 1073741824 and (v > 19 * 1073741824 or done.count("summ") <= DC / 2):
-			caps.append("summ")
-			done.append("summ")
-			v -= 2 * 1073741824
 		if c > 400000 and v > 15 * 1073741824:
 			caps.append("sdxlr")
 			caps.append("sdxl")
@@ -2679,7 +2676,7 @@ def spec2cap():
 			caps.append("sdxlr")
 			caps.append("ngptq")
 			# done.append("sdxlr")
-			v = 0
+			v -= 15 * 1073741824
 		elif c > 400000 and v > 9 * 1073741824:
 			# if "sdxl" not in done or c <= 600000:
 			caps.append("sdxl")
@@ -2690,15 +2687,21 @@ def spec2cap():
 			caps.append("sdxl")
 			caps.append("ngptq")
 			done.append("sdxl")
-			v = 0
-		elif c > 200000 and v > 5 * 1073741824:
+			v -= 9 * 1073741824
+		if c > 200000 and v > 5 * 1073741824:
 			if "sd" not in done or c <= 600000:
 				caps.append("sd")
 				done.append("sd")
 				v -= 5 * 1073741824
+		if c > 200000 and v > 2 * 1073741824 and vrams[i] > 4 * 1073741824:
+			caps.append("summ")
+			done.append("summ")
+			# v -= 2 * 1073741824
 		# if v <= 4 * 1073741824:
 			# v = 0
 		# vrams[i] = v
+		if i not in did and "ngptq" in caps:
+			caps.remove("ngptq")
 		if len(caps) > 1:
 			yield caps
 
@@ -2718,12 +2721,14 @@ def proc_start():
 	else:
 		COMPUTE_LOAD = ()
 		globals()["DC"] = 0
-	with tracebacksuppressor:
-		caps = list(spec2cap())
+	caps = globals().get("SCAP", [])
+	if not caps:
+		with tracebacksuppressor:
+			caps = globals()["SCAP"] = list(spec2cap())
 	print("CAPS:", caps)
 	for n, (di, *caps) in enumerate(caps):
 		create_task(start_proc(n, di, caps))
-		time.sleep(1)
+		time.sleep(2)
 
 async def sub_submit(cap, command, _timeout=12):
 	bot = BOT[0]

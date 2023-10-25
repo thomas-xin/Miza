@@ -1118,7 +1118,7 @@ class Resize(Command):
 			fmt2 = url.split("?", 1)[0].rsplit(".", 1)[-1]
 			if fmt2 not in ("mp4", "gif"):
 				if is_url(url):
-					resp = await asubmit(requests.head, url)
+					resp = await asubmit(requests.head, url, headers=Request.header(), stream=True)
 					fmt2 = resp.headers["Content-Type"].rsplit("/", 1)[-1]
 					if fmt2 not in ("mp4", "gif"):
 						fmt2 = "mp4"
@@ -1548,7 +1548,7 @@ class Art(Command):
 	usage = "<0:prompt> <inpaint{?i}>? <single{?s}> <raw{?r}>"
 	example = ("art cute kitten", "art https://mizabot.xyz/favicon")
 	rate_limit = (45, 60)
-	flags = "irs"
+	flags = "irsz"
 	typing = True
 	slash = ("Art", "Imagine")
 	sdiff_sem = Semaphore(3, 256, rate_limit=7)
@@ -1731,7 +1731,7 @@ class Art(Command):
 					pass
 			out = out.replace("Dall·E", "art")
 			if out:
-				prompt = (nprompt or oprompt) + ".\n\n" + out.strip()
+				prompt = (nprompt or oprompt).removesuffix(".") + ".\n\n" + out.strip()
 			else:
 				prompt = nprompt or oprompt
 		req = prompt
@@ -1785,15 +1785,15 @@ class Art(Command):
 			return
 
 		async def ibasl_r(p, k, n, f, c, s, a, np):
-			if sdxl and (c > 1 or premium >= 4 or random.randint(0, 1)):
+			if sdxl and (c > 1 or premium >= 4 or random.randint(0, 1)) and "z" not in flags:
 				try:
 					await process_image("lambda: 1+1", "$", (), cap="sdxlr", timeout=2)
 				except:
 					print_exc()
 				else:
 					return await process_image("IBASLR", "&", [p, k, n, f, c, a, np], cap="sdxlr", timeout=420)
-			resp = await process_image("IBASL", "&", [p, k, n, f, c, s, a, np], cap="sdxl" if s else "sd", timeout=420)
-			if s:
+			resp = await process_image("IBASL", "&", [p, k, n, f, c, s, a, np, "z" in flags], cap="sdxl" if s else "sd", timeout=420)
+			if s and "z" not in flags:
 				out = []
 				for r1 in resp:
 					r2 = await process_image("IBASR", "$", [p, r1, 64, np], cap="sdxlr", timeout=240)

@@ -1376,7 +1376,7 @@ class AudioDownloader:
 		with self.backup_sem:
 			url = verify_url(url)
 			if is_url(url) and not is_youtube_url(url):
-				with requests.head(url) as resp:
+				with requests.head(url, headers=Request.header(), stream=True) as resp:
 					url = resp.url
 					name = url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
 					ctype = resp.headers.get("Content-Type")
@@ -5779,7 +5779,8 @@ class UpdateAudio(Database):
 	backup_sem = Semaphore(1, 0, rate_limit=30)
 	async def backup(self, force=False):
 		if self.bot.ready:
-			self.data.clear()
+			if "blacklist" in self.bot.data and self.bot.data.blacklist.get(0):
+				self.data.clear()
 		for auds in tuple(self.players.values()):
 			if not auds.acsi:
 				continue
@@ -5827,7 +5828,7 @@ class UpdateAudio(Database):
 				count += 1
 		if count:
 			print(f"Successfully reinstated {count} audio file{'s' if count != 1 else ''}")
-		if "blacklist" in self.data and self.data.blacklist.get(0):
+		if "blacklist" in self.bot.data and self.bot.data.blacklist.get(0):
 			return
 		for k, v in self.data.items():
 			with tracebacksuppressor:

@@ -413,13 +413,14 @@ try:
 	up_old = ioc.bytes_sent
 	down_old = ioc.bytes_recv
 	ot = time.time() - 1
+	next_delay = 0
 	import itertools
 	for i in itertools.count(0):
+		t = time.time()
 		if debug:
-			print(i)
+			print(i, next_delay, t)
 		next_delay = 5
 		ip = "<IP>"
-		t = time.time()
 		ioc = psutil.net_io_counters()
 		up_bps = (ioc.bytes_sent - up_old) / (t - ot)
 		down_bps = (ioc.bytes_recv - down_old) / (t - ot)

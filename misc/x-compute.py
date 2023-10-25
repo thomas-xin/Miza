@@ -82,6 +82,7 @@ def convert_fut(fut):
 		loop.create_task(_await_fut(fut, ret))
 	return ret
 
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 if len(sys.argv) > 1 and sys.argv[1]:
 	os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
 	DEVICES = list(map(int, sys.argv[1].split(",")))
@@ -130,7 +131,6 @@ if CAPS.intersection(("image", "caption", "video", "sd", "sdxl", "sdxlr")):
 else:
 	Image = None
 
-# os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 try:
 	import torch
 except:
@@ -1801,12 +1801,14 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 		def load_models():
 			mods = dict(
 				load_gptq=(
+					"euryale-70b",
 					"xwin-70b",
 					"wizard-70b",
 					"kimiko-70b",
 					"wizard-coder-34b",
 					"mythalion-13b",
 					"emerhyst-20b",
+					"wizard-vicuna-30b",
 					"orca-70b",
 					"nous-puffin-70b",
 				),
@@ -1880,7 +1882,6 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 				load_bnb=(
 					"pygmalion-13b",
 					"manticore-13b",
-					"wizard-vicuna-30b",
 					"airochronos-33b",
 				),
 			)
@@ -1965,12 +1966,12 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 	imagebot.COMPUTE_ORDER = COMPUTE_ORDER
 	imagebot.DEVICES = DEVICES
 
-	def IBASL(prompt, kwargs, nsfw=False, force=True, count=1, sdxl=False, aspect_ratio=0, negative_prompt=None):
+	def IBASL(prompt, kwargs, nsfw=False, force=True, count=1, sdxl=False, aspect_ratio=0, negative_prompt=None, z=False):
 		try:
 			ib = CBOTS[None]
 		except KeyError:
 			ib = CBOTS[None] = imagebot.Bot()
-		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=sdxl, aspect_ratio=aspect_ratio, negative_prompt=negative_prompt)
+		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=sdxl, aspect_ratio=aspect_ratio, negative_prompt=negative_prompt, z=z)
 
 	def IBASR(prompt, image, steps=64, negative_prompt=None):
 		# print(prompt)

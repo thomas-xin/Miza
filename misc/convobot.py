@@ -503,10 +503,13 @@ class Bot:
 		else:
 			print(f"LOADING GPTQ {model}...")
 		mfut = None
+		from transformers import AutoTokenizer, AutoModelForCausalLM
 		try:
-			from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig, exllama_set_max_input_length
 			buffer = 1.3
-			if model == "wizard-70b":
+			if model == "euryale-70b":
+				m = "TheBloke/Euryale-1.3-L2-70B-GPTQ"
+				req = 35
+			elif model == "wizard-70b":
 				m = "TheBloke/WizardLM-70B-V1.0-GPTQ"
 				req = 35
 			elif model == "xwin-70b":
@@ -524,19 +527,11 @@ class Bot:
 			elif model == "wizard-coder-34b":
 				m = "TheBloke/WizardCoder-Python-34B-V1.0-GPTQ"
 				req = 17
+			elif model == "wizard-vicuna-30b":
+				m = "TheBloke/Wizard-Vicuna-30B-Uncensored-GPTQ"
+				req = 16.5
 			elif model == "emerhyst-20b":
-				f = os.environ.get("TRANSFORMERS_CACHE", "cache").replace("\\", "/")
-				m = f + "/models--TheBloke--Emerhyst-20B-GPTQ"
-				if not os.path.exists(m) or not os.path.exists(m + "/snapshots") and not os.path.exists(m + "/model.safetensors"):
-					args = ["git", "clone", "https://huggingface.co/TheBloke/Emerhyst-20B-GPTQ", m]
-					print(args, m)
-					if os.path.exists(m):
-						import shutil
-						shutil.rmdir(m)
-					import subprocess
-					subprocess.run(args, cwd=f)
-				if fail:
-					return
+				m = "TheBloke/Emerhyst-20B-GPTQ"
 				req = 10
 			elif model == "mythalion-13b":
 				m = "TheBloke/Mythalion-13B-GPTQ"
@@ -549,54 +544,70 @@ class Bot:
 				if fail:
 					max_mem = {}
 				else:
-					tokeniser = backup_model(AutoTokenizer.from_pretrained, m)
+					assert torch.cuda.device_count()
+					tokeniser = AutoTokenizer.from_pretrained(m)
 					mfut = concurrent.futures.Future()
 					self.models[m] = (tokeniser, mfut)
-					n = torch.cuda.device_count()
-					if not n:
-						raise RuntimeError("Required GPU not found.")
 					try:
 						import pynvml
 						pynvml.nvmlInit()
-						dc = pynvml.nvmlDeviceGetCount()
-						COMPUTE_ORDER = globals().get("COMPUTE_ORDER") or range(torch.cuda.device_count())
+						dc = torch.cuda.device_count()
+						COMPUTE_ORDER = globals().get("COMPUTE_ORDER") or range(dc)
 
 						def cuda_info():
 							import torch
-							return [torch.cuda.get_device_properties(COMPUTE_ORDER.index(i)) if i in COMPUTE_ORDER else None for i in range(dc)]
+							return [torch.cuda.get_device_properties(i) for i in range(dc)]
 
 						fut2 = exc.submit(cuda_info)
-						handles = [pynvml.nvmlDeviceGetHandleByIndex(i) if i in COMPUTE_ORDER else None for i in range(dc)]
+						handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in COMPUTE_ORDER]
 						gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) if d else None for d in handles]
 						tinfo = fut2.result()
 					except:
 						print_exc()
 						tinfo = gmems = COMPUTE_ORDER = []
-					COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * n
-					i = sorted(COMPUTE_ORDER, key=lambda i: (gmems[i].total - gmems[i].used >= (req * buffer + 2) * 1073741824, -round(gmems[i].total / 1073741824), COMPUTE_LOAD[i] if priority else -COMPUTE_LOAD[i]), reverse=True)[0]
+					COMPUTE_LOAD = [(globals().get("COMPUTE_LOAD") or [0] * dc)[i] for i in COMPUTE_ORDER]
+					i = sorted(range(len(COMPUTE_ORDER)), key=lambda i: (gmems[i].total - gmems[i].used >= (req * buffer + 2) * 1073741824, -round(gmems[i].total / 1073741824), COMPUTE_LOAD[i] if priority else -COMPUTE_LOAD[i]), reverse=True)[0]
 					if gmems[i].total - gmems[i].used >= (req * buffer + 2) * 1073741824:
-						max_mem = {COMPUTE_ORDER.index(i): f"{round((gmems[i].total - gmems[i].used) / 1048576 - 2048)}MiB"}
+						max_mem = {i: f"{round((gmems[i].total - gmems[i].used) / 1048576 - 2048)}MiB"}
 					else:
 						high = max(COMPUTE_LOAD)
-						bit4 = [i for i in COMPUTE_ORDER if COMPUTE_LOAD[i] > high / 2]
-						total = sum(COMPUTE_LOAD[i] for i in bit4)
 						hmem = max(m.total for m in gmems if m)
-						if high:
-							loads = [(max(r / total, 1.25 / len(bit4)) * req if r < high * 0.9 else inf) if gmems[i] and gmems[i].total > hmem * 0.6 else 0 for i, r in enumerate(COMPUTE_LOAD)]
-						else:
-							loads = [inf] * n
-						max_mem = {COMPUTE_ORDER.index(i): f"{round(min((gmems[i].total / 1048576 - (1 if i else 2) * 1024), loads[i] * 1024))}MiB" for i in bit4}
+						bit4 = [i for i in COMPUTE_ORDER if COMPUTE_LOAD[COMPUTE_ORDER.index(i)] > high / 2 and gmems[COMPUTE_ORDER.index(i)].total >= hmem * 2 / 3]
+						total = sum(COMPUTE_LOAD[COMPUTE_ORDER.index(i)] for i in bit4)
+						loads = [(max(r / total, 1.25 / len(bit4)) * req if r < high * 0.9 else inf) if gmems[i].total > hmem * 0.6 else 0 for i, r in enumerate(COMPUTE_LOAD)]
+						max_mem = {COMPUTE_ORDER.index(i): f"{round(min((gmems[COMPUTE_ORDER.index(i)].total / 1048576 - (1 if i else 2) * 1024), loads[COMPUTE_ORDER.index(i)] * 1024))}MiB" for i in bit4}
 						max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 					print("MAX_MEM:", max_mem)
+				from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig, exllama_set_max_input_length
+				quantize_config = BaseQuantizeConfig(
+					bits=4,
+					group_size=128,
+					damp_percent=0.1,
+					desc_act=True,
+					sym=True,
+					true_sequential=True,
+					model_name_or_path=None,
+					model_file_base_name="model",
+				)
 				if fail:
 					# intentionally fail check so the model downloads but doesn't actually enter gpu ram
 					try:
 						with accelerate.init_empty_weights():
-							model = AutoModelForCausalLM.from_pretrained(m, device_map={}, offload_folder="cache", torch_dtype=torch.float16, resume_download=True)
+							model = AutoModelForCausalLM.from_pretrained(
+								m,
+								revision="gptq-4bit-128g-actorder_True",
+								device_map={},
+								offload_folder="cache",
+								torch_dtype=torch.float16,
+								resume_download=True,
+							)
 					except ValueError:
-						return
+						pass
+					return
 				model = AutoGPTQForCausalLM.from_quantized(
 					m,
+					revision="gptq-4bit-128g-actorder_True",
+					quantize_config=quantize_config,
 					max_memory=max_mem,
 					use_safetensors=True,
 					use_triton=False,
@@ -604,9 +615,12 @@ class Bot:
 					offload_folder="cache",
 					resume_download=True,
 				)
-				if model.config.max_position_embeddings < limit * 2:
+				# lim = 2 ** round(math.log2(limit) + 1)
+				lim = limit
+				if model.config.max_position_embeddings < lim:
+					print(model, model.config.max_position_embeddings, lim)
 					try:
-						model = exllama_set_max_input_length(model, limit * 2)
+						model = exllama_set_max_input_length(model, lim)
 					except:
 						print_exc()
 				mfut.set_result(model)
@@ -641,11 +655,6 @@ class Bot:
 			elif model == "manticore-13b":
 				m = "openaccess-ai-collective/manticore-13b-chat-pyg"
 				req = 13
-			elif model == "wizard-vicuna-30b":
-				# m = "Panchovix/Wizard-Vicuna-30B-Uncensored-lxctx-PI-16384-LoRA-fp16"
-				m = "ehartford/Wizard-Vicuna-30B-Uncensored"
-				req = 33
-				buffer = 1.5
 			else:
 				m = "Henk717/airochronos-33B"
 				req = 33

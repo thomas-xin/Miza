@@ -670,6 +670,8 @@ class UpdateExec(Database):
 		out = [None] * len(urls)
 		files = [None] * len(urls)
 		sendable = [c_id for c_id, flag in self.data.items() if flag & 16]
+		headers = Request.header()
+		headers["User-Agent"] += " MizaUnproxy/1.0.0"
 		bot = self.bot
 		for i, url in enumerate(urls):
 			if isinstance(url, (bytes, memoryview)):
@@ -688,7 +690,7 @@ class UpdateExec(Database):
 				if force or not xrand(16):
 
 					def verify(url, uhu):
-						with reqs.next().head(url, stream=True) as resp:
+						with reqs.next().head(url, headers=headers, stream=True) as resp:
 							if resp.status_code not in range(200, 400):
 								bot.data.proxies.pop(uhu, None)
 
