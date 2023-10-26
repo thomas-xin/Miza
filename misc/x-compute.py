@@ -1696,11 +1696,11 @@ if "ytdl" in CAPS:
 								traceback.print_exc()
 				if not os.path.exists("cache"):
 					os.mkdir("cache")
-				args = ["ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-threads", "3", "-hide_banner", "-nostdin", "-v", "error", "-y", "-i", stream, "-vn", "-c:a", "copy", fn]
+				args = ["ffmpeg", "-map_metadata", "-1", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-threads", "3", "-hide_banner", "-nostdin", "-v", "error", "-y", "-i", stream, "-vn", "-c:a", "copy", fn]
 				try:
 					subprocess.check_output(args)
 				except subprocess.CalledProcessError:
-					args = ["ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-threads", "3", "-hide_banner", "-nostdin", "-v", "error", "-y", "-i", stream, "-vn", "-c:a", "libopus", fn]
+					args = ["ffmpeg", "-map_metadata", "-1", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-threads", "3", "-hide_banner", "-nostdin", "-v", "error", "-y", "-i", stream, "-vn", "-c:a", "libopus", fn]
 					subprocess.check_output(args)
 				if not os.path.exists(fn):
 					try:

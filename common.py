@@ -2580,6 +2580,7 @@ FIRST_LOAD = True
 # sdxlr			GPU >400k, VRAM >11GB			V100, RTX3090, A4000, RTX4080, L4
 # gptq			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
 def spec2cap():
+	global FIRST_LOAD
 	try:
 		from multiprocessing import shared_memory
 		globals()["MEM_LOCK"] = shared_memory.SharedMemory(name="X-DISTRIBUTE", create=True, size=1)
@@ -2632,7 +2633,7 @@ def spec2cap():
 				else:
 					break
 			if FIRST_LOAD:
-				globals()["FIRST_LOAD"] = False
+				FIRST_LOAD = False
 				yield [[], "load", "gptq"]
 			yield [did, "agpt", "gptq"]
 			done.append("gptq")

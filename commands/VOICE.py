@@ -2789,7 +2789,9 @@ class AudioDownloader:
 				out = "cache/~" + h2 + "." + fmt
 				args = ()
 				if not os.path.exists(out) or not os.path.getsize(out):
-					args = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-hide_banner", "-v", "error", "-y", "-vn", "-i", fn, "-map_metadata", "-1"]
+					args = [ffmpeg, "-hide_banner", "-v", "error", "-y", "-vn", "-i", fn, "-map_metadata", "-1"]
+					if is_url(fn):
+						args = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + args[1:]
 					if silenceremove:
 						args.extend(("-af", "silenceremove=start_periods=1:start_duration=1:start_threshold=-50dB:start_silence=0.5:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
 						if fmt == "mp3":
@@ -2937,7 +2939,9 @@ class AudioDownloader:
 						copy = True
 			else:
 				copy = False
-			args = alist((ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-nostdin", "-hide_banner", "-v", "error", "-hwaccel", hwaccel, "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,fd,http,https,tcp,tls"))
+			args = alist((ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-hwaccel", hwaccel, "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,fd,http,https,tcp,tls"))
+			if is_url(url):
+				args = alist([ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"]).concat(args[1:])
 			if hwaccel == "cuda":
 				if "av1_nvenc" in args:
 					devid = random.choice([i for i in range(torch.cuda.device_count()) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor) >= (8, 9)])
