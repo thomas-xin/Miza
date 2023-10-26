@@ -972,7 +972,11 @@ if "video" in CAPS:
 			command = ["ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-threads", "2", "-hide_banner", "-nostdin", "-v", "error", "-y", "-hwaccel", hwaccel]
 			if hwaccel == "cuda":
 				if out.endswith(".webm") and COMPUTE_CAPS:
-					devid = random.choice([i for i, c in enumerate(COMPUTE_CAPS) if c >= [8, 9]])
+					try:
+						devid = random.choice([i for i, c in enumerate(COMPUTE_CAPS) if c >= [8, 9]])
+					except IndexError:
+						devid = random.randint(0, len(COMPUTE_CAPS))
+						fmt = "gif"
 				else:
 					devid = random.randint(0, ceil(len(COMPUTE_CAPS) / 2))
 				command.extend(("-hwaccel_device", str(devid)))
@@ -2459,7 +2463,11 @@ def evalImg(url, operation, args):
 				command = ["ffmpeg", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel]
 				if hwaccel == "cuda":
 					if mode == "RGBA" and COMPUTE_CAPS:
-						devid = random.choice([i for i, c in enumerate(COMPUTE_CAPS) if c >= [8, 9]])
+						try:
+							devid = random.choice([i for i, c in enumerate(COMPUTE_CAPS) if c >= [8, 9]])
+						except IndexError:
+							devid = random.randint(0, len(COMPUTE_CAPS))
+							fmt = "gif"
 					else:
 						devid = random.randint(0, ceil(len(COMPUTE_CAPS) / 2))
 					command.extend(("-hwaccel_device", str(devid)))

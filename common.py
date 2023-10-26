@@ -2736,7 +2736,7 @@ def proc_start():
 		create_task(start_proc(n, di, caps))
 		time.sleep(2)
 		if "load" in caps:
-			CAPS.remove(caps)
+			CAPS.pop(n)
 
 async def sub_submit(cap, command, _timeout=12):
 	bot = BOT[0]
