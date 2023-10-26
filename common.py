@@ -2565,7 +2565,7 @@ async def start_proc(n, di=(), caps="ytdl", it=0, wait=False, timeout=None):
 IS_MAIN = True
 FIRST_LOAD = True
 # Spec requirements:
-# ytdl											anything with internet
+# ytdl			FFMPEG							anything with internet
 # math			CPU >1							multithreading support
 # image			FFMPEG, CPU >3, RAM >6GB		multiprocessing support
 # browse		Windows, CPU >1, RAM >3GB		webdriver support
@@ -2587,7 +2587,7 @@ def spec2cap():
 		if IS_MAIN:
 			raise
 		return
-	caps = [[], "ytdl"]
+	caps = [[]]
 	if not IS_MAIN:
 		caps.append("remote")
 	cc = psutil.cpu_count()
@@ -2598,6 +2598,7 @@ def spec2cap():
 		ffmpeg = False
 	else:
 		ffmpeg = True
+		caps.append("ytdl")
 	try:
 		subprocess.run("tesseract")
 	except FileNotFoundError:
@@ -2644,7 +2645,8 @@ def spec2cap():
 			caps.append("caption")
 		if AUTH.get("discord_token") and cc > 1 and ram > 22 * 1073741824:
 			caps.append("agpt")
-	yield caps
+	if len(caps) > 1:
+		yield caps
 	if cc > 2:
 		caps = [[], "ytdl", "math"]
 		if ram > 14 * 1073741824 and ffmpeg:

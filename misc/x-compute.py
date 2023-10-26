@@ -969,7 +969,7 @@ if "video" in CAPS:
 						size = (960, 540)
 			fn2 = fn + ".gif"
 			f_in = fn if direct else url
-			command = ["./ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-threads", "2", "-hide_banner", "-nostdin", "-v", "error", "-y", "-hwaccel", hwaccel]
+			command = ["ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-threads", "2", "-hide_banner", "-nostdin", "-v", "error", "-y", "-hwaccel", hwaccel]
 			if hwaccel == "cuda":
 				if out.endswith(".webm") and COMPUTE_CAPS:
 					devid = random.choice([i for i, c in enumerate(COMPUTE_CAPS) if c >= [8, 9]])
@@ -1242,7 +1242,7 @@ if "ecdc" in CAPS:
 		fo = "cache/" + str(ts) + ".ecdc"
 		if name:
 			name = " " + base64.b64encode(name.strip().encode("utf-8")).rstrip(b"=").decode("utf-8")
-		args1 = ["./ffmpeg", "-v", "error", "-hide_banner", "-vn", "-nostdin", "-i", fn, "-f", "s16le", "-ac", "2", "-ar", "48k", "-"]
+		args1 = ["ffmpeg", "-v", "error", "-hide_banner", "-vn", "-nostdin", "-i", fn, "-f", "s16le", "-ac", "2", "-ar", "48k", "-"]
 		args2 = [sys.executable, "misc/ecdc_stream.py", "-g", str(DEV), "-n", name, "-s", source, "-b", str(bitrate), "-e", fo]
 		print(args1)
 		print(args2)
@@ -1259,7 +1259,7 @@ if "ecdc" in CAPS:
 		if name:
 			name = " " + base64.b64encode(name.strip().encode("utf-8")).rstrip(b"=").decode("utf-8")
 		args1 = [sys.executable, "misc/ecdc_stream.py", "-g", str(DEV), "-d", fn]
-		args2 = ["./ffmpeg", "-v", "error", "-hide_banner", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "96k", fo]
+		args2 = ["ffmpeg", "-v", "error", "-hide_banner", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "96k", fo]
 		print(args1)
 		print(args2)
 		PipedProcess(args1, args2).wait()
@@ -1694,11 +1694,19 @@ if "ytdl" in CAPS:
 								os.remove(dirlist.pop(0))
 							except:
 								traceback.print_exc()
+				if not os.path.exists("cache"):
+					os.mkdir("cache")
+				args = ["ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-threads", "3", "-hide_banner", "-nostdin", "-v", "error", "-y", "-i", stream, "-vn", "-c:a", "copy", fn]
 				try:
-					# raise
-					ydl.download(url)
-				except:
-					traceback.print_exc()
+					subprocess.check_output(args)
+				except subprocess.CalledProcessError:
+					args = ["ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-threads", "3", "-hide_banner", "-nostdin", "-v", "error", "-y", "-i", stream, "-vn", "-c:a", "libopus", fn]
+					subprocess.check_output(args)
+				if not os.path.exists(fn):
+					try:
+						ydl.download(url)
+					except:
+						traceback.print_exc()
 				if not os.path.exists(fn):
 					part = fn + ".part"
 					sys.stderr.write(f"Incomplete download {part} {os.path.exists(part)}\n")
@@ -2077,10 +2085,10 @@ def from_bytes(b, save=None, nogif=False):
 			fn = "cache/" + str(ts)
 			with open(fn, "wb") as f:
 				f.write(data)
-			cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate,duration", "-of", "csv=s=x:p=0", fn)
+			cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate,duration", "-of", "csv=s=x:p=0", fn)
 			print(cmd)
 			p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-			cmd2 = ["./ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0"]
+			cmd2 = ["ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0"]
 			if nogif:
 				cmd2.extend(("-vframes", "1"))
 			cmd2.append("-")
@@ -2098,7 +2106,7 @@ def from_bytes(b, save=None, nogif=False):
 			print(info)
 			size = tuple(map(int, info[:2]))
 			if info[3] == "N/A":
-				cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "format=duration", "-of", "csv=p=0", fn)
+				cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "format=duration", "-of", "csv=p=0", fn)
 				info[3] = subprocess.check_output(cmd)
 			try:
 				dur = float(info[3])
@@ -2121,7 +2129,7 @@ def from_bytes(b, save=None, nogif=False):
 				framedur = 1000 / fps
 				bcount = 4 if fmt == "rgba" else 3
 				bcount *= int(np.prod(size))
-				cmd3 = ["./ffmpeg", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps},scale={w}:{h}:flags=bicubic", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
+				cmd3 = ["ffmpeg", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps},scale={w}:{h}:flags=bicubic", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
 				print(cmd3)
 				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
 			images = deque()
@@ -2448,7 +2456,7 @@ def evalImg(url, operation, args):
 			if fmt == "zip":
 				resp = zipfile.ZipFile(out, "w", compression=zipfile.ZIP_STORED, allowZip64=True)
 			else:
-				command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel]
+				command = ["ffmpeg", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel]
 				if hwaccel == "cuda":
 					if mode == "RGBA" and COMPUTE_CAPS:
 						devid = random.choice([i for i, c in enumerate(COMPUTE_CAPS) if c >= [8, 9]])
