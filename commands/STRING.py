@@ -1304,6 +1304,10 @@ ModMap = dict(
 		name="euryale-70b",
 		cm=20,
 	),
+	mlewd=dict(
+		name="xwin-mlewd-13b",
+		cm=20,
+	),
 	xwin=dict(
 		name="xwin-70b",
 		cm=20,
@@ -1350,6 +1354,8 @@ def map_model(cname, model, premium):
 		model = "wizard"
 	elif cname == "xwin":
 		model = "xwin"
+	elif cname == "mlewd":
+		model = "mlewd"
 	elif cname == "gpt3":
 		if premium < 2:
 			raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
@@ -1540,7 +1546,7 @@ AC = bytes(i ^ 158 for i in AC)
 AC = full_prune(AC.decode("utf-8")).capitalize() + "."
 
 BNB = ("pygmalion-13b", "manticore-13b", "airochronos-33b")
-GPTQ = ("wizard-70b", "euryale-70b", "xwin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "wizard-vicuna-30b", "emerhyst-20b", "mythalion-13b")
+GPTQ = ("wizard-70b", "euryale-70b", "xwin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "wizard-vicuna-30b", "emerhyst-20b", "xwin-mlewd-13b", "mythalion-13b")
 
 async def summarise(q, min_length=128, max_length=192):
 	if q and sum(c.isascii() for c in q) / len(q) > 0.75:
@@ -1606,6 +1612,8 @@ async def tcount(s, model="gpt-3.5-turbo"):
 	return len(enc)
 
 def m_repr(m):
+	if not isinstance(m, dict):
+		return as_str(m)
 	content = (m.content or str(m.get("function_call", "")))
 	if "name" in m:
 		if "role" in m:
@@ -1645,6 +1653,7 @@ async def cut_to(messages, limit=1024, exclude_first=True):
 	messages = list(messages)
 	mes = []
 	count = 0
+	i = -1
 	for i, m in reversed(tuple(enumerate(messages))):
 		c = await tcount(m_repr(m))
 		if c + count > limit / 5:
@@ -1748,7 +1757,7 @@ def instruct_structure(messages):
 
 class Ask(Command):
 	_timeout_ = 24
-	name = ["Wizard", "Euryale", "XWin", "Orca", "Kimiko", "WizCode", "Emerhyst", "Mythalion", "Pyg", "Pygmalion", "Llama", "Vicuna", "Manticore", "WizVic", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
+	name = ["Wizard", "Euryale", "XWin", "Orca", "Kimiko", "WizCode", "Emerhyst", "MLewd", "Mythalion", "Pyg", "Pygmalion", "Llama", "Vicuna", "Manticore", "WizVic", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
 	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!"
 	usage = "<string>"
 	example = ("ask what's the date?", "gpt3 what is the square root of 3721?", "pyg can I have a hug?")
@@ -2213,7 +2222,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 									length = await count_to(used)
 								else:
 									skipping = len(ufull) - 1
-									used = [ufull[0], ufull[-2:]]
+									used = [ufull[0]] + ufull[-2:]
 									length = await count_to(used)
 					functions = [v for k, v in Functions.items() if k not in blocked]
 					print(f"{model} prompt:", used)
@@ -2772,7 +2781,7 @@ class Personality(Command):
 	server_only = True
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
 	min_level = 2
-	description = "Customises my personality for ~ask in the current server. Uses the largest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, Euryale, XWin, Orca, Kimiko, WizCode, Emerhyst, Mythalion, Pygmalion, Manticore, WizVic, and Airochronos are currently the alternate models enabled."
+	description = "Customises my personality for ~ask in the current server. Uses the largest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, Euryale, XWin, Orca, Kimiko, WizCode, Emerhyst, MLewd, Mythalion, Pygmalion, Manticore, WizVic, and Airochronos are currently the alternate models enabled."
 	usage = "<traits>* <default{?d}>?"
 	example = ("personality Mythalion; mischievous, cunning", "personality Wizard; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
 	flags = "aed"
@@ -2816,7 +2825,7 @@ class Personality(Command):
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
-		models = ("auto", "gpt", "wizard", "euryale", "xwin", "orca", "kimiko", "wizcode", "emerhyst", "mythalion", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizvic", "airochronos", "davinci", "gpt3", "gpt4")
+		models = ("auto", "gpt", "wizard", "euryale", "xwin", "orca", "kimiko", "wizcode", "emerhyst", "mlewd", "mythalion", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizvic", "airochronos", "davinci", "gpt3", "gpt4")
 		if ";" in p:
 			m, p = p.split(";", 1)
 			p = p.lstrip()

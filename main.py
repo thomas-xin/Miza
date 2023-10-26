@@ -82,9 +82,9 @@ if os.name == "nt":
         if s.startswith("version"):
             s = s[7:].lstrip()
         s = s.split("-", 1)[0]
-        if s != v:
-            print(f"FFmpeg version outdated ({v} > {s})")
-            raise FileNotFoundError
+        # if s != v:
+            # print(f"FFmpeg version outdated ({v} > {s})")
+            # raise FileNotFoundError
         print(f"FFmpeg version {s} found; skipping installation...")
     except FileNotFoundError:
         print(f"Downloading FFmpeg version {v}...")

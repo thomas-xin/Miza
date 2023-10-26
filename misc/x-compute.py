@@ -969,7 +969,7 @@ if "video" in CAPS:
 						size = (960, 540)
 			fn2 = fn + ".gif"
 			f_in = fn if direct else url
-			command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-v", "error", "-y", "-hwaccel", hwaccel]
+			command = ["./ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-threads", "2", "-hide_banner", "-nostdin", "-v", "error", "-y", "-hwaccel", hwaccel]
 			if hwaccel == "cuda":
 				if out.endswith(".webm") and COMPUTE_CAPS:
 					devid = random.choice([i for i, c in enumerate(COMPUTE_CAPS) if c >= [8, 9]])
@@ -1806,6 +1806,7 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 					"wizard-70b",
 					"kimiko-70b",
 					"wizard-coder-34b",
+					"xwin-mlewd-13b",
 					"mythalion-13b",
 					"emerhyst-20b",
 					"wizard-vicuna-30b",
@@ -1823,6 +1824,7 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 			raise SystemExit
 
 		def GPTQ(inputs):
+			print("GPTQI:", inputs)
 			model = inputs["model"]
 			prompt = inputs["prompt"]
 			temperature = inputs.get("temperature", 0.8)

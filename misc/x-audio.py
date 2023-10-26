@@ -488,10 +488,12 @@ class AudioFile:
 			else:
 				fmt2 = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", stream])).strip()
 			if fmt2 == cdc2:
-				cmd = ["./ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", "cache/" + self.file]
+				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", "cache/" + self.file]
 				fixed = True
 			elif is_youtube_stream(stream):
 				fixed = True
+		if is_url(stream):
+			cmd = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + cmd[1:]
 		procargs = [cmd]
 		if not fixed and is_url(stream):
 			headers = Request.header()
@@ -696,6 +698,8 @@ class AudioFile:
 		speed = 1
 		if options or auds.reverse or pos or auds.stats.bitrate != 1310.72 or self.live:
 			args = ["./ffmpeg", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets"]
+			if is_url(source):
+				args = ["./ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + args[1:]
 			if (pos or auds.reverse) and self.seekable:
 				arg = "-to" if auds.reverse else "-ss"
 				args += [arg, str(pos)]
@@ -749,7 +753,7 @@ class AudioFile:
 			reader = self.open(key)
 		reader.pos = pos * 50
 		players[key] = reader
-		return reader		
+		return reader
 
 	# Audio duration estimation: Get values from file if possible, otherwise URL
 	duration = lambda self: inf if not self.seekable else getattr(self, "dur", None) or set_dict(self.__dict__, "dur", get_duration("cache/" + self.file) if self.loaded and not self.live else get_duration(self.stream), ignore=True)

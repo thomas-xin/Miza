@@ -506,6 +506,8 @@ class Bot:
 		from transformers import AutoTokenizer, AutoModelForCausalLM
 		try:
 			buffer = 1.3
+			gs = 128
+			bpw = 4
 			if model == "euryale-70b":
 				m = "TheBloke/Euryale-1.3-L2-70B-GPTQ"
 				req = 35
@@ -536,6 +538,11 @@ class Bot:
 			elif model == "mythalion-13b":
 				m = "TheBloke/Mythalion-13B-GPTQ"
 				req = 6.5
+			elif model == "xwin-mlewd-13b":
+				m = "TheBloke/Xwin-MLewd-13B-v0.2-GPTQ"
+				req = 13
+				bpw = 8
+				gs = 32
 			else:
 				raise RuntimeError(f'Model "{model}" not found.')
 			try:
@@ -580,8 +587,8 @@ class Bot:
 					print("MAX_MEM:", max_mem)
 				from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig, exllama_set_max_input_length
 				quantize_config = BaseQuantizeConfig(
-					bits=4,
-					group_size=128,
+					bits=bpw,
+					group_size=gs,
 					damp_percent=0.1,
 					desc_act=True,
 					sym=True,
@@ -595,7 +602,7 @@ class Bot:
 						with accelerate.init_empty_weights():
 							model = AutoModelForCausalLM.from_pretrained(
 								m,
-								revision="gptq-4bit-128g-actorder_True",
+								revision=f"gptq-{bpw}bit-{gs}g-actorder_True",
 								device_map={},
 								offload_folder="cache",
 								torch_dtype=torch.float16,
@@ -606,7 +613,7 @@ class Bot:
 					return
 				model = AutoGPTQForCausalLM.from_quantized(
 					m,
-					revision="gptq-4bit-128g-actorder_True",
+					revision=f"gptq-{bpw}bit-{gs}g-actorder_True",
 					quantize_config=quantize_config,
 					max_memory=max_mem,
 					use_safetensors=True,

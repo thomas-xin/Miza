@@ -475,18 +475,21 @@ class CustomAudio(collections.abc.Hashable):
 		if self.acsi:
 			with tracebacksuppressor(AttributeError):
 				self.acsi.kill()
-		create_task(self.bot.audio.asubmit(f"players.pop({self.guild.id},None)"))
-		if self.guild.me and self.guild.me.voice:
+		fut = create_task(self.bot.audio.asubmit(f"players.pop({self.guild.id},None)"))
+		if wait:
+			await_fut(fut)
+			while self.guild.me.voice:
+				await_fut(self.guild.change_voice_state(channel=None))
+		elif self.guild.me and self.guild.me.voice:
 			create_task(self.guild.change_voice_state(channel=None))
-		self.bot.data.audio.players.pop(self.guild.id, None)
+		popped = self.bot.data.audio.players.pop(self.guild.id, None)
+		self.vc = None
+		print("POPPED:", popped)
 		with suppress(LookupError):
 			if reason is None:
 				reason = css_md(f"🎵 Successfully disconnected from {sqr_md(self.guild)}. 🎵")
 			if reason:
 				self.announce(reason, dump=True, reference=initiator)
-		if wait:
-			while self.guild.me.voice:
-				await_fut(self.guild.change_voice_state(channel=None))
 		if remove:
 			self.bot.data.audio.pop(self.channel.id, None)
 
@@ -1181,9 +1184,16 @@ class AudioClientSubInterface:
 		cls.ensure_bot(cls)
 		cls.afters[key]()
 
+	_pos = 0
 	@property
 	def pos(self):
-		return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).pos")
+		try:
+			if not self.auds or not self.auds.vc:
+				raise AttributeError
+			self._pos = self.bot.audio.submit(f"AP.from_guild({self.guild.id}).pos")
+		except AttributeError:
+			pass
+		return self._pos
 
 	def ensure_bot(self, auds=None):
 		cls = self.__class__
@@ -2638,7 +2648,7 @@ class AudioDownloader:
 						data = self.extract_backup(info["url"], video=True)
 						video = info["video"] = get_best_video(data)
 					vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
-					args = alist(("./ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
+					args = alist(("./ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
 					if hwaccel == "cuda":
 						if "av1_nvenc" in args:
 							devid = random.choice([i for i in range(torch.cuda.device_count()) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor) >= (8, 9)])
@@ -2779,7 +2789,7 @@ class AudioDownloader:
 				out = "cache/~" + h2 + "." + fmt
 				args = ()
 				if not os.path.exists(out) or not os.path.getsize(out):
-					args = [ffmpeg, "-hide_banner", "-v", "error", "-y", "-vn", "-i", fn, "-map_metadata", "-1"]
+					args = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-hide_banner", "-v", "error", "-y", "-vn", "-i", fn, "-map_metadata", "-1"]
 					if silenceremove:
 						args.extend(("-af", "silenceremove=start_periods=1:start_duration=1:start_threshold=-50dB:start_silence=0.5:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
 						if fmt == "mp3":
@@ -2927,7 +2937,7 @@ class AudioDownloader:
 						copy = True
 			else:
 				copy = False
-			args = alist((ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-hwaccel", hwaccel, "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,fd,http,https,tcp,tls"))
+			args = alist((ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-nostdin", "-hide_banner", "-v", "error", "-hwaccel", hwaccel, "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,fd,http,https,tcp,tls"))
 			if hwaccel == "cuda":
 				if "av1_nvenc" in args:
 					devid = random.choice([i for i in range(torch.cuda.device_count()) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor) >= (8, 9)])
