@@ -73,13 +73,14 @@ def spec2cap():
 		ffmpeg = False
 	else:
 		ffmpeg = True
-		caps.append("ytdl")
 	try:
 		subprocess.run("tesseract")
 	except FileNotFoundError:
 		tesseract = False
 	else:
 		tesseract = True
+	if ffmpeg:
+		caps.append("ytdl")
 	done = []
 	try:
 		import pynvml
@@ -123,7 +124,9 @@ def spec2cap():
 	if len(caps) > 1:
 		yield caps
 	if cc > 2:
-		caps = [[], "ytdl", "math"]
+		caps = [[], "math"]
+		if ffmpeg:
+			caps.append("ytdl")
 		if ram > 14 * 1073741824 and ffmpeg:
 			caps.append("image")
 		if ram > 46 * 1073741824 and tesseract:
