@@ -2727,14 +2727,16 @@ def proc_start():
 	else:
 		COMPUTE_LOAD = ()
 		globals()["DC"] = 0
-	caps = globals().get("SCAP", [])
-	if not caps:
+	CAPS = globals().get("SCAP", [])
+	if not CAPS:
 		with tracebacksuppressor:
-			caps = globals()["SCAP"] = list(spec2cap())
-	print("CAPS:", caps)
-	for n, (di, *caps) in enumerate(caps):
+			CAPS = globals()["SCAP"] = list(spec2cap())
+	print("CAPS:", CAPS)
+	for n, (di, *caps) in enumerate(tuple(CAPS)):
 		create_task(start_proc(n, di, caps))
 		time.sleep(2)
+		if "load" in caps:
+			CAPS.remove(caps)
 
 async def sub_submit(cap, command, _timeout=12):
 	bot = BOT[0]

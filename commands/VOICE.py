@@ -5794,10 +5794,10 @@ class UpdateAudio(Database):
 	backup_sem = Semaphore(1, 0, rate_limit=30)
 	async def backup(self, force=False):
 		if self.bot.ready:
-			if "blacklist" in self.bot.data and self.bot.data.blacklist.get(0):
-				self.data.clear()
+			if not ("blacklist" in self.bot.data and self.bot.data.blacklist.get(0)):
+				self.clear()
 		for auds in tuple(self.players.values()):
-			if not auds.acsi:
+			if not auds.acsi or not auds.queue:
 				continue
 			d, _ = await asubmit(auds.get_dump, True, True)
 			self.data[auds.acsi.channel.id] = dict(dump=d, channel=auds.text.id)
