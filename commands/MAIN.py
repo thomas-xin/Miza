@@ -604,7 +604,7 @@ class Avatar(Command):
 					emb.set_thumbnail(url=url2)
 					emb.set_image(url=url)
 					emb.set_author(name=name, icon_url=url, url=url)
-					emb.description = f"{sqr_md(name)}({url})"
+					emb.description = f"{sqr_md(getattr(u, 'display_name', None) or name)}({url})"
 					embs.add(emb)
 		bot.send_embeds(channel, embeds=embs, reference=message)
 

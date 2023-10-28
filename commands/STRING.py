@@ -1569,7 +1569,7 @@ async def summarise(q, min_length=128, max_length=192):
 			s1 = await tik_decode_a(e1)
 			s1 = s1.strip()
 			if sum(c.isascii() for c in s1) / len(s1) > 0.75:
-				fut = create_task(process_image("summarise", "$", [s1, mt - 32, mt, bool(start)], cap="summ", timeout=20))
+				fut = create_task(process_image("summarise", "$", [s1, mt - 32, mt, bool(start)], cap="summ", timeout=30))
 			else:
 				fut = asubmit(lim_tokens(s1, mt))
 			futs.append(fut)
@@ -1584,7 +1584,7 @@ async def summarise(q, min_length=128, max_length=192):
 	s1 = await tik_decode_a(e1)
 	s1 = s1.strip().replace("  ", " ")
 	if len(tokens) > max_length:
-		s2 = await process_image("summarise", "$", [s1, min_length, max_length], cap="summ", timeout=20)
+		s2 = await process_image("summarise", "$", [s1, min_length, max_length], cap="summ", timeout=30)
 	else:
 		s2 = s1
 	out = []
@@ -2136,7 +2136,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					model = choice((
 						"mythalion-13b",
 						# "euryale-70b",
-						ModMap[DEFMOD].name,
+						ModMap[DEFMOD]["name"],
 						"gpt-3.5-turbo-instruct",
 						"gpt-3.5-turbo",
 					))
@@ -2151,7 +2151,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					model = "mythalion-13b"
 					limit = 2000
 				elif premium < 2 or attempts in (4, 6):
-					model = ModMap[DEFMOD].name
+					model = ModMap[DEFMOD]["name"]
 					limit = 4000
 				elif attempts in (3, 5):
 					model = "gpt-3.5-turbo-instruct"

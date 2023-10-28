@@ -595,7 +595,7 @@ class RoleSelect(Command):
 		description = f"```callback-admin-roleselect-{rolestr}-\n{len(buttons)} roles available```Click a button to add or remove a role from yourself!"
 		embed = discord.Embed(colour=colour, title="🗂 Role Selection 🗂", description=description)
 		embed.set_author(**get_author(self.bot.user))
-		await send_with_reply(None, message, embed=embed, buttons=buttons)
+		await send_with_reply(message.channel, None, embed=embed, buttons=buttons)
 
 	async def _callback_(self, bot, message, reaction, user, vals, **void):
 		if not reaction:

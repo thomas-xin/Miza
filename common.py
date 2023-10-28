@@ -1027,9 +1027,46 @@ def restructure_buttons(buttons):
 		return buttons
 	if issubclass(type(buttons[0]), collections.abc.Mapping):
 		b = alist()
-		while buttons:
+		if len(buttons) <= 3:
+			b.append(buttons)
+		elif len(buttons) <= 5:
+			b.append(buttons[:-2])
+			b.append(buttons[-2:])
+		elif len(buttons) <= 7:
+			b.append(buttons[:-3])
+			b.append(buttons[-3:])
+		elif len(buttons) == 8:
+			b.append(buttons[:4])
+			b.append(buttons[4:])
+		elif len(buttons) == 9:
+			b.append(buttons[:3])
+			b.append(buttons[3:6])
+			b.append(buttons[6:])
+		elif len(buttons) == 10:
 			b.append(buttons[:5])
-			buttons = buttons[5:]
+			b.append(buttons[5:])
+		elif len(buttons) <= 12:
+			b.append(buttons[:4])
+			b.append(buttons[4:8])
+			b.append(buttons[8:])
+		elif len(buttons) <= 15:
+			b.append(buttons[:5])
+			b.append(buttons[5:-5])
+			b.append(buttons[-5:])
+		elif len(buttons) == 16:
+			b.append(buttons[:4])
+			b.append(buttons[4:8])
+			b.append(buttons[8:12])
+			b.append(buttons[12:])
+		elif len(buttons) <= 20:
+			b.append(buttons[:5])
+			b.append(buttons[5:10])
+			b.append(buttons[10:15])
+			b.append(buttons[15:])
+		else:
+			while buttons:
+				b.append(buttons[:5])
+				buttons = buttons[5:]
 		buttons = b
 	used_custom_ids = set()
 	for row in buttons:
@@ -3222,7 +3259,14 @@ class CompatFile(discord.File):
 
 	def reset(self, seek=True):
 		if seek:
-			self.fp.seek(self._original_pos)
+			try:
+				self.fp.seek(self._original_pos)
+			except ValueError:
+				if not self._owner:
+					raise
+				self.fp = open2(self._fp, "rb")
+				self._original_pos = 0
+				self.fp.seek(self._original_pos)
 
 	def close(self):
 		self.fp.close = self._closer

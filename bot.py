@@ -4837,6 +4837,21 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					raise AttributeError("Member is not in a guild.")
 				return discord.Member.edit(self, *args, **kwargs)
 
+			def add_roles(self, *args, **kwargs):
+				if not getattr(self, "guild", None):
+					raise AttributeError("Member is not in a guild.")
+				return discord.Member.add_roles(self, *args, **kwargs)
+
+			def remove_roles(self, *args, **kwargs):
+				if not getattr(self, "guild", None):
+					raise AttributeError("Member is not in a guild.")
+				return discord.Member.remove_roles(self, *args, **kwargs)
+
+			def kick(self, reason=None):
+				if not getattr(self, "guild", None):
+					raise AttributeError("Member is not in a guild.")
+				return discord.Member.kick(self, reason=reason)
+
 			def ban(self, reason=None):
 				if not getattr(self, "guild", None):
 					raise AttributeError("Member is not in a guild.")
@@ -4846,6 +4861,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if not getattr(self, "guild", None):
 					raise AttributeError("Member is not in a guild.")
 				return discord.Member.timeout(self, duration, reason=reason)
+
+			def move_to(self, duration, reason=None):
+				if not getattr(self, "guild", None):
+					raise AttributeError("Member is not in a guild.")
+				return discord.Member.move_to(self, duration, reason=reason)
 
 			@property
 			def display_name(self):
@@ -5762,8 +5782,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			emb.description += (
 				f"!\nMy default prefix is `{self.prefix}`, which can be changed as desired on a per-server basis. Mentioning me also serves as an alias for all prefixes.\n"
 				+ f"For more information, use the `{self.prefix}help` command, "
-				+ (f"I have a website at [`{self.webserver}`]({self.webserver}), " if self.webserver else "")
-				+ f"and my source code is available at [`{self.github}`]({self.github}) for those who are interested.\n"
+				+ (f"I have a website at {self.webserver}, " if self.webserver else "")
+				+ f"and my source code is available at {self.github} for those who are interested.\n"
 				+ "Pleased to be at your service 🙂"
 			)
 			if not m.guild_permissions.administrator:
@@ -6478,6 +6498,7 @@ def userIter4(x):
 		yield to_alphanumeric(x.nick).replace(" ", "").casefold()
 
 
+@tracebacksuppressor
 def update_file_cache():
 	attachments = {t for t in bot.cache.attachments.items() if type(t[-1]) is bytes}
 	while len(attachments) > 512:

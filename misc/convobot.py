@@ -622,8 +622,8 @@ class Bot:
 					offload_folder="cache",
 					resume_download=True,
 				)
-				# lim = 2 ** round(math.log2(limit) + 1)
-				lim = limit
+				lim = 2 ** round(log2(limit) + 1)
+				# lim = limit
 				if model.config.max_position_embeddings < lim:
 					print(model, model.config.max_position_embeddings, lim)
 					try:
