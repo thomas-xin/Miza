@@ -2205,7 +2205,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							user=str(user.id) if premium < 3 else str(hash(name)),
 						)
 						try:
-							response = await openai.Completion.acreate(**data, timeout=60)
+							response = await asyncio.wait_for(openai.Completion.acreate(**data, timeout=60), timeout=70)
 						except openai.InvalidRequestError:
 							raise
 						except Exception as e:
@@ -2241,7 +2241,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					text = ""
 					response = None
 					try:
-						response = await openai.ChatCompletion.acreate(**data, timeout=120)
+						response = await asyncio.wait_for(openai.ChatCompletion.acreate(**data, timeout=120), timeout=130)
 					except openai.InvalidRequestError:
 						raise
 					except Exception as e:
@@ -2423,7 +2423,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 				)
 				if model in instructcompletion:
 					try:
-						response = await openai.Completion.acreate(**data, timeout=60)
+						response = await asyncio.wait_for(openai.Completion.acreate(**data, timeout=60), timeout=70)
 					except openai.InvalidRequestError:
 						raise
 					except Exception as e:

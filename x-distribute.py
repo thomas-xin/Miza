@@ -48,22 +48,7 @@ FIRST_LOAD = True
 # agpt			CPU >1, RAM >22GB				(planned) reliability
 # video			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
 # ecdc			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
-# summ			GPU >200k, VRAM >4GB			RTX2060, T4, RTX3050, RTX3060m, A16
-# class			GPU >400k, VRAM >11GB			V100, RTX3060, A2000, RTX4070
-# sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
-# sdxl			GPU >400k, VRAM >9GB			GTX1080ti, RTX2080ti, RTX3060, RTX3080, A2000
-# sdxlr			GPU >400k, VRAM >11GB			V100, RTX3090, A4000, RTX4080, L4
-# gptq			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
-# Spec requirements:
-# ytdl			FFMPEG							anything with internet
-# math			CPU >1							multithreading support
-# image			FFMPEG, CPU >3, RAM >6GB		multiprocessing support
-# browse		Windows, CPU >1, RAM >3GB		webdriver support
-# caption		Tesseract, CPU >5, RAM >14GB	cpu inference
-# agpt			CPU >1, RAM >22GB				(planned) reliability
-# video			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
-# ecdc			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
-# summ			GPU >200k, VRAM >4GB			RTX2060, T4, RTX3050, RTX3060m, A16
+# summ			GPU >200k, VRAM >4GB			GTX970, M60, GTX1050ti, P4, GTX1630
 # class			GPU >400k, VRAM >11GB			V100, RTX3060, A2000, RTX4070
 # sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
 # sdxl			GPU >400k, VRAM >9GB			GTX1080ti, RTX2080ti, RTX3060, RTX3080, A2000
@@ -117,7 +102,7 @@ def spec2cap():
 				v = rrams[i]
 				if cut > 0:
 					red = min(cut, v)
-					rrams[i] = v - red
+					rrams[i] = max(v - red, 1073741824 + 1)
 					cut -= red
 					did.append(i)
 				else:
@@ -161,7 +146,7 @@ def spec2cap():
 		if DC > 1 and c > 400000 and v > 11 * 1073741824 and (v > 29 * 1073741824 or "class" not in done):
 			caps.append("class")
 			done.append("class")
-			v -= 11 * 1073741824
+			v -= 10 * 1073741824
 		if c > 400000 and v > 15 * 1073741824:
 			caps.append("sdxlr")
 			caps.append("sdxl")
@@ -189,10 +174,10 @@ def spec2cap():
 				caps.append("sd")
 				done.append("sd")
 				v -= 5 * 1073741824
-		if c > 200000 and v > 2 * 1073741824 and vrams[i] > 4 * 1073741824:
+		if c > 200000 and v > 1 * 1073741824 and vrams[i] > 4 * 1073741824:
 			caps.append("summ")
 			done.append("summ")
-			# v -= 2 * 1073741824
+			# v -= 1 * 1073741824
 		# if v <= 4 * 1073741824:
 			# v = 0
 		# vrams[i] = v

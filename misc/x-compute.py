@@ -807,13 +807,15 @@ if CAPS.intersection(("image", "caption", "sd", "sdxl", "sdxlr")):
 			h = round(h * r)
 		return w, h
 
-	def resize_max(image, maxsize, resample=Resampling.LANCZOS, box=None, reducing_gap=None, force=False):
+	def resize_max(image, maxsize, force=False, resample=Resampling.LANCZOS, box=None, reducing_gap=None):
 		w, h = max_size(image.width, image.height, maxsize, force=force)
 		if w != image.width or h != image.height:
 			if type(resample) is str:
 				image = resize_to(image, w, h, resample)
 			else:
 				image = image.resize([w, h], resample, box, reducing_gap)
+		if force > 1:
+			return image.copy()
 		return image
 
 	resizers = dict(
@@ -2393,8 +2395,8 @@ def evalImg(url, operation, args):
 				step = 1
 				while fps / step >= fpl:
 					step += 0.25
-				if f // step > 2000:
-					step = f / 1999
+				if f // step > 5000:
+					step = f / 4999
 				elif f // step > 1000 and fpl > 20:
 					step = f / 999
 				new["count"] = int(f // step)
