@@ -1164,18 +1164,9 @@ transform: translate(-50%, -50%);
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
-	def encodec(self, url, name="", source="", bitrate="auto", inference=False, urls=()):
+	def encodec(self, url="", name="", source="", bitrate="auto", inference=False, urls=()):
 		cp.response.headers.update(SHEADERS)
 		true_ip()
-		if isinstance(bitrate, int):
-			br = str(bitrate)
-		elif bitrate == "auto":
-			for br in "3 6 12 24".split():
-				out = cachedir + "/ecdc/!" + shash(url) + "~" + br + ".ecdc"
-				if os.path.exists(out):
-					break
-		else:
-			br = bitrate.removesuffix("k")
 		if not os.path.exists(cachedir + "/ecdc"):
 			os.mkdir(cachedir + "/ecdc")
 		if urls:
@@ -1183,6 +1174,15 @@ transform: translate(-50%, -50%);
 			outs = []
 			for url in urls:
 				url = regexp(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=").sub("https://youtu.be/", url)
+				if isinstance(bitrate, int):
+					br = str(bitrate)
+				elif bitrate == "auto":
+					for br in "3 6 12 24".split():
+						out = cachedir + "/ecdc/!" + shash(url) + "~" + br + ".ecdc"
+						if os.path.exists(out):
+							break
+				else:
+					br = bitrate.removesuffix("k")
 				out = cachedir + "/ecdc/!" + shash(url) + "~" + br + ".ecdc"
 				if out in self.ecdc_running or os.path.exists(out) and os.path.getsize(out):
 					outs.append(1)
@@ -1194,6 +1194,15 @@ transform: translate(-50%, -50%);
 		if isinstance(url, list):
 			url = url[0]
 		url = regexp(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=").sub("https://youtu.be/", url)
+		if isinstance(bitrate, int):
+			br = str(bitrate)
+		elif bitrate == "auto":
+			for br in "3 6 12 24".split():
+				out = cachedir + "/ecdc/!" + shash(url) + "~" + br + ".ecdc"
+				if os.path.exists(out):
+					break
+		else:
+			br = bitrate.removesuffix("k")
 		out = cachedir + "/ecdc/!" + shash(url) + "~" + br + ".ecdc"
 		while out in self.ecdc_running:
 			self.ecdc_running[out].result()
