@@ -5812,7 +5812,7 @@ class UpdateAudio(Database):
 			if not file.loaded:
 				await asubmit(file.destroy)
 		for auds in tuple(self.players.values()):
-			if auds.queue:
+			if auds.queue and not auds.paused:
 				reason = "🎵 Temporarily disconnecting for maintenance"
 				if auds.queue:
 					reason += " (Queue saved)."

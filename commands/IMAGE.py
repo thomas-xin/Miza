@@ -1009,7 +1009,7 @@ class CreateGIF(Command):
 	async def __call__(self, bot, user, guild, channel, message, flags, name, args, _timeout, **void):
 		# Take input from any attachments, or otherwise the message contents
 		if message.attachments:
-			args += [best_url(a) for a in message.attachments]
+			args = [best_url(a) for a in message.attachments] + list(args)
 		try:
 			if not args:
 				raise ArgumentError
