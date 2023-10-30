@@ -1252,7 +1252,8 @@ transform: translate(-50%, -50%);
 		try:
 			t = ts_us()
 			fn = f"cache/{t}"
-			with reqs.next().get(url, timeout=1800, stream=True) as resp:
+			url2 = API + "/ytdl?d=" + url
+			with reqs.next().get(url2, timeout=1800, stream=True) as resp:
 				with open(fn, "wb") as f:
 					shutil.copyfileobj(resp.raw, f, 65536)
 			res = self.bot_exec(f"VOICE.ecdc_encode({repr(fn)},{repr(bitrate)},{repr(name)},{repr(source)})")
