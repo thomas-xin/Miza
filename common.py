@@ -2139,6 +2139,7 @@ is_youtube_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?youtu(?:\\
 is_youtube_stream = lambda url: url and regexp("^https?:\\/\\/r+[0-9]+---.{2}-[A-Za-z0-9\\-_]{4,}\\.googlevideo\\.com").findall(url)
 is_deviantart_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?deviantart\\.com\\/[^\\s<>`|\"']+").findall(url)
 is_reddit_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?reddit.com\\/r\\/[^/]+\\/").findall(url)
+unyt = lambda s: re.sub(r"https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)", "https://youtu.be/", s)
 
 def discord_expired(url):
 	if is_discord_attachment(url):

@@ -1173,7 +1173,7 @@ transform: translate(-50%, -50%);
 			urls = urls.split() if isinstance(urls, str) else urls
 			outs = []
 			for url in urls:
-				url = regexp(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=").sub("https://youtu.be/", url)
+				url = unyt(url)
 				if isinstance(bitrate, int):
 					br = str(bitrate)
 				elif bitrate == "auto":
@@ -1193,7 +1193,7 @@ transform: translate(-50%, -50%);
 			return orjson.dumps(outs)
 		if isinstance(url, list):
 			url = url[0]
-		url = regexp(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=").sub("https://youtu.be/", url)
+		url = unyt(url)
 		if isinstance(bitrate, int):
 			br = str(bitrate)
 		elif bitrate == "auto":
@@ -1342,7 +1342,7 @@ transform: translate(-50%, -50%);
 				name, url = self.bot_exec(f"(bot.audio.returns[{t}].get('name'),bot.audio.returns[{t}].get('url'))")
 				if not name or not url:
 					raise FileNotFoundError(500, v)
-				url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
+				url = unyt(url)
 				h = shash(url)
 				fn = "~" + h + fmt
 				self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.get_stream(bot.audio.returns[{t}],download={repr(fmt)},asap={asap})")

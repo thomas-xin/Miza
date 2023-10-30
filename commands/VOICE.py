@@ -2429,7 +2429,7 @@ class AudioDownloader:
 		icon = entry.get("icon", None)
 		# Use SHA-256 hash of URL to avoid filename conflicts
 		url = entry["url"]
-		url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
+		url = unyt(url)
 		h = shash(url)
 		if type(download) is str:
 			fn = "~" + h + download
@@ -2772,7 +2772,7 @@ class AudioDownloader:
 				return rename, rename
 			enough = False
 			if len(urls) == 1 and fmt in ("opus", "pcm", "wav", "mp3", "ogg") and is_youtube_url(urls[0]):
-				url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
+				url = unyt(url)
 				info = self.search(url)
 				if info and info[0] and info[0].get("duration") and info[0]["duration"] < 3600:
 					enough = True
@@ -5602,7 +5602,7 @@ class Transcribe(Command):
 			name, url = entries[0].get("name"), entries[0].get("url")
 			if not name or not url:
 				raise FileNotFoundError(500, argv)
-			url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
+			url = unyt(url)
 			fn, out = await asubmit(ytdl.download_file, entries[0], fmt="opus")
 			fni = fn.rsplit(".", 1)[0] + ".webm"
 			if bot.is_trusted(guild) >= 2:
