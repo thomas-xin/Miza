@@ -1164,12 +1164,9 @@ transform: translate(-50%, -50%);
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
-	def encodec(self, url, name="", source="", bitrate="auto", inference=False):
+	def encodec(self, url, name="", source="", bitrate="auto", inference=False, urls=()):
 		cp.response.headers.update(SHEADERS)
 		true_ip()
-		if isinstance(url, list):
-			url = url[0]
-		url = regexp(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=").sub("https://youtu.be/", url)
 		if isinstance(bitrate, int):
 			br = str(bitrate)
 		elif bitrate == "auto":
@@ -1181,6 +1178,22 @@ transform: translate(-50%, -50%);
 			br = bitrate.removesuffix("k")
 		if not os.path.exists(cachedir + "/ecdc"):
 			os.mkdir(cachedir + "/ecdc")
+		if urls:
+			urls = urls.split() if isinstance(urls, str) else urls
+			outs = []
+			for url in urls:
+				url = regexp(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=").sub("https://youtu.be/", url)
+				out = cachedir + "/ecdc/!" + shash(url) + "~" + br + ".ecdc"
+				if out in self.ecdc_running or os.path.exists(out) and os.path.getsize(out):
+					outs.append(1)
+				else:
+					outs.append(0)
+			cp.response.headers.update(HEADERS)
+			cp.response.headers["Content-Type"] = "application/json"
+			return orjson.dumps(outs)
+		if isinstance(url, list):
+			url = url[0]
+		url = regexp(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=").sub("https://youtu.be/", url)
 		out = cachedir + "/ecdc/!" + shash(url) + "~" + br + ".ecdc"
 		while out in self.ecdc_running:
 			self.ecdc_running[out].result()
