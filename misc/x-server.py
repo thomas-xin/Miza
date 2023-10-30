@@ -1252,7 +1252,12 @@ transform: translate(-50%, -50%);
 		try:
 			t = ts_us()
 			fn = f"cache/{t}"
-			url2 = API + "/ytdl?d=" + url
+			if url.startswith(API):
+				url2 = url
+			elif is_discord_attachment(url):
+				url2 = API + "/unproxy?url=" + url
+			else:
+				url2 = API + "/ytdl?d=" + url
 			with reqs.next().get(url2, timeout=1800, stream=True) as resp:
 				with open(fn, "wb") as f:
 					shutil.copyfileobj(resp.raw, f, 65536)

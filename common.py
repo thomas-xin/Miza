@@ -886,13 +886,17 @@ class FileHashDict(collections.abc.MutableMapping):
 		self.data.clear()
 		with self.db_sem:
 			self.cur.execute(f"DELETE FROM '{self.path}'")
-		self.codb.clear()
-		try:
-			shutil.rmtree(self.path)
-		except (PermissionError, FileNotFoundError):
-			pass
-		else:
-			os.mkdir(self.path)
+			self.db.commit()
+			self.db.close()
+			self.db = None
+			self.codb.clear()
+			try:
+				shutil.rmtree(self.path)
+			except (PermissionError, FileNotFoundError):
+				pass
+			else:
+				os.mkdir(self.path)
+			self.load_cursor()
 		return self
 
 	def __update__(self):

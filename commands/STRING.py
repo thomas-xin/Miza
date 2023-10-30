@@ -2192,7 +2192,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						for i, m in enumerate(ufc, 1):
 							prompt += f"\n{i}. {m_str(m)}\n"
 						i += 1
-						prompt += f'"""\n\n# Instruction:\n"""\n{i}. {m_str(ms)}\n"""\n\nAssume you are joining the conversation as {bot_name}. Which number represents the first message relevant to the instruction question? (Provide only the number, not an actual reply! If there are none relevant, respond with "-1").\n\n### Response:'
+						prompt += f'"""\n\n### Instruction:\n"""\n{i}. {m_str(ms)}\n"""\n\nAssume you are joining the conversation as {bot_name}. Which number represents the first message relevant to the instruction question? (Provide only the number, not an actual reply! If there are none relevant, respond with "-1").\n\n### Response:'
 						print("Context prompt:", prompt)
 						data = dict(
 							model="gpt-3.5-turbo-instruct",
@@ -2285,7 +2285,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						res = await process_image("BOT.browse", "$", [argv], cap="browse", timeout=60)
 						if res:
 							c = await tcount(res)
-							if c > 1200:
+							if c > 1440:
 								res = await summarise(q=q + "\n" + res, max_length=1296, min_length=1024)
 								res = res.replace("\n", ". ").replace(": ", " -")
 							res = res.strip()
@@ -2315,6 +2315,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								messages = [messages[0], messages[-1]]
 							messages.append(cdict(m))
 							messages.append(cdict(role="function", name=name, content=res))
+							blocked.add("sympy")
 							skipping = 0
 							length = await count_to(messages)
 							print("New prompt:", messages)
@@ -2338,6 +2339,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							skipping = 0
 							length = await count_to(messages)
 							print("New prompt:", messages)
+							blocked.add("wolfram_alpha")
 							continue
 					elif name == "dalle":
 						print("Art query:", argv)

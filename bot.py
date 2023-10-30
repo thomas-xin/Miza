@@ -1560,7 +1560,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		res = None
 		p1 = p2 = ""
 		try:
-			res = await process_image(url, "caption", ["-nogif", 0, False], cap="caption", timeout=20)
+			res = await process_image(url, "caption", ["-nogif", False], cap="caption", timeout=20)
 			p1, p2 = res
 		except:
 			if res:
@@ -1606,7 +1606,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	replicate_client = None
 	def replicate(self, url):
-		resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, "auto", "-f", "png"], timeout=10))
+		resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
 		if not self.replicate_client:
 			import replicate
 			self.replicate_client = replicate.Client(api_token=AUTH.get("replicate_key") or "")
