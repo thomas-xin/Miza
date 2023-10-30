@@ -2534,7 +2534,8 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 		# s = lim_str(code + escape_roles(out), 2000)
 		ref = message
 		if not mresp:
-			s = escape_roles(out)
+			s = escape_roles(out.replace("\r\n", "\n").replace("\r", "\n"))
+			state = 0
 			while len(code) + len(s) > 2000:
 				t = []
 				while s:
@@ -2544,24 +2545,31 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						t.append(spl[0])
 						t.append("\n\n")
 						s = spl[1]
+						state = 2
 						continue
+					if t and state >= 2:
+						break
 					spl = s.split("\n", 1)
-					if len(spl) > 1 and cl + len(spl[0]) < 1998:
+					if len(spl) > 1 and cl + len(spl[0]) < 1997:
 						t.append(spl[0])
 						t.append("\n")
 						s = spl[1]
+						state = 1
 						continue
+					if t and state >= 1:
+						break
 					spl = s.split(None, 1)
-					if len(spl) > 1 and cl + len(spl[0]) < 1998:
+					if len(spl) > 1 and cl + len(spl[0]) < 1997:
 						t.append(spl[0])
 						t.append(" ")
 						s = spl[1]
+						state = 0
 						continue
 					if t:
 						break
 					t.append(s[:1999 - cl])
 					s = s[1999 - cl:]
-				t.insert(0, "\xad")
+				t.insert(0, code)
 				t = "".join(t).strip()
 				create_task(send_with_react(channel, t, reference=ref))
 				ref = None

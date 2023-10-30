@@ -1406,7 +1406,7 @@ if "caption" in CAPS:
 				dfut.result(timeout=1)
 			except concurrent.futures.TimeoutError:
 				raise RuntimeError("Model is loading, please wait...")
-		im = resize_max(im, 1024, "auto")
+		im = resize_max(im, 1024, resample="auto")
 		if im.mode != "RGB":
 			image = im.convert("RGB")
 		else:

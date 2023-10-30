@@ -1560,7 +1560,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		res = None
 		p1 = p2 = ""
 		try:
-			res = await process_image(url, "caption", ["-nogif", False], cap="caption", timeout=20)
+			res = await process_image(url, "caption", ["-nogif", 0, False], cap="caption", timeout=20)
 			p1, p2 = res
 		except:
 			if res:

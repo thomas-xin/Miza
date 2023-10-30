@@ -1530,7 +1530,7 @@ class OCR(Command):
 	async def __call__(self, bot, user, message, args, argv, **void):
 		fut = asubmit(__import__, "pytesseract")
 		name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
-		resp = await process_image(url, "resize_max", ["-nogif", 1024, "auto", "-f", "png"], timeout=60)
+		resp = await process_image(url, "resize_max", ["-nogif", 1024, 0, "auto", "-f", "png"], timeout=60)
 		if isinstance(resp, str):
 			f = open(resp, "rb")
 		else:
@@ -1903,7 +1903,7 @@ class Art(Command):
 				image_1 = image_2 = None
 				image_1b = image_2b = None
 				if url:
-					resp = await process_image(url, "resize_max", ["-nogif", 1024 if sdxl else 768, "auto", "-f", "png"], timeout=60)
+					resp = await process_image(url, "resize_max", ["-nogif", 1024 if sdxl else 768, 0, "auto", "-f", "png"], timeout=60)
 					image_1 = resp
 					if inpaint and url2:
 						image_2b = await bot.get_request(url2)
