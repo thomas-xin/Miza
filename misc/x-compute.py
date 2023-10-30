@@ -1708,7 +1708,9 @@ if "ytdl" in CAPS:
 					if not os.path.exists(fn):
 						raise RuntimeWarning(fn)
 				except (subprocess.CalledProcessError, RuntimeWarning):
+					traceback.print_exc()
 					args = ["ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-threads", "3", "-hide_banner", "-nostdin", "-v", "error", "-y", "-i", stream, "-map_metadata", "-1", "-vn", "-c:a", "libopus", fn]
+					print(args)
 					subprocess.check_output(args)
 				if not os.path.exists(fn):
 					try:
