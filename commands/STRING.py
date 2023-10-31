@@ -1648,9 +1648,9 @@ async def count_to(messages):
 async def cut_to(messages, limit=1024, exclude_first=True):
 	if not messages:
 		return messages
+	messages = list(messages)
 	if exclude_first:
 		sm = messages.pop(0)
-	messages = list(messages)
 	mes = []
 	count = 0
 	i = -1
@@ -1864,6 +1864,8 @@ class Ask(Command):
 				continue
 			if m.id == message.id:
 				content = q
+			elif m.content and m.author.id == bot.id:
+				content = zwremove(m.clean_content)
 			elif m.content:
 				content = m.clean_content
 			elif m.embeds:
@@ -2289,6 +2291,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								res = await summarise(q=q + "\n" + res, max_length=1296, min_length=1024)
 								res = res.replace("\n", ". ").replace(": ", " -")
 							res = res.strip()
+							# print("MLIST:", messages)
 							if len(messages) > 2:
 								messages = [messages[0], messages[-2], messages[-1]]
 							else:
@@ -2301,8 +2304,12 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							continue
 					elif name == "sympy":
 						print("Sympy query:", argv)
-						res = await bot.solve_math(argv)
-						res = res[0]
+						try:
+							res = await bot.solve_math(argv)
+							res = res[0]
+						except:
+							print_exc()
+							res = None
 						if res:
 							c = await tcount(res)
 							if c > 512:
@@ -2509,7 +2516,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 				# emb.description = (
 					# f"Uh-oh, it appears your API key or credit was blocked! Please make sure your payment methods are functional, or purchase a consistent subscription [here]({bot.kofi_url})!"
 				# )
-		out = out or mresp and mresp.content
+		out = (out or mresp and mresp.content).replace("\\times", "×")
 		history = [m_str(m).split(":", 1) for m in used[1:] if m.get("role") != "system"]
 		if used[0].get("role") != "system" or used[0].content.startswith("Summary "):
 			history.insert(0, m_str(used[0]).split(":", 1))

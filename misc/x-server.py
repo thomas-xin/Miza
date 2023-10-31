@@ -925,6 +925,14 @@ transform: translate(-50%, -50%);
 			url = self.bot_exec(f"bot.renew_attachment({id})")
 		else:
 			url = self.renew_url(url, mid=mid)
+		cp.response.headers.update(SHEADERS)
+		if "Cf-Worker" in cp.request.headers and is_discord_attachment(url):
+			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+			fn = f"cache/attachment_{a_id}.bin"
+			if os.path.exists(fn):
+				mim = get_mime(fn)
+				return cp.lib.static.serve_file(fn, content_type=mim)
+			return self.stream(url)
 		raise cp.HTTPRedirect(url, status="307")
 
 	@tracebacksuppressor
@@ -936,6 +944,16 @@ transform: translate(-50%, -50%);
 				return self.bot_exec(f"bot.renew_attachment({repr(url)},m_id={mid})")
 			return self.bot_exec(f"bot.renew_attachment({repr(url)})")
 		return url
+
+	def stream(self, url):
+		headers = fcdict(cp.request.headers)
+		headers.pop("Remote-Addr", None)
+		headers.pop("Host", None)
+		headers.pop("Range", None)
+		headers.update(Request.header())
+		with reqs.next().get(url, headers=headers, stream=True) as resp:
+			resp.raise_for_status()
+			yield from resp
 
 	@tracebacksuppressor
 	def dyn_serve(self, urls, size=0):
