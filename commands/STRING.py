@@ -1806,7 +1806,7 @@ class Ask(Command):
 				tup = tup[2:]
 				inp.append(f"{name}: {content}")
 			if not em:
-				data = await process_image("embedding", "$", ["\n".join(inp)], cap="summ", timeout=10)
+				data = await process_image("embedding", "$", ["\n".join(inp)], cap="summ", timeout=20)
 				em = base64.b64encode(data).decode("ascii")
 			mapd[s] = orig
 			embd[s] = em
@@ -1921,6 +1921,8 @@ class Ask(Command):
 			ignores.add(m.id)
 		if len(self.visited) > 256:
 			self.visited.pop(next(iter(self.visited)))
+		print("VISITED:", len(visconts))
+		efuts = deque()
 		for i, m, content, found, cfut in reversed(visconts):
 			if cfut:
 				cfut = await cfut
@@ -1946,8 +1948,12 @@ class Ask(Command):
 				continue
 			t = (name, content)
 			if str(m.id) not in mapd and m.id != message.id:
-				await register_embedding(m.id, name, content)
+				fut = create_task(register_embedding(m.id, name, content))
+				efuts.append(fut)
 			history.append((name, content))
+		for fut in efuts:
+			with tracebacksuppressor:
+				await fut
 		# else:
 		# 	reset = None
 		if isinstance(caid, dict):

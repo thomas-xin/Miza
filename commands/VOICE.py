@@ -828,9 +828,12 @@ class AudioQueue(alist):
 					break
 				if "file" in e:
 					e.file.ensure_time()
-				if not e.url:
+				if not e.get("url"):
 					if not self.auds.stats.quiet:
-						self.auds.announce(ini_md(f"A problem occured while loading {sqr_md(e.name)}, and it has been automatically removed from the queue."))
+						msg = f"A problem occured while loading {sqr_md(e.name)}, and it has been automatically removed from the queue."
+						if e.get("ex"):
+							msg = msg[:-1] + ":\n" + e["ex"]
+						self.auds.announce(ini_md(msg))
 					dels.append(i)
 					continue
 			q.pops(dels)
@@ -1850,7 +1853,7 @@ class AudioDownloader:
 					try:
 						entries = self.extract_backup(url)
 					except (TypeError, youtube_dl.DownloadError):
-						raise FileNotFoundError("Unable to fetch audio data.")
+						raise FileNotFoundError(f"Unable to fetch audio data: {repr(ex)}")
 			else:
 				raise
 		if "entries" in entries:
@@ -1903,7 +1906,7 @@ class AudioDownloader:
 					try:
 						return self.extract_backup(url)
 					except (TypeError, youtube_dl.DownloadError):
-						raise FileNotFoundError("Unable to fetch audio data.")
+						FileNotFoundError(f"Unable to fetch audio data: {repr(ex)}")
 			raise
 
 	# Extracts info from a URL or search, adjusting accordingly.
@@ -2478,10 +2481,11 @@ class AudioDownloader:
 				self.extract_single(entry)
 				searched = True
 				entry.pop("research", None)
-			except:
+			except Exception as ex:
 				print_exc()
 				entry.pop("research", None)
 				entry["url"] = ""
+				entry["ex"] = repr(ex)
 				raise
 			else:
 				if video:
@@ -2495,8 +2499,9 @@ class AudioDownloader:
 			if type(data) is str:
 				try:
 					data = evalEX(data)
-				except:
+				except Exception as ex:
 					entry["url"] = ""
+					entry["ex"] = repr(ex)
 					raise
 			stream = set_dict(data[0], "stream", data[0].url)
 			icon = set_dict(data[0], "icon", data[0].url)
@@ -2561,10 +2566,11 @@ class AudioDownloader:
 			if callback is not None:
 				asubmit(callback)
 			return f
-		except:
+		except Exception as ex:
 			# Remove entry URL if loading failed
 			print_exc()
 			entry["url"] = ""
+			entry["ex"] = repr(ex)
 
 	# Video concatenation algorithm; supports different formats, codecs, resolutions, aspect ratios and framerates
 	def concat_video(self, urls, fmt, start, end, auds, message=None):
@@ -3294,8 +3300,9 @@ class AudioDownloader:
 				self.searched[item] = obj
 				it = out[0]
 				i.update(it)
-			except:
+			except Exception as ex:
 				i.url = ""
+				i.ex = repr(ex)
 				print_exc(item)
 				return False
 		return True

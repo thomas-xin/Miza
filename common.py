@@ -1516,6 +1516,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 			if ephemeral:
 				message.id = reference.id
 				message.slash = getattr(reference, "slash", None)
+				message.ephemeral = True
 			for a in message.attachments:
 				print("<attachment>", a.url)
 			return message
@@ -1594,8 +1595,10 @@ def to_webp_ex(url):
 	return url.replace(".png", ".webp")
 
 def get_url(obj, f=to_webp):
-	if type(obj) is str:
+	if isinstance(obj, str):
 		return obj
+	if BOT[0] and isinstance(obj, discord.Attachment):
+		return BOT[0].try_attachment(obj.url)
 	for attr in ("display_avatar", "avatar_url", "icon_url", "icon", "avatar"):
 		url = getattr(obj, attr, None)
 		if url:
@@ -2411,7 +2414,10 @@ def force_kill(proc):
 		proc.kill()
 
 async def proc_communicate(proc):
-	while True:
+	b = await proc.stdout.readline()
+	if not b or b == b"#R\n":
+		return create_task(start_proc(proc))
+	while proc:
 		with tracebacksuppressor:
 			if not is_strict_running(proc):
 				return

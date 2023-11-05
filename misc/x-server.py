@@ -312,6 +312,8 @@ def error_handler(exc=None):
 <meta http-equiv="refresh" content=0;url={video}">
 </head><body></body></html>""".encode("utf-8")
 	else:
+		if status == 404:
+			true_ip()
 		resp = errdata.get(status) or errdata.setdefault(status, reqs.next().get(f"https://http.cat/{status}"))
 		head = resp.headers.copy()
 		body = resp.content

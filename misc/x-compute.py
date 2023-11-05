@@ -1350,6 +1350,16 @@ def determine_cuda(mem=1, priority=None, multi=False, major=0):
 		return [COMPUTE_ORDER.index(i) for i in pcs if gmems[i].free >= mem], torch.float16
 	return COMPUTE_ORDER.index(pcs[0]), torch.float16
 
+ot = 0
+def ensure_gc(t):
+	global ot
+	ot = max(ot, time.time() + t)
+	time.sleep(t)
+	if ot and time.time() > ot:
+		with torch.no_grad():
+			torch.cuda.empty_cache()
+		ot = 0
+
 
 if "caption" in CAPS:
 	import tiktoken
@@ -1418,6 +1428,7 @@ if "caption" in CAPS:
 		if not best:
 			# cfut = exc.submit(VIT.generate_caption, image)
 			desc = VIT.interrogate_fast(image, max_flavors=24)#, caption=" ")
+			exc.submit(ensure_gc, 20)
 			p1 = desc.lstrip()
 			enc = tiktoken.get_encoding("cl100k_base")
 			out = []
@@ -1452,6 +1463,7 @@ if "summ" in CAPS:
 	def summarise(s1, min_length=128, max_length=192, rm=True, do_sample=True):
 		with torch.autocast("cuda"):
 			s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
+		exc.submit(ensure_gc, 20)
 		if rm:
 			return re.sub(r"(?:in )?(?:the|this|some)? *(?:article|essay|page|study|text|report|topic)[s, ]*(?:also mentions|we discuss|we look at|is about|includes|is based on)? *", "", s2, flags=re.I)
 		return s2
@@ -1467,6 +1479,7 @@ if "summ" in CAPS:
 			pass
 	def embedding(s):
 		a = Embedder.encode(s).astype(np.float16)
+		exc.submit(ensure_gc, 20)
 		return a.data
 
 if "class" in CAPS:
@@ -1506,7 +1519,7 @@ if "class" in CAPS:
 				max_new_tokens=32,
 				do_sample=True,
 			)
-			torch.cuda.empty_cache()
+			exc.submit(ensure_gc, 60)
 		text = T.decode(res[0])
 		text = text.removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
 		print("MOCK:", text)
@@ -1542,12 +1555,11 @@ if "class" in CAPS:
 						max_new_tokens=max_tokens,
 						do_sample=True,
 					)
-					# torch.cuda.empty_cache()
+					exc.submit(ensure_gc, 60)
 			except RuntimeError as e:
 				if "probability tensor" in str(ex).lower():
 					print(repr(ex))
 					ex = e
-					torch.cuda.empty_cache()
 					continue
 				raise
 			break
@@ -1867,12 +1879,11 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 							max_new_tokens=max_tokens,
 							do_sample=True,
 						)
-						# torch.cuda.empty_cache()
+						exc.submit(ensure_gc, 60)
 				except RuntimeError as e:
 					if "probability tensor" in str(ex).lower():
 						print(repr(ex))
 						ex = e
-						torch.cuda.empty_cache()
 						continue
 					raise
 				break
@@ -1939,12 +1950,11 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 							max_new_tokens=max_tokens,
 							do_sample=True,
 						)
-						torch.cuda.empty_cache()
+						exc.submit(ensure_gc, 60)
 				except RuntimeError as e:
 					if "probability tensor" in str(ex).lower():
 						print(repr(ex))
 						ex = e
-						# torch.cuda.empty_cache()
 						continue
 					raise
 				break
@@ -2749,6 +2759,7 @@ if __name__ == "__main__":
 			sys.stdout.flush()
 
 	async def update_loop():
+		sys.stdout.buffer.write("~print('',end='')\n".encode("utf-8"))
 		while True:
 			argv = await wrap_future(exc.submit(sys.stdin.readline))
 			if not argv:

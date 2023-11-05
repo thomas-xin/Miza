@@ -1064,6 +1064,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			self.data.attachments[a_id] = url
 		return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
 
+	def try_attachment(self, url, m_id=None):
+		if not isinstance(url, int):
+			c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
+			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+		else:
+			a_id = url
+		if a_id in self.data.attachments:
+			return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
+		return url
+
 	async def renew_attachment(self, url, m_id=None):
 		if isinstance(url, int):
 			a_id = url
@@ -1357,6 +1367,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					[found.extend(find_urls(e.description)) for e in m.embeds if e.description]
 					if images:
 						if reactions:
+							m = await self.ensure_reactions(m)
 							for r in m.reactions:
 								e = r.emoji
 								if hasattr(e, "url"):
@@ -1369,6 +1380,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							m = await c.fetch_message(int(spl[2]))
 							self.bot.add_message(m, files=False, force=True)
 							if reactions:
+								m = await self.ensure_reactions(m)
 								for r in m.reactions:
 									e = r.emoji
 									if hasattr(e, "url"):
@@ -4257,12 +4269,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			)
 		except ConnectionError:
 			message = await send_with_reply(None, message, "\xad", ephemeral=True)
-			await Request(
-				f"https://discord.com/api/{api}/webhooks/{self.id}/{int_token}/messages/@original",
-				method="DELETE",
-				authorise=True,
-				aio=True,
-			)
+			if not getattr(message, "ephemeral", False):
+				await self.silent_delete(message)
+				# await Request(
+					# f"https://discord.com/api/{api}/webhooks/{self.id}/{int_token}/messages/@original",
+					# method="DELETE",
+					# authorise=True,
+					# aio=True,
+				# )
 
 	# Adds embeds to the embed sender, waiting for the next update event.
 	def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None, exc=True, bottleneck=False):
@@ -4635,13 +4649,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if arg:
 				await self.send_event("_seen_", user=arg, delay=delay, event=event, **kwargs)
 
+	async def ensure_reactions(self, message):
+		if not message.reactions or isinstance(message, self.CachedMessage):
+			message = await discord.abc.Messageable.fetch_message(message.channel, message.id)
+			self.bot.add_message(message, files=False, force=True)
+		return message
+
 	# Deletes own messages if any of the "X" emojis are reacted by a user with delete message permission level, or if the message originally contained the corresponding reaction from the bot.
 	async def check_to_delete(self, message, reaction, user):
 		if user.id == self.id:
 			return
-		if not message.reactions:
-			message = await discord.abc.Messageable.fetch_message(message.channel, message.id)
-			self.bot.add_message(message, files=False, force=True)
+		message = await self.ensure_reactions(message)
 		if str(reaction) not in "❌✖️🇽❎🔳🔲":
 			return
 		if str(reaction) in "🔳🔲" and (not message.attachments and not message.embeds or "exec" not in self.data):

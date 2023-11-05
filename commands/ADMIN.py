@@ -2806,16 +2806,17 @@ class UpdateStarboards(Database):
 			return
 		e_id, count, *disabled = temp
 		if disabled and message.channel.id in disabled[0]:
-			return
+			with tracebacksuppressor:
+				m = await self.bot.fetch_message(disabled[0][message.channel.id], message.channel)
+				res = await self.bot.verify_integrity(m)
+				if res:
+					return
 		table = self.data[message.guild.id]
 		req = table[react][0]
 		if not req < inf:
 			return
+		message = await self.bot.ensure_reactions(message)
 		count = sum(r.count for r in message.reactions if str(r.emoji) == react)
-		if count <= 1:
-			message = await discord.abc.Messageable.fetch_message(message.channel, message.id)
-			self.bot.add_message(message, files=False, force=True)
-			count = sum(r.count for r in message.reactions if str(r.emoji) == react)
 		sem = self.sems.setdefault(message.guild.id, Semaphore(1, inf))
 		async with sem:
 			if message.id not in table.setdefault(None, {}):
