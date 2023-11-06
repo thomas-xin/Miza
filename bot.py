@@ -1380,7 +1380,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							m = await c.fetch_message(int(spl[2]))
 							self.bot.add_message(m, files=False, force=True)
 							if reactions:
-								m = await self.ensure_reactions(m)
+								if reactions == 1:
+									m = await self.ensure_reactions(m)
 								for r in m.reactions:
 									e = r.emoji
 									if hasattr(e, "url"):
@@ -1389,8 +1390,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 										u = translate_emojis(e)
 										if is_url(u):
 											found.append(u)
-					if not found and (not images or not reactions):
-						found = await self.follow_url(url, it, best=best, preserve=preserve, images=True, reactions=True, allow=True, limit=limit)
+					if not found and (not images or not reactions and reactions is not None):
+						found = await self.follow_url(url, it, best=best, preserve=preserve, images=True, reactions=2, allow=True, limit=limit)
 					for u in found:
 						# Do not attempt to find the same URL twice
 						if u not in it:

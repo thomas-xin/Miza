@@ -1842,10 +1842,10 @@ class UpdateMessages(Database):
 	closed = False
 	hue = 0
 
-	@tracebacksuppressor(SemaphoreOverflowError)
 	async def wrap_semaphore(self, func, *args, **kwargs):
-		async with self.semaphore:
-			return await func(*args, **kwargs)
+		with tracebacksuppressor(SemaphoreOverflowError):
+			async with self.semaphore:
+				return await func(*args, **kwargs)
 
 	async def __call__(self, **void):
 		if self.bot.ready and not self.closed:

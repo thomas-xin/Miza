@@ -1875,12 +1875,13 @@ class Ask(Command):
 			else:
 				content = ""
 			found = None
+			is_curr = m.id == message.id
 			if i < 8 and not simulated and not content.strip():
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = self.visited.get(url)
 				if found is None:
 					try:
-						found = self.visited[url] = await bot.follow_url(url, reactions=False)
+						found = self.visited[url] = await bot.follow_url(url, reactions=False if i < 3 else None)
 					except:
 						print_exc()
 						found = self.visited[url] = ""
@@ -1893,12 +1894,12 @@ class Ask(Command):
 			c = content
 			if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
 				continue
-			if i < 8 and not simulated and not found:
+			if i < 8 and not simulated and found is None:
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = self.visited.get(url)
 				if found is None:
 					try:
-						found = self.visited[url] = await bot.follow_url(url, reactions=False)
+						found = self.visited[url] = await bot.follow_url(url, reactions=False if i < 3 else None)
 					except:
 						print_exc()
 						found = self.visited[url] = ""
@@ -1907,7 +1908,7 @@ class Ask(Command):
 				else:
 					found = None
 			if found:
-				best = premium >= 2 and m.id == message.id
+				best = premium >= 2 and is_curr
 				cfut = create_task(bot.caption(found, best=best))
 				visconts.append((i, m, content, found, cfut))
 			else:
@@ -2058,7 +2059,7 @@ class Ask(Command):
 			vc = bool(getattr(user, "voice", False)) | bool(bot.audio.players.get(getattr(guild, "id", None))) * 2
 			nsfw = bot.is_nsfw(channel)
 			extensions = premium >= 2
-			chatcompletion = ("gpt-4", "gpt-3.5-turbo")
+			chatcompletion = ("gpt-4-turbo", "gpt-4-1106-preview", "gpt-4", "gpt-3.5-turbo")
 			instructcompletion = ("gpt-3.5-turbo-instruct", "text-davinci-003", "text-curie-001")
 			chatcc = ("gpt4", "gpt3")
 

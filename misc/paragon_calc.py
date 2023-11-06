@@ -229,6 +229,7 @@ def parse(args):
 		plural = "towers have" if added != 1 else "tower has"
 		output.append(f"`Note: The missing `{added}` tier-5 {plural} automatically been added.`")
 	output.append(f"Current paragon cost: `{ceil(apcost)}`")
+	pcost = pcost or 1000000 / 3
 	tier5 = max(0, tier5 - 3)
 	M_CASH = max_cost(pcost)
 	if tier5 > 0:
