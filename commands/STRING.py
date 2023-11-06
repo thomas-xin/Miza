@@ -2486,7 +2486,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						continue
 				else:
 					raise FileNotFoundError(f"Unable to find model \"{model}\".")
-				text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
+				text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name).rstrip(":")
 				if not text or len(text) >= 2 and text[-1] in ": aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
 					redo = True
 					continue

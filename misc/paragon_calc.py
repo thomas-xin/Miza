@@ -1,4 +1,5 @@
-import sys, requests, sympy
+import sys, requests
+from sympy import sympify
 from math import *
 
 
@@ -64,12 +65,24 @@ def tower_cost(tower, path, village=False, temple=False):
 def tier_count(t):
 	return sum(map(int, t))
 
-def total_power(cash, pops, tier5, tiers, totems):
+def total_power(cost, cash, injected, pops, tier5, tiers, totems):
 	return (
-		min(floor(cash / 25), 10000) + min(floor(pops / 180), 90000)
-		+ min(tier5 * 10000, 90000) + min(tiers * 100, 10000)
+		min(floor((cash / 1.05 + injected) / cost * 20000), 60000) + min(floor(pops / 180), 90000)
+		+ min(tier5 * 6000, 50000) + min(tiers * 100, 10000)
 		+ totems * 2000
 	)
+
+def max_cost(cost):
+	return ceil(cost / 20000 * 60000)
+
+def available_inject(cost, cash):
+	return ceil((cost / 20000 * 60000 - cash) * 1.05)
+
+def required_inject(cost, cash, power, required):
+	avail = available_inject(cost, cash)
+	avapwr = floor(avail / 1.05 / cost * 20000)
+	tarpwr = min(required - power, avapwr)
+	return ceil(tarpwr / 20000 * cost * 1.05)
 
 def d2p(d):
 	if d <= 1:
@@ -83,12 +96,12 @@ def p2d(p):
 		return 1
 	elif p >= 200000:
 		return 100
-	return min(max(floor(abs(sympy.sympify("-(-1/2 + sqrt(3)*I/2)*(-162*p + sqrt((-324*p - 55961091/100)**2 - 531441/250000)/2 - 55961091/200)**(1/3)/3 - 67/2 - 27/(100*(-1/2 + sqrt(3)*I/2)*(-162*p + sqrt((-324*p - 55961091/100)**2 - 531441/250000)/2 - 55961091/200)**(1/3))").subs("p", p).evalf(24))), 1), 99)
+	return min(max(floor(abs(sympify("-(-1/2 + sqrt(3)*I/2)*(-162*p + sqrt((-324*p - 55961091/100)**2 - 531441/250000)/2 - 55961091/200)**(1/3)/3 - 67/2 - 27/(100*(-1/2 + sqrt(3)*I/2)*(-162*p + sqrt((-324*p - 55961091/100)**2 - 531441/250000)/2 - 55961091/200)**(1/3))").subs("p", p).evalf(24))), 1), 99)
 
 aliases = {
 	"Dart Monkey": [],
 	"Boomerang Monkey": ["boomer"],
-	"Bomb Shooter": ["bomb tower"],
+	"Bomb Shooter": ["bomb tower", "cannon"],
 	"Tack Shooter": [],
 	"Ice Monkey": ["ice tower"],
 	"Glue Gunner": [],
@@ -99,7 +112,7 @@ aliases = {
 	"Heli Pilot": ["heli monkey", "heli tower", "helicopter"],
 	"Mortar Monkey": ["mortar tower"],
 	"Dartling Gunner": ["dartling monkey", "dartling tower"],
-	"Wizard Monkey": ["wizard tower"],
+	"Wizard Monkey": ["wizard tower", "wiz"],
 	"Super Monkey": [],
 	"Ninja Monkey": [],
 	"Alchemist": ["alch"],
@@ -145,10 +158,11 @@ def parse(args):
 	cash = 0
 	pops = 0
 	generated = 0
+	injected = 0
 	tier5 = 0
 	tiers = 0
 	totems = 0
-	limit = inf
+	limit = 40
 
 	t5s = set()
 	t = args.pop(0)
@@ -167,6 +181,7 @@ def parse(args):
 	else:
 		village = False
 	tcost = lambda t: tower_cost(tower, t, temple=temple, village=village)
+	t5cost = []
 
 	for arg in args:
 		arg = arg.rstrip(",")
@@ -191,28 +206,32 @@ def parse(args):
 				cash += tcost(arg) * n
 			else:
 				tier5 += t5 * n
-	pcost = COSTS[tower].get("paragon", 0)
+				t5cost.extend([tcost(arg)] * n)
+	pcost = apcost = COSTS[tower].get("paragon", 0)
 	added = 0
 	for cp in ("500", "050", "005"):
 		if cp not in t5s:
 			added += 1
 			tier5 += 1
-			pcost += tcost(cp)
+			c = tcost(cp)
+			apcost += c
+			t5cost.append(c)
 	if added:
 		plural = "towers have" if added != 1 else "tower has"
 		output.append(f"`Note: The missing {added} tier-5 {plural} automatically been added.`")
-	output.append(f"Current paragon cost: {ceil(pcost)}")
+	output.append(f"Current paragon cost: {ceil(apcost)}")
 	tier5 = max(0, tier5 - 3)
+	M_CASH = max_cost(pcost)
 	if tier5 > 0:
-		cash += M_CASH
-		tiers += tier5 * 4
+		cash += sum(sorted(t5cost)[3:])
+		# tiers += tier5 * 4
 	pops = floor(pops + generated * 4)
 	output.append(f"Current effective cash: {ceil(cash)}")
 	output.append(f"Current effective pops (p/g): {pops}")
 	output.append(f"Current tier5 count: {tier5}")
 	output.append(f"Current upgrade count: {tiers}")
 	output.append(f"Current totem count (t): {totems}")
-	power = total_power(cash, pops, tier5, tiers, totems)
+	power = total_power(pcost, cash, injected, pops, tier5, tiers, totems)
 	output.append(f"Current power: {power}")
 	p = power
 	d = p2d(p)
@@ -254,13 +273,13 @@ def parse(args):
 	lt_crosspaths = [crosspaths[i] for i in order]
 	lt_ccosts = [ccosts[i] for i in order]
 	# print(lt_crosspaths, lt_ccosts)
-	stats = [cash, pops, tier5, tiers, totems]
+	stats = [cash, injected, pops, tier5, tiers, totems]
 	original = degree
 	achieved = original
 	for d, p, a in zip(degs, pows, adds):
 		if achieved >= d:
 			continue
-		cash, pops, tier5, tiers, totems = stats
+		cash, injected, pops, tier5, tiers, totems = stats
 		atowers = []
 		if tiers < M_TIERS:
 			tc = M_TIERS - tiers
@@ -291,7 +310,7 @@ def parse(args):
 				tc -= t
 				cash += cc
 				tiers += t
-				power = total_power(cash, pops, tier5, tiers, totems)
+				power = total_power(pcost, cash, injected, pops, tier5, tiers, totems)
 		if cash < M_CASH:
 			tc = M_CASH - cash
 			while tc > 0 and power < p:
@@ -307,15 +326,15 @@ def parse(args):
 				tc -= cc
 				cash += cc
 				tiers += t
-				power = total_power(cash, pops, tier5, tiers, totems)
+				power = total_power(pcost, cash, injected, pops, tier5, tiers, totems)
 		atowers.sort(key=lambda t: tcost(t))
-		while atowers and len(atowers) > limit or power < p and (tiers < M_TIERS or cash < M_CASH):
+		while atowers and (len(atowers) > limit or power < p and (tiers < M_TIERS or cash < M_CASH)):
 			cp = atowers.pop(0)
 			cc = tcost(cp)
 			t = tier_count(cp)
 			cash -= cc
 			tiers -= t
-			power = total_power(cash, pops, tier5, tiers, totems)
+			power = total_power(pcost, cash, injected, pops, tier5, tiers, totems)
 			if power < p and len(atowers) < limit:
 				d = p2d(power)
 				req = d2p(d + 1)
@@ -335,7 +354,7 @@ def parse(args):
 				cash += cc
 				tiers += tier_count(cp)
 				if op == cp:
-					power = total_power(cash, pops, tier5, tiers, totems)
+					power = total_power(pcost, cash, injected, pops, tier5, tiers, totems)
 					if power >= req:
 						break
 					atowers.pop(-1)
@@ -343,7 +362,7 @@ def parse(args):
 					tiers -= tier_count(cp)
 					break
 		atowers.sort(key=lambda t: tcost(t))
-		power = total_power(cash, pops, tier5, tiers, totems)
+		power = total_power(pcost, cash, injected, pops, tier5, tiers, totems)
 		if atowers:
 			cp = atowers[0]
 			temp = (atowers.copy(), cash, pops, tier5, tiers, totems)
@@ -356,7 +375,7 @@ def parse(args):
 					cp = atowers[0]
 					t = tier_count(cp)
 					c = tcost(cp)
-					estp = total_power(cash - c, pops, tier5, tiers - t, totems)
+					estp = total_power(pcost, injected, cash - c, pops, tier5, tiers - t, totems)
 					atowers.pop(0)
 					power = estp
 					cash -= c
@@ -375,10 +394,10 @@ def parse(args):
 					tc -= t
 					cash += cc
 					tiers += t
-					power = total_power(cash, pops, tier5, tiers, totems)
+					power = total_power(pcost, cash, injected, pops, tier5, tiers, totems)
 				if len(atowers) > limit:
 					atowers, cash, pops, tier5, tiers, totems = temp
-					power = total_power(cash, pops, tier5, tiers, totems)
+					power = total_power(pcost, cash, injected, pops, tier5, tiers, totems)
 				else:
 					atowers.sort(key=lambda t: tcost(t))
 		asacs = []
@@ -395,30 +414,38 @@ def parse(args):
 			count += 1
 		if count > 1:
 			asacs.append(f"{count}x{curr}")
-		else:
+		elif curr:
 			asacs.append(curr)
-		s = " ".join(asacs)
+		if cash < M_CASH and power < p:
+			# injected = available_inject(pcost, cash)
+			injected = required_inject(pcost, cash, power, p)
+			power = total_power(pcost, cash, injected, pops, tier5, tiers, totems)
+		s = " ".join(asacs) if len(asacs) != 1 or "x" in asacs[0] else "(1x)" + asacs[0]
 		if power >= p:
 			d2 = p2d(power)
 			if d2 > d:
 				d = d2
 				a = d2p(d)
 			output.append(f"**Power required for degree {d}: {a}**")
-			output.append(f"Recommended additional sacrifices: {s}")
+			if asacs:
+				output.append(f"Recommended additional sacrifices: {s}")
 			# if verbose:
 			ac = cash - stats[0]
 			if ac:
-				output.append(f"Additional cash: {ceil(ac)}")
-			ap = pops - stats[1]
+				output.append(f"Sacrifice cost: {ceil(ac)}")
+			ac = injected - stats[1]
+			if ac:
+				output.append(f"Injected cash: {ceil(ac)}")
+			ap = pops - stats[2]
 			if ap:
 				output.append(f"Additional pops: {ap}")
-			at = tier5 - stats[2]
+			at = tier5 - stats[3]
 			if at:
 				output.append(f"Additional tier5s: {at}")
-			au = tiers - stats[3]
+			au = tiers - stats[4]
 			if au:
 				output.append(f"Additional upgrades: {au}")
-			at = totems - stats[4]
+			at = totems - stats[5]
 			if at:
 				output.append(f"Additional totems: {at}")
 			achieved = d
@@ -433,22 +460,30 @@ def parse(args):
 						break
 				break
 			p = d2p(d)
+			if injected:
+				power = total_power(pcost, cash, 0, pops, tier5, tiers, totems)
+				injected = required_inject(pcost, cash, power, p)
+				p = total_power(pcost, cash, injected, pops, tier5, tiers, totems)
 			output.append(f"**Power required for degree {d} (maximum available): {p}**")
-			output.append(f"Recommended additional sacrifices: {s}")
+			if asacs:
+				output.append(f"Recommended additional sacrifices: {s}")
 			# if verbose:
 			ac = cash - stats[0]
 			if ac:
-				output.append(f"Additional cash: {ceil(ac)}")
-			ap = pops - stats[1]
+				output.append(f"Sacrifice cost: {ceil(ac)}")
+			ac = injected - stats[1]
+			if ac:
+				output.append(f"Injected cash: {ceil(ac)}")
+			ap = pops - stats[2]
 			if ap:
 				output.append(f"Additional pops: {ap}")
-			at = tier5 - stats[2]
+			at = tier5 - stats[3]
 			if at:
 				output.append(f"Additional tier5s: {at}")
-			au = tiers - stats[3]
+			au = tiers - stats[4]
 			if au:
 				output.append(f"Additional upgrades: {au}")
-			at = totems - stats[4]
+			at = totems - stats[5]
 			if at:
 				output.append(f"Additional totems: {at}")
 			break
