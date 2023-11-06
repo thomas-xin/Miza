@@ -141,7 +141,7 @@ class Mute(Command):
 			mutes, glob = await self.getMutes(guild)
 			users = await bot.find_users(argl, args, user, guild)
 		if not users:
-			raise LookupError("No results found.")
+			raise LookupError(f"No results found for {argv}.")
 		if len(users) > 1 and "f" not in flags:
 			raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
 		if not args or name == "unmute":
@@ -336,7 +336,7 @@ class Ban(Command):
 			bans, glob = await self.getBans(guild)
 			users = await bot.find_users(argl, args, user, guild)
 		if not users:
-			raise LookupError("No results found.")
+			raise LookupError(f"No results found for {argv}.")
 		if len(users) > 1 and "f" not in flags:
 			raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
 		if not args or name == "unban":
@@ -1374,6 +1374,98 @@ class Publish(Command):
 
 #     async def __call__(self, bot, args, message, channel, guild, flags, perm, name, **void):
 #         pass
+
+
+class Relay(Command):
+	server_only = True
+	name = ["Forward"]
+	min_level = 4
+	description = "Causes ⟨MIZA⟩ to send the target user(s) a DM that enables them to communicate through the current channel."
+	usage = "<user>* <disable{?d}>?"
+	example = ("relay @Miza Sorry, you have been banned from this server. Reply to this message to appeal!", "relay -d 201548633244565504")
+	flags = "aedf"
+	rate_limit = (16, 24)
+
+	async def __call__(self, bot, argv, args, argl, message, channel, guild, flags, user, **void):
+		if not argv:
+			raise ArgumentError("Input string is empty.")
+		users = await bot.find_users(argl, args, user, guild)
+		if not users:
+			raise LookupError(f"No results found for {argv}.")
+		if len(users) > 1 and "f" not in flags:
+			raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
+		msg = " ".join(args)
+		if not msg:
+			msg = "[SAMPLE MESSAGE]"
+			msg = bold(ini_md(msg))
+		create_task(message.add_reaction("📧"))
+		fut = create_task(send_with_reply(channel, message, "*```\nLoading DM relay...```*"))
+		colour = await bot.get_colour(user)
+		emb = discord.Embed(colour=colour, description=msg)
+		url = await bot.get_proxy_url(user)
+		emb.set_author(name=f"{user} ({user.id})", icon_url=url)
+		emb.timestamp = message.created_at
+		# emb.set_footer(text=str(message.id))
+		m = await fut
+		futs = deque()
+		for u in users:
+			fut = create_task(u.send(f"*```callback-admin-relay-{m.channel.id}_{m.id}-\nThis is a relayed message. Use Discord reply to send a response.```*", embed=emb))
+			futs.append(fut)
+		mids = []
+		uids = []
+		for fut in futs:
+			with bot.ExceptionSender(channel):
+				mes = await fut
+				mids.append(mes.id)
+				uids.append(mes.channel.recipient.id)
+		if not mids or not uids:
+			return
+		uidf = "x".join(map(str, uids))
+		midf = "x".join(map(str, mids))
+		unames = ", ".join(map(user_mention, uids))
+		await m.edit(content=f"*```callback-admin-relay-{uidf}_{midf}-\nMessage successfully forwarded.```*\n> Received by {unames}. Use Discord reply to send additional messages.", embed=emb)
+
+	_callback_ = _react_callback_ = async_nop
+
+
+class UpdateRelays(Database):
+	name = "relays"
+	no_file = True
+
+	async def _nocommand_(self, message, **void):
+		bot = self.bot
+		if message.reference and message.reference.resolved and message.reference.resolved.author.id == bot.id and message.reference.resolved.content.startswith("*```callback-admin-relay-"):
+			tup = message.reference.resolved.content.removeprefix("*```callback-admin-relay-").split("\n", 1)[0].rstrip("-").split("_")
+		else:
+			return
+		if len(tup) != 2:
+			print(message.reference.resolved.content)
+			raise ValueError(tup)
+		create_task(message.add_reaction("📧"))
+		emb = await bot.as_embed(message)
+		user = message.author
+		channel = message.channel
+		col = await bot.get_colour(user)
+		emb.colour = discord.Colour(col)
+		url = await bot.get_proxy_url(user)
+		emb.set_author(name=f"{user} ({user.id})", icon_url=url)
+		emb.timestamp = message.created_at
+		# emb.set_footer(text=str(message.id))
+		sidf, midf = tup
+		sids, mids = sidf.split("x"), midf.split("x")
+		futs = deque()
+		for si, mi in zip(sids, mids):
+			with bot.ExceptionSender(channel):
+				sendable = await bot.fetch_messageable(si)
+				m = await bot.fetch_message(mi, sendable)
+				fut = create_task(send_with_reply(sendable, m, f"*```callback-admin-relay-{message.channel.id}_{message.id}-\nThis is a relayed message. Use Discord reply to send a response.```*", embed=emb))
+				futs.append(fut)
+		msent = []
+		for fut in futs:
+			with bot.ExceptionSender(channel):
+				m = await fut
+				msent.append(m)
+		print(msent)
 
 
 class UpdateMutes(Database):
@@ -2801,17 +2893,13 @@ class UpdateStarboards(Database):
 	async def _reaction_add_(self, message, react, **void):
 		if not message.guild or message.guild.id not in self.data:
 			return
-		temp = self.data[message.guild.id].get(react)
+		table = self.data[message.guild.id]
+		temp = table.get(react)
 		if not temp:
 			return
 		e_id, count, *disabled = temp
 		if disabled and message.channel.id in disabled[0]:
-			with tracebacksuppressor:
-				m = await self.bot.fetch_message(disabled[0][message.channel.id], message.channel)
-				res = await self.bot.verify_integrity(m)
-				if res:
-					return
-		table = self.data[message.guild.id]
+			return
 		req = table[react][0]
 		if not req < inf:
 			return
@@ -2819,6 +2907,16 @@ class UpdateStarboards(Database):
 		count = sum(r.count for r in message.reactions if str(r.emoji) == react)
 		sem = self.sems.setdefault(message.guild.id, Semaphore(1, inf))
 		async with sem:
+			if message.id in table.get(None, ()):
+				channel = await self.bot.fetch_channel(table[react][1])
+				try:
+					m = await self.bot.fetch_message(table[None][message.id], channel)
+					res = await self.bot.verify_integrity(m)
+					if not res:
+						table[None].pop(message.id)
+				except:
+					print_exc()
+					table[None].pop(message.id)
 			if message.id not in table.setdefault(None, {}):
 				if count >= req and count < req + 2:
 					embed = await self.bot.as_embed(message, link=True, colour=True)

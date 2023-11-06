@@ -2282,14 +2282,16 @@ class UpdateUsers(Database):
 		if force or bot.is_mentioned(message, bot, guild):
 			if user.bot:
 				with suppress(AttributeError):
-					async for m in self.bot.data.channel_cache.get(channel):
+					async for m in bot.data.channel_cache.get(channel):
 						user = m.author
 						if bot.get_perms(user.id, guild) <= -inf:
 							return
 						if not user.bot:
 							break
+			if message.reference and message.reference.resolved and message.reference.resolved.author.id == bot.id and message.reference.resolved.content.startswith("*```callback-admin-relay-"):
+				return
 			if not isnan(perm) and "blacklist" in self.bot.data:
-				gid = self.bot.data.blacklist.get(0)
+				gid = bot.data.blacklist.get(0)
 				if gid and gid != getattr(guild, "id", None):
 					create_task(send_with_react(
 						channel,

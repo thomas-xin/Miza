@@ -1430,7 +1430,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							found = True
 							out.append(stream)
 							break
-			elif images and not any(maps((is_discord_url, is_youtube_url, is_youtube_stream), url)):
+			elif images and any(maps((is_discord_url, is_emoji_url, is_youtube_url, is_youtube_stream), url)):
+				out.append(url)
+			elif images:
 				found = False
 				if images or is_tenor_url(url) or is_deviantart_url(url) or self.is_webserver_url(url):
 					skip = False
@@ -4850,6 +4852,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						pass
 				return self.__getattribute__(k)
 
+			def send(self, *args, **kwargs):
+				if not getattr(self, "guild", None):
+					raise AttributeError("Member is not in a guild.")
+				return discord.Member.send(self, *args, **kwargs)
+
 			def edit(self, *args, **kwargs):
 				if not getattr(self, "guild", None):
 					raise AttributeError("Member is not in a guild.")
@@ -5576,6 +5583,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		discord.Embed.__hash__ = lambda self: len(self)
 
 	def send_exception(self, messageable, ex, reference=None, op=None):
+		if "blacklist" in self.data and self.data.blacklist.get(0) and not (reference and self.is_owner(reference.author)):
+			print(reference)
+			print_exc()
+			return
 		if getattr(ex, "no_react", None):
 			reacts = ""
 		else:

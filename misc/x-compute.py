@@ -1350,11 +1350,25 @@ def determine_cuda(mem=1, priority=None, multi=False, major=0):
 		return [COMPUTE_ORDER.index(i) for i in pcs if gmems[i].free >= mem], torch.float16
 	return COMPUTE_ORDER.index(pcs[0]), torch.float16
 
+gcancel = concurrent.futures.Future()
 ot = 0
 def ensure_gc(t):
-	global ot
+	global ot, gcancel
 	ot = max(ot, time.time() + t)
-	time.sleep(t)
+	if gcancel.done():
+		gcancel = concurrent.futures.Future()
+	else:
+		try:
+			gcancel.set_result(None)
+		except concurrent.futures.InvalidStateError:
+			pass
+	try:
+		gcancel.result(timeout=t)
+	except concurrent.futures.TimeoutError:
+		pass
+	else:
+		gcancel = concurrent.futures.Future()
+		return
 	if ot and time.time() > ot:
 		with torch.no_grad():
 			torch.cuda.empty_cache()

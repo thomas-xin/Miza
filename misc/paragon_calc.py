@@ -96,7 +96,8 @@ def p2d(p):
 		return 1
 	elif p >= 200000:
 		return 100
-	return min(max(floor(abs(sympify("-(-1/2 + sqrt(3)*I/2)*(-162*p + sqrt((-324*p - 55961091/100)**2 - 531441/250000)/2 - 55961091/200)**(1/3)/3 - 67/2 - 27/(100*(-1/2 + sqrt(3)*I/2)*(-162*p + sqrt((-324*p - 55961091/100)**2 - 531441/250000)/2 - 55961091/200)**(1/3))").subs("p", p).evalf(24))), 1), 99)
+	w = sympify("(-162*p + sqrt((-324*p - 55961091/100)**2 - 531441/250000)/2 - 55961091/200)**(1/3)").subs("p", p)
+	return min(max(floor(abs(sympify("-(-1/2 + sqrt(3)*I/2)*w/3 - 67/2 - 27/(100*(-1/2 + sqrt(3)*I/2)*w)").subs("w", w).evalf(24))), 1), 99)
 
 aliases = {
 	"Dart Monkey": [],
@@ -185,7 +186,15 @@ def parse(args):
 
 	for arg in args:
 		arg = arg.rstrip(",")
-		if arg.endswith("p"):
+		if arg.endswith("kp"):
+			pops += float(arg[:-2]) * 1e3
+		elif arg.endswith("mp"):
+			pops += float(arg[:-2]) * 1e6
+		elif arg.endswith("gp"):
+			pops += float(arg[:-2]) * 1e9
+		elif arg.endswith("tp"):
+			pops += float(arg[:-2]) * 1e12
+		elif arg.endswith("p"):
 			pops += float(arg[:-1])
 		elif arg.endswith("g"):
 			pops += float(arg[:-1]) * 4
@@ -218,25 +227,25 @@ def parse(args):
 			t5cost.append(c)
 	if added:
 		plural = "towers have" if added != 1 else "tower has"
-		output.append(f"`Note: The missing {added} tier-5 {plural} automatically been added.`")
-	output.append(f"Current paragon cost: {ceil(apcost)}")
+		output.append(f"`Note: The missing `{added}` tier-5 {plural} automatically been added.`")
+	output.append(f"Current paragon cost: `{ceil(apcost)}`")
 	tier5 = max(0, tier5 - 3)
 	M_CASH = max_cost(pcost)
 	if tier5 > 0:
 		cash += sum(sorted(t5cost)[3:])
 		# tiers += tier5 * 4
 	pops = floor(pops + generated * 4)
-	output.append(f"Current effective cash: {ceil(cash)}")
-	output.append(f"Current effective pops (p/g): {pops}")
-	output.append(f"Current tier5 count: {tier5}")
-	output.append(f"Current upgrade count: {tiers}")
-	output.append(f"Current totem count (t): {totems}")
+	output.append(f"Current effective cash: `{ceil(cash)}`")
+	output.append(f"Current effective pops (p/g): `{pops}`")
+	output.append(f"Current tier5 count: `{tier5}`")
+	output.append(f"Current upgrade count: `{tiers}`")
+	output.append(f"Current totem count (t): `{totems}`")
 	power = total_power(pcost, cash, injected, pops, tier5, tiers, totems)
-	output.append(f"Current power: {power}")
+	output.append(f"Current power: `{power}`")
 	p = power
 	d = p2d(p)
 	degree = d
-	output.append(f"Current degree: {degree}")
+	output.append(f"Current degree: `{degree}`")
 	degs = [20, 40, 60, 80, 100]
 	while degs:
 		n = degs[0]
@@ -426,28 +435,28 @@ def parse(args):
 			if d2 > d:
 				d = d2
 				a = d2p(d)
-			output.append(f"**Power required for degree {d}: {a}**")
+			output.append(f"**Power required for degree {d}: `{a}`**")
 			if asacs:
-				output.append(f"Recommended additional sacrifices: {s}")
+				output.append(f"Recommended additional sacrifices: `{s}`")
 			# if verbose:
 			ac = cash - stats[0]
 			if ac:
-				output.append(f"Sacrifice cost: {ceil(ac)}")
+				output.append(f"Sacrifice cost: `{ceil(ac)}`")
 			ac = injected - stats[1]
 			if ac:
-				output.append(f"Injected cash: {ceil(ac)}")
+				output.append(f"Injected cash: `{ceil(ac)}")
 			ap = pops - stats[2]
 			if ap:
-				output.append(f"Additional pops: {ap}")
+				output.append(f"Additional pops: `{ap}`")
 			at = tier5 - stats[3]
 			if at:
-				output.append(f"Additional tier5s: {at}")
+				output.append(f"Additional tier5s: `{at}`")
 			au = tiers - stats[4]
 			if au:
-				output.append(f"Additional upgrades: {au}")
+				output.append(f"Additional upgrades: `{au}`")
 			at = totems - stats[5]
 			if at:
-				output.append(f"Additional totems: {at}")
+				output.append(f"Additional totems: `{at}`")
 			achieved = d
 		else:
 			d = p2d(power)
@@ -464,28 +473,28 @@ def parse(args):
 				power = total_power(pcost, cash, 0, pops, tier5, tiers, totems)
 				injected = required_inject(pcost, cash, power, p)
 				p = total_power(pcost, cash, injected, pops, tier5, tiers, totems)
-			output.append(f"**Power required for degree {d} (maximum available): {p}**")
+			output.append(f"**Power required for degree {d} (maximum available): `{p}`**")
 			if asacs:
-				output.append(f"Recommended additional sacrifices: {s}")
+				output.append(f"Recommended additional sacrifices: `{s}`")
 			# if verbose:
 			ac = cash - stats[0]
 			if ac:
-				output.append(f"Sacrifice cost: {ceil(ac)}")
+				output.append(f"Sacrifice cost: `{ceil(ac)}`")
 			ac = injected - stats[1]
 			if ac:
-				output.append(f"Injected cash: {ceil(ac)}")
+				output.append(f"Injected cash: `{ceil(ac)}`")
 			ap = pops - stats[2]
 			if ap:
-				output.append(f"Additional pops: {ap}")
+				output.append(f"Additional pops: `{ap}`")
 			at = tier5 - stats[3]
 			if at:
-				output.append(f"Additional tier5s: {at}")
+				output.append(f"Additional tier5s: `{at}`")
 			au = tiers - stats[4]
 			if au:
-				output.append(f"Additional upgrades: {au}")
+				output.append(f"Additional upgrades: `{au}`")
 			at = totems - stats[5]
 			if at:
-				output.append(f"Additional totems: {at}")
+				output.append(f"Additional totems: `{at}`")
 			break
 	if achieved == original:
 		output.append("**No possible degree increases found.**")
