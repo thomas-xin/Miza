@@ -1838,7 +1838,7 @@ class Art(Command):
 					async with discord.context_managers.Typing(channel):
 						response = await bot.oai.images.generate(
 							model=f"dall-e-{dalle}",
-							prompt=prompt,
+							prompt=eprompts.next(),
 							size=size,
 							n=amount - amount2,
 						)
@@ -1857,7 +1857,7 @@ class Art(Command):
 						for i in range(amount - amount2):
 							fut = create_task(bot.oai.images.generate(
 								model=f"dall-e-{dalle}",
-								prompt=prompt,
+								prompt=eprompts.next(),
 								size=size,
 								quality="hd",
 								n=1,
@@ -1871,7 +1871,7 @@ class Art(Command):
 								await asyncio.sleep(60)
 								response = await bot.oai.images.generate(
 									model=f"dall-e-{dalle}",
-									prompt=prompt,
+									prompt=eprompts.next(),
 									size=size,
 									quality="hd",
 									n=1,
@@ -1880,7 +1880,7 @@ class Art(Command):
 								try:
 									response = await bot.oai.images.generate(
 										model=f"dall-e-{dalle}",
-										prompt=prompt,
+										prompt=eprompts.next(),
 										size=size,
 										quality="hd",
 										n=1,
@@ -1911,7 +1911,7 @@ class Art(Command):
 				try:
 					if c > amount:
 						raise PermissionError
-					ims = await asubmit(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle, openjourney, sdxl, nsfw, amount - c, timeout=480)
+					ims = await asubmit(self.imagebot.art, eprompts.next(), url, url2, kwargs, specified, dalle, openjourney, sdxl, nsfw, amount - c, timeout=480)
 				except PermissionError:
 					async with self.sdiff_sem:
 						for fut in futt:
@@ -1982,7 +1982,7 @@ class Art(Command):
 			if prompt and "--prompt" not in kwargs:
 				args.extend((
 					"--prompt",
-					prompt,
+					eprompts.next(),
 				))
 			async with discord.context_managers.Typing(channel):
 				image_1 = image_2 = None
