@@ -21,7 +21,7 @@ if __name__ != "__mp_main__":
 	esubmit(get_colour_list)
 	esubmit(load_emojis)
 	esubmit(load_timezones)
-	esubmit(verify_openai)
+	oaifut = esubmit(verify_openai)
 
 	heartbeat_proc = psutil.Popen([python, "misc/heartbeat.py"])
 
@@ -164,6 +164,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		# Assign bot cache to global variables for convenience
 		globals().update(self.cache)
 		globals()["messages"] = self.messages = self.MessageCache()
+		with tracebacksuppressor:
+			oaifut.result()
+		openai_key = AUTH.get("openai_key")
+		if openai_key:
+			import openai
+			self.oai = openai.AsyncOpenAI(api_key=AUTH.get("openai_key"))
+		else:
+			self.oai = InterruptedError("OpenAI not authenticated.")
 		self.get_modules()
 		self.heartbeat_proc = heartbeat_proc
 
@@ -1571,7 +1579,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if not torch:
 			return ("File", url.rsplit("/", 1)[-1], "", None)
 		if best:
-			fut = asubmit(self.replicate, url)
+			fut = asubmit(self.gpt4v, url)
 		res = None
 		p1 = p2 = ""
 		try:
@@ -1593,51 +1601,72 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				tup = ("Text", p1, p2, False)
 		else:
 			tup = ("Image", p1, p2, best)
-		# if best:
-			# try:
-				# p3 = await asyncio.wait_for(asyncio.shield(fut), timeout=20)
-			# except (T0, T1, T2):
+		if best:
+			try:
+				p3 = await asyncio.wait_for(asyncio.shield(fut), timeout=20)
+			except (T0, T1, T2):
 
-				# async def recaption(h, p1, p2, fut, tup):
-					# p3 = await fut
-					# p1, p2, p3 = sorted((p1, p2, p3), key=len)
-					# tup = ("Image", p2, p3, best)
-					# if len(p1) > 7 and " " in p1 and p1.isascii():
-						# tup = ("Image", p3, p2 + "\n" + p1, best)
-					# print("BEST:", tup)
-					# self.analysed[h] = tup
+				async def recaption(h, p1, p2, fut, tup):
+					p3 = await fut
+					p1, p2, p3 = sorted((p1, p2, p3), key=len)
+					tup = ("Image", p2, p3, best)
+					if len(p1) > 7 and " " in p1 and p1.isascii():
+						tup = ("Image", p3, p2 + "\n" + p1, best)
+					print("BEST:", tup)
+					self.analysed[h] = tup
 
-				# create_task(recaption(h, p1, p2, fut, tup))
-			# else:
-				# p1, p2, p3 = sorted((p1, p2, p3), key=len)
-				# tup = (tup[0], p2, p3, best)
-				# if len(p1) > 7 and " " in p1 and p1.isascii():
-					# tup = (tup[0], p3, p2 + "\n" + p1, best)
-				# print("BEST:", tup)
+				create_task(recaption(h, p1, p2, fut, tup))
+			else:
+				p1, p2, p3 = sorted((p1, p2, p3), key=len)
+				tup = (tup[0], p2, p3, best)
+				if len(p1) > 7 and " " in p1 and p1.isascii():
+					tup = (tup[0], p3, p2 + "\n" + p1, best)
+				print("BEST:", tup)
 		self.analysed[h] = tup
 		while len(self.analysed) > 65536:
 			self.analysed.pop(next(iter(self.analysed)))
 		return self.analysed[h][:-1] if self.analysed.get(h) else None
 
-	replicate_client = None
-	def replicate(self, url):
-		resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
-		if not self.replicate_client:
-			import replicate
-			self.replicate_client = replicate.Client(api_token=AUTH.get("replicate_key") or "")
-		resp = self.replicate_client.run(
-			"joehoover/instructblip-vicuna13b:c4c54e3c8c97cd50c2d2fec9be3b6065563ccf7d43787fb99f84151b867178fe",
-			input=dict(
-				prompt="Describe only what this image contains in detail!",
-				img=io.BytesIO(resp),
-				max_length=256,
-				temperature=0.75,
-				top_p=0.9,
-				top_k=0,
-				repetition_penalty=1.2,
-			),
+	async def gpt4v(self, url):
+		messages = [
+			cdict(role="user", content=[
+				cdict(type="text", text="Please describe this image in detail; be descriptive but concise!"),
+				cdict(type="image_url", image_url=cdict(url=url, detail="low")),
+			]),
+		]
+		data = cdict(
+			model="gpt-4-vision-preview",
+			messages=messages,
+			temperature=0.5,
+			max_tokens=512,
+			top_p=0.9,
+			frequency_penalty=0.6,
+			presence_penalty=0.8,
+			user=str(hash(self.name)),
 		)
-		return "".join(resp)
+		response = await asyncio.wait_for(self.oai.chat.completions.create(**data, timeout=30), timeout=35)
+		print("GPT4V:", response)
+		return response.choices[0].message.content
+
+	# replicate_client = None
+	# def replicate(self, url):
+		# resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
+		# if not self.replicate_client:
+			# import replicate
+			# self.replicate_client = replicate.Client(api_token=AUTH.get("replicate_key") or "")
+		# resp = self.replicate_client.run(
+			# "joehoover/instructblip-vicuna13b:c4c54e3c8c97cd50c2d2fec9be3b6065563ccf7d43787fb99f84151b867178fe",
+			# input=dict(
+				# prompt="Describe only what this image contains in detail!",
+				# img=io.BytesIO(resp),
+				# max_length=256,
+				# temperature=0.75,
+				# top_p=0.9,
+				# top_k=0,
+				# repetition_penalty=1.2,
+			# ),
+		# )
+		# return "".join(resp)
 
 	# Follows a message link, replacing emojis and user mentions with their icon URLs.
 	async def follow_to_image(self, url, follow=True):

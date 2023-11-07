@@ -146,19 +146,20 @@ def access(self):
 		status = response.output_status.split(b' ', 1)[0]
 		status = status.decode('ISO-8859-1')
 
-	atoms = {'h': remote.name or remote.ip,
-			 'l': '-',
-			 'u': getattr(request, 'login', None) or '-',
-			 't': self.time(),
-			 'r': request.request_line,
-			 's': status,
-			 'b': dict.get(outheaders, 'Content-Length', '') or '-',
-			 'f': dict.get(inheaders, 'Referer', ''),
-			 'a': dict.get(inheaders, 'User-Agent', ''),
-			 'o': dict.get(inheaders, 'Host', '-'),
-			 'i': request.unique_id,
-			 'z': cp._cplogging.LazyRfc3339UtcTime(),
-			 }
+	atoms = {
+		'h': true_ip(),
+		'l': '-',
+		'u': getattr(request, 'login', None) or '-',
+		't': self.time(),
+		'r': request.request_line,
+		's': status,
+		'b': dict.get(outheaders, 'Content-Length', '') or '-',
+		'f': dict.get(inheaders, 'Referer', ''),
+		'a': dict.get(inheaders, 'User-Agent', ''),
+		'o': dict.get(inheaders, 'Host', '-'),
+		'i': request.unique_id,
+		'z': cp._cplogging.LazyRfc3339UtcTime(),
+	}
 	for k, v in atoms.items():
 		if not isinstance(v, str):
 			v = str(v)
@@ -312,8 +313,6 @@ def error_handler(exc=None):
 <meta http-equiv="refresh" content=0;url={video}">
 </head><body></body></html>""".encode("utf-8")
 	else:
-		if status == 404:
-			true_ip()
 		resp = errdata.get(status) or errdata.setdefault(status, reqs.next().get(f"https://http.cat/{status}"))
 		head = resp.headers.copy()
 		body = resp.content
@@ -447,13 +446,14 @@ def get_geo(ip):
 		send(ip + "\t" + "\t".join(resp.values()))
 	return resp
 
-def true_ip():
-	ip = cp.request.headers["Remote-Addr"]
+def true_ip(request=None):
+	request = request or cp.request
+	ip = request.headers["Remote-Addr"]
 	if ip == "127.0.0.1":
-		ip = cp.request.headers.get("X-Real-Ip") or ip
+		ip = request.headers.get("X-Real-Ip") or ip
 	if ip == "127.0.0.1":
-		ip = cp.request.remote.ip
-	cp.serving.request.remote.ip = cp.request.remote.ip = ip
+		ip = request.remote.ip
+	cp.serving.request.remote.ip = request.remote.ip = ip
 	return ip
 
 
@@ -548,7 +548,6 @@ class Server:
 		if path in ("hacks", "mods", "files", "download", "static"):
 			send(true_ip() + " was rickrolled 🙃")
 			raise cp.HTTPRedirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ", status=301)
-		true_ip()
 		orig_path = path
 		ind = IND
 		p = None
@@ -918,7 +917,6 @@ transform: translate(-50%, -50%);
 
 	@cp.expose(("u"))
 	def unproxy(self, id=None, url=None, mid=None, **kwargs):
-		true_ip()
 		if id == "u" and url:
 			id = url
 		if id:
@@ -1168,7 +1166,6 @@ transform: translate(-50%, -50%);
 				send("Webserver cache cleared.")
 				return b"\xf0\x9f\x92\x9c"
 			raise PermissionError
-		true_ip()
 		filename = "/".join(filepath)
 		try:
 			data, mime = fetch_static("static/" + filename, ignore=True)
@@ -1180,13 +1177,23 @@ transform: translate(-50%, -50%);
 		cp.response.headers["ETag"] = create_etag(data)
 		return data
 
+	@cp.expose
+	@hostmap
+	def summarise(self, s, min_length=128, max_length=192):
+		v = self.bot_exec(f"STRING.summarise({orjson.dumps(s).decode('utf-8')},min_length={min_length},max_length={max_length})")
+		b = v.encode("utf-8")
+		cp.response.headers.update(CHEADERS)
+		cp.response.headers["Content-Type"] = "text/plain"
+		cp.response.headers["Content-Length"] = len(b)
+		cp.response.headers["ETag"] = create_etag(b)
+		return b
+
 	ecdc_running = {}
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
 	def encodec(self, url="", name="", source="", bitrate="auto", inference=False, urls=()):
 		cp.response.headers.update(SHEADERS)
-		true_ip()
 		if not os.path.exists(cachedir + "/ecdc"):
 			os.mkdir(cachedir + "/ecdc")
 		if urls:
@@ -1300,7 +1307,6 @@ transform: translate(-50%, -50%);
 	@hostmap
 	def decodec(self, url, fmt="opus"):
 		cp.response.headers.update(SHEADERS)
-		true_ip()
 		if isinstance(url, list):
 			url = url[0]
 		out = "cache/!" + shash(url) + "~." + fmt
@@ -1518,7 +1524,6 @@ transform: translate(-50%, -50%);
 	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
 	@hostmap
 	def index(self, path=None, filename=None, *args, code=None, **kwargs):
-		true_ip()
 		url = HOST + "/" + cp.url(qs=cp.request.query_string).rstrip("/").split("//", 1)[-1].split("/", 1)[-1]
 		# if "/user" in url:
 			# try:
@@ -1699,7 +1704,6 @@ transform: translate(-50%, -50%);
 	@cp.expose(("favicon", "favicon.ico"))
 	@hostmap
 	def favicon_ico(self, *args, **kwargs):
-		true_ip()
 		data, mime = fetch_static("icon.ico")
 		cp.response.headers.update(CHEADERS)
 		cp.response.headers["Content-Type"] = mime
@@ -2709,9 +2713,7 @@ alert("File successfully deleted. Returning to home.");
 	@cp.expose
 	@hostmap
 	def status(self, interval=None):
-		if interval:
-			true_ip()
-		else:
+		if not interval:
 			cp.request.no_log = True
 		status = self.bot_exec(f"bot.status(interval={interval})")
 		cp.response.headers.update(HEADERS)

@@ -488,11 +488,12 @@ def verify_openai():
 	if not AUTH.get("openai_key"):
 		return
 	import openai
+	globals()["openai"] = openai
 	try:
 		for i in range(3):
 			try:
-				openai.api_key = AUTH["openai_key"]
-				resp = openai.Moderation.create(
+				oclient = openai.OpenAI(api_key=AUTH["openai_key"])
+				resp = oclient.moderations.create(
 					input=str(utc()),
 				)
 			except:
@@ -501,7 +502,7 @@ def verify_openai():
 				if resp:
 					raise StopIteration
 	except StopIteration:
-		pass
+		return openai
 	else:
 		AUTH["openai_key"] = ""
 		print("OpenAI key has no usable credit. Please verify and fix the key to proceed with relevant commands.")

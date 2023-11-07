@@ -7,7 +7,6 @@ try:
 except:
 	print_exc()
 	googletrans = None
-import openai
 # try:
 #     import convobot
 # except:
@@ -185,19 +184,17 @@ class Translate(Command):
 		data = bot.data.users.get(u.id, {})
 		oai = data.get("trial") and data.get("openai_key")
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
-		inputs = dict(
-			user_id=user.id,
-			channel_id=channel.id,
+		resp = await bot.oai.completions.create(
+			model="gpt-3.5-turbo-instruct",
 			prompt=prompt,
-			key=AUTH.get("openai_key"),
-			huggingface_token=AUTH.get("huggingface_key"),
-			vis_session=AUTH.get("vis_session"),
-			bals={k: v for k, v in bot.data.token_balances.items() if v < 0},
-			oai=oai,
-			nsfw=bot.is_nsfw(channel),
-			premium=premium,
+			temperature=0.5,
+			max_tokens=2048,
+			top_p=0.5,
+			frequency_penalty=0,
+			presence_penalty=0,
+			user=str(user.id),
 		)
-		out = await process_image("CBAU", "$", [inputs], cap="agpt", timeout=30)
+		out = resp.choices[0].text
 		if out and out[0] == out[-1] == '"' and not text[0] == text[-1] == '"':
 			try:
 				out = orjson.loads(out)
@@ -375,7 +372,7 @@ class Math(Command):
 							break
 					if var is not None:
 						break
-		resp = await bot.solve_math(argv, p, r, timeout=24, variables=bot.data.variables.get(user.id))
+		resp = await bot.solve_math(argv, p, r, timeout=36, variables=bot.data.variables.get(user.id))
 		# Determine whether output is a direct answer or a file
 		if type(resp) is dict and "file" in resp:
 			await bot._state.http.send_typing(channel.id),
@@ -1255,7 +1252,7 @@ class Describe(Command):
 		if not s:
 			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 			fut = asubmit(reqs.next().head, url, headers=Request.header(), stream=True)
-			cap = await self.bot.caption(url, best=premium >= 2)
+			cap = await self.bot.caption(url, best=premium >= 4)
 			s = "\n\n".join(cap).strip()
 			resp = await fut
 			name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
@@ -1387,140 +1384,167 @@ MockFunctions = [
 
 Functions = dict(
 	browse={
-		"name": "browse",
-		"description": "Searches internet browser, or visits given URL. Please search for results in the US when location is relevant!",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"query": {
-					"type": "string",
-					"description": "Query, eg. Who won the 2024 world cup?",
+		"type": "function",
+		"function": {
+			"name": "browse",
+			"description": "Searches internet browser, or visits given URL. Please search for results in the US when location is relevant!",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"query": {
+						"type": "string",
+						"description": "Query, eg. Who won the 2024 world cup?",
+					},
 				},
+				"required": ["query"],
 			},
-			"required": ["query"],
 		},
 	},
 	wolfram_alpha={
-		"name": "wolfram_alpha",
-		"description": "Queries Wolfram Alpha. Must use for advanced math questions.",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"query": {
-					"type": "string",
-					"description": "Query, eg. Real solutions for x^3-6x^2+12",
+		"type": "function",
+		"function": {
+			"name": "wolfram_alpha",
+			"description": "Queries Wolfram Alpha. Must use for advanced math questions.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"query": {
+						"type": "string",
+						"description": "Query, eg. Real solutions for x^3-6x^2+12",
+					},
 				},
+				"required": ["query"],
 			},
-			"required": ["query"],
 		},
 	},
 	sympy={
-		"name": "sympy",
-		"description": "Queries the Sympy algebraic library. Faster than Wolfram Alpha for simple math operations.",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"query": {
-					"type": "string",
-					"description": "Query, eg. factorint(57336415063790604359), randint(1, 100)",
+		"type": "function",
+		"function": {
+			"name": "sympy",
+			"description": "Queries the Sympy algebraic library. Faster than Wolfram Alpha for simple math operations.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"query": {
+						"type": "string",
+						"description": "Query, eg. factorint(57336415063790604359), randint(1, 100)",
+					},
 				},
+				"required": ["query"],
 			},
-			"required": ["query"],
 		},
 	},
 	dalle={
-		"name": "dalle",
-		"description": "Creates an image of the input caption. Please be descriptive!!",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"prompt": {
-					"type": "string",
-					"description": "Prompt, eg. Brilliant view of a futuristic city in an alien world, glowing spaceships, 4k fantasy art",
+		"type": "function",
+		"function": {
+			"name": "dalle",
+			"description": "Creates an image of the input caption. Please be descriptive!!",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"prompt": {
+						"type": "string",
+						"description": "Prompt, eg. Brilliant view of a futuristic city in an alien world, glowing spaceships, 4k fantasy art",
+					},
 				},
+				"required": ["prompt"],
 			},
-			"required": ["prompt"],
 		},
 	},
 	reminder={
-		"name": "reminder",
-		"description": "Sets a reminder for the user.",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"message": {
-					"type": "string",
-					"description": "Message, eg. Remember to take your meds!",
+		"type": "function",
+		"function": {
+			"name": "reminder",
+			"description": "Sets a reminder for the user.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"message": {
+						"type": "string",
+						"description": "Message, eg. Remember to take your meds!",
+					},
+					"delay": {
+						"type": "string",
+						"description": "Delay, eg. 3 days 3.9 seconds",
+					},
 				},
-				"delay": {
-					"type": "string",
-					"description": "Delay, eg. 3 days 3.9 seconds",
-				},
+				"required": ["message", "delay"],
 			},
-			"required": ["message", "delay"],
 		},
 	},
 	play={
-		"name": "play",
-		"description": "Searches and plays a song in the nearest voice channel.",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"query": {
-					"type": "string",
-					"description": "Name or URL, eg. Rick Astley - Never gonna give you up",
+		"type": "function",
+		"function": {
+			"name": "play",
+			"description": "Searches and plays a song in the nearest voice channel.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"query": {
+						"type": "string",
+						"description": "Name or URL, eg. Rick Astley - Never gonna give you up",
+					},
 				},
+				"required": ["query"],
 			},
-			"required": ["query"],
 		},
 	},
 	audio={
-		"name": "audio",
-		"description": "Adjusts audio settings for current music player.",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"mode": {
-					"type": "string",
-					"enum": ["volume", "reverb", "pitch", "speed", "pan", "bassboost", "compressor", "chorus", "nightcore", "bitrate"],
+		"type": "function",
+		"function": {
+			"name": "audio",
+			"description": "Adjusts audio settings for current music player.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"mode": {
+						"type": "string",
+						"enum": ["volume", "reverb", "pitch", "speed", "pan", "bassboost", "compressor", "chorus", "nightcore", "bitrate"],
+					},
+					"value": {
+						"type": ["number", "string"],
+						"description": "New value percentage, eg. 300",
+					},
 				},
-				"value": {
-					"type": ["number", "string"],
-					"description": "New value percentage, eg. 300",
-				},
+				"required": ["mode", "value"],
 			},
-			"required": ["mode", "value"],
 		},
 	},
 	astate={
-		"name": "astate",
-		"description": "Adjusts music player state.",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"mode": {
-					"type": "string",
-					"enum": ["pause", "loop", "repeat", "shuffle", "quit"],
+		"type": "function",
+		"function": {
+			"name": "astate",
+			"description": "Adjusts music player state.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"mode": {
+						"type": "string",
+						"enum": ["pause", "loop", "repeat", "shuffle", "quit"],
+					},
+					"value": {
+						"type": "boolean",
+					},
 				},
-				"value": {
-					"type": "boolean",
-				},
+				"required": ["mode", "value"],
 			},
-			"required": ["mode", "value"],
 		},
 	},
 	askip={
-		"name": "askip",
-		"description": "Skips music player songs.",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"range": {
-					"type": "boolean",
-					"description": "Python indexing syntax, eg. 0 or 1:6",
+		"type": "function",
+		"function": {
+			"name": "askip",
+			"description": "Skips music player songs.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"range": {
+						"type": "boolean",
+						"description": "Python indexing syntax, eg. 0 or 1:6",
+					},
 				},
+				"required": ["range"],
 			},
-			"required": ["range"],
 		},
 	},
 )
@@ -1549,6 +1573,8 @@ BNB = ("pygmalion-13b", "manticore-13b", "airochronos-33b")
 GPTQ = ("wizard-70b", "euryale-70b", "xwin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "wizard-vicuna-30b", "emerhyst-20b", "xwin-mlewd-13b", "mythalion-13b")
 
 async def summarise(q, min_length=128, max_length=192):
+	if min_length > max_length - 1:
+		min_length = max_length - 1
 	if q and sum(c.isascii() for c in q) / len(q) > 0.75:
 		q = await asubmit(lim_tokens, q, max_length + min_length << 2, priority=2)
 	else:
@@ -1562,7 +1588,7 @@ async def summarise(q, min_length=128, max_length=192):
 		count = ceil(len(tokens) / limit * 4 / 3)
 		for start in range(0, max(1, len(tokens) - limit * 3 // 4 - 1), limit * 3 // 4):
 			e1 = tokens[start:start + limit]
-			mt = max(max(limit, max_length) // count, limit // 5)
+			mt = max(max(limit, round_random(max_length)) // count, limit // 5)
 			if len(e1) <= mt:
 				futs.append(create_task(tik_decode_a(e1)))
 				continue
@@ -1584,7 +1610,7 @@ async def summarise(q, min_length=128, max_length=192):
 	s1 = await tik_decode_a(e1)
 	s1 = s1.strip().replace("  ", " ")
 	if len(tokens) > max_length:
-		s2 = await process_image("summarise", "$", [s1, min_length, max_length], cap="summ", timeout=30)
+		s2 = await process_image("summarise", "$", [s1, round_random(min_length), round_random(max_length)], cap="summ", timeout=30)
 	else:
 		s2 = s1
 	out = []
@@ -1603,7 +1629,7 @@ async def summarise(q, min_length=128, max_length=192):
 			count = 0
 		out.append(c)
 	if len(out) < min_length / 2:
-		return lim_tokens(q, max_length + min_length >> 1)
+		return lim_tokens(q, round_random(max_length + min_length) >> 1)
 	res = await tik_decode_a(out)
 	return res.strip()
 
@@ -1614,7 +1640,7 @@ async def tcount(s, model="gpt-3.5-turbo"):
 def m_repr(m):
 	if not isinstance(m, dict):
 		return as_str(m)
-	content = (m.content or str(m.get("function_call", "")))
+	content = as_str(m.content or m.get("function_call", ""))
 	if "name" in m:
 		if "role" in m:
 			return m.role + "\n" + m.name + "\n" + content
@@ -1624,7 +1650,7 @@ def m_repr(m):
 	return content
 
 def m_str(m):
-	content = (m.content or str(m.get("function_call", "")))
+	content = as_str(m.content or m.get("function_call", "")).strip()
 	if not m.get("name"):
 		if m.get("role") and m.role != "user":
 			return f"<|{m.role}|>: " + content
@@ -1637,8 +1663,8 @@ def m_name(m):
 	if not m.get("name"):
 		if m.get("role") and m.role != "user":
 			return f"<|{m.role}|>"
-		if m.content and ": " in m.content:
-			return m.content.split(": ", 1)[0]
+		if m.content and ": " in str(m.content):
+			return str(m.content).split(": ", 1)[0]
 		return "<|user|>"
 	return m.name
 
@@ -1681,7 +1707,7 @@ async def cut_to(messages, limit=1024, exclude_first=True):
 	return messages
 
 _ntrans = "".maketrans({"-": "", " ": "", "_": ""})
-def to_msg(k, v, n=None):
+def to_msg(k, v, n=None, t=None):
 	if k == n:
 		role = "assistant"
 		k = n
@@ -1706,10 +1732,21 @@ def to_msg(k, v, n=None):
 			v = orig_k + ": " + v
 	if k:
 		m.name = lim_str(k, 48)
+	v = v.strip() if v else ""
 	m.content = v
+	if t and t[0]:
+		m.content = [cdict(type="text", text=v)] if v else []
+		for url in t:
+			m.content.append(cdict(
+				type="image_url",
+				image_url=cdict(
+					url=url,
+					detail="low",
+				),
+			))
 	return m
 
-def chat_structure(history, refs, u, q, name="", personality="", nsfw=False, start=""):
+def chat_structure(history, refs, u, q, imin, name="", personality="", nsfw=False, start=""):
 	if name.casefold() not in personality.casefold() and "you" not in personality.casefold():
 		nstart = f"Your name is {name}; you are {personality}. Express emotion when appropriate!"
 	else:
@@ -1724,8 +1761,8 @@ def chat_structure(history, refs, u, q, name="", personality="", nsfw=False, sta
 		nend = None
 	m = cdict(role="system", content=nstart)
 	messages = [m]
-	for k, v in history:
-		m = to_msg(k, v, name)
+	for k, v, *t in history:
+		m = to_msg(k, v, name, t)
 		messages.append(m)
 	refcount = len(refs)
 	if refcount:
@@ -1734,8 +1771,8 @@ def chat_structure(history, refs, u, q, name="", personality="", nsfw=False, sta
 			role="system",
 			content=f"The user is replying to the following message{s}:",
 		)
-		for k, v in refs:
-			m = to_msg(k, v, name)
+		for k, v, *t in refs:
+			m = to_msg(k, v, name, t)
 			messages.append(m)
 	dtn = str(utc_dt()).rsplit(".", 1)[0]
 	v = f"Current time: {dtn}"
@@ -1746,7 +1783,7 @@ def chat_structure(history, refs, u, q, name="", personality="", nsfw=False, sta
 		messages.insert(-refcount - 1, m)
 	else:
 		messages.append(m)
-	m = to_msg(u, q)
+	m = to_msg(u, q, t=imin)
 	messages.append(m)
 	return messages
 
@@ -1846,17 +1883,60 @@ class Ask(Command):
 		mids = sorted(mdic, reverse=True)
 		visible = [mdic[i] for i in mids]
 		ignores = set()
-		reset = True
+		reset = [True]
 		visconts = []
 		refs = []
 		history = []
+		mfuts = []
+		async def scan_msg(i, m, content, simulated):
+			found = None
+			is_curr = m.id == message.id
+			if i < 8 and not simulated and not content.strip():
+				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
+				found = self.visited.get(url)
+				if found is None:
+					try:
+						found = self.visited[url] = await bot.follow_url(url, reactions=False if i < 3 else None)
+					except:
+						print_exc()
+						found = self.visited[url] = ""
+				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
+					content = found = found[0]
+				else:
+					content = found = ""
+			if not content:
+				return
+			c = content
+			if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
+				return
+			if reset[0] and not is_curr:
+				reset[0] = False
+				if caid:
+					caid.pop("ids", None)
+					caid.pop("history", None)
+				print(channel, "mismatch", m.id)#, caid)
+			ignores.add(m.id)
+			if i < 8 and not simulated and found is None:
+				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
+				found = self.visited.get(url)
+				if found is None:
+					try:
+						found = self.visited[url] = await bot.follow_url(url, reactions=False if i < 3 else None)
+					except:
+						print_exc()
+						found = self.visited[url] = ""
+				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
+					found = found[0]
+				else:
+					found = ""
+			return m, content, found
 		for i, m in enumerate(visible):
 			if not m or m.id > message.id or m.id == message.id and i != 0:
 				continue
 			if caid and caid.get("first_message_id", 0) >= m.id:
 				break
-			if reset and caid and caid.get("last_message_id") == m.id:
-				reset = None
+			if reset[0] and caid and caid.get("last_message_id") == m.id:
+				reset[0] = None
 				if caid.get("history"):
 					history = caid["history"]
 					break
@@ -1874,64 +1954,38 @@ class Ask(Command):
 					content = ""
 			else:
 				content = ""
-			found = None
-			is_curr = m.id == message.id
-			if i < 8 and not simulated and not content.strip():
-				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
-				found = self.visited.get(url)
-				if found is None:
-					try:
-						found = self.visited[url] = await bot.follow_url(url, reactions=False if i < 3 else None)
-					except:
-						print_exc()
-						found = self.visited[url] = ""
-				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
-					content = found = found[0]
-				else:
-					content = found = None
-			if not content:
+			mfut = create_task(scan_msg(i, m, content, simulated))
+			mfuts.append(mfut)
+		print("VISITING:", len(mfuts))
+		for i, mfut in enumerate(mfuts):
+			tup = await mfut
+			if not tup:
 				continue
-			c = content
-			if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
-				continue
-			if i < 8 and not simulated and found is None:
-				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
-				found = self.visited.get(url)
-				if found is None:
-					try:
-						found = self.visited[url] = await bot.follow_url(url, reactions=False if i < 3 else None)
-					except:
-						print_exc()
-						found = self.visited[url] = ""
-				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
-					found = found[0]
-				else:
-					found = None
-			if found:
-				best = premium >= 2 and is_curr
+			m, content, found = tup
+			if found and (i >= 3 or premium < 4):
+				best = premium >= 4 and m.id == message.id
 				cfut = create_task(bot.caption(found, best=best))
 				visconts.append((i, m, content, found, cfut))
 			else:
 				visconts.append((i, m, content, found, None))
-			if reset and m.id != message.id:
-				reset = False
-				if caid:
-					caid.pop("ids", None)
-					caid.pop("history", None)
-				print(channel, "mismatch", m.id)#, caid)
-			ignores.add(m.id)
 		if len(self.visited) > 256:
 			self.visited.pop(next(iter(self.visited)))
-		print("VISITED:", len(visconts))
+		print("VISITED:", f"{sum(bool(t[4]) for t in visconts)}/{len(visconts)}")
 		efuts = deque()
+		iman = None
 		for i, m, content, found, cfut in reversed(visconts):
 			if cfut:
 				cfut = await cfut
+			imin = ()
 			if cfut:
 				pt, p1, p2 = cfut
 				p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
 				content += f" <|im_sep {pt} {p0}:{p1}:{p2}|>"
 				content = content.strip()
+			elif found:
+				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
+				imin = self.visited.get(url) or [found]
+				print("IMIN:", imin)
 			if m.author.id == bot.id:
 				name = bot_name
 			else:
@@ -1946,17 +2000,18 @@ class Ask(Command):
 			if i == 0:
 				q = content
 				print(q)
+				iman = imin
 				continue
 			t = (name, content)
 			if str(m.id) not in mapd and m.id != message.id:
 				fut = create_task(register_embedding(m.id, name, content))
 				efuts.append(fut)
-			history.append((name, content))
+			history.append((name, content, *imin))
 		for fut in efuts:
 			with tracebacksuppressor:
 				await fut
 		# else:
-		# 	reset = None
+		# 	reset[0] = None
 		if isinstance(caid, dict):
 			caid.setdefault("ids", {})[str(message.id)] = None
 		m = message
@@ -2043,7 +2098,7 @@ class Ask(Command):
 						history.insert(0, (ename, econtent))
 					ignores.add(ki)
 			summary = caid and caid.get("summary")
-			if reset is not None:
+			if reset[0] is not None:
 				summary = None
 			if bot.is_trusted(guild) >= 2:
 				for uid in bot.data.trusted[guild.id]:
@@ -2059,11 +2114,11 @@ class Ask(Command):
 			vc = bool(getattr(user, "voice", False)) | bool(bot.audio.players.get(getattr(guild, "id", None))) * 2
 			nsfw = bot.is_nsfw(channel)
 			extensions = premium >= 2
-			chatcompletion = ("gpt-4-turbo", "gpt-4-1106-preview", "gpt-4", "gpt-3.5-turbo")
+			chatcompletion = ("gpt-4-turbo", "gpt-4-vision-preview", "gpt-4-1106-preview", "gpt-4", "gpt-3.5-turbo", "gpt-3.5-turbo-1106")
 			instructcompletion = ("gpt-3.5-turbo-instruct", "text-davinci-003", "text-curie-001")
 			chatcc = ("gpt4", "gpt3")
 
-			messages = chat_structure(history, refs, name, q, name=bot_name, personality=personality, nsfw=nsfw)
+			messages = chat_structure(history, refs, name, q, imin=iman or (), name=bot_name, personality=personality, nsfw=nsfw)
 			history.append((name, q))
 			# print("Messages:", messages)
 			length = await count_to(messages)
@@ -2077,6 +2132,7 @@ class Ask(Command):
 			if model not in chatcc:
 				blocked.add("roleplay")
 			fut = create_task(cut_to(messages, 3000))
+			tool_choice = "auto"
 			if extensions and "class" in bot.caps:
 				mocked = {}
 				prompt = ""
@@ -2107,12 +2163,16 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						blocked.update(("sympy", "audio", "astate", "askip", "reminder"))
 					elif k == "art":
 						blocked.update(("browse", "sympy", "wolfram_alpha", "audio", "astate", "askip", "reminder"))
+						tool_choice = "dalle"
 					elif k == "remind":
 						blocked.update(("browse", "sympy", "wolfram_alpha", "dalle", "audio", "astate", "askip"))
+						tool_choice = "reminder"
 					elif k == "math":
 						blocked.update(("dalle", "play", "audio", "astate", "askip", "reminder"))
+						tool_choice = "wolfram_alpha"
 					elif k == "play":
 						blocked.update(("browse", "sympy", "wolfram_alpha", "dalle", "reminder"))
+						tool_choice = "play"
 					else:
 						rem = set(Functions)
 						rem.discard(k)
@@ -2121,7 +2181,6 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 			skipping = None
 			messages = await fut
 			length = await count_to(messages)
-			openai.api_key = AUTH["openai_key"]
 			target_model = model
 			text = ""
 			ex = RuntimeError("Maximum attempts exceeded.")
@@ -2167,21 +2226,48 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					limit = 4000
 					cm = 15
 				elif model == "gpt3" or premium < 4:
-					model = "gpt-3.5-turbo"
-					limit = 4000
-					cm = 15
+					if 1:
+						model = "gpt-3.5-turbo-1106"
+						limit = 8000
+						cm = 10
+						cm2 = 20
+					else:
+						model = "gpt-3.5-turbo"
+						limit = 4000
+						cm = 15
+						cm2 = 20
 				else:
-					model = "gpt-4"
-					limit = 6000
-					cm = 300
-					cm2 = 600
+					if 1:
+						if all(isinstance(m.content, str) for m in messages) or tool_choice != "auto":
+							model = "gpt-4-1106-preview"
+						else:
+							model = "gpt-4-vision-preview"
+						limit = 8000
+						cm = 100
+						cm2 = 300
+					else:
+						model = "gpt-4"
+						limit = 6000
+						cm = 300
+						cm2 = 600
 				if text:
 					extensions = False
 				if cm is None:
 					cm = 0
 				if cm2 is None:
 					cm2 = cm
-				used = ufull = await cut_to(messages, limit)
+				ufull = await cut_to(messages, limit)
+				if model != "gpt-4-vision-preview":
+					for m in ufull:
+						if isinstance(m.content, str):
+							continue
+						content = m.content[0].text if m.content[0].type == "text" else ""
+						found = best_url(m.content[-1].image_url)
+						pt, p1, p2 = await bot.caption(found, best=premium >= 4)
+						p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
+						content += f" <|im_sep {pt} {p0}:{p1}:{p2}|>"
+						m.content = content.strip()
+				used = ufull
 				if skipping:
 					used = [ufull[0]] + ufull[skipping - 1:]
 				length = await count_to(used)
@@ -2189,8 +2275,8 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 				if model in chatcompletion or extensions and not attempts:
 					orig_model = model
 					if model not in chatcompletion:
-						model = "gpt-3.5-turbo"
-					elif model == "gpt-4" and len(ufull) > 5 and length > 384:
+						model = "gpt-3.5-turbo-1106"
+					elif model.startswith("gpt-4") and len(ufull) > 5 and length > 384:
 						ms = ufull[-1]
 						prompt = 'The following is a conversation with numbered messages:\n\n"""'
 						ufc = ufull[:-1]
@@ -2214,8 +2300,8 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							user=str(user.id) if premium < 3 else str(hash(name)),
 						)
 						try:
-							response = await asyncio.wait_for(openai.Completion.acreate(**data, timeout=60), timeout=70)
-						except openai.InvalidRequestError:
+							response = await asyncio.wait_for(bot.oai.completions.create(**data, timeout=60), timeout=70)
+						except openai.BadRequestError:
 							raise
 						except Exception as e:
 							ex = e
@@ -2233,7 +2319,10 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 									skipping = len(ufull) - 1
 									used = [ufull[0]] + ufull[-2:]
 									length = await count_to(used)
-					functions = [v for k, v in Functions.items() if k not in blocked]
+					if model == "gpt-4-vision-preview":
+						tools = None
+					else:
+						tools = [v for k, v in Functions.items() if k not in blocked]
 					print(f"{model} prompt:", used)
 					data = cdict(
 						model=model,
@@ -2245,22 +2334,26 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						presence_penalty=0.8,
 						user=str(user.id) if premium < 3 else str(hash(name)),
 					)
-					if functions:
-						data.functions = functions
+					if tools:
+						data.tools = tools
+						data.tool_choice = "auto"
 					text = ""
 					response = None
 					try:
-						response = await asyncio.wait_for(openai.ChatCompletion.acreate(**data, timeout=120), timeout=130)
-					except openai.InvalidRequestError:
+						response = await asyncio.wait_for(bot.oai.chat.completions.create(**data, timeout=120), timeout=130)
+					except openai.BadRequestError:
 						raise
 					except Exception as e:
 						ex = e
 						print_exc()
 						continue
 					print(response)
-					m = response["choices"][0]["message"]
-					fc = m.get("function_call")
-					if not fc or fc.get("name") not in FunctionList:
+					m = cdict(response.choices[0].message)
+					if "function_call" in m:
+						m.pop("function_call")
+					m.content = m.get("content") or ""
+					tc = m.get("tool_calls", None) or ()
+					if not tc or any(fc.function.name not in FunctionList for fc in tc):
 						if orig_model not in chatcompletion:
 							extensions = False
 							print("Function mismatch:", target_model, orig_model, model)
@@ -2278,108 +2371,132 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								continue
 						text = text.strip()
 						break
-					try:
-						args = orjson.loads(fc["arguments"])
-					except:
-						print_exc()
-						args = None
-					if args:
-						argv = " ".join(map(str, args.values()))
-					else:
-						argv = ""
-					name = fc["name"]
-					res = text or ""
-					if name == "browse":
-						print("Browse query:", argv)
-						res = await process_image("BOT.browse", "$", [argv], cap="browse", timeout=60)
-						if res:
-							c = await tcount(res)
-							if c > 1440:
-								res = await summarise(q=q + "\n" + res, max_length=1296, min_length=1024)
-								res = res.replace("\n", ". ").replace(": ", " -")
-							res = res.strip()
-							# print("MLIST:", messages)
-							if len(messages) > 2:
-								messages = [messages[0], messages[-2], messages[-1]]
-							else:
-								messages = [messages[0], messages[-1]]
-							messages.append(cdict(m))
-							messages.append(cdict(role="function", name=name, content=res))
-							skipping = 0
-							length = await count_to(messages)
-							print("New prompt:", messages)
-							continue
-					elif name == "sympy":
-						print("Sympy query:", argv)
+					resend = True
+					appended = False
+					for n, fc in enumerate(tc):
+						tid = fc.id[:6] + str(n)
+						fc.id = tid
 						try:
-							res = await bot.solve_math(argv)
-							res = res[0]
+							args = orjson.loads(fc.function.arguments)
 						except:
 							print_exc()
-							res = None
-						if res:
-							c = await tcount(res)
-							if c > 512:
-								res = await summarise(q=q + "\n" + res, max_length=500, min_length=384)
-								res = res.replace("\n", ". ").replace(": ", " -")
-							res = res.strip()
-							if len(messages) > 2:
-								messages = [messages[0], messages[-2], messages[-1]]
-							else:
-								messages = [messages[0], messages[-1]]
-							messages.append(cdict(m))
-							messages.append(cdict(role="function", name=name, content=res))
-							blocked.add("sympy")
-							skipping = 0
-							length = await count_to(messages)
-							print("New prompt:", messages)
-							continue
-						name = "wolfram_alpha"
-					if name == "wolfram_alpha":
-						print("Wolfram Alpha query:", argv)
-						res = await process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60)
-						if res:
-							c = await tcount(res)
-							if c > 512:
-								res = await summarise(q=q + "\n" + res, max_length=500, min_length=384)
-								res = res.replace("\n", ". ").replace(": ", " -")
-							res = res.strip()
-							if len(messages) > 2:
-								messages = [messages[0], messages[-2], messages[-1]]
-							else:
-								messages = [messages[0], messages[-1]]
-							messages.append(cdict(m))
-							messages.append(cdict(role="function", name=name, content=res))
-							skipping = 0
-							length = await count_to(messages)
-							print("New prompt:", messages)
-							blocked.add("wolfram_alpha")
-							continue
-					elif name == "dalle":
-						print("Art query:", argv)
-						call = {"func": "art", "argv": argv, "comment": res}
-					elif name == "reminder":
-						argv = args["message"] + " in " + args["delay"]
-						print("Reminder query:", argv)
-						call = {"func": "remind", "argv": argv, "comment": res}
-					elif name == "play":
-						print("Play query:", argv)
-						call = {"func": "play", "argv": argv, "comment": res}
-					elif name == "audio":
-						print("Audio query:", args)
-						call = {"func": args["mode"], "argv": args["value"]}
-					elif name == "audiostate":
-						print("AudioState query:", args)
-						if args["mode"] == "quit":
-							call = {"func": "disconnect"}
-						elif args["mode"] == "pause":
-							call = {"func": ("pause" if args["value"] else "resume")}
-						elif args["mode"] == "loop":
-							call = {"func": "loopqueue", "argv": int(args["value"])}
+							args = fc.function.arguments if isinstance(fc.function.arguments, list) else [fc.function.arguments]
+						if args:
+							argv = " ".join(map(str, args.values()))
 						else:
-							call = {"func": args["mode"], "argv": int(args["value"])}
-					else:
-						raise ValueError("OpenAI API returned invalid or inactive function call.")
+							argv = ""
+						name = fc.function.name
+						res = text or ""
+						if name == "browse":
+							print("Browse query:", argv)
+							res = await process_image("BOT.browse", "$", [argv], cap="browse", timeout=60)
+							if res:
+								c = await tcount(res)
+								if c > 1440:
+									res = await summarise(q=q + "\n" + res, max_length=1296, min_length=1024)
+									res = res.replace("\n", ". ").replace(": ", " -")
+								res = res.strip()
+								# print("MLIST:", messages)
+								if appended:
+									pass
+								elif len(messages) > 2:
+									messages = [messages[0], messages[-2], messages[-1]]
+								else:
+									messages = [messages[0], messages[-1]]
+								if not appended:
+									messages.append(cdict(m))
+								messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
+								skipping = 0
+								length = await count_to(messages)
+								print("New prompt:", messages)
+								appended = True
+								continue
+						elif name == "sympy":
+							print("Sympy query:", argv)
+							try:
+								res = await bot.solve_math(argv, timeout=24)
+								res = res[0]
+							except:
+								print_exc()
+								res = None
+							if res:
+								c = await tcount(res)
+								if c > 512:
+									res = await summarise(q=q + "\n" + res, max_length=500, min_length=384)
+									res = res.replace("\n", ". ").replace(": ", " -")
+								res = res.strip()
+								if appended:
+									pass
+								elif len(messages) > 2:
+									messages = [messages[0], messages[-2], messages[-1]]
+								else:
+									messages = [messages[0], messages[-1]]
+								if not appended:
+									messages.append(cdict(m))
+								messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
+								blocked.add("sympy")
+								skipping = 0
+								length = await count_to(messages)
+								print("New prompt:", messages)
+								appended = True
+								continue
+							name = "wolfram_alpha"
+						if name == "wolfram_alpha":
+							print("Wolfram Alpha query:", argv)
+							res = await process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60)
+							if res:
+								c = await tcount(res)
+								if c > 512:
+									res = await summarise(q=q + "\n" + res, max_length=500, min_length=384)
+									res = res.replace("\n", ". ").replace(": ", " -")
+								res = res.strip()
+								if appended:
+									pass
+								elif len(messages) > 2:
+									messages = [messages[0], messages[-2], messages[-1]]
+								else:
+									messages = [messages[0], messages[-1]]
+								if not appended:
+									messages.append(cdict(m))
+								messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
+								blocked.add("wolfram_alpha")
+								skipping = 0
+								length = await count_to(messages)
+								print("New prompt:", messages)
+								appended = True
+								continue
+						elif name == "dalle":
+							print("Art query:", argv)
+							call = {"func": "art", "argv": argv, "comment": res}
+							resend = False
+						elif name == "reminder":
+							argv = args["message"] + " in " + args["delay"]
+							print("Reminder query:", argv)
+							call = {"func": "remind", "argv": argv, "comment": res}
+							resend = False
+						elif name == "play":
+							print("Play query:", argv)
+							call = {"func": "play", "argv": argv, "comment": res}
+							resend = False
+						elif name == "audio":
+							print("Audio query:", args)
+							call = {"func": args["mode"], "argv": args["value"]}
+							resend = False
+						elif name == "audiostate":
+							print("AudioState query:", args)
+							if args["mode"] == "quit":
+								call = {"func": "disconnect"}
+							elif args["mode"] == "pause":
+								call = {"func": ("pause" if args["value"] else "resume")}
+							elif args["mode"] == "loop":
+								call = {"func": "loopqueue", "argv": int(args["value"])}
+							else:
+								call = {"func": args["mode"], "argv": int(args["value"])}
+							resend = False
+						else:
+							raise ValueError("OpenAI API returned invalid or inactive function call.")
+					if resend:
+						continue
 					fname = call["func"]
 					argv = as_str(call.get("argv", ""))
 					args = argv.split()
@@ -2439,8 +2556,8 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 				)
 				if model in instructcompletion:
 					try:
-						response = await asyncio.wait_for(openai.Completion.acreate(**data, timeout=60), timeout=70)
-					except openai.InvalidRequestError:
+						response = await asyncio.wait_for(bot.oai.completions.create(**data, timeout=60), timeout=70)
+					except openai.BadRequestError:
 						raise
 					except Exception as e:
 						ex = e
@@ -2487,7 +2604,9 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						continue
 				else:
 					raise FileNotFoundError(f"Unable to find model \"{model}\".")
-				text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name).rstrip(":")
+				text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
+				if not text.rsplit(None, 1)[-1].startswith(":"):
+					text = text.rstrip(":")
 				if not text or len(text) >= 2 and text[-1] in ": aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
 					redo = True
 					continue
@@ -2835,11 +2954,7 @@ class Personality(Command):
 		p = argv.replace(";", ";")
 		if not bot.is_nsfw(channel):
 			inappropriate = False
-			openai.api_key = AUTH["openai_key"]
-			resp = await asubmit(
-				openai.Moderation.create,
-				input=p,
-			)
+			resp = await bot.oai.moderations.create(input=p)
 			results = resp.results[0]
 			if results.flagged:
 				inappropriate = True

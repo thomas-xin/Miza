@@ -1502,8 +1502,21 @@ if "class" in CAPS:
 	m = "TheBloke/Mythalion-13B-GPTQ"
 	T = backup_model(AutoTokenizer.from_pretrained, m)
 	i = sorted(range(torch.cuda.device_count()), key=lambda i: ((d := torch.cuda.get_device_properties(i)).total_memory > 11, -d.total_memory))[-1]
+	bpw = 4
+	gs = 64
+	quantize_config = BaseQuantizeConfig(
+		bits=bpw,
+		group_size=gs,
+		damp_percent=0.1,
+		desc_act=True,
+		sym=True,
+		true_sequential=True,
+		model_name_or_path=None,
+		model_file_base_name="model",
+	)
 	M = AutoGPTQForCausalLM.from_quantized(
 		m,
+		revision=f"gptq-{bpw}bit-{gs}g-actorder_True",
 		max_memory={i: torch.cuda.get_device_properties(i).total_memory},
 		use_safetensors=True,
 		use_triton=False,

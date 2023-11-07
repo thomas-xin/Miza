@@ -1174,7 +1174,8 @@ class Resize(Command):
 			if not name.endswith("." + fmt):
 				name += "." + fmt
 			if op == "sdxl":
-				fut = create_task(bot.caption(url, best=True))
+				premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
+				fut = create_task(bot.caption(url, best=premium >= 4))
 			# print(url, func, x, y, op, fmt)
 			resp = await process_image(url, func, [x, y, op, "-f", fmt], timeout=_timeout)
 			if op == "sdxl":
@@ -1541,9 +1542,24 @@ class OCR(Command):
 		return css_md(f"[Detected text]\n{no_md(text)}.")
 
 
+STOPS = (
+	"unable to fulfil",
+	"unable to assist",
+	"unable to help",
+	"unable to provide",
+	"cannot fulfil",
+	"cannot assist",
+	"cannot help",
+	"cannot provide",
+	"can't fulfil",
+	"can't assist",
+	"can't help",
+	"can't provide",
+)
+
 class Art(Command):
 	_timeout_ = 150
-	name = ["AIArt", "Inpaint", "StableDiffusion", "SDXL", "Dalle", "Dalle2", "Dream", "Imagine", "Inspire", "Openjourney", "Midjourney"]
+	name = ["AIArt", "Inpaint", "StableDiffusion", "SDXL", "Dalle", "Dalle2", "Dalle3", "Dream", "Imagine", "Inspire", "Openjourney", "Midjourney"]
 	description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system for image prompts. Configurable parameters are --strength, --guidance-scale, --aspect-ratio and --negative-prompt."
 	usage = "<0:prompt> <inpaint{?i}>? <single{?s}> <raw{?r}>"
 	example = ("art cute kitten", "art https://mizabot.xyz/favicon")
@@ -1595,7 +1611,7 @@ class Art(Command):
 				premium = 2
 		else:
 			freebies = None
-		sdxl = premium >= 2
+		sdxl = premium >= 2 and name != "stablediffusion"
 		req = " ".join(args)
 		url = None
 		url2 = None
@@ -1686,7 +1702,14 @@ class Art(Command):
 			force = True
 		if not bot.verify_integrity(message):
 			return
-		if sdxl and "r" not in flags and (not force or prompt.count(" ") < 48):
+		if "s" in flags:
+			amount = 1
+		else:
+			amount = 4 if premium >= 4 else 2 if premium >= 3 else 1
+		if not sdxl:
+			amount = 9 if premium >= 4 else 4
+		eprompts = alist()
+		if sdxl and not name.startswith("dalle") and "r" not in flags and (not force or prompt.count(" ") < 48):
 			oprompt = prompt
 			uid = user.id
 			temp = oprompt.replace('"""', "'''")
@@ -1703,39 +1726,37 @@ class Art(Command):
 			data = bot.data.users.get(u.id, {})
 			oai = data.get("trial") and data.get("openai_key")
 			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
-			inputs = dict(
-				user_id=user.id,
-				channel_id=channel.id,
+			resp = await bot.oai.completions.create(
+				model="gpt-3.5-turbo-instruct",
 				prompt=prompt,
-				key=AUTH.get("openai_key"),
-				huggingface_token=AUTH.get("huggingface_key"),
-				vis_session=AUTH.get("vis_session"),
-				bals={k: v for k, v in bot.data.token_balances.items() if v < 0},
-				oai=oai,
-				nsfw=bot.is_nsfw(channel),
-				premium=premium,
+				temperature=0.5,
+				max_tokens=120,
+				top_p=0.5,
+				frequency_penalty=0,
+				presence_penalty=0,
+				user=str(user.id),
+				n=amount,
 			)
-			out = await process_image("CBAU", "$", [inputs], cap="agpt", timeout=20)
-			stop = [
-				"cannot fulfil",
-				"cannot assist",
-				"can't fulfil",
-				"can't assist",
-			]
-			if any(s in out for s in stop):
-				out = ""
-			if out and out[0] == out[-1] == '"' and not oprompt[0] == oprompt[-1] == '"':
-				try:
-					out = orjson.loads(out)
-				except orjson.JSONDecodeError:
-					pass
-			out = out.replace("Dall·E", "art")
-			if out:
-				prompt = (nprompt or oprompt).removesuffix(".") + ".\n\n" + out.strip()
-			else:
-				prompt = nprompt or oprompt
+			for choice in resp.choices:
+				out = choice.text
+				if any(s in out for s in STOPS):
+					out = ""
+				if out and out[0] == out[-1] == '"' and not oprompt[0] == oprompt[-1] == '"':
+					try:
+						out = orjson.loads(out)
+					except orjson.JSONDecodeError:
+						pass
+				out = out.replace("Dall·E", "art")
+				if out:
+					prompt = (nprompt or oprompt).removesuffix(".") + ".\n\n" + out.strip()
+				else:
+					prompt = nprompt or oprompt
+				eprompts.append(prompt)
+		else:
+			eprompts.extend([prompt] * amount)
 		req = prompt
-		print("PROMPT:", prompt)
+		pname = (lim_str(prompt, 96).rstrip(".").replace(".", "_") or "untitled") + ".png"
+		print("PROMPT:", eprompts or prompt)
 		if url:
 			if force:
 				if req:
@@ -1762,12 +1783,6 @@ class Art(Command):
 		emb = None
 		fn = None
 		futs = []
-		if "s" in flags:
-			amount = 1
-		else:
-			amount = 4 if premium >= 4 else 2 if premium >= 3 else 1
-		if not sdxl:
-			amount = 9 if premium >= 4 else 4
 		amount2 = 0
 		if bot.is_trusted(guild) >= 2:
 			for uid in bot.data.trusted[guild.id]:
@@ -1802,20 +1817,90 @@ class Art(Command):
 			return resp
 
 		if amount2 < amount:
-			dalle2 = name.startswith("dalle")
-			if dalle2 and premium < 4:
-				raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
 			openjourney = "journey" in name
+			if name == "dalle":
+				dalle = 3 if premium >= 4 else 2
+			else:
+				dalle = name.startswith("dalle") and int(name.removeprefix("dalle"))
+			if dalle:
+				if premium < 3:
+					raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
+				if dalle == 3 and premium < 4:
+					raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
+				ar = float(kwargs["--aspect-ratio"]) or 1
+				if url:
+					raise NotImplementedError(f"Dall·E {dalle} interface currently does not support image prompts.")
+				if dalle < 3:
+					if max(ar, 1 / ar) < 1.1:
+						size = "1024x1024"
+					else:
+						raise ValueError(f"Dall·E {dalle} interface currently only supports 1:1 aspect ratio.")
+					async with discord.context_managers.Typing(channel):
+						response = await bot.oai.images.generate(
+							model=f"dall-e-{dalle}",
+							prompt=prompt,
+							size=size,
+							n=amount - amount2,
+						)
+						images = response.data
+				else:
+					if max(ar, 1 / ar) < 1.1:
+						size = "1024x1024"
+					elif max(ar / 1.75, 1.75 / ar) < 1.1:
+						size = "1792x1024"
+					elif max(ar * 1.75, 1 / 1.75 / ar) < 1.1:
+						size = "1024x1792"
+					else:
+						raise ValueError(f"Dall·E {dalle} interface currently only supports 1:1, 7:4 and 4:7 aspect ratios.")
+					async with discord.context_managers.Typing(channel):
+						futn = []
+						for i in range(amount - amount2):
+							fut = create_task(bot.oai.images.generate(
+								model=f"dall-e-{dalle}",
+								prompt=prompt,
+								size=size,
+								quality="hd",
+								n=1,
+							))
+							futn.append(fut)
+						images = []
+						for fut in futn:
+							try:
+								response = await fut
+							except openai.RateLimitError:
+								await asyncio.sleep(60)
+								response = await bot.oai.images.generate(
+									model=f"dall-e-{dalle}",
+									prompt=prompt,
+									size=size,
+									quality="hd",
+									n=1,
+								)
+							except openai.BadRequestError:
+								try:
+									response = await bot.oai.images.generate(
+										model=f"dall-e-{dalle}",
+										prompt=prompt,
+										size=size,
+										quality="hd",
+										n=1,
+									)
+								except openai.BadRequestError:
+									continue
+							images.append(response.data[0])
+				futs.extend(create_task(Request(im.url, timeout=24, aio=True)) for im in images)
+				amount2 += len(images)
+		if amount2 < amount:
 			async with discord.context_managers.Typing(channel):
 				futt = []
 				c = 0
-				if not url and (aspect != 1 or negative or amount >= 1 and not dalle2 and not openjourney and not self.sdiff_sem.is_busy()):
+				if not url and (aspect != 1 or negative or amount >= 1 and not dalle and not openjourney and not self.sdiff_sem.is_busy()):
 					noprompt = not force and not kwargs.get("--mask")
-					p = "" if noprompt and not sdxl else prompt
 					c = min(amount, 9 if nsfw and not self.sdiff_sem.active else 5)
 					c2 = c
 					while c2 > 0:
-						n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1, 2 if sdxl else 9)
+						p = "" if noprompt and not sdxl else eprompts.next()
+						n = 1 if sdxl else min(c2, xrand(floor(sqrt(c2) + 1)) + 1, 2 if sdxl else 9)
 						if not n:
 							n = c2
 						fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))
@@ -1826,7 +1911,7 @@ class Art(Command):
 				try:
 					if c > amount:
 						raise PermissionError
-					ims = await asubmit(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, sdxl, nsfw, amount - c, timeout=480)
+					ims = await asubmit(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle, openjourney, sdxl, nsfw, amount - c, timeout=480)
 				except PermissionError:
 					async with self.sdiff_sem:
 						for fut in futt:
@@ -2005,12 +2090,12 @@ class Art(Command):
 							amount2 = len(futs)
 						else:
 							noprompt = not force and not kwargs.get("--mask")
-							p = "" if noprompt and not sdxl else prompt
 							futt = []
 							c = amount - amount2
 							c2 = c
 							while c2 > 0:
-								n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1, 2 if sdxl else 9)
+								p = "" if noprompt and not sdxl else eprompts.next()
+								n = 1 if sdxl else min(c2, xrand(floor(sqrt(c2) + 1)) + 1, 2 if sdxl else 9)
 								if not n:
 									n = c2
 								fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))
@@ -2029,6 +2114,8 @@ class Art(Command):
 				if not tup:
 					continue
 				if not isinstance(tup, tuple):
+					if awaitable(tup):
+						tup = await tup
 					tup = (tup,)
 				fn = tup[0]
 				if not fn:
@@ -2060,10 +2147,13 @@ class Art(Command):
 								+ "or purchase a subscription to gain temporary unlimited usage!"
 							)
 				if isinstance(fn, str):
-					with open(fn, "rb") as f:
-						fn = f.read()
+					if is_url(fn):
+						fn = await Request(fn, timeout=24, aio=True)
+					else:
+						with open(fn, "rb") as f:
+							fn = f.read()
 				ffut = create_task(bot.commands.steganography[0].call(fn, str(bot.id)))
-				ffut.name = (lim_str(prompt, 96).rstrip(".").replace(".", "_") or "untitled") + ".png"
+				ffut.name = pname
 				ffut.back = fn
 				ffuts.append(ffut)
 		if not ffuts:
