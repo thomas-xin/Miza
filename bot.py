@@ -1644,29 +1644,33 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			presence_penalty=0.8,
 			user=str(hash(self.name)),
 		)
-		response = await asyncio.wait_for(self.oai.chat.completions.create(**data, timeout=30), timeout=35)
+		try:
+			response = await asyncio.wait_for(self.oai.chat.completions.create(**data, timeout=30), timeout=35)
+		except:
+			print_exc()
+			return asubmit(self.replicate, url)
 		print("GPT4V:", response)
 		return response.choices[0].message.content
 
-	# replicate_client = None
-	# def replicate(self, url):
-		# resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
-		# if not self.replicate_client:
-			# import replicate
-			# self.replicate_client = replicate.Client(api_token=AUTH.get("replicate_key") or "")
-		# resp = self.replicate_client.run(
-			# "joehoover/instructblip-vicuna13b:c4c54e3c8c97cd50c2d2fec9be3b6065563ccf7d43787fb99f84151b867178fe",
-			# input=dict(
-				# prompt="Describe only what this image contains in detail!",
-				# img=io.BytesIO(resp),
-				# max_length=256,
-				# temperature=0.75,
-				# top_p=0.9,
-				# top_k=0,
-				# repetition_penalty=1.2,
-			# ),
-		# )
-		# return "".join(resp)
+	replicate_client = None
+	def replicate(self, url):
+		resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
+		if not self.replicate_client:
+			import replicate
+			self.replicate_client = replicate.Client(api_token=AUTH.get("replicate_key") or "")
+		resp = self.replicate_client.run(
+			"joehoover/instructblip-vicuna13b:c4c54e3c8c97cd50c2d2fec9be3b6065563ccf7d43787fb99f84151b867178fe",
+			input=dict(
+				prompt="Describe only what this image contains in detail!",
+				img=io.BytesIO(resp),
+				max_length=256,
+				temperature=0.75,
+				top_p=0.9,
+				top_k=0,
+				repetition_penalty=1.2,
+			),
+		)
+		return "".join(resp)
 
 	# Follows a message link, replacing emojis and user mentions with their icon URLs.
 	async def follow_to_image(self, url, follow=True):

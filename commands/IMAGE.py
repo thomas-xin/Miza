@@ -1198,6 +1198,75 @@ class Resize(Command):
 		await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
+class Crop(Command):
+	name = ["ImageCut", "Cut", "ImageCrop"]
+	description = "Crops the supplied image to a given size, expanding if necessary. Measurements are in pixels; use \"-\" to omit a value."
+	usage = "<0:url> <1:left> <2:top> <3:right> <4:bottom>"
+	example = ("crop https://mizabot.xyz/favicon 10 - 20 10", "cut https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 120 120 -120 -120 webp")
+	no_parse = True
+	rate_limit = (4, 9)
+	_timeout_ = 4
+	typing = True
+	slash = True
+
+	async def __call__(self, bot, user, guild, channel, message, flags, name, args, argv, _timeout, **void):
+		# Take input from any attachments, or otherwise the message contents
+		if message.attachments:
+			args = [best_url(a) for a in message.attachments] + args
+			argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
+		async with discord.context_managers.Typing(channel):
+			try:
+				url = args.pop(0)
+				urls = await bot.follow_url(url, best=True, allow=True, limit=1)
+				if not urls:
+					urls = await bot.follow_to_image(argv)
+					if not urls:
+						urls = await bot.follow_to_image(url)
+						if not urls:
+							raise ArgumentError
+				url = urls[0]
+			except (LookupError, ArgumentError):
+				if not argv:
+					url = None
+					try:
+						url = await bot.get_last_image(message.channel)
+					except FileNotFoundError:
+						raise ArgumentError("Please input an image by URL or attachment.")
+				else:
+					raise ArgumentError("Please input an image by URL or attachment.")
+			fmt2 = url.split("?", 1)[0].rsplit(".", 1)[-1]
+			if fmt2 not in ("mp4", "gif"):
+				if is_url(url):
+					resp = await asubmit(requests.head, url, headers=Request.header(), stream=True)
+					fmt2 = resp.headers["Content-Type"].rsplit("/", 1)[-1]
+					if fmt2 not in ("mp4", "gif"):
+						fmt2 = "mp4"
+				else:
+					fmt2 = "mp4"
+			if args and ("." + args[-1] in IMAGE_FORMS or "." + args[-1] in VIDEO_FORMS):
+				fmt = args.pop(-1)
+			else:
+				fmt = fmt2
+			if len(args) < 4:
+				raise ArgumentError("All 4 positional values are currently required to use this command.")
+			coords = args[:4]
+			resp = await process_image(url, "crop_to", [*coords, "-f", fmt], timeout=_timeout)
+			fn = resp
+			if isinstance(fn, str) and "." in fn:
+				fmt = "." + fn.rsplit(".", 1)[-1]
+				if not name.endswith(fmt):
+					if "." in name:
+						name = name[:name.rindex(".")]
+					name += "." + fmt
+			elif isinstance(fn, (bytes, memoryview)):
+				fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
+				if not name.endswith(fmt):
+					if "." in name:
+						name = name[:name.rindex(".")]
+					name += "." + fmt
+		await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
+
+
 class Rotate(Command):
 	name = ["Orientate", "Orientation", "Transpose"]
 	description = "Rotates an image."
@@ -1660,8 +1729,8 @@ class Art(Command):
 						raise OverflowError("Maximum permitted aspect ratio is 1:256.")
 					kwarg = "--aspect-ratio"
 					kwargs[kwarg] = str(arg)
-				# elif kwargs == "--mask":
-				#     kwargs[kwarg] = arg
+				elif kwargs == "--mask":
+				    kwargs[kwarg] = arg
 				specified = kwarg
 				kwarg = ""
 				continue
@@ -1702,14 +1771,25 @@ class Art(Command):
 			force = True
 		if not bot.verify_integrity(message):
 			return
+		if name == "dalle":
+			dalle = 3 if premium >= 4 else 2
+		else:
+			dalle = name.startswith("dalle") and int(name.removeprefix("dalle"))
+		if dalle:
+			if dalle == 3 and premium < 4:
+				raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
+			if premium < 3:
+				raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
 		if "s" in flags:
 			amount = 1
+		elif dalle:
+			amount = 4 if premium >= 6 else 2 if premium >= 4 else 1
+		elif sdxl:
+			amount = 4 if premium >= 5 else 2 if premium >= 3 else 1
 		else:
-			amount = 4 if premium >= 4 else 2 if premium >= 3 else 1
-		if not sdxl:
 			amount = 9 if premium >= 4 else 4
 		eprompts = alist()
-		if sdxl and not name.startswith("dalle") and "r" not in flags and (not force or prompt.count(" ") < 48):
+		if sdxl and not dalle and "r" not in flags and (not force or prompt.count(" ") < 48):
 			oprompt = prompt
 			uid = user.id
 			temp = oprompt.replace('"""', "'''")
@@ -1755,7 +1835,6 @@ class Art(Command):
 		else:
 			eprompts.extend([prompt] * amount)
 		req = prompt
-		pname = (lim_str(prompt, 96).rstrip(".").replace(".", "_") or "untitled") + ".png"
 		print("PROMPT:", eprompts or prompt)
 		if url:
 			if force:
@@ -1783,6 +1862,7 @@ class Art(Command):
 		emb = None
 		fn = None
 		futs = []
+		pnames = []
 		amount2 = 0
 		if bot.is_trusted(guild) >= 2:
 			for uid in bot.data.trusted[guild.id]:
@@ -1818,15 +1898,7 @@ class Art(Command):
 
 		if amount2 < amount:
 			openjourney = "journey" in name
-			if name == "dalle":
-				dalle = 3 if premium >= 4 else 2
-			else:
-				dalle = name.startswith("dalle") and int(name.removeprefix("dalle"))
 			if dalle:
-				if premium < 3:
-					raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
-				if dalle == 3 and premium < 4:
-					raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
 				ar = float(kwargs["--aspect-ratio"]) or 1
 				if url:
 					raise NotImplementedError(f"Dall·E {dalle} interface currently does not support image prompts.")
@@ -1836,13 +1908,15 @@ class Art(Command):
 					else:
 						raise ValueError(f"Dall·E {dalle} interface currently only supports 1:1 aspect ratio.")
 					async with discord.context_managers.Typing(channel):
+						prompt = eprompts.next()
 						response = await bot.oai.images.generate(
 							model=f"dall-e-{dalle}",
-							prompt=eprompts.next(),
+							prompt=prompt,
 							size=size,
 							n=amount - amount2,
 						)
 						images = response.data
+						pnames.extend([prompt] * len(images))
 				else:
 					if max(ar, 1 / ar) < 1.1:
 						size = "1024x1024"
@@ -1852,6 +1926,7 @@ class Art(Command):
 						size = "1024x1792"
 					else:
 						raise ValueError(f"Dall·E {dalle} interface currently only supports 1:1, 7:4 and 4:7 aspect ratios.")
+					q = "hd" if premium >= 6 and "s" in flags else "standard"
 					async with discord.context_managers.Typing(channel):
 						futn = []
 						for i in range(amount - amount2):
@@ -1859,7 +1934,7 @@ class Art(Command):
 								model=f"dall-e-{dalle}",
 								prompt=eprompts.next(),
 								size=size,
-								quality="hd",
+								quality=q,
 								n=1,
 							))
 							futn.append(fut)
@@ -1868,27 +1943,32 @@ class Art(Command):
 							try:
 								response = await fut
 							except openai.RateLimitError:
+								print_exc()
 								await asyncio.sleep(60)
 								response = await bot.oai.images.generate(
 									model=f"dall-e-{dalle}",
 									prompt=eprompts.next(),
 									size=size,
-									quality="hd",
+									quality="standard",
 									n=1,
 								)
-							except openai.BadRequestError:
+							except:
+								print_exc()
 								try:
 									response = await bot.oai.images.generate(
 										model=f"dall-e-{dalle}",
 										prompt=eprompts.next(),
 										size=size,
-										quality="hd",
+										quality="standard",
 										n=1,
 									)
-								except openai.BadRequestError:
+								except:
+									print_exc()
+									print("SKIPPED")
 									continue
 							images.append(response.data[0])
-				futs.extend(create_task(Request(im.url, timeout=24, aio=True)) for im in images)
+							pnames.append(response.data[0].revised_prompt)
+				futs.extend(create_task(Request(im.url, timeout=48, aio=True)) for im in images)
 				amount2 += len(images)
 		if amount2 < amount:
 			async with discord.context_managers.Typing(channel):
@@ -1907,11 +1987,12 @@ class Art(Command):
 						futt.append(fut)
 						c2 -= n
 				self.imagebot.token = oai or AUTH.get("openai_key")
+				prompt = eprompts.next()
 				ims = []
 				try:
 					if c > amount:
 						raise PermissionError
-					ims = await asubmit(self.imagebot.art, eprompts.next(), url, url2, kwargs, specified, dalle, openjourney, sdxl, nsfw, amount - c, timeout=480)
+					ims = await asubmit(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle, openjourney, sdxl, nsfw, amount - c, timeout=480)
 				except PermissionError:
 					async with self.sdiff_sem:
 						for fut in futt:
@@ -1928,6 +2009,7 @@ class Art(Command):
 							ims2.extend(ims)
 							ims = ims2
 				futs.extend(ims)
+				pnames.extend([prompt] * len(ims))
 				amount2 = len(futs)
 		if amount2 < amount:
 			if self.has_py39:
@@ -1980,9 +2062,10 @@ class Art(Command):
 					"demo.py",
 				]
 			if prompt and "--prompt" not in kwargs:
+				prompt = eprompts.next()
 				args.extend((
 					"--prompt",
-					eprompts.next(),
+					prompt,
 				))
 			async with discord.context_managers.Typing(channel):
 				image_1 = image_2 = None
@@ -2088,18 +2171,21 @@ class Art(Command):
 							with open("misc/stable_diffusion.openvino/output.png", "rb") as f:
 								futs.append(f.read())
 							amount2 = len(futs)
+							pnames.append(prompt)
 						else:
 							noprompt = not force and not kwargs.get("--mask")
 							futt = []
 							c = amount - amount2
 							c2 = c
 							while c2 > 0:
-								p = "" if noprompt and not sdxl else eprompts.next()
+								prompt = eprompts.next()
+								p = "" if noprompt and not sdxl else prompt
 								n = 1 if sdxl else min(c2, xrand(floor(sqrt(c2) + 1)) + 1, 2 if sdxl else 9)
 								if not n:
 									n = c2
 								fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))
 								futt.append(fut)
+								pnames.append(prompt)
 								c2 -= n
 							for fut in futt:
 								ims = await fut
@@ -2108,7 +2194,7 @@ class Art(Command):
 		ffuts = []
 		exc = RuntimeError("Unknown error occured.")
 		async with discord.context_managers.Typing(channel):
-			for tup in futs:
+			for tup, prompt in zip(futs, pnames):
 				if len(ffuts) >= amount:
 					break
 				if not tup:
@@ -2153,18 +2239,18 @@ class Art(Command):
 						with open(fn, "rb") as f:
 							fn = f.read()
 				ffut = create_task(bot.commands.steganography[0].call(fn, str(bot.id)))
-				ffut.name = pname
+				ffut.prompt = prompt
 				ffut.back = fn
 				ffuts.append(ffut)
 		if not ffuts:
 			raise exc
 		files = []
 		for ffut in ffuts:
-			name = ffut.name
+			prompt = ffut.prompt
 			fn = ffut.back
 			with tracebacksuppressor:
 				fn = await ffut
-			files.append(CompatFile(fn, filename=name))
+			files.append(CompatFile(fn, filename=prompt + ".png", description=prompt))
 		if premium >= 2 and freebies is not None:
 			bot.data.users[user.id].setdefault("freebies", []).append(utc())
 			rem = freelim - len(freebies)

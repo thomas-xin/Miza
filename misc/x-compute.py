@@ -770,12 +770,12 @@ if CAPS.intersection(("image", "caption", "sd", "sdxl", "sdxlr")):
 				return im
 			R, G, B, A = im.split()
 			r, g, b = np.asarray(R, dtype=np.uint8), np.asarray(G, dtype=np.uint8), np.asarray(B, dtype=np.uint8)
-			distRG = (r.ravel() - g.ravel()) ** 2
-			if np.max(distRG) <= 4:
-				distGB = (g.ravel() - b.ravel()) ** 2
-				if np.max(distGB) <= 4:
-					distBR = (b.ravel() - r.ravel()) ** 2
-					if np.max(distBR) <= 4:
+			distRG = np.abs(r.ravel() - g.ravel())
+			if np.max(distRG) <= 2:
+				distGB = np.abs(g.ravel() - b.ravel())
+				if np.max(distGB) <= 2:
+					distBR = np.abs(b.ravel() - r.ravel())
+					if np.max(distBR) <= 2:
 						if np.min(A) >= 254:
 							return im.convert("L")
 						return im.convert("LA")
@@ -788,12 +788,12 @@ if CAPS.intersection(("image", "caption", "sd", "sdxl", "sdxlr")):
 			return im
 		R, G, B = im.split()
 		r, g, b = np.asarray(R, dtype=np.uint8), np.asarray(G, dtype=np.uint8), np.asarray(B, dtype=np.uint8)
-		distRG = (r.ravel() - g.ravel()) ** 2
-		if np.max(distRG) <= 4:
-			distGB = (g.ravel() - b.ravel()) ** 2
-			if np.max(distGB) <= 4:
-				distBR = (b.ravel() - r.ravel()) ** 2
-				if np.max(distBR) <= 4:
+		distRG = np.abs(r.ravel() - g.ravel())
+		if np.max(distRG) <= 2:
+			distGB = np.abs(g.ravel() - b.ravel())
+			if np.max(distGB) <= 2:
+				distBR = np.abs(b.ravel() - r.ravel())
+				if np.max(distBR) <= 2:
 					return im.convert("L")
 		return im
 
@@ -911,6 +911,40 @@ if CAPS.intersection(("image", "caption", "sd", "sdxl", "sdxlr")):
 			out.paste(image, pos)
 			return out
 		return image.resize([w, h], filt)
+
+	def crop_to(image, x1, y1, x2, y2):
+		if x1 == "-":
+			x1 = 0
+		elif isinstance(x1, str):
+			x1 = int(x1)
+		if y1 == "-":
+			y1 = 0
+		elif isinstance(y1, str):
+			y1 = int(y1)
+		if x2 == "-":
+			x2 = image.width
+		elif isinstance(x2, str):
+			v = int(x2)
+			if x2.startswith("+") or x2.startswith("-"):
+				x2 = image.width + v
+			else:
+				x2 = v
+		if y2 == "-":
+			y2 = image.height
+		elif isinstance(y2, str):
+			v = int(y2)
+			if y2.startswith("+") or y2.startswith("-"):
+				y2 = image.height + v
+			else:
+				y2 = v
+		if x1 == y1 == 0 and x2 == image.width and y2 == image.height:
+			return image
+		if x1 >= 0 and y1 >= 0 and x2 <= image.width and y2 <= image.height:
+			return image.crop((x1, y1, x2, y2))
+		newsize = (x2 - x1, y2 - y1)
+		im = Image.new("RGBA", newsize)
+		im.paste(image, (-x1, -y1))
+		return im
 
 	def rotate_to(image, angle, expand=True):
 		angle %= 360
@@ -2649,7 +2683,7 @@ def evalImg(url, operation, args):
 			else:
 				proc.stdin.close()
 				proc.wait()
-			if opt and fmt == "gif":
+			if fmt == "gif":
 				if os.name == "nt":
 					if not os.path.exists("misc/gifsicle.exe") or os.path.getsize("misc/gifsicle.exe") < 4096:
 						import requests
@@ -2669,10 +2703,14 @@ def evalImg(url, operation, args):
 					out2 = out.rsplit(".", 1)[0] + "~2." + out.rsplit(".", 1)[-1]
 				else:
 					out2 = out + "~2"
-				args = ["misc/gifsicle", "-O3", "--loopcount=forever", "--lossy=100", "-o", out2, out]
+				args = ["misc/gifsicle"]
+				if i >= 255:
+					args.append("-O3")
+				args.extend(("--loopcount=forever", "--lossy=100", "-o", out2, out))
 				print(args)
 				subprocess.run(args)
-				out = out2
+				if os.path.getsize(out2) < os.path.getsize(out):
+					out = out2
 			# return [out]
 			with open(out, "rb") as f:
 				return f.read()
