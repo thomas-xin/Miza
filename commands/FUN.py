@@ -3501,6 +3501,7 @@ class Akinator(Command):
 				method="PATCH",
 				authorise=True,
 				aio=True,
+				timeout=12,
 			)
 
 

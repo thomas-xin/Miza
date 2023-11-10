@@ -1694,7 +1694,7 @@ class Art(Command):
 		nprompt = ""
 		kwargs = {
 			"--device": "GPU",
-			"--num-inference-steps": "36" if premium < 4 else "48",
+			"--num-inference-steps": "42" if premium < 4 else "48",
 			"--guidance-scale": "9.9",
 			"--eta": "0.8",
 			"--aspect-ratio": "0",
@@ -1993,24 +1993,28 @@ class Art(Command):
 					c = min(amount, 9 if nsfw and not self.sdiff_sem.active else 5)
 					c2 = c
 					while c2 > 0:
-						p = "" if noprompt and not sdxl else eprompts.next()
+						prompt = eprompts.next()
+						p = "" if noprompt and not sdxl else prompt
 						n = min(c2, dups)
 						if not n:
 							n = c2
 						fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))
 						futt.append(fut)
+						pnames.extend([prompt] * n)
 						c2 -= n
 				self.imagebot.token = oai or AUTH.get("openai_key")
-				prompt = eprompts.next()
 				ims = []
 				try:
 					if c > amount:
 						raise PermissionError
+					prompt = eprompts.next()
 					ims = await asubmit(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle, openjourney, sdxl, nsfw, amount - c, timeout=480)
 				except PermissionError:
 					async with self.sdiff_sem:
 						for fut in futt:
 							await fut
+				else:
+					pnames.extend([prompt] * len(ims))
 				# print(ims)
 				async with self.sdiff_sem:
 					for fut in futt:
@@ -2023,7 +2027,6 @@ class Art(Command):
 							ims2.extend(ims)
 							ims = ims2
 				futs.extend(ims)
-				pnames.extend([prompt] * len(ims))
 				amount2 = len(futs)
 		if amount2 < amount:
 			if self.has_py39:
@@ -2212,11 +2215,12 @@ class Art(Command):
 									n = c2
 								fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))
 								futt.append(fut)
-								pnames.append(prompt)
+								pnames.extend([prompt] * n)
 								c2 -= n
 							for fut in futt:
 								ims = await fut
 								futs.extend(ims)
+								# print(dups, len(ims), len(futt), len(futs), amount, amount2)
 							amount2 = len(futs)
 		ffuts = []
 		exc = RuntimeError("Unknown error occured.")

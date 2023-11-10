@@ -1594,13 +1594,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			tup = ("Image", p1, p2, best)
 		if best:
 			try:
-				p3 = await asyncio.wait_for(asyncio.shield(fut), timeout=20)
+				p3 = await asyncio.wait_for(asyncio.shield(fut), timeout=24)
 			except (T0, T1, T2):
 
 				async def recaption(h, p1, p2, fut, tup):
 					p3 = await fut
-					p1, p2, p3 = sorted((p1, p2, p3), key=len)
-					tup = ("Image", p2, p3, best)
+					p1, p2 = sorted((p1, p2), key=len)
+					tup = ("Image", p3, p2, best)
 					if len(p1) > 7 and " " in p1 and p1.isascii():
 						tup = ("Image", p3, p2 + "\n" + p1, best)
 					print("BEST:", tup)
@@ -1608,8 +1608,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 				create_task(recaption(h, p1, p2, fut, tup))
 			else:
-				p1, p2, p3 = sorted((p1, p2, p3), key=len)
-				tup = (tup[0], p2, p3, best)
+				p1, p2 = sorted((p1, p2), key=len)
+				tup = (tup[0], p3, p2, best)
 				if len(p1) > 7 and " " in p1 and p1.isascii():
 					tup = (tup[0], p3, p2 + "\n" + p1, best)
 				print("BEST:", tup)
@@ -6044,6 +6044,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						m = await self.fetch_message(m_id, channel)
 						if type(m) is not self.ExtendedMessage:
 							m = self.ExtendedMessage(m)
+							add = True
+						if "```callback" not in m.content and not m.embeds:
+							m = await channel.fetch_message(m_id)
+							add = True
+						if add:
 							self.add_message(m, force=True)
 						m.int_id = message.id
 						m.int_token = message.slash

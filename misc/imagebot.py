@@ -789,12 +789,13 @@ class Bot:
 				b = io.BytesIO(b)
 			mask = Image.open(b)
 		output_type = "latent" if sdxl > 1 and spare else "pil"
+		end = 0.8
 		kw = {}
 		if sdxl:
 			kw = dict(output_type=output_type)
 			ms = 1024
 			if not z:
-				kw["denoising_end"] = 0.75
+				kw["denoising_end"] = end
 			if aspect_ratio != 0:
 				x, y = max_size(aspect_ratio, 1, ms, force=True)
 			elif im:
@@ -868,7 +869,7 @@ class Bot:
 				image=[mask] * count,
 				num_images_per_prompt=1,
 				controlnet_conditioning_scale=float(kwargs.get("--strength", 0.8)),
-				num_inference_steps=round(float(kwargs.get("--num-inference-steps", 24)) * 0.75),
+				num_inference_steps=ceil(float(kwargs.get("--num-inference-steps", 24)) * end),
 				guidance_scale=float(kwargs.get("--guidance-scale", 9.9)),
 				**kw,
 			)
@@ -928,11 +929,16 @@ class Bot:
 					images[0] = images[0].resize(size, resample=Image.Resampling.LANCZOS)
 					# steps = ceil(steps * 1.5)
 					orig_size = images[0].size
+			start = 0.6
 		elif not isinstance(images, (list, tuple, torch.tensor)):
 			images = [images]
+			start = 0.6
 		elif isinstance(images[0], (bytes, memoryview)):
 			images = [Image.open(io.BytesIO(i)) for i in images]
 			orig_size = images[0].size
+			start = 0.6
+		else:
+			start = 0.7
 		model = "stabilityai/stable-diffusion-xl-refiner-1.0"
 		f2 = DiffusionPipeline
 		cia = torch.cuda.is_available()
@@ -1002,7 +1008,8 @@ class Bot:
 			num_images_per_prompt=1,
 			num_inference_steps=steps,
 			output_type="pil",
-			denoising_start=0.7,
+			denoising_start=start,
+			strength=0,
 		)
 		x, y = max_size(*orig_size, 1024, force=True)
 		w, h = (x // 64 * 64, y // 64 * 64)
