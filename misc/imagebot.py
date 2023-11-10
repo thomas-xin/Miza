@@ -625,13 +625,19 @@ class Bot:
 	# device, dtype = determine_cuda(0)
 	# gen = torch.Generator(f"cuda:{device}" if device >= 0 else "cpu").manual_seed(time.time_ns() - 1)
 	def art_stablediffusion_local(self, prompt, kwargs=None, aspect_ratio=0, negative_prompt=None, model="stabilityai/stable-diffusion-xl-base-1.0", fail_unless_gpu=True, nsfw=False, count=1, sdxl=False, z=False):
-		from diffusers import StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusionXLInpaintPipeline, StableDiffusionImageVariationPipeline
+		from diffusers import StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusionXLInpaintPipeline, StableDiffusionXLControlNetPipeline
 		from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
 		if not kwargs.get("--init-image"):
-			if sdxl:
-				pf = StableDiffusionXLPipeline
+			if kwargs.get("--mask"):
+				if sdxl:
+					pf = StableDiffusionXLControlNetPipeline
+				else:
+					raise NotImplementedError("StableDiffusionControlNetPipeline")
 			else:
-				pf = StableDiffusionPipeline
+				if sdxl:
+					pf = StableDiffusionXLPipeline
+				else:
+					pf = StableDiffusionPipeline
 		elif kwargs.get("--mask"):
 			if sdxl:
 				pf = StableDiffusionXLInpaintPipeline
@@ -691,8 +697,8 @@ class Bot:
 	loading = None
 	neg_prompt = "blurry, distorted, disfigured, bad anatomy, poorly drawn, low quality, ugly"
 	def art_stablediffusion_sub(self, pf, model, prompt, kwargs, count, aspect_ratio=0, negative_prompt=None, device=-1, dtype=torch.float32, nsfw=False, fail_unless_gpu=True, sdxl=False, z=False):
-		from diffusers import DPMSolverMultistepScheduler, StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusionXLInpaintPipeline, StableDiffusionImageVariationPipeline
-		from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline
+		from diffusers import DPMSolverMultistepScheduler, StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusionXLInpaintPipeline, StableDiffusionXLControlNetPipeline, ControlNetModel
+		from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
 		from diffusers.models import AutoencoderKL
 		cia = torch.cuda.is_available()
 		models = self.models.setdefault(device, {})
@@ -714,11 +720,20 @@ class Bot:
 					kw["use_safetensors"] = True
 					kw["variant"] = "fp16"
 					if not self.vae:
-						self.vae = AutoencoderKL.from_pretrained("stabilityai/sdxl-vae", torch_dtype=dtype, use_safetensors=True)
+						self.vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=dtype, use_safetensors=True)
 					kw["vae"] = self.vae
 				try:
 					if fail_unless_gpu and (device < 0 or not models.get((f2, model), True)):
 						return
+					if f2 is StableDiffusionXLControlNetPipeline:
+						controlnet = backup_model(
+							ControlNetModel.from_pretrained,
+							"diffusers/controlnet-canny-sdxl-1.0",
+							torch_dtype=dtype,
+							use_safetensors=True,
+							variant="fp16",
+						)
+						kw["controlnet"] = controlnet
 					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=False, torch_dtype=dtype, **kw)
 					if device >= 0:
 						if os.name != "nt":
@@ -779,11 +794,13 @@ class Bot:
 			kw = dict(output_type=output_type)
 			ms = 1024
 			if not z:
-				kw["denoising_end"] = 0.8
+				kw["denoising_end"] = 0.75
 			if aspect_ratio != 0:
 				x, y = max_size(aspect_ratio, 1, ms, force=True)
 			elif im:
 				x, y = max_size(*im.size, ms, force=True)
+			elif mask:
+				x, y = max_size(*mask.size, ms, force=True)
 			else:
 				x = y = ms
 			d = 64 if sdxl > 1 else 32
@@ -837,6 +854,21 @@ class Bot:
 				image=[image_to(im, size=ois)] * count,
 				num_images_per_prompt=1,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
+				guidance_scale=float(kwargs.get("--guidance-scale", 9.9)),
+				**kw,
+			)
+		elif f2 is StableDiffusionXLControlNetPipeline:
+			a = np.asanyarray(image_to(mask, size=ois))
+			from cv2 import Canny
+			im = Canny(a, 100, 200)
+			mask = Image.fromarray(im, mode="L").convert("RGB")
+			kw.pop("denoising_end", None)
+			data = pipe(
+				true_prompt,
+				image=[mask] * count,
+				num_images_per_prompt=1,
+				controlnet_conditioning_scale=float(kwargs.get("--strength", 0.8)),
+				num_inference_steps=round(float(kwargs.get("--num-inference-steps", 24)) * 0.75),
 				guidance_scale=float(kwargs.get("--guidance-scale", 9.9)),
 				**kw,
 			)

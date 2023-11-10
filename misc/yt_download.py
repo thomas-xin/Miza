@@ -2,6 +2,8 @@ import os, time
 import concurrent.futures
 import selenium
 from selenium import webdriver
+import traceback
+from traceback import print_exc
 
 try:
 	exc = concurrent.futures.exc_worker

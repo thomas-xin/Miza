@@ -67,7 +67,7 @@ def tier_count(t):
 
 def total_power(cost, cash, injected, pops, tier5, tiers, totems):
 	return (
-		min(floor((cash / 1.05 + injected) / cost * 20000), 60000) + min(floor(pops / 180), 90000)
+		min(floor((cash + injected / 1.05) / cost * 20000), 60000) + min(floor(pops / 180), 90000)
 		+ min(tier5 * 6000, 50000) + min(tiers * 100, 10000)
 		+ totems * 2000
 	)
@@ -80,9 +80,9 @@ def available_inject(cost, cash):
 
 def required_inject(cost, cash, power, required):
 	avail = available_inject(cost, cash)
-	avapwr = floor(avail / 1.05 / cost * 20000)
+	avapwr = ceil(avail / 1.05 / cost * 20000)
 	tarpwr = min(required - power, avapwr)
-	return ceil(tarpwr / 20000 * cost * 1.05)
+	return max(0, ceil(tarpwr / 20000 * cost * 1.05))
 
 def d2p(d):
 	if d <= 1:
@@ -163,7 +163,7 @@ def parse(args):
 	tier5 = 0
 	tiers = 0
 	totems = 0
-	limit = 40
+	limit = 34
 
 	t5s = set()
 	t = args.pop(0)
@@ -445,7 +445,7 @@ def parse(args):
 				output.append(f"Sacrifice cost: `{ceil(ac)}`")
 			ac = injected - stats[1]
 			if ac:
-				output.append(f"Injected cash: `{ceil(ac)}")
+				output.append(f"Injected cash: `{ceil(ac)}`")
 			ap = pops - stats[2]
 			if ap:
 				output.append(f"Additional pops: `{ap}`")

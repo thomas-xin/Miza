@@ -1384,35 +1384,26 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 									u = translate_emojis(e)
 									if is_url(u):
 										found.append(u)
-						if not found:
-							m = await c.fetch_message(int(spl[2]))
-							self.bot.add_message(m, files=False, force=True)
-							if reactions:
-								if reactions == 1:
-									m = await self.ensure_reactions(m)
-								for r in m.reactions:
-									e = r.emoji
-									if hasattr(e, "url"):
-										found.append(as_str(e.url))
-									else:
-										u = translate_emojis(e)
-										if is_url(u):
-											found.append(u)
 					if not found and (not images or not reactions and reactions is not None):
 						found = await self.follow_url(url, it, best=best, preserve=preserve, images=True, reactions=2, allow=True, limit=limit)
-					for u in found:
-						# Do not attempt to find the same URL twice
-						if u not in it:
-							it[u] = True
-							if not len(it) & 255:
-								await asyncio.sleep(0.2)
-							found2 = await self.follow_url(u, it, best=best, preserve=preserve, images=images, reactions=reactions, allow=allow, limit=limit)
-							if len(found2):
-								out.extend(found2)
-							elif allow and m.content:
-								lost.append(m.content)
-							elif preserve:
-								lost.append(u)
+						for u in found:
+							if u not in it:
+								it[u] = True
+						out.extend(found)
+					else:
+						for u in found:
+							# Do not attempt to find the same URL twice
+							if u not in it:
+								it[u] = True
+								if not len(it) & 255:
+									await asyncio.sleep(0.2)
+								found2 = await self.follow_url(u, it, best=best, preserve=preserve, images=images, reactions=reactions, allow=allow, limit=limit)
+								if len(found2):
+									out.extend(found2)
+								elif allow and m.content:
+									lost.append(m.content)
+								elif preserve:
+									lost.append(u)
 			elif images and is_imgur_url(url):
 				first = url.split("?", 1)[0]
 				if not first.endswith(".jpg"):

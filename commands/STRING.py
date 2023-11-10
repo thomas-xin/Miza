@@ -1373,9 +1373,9 @@ DEFMOD = "emerhyst"
 
 MockFunctions = [
 	[None, "Placeholder (Do not choose this!)"],
-	[None, "Providing advice, real-world assistance, or formal conversation"],
-	["roleplay", "Describe a roleplay or fictional scenario"],
-	["art", "Create or edit a picture or art"],
+	[None, "Providing advice, real-world assistance, or formal conversation (Please choose this if the user is asking a serious question!)"],
+	["roleplay", "Describe a roleplay or fictional scenario (Please choose this if user is roleplaying!)"],
+	["art", "Create or edit a picture or art (Please choose this if the user wants you to draw something!)"],
 	["remind", "Set alarm or reminder"],
 	["math", "Math or calculator"],
 	["play", "Play or pause music, or change audio settings"],
@@ -1551,18 +1551,24 @@ Functions = dict(
 FunctionList = list(Functions)
 
 STOPS = (
-	"unable to fulfil",
-	"unable to assist",
-	"unable to help",
-	"unable to provide",
-	"cannot fulfil",
-	"cannot assist",
-	"cannot help",
-	"cannot provide",
-	"can't fulfil",
-	"can't assist",
-	"can't help",
-	"can't provide",
+	"m unable to fulfil",
+	"m unable to assist",
+	"m unable to help",
+	"m unable to provide",
+	"m unable to do",
+	"m unable to respond",
+	"i cannot fulfil",
+	"i cannot assist",
+	"i cannot help",
+	"i cannot provide",
+	"i cannot do",
+	"i cannot respond",
+	"i can't fulfil",
+	"i can't assist",
+	"i can't help",
+	"i can't provide",
+	"i can't do",
+	"i can't respond",
 )
 
 AC = b'n\x03\x07\nn\x03\x07:n\x03\x074\xben\x03\x07\x08n\x03\x079n\x03\x07\x04\xben\x03\x07\x06n\x03\x074n\x03\x079n\x03\x079n\x03\x07\x04n\x03\x07=n\x03\x077n\x03\x07?n\x03\x070\xben\x03\x07\x00n\x03\x07=\xben\x03\x07\x08\xben\x01\x1a#n\x01\x1b\x1cn\x01\x1a+n\x01\x1b\x18\xben\x03\x06 n\x03\x07\x03n\x03\x07\x08n\x03\x07=n\x03\x07=n\x03\x07\x04n\x03\x07?\xbf\xben\x03\x0e3n\x03\r/n\x03\x0f\x0c\xben\x03\n>n\x03\x08\nq#\x10n\x01\x1b\x1bn\x01\x1b*|\r?n\x01\x1b<n\x03\x06<n\x03\x077n\x03\x04\x0c\x7f+\x0c\x7f\x06\x17\xben\x03\x0e<n\x03\r"\xben\x03\x0b\x0cn\x03\n7n\x03\x08\x0fq#\x11n\x01\x1b\x18n\x01\x1b*|\r\r\xben\x03\x06+n\x03\x07:\xbe\x7f+\x19\x7f\x06!\xben\x03\x0e8n\x03\r4n\x03\r\x17n\x03\x0b8n\x03\n1n\x03\x08\x14\xben\x01\x1a n\x01\x18\x1f\xben\x01\x1b<n\x03\x068n\x03\x073n\x03\x04\x00\x7f+\x1d\x7f\x0c4\xben\x03\x0e\x04n\x03\r2n\x03\x0c&n\x03\x0b>n\x03\n1n\x03\x08\x17q#\x17n\x01\x1a#n\x01\x1b(\xben\x01\x1b=n\x03\x06.\xben\x03\x04\x03T.\x7f\x06!\xben\x03\x0e9n\x03\r0n\x03\x0f\x0cn\x03\x0b\x0bn\x03\n.\xbeq#\x11n\x01\x1a+\xbe|\r=n\x01\x1b\tn\x03\x068\xben\x03\x04\x00U<\x7f\x06!W\'\xben\x03\r4n\x03\r\x1dn\x03\x0b\x0b\xben\x03\x08\rq#\x11n\x01\x1b\x1d\xbe|\r\x0e\xben\x03\x06/n\x03\x07:n\x03\x04\x0b|\x1f/\x7f\x0f<T\x10'
@@ -1640,7 +1646,12 @@ async def tcount(s, model="gpt-3.5-turbo"):
 def m_repr(m):
 	if not isinstance(m, dict):
 		return as_str(m)
-	content = as_str(m.content or m.get("function_call", ""))
+	content = m.content and str(m.content)
+	if not content or not content.strip():
+		temp = deque()
+		for fc in m.get("tool_calls", ()):
+			temp.append(fc.function.name + " " + as_str(fc.function.arguments))
+		content = "\n".join(temp)
 	if "name" in m:
 		if "role" in m:
 			return m.role + "\n" + m.name + "\n" + content
@@ -1650,7 +1661,12 @@ def m_repr(m):
 	return content
 
 def m_str(m):
-	content = as_str(m.content or m.get("function_call", "")).strip()
+	content = m.content and str(m.content)
+	if not content or not content.strip():
+		temp = deque()
+		for fc in m.get("tool_calls", ()):
+			temp.append(fc.function.name + " " + as_str(fc.function.arguments))
+		content = "\n".join(temp)
 	if not m.get("name"):
 		if m.get("role") and m.role != "user":
 			return f"<|{m.role}|>: " + content
@@ -1787,8 +1803,10 @@ def chat_structure(history, refs, u, q, imin, name="", personality="", nsfw=Fals
 	messages.append(m)
 	return messages
 
-def instruct_structure(messages):
+def instruct_structure(messages, exclude_first=True):
 	ins = map(m_str, messages)
+	if exclude_first:
+		return "### Instruction:\n" + ins.pop(0) + "\n\n" + "### History:\n" + "\n\n".join(ins) + "\n\n### Response:"
 	return "### Instruction:\n" + "\n\n".join(ins) + "\n\n### Response:"
 
 
@@ -1881,6 +1899,9 @@ class Ask(Command):
 		visible.extend([message, reference])
 		mdic = {m.id: m for m in visible if m}
 		mids = sorted(mdic, reverse=True)
+		if reference and mids[1] != reference.id:
+			mids.remove(reference.id)
+			mids.insert(1, reference.id)
 		visible = [mdic[i] for i in mids]
 		ignores = set()
 		reset = [True]
@@ -1896,7 +1917,7 @@ class Ask(Command):
 				found = self.visited.get(url)
 				if found is None:
 					try:
-						found = self.visited[url] = await bot.follow_url(url, reactions=False if i < 3 else None)
+						found = self.visited[url] = await bot.follow_url(url, reactions=None)
 					except:
 						print_exc()
 						found = self.visited[url] = ""
@@ -1916,12 +1937,12 @@ class Ask(Command):
 					caid.pop("history", None)
 				print(channel, "mismatch", m.id)#, caid)
 			ignores.add(m.id)
-			if i < 8 and not simulated and found is None:
+			if i < 4 and not simulated and found is None:
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = self.visited.get(url)
 				if found is None:
 					try:
-						found = self.visited[url] = await bot.follow_url(url, reactions=False if i < 3 else None)
+						found = self.visited[url] = await bot.follow_url(url, reactions=None)
 					except:
 						print_exc()
 						found = self.visited[url] = ""
@@ -1937,7 +1958,7 @@ class Ask(Command):
 				break
 			if reset[0] and caid and caid.get("last_message_id") == m.id:
 				reset[0] = None
-				if caid.get("history"):
+				if caid.get("history") and (not reference or reference.id == m.id):
 					history = caid["history"]
 					break
 			if m.id in ignores or caid and str(m.id) in caid.get("ids", ()) or any(str(e) == "❎" for e in m.reactions):
@@ -1962,7 +1983,7 @@ class Ask(Command):
 			if not tup:
 				continue
 			m, content, found = tup
-			if found and (i >= 3 or premium < 4):
+			if found and (i >= 3 or premium < 4 or found.rsplit("?", 1)[0].rsplit(".", 1)[-1] not in ("png", "jpeg", "jpg", "gif", "webp")):
 				best = premium >= 4 and m.id == message.id
 				cfut = create_task(bot.caption(found, best=best))
 				visconts.append((i, m, content, found, cfut))
@@ -2141,7 +2162,7 @@ class Ask(Command):
 					if k not in blocked:
 						mocked[i] = k
 						prompt += f"{i}: {v}\n"
-					i += 1
+						i += 1
 				if mocked:
 					q2 = q.replace('"""', "'''")
 					c = await tcount(q2)
@@ -2152,8 +2173,18 @@ class Ask(Command):
 ### Instruction:
 SYSTEM: Your name is {bot_name}. Please select one of the following actions by number:
 ''' + prompt
-					prompt += f"\n### Response:\n{bot_name}: I choose option"
-					k = await process_image("moe_class", "$", [prompt, mocked], cap="class", timeout=25)
+					prompt += f"\n### Response:\n{bot_name}: I choose number"
+					try:
+						k = await process_image("moe_class", "$", [prompt, mocked], cap="class", timeout=25)
+					except:
+						print_exc()
+						resp = await bot.oai.moderations.create(input=prompt)
+						results = resp.results[0]
+						print(results)
+						if results.flagged:
+							k = "roleplay"
+						else:
+							k = None
 					if k == "roleplay" or k is None and model not in chatcc:
 						if model == "gpt3" and length >= 192:
 							model = DEFMOD
@@ -2184,6 +2215,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 			target_model = model
 			text = ""
 			ex = RuntimeError("Maximum attempts exceeded.")
+			appended = False
 			print("Chat", model, name, q, extensions)
 			for attempts in range(12):
 				if not bot.verify_integrity(message):
@@ -2228,7 +2260,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 				elif model == "gpt3" or premium < 4:
 					if 1:
 						model = "gpt-3.5-turbo-1106"
-						limit = 8000
+						limit = 6000
 						cm = 10
 						cm2 = 20
 					else:
@@ -2263,9 +2295,13 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							continue
 						content = m.content[0].text if m.content[0].type == "text" else ""
 						found = best_url(m.content[-1].image_url)
-						pt, p1, p2 = await bot.caption(found, best=premium >= 4)
-						p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
-						content += f" <|im_sep {pt} {p0}:{p1}:{p2}|>"
+						with tracebacksuppressor(StopIteration):
+							tup = await bot.caption(found, best=premium >= 4)
+							if not tup:
+								raise StopIteration
+							pt, p1, p2 = tup
+							p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
+							content += f" <|im_sep {pt} {p0}:{p1}:{p2}|>"
 						m.content = content.strip()
 				used = ufull
 				if skipping:
@@ -2364,7 +2400,8 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							redo = True
 							continue
 						if premium >= 2:
-							if any(s in text for s in STOPS):
+							tl = text.lower()
+							if any(s in tl for s in STOPS):
 								text = ""
 								redo = True
 								target_model = DEFMOD
@@ -2372,7 +2409,6 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						text = text.strip()
 						break
 					resend = True
-					appended = False
 					for n, fc in enumerate(tc):
 						tid = fc.id[:6] + str(n)
 						fc.id = tid
@@ -2568,7 +2604,8 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						text += " "
 					text += response.choices[0].text
 					if premium >= 2:
-						if any(s in text for s in STOPS):
+						tl = text.lower()
+						if any(s in tl for s in STOPS):
 							text = ""
 							redo = True
 							target_model = DEFMOD

@@ -1612,28 +1612,34 @@ class OCR(Command):
 
 
 STOPS = (
-	"unable to fulfil",
-	"unable to assist",
-	"unable to help",
-	"unable to provide",
-	"cannot fulfil",
-	"cannot assist",
-	"cannot help",
-	"cannot provide",
-	"can't fulfil",
-	"can't assist",
-	"can't help",
-	"can't provide",
+	"m unable to fulfil",
+	"m unable to assist",
+	"m unable to help",
+	"m unable to provide",
+	"m unable to do",
+	"m unable to respond",
+	"i cannot fulfil",
+	"i cannot assist",
+	"i cannot help",
+	"i cannot provide",
+	"i cannot do",
+	"i cannot respond",
+	"i can't fulfil",
+	"i can't assist",
+	"i can't help",
+	"i can't provide",
+	"i can't do",
+	"i can't respond",
 )
 
 class Art(Command):
 	_timeout_ = 150
-	name = ["AIArt", "Inpaint", "StableDiffusion", "SDXL", "Dalle", "Dalle2", "Dalle3", "Dream", "Imagine", "Inspire", "Openjourney", "Midjourney"]
+	name = ["AIArt", "Inpaint", "Morph", "ControlNet", "StableDiffusion", "SDXL", "Dalle", "Dalle2", "Dalle3", "Dream", "Imagine", "Inspire", "Openjourney", "Midjourney"]
 	description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system for image prompts. Configurable parameters are --strength, --guidance-scale, --aspect-ratio and --negative-prompt."
-	usage = "<0:prompt> <inpaint{?i}>? <single{?s}> <raw{?r}>"
+	usage = "<0:prompt> <inpaint{?i}>? <morph{?m}>? <single{?s}> <raw{?r}>"
 	example = ("art cute kitten", "art https://mizabot.xyz/favicon")
 	rate_limit = (45, 60)
-	flags = "irsz"
+	flags = "imrsz"
 	typing = True
 	slash = ("Art", "Imagine")
 	sdiff_sem = Semaphore(3, 256, rate_limit=7)
@@ -1688,7 +1694,7 @@ class Art(Command):
 		nprompt = ""
 		kwargs = {
 			"--device": "GPU",
-			"--num-inference-steps": "48" if premium < 4 else "64",
+			"--num-inference-steps": "36" if premium < 4 else "48",
 			"--guidance-scale": "9.9",
 			"--eta": "0.8",
 			"--aspect-ratio": "0",
@@ -1697,6 +1703,10 @@ class Art(Command):
 		inpaint = "i" in flags or name == "inpaint"
 		specified = set()
 		kwarg = ""
+		if "--mask" in args or name in ("morph", "controlnet") or "m" in flags:
+			morph = True
+		else:
+			morph = False
 		for arg in args:
 			if kwarg:
 				# if kwarg == "--model":
@@ -1729,8 +1739,8 @@ class Art(Command):
 						raise OverflowError("Maximum permitted aspect ratio is 1:256.")
 					kwarg = "--aspect-ratio"
 					kwargs[kwarg] = str(arg)
-				elif kwargs == "--mask":
-				    kwargs[kwarg] = arg
+				# elif kwarg == "--mask":
+					# kwargs[kwarg] = arg
 				specified = kwarg
 				kwarg = ""
 				continue
@@ -1788,6 +1798,7 @@ class Art(Command):
 			amount = 4 if premium >= 5 else 2 if premium >= 3 else 1
 		else:
 			amount = 9 if premium >= 4 else 4
+		dups = floor(sqrt(amount))
 		eprompts = alist()
 		if sdxl and not dalle and "r" not in flags and (not force or prompt.count(" ") < 48):
 			oprompt = prompt
@@ -1815,11 +1826,12 @@ class Art(Command):
 				frequency_penalty=0,
 				presence_penalty=0,
 				user=str(user.id),
-				n=amount,
+				n=dups,
 			)
 			for choice in resp.choices:
 				out = choice.text
-				if any(s in out for s in STOPS):
+				tl = out.lower()
+				if any(s in tl for s in STOPS):
 					out = ""
 				if out and out[0] == out[-1] == '"' and not oprompt[0] == oprompt[-1] == '"':
 					try:
@@ -1833,7 +1845,7 @@ class Art(Command):
 					prompt = nprompt or oprompt
 				eprompts.append(prompt)
 		else:
-			eprompts.extend([prompt] * amount)
+			eprompts.extend([prompt] * dups)
 		req = prompt
 		print("PROMPT:", eprompts or prompt)
 		if url:
@@ -1880,9 +1892,11 @@ class Art(Command):
 			return
 
 		async def ibasl_r(p, k, n, f, c, s, a, np):
-			if sdxl and (c > 1 or premium >= 4 or random.randint(0, 1)) and "z" not in flags:
+			m = "--mask" in k and "--init-image" not in k
+			if m or sdxl and (c > 1 or premium >= 4 or random.randint(0, 1)) and "z" not in flags:
 				try:
-					await process_image("lambda: 1+1", "$", (), cap="sdxlr", timeout=2)
+					if not m:
+						await process_image("lambda: 1+1", "$", (), cap="sdxlr", timeout=2)
 				except:
 					print_exc()
 				else:
@@ -1891,7 +1905,7 @@ class Art(Command):
 			if s and "z" not in flags:
 				out = []
 				for r1 in resp:
-					r2 = await process_image("IBASR", "$", [p, r1, 64, np], cap="sdxlr", timeout=240)
+					r2 = await process_image("IBASR", "$", [p, r1, 48, np], cap="sdxlr", timeout=240)
 					out.append(r2)
 				return out
 			return resp
@@ -1980,7 +1994,7 @@ class Art(Command):
 					c2 = c
 					while c2 > 0:
 						p = "" if noprompt and not sdxl else eprompts.next()
-						n = 1 if sdxl else min(c2, xrand(floor(sqrt(c2) + 1)) + 1, 2 if sdxl else 9)
+						n = min(c2, dups)
 						if not n:
 							n = c2
 						fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))
@@ -2083,12 +2097,6 @@ class Art(Command):
 						resp = await process_image(image_2, "expand_mask", ["-nogif", 12, "-f", "png"], timeout=60)
 						image_2 = resp
 						print(image_1, image_2)
-					if "--strength" not in kwargs:
-						args.extend((
-							"--strength",
-							"0.8",
-						))
-						kwargs["--strength"] = 0.8
 					# if premium >= 2 and not force and "--strength" not in kwargs and str(kwargs["--guidance-scale"]) == "7.5" and str(kwargs["--eta"]) == "0.8":
 					#     if isinstance(image_1, bytes):
 					#         image_1b = image_1
@@ -2131,32 +2139,51 @@ class Art(Command):
 							# if os.path.exists(fn):
 							#     os.remove(fn)
 							# os.rename(image_1, fn)
-							args.extend((
-								"--init-image",
-								fn,
-							))
-							kwargs["--init-image"] = fn
-							if image_2:
-								fm = os.path.abspath(image_2) if isinstance(image_2, str) else image_2
-								# fm = "misc/stable_diffusion.openvino/mask.png"
-								# if os.path.exists(fm):
-								#     os.remove(fm)
-								# os.rename(image_2, fm)
+							if morph:
+								if "--strength" not in kwargs:
+									args.extend((
+										"--strength",
+										"0.5",
+									))
+									kwargs["--strength"] = 0.5
 								args.extend((
 									"--mask",
-									fm,
+									fn,
 								))
-								kwargs["--mask"] = fm
-							elif image_2b:
-								fm = os.path.abspath(f"cache/{ts_us()}.png")
-								# fm = "misc/stable_diffusion.openvino/mask.png"
-								with open(fm, "wb") as f:
-									f.write(image_2b)
+								kwargs["--mask"] = fn
+							else:
+								if "--strength" not in kwargs:
+									args.extend((
+										"--strength",
+										"0.8",
+									))
+									kwargs["--strength"] = 0.8
 								args.extend((
-									"--mask",
-									fm,
+									"--init-image",
+									fn,
 								))
-								kwargs["--mask"] = fm
+								kwargs["--init-image"] = fn
+								if image_2:
+									fm = os.path.abspath(image_2) if isinstance(image_2, str) else image_2
+									# fm = "misc/stable_diffusion.openvino/mask.png"
+									# if os.path.exists(fm):
+									#     os.remove(fm)
+									# os.rename(image_2, fm)
+									args.extend((
+										"--mask",
+										fm,
+									))
+									kwargs["--mask"] = fm
+								elif image_2b:
+									fm = os.path.abspath(f"cache/{ts_us()}.png")
+									# fm = "misc/stable_diffusion.openvino/mask.png"
+									with open(fm, "wb") as f:
+										f.write(image_2b)
+									args.extend((
+										"--mask",
+										fm,
+									))
+									kwargs["--mask"] = fm
 						for k, v in kwargs.items():
 							args.extend((k, v))
 						print(args)
@@ -2180,7 +2207,7 @@ class Art(Command):
 							while c2 > 0:
 								prompt = eprompts.next()
 								p = "" if noprompt and not sdxl else prompt
-								n = 1 if sdxl else min(c2, xrand(floor(sqrt(c2) + 1)) + 1, 2 if sdxl else 9)
+								n = min(c2, dups)
 								if not n:
 									n = c2
 								fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))

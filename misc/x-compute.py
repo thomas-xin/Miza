@@ -1559,7 +1559,7 @@ if "class" in CAPS:
 		resume_download=True,
 	)
 	try:
-		M = exllama_set_max_input_length(M, 4096)
+		M = exllama_set_max_input_length(M, 2048)
 	except ValueError:
 		traceback.print_exc()
 	print(M)
