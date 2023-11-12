@@ -3188,7 +3188,7 @@ akinator.Akinator.parse_response = lambda self, response: _parse_response(respon
 class Akinator(Command):
 	name = ["Aki"]
 	description = "Think about a real or fictional character. I will try to guess who it is!"
-	usage = "<language(en)>? <child_friendly{?c}>"
+	usage = "<language(en)>? <child_friendly{?c}>?"
 	example = ("akinator", "akinator -c en")
 	flags = "c"
 	slash = True

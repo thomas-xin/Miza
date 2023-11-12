@@ -1828,8 +1828,9 @@ class Art(Command):
 				user=str(user.id),
 				n=dups,
 			)
+			print("REWRITE:", resp)
 			for choice in resp.choices:
-				out = choice.text
+				out = choice.text.strip()
 				tl = out.lower()
 				if any(s in tl for s in STOPS):
 					out = ""

@@ -542,6 +542,11 @@ class Server:
 
 	image_loaders = {}
 
+	@cp.expose("0")
+	@hostmap
+	def rickroll(self, *void1, **void2):
+		raise cp.HTTPRedirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ", status=301)
+
 	@cp.expose(("animate", "animation", "a", "images", "image", "i", "view", "v", "raw", "f", "download", "d"))
 	@hostmap
 	def files(self, path, filename=None, download=None, **void):

@@ -4984,6 +4984,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			pinned = False
 			flags = None
 			reactions = ()
+			reference = None
 			activity = None
 			system_content = clean_content = ""
 			edited_at = None
@@ -6042,6 +6043,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						else:
 							m_id = d["message"]["id"]
 						m = await self.fetch_message(m_id, channel)
+						add = False
 						if type(m) is not self.ExtendedMessage:
 							m = self.ExtendedMessage(m)
 							add = True
