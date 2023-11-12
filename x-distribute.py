@@ -206,7 +206,7 @@ if any("ytdl" in caps for caps in CAPS):
 	req.append("yt-dlp")
 if any("image" in caps for caps in CAPS):
 	req.extend((
-		"blend_modes",
+		"blend-modes",
 		"colorspace",
 	))
 if any("math" in caps for caps in CAPS):
@@ -217,9 +217,10 @@ if any("math" in caps for caps in CAPS):
 	))
 if any("caption" in caps for caps in CAPS):
 	req.extend((
-		"clip_interrogator",
+		"clip-interrogator",
 		"pytesseract",
-		"sentence_transformers",
+		"sentence-transformers",
+		"opencv-python",
 	))
 import pkg_resources, subprocess
 for mn in req:

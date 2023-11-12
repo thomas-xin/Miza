@@ -53,6 +53,7 @@ class ND2048(collections.abc.MutableSequence):
 
 	# Loads a new instance from serialised data
 	@classmethod
+	@functools.lru_cache(maxsize=12)
 	def load(cls, data):
 		spl = data.split(cls.spl)
 		i = spl.index(b"")

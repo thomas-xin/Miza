@@ -1063,6 +1063,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return as_fut(m)
 		return self._fetch_message(m_id, channel)
 
+	@functools.lru_cache(maxsize=64)
 	def preserve_attachment(self, a_id):
 		if is_url(a_id):
 			url = a_id
@@ -1316,7 +1317,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return verify_id(m_id)
 
 	# Finds URLs in a string, following any discord message links found.
-	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, reactions=False, allow=False, limit=None):
+	followed = {}
+	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, reactions=False, allow=False, limit=None, no_cache=False):
 		if limit is not None and limit <= 0:
 			return []
 		if it is None:
@@ -1324,8 +1326,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if not urls:
 				return []
 			it = {}
+		elif not isinstance(url, str) and hasattr(url, "channel"):
+			url = message_link(url)
 		else:
 			urls = [url]
+		urls = tuple(urls)
 		out = deque()
 		if preserve or allow:
 			lost = deque()
@@ -1335,6 +1340,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			medias = ("video", "image", "thumbnail")
 		else:
 			medias = "video"
+		tup = (urls, best, preserve, images, reactions, allow)
+		try:
+			return list(self.followed[tup])[:limit]
+		except KeyError:
+			pass
 		for url in urls:
 			if discord_expired(url):
 				await self.renew_attachment(url)
@@ -1440,9 +1450,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						skip = "text/html" not in self.mimes[url]
 					if not skip:
 						resp = None
-						with tracebacksuppressor:
+						try:
 							resp = await asubmit(reqs.next().get, url, headers=Request.header(), stream=True)
 							resp.raise_for_status()
+						except:
+							print_exc()
+							no_cache = True
 						if not resp:
 							continue
 						url = as_str(resp.url)
@@ -1481,29 +1494,29 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if lost:
 			out.extend(lost)
 		if not out:
-			return urls
+			out = urls
+		out = tuple(out)
+		if not no_cache:
+			self.followed[tup] = out
+			while len(self.followed) > 4096:
+				with suppress():
+					self.followed.pop(next(iter(self.followed)))
 		if limit is not None:
-			return list(out)[:limit]
-		return out
+			return out[:limit]
+		return list(out)
 
+	@functools.lru_cache(maxsize=64)
 	def detect_mime(self, url):
-		try:
-			return self.mimes[url]
-		except KeyError:
-			pass
 		resp = reqs.next().get(url, stream=True)
 		head = fcdict(resp.headers)
 		try:
-			mime = [t.strip() for t in head.get("Content-Type", "").split(";")]
+			return [t.strip() for t in head.get("Content-Type", "").split(";")]
 		except KeyError:
 			it = resp.iter_content(65536)
 			data = next(it)
-			mime = [t.strip() for t in self.mime.from_buffer(data).split(";")]
-		self.mimes[url] = mime
-		return mime
+			return [t.strip() for t in self.mime.from_buffer(data).split(";")]
 
 	emoji_stuff = {}
-
 	def is_animated(self, e, verify=False):
 		if type(e) in (int, str):
 			try:
@@ -1536,7 +1549,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		else:
 			emoji = e
 		return emoji.animated
-	
+
 	def emoji_exists(self, e):
 		if type(e) in (int, str):
 			url = f"https://cdn.discordapp.com/emojis/{e}.png"
@@ -1639,11 +1652,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			response = await asyncio.wait_for(self.oai.chat.completions.create(**data, timeout=30), timeout=35)
 		except:
 			print_exc()
-			return asubmit(self.replicate, url)
+			return await asubmit(self.replicate, url)
 		print("GPT4V:", response)
 		return response.choices[0].message.content
 
 	replicate_client = None
+	@functools.lru_cache(maxsize=64)
 	def replicate(self, url):
 		resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
 		if not self.replicate_client:
@@ -1965,7 +1979,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					emb.url = url
 					emb.set_image(url=url)
 					if link:
-						emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
+						link = message_link(message)
+						emb.description = lim_str(f"{emb.description}\n\n[View Message]({link})", 4096)
 						emb.timestamp = message.edited_at or message.created_at
 					return emb
 			elif not message.attachments and len(message.embeds) == 1:
@@ -1986,7 +2001,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					if f:
 						emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
 				if link:
-					emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
+					link = message_link(message)
+					emb.description = lim_str(f"{emb.description}\n\n[View Message]({link})", 4096)
 					emb.timestamp = message.edited_at or message.created_at
 				return emb
 		else:
@@ -1994,7 +2010,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if urls:
 				with tracebacksuppressor:
 					url = urls[0]
-					resp = await asubmit(reqs.next().get, url, headers=Request.header(), _timeout_=12)
+					resp = await asubmit(reqs.next().head, url, headers=Request.header(), _timeout_=12)
 					headers = fcdict(resp.headers)
 					if headers.get("Content-Type", "").split("/", 1)[0] == "image":
 						if float(headers.get("Content-Length", inf)) < 25165824:
@@ -2006,7 +2022,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						if url != content:
 							emb.description = content
 						if link:
-							emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
+							link = message_link(message)
+							emb.description = lim_str(f"{emb.description}\n\n[View Message]({link})", 4096)
 							emb.timestamp = message.edited_at or message.created_at
 						return emb
 		emb.description = content
@@ -2070,7 +2087,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				items.extend(temp2[x] or temp[x] for x in range(len(temp)))
 			emb.description = lim_str("\n".join(items), 4096)
 		if link:
-			emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
+			link = message_link(message)
+			emb.description = lim_str(f"{emb.description}\n\n[View Message]({link})", 4096)
 			emb.timestamp = message.edited_at or message.created_at
 		return emb
 
@@ -5648,7 +5666,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		channel = messageable
 		message = reference
 		user = message.author
-		s = f"Oops, it appears I do not have permission to reply to your command [here](https://discord.com/channels/{guild.id}/{channel.id}/{message.id}).\nPlease contact an admin of the server if you believe this is a mistake!"
+		link = message_link(message)
+		s = f"Oops, it appears I do not have permission to reply to your command [here]({link}).\nPlease contact an admin of the server if you believe this is a mistake!"
 		colour = await self.get_colour(self.user)
 		emb = discord.Embed(colour=colour)
 		emb.set_author(**get_author(self.user))
@@ -5940,8 +5959,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			channel = message.channel
 			if user.id == self.deleted_user:
 				print("Deleted user MESSAGE", channel, user, message, channel.id, message.id)
-			await self.seen(user, channel, guild, event="message", raw="Sending a message")
+			fut = create_task(self.seen(user, channel, guild, event="message", raw="Sending a message"))
 			await self.react_callback(message, None, user)
+			await fut
 			await self.handle_message(message, False)
 
 		# Socket response event: if the event was an interaction, create a virtual message with the arguments as the content, then process as if it were a regular command.

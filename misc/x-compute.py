@@ -1503,6 +1503,14 @@ if "caption" in CAPS:
 			p2 = None
 		return (p1, p2)
 
+	def canny(im):
+		if "RGB" not in im.mode:
+			im = im.convert("RGBA")
+		a = np.asanyarray(im)
+		from cv2 import Canny
+		a2 = Canny(a, 100, 200)
+		return fromarray(a2)
+
 if "summ" in CAPS:
 	from transformers import pipeline
 	smp = pipeline("summarization", model="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", device=0, torch_dtype=torch.float16)
@@ -2076,11 +2084,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 				break
 		else:
 			raise RuntimeError("Maximum attempts exceeded.")
-		im = optimise(il[0])
-		b = io.BytesIO()
-		im.save(b, format="png")
-		b.seek(0)
-		return b.read()
+		return il[0]
 
 	def IBASLR(prompt, kwargs, nsfw=False, force=True, count=1, aspect_ratio=0, negative_prompt=""):
 		try:
@@ -2088,6 +2092,53 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		except KeyError:
 			ib = CBOTS[None] = imagebot.Bot()
 		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=2, aspect_ratio=aspect_ratio, negative_prompt=negative_prompt)
+
+	EXT1 = None
+	def depth(im):
+		global EXT1, EXT2, DPT1, DPT2
+		if im.mode != "RGB":
+			im = im.convert("RGB")
+		im = resize_max(im, 1024)
+		from transformers import DPTImageProcessor, DPTForDepthEstimation, GLPNImageProcessor, GLPNForDepthEstimation
+		if not EXT1:
+			EXT1 = backup_model(DPTImageProcessor.from_pretrained, "Intel/dpt-hybrid-midas", torch_dtype=torch.float16, device=0)
+			DPT1 = backup_model(DPTForDepthEstimation.from_pretrained, "Intel/dpt-hybrid-midas", torch_dtype=torch.float16).to(0)
+			EXT2 = backup_model(GLPNImageProcessor.from_pretrained, "whoismikha/room-3d-scene-estimation", torch_dtype=torch.float16, device=0)
+			DPT2 = backup_model(GLPNForDepthEstimation.from_pretrained, "whoismikha/room-3d-scene-estimation", torch_dtype=torch.float16).to(0)
+		def process(im, ext, dpt):
+			inputs = ext(im, return_tensors="pt").to(dpt.dtype).to(dpt.device)
+			with torch.no_grad():
+				outputs = dpt(**inputs)
+				depth = outputs.predicted_depth
+			return torch.nn.functional.interpolate(
+				depth.unsqueeze(1),
+				size=im.size[::-1],
+				mode="bicubic",
+				align_corners=False,
+			)
+		fut = exc.submit(process, im, EXT1, DPT1)
+		pred2 = process(im, EXT2, DPT2)
+		pred1 = fut.result()
+		out1 = pred1.squeeze().cpu().numpy()
+		out2 = pred2.squeeze().cpu().numpy()
+
+		def normalise(a):
+			m, M = np.min(a), np.max(a)
+			a -= m
+			a *= 1 / (M - m)
+			return a
+
+		m = np.min(out1)
+		if m < 0:
+			out1 -= m
+		out1 = -np.sqrt(out1, out=out1)
+		out1 = -np.min(out1) - out1
+		out1 **= 2
+		out1 = -out1
+		formatted = normalise(out1)
+		formatted2 = normalise(out2)
+		formatted3 = normalise(formatted + formatted2) * 255
+		return fromarray(formatted3.astype("uint8"))
 
 	# def whisper(url, best=False):
 	# 	ts = time.time()
@@ -2134,7 +2185,7 @@ def from_bytes(b, save=None, nogif=False):
 			pages = pdf2image.convert_from_bytes(b, poppler_path="misc/poppler", use_pdftocairo=True)
 		else:
 			pages = pdf2image.convert_from_bytes(b, use_pdftocairo=True)
-		return ImageSequence(*pages, copy=True)
+		return ImageSequence.open(*pages, copy=True)
 	else:
 		data = b
 		out = io.BytesIO(b) if type(b) is bytes else b
@@ -2147,11 +2198,12 @@ def from_bytes(b, save=None, nogif=False):
 	mime = magic.from_buffer(data)
 	if mime == "application/zip":
 		z = zipfile.ZipFile(io.BytesIO(data), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False)
-		return ImageSequence(*(Image.open(z.open(f.filename)) for f in z.filelist if not f.is_dir()))
+		return ImageSequence.open(*(Image.open(z.open(f.filename)) for f in z.filelist if not f.is_dir()))
 	try:
 		import wand, wand.image
 	except ImportError:
 		wand = None
+	proc = None
 	try:
 		if not wand or mime.split("/", 1)[0] == "image" and mime.split("/", 1)[-1] in "blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal wmf xbm".split():
 			try:
@@ -2193,6 +2245,8 @@ def from_bytes(b, save=None, nogif=False):
 				dur = float(info[3])
 			except (ValueError, TypeError, SyntaxError, ZeroDivisionError):
 				dur = 0
+			if not size[0] or not size[1] or not dur:
+				raise InterruptedError(info)
 			try:
 				fps = eval(info[2], {}, {})
 			except (ValueError, TypeError, SyntaxError, ZeroDivisionError):
@@ -2227,30 +2281,47 @@ def from_bytes(b, save=None, nogif=False):
 				images.append(img)
 			if images:
 				proc.wait(timeout=2)
-				return ImageSequence(*images)
+				return ImageSequence.open(*images)
 			raise RuntimeError(as_str(proc.stderr.read()))
 	# except:
 	# 	pass
 	except Exception as ex:
 		exc = ex
+		if proc and proc.is_running():
+			proc.terminate()
 	else:
 		exc = TypeError(f'Filetype "{mime}" is not supported.')
-	with wand.image.Image() as im:
+	if not wand or mime.split("/", 1)[-1] in ("gif", "webp"):
+		ib = io.BytesIO(b)
+		return Image.open(ib)
+	with wand.image.Image() as img:
 		with wand.color.Color("transparent") as background_color:
 			wand.api.library.MagickSetBackgroundColor(
-				im.wand,
+				img.wand,
 				background_color.resource,
 			)
 		try:
-			im.read(blob=b, resolution=1024)
+			img.read(blob=b, resolution=1024)
 		except Exception as ex:
 			exc.args = exc.args + (str(ex.__class__),) + ex.args
 		else:
 			exc = None
 		if exc:
 			raise exc
-		ib = io.BytesIO(im.make_blob("png32"))
-	return Image.open(ib)
+		frames = []
+		for frame in wand.sequence.Sequence(img):
+			if not frame:
+				continue
+			with wand.image.Image(frame) as fi:
+				ib = io.BytesIO(fi.make_blob("png32"))
+			im = Image.open(ib)
+			frames.append(im)
+		if not frames:
+			with wand.image.Image(img) as fi:
+				ib = io.BytesIO(fi.make_blob("png32"))
+			im = Image.open(ib)
+			frames.append(im)
+	return ImageSequence.open(*frames)
 
 def round_random(x):
 	try:
@@ -2307,10 +2378,12 @@ def ImageIterator(image):
 if Image:
 	class ImageSequence(Image.Image):
 
-		def __init__(self, *images, copy=False, func=None, args=()):
+		@classmethod
+		def open(cls, *images, copy=False, func=None, args=()):
 			if len(images) == 1:
 				simages = []
 				im = images[0]
+				im.load()
 				try:
 					for i in range(2147483648):
 						im.seek(i)
@@ -2322,16 +2395,26 @@ if Image:
 				except EOFError:
 					pass
 				images = simages
-				if len(images) > 1 or copy:
-					im.seek(0)
-					images[0] = im.copy()
+				if len(images) == 1:
+					im = images[0]
+					if func:
+						return func(im, *args)
+					if copy:
+						return im.copy()
+					return im
+				im.seek(0)
+				images[0] = im.copy()
 				copy = False
+			return cls(*images, copy=copy, func=func, args=args)
+
+		def __init__(self, *images, copy=False, func=None, args=()):
 			if func:
 				self._images = [func(image, *args) for image in images]
 			elif copy:
 				self._images = [image.copy() for image in images]
 			else:
 				self._images = images
+				[im.load() for im in images]
 			for i1, i2 in zip(self._images, images):
 				if "duration" in i2.info:
 					i1.info["duration"] = max(i2.info.get("duration", 0), 1000 / 40)
@@ -2433,7 +2516,7 @@ def evalImg(url, operation, args):
 			if fmt == "gif" and np.prod(image.size) > 262144:
 				size = max_size(*image.size, 512)
 				if size != image.size:
-					image = ImageSequence(image, func=resize_to, args=size)
+					image = ImageSequence.open(image, func=resize_to, args=size)
 			new = eval(operation)(image, *args)
 			# print("GIF:", new)
 		else:
@@ -2528,7 +2611,8 @@ def evalImg(url, operation, args):
 			if getattr(first, "audio", None) and fmt in ("default", "webp", "gif", "apng"):
 				fmt = "mp4"
 			elif fmt == "default":
-				fmt = "webp"
+				# fmt = "webp"
+				fmt = "gif"
 			out = "cache/" + str(ts) + "." + fmt
 			mode = str(first.mode)
 			if mode == "P":

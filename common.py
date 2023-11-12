@@ -25,6 +25,7 @@ MultiAutoImporter(
 	"discord",
 	"asyncio",
 	"json",
+	"functools",
 	"orjson",
 	"aiohttp",
 	"threading",
@@ -553,6 +554,7 @@ def bytes2zip(data, lzma=False):
 
 
 # Safer than raw eval, more powerful than json.loads
+@functools.lru_cache(maxsize=2)
 def eval_json(s):
 	if type(s) is memoryview:
 		s = bytes(s)
@@ -566,6 +568,7 @@ def eval_json(s):
 			pass
 		raise
 
+@functools.lru_cache(maxsize=8)
 def select_and_loads(s, mode="safe", size=None):
 	if not s:
 		raise ValueError("Data must not be empty.")
@@ -998,6 +1001,7 @@ def safe_save(fn, s):
 
 
 # Decodes HTML encoded characters in a string.
+@functools.lru_cache(maxsize=8)
 def html_decode(s):
 	while len(s) > 7:
 		try:
@@ -1738,7 +1742,7 @@ def message_repr(message, limit=1024, username=False, link=False):
 	if s and len(s) > len(c):
 		c = s
 	if link:
-		c = f"https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}\n" + c
+		c = message_link(message) + "\n" + c
 	if username:
 		c = user_mention(message.author.id) + ":\n" + c
 	data = lim_str(c, limit)
@@ -1756,6 +1760,15 @@ def message_repr(message, limit=1024, username=False, link=False):
 	if not data:
 		data = css_md(uni_str("[EMPTY MESSAGE]"), force=True)
 	return lim_str(data, limit)
+
+def message_link(message):
+	try:
+		return message.jump_url
+	except AttributeError:
+		pass
+	guild = getattr(message, "guild", None)
+	g_id = getattr(guild, "id", 0)
+	return f"https://discord.com/channels/{g_id}/{message.channel.id}/{message.id}"
 
 
 # Applies stickers to a message based on its discord data.
@@ -1797,6 +1810,7 @@ try:
 except AttributeError:
 	EmptyEmbed = None
 
+@functools.lru_cache(maxsize=4)
 def as_embed(message, link=False):
 	emb = discord.Embed(description="").set_author(**get_author(message.author))
 	content = message.content or message.system_content
@@ -1807,7 +1821,8 @@ def as_embed(message, link=False):
 				emb.url = url
 				emb.set_image(url=url)
 				if link:
-					emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
+					link = message_link(message)
+					emb.description = lim_str(f"{emb.description}\n\n[View Message]({link})", 4096)
 					emb.timestamp = message.edited_at or message.created_at
 				return emb
 		elif not message.attachments and len(message.embeds) == 1:
@@ -1826,7 +1841,8 @@ def as_embed(message, link=False):
 				if f:
 					emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
 			if link:
-				emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
+				link = message_link(message)
+				emb.description = lim_str(f"{emb.description}\n\n[View Message]({link})", 4096)
 				emb.timestamp = message.edited_at or message.created_at
 			return emb
 	else:
@@ -1883,7 +1899,8 @@ def as_embed(message, link=False):
 		urls = chain(("(" + e.url + ")" for e in message.embeds if e.url), ("[" + best_url(a) + "]" for a in message.attachments))
 		emb.description = lim_str("\n".join(urls), 4096)
 	if link:
-		emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
+		link = message_link(message)
+		emb.description = lim_str(f"{emb.description}\n\n[View Message]({link})", 4096)
 		emb.timestamp = message.edited_at or message.created_at
 	return emb
 
@@ -2406,7 +2423,8 @@ def force_kill(proc):
 			print(child, "killed.")
 	proc.terminate()
 	print(proc, "killed.")
-	_, alive = psutil.wait_procs(killed, timeout=2)
+	with tracebacksuppressor:
+		_, alive = psutil.wait_procs(killed, timeout=2)
 	for child in alive:
 		with suppress():
 			child.kill()
@@ -3152,20 +3170,20 @@ def trace(fut, *args):
 # A function that takes a coroutine, and calls a second function if it takes longer than the specified delay.
 async def delayed_callback(fut, delay, func, *args, repeat=False, exc=False, **kwargs):
 	await asyncio.sleep(delay / 2)
-	while not fut.done():
-		await asyncio.sleep(delay)
-		if not repeat:
-			break
-		delay += 1
+	if not fut.done():
+		await asyncio.sleep(delay / 2)
 	try:
 		return fut.result()
 	except ISE:
-		if hasattr(func, "__call__"):
-			res = func(*args, **kwargs)
-		else:
-			res = func
-		if awaitable(res):
-			await res
+		while not fut.done():
+			if hasattr(func, "__call__"):
+				res = func(*args, **kwargs)
+			else:
+				res = func
+			if awaitable(res):
+				await res
+			if not repeat:
+				break
 		return await fut
 	except:
 		if exc:
@@ -4060,18 +4078,21 @@ def load_emojis():
 	em_trans = "".maketrans(emoji_translate)
 	print(f"Successfully loaded {len(etrans)} unicode emojis.")
 
+@functools.lru_cache(maxsize=4)
 def translate_emojis(s):
 	res = s.translate(em_trans)
 	if res in emoji_replace:
 		return emoji_replace[res]
 	return res
 
+@functools.lru_cache(maxsize=4)
 def replace_emojis(s):
 	for emoji, url in emoji_replace.items():
 		if emoji in s:
 			s = s.replace(emoji, url)
 	return s
 
+@functools.lru_cache(maxsize=4)
 def find_emojis_ex(s):
 	out = deque()
 	for emoji, url in emoji_replace.items():
@@ -4262,6 +4283,7 @@ def tzparse(expr):
 	return utc_dft(s)
 
 
+@functools.lru_cache(maxsize=64)
 def smart_split(s):
 	s = s.replace("#", "\uffff")
 	try:
@@ -4299,6 +4321,7 @@ def tik_decode(t, encoding="cl100k_base"):
 	enc = get_encoding(encoding)
 	return enc.decode(t)
 
+@functools.lru_cache(maxsize=64)
 def lim_tokens(s, maxlen=10, mode="centre", encoding="cl100k_base"):
 	if maxlen is None:
 		return s

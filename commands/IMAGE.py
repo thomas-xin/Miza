@@ -202,7 +202,7 @@ VIDEOS = ("gif", "webp", "apng", "mp4", "mkv", "webm", "mov", "wmv", "flv", "avi
 #             await bot.ignore_interaction(message)
 
 
-async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="webp", count=0):
+async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="png", count=0):
 	try:
 		# Take input from any attachments, or otherwise the message contents
 		if message.attachments:
@@ -373,7 +373,7 @@ class ColourDeficiency(Command):
 				name = name[:name.rindex(".")]
 		except ValueError:
 			name = "unknown"
-		ext = "webp"
+		ext = "png"
 		if not name.endswith("." + ext):
 			name += "." + ext
 		async with discord.context_managers.Typing(channel):
@@ -513,9 +513,9 @@ class GreyScale(Command):
 		await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
-class Laplacian(Command):
-	name = ["EdgeDetect", "Edges"]
-	description = "Applies the Laplacian edge-detect algorithm to the image."
+class EdgeDetect(Command):
+	name = ["Laplacian", "Canny", "Depth", "DepthMap", "Edges", "Edge"]
+	description = "Applies an edge or depth detection algorithm to the image."
 	usage = "<url>"
 	example = ("laplacian https://mizabot.xyz/favicon",)
 	no_parse = True
@@ -523,10 +523,19 @@ class Laplacian(Command):
 	_timeout_ = 3
 	typing = True
 
-	async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
+	async def __call__(self, bot, user, channel, message, name, args, argv, _timeout, **void):
+		fname = name
 		name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
 		async with discord.context_managers.Typing(channel):
-			resp = await process_image(url, "laplacian", ["-f", fmt], timeout=_timeout)
+			func = "canny"
+			cap = "caption"
+			if fname in ("depth", "depthmap"):
+				func = "depth"
+				cap = "sd"
+			elif fname == "laplacian":
+				func = "laplacian"
+				cap = "image"
+			resp = await process_image(url, func, ["-f", fmt], cap=cap, timeout=_timeout)
 			fn = resp
 			if isinstance(fn, str) and "." in fn:
 				fmt = "." + fn.rsplit(".", 1)[-1]
@@ -1521,7 +1530,7 @@ class Steganography(Command):
 			url = await self.bot.get_proxy_url(user)
 			await self.bot.send_as_webhook(message.channel, remsg, files=[f], username=user.display_name, avatar_url=url)
 		else:
-			await bot.send_with_file(channel, f'Successfully created image with encoded message "{msg}".', fn, filename=f"{fon}.webp", reference=message, reacts="🔳")
+			await bot.send_with_file(channel, f'Successfully created image with encoded message "{msg}".', fn, filename=f"{fon}.png", reference=message, reacts="🔳")
 
 	async def call(self, b, msg=""):
 		ts = hash(b)
@@ -1659,8 +1668,7 @@ class Art(Command):
 		if not args:
 			if getattr(message, "reference", None) and getattr(message.reference, "resolved", None):
 				m = message.reference.resolved
-				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
-				urls = await bot.follow_url(url, allow=True, images=True)
+				urls = await bot.follow_url(m, allow=True, images=True)
 				if urls and urls[0] != url:
 					args = urls
 		if not args:
@@ -1978,6 +1986,8 @@ class Art(Command):
 										n=1,
 									)
 								except:
+									if amount <= 1:
+										raise
 									print_exc()
 									print("SKIPPED")
 									continue

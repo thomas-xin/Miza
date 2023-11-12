@@ -1806,7 +1806,8 @@ def chat_structure(history, refs, u, q, imin, name="", personality="", nsfw=Fals
 def instruct_structure(messages, exclude_first=True):
 	ins = map(m_str, messages)
 	if exclude_first:
-		return "### Instruction:\n" + ins.pop(0) + "\n\n" + "### History:\n" + "\n\n".join(ins) + "\n\n### Response:"
+		ins = deque(ins)
+		return "### Instruction:\n" + ins.popleft() + "\n\n" + "### History:\n" + "\n\n".join(ins) + "\n\n### Response:"
 	return "### Instruction:\n" + "\n\n".join(ins) + "\n\n### Response:"
 
 
@@ -1913,7 +1914,7 @@ class Ask(Command):
 			found = None
 			is_curr = m.id == message.id
 			if i < 8 and not simulated and not content.strip():
-				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
+				url = message_link(m)
 				found = self.visited.get(url)
 				if found is None:
 					try:
@@ -1938,7 +1939,7 @@ class Ask(Command):
 				print(channel, "mismatch", m.id)#, caid)
 			ignores.add(m.id)
 			if i < 4 and not simulated and found is None:
-				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
+				url = message_link(m)
 				found = self.visited.get(url)
 				if found is None:
 					try:
@@ -2004,7 +2005,7 @@ class Ask(Command):
 				content += f" <|im_sep {pt} {p0}:{p1}:{p2}|>"
 				content = content.strip()
 			elif found:
-				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
+				url = message_link(m)
 				imin = self.visited.get(url) or [found]
 				print("IMIN:", imin)
 			if m.author.id == bot.id:

@@ -552,7 +552,7 @@ class Server:
 	def files(self, path, filename=None, download=None, **void):
 		if path in ("hacks", "mods", "files", "download", "static"):
 			send(true_ip() + " was rickrolled 🙃")
-			raise cp.HTTPRedirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ", status=301)
+			return self.rickroll()
 		orig_path = path
 		ind = IND
 		p = None
