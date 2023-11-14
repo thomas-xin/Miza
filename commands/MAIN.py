@@ -1141,15 +1141,14 @@ class Invite(Command):
 
 
 class Upload(Command):
-	name = ["Filehost", "Files", "Preserve"]
+	name = ["Filehost", "Files", "Preserve", "PreserveAttachmentLinks"]
 	description = "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to ⟨MIZA⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
 	usage = "<url>?"
 	example = ("upload https://cdn.discordapp.com/attachments/911168940246442006/1026474858705588224/6e74595fa98e9c52e2fab6ece4639604.png", "files")
 	rate_limit = (12, 17)
-	msgcmd = True
 	_timeout_ = 50
 	slash = ("Preserve",)
-	msgcmd = ("Preserve Attachment(s)",)
+	msgcmd = ("Preserve Attachment Links",)
 
 	async def __call__(self, name, channel, message, argv, **void):
 		if message.attachments:
@@ -1161,7 +1160,7 @@ class Upload(Command):
 			waited = False
 			futs = deque()
 			for url in args:
-				if name in ("files", "preserve") and is_discord_attachment(url):
+				if name in ("files", "preserve", "preserveattachmentlinks") and is_discord_attachment(url):
 					a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 					if not waited and a_id not in self.bot.data.attachments:
 						waited = True

@@ -966,14 +966,14 @@ class Timezone(Command):
 
 
 class Identify(Command):
-	name = ["📂", "Magic", "Mime", "FileType"]
+	name = ["📂", "Magic", "Mime", "FileType", "IdentifyFiles"]
 	description = "Detects the type, mime, and optionally details of an input file."
 	usage = "<url>*"
 	example = ("identify https://raw.githubusercontent.com/thomas-xin/Image-Test/master/title-rainbow.webp",)
 	rate_limit = (12, 16)
 	mime = magic.Magic(mime=True, mime_encoding=True)
-	msgcmd = True
 	slash = True
+	msgcmd = ("Identify Files",)
 
 	def probe(self, url):
 		command = ["./ffprobe", "-hide_banner", url]
@@ -2451,13 +2451,12 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 									res = await summarise(q=q + "\n" + res, max_length=1296, min_length=1024)
 									res = res.replace("\n", ". ").replace(": ", " -")
 								res = res.strip()
-								# print("MLIST:", messages)
-								if appended:
-									pass
-								elif len(messages) > 2:
-									messages = [messages[0], messages[-2], messages[-1]]
-								else:
-									messages = [messages[0], messages[-1]]
+								# if appended:
+									# pass
+								# elif len(messages) > 2:
+									# messages = [messages[0], messages[-2], messages[-1]]
+								# else:
+									# messages = [messages[0], messages[-1]]
 								if not appended:
 									messages.append(cdict(m))
 								else:
@@ -2488,12 +2487,12 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 									res = await summarise(q=q + "\n" + res, max_length=500, min_length=384)
 									res = res.replace("\n", ". ").replace(": ", " -")
 								res = res.strip()
-								if appended:
-									pass
-								elif len(messages) > 2:
-									messages = [messages[0], messages[-2], messages[-1]]
-								else:
-									messages = [messages[0], messages[-1]]
+								# if appended:
+									# pass
+								# elif len(messages) > 2:
+									# messages = [messages[0], messages[-2], messages[-1]]
+								# else:
+									# messages = [messages[0], messages[-1]]
 								if not appended:
 									messages.append(cdict(m))
 								else:
@@ -2521,12 +2520,12 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 									res = await summarise(q=q + "\n" + res, max_length=500, min_length=384)
 									res = res.replace("\n", ". ").replace(": ", " -")
 								res = res.strip()
-								if appended:
-									pass
-								elif len(messages) > 2:
-									messages = [messages[0], messages[-2], messages[-1]]
-								else:
-									messages = [messages[0], messages[-1]]
+								# if appended:
+									# pass
+								# elif len(messages) > 2:
+									# messages = [messages[0], messages[-2], messages[-1]]
+								# else:
+									# messages = [messages[0], messages[-1]]
 								if not appended:
 									messages.append(cdict(m))
 								else:

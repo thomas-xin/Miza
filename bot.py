@@ -6000,16 +6000,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						author = self._state.store_user(mdata)
 						message.author = author
 						channel = None
-						# if "resolved" in cdata:
-							# res = cdata.get("resolved", {})
-							# for mdata in res.get("users", {}).values():
-								# message.content += " " + mdata["id"]
-								# user = self._state.store_user(mdata)
-							# for mdata in res.get("messages", {}).values():
-								# msg = self.ExtendedMessage.new(mdata)
-								# message.content += " " + msg.jump_url
-								# self.add_message(msg, force=True)
-								# message.channel = msg.channel or message.channel
+						if cdata.get("type") == 3 and "resolved" in cdata:
+							res = cdata.get("resolved", {})
+							for mdata in res.get("users", {}).values():
+								message.content += " " + mdata["id"]
+								user = self._state.store_user(mdata)
+							for mdata in res.get("messages", {}).values():
+								msg = self.ExtendedMessage.new(mdata)
+								message.content += " " + message_link(msg)
+								self.add_message(msg, force=True)
+								message.channel = msg.channel or message.channel
 						try:
 							channel = self.force_channel(d["channel_id"])
 							guild = await self.fetch_guild(d["guild_id"])
