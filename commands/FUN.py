@@ -3226,21 +3226,22 @@ class Akinator(Command):
 	]
 
 	images = [
-		"https://cdn.discordapp.com/attachments/731709481863479436/1000436949573705758/A0.png",
-		"https://cdn.discordapp.com/attachments/731709481863479436/1000436949917630575/A1.png",
-		"https://cdn.discordapp.com/attachments/731709481863479436/1000436950211252385/A2.png",
-		"https://cdn.discordapp.com/attachments/731709481863479436/1000436950550982716/A3.png",
-		"https://cdn.discordapp.com/attachments/731709481863479436/1000436950831988897/A4.png",
-		"https://cdn.discordapp.com/attachments/731709481863479436/1000436951180120145/A5.png",
-		"https://cdn.discordapp.com/attachments/731709481863479436/1000436951498895380/A6.png",
-		"https://cdn.discordapp.com/attachments/731709481863479436/1000436970218078239/A7.png",
-		"https://cdn.discordapp.com/attachments/731709481863479436/1000436970754945034/A8.png",
-		"https://cdn.discordapp.com/attachments/731709481863479436/1000436971048554496/A9.png",
-		"https://cdn.discordapp.com/attachments/731709481863479436/1000436971337945108/A10.png",
+		"https://mizabot.xyz/u/EEsIkmtEEKo", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/vrai_decouragement.png",
+		"https://mizabot.xyz/u/EEsIc9jEMJY", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/surprise.png",
+		"https://mizabot.xyz/u/EEsMUT1EEDw", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/leger_decouragement.png",
+		"https://mizabot.xyz/u/EEsIXxyEQAA", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/concentration_intense.png",
+		"https://mizabot.xyz/u/EEsIRIXEIDI", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/inspiration_legere.png",
+		"https://mizabot.xyz/u/EEsIKp-EUCg", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/serein.png",
+		"https://mizabot.xyz/u/EEsIB0BEEEY", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/defi.png",
+		"https://mizabot.xyz/u/EEsIqFTEUG4", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/inspiration_forte.png",
+		"https://mizabot.xyz/u/EEsIukLEMKA", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/mobile.png",
+		"https://mizabot.xyz/u/EEsIwwGEEFE", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/confiant.png",
 	]
-	default_image = "https://cdn.discordapp.com/attachments/731709481863479436/1000436949573705758/A0.png"
-	defeat_image = "https://cdn.discordapp.com/attachments/731709481863479436/1000436971807715378/A11.png"
-	victory_image = "https://cdn.discordapp.com/attachments/731709481863479436/1000437894768500876/A12.png"
+	start_image = "https://en.akinator.com/bundles/elokencesite/images/akinator.png"
+	default_image = "https://mizabot.xyz/u/EEsIB0BEEEY" #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/defi.png"
+	defeat_image = "https://mizabot.xyz/u/EEsI5iPEEFA" #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/deception.png"
+	check_image = "https://mizabot.xyz/u/EEsIwwGEEFE" #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/confiant.png"
+	victory_image = "https://mizabot.xyz/u/EEsJAGzEUDw" #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/triomphe.png"
 
 	button_equiv = {
 		"Yes": 0,
@@ -3275,7 +3276,7 @@ class Akinator(Command):
 			+ f"{aki.question}```*"
 			+ bar
 		)
-		emb.set_image(url=self.default_image)
+		emb.set_thumbnail(url=self.default_image)
 		emb.set_author(**get_author(user))
 		await send_with_react(channel, "", embed=emb, buttons=self.buttons, reference=message)
 
@@ -3434,7 +3435,9 @@ class Akinator(Command):
 			gold = aki.step * 4
 			bot.data.users.add_gold(user, gold)
 			desc = "+" + await bot.as_rewards(gold)
-			emb.set_image(url=self.victory_image)
+			if getattr(aki, "last_guess", None):
+				emb.set_image(url=aki.last_guess)
+			emb.set_thumbnail(url=self.victory_image)
 			callback = "none"
 		elif guess and not guessing:
 			if isinstance(guess, bool):
@@ -3454,11 +3457,13 @@ class Akinator(Command):
 			desc = "\xad" + bold(guess["name"]) + "\n" + italics(guess["description"])
 			buttons = [self.buttons[0], self.buttons[4]]
 			if guess.get("absolute_picture_path"):
-				emb.set_image(url=guess["absolute_picture_path"])
+				aki.last_guess = guess["absolute_picture_path"]
+				emb.set_image(url=aki.last_guess)
+				emb.set_thumbnail(url=self.check_image)
 		else:
 			emb.title = f"Akinator: Question {aki.step + 1}"
 			if aki.step >= 79:
-				question = "Bravo! You have defeated me! Play the game again on the Akinator website to add the character you were thinking of, and I'll remember for next time!"
+				question = "Bravo! You have defeated me! Play the game again on the [Akinator website](https://en.akinator.com/game) to add the character you were thinking of, and I'll remember for next time!"
 				gold = aki.step * 5
 				bot.data.users.add_gold(user, gold)
 				desc = "+" + await bot.as_rewards(gold)
@@ -3466,7 +3471,12 @@ class Akinator(Command):
 				callback = "none"
 			else:
 				question = aki.question
-				emb.set_image(url=choice(self.images))
+				i = round_random(((40 - aki.step) / 160 + aki.progression / 100 + (random.random() * 2 - 1) / 4) * (len(self.images) - 1))
+				if i < 0:
+					i = 0
+				if i > len(self.images) - 1:
+					i = len(self.images) - 1
+				emb.set_thumbnail(url=self.images[i])
 			buttons = self.buttons
 		if callback == "none":
 			emb.title = "Akinator: Game ended"
