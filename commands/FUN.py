@@ -3436,7 +3436,7 @@ class Akinator(Command):
 			bot.data.users.add_gold(user, gold)
 			desc = "+" + await bot.as_rewards(gold)
 			if getattr(aki, "last_guess", None):
-				emb.set_image(url=aki.last_guess)
+				emb.set_image(url=aki.last_guess["absolute_picture_path"])
 			emb.set_thumbnail(url=self.victory_image)
 			callback = "none"
 		elif guess and not guessing:
@@ -3457,8 +3457,8 @@ class Akinator(Command):
 			desc = "\xad" + bold(guess["name"]) + "\n" + italics(guess["description"])
 			buttons = [self.buttons[0], self.buttons[4]]
 			if guess.get("absolute_picture_path"):
-				aki.last_guess = guess["absolute_picture_path"]
-				emb.set_image(url=aki.last_guess)
+				aki.last_guess = guess
+				emb.set_image(url=aki.last_guess["absolute_picture_path"])
 				emb.set_thumbnail(url=self.check_image)
 		else:
 			emb.title = f"Akinator: Question {aki.step + 1}"
@@ -3479,7 +3479,10 @@ class Akinator(Command):
 				emb.set_thumbnail(url=self.images[i])
 			buttons = self.buttons
 		if callback == "none":
-			emb.title = "Akinator: Game ended"
+			if win and getattr(aki, "last_guess", None):
+				emb.title = aki.last_guess["name"] + " (" + aki.last_guess["description"] + ")"
+			else:
+				emb.title = "Akinator: Game ended"
 			buttons = (self.buttons[-2],)
 			callback = "callback"
 		if desc:
