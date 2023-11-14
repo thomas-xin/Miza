@@ -1274,6 +1274,50 @@ def line_count(fn):
 	return (len(data), data.count("\n") + 1)
 
 
+def split_across(s, lim=2000, prefix=""):
+	n = len(prefix)
+	out = []
+	while len(s) > lim - n:
+		t = []
+		while s:
+			cl = sum(map(len, t))
+			spl = s.split("\n\n", 1)
+			if len(spl) > 1 and cl + len(spl[0]) < lim - n - 2:
+				t.append(spl[0])
+				t.append("\n\n")
+				s = spl[1]
+				state = 2
+				continue
+			if t and state >= 2:
+				break
+			spl = s.split("\n", 1)
+			if len(spl) > 1 and cl + len(spl[0]) < lim - n - 2:
+				t.append(spl[0])
+				t.append("\n")
+				s = spl[1]
+				state = 1
+				continue
+			if t and state >= 1:
+				break
+			spl = s.split(None, 1)
+			if len(spl) > 1 and cl + len(spl[0]) < lim - n - 2:
+				t.append(spl[0])
+				t.append(" ")
+				s = spl[1]
+				state = 0
+				continue
+			if t:
+				break
+			t.append(s[:lim - n - cl])
+			s = s[lim - n - cl:]
+		if prefix:
+			t.insert(0, prefix)
+		out.append("".join(t).strip())
+	if s:
+		out.append(s.strip())
+	return out
+
+
 # Checks if a file is a python code file using its filename extension.
 is_code = lambda fn: str(fn).endswith(".py") or str(fn).endswith(".pyw")
 

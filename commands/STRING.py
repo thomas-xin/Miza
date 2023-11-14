@@ -2002,7 +2002,7 @@ class Ask(Command):
 			if cfut:
 				pt, p1, p2 = cfut
 				p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
-				content += f" <|im_sep {pt} {p0}:{p1}:{p2}|>"
+				content += f" <{pt} {p0}:{p1}:{p2}|>"
 				content = content.strip()
 			elif found:
 				url = message_link(m)
@@ -2176,6 +2176,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 ''' + prompt
 					prompt += f"\n### Response:\n{bot_name}: I choose number"
 					try:
+						await process_image("lambda: 1+1", "$", (), cap="class", timeout=2)
 						k = await process_image("moe_class", "$", [prompt, mocked], cap="class", timeout=25)
 					except:
 						print_exc()
@@ -2302,7 +2303,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								raise StopIteration
 							pt, p1, p2 = tup
 							p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
-							content += f" <|im_sep {pt} {p0}:{p1}:{p2}|>"
+							content += f" <{pt} {p0}:{p1}:{p2}|>"
 						m.content = content.strip()
 				used = ufull
 				if skipping:
@@ -2322,9 +2323,9 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						if ufc[0].get("role") == "system":
 							ufc.pop(0)
 						for i, m in enumerate(ufc, 1):
-							prompt += f"\n{i}. {m_str(m)}\n"
+							prompt += f"\n{i}] {m_str(m)}\n"
 						i += 1
-						prompt += f'"""\n\n### Instruction:\n"""\n{i}. {m_str(ms)}\n"""\n\nAssume you are joining the conversation as {bot_name}. Which number represents the first message relevant to the instruction question? (Provide only the number, not an actual reply! If there are none relevant, respond with "-1").\n\n### Response:'
+						prompt += f'"""\n\n### Instruction:\n"""\n{i}] {m_str(ms)}\n"""\n\nAssuming your name is {bot_name}, which of the numbered messages contains information required to answer the instruction question? (Provide only the number, not a full reply! If there are none relevant, respond with "-1").\n\n### Response:'
 						print("Context prompt:", prompt)
 						data = dict(
 							model="gpt-3.5-turbo-instruct",
@@ -2332,25 +2333,42 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							temperature=0.5,
 							max_tokens=32,
 							top_p=0.5,
-							frequency_penalty=0,
+							frequency_penalty=0.6,
 							presence_penalty=0,
 							user=str(user.id) if premium < 3 else str(hash(name)),
 						)
-						try:
-							response = await asyncio.wait_for(bot.oai.completions.create(**data, timeout=60), timeout=70)
-						except openai.BadRequestError:
-							raise
-						except Exception as e:
-							ex = e
-							print_exc()
-						else:
-							print("Context response:", response.choices[0].text)
-							num = regexp(r"-?[0-9]+").findall(response.choices[0].text)
+						c = await tcount(prompt)
+						resp = None
+						if c < 1536:
+							data["model"] = "mythalion-13b"
+							try:
+								await process_image("lambda: 1+1", "$", (), cap="class", timeout=2)
+								resp = await process_image("GPTQm", "$", [data], cap="class", timeout=25)
+							except:
+								print_exc()
+								data["model"] = "gpt-3.5-turbo-instruct"
+						if not resp:
+							try:
+								response = await asyncio.wait_for(bot.oai.completions.create(**data, timeout=60), timeout=70)
+							except openai.BadRequestError:
+								raise
+							except Exception as e:
+								ex = e
+								print_exc()
+							else:
+								resp = response.choices[0].text
+						if resp:
+							print("Context response:", resp)
+							num = regexp(r"-?[0-9]+").findall(resp)
 							if num and num[0]:
 								num = int(num[0]) - 1
 								if num > 0 and num < len(ufull) - 1:
 									skipping = num
 									used = [ufull[0]] + ufull[skipping - 1:]
+									length = await count_to(used)
+								elif reference:
+									skipping = len(ufull) - 2
+									used = [ufull[0]] + ufull[-3:]
 									length = await count_to(used)
 								else:
 									skipping = len(ufull) - 1
@@ -2409,7 +2427,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								continue
 						text = text.strip()
 						break
-					resend = True
+					resend = False
 					for n, fc in enumerate(tc):
 						tid = fc.id[:6] + str(n)
 						fc.id = tid
@@ -2442,12 +2460,20 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 									messages = [messages[0], messages[-1]]
 								if not appended:
 									messages.append(cdict(m))
+								else:
+									for m2 in reversed(messages):
+										calls = m2.get("tool_calls")
+										if not calls:
+											continue
+										calls.extend(m.tool_calls)
+										break
 								messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
 								skipping = 0
 								length = await count_to(messages)
 								print("New prompt:", messages)
 								appended = True
 								continue
+							resend = True
 						elif name == "sympy":
 							print("Sympy query:", argv)
 							try:
@@ -2470,6 +2496,13 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 									messages = [messages[0], messages[-1]]
 								if not appended:
 									messages.append(cdict(m))
+								else:
+									for m2 in reversed(messages):
+										calls = m2.get("tool_calls")
+										if not calls:
+											continue
+										calls.extend(m.tool_calls)
+										break
 								messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
 								blocked.add("sympy")
 								skipping = 0
@@ -2478,6 +2511,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								appended = True
 								continue
 							name = "wolfram_alpha"
+							resend = True
 						if name == "wolfram_alpha":
 							print("Wolfram Alpha query:", argv)
 							res = await process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60)
@@ -2495,6 +2529,13 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 									messages = [messages[0], messages[-1]]
 								if not appended:
 									messages.append(cdict(m))
+								else:
+									for m2 in reversed(messages):
+										calls = m2.get("tool_calls")
+										if not calls:
+											continue
+										calls.extend(m.tool_calls)
+										break
 								messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
 								blocked.add("wolfram_alpha")
 								skipping = 0
@@ -2502,23 +2543,20 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								print("New prompt:", messages)
 								appended = True
 								continue
+							resend = True
 						elif name == "dalle":
 							print("Art query:", argv)
 							call = {"func": "art", "argv": argv, "comment": res}
-							resend = False
 						elif name == "reminder":
 							argv = args["message"] + " in " + args["delay"]
 							print("Reminder query:", argv)
 							call = {"func": "remind", "argv": argv, "comment": res}
-							resend = False
 						elif name == "play":
 							print("Play query:", argv)
 							call = {"func": "play", "argv": argv, "comment": res}
-							resend = False
 						elif name == "audio":
 							print("Audio query:", args)
 							call = {"func": args["mode"], "argv": args["value"]}
-							resend = False
 						elif name == "audiostate":
 							print("AudioState query:", args)
 							if args["mode"] == "quit":
@@ -2529,51 +2567,50 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								call = {"func": "loopqueue", "argv": int(args["value"])}
 							else:
 								call = {"func": args["mode"], "argv": int(args["value"])}
-							resend = False
 						else:
 							raise ValueError("OpenAI API returned invalid or inactive function call.")
-					if resend:
-						continue
-					fname = call["func"]
-					argv = as_str(call.get("argv", ""))
-					args = argv.split()
-					argl = argv.split()
-					u_perm = bot.get_perms(user)
-					command_check = fname
-					loop = False
-					timeout = 240
-					command = bot.commands[fname][0]
-					fake_message = copy.copy(message)
-					fake_message.content = f"{bot.get_prefix(guild)}{fname} {argv}"
-					comment = (call.get("comment") or "") + f"\n> Used `{fake_message.content}`"
-					response = await asubmit(
-						command,
-						bot=bot,
-						argv=argv,
-						args=args,
-						argl=argl,
-						flags=flags,
-						perm=u_perm,
-						user=user,
-						message=fake_message,
-						channel=channel,
-						guild=guild,
-						name=command_check,
-						looped=loop,
-						_timeout=timeout,
-						timeout=timeout,
-						comment=comment,
-					)
-					if type(response) is tuple and len(response) == 2:
-						response, react = response
-						if react == 1:
-							react = "❎"
-					else:
-						react = False
-					if isinstance(response, str):
-						mresp = await send_with_react(channel, response, reference=not loop and message, reacts=react)
-					else:
-						mresp = response
+						fname = call["func"]
+						argv = as_str(call.get("argv", ""))
+						args = argv.split()
+						argl = argv.split()
+						u_perm = bot.get_perms(user)
+						command_check = fname
+						loop = False
+						timeout = 240
+						command = bot.commands[fname][0]
+						fake_message = copy.copy(message)
+						fake_message.content = f"{bot.get_prefix(guild)}{fname} {argv}"
+						comment = (call.get("comment") or "") + f"\n> Used `{fake_message.content}`"
+						response = await asubmit(
+							command,
+							bot=bot,
+							argv=argv,
+							args=args,
+							argl=argl,
+							flags=flags,
+							perm=u_perm,
+							user=user,
+							message=fake_message,
+							channel=channel,
+							guild=guild,
+							name=command_check,
+							looped=loop,
+							_timeout=timeout,
+							timeout=timeout,
+							comment=comment,
+						)
+						if type(response) is tuple and len(response) == 2:
+							response, react = response
+							if react == 1:
+								react = "❎"
+						else:
+							react = False
+						if not resend and n >= len(tc) - 1:
+							if isinstance(response, str):
+								mresp = await send_with_react(channel, response, reference=not loop and message, reacts=react)
+							else:
+								mresp = response
+				if mresp:
 					break
 				prompt = instruct_structure(used)
 				prompt += f"\n{bot_name}:"
@@ -2708,46 +2745,13 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 		ref = message
 		if not mresp:
 			s = escape_roles(out.replace("\r\n", "\n").replace("\r", "\n"))
-			state = 0
-			while len(code) + len(s) > 2000:
-				t = []
-				while s:
-					cl = sum(map(len, t))
-					spl = s.split("\n\n", 1)
-					if len(spl) > 1 and cl + len(spl[0]) < 1997:
-						t.append(spl[0])
-						t.append("\n\n")
-						s = spl[1]
-						state = 2
-						continue
-					if t and state >= 2:
-						break
-					spl = s.split("\n", 1)
-					if len(spl) > 1 and cl + len(spl[0]) < 1997:
-						t.append(spl[0])
-						t.append("\n")
-						s = spl[1]
-						state = 1
-						continue
-					if t and state >= 1:
-						break
-					spl = s.split(None, 1)
-					if len(spl) > 1 and cl + len(spl[0]) < 1997:
-						t.append(spl[0])
-						t.append(" ")
-						s = spl[1]
-						state = 0
-						continue
-					if t:
-						break
-					t.append(s[:1999 - cl])
-					s = s[1999 - cl:]
-				t.insert(0, code)
-				t = "".join(t).strip()
+			ms = split_across(s, prefix=code)
+			s = ms[-1] if ms else code
+			for t in ms[:-1]:
 				create_task(send_with_react(channel, t, reference=ref))
 				ref = None
 				await asyncio.sleep(0.25)
-			mresp = await send_with_react(channel, code + s, embed=emb, reacts=reacts, reference=ref)
+			mresp = await send_with_react(channel, s, embed=emb, reacts=reacts, reference=ref)
 		else:
 			s = mresp.content.strip()
 		if isinstance(caid, dict):
@@ -3029,6 +3033,48 @@ class UpdatePersonalities(Database):
 #     def __call__(self, **void):
 #         if convobot:
 #             esubmit(convobot.update)
+
+
+class Instruct(Command):
+	name = ["Complete", "Completion"]
+	description = "Similar to ~ask, but functions as instruct rather than chat."
+	usage = "<string>+"
+	example = ("instruct Once upon a time,", "complete Answer the following conversation as the robot!\n\nhuman: Hi!\nrobot: Heya, nice to meet you! How can I help?\nhuman: What's the square root of 289?\nrobot:")
+	slash = True
+
+	async def __call__(self, bot, guild, channel, user, message, argv, **void):
+		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
+		data = dict(
+			model="gpt-3.5-turbo-instruct",
+			prompt=argv,
+			temperature=0.8,
+			max_tokens=4096 if premium else 1024,
+			top_p=0.9,
+			frequency_penalty=0.8,
+			presence_penalty=0.4,
+			user=str(user.id) if premium < 3 else str(hash(user.name)),
+		)
+		c = await tcount(argv)
+		resp = None
+		if c < 1024:
+			data["model"] = "mythalion-13b"
+			try:
+				await process_image("lambda: 1+1", "$", (), cap="class", timeout=2)
+				resp = await process_image("GPTQm", "$", [data], cap="class", timeout=25)
+			except:
+				print_exc()
+				data["model"] = "gpt-3.5-turbo-instruct"
+		if not resp:
+			response = await asyncio.wait_for(bot.oai.completions.create(**data, timeout=60), timeout=70)
+			resp = response.choices[0].text
+		ref = message
+		ms = split_across(resp, 1999, prefix="\xad")
+		s = ms[-1] if ms else code
+		for t in ms[:-1]:
+			create_task(send_with_react(channel, t, reference=ref))
+			ref = None
+			await asyncio.sleep(0.25)
+		return await send_with_react(channel, s, reference=ref)
 
 
 class Random(Command):

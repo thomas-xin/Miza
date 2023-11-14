@@ -1321,13 +1321,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, reactions=False, allow=False, limit=None, no_cache=False):
 		if limit is not None and limit <= 0:
 			return []
+		if not isinstance(url, str) and hasattr(url, "channel"):
+			url = message_link(url)
 		if it is None:
 			urls = find_urls(url)
 			if not urls:
 				return []
 			it = {}
-		elif not isinstance(url, str) and hasattr(url, "channel"):
-			url = message_link(url)
 		else:
 			urls = [url]
 		urls = tuple(urls)
@@ -2909,22 +2909,22 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		# 	ip = await fut
 		t = utc()
 		ram_name = globals().get("RAM_NAME") or "RAM"
-		if ram_name == "RAM" and os.name == "nt" and globals().get("WMI") is not False:
-			if not globals().get("WMI"):
-				try:
-					import wmi
-					globals()["WMI"] = wmi.WMI()
-				except:
-					print_exc()
-					globals()["WMI"] = False
-			if WMI:
-				OS = WMI.Win32_Operatingsystem()[0]
-				cswap = (int(OS.TotalVirtualMemorySize) - int(OS.FreeVirtualMemory)) * 1024 - psutil.virtual_memory().used
-				if cswap > sinfo.used:
-					class mtemp:
-						def __init__(self, used, total):
-							self.used, self.total = used, total
-					sinfo = mtemp(used=cswap, total=sinfo.total)
+		if os.name == "nt" and not globals().get("WMI"):
+			try:
+				import wmi
+				globals()["WMI"] = wmi.WMI()
+			except:
+				print_exc()
+				globals()["WMI"] = False
+		if globals().get("WMI") is not False:
+			OS = WMI.Win32_Operatingsystem()[0]
+			cswap = (int(OS.TotalVirtualMemorySize) - int(OS.FreeVirtualMemory)) * 1024 - psutil.virtual_memory().used
+			if cswap > sinfo.used:
+				class mtemp:
+					def __init__(self, used, total):
+						self.used, self.total = used, total
+				sinfo = mtemp(used=cswap, total=sinfo.total)
+			if ram_name == "RAM":
 				ram = WMI.Win32_PhysicalMemory()[0]
 				ram_speed = ram.ConfiguredClockSpeed
 				ram_type = ram.SMBIOSMemoryType

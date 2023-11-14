@@ -531,7 +531,7 @@ class EdgeDetect(Command):
 			cap = "caption"
 			if fname in ("depth", "depthmap"):
 				func = "depth"
-				cap = "sd"
+				cap = "sdxl"
 			elif fname == "laplacian":
 				func = "laplacian"
 				cap = "image"

@@ -547,6 +547,33 @@ class Server:
 	def rickroll(self, *void1, **void2):
 		raise cp.HTTPRedirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ", status=301)
 
+	opipe = None
+	@cp.expose
+	@hostmap
+	@cp.tools.accept(media="multipart/form-data")
+	def detect(self, image=None):
+		if image is None:
+			from PIL import Image
+			image = Image.open(cp.request.body.fp)
+			image.load()
+		elif isinstance(image, (bytes, memoryview)):
+			from PIL import Image
+			image = Image.open(io.BytesIO(image))
+		elif isinstance(image, cherrypy._cpreqbody.Part):
+			from PIL import Image
+			image = Image.open(image.file)
+		if not isinstance(self.opipe, concurrent.futures.Future):
+			self.opipe = concurrent.futures.Future()
+			from transformers import pipeline
+			pipe = pipeline("object-detection", model="facebook/detr-resnet-50", device=0)
+			self.opipe.set_result(pipe)
+		pipe = self.opipe.result()
+		data = pipe(image, threshold=1 / 3)
+		cp.response.headers["Content-Type"] = "application/json"
+		out = orjson.dumps(data)
+		print("DET:", out)
+		return out
+
 	@cp.expose(("animate", "animation", "a", "images", "image", "i", "view", "v", "raw", "f", "download", "d"))
 	@hostmap
 	def files(self, path, filename=None, download=None, **void):

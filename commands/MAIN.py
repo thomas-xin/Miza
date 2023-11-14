@@ -1151,26 +1151,31 @@ class Upload(Command):
 	slash = ("Preserve",)
 	msgcmd = ("Preserve Attachment(s)",)
 
-	async def __call__(self, name, message, argv, **void):
+	async def __call__(self, name, channel, message, argv, **void):
 		if message.attachments:
 			argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
 		args = await self.bot.follow_url(argv)
 		if not args:
-			return self.bot.raw_webserver + "/files"
-		futs = deque()
-		for url in args:
-			if name in ("files", "preserve") and is_discord_attachment(url):
-				a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-				if a_id in self.bot.data.attachments:
-					futs.append(as_fut("<" + self.bot.preserve_attachment(a_id) + ">"))
-					continue
-			futs.append(Request(self.bot.raw_webserver + "/upload_url?url=" + url, decode=True, aio=True, timeout=1200))
-			await asyncio.sleep(0.1)
-		out = deque()
-		for fut in futs:
-			url = await fut
-			out.append(url)
-		return "\n".join(out)
+			out = [self.bot.raw_webserver + "/files"]
+		else:
+			waited = False
+			futs = deque()
+			for url in args:
+				if name in ("files", "preserve") and is_discord_attachment(url):
+					a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+					if not waited and a_id not in self.bot.data.attachments:
+						waited = True
+						await asyncio.sleep(2)
+					if a_id in self.bot.data.attachments:
+						futs.append(as_fut("<" + self.bot.preserve_attachment(a_id) + ">"))
+						continue
+				futs.append(Request(self.bot.raw_webserver + "/upload_url?url=" + url, decode=True, aio=True, timeout=1200))
+				await asyncio.sleep(0.1)
+			out = deque()
+			for fut in futs:
+				url = await fut
+				out.append(url)
+		return await send_with_reply(channel, message, "\n".join(out), ephemeral=True)
 
 
 class Reminder(Command):

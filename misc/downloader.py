@@ -191,7 +191,7 @@ def download(url, fn, resp=None, index=0, start=None, end=None, tn=None):
 							s = "\n" + s[1:]
 						s += "\x1b[38;5;7m"
 						print(s, end="")
-			except StopIteration:
+			except (StopIteration, KeyboardInterrupt):
 				break
 			except:
 				print_exc()
@@ -240,7 +240,7 @@ def upload(url, fn, resp=None, index=0, start=None, end=None, tn=None):
 				s += "\x1b[38;5;7m"
 				print(s, end="")
 				raise StopIteration
-			except StopIteration:
+			except (StopIteration, KeyboardInterrupt):
 				break
 			except:
 				print_exc()
@@ -314,18 +314,20 @@ if uploading:
 		import requests
 	fsize = fs = os.path.getsize(url)
 	threads = math.ceil(fsize / 1048576)
-	load = math.ceil(fsize / threads)
+	load = fsize / threads
 	delay = 1
 	exc = concurrent.futures.ThreadPoolExecutor(max_workers=threads + 3)
 	submit = exc.submit
 	print(f"Splitting into {threads} threads...")
 	workers = [None] * threads
 	for i in range(threads):
-		start = i * load
+		start = math.ceil(i * load)
 		if i == threads - 1:
 			end = None
 		else:
-			end = min(start + load, fsize)
+			end = min(math.ceil(i * load + load), fsize)
+		if start >= end:
+			continue
 		workers[i] = submit(upload, "https://mizabot.xyz/upload_chunk", url, None, index=i, start=start, end=end)
 		try:
 			workers[i].result(timeout=delay)
@@ -432,6 +434,8 @@ elif "bytes" in head.get("accept-ranges", ""):
 			print(f"Decision tree empty: {n}")
 			threads = n
 		threads = max(3, min(64, threads))
+	if threads > fsize / 65536:
+		threads = -(-fsize // 65536)
 else:
 	threads = 1
 if not fn:
@@ -444,7 +448,7 @@ threaders = {}
 if threads > 1:
 	print(f"Splitting into {threads} threads...")
 	workers = [None] * threads
-	load = math.ceil(fsize / threads)
+	load = fsize / threads
 	delay = 1
 	tt = utc() - t
 	if tt < 1:
@@ -458,11 +462,11 @@ if threads > 1:
 			workers[i] = submit(download, url, f"cache/${PID}-{i}", resp, index=i, start=0, end=None, tn=tn)
 			workers[i].tn = tn
 		else:
-			start = i * load
+			start = math.ceil(i * load)
 			if i == threads - 1:
 				end = None
 			else:
-				end = min(start + load, fsize)
+				end = min(math.ceil(i * load + load), fsize)
 			tn = len(threaders)
 			threaders[tn] = True
 			workers[i] = submit(download, url, f"cache/${PID}-{i}", resp, index=i, start=start, end=end, tn=tn)
@@ -521,11 +525,11 @@ if threads > 1:
 							fut = workers[i + 1] = prio.submit(download, urls[i + 1], f"cache/${PID}-{i + 1}", None, index=i + 1, start=0, end=None, tn=tn)
 							fut.tn = tn
 						else:
-							start = (i + 1) * load
+							start = math.ceil((i + 1) * load)
 							if i + 1 == threads - 1:
 								end = None
 							else:
-								end = min(start + load, fsize)
+								end = min(math.ceil(i * load + load), fsize)
 							tn = len(threaders)
 							threaders[tn] = True
 							fut = workers[i + 1] = prio.submit(download, url, f"cache/${PID}-{i + 1}", None, index=i + 1, start=start, end=end, tn=tn)
@@ -543,6 +547,8 @@ if threads > 1:
 					f.write(b)
 			try:
 				os.remove(fi)
+			except KeyboardInterrupt:
+				break
 			except:
 				pass
 else:
