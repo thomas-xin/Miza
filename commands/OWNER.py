@@ -314,7 +314,7 @@ class UpdateExec(Database):
 		channel = message.channel
 		if term & 32 or proc.startswith("!"):
 			if not term & 32:
-				term = term.removeprefix("!")
+				proc = proc.removeprefix("!")
 			proc = await asyncio.create_subprocess_shell(proc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, limit=65536)
 			out = await proc.stdout.read()
 			err = await proc.stderr.read()
