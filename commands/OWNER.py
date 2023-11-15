@@ -312,6 +312,16 @@ class UpdateExec(Database):
 		proc = as_str(proc)
 		# Main terminal uses bot's global variables, virtual one uses a shallow copy per channel
 		channel = message.channel
+		if term & 32 or proc.startswith("!"):
+			if not term & 32:
+				term = term.removeprefix("!")
+			proc = await asyncio.create_subprocess_shell(proc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, limit=65536)
+			out = await proc.stdout.read()
+			err = await proc.stderr.read()
+			output = (as_str(out) + "\n" + as_str(err)).strip()
+			if output:
+				glob["_"] = output
+			return output
 		if term & 1:
 			glob = bot._globals
 		else:
@@ -332,14 +342,6 @@ class UpdateExec(Database):
 			))
 			with suppress():
 				glob["auds"] = bot.data.audio.players[message.guild.id]
-			if term & 32:
-				proc = await asyncio.create_subprocess_shell(proc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, limit=65536)
-				out = await proc.stdout.read()
-				err = await proc.stderr.read()
-				output = (as_str(out) + "\n" + as_str(err)).strip()
-				if output:
-					glob["_"] = output
-				return output
 		if "\n" not in proc:
 			if proc.startswith("await "):
 				proc = proc[6:]
@@ -419,7 +421,7 @@ class UpdateExec(Database):
 				if not proc:
 					return
 				# Ignore commented messages
-				if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
+				if c[0] in COMM or c[:2] in ("//", "/*"):
 					return
 				if proc == "-" or proc.startswith("http://") or proc.startswith("https://"):
 					return

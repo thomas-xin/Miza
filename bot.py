@@ -2360,7 +2360,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if message.content:
 			c = no_md(message.content)
 			if c and not c.startswith(self.get_prefix(guild)):
-				if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
+				if c[0] in COMM or c[:2] in ("//", "/*"):
 					return False
 		u_id = verify_id(user)
 		if u_id in (member.id for member in message.mentions):

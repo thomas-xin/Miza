@@ -273,7 +273,7 @@ class UpdateTranslators(Database):
 		if not msg:
 			return
 		c = msg
-		if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
+		if c[0] in COMM or c[:2] in ("//", "/*"):
 			return
 		bot = self.bot
 		user = message.author
@@ -1929,7 +1929,7 @@ class Ask(Command):
 			if not content:
 				return
 			c = content
-			if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
+			if c[0] in COMM or c[:2] in ("//", "/*"):
 				return
 			if reset[0] and not is_curr:
 				reset[0] = False

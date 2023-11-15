@@ -102,7 +102,7 @@ def spec2cap():
 				v = rrams[i]
 				if cut > 0:
 					red = min(cut, v)
-					rrams[i] = max(v - red, 1073741824 + 1)
+					rrams[i] -= red
 					cut -= red
 					did.append(i)
 				else:
@@ -174,7 +174,7 @@ def spec2cap():
 				caps.append("sd")
 				done.append("sd")
 				v -= 5 * 1073741824
-		if c > 200000 and v > 1 * 1073741824 and vrams[i] > 4 * 1073741824:
+		if c > 200000 and vrams[i] > 4 * 1073741824:
 			caps.append("summ")
 			done.append("summ")
 			# v -= 1 * 1073741824
