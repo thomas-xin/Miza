@@ -54,6 +54,7 @@ if os.environ.get("AI_FEATURES", True):
 		"sentence-transformers>=2.2.2",
 		"soundfile>=0.12.1",
 		"tiktoken>=0.4.0",
+		"together>=0.2.7",
 		"tokenizers>=0.13.3",
 		"torch>=2.0.1",
 		"transformers>=4.31.0",

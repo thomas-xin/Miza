@@ -1810,6 +1810,37 @@ def instruct_structure(messages, exclude_first=True):
 		return "### Instruction:\n" + ins.popleft() + "\n\n" + "### History:\n" + "\n\n".join(ins) + "\n\n### Response:"
 	return "### Instruction:\n" + "\n\n".join(ins) + "\n\n### Response:"
 
+async def instruct(data, best=False):
+	bot = BOT[0]
+	c = await tcount(data["prompt"])
+	resp = None
+	if not best:
+		if c < 256:
+			data["model"] = "mythalion-13b"
+			try:
+				await process_image("lambda: 1+1", "$", (), cap="class", timeout=2)
+				return await process_image("GPTQm", "$", [data], cap="class", timeout=25)
+			except:
+				print_exc()
+				data["model"] = "gpt-3.5-turbo-instruct"
+		if not resp and AUTH.get("together_key"):
+			import together
+			together.api_key = AUTH["together_key"]
+			rdata = dict(
+				prompt=data["prompt"],
+				model="Gryphe/MythoMax-L2-13b",
+				temperature=data["temperature"] * 2 / 3,
+				top_k=round(data["top_p"] * 120),
+				top_p=data["top_p"],
+				repetition_penalty=(data["frequency_penalty"] + data["presence_penalty"]) / 4 + 1,
+				max_tokens=data["max_tokens"],
+			)
+			response = await asubmit(together.Complete.create, **rdata, timeout=60)
+			return response["output"]["choices"][0]["text"]
+	if not resp:
+		response = await asyncio.wait_for(bot.oai.completions.create(**data, timeout=60), timeout=70)
+		return response.choices[0].text
+
 
 class Ask(Command):
 	_timeout_ = 24
@@ -2338,26 +2369,11 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							presence_penalty=0,
 							user=str(user.id) if premium < 3 else str(hash(name)),
 						)
-						c = await tcount(prompt)
-						resp = None
-						if c < 1536:
-							data["model"] = "mythalion-13b"
-							try:
-								await process_image("lambda: 1+1", "$", (), cap="class", timeout=2)
-								resp = await process_image("GPTQm", "$", [data], cap="class", timeout=25)
-							except:
-								print_exc()
-								data["model"] = "gpt-3.5-turbo-instruct"
-						if not resp:
-							try:
-								response = await asyncio.wait_for(bot.oai.completions.create(**data, timeout=60), timeout=70)
-							except openai.BadRequestError:
-								raise
-							except Exception as e:
-								ex = e
-								print_exc()
-							else:
-								resp = response.choices[0].text
+						try:
+							resp = await instruct(data)
+						except:
+							print_exc()
+							resp = None
 						if resp:
 							print("Context response:", resp)
 							num = regexp(r"-?[0-9]+").findall(resp)
@@ -3097,19 +3113,7 @@ class Instruct(Command):
 			presence_penalty=0.4,
 			user=str(user.id) if premium < 3 else str(hash(user.name)),
 		)
-		c = await tcount(argv)
-		resp = None
-		if c < 1024:
-			data["model"] = "mythalion-13b"
-			try:
-				await process_image("lambda: 1+1", "$", (), cap="class", timeout=2)
-				resp = await process_image("GPTQm", "$", [data], cap="class", timeout=25)
-			except:
-				print_exc()
-				data["model"] = "gpt-3.5-turbo-instruct"
-		if not resp:
-			response = await asyncio.wait_for(bot.oai.completions.create(**data, timeout=60), timeout=70)
-			resp = response.choices[0].text
+		resp = await instruct(data)
 		ref = message
 		ms = split_across(resp, 1999, prefix="\xad")
 		s = ms[-1] if ms else code

@@ -1388,25 +1388,28 @@ gcancel = concurrent.futures.Future()
 ot = 0
 def ensure_gc(t):
 	global ot, gcancel
-	ot = max(ot, time.time() + t)
-	if gcancel.done():
-		gcancel = concurrent.futures.Future()
-	else:
-		try:
-			gcancel.set_result(None)
-		except concurrent.futures.InvalidStateError:
-			pass
 	try:
-		gcancel.result(timeout=t)
-	except concurrent.futures.TimeoutError:
-		pass
-	else:
-		gcancel = concurrent.futures.Future()
-		return
-	if ot and time.time() > ot:
-		with torch.no_grad():
-			torch.cuda.empty_cache()
-		ot = 0
+		ot = max(ot, time.time() + t)
+		if gcancel.done():
+			gcancel = concurrent.futures.Future()
+		else:
+			try:
+				gcancel.set_result(None)
+			except concurrent.futures.InvalidStateError:
+				pass
+		try:
+			gcancel.result(timeout=t)
+		except concurrent.futures.TimeoutError:
+			pass
+		else:
+			gcancel = concurrent.futures.Future()
+			return
+		if ot and time.time() > ot:
+			with torch.no_grad():
+				torch.cuda.empty_cache()
+			ot = 0
+	except:
+		traceback.print_exc()
 
 
 if "caption" in CAPS:
