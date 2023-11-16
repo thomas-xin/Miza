@@ -72,7 +72,7 @@ class_name = webdriver.common.by.By.CLASS_NAME
 css_selector = webdriver.common.by.By.CSS_SELECTOR
 xpath = webdriver.common.by.By.XPATH
 tag_name = webdriver.common.by.By.TAG_NAME
-driver_path = "misc/msedgedriver"
+driver_path = "misc/msedgedriver.exe"
 browsers = dict(
 	edge=dict(
 		driver=webdriver.edge.webdriver.WebDriver,
@@ -402,7 +402,7 @@ class Bot:
 		print(resp)
 		futs = []
 		for im in resp.data:
-			fut = exc.submit(self.session.get, im.url)
+			fut = exc.submit(self.session.get, im.url, verify=False)
 			futs.append(fut)
 		for fut in futs:
 			yield fut.result().content
@@ -450,7 +450,7 @@ class Bot:
 		print(resp)
 		futs = []
 		for im in resp.data:
-			fut = exc.submit(self.session.get, im.url)
+			fut = exc.submit(self.session.get, im.url, verify=False)
 			futs.append(fut)
 		for fut in futs:
 			yield fut.result().content, 180000
@@ -523,7 +523,7 @@ class Bot:
 			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 		}
 		print("Mage:", a)
-		resp = self.session.get(a, headers=headers)
+		resp = self.session.get(a, headers=headers, verify=False)
 		if resp.status_code in range(200, 400):
 			return [resp.content]
 		print(resp.status_code, resp.text)
@@ -540,11 +540,12 @@ class Bot:
 			"https://api.deepai.org/api/text2img",
 			files=dict(text=prompt),
 			headers=headers,
+			verify=False,
 		)
 		if resp.status_code in range(200, 400):
 			print("DeepAI:", resp.text)
 			url = resp.json()["output_url"]
-			b = self.session.get(url, headers=headers).content
+			b = self.session.get(url, headers=headers, verify=False).content
 			image = Image.open(io.BytesIO(b))
 			ims = [
 				image.crop((0, 0, 512, 512)),

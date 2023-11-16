@@ -272,7 +272,7 @@ def get_request(url):
 				with open(fn, "rb") as f:
 					print(f"Attachment {a_id} loaded from cache.")
 					return f.read()
-	with requests.get(url, headers=header(), stream=True, timeout=12) as resp:
+	with requests.get(url, headers=header(), stream=True, verify=False, timeout=12) as resp:
 		return resp.content
 
 
@@ -1801,7 +1801,7 @@ if "ytdl" in CAPS:
 				if not os.path.exists(fn):
 					part = fn + ".part"
 					sys.stderr.write(f"Incomplete download {part} {os.path.exists(part)}\n")
-					resp = requests.get(stream, headers=headers, stream=True)
+					resp = requests.get(stream, headers=headers, verify=False, stream=True)
 					length = int(resp.headers["Content-Length"])
 					sys.stderr.write(f"{resp} {length}\n")
 					resp.raise_for_status()
@@ -1810,7 +1810,7 @@ if "ytdl" in CAPS:
 					while len(b) < length:
 						sys.stderr.write(f"{len(b)}\n")
 						headers["Range"] = f"bytes={len(b)}-"
-						resp = requests.get(stream, headers=headers, stream=True)
+						resp = requests.get(stream, headers=headers, verify=False, stream=True)
 						resp.raise_for_status()
 						b += resp.raw.read()
 					if len(b) > length:

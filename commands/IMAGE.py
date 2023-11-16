@@ -2200,7 +2200,7 @@ class Art(Command):
 									kwargs["--mask"] = fm
 						for k, v in kwargs.items():
 							args.extend((k, v))
-						print(args)
+						# print(args)
 						if self.has_py39:
 							proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
 							try:

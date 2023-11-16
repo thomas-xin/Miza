@@ -2218,6 +2218,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 			text = ""
 			ex = RuntimeError("Maximum attempts exceeded.")
 			appended = False
+			vis_allowed = True
 			print("Chat", model, name, q, extensions)
 			for attempts in range(12):
 				if not bot.verify_integrity(message):
@@ -2272,7 +2273,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						cm2 = 20
 				else:
 					if 1:
-						if all(isinstance(m.content, str) for m in messages) or tool_choice != "auto":
+						if not vis_allowed or all(isinstance(m.content, str) for m in messages) or tool_choice != "auto":
 							model = "gpt-4-1106-preview"
 						else:
 							model = "gpt-4-vision-preview"
@@ -2420,10 +2421,27 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							continue
 						if premium >= 2:
 							tl = text.lower()
-							if any(s in tl for s in STOPS):
-								text = ""
-								redo = True
-								target_model = DEFMOD
+							redo = False
+							for s in STOPS:
+								if s in tl:
+									i = tl.index(s)
+									if "." in text[:i]:
+										text = text[:i].rsplit(".", 1)[0] + "."
+										a = await tcount(text)
+										if a < 64:
+											text = ""
+									else:
+										text = ""
+									redo = True
+									if model == "gpt-4-vision-preview":
+										target_model = "gpt4"
+										vis_allowed = False
+									else:
+										target_model = DEFMOD
+									break
+								else:
+									continue
+							if redo:
 								continue
 						text = text.strip()
 						break
@@ -2442,9 +2460,14 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							argv = ""
 						name = fc.function.name
 						res = text or ""
+						call = None
 						if name == "browse":
 							print("Browse query:", argv)
-							res = await process_image("BOT.browse", "$", [argv], cap="browse", timeout=60)
+							try:
+								res = await process_image("BOT.browse", "$", [argv], cap="browse", timeout=60)
+							except:
+								print_exc()
+								blocked.add("browse")
 							if res:
 								c = await tcount(res)
 								if c > 1440:
@@ -2481,6 +2504,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							except:
 								print_exc()
 								res = None
+								blocked.add("sympy")
 							if res:
 								c = await tcount(res)
 								if c > 512:
@@ -2513,7 +2537,11 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							resend = True
 						if name == "wolfram_alpha":
 							print("Wolfram Alpha query:", argv)
-							res = await process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60)
+							try:
+								res = await process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60)
+							except:
+								print_exc()
+								blocked.add("wolfram_alpha")
 							if res:
 								c = await tcount(res)
 								if c > 512:
@@ -2566,8 +2594,10 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								call = {"func": "loopqueue", "argv": int(args["value"])}
 							else:
 								call = {"func": args["mode"], "argv": int(args["value"])}
-						else:
+						elif name not in Functions:
 							raise ValueError("OpenAI API returned invalid or inactive function call.")
+						if not call:
+							continue
 						fname = call["func"]
 						argv = as_str(call.get("argv", ""))
 						args = argv.split()
@@ -2609,6 +2639,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								mresp = await send_with_react(channel, response, reference=not loop and message, reacts=react)
 							else:
 								mresp = response
+					continue
 				if mresp:
 					break
 				prompt = instruct_structure(used)
@@ -2642,10 +2673,23 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					text += response.choices[0].text
 					if premium >= 2:
 						tl = text.lower()
-						if any(s in tl for s in STOPS):
-							text = ""
-							redo = True
-							target_model = DEFMOD
+						redo = False
+						for s in STOPS:
+							if s in tl:
+								i = tl.index(s)
+								if "." in text[:i]:
+									text = text[:i].rsplit(".", 1)[0] + "."
+									a = await tcount(text)
+									if a < 64:
+										text = ""
+								else:
+									text = ""
+								redo = True
+								target_model = DEFMOD
+								break
+							else:
+								continue
+						if redo:
 							continue
 				elif model in GPTQ:
 					if "gptq" not in bot.caps:
