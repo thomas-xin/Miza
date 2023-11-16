@@ -1815,7 +1815,7 @@ async def instruct(data, best=False):
 	c = await tcount(data["prompt"])
 	resp = None
 	if not best:
-		if c < 256:
+		if c <= 256 and data["max_tokens"] <= 256:
 			data["model"] = "mythalion-13b"
 			try:
 				await process_image("lambda: 1+1", "$", (), cap="class", timeout=2)
@@ -3107,13 +3107,13 @@ class Instruct(Command):
 			model="gpt-3.5-turbo-instruct",
 			prompt=argv,
 			temperature=0.8,
-			max_tokens=4096 if premium else 1024,
+			max_tokens=4096 if premium >= 2 else 1024,
 			top_p=0.9,
 			frequency_penalty=0.8,
 			presence_penalty=0.4,
 			user=str(user.id) if premium < 3 else str(hash(user.name)),
 		)
-		resp = await instruct(data)
+		resp = await instruct(data, best=premium >= 3)
 		ref = message
 		ms = split_across(resp, 1999, prefix="\xad")
 		s = ms[-1] if ms else code
