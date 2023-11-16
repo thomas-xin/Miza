@@ -1582,12 +1582,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			pass
 		if not torch:
 			return ("File", url.rsplit("/", 1)[-1], "", None)
+		fut = None
 		if best:
-			fut = asubmit(self.gpt4v, url)
+			fut = create_task(self.gpt4v(url))
 		res = None
 		p1 = p2 = ""
 		try:
-			res = await process_image(url, "caption", ["-nogif", False], cap="caption", timeout=20)
+			res = await process_image(url, "caption", ["-nogif", best], cap="caption", timeout=20)
 			p1, p2 = res
 		except:
 			if res:
@@ -1605,25 +1606,25 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				tup = ("Text", p1, p2, False)
 		else:
 			tup = ("Image", p1, p2, best)
-		if best:
+		if fut:
 			try:
 				p3 = await asyncio.wait_for(asyncio.shield(fut), timeout=24)
 			except (T0, T1, T2):
 
 				async def recaption(h, p1, p2, fut, tup):
 					p3 = await fut
-					p1, p2 = sorted((p1, p2), key=len)
+					p1, p2 = sorted((p1, p2), key=lambda p: len(p) if p else 0)
 					tup = ("Image", p3, p2, best)
-					if len(p1) > 7 and " " in p1 and p1.isascii():
+					if p1 and len(p1) > 7 and " " in p1 and p1.isascii():
 						tup = ("Image", p3, p2 + "\n" + p1, best)
 					print("BEST:", tup)
 					self.analysed[h] = tup
 
 				create_task(recaption(h, p1, p2, fut, tup))
 			else:
-				p1, p2 = sorted((p1, p2), key=len)
+				p1, p2 = sorted((p1, p2), key=lambda p: len(p) if p else 0)
 				tup = (tup[0], p3, p2, best)
-				if len(p1) > 7 and " " in p1 and p1.isascii():
+				if p1 and len(p1) > 7 and " " in p1 and p1.isascii():
 					tup = (tup[0], p3, p2 + "\n" + p1, best)
 				print("BEST:", tup)
 		self.analysed[h] = tup
@@ -1631,11 +1632,21 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			self.analysed.pop(next(iter(self.analysed)))
 		return self.analysed[h][:-1] if self.analysed.get(h) else None
 
-	async def gpt4v(self, url):
+	async def gpt4v(self, url, best=False):
+		resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True)
+		if resp.headers.get("Content-Type") in ("image/png", "image/gif", "image/jpeg", "image/webp") and float(resp.headers.get("Content-Length", inf)) < 20 * 1e6:
+			data_url = url
+			resp.close()
+		else:
+			d = await asubmit(getattr, resp, "content")
+			resp.close()
+			b = await process_image(d, "resize_max", ["-nogif", 1024 if best else 512, False, "auto", "-f", "png"], timeout=10)
+			mime = magic.from_buffer(b)
+			data_url = "data:" + mime + ";base64," + base64.b64encode(b).rstrip(b"=").decode("ascii")
 		messages = [
 			cdict(role="user", content=[
 				cdict(type="text", text="Please describe this image in detail; be descriptive but concise!"),
-				cdict(type="image_url", image_url=cdict(url=url, detail="low")),
+				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
 		data = cdict(

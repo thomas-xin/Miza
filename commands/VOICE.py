@@ -5670,6 +5670,7 @@ class Transcribe(Command):
 
 class UpdateAudio(Database):
 	name = "audio"
+	destroyed = False
 
 	def __load__(self):
 		self.players = cdict()
@@ -5789,7 +5790,7 @@ class UpdateAudio(Database):
 			await bot.audio.asubmit("ytdl.update()")
 		esubmit(ytd.update)
 		esubmit(ytdl.update_dl, priority=True)
-		if not self.backup_sem.busy:
+		if not self.backup_sem.busy and not self.destroyed:
 			async with self.backup_sem:
 				await self.backup()
 
@@ -5814,6 +5815,7 @@ class UpdateAudio(Database):
 
 	# Stores all currently playing audio data to temporary database when bot shuts down
 	async def _destroy_(self, **void):
+		self.destroyed = True
 		await self.backup(force=True)
 		for file in tuple(ytdl.cache.values()):
 			if not file.loaded:
