@@ -990,6 +990,9 @@ def safe_save(fn, s):
 	if os.path.exists(fn):
 		with open(fn + "\x7f", "wb") as f:
 			f.write(s)
+		with open(f + "\x7f", "rb") as f:
+			if f.read(1) in (b"\x00", b" ", b""):
+				raise ValueError
 		with tracebacksuppressor(FileNotFoundError):
 			os.remove(fn + "\x7f\x7f")
 	if os.path.exists(fn) and not os.path.exists(fn + "\x7f\x7f"):

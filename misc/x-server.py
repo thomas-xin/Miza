@@ -153,7 +153,7 @@ def access(self):
 		't': self.time(),
 		'r': request.request_line,
 		's': status,
-		'b': dict.get(outheaders, 'Content-Length', '') or '-',
+		'b': str(dict.get(inheaders, 'Range', '') or '-') + "/" + str(dict.get(outheaders, 'Content-Length', '') or '-'),
 		'f': dict.get(inheaders, 'Referer', ''),
 		'a': dict.get(inheaders, 'User-Agent', ''),
 		'o': dict.get(inheaders, 'Host', '-'),
@@ -532,7 +532,7 @@ class Server:
 						d["original_url"] = url
 		return d
 
-	@cp.expose
+	@cp.expose("fi")
 	@hostmap
 	def fileinfo(self, path, **void):
 		cp.response.headers.update(SHEADERS)
@@ -865,15 +865,8 @@ transform: translate(-50%, -50%);
 									self.serving.setdefault(p, weakref.WeakSet()).add(f)
 								return resp
 							if info[1] > 256 * 1048576:
-								# uri = f"{API}/fileinfo/{orig_path}"
-								# if not cp.request.headers.get("Range") and len(urls) > 48:
-									# url = f"{HOST}/stream/?info={urllib.parse.quote_plus(uri)}"
-								# else:
-									# url = choice(
-										# "https://stream.miza-stream.workers.dev/",
-										# "https://stream.sub-stream.workers.dev/",
-									# ) + f"?info={urllib.parse.quote_plus(uri)}"
-								# raise cp.HTTPRedirect(url, status="307")
+								if 1:
+									raise cp.HTTPRedirect(f"https://stream.miza-stream.workers.dev/?i={orig_path}", status=307)
 								return self.dyn_serve(urls, size=info[1])
 							return self.concat(p, urls, name=info[0], mime=info[2], stn=stn)
 			f = open(p, "rb")
@@ -961,10 +954,12 @@ transform: translate(-50%, -50%);
 		if "Cf-Worker" in cp.request.headers and is_discord_attachment(url):
 			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 			fn = f"cache/attachment_{a_id}.bin"
-			if os.path.exists(fn):
-				mim = get_mime(fn)
-				return cp.lib.static.serve_file(fn, content_type=mim)
-			return self.stream(url)
+			# print(url, os.path.exists(fn))
+			if not os.path.exists(fn) or not os.path.getsize(fn):
+				return self.dstream(url, fn)
+			mim = get_mime(fn)
+			return cp.lib.static.serve_file(os.path.abspath(fn), content_type=mim)
+			# return self.stream(url)
 		raise cp.HTTPRedirect(url, status="307")
 
 	@tracebacksuppressor
@@ -977,15 +972,63 @@ transform: translate(-50%, -50%);
 			return self.bot_exec(f"bot.renew_attachment({repr(url)})")
 		return url
 
-	def stream(self, url):
+	def dstream(self, url, fn=None):
 		headers = fcdict(cp.request.headers)
 		headers.pop("Remote-Addr", None)
 		headers.pop("Host", None)
-		headers.pop("Range", None)
+		r = headers.pop("Range", None)
 		headers.update(Request.header())
+		if fn:
+			f = open(fn + "~", "wb")
 		with reqs.next().get(url, headers=headers, stream=True) as resp:
 			resp.raise_for_status()
-			yield from resp
+			size = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 1))
+			if r:
+				start, end = r.removeprefix("bytes=").split("-", 1)
+				if not start:
+					if not end:
+						return
+					start = size - int(end)
+					end = size - 1
+				elif not end:
+					end = size - 1
+				start, end = int(start), min(int(end) + 1, size)
+			else:
+				start = 0
+				end = size
+			rr = f"bytes {start}-{end - 1}/{size}"
+			print(r, rr)
+			cp.response.headers["Range"] = rr
+			cp.response.headers["Content-Length"] = end - start + 1
+			cp.response.headers["x-goog-stored-content-length"] = size
+			it = resp.iter_content(65536)
+			pos = 0
+			try:
+				while True:
+					b = ob = next(it)
+					if pos + len(ob) > end:
+						if pos >= end:
+							b = b""
+						else:
+							b = b[:end - pos]
+					pos += len(ob)
+					if start:
+						b2 = b[start:]
+						start -= len(b) - len(b2)
+						b = b2
+					if b:
+						yield b
+					if fn:
+						f.write(ob)
+			except StopIteration:
+				pass
+		if fn:
+			f.close()
+			with tracebacksuppressor:
+				if os.path.exists(fn):
+					return
+					# os.remove(fn)
+				os.rename(fn + "~", fn)
 
 	@tracebacksuppressor
 	def dyn_serve(self, urls, size=0):
@@ -1828,7 +1871,7 @@ transform: translate(-50%, -50%);
 				with open(fn, "w", encoding="utf-8") as f:
 					f.write(s)
 				return self.merge(name=name, index=1)
-			if mfs > 512 * 1048576:
+			if mfs > 4096 * 1048576:
 				fut = esubmit(shutil.copyfileobj, cp.request.body.fp, f, 65536)
 				try:
 					info = cdict(self.chunking[n])
@@ -1842,8 +1885,6 @@ transform: translate(-50%, -50%);
 				if xi % 8 < 2 or xi // 8 * 8 + 7 >= ceil(mfs / csize):
 					fut.result()
 					f.close()
-					if xi == 0:
-						info.mime = get_mime(fn)
 					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)})")
 					self.chunking[fn] = (url1, mid1)
 					with suppress(PermissionError, FileNotFoundError):
@@ -2846,6 +2887,9 @@ alert("File successfully deleted. Returning to home.");
 			else:
 				with open("saves/mpdata\x7f.json", "w") as f:
 					json.dump(self.mpdata, f)
+				with open("saves/mpdata\x7f.json", "rb") as f:
+					if f.read(1) in (b"\x00", b" ", b""):
+						raise ValueError
 				if os.path.exists("saves/mpdata\x7f\x7f.json"):
 					os.remove("saves/mpdata\x7f\x7f.json")
 				os.rename("saves/mpdata.json", "saves/mpdata\x7f\x7f.json")
@@ -2863,6 +2907,9 @@ alert("File successfully deleted. Returning to home.");
 			else:
 				with open("saves/mpact\x7f.json", "wb") as f:
 					pickle.dump(self.mpact, f)
+				with open("saves/mpact\x7f.json", "rb") as f:
+					if f.read(1) in (b"\x00", b" ", b""):
+						raise ValueError
 				if os.path.exists("saves/mpact\x7f\x7f.json"):
 					os.remove("saves/mpact\x7f\x7f.json")
 				os.rename("saves/mpact.json", "saves/mpact\x7f\x7f.json")
