@@ -1571,7 +1571,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return min_emoji(e)
 
 	analysed = {}
-	async def caption(self, url, best=False):
+	async def caption(self, url, best=False, timeout=24):
 		if "analysed" in self.data:
 			self.analysed = self.data.analysed
 		h = shash(url)
@@ -1588,7 +1588,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		res = None
 		p1 = p2 = ""
 		try:
-			res = await process_image(url, "caption", ["-nogif", best], cap="caption", timeout=20)
+			res = await process_image(url, "caption", ["-nogif", best], cap="caption", timeout=timeout)
 			p1, p2 = res
 		except:
 			if res:
@@ -1608,7 +1608,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			tup = ("Image", p1, p2, best)
 		if fut:
 			try:
-				p3 = await asyncio.wait_for(asyncio.shield(fut), timeout=24)
+				p3 = await asyncio.wait_for(asyncio.shield(fut), timeout=timeout)
 			except (T0, T1, T2):
 
 				async def recaption(h, p1, p2, fut, tup):
@@ -1642,7 +1642,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			resp.close()
 			b = await process_image(d, "resize_max", ["-nogif", 1024 if best else 512, False, "auto", "-f", "png"], timeout=10)
 			mime = magic.from_buffer(b)
-			data_url = "data:" + mime + ";base64," + base64.b64encode(b).rstrip(b"=").decode("ascii")
+			data_url = "data:" + mime + ";base64," + base64.b64encode(b).decode("ascii")
 		messages = [
 			cdict(role="user", content=[
 				cdict(type="text", text="Please describe this image in detail; be descriptive but concise!"),

@@ -1031,19 +1031,21 @@ transform: translate(-50%, -50%);
 
 	@tracebacksuppressor(GeneratorExit)
 	def _dyn_serve(self, urls, ranges, headers):
+		# print(headers, ranges)
 		for start, end in ranges:
 			pos = 0
 			rems = urls.copy()
 			futs = []
 			big = False
 			while rems:
-				u = rems.pop(0)
-				u = self.renew_url(u)
+				uo = rems.pop(0)
+				u = self.renew_url(uo)
+				# print(uo, u)
 				if "?size=" in u or "&size=" in u:
-					u, ns = u.replace("?size=", "&size").split("&size=", 1)
+					u, ns = u.replace("?size=", "&size=").split("&size=", 1)
 					ns = int(ns)
 				elif "?S=" in u or "&S=" in u:
-					u, ns = u.replace("?S=", "&S").split("&S=", 1)
+					u, ns = u.replace("?S=", "&S=").split("&S=", 1)
 					ns = int(ns)
 				elif u.startswith("https://s3-us-west-2"):
 					ns = 503316480
@@ -1066,7 +1068,8 @@ transform: translate(-50%, -50%);
 					else:
 						e -= 1
 					h2 = dict(h.items())
-					h2["range"] = f"bytes={s}-{e}"
+					h2["range"] = r = f"bytes={s}-{e}"
+					# print(u, r)
 					ex2 = None
 					for i in range(3):
 						resp = reqs.next().get(u, headers=h2, stream=True)
@@ -1830,10 +1833,13 @@ transform: translate(-50%, -50%);
 				try:
 					info = cdict(self.chunking[n])
 				except KeyError:
+					fut.result()
+					f.close()
+					f = open(fn, "rb")
 					info = self.chunking[n] = cdict(
-						mime="application/octet-stream",
+						mime=magic.from_file(f),
 					)
-				if xi % 8 < 2:
+				if xi % 8 < 2 or xi // 8 * 8 + 7 >= ceil(mfs / csize):
 					fut.result()
 					f.close()
 					if xi == 0:

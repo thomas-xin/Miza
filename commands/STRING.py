@@ -1199,6 +1199,7 @@ class Describe(Command):
 	example = ("describe https://cdn.discordapp.com/attachments/1088007891195265074/1097359599889289216/6e74595fa98e9c52e2fab6ece4639604.webp",)
 	rate_limit = (4, 5)
 	no_parse = True
+	_timeout_ = 24
 
 	async def __call__(self, bot, message, channel, guild, user, argv, **void):
 		if message.attachments:
@@ -1252,8 +1253,8 @@ class Describe(Command):
 		if not s:
 			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 			fut = asubmit(reqs.next().head, url, headers=Request.header(), stream=True)
-			cap = await self.bot.caption(url, best=premium >= 4)
-			s = "\n\n".join(cap).strip()
+			cap = await self.bot.caption(url, best=premium >= 4, timeout=480)
+			s = "\n\n".join(filter(bool, cap)).strip()
 			resp = await fut
 			name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
 			author = get_author(user)

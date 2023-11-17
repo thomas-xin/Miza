@@ -2296,7 +2296,7 @@ def from_bytes(b, save=None, nogif=False):
 			proc.terminate()
 	else:
 		exc = TypeError(f'Filetype "{mime}" is not supported.')
-	if not wand or mime.split("/", 1)[-1] in ("gif", "webp"):
+	if not wand or mime.split("/", 1)[-1] in ("gif", "webp", "ico", "x-icon"):
 		ib = io.BytesIO(b)
 		return Image.open(ib)
 	with wand.image.Image() as img:

@@ -571,23 +571,23 @@ class UpdateExec(Database):
 	async def stash(self, fn, start=0, end=inf, filename=None):
 		bot = self.bot
 		fns = [fn] if isinstance(fn, (str, bytes, memoryview, io.BytesIO, discord.File)) else fn
-		print("Stash", lim_str(str(fns), 80), start, end, filename)
+		print("Stash", lim_str(str(fns), 256), start, end, filename)
 		urls = []
 		mids = []
 		with FileStreamer(*fns) as f:
 			fn = f.filename or "untitled"
-			if start:
-				f.seek(start)
 			i = start
+			f.seek(i)
 			while i < end:
-				if i and end - i > 83886080 and "hmac_signed_session" in AUTH and not self.hmac_sem.busy:
+				b = None
+				if end - i > 83886080 and "hmac_signed_session" in AUTH and not self.hmac_sem.busy:
 					try:
 						async with self.hmac_sem:
 							b = await asubmit(f.read, 503316480)
 							if not b:
 								break
-							if len(b) < 83886080:
-								raise ValueError(f"Skipping small chunk {len(b)}")
+							if len(b) <= 100663296:
+								raise StopIteration(f"Skipping small chunk {len(b)}")
 							fn2 = filename or "c.7z"
 							resp = await asubmit(
 								reqs.next().post,
@@ -602,6 +602,10 @@ class UpdateExec(Database):
 							)
 							resp.raise_for_status()
 							url = resp.json()["url"].split("?", 1)[0]
+					except StopIteration:
+						if not b:
+							print_exc()
+							f.seek(i)
 					except:
 						print_exc()
 						f.seek(i)
@@ -614,13 +618,23 @@ class UpdateExec(Database):
 					fs = []
 					sizes = []
 					fn2 = filename or "c.b"
-					while len(fs) < 8:
-						b = f.read(25165824)
-						if not b:
-							break
-						fi = CompatFile(b, filename=fn2)
-						fs.append(fi)
-						sizes.append(len(b))
+					if b:
+						n = 0
+						while n < len(b):
+							bi = b[n:n + 25165824]
+							fi = CompatFile(bi, filename=fn2)
+							fs.append(fi)
+							sizes.append(len(bi))
+							n += 25165824
+						f.seek(i + len(b))
+					else:
+						while len(fs) < 8:
+							b = await asubmit(f.read, 25165824)
+							if not b:
+								break
+							fi = CompatFile(b, filename=fn2)
+							fs.append(fi)
+							sizes.append(len(b))
 					if not fs:
 						break
 					c_id = choice([c_id for c_id, flag in self.data.items() if flag & 16])
