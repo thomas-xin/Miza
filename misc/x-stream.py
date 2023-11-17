@@ -282,7 +282,7 @@ class Server:
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
-	def proxy(self, url=None):
+	def proxy(self, url=None, **void):
 		if not url:
 			return "Expected proxy URL."
 		try:

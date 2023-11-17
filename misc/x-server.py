@@ -538,6 +538,19 @@ class Server:
 		cp.response.headers.update(SHEADERS)
 		d = self._fileinfo(path)
 		cp.response.headers["Content-Type"] = "application/json"
+		if d.get("chunks") and "Cf-Worker" in cp.request.headers:
+			chunks = []
+			for url in d["chunks"]:
+				if not url.startswith(API) or "/u/" not in url or "?S=" not in url or int(url.rsplit("?S=", 1)[-1]) > 25165824:
+					chunks.append(url)
+					continue
+				id = url.rsplit("/", 1)[-1].split("?", 1)[0]
+				with tracebacksuppressor:
+					id = int.from_bytes(base64.urlsafe_b64decode(id + "=="), "big")
+				url = self.bot_exec(f"bot.renew_attachment({id})")
+				purl = "https://proxy.mizabot.xyz/proxy?S=" + url.rsplit("?S=", 1)[-1] + "&url=" + urllib.parse.quote_plus(url)
+				chunks.append(purl)
+			d["chunks"] = chunks
 		return orjson.dumps(d)
 
 	image_loaders = {}
