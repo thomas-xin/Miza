@@ -1585,10 +1585,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		fut = None
 		if best:
 			fut = create_task(self.gpt4v(url))
+		elif best is not None:
+			fut = asubmit(self.neva, url)
 		res = None
 		p1 = p2 = ""
 		try:
-			res = await process_image(url, "caption", ["-nogif", best], cap="caption", timeout=timeout)
+			res = await process_image(url, "caption", ["-nogif", bool(fut)], cap="caption", timeout=timeout)
 			p1, p2 = res
 		except:
 			if res:
@@ -1621,6 +1623,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					self.analysed[h] = tup
 
 				create_task(recaption(h, p1, p2, fut, tup))
+			except:
+				print_exc()
+				p1, p2 = sorted((p1, p2), key=lambda p: len(p) if p else 0)
+				tup = (tup[0], p2, p1, False)
+				print("WORST:", tup)
 			else:
 				p1, p2 = sorted((p1, p2), key=lambda p: len(p) if p else 0)
 				tup = (tup[0], p3, p2, best)
@@ -1663,13 +1670,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			response = await asyncio.wait_for(self.oai.chat.completions.create(**data, timeout=30), timeout=35)
 		except:
 			print_exc()
-			return await asubmit(self.replicate, url)
-		print("GPT4V:", response)
-		return response.choices[0].message.content
+			return await asubmit(self.ibv, url)
+		out = response.choices[0].message.content
+		print("GPT4V:", out)
+		return out
 
 	replicate_client = None
 	@functools.lru_cache(maxsize=64)
-	def replicate(self, url):
+	def ibv(self, url):
 		resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
 		if not self.replicate_client:
 			import replicate
@@ -1677,16 +1685,55 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		resp = self.replicate_client.run(
 			"joehoover/instructblip-vicuna13b:c4c54e3c8c97cd50c2d2fec9be3b6065563ccf7d43787fb99f84151b867178fe",
 			input=dict(
-				prompt="Describe only what this image contains in detail!",
+				prompt="Please describe this image in detail; be descriptive but concise!",
 				img=io.BytesIO(resp),
 				max_length=256,
 				temperature=0.75,
 				top_p=0.9,
-				top_k=0,
 				repetition_penalty=1.2,
 			),
 		)
-		return "".join(resp)
+		out = "".join(resp)
+		print("IBV:", out)
+		return out
+
+	@functools.lru_cache(maxsize=64)
+	def neva(self, url):
+		resp = await_fut(process_image(url, "resize_max", ["-nogif", 256, False, "auto", "-f", "png"], timeout=10))
+		i = "data:image/png;base64," + base64.b64encode(resp).decode("ascii")
+		resp = requests.post(
+			"https://api.ngc.nvidia.com/v2/predict/models/nvidia/neva-22b",
+			data=orjson.dumps(dict(
+				messages=[
+					dict(
+						content=f'Please describe this image in detail; be descriptive but concise! <img src="{i}" />',
+						role="user",
+					),
+					dict(
+						labels=dict(
+							creativity=6,
+							helpfulness=6,
+							humor=6,
+							quality=6,
+						),
+						role="assistant",
+					),
+				],
+				temperature=0.6,
+				top_p=0.9,
+				max_tokens=512,
+			)),
+			headers=Request.header({"Content-Type": "application/json"}),
+		)
+		
+		try:
+			resp.raise_for_status()
+		except:
+			print(resp, resp.content)
+			raise
+		out = resp.json()["choices"][0]["message"]["content"]
+		print("NeVa:", out)
+		return out
 
 	# Follows a message link, replacing emojis and user mentions with their icon URLs.
 	async def follow_to_image(self, url, follow=True):
@@ -3490,6 +3537,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if AUTH.get("status"):
 					text = AUTH["status"]
 				elif "blacklist" in self.data and self.data.blacklist.get(0):
+					if getattr(self, "laststat", None) == discord.Status.invisible:
+						return
 					text = "Currently under maintenance, please stay tuned!"
 				else:
 					text = f"{self.webserver}, to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}"
@@ -3501,7 +3550,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						text += "!"
 				# Status iterates through 5 possible choices
 				status = self.statuses[self.status_iter]
-				if status is discord.Streaming:
+				if "blacklist" in self.data and self.data.blacklist.get(0):
+					status = None
+					activity = discord.Game(name=text)
+				elif status is discord.Streaming:
 					activity = discord.Streaming(name=text, url=self.twitch_url)
 					status = discord.Status.dnd
 				else:
@@ -3509,17 +3561,26 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if changed:
 					print(repr(activity))
 				if self.audio:
-					audio_status = f"await asyncio.wait_for(client.change_presence(status=discord.Status."
-					if status == discord.Status.invisible:
+					audio_status = f"create_task(client.change_presence(status=discord.Status."
+					if status is None:
+						status = discord.Status.offline
+						create_task(self.audio.asubmit(audio_status + "offline))"))
+						await self.seen(self.user, event="misc", raw="Changing their status")
+					elif status == discord.Status.invisible:
 						status = discord.Status.idle
-						create_task(self.audio.asubmit(audio_status + "online),timeout=8)"))
+						create_task(self.audio.asubmit(audio_status + "online))"))
 						await self.seen(self.user, event="misc", raw="Changing their status")
 					else:
 						# if status == discord.Status.online:
-						create_task(self.audio.asubmit(audio_status + "dnd),timeout=8)"))
+						create_task(self.audio.asubmit(audio_status + "dnd))"))
 						create_task(self.seen(self.user, event="misc", raw="Changing their status"))
+				elif status == None:
+					status = discord.Status.offline
+				elif status == discord.Status.invisible:
+					status = discord.Status.idle
 				with suppress(ConnectionResetError):
 					await self.change_presence(activity=activity, status=status)
+				self.laststat = status
 				# Member update events are not sent through for the current user, so manually send a _seen_ event
 				await self.seen(self.user, event="misc", raw="Changing their status")
 
@@ -4428,41 +4489,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				emb.set_author(name=author.name, url=author.url, icon_url=author.icon_url)
 		if description:
 			# Separate text into paragraphs, then lines, then words, then characters and attempt to add them one at a time, adding extra embeds when necessary
-			curr = ""
-			if "\n\n" in description:
-				paragraphs = alist(p + "\n\n" for p in description.split("\n\n"))
-			else:
-				paragraphs = alist((description,))
-			while paragraphs:
-				para = paragraphs.popleft()
-				if len(para) > 4080:
-					temp = para[:4080]
-					try:
-						i = temp.rindex("\n")
-						s = "\n"
-					except ValueError:
-						try:
-							i = temp.rindex(" ")
-							s = " "
-						except ValueError:
-							paragraphs.appendleft(para[4080:])
-							paragraphs.appendleft(temp)
-							continue
-					paragraphs.appendleft(para[i + 1:])
-					paragraphs.appendleft(para[:i] + s)
-					continue
-				if len(curr) + len(para) > 4080:
-					emb.description = md(curr.strip())
-					curr = para
-					embs.append(emb)
-					emb = discord.Embed(colour=fin_col)
-					if col is not None:
-						col += 128
-						emb.colour = colour2raw(hue2colour(col))
-				else:
-					curr += para
-			if curr:
-				emb.description = md(curr.strip())
+			paragraphs = split_across(description, 4080)
+			for para in paragraphs[:-1]:
+				emb.description = md(para)
+				embs.append(emb)
+				emb = discord.Embed(colour=fin_col)
+				if col is not None:
+					col += 128
+					emb.colour = colour2raw(hue2colour(col))
+			if paragraphs:
+				para = paragraphs[-1]
+				emb.description = md(para)
 		if fields:
 			if issubclass(type(fields), collections.abc.Mapping):
 				fields = fields.items()
@@ -6436,7 +6473,8 @@ class AudioClientInterface:
 				for guild in bot.client.guilds:
 					futs.append(create_task(guild.change_voice_state(channel=None)))
 				for fut in futs:
-					await fut
+					with tracebacksuppressor:
+						await fut
 				if is_strict_running(self.proc):
 					force_kill(self.proc)
 				self.players.clear()
@@ -6445,7 +6483,8 @@ class AudioClientInterface:
 				print("Restarting audio client...")
 				self.__init__()
 				if "audio" in bot.data:
-					await bot.data.audio._bot_ready_(bot)
+					with tracebacksuppressor:
+						await bot.data.audio._bot_ready_(bot)
 			except:
 				print_exc()
 				await asyncio.sleep(1)

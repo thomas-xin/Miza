@@ -983,7 +983,7 @@ discord.gateway.DiscordWebSocket.identify = lambda self: mobile_identify(self)
 async def kill():
 	futs = deque()
 	with suppress(ConnectionResetError):
-		futs.append(create_task(client.change_presence(status=discord.Status.invisible)))
+		futs.append(create_task(client.change_presence(status=discord.Status.offline)))
 	for vc in client.voice_clients:
 		futs.append(create_task(vc.disconnect(force=True)))
 	for fut in futs:

@@ -974,7 +974,7 @@ class Pet(Command):
 
 
 class GMagik(Command):
-	name = ["Liquefy", "MagikGIF"]
+	name = ["Liquefy", "Crumple", "Crush", "MagikGIF"]
 	description = "Repeatedly applies the Magik image filter to supplied image."
 	usage = "<0:url> <cell_size(7)>? <iterations(64)>? <duration(2)>?"
 	example = ("gmagik https://mizabot.xyz/favicon", "liquefy https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 36")
@@ -1627,18 +1627,21 @@ STOPS = (
 	"m unable to provide",
 	"m unable to do",
 	"m unable to respond",
+	"m unable to comply",
 	"i cannot fulfil",
 	"i cannot assist",
 	"i cannot help",
 	"i cannot provide",
 	"i cannot do",
 	"i cannot respond",
+	"i cannot comply",
 	"i can't fulfil",
 	"i can't assist",
 	"i can't help",
 	"i can't provide",
 	"i can't do",
 	"i can't respond",
+	"i can't comply",
 )
 
 class Art(Command):

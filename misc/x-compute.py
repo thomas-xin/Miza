@@ -15,6 +15,7 @@ if os.path.exists("auth.json"):
 
 import io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, contextlib, filetype, ast, base64, hashlib, random
 import numpy as np
+import math
 from math import *
 sys.path.append("misc")
 
@@ -708,7 +709,7 @@ if "image" in CAPS:
 	# lab2hsv = ImageCms.buildTransformFromOpenProfiles(lab_p, hsv_p, "LAB", "HSV")
 
 
-if CAPS.intersection(("image", "caption", "sd", "sdxl", "sdxlr")):
+if CAPS.intersection(("image", "video", "caption", "sd", "sdxl", "sdxlr")):
 	def fromarray(arr, mode="L"):
 		try:
 			return Image.fromarray(arr, mode=mode)
@@ -1459,7 +1460,7 @@ if "caption" in CAPS:
 		# with torch.no_grad():
 		# 	torch.cuda.empty_cache()
 		return pytesseract.image_to_string(im, config="--psm 1")
-	dfut = exc.submit(download_model)
+	# dfut = exc.submit(download_model)
 
 	def caption(im, best=False):
 		if not best:
@@ -1540,118 +1541,6 @@ if "summ" in CAPS:
 		a = Embedder.encode(s).astype(np.float16)
 		exc.submit(ensure_gc, 20)
 		return a.data
-
-if "class" in CAPS:
-	from transformers import AutoTokenizer
-	from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig, exllama_set_max_input_length
-	m = "TheBloke/Mythalion-13B-GPTQ"
-	T = backup_model(AutoTokenizer.from_pretrained, m)
-	i = sorted(range(torch.cuda.device_count()), key=lambda i: ((d := torch.cuda.get_device_properties(i)).total_memory > 11, -d.total_memory))[-1]
-	bpw = 4
-	gs = 64
-	quantize_config = BaseQuantizeConfig(
-		bits=bpw,
-		group_size=gs,
-		damp_percent=0.1,
-		desc_act=True,
-		sym=True,
-		true_sequential=True,
-		model_name_or_path=None,
-		model_file_base_name="model",
-	)
-	M = AutoGPTQForCausalLM.from_quantized(
-		m,
-		revision=f"gptq-{bpw}bit-{gs}g-actorder_True",
-		max_memory={i: torch.cuda.get_device_properties(i).total_memory},
-		use_safetensors=True,
-		use_triton=False,
-		inject_fused_attention=False,
-		offload_folder="cache",
-		resume_download=True,
-	)
-	try:
-		M = exllama_set_max_input_length(M, 2048)
-	except ValueError:
-		traceback.print_exc()
-	print(M)
-
-	def moe_class(prompt, mocked={}):
-		if not mocked:
-			return
-		print("Mock prompt:", prompt)
-		tokens = T(prompt, return_tensors="pt").input_ids[:, -960:].to(M.device)
-		pc = len(tokens)
-		with torch.no_grad():
-			res = M.generate(
-				inputs=tokens,
-				temperature=0.1,
-				top_k=32,
-				top_p=0.1,
-				repetition_penalty=1.2,
-				max_new_tokens=32,
-				do_sample=True,
-			)
-			exc.submit(ensure_gc, 60)
-		text = T.decode(res[0])
-		text = text.removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
-		print("MOCK:", text)
-		try:
-			num = int(re.search("[0-9]+", text).group())
-			k = mocked.get(num)
-		except:
-			k = None
-		return k
-
-	def GPTQm(inputs):
-		model = inputs["model"]
-		prompt = inputs["prompt"]
-		temperature = inputs.get("temperature", 0.8)
-		max_tokens = inputs.get("max_tokens", 1024)
-		top_p = inputs.get("top_p", 1)
-		stop = inputs.get("stop")
-		frequency_penalty = inputs.get("frequency_penalty", 0.5)
-		presence_penalty = inputs.get("presence_penalty", 0.5)
-		model, tokeniser = M, T
-		prompt = prompt.strip()
-		tokens = tokeniser(prompt, return_tensors="pt").input_ids.to(model.device)
-		ex = RuntimeError("Maximum attempts exceeded.")
-		for i in range(3):
-			try:
-				with torch.no_grad():
-					res = model.generate(
-						inputs=tokens,
-						temperature=temperature * 2 / 3,
-						top_k=round(top_p * 120),
-						top_p=top_p,
-						repetition_penalty=(frequency_penalty + presence_penalty) / 4 + 1,
-						max_new_tokens=max_tokens,
-						do_sample=True,
-					)
-					exc.submit(ensure_gc, 60)
-			except RuntimeError as e:
-				if "probability tensor" in str(ex).lower():
-					print(repr(ex))
-					ex = e
-					continue
-				raise
-			break
-		else:
-			raise ex
-		text = tokeniser.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
-		text = text.strip().replace(":\n", ": ")
-		spl = text.split(": ")
-		if len(spl) > 1:
-			text = ""
-			while spl:
-				s = spl.pop(0)
-				if "\n" in s:
-					text += s.rsplit("\n", 1)[0]
-					break
-				text += s + ": "
-			text = text.strip()
-			if text.endswith(":"):
-				text = text.rsplit("\n", 1)[0]
-		return text
 
 if "math" in CAPS:
 	x_math = __import__("x-math")
@@ -1836,6 +1725,214 @@ if "ytdl" in CAPS:
 		) for entry in entries]
 		return output
 
+if "exl2" in CAPS:
+	import torch
+	torch.cuda._lazy_init()
+
+	def get_exl2(model):
+		gs = 128
+		bpw = 4
+		if model == "tess-120b":
+			m = "TheBloke/Tess-XL-v1.0-GPTQ"
+			req = 60
+		if model == "euryale-70b":
+			m = "TheBloke/Euryale-1.3-L2-70B-GPTQ"
+			req = 35
+		elif model == "wizard-70b":
+			m = "TheBloke/WizardLM-70B-V1.0-GPTQ"
+			req = 35
+		elif model == "xwin-70b":
+			m = "TheBloke/Xwin-LM-70B-V0.1-GPTQ"
+			req = 35
+		elif model == "nous-puffin-70b":
+			m = "TheBloke/Nous-Puffin-70B-GPTQ"
+			req = 35
+		elif model == "orca-70b":
+			m = "TheBloke/Llama-2-70B-Orca-200k-GPTQ"
+			req = 35
+		elif model == "kimiko-70b":
+			m = "TheBloke/fiction.live-Kimiko-V2-70B-GPTQ"
+			req = 35
+		elif model == "wizard-coder-34b":
+			m = "TheBloke/WizardCoder-Python-34B-V1.0-GPTQ"
+			req = 17
+		elif model == "wizard-vicuna-30b":
+			m = "TheBloke/Wizard-Vicuna-30B-Uncensored-GPTQ"
+			req = 16.5
+		elif model == "emerhyst-20b":
+			m = "TheBloke/Emerhyst-20B-GPTQ"
+			req = 10
+		elif model == "mythalion-13b":
+			m = "TheBloke/Mythalion-13B-GPTQ"
+			req = 6.5
+		elif model == "xwin-mlewd-13b":
+			m = "TheBloke/Xwin-MLewd-13B-v0.2-GPTQ"
+			req = 13
+			bpw = 8
+			gs = 32
+		else:
+			raise RuntimeError(f'Model "{model}" not found.')
+		base = cachedir + "/huggingface/transformers/" + "models--" + m.replace("/", "--")
+		return m, base, req, bpw, gs
+
+	def snap_exl2(base, assertion=False):
+		snap = base + "/snapshots"
+		if not os.path.exists(snap):
+			if assertion:
+				raise RuntimeError("Model is loading, please wait...")
+			print("Not Found:", snap)
+			import accelerate
+			from transformers import AutoModelForCausalLM
+			try:
+				with accelerate.init_empty_weights():
+					model = AutoModelForCausalLM.from_pretrained(
+						m,
+						revision=f"gptq-{bpw}bit-{gs}g-actorder_True",
+						device_map={},
+						offload_folder="cache",
+						torch_dtype=torch.float16,
+						resume_download=True,
+					)
+			except ValueError:
+				pass
+		return snap
+
+	def fold_exl2(base):
+		fold = base + "/exl2"
+		if not os.path.exists(fold) or not os.listdir(fold):
+			assert os.path.exists(snap)
+			if not os.path.exists(fold):
+				os.mkdir(fold)
+			if not os.path.exists(base + "/refs"):
+				raise FileNotFoundError("refs")
+			with open(base + "/refs/" + rev, "r") as f:
+				ref = f.read()
+			for fn in os.listdir(snap + "/" + ref):
+				if not os.path.exists(fold + "/" + fn):
+					os.symlink(snap + "/" + ref + "/" + fn, fold + "/" + fn)
+			if rev != "main":
+				with open(base + "/refs/main", "r") as f:
+					main = f.read()
+				for fn in os.listdir(snap + "/" + main):
+					if not os.path.exists(fold + "/" + fn):
+						os.symlink(snap + "/" + main + "/" + fn, fold + "/" + fn)
+		return fold
+
+	def load_exl2(model):
+		m, base, req, bpw, gs = get_exl2(model)
+		snap = snap_exl2(base)
+		fold = fold_exl2(base)
+
+	def load_models():
+		mods = dict(
+			load_exl2=(
+				"euryale-70b",
+				"xwin-70b",
+				"wizard-70b",
+				"kimiko-70b",
+				"wizard-coder-34b",
+				"xwin-mlewd-13b",
+				"mythalion-13b",
+				"emerhyst-20b",
+				"wizard-vicuna-30b",
+				"orca-70b",
+				"nous-puffin-70b",
+			),
+		)
+		for k, v in mods.items():
+			for m in v:
+				exc.submit(load_exl2, m, fail=True)
+				time.sleep(1)
+	if "load" in CAPS:
+		time.sleep(20)
+		load_models()
+		raise SystemExit
+
+	mcache = {}
+	def gen_exl2(model):
+		try:
+			return mcache[model]
+		except KeyError:
+			pass
+		m, base, req, bpw, gs = get_exl2(model)
+		snap = snap_exl2(base, assertion=True)
+		fold = fold_exl2(base)
+		from exllamav2 import ExLlamaV2Config, ExLlamaV2, ExLlamaV2Cache, ExLlamaV2Tokenizer
+		config = ExLlamaV2Config()
+		config.model_dir = fold
+		config.prepare()
+		config.max_seq_len = 8192
+		config.scale_pos_emb = 2
+		config.set_low_mem()
+		config.qkv_embed = False
+		M = ExLlamaV2(config)
+		T = ExLlamaV2Tokenizer(config)
+		cache = ExLlamaV2Cache(M, lazy=True)
+		n = 1 if req < 20 else 2
+		M.load_autosplit(cache, reserve_vram=[round(n * 1073741824)] * 1024)
+		tup = mcache[model] = M, T
+		return tup
+
+	def EXL2(inputs):
+		print("EXL2I:", inputs)
+		model = inputs["model"]
+		prompt = inputs["prompt"]
+		temperature = inputs.get("temperature", 0.8)
+		max_tokens = inputs.get("max_tokens", 1024)
+		top_p = inputs.get("top_p", 1)
+		stop = inputs.get("stop")
+		frequency_penalty = inputs.get("frequency_penalty", 0.5)
+		presence_penalty = inputs.get("presence_penalty", 0.5)
+		# time.sleep(10)
+		M, T = gen_exl2(model)
+		# time.sleep(10)
+		prompt = prompt.strip()
+		from exllamav2 import ExLlamaV2Cache
+		from exllamav2.generator import ExLlamaV2StreamingGenerator, ExLlamaV2Sampler
+		with torch.inference_mode():
+			cache = ExLlamaV2Cache(M)
+			generator = ExLlamaV2StreamingGenerator(M, cache, T)
+			generator.warmup()
+			ids = T.encode(prompt)
+			tokens_prompt = ids.shape[-1]
+			settings = ExLlamaV2Sampler.Settings()
+			settings.temperature = temperature
+			settings.top_p = top_p
+			settings.min_p = 1 - top_p
+			rp = ((frequency_penalty + presence_penalty) / 4 + 1) ** (1 / log2(2 + tokens_prompt / 16))
+			settings.token_repetition_penalty = rp
+			generator.set_stop_conditions((stop or []) + [T.eos_token])
+			output = generator.generate_simple(prompt, settings, max_tokens, token_healing=True)
+			outs = [output]
+			# generator.begin_stream(ids, settings, token_healing=True)
+			# outs = []
+			# for n in range(max_tokens):
+				# chunk, eos, _ = generator.stream()
+				# if not chunk:
+					# break
+				# outs.append(chunk)
+				# if eos:
+					# break
+			exc.submit(ensure_gc, 60)
+		text = "".join(outs).removeprefix("<s>").removeprefix(prompt).lstrip()
+		if stop:
+			for s in stop:
+				text = text.split(s, 1)[0]
+		# text = text.strip().replace(":\n", ": ")
+		# spl = text.split(": ")
+		# if len(spl) > 1:
+			# text = ""
+			# while spl:
+				# s = spl.pop(0)
+				# if "\n" in s:
+					# text += s.rsplit("\n", 1)[0]
+					# break
+				# text += s + ": "
+			# text = text.strip()
+			# if text.endswith(":"):
+				# text = text.rsplit("\n", 1)[0]
+		return text
+
 if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 	import convobot, torch
 	convobot.COMPUTE_LOAD = COMPUTE_LOAD
@@ -1946,7 +2043,6 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 						res = model.generate(
 							inputs=tokens,
 							temperature=temperature * 2 / 3,
-							top_k=round(top_p * 120),
 							top_p=top_p,
 							repetition_penalty=(frequency_penalty + presence_penalty) / 4 + 1,
 							max_new_tokens=max_tokens,
@@ -2018,7 +2114,6 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 						res = model.generate(
 							inputs=tokens,
 							temperature=temperature * 2 / 3,
-							top_k=round(top_p * 120),
 							top_p=top_p,
 							repetition_penalty=(frequency_penalty + presence_penalty) / 4 + 1,
 							max_new_tokens=max_tokens,

@@ -532,6 +532,7 @@ class Server:
 						d["original_url"] = url
 		return d
 
+	lfc = {}
 	@cp.expose("fi")
 	@hostmap
 	def fileinfo(self, path, **void):
@@ -539,18 +540,28 @@ class Server:
 		d = self._fileinfo(path)
 		cp.response.headers["Content-Type"] = "application/json"
 		if d.get("chunks") and "Cf-Worker" in cp.request.headers:
-			chunks = []
-			for url in d["chunks"]:
-				if not url.startswith(API) or "/u/" not in url or "?S=" not in url or int(url.rsplit("?S=", 1)[-1]) > 25165824:
-					chunks.append(url)
-					continue
-				id = url.rsplit("/", 1)[-1].split("?", 1)[0]
-				with tracebacksuppressor:
-					id = int.from_bytes(base64.urlsafe_b64decode(id + "=="), "big")
-				url = self.bot_exec(f"bot.renew_attachment({id})")
-				purl = "https://proxy.mizabot.xyz/proxy?S=" + url.rsplit("?S=", 1)[-1] + "&url=" + urllib.parse.quote_plus(url)
-				chunks.append(purl)
-			d["chunks"] = chunks
+			if path in self.lfc and utc() - self.lfc[path].get("t", 0) <= 80000:
+				d["chunks"] = self.lfc[path]["chunks"]
+			else:
+				chunks = []
+				for url in d["chunks"]:
+					if not url.startswith(API) or "/u/" not in url or "?S=" not in url:
+						chunks.append(url)
+						continue
+					id = url.rsplit("/", 1)[-1].split("?", 1)[0]
+					with tracebacksuppressor:
+						id = int.from_bytes(base64.urlsafe_b64decode(id + "=="), "big")
+					aurl = self.bot_exec(f"bot.renew_attachment({id})")
+					if int(url.rsplit("?S=", 1)[-1]) <= 25165824:
+						purl = "https://proxy.mizabot.xyz/proxy?S=" + url.rsplit("?S=", 1)[-1] + "&url=" + urllib.parse.quote_plus(aurl)
+					elif "?S=" not in aurl:
+						purl = aurl + "?S=" + url.rsplit("?S=", 1)[-1]
+					else:
+						purl = aurl
+					chunks.append(purl)
+				d["chunks"] = chunks
+				self.lfc[path] = cdict(t=utc(), chunks=chunks)
+				print(ts_us(), chunks)
 		return orjson.dumps(d)
 
 	image_loaders = {}
@@ -757,6 +768,8 @@ class Server:
 						cp.response.headers["Content-Type"] = get_mime(p)
 						f = open(p, "rb")
 						s = os.path.getsize(p)
+				else:
+					s = inf
 				if s < 1048576:
 					return f.read()
 				if s < 67108864:

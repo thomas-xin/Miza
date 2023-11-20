@@ -1651,10 +1651,17 @@ def get_url(obj, f=to_webp):
 		return obj
 	if BOT[0] and isinstance(obj, discord.Attachment):
 		return BOT[0].try_attachment(obj.url)
+	found = False
 	for attr in ("display_avatar", "avatar_url", "icon_url", "icon", "avatar"):
-		url = getattr(obj, attr, None)
+		try:
+			url = getattr(obj, attr)
+		except AttributeError:
+			continue
+		found = True
 		if url:
 			return f(url)
+	if found:
+		return "https://cdn.discordapp.com/embed/avatars/0.png"
 
 # Finds the best URL for a discord object's icon, prioritizing proxy_url for images if applicable.
 proxy_url = lambda obj: get_url(obj) or (obj.proxy_url if is_image(obj.proxy_url) else obj.url)
@@ -2483,7 +2490,7 @@ def force_kill(proc):
 
 async def proc_communicate(proc):
 	b = await proc.stdout.readline()
-	if not b or b == b"#R\n":
+	if b == b"#R\n":
 		return create_task(start_proc(proc))
 	while proc:
 		with tracebacksuppressor:
@@ -2544,21 +2551,21 @@ async def proc_distribute(proc):
 				for task in tasks:
 					i, cap, command, timeout = task
 					# print("NEW TASK:", proc, i, bot.compute_wait, lim_str(str(command), 64), frand())
-					if "ngptq" in proc.caps:
+					if "nvram" in proc.caps:
 						for p2 in PROCS.values():
-							if p2 and p2.used and "gptq" in p2.caps:
+							if p2 and p2.pid != proc.pid and p2.used and "vram" in p2.caps and set(p2.di).intersection(proc.di):
 								if utc() - p2.used < 10:
-									await asyncio.sleep(10)
+									await asyncio.sleep(5)
 								try:
 									await asyncio.wait_for(start_proc(p2, wait=True), timeout=timeout)
 								except:
 									create_task(asyncio.shield(start_proc(p2, wait=True, timeout=3600)))
 									raise
-					elif "gptq" in proc.caps:
+					elif "vram" in proc.caps:
 						for p2 in PROCS.values():
-							if p2 and p2.used and "ngptq" in p2.caps:
+							if p2 and p2.pid != proc.pid and p2.used and "nvram" in p2.caps and set(p2.di).intersection(proc.di):
 								if utc() - p2.used < 10:
-									await asyncio.sleep(10)
+									await asyncio.sleep(5)
 								try:
 									await asyncio.wait_for(start_proc(p2, wait=True), timeout=timeout)
 								except:
@@ -2686,15 +2693,13 @@ FIRST_LOAD = True
 # image			FFMPEG, CPU >3, RAM >6GB		multiprocessing support
 # browse		Windows, CPU >1, RAM >3GB		webdriver support
 # caption		Tesseract, CPU >5, RAM >14GB	cpu inference
-# agpt			CPU >1, RAM >22GB				(planned) reliability
 # video			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
 # ecdc			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
 # summ			GPU >200k, VRAM >4GB			GTX970, M60, GTX1050ti, P4, GTX1630
-# class			GPU >400k, VRAM >11GB			V100, RTX3060, A2000, RTX4070
 # sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
 # sdxl			GPU >400k, VRAM >9GB			GTX1080ti, RTX2080ti, RTX3060, RTX3080, A2000
 # sdxlr			GPU >400k, VRAM >11GB			V100, RTX3090, A4000, RTX4080, L4
-# gptq			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
+# exl2			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
 def spec2cap():
 	global FIRST_LOAD
 	try:
@@ -2733,26 +2738,33 @@ def spec2cap():
 		rrams = []
 	vrams = tuple(rrams)
 	cut = 0
-	did = ()
+	tdid = []
 	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(rrams, COMPUTE_POT)):
-		vram = sum(rrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
-		if vram > 44 * 1073741824:
-			cut = 44 * 1073741824
-			did = []
-			for i in COMPUTE_ORDER:
-				v = rrams[i]
-				if cut > 0:
-					red = min(cut, v)
-					rrams[i] -= red
-					cut -= red
-					did.append(i)
-				else:
-					break
-			if FIRST_LOAD:
-				FIRST_LOAD = False
-				yield [[], "load", "gptq"]
-			yield [did, "agpt", "gptq"]
-			done.append("gptq")
+		vrs = [11, 23, 44, 69]
+		using = False
+		for v in vrs:
+			vram = sum(rrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
+			if vram > v * 1073741824:
+				using = True
+				cut = v * 1073741824
+				did = []
+				for i in COMPUTE_ORDER:
+					vi = rrams[i]
+					if vi < 2 * 1073741824:
+						continue
+					if cut > 0:
+						red = min(cut, vi)
+						rrams[i] -= red
+						cut -= red
+						did.append(i)
+					else:
+						break
+				yield [did, "exl2", f"vr{v}"] + (["vram"] if v >= 12 else [])
+				tdid.extend(did)
+				done.append("exl2")
+		if using and FIRST_LOAD:
+			FIRST_LOAD = False
+			yield [[], "load", "exl2"]
 	if cc > 1:
 		caps.append("math")
 		if os.name == "nt" and ram > 3 * 1073741824:
@@ -2761,8 +2773,6 @@ def spec2cap():
 			caps.append("image")
 		if cc > 5 and ram > 14 * 1073741824 and tesseract:
 			caps.append("caption")
-		if AUTH.get("discord_token") and cc > 1 and ram > 22 * 1073741824:
-			caps.append("agpt")
 	if len(caps) > 1:
 		yield caps
 	if cc > 2:
@@ -2773,8 +2783,6 @@ def spec2cap():
 			caps.append("image")
 		if ram > 46 * 1073741824 and tesseract:
 			caps.append("caption")
-		if AUTH.get("discord_token") and not cut and cc > 3 and ram > 46 * 1073741824:
-			caps.append("agpt")
 		yield caps
 	if not DC:
 		return
@@ -2784,10 +2792,6 @@ def spec2cap():
 		if c > 100000 and v > 3 * 1073741824 and ffmpeg:
 			caps.append("video")
 			caps.append("ecdc")
-		if DC > 1 and c > 400000 and v > 11 * 1073741824 and (v > 29 * 1073741824 or "class" not in done):
-			caps.append("class")
-			done.append("class")
-			v -= 10 * 1073741824
 		if c > 400000 and v > 15 * 1073741824:
 			caps.append("sdxlr")
 			caps.append("sdxl")
@@ -2796,7 +2800,7 @@ def spec2cap():
 			v -= 15 * 1073741824
 		elif c > 400000 and IS_MAIN and vrams[i] > 15 * 1073741824:
 			caps.append("sdxlr")
-			caps.append("ngptq")
+			caps.append("nvram")
 			# done.append("sdxlr")
 			v -= 15 * 1073741824
 		elif c > 400000 and v > 9 * 1073741824:
@@ -2805,9 +2809,9 @@ def spec2cap():
 			caps.append("sd")
 			done.append("sdxl")
 			v -= 9 * 1073741824
-		elif c > 400000 and IS_MAIN and "sdxl" not in done and vrams[i] > 9 * 1073741824 and "class" not in caps:
+		elif c > 400000 and IS_MAIN and "sdxl" not in done and vrams[i] > 9 * 1073741824:
 			caps.append("sdxl")
-			caps.append("ngptq")
+			caps.append("nvram")
 			done.append("sdxl")
 			v -= 9 * 1073741824
 		if c > 200000 and v > 5 * 1073741824:
@@ -2815,17 +2819,20 @@ def spec2cap():
 				caps.append("sd")
 				done.append("sd")
 				v -= 5 * 1073741824
-		if c > 200000 and vrams[i] > 4 * 1073741824:
+		if c > 200000 and vrams[i] > 4 * 1073741824 and rrams[i] > 1073741824:
 			caps.append("summ")
 			done.append("summ")
 			# v -= 1 * 1073741824
 		# if v <= 4 * 1073741824:
 			# v = 0
 		# vrams[i] = v
-		if i not in did and "ngptq" in caps:
-			caps.remove("ngptq")
+		if i not in tdid and "nvram" in caps:
+			caps.remove("nvram")
 		if len(caps) > 1:
 			yield caps
+
+# print(list(spec2cap()))
+# raise
 
 def proc_start():
 	if torch and os.environ.get("AI_FEATURES", True):
@@ -2865,7 +2872,7 @@ async def sub_submit(cap, command, _timeout=12):
 		queue = bot.compute_queue.setdefault(cap, set())
 		queue.add(task)
 		procs = filter(bool, PROCS.values())
-		for proc in sorted(procs, key=lambda proc: (proc.sem.active, 0 in proc.di or "ngptq" in proc.caps, -COMPUTE_POT[proc.di[0]] if COMPUTE_POT and proc.di else random.random())):
+		for proc in sorted(procs, key=lambda proc: (proc.sem.active, 0 in proc.di or "nvram" in proc.caps, -COMPUTE_POT[proc.di[0]] if COMPUTE_POT and proc.di else random.random())):
 			if not proc:
 				continue
 			if cap in proc.caps and not proc.fut.done():
@@ -2892,7 +2899,8 @@ def sub_kill(start=True, force=False):
 	for p in PROCS.values():
 		if is_strict_running(p):
 			if not force:
-				p.sem.finish()
+				with tracebacksuppressor:
+					p.sem.finish()
 			force_kill(p)
 	PROCS.clear()
 	PROC_RESP.clear()
@@ -3978,13 +3986,18 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 	sessions = ()
 
 	@classmethod
-	def header(cls):
-		return {
+	def header(cls, base=(), **fields):
+		head = {
 			"User-Agent": f"Mozilla/5.{random.randint(1, 9)} (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(xrand(1, 255)) for _ in loop(4)),
 			"X-Real-Ip": ".".join(str(xrand(1, 255)) for _ in loop(4)),
 		}
+		if base:
+			head.update(base)
+		if fields:
+			head.update(fields)
+		return head
 	headers = header
 
 	@tracebacksuppressor

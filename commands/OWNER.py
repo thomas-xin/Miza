@@ -124,12 +124,12 @@ class Restart(Command):
 						await fut
 				await kill
 				await save
-		with suppress():
-			await bot.close()
 		if name.casefold() == "shutdown":
 			touch(bot.shutdown)
 		else:
 			touch(bot.restart)
+		with suppress():
+			await bot.close()
 		# bot.close()
 		del client
 		del bot

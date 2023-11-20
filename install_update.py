@@ -56,9 +56,9 @@ if os.environ.get("AI_FEATURES", True):
 		"tiktoken>=0.4.0",
 		"together>=0.2.7",
 		"tokenizers>=0.13.3",
-		"torch>=2.0.1",
+		"torch>=2.1.1",
 		"transformers>=4.31.0",
-		"xformers>=0.0.21",
+		"xformers>=0.0.22",
 	))
 
 # Parsed requirements.txt
@@ -122,14 +122,14 @@ except:
     print_exc()
     subprocess.run([python, "-m", "pip", "install", "httpx[http2]>=0.24.0", "--upgrade", "--user"])
 
-if os.name == "nt" and os.environ.get("AI_FEATURES", True):
-    try:
-        pkg_resources.get_distribution("bitsandbytes")
-    except:
-        dist = pkg_resources.get_distribution("bitsandbytes-windows")
-        fold = dist.module_path + "/bitsandbytes_windows-" + dist.version + ".dist-info"
-        if os.path.exists(fold):
-            os.rename(fold, fold.replace("_windows", ""))
+# if os.name == "nt" and os.environ.get("AI_FEATURES", True):
+    # try:
+        # pkg_resources.get_distribution("bitsandbytes")
+    # except:
+        # dist = pkg_resources.get_distribution("bitsandbytes-windows")
+        # fold = dist.module_path + "/bitsandbytes_windows-" + dist.version + ".dist-info"
+        # if os.path.exists(fold):
+            # os.rename(fold, fold.replace("_windows", ""))
 
 if os.environ.get("AI_FEATURES", True):
 	try:
@@ -137,8 +137,14 @@ if os.environ.get("AI_FEATURES", True):
 	except (pkg_resources.DistributionNotFound, AssertionError):
 		subprocess.run([python, "-m", "pip", "install", "git+https://github.com/facebookresearch/encodec", "--upgrade", "--user"])
 	try:
-		assert pkg_resources.get_distribution("auto-gptq").version >= "0.4.2+cu118"
+		assert pkg_resources.get_distribution("exllamav2").version >= "0.0.8"
 	except (pkg_resources.DistributionNotFound, AssertionError):
-		subprocess.run([python, "-m", "pip", "install", "auto-gptq", "--upgrade", "--user", "--extra-index-url", "https://huggingface.github.io/autogptq-index/whl/cu118/"])
+		vi = f"{sys.version_info.major}{sys.version_info.minor}"
+		oi = "win_amd64" if os.name == "nt" else "linux_x86_64"
+		subprocess.run([python, "-m", "pip", "install", "--upgrade", "--user", f"https://github.com/turboderp/exllamav2/releases/download/v0.0.8/exllamav2-0.0.8+cu121-cp{vi}-cp{vi}-{oi}.whl"])
+	# try:
+		# assert pkg_resources.get_distribution("auto-gptq").version >= "0.5.1"
+	# except (pkg_resources.DistributionNotFound, AssertionError):
+		# subprocess.run([python, "-m", "pip", "install", "auto-gptq", "--upgrade", "--user", "--extra-index-url", "https://huggingface.github.io/autogptq-index/whl/cu118/"])
 
 print("Installer terminated.")
