@@ -130,14 +130,21 @@ if not is_sub:
 		try:
 			import cpuinfo, psutil
 			if DC:
-				import torch, torchvision
+				import torch, torchvision, xformers
 				if not torch.cuda.is_available() or not torchvision._HAS_OPS:
 					raise ImportError
 		except ImportError:
 			subprocess.run([sys.executable, "-m", "pip", "install", "py-cpuinfo", "--upgrade", "--user"])
 			subprocess.run([sys.executable, "-m", "pip", "install", "psutil", "--upgrade", "--user"])
 			if DC:
-				subprocess.run([sys.executable, "-m", "pip", "install", "torch==2.0.1+cu118", "torchvision==0.15.2+cu118", "torchaudio==2.0.2", "--index-url", "https://download.pytorch.org/whl/cu118", "--upgrade", "--user"])
+				subprocess.run([python, "-m", "pip", "install", "xformers", "--upgrade", "--user", "--index-url", "https://download.pytorch.org/whl/cu121"])
+				subprocess.run([python, "-m", "pip", "install", "torchvision", "torchaudio", "--upgrade", "--user", "--index-url", "https://download.pytorch.org/whl/cu121"])
+				try:
+					assert pkg_resources.get_distribution("exllamav2").version >= "0.0.8"
+				except (pkg_resources.DistributionNotFound, AssertionError):
+					vi = f"{sys.version_info.major}{sys.version_info.minor}"
+					oi = "win_amd64" if os.name == "nt" else "linux_x86_64"
+					subprocess.run([python, "-m", "pip", "install", "--upgrade", "--user", f"https://github.com/turboderp/exllamav2/releases/download/v0.0.8/exllamav2-0.0.8+cu121-cp{vi}-cp{vi}-{oi}.whl"])
 				import torch
 			import cpuinfo, psutil
 

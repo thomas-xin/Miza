@@ -45,15 +45,13 @@ FIRST_LOAD = True
 # image			FFMPEG, CPU >3, RAM >6GB		multiprocessing support
 # browse		Windows, CPU >1, RAM >3GB		webdriver support
 # caption		Tesseract, CPU >5, RAM >14GB	cpu inference
-# agpt			CPU >1, RAM >22GB				(planned) reliability
 # video			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
 # ecdc			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
 # summ			GPU >200k, VRAM >4GB			GTX970, M60, GTX1050ti, P4, GTX1630
-# class			GPU >400k, VRAM >11GB			V100, RTX3060, A2000, RTX4070
 # sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
 # sdxl			GPU >400k, VRAM >9GB			GTX1080ti, RTX2080ti, RTX3060, RTX3080, A2000
 # sdxlr			GPU >400k, VRAM >11GB			V100, RTX3090, A4000, RTX4080, L4
-# gptq			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
+# exl2			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
 def spec2cap():
 	global FIRST_LOAD
 	try:
@@ -92,26 +90,33 @@ def spec2cap():
 		rrams = []
 	vrams = tuple(rrams)
 	cut = 0
-	did = ()
+	tdid = []
 	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(rrams, COMPUTE_POT)):
-		vram = sum(rrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
-		if vram > 44 * 1073741824:
-			cut = 44 * 1073741824
-			did = []
-			for i in COMPUTE_ORDER:
-				v = rrams[i]
-				if cut > 0:
-					red = min(cut, v)
-					rrams[i] -= red
-					cut -= red
-					did.append(i)
-				else:
-					break
-			if FIRST_LOAD:
-				FIRST_LOAD = False
-				yield [[], "load", "gptq"]
-			yield [did, "agpt", "gptq"]
-			done.append("gptq")
+		vrs = [11, 23, 44, 69]
+		using = False
+		for v in vrs:
+			vram = sum(rrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
+			if vram > v * 1073741824:
+				using = True
+				cut = v * 1073741824
+				did = []
+				for i in COMPUTE_ORDER:
+					vi = rrams[i]
+					if vi < 2 * 1073741824:
+						continue
+					if cut > 0:
+						red = min(cut, vi)
+						rrams[i] -= red
+						cut -= red
+						did.append(i)
+					else:
+						break
+				yield [did, "exl2", f"vr{v}"] + (["vram"] if v >= 12 else [])
+				tdid.extend(did)
+				done.append("exl2")
+		if using and FIRST_LOAD:
+			FIRST_LOAD = False
+			yield [[], "load", "exl2"]
 	if cc > 1:
 		caps.append("math")
 		if os.name == "nt" and ram > 3 * 1073741824:
@@ -120,8 +125,6 @@ def spec2cap():
 			caps.append("image")
 		if cc > 5 and ram > 14 * 1073741824 and tesseract:
 			caps.append("caption")
-		if AUTH.get("discord_token") and cc > 1 and ram > 22 * 1073741824:
-			caps.append("agpt")
 	if len(caps) > 1:
 		yield caps
 	if cc > 2:
@@ -132,8 +135,6 @@ def spec2cap():
 			caps.append("image")
 		if ram > 46 * 1073741824 and tesseract:
 			caps.append("caption")
-		if AUTH.get("discord_token") and not cut and cc > 3 and ram > 46 * 1073741824:
-			caps.append("agpt")
 		yield caps
 	if not DC:
 		return
@@ -143,10 +144,6 @@ def spec2cap():
 		if c > 100000 and v > 3 * 1073741824 and ffmpeg:
 			caps.append("video")
 			caps.append("ecdc")
-		if DC > 1 and c > 400000 and v > 11 * 1073741824 and (v > 29 * 1073741824 or "class" not in done):
-			caps.append("class")
-			done.append("class")
-			v -= 10 * 1073741824
 		if c > 400000 and v > 15 * 1073741824:
 			caps.append("sdxlr")
 			caps.append("sdxl")
@@ -155,7 +152,7 @@ def spec2cap():
 			v -= 15 * 1073741824
 		elif c > 400000 and IS_MAIN and vrams[i] > 15 * 1073741824:
 			caps.append("sdxlr")
-			caps.append("ngptq")
+			caps.append("nvram")
 			# done.append("sdxlr")
 			v -= 15 * 1073741824
 		elif c > 400000 and v > 9 * 1073741824:
@@ -164,9 +161,9 @@ def spec2cap():
 			caps.append("sd")
 			done.append("sdxl")
 			v -= 9 * 1073741824
-		elif c > 400000 and IS_MAIN and "sdxl" not in done and vrams[i] > 9 * 1073741824 and "class" not in caps:
+		elif c > 400000 and IS_MAIN and "sdxl" not in done and vrams[i] > 9 * 1073741824:
 			caps.append("sdxl")
-			caps.append("ngptq")
+			caps.append("nvram")
 			done.append("sdxl")
 			v -= 9 * 1073741824
 		if c > 200000 and v > 5 * 1073741824:
@@ -174,15 +171,15 @@ def spec2cap():
 				caps.append("sd")
 				done.append("sd")
 				v -= 5 * 1073741824
-		if c > 200000 and vrams[i] > 4 * 1073741824:
+		if c > 200000 and vrams[i] > 4 * 1073741824 and rrams[i] > 1073741824:
 			caps.append("summ")
 			done.append("summ")
 			# v -= 1 * 1073741824
 		# if v <= 4 * 1073741824:
 			# v = 0
 		# vrams[i] = v
-		if i not in did and "ngptq" in caps:
-			caps.remove("ngptq")
+		if i not in tdid and "nvram" in caps:
+			caps.remove("nvram")
 		if len(caps) > 1:
 			yield caps
 
@@ -465,22 +462,22 @@ try:
 			except OSError:
 				pass
 		ram_name = globals().get("RAM_NAME") or "RAM"
-		if ram_name == "RAM" and os.name == "nt" and globals().get("WMI") is not False:
-			if not globals().get("WMI"):
-				try:
-					import wmi
-					globals()["WMI"] = wmi.WMI()
-				except:
-					print_exc()
-					globals()["WMI"] = False
-			if WMI:
-				OS = WMI.Win32_Operatingsystem()[0]
-				cswap = (int(OS.TotalVirtualMemorySize) - int(OS.FreeVirtualMemory)) * 1024 - psutil.virtual_memory().used
-				if cswap > sinfo.used:
-					class mtemp:
-						def __init__(self, used, total):
-							self.used, self.total = used, total
-					sinfo = mtemp(used=cswap, total=sinfo.total)
+		if os.name == "nt" and not globals().get("WMI"):
+			try:
+				import wmi
+				globals()["WMI"] = wmi.WMI()
+			except:
+				print_exc()
+				globals()["WMI"] = False
+		if globals().get("WMI") is not False:
+			OS = WMI.Win32_Operatingsystem()[0]
+			cswap = (int(OS.TotalVirtualMemorySize) - int(OS.FreeVirtualMemory)) * 1024 - psutil.virtual_memory().used
+			if cswap > sinfo.used:
+				class mtemp:
+					def __init__(self, used, total):
+						self.used, self.total = used, total
+				sinfo = mtemp(used=cswap, total=sinfo.total)
+			if ram_name == "RAM":
 				ram = WMI.Win32_PhysicalMemory()[0]
 				ram_speed = ram.ConfiguredClockSpeed
 				ram_type = ram.SMBIOSMemoryType

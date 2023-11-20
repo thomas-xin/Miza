@@ -141,6 +141,7 @@ if os.environ.get("AI_FEATURES", True):
 		assert pkg_resources.get_distribution("torch").version >= "2.1.0"
 	except (pkg_resources.DistributionNotFound, AssertionError):
 		subprocess.run([python, "-m", "pip", "install", "xformers", "--upgrade", "--user", "--index-url", "https://download.pytorch.org/whl/cu121"])
+		subprocess.run([python, "-m", "pip", "install", "torchvision", "torchaudio", "--upgrade", "--user", "--index-url", "https://download.pytorch.org/whl/cu121"])
 	try:
 		assert pkg_resources.get_distribution("exllamav2").version >= "0.0.8"
 	except (pkg_resources.DistributionNotFound, AssertionError):
