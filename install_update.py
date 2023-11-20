@@ -56,9 +56,9 @@ if os.environ.get("AI_FEATURES", True):
 		"tiktoken>=0.4.0",
 		"together>=0.2.7",
 		"tokenizers>=0.13.3",
-		"torch>=2.1.1",
+		# "torch>=2.1.1",
 		"transformers>=4.31.0",
-		"xformers>=0.0.22",
+		"tomesd>=0.1.3",
 	))
 
 # Parsed requirements.txt
@@ -137,14 +137,15 @@ if os.environ.get("AI_FEATURES", True):
 	except (pkg_resources.DistributionNotFound, AssertionError):
 		subprocess.run([python, "-m", "pip", "install", "git+https://github.com/facebookresearch/encodec", "--upgrade", "--user"])
 	try:
+		assert pkg_resources.get_distribution("xformers").version >= "0.0.22"
+		assert pkg_resources.get_distribution("torch").version >= "2.1.0"
+	except (pkg_resources.DistributionNotFound, AssertionError):
+		subprocess.run([python, "-m", "pip", "install", "xformers", "--upgrade", "--user", "--index-url", "https://download.pytorch.org/whl/cu121"])
+	try:
 		assert pkg_resources.get_distribution("exllamav2").version >= "0.0.8"
 	except (pkg_resources.DistributionNotFound, AssertionError):
 		vi = f"{sys.version_info.major}{sys.version_info.minor}"
 		oi = "win_amd64" if os.name == "nt" else "linux_x86_64"
 		subprocess.run([python, "-m", "pip", "install", "--upgrade", "--user", f"https://github.com/turboderp/exllamav2/releases/download/v0.0.8/exllamav2-0.0.8+cu121-cp{vi}-cp{vi}-{oi}.whl"])
-	# try:
-		# assert pkg_resources.get_distribution("auto-gptq").version >= "0.5.1"
-	# except (pkg_resources.DistributionNotFound, AssertionError):
-		# subprocess.run([python, "-m", "pip", "install", "auto-gptq", "--upgrade", "--user", "--extra-index-url", "https://huggingface.github.io/autogptq-index/whl/cu118/"])
 
 print("Installer terminated.")

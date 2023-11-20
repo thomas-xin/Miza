@@ -11,6 +11,7 @@ print_exc = lambda: sys.stdout.write(traceback.format_exc())
 print = lambda *args, sep=" ", end="\n": sys.stdout.buffer.write(f"~print({repr(sep.join(map(str, args)))},end={repr(end)})\n".encode("utf-8"))
 
 if torch and torch.cuda.is_available():
+	torch.backends.cuda.matmul.allow_tf32 = True
 	torch.cuda._lazy_init()
 	try:
 		torch.cuda.set_enabled_lms(True)
@@ -750,6 +751,12 @@ class Bot:
 						except AttributeError:
 							pipe = pipe.to(f"cuda:{device}")
 						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+						try:
+							pipe.enable_xformers_memory_efficient_attention()
+							import tomesd
+							tomesd.apply_patch(pipe, ratio=0.5)
+						except:
+							print_exc()
 				except Exception as ex:
 					if isinstance(ex, RuntimeError):
 						if sdxl:
@@ -983,6 +990,12 @@ class Bot:
 						except AttributeError:
 							pipe = pipe.to(f"cuda:{device}")
 						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+						try:
+							pipe.enable_xformers_memory_efficient_attention()
+							import tomesd
+							tomesd.apply_patch(pipe, ratio=0.5)
+						except:
+							print_exc()
 				except Exception as ex:
 					if isinstance(ex, RuntimeError):
 						raise

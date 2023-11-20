@@ -139,6 +139,7 @@ except:
 	hwaccel = "d3d11va" if os.name == "nt" else "auto"
 else:
 	hwaccel = "cuda" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
+	torch.backends.cuda.matmul.allow_tf32 = True
 
 if not hasattr(time, "time_ns"):
 	time.time_ns = lambda: int(time.time() * 1e9)
@@ -1727,6 +1728,7 @@ if "ytdl" in CAPS:
 
 if "exl2" in CAPS:
 	import torch
+	torch.backends.cuda.matmul.allow_tf32 = True
 	torch.cuda._lazy_init()
 
 	def get_exl2(model):
