@@ -92,7 +92,7 @@ def spec2cap():
 	cut = 0
 	tdid = []
 	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(rrams, COMPUTE_POT)):
-		vrs = [11, 23, 44, 69]
+		vrs = [23, 44, 11, 69]
 		using = False
 		for v in vrs:
 			vram = sum(rrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
@@ -102,7 +102,7 @@ def spec2cap():
 				did = []
 				for i in COMPUTE_ORDER:
 					vi = rrams[i]
-					if vi < 2 * 1073741824:
+					if vi < 2 * 1073741824 or (vi < v / 2 * 1073741824 and i in tdid):
 						continue
 					if cut > 0:
 						red = min(cut, vi)

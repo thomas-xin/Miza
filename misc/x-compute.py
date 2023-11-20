@@ -1461,7 +1461,7 @@ if "caption" in CAPS:
 		# with torch.no_grad():
 		# 	torch.cuda.empty_cache()
 		return pytesseract.image_to_string(im, config="--psm 1")
-	# dfut = exc.submit(download_model)
+	dfut = exc.submit(download_model)
 
 	def caption(im, best=False):
 		if not best:
