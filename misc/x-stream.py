@@ -12,6 +12,7 @@ class EndpointRedirects(Dispatcher):
 	def __call__(self, path):
 		p = path.strip("/")
 		first = p.split("/", 1)[0]
+		print(p, first)
 		if not p:
 			p = "index.html"
 		elif first in ("home", "index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"):
