@@ -2,7 +2,6 @@ import requests, logging, random, datetime, time, os, sys, json, concurrent.futu
 import cherrypy as cp
 url_unparse = urllib.parse.unquote_plus
 
-
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=128)
 ADDRESS = "0.0.0.0"
 PORT = 443
@@ -87,6 +86,17 @@ MIMES = dict(
 	wav="audio/x-wav",
 	mp4="video/mp4",
 )
+
+__scales = ("", "k", "M", "G", "T", "P", "E", "Z", "Y")
+
+def byte_scale(n, ratio=1024):
+	e = 0
+	while n >= ratio:
+		n /= ratio
+		e += 1
+		if e >= len(__scales) - 1:
+			break
+	return f"{round(n, 4)} {__scales[e]}"
 
 
 class Server:
