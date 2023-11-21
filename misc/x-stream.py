@@ -262,10 +262,12 @@ class Server:
 			raise cp.HTTPRedirect(self.upcache[url], 307)
 		except KeyError:
 			pass
+		print("Uncached:", url)
 		try:
 			with self.session.head(url, verify=False, allow_redirects=False) as resp:
 				url = self.upcache[url] = resp.headers.get("Location") or url
-		except:
+		except Exception as ex:
+			print("Error:", repr(ex))
 			raise cp.HTTPRedirect("https://mizabot.xyz/notfound.png", 307)
 		raise cp.HTTPRedirect(self.upcache[url], 307)
 
