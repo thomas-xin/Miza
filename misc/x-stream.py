@@ -139,6 +139,7 @@ class Server:
 					info = self.cache[irl][1]
 				else:
 					info = self.cache[irl][1]
+				fn = info["filename"]
 				mim = info["mimetype"]
 				attachment = filename or fn
 				size = info["size"]
@@ -301,6 +302,11 @@ class Server:
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
 		return resp.iter_content(65536)
+
+	@cp.expose
+	def cache(self):
+		cp.response.headers["Content-Type"] = "application/json"
+		return json.dumps(self.cache)
 
 	@cp.expose
 	def stream(self, info=None):
