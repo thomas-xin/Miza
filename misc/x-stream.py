@@ -228,7 +228,7 @@ class Server:
 		rquery = cp.request.query_string
 		if rquery:
 			rquery = "?" + rquery
-		irl = f"{self.state['/']}{rpath}"
+		irl = f"{self.state['/']}/u{rpath}"
 		if irl not in self.cache or time.time() - self.cache[irl][0] > 80000:
 			try:
 				with self.session.head(irl, verify=False, allow_redirects=False) as resp:
