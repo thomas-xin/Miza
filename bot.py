@@ -1817,7 +1817,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					ext = None
 				urls = await asubmit(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
 				if hasattr(channel, "simulated"):
-					urls = (urls[1],)
+					urls = (urls[0],)
 				message = await send_with_reply(channel, reference, (msg + ("" if msg.endswith("```") else "\n") + urls[0]).strip(), embed=embed)
 			else:
 				message = await send_with_reply(channel, reference, msg, embed=embed, file=file)
