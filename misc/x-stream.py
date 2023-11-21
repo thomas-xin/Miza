@@ -15,12 +15,12 @@ class EndpointRedirects(Dispatcher):
 		if first in ("home", "index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"):
 			if first not in ("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"):
 				p = "index.html"
+		elif not p:
+			p = "index.html"
 		elif os.path.exists(f"misc/web/{p}"):
 			p = "raw/" + p
 		elif first not in ("proxy", "stream", "heartbeat", "backend"):
 			p = "backend/" + p
-		if not p:
-			p = "index.html"
 		p = "/" + p
 		return super().__call__(p)
 
@@ -210,7 +210,7 @@ class Server:
 	@cp.expose
 	def raw(self, *path, **query):
 		rpath = "/".join(path)
-		rpath = "misc/web/" + rpath
+		rpath = "misc/web/" + (rpath or "index.html")
 		cp.response.headers.update(CHEADERS)
 		cp.response.headers["Content-Type"] = MIMES.get(rpath.rsplit(".", 1)[-1]) or "text/html"
 		if rpath in self.cache:
