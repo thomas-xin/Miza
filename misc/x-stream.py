@@ -20,7 +20,7 @@ class EndpointRedirects(Dispatcher):
 				p = "raw/index.html"
 		elif os.path.exists(f"misc/web/{p}"):
 			p = "raw/" + p
-		elif first not in ("proxy", "stream", "heartbeat", "backend"):
+		elif first not in ("proxy", "stream", "heartbeat", "backend", "debug"):
 			p = "backend/" + p
 		p = "/" + p
 		return super().__call__(p)
@@ -228,7 +228,7 @@ class Server:
 		rquery = cp.request.query_string
 		if rquery:
 			rquery = "?" + rquery
-		irl = f"{self.state['/']}{rpath}{rquery}"
+		irl = f"{self.state['/']}{rpath}"
 		if irl not in self.cache or time.time() - self.cache[irl][0] > 80000:
 			try:
 				with self.session.head(irl, verify=False, allow_redirects=False) as resp:
@@ -246,7 +246,7 @@ class Server:
 			url = self.cache[irl][1]
 		else:
 			url = self.cache[irl][1]
-		raise cp.HTTPRedirect(url, 307)
+		raise cp.HTTPRedirect(url + rquery, 307)
 
 	@cp.expose
 	# @cp.tools.accept(media="multipart/form-data")

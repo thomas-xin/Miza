@@ -2931,7 +2931,7 @@ class UpdateStarboards(Database):
 					else:
 						table[None][message.id] = m.id
 						with tracebacksuppressor(RuntimeError, KeyError):
-							while len(table[None]) > 16384:
+							while len(table[None]) > 32768:
 								table[None].pop(next(iter(table[None])))
 						self.update(message.guild.id)
 			else:
@@ -2948,7 +2948,7 @@ class UpdateStarboards(Database):
 				else:
 					table[None][message.id] = m.id
 					with tracebacksuppressor(RuntimeError, KeyError):
-						while len(table[None]) > 16384:
+						while len(table[None]) > 32768:
 							table[None].pop(next(iter(table[None])))
 					self.update(message.guild.id)
 
