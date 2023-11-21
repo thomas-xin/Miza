@@ -105,6 +105,7 @@ def byte_scale(n, ratio=1024):
 class Server:
 
 	cache = {}
+	ucache = {}
 	if os.path.exists("temp.json") and os.path.getsize("temp.json"):
 		with open("temp.json", "rb") as f:
 			state = json.load(f)
@@ -140,19 +141,19 @@ class Server:
 				meta += f'<meta http-equiv="refresh" content={random.randint(15, 31)};url=https://{cp.request.headers["Host"]}/teapot">'
 			if path:
 				irl = HOST + "/fi/" + path
-				if irl not in self.cache or time.time() - self.cache[irl][0] > 3600:
+				if irl not in self.ucache or time.time() - self.ucache[irl][0] > 3600:
 					with self.session.get(irl) as resp:
 						info = resp.json()
-					self.cache[irl] = [time.time(), info]
-				elif time.time() - self.cache[irl][0] > 60:
+					self.ucache[irl] = [time.time(), info]
+				elif time.time() - self.ucache[irl][0] > 60:
 					def cache_temp():
 						with self.session.get(irl) as resp:
 							info = resp.json()
-						self.cache[irl] = [time.time(), info]
+						self.ucache[irl] = [time.time(), info]
 					exc.submit(cache_temp)
-					info = self.cache[irl][1]
+					info = self.ucache[irl][1]
 				else:
-					info = self.cache[irl][1]
+					info = self.ucache[irl][1]
 				fn = info["filename"]
 				mim = info["mimetype"]
 				attachment = filename or fn
@@ -195,6 +196,11 @@ class Server:
 			self.state["/"] = uri
 			with open("temp.json", "w") as f:
 				json.dump(self.state, f)
+		if len(self.ucache) > 65536:
+			t = time.time()
+			for k, v in tuple(self.ucache.items()):
+				if isinstance(v, list) and t - v[0] > 80000:
+					self.ucache.pop(k, None)
 		return "💜"
 
 	@cp.expose
@@ -229,23 +235,23 @@ class Server:
 		if rquery:
 			rquery = "?" + rquery
 		irl = f"{self.state['/']}/u{rpath}"
-		if irl not in self.cache or time.time() - self.cache[irl][0] > 80000:
+		if irl not in self.ucache or time.time() - self.ucache[irl][0] > 80000:
 			try:
 				with self.session.head(irl, verify=False, allow_redirects=False) as resp:
 					url = resp.headers.get("Location") or irl
 			except Exception as ex:
 				print("Error:", repr(ex))
 				url = "https://mizabot.xyz/notfound.png"
-			self.cache[irl] = [time.time(), url]
-		elif time.time() - self.cache[irl][0] > 3600:
+			self.ucache[irl] = [time.time(), url]
+		elif time.time() - self.ucache[irl][0] > 3600:
 			def cache_temp():
 				with self.session.head(irl, verify=False, allow_redirects=False) as resp:
 					url = resp.headers.get("Location") or irl
-				self.cache[irl] = [time.time(), url]
+				self.ucache[irl] = [time.time(), url]
 			exc.submit(cache_temp)
-			url = self.cache[irl][1]
+			url = self.ucache[irl][1]
 		else:
-			url = self.cache[irl][1]
+			url = self.ucache[irl][1]
 		raise cp.HTTPRedirect(url + rquery, 307)
 
 	@cp.expose
