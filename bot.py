@@ -1837,7 +1837,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if not getattr(reference, "slash", None) and message.attachments:
 			await self.add_attachment(message.attachments[0], data, c_id=message.channel.id, m_id=message.id)
 			def temp_url(url):
-				if is_discord_attachment:
+				if is_discord_attachment(url):
 					a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 					if a_id in self.data.attachments:
 						return self.preserve_attachment(a_id)
@@ -4777,7 +4777,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							content = message.content.replace("||", "")
 						else:
 							def temp_url(url, mid=None):
-								if is_discord_attachment:
+								if is_discord_attachment(url):
 									a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 									if a_id in self.data.attachments:
 										return self.preserve_attachment(a_id)

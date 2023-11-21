@@ -2681,11 +2681,15 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								react = "❎"
 						else:
 							react = False
+						if isinstance(response, str):
+							mr1 = await send_with_react(channel, response, reference=not loop and message, reacts=react)
+						else:
+							mr1 = response
 						if not resend and n >= len(tc) - 1:
-							if isinstance(response, str):
-								mresp = await send_with_react(channel, response, reference=not loop and message, reacts=react)
-							else:
-								mresp = response
+							mresp = mr1
+							break
+					if mresp:
+						break
 					continue
 				if mresp:
 					break

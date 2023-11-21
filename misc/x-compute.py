@@ -2021,7 +2021,7 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 					exc.submit(getattr(bot, k), m, fail=True)
 					time.sleep(1)
 		if "load" in CAPS:
-			time.sleep(20)
+			time.sleep(40)
 			load_models()
 			raise SystemExit
 
@@ -2093,7 +2093,7 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 					exc.submit(getattr(bot, k), m, fail=True)
 					time.sleep(1)
 		if "load" in CAPS:
-			time.sleep(40)
+			time.sleep(60)
 			load_models()
 			raise SystemExit
 

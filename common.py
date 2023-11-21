@@ -2645,6 +2645,7 @@ if COMPUTE_LOAD:
 		print("Compute load distribution:", COMPUTE_LOAD)
 		print("Compute pool order:", COMPUTE_ORDER)
 
+RESTARTING = {}
 async def start_proc(n, di=(), caps="ytdl", it=0, wait=False, timeout=None):
 	if hasattr(n, "caps"):
 		n, di, caps, it = n.n, n.di, n.caps, it + 1
@@ -2652,6 +2653,7 @@ async def start_proc(n, di=(), caps="ytdl", it=0, wait=False, timeout=None):
 		proc = PROCS[n]
 		if is_strict_running(proc):
 			PROCS[n] = False
+			RESTARTING[n] = proc
 			it = max(it, proc.it + 1)
 			if wait:
 				with tracebacksuppressor:
@@ -2768,7 +2770,7 @@ def spec2cap():
 						did.append(i)
 					else:
 						break
-				yield [did, "exl2", f"vr{v}"] + (["vram"] if v >= 12 else [])
+				yield [did, "exl2", f"vr{v}", "vram"]
 				tdid.extend(did)
 				done.append("exl2")
 		if using and FIRST_LOAD:
