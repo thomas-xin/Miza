@@ -108,8 +108,7 @@ class Server:
 			raise cp.HTTPRedirect(url.replace("/preview/", "/file/"), status=307)
 		if "/upload" in url:
 			raise cp.HTTPRedirect(url.replace("/upload", "/files"), status=307)
-		rpath = "/".join(path or "")
-		rpath = "misc/web/" + rpath
+		rpath = "misc/web/index.html"
 		mime = MIMES.get(rpath.rsplit(".", 1)[-1]) or "text/html"
 		if rpath in self.cache:
 			data = self.cache[rpath]
