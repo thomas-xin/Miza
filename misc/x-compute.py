@@ -2323,7 +2323,10 @@ def from_bytes(b, save=None, nogif=False):
 			cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate,duration", "-of", "csv=s=x:p=0", fn)
 			print(cmd)
 			p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-			cmd2 = ["ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0"]
+			cmd2 = ["ffmpeg", "-hide_banner", "-v", "error", "-y"]
+			if nogif:
+				cmd2.extend(("-to", "1"))
+			cmd2 += ["-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0"]
 			if nogif:
 				cmd2.extend(("-vframes", "1"))
 			cmd2.append("-")

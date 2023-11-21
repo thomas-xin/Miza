@@ -11,13 +11,10 @@ class EndpointRedirects(Dispatcher):
 
 	def __call__(self, path):
 		p = path.strip("/")
-		if p.split("/", 1)[0] in (
-			"", "index", "home", "p", "preview", "files", "file",
-			"chat", "tester", "atlas", "mizatlas", "user", "login",
-			"logout", "mpinsights", "createredirect",
-		):
-			p = "index.html"
-		if os.path.exists(f"misc/web/{p}"):
+		if p.split("/", 1)[0] in ("", "home", "index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"):
+			if p not in ("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"):
+				p = "index.html"
+		elif os.path.exists(f"misc/web/{p}"):
 			p = "raw/" + p
 		elif p.split("/", 1)[0] not in ("proxy", "stream", "heartbeat", "backend"):
 			p = "backend/" + p
@@ -213,6 +210,74 @@ class Server:
 	else:
 		state = {"/": f"https://api.mizabot.xyz:{webserver_port}"}
 	session = requests.Session()
+
+	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
+	def index(self, path=None, filename=None, *args, code=None, **kwargs):
+		HOST = self.state["/"] if self.state["/"].startswith("https://") else cp.request.base
+		url = HOST + "/" + cp.url(qs=cp.request.query_string).rstrip("/").split("//", 1)[-1].split("/", 1)[-1]
+		if "/p/" in url:
+			raise cp.HTTPRedirect(url.replace("/p/", "/file/"), status=307)
+		if "/preview/" in url:
+			raise cp.HTTPRedirect(url.replace("/preview/", "/file/"), status=307)
+		if "/upload" in url:
+			raise cp.HTTPRedirect(url.replace("/upload", "/files"), status=307)
+		rpath = "/".join(path)
+		rpath = "misc/web/" + rpath
+		mime = MIMES.get(rpath.rsplit(".", 1)[-1]) or "text/html"
+		if rpath in self.cache:
+			data = self.cache[rpath]
+		else:
+			with open(rpath, "rb") as f:
+				self.cache[rpath] = data = f.read()
+		if url.split("//", 1)[-1].count("/") > 1:
+			meta = '<meta property="og:title" content="Miza"><meta property="og:description" content="A multipurpose Discord bot.">'
+			if "/file" in url or "/files" in url:
+				meta += '<meta property="og:image" content="/mizaleaf.png">'
+			else:
+				meta += '<meta property="og:image" content="/logo256.png">'
+			meta += '<meta property="og:site_name" content="Miza">'
+			if not xrand(2) and (dt := datetime.datetime.utcnow()) and (dt.month, dt.day) in ((3, 31), (4, 1), (4, 2)):
+				meta += f'<meta http-equiv="refresh" content={xrand(15, 31)};url=https://{cp.request.headers["Host"]}/teapot">'
+			if path:
+				irl = HOST + "/fi/" + path
+				if irl in self.cache and time.time() - self.cache[irl][0] < 300:
+					with self.session.get(irl) as resp:
+						info = resp.json()
+					self.cache[irl] = [time.time(), info]
+				else:
+					info = self.cache[irl][1]
+				mim = info["mimetype"]
+				attachment = filename or fn
+				size = info["size"]
+				a2 = url_unparse(attachment).removeprefix(".temp$@")
+				f_url = info["raw"]
+				description = mim + f", {byte_scale(size)}B"
+				meta = '<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">'
+				if mim.startswith("image/") and mim.split("/", 1)[-1] in ("png", "jpg", "jpeg", "webp", "gif") and size < 1048576:
+					i_url = f_url
+					meta += f"""<meta name="twitter:image:src" content="{i_url}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{a2}"><meta property="twitter:url" content="{f_url}"><meta property="og:image" content="{i_url}"><meta property="og:image:type" content="{mim}"><meta property="og:url" content="{f_url}"><meta name="og:description" content="{description}">"""
+				elif mim.split("/", 1)[0] in ("image", "video", "audio"):
+					i_url = f_url.replace("/f/", "/i/") + ".png" if mim.startswith("video") else HOST + "/mizaleaf.png"
+					r_url = f_url.replace("/f/", "/r/") + ".webm" if mim.startswith("audio") else f_url + "." + mim.split("/", 1)[-1]
+					if mim.startswith("audio/"):
+						dims = '<meta property="og:video:width" content="640"><meta property="og:video:height" content="64">'
+					else:
+						dims = '<meta property="og:video:width" content="960"><meta property="og:video:height" content="540">'
+					meta += f"""<meta property="og:type" content="video.other"><meta property="twitter:player" content="{r_url}"><meta property="og:video:type" content="{mim}"><meta property="og:url" content="{f_url}">{dims}<meta name="twitter:image" content="{i_url}">"""
+			else:
+				a2 = "Miza"
+				description = "A multipurpose Discord bot."
+			i = data.index(b'</title>') + 8
+			s = """<!doctype html><html lang="en"><head>
+	<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
+	<meta charset="utf-8"/><link rel="icon" href="/logo256.png"/><meta charset="utf-8"><meta name="author" content="Miza"><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#694777"/><link rel="apple-touch-icon" href="/logo256.png"/><link rel="manifest" href="/manifest.json"/>""" + meta
+			t = f'<title>{a2}</title><meta name="description" content="{description}"/>'
+			data = s.encode("utf-8") + t.encode("utf-8") + data[i:]
+		cp.response.headers.update(CHEADERS)
+		cp.response.headers["Content-Type"] = mime
+		cp.response.headers["Content-Length"] = len(data)
+		cp.response.headers["ETag"] = create_etag(data)
+		return data
 
 	@cp.expose
 	def heartbeat(self, key, uri=""):

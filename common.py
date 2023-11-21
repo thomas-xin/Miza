@@ -2790,7 +2790,7 @@ def spec2cap():
 			caps.append("ytdl")
 		if ram > 14 * 1073741824 and ffmpeg:
 			caps.append("image")
-		if ram > 46 * 1073741824 and tesseract:
+		if ram > 94 * 1073741824 and tesseract:
 			caps.append("caption")
 		yield caps
 	if not DC:

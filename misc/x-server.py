@@ -598,9 +598,9 @@ class Server:
 		print("DET:", out)
 		return out
 
-	@cp.expose(("animate", "animation", "a", "images", "image", "i", "view", "v", "raw", "f", "download", "d"))
+	@cp.expose(("images", "image", "i", "view", "v", "raw", "r", "n", "f", "d"))
 	@hostmap
-	def files(self, path, filename=None, download=None, **void):
+	def download(self, path, filename=None, download=None, **void):
 		if path in ("hacks", "mods", "files", "download", "static"):
 			send(true_ip() + " was rickrolled 🙃")
 			return self.rickroll()
@@ -621,7 +621,7 @@ class Server:
 				except FileNotFoundError:
 					pass
 				else:
-					url = cp.request.base + "/i/" + c.rstrip(b"=").decode("ascii", "replace") + ".gif"
+					url = HOST + "/i/" + c.rstrip(b"=").decode("ascii", "replace") + ".gif"
 					return f"""<!DOCTYPE html>
 <html><head>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
@@ -667,145 +667,29 @@ class Server:
 			else:
 				a3 = False
 			cp.response.headers["Attachment-Filename"] = a2
-			if endpoint.startswith("r") and (mime in ("image/webp", "image/apng") or mime.split("/", 1)[0] == "video"):
-				preview = "cache/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".gif"
+			proc = None
+			if endpoint.startswith("r") and mime.split("/", 1)[0] in ("video", "audio"):
+				preview = "cache/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".webm"
 				image_loaders = self.image_loaders
 				if (not os.path.exists(preview) or not os.path.getsize(preview)) and preview not in image_loaders:
-					args = (
-						"./ffmpeg",
-						"-nostdin",
-						"-hide_banner",
-						"-v",
-						"error",
-						"-err_detect",
-						"ignore_err",
-						"-fflags",
-						"+discardcorrupt+genpts+igndts+flush_packets",
-						"-hwaccel",
-						hwaccel,
-						"-an",
-						"-i",
-						p,
-						"-loop",
-						"0",
-						"-fs",
-						"1048576",
-						"-vf",
-						"scale=240:-1",
-						preview,
-					)
+					args = ("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", hwaccel, "-f", "lavfi", "-an", "-i", "color=size=640x96:rate=1:color=#bf7fff", "-vn", "-i", p, "-pix_fmt", "yuv420p", "-f", "webm", "-crf", "50", "-c:a", "libopus", "-b:a", "96k", "-shortest", preview)
 					print(args)
 					proc = psutil.Popen(args)
 					image_loaders[preview] = proc
-				cp.response.headers["Content-Type"] = "image/gif"
-				cp.response.headers["ETag"] = create_etag(p)
-				while preview in image_loaders and (not os.path.exists(preview) or os.path.getsize(preview) < 524288) and is_strict_running(image_loaders[preview]):
-					time.sleep(0.05)
-				f = None
-				if preview in image_loaders and not is_strict_running(image_loaders[preview]) or preview not in image_loaders and os.path.exists(preview):
-					cp.response.headers["Content-Length"] = os.path.getsize(preview)
-				elif preview in image_loaders:
-					f = DownloadingFile(
-						preview,
-						lambda: not is_strict_running(image_loaders[preview]),
-					)
-				if not f:
-					s = os.path.getsize(preview)
-					if s:
-						f = open(preview, "rb")
-					else:
-						cp.response.headers["Content-Type"] = get_mime(p)
-						f = open(p, "rb")
-						s = os.path.getsize(p)
-				if s < 1048576:
-					return f.read()
-				if s < 67108864:
-					f = io.BytesIO(f.read())
-				return cp.lib.file_generator(f, 262144)
-			elif endpoint.startswith("i") and (mime in ("image/webp", "image/apng") or mime.split("/", 1)[0] == "video"):
+				else:
+					proc = preview
+				cp.response.headers["Content-Type"] = "video/webm"
+			elif endpoint.startswith("i") and mime.split("/", 1)[0] in ("image", "video"):
 				preview = "cache/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".png"
 				image_loaders = self.image_loaders
 				if (not os.path.exists(preview) or not os.path.getsize(preview)) and preview not in image_loaders:
-					args = (
-						"./ffmpeg",
-						"-nostdin",
-						"-hide_banner",
-						"-v",
-						"error",
-						"-err_detect",
-						"ignore_err",
-						"-fflags",
-						"+discardcorrupt+genpts+igndts+flush_packets",
-						"-hwaccel",
-						hwaccel,
-						"-an",
-						"-i",
-						p,
-						"-vframes",
-						"1",
-						preview,
-					)
+					args = ("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", hwaccel, "-an", "-i", p, "-loop", "0", "-fs", "1048576", "-vf", "scale=240:-1", preview)
 					print(args)
 					proc = psutil.Popen(args)
 					image_loaders[preview] = proc
-				cp.response.headers["Content-Type"] = "image/png"
-				cp.response.headers["ETag"] = create_etag(p)
-				while preview in image_loaders and (not os.path.exists(preview) or os.path.getsize(preview) < 524288) and is_strict_running(image_loaders[preview]):
-					time.sleep(0.05)
-				f = None
-				if preview in image_loaders and not is_strict_running(image_loaders[preview]) or preview not in image_loaders and os.path.exists(preview):
-					cp.response.headers["Content-Length"] = os.path.getsize(preview)
-				elif preview in image_loaders:
-					f = DownloadingFile(
-						preview,
-						lambda: not is_strict_running(image_loaders[preview]),
-					)
-				if not f:
-					s = os.path.getsize(preview)
-					if s:
-						f = open(preview, "rb")
-					else:
-						cp.response.headers["Content-Type"] = get_mime(p)
-						f = open(p, "rb")
-						s = os.path.getsize(p)
 				else:
-					s = inf
-				if s < 1048576:
-					return f.read()
-				if s < 67108864:
-					f = io.BytesIO(f.read())
-				return cp.lib.file_generator(f, 262144)
-			elif endpoint.startswith("a") and mime.split("/", 1)[0] in "video":
-				f_url = cp.url(qs=cp.request.query_string).replace(f"/{endpoint}/", "/f/")
-				i_url = f_url.replace("/f/", "/r/") + ".gif"
-				b = ("""<!DOCTYPE html>
-<html>
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
-<style>
-.center {
-margin: 0;
-position: absolute;
-top: 50%;
-left: 50%;
--ms-transform: translate(-50%, -50%);
-transform: translate(-50%, -50%);
-}
-</style>""" + f"""
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<meta name="twitter:image:src" content="{i_url}">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{a2}">
-<meta property="og:image" content="{i_url}">
-<body style="background-color:black;">
-<video class="center" playsinline autoplay muted loop>
-<source src="{f_url}">
-</video>
-</body>
-</html>""").encode("utf-8")
-				cp.response.headers["Content-Type"] = "text/html"
-				cp.response.headers["Content-Length"] = len(b)
-				cp.response.headers["ETag"] = create_etag(b)
-				return b
+					proc = preview
+				cp.response.headers["Content-Type"] = "image/png"
 			elif not os.path.exists(p):
 				raise FileNotFoundError(404, p)
 			elif "$" in p and p.split("$", 1)[0].endswith("~.forward") and mime == "text/html" and os.path.getsize(p) < 1048576:
@@ -866,7 +750,7 @@ transform: translate(-50%, -50%);
 							disp = "filename=" + info[0]
 							cp.response.headers["Content-Disposition"] = disp
 							# cp.response.headers["Content-Length"] = info[1]
-							cp.response.headers["Content-Type"] = info[2]
+							cp.response.headers["Content-Type"] = mime = info[2]
 							referrer = cp.request.headers.get("Referer")
 							# print(p, len(urls), referrer)
 							cp.response.headers["Attachment-Filename"] = info[0]
@@ -884,17 +768,69 @@ transform: translate(-50%, -50%);
 							cp.response.headers.pop("Accept-Ranges", None)
 							stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", "cache/")
 							pn = stn + "~.temp$@" + info[0]
-							if os.path.exists(pn):
-								f = open(pn, "rb")
-								resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=info[0])
-								if a3:
-									self.serving.setdefault(p, weakref.WeakSet()).add(f)
-								return resp
-							if info[1] > 256 * 1048576:
-								if 1:
-									raise cp.HTTPRedirect(f"https://stream.miza-stream.workers.dev/?i={orig_path}", status=307)
-								return self.dyn_serve(urls, size=info[1])
-							return self.concat(p, urls, name=info[0], mime=info[2], stn=stn)
+							dl = HOST + "/d/" + orig_path
+							print("END:", endpoint, mime, dl)
+							if endpoint.startswith("r") and mime.split("/", 1)[0] in ("video", "audio"):
+								preview = "cache/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".webm"
+								image_loaders = self.image_loaders
+								if (not os.path.exists(preview) or not os.path.getsize(preview)) and preview not in image_loaders:
+									args = ("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", hwaccel, "-f", "lavfi", "-an", "-i", "color=size=640x96:rate=1:color=#bf7fff", "-vn", "-i", dl, "-pix_fmt", "yuv420p", "-f", "webm", "-crf", "50", "-c:a", "libopus", "-b:a", "96k", "-shortest", preview)
+									print(args)
+									proc = psutil.Popen(args)
+									image_loaders[preview] = proc
+								else:
+									proc = preview
+								cp.response.headers["Content-Type"] = "video/webm"
+							elif endpoint.startswith("i") and mime.split("/", 1)[0] in ("image", "video"):
+								preview = "cache/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".png"
+								image_loaders = self.image_loaders
+								if (not os.path.exists(preview) or not os.path.getsize(preview)) and preview not in image_loaders:
+									args = ("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", hwaccel, "-an", "-to", "1", "-i", dl, "-loop", "0", "-fs", "1048576", "-vf", "scale=240:-1", "-vframes", "1", preview)
+									print(args)
+									proc = psutil.Popen(args)
+									image_loaders[preview] = proc
+								else:
+									proc = preview
+								cp.response.headers["Content-Type"] = "image/png"
+							if not proc:
+								if os.path.exists(pn):
+									f = open(pn, "rb")
+									resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=info[0])
+									if a3:
+										self.serving.setdefault(p, weakref.WeakSet()).add(f)
+									return resp
+								if info[1] > 256 * 1048576:
+									if endpoint != "n":
+										raise cp.HTTPRedirect(f"https://stream.miza-stream.workers.dev/?i={orig_path}", status=307)
+									return self.dyn_serve(urls, size=info[1])
+								return self.concat(p, urls, name=info[0], mime=info[2], stn=stn)
+			if proc:
+				cp.response.headers["ETag"] = create_etag(p)
+				while preview in image_loaders and (not os.path.exists(preview) or os.path.getsize(preview) < 4096) and is_strict_running(image_loaders[preview]):
+					time.sleep(0.05)
+				f = None
+				if preview in image_loaders and not is_strict_running(image_loaders[preview]) or preview not in image_loaders and os.path.exists(preview):
+					cp.response.headers["Content-Length"] = os.path.getsize(preview)
+				elif preview in image_loaders:
+					f = DownloadingFile(
+						preview,
+						af=lambda: not is_strict_running(image_loaders[preview]),
+					)
+					print("PREVIEW:", f)
+				s = inf
+				if not f:
+					s = os.path.getsize(preview)
+					if s:
+						f = open(preview, "rb")
+					else:
+						cp.response.headers["Content-Type"] = get_mime(p)
+						f = open(p, "rb")
+						s = os.path.getsize(p)
+				if s < 1048576:
+					return f.read()
+				if s < 67108864:
+					f = io.BytesIO(f.read())
+				return cp.lib.file_generator(f, 262144)
 			f = open(p, "rb")
 			s = os.path.getsize(p)
 			if s < 67108864:
@@ -908,7 +844,7 @@ transform: translate(-50%, -50%);
 			if a3:
 				self.serving.setdefault(p, weakref.WeakSet()).add(f)
 			return resp
-	files._cp_config = {"response.stream": True}
+	download._cp_config = {"response.stream": True}
 
 	def concat(self, fn, urls, name="", download=False, mime=None, stn="", waiter=False):
 		on = stn + "!.temp$@" + name
@@ -1629,75 +1565,6 @@ transform: translate(-50%, -50%);
 	@hostmap
 	def index(self, path=None, filename=None, *args, code=None, **kwargs):
 		url = HOST + "/" + cp.url(qs=cp.request.query_string).rstrip("/").split("//", 1)[-1].split("/", 1)[-1]
-		# if "/user" in url:
-			# try:
-				# sessid = int(cp.request.cookie["sessid"].value)
-			# except (KeyError, ValueError):
-				# adata = None
-			# else:
-				# adata = cdict(self.bot_exec(f"bot.data.sessions.get({repr(sessid)})"))
-			# t = utc()
-			# if not adata:
-				# if not code:
-					# cp.response.cookie["sessid"] = ""
-					# raise cp.HTTPRedirect(url.replace("/user", "/login"))
-				# resp = reqs.next().post(
-					# f"https://discord.com/api/oauth2/token",
-					# data=dict(
-						# client_id=AUTH.get("discord_id") or self.bot_exec("bot.id"),
-						# client_secret=AUTH["discord_secret"],
-						# grant_type="authorization_code",
-						# code=code,
-						# redirect_uri=f"{API}/user",
-					# ),
-				# )
-				# resp.raise_for_status()
-				# adata = cdict(resp.json())
-				# adata.ts = round_random(t * 1e6)
-				# adata.expiry = t + adata.expires_in
-				# adata.refreshed = 0
-			# t = utc()
-			# if t > adata.expiry:
-				# resp = reqs.next().post(
-					# f"https://discord.com/api/oauth2/token",
-					# data=dict(
-						# client_id=AUTH.get("discord_id") or self.bot_exec("bot.id"),
-						# client_secret=AUTH["discord_secret"],
-						# grant_type="refresh_token",
-						# refresh_token=adata.refresh_token,
-					# ),
-				# )
-				# resp.raise_for_status()
-				# adata.update(resp.json())
-				# adata.expiry = t + adata.expires_in
-			# t = utc()
-			# if t > adata.refreshed + 30:
-				# resp = reqs.next().get(
-					# "https://discord.com/api/users/@me",
-					# headers={"Authorization": f"{adata.token_type} {adata.access_token}"},
-				# )
-				# resp.raise_for_status()
-				# adata.update(resp.json())
-				# adata.refreshed = t
-			# sessid = adata.id
-			# if "email" in adata and "id" in adata:
-				# self.bot_exec(
-					# f"bot.data.accounts.setdefault({repr(adata.email)},{{}})['uid']={adata.id};"
-					# + f"bot.data.users.setdefault({adata.id},{{}})['email']={repr(adata.email)}"
-				# )
-			# cp.response.cookie["sessid"] = sessid
-			# cp.response.cookie["email"] = adata.get("email") or ""
-			# cp.response.cookie["name"] = adata.get("username") or adata.email.split("@", 1)[0]
-			# cp.response.cookie["uid"] = int(adata.get("id", 0)) or ""
-			# if "id" in adata:
-				# adata["icon"] = self.bot_exec(
-					# f"bot.cache.users[{adata.id}]=await bot.fetch_user({adata.id});"
-					# + f"return best_url(bot.cache.users[{adata.id}])"
-				# )
-			# else:
-				# adata.pop("icon")
-			# self.bot_exec(f"bot.data.sessions[{repr(sessid)}]={repr(adata)}")
-			# cp.response.cookie["icon"] = adata.get("icon")
 		if "/p/" in url:
 			raise cp.HTTPRedirect(url.replace("/p/", "/file/"), status=307)
 		if "/preview/" in url:
@@ -1715,88 +1582,36 @@ transform: translate(-50%, -50%);
 			if not xrand(2) and (dt := datetime.datetime.utcnow()) and (dt.month, dt.day) in ((3, 31), (4, 1), (4, 2)):
 				meta += f'<meta http-equiv="refresh" content={xrand(15, 31)};url=https://{cp.request.headers["Host"]}/teapot">'
 			if path:
-				ind = IND
-				p = None
-				if path.startswith("!"):
-					ind = "!"
-					path = path[1:]
-				elif not path.startswith("@"):
-					b = path.lstrip("~").split(".", 1)[0].encode("utf-8") + b"=="
-					if b.startswith(b"dQ"):
-						c = b[2:]
-						path = str(p2n(c))
-						try:
-							p = find_file(path, ind=ind)
-						except FileNotFoundError:
-							pass
-						else:
-							url = cp.request.base + "/i/" + c.rstrip(b"=").decode("utf-8", "replace") + ".gif"
-							return f"""<!DOCTYPE html>
-	<html><head>
-	<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
-	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-	<meta property="og:url" content="/">
-	<meta property="og:type" content="video.other">
-	<meta property="twitter:player" content="https://www.youtube.com/embed/dQw4w9WgXcQ">
-	<meta property="og:video:type" content="text/html">
-	<meta property="og:video:width" content="960">
-	<meta property="og:video:height" content="720">
-	<meta name="twitter:image" content="{url}">
-	<meta http-equiv="refresh" content="0;url=https://www.youtube.com/watch?v=dQw4w9WgXcQ">
-	</head><body></body></html>""".encode("utf-8")
-					path = str(p2n(b))
-				else:
-					path = path[1:]
-				if not p:
-					p = find_file(path, cwd=("cache", "saves/filehost"), ind=ind)
-				sem = SEMAPHORES.get(p)
-				if not sem:
-					while len(SEMAPHORES) >= 4096:
-						sem = SEMAPHORES.pop(next(iter(SEMAPHORES)))
-						if sem.is_busy():
-							raise SemaphoreOverflowError
-					sem = SEMAPHORES[p] = Semaphore(256, 256, rate_limit=4)
-				with sem:
-					fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
-					if fn.startswith(".forward$"):
-						info = self._fileinfo(f"@{path}")
-						attachment = info["filename"]
-						mim = info["mimetype"]
-						attachment = info["filename"]
-						size = info["size"]
+				info = self._fileinfo(path)
+				fn = info["filename"]
+				if fn.startswith(".forward$"):
+					info = self._fileinfo(f"@{path}")
+					attachment = info["filename"]
+				mim = info["mimetype"]
+				attachment = filename or fn
+				size = info["size"]
+				a2 = url_unparse(attachment).removeprefix(".temp$@")
+				f_url = info["raw"]
+				description = mim + f", {byte_scale(size)}B"
+				meta = '<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">'
+				if mim.startswith("image/") and mim.split("/", 1)[-1] in ("png", "jpg", "jpeg", "webp", "gif") and size < 1048576:
+					i_url = f_url
+					meta += f"""<meta name="twitter:image:src" content="{i_url}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{a2}"><meta property="twitter:url" content="{f_url}"><meta property="og:image" content="{i_url}"><meta property="og:image:type" content="{mim}"><meta property="og:url" content="{f_url}"><meta name="og:description" content="{description}">"""
+				elif mim.split("/", 1)[0] in ("image", "video", "audio"):
+					i_url = f_url.replace("/f/", "/i/") + ".png" if mim.startswith("video") else HOST + "/mizaleaf.png"
+					r_url = f_url.replace("/f/", "/r/") + ".webm" if mim.startswith("audio") else f_url + "." + mim.split("/", 1)[-1]
+					if mim.startswith("audio/"):
+						dims = '<meta property="og:video:width" content="640"><meta property="og:video:height" content="64">'
 					else:
-						mim = get_mime(p)
-						attachment = filename or fn
-						size = os.path.getsize(p)
-					a2 = url_unparse(attachment).removeprefix(".temp$@")
-					f_url = url.replace("/file/", "/f/")
-					description = mim + f", {byte_scale(size)}B"
-					meta = '<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">'
-					if mim.startswith("video/"):
-						i_url = url.replace("/file/", "/i/") + ".gif"
-						meta += f"""<meta property="og:type" content="video.other">\
-	<meta property="twitter:player" content="{f_url}">\
-	<meta property="og:video:type" content="{mim}">\
-	<meta property="og:video:width" content="960">\
-	<meta name="twitter:image" content="{i_url}">"""
-					else:
-						i_url = url.replace("/file/", "/r/") + ".gif"
-						meta += f"""<meta name="twitter:image:src" content="{i_url}">\
-	<meta name="twitter:card" content="summary_large_image">\
-	<meta name="twitter:title" content="{a2}"><meta property="twitter:url" content="{f_url}"><meta property="og:image" content="{i_url}">\
-	<meta property="og:image:type" content="{mim}"><meta property="og:url" content="{f_url}"><meta name="og:description" content="{description}">"""
+						dims = '<meta property="og:video:width" content="960"><meta property="og:video:height" content="540">'
+					meta += f"""<meta property="og:type" content="video.other"><meta property="twitter:player" content="{r_url}"><meta property="og:video:type" content="{mim}"><meta property="og:url" content="{f_url}">{dims}<meta name="twitter:image" content="{i_url}">"""
 			else:
 				a2 = "Miza"
 				description = "A multipurpose Discord bot."
 			i = data.index(b'</title>') + 8
 			s = """<!doctype html><html lang="en"><head>
 	<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
-	<meta charset="utf-8"/><link rel="icon" href="/logo256.png"/>\
-	<meta charset="utf-8"><meta name="author" content="Miza">\
-	<meta name="viewport" content="width=device-width,initial-scale=1"/>\
-	<meta name="theme-color" content="#694777"/>\
-	<link rel="apple-touch-icon" href="/logo256.png"/>\
-	<link rel="manifest" href="/manifest.json"/>""" + meta
+	<meta charset="utf-8"/><link rel="icon" href="/logo256.png"/><meta charset="utf-8"><meta name="author" content="Miza"><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#694777"/><link rel="apple-touch-icon" href="/logo256.png"/><link rel="manifest" href="/manifest.json"/>""" + meta
 			t = f'<title>{a2}</title><meta name="description" content="{description}"/>'
 			data = s.encode("utf-8") + t.encode("utf-8") + data[i:]
 		cp.response.headers.update(CHEADERS)
