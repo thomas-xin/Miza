@@ -1822,8 +1822,8 @@ async def instruct(data, best=False):
 			data["model"] = "mythalion-13b"
 			data["stop"] = [f"### Instruction:", f"### Response:", "<|system|>:"]
 			try:
-				await process_image("lambda: 1+1", "$", (), cap="vr11", timeout=2)
-				return await process_image("EXL2", "$", [data], cap="vr11", timeout=25)
+				await process_image(lambdassert, "$", (), cap="vr11", timeout=2)
+				return await process_image("EXL2", "$", [data], cap="vr11", timeout=30)
 			except:
 				print_exc()
 				data["model"] = "gpt-3.5-turbo-instruct"
@@ -1831,8 +1831,8 @@ async def instruct(data, best=False):
 			data["model"] = "emerhyst-20b"
 			data["stop"] = [f"### Instruction:", f"### Response:"]
 			try:
-				await process_image("lambda: 1+1", "$", (), cap="vr23", timeout=2)
-				return await process_image("EXL2", "$", [data], cap="vr23", timeout=25)
+				await process_image(lambdassert, "$", (), cap="vr23", timeout=2)
+				return await process_image("EXL2", "$", [data], cap="vr23", timeout=30)
 			except:
 				print_exc()
 				data["model"] = "gpt-3.5-turbo-instruct"

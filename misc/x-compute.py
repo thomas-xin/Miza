@@ -19,7 +19,7 @@ import math
 from math import *
 sys.path.append("misc")
 
-print = lambda *args, sep=" ", end="\n": sys.stdout.buffer.write(f"~print({repr(sep.join(map(str, args)))},end={repr(end)})\n".encode("utf-8"))
+print = lambda *args, sep=" ", end="\n": sys.stdout.buffer.write(f"~print({repr(sep.join(map(str, args)))},end={repr(end)})\n".encode("utf-8")) or sys.stdout.flush()
 
 def lim_str(s, maxlen=10, mode="centre"):
 	if maxlen is None:
@@ -94,7 +94,7 @@ else:
 if len(sys.argv) > 2:
 	CAPS = set(sys.argv[2].split(","))
 else:
-	CAPS = ()
+	CAPS = frozenset()
 if len(sys.argv) > 3:
 	COMPUTE_LOAD = orjson.loads(sys.argv[3])
 else:
@@ -1859,7 +1859,7 @@ if "exl2" in CAPS:
 		m, base, req, bpw, gs = get_exl2(model)
 		snap = snap_exl2(base, assertion=True)
 		fold = fold_exl2(base)
-		from exllamav2 import ExLlamaV2Config, ExLlamaV2, ExLlamaV2Cache, ExLlamaV2Tokenizer
+		from exllamav2 import ExLlamaV2Config, ExLlamaV2, ExLlamaV2Cache_8bit, ExLlamaV2Tokenizer
 		config = ExLlamaV2Config()
 		config.model_dir = fold
 		config.prepare()
@@ -1869,8 +1869,8 @@ if "exl2" in CAPS:
 		config.qkv_embed = False
 		M = ExLlamaV2(config)
 		T = ExLlamaV2Tokenizer(config)
-		cache = ExLlamaV2Cache(M, lazy=True)
-		n = 1 if req < 20 else 2
+		cache = ExLlamaV2Cache_8bit(M, lazy=True)
+		n = 0.5 if req < 20 else 2
 		M.load_autosplit(cache, reserve_vram=[round(n * 1073741824)] * 1024)
 		tup = mcache[model] = M, T
 		return tup
@@ -1889,10 +1889,10 @@ if "exl2" in CAPS:
 		M, T = gen_exl2(model)
 		# time.sleep(10)
 		prompt = prompt.strip()
-		from exllamav2 import ExLlamaV2Cache
+		from exllamav2 import ExLlamaV2Cache_8bit
 		from exllamav2.generator import ExLlamaV2StreamingGenerator, ExLlamaV2Sampler
 		with torch.inference_mode():
-			cache = ExLlamaV2Cache(M)
+			cache = ExLlamaV2Cache_8bit(M)
 			generator = ExLlamaV2StreamingGenerator(M, cache, T)
 			generator.warmup()
 			ids = T.encode(prompt)
@@ -1920,19 +1920,19 @@ if "exl2" in CAPS:
 		if stop:
 			for s in stop:
 				text = text.split(s, 1)[0]
-		# text = text.strip().replace(":\n", ": ")
-		# spl = text.split(": ")
-		# if len(spl) > 1:
-			# text = ""
-			# while spl:
-				# s = spl.pop(0)
-				# if "\n" in s:
-					# text += s.rsplit("\n", 1)[0]
-					# break
-				# text += s + ": "
-			# text = text.strip()
-			# if text.endswith(":"):
-				# text = text.rsplit("\n", 1)[0]
+		text = text.strip().replace(":\n", ": ")
+		spl = text.split(": ")
+		if len(spl) > 1:
+			text = ""
+			while spl:
+				s = spl.pop(0)
+				if "\n" in s:
+					text += s.rsplit("\n", 1)[0]
+					break
+				text += s + ": "
+			text = text.strip()
+			if text.endswith(":"):
+				text = text.rsplit("\n", 1)[0]
 		return text
 
 if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
@@ -3006,11 +3006,12 @@ if __name__ == "__main__":
 				except RuntimeError:
 					pass
 		else:
-			sys.stdout.buffer.write(f"~print({repr(argv)}, end='')\n".encode("utf-8"))
+			sys.stdout.buffer.write(f"~print({repr(argv)},end='')\n".encode("utf-8"))
 			sys.stdout.flush()
 
 	async def update_loop():
 		sys.stdout.buffer.write("~print('',end='')\n".encode("utf-8"))
+		sys.stdout.flush()
 		while True:
 			argv = await wrap_future(exc.submit(sys.stdin.readline))
 			if not argv:

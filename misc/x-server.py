@@ -533,7 +533,7 @@ class Server:
 		return d
 
 	lfc = {}
-	@cp.expose("fi")
+	@cp.expose(("fi",))
 	@hostmap
 	def fileinfo(self, path, **void):
 		cp.response.headers.update(SHEADERS)
@@ -566,7 +566,7 @@ class Server:
 
 	image_loaders = {}
 
-	@cp.expose("0")
+	@cp.expose(("0",))
 	@hostmap
 	def rickroll(self, *void1, **void2):
 		raise cp.HTTPRedirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ", status=301)
@@ -966,7 +966,7 @@ transform: translate(-50%, -50%);
 					return
 				yield b
 
-	@cp.expose(("u"))
+	@cp.expose(("u",))
 	def unproxy(self, id=None, url=None, mid=None, **kwargs):
 		if id == "u" and url:
 			id = url

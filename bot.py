@@ -382,7 +382,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					raise ConnectionError(f"Error {resp.status_code}", resp.text)
 
 	async def create_main_website(self, first=False):
-		self.start_webserver()
 		if first:
 			tsubmit(webserver_communicate, self)
 			print("Generating command json...")
@@ -1090,7 +1089,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if is_url(tup):
 				return tup
 			if not tup:
-				return "https://mizabot.xyz/u/ECKzxzSEEEY"
+				return "https://mizabot.xyz/notfound.png"
 			c_id, m_id = tup
 		else:
 			c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
@@ -2897,7 +2896,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				k = int(k)
 				# print("END TASK:", k, bot.compute_wait, lim_str(str(v), 64), frand())
 				if k not in self.compute_wait:
-					print("MISSING:", k, v)
+					if not isinstance(v, Exception):
+						print("MISSING:", k, v)
 					continue
 				task = self.compute_wait.pop(k)
 				if isinstance(v, Exception):
@@ -4685,7 +4685,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				async with tracebacksuppressor:
 					futs = []
 					key = AUTH.get("discord_secret") or ""
-					uri = f"http://IP:{PORT}"
+					# uri = f"http://IP:{PORT}"
+					uri = "https://api.mizabot.xyz"
 					for addr in AUTH.get("remote_servers", ()):
 						fut = create_task(Request(
 							f"https://{addr}/heartbeat?key={url_parse(key)}&uri={url_parse(uri)}",
@@ -5773,6 +5774,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	@tracebacksuppressor
 	async def init_ready(self):
+		self.start_webserver()
 		attachments = (file for file in sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_"))))
 		for file in attachments:
 			with tracebacksuppressor:

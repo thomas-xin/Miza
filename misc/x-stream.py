@@ -248,6 +248,27 @@ class Server:
 			self.cache[rpath] = b = f.read()
 		return b
 
+	upcache = {}
+	@cp.expose(("u",))
+	def unproxy(self, *path, **query):
+		rpath = "/".join(path)
+		if rpath:
+			rpath = "/" + rpath
+		rquery = cp.request.query_string
+		if rquery:
+			rquery = "?" + rquery
+		url = f"{self.state['/']}{rpath}{rquery}"
+		try:
+			raise cp.HTTPRedirect(self.upcache[url], 307)
+		except KeyError:
+			pass
+		try:
+			with self.session.head(url, verify=False, allow_redirects=False) as resp:
+				url = self.upcache[url] = resp.headers.get("Location") or url
+		except:
+			raise cp.HTTPRedirect("https://mizabot.xyz/notfound.png", 307)
+		raise cp.HTTPRedirect(self.upcache[url], 307)
+
 	@cp.expose
 	# @cp.tools.accept(media="multipart/form-data")
 	def backend(self, *path, **query):
@@ -258,7 +279,7 @@ class Server:
 		if rquery:
 			rquery = "?" + rquery
 		url = f"{self.state['/']}{rpath}{rquery}"
-		if cp.request.method.upper() != "GET":
+		if cp.request.method.upper() != "GET" or self.state["/"].startswith("https://"):
 			raise cp.HTTPRedirect(url, 307)
 		headers = dict(cp.request.headers)
 		headers.pop("Connection", None)
@@ -270,7 +291,10 @@ class Server:
 			headers=headers,
 			stream=True,
 			verify=False,
+			allow_redirects=False,
 		)
+		if resp.status_code in range(300, 400):
+			raise cp.HTTPRedirect(resp.headers.get("Location") or url, resp.status_code)
 		cp.response.headers.update(resp.headers)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)

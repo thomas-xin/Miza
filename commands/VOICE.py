@@ -791,7 +791,7 @@ class AudioQueue(alist):
 			source = None
 			with self.sem:
 				with tracebacksuppressor:
-					source = ytdl.get_stream(e, force=True, asap=2)
+					source = ytdl.get_stream(e, force=True, asap=True)
 			if self.sem.is_busy():
 				self.sem.wait()
 			if not source:

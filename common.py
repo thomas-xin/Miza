@@ -463,6 +463,10 @@ class TooManyRequests(PermissionError):
 class CommandCancelledError(Exception):
 	__slots__ = ()
 
+AE = ArgumentError
+TMR = TooManyRequests
+CCE = CommandCancelledError
+
 
 python = sys.executable
 
@@ -2440,13 +2444,13 @@ def is_strict_running(proc):
 			if proc.status() == "zombie":
 				proc.wait()
 				return
-		except psutil.NoSuchProcess:
+		except (ProcessLookupError, psutil.NoSuchProcess):
 			return
 		return True
 	except AttributeError:
 		try:
 			proc = psutil.Process(proc.pid)
-		except ProcessLookupError:
+		except (ProcessLookupError, psutil.NoSuchProcess):
 			return
 		except:
 			print_exc()
@@ -2457,7 +2461,7 @@ def is_strict_running(proc):
 		if proc.status() == "zombie":
 			proc.wait()
 			return
-	except psutil.NoSuchProcess:
+	except (ProcessLookupError, psutil.NoSuchProcess):
 		return
 	return True
 
@@ -2467,7 +2471,7 @@ def force_kill(proc):
 		return
 	if getattr(proc, "fut", None) and not proc.fut.done():
 		with tracebacksuppressor:
-			proc.fut.set_exception(CommandCancelledError("Response disconnected. If this error occurs during a command, it is likely due to maintenance!"))
+			proc.fut.set_exception(CCE("Response disconnected. If this error occurs during a command, it is likely due to maintenance!"))
 	killed = deque()
 	if not callable(getattr(proc, "children", None)):
 		proc = psutil.Process(proc.pid)
@@ -2529,6 +2533,7 @@ async def proc_distribute(proc):
 	tasks = ()
 	frozen = False
 	while True:
+		exc = None
 		with tracebacksuppressor:
 			if not is_strict_running(proc):
 				return
@@ -2537,12 +2542,16 @@ async def proc_distribute(proc):
 					await asyncio.wait_for(wrap_future(proc.fut), timeout=60)
 				except (T0, T1, T2):
 					pass
+				except CCE as ex:
+					exc = ex
 				else:
 					proc.fut = Future()
 				tasks = bot.distribute(proc.caps, {}, {})
 				if not tasks:
 					await asyncio.sleep(1 / 6)
 					continue
+			if exc:
+				raise exc
 			resps = {}
 			futs = []
 			while tasks or futs:
@@ -2578,7 +2587,7 @@ async def proc_distribute(proc):
 						proc.used = utc()
 					if len(command) > 1 and command[1] == "&":
 						with suppress():
-							fut.result()
+							await fut
 				# print(proc, tasks, [fut.ts for fut in futs], futs)
 				futd = {i for i, fut in enumerate(futs) if fut.done()}
 				for i in futd:
@@ -2651,7 +2660,7 @@ async def start_proc(n, di=(), caps="ytdl", it=0, wait=False, timeout=None):
 					else:
 						await asyncio.wait_for(proc.sem.afinish(), timeout=timeout)
 				if timeout and proc.sem.active and utc() - proc.used < 60:
-					raise CommandCancelledError("Process schedule conflict.")
+					raise CCE("Process schedule conflict.")
 			await create_future(force_kill, proc)
 		elif PROCS[n] is False:
 			return
@@ -2786,7 +2795,7 @@ def spec2cap():
 		yield caps
 	if not DC:
 		return
-	for i, v in reversed(tuple(enumerate(rrams))):
+	for i, v in enumerate(rrams):
 		c = COMPUTE_POT[i]
 		caps = [[i]]
 		if c > 100000 and v > 3 * 1073741824 and ffmpeg:
@@ -2803,7 +2812,7 @@ def spec2cap():
 			caps.append("nvram")
 			# done.append("sdxlr")
 			v -= 15 * 1073741824
-		elif c > 400000 and v > 9 * 1073741824:
+		elif c > 400000 and v > 9 * 1073741824 and "sdxl" not in done:
 			# if "sdxl" not in done or c <= 600000:
 			caps.append("sdxl")
 			caps.append("sd")
@@ -2872,13 +2881,13 @@ async def sub_submit(cap, command, _timeout=12):
 		queue = bot.compute_queue.setdefault(cap, set())
 		queue.add(task)
 		procs = filter(bool, PROCS.values())
-		for proc in sorted(procs, key=lambda proc: (proc.sem.active, 0 in proc.di or "nvram" in proc.caps, -COMPUTE_POT[proc.di[0]] if COMPUTE_POT and proc.di else random.random())):
+		for proc in sorted(PROCS.values(), key=lambda proc: (proc.sem.active, 0 in proc.di or "nvram" in proc.caps, -COMPUTE_POT[proc.di[0]] if COMPUTE_POT and proc.di else random.random())):
 			if not proc:
 				continue
 			if cap in proc.caps and not proc.fut.done():
 				proc.fut.set_result(None)
 		try:
-			return await asyncio.wait_for(wrap_future(task), timeout=(_timeout or inf) + 2)
+			return await asyncio.wait_for(wrap_future(task), timeout=(_timeout or inf) + 1)
 		except (T1, CE) as ex:
 			task.cancel()
 			queue.discard(task)
@@ -2886,11 +2895,11 @@ async def sub_submit(cap, command, _timeout=12):
 			if ts:
 				bot.compute_wait.pop(ts, None)
 			elif isinstance(ex, CE):
-				raise CommandCancelledError(*ex.args)
+				raise CCE(*ex.args)
 			else:
-				raise
+				raise EnvironmentError(repr(ex))
 			ex2 = ex
-			print(task, task.cap, task.command, task.timeout)
+			print(lim_str((task, task.cap, task.command, task.timeout), 256))
 			print_exc()
 			continue
 	raise ex2
@@ -2915,6 +2924,8 @@ def sub_kill(start=True, force=False):
 	if start:
 		return proc_start()
 
+lambdassert = "lambda:1+1"
+
 async def _sub_submit(proc, command, _timeout=12):
 	ts = ts_us()
 	while ts in PROC_RESP:
@@ -2925,6 +2936,7 @@ async def _sub_submit(proc, command, _timeout=12):
 	sem = proc.sem
 	await sem()
 	async with sem:
+		proc.last_task = s
 		try:
 			proc.stdin.write(s)
 			await proc.stdin.drain()
@@ -2933,17 +2945,20 @@ async def _sub_submit(proc, command, _timeout=12):
 			ex2 = None
 			for i in range(tries):
 				if not is_strict_running(proc):
-					raise CommandCancelledError("Retrying as process disappeared.")
+					raise CCE("Retrying as process disappeared.")
 				if ts not in PROC_RESP:
-					raise CommandCancelledError("Response disconnected. If this error occurs during a command, it is likely due to maintenance!")
+					raise CCE("Response disconnected. If this error occurs during a command, it is likely due to maintenance!")
 				try:
-					resp = await asyncio.wait_for(wrap_future(fut), timeout=3)
+					resp = await asyncio.wait_for(wrap_future(fut), timeout=min(4, i + 1))
 				except T1 as ex:
-					if command[0] == "lambda: 1+1" and command[1] in "$&" and command[2] in ("[]", "()"):
+					if command[0] == lambdassert and command[1] in "$&" and command[2] in ("[]", "()"):
 						raise StopIteration("Temporary wait cancelled.")
 					if i >= tries - 1:
 						ex2 = ex
 						break
+				except Exception as ex:
+					ex2 = ex
+					break
 				else:
 					break
 			else:
@@ -2958,7 +2973,7 @@ async def _sub_submit(proc, command, _timeout=12):
 					pass
 				else:
 					raise
-			print("Killing process", proc, command, ex)
+			print("Killing process", lim_str((proc, command, ex), 384))
 			create_task(start_proc(proc))
 			raise
 		except StopIteration as ex:

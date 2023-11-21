@@ -1905,10 +1905,10 @@ class Art(Command):
 
 		async def ibasl_r(p, k, n, f, c, s, a, np):
 			m = "--mask" in k and "--init-image" not in k
-			if m or sdxl and (c > 1 or premium >= 4 or random.randint(0, 1)) and "z" not in flags:
+			if m or sdxl and (1 or c > 1 or premium >= 4 or random.randint(0, 1)) and "z" not in flags:
 				try:
 					if not m:
-						await process_image("lambda: 1+1", "$", (), cap="sdxlr", timeout=2)
+						await process_image(lambdassert, "$", (), cap="sdxlr", timeout=2)
 				except:
 					print_exc()
 				else:
