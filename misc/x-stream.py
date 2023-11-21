@@ -304,7 +304,7 @@ class Server:
 		return resp.iter_content(65536)
 
 	@cp.expose
-	def cache(self):
+	def debug(self):
 		cp.response.headers["Content-Type"] = "application/json"
 		return json.dumps(self.cache)
 
