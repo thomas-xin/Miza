@@ -12,13 +12,15 @@ class EndpointRedirects(Dispatcher):
 	def __call__(self, path):
 		p = path.strip("/")
 		first = p.split("/", 1)[0]
-		if first in ("", "home", "index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"):
+		if first in ("home", "index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"):
 			if first not in ("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"):
 				p = "index.html"
 		elif os.path.exists(f"misc/web/{p}"):
 			p = "raw/" + p
 		elif first not in ("proxy", "stream", "heartbeat", "backend"):
 			p = "backend/" + p
+		if not p:
+			p = "index.html"
 		p = "/" + p
 		return super().__call__(p)
 
