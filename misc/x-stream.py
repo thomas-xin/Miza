@@ -126,10 +126,17 @@ class Server:
 				meta += f'<meta http-equiv="refresh" content={random.randint(15, 31)};url=https://{cp.request.headers["Host"]}/teapot">'
 			if path:
 				irl = HOST + "/fi/" + path
-				if irl in self.cache and time.time() - self.cache[irl][0] < 300:
+				if irl not in self.cache or time.time() - self.cache[irl][0] > 3600:
 					with self.session.get(irl) as resp:
 						info = resp.json()
 					self.cache[irl] = [time.time(), info]
+				elif time.time() - self.cache[irl][0] > 60:
+					def cache_temp():
+						with self.session.get(irl) as resp:
+							info = resp.json()
+						self.cache[irl] = [time.time(), info]
+					exc.submit(cache_temp)
+					info = self.cache[irl][1]
 				else:
 					info = self.cache[irl][1]
 				mim = info["mimetype"]
@@ -199,7 +206,6 @@ class Server:
 			self.cache[rpath] = b = f.read()
 		return b
 
-	upcache = {}
 	@cp.expose(("u",))
 	def unproxy(self, *path, **query):
 		rpath = "/".join(path)
@@ -208,19 +214,25 @@ class Server:
 		rquery = cp.request.query_string
 		if rquery:
 			rquery = "?" + rquery
-		url = f"{self.state['/']}{rpath}{rquery}"
-		try:
-			raise cp.HTTPRedirect(self.upcache[url], 307)
-		except KeyError:
-			pass
-		print("Uncached:", url)
-		try:
-			with self.session.head(url, verify=False, allow_redirects=False) as resp:
-				url = self.upcache[url] = resp.headers.get("Location") or url
-		except Exception as ex:
-			print("Error:", repr(ex))
-			raise cp.HTTPRedirect("https://mizabot.xyz/notfound.png", 307)
-		raise cp.HTTPRedirect(self.upcache[url], 307)
+		irl = f"{self.state['/']}{rpath}{rquery}"
+		if irl not in self.cache or time.time() - self.cache[irl][0] > 80000:
+			try:
+				with self.session.head(irl, verify=False, allow_redirects=False) as resp:
+					url = resp.headers.get("Location") or irl
+			except Exception as ex:
+				print("Error:", repr(ex))
+				url = "https://mizabot.xyz/notfound.png"
+			self.cache[irl] = [time.time(), url]
+		elif time.time() - self.cache[irl][0] > 3600:
+			def cache_temp():
+				with self.session.head(irl, verify=False, allow_redirects=False) as resp:
+					url = resp.headers.get("Location") or irl
+				self.cache[irl] = [time.time(), url]
+			exc.submit(cache_temp)
+			url = self.cache[irl][1]
+		else:
+			url = self.cache[irl][1]
+		raise cp.HTTPRedirect(url, 307)
 
 	@cp.expose
 	# @cp.tools.accept(media="multipart/form-data")
