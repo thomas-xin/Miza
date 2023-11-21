@@ -10,7 +10,7 @@ from cherrypy._cpdispatch import Dispatcher
 class EndpointRedirects(Dispatcher):
 
 	def __call__(self, path):
-		p = path.strip("/")
+		p = path.split("/", 1)[0]
 		if p in (
 			"", "index", "home", "p", "preview", "files", "file",
 			"chat", "tester", "atlas", "mizatlas", "user", "login",
