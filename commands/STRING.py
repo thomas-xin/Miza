@@ -1818,7 +1818,7 @@ async def instruct(data, best=False):
 	bot = BOT[0]
 	c = await tcount(data["prompt"])
 	if not best:
-		if c <= 256 and data["max_tokens"] <= 256:
+		if 0:#c <= 256 and data["max_tokens"] <= 256:
 			data["model"] = "mythalion-13b"
 			data["stop"] = [f"### Instruction:", f"### Response:", "<|system|>:"]
 			try:
@@ -2299,7 +2299,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					cm = 200
 				if not model or attempts >= 8:
 					model = choice((
-						"mythalion-13b",
+						"emerhyst-20b",
 						# "euryale-70b",
 						ModMap[DEFMOD]["name"],
 						"gpt-3.5-turbo-instruct",
@@ -2313,7 +2313,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					limit = data.get("limit") or limit
 					cm = data.get("cm") or cm
 				elif attempts >= 7:
-					model = "mythalion-13b"
+					model = "emerhyst-20b"
 					limit = 2000
 				elif premium < 2 or attempts in (4, 6):
 					model = ModMap[DEFMOD]["name"]
