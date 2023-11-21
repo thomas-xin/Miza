@@ -1,4 +1,4 @@
-import requests, logging, random, time, os, sys, json, concurrent.futures
+import requests, logging, random, datetime, time, os, sys, json, concurrent.futures
 import cherrypy as cp
 
 
@@ -122,8 +122,8 @@ class Server:
 			else:
 				meta += '<meta property="og:image" content="/logo256.png">'
 			meta += '<meta property="og:site_name" content="Miza">'
-			if not xrand(2) and (dt := datetime.datetime.utcnow()) and (dt.month, dt.day) in ((3, 31), (4, 1), (4, 2)):
-				meta += f'<meta http-equiv="refresh" content={xrand(15, 31)};url=https://{cp.request.headers["Host"]}/teapot">'
+			if not random.randint(0, 1) and (dt := datetime.datetime.utcnow()) and (dt.month, dt.day) in ((3, 31), (4, 1), (4, 2)):
+				meta += f'<meta http-equiv="refresh" content={random.randint(15, 31)};url=https://{cp.request.headers["Host"]}/teapot">'
 			if path:
 				irl = HOST + "/fi/" + path
 				if irl in self.cache and time.time() - self.cache[irl][0] < 300:

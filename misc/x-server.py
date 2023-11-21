@@ -1579,8 +1579,8 @@ class Server:
 			else:
 				meta += '<meta property="og:image" content="/logo256.png">'
 			meta += '<meta property="og:site_name" content="Miza">'
-			if not xrand(2) and (dt := datetime.datetime.utcnow()) and (dt.month, dt.day) in ((3, 31), (4, 1), (4, 2)):
-				meta += f'<meta http-equiv="refresh" content={xrand(15, 31)};url=https://{cp.request.headers["Host"]}/teapot">'
+			if not random.randint(0, 1) and (dt := datetime.datetime.utcnow()) and (dt.month, dt.day) in ((3, 31), (4, 1), (4, 2)):
+				meta += f'<meta http-equiv="refresh" content={random.randint(15, 31)};url=https://{cp.request.headers["Host"]}/teapot">'
 			if path:
 				info = self._fileinfo(path)
 				fn = info["filename"]
