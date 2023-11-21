@@ -181,7 +181,6 @@ class Server:
 		cp.response.headers.update(CHEADERS)
 		cp.response.headers["Content-Type"] = mime
 		cp.response.headers["Content-Length"] = len(data)
-		cp.response.headers["ETag"] = create_etag(data)
 		return data
 
 	@cp.expose
