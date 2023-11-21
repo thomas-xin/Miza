@@ -20,7 +20,7 @@ class EndpointRedirects(Dispatcher):
 				p = "raw/index.html"
 		elif os.path.exists(f"misc/web/{p}"):
 			p = "raw/" + p
-		elif first not in ("proxy", "stream", "heartbeat", "backend", "debug"):
+		elif first not in ("proxy", "u", "unproxy", "stream", "heartbeat", "backend", "debug"):
 			p = "backend/" + p
 		p = "/" + p
 		return super().__call__(p)
