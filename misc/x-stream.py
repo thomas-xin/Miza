@@ -325,7 +325,7 @@ class Server:
 	@cp.expose
 	def debug(self):
 		cp.response.headers["Content-Type"] = "application/json"
-		return json.dumps(self.cache).encode("utf-8")
+		return json.dumps(self.ucache).encode("utf-8")
 
 	@cp.expose
 	def stream(self, info=None):
