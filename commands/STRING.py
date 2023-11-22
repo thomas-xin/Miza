@@ -1946,6 +1946,8 @@ class Ask(Command):
 		if reference and mids[1] != reference.id:
 			mids.remove(reference.id)
 			mids.insert(1, reference.id)
+		mids.remove(message.id)
+		mids.append(message.id)
 		visible = [mdic[i] for i in mids]
 		ignores = set()
 		reset = [True]
@@ -1996,7 +1998,7 @@ class Ask(Command):
 					found = ""
 			return m, content, found
 		for i, m in enumerate(visible):
-			if not m or m.id > message.id or m.id == message.id and i != 0:
+			if not m or m.id > message.id:
 				continue
 			if caid and caid.get("first_message_id", 0) >= m.id:
 				break

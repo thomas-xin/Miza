@@ -3053,6 +3053,8 @@ class AudioDownloader:
 			elif fmt == "weba":
 				fmt = "webm"
 				args.extend(("-c:a", "libopus"))
+				outf = f"{info['name']}.{fmt}"
+				fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
 			elif fmt == "pcm":
 				fmt = "s16le"
 			elif fmt == "mp2":
@@ -5565,6 +5567,8 @@ class Transcribe(Command):
 	async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
 		if max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1) < 2:
 			raise PermissionError(f"Sorry, this feature is currently for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
+		for a in message.attachments:
+			argv = a.url + " " + argv
 		dest = "English"
 		# Attempt to download items in queue if no search query provided
 		if not argv:
@@ -5610,8 +5614,8 @@ class Transcribe(Command):
 			if not name or not url:
 				raise FileNotFoundError(500, argv)
 			url = unyt(url)
-			fn, out = await asubmit(ytdl.download_file, entries[0], fmt="opus")
-			fni = fn.rsplit(".", 1)[0] + ".webm"
+			fn, out = await asubmit(ytdl.download_file, entries[0].get("stream") or entries[0].url, fmt="weba")
+			fni = fn#.rsplit(".", 1)[0] + ".webm"
 			if bot.is_trusted(guild) >= 2:
 				for uid in bot.data.trusted[guild.id]:
 					if uid and bot.premium_level(uid, absolute=True) >= 2:
@@ -5634,15 +5638,14 @@ class Transcribe(Command):
 					embed=None,
 				))
 			with open(fni, "rb") as f:
-				resp = await asubmit(
-					openai.Audio.translate,
+				resp = await bot.oai.audio.translations.create(
 					model="whisper-1",
-					temperature=0.5,
+					temperature=0,
 					file=f,
 				)
 			# resp.raise_for_status()
 		# text = resp.json()["text"].strip()
-		text = resp["text"].strip()
+		text = resp.text.strip()
 		tr = bot.commands.translate[0]
 		if not tr.equiv(dest, "English"):
 			if m:
