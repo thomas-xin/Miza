@@ -236,8 +236,12 @@ class Server:
 			rquery = "?" + rquery
 		irl = f"{self.state['/']}/u{rpath}"
 		if irl not in self.ucache or time.time() - self.ucache[irl][0] > 80000:
+			headers = dict(cp.request.headers)
+			headers.pop("Connection", None)
+			headers.pop("Transfer-Encoding", None)
+			headers["X-Real-Ip"] = cp.request.remote.ip
 			try:
-				with self.session.head(irl, verify=False, allow_redirects=False) as resp:
+				with self.session.head(irl, headers=headers, verify=False, allow_redirects=False) as resp:
 					url = resp.headers.get("Location") or irl
 			except Exception as ex:
 				print("Error:", repr(ex))
@@ -245,7 +249,11 @@ class Server:
 			self.ucache[irl] = [time.time(), url]
 		elif time.time() - self.ucache[irl][0] > 3600:
 			def cache_temp():
-				with self.session.head(irl, verify=False, allow_redirects=False) as resp:
+				headers = dict(cp.request.headers)
+				headers.pop("Connection", None)
+				headers.pop("Transfer-Encoding", None)
+				headers["X-Real-Ip"] = cp.request.remote.ip
+				with self.session.head(irl, headers=headers, verify=False, allow_redirects=False) as resp:
 					url = resp.headers.get("Location") or irl
 				self.ucache[irl] = [time.time(), url]
 			exc.submit(cache_temp)

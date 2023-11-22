@@ -4069,7 +4069,8 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				if not isinstance(data, aiohttp.FormData):
 					if not isinstance(data, (str, bytes, memoryview)):
 						data = orjson.dumps(data)
-					headers["Content-Type"] = "application/json"
+			if data and data[:1] in b'[{"':
+				headers["Content-Type"] = "application/json"
 			if aio:
 				session = self.sessions.next()
 			else:
