@@ -444,7 +444,6 @@ class Prefix(Command):
 class Loop(Command):
 	time_consuming = 3
 	_timeout_ = 12
-	name = ["For", "Rep", "While"]
 	min_level = 1
 	min_display = "1+"
 	description = "Loops a command. Delete the original message to terminate the loop if necessary."
@@ -1094,6 +1093,7 @@ class Status(Command):
 		else:
 			emb.description = msg
 		func = channel.send
+		message = None
 		if m_id is not None:
 			with tracebacksuppressor(StopIteration, discord.NotFound, discord.Forbidden):
 				message = bot.cache.messages.get(m_id)
@@ -1102,14 +1102,19 @@ class Status(Command):
 					if utc() - snowflake_time_2(message.id).timestamp() > 86400 * 14 - 60:
 						create_task(bot.silent_delete(message))
 						raise StopIteration
-				if message.id != channel.last_message_id:
+				if message.id != channel.last_message_id or getattr(message, "rated", False):
 					async for m in bot.data.channel_cache.get(channel):
 						if message.id != m.id or utc() - snowflake_time_2(m.id).timestamp() > 86400 * 14 - 60:
 							create_task(bot.silent_delete(m))
 							raise StopIteration
 						break
 				func = lambda *args, **kwargs: message.edit(*args, content=None, **kwargs)
-		message = await func(embed=emb)
+		try:
+			message = await func(embed=emb)
+		except discord.HTTPException as ex:
+			if message and "429" in repr(ex):
+				message.rated = True
+			raise
 		if m_id is not None and message is not None:
 			bot.data.messages[channel.id] = {message.id: cdict(t=utc(), command="bot.commands.status[0]")}
 

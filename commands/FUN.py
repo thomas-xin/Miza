@@ -3168,6 +3168,15 @@ class UpdateRPS(Database):
 	name = "rps"
 
 
+class HOW(Command):
+	description = ":3"
+	rate_limit = (0, 1)
+	no_parse = True
+
+	def __call__(self, channel, message, **void):
+		self.bot.send_as_embeds(channel, image="https://mizabot.xyz/u/EFz0uPvEMFE.gif", reference=message)
+
+
 EXCLUDE_URL = "{}/exclusion?callback=jQuery331023608747682107778_{}&childMod={}&session={}&signature={}&step={}&frontaddr={}&question_filter={}&forward_answer=1&_={}"
 CHOICE_URL = "{}/choice?callback=jQuery331023608747682107778_{}&childMod={}&session={}&signature={}&step={}&frontaddr={}&question_filter={}&element={}&duel_allowed=1&_={}"
 

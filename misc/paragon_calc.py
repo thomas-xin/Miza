@@ -185,7 +185,7 @@ def parse(args):
 	t5cost = []
 
 	for arg in args:
-		arg = arg.rstrip(",")
+		arg = arg.rstrip(",").lower()
 		if arg.endswith("kp"):
 			pops += float(arg[:-2]) * 1e3
 		elif arg.endswith("mp"):
@@ -346,8 +346,9 @@ def parse(args):
 			tiers -= t
 			power = total_power(pcost, cash, injected, pops, tier5, tiers, totems)
 			if power < p and len(atowers) < limit:
-				d = p2d(power)
-				req = d2p(d + 1)
+				# d = p2d(power)
+				# req = d2p(d + 1)
+				req = p
 				op = cp
 				for cp2, cc2 in zip(reversed(lt_crosspaths), reversed(lt_ccosts)):
 					if cp2 == op:
@@ -410,6 +411,9 @@ def parse(args):
 					power = total_power(pcost, cash, injected, pops, tier5, tiers, totems)
 				else:
 					atowers.sort(key=lambda t: tcost(t))
+			if cash > temp[1]:
+				atowers, cash, pops, tier5, tiers, totems = temp
+				power = total_power(pcost, cash, injected, pops, tier5, tiers, totems)
 		asacs = []
 		curr = ""
 		count = 0

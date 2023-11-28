@@ -66,9 +66,9 @@ def get_best_audio(entry):
 	except KeyError:
 		fmts = ()
 	try:
-		url = entry["webpage_url"]
+		url = entry["url"]
 	except KeyError:
-		url = entry.get("url")
+		url = entry["webpage_url"]
 	replace = True
 	for fmt in fmts:
 		q = fmt.get("abr", 0)
@@ -122,9 +122,9 @@ def get_best_video(entry):
 	except KeyError:
 		fmts = ()
 	try:
-		url = entry["webpage_url"]
+		url = entry["url"]
 	except KeyError:
-		url = entry.get("url")
+		url = entry["webpage_url"]
 	replace = True
 	for fmt in fmts:
 		q = fmt.get("height", 0)
@@ -1798,6 +1798,49 @@ class AudioDownloader:
 
 	blocked_yt = False
 
+	@functools.lru_cache(maxsize=64)
+	def extract_audio_video(self, url):
+		with reqs.next().get(url, headers=Request.header(), stream=True) as resp:
+			resp.raise_for_status()
+			ct = resp.headers.get("Content-Type")
+			if ct == "text/html":
+				s = resp.text
+				out = []
+				matches = re.findall(r"""(?:audio|video)\.src ?= ?['"]https?:""", s)
+				t = s
+				for match in matches:
+					try:
+						t = t[t.index(match):]
+						t = t[t.index("http"):]
+						t2 = t[:re.search(r"""['"]""", t).start()]
+					except (IndexError, ValueError):
+						continue
+					if is_url(t2):
+						title = t2.split("?", 1)[0].rsplit("/", 1)[-1]
+						temp = dict(url=t2, webpage_url=url, title=title, direct=True)
+						out.append(temp)
+				matches = re.findall(r"""<(?:audio|video) """, s)
+				t = s
+				for match in matches:
+					try:
+						t = t[t.index(match):]
+						t = t[t.index("src="):]
+						t = t[t.index("http"):]
+						t2 = t[:re.search(r"""['"]""", t).start()]
+					except (IndexError, ValueError):
+						continue
+					if is_url(t2):
+						title = t2.split("?", 1)[0].rsplit("/", 1)[-1]
+						temp = dict(url=t2, webpage_url=url, title=title, direct=True)
+						out.append(temp)
+				if len(out) > 1:
+					return {"_type": "playlist", "entries": out}
+				elif out:
+					return out[0]
+			elif ct.split("/", 1)[0] in ("audio", "video", "image"):
+				title = url.split("?", 1)[0].rsplit("/", 1)[-1]
+				return dict(url=url, webpage_url=url, title=title, direct=True)
+
 	# Repeatedly makes calls to youtube-dl until there is no more data to be collected.
 	def extract_true(self, url):
 		while not is_url(url):
@@ -1846,7 +1889,12 @@ class AudioDownloader:
 			entries = self.downloader.extract_info(url, download=False, process=True)
 		except Exception as ex:
 			s = str(ex).casefold()
-			if type(ex) is not youtube_dl.DownloadError or self.ydl_errors(s):
+			if "unsupported url:" in s:
+				out = self.extract_audio_video(url)
+				if out:
+					return out
+				raise
+			elif not isinstance(ex, youtube_dl.DownloadError) or self.ydl_errors(s):
 				if "429" in s:
 					self.blocked_yt = utc() + 3600
 				if has_ytd:
@@ -1854,6 +1902,8 @@ class AudioDownloader:
 						entries = self.extract_backup(url)
 					except (TypeError, youtube_dl.DownloadError):
 						raise FileNotFoundError(f"Unable to fetch audio data: {repr(ex)}")
+				else:
+					raise
 			else:
 				raise
 		if "entries" in entries:
@@ -1899,15 +1949,23 @@ class AudioDownloader:
 			return self.downloader.extract_info(url, download=False, process=False)
 		except Exception as ex:
 			s = str(ex).casefold()
-			if type(ex) is not youtube_dl.DownloadError or self.ydl_errors(s):
+			if "unsupported url:" in s:
+				out = self.extract_audio_video(url)
+				if out:
+					return out
+				raise
+			elif not isinstance(ex, youtube_dl.DownloadError) or self.ydl_errors(s):
 				if "429" in s:
 					self.blocked_yt = utc() + 3600
-				if is_url(url) and has_ytd:
+				if has_ytd:
 					try:
-						return self.extract_backup(url)
+						entries = self.extract_backup(url)
 					except (TypeError, youtube_dl.DownloadError):
-						FileNotFoundError(f"Unable to fetch audio data: {repr(ex)}")
-			raise
+						raise FileNotFoundError(f"Unable to fetch audio data: {repr(ex)}")
+				else:
+					raise
+			else:
+				raise
 
 	# Extracts info from a URL or search, adjusting accordingly.
 	def extract_info(self, item, count=1, search=False, mode=None):
@@ -2115,7 +2173,7 @@ class AudioDownloader:
 				if is_url(item):
 					url = verify_url(item)
 					utest = url.split("?", 1)[0]
-					if utest[-5:] == ".json" or utest[-4:] in (".txt", ".bin", ".zip"):
+					if utest[-5:] == ".json" or utest[-4:] in (".txt", ".zip"):
 						s = await_fut(self.bot.get_request(url))
 						try:
 							d = select_and_loads(s, size=268435456)
@@ -2148,13 +2206,14 @@ class AudioDownloader:
 							try:
 								data = self.extract_from(entry["url"])
 							except KeyError:
+								url = get_best_video(entry)
 								temp = cdict({
 									"name": resp["title"],
-									"url": resp["webpage_url"],
+									"url": resp.get("webpage_url", url),
 									"duration": inf,
 									"stream": get_best_audio(entry),
 									"icon": get_best_icon(entry),
-									"video": get_best_video(entry),
+									"video": url,
 								})
 							else:
 								try:
@@ -2176,10 +2235,28 @@ class AudioDownloader:
 									temp.duration = round_min(durstr[0])
 							output.append(temp)
 					else:
-						for i, entry in enumerate(entries):
-							if not i:
+						found = False
+						for entry in entries:
+							if not found:
 								# Extract full data from first item only
-								temp = self.extract(entry["url"], search=False)[0]
+								try:
+									if "url" in entry:
+										temp = self.extract(entry["url"], search=False)[0]
+									elif "formats" in entry:
+										url = get_best_video(entry)
+										temp = cdict({
+											"name": resp["title"],
+											"url": resp.get("webpage_url", url),
+											"duration": inf,
+											"stream": get_best_audio(entry),
+											"icon": get_best_icon(entry),
+											"video": url,
+										})
+								except:
+									print_exc()
+									continue
+								else:
+									found = True
 							else:
 								# Get as much data as possible from all other items, set "research" flag to have bot lazily extract more info in background
 								with tracebacksuppressor:
@@ -2506,7 +2583,7 @@ class AudioDownloader:
 			stream = set_dict(data[0], "stream", data[0].url)
 			icon = set_dict(data[0], "icon", data[0].url)
 			entry.update(data[0])
-		elif not searched and (stream.startswith("ytsearch:") or stream.startswith("https://cf-hls-media.sndcdn.com/") or expired(stream)):
+		if not searched and (stream.startswith("ytsearch:") or stream.startswith("https://cf-hls-media.sndcdn.com/") or expired(stream)):
 			data = self.extract(entry["url"])
 			stream = set_dict(data[0], "stream", data[0].url)
 			icon = set_dict(data[0], "icon", data[0].url)
@@ -2551,7 +2628,7 @@ class AudioDownloader:
 				live = not entry.get("duration") or entry["duration"] > 960 or asap > 1
 			seekable = not entry.get("duration") or entry["duration"] < inf
 			cf = isnan(entry.get("duration") or nan) or not (stream.startswith("https://cf-hls-media.sndcdn.com/") or is_youtube_stream(stream))
-			if asap > 1 and not f.proc:
+			if asap > 1 and not f.proc and not live:
 				esubmit(f.load, check_fmt=cf, webpage_url=entry["url"], live=False, seekable=seekable, duration=entry.get("duration"), asap=False)
 			try:
 				f.load(stream, check_fmt=cf, webpage_url=entry["url"], live=live, seekable=seekable, duration=entry.get("duration"), asap=asap)
@@ -4600,7 +4677,7 @@ class Radio(Command):
 					try:
 						self.countries[country].url = href
 					except KeyError:
-						self.countries[country] = cdict(url=href, cities=fcdict(), states=False)
+						self.countries[country] = cdict(name=country, url=href, cities=fcdict(), states=False)
 					data = self.countries[country]
 					alias = href.rsplit("/", 1)[-1].split("_", 1)[-1]
 					self.countries[alias] = data
@@ -4633,6 +4710,9 @@ class Radio(Command):
 									resp = resp[resp.index(search) + len(search):]
 									city = single_space(resp[:resp.index("-->")].replace(".", " ")).replace(" ", "_")
 									country.cities[city] = cdict(url=href, cities=fcdict(), icon=icon, states=False, get_cities=get_cities)
+									country.cities[city.rsplit(",", 1)[0]] = cdict(url=href, cities=fcdict(), icon=icon, states=False, get_cities=get_cities)
+									self.bot.data.radiomaps[city] = country.name
+									self.bot.data.radiomaps[city.rsplit(",", 1)[0]] = country.name
 						else:
 							resp = resp[:resp.index("</select>")]
 							with suppress(ValueError):
@@ -4648,6 +4728,9 @@ class Radio(Command):
 									resp = resp[resp.index(search) + len(search):]
 									city = single_space(resp[:resp.index("</option>")].replace(".", " ")).replace(" ", "_")
 									country.cities[city] = href
+									country.cities[city.rsplit(",", 1)[0]] = href
+									self.bot.data.radiomaps[city] = country.name
+									self.bot.data.radiomaps[city.rsplit(",", 1)[0]] = country.name
 						return country
 
 					data.get_cities = get_cities
@@ -4668,7 +4751,11 @@ class Radio(Command):
 		if c not in self.countries:
 			await asubmit(self.get_countries)
 			if c not in self.countries:
-				raise LookupError(f"Country {c} not found.")
+				if c in bot.data.radiomaps:
+					args.insert(0, c)
+					c = bot.data.radiomaps[c]
+				else:
+					raise LookupError(f"Country {c} not found.")
 		path.append(c)
 		country = self.countries[c]
 		if not country.cities:
@@ -4685,7 +4772,11 @@ class Radio(Command):
 		if c not in country.cities:
 			await asubmit(country.get_cities, country)
 			if c not in country.cities:
-				raise LookupError(f"City/State {c} not found.")
+				if c in bot.data.radiomaps:
+					args.insert(0, c)
+					c = bot.data.radiomaps[c]
+				else:
+					raise LookupError(f"City/State {c} not found.")
 		path.append(c)
 		city = country.cities[c]
 		if type(city) is not str:
@@ -4712,12 +4803,20 @@ class Radio(Command):
 		search = b'<table class=fix cellpadding="0" cellspacing="0">'
 		resp = as_str(resp[resp.index(search) + len(search):resp.index(b"</p></div><!--end rightcontent-->")])
 		for section in resp.split("<td class=tr31><b>")[1:]:
-			scale = section[section.index("</b>,") + 5:section.index("Hz</td>")].upper()
+			try:
+				i = regexp(r"(?:Hz|赫|هرتز|Гц)</td>").search(section).start()
+				scale = section[section.index("</b>,") + 5:i].upper()
+			except:
+				print(section)
+				print_exc()
+				scale = ""
 			coeff = 0.000001
-			if "M" in scale:
+			if any(n in scale for n in ("M", "兆", "مگا", "М")):
 				coeff = 1
-			elif "K" in scale:
+			elif any(n in scale for n in ("K", "千", "کیلو", "к")):
 				coeff = 0.001
+			# else:
+				# coeff = 1
 			with tracebacksuppressor:
 				while True:
 					search = "<td class=freq>"
@@ -4749,6 +4848,10 @@ class Radio(Command):
 						field[1] += f"[{name.strip()}]({href.strip()})"
 					fields.append(field)
 		bot.send_as_embeds(channel, title=title, thumbnail=country.icon, fields=sorted(fields), author=get_author(bot.user), reference=message)
+
+
+class UpdateRadioMaps(Database):
+	name = "radiomaps"
 
 
 class Party(Command):

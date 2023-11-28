@@ -1783,7 +1783,7 @@ class Art(Command):
 			if not url:
 				raise ArgumentError("Please input a valid prompt.")
 			pt, p1, p2 = await bot.caption(url, best=premium >= 4)
-			prompt = "\n".join((p1, p2))
+			prompt = "\n".join(filter(bool, (p1, p2)))
 			if not prompt:
 				prompt = "art"
 			print(url, prompt)
@@ -1815,7 +1815,7 @@ class Art(Command):
 			oprompt = prompt
 			uid = user.id
 			temp = oprompt.replace('"""', "'''")
-			prompt = f'"""\n{temp}\n"""\n\nImprove the above image caption as a description to send to Dall·E image generation. Be as detailed as possible in at least 2 sentences, and reword anything that may violate policy guidelines.'
+			prompt = f'### Instruction:\n"""\n{temp}\n"""\n\nImprove the above image caption as a description to send to Dall·E image generation. Be as detailed as possible in at least 2 sentences, and reword anything that may violate policy guidelines.\n\n### Response:'
 			if bot.is_trusted(guild) >= 2:
 				for uid in bot.data.trusted[guild.id]:
 					if uid and bot.premium_level(uid, absolute=True) >= 2:
@@ -1828,17 +1828,46 @@ class Art(Command):
 			data = bot.data.users.get(u.id, {})
 			oai = data.get("trial") and data.get("openai_key")
 			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
-			resp = await bot.oai.completions.create(
-				model="gpt-3.5-turbo-instruct",
-				prompt=prompt,
-				temperature=0.5,
-				max_tokens=120,
-				top_p=0.5,
-				frequency_penalty=0,
-				presence_penalty=0,
-				user=str(user.id),
-				n=dups,
-			)
+			resp = None
+			dupn = dups
+			if "STRING" in bot._globals:
+				resp = cdict(choices=[])
+				while not resp.choices or dupn > 1:
+					try:
+						s = await bot.instruct(
+							dict(
+								model="gpt-3.5-turbo-instruct",
+								prompt=prompt,
+								temperature=0.75,
+								max_tokens=200,
+								top_p=0.9,
+								frequency_penalty=0.25,
+								presence_penalty=0.25,
+							),
+							skip=False,
+						)
+						assert len(s.strip()) > 12
+					except:
+						print_exc()
+						break
+					resp.choices.append(cdict(text=s))
+					dupn -= 1
+			if not resp or len(resp.choices) < dups:
+				resp2 = await bot.oai.completions.create(
+					model="gpt-3.5-turbo-instruct",
+					prompt=prompt,
+					temperature=0.75,
+					max_tokens=120,
+					top_p=0.9,
+					frequency_penalty=0.25,
+					presence_penalty=0.25,
+					user=str(user.id),
+					n=dupn,
+				)
+				if resp:
+					resp.choices.extend(resp2.choices)
+				else:
+					resp = resp2
 			print("REWRITE:", resp)
 			for choice in resp.choices:
 				out = choice.text.strip()
@@ -1847,10 +1876,10 @@ class Art(Command):
 					out = ""
 				if out and out[0] == out[-1] == '"' and not oprompt[0] == oprompt[-1] == '"':
 					try:
-						out = orjson.loads(out)
-					except orjson.JSONDecodeError:
+						out = str(literal_eval(out))
+					except SyntaxError:
 						pass
-				out = out.replace("Dall·E", "art")
+				out = out.strip().replace("Dall·E", "art").removeprefix("art").removeprefix(":").strip()
 				if out:
 					prompt = (nprompt or oprompt).removesuffix(".") + ".\n\n" + out.strip()
 				else:

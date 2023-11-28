@@ -4,6 +4,7 @@ if len(sys.argv) < 3:
 	print(f"Usage: python {sys.argv[0]} <token> <server-id>")
 	sys.exit(1)
 
+compressible = {"txt", "exe", "py", "jar", "js", "c", "pl", "json", "php", "svg", "html", "css", "xml", "md", "pdf", "doc", "xls", "ppt", "docx", "xlsx", "pptx", "eot", "swf"}
 mime_map = {
 	"plain": "txt",
 	"mpeg": "mp3",
@@ -56,7 +57,8 @@ if sys.argv[1] == "-map_mime":
 	print(f"Progress: {PROGRESS} (Complete)", end="")
 	sys.exit(0)
 
-import requests, json, time, concurrent.futures, random
+import requests, json, time, concurrent.futures, random, re
+from traceback import print_exc
 reqs = requests.Session()
 token, gid = sys.argv[1], sys.argv[2]
 
@@ -64,25 +66,56 @@ exc = concurrent.futures.ThreadPoolExecutor(max_workers=64)
 futs = []
 PTIME = 0
 
-headers = {"Authorization": "Bot " + token, "Content-Type": "application/json"}
-resp = reqs.get(
-	"https://discord.com/api/v9/users/@me/guilds",
-	headers=headers,
-)
-PROGRESS += 1
-if resp.status_code == 401:
-	headers = {"Authorization": token, "Content-Type": "application/json"}
+if "," in gid:
+	if "(" not in gid and "[" not in gid and "{" not in gid:
+		gid = f"[{gid}]"
+	import ast
+	cids = ast.literal_eval(gid)
+	server = [{}]
+	channels = []
+	headers = {"Authorization": "Bot " + token, "Content-Type": "application/json"}
+	for cid in cids:
+		resp = reqs.get(
+			f"https://discord.com/api/v10/channels/{cid}",
+			headers=headers,
+		)
+		PROGRESS += 1
+		resp.raise_for_status()
+		channel = resp.json()
+		channels.append(channel)
+		if not server[0].get("name"):
+			server[0]["name"] = channel.get("name")
+			if len(cids) > 1:
+				server[0]["name"] += f" +{len(cids) - 1}"
+	gid = None
+else:
+	headers = {"Authorization": "Bot " + token, "Content-Type": "application/json"}
 	resp = reqs.get(
-		"https://discord.com/api/v9/users/@me/guilds",
+		"https://discord.com/api/v10/users/@me/guilds",
 		headers=headers,
 	)
 	PROGRESS += 1
-resp.raise_for_status()
-d = resp.json()
+	if resp.status_code == 401:
+		headers = {"Authorization": token, "Content-Type": "application/json"}
+		resp = reqs.get(
+			"https://discord.com/api/v10/users/@me/guilds",
+			headers=headers,
+		)
+		PROGRESS += 1
+	resp.raise_for_status()
+	d = resp.json()
 
-server = [s for s in d if int(gid) == int(s["id"])]
-if not server:
-	raise FileNotFoundError("Server not found.")
+	server = [s for s in d if int(gid) == int(s["id"])]
+	if not server:
+		raise FileNotFoundError("Server not found.")
+
+	resp = reqs.get(
+		f"https://discord.com/api/v10/guilds/{gid}/channels",
+		headers=headers,
+	)
+	PROGRESS += 1
+	channels = resp.json()
+
 fn = " ".join(sys.argv[3:])
 if fn:
 	sfold = str(time.time_ns() // 1000)
@@ -95,13 +128,6 @@ if not sfold.endswith("/"):
 
 if not os.path.exists(sfold):
 	os.mkdir(sfold)
-
-resp = reqs.get(
-	f"https://discord.com/api/v9/guilds/{gid}/channels",
-	headers=headers,
-)
-PROGRESS += 1
-channels = resp.json()
 
 def header():
 	return {
@@ -151,7 +177,6 @@ def proxy_download(url, fn=None, proxy=True, timeout=24):
 			except StopIteration:
 				pass
 			except:
-				from traceback import print_exc
 				print_exc()
 		if size:
 			for i in range(3):
@@ -174,20 +199,18 @@ def proxy_download(url, fn=None, proxy=True, timeout=24):
 					except StopIteration:
 						continue
 					except:
-						from traceback import print_exc
 						print_exc()
 			pos = os.path.getsize(fn)
 			if pos < size:
 				raise EOFError(f"{url}: Incomplete download ({pos} < {size}), unable to resolve.")
 		return fn
 
-def download(url, fn):
+def download(url, fn, backup=None):
 	try:
-		resp = proxy_download(url)
+		resp = proxy_download(url, proxy=False)
 	except:
-		from traceback import print_exc
 		print_exc()
-		resp = reqs.get(url)
+		resp = reqs.get(backup or url)
 	globals()["PROGRESS"] += 1
 	if resp.headers.get("Content-Type"):
 		ctype = resp.headers["Content-Type"]
@@ -200,6 +223,16 @@ def download(url, fn):
 		sys.stdout.write(f"\rProgress: {PROGRESS}{END}")
 		sys.stdout.flush()
 
+if gid:
+	resp = reqs.get(
+		f"https://discord.com/api/v10/guilds/{gid}/emojis",
+		headers=headers,
+	)
+	emojis = {int(e["id"]): e for e in resp.json()}
+else:
+	emojis = {}
+
+ereg = re.compile("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>")
 users = {}
 while channels:
 	channel = channels.pop(0)
@@ -208,7 +241,7 @@ while channels:
 	cid = channel["id"]
 	for mode in ("public", "private"):
 		resp = reqs.get(
-			f"https://discord.com/api/v9/channels/{cid}/threads/archived/{mode}",
+			f"https://discord.com/api/v10/channels/{cid}/threads/archived/{mode}",
 			headers=headers,
 		)
 		PROGRESS += 1
@@ -226,7 +259,7 @@ while channels:
 		data = []
 		while True:
 			resp = reqs.get(
-				f"https://discord.com/api/v9/channels/{cid}/messages?limit=100&after={MID}",
+				f"https://discord.com/api/v10/channels/{cid}/messages?limit=100&after={MID}",
 				headers=headers,
 			)
 			PROGRESS += 1
@@ -281,6 +314,17 @@ while channels:
 						s += "\t".join(f["name"] for f in e["fields"]) + "\t".join(f["value"] for f in e["fields"])
 					s += "}"
 				s += "\n\u200c\n"
+				found = ereg.findall(s)
+				for er in found:
+					try:
+						id = int(er.removesuffix(">").rsplit(":", 1)[-1])
+					except:
+						print_exc()
+					else:
+						animated = er.startswith("<a:")
+						name = er.split(":", 2)[1]
+						if id not in emojis or len(emojis[id]["name"]) < len(name):
+							emojis[id] = dict(id=id, name=name, animated=animated)
 				f.write(s.encode("utf-8"))
 			time.sleep(1)
 			if len(d) < 100:
@@ -297,21 +341,19 @@ for uid, u in users.items():
 	url = f"https://cdn.discordapp.com/avatars/{uid}/{avatar}.png?size=4096"
 	futs.append(exc.submit(download, url, f"{sfold}users/{name}"))
 
-resp = reqs.get(
-	f"https://discord.com/api/v9/guilds/{gid}/emojis",
-	headers=headers,
-)
-emojis = resp.json()
+for fut in futs:
+	fut.result()
+futs.clear()
 
 if emojis:
 	if not os.path.exists(sfold + "emojis"):
 		os.mkdir(sfold + "emojis")
-	for emoji in emojis:
+	for emoji in emojis.values():
 		eid = emoji["id"]
-		name = emoji["name"] + " ~ " + eid
-		fmt = "gif" if emoji.get("animated") else "png"
-		url = f"https://cdn.discordapp.com/emojis/{eid}.{fmt}?quality=lossless"
-		futs.append(exc.submit(download, url, f"{sfold}emojis/{name}"))
+		name = emoji["name"] + " ~ " + str(eid)
+		fmt = "gif" if emoji.get("animated", True) else "png"
+		url = f"https://cdn.discordapp.com/emojis/{eid}.{fmt}"
+		futs.append(exc.submit(download, url, f"{sfold}emojis/{name}", backup=url.rsplit(".", 1)[0] + ".png" if emoji.get("animated", True) else None))
 
 for fut in futs:
 	fut.result()
@@ -322,9 +364,9 @@ if fn:
 	if os.path.exists(fn):
 		os.remove(fn)
 	fold = Path(sfold)
-	with zipfile.ZipFile(fn, "w", zipfile.ZIP_STORED) as z:
+	with zipfile.ZipFile(fn, "w", zipfile.ZIP_DEFLATED) as z:
 		for entry in fold.rglob("*"):
-			z.write(entry, entry.relative_to(fold))
+			z.write(entry, entry.relative_to(fold), compress_type=zipfile.ZIP_LZMA if str(entry).rsplit(".", 1)[-1] in compressible else zipfile.ZIP_STORED, compresslevel=6)
 	shutil.rmtree(sfold)
 
 sys.stdout.write(f"\rProgress: {PROGRESS} (Complete){END}")

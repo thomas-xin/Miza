@@ -591,11 +591,13 @@ class Server:
 			from transformers import pipeline
 			pipe = pipeline("object-detection", model="facebook/detr-resnet-50", device=0)
 			self.opipe.set_result(pipe)
+		image = image.rotate(-90)
+		image.save("test.png")
 		pipe = self.opipe.result()
 		data = pipe(image, threshold=1 / 3)
 		cp.response.headers["Content-Type"] = "application/json"
 		out = orjson.dumps(data)
-		print("DET:", out)
+		print("DET:", image.size, out)
 		return out
 
 	@cp.expose(("images", "image", "i", "view", "v", "raw", "r", "n", "f", "d"))
@@ -907,6 +909,8 @@ class Server:
 		if id == "u" and url:
 			id = url
 		if id:
+			if "." in id:
+				id = id.split(".", 1)[0]
 			with tracebacksuppressor:
 				id = int.from_bytes(base64.urlsafe_b64decode(id + "=="), "big")
 			url = self.bot_exec(f"bot.renew_attachment({id})")

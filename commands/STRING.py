@@ -197,8 +197,8 @@ class Translate(Command):
 		out = resp.choices[0].text
 		if out and out[0] == out[-1] == '"' and not text[0] == text[-1] == '"':
 			try:
-				out = orjson.loads(out)
-			except orjson.JSONDecodeError:
+				out = str(literal_eval(out))
+			except SyntaxError:
 				pass
 		lines = [line2 for line in out.split("•") if (line2 := line.strip())]
 		print("ChatGPT Translate:", user, text, src, dests, lines)
@@ -1644,10 +1644,6 @@ async def summarise(q, min_length=128, max_length=192):
 	res = await tik_decode_a(out)
 	return res.strip()
 
-async def tcount(s, model="gpt-3.5-turbo"):
-	enc = await tik_encode_a(s, encoding=model)
-	return len(enc)
-
 def m_repr(m):
 	if not isinstance(m, dict):
 		return as_str(m)
@@ -1814,45 +1810,6 @@ def instruct_structure(messages, exclude_first=True):
 		return ins[0] + "\n\n### History:\n" + "\n\n".join(ins[1:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
 	return "\n\n".join(ins[:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
 
-async def instruct(data, best=False):
-	bot = BOT[0]
-	c = await tcount(data["prompt"])
-	if not best:
-		if 0:#c <= 256 and data["max_tokens"] <= 256:
-			data["model"] = "mythalion-13b"
-			data["stop"] = [f"### Instruction:", f"### Response:", "<|system|>:"]
-			try:
-				await process_image(lambdassert, "$", (), cap="vr11", timeout=2)
-				return await process_image("EXL2", "$", [data], cap="vr11", timeout=30)
-			except:
-				print_exc()
-				data["model"] = "gpt-3.5-turbo-instruct"
-		elif c <= 2048 and data["max_tokens"] <= 2048:
-			data["model"] = "emerhyst-20b"
-			data["stop"] = [f"### Instruction:", f"### Response:"]
-			try:
-				await process_image(lambdassert, "$", (), cap="vr23", timeout=2)
-				return await process_image("EXL2", "$", [data], cap="vr23", timeout=30)
-			except:
-				print_exc()
-				data["model"] = "gpt-3.5-turbo-instruct"
-		if AUTH.get("together_key"):
-			import together
-			together.api_key = AUTH["together_key"]
-			rp = ((data["frequency_penalty"] + data["presence_penalty"]) / 4 + 1) ** (1 / log2(2 + c / 8))
-			rdata = dict(
-				prompt=data["prompt"],
-				model="Gryphe/MythoMax-L2-13b",
-				temperature=data["temperature"] * 2 / 3,
-				top_p=data["top_p"],
-				repetition_penalty=rp,
-				max_tokens=data["max_tokens"],
-			)
-			response = await asubmit(together.Complete.create, **rdata, timeout=60)
-			return response["output"]["choices"][0]["text"]
-	response = await asyncio.wait_for(bot.oai.completions.create(**data, timeout=60), timeout=70)
-	return response.choices[0].text
-
 
 class Ask(Command):
 	_timeout_ = 24
@@ -1905,7 +1862,8 @@ class Ask(Command):
 				tup = tup[2:]
 				inp.append(f"{name}: {content}")
 			if not em:
-				data = await process_image("embedding", "$", ["\n".join(inp)], cap="summ", timeout=20)
+				await process_image(lambdassert, "$", (), cap="summ", timeout=2)
+				data = await process_image("embedding", "$", ["\n".join(inp)], cap="summ", timeout=30)
 				em = base64.b64encode(data).decode("ascii")
 			mapd[s] = orig
 			embd[s] = em
@@ -1947,7 +1905,7 @@ class Ask(Command):
 			mids.remove(reference.id)
 			mids.insert(1, reference.id)
 		mids.remove(message.id)
-		mids.append(message.id)
+		mids.insert(0, message.id)
 		visible = [mdic[i] for i in mids]
 		ignores = set()
 		reset = [True]
@@ -2146,7 +2104,8 @@ class Ask(Command):
 			await ignore_embedding(message.id)
 			orig_tup = (name, q)
 			if embd:
-				data = await process_image("embedding", "$", [f"{name}: {q}"], cap="summ", timeout=5)
+				await process_image(lambdassert, "$", (), cap="summ", timeout=2)
+				data = await process_image("embedding", "$", [f"{name}: {q}"], cap="summ", timeout=30)
 				em = base64.b64encode(data).decode("ascii")
 				objs = list(embd.items())
 				keys = [t[0] for t in objs]
@@ -2234,7 +2193,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						user=str(user.id) if premium < 3 else str(hash(name)),
 					)
 					try:
-						resp = await instruct(data)
+						resp = await bot.instruct(data)
 					except:
 						print_exc()
 						resp = await bot.oai.moderations.create(input=prompt)
@@ -2283,6 +2242,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 			ex = RuntimeError("Maximum attempts exceeded.")
 			appended = False
 			vis_allowed = True
+			browsed = set()
 			print("Chat", model, name, q, extensions)
 			for attempts in range(12):
 				if not bot.verify_integrity(message):
@@ -2379,7 +2339,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					orig_model = model
 					if model not in chatcompletion:
 						model = "gpt-3.5-turbo-1106"
-					elif model.startswith("gpt-4") and len(ufull) > 5 and length > 384:
+					if premium >= 2 and len(ufull) > 5 and length > 384:
 						ms = ufull[-1]
 						prompt = 'The following is a conversation with numbered messages:\n\n"""'
 						ufc = ufull[:-1]
@@ -2403,7 +2363,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							user=str(user.id) if premium < 3 else str(hash(name)),
 						)
 						try:
-							resp = await instruct(data)
+							resp = await bot.instruct(data)
 						except:
 							print_exc()
 							resp = None
@@ -2458,60 +2418,33 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						m.pop("function_call")
 					m.content = m.get("content") or ""
 					tc = m.get("tool_calls", None) or ()
-					if not tc or any(fc.function.name not in FunctionList for fc in tc):
-						if orig_model not in chatcompletion:
-							extensions = False
-							print("Function mismatch:", target_model, orig_model, model)
-							continue
-						text = m["content"] if m["content"] else ""
-						text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
-						if not text or len(text) >= 2 and text[-1] in ",: aAsS" and text[-2] not in ",.!?" or text.endswith(' "') or text.endswith('\n"'):
-							redo = True
-							continue
-						if premium >= 2:
-							tl = text.lower()
-							redo = False
-							for s in STOPS:
-								if s in tl:
-									i = tl.index(s)
-									if "." in text[:i]:
-										text = text[:i].rsplit(".", 1)[0] + "."
-										a = await tcount(text)
-										if a < 64:
-											text = ""
-									else:
-										text = ""
-									redo = True
-									if model == "gpt-4-vision-preview":
-										target_model = "gpt4"
-										vis_allowed = False
-									else:
-										target_model = DEFMOD
-									break
-								else:
-									continue
-							if redo:
-								continue
-						text = text.strip()
-						break
 					resend = False
+					ucid = set()
 					for n, fc in enumerate(tc):
+						if n >= 8:
+							break
 						tid = fc.id[:6] + str(n)
+						while tid in ucid:
+							tid += "0"
+						ucid.add(tid)
 						fc.id = tid
 						try:
 							args = orjson.loads(fc.function.arguments)
 						except:
 							print_exc()
 							args = fc.function.arguments if isinstance(fc.function.arguments, list) else [fc.function.arguments]
-						if args:
+						if isinstance(args, dict):
 							argv = " ".join(map(str, args.values()))
+						elif args:
+							argv = " ".join(map(str, args))
 						else:
 							argv = ""
 						name = fc.function.name
 						res = text or ""
 						call = None
-						if name == "browse":
+						if name == "browse" and f"b${argv}" not in browsed:
 							print("Browse query:", argv)
+							browsed.add(f"b${argv}")
 							try:
 								res = await process_image("BOT.browse", "$", [argv], cap="browse", timeout=60)
 							except:
@@ -2536,7 +2469,10 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 										calls = m2.get("tool_calls")
 										if not calls:
 											continue
-										calls.extend(m.tool_calls)
+										cids = {c.id for c in calls}
+										for c in m.tool_calls:
+											if c.id not in cids:
+												calls.append(c)
 										break
 								messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
 								skipping = 0
@@ -2545,14 +2481,14 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								appended = True
 								continue
 							resend = True
-						elif name == "sympy":
+						elif name == "sympy" and f"s${argv}" not in browsed:
 							print("Sympy query:", argv)
+							browsed.add(f"s${argv}")
 							try:
 								res = await bot.solve_math(argv, timeout=24)
 								res = res[0]
 							except:
 								print_exc()
-								res = None
 								blocked.add("sympy")
 							if res:
 								c = await tcount(res)
@@ -2573,7 +2509,10 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 										calls = m2.get("tool_calls")
 										if not calls:
 											continue
-										calls.extend(m.tool_calls)
+										cids = {c.id for c in calls}
+										for c in m.tool_calls:
+											if c.id not in cids:
+												calls.append(c)
 										break
 								messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
 								blocked.add("sympy")
@@ -2584,8 +2523,9 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								continue
 							name = "wolfram_alpha"
 							resend = True
-						if name == "wolfram_alpha":
+						if name == "wolfram_alpha" and f"w${argv}" not in browsed:
 							print("Wolfram Alpha query:", argv)
+							browsed.add(f"w${argv}")
 							try:
 								res = await process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60)
 							except:
@@ -2610,7 +2550,10 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 										calls = m2.get("tool_calls")
 										if not calls:
 											continue
-										calls.extend(m.tool_calls)
+										cids = {c.id for c in calls}
+										for c in m.tool_calls:
+											if c.id not in cids:
+												calls.append(c)
 										break
 								messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
 								blocked.add("wolfram_alpha")
@@ -2691,6 +2634,42 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							mresp = mr1
 							break
 					if mresp:
+						break
+					if not tc or m.get("content"):
+						if orig_model not in chatcompletion:
+							extensions = False
+							print("Function mismatch:", target_model, orig_model, model)
+							continue
+						text = m["content"] if m["content"] else ""
+						text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
+						if not text or len(text) >= 2 and text[-1] in ",: aAsS" and text[-2] not in ",.!?" or text.endswith(' "') or text.endswith('\n"'):
+							redo = True
+							continue
+						if premium >= 2:
+							tl = text.lower()
+							redo = False
+							for s in STOPS:
+								if s in tl:
+									i = tl.index(s)
+									if "." in text[:i]:
+										text = text[:i].rsplit(".", 1)[0] + "."
+										a = await tcount(text)
+										if a < 64:
+											text = ""
+									else:
+										text = ""
+									redo = True
+									if model == "gpt-4-vision-preview":
+										target_model = "gpt4"
+										vis_allowed = False
+									else:
+										target_model = DEFMOD
+									break
+								else:
+									continue
+							if redo:
+								continue
+						text = text.strip()
 						break
 					continue
 				if mresp:
@@ -3153,7 +3132,7 @@ class Instruct(Command):
 			presence_penalty=0.4,
 			user=str(user.id) if premium < 3 else str(hash(user.name)),
 		)
-		resp = await instruct(data, best=premium >= 3)
+		resp = await bot.instruct(data, best=premium >= 3)
 		ref = message
 		ms = split_across(resp, 1999, prefix="\xad")
 		s = ms[-1] if ms else code

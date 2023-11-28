@@ -1530,7 +1530,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					pass
 				base = f"https://cdn.discordapp.com/emojis/{e}."
 				if verify:
-					fut = esubmit(Request, base + "png")
+					fut = esubmit(Request, base + "png", method="HEAD")
 				url = base + "gif"
 				with reqs.next().head(url, headers=Request.header(), stream=True) as resp:
 					if resp.status_code in range(400, 500):
@@ -1568,6 +1568,47 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if type(e) in (int, str):
 			e = cdict(id=e, animated=animated)
 		return min_emoji(e)
+
+	llsem = Semaphore(2, 2, rate_limit=4)
+	async def instruct(self, data, best=False, skip=True):
+		bot = BOT[0]
+		c = await tcount(data["prompt"])
+		if not best:
+			if 0:#c <= 256 and data["max_tokens"] <= 256:
+				data["model"] = "mythalion-13b"
+				data["stop"] = [f"### Instruction:", f"### Response:", "<|system|>:"]
+				try:
+					await process_image(lambdassert, "$", (), cap="vr11", timeout=2)
+					return await process_image("EXL2", "$", [data], cap="vr11", timeout=30)
+				except:
+					print_exc()
+					data["model"] = "gpt-3.5-turbo-instruct"
+			elif c <= 2048 and data["max_tokens"] <= 2048 and not self.llsem.busy:
+				data["model"] = "emerhyst-20b"
+				data["stop"] = [f"### Instruction:", f"### Response:"]
+				try:
+					async with self.llsem:
+						await process_image(lambdassert, "$", (), cap="vr23", timeout=2)
+						return await process_image("EXL2", "$", [data, skip], cap="vr23", timeout=30)
+				except:
+					print_exc()
+					data["model"] = "gpt-3.5-turbo-instruct"
+			if AUTH.get("together_key"):
+				import together
+				together.api_key = AUTH["together_key"]
+				rp = ((data["frequency_penalty"] + data["presence_penalty"]) / 4 + 1) ** (1 / log2(2 + c / 8))
+				rdata = dict(
+					prompt=data["prompt"],
+					model="Gryphe/MythoMax-L2-13b",
+					temperature=data["temperature"] * 2 / 3,
+					top_p=data["top_p"],
+					repetition_penalty=rp,
+					max_tokens=data["max_tokens"],
+				)
+				response = await asubmit(together.Complete.create, **rdata, timeout=60)
+				return response["output"]["choices"][0]["text"]
+		response = await asyncio.wait_for(self.oai.completions.create(**data, timeout=60), timeout=70)
+		return response.choices[0].text
 
 	analysed = {}
 	async def caption(self, url, best=False, timeout=24):
@@ -1669,7 +1710,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			response = await asyncio.wait_for(self.oai.chat.completions.create(**data, timeout=30), timeout=35)
 		except:
 			print_exc()
-			return await asubmit(self.ibv, url)
+			return await asubmit(self.neva, url)
 		out = response.choices[0].message.content
 		print("GPT4V:", out)
 		return out
@@ -5641,7 +5682,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				except AttributeError:
 					pass
 
-		discord.state.ConnectionState.parse_message_create = lambda self, data: parse_message_create(self, data)
+		discord.state.ConnectionState.parse_message_create = lambda self, data, *void: parse_message_create(self, data)
 
 		def create_message(self, channel, data):
 			data["channel_id"] = channel.id
@@ -5664,7 +5705,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			typing = channel._state.http.send_typing
 
 			while True:
-				async with Delay(7):
+				async with Delay(6):
 					await typing(channel.id)
 		async def __aenter__(self):
 			self.task = self.loop.create_task(self.do_typing())

@@ -305,7 +305,10 @@ class AudioPlayer(discord.AudioSource):
 	def read(self):
 		if not self.queue or not self.queue[0]:
 			if self.silent:
-				self.vc.pause()
+				try:
+					self.vc.pause()
+				except:
+					pause
 			self.silent = True
 			self.queue.clear()
 			return self.emptyopus * 3
@@ -327,8 +330,17 @@ class AudioPlayer(discord.AudioSource):
 				if not self.queue:
 					return self.emptyopus
 				out = self.queue[0][0].read()
-		if self.silent:
+		if not out:
+			out = self.emptyopus
+		if out == self.emptyopus:
+			self.silent = True
+		elif self.silent:
 			self.silent = False
+			try:
+				self.pause()
+			except:
+				pass
+			self.resume()
 		return out or self.emptyopus
 
 	def play(self, source, after=None):

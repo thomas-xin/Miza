@@ -932,14 +932,34 @@ class Archive(Command):
 	_timeout_ = 3600
 	name = ["ArchiveServer", "DownloadServer"]
 	min_level = 3
-	description = "Archives all messages, attachments and users into a .zip folder. Requires server permission level 3 as well as a Lv2 or above ⟨MIZA⟩ subscription to perform, and may take a significant amount of time."
+	description = "Archives all messages, attachments and users into a .zip folder. Defaults to entire server if no channel specified, requires server permission level 3 as well as a Lv2 or above ⟨MIZA⟩ subscription to perform, and may take a significant amount of time."
 	usage = "<server>?"
 	flags = "f"
 	rate_limit = 172800
 
-	async def __call__(self, bot, message, guild, user, channel, argv, flags, **void):
-		if argv:
-			guild = await bot.fetch_guild(argv)
+	async def __call__(self, bot, message, guild, user, channel, args, flags, **void):
+		target = guild.id
+		tarname = guild.name
+		if args:
+			try:
+				c = await bot.fetch_channel(verify_id(args[0]))
+			except Exception as ex:
+				try:
+					guild = await bot.fetch_guild(verify_id(args[0]))
+				except:
+					raise ex
+				else:
+					target = guild.id
+					tarname = guild.name
+			else:
+				channels = [c]
+				for a in map(verify_id, args[1:]):
+					c = await bot.fetch_channel(a)
+					channels.append(c)
+				target = ",".join(str(c.id) for c in channels) + ("," if len(channels) == 1 else "")
+				tarname = channels[0].name
+				if len(channels) > 1:
+					tarname += f" +{len(channels) - 1}"
 		if bot.get_perms(user, guild) < 3:
 			raise PermissionError("You must be in the target server and have a permission level of minimum 3.")
 		if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
@@ -951,7 +971,7 @@ class Archive(Command):
 			sys.executable,
 			"misc/server-dump.py",
 			bot.token,
-			str(guild.id),
+			str(target),
 			fn,
 		]
 		info = ini_md("Archive Started!")
@@ -979,7 +999,9 @@ class Archive(Command):
 					await m.edit(content=info)
 		if not fn:
 			raise FileNotFoundError("The requested file was not found. If this issue persists, please report it in the support server.")
-		await bot.send_with_file(channel, file=CompatFile(fn), reference=message)
+		if not tarname.endswith(".zip"):
+			tarname += ".zip"
+		await bot.send_with_file(channel, file=CompatFile(fn, filename=tarname), reference=message)
 		info = ini_md("Archive Complete!")
 		await m.edit(content=info)
 

@@ -1589,8 +1589,14 @@ async def send_with_react(channel, *args, reacts=None, reference=None, mention=F
 		else:
 			sent = await discord.abc.Messageable.send(channel, *args, **kwargs)
 		if reacts:
-			for react in reacts:
-				await sent.add_reaction(react)
+			if len(reacts) > 5:
+				for react in reacts:
+					async with Delay(1):
+						await aretry(sent.add_reaction, react)
+			else:
+				for react in reacts:
+					async with Delay(0.5):
+						create_task(aretry(sent.add_reaction, react))
 		return sent
 	except:
 		print_exc()
@@ -4069,7 +4075,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				if not isinstance(data, aiohttp.FormData):
 					if not isinstance(data, (str, bytes, memoryview)):
 						data = orjson.dumps(data)
-			if data and data[:1] in b'[{"':
+			if data and (isinstance(data, (list, dict)) or (data[:1] in '[{"') if isinstance(data, str) else (data[:1] in b'[{"')):
 				headers["Content-Type"] = "application/json"
 			if aio:
 				session = self.sessions.next()
@@ -4426,6 +4432,10 @@ async def tik_decode_a(t, encoding="cl100k_base"):
 	if len(t) > 256:
 		return await asubmit(tik_decode, t, encoding=encoding, priority=2)
 	return tik_decode(t, encoding=encoding)
+
+async def tcount(s, model="gpt-3.5-turbo"):
+	enc = await tik_encode_a(s, encoding=model)
+	return len(enc)
 
 
 __filetrans = {

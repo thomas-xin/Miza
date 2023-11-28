@@ -1875,7 +1875,7 @@ if "exl2" in CAPS:
 		tup = mcache[model] = M, T
 		return tup
 
-	def EXL2(inputs):
+	def EXL2(inputs, skip=True):
 		print("EXL2I:", inputs)
 		model = inputs["model"]
 		prompt = inputs["prompt"]
@@ -1920,7 +1920,10 @@ if "exl2" in CAPS:
 		if stop:
 			for s in stop:
 				text = text.split(s, 1)[0]
-		text = text.strip().replace(":\n", ": ")
+		text = text.strip()
+		if not skip:
+			return text
+		text = text.replace(":\n", ": ")
 		spl = text.split(": ")
 		if len(spl) > 1:
 			text = ""
@@ -1929,7 +1932,8 @@ if "exl2" in CAPS:
 				if "\n" in s:
 					text += s.rsplit("\n", 1)[0]
 					break
-				text += s + ": "
+				if spl:
+					text += s + ": "
 			text = text.strip()
 			if text.endswith(":"):
 				text = text.rsplit("\n", 1)[0]
@@ -2070,7 +2074,8 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 					if "\n" in s:
 						text += s.rsplit("\n", 1)[0]
 						break
-					text += s + ": "
+					if spl:
+						text += s + ": "
 				text = text.strip()
 				if text.endswith(":"):
 					text = text.rsplit("\n", 1)[0]
@@ -2141,7 +2146,8 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 					if "\n" in s:
 						text += s.rsplit("\n", 1)[0]
 						break
-					text += s + ": "
+					if spl:
+						text += s + ": "
 				text = text.strip()
 				if text.endswith(":"):
 					text = text.rsplit("\n", 1)[0]
