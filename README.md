@@ -113,6 +113,8 @@ git clone https://github.com/thomas-xin/Miza.git
   - GPT-3.5 Turbo (API, fees apply)
   - GPT-3.5 Davinci (API, fees apply, deprecated)
   - GPT-3.5 Curie (API, fees apply, deprecated)
+  - NVIDIA NeVA (API, fees apply)
+  - Instructblip-Vicuna (API, fees apply)
   - OpenAI Whisper (API, fees apply)
   - Airochronos-33B (Locally hosted, ~40GB VRAM)
   - GPlatty-33B (Locally hosted, ~40GB VRAM)
@@ -124,9 +126,9 @@ git clone https://github.com/thomas-xin/Miza.git
   - Stable Diffusion v1.5 (Locally hosted, ~6GB VRAM)
   - Encodec (Locally hosted, ~100MB RAM)
 - Locally hosted models do not incur fees, but they require substantial amounts of GPU memory, as well as compute power.
-  - Multiple weaker GPUs may be utilised, however at the moment the underlying frameworks do not appear to have NVLink support, meaning high PCIe bandwidth is necessary for some models, espcially if VRAM is insufficient and offloading is required.
+  - Multiple weaker GPUs may be utilised, however at the moment the underlying frameworks do not appear to have NVLink support, meaning high PCIe bandwidth is necessary for some models, espcially if VRAM is insufficient and offloading is required. Miza makes an attempt to sort available GPUs by bandwidth and VRAM, but this is often not perfect.
     - Worthy of note is that most of Miza's AI compute is done using **FP16**, **BF16** and **FP8**, using PyTorch as the main framework. This means GPUs with native support for these data types is preferred. GPUs with at least 10GB of VRAM are officially supported. For NVIDIA cards, this means Pascal series or above is necessary (>= 1080ti/P5000/P40), Volta/Turing series or above is recommended (>= 2080ti/T5000/V100/T4), Ampere series or above is preferred (>= 3060/A2000/A2), and Ada/Hopper series or above is helpful for AV1 acceleration on WEBM files (>= 4060ti/Ada4000/L4/H100).
-    - FP4 quantisation and AMD/Intel GPU support may be possible on Linux. However, due to driver compatibility issues, Miza currently does not officially support this use case.
+    - AMD/Intel GPU support may be possible on Linux. However, due to driver compatibility issues, Miza currently does not officially support this use case.
     - For hobbyists, typically the best value compute devices are RTX 4090, RTX 3090ti, RTX 3090, or RTX 3060, all of which may be purchased second hand, and may be combined. For those with much higher budgets, A40/L40/A6000/Ada6000/A100/H100 are excellent for AI inference, and will be more efficient for space, stability, and power consumption.
     - Run the `benchmark.py` file within the main project directory to enable Miza to make the most efficient use of GPU resources. The order of task priority will be automatically distributed according to FP16 TFLOPS, as well as data transfer rate, which will be used to sort optimal device order for models that do not fit on single GPUs.
   - The main Miza bot's API use is funded by premium subscriptions, with GPT-4 being the most costly. Several methods of context optimisation have been implemented, including embeddings and summarisation (also hosted locally).
