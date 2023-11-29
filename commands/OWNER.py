@@ -92,7 +92,8 @@ class Restart(Command):
 				bot.closed = True
 				print("Going offline...")
 				with tracebacksuppressor:
-					await asyncio.wait_for(bot.change_presence(status=discord.Status.invisible), timeout=3)
+					async with asyncio.timeout(3):
+						await bot.change_presence(status=discord.Status.invisible)
 				# Kill math and image subprocesses
 				print("Killing math and image subprocesses...")
 				with tracebacksuppressor:
@@ -719,7 +720,8 @@ class UpdateExec(Database):
 					out[i] = url
 					continue
 				try:
-					url = await asyncio.wait_for(wrap_future(self.temp[url], shield=True), timeout=12)
+					async with asyncio.timeout(12):
+						url = await wrap_future(self.temp[url], shield=True)
 				except (KeyError, T1):
 					if url not in self.temp:
 						self.temp[url] = Future()

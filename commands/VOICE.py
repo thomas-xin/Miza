@@ -4711,8 +4711,8 @@ class Radio(Command):
 									city = single_space(resp[:resp.index("-->")].replace(".", " ")).replace(" ", "_")
 									country.cities[city] = cdict(url=href, cities=fcdict(), icon=icon, states=False, get_cities=get_cities)
 									country.cities[city.rsplit(",", 1)[0]] = cdict(url=href, cities=fcdict(), icon=icon, states=False, get_cities=get_cities)
-									self.bot.data.radiomaps[city] = country.name
-									self.bot.data.radiomaps[city.rsplit(",", 1)[0]] = country.name
+									self.bot.data.radiomaps[full_prune(city)] = country.name
+									self.bot.data.radiomaps[full_prune(city.rsplit(",", 1)[0])] = country.name
 						else:
 							resp = resp[:resp.index("</select>")]
 							with suppress(ValueError):
@@ -4729,8 +4729,8 @@ class Radio(Command):
 									city = single_space(resp[:resp.index("</option>")].replace(".", " ")).replace(" ", "_")
 									country.cities[city] = href
 									country.cities[city.rsplit(",", 1)[0]] = href
-									self.bot.data.radiomaps[city] = country.name
-									self.bot.data.radiomaps[city.rsplit(",", 1)[0]] = country.name
+									self.bot.data.radiomaps[full_prune(city)] = country.name
+									self.bot.data.radiomaps[full_prune(city.rsplit(",", 1)[0])] = country.name
 						return country
 
 					data.get_cities = get_cities
@@ -4751,9 +4751,10 @@ class Radio(Command):
 		if c not in self.countries:
 			await asubmit(self.get_countries)
 			if c not in self.countries:
-				if c in bot.data.radiomaps:
+				d = full_prune(c)
+				if d in bot.data.radiomaps:
 					args.insert(0, c)
-					c = bot.data.radiomaps[c]
+					c = bot.data.radiomaps[d]
 				else:
 					raise LookupError(f"Country {c} not found.")
 		path.append(c)
@@ -4772,11 +4773,12 @@ class Radio(Command):
 		if c not in country.cities:
 			await asubmit(country.get_cities, country)
 			if c not in country.cities:
-				if c in bot.data.radiomaps:
+				d = full_prune(c)
+				if d in bot.data.radiomaps:
 					args.insert(0, c)
-					c = bot.data.radiomaps[c]
+					c = bot.data.radiomaps[d]
 				else:
-					raise LookupError(f"City/State {c} not found.")
+					raise LookupError(f"Country {c} not found.")
 		path.append(c)
 		city = country.cities[c]
 		if type(city) is not str:

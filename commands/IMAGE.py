@@ -1188,8 +1188,9 @@ class Resize(Command):
 			# print(url, func, x, y, op, fmt)
 			resp = await process_image(url, func, [x, y, op, "-f", fmt], timeout=_timeout)
 			if op == "sdxl":
-				pt, p1, p2 = await fut
-				prompt = "4k, " + p1 + "\n" + p2
+				pt, *p1 = await fut
+				p1 = "\n\n".join(p1)
+				prompt = "4k, " + p1
 				resp = await process_image("IBASR", "&", [prompt, resp], cap="sdxlr", timeout=240)
 			fn = resp
 			if isinstance(fn, str) and "." in fn:
@@ -1782,8 +1783,8 @@ class Art(Command):
 		if not prompt:
 			if not url:
 				raise ArgumentError("Please input a valid prompt.")
-			pt, p1, p2 = await bot.caption(url, best=premium >= 4)
-			prompt = "\n".join(filter(bool, (p1, p2)))
+			pt, *p1 = await bot.caption(url, best=premium >= 4)
+			prompt = "\n".join(filter(bool, p1))
 			if not prompt:
 				prompt = "art"
 			print(url, prompt)
@@ -2236,7 +2237,8 @@ class Art(Command):
 						if self.has_py39:
 							proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
 							try:
-								await asyncio.wait_for(proc.wait(), timeout=3200)
+								async with asyncio.timeout(3200):
+									await proc.wait()
 							except (T0, T1, T2):
 								with tracebacksuppressor:
 									force_kill(proc)

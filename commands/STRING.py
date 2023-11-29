@@ -803,7 +803,8 @@ class EmojiCrypt(Command):
 			args = (python, "downloader.py", msg, "../" + fi)
 			proc = await asyncio.create_subprocess_exec(*args, cwd="misc")
 			try:
-				await asyncio.wait_for(proc.wait(), timeout=48)
+				async with asyncio.timeout(48):
+					await proc.wait()
 			except (T0, T1, T2):
 				with tracebacksuppressor:
 					force_kill(proc)
@@ -822,7 +823,8 @@ class EmojiCrypt(Command):
 		args.append(password or "\x7f")
 		proc = await asyncio.create_subprocess_exec(*args, cwd="misc")
 		try:
-			await asyncio.wait_for(proc.wait(), timeout=60)
+			async with asyncio.timeout(60):
+				await proc.wait()
 		except (T0, T1, T2):
 			with tracebacksuppressor:
 				force_kill(proc)
@@ -1253,7 +1255,7 @@ class Describe(Command):
 		if not s:
 			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 			fut = asubmit(reqs.next().head, url, headers=Request.header(), stream=True)
-			cap = await self.bot.caption(url, best=premium >= 4, timeout=480)
+			cap = await self.bot.caption(url, best=premium >= 4, timeout=24)
 			s = "\n\n".join(filter(bool, cap)).strip()
 			resp = await fut
 			name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
@@ -2006,7 +2008,8 @@ class Ask(Command):
 				cfut = await cfut
 			imin = ()
 			if cfut:
-				pt, p1, p2 = cfut
+				pt, *p1 = cfut
+				p1 = ":".join(p1)
 				p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
 				content += f" <{pt} {p0}:{p1}:{p2}>"
 				content = content.strip()
@@ -2326,9 +2329,10 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 							tup = await bot.caption(found, best=premium >= 4)
 							if not tup:
 								raise StopIteration
-							pt, p1, p2 = tup
+							pt, *p1 = tup
+							p1 = ":".join(p1)
 							p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
-							content += f" <{pt} {p0}:{p1}:{p2}>"
+							content += f" <{pt} {p0}:{p1}>"
 						m.content = content.strip()
 				used = ufull
 				if skipping:
@@ -2405,7 +2409,8 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					text = ""
 					response = None
 					try:
-						response = await asyncio.wait_for(bot.oai.chat.completions.create(**data, timeout=120), timeout=130)
+						async with asyncio.timeout(130):
+							response = await bot.oai.chat.completions.create(**data, timeout=120)
 					except openai.BadRequestError:
 						raise
 					except Exception as e:
@@ -2692,7 +2697,8 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 				)
 				if model in instructcompletion:
 					try:
-						response = await asyncio.wait_for(bot.oai.completions.create(**data, timeout=60), timeout=70)
+						async with asyncio.timeout(70):
+							response = await bot.oai.completions.create(**data, timeout=60)
 					except openai.BadRequestError:
 						raise
 					except Exception as e:

@@ -1574,16 +1574,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		bot = BOT[0]
 		c = await tcount(data["prompt"])
 		if not best:
-			if 0:#c <= 256 and data["max_tokens"] <= 256:
-				data["model"] = "mythalion-13b"
-				data["stop"] = [f"### Instruction:", f"### Response:", "<|system|>:"]
-				try:
-					await process_image(lambdassert, "$", (), cap="vr11", timeout=2)
-					return await process_image("EXL2", "$", [data], cap="vr11", timeout=30)
-				except:
-					print_exc()
-					data["model"] = "gpt-3.5-turbo-instruct"
-			elif c <= 2048 and data["max_tokens"] <= 2048 and not self.llsem.busy:
+			if c <= 2048 and data["max_tokens"] <= 2048 and not self.llsem.busy:
 				data["model"] = "emerhyst-20b"
 				data["stop"] = [f"### Instruction:", f"### Response:"]
 				try:
@@ -1607,7 +1598,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				)
 				response = await asubmit(together.Complete.create, **rdata, timeout=60)
 				return response["output"]["choices"][0]["text"]
-		response = await asyncio.wait_for(self.oai.completions.create(**data, timeout=60), timeout=70)
+		elif "instruct" not in data["model"]:
+			prompt = data.pop("prompt")
+			data["messages"] = [dict(role="user", content=prompt)]
+			async with asyncio.timeout(70):
+				response = await self.oai.chat.completions.create(**data, timeout=60)
+			return response.choices[0].message.content
+		async with asyncio.timeout(nt):
+			response = await self.oai.completions.create(**data, timeout=60)
 		return response.choices[0].text
 
 	analysed = {}
@@ -1621,16 +1619,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		except (LookupError, TypeError):
 			pass
 		if not torch:
-			return ("File", url.rsplit("/", 1)[-1], "", None)
-		fut = None
+			return ("File", url.rsplit("/", 1)[-1].split("?", 1)[0], None)
+		futs = []
 		if best:
 			fut = create_task(self.gpt4v(url))
-		elif best is not None:
-			fut = asubmit(self.neva, url)
+			futs.append(fut)
+		fut = asubmit(self.neva, url)
+		futs.append(fut)
+		fut = asubmit(self.ibv, url)
+		futs.append(fut)
+		prompts = []
 		res = None
-		p1 = p2 = ""
 		try:
-			res = await process_image(url, "caption", ["-nogif", bool(fut)], cap="caption", timeout=timeout)
+			res = await process_image(url, "caption", ["-nogif", False], cap="caption", timeout=timeout)
 			p1, p2 = res
 		except:
 			if res:
@@ -1642,43 +1643,75 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					url,
 					decode=True,
 					aio=True,
+					ssl=False,
 				)
-				p1 = ""
-				p2 = lim_str(text, 128)
-				tup = ("Text", p1, p2, False)
+				p1 = lim_str(text, 128)
+				if p1:
+					prompts.append(p1)
 		else:
-			tup = ("Image", p1, p2, best)
-		if fut:
+			if p1:
+				prompts.append(p1)
+			if p2:
+				prompts.append(p2)
+		nprompts = []
+		ts = utc()
+		for fut in futs:
+			nt = timeout + ts - utc()
+			if nt < 0 and not fut.done():
+				continue
 			try:
-				p3 = await asyncio.wait_for(asyncio.shield(fut), timeout=timeout)
-			except (T0, T1, T2):
-
-				async def recaption(h, p1, p2, fut, tup):
-					p3 = await fut
-					p1, p2 = sorted((p1, p2), key=lambda p: len(p) if p else 0)
-					tup = ("Image", p3, p2, best)
-					if p1 and len(p1) > 7 and " " in p1 and p1.isascii():
-						tup = ("Image", p3, p2 + "\n" + p1, best)
-					print("BEST:", tup)
-					self.analysed[h] = tup
-
-				create_task(recaption(h, p1, p2, fut, tup))
+				async with asyncio.timeout(max(1, nt)):
+					p3 = await asyncio.shield(fut)
 			except:
 				print_exc()
-				p1, p2 = sorted((p1, p2), key=lambda p: len(p) if p else 0)
-				tup = (tup[0], p2, p1, False)
-				print("WORST:", tup)
-			else:
-				p1, p2 = sorted((p1, p2), key=lambda p: len(p) if p else 0)
-				tup = (tup[0], p3, p2, best)
-				if p1 and len(p1) > 7 and " " in p1 and p1.isascii():
-					tup = (tup[0], p3, p2 + "\n" + p1, best)
-				print("BEST:", tup)
+				continue
+			nprompts.append(p3)
+		if len(nprompts) > 1:
+			prompts = nprompts + prompts[1:]
+		else:
+			prompts = nprompts + prompts
+		if len(prompts) > 1:
+			name = url.rsplit("/", 1)[-1].split("?", 1)[0]
+			caption = await self.recaption(prompts, name=name, best=best)
+		elif not prompts:
+			caption = ""
+		else:
+			caption = prompts[0]
+		tup = ("Image", caption, best)
 		self.analysed[h] = tup
 		while len(self.analysed) > 65536:
 			self.analysed.pop(next(iter(self.analysed)))
 		return self.analysed[h][:-1] if self.analysed.get(h) else None
 
+	async def recaption(self, prompts, name=None, best=False):
+		pin = []
+		for i, p in enumerate(prompts, 1):
+			pin.append(f'### Input ({i}):\n"""\n')
+			pin.append(p.replace('"""', "'''"))
+			pin.append('\n"""\n\n')
+		if name:
+			iname = f'image "{name}"'
+		else:
+			iname = "image"
+		pin.append(f"### Instruction:\nHere are {len(prompts)} captions for an {iname}. Please rewrite the first caption using the most likely elements from the others; be detailed but concise!\n\n###Response:")
+		prompt = "".join(pin)
+		print("Recaption prompt:", prompt)
+		model = "gpt-4-1106-preview" if best else "gpt-3.5-turbo-1106"
+		resp = await self.instruct(
+			dict(
+				prompt=prompt,
+				model=model,
+				temperature=0.5,
+				frequency_penalty=0,
+				presence_penalty=0,
+				max_tokens=256,
+			),
+			best=best,
+		)
+		print("Recaption response:", resp)
+		return resp
+
+	caption_prompt = "Please describe this image in detail; be descriptive but concise!"
 	async def gpt4v(self, url, best=False):
 		resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True)
 		if resp.headers.get("Content-Type") in ("image/png", "image/gif", "image/jpeg", "image/webp") and float(resp.headers.get("Content-Length", inf)) < 20 * 1e6:
@@ -1692,7 +1725,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			data_url = "data:" + mime + ";base64," + base64.b64encode(b).decode("ascii")
 		messages = [
 			cdict(role="user", content=[
-				cdict(type="text", text="Please describe this image in detail; be descriptive but concise!"),
+				cdict(type="text", text=self.caption_prompt),
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
@@ -1707,7 +1740,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			user=str(hash(self.name)),
 		)
 		try:
-			response = await asyncio.wait_for(self.oai.chat.completions.create(**data, timeout=30), timeout=35)
+			async with asyncio.timeout(35):
+				response = await self.oai.chat.completions.create(**data, timeout=30)
 		except:
 			print_exc()
 			return await asubmit(self.neva, url)
@@ -1725,7 +1759,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		resp = self.replicate_client.run(
 			"joehoover/instructblip-vicuna13b:c4c54e3c8c97cd50c2d2fec9be3b6065563ccf7d43787fb99f84151b867178fe",
 			input=dict(
-				prompt="Please describe this image in detail; be descriptive but concise!",
+				prompt=self.caption_prompt,
 				img=io.BytesIO(resp),
 				max_length=256,
 				temperature=0.75,
@@ -1746,7 +1780,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			data=orjson.dumps(dict(
 				messages=[
 					dict(
-						content=f'Please describe this image in detail; be descriptive but concise! <img src="{i}" />',
+						content=f'{self.caption_prompt} <img src="{i}" />',
 						role="user",
 					),
 					dict(
@@ -3545,8 +3579,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							timeout = None
 						elif self.is_trusted(message.guild):
 							timeout *= 3
-						await asyncio.wait_for(
-							f._callback_(
+						async with asyncio.timeout(timeout):
+							await f._callback_(
 								message=message,
 								channel=message.channel,
 								guild=message.guild,
@@ -3556,8 +3590,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								vals=vals,
 								argv=argv,
 								bot=self,
-							),
-							timeout=timeout)
+							)
 						await self.send_event("_command_", user=user, command=f, loop=False, message=message)
 						break
 			self.react_sem.pop(message.id, None)
@@ -6498,7 +6531,8 @@ class AudioClientInterface:
 			await wrap_future(self.fut)
 			self.proc.stdin.write(b)
 			self.proc.stdin.flush()
-			resp = await asyncio.wait_for(wrap_future(self.returns[key]), timeout=48)
+			async with asyncio.timeout(48):
+				resp = await wrap_future(self.returns[key])
 		except (T0, T1, T2, CE, OSError):
 			if self.returns[key].done():
 				raise

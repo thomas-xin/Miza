@@ -2545,7 +2545,8 @@ async def proc_distribute(proc):
 				return
 			if not tasks:
 				try:
-					await asyncio.wait_for(wrap_future(proc.fut), timeout=60)
+					async with asyncio.timeout(60):
+						await wrap_future(proc.fut)
 				except (T0, T1, T2):
 					pass
 				except CCE as ex:
@@ -2572,7 +2573,8 @@ async def proc_distribute(proc):
 								if utc() - p2.used < 10:
 									await asyncio.sleep(5)
 								try:
-									await asyncio.wait_for(start_proc(p2, wait=True), timeout=timeout)
+									async with asyncio.timeout(timeout):
+										await start_proc(p2, wait=True)
 								except:
 									create_task(asyncio.shield(start_proc(p2, wait=True, timeout=3600)))
 									raise
@@ -2582,7 +2584,8 @@ async def proc_distribute(proc):
 								if utc() - p2.used < 10:
 									await asyncio.sleep(5)
 								try:
-									await asyncio.wait_for(start_proc(p2, wait=True), timeout=timeout)
+									async with asyncio.timeout(timeout):
+										await start_proc(p2, wait=True)
 								except:
 									create_task(asyncio.shield(start_proc(p2, wait=True, timeout=3600)))
 									raise
@@ -2600,7 +2603,8 @@ async def proc_distribute(proc):
 					fut = futs[i]
 					while is_strict_running(proc):
 						try:
-							resp = await asyncio.wait_for(asyncio.shield(fut), timeout=6)
+							async with asyncio.timeout(6):
+								resp = await asyncio.shield(fut)
 						except Exception as ex:
 							if not fut.done():
 								continue
@@ -2619,7 +2623,8 @@ async def proc_distribute(proc):
 				if futs and not resps:
 					delay = 1 + proc.sem.active
 					with tracebacksuppressor(T1):
-						await asyncio.wait_for(asyncio.shield(futs[0]), timeout=delay)
+						async with asyncio.timeout(delay):
+							await asyncio.shield(futs[0])
 				if not is_strict_running(proc) or proc.sem.busy:
 					caps = ()
 				else:
@@ -2666,7 +2671,8 @@ async def start_proc(n, di=(), caps="ytdl", it=0, wait=False, timeout=None):
 					if timeout is None:
 						await proc.sem.afinish()
 					else:
-						await asyncio.wait_for(proc.sem.afinish(), timeout=timeout)
+						async with asyncio.timeout(timeout):
+							await proc.sem.afinish()
 				if timeout and proc.sem.active and utc() - proc.used < 60:
 					raise CCE("Process schedule conflict.")
 			await create_future(force_kill, proc)
@@ -2895,7 +2901,8 @@ async def sub_submit(cap, command, _timeout=12):
 			if cap in proc.caps and not proc.fut.done():
 				proc.fut.set_result(None)
 		try:
-			return await asyncio.wait_for(wrap_future(task), timeout=(_timeout or inf) + 1)
+			async with asyncio.timeout((_timeout or inf) + 1):
+				return await wrap_future(task)
 		except (T1, CE) as ex:
 			task.cancel()
 			queue.discard(task)
@@ -2957,7 +2964,8 @@ async def _sub_submit(proc, command, _timeout=12):
 				if ts not in PROC_RESP:
 					raise CCE("Response disconnected. If this error occurs during a command, it is likely due to maintenance!")
 				try:
-					resp = await asyncio.wait_for(wrap_future(fut), timeout=min(4, i + 1))
+					async with asyncio.timeout(min(4, i + 1)):
+						resp = await wrap_future(fut)
 				except T1 as ex:
 					if command[0] == lambdassert and command[1] in "$&" and command[2] in ("[]", "()"):
 						raise StopIteration("Temporary wait cancelled.")
@@ -3186,7 +3194,8 @@ async def _create_future(obj, *args, loop, timeout, priority, **kwargs):
 		if not awaitable(obj):
 			break
 		if timeout is not None:
-			obj = await asyncio.wait_for(obj, timeout=timeout)
+			async with asyncio.timeout(timeout):
+				obj = await obj
 		else:
 			obj = await obj
 	return obj
@@ -4075,7 +4084,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				if not isinstance(data, aiohttp.FormData):
 					if not isinstance(data, (str, bytes, memoryview)):
 						data = orjson.dumps(data)
-			if data and (isinstance(data, (list, dict)) or (data[:1] in '[{"') if isinstance(data, str) else (data[:1] in b'[{"')):
+			if data and (isinstance(data, (list, dict)) or (data[:1] in '[{"') if isinstance(data, str) else (data[:1] in b'[{"' if isinstance(data, (bytes, memoryview)) else False)):
 				headers["Content-Type"] = "application/json"
 			if aio:
 				session = self.sessions.next()

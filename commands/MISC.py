@@ -459,7 +459,8 @@ class Wav2Png(Command):
 			print(args)
 			proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL)
 			try:
-				await asyncio.wait_for(proc.wait(), timeout=3200)
+				async with asyncio.timeout(3200):
+					await proc.wait()
 			except (T0, T1, T2):
 				with tracebacksuppressor:
 					force_kill(proc)
@@ -538,7 +539,8 @@ class SpectralPulse(Command):
 				with suppress():
 					message.__dict__.setdefault("inits", []).append(proc)
 				try:
-					await asyncio.wait_for(proc.wait(), timeout=3200)
+					async with asyncio.timeout(3200):
+						await proc.wait()
 				except (T0, T1, T2):
 					with tracebacksuppressor:
 						force_kill(proc)
