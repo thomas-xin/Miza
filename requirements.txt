@@ -41,4 +41,4 @@ selenium>=4.15.2
 sympy>=1.12
 tsc_utils>=0.2.5
 wand>=0.6.13
-yt-dlp>=2023.10.13
+yt-dlp>=2023.11.16

@@ -182,7 +182,12 @@ exc = concurrent.futures.ThreadPoolExecutor(max_workers=24)
 def load_mimes():
 	with open("misc/mimes.txt") as f:
 		mimedata = f.read().splitlines()
-		globals()["mimesplitter"] = {}
+		globals()["mimesplitter"] = mimesplitter = {}
+		def hex2bytes(b):
+			s = as_str(b).replace(" ", "")
+			if len(s) & 1:
+				s = s[:-1] + "0" + s[-1]
+			return bytes.hex(s)
 		for line in mimedata:
 			dat, ext, mime = line.split("\t")
 			data = hex2bytes(dat)
@@ -195,6 +200,7 @@ def load_mimes():
 exc.submit(load_mimes)
 
 def simple_mimes(b, mime=True):
+	mimesplitter = globals()["mimesplitter"]
 	for k, v in reversed(mimesplitter.items()):
 		out = v.get(b[:k])
 		if out:
@@ -1547,6 +1553,23 @@ if "math" in CAPS:
 	x_math = __import__("x-math")
 
 if "ytdl" in CAPS:
+	IMAGE_FORMS = {
+		".gif": True,
+		".png": True,
+		".bmp": False,
+		".jpg": True,
+		".jpeg": True,
+		".tiff": False,
+		".webp": True,
+	}
+	def is_image(url):
+		if url:
+			url = url.split("?", 1)[0]
+			if "." in url:
+				url = url[url.rindex("."):]
+				url = url.casefold()
+				return IMAGE_FORMS.get(url)
+	is_youtube_url = lambda url: url and re.findall("^https?:\\/\\/(?:www\\.)?youtu(?:\\.be|be\\.com)\\/[^\\s<>`|\"']+", url)
 	def get_best_icon(entry):
 		with suppress(KeyError):
 			return entry["thumbnail"]
@@ -1775,9 +1798,10 @@ if "exl2" in CAPS:
 		else:
 			raise RuntimeError(f'Model "{model}" not found.')
 		base = cachedir + "/huggingface/transformers/" + "models--" + m.replace("/", "--")
-		return m, base, req, bpw, gs
+		# return m, base, req, bpw, gs
+		return m, base, f"gptq-{bpw}bit-{gs}g-actorder_True", req
 
-	def snap_exl2(base, assertion=False):
+	def snap_exl2(m, base, rev, assertion=False):
 		snap = base + "/snapshots"
 		if not os.path.exists(snap):
 			if assertion:
@@ -1789,7 +1813,7 @@ if "exl2" in CAPS:
 				with accelerate.init_empty_weights():
 					model = AutoModelForCausalLM.from_pretrained(
 						m,
-						revision=f"gptq-{bpw}bit-{gs}g-actorder_True",
+						revision=rev,
 						device_map={},
 						offload_folder="cache",
 						torch_dtype=torch.float16,
@@ -1799,7 +1823,8 @@ if "exl2" in CAPS:
 				pass
 		return snap
 
-	def fold_exl2(base):
+	def fold_exl2(m, base, rev="main"):
+		snap = base + "/snapshots"
 		fold = base + "/exl2"
 		if not os.path.exists(fold) or not os.listdir(fold):
 			assert os.path.exists(snap)
@@ -1821,9 +1846,9 @@ if "exl2" in CAPS:
 		return fold
 
 	def load_exl2(model):
-		m, base, req, bpw, gs = get_exl2(model)
-		snap = snap_exl2(base)
-		fold = fold_exl2(base)
+		m, base, rev, *_ = get_exl2(model)
+		snap = snap_exl2(m, base, rev)
+		fold = fold_exl2(m, base, rev)
 
 	def load_models():
 		mods = dict(
@@ -1856,9 +1881,9 @@ if "exl2" in CAPS:
 			return mcache[model]
 		except KeyError:
 			pass
-		m, base, req, bpw, gs = get_exl2(model)
-		snap = snap_exl2(base, assertion=True)
-		fold = fold_exl2(base)
+		m, base, rev, req = get_exl2(model)
+		# snap = snap_exl2(m, base, rev, assertion=True)
+		fold = fold_exl2(m, base, rev)
 		from exllamav2 import ExLlamaV2Config, ExLlamaV2, ExLlamaV2Cache_8bit, ExLlamaV2Tokenizer
 		config = ExLlamaV2Config()
 		config.model_dir = fold
@@ -2151,7 +2176,6 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 				text = text.strip()
 				if text.endswith(":"):
 					text = text.rsplit("\n", 1)[0]
-				start = ns
 			return text
 
 	# exc.submit(convobot.Bot.answer_summarise, convobot.Bot, q="test")

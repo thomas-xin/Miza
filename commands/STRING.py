@@ -1,3 +1,7 @@
+# Make linter shut up lol
+if "common" not in globals():
+	import common
+	from common import *
 print = PRINT
 
 try:
@@ -2011,7 +2015,7 @@ class Ask(Command):
 				pt, *p1 = cfut
 				p1 = ":".join(p1)
 				p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
-				content += f" <{pt} {p0}:{p1}:{p2}>"
+				content += f" <{pt} {p0}:{p1}>"
 				content = content.strip()
 			elif found:
 				url = message_link(m)
@@ -2354,7 +2358,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						for i, m in enumerate(ufc, 1):
 							prompt += f"\n{i}] {m_str(m)}\n"
 						i += 1
-						prompt += f'"""\n\n### Instruction:\n"""\n{i}] {m_str(ms)}\n"""\n\nAssuming your name is {bot_name}, which of the numbered messages contains information required to answer the instruction question? (Provide only the number, not a full reply! If there are none relevant, respond with "-1").\n\n### Response:'
+						prompt += f'"""\n\n### Instruction:\n"""\n{i}] {m_str(ms)}\n"""\n\nAssuming your name is {bot_name}, which of the numbered messages is the first that contains information required to answer the instruction question? (Provide only the number, not a full reply! If there are none relevant, respond with "-1").\n\n### Response:'
 						print("Context prompt:", prompt)
 						data = dict(
 							model="gpt-3.5-turbo-instruct",
@@ -2447,6 +2451,8 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						name = fc.function.name
 						res = text or ""
 						call = None
+						if name == "wolfram_alpha" and regexp(r"[1-9]*[0-9]?\.?[0-9]+[+\-*/^][1-9]*[0-9]?\.[0-9]+").fullmatch(argv.strip()):
+							name = "sympy"
 						if name == "browse" and f"b${argv}" not in browsed:
 							print("Browse query:", argv)
 							browsed.add(f"b${argv}")
@@ -3141,7 +3147,7 @@ class Instruct(Command):
 		resp = await bot.instruct(data, best=premium >= 3)
 		ref = message
 		ms = split_across(resp, 1999, prefix="\xad")
-		s = ms[-1] if ms else code
+		s = ms[-1] if ms else "\xad"
 		for t in ms[:-1]:
 			create_task(send_with_react(channel, t, reference=ref))
 			ref = None

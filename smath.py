@@ -103,7 +103,7 @@ class MultiAutoImporter:
 					object.__setattr__(self.futs[j], "__fut", fut)
 					break
 
-MultiAutoImporter(
+common_modules = (
 	"sys",
 	"collections",
 	"time",
@@ -129,9 +129,16 @@ MultiAutoImporter(
 	"hashlib",
 	"base64",
 	"itertools",
+)
+
+MultiAutoImporter(
+	*common_modules,
 	pool=import_exc,
 	_globals=globals(),
 )
+if __name__ == "__lint__":
+	import sys, collections, time, requests, traceback, numpy, sympy, dateutil, datetime, colormath, pytz, ast, copy, pickle, io, random, cmath, fractions, mpmath, shlex, colorsys, re, hashlib, base64, itertools
+
 collections2f = "misc/collections2.py"
 
 def update_collections2():
@@ -150,6 +157,8 @@ with open(collections2f, "rb") as f:
 	b = f.read()
 if time.time() - os.path.getmtime(collections2f) > 3600:
 	import_exc.submit(update_collections2)
+if __name__ == "__lint__":
+	from misc.collections2 import *
 
 import math
 from math import *
@@ -739,7 +748,7 @@ def generate_primes(a=2, b=inf, c=1):
 		p = next(g)
 		if p >= b:
 			break
-		if isPrime(p):
+		if is_prime(p):
 			c -= 1
 			primes.append(p)
 	return primes

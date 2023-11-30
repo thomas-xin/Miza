@@ -1,3 +1,7 @@
+# Make linter shut up lol
+if "common" not in globals():
+	import common
+	from common import *
 print = PRINT
 
 
@@ -1971,6 +1975,7 @@ class CreateSticker(Command):
 				)
 				return
 			sticker = f"https://media.discordapp.net/stickers/{data['id']}"
+			colour = await bot.get_colour(sticker)
 			embed = discord.Embed(colour=colour)
 			embed.set_image(url=sticker)
 			content = css_md(f"Successfully created sticker {sqr_md(name)} for {sqr_md(guild)}.")
@@ -3194,7 +3199,7 @@ class ThreadList(Command):
 				c = factory(me=bot.user, data=data, state=bot._connection)
 			else:
 				guild_id = int(data["guild_id"])
-				guild = bot.get_guild(guild_id) or Object(id=guild_id)
+				guild = bot.get_guild(guild_id) or discord.Object(id=guild_id)
 				c = factory(guild=guild, state=bot._connection, data=data)
 			threads.append(c)
 		threads = {c.id: c for c in threads}

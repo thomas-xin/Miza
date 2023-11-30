@@ -1,12 +1,19 @@
+# Make linter shut up lol
+if "common" not in globals():
+	import common
+	from common import *
 print = PRINT
 
 try:
 	import yt_dlp as youtube_dl
 except ModuleNotFoundError:
-	import youtube_dl
+	try:
+		youtube_dl = __import__("youtube_dl")
+	except ModuleNotFoundError:
+		youtube_dl = None
 try:
-	import yt_download as ytd
-	from yt_download import *
+	from misc import yt_download as ytd
+	from misc.yt_download import *
 except:
 	print_exc()
 	has_ytd = False
@@ -16,6 +23,8 @@ from bs4 import BeautifulSoup
 with tracebacksuppressor:
 	import openai
 	import googletrans
+if BOT[0]:
+	bot = BOT[0]
 
 # Audio sample rate for both converting and playing
 SAMPLE_RATE = 48000
@@ -1383,65 +1392,72 @@ class AudioDownloader:
 			self.spotify_header = {"authorization": f"Bearer {orjson.loads(token[:512])['accessToken']}"}
 			self.other_x += 1
 
+	ytd_blocked = {}
 	backup_sem = Semaphore(2, 256, rate_limit=1)
 	# Gets data from yt-download.org, and adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
 	def extract_backup(self, url, video=False):
-		with self.backup_sem:
-			url = verify_url(url)
-			if is_url(url) and not is_youtube_url(url):
-				with requests.head(url, headers=Request.header(), stream=True) as resp:
-					url = resp.url
-					name = url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-					ctype = resp.headers.get("Content-Type")
-					if ctype.startswith("video") or ctype.startswith("audio"):
-						return dict(
-							id=name,
-							title=name,
-							direct=True,
-							url=url,
-							webpage_url=url,
-							extractor="generic",
-						)
-					elif ctype == "application/octet-stream":
-						dur = get_duration(url)
-						d = dict(
-							id=name,
-							title=name,
-							direct=True,
-							url=url,
-							webpage_url=url,
-							extractor="generic",
-						)
-						if dur:
-							d["duration"] = dur
-						return d
-				raise TypeError("Unsupported URL.")
-			if ":" in url:
-				url = url.rsplit("/", 1)[-1].split("v=", 1)[-1].split("&", 1)[0]
-			webpage_url = f"https://www.youtube.com/watch?v={url}"
-			if video:
-				title, stream = yt_download(webpage_url, fmt="mp4", timeout=720)
-				entry = dict(
-					formats=[dict(
-						abr=1,
-						url=stream,
-						height=1080,
-					)],
-					title=title,
-					webpage_url=webpage_url,
-				)
-			else:
-				title, stream = yt_download(webpage_url, fmt="mp3", timeout=720)
-				entry = dict(
-					formats=[dict(
-						abr=256,
-						url=stream,
-					)],
-					duration=os.path.getsize(stream) / 256000 * 8,
-					title=title,
-					webpage_url=webpage_url,
-				)
-		print("Successfully resolved with yt-download.")
+		if utc() - self.ytd_blocked.get(url, (0,))[0] < 3600:
+			raise self.ytd_blocked[url][1]
+		ourl = url
+		try:
+			with self.backup_sem:
+				url = verify_url(url)
+				if is_url(url) and not is_youtube_url(url):
+					with requests.head(url, headers=Request.header(), stream=True) as resp:
+						url = resp.url
+						name = url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+						ctype = resp.headers.get("Content-Type")
+						if ctype.startswith("video") or ctype.startswith("audio"):
+							return dict(
+								id=name,
+								title=name,
+								direct=True,
+								url=url,
+								webpage_url=url,
+								extractor="generic",
+							)
+						elif ctype == "application/octet-stream":
+							dur = get_duration(url)
+							d = dict(
+								id=name,
+								title=name,
+								direct=True,
+								url=url,
+								webpage_url=url,
+								extractor="generic",
+							)
+							if dur:
+								d["duration"] = dur
+							return d
+					raise TypeError("Unsupported URL.")
+				if ":" in url:
+					url = url.rsplit("/", 1)[-1].split("v=", 1)[-1].split("&", 1)[0]
+				webpage_url = f"https://www.youtube.com/watch?v={url}"
+				if video:
+					title, stream = yt_download(webpage_url, fmt="mp4", timeout=720)
+					entry = dict(
+						formats=[dict(
+							abr=1,
+							url=stream,
+							height=1080,
+						)],
+						title=title,
+						webpage_url=webpage_url,
+					)
+				else:
+					title, stream = yt_download(webpage_url, fmt="mp3", timeout=720)
+					entry = dict(
+						formats=[dict(
+							abr=256,
+							url=stream,
+						)],
+						duration=os.path.getsize(stream) / 256000 * 8,
+						title=title,
+						webpage_url=webpage_url,
+					)
+			print("Successfully resolved with yt-download.")
+		except Exception as ex:
+			self.ytd_blocked[ourl] = (utc(), ex)
 		return entry
 
 	# Returns part of a spotify playlist.
@@ -1517,7 +1533,7 @@ class AudioDownloader:
 				try:
 					token = data["continuationItemRenderer"]["continuationEndpoint"]["continuationCommand"]["token"]
 				except KeyError:
-					print(part)
+					print(data)
 				continue
 			v_id = video['videoId']
 			try:
@@ -2914,7 +2930,7 @@ class AudioDownloader:
 				self.cache[file] = AudioFileLink(file, out2, wasfile=True)
 				if ecdc:
 					try:
-						dur, bps = _get_duration(out)
+						dur, bps = get_duration_simple(out)
 					except:
 						print_exc()
 						bps = 196608
@@ -3289,7 +3305,7 @@ class AudioDownloader:
 						with open(fn, "rb") as f:
 							b = f.read()
 						try:
-							dur, bps = _get_duration(fn)
+							dur, bps = get_duration_simple(fn)
 						except:
 							print_exc()
 							bps = 196608
@@ -5938,7 +5954,8 @@ class UpdateAudio(Database):
 				reason += " Apologies for any inconvenience! 🎵"
 			else:
 				reason = ""
-			await asubmit(auds.kill, reason=css_md(reason) if reason else None, remove=False)
+			with tracebacksuppressor:
+				await asubmit(auds.kill, reason=css_md(reason) if reason else None, remove=False)
 
 	# Restores all audio players from temporary database when applicable
 	async def _bot_ready_(self, bot, **void):

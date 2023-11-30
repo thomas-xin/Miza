@@ -1,3 +1,7 @@
+# Make linter shut up lol
+if "common" not in globals():
+	import common
+	from common import *
 print = PRINT
 
 import nekos, rule34, pybooru

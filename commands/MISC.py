@@ -1,3 +1,7 @@
+# Make linter shut up lol
+if "common" not in globals():
+	import common
+	from common import *
 print = PRINT
 
 import csv, knackpy
@@ -560,7 +564,7 @@ class MCEnchant(Command):
 	rate_limit = (4, 5)
 
 	def __call__(self, args, **void):
-		import enchant_generator
+		from misc import enchant_generator
 		if not args:
 			raise ArgumentError("Input string is empty.")
 		item = args.pop(0)
@@ -575,7 +579,7 @@ class BTD6Paragon(Command):
 	rate_limit = (4, 5)
 
 	def __call__(self, args, **void):
-		import paragon_calc
+		from misc import paragon_calc
 		if not args:
 			raise ArgumentError("Input string is empty.")
 		return "\xad" + paragon_calc.parse(args)

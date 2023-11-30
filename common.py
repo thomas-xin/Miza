@@ -13,8 +13,8 @@ if cachedir:
 	os.environ["TRANSFORMERS_CACHE"] = f"{cachedir}/huggingface/transformers"
 	os.environ["HF_DATASETS_CACHE"] = f"{cachedir}/huggingface/datasets"
 
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-MultiAutoImporter(
+common_modules = (
+	"asyncio",
 	"psutil",
 	"subprocess",
 	"weakref",
@@ -23,7 +23,6 @@ MultiAutoImporter(
 	"urllib",
 	"nacl",
 	"discord",
-	"asyncio",
 	"json",
 	"functools",
 	"orjson",
@@ -33,9 +32,16 @@ MultiAutoImporter(
 	"filetype",
 	"inspect",
 	"sqlite3",
+)
+
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+MultiAutoImporter(
+	*common_modules,
 	pool=import_exc,
 	_globals=globals(),
 )
+if __name__ == "__lint__":
+	import psutil, subprocess, weakref, tracemalloc, zipfile, urllib, nacl,discord, asyncio, json, functools, orjson, aiohttp, threading, shutil, filetype, inspect, sqlite3
 
 PROC = psutil.Process()
 quit = lambda *args, **kwargs: force_kill(PROC)
@@ -511,6 +517,8 @@ def verify_openai():
 	else:
 		AUTH["openai_key"] = ""
 		print("OpenAI key has no usable credit. Please verify and fix the key to proceed with relevant commands.")
+if __name__ == "__lint__":
+	import openai
 
 enc_key += "=="
 enc_box = nacl.secret.SecretBox(base64.b64decode(enc_key)[:32])
@@ -1656,7 +1664,7 @@ def to_webp_ex(url):
 		url = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
 	return url.replace(".png", ".webp")
 
-def get_url(obj, f=to_webp):
+def get_url(obj, f=to_webp) -> str:
 	if isinstance(obj, str):
 		return obj
 	if BOT[0] and isinstance(obj, discord.Attachment):
@@ -2336,7 +2344,7 @@ MIMES = cdict(
 def load_mimes():
 	with open("misc/mimes.txt") as f:
 		mimedata = f.read().splitlines()
-		globals()["mimesplitter"] = {}
+		globals()["mimesplitter"] = mimesplitter = {}
 		for line in mimedata:
 			dat, ext, mime = line.split("\t")
 			data = hex2bytes(dat)
@@ -2347,6 +2355,7 @@ def load_mimes():
 				mimesplitter[len(data)][data] = (ext, mime)
 
 def simple_mimes(b, mime=True):
+	mimesplitter = globals()["mimesplitter"]
 	for k, v in reversed(mimesplitter.items()):
 		out = v.get(b[:k])
 		if out:
@@ -3844,7 +3853,7 @@ class Stream(io.IOBase):
 		if self.resp:
 			with suppress():
 				self.resp.close()
-		self.resp = reqs.next().get(url, stream=True)
+		self.resp = reqs.next().get(self.url, stream=True)
 		self.iter = self.resp.iter_content(self.BUF)
 
 	def refill(self):
@@ -3925,14 +3934,14 @@ def proxy_download(url, fn=None, refuse_html=True, timeout=720):
 				f.seek(0)
 				raise ValueError(f.read(256))
 		return fn
-	if fn:
-		return o_url
-	fut.set_result(o_url)
-	return o_url
+	# if fn:
+	# 	return o_url
+	# fut.set_result(o_url)
+	# return o_url
 
 
 # Runs ffprobe on a file or url, returning the duration if possible.
-def _get_duration(filename, _timeout=12):
+def get_duration_simple(filename, _timeout=12):
 	command = (
 		"./ffprobe",
 		"-v",
@@ -3949,7 +3958,7 @@ def _get_duration(filename, _timeout=12):
 	try:
 		proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
 		fut = esubmit(proc.wait, timeout=_timeout)
-		res = fut.result(timeout=_timeout)
+		fut.result(timeout=_timeout)
 		resp = proc.stdout.read().split()
 	except:
 		with suppress():
@@ -3972,12 +3981,12 @@ def get_duration(filename):
 	if filename:
 		with suppress(KeyError):
 			return DUR_CACHE[filename]
-		dur, bps = _get_duration(filename, 4)
+		dur, bps = get_duration_simple(filename, 4)
 		if not dur and is_url(filename):
 			with reqs.next().get(filename, headers=Request.header(), stream=True) as resp:
 				head = fcdict(resp.headers)
 				if "Content-Length" not in head:
-					dur = _get_duration(filename, 20)[0]
+					dur = get_duration_simple(filename, 20)[0]
 					DUR_CACHE[filename] = dur
 					return dur
 				if bps:
@@ -3994,7 +4003,7 @@ def get_duration(filename):
 			try:
 				bitrate = regexp("[0-9.]+\\s.?bps").findall(ident)[0].casefold()
 			except IndexError:
-				dur = _get_duration(filename, 16)[0]
+				dur = get_duration_simple(filename, 16)[0]
 				DUR_CACHE[filename] = dur
 				return dur
 			bps, key = bitrate.split(None, 1)

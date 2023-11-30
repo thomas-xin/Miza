@@ -445,7 +445,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		sys.__stdout__.write(str(sep).join(str(i) for i in args) + end)
 
 	# Closes the bot, preventing all events.
-	close = lambda self: setattr(self, "closed", True) or create_task(super().close())
+	def close(self):
+		self.closed = True
+		return create_task(super().close())
 
 	# A garbage collector for empty and unassigned objects in the database.
 	@tracebacksuppressor(SemaphoreOverflowError)
@@ -1072,7 +1074,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			self.data.attachments[a_id] = url
 		return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
 
-	def try_attachment(self, url, m_id=None):
+	def try_attachment(self, url, m_id=None) -> str:
 		if not isinstance(url, int):
 			c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
 			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
@@ -1604,7 +1606,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			async with asyncio.timeout(70):
 				response = await self.oai.chat.completions.create(**data, timeout=60)
 			return response.choices[0].message.content
-		async with asyncio.timeout(nt):
+		async with asyncio.timeout(70):
 			response = await self.oai.completions.create(**data, timeout=60)
 		return response.choices[0].text
 
@@ -2039,7 +2041,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 									data = await asubmit(f.read)
 							except FileNotFoundError:
 								if allow_proxy and is_image(url):
-									url = to_png(url)
+									url = to_webp(url)
 								data = await Request(url, aio=True)
 								await self.add_attachment(cdict(id=a_id), data=data)
 								return data
@@ -2050,7 +2052,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					if i:
 						await asyncio.sleep(0.25 * i)
 			if allow_proxy and is_image(url):
-				url = to_png(url)
+				url = to_webp(url)
 			if full:
 				data = await Request(url, aio=True)
 				await self.add_attachment(cdict(id=a_id), data=data)
@@ -2076,7 +2078,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return await asubmit(reqs.next().get, url, stream=True)
 		return await Request(url, timeout=timeout, aio=True, ssl=False)
 
-	def get_colour(self, user):
+	def get_colour(self, user) -> int:
 		if user is None:
 			return as_fut(16777214)
 		if hasattr(user, "icon_url"):
@@ -2084,7 +2086,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		url = worst_url(user)
 		return self.data.colours.get(url)
 
-	async def get_proxy_url(self, user, force=False):
+	async def get_proxy_url(self, user, force=False) -> str:
 		if hasattr(user, "webhook"):
 			url = user.webhook.avatar_url_as(format="webp", size=4096)
 		else:
@@ -2097,7 +2099,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				url = (await self.data.exec.uproxy(url, force=force)) or url
 		return url
 
-	async def as_embed(self, message, link=False, colour=False):
+	async def as_embed(self, message, link=False, colour=False) -> discord.Embed:
 		emb = discord.Embed(description="").set_author(**get_author(message.author))
 		if colour:
 			col = await self.get_colour(message.author)
@@ -3008,6 +3010,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return prompts
 
 	async def get_current_stats(self):
+		global WMI
 		import psutil, cpuinfo
 		# fut = create_task(self.get_ip())
 		cinfo = self._cpuinfo
@@ -3045,7 +3048,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if os.name == "nt" and not globals().get("WMI"):
 			try:
 				import wmi
-				globals()["WMI"] = wmi.WMI()
+				globals()["WMI"] = WMI = wmi.WMI()
 			except:
 				print_exc()
 				globals()["WMI"] = False
@@ -5168,7 +5171,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 			async def edit(self, *args, **kwargs):
 				if not self.webhook_id:
-					return await discord.Message.edit(self, *args, **kwargs)
+					try:
+						return await discord.Message.edit(self, *args, **kwargs)
+					except discord.HTTPException:
+						print(self)
+						print(args)
+						print(kwargs)
+						raise
 				try:
 					w = bot.cache.users[self.webhook_id]
 					webhook = getattr(w, "webhook", w)
@@ -5718,9 +5727,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		discord.state.ConnectionState.parse_message_create = lambda self, data, *void: parse_message_create(self, data)
 
 		def create_message(self, channel, data):
+			if not isinstance(data, dict):
+				print("CREATE_MESSAGE:", data)
 			data["channel_id"] = channel.id
 			return bot.ExtendedMessage.new(data)
-		
+
 		discord.state.ConnectionState.create_message = lambda self, *, channel, data: create_message(self, channel, data)
 
 		@property

@@ -1,3 +1,7 @@
+# Make linter shut up lol
+if "common" not in globals():
+	import common
+	from common import *
 print = PRINT
 
 
@@ -305,7 +309,7 @@ class UpdateExec(Database):
 	_print = lambda self, *args, sep=" ", end="\n", prefix="", channel=None, **void: self.bot.send_as_embeds(channel, "```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```")
 	def _input(self, *args, channel=None, **kwargs):
 		self._print(*args, channel=channel, **kwargs)
-		self.listeners[channel.id] = fut = concurent.futures.Future()
+		self.listeners[channel.id] = fut = Future()
 		return fut.result(timeout=86400)
 
 	# Asynchronously evaluates Python code

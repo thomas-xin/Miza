@@ -1,3 +1,9 @@
+# Make linter shut up lol
+if "common" not in globals():
+	import common
+	from common import *
+print = PRINT
+
 import nekos, akinator
 try:
 	from akinator.async_aki import Akinator as async_akinator
@@ -20,9 +26,6 @@ except (AttributeError, ModuleNotFoundError):
 				return setattr(self.aki, k, v)
 			except AttributeError:
 				self.__dict__[k] = v
-
-print = PRINT
-
 
 try:
 	alexflipnote_key = AUTH["alexflipnote_key"]
@@ -2635,7 +2638,7 @@ class Shop(Command):
 		try:
 			product = self.products[item]
 		except KeyError:
-			raise LookupError(f"Sorry, we don't sell {argv} here...")
+			raise LookupError(f"Sorry, we don't sell {item} here...")
 		data = bot.data.users.get(user.id, {})
 		gold = data.get("gold", 0)
 		diamonds = data.get("diamonds", 0)

@@ -1,3 +1,7 @@
+# Make linter shut up lol
+if "common" not in globals():
+	import common
+	from common import *
 print = PRINT
 
 
@@ -1104,7 +1108,7 @@ class Status(Command):
 						raise StopIteration
 				if message.id != channel.last_message_id or getattr(message, "rated", False):
 					async for m in bot.data.channel_cache.get(channel):
-						if message.id != m.id or utc() - snowflake_time_2(m.id).timestamp() > 86400 * 14 - 60:
+						if message.id != m.id or utc() - snowflake_time_2(m.id).timestamp() > 86400 * 14 - 60 or getattr(m, "rated", False):
 							create_task(bot.silent_delete(m))
 							raise StopIteration
 						break

@@ -1,11 +1,19 @@
+# Make linter shut up lol
+if "common" not in globals():
+	import common
+	from common import *
 print = PRINT
 
 try:
 	import yt_dlp as youtube_dl
 except ModuleNotFoundError:
-	import youtube_dl
-import aiohttp, torch
-import imagebot
+	try:
+		import youtube_dl
+	except ModuleNotFoundError:
+		youtube_dl = None
+if AUTH["ai_features"]:
+	import torch
+	import misc.imagebot as imagebot
 from PIL import Image
 
 getattr(youtube_dl, "__builtins__", {})["print"] = print
@@ -1525,7 +1533,7 @@ class Steganography(Command):
 		fon = url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
 		async with discord.context_managers.Typing(channel):
 			fn = await self.call(b, msg)
-		fn = f"cache/{ts}~1.png"
+		# fn = f"cache/{ts}~1.png"
 		if name == "nft":
 			f = CompatFile(fn, filename=f"{fon}.png")
 			url = await self.bot.get_proxy_url(user)
@@ -1560,7 +1568,7 @@ class Steganography(Command):
 				if i.isnumeric():
 					i = int(i)
 					try:
-						u = await bot.fetch_user(i)
+						u = await self.bot.fetch_user(i)
 					except:
 						pass
 					else:

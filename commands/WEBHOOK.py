@@ -1,3 +1,10 @@
+# Make linter shut up lol
+if "common" not in globals():
+	import common
+	from common import *
+print = PRINT
+
+
 class AutoEmoji(Command):
 	server_only = True
 	name = ["NQN", "Emojis"]
