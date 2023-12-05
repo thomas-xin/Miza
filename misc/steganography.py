@@ -537,6 +537,8 @@ try:
 	u, c = np.unique(ita, return_counts=True)
 	a = np.argsort(c)
 	its = u[a[-1]]
+	if its > 50 or its < 2:
+		raise ValueError
 	# print(its, u, c, a)
 	# print(b)
 	if len(b) < its:
@@ -578,7 +580,7 @@ try:
 	if s == msg:
 		raise ValueError
 	confidence = round(sum(confidences) / len(confidences) / 5 * 100)
-	if confidence < 10:
+	if confidence < 40:
 		raise ValueError
 except (ValueError, UnicodeDecodeError):
 	# print(b)
