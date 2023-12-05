@@ -1290,6 +1290,14 @@ ModMap = dict(
 		name="emerhyst-20b",
 		limit=4000,
 	),
+	mistral=dict(
+		name="mistral-7b",
+		limit=4000,
+	),
+	mythomax=dict(
+		name="mythomax-13b",
+		limit=4000,
+	),
 	mythalion=dict(
 		name="mythalion-13b",
 		limit=2000,
@@ -1297,6 +1305,10 @@ ModMap = dict(
 	wizcode=dict(
 		name="wizard-coder-34b",
 		cm=10,
+	),
+	llama=dict(
+		name="llama-70b",
+		cm=20,
 	),
 	orca=dict(
 		name="orca-70b",
@@ -1374,7 +1386,7 @@ def map_model(cname, model, premium):
 		keep_model = False
 	return model, keep_model
 
-DEFMOD = "emerhyst"
+DEFMOD = "mistral"
 
 MockFunctions = [
 	[None, "Placeholder (Do not choose this!)"],
@@ -1590,6 +1602,15 @@ AC = full_prune(AC.decode("utf-8")).capitalize() + "."
 BNB = ("pygmalion-13b", "manticore-13b", "airochronos-33b")
 GPTQ = ("wizard-70b", "euryale-70b", "xwin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "wizard-vicuna-30b", "emerhyst-20b", "xwin-mlewd-13b", "mythalion-13b")
 EXL2 = ("wizard-70b", "euryale-70b", "xwin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "wizard-vicuna-30b", "emerhyst-20b", "xwin-mlewd-13b", "mythalion-13b")
+TOGETHER = {
+	"llama-coder-34b": "togethercomputer/CodeLlama-34b-Instruct",
+	"falcon-40b": "togethercomputer/falcon-40b-instruct",
+	"llama-70b": "togethercomputer/llama-2-70b",
+	"mythomax-13b": "Gryphe/MythoMax-L2-13b",
+	"mistral-7b": "teknium/OpenHermes-2p5-Mistral-7B",
+	"qwen-7b": "togethercomputer/Qwen-7B-Chat",
+	"wizard-70b": "WizardLM/WizardLM-70B-V1.0",
+}
 
 async def summarise(q, min_length=128, max_length=192):
 	if min_length > max_length - 1:
@@ -2118,28 +2139,32 @@ class Ask(Command):
 			await ignore_embedding(message.id)
 			orig_tup = (name, q)
 			if embd:
-				await bot.lambdassert("summ")
-				data = await process_image("embedding", "$", [f"{name}: {q}"], cap="summ", timeout=30)
-				em = base64.b64encode(data).decode("ascii")
-				objs = list(embd.items())
-				keys = [t[0] for t in objs]
-				ems = [t[1] for t in objs]
-				print("EM:", len(ems))
-				argsort = await process_image("rank_embeddings", "$", [ems, em], cap="math", timeout=15)
-				n = 4 if premium < 3 else 6
-				argi = argsort[:n]
-				print("ARGI:", argi)
-				for i in sorted(argi, key=keys.__getitem__, reverse=True):
-					k = keys[i]
-					ki = int(k)
-					if ki in ignores or not mapd.get(k):
-						continue
-					temp = mapd[k].copy()
-					while len(temp):
-						ename, econtent = temp[:2]
-						temp = temp[2:]
-						history.insert(0, (ename, econtent))
-					ignores.add(ki)
+				try:
+					await bot.lambdassert("summ")
+				except:
+					print_exc()
+				else:
+					data = await process_image("embedding", "$", [f"{name}: {q}"], cap="summ", timeout=30)
+					em = base64.b64encode(data).decode("ascii")
+					objs = list(embd.items())
+					keys = [t[0] for t in objs]
+					ems = [t[1] for t in objs]
+					print("EM:", len(ems))
+					argsort = await process_image("rank_embeddings", "$", [ems, em], cap="math", timeout=15)
+					n = 4 if premium < 3 else 6
+					argi = argsort[:n]
+					print("ARGI:", argi)
+					for i in sorted(argi, key=keys.__getitem__, reverse=True):
+						k = keys[i]
+						ki = int(k)
+						if ki in ignores or not mapd.get(k):
+							continue
+						temp = mapd[k].copy()
+						while len(temp):
+							ename, econtent = temp[:2]
+							temp = temp[2:]
+							history.insert(0, (ename, econtent))
+						ignores.add(ki)
 			summary = caid and caid.get("summary")
 			if reset[0] is not None:
 				summary = None
@@ -2282,7 +2307,9 @@ class Ask(Command):
 					cm = 200
 				if not model or attempts >= 8:
 					model = choice((
-						"emerhyst-20b",
+						"mistral-7b",
+						"mythomax-13b",
+						# "emerhyst-20b",
 						# "euryale-70b",
 						ModMap[DEFMOD]["name"],
 						"gpt-3.5-turbo-instruct",
@@ -2296,7 +2323,7 @@ class Ask(Command):
 					limit = data.get("limit") or limit
 					cm = data.get("cm") or cm
 				elif attempts >= 7:
-					model = "emerhyst-20b"
+					model = "wizard-70b"
 					limit = 2000
 				elif premium < 2 or attempts in (4, 6):
 					model = ModMap[DEFMOD]["name"]
@@ -2750,6 +2777,27 @@ class Ask(Command):
 								continue
 						if redo:
 							continue
+				elif model in TOGETHER and AUTH.get("together_key") and not bot.together_sem.busy:
+					import together
+					together.api_key = AUTH["together_key"]
+					rp = ((data.get("frequency_penalty", 0.25) + data.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
+					rdata = dict(
+						prompt=data["prompt"],
+						model=TOGETHER[model],
+						temperature=data.get("temperature", 0.8) * 2 / 3,
+						top_p=data.get("top_p", 1),
+						repetition_penalty=rp,
+						max_tokens=data.get("max_tokens", 1024),
+					)
+					try:
+						async with bot.together_sem:
+							response = await asubmit(together.Complete.create, **rdata, timeout=60)
+						text += response["output"]["choices"][0]["text"]
+					except Exception as e:
+						ex = e
+						print_exc()
+						target_model = "gpt3"
+						continue
 				elif model in EXL2:
 					if "exl2" not in bot.caps:
 						target_model = "gpt3"

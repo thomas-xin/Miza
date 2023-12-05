@@ -763,7 +763,7 @@ class Server:
 							cp.response.headers["Content-Disposition"] = disp
 							# cp.response.headers["Content-Length"] = info[1]
 							cp.response.headers["Content-Type"] = mime = info[2]
-							referrer = cp.request.headers.get("Referer")
+							# referrer = cp.request.headers.get("Referer")
 							# print(p, len(urls), referrer)
 							cp.response.headers["Attachment-Filename"] = info[0]
 							if cp.request.method == "HEAD":
@@ -775,8 +775,8 @@ class Server:
 								if not is_url(urls[0]):
 									p = find_file(urls[0], cwd=("cache", "saves/filehost"))
 									urls = self._fileinfo(f"@{urls[0]}").get("chunks", ())
-								if download and not referrer:
-									raise cp.HTTPRedirect(url, status="307")
+								if download and ("Cf-Worker" not in cp.request.headers or not is_discord_attachment(url)):
+									raise cp.HTTPRedirect(urls[0], status="307")
 							cp.response.headers.pop("Accept-Ranges", None)
 							stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", "cache/")
 							pn = stn + "~.temp$@" + info[0]

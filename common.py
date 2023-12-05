@@ -167,7 +167,14 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 	def __str__(self):
 		classname = str(self.__class__).replace("'>", "")
 		classname = classname[classname.index("'") + 1:]
-		return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>: {self.active}/{self.limit}, {self.passive}/{self.buffer}, {len(self.rate_bin)}/{self.rate_limit}"
+		s = f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>: {self.active}/{self.limit}, {self.passive}/{self.buffer}"
+		if self.rate_limit:
+			if self.rate_bin and time.time() - self.rate_bin[0] <= self.rate_limit:
+				rate = round(self.rate_limit - (time.time() - self.rate_bin[0]), 1)
+			else:
+				rate = 0
+			s += f", {rate}/{self.rate_limit}"
+		return s
 
 	async def _update_bin_after_a(self, t):
 		await asyncio.sleep(t)
@@ -1461,10 +1468,16 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 			except discord.HTTPException as ex:
 				if fields.get("reference") and "Unknown message" in str(ex):
 					fields.pop("reference")
+					if fields.get("files"):
+						for file in fields["files"]:
+							file.reset()
 					return await channel.send(content, **fields)
 				raise
-			except aiohttp.client_exceptions.ClientOSError:
-				await asyncio.sleep(2)
+			except (aiohttp.client_exceptions.ClientOSError, CE):
+				await asyncio.sleep(random.random() * 2 + 1)
+				if fields.get("files"):
+					for file in fields["files"]:
+						file.reset()
 				return await channel.send(content, **fields)
 		try:
 			sem = REPLY_SEM[channel.id]
@@ -2897,7 +2910,17 @@ def proc_start():
 		if "load" in caps:
 			CAPS.pop(n)
 
+def device_cap(i, resolve=False):
+	di = torch.cuda.get_device_capability(i)
+	if resolve:
+		return np.prod(di)
+	return di
+
+last_task_time = 0
 async def sub_submit(cap, command, _timeout=12):
+	t = utc()
+	td = t - last_task_time
+	globals()["last_task_time"] = t
 	bot = BOT[0]
 	ex2 = RuntimeError("Maximum compute attempts exceeded.")
 	for i in range(3):
@@ -2908,7 +2931,7 @@ async def sub_submit(cap, command, _timeout=12):
 		queue = bot.compute_queue.setdefault(cap, set())
 		queue.add(task)
 		procs = filter(bool, PROCS.values())
-		for proc in sorted(procs, key=lambda proc: (proc.sem.active, 0 in proc.di or "nvram" in proc.caps, -COMPUTE_POT[proc.di[0]] if COMPUTE_POT and proc.di else random.random())):
+		for proc in sorted(procs, key=lambda proc: (proc.sem.active, (0 in proc.di or "nvram" in proc.caps) and not proc.used and td < 60, -device_cap(proc.di[0], resolve=True) * COMPUTE_POT[proc.di[0]] if COMPUTE_POT and proc.di else random.random())):
 			if not proc:
 				continue
 			if cap in proc.caps and not proc.fut.done():

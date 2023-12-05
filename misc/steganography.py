@@ -146,7 +146,7 @@ if "-i" in sys.argv:
 	its = int(sys.argv[i + 1])
 	sys.argv = sys.argv[:i] + sys.argv[i + 2:]
 else:
-	its = 5
+	its = None
 
 if "-o" in sys.argv:
 	i = sys.argv.index("-o")
@@ -157,6 +157,9 @@ else:
 
 fn = sys.argv[1]
 msg = " ".join(sys.argv[2:])
+if not its:
+	its = 100 // (len(msg.encode("utf-8")) + 2)
+	# print(its)
 if fn.startswith("https://") or fn.startswith("http://"):
 	import requests, io
 	im = Image.open(io.BytesIO(requests.get(fn).content))
@@ -167,7 +170,8 @@ if getattr(im, "text", None) and im.text.get("copyright") and not test:
 	if im.text["copyright"] != msg:
 		print("Copyright detected in metadata:", im.text["copyright"])
 		raise SystemExit
-if not msg and (im.width > 156 or im.height > 156):
+Ms = 156
+if not msg and (im.width > Ms or im.height > Ms):
 
 	def max_size(w, h, maxsize, force=False):
 		s = w * h
@@ -178,7 +182,7 @@ if not msg and (im.width > 156 or im.height > 156):
 			h = round(h * r)
 		return w, h
 
-	im = im.resize(max_size(im.width, im.height, 156), resample=Resampling.NEAREST)
+	im = im.resize(max_size(im.width, im.height, Ms), resample=Resampling.NEAREST)
 
 if "RGB" not in im.mode:
 	im = im.convert("RGBA")
@@ -189,9 +193,10 @@ ar = im.size[0] / im.size[1]
 # print(im.size, area)
 
 i_entropy = im.entropy()
+e_entropy = abs(i_entropy) ** 3 / 1024
 ie_req = 4
-entropy = min(1, abs(i_entropy) ** 3 / 384)
-# print(entropy, i_entropy)
+entropy = min(1, e_entropy)
+# print(entropy, e_entropy, i_entropy)
 
 write = bool(msg)
 mb = msg.encode("utf-8")
@@ -199,8 +204,9 @@ b = [bytes([its])]
 for n in range(its):
 	b.append(mb)
 	mb = invert(mb)
-b.append(b"\xaa" * (its * 2 - 1))
+b.append(bytes([its, 170] * its)[1:])
 b = b"".join(b)
+# print(len(b))
 bb = list(bool(i & 1 << j) for i in b for j in range(8))
 bs = len(bb)
 it = iter(bb)
@@ -372,10 +378,12 @@ def encode(a, target, rc, bit):
 			r2[r2 == 0] = -3
 			r2[r2 > 0] = 1
 			r2 = np.tile(r2, (2, 1)).T.ravel()[:pa]
+			# r1 = (-2, 2)
+			# r2 = (-3, 1)
 			# print(r1, r2)
 
 		if entropy != 0:
-			rind = np.random.binomial(1, entropy, len(rv))
+			rind = np.random.binomial(1, entropy, len(rv)).astype(bool)
 
 		if bit:
 			# rv[:] = 255
@@ -384,8 +392,7 @@ def encode(a, target, rc, bit):
 				v[rind] |= 2
 				v[rind] &= 254
 			if entropy != 1:
-				# must be &2 = 2
-				ind = v & 3
+				ind = v & 3 # must be &2 = 2
 				mask = ind == 0
 				t = v[mask]
 				v[mask] = np.subtract(t, r1[:len(t)], out=t, casting="unsafe")
@@ -394,15 +401,14 @@ def encode(a, target, rc, bit):
 				v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
 				mask = ind == 3
 				t = v[mask]
-				v[mask] = np.subtract(t, r1[:len(t)], out=t, casting="unsafe")
+				v[mask] = np.subtract(t, r2[:len(t)], out=t, casting="unsafe")
 		else:
 			# rv[:] = 0
 			v = np.clip(rv, 0, 251, out=rv)
 			if entropy != 0:
 				v[rind] &= 252
 			if entropy != 1:
-				# must be &2 = 0
-				ind = v & 3
+				ind = v & 3 # must be &2 = 0
 				mask = ind == 1
 				t = v[mask]
 				v[mask] = np.subtract(t, r2[:len(t)], out=t, casting="unsafe")
@@ -412,8 +418,8 @@ def encode(a, target, rc, bit):
 				mask = ind == 3
 				t = v[mask]
 				v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
-		# v = rv
 		target[:] = v.reshape(target.shape)
+		# print(bit, v[:20] & 2, v[:5], entropy)
 
 corners = [
 	(0, 0),
@@ -460,7 +466,8 @@ for p, (x, y) in enumerate(tiles):
 		# print(rc, pa)
 		if copydetect:
 			if not counted:
-				cornerdata.append(rc >= pa / np.sqrt(2))
+				rr = rc >= pa / np.sqrt(2)
+				cornerdata.append(rr)
 			else:
 				reader.append(rc >= pa)
 		if counted:
@@ -513,14 +520,29 @@ try:
 	# print(b)
 	if len(b) < 1 or b[-1] != 170:
 		raise ValueError
-	its = b[0]
-	if its not in range(2, 8):
-		raise ValueError
+	ita = [b[0]]
 	b = b[1:]
-	# print(b, its)
-	while len(b) and (len(b) % its or b[-1] == 170):
-		b = b[:-1]
-	if not len(b) or len(b) % its:
+	established = False
+	for i in range(len(b)):
+		if i & 1 or b[-1] == 170:
+			if b[-1] != 170:
+				ita.append(b[-1])
+				if len(ita) >= 3:
+					u, c = np.unique(ita, return_counts=True)
+					if np.max(c) >= 3:
+						established = True
+			elif established and (len(b) < 3 or b[-3] != 170):
+				b = b[:-1]
+				break
+			b = b[:-1]
+		else:
+			break
+	u, c = np.unique(ita, return_counts=True)
+	a = np.argsort(c)
+	its = u[a[-1]]
+	# print(its, u, c, a)
+	# print(b)
+	if len(b) < its:
 		raise ValueError
 	l = len(b) // its
 	dups = []
@@ -532,21 +554,24 @@ try:
 	dups = np.asanyarray(dups, dtype=np.uint8).T
 	# print(dups)
 	errs = 0
+	confidences = []
 	d = []
 	for i in range(l):
 		u, c = np.unique(dups[i], return_counts=True)
 		a = np.argsort(c)
-		if np.max(c) > 1:
-			c = u[a][-1]
-		else:
+		m = np.max(c)
+		confidences.append(m)
+		if sum(c == m) > 1:
 			if errs >= 3:
 				raise ValueError
 			errs += 1
-			l = [n for n in u if 32 <= n < 128]
+			l = sorted([n for n in u if 32 <= n < 128])
 			if not l:
 				c = u[-1]
 			else:
 				c = l[0]
+		else:
+			c = u[a[-1]]
 		d.append(c)
 		# print(dups[i])
 		# print(np.unique(dups[i], return_counts=True))
@@ -555,11 +580,15 @@ try:
 	s = b.decode("utf-8")
 	if s == msg:
 		raise ValueError
+	confidence = round(sum(confidences) / len(confidences) / 5 * 100)
+	if confidence < 10:
+		raise ValueError
 except (ValueError, UnicodeDecodeError):
 	# print(b)
 	if write:
 		im = Image.merge(im.mode, spl)
 		fn = ofn or fn.rsplit(".", 1)[0] + "~1.png"
+		# im.save(fn)
 		meta = PngInfo()
 		meta.add_text("copyright", msg)
 		level = round((1 - entropy) * 8 + 1)
@@ -568,4 +597,4 @@ except (ValueError, UnicodeDecodeError):
 else:
 	# if i_entropy >= ie_req:
 		# hash_to(im, s, skip=True)
-	print("Copyright detected in steganography:", s)
+	print(f"Copyright detected in steganography:", s)

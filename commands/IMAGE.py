@@ -1730,6 +1730,7 @@ class Art(Command):
 			morph = True
 		else:
 			morph = False
+		count = inf
 		for arg in args:
 			if kwarg:
 				# if kwarg == "--model":
@@ -1755,6 +1756,8 @@ class Art(Command):
 					kwargs[kwarg] = arg
 				elif kwarg == "--strength":
 					kwargs[kwarg] = str(max(0, min(1, float(arg))))
+				elif kwarg == "--count":
+					count = round_random(float(arg))
 				elif kwarg in ("--aspect-ratio", "--aspect", "--ar"):
 					arg = await bot.eval_math(arg.replace(":", "/").replace("x", "/").replace("×", "/"))
 					arg = float(arg)
@@ -1814,13 +1817,14 @@ class Art(Command):
 			if premium < 3:
 				raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
 		if "s" in flags:
-			amount = 1
-		elif dalle:
+			count = 1
+		if dalle:
 			amount = 4 if premium >= 6 else 2 if premium >= 4 else 1
 		elif sdxl:
 			amount = 9 if premium >= 5 else 4 if premium >= 3 else 1
 		else:
 			amount = 9 if premium >= 4 else 4
+		amount = min(count, amount)
 		dups = ceil(amount / 2)
 		eprompts = alist()
 		if sdxl and not dalle and "r" not in flags and (not force or prompt.count(" ") < 32):
@@ -1856,6 +1860,7 @@ class Art(Command):
 							presence_penalty=0.25,
 						),
 						skip=False,
+						best=not i and premium >= 3,
 					))
 					futs.append(fut)
 				for fut in futs:

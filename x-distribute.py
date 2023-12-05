@@ -36,6 +36,7 @@ if compute_load and compute_order:
 	compute_caps = [[torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor] for i in range(torch.cuda.device_count())]
 else:
 	compute_caps = []
+COMPUTE_ORDER = compute_order
 
 IS_MAIN = False
 FIRST_LOAD = True
@@ -50,7 +51,7 @@ FIRST_LOAD = True
 # summ			GPU >200k, VRAM >4GB			GTX970, M60, GTX1050ti, P4, GTX1630
 # sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
 # sdxl			GPU >400k, VRAM >9GB			GTX1080ti, RTX2080ti, RTX3060, RTX3080, A2000
-# sdxlr			GPU >400k, VRAM >11GB			V100, RTX3090, A4000, RTX4080, L4
+# sdxlr			GPU >400k, VRAM >19GB			V100, RTX3090, A5000, RTX4090, L4
 # exl2			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
 def spec2cap():
 	global FIRST_LOAD
@@ -111,7 +112,7 @@ def spec2cap():
 						did.append(i)
 					else:
 						break
-				yield [did, "exl2", f"vr{v}"] + (["vram"] if v >= 12 else [])
+				yield [did, "exl2", f"vr{v}", "vram"]
 				tdid.extend(did)
 				done.append("exl2")
 		if using and FIRST_LOAD:
@@ -133,30 +134,30 @@ def spec2cap():
 			caps.append("ytdl")
 		if ram > 14 * 1073741824 and ffmpeg:
 			caps.append("image")
-		if ram > 46 * 1073741824 and tesseract:
+		if ram > 94 * 1073741824 and tesseract:
 			caps.append("caption")
 		yield caps
 	if not DC:
 		return
-	for i, v in reversed(tuple(enumerate(rrams))):
+	for i, v in enumerate(rrams):
 		c = COMPUTE_POT[i]
 		caps = [[i]]
 		if c > 100000 and v > 3 * 1073741824 and ffmpeg:
 			caps.append("video")
 			caps.append("ecdc")
-		if c > 400000 and v > 15 * 1073741824:
+		if c > 400000 and v > 19 * 1073741824:
 			caps.append("sdxlr")
 			caps.append("sdxl")
 			# done.append("sdxlr")
 			done.append("sdxl")
 			v -= 15 * 1073741824
-		elif c > 400000 and IS_MAIN and vrams[i] > 15 * 1073741824:
+		elif c > 400000 and IS_MAIN and vrams[i] > 19 * 1073741824:
 			caps.append("sdxlr")
 			caps.append("sdxl")
 			caps.append("nvram")
 			# done.append("sdxlr")
 			v -= 15 * 1073741824
-		elif c > 400000 and v > 9 * 1073741824:
+		elif c > 400000 and v > 9 * 1073741824 and "sdxl" not in done:
 			# if "sdxl" not in done or c <= 600000:
 			caps.append("sdxl")
 			caps.append("sd")

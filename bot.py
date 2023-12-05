@@ -1614,7 +1614,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	together_sem = Semaphore(2, 2, rate_limit=0.5)
 	async def instruct(self, data, best=False, skip=True):
 		c = await tcount(data["prompt"])
-		if not best:
+		# if not best:
 			# if c <= 2048 and data["max_tokens"] <= 2048 and not self.llsem.busy:
 			# 	data["model"] = "emerhyst-20b"
 			# 	data["stop"] = [f"### Instruction:", f"### Response:"]
@@ -1625,24 +1625,25 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			# 	except:
 			# 		print_exc()
 			# 		data["model"] = "gpt-3.5-turbo-instruct"
-			if AUTH.get("together_key") and not self.together_sem.busy:
-				import together
-				together.api_key = AUTH["together_key"]
-				rp = ((data.get("frequency_penalty", 0.25) + data.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
-				rdata = dict(
-					prompt=data["prompt"],
-					model="Gryphe/MythoMax-L2-13b",
-					temperature=data.get("temperature", 0.8) * 2 / 3,
-					top_p=data.get("top_p", 1),
-					repetition_penalty=rp,
-					max_tokens=data.get("max_tokens", 1024),
-				)
-				try:
-					async with self.together_sem:
-						response = await asubmit(together.Complete.create, **rdata, timeout=60)
-					return response["output"]["choices"][0]["text"]
-				except:
-					print_exc()
+		if AUTH.get("together_key") and not self.together_sem.busy:
+			import together
+			together.api_key = AUTH["together_key"]
+			rp = ((data.get("frequency_penalty", 0.25) + data.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
+			m = "WizardLM/WizardLM-70B-V1.0" if best else "Gryphe/MythoMax-L2-13b"
+			rdata = dict(
+				prompt=data["prompt"],
+				model=m,
+				temperature=data.get("temperature", 0.8) * 2 / 3,
+				top_p=data.get("top_p", 1),
+				repetition_penalty=rp,
+				max_tokens=data.get("max_tokens", 1024),
+			)
+			try:
+				async with self.together_sem:
+					response = await asubmit(together.Complete.create, **rdata, timeout=60)
+				return response["output"]["choices"][0]["text"]
+			except:
+				print_exc()
 		if "instruct" not in data["model"]:
 			prompt = data.pop("prompt")
 			data["messages"] = [dict(role="user", content=prompt)]
@@ -1663,14 +1664,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return self.analysed[h][:-1]
 		except (LookupError, TypeError):
 			pass
-		if not torch:
-			return ("File", url.rsplit("/", 1)[-1].split("?", 1)[0], None)
+		if not torch or best is None:
+			return ("File", url.rsplit("/", 1)[-1].split("?", 1)[0])
 		futs = []
 		if best:
 			fut = create_task(self.gpt4v(url))
 			futs.append(fut)
 		fut = asubmit(self.neva, url)
 		futs.append(fut)
+		if not self.ibv_fut.done():
+			timeout = max(12, timeout / 2)
 		fut = asubmit(self.ibv, url)
 		futs.append(fut)
 		prompts = []
@@ -1796,9 +1799,27 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		print("GPT4V:", out)
 		return out
 
+	ibv_sem = Semaphore(600, 256, rate_limit=60)
+	ibv_cold = Semaphore(1, 256, rate_limit=900)
+	ibv_fut = Future()
+	def ibv(self, url):
+		sem = self.ibv_cold
+		if sem.busy:
+			if sem.active:
+				self.ibv_fut.result()
+			else:
+				self.ibv_fut = Future()
+			sem = self.ibv_sem
+		with sem:
+			out = self._ibv(url)
+		if not self.ibv_fut.done():
+			self.ibv_fut.set_result(None)
+		print("IBV:", out)
+		return out
+
 	replicate_client = None
 	@functools.lru_cache(maxsize=64)
-	def ibv(self, url):
+	def _ibv(self, url):
 		resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
 		if not self.replicate_client:
 			import replicate
@@ -1814,9 +1835,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				repetition_penalty=1.2,
 			),
 		)
-		out = "".join(resp)
-		print("IBV:", out)
-		return out
+		return "".join(resp)
 
 	@functools.lru_cache(maxsize=64)
 	def neva(self, url):
@@ -6382,12 +6401,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if guild:
 				await self.send_event("_delete_", message=message)
 			with tracebacksuppressor:
-				inits = getattr(message, "inits", ())
-				for fut in inits:
-					try:
-						fut.cancel()
-					except AttributeError:
-						force_kill(fut)
+				inits = getattr(message, "inits", None)
+				if inits:
+					print("Cancel:", inits)
+					for fut in inits:
+						if fut.done():
+							continue
+						try:
+							fut.cancel()
+						except AttributeError:
+							force_kill(fut)
 
 		# Message bulk delete event: uses raw payloads rather than discord.py message cache. calls _bulk_delete_ and _delete_ bot database events.
 		@self.event
