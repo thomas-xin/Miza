@@ -517,7 +517,7 @@ else:
 	b = b""
 
 try:
-	print(b)
+	# print(b)
 	if len(b) < 1 or b[-1] != 170:
 		raise ValueError
 	ita = [b[0]] if b[0] != 0 else []
@@ -559,10 +559,10 @@ try:
 		m = np.max(c)
 		confidences.append(m)
 		if sum(c == m) > 1:
-			if errs >= 3:
+			if errs >= l / 2:
 				raise ValueError
 			errs += 1
-			l = sorted([n for n in u if 32 <= n < 128])
+			l = sorted(n for n in u if 32 <= n < 128)
 			if not l:
 				c = u[-1]
 			else:
