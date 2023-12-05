@@ -517,26 +517,23 @@ else:
 	b = b""
 
 try:
-	# print(b)
+	print(b)
 	if len(b) < 1 or b[-1] != 170:
 		raise ValueError
-	ita = [b[0]]
+	ita = [b[0]] if b[0] != 0 else []
 	b = b[1:]
-	established = False
 	for i in range(len(b)):
 		if i & 1 or b[-1] == 170:
 			if b[-1] != 170:
 				ita.append(b[-1])
-				if len(ita) >= 3:
-					u, c = np.unique(ita, return_counts=True)
-					if np.max(c) >= 3:
-						established = True
-			elif established and (len(b) < 3 or b[-3] != 170):
+			elif (len(b) < 3 or b[-3] != 170):
 				b = b[:-1]
 				break
 			b = b[:-1]
 		else:
 			break
+	if not ita:
+		raise ValueError
 	u, c = np.unique(ita, return_counts=True)
 	a = np.argsort(c)
 	its = u[a[-1]]
