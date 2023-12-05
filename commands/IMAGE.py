@@ -8,7 +8,7 @@ try:
 	import yt_dlp as youtube_dl
 except ModuleNotFoundError:
 	try:
-		import youtube_dl
+		youtube_dl = __import__("youtube_dl")
 	except ModuleNotFoundError:
 		youtube_dl = None
 if AUTH["ai_features"]:
@@ -1637,6 +1637,7 @@ STOPS = (
 	"m unable to do",
 	"m unable to respond",
 	"m unable to comply",
+	"m unable to engage",
 	"i cannot fulfil",
 	"i cannot assist",
 	"i cannot help",
@@ -1644,6 +1645,7 @@ STOPS = (
 	"i cannot do",
 	"i cannot respond",
 	"i cannot comply",
+	"i cannot engage",
 	"i can't fulfil",
 	"i can't assist",
 	"i can't help",
@@ -1651,11 +1653,12 @@ STOPS = (
 	"i can't do",
 	"i can't respond",
 	"i can't comply",
+	"i can't engage",
 )
 
 class Art(Command):
 	_timeout_ = 150
-	name = ["AIArt", "Inpaint", "Morph", "ControlNet", "StableDiffusion", "SDXL", "Dalle", "Dalle2", "Dalle3", "Dream", "Imagine", "Inspire", "Openjourney", "Midjourney"]
+	name = ["AIArt", "Inpaint", "Morph", "ControlNet", "StableDiffusion", "SDXL", "Dalle", "Dalle2", "Dalle3", "Dream", "Imagine", "Inspire"]
 	description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system for image prompts. Configurable parameters are --strength, --guidance-scale, --aspect-ratio and --negative-prompt."
 	usage = "<0:prompt> <inpaint{?i}>? <morph{?m}>? <single{?s}> <raw{?r}>"
 	example = ("art cute kitten", "art https://mizabot.xyz/favicon")
@@ -1670,7 +1673,7 @@ class Art(Command):
 	except:
 		print_exc()
 		imagebot = None
-	has_py39 = subprocess.run("py -3.9 -m pip").returncode == 0
+	# has_py39 = subprocess.run("py -3.9 -m pip").returncode == 0
 
 	async def __call__(self, bot, guild, user, channel, message, name, args, flags, comment="", **void):
 		if not torch:
@@ -1714,11 +1717,11 @@ class Art(Command):
 		nprompt = ""
 		kwargs = {
 			"--device": "GPU",
-			"--num-inference-steps": "42" if premium < 4 else "48",
-			"--guidance-scale": "9.9",
+			"--num-inference-steps": "38" if premium < 4 else "48",
+			"--guidance-scale": "7",
 			"--eta": "0.8",
 			"--aspect-ratio": "0",
-			"--negative-prompt": "blurry, distorted, disfigured, bad anatomy, poorly drawn, low quality, ugly",
+			"--negative-prompt": "watermark, blurry, distorted, disfigured, bad anatomy, poorly drawn, low quality, ugly",
 		}
 		inpaint = "i" in flags or name == "inpaint"
 		specified = set()
@@ -1737,7 +1740,7 @@ class Art(Command):
 					kwargs[kwarg] = arg
 				elif kwarg in ("--num-inference-steps", "--ddim-steps"):
 					kwarg = "--num-inference-steps"
-					kwargs[kwarg] = str(max(1, min(64, int(arg))))
+					kwargs[kwarg] = str(max(1, min(32 * (premium + 2), int(arg))))
 				elif kwarg in ("--guidance-scale", "--guidance", "--scale"):
 					kwarg = "--guidance-scale"
 					kwargs[kwarg] = str(max(0, min(100, float(arg))))
@@ -1815,12 +1818,12 @@ class Art(Command):
 		elif dalle:
 			amount = 4 if premium >= 6 else 2 if premium >= 4 else 1
 		elif sdxl:
-			amount = 4 if premium >= 5 else 2 if premium >= 3 else 1
+			amount = 9 if premium >= 5 else 4 if premium >= 3 else 1
 		else:
 			amount = 9 if premium >= 4 else 4
-		dups = floor(sqrt(amount))
+		dups = ceil(amount / 2)
 		eprompts = alist()
-		if sdxl and not dalle and "r" not in flags and (not force or prompt.count(" ") < 48):
+		if sdxl and not dalle and "r" not in flags and (not force or prompt.count(" ") < 32):
 			oprompt = prompt
 			uid = user.id
 			temp = oprompt.replace('"""', "'''")
@@ -1837,30 +1840,35 @@ class Art(Command):
 			data = bot.data.users.get(u.id, {})
 			oai = data.get("trial") and data.get("openai_key")
 			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
-			resp = None
 			dupn = dups
-			if "STRING" in bot._globals:
-				resp = cdict(choices=[])
-				while not resp.choices or dupn > 1:
+			resp = cdict(choices=[])
+			if not resp.choices or dupn > 1:
+				futs = []
+				for i in range(min(3, max(1, dupn - 1))):
+					fut = create_task(bot.instruct(
+						dict(
+							model="gpt-3.5-turbo-instruct",
+							prompt=prompt,
+							temperature=0.75,
+							max_tokens=200,
+							top_p=0.9,
+							frequency_penalty=0.25,
+							presence_penalty=0.25,
+						),
+						skip=False,
+					))
+					futs.append(fut)
+				for fut in futs:
 					try:
-						s = await bot.instruct(
-							dict(
-								model="gpt-3.5-turbo-instruct",
-								prompt=prompt,
-								temperature=0.75,
-								max_tokens=200,
-								top_p=0.9,
-								frequency_penalty=0.25,
-								presence_penalty=0.25,
-							),
-							skip=False,
-						)
+						s = await fut
 						assert len(s.strip()) > 12
 					except:
 						print_exc()
-						break
+						continue
 					resp.choices.append(cdict(text=s))
 					dupn -= 1
+			resp.choices.append(cdict(text=""))
+			dupn -= 1
 			if not resp or len(resp.choices) < dups:
 				resp2 = await bot.oai.completions.create(
 					model="gpt-3.5-turbo-instruct",
@@ -1912,15 +1920,6 @@ class Art(Command):
 		aspect = float(kwargs.get("--aspect-ratio", 1))
 		negative = kwargs.get("--negative-prompt", "")
 		nsfw = bot.is_nsfw(channel)
-		# if not nsfw and prompt and AUTH.get("openai_key"):
-		#     import openai
-		#     openai.api_key = AUTH["openai_key"]
-		#     resp = openai.Moderation.create(
-		#         input=prompt,
-		#     )
-		#     results = resp.results[0].categories
-		#     if results.hate or results["self-harm"] or results["sexual/minors"] or results["violence/graphic"]:
-		#         raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
 		emb = None
 		fn = None
 		futs = []
@@ -1943,25 +1942,25 @@ class Art(Command):
 
 		async def ibasl_r(p, k, n, f, c, s, a, np):
 			m = "--mask" in k and "--init-image" not in k
-			if m or sdxl and (1 or c > 1 or premium >= 4 or random.randint(0, 1)) and "z" not in flags:
-				try:
-					if not m:
-						await process_image(lambdassert, "$", (), cap="sdxlr", timeout=2)
-				except:
-					print_exc()
-				else:
-					return await process_image("IBASLR", "&", [p, k, n, f, c, a, np], cap="sdxlr", timeout=420)
+			if m or s and "z" not in flags:
+				# try:
+				# 	if not m and c <= 1:
+				# 		await bot.lambdassert("sdxlr")
+				# except:
+				# 	print_exc()
+				# else:
+				cap = "sdxlr" if "--mask" in k else "sdxl"
+				return await process_image("IBASLR", "&", [p, k, n, f, c, a, np], cap=cap, timeout=420)
 			resp = await process_image("IBASL", "&", [p, k, n, f, c, s, a, np, "z" in flags], cap="sdxl" if s else "sd", timeout=420)
-			if s and "z" not in flags:
-				out = []
-				for r1 in resp:
-					r2 = await process_image("IBASR", "$", [p, r1, 48, np], cap="sdxlr", timeout=240)
-					out.append(r2)
-				return out
+			# if s and "z" not in flags:
+			# 	out = []
+			# 	for r1 in resp:
+			# 		r2 = await process_image("IBASR", "$", [p, r1, 48, np], cap="sdxlr", timeout=240)
+			# 		out.append(r2)
+			# 	return out
 			return resp
 
 		if amount2 < amount:
-			openjourney = "journey" in name
 			if dalle:
 				ar = float(kwargs["--aspect-ratio"]) or 1
 				if url:
@@ -2036,39 +2035,26 @@ class Art(Command):
 							pnames.append(response.data[0].revised_prompt)
 				futs.extend(create_task(Request(im.url, timeout=48, aio=True)) for im in images)
 				amount2 += len(images)
-		if amount2 < amount:
+		if amount2 < amount and not url:
 			async with discord.context_managers.Typing(channel):
 				futt = []
 				c = 0
-				if not url and (aspect != 1 or negative or amount >= 1 and not dalle and not openjourney and not self.sdiff_sem.is_busy()):
+				async with self.sdiff_sem:
 					noprompt = not force and not kwargs.get("--mask")
-					c = min(amount, 9 if nsfw and not self.sdiff_sem.active else 5)
+					c = min(amount, 9)
 					c2 = c
 					while c2 > 0:
 						prompt = eprompts.next()
 						p = "" if noprompt and not sdxl else prompt
-						n = min(c2, dups)
+						n = min(c2, round_random(amount / dups))
 						if not n:
 							n = c2
 						fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))
 						futt.append(fut)
 						pnames.extend([prompt] * n)
 						c2 -= n
-				self.imagebot.token = oai or AUTH.get("openai_key")
-				ims = []
-				try:
-					if c > amount:
-						raise PermissionError
-					prompt = eprompts.next()
-					ims = await asubmit(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle, openjourney, sdxl, nsfw, amount - c, timeout=480)
-				except PermissionError:
-					async with self.sdiff_sem:
-						for fut in futt:
-							await fut
-				else:
-					pnames.extend([prompt] * len(ims))
-				# print(ims)
-				async with self.sdiff_sem:
+						await asyncio.sleep(0.5)
+					ims = []
 					for fut in futt:
 						try:
 							ims2 = await fut
@@ -2081,44 +2067,6 @@ class Art(Command):
 				futs.extend(ims)
 				amount2 = len(futs)
 		if amount2 < amount:
-			if self.has_py39:
-				with tracebacksuppressor:
-					if not self.fut and not os.path.exists("misc/stable_diffusion.openvino"):
-						self.fut = asubmit(subprocess.run(
-							[
-								"git",
-								"clone",
-								"https://github.com/bes-dev/stable_diffusion.openvino.git",
-							],
-							cwd="misc",
-						))
-					await self.fut
-					if os.name == "nt":
-						self.fut = asubmit(subprocess.run(
-							[
-								python,
-								"-m",
-								"pip",
-								"install",
-								"-r",
-								"requirements.txt",
-							],
-							cwd="misc",
-						))
-					else:
-						self.fut = asubmit(subprocess.run(
-							[
-								sys.executable,
-								"-m",
-								"pip",
-								"install",
-								"-r",
-								"requirements.txt",
-							],
-							cwd="misc",
-						))
-					await self.fut
-					self.fut = None
 			if os.name == "nt":
 				args = [
 					"py",
@@ -2152,34 +2100,6 @@ class Art(Command):
 						resp = await process_image(image_2, "expand_mask", ["-nogif", 12, "-f", "png"], timeout=60)
 						image_2 = resp
 						print(image_1, image_2)
-					# if premium >= 2 and not force and "--strength" not in kwargs and str(kwargs["--guidance-scale"]) == "7.5" and str(kwargs["--eta"]) == "0.8":
-					#     if isinstance(image_1, bytes):
-					#         image_1b = image_1
-					#     else:
-					#         with open(image_1, "rb") as f:
-					#             image_1b = f.read()
-					#     if image_2:
-					#         if isinstance(image_2, bytes):
-					#             image_2b = image_2
-					#         else:
-					#             with open(image_2, "rb") as f:
-					#                 image_2b = f.read()
-					#     with tracebacksuppressor:
-					#         if bot.is_trusted(guild) >= 2:
-					#             for uid in bot.data.trusted[guild.id]:
-					#                 if uid and bot.premium_level(uid, absolute=True) >= 2:
-					#                     break
-					#             else:
-					#                 uid = next(iter(bot.data.trusted[guild.id]))
-					#             u = await bot.fetch_user(uid)
-					#         else:
-					#             u = user
-					#         data = bot.data.users.get(u.id, {})
-					#         oai = data.get("trial") and data.get("openai_key")
-					#         self.imagebot.token = oai or AUTH.get("openai_key")
-					#         ims = await asubmit(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, False, amount, timeout=60)
-					#         futs.extend(ims)
-					#         amount2 = len(futs)
 				oargs = args
 				att = 0
 				while amount2 < amount and att < 5:
@@ -2190,10 +2110,6 @@ class Art(Command):
 					async with self.sdiff_sem:
 						if url:
 							fn = os.path.abspath(image_1) if isinstance(image_1, str) else image_1
-							# fn = "misc/stable_diffusion.openvino/input.png"
-							# if os.path.exists(fn):
-							#     os.remove(fn)
-							# os.rename(image_1, fn)
 							if morph:
 								if "--strength" not in kwargs:
 									args.extend((
@@ -2210,9 +2126,9 @@ class Art(Command):
 								if "--strength" not in kwargs:
 									args.extend((
 										"--strength",
-										"0.8",
+										"0.6",
 									))
-									kwargs["--strength"] = 0.8
+									kwargs["--strength"] = 0.6
 								args.extend((
 									"--init-image",
 									fn,
@@ -2220,10 +2136,6 @@ class Art(Command):
 								kwargs["--init-image"] = fn
 								if image_2:
 									fm = os.path.abspath(image_2) if isinstance(image_2, str) else image_2
-									# fm = "misc/stable_diffusion.openvino/mask.png"
-									# if os.path.exists(fm):
-									#     os.remove(fm)
-									# os.rename(image_2, fm)
 									args.extend((
 										"--mask",
 										fm,
@@ -2231,7 +2143,6 @@ class Art(Command):
 									kwargs["--mask"] = fm
 								elif image_2b:
 									fm = os.path.abspath(f"cache/{ts_us()}.png")
-									# fm = "misc/stable_diffusion.openvino/mask.png"
 									with open(fm, "wb") as f:
 										f.write(image_2b)
 									args.extend((
@@ -2242,39 +2153,26 @@ class Art(Command):
 						for k, v in kwargs.items():
 							args.extend((k, v))
 						# print(args)
-						if self.has_py39:
-							proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
-							try:
-								async with asyncio.timeout(3200):
-									await proc.wait()
-							except (T0, T1, T2):
-								with tracebacksuppressor:
-									force_kill(proc)
-								raise
-							with open("misc/stable_diffusion.openvino/output.png", "rb") as f:
-								futs.append(f.read())
-							amount2 = len(futs)
-							pnames.append(prompt)
-						else:
-							noprompt = not force and not kwargs.get("--mask")
-							futt = []
-							c = amount - amount2
-							c2 = c
-							while c2 > 0:
-								prompt = eprompts.next()
-								p = "" if noprompt and not sdxl else prompt
-								n = min(c2, dups)
-								if not n:
-									n = c2
-								fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))
-								futt.append(fut)
-								pnames.extend([prompt] * n)
-								c2 -= n
-							for fut in futt:
-								ims = await fut
-								futs.extend(ims)
-								# print(dups, len(ims), len(futt), len(futs), amount, amount2)
-							amount2 = len(futs)
+						noprompt = not force and not kwargs.get("--mask")
+						futt = []
+						c = amount - amount2
+						c2 = c
+						while c2 > 0:
+							prompt = eprompts.next()
+							p = "" if noprompt and not sdxl else prompt
+							n = min(c2, round_random(amount / dups))
+							if not n:
+								n = c2
+							fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))
+							futt.append(fut)
+							pnames.extend([prompt] * n)
+							c2 -= n
+							await asyncio.sleep(0.5)
+						for fut in futt:
+							ims = await fut
+							futs.extend(ims)
+							# print(dups, len(ims), len(futt), len(futs), amount, amount2)
+						amount2 = len(futs)
 		ffuts = []
 		exc = RuntimeError("Unknown error occured.")
 		async with discord.context_managers.Typing(channel):

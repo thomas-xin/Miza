@@ -14,6 +14,7 @@ if os.path.exists("auth.json"):
 		os.environ["HF_DATASETS_CACHE"] = f"{cachedir}/huggingface/datasets"
 
 import io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, contextlib, filetype, ast, base64, hashlib, random
+import urllib.request
 import numpy as np
 import math
 from math import *
@@ -825,6 +826,12 @@ if CAPS.intersection(("image", "video", "caption", "sd", "sdxl", "sdxlr")):
 		if force > 1:
 			return image.copy()
 		return image
+
+	def image_to(im, mode="RGB", size=None):
+		im = im if im.mode == mode else im.convert(mode)
+		if size and size != im.size:
+			im = im.resize(size, resample=Image.Resampling.LANCZOS)
+		return im
 
 	resizers = dict(
 		sinc=Resampling.LANCZOS,
@@ -1908,8 +1915,8 @@ if "exl2" in CAPS:
 		max_tokens = inputs.get("max_tokens", 1024)
 		top_p = inputs.get("top_p", 1)
 		stop = inputs.get("stop")
-		frequency_penalty = inputs.get("frequency_penalty", 0.5)
-		presence_penalty = inputs.get("presence_penalty", 0.5)
+		frequency_penalty = inputs.get("frequency_penalty", 0.25)
+		presence_penalty = inputs.get("presence_penalty", 0.25)
 		# time.sleep(10)
 		M, T = gen_exl2(model)
 		# time.sleep(10)
@@ -1924,8 +1931,8 @@ if "exl2" in CAPS:
 			tokens_prompt = ids.shape[-1]
 			settings = ExLlamaV2Sampler.Settings()
 			settings.temperature = temperature
-			settings.top_p = top_p
-			settings.min_p = 1 - top_p
+			settings.min_p = (1 - top_p) / 2
+			settings.top_p = 1 - settings.min_p
 			rp = ((frequency_penalty + presence_penalty) / 4 + 1) ** (1 / log2(2 + tokens_prompt / 16))
 			settings.token_repetition_penalty = rp
 			generator.set_stop_conditions((stop or []) + [T.eos_token])
@@ -2205,7 +2212,6 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=sdxl, aspect_ratio=aspect_ratio, negative_prompt=negative_prompt, z=z)
 
 	def IBASR(prompt, image, steps=64, negative_prompt=None):
-		# print(prompt)
 		try:
 			ib = CBOTS[None]
 		except KeyError:
@@ -2218,12 +2224,132 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			raise RuntimeError("Maximum attempts exceeded.")
 		return il[0]
 
+	WEBUIS = {}
 	def IBASLR(prompt, kwargs, nsfw=False, force=True, count=1, aspect_ratio=0, negative_prompt=""):
+		if kwargs.get("--mask"):
+			try:
+				ib = CBOTS[None]
+			except KeyError:
+				ib = CBOTS[None] = imagebot.Bot()
+			return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=2, aspect_ratio=aspect_ratio, negative_prompt=negative_prompt)
+		model = "zavychromaxl_v21.safetensors"
+		PORT = 7800 + DEV
+		webui_server_url = f"http://127.0.0.1:{PORT}"
 		try:
-			ib = CBOTS[None]
+			proc = WEBUIS[model]
+			if not proc or hasattr(proc, "is_running") and not proc.is_running():
+				raise KeyError
 		except KeyError:
-			ib = CBOTS[None] = imagebot.Bot()
-		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=2, aspect_ratio=aspect_ratio, negative_prompt=negative_prompt)
+			if WEBUIS:
+				for proc in WEBUIS.values():
+					for child in proc.children(True):
+						child.terminate()
+					proc.terminate()
+				WEBUIS.clear()
+			fut = WEBUIS[model] = concurrent.futures.Future()
+			webui_dir = cachedir + "/stable-diffusion-webui"
+			if not os.path.exists(webui_dir) or not os.listdir(webui_dir):
+				args = ["git", "clone", "https://github.com/AUTOMATIC1111/stable-diffusion-webui.git"]
+				print(args)
+				subprocess.run(args, cwd=cachedir)
+			model_dir = webui_dir + "/models/Stable-diffusion"
+			target_model = model_dir + "/" + model
+			if not os.path.exists(target_model) or not os.path.getsize(target_model):
+				args = [sys.executable, "downloader.py", "https://civitai.com/api/download/models/169740?type=Model&format=SafeTensor&size=full&fp=fp16", target_model]
+				print(args)
+				subprocess.run(args)
+			device, dtype = determine_cuda(priority=False)
+			args = [os.path.join(webui_dir, ("webui.bat" if os.name == "nt" else "webui.sh")), "--device-id", str(device), "--api", "--nowebui", "--port", str(PORT)]
+			if torch.cuda.get_device_properties(device).total_memory <= 15 * 1073741824:
+				args.append("--medvram")
+			print(args, webui_dir)
+			time.sleep(DEV * 5)
+			while True:
+				proc = psutil.Popen(args, cwd=webui_dir)
+				start = time.time()
+				while proc.is_running() and time.time() - start < 60:
+					try:
+						resp = urllib.request.urlopen(webui_server_url)
+					except urllib.error.HTTPError:
+						break
+					except (urllib.error.URLError, ConnectionRefusedError):
+						time.sleep(1)
+						continue
+					break
+				else:
+					for child in proc.children(True):
+						child.terminate()
+					proc.terminate()
+					continue
+				break
+			WEBUIS[model] = proc
+			fut.set_result(proc)
+		if isinstance(proc, concurrent.futures.Future):
+			proc = proc.result()
+		b = kwargs.get("--init-image")
+		if b:
+			if not isinstance(b, str):
+				b = io.BytesIO(b)
+			im = Image.open(b)
+			im = image_to(im)
+		else:
+			im = None
+		steps = int(kwargs.get("--num-inference-steps", 38))
+		rsteps = steps // 10 * 2
+		msteps = steps - rsteps
+		ms = 768
+		if aspect_ratio != 0:
+			x, y = max_size(aspect_ratio, 1, ms, force=True)
+		elif im:
+			x, y = max_size(*im.size, ms, force=True)
+		# elif mask:
+		# 	x, y = max_size(*mask.size, ms, force=True)
+		else:
+			x = y = ms
+		d = 48
+		w, h = (x // d * d, y // d * d)
+		r = 4 / 3
+		payload = dict(
+			model=model,
+			prompt=prompt,
+			negative_prompt=negative_prompt,
+			steps=msteps,
+			width=w,
+			height=h,
+			cfg_scale=float(kwargs.get("--guidance-scale", 7)),
+			sampler_name="DPM++ 2M Karras",
+			n_iter=1,
+			batch_size=count,
+			enable_hr=True,
+			hr_upscaler="Lanczos",
+			hr_second_pass_steps=rsteps,
+			hr_resize_x=round(w * r),
+			hr_resize_y=round(h * r),
+			denoising_strength=float(kwargs.get("--strength", 0.6)),
+			refiner_checkpoint=model,
+			refiner_switch_at=0.75,
+		)
+		if im:
+			bi = io.BytesIO()
+			im.save(bi, "jpeg")
+			b = bi.getbuffer()
+			payload["init_images"] = [base64.b64encode(b).decode("ascii")]
+			endpoint = "img2img"
+		else:
+			endpoint = "txt2img"
+		request = urllib.request.Request(
+			f"{webui_server_url}/sdapi/v1/{endpoint}",
+			headers={"Content-Type": "application/json"},
+			data=orjson.dumps(payload),
+		)
+		resp = urllib.request.urlopen(request)
+		data = orjson.loads(resp.read())
+		out = []
+		for image in data.get("images", ()):
+			b = base64.b64decode(image)
+			out.append(b)
+		return out
+		
 
 	EXT1 = None
 	def depth(im):

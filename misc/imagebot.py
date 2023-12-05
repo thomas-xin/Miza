@@ -704,7 +704,7 @@ class Bot:
 		from diffusers.models import AutoencoderKL
 		cia = torch.cuda.is_available()
 		models = self.models.setdefault(device, {})
-		checkers = self.safety_checkers.setdefault(device, {})
+		# checkers = self.safety_checkers.setdefault(device, {})
 		f2 = pf
 		pipe = cia and models.get((f2, model))
 		if pipe == False and fail_unless_gpu:
@@ -714,16 +714,59 @@ class Bot:
 		with torch.no_grad():
 			torch.cuda.empty_cache()
 		spare = torch.cuda.get_device_properties(device).total_memory > 15 * 1073741824
+		im = mask = None
+		if kwargs.get("--init-image"):
+			b = kwargs["--init-image"]
+			if not isinstance(b, str):
+				b = io.BytesIO(b)
+			im = Image.open(b)
+		if kwargs.get("--mask"):
+			b = kwargs["--mask"]
+			if not isinstance(b, str):
+				b = io.BytesIO(b)
+			mask = Image.open(b)
+		output_type = "latent" if sdxl > 1 and spare else "pil"
+		end = 0.8 if output_type == "latent" else 1
+		kw = {}
+		if sdxl:
+			ms = 1024
+			if aspect_ratio != 0:
+				x, y = max_size(aspect_ratio, 1, ms, force=True)
+			elif im:
+				x, y = max_size(*im.size, ms, force=True)
+			elif mask:
+				x, y = max_size(*mask.size, ms, force=True)
+			else:
+				x = y = ms
+			d = 64 if sdxl > 1 else 32
+			w, h = (x // d * d, y // d * d)
+			# if w == h:
+			# 	model = "stabilityai/sdxl-turbo"
+			# 	kwargs["--num-inference-steps"] = max(1, int(int(kwargs.get("--num-inference-steps", 24)) / 16))
+			# 	kwargs["--guidance-scale"] = 0
+			# 	w = h = 512
+			# 	output_type = "pil"
+			# 	end = 1
+			kw["target_size"] = (w, h)
+			if not im and not mask:
+				kw["width"], kw["height"] = w, h
+		else:
+			w = h = 512
+		original_prompt = prompt
+		kw["denoising_end"] = end
+		kw["output_type"] = output_type
+		ois = (w, h)
 		if not pipe:
 			try:
 				self.loading = concurrent.futures.Future()
-				kw = {}
+				kwl = {}
 				if sdxl:
-					kw["use_safetensors"] = True
-					kw["variant"] = "fp16"
-					if not self.vae:
+					kwl["use_safetensors"] = True
+					kwl["variant"] = "fp16"
+					if not self.vae and model == "stabilityai/stable-diffusion-xl-base-1.0":
 						self.vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=dtype, use_safetensors=True)
-					kw["vae"] = self.vae
+					if self.vae:
+						kwl["vae"] = self.vae
 				try:
 					if fail_unless_gpu and (device < 0 or not models.get((f2, model), True)):
 						return
@@ -735,28 +778,34 @@ class Bot:
 							use_safetensors=True,
 							variant="fp16",
 						)
-						kw["controlnet"] = controlnet
-					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=False, torch_dtype=dtype, **kw)
-					if device >= 0:
+						kwl["controlnet"] = controlnet
+					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=False, torch_dtype=dtype, **kwl)
+					if 0:#device >= 0:
 						if os.name != "nt":
 							pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
-						pipe.enable_attention_slicing()
-						if sdxl and spare:
+						if not spare:
+							pipe.enable_attention_slicing()
+						if sdxl and model != "stabilityai/sdxl-turbo":
 							pipe.enable_vae_tiling()
 						try:
+							if model == "stabilityai/sdxl-turbo":
+								raise AttributeError
 							if 1 or spare:
 								pipe.enable_model_cpu_offload(gpu_id=device)
 							else:
 								pipe.enable_sequential_cpu_offload(gpu_id=device)
 						except AttributeError:
 							pipe = pipe.to(f"cuda:{device}")
-						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+						if model != "stabilityai/sdxl-turbo":
+							pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 						try:
 							pipe.enable_xformers_memory_efficient_attention()
 							import tomesd
 							tomesd.apply_patch(pipe, ratio=0.5)
 						except:
 							print_exc()
+					else:
+						pipe = pipe.to(f"cuda:{device}")
 				except Exception as ex:
 					if isinstance(ex, RuntimeError):
 						if sdxl:
@@ -767,7 +816,7 @@ class Bot:
 						models[(f2, model)] = False
 						print("StablediffusionL: CUDA f16 init failed")
 						return ()
-					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=False, **kw)
+					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=False, **kwl)
 				# checkers[model] = pipe.safety_checker
 				models[(f2, model)] = pipe
 			finally:
@@ -785,42 +834,6 @@ class Bot:
 		# else:
 			# pipe.safety_checker = checkers[model]
 		# pipe = pipe.to(f"cuda:{device}")
-		im = mask = None
-		if kwargs.get("--init-image"):
-			b = kwargs["--init-image"]
-			if not isinstance(b, str):
-				b = io.BytesIO(b)
-			im = Image.open(b)
-		if kwargs.get("--mask"):
-			b = kwargs["--mask"]
-			if not isinstance(b, str):
-				b = io.BytesIO(b)
-			mask = Image.open(b)
-		output_type = "latent" if sdxl > 1 and spare else "pil"
-		end = 0.8
-		kw = {}
-		if sdxl:
-			kw = dict(output_type=output_type)
-			ms = 1024
-			if not z:
-				kw["denoising_end"] = end
-			if aspect_ratio != 0:
-				x, y = max_size(aspect_ratio, 1, ms, force=True)
-			elif im:
-				x, y = max_size(*im.size, ms, force=True)
-			elif mask:
-				x, y = max_size(*mask.size, ms, force=True)
-			else:
-				x = y = ms
-			d = 64 if sdxl > 1 else 32
-			w, h = (x // d * d, y // d * d)
-			kw["target_size"] = (w, h)
-			if not im and not mask:
-				kw["width"], kw["height"] = w, h
-		else:
-			w = h = 512
-		ois = (w, h)
-		original_prompt = prompt
 		prompt = lim_tokens(prompt, 150 if sdxl else 50)
 		if sdxl:
 			prompts = split_prompt(prompt)
@@ -828,7 +841,7 @@ class Bot:
 			true_prompt = [prompts[i] for i in prompt_indices]
 			kw["prompt_2"] = [prompts[not i] for i in prompt_indices]
 			negative_prompt = negative_prompt if negative_prompt is not None else self.neg_prompt
-			if negative_prompt:
+			if negative_prompt and model != "stabilityai/sdxl-turbo":
 				negs = split_prompt(negative_prompt, aggressive=True)
 				neg_indices = [random.randint(0, 1) for i in range(count)]
 				kw["negative_prompt"] = [negs[i] for i in neg_indices]
@@ -867,10 +880,11 @@ class Bot:
 				**kw,
 			)
 		elif f2 is StableDiffusionXLControlNetPipeline:
-			a = np.asanyarray(image_to(mask, size=ois))
-			from cv2 import Canny
-			im = Canny(a, 100, 200)
-			mask = Image.fromarray(im, mode="L").convert("RGB")
+			mask = image_to(mask, size=ois)
+			# a = np.asanyarray(mask)
+			# from cv2 import Canny
+			# im2 = Canny(a, 100, 200)
+			# mask = Image.fromarray(im2, mode="L").convert("RGB")
 			kw.pop("denoising_end", None)
 			data = pipe(
 				true_prompt,
@@ -917,7 +931,7 @@ class Bot:
 			text_encoder_2 = pipe.text_encoder_2
 		else:
 			vae = text_encoder_2 = None
-		if images and sdxl > 1:
+		if images and sdxl > 1 and output_type == "latent":
 			images = self.art_stablediffusion_refine(original_prompt, images, negative_prompt=negative_prompt, vae=vae, text_encoder_2=text_encoder_2, fail_unless_gpu=fail_unless_gpu, device=device, dtype=dtype, orig_size=max_size(*kw.get("target_size", (1024, 1024)), 1024))
 			# random.shuffle(images)
 		elif not self.loading or self.loading.done():
@@ -963,19 +977,20 @@ class Bot:
 		if not pipe:
 			try:
 				self.loading = concurrent.futures.Future()
-				kw = {}
+				kwl = {}
 				if vae:
-					kw["vae"] = vae
+					kwl["vae"] = vae
 				else:
-					if not self.vae:
-						self.vae = AutoencoderKL.from_pretrained("stabilityai/sdxl-vae", torch_dtype=dtype, use_safetensors=True)
-					kw["vae"] = self.vae
+					if not self.vae and model == "stabilityai/stable-diffusion-xl-base-1.0":
+						self.vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=dtype, use_safetensors=True)
+					if self.vae:
+						kwl["vae"] = self.vae
 				if text_encoder_2:
-					kw["text_encoder_2"] = text_encoder_2
+					kwl["text_encoder_2"] = text_encoder_2
 				try:
 					if fail_unless_gpu and (device < 0 or not models.get((f2, model), True)):
 						return
-					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=False, torch_dtype=dtype, use_safetensors=True, variant="fp16", **kw)
+					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=False, torch_dtype=dtype, use_safetensors=True, variant="fp16", **kwl)
 					if device >= 0:
 						if os.name != "nt":
 							pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
@@ -1004,7 +1019,7 @@ class Bot:
 						models[(f2, model)] = False
 						print("StablediffusionL: CUDA f16 init failed")
 						return ()
-					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=False, use_safetensors=True, **kw)
+					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=False, use_safetensors=True, **kwl)
 				models[(f2, model)] = pipe
 			finally:
 				self.loading.set_result(None)

@@ -152,6 +152,7 @@ def spec2cap():
 			v -= 15 * 1073741824
 		elif c > 400000 and IS_MAIN and vrams[i] > 15 * 1073741824:
 			caps.append("sdxlr")
+			caps.append("sdxl")
 			caps.append("nvram")
 			# done.append("sdxlr")
 			v -= 15 * 1073741824
@@ -339,6 +340,7 @@ def update_tasks(proc):
 					data=dict(
 						caps=orjson.dumps(proc.caps),
 						resp=resp,
+						id=proc.n,
 					),
 					verify=False
 				)
@@ -380,7 +382,7 @@ def update_tasks(proc):
 					resps[str(i)] = "RES:" + resp if isinstance(resp, str) else resp
 	return func
 
-def start_proc(di, caps):
+def start_proc(di, caps, n=0):
 	args = [python, "misc/x-compute.py", ",".join(map(str, di)), ",".join(caps), json.dumps(compute_load), json.dumps(compute_caps), json.dumps(compute_order)]
 	print(args)
 	proc = psutil.Popen(
@@ -392,6 +394,7 @@ def start_proc(di, caps):
 	)
 	proc.busy = None
 	proc.waiting = concurrent.futures.Future()
+	proc.n = n
 	proc.di = di
 	proc.caps = caps
 	procs.append(proc)
@@ -400,8 +403,8 @@ def start_proc(di, caps):
 	return proc
 
 
-for di, *caps in CAPS:
-	start_proc(di, caps)
+for n, (di, *caps) in enumerate(CAPS):
+	start_proc(di, caps, n=n)
 	time.sleep(1)
 try:
 	import time, orjson, base64, cpuinfo
@@ -465,7 +468,7 @@ try:
 		if os.name == "nt" and not globals().get("WMI"):
 			try:
 				import wmi
-				globals()["WMI"] = wmi.WMI()
+				globals()["WMI"] = WMI = wmi.WMI()
 			except:
 				print_exc()
 				globals()["WMI"] = False
@@ -554,6 +557,7 @@ try:
 				data=dict(
 					caps=orjson.dumps(caps),
 					stat=stat,
+					id="0",
 				),
 				verify=False,
 			)

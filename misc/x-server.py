@@ -265,6 +265,7 @@ error_map = {
 	PermissionError: 401,
 	InterruptedError: 403,
 	FileNotFoundError: 404,
+	UnicodeError: 406,
 	FileExistsError: 409,
 	AssertionError: 412,
 	OverflowError: 413,
@@ -535,31 +536,40 @@ class Server:
 	lfc = {}
 	@cp.expose(("fi",))
 	@hostmap
-	def fileinfo(self, path, **void):
+	def fileinfo(self, path, **kwargs):
 		cp.response.headers.update(SHEADERS)
 		d = self._fileinfo(path)
 		cp.response.headers["Content-Type"] = "application/json"
-		if d.get("chunks") and "Cf-Worker" in cp.request.headers:
+		if d.get("chunks") and ("Cf-Worker" in cp.request.headers or kwargs.get("cf")):
 			if path in self.lfc and utc() - self.lfc[path].get("t", 0) <= 80000:
 				d["chunks"] = self.lfc[path]["chunks"]
 			else:
-				chunks = []
+				chunkt = []
+				o_urls = []
+				chunkset = []
+				chunkmap = {}
 				for url in d["chunks"]:
 					if not url.startswith(API) or "/u/" not in url or "?S=" not in url:
-						chunks.append(url)
+						chunkt.append(url)
 						continue
 					id = url.rsplit("/", 1)[-1].split("?", 1)[0]
 					with tracebacksuppressor:
 						id = int.from_bytes(base64.urlsafe_b64decode(id + "=="), "big")
-					aurl = self.bot_exec(f"bot.renew_attachment({id})")
-					if int(url.rsplit("?S=", 1)[-1]) <= 25165824:
-						purl = "https://proxy.mizabot.xyz/proxy?S=" + url.rsplit("?S=", 1)[-1] + "&url=" + urllib.parse.quote_plus(aurl)
-					elif "?S=" not in aurl:
-						purl = aurl + "?S=" + url.rsplit("?S=", 1)[-1]
-					else:
-						purl = aurl
-					chunks.append(purl)
-				d["chunks"] = chunks
+					chunkset.append(id)
+					chunkt.append(id)
+					o_urls.append(url)
+				if chunkset:
+					a_urls = self.bot_exec(f"bot.renew_attachments({chunkset})")
+					print("CHUNKSET:", len(chunkset), len(a_urls))
+					for id, aurl, url in zip(chunkset, a_urls, o_urls):
+						if int(url.rsplit("?S=", 1)[-1]) <= 25165824:
+							purl = "https://proxy.mizabot.xyz/proxy?S=" + url.rsplit("?S=", 1)[-1] + "&url=" + urllib.parse.quote_plus(aurl)
+						elif "?S=" not in aurl:
+							purl = aurl + "?S=" + url.rsplit("?S=", 1)[-1]
+						else:
+							purl = aurl
+						chunkmap[id] = purl
+				d["chunks"] = chunks = [chunkmap.get(u, u) for u in chunkt]
 				self.lfc[path] = cdict(t=utc(), chunks=chunks)
 				print(ts_us(), chunks)
 		return orjson.dumps(d)
@@ -1686,21 +1696,18 @@ class Server:
 				pos = 0
 				g = cp.request.body.fp
 				urls = []
-				mids = []
 				while True:
 					b = g.read(csize)
 					if not b:
 						break
 					f.write(b)
 					if f.tell() > pos + csize:
-						url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)}, start={pos}, end={pos + csize})")
+						url1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)}, start={pos}, end={pos + csize})")
 						urls.extend(url1)
-						mids.extend(mid1)
 						pos += csize
 				if f.tell() > pos:
-					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)}, start={pos})")
+					url1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)}, start={pos})")
 					urls.extend(url1)
-					mids.extend(mid1)
 				size = os.path.getsize(fn)
 				mime = get_mime(fn)
 				fn = f"cache/{h}%!"
@@ -1712,7 +1719,7 @@ class Server:
 				url = ""
 				n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
 				key = n2p(n)
-				s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta/><!--["{name}","{size}","{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}--><!--MID={mids}--></html>'
+				s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta/><!--["{name}","{size}","{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}--></html>'
 				with open(fn, "w", encoding="utf-8") as f:
 					f.write(s)
 				return self.merge(name=name, index=1)
@@ -1730,8 +1737,8 @@ class Server:
 				if xi % 8 < 2 or xi // 8 * 8 + 7 >= ceil(mfs / csize):
 					fut.result()
 					f.close()
-					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)})")
-					self.chunking[fn] = (url1, mid1)
+					url1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)})")
+					self.chunking[fn] = url1
 					with suppress(PermissionError, FileNotFoundError):
 						os.remove(fn)
 				elif xi % 8 == 7:
@@ -1752,8 +1759,8 @@ class Server:
 						assert os.path.exists(ft)
 						fns.append(ft)
 					fns.append(fn)
-					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fns)})")
-					self.chunking[fn] = (url1, mid1)
+					url1 = self.bot_exec(f"bot.data.exec.stash({repr(fns)})")
+					self.chunking[fn] = url1
 					for ft in fns:
 						with suppress(PermissionError, FileNotFoundError):
 							os.remove(ft)
@@ -1772,7 +1779,7 @@ class Server:
 					fut.result()
 				self.update_merge()
 				return
-			shutil.copyfileobj(cp.request.body.fp, f, 65536)
+			shutil.copyfileobj(cp.request.body.fp, f, 262144 if mfs >= 1073741824 else 65536)
 
 	chunk_file = "cache/chunking.json"
 	try:
@@ -1855,7 +1862,6 @@ class Server:
 				size = mfs
 				tn = f"saves/filehost/{IND}{ts}~.forward${size}$ ${na2}.$"
 				urls = []
-				mids = []
 				mime = info.mime
 				for i in range(high):
 					gn = nh + str(i)
@@ -1863,19 +1869,17 @@ class Server:
 					if not fut:
 						if not os.path.exists(gn):
 							raise FileNotFoundError(gn)
-						url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(gn)})")
+						url1 = self.bot_exec(f"bot.data.exec.stash({repr(gn)})")
 						urls.extend(url1)
-						mids.extend(mid1)
 					elif isinstance(fut, (tuple, list)):
-						urls.extend(fut[0])
-						mids.extend(fut[1])
+						urls.extend(fut)
 				urls = [map_url(url) for url in urls]
 				code = 307
 				ftype = 3
 				jdn = json.dumps(name).replace("<", '"\u003c"').replace(">", '"\u003e"')
 				s = (
 					f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0;URL={url}"/>'
-					+ f'<!--[{jdn},{size},"{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}--><!--MID={json.dumps(mids)}-->'
+					+ f'<!--[{jdn},{size},"{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}-->'
 					+ f'<!--SHA=A-->'
 					+ '</html>'
 				)
@@ -2077,13 +2081,15 @@ class Server:
 			return ""
 		args = ["certutil", "-hashfile", fn, "sha384"]
 		print(args)
-		s = subprocess.check_output(args)
+		s = ""
 		try:
+			s = subprocess.check_output(args)
 			s = s.splitlines()[1].decode("ascii")
 			print(s)
 			return s
 		except:
-			print(s)
+			if s:
+				print(s)
 			print_exc()
 		return ""
 
@@ -2104,7 +2110,7 @@ class Server:
 			return
 		# if os.path.exists(fn) and not urls:
 		# 	return url + f"?key={key}"
-		ha1 = self.hash_file(of)
+		ha1 = ha2 = self.hash_file(of)
 		if ha1:
 			ha2 = ha1[:4] + ha1[-4:]
 			for fp in os.listdir("saves/filehost"):
@@ -2167,9 +2173,9 @@ class Server:
 			pass
 		elif size > 0:
 			self.register_replacer(ts, key)
-			urls, mids = self.bot_exec(f"bot.data.exec.stash({repr(of)})")
+			urls = self.bot_exec(f"bot.data.exec.stash({repr(of)})")
 			if not self.in_replacer(ts, key):
-				self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
+				self.bot_exec(f"bot.data.exec.delete({repr(urls)})")
 				return
 			print(urls)
 			assert urls
@@ -2181,7 +2187,7 @@ class Server:
 		jdn = json.dumps(name).replace("<", '"\u003c"').replace(">", '"\u003e"')
 		s = (
 			f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0;URL={url}"/>'
-			+ f'<!--[{jdn},{size},"{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}--><!--MID={json.dumps(mids)}-->'
+			+ f'<!--[{jdn},{size},"{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}-->'
 			+ (f'<!--SHA={ha1}-->' if ha1 else "")
 			+ '</html>'
 		)
@@ -2214,7 +2220,6 @@ class Server:
 				continue
 			info = orjson.loads(infd.removeprefix("<!--"))
 			urls = orjson.loads(urld.removeprefix("<!--").removeprefix("URL="))
-			mids = orjson.loads(midd.removeprefix("<!--").removeprefix("MID="))
 			while key.startswith("<!--KEY="):
 				key = key[8:]
 			urls = [remap_url(url) for url in urls]
@@ -2225,7 +2230,7 @@ class Server:
 			self.concat(pn, urls, name=info[0], mime=info[2], stn=stn, waiter=True).result()
 			if fp.count("$") >= 4:
 				continue
-			self.replace_file(pn, name=info[0], key=key, urls=urls, mids=mids)
+			self.replace_file(pn, name=info[0], key=key, urls=urls)
 
 	@cp.expose
 	@hostmap
@@ -2285,7 +2290,7 @@ class Server:
 		with self.replacer_sem:
 			with open("saves/filehost/-1.txt", "r", encoding="ascii") as f:
 				lines = f.readlines()
-		for line in lines:
+		for line in set(lines):
 			ts, key = line.rstrip().split(":", 1)
 			try:
 				fn = find_file(ts, cwd="cache", ind=IND)
@@ -2342,8 +2347,8 @@ class Server:
 		self.edited[ots] = True
 		try:
 			if not replaceable:
-				mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
-				self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
+				urls = orjson.loads(orig.split("<!--URL=", 1)[-1].split("-->", 1)[0])
+				self.bot_exec(f"bot.data.exec.delete({repr(urls)})")
 			kwargs["?ts"] = ots
 			kwargs["?key"] = key
 			url = self.merge(**kwargs)
@@ -2361,7 +2366,6 @@ class Server:
 		infd, urld, _k, midd, ext  = s.split("-->", 4)
 		# info = orjson.loads(infd.removeprefix("<!--"))
 		urls = orjson.loads(urld.removeprefix("<!--URL="))
-		mids = orjson.loads(midd.removeprefix("<!--MID="))
 		spl = ext.split("-->")
 		if len(spl) > 1:
 			ha1 = spl[0].removeprefix("<!--SHA=")
@@ -2384,10 +2388,9 @@ class Server:
 								f.write(s)
 								f.seek(0)
 								sn = f.read()
-								i = sn.index("<!--MID=") + len("<!--MID=")
+								i = sn.index("<!--SHA=") + len("<!--SHA=")
 								s = sn[i:].split("-->", 1)[-1]
 								f.seek(i)
-								f.write(json.dumps(mids, separators=(",", ":")))
 								f.write(f"<!--SHA={ha1}-->")
 								f.write(s)
 							else:
@@ -2427,8 +2430,8 @@ class Server:
 		else:
 			os.remove(p)
 		if not replaceable:
-			mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
-			self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
+			urls = orjson.loads(orig.split("<!--URL=", 1)[-1].split("-->", 1)[0])
+			self.bot_exec(f"bot.data.exec.delete({repr(urls)})")
 		cp.response.headers.update(HEADERS)
 		return """<!DOCTYPE html><html>
 <meta http-equiv="refresh" content="0;URL=/">
@@ -2647,7 +2650,7 @@ alert("File successfully deleted. Returning to home.");
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
-	def distribute(self, caps="[]", stat="{}", resp="{}", token=""):
+	def distribute(self, caps="[]", stat="{}", resp="{}", token="", id=""):
 		ip = true_ip()
 		at = AUTH.get("discord_token")
 		verified = int(at == token)
@@ -2680,7 +2683,8 @@ alert("File successfully deleted. Returning to home.");
 		caps = orjson.dumps(caps).decode("ascii")
 		stat = orjson.dumps(stat).decode("utf-8", "replace")
 		resp = repr(resp)
-		tasks, shards = self.bot_exec(f"(bot.distribute({caps},{stat},{resp},{repr(ip)}),len(bot.status_data.system['cpu']))")
+		idp = ip + "-" + id
+		tasks, shards = self.bot_exec(f"(bot.distribute({caps},{stat},{resp},{repr(idp)}),len(bot.status_data.system['cpu']))")
 		data = dict(tasks=tasks, next_delay=max(1, shards - 1))
 		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"

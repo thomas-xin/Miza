@@ -2448,13 +2448,13 @@ class UpdateDailies(Database):
 
 class Wallet(Command):
 	name = ["Level", "Bal", "Balance", "Trial"]
-	description = "Shows the target users' wallet, or enables a token-based trial of ⟨MIZA⟩'s premium features, where 1 💎 = 25000 quota."
-	usage = "<user>* <trial{?t}>?"
+	description = "Shows the target users' wallet."
+	usage = "<user>*"
 	flags = "t"
-	example = ("bal", "wallet @Miza", "trial <OpenAI API key>")
+	example = ("bal", "wallet @Miza")
 	rate_limit = (3, 4)
 	multi = True
-	slash = ("Wallet", "Trial")
+	slash = True
 
 	async def __call__(self, bot, name, flags, args, argv, argl, user, guild, channel, **void):
 		if name == "trial" or "t" in flags:

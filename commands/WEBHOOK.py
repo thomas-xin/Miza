@@ -184,7 +184,6 @@ class UpdateAutoEmojis(Database):
 				except LookupError:
 					m2 = None
 			if m2:
-				futs = deque()
 				ems = regexp("<a?:[A-Za-z0-9\\-~_]{1,32}").sub("", ems.replace(" ", "").replace("\\", "")).replace(">", ":")
 				possible = regexp(":[A-Za-z0-9\\-~_]{1,32}:|[^\\x00-\\x7F]").findall(ems)
 				s = ems
@@ -192,6 +191,7 @@ class UpdateAutoEmojis(Database):
 					s = s.replace(word, "")
 				if s.strip():
 					return
+				futs = deque()
 				possible = (n.strip(":") for n in possible)
 				for name in (n for n in possible if n):
 					emoji = None
@@ -222,16 +222,15 @@ class UpdateAutoEmojis(Database):
 						if type(emoji) is int:
 							e_id = await self.bot.id_from_message(emoji)
 							emoji = self.bot.cache.emojis.get(e_id)
-						futs.append(create_task(m2.add_reaction(emoji)))
+						futs.append(m2.add_reaction(emoji))
 						orig = self.bot.data.emojilists.setdefault(message.author.id, {})
 						if getattr(emoji, "id", None):
 							orig[name] = emoji.id
 							self.bot.data.emojilists.update(message.author.id)
 							self.bot.data.emojinames[emoji.id] = name
 				if futs:
-					futs.append(create_task(self.bot.silent_delete(message)))
-					for fut in futs:
-						await fut
+					futs.append(self.bot.silent_delete(message))
+					await asyncio.gather(*futs)
 					return
 		if message.content.count(":") < 2:
 			return

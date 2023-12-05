@@ -1084,6 +1084,31 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
 		return url
 
+	async def delete_attachment(self, url, m_id=None):
+		if isinstance(url, int):
+			a_id = url
+			tup = self.data.attachments.get(a_id)
+			if is_url(tup):
+				return tup
+			if not tup:
+				return False
+			c_id, m_id = tup
+		else:
+			c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
+			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+		if not m_id:
+			m_id = self.data.attachments.get(a_id)
+			if is_url(m_id):
+				return m_id
+			if isinstance(m_id, (tuple, list)):
+				c_id, m_id = m_id
+		if not m_id:
+			return False
+		channel = await self.fetch_channel(c_id)
+		message = await self.fetch_message(channel, m_id)
+		await self.silent_delete(message)
+		return True
+
 	async def renew_attachment(self, url, m_id=None):
 		if isinstance(url, int):
 			a_id = url
@@ -1125,6 +1150,20 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return str(attachment.url).rstrip("&")
 		# raise FileNotFoundError(f"Attachment {a_id} disappeared.")
 		return url.rstrip("&")
+
+	async def delete_attachments(self, aids=()):
+		futs = []
+		for a_id in aids:
+			fut = self.delete_attachment(a_id)
+			futs.append(fut)
+		return await asyncio.gather(*futs)
+
+	async def renew_attachments(self, aids=()):
+		futs = []
+		for a_id in aids:
+			fut = self.renew_attachment(a_id)
+			futs.append(fut)
+		return await asyncio.gather(*futs)
 
 	# Fetches a role from ID and guild, using the bot cache when possible.
 	async def fetch_role(self, r_id, guild=None):
@@ -1572,35 +1611,39 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return min_emoji(e)
 
 	llsem = Semaphore(2, 2, rate_limit=4)
+	together_sem = Semaphore(2, 2, rate_limit=0.5)
 	async def instruct(self, data, best=False, skip=True):
-		bot = BOT[0]
 		c = await tcount(data["prompt"])
 		if not best:
-			if c <= 2048 and data["max_tokens"] <= 2048 and not self.llsem.busy:
-				data["model"] = "emerhyst-20b"
-				data["stop"] = [f"### Instruction:", f"### Response:"]
-				try:
-					async with self.llsem:
-						await process_image(lambdassert, "$", (), cap="vr23", timeout=2)
-						return await process_image("EXL2", "$", [data, skip], cap="vr23", timeout=30)
-				except:
-					print_exc()
-					data["model"] = "gpt-3.5-turbo-instruct"
-			if AUTH.get("together_key"):
+			# if c <= 2048 and data["max_tokens"] <= 2048 and not self.llsem.busy:
+			# 	data["model"] = "emerhyst-20b"
+			# 	data["stop"] = [f"### Instruction:", f"### Response:"]
+			# 	try:
+			# 		async with self.llsem:
+			# 			await self.lambdassert("vr23")
+			# 			return await process_image("EXL2", "$", [data, skip], cap="vr23", timeout=30)
+			# 	except:
+			# 		print_exc()
+			# 		data["model"] = "gpt-3.5-turbo-instruct"
+			if AUTH.get("together_key") and not self.together_sem.busy:
 				import together
 				together.api_key = AUTH["together_key"]
-				rp = ((data["frequency_penalty"] + data["presence_penalty"]) / 4 + 1) ** (1 / log2(2 + c / 8))
+				rp = ((data.get("frequency_penalty", 0.25) + data.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
 				rdata = dict(
 					prompt=data["prompt"],
 					model="Gryphe/MythoMax-L2-13b",
-					temperature=data["temperature"] * 2 / 3,
-					top_p=data["top_p"],
+					temperature=data.get("temperature", 0.8) * 2 / 3,
+					top_p=data.get("top_p", 1),
 					repetition_penalty=rp,
-					max_tokens=data["max_tokens"],
+					max_tokens=data.get("max_tokens", 1024),
 				)
-				response = await asubmit(together.Complete.create, **rdata, timeout=60)
-				return response["output"]["choices"][0]["text"]
-		elif "instruct" not in data["model"]:
+				try:
+					async with self.together_sem:
+						response = await asubmit(together.Complete.create, **rdata, timeout=60)
+					return response["output"]["choices"][0]["text"]
+				except:
+					print_exc()
+		if "instruct" not in data["model"]:
 			prompt = data.pop("prompt")
 			data["messages"] = [dict(role="user", content=prompt)]
 			async with asyncio.timeout(70):
@@ -1631,30 +1674,31 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		fut = asubmit(self.ibv, url)
 		futs.append(fut)
 		prompts = []
-		res = None
-		try:
-			res = await process_image(url, "caption", ["-nogif", False], cap="caption", timeout=timeout)
-			p1, p2 = res
-		except:
-			if res:
-				print(res)
-			print_exc()
-			tup = None
-			with tracebacksuppressor:
-				text = await Request(
-					url,
-					decode=True,
-					aio=True,
-					ssl=False,
-				)
-				p1 = lim_str(text, 128)
+		if len(futs) < 3:
+			res = None
+			try:
+				res = await process_image(url, "caption", ["-nogif", False], cap="caption", timeout=timeout)
+				p1, p2 = res
+			except:
+				if res:
+					print(res)
+				print_exc()
+				tup = None
+				with tracebacksuppressor:
+					text = await Request(
+						url,
+						decode=True,
+						aio=True,
+						ssl=False,
+					)
+					p1 = lim_str(text, 128)
+					if p1:
+						prompts.append(p1)
+			else:
 				if p1:
 					prompts.append(p1)
-		else:
-			if p1:
-				prompts.append(p1)
-			if p2:
-				prompts.append(p2)
+				if p2:
+					prompts.append(p2)
 		nprompts = []
 		ts = utc()
 		for fut in futs:
@@ -1704,6 +1748,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				prompt=prompt,
 				model=model,
 				temperature=0.5,
+				top_p=0.9,
 				frequency_penalty=0,
 				presence_penalty=0,
 				max_tokens=256,
@@ -2960,7 +3005,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		self.total_hosted = size
 		return size
 
-	caps = {}
+	caps = set()
+	capfrom = Cache(timeout=60, trash=0)
 	last_pings = {}
 	compute_queue = {}
 	compute_wait = {}
@@ -2986,7 +3032,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				# print("TASK:", k, task, v)
 		tasks = []
 		for cap in caps:
-			self.caps[cap] = utc()
+			self.capfrom[(cap, ip)] = None
 			misc = self.compute_queue.get(cap)
 			if not misc:
 				continue
@@ -3003,11 +3049,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			self.compute_wait[i] = task
 			prompt = [i, task.cap, task.command, task.timeout]
 			prompts.append(prompt)
-		t = utc()
-		for k, v in tuple(self.caps.items()):
-			if t - v > 720:
-				self.caps.pop(k)
+		self.caps = set(c for c, i in self.capfrom)
 		return prompts
+
+	def worker_count(self, cap="image"):
+		return sum(c == cap for c, i in self.capfrom)
+
+	async def lambdassert(self, cap="image", timeout=2):
+		if cap not in self.caps:
+			raise NotImplementedError(f"Capability {cap} required.")
+		await process_image(lambdassert, "$", (), cap=cap, timeout=timeout)
+		return sum(c == cap for c, i in self.capfrom)
 
 	async def get_current_stats(self):
 		global WMI
@@ -3464,10 +3516,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			das = deque()
 			for u in self.data.values():
 				if not xrand(5) and not u._garbage_semaphore.busy:
-					futs.append(create_task(self.garbage_collect(u)))
+					futs.append(self.garbage_collect(u))
 					das.append(u)
-			for fut in futs:
-				await_fut(fut)
+			await_fut(asyncio.gather(*futs))
 			for u in das:
 				u.vacuum()
 
@@ -4013,18 +4064,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 									futs = deque()
 									for r in response:
 										async with Delay(1 / 3):
-											futs.append(create_task(channel.send(r)))
-									for fut in futs:
-										await fut
+											futs.append(channel.send(r))
+									await asyncio.gather(*futs)
 								elif type(response) is alist:
 									m = guild.me
 									futs = deque()
 									for r in response:
 										async with Delay(1 / 3):
 											url = await self.get_proxy_url(m)
-											futs.append(create_task(self.send_as_webhook(channel, r, username=m.display_name, avatar_url=url)))
-									for fut in futs:
-										await fut
+											futs.append(self.send_as_webhook(channel, r, username=m.display_name, avatar_url=url))
+									await asyncio.gather(*futs)
 								# Process dict as kwargs for a message send
 								elif isinstance(response, collections.abc.Mapping):
 									if "file" in response:
@@ -5525,9 +5574,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			for index in reversed(removed):
 				del self._dispatch_listeners[index]
 
-		discord.gateway.DiscordWebSocket.received_message = lambda self, msg: received_message(self, msg)
+		discord.gateway.DiscordWebSocket.received_message = received_message
 
-		def _get_guild_channel(self, data):
+		def _get_guild_channel(self, data, g_id=None):
 			channel_id = int(data["channel_id"])
 			try:
 				channel = bot.cache.channels[channel_id]
@@ -5536,7 +5585,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			else:
 				return channel, getattr(channel, "guild", None)
 			try:
-				guild = self._get_guild(int(data["guild_id"]))
+				guild = self._get_guild(int(g_id or data["guild_id"]))
 			except KeyError:
 				channel = discord.DMChannel._from_message(self, channel_id)
 				guild = None
@@ -5544,7 +5593,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				channel = guild and guild._resolve_channel(channel_id)
 			return channel or discord.PartialMessageable(state=self, id=channel_id), guild
 
-		discord.state.ConnectionState._get_guild_channel = lambda self, data: _get_guild_channel(self, data)
+		discord.state.ConnectionState._get_guild_channel = _get_guild_channel
 
 		async def get_gateway(self, *, encoding="json", zlib=True):
 			try:
@@ -5556,7 +5605,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				value += "&compress=zlib-stream"
 			return value.format(data["url"], encoding)
 
-		discord.http.HTTPClient.get_gateway = lambda self, *args, **kwargs: get_gateway(self, *args, **kwargs)
+		discord.http.HTTPClient.get_gateway = get_gateway
 
 		async def history(self, limit=100, before=None, after=None, around=None, oldest_first=None):
 			if not getattr(self, "channel", None):
@@ -5674,7 +5723,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					# There's no data left after this
 					break
 
-		discord.abc.Messageable.history = lambda self, *args, **kwargs: history(self, *args, **kwargs)
+		discord.abc.Messageable.history = history
 
 		def parse_message_reaction_add(self, data):
 			emoji = data["emoji"]
@@ -5691,7 +5740,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			self.dispatch("raw_reaction_add", raw)
 			create_task(bot.reaction_add(raw, data))
 
-		discord.state.ConnectionState.parse_message_reaction_add = lambda self, data: parse_message_reaction_add(self, data)
+		discord.state.ConnectionState.parse_message_reaction_add = parse_message_reaction_add
 
 		def parse_message_reaction_remove(self, data):
 			emoji = data["emoji"]
@@ -5701,16 +5750,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			self.dispatch("raw_reaction_remove", raw)
 			create_task(bot.reaction_remove(raw, data))
 
-		discord.state.ConnectionState.parse_message_reaction_remove = lambda self, data: parse_message_reaction_remove(self, data)
+		discord.state.ConnectionState.parse_message_reaction_remove = parse_message_reaction_remove
 
 		def parse_message_reaction_remove_all(self, data):
 			raw = discord.RawReactionClearEvent(data)
 			self.dispatch("raw_reaction_clear", raw)
 			create_task(bot.reaction_clear(raw, data))
 		
-		discord.state.ConnectionState.parse_message_reaction_remove_all = lambda self, data: parse_message_reaction_remove_all(self, data)
+		discord.state.ConnectionState.parse_message_reaction_remove_all = parse_message_reaction_remove_all
 
-		def parse_message_create(self, data):
+		def parse_message_create(self, data, *_):
 			message = bot.ExtendedMessage.new(data)
 			self.dispatch("message", message)
 			if self._messages is not None:
@@ -5724,15 +5773,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				except AttributeError:
 					pass
 
-		discord.state.ConnectionState.parse_message_create = lambda self, data, *void: parse_message_create(self, data)
+		discord.state.ConnectionState.parse_message_create = parse_message_create
 
-		def create_message(self, channel, data):
-			if not isinstance(data, dict):
+		def create_message(self, *, channel, data=None):
+			try:
+				data["channel_id"] = channel.id
+			except:
 				print("CREATE_MESSAGE:", data)
-			data["channel_id"] = channel.id
+				raise
 			return bot.ExtendedMessage.new(data)
 
-		discord.state.ConnectionState.create_message = lambda self, *, channel, data: create_message(self, channel, data)
+		discord.state.ConnectionState.create_message = create_message
 
 		@property
 		def cached_message(self):

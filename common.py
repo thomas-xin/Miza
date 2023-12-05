@@ -1463,6 +1463,9 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 					fields.pop("reference")
 					return await channel.send(content, **fields)
 				raise
+			except aiohttp.client_exceptions.ClientOSError:
+				await asyncio.sleep(2)
+				return await channel.send(content, **fields)
 		try:
 			sem = REPLY_SEM[channel.id]
 		except KeyError:
@@ -2562,7 +2565,7 @@ async def proc_distribute(proc):
 					exc = ex
 				else:
 					proc.fut = Future()
-				tasks = bot.distribute(proc.caps, {}, {})
+				tasks = bot.distribute(proc.caps, {}, {}, ip=f"127.0.0.1-{proc.n}")
 				if not tasks:
 					await asyncio.sleep(1 / 6)
 					continue
@@ -2638,7 +2641,7 @@ async def proc_distribute(proc):
 					caps = ()
 				else:
 					caps = proc.caps
-				tasks = bot.distribute(caps, {}, resps)
+				tasks = bot.distribute(caps, {}, resps, ip=f"127.0.0.1-{proc.n}")
 				resps.clear()
 		await asyncio.sleep(0.01)
 
@@ -2730,7 +2733,7 @@ FIRST_LOAD = True
 # summ			GPU >200k, VRAM >4GB			GTX970, M60, GTX1050ti, P4, GTX1630
 # sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
 # sdxl			GPU >400k, VRAM >9GB			GTX1080ti, RTX2080ti, RTX3060, RTX3080, A2000
-# sdxlr			GPU >400k, VRAM >11GB			V100, RTX3090, A4000, RTX4080, L4
+# sdxlr			GPU >400k, VRAM >19GB			V100, RTX3090, A5000, RTX4090, L4
 # exl2			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
 def spec2cap():
 	global FIRST_LOAD
@@ -2824,14 +2827,15 @@ def spec2cap():
 		if c > 100000 and v > 3 * 1073741824 and ffmpeg:
 			caps.append("video")
 			caps.append("ecdc")
-		if c > 400000 and v > 15 * 1073741824:
+		if c > 400000 and v > 19 * 1073741824:
 			caps.append("sdxlr")
 			caps.append("sdxl")
 			# done.append("sdxlr")
 			done.append("sdxl")
 			v -= 15 * 1073741824
-		elif c > 400000 and IS_MAIN and vrams[i] > 15 * 1073741824:
+		elif c > 400000 and IS_MAIN and vrams[i] > 19 * 1073741824:
 			caps.append("sdxlr")
+			caps.append("sdxl")
 			caps.append("nvram")
 			# done.append("sdxlr")
 			v -= 15 * 1073741824
@@ -3256,6 +3260,10 @@ async_nop = lambda *args, **kwargs: emptyfut
 async def delayed_coro(fut, duration=None):
 	async with Delay(duration):
 		return await fut
+
+async def waited_coro(fut, duration=None):
+	await asyncio.sleep(duration)
+	return await fut
 
 async def traceback_coro(fut, *args):
 	with tracebacksuppressor(*args):
@@ -4454,6 +4462,66 @@ async def tik_decode_a(t, encoding="cl100k_base"):
 async def tcount(s, model="gpt-3.5-turbo"):
 	enc = await tik_encode_a(s, encoding=model)
 	return len(enc)
+
+
+class Cache(cdict):
+	__slots__ = ("timeout", "tmap", "soonest", "sooning", "lost", "trash")
+
+	def __init__(self, *args, timeout=60, trash=8, **kwargs):
+		super().__init__(*args, **kwargs)
+		tmap = {}
+		object.__setattr__(self, "tmap", tmap)
+		object.__setattr__(self, "timeout", timeout)
+		object.__setattr__(self, "lost", {})
+		object.__setattr__(self, "trash", trash)
+		if self:
+			ts = utc() + timeout
+			for k in self:
+				tmap[k] = ts
+			object.__setattr__(self, "soonest", ts)
+			fut = create_task(waited_coro(self._update(), timeout))
+			object.__setattr__(self, "sooning", fut)
+		else:
+			object.__setattr__(self, "soonest", inf)
+			object.__setattr__(self, "sooning", None)
+
+	async def _update(self):
+		tmap = self.tmap
+		timeout = self.timeout
+		lost = self.lost
+		t = utc()
+		for k in sorted(tmap, key=tmap.__getitem__):
+			if t <= tmap[k] + timeout:
+				ts = tmap[k] + timeout
+				object.__setattr__(self, "soonest", ts)
+				fut = create_task(waited_coro(self._update(), ts - t))
+				object.__setattr__(self, "sooning", fut)
+				break
+			tmap.pop(k)
+			if self.trash > 0:
+				while len(lost) > self.trash:
+					with suppress(KeyError, RuntimeError):
+						lost.pop(next(iter(lost)))
+				lost[k] = super().pop(k)
+		else:
+			object.__setattr__(self, "soonest", inf)
+		return self
+
+	def __setitem__(self, k, v):
+		super().__setitem__(k, v)
+		timeout = self.timeout
+		t = utc()
+		ts = t + timeout
+		if ts < self.soonest:
+			object.__setattr__(self, "soonest", ts)
+			fut = create_task(waited_coro(self._update(), timeout))
+			sooning = self.sooning
+			if sooning:
+				sooning.cancel()
+			object.__setattr__(self, "sooning", fut)
+		self.tmap[k] = ts
+
+	retrieve = lambda self, k: self.lost.pop(k)
 
 
 __filetrans = {

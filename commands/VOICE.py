@@ -207,9 +207,8 @@ async def disconnect_members(bot, guild, members, channel=None):
 		with suppress(KeyError):
 			auds = bot.data.audio.players[guild.id]
 			await asubmit(auds.kill)
-	futs = [create_task(member.move_to(None)) for member in members]
-	for fut in futs:
-		await fut
+	futs = (member.move_to(None) for member in members)
+	await asyncio.gather(*futs)
 
 
 # Checks if the user is alone in voice chat (excluding bots).
@@ -1352,7 +1351,7 @@ class AudioDownloader:
 		self.lastclear = 0
 		self.downloading = cdict()
 		self.cache = cdict()
-		self.searched = cdict()
+		self.searched = Cache(timeout=3600, trash=256)
 		self.semaphore = Semaphore(4, 128)
 		self.download_sem = Semaphore(16, 64, rate_limit=0.5)
 		esubmit(self.update_dl)
@@ -1392,12 +1391,13 @@ class AudioDownloader:
 			self.spotify_header = {"authorization": f"Bearer {orjson.loads(token[:512])['accessToken']}"}
 			self.other_x += 1
 
-	ytd_blocked = {}
+	ytd_blocked = Cache(timeout=3600)
 	backup_sem = Semaphore(2, 256, rate_limit=1)
 	# Gets data from yt-download.org, and adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
 	def extract_backup(self, url, video=False):
-		if utc() - self.ytd_blocked.get(url, (0,))[0] < 3600:
-			raise self.ytd_blocked[url][1]
+		if url in self.ytd_blocked:
+			raise self.ytd_blocked[url]
+		entry = None
 		ourl = url
 		try:
 			with self.backup_sem:
@@ -1457,7 +1457,9 @@ class AudioDownloader:
 					)
 			print("Successfully resolved with yt-download.")
 		except Exception as ex:
-			self.ytd_blocked[ourl] = (utc(), ex)
+			self.ytd_blocked[ourl] = ex
+			if not entry:
+				raise
 		return entry
 
 	# Returns part of a spotify playlist.
@@ -2480,16 +2482,20 @@ class AudioDownloader:
 				items = await_fut(self.bot.follow_url(item, images=images))
 				if items:
 					item = items[0]
-		if mode is None and count == 1 and item in self.searched:
-			if utc() - self.searched[item].t < 180:
-				return self.searched[item].data
+		if mode is None and count == 1:
+			try:
+				return self.searched[item]
+			except KeyError:
+				pass
+			try:
+				output = self.searched.retrieve(item)
+			except KeyError:
+				pass
 			else:
-				self.searched.pop(item)
-		while len(self.searched) > 262144:
-			self.searched.pop(next(iter(self.searched)))
+				esubmit(self.search, item, force=force, mode=mode, images=images, count=count)
+				return output
 		with self.semaphore:
 			try:
-				obj = cdict(t=utc())
 				output = None
 				remote = AUTH.get("remote-servers", ())
 				if 0 and remote:
@@ -2500,9 +2506,7 @@ class AudioDownloader:
 						output = [cdict(e) for e in resp.json()]
 				if not output:
 					output = self.extract(item, force, mode=mode, count=count)
-				obj.data = output
-				if obj.data and len(obj.data) < 16384:
-					self.searched[item] = obj
+				self.searched[item] = output
 				return output
 			except Exception as ex:
 				print_exc()
@@ -2515,7 +2519,7 @@ class AudioDownloader:
 		if not entry.get("url"):
 			raise FileNotFoundError
 		try:
-			entry.update(self.searched[entry["url"]][0]["data"])
+			entry.update(self.searched[entry["url"]][0])
 		except KeyError:
 			pass
 		if video:
@@ -2627,14 +2631,9 @@ class AudioDownloader:
 				entry["duration"] = get_duration(stream)
 			# print(entry.url, entry.duration)
 			if entry["url"] not in self.searched:
-				self.searched[entry["url"]] = cdict(
-					t=utc(),
-					data=[cdict(entry)],
-				)
+				self.searched[entry["url"]] = [cdict(entry)]
 			else:
-				with suppress(KeyError):
-					self.searched[entry["url"]]["duration"] = entry["duration"]
-			self.searched[entry["url"]].data[0].update(entry)
+				self.searched[entry["url"]][0].update(entry)
 			if not download:
 				return entry
 			self.cache[fn] = f = AudioFileLink(fn)
@@ -3362,15 +3361,10 @@ class AudioDownloader:
 		item = i.url
 		if not force:
 			if item in self.searched and not item.startswith("ytsearch:"):
-				if utc() - self.searched[item].t < 60:
-					it = self.searched[item].data[0]
-					i.update(it)
-					if i.get("stream") not in (None, "none"):
-						return True
-				else:
-					self.searched.pop(item, None)
-			while len(self.searched) > 262144:
-				self.searched.pop(next(iter(self.searched)))
+				it = self.searched[item][0]
+				i.update(it)
+				if i.get("stream") not in (None, "none"):
+					return True
 		with self.semaphore:
 			try:
 				data = self.extract_true(item)
@@ -3380,8 +3374,7 @@ class AudioDownloader:
 					data = data[0]
 				if data.get("research"):
 					data = self.extract_true(data["url"])[0]
-				obj = cdict(t=utc())
-				obj.data = out = [cdict(
+				out = [cdict(
 					name=data.get("title") or data.get("name"),
 					url=data.get("webpage_url") or data.get("url"),
 					stream=data.get("stream") or get_best_audio(data),
@@ -3392,7 +3385,7 @@ class AudioDownloader:
 					out[0].duration = data["duration"]
 				except KeyError:
 					pass
-				self.searched[item] = obj
+				self.searched[item] = out
 				it = out[0]
 				i.update(it)
 			except Exception as ex:

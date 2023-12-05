@@ -12,7 +12,7 @@ class Reload(Command):
 	example = ("reload admin", "unload string")
 	_timeout_ = inf
 
-	async def __call__(self, bot, message, channel, guild, argv, name, **void):
+	async def __call__(self, bot, message, channel, argv, name, **void):
 		mod = full_prune(argv)
 		_mod = mod.upper()
 		if mod:
@@ -124,9 +124,7 @@ class Restart(Command):
 					PRINT.close(force=True)
 				with tracebacksuppressor:
 					await asubmit(retry, os.remove, "log.txt", attempts=8, delay=0.1)
-				for fut in futs:
-					with suppress():
-						await fut
+				await asyncio.gather(*futs, return_exceptions=True)
 				await kill
 				await save
 		if name.casefold() == "shutdown":
@@ -223,9 +221,8 @@ class Execute(Command):
 				fake_message.author = g.get_member(u.id) or u
 			else:
 				fake_message.author = u
-			futs.append(create_task(bot.process_message(fake_message, argv, min_perm=perm)))
-		for fut in futs:
-			await fut
+			futs.append(bot.process_message(fake_message, argv, min_perm=perm))
+		await asyncio.gather(*futs)
 
 
 class Exec(Command):
@@ -247,7 +244,7 @@ class Exec(Command):
 		chat=64,
 	))
 
-	def __call__(self, bot, flags, argv, message, channel, guild, **void):
+	def __call__(self, bot, flags, argv, message, channel, **void):
 		if not argv:
 			argv = 0
 		try:
@@ -573,12 +570,11 @@ class UpdateExec(Database):
 		return out if len(out) > 1 else out[0]
 
 	hmac_sem = Semaphore(5, 1, rate_limit=5)
-	async def stash(self, fn, start=0, end=inf, filename=None):
+	async def stash(self, fn, start=0, end=inf, filename=None, dont=False):
 		bot = self.bot
 		fns = [fn] if isinstance(fn, (str, bytes, memoryview, io.BytesIO, discord.File)) else fn
 		print("Stash", lim_str(str(fns), 256), start, end, filename)
 		urls = []
-		mids = []
 		with FileStreamer(*fns) as f:
 			fn = f.filename or "untitled"
 			i = start
@@ -591,7 +587,7 @@ class UpdateExec(Database):
 							b = await asubmit(f.read, 503316480)
 							if not b:
 								break
-							if len(b) <= 100663296:
+							if len(b) <= 100663296 or dont:
 								raise StopIteration(f"Skipping small chunk {len(b)}")
 							fn2 = filename or "c.7z"
 							resp = await asubmit(
@@ -607,7 +603,8 @@ class UpdateExec(Database):
 							)
 							resp.raise_for_status()
 							url = resp.json()["url"].split("?", 1)[0]
-					except StopIteration:
+					except StopIteration as ex:
+						print(repr(ex))
 						if not b:
 							print_exc()
 							f.seek(i)
@@ -620,33 +617,49 @@ class UpdateExec(Database):
 						i = f.tell()
 						continue
 				with tracebacksuppressor:
+					chunkf = []
 					fs = []
 					sizes = []
 					fn2 = filename or "c.b"
 					if b:
-						n = 0
-						while n < len(b):
-							bi = b[n:n + 25165824]
+						bm = memoryview(b)
+						if len(bm) > 25165824 * 8:
+							bm = bm[:25165824 * 8]
+						for n in range(0, len(bm), 25165824):
+							bi = bm[n:n + 25165824]
+							chunkf.append(bi)
 							fi = CompatFile(bi, filename=fn2)
 							fs.append(fi)
 							sizes.append(len(bi))
-							n += 25165824
-						f.seek(i + len(b))
-					else:
-						while len(fs) < 8:
-							b = await asubmit(f.read, 25165824)
-							if not b:
-								break
-							fi = CompatFile(b, filename=fn2)
-							fs.append(fi)
-							sizes.append(len(b))
+						f.seek(i + len(bm))
+					while len(fs) < 8:
+						b = await asubmit(f.read, 25165824)
+						if not b:
+							break
+						chunkf.append(b)
+						fi = CompatFile(b, filename=fn2)
+						fs.append(fi)
+						sizes.append(len(b))
 					if not fs:
 						break
 					c_id = choice([c_id for c_id, flag in self.data.items() if flag & 16])
 					channel = await bot.fetch_channel(c_id)
-					m = channel.guild.me
-					message = await channel.send(f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs)
-					# message = await bot.send_as_webhook(channel, f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
+					fstr = f"{fn.rsplit('/', 1)[-1]} ({i})"
+					try:
+						message = await channel.send(fstr, files=fs)
+					except:
+						print(channel, c_id)
+						print(sizes)
+						print_exc()
+						await asyncio.sleep(10)
+						try:
+							message = await channel.send(fstr, files=[CompatFile(b, filename=fn2) for b in chunkf])
+						except:
+							print_exc()
+							f.seek(i)
+							await asyncio.sleep(20)
+							continue
+					# message = await bot.send_as_webhook(channel, fstr, files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
 					for a, bs in zip(message.attachments, sizes):
 						u = self.bot.preserve_attachment(a.id) + "?S=" + str(bs)
 						urls.append(u)
@@ -654,16 +667,16 @@ class UpdateExec(Database):
 						# u += "?" if "?" not in u else "&"
 						# u += "size=" + str(bs) + "&mid=" + str(message.id)
 						# urls.append(u)
-					mids.append(message.id)
+					# mids.append(message.id)
 					i = f.tell()
 				await asyncio.sleep(0.25)
-		print(urls, mids)
+		print(urls)
 		esubmit(bot.clear_cache, priority=True)
-		return urls, mids
+		return urls
 
 	async def delete(self, mids):
 		bot = self.bot
-		print("Delete", mids)
+		print("Delete:", mids)
 		cids = [c_id for c_id, flag in self.data.items() if flag & 16]
 		channels = []
 		for cid in cids:
@@ -688,6 +701,8 @@ class UpdateExec(Database):
 		return deleted
 
 	async def uproxy(self, *urls, collapse=True, force=False):
+		if urls == ("https://cdn.discordapp.com/embed/avatars/0.png",):
+			return urls
 		out = [None] * len(urls)
 		files = [None] * len(urls)
 		sendable = [c_id for c_id, flag in self.data.items() if flag & 16]

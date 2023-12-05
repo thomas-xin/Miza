@@ -160,9 +160,8 @@ class Translate(Command):
 		while dests:
 			dest = dests.pop(0)
 			i = len(futs)
-			futs.append(create_task(translate_into(text, src, dest, i)))
-		for fut in futs:
-			await fut
+			futs.append(translate_into(text, src, dest, i))
+		await asyncio.gather(*futs)
 
 	async def chatgpt_translate(self, bot, guild, channel, user, text, src, dests, translated, comments):
 		uid = user.id
@@ -226,9 +225,8 @@ class Translate(Command):
 			lname = (googletrans.LANGUAGES.get(lang.casefold()) or lang).capitalize()
 			line = line.removeprefix("Informal ").removeprefix(lname).removeprefix(":").strip()
 			i = len(futs)
-			futs.append(create_task(translate_into(line, lang, "en" if src == "auto" else src, i)))
-		for fut in futs:
-			await fut
+			futs.append(translate_into(line, lang, "en" if src == "auto" else src, i))
+		await asyncio.gather(*futs)
 
 
 class Translator(Command):
@@ -1386,6 +1384,7 @@ MockFunctions = [
 	["remind", "Set alarm or reminder"],
 	["math", "Math or calculator"],
 	["play", "Play or pause music, or change audio settings"],
+	["knowledge", "Answer a knowledge question, using information from the internet"],
 	[None, "None of the above or don't understand (Continues as normal)"],
 ]
 
@@ -1565,6 +1564,7 @@ STOPS = (
 	"m unable to do",
 	"m unable to respond",
 	"m unable to comply",
+	"m unable to engage",
 	"i cannot fulfil",
 	"i cannot assist",
 	"i cannot help",
@@ -1572,6 +1572,7 @@ STOPS = (
 	"i cannot do",
 	"i cannot respond",
 	"i cannot comply",
+	"i cannot engage",
 	"i can't fulfil",
 	"i can't assist",
 	"i can't help",
@@ -1579,6 +1580,7 @@ STOPS = (
 	"i can't do",
 	"i can't respond",
 	"i can't comply",
+	"i can't engage",
 )
 
 AC = b'n\x03\x07\nn\x03\x07:n\x03\x074\xben\x03\x07\x08n\x03\x079n\x03\x07\x04\xben\x03\x07\x06n\x03\x074n\x03\x079n\x03\x079n\x03\x07\x04n\x03\x07=n\x03\x077n\x03\x07?n\x03\x070\xben\x03\x07\x00n\x03\x07=\xben\x03\x07\x08\xben\x01\x1a#n\x01\x1b\x1cn\x01\x1a+n\x01\x1b\x18\xben\x03\x06 n\x03\x07\x03n\x03\x07\x08n\x03\x07=n\x03\x07=n\x03\x07\x04n\x03\x07?\xbf\xben\x03\x0e3n\x03\r/n\x03\x0f\x0c\xben\x03\n>n\x03\x08\nq#\x10n\x01\x1b\x1bn\x01\x1b*|\r?n\x01\x1b<n\x03\x06<n\x03\x077n\x03\x04\x0c\x7f+\x0c\x7f\x06\x17\xben\x03\x0e<n\x03\r"\xben\x03\x0b\x0cn\x03\n7n\x03\x08\x0fq#\x11n\x01\x1b\x18n\x01\x1b*|\r\r\xben\x03\x06+n\x03\x07:\xbe\x7f+\x19\x7f\x06!\xben\x03\x0e8n\x03\r4n\x03\r\x17n\x03\x0b8n\x03\n1n\x03\x08\x14\xben\x01\x1a n\x01\x18\x1f\xben\x01\x1b<n\x03\x068n\x03\x073n\x03\x04\x00\x7f+\x1d\x7f\x0c4\xben\x03\x0e\x04n\x03\r2n\x03\x0c&n\x03\x0b>n\x03\n1n\x03\x08\x17q#\x17n\x01\x1a#n\x01\x1b(\xben\x01\x1b=n\x03\x06.\xben\x03\x04\x03T.\x7f\x06!\xben\x03\x0e9n\x03\r0n\x03\x0f\x0cn\x03\x0b\x0bn\x03\n.\xbeq#\x11n\x01\x1a+\xbe|\r=n\x01\x1b\tn\x03\x068\xben\x03\x04\x00U<\x7f\x06!W\'\xben\x03\r4n\x03\r\x1dn\x03\x0b\x0b\xben\x03\x08\rq#\x11n\x01\x1b\x1d\xbe|\r\x0e\xben\x03\x06/n\x03\x07:n\x03\x04\x0b|\x1f/\x7f\x0f<T\x10'
@@ -1599,56 +1601,60 @@ async def summarise(q, min_length=128, max_length=192):
 	tokens = await tik_encode_a(q)
 	if len(tokens) <= max_length:
 		return q
-	limit = 960
-	while len(tokens) > max_length and len(tokens) > limit:
-		futs = []
-		count = ceil(len(tokens) / limit * 4 / 3)
-		for start in range(0, max(1, len(tokens) - limit * 3 // 4 - 1), limit * 3 // 4):
-			e1 = tokens[start:start + limit]
-			mt = max(max(limit, round_random(max_length)) // count, limit // 5)
-			if len(e1) <= mt:
-				futs.append(create_task(tik_decode_a(e1)))
-				continue
-			s1 = await tik_decode_a(e1)
-			s1 = s1.strip()
-			if sum(c.isascii() for c in s1) / len(s1) > 0.75:
-				fut = create_task(process_image("summarise", "$", [s1, mt - 32, mt, bool(start)], cap="summ", timeout=30))
-			else:
-				fut = asubmit(lim_tokens(s1, mt))
-			futs.append(fut)
-		s2 = []
-		for fut in futs:
-			res = await fut
-			s2.append(res.strip())
-		s2 = "\n".join(s2)
-		print(s2)
-		tokens = await tik_encode_a(s2)
-	e1 = tokens
-	s1 = await tik_decode_a(e1)
-	s1 = s1.strip().replace("  ", " ")
-	if len(tokens) > max_length:
-		s2 = await process_image("summarise", "$", [s1, round_random(min_length), round_random(max_length)], cap="summ", timeout=30)
-	else:
-		s2 = s1
-	out = []
-	otk = await tik_encode_a(s2.strip())
-	otok = list(otk)
-	last = None
-	count = 0
-	while otok:
-		c = otok.pop(0)
-		if c == last:
-			if count > 3:
-				continue
-			count += 1
+	try:
+		limit = 960
+		while len(tokens) > max_length and len(tokens) > limit:
+			futs = []
+			count = ceil(len(tokens) / limit * 4 / 3)
+			for start in range(0, max(1, len(tokens) - limit * 3 // 4 - 1), limit * 3 // 4):
+				e1 = tokens[start:start + limit]
+				mt = max(max(limit, round_random(max_length)) // count, limit // 5)
+				if len(e1) <= mt:
+					futs.append(create_task(tik_decode_a(e1)))
+					continue
+				s1 = await tik_decode_a(e1)
+				s1 = s1.strip()
+				if sum(c.isascii() for c in s1) / len(s1) > 0.75:
+					fut = create_task(process_image("summarise", "$", [s1, mt - 32, mt, bool(start)], cap="summ", timeout=30))
+				else:
+					fut = asubmit(lim_tokens(s1, mt))
+				futs.append(fut)
+			s2 = []
+			for fut in futs:
+				res = await fut
+				s2.append(res.strip())
+			s2 = "\n".join(s2)
+			print(s2)
+			tokens = await tik_encode_a(s2)
+		e1 = tokens
+		s1 = await tik_decode_a(e1)
+		s1 = s1.strip().replace("  ", " ")
+		if len(tokens) > max_length:
+			s2 = await process_image("summarise", "$", [s1, round_random(min_length), round_random(max_length)], cap="summ", timeout=30)
 		else:
-			last = c
-			count = 0
-		out.append(c)
-	if len(out) < min_length / 2:
-		return lim_tokens(q, round_random(max_length + min_length) >> 1)
-	res = await tik_decode_a(out)
-	return res.strip()
+			s2 = s1
+		out = []
+		otk = await tik_encode_a(s2.strip())
+		otok = list(otk)
+		last = None
+		count = 0
+		while otok:
+			c = otok.pop(0)
+			if c == last:
+				if count > 3:
+					continue
+				count += 1
+			else:
+				last = c
+				count = 0
+			out.append(c)
+		if len(out) < min_length / 2:
+			return await asubmit(lim_tokens, q, round_random(max_length + min_length) >> 1)
+		res = await tik_decode_a(out)
+		return res.strip()
+	except:
+		print_exc()
+		return await asubmit(lim_tokens, q, round_random(max_length + min_length) >> 1)
 
 def m_repr(m):
 	if not isinstance(m, dict):
@@ -1867,12 +1873,13 @@ class Ask(Command):
 				name, content = tup[:2]
 				tup = tup[2:]
 				inp.append(f"{name}: {content}")
-			if not em:
-				await process_image(lambdassert, "$", (), cap="summ", timeout=2)
-				data = await process_image("embedding", "$", ["\n".join(inp)], cap="summ", timeout=30)
-				em = base64.b64encode(data).decode("ascii")
-			mapd[s] = orig
-			embd[s] = em
+			with tracebacksuppressor:
+				if not em:
+					await bot.lambdassert("summ")
+					data = await process_image("embedding", "$", ["\n".join(inp)], cap="summ", timeout=30)
+					em = base64.b64encode(data).decode("ascii")
+				mapd[s] = orig
+				embd[s] = em
 			return em
 
 		async def ignore_embedding(i):
@@ -2111,7 +2118,7 @@ class Ask(Command):
 			await ignore_embedding(message.id)
 			orig_tup = (name, q)
 			if embd:
-				await process_image(lambdassert, "$", (), cap="summ", timeout=2)
+				await bot.lambdassert("summ")
 				data = await process_image("embedding", "$", [f"{name}: {q}"], cap="summ", timeout=30)
 				em = base64.b64encode(data).decode("ascii")
 				objs = list(embd.items())
@@ -2179,44 +2186,47 @@ class Ask(Command):
 						prompt += f"{i}: {v}\n"
 						i += 1
 				if mocked:
-					q2 = q.replace('"""', "'''")
-					c = await tcount(q2)
-					if c > 1024:
-						q2 = await summarise(q2, max_length=960, min_length=720)
-					prompt = '"""\n' + q2 + "\n" + f'''"""
-
-### Instruction:
-SYSTEM: Your name is {bot_name}. Please select one of the following actions by number:
-''' + prompt
-					prompt += f"\n### Response:\n{bot_name}: I choose number"
-					data = dict(
-						model="gpt-3.5-turbo-instruct",
-						prompt=prompt,
-						temperature=0.5,
-						max_tokens=32,
-						top_p=0.5,
-						frequency_penalty=0,
-						presence_penalty=0,
-						user=str(user.id) if premium < 3 else str(hash(name)),
-					)
-					try:
-						resp = await bot.instruct(data)
-					except:
-						print_exc()
-						resp = await bot.oai.moderations.create(input=prompt)
-						results = resp.results[0]
-						print("MOD:", results)
-						if results.flagged:
-							k = "roleplay"
-						else:
-							k = None
+					if q == "Hi!":
+						k = "roleplay"
 					else:
-						print("MOCK:", resp)
+						q2 = q.replace('"""', "'''")
+						c = await tcount(q2)
+						if c > 1024:
+							q2 = await summarise(q2, max_length=960, min_length=720)
+						prompt = '"""\n' + q2 + "\n" + f'''"""
+
+	### Instruction:
+	SYSTEM: Your name is {bot_name}. Please select one of the following actions by number:
+	''' + prompt
+						prompt += f"\n### Response:\n{bot_name}: I choose number"
+						data = dict(
+							model="gpt-3.5-turbo-instruct",
+							prompt=prompt,
+							temperature=0.5,
+							max_tokens=32,
+							top_p=0.5,
+							frequency_penalty=0,
+							presence_penalty=0,
+							user=str(user.id) if premium < 3 else str(hash(name)),
+						)
 						try:
-							num = int(re.search("[0-9]+", resp).group())
-							k = mocked.get(num)
+							resp = await bot.instruct(data)
 						except:
-							k = None
+							print_exc()
+							resp = await bot.oai.moderations.create(input=prompt)
+							results = resp.results[0]
+							print("MOD:", results)
+							if results.flagged:
+								k = "roleplay"
+							else:
+								k = None
+						else:
+							print("MOCK:", resp)
+							try:
+								num = int(re.search("[0-9]+", resp).group())
+								k = mocked.get(num)
+							except:
+								k = None
 					if k == "roleplay" or k is None and model not in chatcc:
 						if model == "gpt3" and length >= 192:
 							model = DEFMOD
@@ -2236,6 +2246,9 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					elif k == "play":
 						blocked.update(("browse", "sympy", "wolfram_alpha", "dalle", "reminder"))
 						tool_choice = "play"
+					elif k == "knowledge":
+						blocked.update(("wolfram_alpha", "dalle", "play", "audio", "astate", "askip", "reminder"))
+						tool_choice = "play"
 					else:
 						rem = set(Functions)
 						rem.discard(k)
@@ -2250,6 +2263,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 			appended = False
 			vis_allowed = True
 			browsed = set()
+			cs_allowed = True
 			print("Chat", model, name, q, extensions)
 			for attempts in range(12):
 				if not bot.verify_integrity(message):
@@ -2342,12 +2356,11 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 				if skipping:
 					used = [ufull[0]] + ufull[skipping - 1:]
 				length = await count_to(used)
-				intended = None
 				if model in chatcompletion or extensions and not attempts:
 					orig_model = model
 					if model not in chatcompletion:
 						model = "gpt-3.5-turbo-1106"
-					if premium >= 2 and len(ufull) > 5 and length > 384:
+					if premium >= 2 and len(ufull) > 5 and length > 384 and cs_allowed:
 						ms = ufull[-1]
 						prompt = 'The following is a conversation with numbered messages:\n\n"""'
 						ufc = ufull[:-1]
@@ -2392,6 +2405,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 									skipping = len(ufull) - 1
 									used = [ufull[0]] + ufull[-2:]
 									length = await count_to(used)
+								cs_allowed = False
 					if model == "gpt-4-vision-preview":
 						tools = None
 					else:
@@ -2463,8 +2477,9 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								blocked.add("browse")
 							if res:
 								c = await tcount(res)
-								if c > 1440:
-									res = await summarise(q=q + "\n" + res, max_length=1296, min_length=1024)
+								ra = 1 if premium < 2 else 1.5 if premium < 5 else 2
+								if c > round(1440 * ra):
+									res = await summarise(q=q + "\n" + res, max_length=round(1296 * ra), min_length=round(1024 * ra))
 									res = res.replace("\n", ". ").replace(": ", " -")
 								res = res.strip()
 								# if appended:
@@ -2777,7 +2792,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 				else:
 					raise FileNotFoundError(f"Unable to find model \"{model}\".")
 				text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
-				if not text.rsplit(None, 1)[-1].startswith(":"):
+				if text and not text.rsplit(None, 1)[-1].startswith(":"):
 					text = text.rstrip(":")
 				if not text or len(text) >= 2 and text[-1] in ",: aAsS" and text[-2] not in ",.!?" or text.endswith(' "') or text.endswith('\n"'):
 					redo = True
