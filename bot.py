@@ -1626,7 +1626,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			top_p=0.75,
 			frequency_penalty=0,
 			presence_penalty=0,
-			user=hash(self.id),
+			user=str(hash(self.name)),
 		)
 		inputs.update(data)
 		# if not best:
