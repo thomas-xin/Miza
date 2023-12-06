@@ -1686,20 +1686,6 @@ class Art(Command):
 				urls = await bot.follow_url(m, allow=True, images=True)
 				if urls and urls[0] != url:
 					args = urls
-		if not args:
-			# raise ArgumentError("Input string is empty.")
-			# s = await Request(
-			#     "https://magatsu.net/generators/art/index.php",
-			#     data=dict(selGenCount="1", selStyle="2", subGenerate="Generate Prompts"),
-			#     method="POST",
-			#     decode=True,
-			#     aio=True,
-			# )
-			# s = s.split("<strong>Prompt:</strong>", 1)[-1].removeprefix("<BR>")
-			# s = s.split("<BR>", 1)[0].replace("<br />", " ").replace("<br>", " ").replace("<i>", "*").replace("<b>", "**").replace("<u>", "__")
-			# args = [s]
-			# print(s)
-			args = [("art " * xrand(1, 64)).rstrip()]
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 		freelim = 50
 		if premium < 2:
@@ -1791,22 +1777,32 @@ class Art(Command):
 				url = urls.pop(0)
 			if urls and not url2:
 				url2 = urls.pop(0)
+		nsfw = bot.is_nsfw(channel)
 		prompt = " ".join(rems).strip()
 		if not prompt and not sdxl:
 			prompt = nprompt
 		if not prompt:
-			if not url:
-				raise ArgumentError("Please input a valid prompt.")
-			pt, *p1 = await bot.caption(url, best=premium >= 4)
-			prompt = "\n".join(filter(bool, p1))
-			if not prompt:
-				prompt = "art"
+			if url:
+				# raise ArgumentError("Please input a valid prompt.")
+				pt, *p1 = await bot.caption(url, best=premium >= 4)
+				prompt = "\n".join(filter(bool, p1))
 			print(url, prompt)
 			force = False
 		else:
 			force = True
+		if not prompt:
+			prompt = "art"
+		elif not nsfw:
+			resp = await bot.moderate(prompt)
+			if resp.flagged:
+				raise PermissionError(
+					"Apologies, my AI has detected that your input may be inappropriate.\n"
+					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
+				)
+
 		if not bot.verify_integrity(message):
 			return
+
 		if name == "dalle":
 			dalle = 3 if premium >= 4 else 2
 		else:
@@ -1844,11 +1840,10 @@ class Art(Command):
 			data = bot.data.users.get(u.id, {})
 			oai = data.get("trial") and data.get("openai_key")
 			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
-			dupn = dups
 			resp = cdict(choices=[])
-			if not resp.choices or dupn > 1:
+			if len(resp.choices) < dups:
 				futs = []
-				for i in range(min(3, max(1, dupn - 1))):
+				for i in range(min(3, max(1, dups - 1))):
 					fut = create_task(bot.instruct(
 						dict(
 							model="gpt-3.5-turbo-instruct",
@@ -1871,9 +1866,7 @@ class Art(Command):
 						print_exc()
 						continue
 					resp.choices.append(cdict(text=s))
-					dupn -= 1
 			resp.choices.append(cdict(text=""))
-			dupn -= 1
 			if not resp or len(resp.choices) < dups:
 				resp2 = await bot.oai.completions.create(
 					model="gpt-3.5-turbo-instruct",
@@ -1884,7 +1877,7 @@ class Art(Command):
 					frequency_penalty=0.25,
 					presence_penalty=0.25,
 					user=str(user.id),
-					n=dupn,
+					n=dups - len(resp.choices),
 				)
 				if resp:
 					resp.choices.extend(resp2.choices)
@@ -1924,7 +1917,6 @@ class Art(Command):
 			req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
 		aspect = float(kwargs.get("--aspect-ratio", 1))
 		negative = kwargs.get("--negative-prompt", "")
-		nsfw = bot.is_nsfw(channel)
 		emb = None
 		fn = None
 		futs = []

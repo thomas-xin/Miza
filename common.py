@@ -4487,26 +4487,33 @@ async def tcount(s, model="gpt-3.5-turbo"):
 	return len(enc)
 
 
+class CacheItem:
+	__slots__ = ("value")
+
+	def __init__(self, value):
+		self.value = value
+
 class Cache(cdict):
 	__slots__ = ("timeout", "tmap", "soonest", "sooning", "lost", "trash")
 
 	def __init__(self, *args, timeout=60, trash=8, **kwargs):
 		super().__init__(*args, **kwargs)
-		tmap = {}
-		object.__setattr__(self, "tmap", tmap)
 		object.__setattr__(self, "timeout", timeout)
 		object.__setattr__(self, "lost", {})
 		object.__setattr__(self, "trash", trash)
 		if self:
 			ts = utc() + timeout
-			for k in self:
-				tmap[k] = ts
+			tmap = {k: ts for k in self}
 			object.__setattr__(self, "soonest", ts)
-			fut = create_task(waited_coro(self._update(), timeout))
-			object.__setattr__(self, "sooning", fut)
 		else:
+			tmap = {}
 			object.__setattr__(self, "soonest", inf)
-			object.__setattr__(self, "sooning", None)
+		object.__setattr__(self, "tmap", tmap)
+		if self:
+			fut = create_task(waited_coro(self._update(), timeout))
+		else:
+			fut = None
+		object.__setattr__(self, "sooning", fut)
 
 	async def _update(self):
 		tmap = self.tmap
@@ -4545,6 +4552,30 @@ class Cache(cdict):
 		self.tmap[k] = ts
 
 	retrieve = lambda self, k: self.lost.pop(k)
+
+	async def retrieve_into(self, k, func, *args, **kwargs):
+		resp = await asubmit(func, *args, **kwargs)
+		self[k] = resp
+		return resp
+
+	async def retrieve_from(self, k, func, *args, **kwargs):
+		try:
+			resp = self[k]
+		except KeyError:
+			pass
+		else:
+			if isinstance(resp, CacheItem):
+				return await resp.value
+		fut = create_task(self.retrieve_into(k, func, *args, **kwargs))
+		try:
+			resp = self.retrieve(k)
+		except KeyError:
+			pass
+		else:
+			if isinstance(resp, CacheItem):
+				return await resp.value
+		self[k] = CacheItem(fut)
+		return await fut
 
 
 __filetrans = {

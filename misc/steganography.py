@@ -193,9 +193,9 @@ ar = im.size[0] / im.size[1]
 # print(im.size, area)
 
 i_entropy = im.entropy()
-e_entropy = abs(i_entropy) ** 3 / 1024
+e_entropy = abs(i_entropy) ** 2 / 256
 ie_req = 4
-entropy = min(1, e_entropy)
+entropy = (min(1.5, e_entropy) + 0.5) / 2
 # print(entropy, e_entropy, i_entropy)
 
 write = bool(msg)

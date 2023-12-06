@@ -2230,8 +2230,6 @@ class Ask(Command):
 							temperature=0.5,
 							max_tokens=32,
 							top_p=0.5,
-							frequency_penalty=0,
-							presence_penalty=0,
 							user=str(user.id) if premium < 3 else str(hash(name)),
 						)
 						try:
@@ -2406,8 +2404,6 @@ class Ask(Command):
 							temperature=0.5,
 							max_tokens=32,
 							top_p=0.5,
-							frequency_penalty=0.6,
-							presence_penalty=0,
 							user=str(user.id) if premium < 3 else str(hash(name)),
 						)
 						try:
@@ -3148,13 +3144,9 @@ class Personality(Command):
 			raise OverflowError("Maximum currently supported personality prompt size is 512 characters, 4096 for premium users.")
 		p = argv.replace(";", ";")
 		if not bot.is_nsfw(channel):
-			inappropriate = False
-			resp = await bot.oai.moderations.create(input=p)
-			results = resp.results[0]
-			if results.flagged:
-				inappropriate = True
-				print(results)
-			if inappropriate:
+			resp = await bot.moderate(p)
+			if resp.flagged:
+				print(resp)
 				raise PermissionError(
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
@@ -3198,7 +3190,7 @@ class Instruct(Command):
 	async def __call__(self, bot, guild, channel, user, message, argv, **void):
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 		data = dict(
-			model="gpt-3.5-turbo-instruct",
+			model="gpt-4-1106-preview" if premium >= 5 else "gpt-3.5-turbo-instruct",
 			prompt=argv,
 			temperature=0.8,
 			max_tokens=4096 if premium >= 2 else 1024,
@@ -3207,7 +3199,7 @@ class Instruct(Command):
 			presence_penalty=0.4,
 			user=str(user.id) if premium < 3 else str(hash(user.name)),
 		)
-		resp = await bot.instruct(data, best=premium >= 3)
+		resp = await bot.instruct(data, best=None)
 		ref = message
 		ms = split_across(resp, 1999, prefix="\xad")
 		s = ms[-1] if ms else "\xad"

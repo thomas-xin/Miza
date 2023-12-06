@@ -1610,10 +1610,25 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			e = cdict(id=e, animated=animated)
 		return min_emoji(e)
 
+	mod_cache = Cache(timeout=86400, trash=256)
+	async def moderate(self, input=""):
+		resp = await self.mod_cache.retrieve_from(input, self.oai.moderations.create, input=input)
+		return resp.results[0]
+
 	llsem = Semaphore(2, 2, rate_limit=4)
 	together_sem = Semaphore(2, 2, rate_limit=0.5)
 	async def instruct(self, data, best=False, skip=True):
 		c = await tcount(data["prompt"])
+		inputs = dict(
+			model="gpt-3.5-turbo-1106",
+			temperature=0.75,
+			max_tokens=256,
+			top_p=0.75,
+			frequency_penalty=0,
+			presence_penalty=0,
+			user=hash(self.id),
+		)
+		inputs.update(data)
 		# if not best:
 			# if c <= 2048 and data["max_tokens"] <= 2048 and not self.llsem.busy:
 			# 	data["model"] = "emerhyst-20b"
@@ -1625,18 +1640,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			# 	except:
 			# 		print_exc()
 			# 		data["model"] = "gpt-3.5-turbo-instruct"
-		if AUTH.get("together_key") and not self.together_sem.busy:
+		if AUTH.get("together_key") and not self.together_sem.busy and best is not None:
 			import together
 			together.api_key = AUTH["together_key"]
-			rp = ((data.get("frequency_penalty", 0.25) + data.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
+			rp = ((data.get("frequency_penalty", 0.25) + inputs.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
 			m = "WizardLM/WizardLM-70B-V1.0" if best else "Gryphe/MythoMax-L2-13b"
 			rdata = dict(
-				prompt=data["prompt"],
+				prompt=inputs["prompt"],
 				model=m,
-				temperature=data.get("temperature", 0.8) * 2 / 3,
-				top_p=data.get("top_p", 1),
+				temperature=inputs.get("temperature", 0.8) * 2 / 3,
+				top_p=inputs.get("top_p", 1),
 				repetition_penalty=rp,
-				max_tokens=data.get("max_tokens", 1024),
+				max_tokens=inputs.get("max_tokens", 1024),
 			)
 			try:
 				async with self.together_sem:
@@ -1644,14 +1659,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return response["output"]["choices"][0]["text"]
 			except:
 				print_exc()
-		if "instruct" not in data["model"]:
-			prompt = data.pop("prompt")
-			data["messages"] = [dict(role="user", content=prompt)]
+		if "instruct" not in inputs["model"]:
+			prompt = inputs.pop("prompt")
+			inputs["messages"] = [dict(role="user", content=prompt)]
 			async with asyncio.timeout(70):
-				response = await self.oai.chat.completions.create(**data, timeout=60)
+				response = await self.oai.chat.completions.create(**inputs, timeout=60)
 			return response.choices[0].message.content
 		async with asyncio.timeout(70):
-			response = await self.oai.completions.create(**data, timeout=60)
+			response = await self.oai.completions.create(**inputs, timeout=60)
 		return response.choices[0].text
 
 	analysed = {}
@@ -1742,7 +1757,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			iname = f'image "{name}"'
 		else:
 			iname = "image"
-		pin.append(f"### Instruction:\nHere are {len(prompts)} captions for an {iname}. Please rewrite the first caption using the most likely elements from the others; be detailed but concise!\n\n###Response:")
+		pin.append(f"### Instruction:\nHere are {len(prompts)} conflicting captions for an {iname}. Please rewrite the first caption using the most likely elements from the others; be detailed but concise!\n\n###Response:")
 		prompt = "".join(pin)
 		print("Recaption prompt:", prompt)
 		model = "gpt-4-1106-preview" if best else "gpt-3.5-turbo-1106"
@@ -1752,11 +1767,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				model=model,
 				temperature=0.5,
 				top_p=0.9,
-				frequency_penalty=0,
-				presence_penalty=0,
 				max_tokens=256,
 			),
-			best=best,
+			best=None,
 		)
 		print("Recaption response:", resp)
 		return resp
