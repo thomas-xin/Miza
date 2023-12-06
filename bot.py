@@ -4788,15 +4788,20 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							interval = 86400 * 7
 							if it not in uptime:
 								uptime[it] = copy.deepcopy(data)
-								if min(uptime) <= it - interval:
+								if min(uptime) <= it - interval - 3600:
 									sl = sorted(uptime)
 									while sl[0] <= it - interval:
 										uptime.pop(sl.pop(0), None)
 									while sl[-1] > it:
 										uptime.pop(sl.pop(-1), None)
+									skipto = 0
 									for i in sl[:-3600 // ninter]:
 										if i * ninter % 3600 == 0:
 											continue
+										if skipto >= i:
+											continue
+										if i * ninter % 3600 == ninter and uptime.get(i * ninter + 3600 - ninter * 2) == {}:
+											skipto = i * ninter + 3600 - ninter * 2
 										if uptime[i]:
 											uptime[i] = {}
 							gen = ((it - interval + i in uptime) for i in range(ninter, interval + ninter, ninter))

@@ -2347,7 +2347,7 @@ class UpdateMessageCache(Database):
 	loaded = {}
 	saving = {}
 	save_sem = Semaphore(1, 512, 5, 30)
-	search_sem = Semaphore(20, 512, rate_limit=5)
+	search_sem = Semaphore(16, 4096, rate_limit=5)
 
 	def __load__(self, **void):
 		self.data.encoder = [encrypt, decrypt]

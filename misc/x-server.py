@@ -1673,7 +1673,6 @@ class Server:
 	def error(self, code=400):
 		raise ConnectionError(int(code))
 
-	chunking = {}
 	@cp.expose(("upload_single",))
 	@hostmap
 	def upload_chunk(self, **kwargs):
@@ -1691,6 +1690,17 @@ class Server:
 		n = f"cache/{h}%"
 		fn = n + str(xi)
 		csize = 83886080
+		try:
+			info = cdict(self.chunking[n])
+		except KeyError:
+			pass
+		else:
+			if xi % 8 in (0, 1, 7):
+				fne = fn
+			else:
+				fne = fn + str(xi // 8 * 8 + 7)
+			if isinstance(self.chunking.get(fne), str):
+				return
 		with open(fn, "wb") as f:
 			if single:
 				pos = 0
@@ -1733,6 +1743,7 @@ class Server:
 					f = open(fn, "rb")
 					info = self.chunking[n] = cdict(
 						mime=magic.from_file(f),
+						timestamp=utc(),
 					)
 				if xi % 8 < 2 or xi // 8 * 8 + 7 >= ceil(mfs / csize):
 					fut.result()
@@ -1797,8 +1808,17 @@ class Server:
 	@tracebacksuppressor
 	def update_merge(self):
 		d = self.chunking.copy()
+		available = set()
 		for k, v in tuple(d.items()):
 			if isinstance(v, Future):
+				d.pop(k)
+			if k[-1] == "%":
+				if utc() - v.setdefault("timestamp", utc()) > 86400 * 7:
+					d.pop(k)
+				else:
+					available.add(k)
+		for k in tuple(d):
+			if k[-1] != "%" and k.split("%", 1)[0] + "%" not in available:
 				d.pop(k)
 		with self.merge_sem:
 			b = orjson.dumps(d)
@@ -1865,14 +1885,19 @@ class Server:
 				mime = info.mime
 				for i in range(high):
 					gn = nh + str(i)
-					fut = self.chunking.pop(gn, None)
+					fut = self.chunking.get(gn)
 					if not fut:
+						if i % 8 not in (0, 1, 7):
+							fne = fn + str(i // 8 * 8 + 7)
+							if fne in self.chunking or os.path.exists(fne) and os.path.getsize(fne):
+								continue
 						if not os.path.exists(gn):
 							raise FileNotFoundError(gn)
 						url1 = self.bot_exec(f"bot.data.exec.stash({repr(gn)})")
 						urls.extend(url1)
 					elif isinstance(fut, (tuple, list)):
 						urls.extend(fut)
+					fut = self.chunking.pop(gn, None)
 				urls = [map_url(url) for url in urls]
 				code = 307
 				ftype = 3
