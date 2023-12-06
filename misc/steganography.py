@@ -564,11 +564,11 @@ try:
 			if errs >= l / 2:
 				raise ValueError
 			errs += 1
-			l = sorted(n for n in u if 32 <= n < 128)
-			if not l:
+			li = sorted(n for n in u if 32 <= n < 128)
+			if not li:
 				c = u[-1]
 			else:
-				c = l[0]
+				c = li[0]
 		else:
 			c = u[a[-1]]
 		d.append(c)
