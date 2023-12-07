@@ -1883,6 +1883,7 @@ if "exl2" in CAPS:
 				time.sleep(1)
 	if "load" in CAPS:
 		time.sleep(20)
+		print("LOADING EXL2...")
 		load_models()
 		raise SystemExit
 
@@ -2062,6 +2063,7 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 					time.sleep(1)
 		if "load" in CAPS:
 			time.sleep(40)
+			print("LOADING GPTQ...")
 			load_models()
 			raise SystemExit
 
@@ -2135,6 +2137,7 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 					time.sleep(1)
 		if "load" in CAPS:
 			time.sleep(60)
+			print("LOADING BNB...")
 			load_models()
 			raise SystemExit
 
@@ -2359,7 +2362,13 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		return out
 	
 	if "load" in CAPS:
-		exc.submit(IBASLR)
+		def load_ibaslr():
+			try:
+				return IBASLR()
+			except:
+				traceback.print_exc()
+		print("LOADING IBASLR...")
+		exc.submit(load_ibaslr)
 		
 
 	EXT1 = None
