@@ -386,6 +386,7 @@ def update_tasks(proc):
 					resps[str(i)] = "RES:" + resp if isinstance(resp, str) else resp
 	return func
 
+temp = []
 def start_proc(di, caps, n=0):
 	args = [python, "misc/x-compute.py", ",".join(map(str, di)), ",".join(caps), json.dumps(compute_load), json.dumps(compute_caps), json.dumps(compute_order)]
 	print(args)
@@ -396,13 +397,14 @@ def start_proc(di, caps, n=0):
 		# stderr=None,
 		bufsize=262144,
 	)
+	temp.append(proc)
+	if "load" in caps:
+		return
 	proc.busy = None
 	proc.waiting = concurrent.futures.Future()
 	proc.n = n
 	proc.di = di
 	proc.caps = caps
-	if "load" in proc.caps:
-		return
 	procs.append(proc)
 	threading.Thread(target=update_tasks(proc)).start()
 	threading.Thread(target=update_resps(proc)).start()
