@@ -392,8 +392,8 @@ def start_proc(di, caps, n=0):
 	print(args)
 	proc = psutil.Popen(
 		args,
-		stdin=subprocess.PIPE,
-		stdout=subprocess.PIPE,
+		stdin=subprocess.DEVNULL if "load" in caps else subprocess.PIPE,
+		stdout=None if "load" in caps else subprocess.PIPE,
 		# stderr=None,
 		bufsize=262144,
 	)
