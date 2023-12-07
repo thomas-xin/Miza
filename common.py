@@ -2812,7 +2812,7 @@ def spec2cap():
 				done.append("exl2")
 		if using and FIRST_LOAD:
 			FIRST_LOAD = False
-			yield [[], "load", "exl2"]
+			yield [[], "load", "exl2", "sdxlr"]
 	if cc > 1:
 		caps.append("math")
 		if os.name == "nt" and ram > 3 * 1073741824:
@@ -2877,6 +2877,9 @@ def spec2cap():
 		# vrams[i] = v
 		if i not in tdid and "nvram" in caps:
 			caps.remove("nvram")
+		if "sdxl" in caps and FIRST_LOAD:
+			FIRST_LOAD = False
+			yield [[], "load", "sdxlr"]
 		if len(caps) > 1:
 			yield caps
 
