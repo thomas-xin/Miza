@@ -2232,7 +2232,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		return il[0]
 
 	WEBUIS = {}
-	def IBASLR(prompt, kwargs={}, nsfw=False, force=True, count=1, aspect_ratio=0, negative_prompt=""):
+	def IBASLR(prompt="", kwargs={}, nsfw=False, force=True, count=1, aspect_ratio=0, negative_prompt=""):
 		if kwargs.get("--mask"):
 			try:
 				ib = CBOTS[None]
