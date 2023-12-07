@@ -1,4 +1,4 @@
-import requests, logging, random, datetime, time, os, sys, json, concurrent.futures, urllib.parse
+import requests, logging, random, datetime, time, os, sys, re, json, concurrent.futures, urllib.parse
 import cherrypy as cp
 url_unparse = urllib.parse.unquote_plus
 
@@ -101,6 +101,18 @@ def byte_scale(n, ratio=1024):
 			break
 	return f"{round(n, 4)} {__scales[e]}"
 
+is_discord_attachment = lambda url: url and re.search("^https?:\\/\\/(?:[A-Za-z]{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/attachments\\/", url)
+def discord_expired(url):
+	if is_discord_attachment(url):
+		if "?ex=" not in url and "&ex=" not in url:
+			return True
+		temp = url.replace("?ex=", "&ex=").split("&ex=", 1)[-1].split("&", 1)[0]
+		try:
+			ts = int(temp, 16)
+		except ValueError:
+			return True
+		return ts < time.time() + 60
+
 
 class Server:
 
@@ -196,10 +208,9 @@ class Server:
 			self.state["/"] = uri
 			with open("temp.json", "w") as f:
 				json.dump(self.state, f)
-		if len(self.ucache) > 65536:
-			t = time.time()
+		if len(self.ucache) > 1048576:
 			for k, v in tuple(self.ucache.items()):
-				if isinstance(v, list) and t - v[0] > 80000:
+				if isinstance(v, list) and discord_expired(v[1]):
 					self.ucache.pop(k, None)
 		return "💜"
 
@@ -235,7 +246,7 @@ class Server:
 		if rquery:
 			rquery = "?" + rquery
 		irl = f"{self.state['/']}/u{rpath}"
-		if irl not in self.ucache or time.time() - self.ucache[irl][0] > 80000:
+		if irl not in self.ucache or discord_expired(self.ucache[irl][1]):
 			headers = dict(cp.request.headers)
 			headers.pop("Connection", None)
 			headers.pop("Transfer-Encoding", None)
@@ -247,7 +258,7 @@ class Server:
 				print("Error:", repr(ex))
 				url = "https://mizabot.xyz/notfound.png"
 			self.ucache[irl] = [time.time(), url]
-		elif time.time() - self.ucache[irl][0] > 3600:
+		elif time.time() - self.ucache[irl][0] > 43200:
 			def cache_temp():
 				headers = dict(cp.request.headers)
 				headers.pop("Connection", None)

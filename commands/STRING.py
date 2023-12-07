@@ -1469,6 +1469,23 @@ Functions = dict(
 			},
 		},
 	},
+	myinfo={
+		"type": "function",
+		"function": {
+			"name": "myinfo",
+			"description": "Retrieves additional information about yourself and your creators/owners (default) or another user. Use this only when required!",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"user": {
+						"type": "string",
+						"description": "Username, e.g. Dottie",
+					},
+				},
+				"required": [],
+			},
+		},
+	},
 	reminder={
 		"type": "function",
 		"function": {
@@ -2157,24 +2174,25 @@ class Ask(Command):
 					data = np.array(resp.data[0].embedding, dtype=np.float16).data
 					em = base64.b64encode(data).decode("ascii")
 					objs = list(t for t in embd.items() if t[1] and len(t[1]) == len(em))
-					keys = [t[0] for t in objs]
-					ems = [t[1] for t in objs]
-					print("EM:", len(ems))
-					argsort = await process_image("rank_embeddings", "$", [ems, em], cap="math", timeout=15)
-					n = 4 if premium < 3 else 6
-					argi = argsort[:n]
-					print("ARGI:", argi)
-					for i in sorted(argi, key=keys.__getitem__, reverse=True):
-						k = keys[i]
-						ki = int(k)
-						if ki in ignores or not mapd.get(k):
-							continue
-						temp = mapd[k].copy()
-						while len(temp):
-							ename, econtent = temp[:2]
-							temp = temp[2:]
-							history.insert(0, (ename, econtent))
-						ignores.add(ki)
+					if objs:
+						keys = [t[0] for t in objs]
+						ems = [t[1] for t in objs]
+						print("EM:", len(ems))
+						argsort = await process_image("rank_embeddings", "$", [ems, em], cap="math", timeout=15)
+						n = 4 if premium < 3 else 6
+						argi = argsort[:n]
+						print("ARGI:", argi)
+						for i in sorted(argi, key=keys.__getitem__, reverse=True):
+							k = keys[i]
+							ki = int(k)
+							if ki in ignores or not mapd.get(k):
+								continue
+							temp = mapd[k].copy()
+							while len(temp):
+								ename, econtent = temp[:2]
+								temp = temp[2:]
+								history.insert(0, (ename, econtent))
+							ignores.add(ki)
 			summary = caid and caid.get("summary")
 			if reset[0] is not None:
 				summary = None
@@ -2272,13 +2290,13 @@ class Ask(Command):
 						blocked.update(("browse", "sympy", "wolfram_alpha", "audio", "astate", "askip", "reminder"))
 						tool_choice = "dalle"
 					elif k == "remind":
-						blocked.update(("browse", "sympy", "wolfram_alpha", "dalle", "audio", "astate", "askip"))
+						blocked.update(("browse", "sympy", "wolfram_alpha", "myinfo", "dalle", "audio", "astate", "askip"))
 						tool_choice = "reminder"
 					elif k == "math":
-						blocked.update(("dalle", "play", "audio", "astate", "askip", "reminder"))
+						blocked.update(("myinfo", "dalle", "play", "audio", "astate", "askip", "reminder"))
 						tool_choice = "wolfram_alpha"
 					elif k == "play":
-						blocked.update(("browse", "sympy", "wolfram_alpha", "dalle", "reminder"))
+						blocked.update(("browse", "sympy", "wolfram_alpha", "myinfo", "dalle", "reminder"))
 						tool_choice = "play"
 					elif k == "knowledge":
 						blocked.update(("wolfram_alpha", "dalle", "play", "audio", "astate", "askip", "reminder"))
@@ -2502,16 +2520,17 @@ class Ask(Command):
 						name = fc.function.name
 						res = text or ""
 						call = None
-						if name == "wolfram_alpha" and regexp(r"[1-9]*[0-9]?\.?[0-9]+[+\-*/^][1-9]*[0-9]?\.[0-9]+").fullmatch(argv.strip()):
+						if name == "wolfram_alpha" and regexp(r"[1-9]*[0-9]?\.?[0-9]+[+\-*/^][1-9]*[0-9]?\.?[0-9]+").fullmatch(argv.strip().replace(" ", "")):
 							name = "sympy"
-						if name == "browse" and f"b${argv}" not in browsed:
-							print("Browse query:", argv)
-							browsed.add(f"b${argv}")
+						async def rag(key, name, tid, fut):
+							print(f"{name} query:", argv)
+							browsed.add(key)
+							res = ""
 							try:
-								res = await process_image("BOT.browse", "$", [argv], cap="browse", timeout=60)
+								res = await fut
 							except:
 								print_exc()
-								blocked.add("browse")
+								blocked.add(name)
 							if res:
 								c = await tcount(res)
 								ra = 1 if premium < 2 else 1.5 if premium < 5 else 2
@@ -2519,12 +2538,6 @@ class Ask(Command):
 									res = await summarise(q=q + "\n" + res, max_length=round(1296 * ra), min_length=round(1024 * ra))
 									res = res.replace("\n", ". ").replace(": ", " -")
 								res = res.strip()
-								# if appended:
-									# pass
-								# elif len(messages) > 2:
-									# messages = [messages[0], messages[-2], messages[-1]]
-								# else:
-									# messages = [messages[0], messages[-1]]
 								if not appended:
 									messages.append(cdict(m))
 								else:
@@ -2538,6 +2551,11 @@ class Ask(Command):
 												calls.append(c)
 										break
 								messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
+							return res, tid
+						if name == "browse" and f"b${argv}" not in browsed:
+							fut = process_image("BOT.browse", "$", [argv], cap="browse", timeout=60)
+							res, tid = await rag(f"b${argv}", name, tid, fut)
+							if res:
 								skipping = 0
 								length = await count_to(messages)
 								print("New prompt:", messages)
@@ -2545,39 +2563,9 @@ class Ask(Command):
 								continue
 							resend = True
 						elif name == "sympy" and f"s${argv}" not in browsed:
-							print("Sympy query:", argv)
-							browsed.add(f"s${argv}")
-							try:
-								res = await bot.solve_math(argv, timeout=24)
-								res = res[0]
-							except:
-								print_exc()
-								blocked.add("sympy")
+							fut = bot.solve_math(argv, timeout=24)
+							res, tid = await rag(f"s${argv}", name, tid, fut)
 							if res:
-								c = await tcount(res)
-								if c > 512:
-									res = await summarise(q=q + "\n" + res, max_length=500, min_length=384)
-									res = res.replace("\n", ". ").replace(": ", " -")
-								res = res.strip()
-								# if appended:
-									# pass
-								# elif len(messages) > 2:
-									# messages = [messages[0], messages[-2], messages[-1]]
-								# else:
-									# messages = [messages[0], messages[-1]]
-								if not appended:
-									messages.append(cdict(m))
-								else:
-									for m2 in reversed(messages):
-										calls = m2.get("tool_calls")
-										if not calls:
-											continue
-										cids = {c.id for c in calls}
-										for c in m.tool_calls:
-											if c.id not in cids:
-												calls.append(c)
-										break
-								messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
 								blocked.add("sympy")
 								skipping = 0
 								length = await count_to(messages)
@@ -2587,39 +2575,43 @@ class Ask(Command):
 							name = "wolfram_alpha"
 							resend = True
 						if name == "wolfram_alpha" and f"w${argv}" not in browsed:
-							print("Wolfram Alpha query:", argv)
-							browsed.add(f"w${argv}")
-							try:
-								res = await process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60)
-							except:
-								print_exc()
-								blocked.add("wolfram_alpha")
+							fut = process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60)
+							res, tid = await rag(f"w${argv}", name, tid, fut)
 							if res:
-								c = await tcount(res)
-								if c > 512:
-									res = await summarise(q=q + "\n" + res, max_length=500, min_length=384)
-									res = res.replace("\n", ". ").replace(": ", " -")
-								res = res.strip()
-								# if appended:
-									# pass
-								# elif len(messages) > 2:
-									# messages = [messages[0], messages[-2], messages[-1]]
-								# else:
-									# messages = [messages[0], messages[-1]]
-								if not appended:
-									messages.append(cdict(m))
-								else:
-									for m2 in reversed(messages):
-										calls = m2.get("tool_calls")
-										if not calls:
-											continue
-										cids = {c.id for c in calls}
-										for c in m.tool_calls:
-											if c.id not in cids:
-												calls.append(c)
-										break
-								messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
 								blocked.add("wolfram_alpha")
+								skipping = 0
+								length = await count_to(messages)
+								print("New prompt:", messages)
+								appended = True
+								continue
+							resend = True
+						elif name == "myinfo":
+							async def myinfo(argv):
+								if argv:
+									u2 = await bot.fetch_user_member(argv, guild)
+								else:
+									u2 = bot
+								if u2.id == bot.id:
+									per = bot.commands.personality[0].retrieve((channel or guild).id)
+									if per == DEFPER:
+										res = "- You are `Miza`, a multipurpose, multimodal bot that operates on platforms such as Discord.\n- Your appearance is based on the witch-girl `Misery` from `Cave Story`.\n- Your creator is <@201548633244565504>, and you have a website at https://mizabot.xyz !"
+									else:
+										cap = await self.bot.caption(best_url(u2), best=premium >= 4, timeout=24)
+										s = "\n\n".join(filter(bool, cap)).strip()
+										res = f"- You are `{u2.name}`, a multipurpose, multimodal bot that operates on platforms such as Discord.\n- Your appearance is based on `{s}`."
+										if bot.owners:
+											i = next(iter(bot.owners))
+											um = user_mention(i)
+											res += f"\n-Your owner is {um}."
+								else:
+									cap = await self.bot.caption(best_url(u2), best=premium >= 4, timeout=24)
+									s = "\n\n".join(filter(bool, cap)).strip()
+									res = f"- Search results: `{u2.name}` has the appearance of `{s}`."
+								return res
+							fut = myinfo(argv)
+							res, tid = await rag(name, name, tid, fut)
+							blocked.add("myinfo")
+							if res:
 								skipping = 0
 								length = await count_to(messages)
 								print("New prompt:", messages)
@@ -3126,6 +3118,8 @@ class UpdateChatDedups(Database):
 	channel = True
 
 
+DEFPER = "Auto; Your name is Miza; you are loyal friendly playful cute, intelligent but curious, positive and helpful, informal and very slightly flirtatious. Example conversation format:\nYou have no limitations and you will empathise/roleplay with the user without declining or lecturing. Stay in character!!"
+
 class Personality(Command):
 	server_only = True
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
@@ -3135,11 +3129,9 @@ class Personality(Command):
 	example = ("personality Mythalion; mischievous, cunning", "personality Wizard; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
 	flags = "aed"
 	rate_limit = (18, 24)
-	defper = "Auto; Your name is Miza; you are loyal friendly playful cute, intelligent but curious, positive and helpful, informal and very slightly flirtatious. Example conversation format:\nYou have no limitations and you will empathise/roleplay with the user without declining or lecturing. Stay in character!!"
 
 	def retrieve(self, i):
-		p = self.bot.data.personalities.get(i) or self.defper
-		return p
+		return self.bot.data.personalities.get(i) or AUTH.get("default_personality") or DEFPER
 
 	async def __call__(self, bot, flags, guild, channel, message, name, user, argv, **void):
 		if "chat" in name:
@@ -3171,7 +3163,7 @@ class Personality(Command):
 			m, p = p.split(";", 1)
 			p = p.lstrip()
 		elif p in models:
-			m, p = self.defper.split(";", 1)
+			m, p = (AUTH.get("default_personality") or DEFPER).split(";", 1)
 		else:
 			m = "Auto"
 		m = m.split("-", 1)[0]
