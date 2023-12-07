@@ -256,7 +256,10 @@ class Server:
 					url = resp.headers.get("Location") or irl
 			except Exception as ex:
 				print("Error:", repr(ex))
-				url = "https://mizabot.xyz/notfound.png"
+				if irl in self.ucache:
+					url = self.ucache[irl][1]
+				else:
+					url = "https://mizabot.xyz/notfound.png"
 			self.ucache[irl] = [time.time(), url]
 		elif time.time() - self.ucache[irl][0] > 43200:
 			def cache_temp():
