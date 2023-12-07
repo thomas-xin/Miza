@@ -12,6 +12,10 @@ if cachedir:
 	os.environ["HUGGINGFACE_HUB_CACHE"] = f"{cachedir}/huggingface/hub"
 	os.environ["TRANSFORMERS_CACHE"] = f"{cachedir}/huggingface/transformers"
 	os.environ["HF_DATASETS_CACHE"] = f"{cachedir}/huggingface/datasets"
+else:
+	cachedir = os.path.expanduser("~") + "/.cache"
+	if not os.path.exists(cachedir):
+		os.mkdir(cachedir)
 
 common_modules = (
 	"asyncio",

@@ -12,6 +12,10 @@ if os.path.exists("auth.json"):
 		os.environ["HUGGINGFACE_HUB_CACHE"] = f"{cachedir}/huggingface/hub"
 		os.environ["TRANSFORMERS_CACHE"] = f"{cachedir}/huggingface/transformers"
 		os.environ["HF_DATASETS_CACHE"] = f"{cachedir}/huggingface/datasets"
+	else:
+		cachedir = os.path.expanduser("~") + "/.cache"
+		if not os.path.exists(cachedir):
+			os.mkdir(cachedir)
 
 import io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, contextlib, filetype, ast, base64, hashlib, random
 import urllib.request
