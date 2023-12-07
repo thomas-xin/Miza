@@ -129,6 +129,14 @@ if not is_sub:
 	keep = True
 	if __name__ != "__main__" and os.path.exists("auth.json"):
 		try:
+			import pkg_resources
+		except:
+			import traceback
+			print(srgb(255, 0, 0, traceback.format_exc()), end="")
+			subprocess.run(["pip", "install", "setuptools", "--upgrade", "--user"])
+			import pkg_resources
+
+		try:
 			import cpuinfo, psutil
 			if DC:
 				import torch, torchvision, xformers
@@ -149,13 +157,6 @@ if not is_sub:
 				import torch
 			import cpuinfo, psutil
 
-		try:
-			import pkg_resources
-		except:
-			import traceback
-			print(srgb(255, 0, 0, traceback.format_exc()), end="")
-			subprocess.run(["pip", "install", "setuptools", "--upgrade", "--user"])
-			import pkg_resources
 		req = ["diffusers"]
 		if DC:
 			req.append("accelerate")
