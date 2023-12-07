@@ -5865,6 +5865,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			fields = (("403", "This error usually indicates that I am missing one or more necessary Discord permissions to perform this command!",),)
 		elif isinstance(ex, (CE, CE2)):
 			fields = (("Response disconnected.", "If this error occurs during a command, it is likely due to maintenance!"),)
+		elif hasattr(ex, "footer"):
+			fields = (ex.footer,)
 		elif isinstance(op, tuple):
 			fields = (op,)
 		else:

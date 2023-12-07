@@ -1770,7 +1770,7 @@ class ServerProtector(Database):
 class CreateEmoji(Command):
 	server_only = True
 	name = ["EmojiCreate", "EmojiCopy", "CopyEmoji", "Emote", "Emoticon", "Emoji"]
-	min_level = 2
+	min_level = 0
 	description = "Creates a custom emoji from a URL or attached file."
 	usage = "<1:name>+ <0:url>"
 	example = ("emoji how https://cdn.discordapp.com/emojis/645188934267043840.gif?size=128",)
@@ -1781,13 +1781,19 @@ class CreateEmoji(Command):
 	typing = True
 	slash = ("Emoji",)
 
-	async def __call__(self, bot, user, guild, channel, message, args, argv, _timeout, **void):
+	async def __call__(self, bot, name, perm, user, guild, channel, message, args, argv, _timeout, **void):
 		# Take input from any attachments, or otherwise the message contents
 		if message.attachments:
 			args.extend(best_url(a) for a in message.attachments)
 			argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
 		if not args:
 			raise ArgumentError("Please enter URL, emoji, or attached file to add.")
+		if perm < 2:
+			ex = self.perm_error(perm, 2, "for command " + name)
+			if args[0].casefold() == "jumbo":
+				p = bot.get_prefix(guild)
+				ex.footer = f"This command is for creating a new emoji. If you meant to copy an existing one, please see {p}jumbo!"
+			raise ex
 		async with discord.context_managers.Typing(channel):
 			try:
 				if len(args) > 1 and is_url(args[0]):

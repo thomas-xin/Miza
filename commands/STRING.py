@@ -1896,8 +1896,10 @@ class Ask(Command):
 				inp.append(f"{name}: {content}")
 			with tracebacksuppressor:
 				if not em:
-					await bot.lambdassert("summ")
-					data = await process_image("embedding", "$", ["\n".join(inp)], cap="summ", timeout=30)
+					input = "\n".join(inp)
+					# data = await process_image("embedding", "$", [input], cap="summ", timeout=30)
+					resp = await bot.oai.embeddings.create(input=input, model="text-embedding-ada-002")
+					data = np.array(resp.data[0].embedding, dtype=np.float16).data
 					em = base64.b64encode(data).decode("ascii")
 				mapd[s] = orig
 				embd[s] = em
@@ -2145,13 +2147,16 @@ class Ask(Command):
 			orig_tup = (name, q)
 			if embd:
 				try:
-					await bot.lambdassert("summ")
+					await bot.lambdassert("math")
 				except:
 					print_exc()
 				else:
-					data = await process_image("embedding", "$", [f"{name}: {q}"], cap="summ", timeout=30)
+					input = f"{name}: {q}"
+					# data = await process_image("embedding", "$", [input], cap="summ", timeout=30)
+					resp = await bot.oai.embeddings.create(input=input, model="text-embedding-ada-002")
+					data = np.array(resp.data[0].embedding, dtype=np.float16).data
 					em = base64.b64encode(data).decode("ascii")
-					objs = list(embd.items())
+					objs = list(t for t in embd.items() if t[1] and len(t[1]) == len(em))
 					keys = [t[0] for t in objs]
 					ems = [t[1] for t in objs]
 					print("EM:", len(ems))
@@ -2333,7 +2338,10 @@ class Ask(Command):
 					model = ModMap[DEFMOD]["name"]
 					limit = 4000
 				elif attempts in (3, 5):
-					model = "gpt-3.5-turbo-instruct"
+					if "gpt-4" in model:
+						model = "gpt-3.5-turbo-1106"
+					else:
+						model = "gpt-3.5-turbo-instruct"
 					limit = 4000
 					cm = 15
 				elif model == "gpt3" or premium < 4:

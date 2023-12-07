@@ -1827,7 +1827,7 @@ class Art(Command):
 			oprompt = prompt
 			uid = user.id
 			temp = oprompt.replace('"""', "'''")
-			prompt = f'### Instruction:\n"""\n{temp}\n"""\n\nImprove the above image caption as a description to send to Dall·E image generation. Be as detailed as possible in at least 2 sentences, and reword anything that may violate policy guidelines.\n\n### Response:'
+			prompt = f'### Instruction:\n"""\n{temp}\n"""\n\nImprove the above image caption as a description to send to Dall·E image generation. Be as detailed as possible in at least 2 sentences.\n\n### Response:'
 			if bot.is_trusted(guild) >= 2:
 				for uid in bot.data.trusted[guild.id]:
 					if uid and bot.premium_level(uid, absolute=True) >= 2:
@@ -1841,48 +1841,48 @@ class Art(Command):
 			oai = data.get("trial") and data.get("openai_key")
 			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 			resp = cdict(choices=[])
-			if len(resp.choices) < dups:
-				futs = []
-				for i in range(min(3, max(1, dups - 1))):
-					fut = create_task(bot.instruct(
-						dict(
-							model="gpt-3.5-turbo-instruct",
-							prompt=prompt,
-							temperature=0.75,
-							max_tokens=200,
-							top_p=0.9,
-							frequency_penalty=0.25,
-							presence_penalty=0.25,
-						),
-						skip=False,
-						best=not i and premium >= 3,
-					))
-					futs.append(fut)
-				for fut in futs:
-					try:
-						s = await fut
-						assert len(s.strip()) > 12
-					except:
-						print_exc()
-						continue
-					resp.choices.append(cdict(text=s))
-			resp.choices.append(cdict(text=""))
-			if not resp or len(resp.choices) < dups:
-				resp2 = await bot.oai.completions.create(
-					model="gpt-3.5-turbo-instruct",
-					prompt=prompt,
+			# if len(resp.choices) < dups:
+			# 	futs = []
+			# 	for i in range(min(3, max(1, dups - 1))):
+			# 		fut = create_task(bot.instruct(
+			# 			dict(
+			# 				model="gpt-3.5-turbo-instruct",
+			# 				prompt=prompt,
+			# 				temperature=0.75,
+			# 				max_tokens=200,
+			# 				top_p=0.9,
+			# 				frequency_penalty=0.25,
+			# 				presence_penalty=0.25,
+			# 			),
+			# 			skip=False,
+			# 			best=not i and premium >= 3,
+			# 		))
+			# 		futs.append(fut)
+			# 	for fut in futs:
+			# 		try:
+			# 			s = await fut
+			# 			assert len(s.strip()) > 12
+			# 		except:
+			# 			print_exc()
+			# 			continue
+			# 		resp.choices.append(cdict(text=s))
+			if not resp or len(resp.choices) < max(1, dups - 1):
+				resp2 = await bot.oai.chat.completions.create(
+					model="gpt-3.5-turbo-1106",
+					messages=[dict(role="user", content=prompt)],
 					temperature=0.75,
 					max_tokens=120,
 					top_p=0.9,
 					frequency_penalty=0.25,
 					presence_penalty=0.25,
 					user=str(user.id),
-					n=dups - len(resp.choices),
+					n=max(1, dups - len(resp.choices) - 1),
 				)
 				if resp:
-					resp.choices.extend(resp2.choices)
+					resp.choices.extend(cdict(text=choice.message.content) for choice in resp2.choices)
 				else:
 					resp = resp2
+			resp.choices.append(cdict(text=""))
 			print("REWRITE:", resp)
 			for choice in resp.choices:
 				out = choice.text.strip()

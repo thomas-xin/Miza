@@ -2197,7 +2197,7 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 	# else:
 		# convobot.AsyncChatGPT = AsyncChatGPT
 
-if CAPS.intersection(("sd", "sdxl", "sdxlr")):
+if CAPS.intersection(("sd", "sdxl", "sdxlr", "load")):
 	import imagebot
 	imagebot.COMPUTE_LOAD = COMPUTE_LOAD
 	imagebot.COMPUTE_CAPS = COMPUTE_CAPS
@@ -2225,7 +2225,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		return il[0]
 
 	WEBUIS = {}
-	def IBASLR(prompt, kwargs, nsfw=False, force=True, count=1, aspect_ratio=0, negative_prompt=""):
+	def IBASLR(prompt, kwargs={}, nsfw=False, force=True, count=1, aspect_ratio=0, negative_prompt=""):
 		if kwargs.get("--mask"):
 			try:
 				ib = CBOTS[None]
@@ -2286,6 +2286,8 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			fut.set_result(proc)
 		if isinstance(proc, concurrent.futures.Future):
 			proc = proc.result()
+		if not kwargs:
+			return
 		b = kwargs.get("--init-image")
 		if b:
 			if not isinstance(b, str):
@@ -2349,6 +2351,9 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			b = base64.b64decode(image)
 			out.append(b)
 		return out
+	
+	if "load" in CAPS:
+		exc.submit(IBASLR)
 		
 
 	EXT1 = None

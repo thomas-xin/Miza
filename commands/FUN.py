@@ -1802,7 +1802,7 @@ class Pay(Command):
 class React(Command):
 	server_only = True
 	name = ["AutoReact"]
-	min_level = 2
+	min_level = 0
 	description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the substring."
 	usage = "<0:react_to>? <1:react_data>? <disable{?d}>?"
 	example = ("react cat 🐱", "react ?d dog", "react remove 1")
@@ -1813,7 +1813,7 @@ class React(Command):
 	rate_limit = (4, 6)
 	slash = True
 
-	async def __call__(self, bot, flags, guild, message, user, argv, args, **void):
+	async def __call__(self, bot, flags, guild, message, user, name, perm, argv, args, **void):
 		update = self.data.reacts.update
 		following = bot.data.reacts
 		curr = set_dict(following, guild.id, mdict())
@@ -1821,6 +1821,8 @@ class React(Command):
 			following[guild.id] = curr = mdict(curr)
 		if not argv:
 			if "d" in flags:
+				if perm < 2:
+					raise self.perm_error(perm, 2, "for command " + name)
 				# This deletes all auto reacts for the current guild
 				if "f" not in flags and len(curr) > 1:
 					raise InterruptedError(css_md(sqr_md(f"WARNING: {len(curr)} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), force=True))
@@ -1838,6 +1840,8 @@ class React(Command):
 				buttons=buttons,
 			)
 			return
+		if perm < 2:
+			raise self.perm_error(perm, 2, "for command " + name)
 		if "d" in flags:
 			a = full_prune(argv)
 			if a not in curr and a.isnumeric() and int(a) < len(curr):

@@ -457,10 +457,14 @@ class Loop(Command):
 	active = set()
 
 	async def __call__(self, args, argv, message, channel, bot, perm, user, guild, **void):
-		if not args:
+		try:
+			num = await bot.eval_math(args[0])
+		except:
+			print_exc()
+			num = None
+		if num is None:
 			# Ah yes, I made this error specifically for people trying to use this command to loop songs 🙃
 			raise ArgumentError("Please input loop iterations and target command. For looping songs in voice, consider using the aliases LoopQueue and Repeat under the AudioSettings command.")
-		num = await bot.eval_math(args[0])
 		iters = round(num)
 		# Bot owner bypasses restrictions
 		if not isnan(perm):
