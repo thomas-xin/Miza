@@ -2262,16 +2262,16 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			model_dir = webui_dir + "/models/Stable-diffusion"
 			target_model = model_dir + "/" + model
 			if not os.path.exists(target_model) or not os.path.getsize(target_model):
-				args = [sys.executable, "downloader.py", "https://civitai.com/api/download/models/169740?type=Model&format=SafeTensor&size=full&fp=fp16", target_model]
+				args = [sys.executable, "misc/downloader.py", "https://civitai.com/api/download/models/169740?type=Model&format=SafeTensor&size=full&fp=fp16", target_model]
 				print(args)
 				subprocess.run(args)
+			if not kwargs:
+				return
 			device, dtype = determine_cuda(priority=False)
 			args = [os.path.join(webui_dir, ("webui.bat" if os.name == "nt" else "webui.sh")), "--device-id", str(device), "--api", "--nowebui", "--port", str(PORT)]
 			if torch.cuda.get_device_properties(device).total_memory <= 15 * 1073741824:
 				args.append("--medvram")
 			print(args, webui_dir)
-			if not kwargs:
-				return
 			time.sleep(DEV * 5)
 			while True:
 				proc = psutil.Popen(args, cwd=webui_dir)
