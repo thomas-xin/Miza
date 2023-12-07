@@ -2197,7 +2197,7 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 	# else:
 		# convobot.AsyncChatGPT = AsyncChatGPT
 
-if CAPS.intersection(("sd", "sdxl", "sdxlr", "load")):
+if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 	import imagebot
 	imagebot.COMPUTE_LOAD = COMPUTE_LOAD
 	imagebot.COMPUTE_CAPS = COMPUTE_CAPS
@@ -2263,6 +2263,8 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr", "load")):
 			if torch.cuda.get_device_properties(device).total_memory <= 15 * 1073741824:
 				args.append("--medvram")
 			print(args, webui_dir)
+			if not kwargs:
+				return
 			time.sleep(DEV * 5)
 			while True:
 				proc = psutil.Popen(args, cwd=webui_dir)
