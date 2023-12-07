@@ -2230,8 +2230,8 @@ class Ask(Command):
 				blocked.update(("audio", "astate", "askip"))
 			else:
 				blocked.update(("audio", "astate", "askip", "play"))
-			if model not in chatcc:
-				blocked.add("roleplay")
+			# if model not in chatcc:
+			# 	blocked.add("roleplay")
 			fut = create_task(cut_to(messages, 3000))
 			tool_choice = "auto"
 			if extensions:
@@ -2563,7 +2563,10 @@ class Ask(Command):
 								continue
 							resend = True
 						elif name == "sympy" and f"s${argv}" not in browsed:
-							fut = bot.solve_math(argv, timeout=24)
+							async def solve_into(argv):
+								res = await bot.solve_math(argv, timeout=24)
+								return f"{argv} = {res[0]}"
+							fut = solve_into(argv)
 							res, tid = await rag(f"s${argv}", name, tid, fut)
 							if res:
 								blocked.add("sympy")

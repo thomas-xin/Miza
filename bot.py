@@ -31,7 +31,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	github = AUTH.get("github") or "https://github.com/thomas-xin/Miza"
 	rcc_invite = AUTH.get("rcc_invite") or "https://discord.gg/cbKQKAr"
-	discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
+	discord_icon = BASE_LOGO
 	twitch_url = "https://www.twitch.tv/-"
 	webserver = AUTH.get("webserver") or "https://mizabot.xyz"
 	kofi_url = AUTH.get("kofi_url") or "https://ko-fi.com/mizabot"
@@ -604,7 +604,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return user
 	def fetch_user(self, u_id):
 		with suppress(KeyError):
-			return as_fut(self.get_user(u_id))
+			user = as_fut(self.get_user(u_id))
+			if user and getattr(user, "_avatar", None) != self.discord_icon:
+				return user
 		u_id = verify_id(u_id)
 		if type(u_id) is not int:
 			raise TypeError(f"Invalid user identifier: {u_id}")
@@ -5070,7 +5072,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			is_friend = lambda self: None
 			is_blocked = lambda self: None
 			colour = color = discord.Colour(16777215)
-			avatar = _avatar = ""
+			_avatar = None
 			name = "[USER DATA NOT FOUND]"
 			nick = None
 			global_name = None

@@ -1684,6 +1684,7 @@ def to_webp_ex(url):
 		url = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
 	return url.replace(".png", ".webp")
 
+BASE_LOGO = "https://cdn.discordapp.com/embed/avatars/0.png"
 def get_url(obj, f=to_webp) -> str:
 	if isinstance(obj, str):
 		return obj
@@ -1699,7 +1700,7 @@ def get_url(obj, f=to_webp) -> str:
 		if url:
 			return f(url)
 	if found:
-		return "https://cdn.discordapp.com/embed/avatars/0.png"
+		return BASE_LOGO
 
 # Finds the best URL for a discord object's icon, prioritizing proxy_url for images if applicable.
 proxy_url = lambda obj: get_url(obj) or (obj.proxy_url if is_image(obj.proxy_url) else obj.url)

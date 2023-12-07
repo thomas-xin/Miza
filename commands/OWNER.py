@@ -987,17 +987,18 @@ class UpdateColours(Database):
 			key = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
 		else:
 			key = uhash(url.split("?", 1)[0])
+		if isinstance(self.data.get("colours"), dict):
+			self.data.update(self.pop("colours"))
+			self.update()
 		try:
-			out = self.data["colours"][key]
+			out = self[key]
 		except KeyError:
-			colours = self.data.setdefault("colours", {})
 			try:
-				resp = await process_image(url, "get_colour", ["-nogif"], timeout=40)
+				resp = await process_image(url, "get_colour", ["-nogif"], timeout=20)
 			except TypeError:
 				print_exc()
 				return 0
-			colours[key] = out = [round(i) for i in eval_json(resp)]
-			self.update()
+			self[key] = out = [round(i) for i in eval_json(resp)]
 		raw = colour2raw(out)
 		if threshold:
 			if raw == 0:
@@ -1313,6 +1314,8 @@ class UpdateGuilds(Database):
 			)
 			if m.bot:
 				cm.bot = True
+			if m._avatar:
+				cm._a = m._avatar
 			tou = getattr(m, "timed_out_until", None)
 			if tou and ts - tou.timestamp() > 0:
 				cm.tou = tou.timestamp()
@@ -1343,6 +1346,7 @@ class UpdateGuilds(Database):
 				r = guild._roles.get(guild.id) or discord.Role(guild=guild, state=self.bot._state, data=dict(id=guild.id, name="@everyone"))
 				m.roles.append(r)
 			m.bot = cm.get("bot", False)
+			m._avatar = getattr(cm, "_a", None)
 			if getattr(cm, "tou", None):
 				m.timed_out_until = datetime.datetime.utcfromtimestamp(cm.tou).replace(tzinfo=datetime.timezone.utc)
 			guild._members[m.id] = m
