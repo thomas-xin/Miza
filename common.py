@@ -1301,6 +1301,7 @@ def line_count(fn):
 
 
 def split_across(s, lim=2000, prefix=""):
+	state = 0
 	n = len(prefix)
 	out = []
 	while len(s) > lim - n:
@@ -2919,10 +2920,10 @@ def proc_start():
 			CAPS.pop(n)
 
 def device_cap(i, resolve=False):
-	di = torch.cuda.get_device_capability(i)
-	if resolve:
-		return np.prod(di)
-	return di
+    di = torch.cuda.get_device_capability(i)
+    if resolve:
+        return 1.15 ** (di[0] * 10 + di[1])
+    return di
 
 last_task_time = 0
 async def sub_submit(cap, command, _timeout=12):

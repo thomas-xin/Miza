@@ -1915,8 +1915,8 @@ class Ask(Command):
 				if not em:
 					input = "\n".join(inp)
 					# data = await process_image("embedding", "$", [input], cap="summ", timeout=30)
-					resp = await bot.oai.embeddings.create(input=input, model="text-embedding-ada-002")
-					data = np.array(resp.data[0].embedding, dtype=np.float16).data
+					resp = await bot.embedding(input)
+					data = resp.data
 					em = base64.b64encode(data).decode("ascii")
 				mapd[s] = orig
 				embd[s] = em
@@ -2172,16 +2172,16 @@ class Ask(Command):
 				else:
 					input = f"{name}: {q}"
 					# data = await process_image("embedding", "$", [input], cap="summ", timeout=30)
-					resp = await bot.oai.embeddings.create(input=input, model="text-embedding-ada-002")
-					data = np.array(resp.data[0].embedding, dtype=np.float16).data
+					resp = await bot.embedding(input)
+					data = resp.data
 					em = base64.b64encode(data).decode("ascii")
 					objs = list(t for t in ((k, embd[k]) for k in mapd if k in embd) if t[1] and len(t[1]) == len(em))
 					if objs:
 						keys = [t[0] for t in objs]
 						ems = [t[1] for t in objs]
 						print("EM:", len(ems))
-						argsort = await process_image("rank_embeddings", "$", [ems, em], cap="math", timeout=15)
-						n = 4 if premium < 3 else 6
+						argsort = await bot.rank_embeddings(ems, em)
+						n = 6 if premium < 3 else 12
 						argi = argsort[:n]
 						print("ARGI:", argi)
 						for i in sorted(argi, key=keys.__getitem__, reverse=True):
@@ -2234,7 +2234,7 @@ class Ask(Command):
 				blocked.update(("audio", "astate", "askip", "play"))
 			# if model not in chatcc:
 			# 	blocked.add("roleplay")
-			fut = create_task(cut_to(messages, 3000))
+			fut = create_task(cut_to(messages, 6000 if premium >= 3 else 4000))
 			tool_choice = "auto"
 			if extensions:
 				mocked = {}

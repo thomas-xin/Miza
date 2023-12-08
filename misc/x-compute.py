@@ -2274,7 +2274,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			print(args, webui_dir)
 			time.sleep(DEV * 5)
 			while True:
-				proc = psutil.Popen(args, cwd=webui_dir)
+				proc = psutil.Popen(args, cwd=webui_dir, stdout=sys.__stderr__, stderr=subprocess.STDOUT)
 				start = time.time()
 				while proc.is_running() and time.time() - start < 60:
 					try:

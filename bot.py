@@ -1617,6 +1617,39 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		resp = await self.mod_cache.retrieve_from(input, self.oai.moderations.create, input=input)
 		return resp.results[0]
 
+	emb_cache = Cache(timeout=86400, trash=256)
+	async def embedding(self, input=""):
+		resp = await self.emb_cache.retrieve_from(input, self.oai.embeddings.create, input=input, model="text-embedding-ada-002")
+		return np.array(resp.data[0].embedding, dtype=np.float16)
+
+	async def rank_embeddings(self, ems, em):
+		if not torch or not torch.cuda.is_available():
+			return await process_image("rank_embeddings", "$", [ems, em], cap="math", timeout=15)
+		return await asubmit(self._rank_embeddings, ems, em)
+
+	async def _rank_embeddings(embs, emb, temp=0.5):
+		di = getattr(self, "efficient_device", None)
+		if di is None:
+			di = self.efficient_device = np.argsort([-device_cap(i, resolve=True) * COMPUTE_POT[i] for i in range(torch.cuda.device_count())])[0]
+		dt = torch.bfloat16 if device_cap(di)[0] >= 8 else torch.float32
+		btest = base64.b64decode(emb)
+		y = torch.frombuffer(btest, dtype=torch.float16).to(dt).to(di)
+		blist = [base64.b64decode(line) for line in embs]
+		bt2 = b"".join(blist)
+		x = torch.frombuffer(bt2, dtype=torch.float16).to(dt).to(di)
+		x = x.reshape((len(x) // len(y), len(y)))
+		y = y.reshape((1, len(y)))
+		norms = torch.linalg.norm(x, axis=1) * torch.linalg.norm(y, axis=1)
+		z = (x * y).sum(axis=1)
+		z /= norms
+		top = torch.max(z)
+		order = torch.argsort(z, descending=True)
+		thresh = torch.rand(len(z), device=di, dtype=dt)
+		thresh *= 1 / 3
+		check = z[order] - thresh
+		inds = check >= top - temp * 2 / 3
+		return order[inds].cpu().numpy()
+
 	llsem = Semaphore(2, 2, rate_limit=4)
 	together_sem = Semaphore(2, 2, rate_limit=0.5)
 	async def instruct(self, data, best=False, skip=True):
