@@ -1386,7 +1386,7 @@ def map_model(cname, model, premium):
 		keep_model = False
 	return model, keep_model
 
-DEFMOD = "mistral"
+DEFMOD = "mythomax"
 
 MockFunctions = [
 	[None, "Placeholder (Do not choose this!)"],
@@ -1944,7 +1944,9 @@ class Ask(Command):
 		if not isinstance(caid, dict):
 			caid = None
 		mapd = bot.data.chat_mappings.get(channel.id, {})
-		embd = bot.data.chat_embeddings.get(channel.id, {})
+		embd = bot.data.chat_embeddings
+		if channel.id in embd:
+			embd.pop(channel.id)
 		chdd = bot.data.chat_dedups.get(channel.id, {})
 		visible = []
 		simulated = getattr(message, "simulated", False)
@@ -2162,7 +2164,7 @@ class Ask(Command):
 		async with discord.context_managers.Typing(channel):
 			await ignore_embedding(message.id)
 			orig_tup = (name, q)
-			if embd:
+			if mapd:
 				try:
 					await bot.lambdassert("math")
 				except:
@@ -2173,7 +2175,7 @@ class Ask(Command):
 					resp = await bot.oai.embeddings.create(input=input, model="text-embedding-ada-002")
 					data = np.array(resp.data[0].embedding, dtype=np.float16).data
 					em = base64.b64encode(data).decode("ascii")
-					objs = list(t for t in embd.items() if t[1] and len(t[1]) == len(em))
+					objs = list(t for t in ((k, embd[k]) for k in mapd if k in embd) if t[1] and len(t[1]) == len(em))
 					if objs:
 						keys = [t[0] for t in objs]
 						ems = [t[1] for t in objs]
@@ -2946,8 +2948,8 @@ class Ask(Command):
 		tup = orig_tup + (bot_name, self.alm_re.sub("", s))
 		await register_embedding(mresp.id, *tup)
 		lm = ceil(caid.get("long_mem", 0))
-		if len(embd) > lm:
-			keys = sorted(embd.keys())
+		if len(mapd) > lm:
+			keys = sorted(mapd.keys())
 			keys = keys[:-lm]
 			for k in keys:
 				tup = tuple(mapd.pop(k, ()))
@@ -2959,12 +2961,6 @@ class Ask(Command):
 			bot.data.chat_mappings[channel.id] = mapd
 		else:
 			bot.data.chat_mappings.update(channel.id)
-		try:
-			bot.data.chat_embeddings[channel.id].update(embd)
-		except KeyError:
-			bot.data.chat_embeddings[channel.id] = embd
-		else:
-			bot.data.chat_embeddings.update(channel.id)
 		try:
 			bot.data.chat_dedups[channel.id].update(chdd)
 		except KeyError:

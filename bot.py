@@ -1645,7 +1645,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if AUTH.get("together_key") and not self.together_sem.busy and best is not None:
 			import together
 			together.api_key = AUTH["together_key"]
-			rp = ((data.get("frequency_penalty", 0.25) + inputs.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
+			rp = ((inputs.get("frequency_penalty", 0.25) + inputs.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
 			m = "WizardLM/WizardLM-70B-V1.0" if best else "Gryphe/MythoMax-L2-13b"
 			rdata = dict(
 				prompt=inputs["prompt"],

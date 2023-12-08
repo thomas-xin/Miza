@@ -1133,7 +1133,7 @@ class Suspend(Command):
 	example = ("block 201548633244565504",)
 	flags = "aed"
 
-	async def __call__(self, bot, user, guild, args, flags, name, **void):
+	async def __call__(self, bot, user, args, flags, name, **void):
 		v = 1 if name == "block" else 2
 		nlist = name + " list" if name != "blacklist" else name
 		if len(args) >= 1:
