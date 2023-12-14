@@ -44,6 +44,7 @@ if os.environ.get("AI_FEATURES", True):
 		"accelerate>=0.22.0",
 		"clip-interrogator>=0.6.0",
 		"diffusers>=0.19.0",
+        "fireworks-ai>=0.9.0",
 		"openai>=1.3.4",
 		"opencv-python>=4.8.0.74",
 		"protobuf==3.20.3",

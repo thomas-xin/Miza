@@ -783,7 +783,6 @@ class Snake(Command):
 		embed.set_footer(text="Score: 0")
 		message = await send_with_reply(None, message, embed=embed, buttons=self.buttons)
 		self.playing[message.id] = game
-		channel = message.channel
 
 		while game.alive:
 			if game.dir is not None:
@@ -889,7 +888,7 @@ class SlotMachine(Command):
 		out = ""
 		for item in wheel:
 			if item is None:
-				out += await asubmit(self.bot.data.emojis.emoji_as, "slot_machine.gif")
+				out += await self.bot.data.emojis.emoji_as("slot_machine.gif")
 			else:
 				out += item
 		return out
@@ -1072,7 +1071,7 @@ class Barter(Command):
 					data["minecraft"][i] += c
 				except KeyError:
 					data["minecraft"][i] = c
-				s = await asubmit(bot.data.emojis.emoji_as, barter_values[i] + ".gif")
+				s = await bot.data.emojis.emoji_as(barter_values[i] + ".gif")
 				if c != 1:
 					s += f" {c}"
 				rewards.append(s)
@@ -1084,7 +1083,7 @@ class Barter(Command):
 			footer = cdict(
 				text=f"{w} in 459 ({p}%) chance",
 			)
-			thumbnail = await asubmit(bot.data.emojis.get, barter_values[ids[0]] + ".gif")
+			thumbnail = await bot.data.emojis.grab(barter_values[ids[0]] + ".gif")
 			thumbnail = str(thumbnail.url)
 		bot.send_as_embeds(
 			channel,
@@ -1093,6 +1092,75 @@ class Barter(Command):
 			thumbnail=thumbnail,
 			reference=message,
 		)
+
+
+# class SpecialReacts(Command):
+# 	server_only = True
+# 	name = ["Sparkles", "Outbreak", "PokemonOutbreak"]
+# 	min_level = 2
+# 	description = "Toggles or changes the mode of ⟨MIZA⟩'s random special reactions. Sparkles (default) has a 1 in 1000 chance of reacting to any message with a sparkle reaction and granting diamonds, while "
+# 	usage = "(enable|disable|clear)?"
+# 	example = ("sparkles disable", "outbreak enable")
+# 	flags = "aed"
+# 	no_parse = True
+# 	rate_limit = (8, 12)
+
+# 	async def __call__(self, bot, flags, guild, message, user, name, perm, argv, args, **void):
+# 		pass
+
+
+class UpdateOutbreaks(Command):
+	managed_limit = 32
+	pokemon_count = 0
+	single_sem = Semaphore(1, 0, rate_limit=60)
+
+	async def get_buffer(self, shiny=False):
+		curr = self.setdefault(None, [])
+		guilds, limits = self.bot.get_available_guild(animated=shiny, return_all=True)
+		if len(curr) + len(guilds) * 2 > self.managed_limit:
+			rems = len(curr) + len(guilds) * 2 - self.managed_limit
+			for i in range(rems):
+				eid = curr.pop(0)
+				emoji = self.bot.cache.emojis.get(eid)
+				if not emoji:
+					continue
+				with tracebacksuppressor:
+					await emoji.delete("Buffer expired")
+		futs = []
+		for guild, limit in zip(guilds, limits):
+			if not limit: continue
+			lim = min(2, limit)
+			for i in range(lim):
+				if not self.pokemon_count:
+					if self.single_sem.busy:
+						await self.single_sem.acquire()
+					else:
+						async with self.single_sem:
+							b = await self.bot.get_request("https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_by_National_Pok%C3%A9dex_number")
+							count = 0
+							while not count:
+								b, last = b.rsplit(b'<td rowspan="1" style="font-family:monospace,monospace">#', 1)
+								count = int(last.split(b'</td>', 1)[0])
+							self.pokemon_count = count
+				url = None
+				while not url:
+					pid = xrand(self.pokemon_count) + 1
+					if shiny:
+						u = f"https://archives.bulbagarden.net/wiki/File:HOME{pid}_s.png"
+						name = f"S-{pid}"
+					else:
+						u = f"https://archives.bulbagarden.net/wiki/File:HOME{pid}.png"
+						name = f"P-{pid}"
+					urls = await self.bot.follow_url(u)
+					if urls:
+						url = urls[0]
+				# futs.append(guild.create_custom_emoji(name=str(p), image=b))
+
+	async def grab(self, guild, shiny=False):
+		reached = self.get(guild.id)
+		curr = self.get(None)
+		if not curr or reached == curr[-1]:
+			buff = await self.get_buffer(shiny=shiny)
 
 
 class Uno(Command):
@@ -1175,7 +1243,7 @@ class Uno(Command):
 				embed.set_footer(text="Click ✋ to join, ✅ to start!")
 				s = ""
 				for c in hand:
-					s += await asubmit(bot.data.emojis.emoji_as, c + ".png")
+					s += await bot.data.emojis.emoji_as(c + ".png")
 				c = await bot.get_colour(user)
 				emb = discord.Embed(
 					colour=c,
@@ -1194,7 +1262,7 @@ class Uno(Command):
 			hand = hands[players.index(user.id)]
 			s = ""
 			for c in hand:
-				s += await asubmit(bot.data.emojis.emoji_as, c + ".png")
+				s += await bot.data.emojis.emoji_as(c + ".png")
 			c = await bot.get_colour(user)
 			if user.id == players[0]:
 				d = f"Begin the game with ✅ when all players are ready!"
@@ -1247,12 +1315,12 @@ class Uno(Command):
 				content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_-\nUNO game in progress...```"
 				embed = message.embeds[0]
 				embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
-				emoji = await asubmit(bot.data.emojis.get, last + ".png")
+				emoji = await bot.data.emojis.grab(last + ".png")
 				embed.set_thumbnail(url=str(emoji.url))
 				embed.set_footer(text="Click 🔻 to play if it's your turn, ✖ to leave!")
 				s = ""
 				for c in hand:
-					s += await asubmit(bot.data.emojis.emoji_as, c + ".png")
+					s += await bot.data.emojis.emoji_as(c + ".png")
 
 				create_task(interaction_response(
 					bot=bot,
@@ -1291,7 +1359,7 @@ class Uno(Command):
 				emb = None
 			else:
 				for c in hand:
-					s += await asubmit(bot.data.emojis.emoji_as, c + ".png")
+					s += await bot.data.emojis.emoji_as(c + ".png")
 				c = await bot.get_colour(user)
 				emb = discord.Embed(
 					colour=c,
@@ -1316,11 +1384,11 @@ class Uno(Command):
 				elif last == "WX":
 					playable = set(hand)
 					for c in hand:
-						s += await asubmit(bot.data.emojis.emoji_as, c + ".png")
+						s += await bot.data.emojis.emoji_as(c + ".png")
 				else:
 					playable = set()
 					for card in hand:
-						s += await asubmit(bot.data.emojis.emoji_as, card + ".png")
+						s += await bot.data.emojis.emoji_as(card + ".png")
 						if card == "WY":
 							playable.add(card)
 						elif draw:
@@ -1333,7 +1401,8 @@ class Uno(Command):
 				playable = list(playable)
 				self.sort(playable)
 				pickup = max(1, draw)
-				buttons = [cdict(emoji=bot.data.emojis.get(c + ".png"), custom_id=f"~{message.id}~{c}", style=3) for c in playable]
+				es = await asyncio.gather(*(bot.data.emojis.grab(c + ".png") for c in playable))
+				buttons = [cdict(emoji=e, custom_id=f"~{message.id}~{c}", style=3) for c, e in zip(playable, es)]
 				buttons.append(cdict(emoji="📤", name=f"Pickup {pickup}", custom_id=f"~{message.id}~!", style=4))
 
 				return await interaction_response(
@@ -1347,7 +1416,7 @@ class Uno(Command):
 			hand = hands[players.index(user.id)]
 			s = ""
 			for c in hand:
-				s += await asubmit(bot.data.emojis.emoji_as, c + ".png")
+				s += await bot.data.emojis.emoji_as(c + ".png")
 			c = await bot.get_colour(user)
 			d = f"Please wait for {user_mention(players[turn])} to complete their turn!"
 			emb = discord.Embed(
@@ -1381,11 +1450,11 @@ class Uno(Command):
 					elif last == "WX":
 						playable = set(hand)
 						for c in hand:
-							s += await asubmit(bot.data.emojis.emoji_as, c + ".png")
+							s += await bot.data.emojis.emoji_as(c + ".png")
 					else:
 						playable = set()
 						for card in hand:
-							s += await asubmit(bot.data.emojis.emoji_as, card + ".png")
+							s += await bot.data.emojis.emoji_as(card + ".png")
 							if card == "WY":
 								playable.add(card)
 							elif draw:
@@ -1398,7 +1467,7 @@ class Uno(Command):
 					playable = list(playable)
 					if playable:
 						self.sort(playable)
-						buttons = [cdict(emoji=bot.data.emojis.get(c + ".png"), custom_id=f"~{message.id}~{c}", style=3) for c in playable]
+						buttons = [cdict(emoji=bot.data.emojis.grab(c + ".png"), custom_id=f"~{message.id}~{c}", style=3) for c in playable]
 						buttons.append(cdict(emoji="⏭️", name=f"Pass", custom_id=f"~{message.id}~@", style=4))
 					else:
 						buttons = ()
@@ -1407,11 +1476,11 @@ class Uno(Command):
 				content += user_mention(players[turn])
 				embed = message.embeds[0]
 				embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
-				emoji = await asubmit(bot.data.emojis.get, last + ".png")
+				emoji = await bot.data.emojis.grab(last + ".png")
 				embed.set_thumbnail(url=str(emoji.url))
 				t = ""
 				for card in played:
-					t += await asubmit(bot.data.emojis.emoji_as, card + ".png")
+					t += await bot.data.emojis.emoji_as(card + ".png")
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
 
@@ -1429,14 +1498,14 @@ class Uno(Command):
 			hand = hands[turn]
 			s = ""
 			for c in hand:
-				s += await asubmit(bot.data.emojis.emoji_as, c + ".png")
+				s += await bot.data.emojis.emoji_as(c + ".png")
 			# Skip turn
 			if last[0] == "W":
 				# Select a colour if last card played was wild
 				playable = [c + last[-1] for c in "RYGB"]
 				buttons = []
 				for c in playable:
-					emoji = await asubmit(bot.data.emojis.get, c + ".png")
+					emoji = await asubmit(bot.data.emojis.grab, c + ".png")
 					button = cdict(emoji=emoji, custom_id=f"~{message.id}~{c}", style=3)
 					buttons.append(button)
 
@@ -1444,11 +1513,11 @@ class Uno(Command):
 				content += user_mention(players[turn])
 				embed = message.embeds[0]
 				embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
-				emoji = await asubmit(bot.data.emojis.get, last + ".png")
+				emoji = await bot.data.emojis.grab(last + ".png")
 				embed.set_thumbnail(url=str(emoji.url))
 				t = ""
 				for card in played:
-					t += await asubmit(bot.data.emojis.emoji_as, card + ".png")
+					t += await bot.data.emojis.emoji_as(card + ".png")
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
 
@@ -1481,11 +1550,11 @@ class Uno(Command):
 			content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_{winners}_{turn}_{last}_{'-01'[td]}_{draw}_-\nUNO game in progress...```"
 			embed = message.embeds[0]
 			embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
-			emoji = await asubmit(bot.data.emojis.get, last + ".png")
+			emoji = await bot.data.emojis.grab(last + ".png")
 			embed.set_thumbnail(url=str(emoji.url))
 			t = ""
 			for card in played:
-				t += await asubmit(bot.data.emojis.emoji_as, card + ".png")
+				t += await bot.data.emojis.emoji_as(card + ".png")
 			embed.clear_fields()
 			embed.add_field(name="Previous turn", value=t or "\xad")
 			create_task(message.edit(content=content, embed=embed))
@@ -1504,7 +1573,7 @@ class Uno(Command):
 			card = r[1:]
 			s = ""
 			for c in hand:
-				s += await asubmit(bot.data.emojis.emoji_as, c + ".png")
+				s += await bot.data.emojis.emoji_as(c + ".png")
 			if last[0] == "W" and card[1] == last[1]:
 				if card[0] != "W":
 					# Player chooses a +4 colour
@@ -1526,11 +1595,11 @@ class Uno(Command):
 					content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_{winners}_{turn}_{last}_{'-01'[td]}_{draw}_-\nUNO game in progress...```"
 					embed = message.embeds[0]
 					embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
-					emoji = await asubmit(bot.data.emojis.get, last + ".png")
+					emoji = await bot.data.emojis.grab(last + ".png")
 					embed.set_thumbnail(url=str(emoji.url))
 					t = ""
 					for card in played:
-						t += await asubmit(bot.data.emojis.emoji_as, card + ".png")
+						t += await bot.data.emojis.emoji_as(card + ".png")
 					embed.clear_fields()
 					embed.add_field(name="Previous turn", value=t or "\xad")
 					create_task(message.edit(content=content, embed=embed))
@@ -1567,22 +1636,23 @@ class Uno(Command):
 				draw += 4
 			s = ""
 			for c in hand:
-				s += await asubmit(bot.data.emojis.emoji_as, c + ".png")
+				s += await bot.data.emojis.emoji_as(c + ".png")
 			if last[0] != "W":
 				playable = [c for c in set(hand) if c[1] == last[1]]
 				if playable:
 					self.sort(playable)
-					buttons = [cdict(emoji=bot.data.emojis.get(c + ".png"), custom_id=f"~{message.id}~{c}", style=3) for c in playable]
+					es = await asyncio.gather(*(bot.data.emojis.grab(c + ".png") for c in playable))
+					buttons = [cdict(emoji=e, custom_id=f"~{message.id}~{c}", style=3) for c, e in zip(playable, es)]
 					buttons.append(cdict(emoji="⏭️", name=f"Pass", custom_id=f"~{message.id}~@", style=4))
 
 					content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_{winners}_{turn}_{last}_{'-01'[td]}_{draw}_{self.played_repr(played)}-\nUNO game in progress...```"
 					embed = message.embeds[0]
 					embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
-					emoji = await asubmit(bot.data.emojis.get, last + ".png")
+					emoji = await bot.data.emojis.grab(last + ".png")
 					embed.set_thumbnail(url=str(emoji.url))
 					t = ""
 					for card in played:
-						t += await asubmit(bot.data.emojis.emoji_as, card + ".png")
+						t += await bot.data.emojis.emoji_as(card + ".png")
 					embed.clear_fields()
 					embed.add_field(name="Previous turn", value=t or "\xad")
 
@@ -1614,11 +1684,11 @@ class Uno(Command):
 				content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_{winners}_{turn}_{last}_{'-01'[td]}_{draw}_-\nUNO game in progress...```"
 				embed = message.embeds[0]
 				embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
-				emoji = await asubmit(bot.data.emojis.get, last + ".png")
+				emoji = await bot.data.emojis.grab(last + ".png")
 				embed.set_thumbnail(url=str(emoji.url))
 				t = ""
 				for card in played:
-					t += await asubmit(bot.data.emojis.emoji_as, card + ".png")
+					t += await bot.data.emojis.emoji_as(card + ".png")
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
 				create_task(message.edit(content=content, embed=embed))
@@ -1631,17 +1701,18 @@ class Uno(Command):
 			playable = [c for c in set(hand) if c == last or last[1] == "X" and c[1] == "Y"]
 			if playable:
 				self.sort(playable)
-				buttons = [cdict(emoji=bot.data.emojis.get(c + ".png"), custom_id=f"~{message.id}~{c}", style=3) for c in playable]
+				es = await asyncio.gather(*(bot.data.emojis.grab(c + ".png") for c in playable))
+				buttons = [cdict(emoji=e, custom_id=f"~{message.id}~{c}", style=3) for c, e in zip(playable, es)]
 				buttons.append(cdict(emoji="⏭️", name=f"Pass", custom_id=f"~{message.id}~@", style=4))
 
 				content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_{winners}_{turn}_{last}_{'-01'[td]}_{draw}_{self.played_repr(played)}-\nUNO game in progress...```"
 				embed = message.embeds[0]
 				embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
-				emoji = await asubmit(bot.data.emojis.get, last + ".png")
+				emoji = await bot.data.emojis.grab(last + ".png")
 				embed.set_thumbnail(url=str(emoji.url))
 				t = ""
 				for card in played:
-					t += await asubmit(bot.data.emojis.emoji_as, card + ".png")
+					t += await bot.data.emojis.emoji_as(card + ".png")
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
 
@@ -1655,18 +1726,18 @@ class Uno(Command):
 			playable = [c + last[-1] for c in "RYGB"]
 			buttons = []
 			for c in playable:
-				emoji = await asubmit(bot.data.emojis.get, c + ".png")
+				emoji = await bot.data.emojis.grab(c + ".png")
 				button = cdict(emoji=emoji, custom_id=f"~{message.id}~{c}", style=3)
 				buttons.append(button)
 
 			content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_{winners}_{turn}_{last}_{'-01'[td]}_{draw}_{self.played_repr(played)}-\nUNO game in progress...```"
 			embed = message.embeds[0]
 			embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
-			emoji = await asubmit(bot.data.emojis.get, last + ".png")
+			emoji = await bot.data.emojis.grab(last + ".png")
 			embed.set_thumbnail(url=str(emoji.url))
 			t = ""
 			for card in played:
-				t += await asubmit(bot.data.emojis.emoji_as, card + ".png")
+				t += await bot.data.emojis.emoji_as(card + ".png")
 			embed.clear_fields()
 			embed.add_field(name="Previous turn", value=t or "\xad")
 
@@ -1996,7 +2067,7 @@ class UpdateReacts(Database):
 class Dogpile(Command):
 	server_only = True
 	min_level = 2
-	description = "Causes ⟨MIZA⟩ to automatically imitate users when 3+ of the same messages are posted in a row. Grants XP and gold when triggered."
+	description = "Causes ⟨MIZA⟩ to automatically imitate users when 3+ of the same messages are posted in a row. Grants XP and gold when triggered. Enabled by default."
 	usage = "(enable|disable)?"
 	example = ("dogpile enable",)
 	flags = "aed"
@@ -2459,6 +2530,7 @@ class Wallet(Command):
 	rate_limit = (3, 4)
 	multi = True
 	slash = True
+	ephemeral = True
 
 	async def __call__(self, bot, name, flags, args, argv, argl, user, guild, channel, **void):
 		if name == "trial" or "t" in flags:
@@ -2520,7 +2592,7 @@ class Wallet(Command):
 			description = f"{bar}\n`Lv {level}`\n`XP {xp}/{xp_next}`\n{bal}"
 			ingots = data.get("ingots", 0)
 			if ingots:
-				ingot = await asubmit(bot.data.emojis.emoji_as, "gold_ingot.gif")
+				ingot = await bot.data.emojis.emoji_as("gold_ingot.gif")
 				description += f" {ingot} {ingots}"
 			lv = bot.premium_level(user)
 			lv2 = bot.premium_level(user, absolute=True)
@@ -2532,7 +2604,7 @@ class Wallet(Command):
 			if minecraft:
 				items = deque()
 				for i, c in sorted(minecraft.items()):
-					s = await asubmit(bot.data.emojis.emoji_as, barter_values[i] + ".gif")
+					s = await bot.data.emojis.emoji_as(barter_values[i] + ".gif")
 					s += f" {c}"
 					items.append(s)
 				description += "\n" + " ".join(items)
@@ -2970,6 +3042,7 @@ class Rickroll(Command):
 	example = ("rickroll https://i.ytimg.com/kJQP7kiw5Fk/maxresdefault.jpg", "rickroll https://i.ytimg.com/kJQP7kiw5Fk/maxresdefault.jpg https://www.youtube.com/watch?v=wDgQdr8ZkTw")
 	no_parse = True
 	rate_limit = (6, 9)
+	ephemeral = True
 
 	async def __call__(self, bot, args, message, channel, **void):
 		if message.attachments:
@@ -3179,6 +3252,7 @@ class HOW(Command):
 	description = ":3"
 	rate_limit = (0, 1)
 	no_parse = True
+	ephemeral = True
 
 	def __call__(self, channel, message, **void):
 		self.bot.send_as_embeds(channel, image="https://mizabot.xyz/u/EFz0uPvEMFE.gif", reference=message)

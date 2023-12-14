@@ -108,7 +108,7 @@ class Restart(Command):
 				# Kill the webserver
 				print("Killing webserver...")
 				with tracebacksuppressor:
-					await asubmit(force_kill, bot.server, priority=True)
+					await asubmit(force_kill, bot.server, timeout=16, priority=True)
 				# Disconnect as many voice clients as possible
 				print("Disconnecting remaining voice clients...")
 				futs = deque()
@@ -1012,14 +1012,14 @@ class UpdateChannelCache(Database):
 	name = "channel_cache"
 	channel = True
 
-	async def get(self, channel, as_message=True, force=False):
+	async def grab(self, channel, as_message=True, force=False):
 		if hasattr(channel, "simulated"):
 			yield channel.message
 			return
 		c_id = verify_id(channel)
 		min_time = time_snowflake(dtn() - datetime.timedelta(days=14))
 		deletable = False
-		for m_id in sorted(self.data.get(c_id, ()), reverse=True):
+		for m_id in sorted(self.get(c_id, ()), reverse=True):
 			if as_message:
 				try:
 					if m_id < min_time:
@@ -1156,25 +1156,35 @@ class UpdateBlacklist(Database):
 class UpdateEmojis(Database):
 	name = "emojis"
 
-	def get(self, name):
+	async def grab(self, name):
 		while not self.bot.bot_ready:
-			time.sleep(2)
+			await asyncio.sleep(2)
+		ename = name.rsplit(".", 1)[0]
+		animated = name.endswith(".gif")
 		with suppress(KeyError):
 			return self.bot.cache.emojis[self.data[name]]
-		guild = self.bot.get_available_guild()
+		guilds, limits = self.bot.get_available_guild(animated=animated, return_all=True)
+		for guild in guilds:
+			for emoji in guild.emojis:
+				if emoji.name == name and emoji.animated == animated:
+					return emoji
+		if not sum(limits):
+			raise LookupError("Unable to find suitable guild for the required emoji.")
 		with open(f"misc/emojis/{name}", "rb") as f:
-			emoji = await_fut(guild.create_custom_emoji(name=name.split(".", 1)[0], image=f.read()))
-			self.data[name] = emoji.id
+			b = await asubmit(f.read)
+		emoji = await guilds[0].create_custom_emoji(name=ename, image=b)
+		self.data[name] = emoji.id
 		self.bot.cache.emojis[emoji.id] = emoji
 		return emoji
 
-	def emoji_as(self, s):
-		return min_emoji(self.get(s))
+	async def emoji_as(self, s):
+		e = await self.grab(s)
+		return min_emoji(e)
 
-	def create_progress_bar(self, length, ratio):
-		start_bar = [self.emoji_as(f"start_bar_{i}.gif") for i in range(5)]
-		mid_bar = [self.emoji_as(f"mid_bar_{i}.gif") for i in range(5)]
-		end_bar = [self.emoji_as(f"end_bar_{i}.gif") for i in range(5)]
+	async def create_progress_bar(self, length, ratio):
+		start_bar = await asyncio.gather(*[self.emoji_as(f"start_bar_{i}.gif") for i in range(5)])
+		mid_bar = await asyncio.gather(*[self.emoji_as(f"mid_bar_{i}.gif") for i in range(5)])
+		end_bar = await asyncio.gather(*[self.emoji_as(f"end_bar_{i}.gif") for i in range(5)])
 		high = length * 4
 		position = min(high, round(ratio * high))
 		items = deque()
@@ -1308,6 +1318,7 @@ class UpdateGuilds(Database):
 			cm = cdict(
 				name=m.name,
 				nick=m.nick,
+				global_name=m.global_name,
 				id=m.id,
 				gp=m.guild_permissions.value,
 				rids=list(m._roles),
@@ -1338,7 +1349,8 @@ class UpdateGuilds(Database):
 			m = self.bot.GhostUser()
 			m.id = cm.id
 			m.name = cm.name
-			m.nick = cm.nick
+			m.nick = cm.get("nick")
+			m.global_name = cm.get("global_name")
 			m.guild_permissions = discord.Permissions(cm.gp)
 			m.guild = guild
 			m.roles = list(filter(bool, map(guild._roles.get, cm.get("rids", ()))))
@@ -1358,6 +1370,10 @@ class UpdateGuilds(Database):
 		elif guild.id not in self.forced:
 			return
 		return self.cache_guild(guild)
+
+
+class UpdateLLCache(Database):
+	name = "llcache"
 
 
 class UpdateDrives(Database):

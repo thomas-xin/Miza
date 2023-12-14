@@ -506,7 +506,7 @@ try:
 						35: "DDR5",
 					}[ram_type]
 				except KeyError:
-					ram_class = "DDR" + str(max(1, ceil(math.log2(ram_speed / 250))))
+					ram_class = "DDR" + str(max(1, ceil(log2(ram_speed / 250))))
 				ram_name = globals()["RAM_NAME"] = f"{ram_class}-{ram_speed}"
 		stats = orjson.dumps(dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},

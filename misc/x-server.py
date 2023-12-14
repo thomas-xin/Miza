@@ -1439,8 +1439,11 @@ class Server:
 						return
 					if not os.path.getsize(fni):
 						return
+					if utc() - os.path.getmtime(fni) < 3:
+						return
 					try:
 						res = self.bot_exec(f"bool(bot.audio.returns[{t}].is_finished())")
+						# print(t, res, type(res))
 					except:
 						print_exc()
 						return True
@@ -1450,13 +1453,17 @@ class Server:
 				if af():
 					f = open(fni, "rb")
 					self.bot_exec(f"bot.audio.returns.pop({t},None)")
+					print("Cache hit, skipping...")
 				else:
+					if not os.path.exists(fni):
+						fni = self.bot_exec(f"bot.audio.returns[{t}].file")
 					f = DownloadingFile(fni, af=af)
 					if d:
 						cp.response.status = 202
 					cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
 					cp.response.headers["Content-Disposition"] = "attachment; " * bool(d) + "filename=" + json.dumps(name + fmt)
 					cp.response.headers.pop("Accept-Ranges", None)
+					print("Cache miss, waiting...")
 					return cp.lib.file_generator(f, 262144)
 				# cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
 			return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt[1:]}", disposition="attachment" if d else "", name=name + fmt)

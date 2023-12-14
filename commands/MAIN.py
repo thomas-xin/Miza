@@ -59,6 +59,7 @@ class Help(Command):
 	rate_limit = (3, 5)
 	no_parse = True
 	slash = True
+	ephemeral = True
 
 	async def __call__(self, bot, argv, user, message, original=None, **void):
 		bot = self.bot
@@ -261,6 +262,7 @@ class Perms(Command):
 	rate_limit = (5, 8)
 	multi = True
 	slash = True
+	ephemeral = True
 
 	async def __call__(self, bot, args, argl, user, name, perm, channel, guild, flags, **void):
 		if name == "defaultperms":
@@ -322,6 +324,8 @@ class EnabledCommands(Command):
 	flags = "aedlhrs"
 	rate_limit = (5, 8)
 	slash = True
+	ephemeral = True
+	exact = False
 
 	def __call__(self, argv, args, flags, user, channel, guild, perm, name, **void):
 		bot = self.bot
@@ -420,6 +424,8 @@ class Prefix(Command):
 	umap["\u200a"] = ""
 	utrans = "".maketrans(umap)
 	slash = True
+	ephemeral = True
+	exact = False
 
 	def __call__(self, argv, guild, perm, bot, flags, **void):
 		pref = bot.data.prefixes
@@ -519,6 +525,7 @@ class Avatar(Command):
 	rate_limit = (5, 7)
 	multi = True
 	slash = True
+	ephemeral = True
 
 	async def getGuildData(self, g):
 		# Gets icon display of a server and returns as an embed.
@@ -625,6 +632,7 @@ class Info(Command):
 	rate_limit = (6, 9)
 	multi = True
 	slash = True
+	ephemeral = True
 	usercmd = True
 
 	async def getGuildData(self, g, flags={}):
@@ -930,6 +938,7 @@ class Profile(Command):
 	rate_limit = (4, 6)
 	no_parse = True
 	slash = True
+	ephemeral = True
 	usercmd = True
 
 	async def __call__(self, user, args, argv, flags, channel, guild, bot, message, **void):
@@ -1057,6 +1066,7 @@ class Status(Command):
 	example = ("status", "status enable")
 	flags = "aed"
 	slash = True
+	ephemeral = True
 	rate_limit = (9, 13)
 
 	async def __call__(self, perm, flags, channel, bot, **void):
@@ -1111,7 +1121,7 @@ class Status(Command):
 						create_task(bot.silent_delete(message))
 						raise StopIteration
 				if message.id != channel.last_message_id or getattr(message, "rated", False):
-					async for m in bot.data.channel_cache.get(channel):
+					async for m in bot.data.channel_cache.grab(channel):
 						if message.id != m.id or utc() - snowflake_time_2(m.id).timestamp() > 86400 * 14 - 60 or getattr(m, "rated", False):
 							create_task(bot.silent_delete(m))
 							raise StopIteration
@@ -1133,6 +1143,7 @@ class Invite(Command):
 	example = ("invite",)
 	rate_limit = (9, 13)
 	slash = True
+	ephemeral = True
 
 	async def __call__(self, channel, message, **void):
 		emb = discord.Embed(colour=rand_colour())
@@ -1157,11 +1168,12 @@ class Upload(Command):
 	name = ["Filehost", "Files", "Preserve", "PreserveAttachmentLinks"]
 	description = "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to ⟨MIZA⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
 	usage = "<url>?"
-	example = ("upload https://cdn.discordapp.com/attachments/911168940246442006/1026474858705588224/6e74595fa98e9c52e2fab6ece4639604.png", "files")
+	example = ("preserve https://cdn.discordapp.com/attachments/911168940246442006/1026474858705588224/6e74595fa98e9c52e2fab6ece4639604.png", "files")
 	rate_limit = (12, 17)
 	_timeout_ = 50
 	slash = ("Preserve",)
 	msgcmd = ("Preserve Attachment Links",)
+	ephemeral = True
 
 	async def __call__(self, name, channel, message, argv, **void):
 		if message.attachments:
@@ -1179,12 +1191,12 @@ class Upload(Command):
 						waited = True
 						await asyncio.sleep(2)
 					if a_id in self.bot.data.attachments:
-						futs.append(as_fut("<" + self.bot.preserve_attachment(a_id) + ">"))
+						futs.append(as_fut(self.bot.preserve_attachment(a_id)))
 						continue
 				futs.append(Request(self.bot.raw_webserver + "/upload_url?url=" + url, decode=True, aio=True, ssl=False, timeout=1200))
 				await asyncio.sleep(0.1)
 			out = await asyncio.gather(*futs)
-		return await send_with_reply(channel, message, "\n".join(out), ephemeral=True)
+		return await send_with_reply(channel, message, "\n".join("<" + u + ">" for u in out), ephemeral=True)
 
 
 class Reminder(Command):
@@ -2165,7 +2177,7 @@ class UpdateUsers(Database):
 
 	async def react_sparkle(self, message):
 		bot = self.bot
-		react = await asubmit(bot.data.emojis.get, "sparkles.gif")
+		react = await bot.data.emojis.grab("sparkles.gif")
 		return await message.add_reaction(react)
 
 	def _send_(self, message, **void):
@@ -2254,8 +2266,7 @@ class UpdateUsers(Database):
 	def add_xp(self, user, amount, multiplier=True):
 		if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
 			pl = self.bot.premium_level(user)
-			if pl:
-				amount *= 2 ** pl
+			amount *= self.bot.premium_multiplier(pl)
 			add_dict(set_dict(self.data, user.id, {}), {"xp": amount})
 			if "dailies" in self.bot.data:
 				self.bot.data.dailies.progress_quests(user, "xp", amount)
@@ -2264,8 +2275,7 @@ class UpdateUsers(Database):
 	def add_gold(self, user, amount, multiplier=True):
 		if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
 			pl = self.bot.premium_level(user, absolute=True)
-			if pl:
-				amount *= 2 ** pl
+			amount *= self.bot.premium_multiplier(pl)
 			add_dict(set_dict(self.data, user.id, {}), {"gold": amount})
 			if amount < 0 and self[user.id]["gold"] < 0:
 				self[user.id]["gold"] = 0
@@ -2274,8 +2284,7 @@ class UpdateUsers(Database):
 	def add_diamonds(self, user, amount, multiplier=True):
 		if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
 			pl = self.bot.premium_level(user, absolute=True)
-			if pl:
-				amount *= 2 ** pl
+			amount *= self.bot.premium_multiplier(pl)
 			add_dict(set_dict(self.data, user.id, {}), {"diamonds": amount})
 			if amount > 0 and "dailies" in self.bot.data:
 				self.bot.data.dailies.progress_quests(user, "diamond", amount)
@@ -2297,7 +2306,7 @@ class UpdateUsers(Database):
 		if force or bot.is_mentioned(message, bot, guild):
 			if user.bot:
 				with suppress(AttributeError):
-					async for m in bot.data.channel_cache.get(channel):
+					async for m in bot.data.channel_cache.grab(channel):
 						user = m.author
 						if bot.get_perms(user.id, guild) <= -inf:
 							return

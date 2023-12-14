@@ -17,19 +17,6 @@ def to_qr(s, rainbow=False):
 	size = len(s)
 	err = "M" if size <= 2334 else "L"
 	ver = None
-	# if size > 125:
-	#	 if size <= 2334:
-	#		 for i, n in enumerate(qr_bytes):
-	#			 if n >= size:
-	#				 ver = i + 1
-	#				 break
-	#	 if ver is None:
-	#		 for i, n in enumerate(qr_bytes_ex):
-	#			 if n >= size:
-	#				 ver = i + 36
-	#				 err = "L"
-	#	 if ver is None:
-	#		 raise OverflowError("Input string too large for QR code encoding.")
 	import pyqrcode
 	img = pyqrcode.create(s, error=err, version=ver, mode=None, encoding="utf-8" if max(s) >= 80 else "ascii")
 	fn = f"cache/{time.time_ns() // 1000}.png"
@@ -94,7 +81,6 @@ def rainbow_gif2(image, duration):
 	if abs(loops) < 1:
 		loops = 1 if loops >= 0 else -1
 	size = image.size
-	# print(image, length, scale, loops)
 
 	def rainbow_gif_iterator(image):
 		for f in range(length * scale):
@@ -110,10 +96,7 @@ def rainbow_gif2(image, duration):
 			if temp.size[0] != size[0] or temp.size[1] != size[1]:
 				temp = temp.resize(size, Resampling.HAMMING)
 			channels = list(temp.convert("HSV").split())
-			# channels = hsv_split(temp, convert=False)
-			# hue = channels[0] + round(f / length / scale * loops * 256)
-			# temp = hsv_merge(hue, *channels[1:])
-			channels[0] = channels[0].point(lambda x: int(((f / length / scale * loops + x / 256) % 1) * 256))
+			channels[0] = channels[0].point(lambda x: round_random((f / length / scale * loops % 1) * 256) + x & 255)
 			temp = Image.merge("HSV", channels).convert("RGB")
 			if A:
 				temp.putalpha(A)
@@ -128,9 +111,6 @@ def rainbow_gif(image, duration):
 		image.seek(0)
 	else:
 		return rainbow_gif2(image, duration)
-	# image = resize_max(image, 960, resample=Image.HAMMING)
-	# size = list(image.size)
-	size = image.size
 	if duration == 0:
 		fps = 0
 	else:
@@ -151,25 +131,119 @@ def rainbow_gif(image, duration):
 	else:
 		A = None
 	channels = list(image.convert("HSV").split())
-	# channels = hsv_split(image, convert=False)
 	if duration < 0:
 		rate = -rate
 	count = 256 // abs(rate)
-	func = lambda x: (x + rate) & 255
 
 	# Repeatedly hueshift image and return copies
 	def rainbow_gif_iterator(image):
+		hue = channels[0]
 		for i in range(0, 256, abs(rate)):
 			if i:
-				# hue = channels[0] + i
-				# image = hsv_merge(hue, *channels[1:])
-				channels[0] = channels[0].point(func)
+				channels[0] = hue.point(lambda x: i + x & 255)
 				image = Image.merge("HSV", channels).convert("RGBA")
 				if A is not None:
 					image.putalpha(A)
 			yield image
 
 	return dict(duration=1000 / fps * count, count=count, frames=rainbow_gif_iterator(image))
+
+
+def shiny_gif2(image, duration):
+	total = 0
+	for f in range(2147483648):
+		try:
+			image.seek(f)
+		except EOFError:
+			break
+		total += max(image.info.get("duration", 0), 50)
+	fps = f / total * 1000
+	if fps < 24:
+		step = fps / 24
+		image = ImageSequence(*ImageOpIterator(image, step=step))
+		f = len(image)
+	length = f
+	loops = total / duration / 1000
+	scale = 1
+	while abs(loops * scale) < 1:
+		scale <<= 1
+		if length * scale >= 64:
+			loops = 1 if loops >= 0 else -1
+			break
+	loops = round(loops * scale) / scale
+	if abs(loops) < 1:
+		loops = 1 if loops >= 0 else -1
+	size = image.size
+
+	def shiny_gif_iterator(image):
+		for f in range(length * scale):
+			image.seek(f % length)
+			if str(image.mode) == "P":
+				temp = image.convert("RGBA")
+			else:
+				temp = image
+			if str(image.mode) == "RGBA":
+				A = temp.getchannel("A")
+			else:
+				A = None
+			if temp.size[0] != size[0] or temp.size[1] != size[1]:
+				temp = temp.resize(size, Resampling.HAMMING)
+			channels = list(temp.convert("HSV").split())
+			func = lambda x: round_random((abs((f / length / scale * loops / 3) % (1 / 3) - 1 / 6) - 1 / 12) * 256) + x & 255
+			channels[0] = channels[0].point(func)
+			temp = Image.merge("HSV", channels).convert("RGB")
+			if A:
+				temp.putalpha(A)
+			yield temp
+
+	return dict(duration=total * scale, count=length * scale, frames=shiny_gif_iterator(image))
+
+def shiny_gif(image, duration):
+	try:
+		image.seek(1)
+	except EOFError:
+		image.seek(0)
+	else:
+		return shiny_gif2(image, duration)
+	if duration == 0:
+		fps = 0
+	else:
+		fps = round(256 / abs(duration))
+	rate = 1
+	while fps > 48 and rate < 8:
+		fps >>= 1
+		rate <<= 1
+	while fps >= 64:
+		fps >>= 1
+		rate <<= 1
+	if fps <= 0:
+		raise ValueError("Invalid framerate value.")
+	if str(image.mode) == "P":
+		image = image.convert("RGBA")
+	if str(image.mode) == "RGBA":
+		A = image.getchannel("A")
+	else:
+		A = None
+	channels = list(image.convert("HSV").split())
+	if duration < 0:
+		rate = -rate
+	count = 256 // abs(rate)
+
+	# Repeatedly hueshift image and return copies
+	def shiny_gif_iterator(image):
+		hue = channels[0].copy()
+		for i in range(0, 256, abs(rate)):
+			func = lambda x: round_random((abs(i / 256 / 3 % (1 / 3) - 1 / 6) - 1 / 12) * 256) + x & 255
+			channels[0] = hue.point(func)
+			image = Image.merge("HSV", channels).convert("RGBA")
+			if i < 32:
+				if i < 8:
+					pass
+			if A is not None:
+				image.putalpha(A)
+			yield image
+
+	return dict(duration=1000 / fps * count, count=count, frames=shiny_gif_iterator(image))
 
 
 def pet_gif2(image, squeeze, duration):

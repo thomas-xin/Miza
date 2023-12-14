@@ -3095,7 +3095,8 @@ def evalImg(url, operation, args):
 			return out
 		else:
 			out = io.BytesIO()
-			new.save(out, format="png", optimize=True)
+			fmt = dict(jpeg="jpg", jpg="jpg", webp="webp", gif="gif").get(fmt.lower(), "png")
+			new.save(out, format=fmt, optimize=True)
 			return out
 	elif type(new) is str and new.startswith("$"):
 		return new[1:]

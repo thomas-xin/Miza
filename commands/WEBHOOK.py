@@ -9,7 +9,7 @@ class AutoEmoji(Command):
 	server_only = True
 	name = ["NQN", "Emojis"]
 	min_level = 0
-	description = "Causes all failed emojis starting and ending with : to be deleted and reposted with a webhook, when possible. See ~emojilist for assigned emojis!"
+	description = "Causes all failed emojis starting and ending with : to be deleted and reposted with a webhook, when possible. See ~emojilist for assigned emojis. Enabled by default, unless NQN (<@559426966151757824>) is in the server."
 	usage = "(enable|disable)?"
 	example = ("emojis", "autoemoji enable", "nqn disable")
 	flags = "aed"
@@ -27,7 +27,7 @@ class AutoEmoji(Command):
 			data[guild.id] = True
 			return italics(css_md(f"Enabled automatic emoji substitution for {sqr_md(guild)}."))
 		elif "d" in flags:
-			data.pop(guild.id, None)
+			data[guild.id] = False
 			return italics(css_md(f"Disabled automatic emoji substitution for {sqr_md(guild)}."))
 		buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
 		await send_with_reply(
@@ -73,7 +73,7 @@ class AutoEmoji(Command):
 			+ str(u_id) + "_" + str(pos)
 			+ "-\n"
 		)
-		if guild.id in data:
+		if data.get(guild.id) or guild.id not in data and not (559426966151757824 in guild._members or not guild.me.guild_permissions.manage_messages or not guild.me.guild_permissions.manage_webhooks):
 			content += f"Automatic emoji substitution is currently enabled in {sqr_md(guild)}.```"
 		else:
 			content += f'Automatic emoji substitution is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}autoemoji enable" to enable.```'
@@ -156,11 +156,13 @@ class UpdateAutoEmojis(Database):
 					orig = self.bot.data.emojilists.setdefault(message.guild.id, {})
 					orig[name] = e_id
 					self.bot.data.emojilists.update(message.guild.id)
-		if not message.guild or message.guild.id not in self.data:
+		if not message.guild:
+			return
+		guild = message.guild
+		if not self.get(guild.id) and guild.id not in self and (559426966151757824 in guild._members or not guild.me.guild_permissions.manage_messages or not guild.me.guild_permissions.manage_webhooks):
 			return
 		m_id = None
 		msg = message.content
-		guild = message.guild
 		orig = self.bot.data.emojilists.get(message.author.id, {})
 		emojis = None
 		# long = len(msg) > 32

@@ -65,151 +65,6 @@ def get_video(url, fps=None):
 VIDEOS = ("gif", "webp", "apng", "mp4", "mkv", "webm", "mov", "wmv", "flv", "avi", "qt", "f4v", "zip")
 
 
-# class IMG(Command):
-#     min_display = "0~2"
-#     description = "Sends an image in the current chat from a list."
-#     usage = "(add|delete)? <0:tags>* <1:url>? <verbose{?v}|delete{?x}|hide{?h}>?"
-#     example = ("img add how https://media.discordapp.net/attachments/500919580596764673/642515924578205696/HOW.gif", "img delete how")
-#     flags = "vraedhzfx"
-#     rate_limit = (4, 6)
-#     no_parse = True
-#     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-#     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
-#     slash = True
-# 
-#     async def __call__(self, bot, flags, args, argv, user, message, channel, guild, perm, **void):
-#         update = bot.data.images.update
-#         imglists = bot.data.images
-#         images = imglists.get(guild.id, {})
-#         if "a" in flags or "e" in flags or "d" in flags:
-#             if message.attachments:
-#                 args.extend(best_url(a) for a in message.attachments)
-#                 argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
-#             req = 2
-#             if perm < req:
-#                 reason = "to change image list for " + guild.name
-#                 raise self.perm_error(perm, req, reason)
-#             if "a" in flags or "e" in flags:
-#                 lim = 256 << bot.is_trusted(guild.id) * 2 + 1
-#                 if len(images) > lim:
-#                     raise OverflowError(f"Image list for {guild} has reached the maximum of {lim} items. Please remove an item to add another.")
-#                 key = " ".join(args[:-1]).casefold()
-#                 if len(key) > 2000:
-#                     raise ArgumentError("Image tag too long.")
-#                 elif not key:
-#                     raise ArgumentError("Image tag must not be empty.")
-#                 if is_url(args[0]):
-#                     if len(args) > 1:
-#                         args = (args[-1], args[0])
-#                     else:
-#                         args = (args[0].split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[0], args[0])
-#                 urls = await bot.follow_url(args[-1], best=True, allow=True, limit=1)
-#                 url = urls[0]
-#                 if len(url) > 2000:
-#                     raise ArgumentError("Image url too long.")
-#                 images[key] = url
-#                 images = {i: images[i] for i in sorted(images)}
-#                 imglists[guild.id] = images
-#                 if not "h" in flags:
-#                     return css_md(f"Successfully added {sqr_md(key)} to the image list for {sqr_md(guild)}.")
-#             if not args:
-#                 # This deletes all images for the current guild
-#                 if "f" not in flags and len(images) > 1:
-#                     raise InterruptedError(css_md(sqr_md(f"WARNING: {len(images)} IMAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), force=True))
-#                 imglists[guild.id] = {}
-#                 return italics(css_md(f"Successfully removed all {sqr_md(len(images))} images from the image list for {sqr_md(guild)}."))
-#             key = argv.casefold()
-#             images.pop(key)
-#             imglists[guild.id] = images
-#             return italics(css_md(f"Successfully removed {sqr_md(key)} from the image list for {sqr_md(guild)}."))
-#         if not argv and not "r" in flags:
-#             # Set callback message for scrollable list
-#             buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-#             await send_with_reply(
-#                 None,
-#                 message,
-#                 "*```" + "\n" * ("z" in flags) + "callback-image-img-"
-#                 + str(user.id) + "_0"
-#                 + "-\nLoading Image database...```*",
-#                 buttons=buttons,
-#             )
-#             return
-#         sources = alist()
-#         for tag in args:
-#             t = tag.casefold()
-#             if t in images:
-#                 sources.append(images[t])
-#         r = flags.get("r", 0)
-#         for _ in loop(r):
-#             sources.append(choice(images.values()))
-#         if not len(sources):
-#             raise LookupError(f"Target image {argv} not found. Use img for list.")
-#         url = choice(sources)
-#         if "x" in flags:
-#             create_task(bot.silent_delete(message))
-#         if "v" in flags:
-#             msg = escape_roles(url)
-#         else:
-#             msg = None
-#         url2 = await bot.get_proxy_url(message.author)
-#         colour = await asubmit(bot.get_colour, message.author)
-#         emb = discord.Embed(colour=colour, url=url).set_image(url=url)
-#         await bot.send_as_webhook(channel, msg, embed=emb, username=message.author.display_name, avatar_url=url2)
-# 
-#     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-#         u_id, pos = list(map(int, vals.split("_", 1)))
-#         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
-#             return
-#         if reaction not in self.directions and reaction is not None:
-#             return
-#         guild = message.guild
-#         user = await bot.fetch_user(u_id)
-#         imglists = bot.data.images
-#         images = imglists.get(guild.id, {})
-#         page = 12
-#         last = max(0, len(images) - page)
-#         if reaction is not None:
-#             i = self.directions.index(reaction)
-#             if i == 0:
-#                 new = 0
-#             elif i == 1:
-#                 new = max(0, pos - page)
-#             elif i == 2:
-#                 new = min(last, pos + page)
-#             elif i == 3:
-#                 new = last
-#             else:
-#                 new = pos
-#             pos = new
-#         content = message.content
-#         if not content:
-#             content = message.embeds[0].description
-#         i = content.index("callback")
-#         content = "*```" + "\n" * ("\n" in content[:i]) + (
-#             "callback-image-img-"
-#             + str(u_id) + "_" + str(pos)
-#             + "-\n"
-#         )
-#         if not images:
-#             content += f"Image list for {str(guild).replace('`', '')} is currently empty.```*"
-#             msg = ""
-#         else:
-#             content += f"{len(images)} image(s) currently assigned for {str(guild).replace('`', '')}:```*"
-#             msg = ini_md(iter2str({k: "\n" + images[k] for k in tuple(images)[pos:pos + page]}))
-#         colour = await self.bot.get_colour(guild)
-#         emb = discord.Embed(
-#             description=content + msg,
-#             colour=colour,
-#         )
-#         emb.set_author(**get_author(user))
-#         more = len(images) - pos - page
-#         if more > 0:
-#             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-#         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-#         if hasattr(message, "int_token"):
-#             await bot.ignore_interaction(message)
-
-
 async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="png", count=0):
 	try:
 		# Take input from any attachments, or otherwise the message contents
@@ -790,7 +645,7 @@ class QR(Command):
 
 
 class Rainbow(Command):
-	name = ["RainbowGIF", "Gay"]
+	name = ["RainbowGIF", "Gay", "Shiny"]
 	description = "Creates a .gif image from repeatedly hueshifting supplied image."
 	usage = "<0:url> <1:duration(2)>?"
 	example = ("rainbow https://mizabot.xyz/favicon", "rainbow https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 6")
@@ -799,11 +654,12 @@ class Rainbow(Command):
 	_timeout_ = 8
 	typing = True
 
-	async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
+	async def __call__(self, bot, user, channel, message, name, args, argv, _timeout, **void):
+		func = "shiny_gif" if name == "shiny" else "rainbow_gif"
 		name, value, url, fmt, extra = await get_image(bot, user, message, args, argv, ext="gif")
 		async with discord.context_managers.Typing(channel):
 			# -gif signals to image subprocess that the output is always a .gif image
-			resp = await process_image(url, "rainbow_gif", [value, "-gif", "-f", fmt], timeout=_timeout)
+			resp = await process_image(url, func, [value, "-gif", "-f", fmt], timeout=_timeout)
 			fn = resp
 		await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
@@ -1430,7 +1286,7 @@ class Blend(Command):
 			if urls:
 				url2 = urls[0]
 			else:
-				url1 = None
+				url2 = None
 			fromA = False
 			if not url1 or not url2:
 				urls = await bot.follow_to_image(argv)
@@ -1575,7 +1431,7 @@ class Steganography(Command):
 						pe = PermissionError(f"Copyright detected; image belongs to {user_mention(u.id)}")
 						pe.no_react = True
 						raise pe
-				pe = PermissionError(text)
+				pe = PermissionError(text.replace("Copyright detected", "Text detected", 1))
 				pe.no_react = True
 				raise pe
 		return f"cache/{ts}~1.png"
@@ -1614,6 +1470,7 @@ class OCR(Command):
 	example = ("ocr https://opengraph.githubassets.com/c3922b6d44ff4a498c1607bec89b70a1c755e2d44d115bec93b5bb981aa1ad36/tesseract-ocr/tesseract",)
 	rate_limit = (10, 15)
 	slash = ("Read")
+	ephemeral = True
 
 	async def __call__(self, bot, user, message, args, argv, **void):
 		fut = asubmit(__import__, "pytesseract")
@@ -1629,38 +1486,11 @@ class OCR(Command):
 		return css_md(f"[Detected text]\n{no_md(text)}.")
 
 
-STOPS = (
-	"m unable to fulfil",
-	"m unable to assist",
-	"m unable to help",
-	"m unable to provide",
-	"m unable to do",
-	"m unable to respond",
-	"m unable to comply",
-	"m unable to engage",
-	"i cannot fulfil",
-	"i cannot assist",
-	"i cannot help",
-	"i cannot provide",
-	"i cannot do",
-	"i cannot respond",
-	"i cannot comply",
-	"i cannot engage",
-	"i can't fulfil",
-	"i can't assist",
-	"i can't help",
-	"i can't provide",
-	"i can't do",
-	"i can't respond",
-	"i can't comply",
-	"i can't engage",
-)
-
 class Art(Command):
 	_timeout_ = 150
 	name = ["AIArt", "Inpaint", "Morph", "ControlNet", "StableDiffusion", "SDXL", "Dalle", "Dalle2", "Dalle3", "Dream", "Imagine", "Inspire"]
 	description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system for image prompts. Configurable parameters are --strength, --guidance-scale, --aspect-ratio and --negative-prompt."
-	usage = "<0:prompt> <inpaint{?i}>? <morph{?m}>? <single{?s}> <raw{?r}>"
+	usage = "<0:prompt> <inpaint{?i}>? <morph{?m}>? <single{?s}>? <raw{?r}>?"
 	example = ("art cute kitten", "art https://mizabot.xyz/favicon")
 	rate_limit = (45, 60)
 	flags = "imrsz"
@@ -1684,7 +1514,7 @@ class Art(Command):
 			if getattr(message, "reference", None) and getattr(message.reference, "resolved", None):
 				m = message.reference.resolved
 				urls = await bot.follow_url(m, allow=True, images=True)
-				if urls and urls[0] != url:
+				if urls:
 					args = urls
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 		freelim = 50
@@ -1827,7 +1657,7 @@ class Art(Command):
 			oprompt = prompt
 			uid = user.id
 			temp = oprompt.replace('"""', "'''")
-			prompt = f'### Instruction:\n"""\n{temp}\n"""\n\nImprove the above image caption as a description to send to Dall·E image generation. Be as detailed as possible in at least 2 sentences.\n\n### Response:'
+			prompt = f'### Instruction:\n"""\n{temp}\n"""\n\nImprove the above image caption as a description to send to txt2img image generation. Be as detailed as possible in at least 2 sentences, but stay concise where possible!\n\n### Response:'
 			if bot.is_trusted(guild) >= 2:
 				for uid in bot.data.trusted[guild.id]:
 					if uid and bot.premium_level(uid, absolute=True) >= 2:
@@ -1841,45 +1671,44 @@ class Art(Command):
 			oai = data.get("trial") and data.get("openai_key")
 			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 			resp = cdict(choices=[])
-			# if len(resp.choices) < dups:
-			# 	futs = []
-			# 	for i in range(min(3, max(1, dups - 1))):
-			# 		fut = create_task(bot.instruct(
-			# 			dict(
-			# 				model="gpt-3.5-turbo-instruct",
-			# 				prompt=prompt,
-			# 				temperature=0.75,
-			# 				max_tokens=200,
-			# 				top_p=0.9,
-			# 				frequency_penalty=0.25,
-			# 				presence_penalty=0.25,
-			# 			),
-			# 			skip=False,
-			# 			best=not i and premium >= 3,
-			# 		))
-			# 		futs.append(fut)
-			# 	for fut in futs:
-			# 		try:
-			# 			s = await fut
-			# 			assert len(s.strip()) > 12
-			# 		except:
-			# 			print_exc()
-			# 			continue
-			# 		resp.choices.append(cdict(text=s))
+			if len(resp.choices) < dups:
+				futs = []
+				for i in range(min(3, max(1, dups // 2))):
+					fut = create_task(bot.instruct(
+						dict(
+							prompt=prompt,
+							temperature=1,
+							max_tokens=200,
+							top_p=0.9,
+							frequency_penalty=0.25,
+							presence_penalty=0,
+						),
+						best=premium >= 3,
+						skip=False,
+					))
+					futs.append(fut)
+				for fut in futs:
+					try:
+						s = await fut
+						assert len(s.strip()) > 12
+					except:
+						print_exc()
+						continue
+					resp.choices.append(cdict(text=s))
 			if not resp or len(resp.choices) < max(1, dups - 1):
 				resp2 = await bot.oai.chat.completions.create(
 					model="gpt-3.5-turbo-1106",
 					messages=[dict(role="user", content=prompt)],
-					temperature=0.75,
+					temperature=1,
 					max_tokens=120,
 					top_p=0.9,
 					frequency_penalty=0.25,
-					presence_penalty=0.25,
+					presence_penalty=0,
 					user=str(user.id),
 					n=max(1, dups - len(resp.choices) - 1),
 				)
 				if resp:
-					resp.choices.extend(cdict(text=choice.message.content) for choice in resp2.choices)
+					resp.choices.extend(cdict(text=choice.message.content) for choice in reversed(resp2.choices))
 				else:
 					resp = resp2
 			resp.choices.append(cdict(text=""))
@@ -1887,15 +1716,18 @@ class Art(Command):
 			for choice in resp.choices:
 				out = choice.text.strip()
 				tl = out.lower()
-				if any(s in tl for s in STOPS):
+				if any(s in tl for s in bot.STOPS):
 					out = ""
 				if out and out[0] == out[-1] == '"' and not oprompt[0] == oprompt[-1] == '"':
 					try:
 						out = str(literal_eval(out))
 					except SyntaxError:
 						pass
-				out = out.strip().replace("Dall·E", "art").removeprefix("art").removeprefix(":").strip()
+				out = regexp(r"^(?: [Pp]lease)?(?: [Gg]enerate| [Cc]reate)?(?: [Aa]n image (?:of|with|containing))? ").sub("", " " + regexp(r"[Tt]hank you[.!]$").sub("", out.strip().replace("txt2img", "art").removeprefix("art").removeprefix(":"))).strip(' \t\n,`"')
 				if out:
+					if not out[0].isupper() and " " in out:
+						s, o = out.split(" ", 1)
+						out = s.capitalize() + " " + o
 					prompt = (nprompt or oprompt).removesuffix(".") + ".\n\n" + out.strip()
 				else:
 					prompt = nprompt or oprompt
@@ -2059,23 +1891,15 @@ class Art(Command):
 							if not ims:
 								raise
 						if ims2:
-							ims2.extend(ims)
-							ims = ims2
+							ims.extend(ims2)
 				futs.extend(ims)
 				amount2 = len(futs)
 		if amount2 < amount:
-			if os.name == "nt":
-				args = [
-					"py",
-					"-3.9",
-					"demo.py",
-				]
-			else:
-				args = [
-					sys.executable,
-					"demo.py",
-				]
-			if prompt and "--prompt" not in kwargs:
+			args = [
+				python,
+				"demo.py",
+			]
+			if not prompt and "--prompt" not in kwargs:
 				prompt = eprompts.next()
 				args.extend((
 					"--prompt",
@@ -2239,7 +2063,7 @@ class Art(Command):
 				emb.description = f"{rem}/{freelim} premium commands remaining today (free commands will be used after).\nIf you're able to contribute towards [funding my API]({bot.kofi_url}) hosting costs it would mean the world to us, and ensure that I can continue providing up-to-date tools and entertainment.\nEvery little bit helps due to the size of my audience, and you will receive access to unlimited and various improved commands as thanks!"
 		if len(files) == 2:
 			fe = files.pop(1)
-			urls, mids = await bot.data.exec.stash(fe, filename=fe.filename)
+			urls = await bot.data.exec.stash(fe, filename=fe.filename)
 			if urls:
 				comment = ("\n".join(url.split("?", 1)[0] for url in urls) + "\n" + comment).strip()
 		return await send_with_react(channel, comment, files=files, reference=message, reacts="🔳", embed=emb)

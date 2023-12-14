@@ -770,6 +770,10 @@ class AudioFile:
 	# Audio duration estimation: Get values from file if possible, otherwise URL
 	duration = lambda self: inf if not self.seekable else getattr(self, "dur", None) or set_dict(self.__dict__, "dur", get_duration("cache/" + self.file) if self.loaded and not self.live else get_duration(self.stream), ignore=True)
 
+	@property
+	def proc_expired(self):
+		return not self.proc or not self.proc.is_running()
+
 
 # Audio reader for fully loaded files. FFmpeg with single pipe for output.
 class LoadedAudioReader(discord.AudioSource):

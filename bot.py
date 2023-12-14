@@ -7,7 +7,6 @@ import os
 os.environ["IS_BOT"] = "1"
 import common
 from common import *
-import h2
 
 ADDRESS = AUTH.get("webserver_address") or "0.0.0.0"
 if ADDRESS == "0.0.0.0":
@@ -21,7 +20,7 @@ if __name__ != "__mp_main__":
 	esubmit(get_colour_list)
 	esubmit(load_emojis)
 	esubmit(load_timezones)
-	oaifut = esubmit(verify_openai)
+	oaifut = esubmit(verify_ai)
 
 	heartbeat_proc = psutil.Popen([python, "misc/heartbeat.py"])
 
@@ -122,7 +121,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		self.guild_semaphore = Semaphore(5, inf, rate_limit=5)
 		self.load_semaphore = Semaphore(5, inf, rate_limit=1)
 		self.user_semaphore = Semaphore(64, inf, rate_limit=8)
-		# self.disk_semaphore = Semaphore(1, 1, rate_limit=1)
 		self.cache_semaphore = Semaphore(1, 1, rate_limit=30)
 		self.command_semaphore = Semaphore(262144, 16384)
 		print("Time:", datetime.datetime.now())
@@ -153,7 +151,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		self.bot_ready = False
 		self.ready = False
 		self.initialisation_complete = False
-		self.stat_timer = 0
 		self.last_check = 0
 		self.status_iter = xrand(4)
 		self.curr_state = azero(4)
@@ -1240,9 +1237,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			channel = await user.create_dm()
 		return channel
 
-	def get_available_guild(self, animated=True):
-		found = [{} for _ in loop(6)]
-		for guild in self.guilds:
+	def get_available_guild(self, animated=True, return_all=False):
+		gids = AUTH.get("emoji_servers", ())
+		found = [{} for i in range(6)]
+		if gids:
+			guilds = [self.cache.guilds[gid] for gid in gids]
+		else:
+			guilds = self.guilds
+		for guild in guilds:
 			m = guild.me
 			if m is not None and m.guild_permissions.manage_emojis:
 				owners_in = self.owners.intersection(guild._members)
@@ -1258,27 +1260,24 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					x = 4
 				else:
 					x = 5
-				if animated:
-					rem = guild.emoji_limit - len(deque(e for e in guild.emojis if e.animated))
-					rem /= len(guild.members)
-					if rem > 0:
-						found[x][rem] = guild
-				else:
-					rem = guild.emoji_limit - len(deque(e for e in guild.emojis if not e.animated))
-					rem /= len(guild.members)
-					if rem > 0:
-						found[x][rem] = guild
+				rem = guild.emoji_limit - len(deque(e for e in guild.emojis if e.animated == animated))
+				rem /= len(guild.members)
+				if rem > 0:
+					found[x][rem] = guild
+		if return_all:
+			valids = list(itertools.chain(*(v.values() for v in found)))
+			return valids, [guild.emoji_limit - len(deque(e for e in guild.emojis if e.animated == animated)) for guild in valids]
 		for i, f in enumerate(found):
 			if f:
 				return f[max(f.keys())]
 		raise LookupError("Unable to find suitable guild.")
 
 	@tracebacksuppressor
-	def create_progress_bar(self, length, ratio=0.5):
+	async def create_progress_bar(self, length, ratio=0.5):
 		if "emojis" in self.data:
-			return asubmit(self.data.emojis.create_progress_bar, length, ratio)
+			return await self.data.emojis.create_progress_bar(length, ratio)
 		position = min(length, round(length * ratio))
-		return as_fut("⬜" * position + "⬛" * (length - position))
+		return "⬜" * position + "⬛" * (length - position)
 
 	async def history(self, channel, limit=200, before=None, after=None, care=True):
 		c = self.in_cache(verify_id(channel))
@@ -1290,7 +1289,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			channel = await self.get_dm(channel)
 		found = set()
 		if "channel_cache" in self.data:
-			async for message in self.data.channel_cache.get(channel.id, as_message=care, force=False):
+			async for message in self.data.channel_cache.grab(channel.id, as_message=care, force=False):
 				if isinstance(message, int):
 					message = cdict(id=message)
 				if before:
@@ -1482,6 +1481,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							found = True
 							out.append(stream)
 							break
+			elif images and is_youtube_url(url):
+				if "?v=" in url:
+					vid = url.split("?v=", 1)[-1]
+				else:
+					vid = url.rsplit("/", 1)[-1].split("?", 1)[0]
+				out.append(f"https://i.ytimg.com/vi/{vid}/maxresdefault.jpg")
 			elif images and any(maps((is_discord_url, is_emoji_url, is_youtube_url, is_youtube_stream), url)):
 				out.append(url)
 			elif images:
@@ -1650,12 +1655,68 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		inds = check >= top - temp * 2 / 3
 		return order[inds].cpu().numpy()
 
+	STOPS = (
+		"m unable to fulfil",
+		"m unable to assist",
+		"m unable to help",
+		"m unable to provide",
+		"m unable to do",
+		"m unable to respond",
+		"m unable to comply",
+		"m unable to engage",
+		"m unable to perform",
+		"i cannot fulfil",
+		"i cannot assist",
+		"i cannot help",
+		"i cannot provide",
+		"i cannot do",
+		"i cannot respond",
+		"i cannot comply",
+		"i cannot engage",
+		"i cannot perform",
+		"i can't fulfil",
+		"i can't assist",
+		"i can't help",
+		"i can't provide",
+		"i can't do",
+		"i can't respond",
+		"i can't comply",
+		"i can't engage",
+		"i can't perform",
+	)
+
+	llcache = Cache(timeout=86400, trash=256)
+	async def instruct(self, data, best=False, skip=False, prune=True, cache=True):
+		if not self.llcache.db and "llcache" in self.data:
+			self.llcache.attach(self.data.llcache)
+		data["prompt"] = data.get("prompt") or data.pop("inputs", None) or data.pop("input", None)
+		key = shash(str((data["prompt"], data.get("model", "gpt-3.5-turbo-1106"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.75), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
+		if cache:
+			tup = await self.llcache.retrieve_from(key, self._instruct2, data, best=best, skip=skip, prune=prune)
+			if tup[1] >= best:
+				return tup[0]
+		resp, best = await self._instruct2(data, best=best, skip=skip, prune=prune)
+		if best and any(s in resp for s in self.STOPS):
+			resp, best = await self._instruct2(data, best=False, skip=False, prune=True)
+		self.llcache[key] = (resp, best)
+		return resp
+
+	async def _instruct2(self, data, best=False, skip=False, prune=True):
+		resp = await self._instruct(data, best=best, skip=skip)
+		if prune:
+			resp2 = regexp(r"### (?:Input|Instruction|Response):|<|endoftext|>").split(resp, 1)[0]
+			if resp != resp2:
+				print("PRUNED:", resp)
+				print(resp2)
+				resp = resp2
+		return (resp, best)
+
 	llsem = Semaphore(2, 2, rate_limit=4)
 	together_sem = Semaphore(2, 2, rate_limit=0.5)
-	async def instruct(self, data, best=False, skip=True):
+	async def _instruct(self, data, best=False, skip=False):
 		c = await tcount(data["prompt"])
 		inputs = dict(
-			model="gpt-3.5-turbo-1106",
+			model="gpt-4-1106-preview" if best >= 3 else "gpt-3.5-turbo-1106",
 			temperature=0.75,
 			max_tokens=256,
 			top_p=0.75,
@@ -1675,11 +1736,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			# 	except:
 			# 		print_exc()
 			# 		data["model"] = "gpt-3.5-turbo-instruct"
-		if AUTH.get("together_key") and not self.together_sem.busy and best is not None:
+		if AUTH.get("together_key") and not self.together_sem.busy and best <= 0 and not skip:
 			import together
-			together.api_key = AUTH["together_key"]
 			rp = ((inputs.get("frequency_penalty", 0.25) + inputs.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
-			m = "WizardLM/WizardLM-70B-V1.0" if best else "Gryphe/MythoMax-L2-13b"
+			m = "mistralai/Mixtral-8x7B-Instruct-v0.1" if best else "togethercomputer/StripedHyena-Nous-7B"
 			rdata = dict(
 				prompt=inputs["prompt"],
 				model=m,
@@ -1692,6 +1752,23 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				async with self.together_sem:
 					response = await asubmit(together.Complete.create, **rdata, timeout=60)
 				return response["output"]["choices"][0]["text"]
+			except:
+				print_exc()
+		if AUTH.get("fireworks_key") and best <= 1 and not skip:
+			import fireworks.client
+			# rp = ((inputs.get("frequency_penalty", 0.25) + inputs.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
+			m = "accounts/fireworks/models/mixtral-8x7b-instruct"
+			data = cdict(
+				prompt=inputs["prompt"],
+				model=m,
+				temperature=inputs.get("temperature", 0.8) * 2 / 3,
+				top_p=inputs.get("top_p", 1),
+				# repetition_penalty=rp,
+				max_tokens=inputs.get("max_tokens", 1024),
+			)
+			try:
+				response = await asubmit(fireworks.client.Completion.create, **data, request_timeout=30)
+				return response.choices[0].text
 			except:
 				print_exc()
 		if "instruct" not in inputs["model"]:
@@ -1720,12 +1797,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if best:
 			fut = create_task(self.gpt4v(url))
 			futs.append(fut)
-		fut = asubmit(self.neva, url)
-		futs.append(fut)
-		if not self.ibv_fut.done():
-			timeout = max(12, timeout / 2)
-		fut = asubmit(self.ibv, url)
-		futs.append(fut)
+		# fut = asubmit(self.neva, url)
+		# futs.append(fut)
+		if AUTH.get("fireworks_key"):
+			fut = asubmit(self.llava, url)
+			futs.insert(-1, fut)
+		elif AUTH.get("replicate_key"):
+			if not self.ibv_fut.done():
+				timeout = max(12, timeout / 2)
+			fut = asubmit(self.ibv, url)
+			futs.append(fut)
 		prompts = []
 		if len(futs) < 3:
 			res = None
@@ -1763,6 +1844,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					p3 = await asyncio.shield(fut)
 			except:
 				print_exc()
+				best = False
 				continue
 			nprompts.append(p3)
 		if len(nprompts) > 1:
@@ -1792,19 +1874,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			iname = f'image "{name}"'
 		else:
 			iname = "image"
-		pin.append(f"### Instruction:\nHere are {len(prompts)} conflicting captions for an {iname}. Please rewrite the first caption using the most likely elements from the others; be detailed but concise!\n\n###Response:")
+		pin.append(f"### Instruction:\nHere are {len(prompts)} conflicting captions for an {iname}. Please rewrite the first caption adding the most likely elements from the others; be detailed where possible!\n\n###Response:")
 		prompt = "".join(pin)
 		print("Recaption prompt:", prompt)
-		model = "gpt-4-1106-preview" if best else "gpt-3.5-turbo-1106"
 		resp = await self.instruct(
 			dict(
 				prompt=prompt,
-				model=model,
 				temperature=0.5,
 				top_p=0.9,
 				max_tokens=256,
 			),
-			best=None,
+			best=3 if best else 1,
 		)
 		print("Recaption response:", resp)
 		return resp
@@ -1843,8 +1923,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		except:
 			print_exc()
 			return await asubmit(self.neva, url)
-		out = response.choices[0].message.content
+		out = response.choices[0].message.content.strip()
 		print("GPT4V:", out)
+		if any(s in out for s in self.STOPS):
+			raise ValueError("Censored response.")
 		return out
 
 	ibv_sem = Semaphore(600, 256, rate_limit=60)
@@ -1871,7 +1953,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
 		if not self.replicate_client:
 			import replicate
-			self.replicate_client = replicate.Client(api_token=AUTH.get("replicate_key") or "")
+			self.replicate_client = replicate.Client(api_token=AUTH["replicate_key"])
 		resp = self.replicate_client.run(
 			"joehoover/instructblip-vicuna13b:c4c54e3c8c97cd50c2d2fec9be3b6065563ccf7d43787fb99f84151b867178fe",
 			input=dict(
@@ -1883,7 +1965,39 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				repetition_penalty=1.2,
 			),
 		)
-		return "".join(resp)
+		return "".join(resp).strip()
+
+	@functools.lru_cache(maxsize=64)
+	def llava(self, url):
+		b = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
+		mime = magic.from_buffer(b)
+		data_url = "data:" + mime + ";base64," + base64.b64encode(b).decode("ascii")
+		messages = [
+			cdict(role="user", content=[
+				cdict(type="text", text=self.caption_prompt),
+				cdict(type="image_url", image_url=cdict(url=data_url)),
+			]),
+		]
+		data = cdict(
+			model="accounts/fireworks/models/llava-v15-13b",
+			messages=messages,
+			temperature=0.5,
+			max_tokens=256,
+			top_p=0.9,
+			frequency_penalty=0.6,
+			presence_penalty=0.8,
+			n=1,
+		)
+		try:
+			import fireworks.client
+			fireworks.client.api_key = AUTH["fireworks_key"]
+			response = fireworks.client.ChatCompletion.create(**data, request_timeout=30)
+		except:
+			print_exc()
+			return self.ibv(url)
+		out = response.choices[0].message.content.strip()
+		print("LLAVA:", out)
+		return out
 
 	@functools.lru_cache(maxsize=64)
 	def neva(self, url):
@@ -1919,7 +2033,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		except:
 			print(resp, resp.content)
 			raise
-		out = resp.json()["choices"][0]["message"]["content"]
+		out = resp.json()["choices"][0]["message"]["content"].strip()
 		print("NeVa:", out)
 		return out
 
@@ -2132,7 +2246,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			self.cache.attachments[fn] = res
 
 	def attachment_from_file(self, file):
-		a_id = int(file.split(".", 1)[0][11:])
+		a_id = file.split(".", 1)[0][11:]
+		if not a_id.isnumeric():
+			return
+		a_id = int(a_id)
 		self.cache.attachments[a_id] = a_id
 
 	async def get_attachment(self, url, full=True, allow_proxy=False):
@@ -2223,6 +2340,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if is_image(url):
 					url = await self.data.exec.uproxy(url)
 					emb.url = url
+					url = allow_gif(url)
 					emb.set_image(url=url)
 					if link:
 						link = message_link(message)
@@ -2239,9 +2357,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					emb.url = emb2.url
 				if emb2.image:
 					url = await self.data.exec.uproxy(emb2.image.url)
+					url = allow_gif(url)
 					emb.set_image(url=url)
 				if emb2.thumbnail:
 					url = await self.data.exec.uproxy(emb2.thumbnail.url)
+					url = allow_gif(url)
 					emb.set_thumbnail(url=url)
 				for f in emb2.fields:
 					if f:
@@ -2264,6 +2384,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						else:
 							url = await self.data.exec.aproxy(url)
 						emb.url = url
+						url = allow_gif(url)
 						emb.set_image(url=url)
 						if url != content:
 							emb.description = content
@@ -2300,6 +2421,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					image = await self.data.exec.uproxy(e.thumbnail.url)
 		if image:
 			emb.url = image
+			image = allow_gif(image)
 			emb.set_image(url=image)
 		for e in message.embeds:
 			if len(emb.fields) >= 25:
@@ -2693,6 +2815,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			premiums.subscribe(user, lv)
 		return lv
 
+	def premium_multiplier(self, pl):
+		if pl < 0:
+			return 0
+		if pl < 1:
+			return 1
+		if pl < 2:
+			return 1.5
+		if pl < 3:
+			return 2
+		return 3
+
 	def is_nsfw(self, channel):
 		if is_nsfw(channel):
 			return True
@@ -2897,9 +3030,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		"minutes": ("m", "min", "minute", "mins", "minutes"),
 		"seconds": ("s", "sec", "second", "secs", "seconds"),
 	}
-	num_words = "(?:(?:(?:[0-9]+|[a-z]{1,}illion)|thousand|hundred|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|zero|one|two|three|four|five|six|seven|eight|nine)\\s*)"
-	numericals = re.compile("^(?:" + num_words + "|(?:a|an)\\s*)(?:" + num_words + ")*", re.I)
-	connectors = re.compile("\\s(?:and|at)\\s", re.I)
+	num_words = r"(?:(?:(?:[0-9\.]+|[a-z]{1,}illion)|thousand|hundred|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|zero|one|two|three|four|five|six|seven|eight|nine)\s*)"
+	numericals = re.compile(r"^(?:" + num_words + r"|(?:a|an)\s*)(?:" + num_words + r")*", re.I)
+	connectors = re.compile(r"\s(?:and|at)\s", re.I)
 	alphabet = frozenset("abcdefghijklmnopqrstuvwxyz")
 
 	# Evaluates a time input, using a math process from the subprocess pool when necessary.
@@ -3020,7 +3153,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				t = (raw - utc_ddt()).total_seconds()
 		if not isinstance(t, (int, float)):
 			try:
-				t = float(t)
+				t = round_min(float(t))
 			except OverflowError:
 				t = int(t)
 		return t
@@ -3087,7 +3220,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				# print("END TASK:", k, bot.compute_wait, lim_str(str(v), 64), frand())
 				if k not in self.compute_wait:
 					if not isinstance(v, Exception):
-						print("MISSING:", k, v)
+						print("MISSING:", k, lim_str(str(v), 256))
 					continue
 				task = self.compute_wait.pop(k)
 				if isinstance(v, Exception):
@@ -3197,7 +3330,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						35: "DDR5",
 					}[ram_type]
 				except KeyError:
-					ram_class = "DDR" + str(max(1, ceil(math.log2(ram_speed / 250))))
+					ram_class = "DDR" + str(max(1, ceil(log2(ram_speed / 250))))
 				ram_name = globals()["RAM_NAME"] = f"{ram_class}-{ram_speed}"
 		return dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
@@ -3307,7 +3440,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		})
 		return self.status_data
 
-	status_sem = Semaphore(1, inf, rate_limit=1)
+	status_sem = Semaphore(1, inf, rate_limit=1, sync=True)
 	status_data = cdict(
 		system=cdict(
 			cpu={},
@@ -3601,7 +3734,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if diamonds:
 			out.append(f"💎 {diamonds}")
 		if gold:
-			coin = await asubmit(self.data.emojis.emoji_as, "miza_coin.gif")
+			coin = await self.data.emojis.emoji_as("miza_coin.gif")
 			out.append(f"{coin} {gold}")
 		if out:
 			return " ".join(out)
@@ -3716,12 +3849,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						break
 			self.react_sem.pop(message.id, None)
 
+	status_cycle = Semaphore(1, 1, rate_limit=60, sync=True)
 	@tracebacksuppressor
 	async def update_status(self):
 		guild_count = len(self.guilds)
 		changed = guild_count != self.guild_count
-		if changed or utc() > self.stat_timer:
-			self.stat_timer = utc() + 4.5
+		sem = emptyctx if changed else self.status_cycle
+		if getattr(sem, "busy", False):
+			return
+		async with sem:
 			self.guild_count = guild_count
 			status_changes = list(range(self.status_iter))
 			status_changes.extend(range(self.status_iter + 1, len(self.statuses) - (not self.audio)))
@@ -3899,7 +4035,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							i = i2
 				command_check = full_prune(comm[:i]).replace("*", "").replace("_", "").replace("||", "")
 			# Hash table lookup for target command: O(1) average time complexity.
-			if command_check in bot.commands:
+			if command_check in self.commands:
 				gid = self.data.blacklist.get(0)
 				if gid and gid != g_id and not isnan(u_perm):
 					print("BOUNCED:", user, message.content)
@@ -3911,7 +4047,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					))
 					return 0
 				# Multiple commands may have the same alias, run all of them
-				for command in bot.commands[command_check]:
+				for command in self.commands[command_check]:
+					if getattr(command, "exact", True) and full_prune(comm) != command_check and op != True:
+						continue
 					# Make sure command is enabled, administrators bypass this
 					if full_prune(command.catg) not in enabled and not admin:
 						raise PermissionError(f"This command is not enabled here. Use {prefix}ec to view or modify the list of enabled commands")
@@ -3933,19 +4071,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							x = command.rate_limit
 							if x:
 								x2 = x
-								if user.id in bot.owners:
+								if user.id in self.owners:
 									x = x2 = 0
 								elif isinstance(x, collections.abc.Sequence):
-									x = x2 = x[not bot.is_trusted(getattr(guild, "id", 0))]
-									x /= 2 ** bot.premium_level(user)
-									x2 /= 2 ** bot.premium_level(user, absolute=True)
+									x = x2 = x[not self.is_trusted(getattr(guild, "id", 0))]
+									x /= self.premium_multiplier(self.premium_level(user))
+									x2 /= self.premium_multiplier(self.premium_level(user, absolute=True))
 								remaining += x
 								d = command.used
 								t = d.get(u_id, -inf)
 								wait = utc() - t - x
 								if wait > min(1 - x, -1):
 									if x < x2 and (utc() - t - x2) < min(1 - x2, -1):
-										bot.data.users.add_diamonds(user, (x - x2) / 100)
+										self.data.users.add_diamonds(user, (x - x2) / 100)
 									if wait < 0:
 										w = -wait
 										d[u_id] = max(t, utc()) + w
@@ -4070,16 +4208,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						if isnan(u_perm):
 							timeout = None
 						else:
-							timeout = getattr(command, "_timeout_", 1) * bot.timeout
+							timeout = getattr(command, "_timeout_", 1) * self.timeout
 							if timeout >= inf:
 								timeout = None
 							elif self.is_trusted(message.guild):
 								timeout *= 2
-							timeout *= 2 ** self.premium_level(user)
+							timeout *= self.premium_multiplier(self.premium_level(user))
 						# Create a future to run the command
 						future = asubmit(
 							command,                        # command is a callable object, may be async or not
-							bot=bot,                        # for interfacing with bot's database
+							bot=self,                        # for interfacing with bot's database
 							argv=argv,                      # raw text argument
 							args=args,                      # split text arguments
 							argl=argl,                      # inputted array of arguments
@@ -4102,7 +4240,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						if fut is None and not hasattr(command, "typing") and not getattr(message, "simulated", False):
 							create_task(delayed_callback(future, sqrt(3), self._state.http.send_typing, channel.id, repeat=True))
 						if slash or getattr(message, "slash", None):
-							create_task(delayed_callback(future, 1, self.defer_interaction, message))
+							create_task(delayed_callback(future, 1, self.defer_interaction, message, ephemeral=getattr(command, "ephemeral", False)))
 						with self.command_semaphore:
 							response = await future
 						# Send bot event: user has executed command
@@ -4149,10 +4287,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 										sent = await send_with_react(channel, reference=not loop and message, **response)
 								else:
 									if type(response) not in (str, bytes, bytearray):
-										response = str(response)
+										response = as_str(response)
 									# Process everything else as a string
 									if type(response) is str and (len(response) <= 2000 or getattr(message, "simulated", False)):
-										sent = await send_with_react(channel, response, reference=not loop and message)
+										sent = await send_with_react(channel, response, reference=not loop and message, ephemeral=getattr(command, "ephemeral", False))
 										# sent = await channel.send(response)
 									else:
 										# Send a file if the message is too long
@@ -4203,7 +4341,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			with self.command_semaphore:
 				await self.send_event("_nocommand2_", message=message)
 				not_self = True
-				if u_id == bot.id:
+				if u_id == self.id:
 					not_self = False
 				elif getattr(message, "webhook_id", None) and guild and message.author.name == guild.me.display_name:
 					cola = await asubmit(self.get_colour, self)
@@ -4537,7 +4675,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				url = await self.get_proxy_url(m)
 				await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=url, reacts=reacts)
 
-	async def defer_interaction(self, message):
+	inter_cache = Cache(timeout=900, trash=0)
+	async def defer_interaction(self, message, ephemeral=False):
 		with suppress():
 			if hasattr(message, "int_id"):
 				int_id, int_token = message.int_id, message.int_token
@@ -4549,12 +4688,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
 				method="POST",
 				authorise=True,
-				data='{"type":5}',
+				data='{"type":5,"data":{"flags":64}}' if ephemeral else '{"type":5}',
 				aio=True,
 			)
-			message.deferred = True
+			print("Deferred:", message.id)
+			self.inter_cache[int_id] = int_token
+			self.inter_cache[message.id] = int_token
+			message.deferred = int_token
 			if self.cache.messages.get(message.id):
-				self.cache.messages[message.id].deferred = True
+				self.cache.messages[message.id].deferred = int_token
 			else:
 				self.cache.messages[message.id] = message
 			return message
@@ -4804,10 +4946,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	total_bytes = 0
 	async def slow_loop(self):
 		await asyncio.sleep(2)
-		errored = 0
+		ninter = 3
+		sem = Semaphore(1, 1, rate_limit=ninter, sync=True)
 		while not self.closed:
-			ninter = 3
-			async with Delay(ninter):
+			async with sem:
 				async with tracebacksuppressor:
 					create_task(self.update_status())
 					data = await self.status()
@@ -4870,7 +5012,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	async def lazy_loop(self):
 		await asyncio.sleep(5)
 		while not self.closed:
-			async with Delay(random.random() * 2 + 3):
+			async with Delay(random.random() * 8 + 3):
 				async with tracebacksuppressor:
 					# self.var_count = await asubmit(var_count)
 					with MemoryTimer("handle_update"):
@@ -6269,7 +6411,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								msg = self.ExtendedMessage.new(mdata)
 								message.content += " " + message_link(msg)
 								self.add_message(msg, force=True)
-								message.channel = msg.channel or message.channel
+								message.channel = channel = msg.channel or message.channel
 						try:
 							channel = self.force_channel(d["channel_id"])
 							guild = await self.fetch_guild(d["guild_id"])
@@ -6627,7 +6769,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 class AudioClientInterface:
 
-	clients = {}
+	clients = weakref.WeakValueDictionary()
 	returns = {}
 	written = False
 	killed = False
@@ -6826,6 +6968,8 @@ def userQuery2(x):
 def userIter2(x):
 	yield str(x)
 	yield str(x.name).casefold()
+	if getattr(x, "global_name", None):
+		yield str(x.global_name).casefold()
 	if getattr(x, "nick", None):
 		yield str(x.nick).casefold()
 
@@ -6834,6 +6978,8 @@ def userQuery3(x):
 
 def userIter3(x):
 	yield full_prune(x.name)
+	if getattr(x, "global_name", None):
+		yield full_prune(x.global_name)
 	if getattr(x, "nick", None):
 		yield full_prune(x.nick)
 
@@ -6842,6 +6988,8 @@ def userQuery4(x):
 
 def userIter4(x):
 	yield to_alphanumeric(x.name).replace(" ", "").casefold()
+	if getattr(x, "global_name", None):
+		yield to_alphanumeric(x.global_name).replace(" ", "").casefold()
 	if getattr(x, "nick", None):
 		yield to_alphanumeric(x.nick).replace(" ", "").casefold()
 

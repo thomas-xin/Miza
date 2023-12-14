@@ -155,7 +155,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 
 	__slots__ = ("limit", "buffer", "fut", "active", "passive", "rate_limit", "rate_bin", "last", "trace", "weak")
 
-	def __init__(self, limit=256, buffer=32, delay=0.05, rate_limit=None, randomize_ratio=2, last=False, trace=False, weak=False):
+	def __init__(self, limit=256, buffer=32, delay=0.05, rate_limit=None, sync=False, randomize_ratio=2, last=False, trace=False, weak=False):
 		self.limit = limit
 		self.buffer = buffer
 		self.active = 0
@@ -167,14 +167,18 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 		self.last = last
 		self.trace = trace and inspect.stack()[1]
 		self.weak = weak
+		self.sync = sync
+		if rate_limit and sync:
+			self.delay_for(rate_limit - 1)
 
 	def __str__(self):
 		classname = str(self.__class__).replace("'>", "")
 		classname = classname[classname.index("'") + 1:]
 		s = f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>: {self.active}/{self.limit}, {self.passive}/{self.buffer}"
 		if self.rate_limit:
-			if self.rate_bin and time.time() - self.rate_bin[0] <= self.rate_limit:
-				rate = round(self.rate_limit - (time.time() - self.rate_bin[0]), 1)
+			t = time.time()
+			if self.rate_bin and t - self.rate_bin[0] <= self.rate_limit:
+				rate = round(self.rate_limit - (t - self.rate_bin[0]), 1)
 			else:
 				rate = 0
 			s += f", {rate}/{self.rate_limit}"
@@ -209,7 +213,9 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 		return self.rate_bin
 
 	def delay_for(self, seconds=0):
-		t = utc() + seconds
+		t = time.time() + seconds
+		if self.sync and self.rate_limit:
+			t -= t % self.rate_limit
 		for i in range(self.limit):
 			self.rate_bin.append(t)
 		for i in range(len(self.rate_bin) - self.limit):
@@ -221,7 +227,10 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 			self.trace = inspect.stack()[2]
 		self.active += 1
 		if self.rate_limit:
-			self._update_bin().append(time.time())
+			t = time.time()
+			if self.sync and self.rate_limit:
+				t -= t % self.rate_limit
+			self._update_bin().append(t)
 			if self.weak:
 				SEMS[id(self)] = self
 		return self
@@ -319,6 +328,10 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 	@property
 	def busy(self):
 		return self.is_busy()
+
+	@property
+	def free(self):
+		return not self.is_busy()
 
 	def is_inactive(self):
 		return not self.is_busy()
@@ -506,30 +519,40 @@ if not enc_key:
 	with open("auth.json", "w", encoding="utf-8") as f:
 		json.dump(AUTH, f, indent="\t")
 
-def verify_openai():
-	if not AUTH.get("openai_key"):
+def verify_ai():
+	if not os.environ.get("AI_FEATURES", True):
 		return
-	import openai
-	globals()["openai"] = openai
-	try:
-		for i in range(3):
+	with tracebacksuppressor:
+		if AUTH.get("openai_key"):
+			import openai
+			globals()["openai"] = openai
 			try:
-				oclient = openai.OpenAI(api_key=AUTH["openai_key"])
-				resp = oclient.moderations.create(
-					input=str(utc()),
-				)
-			except:
-				print_exc()
+				for i in range(3):
+					try:
+						oclient = openai.OpenAI(api_key=AUTH["openai_key"])
+						resp = oclient.moderations.create(
+							input=str(utc()),
+						)
+					except:
+						print_exc()
+					else:
+						if resp:
+							raise StopIteration
+			except StopIteration:
+				pass
 			else:
-				if resp:
-					raise StopIteration
-	except StopIteration:
-		return openai
-	else:
-		AUTH["openai_key"] = ""
-		print("OpenAI key has no usable credit. Please verify and fix the key to proceed with relevant commands.")
+				AUTH["openai_key"] = ""
+				print("OpenAI key has no usable credit. Please verify and fix the key to proceed with relevant commands.")
+		if AUTH.get("fireworks_key"):
+			import fireworks.client
+			fireworks.client.api_key = AUTH["fireworks_key"]
+			globals()["fireworks"] = fireworks
+		if AUTH.get("together_key"):
+			import together
+			together.api_key = AUTH["together_key"]
+			globals()["together"] = together
 if __name__ == "__lint__":
-	import openai
+	import openai, fireworks.client, together
 
 enc_key += "=="
 enc_box = nacl.secret.SecretBox(base64.b64decode(enc_key)[:32])
@@ -842,7 +865,7 @@ class FileHashDict(collections.abc.MutableMapping):
 		return data
 
 	def __setitem__(self, k, v):
-		with suppress(ValueError):
+		with suppress(TypeError, ValueError):
 			k = int(k)
 		if k not in self:
 			self.iter = None
@@ -1430,14 +1453,14 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 		ephemeral = ephemeral and 64
 		sem = emptyctx
 		inter = True
-		if getattr(reference, "deferred", False):
-			url = f"https://discord.com/api/{api}/webhooks/{bot.id}/{reference.slash}/messages/@original"
+		if getattr(reference, "deferred", False) or getattr(reference, "int_id", reference.id) in bot.inter_cache:
+			url = f"https://discord.com/api/{api}/webhooks/{bot.id}/{bot.inter_cache.get(reference.id, reference.slash)}/messages/@original"
 		else:
 			url = f"https://discord.com/api/{api}/interactions/{reference.id}/{reference.slash}/callback"
 		data = dict(
 			type=4,
 			data=dict(
-				flags=ephemeral,
+				flags=ephemeral or 0,
 			),
 		)
 		if content:
@@ -1446,8 +1469,6 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 			data["data"]["embeds"] = [embed.to_dict() for embed in embeds]
 		if components:
 			data["data"]["components"] = components
-		if getattr(reference, "deferred", False):
-			data = data["data"]
 	else:
 		ephemeral = False
 		fields = {}
@@ -1527,8 +1548,16 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 			return await channel.send(content, **fields)
 	body = orjson.dumps(data)
 	exc = RuntimeError
+	if bot:
+		M = bot.ExtendedMessage.new
+	else:
+		M = discord.Message
 	for i in range(xrand(3, 6)):
 		try:
+			method = "patch" if getattr(reference, "deferred", False) else "post"
+			if method == "patch":
+				url = f"https://discord.com/api/{api}/webhooks/{bot.id}/{reference.slash}/messages/@original"
+				body = orjson.dumps(data["data"])
 			if files:
 				form = aiohttp.FormData()
 				for i, f in enumerate(files):
@@ -1549,7 +1578,6 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 					content_type="application/json",
 				)
 				body = form
-			method = "patch" if getattr(reference, "deferred", False) else "post"
 			async with sem:
 				resp = await Request(
 					url,
@@ -1565,7 +1593,29 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 					print_exc()
 				elif ex.errno == 404:
 					continue
+				elif ex.errno == 400 and "Interaction has already been acknowledged." in repr(ex):
+					slash = bot.inter_cache.get(reference.id, reference.slash)
+					url = f"https://discord.com/api/{api}/webhooks/{bot.id}/{slash}/messages/@original"
+					method = "patch"
+					body = orjson.dumps(data["data"])
+					print("Retrying interaction:", url, method, body)
+					resp = await Request(
+						url,
+						method=method,
+						data=body,
+						authorise=True,
+						aio=True,
+					)
+					message = M(state=bot._state, channel=channel, data=eval_json(resp))
+					if ephemeral:
+						message.id = reference.id
+						message.slash = getattr(reference, "slash", None)
+						message.ephemeral = True
+					for a in message.attachments:
+						print("<attachment>", a.url)
+					return message
 				print_exc()
+				print("Broken interaction:", url, repr(ex), data)
 				fields = {}
 				if files:
 					fields["files"] = files
@@ -1593,10 +1643,6 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 					)
 				if not resp:
 					return
-			if bot:
-				M = bot.ExtendedMessage.new
-			else:
-				M = discord.Message
 			message = M(state=bot._state, channel=channel, data=eval_json(resp))
 			if ephemeral:
 				message.id = reference.id
@@ -1706,9 +1752,11 @@ def get_url(obj, f=to_webp) -> str:
 # Finds the best URL for a discord object's icon, prioritizing proxy_url for images if applicable.
 proxy_url = lambda obj: get_url(obj) or (obj.proxy_url if is_image(obj.proxy_url) else obj.url)
 # Finds the best URL for a discord object's icon.
-best_url = lambda obj: get_url(obj) or obj.url
+best_url = lambda obj: get_url(obj) or getattr(obj, "url", None) or BASE_LOGO
 # Finds the worst URL for a discord object's icon.
-worst_url = lambda obj: get_url(obj, to_webp_ex) or obj.url
+worst_url = lambda obj: get_url(obj, to_webp_ex) or getattr(obj, "url", None) or BASE_LOGO
+
+allow_gif = lambda url: url + ".gif" if "." not in url else url
 
 def get_author(user, u_id=None):
 	url = best_url(user)
@@ -1722,7 +1770,7 @@ def get_author(user, u_id=None):
 	name = getattr(user, "display_name", None) or user.name
 	if u_id:
 		name = f"{name} ({user.id})"
-	return cdict(name=name, icon_url=url, url=url)
+	return cdict(name=name, icon_url=allow_gif(url), url=url)
 
 # Finds emojis and user mentions in a string.
 find_emojis = lambda s: regexp("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>").findall(s)
@@ -3482,11 +3530,14 @@ class DownloadingFile(io.IOBase):
 		if s < size:
 			buf = deque()
 			buf.append(b)
+			n = 1
 			while s < size:
-				time.sleep(2 / 3)
+				time.sleep(n / 3)
+				n += 1
 				b = self._read(size - s)
 				if not b:
 					if self.af():
+						print("AF Complete.")
 						b = self._read(size - s)
 						if not b:
 							break
@@ -3951,7 +4002,7 @@ def proxy_download(url, fn=None, refuse_html=True, timeout=720):
 		stream=True,
 	) as resp:
 		if resp.status_code not in range(200, 400):
-			raise ConnectionError(resp.status_code, resp)
+			raise ConnectionError(resp.status_code, (url, resp.content))
 		if not fn:
 			b = resp.content
 			if refuse_html and b[:15] == b"<!DOCTYPE html>":
@@ -4109,7 +4160,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				if not isinstance(data, bytes):
 					data = bytes(data, "utf-8")
 				if not data or magic.from_buffer(data).startswith("text/"):
-					raise ConnectionError(status, url, as_str(data))
+					raise ConnectionError(status, (url, as_str(data)))
 			if json:
 				data = resp.json()
 				if awaitable(data):
@@ -4166,7 +4217,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
 			if resp.status_code >= 400:
 				if not resp.content or magic.from_buffer(resp.content).startswith("text/"):
-					raise ConnectionError(resp.status_code, url, resp.text)
+					raise ConnectionError(resp.status_code, (url, resp.text))
 			if json:
 				return resp.json()
 			if raw and getattr(resp, "raw", None):
@@ -4503,7 +4554,7 @@ class CacheItem:
 		self.value = value
 
 class Cache(cdict):
-	__slots__ = ("timeout", "tmap", "soonest", "sooning", "lost", "trash")
+	__slots__ = ("timeout", "tmap", "soonest", "sooning", "lost", "trash", "db")
 
 	def __init__(self, *args, timeout=60, trash=8, **kwargs):
 		super().__init__(*args, **kwargs)
@@ -4523,6 +4574,14 @@ class Cache(cdict):
 		else:
 			fut = None
 		object.__setattr__(self, "sooning", fut)
+		object.__setattr__(self, "db", None)
+
+	def attach(self, db):
+		db.setdefault("__lost", {}).update(self.lost)
+		object.__setattr__(self, "lost", db["__lost"])
+		db.setdefault("__tmap", {}).update(self.tmap)
+		object.__setattr__(self, "tmap", db["__tmap"])
+		object.__setattr__(self, "db", db)
 
 	async def _update(self):
 		tmap = self.tmap
@@ -4546,8 +4605,18 @@ class Cache(cdict):
 			object.__setattr__(self, "soonest", inf)
 		return self
 
+	def __getitem__(self, k):
+		if self.db is None:
+			return super().__getitem__(k)
+		return self.db.__getitem__(k)
+
 	def __setitem__(self, k, v):
-		super().__setitem__(k, v)
+		if self.db is None:
+			super().__setitem__(k, v)
+		else:
+			self.db.__setitem__(k, v)
+			self.db.update("__tmap")
+			self.db.update("__lost")
 		timeout = self.timeout
 		t = utc()
 		ts = t + timeout

@@ -27,6 +27,7 @@ AUTH = {
 	"giphy_key": "",
 	"huggingface_key": "",
 	"openai_key": "",
+	"fireworks_key": "",
 	"replicate_key": "",
 	"together_key": "",
 	"backup_path": "",

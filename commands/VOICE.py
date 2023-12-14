@@ -799,7 +799,7 @@ class AudioQueue(alist):
 			source = None
 			with self.sem:
 				with tracebacksuppressor:
-					source = ytdl.get_stream(e, force=True, asap=True)
+					source = ytdl.get_stream(e, force=True, asap=2)
 			if self.sem.is_busy():
 				self.sem.wait()
 			if not source:
@@ -883,7 +883,7 @@ class AudioQueue(alist):
 				e = cdict(p)
 				e.u_id = self.bot.id
 				e.skips = ()
-				ytdl.get_stream(e)
+				ytdl.get_stream(e, asap=2)
 				q.appendleft(e)
 		else:
 			self.announce_play(self[0])
@@ -1158,14 +1158,13 @@ class AudioFileLink:
 		bot.audio.submit(f"cache['{self.fn}'].destroy()")
 		ytdl.cache.pop(self.fn, None)
 
-	ctime = 0
+	# ctime = 0
 	def is_finished(self):
-		if not self.ctime:
-			self.ctime = utc()
-		if utc() - self.ctime > 60:
-			return True
-		return self.started and (getattr(self, "loaded", None) or bot.audio.submit(f"bool(cache['{self.fn}'].proc)") and bot.audio.submit(f"not cache['{self.fn}'].proc.is_running()"))
-
+		# if not self.ctime:
+		# 	self.ctime = utc()
+		# if utc() - self.ctime > 60:
+		# 	return True
+		return self.started and (getattr(self, "loaded", None) or bot.audio.submit(f"cache['{self.fn}'].proc_expired"))
 
 class AudioClientSubInterface:
 
@@ -1851,6 +1850,14 @@ class AudioDownloader:
 						title = t2.split("?", 1)[0].rsplit("/", 1)[-1]
 						temp = dict(url=t2, webpage_url=url, title=title, direct=True)
 						out.append(temp)
+				t = s
+				spl = t.split('<meta itemprop="contentURL" content="', 1)
+				if len(spl) > 1:
+					t2 = spl[1].split('">', 1)[0]
+					if is_url(t2):
+						title = t2.split("?", 1)[0].rsplit("/", 1)[-1]
+						temp = dict(url=t2, webpage_url=url, title=title, direct=True)
+						out.append(temp)
 				if len(out) > 1:
 					return {"_type": "playlist", "entries": out}
 				elif out:
@@ -2156,34 +2163,6 @@ class AudioDownloader:
 							if v_id == e.get("id"):
 								output.rotate(-i)
 								break
-			elif is_url(item) and tuple(reversed(item.split("/", 3)[2].encode("utf-8"))) == (109, 111, 99, 46, 117, 109, 105, 110, 97, 120):
-				b = Request(item, headers=self.youtube_header(), timeout=12)
-				search = b'itemprop="name" content="'
-				try:
-					i = b.index(search)
-				except ValueError:
-					pass
-				else:
-					s, b = b[i + len(search):].split(b'"', 1)
-					name = s.decode("utf-8", "replace")
-					search = b'itemprop="duration" content="'
-					s, b = b.split(search, 1)[-1].split(b'"', 1)
-					duration = time_parse(s.decode("utf-8", "replace").lstrip("P").rstrip("S").replace("DT", ":").replace("H", ":").replace("M", ":"))
-					search = b'itemprop="thumbnailUrl" content="'
-					s, b = b.split(search, 1)[-1].split(b'"', 1)
-					thumbnail = s.decode("utf-8", "replace")
-					search = b'itemprop="embedURL" content="'
-					with requests.head(b.split(search, 1)[-1].split(b'"', 1)[0].decode("utf-8", "replace"), headers=self.youtube_header(), allow_redirects=True) as resp:
-						stream = resp.url
-					temp = cdict(
-						name=name,
-						url=item,
-						duration=duration,
-						stream=stream,
-						icon=thumbnail,
-						video=stream,
-					)
-					output.append(temp)
 			# Only proceed if no items have already been found (from playlists in this case)
 			if not len(output):
 				resp = None
@@ -2212,6 +2191,8 @@ class AudioDownloader:
 				# Otherwise call automatic extract_info function
 				if not resp:
 					resp = self.extract_info(item, count, search=search, mode=mode)
+				if not resp:
+					return []
 				if resp.get("_type") == "url":
 					resp = self.extract_from(resp["url"])
 				if resp is None or not len(resp):
@@ -2641,10 +2622,10 @@ class AudioDownloader:
 			if type(download) is str:
 				live = False
 			else:
-				live = not entry.get("duration") or entry["duration"] > 960 or asap > 1
+				live = not entry.get("duration") or entry["duration"] > 960
 			seekable = not entry.get("duration") or entry["duration"] < inf
 			cf = isnan(entry.get("duration") or nan) or not (stream.startswith("https://cf-hls-media.sndcdn.com/") or is_youtube_stream(stream))
-			if asap > 1 and not f.proc and not live:
+			if asap > 1 and not f.proc and live and entry.get("duration", 0) > 960:
 				esubmit(f.load, check_fmt=cf, webpage_url=entry["url"], live=False, seekable=seekable, duration=entry.get("duration"), asap=False)
 			try:
 				f.load(stream, check_fmt=cf, webpage_url=entry["url"], live=live, seekable=seekable, duration=entry.get("duration"), asap=asap)
@@ -2844,7 +2825,12 @@ class AudioDownloader:
 			ctx = self.download_sem
 		ofmt = fmt
 		with ctx:
-			if fmt == "ecdc":
+			topng = False
+			if fmt in ("png", "jpg", "webp"):
+				fmt = "opus"
+				ecdc = False
+				topng = True
+			elif fmt == "ecdc":
 				fmt = "opus"
 				ecdc = True
 			else:
@@ -2965,6 +2951,13 @@ class AudioDownloader:
 							with open(out3, "wb") as f:
 								f.write(b)
 					return out3, name.translate(filetrans) + ".ecdc"
+				if topng:
+					out3 = "cache/~" + h + "." + ofmt
+					if not os.path.exists(out3) or not os.path.getsize(out3):
+						args = [python, "wav2png.py", os.path.abspath(out2), "../" + out3]
+						print(args)
+						subprocess.run(args, cwd=os.getcwd() + "/misc")
+					return out3, name.translate(filetrans) + "." + ofmt
 				return out, out
 			outf = None
 			for url in urls:
@@ -3333,6 +3326,14 @@ class AudioDownloader:
 							with open(out3, "wb") as f:
 								f.write(b)
 					fn = out3
+				if topng:
+					out3 = fn.rsplit(".", 1)[0] + "." + ofmt
+					outf = outf.rsplit(".", 1)[0] + "." + ofmt
+					if not os.path.exists(out3) or not os.path.getsize(out3):
+						args = [python, "wav2png.py", os.path.abspath(fn), "../" + out3]
+						print(args)
+						subprocess.run(args, cwd=os.getcwd() + "/misc")
+					fn = out3
 				if rename:
 					os.rename(fn, rename)
 					return rename, outf
@@ -3401,7 +3402,7 @@ ytdl = AudioDownloader()
 
 class Queue(Command):
 	server_only = True
-	name = ["▶️", "P", "Q", "Play", "Enqueue", "Search&Play"]
+	name = ["▶️", "P", "Q", "Play", "PlayNow", "PlayNext", "Enqueue", "Search&Play"]
 	alias = name + ["LS"]
 	description = "Shows the music queue, or plays a song in voice."
 	usage = "<url>* <force{?f}|budge{?b}|random{?r}|verbose{?v}|hide{?h}>*"
@@ -3415,6 +3416,7 @@ class Queue(Command):
 	typing = True
 	slash = ("Play", "Queue")
 	msgcmd = ("Search & Play",)
+	exact = False
 
 	async def __call__(self, bot, user, perm, message, channel, guild, flags, name, argv, comment="", **void):
 		# This command is a bit of a mess
@@ -3449,6 +3451,14 @@ class Queue(Command):
 			future = None
 		except KeyError:
 			future = create_task(auto_join(guild, channel, user, bot, preparing=True))
+		if name == "playnext":
+			if not isinstance(flags, dict):
+				flags = dict.fromkeys(flags, True)
+			flags["b"] = True
+		elif name == "playnow":
+			if not isinstance(flags, dict):
+				flags = dict.fromkeys(flags, True)
+			flags["f"] = True
 		# Start typing event asynchronously to avoid delays
 		async with discord.context_managers.Typing(channel):
 			# Perform search concurrently, may contain multiple URLs
@@ -3706,6 +3716,7 @@ class Playlist(Command):
 	rate_limit = (7, 11)
 	typing = True
 	slash = True
+	ephemeral = True
 
 	async def __call__(self, user, argv, guild, flags, channel, message, perm, **void):
 		update = self.bot.data.playlists.update
@@ -4271,6 +4282,7 @@ class AudioSettings(Command):
 		"Resample": "resample",
 		"Bitrate": "bitrate",
 		"LoopQueue": "loop",
+		"LoopQ": "loop",
 		"Repeat": "repeat",
 		"ShuffleQueue": "shuffle",
 		"AutoShuffle": "shuffle",
@@ -4624,6 +4636,7 @@ class VoiceNuke(Command):
 	usage = "<hide{?h}>?"
 	flags = "h"
 	rate_limit = 10
+	ephemeral = True
 
 	async def __call__(self, guild, flags, **void):
 		connected = set()
@@ -4645,6 +4658,7 @@ class Radio(Command):
 	rate_limit = (6, 8)
 	slash = True
 	countries = fcdict()
+	ephemeral = True
 
 	def country_repr(self, c):
 		out = io.StringIO()
@@ -4886,6 +4900,7 @@ class Party(Command):
 		("Fishington.io", 814288819477020702),
 		("Chess", 832012586023256104),
 	))
+	ephemeral = True
 
 	async def __call__(self, bot, guild, channel, user, argv, **void):
 		vc = select_voice_channel(user, channel)
@@ -5357,6 +5372,8 @@ class Download(Command):
 	typing = True
 	slash = True
 	msgcmd = ("Download as mp3",)
+	ephemeral = True
+	exact = False
 
 	async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
 		ytdl.bot = bot
@@ -5387,7 +5404,7 @@ class Download(Command):
 				spl = smart_split(argv)
 				if len(spl) >= 1:
 					fmt = spl[-1].lstrip(".")
-					if fmt.casefold() not in ("mp3", "ecdc", "opus", "ogg", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp"):
+					if fmt.casefold() not in ("mp3", "ecdc", "opus", "ogg", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp", "png", "jpg", "webp"):
 						fmt = default_fmt
 					else:
 						if spl[-2] in ("as", "to"):
@@ -5678,6 +5695,7 @@ class Transcribe(Command):
 	rate_limit = (30, 45)
 	typing = True
 	slash = True
+	ephemeral = True
 
 	async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
 		if max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1) < 2:

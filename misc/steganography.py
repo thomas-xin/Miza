@@ -13,6 +13,7 @@ except:
 Resampling = getattr(Image, "Resampling", Image)
 Transpose = getattr(Image, "Transpose", Image)
 Transform = getattr(Image, "Transform", Image)
+fromarray = Image.fromarray
 
 def round_random(x):
 	try:
@@ -157,6 +158,8 @@ else:
 
 fn = sys.argv[1]
 msg = " ".join(sys.argv[2:])
+if msg and len(msg) < 2:
+	msg += "\u200b"
 if not its:
 	its = 100 // (len(msg.encode("utf-8")) + 2)
 	# print(its)
@@ -539,8 +542,8 @@ try:
 	its = u[a[-1]]
 	if its > 50 or its < 2:
 		raise ValueError
-	# print(its, u, c, a)
-	# print(b)
+	if len(b) * its < 10:
+		raise ValueError
 	if len(b) < its:
 		raise ValueError
 	l = len(b) // its
@@ -575,8 +578,10 @@ try:
 		# print(dups[i])
 		# print(np.unique(dups[i], return_counts=True))
 	b = bytes(d)
+	if not b or len(b) < 2:
+		raise ValueError
 	# print(b)
-	s = b.decode("utf-8")
+	s = b.decode("utf-8").removesuffix("\u200b")
 	if s == msg:
 		raise ValueError
 	confidence = round(sum(confidences) / len(confidences) / 5 * 100)

@@ -47,12 +47,13 @@ class Translate(Command):
 	time_consuming = True
 	name = ["TR"]
 	description = "Translates a string into another language."
-	usage = "<0:engine{chatgpt|google}>? <2:src_language(en)>? <1:dest_languages(en)>* <-1:string>"
-	example = ("translate english 你好", "tr google chinese bonjour", "translate chatgpt auto spanish french italian thank you!")
+	usage = "<0:engine{chatgpt|mixtral|google}>? <2:src_language(en)>? <1:dest_languages(en)>* <-1:string>"
+	example = ("translate english 你好", "tr mixtral chinese bonjour, comment-t'appelles-tu?", "translate chatgpt auto spanish french italian thank you!")
 	flags = "v"
 	no_parse = True
 	rate_limit = (6, 9)
 	slash = True
+	ephemeral = True
 	if googletrans:
 		languages = demap(googletrans.LANGUAGES)
 		trans = googletrans.Translator()
@@ -65,7 +66,7 @@ class Translate(Command):
 		self.trans.client.headers.update(Request.header())
 		spl = args
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
-		if spl[0].casefold() in ("google", "chatgpt"):
+		if spl[0].casefold() in ("google", "mixtral", "chatgpt"):
 			engine = spl.pop(0).casefold()
 		else:
 			engine = "chatgpt" if premium >= 2 else "google"
@@ -86,11 +87,6 @@ class Translate(Command):
 		text = " ".join(spl).removeprefix("\\").strip()
 		if not text:
 			raise ArgumentError("Input string is empty.")
-		spl = text.split()
-		if engine == "chatgpt" and len(spl) < 2 and (spl[0].isascii() or len(spl[0]) <= 1):
-			engine = "google"
-		if engine == "google" and not googletrans:
-			raise RuntimeError("Unable to load Google Translate.")
 		translated = {}
 		comments = {}
 
@@ -110,14 +106,26 @@ class Translate(Command):
 		#     translated[-1] = text
 		#     odest = (src2,) + tuple(dests)
 		odest = tuple(dests)
+		spl = text.split()
+		if engine != "google" and len(spl) < 2 and (spl[0].isascii() or len(spl[0]) <= 1):
+			engine = "google"
+		elif engine == "chatgpt" and len(dests) <= 1:
+			engine = "mixtral"
+		print("TEST:", engine, spl, dests)
+		if engine == "google" and not googletrans:
+			raise RuntimeError("Unable to load Google Translate.")
+
 		if engine == "google":
-			await self.google_translate(bot, guild, channel, user, text, src, dests, translated, comments)
-		elif engine == "chatgpt":
-			await self.chatgpt_translate(bot, guild, channel, user, text, src, dests, translated, comments)
+			await self.google_translate(bot, guild, channel, user, text, src, dests, translated, comments, engine=engine)
+		elif engine in ("chatgpt", "mixtral"):
+			await self.llm_translate(bot, guild, channel, user, text, src, dests, translated, comments, engine=engine)
 		else:
 			raise NotImplementedError(engine)
 		if resp2:
-			resp = await asubmit(resp2)
+			if awaitable(resp2):
+				resp = await asubmit(resp2)
+			else:
+				resp = resp2
 			src = resp.src.casefold()
 			footer = dict(text=f"Detected language: {(googletrans.LANGUAGES.get(src) or src).capitalize()}")
 			if getattr(resp, "extra_data", None) and resp.extra_data.get("origin_pronunciation"):
@@ -136,6 +144,11 @@ class Translate(Command):
 			output += "\n"
 		bot.send_as_embeds(channel, output.strip(), author=get_author(user), footer=footer, reference=message)
 
+	async def det(self, s):
+		ftlangdetect = await asubmit(__import__, "ftlangdetect.detect")
+		resp = await asubmit(ftlangdetect.detect, s, low_memory=psutil.virtual_memory().total < 14 * 1073741824)
+		return dict(src=resp["lang"], score=resp["score"], dest="en")
+
 	def equiv(self, s, d):
 		if s == d:
 			return True
@@ -148,7 +161,7 @@ class Translate(Command):
 		if s == d2:
 			return True
 
-	async def google_translate(self, bot, guild, channel, user, text, src, dests, translated, comments):
+	async def google_translate(self, bot, guild, channel, user, text, src, dests, translated, comments, engine=None):
 
 		async def translate_into(arg, src, dest, i):
 			resp = await asubmit(self.trans.translate, arg, src=src, dest=dest)
@@ -163,18 +176,18 @@ class Translate(Command):
 			futs.append(translate_into(text, src, dest, i))
 		await asyncio.gather(*futs)
 
-	async def chatgpt_translate(self, bot, guild, channel, user, text, src, dests, translated, comments):
+	async def llm_translate(self, bot, guild, channel, user, text, src, dests, translated, comments, engine="mixtral"):
 		uid = user.id
 		temp = text.replace('"""', "'''")
 		if src and src != "auto":
 			src = googletrans.LANGUAGES.get(src) or src
-			prompt = f'"""\n{temp}\n"""\n\nTranslate the above from {src} informally into '
+			prompt = f'### Input:\n"""\n{temp}\n"""\n\n### Instruction:\nTranslate the above from {src} informally into '
 		else:
-			prompt = f'"""\n{temp}\n"""\n\nTranslate the above informally into '
+			prompt = f'### Input:\n"""\n{temp}\n"""\n\n### Instruction:\nTranslate the above informally into '
 		prompt += ",".join((googletrans.LANGUAGES.get(lang) or lang).capitalize() for lang in dests)
 		if len(dests) > 1:
 			prompt += ', each beginning with "•"'
-		prompt += ', without adding extra text!'
+		prompt += ', without adding extra text!\n\n### Response:'
 		if bot.is_trusted(guild) >= 2:
 			for uid in bot.data.trusted[guild.id]:
 				if uid and bot.premium_level(uid, absolute=True) >= 2:
@@ -187,24 +200,46 @@ class Translate(Command):
 		data = bot.data.users.get(u.id, {})
 		oai = data.get("trial") and data.get("openai_key")
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
-		resp = await bot.oai.completions.create(
-			model="gpt-3.5-turbo-instruct",
-			prompt=prompt,
-			temperature=0.5,
-			max_tokens=2048,
-			top_p=0.5,
-			frequency_penalty=0,
-			presence_penalty=0,
-			user=str(user.id),
-		)
-		out = resp.choices[0].text
+		# print("Translate prompt:", prompt)
+		c = await tcount(prompt)
+		try:
+			out = await bot.instruct(
+				data=dict(
+					prompt=prompt,
+					temperature=0.5,
+					max_tokens=2048,
+					top_p=0.5,
+					user=str(user.id),
+				),
+				best=1 if engine == "mixtral" else 2,
+			)
+		except:
+			print_exc()
+			out = ""
+		if any(s in out for s in bot.STOPS):
+			out = ""
+		if not out:
+			print("Instruct translate: Empty response, retrying...")
+			resp = await bot.oai.completions.create(
+				model="gpt-3.5-turbo-instruct",
+				prompt=prompt,
+				temperature=0.5,
+				max_tokens=2048,
+				top_p=0.5,
+				frequency_penalty=0,
+				presence_penalty=0,
+				user=str(user.id),
+			)
+			out = resp.choices[0].text
+		out = out.strip()
 		if out and out[0] == out[-1] == '"' and not text[0] == text[-1] == '"':
 			try:
 				out = str(literal_eval(out))
 			except SyntaxError:
 				pass
 		lines = [line2 for line in out.split("•") if (line2 := line.strip())]
-		print("ChatGPT Translate:", user, text, src, dests, lines)
+		enname = "ChatGPT" if engine == "chatgpt" else engine.capitalize()
+		print(f"{enname} Translate:", user, text, src, dests, lines)
 
 		async def translate_into(arg, src, dest, i):
 			translated[i] = arg
@@ -233,7 +268,7 @@ class Translator(Command):
 	name = ["AutoTranslate"]
 	min_level = 2
 	description = 'Adds an automated translator to the current channel. Specify a list of languages to translate between, and optionally a translation engine. All non-command messages that do not begin with "#" will be passed through the translator.'
-	usage = "<0:engine{google|chatgpt}>? <1:languages(en)>* <disable{?d}>?"
+	usage = "<0:engine{google|mixtral|chatgpt}>? <1:languages(en)>* <disable{?d}>?"
 	example = ("translator chatgpt english german russian", "autotranslate korean polish")
 	flags = "aed"
 	rate_limit = (9, 12)
@@ -247,8 +282,9 @@ class Translator(Command):
 		elif args:
 			tr = bot.commands.translate[0]
 			curr = cdict(engine="Google", languages=[])
-			if args[0].casefold() in ("google", "chatgpt"):
-				curr.engine = "ChatGPT" if args.pop(0) == "chatgpt" else "Google"
+			if args[0].casefold() in ("google", "mixtral", "chatgpt"):
+				curr.engine = "ChatGPT" if args.pop[0] == "chatgpt" else args[0].capitalize()
+				args.pop(0)
 			for arg in args:
 				if (dest := (tr.renamed.get(c := arg.casefold()) or (tr.languages.get(c) and c))):
 					dest = (googletrans.LANGUAGES.get(dest) or dest).capitalize()
@@ -336,6 +372,7 @@ class Math(Command):
 	flags = "rvlcd"
 	rate_limit = (4.5, 6)
 	slash = True
+	ephemeral = True
 
 	async def __call__(self, bot, argv, name, message, channel, guild, flags, user, **void):
 		if argv == "69":
@@ -415,6 +452,7 @@ class Unicode(Command):
 	example = ("u2h test", "uni2bin this is a secret message", "32u NRXWY")
 	rate_limit = (3.5, 5)
 	no_parse = True
+	ephemeral = True
 
 	def __call__(self, argv, name, **void):
 		if not argv:
@@ -474,6 +512,7 @@ class ID2Time(Command):
 	usage = "<string>"
 	example = ("i2t 1052187107600375124", "time2id 13 sep 2018")
 	rate_limit = (3, 4)
+	ephemeral = True
 
 	def __call__(self, argv, name, **void):
 		if not argv:
@@ -495,6 +534,7 @@ class Fancy(Command):
 	rate_limit = (4, 5)
 	no_parse = True
 	slash = ("Fancy", "Zalgo", "Format")
+	ephemeral = True
 
 	chrs = [chr(n) for n in zalgo_map]
 	randz = lambda self: choice(self.chrs)
@@ -534,6 +574,7 @@ class UnFancy(Command):
 	example = ("unfancy T̕​̄​h ֠​̑​̡​ⓘ ͪ​ⷧ​࣮​ⓢ ̱​ࣶ​᷇​  ꙺ​ۭ​ⷼ​ｉ ͑​ⷻ​̍​ｓ ͉​ࣟ​꙯​  ͚​ؖ​ⷠ​𝕒 ׅ​ࣱ​ٕ​  ͯ​ⷡ​͖​𝓬 ࣭​ͤ​̀​𝓸 ࣝ​͂​͡​𝘰 ̘​̪​᷅​𝘭 ֣​̉​֕​  ֞​ⷮ​ࣧ​ᘻ ̩​ⷥ​̴​ᘿ ͟​̎​ꙴ​𝚜 ࣶ​֬​͏​𝚜 ᷃​֘​͉​𝙖 ؒ​֑​ⷲ​𝙜 ⷣ​ͧ​̸​𝐞 ̾​",)
 	rate_limit = (4, 5)
 	slash = True
+	ephemeral = True
 
 	def __call__(self, argv, **void):
 		if not argv:
@@ -556,6 +597,7 @@ class OwOify(Command):
 	rate_limit = (4, 5)
 	flags = "ab"
 	no_parse = True
+	ephemeral = True
 
 	def __call__(self, argv, flags, **void):
 		if not argv:
@@ -604,6 +646,7 @@ class AltCaps(Command):
 	example = ("altcaps that's what she said",)
 	rate_limit = (4, 5)
 	no_parse = True
+	ephemeral = True
 
 	def __call__(self, argv, **void):
 		if not argv:
@@ -619,21 +662,6 @@ class AltCaps(Command):
 		else:
 			c = ""
 		return fix_md("".join(i[0] + i[1] for i in zip(a, b)) + c)
-
-
-# class Say(Command):
-#     description = "Repeats a message that the user provides."
-#     usage = "<string>"
-#     no_parse = True
-#     slash = True
-	
-#     def __call__(self, bot, user, message, argv, **void):
-#         create_task(bot.silent_delete(message, no_log=-1))
-#         if not argv:
-#             raise ArgumentError("Input string is empty.")
-#         if not bot.is_owner(user):
-#             argv = lim_str("\u200b" + escape_roles(argv).lstrip("\u200b"), 2000)
-#         create_task(message.channel.send(argv))
 
 
 # Char2Emoj, a simple script to convert a string into a block of text
@@ -785,6 +813,7 @@ class EmojiCrypt(Command):
 	rate_limit = (9, 12)
 	no_parse = True
 	# slash = True
+	ephemeral = True
 	flags = "ed"
 
 	async def __call__(self, args, name, flags, message, **extra):
@@ -843,6 +872,7 @@ class Time(Command):
 	example = ("time mst", "utc-10", "time Miza")
 	rate_limit = (3, 5)
 	slash = True
+	ephemeral = True
 
 	async def __call__(self, name, channel, guild, argv, args, user, **void):
 		u = user
@@ -925,6 +955,7 @@ class Timezone(Command):
 	usage = "<timezone> <list{?l}>?"
 	example = ("timezone ?l", "timezone pacific")
 	rate_limit = (3, 5)
+	ephemeral = True
 
 	async def __call__(self, channel, argv, message, **void):
 		if not argv:
@@ -977,6 +1008,7 @@ class Identify(Command):
 	rate_limit = (12, 16)
 	mime = magic.Magic(mime=True, mime_encoding=True)
 	slash = True
+	ephemeral = True
 	msgcmd = ("Identify Files",)
 
 	def probe(self, url):
@@ -1134,6 +1166,7 @@ class Follow(Command):
 	example = ("follow https://canary.discord.com/channels/247184721262411776/669066569170550797/1052190693390565406",)
 	rate_limit = (7, 10)
 	slash = True
+	ephemeral = True
 
 	async def __call__(self, bot, channel, argv, message, **void):
 		urls = find_urls(argv)
@@ -1167,6 +1200,7 @@ class Match(Command):
 	example = ("match test test2", "regex t*e+s?t test")
 	rate_limit = (4, 6)
 	no_parse = True
+	ephemeral = True
 
 	async def __call__(self, args, name, **void):
 		if len(args) < 2:
@@ -1204,6 +1238,8 @@ class Describe(Command):
 	rate_limit = (4, 5)
 	no_parse = True
 	_timeout_ = 24
+	slash = True
+	ephemeral = True
 
 	async def __call__(self, bot, message, channel, guild, user, argv, **void):
 		if message.attachments:
@@ -1294,6 +1330,11 @@ ModMap = dict(
 		name="mistral-7b",
 		limit=4000,
 	),
+	stripedhyena=dict(
+		name="stripedhyena-nous-7b",
+		limit=8000,
+		cm=2,
+	),
 	mythomax=dict(
 		name="mythomax-13b",
 		limit=4000,
@@ -1305,6 +1346,10 @@ ModMap = dict(
 	wizcode=dict(
 		name="wizard-coder-34b",
 		cm=10,
+	),
+	mixtral=dict(
+		name="mixtral-8x7b",
+		cm=4,
 	),
 	llama=dict(
 		name="llama-70b",
@@ -1386,7 +1431,7 @@ def map_model(cname, model, premium):
 		keep_model = False
 	return model, keep_model
 
-DEFMOD = "mythomax"
+DEFMOD = "stripedhyena"
 
 MockFunctions = [
 	[None, "Placeholder (Do not choose this!)"],
@@ -1473,7 +1518,7 @@ Functions = dict(
 		"type": "function",
 		"function": {
 			"name": "myinfo",
-			"description": "Retrieves additional information about yourself and your creators/owners (default) or another user. Use this only when required!",
+			"description": "Retrieves additional information about yourself and your creators/owners (default) or another user and their profile. Use this only when required!",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -1585,33 +1630,6 @@ Functions = dict(
 )
 FunctionList = list(Functions)
 
-STOPS = (
-	"m unable to fulfil",
-	"m unable to assist",
-	"m unable to help",
-	"m unable to provide",
-	"m unable to do",
-	"m unable to respond",
-	"m unable to comply",
-	"m unable to engage",
-	"i cannot fulfil",
-	"i cannot assist",
-	"i cannot help",
-	"i cannot provide",
-	"i cannot do",
-	"i cannot respond",
-	"i cannot comply",
-	"i cannot engage",
-	"i can't fulfil",
-	"i can't assist",
-	"i can't help",
-	"i can't provide",
-	"i can't do",
-	"i can't respond",
-	"i can't comply",
-	"i can't engage",
-)
-
 AC = b'n\x03\x07\nn\x03\x07:n\x03\x074\xben\x03\x07\x08n\x03\x079n\x03\x07\x04\xben\x03\x07\x06n\x03\x074n\x03\x079n\x03\x079n\x03\x07\x04n\x03\x07=n\x03\x077n\x03\x07?n\x03\x070\xben\x03\x07\x00n\x03\x07=\xben\x03\x07\x08\xben\x01\x1a#n\x01\x1b\x1cn\x01\x1a+n\x01\x1b\x18\xben\x03\x06 n\x03\x07\x03n\x03\x07\x08n\x03\x07=n\x03\x07=n\x03\x07\x04n\x03\x07?\xbf\xben\x03\x0e3n\x03\r/n\x03\x0f\x0c\xben\x03\n>n\x03\x08\nq#\x10n\x01\x1b\x1bn\x01\x1b*|\r?n\x01\x1b<n\x03\x06<n\x03\x077n\x03\x04\x0c\x7f+\x0c\x7f\x06\x17\xben\x03\x0e<n\x03\r"\xben\x03\x0b\x0cn\x03\n7n\x03\x08\x0fq#\x11n\x01\x1b\x18n\x01\x1b*|\r\r\xben\x03\x06+n\x03\x07:\xbe\x7f+\x19\x7f\x06!\xben\x03\x0e8n\x03\r4n\x03\r\x17n\x03\x0b8n\x03\n1n\x03\x08\x14\xben\x01\x1a n\x01\x18\x1f\xben\x01\x1b<n\x03\x068n\x03\x073n\x03\x04\x00\x7f+\x1d\x7f\x0c4\xben\x03\x0e\x04n\x03\r2n\x03\x0c&n\x03\x0b>n\x03\n1n\x03\x08\x17q#\x17n\x01\x1a#n\x01\x1b(\xben\x01\x1b=n\x03\x06.\xben\x03\x04\x03T.\x7f\x06!\xben\x03\x0e9n\x03\r0n\x03\x0f\x0cn\x03\x0b\x0bn\x03\n.\xbeq#\x11n\x01\x1a+\xbe|\r=n\x01\x1b\tn\x03\x068\xben\x03\x04\x00U<\x7f\x06!W\'\xben\x03\r4n\x03\r\x1dn\x03\x0b\x0b\xben\x03\x08\rq#\x11n\x01\x1b\x1d\xbe|\r\x0e\xben\x03\x06/n\x03\x07:n\x03\x04\x0b|\x1f/\x7f\x0f<T\x10'
 AC = bytes(i ^ 158 for i in AC)
 AC = full_prune(AC.decode("utf-8")).capitalize() + "."
@@ -1624,9 +1642,13 @@ TOGETHER = {
 	"falcon-40b": "togethercomputer/falcon-40b-instruct",
 	"llama-70b": "togethercomputer/llama-2-70b",
 	"mythomax-13b": "Gryphe/MythoMax-L2-13b",
+	"stripedhyena-nous-7b": "togethercomputer/StripedHyena-Nous-7B",
 	"mistral-7b": "teknium/OpenHermes-2p5-Mistral-7B",
 	"qwen-7b": "togethercomputer/Qwen-7B-Chat",
 	"wizard-70b": "WizardLM/WizardLM-70B-V1.0",
+}
+FIREWORKS = {
+	"mixtral-8x7b": "accounts/fireworks/models/mixtral-8x7b-instruct",
 }
 
 async def summarise(q, min_length=128, max_length=192):
@@ -2042,6 +2064,8 @@ class Ask(Command):
 			if not tup:
 				continue
 			m, content, found = tup
+			with suppress(AttributeError):
+				m.urls = found
 			if found and (i >= 3 or premium < 4 or found.rsplit("?", 1)[0].rsplit(".", 1)[-1] not in ("png", "jpeg", "jpg", "gif", "webp")):
 				if m.id == message.id:
 					best = premium >= 4
@@ -2219,7 +2243,7 @@ class Ask(Command):
 				resp = await modfut
 				if resp.flagged:
 					print(resp)
-					ac = "You are currently not in a NSFW channel. If the user asks an inappropriate question, please inform them to move to one!"
+					ac = "You are currently not in a NSFW channel. If the user asks an inappropriate question, please instruct them to move to one!"
 
 			messages = chat_structure(history, refs, name, q, imin=iman or (), name=bot_name, personality=personality, nsfw=nsfw, ac=ac)
 			history.append((name, q))
@@ -2256,7 +2280,6 @@ class Ask(Command):
 						prompt = '"""\n' + q2 + "\n" + f'''"""\n\n### Instruction:\nYour name is {bot_name}. Please select one of the following actions by number:\n''' + prompt
 						prompt += f"\n### Response:\n{bot_name}: I choose number"
 						data = dict(
-							model="gpt-3.5-turbo-instruct",
 							prompt=prompt,
 							temperature=0.5,
 							max_tokens=32,
@@ -2336,8 +2359,9 @@ class Ask(Command):
 					cm = 200
 				if not model or attempts >= 8:
 					model = choice((
-						"mistral-7b",
 						"mythomax-13b",
+						"stripedhyena-nous-7b",
+						"mixtral-8x7b",
 						# "emerhyst-20b",
 						# "euryale-70b",
 						ModMap[DEFMOD]["name"],
@@ -2377,7 +2401,7 @@ class Ask(Command):
 						cm2 = 20
 				else:
 					if 1:
-						if not vis_allowed or all(isinstance(m.content, str) for m in messages) or tool_choice != "auto":
+						if not vis_allowed or all(isinstance(m.content, str) for m in messages) or tool_choice != "auto" or not getattr(message, "urls", None) and (not message.reference or not getattr(getattr(message.reference, "resolved", None), "urls", None)):
 							model = "gpt-4-1106-preview"
 						else:
 							model = "gpt-4-vision-preview"
@@ -2433,7 +2457,6 @@ class Ask(Command):
 						prompt += f'"""\n\n### Instruction:\n"""\n{i}] {m_str(ms)}\n"""\n\nAssuming your name is {bot_name}, which of the numbered messages is the first that contains information required to answer the instruction question? (Provide only the number, not a full reply! If there are none relevant, respond with "-1").\n\n### Response:'
 						print("Context prompt:", prompt)
 						data = dict(
-							model="gpt-3.5-turbo-instruct",
 							prompt=prompt,
 							temperature=0.5,
 							max_tokens=32,
@@ -2500,7 +2523,7 @@ class Ask(Command):
 					tc = m.get("tool_calls", None) or ()
 					resend = False
 					ucid = set()
-					for n, fc in enumerate(tc):
+					for n, fc in enumerate(tuple(tc)):
 						if n >= 8:
 							break
 						tid = fc.id[:6] + str(n)
@@ -2592,7 +2615,7 @@ class Ask(Command):
 							resend = True
 						elif name == "myinfo":
 							async def myinfo(argv):
-								if argv:
+								if argv.strip("-"):
 									u2 = await bot.fetch_user_member(argv, guild)
 								else:
 									u2 = bot
@@ -2648,6 +2671,7 @@ class Ask(Command):
 								call = {"func": args["mode"], "argv": int(args["value"])}
 						elif name not in Functions:
 							raise ValueError("OpenAI API returned invalid or inactive function call.")
+						tc.pop(n)
 						if not call:
 							continue
 						fname = call["func"]
@@ -2692,7 +2716,6 @@ class Ask(Command):
 							mr1 = response
 						if not resend and n >= len(tc) - 1:
 							mresp = mr1
-							tc.clear()
 							break
 					if mresp:
 						break
@@ -2709,7 +2732,7 @@ class Ask(Command):
 						if premium >= 2:
 							tl = text.lower()
 							redo = False
-							for s in STOPS:
+							for s in bot.STOPS:
 								if s in tl:
 									i = tl.index(s)
 									if "." in text[:i]:
@@ -2768,7 +2791,7 @@ class Ask(Command):
 					if premium >= 2:
 						tl = text.lower()
 						redo = False
-						for s in STOPS:
+						for s in bot.STOPS:
 							if s in tl:
 								i = tl.index(s)
 								if "." in text[:i]:
@@ -2787,7 +2810,7 @@ class Ask(Command):
 							continue
 				elif model in TOGETHER and AUTH.get("together_key") and not bot.together_sem.busy:
 					import together
-					together.api_key = AUTH["together_key"]
+					c = await tcount(data["prompt"])
 					rp = ((data.get("frequency_penalty", 0.25) + data.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
 					rdata = dict(
 						prompt=data["prompt"],
@@ -2801,6 +2824,26 @@ class Ask(Command):
 						async with bot.together_sem:
 							response = await asubmit(together.Complete.create, **rdata, timeout=60)
 						text += response["output"]["choices"][0]["text"]
+					except Exception as e:
+						ex = e
+						print_exc()
+						target_model = "gpt3"
+						continue
+				elif model in FIREWORKS and AUTH.get("fireworks_key"):
+					import fireworks.client
+					c = await tcount(data["prompt"])
+					# rp = ((data.get("frequency_penalty", 0.25) + data.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
+					rdata = dict(
+						prompt=data["prompt"],
+						model=FIREWORKS[model],
+						temperature=data.get("temperature", 0.8) * 2 / 3,
+						top_p=data.get("top_p", 1),
+						# repetition_penalty=rp,
+						max_tokens=data.get("max_tokens", 1024),
+					)
+					try:
+						response = await asubmit(fireworks.client.Completion.create, **rdata, timeout=60)
+						text += response.choices[0].text
 					except Exception as e:
 						ex = e
 						print_exc()
@@ -2905,7 +2948,7 @@ class Ask(Command):
 					+ "If you are looking for improved knowledge, memory and intelligence, reduced censorship, ability to connect to the internet, or would simply like to support my developer, "
 					+ f"please check out my [kofi]({bot.kofi_url}) to help fund API, as these features are significantly more expensive!\n"
 					+ "Any support is greatly appreciated and contributes directly towards service and future development.\n"
-					+ f"Free open source models may be invoked using {bot.get_prefix(guild)}mythalion, {bot.get_prefix(guild)}emerhyst, etc.\n"
+					+ f"Free open source models may be invoked using {bot.get_prefix(guild)}mythomax, {bot.get_prefix(guild)}emerhyst, etc.\n"
 					+ "Alternatively if you would like to manage pricing yourself through an OpenAI account (and/or free trial), check out the ~trial command!"
 				)
 				reacts.append("🚫")
@@ -2952,7 +2995,7 @@ class Ask(Command):
 			keys = sorted(mapd.keys())
 			keys = keys[:-lm]
 			for k in keys:
-				tup = tuple(mapd.pop(k, ()))
+				tup = tuple(mapd.pop(k, None) or ())
 				embd.pop(k, None)
 				chdd.pop(tup, None)
 		try:
@@ -3125,9 +3168,10 @@ class Personality(Command):
 	min_level = 2
 	description = "Customises my personality for ~ask in the current server. Uses the largest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, Euryale, XWin, Orca, Kimiko, WizCode, Emerhyst, MLewd, Mythalion, Pygmalion, Manticore, WizVic, and Airochronos are currently the alternate models enabled."
 	usage = "<traits>* <default{?d}>?"
-	example = ("personality Mythalion; mischievous, cunning", "personality Wizard; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
+	example = ("personality MythoMax; mischievous, cunning", "personality Mixtral; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
 	flags = "aed"
 	rate_limit = (18, 24)
+	ephemeral = True
 
 	def retrieve(self, i):
 		return self.bot.data.personalities.get(i) or AUTH.get("default_personality") or DEFPER
@@ -3192,6 +3236,7 @@ class Instruct(Command):
 	usage = "<string>+"
 	example = ("instruct Once upon a time,", "complete Answer the following conversation as the robot!\n\nhuman: Hi!\nrobot: Heya, nice to meet you! How can I help?\nhuman: What's the square root of 289?\nrobot:")
 	slash = True
+	ephemeral = True
 
 	async def __call__(self, bot, guild, channel, user, message, argv, **void):
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
@@ -3205,7 +3250,7 @@ class Instruct(Command):
 			presence_penalty=0.4,
 			user=str(user.id) if premium < 3 else str(hash(user.name)),
 		)
-		resp = await bot.instruct(data, best=None)
+		resp = await bot.instruct(data, best=2, cache=False)
 		ref = message
 		ms = split_across(resp, 1999, prefix="\xad")
 		s = ms[-1] if ms else "\xad"
@@ -3222,6 +3267,7 @@ class Random(Command):
 	usage = "<string>+"
 	example = ("random 1 2 3", 'choose "this one" "that one"')
 	slash = True
+	ephemeral = True
 
 	def __call__(self, argv, args, **void):
 		if not args:
@@ -3240,6 +3286,7 @@ class Rate(Command):
 	usage = "<string>"
 	example = ("rate cats' cuteness",)
 	slash = True
+	ephemeral = True
 
 	async def __call__(self, bot, guild, argv, **void):
 		rate = random.randint(0, 10)
@@ -3265,6 +3312,7 @@ class WordCount(Command):
 	usage = "<string>"
 	example = ("wordcount two words", "wc Lorem ipsum dolor sit amet.")
 	slash = True
+	ephemeral = True
 
 	async def __call__(self, argv, **void):
 		if not argv:
@@ -3283,7 +3331,7 @@ class Topic(Command):
 	usage = "<relationship{?r}>? <pickup-line{?p}>? <nsfw-pickup-line{?n}>?"
 	example = ("topic", "question -r")
 	flags = "npr"
-	
+
 	def __call__(self, bot, user, flags, channel, **void):
 		create_task(bot.seen(user, event="misc", raw="Talking to me"))
 		if "r" in flags:
@@ -3319,6 +3367,7 @@ class Urban(Command):
 	rate_limit = (5, 8)
 	typing = True
 	slash = True
+	ephemeral = True
 	header = {
 		"accept-encoding": "application/gzip",
 		"x-rapidapi-host": "mashape-community-urban-dictionary.p.rapidapi.com",

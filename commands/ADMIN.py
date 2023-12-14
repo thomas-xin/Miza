@@ -17,6 +17,7 @@ class Purge(Command):
 	rate_limit = (7, 12)
 	multi = True
 	slash = True
+	ephemeral = True
 
 	async def __call__(self, bot, args, argl, user, message, channel, name, flags, perm, guild, **void):
 		# print(self, bot, args, argl, user, channel, name, flags, perm, guild, void)
@@ -701,6 +702,7 @@ class AutoRole(Command):
 	flags = "aedx"
 	rate_limit = (9, 12)
 	slash = True
+	ephemeral = True
 
 	async def __call__(self, argv, args, name, user, channel, guild, perm, flags, **void):
 		update = self.bot.data.autoroles.update
@@ -812,6 +814,7 @@ class RolePreserver(Command):
 	flags = "aed"
 	rate_limit = (9, 12)
 	slash = True
+	ephemeral = True
 
 	def __call__(self, flags, guild, name, **void):
 		bot = self.bot
@@ -1745,7 +1748,7 @@ class ServerProtector(Database):
 						if str(u.id) in message.content:
 							return text
 						if u.bot:
-							react = await asubmit(self.bot.data.emojis.get, "ai_art.gif")
+							react = await self.bot.data.emojis.grab("ai_art.gif")
 							await message.add_reaction(react)
 							return text
 						create_task(send_with_react(
@@ -2147,9 +2150,9 @@ class UpdateUserLogs(Database):
 				for i, url in enumerate(urls):
 					if url:
 						if i:
-							a_url = url
+							a_url = url + (".gif" if a_url.split("?", 1)[0].endswith(".gif") else "")
 						else:
-							b_url = url
+							b_url = url + (".gif" if b_url.split("?", 1)[0].endswith(".gif") else "")
 			emb.add_field(
 				name="Avatar",
 				value=f"[Before]({b_url}) ➡️ [After]({a_url})",
@@ -2176,7 +2179,7 @@ class UpdateUserLogs(Database):
 			return
 		emb = discord.Embed(colour=8323072)
 		emb.set_author(**get_author(user))
-		mlist = self.bot.data.channel_cache.data.get(ch.id, ())
+		mlist = self.bot.data.channel_cache.get(ch.id)
 		count = f" ({len(mlist)}+)" if mlist else ""
 		emb.description = f"{channel_mention(ch.id)}{count} was deleted by {user_mention(user.id)}."
 		self.bot.send_embeds(channel, emb)
@@ -2210,9 +2213,9 @@ class UpdateUserLogs(Database):
 				for i, url in enumerate(urls):
 					if url:
 						if i:
-							a_url = url
+							a_url = url + (".gif" if a_url.split("?", 1)[0].endswith(".gif") else "")
 						else:
-							b_url = url
+							b_url = url + (".gif" if b_url.split("?", 1)[0].endswith(".gif") else "")
 			emb.add_field(
 				name="Icon",
 				value=f"[Before]({b_url}) ➡️ [After]({a_url})",
@@ -2509,7 +2512,7 @@ class UpdateMessageCache(Database):
 					i += 1
 					if not i % 24:
 						await asyncio.sleep(0.2)
-			if len(saving) >= 8:
+			if len(saving) >= 12:
 				print(f"Message Database: {len(saving)} files updated.")
 			deleted = 0
 			limit = self.get_fn(time_snowflake(dtn() - datetime.timedelta(days=28)))
@@ -2521,7 +2524,7 @@ class UpdateMessageCache(Database):
 					deleted += 1
 				else:
 					break
-			if deleted >= 8:
+			if deleted >= 3:
 				print(f"Message Database: {deleted} files deleted.")
 			if os.path.exists(self.files + "/~~~"):
 				self.setmtime()
@@ -2567,7 +2570,7 @@ class UpdateMessageLogs(Database):
 		if i:
 			if id2ts(i) < self.bot.data.message_cache.getmtime():
 				return
-			# async for m in self.bot.data.channel_cache.get(channel, as_message=False):
+			# async for m in self.bot.data.channel_cache.grab(channel, as_message=False):
 			#     if m == i:
 			#         return
 			#     break
@@ -2996,7 +2999,7 @@ class UpdateStarboards(Database):
 		sem = self.sems.setdefault(message.guild.id, Semaphore(1, inf))
 		async with sem:
 			try:
-				reacts = [str(r) for r in sorted(message.reactions, key=lambda r: -r.count)]
+				reacts = [str(r.emoji) for r in sorted(message.reactions, key=lambda r: -r.count)]
 				if not reacts:
 					return
 				react = reacts[0]
@@ -3004,7 +3007,7 @@ class UpdateStarboards(Database):
 				m = await self.bot.fetch_message(table[None][message.id], channel)
 				embed = await self.bot.as_embed(message, link=True, colour=True)
 				text, link = embed.description.rsplit("\n\n", 1)
-				description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in reacts if str(r.emoji) in table) + "   " + link
+				description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in reacts if str(r) in table) + "   " + link
 				embed.description = lim_str(description, 4096)
 				await m.edit(content=None, embed=embed)
 			except (discord.NotFound, discord.Forbidden):

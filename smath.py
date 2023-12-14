@@ -1216,13 +1216,13 @@ def num_parse(s):
 		w = words[i]
 		x = NumWords.get(w, w)
 		if type(x) is str:
-			x = int(x)
+			x = round_min(x)
 		while i < len(words) - 1:
 			i += 1
 			w = words[i]
 			y = NumWords.get(w, w)
 			if type(y) is str:
-				y = int(y)
+				y = round_min(y)
 			if x < y:
 				x *= y
 			elif x <= 1000:
