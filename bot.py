@@ -1712,7 +1712,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return (resp, best)
 
 	llsem = Semaphore(2, 2, rate_limit=4)
-	together_sem = Semaphore(2, 256, rate_limit=0.5)
+	together_sem = Semaphore(100, 2048, rate_limit=6)
 	fireworks_sem = Semaphore(10, 256, rate_limit=6)
 	async def _instruct(self, data, best=False, skip=False):
 		c = await tcount(data["prompt"])
