@@ -179,15 +179,18 @@ class Translate(Command):
 	async def llm_translate(self, bot, guild, channel, user, text, src, dests, translated, comments, engine="mixtral"):
 		uid = user.id
 		temp = text.replace('"""', "'''")
+		start = "### Input:\n"
+		instruction = "### Instruction:\n"
+		response = "\n\n### Response:"
 		if src and src != "auto":
 			src = googletrans.LANGUAGES.get(src) or src
-			prompt = f'### Input:\n"""\n{temp}\n"""\n\n### Instruction:\nTranslate the above from {src} informally into '
+			prompt = f'{start}"""\n{temp}\n"""\n\n{instruction}Translate the above from {src} informally into '
 		else:
-			prompt = f'### Input:\n"""\n{temp}\n"""\n\n### Instruction:\nTranslate the above informally into '
+			prompt = f'{start}"""\n{temp}\n"""\n\n{instruction}Translate the above informally into '
 		prompt += ",".join((googletrans.LANGUAGES.get(lang) or lang).capitalize() for lang in dests)
 		if len(dests) > 1:
 			prompt += ', each beginning with "•"'
-		prompt += ', without adding extra text!\n\n### Response:'
+		prompt += f', without adding extra text!{response}'
 		if bot.is_trusted(guild) >= 2:
 			for uid in bot.data.trusted[guild.id]:
 				if uid and bot.premium_level(uid, absolute=True) >= 2:
@@ -1349,7 +1352,7 @@ ModMap = dict(
 	),
 	mixtral=dict(
 		name="mixtral-8x7b",
-		cm=4,
+		cm=6,
 	),
 	llama=dict(
 		name="llama-70b",
@@ -1415,6 +1418,10 @@ def map_model(cname, model, premium):
 		model = "xwin"
 	elif cname == "mlewd":
 		model = "mlewd"
+	elif cname == "mixtral":
+		model = "mixtral"
+	elif cname == "mistral":
+		model = "mistral"
 	elif cname == "gpt3":
 		if premium < 2:
 			raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
@@ -1431,7 +1438,7 @@ def map_model(cname, model, premium):
 		keep_model = False
 	return model, keep_model
 
-DEFMOD = "stripedhyena"
+DEFMOD = "mixtral"
 
 MockFunctions = [
 	[None, "Placeholder (Do not choose this!)"],
@@ -1646,75 +1653,11 @@ TOGETHER = {
 	"mistral-7b": "teknium/OpenHermes-2p5-Mistral-7B",
 	"qwen-7b": "togethercomputer/Qwen-7B-Chat",
 	"wizard-70b": "WizardLM/WizardLM-70B-V1.0",
+	"mixtral-8x7b": "mistralai/Mixtral-8x7B-Instruct-v0.1",
 }
 FIREWORKS = {
 	"mixtral-8x7b": "accounts/fireworks/models/mixtral-8x7b-instruct",
 }
-
-async def summarise(q, min_length=128, max_length=192):
-	if min_length > max_length - 1:
-		min_length = max_length - 1
-	if q and sum(c.isascii() for c in q) / len(q) > 0.75:
-		q = await asubmit(lim_tokens, q, max_length + min_length << 2, priority=2)
-	else:
-		return await asubmit(lim_tokens, q, max_length, priority=2)
-	tokens = await tik_encode_a(q)
-	if len(tokens) <= max_length:
-		return q
-	try:
-		limit = 960
-		while len(tokens) > max_length and len(tokens) > limit:
-			futs = []
-			count = ceil(len(tokens) / limit * 4 / 3)
-			for start in range(0, max(1, len(tokens) - limit * 3 // 4 - 1), limit * 3 // 4):
-				e1 = tokens[start:start + limit]
-				mt = max(max(limit, round_random(max_length)) // count, limit // 5)
-				if len(e1) <= mt:
-					futs.append(create_task(tik_decode_a(e1)))
-					continue
-				s1 = await tik_decode_a(e1)
-				s1 = s1.strip()
-				if sum(c.isascii() for c in s1) / len(s1) > 0.75:
-					fut = create_task(process_image("summarise", "$", [s1, mt - 32, mt, bool(start)], cap="summ", timeout=30))
-				else:
-					fut = asubmit(lim_tokens(s1, mt))
-				futs.append(fut)
-			s2 = []
-			for fut in futs:
-				res = await fut
-				s2.append(res.strip())
-			s2 = "\n".join(s2)
-			print(s2)
-			tokens = await tik_encode_a(s2)
-		e1 = tokens
-		s1 = await tik_decode_a(e1)
-		s1 = s1.strip().replace("  ", " ")
-		if len(tokens) > max_length:
-			s2 = await process_image("summarise", "$", [s1, round_random(min_length), round_random(max_length)], cap="summ", timeout=30)
-		else:
-			s2 = s1
-		out = []
-		otk = await tik_encode_a(s2.strip())
-		otok = list(otk)
-		last = None
-		count = 0
-		while otok:
-			c = otok.pop(0)
-			if c == last:
-				if count > 3:
-					continue
-				count += 1
-			else:
-				last = c
-				count = 0
-			out.append(c)
-		if len(out) < min_length / 2:
-			return await asubmit(lim_tokens, q, round_random(max_length + min_length) >> 1)
-		res = await tik_decode_a(out)
-		return res.strip()
-	except:
-		print_exc()
-		return await asubmit(lim_tokens, q, round_random(max_length + min_length) >> 1)
 
 def m_repr(m):
 	if not isinstance(m, dict):
@@ -1784,7 +1727,7 @@ async def cut_to(messages, limit=1024, exclude_first=True):
 		return messages
 	ml = round_random(limit / 4)
 	Ml = round_random(limit / 3)
-	s2 = await summarise(s, min_length=ml, max_length=Ml)
+	s2 = await BOT[0].summarise(s, min_length=ml, max_length=Ml)
 	summ += s2
 	messages = mes[::-1]
 	messages.insert(0, cdict(
@@ -1876,16 +1819,25 @@ def chat_structure(history, refs, u, q, imin, name="", personality="", nsfw=Fals
 	messages.append(m)
 	return messages
 
-def instruct_structure(messages, exclude_first=True):
+exclusive_format = {
+	"mistral-7b",
+	"mixtral-8x7b",
+}
+def instruct_structure(messages, exclude_first=True, model=None):
 	ins = tuple(map(m_str, messages))
-	if exclude_first:
-		return ins[0] + "\n\n### History:\n" + "\n\n".join(ins[1:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
-	return "\n\n".join(ins[:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
-
+	if model not in exclusive_format:
+		stops = ["### Instruction:", "### Response:", "<|system|>:"]
+		if exclude_first:
+			prompt = ins[0] + "\n\n### History:\n" + "\n\n".join(ins[1:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
+		prompt = "\n\n".join(ins[:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
+	else:
+		stops = ["</s>", "[INST]", "<|system|>:"]
+		prompt = "\n\n".join(s if m.get("role") == "assistant" else f"[INST]{s}[/INST]" for s, m in zip(ins, messages))
+	return prompt, stops
 
 class Ask(Command):
 	_timeout_ = 24
-	name = ["Wizard", "Euryale", "XWin", "Orca", "Kimiko", "WizCode", "Emerhyst", "MLewd", "Mythalion", "Pyg", "Pygmalion", "Llama", "Vicuna", "Manticore", "WizVic", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
+	name = ["Mixtral", "Mistral", "Wizard", "Euryale", "WizCode", "Emerhyst", "MLewd", "Mythalion", "Pyg", "Pygmalion", "Llama", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
 	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!"
 	usage = "<string>"
 	example = ("ask what's the date?", "gpt3 what is the square root of 3721?", "pyg can I have a hug?")
@@ -2276,7 +2228,7 @@ class Ask(Command):
 						q2 = q.replace('"""', "'''")
 						c = await tcount(q2)
 						if c > 1024:
-							q2 = await summarise(q2, max_length=960, min_length=720)
+							q2 = await bot.summarise(q2, max_length=960, min_length=720)
 						prompt = '"""\n' + q2 + "\n" + f'''"""\n\n### Instruction:\nYour name is {bot_name}. Please select one of the following actions by number:\n''' + prompt
 						prompt += f"\n### Response:\n{bot_name}: I choose number"
 						data = dict(
@@ -2560,7 +2512,7 @@ class Ask(Command):
 								c = await tcount(res)
 								ra = 1 if premium < 2 else 1.5 if premium < 5 else 2
 								if c > round(1440 * ra):
-									res = await summarise(q=q + "\n" + res, max_length=round(1296 * ra), min_length=round(1024 * ra))
+									res = await bot.summarise(q=q + "\n" + res, max_length=round(1296 * ra), min_length=round(1024 * ra))
 									res = res.replace("\n", ". ").replace(": ", " -")
 								res = res.strip()
 								if not appended:
@@ -2758,7 +2710,7 @@ class Ask(Command):
 					continue
 				if mresp:
 					break
-				prompt = instruct_structure(used)
+				prompt, stops = instruct_structure(used, model=model)
 				prompt += f"\n{bot_name}:"
 				if text:
 					prompt += " " + text
@@ -2769,7 +2721,7 @@ class Ask(Command):
 					temperature=temperature,
 					max_tokens=min(1024, limit - length - 64),
 					top_p=0.9,
-					stop=[f"{name}:", f"### Instruction:", f"### Response:", "<|system|>:"],
+					stop=[f"{name}:"] + stops,
 					frequency_penalty=0.8,
 					presence_penalty=0.4,
 					user=str(hash(name)),
@@ -2948,7 +2900,7 @@ class Ask(Command):
 					+ "If you are looking for improved knowledge, memory and intelligence, reduced censorship, ability to connect to the internet, or would simply like to support my developer, "
 					+ f"please check out my [kofi]({bot.kofi_url}) to help fund API, as these features are significantly more expensive!\n"
 					+ "Any support is greatly appreciated and contributes directly towards service and future development.\n"
-					+ f"Free open source models may be invoked using {bot.get_prefix(guild)}mythomax, {bot.get_prefix(guild)}emerhyst, etc.\n"
+					+ f"Free open source models may be invoked using {bot.get_prefix(guild)}mythomax, {bot.get_prefix(guild)}mixtral, etc.\n"
 					+ "Alternatively if you would like to manage pricing yourself through an OpenAI account (and/or free trial), check out the ~trial command!"
 				)
 				reacts.append("🚫")
@@ -3166,7 +3118,7 @@ class Personality(Command):
 	server_only = True
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
 	min_level = 2
-	description = "Customises my personality for ~ask in the current server. Uses the largest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, Euryale, XWin, Orca, Kimiko, WizCode, Emerhyst, MLewd, Mythalion, Pygmalion, Manticore, WizVic, and Airochronos are currently the alternate models enabled."
+	description = "Customises my personality for ~ask in the current server. Uses the largest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Mixtral, Mistral, Wizard, Euryale, WizCode, Emerhyst, MLewd, Mythalion and Pygmalion are currently the alternate models enabled."
 	usage = "<traits>* <default{?d}>?"
 	example = ("personality MythoMax; mischievous, cunning", "personality Mixtral; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
 	flags = "aed"
@@ -3201,7 +3153,7 @@ class Personality(Command):
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
-		models = ("auto", "gpt", "wizard", "euryale", "xwin", "orca", "kimiko", "wizcode", "emerhyst", "mlewd", "mythalion", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizvic", "airochronos", "davinci", "gpt3", "gpt4")
+		models = ("auto", "gpt", "mixtral", "mistral", "wizard", "euryale", "wizcode", "emerhyst", "mlewd", "mythalion", "pyg", "pygmalion", "llama", "davinci", "gpt3", "gpt4")
 		if ";" in p:
 			m, p = p.split(";", 1)
 			p = p.lstrip()

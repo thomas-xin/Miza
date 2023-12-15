@@ -176,13 +176,17 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 		classname = classname[classname.index("'") + 1:]
 		s = f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>: {self.active}/{self.limit}, {self.passive}/{self.buffer}"
 		if self.rate_limit:
-			t = time.time()
-			if self.rate_bin and t - self.rate_bin[0] <= self.rate_limit:
-				rate = round(self.rate_limit - (t - self.rate_bin[0]), 1)
-			else:
-				rate = 0
-			s += f", {rate}/{self.rate_limit}"
+			s += f", {round(self.reset_after, 1)}/{self.rate_limit}"
 		return s
+
+	@property
+	def reset_after(self):
+		if not self.rate_limit or not self.rate_bin:
+			return 0
+		t = time.time()
+		if t - self.rate_bin[0] <= self.rate_limit:
+			return self.rate_limit - (t - self.rate_bin[0])
+		return 0
 
 	async def _update_bin_after_a(self, t):
 		await asyncio.sleep(t)

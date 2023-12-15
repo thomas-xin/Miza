@@ -1712,7 +1712,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return (resp, best)
 
 	llsem = Semaphore(2, 2, rate_limit=4)
-	together_sem = Semaphore(2, 2, rate_limit=0.5)
+	together_sem = Semaphore(2, 8, rate_limit=0.5)
 	async def _instruct(self, data, best=False, skip=False):
 		c = await tcount(data["prompt"])
 		inputs = dict(
@@ -1736,17 +1736,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			# 	except:
 			# 		print_exc()
 			# 		data["model"] = "gpt-3.5-turbo-instruct"
-		if AUTH.get("together_key") and not self.together_sem.busy and best <= 0 and not skip:
+		if AUTH.get("together_key") and not self.together_sem.busy and best <= 1 and not skip:
 			import together
 			rp = ((inputs.get("frequency_penalty", 0.25) + inputs.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
 			m = "mistralai/Mixtral-8x7B-Instruct-v0.1" if best else "togethercomputer/StripedHyena-Nous-7B"
+			p = inputs["prompt"]
 			rdata = dict(
-				prompt=inputs["prompt"],
+				prompt=self.restruct(p) if best else p,
 				model=m,
 				temperature=inputs.get("temperature", 0.8) * 2 / 3,
 				top_p=inputs.get("top_p", 1),
 				repetition_penalty=rp,
 				max_tokens=inputs.get("max_tokens", 1024),
+				stop=["</s>", "[INST]"] if best else ["</s>", "### Instruction:"],
 			)
 			try:
 				async with self.together_sem:
@@ -1759,7 +1761,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			# rp = ((inputs.get("frequency_penalty", 0.25) + inputs.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
 			m = "accounts/fireworks/models/mixtral-8x7b-instruct"
 			data = cdict(
-				prompt=inputs["prompt"],
+				prompt=self.restruct(inputs["prompt"]),
 				model=m,
 				temperature=inputs.get("temperature", 0.8) * 2 / 3,
 				top_p=inputs.get("top_p", 1),
@@ -1780,6 +1782,86 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		async with asyncio.timeout(70):
 			response = await self.oai.completions.create(**inputs, timeout=60)
 		return response.choices[0].text
+
+	def restruct(self, s):
+		t = s.replace("\n### Instruction:\n", "[INST]").replace("### Instruction:\n", "[INST]").replace("\n\n### Response:", "[/INST]").replace("### Input:", "").strip()
+		print("Restruct:", t)
+		return t
+
+	async def summarise(q, min_length=128, max_length=192, best=True):
+		if min_length > max_length - 1:
+			min_length = max_length - 1
+		if q and sum(c.isascii() for c in q) / len(q) > 0.75:
+			q = await asubmit(lim_tokens, q, max_length + min_length << 2, priority=2)
+		else:
+			return await asubmit(lim_tokens, q, max_length, priority=2)
+		tokens = await tik_encode_a(q)
+		if len(tokens) <= max_length:
+			return q
+		try:
+			limit = 9600 if best else 960
+			while len(tokens) > max_length and len(tokens) > limit:
+				futs = []
+				count = ceil(len(tokens) / limit * 4 / 3)
+				for start in range(0, max(1, len(tokens) - limit * 3 // 4 - 1), limit * 3 // 4):
+					e1 = tokens[start:start + limit]
+					mt = max(max(limit, round_random(max_length)) // count, limit // 5)
+					if len(e1) <= mt:
+						futs.append(create_task(tik_decode_a(e1)))
+						continue
+					s1 = await tik_decode_a(e1)
+					s1 = s1.strip()
+					if sum(c.isascii() for c in s1) / len(s1) > 0.75:
+						fut = create_task(self._summarise(s1, mt - 32, mt, bool(start)))
+					else:
+						fut = asubmit(lim_tokens(s1, mt))
+					futs.append(fut)
+				s2 = []
+				for fut in futs:
+					res = await fut
+					s2.append(res.strip())
+				s2 = "\n".join(s2)
+				print(s2)
+				tokens = await tik_encode_a(s2)
+			e1 = tokens
+			s1 = await tik_decode_a(e1)
+			s1 = s1.strip().replace("  ", " ")
+			if len(tokens) > max_length:
+				s2 = await self._summarise(s1, round_random(min_length), round_random(max_length), best=best)
+			else:
+				s2 = s1
+			out = []
+			otk = await tik_encode_a(s2.strip())
+			otok = list(otk)
+			last = None
+			count = 0
+			while otok:
+				c = otok.pop(0)
+				if c == last:
+					if count > 3:
+						continue
+					count += 1
+				else:
+					last = c
+					count = 0
+				out.append(c)
+			if len(out) < min_length / 2:
+				return await asubmit(lim_tokens, q, round_random(max_length + min_length) >> 1)
+			res = await tik_decode_a(out)
+			return res.strip()
+		except:
+			print_exc()
+			return await asubmit(lim_tokens, q, round_random(max_length + min_length) >> 1)
+		
+	async def _summarise(self, s, min_length, max_length, prune=True, best=False):
+		if best or 1:
+			prompt = f'"""\n{s}\n"""\n\n[INST]Please provide a comprehensive summary of the text above![/INST]'
+			resp = await self.instruct(dict(prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=round_random(max_length + min_length) >> 1), best=best)
+			resp = resp.strip()
+			print("Summ:", prompt, resp)
+			if resp:
+				return resp
+		return await process_image("summarise", "$", [s, min_length, max_length, int(bool(prune))], cap="summ", timeout=30)
 
 	analysed = {}
 	async def caption(self, url, best=False, timeout=24):
@@ -1808,10 +1890,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			fut = asubmit(self.ibv, url)
 			futs.append(fut)
 		prompts = []
-		if len(futs) < 3:
+		if not best:
 			res = None
 			try:
-				res = await process_image(url, "caption", ["-nogif", False], cap="caption", timeout=timeout)
+				res = await process_image(url, "caption", ["-nogif", True], cap="caption", timeout=timeout)
 				p1, p2 = res
 			except:
 				if res:
@@ -4059,6 +4141,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					print(f"{getattr(guild, 'id', 0)}: {user} ({u_id}) issued command {msg}")
 					req = command.min_level
 					fut = out_fut = None
+					sem = emptyctx
 					try:
 						# Make sure server-only commands can only be run in servers.
 						if guild is None or getattr(guild, "ghost", None):
@@ -4068,32 +4151,24 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						if not isnan(u_perm):
 							if not u_perm >= req:
 								raise command.perm_error(u_perm, req, "for command " + command_check)
-							x = command.rate_limit
-							if x:
-								x2 = x
+							rl = command.rate_limit
+							if rl:
+								pm = self.premium_multiplier(self.premium_level(user))
 								if user.id in self.owners:
-									x = x2 = 0
-								elif isinstance(x, collections.abc.Sequence):
-									x = x2 = x[not self.is_trusted(getattr(guild, "id", 0))]
-									x /= self.premium_multiplier(self.premium_level(user))
-									x2 /= self.premium_multiplier(self.premium_level(user, absolute=True))
-								remaining += x
-								d = command.used
-								t = d.get(u_id, -inf)
-								wait = utc() - t - x
-								if wait > min(1 - x, -1):
-									if x < x2 and (utc() - t - x2) < min(1 - x2, -1):
-										self.data.users.add_diamonds(user, (x - x2) / 100)
-									if wait < 0:
-										w = -wait
-										d[u_id] = max(t, utc()) + w
-										await asyncio.sleep(w)
-									if len(d) >= 4096:
-										with suppress(RuntimeError):
-											d.pop(next(iter(d)))
-									d[u_id] = max(t, utc())
-								else:
-									raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
+									rl = 0
+									pm = inf
+								elif isinstance(rl, collections.abc.Sequence):
+									rl = rl[not self.is_trusted(getattr(guild, "id", 0))]
+									rl /= pm
+								remaining += rl
+								burst = ceil(pm + 2)
+								rlv = ceil(rl * burst)
+								sem = command.used.get(u_id)
+								if sem is None or sem.rate_limit != rlv:
+									sem = command.used[u_id] = Semaphore(burst, 256, rate_limit=rlv)
+								if sem.busy and sem.reset_after:
+									raise TooManyRequests(f"Command has a rate limit of {sec2time(rl)} with a burst of {burst}; please wait {sec2time(sem.reset_after)}.")
+						# print("Using sem:", sem, u_perm, command.rate_limit, self.premium_level(user))
 						flags = {}
 						if loop:
 							inc_dict(flags, h=1)
@@ -4200,49 +4275,50 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								channel=channel,
 							)
 							channel = guild.channel
-						# Automatically start typing if the command is time consuming
-						tc = getattr(command, "time_consuming", False)
-						if not loop and tc and not getattr(message, "simulated", False):
-							fut = create_task(self._state.http.send_typing(channel.id))
-						# Get maximum time allowed for command to process
-						if isnan(u_perm):
-							timeout = None
-						else:
-							timeout = getattr(command, "_timeout_", 1) * self.timeout
-							if timeout >= inf:
+						async with sem:
+							# Automatically start typing if the command is time consuming
+							tc = getattr(command, "time_consuming", False)
+							if not loop and tc and not getattr(message, "simulated", False):
+								fut = create_task(self._state.http.send_typing(channel.id))
+							# Get maximum time allowed for command to process
+							if isnan(u_perm):
 								timeout = None
-							elif self.is_trusted(message.guild):
-								timeout *= 2
-							timeout *= self.premium_multiplier(self.premium_level(user))
-						# Create a future to run the command
-						future = asubmit(
-							command,                        # command is a callable object, may be async or not
-							bot=self,                        # for interfacing with bot's database
-							argv=argv,                      # raw text argument
-							args=args,                      # split text arguments
-							argl=argl,                      # inputted array of arguments
-							flags=flags,                    # special flags
-							perm=u_perm,                    # permission level
-							user=user,                      # user that invoked the command
-							message=message,                # message data
-							channel=channel,                # channel data
-							guild=guild,                    # guild data
-							name=command_check,             # alias the command was called as
-							looped=loop,                    # whether this command was invoked as part of a loop
-							_timeout=timeout,               # timeout delay assigned to the command
-							timeout=timeout,                # timeout delay for the whole function
-						)
-						try:
-							message.__dict__.setdefault("inits", []).append(future)
-						except:
-							pass
-						# Add a callback to typing in the channel if the command takes too long
-						if fut is None and not hasattr(command, "typing") and not getattr(message, "simulated", False):
-							create_task(delayed_callback(future, sqrt(3), self._state.http.send_typing, channel.id, repeat=True))
-						if slash or getattr(message, "slash", None):
-							create_task(delayed_callback(future, 1, self.defer_interaction, message, ephemeral=getattr(command, "ephemeral", False)))
-						with self.command_semaphore:
-							response = await future
+							else:
+								timeout = getattr(command, "_timeout_", 1) * self.timeout
+								if timeout >= inf:
+									timeout = None
+								elif self.is_trusted(message.guild):
+									timeout *= 2
+								timeout *= self.premium_multiplier(self.premium_level(user))
+							# Create a future to run the command
+							future = asubmit(
+								command,                        # command is a callable object, may be async or not
+								bot=self,                        # for interfacing with bot's database
+								argv=argv,                      # raw text argument
+								args=args,                      # split text arguments
+								argl=argl,                      # inputted array of arguments
+								flags=flags,                    # special flags
+								perm=u_perm,                    # permission level
+								user=user,                      # user that invoked the command
+								message=message,                # message data
+								channel=channel,                # channel data
+								guild=guild,                    # guild data
+								name=command_check,             # alias the command was called as
+								looped=loop,                    # whether this command was invoked as part of a loop
+								_timeout=timeout,               # timeout delay assigned to the command
+								timeout=timeout,                # timeout delay for the whole function
+							)
+							try:
+								message.__dict__.setdefault("inits", []).append(future)
+							except:
+								pass
+							# Add a callback to typing in the channel if the command takes too long
+							if fut is None and not hasattr(command, "typing") and not getattr(message, "simulated", False):
+								create_task(delayed_callback(future, sqrt(3), self._state.http.send_typing, channel.id, repeat=True))
+							if slash or getattr(message, "slash", None):
+								create_task(delayed_callback(future, 1, self.defer_interaction, message, ephemeral=getattr(command, "ephemeral", False)))
+							with self.command_semaphore:
+								response = await future
 						# Send bot event: user has executed command
 						await self.send_event("_command_", user=user, command=command, loop=loop, message=message)
 						# Process response to command if there is one

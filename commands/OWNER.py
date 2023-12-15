@@ -147,11 +147,12 @@ class Restart(Command):
 class Execute(Command):
 	min_level = nan
 	description = "Executes a command as other user(s), similar to the command's function in Minecraft."
-	usage = "as <0:user>* run <1:command>+"
+	usage = "as <0:user>* run <1:command>+ <inherit_perms{?i}>?"
 	example = ("execute as @Miza run ~info",)
+	flags = "i"
 	multi = True
 
-	async def __call__(self, bot, user, message, channel, guild, argl, args, argv, perm, **void):
+	async def __call__(self, bot, user, message, channel, guild, argl, args, argv, flags, perm, **void):
 		env = (user, channel)
 		envs = [env]
 		while args:
@@ -221,7 +222,7 @@ class Execute(Command):
 				fake_message.author = g.get_member(u.id) or u
 			else:
 				fake_message.author = u
-			futs.append(bot.process_message(fake_message, argv, min_perm=perm))
+			futs.append(bot.process_message(fake_message, argv, min_perm=-inf if "i" in flags else perm))
 		await asyncio.gather(*futs)
 
 

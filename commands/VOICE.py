@@ -5960,7 +5960,7 @@ class UpdateAudio(Database):
 			if auds.queue and not auds.paused:
 				reason = "🎵 Temporarily disconnecting for maintenance"
 				if auds.queue:
-					reason += " (Queue saved)."
+					reason += " (Queue saved; use ~load or ~play on this link to reload anytime)."
 				else:
 					reason += "."
 				reason += " Apologies for any inconvenience! 🎵"

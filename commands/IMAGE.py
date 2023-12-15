@@ -13,7 +13,6 @@ except ModuleNotFoundError:
 		youtube_dl = None
 if AUTH["ai_features"]:
 	import torch
-	import misc.imagebot as imagebot
 from PIL import Image
 
 getattr(youtube_dl, "__builtins__", {})["print"] = print
@@ -1498,12 +1497,6 @@ class Art(Command):
 	slash = ("Art", "Imagine")
 	sdiff_sem = Semaphore(3, 256, rate_limit=7)
 	fut = None
-	try:
-		imagebot = imagebot.Bot(token=AUTH.get("openai_key"))
-	except:
-		print_exc()
-		imagebot = None
-	# has_py39 = subprocess.run("py -3.9 -m pip").returncode == 0
 
 	async def __call__(self, bot, guild, user, channel, message, name, args, flags, comment="", **void):
 		if not torch:
@@ -2068,11 +2061,3 @@ class Art(Command):
 				comment = ("\n".join(url.split("?", 1)[0] for url in urls) + "\n" + comment).strip()
 		return await send_with_react(channel, comment, files=files, reference=message, reacts="🔳", embed=emb)
 		# await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳", embed=emb)
-
-
-class UpdateImages(Database):
-	name = "images"
-
-	def __call__(self, **void):
-		if imagebot:
-			imagebot.update()
