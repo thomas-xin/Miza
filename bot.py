@@ -1749,7 +1749,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				top_p=inputs.get("top_p", 1),
 				repetition_penalty=rp,
 				max_tokens=inputs.get("max_tokens", 1024),
-				stop=["</s>", "[INST"] if best else ["</s>", "### Instruction:"],
+				stop=["</s>", "[INST", "[Inst"] if best else ["</s>", "### Instruction:"],
 			)
 			try:
 				async with self.together_sem:
@@ -1856,7 +1856,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return await asubmit(lim_tokens, q, round_random(max_length + min_length) >> 1)
 		
 	async def _summarise(self, s, min_length, max_length, prune=True, best=False):
-		if best or 1:
+		if best:
 			prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive summary of the text above!\n\n### Response:'
 			resp = await self.instruct(dict(prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=round_random(max_length + min_length) >> 1), best=False)
 			resp = resp.strip()
