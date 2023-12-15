@@ -53,7 +53,7 @@ help_descriptions = fcdict((
 class Help(Command):
 	name = ["❓", "❔", "?", "Halp"]
 	description = "Shows a list of usable commands, or gives a detailed description of a command."
-	usage = "<(command|category)>?"
+	usage = "<target(?:command|category)>?"
 	example = ("help string", "help waifu2x")
 	flags = "v"
 	rate_limit = (3, 5)
@@ -256,7 +256,7 @@ class Perms(Command):
 	server_only = True
 	name = ["DefaultPerms", "ChangePerms", "Perm", "ChangePerm", "Permissions"]
 	description = "Shows or changes a user's permission level."
-	usage = "<0:user>* <1:new_level>? <default{?d}>? <hide{?h}>?"
+	usage = "<0:user>* <1:new_level|default(-d)>?"
 	example = ("perms steven 2", "perms 201548633244565504 ?d")
 	flags = "fhd"
 	rate_limit = (5, 8)
@@ -319,7 +319,7 @@ class EnabledCommands(Command):
 	name = ["EC", "Enable", "Disable"]
 	min_display = "0~3"
 	description = "Shows, enables, or disables a command category in the current channel."
-	usage = "(enable|disable|clear)? <category>? <server-wide(?s)> <list{?l}>? <hide{?h}>?"
+	usage = "<mode(enable|disable|clear)>? <category>? <server-wide(-s)>? <list(-l)>?"
 	example = ("enable fun ", "ec disable main", "ec -l")
 	flags = "aedlhrs"
 	rate_limit = (5, 8)
@@ -416,7 +416,7 @@ class Prefix(Command):
 	name = ["ChangePrefix"]
 	min_display = "0~3"
 	description = "Shows or changes the prefix for ⟨MIZA⟩'s commands for this server."
-	usage = "<new_prefix>? <default{?d}>?"
+	usage = "<new_prefix>? <default(-d)>?"
 	example = ("prefix !", "change_prefix >", "prefix -d")
 	flags = "hd"
 	rate_limit = (5, 8)
@@ -465,13 +465,13 @@ class Loop(Command):
 	async def __call__(self, args, argv, message, channel, bot, perm, user, guild, **void):
 		try:
 			num = await bot.eval_math(args[0])
+			iters = round(num)
 		except:
 			print_exc()
 			num = None
 		if num is None:
 			# Ah yes, I made this error specifically for people trying to use this command to loop songs 🙃
-			raise ArgumentError("Please input loop iterations and target command. For looping songs in voice, consider using the aliases LoopQueue and Repeat under the AudioSettings command.")
-		iters = round(num)
+			raise ArgumentError("Please input loop iterations, then target command. For looping songs in voice, consider using the aliases LoopQueue and Repeat under the AudioSettings command.")
 		# Bot owner bypasses restrictions
 		if not isnan(perm):
 			if channel.id in self.active:
@@ -626,7 +626,7 @@ class Avatar(Command):
 class Info(Command):
 	name = ["🔍", "🔎", "UserInfo", "ServerInfo", "WhoIs"]
 	description = "Shows information about the target user or server."
-	usage = "<user>* <verbose{?v}>?"
+	usage = "<user>* <verbose(-v)>?"
 	example = ("info 201548633244565504", "info")
 	flags = "v"
 	rate_limit = (6, 9)
@@ -932,7 +932,7 @@ class Info(Command):
 class Profile(Command):
 	name = ["User", "UserProfile"]
 	description = "Shows or edits a user profile on ⟨MIZA⟩."
-	usage = "<user>? (description|thumbnail|timezone|birthday)? <value>? <delete{?d}>?"
+	usage = "<user>? <mode(description|thumbnail|timezone|birthday)>? <value>? <delete(-d)>?"
 	example = ("profile 201548633244565504", "profile timezone singapore", "profile thumbnail https://cdn.discordapp.com/emojis/879989027711877130.gif", "user")
 	flags = "d"
 	rate_limit = (4, 6)
@@ -1025,7 +1025,7 @@ class Profile(Command):
 class Activity(Command):
 	name = ["Recent", "Log"]
 	description = "Shows recent Discord activity for the targeted user, server, or channel."
-	usage = "<user>? <verbose{?v}>?"
+	usage = "<user>? <verbose(-v)>?"
 	example = ("recent 201548633244565504", "log")
 	flags = "v"
 	rate_limit = (8, 11)
@@ -1062,7 +1062,7 @@ class Activity(Command):
 class Status(Command):
 	name = ["State", "Ping"]
 	description = "Shows the bot's current internal program state."
-	usage = "(enable|disable)?"
+	usage = "<mode(enable|disable)>?"
 	example = ("status", "status enable")
 	flags = "aed"
 	slash = True
@@ -1202,7 +1202,7 @@ class Upload(Command):
 class Reminder(Command):
 	name = ["Announcement", "Announcements", "Announce", "RemindMe", "Reminders", "Remind"]
 	description = "Sets a reminder for a certain date and time."
-	usage = "<1:message>? <0:time>? <urgent{?u}>? <delete{?d}>?"
+	usage = "<1:message>? <0:time>? <urgent(-u)>? <delete(-d)>?"
 	flags = "aedurf"
 	example = ("remindme test in 3 hours 27 mins", "remind urgently submit ticket on 3 june 2023", "announce look at me! in 10 minutes", "remind every 8h take meds in 2d")
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -1572,7 +1572,7 @@ class Reminder(Command):
 class Note(Command):
 	name = ["Trash", "Notes"]
 	description = "Takes note of a given string and allows you to view and edit a to-do list!"
-	usage = "(edit|delete)? <id|note>?"
+	usage = "<mode(edit|delete)>? <target(id|note)>?"
 	example = ("note test", "trash 1", "note edit 0 do the laundry")
 	rate_limit = (6, 10)
 	flags = "aed"
@@ -2340,38 +2340,31 @@ class UpdateUsers(Database):
 					u_perm = bot.get_perms(user.id, guild)
 					u_id = user.id
 					for ask in bot.commands.ask:
+						sem = emptyctx
 						command = ask
 						req = command.min_level
 						if not isnan(u_perm):
 							if not u_perm >= req:
 								raise command.perm_error(u_perm, req, "for command ask")
-							x = command.rate_limit
-							if x:
-								x2 = x
+							rl = command.rate_limit
+							if rl:
+								pm = bot.premium_multiplier(bot.premium_level(user))
 								if user.id in bot.owners:
-									x = x2 = 0
-								elif isinstance(x, collections.abc.Sequence):
-									x = x2 = x[not bot.is_trusted(getattr(guild, "id", 0))]
-									x /= 2 ** bot.premium_level(user)
-									x2 /= 2 ** bot.premium_level(user, absolute=True)
-								# remaining += x
-								d = command.used
-								t = d.get(u_id, -inf)
-								wait = utc() - t - x
-								if wait > min(1 - x, -1):
-									if x < x2 and (utc() - t - x2) < min(1 - x2, -1):
-										bot.data.users.add_diamonds(user, (x - x2) / 100)
-									if wait < 0:
-										w = -wait
-										d[u_id] = max(t, utc()) + w
-										await asyncio.sleep(w)
-									if len(d) >= 4096:
-										with suppress(RuntimeError):
-											d.pop(next(iter(d)))
-									d[u_id] = max(t, utc())
-								else:
-									raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
-						m = await ask(message, guild, channel, user, argv, name="ask", flags=flags)
+									rl = 0
+									pm = inf
+								elif isinstance(rl, collections.abc.Sequence):
+									rl = rl[not bot.is_trusted(getattr(guild, "id", 0))]
+									rl /= pm
+								remaining += rl
+								burst = ceil(pm + 2)
+								rlv = ceil(rl * burst)
+								sem = command.used.get(u_id)
+								if sem is None or sem.rate_limit != rlv:
+									sem = command.used[u_id] = Semaphore(burst, burst, rate_limit=rlv)
+								if sem.full and sem.reset_after:
+									raise TooManyRequests(f"Command has a rate limit of {sec2time(rl)} with a burst+queue of {burst}; please wait {sec2time(sem.reset_after)}.")
+						async with sem:
+							m = await ask(message, guild, channel, user, argv, name="ask", flags=flags)
 						if m and "exec" in bot.data and not message.guild and ("blacklist" not in bot.data or (bot.data.blacklist.get(user.id) or 0) < 1):
 							await bot.data.exec._nocommand_(message=m)
 				return

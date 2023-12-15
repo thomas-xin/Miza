@@ -228,34 +228,38 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					# if not default and usage.count(" "):
 					#     arg["default"] = default = True
 				arg["description"] = lim_str(arg["description"], 100)
-				if i.startswith("("):
-					arg["name"] = "option"
-					s = i[1:i.rindex(")")]
-					if s.count("|") < 10:
-						arg["choices"] = [dict(name=opt, value=opt) for opt in s.split("|")]
-				elif i.startswith("["):
-					arg["name"] = "option"
-				elif i.startswith("<"):
-					name = i[1:].split(":", 1)[-1].rsplit(">", 1)[0]
-					if "{" in name:
-						if name.count("{") > 1:
-							if name.count("|") >= 10:
-								arg["name"] = name.split("{", 1)[0]
+				if i.startswith("<"):
+					s = i[1:].split(":", 1)[-1].rsplit(">", 1)[0]
+					formats = regexp(r"[\w\-\[\]]+(?:\((?:\?:)?[\w\-\|\[\]]+\))?").findall(s)
+					for fmt in formats:
+						a = dict(arg)
+						if "(" not in fmt:
+							name = fmt
+							if fmt == "user":
+								a["type"] = 9
+								a["description"] = "user"
+							elif fmt == "id":
+								a["type"] = 4
+								a["description"] = "integer"
 							else:
-								for n in name.split("|"):
-									arg = dict(arg)
-									arg["name"], flag = n.split("{", 1)
-									# arg["choices"] = [dict(name="true", value=flag.rsplit("}", 1)[0]), dict(name="false", value=None if compare else "")]
-									arg["type"] = 5
-									out.append(arg)
-								continue
+								a["description"] = "string"
 						else:
-							arg["name"], flag = name.split("{", 1)
-							arg["choices"] = [dict(name="true", value=flag.rsplit("}", 1)[0]), dict(name="false", value=None if compare else "")]
-					else:
-						if name.startswith("("):
-							name = name.strip("()")
-						arg["name"] = name.split("(", 1)[0].replace("|", "-")
+							name, opts = fmt.split("(", 1)
+							if "|" not in opts:
+								a["type"] = 5
+								a["description"] = "bool"
+							elif opts.startswith("?:"):
+								a["description"] = "(" + opts[2:].rstrip(")") + ")"
+							else:
+								opts = opts.rstrip(")").split("|")
+								a["choices"] = [dict(name=opt, value=opt) for opt in opts]
+								a["description"] = "choice"
+						if "[" in name:
+							name, d = name.split("[", 1)
+							a["description"] += " [" + d
+						a["name"] = name
+						out.append(a)
+					continue
 				if arg["name"] == "user":
 					arg["type"] = 9
 				elif arg["name"] == "url":
@@ -266,20 +270,22 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			out.append(arg)
 		return sorted(out, key=lambda arg: not arg.get("required"))
 
+	slash_sem = Semaphore(5, 256, rate_limit=5)
 	@tracebacksuppressor
 	def create_command(self, data):
 		for i in range(16):
-			resp = reqs.next().post(
-				f"https://discord.com/api/{api}/applications/{self.id}/commands",
-				headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
-				data=orjson.dumps(data),
-			)
+			with self.slash_sem:
+				resp = reqs.next().post(
+					f"https://discord.com/api/{api}/applications/{self.id}/commands",
+					headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
+					data=orjson.dumps(data),
+				)
 			if resp.status_code == 429:
 				time.sleep(20)
 				continue
 			if resp.status_code not in range(200, 400):
 				print("\n", data, " ", ConnectionError(f"Error {resp.status_code}", resp.text), "\n", sep="")
-			print(resp.text)
+			print("SLASH CREATE:", resp.text)
 			return
 
 	def update_slash_commands(self):
@@ -347,10 +353,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 											print(curr)
 											print(f"{curr['name']}'s slash command does not match, removing...")
 											for i in range(16):
-												resp = reqs.next().delete(
-													f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}",
-													headers=dict(Authorization="Bot " + self.token),
-												)
+												with self.slash_sem:
+													resp = reqs.next().delete(
+														f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}",
+														headers=dict(Authorization="Bot " + self.token),
+													)
 												if resp.status_code == 429:
 													time.sleep(1)
 													continue

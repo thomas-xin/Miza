@@ -11,7 +11,7 @@ class Purge(Command):
 	name = ["🗑", "Del", "Delete", "Purge_Range"]
 	min_level = 3
 	description = "Deletes a number of messages from a certain user in current channel."
-	usage = "<1:user>? <0:count(1)>? <ignore{?i}|range{?r}|hide{?h}>*"
+	usage = "<1:user>? <0:count[1]>? <ignore(-i)>? <range(-r)>?"
 	example = ("purge @Miza 3", "purge 50", "purge_range 1038565892185222287 1128125804136579235")
 	flags = "fiaehr"
 	rate_limit = (7, 12)
@@ -114,7 +114,7 @@ class Mute(Command):
 	min_level = 3
 	min_display = "3+"
 	description = "Mutes a user for a certain amount of time, with an optional reason."
-	usage = "<0:user>* <1:time>? <2:reason>? <hide{?h}>?"
+	usage = "<0:user>* <1:time>? <2:reason>?"
 	example = ("mute @Miza 1h for being naughty",)
 	flags = "fhz"
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -310,7 +310,7 @@ class Ban(Command):
 	min_level = 3
 	min_display = "3+"
 	description = "Bans a user for a certain amount of time, with an optional reason."
-	usage = "<0:user>* <1:time>? <2:reason>? <hide{?h}>?"
+	usage = "<0:user>* <1:time>? <2:reason>?"
 	example = ("ban @Miza 30m for being naughty",)
 	flags = "fhz"
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -630,7 +630,7 @@ class RoleGiver(Command):
 	min_level = 3
 	min_display = "3+"
 	description = "Adds an automated role giver to the current channel. Triggered by a keyword in messages, only applicable to users with permission level >= 0 and account age >= 7d."
-	usage = "<0:react_to>? <1:role>? <delete_messages{?x}>? <disable{?d}>?"
+	usage = "<0:react_to>? <1:role>? <delete_messages(-x)>?"
 	example = ("rolegiver lol lol_role", "rolegiver n*gger muted")
 	flags = "aedx"
 	no_parse = True
@@ -697,7 +697,7 @@ class AutoRole(Command):
 	min_display = "3+"
 	_timeout_ = 12
 	description = "Causes any new user joining the server to automatically gain the targeted role. Input multiple roles to create a randomized role giver."
-	usage = "<role>? <update_all{?x}>? <disable{?d}>?"
+	usage = "<role>? <update_all(-x)>? <disable(-d)>?"
 	example = ("autorole welcome", 'autorole -x "lovely people"')
 	flags = "aedx"
 	rate_limit = (9, 12)
@@ -809,7 +809,7 @@ class RolePreserver(Command):
 	min_level = 3
 	min_display = "3+"
 	description = "Causes ⟨MIZA⟩ to save roles for all users, and re-add them when they leave and rejoin."
-	usage = "(enable|disable)?"
+	usage = "<mode(enable|disable)>?"
 	example = ("rolepreserver enable", "stickyroles disable")
 	flags = "aed"
 	rate_limit = (9, 12)
@@ -841,7 +841,7 @@ class NickPreserver(Command):
 	min_level = 3
 	min_display = "3+"
 	description = "Causes ⟨MIZA⟩ to save nicknames for all users, and re-add them when they leave and rejoin."
-	usage = "(enable|disable)?"
+	usage = "<mode(enable|disable)>?"
 	example = ("nickpreserver enable", "stickynicks disable")
 	rate_limit = (9, 12)
 	flags = "aed"
@@ -871,7 +871,7 @@ class ThreadPreserver(Command):
 	min_level = 3
 	min_display = "3+"
 	description = 'Causes ⟨MIZA⟩ to "bump" (revive) the current thread when auto-archived.'
-	usage = "(enable|disable)?"
+	usage = "<mode(enable|disable)>?"
 	example = ("keepalive enable", "threadpreserver disable")
 	rate_limit = (9, 12)
 	flags = "aed"
@@ -1018,7 +1018,7 @@ class UserLog(Command):
 	name = ["MemberLog"]
 	min_level = 3
 	description = "Causes ⟨MIZA⟩ to log user and member events from the server, in the current channel."
-	usage = "(enable|disable)?"
+	usage = "<mode(enable|disable)>?"
 	example = ("userlog enable",)
 	flags = "aed"
 	rate_limit = 1
@@ -1044,7 +1044,7 @@ class MessageLog(Command):
 	server_only = True
 	min_level = 3
 	description = "Causes ⟨MIZA⟩ to log message events from the server, in the current channel."
-	usage = "(enable|disable)?"
+	usage = "<mode(enable|disable)>?"
 	example = ("messagelog enable",)
 	flags = "aed"
 	rate_limit = 1
@@ -1070,7 +1070,7 @@ class FileLog(Command):
 	server_only = True
 	min_level = 3
 	description = "Causes ⟨MIZA⟩ to log deleted files from the server, in the current channel."
-	usage = "(enable|disable)?"
+	usage = "<mode(enable|disable)>?"
 	example = ("filelog enable",)
 	flags = "aed"
 	rate_limit = 1
@@ -1096,7 +1096,7 @@ class StarBoard(Command):
 	server_only = True
 	min_level = 2
 	description = "Causes ⟨MIZA⟩ to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel."
-	usage = "<0:reaction> <1:react_count(1)>? <enable_channel{?e}>? <disable_channel{?d}>? <channel_ids(-1)>*"
+	usage = "<0:reaction> <1:react_count[1]>? <enable_channel(-e)|disable_channel(-d)>? <-1:channel_ids>*"
 	example = ("starboard 🐱 6", "starboard disable")
 	flags = "aed"
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -1266,7 +1266,7 @@ class Crosspost(Command):
 	name = ["Repost", "Subscribe"]
 	min_level = 3
 	description = "Causes ⟨MIZA⟩ to automatically crosspost all messages from the target channel, into the current channel."
-	usage = "<channel> <disable{?d}>?"
+	usage = "<channel> <disable(-d)>?"
 	example = ("crosspost 683634093464092672", "crosspost -d #general")
 	flags = "aed"
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -1369,7 +1369,7 @@ class Publish(Command):
 	name = ["News", "AutoPublish"]
 	min_level = 3
 	description = "Causes ⟨MIZA⟩ to automatically publish all posted messages in the current channel."
-	usage = "(enable|disable)? <force{?x}>?"
+	usage = "<mode(enable|disable)>? <force(-x)>?"
 	example = ("publish enable", "news disable")
 	flags = "aedx"
 	rate_limit = (16, 24)
@@ -1397,7 +1397,7 @@ class Publish(Command):
 #     name = ["Welcome", "JoinMessage"]
 #     min_level = 2
 #     description = "Sets up or modifies a welcome message generator for new users in the server."
-#     usage = "<0:option(image_url)(image_position{centre})(shape[{square},circle,rounded_square,hexagon])> <-1:value> <disable(?d)>"
+#     usage = "<0:option(image_url)(image_position{centre})(shape[{square},circle,rounded_square,hexagon])> <-1:value> <disable(-d)>"
 #     flags = "h"
 #     rate_limit = (2, 4)
 
@@ -1410,7 +1410,7 @@ class Relay(Command):
 	name = ["Forward"]
 	min_level = 4
 	description = "Causes ⟨MIZA⟩ to send the target user(s) a DM that enables them to communicate through the current channel."
-	usage = "<user>* <disable{?d}>?"
+	usage = "<user>* <disable(-d)>?"
 	example = ("relay @Miza Sorry, you have been banned from this server. Reply to this message to appeal!", "relay -d 201548633244565504")
 	flags = "aedf"
 	rate_limit = (16, 24)
@@ -1790,7 +1790,8 @@ class CreateEmoji(Command):
 			args.extend(best_url(a) for a in message.attachments)
 			argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
 		if not args:
-			raise ArgumentError("Please enter URL, emoji, or attached file to add.")
+			prefix = bot.get_prefix(guild)
+			raise ArgumentError("Please enter URL, emoji, or attached file to add. To view list of emojis, use {prefix}emojis!")
 		if perm < 2:
 			ex = self.perm_error(perm, 2, "for command " + name)
 			if args[0].casefold() == "jumbo":
@@ -1995,7 +1996,7 @@ class ScanEmoji(Command):
 	name = ["EmojiScan", "ScanEmojis"]
 	min_level = 1
 	description = "Scans all the emojis in the current server for potential issues."
-	usage = "<count(inf)>"
+	usage = "<count>?"
 	example = ("scanemoji",)
 	no_parse = True
 	rate_limit = (24, 32)

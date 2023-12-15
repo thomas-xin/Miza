@@ -192,7 +192,7 @@ tsc_list = None
 class CS_mem2flag(Command):
 	name = ["mem2flag", "m2f", "CS_m2f"]
 	description = "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value."
-	usage = "<0:address> <1:value(1)>?"
+	usage = "<0:address> <1:value[1]>?"
 	example = ("cs_m2f 49e6e8 123",)
 	rate_limit = 1
 
@@ -222,7 +222,7 @@ class CS_flag2mem(Command):
 class CS_num2val(Command):
 	name = ["num2val", "n2v", "CS_n2v"]
 	description = "Returns a TSC value representing the desired number, within a certain number of characters."
-	usage = "<0:number> <1:length(4)>?"
+	usage = "<0:number> <1:length[4]>?"
 	example = ("cs_n2v 12345",)
 	rate_limit = 1
 
@@ -318,7 +318,7 @@ class CS_npc(Command):
 	time_consuming = True
 	name = ["npc", "cs_bul", "cs_sfx", "cs_mus"]
 	description = "Searches the Cave Story NPC list for an NPC/bullet/effect/music by name or ID."
-	usage = "<query> <condensed{?c}>?"
+	usage = "<query> <condensed(-c)>?"
 	example = ("cs_npc misery",)
 	flags = "c"
 	no_parse = True
@@ -357,7 +357,7 @@ class CS_npc(Command):
 # class CS_flag(Command):
 	# name = ["OOB", "CS_OOB", "CS_flags"]
 	# description = "Searches the Cave Story OOB flags list for a memory variable."
-	# usage = "<query> <condensed{?c}>?"
+	# usage = "<query> <condensed(-c)>?"
 	# example = ("cs_oob key",)
 	# flags = "c"
 	# no_parse = True
@@ -559,7 +559,7 @@ class SpectralPulse(Command):
 class MCEnchant(Command):
 	name = ["Enchant", "GenerateEnchant"]
 	description = "Given an item and custom enchant values, generates a Minecraft /give command. An old misc command brought back."
-	usage = "<item> (<enchantment>|<level>)*"
+	usage = "<item> <enchantment(?:name/level)>*"
 	example = ("enchant diamond_sword sharpness 8, fire_aspect 3, sweeping", "enchant diamond_axe mending unbreaking XI silk_touch", "enchant netherite_shovel efficiency 2000 looting vanishing_curse")
 	rate_limit = (4, 5)
 
@@ -590,7 +590,7 @@ class DeviantArt(Command):
 	name = ["DASubscribe"]
 	min_level = 2
 	description = "Subscribes to a DeviantArt Gallery, reposting links to all new posts."
-	usage = "(add|remove)? <url> <reversed{?r}>?"
+	usage = "<action(add|remove)>? <url> <reversed(-r)>?"
 	flags = "raed"
 	rate_limit = 4
 

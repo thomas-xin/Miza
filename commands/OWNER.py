@@ -147,7 +147,7 @@ class Restart(Command):
 class Execute(Command):
 	min_level = nan
 	description = "Executes a command as other user(s), similar to the command's function in Minecraft."
-	usage = "as <0:user>* run <1:command>+ <inherit_perms{?i}>?"
+	usage = "as <0:user>* run <1:command>+ <inherit_perms(-i)>?"
 	example = ("execute as @Miza run ~info",)
 	flags = "i"
 	multi = True
@@ -230,7 +230,7 @@ class Exec(Command):
 	name = ["Eval"]
 	min_level = nan
 	description = "Causes all messages by the bot owner(s) in the current channel to be executed as python code on ⟨MIZA⟩."
-	usage = "(enable|disable)? <type(virtual)>?"
+	usage = "<mode(enable|disable)>? <type(virtual)>?"
 	example = ("exec enable", "exec ?d")
 	flags = "aed"
 	# Different types of terminals for different purposes
@@ -1112,7 +1112,7 @@ class UpdateChannelHistories(Database):
 class Maintenance(Command):
 	min_level = nan
 	description = "Toggles Maintenance mode, which will block all use of commands for all servers except the current one while active."
-	usage = "<disable(?d)>"
+	usage = "<disable(-d)>"
 	flags = "aed"
 
 	async def __call__(self, bot, guild, flags, **void):
@@ -1130,7 +1130,7 @@ class Suspend(Command):
 	name = ["Block", "Blacklist"]
 	min_level = nan
 	description = "Prevents a user from accessing ⟨MIZA⟩'s commands. Overrides <perms>."
-	usage = "<0:user> <disable(?d)>"
+	usage = "<0:user> <disable(-d)>"
 	example = ("block 201548633244565504",)
 	flags = "aed"
 

@@ -288,7 +288,7 @@ nekoslife_deprecated = {
 class Neko(Command):
 	name = ["Nya"]
 	description = "Pulls a random image from nekos.life and embeds it."
-	usage = "<tags(neko)>? <verbose{?v}|random{?r}|list{?l}>?"
+	usage = "<tags[neko]>? <verbose(-v)|random(-r)|list(-l)>?"
 	example = ("neko poke", "neko lizard")
 	flags = "lrv"
 	rate_limit = (0.5, 3)
@@ -407,7 +407,7 @@ class Lewd(Command):
 	name = ["NSFW"]
 	min_level = 1
 	description = "Pulls a random image from a search on Rule34 and e621, and embeds it."
-	usage = "<query> <verbose{?v}>?"
+	usage = "<query> <verbose(-v)>?"
 	example = ("lewd pokemon",)
 	flags = "v"
 	no_parse = True
@@ -437,7 +437,7 @@ class Verify(Command):
 	name = ["AgeVerify"]
 	min_level = 0
 	description = "Verifies your account age as 18+, allowing you to access NSFW-restricted commands within DM channels."
-	usage = "(enable|disable)?"
+	usage = "<mode(enable|disable)>?"
 	example = ("verify enable", "verify disable")
 	flags = "aed"
 	no_parse = True

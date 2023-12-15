@@ -1865,16 +1865,10 @@ if "exl2" in CAPS:
 		mods = dict(
 			load_exl2=(
 				"euryale-70b",
-				"xwin-70b",
-				"wizard-70b",
-				"kimiko-70b",
 				"wizard-coder-34b",
 				"xwin-mlewd-13b",
 				"mythalion-13b",
 				"emerhyst-20b",
-				"wizard-vicuna-30b",
-				"orca-70b",
-				"nous-puffin-70b",
 			),
 		)
 		for k, v in mods.items():
@@ -2044,16 +2038,10 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 			mods = dict(
 				load_gptq=(
 					"euryale-70b",
-					"xwin-70b",
-					"wizard-70b",
-					"kimiko-70b",
 					"wizard-coder-34b",
 					"xwin-mlewd-13b",
 					"mythalion-13b",
 					"emerhyst-20b",
-					"wizard-vicuna-30b",
-					"orca-70b",
-					"nous-puffin-70b",
 				),
 			)
 			bot = convobot.Bot()

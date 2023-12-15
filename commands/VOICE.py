@@ -3405,7 +3405,7 @@ class Queue(Command):
 	name = ["▶️", "P", "Q", "Play", "PlayNow", "PlayNext", "Enqueue", "Search&Play"]
 	alias = name + ["LS"]
 	description = "Shows the music queue, or plays a song in voice."
-	usage = "<url>* <force{?f}|budge{?b}|random{?r}|verbose{?v}|hide{?h}>*"
+	usage = "<url>* <force(-f)|budge(-b)|random(-r)|verbose(-v)>*"
 	example = ("play despacito", "queue", "enqueue https://www.youtube.com/watch?v=dQw4w9WgXcQ")
 	flags = "hvfbrz"
 	no_parse = True
@@ -3708,7 +3708,7 @@ class Playlist(Command):
 	name = ["DefaultPlaylist", "PL"]
 	min_display = "0~2"
 	description = "Shows, appends, or removes from the default playlist."
-	usage = "(add|remove)? <search_links>*"
+	usage = "<mode(add|remove)>? <search_links>*"
 	example = ("playlist add https://www.youtube.com/watch?v=wDgQdr8ZkTw", "playlist remove 6")
 	flags = "aedzf"
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -3964,7 +3964,7 @@ class Skip(Command):
 	name = ["⏭", "🚫", "S", "SK", "FS", "CQ", "ForceSkip", "Remove", "Rem", "ClearQueue", "Clear"]
 	min_display = "0~1"
 	description = "Removes an entry or range of entries from the voice channel queue."
-	usage = "<queue_positions(0)>* <force{?f}|vote{?v}|hide{?h}>*"
+	usage = "<queue_positions[0]>* <force(-f)|vote(-v)>*"
 	example = ("skip", "fs", "skip 1 2 3", "skip 3..9", "skip 90:50:-1", "remove 9", "clear")
 	flags = "fhv"
 	rate_limit = (3.5, 5)
@@ -4102,7 +4102,6 @@ class Pause(Command):
 	name = ["⏸️", "⏯️", "⏹️", "Resume", "Unpause", "Stop"]
 	min_display = "0~1"
 	description = "Pauses, stops, or resumes audio playing."
-	usage = "<hide{?h}>?"
 	example = ("pause", "resume", "stop")
 	flags = "h"
 	rate_limit = (3, 4)
@@ -4140,7 +4139,7 @@ class Seek(Command):
 	name = ["↔️", "Replay"]
 	min_display = "0~1"
 	description = "Seeks to a position in the current audio file."
-	usage = "<position(0)>? <hide{?h}>?"
+	usage = "<position[0]>?"
 	example = ("replay", "seek 5m30", "seek 3:41", "seek 123")
 	flags = "h"
 	rate_limit = (0.5, 3)
@@ -4175,7 +4174,7 @@ class Dump(Command):
 	alias = name + ["Dujmpö"]
 	min_display = "0~1"
 	description = "Saves or loads the currently playing audio queue state."
-	usage = "<data>? <append{?a}|song_positions{?x}|hide{?h}>*"
+	usage = "<data>? <append(-a)|song_positions(-x)>*"
 	example = ("save", "dump https://cdn.discordapp.com/attachments/731709481863479436/1052210287303999528/dump.json")
 	flags = "ahx"
 	rate_limit = (1, 2)
@@ -4336,7 +4335,7 @@ class AudioSettings(Command):
 		self.name = list(self.aliasMap)
 		self.min_display = "0~2"
 		self.description = "Changes the current audio settings for this server. Some settings are very flexible; volume and bassboost are unlimited, speed and nightcore can be negative, etc."
-		self.usage = "<value>? <volume(?v)|speed(?s)|pitch(?p)|pan(?e)|bassboost(?b)|reverb(?r)|compressor(?c)|chorus(?u)|nightcore(?n)|bitrate(?i)|loop(?l)|repeat(?1)|shuffle(?x)|quiet(?q)|stay(?t)|force_permanent(?f)|disable(?d)|hide(?h)>*"
+		self.usage = "<value>? <volume(-v)|speed(-s)|pitch(-p)|pan(-e)|bassboost(-b)|reverb(-r)|compressor(-c)|chorus(-u)|nightcore(-n)|bitrate(-i)|loop(-l)|repeat(-1)|shuffle(-x)|quiet(-q)|stay(-t)>* <force_permanent(-f)>? <disable(-d)>?"
 		self.example = ("volume 150", "speed 200", "pitch -400", "reverb -f 320", "chorus -d", "bitrate 19600", "repeat 1", "stay 1")
 		self.flags = "vspebrcunil1xqtfdh"
 		self.map = {k.casefold(): self.aliasMap[k] for k in self.aliasMap}
@@ -4491,7 +4490,7 @@ class Jump(Command):
 	name = ["🔄", "Roll", "Next", "RotateQueue"]
 	min_display = "0~1"
 	description = "Rotates the queue to the left by a certain amount of steps."
-	usage = "<position>? <hide{?h}>?"
+	usage = "<position[1]>?"
 	example = ("jump 6", "roll -3")
 	flags = "h"
 	rate_limit = (4, 9)
@@ -4521,7 +4520,7 @@ class Shuffle(Command):
 	name = ["🔀", "Scramble"]
 	min_display = "0~1"
 	description = "Shuffles the audio queue. Leaves the current song untouched unless ?f is specified."
-	usage = "<force_full_shuffle{?f}|hide{?h}>*"
+	usage = "<force_full_shuffle(-f)>?"
 	flags = "fsh"
 	rate_limit = (4, 9)
 	slash = True
@@ -4553,7 +4552,6 @@ class Dedup(Command):
 	name = ["Unique", "Deduplicate", "RemoveDuplicates"]
 	min_display = "0~1"
 	description = "Removes all duplicate items from the audio queue."
-	usage = "<hide{?h}>*"
 	flags = "h"
 	rate_limit = (4, 9)
 
@@ -4588,7 +4586,6 @@ class Reverse(Command):
 	server_only = True
 	min_display = "0~1"
 	description = "Reverses the audio queue direction."
-	usage = "<hide{?h}>?"
 	flags = "h"
 	rate_limit = (4, 9)
 
@@ -4613,7 +4610,6 @@ class UnmuteAll(Command):
 	time_consuming = True
 	min_level = 3
 	description = "Disables server mute/deafen for all members."
-	usage = "<hide{?h}>?"
 	flags = "h"
 	rate_limit = 10
 
@@ -4633,7 +4629,6 @@ class VoiceNuke(Command):
 	min_level = 3
 	name = ["☢️"]
 	description = "Removes all users from voice channels in the current server."
-	usage = "<hide{?h}>?"
 	flags = "h"
 	rate_limit = 10
 	ephemeral = True
@@ -4876,68 +4871,68 @@ class Radio(Command):
 		bot.send_as_embeds(channel, title=title, thumbnail=country.icon, fields=sorted(fields), author=get_author(bot.user), reference=message)
 
 
-class UpdateRadioMaps(Database):
-	name = "radiomaps"
+# class UpdateRadioMaps(Database):
+# 	name = "radiomaps"
 
 
-class Party(Command):
-	server_only = True
-	min_level = 2
-	name = ["YTT"]
-	description = "Generates an activity party link in the nearest voice channel!"
-	usage = "(poker|betrayal|youtube|fishington|chess)?"
-	example = ("ytt", "party poker")
-	rate_limit = (10, 14)
-	sem = Semaphore(2, 8, rate_limit=8)
-	names = fcdict((
-		("Poker", 755827207812677713),
-		("Poker Night", 755827207812677713),
-		("YouTube", 755600276941176913),
-		("YouTube Together", 755600276941176913),
-		("Betrayal", 773336526917861400),
-		("Betrayal.io", 773336526917861400),
-		("Fishington", 814288819477020702),
-		("Fishington.io", 814288819477020702),
-		("Chess", 832012586023256104),
-	))
-	ephemeral = True
+# class Party(Command):
+# 	server_only = True
+# 	min_level = 2
+# 	name = ["YTT"]
+# 	description = "Generates an activity party link in the nearest voice channel!"
+# 	usage = "<mode(poker|betrayal|youtube|fishington|chess)>?"
+# 	example = ("ytt", "party poker")
+# 	rate_limit = (10, 14)
+# 	sem = Semaphore(2, 8, rate_limit=8)
+# 	names = fcdict((
+# 		("Poker", 755827207812677713),
+# 		("Poker Night", 755827207812677713),
+# 		("YouTube", 755600276941176913),
+# 		("YouTube Together", 755600276941176913),
+# 		("Betrayal", 773336526917861400),
+# 		("Betrayal.io", 773336526917861400),
+# 		("Fishington", 814288819477020702),
+# 		("Fishington.io", 814288819477020702),
+# 		("Chess", 832012586023256104),
+# 	))
+# 	ephemeral = True
 
-	async def __call__(self, bot, guild, channel, user, argv, **void):
-		vc = select_voice_channel(user, channel)
-		if not argv:
-			argv = "YouTube"
-		try:
-			aid = self.names[argv]
-		except KeyError:
-			if not argv.isnumeric():
-				raise KeyError(f"Unsupported party application: {argv}")
-			aid = int(argv)
-		# invites = await bot.get_full_invites(guild)
-		# for invite in invites:
-		#     if invite.max_age == invite.max_uses == 0:
-		#         c = invite.get("channel", {})
-		#         if c.get("id") == vc.id:
-		#             app = invite.get("target_application")
-		#             if app:
-		#                 if app.get("id") == aid:
-		#                     return f"https://discord.gg/{invite.code}"
-		async with self.sem:
-			data = await Request(
-				f"https://discord.com/api/{api}/channels/{vc.id}/invites",
-				method="POST",
-				data=dict(
-					max_age=0,
-					max_uses=0,
-					target_application_id=aid,
-					target_type=2,
-					temporary=False,
-					validate=None,
-				),
-				authorise=True,
-				aio=True,
-				json=True
-			)
-		return f"https://discord.gg/{data['code']}"
+# 	async def __call__(self, bot, guild, channel, user, argv, **void):
+# 		vc = select_voice_channel(user, channel)
+# 		if not argv:
+# 			argv = "YouTube"
+# 		try:
+# 			aid = self.names[argv]
+# 		except KeyError:
+# 			if not argv.isnumeric():
+# 				raise KeyError(f"Unsupported party application: {argv}")
+# 			aid = int(argv)
+# 		# invites = await bot.get_full_invites(guild)
+# 		# for invite in invites:
+# 		#     if invite.max_age == invite.max_uses == 0:
+# 		#         c = invite.get("channel", {})
+# 		#         if c.get("id") == vc.id:
+# 		#             app = invite.get("target_application")
+# 		#             if app:
+# 		#                 if app.get("id") == aid:
+# 		#                     return f"https://discord.gg/{invite.code}"
+# 		async with self.sem:
+# 			data = await Request(
+# 				f"https://discord.com/api/{api}/channels/{vc.id}/invites",
+# 				method="POST",
+# 				data=dict(
+# 					max_age=0,
+# 					max_uses=0,
+# 					target_application_id=aid,
+# 					target_type=2,
+# 					temporary=False,
+# 					validate=None,
+# 				),
+# 				authorise=True,
+# 				aio=True,
+# 				json=True
+# 			)
+# 		return f"https://discord.gg/{data['code']}"
 
 
 class Player(Command):
@@ -4964,7 +4959,7 @@ class Player(Command):
 	name = ["NP", "NowPlaying", "Playing"]
 	min_display = "0~3"
 	description = "Creates an auto-updating virtual audio player for the current server."
-	usage = "<enable{?e}|disable{?d}>?"
+	usage = "<mode(enable|disable)>?"
 	example = ("player", "np -d")
 	flags = "adez"
 	rate_limit = (6, 9)
@@ -5299,7 +5294,7 @@ class Lyrics(Command):
 	time_consuming = True
 	name = ["SongLyrics"]
 	description = "Searches genius.com for lyrics of a song."
-	usage = "<search_link>* <verbose{?v}>?"
+	usage = "<search_link>* <verbose(-v)>?"
 	example = ("lyrics", "lyrics despacito", "lyrics -v viva la vida")
 	flags = "v"
 	rate_limit = (7, 12)
@@ -5365,7 +5360,7 @@ class Download(Command):
 	_timeout_ = 75
 	name = ["📥", "Search", "YTDL", "DownloadAsMP3", "Youtube_DL", "AF", "AudioFilter", "Trim", "Concat", "Concatenate", "🌽🐱", "ConvertORG", "Org2xm", "Convert"]
 	description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link. Will extend (loop) if trimmed past the end. The \"-\" character is used to omit parameters for ~trim."
-	usage = "<0:search_links>* <multi{?m}> <trim{?t}>? <-3:trim_start|->? <-2:trim_end|->? <-1:out_format(mp4)>? <concatenate{?c}|remove_silence{?r}|apply_settings{?a}|verbose_search{?v}>*"
+	usage = "<0:search_links>* <multi_output(-m)|trim(-t)>? <-3:trim_start[-]>? <-2:trim_end[-]>? <-1:out_format[mp4]>? <concatenate(-c)|remove_silence(-r)|apply_settings(-a)|verbose_search(-v)>*"
 	example = ("download https://www.youtube.com/watch?v=kJQP7kiw5Fk mp3", "trim https://www.youtube.com/watch?v=dQw4w9WgXcQ 1m 3m as mp4", "concatenate https://www.youtube.com/watch?v=kJQP7kiw5Fk https://www.youtube.com/watch?v=dQw4w9WgXcQ webm")
 	flags = "avtzcrm"
 	rate_limit = (30, 45)
@@ -5690,7 +5685,7 @@ class Transcribe(Command):
 	_timeout_ = 75
 	name = ["Whisper", "TranscribeAudio", "Caption"]
 	description = "Downloads a song from a link, automatically transcribing to English, or a provided language if applicable."
-	usage = "<1:language(en)>? <0:search_link>"
+	usage = "<1:language[en]>? <0:search_link>"
 	example = ("transcribe https://www.youtube.com/watch?v=kJQP7kiw5Fk", "transcribe Chinese https://www.youtube.com/watch?v=dQw4w9WgXcQ")
 	rate_limit = (30, 45)
 	typing = True

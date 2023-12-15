@@ -47,7 +47,7 @@ class Translate(Command):
 	time_consuming = True
 	name = ["TR"]
 	description = "Translates a string into another language."
-	usage = "<0:engine{chatgpt|mixtral|google}>? <2:src_language(en)>? <1:dest_languages(en)>* <-1:string>"
+	usage = "<0:engine(chatgpt|mixtral|google)>? <2:src_language>? <1:dest_languages>* <-1:string>"
 	example = ("translate english 你好", "tr mixtral chinese bonjour, comment-t'appelles-tu?", "translate chatgpt auto spanish french italian thank you!")
 	flags = "v"
 	no_parse = True
@@ -69,7 +69,7 @@ class Translate(Command):
 		if spl[0].casefold() in ("google", "mixtral", "chatgpt"):
 			engine = spl.pop(0).casefold()
 		else:
-			engine = "chatgpt" if premium >= 2 else "google"
+			engine = "chatgpt" if premium >= 2 else "mixtral"
 		if len(spl) > 2 and (spl[1].casefold() in self.renamed or spl[1].casefold() in self.languages) and(src := (self.renamed.get(c := spl[0].casefold()) or (self.languages.get(c) and c))):
 			spl.pop(0)
 			src = lim_str(src, 32)
@@ -91,8 +91,13 @@ class Translate(Command):
 		comments = {}
 
 		if src.casefold() == "auto":
-			resp2 = await asubmit(self.trans.translate, text, src="auto", dest="en")
-			src2 = resp2.src.casefold()
+			try:
+				resp2 = await asubmit(self.trans.translate, text, src="auto", dest="en")
+				src2 = resp2.src.casefold()
+			except:
+				print_exc()
+				resp2 = await self.det(text)
+				src2 = resp2.src.casefold() if resp2 else src.casefold()
 		elif src.casefold() != "en":
 			resp2 = asubmit(self.trans.translate, text, src="auto", dest="en")
 			src2 = src.casefold()
@@ -123,7 +128,13 @@ class Translate(Command):
 			raise NotImplementedError(engine)
 		if resp2:
 			if awaitable(resp2):
-				resp = await asubmit(resp2)
+				try:
+					resp = await asubmit(resp2)
+				except:
+					print_exc()
+					resp = await self.det(text)
+					if not resp:
+						resp = cdict(src=src)
 			else:
 				resp = resp2
 			src = resp.src.casefold()
@@ -145,9 +156,12 @@ class Translate(Command):
 		bot.send_as_embeds(channel, output.strip(), author=get_author(user), footer=footer, reference=message)
 
 	async def det(self, s):
-		ftlangdetect = await asubmit(__import__, "ftlangdetect.detect")
+		try:
+			ftlangdetect = await asubmit(__import__, "ftlangdetect.detect")
+		except ImportError:
+			return
 		resp = await asubmit(ftlangdetect.detect, s, low_memory=psutil.virtual_memory().total < 14 * 1073741824)
-		return dict(src=resp["lang"], score=resp["score"], dest="en")
+		return cdict(src=resp["lang"], score=resp["score"], dest="en")
 
 	def equiv(self, s, d):
 		if s == d:
@@ -204,7 +218,7 @@ class Translate(Command):
 		oai = data.get("trial") and data.get("openai_key")
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 		# print("Translate prompt:", prompt)
-		c = await tcount(prompt)
+		# c = await tcount(prompt)
 		try:
 			out = await bot.instruct(
 				data=dict(
@@ -271,7 +285,7 @@ class Translator(Command):
 	name = ["AutoTranslate"]
 	min_level = 2
 	description = 'Adds an automated translator to the current channel. Specify a list of languages to translate between, and optionally a translation engine. All non-command messages that do not begin with "#" will be passed through the translator.'
-	usage = "<0:engine{google|mixtral|chatgpt}>? <1:languages(en)>* <disable{?d}>?"
+	usage = "<0:engine(google|mixtral|chatgpt)>? <1:languages>* <disable(-d)>?"
 	example = ("translator chatgpt english german russian", "autotranslate korean polish")
 	flags = "aed"
 	rate_limit = (9, 12)
@@ -370,7 +384,7 @@ class Math(Command):
 	name = ["🔢", "M", "PY", "Sympy", "Plot", "Calc"]
 	alias = name + ["Plot3D", "Factor", "Factorise", "Factorize"]
 	description = "Evaluates a math formula."
-	usage = "<string> <verbose{?v}>? <rationalize{?r}>? <show_variables{?l}>? <clear_variables{?c}>?"
+	usage = "<string> <verbose(-v)|rationalize(-r)>? <show_variables(-l)|clear_variables(-c)>?"
 	example = ("m factorial 32", "plot 3x^2-2x+1", "math integral tan(x)", "m solve(x^3-1)", "calc std([6.26,6.23,6.34,6.28])", "🔢 predict_next([2, 10, 30, 68, 130])")
 	flags = "rvlcd"
 	rate_limit = (4.5, 6)
@@ -595,7 +609,7 @@ class OwOify(Command):
 	otrans = "".maketrans(omap)
 	name = ["UwU", "OwO", "UwUify"]
 	description = "Applies the owo/uwu text filter to a string."
-	usage = "<string> <aggressive{?a}>? <basic{?b}>?"
+	usage = "<string> <aggressive(-a)>? <basic(-b)>?"
 	example = ("owoify hello, what's your name?", "owoify -a Greetings, this is your cat god speaking")
 	rate_limit = (4, 5)
 	flags = "ab"
@@ -760,16 +774,16 @@ def _c2e(string, em1, em2):
 class Char2Emoji(Command):
 	name = ["C2E", "Char2Emoj"]
 	description = "Makes emoji blocks using a string."
-	usage = "<0:string> <1:emoji_1> <2:emoji_2>"
+	usage = "<0:string> <1:emoji_1> <2:emoji_2>?"
 	example = ("c2e POOP 💩 🪰",)
 	rate_limit = (10, 14)
 	no_parse = True
 	slash = True
 
 	def __call__(self, args, guild, message, **extra):
-		if len(args) != 3:
+		if len(args) < 2:
 			raise ArgumentError(
-				"Exactly 3 arguments are required for this command.\n"
+				"At least 2 arguments are required for this command.\n"
 				+ "Place quotes around arguments containing spaces as required."
 			)
 		webhook = not getattr(guild, "ghost", None)
@@ -793,6 +807,8 @@ class Char2Emoji(Command):
 					args[i] = f"<a:_:{e_id}>"
 				else:
 					args[i] = f"<:_:{e_id}>"
+		if len(args) < 3:
+			args.append("⬛")
 		resp = _c2e(*args[:3])
 		if hasattr(message, "simulated"):
 			return resp
@@ -812,7 +828,7 @@ class Char2Emoji(Command):
 class EmojiCrypt(Command):
 	name = ["EncryptEmoji", "DecryptEmoji", "EmojiEncrypt", "EmojiDecrypt"]
 	description = "Encrypts the input text or file into smileys."
-	usage = "<string> <encrypt{?e}|decrypt{?d}> <encrypted{?p}>? <-1:password>"
+	usage = "<string> <mode(encrypt|decrypt)> <encrypted(-p)>? <-1:password>"
 	rate_limit = (9, 12)
 	no_parse = True
 	# slash = True
@@ -871,7 +887,7 @@ class EmojiCrypt(Command):
 class Time(Command):
 	name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T", "EstimateTime", "EstimateTimezone"]
 	description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user. Be sure to check out ⟨WEBSERVER⟩/time!"
-	usage = "<offset_hours|user>?"
+	usage = "<target(?:offset_hours|user)>?"
 	example = ("time mst", "utc-10", "time Miza")
 	rate_limit = (3, 5)
 	slash = True
@@ -955,7 +971,7 @@ class Time(Command):
 
 class Timezone(Command):
 	description = "Shows the current time in a certain timezone. Be sure to check out ⟨WEBSERVER⟩/time!"
-	usage = "<timezone> <list{?l}>?"
+	usage = "<timezone> <list(-l)>?"
 	example = ("timezone ?l", "timezone pacific")
 	rate_limit = (3, 5)
 	ephemeral = True
@@ -975,32 +991,6 @@ class Timezone(Command):
 		if not h < 0:
 			h = "+" + str(h)
 		return ini_md(f"Current time at UTC/GMT{h}: {sqr_md(t)}.")
-
-
-# class TimeCalc(Command):
-#     name = ["TimeDifference", "TimeDiff", "TimeSum", "TimeAdd"]
-#     description = "Computes the sum or difference between two times, or the Unix timestamp of a datetime string."
-#     usage = "<0:time1> [|,] <1:time2>?"
-#     no_parse = True
-
-#     def __call__(self, argv, user, name, **void):
-#         if not argv:
-#             timestamps = [utc()]
-#         else:
-#             if "|" in argv:
-#                 spl = argv.split("|")
-#             elif "," in argv:
-#                 spl = argv.split(",")
-#             else:
-#                 spl = [argv]
-#             timestamps = [utc_ts(tzparse(t)) for t in spl]
-#         if len(timestamps) == 1:
-#             out = f"{round_min(timestamps[0])} ({DynamicDT.utcfromtimestamp(timestamps[0])} UTC)"
-#         elif "sum" not in name and "add" not in name:
-#             out = dyn_time_diff(max(timestamps), min(timestamps))
-#         else:
-#             out = time_sum(*timestamps)
-#         return code_md(out)
 
 
 class Identify(Command):
@@ -2259,24 +2249,27 @@ class Ask(Command):
 					if k == "roleplay" or k is None and model not in chatcc:
 						if model == "gpt3" and length >= 192:
 							model = DEFMOD
-						blocked.update(Functions)
-						extensions = False
+						if len(blocked.intersection(("audio", "astate", "askip"))) >= 3:
+							blocked.update(Functions)
+							extensions = False
+						else:
+							blocked.update(("browse", "sympy", "wolfram_alpha", "dalle", "reminder"))
 					elif k is None:
-						blocked.update(("sympy", "audio", "astate", "askip", "reminder"))
+						blocked.update(("sympy", "reminder"))
 					elif k == "art":
 						blocked.update(("browse", "sympy", "wolfram_alpha", "audio", "astate", "askip", "reminder"))
 						tool_choice = "dalle"
 					elif k == "remind":
-						blocked.update(("browse", "sympy", "wolfram_alpha", "myinfo", "dalle", "audio", "astate", "askip"))
+						blocked.update(("browse", "sympy", "wolfram_alpha", "myinfo", "dalle"))
 						tool_choice = "reminder"
 					elif k == "math":
-						blocked.update(("myinfo", "dalle", "play", "audio", "astate", "askip", "reminder"))
+						blocked.update(("myinfo", "dalle", "reminder"))
 						tool_choice = "wolfram_alpha"
 					elif k == "play":
 						blocked.update(("browse", "sympy", "wolfram_alpha", "myinfo", "dalle", "reminder"))
 						tool_choice = "play"
 					elif k == "knowledge":
-						blocked.update(("wolfram_alpha", "dalle", "play", "audio", "astate", "askip", "reminder"))
+						blocked.update(("wolfram_alpha", "dalle"))
 						tool_choice = "knowledge"
 					else:
 						rem = set(Functions)
@@ -2393,7 +2386,7 @@ class Ask(Command):
 				length = await count_to(used)
 				if model in chatcompletion or extensions and not attempts:
 					orig_model = model
-					if model not in chatcompletion:
+					if orig_model not in chatcompletion:
 						model = "gpt-3.5-turbo-1106"
 					if premium >= 2 and len(ufull) > 5 and length > 384 and cs_allowed:
 						ms = ufull[-1]
@@ -2447,7 +2440,7 @@ class Ask(Command):
 						model=model,
 						messages=used,
 						temperature=temperature,
-						max_tokens=min(4096, limit - length - 768),
+						max_tokens=min(256 if orig_model not in chatcompletion else 4096, limit - length - 768),
 						top_p=0.9,
 						frequency_penalty=0.6,
 						presence_penalty=0.8,
@@ -3120,7 +3113,7 @@ class Personality(Command):
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
 	min_level = 2
 	description = "Customises my personality for ~ask in the current server. Uses the largest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Mixtral, Mistral, Wizard, Euryale, WizCode, Emerhyst, MLewd, Mythalion and Pygmalion are currently the alternate models enabled."
-	usage = "<traits>* <default{?d}>?"
+	usage = "<traits>* <default(-d)>?"
 	example = ("personality MythoMax; mischievous, cunning", "personality Mixtral; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
 	flags = "aed"
 	rate_limit = (18, 24)
@@ -3281,7 +3274,7 @@ class WordCount(Command):
 class Topic(Command):
 	name = ["Question"]
 	description = "Asks a random question."
-	usage = "<relationship{?r}>? <pickup-line{?p}>? <nsfw-pickup-line{?n}>?"
+	usage = "<relationship(-r)>? <pickup-line(-p)>? <nsfw-pickup-line(-n)>?"
 	example = ("topic", "question -r")
 	flags = "npr"
 

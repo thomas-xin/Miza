@@ -127,7 +127,7 @@ class ImageAdjust(Command):
 		"Blur", "Gaussian",
 	]
 	description = "Applies an adjustment filter to the supplied image."
-	usage = "<0:url> <1:multiplier(2)>?"
+	usage = "<0:url> <1:multiplier[2]>?"
 	example = ("saturate https://mizabot.xyz/favicon", "hue https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 0.8")
 	no_parse = True
 	rate_limit = (5, 9)
@@ -180,7 +180,7 @@ class ColourDeficiency(Command):
 	name = ["ColorBlind", "ColourBlind", "ColorBlindness", "ColourBlindness", "ColorDeficiency"]
 	alias = name + ["Protanopia", "Protanomaly", "Deuteranopia", "Deuteranomaly", "Tritanopia", "Tritanomaly", "Achromatopsia", "Achromatonomaly"]
 	description = "Applies a colourblindness filter to the target image."
-	usage = "<0:url> (protanopia|protanomaly|deuteranopia|deuteranomaly|tritanopia|tritanomaly|achromatopsia|achromatonomaly)? <1:ratio(0.9)>?"
+	usage = "<0:url> <mode(protanopia|protanomaly|deuteranopia|deuteranomaly|tritanopia|tritanomaly|achromatopsia|achromatonomaly)>? <1:ratio[0.9]>?"
 	example = ("colourdeficiency tritanomaly https://mizabot.xyz/favicon", "colourblind protanopia https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png")
 	no_parse = True
 	rate_limit = (6, 10)
@@ -417,7 +417,7 @@ class EdgeDetect(Command):
 class ColourSpace(Command):
 	name = ["ColorSpace"]
 	description = "Changes the colour space of the supplied image."
-	usage = "<0:url> <2:source(rgb)>? <1:dest(hsv)>?"
+	usage = "<0:url> <2:source(rgb|cmy|xyz|hsv|hsl|hsi|lab|luv|yiq|yuv)>? <1:dest(hsv|hsl|hsi|lab|luv|yiq|yuv|rgb|cmy|xyz)>?"
 	example = ("colourspace https://mizabot.xyz/favicon rgb hsv", "colorspace https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png cmy hsi")
 	no_parse = True
 	rate_limit = (7, 11)
@@ -461,7 +461,7 @@ class ColourSpace(Command):
 class Magik(Command):
 	name = ["Distort"]
 	description = "Applies the Magik image filter to supplied image."
-	usage = "<0:url> <cell_count(7)>?"
+	usage = "<0:url> <cell_count[7]>?"
 	example = ("magik https://mizabot.xyz/favicon", "magik https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 3")
 	no_parse = True
 	rate_limit = (8, 12)
@@ -537,7 +537,7 @@ class Colour(Command):
 
 class Gradient(Command):
 	description = "Generates a gradient with a specific shape."
-	usage = "(linear|radial|conical|spiral|polygon)? <0:count(1)>? <-1:colour(white)>?"
+	usage = "<mode(linear|radial|conical|spiral|polygon)>? <0:count[1]>? <-1:colour[white]>?"
 	example = ("gradient radial red", "gradient linear green")
 	no_parse = True
 	rate_limit = (4, 6)
@@ -646,7 +646,7 @@ class QR(Command):
 class Rainbow(Command):
 	name = ["RainbowGIF", "Gay", "Shiny"]
 	description = "Creates a .gif image from repeatedly hueshifting supplied image."
-	usage = "<0:url> <1:duration(2)>?"
+	usage = "<0:url> <1:duration[2]>?"
 	example = ("rainbow https://mizabot.xyz/favicon", "rainbow https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 6")
 	no_parse = True
 	rate_limit = (10, 13)
@@ -666,7 +666,7 @@ class Rainbow(Command):
 class Scroll(Command):
 	name = ["Parallax", "Offset", "ScrollGIF"]
 	description = "Creates a .gif image from repeatedly shifting supplied image in a specified direction."
-	usage = "<0:url> <1:direction(left)>? <2:duration(2)>? <3:fps(32)>?"
+	usage = "<0:url> <1:direction[left]>? <2:duration[2]>? <3:fps[32]>?"
 	example = ("scroll https://mizabot.xyz/favicon", "scroll https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png down 4")
 	no_parse = True
 	rate_limit = (10, 13)
@@ -735,7 +735,7 @@ class Scroll(Command):
 class Spin(Command):
 	name = ["SpinGIF"]
 	description = "Creates a .gif image from repeatedly rotating supplied image."
-	usage = "<0:url> <1:duration(2)>?"
+	usage = "<0:url> <1:duration[2]>?"
 	example = ("spin https://mizabot.xyz/favicon", "spin https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 3")
 	no_parse = True
 	rate_limit = (10, 13)
@@ -754,7 +754,7 @@ class Spin(Command):
 class Orbit(Command):
 	name = ["Orbital", "Orbitals"]
 	description = "Renders a ring of orbiting sprites of the supplied image."
-	usage = "<0:url>+ <1:orbital_count(5)>? <2:duration(2)>?"
+	usage = "<0:url>+ <1:orbital_count[5]>? <2:duration[2]>?"
 	example = ("orbitals https://mizabot.xyz/favicon", "orbit https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 3 10")
 	no_parse = True
 	rate_limit = (16, 22)
@@ -801,7 +801,7 @@ class Orbit(Command):
 class Pet(Command):
 	name = ["PetPet", "Attack", "PatGIF", "Pat", "PetGIF"]
 	description = "Creates a .gif image from applying the Petpet generator to the supplied image."
-	usage = "<0:url> <1:squish(0.1)>? <2:duration(0.25)>?"
+	usage = "<0:url> <1:squish[0.1]>? <2:duration[0.25]>?"
 	example = ("pet https://mizabot.xyz/favicon", "pet https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 3")
 	no_parse = True
 	rate_limit = (10, 13)
@@ -839,7 +839,7 @@ class Pet(Command):
 class GMagik(Command):
 	name = ["Liquefy", "Crumple", "Crush", "MagikGIF"]
 	description = "Repeatedly applies the Magik image filter to supplied image."
-	usage = "<0:url> <cell_size(7)>? <iterations(64)>? <duration(2)>?"
+	usage = "<0:url> <cell_size[7]>? <iterations[64]>? <duration[2]>?"
 	example = ("gmagik https://mizabot.xyz/favicon", "liquefy https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 36")
 	no_parse = True
 	rate_limit = (11, 14)
@@ -870,7 +870,7 @@ class GMagik(Command):
 class CreateGIF(Command):
 	name = ["Animate", "GIF", "Frames", "ImageSequence"]
 	description = "Combines multiple supplied images, and/or optionally a video, into an animated image, image sequence, or video."
-	usage = "<0:url>+ <-2:fps(20)>? <-1:format(gif)>?"
+	usage = "<0:url>+ <-2:fps[20]>? <-1:format[gif]>?"
 	example = ("gif https://www.youtube.com/watch?v=dQw4w9WgXcQ", "gif https://discord.com/assets/7c010dc6da25c012643ea22c1f002bb4.svg https://discord.com/assets/66f6c781fe86c346fbaf3390618668fc.svg https://discord.com/assets/626aaed496ac12bbdb68a86b46871a1f.svg -r 3")
 	no_parse = True
 	rate_limit = (12, 16)
@@ -947,7 +947,7 @@ class CreateGIF(Command):
 class Resize(Command):
 	name = ["ImageScale", "Scale", "Rescale", "ImageResize", "Denoise", "Enhance", "Refine", "Copy", "Jumbo"]
 	description = "Changes size of supplied image, using an optional scaling operation."
-	usage = "<0:url> <1:resolution|multiplier>? <2:y_multiplier(x)>? (nearest|linear|hamming|bicubic|lanczos|scale2x|sdxl|crop|auto)?"
+	usage = "<0:url> <1:size(?:resolution|multiplier)>* <-1:mode(nearest|linear|hamming|bicubic|lanczos|scale2x|sdxl|crop|auto)>?"
 	example = ("scale https://mizabot.xyz/favicon 4", "resize https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 2048x2048 scale2x")
 	no_parse = True
 	rate_limit = (8, 13)
@@ -1142,8 +1142,8 @@ class Crop(Command):
 
 class Rotate(Command):
 	name = ["Orientate", "Orientation", "Transpose"]
-	description = "Rotates an image."
-	usage = "<0:url> <1:angle(90)>?"
+	description = "Rotates an image. Defaults to counterclockwise rotation."
+	usage = "<0:url> <1:angle[90]>?"
 	example = ("rotate https://mizabot.xyz/favicon 90", "rotate https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 123.456")
 	no_parse = True
 	rate_limit = (8, 13)
@@ -1174,7 +1174,7 @@ class Rotate(Command):
 class Fill(Command):
 	name = ["ImageFill", "FillChannel", "FillImage"]
 	description = "Fills an optional amount of channels in the target image with an optional value."
-	usage = "<0:url> [rgbcmyhsva]* <-1:value(0)>?"
+	usage = "<0:url> <channels(r|g|b|c|m|y|h|s|v|a)>* <-1:value[0]>?"
 	example = ("fill https://mizabot.xyz/favicon gb 255", "fill https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png r 0")
 	no_parse = True
 	rate_limit = (7, 10)
@@ -1251,7 +1251,7 @@ class Fill(Command):
 class Blend(Command):
 	name = ["ImageBlend", "ImageOP"]
 	description = "Combines the two supplied images, using an optional blend operation."
-	usage = "<0:url1> <1:url2> (normal|replace|add|sub|mul|div|mod|and|or|xor|nand|nor|xnor|difference|overlay|screen|soft|hard|lighten|darken|plusdarken|overflow|lighting|burn|linearburn|dodge|hue|sat|lum|colour|extract|merge)? <3:opacity(0.5|1)>?"
+	usage = "<0:url1> <1:url2> <mode(normal|replace|add|sub|mul|div|mod|and|or|xor|nand|nor|xnor|difference|overlay|screen|soft|hard|lighten|darken|plusdarken|overflow|lighting|burn|linearburn|dodge|hue|sat|lum|colour|extract|merge)>? <3:opacity[0.5/1]>?"
 	example = ("blend https://mizabot.xyz/favicon https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png overflow",)
 	no_parse = True
 	rate_limit = (13, 17)
@@ -1489,7 +1489,7 @@ class Art(Command):
 	_timeout_ = 150
 	name = ["AIArt", "Inpaint", "Morph", "ControlNet", "StableDiffusion", "SDXL", "Dalle", "Dalle2", "Dalle3", "Dream", "Imagine", "Inspire"]
 	description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system for image prompts. Configurable parameters are --strength, --guidance-scale, --aspect-ratio and --negative-prompt."
-	usage = "<0:prompt> <inpaint{?i}>? <morph{?m}>? <single{?s}>? <raw{?r}>?"
+	usage = "<0:prompt> <inpaint(-i)|morph(-m)>? <single(-s)>? <raw(-r)>?"
 	example = ("art cute kitten", "art https://mizabot.xyz/favicon")
 	rate_limit = (45, 60)
 	flags = "imrsz"

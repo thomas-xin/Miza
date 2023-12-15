@@ -282,7 +282,7 @@ class Text2048(Command):
 	time_consuming = True
 	name = ["2048", "🎮"]
 	description = "Plays a game of 2048 using buttons. Gained points are rewarded as gold."
-	usage = "<0:dimension_sizes(4x4)>* <1:dimension_count(2)>? <public{?p}|special_tiles{?s}|insanity_mode{?i}|easy_mode{?e}>*"
+	usage = "<0:dimension_sizes[4x4]|dimension_count[2]>* <public(-p)|special_tiles(-s)|insanity_mode(-i)|easy_mode(-e)>*"
 	example = ("2048", "text2048 3x4 -p", "2048 3x3x3 -e -s", "2048 4x4x4x4 -i")
 	flags = "pies"
 	rate_limit = (8, 14)
@@ -634,7 +634,7 @@ class Snake(Command):
 	time_consuming = True
 	name = ["Snaek", "🐍"]
 	description = "Plays a game of Snake using buttons!"
-	usage = "<dimensions(8x8)>* <public{?p}|insanity_mode{?i}>*"
+	usage = "<dimensions[8x8]>* <public(-p)|insanity_mode(-i)>*"
 	example = ("snake", "snake 4x12", "snake 6x6 -i")
 	flags = "pi"
 	rate_limit = (8, 14)
@@ -847,7 +847,7 @@ class Snake(Command):
 class SlotMachine(Command):
 	name = ["Slots"]
 	description = "Plays a slot machine game. Costs gold to play, can yield gold and diamonds."
-	usage = "<bet{50}>? <skip_animation{?s}>?"
+	usage = "<bet[50]>? <skip_animation(-s)>?"
 	example = ("slots 60", "slots -s 1000")
 	flags = "s"
 	rate_limit = (7, 12)
@@ -1835,7 +1835,7 @@ class Matchmaking(Command):
 class Pay(Command):
 	name = ["GiveCoins", "GiveGold", "GiveDiamond", "GiveDiamonds", "🪙", "💎"]
 	description = "Pays a specified amount of coins or diamonds to the target user."
-	usage = "<0:user> <1:amount(1)>? <-1:diamonds{💎}>?"
+	usage = "<0:user> <1:amount[1]>? <-1:diamonds(💎)>?"
 	example = ("pay @Miza 100",)
 	rate_limit = (6, 8)
 
@@ -1875,7 +1875,7 @@ class React(Command):
 	name = ["AutoReact"]
 	min_level = 0
 	description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the substring."
-	usage = "<0:react_to>? <1:react_data>? <disable{?d}>?"
+	usage = "<0:react_to>? <1:react_data>? <disable(-d)>?"
 	example = ("react cat 🐱", "react ?d dog", "react remove 1")
 	flags = "aedzf"
 	no_parse = True
@@ -2068,7 +2068,7 @@ class Dogpile(Command):
 	server_only = True
 	min_level = 2
 	description = "Causes ⟨MIZA⟩ to automatically imitate users when 3+ of the same messages are posted in a row. Grants XP and gold when triggered. Enabled by default."
-	usage = "(enable|disable)?"
+	usage = "<mode(enable|disable)>?"
 	example = ("dogpile enable",)
 	flags = "aed"
 	rate_limit = 0.5
@@ -2224,7 +2224,7 @@ class DadJoke(Command):
 	server_only = True
 	min_level = 3
 	description = "Causes ⟨MIZA⟩ to automatically nickname a user whenever they say \"I am <something>\" or some variant."
-	usage = "(enable|disable)? <mode(nickname|response|all)>? <chance{100}>?"
+	usage = "<mode(enable|disable)>? <target(nickname|response|all)>? <chance[100]>?"
 	example = ("dadjoke enable", "dadjoke disable")
 	flags = "aed"
 	rate_limit = 0.5
@@ -2632,7 +2632,7 @@ class Wallet(Command):
 class Shop(Command):
 	name = ["Upgrade", "Premium", "Premiums", "UpgradeServer"]
 	description = "Displays the shop system, or purchases an item."
-	usage = "<item[]>"
+	usage = "<item>?"
 	example = ("shop", "shop upgrade_server", "upgrade_server")
 	rate_limit = (6, 10)
 
@@ -3116,7 +3116,7 @@ class Rickroll(Command):
 class RPS(Command):
 	name = ["Rockpaperscissors"]
 	description = "A randomised game of Rock-Paper-Scissors!"
-	usage = "<rock>? <paper>? <scissors>?"
+	usage = "<move(rock|paper|scissors)>?"
 	example = ("rockpaperscissors", "rps rock")
 	slash = True
 	typing = False
@@ -3279,7 +3279,7 @@ akinator.Akinator.parse_response = lambda self, response: _parse_response(respon
 class Akinator(Command):
 	name = ["Aki"]
 	description = "Think about a real or fictional character. I will try to guess who it is!"
-	usage = "<language(en)>? <child_friendly{?c}>?"
+	usage = "<language[en]>? <child_friendly(-c)>?"
 	example = ("akinator", "akinator -c en")
 	flags = "c"
 	slash = True
