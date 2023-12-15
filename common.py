@@ -240,7 +240,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 		return self
 
 	def check_overflow(self):
-		if self.passive >= self.buffer:
+		if self.is_full():
 			raise SemaphoreOverflowError(f"Semaphore object of limit {self.limit} overloaded by {self.passive}")
 
 	def __enter__(self):
@@ -325,9 +325,16 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 	def is_busy(self):
 		return self.rate_limit and len(self._update_bin()) >= self.limit or self.active >= self.limit
 
+	def is_full(self):
+		return self.passive >= self.buffer
+
 	def clear(self):
 		self.rate_bin.clear()
 		self._update_bin()
+
+	@property
+	def full(self):
+		return self.is_full()
 
 	@property
 	def busy(self):

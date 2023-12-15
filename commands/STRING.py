@@ -1438,7 +1438,7 @@ def map_model(cname, model, premium):
 		keep_model = False
 	return model, keep_model
 
-DEFMOD = "mixtral"
+DEFMOD = "stripedhyena"
 
 MockFunctions = [
 	[None, "Placeholder (Do not choose this!)"],
@@ -1831,7 +1831,7 @@ def instruct_structure(messages, exclude_first=True, model=None):
 			prompt = ins[0] + "\n\n### History:\n" + "\n\n".join(ins[1:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
 		prompt = "\n\n".join(ins[:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
 	else:
-		stops = ["</s>", "[INST]", "<|system|>:"]
+		stops = ["</s>", "[INST", "<|system|>:"]
 		prompt = "\n\n".join(s if m.get("role") == "assistant" else f"[INST]{s}[/INST]" for s, m in zip(ins, messages))
 	return prompt, stops
 
@@ -2760,7 +2760,7 @@ class Ask(Command):
 								continue
 						if redo:
 							continue
-				elif model in TOGETHER and AUTH.get("together_key") and not bot.together_sem.busy:
+				elif model in TOGETHER and AUTH.get("together_key") and not bot.together_sem.full:
 					import together
 					c = await tcount(data["prompt"])
 					rp = ((data.get("frequency_penalty", 0.25) + data.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
@@ -2781,7 +2781,7 @@ class Ask(Command):
 						print_exc()
 						target_model = "gpt3"
 						continue
-				elif model in FIREWORKS and AUTH.get("fireworks_key"):
+				elif model in FIREWORKS and AUTH.get("fireworks_key") and not bot.fireworks_sem.full:
 					import fireworks.client
 					c = await tcount(data["prompt"])
 					# rp = ((data.get("frequency_penalty", 0.25) + data.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
@@ -2794,7 +2794,8 @@ class Ask(Command):
 						max_tokens=data.get("max_tokens", 1024),
 					)
 					try:
-						response = await asubmit(fireworks.client.Completion.create, **rdata, timeout=60)
+						async with bot.fireworks_sem:
+							response = await asubmit(fireworks.client.Completion.create, **rdata, timeout=60)
 						text += response.choices[0].text
 					except Exception as e:
 						ex = e
@@ -2842,7 +2843,7 @@ class Ask(Command):
 						continue
 				else:
 					raise FileNotFoundError(f"Unable to find model \"{model}\".")
-				text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
+				text = regexp(r"\[inst", re.I).split(text, 1)[0].removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
 				if text and not text.rsplit(None, 1)[-1].startswith(":"):
 					text = text.rstrip(":")
 				if not text or len(text) >= 2 and text[-1] in ",: aAsS" and text[-2] not in ",.!?" or text.endswith(' "') or text.endswith('\n"'):

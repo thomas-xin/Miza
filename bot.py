@@ -1712,7 +1712,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return (resp, best)
 
 	llsem = Semaphore(2, 2, rate_limit=4)
-	together_sem = Semaphore(2, 8, rate_limit=0.5)
+	together_sem = Semaphore(2, 256, rate_limit=0.5)
+	fireworks_sem = Semaphore(10, 256, rate_limit=6)
 	async def _instruct(self, data, best=False, skip=False):
 		c = await tcount(data["prompt"])
 		inputs = dict(
@@ -1736,7 +1737,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			# 	except:
 			# 		print_exc()
 			# 		data["model"] = "gpt-3.5-turbo-instruct"
-		if AUTH.get("together_key") and not self.together_sem.busy and best <= 1 and not skip:
+		if AUTH.get("together_key") and not self.together_sem.full and best <= 1 and not skip:
 			import together
 			rp = ((inputs.get("frequency_penalty", 0.25) + inputs.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
 			m = "mistralai/Mixtral-8x7B-Instruct-v0.1" if best else "togethercomputer/StripedHyena-Nous-7B"
@@ -1748,7 +1749,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				top_p=inputs.get("top_p", 1),
 				repetition_penalty=rp,
 				max_tokens=inputs.get("max_tokens", 1024),
-				stop=["</s>", "[INST]"] if best else ["</s>", "### Instruction:"],
+				stop=["</s>", "[INST"] if best else ["</s>", "### Instruction:"],
 			)
 			try:
 				async with self.together_sem:
@@ -1756,7 +1757,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return response["output"]["choices"][0]["text"]
 			except:
 				print_exc()
-		if AUTH.get("fireworks_key") and best <= 1 and not skip:
+		if AUTH.get("fireworks_key") and not self.fireworks_sem.full and best <= 1 and not skip:
 			import fireworks.client
 			# rp = ((inputs.get("frequency_penalty", 0.25) + inputs.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
 			m = "accounts/fireworks/models/mixtral-8x7b-instruct"
@@ -1769,7 +1770,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				max_tokens=inputs.get("max_tokens", 1024),
 			)
 			try:
-				response = await asubmit(fireworks.client.Completion.create, **data, request_timeout=30)
+				async with self.fireworks_sem:
+					response = await asubmit(fireworks.client.Completion.create, **data, request_timeout=30)
 				return response.choices[0].text
 			except:
 				print_exc()
@@ -1788,7 +1790,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		print("Restruct:", t)
 		return t
 
-	async def summarise(q, min_length=128, max_length=192, best=True):
+	async def summarise(self, q, min_length=128, max_length=192, best=True):
 		if min_length > max_length - 1:
 			min_length = max_length - 1
 		if q and sum(c.isascii() for c in q) / len(q) > 0.75:
@@ -1855,8 +1857,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		
 	async def _summarise(self, s, min_length, max_length, prune=True, best=False):
 		if best or 1:
-			prompt = f'"""\n{s}\n"""\n\n[INST]Please provide a comprehensive summary of the text above![/INST]'
-			resp = await self.instruct(dict(prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=round_random(max_length + min_length) >> 1), best=best)
+			prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive summary of the text above!\n\n### Response:'
+			resp = await self.instruct(dict(prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=round_random(max_length + min_length) >> 1), best=False)
 			resp = resp.strip()
 			print("Summ:", prompt, resp)
 			if resp:
@@ -4165,9 +4167,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								rlv = ceil(rl * burst)
 								sem = command.used.get(u_id)
 								if sem is None or sem.rate_limit != rlv:
-									sem = command.used[u_id] = Semaphore(burst, 256, rate_limit=rlv)
-								if sem.busy and sem.reset_after:
-									raise TooManyRequests(f"Command has a rate limit of {sec2time(rl)} with a burst of {burst}; please wait {sec2time(sem.reset_after)}.")
+									sem = command.used[u_id] = Semaphore(burst, burst, rate_limit=rlv)
+								if sem.full and sem.reset_after:
+									raise TooManyRequests(f"Command has a rate limit of {sec2time(rl)} with a burst+queue of {burst}; please wait {sec2time(sem.reset_after)}.")
 						# print("Using sem:", sem, u_perm, command.rate_limit, self.premium_level(user))
 						flags = {}
 						if loop:

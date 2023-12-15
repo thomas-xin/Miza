@@ -582,7 +582,7 @@ class UpdateExec(Database):
 			f.seek(i)
 			while i < end:
 				b = None
-				if end - i > 83886080 and "hmac_signed_session" in AUTH and not self.hmac_sem.busy:
+				if end - i > 83886080 and "hmac_signed_session" in AUTH and not self.hmac_sem.full:
 					try:
 						async with self.hmac_sem:
 							b = await asubmit(f.read, 503316480)
