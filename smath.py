@@ -2416,7 +2416,7 @@ def regexp(s, flags=0):
 	if issubclass(type(s), re.Pattern):
 		return s
 	s = as_str(s)
-	t = (s, flags)
+	t = f"{s}\x00{flags}"
 	try:
 		return RE[t]
 	except KeyError:

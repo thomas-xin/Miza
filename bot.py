@@ -1665,35 +1665,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		inds = check >= top - temp * 2 / 3
 		return order[inds].cpu().numpy()
 
-	STOPS = (
-		"m unable to fulfil",
-		"m unable to assist",
-		"m unable to help",
-		"m unable to provide",
-		"m unable to do",
-		"m unable to respond",
-		"m unable to comply",
-		"m unable to engage",
-		"m unable to perform",
-		"i cannot fulfil",
-		"i cannot assist",
-		"i cannot help",
-		"i cannot provide",
-		"i cannot do",
-		"i cannot respond",
-		"i cannot comply",
-		"i cannot engage",
-		"i cannot perform",
-		"i can't fulfil",
-		"i can't assist",
-		"i can't help",
-		"i can't provide",
-		"i can't do",
-		"i can't respond",
-		"i can't comply",
-		"i can't engage",
-		"i can't perform",
-	)
+	decensor = regexp(r"(?:i am unable to|i'm unable to|i cannot|i can't|i am not able to|i'm not able to) (?:fulfil|assist|help|provide|do|respond|comply|engage|perform)", re.I)
 
 	llcache = Cache(timeout=86400, trash=256)
 	async def instruct(self, data, best=False, skip=False, prune=True, cache=True):
@@ -1706,7 +1678,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if tup[1] >= best:
 				return tup[0]
 		resp, best = await self._instruct2(data, best=best, skip=skip, prune=prune)
-		if best and any(s in resp for s in self.STOPS):
+		if best and self.decensor.search(resp):
 			resp, best = await self._instruct2(data, best=False, skip=False, prune=True)
 		self.llcache[key] = (resp, best)
 		return resp
@@ -1797,7 +1769,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	def restruct(self, s):
 		t = s.replace("\n### Instruction:\n", "[INST]").replace("### Instruction:\n", "[INST]").replace("\n\n### Response:", "[/INST]").replace("### Input:", "").strip()
-		print("Restruct:", t)
+		# print("Restruct:", t)
 		return t
 
 	async def summarise(self, q, min_length=128, max_length=192, best=True):
@@ -2021,8 +1993,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			async with asyncio.timeout(35):
 				response = await self.oai.chat.completions.create(**data, timeout=30)
 			out = response.choices[0].message.content.strip()
-			if any(s in out for s in self.STOPS):
-				raise ValueError("Censored response.")
+			if self.decensor.search(out):
+				raise ValueError(f"Censored response {repr(out)}.")
 		except:
 			print_exc()
 			return await asubmit(self.neva, url)

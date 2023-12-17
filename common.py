@@ -4594,7 +4594,7 @@ class Cache(cdict):
 		db.setdefault("__lost", {}).update(self.lost)
 		object.__setattr__(self, "lost", db["__lost"])
 		db.setdefault("__tmap", {}).update(self.tmap)
-		object.__setattr__(self, "tmap", db["__tmap"])
+		db.pop("tmap", None)
 		object.__setattr__(self, "db", db)
 
 	async def _update(self):
@@ -4614,15 +4614,18 @@ class Cache(cdict):
 				while len(lost) > self.trash:
 					with suppress(KeyError, RuntimeError):
 						lost.pop(next(iter(lost)))
-				lost[k] = super().pop(k)
+				lost[k] = self.db.pop(k) if self.db else super().pop(k)
 		else:
 			object.__setattr__(self, "soonest", inf)
 		return self
 
 	def __getitem__(self, k):
-		if self.db is None:
-			return super().__getitem__(k)
-		return self.db.__getitem__(k)
+		if self.db is not None:
+			try:
+				return self.db.__getitem__(k)
+			except KeyError:
+				pass
+		return super().__getitem__(k)
 
 	def __setitem__(self, k, v):
 		if self.db is None:
@@ -4666,7 +4669,7 @@ class Cache(cdict):
 		else:
 			if isinstance(resp, CacheItem):
 				return await resp.value
-		self[k] = CacheItem(fut)
+		super().__setitem__(k, CacheItem(fut))
 		return await fut
 
 

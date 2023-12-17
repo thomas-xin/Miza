@@ -233,7 +233,7 @@ class Translate(Command):
 		except:
 			print_exc()
 			out = ""
-		if any(s in out for s in bot.STOPS):
+		if bot.decensor.search(out):
 			out = ""
 		if not out:
 			print("Instruct translate: Empty response, retrying...")
@@ -2679,27 +2679,23 @@ class Ask(Command):
 							redo = True
 							continue
 						if premium >= 2:
-							tl = text.lower()
 							redo = False
-							for s in bot.STOPS:
-								if s in tl:
-									i = tl.index(s)
-									if "." in text[:i]:
-										text = text[:i].rsplit(".", 1)[0] + "."
-										a = await tcount(text)
-										if a < 64:
-											text = ""
-									else:
+							match = bot.decensor.search(text)
+							if match:
+								i = match.start()
+								if "." in text[:i]:
+									text = text[:i].rsplit(".", 1)[0] + "."
+									a = await tcount(text)
+									if a < 64:
 										text = ""
-									redo = True
-									if model == "gpt-4-vision-preview":
-										target_model = "gpt4"
-										vis_allowed = False
-									else:
-										target_model = DEFMOD
-									break
 								else:
-									continue
+									text = ""
+								redo = True
+								if model == "gpt-4-vision-preview":
+									target_model = "gpt4"
+									vis_allowed = False
+								else:
+									target_model = DEFMOD
 							if redo:
 								continue
 						text = text.strip()
@@ -2738,23 +2734,23 @@ class Ask(Command):
 						text += " "
 					text += response.choices[0].text
 					if premium >= 2:
-						tl = text.lower()
 						redo = False
-						for s in bot.STOPS:
-							if s in tl:
-								i = tl.index(s)
-								if "." in text[:i]:
-									text = text[:i].rsplit(".", 1)[0] + "."
-									a = await tcount(text)
-									if a < 64:
-										text = ""
-								else:
+						match = bot.decensor.search(text)
+						if match:
+							i = match.start()
+							if "." in text[:i]:
+								text = text[:i].rsplit(".", 1)[0] + "."
+								a = await tcount(text)
+								if a < 64:
 									text = ""
-								redo = True
-								target_model = DEFMOD
-								break
 							else:
-								continue
+								text = ""
+							redo = True
+							if model == "gpt-4-vision-preview":
+								target_model = "gpt4"
+								vis_allowed = False
+							else:
+								target_model = DEFMOD
 						if redo:
 							continue
 				elif model in TOGETHER and AUTH.get("together_key") and not bot.together_sem.full:

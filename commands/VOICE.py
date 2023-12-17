@@ -2625,7 +2625,7 @@ class AudioDownloader:
 				live = not entry.get("duration") or entry["duration"] > 960
 			seekable = not entry.get("duration") or entry["duration"] < inf
 			cf = isnan(entry.get("duration") or nan) or not (stream.startswith("https://cf-hls-media.sndcdn.com/") or is_youtube_stream(stream))
-			if asap > 1 and not f.proc and live and entry.get("duration", 0) > 960:
+			if asap > 1 and not f.proc and live and 960 < entry.get("duration", 0) < 4200:
 				esubmit(f.load, check_fmt=cf, webpage_url=entry["url"], live=False, seekable=seekable, duration=entry.get("duration"), asap=False)
 			try:
 				f.load(stream, check_fmt=cf, webpage_url=entry["url"], live=live, seekable=seekable, duration=entry.get("duration"), asap=asap)
