@@ -2471,6 +2471,7 @@ class Ask(Command):
 					for n, fc in enumerate(tuple(tc)):
 						if n >= 8:
 							break
+						popping = True
 						tid = fc.id[:6] + str(n)
 						while tid in ucid:
 							tid += "0"
@@ -2526,6 +2527,7 @@ class Ask(Command):
 							fut = process_image("BOT.browse", "$", [argv], cap="browse", timeout=60)
 							res, tid = await rag(f"b${argv}", name, tid, fut)
 							if res:
+								popping = False
 								skipping = 0
 								length = await count_to(messages)
 								print("New prompt:", messages)
@@ -2539,6 +2541,7 @@ class Ask(Command):
 							fut = solve_into(argv)
 							res, tid = await rag(f"s${argv}", name, tid, fut)
 							if res:
+								popping = False
 								blocked.add("sympy")
 								skipping = 0
 								length = await count_to(messages)
@@ -2551,6 +2554,7 @@ class Ask(Command):
 							fut = process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60)
 							res, tid = await rag(f"w${argv}", name, tid, fut)
 							if res:
+								popping = False
 								blocked.add("wolfram_alpha")
 								skipping = 0
 								length = await count_to(messages)
@@ -2589,6 +2593,7 @@ class Ask(Command):
 							res, tid = await rag(name, name, tid, fut)
 							blocked.add("myinfo")
 							if res:
+								popping = False
 								skipping = 0
 								length = await count_to(messages)
 								print("New prompt:", messages)
@@ -2620,7 +2625,8 @@ class Ask(Command):
 								call = {"func": args["mode"], "argv": int(args["value"])}
 						elif name not in Functions:
 							raise ValueError("OpenAI API returned invalid or inactive function call.")
-						tc.pop(n)
+						if popping:
+							tc.pop(n)
 						if not call:
 							continue
 						fname = call["func"]
