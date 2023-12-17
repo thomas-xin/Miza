@@ -4,6 +4,8 @@ import os, sys, subprocess, time, math, random, concurrent.futures, urllib.reque
 if os.name == "nt":
 	os.system("color")
 
+print = lambda *args, sep=" ", end="\n": sys.__stdout__.buffer.write((sep.join(map(str, args)) + end).encode("utf-8"))
+
 from traceback import print_exc
 from math import *
 from concurrent.futures import thread

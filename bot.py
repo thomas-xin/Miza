@@ -693,7 +693,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				users[u.id] = u
 			return users.values()
 		u_id = verify_id(args.pop(0))
-		if type(u_id) is int:
+		if type(u_id) is int and guild:
 			role = guild.get_role(u_id)
 			if role is not None:
 				if roles:
@@ -725,7 +725,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				try:
 					user = await self.fetch_user(u_id)
 				except discord.NotFound:
-					if "webhooks" in self.data:
+					if guild and "webhooks" in self.data:
 						for channel in guild.text_channels:
 							webhooks = await self.data.webhooks.get(channel)
 							try:
@@ -807,7 +807,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			with suppress(TypeError, ValueError):
 				u_id = int(u_id)
 		member = None
-		if type(u_id) is int:
+		if type(u_id) is int and guild:
 			member = guild.get_member(u_id)
 		if member is None:
 			if type(u_id) is int:
@@ -816,7 +816,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						member = await self.fetch_member(u_id, guild)
 					else:
 						member = await self.fetch_user(u_id)
-			if member is None:
+			if member is None and guild:
 				if allow_banned:
 					members = await self.get_full_members(guild)
 				else:
@@ -1564,11 +1564,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		resp = reqs.next().get(url, stream=True)
 		head = fcdict(resp.headers)
 		try:
-			return [t.strip() for t in head.get("Content-Type", "").split(";")]
+			return tuple(t.strip() for t in head.get("Content-Type", "").split(";"))
 		except KeyError:
 			it = resp.iter_content(65536)
 			data = next(it)
-			return [t.strip() for t in self.mime.from_buffer(data).split(";")]
+			return tuple(t.strip() for t in self.mime.from_buffer(data).split(";"))
 
 	emoji_stuff = {}
 	def is_animated(self, e, verify=False):
@@ -1977,6 +1977,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			),
 			best=3 if best else 1,
 		)
+		resp = resp.strip()
+		if resp and resp[0] == resp[-1] == '"':
+			try:
+				resp = str(literal_eval(resp)).strip()
+			except SyntaxError:
+				pass
 		print("Recaption response:", resp)
 		return resp
 
@@ -2011,13 +2017,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		try:
 			async with asyncio.timeout(35):
 				response = await self.oai.chat.completions.create(**data, timeout=30)
+			out = response.choices[0].message.content.strip()
+			if any(s in out for s in self.STOPS):
+				raise ValueError("Censored response.")
 		except:
 			print_exc()
 			return await asubmit(self.neva, url)
-		out = response.choices[0].message.content.strip()
 		print("GPT4V:", out)
-		if any(s in out for s in self.STOPS):
-			raise ValueError("Censored response.")
 		return out
 
 	ibv_sem = Semaphore(600, 256, rate_limit=60)
@@ -3084,7 +3090,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						try:
 							return orjson.loads(f)
 						except:
-							return ast.literal_eval(f)
+							return literal_eval(f)
 		except (ValueError, TypeError, SyntaxError):
 			r = await self.solve_math(f, 128, 0, variables=self.consts)
 		x = r[0]
@@ -4260,6 +4266,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							if args is None:
 								argv2 = single_space(argv.replace("\n", " ").replace("\t", " "))
 								args = smart_split(argv2)
+							# print(command, args, getattr(command, "flags", None), flags)
 							if args and getattr(command, "flags", None):
 								if not ("a" in flags or "e" in flags or "d" in flags):
 									if "a" in command.flags and "e" in command.flags and "d" in command.flags:

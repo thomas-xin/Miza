@@ -114,8 +114,8 @@ class Translate(Command):
 		spl = text.split()
 		if engine != "google" and len(spl) < 2 and (spl[0].isascii() or len(spl[0]) <= 1):
 			engine = "google"
-		elif engine == "chatgpt" and len(dests) <= 1:
-			engine = "mixtral"
+		# elif engine == "chatgpt" and len(dests) <= 1:
+		# 	engine = "mixtral"
 		print("TEST:", engine, spl, dests)
 		if engine == "google" and not googletrans:
 			raise RuntimeError("Unable to load Google Translate.")
@@ -251,7 +251,7 @@ class Translate(Command):
 		out = out.strip()
 		if out and out[0] == out[-1] == '"' and not text[0] == text[-1] == '"':
 			try:
-				out = str(literal_eval(out))
+				out = str(literal_eval(out)).strip()
 			except SyntaxError:
 				pass
 		lines = [line2 for line in out.split("•") if (line2 := line.strip())]

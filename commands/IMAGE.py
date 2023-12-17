@@ -1526,7 +1526,7 @@ class Art(Command):
 		nprompt = ""
 		kwargs = {
 			"--device": "GPU",
-			"--num-inference-steps": "38" if premium < 4 else "48",
+			"--num-inference-steps": "38" if premium < 4 else "44",
 			"--guidance-scale": "7",
 			"--eta": "0.8",
 			"--aspect-ratio": "0",
@@ -1713,7 +1713,7 @@ class Art(Command):
 					out = ""
 				if out and out[0] == out[-1] == '"' and not oprompt[0] == oprompt[-1] == '"':
 					try:
-						out = str(literal_eval(out))
+						out = str(literal_eval(out)).strip()
 					except SyntaxError:
 						pass
 				out = regexp(r"^(?: [Pp]lease)?(?: [Gg]enerate| [Cc]reate)?(?: [Aa]n image (?:of|with|containing))? ").sub("", " " + regexp(r"[Tt]hank you[.!]$").sub("", out.strip().replace("txt2img", "art").removeprefix("art").removeprefix(":"))).strip(' \t\n,`"')
@@ -2048,9 +2048,9 @@ class Art(Command):
 				fn = await ffut
 			files.append(CompatFile(fn, filename=prompt + ".png", description=prompt))
 		if premium >= 2 and freebies is not None:
-			bot.data.users[user.id].setdefault("freebies", []).append(utc())
+			bot.data.users[user.id].setdefault("freebies", []).extend((utc() - 1, utc()))
 			rem = freelim - len(freebies)
-			if not emb and rem in (27, 9, 3, 1):
+			if not emb and rem in (27, 26, 9, 8, 3, 2, 1):
 				emb = discord.Embed(colour=rand_colour())
 				emb.set_author(**get_author(bot.user))
 				emb.description = f"{rem}/{freelim} premium commands remaining today (free commands will be used after).\nIf you're able to contribute towards [funding my API]({bot.kofi_url}) hosting costs it would mean the world to us, and ensure that I can continue providing up-to-date tools and entertainment.\nEvery little bit helps due to the size of my audience, and you will receive access to unlimited and various improved commands as thanks!"

@@ -61,7 +61,7 @@ class Help(Command):
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, bot, argv, user, message, original=None, **void):
+	async def __call__(self, bot, args, user, message, original=None, **void):
 		bot = self.bot
 		guild = message.guild
 		channel = message.channel
@@ -70,7 +70,7 @@ class Help(Command):
 			prefix += " "
 		embed = discord.Embed()
 		embed.set_author(name="❓ Help ❓", icon_url=best_url(user), url=bot.webserver)
-		argv = full_prune(argv).replace("*", "").replace("_", "").replace("||", "")
+		argv = full_prune("".join(args)).replace("*", "").replace("_", "").replace("||", "")
 		comm = None
 		if argv in bot.categories:
 			catg = argv
@@ -2355,7 +2355,7 @@ class UpdateUsers(Database):
 								elif isinstance(rl, collections.abc.Sequence):
 									rl = rl[not bot.is_trusted(getattr(guild, "id", 0))]
 									rl /= pm
-								remaining += rl
+								# remaining += rl
 								burst = ceil(pm + 2)
 								rlv = ceil(rl * burst)
 								sem = command.used.get(u_id)

@@ -611,8 +611,9 @@ def bytes2zip(data, lzma=False):
 
 
 # Safer than raw eval, more powerful than json.loads
+eval_json = lambda s: copy.deepcopy(_eval_json(s))
 @functools.lru_cache(maxsize=2)
-def eval_json(s):
+def _eval_json(s):
 	if type(s) is memoryview:
 		s = bytes(s)
 	try:
@@ -4488,8 +4489,10 @@ def tzparse(expr):
 	return utc_dft(s)
 
 
+smart_split = lambda s: _smart_split(s).copy()
+
 @functools.lru_cache(maxsize=64)
-def smart_split(s):
+def _smart_split(s):
 	s = s.replace("#", "\uffff")
 	try:
 		t = shlex.shlex(s)

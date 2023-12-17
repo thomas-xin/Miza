@@ -2227,7 +2227,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			except KeyError:
 				ib = CBOTS[None] = imagebot.Bot()
 			return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=2, aspect_ratio=aspect_ratio, negative_prompt=negative_prompt)
-		model = "zavychromaxl_v21.safetensors"
+		model = "zavychromaxl_v30.safetensors"
 		PORT = 7800 + DEV
 		webui_server_url = f"http://127.0.0.1:{PORT}"
 		try:
@@ -2244,13 +2244,17 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			fut = WEBUIS[model] = concurrent.futures.Future()
 			webui_dir = cachedir + "/stable-diffusion-webui"
 			if not os.path.exists(webui_dir) or not os.listdir(webui_dir):
+				if kwargs:
+					raise RuntimeError("Model is loading, please wait...")
 				args = ["git", "clone", "https://github.com/AUTOMATIC1111/stable-diffusion-webui.git"]
 				print(args)
 				subprocess.run(args, cwd=cachedir)
 			model_dir = webui_dir + "/models/Stable-diffusion"
 			target_model = model_dir + "/" + model
 			if not os.path.exists(target_model) or not os.path.getsize(target_model):
-				args = [sys.executable, "misc/downloader.py", "https://civitai.com/api/download/models/169740?type=Model&format=SafeTensor&size=full&fp=fp16", target_model]
+				if kwargs:
+					raise RuntimeError("Model is loading, please wait...")
+				args = [sys.executable, "misc/downloader.py", "https://civitai.com/api/download/models/252831?type=Model&format=SafeTensor&size=full&fp=fp16", target_model]
 				print(args)
 				subprocess.run(args)
 			if not kwargs:
@@ -2316,7 +2320,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			width=w,
 			height=h,
 			cfg_scale=float(kwargs.get("--guidance-scale", 7)),
-			sampler_name="DPM++ 2M Karras",
+			sampler_name="DPM++ 3M SDE Exponential",
 			n_iter=1,
 			batch_size=count,
 			enable_hr=True,
@@ -2325,8 +2329,8 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			hr_resize_x=round(w * r),
 			hr_resize_y=round(h * r),
 			denoising_strength=float(kwargs.get("--strength", 0.6)),
-			refiner_checkpoint=model,
-			refiner_switch_at=0.75,
+			# refiner_checkpoint=model,
+			# refiner_switch_at=0.75,
 		)
 		if im:
 			bi = io.BytesIO()

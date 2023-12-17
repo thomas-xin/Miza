@@ -1328,6 +1328,7 @@ class Server:
 			f = open(out, "rb")
 			return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
 		if b or inference in (None, "None", "none", "null", ""):
+			cp.response.status = 204
 			return b""
 		self.ecdc_running[out] = Future()
 		try:

@@ -10,8 +10,8 @@ class Purge(Command):
 	_timeout_ = 16
 	name = ["🗑", "Del", "Delete", "Purge_Range"]
 	min_level = 3
-	description = "Deletes a number of messages from a certain user in current channel."
-	usage = "<1:user>? <0:count[1]>? <ignore(-i)>? <range(-r)>?"
+	description = "Deletes a number or range of messages from a certain user in current channel."
+	usage = "<1:user>? <range(-r)> <0:count/slice[1]>? <ignore_restrictions(-i)>??"
 	example = ("purge @Miza 3", "purge 50", "purge_range 1038565892185222287 1128125804136579235")
 	flags = "fiaehr"
 	rate_limit = (7, 12)
@@ -3000,15 +3000,15 @@ class UpdateStarboards(Database):
 		sem = self.sems.setdefault(message.guild.id, Semaphore(1, inf))
 		async with sem:
 			try:
-				reacts = [str(r.emoji) for r in sorted(message.reactions, key=lambda r: -r.count)]
+				reacts = sorted(message.reactions, key=lambda r: -r.count)
 				if not reacts:
 					return
-				react = reacts[0]
+				react = str(reacts[0].emoji)
 				channel = await self.bot.fetch_channel(table[react][1])
 				m = await self.bot.fetch_message(table[None][message.id], channel)
 				embed = await self.bot.as_embed(message, link=True, colour=True)
 				text, link = embed.description.rsplit("\n\n", 1)
-				description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in reacts if str(r) in table) + "   " + link
+				description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in reacts if str(r.emoji) in table) + "   " + link
 				embed.description = lim_str(description, 4096)
 				await m.edit(content=None, embed=embed)
 			except (discord.NotFound, discord.Forbidden):
