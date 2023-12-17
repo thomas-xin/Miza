@@ -816,8 +816,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						member = await self.fetch_member(u_id, guild)
 					else:
 						member = await self.fetch_user(u_id)
-			if member is None and guild:
-				if allow_banned:
+			if member is None:
+				if not guild:
+					u_id = full_prune(str(u_id))
+					members = [u for u in bot.cache.users if full_prune(u.name) == u_id or getattr(u, "global_name", None) and full_prune(u.global_name) == u_id]
+				elif allow_banned:
 					members = await self.get_full_members(guild)
 				else:
 					members = guild.members

@@ -2560,9 +2560,13 @@ class Ask(Command):
 							resend = True
 						elif name == "myinfo":
 							async def myinfo(argv):
+								u2 = None
 								if argv.strip("-"):
-									u2 = await bot.fetch_user_member(argv, guild)
-								else:
+									if not guild and getattr(channel, "recipient", None):
+										u2 = await bot.query_members([channel.recipient, bot.user], argv)
+									else:
+										u2 = await bot.fetch_user_member(argv, guild)
+								if not u2:
 									u2 = bot
 								if u2.id == bot.id:
 									per = bot.commands.personality[0].retrieve((channel or guild).id)
