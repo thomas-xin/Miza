@@ -193,65 +193,6 @@ class Help(Command):
 		await self.__call__(self.bot, as_str(reaction), user, message=message, original=message)
 
 
-# class Hello(Command):
-#     name = ["👋", "Hi", "Hi!", "Hewwo", "Herro", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
-#     description = "Sends a greeting message. Useful for checking whether the bot is online."
-#     usage = "<user>?"
-#     example = ("hello",)
-#     rate_limit = (1, 2)
-#     slash = True
-
-#     async def __call__(self, bot, user, name, argv, guild, **void):
-#         if "dailies" in bot.data:
-#             bot.data.dailies.progress_quests(user, "talk")
-#         if argv:
-#             try:
-#                 u = await bot.fetch_user_member(argv, guild)
-#             except:
-#                 u = None
-#             if u and u.id != bot.id:
-#                 user = u
-#         elif bot.is_owner(user):
-#             return "👋"
-#         if name in ("bye", "cya", "goodbye"):
-#             start = choice("Bye", "Cya", "Goodbye")
-#         else:
-#             if not argv and not xrand(5):
-#                 return choice(
-#                     f"Hi, {user}. I'm feeling a little lonely, so I appreciate you talking to me. 😊",
-#                     f"Hello? {get_random_emoji()}",
-#                     "Hi! " + choice(HEARTS),
-#                 )
-#             start = choice("Hi", "Hello", "Hey", "'sup")
-#         middle = choice(user.name, user.display_name)
-#         if name in ("bye", "cya", "goodbye"):
-#             end = choice(
-#                 "",
-#                 "See you soon!",
-#                 "See you around!",
-#                 "Have a good one!",
-#                 "Later!",
-#                 "Talk to you again sometime!",
-#                 "Was nice talking to you!",
-#                 "Peace!",
-#             )
-#         else:
-#             end = choice(
-#                 "",
-#                 "How are you?",
-#                 "Can I help you?",
-#                 "What can I do for you today?",
-#                 "Nice to see you!",
-#                 "Great to see you!",
-#                 "Always good to see you!",
-#                 "Do you need something?",
-#             )
-#         out = "👋 " + start + ", `" + middle + "`!"
-#         if end:
-#             out += " " + end
-#         return out
-
-
 class Perms(Command):
 	server_only = True
 	name = ["DefaultPerms", "ChangePerms", "Perm", "ChangePerm", "Permissions"]
@@ -526,6 +467,7 @@ class Avatar(Command):
 	multi = True
 	slash = True
 	ephemeral = True
+	exact = False
 
 	async def getGuildData(self, g):
 		# Gets icon display of a server and returns as an embed.
@@ -634,6 +576,7 @@ class Info(Command):
 	slash = True
 	ephemeral = True
 	usercmd = True
+	exact = False
 
 	async def getGuildData(self, g, flags={}):
 		bot = self.bot
@@ -940,6 +883,7 @@ class Profile(Command):
 	slash = True
 	ephemeral = True
 	usercmd = True
+	exact = False
 
 	async def __call__(self, user, args, argv, flags, channel, guild, bot, message, **void):
 		if message.attachments:
