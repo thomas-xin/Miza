@@ -1708,8 +1708,7 @@ class Art(Command):
 			print("REWRITE:", resp)
 			for choice in resp.choices:
 				out = choice.text.strip()
-				tl = out.lower()
-				if any(s in tl for s in bot.STOPS):
+				if bot.decensor.search(out):
 					out = ""
 				if out and out[0] == out[-1] == '"' and not oprompt[0] == oprompt[-1] == '"':
 					try:
