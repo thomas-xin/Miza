@@ -1859,25 +1859,41 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			pass
 		if not torch or best is None:
 			return ("File", url.rsplit("/", 1)[-1].split("?", 1)[0])
+		resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True)
+		if resp.headers.get("Content-Type", "").split("/", 1)[0] not in ("image", "video"):
+			with tracebacksuppressor:
+				text = await Request(
+					url,
+					decode=True,
+					aio=True,
+					ssl=False,
+				)
+				p1 = lim_str(text, 128)
+				if p1:
+					prompts.append(p1)
+					return ("Data", p1)
+		with resp:
+			d = await asubmit(getattr, resp, "content")
+		resp = await process_image(d, "resize_max", ["-nogif", 1024 if best else 512, False, "auto", "-f", "png"], timeout=10)
 		futs = []
 		if best:
 			fut = create_task(self.gpt4v(url))
 			futs.append(fut)
-		# fut = asubmit(self.neva, url)
+		# fut = asubmit(self.neva, resp)
 		# futs.append(fut)
 		if AUTH.get("fireworks_key"):
-			fut = asubmit(self.llava, url)
+			fut = asubmit(self.llava, resp)
 			futs.insert(-1, fut)
 		elif AUTH.get("replicate_key"):
 			if not self.ibv_fut.done():
 				timeout = max(12, timeout / 2)
-			fut = asubmit(self.ibv, url)
+			fut = asubmit(self.ibv, resp)
 			futs.append(fut)
 		prompts = []
 		if not best:
 			res = None
 			try:
-				res = await process_image(url, "caption", ["-nogif", True], cap="caption", timeout=timeout)
+				res = await process_image(resp, "caption", ["-nogif", True], cap="caption", timeout=timeout)
 				p1, p2 = res
 			except:
 				if res:
@@ -1946,9 +1962,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		resp = await self.instruct(
 			dict(
 				prompt=prompt,
-				temperature=0.5,
+				temperature=0.6,
 				top_p=0.9,
-				max_tokens=256,
+				max_tokens=384,
 			),
 			best=3 if best else 1,
 		)
@@ -1963,16 +1979,20 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	caption_prompt = "Please describe this image in detail; be descriptive but concise!"
 	async def gpt4v(self, url, best=False):
-		resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True)
-		if resp.headers.get("Content-Type") in ("image/png", "image/gif", "image/jpeg", "image/webp") and float(resp.headers.get("Content-Length", inf)) < 20 * 1e6:
-			data_url = url
-			resp.close()
+		if isinstance(url, str):
+			resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True)
+			if resp.headers.get("Content-Type") in ("image/png", "image/gif", "image/jpeg", "image/webp") and float(resp.headers.get("Content-Length", inf)) < 20 * 1e6:
+				data_url = url
+				resp.close()
+			else:
+				d = await asubmit(getattr, resp, "content")
+				resp.close()
+				b = await process_image(d, "resize_max", [1024 if best else 512, False, "auto", "-oz"], timeout=30)
+				mime = magic.from_buffer(b)
+				data_url = "data:" + mime + ";base64," + base64.b64encode(b).decode("ascii")
 		else:
-			d = await asubmit(getattr, resp, "content")
-			resp.close()
-			b = await process_image(d, "resize_max", ["-nogif", 1024 if best else 512, False, "auto", "-f", "png"], timeout=10)
-			mime = magic.from_buffer(b)
-			data_url = "data:" + mime + ";base64," + base64.b64encode(b).decode("ascii")
+			mime = magic.from_buffer(url)
+			data_url = "data:" + mime + ";base64," + base64.b64encode(url).decode("ascii")
 		messages = [
 			cdict(role="user", content=[
 				cdict(type="text", text=self.caption_prompt),
@@ -2022,7 +2042,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	replicate_client = None
 	@functools.lru_cache(maxsize=64)
 	def _ibv(self, url):
-		resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
+		if isinstance(url, str):
+			resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
+		else:
+			resp = url
 		if not self.replicate_client:
 			import replicate
 			self.replicate_client = replicate.Client(api_token=AUTH["replicate_key"])
@@ -2041,7 +2064,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	@functools.lru_cache(maxsize=64)
 	def llava(self, url):
-		b = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
+		if isinstance(url, str):
+			b = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
+		else:
+			b = url
 		mime = magic.from_buffer(b)
 		data_url = "data:" + mime + ";base64," + base64.b64encode(b).decode("ascii")
 		messages = [
@@ -2073,7 +2099,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	@functools.lru_cache(maxsize=64)
 	def neva(self, url):
-		resp = await_fut(process_image(url, "resize_max", ["-nogif", 256, False, "auto", "-f", "png"], timeout=10))
+		if isinstance(url, str):
+			resp = await_fut(process_image(url, "resize_max", ["-nogif", 256, False, "auto", "-f", "png"], timeout=10))
+		else:
+			resp = url
 		i = "data:image/png;base64," + base64.b64encode(resp).decode("ascii")
 		resp = requests.post(
 			"https://api.ngc.nvidia.com/v2/predict/models/nvidia/neva-22b",

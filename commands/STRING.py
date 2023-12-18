@@ -1704,7 +1704,7 @@ async def cut_to(messages, limit=1024, exclude_first=True):
 	i = -1
 	for i, m in reversed(tuple(enumerate(messages))):
 		c = await tcount(m_repr(m))
-		if c + count > limit / 5:
+		if c + count > limit / 5 and not m.get("tool_calls"):
 			break
 		mes.append(m)
 		count += c
@@ -2418,7 +2418,9 @@ class Ask(Command):
 							num = regexp(r"-?[0-9]+").findall(resp)
 							if num and num[0]:
 								num = int(num[0]) - 1
-								if num > 0 and num < len(ufull) - 1:
+								if num <= 1:
+									pass
+								elif num < len(ufull) - 1:
 									skipping = num
 									used = [ufull[0]] + ufull[skipping - 1:]
 									length = await count_to(used)

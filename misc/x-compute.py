@@ -2437,7 +2437,7 @@ def write_video(proc, data):
 	except:
 		print(traceback.format_exc(), end="")
 
-def from_bytes(b, save=None, nogif=False):
+def from_bytes(b, save=None, nogif=False, maxframes=inf):
 	if b[:4] == b"<svg" or b[:5] == b"<?xml":
 		import wand, wand.image
 		with wand.image.Image() as im:
@@ -2491,7 +2491,7 @@ def from_bytes(b, save=None, nogif=False):
 			cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate,duration", "-of", "csv=s=x:p=0", fn)
 			print(cmd)
 			p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-			cmd2 = ["ffmpeg", "-hide_banner", "-v", "error", "-y"]
+			cmd2 = ["ffmpeg", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y"]
 			if nogif:
 				cmd2.extend(("-to", "1"))
 			cmd2 += ["-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0"]
@@ -2528,7 +2528,14 @@ def from_bytes(b, save=None, nogif=False):
 			bcount = 4 if fmt == "rgba" else 3
 			bcount *= int(np.prod(size))
 			bytecount = bcount * dur * fps
-			if not nogif and bytecount > 32 * 1073741824:
+			if fps * dur > maxframes:
+				proc.terminate()
+				fps = maxframes / dur
+				framedur = 1000 / fps
+				cmd3 = ["ffmpeg", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps}", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
+				print(cmd3)
+				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
+			elif not nogif and bytecount > 32 * 1073741824:
 				proc.terminate()
 				scale = sqrt((32 * 1073741824) / bytecount)
 				fps = max(8, fps * scale)
@@ -2707,7 +2714,7 @@ if Image:
 				return getattr(self._images[self._position], key)
 
 
-def get_image(url, out=None, nodel=False, nogif=False):
+def get_image(url, out=None, nodel=False, nogif=False, maxframes=inf):
 	if isinstance(url, Image.Image):
 		return url
 	out = out or url
@@ -2727,7 +2734,7 @@ def get_image(url, out=None, nodel=False, nogif=False):
 				data = get_request(url)
 			if len(data) > 8589934592:
 				raise OverflowError("Max file size to load is 8GB.")
-			image = from_bytes(data, save, nogif=nogif)
+			image = from_bytes(data, save, nogif=nogif, maxframes=maxframes)
 			# CACHE[url] = image
 		else:
 			if os.path.getsize(url) > 8589934592:
@@ -2739,11 +2746,11 @@ def get_image(url, out=None, nodel=False, nogif=False):
 			# 		os.remove(url)
 			# 	except:
 			# 		pass
-			image = from_bytes(data, save, nogif=nogif)
+			image = from_bytes(data, save, nogif=nogif, maxframes=maxframes)
 	else:
 		if len(url) > 8589934592:
 			raise OverflowError("Max file size to load is 8GB.")
-		image = from_bytes(url)
+		image = from_bytes(url, maxframes=maxframes)
 	return image
 
 
@@ -2754,6 +2761,7 @@ def evalImg(url, operation, args):
 	out = "cache/" + str(ts) + ".png"
 	fmt = "default"
 	dur = None
+	maxframes = inf
 	if len(args) > 1 and args[-2] == "-f":
 		fmt = args.pop(-1)
 		args.pop(-1)
@@ -2761,6 +2769,10 @@ def evalImg(url, operation, args):
 		dur = args.pop(-1) * 1000
 		args.pop(-1)
 	if args and args[-1] == "-o":
+		opt = True
+		args.pop(-1)
+	elif args and args[-1] == "-oz":
+		maxframes = 5
 		opt = True
 		args.pop(-1)
 	else:
@@ -2779,7 +2791,7 @@ def evalImg(url, operation, args):
 				nodel = args.pop(-1)
 			else:
 				nodel = False
-			image = get_image(url, out, nodel=nodel, nogif=nogif)
+			image = get_image(url, out, nodel=nodel, nogif=nogif, maxframes=maxframes)
 		# print("AOPER:", image, args)
 		# -gif is a special case where the output is always an animated format (gif, mp4, mkv etc)
 		if args and args[-1] == "-gif":
@@ -2830,6 +2842,8 @@ def evalImg(url, operation, args):
 					step = f / 4999
 				elif f // step > 1000 and fpl > 20:
 					step = f / 999
+				if f // step > maxframes:
+					step = f / maxframes
 				new["count"] = int(f // step)
 				print("ImageOPIterator:", image, step, fps, fpl, f)
 				new["frames"] = ImageOpIterator(image, step, operation=operation, ts=ts, args=args)
