@@ -1944,7 +1944,7 @@ class Ask(Command):
 					except:
 						print_exc()
 						found = self.visited[url] = ""
-				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
+				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None or is_audio(found[0]) is not None):
 					content = found = found[0]
 				else:
 					content = found = ""
@@ -1969,7 +1969,7 @@ class Ask(Command):
 					except:
 						print_exc()
 						found = self.visited[url] = ""
-				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
+				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None or is_audio(found[0]) is not None):
 					found = found[0]
 				else:
 					found = ""

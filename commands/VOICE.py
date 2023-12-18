@@ -5692,12 +5692,13 @@ class Transcribe(Command):
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
-		if max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1) < 2:
+	async def __call__(self, bot, channel, guild, message, argv, flags, user, **void):
+		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
+		if premium < 2:
 			raise PermissionError(f"Sorry, this feature is currently for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
 		for a in message.attachments:
 			argv = a.url + " " + argv
-		dest = "English"
+		dest = None
 		# Attempt to download items in queue if no search query provided
 		if not argv:
 			try:
@@ -5733,7 +5734,7 @@ class Transcribe(Command):
 				name = None
 			if not simulated:
 				m = await message.reply(
-					ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
+					ini_md(f"Downloading and transcribing {sqr_md(ensure_url(url))}..."),
 				)
 			else:
 				m = None
@@ -5742,49 +5743,18 @@ class Transcribe(Command):
 			if not name or not url:
 				raise FileNotFoundError(500, argv)
 			url = unyt(url)
-			fn, out = await asubmit(ytdl.download_file, entries[0].get("stream") or entries[0].url, fmt="weba")
-			fni = fn#.rsplit(".", 1)[0] + ".webm"
-			if bot.is_trusted(guild) >= 2:
-				for uid in bot.data.trusted[guild.id]:
-					if uid and bot.premium_level(uid, absolute=True) >= 2:
-						break
-				else:
-					uid = next(iter(bot.data.trusted[guild.id]))
-				u = await bot.fetch_user(uid)
-			else:
-				u = user
-			data = bot.data.users.get(u.id, {})
-			oai = data.get("trial") and data.get("openai_key") or AUTH.get("openai_key")
-			bals = {k: v for k, v in bot.data.token_balances.items() if v < 0}
-			if bals:
-				openai.api_key = uoai = sorted(bals, key=bals.get)[0]
-			else:
-				openai.api_key = uoai = oai
+			stream = entries[0].get("stream") or entries[0].url
+			text = await process_image("whisper", "$", [stream], cap="whisper", timeout=3600)
+		if dest:
 			if m:
 				create_task(m.edit(
-					content=css_md(f"Transcribing {fni}..."),
-					embed=None,
-				))
-			with open(fni, "rb") as f:
-				resp = await bot.oai.audio.translations.create(
-					model="whisper-1",
-					temperature=0,
-					file=f,
-				)
-			# resp.raise_for_status()
-		# text = resp.json()["text"].strip()
-		text = resp.text.strip()
-		tr = bot.commands.translate[0]
-		if not tr.equiv(dest, "English"):
-			if m:
-				create_task(m.edit(
-					content=css_md(f"Translating {fni}..."),
+					content=css_md(f"Translating {name}..."),
 					embed=None,
 				))
 				create_task(bot._state.http.send_typing(channel.id))
 			translated = {}
 			comments = {}
-			await tr.chatgpt_translate(bot, guild, channel, user, text, "English", [dest], translated, comments)
+			await bot.commands.translate[0].llm_translate(bot, guild, channel, user, text, "auto", [dest], translated, comments, engine="chatgpt" if premium > 1 else "mixtral")
 			text = "\n".join(translated.values()).strip()
 		emb = discord.Embed(description=text)
 		emb.title = name
@@ -5792,10 +5762,6 @@ class Transcribe(Command):
 		emb.set_author(**get_author(user))
 		if m:
 			create_task(bot.silent_delete(m, no_log=True))
-		# reference = getattr(m, "reference", None)
-		# if reference:
-		#     r_id = getattr(m, "message_id", None) or getattr(m, "id", None)
-		#     reference = bot.cache.messages.get(r_id)
 		bot.send_as_embeds(channel, text, author=get_author(user), reference=message)
 
 

@@ -1675,7 +1675,7 @@ async def send_with_react(channel, *args, reacts=None, reference=None, mention=F
 			sent = await channel.send(*args, **kwargs)
 		else:
 			sent = await discord.abc.Messageable.send(channel, *args, **kwargs)
-		if reacts:
+		if reacts and not getattr(sent, "ephemeral", False):
 			if len(reacts) > 5:
 				for react in reacts:
 					async with Delay(1):
@@ -2400,6 +2400,28 @@ def is_video(url):
 		url = url.casefold()
 		return VIDEO_FORMS.get(url)
 
+AUDIO_FORMS = {
+	".mp3": True,
+	".mp2": True,
+	".ogg": True,
+	".opus": True,
+	".wav": True,
+	".flac": True,
+	".m4a": True,
+	".aac": True,
+	".wma": True,
+	".vox": True,
+	".webm": False,
+	".mp4": False,
+}
+def is_audio(url):
+	if url:
+		url = url.split("?", 1)[0]
+		if "." in url:
+			url = url[url.rindex("."):]
+			url = url.casefold()
+			return AUDIO_FORMS.get(url)
+
 
 MIMES = cdict(
 	bin="application/octet-stream",
@@ -2811,6 +2833,7 @@ FIRST_LOAD = True
 # ecdc			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
 # summ			GPU >200k, VRAM >4GB			GTX970, M60, GTX1050ti, P4, GTX1630
 # sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
+# whisper		GPU >200k, VRAM >6GB			RTX2070, T4, RTX3060, A16, RTX4060
 # sdxl			GPU >400k, VRAM >9GB			GTX1080ti, RTX2080ti, RTX3060, RTX3080, A2000
 # sdxlr			GPU >400k, VRAM >19GB			V100, RTX3090, A5000, RTX4090, L4
 # exl2			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
@@ -2929,6 +2952,11 @@ def spec2cap():
 			caps.append("nvram")
 			done.append("sdxl")
 			v -= 9 * 1073741824
+		if c > 200000 and v > 6 * 1073741824:
+			if "whisper" not in done or c <= 600000:
+				caps.append("whisper")
+				done.append("whisper")
+				v -= 7 * 1073741824
 		if c > 200000 and v > 5 * 1073741824:
 			if "sd" not in done or c <= 600000:
 				caps.append("sd")

@@ -1860,20 +1860,24 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if not torch or best is None:
 			return ("File", url.rsplit("/", 1)[-1].split("?", 1)[0])
 		resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True)
-		if resp.headers.get("Content-Type", "").split("/", 1)[0] not in ("image", "video"):
-			with tracebacksuppressor:
-				text = await Request(
-					url,
-					decode=True,
-					aio=True,
-					ssl=False,
-				)
-				p1 = lim_str(text, 128)
-				if p1:
-					prompts.append(p1)
-					return ("Data", p1)
 		with resp:
 			d = await asubmit(getattr, resp, "content")
+		mime = resp.headers.get("Content-Type", "")
+		if mime.split("/", 1)[0] not in ("image", "video"):
+			if mime.split("/", 1)[0] == "audio":
+				with tracebacksuppressor:
+					p1 = await process_image("whisper", "$", [d], cap="whisper", timeout=3600)
+					if p1:
+						tup = ("Voice", p1, True)
+						self.analysed[h] = tup
+						while len(self.analysed) > 65536:
+							self.analysed.pop(next(iter(self.analysed)))
+						return self.analysed[h][:-1] if self.analysed.get(h) else None
+			with tracebacksuppressor:
+				text = as_str(d)
+				p1 = lim_str(text, 128)
+				if p1:
+					return ("Data", p1)
 		resp = await process_image(d, "resize_max", ["-nogif", 1024 if best else 512, False, "auto", "-f", "png"], timeout=10)
 		futs = []
 		if best:

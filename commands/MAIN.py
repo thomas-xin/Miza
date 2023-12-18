@@ -1146,7 +1146,7 @@ class Upload(Command):
 class Reminder(Command):
 	name = ["Announcement", "Announcements", "Announce", "RemindMe", "Reminders", "Remind"]
 	description = "Sets a reminder for a certain date and time."
-	usage = "<1:message>? <0:time>? <urgent(-u)>? <delete(-d)>?"
+	usage = "<1:message>? <0:time[30s]>? <urgent(-u)>? <delete(-d)>?"
 	flags = "aedurf"
 	example = ("remindme test in 3 hours 27 mins", "remind urgently submit ticket on 3 june 2023", "announce look at me! in 10 minutes", "remind every 8h take meds in 2d")
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -1162,7 +1162,9 @@ class Reminder(Command):
 		self.timefind = re.compile("(?:(?:(?:[0-9]+:)+[0-9.]+\\s*(?:am|pm)?|" + self.bot.num_words + "|[\\s\-+*\\/^%.,0-9]+\\s*(?:am|pm|s|m|h|d|w|y|century|centuries|millenium|millenia|(?:second|sec|minute|min|hour|hr|day|week|wk|month|mo|year|yr|decade|galactic[\\s\\-_]year)s?))\\s*)+$", re.I)
 
 	async def __call__(self, name, message, flags, bot, user, guild, perm, argv, args, comment="", **void):
-		if getattr(message, "slash", None) and args:
+		if len(args) <= 1:
+			msg = "".join(args) + " in 30s"
+		elif getattr(message, "slash", None) and args:
 			msg = "in " + args.pop(-1)
 			if args:
 				msg = " ".join(args) + " " + msg
@@ -1172,7 +1174,7 @@ class Reminder(Command):
 			msg = msg[msg.casefold().index(name) + len(name):]
 		except ValueError:
 			print_exc(msg)
-			msg = msg.casefold().split(None, 1)[-1]
+			# msg = msg.casefold().split(None, 1)[-1]
 		orig = argv
 		argv = msg.strip()
 		args = argv.split()

@@ -1560,6 +1560,109 @@ if "summ" in CAPS:
 		exc.submit(ensure_gc, 20)
 		return a.data
 
+if "whisper" in CAPS:
+	special_languages = {
+		"mandarin chinese": "chinese",
+		"cantonese chinese": "chinese",
+	}
+	usable_languages = {'english', 'chinese', 'german', 'spanish', 'russian', 'korean', 'french', 'japanese', 'portuguese', 'turkish', 'polish', 'catalan', 'dutch', 'arabic', 'swedish', 'italian', 'indonesian', 'hindi', 'finnish', 'vietnamese', 'hebrew', 'ukrainian', 'greek', 'malay', 'czech', 'romanian', 'danish', 'hungarian', 'tamil', 'norwegian', 'thai', 'urdu', 'croatian', 'bulgarian', 'lithuanian', 'latin', 'maori', 'malayalam', 'welsh', 'slovak', 'telugu', 'persian', 'latvian', 'bengali', 'serbian', 'azerbaijani', 'slovenian', 'kannada', 'estonian', 'macedonian', 'breton', 'basque', 'icelandic', 'armenian', 'nepali', 'mongolian', 'bosnian', 'kazakh', 'albanian', 'swahili', 'galician', 'marathi', 'punjabi', 'sinhala', 'khmer', 'shona', 'yoruba', 'somali', 'afrikaans', 'occitan', 'georgian', 'belarusian', 'tajik', 'sindhi', 'gujarati', 'amharic', 'yiddish', 'lao', 'uzbek', 'faroese', 'haitian creole', 'pashto', 'turkmen', 'nynorsk', 'maltese', 'sanskrit', 'luxembourgish', 'myanmar', 'tibetan', 'tagalog', 'malagasy', 'assamese', 'tatar', 'hawaiian', 'lingala', 'hausa', 'bashkir', 'javanese', 'sundanese', 'burmese', 'valencian', 'flemish', 'haitian', 'letzeburgesch', 'pushto', 'panjabi', 'moldavian', 'moldovan', 'sinhalese', 'castilian'}
+	common_languages = {"english", "mandarin chinese", "hindi", "spanish", "french", "arabic", "bengali", "portuguese", "russian", "urdu", "indonesian", "german", "japanese", "telugu", "turkish", "tamil", "vietnamese", "korean", "persian", "javanese", "italian", "thai"}
+
+	import torch
+	from transformers import AutoFeatureExtractor, WhisperProcessor, WhisperForConditionalGeneration, AutoModelForAudioClassification
+	w_extractor = AutoFeatureExtractor.from_pretrained("sanchit-gandhi/whisper-medium-fleurs-lang-id", return_attention_mask=True)
+	w_classifier = AutoModelForAudioClassification.from_pretrained("sanchit-gandhi/whisper-medium-fleurs-lang-id", torch_dtype=torch.float16).to(0)
+	print("CLASSIFIER:", w_classifier)
+	w_processor = WhisperProcessor.from_pretrained("openai/whisper-large-v2", torch_dtype=torch.float16)
+	w_model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-large-v2", torch_dtype=torch.float16).to(0)
+	print("MODEL:", w_model)
+
+	def pipe_to(p, f):
+		while True:
+			b = f.read(1048576)
+			if not b or not p.is_running():
+				p.stdin.close()
+				break
+			p.stdin.write(b)
+			p.stdin.flush()
+
+	def split_audio(f):
+		args = ["ffmpeg", "-hide_banner", "-v", "error", "-i", "-", "-vn", "-f", "s16le", "-ar", "16k", "-ac", "1", "-"]
+		print(args)
+		proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=1048576)
+		exc.submit(pipe_to, proc, f)
+		buf = []
+		emptied = 0
+		n = 0
+		while True:
+			b = proc.stdout.read(16000 // 2)
+			if not b:
+				break
+			a = np.frombuffer(b, dtype=np.int16)
+			x = a.astype(np.float32)
+			x *= 1 / 32768
+			rms = np.sqrt(x.dot(x) / x.size)
+			if rms < len(buf) / 256:
+				if buf:
+					if emptied > 3:
+						buf.append(a)
+						temp = np.concatenate(buf)
+						buf.clear()
+						yield temp
+						emptied = 0
+						n += 1
+						continue
+					emptied += 1
+			buf.append(a)
+		if buf:
+			yield np.concatenate(buf)
+
+	def lang_id(audio):
+		floats = torch.from_numpy(audio).to(torch.float16)
+		floats *= 1 / 32768
+		extracted_features = w_extractor(floats, sampling_rate=16000, return_tensors="pt").input_features
+		classes = w_classifier(extracted_features.to(w_classifier.dtype).to(w_classifier.device))
+		logits = classes.logits
+		for lang in common_languages:
+			lid = int(w_classifier.config.label2id[" ".join(s.capitalize() for s in lang.split())])
+			logits[:, lid] *= 2
+			logits[:, lid] += 0.5
+		predicted_class_ids = torch.argmax(logits, dim=-1).item()
+		language = w_classifier.config.id2label[predicted_class_ids].lower()
+		language = special_languages.get(language, language)
+		if language not in usable_languages:
+			language = "english"
+		return language
+
+	def whisper(url):
+		if isinstance(url, str):
+			f = requests.get(url, headers=header(), stream=True, verify=False, timeout=12).raw
+		else:
+			f = io.BytesIO(url)
+		out = []
+		with torch.no_grad():
+			for audio in split_audio(f):
+				language = lang_id(audio)
+				input_features = w_processor(audio, sampling_rate=16000, return_tensors="pt").input_features
+				forced_decoder_ids = w_processor.get_decoder_prompt_ids(task="transcribe", language=language)
+				predicted_ids = w_model.generate(input_features.to(w_model.dtype).to(w_model.device), forced_decoder_ids=forced_decoder_ids)
+				resp = w_processor.batch_decode(predicted_ids, skip_special_tokens=True)
+				out.extend(resp)
+			if not out:
+				return ""
+		s = "".join(out)
+		while True:
+			m = re.search(r"(.+?)\1{4,}?", s)
+			if not m:
+				break
+			sub = m.group(1)
+			r2 = r"(" + re.escape(sub) + r"){4,}"
+			s2 = re.sub(r2, lambda s: s.group(1) * 3, s)
+			if s2 == s:
+				break
+			s = s2
+		return s.strip()
+
 if "math" in CAPS:
 	x_math = __import__("x-math")
 
