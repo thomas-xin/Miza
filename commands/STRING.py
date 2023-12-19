@@ -106,7 +106,7 @@ class Translate(Command):
 			src2 = src.casefold()
 
 		odest = tuple(dests)
-		dests = [d for d in dests if not self.equiv(d, src2)]
+		dests = [d for d in dests if not self.equiv(d, src2)] or [dests[0]]
 		# if len(odest) != len(dests):
 		#     translated[-1] = text
 		#     odest = (src2,) + tuple(dests)
@@ -159,7 +159,7 @@ class Translate(Command):
 		try:
 			ftlangdetect = await asubmit(__import__, "ftlangdetect.detect")
 		except ImportError:
-			return
+			return cdict(src="auto", score=0, dest="en")
 		resp = await asubmit(ftlangdetect.detect, s, low_memory=psutil.virtual_memory().total < 14 * 1073741824)
 		return cdict(src=resp["lang"], score=resp["score"], dest="en")
 
@@ -1998,7 +1998,7 @@ class Ask(Command):
 					content = ""
 			else:
 				content = ""
-			mfut = create_task(scan_msg(i, m, content, simulated))
+			mfut = csubmit(scan_msg(i, m, content, simulated))
 			mfuts.append(mfut)
 		print("VISITING:", len(mfuts))
 		for i, mfut in enumerate(mfuts):
@@ -2013,7 +2013,7 @@ class Ask(Command):
 					best = premium >= 4
 				else:
 					best = False if premium >= 4 else None
-				cfut = create_task(bot.caption(found, best=best))
+				cfut = csubmit(bot.caption(found, best=best))
 				visconts.append((i, m, content, found, cfut))
 			else:
 				visconts.append((i, m, content, found, None))
@@ -2054,7 +2054,7 @@ class Ask(Command):
 				continue
 			t = (name, content)
 			if str(m.id) not in mapd and m.id != message.id:
-				fut = create_task(register_embedding(m.id, name, content))
+				fut = csubmit(register_embedding(m.id, name, content))
 				efuts.append(fut)
 			history.append((name, content, *imin))
 		for fut in efuts:
@@ -2077,7 +2077,7 @@ class Ask(Command):
 			print(f"{name}:", q)
 		nsfw = bot.is_nsfw(channel)
 		if q and not nsfw and xrand(2):
-			modfut = create_task(bot.moderate(q))
+			modfut = csubmit(bot.moderate(q))
 		else:
 			modfut = None
 		personality = bot.commands.personality[0].retrieve((channel or guild).id)
@@ -2200,7 +2200,7 @@ class Ask(Command):
 				blocked.update(("audio", "astate", "askip", "play"))
 			# if model not in chatcc:
 			# 	blocked.add("roleplay")
-			fut = create_task(cut_to(messages, 6000 if premium >= 3 else 4000))
+			fut = csubmit(cut_to(messages, 6000 if premium >= 3 else 4000))
 			tool_choice = "auto"
 			if extensions:
 				mocked = {}
@@ -2913,7 +2913,7 @@ class Ask(Command):
 			ms = split_across(s, prefix=code)
 			s = ms[-1] if ms else code
 			for t in ms[:-1]:
-				create_task(send_with_react(channel, t, reference=ref))
+				csubmit(send_with_react(channel, t, reference=ref))
 				ref = None
 				await asyncio.sleep(0.25)
 			mresp = await send_with_react(channel, s, embed=emb, reacts=reacts, reference=ref)
@@ -2972,10 +2972,10 @@ class Ask(Command):
 	async def remove_reacts(self, message):
 		guild = message.guild
 		if guild and guild.me and guild.me.permissions_in(message.channel).manage_messages:
-			create_task(message.clear_reaction("🔄"))
+			csubmit(message.clear_reaction("🔄"))
 			await message.clear_reaction("🗑️")
 		else:
-			create_task(message.remove_reaction("🔄", self.bot.user))
+			csubmit(message.remove_reaction("🔄", self.bot.user))
 			await message.remove_reaction("🗑️", self.bot.user)
 
 	async def _callback_(self, bot, message, reaction=3, user=None, perm=0, vals="", **void):
@@ -3011,8 +3011,8 @@ class Ask(Command):
 			colour = await bot.get_colour(bot.user)
 			emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
 			emb.set_author(**get_author(bot.user))
-			create_task(message.edit(embed=emb))
-			create_task(self.remove_reacts(message))
+			csubmit(message.edit(embed=emb))
+			csubmit(self.remove_reacts(message))
 			await message.add_reaction("❎")
 			if m and m.id != message.id:
 				await bot.process_message(m)
@@ -3030,8 +3030,8 @@ class Ask(Command):
 			colour = await bot.get_colour(bot.user)
 			emb = discord.Embed(colour=colour, description=css_md("[The conversation has been reset.]"))
 			emb.set_author(**get_author(bot.user))
-			create_task(message.edit(embed=emb))
-			create_task(self.remove_reacts(message))
+			csubmit(message.edit(embed=emb))
+			csubmit(self.remove_reacts(message))
 			await message.add_reaction("❎")
 			return
 
@@ -3066,8 +3066,8 @@ class UpdateChatHistories(Database):
 		colour = await bot.get_colour(bot.user)
 		emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
 		emb.set_author(**get_author(bot.user))
-		create_task(message.edit(embed=emb))
-		create_task(self.bot.commands.ask[0].remove_reacts(message))
+		csubmit(message.edit(embed=emb))
+		csubmit(self.bot.commands.ask[0].remove_reacts(message))
 		await message.add_reaction("❎")
 
 	async def _delete_(self, message, **void):
@@ -3097,8 +3097,8 @@ class UpdateChatHistories(Database):
 		colour = await bot.get_colour(bot.user)
 		emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
 		emb.set_author(**get_author(bot.user))
-		create_task(message.edit(embed=emb))
-		create_task(self.bot.commands.ask[0].remove_reacts(message))
+		csubmit(message.edit(embed=emb))
+		csubmit(self.bot.commands.ask[0].remove_reacts(message))
 		await message.add_reaction("❎")
 
 class UpdateChatMappings(Database):
@@ -3209,7 +3209,7 @@ class Instruct(Command):
 		ms = split_across(resp, 1999, prefix="\xad")
 		s = ms[-1] if ms else "\xad"
 		for t in ms[:-1]:
-			create_task(send_with_react(channel, t, reference=ref))
+			csubmit(send_with_react(channel, t, reference=ref))
 			ref = None
 			await asyncio.sleep(0.25)
 		return await send_with_react(channel, s, reference=ref)
@@ -3287,7 +3287,7 @@ class Topic(Command):
 	flags = "npr"
 
 	def __call__(self, bot, user, flags, channel, **void):
-		create_task(bot.seen(user, event="misc", raw="Talking to me"))
+		csubmit(bot.seen(user, event="misc", raw="Talking to me"))
 		if "r" in flags:
 			return "\u200b" + choice(bot.data.users.rquestions)
 		elif "p" in flags:
@@ -3306,7 +3306,7 @@ class Fact(Command):
 	description = "Provides a random fact."
 
 	async def __call__(self, bot, user, **void):
-		create_task(bot.seen(user, event="misc", raw="Talking to me"))
+		csubmit(bot.seen(user, event="misc", raw="Talking to me"))
 		fact = await bot.data.flavour.get(p=False, q=False)
 		return "\u200b" + fact
 

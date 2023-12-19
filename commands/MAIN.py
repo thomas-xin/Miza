@@ -168,7 +168,7 @@ class Help(Command):
 				await interaction_patch(bot, original, embed=embed, buttons=buttons)
 			else:
 				if getattr(message, "slash", None):
-					create_task(bot.ignore_interaction, message)
+					csubmit(bot.ignore_interaction, message)
 				await Request(
 					f"https://discord.com/api/{api}/channels/{original.channel.id}/messages/{original.id}",
 					data=dict(
@@ -433,7 +433,7 @@ class Loop(Command):
 				):
 					raise PermissionError("Loops must not be nested.")
 		func2 = func2.split(None, 1)[-1]
-		create_task(send_with_react(
+		csubmit(send_with_react(
 			channel,
 			italics(css_md(f"Looping {sqr_md(func)} {iters} time{'s' if iters != 1 else ''}...")),
 			reacts=["❎"],
@@ -1062,12 +1062,12 @@ class Status(Command):
 				if message is None:
 					message = await aretry(channel.fetch_message, m_id, attempts=6, delay=2, exc=(discord.NotFound, discord.Forbidden))
 					if utc() - snowflake_time_2(message.id).timestamp() > 86400 * 14 - 60:
-						create_task(bot.silent_delete(message))
+						csubmit(bot.silent_delete(message))
 						raise StopIteration
 				if message.id != channel.last_message_id or getattr(message, "rated", False):
 					async for m in bot.data.channel_cache.grab(channel):
 						if message.id != m.id or utc() - snowflake_time_2(m.id).timestamp() > 86400 * 14 - 60 or getattr(m, "rated", False):
-							create_task(bot.silent_delete(m))
+							csubmit(bot.silent_delete(m))
 							raise StopIteration
 						break
 				func = lambda *args, **kwargs: message.edit(*args, content=None, **kwargs)
@@ -1510,7 +1510,7 @@ class Reminder(Command):
 		more = len(rems) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -1621,7 +1621,7 @@ class Note(Command):
 		more = len(curr) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -1634,7 +1634,7 @@ class UpdateUrgentReminders(Database):
 			self.data["listed"]
 		except KeyError:
 			self.data["listed"] = alist()
-		create_task(self.update_urgents())
+		csubmit(self.update_urgents())
 
 	async def update_urgents(self):
 		while True:
@@ -1674,7 +1674,7 @@ class UpdateUrgentReminders(Database):
 								async for u in react.users():
 									if u.id != self.bot.id:
 										raise StopIteration
-						fut = create_task(channel.send(embed=emb))
+						fut = csubmit(channel.send(embed=emb))
 						await self.bot.silent_delete(message)
 						message = await fut
 						await message.add_reaction("✅")
@@ -1755,7 +1755,7 @@ class UpdateReminders(Database):
 			if not x.get("recur"):
 				self.bot.send_embeds(ch, emb)
 			else:
-				create_task(self.recurrent_message(ch, emb, x.get("recur", 60)))
+				csubmit(self.recurrent_message(ch, emb, x.get("recur", 60)))
 
 	# Seen event: runs when users perform discord actions
 	async def _seen_(self, user, **void):
@@ -1783,7 +1783,7 @@ class UpdateReminders(Database):
 							if not x.get("recur"):
 								self.bot.send_embeds(ch, emb)
 							else:
-								create_task(self.recurrent_message(ch, emb, x.get("recur", 60)))
+								csubmit(self.recurrent_message(ch, emb, x.get("recur", 60)))
 							pops.add(len(rems) - i)
 						elif is_finite(x["t"]):
 							break
@@ -1837,7 +1837,7 @@ class UpdateMessages(Database):
 						for m_id, v in data.items():
 							if t - v.t >= 4:
 								v.t = t
-								create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_, channel=channel, m_id=m_id, colour=col))
+								csubmit(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_, channel=channel, m_id=m_id, colour=col))
 
 	async def _destroy_(self, **void):
 		self.closed = True
@@ -2147,15 +2147,15 @@ class UpdateUsers(Database):
 		if message.id % 1000 == 0:
 			self.add_diamonds(user, points)
 			points *= 1000
-			# create_task(message.add_reaction("✨"))
+			# csubmit(message.add_reaction("✨"))
 			if self.bot.data.enabled.get(message.channel.id, True):
-				create_task(self.react_sparkle(message))
+				csubmit(self.react_sparkle(message))
 			print(f"{user} has triggered the rare message bonus in {message.guild}!")
 		else:
 			self.add_gold(user, points)
 		self.add_xp(user, points)
 		if "dailies" in self.bot.data:
-			create_task(self.bot.data.dailies.valid_message(message))
+			csubmit(self.bot.data.dailies.valid_message(message))
 
 	async def _mention_(self, user, message, msg, **void):
 		bot = self.bot
@@ -2169,7 +2169,7 @@ class UpdateUsers(Database):
 		elif len(mentions) >= 2 and self.data.get(user.id, EMPTY).get("last_mention", 0) > 0 and random.random() >= 0.75:
 			out = "One mention is enough, but I appreciate your enthusiasm 🙂"
 		if out:
-			create_task(send_with_react(message.channel, out, reacts="❎", reference=message))
+			csubmit(send_with_react(message.channel, out, reacts="❎", reference=message))
 			await bot.seen(user, event="misc", raw="Being naughty")
 			add_dict(self.data, {user.id: {"last_mention": 1}})
 			self.data[user.id]["last_used"] = t
@@ -2263,7 +2263,7 @@ class UpdateUsers(Database):
 			if not isnan(perm) and "blacklist" in self.bot.data:
 				gid = bot.data.blacklist.get(0)
 				if gid and gid != getattr(guild, "id", None):
-					create_task(send_with_react(
+					csubmit(send_with_react(
 						channel,
 						"I am currently under maintenance, please stay tuned!",
 						reacts="❎",
@@ -2275,7 +2275,7 @@ class UpdateUsers(Database):
 			count = self.data.get(user.id, EMPTY).get("last_talk", 0)
 			# Simulates a randomized conversation
 			if count < 5:
-				create_task(message.add_reaction("👀"))
+				csubmit(message.add_reaction("👀"))
 			if "ask" in bot.commands and ("string" in bot.get_enabled(channel) or not perm < inf):
 				argv = message.clean_content.strip()
 				me = guild.me if guild else bot

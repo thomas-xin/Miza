@@ -337,6 +337,15 @@ if "image" in CAPS:
 			return im.resize((s,) * 2, resample=Resampling.NEAREST)
 		return im
 
+	def gen_bg(size):
+		rb = np.zeros(size[::-1], dtype=np.uint8)
+		rb[::2, ::2] = 255
+		rb[1::2, 1::2] = 255
+		r = b = fromarray(rb)
+		g = Image.new("L", size)
+		a = Image.new("L", size, color=255)
+		return Image.merge("RGBA", (r, g, b, a))
+
 	def rgb_split(image, dtype=np.uint8, force=False):
 		channels = None
 		if not force and "RGB" not in str(image.mode):
@@ -1565,6 +1574,9 @@ if "whisper" in CAPS:
 		"mandarin chinese": "chinese",
 		"cantonese chinese": "chinese",
 	}
+	special_unmap = {
+		"chinese": "mandarin chinese",
+	}
 	usable_languages = {'english', 'chinese', 'german', 'spanish', 'russian', 'korean', 'french', 'japanese', 'portuguese', 'turkish', 'polish', 'catalan', 'dutch', 'arabic', 'swedish', 'italian', 'indonesian', 'hindi', 'finnish', 'vietnamese', 'hebrew', 'ukrainian', 'greek', 'malay', 'czech', 'romanian', 'danish', 'hungarian', 'tamil', 'norwegian', 'thai', 'urdu', 'croatian', 'bulgarian', 'lithuanian', 'latin', 'maori', 'malayalam', 'welsh', 'slovak', 'telugu', 'persian', 'latvian', 'bengali', 'serbian', 'azerbaijani', 'slovenian', 'kannada', 'estonian', 'macedonian', 'breton', 'basque', 'icelandic', 'armenian', 'nepali', 'mongolian', 'bosnian', 'kazakh', 'albanian', 'swahili', 'galician', 'marathi', 'punjabi', 'sinhala', 'khmer', 'shona', 'yoruba', 'somali', 'afrikaans', 'occitan', 'georgian', 'belarusian', 'tajik', 'sindhi', 'gujarati', 'amharic', 'yiddish', 'lao', 'uzbek', 'faroese', 'haitian creole', 'pashto', 'turkmen', 'nynorsk', 'maltese', 'sanskrit', 'luxembourgish', 'myanmar', 'tibetan', 'tagalog', 'malagasy', 'assamese', 'tatar', 'hawaiian', 'lingala', 'hausa', 'bashkir', 'javanese', 'sundanese', 'burmese', 'valencian', 'flemish', 'haitian', 'letzeburgesch', 'pushto', 'panjabi', 'moldavian', 'moldovan', 'sinhalese', 'castilian'}
 	common_languages = {"english", "mandarin chinese", "hindi", "spanish", "french", "arabic", "bengali", "portuguese", "russian", "urdu", "indonesian", "german", "japanese", "telugu", "turkish", "tamil", "vietnamese", "korean", "persian", "javanese", "italian", "thai"}
 
@@ -1613,11 +1625,12 @@ if "whisper" in CAPS:
 						n += 1
 						continue
 					emptied += 1
-			buf.append(a)
+			if rms > 1 / 1024:
+				buf.append(a)
 		if buf:
 			yield np.concatenate(buf)
 
-	def lang_id(audio):
+	def lang_id(audio, favoured=None):
 		floats = torch.from_numpy(audio).to(torch.float16)
 		floats *= 1 / 32768
 		extracted_features = w_extractor(floats, sampling_rate=16000, return_tensors="pt").input_features
@@ -1626,6 +1639,9 @@ if "whisper" in CAPS:
 		for lang in common_languages:
 			lid = int(w_classifier.config.label2id[" ".join(s.capitalize() for s in lang.split())])
 			logits[:, lid] *= 2
+		if favoured:
+			lang = special_unmap.get(favoured, favoured)
+			lid = int(w_classifier.config.label2id[" ".join(s.capitalize() for s in lang.split())])
 			logits[:, lid] += 0.5
 		predicted_class_ids = torch.argmax(logits, dim=-1).item()
 		language = w_classifier.config.id2label[predicted_class_ids].lower()
@@ -1634,18 +1650,20 @@ if "whisper" in CAPS:
 			language = "english"
 		return language
 
-	def whisper(url):
+	def whisper(url, prompt=""):
 		if isinstance(url, str):
 			f = requests.get(url, headers=header(), stream=True, verify=False, timeout=12).raw
 		else:
 			f = io.BytesIO(url)
+		prompt_ids = w_processor.get_prompt_ids(prompt)
+		language = None
 		out = []
 		with torch.no_grad():
 			for audio in split_audio(f):
-				language = lang_id(audio)
+				language = lang_id(audio, favoured=language)
 				input_features = w_processor(audio, sampling_rate=16000, return_tensors="pt").input_features
 				forced_decoder_ids = w_processor.get_decoder_prompt_ids(task="transcribe", language=language)
-				predicted_ids = w_model.generate(input_features.to(w_model.dtype).to(w_model.device), forced_decoder_ids=forced_decoder_ids)
+				predicted_ids = w_model.generate(input_features.to(w_model.dtype).to(w_model.device), forced_decoder_ids=forced_decoder_ids, prompt_ids=prompt_ids)
 				resp = w_processor.batch_decode(predicted_ids, skip_special_tokens=True)
 				out.extend(resp)
 			if not out:
@@ -2880,6 +2898,11 @@ def evalImg(url, operation, args):
 		args.pop(-1)
 	else:
 		opt = False
+	if args and args[-1] == "-bg":
+		bg = True
+		args.pop(-1)
+	else:
+		bg = False
 	if operation != "$":
 		# print("IOPER:", operation, args)
 		if args and args[0] == "-nogif":
@@ -3120,6 +3143,10 @@ def evalImg(url, operation, args):
 						frame = frame.resize(size)
 					if frame.mode != mode:
 						frame = frame.convert(mode)
+					if bg and "A" in mode:
+						i2 = gen_bg(size)
+						i3 = Image.alpha_composite(i2, frame)
+						frame = i3.convert("RGB")
 					if fmt == "zip":
 						if frame.entropy() > 8:
 							frame.save(b, format="webp", lossless=False, quality=67)
@@ -3192,6 +3219,10 @@ def evalImg(url, operation, args):
 			new = next(iter(new["frames"]))
 	if Image and isinstance(new, Image.Image):
 		new = optimise(new, keep_rgb=False)
+		if bg and "A" in new.mode:
+			i2 = gen_bg(new.size)
+			i3 = Image.alpha_composite(i2, new)
+			new = i3.convert("RGB")
 		if new.entropy() > 8 and fmt in ("default", "webp"):
 			# out = "cache/" + str(ts) + ".webp"
 			out = io.BytesIO()

@@ -304,7 +304,7 @@ class CustomAudio(collections.abc.Hashable):
 				bot.data.audio.players[guild.id] = self
 				self.stats.update(bot.data.audiosettings.get(guild.id, {}))
 			self.timeout = utc()
-			return create_task(self.connect_to(channel))
+			return csubmit(self.connect_to(channel))
 
 	def __str__(self):
 		classname = str(self.__class__).replace("'>", "")
@@ -448,6 +448,18 @@ class CustomAudio(collections.abc.Hashable):
 		else:
 			self.stop()
 
+	@property
+	def listening(self):
+		return self.acsi.listening
+
+	@tracebacksuppressor
+	def listen(self):
+		self.acsi.listen()
+
+	@tracebacksuppressor
+	def deafen(self):
+		self.acsi.deafen()
+
 	@tracebacksuppressor
 	def enqueue(self, source):
 		self.next = source
@@ -474,7 +486,7 @@ class CustomAudio(collections.abc.Hashable):
 		else:
 			f = None
 		if aio or is_main_thread():
-			return create_task(send_with_react(self.text, *args, file=f, reacts="❎", **kwargs))
+			return csubmit(send_with_react(self.text, *args, file=f, reacts="❎", **kwargs))
 		with self.announcer:
 			return await_fut(send_with_react(self.text, *args, file=f, reacts="❎", **kwargs))
 
@@ -483,13 +495,13 @@ class CustomAudio(collections.abc.Hashable):
 		if self.acsi:
 			with tracebacksuppressor(AttributeError):
 				self.acsi.kill()
-		fut = create_task(self.bot.audio.asubmit(f"players.pop({self.guild.id},None)"))
+		fut = csubmit(self.bot.audio.asubmit(f"players.pop({self.guild.id},None)"))
 		if wait:
 			await_fut(fut)
 			while self.guild.me.voice:
 				await_fut(self.guild.change_voice_state(channel=None))
 		elif self.guild.me and self.guild.me.voice:
-			create_task(self.guild.change_voice_state(channel=None))
+			csubmit(self.guild.change_voice_state(channel=None))
 		popped = self.bot.data.audio.players.pop(self.guild.id, None)
 		self.vc = None
 		print("POPPED:", popped)
@@ -516,7 +528,7 @@ class CustomAudio(collections.abc.Hashable):
 		if getattr(self, "player", None) is not None and self.stats.speed and not self.paused:
 			if t - self.player.get("time", 0) >= 0:
 				self.player.time = t + 20
-				create_task(bot.commands.player[0]._callback_(self.player.get("message"), guild, self.text, 0, self.bot, inf))
+				csubmit(bot.commands.player[0]._callback_(self.player.get("message"), guild, self.text, 0, self.bot, inf))
 		if self.stats.stay:
 			cnt = inf
 		else:
@@ -1224,6 +1236,7 @@ class AudioClientSubInterface:
 		if channel:
 			self.channel = channel
 			self.guild = channel.guild
+		self.listening = False
 
 	async def start(self):
 		if self.channel:
@@ -1285,7 +1298,7 @@ class AudioClientSubInterface:
 		return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}])")
 
 	def connect(self, reconnect=True, timeout=60):
-		return create_task(self.bot.audio.asubmit(f"!await AP.from_guild({self.guild.id}).connect(reconnect={reconnect},timeout={timeout})"))
+		return csubmit(self.bot.audio.asubmit(f"!await AP.from_guild({self.guild.id}).connect(reconnect={reconnect},timeout={timeout})"))
 
 	async def disconnect(self, force=False):
 		await self.bot.audio.asubmit(f"!await AP.from_guild({self.guild.id}).disconnect(force={force})")
@@ -1297,6 +1310,18 @@ class AudioClientSubInterface:
 			return await self.disconnect(force=True)
 		await self.bot.audio.asubmit(f"!await AP.from_guild({self.guild.id}).move_to(client.get_channel({channel.id}))")
 		self.channel = channel
+
+	async def listen(self):
+		if self.listening:
+			return
+		self.listening = True
+		await self.bot.audio.asubmit(f"!AP.from_guild({self.guild.id}).listen()")
+
+	async def deafen(self):
+		if not self.listening:
+			return
+		self.listening = False
+		await self.bot.audio.asubmit(f"!AP.from_guild({self.guild.id}).deafen()")
 
 	def is_connected(self):
 		try:
@@ -3450,7 +3475,7 @@ class Queue(Command):
 			auds.channel = channel
 			future = None
 		except KeyError:
-			future = create_task(auto_join(guild, channel, user, bot, preparing=True))
+			future = csubmit(auto_join(guild, channel, user, bot, preparing=True))
 		if name == "playnext":
 			if not isinstance(flags, dict):
 				flags = dict.fromkeys(flags, True)
@@ -3698,7 +3723,7 @@ class Queue(Command):
 		more = len(q) - i
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -3830,14 +3855,14 @@ class Playlist(Command):
 		more = len(pl) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
 
 class Connect(Command):
 	server_only = True
-	name = ["📲", "🎤", "🎵", "🎶", "📴", "📛", "Summon", "J", "Join", "DC", "Disconnect", "Leave", "Yeet", "Move", "Reconnect"]
+	name = ["📲", "🎤", "🎵", "🎶", "📴", "📛", "Summon", "J", "Join", "DC", "Disconnect", "Leave", "Yeet", "Move", "Reconnect", "Listen", "Deafen"]
 	# Because Rythm also has this alias :P
 	alias = name + ["FuckOff"]
 	description = "Summons the bot into a voice channel, or advises it to leave."
@@ -3952,10 +3977,16 @@ class Connect(Command):
 				if member.voice.suppress or member.voice.requested_to_speak_at:
 					auds.speak()
 			elif member.voice.deaf or member.voice.mute or member.voice.afk:
-				create_task(member.edit(mute=False))
+				csubmit(member.edit(mute=False))
+		if name == "listen":
+			auds.listen()
+			return css_md(f"🎵 Connected and listening to {sqr_md(vc_)} in {sqr_md(guild)}! 🎵"), 1
+		if name == "deafen":
+			auds.deafen()
+			return css_md(f"🎵 No longer listening in {sqr_md(guild)}. 🎵"), 1
 		if joining:
 			# Send update event to bot audio database upon joining
-			create_task(bot.data.audio(guild=guild))
+			csubmit(bot.data.audio(guild=guild))
 			return css_md(f"🎵 Successfully connected to {sqr_md(vc_)} in {sqr_md(guild)}. 🎵"), 1
 
 
@@ -4190,7 +4221,7 @@ class Dump(Command):
 				x = "x" in flags
 				resp, fn = await asubmit(auds.get_dump, x, paused=x, js=True, timeout=18)
 				f = CompatFile(resp, filename=fn)
-			create_task(bot.send_with_file(channel, f"Queue data for {bold(str(guild))}:", f, reference=message))
+			csubmit(bot.send_with_file(channel, f"Queue data for {bold(str(guild))}:", f, reference=message))
 			return
 		if not is_alone(auds, user) and perm < 1:
 			raise self.perm_error(perm, 1, "to load new queue while other users are in voice")
@@ -4618,7 +4649,7 @@ class UnmuteAll(Command):
 			for user in vc.members:
 				if user.voice is not None:
 					if user.voice.deaf or user.voice.mute or user.voice.afk:
-						create_task(user.edit(mute=False, deafen=False))
+						csubmit(user.edit(mute=False, deafen=False))
 		if "h" not in flags:
 			return italics(css_md(f"Successfully unmuted all users in voice channels in {sqr_md(guild)}.")), 1
 
@@ -5085,7 +5116,7 @@ class Player(Command):
 				emoji = reaction.encode("utf-8")
 			if emoji in self.buttons:
 				if hasattr(message, "int_token"):
-					create_task(bot.ignore_interaction(message))
+					csubmit(bot.ignore_interaction(message))
 				i = self.buttons[emoji]
 				if i == 0:
 					await asubmit(auds.pause, unpause=True)
@@ -5483,7 +5514,7 @@ class Download(Command):
 					for fut in futs:
 						f, out = await wrap_future(fut)
 						z.write(f, arcname=f.rsplit("/", 1)[-1])
-				create_task(bot.send_with_file(
+				csubmit(bot.send_with_file(
 					channel=channel,
 					msg="",
 					file=fn,
@@ -5513,7 +5544,7 @@ class Download(Command):
 					silenceremove=b,
 					message=message,
 				)
-				create_task(bot.send_with_file(
+				csubmit(bot.send_with_file(
 					channel=channel,
 					msg="",
 					file=f,
@@ -5633,7 +5664,7 @@ class Download(Command):
 						#         aio=True,
 						#     )
 					if len(data) <= 1:
-						create_task(message.edit(
+						csubmit(message.edit(
 							content=ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
 							embed=None,
 						))
@@ -5656,11 +5687,11 @@ class Download(Command):
 						message=message.reference.cached_message if message.reference else None,
 					)
 				if not simulated:
-					create_task(message.edit(
+					csubmit(message.edit(
 						content=css_md(f"Uploading {sqr_md(out)}..."),
 						embed=None,
 					))
-					create_task(bot._state.http.send_typing(channel.id))
+					csubmit(bot._state.http.send_typing(channel.id))
 			reference = getattr(message, "reference", None)
 			if reference:
 				r_id = getattr(reference, "message_id", None) or getattr(reference, "id", None)
@@ -5677,7 +5708,7 @@ class Download(Command):
 				with suppress():
 					os.remove(f)
 			if not simulated:
-				create_task(bot.silent_delete(message, no_log=True))
+				csubmit(bot.silent_delete(message, no_log=True))
 
 
 class Transcribe(Command):
@@ -5747,11 +5778,11 @@ class Transcribe(Command):
 			text = await process_image("whisper", "$", [stream], cap="whisper", timeout=3600)
 		if dest:
 			if m:
-				create_task(m.edit(
+				csubmit(m.edit(
 					content=css_md(f"Translating {name}..."),
 					embed=None,
 				))
-				create_task(bot._state.http.send_typing(channel.id))
+				csubmit(bot._state.http.send_typing(channel.id))
 			translated = {}
 			comments = {}
 			await bot.commands.translate[0].llm_translate(bot, guild, channel, user, text, "auto", [dest], translated, comments, engine="chatgpt" if premium > 1 else "mixtral")
@@ -5761,7 +5792,7 @@ class Transcribe(Command):
 		emb.colour = await bot.get_colour(user)
 		emb.set_author(**get_author(user))
 		if m:
-			create_task(bot.silent_delete(m, no_log=True))
+			csubmit(bot.silent_delete(m, no_log=True))
 		bot.send_as_embeds(channel, text, author=get_author(user), reference=message)
 
 
@@ -5850,9 +5881,9 @@ class UpdateAudio(Database):
 		async with self._semaphore:
 			# Ensure all voice clients are not muted, disconnect ones without matching audio players
 			if guild is not None:
-				create_task(self.update_vc(guild))
+				csubmit(self.update_vc(guild))
 			else:
-				[create_task(self.update_vc(g)) for g in bot.cache.guilds.values()]
+				[csubmit(self.update_vc(g)) for g in bot.cache.guilds.values()]
 		# Update audio players
 		if guild is not None:
 			if guild.id in self.players:
@@ -5866,7 +5897,7 @@ class UpdateAudio(Database):
 					with tracebacksuppressor(KeyError):
 						auds = self.players[g]
 						futs.append(asubmit(auds.update, priority=True))
-						futs.append(create_task(self.research(auds)))
+						futs.append(csubmit(self.research(auds)))
 						if auds.queue and not auds.paused and "dailies" in bot.data:
 							if auds.ts is not None and auds.acsi:
 								for member in auds.acsi.channel.members:
@@ -5921,7 +5952,7 @@ class UpdateAudio(Database):
 			if auds.queue and not auds.paused:
 				reason = "🎵 Temporarily disconnecting for maintenance"
 				if auds.queue:
-					reason += " (Queue saved; use ~load or ~play on this link to reload anytime)."
+					reason += " (Queue saved | use ~load or ~play on this link to reload anytime)."
 				else:
 					reason += "."
 				reason += " Apologies for any inconvenience! 🎵"
@@ -5973,7 +6004,7 @@ class UpdateAudio(Database):
 						loading = stats != CustomAudio.defaults
 					if loading:
 						print("Auto-loading queue of", len(argv["queue"]), "items to", guild)
-						create_task(dump(guild, channel, user, bot, perm, name, argv, flags, message, vc=vc, noannouncefirst=True))
+						csubmit(dump(guild, channel, user, bot, perm, name, argv, flags, message, vc=vc, noannouncefirst=True))
 		# self.data.clear()
 
 

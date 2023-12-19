@@ -311,7 +311,7 @@ class CS_hex2xml(Command):
 		)
 		b = output.encode("utf-8")
 		f = CompatFile(b, filename="patch.xml")
-		create_task(bot.send_with_file(channel, "Patch successfully converted!", f, reference=message))
+		csubmit(bot.send_with_file(channel, "Patch successfully converted!", f, reference=message))
 
 
 class CS_npc(Command):
@@ -785,7 +785,7 @@ class UpdateDeviantArt(Database):
 				if items:
 					total[folder] = items
 		for c_id in tuple(self.data):
-			create_task(self.processPart(total, c_id))
+			csubmit(self.processPart(total, c_id))
 		self.time = utc()
 
 

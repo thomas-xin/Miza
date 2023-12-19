@@ -90,7 +90,7 @@ class AutoEmoji(Command):
 		more = len(curr) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		create_task(message.edit(content=content, embed=emb))
+		csubmit(message.edit(content=content, embed=emb))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -314,7 +314,7 @@ class UpdateAutoEmojis(Database):
 		for a in message.attachments:
 			b = await self.bot.get_request(a.url, full=False)
 			files.append(CompatFile(seq(b), filename=a.filename))
-		create_task(self.bot.silent_delete(message))
+		csubmit(self.bot.silent_delete(message))
 		url = await self.bot.get_proxy_url(message.author)
 		m = await self.bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
 		if recursive and regex.search(m.content):
@@ -356,7 +356,7 @@ class UpdateAutoEmojis(Database):
 							await m.edit(embed=emb)
 							self.pop(m.channel.id)
 							self.bot.data.webhooks.temp.pop(m.channel.id, None)
-						# create_task(self.bot.silent_delete(m))
+						# csubmit(self.bot.silent_delete(m))
 						# m2 = await self.bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
 
 
@@ -453,7 +453,7 @@ class EmojiList(Command):
 					return
 				return f"({v})` {me}"
 
-			fut = create_task(check_emoji(k, v))
+			fut = csubmit(check_emoji(k, v))
 			fut.k = k
 			futs.append(fut)
 		for fut in futs:
@@ -486,7 +486,7 @@ class EmojiList(Command):
 		more = len(curr) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -814,7 +814,7 @@ class Mimic(Command):
 		more = len(mimics) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -881,7 +881,7 @@ class MimicSend(Command):
 				await wait_on_none(bot.send_as_webhook(channel, msg, username=name, avatar_url=url, tts=tts))
 				mimic.count += 1
 				mimic.total += len(msg)
-			create_task(message.add_reaction("👀"))
+			csubmit(message.add_reaction("👀"))
 
 
 class UpdateMimics(Database):
@@ -934,7 +934,7 @@ class UpdateMimics(Database):
 				if not sending:
 					return
 				guild = message.guild
-				create_task(bot.silent_delete(message))
+				csubmit(bot.silent_delete(message))
 				if guild and "logM" in bot.data and guild.id in bot.data.logM:
 					c_id = bot.data.logM[guild.id]
 					try:

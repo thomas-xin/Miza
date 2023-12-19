@@ -15,6 +15,8 @@ except ModuleNotFoundError:
 	exec(code, globals())
 
 
+# import pycord as discord
+
 tracebacksuppressor.fn = traceback.print_exc
 
 ADDRESS = AUTH.get("webserver_address") or "0.0.0.0"
@@ -104,7 +106,7 @@ async def communicate():
 			if not s:
 				break
 			if s.startswith(b"~"):
-				create_task(respond(s))
+				csubmit(respond(s))
 	send("Audio client successfully disconnected.")
 
 def is_strict_running(proc):
@@ -255,6 +257,7 @@ class AudioPlayer(discord.AudioSource):
 			return self
 
 	def __init__(self, guild=None):
+		self.listening = None
 		self.queue = deque(maxlen=2)
 		if guild:
 			self.vc = client.get_guild(verify_id(guild)).voice_client
@@ -308,7 +311,7 @@ class AudioPlayer(discord.AudioSource):
 				try:
 					self.vc.pause()
 				except:
-					pause
+					pass
 			self.silent = True
 			self.queue.clear()
 			return self.emptyopus * 3
@@ -394,11 +397,33 @@ class AudioPlayer(discord.AudioSource):
 		self.queue.clear()
 
 	def kill(self):
-		create_task(self.vc.disconnect(force=True))
+		csubmit(self.vc.disconnect(force=True))
 		self.clear()
 		players.pop(self.guild.id, None)
 		self.vc.dead = True
 		self.vc = None
+
+	def listen(self):
+		if self.recording:
+			self.deafen()
+		self.sink = discord.sinks.PCMSink()
+		self.start_recording(self.sink, async_nop)
+		self.csubmit(self.listener())
+
+	def deafen(self):
+		if self.listening and not self.listening.done():
+			self.listening.cancel()
+		self.stop_recording()
+
+	# Minimum 5 second recordings with 3s of silence at the end
+	async def listener(self):
+		while self.recording:
+			await asyncio.sleep(1)
+			b = self.sink.file.getbuffer()
+			print(len(b))
+			if len(b) > 48000 * 2 * 2:
+				pass
+
 
 	is_opus = lambda self: True
 	cleanup = lambda self: None
@@ -872,7 +897,7 @@ class BufferedAudioReader(discord.AudioSource):
 			fut = esubmit(next, self.packet_iter, b"")
 			try:
 				out = fut.result(timeout=0.8)
-			except concurent.futures.TimeoutError:
+			except concurrent.futures.TimeoutError:
 				with suppress():
 					force_kill(self.proc)
 				out = b""
@@ -948,7 +973,7 @@ class AudioClient(discord.Client):
 			guild_subscriptions=False,
 			intents=self.intents,
 		)
-		create_task(super()._async_setup_hook())
+		# csubmit(super()._async_setup_hook())
 		self._globals = globals()
 
 client = AudioClient()
@@ -999,9 +1024,9 @@ discord.gateway.DiscordWebSocket.identify = lambda self: mobile_identify(self)
 async def kill():
 	futs = deque()
 	with suppress(ConnectionResetError):
-		futs.append(create_task(client.change_presence(status=discord.Status.offline)))
+		futs.append(csubmit(client.change_presence(status=discord.Status.offline)))
 	for vc in client.voice_clients:
-		futs.append(create_task(vc.disconnect(force=True)))
+		futs.append(csubmit(vc.disconnect(force=True)))
 	for fut in futs:
 		await fut
 	sys.stdin.close()
@@ -1031,6 +1056,6 @@ if __name__ == "__main__":
 	send(f"Audio client starting with PID {pid} and parent PID {ppid}...")
 	proc = psutil.Process(pid)
 	parent = psutil.Process(ppid)
-	create_task(ensure_parent(proc, parent))
+	csubmit(ensure_parent(proc, parent))
 	discord.client._loop = eloop
 	eloop.run_until_complete(client.start(AUTH["discord_token"]))

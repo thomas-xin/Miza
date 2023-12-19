@@ -97,7 +97,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			allowed_mentions=self.allowed_mentions,
 			assume_unsync_clock=True,
 		)
-		create_task(super()._async_setup_hook())
+		# with suppress(AttributeError):
+		# 	create_task(super()._async_setup_hook())
 		self.cache_size = cache_size
 		# Base cache: contains all other caches
 		self.cache = fcdict((c, fdict()) for c in self.caches)
@@ -1866,7 +1867,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if mime.split("/", 1)[0] not in ("image", "video"):
 			if mime.split("/", 1)[0] == "audio":
 				with tracebacksuppressor:
-					p1 = await process_image("whisper", "$", [d], cap="whisper", timeout=3600)
+					p1 = await process_image("whisper", "$", [d, "Miza"], cap="whisper", timeout=3600)
 					if p1:
 						tup = ("Voice", p1, True)
 						self.analysed[h] = tup
@@ -1878,7 +1879,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				p1 = lim_str(text, 128)
 				if p1:
 					return ("Data", p1)
-		resp = await process_image(d, "resize_max", ["-nogif", 1024 if best else 512, False, "auto", "-f", "png"], timeout=10)
+		resp = await process_image(d, "resize_max", ["-nogif", 1024 if best else 512, False, "auto", "-f", "png", "-bg"], timeout=10)
 		futs = []
 		if best:
 			fut = create_task(self.gpt4v(url))
@@ -1991,7 +1992,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			else:
 				d = await asubmit(getattr, resp, "content")
 				resp.close()
-				b = await process_image(d, "resize_max", [1024 if best else 512, False, "auto", "-oz"], timeout=30)
+				b = await process_image(d, "resize_max", [1024 if best else 512, False, "auto", "-bg", "-oz"], timeout=30)
 				mime = magic.from_buffer(b)
 				data_url = "data:" + mime + ";base64," + base64.b64encode(b).decode("ascii")
 		else:
@@ -3879,7 +3880,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				msg = str(message.embeds[0].description).strip("*")
 			if msg[:3] != "```" or len(msg) <= 3:
 				msg = None
-				if message.embeds:
+				if message.embeds and message.embeds[0].footer:
 					s = message.embeds[0].footer.text
 					if is_zero_enc(s):
 						msg = s
@@ -3905,7 +3906,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				msg = str(message.embeds[0].description).strip("*")
 			if msg[:3] != "```" or len(msg) <= 3:
 				msg = None
-				if message.embeds:
+				if message.embeds and message.embeds[0].footer:
 					s = message.embeds[0].footer.text
 					if is_zero_enc(s):
 						msg = s
@@ -5360,7 +5361,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			display_avatar = avatar_url = icon_url = avatar = url = bot.discord_icon
 			joined_at = premium_since = None
 			timed_out_until = None
-			_client_status = _status = discord.member._ClientStatus()
+			communication_disabled_until = None
+			_client_status = _status = {None: "offline"}
 			pending = False
 			ghost = True
 			roles = ()

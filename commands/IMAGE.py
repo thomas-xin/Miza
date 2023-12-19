@@ -1047,7 +1047,7 @@ class Resize(Command):
 				name += "." + fmt
 			if op == "sdxl":
 				premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
-				fut = create_task(bot.caption(url, best=premium >= 4))
+				fut = csubmit(bot.caption(url, best=premium >= 4))
 			# print(url, func, x, y, op, fmt)
 			resp = await process_image(url, func, [x, y, op, "-f", fmt], timeout=_timeout)
 			if op == "sdxl":
@@ -1667,7 +1667,7 @@ class Art(Command):
 			if len(resp.choices) < dups:
 				futs = []
 				for i in range(min(3, max(1, dups // 2))):
-					fut = create_task(bot.instruct(
+					fut = csubmit(bot.instruct(
 						dict(
 							prompt=prompt,
 							temperature=1,
@@ -1814,7 +1814,7 @@ class Art(Command):
 					async with discord.context_managers.Typing(channel):
 						futn = []
 						for i in range(amount - amount2):
-							fut = create_task(bot.oai.images.generate(
+							fut = csubmit(bot.oai.images.generate(
 								model=f"dall-e-{dalle}",
 								prompt=eprompts.next(),
 								size=size,
@@ -1854,7 +1854,7 @@ class Art(Command):
 									continue
 							images.append(response.data[0])
 							pnames.append(response.data[0].revised_prompt)
-				futs.extend(create_task(Request(im.url, timeout=48, aio=True)) for im in images)
+				futs.extend(csubmit(Request(im.url, timeout=48, aio=True)) for im in images)
 				amount2 += len(images)
 		if amount2 < amount and not url:
 			async with discord.context_managers.Typing(channel):
@@ -1870,7 +1870,7 @@ class Art(Command):
 						n = min(c2, round_random(amount / dups))
 						if not n:
 							n = c2
-						fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))
+						fut = csubmit(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))
 						futt.append(fut)
 						pnames.extend([prompt] * n)
 						c2 -= n
@@ -1976,7 +1976,7 @@ class Art(Command):
 							n = min(c2, round_random(amount / dups))
 							if not n:
 								n = c2
-							fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))
+							fut = csubmit(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))
 							futt.append(fut)
 							pnames.extend([prompt] * n)
 							c2 -= n
@@ -2033,7 +2033,7 @@ class Art(Command):
 					else:
 						with open(fn, "rb") as f:
 							fn = f.read()
-				ffut = create_task(bot.commands.steganography[0].call(fn, str(bot.id)))
+				ffut = csubmit(bot.commands.steganography[0].call(fn, str(bot.id)))
 				ffut.prompt = prompt
 				ffut.back = fn
 				ffuts.append(ffut)

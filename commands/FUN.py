@@ -500,7 +500,7 @@ class Text2048(Command):
 				if rew:
 					emb.description += "+" + rew
 			emb.set_footer(text=f"Score: {fscore}")
-			create_task(bot.ignore_interaction(message))
+			csubmit(bot.ignore_interaction(message))
 			dims = max(2, len(g.data.shape))
 			buttons = copy.deepcopy(self.buttons[dims])
 			vm = g.valid_moves()
@@ -682,7 +682,7 @@ class Snake(Command):
 			raise OverflowError(f"Board size too large ({cells} > 199)")
 		elif cells < 2:
 			raise ValueError(f"Board size too small ({cells} < 2)")
-		create_task(self.generate_snaek_game(message, size, flags))
+		csubmit(self.generate_snaek_game(message, size, flags))
 
 	async def _callback_(self, bot, message, reaction, user, vals, perm, **void):
 		if message.id not in self.playing:
@@ -914,7 +914,7 @@ class SlotMachine(Command):
 		u_id, bet, skip = spl
 		if reaction is None or as_str(reaction) == "⤵️":
 			if reaction is None:
-				create_task(message.add_reaction("⤵️"))
+				csubmit(message.add_reaction("⤵️"))
 				user = await bot.fetch_user(u_id)
 			else:
 				if bet > bot.data.users.get(user.id, {}).get("gold", 0):
@@ -1250,7 +1250,7 @@ class Uno(Command):
 					description=f"Here is your deal hand. Please wait for {user_mention(players[0])} to begin the game!",
 				)
 
-				create_task(interaction_response(
+				csubmit(interaction_response(
 					bot=bot,
 					message=message,
 					content=s,
@@ -1322,7 +1322,7 @@ class Uno(Command):
 				for c in hand:
 					s += await bot.data.emojis.emoji_as(c + ".png")
 
-				create_task(interaction_response(
+				csubmit(interaction_response(
 					bot=bot,
 					message=message,
 					content=s,
@@ -1484,7 +1484,7 @@ class Uno(Command):
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
 
-				create_task(message.edit(content=content, embed=embed))
+				csubmit(message.edit(content=content, embed=embed))
 				return await interaction_response(
 					bot=bot,
 					message=message,
@@ -1521,7 +1521,7 @@ class Uno(Command):
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
 
-				create_task(message.edit(content=content, embed=embed))
+				csubmit(message.edit(content=content, embed=embed))
 				return await interaction_patch(
 					bot=bot,
 					message=message,
@@ -1557,7 +1557,7 @@ class Uno(Command):
 				t += await bot.data.emojis.emoji_as(card + ".png")
 			embed.clear_fields()
 			embed.add_field(name="Previous turn", value=t or "\xad")
-			create_task(message.edit(content=content, embed=embed))
+			csubmit(message.edit(content=content, embed=embed))
 			return await interaction_patch(
 				bot=bot,
 				message=message,
@@ -1602,7 +1602,7 @@ class Uno(Command):
 						t += await bot.data.emojis.emoji_as(card + ".png")
 					embed.clear_fields()
 					embed.add_field(name="Previous turn", value=t or "\xad")
-					create_task(message.edit(content=content, embed=embed))
+					csubmit(message.edit(content=content, embed=embed))
 					return await interaction_patch(
 						bot=bot,
 						message=message,
@@ -1656,7 +1656,7 @@ class Uno(Command):
 					embed.clear_fields()
 					embed.add_field(name="Previous turn", value=t or "\xad")
 
-					create_task(message.edit(content=content, embed=embed))
+					csubmit(message.edit(content=content, embed=embed))
 					return await interaction_patch(
 						bot=bot,
 						message=message,
@@ -1691,7 +1691,7 @@ class Uno(Command):
 					t += await bot.data.emojis.emoji_as(card + ".png")
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
-				create_task(message.edit(content=content, embed=embed))
+				csubmit(message.edit(content=content, embed=embed))
 				return await interaction_patch(
 					bot=bot,
 					message=message,
@@ -1716,7 +1716,7 @@ class Uno(Command):
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
 
-				create_task(message.edit(content=content, embed=embed))
+				csubmit(message.edit(content=content, embed=embed))
 				return await interaction_patch(
 					bot=bot,
 					message=message,
@@ -1741,7 +1741,7 @@ class Uno(Command):
 			embed.clear_fields()
 			embed.add_field(name="Previous turn", value=t or "\xad")
 
-			create_task(message.edit(content=content, embed=embed))
+			csubmit(message.edit(content=content, embed=embed))
 			return await interaction_patch(
 				bot=bot,
 				message=message,
@@ -1993,7 +1993,7 @@ class React(Command):
 		more = len(curr) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -2196,7 +2196,7 @@ class UpdateDogpiles(Database):
 		if random.random() >= 3 / (count + 0.5):
 			if not xrand(4096):
 				content = "https://cdn.discordapp.com/attachments/321524006316539904/843707932989587476/secretsmall.gif"
-				create_task(message.add_reaction("💎"))
+				csubmit(message.add_reaction("💎"))
 				self.bot.data.users.add_diamonds(message.author, 1000)
 			elif fix and not broken:
 				content = content.join(fix)
@@ -2215,7 +2215,7 @@ class UpdateDogpiles(Database):
 			print("DOGPILE:", message.guild, message.channel, numbers, mcount, hist[::-1], content)
 			if content[0].isascii() and content[:2] != "<:" and not is_url(content):
 				content = lim_str("\u200b" + content, 2000)
-			create_task(discord.abc.Messageable.send(message.channel, content, tts=message.tts))
+			csubmit(discord.abc.Messageable.send(message.channel, content, tts=message.tts))
 			self.bot.data.users.add_xp(message.author, len(content) / 2 + 16)
 			self.bot.data.users.add_gold(message.author, len(content) / 4 + 32)
 
@@ -2297,7 +2297,7 @@ class UpdateDadjokes(Database):
 		if nick and nick != user.display_name:
 			v = random.random() * 100
 			if v < curr.get("resp", 0):
-				create_task(send_with_reply(message.channel, message, f"Hi, {nick}! {get_random_emoji()}"))
+				csubmit(send_with_reply(message.channel, message, f"Hi, {nick}! {get_random_emoji()}"))
 			if v < curr.get("nick", 0):
 				await user.edit(nick=nick, reason="Pranked!")
 
@@ -2319,7 +2319,7 @@ class Daily(Command):
 			rewards = await bot.as_rewards(field.get("diamonds", None), field.get("gold", None))
 			emb.add_field(name=field.name, value=f"{bar} `{int(field.progress)}/{field.required}`\nRewards: {rewards}", inline=False)
 		message = await channel.send(embed=emb)
-		create_task(message.add_reaction("✅"))
+		csubmit(message.add_reaction("✅"))
 
 	async def _callback_(self, bot, user, reaction, message, perm, vals, **void):
 		if reaction is None:
@@ -2964,7 +2964,7 @@ class ImageSearch(ImagePool, Command):
 			return images
 
 		if file not in self.bot.data.imagepools.finished:
-			create_task(fetchall(tag, search_tag))
+			csubmit(fetchall(tag, search_tag))
 		return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(tag, search_tag))
 	
 	async def __call__(self, bot, channel, flags, args, name, **void):
@@ -3020,7 +3020,7 @@ class Giphy(ImagePool, Command):
 			return images
 
 		if file not in self.bot.data.imagepools.finished:
-			create_task(fetchall(tag, search_tag))
+			csubmit(fetchall(tag, search_tag))
 		return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(tag, search_tag))
 	
 	async def __call__(self, bot, channel, flags, args, **void):
@@ -3159,7 +3159,7 @@ class RPS(Command):
 				raise KeyError
 			decision = choice(self.button_equiv.values())
 			response = f"I'll go with {decision}!\n"
-			earned = random.randint(16, 48) * 2 ** bot.data.rps.setdefault(user.id, 0)
+			earned = random.randint(8, 24) * 2 ** bot.data.rps.setdefault(user.id, 0)
 			if looped:
 				earned = ceil(earned / 8)
 
@@ -3240,7 +3240,7 @@ class RPS(Command):
 			+ response
 		)
 		emb.set_author(**get_author(user))
-		create_task(message.edit(embed=emb))
+		csubmit(message.edit(embed=emb))
 		await bot.ignore_interaction(message)
 
 
@@ -3390,10 +3390,10 @@ class Akinator(Command):
 			# emb.description = message.embeds[0].description.replace("callback-", "none-")
 			# if message.embeds[0].image:
 			#     emb.set_image(message.embeds[0].image.url)
-			# create_task(message.edit(embed=emb))
+			# csubmit(message.edit(embed=emb))
 			# raise TimeoutError("Akinator game has expired. Please create a new one to proceed!")
 			ans = "restart"
-		create_task(bot.ignore_interaction(message))
+		csubmit(bot.ignore_interaction(message))
 
 		callback = "callback"
 
@@ -3618,7 +3618,7 @@ class UpdateAkinator(Database):
 
 	def __load__(self):
 		self.akinators = deque()
-		create_task(self.ensure_akinators())
+		csubmit(self.ensure_akinators())
 
 	async def ensure_akinators(self):
 		if self.sem.busy:

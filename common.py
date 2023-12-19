@@ -261,7 +261,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 			t = self.rate_bin[0 - self.last] + self.rate_limit - time.time()
 			if t > 0:
 				if get_event_loop().is_running():
-					fsubmit(self._update_bin_after_a(t))
+					csubmit(self._update_bin_after_a(t))
 				else:
 					esubmit(self._update_bin_after, t)
 			else:
@@ -1526,13 +1526,13 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 			bucket = f"{channel.id}:{g_id}:" + "/channels/{channel_id}/messages"
 			try:
 				try:
-					sem = REPLY_SEM[channel.id] = bot.http._buckets[bucket]
+					sem = REPLY_SEM[channel.id]
 				except KeyError:
 					bucket = f"{channel.id}:None:" + "/channels/{channel_id}/messages"
-					sem = REPLY_SEM[channel.id] = bot.http._buckets[bucket]
+					sem = REPLY_SEM[channel.id]
 			except KeyError:
 				# print_exc()
-				sem = REPLY_SEM[channel.id] = bot.http._buckets[bucket] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5.15)
+				sem = REPLY_SEM[channel.id] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5.15)
 		inter = False
 		url = f"https://discord.com/api/{api}/channels/{channel.id}/messages"
 		if getattr(channel, "dm_channel", None):
@@ -1931,8 +1931,10 @@ def apply_stickers(message, data=None):
 		return message
 	has = set()
 	for e in getattr(message, "embeds", ()):
-		has.add(e.image.url)
-		has.add(e.thumbnail.url)
+		if e.image:
+			has.add(e.image.url)
+		if e.thumbnail:
+			has.add(e.thumbnail.url)
 		has.add(e.url)
 	for a in getattr(message, "attachments", ()):
 		has.add(a.url)
@@ -3141,7 +3143,7 @@ def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
 	return sub_submit("math", (expr, "%", prec, rat, variables), _timeout=timeout)
 
 # Sends an operation to the image subprocess pool.
-def process_image(image, operation, args=[], cap="image", timeout=36):
+def process_image(image, operation="$", args=[], cap="image", timeout=36):
 	args = astype(args, list)
 	for i, a in enumerate(args):
 		if type(a) is mpf:
@@ -3348,7 +3350,7 @@ def create_task(fut, *args, loop=None, **kwargs):
 	if loop is None:
 		loop = get_event_loop()
 	return asyncio.ensure_future(fut, *args, loop=loop, **kwargs)
-fsubmit = create_task
+fsubmit = csubmit = create_task
 
 async def _await_fut(fut, ret):
 	out = await fut

@@ -100,7 +100,7 @@ class Purge(Command):
 		s = italics(css_md(f"Deleted {sqr_md(deleted)} message{'s' if deleted != 1 else ''}!", force=True))
 		if getattr(message, "slash", None):
 			return s
-		create_task(send_with_react(
+		csubmit(send_with_react(
 			channel,
 			s,
 			reacts="❎",
@@ -197,7 +197,7 @@ class Mute(Command):
 				expr = expr[len(op):].strip()
 				_op = at
 		num = await bot.eval_time(expr, op=False)
-		create_task(message.add_reaction("❗"))
+		csubmit(message.add_reaction("❗"))
 		out = deque()
 		for user in users:
 			p = bot.get_perms(user, guild)
@@ -298,7 +298,7 @@ class Mute(Command):
 		more = len(mutes) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -349,7 +349,7 @@ class Ban(Command):
 				try:
 					ban = bans[user.id]
 				except LookupError:
-					create_task(channel.send(ini_md(f"{sqr_md(user)} is currently not banned from {sqr_md(guild)}. Specify a duration for temporary bans, or `inf` for permanent bans.")))
+					csubmit(channel.send(ini_md(f"{sqr_md(user)} is currently not banned from {sqr_md(guild)}. Specify a duration for temporary bans, or `inf` for permanent bans.")))
 					continue
 				if name == "unban":
 					await guild.unban(user)
@@ -365,9 +365,9 @@ class Ban(Command):
 							if banlist:
 								bot.data.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
 						update(guild.id)
-					create_task(channel.send(css_md(f"Successfully unbanned {sqr_md(user)} from {sqr_md(guild)}.")))
+					csubmit(channel.send(css_md(f"Successfully unbanned {sqr_md(user)} from {sqr_md(guild)}.")))
 					continue
-				create_task(channel.send(italics(ini_md(f"Current ban for {sqr_md(user)} from {sqr_md(guild)}: {sqr_md(time_until(ban['t']))}."))))
+				csubmit(channel.send(italics(ini_md(f"Current ban for {sqr_md(user)} from {sqr_md(guild)}: {sqr_md(time_until(ban['t']))}."))))
 			return
 		# This parser is a mess too
 		bantype = " ".join(args)
@@ -397,7 +397,7 @@ class Ban(Command):
 				expr = expr[len(op):].strip()
 				_op = at
 		num = await bot.eval_time(expr, op=False)
-		create_task(message.add_reaction("❗"))
+		csubmit(message.add_reaction("❗"))
 		for user in users:
 			p = bot.get_perms(user, guild)
 			if not p < 0 and not is_finite(p):
@@ -418,7 +418,7 @@ class Ban(Command):
 				new = getattr(float(orig), _op)(num)
 			else:
 				new = num
-			create_task(self.createBan(guild, user, reason=msg, length=new, channel=channel, bans=bans, glob=glob))
+			csubmit(self.createBan(guild, user, reason=msg, length=new, channel=channel, bans=bans, glob=glob))
 
 	async def getBans(self, guild):
 		loc = self.bot.data.bans.get(guild.id)
@@ -528,7 +528,7 @@ class Ban(Command):
 		more = len(bans) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -731,7 +731,7 @@ class AutoRole(Command):
 								for role in tuple(new):
 									if role in removed:
 										new.pop(role)
-								create_task(member.edit(roles=list(new), reason="InstaRole"))
+								csubmit(member.edit(roles=list(new), reason="InstaRole"))
 								break
 						if not i % 5:
 							await asyncio.sleep(5)
@@ -795,7 +795,7 @@ class AutoRole(Command):
 					for member in guild.members:
 						role = roles.next()
 						if role not in member.roles:
-							create_task(member.add_roles(role, reason="InstaRole", atomic=True))
+							csubmit(member.add_roles(role, reason="InstaRole", atomic=True))
 							if not i % 5:
 								await asyncio.sleep(5)
 							i += 1
@@ -925,12 +925,12 @@ class Lockdown(Command):
 		u_id = self.bot.id
 		for role in guild.roles:
 			if len(role.members) != 1 or role.members[-1].id not in (u_id, guild.owner_id):
-				create_task(self.roleLock(role, channel))
+				csubmit(self.roleLock(role, channel))
 		for thread in guild.threads:
-			create_task(self.threadLock(thread, channel))
+			csubmit(self.threadLock(thread, channel))
 		invites = await guild.invites()
 		for inv in invites:
-			create_task(self.invLock(inv, channel))
+			csubmit(self.invLock(inv, channel))
 		return bold(css_md(sqr_md(uni_str("LOCKDOWN REQUESTED.")), force=True))
 
 
@@ -1256,7 +1256,7 @@ class StarBoard(Command):
 		more = len(curr) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -1359,7 +1359,7 @@ class Crosspost(Command):
 		more = len(curr) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -1427,8 +1427,8 @@ class Relay(Command):
 		if not msg:
 			msg = "[SAMPLE MESSAGE]"
 			msg = bold(ini_md(msg))
-		create_task(message.add_reaction("📧"))
-		fut = create_task(send_with_reply(channel, message, "*```\nLoading DM relay...```*"))
+		csubmit(message.add_reaction("📧"))
+		fut = csubmit(send_with_reply(channel, message, "*```\nLoading DM relay...```*"))
 		colour = await bot.get_colour(user)
 		emb = discord.Embed(colour=colour, description=msg)
 		url = await bot.get_proxy_url(user)
@@ -1438,7 +1438,7 @@ class Relay(Command):
 		m = await fut
 		futs = deque()
 		for u in users:
-			fut = create_task(u.send(f"*```callback-admin-relay-{m.channel.id}_{m.id}-\nThis is a relayed message. Use Discord reply to send a response.```*", embed=emb))
+			fut = csubmit(u.send(f"*```callback-admin-relay-{m.channel.id}_{m.id}-\nThis is a relayed message. Use Discord reply to send a response.```*", embed=emb))
 			futs.append(fut)
 		mids = []
 		uids = []
@@ -1470,7 +1470,7 @@ class UpdateRelays(Database):
 		if len(tup) != 2:
 			print(message.reference.resolved.content)
 			raise ValueError(tup)
-		create_task(message.add_reaction("📧"))
+		csubmit(message.add_reaction("📧"))
 		emb = await bot.as_embed(message)
 		user = message.author
 		channel = message.channel
@@ -1487,7 +1487,7 @@ class UpdateRelays(Database):
 			with bot.ExceptionSender(channel):
 				sendable = await bot.fetch_messageable(si)
 				m = await bot.fetch_message(mi, sendable)
-				fut = create_task(send_with_reply(sendable, m, f"*```callback-admin-relay-{message.channel.id}_{message.id}-\nThis is a relayed message. Use Discord reply to send a response.```*", embed=emb))
+				fut = csubmit(send_with_reply(sendable, m, f"*```callback-admin-relay-{message.channel.id}_{message.id}-\nThis is a relayed message. Use Discord reply to send a response.```*", embed=emb))
 				futs.append(fut)
 		msent = []
 		for fut in futs:
@@ -1661,7 +1661,7 @@ class ServerProtector(Database):
 				+ "If this was intentional, please ignore this message."
 			)
 		elif u_id == user.id:
-			create_task(guild.leave())
+			csubmit(guild.leave())
 			await owner.send(
 				f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
 				+ f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
@@ -1688,7 +1688,7 @@ class ServerProtector(Database):
 			for u_id in cnt:
 				if cnt[u_id] > 2:
 					if self.bot.is_trusted(guild.id) or u_id == self.bot.user.id:
-						create_task(self.targetWarn(u_id, guild, f"channel deletions `({cnt[u_id]})`"))
+						csubmit(self.targetWarn(u_id, guild, f"channel deletions `({cnt[u_id]})`"))
 		if guild.id in self.bot.data.logU:
 			await self.bot.data.logU._channel_delete_2_(channel, guild, user)
 
@@ -1707,7 +1707,7 @@ class ServerProtector(Database):
 				break
 		for u_id in cnt:
 			if cnt[u_id] > 5:
-				create_task(self.targetWarn(u_id, guild, f"banning `({cnt[u_id]})`"))
+				csubmit(self.targetWarn(u_id, guild, f"banning `({cnt[u_id]})`"))
 
 	async def call(self, message, fn, known=None):
 		args = (
@@ -1751,7 +1751,7 @@ class ServerProtector(Database):
 							react = await self.bot.data.emojis.grab("ai_art.gif")
 							await message.add_reaction(react)
 							return text
-						create_task(send_with_react(
+						csubmit(send_with_react(
 							u,
 							(
 								f"```callback-image-steganography-{u.id}_{message.channel.id}_{message.id}-\n⚠️ Steganography alert ⚠️```"
@@ -2017,7 +2017,7 @@ class ScanEmoji(Command):
 	)
 
 	async def __call__(self, bot, guild, channel, message, argv, **void):
-		# fut = create_task(send_with_reply(channel, message, "Emoji scan initiated. Delete the original message at any point in time to cancel."))
+		# fut = csubmit(send_with_reply(channel, message, "Emoji scan initiated. Delete the original message at any point in time to cancel."))
 		p = bot.get_prefix(guild)
 		if argv:
 			count = await bot.eval_math(argv)
@@ -2072,7 +2072,7 @@ class UpdateUserLogs(Database):
 		for g_id in self.data:
 			guild = self.bot.cache.guilds.get(g_id)
 			if guild:
-				create_task(self._member_update_(before, after, guild))
+				csubmit(self._member_update_(before, after, guild))
 
 	async def _member_update_(self, before, after, guild=None):
 		if guild is None:
@@ -2300,7 +2300,7 @@ class UpdateUserLogs(Database):
 			# Check audit log to find whether user left or was kicked/banned
 			with tracebacksuppressor(StopIteration):
 				ts = utc()
-				futs = [create_task(bot.flatten(guild.audit_logs(limit=4, action=getattr(discord.AuditLogAction, action)))) for action in ("ban", "kick", "member_prune")]
+				futs = [csubmit(bot.flatten(guild.audit_logs(limit=4, action=getattr(discord.AuditLogAction, action)))) for action in ("ban", "kick", "member_prune")]
 				bans = kicks = prunes = ()
 				with tracebacksuppressor:
 					bans = await futs[0]
@@ -2564,7 +2564,7 @@ class UpdateMessageLogs(Database):
 				t = utc_ft(self.bot.data.message_cache.getmtime())
 			if not t:
 				t = utc_dt() - datetime.timedelta(days=7)
-			create_task(self.load_new_messages(t))
+			csubmit(self.load_new_messages(t))
 
 	async def save_channel(self, channel, t=None):
 		i = getattr(channel, "last_message_id", None)
@@ -2595,7 +2595,7 @@ class UpdateMessageLogs(Database):
 						print_exc()
 						perm = True
 					if perm:
-						futs.append(create_task(self.save_channel(channel, t)))
+						futs.append(csubmit(self.save_channel(channel, t)))
 					if len(futs) >= 4:
 						with tracebacksuppressor:
 							await futs.popleft()
@@ -2857,12 +2857,12 @@ class UpdateCrossposts(Database):
 						embs = deque()
 						for emb in v:
 							if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
-								create_task(self.bot.send_as_webhook(channel, embeds=embs, username=k[0], avatar_url=k[1]))
+								csubmit(self.bot.send_as_webhook(channel, embeds=embs, username=k[0], avatar_url=k[1]))
 								embs.clear()
 							embs.append(emb)
 							reacts = None
 						if embs:
-							create_task(self.bot.send_as_webhook(channel, embeds=embs, username=k[0], avatar_url=k[1]))
+							csubmit(self.bot.send_as_webhook(channel, embeds=embs, username=k[0], avatar_url=k[1]))
 				self.stack.clear()
 
 	@tracebacksuppressor
@@ -2920,7 +2920,7 @@ class UpdateCrossposts(Database):
 				continue
 			name = message.guild.name + "\u2009﹟" + str(message.channel)
 			url = best_url(message.guild)
-			create_task(self.bot.send_as_webhook(channel, content, embeds=list(embeds), files=list(files), username=name, avatar_url=url))
+			csubmit(self.bot.send_as_webhook(channel, content, embeds=list(embeds), files=list(files), username=name, avatar_url=url))
 
 
 class UpdateStarboards(Database):
@@ -3118,7 +3118,7 @@ class UpdateRolePreservers(Database):
 			await user.edit(roles=roles, reason="RolePreserver", **nick)
 		except discord.Forbidden:
 			if nick:
-				create_task(user.edit(nick=nick.nick, reason="NickPreserver"))
+				csubmit(user.edit(nick=nick.nick, reason="NickPreserver"))
 			try:
 				await user.add_roles(*roles, reason="RolePreserver", atomic=False)
 			except discord.Forbidden:
@@ -3230,7 +3230,7 @@ class ThreadList(Command):
 					await thread.edit(archived=False, locked=False)
 				else:
 					m = await thread.send("\xad")
-					create_task(bot.silent_delete(m))
+					csubmit(bot.silent_delete(m))
 
 
 class UpdateThreadPreservers(Database):

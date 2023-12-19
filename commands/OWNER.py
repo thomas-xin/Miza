@@ -70,7 +70,7 @@ class Restart(Command):
 				emb.set_author(name=str(bot.user), url=bot.github, icon_url=url)
 				emb.description = f"I will be {'shutting down' if name == 'shutdown' else 'restarting'} in {sec2time(wait)}, apologies for any inconvenience..."
 				await bot.send_event("_announce_", embed=emb)
-				save = create_task(bot.send_event("_save_"))
+				save = csubmit(bot.send_event("_save_"))
 				if wait > 0:
 					await asyncio.sleep(wait)
 		if name == "shutdown":
@@ -79,7 +79,7 @@ class Restart(Command):
 			await send_with_reply(channel, content="Restarting... :wave:", reference=message)
 		if save is None:
 			print("Saving message cache...")
-			save = create_task(bot.send_event("_save_"))
+			save = csubmit(bot.send_event("_save_"))
 		async with Delay(1):
 			async with discord.context_managers.Typing(channel):
 				# Call _destroy_ bot event to indicate to all databases the imminent shutdown
@@ -117,7 +117,7 @@ class Restart(Command):
 					if member:
 						voice = member.voice
 						if voice:
-							futs.append(create_task(member.move_to(None)))
+							futs.append(csubmit(member.move_to(None)))
 				print("Goodbye.")
 				with suppress(NameError, AttributeError):
 					PRINT.flush()
@@ -264,7 +264,7 @@ class Exec(Command):
 				bot.data.exec[channel.id] = num
 			# Test bitwise flags for enabled terminals
 			out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec[channel.id]))
-			create_task(message.add_reaction("❗"))
+			csubmit(message.add_reaction("❗"))
 			return css_md(f"{sqr_md(out)} terminal now enabled in {sqr_md(channel)}.")
 		elif "d" in flags:
 			with suppress(KeyError):
@@ -382,7 +382,7 @@ class UpdateExec(Database):
 		channel = await self.bot.fetch_channel(c_id)
 		message = await channel.send(**kwargs)
 		if is_finite(delete_after):
-			create_task(self.bot.silent_delete(message, no_log=True, delay=delete_after))
+			csubmit(self.bot.silent_delete(message, no_log=True, delay=delete_after))
 
 	# async def _typing_(self, user, channel, **void):
 	#     # Typing indicator for DM channels
@@ -397,7 +397,7 @@ class UpdateExec(Database):
 	#         emb.description = italics(ini_md("typing..."))
 	#         for c_id, flag in self.data.items():
 	#             if flag & 2:
-	#                 create_task(self.sendDeleteID(c_id, embed=emb))
+	#                 csubmit(self.sendDeleteID(c_id, embed=emb))
 
 	def prepare_string(self, s, lim=2000, fmt="py"):
 		if type(s) is not str:
@@ -441,14 +441,14 @@ class UpdateExec(Database):
 				with suppress(KeyError):
 					# Write to input() listener if required
 					if self.listeners[channel.id]:
-						create_task(message.add_reaction("👀"))
+						csubmit(message.add_reaction("👀"))
 						self.listeners.pop(channel.id).set_result(proc)
 						return
 				if not proc:
 					return
 				proc = proc.translate(self.qtrans)
 				try:
-					create_task(message.add_reaction("❗"))
+					csubmit(message.add_reaction("❗"))
 					result = await self.procFunc(message, proc, bot, term=f)
 					output = str(result)
 					if len(output) > 24000:
@@ -499,7 +499,7 @@ class UpdateExec(Database):
 						b = msg.encode("utf-8")
 						if len(b) > 25165824:
 							b = b[:4194304] + b[-4194304:]
-						create_task(channel.send(file=CompatFile(b, filename="message.txt")))
+						csubmit(channel.send(file=CompatFile(b, filename="message.txt")))
 					else:
 						self.bot.send_as_embeds(channel, msg, md=code_md, bottleneck=True)
 			if self.bot.ready:
@@ -516,7 +516,7 @@ class UpdateExec(Database):
 		aurl = await bot.get_proxy_url(m)
 		message = await bot.send_as_webhook(channel, url, username=m.display_name, avatar_url=aurl)
 		if not message.embeds:
-			fut = create_task(asyncio.wait_for(bot.wait_for("raw_message_edit", check=lambda m: [m_id == message.id and getattr(self.bot.cache.messages.get(m_id), "embeds", None) for m_id in (getattr(m, "id", None) or getattr(m, "message_id", None),)][0]), timeout=12))
+			fut = csubmit(asyncio.wait_for(bot.wait_for("raw_message_edit", check=lambda m: [m_id == message.id and getattr(self.bot.cache.messages.get(m_id), "embeds", None) for m_id in (getattr(m, "id", None) or getattr(m, "message_id", None),)][0]), timeout=12))
 			for i in range(120):
 				try:
 					message = fut.result()
@@ -683,7 +683,7 @@ class UpdateExec(Database):
 		for cid in cids:
 			channel = await bot.fetch_channel(cid)
 			channels.append(channel)
-		create_task(self._delete(channels, mids))
+		csubmit(self._delete(channels, mids))
 
 	@tracebacksuppressor
 	async def _delete(self, channels, mids):
@@ -806,7 +806,7 @@ class UpdateExec(Database):
 	def cproxy(self, url):
 		if url in self.temp:
 			return
-		self.temp[url] = create_task(self.uproxy(url))
+		self.temp[url] = csubmit(self.uproxy(url))
 
 	def _bot_ready_(self, **void):
 		with suppress(AttributeError):
@@ -822,7 +822,7 @@ class UpdateExec(Database):
 				mchannel = channel.parent if hasattr(channel, "thread") or isinstance(channel, discord.Thread) else channel
 			if not mchannel:
 				continue
-			create_task(self.bot.ensure_webhook(mchannel, force=True))
+			csubmit(self.bot.ensure_webhook(mchannel, force=True))
 		self.bot._globals["miza_player"] = Miza_Player(self.bot)
 
 	def _destroy_(self, **void):
@@ -1262,7 +1262,7 @@ class UpdateImagePools(Database):
 	async def get(self, key, func, threshold=1024, args=()):
 		if key not in self.loading:
 			self.loading.add(key)
-			create_task(self.load_until(key, func, threshold, args=args))
+			csubmit(self.load_until(key, func, threshold, args=args))
 		data = set_dict(self.data, key, alist())
 		if not data or key not in self.finished and (len(data) < threshold >> 1 or len(data) < threshold and xrand(2)):
 			out = await func(*args)
@@ -1277,7 +1277,7 @@ class UpdateImagePools(Database):
 					self.update(key)
 			return url
 		if not self.sem.is_busy():
-			create_task(self.proc(key, func, args=args))
+			csubmit(self.proc(key, func, args=args))
 		return choice(data)
 
 
@@ -1319,7 +1319,7 @@ class UpdateGuilds(Database):
 			cm = cdict(
 				name=m.name,
 				nick=m.nick,
-				global_name=m.global_name,
+				global_name=getattr(m, "global_name", None),
 				id=m.id,
 				gp=m.guild_permissions.value,
 				rids=list(m._roles),
