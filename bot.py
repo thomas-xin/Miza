@@ -1879,7 +1879,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				p1 = lim_str(text, 128)
 				if p1:
 					return ("Data", p1)
-		resp = await process_image(d, "resize_max", ["-nogif", 1024 if best else 512, False, "auto", "-f", "png", "-bg"], timeout=10)
+		resp = await process_image(d, "resize_max", ["-nogif", 1024 if best else 512, False, "auto", "-bg", "-f", "png"], timeout=10)
 		futs = []
 		if best:
 			fut = create_task(self.gpt4v(url))

@@ -3144,6 +3144,8 @@ def evalImg(url, operation, args):
 					if frame.mode != mode:
 						frame = frame.convert(mode)
 					if bg and "A" in mode:
+						if mode != "RGBA":
+							frame = frame.convert("RGBA")
 						i2 = gen_bg(size)
 						i3 = Image.alpha_composite(i2, frame)
 						frame = i3.convert("RGB")
@@ -3220,6 +3222,8 @@ def evalImg(url, operation, args):
 	if Image and isinstance(new, Image.Image):
 		new = optimise(new, keep_rgb=False)
 		if bg and "A" in new.mode:
+			if new.mode != "RGBA":
+				new = new.convert("RGBA")
 			i2 = gen_bg(new.size)
 			i3 = Image.alpha_composite(i2, new)
 			new = i3.convert("RGB")
