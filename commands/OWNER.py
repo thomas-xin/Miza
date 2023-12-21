@@ -1163,11 +1163,14 @@ class UpdateEmojis(Database):
 		ename = name.rsplit(".", 1)[0]
 		animated = name.endswith(".gif")
 		with suppress(KeyError):
-			return self.bot.cache.emojis[self.data[name]]
+			emoji = self.bot.cache.emojis[self.data[name]]
+			if not emoji or self.bot.ready and emoji.id not in (e.id for e in emoji.guild.emojis):
+				raise KeyError
+			return emoji
 		guilds, limits = self.bot.get_available_guild(animated=animated, return_all=True)
 		for guild in guilds:
 			for emoji in guild.emojis:
-				if emoji.name == name and emoji.animated == animated:
+				if emoji.name == ename and emoji.animated == animated:
 					return emoji
 		if not sum(limits):
 			raise LookupError("Unable to find suitable guild for the required emoji.")

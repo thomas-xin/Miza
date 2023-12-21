@@ -2341,6 +2341,53 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		return il[0]
 
 	WEBUIS = {}
+	def load_webui(model, raises=True):
+		PORT = 7800 + DEV
+		webui_server_url = f"http://127.0.0.1:{PORT}"
+		webui_dir = cachedir + "/stable-diffusion-webui"
+		if not os.path.exists(webui_dir) or not os.listdir(webui_dir):
+			if raises:
+				raise RuntimeError("Model is loading, please wait...")
+			args = ["git", "clone", "https://github.com/AUTOMATIC1111/stable-diffusion-webui.git"]
+			print(args)
+			subprocess.run(args, cwd=cachedir)
+		model_dir = webui_dir + "/models/Stable-diffusion"
+		target_model = model_dir + "/" + model
+		if not os.path.exists(target_model) or not os.path.getsize(target_model):
+			if raises:
+				raise RuntimeError("Model is loading, please wait...")
+			args = [sys.executable, "misc/downloader.py", "https://civitai.com/api/download/models/252831?type=Model&format=SafeTensor&size=full&fp=fp16", target_model]
+			print(args)
+			subprocess.run(args)
+		if not raises:
+			return
+		device, dtype = determine_cuda(priority=False)
+		args = [os.path.join(webui_dir, ("webui.bat" if os.name == "nt" else "webui.sh")), "--device-id", str(device), "--api", "--nowebui", "--port", str(PORT)]
+		if torch.cuda.get_device_properties(device).total_memory <= 11 * 1073741824:
+			args.append("--medvram")
+		print(args, webui_dir)
+		time.sleep(DEV * 5)
+		while True:
+			proc = psutil.Popen(args, cwd=webui_dir, stdout=sys.__stderr__, stderr=subprocess.STDOUT)
+			start = time.time()
+			while proc.is_running() and time.time() - start < 60:
+				try:
+					resp = urllib.request.urlopen(webui_server_url)
+				except urllib.error.HTTPError:
+					break
+				except (urllib.error.URLError, ConnectionRefusedError):
+					time.sleep(1)
+					continue
+				break
+			else:
+				for child in proc.children(True):
+					child.terminate()
+				proc.terminate()
+				continue
+			break
+		proc.device = device
+		return proc
+
 	def IBASLR(prompt="", kwargs={}, nsfw=False, force=True, count=1, aspect_ratio=0, negative_prompt=""):
 		if kwargs.get("--mask"):
 			try:
@@ -2363,49 +2410,13 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 					proc.terminate()
 				WEBUIS.clear()
 			fut = WEBUIS[model] = concurrent.futures.Future()
-			webui_dir = cachedir + "/stable-diffusion-webui"
-			if not os.path.exists(webui_dir) or not os.listdir(webui_dir):
-				if kwargs:
-					raise RuntimeError("Model is loading, please wait...")
-				args = ["git", "clone", "https://github.com/AUTOMATIC1111/stable-diffusion-webui.git"]
-				print(args)
-				subprocess.run(args, cwd=cachedir)
-			model_dir = webui_dir + "/models/Stable-diffusion"
-			target_model = model_dir + "/" + model
-			if not os.path.exists(target_model) or not os.path.getsize(target_model):
-				if kwargs:
-					raise RuntimeError("Model is loading, please wait...")
-				args = [sys.executable, "misc/downloader.py", "https://civitai.com/api/download/models/252831?type=Model&format=SafeTensor&size=full&fp=fp16", target_model]
-				print(args)
-				subprocess.run(args)
-			if not kwargs:
-				return
-			device, dtype = determine_cuda(priority=False)
-			args = [os.path.join(webui_dir, ("webui.bat" if os.name == "nt" else "webui.sh")), "--device-id", str(device), "--api", "--nowebui", "--port", str(PORT)]
-			if torch.cuda.get_device_properties(device).total_memory <= 15 * 1073741824:
-				args.append("--medvram")
-			print(args, webui_dir)
-			time.sleep(DEV * 5)
-			while True:
-				proc = psutil.Popen(args, cwd=webui_dir, stdout=sys.__stderr__, stderr=subprocess.STDOUT)
-				start = time.time()
-				while proc.is_running() and time.time() - start < 60:
-					try:
-						resp = urllib.request.urlopen(webui_server_url)
-					except urllib.error.HTTPError:
-						break
-					except (urllib.error.URLError, ConnectionRefusedError):
-						time.sleep(1)
-						continue
-					break
-				else:
-					for child in proc.children(True):
-						child.terminate()
-					proc.terminate()
-					continue
-				break
+			proc = load_webui(model, raises=bool(kwargs))
 			WEBUIS[model] = proc
 			fut.set_result(proc)
+		if 11 * 1073741824 < torch.cuda.get_device_properties(proc.device).total_memory < 15 * 1073741824:
+			batch_size = 1 if count & 1 else 2
+		else:
+			batch_size = count
 		if isinstance(proc, concurrent.futures.Future):
 			proc = proc.result()
 		if not kwargs:
@@ -2442,8 +2453,8 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			height=h,
 			cfg_scale=float(kwargs.get("--guidance-scale", 7)),
 			sampler_name="DPM++ 3M SDE Exponential",
-			n_iter=1,
-			batch_size=count,
+			n_iter=count // batch_size,
+			batch_size=batch_size,
 			enable_hr=True,
 			hr_upscaler="Lanczos",
 			hr_second_pass_steps=rsteps,
@@ -2473,7 +2484,81 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			b = base64.b64decode(image)
 			out.append(b)
 		return out
-	
+
+	def IBASU(im, x, y, op=None):
+		im2 = im
+		w, h = im.size
+		Me = e = im.entropy()
+		r = sqrt(2)
+		print(e, w, h, r)
+		while True:
+			x, y = round(w / r), round(h / r)
+			if x < 16 or y < 16:
+				break
+			im2 = im.resize((x, y), resample=Image.Resampling.BILINEAR)
+			im2.save(f"cache/test{r}.png")
+			e = im2.entropy()
+			Me = max(Me, e)
+			print(e, x, y, r)
+			if e < Me * 0.9875:
+				break
+			r *= sqrt(2)
+
+		r = max(1, r / 2)
+		x, y = round(w / r), round(h / r)
+		print(Me, x, y, r)
+		if r > 1:
+			im2 = im.resize((x, y), resample=Image.Resampling.LANCZOS)
+		else:
+			im2 = im
+		im2.save("outscale.png")
+		model = "zavychromaxl_v30.safetensors"
+		PORT = 7800 + DEV
+		webui_server_url = f"http://127.0.0.1:{PORT}"
+		try:
+			proc = WEBUIS[model]
+			if not proc or hasattr(proc, "is_running") and not proc.is_running():
+				raise KeyError
+		except KeyError:
+			if WEBUIS:
+				for proc in WEBUIS.values():
+					for child in proc.children(True):
+						child.terminate()
+					proc.terminate()
+				WEBUIS.clear()
+			fut = WEBUIS[model] = concurrent.futures.Future()
+			proc = load_webui(model, raises=bool(kwargs))
+			WEBUIS[model] = proc
+			fut.set_result(proc)
+		payload = dict(
+			resize_mode=0,
+			show_extras_results=False,
+			gfpgan_visibility=0,
+			codeformer_visibility=0,
+			codeformer_weight=0,
+			upscaling_resize=2,
+		)
+		if im:
+			bi = io.BytesIO()
+			im.save(bi, "jpeg")
+			b = bi.getbuffer()
+			payload["init_images"] = [base64.b64encode(b).decode("ascii")]
+			endpoint = "img2img"
+		else:
+			endpoint = "txt2img"
+		request = urllib.request.Request(
+			f"{webui_server_url}/sdapi/v1/{endpoint}",
+			headers={"Content-Type": "application/json"},
+			data=orjson.dumps(payload),
+		)
+		resp = urllib.request.urlopen(request)
+		data = orjson.loads(resp.read())
+		out = []
+		for image in data.get("images", ()):
+			b = base64.b64decode(image)
+			out.append(b)
+		return out
+
 	if "load" in CAPS:
 		def load_ibaslr():
 			try:

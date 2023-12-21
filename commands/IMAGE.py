@@ -945,9 +945,9 @@ class CreateGIF(Command):
 
 
 class Resize(Command):
-	name = ["ImageScale", "Scale", "Rescale", "ImageResize", "Denoise", "Enhance", "Refine", "Copy", "Jumbo"]
+	name = ["ImageScale", "Scale", "Rescale", "ImageResize", "Scale2x", "SwinIR", "Denoise", "Enhance", "Refine", "Copy", "Jumbo"]
 	description = "Changes size of supplied image, using an optional scaling operation."
-	usage = "<0:url> <1:size(?:resolution|multiplier)>* <-1:mode(nearest|linear|hamming|bicubic|lanczos|scale2x|sdxl|crop|auto)>?"
+	usage = "<0:url> <1:size(?:resolution|multiplier)>* <-1:mode(nearest|linear|hamming|bicubic|lanczos|scale2x|swinir|crop|auto)>?"
 	example = ("scale https://mizabot.xyz/favicon 4", "resize https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 2048x2048 scale2x")
 	no_parse = True
 	rate_limit = (8, 13)
@@ -961,8 +961,8 @@ class Resize(Command):
 		if message.attachments:
 			args = [best_url(a) for a in message.attachments] + args
 			argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
-		ops = {"nearest", "linear", "hamming", "bicubic", "lanczos", "scale2x", "crop", "auto"}
-		if not args or argv == "list":
+		ops = {"nearest", "linear", "hamming", "bicubic", "lanczos", "scale2x", "swinir", "crop", "auto"}
+		if not args and name not in ops or argv == "list":
 			if "l" in flags or argv == "list":
 				return ini_md(f"Available scaling operations: [{', '.join(ops)}]")
 			# raise ArgumentError("Please input an image by URL or attachment.")
@@ -1000,11 +1000,13 @@ class Resize(Command):
 				fmt = args.pop(-1)
 			else:
 				fmt = fmt2
-			if args and args[-1] in ops:
+			if name in ops:
+				op = name
+			elif args and args[-1] in ops:
 				op = args.pop(-1)
 			else:
 				if name in ("denoise", "enhance", "refine"):
-					op = "sdxl"
+					op = "swinir"
 				else:
 					op = "auto"
 			value = " ".join(args).strip()
@@ -1045,16 +1047,11 @@ class Resize(Command):
 				name = "unknown"
 			if not name.endswith("." + fmt):
 				name += "." + fmt
-			if op == "sdxl":
-				premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
-				fut = csubmit(bot.caption(url, best=premium >= 4))
-			# print(url, func, x, y, op, fmt)
-			resp = await process_image(url, func, [x, y, op, "-f", fmt], timeout=_timeout)
-			if op == "sdxl":
-				pt, *p1 = await fut
-				p1 = "\n\n".join(p1)
-				prompt = "4k, " + p1
-				resp = await process_image("IBASR", "&", [prompt, resp], cap="sdxlr", timeout=240)
+			cap = "image"
+			if op == "swinir":
+				func = "IBASU"
+				cap = "sdxl"
+			resp = await process_image(url, func, [x, y, op, "-f", fmt], cap=cap, timeout=_timeout)
 			fn = resp
 			if isinstance(fn, str) and "." in fn:
 				fmt = "." + fn.rsplit(".", 1)[-1]

@@ -937,8 +937,21 @@ class FileHashDict(collections.abc.MutableMapping):
 
 	def update(self, other):
 		self.modified.update(other)
+		self.deleted.difference_update(other)
 		self.data.update(other)
 		self.iter = None
+		return self
+
+	def fill(self, other):
+		if not other:
+			return self.clear()
+		self.iter = None
+		self.modified.update(other)
+		self.deleted.difference_update(other)
+		self.data.update(other)
+		temp = set(self)
+		temp.difference_update(other)
+		self.deleted.update(temp)
 		return self
 
 	def clear(self):
@@ -4880,6 +4893,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
 	get = lambda self, *args, **kwargs: self.data.get(*args, **kwargs)
 	pop = lambda self, *args, **kwargs: self.data.pop(*args, **kwargs)
 	popitem = lambda self, *args, **kwargs: self.data.popitem(*args, **kwargs)
+	fill = lambda self, other: self.data.fill(other)
 	clear = lambda self: self.data.clear()
 	setdefault = lambda self, k, v: self.data.setdefault(k, v)
 	keys = lambda self: self.data.keys()

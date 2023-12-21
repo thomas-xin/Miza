@@ -5227,6 +5227,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 									return self.raw_webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0])
 								return url
 							urls = set()
+							url = None
 							for a in message.attachments:
 								url = await self.data.exec.uproxy(str(a.url))
 								urls.add(temp_url(url, mid=message.id))

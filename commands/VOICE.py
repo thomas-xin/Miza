@@ -2903,7 +2903,7 @@ class AudioDownloader:
 					if is_url(fn):
 						args = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + args[1:]
 					if silenceremove:
-						args.extend(("-af", "silenceremove=start_periods=1:start_duration=1:start_threshold=-50dB:start_silence=0.5:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
+						args.extend(("-af", "silenceremove=start_periods=1:start_duration=1:start_threshold=-50dB:start_silence=1:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
 						if fmt == "mp3":
 							args.extend(("-b:a", "196608", out))
 						elif fmt == "ogg":
@@ -3144,7 +3144,7 @@ class AudioDownloader:
 			if auds:
 				args.extend(auds.construct_options(full=True))
 			if silenceremove and len(ast) == 1 and not vid:
-				args.extend(("-af", "silenceremove=start_periods=1:start_duration=1:start_threshold=-50dB:start_silence=0.5:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
+				args.extend(("-af", "silenceremove=start_periods=1:start_duration=1:start_threshold=-50dB:start_silence=1:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
 			if size:
 				w1, h1 = map(int, size[0])
 				w2, h2 = map(int, size[1])
@@ -5929,15 +5929,15 @@ class UpdateAudio(Database):
 
 	backup_sem = Semaphore(1, 0, rate_limit=30)
 	async def backup(self, force=False):
-		if self.bot.ready:
-			if not ("blacklist" in self.bot.data and self.bot.data.blacklist.get(0)):
-				self.clear()
+		if not self.bot.ready or "blacklist" in self.bot.data and self.bot.data.blacklist.get(0):
+			return
+		temp = {}
 		for auds in tuple(self.players.values()):
 			if not auds.acsi or not auds.queue:
 				continue
 			d, _ = await asubmit(auds.get_dump, True, True)
-			self.data[auds.acsi.channel.id] = dict(dump=d, channel=auds.text.id)
-			self.update(auds.acsi.channel.id)
+			temp[auds.acsi.channel.id] = dict(dump=d, channel=auds.text.id)
+		self.fill(temp)
 		if force:
 			await asubmit(self.update, force=True, priority=True)
 

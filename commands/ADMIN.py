@@ -615,7 +615,7 @@ class RoleSelect(Command):
 		role = await bot.fetch_role(r_id)
 		h2 = "%04d" % (ihash(role.name) % 10000)
 		if h1 != h2:
-			raise NameError(f"Incorrect hash: {h1} != {h2}")
+			raise NameError(f"Role hash mismatch ({h1} != {h2}). Please check if the role name was modified!")
 		if role in user.roles:
 			await user.remove_roles(role, reason="Role Select")
 			await interaction_response(bot, message, user.mention + ": Successfully removed " + role.mention, ephemeral=True)

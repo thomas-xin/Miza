@@ -300,7 +300,7 @@ class Translator(Command):
 			tr = bot.commands.translate[0]
 			curr = cdict(engine="Google", languages=[])
 			if args[0].casefold() in ("google", "mixtral", "chatgpt"):
-				curr.engine = "ChatGPT" if args.pop[0] == "chatgpt" else args[0].capitalize()
+				curr.engine = "ChatGPT" if args[0] == "chatgpt" else args[0].capitalize()
 				args.pop(0)
 			for arg in args:
 				if (dest := (tr.renamed.get(c := arg.casefold()) or (tr.languages.get(c) and c))):
@@ -2550,7 +2550,8 @@ class Ask(Command):
 								print("New prompt:", messages)
 								appended = True
 								continue
-							name = "wolfram_alpha"
+							if "wolfram_alpha" not in blocked:
+								name = "wolfram_alpha"
 							resend = True
 						if name == "wolfram_alpha" and f"w${argv}" not in browsed:
 							fut = process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60)

@@ -349,9 +349,8 @@ class UpdateAutoEmojis(Database):
 							emb = discord.Embed()
 							emb.set_author(**get_author(self.bot.user))
 							emb.description = (
-								"Psst! It appears as though AutoEmoji has failed to convert an emoji. "
-								+ "To fix this, either add the emoji to this server, invite me to the server with the emoji, "
-								+ "or manually create a new webhook for this channel!"
+								"Psst! It appears as though AutoEmoji has failed to convert an emoji."
+								+ " To fix this, either delete my webhook for this channel and create a new one manually, add the emoji to this server, or invite me to the server containing said emoji!"
 							)
 							await m.edit(embed=emb)
 							self.pop(m.channel.id)
