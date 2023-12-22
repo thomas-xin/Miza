@@ -1471,7 +1471,7 @@ class OCR(Command):
 	async def __call__(self, bot, user, message, args, argv, **void):
 		fut = asubmit(__import__, "pytesseract")
 		name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
-		resp = await process_image(url, "resize_max", ["-nogif", 1024, 0, "auto", "-f", "png"], timeout=60)
+		resp = await process_image(url, "resize_max", ["-nogif", 4096, 0, "auto", "-f", "png"], timeout=60)
 		if isinstance(resp, str):
 			f = open(resp, "rb")
 		else:
@@ -1896,12 +1896,11 @@ class Art(Command):
 				))
 			async with discord.context_managers.Typing(channel):
 				image_1 = image_2 = None
-				image_1b = image_2b = None
 				if url:
-					resp = await process_image(url, "resize_max", ["-nogif", 1024 if sdxl else 768, 0, "auto", "-f", "png"], timeout=60)
+					resp = await process_image(url, "downsample", ["-nogif", 5, 1024 if sdxl else 768, "-bg", "-f", "png"], timeout=60)
 					image_1 = resp
 					if inpaint and url2:
-						image_2b = await bot.get_request(url2)
+						image_2 = await bot.get_request(url2)
 					if inpaint and not url2:
 						resp = await process_image(image_1, "get_mask", ["-nogif", "-nodel", "-f", "png"], timeout=60)
 						image_2 = resp
@@ -1946,15 +1945,6 @@ class Art(Command):
 								kwargs["--init-image"] = fn
 								if image_2:
 									fm = os.path.abspath(image_2) if isinstance(image_2, str) else image_2
-									args.extend((
-										"--mask",
-										fm,
-									))
-									kwargs["--mask"] = fm
-								elif image_2b:
-									fm = os.path.abspath(f"cache/{ts_us()}.png")
-									with open(fm, "wb") as f:
-										f.write(image_2b)
 									args.extend((
 										"--mask",
 										fm,

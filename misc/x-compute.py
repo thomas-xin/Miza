@@ -840,6 +840,81 @@ if CAPS.intersection(("image", "video", "caption", "sd", "sdxl", "sdxlr")):
 			return image.copy()
 		return image
 
+	def downsample(im, lenience=5, maxsize=16384, minsize=48, keep_alpha=True):
+		cache = {}
+		es = {}
+		A = None
+		if im.mode != "RGB":
+			im = im.convert("RGB")
+			if keep_alpha and "A" in im.mode:
+				A = im.getchannel("A")
+		im3 = im
+		thresh = 2 ** (lenience + 4)
+
+		def roundown(x):
+			consts = range(2, int(sqrt(x + 1)))
+			cs = [ceil(log2(x / c) - 1) for c in consts]
+			return sorted((c * 2 ** n for c, n in zip(consts, cs)), key=lambda y: (x >= y, abs(x - y)))[0]
+
+		cache[1] = w, h = lx, ly = im.size
+		Me = e = im3.entropy()
+		es[1] = e
+		ex = 0
+		r = sqrt(max(2, w * h / maxsize / maxsize))
+		mr = 1
+		# print(e, w, h, r, ex)
+		for i in range(64):
+			if w > h:
+				x = roundown(min(lx - 1, w / r))
+				y = round(h / w * x)
+			else:
+				y = roundown(min(ly - 1, h / r))
+				x = round(w / h * y)
+			lx, ly = x, y
+			if x < minsize or y < minsize:
+				break
+			im2 = im3.resize((x, y), resample=Image.Resampling.BILINEAR)
+			im4 = im2.resize((w, h), resample=Image.Resampling.NEAREST)
+			im4 = ImageChops.difference(im4, im3)
+			ex = im4.entropy()
+			if ex > lenience:
+				break
+			cache[r] = im2.size
+			e = im2.entropy()
+			es[r] = e
+			Me = max(Me, e)
+			mr = min(mr, e / Me)
+			# print(e, x, y, r, ex)
+			if mr < 1 - 1 / thresh / 1.5 or ex > lenience - 1:
+				r *= 2 ** 0.125
+			elif mr < 1 - 1 / thresh / 2 or ex > lenience - 2:
+				r *= 2 ** 0.25
+			else:
+				r *=  2 ** 0.5
+
+		for k in sorted(es, reverse=True):
+			v = es[k]
+			if v > Me * (1 - 1 / thresh):
+				break
+		size = max_size(*cache[k], maxsize=maxsize)
+		if im.size != size:
+			im2 = im.resize(size, resample=Image.Resampling.LANCZOS)
+			im3 = im.resize(size, resample=Image.Resampling.NEAREST)
+			d2 = ImageChops.difference(im2.resize(im.size, resample=Image.Resampling.LANCZOS), im)
+			d3 = ImageChops.difference(im3.resize(im.size, resample=Image.Resampling.LANCZOS), im)
+			if d2.entropy() > d3.entropy():
+				out = im3
+			else:
+				out = im2
+		else:
+			out = im
+		if A:
+			if A.size != out.size:
+				A = A.resize(out.size, resample=Image.Resampling.LANCZOS)
+			out.putalpha(A)
+		print(im, out)
+		return out
+
 	def image_to(im, mode="RGB", size=None):
 		im = im if im.mode == mode else im.convert(mode)
 		if size and size != im.size:
@@ -2437,6 +2512,9 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			x, y = max_size(aspect_ratio, 1, ms, force=True)
 		elif im:
 			x, y = max_size(*im.size, ms, force=True)
+			mx, my = ceil(x / 8), ceil(y / 8)
+			if im.width < mx or im.height < my:
+				im = im.resize((mx, my), resample=Image.Resampling.LANCZOS)
 		# elif mask:
 		# 	x, y = max_size(*mask.size, ms, force=True)
 		else:
@@ -2444,6 +2522,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		d = 48
 		w, h = (x // d * d, y // d * d)
 		r = 4 / 3
+		# print(x, y, w, h, im.size)
 		payload = dict(
 			model=model,
 			prompt=prompt,
@@ -2456,20 +2535,24 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			n_iter=count // batch_size,
 			batch_size=batch_size,
 			enable_hr=True,
-			hr_upscaler="Lanczos",
+			hr_upscaler="SwinIR_4x",
 			hr_second_pass_steps=rsteps,
 			hr_resize_x=round(w * r),
 			hr_resize_y=round(h * r),
 			denoising_strength=float(kwargs.get("--strength", 0.6)),
-			# refiner_checkpoint=model,
-			# refiner_switch_at=0.75,
 		)
 		if im:
-			bi = io.BytesIO()
-			im.save(bi, "jpeg")
-			b = bi.getbuffer()
-			payload["init_images"] = [base64.b64encode(b).decode("ascii")]
 			endpoint = "img2img"
+			bi = io.BytesIO()
+			im.save(bi, "png")
+			b = bi.getbuffer()
+			r2 = r * max(x / im.width, y / im.height)
+			payload["init_images"] = [base64.b64encode(b).decode("ascii")]
+			payload["script_name"] = "sd upscale"
+			payload["script_args"] = [None, 64, "SwinIR_4x", r2]
+			# payload["tiling"] = False
+			# payload["width"] = round(w * r)
+			# payload["height"] = round(h * r)
 		else:
 			endpoint = "txt2img"
 		request = urllib.request.Request(
@@ -2486,32 +2569,13 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		return out
 
 	def IBASU(im, x, y, op=None):
-		im2 = im
-		w, h = im.size
-		Me = e = im.entropy()
-		r = sqrt(2)
-		print(e, w, h, r)
-		while True:
-			x, y = round(w / r), round(h / r)
-			if x < 16 or y < 16:
-				break
-			im2 = im.resize((x, y), resample=Image.Resampling.BILINEAR)
-			im2.save(f"cache/test{r}.png")
-			e = im2.entropy()
-			Me = max(Me, e)
-			print(e, x, y, r)
-			if e < Me * 0.9875:
-				break
-			r *= sqrt(2)
-
-		r = max(1, r / 2)
-		x, y = round(w / r), round(h / r)
-		print(Me, x, y, r)
-		if r > 1:
-			im2 = im.resize((x, y), resample=Image.Resampling.LANCZOS)
-		else:
-			im2 = im
-		im2.save("outscale.png")
+		orig = im
+		A = None
+		if im.mode == "P" or "A" in im.mode:
+			A = im.getchannel("A")
+		im = downsample(im, keep_alpha=False)
+		if im.width * im.height > x * y:
+			return resize_to(orig, x, y)
 		model = "zavychromaxl_v30.safetensors"
 		PORT = 7800 + DEV
 		webui_server_url = f"http://127.0.0.1:{PORT}"
@@ -2527,37 +2591,42 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 					proc.terminate()
 				WEBUIS.clear()
 			fut = WEBUIS[model] = concurrent.futures.Future()
-			proc = load_webui(model, raises=bool(kwargs))
+			proc = load_webui(model)
 			WEBUIS[model] = proc
 			fut.set_result(proc)
+		bi = io.BytesIO()
+		im.save(bi, "jpeg")
+		b = bi.getbuffer()
 		payload = dict(
 			resize_mode=0,
 			show_extras_results=False,
 			gfpgan_visibility=0,
 			codeformer_visibility=0,
 			codeformer_weight=0,
-			upscaling_resize=2,
+			upscaling_resize_w=x,
+			upscaling_resize_h=y,
+			upscaling_crop=False,
+			upscaler_1="SwinIR_4x",
+			extras_upscaler_2_visibility=0,
+			upscale_first=False,
+			image=[base64.b64encode(b).decode("ascii")],
 		)
-		if im:
-			bi = io.BytesIO()
-			im.save(bi, "jpeg")
-			b = bi.getbuffer()
-			payload["init_images"] = [base64.b64encode(b).decode("ascii")]
-			endpoint = "img2img"
-		else:
-			endpoint = "txt2img"
 		request = urllib.request.Request(
-			f"{webui_server_url}/sdapi/v1/{endpoint}",
+			f"{webui_server_url}/sdapi/v1/extra-single-image",
 			headers={"Content-Type": "application/json"},
 			data=orjson.dumps(payload),
 		)
 		resp = urllib.request.urlopen(request)
 		data = orjson.loads(resp.read())
-		out = []
-		for image in data.get("images", ()):
-			b = base64.b64decode(image)
-			out.append(b)
-		return out
+		image = data["image"]
+		b = base64.b64decode(image)
+		if A:
+			im = Image.open(io.BytesIO(b))
+			if "RGB" not in im.mode:
+				im = im.convert("RGB")
+			im.putalpha(A)
+			return im
+		return b
 
 	if "load" in CAPS:
 		def load_ibaslr():

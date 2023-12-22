@@ -1428,7 +1428,7 @@ def map_model(cname, model, premium):
 		keep_model = False
 	return model, keep_model
 
-DEFMOD = "stripedhyena"
+DEFMOD = "mythomax"
 
 MockFunctions = [
 	[None, "Placeholder (Do not choose this!)"],
@@ -2607,7 +2607,7 @@ class Ask(Command):
 							print("Art query:", argv)
 							call = {"func": "art", "argv": argv, "comment": res}
 						elif name == "reminder":
-							argv = args["message"] + " in " + args["delay"]
+							argv = args["message"] + " in " + args.get("delay", "3")
 							print("Reminder query:", argv)
 							call = {"func": "remind", "argv": argv, "comment": res}
 						elif name == "play":
@@ -2629,7 +2629,8 @@ class Ask(Command):
 						elif name not in Functions:
 							raise ValueError("OpenAI API returned invalid or inactive function call.")
 						if popping:
-							tc.pop(n)
+							with suppress(IndexError):
+								tc.pop(n)
 						if not call:
 							continue
 						fname = call["func"]
@@ -2703,6 +2704,8 @@ class Ask(Command):
 								if model == "gpt-4-vision-preview":
 									target_model = "gpt4"
 									vis_allowed = False
+								elif premium >= 2:
+									target_model = "instruct"
 								else:
 									target_model = DEFMOD
 							if redo:
@@ -2973,11 +2976,14 @@ class Ask(Command):
 	async def remove_reacts(self, message):
 		guild = message.guild
 		if guild and guild.me and guild.me.permissions_in(message.channel).manage_messages:
-			csubmit(message.clear_reaction("🔄"))
-			await message.clear_reaction("🗑️")
-		else:
-			csubmit(message.remove_reaction("🔄", self.bot.user))
-			await message.remove_reaction("🗑️", self.bot.user)
+			message = await self.bot.ensure_reactions(message)
+			for r in message.reactions:
+				if not r.me:
+					csubmit(message.clear_reaction("🔄"))
+					return await message.clear_reaction("🗑️")
+			return await message.clear_reactions()
+		csubmit(message.remove_reaction("🔄", self.bot.user))
+		return await message.remove_reaction("🗑️", self.bot.user)
 
 	async def _callback_(self, bot, message, reaction=3, user=None, perm=0, vals="", **void):
 		u_id = int(vals) if vals else user.id

@@ -1879,7 +1879,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				p1 = lim_str(text, 128)
 				if p1:
 					return ("Data", p1)
-		resp = await process_image(d, "resize_max", ["-nogif", 1024 if best else 512, False, "auto", "-bg", "-f", "png"], timeout=10)
+		resp = await process_image(d, "downsample", ["-nogif", 5, 1024 if best else 512, "-bg", "-f", "png"], timeout=30)
 		futs = []
 		if best:
 			fut = create_task(self.gpt4v(url))
@@ -1888,7 +1888,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		# futs.append(fut)
 		if AUTH.get("fireworks_key"):
 			fut = asubmit(self.llava, resp)
-			futs.insert(-1, fut)
+			futs.append(fut)
 		elif AUTH.get("replicate_key"):
 			if not self.ibv_fut.done():
 				timeout = max(12, timeout / 2)
@@ -1992,7 +1992,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			else:
 				d = await asubmit(getattr, resp, "content")
 				resp.close()
-				b = await process_image(d, "resize_max", [1024 if best else 512, False, "auto", "-bg", "-oz"], timeout=30)
+				b = await process_image(d, "resize_max", [1024, False, "auto", "-bg", "-oz"], timeout=30)
 				mime = magic.from_buffer(b)
 				data_url = "data:" + mime + ";base64," + base64.b64encode(b).decode("ascii")
 		else:
