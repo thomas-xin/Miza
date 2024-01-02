@@ -1206,7 +1206,7 @@ class AudioClientSubInterface:
 		cls.ensure_bot(cls)
 		cls.afters[key]()
 
-	_pos = 0
+	_pos = (0, 0)
 	@property
 	def pos(self):
 		try:

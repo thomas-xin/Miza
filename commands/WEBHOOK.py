@@ -1090,7 +1090,9 @@ class UpdateWebhooks(Database):
 				if temp:
 					return temp
 			if channel.id in self.data:
-				self.temp[channel.id] = temp = alist(self.from_dict(w, channel.id) for w in self.data[channel.id].values() if (getattr(w, "user", None) or getattr(w, "owner_id", None)))
+				temp = ()
+				with suppress(KeyError):
+					self.temp[channel.id] = temp = alist(self.from_dict(w, channel.id) for w in self.data[channel.id].values() if (getattr(w, "user", None) or getattr(w, "owner_id", None)))
 				if temp:
 					bot = True
 					for w in temp:

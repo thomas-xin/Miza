@@ -1271,16 +1271,16 @@ class Describe(Command):
 				for e in m.embeds:
 					if e.title:
 						s += "\n## " + e.title
-					if e.thumbnail.url:
+					if e.thumbnail and e.thumbnail.url:
 						s += "\n" + e.thumbnail.url
 					if e.description:
 						s += "\n" + e.description
-					if e.image.url:
+					if e.image and e.image.url:
 						s += "\n" + e.image.url
 					for f in e.fields:
 						s += "\n### " + f.name
 						s += "\n" + f.value
-					if e.footer.text:
+					if e.footer and e.footer.text:
 						s += "\n" + e.footer.text
 				return s.strip()
 		if not s:
@@ -2442,7 +2442,7 @@ class Ask(Command):
 						model=model,
 						messages=used,
 						temperature=temperature,
-						max_tokens=min(256 if orig_model not in chatcompletion else 4096, limit - length - 768),
+						max_tokens=max(32, min(256 if orig_model not in chatcompletion else 4096, limit - length - 768)),
 						top_p=0.9,
 						frequency_penalty=0.6,
 						presence_penalty=0.8,
@@ -2456,8 +2456,14 @@ class Ask(Command):
 					try:
 						async with asyncio.timeout(130):
 							response = await bot.oai.chat.completions.create(**data, timeout=120)
-					except openai.BadRequestError:
-						raise
+					except openai.BadRequestError as e:
+						if "Please try again with a different prompt." in repr(e):
+							ex = e
+							print_exc()
+							target_model = "instruct"
+							continue
+						else:
+							raise
 					except Exception as e:
 						ex = e
 						print_exc()
@@ -2607,7 +2613,7 @@ class Ask(Command):
 							print("Art query:", argv)
 							call = {"func": "art", "argv": argv, "comment": res}
 						elif name == "reminder":
-							argv = args["message"] + " in " + args.get("delay", "3")
+							argv = args["message"] + " in " + args.get("delay", "30s")
 							print("Reminder query:", argv)
 							call = {"func": "remind", "argv": argv, "comment": res}
 						elif name == "play":
@@ -2724,7 +2730,7 @@ class Ask(Command):
 					model=model,
 					prompt=prompt,
 					temperature=temperature,
-					max_tokens=min(1024, limit - length - 64),
+					max_tokens=max(32, min(1024, limit - length - 64)),
 					top_p=0.9,
 					stop=[f"{name}:"] + stops,
 					frequency_penalty=0.8,

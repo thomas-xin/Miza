@@ -2512,9 +2512,11 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			x, y = max_size(aspect_ratio, 1, ms, force=True)
 		elif im:
 			x, y = max_size(*im.size, ms, force=True)
-			mx, my = ceil(x / 8), ceil(y / 8)
+			mx, my = ceil(x / 16), ceil(y / 16)
 			if im.width < mx or im.height < my:
 				im = im.resize((mx, my), resample=Image.Resampling.LANCZOS)
+			else:
+				im = resize_max(im, maxsize=ms / 2, force=False)
 		# elif mask:
 		# 	x, y = max_size(*mask.size, ms, force=True)
 		else:
@@ -2535,7 +2537,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			n_iter=count // batch_size,
 			batch_size=batch_size,
 			enable_hr=True,
-			hr_upscaler="SwinIR_4x",
+			hr_upscaler="R-ESRGAN 4x+",
 			hr_second_pass_steps=rsteps,
 			hr_resize_x=round(w * r),
 			hr_resize_y=round(h * r),
@@ -2550,9 +2552,9 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			payload["init_images"] = [base64.b64encode(b).decode("ascii")]
 			payload["script_name"] = "sd upscale"
 			payload["script_args"] = [None, 64, "SwinIR_4x", r2]
-			# payload["tiling"] = False
-			# payload["width"] = round(w * r)
-			# payload["height"] = round(h * r)
+			payload["tiling"] = False
+			payload["width"] = round(x * 2)
+			payload["height"] = round(y * 2)
 		else:
 			endpoint = "txt2img"
 		request = urllib.request.Request(

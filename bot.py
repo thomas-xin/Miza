@@ -1879,7 +1879,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				p1 = lim_str(text, 128)
 				if p1:
 					return ("Data", p1)
-		resp = await process_image(d, "downsample", ["-nogif", 5, 1024 if best else 512, "-bg", "-f", "png"], timeout=30)
+		resp = await process_image(d, "downsample", ["-nogif", 5, 1024 if best else 512, 128, "-bg", "-f", "png"], timeout=30)
 		futs = []
 		if best:
 			fut = create_task(self.gpt4v(url))
@@ -2249,7 +2249,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if is_discord_attachment(url):
 					a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 					if a_id in self.data.attachments:
-						return self.preserve_attachment(a_id)
+						u = self.preserve_attachment(a_id)
+						if filename and filename.endswith(".gif"):
+							u += ".gif"
+						return u
 					return self.raw_webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0]) + f"?mid={message.id}"
 				return url
 			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join("<" + temp_url(a.url) + ">" for a in message.attachments)
@@ -3766,27 +3769,23 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		date = datetime.datetime.utcnow().date()
 		if not os.path.exists(backup):
 			os.mkdir(backup)
-		fn = f"{backup}/saves.{date}.wb"
+		fn = f"{backup}/saves.{date}.tar"
 		if os.path.exists(fn):
 			if utc() - os.path.getmtime(fn) < 60:
 				return fn
 			os.remove(fn)
 		for i in range(30):
-			d2 = date - datetime.timedelta(days=i + 3)
-			f2 = f"{backup}/saves.{d2}.wb"
+			d2 = date - datetime.timedelta(days=i + 7)
+			f2 = f"{backup}/saves.{d2}.tar"
 			if os.path.exists(f2):
 				os.remove(f2)
 				continue
 			break
-		lines = as_str(subprocess.run([python, "neutrino.py", "-c0", "../saves", fn], stdout=subprocess.PIPE, cwd="misc").stdout).split("\n")
-		s = "\n".join(line.strip() for line in lines if not line.startswith("\r"))
-		print(s)
-		# zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
-		# for x, y, z in os.walk("saves"):
-		#     for f in z:
-		#         fp = os.path.join(x, f)
-		#         zf.write(fp, fp)
-		# zf.close()
+		args = ["tar", "-cvf", fn, "saves"]
+		subprocess.run(args)
+		# lines = as_str(subprocess.run([python, "neutrino.py", "-c0", "../saves", fn], stdout=subprocess.PIPE, cwd="misc").stdout).split("\n")
+		# s = "\n".join(line.strip() for line in lines if not line.startswith("\r"))
+		# print(s)
 		if os.path.exists(fn):
 			print("Backup database created in", fn)
 		else:
@@ -3808,7 +3807,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		backup = AUTH.get("backup_path") or "backup"
 		if not os.path.exists(backup):
 			os.mkdir(backup)
-		fn = f"{backup}/saves.{datetime.datetime.utcnow().date()}.wb"
+		fn = f"{backup}/saves.{datetime.datetime.utcnow().date()}.tar"
 		day = not os.path.exists(fn)
 		if day:
 			await_fut(self.send_event("_day_"))
@@ -3817,16 +3816,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			fut = self.send_event("_save_")
 			await_fut(fut)
 		if day:
+			for u in self.data.values():
+				u.vacuum()
 			self.backup()
 			futs = deque()
-			das = deque()
 			for u in self.data.values():
 				if not xrand(5) and not u._garbage_semaphore.busy:
 					futs.append(self.garbage_collect(u))
-					das.append(u)
 			await_fut(asyncio.gather(*futs))
-			for u in das:
-				u.vacuum()
 
 	async def as_rewards(self, diamonds, gold=Dummy):
 		if type(diamonds) is not int:
@@ -5221,7 +5218,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								if is_discord_attachment(url):
 									a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 									if a_id in self.data.attachments:
-										return self.preserve_attachment(a_id)
+										return allow_gif(self.preserve_attachment(a_id))
 									if mid:
 										return self.raw_webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0]) + f"?mid={mid}"
 									return self.raw_webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0])
@@ -5229,15 +5226,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							urls = set()
 							url = None
 							for a in message.attachments:
-								url = await self.data.exec.uproxy(str(a.url))
-								urls.add(temp_url(url, mid=message.id))
+								url = await self.data.exec.uproxy(a.url)
+								urls.add(temp_url(allow_gif(url) if ".gif" in a.url or ".webp" in a.url else url, mid=message.id))
 							for e in message.embeds:
 								if e.image:
 									urls.add(temp_url(e.image.url))
 								if e.thumbnail:
-									urls.add(temp_url(e.thumbnail))
+									urls.add(temp_url(e.thumbnail.url))
 							symrem = "".maketrans({c: "" for c in "<>|*"})
-							spl = [word.translate(symrem) for word in message.content.split()]
+							spl = [word.translate(symrem) for word in message.content.split() if not word.startswith("<")]
 							content = " ".join(word for word in spl if url and not is_url(word))
 							urls.update(word for word in spl if is_url(word))
 							if urls:
@@ -6142,11 +6139,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if isinstance(ex, TooManyRequests):
 			fields = (("Running into the rate limit often?", f"Consider donating using one of the subscriptions from my [ko-fi]({self.kofi_url}), which will grant shorter rate limits amongst many feature improvements!"),)
 		elif isinstance(ex, discord.Forbidden):
-			fields = (("403", "This error usually indicates that I am missing one or more necessary Discord permissions to perform this command!",),)
+			fields = (("403", "This error usually indicates that I am missing one or more necessary Discord permissions to perform this command!"),)
 		elif isinstance(ex, (CE, CE2)):
 			fields = (("Response disconnected.", "If this error occurs during a command, it is likely due to maintenance!"),)
 		elif hasattr(ex, "footer"):
-			fields = (ex.footer,)
+			fields = (ex.footer,) if isinstance(ex.footer, tuple) else (("Note", ex.footer))
 		elif isinstance(op, tuple):
 			fields = (op,)
 		else:

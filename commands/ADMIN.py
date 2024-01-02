@@ -1675,9 +1675,9 @@ class ServerProtector(Database):
 			return
 		user = None
 		if not isinstance(channel, discord.Thread) and channel.permissions_for(guild.me).view_audit_log:
-			audits = guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete)
 			ts = utc()
 			cnt = {}
+			audits = guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete)
 			async for log in audits:
 				if ts - utc_ts(log.created_at) < 120:
 					add_dict(cnt, {log.user.id: 1})
@@ -1685,6 +1685,15 @@ class ServerProtector(Database):
 						user = log.user
 				else:
 					break
+			else:
+				audits = guild.audit_logs(limit=5, action=discord.AuditLogAction.thread_delete)
+				async for log in audits:
+					if ts - utc_ts(log.created_at) < 120:
+						add_dict(cnt, {log.user.id: 1})
+						if user is None and log.target.id == channel.id:
+							user = log.user
+					else:
+						break
 			for u_id in cnt:
 				if cnt[u_id] > 2:
 					if self.bot.is_trusted(guild.id) or u_id == self.bot.user.id:
@@ -2179,10 +2188,13 @@ class UpdateUserLogs(Database):
 			self.data.pop(guild.id)
 			return
 		emb = discord.Embed(colour=8323072)
-		emb.set_author(**get_author(user))
 		mlist = self.bot.data.channel_cache.get(ch.id)
 		count = f" ({len(mlist)}+)" if mlist else ""
-		emb.description = f"{channel_mention(ch.id)}{count} was deleted by {user_mention(user.id)}."
+		if user:
+			emb.set_author(**get_author(user))
+			emb.description = f"{channel_mention(ch.id)}{count} was deleted by {user_mention(user.id)}."
+		else:
+			emb.description = f"{channel_mention(ch.id)}{count} has been deleted."	
 		self.bot.send_embeds(channel, emb)
 
 	async def _guild_update_(self, before, after, **void):

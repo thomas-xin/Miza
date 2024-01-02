@@ -884,6 +884,18 @@ class Profile(Command):
 	ephemeral = True
 	usercmd = True
 	exact = False
+	amap = dict(
+		desc="description",
+		description="description",
+		thumb="thumbnail",
+		icon="thumbnail",
+		image="thumbnail",
+		thumbnail="thumbnail",
+		time="timezone",
+		timezone="timezone",
+		birth="birthday",
+		birthday="birthday",
+	)
 
 	async def __call__(self, user, args, argv, flags, channel, guild, bot, message, **void):
 		if message.attachments:
@@ -892,9 +904,9 @@ class Profile(Command):
 		setting = None
 		if not args:
 			target = user
-		elif args[0] in ("description", "thumbnail", "timezone", "time", "birthday"):
+		elif args[0] in self.amap:
 			target = user
-			setting = args.pop(0)
+			setting = self.amap[args.pop(0)]
 			if not args:
 				value = None
 			else:
@@ -940,8 +952,8 @@ class Profile(Command):
 		if value is None:
 			return ini_md(f"Currently set {setting} for {sqr_md(user)}: {sqr_md(bot.data.users.get(user.id, EMPTY).get(setting))}.")
 		if setting == "description":
-			if len(value) > 1024:
-				raise OverflowError("Description must be 1024 or fewer in length.")
+			if len(value) > 3072:
+				raise OverflowError("Description must be 3072 or fewer in length.")
 		elif setting == "thumbnail":
 			urls = await bot.follow_url(value)
 			if not urls:
@@ -1162,7 +1174,9 @@ class Reminder(Command):
 		self.timefind = re.compile("(?:(?:(?:[0-9]+:)+[0-9.]+\\s*(?:am|pm)?|" + self.bot.num_words + "|[\\s\-+*\\/^%.,0-9]+\\s*(?:am|pm|s|m|h|d|w|y|century|centuries|millenium|millenia|(?:second|sec|minute|min|hour|hr|day|week|wk|month|mo|year|yr|decade|galactic[\\s\\-_]year)s?))\\s*)+$", re.I)
 
 	async def __call__(self, name, message, flags, bot, user, guild, perm, argv, args, comment="", **void):
-		if len(args) <= 1:
+		if not argv:
+			msg = ""
+		elif len(args) == 1:
 			msg = "".join(args) + " in 30s"
 		elif getattr(message, "slash", None) and args:
 			msg = "in " + args.pop(-1)

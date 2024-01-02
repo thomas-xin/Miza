@@ -1545,10 +1545,10 @@ class Art(Command):
 					kwarg = kwarg.replace("_", "-")
 				if kwarg == "--seed":
 					kwargs[kwarg] = arg
-				elif kwarg in ("--num-inference-steps", "--ddim-steps"):
+				elif kwarg in ("--num-inference-steps", "--ddim-steps", "--steps", "--step"):
 					kwarg = "--num-inference-steps"
 					kwargs[kwarg] = str(max(1, min(32 * (premium + 2), int(arg))))
-				elif kwarg in ("--guidance-scale", "--guidance", "--scale"):
+				elif kwarg in ("--guidance-scale", "--guidance", "--scale", "--gs"):
 					kwarg = "--guidance-scale"
 					kwargs[kwarg] = str(max(0, min(100, float(arg))))
 				elif kwarg == "--eta":

@@ -853,25 +853,25 @@ class FileHashDict(collections.abc.MutableMapping):
 		data = BaseException
 		with tracebacksuppressor:
 			data = select_and_loads(self.decode(s), mode="unsafe")
+		# if data is BaseException:
+		# 	fn = fn.rstrip("\x7f")
+		# 	backup = AUTH.get("backup_path") or "backup"
+		# 	for file in sorted(os.listdir(backup), reverse=True):
+		# 		with tracebacksuppressor:
+		# 			if file.endswith(".wb"):
+		# 				if ":" not in backup:
+		# 					backup = "../" + backup
+		# 				s = subprocess.check_output([sys.executable, "neutrino.py", backup + "/" + file, "-f", fn.split("/", 1)[-1]], cwd="misc")
+		# 			else:
+		# 				with zipfile.ZipFile(backup + "/" + file, allowZip64=True, strict_timestamps=False) as z:
+		# 					s = z.read(fn)
+		# 			data = select_and_loads(self.decode(s), mode="unsafe")
+		# 			self.modified.add(k)
+		# 			self.iter = None
+		# 			print(f"Successfully recovered backup of {fn} from {file}.")
+		# 			break
 		if data is BaseException:
-			fn = fn.rstrip("\x7f")
-			backup = AUTH.get("backup_path") or "backup"
-			for file in sorted(os.listdir(backup), reverse=True):
-				with tracebacksuppressor:
-					if file.endswith(".wb"):
-						if ":" not in backup:
-							backup = "../" + backup
-						s = subprocess.check_output([sys.executable, "neutrino.py", backup + "/" + file, "-f", fn.split("/", 1)[-1]], cwd="misc")
-					else:
-						with zipfile.ZipFile(backup + "/" + file, allowZip64=True, strict_timestamps=False) as z:
-							s = z.read(fn)
-					data = select_and_loads(self.decode(s), mode="unsafe")
-					self.modified.add(k)
-					self.iter = None
-					print(f"Successfully recovered backup of {fn} from {file}.")
-					break
-		if data is BaseException:
-			self.deleted.add(k)
+			# self.deleted.add(k)
 			raise KeyError(k)
 		self.data[k] = data
 		return data
@@ -1781,7 +1781,7 @@ best_url = lambda obj: get_url(obj) or getattr(obj, "url", None) or BASE_LOGO
 # Finds the worst URL for a discord object's icon.
 worst_url = lambda obj: get_url(obj, to_webp_ex) or getattr(obj, "url", None) or BASE_LOGO
 
-allow_gif = lambda url: url + ".gif" if "." not in url else url
+allow_gif = lambda url: url + ".gif" if "." not in url.rsplit("/", 1)[-1] and "?" not in url else url
 
 def get_author(user, u_id=None):
 	url = best_url(user)
@@ -2850,7 +2850,7 @@ FIRST_LOAD = True
 # sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
 # whisper		GPU >200k, VRAM >6GB			RTX2070, T4, RTX3060, A16, RTX4060
 # sdxl			GPU >400k, VRAM >9GB			GTX1080ti, RTX2080ti, RTX3060, RTX3080, A2000
-# sdxlr			GPU >400k, VRAM >19GB			V100, RTX3090, A5000, RTX4090, L4
+# sdxlr			GPU >400k, VRAM >15GB			V100, RTX3090, A4000, RTX4080, L4
 # exl2			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
 def spec2cap():
 	global FIRST_LOAD
@@ -2944,13 +2944,13 @@ def spec2cap():
 		if c > 100000 and v > 3 * 1073741824 and ffmpeg:
 			caps.append("video")
 			caps.append("ecdc")
-		if c > 400000 and v > 19 * 1073741824:
+		if c > 400000 and v > 15 * 1073741824:
 			caps.append("sdxlr")
 			caps.append("sdxl")
 			# done.append("sdxlr")
 			done.append("sdxl")
 			v -= 15 * 1073741824
-		elif c > 400000 and IS_MAIN and vrams[i] > 19 * 1073741824:
+		elif c > 400000 and IS_MAIN and vrams[i] > 15 * 1073741824:
 			caps.append("sdxlr")
 			caps.append("sdxl")
 			caps.append("nvram")
