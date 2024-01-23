@@ -1224,7 +1224,10 @@ class Server:
 		try:
 			data, mime = fetch_static("static/" + filename, ignore=True)
 		except FileNotFoundError:
-			data, mime = fetch_static(filename)
+			try:
+				data, mime = fetch_static(filename)
+			except FileNotFoundError as ex:
+				print(true_ip(), repr(ex))
 		cp.response.headers.update(CHEADERS)
 		cp.response.headers["Content-Type"] = mime
 		cp.response.headers["Content-Length"] = len(data)

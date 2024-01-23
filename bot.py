@@ -2082,7 +2082,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			]),
 		]
 		data = cdict(
-			model="accounts/fireworks/models/llava-v15-13b",
+			model="accounts/fireworks/models/llava-v15-13b-fireworks",
 			messages=messages,
 			temperature=0.5,
 			max_tokens=256,
@@ -2250,7 +2250,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 					if a_id in self.data.attachments:
 						u = self.preserve_attachment(a_id)
-						if filename and filename.endswith(".gif"):
+						if filename and not isinstance(filename, str) or filename.endswith(".gif"):
 							u += ".gif"
 						return u
 					return self.raw_webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0]) + f"?mid={message.id}"
@@ -6650,6 +6650,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if before.author.id == self.deleted_user or after.author.id == self.deleted_user:
 				print("Deleted user RAW_MESSAGE_EDIT", after.channel, before.author, after.author, before, after, after.channel.id, after.id)
 			if raw or before.content != after.content:
+				if isinstance(before, self.GhostMessage) and after.embeds and after.embeds[0].thumbnail.url:
+					return
 				if "users" in self.data:
 					self.data.users.add_xp(after.author, xrand(1, 4))
 				if getattr(after, "guild", None):

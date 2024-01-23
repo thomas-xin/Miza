@@ -2982,8 +2982,13 @@ class AudioDownloader:
 						args = [python, "wav2png.py", os.path.abspath(out2), "../" + out3]
 						print(args)
 						subprocess.run(args, cwd=os.getcwd() + "/misc")
+					res = self.search(url)
+					if type(res) is str:
+						raise evalex(res)
+					info = res[0]
+					name = info.get("name") or "untitled"
 					return out3, name.translate(filetrans) + "." + ofmt
-				return out, out
+				return out, out.rsplit("/", 1)[-1]
 			outf = None
 			for url in urls:
 				if len(ast) > 1 and not vst:

@@ -530,8 +530,8 @@ class Colour(Command):
 		)
 		async with discord.context_managers.Typing(channel):
 			resp = await process_image("from_colour", "$", [channels])
-			fn = resp
-			f = CompatFile(fn, filename="colour.png")
+			fn = "colour.png"
+			f = CompatFile(resp, filename=fn)
 		await bot.send_with_file(channel, msg, f, filename=fn, best=True, reference=message)
 
 
@@ -561,8 +561,8 @@ class Gradient(Command):
 			count = 1
 		async with discord.context_managers.Typing(channel):
 			resp = await process_image("from_gradient", "$", [shape, count, colour])
-			fn = resp
-			f = CompatFile(fn, filename="gradient.png")
+			fn = "gradient.png"
+			f = CompatFile(resp, filename=fn)
 		await bot.send_with_file(channel, "", f, filename=fn, best=True, reference=message)
 
 
@@ -618,8 +618,9 @@ class Average(Command):
 				+ "\nXYZ values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_xyz(adj)))
 			)
 			resp = await process_image("from_colour", "$", [channels])
-			fn = resp
-			f = CompatFile(fn, filename="average.png")
+			# fn = resp
+			fn = "average.png"
+			f = CompatFile(resp, filename=fn)
 		await bot.send_with_file(channel, msg, f, filename=fn, best=True, reference=message)
 		# return css_md("#" + bytes2hex(bytes(raw2colour(colour)), space=False))
 
@@ -1633,6 +1634,8 @@ class Art(Command):
 			if premium < 3:
 				raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
 		if "s" in flags:
+			count = 1
+		elif not isfinite(count) and url:
 			count = 1
 		if dalle:
 			amount = 4 if premium >= 6 else 2 if premium >= 4 else 1

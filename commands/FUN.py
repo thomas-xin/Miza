@@ -638,7 +638,7 @@ class Snake(Command):
 	example = ("snake", "snake 4x12", "snake 6x6 -i")
 	flags = "pi"
 	rate_limit = (8, 14)
-	slash = True
+	# slash = True
 
 	buttons = [
 		[

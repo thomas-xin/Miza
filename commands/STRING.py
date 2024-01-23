@@ -1453,7 +1453,7 @@ Functions = dict(
 				"properties": {
 					"query": {
 						"type": "string",
-						"description": "Query, eg. Who won the 2024 world cup?",
+						"description": 'Query, eg. "Who won the 2025 world cup?", "https://youtu.be/dQw4w9WgXcQ"',
 					},
 				},
 				"required": ["query"],
@@ -1470,7 +1470,7 @@ Functions = dict(
 				"properties": {
 					"query": {
 						"type": "string",
-						"description": "Query, eg. Real solutions for x^3-6x^2+12",
+						"description": 'Query, eg. "Real solutions for x^3-6x^2+12", "eigenvalues of {{2,3,-3},{4,2,-4},{4,3,-5}}"',
 					},
 				},
 				"required": ["query"],
@@ -1487,7 +1487,7 @@ Functions = dict(
 				"properties": {
 					"query": {
 						"type": "string",
-						"description": "Query, eg. factorint(57336415063790604359), randint(1, 100)",
+						"description": 'Query, eg. "factorint(57336415063790604359)", "randint(1,100)"',
 					},
 				},
 				"required": ["query"],
@@ -1818,8 +1818,9 @@ def instruct_structure(messages, exclude_first=True, model=None):
 	if model not in exclusive_format:
 		stops = ["### Instruction:", "### Response:", "<|system|>:"]
 		if exclude_first:
-			prompt = ins[0] + "\n\n### History:\n" + "\n\n".join(ins[1:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
-		prompt = "\n\n".join(ins[:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
+			prompt = ins[0] + "\n\n### Input:\n" + "\n\n".join(ins[1:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
+		else:
+			prompt = "\n\n".join(ins[:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
 	else:
 		stops = ["</s>", "[INST", "<|system|>:"]
 		prompt = "\n\n".join(s if m.get("role") == "assistant" else f"[INST]{s}[/INST]" for s, m in zip(ins, messages))
@@ -2649,7 +2650,8 @@ class Ask(Command):
 						timeout = 240
 						command = bot.commands[fname][0]
 						fake_message = copy.copy(message)
-						fake_message.content = f"{bot.get_prefix(guild)}{fname} {argv}"
+						argv2 = single_space(argv.replace('\n', ' '))
+						fake_message.content = f"{bot.get_prefix(guild)}{fname} {argv2}"
 						comment = (call.get("comment") or "") + f"\n> Used `{fake_message.content}`"
 						response = await asubmit(
 							command,
