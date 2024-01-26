@@ -321,8 +321,8 @@ sympy.erfcinv = lambda z: sympy.erfinv(1 - z)
 sympy.erfcinv.inverse = sympy.erfc
 sympy.erfc.inverse = sympy.erfcinv
 
-from sympy.solvers.diophantine.diophantine import divisible
 r_evalf = sympy.Rational.evalf
+from sympy.solvers.diophantine.diophantine import divisible
 
 def carmichael(n):
 	temp = _factorint(n)

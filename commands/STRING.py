@@ -2009,7 +2009,7 @@ class Ask(Command):
 			m, content, found = tup
 			with suppress(AttributeError):
 				m.urls = found
-			if found and (i >= 3 or premium < 4 or found.rsplit("?", 1)[0].rsplit(".", 1)[-1] not in ("png", "jpeg", "jpg", "gif", "webp")):
+			if found and (i >= 2 or premium < 4 or found.rsplit("?", 1)[0].rsplit(".", 1)[-1] not in ("png", "jpeg", "jpg", "gif", "webp")):
 				if m.id == message.id:
 					best = premium >= 4
 				else:
@@ -2178,7 +2178,7 @@ class Ask(Command):
 			oai = data.get("trial") and data.get("openai_key")
 			vc = bool(getattr(user, "voice", False)) | bool(bot.audio.players.get(getattr(guild, "id", None))) * 2
 			extensions = premium >= 2
-			chatcompletion = ("gpt-4-turbo", "gpt-4-vision-preview", "gpt-4-1106-preview", "gpt-4", "gpt-3.5-turbo", "gpt-3.5-turbo-1106")
+			chatcompletion = ("gpt-4-turbo", "gpt-4-vision-preview", "gpt-4-0125-preview", "gpt-4-1106-preview", "gpt-4", "gpt-3.5-turbo", "gpt-3.5-turbo-1106")
 			instructcompletion = ("gpt-3.5-turbo-instruct", "text-davinci-003", "text-curie-001")
 			chatcc = ("gpt4", "gpt3")
 			ac = AC if nsfw and "nsfw" not in personality.casefold() else None
@@ -2348,7 +2348,7 @@ class Ask(Command):
 				else:
 					if 1:
 						if not vis_allowed or all(isinstance(m.content, str) for m in messages) or tool_choice != "auto" or not getattr(message, "urls", None) and (not message.reference or not getattr(getattr(message.reference, "resolved", None), "urls", None)):
-							model = "gpt-4-1106-preview"
+							model = "gpt-4-0125-preview"
 						else:
 							model = "gpt-4-vision-preview"
 						limit = 8000
@@ -3210,7 +3210,7 @@ class Instruct(Command):
 	async def __call__(self, bot, guild, channel, user, message, argv, **void):
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 		data = dict(
-			model="gpt-4-1106-preview" if premium >= 5 else "gpt-3.5-turbo-instruct",
+			model="gpt-4-0125-preview" if premium >= 5 else "gpt-3.5-turbo-instruct",
 			prompt=argv,
 			temperature=0.8,
 			max_tokens=4096 if premium >= 2 else 1024,

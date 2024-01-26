@@ -1635,7 +1635,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	emb_cache = Cache(timeout=86400, trash=256)
 	async def embedding(self, input=""):
-		resp = await self.emb_cache.retrieve_from(input, self.oai.embeddings.create, input=input, model="text-embedding-ada-002")
+		resp = await self.emb_cache.retrieve_from(input, self.oai.embeddings.create, input=input, model="text-embedding-3-small")
 		return np.array(resp.data[0].embedding, dtype=np.float16)
 
 	async def rank_embeddings(self, ems, em):
@@ -1700,7 +1700,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	async def _instruct(self, data, best=False, skip=False):
 		c = await tcount(data["prompt"])
 		inputs = dict(
-			model="gpt-4-1106-preview" if best >= 3 else "gpt-3.5-turbo-1106",
+			model="gpt-4-0125-preview" if best >= 3 else "gpt-3.5-turbo-1106",
 			temperature=0.75,
 			max_tokens=256,
 			top_p=0.75,
