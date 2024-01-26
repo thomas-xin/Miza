@@ -2082,7 +2082,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			]),
 		]
 		data = cdict(
-			model="accounts/fireworks/models/llava-v15-13b-fireworks",
+			model="accounts/fireworks/models/firellava-13b",
 			messages=messages,
 			temperature=0.5,
 			max_tokens=256,
@@ -6650,7 +6650,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if before.author.id == self.deleted_user or after.author.id == self.deleted_user:
 				print("Deleted user RAW_MESSAGE_EDIT", after.channel, before.author, after.author, before, after, after.channel.id, after.id)
 			if raw or before.content != after.content:
-				if isinstance(before, self.GhostMessage) and after.embeds and after.embeds[0].thumbnail.url:
+				if isinstance(before, self.GhostMessage) and after.embeds and after.embeds[0].thumbnail and after.embeds[0].thumbnail.url:
 					return
 				if "users" in self.data:
 					self.data.users.add_xp(after.author, xrand(1, 4))

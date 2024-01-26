@@ -321,6 +321,85 @@ sympy.erfcinv = lambda z: sympy.erfinv(1 - z)
 sympy.erfcinv.inverse = sympy.erfc
 sympy.erfc.inverse = sympy.erfcinv
 
+from sympy.solvers.diophantine.diophantine import divisible
+r_evalf = sympy.Rational.evalf
+
+def carmichael(n):
+	temp = _factorint(n)
+	res = 1
+	if temp.get(2, 0) >= 3:
+		res = sympy.totient(2 ** (temp.pop(2) - 1))
+	for k, v in temp.items():
+		res = sympy.lcm(res, sympy.totient(k ** v))
+	return res
+
+def simplify_recurring(r, prec=100):
+	p, q = r.p, r.q
+	temp = _factorint(q)
+	tq = np.prod([k ** v for k, v in temp.items() if k not in (2, 5)], dtype=object)
+	if tq == 1:
+		return
+	try:
+		pr = sympy.ntheory.residue_ntheory.is_primitive_root(10, tq)
+	except ValueError:
+		pr = False
+	cq = carmichael(tq)
+	if pr:
+		digits = cq
+	else:
+		try:
+			facts = factors(cq)
+		except OverflowError:
+			return
+		digits = cq
+		for f in facts:
+			if f < prec and divisible(10 ** f - 1, tq):
+				digits = f
+				break
+	if digits > prec * 10:
+		return
+	transient = max(temp.get(2, 0), temp.get(5, 0))
+	s = str(r_evalf(r, transient + digits * 3))
+	dec = s.split(".", 1)[-1][transient:]
+	assert dec[:digits] == dec[digits:digits * 2]
+	if digits > prec / 2:
+		return s[:s.index(".") + transient + 1] + "[" + dec[:digits] + "]"
+	if digits > prec / 3:
+		return s[:s.index(".") + transient + digits + 1] + "[" + dec[:digits] + "]"
+	return s[:s.index(".") + transient + digits * 2 + 1] + "[" + dec[:digits] + "]"
+
+class FakeFloat(sympy.Rational):
+
+	__slots__ = ("recur",)
+
+	def __new__(cls, p, q=1, r=None):
+		obj = sympy.Expr.__new__(cls)
+		obj.p, obj.q = p, q
+		r = r or simplify_recurring(obj)
+		if r:
+			obj.recur = r
+		return obj
+
+	def __str__(self):
+		return getattr(self, "recur", None) or sympy.Float.__str__(self)
+
+	@property
+	def is_Rational(self):
+		return hasattr(self, "recur")
+
+def evalf_true(n, prec=100, **void):
+	if isinstance(n, sympy.Float):
+		return n
+	if not isinstance(n, sympy.Rational):
+		return r_evalf(n, prec=prec)
+	r = simplify_recurring(n, prec=prec)
+	if r:
+		return FakeFloat(n.p, n.q, r)
+	return r_evalf(n, prec)
+
+sympy.Rational.evalf = FakeFloat.evalf = evalf_true
+sympy.StrPrinter._print_FakeFloat = lambda self, expr: FakeFloat.__str__(expr)
+
 
 # Sympy plotting functions
 def plotArgs(args):
@@ -621,6 +700,19 @@ def factorize(*args, **kwargs):
 	temp = _factorint(*args, **kwargs)
 	return list(itertools.chain(*((k,) * v for k, v in sorted(temp.items()))))
 
+def factors(n):
+	temp = _factorint(n)
+	fcount = np.prod([x + 1 for x in temp.values()], dtype=object)
+	if fcount > 1048576:
+		raise OverflowError("Too many factors to evaluate.")
+	pfact = list(itertools.chain(*((k,) * v for k, v in sorted(temp.items()))))
+	facts = set(temp.keys())
+	facts.add(1)
+	facts.add(n)
+	for i in range(2, sum(temp.values())):
+		facts.update(np.prod(comb, dtype=object) for comb in itertools.combinations(pfact, i))
+	return sorted(facts)
+
 def sort(*args):
 	if len(args) != 1:
 		return sorted(args)
@@ -747,6 +839,7 @@ _globals.update({
 	"rot90": np.rot90,
 	"conjugate": np.conjugate,
 	"sum": np.sum,
+	"prod": np.prod,
 	"max": np.nanmax,
 	"min": np.nanmin,
 	"argmax": np.argmax,
@@ -803,7 +896,8 @@ _globals.update({
 	"sub": lim,
 	"subs": lim,
 	"factorint": _factorint,
-	"factors": _factorint,
+	"factorlist": factors,
+	"factors": factors,
 	"factorise": factorize,
 	"factorize": factorize,
 	"factor": sympy.factor,
