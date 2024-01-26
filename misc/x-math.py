@@ -353,10 +353,10 @@ def simplify_recurring(r, prec=100):
 			return
 		digits = cq
 		for f in facts:
-			if f < prec and divisible(10 ** f - 1, tq):
+			if f < prec * 16 and divisible(10 ** f - 1, tq):
 				digits = f
 				break
-	if digits > prec * 10:
+	if digits > prec * 16:
 		return
 	transient = max(temp.get(2, 0), temp.get(5, 0))
 	s = str(r_evalf(r, transient + digits * 3))
