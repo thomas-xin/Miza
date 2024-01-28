@@ -535,7 +535,11 @@ def verify_ai():
 		return
 	with tracebacksuppressor:
 		if AUTH.get("openai_key"):
-			import openai
+			try:
+				import openai
+			except:
+				time.sleep(3)
+				import openai
 			globals()["openai"] = openai
 			try:
 				for i in range(3):

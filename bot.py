@@ -20,7 +20,7 @@ if __name__ != "__mp_main__":
 	esubmit(get_colour_list)
 	esubmit(load_emojis)
 	esubmit(load_timezones)
-	oaifut = esubmit(verify_ai)
+	apifut = esubmit(verify_ai)
 
 	heartbeat_proc = psutil.Popen([python, "misc/heartbeat.py"])
 
@@ -162,8 +162,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		# Assign bot cache to global variables for convenience
 		globals().update(self.cache)
 		globals()["messages"] = self.messages = self.MessageCache()
+		if os.name == "nt":
+			import wmi
+			globals()["WMI"] = WMI = wmi.WMI()
 		with tracebacksuppressor:
-			oaifut.result()
+			apifut.result(timeout=30)
 		openai_key = AUTH.get("openai_key")
 		if openai_key:
 			import openai
@@ -1545,6 +1548,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								pass
 							else:
 								found = True
+								if res.startswith("/"):
+									res = url.split("://", 1)[0] + ":/" + res
 								print(res)
 								out.append(res)
 				if not found:
