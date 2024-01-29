@@ -2300,7 +2300,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								self.data.guilds.register(guild, force=False)
 					except KeyError:
 						pass
-			if files and not message.author.bot:
+			if files and (not message.author.bot or message.webhook_id):
 				if (utc_dt() - created_at).total_seconds() < 7200:
 					for attachment in message.attachments:
 						create_task(self.add_and_test(message, attachment))
