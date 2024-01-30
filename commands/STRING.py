@@ -461,6 +461,8 @@ class Unicode(Command):
 		"Bin2Uni", "B2U", "BinDecode",
 		"Uni2B64", "U64", "B64Encode",
 		"B642Uni", "64U", "B64Decode",
+		"Uni2S64", "S64", "S64Encode",
+		"S642Uni", "64S", "S64Decode",
 		"Uni2B32", "U32", "B32Encode",
 		"B322Uni", "32U", "B32Decode",
 	]
@@ -509,6 +511,15 @@ class Unicode(Command):
 			if (len(b) - 1) & 3 == 0:
 				b += b"="
 			b = as_str(base64.b64decode(b))
+			return fix_md(b)
+		if name in ("uni2s64", "s64", "s64encode"):
+			b = as_str(base64.urlsafe_b64encode(argv.encode("utf-8")).rstrip(b"="))
+			return fix_md(b)
+		if name in ("s642uni", "64s", "s64decode"):
+			b = unicode_prune(argv).encode("utf-8") + b"=="
+			if (len(b) - 1) & 3 == 0:
+				b += b"="
+			b = as_str(base64.urlsafe_b64decode(b))
 			return fix_md(b)
 		if name in ("uni2b32", "u32", "b32encode"):
 			b = as_str(base64.b32encode(argv.encode("utf-8")).rstrip(b"="))
@@ -932,18 +943,19 @@ class Time(Command):
 		elif name in TIMEZONES:
 			s = TIMEZONES.get(name, 0)
 		estimated = None
+		c = 0
 		if argv:
 			h = await self.bot.eval_math(argv)
 		elif "estimate" in name:
 			if is_channel(user):
-				h = self.bot.data.users.estimate_timezone("#" + str(user.id))
+				h, c = self.bot.data.users.estimate_timezone("#" + str(user.id))
 			else:
-				h = self.bot.data.users.estimate_timezone(user.id)
+				h, c = self.bot.data.users.estimate_timezone(user.id)
 			estimated = True
 		elif name in "time":
 			h = self.bot.data.users.get_timezone(user.id)
 			if h is None:
-				h = self.bot.data.users.estimate_timezone(user.id)
+				h, c = self.bot.data.users.estimate_timezone(user.id)
 				estimated = True
 			else:
 				estimated = False
@@ -963,7 +975,7 @@ class Time(Command):
 			hrs = "+" + str(hrs)
 		out = f"Current time at UTC/GMT{hrs}: {sqr_md(t)}."
 		if estimated:
-			out += f"\nUsing timezone automatically estimated from {sqr_md(user)}'s discord activity."
+			out += f"\nUsing timezone automatically estimated from {sqr_md(user)}'s discord activity ({round(c * 100)}% confidence)."
 		elif estimated is not None:
 			out += f"\nUsing timezone assigned by {sqr_md(user)}."
 		return ini_md(out)
@@ -1286,7 +1298,7 @@ class Describe(Command):
 		if not s:
 			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 			fut = asubmit(reqs.next().head, url, headers=Request.header(), stream=True)
-			cap = await self.bot.caption(url, best=premium >= 4, timeout=24)
+			cap = await self.bot.caption(url, best=3 if premium >= 4 else 2, timeout=24)
 			s = "\n\n".join(filter(bool, cap)).strip()
 			resp = await fut
 			name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
@@ -2009,9 +2021,9 @@ class Ask(Command):
 			m, content, found = tup
 			with suppress(AttributeError):
 				m.urls = found
-			if found and (i >= 2 or premium < 4 or found.rsplit("?", 1)[0].rsplit(".", 1)[-1] not in ("png", "jpeg", "jpg", "gif", "webp")):
-				if m.id == message.id:
-					best = premium >= 4
+			if found and (premium < 4 or found.rsplit("?", 1)[0].rsplit(".", 1)[-1] not in ("png", "jpeg", "jpg", "gif", "webp")):
+				if m.id == message.id or reference and m.id == reference.id:
+					best = 3 if premium >= 4 else 2
 				else:
 					best = False if premium >= 4 else None
 				cfut = csubmit(bot.caption(found, best=best))
@@ -2373,7 +2385,7 @@ class Ask(Command):
 						content = m.content[0].text if m.content[0].type == "text" else ""
 						found = best_url(m.content[-1].image_url)
 						with tracebacksuppressor(StopIteration):
-							tup = await bot.caption(found, best=premium >= 4)
+							tup = await bot.caption(found, best=3 if premium >= 4 else 1)
 							if not tup:
 								raise StopIteration
 							pt, *p1 = tup
@@ -2401,7 +2413,7 @@ class Ask(Command):
 							prompt += f"\n{i}] {m_str(m)}\n"
 						i += 1
 						prompt += f'"""\n\n### Instruction:\n"""\n{i}] {m_str(ms)}\n"""\n\nAssuming your name is {bot_name}, which of the numbered messages is the first that contains information required to answer the instruction question? (Provide only the number, not a full reply! If there are none relevant, respond with "-1").\n\n### Response:'
-						print("Context prompt:", prompt)
+						# print("Context prompt:", prompt)
 						data = dict(
 							prompt=prompt,
 							temperature=0.5,
@@ -2415,7 +2427,7 @@ class Ask(Command):
 							print_exc()
 							resp = None
 						if resp:
-							print("Context response:", resp)
+							print("Context response:", i, "::", resp)
 							num = regexp(r"-?[0-9]+").findall(resp)
 							if num and num[0]:
 								num = int(num[0]) - 1
@@ -2533,7 +2545,7 @@ class Ask(Command):
 								messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
 							return res, tid
 						if name == "browse" and f"b${argv}" not in browsed:
-							fut = process_image("BOT.browse", "$", [argv], cap="browse", timeout=60)
+							fut = bot.browse(argv, uid=user.id)
 							res, tid = await rag(f"b${argv}", name, tid, fut)
 							if res:
 								popping = False
@@ -2587,7 +2599,7 @@ class Ask(Command):
 									if per == DEFPER:
 										res = "- You are `Miza`, a multipurpose, multimodal bot that operates on platforms such as Discord.\n- Your appearance is based on the witch-girl `Misery` from `Cave Story`.\n- Your creator is <@201548633244565504>, and you have a website at https://mizabot.xyz !"
 									else:
-										cap = await self.bot.caption(best_url(u2), best=premium >= 4, timeout=24)
+										cap = await self.bot.caption(best_url(u2), best=2 if premium >= 4 else 0, timeout=24)
 										s = "\n\n".join(filter(bool, cap)).strip()
 										res = f"- You are `{u2.name}`, a multipurpose, multimodal bot that operates on platforms such as Discord.\n- Your appearance is based on `{s}`."
 										if bot.owners:
@@ -2595,7 +2607,7 @@ class Ask(Command):
 											um = user_mention(i)
 											res += f"\n-Your owner is {um}."
 								else:
-									cap = await self.bot.caption(best_url(u2), best=premium >= 4, timeout=24)
+									cap = await self.bot.caption(best_url(u2), best=2 if premium >= 4 else 0, timeout=24)
 									s = "\n\n".join(filter(bool, cap)).strip()
 									res = f"- Search results: `{u2.name}` has the appearance of `{s}`."
 								return res

@@ -834,7 +834,12 @@ class Info(Command):
 						if la:
 							seen = f"{la}, {seen}"
 						if "v" in flags:
-							tz = bot.data.users.estimate_timezone(u.id)
+							tz = self.bot.data.users.get_timezone(u.id)
+							if tz is None:
+								tz, c = self.bot.data.users.estimate_timezone(u.id)
+								estimated = True
+							else:
+								estimated = False
 							if tz >= 0:
 								zone = f"GMT+{tz}"
 							else:
@@ -861,7 +866,8 @@ class Info(Command):
 					if joined:
 						emb.add_field(name="Join time", value=time_repr(joined), inline=1)
 					if zone:
-						emb.add_field(name="Estimated timezone", value=str(zone), inline=1)
+						tn = "Estimated timezone" if estimated else "Timezone"
+						emb.add_field(name=tn, value=str(zone), inline=1)
 					if seen:
 						emb.add_field(name="Last seen", value=str(seen), inline=1)
 					if dname:
@@ -2036,7 +2042,7 @@ class UpdateUsers(Database):
 	def estimate_timezone(self, u_id):
 		data = self.data.get(u_id, EMPTY).get("recent")
 		if not data:
-			return 0
+			return 0, 0
 		hour = round_min(int(utc() // self.interval) / self.scale)
 		self.clear_events(data, hour - self.hours)
 		start = hour - self.hours
@@ -2091,7 +2097,7 @@ class UpdateUsers(Database):
 		else:
 			estimated = 0
 		# print(estimated, inactive, activity)
-		return estimated
+		return estimated, min(1, len(data) / self.hours)
 
 	async def __call__(self):
 		changed = False

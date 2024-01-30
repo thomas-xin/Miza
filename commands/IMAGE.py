@@ -1605,7 +1605,7 @@ class Art(Command):
 		if not prompt:
 			if url:
 				# raise ArgumentError("Please input a valid prompt.")
-				pt, *p1 = await bot.caption(url, best=premium >= 4)
+				pt, *p1 = await bot.caption(url, best=3 if premium >= 4 else 0)
 				prompt = "\n".join(filter(bool, p1))
 			print(url, prompt)
 			force = False
@@ -1650,7 +1650,7 @@ class Art(Command):
 			oprompt = prompt
 			uid = user.id
 			temp = oprompt.replace('"""', "'''")
-			prompt = f'### Instruction:\n"""\n{temp}\n"""\n\nImprove the above image caption as a description to send to txt2img image generation. Be as detailed as possible in at least 2 sentences, but stay concise where possible!\n\n### Response:'
+			prompt = f'### Instruction:\n"""\n{temp}\n"""\n\nImprove the above image caption as a description to send to txt2img image generation. Be as detailed as possible in at least 2 sentences, but stay concise!\n\n### Response:'
 			if bot.is_trusted(guild) >= 2:
 				for uid in bot.data.trusted[guild.id]:
 					if uid and bot.premium_level(uid, absolute=True) >= 2:

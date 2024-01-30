@@ -1633,6 +1633,58 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			e = cdict(id=e, animated=animated)
 		return min_emoji(e)
 
+	browse_locations = {
+		-11: "nz-en",	# New Zealand
+		-10: "nz-en",
+		-9: "us-en",	# United States
+		-8: "us-en",
+		-7: "us-en",
+		-6: "us-en",
+		-5: "ca-en",	# Canada
+		-4: "ca-en",
+		-3: "ca-en",
+		-2: "uk-en",	# United Kingdom
+		-1: "uk-en",
+		0: "uk-en",
+		1: "uk-en",
+		2: "za-en",		# South Africa
+		3: "xa-en",		# Arabia
+		4: "xa-en",
+		5: "in-en",		# India
+		6: "in-en",
+		7: "id-en",		# Indonesia
+		8: "sg-en",		# Singapore
+		9: "au-en",		# Australia
+		10: "au-en",
+		11: "au-en",
+		12: "nz-en",	# New Zealand
+	}
+	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60):
+		if not region:
+			if timezone is None:
+				if "users" in self.data:
+					timezone, confidence = self.data.users.estimate_timezone(uid)
+					if confidence < 1 / 256:
+						timezone = None
+			region = self.browse_locations.get(timezone, "us-en")
+		if not is_url(argv):
+			query = urllib.parse.quote_plus(argv)
+			url = f"https://duckduckgo.com/?q={query}&kl={region}&kp=-2&kz=1&kav=1&kf=-1&kaf=1&km=l&ko=s&k1=1"
+			print("Browse:", url)
+			with tracebacksuppressor:
+				s = await Request(url, decode=True, aio=True)
+				search = 'id="deep_preload_script" src="'
+				assert search in s
+				url = s.split(search, 1)[-1].split('"', 1)[0]
+				print("Browse:", url)
+				s = await Request(url, decode=True, aio=True)
+				search = "DDG.pageLayout.load('d',[{"
+				assert search in s
+				res = "[{" + s.split(search, 1)[-1].split("}]);DDG.duckbar.load('", 1)[0] + "}]"
+				data = orjson.loads(res)
+				return "\n\n".join((e.get("c", "") + "\n" + html_decode(e.get("a", ""))).strip() for e in data)
+		return await process_image("BOT.browse", "$", [argv], cap="browse", timeout=timeout)
+
 	mod_cache = Cache(timeout=86400, trash=256)
 	async def moderate(self, input=""):
 		resp = await self.mod_cache.retrieve_from(input, self.oai.moderations.create, input=input)
@@ -1886,9 +1938,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					return ("Data", p1)
 		resp = await process_image(d, "downsample", ["-nogif", 5, 1024 if best else 512, 128, "-bg", "-f", "png"], timeout=30)
 		futs = []
-		if best:
-			fut = create_task(self.gpt4v(url))
-			futs.append(fut)
 		# fut = asubmit(self.neva, resp)
 		# futs.append(fut)
 		if AUTH.get("fireworks_key"):
@@ -1900,7 +1949,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			fut = asubmit(self.ibv, resp)
 			futs.append(fut)
 		prompts = []
-		if not best:
+		if best >= 1:
 			res = None
 			try:
 				res = await process_image(resp, "caption", ["-nogif", True], cap="caption", timeout=timeout)
@@ -1943,18 +1992,82 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			prompts = nprompts + prompts[1:]
 		else:
 			prompts = nprompts + prompts
-		if len(prompts) > 1:
+		caption = None
+		if best >= 2:
 			name = url.rsplit("/", 1)[-1].split("?", 1)[0]
-			caption = await self.recaption(prompts, name=name, best=best)
-		elif not prompts:
-			caption = ""
-		else:
-			caption = prompts[0]
+			with tracebacksuppressor:
+				caption = await self.cocaption(url, prompts, name=name, best=best - 2)
+			if not caption:
+				caption = await self.gpt4v(url, best=best - 2)
+				prompts.insert(0, caption)
+		if not caption:
+			if len(prompts) > 1:
+				name = url.rsplit("/", 1)[-1].split("?", 1)[0]
+				caption = await self.recaption(prompts, name=name, best=best - 2)
+			elif not prompts:
+				caption = ""
+			else:
+				caption = prompts[0]
 		tup = ("Image", caption, best)
 		self.analysed[h] = tup
 		while len(self.analysed) > 65536:
 			self.analysed.pop(next(iter(self.analysed)))
 		return self.analysed[h][:-1] if self.analysed.get(h) else None
+
+	cocaption_instr = "Please rewrite a description to fix inaccuracies; transcribe any text precisely, don't remove relevant pronouns and don't comment on elements not present in the image. Be as detailed as possible in at least 3 sentences, but stay concise!"
+	async def cocaption(self, url, prompts, name=None, best=False):
+		if isinstance(url, str):
+			resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True)
+			if resp.headers.get("Content-Type") in ("image/png", "image/gif", "image/jpeg", "image/webp") and float(resp.headers.get("Content-Length", inf)) < 20 * 1e6:
+				data_url = url
+				resp.close()
+			else:
+				d = await asubmit(getattr, resp, "content")
+				resp.close()
+				b = await process_image(d, "resize_max", [1024, False, "auto", "-bg", "-oz"], timeout=30)
+				mime = magic.from_buffer(b)
+				data_url = "data:" + mime + ";base64," + base64.b64encode(b).decode("ascii")
+		else:
+			mime = magic.from_buffer(url)
+			data_url = "data:" + mime + ";base64," + base64.b64encode(url).decode("ascii")
+		pin = []
+		for i, p in enumerate(prompts, 1):
+			pin.append(f'### Input ({i}):\n"""\n')
+			pin.append(p.replace('"""', "'''"))
+			pin.append('\n"""\n\n')
+		if name:
+			iname = f'image "{name}"'
+		else:
+			iname = "image"
+		if len(prompts) > 1:
+			pin.append(f"### Instruction:\nAbove are {len(prompts)} possibly incomplete or incorrect captions for the input {iname}. {self.cocaption_instr}\n\n###Response:")
+		else:
+			pin.append(f"### Instruction:\nAbove is a possibly incomplete or incorrect caption for the input {iname}. {self.cocaption_instr}\n\n###Response:")
+		cocaption_prompt = "".join(pin)
+		print("Cocaption prompt:", cocaption_prompt)
+		messages = [
+			cdict(role="user", content=[
+				cdict(type="text", text=cocaption_prompt),
+				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
+			]),
+		]
+		data = cdict(
+			model="gpt-4-vision-preview",
+			messages=messages,
+			temperature=0.5,
+			max_tokens=512,
+			top_p=0.9,
+			frequency_penalty=0.6,
+			presence_penalty=0.8,
+			user=str(hash(self.name)),
+		)
+		async with asyncio.timeout(35):
+			response = await self.oai.chat.completions.create(**data, timeout=30)
+		out = response.choices[0].message.content.strip()
+		if self.decensor.search(out):
+			raise ValueError(f"Censored response {repr(out)}.")
+		print("GPT4V:", out)
+		return out
 
 	async def recaption(self, prompts, name=None, best=False):
 		pin = []
@@ -2916,16 +3029,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		else:
 			return 3
 		if not absolute:
-			data = bot.data.users.get(uid)
+			data = self.data.users.get(uid)
 			if data and data.get("trial"):
 				if lv >= 2:
 					data.pop("trial")
-					bot.data.users.update(uid)
+					self.data.users.update(uid)
 				elif data.get("diamonds", 0) >= 1:
 					lv = max(lv, data["trial"])
 				else:
 					data.pop("trial")
-					bot.data.users.update(uid)
+					self.data.users.update(uid)
 			premiums.subscribe(user, lv)
 		return lv
 
@@ -3107,7 +3220,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						try:
 							return orjson.loads(f)
 						except:
-							return literal_eval(f)
+							return eval_json(f)
 		except (ValueError, TypeError, SyntaxError):
 			r = await self.solve_math(f, 128, 0, variables=self.consts)
 		x = r[0]
@@ -3122,7 +3235,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return x
 		if x in (None, "None"):
 			return
-		x = round_min(x)
+		try:
+			if "/" in x:
+				raise ValueError
+			x = round_min(x)
+		except ValueError as ex:
+			try:
+				x = round_min(eval_json(x))
+			except:
+				raise ex
 		if type(x) is not int and len(str(x)) <= 16:
 			return float(x)
 		return x
@@ -3544,10 +3665,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			"misc": {
 				"Active commands": self.command_semaphore.active,
 				"Voice (Conn|Act|Stream)": f"{audio_players}|{active_audio_players}|{playing_audio_players}",
-				"Total data transmitted": bot.total_bytes,
-				"Hosted storage": bot.total_hosted,
+				"Total data transmitted": self.total_bytes,
+				"Hosted storage": self.total_hosted,
 				"System time": datetime.datetime.now(),
-				"Uptime (past week)": bot.uptime,
+				"Uptime (past week)": self.uptime,
 				"Command count": len(set(itertools.chain(*self.commands.values()))),
 				"Code size": [x.item() for x in size],
 			},
@@ -5189,7 +5310,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	async def ensure_reactions(self, message):
 		if not message.reactions or isinstance(message, self.CachedMessage):
 			message = await discord.abc.Messageable.fetch_message(message.channel, message.id)
-			self.bot.add_message(message, files=False, force=True)
+			self.add_message(message, files=False, force=True)
 		return message
 
 	# Deletes own messages if any of the "X" emojis are reacted by a user with delete message permission level, or if the message originally contained the corresponding reaction from the bot.
