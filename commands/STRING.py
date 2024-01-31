@@ -1716,7 +1716,7 @@ async def cut_to(messages, limit=1024, exclude_first=True):
 	i = -1
 	for i, m in reversed(tuple(enumerate(messages))):
 		c = await tcount(m_repr(m))
-		if c + count > limit / 5 and not m.get("tool_calls"):
+		if c + count > limit / 5 and not m.get("tool_calls") and m.get("role") != "tool":
 			break
 		mes.append(m)
 		count += c
@@ -2295,7 +2295,7 @@ class Ask(Command):
 			target_model = model
 			text = ""
 			ex = RuntimeError("Maximum attempts exceeded.")
-			appended = False
+			appended = []
 			vis_allowed = True
 			browsed = set()
 			cs_allowed = True
@@ -2431,19 +2431,13 @@ class Ask(Command):
 							num = regexp(r"-?[0-9]+").findall(resp)
 							if num and num[0]:
 								num = int(num[0]) - 1
-								if num <= 1:
-									pass
-								elif num < len(ufull) - 1:
-									skipping = num
-									used = [ufull[0]] + ufull[skipping - 1:]
-									length = await count_to(used)
-								elif reference:
-									skipping = len(ufull) - 2
-									used = [ufull[0]] + ufull[-3:]
-									length = await count_to(used)
+								if num <= 2:
+									skipping = 0
 								else:
-									skipping = len(ufull) - 1
-									used = [ufull[0]] + ufull[-2:]
+									skipping = max(1, min(num - 2, len(ufull) - 2))
+									while skipping >= 1 and ("tool_calls" in ufull[skipping] or ufull[skipping].get("role") == "tool"):
+										skipping -= 1
+									used = [ufull[0]] + ufull[skipping:]
 									length = await count_to(used)
 								cs_allowed = False
 					if model == "gpt-4-vision-preview":
@@ -2532,6 +2526,7 @@ class Ask(Command):
 								res = res.strip()
 								if not appended:
 									messages.append(cdict(m))
+									appended.append(True)
 								else:
 									for m2 in reversed(messages):
 										calls = m2.get("tool_calls")
@@ -2552,7 +2547,6 @@ class Ask(Command):
 								skipping = 0
 								length = await count_to(messages)
 								print("New prompt:", messages)
-								appended = True
 								continue
 							resend = True
 						elif name == "sympy" and f"s${argv}" not in browsed:
@@ -2567,7 +2561,6 @@ class Ask(Command):
 								skipping = 0
 								length = await count_to(messages)
 								print("New prompt:", messages)
-								appended = True
 								continue
 							if "wolfram_alpha" not in blocked:
 								name = "wolfram_alpha"
@@ -2581,7 +2574,6 @@ class Ask(Command):
 								skipping = 0
 								length = await count_to(messages)
 								print("New prompt:", messages)
-								appended = True
 								continue
 							resend = True
 						elif name == "myinfo":
@@ -2619,7 +2611,6 @@ class Ask(Command):
 								skipping = 0
 								length = await count_to(messages)
 								print("New prompt:", messages)
-								appended = True
 								continue
 							resend = True
 						elif name == "dalle":

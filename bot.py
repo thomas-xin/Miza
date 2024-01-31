@@ -1685,8 +1685,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					res = "[{" + s.split(search, 1)[-1].split("}]);DDG.duckbar.load('", 1)[0] + "}]"
 					data = orjson.loads(res)
 					return "\n\n".join((e.get("c", "") + "\n" + html_decode(e.get("a", ""))).strip() for e in data)
-			return await process_image("BOT.browse", "$", [argv], cap="browse", timeout=timeout)
-		return self.bcache.retrieve_from(argv, retrieval, argv, region)
+			return await process_image("BROWSE", "$", [argv], cap="browse", timeout=timeout)
+		return await self.bcache.retrieve_from(argv, retrieval, argv, region)
 
 	mod_cache = Cache(timeout=86400, trash=256)
 	async def moderate(self, input=""):

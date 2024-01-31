@@ -760,26 +760,36 @@ class Bot:
 			print_exc()
 			raise
 
-	def browse(self, q):
+	def browse(self, q, text=True):
 		if not is_url(q):
 			return random.choice((self.google, self.bing, self.yahoo))(q)
 		driver = get_driver()
 		try:
 			fut = exc.submit(driver.get, q)
-			fut.result(timeout=16)
+			fut.result(timeout=32)
 		except:
 			print("Browse: Timed out.")
 			return_driver(driver)
 			return ""
 		time.sleep(1)
-
 		try:
 			elem = driver.find_element(by=tag_name, value="body")
 		except:
-			print("Browse: Timed out.")
+			print("Browse: Body missing.")
 			return_driver(driver)
 			return ""
-		return elem.text
+		if text:
+			resp = elem.text
+			return_driver(driver)
+			return resp
+		osize = driver.get_window_size()
+		w = driver.execute_script("return document.body.parentNode.scrollWidth")
+		h = driver.execute_script("return document.body.parentNode.scrollHeight")
+		driver.set_window_size(w, h)
+		resp = driver.find_element_by_tag_name("body").screenshot_as_png
+		driver.set_window_size(osize["width"], osize["height"])
+		return_driver(driver)
+		return resp
 
 	def google(self, q, raw=False):
 		words = q.split()

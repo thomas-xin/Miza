@@ -2174,6 +2174,14 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 	convobot.DEVICES = DEVICES
 	BOT = convobot.Bot()
 
+	def BROWSE(query, text=True):
+		resp = BOT.browse(query, text=text)
+		if isinstance(resp, bytes):
+			im = Image.open(io.BytesIO(resp))
+			im = resize_max(im, 1024)
+			return im
+		return resp
+
 	def CBAU(inputs):
 		user_id = inputs["user_id"]
 		channel_id = inputs["channel_id"]
