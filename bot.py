@@ -1659,6 +1659,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		11: "au-en",
 		12: "nz-en",	# New Zealand
 	}
+	bcache = Cache(timeout=43200, trash=60)
 	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60):
 		if not region:
 			if timezone is None:
@@ -1667,23 +1668,25 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					if confidence < 1 / 256:
 						timezone = None
 			region = self.browse_locations.get(timezone, "us-en")
-		if not is_url(argv):
-			query = urllib.parse.quote_plus(argv)
-			url = f"https://duckduckgo.com/?q={query}&kl={region}&kp=-2&kz=1&kav=1&kf=-1&kaf=1&km=l&ko=s&k1=1"
-			print("Browse:", url)
-			with tracebacksuppressor:
-				s = await Request(url, decode=True, aio=True)
-				search = 'id="deep_preload_script" src="'
-				assert search in s
-				url = s.split(search, 1)[-1].split('"', 1)[0]
+		async def retrieval(argv, region="us-en"):
+			if not is_url(argv):
+				query = urllib.parse.quote_plus(argv)
+				url = f"https://duckduckgo.com/?q={query}&kl={region}&kp=-2&kz=1&kav=1&kf=-1&kaf=1&km=l&ko=s&k1=1"
 				print("Browse:", url)
-				s = await Request(url, decode=True, aio=True)
-				search = "DDG.pageLayout.load('d',[{"
-				assert search in s
-				res = "[{" + s.split(search, 1)[-1].split("}]);DDG.duckbar.load('", 1)[0] + "}]"
-				data = orjson.loads(res)
-				return "\n\n".join((e.get("c", "") + "\n" + html_decode(e.get("a", ""))).strip() for e in data)
-		return await process_image("BOT.browse", "$", [argv], cap="browse", timeout=timeout)
+				with tracebacksuppressor:
+					s = await Request(url, decode=True, aio=True)
+					search = 'id="deep_preload_script" src="'
+					assert search in s
+					url = s.split(search, 1)[-1].split('"', 1)[0]
+					print("Browse:", url)
+					s = await Request(url, decode=True, aio=True)
+					search = "DDG.pageLayout.load('d',[{"
+					assert search in s
+					res = "[{" + s.split(search, 1)[-1].split("}]);DDG.duckbar.load('", 1)[0] + "}]"
+					data = orjson.loads(res)
+					return "\n\n".join((e.get("c", "") + "\n" + html_decode(e.get("a", ""))).strip() for e in data)
+			return await process_image("BOT.browse", "$", [argv], cap="browse", timeout=timeout)
+		return self.bcache.retrieve_from(argv, retrieval, argv, region)
 
 	mod_cache = Cache(timeout=86400, trash=256)
 	async def moderate(self, input=""):
