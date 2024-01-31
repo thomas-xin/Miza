@@ -1937,69 +1937,71 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if p1:
 					return ("Data", p1)
 		resp = await process_image(d, "downsample", ["-nogif", 5, 1024 if best else 512, 128, "-bg", "-f", "png"], timeout=30)
-		futs = []
-		# fut = asubmit(self.neva, resp)
-		# futs.append(fut)
-		if AUTH.get("fireworks_key"):
-			fut = asubmit(self.llava, resp)
-			futs.append(fut)
-		elif AUTH.get("replicate_key"):
-			if not self.ibv_fut.done():
-				timeout = max(12, timeout / 2)
-			fut = asubmit(self.ibv, resp)
-			futs.append(fut)
-		prompts = []
-		if best >= 1:
-			res = None
-			try:
-				res = await process_image(resp, "caption", ["-nogif", True], cap="caption", timeout=timeout)
-				p1, p2 = res
-			except:
-				if res:
-					print(res)
-				print_exc()
-				tup = None
-				with tracebacksuppressor:
-					text = await Request(
-						url,
-						decode=True,
-						aio=True,
-						ssl=False,
-					)
-					p1 = lim_str(text, 128)
-					if p1:
-						prompts.append(p1)
-			else:
-				if p1:
-					prompts.append(p1)
-				if p2:
-					prompts.append(p2)
-		nprompts = []
-		ts = utc()
-		for fut in futs:
-			nt = timeout + ts - utc()
-			if nt < 0 and not fut.done():
-				continue
-			try:
-				async with asyncio.timeout(max(1, nt)):
-					p3 = await asyncio.shield(fut)
-			except:
-				print_exc()
-				best = False
-				continue
-			nprompts.append(p3)
-		if len(nprompts) > 1:
-			prompts = nprompts + prompts[1:]
-		else:
-			prompts = nprompts + prompts
 		caption = None
 		if best >= 2:
 			name = url.rsplit("/", 1)[-1].split("?", 1)[0]
 			with tracebacksuppressor:
-				caption = await self.cocaption(url, prompts, name=name, best=best - 2)
-			if not caption:
-				caption = await self.gpt4v(url, best=best - 2)
-				prompts.insert(0, caption)
+				caption = await self.gpt4v(url, name=name, best=best - 2)
+		if not caption:
+			futs = []
+			# fut = asubmit(self.neva, resp)
+			# futs.append(fut)
+			if AUTH.get("fireworks_key"):
+				fut = asubmit(self.llava, resp)
+				futs.append(fut)
+			elif AUTH.get("replicate_key"):
+				if not self.ibv_fut.done():
+					timeout = max(12, timeout / 2)
+				fut = asubmit(self.ibv, resp)
+				futs.append(fut)
+			prompts = []
+			if best >= 1:
+				res = None
+				try:
+					res = await process_image(resp, "caption", ["-nogif", True], cap="caption", timeout=timeout)
+					p1, p2 = res
+				except:
+					if res:
+						print(res)
+					print_exc()
+					tup = None
+					with tracebacksuppressor:
+						text = await Request(
+							url,
+							decode=True,
+							aio=True,
+							ssl=False,
+						)
+						p1 = lim_str(text, 128)
+						if p1:
+							prompts.append(p1)
+				else:
+					if p1:
+						prompts.append(p1)
+					if p2:
+						prompts.append(p2)
+			nprompts = []
+			ts = utc()
+			for fut in futs:
+				nt = timeout + ts - utc()
+				if nt < 0 and not fut.done():
+					continue
+				try:
+					async with asyncio.timeout(max(1, nt)):
+						p3 = await asyncio.shield(fut)
+				except:
+					print_exc()
+					best = False
+					continue
+				nprompts.append(p3)
+			if len(nprompts) > 1:
+				prompts = nprompts + prompts[1:]
+			else:
+				prompts = nprompts + prompts
+			if best >= 2:
+				name = url.rsplit("/", 1)[-1].split("?", 1)[0]
+				with tracebacksuppressor:
+					caption = await self.cocaption(url, prompts, name=name, best=best - 2)
 		if not caption:
 			if len(prompts) > 1:
 				name = url.rsplit("/", 1)[-1].split("?", 1)[0]
@@ -2101,7 +2103,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return resp
 
 	caption_prompt = "Please describe this image in detail; be descriptive but concise!"
-	async def gpt4v(self, url, best=False):
+	description_prompt = "Please describe this <IMAGE> in detail:\n- Transcribe text if present, but do not mention there not being text\n- Note details if obvious such as gender and race of characters\n- Be descriptive but concise"
+	async def gpt4v(self, url, name=None, best=False):
 		if isinstance(url, str):
 			resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True)
 			if resp.headers.get("Content-Type") in ("image/png", "image/gif", "image/jpeg", "image/webp") and float(resp.headers.get("Content-Length", inf)) < 20 * 1e6:
@@ -2116,9 +2119,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		else:
 			mime = magic.from_buffer(url)
 			data_url = "data:" + mime + ";base64," + base64.b64encode(url).decode("ascii")
+		if name:
+			iname = f'image "{name}"'
+		else:
+			iname = "image"
 		messages = [
 			cdict(role="user", content=[
-				cdict(type="text", text=self.caption_prompt),
+				cdict(type="text", text=self.description_prompt.replace("<IMAGE>", iname)),
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
@@ -2132,15 +2139,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			presence_penalty=0.8,
 			user=str(hash(self.name)),
 		)
-		try:
-			async with asyncio.timeout(35):
-				response = await self.oai.chat.completions.create(**data, timeout=30)
-			out = response.choices[0].message.content.strip()
-			if self.decensor.search(out):
-				raise ValueError(f"Censored response {repr(out)}.")
-		except:
-			print_exc()
-			return await asubmit(self.neva, url)
+		async with asyncio.timeout(35):
+			response = await self.oai.chat.completions.create(**data, timeout=30)
+		out = response.choices[0].message.content.strip()
+		if self.decensor.search(out):
+			raise ValueError(f"Censored response {repr(out)}.")
 		print("GPT4V:", out)
 		return out
 
