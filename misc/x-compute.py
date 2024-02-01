@@ -2178,7 +2178,7 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 		resp = BOT.browse(query, text=text)
 		if isinstance(resp, bytes):
 			im = Image.open(io.BytesIO(resp))
-			im = resize_max(im, 1024)
+			im = resize_max(im, 2048)
 			return im
 		return resp
 

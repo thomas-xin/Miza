@@ -783,10 +783,15 @@ class Bot:
 			return_driver(driver)
 			return resp
 		osize = driver.get_window_size()
-		w = driver.execute_script("return document.body.parentNode.scrollWidth")
-		h = driver.execute_script("return document.body.parentNode.scrollHeight")
+		w = max(480, driver.execute_script("return document.body.parentNode.scrollWidth"))
+		h = max(270, driver.execute_script("return document.body.parentNode.scrollHeight"))
+		print("ParentNode:", w, h)
 		driver.set_window_size(w, h)
-		resp = driver.find_element_by_tag_name("body").screenshot_as_png
+		body = driver.find_element(by=tag_name, value="body")
+		if body.size["width"] * body.size["height"] <= 1:
+			resp = driver.get_screenshot_as_png()
+		else:
+			resp = body.screenshot_as_png
 		driver.set_window_size(osize["width"], osize["height"])
 		return_driver(driver)
 		return resp

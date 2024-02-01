@@ -1660,7 +1660,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		12: "nz-en",	# New Zealand
 	}
 	bcache = Cache(timeout=43200, trash=60)
-	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60):
+	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60, screenshot=False):
 		if not region:
 			if timezone is None:
 				if "users" in self.data:
@@ -1685,7 +1685,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					res = "[{" + s.split(search, 1)[-1].split("}]);DDG.duckbar.load('", 1)[0] + "}]"
 					data = orjson.loads(res)
 					return "\n\n".join((e.get("c", "") + "\n" + html_decode(e.get("a", ""))).strip() for e in data)
-			return await process_image("BROWSE", "$", [argv], cap="browse", timeout=timeout)
+			return await process_image("BROWSE", "$", [argv, not screenshot], cap="browse", timeout=timeout)
 		return await self.bcache.retrieve_from(argv, retrieval, argv, region)
 
 	mod_cache = Cache(timeout=86400, trash=256)
@@ -1919,10 +1919,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		except (LookupError, TypeError):
 			pass
 		if not torch or best is None:
-			return ("File", url.rsplit("/", 1)[-1].split("?", 1)[0])
-		resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True)
-		with resp:
-			d = await asubmit(getattr, resp, "content")
+			return ("File", url.rsplit("/", 1)[-1].split("?", 1)[0] if isinstance(url, str) else "Unknown")
+		if isinstance(url, str):
+			resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True)
+			with resp:
+				d = await asubmit(getattr, resp, "content")
+			name = url.rsplit("/", 1)[-1].split("?", 1)[0]
+		else:
+			d = url
+			name = None
 		mime = resp.headers.get("Content-Type", "")
 		if mime.split("/", 1)[0] not in ("image", "video"):
 			if mime.split("/", 1)[0] == "audio":
@@ -1939,13 +1944,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				p1 = lim_str(text, 128)
 				if p1:
 					return ("Data", p1)
-		resp = await process_image(d, "downsample", ["-nogif", 5, 1024 if best else 512, 128, "-bg", "-f", "png"], timeout=30)
-		caption = None
 		if best >= 2:
-			name = url.rsplit("/", 1)[-1].split("?", 1)[0]
 			with tracebacksuppressor:
 				caption = await self.gpt4v(url, name=name, best=best - 2)
 		if not caption:
+			resp = await process_image(d, "downsample", ["-nogif", 5, 1024 if best else 512, 128, "-bg", "-f", "png"], timeout=30)
+			caption = None
 			futs = []
 			# fut = asubmit(self.neva, resp)
 			# futs.append(fut)
@@ -2002,12 +2006,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			else:
 				prompts = nprompts + prompts
 			if best >= 2:
-				name = url.rsplit("/", 1)[-1].split("?", 1)[0]
 				with tracebacksuppressor:
 					caption = await self.cocaption(url, prompts, name=name, best=best - 2)
 		if not caption:
 			if len(prompts) > 1:
-				name = url.rsplit("/", 1)[-1].split("?", 1)[0]
 				caption = await self.recaption(prompts, name=name, best=best - 2)
 			elif not prompts:
 				caption = ""
