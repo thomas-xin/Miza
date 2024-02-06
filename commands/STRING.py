@@ -821,7 +821,7 @@ class Char2Emoji(Command):
 		if len(args) < 3:
 			args.append("⬛")
 		resp = _c2e(*args[:3])
-		if hasattr(message, "simulated"):
+		if hasattr(message, "simulated") or len(args[0]) <= 25:
 			return resp
 		out = []
 		for line in resp:
@@ -1298,7 +1298,7 @@ class Describe(Command):
 		if not s:
 			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 			fut = asubmit(reqs.next().head, url, headers=Request.header(), stream=True)
-			cap = await self.bot.caption(url, best=3 if premium >= 4 else 2, timeout=24)
+			cap = await self.bot.caption(url, best=3 if premium >= 4 else 1, timeout=24)
 			s = "\n\n".join(filter(bool, cap)).strip()
 			resp = await fut
 			name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
@@ -2023,7 +2023,7 @@ class Ask(Command):
 				m.urls = found
 			if found and (premium < 4 or found.rsplit("?", 1)[0].rsplit(".", 1)[-1] not in ("png", "jpeg", "jpg", "gif", "webp")):
 				if m.id == message.id or reference and m.id == reference.id:
-					best = 3 if premium >= 4 else 2
+					best = 3 if premium >= 4 else 1
 				else:
 					best = False if premium >= 4 else None
 				cfut = csubmit(bot.caption(found, best=best))
@@ -2860,7 +2860,7 @@ class Ask(Command):
 				else:
 					raise FileNotFoundError(f"Unable to find model \"{model}\".")
 				text = regexp(r"\[inst", re.I).split(text, 1)[0].removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
-				if text and not text.rsplit(None, 1)[-1].startswith(":"):
+				if text and text.strip() and not text.rsplit(None, 1)[-1].startswith(":"):
 					text = text.rstrip(":")
 				if not text or len(text) >= 2 and text[-1] in ",: aAsS" and text[-2] not in ",.!?" or text.endswith(' "') or text.endswith('\n"'):
 					redo = True
@@ -2872,8 +2872,12 @@ class Ask(Command):
 			out = text
 
 			if premium >= 2 and freebies is not None:
-				bot.data.users[user.id].setdefault("freebies", []).append(utc())
+				data = bot.data.users.setdefault(user.id, {})
+				freebies = [t for t in data.get("freebies", ()) if utc() - t < 86400]
+				freebies.append(utc())
+				data["freebies"] = freebies
 				rem = freelim - len(freebies)
+				print("REM:", user, rem)
 				if not emb and rem in (27, 9, 3, 1):
 					emb = discord.Embed(colour=rand_colour())
 					emb.set_author(**get_author(bot.user))

@@ -205,6 +205,23 @@ class Perms(Command):
 	slash = True
 	ephemeral = True
 
+	def perm_display(self, value):
+		if isinstance(value, str):
+			pass
+		elif not value <= inf:
+			return "nan (Bot Owner)"
+		elif req >= inf:
+			return "inf (Administrator)"
+		elif req >= 3:
+			return f"{req} (Ban Members or Manage Channels/Server)"
+		elif req >= 2:
+			return f"{req} (Manage Messages/Threads/Nicknames/Roles/Webhooks/Emojis/Events)"
+		elif req >= 1:
+			return f"{req} (View Audit Log/Server Insights or Move/Mute/Deafen Members or Mention Everyone)"
+		elif req >= 0:
+			return f"{req} (Member)"
+		return f"{req} (Guest)"
+
 	async def __call__(self, bot, args, argl, user, name, perm, channel, guild, flags, **void):
 		if name == "defaultperms":
 			users = (guild.get_role(guild.id),)
@@ -226,9 +243,9 @@ class Perms(Command):
 						c_perm = round_min(bot.get_perms(t_user, guild))
 						m_perm = max(abs(t_perm), abs(c_perm), 2) + 1
 						if not perm < m_perm and not isnan(m_perm):
-							msgs.append(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(t_perm)} to the default value of {sqr_md(c_perm)}."))
+							msgs.append(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(self.perm_display(t_perm))} to the default value of {sqr_md(self.perm_display(c_perm))}."))
 							continue
-						reason = f"to change permissions for {name} in {guild} from {t_perm} to {c_perm}"
+						reason = f"to change permissions for {name} in {guild} from {self.perm_display(t_perm)} to {self.perm_display(c_perm)}"
 						bot.set_perms(t_user, guild, o_perm)
 						raise self.perm_error(perm, m_perm, reason)
 					orig = t_perm
@@ -246,11 +263,11 @@ class Perms(Command):
 						bot.set_perms(t_user, guild, c_perm)
 						if "h" in flags:
 							continue
-						msgs.append(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(t_perm)} to {sqr_md(c_perm)}."))
+						msgs.append(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(self.perm_display(t_perm))} to {sqr_md(self.perm_display(c_perm))}."))
 						continue
-					reason = f"to change permissions for {name} in {guild} from {t_perm} to {c_perm}"
+					reason = f"to change permissions for {name} in {guild} from {self.perm_display(t_perm)} to {self.perm_display(c_perm)}"
 					raise self.perm_error(perm, m_perm, reason)
-				msgs.append(css_md(f"Current permissions for {sqr_md(t_user)} in {sqr_md(guild)}: {sqr_md(t_perm)}."))
+				msgs.append(css_md(f"Current permissions for {sqr_md(t_user)} in {sqr_md(guild)}: {sqr_md(self.perm_display(t_perm))}."))
 		finally:
 			return "".join(msgs)
 

@@ -2439,7 +2439,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		if not os.path.exists(target_model) or not os.path.getsize(target_model):
 			if raises:
 				raise RuntimeError("Model is loading, please wait...")
-			args = [sys.executable, "misc/downloader.py", "https://civitai.com/api/download/models/252831?type=Model&format=SafeTensor&size=full&fp=fp16", target_model]
+			args = [sys.executable, "misc/downloader.py", "https://civitai.com/api/download/models/320428?type=Model&format=SafeTensor&size=full&fp=fp16", target_model]
 			print(args)
 			subprocess.run(args)
 		if not raises:
@@ -2478,7 +2478,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			except KeyError:
 				ib = CBOTS[None] = imagebot.Bot()
 			return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=2, aspect_ratio=aspect_ratio, negative_prompt=negative_prompt)
-		model = "zavychromaxl_v30.safetensors"
+		model = "zavychromaxl_v40.safetensors"
 		PORT = 7800 + DEV
 		webui_server_url = f"http://127.0.0.1:{PORT}"
 		try:
@@ -2586,7 +2586,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		im = downsample(im, keep_alpha=False)
 		if im.width * im.height > x * y:
 			return resize_to(orig, x, y)
-		model = "zavychromaxl_v30.safetensors"
+		model = "zavychromaxl_v40.safetensors"
 		PORT = 7800 + DEV
 		webui_server_url = f"http://127.0.0.1:{PORT}"
 		try:
@@ -2904,7 +2904,7 @@ def ImageOpIterator(image, step=1, operation=None, ts=0, args=()):
 	# Attempt to perform operation on all individual frames of .gif images
 	fl = 0
 	for i in range(2147483648):
-		f = max(fl, round_random(i * step))
+		f = max(fl, round_random(i * step) if step > 1 else round(i * step))
 		fl = f
 		np.random.seed(ts & 4294967295)
 		globals()["CURRENT_FRAME"] = i

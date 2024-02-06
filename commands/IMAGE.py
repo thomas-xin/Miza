@@ -774,7 +774,18 @@ class Orbit(Command):
 			extras.append(urls[0])
 		# if extras:
 		#     print(url, *extras)
+		ems = find_emojis(value)
+		for em in ems:
+			u = await bot.emoji_to_url(em)
+			if u:
+				extras.append(u)
+			else:
+				ems.remove(u)
+		if ems:
+			search = ems[-1]
+			value = value[value.index(search) + len(search):].strip()
 		spl = value.rsplit(None, 1)
+		print("ORBIT:", name, value, url, fmt, extra, extras, sep=", ")
 		if not spl:
 			if not extras:
 				count = 5
@@ -1662,7 +1673,6 @@ class Art(Command):
 				u = user
 			data = bot.data.users.get(u.id, {})
 			oai = data.get("trial") and data.get("openai_key")
-			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 			resp = cdict(choices=[])
 			if len(resp.choices) < dups:
 				futs = []
@@ -1676,7 +1686,7 @@ class Art(Command):
 							frequency_penalty=0.25,
 							presence_penalty=0,
 						),
-						best=premium >= 3,
+						best=premium >= 3 and not (dups > 2 and not i),
 						skip=False,
 					))
 					futs.append(fut)
@@ -2037,8 +2047,12 @@ class Art(Command):
 				fn = await ffut
 			files.append(CompatFile(fn, filename=prompt + ".png", description=prompt))
 		if premium >= 2 and freebies is not None:
-			bot.data.users[user.id].setdefault("freebies", []).extend((utc() - 1, utc()))
+			data = bot.data.users.setdefault(user.id, {})
+			freebies = [t for t in data.get("freebies", ()) if utc() - t < 86400]
+			freebies.extend((utc() - 1, utc()))
+			data["freebies"] = freebies
 			rem = freelim - len(freebies)
+			print("REM:", user, rem)
 			if not emb and rem in (27, 26, 9, 8, 3, 2, 1):
 				emb = discord.Embed(colour=rand_colour())
 				emb.set_author(**get_author(bot.user))

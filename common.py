@@ -2958,6 +2958,8 @@ def spec2cap():
 			caps.append("sdxlr")
 			caps.append("sdxl")
 			caps.append("nvram")
+			if vrams[i] > 19 * 1073741824:
+				caps.append("sd")
 			# done.append("sdxlr")
 			v -= 15 * 1073741824
 		elif c > 400000 and v > 9 * 1073741824 and "sdxl" not in done:
@@ -4749,17 +4751,17 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
 		if reason is None:
 			reason = f"for command {self.name[-1]}"
 		if isinstance(req, str):
-			req = req
+			pass
 		elif not req <= inf:
-			req = "nan (Bot owner)"
+			req = "nan (Bot Owner)"
 		elif req >= inf:
-			req = "inf (Admin)"
+			req = "inf (Administrator)"
 		elif req >= 3:
-			req = f"{req} (Moderator)"
+			req = f"{req} (Moderator: Ban Members or Manage Channels/Server)"
 		elif req >= 2:
-			req = f"{req} (Helper)"
+			req = f"{req} (Helper: Manage Messages/Threads/Nicknames/Roles/Webhooks/Emojis/Events)"
 		elif req >= 1:
-			req = f"{req} (Trusted)"
+			req = f"{req} (Trusted: View Audit Log/Server Insights or Move/Mute/Deafen Members or Mention Everyone)"
 		elif req >= 0:
 			req = f"{req} (Member)"
 		else:

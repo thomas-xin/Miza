@@ -1442,11 +1442,11 @@ class Relay(Command):
 			futs.append(fut)
 		mids = []
 		uids = []
-		for fut in futs:
+		for fut, u in zip(futs, users):
 			with bot.ExceptionSender(channel):
 				mes = await fut
 				mids.append(mes.id)
-				uids.append(mes.channel.recipient.id)
+				uids.append(u.id)
 		if not mids or not uids:
 			return
 		uidf = "x".join(map(str, uids))

@@ -415,6 +415,7 @@ def orbit_gif2(image, orbitals, duration, extras):
 		step = fps / 24
 		image = ImageSequence(*ImageOpIterator(image, step=step))
 		f = len(image)
+		extras = [ImageSequence(*ImageOpIterator(im, step=step)) for im in extras]
 	length = f
 	loops = total / duration / 1000
 	scale = 1
@@ -452,7 +453,7 @@ def orbit_gif2(image, orbitals, duration, extras):
 				except EOFError:
 					image.length = f
 					image.seek(0)
-				image = resize_max(image, diameter, force=True)
+				image = resize_max(image, diameter, force=2)
 				angle = f / length / scale * loops * tau / x + j / orbitals * tau
 				pos = im.width / 2 + np.array((cos(angle), sin(angle))) * (diameter * scale2 / 2 - diameter / 2) - (image.width / 2, image.height / 2)
 				pos = list(map(round, pos))

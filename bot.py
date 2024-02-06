@@ -1218,7 +1218,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if guild is not None:
 				emoji = await guild.fetch_emoji(e_id)
 			else:
-				raise LookupError("Emoji not found.")
+				raise LookupError("Emoji not found or not usable.")
 		self.cache.emojis[e_id] = emoji
 		return emoji
 
@@ -1613,6 +1613,110 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			emoji = e
 		return emoji.animated
 
+	async def proxy_emojis(self, msg, guild=None, user=None, is_webhook=False, return_pops=False, lim=1936):
+		orig = self.bot.data.emojilists.get(user.id, {}) if user else {}
+		emojis = None
+		regex = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
+		pops = set()
+		offs = 0
+		while offs < len(msg):
+			matched = regex.search(msg[offs:])
+			if not matched:
+				break
+			substitutes = None
+			s = matched.group()
+			start = matched.start()
+			while s and not regexp(":[A-Za-z0-9\\-~_]").fullmatch(s[:2]):
+				s = s[1:]
+				start += 1
+			while s and not regexp("[A-Za-z0-9\\-~_]:").fullmatch(s[-2:]):
+				s = s[:-1]
+			offs = start = offs + start
+			offs += len(s)
+			if not s:
+				continue
+			name = s[1:-1]
+			if emojis is None:
+				emojis = self.data.autoemojis.guild_emoji_map(guild, user, dict(orig))
+			emoji = emojis.get(name)
+			if not emoji:
+				if name.isnumeric():
+					emoji = int(name)
+				else:
+					t = name[::-1].replace("~", "-", 1)[::-1].rsplit("-", 1)
+					if t[-1].isnumeric():
+						i = int(t[-1])
+						if i < 1000:
+							if not emoji:
+								name = t[0]
+								emoji = emojis.get(name)
+							while i > 1 and not emoji:
+								i -= 1
+								name = t[0] + "-" + str(i)
+								emoji = emojis.get(name)
+			if type(emoji) is int:
+				e_id = await self.id_from_message(emoji)
+				emoji = self.cache.emojis.get(e_id)
+				if not emoji:
+					animated = await asubmit(self.is_animated, e_id, verify=True)
+					if animated is not None:
+						emoji = cdict(id=e_id, animated=animated, name=self.data.emojinames.get(e_id))
+				if not emoji and not is_webhook and user:
+					self.data.emojilists.get(user.id, {}).pop(name, None)
+					self.data.emojilists.update(user.id)
+			if emoji:
+				pops.add((str(name), emoji.id))
+				if len(msg) < lim:
+					sub = "<"
+					if emoji.animated:
+						sub += "a"
+					name = getattr(emoji, "name", None) or "_"
+					sub += f":{name}:{emoji.id}>"
+				else:
+					sub = min_emoji(emoji)
+				substitutes = (start, sub, start + len(s))
+				if getattr(emoji, "name", None):
+					if not is_webhook and user:
+						orig = self.data.emojilists.setdefault(user.id, {})
+						orig.setdefault(name, emoji.id)
+						self.data.emojilists.update(user.id)
+						self.data.emojinames[emoji.id] = name
+			if substitutes:
+				msg = msg[:substitutes[0]] + substitutes[1] + msg[substitutes[2]:]
+		if return_pops:
+			return msg, pops
+		return msg
+
+	async def emoji_to_url(self, e):
+		if isinstance(e, str) and not e.isnumeric():
+			e = e[3:]
+			i = e.index(":")
+			e_id = int(e[i + 1:e.rindex(">")])
+			try:
+				url = str(self.cache.emojis[e_id].url)
+			except KeyError:
+				anim = await asubmit(self.is_animated, e_id)
+				if anim is None:
+					return
+				if anim:
+					fmt = "gif"
+				else:
+					fmt = "png"
+				url = f"https://cdn.discordapp.com/emojis/{e_id}.{fmt}"
+		elif type(e) in (int, str):
+			anim = self.is_animated(e)
+			if anim is None:
+				return
+			fmt = "gif" if anim else "png"
+			url = f"https://cdn.discordapp.com/emojis/{e}.{fmt}"
+		else:
+			anim = self.is_animated(e)
+			if anim is None:
+				return
+			fmt = "gif" if anim else "png"
+			url = f"https://cdn.discordapp.com/emojis/{e.id}.{fmt}"
+		return url
+
 	def emoji_exists(self, e):
 		if type(e) in (int, str):
 			url = f"https://cdn.discordapp.com/emojis/{e}.png"
@@ -1706,7 +1810,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	async def _rank_embeddings(embs, emb, temp=0.5):
 		di = getattr(self, "efficient_device", None)
 		if di is None:
-			di = self.efficient_device = np.argsort([-device_cap(i, resolve=True) * COMPUTE_POT[i] for i in range(torch.cuda.device_count())])[0]
+			if not torch.cuda.device_count:
+				di = self.efficient_device = -1
+			else:
+				di = self.efficient_device = np.argsort([-device_cap(i, resolve=True) * COMPUTE_POT[i] for i in range(torch.cuda.device_count())])[0]
 		dt = torch.bfloat16 if device_cap(di)[0] >= 8 else torch.float32
 		btest = base64.b64decode(emb)
 		y = torch.frombuffer(btest, dtype=torch.float16).to(dt).to(di)
@@ -1726,7 +1833,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		inds = check >= top - temp * 2 / 3
 		return order[inds].cpu().numpy()
 
-	decensor = regexp(r"(?:i am unable to|i'm unable to|i cannot|i can't|i am not able to|i'm not able to) (?:fulfil|assist|help|provide|do|respond|comply|engage|perform)", re.I)
+	decensor = regexp(r"(?:i am unable to|i'm unable to|i cannot|i can't|i am not able to|i'm not able to) (?:fulfil|assist|help|provide|do|respond|comply|engage|perform)|refrain from", re.I)
 
 	llcache = Cache(timeout=86400, trash=256)
 	async def instruct(self, data, best=False, skip=False, prune=True, cache=True):
@@ -1944,6 +2051,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				p1 = lim_str(text, 128)
 				if p1:
 					return ("Data", p1)
+		caption = None
 		if best >= 2:
 			with tracebacksuppressor:
 				caption = await self.gpt4v(url, name=name, best=best - 2)
@@ -2284,18 +2392,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					res = await fut
 					out.append(best_url(res))
 		for s in emojis:
-			s = s[3:]
-			i = s.index(":")
-			e_id = int(s[i + 1:s.rindex(">")])
-			try:
-				out.append(str(self.cache.emojis[e_id].url))
-			except KeyError:
-				animated = await asubmit(self.is_animated, e_id)
-				if animated:
-					end = "gif"
-				else:
-					end = "png"
-				url = f"https://cdn.discordapp.com/emojis/{e_id}.{end}"
+			url = await self.emoji_to_url(s)
 			out.append(url)
 		if not out:
 			out = find_urls(translate_emojis(replace_emojis(url)))
@@ -2828,9 +2925,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return 4
 		elif any((p.ban_members, p.manage_channels, p.manage_guild)):
 			return 3
-		elif any((p.kick_members, p.manage_messages, p.manage_nicknames, p.manage_roles, p.manage_webhooks, p.manage_emojis)):
+		elif any((p.kick_members, p.manage_messages, p.manage_nicknames, p.manage_roles, p.manage_webhooks, p.manage_emojis, p.value & 0x200000000, p.value & 0x400000000)):
 			return 2
-		elif any((p.view_audit_log, p.priority_speaker, p.mention_everyone, p.move_members)):
+		elif any((p.view_audit_log, p.priority_speaker, p.mention_everyone, p.move_members, p.mute_members, p.deafen_members, p.value & 0x80000)):
 			return 1
 		return -1
 
@@ -4329,6 +4426,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							inc_dict(flags, h=1)
 						if argv:
 							# Commands by default always parse unicode fonts as regular text unless otherwise specified.
+							argv = await self.proxy_emojis(argv, guild=guild, user=user, is_webhook=getattr(message, "webhook_id", None), lim=inf)
 							if not hasattr(command, "no_parse"):
 								argv = unicode_prune(argv)
 							argv = argv.strip()
@@ -4685,7 +4783,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			members = {int(m["user"]["id"]): discord.Member(guild=guild, data=m, state=self._connection) for m in memberdata}
 			_members.update(members)
 			i = len(memberdata)
-			x = max(members)
+			x = max(members) if members else 0
 		guild._members = _members
 		guild._member_count = len(_members)
 		return guild.members
@@ -4696,9 +4794,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		futs = alist()
 		for n, guild in enumerate(self.client.guilds):
 			i = n % 5 != 0
-			if not i and getattr(guild, "_member_count", len(guild._members)) > 250:
+			if not i and not (mc := getattr(guild, "_member_count", None) or len(guild._members)) or mc > 250:
 				i = 1
-			fut = create_task(asyncio.wait_for(funcs[i](guild), timeout=None if i else 30))
+			fut = create_task(asyncio.wait_for(funcs[i](guild), timeout=3600 if i else 30))
 			fut.guild = guild
 			if len(futs) >= 8:
 				pops = [a for a, fut in enumerate(futs) if fut.done()]

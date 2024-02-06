@@ -1221,6 +1221,7 @@ class Server:
 				return b"\xf0\x9f\x92\x9c"
 			raise PermissionError
 		filename = "/".join(filepath)
+		data = None
 		try:
 			data, mime = fetch_static("static/" + filename, ignore=True)
 		except FileNotFoundError:
@@ -1228,6 +1229,8 @@ class Server:
 				data, mime = fetch_static(filename)
 			except FileNotFoundError as ex:
 				print(true_ip(), repr(ex))
+		if data is None:
+			raise FileNotFoundError(500, filepath)
 		cp.response.headers.update(CHEADERS)
 		cp.response.headers["Content-Type"] = mime
 		cp.response.headers["Content-Length"] = len(data)
@@ -1959,7 +1962,7 @@ class Server:
 		print("Convert", of, mime, size)
 		dur = get_duration(of)
 		if mime.split("/", 1)[-1] in ("mp4", "webm"):
-			if dur > 3600 and size > 524288000:
+			if (not dur or dur > 3600) and (not size or size > 524288000):
 				raise StopIteration
 			if size / dur <= 1048576:
 				args = [

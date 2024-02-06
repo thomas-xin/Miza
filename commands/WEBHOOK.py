@@ -236,73 +236,7 @@ class UpdateAutoEmojis(Database):
 					return
 		if message.content.count(":") < 2:
 			return
-		regex = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
-		pops = set()
-		offs = 0
-		while offs < len(msg):
-			matched = regex.search(msg[offs:])
-			if not matched:
-				break
-			substitutes = None
-			s = matched.group()
-			start = matched.start()
-			while s and not regexp(":[A-Za-z0-9\\-~_]").fullmatch(s[:2]):
-				s = s[1:]
-				start += 1
-			while s and not regexp("[A-Za-z0-9\\-~_]:").fullmatch(s[-2:]):
-				s = s[:-1]
-			offs = start = offs + start
-			offs += len(s)
-			if not s:
-				continue
-			name = s[1:-1]
-			if emojis is None:
-				emojis = self.guild_emoji_map(guild, message.author, dict(orig))
-			emoji = emojis.get(name)
-			if not emoji:
-				if name.isnumeric():
-					emoji = int(name)
-				else:
-					t = name[::-1].replace("~", "-", 1)[::-1].rsplit("-", 1)
-					if t[-1].isnumeric():
-						i = int(t[-1])
-						if i < 1000:
-							if not emoji:
-								name = t[0]
-								emoji = emojis.get(name)
-							while i > 1 and not emoji:
-								i -= 1
-								name = t[0] + "-" + str(i)
-								emoji = emojis.get(name)
-			if type(emoji) is int:
-				e_id = await self.bot.id_from_message(emoji)
-				emoji = self.bot.cache.emojis.get(e_id)
-				if not emoji:
-					animated = await asubmit(self.bot.is_animated, e_id, verify=True)
-					if animated is not None:
-						emoji = cdict(id=e_id, animated=animated, name=self.bot.data.emojinames.get(e_id))
-				if not emoji and not message.webhook_id:
-					self.bot.data.emojilists.get(message.author.id, {}).pop(name, None)
-					self.bot.data.emojilists.update(message.author.id)
-			if emoji:
-				pops.add((str(name), emoji.id))
-				if len(msg) < 1936:
-					sub = "<"
-					if emoji.animated:
-						sub += "a"
-					name = getattr(emoji, "name", None) or "_"
-					sub += f":{name}:{emoji.id}>"
-				else:
-					sub = min_emoji(emoji)
-				substitutes = (start, sub, start + len(s))
-				if getattr(emoji, "name", None):
-					if not message.webhook_id:
-						orig = self.bot.data.emojilists.setdefault(message.author.id, {})
-						orig.setdefault(name, emoji.id)
-						self.bot.data.emojilists.update(message.author.id)
-						self.bot.data.emojinames[emoji.id] = name
-			if substitutes:
-				msg = msg[:substitutes[0]] + substitutes[1] + msg[substitutes[2]:]
+		msg, pops = await self.bot.proxy_emojis(msg, guild=guild, user=message.author, is_webhook=message.webhook_id, return_pops=True)
 		if not msg or msg == message.content:
 			return
 		msg = escape_everyone(msg).strip("\u200b")
@@ -317,6 +251,7 @@ class UpdateAutoEmojis(Database):
 		csubmit(self.bot.silent_delete(message))
 		url = await self.bot.get_proxy_url(message.author)
 		m = await self.bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
+		regex = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
 		if recursive and regex.search(m.content):
 			m = await m.edit(content=msg)
 			print(m, m.content)
@@ -802,7 +737,7 @@ class Mimic(Command):
 			msg = ""
 		else:
 			content += f"{len(mimics)} currently enabled webhook mimic(s) for {str(user).replace('`', '')}:```*"
-			key = lambda x: lim_str("⟨" + ", ".join(i + ": " + (str(no_md(mimicdb[i].name)), "[<@" + str(getattr(mimicdb[i], "auto", "None")) + ">]")[bool(getattr(mimicdb[i], "auto", None))] for i in iter(x)) + "⟩", 1900 / len(mimics))
+			key = lambda x: lim_str("⟨" + ", ".join(i + ": " + (str(no_md(mimicdb[i].get("name"))), "[<@" + str(mimicdb[i].get("auto", "None")) + ">]")[bool(mimicdb[i].get("auto"))] for i in iter(x)) + "⟩", 1900 / len(mimics))
 			msg = ini_md(iter2str({k: mimics[k] for k in sorted(mimics)[pos:pos + page]}, key=key))
 		colour = await bot.get_colour(user)
 		emb = discord.Embed(

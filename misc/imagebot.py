@@ -848,6 +848,7 @@ class Bot:
 				kw["negative_prompt_2"] = [negs[not i] for i in neg_indices]
 		else:
 			true_prompt = [prompt] * count
+			kw.pop("denoising_end", None)
 		# if not spare:
 			# pipe.enable_model_cpu_offload(gpu_id=device)
 		if f2 in (StableDiffusionInpaintPipeline, StableDiffusionXLInpaintPipeline):
