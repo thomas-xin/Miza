@@ -1653,7 +1653,7 @@ class Art(Command):
 		elif sdxl:
 			amount = 9 if premium >= 5 else 4 if premium >= 3 else 1
 		else:
-			amount = 9 if premium >= 4 else 4
+			amount = 9 if premium >= 4 else 4 if premium >= 2 else 2
 		amount = min(count, amount)
 		dups = ceil(amount / 2)
 		eprompts = alist()

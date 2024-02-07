@@ -760,7 +760,7 @@ def round_random(x):
 
 def rounder(x):
 	try:
-		if type(x) is int:
+		if isinstance(x, (int, sympy.Integer)):
 			return x
 		y = int(x)
 		if x == y:
@@ -1193,9 +1193,15 @@ def evalSym(f, prec=64, r=False, variables=None):
 				pass
 		elif hasattr(i, "doit"):
 			try:
-				f = f.subs(i, i.doit())
+				i2 = i.doit()
 			except:
-				pass
+				continue
+			if i == i2 and str(i) == str(i2):
+				continue
+			try:
+				f = f.subs(i, i2)
+			except:
+				continue
 	# If the requested expression evaluates to a plot, return it
 	if isinstance(f, Plot) or f is plt or type(f) is str:
 		return (f,)
@@ -1212,9 +1218,15 @@ def evalSym(f, prec=64, r=False, variables=None):
 				pass
 		elif hasattr(i, "doit"):
 			try:
-				f = f.subs(i, i.doit())
+				i2 = i.doit()
 			except:
-				pass
+				continue
+			if i == i2 and str(i) == str(i2):
+				continue
+			try:
+				f = f.subs(i, i2)
+			except:
+				continue
 	# Select list of answers to return based on the desired float precision level
 	if isinstance(f, (str, bool, tuple, list, dict, np.ndarray)):
 		return [f]
@@ -1224,7 +1236,7 @@ def evalSym(f, prec=64, r=False, variables=None):
 	# 	return [f.evalf(prec, chop=True)]
 	if prec:
 		try:
-			y = f.evalf(prec, chop=True)
+			y = f.evalf(prec, chop=False)
 		except:
 			y = f
 		try:
