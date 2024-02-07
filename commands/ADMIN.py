@@ -2178,6 +2178,31 @@ class UpdateUserLogs(Database):
 		emb.colour = colour2raw(colour)
 		self.bot.send_embeds(channel, emb)
 
+	async def _channel_update_(self, before, after, guild, **void):
+		if guild.id not in self.data:
+			return
+		c_id = self.data[guild.id]
+		try:
+			channel = await self.bot.fetch_channel(c_id)
+		except (EOFError, discord.NotFound):
+			self.data.pop(guild.id)
+			return
+		emb = discord.Embed(colour=8323072)
+		mlist = self.bot.data.channel_cache.get(after.id)
+		count = f" ({len(mlist)}+)" if mlist else ""
+		if before.name != after.name:
+			emb.add_field(
+				name="Name",
+				value=escape_markdown(before.name) + " ➡️ " + escape_markdown(after.name),
+			)
+		elif before.position != after.position:
+			emb.add_field(
+				name="Position",
+				value=str(before.position) + " ➡️ " + str(after.position),
+			)
+		emb.description = f"{channel_mention(after.id)}{count} has been updated:"	
+		self.bot.send_embeds(channel, emb)
+
 	async def _channel_delete_2_(self, ch, guild, user, **void):
 		if guild.id not in self.data:
 			return
@@ -2192,9 +2217,9 @@ class UpdateUserLogs(Database):
 		count = f" ({len(mlist)}+)" if mlist else ""
 		if user:
 			emb.set_author(**get_author(user))
-			emb.description = f"{channel_mention(ch.id)}{count} was deleted by {user_mention(user.id)}."
+			emb.description = f"#{ch.name}{count} was deleted by {user_mention(user.id)}."
 		else:
-			emb.description = f"{channel_mention(ch.id)}{count} has been deleted."	
+			emb.description = f"#{ch.name}{count} has been deleted."	
 		self.bot.send_embeds(channel, emb)
 
 	async def _guild_update_(self, before, after, **void):

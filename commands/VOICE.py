@@ -3145,6 +3145,19 @@ class AudioDownloader:
 				args.extend(("-ar", sr, "-ac", ac))
 				if vst:
 					args.extend(("-pix_fmt", "yuv420p", "-crf", "28"))
+			if topng and not vst and is_url(asf) and len(ast) == 1:
+				with reqs.next().get(asf, headers=Request.header(), stream=True) as resp:
+					head = fcdict(resp.headers)
+					it = resp.iter_content(262144)
+					data = next(it)
+				mime = magic.from_buffer(data)
+				if mime.rsplit("/", 1)[-1] in ("png", "jpeg", "webp", "ico", "gif"):
+					argn = [65536, 0, "auto", "-f", "png"]
+					if ofmt not in ("gif", "webp"):
+						argn.insert(0, "-nogif")
+					resp = await_fut(process_image(asf, "resize_max", argn, timeout=480))
+					outf = f"{info['name']}.{ofmt}"
+					return resp, outf
 			args.extend(("-i", asf, "-map_metadata", "-1"))
 			if auds:
 				args.extend(auds.construct_options(full=True))
@@ -3192,7 +3205,7 @@ class AudioDownloader:
 			if not copy and ast:
 				args.extend(("-b:a", str(br)))
 				if len(ast) == 1:
-					args.extend(("-ar", sr, "-ac", ac, "-b:a", str(br)))
+					args.extend(("-ar", sr, "-ac", ac))
 					if vst:
 						args.extend(("-pix_fmt", "yuv420p", "-crf", "28"))
 			if copy:

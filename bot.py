@@ -5676,7 +5676,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			def _user(self):
 				return bot.cache.users.get(self.id) or self
 			@_user.setter
-			def set_user(self, user):
+			def _user(self, user):
 				bot.cache.users[user.id] = user
 
 			def _to_minimal_user_json(self):
@@ -7066,6 +7066,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			guild = channel.guild
 			if guild:
 				await self.send_event("_channel_create_", channel=channel, guild=guild)
+
+		# Channel update event: calls _channel_update_ bot database event.
+		@self.event
+		async def on_guild_channel_update(before, after):
+			self.sub_channels[after.id] = after
+			guild = after.guild
+			if guild and (before.name != after.name or before.position != after.position):
+				await self.send_event("_channel_update_", before=before, after=after, guild=guild)
 
 		# Channel delete event: calls _channel_delete_ bot database event.
 		@self.event
