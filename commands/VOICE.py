@@ -5394,7 +5394,7 @@ class Lyrics(Command):
 class Download(Command):
 	time_consuming = True
 	_timeout_ = 75
-	name = ["📥", "Search", "YTDL", "DownloadAsMP3", "Youtube_DL", "AF", "AudioFilter", "Trim", "Concat", "Concatenate", "🌽🐱", "ConvertORG", "Org2xm", "Convert"]
+	name = ["📥", "YTSearch", "YTDL", "DownloadAsMP3", "Youtube_DL", "AF", "AudioFilter", "Trim", "Concat", "Concatenate", "🌽🐱", "ConvertORG", "Org2xm", "Convert"]
 	description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link. Will extend (loop) if trimmed past the end. The \"-\" character is used to omit parameters for ~trim."
 	usage = "<0:search_links>* <multi_output(-m)|trim(-t)>? <-3:trim_start[-]>? <-2:trim_end[-]>? <-1:out_format[mp4]>? <concatenate(-c)|remove_silence(-r)|apply_settings(-a)|verbose_search(-v)>*"
 	example = ("download https://www.youtube.com/watch?v=kJQP7kiw5Fk mp3", "trim https://www.youtube.com/watch?v=dQw4w9WgXcQ 1m 3m as mp4", "concatenate https://www.youtube.com/watch?v=kJQP7kiw5Fk https://www.youtube.com/watch?v=dQw4w9WgXcQ webm")
@@ -5641,7 +5641,7 @@ class Download(Command):
 					download = None
 					if tuple(map(str, (start, end))) == ("None", "None") and not silenceremove and not auds and fmt in ("mp3", "opus", "ogg", "wav", "weba"):
 						# view = bot.raw_webserver + "/ytdl?fmt=" + fmt + "&view=" + url
-						download =  f"http://127.0.0.1:{PORT}/ytdl?fmt={fmt}&download={url}"
+						download =  f"http://127.0.0.1:{PORT}/ytdl?fmt={fmt}&download={url_parse(url)}"
 						entries = await asubmit(ytdl.search, url)
 						if entries:
 							name = entries[0].get("name")

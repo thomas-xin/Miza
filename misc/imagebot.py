@@ -293,8 +293,12 @@ def split_prompt(prompt, limit=75, aggressive=False):
 		prompt, prompt2 = (s.strip() for s in prompt.split("..", 1))
 	else:
 		prompt2 = prompt
-		if aggressive or "\n\n" in prompt or ".." in lim_tokens(prompt, limit):
-			if "\n\n" in prompt:
+		if aggressive or " BREAK " in prompt or "\n\n" in prompt or ".." in lim_tokens(prompt, limit):
+			if " BREAK " in prompt:
+				spl = prompt.split(" BREAK ")
+				half = len(spl) + 1 >> 1
+				prompt, prompt2 = " BREAK ".join(spl[:half]).rstrip(), " BREAK ".join(spl[half:]).lstrip(" ,.")
+			elif "\n\n" in prompt:
 				spl = prompt.split("\n\n")
 				half = len(spl) + 1 >> 1
 				prompt, prompt2 = "\n\n".join(spl[:half]).rstrip(), "\n\n".join(spl[half:]).lstrip(" ,.")

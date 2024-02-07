@@ -2412,7 +2412,7 @@ class Ask(Command):
 						for i, m in enumerate(ufc, 1):
 							prompt += f"\n{i}] {m_str(m)}\n"
 						i += 1
-						prompt += f'"""\n\n### Instruction:\n"""\n{i}] {m_str(ms)}\n"""\n\nAssuming your name is {bot_name}, which of the numbered messages is the first that contains information required to answer the instruction question? (Provide only the number, not a full reply! If there are none relevant, respond with "-1").\n\n### Response:'
+						prompt += f'"""\n\n### Instruction:\n"""\n{m_str(ms)}\n"""\n\nAssuming your name is {bot_name}, which of the numbered messages is the first that contains information required to answer the instruction question? (Provide only the number, not a full reply! If there are none relevant, respond with "-1").\n\n### Response:'
 						# print("Context prompt:", prompt)
 						data = dict(
 							prompt=prompt,
@@ -3369,3 +3369,20 @@ class Urban(Command):
 				inline=False,
 			))
 		self.bot.send_as_embeds(channel, title=title, fields=fields, author=get_author(user), reference=message)
+
+
+class Search(Command):
+	time_consuming = True
+	name = ["🦆", "🌐", "Google", "Bing", "DuckDuckGo", "Browse"]
+	description = "Searches the web for an item."
+	usage = "<string>"
+	example = ("google en passant",)
+	rate_limit = (10, 16)
+	typing = True
+	slash = True
+	ephemeral = True
+	no_parse = True
+
+	async def __call__(self, bot, channel, user, argv, message, **void):
+		s = await bot.browse(argv, uid=user.id)
+		self.bot.send_as_embeds(channel, s, title=f"Search results for {json.dumps(argv)}:", author=get_author(user), reference=message)

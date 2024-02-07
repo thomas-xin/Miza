@@ -323,6 +323,8 @@ sympy.erfc.inverse = sympy.erfcinv
 
 r_evalf = sympy.Rational.evalf
 from sympy.solvers.diophantine.diophantine import divisible
+from sympy.printing.pretty.pretty import PrettyPrinter
+from sympy.printing.pretty.stringpict import prettyForm
 
 def carmichael(n):
 	temp = _factorint(n)
@@ -362,9 +364,9 @@ def simplify_recurring(r, prec=100):
 	s = str(r_evalf(r, transient + digits * 3))
 	dec = s.split(".", 1)[-1][transient:]
 	assert dec[:digits] == dec[digits:digits * 2]
-	if digits > prec / 2:
+	if digits > 16:
 		return s[:s.index(".") + transient + 1] + "[" + dec[:digits] + "]"
-	if digits > prec / 3:
+	if digits > 4:
 		return s[:s.index(".") + transient + digits + 1] + "[" + dec[:digits] + "]"
 	return s[:s.index(".") + transient + digits * 2 + 1] + "[" + dec[:digits] + "]"
 
@@ -374,6 +376,8 @@ class FakeFloat(sympy.Rational):
 
 	def __new__(cls, p, q=1, r=None):
 		obj = sympy.Expr.__new__(cls)
+		if math.log10(max(p, q)) > BF_PREC:
+			return r_evalf(obj, BF_PREC, chop=True)
 		obj.p, obj.q = p, q
 		r = r or simplify_recurring(obj)
 		if r:
@@ -397,8 +401,32 @@ def evalf_true(n, prec=100, **void):
 		return FakeFloat(n.p, n.q, r)
 	return r_evalf(n, prec)
 
+def _print_Fraction(self, expr):
+	if expr.q == 1:
+		return expr.p
+	if math.log10(max(expr.p, expr.q)) > BF_PREC:
+		return r_evalf(expr, BF_PREC, chop=True)
+	if self._settings.get("sympy_integers", False):
+		return "S(%s)/%s" % (expr.p, expr.q)
+	return "%s/%s" % (expr.p, expr.q)
+
+def _pprint_Fraction(self, expr):
+	if expr.q == 1:
+		return self._print_Atom(expr.p)
+	if math.log10(max(expr.p, expr.q)) > BF_PREC:
+		return self._print_Float(r_evalf(expr, BF_PREC, chop=True))
+	p, q = expr.p, expr.q
+	if abs(p) >= 10 and abs(q) >= 10:
+		if p < 0:
+			return prettyForm(str(p), binding=prettyForm.NEG)/prettyForm(str(q))
+		else:
+			return prettyForm(str(p))/prettyForm(str(q))
+	return self.emptyPrinter(expr)
+
 sympy.Rational.evalf = FakeFloat.evalf = evalf_true
 sympy.StrPrinter._print_FakeFloat = lambda self, expr: FakeFloat.__str__(expr)
+sympy.StrPrinter._print_Rational = lambda self, expr: _print_Fraction(self, expr)
+PrettyPrinter._print_Rational = lambda self, expr: _pprint_Fraction(self, expr)
 
 
 # Sympy plotting functions
@@ -1192,6 +1220,8 @@ def evalSym(f, prec=64, r=False, variables=None):
 		return [f]
 	if isinstance(f, (sympy.Integer, float, int, np.number)):
 		return [f]
+	# if isinstance(f, sympy.Rational) and math.log10(max(f.p, f.q)) > prec and math.log10(f) <= prec:
+	# 	return [f.evalf(prec, chop=True)]
 	if prec:
 		try:
 			y = f.evalf(prec, chop=True)
@@ -1207,19 +1237,21 @@ def evalSym(f, prec=64, r=False, variables=None):
 		if r:
 			p = prettyAns(f)
 			if p == repr(e):
-				p = ""
+				return [f]
 			return [f, p]
 		p = prettyAns(f)
 		f = repr(e)
 		if re.fullmatch(f"-?[0-9]*\.[0-9]*0", f):
 			return [f.rstrip(".0")]
+		if len(f) > 1 and f[-1].isnumeric() and p.startswith(f[:-1]):
+			return [e]
 		if p == f:
-			p = ""
+			return [e]
 		return [e, p]
 	else:
 		p = prettyAns(f)
-		if p == repr(f):
-			p = ""
+		if p == repr(f) or len(p) > 1 and p[-1].isnumeric() and repr(f).startswith(p[:-1]):
+			return [f]
 		return [f, p]
 
 

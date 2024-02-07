@@ -1105,6 +1105,7 @@ def html_decode(s):
 		except (ValueError, NameError, IndexError):
 			s = s[:i + 1] + "\u200b" + s[i + 1:]
 			continue
+	s = s.replace("<b>", "**").replace("</b>", "**").replace("<i>", "*").replace("</i>", "*").replace("<u>", "*").replace("</u>", "*")
 	s = s.replace("\u200b", "").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
 	return s.replace("&quot;", '"').replace("&apos;", "'")
 

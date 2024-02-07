@@ -1730,7 +1730,7 @@ class Art(Command):
 					if not out[0].isupper() and " " in out:
 						s, o = out.split(" ", 1)
 						out = s.capitalize() + " " + o
-					prompt = (nprompt or oprompt).removesuffix(".") + ".\n\n" + out.strip()
+					prompt = (nprompt or oprompt).removesuffix(".") + " BREAK " + out.strip()
 				else:
 					prompt = nprompt or oprompt
 				eprompts.append(prompt)
@@ -1803,11 +1803,13 @@ class Art(Command):
 						raise ValueError(f"Dall·E {dalle} interface currently only supports 1:1 aspect ratio.")
 					async with discord.context_managers.Typing(channel):
 						prompt = eprompts.next()
+						prompt = lim_str(prompt, 1000)
 						response = await bot.oai.images.generate(
 							model=f"dall-e-{dalle}",
 							prompt=prompt,
 							size=size,
 							n=amount - amount2,
+							user=str(user.id) if premium < 3 else str(hash(user.name)),
 						)
 						images = response.data
 						pnames.extend([prompt] * len(images))
@@ -1826,10 +1828,12 @@ class Art(Command):
 						for i in range(amount - amount2):
 							fut = csubmit(bot.oai.images.generate(
 								model=f"dall-e-{dalle}",
-								prompt=eprompts.next(),
+								prompt=lim_str(eprompts.next(), 4000),
 								size=size,
 								quality=q,
 								n=1,
+								style="natural" if i else "vivid",
+								user=str(user.id) if premium < 3 else str(hash(user.name)),
 							))
 							futn.append(fut)
 						images = []
@@ -1841,20 +1845,24 @@ class Art(Command):
 								await asyncio.sleep(60)
 								response = await bot.oai.images.generate(
 									model=f"dall-e-{dalle}",
-									prompt=eprompts.next(),
+									prompt=lim_str(eprompts.next(), 4000),
 									size=size,
 									quality="standard",
 									n=1,
+									style="natural",
+									user=str(user.id) if premium < 3 else str(hash(user.name)),
 								)
 							except:
 								print_exc()
 								try:
 									response = await bot.oai.images.generate(
 										model=f"dall-e-{dalle}",
-										prompt=eprompts.next(),
+										prompt=lim_str(eprompts.next(), 4000),
 										size=size,
 										quality="standard",
 										n=1,
+										style="natural",
+										user=str(user.id) if premium < 3 else str(hash(user.name)),
 									)
 								except:
 									if amount <= 1:
