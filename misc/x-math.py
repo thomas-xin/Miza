@@ -2,7 +2,7 @@
 
 import sympy, mpmath, math, time, os, sys, subprocess, psutil, traceback, random
 import collections, itertools, pickle, base64, ast, re
-import sympy.stats
+import sympy.stats, scipy.stats
 import numpy as np
 import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
@@ -875,6 +875,7 @@ _globals.update({
 	"ptp": np.ptp,
 	"mean": np.mean,
 	"median": np.median,
+	"mode": scipy.stats.mode,
 	"std": lambda a: sympy.sqrt(np.var(a)),
 	"var": np.var,
 	"corrcoef": np.corrcoef,

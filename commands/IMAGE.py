@@ -1687,7 +1687,7 @@ class Art(Command):
 							presence_penalty=0,
 						),
 						best=premium >= 3 and not (dups > 2 and not i),
-						skip=False,
+						skip=not nsfw,
 					))
 					futs.append(fut)
 				for fut in futs:
@@ -1700,7 +1700,7 @@ class Art(Command):
 					resp.choices.append(cdict(text=s))
 			if not resp or len(resp.choices) < max(1, dups - 1):
 				resp2 = await bot.oai.chat.completions.create(
-					model="gpt-3.5-turbo-1106",
+					model="gpt-3.5-turbo-0125",
 					messages=[dict(role="user", content=prompt)],
 					temperature=1,
 					max_tokens=120,

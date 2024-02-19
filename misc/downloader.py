@@ -528,7 +528,7 @@ if threads > 1:
 		time.sleep(0.5)
 		fut = workers[0]
 		if tt is None and fut.done():
-			tt = utc() - t
+			tt = (utc() - t) * 2
 		if attempts > max_attempts:
 			try:
 				import psutil
@@ -540,7 +540,7 @@ if threads > 1:
 		os.remove(fn2)
 	fi = fut.result()
 	if tt is None:
-		tt = utc() - t + 20
+		tt = (utc() - t + 20) * 2
 	try:
 		os.rename(fi, fn2)
 	except OSError:
@@ -567,7 +567,7 @@ if threads > 1:
 					if i + 2 >= len(workers) or workers[i + 2].done() or x > 2:
 						print(f"Thread {i + 1} timed out, restarting...")
 						threaders[workers[i + 1].tn] = False
-						tt += 5
+						tt = tt * 1.1 + 5
 						if chunked:
 							tn = len(threaders)
 							threaders[tn] = True
@@ -586,7 +586,7 @@ if threads > 1:
 					continue
 				else:
 					if x:
-						tt = 20
+						tt = 40
 					break
 			with open(fi, "rb") as g:
 				while True:

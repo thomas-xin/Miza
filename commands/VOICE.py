@@ -2650,7 +2650,7 @@ class AudioDownloader:
 				live = not entry.get("duration") or entry["duration"] > 960
 			seekable = not entry.get("duration") or entry["duration"] < inf
 			cf = isnan(entry.get("duration") or nan) or not (stream.startswith("https://cf-hls-media.sndcdn.com/") or is_youtube_stream(stream))
-			if asap > 1 and not f.proc and live and 960 < entry.get("duration", 0) < 4200:
+			if asap > 1 and not f.proc and live and 960 < (entry.get("duration") or 0) < 4200:
 				esubmit(f.load, check_fmt=cf, webpage_url=entry["url"], live=False, seekable=seekable, duration=entry.get("duration"), asap=False)
 			try:
 				f.load(stream, check_fmt=cf, webpage_url=entry["url"], live=live, seekable=seekable, duration=entry.get("duration"), asap=asap)
@@ -2712,7 +2712,7 @@ class AudioDownloader:
 			if str(end) != "None":
 				end = round_min(min(float(end), 86400))
 				args.extend(("-to", str(end)))
-		args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-i", "-", "-an", "-pix_fmt", "yuv420p", "-crf", "28"))
+		args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-an", "-i", "-", "-pix_fmt", "yuv420p", "-crf", "28"))
 		afile = f"cache/-{ts}-.pcm"
 		if hwaccel == "cuda":
 			if fmt == "mp4":
@@ -2781,20 +2781,33 @@ class AudioDownloader:
 					args.extend(("-vf", vf))
 					# Pipe to main process, as raw video is extremely bloated and easily overflows hundreds of GB disk
 					args.extend(("-f", "rawvideo", "-pix_fmt", "rgb24", "-"))
-					print(args)
-					pin = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=1048576)
-					with suppress():
-						message.__dict__.setdefault("inits", []).append(pin)
-					# Count amount of data for the raw video input, while piping to FFmpeg to encode
-					fsize = 0
-					while True:
-						b = pin.stdout.read(1048576)
-						if not b:
-							break
-						proc.stdin.write(b)
-						fsize += len(b)
-					# Calculate duration and exact amount of audio samples to use, minimising possibility of desyncs
-					duration = fsize / np.prod(size) / 3 / fps
+					if len(urls) == 1:
+						s, e = 0, 86400
+						if str(start) != "None":
+							s = round_min(float(start))
+						if str(end) != "None":
+							e = round_min(min(float(end), 86400))
+						args = [sys.executable, "misc/lightning.py", video, str(s), str(e), fnv]
+						print(args)
+						force_kill(proc)
+						proc = psutil.Popen(args, stdin=subprocess.PIPE)
+						proc.wait()
+						duration = get_duration(fnv)
+					else:
+						print(args)
+						pin = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=1048576)
+						with suppress():
+							message.__dict__.setdefault("inits", []).append(pin)
+						# Count amount of data for the raw video input, while piping to FFmpeg to encode
+						fsize = 0
+						while True:
+							b = pin.stdout.read(1048576)
+							if not b:
+								break
+							proc.stdin.write(b)
+							fsize += len(b)
+						# Calculate duration and exact amount of audio samples to use, minimising possibility of desyncs
+						duration = fsize / np.prod(size) / 3 / fps
 					amax = round_random(duration * SAMPLE_RATE) * 2 * 2
 					cfn = fut.result()[0]
 					# Write audio to the raw pcm as desired; trim if there is too much, pad with zeros if not enough
@@ -3070,6 +3083,10 @@ class AudioDownloader:
 				else:
 					devid = random.randint(0, ceil(torch.cuda.device_count() / 2))
 				args.extend(("-hwaccel_device", str(devid)))
+			if not vst and not size:
+				args.append("-vn")
+			elif fmt in ("gif", "apng", "webp"):
+				args.append("-an")
 			if vst:
 				if len(vst) > 1:
 					codec_map = {}
@@ -3117,10 +3134,6 @@ class AudioDownloader:
 				br = max(4096, auds.stats.bitrate)
 			sr = str(SAMPLE_RATE)
 			ac = "2"
-			if not vst and not size:
-				args.append("-vn")
-			elif fmt in ("gif", "apng", "webp"):
-				args.append("-an")
 			if str(start) != "None":
 				start = round_min(float(start))
 				args.extend(("-ss", str(start)))
@@ -3265,9 +3278,13 @@ class AudioDownloader:
 						"./ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
 						"-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets",
 						"-protocol_whitelist", "concat,tls,tcp,file,fd,http,https",
-						"-f", "concat", "-safe", "0", "-vn",
-						"-i", concf, "-c:a", "copy", fn,
+						"-f", "concat", "-safe", "0",
 					]
+					if not vst:
+						args.append("-vn")
+					args.extend((
+						"-i", concf, "-c:a", "copy", fn,
+					))
 					print(args)
 					proc = psutil.Popen(args)
 					with suppress():

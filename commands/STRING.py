@@ -229,6 +229,7 @@ class Translate(Command):
 					user=str(user.id),
 				),
 				best=1 if engine == "mixtral" else 2,
+				skip=True,
 			)
 		except:
 			print_exc()
@@ -1380,6 +1381,10 @@ ModMap = dict(
 		name="wizard-70b",
 		cm=20,
 	),
+	miqumaid=dict(
+		name="miqumaid-2x70b",
+		cm=40,
+	),
 	instruct=dict(
 		name="gpt-3.5-turbo-instruct",
 		cm=15,
@@ -1424,6 +1429,8 @@ def map_model(cname, model, premium):
 		model = "mixtral"
 	elif cname == "mistral":
 		model = "mistral"
+	elif cname == "miqumaid":
+		model = "miqumaid"
 	elif cname == "gpt3":
 		if premium < 2:
 			raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
@@ -1645,7 +1652,7 @@ AC = full_prune(AC.decode("utf-8")).capitalize() + "."
 
 BNB = ("pygmalion-13b", "manticore-13b", "airochronos-33b")
 GPTQ = ("wizard-70b", "euryale-70b", "xwin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "wizard-vicuna-30b", "emerhyst-20b", "xwin-mlewd-13b", "mythalion-13b")
-EXL2 = ("wizard-70b", "euryale-70b", "xwin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "wizard-vicuna-30b", "emerhyst-20b", "xwin-mlewd-13b", "mythalion-13b")
+EXL2 = ("miqumaid-2x70b", "wizard-70b", "euryale-70b", "xwin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "wizard-vicuna-30b", "emerhyst-20b", "xwin-mlewd-13b", "mythalion-13b")
 TOGETHER = {
 	"llama-coder-34b": "togethercomputer/CodeLlama-34b-Instruct",
 	"falcon-40b": "togethercomputer/falcon-40b-instruct",
@@ -1705,7 +1712,7 @@ def m_name(m):
 async def count_to(messages):
 	return await tcount("\n\n".join(map(m_repr, messages)))
 
-async def cut_to(messages, limit=1024, exclude_first=True):
+async def cut_to(messages, limit=1024, exclude_first=True, best=False):
 	if not messages:
 		return messages
 	messages = list(messages)
@@ -1723,13 +1730,13 @@ async def cut_to(messages, limit=1024, exclude_first=True):
 	summ = "Summary of prior conversation:\n"
 	s = "\n\n".join(m_str(m) for m in (messages[:i][::-1]))
 	c = await tcount(summ + s)
-	if c + count <= limit / 2:
+	if c + count <= limit / 3:
 		if exclude_first:
 			messages.insert(0, sm)
 		return messages
-	ml = round_random(limit / 4)
-	Ml = round_random(limit / 3)
-	s2 = await BOT[0].summarise(s, min_length=ml, max_length=Ml)
+	ml = round_random(limit / 6)
+	Ml = round_random(limit / 4)
+	s2 = await BOT[0].summarise(s, min_length=ml, max_length=Ml, best=best + 1)
 	summ += s2
 	messages = mes[::-1]
 	messages.insert(0, cdict(
@@ -1840,7 +1847,7 @@ def instruct_structure(messages, exclude_first=True, model=None):
 
 class Ask(Command):
 	_timeout_ = 24
-	name = ["Mixtral", "Mistral", "Wizard", "Euryale", "WizCode", "Emerhyst", "MLewd", "Mythalion", "Pyg", "Pygmalion", "Llama", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
+	name = ["Miqumaid", "Mixtral", "Mistral", "Wizard", "Euryale", "WizCode", "Emerhyst", "MLewd", "Mythalion", "Pyg", "Pygmalion", "Llama", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
 	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!"
 	usage = "<string>"
 	example = ("ask what's the date?", "gpt3 what is the square root of 3721?", "pyg can I have a hug?")
@@ -2190,7 +2197,7 @@ class Ask(Command):
 			oai = data.get("trial") and data.get("openai_key")
 			vc = bool(getattr(user, "voice", False)) | bool(bot.audio.players.get(getattr(guild, "id", None))) * 2
 			extensions = premium >= 2
-			chatcompletion = ("gpt-4-turbo", "gpt-4-vision-preview", "gpt-4-0125-preview", "gpt-4-1106-preview", "gpt-4", "gpt-3.5-turbo", "gpt-3.5-turbo-1106")
+			chatcompletion = ("gpt-4-turbo", "gpt-4-vision-preview", "gpt-4-0125-preview", "gpt-4-1106-preview", "gpt-4", "gpt-3.5-turbo", "gpt-3.5-turbo-0125", "gpt-3.5-turbo-1106")
 			instructcompletion = ("gpt-3.5-turbo-instruct", "text-davinci-003", "text-curie-001")
 			chatcc = ("gpt4", "gpt3")
 			ac = AC if nsfw and "nsfw" not in personality.casefold() else None
@@ -2213,7 +2220,7 @@ class Ask(Command):
 				blocked.update(("audio", "astate", "askip", "play"))
 			# if model not in chatcc:
 			# 	blocked.add("roleplay")
-			fut = csubmit(cut_to(messages, 6000 if premium >= 3 else 4000))
+			fut = csubmit(cut_to(messages, 8000 if premium >= 3 else 6000))
 			tool_choice = "auto"
 			if extensions:
 				mocked = {}
@@ -2231,7 +2238,7 @@ class Ask(Command):
 						q2 = q.replace('"""', "'''")
 						c = await tcount(q2)
 						if c > 1024:
-							q2 = await bot.summarise(q2, max_length=960, min_length=720)
+							q2 = await bot.summarise(q2, max_length=960, min_length=720, best=premium >= 4)
 						prompt = '"""\n' + q2 + "\n" + f'''"""\n\n### Instruction:\nYour name is {bot_name}. Please select one of the following actions by number:\n''' + prompt
 						prompt += f"\n### Response:\n{bot_name}: I choose number"
 						data = dict(
@@ -2341,20 +2348,20 @@ class Ask(Command):
 					limit = 4000
 				elif attempts in (3, 5):
 					if "gpt-4" in model:
-						model = "gpt-3.5-turbo-1106"
+						model = "gpt-3.5-turbo-0125"
 					else:
 						model = "gpt-3.5-turbo-instruct"
 					limit = 4000
 					cm = 15
 				elif model == "gpt3" or premium < 4:
 					if 1:
-						model = "gpt-3.5-turbo-1106"
-						limit = 6000
+						model = "gpt-3.5-turbo-0125"
+						limit = 8000
 						cm = 10
 						cm2 = 20
 					else:
 						model = "gpt-3.5-turbo"
-						limit = 4000
+						limit = 6000
 						cm = 15
 						cm2 = 20
 				else:
@@ -2363,7 +2370,7 @@ class Ask(Command):
 							model = "gpt-4-0125-preview"
 						else:
 							model = "gpt-4-vision-preview"
-						limit = 8000
+						limit = 12000
 						cm = 100
 						cm2 = 300
 					else:
@@ -2400,7 +2407,7 @@ class Ask(Command):
 				if model in chatcompletion or extensions and not attempts:
 					orig_model = model
 					if orig_model not in chatcompletion:
-						model = "gpt-3.5-turbo-1106"
+						model = "gpt-3.5-turbo-0125"
 					if premium >= 2 and len(ufull) > 5 and length > 384 and cs_allowed:
 						ms = ufull[-1]
 						prompt = 'The following is a conversation with numbered messages:\n\n"""'
@@ -2449,7 +2456,7 @@ class Ask(Command):
 						model=model,
 						messages=used,
 						temperature=temperature,
-						max_tokens=max(32, min(256 if orig_model not in chatcompletion else 4096, limit - length - 768)),
+						max_tokens=max(256, min(512 if orig_model not in chatcompletion else 4096, limit - length - 768)),
 						top_p=0.9,
 						frequency_penalty=0.6,
 						presence_penalty=0.8,
@@ -2521,7 +2528,7 @@ class Ask(Command):
 								c = await tcount(res)
 								ra = 1 if premium < 2 else 1.5 if premium < 5 else 2
 								if c > round(1440 * ra):
-									res = await bot.summarise(q=q + "\n" + res, max_length=round(1296 * ra), min_length=round(1024 * ra))
+									res = await bot.summarise(q=q + "\n" + res, max_length=round(1296 * ra), min_length=round(1024 * ra), best=premium >= 4)
 									res = res.replace("\n", ". ").replace(": ", " -")
 								res = res.strip()
 								if not appended:
@@ -2735,7 +2742,7 @@ class Ask(Command):
 					model=model,
 					prompt=prompt,
 					temperature=temperature,
-					max_tokens=max(32, min(1024, limit - length - 64)),
+					max_tokens=max(256, min(1024, limit - length - 64)),
 					top_p=0.9,
 					stop=[f"{name}:"] + stops,
 					frequency_penalty=0.8,
@@ -3142,7 +3149,7 @@ class Personality(Command):
 	server_only = True
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
 	min_level = 2
-	description = "Customises my personality for ~ask in the current server. Uses the largest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Mixtral, Mistral, Wizard, Euryale, WizCode, Emerhyst, MLewd, Mythalion and Pygmalion are currently the alternate models enabled."
+	description = "Customises my personality for ~ask in the current server. Uses the largest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Miqumaid, Mixtral, Mistral, Wizard, Emerhyst, Mythalion, and Mythomax are currently the alternate models enabled."
 	usage = "<traits>* <default(-d)>?"
 	example = ("personality MythoMax; mischievous, cunning", "personality Mixtral; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
 	flags = "aed"
@@ -3177,7 +3184,7 @@ class Personality(Command):
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
-		models = ("auto", "gpt", "mixtral", "mistral", "wizard", "euryale", "wizcode", "emerhyst", "mlewd", "mythalion", "pyg", "pygmalion", "llama", "davinci", "gpt3", "gpt4")
+		models = ("auto", "gpt", "miqumaid", "mixtral", "mistral", "wizard", "euryale", "wizcode", "emerhyst", "mlewd", "mythalion", "pyg", "pygmalion", "llama", "davinci", "gpt3", "gpt4")
 		if ";" in p:
 			m, p = p.split(";", 1)
 			p = p.lstrip()
@@ -3226,7 +3233,7 @@ class Instruct(Command):
 			presence_penalty=0.4,
 			user=str(user.id) if premium < 3 else str(hash(user.name)),
 		)
-		resp = await bot.instruct(data, best=2, cache=False)
+		resp = await bot.instruct(data, best=1, cache=False)
 		ref = message
 		ms = split_across(resp, 1999, prefix="\xad")
 		s = ms[-1] if ms else "\xad"

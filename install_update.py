@@ -145,10 +145,10 @@ if os.environ.get("AI_FEATURES", True):
 		subprocess.run([python, "-m", "pip", "install", "xformers", "--upgrade", "--user", "--index-url", "https://download.pytorch.org/whl/cu121"])
 		subprocess.run([python, "-m", "pip", "install", "torchvision", "torchaudio", "--upgrade", "--user", "--index-url", "https://download.pytorch.org/whl/cu121"])
 	try:
-		assert pkg_resources.get_distribution("exllamav2").version >= "0.0.8"
+		assert pkg_resources.get_distribution("exllamav2").version >= "0.0.13"
 	except (pkg_resources.DistributionNotFound, AssertionError):
 		vi = f"{sys.version_info.major}{sys.version_info.minor}"
 		oi = "win_amd64" if os.name == "nt" else "linux_x86_64"
-		subprocess.run([python, "-m", "pip", "install", "--upgrade", "--user", f"https://github.com/turboderp/exllamav2/releases/download/v0.0.8/exllamav2-0.0.8+cu121-cp{vi}-cp{vi}-{oi}.whl"])
+		subprocess.run([python, "-m", "pip", "install", "--upgrade", "--user", f"https://github.com/turboderp/exllamav2/releases/download/v0.0.13/exllamav2-0.0.13+cu121-cp{vi}-cp{vi}-{oi}.whl"])
 
 print("Installer terminated.")

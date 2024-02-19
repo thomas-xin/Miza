@@ -1962,12 +1962,21 @@ if "exl2" in CAPS:
 	torch.cuda._lazy_init()
 
 	def get_exl2(model):
+		override = None
+		loader = "transformers"
 		gs = 128
 		bpw = 4
-		if model == "tess-120b":
-			m = "TheBloke/Tess-XL-v1.0-GPTQ"
+		if model == "miqumaid-2x70b":
+			m = "alpindale/MiquMaid-v2-2x70B-DPO-exl2-4bpw"
+			req = 70
+			override = "main"
+			loader = "git"
+		elif model == "goliath-120b":
+			m = "Panchovix/goliath-120b-exl2-rpcal"
 			req = 60
-		if model == "euryale-70b":
+			override = "4.85bpw"
+			loader = "git"
+		elif model == "euryale-70b":
 			m = "TheBloke/Euryale-1.3-L2-70B-GPTQ"
 			req = 35
 		elif model == "wizard-70b":
@@ -2006,28 +2015,72 @@ if "exl2" in CAPS:
 			raise RuntimeError(f'Model "{model}" not found.')
 		base = cachedir + "/huggingface/transformers/" + "models--" + m.replace("/", "--")
 		# return m, base, req, bpw, gs
-		return m, base, f"gptq-{bpw}bit-{gs}g-actorder_True", req
+		return m, base, override or f"gptq-{bpw}bit-{gs}g-actorder_True", req, loader
 
-	def snap_exl2(m, base, rev, assertion=False):
+	def is_lfs_link(fn):
+		if fn.rsplit(".", 1)[-1] in ("md", "txt", "gitattributes", "README") or os.path.isdir(fn):
+			return
+		if not os.path.exists(fn) or not os.path.getsize(fn):
+			return True
+		with open(fn, "rb") as f:
+			test = f.read(7)
+		return test == b"version"
+
+	def snap_exl2(m, base, rev, assertion=False, loader="transformers"):
 		snap = base + "/snapshots"
-		if not os.path.exists(snap):
+		cond = False
+		if not os.path.exists(snap) or not os.listdir(snap):
+			cond |= True
+		elif loader == "git":
+			cond |= any(is_lfs_link(snap + "/" + h + "/" + fn) for h in os.listdir(snap) for fn in os.listdir(snap + "/" + h))
+		if cond:
 			if assertion:
 				raise RuntimeError("Model is loading, please wait...")
 			print("Not Found:", snap)
-			import accelerate
-			from transformers import AutoModelForCausalLM
-			try:
-				with accelerate.init_empty_weights():
-					model = AutoModelForCausalLM.from_pretrained(
-						m,
-						revision=rev,
-						device_map={},
-						offload_folder="cache",
-						torch_dtype=torch.float16,
-						resume_download=True,
-					)
-			except ValueError:
-				pass
+			if loader == "transformers":
+				import accelerate
+				from transformers import AutoModelForCausalLM
+				try:
+					with accelerate.init_empty_weights():
+						model = AutoModelForCausalLM.from_pretrained(
+							m,
+							revision=rev,
+							device_map={},
+							offload_folder="cache",
+							torch_dtype=torch.float16,
+							resume_download=True,
+						)
+				except ValueError:
+					pass
+			elif loader == "git":
+				if not os.path.exists(base):
+					os.mkdir(base)
+				if not os.path.exists(snap):
+					os.mkdir(snap)
+				url = f"https://huggingface.co/{m}"
+				args = ["git", "ls-remote", url, f"refs/heads/{rev}"]
+				print(args)
+				h = subprocess.check_output(args, stdin=subprocess.DEVNULL).split(None, 1)[0].decode("ascii")
+				if not os.path.exists(base + "/refs"):
+					os.mkdir(base + "/refs")
+				if not os.path.exists(base + "/refs/" + rev):
+					with open(base + "/refs/" + rev, "w") as f:
+						f.write(h)
+				dest = snap + "/" + h
+				if not os.path.exists(dest):
+					args = ["git", "clone", "--depth=1", f"--branch={rev}", url, dest]
+					print(args)
+					subprocess.run(args, stdin=subprocess.DEVNULL, stdout=sys.stderr)
+				assert os.path.exists(dest)
+				for fn in os.listdir(dest):
+					fi = dest + "/" + fn
+					if is_lfs_link(fi):
+						lfs = f"{url}/resolve/{rev}/{fn}?download=true"
+						args = [sys.executable, "downloader.py", lfs, fi]
+						print(args)
+						subprocess.run(args, stdin=subprocess.DEVNULL, stdout=sys.stderr, cwd="misc")
+			else:
+				raise NotImplementedError(f'Loader "{loader}" not supported.')
 		return snap
 
 	def fold_exl2(m, base, rev="main"):
@@ -2040,11 +2093,11 @@ if "exl2" in CAPS:
 			if not os.path.exists(base + "/refs"):
 				raise FileNotFoundError("refs")
 			with open(base + "/refs/" + rev, "r") as f:
-				ref = f.read()
+				ref = f.read().strip()
 			for fn in os.listdir(snap + "/" + ref):
 				if not os.path.exists(fold + "/" + fn):
 					os.symlink(snap + "/" + ref + "/" + fn, fold + "/" + fn)
-			if rev != "main":
+			if rev != "main" and os.path.exists(base + "/refs/main"):
 				with open(base + "/refs/main", "r") as f:
 					main = f.read()
 				for fn in os.listdir(snap + "/" + main):
@@ -2052,19 +2105,21 @@ if "exl2" in CAPS:
 						os.symlink(snap + "/" + main + "/" + fn, fold + "/" + fn)
 		return fold
 
-	def load_exl2(model):
-		m, base, rev, *_ = get_exl2(model)
-		snap = snap_exl2(m, base, rev)
+	def load_exl2(model, fail=False):
+		m, base, rev, req, loader = get_exl2(model)
+		snap = snap_exl2(m, base, rev, loader=loader)
 		fold = fold_exl2(m, base, rev)
 
 	def load_models():
 		mods = dict(
 			load_exl2=(
+				"miqumaid-2x70b",
+				"goliath-120b",
 				"euryale-70b",
 				"wizard-coder-34b",
-				"xwin-mlewd-13b",
-				"mythalion-13b",
 				"emerhyst-20b",
+				"mythalion-13b",
+				"xwin-mlewd-13b",
 			),
 		)
 		for k, v in mods.items():
@@ -2083,7 +2138,7 @@ if "exl2" in CAPS:
 			return mcache[model]
 		except KeyError:
 			pass
-		m, base, rev, req = get_exl2(model)
+		m, base, rev, req, *_ = get_exl2(model)
 		# snap = snap_exl2(m, base, rev, assertion=True)
 		fold = fold_exl2(m, base, rev)
 		from exllamav2 import ExLlamaV2Config, ExLlamaV2, ExLlamaV2Cache_8bit, ExLlamaV2Tokenizer
@@ -2439,9 +2494,9 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		if not os.path.exists(target_model) or not os.path.getsize(target_model):
 			if raises:
 				raise RuntimeError("Model is loading, please wait...")
-			args = [sys.executable, "misc/downloader.py", "https://civitai.com/api/download/models/320428?type=Model&format=SafeTensor&size=full&fp=fp16", target_model]
+			args = [sys.executable, "downloader.py", "https://civitai.com/api/download/models/320428?type=Model&format=SafeTensor&size=full&fp=fp16", target_model]
 			print(args)
-			subprocess.run(args)
+			subprocess.run(args, cwd="misc")
 		if not raises:
 			return
 		device, dtype = determine_cuda(priority=False)
@@ -2471,6 +2526,80 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		proc.device = device
 		return proc
 
+	SCCP = SCCD = None
+	def IBASCC(prompt, kwargs, count, aspect_ratio, negative_prompt):
+		global SCCP, SCCD
+		device, dtype = determine_cuda(priority=False)
+		vram = torch.cuda.get_device_properties(device).total_memory
+		lowvram = vram < 15 * 1073741824
+		b = kwargs.get("--init-image")
+		if b:
+			if not isinstance(b, str):
+				b = io.BytesIO(b)
+			im = Image.open(b)
+			im = image_to(im)
+		else:
+			im = None
+		steps = int(kwargs.get("--num-inference-steps", 38))
+		rsteps = steps // 3
+		msteps = steps // 2
+		ms = 1024
+		if aspect_ratio != 0:
+			x, y = max_size(aspect_ratio, 1, ms, force=True)
+		elif im:
+			x, y = max_size(*im.size, ms, force=True)
+			mx, my = ceil(x / 16), ceil(y / 16)
+			if im.width < mx or im.height < my:
+				im = im.resize((mx, my), resample=Image.Resampling.LANCZOS)
+			else:
+				im = resize_max(im, maxsize=ms / 2, force=False)
+		# elif mask:
+		# 	x, y = max_size(*mask.size, ms, force=True)
+		else:
+			x = y = ms
+		d = 64
+		w, h = (x // d * d, y // d * d)
+		from diffusers import StableCascadeDecoderPipeline, StableCascadePriorPipeline
+
+		if not SCCP:
+			SCCP = StableCascadePriorPipeline.from_pretrained("stabilityai/stable-cascade-prior", torch_dtype=torch.bfloat16)
+			SCCP.enable_xformers_memory_efficient_attention()
+			if lowvram:
+				SCCP.enable_model_cpu_offload()
+			else:
+				SCCP = SCCP.to(device)
+		prior = SCCP
+		payload = dict(
+			prompt=prompt.replace(" BREAK ", ".\n\n").replace("BREAK", ".\n\n").strip(),
+			height=w,
+			width=h,
+			negative_prompt="",
+			guidance_scale=float(kwargs.get("--guidance-scale", 7)),
+			num_images_per_prompt=count,
+			num_inference_steps=msteps,
+		)
+		if im:
+			payload["images"] = [im]
+		prior_output = prior(**payload)
+
+		if not SCCD:
+			SCCD = StableCascadeDecoderPipeline.from_pretrained("stabilityai/stable-cascade", torch_dtype=torch.float16)
+			SCCD.enable_xformers_memory_efficient_attention()
+			if lowvram:
+				SCCD.enable_model_cpu_offload()
+			else:
+				SCCD = SCCD.to(device)
+		decoder = SCCD
+		decoder_output = decoder(
+			image_embeddings=prior_output.image_embeddings.half(),
+			prompt=prompt,
+			negative_prompt=negative_prompt,
+			guidance_scale=0.,
+			output_type="pil",
+			num_inference_steps=rsteps,
+		)
+		return decoder_output.images
+
 	def IBASLR(prompt="", kwargs={}, nsfw=False, force=True, count=1, aspect_ratio=0, negative_prompt=""):
 		if kwargs.get("--mask"):
 			try:
@@ -2478,6 +2607,13 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			except KeyError:
 				ib = CBOTS[None] = imagebot.Bot()
 			return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=2, aspect_ratio=aspect_ratio, negative_prompt=negative_prompt)
+		if kwargs:
+			try:
+				from diffusers import StableCascadePriorPipeline
+			except ImportError:
+				pass
+			else:
+				return IBASCC(prompt, kwargs, count=count, aspect_ratio=aspect_ratio, negative_prompt=negative_prompt)
 		model = "zavychromaxl_v40.safetensors"
 		PORT = 7800 + DEV
 		webui_server_url = f"http://127.0.0.1:{PORT}"
@@ -3416,9 +3552,20 @@ ILLEGAL_EXCS = (BrokenPipeError, OSError, RuntimeError, TimeoutError, asyncio.Ti
 def evaluate(ts, args):
 	try:
 		out = evalImg(*args)
-		if out and isinstance(out, (tuple, list)) and isinstance(out[0], io.BytesIO):
-			out[0].seek(0)
-			out[0] = out[0].read()
+		if out and isinstance(out, (tuple, list)) and isinstance(out[0], (io.BytesIO, memoryview, Image.Image)):
+			if isinstance(out[0], io.BytesIO):
+				for i in range(len(out)):
+					out[i].seek(i)
+					out[i] = out[i].read()
+			elif isinstance(out[0], memoryview):
+				for i in range(len(out)):
+					out[i] = bytes(out[i])
+			elif isinstance(out[0], Image.Image):
+				for i in range(len(out)):
+					b = io.BytesIO()
+					out[i].save(b, "png")
+					b.seek(0)
+					out[i] = b.read()
 		elif isinstance(out, io.BytesIO):
 			out.seek(0)
 			out = out.read()
@@ -3498,7 +3645,7 @@ if __name__ == "__main__":
 			sys.stdout.flush()
 
 	async def update_loop():
-		sys.stdout.buffer.write("~print('',end='')\n".encode("utf-8"))
+		sys.stdout.buffer.write("~print('',end='')\n".encode("utf-8") * 2)
 		sys.stdout.flush()
 		while True:
 			argv = await wrap_future(exc.submit(sys.stdin.readline))

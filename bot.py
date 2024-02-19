@@ -1840,7 +1840,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if not self.llcache.db and "llcache" in self.data:
 			self.llcache.attach(self.data.llcache)
 		data["prompt"] = data.get("prompt") or data.pop("inputs", None) or data.pop("input", None)
-		key = shash(str((data["prompt"], data.get("model", "gpt-3.5-turbo-1106"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.75), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
+		key = shash(str((data["prompt"], data.get("model", "gpt-3.5-turbo-0125"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.75), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
 		if cache:
 			tup = await self.llcache.retrieve_from(key, self._instruct2, data, best=best, skip=skip, prune=prune)
 			if tup[1] >= best:
@@ -1867,7 +1867,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	async def _instruct(self, data, best=False, skip=False):
 		c = await tcount(data["prompt"])
 		inputs = dict(
-			model="gpt-4-0125-preview" if best >= 3 else "gpt-3.5-turbo-1106",
+			model="gpt-4-0125-preview" if best >= 2 else "gpt-3.5-turbo-0125",
 			temperature=0.75,
 			max_tokens=256,
 			top_p=0.75,
@@ -1887,7 +1887,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			# 	except:
 			# 		print_exc()
 			# 		data["model"] = "gpt-3.5-turbo-instruct"
-		if AUTH.get("together_key") and not self.together_sem.full and best <= 1 and not skip:
+		if best == 1:
+			res = await self.moderate(data["prompt"])
+			dec = res.flagged
+		else:
+			dec = True
+		if AUTH.get("together_key") and not self.together_sem.full and best <= 1 and not skip and dec:
 			import together
 			rp = ((inputs.get("frequency_penalty", 0.25) + inputs.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
 			m = "mistralai/Mixtral-8x7B-Instruct-v0.1" if best else "togethercomputer/StripedHyena-Nous-7B"
@@ -1907,7 +1912,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return response["output"]["choices"][0]["text"]
 			except:
 				print_exc()
-		if AUTH.get("fireworks_key") and not self.fireworks_sem.full and best <= 1 and not skip:
+		if AUTH.get("fireworks_key") and not self.fireworks_sem.full and best <= 1 and not skip and dec:
 			import fireworks.client
 			# rp = ((inputs.get("frequency_penalty", 0.25) + inputs.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
 			m = "accounts/fireworks/models/mixtral-8x7b-instruct"
@@ -2008,7 +2013,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	async def _summarise(self, s, min_length, max_length, prune=True, best=False):
 		if best:
 			prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive summary of the text above!\n\n### Response:'
-			resp = await self.instruct(dict(prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=round_random(max_length + min_length) >> 1), best=False)
+			resp = await self.instruct(dict(prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=round_random(max_length + min_length) >> 1), best=best - 1)
 			resp = resp.strip()
 			print("Summ:", prompt, resp)
 			if resp:
@@ -2204,7 +2209,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				top_p=0.9,
 				max_tokens=384,
 			),
-			best=3 if best else 1,
+			best=2 if best else 1,
 		)
 		resp = resp.strip()
 		if resp and resp[0] == resp[-1] == '"':

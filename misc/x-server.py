@@ -695,7 +695,7 @@ class Server:
 				preview = "cache/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".png"
 				image_loaders = self.image_loaders
 				if (not os.path.exists(preview) or not os.path.getsize(preview)) and preview not in image_loaders:
-					args = ("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", hwaccel, "-an", "-i", p, "-loop", "0", "-fs", "1048576", "-vf", "scale=240:-1", preview)
+					args = ("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", hwaccel, "-an", "-i", p, "-loop", "0", "-fs", "1048576", "-vf", "scale=240:-1", "-vframes", "1", preview)
 					print(args)
 					proc = psutil.Popen(args)
 					image_loaders[preview] = proc

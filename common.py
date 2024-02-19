@@ -2897,7 +2897,7 @@ def spec2cap():
 	cut = 0
 	tdid = []
 	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(rrams, COMPUTE_POT)):
-		vrs = [23, 44, 11, 69]
+		vrs = [69]
 		using = False
 		for v in vrs:
 			vram = sum(rrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
@@ -3191,6 +3191,7 @@ def evalex(exc, g=None, l=None):
 		s = exc[exc.index("(") + 1:exc.rindex(")")]
 		with suppress(TypeError, SyntaxError, ValueError):
 			s = ast.literal_eval(s)
+		s = lim_str(s, 4096)
 		ex = RuntimeError(s)
 		if exc.startswith("PROC_RESP["):
 			ex = eval(exc.split("(", 1)[0] + f"({repr(ex)})", g, l)

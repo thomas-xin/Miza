@@ -871,9 +871,9 @@ def round_min(x):
 		else:
 			return round_min(complex(x).real) + round_min(complex(x).imag) * (1j)
 	if math.isfinite(x):
-		y = round(x)
+		y = int(x)
 		if x == y:
-			return int(y)
+			return y
 	return x
 
 # Rounds a number to various fractional positions if possible.

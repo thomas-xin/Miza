@@ -2217,9 +2217,9 @@ class UpdateUserLogs(Database):
 		count = f" ({len(mlist)}+)" if mlist else ""
 		if user:
 			emb.set_author(**get_author(user))
-			emb.description = f"#{ch.name}{count} was deleted by {user_mention(user.id)}."
+			emb.description = f"#{ch.name}{count}: {ch.id} was deleted by {user_mention(user.id)}."
 		else:
-			emb.description = f"#{ch.name}{count} has been deleted."	
+			emb.description = f"#{ch.name}{count}: {ch.id} has been deleted."	
 		self.bot.send_embeds(channel, emb)
 
 	async def _guild_update_(self, before, after, **void):
