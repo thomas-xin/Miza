@@ -1682,6 +1682,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 				print("<attachment>", a.url)
 			return message
 		await asyncio.sleep(i + 1)
+	print("Maximum attempts exceeded:", url, method)
 	raise exc
 
 # Sends a message to a channel, then adds reactions accordingly.

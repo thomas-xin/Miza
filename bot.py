@@ -234,7 +234,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				arg["description"] = lim_str(arg["description"], 100)
 				if i.startswith("<"):
 					s = i[1:].split(":", 1)[-1].rsplit(">", 1)[0]
-					formats = regexp(r"[\w\-\[\]]+(?:\((?:\?:)?[\w\-\|\[\]]+\))?").findall(s)
+					formats = regexp(r"[\w\-\[\]]+(?:\((?:\?:)?[\w\'\-\|\[\]]+\))?").findall(s)
 					for fmt in formats:
 						a = dict(arg)
 						if "(" not in fmt:
@@ -5040,10 +5040,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	async def ignore_interaction(self, message, skip=False):
 		if hasattr(message, "int_id"):
 			int_id, int_token = message.int_id, message.int_token
+			if getattr(message, "deferred", None):
+				self.inter_cache[int_id] = int_token
+			self.inter_cache[message.id] = int_token
 		elif hasattr(message, "slash"):
 			int_id, int_token = message.id, message.slash
 		else:
 			return
+		m = None
 		try:
 			if skip:
 				raise ConnectionError(400)
@@ -5055,15 +5059,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				aio=True,
 			)
 		except ConnectionError:
-			message = await send_with_reply(None, message, "\xad", ephemeral=True)
-			if not getattr(message, "ephemeral", False):
-				await self.silent_delete(message)
-				# await Request(
-					# f"https://discord.com/api/{api}/webhooks/{self.id}/{int_token}/messages/@original",
-					# method="DELETE",
-					# authorise=True,
-					# aio=True,
-				# )
+			m = await send_with_reply(getattr(message, "channel", None), message, "\xad", ephemeral=False)
+		print("II:", m)
+		if m and not getattr(m, "ephemeral", False):
+			await self.silent_delete(m)
+		# else:
+			# await Request(
+				# f"https://discord.com/api/{api}/webhooks/{self.id}/{int_token}/messages/@original",
+				# method="DELETE",
+				# authorise=True,
+				# aio=True,
+			# )
 
 	# Adds embeds to the embed sender, waiting for the next update event.
 	def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None, exc=True, bottleneck=False):

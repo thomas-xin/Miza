@@ -792,7 +792,7 @@ class Char2Emoji(Command):
 	no_parse = True
 	slash = True
 
-	def __call__(self, args, guild, message, **extra):
+	def __call__(self, args, guild, message, **void):
 		if len(args) < 2:
 			raise ArgumentError(
 				"At least 2 arguments are required for this command.\n"
@@ -837,6 +837,61 @@ class Char2Emoji(Command):
 		return out
 
 
+class Emoticon(Command):
+	description = "Sends an ASCII emoticon from a selection."
+	em_map = {k: v for v, k in (line.rsplit(None, 1) for line in """( ͡° ͜ʖ ͡°) Lenny
+ಠ_ಠ Disapprove
+ฅ(^•ﻌ•^ฅ) Cat
+ʕ •ᴥ•ʔ Bear
+(⁄ ⁄•⁄ω⁄•⁄ ⁄) Embarrassed
+(≧∇≦)/ Hai
+(/◕ヮ◕)/ Joy
+(凸ಠ益ಠ)凸 FlipOff
+Ｔ▽Ｔ Cry
+(✿◠‿◠) Flower
+(*´▽｀*) Infatuated
+ᕕ( ᐛ )ᕗ HappyGary
+ヽ(´ー｀)┌ Mellow
+(´･ω･`) UwU
+(*^3^)/~☆ Smooch
+.....φ(・∀・＊) Studying
+☆彡 Star
+(｀-´)> Salute
+(´；ω；`) Sad
+（ ^_^）o自自o（^_^ ） Cheers
+⊂二二二（＾ω＾）二⊃ Com'ere
+ヽ(´ー`)人(´∇｀)人(`Д´)ノ Friends
+（･∀･)つ⑩ Money
+d(*⌒▽⌒*)b Happy
+(≧ロ≦) Shout""".splitlines())}
+	em_mapper = fcdict(em_map)
+	modes = "|".join(sorted(em_map))
+	usage = f"<-1:mode({modes})> <string>?"
+	rate_limit = (1, 5)
+	no_parse = True
+	slash = True
+	# ephemeral = True
+
+	async def __call__(self, bot, argv, channel, user, message, **void):
+		tup = argv.split(None, 1)
+		if len(tup) >= 2:
+			key, argv = tup
+			if key.startswith('"') and key.endswith('"'):
+				with suppress():
+					key = literal_eval(key)
+			resp = argv + " " + escape_markdown(self.em_mapper[key])
+		else:
+			key = argv
+			if key.startswith('"') and key.endswith('"'):
+				with suppress():
+					key = literal_eval(key)
+			resp = escape_markdown(self.em_mapper[key])
+		url = await self.bot.get_proxy_url(user)
+		if getattr(message, "slash", None):
+			create_task(bot.ignore_interaction(message, skip=True))
+		await bot.send_as_webhook(channel, resp, username=user.display_name, avatar_url=url)
+
+
 class EmojiCrypt(Command):
 	name = ["EncryptEmoji", "DecryptEmoji", "EmojiEncrypt", "EmojiDecrypt"]
 	description = "Encrypts the input text or file into smileys."
@@ -847,7 +902,7 @@ class EmojiCrypt(Command):
 	ephemeral = True
 	flags = "ed"
 
-	async def __call__(self, args, name, flags, message, **extra):
+	async def __call__(self, args, name, flags, message, **void):
 		password = None
 		for flag in ("+p", "-p", "?p"):
 			try:
@@ -2097,7 +2152,7 @@ class Ask(Command):
 			print(f"{name}:", q)
 		nsfw = bot.is_nsfw(channel)
 		if q and not nsfw and xrand(2):
-			modfut = csubmit(bot.moderate(q))
+			modfut = csubmit(bot.moderate("You are: " + q))
 		else:
 			modfut = None
 		personality = bot.commands.personality[0].retrieve((channel or guild).id)

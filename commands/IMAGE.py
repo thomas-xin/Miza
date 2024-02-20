@@ -1625,7 +1625,8 @@ class Art(Command):
 		if not prompt:
 			prompt = "art"
 		elif not nsfw:
-			resp = await bot.moderate(prompt)
+			resp = await bot.moderate("Create an image of: " + prompt)
+			# resp = await bot.moderate(prompt)
 			if resp.flagged:
 				raise PermissionError(
 					"Apologies, my AI has detected that your input may be inappropriate.\n"

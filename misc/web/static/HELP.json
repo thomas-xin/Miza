@@ -9,7 +9,7 @@
 				"Help"
 			],
 			"description": "Shows a list of usable commands, or gives a detailed description of a command.",
-			"usage": "<target(?:command|category)>?",
+			"usage": "<category(Admin|Fun|Image|Main|String|Voice|Webhook)>? <command>?",
 			"level": "0",
 			"rate_limit": "(3, 5)",
 			"example": [
@@ -448,6 +448,17 @@
 			"example": [
 				"c2e POOP \ud83d\udca9 \ud83e\udeb0"
 			],
+			"timeout": "24"
+		},
+		"Emoticon": {
+			"aliases": [
+				"Emoticon"
+			],
+			"description": "Sends an ASCII emoticon from a selection.",
+			"usage": "<-1:mode(Bear|Cat|Cheers|Com'ere|Cry|Disapprove|Embarrassed|FlipOff|Flower|Friends|Hai|Happy|HappyGary|Infatuated|Joy|Lenny|Mellow|Money|Sad|Salute|Shout|Smooch|Star|Studying|UwU)> <string>?",
+			"level": "0",
+			"rate_limit": "(1, 5)",
+			"example": [],
 			"timeout": "24"
 		},
 		"EmojiCrypt": {
@@ -1037,7 +1048,6 @@
 				"EmojiCopy",
 				"CopyEmoji",
 				"Emote",
-				"Emoticon",
 				"Emoji",
 				"CreateEmoji"
 			],

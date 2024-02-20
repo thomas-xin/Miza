@@ -53,7 +53,8 @@ help_descriptions = fcdict((
 class Help(Command):
 	name = ["❓", "❔", "?", "Halp"]
 	description = "Shows a list of usable commands, or gives a detailed description of a command."
-	usage = "<target(?:command|category)>?"
+	cats = "|".join(c.capitalize() for c in sorted(standard_commands))
+	usage = f"<category({cats})>? <command>?"
 	example = ("help string", "help waifu2x")
 	flags = "v"
 	rate_limit = (3, 5)
