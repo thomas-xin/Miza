@@ -530,44 +530,8 @@ if not enc_key:
 	with open("auth.json", "w", encoding="utf-8") as f:
 		json.dump(AUTH, f, indent="\t")
 
-def verify_ai():
-	if not os.environ.get("AI_FEATURES", True):
-		return
-	with tracebacksuppressor:
-		if AUTH.get("openai_key"):
-			try:
-				import openai
-			except:
-				time.sleep(3)
-				import openai
-			globals()["openai"] = openai
-			try:
-				for i in range(3):
-					try:
-						oclient = openai.OpenAI(api_key=AUTH["openai_key"])
-						resp = oclient.moderations.create(
-							input=str(utc()),
-						)
-					except:
-						print_exc()
-					else:
-						if resp:
-							raise StopIteration
-			except StopIteration:
-				pass
-			else:
-				AUTH["openai_key"] = ""
-				print("OpenAI key has no usable credit. Please verify and fix the key to proceed with relevant commands.")
-		if AUTH.get("fireworks_key"):
-			import fireworks.client
-			fireworks.client.api_key = AUTH["fireworks_key"]
-			globals()["fireworks"] = fireworks
-		if AUTH.get("together_key"):
-			import together
-			together.api_key = AUTH["together_key"]
-			globals()["together"] = together
-if __name__ == "__lint__":
-	import openai, fireworks.client, together
+if os.environ.get("AI_FEATURES", True):
+	import openai
 
 enc_key += "=="
 enc_box = nacl.secret.SecretBox(base64.b64decode(enc_key)[:32])
@@ -2871,6 +2835,7 @@ def spec2cap():
 	if not IS_MAIN:
 		caps.append("remote")
 	cc = psutil.cpu_count()
+	mc = cc
 	ram = psutil.virtual_memory().total
 	try:
 		subprocess.run("ffmpeg")
@@ -2923,24 +2888,21 @@ def spec2cap():
 		if using and FIRST_LOAD:
 			FIRST_LOAD = False
 			yield [[], "load", "exl2", "sdxlr"]
-	if cc > 1:
-		caps.append("math")
-		if os.name == "nt" and ram > 3 * 1073741824:
-			caps.append("browse")
-		if cc > 3 and ram > 6 * 1073741824 and ffmpeg:
-			caps.append("image")
-		if cc > 5 and ram > 14 * 1073741824 and tesseract:
-			caps.append("caption")
+	if os.name == "nt" and ram > 3 * 1073741824:
+		caps.append("browse")
 	if len(caps) > 1:
 		yield caps
-	if cc > 2:
+		if cc > 1:
+			yield caps
+	rm = 1
+	while mc > 1:
 		caps = [[], "math"]
-		if ffmpeg:
-			caps.append("ytdl")
-		if ram > 14 * 1073741824 and ffmpeg:
+		if cc > 3 and ram > (rm * 8 - 2) * 1073741824 and ffmpeg:
 			caps.append("image")
-		if ram > 94 * 1073741824 and tesseract:
+		if cc > 5 and ram > (rm * 32 - 2) * 1073741824 and tesseract:
 			caps.append("caption")
+		mc -= 1
+		rm += 1
 		yield caps
 	if not DC:
 		return
@@ -2967,7 +2929,7 @@ def spec2cap():
 		elif c > 400000 and v > 9 * 1073741824 and "sdxl" not in done:
 			# if "sdxl" not in done or c <= 600000:
 			caps.append("sdxl")
-			caps.append("sd")
+			# caps.append("sd")
 			done.append("sdxl")
 			v -= 9 * 1073741824
 		elif c > 400000 and IS_MAIN and "sdxl" not in done and vrams[i] > 9 * 1073741824:
@@ -3037,13 +2999,13 @@ def device_cap(i, resolve=False):
     return di
 
 last_task_time = 0
-async def sub_submit(cap, command, _timeout=12):
+async def sub_submit(cap, command, _timeout=12, retries=1):
 	t = utc()
 	td = t - last_task_time
 	globals()["last_task_time"] = t
 	bot = BOT[0]
 	ex2 = RuntimeError("Maximum compute attempts exceeded.")
-	for i in range(3):
+	for i in range(round_random(retries) + 1):
 		task = Future()
 		task.cap = cap
 		task.command = command
@@ -3072,6 +3034,7 @@ async def sub_submit(cap, command, _timeout=12):
 			ex2 = ex
 			print(lim_str((task, task.cap, task.command, task.timeout), 256))
 			print_exc()
+			await asyncio.sleep(i)
 			continue
 	raise ex2
 
@@ -3160,11 +3123,11 @@ SUB_WAITING = None
 
 
 # Sends an operation to the math subprocess pool.
-def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
-	return sub_submit("math", (expr, "%", prec, rat, variables), _timeout=timeout)
+def process_math(expr, prec=64, rat=False, timeout=12, variables=None, retries=0):
+	return sub_submit("math", (expr, "%", prec, rat, variables), _timeout=timeout, retries=retries)
 
 # Sends an operation to the image subprocess pool.
-def process_image(image, operation="$", args=[], cap="image", timeout=36):
+def process_image(image, operation="$", args=[], cap="image", timeout=36, retries=1):
 	args = astype(args, list)
 	for i, a in enumerate(args):
 		if type(a) is mpf:
@@ -3181,7 +3144,7 @@ def process_image(image, operation="$", args=[], cap="image", timeout=36):
 		return repr(arg)
 
 	command = "[" + ",".join(map(as_arg, args)) + "]"
-	return sub_submit(cap, (image, operation, command), _timeout=timeout)
+	return sub_submit(cap, (image, operation, command), _timeout=timeout, retries=retries)
 
 
 def evalex(exc, g=None, l=None):

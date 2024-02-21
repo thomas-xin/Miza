@@ -20,7 +20,6 @@ if __name__ != "__mp_main__":
 	esubmit(get_colour_list)
 	esubmit(load_emojis)
 	esubmit(load_timezones)
-	apifut = esubmit(verify_ai)
 
 	heartbeat_proc = psutil.Popen([python, "misc/heartbeat.py"])
 
@@ -165,14 +164,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if os.name == "nt":
 			import wmi
 			globals()["WMI"] = WMI = wmi.WMI()
-		with tracebacksuppressor:
-			apifut.result(timeout=30)
-		openai_key = AUTH.get("openai_key")
-		if openai_key:
-			import openai
-			self.oai = openai.AsyncOpenAI(api_key=AUTH.get("openai_key"))
-		else:
-			self.oai = InterruptedError("OpenAI not authenticated.")
 		self.get_modules()
 		self.heartbeat_proc = heartbeat_proc
 
@@ -1764,7 +1755,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		12: "nz-en",	# New Zealand
 	}
 	bcache = Cache(timeout=43200, trash=60)
-	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60, screenshot=False):
+	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60, screenshot=False, best=False):
 		if not region:
 			if timezone is None:
 				if "users" in self.data:
@@ -1772,7 +1763,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					if confidence < 1 / 256:
 						timezone = None
 			region = self.browse_locations.get(timezone, "us-en")
-		async def retrieval(argv, region="us-en"):
+		async def retrieval(argv, region="us-en", screenshot=False, best=False):
 			if not is_url(argv):
 				query = urllib.parse.quote_plus(argv)
 				url = f"https://duckduckgo.com/?q={query}&kl={region}&kp=-2&kz=1&kav=1&kf=-1&kaf=1&km=l&ko=s&k1=1"
@@ -1789,22 +1780,51 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					res = "[{" + s.split(search, 1)[-1].split("}]);DDG.duckbar.load('", 1)[0] + "}]"
 					data = orjson.loads(res)
 					return "\n\n".join((e.get("c", "") + "\n" + html_decode(e.get("a", ""))).strip() for e in data)
-			return await process_image("BROWSE", "$", [argv, not screenshot], cap="browse", timeout=timeout)
-		return await self.bcache.retrieve_from(argv, retrieval, argv, region)
+			return await process_image("BROWSE", "$", [argv, not screenshot], cap="browse", timeout=timeout, retries=2)
+		return await self.bcache.retrieve_from((argv, screenshot, best), retrieval, argv, region, screenshot, best)
 
 	mod_cache = Cache(timeout=86400, trash=256)
 	async def moderate(self, input=""):
-		resp = await self.mod_cache.retrieve_from(input, self.oai.moderations.create, input=input)
+		resp = await self.mod_cache.retrieve_from(input, self.get_oai("moderations.create"), input=input)
 		return resp.results[0]
+
+	async def summ_for(self, q, s):
+		t = await tcount(q)
+		if t < 256:
+			return t
+		tools = [{
+			"type": "function", "function": {
+				"name": "summary",
+				"description": f'Please summarise the input to best answer the question "{q}".',
+				"parameters": {
+					"type": "object", "properties": {
+						"output": {
+							"type": "string",
+							"description": "Enter summary here:",
+						},
+					},
+					"required": ["output"],
+		}}},
+		]
+		messages = [dict(role="user", content=s)]
+		data = dict(
+			model="gpt-3.5-turbo-0125",
+			messages=messages,
+			temperature=0,
+			tool_choice={"type": "function", "function": {"name": "summary"}},
+			tools=tools,
+			user=str(hash(self.name)),
+		)
+		return await self.llm("chat.completions.create", **data)
 
 	emb_cache = Cache(timeout=86400, trash=256)
 	async def embedding(self, input=""):
-		resp = await self.emb_cache.retrieve_from(input, self.oai.embeddings.create, input=input, model="text-embedding-3-small")
+		resp = await self.emb_cache.retrieve_from(input, self.get_oai("embeddings.create"), input=input, model="text-embedding-3-small")
 		return np.array(resp.data[0].embedding, dtype=np.float16)
 
 	async def rank_embeddings(self, ems, em):
 		if not torch or not torch.cuda.is_available():
-			return await process_image("rank_embeddings", "$", [ems, em], cap="math", timeout=15)
+			return await process_image("rank_embeddings", "$", [ems, em], cap="math", timeout=15, retries=2)
 		return await asubmit(self._rank_embeddings, ems, em)
 
 	async def _rank_embeddings(embs, emb, temp=0.5):
@@ -1834,6 +1854,73 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return order[inds].cpu().numpy()
 
 	decensor = regexp(r"(?:i am unable to|i'm unable to|i cannot|i can't|i am not able to|i'm not able to) (?:fulfil|assist|help|provide|do|respond|comply|engage|perform)|refrain from", re.I)
+
+	ai_endpoints = cdict(
+		openai="https://api.openai.com/v1/",
+		together="https://api.together.xyz/v1/",
+		fireworks="https://api.fireworks.ai/inference/v1/",
+	)
+	ai_available = {
+		"goliath-120b": {
+			"https://fdigsujdfigsd-plsbuild.hf.space/v1": "TheBloke/goliath-120b-GPTQ",
+		},
+		"mixtral-8x7b-instruct": {
+			"together": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+			"fireworks": "accounts/fireworks/models/mixtral-8x7b-instruct",
+		},
+		"stripedhyena-nous-7b": {
+			"together": "togethercomputer/StripedHyena-Nous-7B",
+		},
+		"llama-70b": {
+			"together": "togethercomputer/llama-2-70b",
+		},
+		"mythomax-13b": {
+			"together": "Gryphe/MythoMax-L2-13b",
+		},
+		"mistral-7b": {
+			"together": "teknium/OpenHermes-2p5-Mistral-7B",
+		},
+		"qwen-7b": {
+			"together": "togethercomputer/Qwen-7B-Chat",
+		},
+		"wizard-70b": {
+			"together": "WizardLM/WizardLM-70B-V1.0",
+		},
+	}
+	api_map = cdict()
+	def get_oai(self, func, api="openai"):
+		endpoint = self.ai_endpoints.get(api, api)
+		oai = self.api_map.get(endpoint)
+		if not oai:
+			key = (AUTH.get(api + "_key") if ":" not in api else None) or "."
+			oai = openai.AsyncOpenAI(api_key=key, base_url=endpoint)
+			self.api_map[endpoint] = oai
+		lookup = func.split(".")
+		caller = oai
+		for k in lookup:
+			caller = getattr(caller, k)
+		return caller
+	async def llm(self, func, *args, api="openai", timeout=120, **kwargs):
+		if "model" in kwargs:
+			apis = self.ai_available.get(kwargs["model"]) or {api: None}
+		else:
+			apis = {api: None}
+		orig_model = kwargs.pop("model", None)
+		for api, model in apis.items():
+			kwargs["model"] = model or orig_model
+			caller = self.get_oai(func, api=api)
+			body = cdict()
+			if "repetition_penalty" in kwargs:
+				body["repetition_penalty"] = kwargs.pop("repetition_penalty")
+			if body:
+				kwargs["extra_body"] = body
+			try:
+				return await asyncio.wait_for(caller(*args, timeout=timeout, **kwargs), timeout=timeout)
+			except CE:
+				raise
+			except:
+				print_exc()
+				continue
 
 	llcache = Cache(timeout=86400, trash=256)
 	async def instruct(self, data, best=False, skip=False, prune=True, cache=True):
@@ -1893,11 +1980,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		else:
 			dec = True
 		if AUTH.get("together_key") and not self.together_sem.full and best <= 1 and not skip and dec:
-			import together
 			rp = ((inputs.get("frequency_penalty", 0.25) + inputs.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
-			m = "mistralai/Mixtral-8x7B-Instruct-v0.1" if best else "togethercomputer/StripedHyena-Nous-7B"
+			m = "mixtral-8x7b-instruct" if best else "stripedhyena-nous-7b"
 			p = inputs["prompt"]
-			rdata = dict(
+			data = dict(
 				prompt=self.restruct(p) if best else p,
 				model=m,
 				temperature=inputs.get("temperature", 0.8) * 2 / 3,
@@ -1908,17 +1994,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			)
 			try:
 				async with self.together_sem:
-					response = await asubmit(together.Complete.create, **rdata, timeout=60)
-				return response["output"]["choices"][0]["text"]
+					response = await self.llm("completions.create", **data, timeout=30)
+				return response.choices[0].text
 			except:
 				print_exc()
 		if AUTH.get("fireworks_key") and not self.fireworks_sem.full and best <= 1 and not skip and dec:
-			import fireworks.client
 			# rp = ((inputs.get("frequency_penalty", 0.25) + inputs.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
-			m = "accounts/fireworks/models/mixtral-8x7b-instruct"
 			data = cdict(
 				prompt=self.restruct(inputs["prompt"]),
-				model=m,
+				model="mixtral-8x7b-instruct",
 				temperature=inputs.get("temperature", 0.8) * 2 / 3,
 				top_p=inputs.get("top_p", 1),
 				# repetition_penalty=rp,
@@ -1926,7 +2010,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			)
 			try:
 				async with self.fireworks_sem:
-					response = await asubmit(fireworks.client.Completion.create, **data, request_timeout=30)
+					response = await self.llm("completions.create", **data, timeout=30)
 				return response.choices[0].text
 			except:
 				print_exc()
@@ -1934,10 +2018,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			prompt = inputs.pop("prompt")
 			inputs["messages"] = [dict(role="user", content=prompt)]
 			async with asyncio.timeout(70):
-				response = await self.oai.chat.completions.create(**inputs, timeout=60)
+				response = await self.llm("chat.completions.create", **inputs, timeout=60)
 			return response.choices[0].message.content
 		async with asyncio.timeout(70):
-			response = await self.oai.completions.create(**inputs, timeout=60)
+			response = await self.llm("completions.create", **inputs, timeout=60)
 		return response.choices[0].text
 
 	def restruct(self, s):
@@ -2144,7 +2228,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			else:
 				d = await asubmit(getattr, resp, "content")
 				resp.close()
-				b = await process_image(d, "resize_max", [1024, False, "auto", "-bg", "-oz"], timeout=30)
+				b = await process_image(d, "resize_max", [1024, False, "auto", "-bg", "-oz"], timeout=30, retries=2)
 				mime = magic.from_buffer(b)
 				data_url = "data:" + mime + ";base64," + base64.b64encode(b).decode("ascii")
 		else:
@@ -2182,7 +2266,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			user=str(hash(self.name)),
 		)
 		async with asyncio.timeout(35):
-			response = await self.oai.chat.completions.create(**data, timeout=30)
+			response = await self.llm("chat.completions.create", **data, timeout=30)
 		out = response.choices[0].message.content.strip()
 		if self.decensor.search(out):
 			raise ValueError(f"Censored response {repr(out)}.")
@@ -2231,7 +2315,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			else:
 				d = await asubmit(getattr, resp, "content")
 				resp.close()
-				b = await process_image(d, "resize_max", [1024, False, "auto", "-bg", "-oz"], timeout=30)
+				b = await process_image(d, "resize_max", [1024, False, "auto", "-bg", "-oz"], timeout=30, retries=2)
 				mime = magic.from_buffer(b)
 				data_url = "data:" + mime + ";base64," + base64.b64encode(b).decode("ascii")
 		else:
@@ -2258,7 +2342,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			user=str(hash(self.name)),
 		)
 		async with asyncio.timeout(35):
-			response = await self.oai.chat.completions.create(**data, timeout=30)
+			response = await self.llm("chat.completions.create", **data, timeout=45)
 		out = response.choices[0].message.content.strip()
 		if self.decensor.search(out):
 			raise ValueError(f"Censored response {repr(out)}.")
@@ -2287,7 +2371,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	@functools.lru_cache(maxsize=64)
 	def _ibv(self, url):
 		if isinstance(url, str):
-			resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
+			resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10, retries=2))
 		else:
 			resp = url
 		if not self.replicate_client:
@@ -2307,9 +2391,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return "".join(resp).strip()
 
 	@functools.lru_cache(maxsize=64)
-	def llava(self, url):
+	async def llava(self, url):
 		if isinstance(url, str):
-			b = await_fut(process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10))
+			b = await process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10, retries=2)
 		else:
 			b = url
 		mime = magic.from_buffer(b)
@@ -2331,9 +2415,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			n=1,
 		)
 		try:
-			import fireworks.client
-			fireworks.client.api_key = AUTH["fireworks_key"]
-			response = fireworks.client.ChatCompletion.create(**data, request_timeout=30)
+			async with self.fireworks_sem:
+				response = await self.llm("chat.completions.create", api="fireworks", **data, timeout=30)
 		except:
 			print_exc()
 			return self.ibv(url)
@@ -2344,7 +2427,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	@functools.lru_cache(maxsize=64)
 	def neva(self, url):
 		if isinstance(url, str):
-			resp = await_fut(process_image(url, "resize_max", ["-nogif", 256, False, "auto", "-f", "png"], timeout=10))
+			resp = await_fut(process_image(url, "resize_max", ["-nogif", 256, False, "auto", "-f", "png"], timeout=10, retries=2))
 		else:
 			resp = url
 		i = "data:image/png;base64," + base64.b64encode(resp).decode("ascii")

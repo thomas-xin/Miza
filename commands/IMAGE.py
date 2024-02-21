@@ -1700,7 +1700,8 @@ class Art(Command):
 						continue
 					resp.choices.append(cdict(text=s))
 			if not resp or len(resp.choices) < max(1, dups - 1):
-				resp2 = await bot.oai.chat.completions.create(
+				resp2 = await bot.llm(
+					"chat.completions.create",
 					model="gpt-3.5-turbo-0125",
 					messages=[dict(role="user", content=prompt)],
 					temperature=1,
@@ -1805,7 +1806,7 @@ class Art(Command):
 					async with discord.context_managers.Typing(channel):
 						prompt = eprompts.next()
 						prompt = lim_str(prompt, 1000)
-						response = await bot.oai.images.generate(
+						response = await bot.get_oai("images.generate")(
 							model=f"dall-e-{dalle}",
 							prompt=prompt,
 							size=size,
@@ -1827,7 +1828,7 @@ class Art(Command):
 					async with discord.context_managers.Typing(channel):
 						futn = []
 						for i in range(amount - amount2):
-							fut = csubmit(bot.oai.images.generate(
+							fut = csubmit(bot.get_oai("images.generate")(
 								model=f"dall-e-{dalle}",
 								prompt=lim_str(eprompts.next(), 4000),
 								size=size,
@@ -1844,7 +1845,7 @@ class Art(Command):
 							except openai.RateLimitError:
 								print_exc()
 								await asyncio.sleep(60)
-								response = await bot.oai.images.generate(
+								response = await bot.get_oai("images.generate")(
 									model=f"dall-e-{dalle}",
 									prompt=lim_str(eprompts.next(), 4000),
 									size=size,
@@ -1856,7 +1857,7 @@ class Art(Command):
 							except:
 								print_exc()
 								try:
-									response = await bot.oai.images.generate(
+									response = await bot.get_oai("images.generate")(
 										model=f"dall-e-{dalle}",
 										prompt=lim_str(eprompts.next(), 4000),
 										size=size,

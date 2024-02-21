@@ -238,7 +238,8 @@ class Translate(Command):
 			out = ""
 		if not out:
 			print("Instruct translate: Empty response, retrying...")
-			resp = await bot.oai.completions.create(
+			resp = await bot.llm(
+				"completions.create",
 				model="gpt-3.5-turbo-instruct",
 				prompt=prompt,
 				temperature=0.5,
@@ -2307,7 +2308,7 @@ class Ask(Command):
 							resp = await bot.instruct(data)
 						except:
 							print_exc()
-							resp = await bot.oai.moderations.create(input=prompt)
+							resp = await bot.moderate(input=prompt)
 							results = resp.results[0]
 							print("MOD:", results)
 							if results.flagged:
@@ -2524,7 +2525,7 @@ class Ask(Command):
 					response = None
 					try:
 						async with asyncio.timeout(130):
-							response = await bot.oai.chat.completions.create(**data, timeout=120)
+							response = await bot.llm("chat.completions.create", **data, timeout=120)
 					except openai.BadRequestError as e:
 						if "Please try again with a different prompt." in repr(e):
 							ex = e
@@ -2628,7 +2629,7 @@ class Ask(Command):
 								name = "wolfram_alpha"
 							resend = True
 						if name == "wolfram_alpha" and f"w${argv}" not in browsed:
-							fut = process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60)
+							fut = process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60, retries=2)
 							res, tid = await rag(f"w${argv}", name, tid, fut)
 							if res:
 								popping = False
@@ -2807,7 +2808,7 @@ class Ask(Command):
 				if model in instructcompletion:
 					try:
 						async with asyncio.timeout(70):
-							response = await bot.oai.completions.create(**data, timeout=60)
+							response = await bot.llm("completions.create", **data, timeout=60)
 					except openai.BadRequestError:
 						raise
 					except Exception as e:
@@ -2839,7 +2840,6 @@ class Ask(Command):
 						if redo:
 							continue
 				elif model in TOGETHER and AUTH.get("together_key") and not bot.together_sem.full:
-					import together
 					c = await tcount(data["prompt"])
 					rp = ((data.get("frequency_penalty", 0.25) + data.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
 					rdata = dict(
@@ -2852,15 +2852,14 @@ class Ask(Command):
 					)
 					try:
 						async with bot.together_sem:
-							response = await asubmit(together.Complete.create, **rdata, timeout=60)
-						text += response["output"]["choices"][0]["text"]
+							response = await bot.llm("completions.create", api="together", **rdata, timeout=60)
+						text += response.choices[0].text
 					except Exception as e:
 						ex = e
 						print_exc()
 						target_model = "gpt3"
 						continue
 				elif model in FIREWORKS and AUTH.get("fireworks_key") and not bot.fireworks_sem.full:
-					import fireworks.client
 					c = await tcount(data["prompt"])
 					# rp = ((data.get("frequency_penalty", 0.25) + data.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
 					rdata = dict(
@@ -2873,7 +2872,7 @@ class Ask(Command):
 					)
 					try:
 						async with bot.fireworks_sem:
-							response = await asubmit(fireworks.client.Completion.create, **rdata, timeout=60)
+							response = await bot.llm("completions.create", api="fireworks", **rdata, timeout=60)
 						text += response.choices[0].text
 					except Exception as e:
 						ex = e

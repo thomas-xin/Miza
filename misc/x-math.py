@@ -298,22 +298,9 @@ def ixor(a, b):
 	y = round(b * RI)
 	return sympy.Integer(x ^ y) / RI
 
-_pow = sympy.Float.__pow__
-
-def pow(a, b):
-	if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
-		exponent = mpmath.log(a.p, 2) * b.p
-		if exponent > 256:
-			return sympy.Float(2 ** exponent)
-		return a.p ** b.p
-	a = astype(a, sympy.Float)
-	return _pow(a, b)
-
 sympy.Basic.__and__ = lambda self, other: iand(self, other)
 sympy.Basic.__or__ = lambda self, other: ior(self, other)
 sympy.Basic.__xor__ = lambda self, other: ixor(self, other)
-sympy.Basic.__pow__ = lambda self, other: pow(self, other)
-sympy.Basic.__rpow__ = lambda self, other: pow(other, self)
 sympy.core.numbers.Infinity.__str__ = lambda self: "inf"
 sympy.core.numbers.NegativeInfinity.__str__ = lambda self: "-inf"
 sympy.core.numbers.ComplexInfinity.__str__ = lambda self: "ℂ∞"
@@ -325,6 +312,20 @@ r_evalf = sympy.Rational.evalf
 from sympy.solvers.diophantine.diophantine import divisible
 from sympy.printing.pretty.pretty import PrettyPrinter
 from sympy.printing.pretty.stringpict import prettyForm
+
+_pow = sympy.Float.__pow__
+
+def pow(a, b):
+	print("_POW:", a, b)
+	if isinstance(a, sympy.Integer) and isinstance(a, sympy.Integer):
+		return _pow(a, b)
+	temp = _pow(r_evalf(a, BF_PREC), b)
+	if math.log10(abs(temp)) > BF_PREC:
+		return temp
+	return _pow(a, b)
+
+sympy.Basic.__pow__ = lambda self, other: pow(self, other)
+sympy.Basic.__rpow__ = lambda self, other: pow(other, self)
 
 def carmichael(n):
 	temp = _factorint(n)
@@ -341,6 +342,7 @@ def simplify_recurring(r, prec=100):
 	tq = np.prod([k ** v for k, v in temp.items() if k not in (2, 5)], dtype=object)
 	if tq == 1:
 		return
+	print("SR:", r)
 	try:
 		pr = sympy.ntheory.residue_ntheory.is_primitive_root(10, tq)
 	except ValueError:
@@ -376,7 +378,7 @@ class FakeFloat(sympy.Rational):
 
 	def __new__(cls, p, q=1, r=None):
 		obj = sympy.Expr.__new__(cls)
-		if math.log10(max(p, q)) > BF_PREC:
+		if math.log10(max(abs(p), abs(q))) > BF_PREC:
 			return r_evalf(obj, BF_PREC, chop=True)
 		obj.p, obj.q = p, q
 		r = r or simplify_recurring(obj)

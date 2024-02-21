@@ -923,9 +923,9 @@ class Server:
 				id = id.split(".", 1)[0]
 			with tracebacksuppressor:
 				id = int.from_bytes(base64.urlsafe_b64decode(id + "=="), "big")
-			url = self.bot_exec(f"bot.renew_attachment({id})")
+			url = self.bot_exec(f"bot.renew_attachment({id})") or url
 		else:
-			url = self.renew_url(url, mid=mid)
+			url = self.renew_url(url, mid=mid) or url
 		cp.response.headers.update(SHEADERS)
 		if "Cf-Worker" in cp.request.headers and is_discord_attachment(url):
 			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
@@ -936,7 +936,9 @@ class Server:
 			mim = get_mime(fn)
 			return cp.lib.static.serve_file(os.path.abspath(fn), content_type=mim)
 			# return self.stream(url)
-		raise cp.HTTPRedirect(url, status="307")
+		if url:
+			raise cp.HTTPRedirect(url, status="307")
+		raise FileNotFoundError(id, url, mid)
 
 	@tracebacksuppressor
 	def renew_url(self, url, mid=None):
@@ -1343,9 +1345,9 @@ class Server:
 			if url.startswith(API):
 				url2 = url
 			elif is_discord_attachment(url):
-				url2 = API + "/unproxy?url=" + url
+				url2 = API + "/u?url=" + url_parse(url)
 			else:
-				url2 = API + "/ytdl?d=" + url
+				url2 = API + "/ytdl?d=" + url_parse(url)
 			with reqs.next().get(url2, timeout=1800, stream=True) as resp:
 				with open(fn, "wb") as f:
 					shutil.copyfileobj(resp.raw, f, 65536)
@@ -1370,6 +1372,8 @@ class Server:
 		cp.response.headers.update(SHEADERS)
 		if isinstance(url, list):
 			url = url[0]
+		if is_discord_attachment(url):
+			url = API + "/u?url=" + url_parse(url)
 		out = "cache/!" + shash(url) + "~." + fmt
 		while out in self.ecdc_running:
 			self.ecdc_running[out].result()

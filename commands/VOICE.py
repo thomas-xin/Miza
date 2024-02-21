@@ -2089,7 +2089,9 @@ class AudioDownloader:
 		try:
 			page = None
 			output = deque()
-			if "youtube.com" in item or "youtu.be/" in item:
+			if is_url(item) and discord_expired(item):
+				item = await_fut(bot.renew_attachment(item))
+			elif "youtube.com" in item or "youtu.be/" in item:
 				p_id = None
 				for x in ("?list=", "&list="):
 					if x in item:

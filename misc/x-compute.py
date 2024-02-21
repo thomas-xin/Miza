@@ -2559,6 +2559,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			x = y = ms
 		d = 64
 		w, h = (x // d * d, y // d * d)
+		print("IBASCC:", w, h)
 		from diffusers import StableCascadeDecoderPipeline, StableCascadePriorPipeline
 
 		if not SCCP:
@@ -2581,6 +2582,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		if im:
 			payload["images"] = [im]
 		prior_output = prior(**payload)
+		# print("PO:", prior_output.shape)
 
 		if not SCCD:
 			SCCD = StableCascadeDecoderPipeline.from_pretrained("stabilityai/stable-cascade", torch_dtype=torch.float16)

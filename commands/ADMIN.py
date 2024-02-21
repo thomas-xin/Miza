@@ -1847,7 +1847,7 @@ class CreateEmoji(Command):
 				while len(image) > 262144 or not verified:
 					print("RESIZE:", width)
 					try:
-						resp = await process_image(o_image, "resize_max", [width, 2, "-o"], timeout=30)
+						resp = await process_image(o_image, "resize_max", [width, 2, "-o"], timeout=30, retries=2)
 					except:
 						raise
 					else:
@@ -1942,7 +1942,7 @@ class CreateSticker(Command):
 			while len(image) > 512000 or not verified:
 				print("RESIZE:", width)
 				try:
-					resp = await process_image(o_image, "resize_max", [width, 2, "-o", "-d", 5, "-f", "apng"], timeout=60)
+					resp = await process_image(o_image, "resize_max", [width, 2, "-o", "-d", 5, "-f", "apng"], timeout=60, retries=2)
 				except:
 					raise
 				else:
