@@ -73,7 +73,7 @@ async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="p
 		if not args:
 			raise ArgumentError
 		url = args.pop(0)
-		urls = await bot.follow_url(url, best=True, allow=True, limit=1)
+		urls = await bot.follow_url(url, best=True, allow=not raw, limit=1)
 		if not urls:
 			urls = await bot.follow_to_image(argv)
 			if not urls:
@@ -767,23 +767,27 @@ class Orbit(Command):
 		extras = deque()
 		while value:
 			spl = value.split(None, 1)
-			urls = await bot.follow_url(spl[0], best=True, allow=True, limit=1)
+			urls = await bot.follow_url(spl[0], best=True, limit=1)
 			if not urls:
 				break
 			value = spl[-1] if len(spl) > 1 else ""
 			extras.append(urls[0])
 		# if extras:
 		#     print(url, *extras)
-		ems = find_emojis(value)
+		ems = find_emojis_ex(value)
 		for em in ems:
-			u = await bot.emoji_to_url(em)
+			if is_url(em):
+				u = em
+			else:
+				u = await bot.emoji_to_url(em)
 			if u:
 				extras.append(u)
 			else:
 				ems.remove(u)
 		if ems:
-			search = ems[-1]
-			value = value[value.index(search) + len(search):].strip()
+			value = translate_emojis(replace_emojis(value))
+			for search in ems:
+				value = value.replace(search, "").strip()
 		spl = value.rsplit(None, 1)
 		print("ORBIT:", name, value, url, fmt, extra, extras, sep=", ")
 		if not spl:

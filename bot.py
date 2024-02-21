@@ -2477,7 +2477,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if temp:
 			return temp
 		users = find_users(url)
-		emojis = find_emojis(url)
+		emojis = find_emojis_ex(url)
 		out = deque()
 		if users and follow:
 			futs = [create_task(self.fetch_user(verify_id(u))) for u in users]
@@ -2486,7 +2486,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					res = await fut
 					out.append(best_url(res))
 		for s in emojis:
-			url = await self.emoji_to_url(s)
+			if is_url(s):
+				url = s
+			else:
+				url = await self.emoji_to_url(s)
 			out.append(url)
 		if not out:
 			out = find_urls(translate_emojis(replace_emojis(url)))

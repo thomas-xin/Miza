@@ -4288,12 +4288,61 @@ def load_emojis():
 	global emoji_translate, emoji_replace, em_trans
 	if os.path.exists("misc/emojis.json") and utc() - os.path.getmtime("misc/emojis.json") < 86400:
 		return
-	data = Request("https://api.github.com/repos/twitter/twemoji/git/trees/master?recursive=1", json=True, timeout=None)
-	ems = [e for e in data["tree"] if e["path"].startswith("assets/svg/")]
-	e_ids = [e["path"].rsplit("/", 1)[-1].split(".", 1)[0] for e in ems]
-	urls = [f"https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/{e_id}.svg" for e_id in e_ids]
-	emojis = ["".join(chr(int(i, 16)) for i in e_id.split("-")) for e_id in e_ids]
+	data = Request(
+		"https://emojipedia.org/api/graphql",
+		data=orjson.dumps(dict(
+			operationName="vendorHistoricEmojiV1",
+			variables=dict(
+				lang="EN",
+				slug="twitter",
+				version="twemoji-15.0.1",
+			),
+		)),
+		headers={"Content-Type": "application/json"},
+		method="POST",
+		json=True,
+		timeout=None,
+	)
+	emojis = []
+	urls = []
+	names = []
+	for category in data["data"]["vendorHistoricEmoji_v1"]["items"]:
+		for emoji in category["images"]:
+			name = emoji["slug"]
+			source = emoji["image"]["source"]
+			url = "https://em-content.zobj.net/" + source
+			e_id = source.rsplit(".", 1)[0].rsplit("_", 1)[-1]
+			e = "".join(chr(int(ei, 16)) for ei in e_id.split("-"))
+			emojis.append(e)
+			urls.append(url)
+			names.append(name)
+	ntrans = dict(zip(emojis, names))
 	etrans = dict(zip(emojis, urls))
+	with tracebacksuppressor:
+		data = Request(
+			"https://emojipedia.org/api/graphql",
+			data=orjson.dumps(dict(
+				operationName="vendorHistoricEmojiV1",
+				variables=dict(
+					lang="EN",
+					slug="discord",
+					version="15.0",
+				),
+			)),
+			headers={"Content-Type": "application/json"},
+			method="POST",
+			json=True,
+			timeout=None,
+		)
+		for category in data["data"]["vendorHistoricEmoji_v1"]["items"]:
+			for emoji in category["images"]:
+				name = emoji["slug"]
+				source = emoji["image"]["source"]
+				url = "https://em-content.zobj.net/" + source
+				e_id = source.rsplit(".", 1)[0].rsplit("_", 1)[-1]
+				e = "".join(chr(int(ei, 16)) for ei in e_id.split("-"))
+				ntrans[e] = name
+				etrans[e] = url
 	b = orjson.dumps(etrans)
 	with open("misc/emojis.json", "wb") as f:
 		f.write(b)
@@ -4301,6 +4350,7 @@ def load_emojis():
 	emoji_replace = {k: v for k, v in etrans.items() if len(k) > 1}
 	em_trans = "".maketrans(emoji_translate)
 	print(f"Successfully loaded {len(etrans)} unicode emojis.")
+	return etrans
 
 @functools.lru_cache(maxsize=4)
 def translate_emojis(s):
@@ -4321,10 +4371,10 @@ def find_emojis_ex(s):
 	out = deque()
 	for emoji, url in emoji_replace.items():
 		if emoji in s:
-			out.append(url[1:-1])
+			out.append(url)
 	for emoji, url in emoji_translate.items():
 		if emoji in s:
-			out.append(url[1:-1])
+			out.append(url)
 	return list(set(out))
 
 HEARTS = ["❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
