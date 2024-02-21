@@ -4368,14 +4368,20 @@ def replace_emojis(s):
 
 @functools.lru_cache(maxsize=4)
 def find_emojis_ex(s):
-	out = deque()
+	out = {}
 	for emoji, url in emoji_replace.items():
-		if emoji in s:
-			out.append(url)
+		try:
+			i = s.index(emoji)
+		except ValueError:
+			continue
+		out[i] = url
 	for emoji, url in emoji_translate.items():
-		if emoji in s:
-			out.append(url)
-	return list(set(out))
+		try:
+			i = s.index(emoji)
+		except ValueError:
+			continue
+		out[i] = url
+	return [t[1] for t in sorted(out.items())]
 
 HEARTS = ["❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
 
