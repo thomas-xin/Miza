@@ -2361,6 +2361,7 @@ def is_image(url):
 			return IMAGE_FORMS.get(url)
 
 VIDEO_FORMS = {
+	".ts": True,
 	".webm": True,
 	".mkv": True,
 	".f4v": False,
@@ -2396,6 +2397,7 @@ AUDIO_FORMS = {
 	".aac": True,
 	".wma": True,
 	".vox": True,
+	".ts": False,
 	".webm": False,
 	".mp4": False,
 }
@@ -2421,7 +2423,8 @@ MIMES = cdict(
 	jpg="image/jpeg",
 	gif="image/gif",
 	webp="image/webp",
-	webm="video/webm",
+	ts="video/ts",
+	webm="video/mp2t",
 	mp3="audio/mpeg",
 	ogg="audio/ogg",
 	opus="audio/opus",

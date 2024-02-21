@@ -84,6 +84,8 @@ else:
 	except:
 		easygui.exceptionbox()
 		raise SystemExit
+while name and ".." in name:
+	name = name.replace("..", "_")
 
 try:
 	proc = subprocess.Popen(["ffprobe", "-read_intervals", str(max(0, start - 30)) + "%+60", "-skip_frame", "nokey", "-select_streams", "v:0", "-show_entries", "frame=pts_time", "-of", "default=nokey=1:noprint_wrappers=1", "-i", fi], stdout=subprocess.PIPE)
@@ -104,30 +106,50 @@ try:
 
 		f1 = name + "~1" + "." + "ts"
 		f2 = name + "~2" + "." + "ts"
-		cdc = subprocess.check_output(["ffprobe", "-skip_frame", "nokey", "-select_streams", "v:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", "-i", fi]).strip()
-
-		vproc = subprocess.Popen(["ffmpeg", "-y", "-hwaccel", "auto", "-ss", str(start), "-to", str(key), "-an", "-i", fi, "-crf", "20", "-c:v", cdc, f1])
+		f3 = None
+		cproc = subprocess.Popen(["ffprobe", "-skip_frame", "nokey", "-select_streams", "v:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", "-i", fi], stdout=subprocess.PIPE)
 		fps = subprocess.check_output(["ffprobe", "-skip_frame", "nokey", "-select_streams", "v:0", "-show_entries", "stream=avg_frame_rate", "-of", "default=nokey=1:noprint_wrappers=1", "-i", fi]).strip().decode("ascii")
+		cdc = cproc.stdout.read().strip()
 		if not fps or fps == "N/A":
 			fps = 1000
 		else:
 			fps = eval(fps, {}, {})
 		print("TRIM:", start, key, end, fps)
-		subprocess.run(["ffmpeg", "-y", "-hwaccel", "auto", "-ss", str(key + 1 / fps), "-to", str(end), "-an", "-i", fi, "-c:v", "copy", "-avoid_negative_ts", "1", f2])
-		aproc.wait()
+		vproc = subprocess.Popen(["ffmpeg", "-y", "-hwaccel", "auto", "-ss", str(start), "-to", str(key - 1 / fps), "-an", "-i", fi, "-crf", "20", "-c:v", cdc, f1])
+		subprocess.run(["ffmpeg", "-y", "-hwaccel", "auto", "-ss", str(key), "-to", str(end), "-an", "-i", fi, "-c:v", "copy", "-avoid_negative_ts", "1", f2])
 		vproc.wait()
 
+		if "://" in fi and os.path.exists(f2) and os.path.getsize(f2):
+			dur = subprocess.check_output(["ffprobe", "-skip_frame", "nokey", "-select_streams", "v:0", "-show_entries", "format=duration", "-of", "default=nokey=1:noprint_wrappers=1", "-i", f2]).strip().decode("ascii")
+			if not dur or dur == "N/A":
+				dur = subprocess.check_output(["ffprobe", "-skip_frame", "nokey", "-select_streams", "v:0", "-show_entries", "stream=duration", "-of", "default=nokey=1:noprint_wrappers=1", "-i", f2]).strip().decode("ascii")
+			if dur != "N/A":
+				dur = float(dur)
+				# print("DUR:", dur, start, key, end)
+				diff = dur - (end - key)
+				if diff > 1 / 30:
+					f3 = name + "~3" + "." + "ts"
+					print(f"Mismatch of {diff}s, retrimming...")
+					subprocess.run(["ffmpeg", "-y", "-hwaccel", "auto", "-t", str(key - start - diff - 1 / fps), "-an", "-i", f1, "-c:v", "copy", f3])
+					f1, f3 = f3, f1
+
+		aproc.wait()
+
+		fstart = fn.rsplit("/", 1)
 		fc = name + "~c" + "." + "txt"
 		with open(fc, "w", encoding="utf-8") as f:
-			f.write("file " + repr(f1) + "\n")
-			f.write("file " + repr(f2) + "\n")
+			f.write("file " + repr(os.path.abspath(f1)) + "\n")
+			f.write("file " + repr(os.path.abspath(f2)) + "\n")
 		subprocess.run(["ffmpeg", "-y", "-hwaccel", "auto", "-safe", "0", "-f", "concat", "-i", fc, *(("-i", fa) if os.path.exists(fa) and os.path.getsize(fa) else ()), "-c:v", "copy", "-c:a", "copy", fn])
-		for fd in (fa, f1, f2, fc):
-			try:
-				os.remove(fd)
-			except:
-				pass
-	if not os.path.exists(fn):
+		if os.path.exists(fn) and os.path.getsize(fn):
+			for fd in (fa, f1, f2, f3, fc):
+				if not fd:
+					continue
+				try:
+					os.remove(fd)
+				except:
+					pass
+	if not os.path.exists(fn) or not os.path.getsize(fn):
 		raise RuntimeError("Unable to save file. Please check log for info.")
 except:
 	if not easygui:

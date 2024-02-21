@@ -1924,7 +1924,7 @@ class AudioDownloader:
 					url = resp["id"]
 		if is_discord_url(url):
 			title = url.split("?", 1)[0].rsplit("/", 1)[-1]
-			if title.rsplit(".", 1)[-1] in ("ogg", "webm", "mp4", "avi", "mov"):
+			if title.rsplit(".", 1)[-1] in ("ogg", "ts", "webm", "mp4", "avi", "mov"):
 				url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
 				with reqs.next().get(url2, headers=Request.header(), stream=True) as resp:
 					if resp.status_code in range(200, 400):
@@ -1982,7 +1982,7 @@ class AudioDownloader:
 	def extract_from(self, url):
 		if is_discord_url(url):
 			title = url.split("?", 1)[0].rsplit("/", 1)[-1]
-			if title.rsplit(".", 1)[-1] in ("ogg", "webm", "mp4", "avi", "mov"):
+			if title.rsplit(".", 1)[-1] in ("ogg", "ts", "webm", "mp4", "avi", "mov"):
 				url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
 				with reqs.next().get(url2, headers=Request.header(), stream=True) as resp:
 					if resp.status_code in range(200, 400):
@@ -2719,7 +2719,7 @@ class AudioDownloader:
 		if hwaccel == "cuda":
 			if fmt == "mp4":
 				args.extend(("-c:v", "h264_nvenc"))
-			elif fmt == "webm":
+			elif fmt in ("webm", "ts"):
 				args.extend(("-c:v", "av1_nvenc"))
 		if len(urls) > 1:
 			outf = f"{info['name']} +{len(urls) - 1}.{fmt}"
@@ -2881,7 +2881,7 @@ class AudioDownloader:
 				fmt = "mp3"
 			else:
 				mid = False
-			videos = {"webm", "mkv", "f4v", "flv", "mov", "qt", "wmv", "mp4", "m4v", "mpv", "gif", "apng", "webp"}
+			videos = {"ts", "webm", "mkv", "f4v", "flv", "mov", "qt", "wmv", "mp4", "m4v", "mpv", "gif", "apng", "webp"}
 			vid = fmt in videos or container and container in videos
 			if type(url) is str:
 				urls = (url,)
@@ -2896,14 +2896,14 @@ class AudioDownloader:
 			if rename and os.path.exists(rename) and os.path.getsize(rename):
 				return rename, rename
 			enough = False
-			if len(urls) == 1 and fmt in ("opus", "pcm", "wav", "mp3", "ogg") and is_youtube_url(urls[0]):
+			if len(urls) == 1 and not (start or end) and fmt in ("opus", "pcm", "wav", "mp3", "ogg") and is_youtube_url(urls[0]):
 				url = unyt(url)
 				info = self.search(url)
 				if info and info[0] and info[0].get("duration") and info[0]["duration"] < 3600:
 					enough = True
 			if enough:
 				h = shash(url)
-				fn = "cache/~" + h + ".webm"
+				fn = "cache/~" + h + ".ts"
 				out2 = "cache/~" + h + ".opus"
 				if not os.path.exists(fn):
 					b = await_fut(process_image("ytdl", "$", [urls[0], True], cap="ytdl", timeout=600))
@@ -3241,7 +3241,7 @@ class AudioDownloader:
 				if hwaccel == "cuda":
 					if fmt == "mp4":
 						args.extend(("-c:v", "h264_nvenc"))
-					elif fmt == "webm":
+					elif fmt in ("webm", "ts"):
 						args.extend(("-c:v", "av1_nvenc"))
 				args.extend(("-f", fmt, fn))
 			try:
@@ -5467,7 +5467,7 @@ class Download(Command):
 				spl = smart_split(argv)
 				if len(spl) >= 1:
 					fmt = spl[-1].lstrip(".")
-					if fmt.casefold() not in ("mp3", "ecdc", "opus", "ogg", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp", "png", "jpg", "webp"):
+					if fmt.casefold() not in ("mp3", "ecdc", "opus", "ogg", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "ts", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp", "png", "jpg", "webp"):
 						fmt = default_fmt
 					else:
 						if spl[-2] in ("as", "to"):

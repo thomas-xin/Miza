@@ -2390,8 +2390,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		)
 		return "".join(resp).strip()
 
-	@functools.lru_cache(maxsize=64)
+	llava_cache = {}
 	async def llava(self, url):
+		try:
+			return self.llava_cache[url]
+		except KeyError:
+			pass
 		if isinstance(url, str):
 			b = await process_image(url, "resize_max", ["-nogif", 512, False, "auto", "-f", "png"], timeout=10, retries=2)
 		else:
@@ -2419,9 +2423,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				response = await self.llm("chat.completions.create", api="fireworks", **data, timeout=30)
 		except:
 			print_exc()
-			return self.ibv(url)
-		out = response.choices[0].message.content.strip()
-		print("LLAVA:", out)
+			out = self.ibv(url)
+		else:
+			out = response.choices[0].message.content.strip()
+			print("LLAVA:", out)
+		self.llava_cache[url] = out
 		return out
 
 	@functools.lru_cache(maxsize=64)

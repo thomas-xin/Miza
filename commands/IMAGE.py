@@ -61,7 +61,7 @@ def get_video(url, fps=None):
 			url = url.replace("?dl=0", "?dl=1")
 	return url, size, dur, fps
 
-VIDEOS = ("gif", "webp", "apng", "mp4", "mkv", "webm", "mov", "wmv", "flv", "avi", "qt", "f4v", "zip")
+VIDEOS = ("gif", "webp", "apng", "mp4", "mkv", "ts", "webm", "mov", "wmv", "flv", "avi", "qt", "f4v", "zip")
 
 
 async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="png", count=0):

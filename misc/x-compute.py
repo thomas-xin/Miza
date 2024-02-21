@@ -1878,7 +1878,7 @@ if "ytdl" in CAPS:
 	def ytdl(q, download=False):
 		import yt_dlp
 		print("YTDL:", q)
-		params = dict(default_search="auto", source_address="0.0.0.0", final_ext="webm", format=format_selector)
+		params = dict(default_search="auto", source_address="0.0.0.0", final_ext="ts", format=format_selector)
 		ydl = yt_dlp.ydl = getattr(yt_dlp, "ydl", None) or yt_dlp.YoutubeDL(params)
 		res = ydl.extract_info(q, download=False, process=True)
 		if "entries" in res:
@@ -1889,7 +1889,7 @@ if "ytdl" in CAPS:
 			entry = entries[0]
 			url = entry["webpage_url"]
 			url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
-			fn = "cache/~" + shash(url) + ".webm"
+			fn = "cache/~" + shash(url) + ".ts"
 			if not os.path.exists(fn) or not os.path.getsize(fn):
 				ydl.params["outtmpl"] = dict(default=fn)
 				headers = header()
@@ -1901,7 +1901,7 @@ if "ytdl" in CAPS:
 						random.shuffle(dirlist)
 						while len(dirlist) >= 1024:
 							try:
-								os.remove(dirlist.pop(0))
+								os.remove("cache/" + dirlist.pop(0))
 							except:
 								traceback.print_exc()
 				if not os.path.exists("cache"):
@@ -2557,8 +2557,8 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		# 	x, y = max_size(*mask.size, ms, force=True)
 		else:
 			x = y = ms
-		d = 64
-		w, h = (x // d * d, y // d * d)
+		d = 128
+		w, h = (round(x / d) * d, round(y / d) * d)
 		print("IBASCC:", w, h)
 		from diffusers import StableCascadeDecoderPipeline, StableCascadePriorPipeline
 
@@ -2572,8 +2572,8 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		prior = SCCP
 		payload = dict(
 			prompt=prompt.replace(" BREAK ", ".\n\n").replace("BREAK", ".\n\n").strip(),
-			height=w,
-			width=h,
+			width=w,
+			height=h,
 			negative_prompt="",
 			guidance_scale=float(kwargs.get("--guidance-scale", 7)),
 			num_images_per_prompt=count,
@@ -2582,7 +2582,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		if im:
 			payload["images"] = [im]
 		prior_output = prior(**payload)
-		# print("PO:", prior_output.shape)
+		print("PO:", prior_output.image_embeddings.shape)
 
 		if not SCCD:
 			SCCD = StableCascadeDecoderPipeline.from_pretrained("stabilityai/stable-cascade", torch_dtype=torch.float16)
