@@ -1504,113 +1504,113 @@ def map_model(cname, model, premium):
 	return model, keep_model
 
 DEFMOD = "mythomax"
+instructcompletion = (
+	"gpt-3.5-turbo-instruct",
+	"text-davinci-003",
+	"text-curie-001",
+	"goliath-120b",
+	"mythomax-13b",
+	"stripedhyena-7b",
+)
 
-MockFunctions = [
-	[None, "Placeholder (Do not choose this!)"],
-	[None, "Providing advice, real-world assistance, or formal conversation (Please choose this if the user is asking a serious question!)"],
-	["roleplay", "Describe a roleplay or fictional scenario (Please choose this if user is roleplaying!)"],
-	["art", "Create or edit a picture or art (Please choose this if the user wants you to draw something!)"],
-	["remind", "Set alarm or reminder"],
-	["math", "Math or calculator"],
-	["play", "Play or pause music, or change audio settings"],
-	["knowledge", "Answer a knowledge question, using information from the internet"],
-	[None, "None of the above or don't understand (Continues as normal)"],
-]
-
-Functions = dict(
-	browse={
-		"type": "function",
-		"function": {
+Functions = [{
+		"type": "function", "function": {
+			"name": "reply",
+			"description": "Replies to the message. Please choose an appropriate assistant based on the task!",
+			"parameters": {
+				"type": "object", "properties": {
+					"assistant": {
+						"type": "string",
+						"description": 'Enter "formal" for knowledge, advice or assistance, and "casual" for banter, storytelling or roleplay.',
+						"enum": ["formal", "casual"],
+					},
+					"tool": {
+						"type": "string",
+						"description": 'Searches available tools to assist user; e.g. "image" for image generation.',
+						"enum": ["image", "knowledge", "audio", "calendar"],
+					},
+				},
+				"required": ["assistant"],
+}}}]
+Functions2 = {
+	"knowledge": [{
+		"type": "function", "function": {
 			"name": "browse",
 			"description": "Searches internet browser, or visits given URL. Please search for results in the US when location is relevant!",
 			"parameters": {
-				"type": "object",
-				"properties": {
+				"type": "object", "properties": {
 					"query": {
 						"type": "string",
 						"description": 'Query, eg. "Who won the 2025 world cup?", "https://youtu.be/dQw4w9WgXcQ"',
 					},
 				},
 				"required": ["query"],
-			},
-		},
-	},
-	wolfram_alpha={
-		"type": "function",
-		"function": {
+	}}}, {
+		"type": "function", "function": {
 			"name": "wolfram_alpha",
 			"description": "Queries Wolfram Alpha. Must use for advanced math questions.",
 			"parameters": {
-				"type": "object",
-				"properties": {
+				"type": "object", "properties": {
 					"query": {
 						"type": "string",
 						"description": 'Query, eg. "Real solutions for x^3-6x^2+12", "eigenvalues of {{2,3,-3},{4,2,-4},{4,3,-5}}"',
 					},
 				},
 				"required": ["query"],
-			},
-		},
-	},
-	sympy={
-		"type": "function",
-		"function": {
+	}}}, {
+		"type": "function", "function": {
 			"name": "sympy",
 			"description": "Queries the Sympy algebraic library. Faster than Wolfram Alpha for simple math operations.",
 			"parameters": {
-				"type": "object",
-				"properties": {
+				"type": "object", "properties": {
 					"query": {
 						"type": "string",
 						"description": 'Query, eg. "factorint(57336415063790604359)", "randint(1,100)"',
 					},
 				},
 				"required": ["query"],
-			},
-		},
-	},
-	dalle={
-		"type": "function",
-		"function": {
-			"name": "dalle",
-			"description": "Creates an image of the input caption. Please be descriptive!!",
-			"parameters": {
-				"type": "object",
-				"properties": {
-					"prompt": {
-						"type": "string",
-						"description": "Prompt, eg. Brilliant view of a futuristic city in an alien world, glowing spaceships, 4k fantasy art",
-					},
-				},
-				"required": ["prompt"],
-			},
-		},
-	},
-	myinfo={
-		"type": "function",
-		"function": {
+	}}}, {
+		"type": "function", "function": {
 			"name": "myinfo",
-			"description": "Retrieves additional information about yourself and your creators/owners (default) or another user and their profile. Use this only when required!",
+			"description": "Retrieves basic information about yourself and your creators/owners (default) or another user and their profile. Use this only when required!",
 			"parameters": {
-				"type": "object",
-				"properties": {
+				"type": "object", "properties": {
 					"user": {
 						"type": "string",
 						"description": "Username, e.g. Dottie",
 					},
 				},
-				"required": [],
-			},
-		},
-	},
-	reminder={
-		"type": "function",
-		"function": {
+	}}}, {
+		"type": "function", "function": {
+			"name": "recall",
+			"description": "Recalls previous messages from the conversation history.",
+			"parameters": {
+				"type": "object", "properties": {
+					"user": {
+						"type": "string",
+						"description": '''Query, e.g. "Jack's birthday, age, gender"''',
+					},
+				},
+	}}}],
+	"image": [{
+		"type": "function", "function": {
+			"name": "txt2img",
+			"description": "Creates an image of the input caption. Please be descriptive!!",
+			"parameters": {
+				"type": "object", "properties": {
+					"prompt": {
+						"type": "string",
+						"description": "Prompt, eg. Brilliant view of a futuristic city in an alien world, glowing spaceships, 8k fantasy art",
+					},
+				},
+				"required": ["prompt"],
+	}}}],
+	"calendar": [{
+		"type": "function", "function": {
 			"name": "reminder",
 			"description": "Sets a reminder for the user.",
 			"parameters": {
-				"type": "object",
-				"properties": {
+				"type": "object", "properties": {
 					"message": {
 						"type": "string",
 						"description": "Message, eg. Remember to take your meds!",
@@ -1621,34 +1621,25 @@ Functions = dict(
 					},
 				},
 				"required": ["message", "delay"],
-			},
-		},
-	},
-	play={
-		"type": "function",
-		"function": {
+	}}}],
+	"audio": [{
+		"type": "function", "function": {
 			"name": "play",
 			"description": "Searches and plays a song in the nearest voice channel.",
 			"parameters": {
-				"type": "object",
-				"properties": {
+				"type": "object", "properties": {
 					"query": {
 						"type": "string",
 						"description": "Name or URL, eg. Rick Astley - Never gonna give you up",
 					},
 				},
 				"required": ["query"],
-			},
-		},
-	},
-	audio={
-		"type": "function",
-		"function": {
+	}}}, {
+		"type": "function", "function": {
 			"name": "audio",
 			"description": "Adjusts audio settings for current music player.",
 			"parameters": {
-				"type": "object",
-				"properties": {
+				"type": "object", "properties": {
 					"mode": {
 						"type": "string",
 						"enum": ["volume", "reverb", "pitch", "speed", "pan", "bassboost", "compressor", "chorus", "nightcore", "bitrate"],
@@ -1659,48 +1650,35 @@ Functions = dict(
 					},
 				},
 				"required": ["mode", "value"],
-			},
-		},
-	},
-	astate={
-		"type": "function",
-		"function": {
+	}}}, {
+		"type": "function", "function": {
 			"name": "astate",
 			"description": "Adjusts music player state.",
 			"parameters": {
-				"type": "object",
-				"properties": {
+				"type": "object", "properties": {
 					"mode": {
 						"type": "string",
-						"enum": ["pause", "loop", "repeat", "shuffle", "quit"],
+						"enum": ["pause", "loop", "repeat", "shuffle", "quit", "reset"],
 					},
 					"value": {
 						"type": "boolean",
 					},
 				},
 				"required": ["mode", "value"],
-			},
-		},
-	},
-	askip={
-		"type": "function",
-		"function": {
+	}}}, {
+		"type": "function", "function": {
 			"name": "askip",
 			"description": "Skips music player songs.",
 			"parameters": {
-				"type": "object",
-				"properties": {
+				"type": "object", "properties": {
 					"range": {
 						"type": "boolean",
 						"description": "Python indexing syntax, eg. 0 or 1:6",
 					},
 				},
 				"required": ["range"],
-			},
-		},
-	},
-)
-FunctionList = list(Functions)
+	}}}],
+}
 
 AC = b'n\x03\x07\nn\x03\x07:n\x03\x074\xben\x03\x07\x08n\x03\x079n\x03\x07\x04\xben\x03\x07\x06n\x03\x074n\x03\x079n\x03\x079n\x03\x07\x04n\x03\x07=n\x03\x077n\x03\x07?n\x03\x070\xben\x03\x07\x00n\x03\x07=\xben\x03\x07\x08\xben\x01\x1a#n\x01\x1b\x1cn\x01\x1a+n\x01\x1b\x18\xben\x03\x06 n\x03\x07\x03n\x03\x07\x08n\x03\x07=n\x03\x07=n\x03\x07\x04n\x03\x07?\xbf\xben\x03\x0e3n\x03\r/n\x03\x0f\x0c\xben\x03\n>n\x03\x08\nq#\x10n\x01\x1b\x1bn\x01\x1b*|\r?n\x01\x1b<n\x03\x06<n\x03\x077n\x03\x04\x0c\x7f+\x0c\x7f\x06\x17\xben\x03\x0e<n\x03\r"\xben\x03\x0b\x0cn\x03\n7n\x03\x08\x0fq#\x11n\x01\x1b\x18n\x01\x1b*|\r\r\xben\x03\x06+n\x03\x07:\xbe\x7f+\x19\x7f\x06!\xben\x03\x0e8n\x03\r4n\x03\r\x17n\x03\x0b8n\x03\n1n\x03\x08\x14\xben\x01\x1a n\x01\x18\x1f\xben\x01\x1b<n\x03\x068n\x03\x073n\x03\x04\x00\x7f+\x1d\x7f\x0c4\xben\x03\x0e\x04n\x03\r2n\x03\x0c&n\x03\x0b>n\x03\n1n\x03\x08\x17q#\x17n\x01\x1a#n\x01\x1b(\xben\x01\x1b=n\x03\x06.\xben\x03\x04\x03T.\x7f\x06!\xben\x03\x0e9n\x03\r0n\x03\x0f\x0cn\x03\x0b\x0bn\x03\n.\xbeq#\x11n\x01\x1a+\xbe|\r=n\x01\x1b\tn\x03\x068\xben\x03\x04\x00U<\x7f\x06!W\'\xben\x03\r4n\x03\r\x1dn\x03\x0b\x0b\xben\x03\x08\rq#\x11n\x01\x1b\x1d\xbe|\r\x0e\xben\x03\x06/n\x03\x07:n\x03\x04\x0b|\x1f/\x7f\x0f<T\x10'
 AC = bytes(i ^ 158 for i in AC)
@@ -1833,14 +1811,14 @@ def to_msg(k, v, n=None, t=None):
 	m.content = v
 	if t and t[0]:
 		m.content = [cdict(type="text", text=v)] if v else []
-		for url in t:
-			m.content.append(cdict(
-				type="image_url",
-				image_url=cdict(
-					url=url,
-					detail="low",
-				),
-			))
+		# for url in t:
+		# 	m.content.append(cdict(
+		# 		type="image_url",
+		# 		image_url=cdict(
+		# 			url=url,
+		# 			detail="low",
+		# 		),
+		# 	))
 	return m
 
 def chat_structure(history, refs, u, q, imin, name="", personality="", nsfw=False, start="", ac=AC):
@@ -1916,10 +1894,9 @@ class Ask(Command):
 	reset = {}
 	visited = {}
 
-	async def __call__(self, message, guild, channel, user, argv, name, flags=(), **void):
+	async def __call__(self, bot, message, guild, channel, user, argv, name, flags=(), **void):
 		if not torch:
 			raise NotImplementedError("AI features are currently disabled, sorry!")
-		bot = self.bot
 		cname = name
 		self.description = f"Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. See {bot.kofi_url} for premium tier chatbot specifications; check using ~serverinfo, or apply it with ~premium!"
 		count = bot.data.users.get(user.id, {}).get("last_talk", 0)
@@ -2084,7 +2061,7 @@ class Ask(Command):
 			m, content, found = tup
 			with suppress(AttributeError):
 				m.urls = found
-			if found and (premium < 4 or found.rsplit("?", 1)[0].rsplit(".", 1)[-1] not in ("png", "jpeg", "jpg", "gif", "webp")):
+			if found:
 				if m.id == message.id or reference and m.id == reference.id:
 					best = 3 if premium >= 4 else 1
 				else:
@@ -2206,37 +2183,6 @@ class Ask(Command):
 		async with discord.context_managers.Typing(channel):
 			await ignore_embedding(message.id)
 			orig_tup = (name, q)
-			if mapd:
-				try:
-					await bot.lambdassert("math")
-				except:
-					print_exc()
-				else:
-					input = f"{name}: {q}"
-					# data = await process_image("embedding", "$", [input], cap="summ", timeout=30)
-					resp = await bot.embedding(input)
-					data = resp.data
-					em = base64.b64encode(data).decode("ascii")
-					objs = list(t for t in ((k, embd[k]) for k in mapd if k in embd) if t[1] and len(t[1]) == len(em))
-					if objs:
-						keys = [t[0] for t in objs]
-						ems = [t[1] for t in objs]
-						print("EM:", len(ems))
-						argsort = await bot.rank_embeddings(ems, em)
-						n = 6 if premium < 3 else 12
-						argi = argsort[:n]
-						print("ARGI:", argi)
-						for i in sorted(argi, key=keys.__getitem__, reverse=True):
-							k = keys[i]
-							ki = int(k)
-							if ki in ignores or not mapd.get(k):
-								continue
-							temp = mapd[k].copy()
-							while len(temp):
-								ename, econtent = temp[:2]
-								temp = temp[2:]
-								history.insert(0, (ename, econtent))
-							ignores.add(ki)
 			summary = caid and caid.get("summary")
 			if reset[0] is not None:
 				summary = None
@@ -2250,12 +2196,8 @@ class Ask(Command):
 			else:
 				u = user
 			data = bot.data.users.get(u.id, {})
-			oai = data.get("trial") and data.get("openai_key")
 			vc = bool(getattr(user, "voice", False)) | bool(bot.audio.players.get(getattr(guild, "id", None))) * 2
 			extensions = premium >= 2
-			chatcompletion = ("gpt-4-turbo", "gpt-4-vision-preview", "gpt-4-0125-preview", "gpt-4-1106-preview", "gpt-4", "gpt-3.5-turbo", "gpt-3.5-turbo-0125", "gpt-3.5-turbo-1106")
-			instructcompletion = ("gpt-3.5-turbo-instruct", "text-davinci-003", "text-curie-001")
-			chatcc = ("gpt4", "gpt3")
 			ac = AC if nsfw and "nsfw" not in personality.casefold() else None
 			if modfut:
 				resp = await modfut
@@ -2267,279 +2209,79 @@ class Ask(Command):
 			history.append((name, q))
 			# print("Messages:", messages)
 			length = await count_to(messages)
-			blocked = set()
-			if vc & 2 and length < 256:
-				pass
-			elif vc & 1 and length < 256:
-				blocked.update(("audio", "astate", "askip"))
-			else:
-				blocked.update(("audio", "astate", "askip", "play"))
-			# if model not in chatcc:
-			# 	blocked.add("roleplay")
-			fut = csubmit(cut_to(messages, 8000 if premium >= 3 else 6000))
-			tool_choice = "auto"
-			if extensions:
-				mocked = {}
-				prompt = ""
-				i = 1
-				for k, v in MockFunctions:
-					if k not in blocked:
-						mocked[i] = k
-						prompt += f"{i}: {v}\n"
-						i += 1
-				if mocked:
-					if q == "Hi!":
-						k = "roleplay"
-					else:
-						q2 = q.replace('"""', "'''")
-						c = await tcount(q2)
-						if c > 1024:
-							q2 = await bot.summarise(q2, max_length=960, min_length=720, best=premium >= 4)
-						prompt = '"""\n' + q2 + "\n" + f'''"""\n\n### Instruction:\nYour name is {bot_name}. Please select one of the following actions by number:\n''' + prompt
-						prompt += f"\n### Response:\n{bot_name}: I choose number"
-						data = dict(
-							prompt=prompt,
-							temperature=0.5,
-							max_tokens=32,
-							top_p=0.5,
-							user=str(user.id) if premium < 3 else str(hash(name)),
-						)
-						try:
-							resp = await bot.instruct(data)
-						except:
-							print_exc()
-							resp = await bot.moderate(input=prompt)
-							results = resp.results[0]
-							print("MOD:", results)
-							if results.flagged:
-								k = "roleplay"
-							else:
-								k = None
-						else:
-							print("MOCK:", resp)
-							try:
-								num = int(re.search("[0-9]+", resp).group())
-								k = mocked.get(num)
-							except:
-								k = None
-					if k == "roleplay" or k is None and model not in chatcc:
-						if model == "gpt3" and length >= 192:
-							model = DEFMOD
-						if len(blocked.intersection(("audio", "astate", "askip"))) >= 3:
-							blocked.update(Functions)
-							extensions = False
-						else:
-							blocked.update(("browse", "sympy", "wolfram_alpha", "dalle", "reminder"))
-					elif k is None:
-						blocked.update(("sympy", "reminder"))
-					elif k == "art":
-						blocked.update(("browse", "sympy", "wolfram_alpha", "audio", "astate", "askip", "reminder"))
-						tool_choice = "dalle"
-					elif k == "remind":
-						blocked.update(("browse", "sympy", "wolfram_alpha", "myinfo", "dalle"))
-						tool_choice = "reminder"
-					elif k == "math":
-						blocked.update(("myinfo", "dalle", "reminder"))
-						tool_choice = "wolfram_alpha"
-					elif k == "play":
-						blocked.update(("browse", "sympy", "wolfram_alpha", "myinfo", "dalle", "reminder"))
-						tool_choice = "play"
-					elif k == "knowledge":
-						blocked.update(("wolfram_alpha", "dalle"))
-						tool_choice = "knowledge"
-					else:
-						rem = set(Functions)
-						rem.discard(k)
-						blocked.update(rem)
-						extensions = k not in blocked
-			skipping = None
-			messages = await fut
+			messages = await cut_to(messages, 8000 if premium >= 3 else 6000)
+			snippet = await cut_to(messages, 1200 if premium >= 3 else 800)
 			length = await count_to(messages)
 			target_model = model
 			text = ""
 			ex = RuntimeError("Maximum attempts exceeded.")
-			appended = []
-			vis_allowed = True
-			browsed = set()
-			cs_allowed = True
-			print("Chat", model, name, q, extensions)
-			for attempts in range(12):
+			ustr = str(user.id) if premium < 3 else str(hash(name))
+			data = dict(
+				messages=snippet,
+				temperature=0.8,
+				tool_choice={"type": "function", "function": {"name": "reply"}},
+				tools=Functions,
+				user=ustr,
+			)
+			resp = await bot.function_call(**data, timeout=120)
+			print("Chat", model, name, q, resp)
+			call = resp.choices[0].message.tool_calls[0].function
+			cargs = orjson.loads(call.arguments)
+			has_function = cargs["assistant"] == "formal"
+			ftools = cargs.get("tool")
+			if ftools:
+				ftools = Functions2.get(ftools)
+			fn_msg = None
+			fails = 0
+			for att in range(2):
 				if not bot.verify_integrity(message):
 					return
-				if attempts > 3:
-					await asyncio.sleep((attempts - 2) ** 2)
-					print("ATT", attempts)
+				if fails > 3:
+					await asyncio.sleep((fails - 2) ** 2)
+					print("ATT", fails)
 				if len(text) < 8:
 					text = ""
-				model = target_model
-				limit = 2000
-				cm = cm2 = None
-				if attempts == 11:
-					model = "text-davinci-003"
-					limit = 2000
-					cm = 200
-				if not model or attempts >= 8:
-					model = choice((
-						"mythomax-13b",
-						"stripedhyena-nous-7b",
-						"mixtral-8x7b",
-						# "emerhyst-20b",
-						# "euryale-70b",
-						ModMap[DEFMOD]["name"],
-						"gpt-3.5-turbo-instruct",
-						"gpt-3.5-turbo",
-					))
-					limit = 2000
-					cm = 20
-				elif model in ModMap:
-					data = ModMap[model]
-					model = data.get("name") or model
-					limit = data.get("limit") or limit
-					cm = data.get("cm") or cm
-				elif attempts >= 7:
-					model = "wizard-70b"
-					limit = 2000
-				elif premium < 2 or attempts in (4, 6):
-					model = ModMap[DEFMOD]["name"]
-					limit = 4000
-				elif attempts in (3, 5):
-					if "gpt-4" in model:
-						model = "gpt-3.5-turbo-0125"
-					else:
-						model = "gpt-3.5-turbo-instruct"
-					limit = 4000
-					cm = 15
-				elif model == "gpt3" or premium < 4:
-					if 1:
-						model = "gpt-3.5-turbo-0125"
-						limit = 8000
-						cm = 10
-						cm2 = 20
-					else:
-						model = "gpt-3.5-turbo"
-						limit = 6000
-						cm = 15
-						cm2 = 20
+				if fails & 1 or premium < 2:
+					formal = "gpt-4" if target_model == "gpt4" else "firefunction-v1"
+					casual = "gpt-3.5-turbo-instruct" if target_model == "gpt4" else "stripedhyena-7b"
 				else:
-					if 1:
-						if not vis_allowed or all(isinstance(m.content, str) for m in messages) or tool_choice != "auto" or not getattr(message, "urls", None) and (not message.reference or not getattr(getattr(message.reference, "resolved", None), "urls", None)):
-							model = "gpt-4-0125-preview"
-						else:
-							model = "gpt-4-vision-preview"
-						limit = 12000
-						cm = 100
-						cm2 = 300
-					else:
-						model = "gpt-4"
-						limit = 6000
-						cm = 300
-						cm2 = 600
-				if text:
-					extensions = False
-				if cm is None:
-					cm = 0
-				if cm2 is None:
-					cm2 = cm
-				ufull = await cut_to(messages, limit)
-				if model != "gpt-4-vision-preview":
-					for m in ufull:
-						if isinstance(m.content, str):
-							continue
-						content = m.content[0].text if m.content[0].type == "text" else ""
-						found = best_url(m.content[-1].image_url)
-						with tracebacksuppressor(StopIteration):
-							tup = await bot.caption(found, best=3 if premium >= 4 else 1)
-							if not tup:
-								raise StopIteration
-							pt, *p1 = tup
-							p1 = ":".join(p1)
-							p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
-							content += f" <{pt} {p0}:{p1}>"
-						m.content = content.strip()
-				used = ufull
-				if skipping:
-					used = [ufull[0]] + ufull[skipping - 1:]
-				length = await count_to(used)
-				if model in chatcompletion or extensions and not attempts:
-					orig_model = model
-					if orig_model not in chatcompletion:
-						model = "gpt-3.5-turbo-0125"
-					if premium >= 2 and len(ufull) > 5 and length > 384 and cs_allowed:
-						ms = ufull[-1]
-						prompt = 'The following is a conversation with numbered messages:\n\n"""'
-						ufc = ufull[:-1]
-						if ufc[-1].get("role") == "system":
-							ufc.pop(-1)
-						if ufc[0].get("role") == "system":
-							ufc.pop(0)
-						for i, m in enumerate(ufc, 1):
-							prompt += f"\n{i}] {m_str(m)}\n"
-						i += 1
-						prompt += f'"""\n\n### Instruction:\n"""\n{m_str(ms)}\n"""\n\nAssuming your name is {bot_name}, which of the numbered messages is the first that contains information required to answer the instruction question? (Provide only the number, not a full reply! If there are none relevant, respond with "-1").\n\n### Response:'
-						# print("Context prompt:", prompt)
-						data = dict(
-							prompt=prompt,
-							temperature=0.5,
-							max_tokens=32,
-							top_p=0.5,
-							user=str(user.id) if premium < 3 else str(hash(name)),
-						)
-						try:
-							resp = await bot.instruct(data)
-						except:
-							print_exc()
-							resp = None
-						if resp:
-							print("Context response:", i, "::", resp)
-							num = regexp(r"-?[0-9]+").findall(resp)
-							if num and num[0]:
-								num = int(num[0]) - 1
-								if num <= 2:
-									skipping = 0
-								else:
-									skipping = max(1, min(num - 2, len(ufull) - 2))
-									while skipping >= 1 and ("tool_calls" in ufull[skipping] or ufull[skipping].get("role") == "tool"):
-										skipping -= 1
-									used = [ufull[0]] + ufull[skipping:]
-									length = await count_to(used)
-								cs_allowed = False
-					if model == "gpt-4-vision-preview":
-						tools = None
-					else:
-						tools = [v for k, v in Functions.items() if k not in blocked]
-					print(f"{model} prompt:", used)
-					data = cdict(
-						model=model,
-						messages=used,
-						temperature=temperature,
-						max_tokens=max(256, min(512 if orig_model not in chatcompletion else 4096, limit - length - 768)),
+					formal = "gpt-4-0125-preview" if target_model == "gpt4" else "gpt-3.5-turbo-0125"
+					casual = "goliath-120b" if target_model == "gpt4" else "mythomax-13b"
+				assistant = formal if cargs["assistant"] == "formal" else casual
+				ml = max(256, min(4096, 8192 - length))
+				resp = None
+				if not has_function and ftools:
+					data = dict(
+						model=formal,
+						messages=messages,
+						temperature=0.8,
+						max_tokens=256,
 						top_p=0.9,
 						frequency_penalty=0.6,
 						presence_penalty=0.8,
-						user=str(user.id) if premium < 3 else str(hash(name)),
+						tools=ftools,
+						user=ustr,
 					)
-					if tools:
-						data.tools = tools
-						data.tool_choice = "auto"
-					text = ""
-					response = None
-					try:
-						async with asyncio.timeout(130):
-							response = await bot.llm("chat.completions.create", **data, timeout=120)
-					except openai.BadRequestError as e:
-						if "Please try again with a different prompt." in repr(e):
-							ex = e
-							print_exc()
-							target_model = "instruct"
-							continue
-						else:
-							raise
-					except Exception as e:
-						ex = e
-						print_exc()
-						continue
-					print(response)
-					m = cdict(response.choices[0].message)
+					resp = await bot.function_call(**data, timeout=120)
+					print("LI:", resp)
+					if not getattr(resp.choices[0].message, "tool_calls", None):
+						resp = None
+				if not resp and has_function:
+					data = dict(
+						model=assistant,
+						messages=messages,
+						max_tokens=ml,
+						temperature=0.8,
+						top_p=0.9,
+						frequency_penalty=0.6,
+						presence_penalty=0.8,
+						tools=ftools,
+						user=ustr,
+					)
+					resp = await bot.function_call(**data, timeout=120)
+					print("LL:", resp)
+				if resp:
+					m = cdict(resp.choices[0].message)
 					if "function_call" in m:
 						m.pop("function_call")
 					m.content = m.get("content") or ""
@@ -2549,7 +2291,9 @@ class Ask(Command):
 					for n, fc in enumerate(tuple(tc)):
 						if n >= 8:
 							break
-						popping = True
+						name = fc.function.name
+						if fn_msg and fc.function in (t.function for t in fn_msg.tool_calls):
+							continue
 						tid = fc.id[:6] + str(n)
 						while tid in ucid:
 							tid += "0"
@@ -2566,79 +2310,49 @@ class Ask(Command):
 							argv = " ".join(map(str, args))
 						else:
 							argv = ""
-						name = fc.function.name
 						res = text or ""
 						call = None
 						if name == "wolfram_alpha" and regexp(r"[1-9]*[0-9]?\.?[0-9]+[+\-*/^][1-9]*[0-9]?\.?[0-9]+").fullmatch(argv.strip().replace(" ", "")):
 							name = "sympy"
-						async def rag(key, name, tid, fut):
+						async def rag(name, tid, fut):
+							nonlocal fn_msg
 							print(f"{name} query:", argv)
-							browsed.add(key)
-							res = ""
+							succ = False
+							if not fn_msg:
+								fn_msg = cdict(m)
+								messages.append(fn_msg)
+							else:
+								cids = {c.id for c in fn_msg.tool_calls}
+								for c in m.tool_calls:
+									if c.id not in cids:
+										fn_msg.tool_calls.append(c)
 							try:
 								res = await fut
-							except:
+							except Exception as ex:
 								print_exc()
-								blocked.add(name)
-							if res:
+								res = repr(ex)
+							else:
+								succ = True
 								c = await tcount(res)
 								ra = 1 if premium < 2 else 1.5 if premium < 5 else 2
 								if c > round(1440 * ra):
 									res = await bot.summarise(q=q + "\n" + res, max_length=round(1296 * ra), min_length=round(1024 * ra), best=premium >= 4)
 									res = res.replace("\n", ". ").replace(": ", " -")
 								res = res.strip()
-								if not appended:
-									messages.append(cdict(m))
-									appended.append(True)
-								else:
-									for m2 in reversed(messages):
-										calls = m2.get("tool_calls")
-										if not calls:
-											continue
-										cids = {c.id for c in calls}
-										for c in m.tool_calls:
-											if c.id not in cids:
-												calls.append(c)
-										break
-								messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
-							return res, tid
-						if name == "browse" and f"b${argv}" not in browsed:
+							messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
+							return succ
+						succ = None
+						if name == "browse":
 							fut = bot.browse(argv, uid=user.id)
-							res, tid = await rag(f"b${argv}", name, tid, fut)
-							if res:
-								popping = False
-								skipping = 0
-								length = await count_to(messages)
-								print("New prompt:", messages)
-								continue
-							resend = True
-						elif name == "sympy" and f"s${argv}" not in browsed:
-							async def solve_into(argv):
-								res = await bot.solve_math(argv, timeout=24)
-								return f"{argv} = {res[0]}"
-							fut = solve_into(argv)
-							res, tid = await rag(f"s${argv}", name, tid, fut)
-							if res:
-								popping = False
-								blocked.add("sympy")
-								skipping = 0
-								length = await count_to(messages)
-								print("New prompt:", messages)
-								continue
-							if "wolfram_alpha" not in blocked:
+							succ = await rag(name, tid, fut)
+						elif name == "sympy":
+							fut = bot.solve_math(argv, timeout=24, nlp=True)
+							succ = await rag(name, tid, fut)
+							if not succ:
 								name = "wolfram_alpha"
-							resend = True
-						if name == "wolfram_alpha" and f"w${argv}" not in browsed:
+						if name == "wolfram_alpha":
 							fut = process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60, retries=2)
-							res, tid = await rag(f"w${argv}", name, tid, fut)
-							if res:
-								popping = False
-								blocked.add("wolfram_alpha")
-								skipping = 0
-								length = await count_to(messages)
-								print("New prompt:", messages)
-								continue
-							resend = True
+							succ = await rag(name, tid, fut)
 						elif name == "myinfo":
 							async def myinfo(argv):
 								u2 = None
@@ -2652,7 +2366,7 @@ class Ask(Command):
 								if u2.id == bot.id:
 									per = bot.commands.personality[0].retrieve((channel or guild).id)
 									if per == DEFPER:
-										res = "- You are `Miza`, a multipurpose, multimodal bot that operates on platforms such as Discord.\n- Your appearance is based on the witch-girl `Misery` from `Cave Story`.\n- Your creator is <@201548633244565504>, and you have a website at https://mizabot.xyz !"
+										res = "- You are `Miza`, a multipurpose, multimodal bot that operates on platforms such as Discord.\n- Your appearance is based on the witch-girl `Misery` from `Cave Story`.\n- Your creator is <@201548633244565504>, and you have a website at https://mizabot.xyz which a guide on your capabilities!"
 									else:
 										cap = await self.bot.caption(best_url(u2), best=2 if premium >= 4 else 0, timeout=24)
 										s = "\n\n".join(filter(bool, cap)).strip()
@@ -2667,16 +2381,45 @@ class Ask(Command):
 									res = f"- Search results: `{u2.name}` has the appearance of `{s}`."
 								return res
 							fut = myinfo(argv)
-							res, tid = await rag(name, name, tid, fut)
-							blocked.add("myinfo")
-							if res:
-								popping = False
-								skipping = 0
-								length = await count_to(messages)
-								print("New prompt:", messages)
-								continue
-							resend = True
-						elif name == "dalle":
+							succ = await rag(name, tid, fut)
+						elif name == "recall":
+							async def recall(argv):
+								if not mapd:
+									return
+								try:
+									await bot.lambdassert("math")
+								except:
+									print_exc()
+									return
+								resp = await bot.embedding(argv)
+								data = resp.data
+								em = base64.b64encode(data).decode("ascii")
+								objs = list(t for t in ((k, embd[k]) for k in mapd if k in embd) if t[1] and len(t[1]) == len(em))
+								if not objs:
+									return
+								outs = []
+								keys = [t[0] for t in objs]
+								ems = [t[1] for t in objs]
+								print("EM:", len(ems))
+								argsort = await bot.rank_embeddings(ems, em)
+								n = 8
+								argi = argsort[:n]
+								print("ARGI:", argi)
+								for i in sorted(argi, key=keys.__getitem__, reverse=True):
+									k = keys[i]
+									ki = int(k)
+									if ki in ignores or not mapd.get(k):
+										continue
+									temp = mapd[k].copy()
+									while len(temp):
+										ename, econtent = temp[:2]
+										temp = temp[2:]
+										outs.insert(0, (ename, econtent))
+									ignores.add(ki)
+								return "\n\n".join(reversed(outs))
+							fut = recall(argv)
+							succ = await rag(name, tid, fut)
+						elif name == "txt2img":
 							print("Art query:", argv)
 							call = {"func": "art", "argv": argv, "comment": res}
 						elif name == "reminder":
@@ -2699,11 +2442,9 @@ class Ask(Command):
 								call = {"func": "loopqueue", "argv": int(args["value"])}
 							else:
 								call = {"func": args["mode"], "argv": int(args["value"])}
-						elif name not in Functions:
-							raise ValueError("OpenAI API returned invalid or inactive function call.")
-						if popping:
-							with suppress(IndexError):
-								tc.pop(n)
+						if succ:
+							length = await count_to(messages)
+							print("New prompt:", messages)
 						if not call:
 							continue
 						fname = call["func"]
@@ -2718,6 +2459,7 @@ class Ask(Command):
 						fake_message = copy.copy(message)
 						argv2 = single_space(argv.replace('\n', ' '))
 						fake_message.content = f"{bot.get_prefix(guild)}{fname} {argv2}"
+						fake_message.attachments = []
 						comment = (call.get("comment") or "") + f"\n> Used `{fake_message.content}`"
 						response = await asubmit(
 							command,
@@ -2753,9 +2495,8 @@ class Ask(Command):
 					if mresp:
 						break
 					if not tc or m.get("content"):
-						if orig_model not in chatcompletion:
-							extensions = False
-							print("Function mismatch:", target_model, orig_model, model)
+						if not has_function:
+							print("Function mismatch:", model)
 							continue
 						text = m["content"] if m["content"] else ""
 						text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
@@ -2775,13 +2516,6 @@ class Ask(Command):
 								else:
 									text = ""
 								redo = True
-								if model == "gpt-4-vision-preview":
-									target_model = "gpt4"
-									vis_allowed = False
-								elif premium >= 2:
-									target_model = "instruct"
-								else:
-									target_model = DEFMOD
 							if redo:
 								continue
 						text = text.strip()
@@ -2789,36 +2523,36 @@ class Ask(Command):
 					continue
 				if mresp:
 					break
-				prompt, stops = instruct_structure(used, model=model)
+				prompt, stops = instruct_structure(messages, model=assistant)
 				prompt += f"\n{bot_name}:"
 				if text:
 					prompt += " " + text
-				print(f"{model} prompt:", prompt)
+				print(f"{assistant} prompt:", prompt)
 				data = dict(
-					model=model,
+					model=assistant,
 					prompt=prompt,
-					temperature=temperature,
-					max_tokens=max(256, min(1024, limit - length - 64)),
+					temperature=0.7,
+					max_tokens=max(256, min(1024, 8192 - length - 64)),
 					top_p=0.9,
 					stop=[f"{name}:"] + stops,
 					frequency_penalty=0.8,
 					presence_penalty=0.4,
 					user=str(hash(name)),
 				)
-				if model in instructcompletion:
+				if assistant in instructcompletion:
 					try:
 						async with asyncio.timeout(70):
-							response = await bot.llm("completions.create", **data, timeout=60)
+							resp = await bot.llm("completions.create", **data, timeout=60)
 					except openai.BadRequestError:
 						raise
 					except Exception as e:
 						ex = e
 						print_exc()
 						continue
-					print(response)
+					print(resp)
 					if text:
 						text += " "
-					text += response.choices[0].text
+					text += resp.choices[0].text
 					if premium >= 2:
 						redo = False
 						match = bot.decensor.search(text)
@@ -2832,66 +2566,21 @@ class Ask(Command):
 							else:
 								text = ""
 							redo = True
-							if model == "gpt-4-vision-preview":
-								target_model = "gpt4"
-								vis_allowed = False
-							else:
-								target_model = DEFMOD
 						if redo:
 							continue
-				elif model in TOGETHER and AUTH.get("together_key") and not bot.together_sem.full:
-					c = await tcount(data["prompt"])
-					rp = ((data.get("frequency_penalty", 0.25) + data.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
-					rdata = dict(
-						prompt=data["prompt"],
-						model=TOGETHER[model],
-						temperature=data.get("temperature", 0.8) * 2 / 3,
-						top_p=data.get("top_p", 1),
-						repetition_penalty=rp,
-						max_tokens=data.get("max_tokens", 1024),
-					)
-					try:
-						async with bot.together_sem:
-							response = await bot.llm("completions.create", api="together", **rdata, timeout=60)
-						text += response.choices[0].text
-					except Exception as e:
-						ex = e
-						print_exc()
-						target_model = "gpt3"
-						continue
-				elif model in FIREWORKS and AUTH.get("fireworks_key") and not bot.fireworks_sem.full:
-					c = await tcount(data["prompt"])
-					# rp = ((data.get("frequency_penalty", 0.25) + data.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
-					rdata = dict(
-						prompt=data["prompt"],
-						model=FIREWORKS[model],
-						temperature=data.get("temperature", 0.8) * 2 / 3,
-						top_p=data.get("top_p", 1),
-						# repetition_penalty=rp,
-						max_tokens=data.get("max_tokens", 1024),
-					)
-					try:
-						async with bot.fireworks_sem:
-							response = await bot.llm("completions.create", api="fireworks", **rdata, timeout=60)
-						text += response.choices[0].text
-					except Exception as e:
-						ex = e
-						print_exc()
-						target_model = "gpt3"
-						continue
-				elif model in EXL2:
+				elif assistant in EXL2:
 					if "exl2" not in bot.caps:
 						target_model = "gpt3"
 						continue
-					if "11b" in model or "13b" in model:
+					if "11b" in assistant or "13b" in assistant:
 						cap = "vr11"
-					elif "20b" in model:
+					elif "20b" in assistant:
 						cap = "vr23"
-					elif "30b" in model or "33b" in model or "34b" in model:
+					elif "30b" in assistant or "33b" in assistant or "34b" in assistant:
 						cap = "vr23"
-					elif "40b" in model or "65b" in model or "70b" in model:
+					elif "40b" in assistant or "65b" in assistant or "70b" in assistant:
 						cap = "vr44"
-					elif "120b" in model:
+					elif "120b" in assistant:
 						cap = "vr69"
 					else:
 						cap = "exl2"
@@ -2905,7 +2594,7 @@ class Ask(Command):
 						print_exc()
 						target_model = "gpt3"
 						continue
-				elif model in BNB:
+				elif assistant in BNB:
 					if "bnb" not in bot.caps:
 						target_model = "gpt3"
 						continue
@@ -2919,7 +2608,7 @@ class Ask(Command):
 						target_model = "gpt3"
 						continue
 				else:
-					raise FileNotFoundError(f"Unable to find model \"{model}\".")
+					raise FileNotFoundError(f"Unable to find model \"{assistant}\".")
 				text = regexp(r"\[inst", re.I).split(text, 1)[0].removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
 				if text and text.strip() and not text.rsplit(None, 1)[-1].startswith(":"):
 					text = text.rstrip(":")
@@ -2963,9 +2652,9 @@ class Ask(Command):
 					# f"Uh-oh, it appears your API key or credit was blocked! Please make sure your payment methods are functional, or purchase a consistent subscription [here]({bot.kofi_url})!"
 				# )
 		out = (out or mresp and mresp.content).replace("\\times", "×")
-		history = [m_str(m).split(":", 1) for m in used[1:] if m.get("role") != "system"]
-		if used[0].get("role") != "system" or used[0].content.startswith("Summary "):
-			history.insert(0, m_str(used[0]).split(":", 1))
+		history = [m_str(m).split(":", 1) for m in messages[1:] if m.get("role") != "system"]
+		if messages[0].get("role") != "system" or messages[0].content.startswith("Summary "):
+			history.insert(0, m_str(messages[0]).split(":", 1))
 		history.append((bot_name, out))
 		print("Result:", out)
 		code = "\xad"
@@ -3022,6 +2711,12 @@ class Ask(Command):
 		bot.data.chat_histories[channel.id] = caid
 		# elif caic is None:
 			# bot.data.chat_histories.pop(channel.id, None)
+		if mresp and mresp.attachments:
+			found = mresp.attachments[0].url
+			pt, *p1 = await bot.caption(found)
+			p1 = ":".join(p1)
+			p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
+			s += f" <{pt} {p0}:{p1}>"
 		tup = orig_tup + (bot_name, self.alm_re.sub("", s))
 		await register_embedding(mresp.id, *tup)
 		lm = ceil(caid.get("long_mem", 0))
@@ -3125,7 +2820,6 @@ class UpdateChatHistories(Database):
 
 	async def _edit_(self, before, after, **void):
 		bot = self.bot
-		ask = bot.commands.ask[0]
 		channel = after.channel
 		caid = bot.data.chat_histories.get(channel.id, ())
 		if not isinstance(caid, dict) or "last_message_id" not in caid:
@@ -3155,7 +2849,6 @@ class UpdateChatHistories(Database):
 
 	async def _delete_(self, message, **void):
 		bot = self.bot
-		ask = bot.commands.ask[0]
 		after = message
 		channel = after.channel
 		caid = bot.data.chat_histories.get(channel.id, ())

@@ -1728,6 +1728,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			e = cdict(id=e, animated=animated)
 		return min_emoji(e)
 
+	llcache = Cache(timeout=43200, trash=256)
 	browse_locations = {
 		-11: "nz-en",	# New Zealand
 		-10: "nz-en",
@@ -1754,7 +1755,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		11: "au-en",
 		12: "nz-en",	# New Zealand
 	}
-	bcache = Cache(timeout=43200, trash=60)
 	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60, screenshot=False, best=False):
 		if not region:
 			if timezone is None:
@@ -1781,11 +1781,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					data = orjson.loads(res)
 					return "\n\n".join((e.get("c", "") + "\n" + html_decode(e.get("a", ""))).strip() for e in data)
 			return await process_image("BROWSE", "$", [argv, not screenshot], cap="browse", timeout=timeout, retries=2)
-		return await self.bcache.retrieve_from((argv, screenshot, best), retrieval, argv, region, screenshot, best)
+		return await self.llcache.retrieve_from(shash((argv, screenshot, best)), retrieval, argv, region, screenshot, best)
 
-	mod_cache = Cache(timeout=86400, trash=256)
 	async def moderate(self, input=""):
-		resp = await self.mod_cache.retrieve_from(input, self.get_oai("moderations.create"), input=input)
+		input = as_str(input)
+		resp = await self.llcache.retrieve_from(shash((input, "M")), self.get_oai("moderations.create"), input=input)
 		return resp.results[0]
 
 	async def summ_for(self, q, s):
@@ -1817,9 +1817,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		)
 		return await self.llm("chat.completions.create", **data)
 
-	emb_cache = Cache(timeout=86400, trash=256)
 	async def embedding(self, input=""):
-		resp = await self.emb_cache.retrieve_from(input, self.get_oai("embeddings.create"), input=input, model="text-embedding-3-small")
+		resp = await self.llcache.retrieve_from(shash((input, "te3s")), self.get_oai("embeddings.create"), input=input, model="text-embedding-3-small")
 		return np.array(resp.data[0].embedding, dtype=np.float16)
 
 	async def rank_embeddings(self, ems, em):
@@ -1861,6 +1860,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		fireworks="https://api.fireworks.ai/inference/v1/",
 	)
 	ai_available = {
+		"firefunction-v1": {
+			"fireworks": "accounts/fireworks/models/firefunction-v1",
+		},
+		"firellava-13b": {
+			"fireworks": "accounts/fireworks/models/firellava-13b",
+		},
 		"goliath-120b": {
 			"https://fdigsujdfigsd-plsbuild.hf.space/v1": "TheBloke/goliath-120b-GPTQ",
 		},
@@ -1906,26 +1911,63 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		else:
 			apis = {api: None}
 		orig_model = kwargs.pop("model", None)
+		exc = None
 		for api, model in apis.items():
-			kwargs["model"] = model or orig_model
+			kwa = kwargs.copy()
+			kwa["model"] = model or orig_model
 			caller = self.get_oai(func, api=api)
 			body = cdict()
-			if "repetition_penalty" in kwargs:
-				body["repetition_penalty"] = kwargs.pop("repetition_penalty")
+			if api == "fireworks":
+				kwa.pop("frequency_penalty", None)
+				kwa.pop("repetition_penalty", None)
+				kwa.pop("presence_penalty", None)
+			elif "repetition_penalty" in kwa:
+				body["repetition_penalty"] = kwa.pop("repetition_penalty")
+			elif "frequency_penalty" in kwa and api != "openai":
+				body["repetition_penalty"] = ((kwa.pop("frequency_penalty", 0.25) + kwa.pop("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
+			if api != "openai":
+				kwa.pop("user", None)
 			if body:
-				kwargs["extra_body"] = body
+				kwa["extra_body"] = body
 			try:
-				return await asyncio.wait_for(caller(*args, timeout=timeout, **kwargs), timeout=timeout)
+				# print("LLM:", args, kwa, timeout)
+				return await asyncio.wait_for(caller(*args, timeout=timeout, **kwa), timeout=timeout)
 			except CE:
 				raise
-			except:
+			except Exception as ex:
+				exc = ex
 				print_exc()
 				continue
+		raise (exc or RuntimeError("Unknown error occured."))
 
-	llcache = Cache(timeout=86400, trash=256)
+	async def function_call(self, *args, **kwargs):
+		models = [
+			"gpt-3.5-turbo-0125",
+			"firefunction-v1",
+		]
+		if kwargs.get("model"):
+			model = kwargs.pop("model")
+			if model in models:
+				models.remove(model)
+			models.insert(0, model)
+		else:
+			mod1 = orjson.dumps(kwargs.get("tools"))
+			mod2 = orjson.dumps(kwargs.get("messages"))
+			r1, r2 = await asyncio.gather(self.moderate(mod1), self.moderate(mod2))
+			if r1.flagged or r2.flagged:
+				models = reversed(models)
+		exc = None
+		for model in models:
+			kwargs["model"] = model
+			try:
+				return await self.llm("chat.completions.create", *args, **kwargs)
+			except Exception as ex:
+				if not exc:
+					exc = ex
+				print_exc()
+		raise (exc or RuntimeError("Unknown error occured."))
+
 	async def instruct(self, data, best=False, skip=False, prune=True, cache=True):
-		if not self.llcache.db and "llcache" in self.data:
-			self.llcache.attach(self.data.llcache)
 		data["prompt"] = data.get("prompt") or data.pop("inputs", None) or data.pop("input", None)
 		key = shash(str((data["prompt"], data.get("model", "gpt-3.5-turbo-0125"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.75), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
 		if cache:
@@ -1963,17 +2005,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			user=str(hash(self.name)),
 		)
 		inputs.update(data)
-		# if not best:
-			# if c <= 2048 and data["max_tokens"] <= 2048 and not self.llsem.busy:
-			# 	data["model"] = "emerhyst-20b"
-			# 	data["stop"] = [f"### Instruction:", f"### Response:"]
-			# 	try:
-			# 		async with self.llsem:
-			# 			await self.lambdassert("vr23")
-			# 			return await process_image("EXL2", "$", [data, skip], cap="vr23", timeout=30)
-			# 	except:
-			# 		print_exc()
-			# 		data["model"] = "gpt-3.5-turbo-instruct"
 		if best == 1:
 			res = await self.moderate(data["prompt"])
 			dec = res.flagged
@@ -2409,7 +2440,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			]),
 		]
 		data = cdict(
-			model="accounts/fireworks/models/firellava-13b",
+			model="firellava-13b",
 			messages=messages,
 			temperature=0.5,
 			max_tokens=256,
@@ -2420,7 +2451,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		)
 		try:
 			async with self.fireworks_sem:
-				response = await self.llm("chat.completions.create", api="fireworks", **data, timeout=30)
+				response = await self.llm("chat.completions.create", **data, timeout=30)
 		except:
 			print_exc()
 			out = self.ibv(url)
@@ -3451,8 +3482,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return x
 
 	# Evaluates a math formula to a list of answers, using a math process from the subprocess pool when necessary.
-	def solve_math(self, f, prec=128, r=False, timeout=16, variables=None):
-		return process_math(f.strip(), int(prec), int(r), timeout=timeout, variables=variables)
+	async def solve_math(self, f, prec=128, r=False, timeout=16, variables=None, nlp=False):
+		res = await process_math(f.strip(), int(prec), int(r), timeout=timeout, variables=variables)
+		if nlp:
+			return f"{f} = {res[0]}"
+		return res
 
 	TimeChecks = {
 		"galactic years": ("gy", "galactic year", "galactic years"),
@@ -5854,6 +5888,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 			__slots__ = ("__dict__",)
 
+			def __repr__(self):
+				return "<" + self.__class__.__name__ + " object @ " + str(self.id) + ">"
+
 			@classmethod
 			def new(cls, data, channel=None, **void):
 				if not channel:
@@ -6595,6 +6632,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		futs.add(asubmit(self.update_slash_commands, priority=True))
 		futs.add(create_task(self.create_main_website(first=True)))
 		futs.add(self.audio_client_start)
+		self.llcache.attach(self.data.llcache)
 		await self.wait_until_ready()
 		self.bot_ready = True
 		# Send bot_ready event to all databases.

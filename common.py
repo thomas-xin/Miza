@@ -4375,10 +4375,10 @@ def find_emojis_ex(s):
 		except ValueError:
 			continue
 		out[i] = url
-	for emoji, url in emoji_translate.items():
+	for i, c in enumerate(s):
 		try:
-			i = s.index(emoji)
-		except ValueError:
+			url = emoji_translate[c]
+		except KeyError:
 			continue
 		out[i] = url
 	return [t[1] for t in sorted(out.items())]
@@ -4642,7 +4642,7 @@ class CacheItem:
 		self.value = value
 
 class Cache(cdict):
-	__slots__ = ("timeout", "tmap", "soonest", "sooning", "lost", "trash", "db")
+	__slots__ = ("timeout", "tmap", "soonest", "waiting", "lost", "trash", "db")
 
 	def __init__(self, *args, timeout=60, trash=8, **kwargs):
 		super().__init__(*args, **kwargs)
@@ -4661,7 +4661,7 @@ class Cache(cdict):
 			fut = create_task(waited_coro(self._update(), timeout))
 		else:
 			fut = None
-		object.__setattr__(self, "sooning", fut)
+		object.__setattr__(self, "waiting", fut)
 		object.__setattr__(self, "db", None)
 
 	def attach(self, db):
@@ -4670,6 +4670,14 @@ class Cache(cdict):
 		db.setdefault("__tmap", {}).update(self.tmap)
 		db.pop("tmap", None)
 		object.__setattr__(self, "db", db)
+		object.__setattr__(self, "tmap", db["__tmap"])
+		self.clear()
+		fut = create_task(waited_coro(self._update(), self.timeout))
+		object.__setattr__(self, "waiting", fut)
+		t = utc() + self.timeout
+		for k in self.db:
+			if k not in self.tmap:
+				self.tmap[k] = t
 
 	async def _update(self):
 		tmap = self.tmap
@@ -4681,7 +4689,7 @@ class Cache(cdict):
 				ts = tmap[k] + timeout
 				object.__setattr__(self, "soonest", ts)
 				fut = create_task(waited_coro(self._update(), ts - t))
-				object.__setattr__(self, "sooning", fut)
+				object.__setattr__(self, "waiting", fut)
 				break
 			tmap.pop(k)
 			if self.trash > 0:
@@ -4706,18 +4714,16 @@ class Cache(cdict):
 			super().__setitem__(k, v)
 		else:
 			self.db.__setitem__(k, v)
-			self.db.update("__tmap")
-			self.db.update("__lost")
 		timeout = self.timeout
 		t = utc()
 		ts = t + timeout
 		if ts < self.soonest:
 			object.__setattr__(self, "soonest", ts)
 			fut = create_task(waited_coro(self._update(), timeout))
-			sooning = self.sooning
-			if sooning:
-				sooning.cancel()
-			object.__setattr__(self, "sooning", fut)
+			waiting = self.waiting
+			if waiting:
+				waiting.cancel()
+			object.__setattr__(self, "waiting", fut)
 		self.tmap[k] = ts
 
 	retrieve = lambda self, k: self.lost.pop(k)

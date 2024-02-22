@@ -2348,7 +2348,7 @@ class UpdateUsers(Database):
 								if sem.full and sem.reset_after:
 									raise TooManyRequests(f"Command has a rate limit of {sec2time(rl)} with a burst+queue of {burst}; please wait {sec2time(sem.reset_after)}.")
 						async with sem:
-							m = await ask(message, guild, channel, user, argv, name="ask", flags=flags)
+							m = await ask(bot, message, guild, channel, user, argv, name="ask", flags=flags)
 						if m and "exec" in bot.data and not message.guild and ("blacklist" not in bot.data or (bot.data.blacklist.get(user.id) or 0) < 1):
 							await bot.data.exec._nocommand_(message=m)
 				return
