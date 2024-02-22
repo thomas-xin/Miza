@@ -1623,9 +1623,8 @@ if "summ" in CAPS:
 	print(smp)
 
 	def summarise(s1, min_length=128, max_length=192, rm=True, do_sample=True):
-		with torch.autocast("cuda"):
-			s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
-		exc.submit(ensure_gc, 20)
+		s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
+		# exc.submit(ensure_gc, 20)
 		if rm:
 			return re.sub(r"(?:in )?(?:the|this|some)? *(?:article|essay|page|study|text|report|topic)[s, ]*(?:also mentions|we discuss|we look at|is about|includes|is based on)? *", "", s2, flags=re.I)
 		return s2

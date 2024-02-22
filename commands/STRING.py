@@ -1527,13 +1527,13 @@ Functions = [{
 					"tool": {
 						"type": "string",
 						"description": 'Searches available tools to assist user; e.g. "image" for image generation.',
-						"enum": ["image", "knowledge", "audio", "calendar"],
+						"enum": ["image", "knowledge/internet", "audio", "calendar"],
 					},
 				},
 				"required": ["assistant"],
 }}}]
 Functions2 = {
-	"knowledge": [{
+	"knowledge/internet": [{
 		"type": "function", "function": {
 			"name": "browse",
 			"description": "Searches internet browser, or visits given URL. Please search for results in the US when location is relevant!",
@@ -2022,8 +2022,25 @@ class Ask(Command):
 					except:
 						print_exc()
 						found = self.visited[url] = ""
-				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None or is_audio(found[0]) is not None):
-					found = found[0]
+					else:
+						found = [f for f in found if not is_discord_message_link(f)]
+				if found:
+					for f in found:
+						if is_image(f) or is_video(f) or is_audio(f):
+							found = f
+							break
+						if f.endswith(".html") or f.endswith(".htm"):
+							found = [f]
+							break
+					else:
+						futs = [create_future(requests.head, f, headers=Request.header(), stream=True, allow_redirects=True) for f in found]
+						founds = await asyncio.gather(*futs)
+						for r in founds:
+							if r.headers.get("Content-Type") == "text/html":
+								found = [r.url]
+								break
+						else:
+							found = ""
 				else:
 					found = ""
 			return m, content, found
@@ -2066,7 +2083,10 @@ class Ask(Command):
 					best = 3 if premium >= 4 else 1
 				else:
 					best = False if premium >= 4 else None
-				cfut = csubmit(bot.caption(found, best=best))
+				if isinstance(found, list):
+					cfut = csubmit(bot.caption(found[0], best=best, screenshot=True, timeout=72))
+				else:
+					cfut = csubmit(bot.caption(found, best=best))
 				visconts.append((i, m, content, found, cfut))
 			else:
 				visconts.append((i, m, content, found, None))

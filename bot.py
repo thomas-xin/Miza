@@ -2071,8 +2071,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if len(tokens) <= max_length:
 			return q
 		try:
-			limit = 9600 if best else 960
-			while len(tokens) > max_length and len(tokens) > limit:
+			limit = 960
+			while len(tokens) > max_length and len(tokens) > limit * 10:
 				futs = []
 				count = ceil(len(tokens) / limit * 4 / 3)
 				for start in range(0, max(1, len(tokens) - limit * 3 // 4 - 1), limit * 3 // 4):
@@ -2133,10 +2133,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			print("Summ:", prompt, resp)
 			if resp:
 				return resp
-		return await process_image("summarise", "$", [s, min_length, max_length, int(bool(prune))], cap="summ", timeout=30)
+		with tracebacksuppressor:
+			return await process_image("summarise", "$", [s, min_length, max_length, int(bool(prune))], cap="summ", timeout=30)
+		return lim_tokens(s, round_random(max_length + min_length) >> 1)
 
 	analysed = {}
-	async def caption(self, url, best=False, timeout=24):
+	async def caption(self, url, best=False, screenshot=False, timeout=24):
 		if "analysed" in self.data:
 			self.analysed = self.data.analysed
 		h = shash(url)
@@ -2147,15 +2149,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			pass
 		if not torch or best is None:
 			return ("File", url.rsplit("/", 1)[-1].split("?", 1)[0] if isinstance(url, str) else "Unknown")
+		resp = None
 		if isinstance(url, str):
-			resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True)
-			with resp:
-				d = await asubmit(getattr, resp, "content")
+			if screenshot:
+				d = await self.browse(url, best=best, timeout=timeout)
+			else:
+				resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True)
+				with resp:
+					d = await asubmit(getattr, resp, "content")
 			name = url.rsplit("/", 1)[-1].split("?", 1)[0]
 		else:
 			d = url
 			name = None
-		mime = resp.headers.get("Content-Type", "")
+		mime = resp.headers.get("Content-Type", "") if resp else magic.from_buffer(d)
 		if mime.split("/", 1)[0] not in ("image", "video"):
 			if mime.split("/", 1)[0] == "audio":
 				with tracebacksuppressor:
