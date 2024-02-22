@@ -2233,7 +2233,7 @@ class Ask(Command):
 				ftools = Functions2.get(ftools)
 			fn_msg = None
 			fails = 0
-			for att in range(2):
+			for att in range(5):
 				if not bot.verify_integrity(message):
 					return
 				if fails > 3:
@@ -2262,7 +2262,12 @@ class Ask(Command):
 						tools=ftools,
 						user=ustr,
 					)
-					resp = await bot.function_call(**data, timeout=120)
+					try:
+						resp = await bot.function_call(**data, timeout=120)
+					except Exception as exc:
+						print_exc()
+						ex = exc
+						continue
 					print("LI:", resp)
 					if not getattr(resp.choices[0].message, "tool_calls", None):
 						resp = None
@@ -2278,7 +2283,12 @@ class Ask(Command):
 						tools=ftools,
 						user=ustr,
 					)
-					resp = await bot.function_call(**data, timeout=120)
+					try:
+						resp = await bot.function_call(**data, timeout=120)
+					except Exception as exc:
+						print_exc()
+						ex = exc
+						continue
 					print("LL:", resp)
 				if resp:
 					m = cdict(resp.choices[0].message)
@@ -2545,9 +2555,9 @@ class Ask(Command):
 							resp = await bot.llm("completions.create", **data, timeout=60)
 					except openai.BadRequestError:
 						raise
-					except Exception as e:
-						ex = e
+					except Exception as exc:
 						print_exc()
+						ex = exc
 						continue
 					print(resp)
 					if text:
