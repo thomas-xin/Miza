@@ -358,8 +358,8 @@ HEADERS = {
 	"Access-Control-Allow-Origin": "*",
 }
 
-CHEADERS = {"Cache-Control": "public, max-age=3600, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
-SHEADERS = {"Cache-Control": "public, max-age=5, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
+CHEADERS = {"Cache-Control": "public, max-age=21600, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
+SHEADERS = {"Cache-Control": "public, max-age=60, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
 CHEADERS.update(HEADERS)
 SHEADERS.update(HEADERS)
 
@@ -926,7 +926,7 @@ class Server:
 			url = self.bot_exec(f"bot.renew_attachment({id})") or url
 		else:
 			url = self.renew_url(url, mid=mid) or url
-		cp.response.headers.update(SHEADERS)
+		cp.response.headers.update(CHEADERS)
 		if "Cf-Worker" in cp.request.headers and is_discord_attachment(url):
 			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 			fn = f"cache/attachment_{a_id}.bin"

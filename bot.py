@@ -1364,7 +1364,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	# Finds URLs in a string, following any discord message links found.
 	followed = {}
-	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, reactions=False, allow=False, limit=None, no_cache=False):
+	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, emojis=True, reactions=False, allow=False, limit=None, no_cache=False):
 		if limit is not None and limit <= 0:
 			return []
 		if not isinstance(url, str) and hasattr(url, "channel"):
@@ -1386,7 +1386,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			medias = ("video", "image", "thumbnail")
 		else:
 			medias = "video"
-		tup = (urls, best, preserve, images, reactions, allow)
+		tup = (urls, best, preserve, images, emojis, reactions, allow)
 		try:
 			return list(self.followed[tup])[:limit]
 		except KeyError:
@@ -1412,8 +1412,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					else:
 						found.extend(a.url for a in m.attachments)
 					found.extend(find_urls(m.content))
-					temp = await self.follow_to_image(m.content, follow=reactions)
-					found.extend(filter(is_url, temp))
+					if emojis:
+						temp = await self.follow_to_image(m.content, follow=reactions)
+						found.extend(filter(is_url, temp))
 					# Attempt to find URLs in embed contents
 					apply_stickers(m)
 					for e in m.embeds:
@@ -1441,7 +1442,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 									if is_url(u):
 										found.append(u)
 					if not found and (not images or not reactions and reactions is not None):
-						found = await self.follow_url(url, it, best=best, preserve=preserve, images=True, reactions=2, allow=True, limit=limit)
+						found = await self.follow_url(url, it, best=best, preserve=preserve, images=True, emojis=True, reactions=2, allow=True, limit=limit)
 						for u in found:
 							if u not in it:
 								it[u] = True
@@ -1449,17 +1450,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					else:
 						for u in found:
 							# Do not attempt to find the same URL twice
-							if u not in it:
-								it[u] = True
-								if not len(it) & 255:
-									await asyncio.sleep(0.2)
-								found2 = await self.follow_url(u, it, best=best, preserve=preserve, images=images, reactions=reactions, allow=allow, limit=limit)
-								if len(found2):
-									out.extend(found2)
-								elif allow and m.content:
-									lost.append(m.content)
-								elif preserve:
-									lost.append(u)
+							if u in it:
+								continue
+							it[u] = True
+							if not len(it) & 255:
+								await asyncio.sleep(0.2)
+							found2 = await self.follow_url(u, it, best=best, preserve=preserve, images=images, emojis=emojis, reactions=reactions, allow=allow, limit=limit)
+							if len(found2):
+								out.extend(found2)
+							elif allow and m.content:
+								lost.append(m.content)
+							elif preserve:
+								lost.append(u)
 			elif images and is_imgur_url(url):
 				first = url.split("?", 1)[0]
 				if not first.endswith(".jpg"):
@@ -1606,7 +1608,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	async def proxy_emojis(self, msg, guild=None, user=None, is_webhook=False, return_pops=False, lim=1936):
 		orig = self.bot.data.emojilists.get(user.id, {}) if user else {}
-		emojis = None
+		emojis = emoji = None
 		regex = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
 		pops = set()
 		offs = 0
@@ -1675,7 +1677,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if substitutes:
 				msg = msg[:substitutes[0]] + substitutes[1] + msg[substitutes[2]:]
 		if return_pops:
-			return msg, pops
+			return msg, pops, emoji
 		return msg
 
 	async def emoji_to_url(self, e):
@@ -1935,12 +1937,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			except CE:
 				raise
 			except Exception as ex:
-				exc = ex
-				print_exc()
+				if not exc:
+					exc = ex
+				print(repr(ex))
 				continue
 		raise (exc or RuntimeError("Unknown error occured."))
 
-	async def function_call(self, *args, **kwargs):
+	async def function_call(self, *args, rev_nsfw=True, **kwargs):
 		models = [
 			"gpt-3.5-turbo-0125",
 			"firefunction-v1",
@@ -1950,7 +1953,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if model in models:
 				models.remove(model)
 			models.insert(0, model)
-		else:
+		if rev_nsfw:
 			mod1 = orjson.dumps(kwargs.get("tools"))
 			mod2 = orjson.dumps(kwargs.get("messages"))
 			r1, r2 = await asyncio.gather(self.moderate(mod1), self.moderate(mod2))
@@ -1964,7 +1967,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			except Exception as ex:
 				if not exc:
 					exc = ex
-				print_exc()
+				print(repr(ex))
 		raise (exc or RuntimeError("Unknown error occured."))
 
 	async def instruct(self, data, best=False, skip=False, prune=True, cache=True):
@@ -2133,8 +2136,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			print("Summ:", prompt, resp)
 			if resp:
 				return resp
-		with tracebacksuppressor:
-			return await process_image("summarise", "$", [s, min_length, max_length, int(bool(prune))], cap="summ", timeout=30)
+		# with tracebacksuppressor:
+		# 	return await process_image("summarise", "$", [s, min_length, max_length, int(bool(prune))], cap="summ", timeout=30)
 		return lim_tokens(s, round_random(max_length + min_length) >> 1)
 
 	analysed = {}
@@ -2152,7 +2155,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		resp = None
 		if isinstance(url, str):
 			if screenshot:
-				d = await self.browse(url, best=best, timeout=timeout)
+				d = await self.browse(url, best=best, timeout=timeout, screenshot=True)
 			else:
 				resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True)
 				with resp:
@@ -2514,7 +2517,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if temp:
 			return temp
 		users = find_users(url)
-		emojis = find_emojis_ex(url)
+		if follow:
+			emojis = find_emojis_ex(url)
+		else:
+			emojis = find_emojis(url)
 		out = deque()
 		if users and follow:
 			futs = [create_task(self.fetch_user(verify_id(u))) for u in users]
@@ -4415,6 +4421,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			g_id = guild.id
 		else:
 			g_id = 0
+		if not self.bot_ready and u_id == self.id:
+			return 0
 		if not slash:
 			if u_id != self.id:
 				# Strip quote from message.
@@ -4457,7 +4465,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			op = True
 		mentioning = (op or self.id in (member.id for member in message.mentions))
 		# Respond to blacklisted users attempting to use a command, or when mentioned without a command.
-		if (u_perm <= -inf and mentioning) and not cpy.startswith("~~"):
+		if ((u_perm <= -inf or not self.bot_ready) and mentioning) and not cpy.startswith("~~"):
 			# print(f"Ignoring command from blacklisted user {user} ({u_id}): {lim_str(message.content, 256)}")
 			if not self.ready:
 				create_task(send_with_react(

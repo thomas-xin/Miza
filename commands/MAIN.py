@@ -1173,7 +1173,7 @@ class Upload(Command):
 					if a_id in self.bot.data.attachments:
 						futs.append(as_fut(self.bot.preserve_attachment(a_id)))
 						continue
-				futs.append(Request(self.bot.raw_webserver + "/upload_url?url=" + url, decode=True, aio=True, ssl=False, timeout=1200))
+				futs.append(Request(self.bot.raw_webserver + "/upload_url?url=" + url_parse(url), decode=True, aio=True, ssl=False, timeout=1200))
 				await asyncio.sleep(0.1)
 			out = await asyncio.gather(*futs)
 		return await send_with_reply(channel, message, "\n".join("<" + u + ">" for u in out), ephemeral=True)

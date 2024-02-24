@@ -2192,6 +2192,8 @@ class AudioDownloader:
 								break
 			# Only proceed if no items have already been found (from playlists in this case)
 			if not len(output):
+				if item in self.ytd_blocked:
+					raise self.ytd_blocked[url]
 				resp = None
 				# Allow loading of files output by ~dump
 				if is_url(item):
@@ -3482,7 +3484,6 @@ class Queue(Command):
 
 	async def __call__(self, bot, user, perm, message, channel, guild, flags, name, argv, comment="", **void):
 		# This command is a bit of a mess
-		ytdl.bot = bot
 		argv += " ".join(best_url(a) for a in message.attachments)
 		if not argv:
 			auds = await auto_join(guild, channel, user, bot, ignore=True)
@@ -5439,7 +5440,6 @@ class Download(Command):
 	exact = False
 
 	async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
-		ytdl.bot = bot
 		fmt = default_fmt = "mp3"
 		if name in ("af", "audiofilter"):
 			set_dict(flags, "a", 1)
@@ -6002,6 +6002,7 @@ class UpdateAudio(Database):
 	async def _bot_ready_(self, bot, **void):
 		globals()["bot"] = bot
 		ytdl.bot = bot
+		ytdl.ytd_blocked.attach(bot.data.inaccessible)
 		try:
 			await asubmit(subprocess.check_output, ("./ffmpeg",))
 		except subprocess.CalledProcessError:
@@ -6051,3 +6052,7 @@ class UpdatePlaylists(Database):
 
 class UpdateAudioSettings(Database):
 	name = "audiosettings"
+
+
+class UpdateInaccessible(Database):
+	name = "inaccessible"

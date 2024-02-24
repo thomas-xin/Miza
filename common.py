@@ -2316,7 +2316,7 @@ def discord_expired(url):
 			ts = int(temp, 16)
 		except ValueError:
 			return True
-		return ts < utc() + 60
+		return ts < utc() + 21600 + 60
 
 def expired(stream):
 	if is_youtube_url(stream):
@@ -3778,7 +3778,10 @@ class PipedProcess:
 			proc.wait()
 
 	def status(self):
-		return self.procs[-1].status()
+		try:
+			return self.procs[-1].status()
+		except psutil.NoSuchProcess:
+			return "terminated"
 
 class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.AbstractContextManager):
 

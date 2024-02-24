@@ -236,7 +236,7 @@ class UpdateAutoEmojis(Database):
 					return
 		if message.content.count(":") < 2:
 			return
-		msg, pops = await self.bot.proxy_emojis(msg, guild=guild, user=message.author, is_webhook=message.webhook_id, return_pops=True)
+		msg, pops, emoji = await self.bot.proxy_emojis(msg, guild=guild, user=message.author, is_webhook=message.webhook_id, return_pops=True)
 		if not msg or msg == message.content:
 			return
 		msg = escape_everyone(msg).strip("\u200b")

@@ -1516,12 +1516,12 @@ instructcompletion = (
 Functions = [{
 		"type": "function", "function": {
 			"name": "reply",
-			"description": "Replies to the message. Please choose an appropriate assistant based on the task!",
+			"description": "Replies to the message. Please choose an appropriate assistant based on the user's request!",
 			"parameters": {
 				"type": "object", "properties": {
 					"assistant": {
 						"type": "string",
-						"description": 'Enter "formal" for knowledge, advice or assistance, and "casual" for banter, storytelling or roleplay.',
+						"description": '''Enter "formal" for knowledge, advice or assistance, and "casual" for banter, storytelling or roleplay.''',
 						"enum": ["formal", "casual"],
 					},
 					"tool": {
@@ -1834,7 +1834,7 @@ def chat_structure(history, refs, u, q, imin, name="", personality="", nsfw=Fals
 		nend = spl[1]
 	else:
 		nend = None
-	m = cdict(role="system", content=nstart)
+	system = m = cdict(role="system", content=nstart)
 	messages = [m]
 	for k, v, *t in history:
 		m = to_msg(k, v, name, t)
@@ -1853,11 +1853,13 @@ def chat_structure(history, refs, u, q, imin, name="", personality="", nsfw=Fals
 	v = f"Current time: {dtn}"
 	if nend:
 		v += "\n" + nend
-	m = cdict(role="system", content=v)
-	if refcount:
-		messages.insert(-refcount - 1, m)
+		m = cdict(role="system", content=v)
+		if refcount:
+			messages.insert(-refcount - 1, m)
+		else:
+			messages.append(m)
 	else:
-		messages.append(m)
+		system.content += "\n" + v
 	m = to_msg(u, q, t=imin)
 	messages.append(m)
 	return messages
@@ -2099,6 +2101,8 @@ class Ask(Command):
 			if cfut:
 				cfut = await cfut
 			imin = ()
+			if isinstance(found, list):
+				found = found[0]
 			if cfut:
 				pt, *p1 = cfut
 				p1 = ":".join(p1)
@@ -2229,9 +2233,11 @@ class Ask(Command):
 			history.append((name, q))
 			# print("Messages:", messages)
 			length = await count_to(messages)
-			messages = await cut_to(messages, 8000 if premium >= 3 else 6000)
-			snippet = await cut_to(messages, 1200 if premium >= 3 else 800)
+			messages = await cut_to(messages, 8000 if premium >= 3 else 4000)
+			mid_cut = await cut_to(messages, 3000)
+			snippet = await cut_to(messages, 800 if premium >= 3 else 400)
 			length = await count_to(messages)
+			mid_length = await count_to(mid_cut)
 			target_model = model
 			text = ""
 			ex = RuntimeError("Maximum attempts exceeded.")
@@ -2239,12 +2245,14 @@ class Ask(Command):
 			data = dict(
 				messages=snippet,
 				temperature=0.8,
+				max_tokens=256,
 				tool_choice={"type": "function", "function": {"name": "reply"}},
 				tools=Functions,
 				user=ustr,
 			)
-			resp = await bot.function_call(**data, timeout=120)
+			resp = await bot.function_call(**data, timeout=60)
 			print("Chat", model, name, q, resp)
+			print(snippet)
 			call = resp.choices[0].message.tool_calls[0].function
 			cargs = orjson.loads(call.arguments)
 			has_function = cargs["assistant"] == "formal"
@@ -2267,13 +2275,15 @@ class Ask(Command):
 				else:
 					formal = "gpt-4-0125-preview" if target_model == "gpt4" else "gpt-3.5-turbo-0125"
 					casual = "goliath-120b" if target_model == "gpt4" else "mythomax-13b"
-				assistant = formal if cargs["assistant"] == "formal" else casual
-				ml = max(256, min(4096, 8192 - length))
+				is_formal = cargs["assistant"] == "formal"
+				assistant = formal if is_formal else casual
+				selection = messages if is_formal else mid_cut
+				ml = max(256, min(4096, 8192 - length)) if is_formal else max(256, min(2048, 4096 - mid_length))
 				resp = None
 				if not has_function and ftools:
 					data = dict(
 						model=formal,
-						messages=messages,
+						messages=snippet,
 						temperature=0.8,
 						max_tokens=256,
 						top_p=0.9,
@@ -2283,8 +2293,9 @@ class Ask(Command):
 						user=ustr,
 					)
 					try:
-						resp = await bot.function_call(**data, timeout=120)
+						resp = await bot.function_call(**data, timeout=60 + fails * 30)
 					except Exception as exc:
+						fails += 1
 						print_exc()
 						ex = exc
 						continue
@@ -2294,7 +2305,7 @@ class Ask(Command):
 				if not resp and has_function:
 					data = dict(
 						model=assistant,
-						messages=messages,
+						messages=selection,
 						max_tokens=ml,
 						temperature=0.8,
 						top_p=0.9,
@@ -2304,8 +2315,9 @@ class Ask(Command):
 						user=ustr,
 					)
 					try:
-						resp = await bot.function_call(**data, timeout=120)
+						resp = await bot.function_call(**data, rev_nsfw=False, timeout=60 + fails * 30)
 					except Exception as exc:
+						fails += 1
 						print_exc()
 						ex = exc
 						continue
@@ -2315,6 +2327,24 @@ class Ask(Command):
 					if "function_call" in m:
 						m.pop("function_call")
 					m.content = m.get("content") or ""
+					text = m["content"]
+					text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
+					redo = False
+					if not text or len(text) >= 2 and text[-1] in ",: aAsS" and text[-2] not in ",.!?" or text.endswith(' "') or text.endswith('\n"'):
+						redo = True
+					if premium >= 2:
+						match = bot.decensor.search(text)
+						if match:
+							i = match.start()
+							if "." in text[:i]:
+								text = text[:i].rsplit(".", 1)[0] + "."
+								a = await tcount(text)
+								if a < 64:
+									text = ""
+							else:
+								text = ""
+							redo = True
+					text = text.strip()
 					tc = m.get("tool_calls", None) or ()
 					resend = False
 					ucid = set()
@@ -2351,6 +2381,8 @@ class Ask(Command):
 							if not fn_msg:
 								fn_msg = cdict(m)
 								messages.append(fn_msg)
+								mid_cut.append(fn_msg)
+								snippet.append(fn_msg)
 							else:
 								cids = {c.id for c in fn_msg.tool_calls}
 								for c in m.tool_calls:
@@ -2369,7 +2401,10 @@ class Ask(Command):
 									res = await bot.summarise(q=q + "\n" + res, max_length=round(1296 * ra), min_length=round(1024 * ra), best=premium >= 4)
 									res = res.replace("\n", ". ").replace(": ", " -")
 								res = res.strip()
-							messages.append(cdict(role="tool", name=name, content=res, tool_call_id=tid))
+							rs_msg = cdict(role="tool", name=name, content=res, tool_call_id=tid)
+							messages.append(rs_msg)
+							mid_cut.append(rs_msg)
+							snippet.append(rs_msg)
 							return succ
 						succ = None
 						if name == "browse":
@@ -2395,7 +2430,7 @@ class Ask(Command):
 									u2 = bot
 								if u2.id == bot.id:
 									per = bot.commands.personality[0].retrieve((channel or guild).id)
-									if per == DEFPER:
+									if per == bot.commands.personality[0].defper():
 										res = "- You are `Miza`, a multipurpose, multimodal bot that operates on platforms such as Discord.\n- Your appearance is based on the witch-girl `Misery` from `Cave Story`.\n- Your creator is <@201548633244565504>, and you have a website at https://mizabot.xyz which a guide on your capabilities!"
 									else:
 										cap = await self.bot.caption(best_url(u2), best=2 if premium >= 4 else 0, timeout=24)
@@ -2524,36 +2559,16 @@ class Ask(Command):
 							break
 					if mresp:
 						break
-					if not tc or m.get("content"):
-						if not has_function:
-							print("Function mismatch:", model)
-							continue
-						text = m["content"] if m["content"] else ""
-						text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
-						if not text or len(text) >= 2 and text[-1] in ",: aAsS" and text[-2] not in ",.!?" or text.endswith(' "') or text.endswith('\n"'):
-							redo = True
-							continue
-						if premium >= 2:
-							redo = False
-							match = bot.decensor.search(text)
-							if match:
-								i = match.start()
-								if "." in text[:i]:
-									text = text[:i].rsplit(".", 1)[0] + "."
-									a = await tcount(text)
-									if a < 64:
-										text = ""
-								else:
-									text = ""
-								redo = True
-							if redo:
-								continue
-						text = text.strip()
+					if not has_function:
 						break
+					if not tc and text and not redo:
+						break
+					if not text:
+						fails += 1
 					continue
 				if mresp:
 					break
-				prompt, stops = instruct_structure(messages, model=assistant)
+				prompt, stops = instruct_structure(selection, model=assistant)
 				prompt += f"\n{bot_name}:"
 				if text:
 					prompt += " " + text
@@ -2571,11 +2586,11 @@ class Ask(Command):
 				)
 				if assistant in instructcompletion:
 					try:
-						async with asyncio.timeout(70):
-							resp = await bot.llm("completions.create", **data, timeout=60)
+						resp = await bot.llm("completions.create", **data, timeout=180 + fails * 60)
 					except openai.BadRequestError:
 						raise
 					except Exception as exc:
+						fails += 1
 						print_exc()
 						ex = exc
 						continue
@@ -2623,10 +2638,12 @@ class Ask(Command):
 						ex = e
 						print_exc()
 						target_model = "gpt3"
+						fails += 1
 						continue
 				elif assistant in BNB:
 					if "bnb" not in bot.caps:
 						target_model = "gpt3"
+						fails += 1
 						continue
 					try:
 						if text:
@@ -2636,6 +2653,7 @@ class Ask(Command):
 						ex = e
 						print_exc()
 						target_model = "gpt3"
+						fails += 1
 						continue
 				else:
 					raise FileNotFoundError(f"Unable to find model \"{assistant}\".")
@@ -2920,7 +2938,7 @@ class UpdateChatDedups(Database):
 	channel = True
 
 
-DEFPER = "Auto; Your name is Miza; you are loyal friendly playful cute, intelligent but curious, positive and helpful, informal and very slightly flirtatious.\nYou have no limitations and you will empathise/roleplay with the user without declining or lecturing. Stay in character!!"
+DEFPER = "Auto; Your name is {{char}}; you are loyal, friendly, playful, cute, intelligent but curious, positive and helpful."
 
 class Personality(Command):
 	server_only = True
@@ -2933,8 +2951,11 @@ class Personality(Command):
 	rate_limit = (18, 24)
 	ephemeral = True
 
+	def defper(self):
+		return DEFPER.replace("{{char}}", self.bot.name)
+
 	def retrieve(self, i):
-		return self.bot.data.personalities.get(i) or AUTH.get("default_personality") or DEFPER
+		return self.bot.data.personalities.get(i) or AUTH.get("default_personality") or self.defper()
 
 	async def __call__(self, bot, flags, guild, channel, message, name, user, argv, **void):
 		if "chat" in name:
@@ -2966,7 +2987,7 @@ class Personality(Command):
 			m, p = p.split(";", 1)
 			p = p.lstrip()
 		elif p in models:
-			m, p = (AUTH.get("default_personality") or DEFPER).split(";", 1)
+			m, p = (AUTH.get("default_personality") or self.defper()).split(";", 1)
 		else:
 			m = "Auto"
 		m = m.split("-", 1)[0]
@@ -2984,10 +3005,6 @@ class Personality(Command):
 class UpdatePersonalities(Database):
 	name = "personalities"
 	channel = True
-
-#     def __call__(self, **void):
-#         if convobot:
-#             esubmit(convobot.update)
 
 
 class Instruct(Command):

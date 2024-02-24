@@ -940,33 +940,73 @@ class Archive(Command):
 	name = ["ArchiveServer", "DownloadServer"]
 	min_level = 3
 	description = "Archives all messages, attachments and users into a .zip folder. Defaults to entire server if no channel specified, requires server permission level 3 as well as a Lv2 or above ⟨MIZA⟩ subscription to perform, and may take a significant amount of time."
-	usage = "<server>?"
+	usage = "<server|channel>? <start-id>? <end-id>? <token>?"
 	flags = "f"
 	rate_limit = 172800
 
 	async def __call__(self, bot, message, guild, user, channel, args, flags, **void):
 		target = guild.id
 		tarname = guild.name
+		token = bot.token
 		if args:
-			try:
-				c = await bot.fetch_channel(verify_id(args[0]))
-			except Exception as ex:
-				try:
-					guild = await bot.fetch_guild(verify_id(args[0]))
-				except:
-					raise ex
-				else:
-					target = guild.id
-					tarname = guild.name
+			if len(args) > 1:
+				token = regexp(r"[\w.-]{22,}").fullmatch(args[-1])
+				if token:
+					token = args.pop(-1)
+					if token.startswith("Bot "):
+						resp = None
+					else:
+						headers = {"Authorization": "Bot " + token, "Content-Type": "application/json"}
+						resp = await create_future(
+							requests.get,
+							"https://discord.com/api/v10/users/@me",
+							headers=headers,
+						)
+					if not resp or resp.status_code == 401:
+						headers = {"Authorization": token, "Content-Type": "application/json"}
+						resp = await create_future(
+							requests.get,
+							"https://discord.com/api/v10/users/@me",
+							headers=headers,
+						)
+					else:
+						token = "Bot " + token
+					resp.raise_for_status()
+			oid = verify_id(args.pop(0))
+			if oid in bot.cache.channels:
+				c = await bot.fetch_channel(oid)
+				tarname = c.name
+				target = str(c.id) + ","
+			elif oid in bot.cache.guilds:
+				g = await bot.fetch_guild(oid)
+				tarname = g.name
+				target = str(g.id)
 			else:
-				channels = [c]
-				for a in map(verify_id, args[1:]):
-					c = await bot.fetch_channel(a)
-					channels.append(c)
-				target = ",".join(str(c.id) for c in channels) + ("," if len(channels) == 1 else "")
-				tarname = channels[0].name
-				if len(channels) > 1:
-					tarname += f" +{len(channels) - 1}"
+				headers = {"Authorization": token, "Content-Type": "application/json"}
+				try:
+					data = await create_future(
+						Request,
+						f"https://discord.com/api/v10/channels/{oid}",
+						headers=headers,
+						aio=True,
+						json=True,
+						bypass=False,
+					)
+					c = cdict(data)
+					tarname = c.name
+					target = str(c.id) + ","
+				except ConnectionError:
+					data = await create_future(
+						Request,
+						f"https://discord.com/api/v10/guilds/{oid}",
+						headers=headers,
+						aio=True,
+						json=True,
+						bypass=False,
+					)
+					target = cdict(data)
+					tarname = g.name
+					target = str(g.id)
 		if bot.get_perms(user, guild) < 3:
 			raise PermissionError("You must be in the target server and have a permission level of minimum 3.")
 		if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
@@ -977,8 +1017,8 @@ class Archive(Command):
 		args = [
 			sys.executable,
 			"misc/server-dump.py",
-			bot.token,
-			str(target),
+			"~" + token,
+			target,
 			fn,
 		]
 		info = ini_md("Archive Started!")

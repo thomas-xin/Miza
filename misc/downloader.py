@@ -453,12 +453,10 @@ elif "bytes" in head.get("accept-ranges", ""):
 			threads = round(sizes[k] / LS * fsize)
 			if LS == fsize:
 				print(f"Decision tree hit: {threads}")
+				lr = max(1, round(threads / 4))
 			else:
 				print(f"Decision tree miss: {threads}")
-			if random.random() >= 0.125:
-				lr = max(1, round(threads / 8), round(256 / len(sizes)))
-			else:
-				lr = 0
+				lr = max(1, round(threads / 3))
 			threads += random.randint(-lr, lr)
 			if threads <= 1:
 				threads = random.randint(1, 3)
@@ -631,7 +629,7 @@ if bps >= 1 << 10:
 bps = str(round(bps, 4)) + " " + e
 print(f"\n{fs} bytes successfully downloaded in {time_disp(s)}, average download speed {bps}bps")
 
-if fs == fsize:
+if fs == fsize and len(sys.argv) < 2:
 	import shutil
 	try:
 		shutil.rmtree("cache")

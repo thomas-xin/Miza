@@ -66,6 +66,30 @@ exc = concurrent.futures.ThreadPoolExecutor(max_workers=64)
 futs = []
 PTIME = 0
 
+if token.startswith("~"):
+	token = token.lstrip("~")
+else:
+	if token.startswith("Bot "):
+		resp = None
+	else:
+		headers = {"Authorization": "Bot " + token, "Content-Type": "application/json"}
+		resp = reqs.get(
+			"https://discord.com/api/v10/users/@me",
+			headers=headers,
+		)
+		PROGRESS += 1
+	if not resp or resp.status_code == 401:
+		headers = {"Authorization": token, "Content-Type": "application/json"}
+		resp = reqs.get(
+			"https://discord.com/api/v10/users/@me",
+			headers=headers,
+		)
+		PROGRESS += 1
+	else:
+		token = "Bot " + token
+	resp.raise_for_status()
+headers = {"Authorization": token, "Content-Type": "application/json"}
+
 if "," in gid:
 	if "(" not in gid and "[" not in gid and "{" not in gid:
 		gid = f"[{gid}]"
@@ -73,7 +97,6 @@ if "," in gid:
 	cids = ast.literal_eval(gid)
 	server = [{}]
 	channels = []
-	headers = {"Authorization": "Bot " + token, "Content-Type": "application/json"}
 	for cid in cids:
 		resp = reqs.get(
 			f"https://discord.com/api/v10/channels/{cid}",
@@ -89,19 +112,11 @@ if "," in gid:
 				server[0]["name"] += f" +{len(cids) - 1}"
 	gid = None
 else:
-	headers = {"Authorization": "Bot " + token, "Content-Type": "application/json"}
 	resp = reqs.get(
 		"https://discord.com/api/v10/users/@me/guilds",
 		headers=headers,
 	)
 	PROGRESS += 1
-	if resp.status_code == 401:
-		headers = {"Authorization": token, "Content-Type": "application/json"}
-		resp = reqs.get(
-			"https://discord.com/api/v10/users/@me/guilds",
-			headers=headers,
-		)
-		PROGRESS += 1
 	resp.raise_for_status()
 	d = resp.json()
 

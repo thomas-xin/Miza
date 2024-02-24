@@ -935,7 +935,7 @@
 				"Archive"
 			],
 			"description": "Archives all messages, attachments and users into a .zip folder. Defaults to entire server if no channel specified, requires server permission level 3 as well as a Lv2 or above Miza subscription to perform, and may take a significant amount of time.",
-			"usage": "<server>?",
+			"usage": "<server|channel>? <start-id>? <end-id>? <token>?",
 			"level": "3",
 			"rate_limit": "172800",
 			"example": [],
