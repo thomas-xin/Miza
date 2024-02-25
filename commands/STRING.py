@@ -1510,7 +1510,7 @@ instructcompletion = (
 	"text-curie-001",
 	"goliath-120b",
 	"mythomax-13b",
-	"stripedhyena-7b",
+	"stripedhyena-nous-7b",
 )
 
 Functions = [{
@@ -1521,7 +1521,7 @@ Functions = [{
 				"type": "object", "properties": {
 					"assistant": {
 						"type": "string",
-						"description": '''Enter "formal" for knowledge, advice or assistance, and "casual" for banter, storytelling or roleplay.''',
+						"description": '''Enter "formal" for knowledge, advice or assistance, and "casual" for banter or roleplay.''',
 						"enum": ["formal", "casual"],
 					},
 					"tool": {
@@ -2240,7 +2240,7 @@ class Ask(Command):
 			mid_length = await count_to(mid_cut)
 			target_model = model
 			text = ""
-			ex = RuntimeError("Maximum attempts exceeded.")
+			ex = RuntimeError("Maximum inference attempts exceeded.")
 			ustr = str(user.id) if premium < 3 else str(hash(name))
 			data = dict(
 				messages=snippet,
@@ -2271,7 +2271,7 @@ class Ask(Command):
 					text = ""
 				if fails & 1 or premium < 2:
 					formal = "gpt-4" if target_model == "gpt4" else "firefunction-v1"
-					casual = "gpt-3.5-turbo-instruct" if target_model == "gpt4" else "stripedhyena-7b"
+					casual = "gpt-3.5-turbo-instruct" if target_model == "gpt4" else "stripedhyena-nous-7b"
 				else:
 					formal = "gpt-4-0125-preview" if target_model == "gpt4" else "gpt-3.5-turbo-0125"
 					casual = "goliath-120b" if target_model == "gpt4" else "mythomax-13b"
@@ -2311,9 +2311,10 @@ class Ask(Command):
 						top_p=0.9,
 						frequency_penalty=0.6,
 						presence_penalty=0.8,
-						tools=ftools,
 						user=ustr,
 					)
+					if ftools:
+						data["tools"] = ftools
 					try:
 						resp = await bot.function_call(**data, rev_nsfw=False, timeout=60 + fails * 30)
 					except Exception as exc:
@@ -2559,13 +2560,13 @@ class Ask(Command):
 							break
 					if mresp:
 						break
-					if not has_function:
-						break
-					if not tc and text and not redo:
-						break
-					if not text:
-						fails += 1
-					continue
+					if has_function:
+						if not tc and text and not redo:
+							break
+						if not text:
+							fails += 1
+						continue
+					text = ""
 				if mresp:
 					break
 				prompt, stops = instruct_structure(selection, model=assistant)
@@ -2657,14 +2658,31 @@ class Ask(Command):
 						continue
 				else:
 					raise FileNotFoundError(f"Unable to find model \"{assistant}\".")
-				text = regexp(r"\[inst", re.I).split(text, 1)[0].removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
+				text = regexp(r"\[inst", re.I).split(text, 1)[0].strip().removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", name).replace("<|user|>", name)
 				if text and text.strip() and not text.rsplit(None, 1)[-1].startswith(":"):
 					text = text.rstrip(":")
 				if not text or len(text) >= 2 and text[-1] in ",: aAsS" and text[-2] not in ",.!?" or text.endswith(' "') or text.endswith('\n"'):
 					redo = True
 					continue
 				text = text.strip()
-				break
+				if ":" in text:
+					text = text.replace(":\n", ": ")
+					spl = text.split(": ")
+					if len(spl) > 1:
+						text = ""
+						while spl:
+							s = spl.pop(0)
+							if "\n" in s:
+								text += s.rsplit("\n", 1)[0]
+								break
+							if spl:
+								text += s + ": "
+						text = text.strip()
+						if text.endswith(":"):
+							text = text.rsplit("\n", 1)[0]
+					text = text.strip()
+				if text or mresp:
+					break
 			else:
 				raise ex
 			out = text

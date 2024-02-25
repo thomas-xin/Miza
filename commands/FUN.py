@@ -3068,7 +3068,7 @@ class Rickroll(Command):
 							resp = await process_image(url, "resize_mult", ["-nogif", 1, 1, "auto"], timeout=60)
 							with open(resp, "rb") as f:
 								data = await asubmit(f.read)
-							url = await bot.data.exec.uproxy(data)
+							url = await bot.data.exec.uproxy(data, force=True)
 							ext = "png"
 						else:
 							ext = "jpeg"

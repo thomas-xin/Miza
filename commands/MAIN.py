@@ -1170,6 +1170,14 @@ class Upload(Command):
 					if not waited and a_id not in self.bot.data.attachments:
 						waited = True
 						await asyncio.sleep(2)
+					found = None
+					for attachment in message.attachments:
+						if attachment.id == a_id:
+							found = attachment
+							break
+					if found:
+						url = self.bot.preserve_into(channel, message, a_id)
+						futs.append(as_fut(url))
 					if a_id in self.bot.data.attachments:
 						futs.append(as_fut(self.bot.preserve_attachment(a_id)))
 						continue

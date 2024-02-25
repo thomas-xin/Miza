@@ -2822,11 +2822,12 @@ FIRST_LOAD = True
 # summ			GPU >200k, VRAM >4GB			GTX970, M60, GTX1050ti, P4, GTX1630
 # sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
 # whisper		GPU >200k, VRAM >6GB			RTX2070, T4, RTX3060, A16, RTX4060
-# sdxl			GPU >400k, VRAM >9GB			GTX1080ti, RTX2080ti, RTX3060, RTX3080, A2000
-# sdxlr			GPU >400k, VRAM >15GB			V100, RTX3090, A4000, RTX4080, L4
+# sdxl			GPU >400k, VRAM >11GB			P40, RTX3060, A2000, RTX4070
+# sdcc			GPU >400k, VRAM >15GB			V100, RTX3090, A4000, RTX4080, L4
 # exl2			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
 def spec2cap():
 	global FIRST_LOAD
+	g = 1073741824
 	try:
 		from multiprocessing import shared_memory
 		globals()["MEM_LOCK"] = shared_memory.SharedMemory(name="X-DISTRIBUTE", create=True, size=1)
@@ -2865,18 +2866,18 @@ def spec2cap():
 	vrams = tuple(rrams)
 	cut = 0
 	tdid = []
-	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(rrams, COMPUTE_POT)):
+	if AUTH.get("discord_token") and any(v > 6 * g and c > 700000 for v, c in zip(rrams, COMPUTE_POT)):
 		vrs = [69]
 		using = False
 		for v in vrs:
 			vram = sum(rrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
-			if vram > v * 1073741824:
+			if vram > v * g:
 				using = True
-				cut = v * 1073741824
+				cut = v * g
 				did = []
 				for i in COMPUTE_ORDER:
 					vi = rrams[i]
-					if vi < 2 * 1073741824 or (vi < v / 2 * 1073741824 and i in tdid):
+					if vi < 2 * g or (vi < v / 2 * g and i in tdid):
 						continue
 					if cut > 0:
 						red = min(cut, vi)
@@ -2890,8 +2891,8 @@ def spec2cap():
 				done.append("exl2")
 		if using and FIRST_LOAD:
 			FIRST_LOAD = False
-			yield [[], "load", "exl2", "sdxlr"]
-	if os.name == "nt" and ram > 3 * 1073741824:
+			yield [[], "load", "exl2", "sdcc"]
+	if os.name == "nt" and ram > 3 * g:
 		caps.append("browse")
 	if len(caps) > 1:
 		yield caps
@@ -2900,9 +2901,9 @@ def spec2cap():
 	rm = 1
 	while mc > 1:
 		caps = [[], "math"]
-		if cc > 3 and ram > (rm * 8 - 2) * 1073741824 and ffmpeg:
+		if cc > 3 and ram > (rm * 8 - 2) * g and ffmpeg:
 			caps.append("image")
-		if cc > 5 and ram > (rm * 32 - 2) * 1073741824 and tesseract:
+		if cc > 5 and ram > (rm * 32 - 2) * g and tesseract:
 			caps.append("caption")
 		mc -= 1
 		rm += 1
@@ -2912,56 +2913,54 @@ def spec2cap():
 	for i, v in enumerate(rrams):
 		c = COMPUTE_POT[i]
 		caps = [[i]]
-		if c > 100000 and v > 3 * 1073741824 and ffmpeg:
+		if c > 100000 and v > 3 * g and ffmpeg:
 			caps.append("video")
 			caps.append("ecdc")
-		if c > 400000 and v > 15 * 1073741824:
-			caps.append("sdxlr")
+		if c > 400000 and v > 15 * g:
 			caps.append("sdxl")
-			# done.append("sdxlr")
-			done.append("sdxl")
-			v -= 15 * 1073741824
-		elif c > 400000 and IS_MAIN and vrams[i] > 15 * 1073741824:
-			caps.append("sdxlr")
-			caps.append("sdxl")
-			caps.append("nvram")
-			if vrams[i] > 19 * 1073741824:
+			if v > 19 * g:
+				caps.append("sdcc")
+				done.append("sdcc")
 				caps.append("sd")
-			# done.append("sdxlr")
-			v -= 15 * 1073741824
-		elif c > 400000 and v > 9 * 1073741824 and "sdxl" not in done:
-			# if "sdxl" not in done or c <= 600000:
+			v -= 15 * g
+		elif c > 400000 and IS_MAIN and vrams[i] > 15 * g:
 			caps.append("sdxl")
-			# caps.append("sd")
-			done.append("sdxl")
-			v -= 9 * 1073741824
-		elif c > 400000 and IS_MAIN and "sdxl" not in done and vrams[i] > 9 * 1073741824:
-			caps.append("sdxl")
+			if vrams[i] > 19 * g:
+				caps.append("sdcc")
 			caps.append("nvram")
-			done.append("sdxl")
-			v -= 9 * 1073741824
-		if c > 200000 and v > 6 * 1073741824:
+			v -= 15 * g
+		elif c > 400000 and v > 11 * g and "sdcc" not in done:
+			# if "sdxl" not in done or c <= 600000:
+			caps.append("sdcc")
+			done.append("sdcc")
+			v -= 11 * g
+		elif c > 400000 and IS_MAIN and "sdcc" not in done and vrams[i] > 11 * g:
+			caps.append("sdcc")
+			caps.append("nvram")
+			done.append("sdcc")
+			v -= 11 * g
+		if c > 200000 and v > 6 * g:
 			if "whisper" not in done or c <= 600000:
 				caps.append("whisper")
 				done.append("whisper")
-				v -= 7 * 1073741824
-		if c > 200000 and v > 5 * 1073741824:
+				v -= 6 * g
+		if c > 200000 and v > 5 * g:
 			if "sd" not in done or c <= 600000:
 				caps.append("sd")
 				done.append("sd")
-				v -= 5 * 1073741824
-		if c > 200000 and vrams[i] > 4 * 1073741824 and rrams[i] > 1073741824:
+				v -= 5 * g
+		if c > 200000 and vrams[i] > 4 * g and rrams[i] > g:
 			caps.append("summ")
 			done.append("summ")
-			# v -= 1 * 1073741824
-		# if v <= 4 * 1073741824:
+			# v -= 1 * g
+		# if v <= 4 * g:
 			# v = 0
 		# vrams[i] = v
 		if i not in tdid and "nvram" in caps:
 			caps.remove("nvram")
 		if "sdxl" in caps and FIRST_LOAD:
 			FIRST_LOAD = False
-			yield [[], "load", "sdxlr"]
+			yield [[], "load", "sdcc"]
 		if len(caps) > 1:
 			yield caps
 

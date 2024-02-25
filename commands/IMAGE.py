@@ -1782,17 +1782,17 @@ class Art(Command):
 			if m or s and "z" not in flags:
 				# try:
 				# 	if not m and c <= 1:
-				# 		await bot.lambdassert("sdxlr")
+				# 		await bot.lambdassert("sdcc")
 				# except:
 				# 	print_exc()
 				# else:
-				cap = "sdxlr" if "--mask" in k else "sdxl"
+				cap = "sdxl" if "--mask" in k or "--init-image" in k else "sdcc"
 				return await process_image("IBASLR", "&", [p, k, n, f, c, a, np], cap=cap, timeout=420)
 			resp = await process_image("IBASL", "&", [p, k, n, f, c, s, a, np, "z" in flags], cap="sdxl" if s else "sd", timeout=420)
 			# if s and "z" not in flags:
 			# 	out = []
 			# 	for r1 in resp:
-			# 		r2 = await process_image("IBASR", "$", [p, r1, 48, np], cap="sdxlr", timeout=240)
+			# 		r2 = await process_image("IBASR", "$", [p, r1, 48, np], cap="sdcc", timeout=240)
 			# 		out.append(r2)
 			# 	return out
 			return resp

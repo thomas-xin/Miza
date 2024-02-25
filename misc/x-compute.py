@@ -117,7 +117,7 @@ if len(sys.argv) > 6:
 else:
 	IT = 0
 
-if CAPS.intersection(("image", "caption", "video", "sd", "sdxl", "sdxlr")):
+if CAPS.intersection(("browse", "image", "caption", "video", "sd", "sdxl", "sdcc")):
 	import zipfile, blend_modes
 	try:
 		# This module apparently does not exist on Linux
@@ -730,7 +730,7 @@ if "image" in CAPS:
 	# lab2hsv = ImageCms.buildTransformFromOpenProfiles(lab_p, hsv_p, "LAB", "HSV")
 
 
-if CAPS.intersection(("image", "video", "caption", "sd", "sdxl", "sdxlr")):
+if CAPS.intersection(("browse", "image", "video", "caption", "sd", "sdxl", "sdcc")):
 	def fromarray(arr, mode="L"):
 		try:
 			return Image.fromarray(arr, mode=mode)
@@ -2450,7 +2450,7 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 	# else:
 		# convobot.AsyncChatGPT = AsyncChatGPT
 
-if CAPS.intersection(("sd", "sdxl", "sdxlr")):
+if CAPS.intersection(("sd", "sdxl", "sdcc")):
 	import imagebot
 	imagebot.COMPUTE_LOAD = COMPUTE_LOAD
 	imagebot.COMPUTE_CAPS = COMPUTE_CAPS
@@ -2608,7 +2608,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 			except KeyError:
 				ib = CBOTS[None] = imagebot.Bot()
 			return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=2, aspect_ratio=aspect_ratio, negative_prompt=negative_prompt)
-		if kwargs:
+		if kwargs and not kwargs.get("--init-image"):
 			try:
 				from diffusers import StableCascadePriorPipeline
 			except ImportError:

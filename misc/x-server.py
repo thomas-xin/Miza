@@ -919,11 +919,15 @@ class Server:
 		if id == "u" and url:
 			id = url
 		if id:
-			if "." in id:
+			if "*" in id:
 				id = id.split(".", 1)[0]
-			with tracebacksuppressor:
-				id = int.from_bytes(base64.urlsafe_b64decode(id + "=="), "big")
-			url = self.bot_exec(f"bot.renew_attachment({id})") or url
+				url = self.bot_exec(f"bot.renew_from_long(*{id.split('*')})") or url
+			else:
+				if "." in id:
+					id = id.split(".", 1)[0]
+				with tracebacksuppressor:
+					id = int.from_bytes(base64.urlsafe_b64decode(id + "=="), "big")
+				url = self.bot_exec(f"bot.renew_attachment({id})") or url
 		else:
 			url = self.renew_url(url, mid=mid) or url
 		cp.response.headers.update(CHEADERS)
@@ -2881,6 +2885,8 @@ alert("File successfully deleted. Returning to home.");
 			j, after = fut.result()
 		finally:
 			RESPONSES.pop(t, None)
+		if "result" not in j:
+			raise evalEX(j["error"])
 		return j["result"]
 
 	rapidapi = 0

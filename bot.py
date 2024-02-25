@@ -1072,11 +1072,42 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	def preserve_attachment(self, a_id):
 		if is_url(a_id):
 			url = a_id
+			if is_discord_attachment(url):
+				c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
+				a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+				if a_id in self.data.attachments:
+					return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
 			a_id = ts_us()
 			while a_id in self.data.attachments:
 				a_id += 1
 			self.data.attachments[a_id] = url
 		return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
+
+	def preserve_into(self, c, m, a):
+		a_id = verify_id(a)
+		self.data.attachments[a_id] = (verify_id(c), verify_id(m))
+		return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
+
+	def preserve_as_long(self, c_id, m_id, a_id):
+		c = base64.urlsafe_b64encode(c_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
+		m = base64.urlsafe_b64encode(m_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
+		a = base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
+		return self.raw_webserver + "/u/" + c + "*" + m + "*" + a
+
+	async def renew_from_long(cself, c, m, a):
+		c_id = int.from_bytes(base64.urlsafe_b64decode(c + "=="), "big")
+		m_id = int.from_bytes(base64.urlsafe_b64decode(m + "=="), "big")
+		a_id = int.from_bytes(base64.urlsafe_b64decode(a + "=="), "big")
+		with tracebacksuppressor:
+			channel = await self.fetch_channel(c_id)
+			message = await self.fetch_message(m_id, channel)
+			for attachment in message.attachments:
+				if attachment.id == a_id:
+					url = str(attachment.url).rstrip("&")
+					if discord_expired(url):
+						return await self.renew_attachment(url, m_id)
+					return url
+		return "https://mizabot.xyz/notfound.png"
 
 	def try_attachment(self, url, m_id=None) -> str:
 		if not isinstance(url, int):
@@ -1869,6 +1900,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			"fireworks": "accounts/fireworks/models/firellava-13b",
 		},
 		"goliath-120b": {
+			"https://api.pygmalion.chat/v1#pyg-model11": "goliath-120b-GPTQ",
 			"https://fdigsujdfigsd-plsbuild.hf.space/v1": "TheBloke/goliath-120b-GPTQ",
 		},
 		"mixtral-8x7b-instruct": {
@@ -1895,12 +1927,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		},
 	}
 	api_map = cdict()
+	api_blocked = Cache(timeout=720, trash=0)
 	def get_oai(self, func, api="openai"):
-		endpoint = self.ai_endpoints.get(api, api)
+		base_url = endpoint = self.ai_endpoints.get(api, api)
 		oai = self.api_map.get(endpoint)
 		if not oai:
-			key = (AUTH.get(api + "_key") if ":" not in api else None) or "."
-			oai = openai.AsyncOpenAI(api_key=key, base_url=endpoint)
+			if "#" in endpoint:
+				base_url, key = endpoint.split("#", 1)
+			else:
+				kkey = api.split("://", 1)[-1].split("/", 1)[0] + "_key"
+				key = AUTH.get(kkey) or "."
+			oai = openai.AsyncOpenAI(api_key=key, base_url=base_url)
 			self.api_map[endpoint] = oai
 		lookup = func.split(".")
 		caller = oai
@@ -1914,7 +1951,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			apis = {api: None}
 		orig_model = kwargs.pop("model", None)
 		exc = None
-		for api, model in apis.items():
+		for api, model in shuffle(apis.items()):
+			if (api, model) in self.api_blocked:
+				continue
 			kwa = kwargs.copy()
 			kwa["model"] = model or orig_model
 			caller = self.get_oai(func, api=api)
@@ -1937,6 +1976,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			except CE:
 				raise
 			except Exception as ex:
+				if isinstance(ex, ConnectionError) and ex.errno in (401, 403, 404, 429, 502, 503):
+					self.api_blocked[(api, model)] = True
 				if not exc:
 					exc = ex
 				print(repr(ex))
@@ -2616,7 +2657,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						if filename and not isinstance(filename, str) or filename.endswith(".gif"):
 							u += ".gif"
 						return u
-					return self.raw_webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0]) + f"?mid={message.id}"
+					if best:
+						return self.preserve_into(channel.id, message.id, a_id)
+					return self.preserve_as_long(channel.id, message.id, a_id)
 				return url
 			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join("<" + temp_url(a.url) + ">" for a in message.attachments)
 			message = await message.edit(content=content.strip())
@@ -2670,9 +2713,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			self.cache.messages[message.id] = message
 			if (utc_dt() - created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
 				self.data.message_cache.save_message(message)
-		if "attachments" in self.data:
-			for a in message.attachments:
-				self.data.attachments[a.id] = (message.channel.id, message.id)
+		# if "attachments" in self.data:
+		# 	for a in message.attachments:
+		# 		self.data.attachments[a.id] = (message.channel.id, message.id)
 		return message
 
 	# Deletes a message from the bot cache.
@@ -2684,8 +2727,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			print(s, file=ch)
 
 	async def add_attachment(self, attachment, data=None, c_id=None, m_id=None):
-		if c_id and m_id and "attachments" in self.data:
-			self.data.attachments[attachment.id] = (c_id, m_id)
+		# if c_id and m_id and "attachments" in self.data:
+		# 	self.data.attachments[attachment.id] = (c_id, m_id)
 		if attachment.id not in self.cache.attachments:
 			self.cache.attachments[attachment.id] = None
 			if data is None:
@@ -4855,46 +4898,49 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		glob = self._globals
 		url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
 		out = '{"result":null}'
-		code = None
-		with suppress(SyntaxError):
-			code = compile(proc, "<webserver>", "eval", optimize=2)
-		if code is None:
-			with suppress(SyntaxError):
-				code = compile(proc, "<webserver>", "exec", optimize=2)
-			if code is None:
-				_ = glob.get("_")
-				defs = False
-				lines = proc.splitlines()
-				for line in lines:
-					if line.startswith("def") or line.startswith("async def"):
-						defs = True
-				func = "async def _():\n\tlocals().update(globals())\n"
-				func += "\n".join(("\tglobals().update(locals())\n" if not defs and line.strip().startswith("return") else "") + "\t" + line for line in lines)
-				func += "\n\tglobals().update(locals())"
-				code2 = compile(func, "<webserver>", "exec", optimize=2)
-				await asubmit(eval, code2, glob)
-				output = await glob["_"]()
-				glob["_"] = _
-		if code is not None:
-			try:
-				output = await asubmit(eval, code, glob, priority=True)
-			except:
-				print(proc)
-				raise
-		if type(output) in (deque, alist):
-			output = list(output)
-		if output is not None:
-			glob["_"] = output
 		try:
-			out = orjson.dumps(dict(result=output))
-		except TypeError:
+			code = None
+			with suppress(SyntaxError):
+				code = compile(proc, "<webserver>", "eval", optimize=2)
+			if code is None:
+				with suppress(SyntaxError):
+					code = compile(proc, "<webserver>", "exec", optimize=2)
+				if code is None:
+					_ = glob.get("_")
+					defs = False
+					lines = proc.splitlines()
+					for line in lines:
+						if line.startswith("def") or line.startswith("async def"):
+							defs = True
+					func = "async def _():\n\tlocals().update(globals())\n"
+					func += "\n".join(("\tglobals().update(locals())\n" if not defs and line.strip().startswith("return") else "") + "\t" + line for line in lines)
+					func += "\n\tglobals().update(locals())"
+					code2 = compile(func, "<webserver>", "exec", optimize=2)
+					await asubmit(eval, code2, glob)
+					output = await glob["_"]()
+					glob["_"] = _
+			if code is not None:
+				try:
+					output = await asubmit(eval, code, glob, priority=True)
+				except:
+					print(proc)
+					raise
+			if type(output) in (deque, alist):
+				output = list(output)
+			if output is not None:
+				glob["_"] = output
 			try:
-				out = json.dumps(dict(result=output), cls=MultiEncoder)
+				out = orjson.dumps(dict(result=output))
 			except TypeError:
 				try:
-					out = orjson.dumps(dict(result=repr(output)))
+					out = json.dumps(dict(result=output), cls=MultiEncoder)
 				except TypeError:
-					out = repr(dict(result=output))
+					try:
+						out = orjson.dumps(dict(result=repr(output)))
+					except TypeError:
+						out = repr(dict(result=output))
+		except Exception as ex:
+			out = orjson.dumps(dict(error=repr(ex)))
 		# print(url, out)
 		try:
 			await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False, timeout=16)
@@ -5602,9 +5648,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 									a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 									if a_id in self.data.attachments:
 										return allow_gif(self.preserve_attachment(a_id))
-									if mid:
-										return self.raw_webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0]) + f"?mid={mid}"
-									return self.raw_webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0])
+									channel = message.channel
+									return self.preserve_as_long(channel.id, message.id, a_id)
 								return url
 							urls = set()
 							url = None

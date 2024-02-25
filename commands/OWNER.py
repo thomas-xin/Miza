@@ -582,7 +582,7 @@ class UpdateExec(Database):
 			f.seek(i)
 			while i < end:
 				b = None
-				if end - i > 83886080 and "hmac_signed_session" in AUTH and not self.hmac_sem.full:
+				if 0 and end - i > 83886080 and "hmac_signed_session" in AUTH and not self.hmac_sem.full:
 					try:
 						async with self.hmac_sem:
 							b = await asubmit(f.read, 503316480)
@@ -715,6 +715,9 @@ class UpdateExec(Database):
 				files[i] = cdict(fut=as_fut(url), filename="untitled.webp")
 				continue
 			if not is_url(url):
+				continue
+			if not force and url.startswith(bot.raw_webserver + "/u/"):
+				out[i] = url
 				continue
 			try:
 				uhu = uhash(url)

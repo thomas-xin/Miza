@@ -1106,30 +1106,30 @@ class MessageLog(Command):
 		return ini_md(f'Message event logging is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
 
 
-class FileLog(Command):
-	server_only = True
-	min_level = 3
-	description = "Causes ⟨MIZA⟩ to log deleted files from the server, in the current channel."
-	usage = "<mode(enable|disable)>?"
-	example = ("filelog enable",)
-	flags = "aed"
-	rate_limit = 1
+# class FileLog(Command):
+# 	server_only = True
+# 	min_level = 3
+# 	description = "Causes ⟨MIZA⟩ to log deleted files from the server, in the current channel."
+# 	usage = "<mode(enable|disable)>?"
+# 	example = ("filelog enable",)
+# 	flags = "aed"
+# 	rate_limit = 1
 
-	async def __call__(self, bot, flags, channel, guild, name, **void):
-		data = bot.data.logF
-		update = bot.data.logF.update
-		if "e" in flags or "a" in flags:
-			data[guild.id] = channel.id
-			return italics(css_md(f"Enabled file deletion logging in {sqr_md(channel)} for {sqr_md(guild)}."))
-		elif "d" in flags:
-			if guild.id in data:
-				data.pop(guild.id)
-			return italics(css_md(f"Disabled file deletion logging for {sqr_md(guild)}."))
-		if guild.id in data:
-			c_id = data[guild.id]
-			channel = await bot.fetch_channel(c_id)
-			return ini_md(f"File deletion logging for {sqr_md(guild)} is currently enabled in {sqr_md(channel)}.")
-		return ini_md(f'File deletion logging is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
+# 	async def __call__(self, bot, flags, channel, guild, name, **void):
+# 		data = bot.data.logF
+# 		update = bot.data.logF.update
+# 		if "e" in flags or "a" in flags:
+# 			data[guild.id] = channel.id
+# 			return italics(css_md(f"Enabled file deletion logging in {sqr_md(channel)} for {sqr_md(guild)}."))
+# 		elif "d" in flags:
+# 			if guild.id in data:
+# 				data.pop(guild.id)
+# 			return italics(css_md(f"Disabled file deletion logging for {sqr_md(guild)}."))
+# 		if guild.id in data:
+# 			c_id = data[guild.id]
+# 			channel = await bot.fetch_channel(c_id)
+# 			return ini_md(f"File deletion logging for {sqr_md(guild)} is currently enabled in {sqr_md(channel)}.")
+# 		return ini_md(f'File deletion logging is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
 
 
 class StarBoard(Command):
@@ -2724,6 +2724,33 @@ class UpdateMessageLogs(Database):
 		emb.timestamp = before.edited_at or after.created_at
 		self.bot.send_embeds(channel, emb)
 
+	async def reattachments(self, channel, message):
+		if not message.attachments:
+			return
+		msg = deque()
+		fils = []
+		for a in message.attachments:
+			try:
+				b = await self.bot.get_attachment(a.url, full=False, allow_proxy=True)
+				fil = CompatFile(seq(b), filename=a.filename.removeprefix("SPOILER_"))
+				fils.append(fil)
+			except:
+				msg.append(proxy_url(a))
+		colour = await self.bot.get_colour(message.author)
+		emb = discord.Embed(colour=colour)
+		emb.description = f"File{'s' if len(fils) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"
+		msg = "\n".join(msg) if msg else None
+		if len(fils) == 1:
+			m2 = await self.bot.send_with_file(channel, msg, embed=emb, file=fils[0])
+		else:
+			m2 = await channel.send(msg, embed=emb, files=fils)
+		def get_ext(u):
+			u = u.split("?", 1)[0].rsplit("/", 1)[-1]
+			if "." in u:
+				return "." + u.rsplit(".", 1)[-1]
+			return ""
+		message.attachments = [cdict(name=a.filename, url=self.bot.preserve_as_long(channel.id, m2.id, a.id) + get_ext(a.url)) for a in m2.attachments]
+
 	# Delete events must attempt to find the user who deleted the message
 	async def _delete_(self, message, bulk=False, **void):
 		cu_id = self.bot.id
@@ -2739,6 +2766,7 @@ class UpdateMessageLogs(Database):
 			self.data.pop(guild.id)
 			return
 		now = utc()
+		await self.reattachments(channel, message)
 		u = message.author
 		name_id = str(u)
 		url = await self.bot.get_proxy_url(u)
@@ -2806,6 +2834,7 @@ class UpdateMessageLogs(Database):
 			self.data.pop(guild.id)
 			return
 		now = utc()
+		await asyncio.gather(*(self.reattachments(channel, m) for m in messages))
 		action = discord.AuditLogAction.message_bulk_delete
 		try:
 			init = "[UNKNOWN USER]"
@@ -2856,40 +2885,40 @@ class UpdateMessageLogs(Database):
 		self.bot.send_embeds(channel, embs)
 
 
-class UpdateFileLogs(Database):
-	name = "logF"
+# class UpdateFileLogs(Database):
+# 	name = "logF"
 
-	async def _delete_(self, message, **void):
-		if self.bot.is_deleted(message) > 1:
-			return
-		if not message.attachments:
-			return
-		guild = message.guild
-		if guild.id not in self.data:
-			return
-		c_id = self.data[guild.id]
-		try:
-			channel = await self.bot.fetch_channel(c_id)
-		except (EOFError, discord.NotFound):
-			self.data.pop(guild.id)
-			return
-		# Attempt to recover files from their proxy URLs, otherwise send the original URLs
-		msg = deque()
-		fils = []
-		for a in message.attachments:
-			try:
-				b = await self.bot.get_attachment(a.url, full=False, allow_proxy=True)
-				fil = CompatFile(seq(b), filename=str(a).rsplit("/", 1)[-1])
-				fils.append(fil)
-			except:
-				msg.append(proxy_url(a))
-		colour = await self.bot.get_colour(message.author)
-		emb = discord.Embed(colour=colour)
-		emb.description = f"File{'s' if len(fils) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"
-		msg = "\n".join(msg) if msg else None
-		if len(fils) == 1:
-			return await self.bot.send_with_file(channel, msg, embed=emb, file=fils[0])
-		await channel.send(msg, embed=emb, files=fils)
+# 	async def _delete_(self, message, **void):
+# 		if self.bot.is_deleted(message) > 1:
+# 			return
+# 		if not message.attachments:
+# 			return
+# 		guild = message.guild
+# 		if guild.id not in self.data:
+# 			return
+# 		c_id = self.data[guild.id]
+# 		try:
+# 			channel = await self.bot.fetch_channel(c_id)
+# 		except (EOFError, discord.NotFound):
+# 			self.data.pop(guild.id)
+# 			return
+# 		# Attempt to recover files from their proxy URLs, otherwise send the original URLs
+# 		msg = deque()
+# 		fils = []
+# 		for a in message.attachments:
+# 			try:
+# 				b = await self.bot.get_attachment(a.url, full=False, allow_proxy=True)
+# 				fil = CompatFile(seq(b), filename=str(a).rsplit("/", 1)[-1])
+# 				fils.append(fil)
+# 			except:
+# 				msg.append(proxy_url(a))
+# 		colour = await self.bot.get_colour(message.author)
+# 		emb = discord.Embed(colour=colour)
+# 		emb.description = f"File{'s' if len(fils) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"
+# 		msg = "\n".join(msg) if msg else None
+# 		if len(fils) == 1:
+# 			return await self.bot.send_with_file(channel, msg, embed=emb, file=fils[0])
+# 		await channel.send(msg, embed=emb, files=fils)
 
 
 class UpdatePublishers(Database):

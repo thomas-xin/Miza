@@ -968,19 +968,6 @@
 			],
 			"timeout": "24"
 		},
-		"FileLog": {
-			"aliases": [
-				"FileLog"
-			],
-			"description": "Causes Miza to log deleted files from the server, in the current channel.",
-			"usage": "<mode(enable|disable)>?",
-			"level": "3",
-			"rate_limit": "1",
-			"example": [
-				"filelog enable"
-			],
-			"timeout": "24"
-		},
 		"StarBoard": {
 			"aliases": [
 				"StarBoard"
