@@ -493,6 +493,7 @@ try:
 	CE2 = concurrent.futures._base.CancelledError
 except AttributeError:
 	CE2 = concurrent.futures.CancelledError
+TE = subprocess.TimeoutExpired
 
 
 class ArgumentError(LookupError):

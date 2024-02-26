@@ -1762,7 +1762,7 @@ async def cut_to(messages, limit=1024, exclude_first=True, best=False):
 		mes.append(m)
 		count += c
 	summ = "Summary of prior conversation:\n"
-	s = "\n\n".join(m_str(m) for m in (messages[:i][::-1]))
+	s = "\n\n".join(m_str(m) for m in (messages[:len(messages) - i] if i > 0 else messages))
 	c = await tcount(summ + s)
 	if c + count <= limit / 3:
 		if exclude_first:

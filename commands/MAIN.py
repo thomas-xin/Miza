@@ -1176,10 +1176,12 @@ class Upload(Command):
 							found = attachment
 							break
 					if found:
-						url = self.bot.preserve_into(channel, message, a_id)
+						url = self.bot.preserve_into(channel, message, a_id, ext=found.url)
 						futs.append(as_fut(url))
+						continue
 					if a_id in self.bot.data.attachments:
-						futs.append(as_fut(self.bot.preserve_attachment(a_id)))
+						u = await self.bot.renew_attachment(a_id)
+						futs.append(as_fut(self.bot.preserve_attachment(a_id, ext=u)))
 						continue
 				futs.append(Request(self.bot.raw_webserver + "/upload_url?url=" + url_parse(url), decode=True, aio=True, ssl=False, timeout=1200))
 				await asyncio.sleep(0.1)

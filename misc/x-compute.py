@@ -3512,9 +3512,13 @@ def evalImg(url, operation, args):
 					args.append("-O3")
 				args.extend(("--loopcount=forever", "--lossy=100", "-o", out2, out))
 				print(args)
-				subprocess.run(args)
-				if os.path.getsize(out2) < os.path.getsize(out):
-					out = out2
+				try:
+					subprocess.run(args, timeout=60)
+				except subprocess.TimeoutExpired:
+					pass
+				else:
+					if os.path.getsize(out2) < os.path.getsize(out):
+						out = out2
 			# return [out]
 			with open(out, "rb") as f:
 				return f.read()

@@ -919,8 +919,8 @@ class Server:
 		if id == "u" and url:
 			id = url
 		if id:
-			if "*" in id:
-				id = id.split(".", 1)[0]
+			if "*" in id or "~" in id:
+				id = id.split(".", 1)[0].replace("~", "*")
 				url = self.bot_exec(f"bot.renew_from_long(*{id.split('*')})") or url
 			else:
 				if "." in id:

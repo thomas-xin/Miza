@@ -338,10 +338,14 @@ def carmichael(n):
 
 def simplify_recurring(r, prec=100):
 	p, q = r.p, r.q
-	temp = _factorint(q)
-	tq = np.prod([k ** v for k, v in temp.items() if k not in (2, 5)], dtype=object)
-	if tq == 1:
+	try:
+		temp = _factorint(q, timeout=1)
+	except subprocess.TimeoutExpired as ex:
+		print(repr(ex))
 		return
+	if all(i in (2, 5) for i in temp):
+		return
+	tq = np.prod([k ** v for k, v in temp.items() if k not in (2, 5)], dtype=object)
 	print("SR:", r)
 	try:
 		pr = sympy.ntheory.residue_ntheory.is_primitive_root(10, tq)
@@ -352,7 +356,7 @@ def simplify_recurring(r, prec=100):
 		digits = cq
 	else:
 		try:
-			facts = factors(cq)
+			facts = factors(cq, lim=prec ** 2)
 		except OverflowError:
 			return
 		digits = cq
@@ -360,7 +364,7 @@ def simplify_recurring(r, prec=100):
 			if f < prec * 16 and divisible(10 ** f - 1, tq):
 				digits = f
 				break
-	if digits > prec * 16:
+	if digits > prec * 2:
 		return
 	transient = max(temp.get(2, 0), temp.get(5, 0))
 	s = str(r_evalf(r, transient + digits * 3))
@@ -381,7 +385,7 @@ class FakeFloat(sympy.Rational):
 		if math.log10(max(abs(p), abs(q))) > BF_PREC:
 			return r_evalf(obj, BF_PREC, chop=True)
 		obj.p, obj.q = p, q
-		r = r or simplify_recurring(obj)
+		r = r or simplify_recurring(obj, prec=BF_PREC)
 		if r:
 			obj.recur = r
 		return obj
@@ -676,8 +680,10 @@ else:
 		with open("misc/ecm", "wb") as f:
 			f.write(b)
 		subprocess.run(("chmod", "777", "misc/ecm"))
+o_factorint = sympy.factorint
 _fcache = {}
 def _factorint(n, **kwargs):
+	timeout = kwargs.pop("timeout", None) or (kwargs["limit"] / 1000 + 1 if kwargs.get("limit") else None)
 	try:
 		s = str(n)
 		if "." in s:
@@ -685,19 +691,19 @@ def _factorint(n, **kwargs):
 		if abs(int(s)) < 1 << 64:
 			raise ValueError
 	except (TypeError, ValueError):
-		return sympy.factorint(n, **kwargs)
+		return o_factorint(n, **kwargs)
 	try:
 		return _fcache[s]
 	except KeyError:
 		pass
 	args = ["misc/ecm", s, "2"]
 	try:
-		proc = subprocess.run(args, stdout=subprocess.PIPE)
+		proc = subprocess.run(args, stdout=subprocess.PIPE, timeout=timeout)
 	except PermissionError:
 		if os.name == "nt":
 			raise
 		subprocess.run(("chmod", "777", "misc/ecm"))
-		proc = subprocess.run(args, stdout=subprocess.PIPE)
+		proc = subprocess.run(args, stdout=subprocess.PIPE, timeout=timeout)
 	data = proc.stdout.decode("utf-8", "replace").replace(" ", "")
 	if "<li>" not in data:
 		if not data:
@@ -725,15 +731,16 @@ def _factorint(n, **kwargs):
 		factors[int(k)] = int(v)
 	_fcache[s] = factors
 	return factors
+sympy.factorint = _factorint
 
 def factorize(*args, **kwargs):
 	temp = _factorint(*args, **kwargs)
 	return list(itertools.chain(*((k,) * v for k, v in sorted(temp.items()))))
 
-def factors(n):
+def factors(n, lim=1048576):
 	temp = _factorint(n)
 	fcount = np.prod([x + 1 for x in temp.values()], dtype=object)
-	if fcount > 1048576:
+	if fcount > lim:
 		raise OverflowError("Too many factors to evaluate.")
 	pfact = list(itertools.chain(*((k,) * v for k, v in sorted(temp.items()))))
 	facts = set(temp.keys())

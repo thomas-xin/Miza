@@ -701,7 +701,7 @@ class UpdateExec(Database):
 		print("Deleted", deleted)
 		return deleted
 
-	async def uproxy(self, *urls, collapse=True, force=False):
+	async def uproxy(self, *urls, collapse=True, force=False, ext=True):
 		if urls == ("https://cdn.discordapp.com/embed/avatars/0.png",):
 			return urls
 		out = [None] * len(urls)
@@ -726,7 +726,7 @@ class UpdateExec(Database):
 					raise KeyError
 				if is_discord_attachment(out[i]):
 					with tracebacksuppressor:
-						out[i] = bot.preserve_attachment(out[i])
+						out[i] = bot.preserve_attachment(out[i], ext=ext and out[i])
 				if force or not xrand(16):
 
 					def verify(url, uhu):
@@ -789,8 +789,9 @@ class UpdateExec(Database):
 					if not message.attachments[c].size:
 						url = urls[i]
 					else:
+						a = message.attachments[c]
 						try:
-							url = bot.preserve_attachment(message.attachments[c].id)
+							url = bot.preserve_as_long(channel.id, message.id, a.id, ext=ext and message.attachments[c].url)
 						except:
 							print_exc()
 							url = str(message.attachments[c].url)

@@ -1069,30 +1069,57 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return self._fetch_message(m_id, channel)
 
 	@functools.lru_cache(maxsize=64)
-	def preserve_attachment(self, a_id):
+	def preserve_attachment(self, a_id, ext=None):
+		if ext and "://" in ext:
+			u = ext.split("?", 1)[0].rsplit("/", 1)[-1]
+			if "." in u:
+				ext = "." + u.rsplit(".", 1)[-1]
+			ext = ""
+		elif not ext:
+			ext = ""
+		elif "." not in ext:
+			ext = "." + ext
 		if is_url(a_id):
 			url = a_id
 			if is_discord_attachment(url):
 				c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
 				a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 				if a_id in self.data.attachments:
-					return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
+					return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii") + ext
 			a_id = ts_us()
 			while a_id in self.data.attachments:
 				a_id += 1
 			self.data.attachments[a_id] = url
-		return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
+		return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii") + ext
 
-	def preserve_into(self, c, m, a):
+	def preserve_into(self, c, m, a, ext=None):
+		if ext and "://" in ext:
+			u = ext.split("?", 1)[0].rsplit("/", 1)[-1]
+			if "." in u:
+				ext = "." + u.rsplit(".", 1)[-1]
+			ext = ""
+		elif not ext:
+			ext = ""
+		elif "." not in ext:
+			ext = "." + ext
 		a_id = verify_id(a)
 		self.data.attachments[a_id] = (verify_id(c), verify_id(m))
-		return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
+		return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii") + ext
 
-	def preserve_as_long(self, c_id, m_id, a_id):
-		c = base64.urlsafe_b64encode(c_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
-		m = base64.urlsafe_b64encode(m_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
-		a = base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
-		return self.raw_webserver + "/u/" + c + "*" + m + "*" + a
+	def preserve_as_long(self, c_id, m_id, a_id, ext=None):
+		if ext and "://" in ext:
+			u = ext.split("?", 1)[0].rsplit("/", 1)[-1]
+			if "." in u:
+				ext = "." + u.rsplit(".", 1)[-1]
+			ext = ""
+		elif not ext:
+			ext = ""
+		elif "." not in ext:
+			ext = "." + ext
+		c = base64.urlsafe_b64encode(verify_id(c_id).to_bytes(8, "big")).rstrip(b"=").decode("ascii")
+		m = base64.urlsafe_b64encode(verify_id(m_id).to_bytes(8, "big")).rstrip(b"=").decode("ascii")
+		a = base64.urlsafe_b64encode(verify_id(a_id).to_bytes(8, "big")).rstrip(b"=").decode("ascii")
+		return self.raw_webserver + "/u/" + c + "~" + m + "~" + a + ext
 
 	async def renew_from_long(cself, c, m, a):
 		c_id = int.from_bytes(base64.urlsafe_b64decode(c + "=="), "big")
@@ -2653,13 +2680,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if is_discord_attachment(url):
 					a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 					if a_id in self.data.attachments:
-						u = self.preserve_attachment(a_id)
+						u = self.preserve_attachment(a_id, ext=url)
 						if filename and not isinstance(filename, str) or filename.endswith(".gif"):
 							u += ".gif"
 						return u
 					if best:
-						return self.preserve_into(channel.id, message.id, a_id)
-					return self.preserve_as_long(channel.id, message.id, a_id)
+						return self.preserve_into(channel.id, message.id, a_id, ext=url)
+					return self.preserve_as_long(channel.id, message.id, a_id, ext=url)
 				return url
 			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join("<" + temp_url(a.url) + ">" for a in message.attachments)
 			message = await message.edit(content=content.strip())
@@ -5647,9 +5674,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								if is_discord_attachment(url):
 									a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 									if a_id in self.data.attachments:
-										return allow_gif(self.preserve_attachment(a_id))
+										return self.preserve_attachment(a_id, ext=url)
 									channel = message.channel
-									return self.preserve_as_long(channel.id, message.id, a_id)
+									return self.preserve_as_long(channel.id, message.id, a_id, ext=url)
 								return url
 							urls = set()
 							url = None
