@@ -232,6 +232,8 @@ class Server:
 		rpath = "misc/web/" + (rpath or "index.html")
 		cp.response.headers.update(CHEADERS)
 		cp.response.headers["Content-Type"] = MIMES.get(rpath.rsplit(".", 1)[-1]) or "text/html"
+		if rpath.strip("/") == "notfound.png":
+			cp.response.status = 404
 		if rpath in self.cache:
 			return self.cache[rpath]
 		with open(rpath, "rb") as f:
@@ -259,7 +261,6 @@ class Server:
 					url = self.ucache[irl][1]
 				else:
 					url = "https://mizabot.xyz/notfound.png"
-					cp.response.status = 404
 			self.ucache[irl] = [time.time(), url]
 		elif time.time() - self.ucache[irl][0] > 43200:
 			def cache_temp():

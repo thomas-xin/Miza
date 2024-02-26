@@ -1238,7 +1238,7 @@ class Server:
 				print(true_ip(), repr(ex))
 		if data is None:
 			raise FileNotFoundError(500, filepath)
-		if filepath.strip("/") == "notfound.png":
+		if filename.strip("/") == "notfound.png":
 			cp.response.status = 404
 		cp.response.headers.update(CHEADERS)
 		cp.response.headers["Content-Type"] = mime
