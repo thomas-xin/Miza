@@ -1532,23 +1532,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				first = url.split("?", 1)[0]
 				item = first[first.rindex("/") + 1:]
 				out.append(f"https://media2.giphy.com/media/{item}/giphy.gif")
-			elif images and is_reddit_url(url):
-				first = url.split("?", 1)[0]
-				b = await Request(url, aio=True, timeout=16)
-				search = b'<script id="data">window.___r = '
-				with tracebacksuppressor:
-					b = b[b.index(search) + len(search):]
-					b = b[:b.index(b";</script><")]
-					data = orjson.loads(b)
-					for model in data["posts"]["models"].values():
-						try:
-							stream = model["media"]["scrubberThumbSource"]
-						except KeyError:
-							continue
-						else:
-							found = True
-							out.append(stream)
-							break
 			elif images and is_youtube_url(url):
 				if "?v=" in url:
 					vid = url.split("?v=", 1)[-1]
@@ -1559,7 +1542,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				out.append(url)
 			elif images:
 				found = False
-				if images or is_tenor_url(url) or is_deviantart_url(url) or self.is_webserver_url(url):
+				if is_reddit_url(url):
+					url = url.replace("www.reddit.com", "vxreddit.com")
+				if images or is_tenor_url(url) or is_deviantart_url(url) or self.is_webserver_url(url) or is_reddit_url(url):
 					skip = False
 					if url in self.mimes:
 						skip = "text/html" not in self.mimes[url]
@@ -1582,22 +1567,27 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							s = as_str(data)
 							try:
 								s = s[s.index("<meta") + 5:]
-								search = 'http-equiv="refresh" content="'
 								try:
-									s = s[s.index(search) + len(search):]
-									s = s[:s.index('"')]
-									res = None
-									for k in s.split(";"):
-										temp = k.strip()
-										if temp.casefold().startswith("url="):
-											res = temp[4:]
-											break
-									if not res:
-										raise ValueError
-								except ValueError:
-									search ='property="og:image" content="'
+									search ='property="og:video" content="'
 									s = s[s.index(search) + len(search):]
 									res = s[:s.index('"')]
+								except ValueError:
+									try:
+										search = 'http-equiv="refresh" content="'
+										s = s[s.index(search) + len(search):]
+										s = s[:s.index('"')]
+										res = None
+										for k in s.split(";"):
+											temp = k.strip()
+											if temp.casefold().startswith("url="):
+												res = temp[4:]
+												break
+										if not res:
+											raise ValueError
+									except ValueError:
+										search ='property="og:image" content="'
+										s = s[s.index(search) + len(search):]
+										res = s[:s.index('"')]
 							except ValueError:
 								pass
 							else:
@@ -2079,7 +2069,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			user=str(hash(self.name)),
 		)
 		inputs.update(data)
-		if best == 1:
+		if best >= 1:
 			res = await self.moderate(data["prompt"])
 			dec = res.flagged
 		else:
@@ -2104,18 +2094,32 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			except:
 				print_exc()
 		if AUTH.get("fireworks_key") and not self.fireworks_sem.full and best <= 1 and not skip and dec:
-			# rp = ((inputs.get("frequency_penalty", 0.25) + inputs.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
 			data = cdict(
 				prompt=self.restruct(inputs["prompt"]),
 				model="mixtral-8x7b-instruct",
 				temperature=inputs.get("temperature", 0.8) * 2 / 3,
 				top_p=inputs.get("top_p", 1),
-				# repetition_penalty=rp,
 				max_tokens=inputs.get("max_tokens", 1024),
 			)
 			try:
 				async with self.fireworks_sem:
 					response = await self.llm("completions.create", **data, timeout=30)
+				return response.choices[0].text
+			except:
+				print_exc()
+		if best >= 2 and dec:
+			data = cdict(
+				prompt=inputs["prompt"],
+				model="goliath-120b",
+				temperature=inputs.get("temperature", 0.8) * 2 / 3,
+				top_p=inputs.get("top_p", 1),
+				max_tokens=inputs.get("max_tokens", 1024),
+				frequency_penalty=inputs.get("frequency_penalty", 0.8),
+				presence_penalty=inputs.get("presence_penalty", 0.8),
+			)
+			try:
+				async with asyncio.timeout(130):
+					response = await self.llm("completions.create", **data, timeout=120)
 				return response.choices[0].text
 			except:
 				print_exc()
@@ -2125,8 +2129,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			async with asyncio.timeout(70):
 				response = await self.llm("chat.completions.create", **inputs, timeout=60)
 			return response.choices[0].message.content
-		async with asyncio.timeout(70):
-			response = await self.llm("completions.create", **inputs, timeout=60)
+		async with asyncio.timeout(100):
+			response = await self.llm("completions.create", **inputs, timeout=90)
 		return response.choices[0].text
 
 	def restruct(self, s):

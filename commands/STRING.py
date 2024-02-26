@@ -3045,7 +3045,7 @@ class Instruct(Command):
 			presence_penalty=0.4,
 			user=str(user.id) if premium < 3 else str(hash(user.name)),
 		)
-		resp = await bot.instruct(data, best=1, cache=False)
+		resp = await bot.instruct(data, best=2 if premium >= 5 else 1, cache=False)
 		ref = message
 		ms = split_across(resp, 1999, prefix="\xad")
 		s = ms[-1] if ms else "\xad"

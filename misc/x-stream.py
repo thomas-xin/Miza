@@ -244,8 +244,6 @@ class Server:
 		if rpath:
 			rpath = "/" + rpath
 		rquery = cp.request.query_string
-		if rquery:
-			rquery = "?" + rquery
 		irl = f"{self.state['/']}/u{rpath}"
 		if irl not in self.ucache or discord_expired(self.ucache[irl][1]):
 			headers = dict(cp.request.headers)
@@ -261,6 +259,7 @@ class Server:
 					url = self.ucache[irl][1]
 				else:
 					url = "https://mizabot.xyz/notfound.png"
+					cp.response.status = 404
 			self.ucache[irl] = [time.time(), url]
 		elif time.time() - self.ucache[irl][0] > 43200:
 			def cache_temp():
@@ -275,7 +274,9 @@ class Server:
 			url = self.ucache[irl][1]
 		else:
 			url = self.ucache[irl][1]
-		raise cp.HTTPRedirect(url + rquery, 307)
+		if rquery:
+			rquery = "?" + rquery if "?" not in url else "&" + rquery
+		raise cp.HTTPRedirect(url, 307)
 
 	@cp.expose
 	# @cp.tools.accept(media="multipart/form-data")

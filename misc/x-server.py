@@ -919,6 +919,7 @@ class Server:
 		if id == "u" and url:
 			id = url
 		if id:
+			id = id.split("?", 1)[0]
 			if "*" in id or "~" in id:
 				id = id.split(".", 1)[0].replace("~", "*")
 				url = self.bot_exec(f"bot.renew_from_long(*{id.split('*')})") or url
@@ -1237,6 +1238,8 @@ class Server:
 				print(true_ip(), repr(ex))
 		if data is None:
 			raise FileNotFoundError(500, filepath)
+		if filepath.strip("/") == "notfound.png":
+			cp.response.status = 404
 		cp.response.headers.update(CHEADERS)
 		cp.response.headers["Content-Type"] = mime
 		cp.response.headers["Content-Length"] = len(data)
