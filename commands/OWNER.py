@@ -662,7 +662,7 @@ class UpdateExec(Database):
 							continue
 					# message = await bot.send_as_webhook(channel, fstr, files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
 					for a, bs in zip(message.attachments, sizes):
-						u = self.bot.preserve_attachment(a.id) + "?S=" + str(bs)
+						u = self.bot.preserve_as_long(channel.id, message.id, a.id, a.url) + "?S=" + str(bs)
 						urls.append(u)
 						# u = str(a.url).rstrip("&")
 						# u += "?" if "?" not in u else "&"
@@ -791,7 +791,7 @@ class UpdateExec(Database):
 					else:
 						a = message.attachments[c]
 						try:
-							url = bot.preserve_as_long(channel.id, message.id, a.id, ext=ext and message.attachments[c].url)
+							url = bot.preserve_as_long(channel.id, message.id, a.id, ext=ext and a.url)
 						except:
 							print_exc()
 							url = str(message.attachments[c].url)

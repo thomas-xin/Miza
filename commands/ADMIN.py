@@ -2744,7 +2744,7 @@ class UpdateMessageLogs(Database):
 			m2 = await self.bot.send_with_file(channel, msg, embed=emb, file=fils[0])
 		else:
 			m2 = await channel.send(msg, embed=emb, files=fils)
-		message.attachments = [cdict(name=a.filename, url=self.bot.preserve_as_long(channel.id, m2.id, a.id, ext=a.url)) for a in m2.attachments]
+		message.attachments = [cdict(name=a.filename, id=a.id, url=self.bot.preserve_as_long(channel.id, m2.id, a.id, ext=a.url)) for a in m2.attachments]
 
 	# Delete events must attempt to find the user who deleted the message
 	async def _delete_(self, message, bulk=False, **void):

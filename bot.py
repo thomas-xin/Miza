@@ -1074,7 +1074,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			u = ext.split("?", 1)[0].rsplit("/", 1)[-1]
 			if "." in u:
 				ext = "." + u.rsplit(".", 1)[-1]
-			ext = ""
+			else:
+				ext = ""
 		elif not ext:
 			ext = ""
 		elif "." not in ext:
@@ -1097,7 +1098,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			u = ext.split("?", 1)[0].rsplit("/", 1)[-1]
 			if "." in u:
 				ext = "." + u.rsplit(".", 1)[-1]
-			ext = ""
+			else:
+				ext = ""
 		elif not ext:
 			ext = ""
 		elif "." not in ext:
@@ -1111,7 +1113,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			u = ext.split("?", 1)[0].rsplit("/", 1)[-1]
 			if "." in u:
 				ext = "." + u.rsplit(".", 1)[-1]
-			ext = ""
+			else:
+				ext = ""
 		elif not ext:
 			ext = ""
 		elif "." not in ext:
@@ -2882,7 +2885,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if is_image(url):
 					url = await self.data.exec.uproxy(url)
 					emb.url = url
-					url = allow_gif(url)
+					# url = allow_gif(url)
 					emb.set_image(url=url)
 					if link:
 						link = message_link(message)
@@ -2899,11 +2902,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					emb.url = emb2.url
 				if emb2.image:
 					url = await self.data.exec.uproxy(emb2.image.url)
-					url = allow_gif(url)
+					# url = allow_gif(url)
 					emb.set_image(url=url)
 				if emb2.thumbnail:
 					url = await self.data.exec.uproxy(emb2.thumbnail.url)
-					url = allow_gif(url)
+					# url = allow_gif(url)
 					emb.set_thumbnail(url=url)
 				for f in emb2.fields:
 					if f:
@@ -2926,7 +2929,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						else:
 							url = await self.data.exec.aproxy(url)
 						emb.url = url
-						url = allow_gif(url)
+						# url = allow_gif(url)
 						emb.set_image(url=url)
 						if url != content:
 							emb.description = content
@@ -2963,7 +2966,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					image = await self.data.exec.uproxy(e.thumbnail.url)
 		if image:
 			emb.url = image
-			image = allow_gif(image)
+			# image = allow_gif(image)
 			emb.set_image(url=image)
 		for e in message.embeds:
 			if len(emb.fields) >= 25:
@@ -5682,7 +5685,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							url = None
 							for a in message.attachments:
 								url = await self.data.exec.uproxy(a.url)
-								urls.add(temp_url(allow_gif(url) if ".gif" in a.url or ".webp" in a.url else url, mid=message.id))
+								urls.add(temp_url(url, mid=message.id))
 							for e in message.embeds:
 								if e.image:
 									urls.add(temp_url(e.image.url))

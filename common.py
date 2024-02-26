@@ -1766,7 +1766,7 @@ def get_author(user, u_id=None):
 	name = getattr(user, "display_name", None) or user.name
 	if u_id:
 		name = f"{name} ({user.id})"
-	return cdict(name=name, icon_url=allow_gif(url), url=url)
+	return cdict(name=name, icon_url=url, url=url)
 
 # Finds emojis and user mentions in a string.
 find_emojis = lambda s: regexp("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>").findall(s)

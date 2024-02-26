@@ -369,6 +369,8 @@ def simplify_recurring(r, prec=100):
 	transient = max(temp.get(2, 0), temp.get(5, 0))
 	s = str(r_evalf(r, transient + digits * 3))
 	dec = s.split(".", 1)[-1][transient:]
+	if len(dec) < digits * 2:
+		return
 	assert dec[:digits] == dec[digits:digits * 2]
 	if digits > 16:
 		return s[:s.index(".") + transient + 1] + "[" + dec[:digits] + "]"
