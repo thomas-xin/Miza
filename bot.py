@@ -1565,29 +1565,35 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							rit = resp.iter_content(65536)
 							data = await asubmit(next, rit)
 							s = as_str(data)
+							res = None
 							try:
 								s = s[s.index("<meta") + 5:]
-								try:
-									search ='property="og:video" content="'
-									s = s[s.index(search) + len(search):]
-									res = s[:s.index('"')]
-								except ValueError:
+								if 'property="og:video" content="' in s:
 									try:
-										search = 'http-equiv="refresh" content="'
-										s = s[s.index(search) + len(search):]
-										s = s[:s.index('"')]
-										res = None
-										for k in s.split(";"):
-											temp = k.strip()
-											if temp.casefold().startswith("url="):
-												res = temp[4:]
-												break
-										if not res:
-											raise ValueError
-									except ValueError:
-										search ='property="og:image" content="'
+										search = 'property="og:video" content="'
 										s = s[s.index(search) + len(search):]
 										res = s[:s.index('"')]
+									except ValueError:
+										pass
+								if not res and 'property="og:image" content="' in s:
+									try:
+										search = 'property="og:image" content="'
+										s = s[s.index(search) + len(search):]
+										res = s[:s.index('"')]
+									except ValueError:
+										pass
+								if not res:
+									search = 'http-equiv="refresh" content="'
+									s = s[s.index(search) + len(search):]
+									s = s[:s.index('"')]
+									res = None
+									for k in s.split(";"):
+										temp = k.strip()
+										if temp.casefold().startswith("url="):
+											res = temp[4:]
+											break
+									if not res:
+										raise ValueError
 							except ValueError:
 								pass
 							else:
