@@ -2303,7 +2303,8 @@ is_giphy_url = lambda url: url and regexp("^https?:\\/\\/giphy.com/gifs/[a-zA-Z0
 is_youtube_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?youtu(?:\\.be|be\\.com)\\/[^\\s<>`|\"']+").findall(url)
 is_youtube_stream = lambda url: url and regexp("^https?:\\/\\/r+[0-9]+---.{2}-[A-Za-z0-9\\-_]{4,}\\.googlevideo\\.com").findall(url)
 is_deviantart_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?deviantart\\.com\\/[^\\s<>`|\"']+").findall(url)
-is_reddit_url = lambda url: url and regexp("^https?:\\/\\/(?:[A-Za-z]{2,3}\\.)?reddit.com\\/r\\/[^/]+\\/").findall(url)
+is_reddit_url = lambda url: url and regexp("^https?:\\/\\/(?:[A-Za-z]{2,3}\\.)?reddit.com\\/r\\/[^/\\W]+\\/").findall(url)
+is_redgifs_url = lambda url: url and regexp("^https?:\\/\\/(?:[A-Za-z]{2,3}\\.)?redgifs.com\\/[A-Za-z]{2,6}\\/[^/\\W]+").findall(url)
 is_emoji_url = lambda url: url and url.startswith("https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/")
 unyt = lambda s: re.sub(r"https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)|https?:\/\/(?:api\.)?mizabot\.xyz\/ytdl\?[vd]=(?:https:\/\/youtu\.be\/|https%3A%2F%2Fyoutu\.be%2F)", "https://youtu.be/", s)
 COMM = "\\#$%"
@@ -4636,6 +4637,67 @@ async def tik_decode_a(t, encoding="cl100k_base"):
 async def tcount(s, model="gpt-3.5-turbo"):
 	enc = await tik_encode_a(s, encoding=model)
 	return len(enc)
+
+
+def m_repr(m):
+	if not isinstance(m, dict):
+		return as_str(m)
+	content = m.content and str(m.content)
+	if not content or not content.strip():
+		temp = deque()
+		for fc in m.get("tool_calls", ()):
+			temp.append(fc.function.name + " " + as_str(fc.function.arguments))
+		content = "\n".join(temp)
+	if "name" in m:
+		if "role" in m:
+			return m.role + "\n" + m.name + "\n" + content
+		return m.name + "\n" + content
+	if "role" in m:
+		m.role + "\n" + content
+	return content
+
+def m_str(m):
+	content = m.content and str(m.content)
+	if not content or not content.strip():
+		temp = deque()
+		for fc in m.get("tool_calls", ()):
+			temp.append(fc.function.name + " " + as_str(fc.function.arguments))
+		content = "\n".join(temp)
+	if not m.get("name"):
+		if m.get("role") and m.role != "user":
+			return f"<|{m.role}|>: " + content
+		if content and ": " in content:
+			return content
+		return "<|user|>: " + content
+	return m.name + ": " + content
+
+def chatml(m):
+	if type(m) is dict:
+		m = cdict(m)
+	content = str(getattr(m, "content", ""))
+	if not content or not content.strip():
+		temp = deque()
+		for fc in m.get("tool_calls", ()):
+			temp.append(fc.function.name + " " + as_str(fc.function.arguments))
+		content = "\n".join(temp)
+	name, role = getattr(m, "name", None), (getattr(m, "role", None) or "user")
+	if not name:
+		if ": " not in content:
+			return f"<|im_start|>{role}\n" + content + "<|im_end|>"
+		name, content = content.split(": ", 1)
+	return f"<|im_start|>{role} name={name}\n" + content + "<|im_end|>"
+
+def m_name(m):
+	if not m.get("name"):
+		if m.get("role") and m.role != "user":
+			return f"<|{m.role}|>"
+		if m.content and ": " in str(m.content):
+			return str(m.content).split(": ", 1)[0]
+		return "<|user|>"
+	return m.name
+
+async def count_to(messages):
+	return await tcount("\n\n".join(map(m_repr, messages)))
 
 
 class CacheItem:

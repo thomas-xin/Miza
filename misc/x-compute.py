@@ -1537,7 +1537,9 @@ if "caption" in CAPS:
 		VIT.dtype = torch.float32
 		VIT.device = "cpu"
 
-		def image_to_features(self, image: Image) -> torch.Tensor:
+		from PIL import Image
+		import torch
+		def image_to_features(self, image: Image.Image) -> torch.Tensor:
 			self._prepare_clip()
 			images = self.clip_preprocess(image).unsqueeze(0).to(self.device).to(torch.float32)
 			with torch.no_grad():
@@ -2608,14 +2610,14 @@ if CAPS.intersection(("sd", "sdxl", "sdcc")):
 			except KeyError:
 				ib = CBOTS[None] = imagebot.Bot()
 			return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=2, aspect_ratio=aspect_ratio, negative_prompt=negative_prompt)
-		if kwargs and not kwargs.get("--init-image"):
+		if kwargs and not kwargs.get("--init-image") and not kwargs.get("--nsfw"):
 			try:
 				from diffusers import StableCascadePriorPipeline
 			except ImportError:
 				pass
 			else:
 				return IBASCC(prompt, kwargs, count=count, aspect_ratio=aspect_ratio, negative_prompt=negative_prompt)
-		model = "zavychromaxl_v40.safetensors"
+		model = "zavychromaxl_v50.safetensors"
 		PORT = 7800 + DEV
 		webui_server_url = f"http://127.0.0.1:{PORT}"
 		try:
@@ -2723,7 +2725,7 @@ if CAPS.intersection(("sd", "sdxl", "sdcc")):
 		im = downsample(im, keep_alpha=False)
 		if im.width * im.height > x * y:
 			return resize_to(orig, x, y)
-		model = "zavychromaxl_v40.safetensors"
+		model = "zavychromaxl_v50.safetensors"
 		PORT = 7800 + DEV
 		webui_server_url = f"http://127.0.0.1:{PORT}"
 		try:

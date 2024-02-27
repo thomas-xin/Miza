@@ -1424,8 +1424,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return verify_id(m_id)
 
 	# Finds URLs in a string, following any discord message links found.
-	followed = {}
+	# followed = llcache
 	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, emojis=True, reactions=False, allow=False, limit=None, no_cache=False):
+		self.followed = self.llcache
 		if limit is not None and limit <= 0:
 			return []
 		if not isinstance(url, str) and hasattr(url, "channel"):
@@ -1447,7 +1448,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			medias = ("video", "image", "thumbnail")
 		else:
 			medias = "video"
-		tup = (urls, best, preserve, images, emojis, reactions, allow)
+		tup = shash((urls, best, preserve, images, emojis, reactions, allow))
 		try:
 			return list(self.followed[tup])[:limit]
 		except KeyError:
@@ -1523,85 +1524,93 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								lost.append(m.content)
 							elif preserve:
 								lost.append(u)
-			elif images and is_imgur_url(url):
-				first = url.split("?", 1)[0]
+			elif is_imgur_url(url):
+				first = url.split("#", 1)[0].split("?", 1)[0]
 				if not first.endswith(".jpg"):
 					first += ".jpg"
 				out.append(first)
-			elif images and is_giphy_url(url):
-				first = url.split("?", 1)[0]
+			elif is_giphy_url(url):
+				first = url.split("#", 1)[0].split("?", 1)[0]
 				item = first[first.rindex("/") + 1:]
 				out.append(f"https://media2.giphy.com/media/{item}/giphy.gif")
 			elif images and is_youtube_url(url):
 				if "?v=" in url:
 					vid = url.split("?v=", 1)[-1]
 				else:
-					vid = url.rsplit("/", 1)[-1].split("?", 1)[0]
+					vid = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
 				out.append(f"https://i.ytimg.com/vi/{vid}/maxresdefault.jpg")
-			elif images and any(maps((is_discord_url, is_emoji_url, is_youtube_url, is_youtube_stream), url)):
+			elif is_redgifs_url(url):
+				vid = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
+				out.append(f"https://api.redgifs.com/v2/gifs/{vid}/sd.m3u8")
+			elif any(maps((is_discord_url, is_emoji_url, is_youtube_url, is_youtube_stream), url)):
 				out.append(url)
-			elif images:
+			else:
 				found = False
 				if is_reddit_url(url):
 					url = url.replace("www.reddit.com", "vxreddit.com")
-				if images or is_tenor_url(url) or is_deviantart_url(url) or self.is_webserver_url(url) or is_reddit_url(url):
-					skip = False
-					if url in self.mimes:
-						skip = "text/html" not in self.mimes[url]
-					if not skip:
-						resp = None
+				skip = False
+				if url in self.mimes:
+					skip = "text/html" not in self.mimes[url]
+				if not skip:
+					resp = None
+					try:
+						resp = await asubmit(reqs.next().get, url, headers=Request.header(), stream=True)
+						resp.raise_for_status()
+					except:
+						print_exc()
+						no_cache = True
+					if not resp:
+						continue
+					u_url = url
+					url = as_str(resp.url)
+					head = fcdict(resp.headers)
+					ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
+					if is_redgifs_url(url):
+						vid = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
+						out.append(f"https://api.redgifs.com/v2/gifs/{vid}/sd.m3u8")
+					elif "text/html" in ctype:
+						rit = resp.iter_content(65536)
+						data = await asubmit(next, rit)
+						s = as_str(data)
+						res = None
 						try:
-							resp = await asubmit(reqs.next().get, url, headers=Request.header(), stream=True)
-							resp.raise_for_status()
-						except:
-							print_exc()
-							no_cache = True
-						if not resp:
-							continue
-						url = as_str(resp.url)
-						head = fcdict(resp.headers)
-						ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
-						if "text/html" in ctype:
-							rit = resp.iter_content(65536)
-							data = await asubmit(next, rit)
-							s = as_str(data)
-							res = None
-							try:
-								s = s[s.index("<meta") + 5:]
-								if 'property="og:video" content="' in s:
-									try:
-										search = 'property="og:video" content="'
-										s = s[s.index(search) + len(search):]
-										res = s[:s.index('"')]
-									except ValueError:
-										pass
-								if not res and 'property="og:image" content="' in s:
-									try:
-										search = 'property="og:image" content="'
-										s = s[s.index(search) + len(search):]
-										res = s[:s.index('"')]
-									except ValueError:
-										pass
-								if not res:
-									search = 'http-equiv="refresh" content="'
+							s = s[s.index("<meta") + 5:]
+							if 'property="og:video" content="' in s:
+								try:
+									search = 'property="og:video" content="'
 									s = s[s.index(search) + len(search):]
-									s = s[:s.index('"')]
-									res = None
-									for k in s.split(";"):
-										temp = k.strip()
-										if temp.casefold().startswith("url="):
-											res = temp[4:]
-											break
-									if not res:
-										raise ValueError
-							except ValueError:
-								pass
-							else:
-								found = True
-								if res.startswith("/"):
-									res = url.split("://", 1)[0] + ":/" + res
-								print(res)
-								out.append(res)
+									res = s[:s.index('"')]
+								except ValueError:
+									pass
+							if not res and 'property="og:image" content="' in s:
+								try:
+									search = 'property="og:image" content="'
+									s = s[s.index(search) + len(search):]
+									res = s[:s.index('"')]
+								except ValueError:
+									pass
+							if not res:
+								search = 'http-equiv="refresh" content="'
+								s = s[s.index(search) + len(search):]
+								s = s[:s.index('"')]
+								res = None
+								for k in s.split(";"):
+									temp = k.strip()
+									if temp.casefold().startswith("url="):
+										res = temp[4:]
+										break
+								if not res:
+									raise ValueError
+						except ValueError:
+							pass
+						else:
+							found = True
+							if res.startswith("/"):
+								res = url.split("://", 1)[0] + ":/" + res
+							print(res)
+							out.append(res)
+					else:
+						self.mimes[u_url] = self.mimes[url] = ctype
 				if not found:
 					out.append(url)
 		if lost:
@@ -1913,6 +1922,32 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	decensor = regexp(r"(?:i am unable to|i'm unable to|i cannot|i can't|i am not able to|i'm not able to) (?:fulfil|assist|help|provide|do|respond|comply|engage|perform)|refrain from", re.I)
 
+	def instruct_structure(self, messages, exclude_first=True, fmt="alpaca", assistant=None):
+		if fmt == "mistral":
+			ins = tuple(map(m_str, messages))
+			stops = ["</s>", "[INST", "<|system|>:", f"{assistant}:"]
+			prompt = "\n\n".join(s if m.get("role") == "assistant" else f"[INST]{s}[/INST]" for s, m in zip(ins, messages))
+			if assistant:
+				prompt += f"\n\n{assistant}:"
+		elif fmt == "alpaca":
+			ins = tuple(map(m_str, messages))
+			stops = ["### Instruction:", "### Response:", "<|system|>:", f"{assistant}:"]
+			if exclude_first:
+				prompt = ins[0] + "\n\n### Input:\n" + "\n\n".join(ins[1:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
+			else:
+				prompt = "\n\n".join(ins[:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
+			if assistant:
+				prompt += f"\n{assistant}:"
+		elif fmt == "chatml":
+			ins = tuple(map(chatml, messages))
+			stops = ["<|im_start|>", "<|im_end|>"]
+			prompt = "\n".join(ins) + "\n<|im_start|>"
+			if assistant:
+				prompt += f"assistant name={assistant}"
+		else:
+			raise NotImplementedError(fmt)
+		return prompt, stops
+
 	ai_endpoints = cdict(
 		openai="https://api.openai.com/v1/",
 		together="https://api.together.xyz/v1/",
@@ -1926,7 +1961,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			"fireworks": "accounts/fireworks/models/firellava-13b",
 		},
 		"goliath-120b": {
-			"https://api.pygmalion.chat/v1#pyg-model11": "goliath-120b-GPTQ",
 			"https://fdigsujdfigsd-plsbuild.hf.space/v1": "TheBloke/goliath-120b-GPTQ",
 		},
 		"mixtral-8x7b-instruct": {

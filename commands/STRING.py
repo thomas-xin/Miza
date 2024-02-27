@@ -1521,7 +1521,7 @@ Functions = [{
 				"type": "object", "properties": {
 					"assistant": {
 						"type": "string",
-						"description": '''Enter "formal" for knowledge, advice or assistance, and "casual" for banter or roleplay.''',
+						"description": '''Enter "formal" for facts, knowledge, advice or assistance, and "casual" for banter or roleplay.''',
 						"enum": ["formal", "casual"],
 					},
 					"tool": {
@@ -1702,50 +1702,6 @@ FIREWORKS = {
 	"mixtral-8x7b": "accounts/fireworks/models/mixtral-8x7b-instruct",
 }
 
-def m_repr(m):
-	if not isinstance(m, dict):
-		return as_str(m)
-	content = m.content and str(m.content)
-	if not content or not content.strip():
-		temp = deque()
-		for fc in m.get("tool_calls", ()):
-			temp.append(fc.function.name + " " + as_str(fc.function.arguments))
-		content = "\n".join(temp)
-	if "name" in m:
-		if "role" in m:
-			return m.role + "\n" + m.name + "\n" + content
-		return m.name + "\n" + content
-	if "role" in m:
-		m.role + "\n" + content
-	return content
-
-def m_str(m):
-	content = m.content and str(m.content)
-	if not content or not content.strip():
-		temp = deque()
-		for fc in m.get("tool_calls", ()):
-			temp.append(fc.function.name + " " + as_str(fc.function.arguments))
-		content = "\n".join(temp)
-	if not m.get("name"):
-		if m.get("role") and m.role != "user":
-			return f"<|{m.role}|>: " + content
-		if content and ": " in content:
-			return content
-		return "<|user|>: " + content
-	return m.name + ": " + content
-
-def m_name(m):
-	if not m.get("name"):
-		if m.get("role") and m.role != "user":
-			return f"<|{m.role}|>"
-		if m.content and ": " in str(m.content):
-			return str(m.content).split(": ", 1)[0]
-		return "<|user|>"
-	return m.name
-
-async def count_to(messages):
-	return await tcount("\n\n".join(map(m_repr, messages)))
-
 async def cut_to(messages, limit=1024, exclude_first=True, best=False):
 	if not messages:
 		return messages
@@ -1864,22 +1820,6 @@ def chat_structure(history, refs, u, q, imin, name="", personality="", nsfw=Fals
 	messages.append(m)
 	return messages
 
-exclusive_format = {
-	"mistral-7b",
-	"mixtral-8x7b",
-}
-def instruct_structure(messages, exclude_first=True, model=None):
-	ins = tuple(map(m_str, messages))
-	if model not in exclusive_format:
-		stops = ["### Instruction:", "### Response:", "<|system|>:"]
-		if exclude_first:
-			prompt = ins[0] + "\n\n### Input:\n" + "\n\n".join(ins[1:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
-		else:
-			prompt = "\n\n".join(ins[:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
-	else:
-		stops = ["</s>", "[INST", "<|system|>:"]
-		prompt = "\n\n".join(s if m.get("role") == "assistant" else f"[INST]{s}[/INST]" for s, m in zip(ins, messages))
-	return prompt, stops
 
 class Ask(Command):
 	_timeout_ = 24
@@ -2569,8 +2509,7 @@ class Ask(Command):
 					text = ""
 				if mresp:
 					break
-				prompt, stops = instruct_structure(selection, model=assistant)
-				prompt += f"\n{bot_name}:"
+				prompt, stops = bot.instruct_structure(selection, fmt="chatml", assistant=bot_name)
 				if text:
 					prompt += " " + text
 				print(f"{assistant} prompt:", prompt)
@@ -2580,7 +2519,7 @@ class Ask(Command):
 					temperature=0.7,
 					max_tokens=max(256, min(1024, 8192 - length - 64)),
 					top_p=0.9,
-					stop=[f"{name}:"] + stops,
+					stop=stops,
 					frequency_penalty=0.8,
 					presence_penalty=0.4,
 					user=str(hash(name)),
@@ -2665,22 +2604,22 @@ class Ask(Command):
 					redo = True
 					continue
 				text = text.strip()
-				if ":" in text:
-					text = text.replace(":\n", ": ")
-					spl = text.split(": ")
-					if len(spl) > 1:
-						text = ""
-						while spl:
-							s = spl.pop(0)
-							if "\n" in s:
-								text += s.rsplit("\n", 1)[0]
-								break
-							if spl:
-								text += s + ": "
-						text = text.strip()
-						if text.endswith(":"):
-							text = text.rsplit("\n", 1)[0]
-					text = text.strip()
+				# if ":" in text:
+				# 	text = text.replace(":\n", ": ")
+				# 	spl = text.split(": ")
+				# 	if len(spl) > 1:
+				# 		text = ""
+				# 		while spl:
+				# 			s = spl.pop(0)
+				# 			if "\n" in s:
+				# 				text += s.rsplit("\n", 1)[0]
+				# 				break
+				# 			if spl:
+				# 				text += s + ": "
+				# 		text = text.strip()
+				# 		if text.endswith(":"):
+				# 			text = text.rsplit("\n", 1)[0]
+				# 	text = text.strip()
 				if text or mresp:
 					break
 			else:

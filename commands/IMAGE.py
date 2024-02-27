@@ -1628,14 +1628,17 @@ class Art(Command):
 			force = True
 		if not prompt:
 			prompt = "art"
-		elif not nsfw:
+		else:
 			resp = await bot.moderate("Create an image of: " + prompt)
-			# resp = await bot.moderate(prompt)
-			if resp.flagged:
+			flagged = resp.flagged
+			if not nsfw and flagged:
 				raise PermissionError(
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
+			print("Flagged:", resp)
+			if flagged:
+				kwargs["--nsfw"] = True
 
 		if not bot.verify_integrity(message):
 			return
@@ -1786,7 +1789,7 @@ class Art(Command):
 				# except:
 				# 	print_exc()
 				# else:
-				cap = "sdxl" if "--mask" in k or "--init-image" in k else "sdcc"
+				cap = "sdxl" if "--mask" in k or "--init-image" in k or "--nsfw" in k else "sdcc"
 				return await process_image("IBASLR", "&", [p, k, n, f, c, a, np], cap=cap, timeout=420)
 			resp = await process_image("IBASL", "&", [p, k, n, f, c, s, a, np, "z" in flags], cap="sdxl" if s else "sd", timeout=420)
 			# if s and "z" not in flags:
