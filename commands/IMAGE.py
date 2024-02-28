@@ -1636,8 +1636,8 @@ class Art(Command):
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
-			print("Flagged:", resp)
 			if flagged:
+				print("Flagged:", resp)
 				kwargs["--nsfw"] = True
 
 		if not bot.verify_integrity(message):

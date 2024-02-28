@@ -1920,7 +1920,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		inds = check >= top - temp * 2 / 3
 		return order[inds].cpu().numpy()
 
-	decensor = regexp(r"(?:i am unable to|i'm unable to|i cannot|i can't|i am not able to|i'm not able to) (?:fulfil|assist|help|provide|do|respond|comply|engage|perform)|refrain from", re.I)
+	decensor = regexp(r"(?:i am unable to|i'm unable to|i cannot|i can't|i am not able to|i'm not able to) (?:fulfil|assist|help with|provide|do|respond|comply|engage|perform)|refrain from", re.I)
 
 	def instruct_structure(self, messages, exclude_first=True, fmt="alpaca", assistant=None):
 		if fmt == "mistral":
@@ -2741,7 +2741,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			print("No message detected.")
 		elif reacts:
 			for react in reacts:
-				await message.add_reaction(react)
+				try:
+					await message.add_reaction(react)
+				except CE:
+					await asyncio.sleep(1)
+					with tracebacksuppressor:
+						await message.add_reaction(react)
 		return message
 
 	# Inserts a message into the bot cache, discarding existing ones if full.
@@ -4541,15 +4546,20 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if not self.bot_ready and u_id == self.id:
 			return 0
 		if not slash:
-			if u_id != self.id:
+			if msg and u_id != self.id:
 				# Strip quote from message.
 				if msg[:2] == "> ":
 					msg = msg[2:]
 				# Strip spoiler from message.
-				elif msg[:2] == "||" and msg[-2:] == "||":
+				elif msg[:2] == msg[-2:] == "||":
 					msg = msg[2:-2]
 				# Strip code boxes from message.
-				msg = msg.replace("`", "").strip()
+				elif msg[0] == msg[-1] == "`":
+					if msg[:3] == msg[-3:] == "```":
+						msg = msg[3:-3]
+					else:
+						msg = msg[1:-1]
+				msg = msg.strip()
 		# Get list of enabled commands for the channel.
 		enabled = self.get_enabled(channel)
 		u_perm = max(min_perm, self.get_perms(u_id, guild)) if min_perm is not None else self.get_perms(u_id, guild)

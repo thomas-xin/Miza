@@ -467,6 +467,10 @@ class Unicode(Command):
 		"S642Uni", "64S", "S64Decode",
 		"Uni2B32", "U32", "B32Encode",
 		"B322Uni", "32U", "B32Decode",
+		"Uni2A85", "A85", "A85Encode",
+		"A852Uni", "85A", "A85Decode",
+		"Uni2B85", "B85", "B85Encode",
+		"B852Uni", "85B", "B85Decode",
 	]
 	description = "Converts unicode text to hexadecimal or binary numbers."
 	usage = "<string>"
@@ -482,7 +486,7 @@ class Unicode(Command):
 			b = bytes2hex(argv.encode("utf-8"))
 			return fix_md(b)
 		if name in ("hex2uni", "h2u", "hexdecode"):
-			b = as_str(hex2bytes(to_alphanumeric(argv).replace("0x", "")))
+			b = as_str(hex2bytes(regexp(r"[^0-9A-Fa-f]+").sub("", argv).replace("0x", "")))
 			return fix_md(b)
 		if name in ("uni2bin", "u2b", "binencode"):
 			b = " ".join(f"{ord(c):08b}" for c in argv)
@@ -509,9 +513,10 @@ class Unicode(Command):
 			b = as_str(base64.b64encode(argv.encode("utf-8")).rstrip(b"="))
 			return fix_md(b)
 		if name in ("b642uni", "64u", "b64decode"):
-			b = unicode_prune(argv).encode("utf-8") + b"=="
-			if (len(b) - 1) & 3 == 0:
-				b += b"="
+			b = unicode_prune(argv).encode("utf-8").rstrip(b"==")
+			if len(b) & 3 == 1:
+				b = b[:-1]
+			b += b"=" * (4 - (len(b) & 3) & 3)
 			b = as_str(base64.b64decode(b))
 			return fix_md(b)
 		if name in ("uni2s64", "s64", "s64encode"):
@@ -519,8 +524,9 @@ class Unicode(Command):
 			return fix_md(b)
 		if name in ("s642uni", "64s", "s64decode"):
 			b = unicode_prune(argv).encode("utf-8") + b"=="
-			if (len(b) - 1) & 3 == 0:
-				b += b"="
+			if len(b) & 3 == 1:
+				b = b[:-1]
+			b += b"=" * (4 - (len(b) & 3) & 3)
 			b = as_str(base64.urlsafe_b64decode(b))
 			return fix_md(b)
 		if name in ("uni2b32", "u32", "b32encode"):
@@ -531,6 +537,50 @@ class Unicode(Command):
 			if len(b) & 7:
 				b += b"=" * (8 - len(b) % 8)
 			b = as_str(base64.b32decode(b))
+			return fix_md(b)
+		if name in ("uni2a85", "a85", "a85encode"):
+			b = as_str(base64.a85encode(argv.encode("utf-8")))
+			return fix_md(b)
+		if name in ("a852uni", "85a", "a85decode"):
+			b = unicode_prune(argv).encode("utf-8")
+			try:
+				b = base64.a85decode(b)
+			except ValueError:
+				ba = bytearray()
+				for i in range(0, len(b), 5):
+					try:
+						bi = base64.a85decode(b[i:i + 5])
+					except ValueError:
+						pass
+					else:
+						ba.extend(bi)
+				if not ba:
+					raise
+				print_exc()
+				b = ba
+			b = as_str(b)
+			return fix_md(b)
+		if name in ("uni2b85", "b85", "b85encode"):
+			b = as_str(base64.b85encode(argv.encode("utf-8")))
+			return fix_md(b)
+		if name in ("b852uni", "85b", "b85decode"):
+			b = unicode_prune(argv).encode("utf-8")
+			try:
+				b = base64.b85decode(b)
+			except ValueError:
+				ba = bytearray()
+				for i in range(0, len(b), 5):
+					try:
+						bi = base64.b85decode(b[i:i + 5])
+					except ValueError:
+						pass
+					else:
+						ba.extend(bi)
+				if not ba:
+					raise
+				print_exc()
+				b = ba
+			b = as_str(b)
 			return fix_md(b)
 		b = shash(argv)
 		return fix_md(b)
