@@ -1944,6 +1944,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			prompt = "\n".join(ins) + "\n<|im_start|>"
 			if assistant:
 				prompt += f"assistant name={assistant}"
+		elif fmt == "chatcc":
+			ins = [chatml(m, "cc") for m in messages]
+			stops = im_sep("cc")
+			prompt = "\n".join(ins) + "\n" + stops[0]
+			if assistant:
+				prompt += f"assistant name={assistant}"
 		else:
 			raise NotImplementedError(fmt)
 		return prompt, stops

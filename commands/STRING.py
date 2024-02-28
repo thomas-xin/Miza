@@ -1751,6 +1751,14 @@ TOGETHER = {
 FIREWORKS = {
 	"mixtral-8x7b": "accounts/fireworks/models/mixtral-8x7b-instruct",
 }
+instruct_formats = {
+	"mistral-7b": "mistral",
+	"mixtral-8x7b": "mistral",
+	"stripedhyena-7b": "chatcc",
+	"mythomax-13b": "chatcc",
+	"goliath-120b": "chatcc",
+	"wizard-70b": "chatcc",
+}
 
 async def cut_to(messages, limit=1024, exclude_first=True, best=False):
 	if not messages:
@@ -2089,7 +2097,11 @@ class Ask(Command):
 		iman = None
 		for i, m, content, found, cfut in reversed(visconts):
 			if cfut:
-				cfut = await cfut
+				try:
+					cfut = await cfut
+				except:
+					print_exc()
+					cfut = None
 			imin = ()
 			if isinstance(found, list):
 				found = found[0]
@@ -2559,7 +2571,8 @@ class Ask(Command):
 					text = ""
 				if mresp:
 					break
-				prompt, stops = bot.instruct_structure(selection, fmt="chatml", assistant=bot_name)
+				fmt = instruct_formats.get(assistant, "chatml")
+				prompt, stops = bot.instruct_structure(selection, fmt=fmt, assistant=bot_name)
 				if text:
 					prompt += " " + text
 				print(f"{assistant} prompt:", prompt)

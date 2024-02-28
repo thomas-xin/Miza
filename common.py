@@ -4592,29 +4592,43 @@ def _smart_split(s):
 
 import tiktoken
 
+cl100k_base = tiktoken.get_encoding("cl100k_base")
+cl100k_im = tiktoken.Encoding(
+    name="cl100k_im",
+    pat_str=cl100k_base._pat_str,
+    mergeable_ranks=cl100k_base._mergeable_ranks,
+    special_tokens={
+        **cl100k_base._special_tokens,
+        "<|im_start|>": 100264,
+        "<|im_end|>": 100265,
+    },
+)
+
 def get_encoding(e):
+	if e == "cl100k_im":
+		return cl100k_im
 	try:
 		return tiktoken.get_encoding(e)
 	except (KeyError, ValueError):
 		pass
 	return tiktoken.encoding_for_model(e)
 
-def tik_encode(s, encoding="cl100k_base"):
+def tik_encode(s, encoding="cl100k_im"):
 	enc = get_encoding(encoding)
-	return enc.encode(s)
+	return enc.encode(s, allowed_special=set(enc._special_tokens))
 
-def tik_decode(t, encoding="cl100k_base"):
+def tik_decode(t, encoding="cl100k_im"):
 	enc = get_encoding(encoding)
 	return enc.decode(t)
 
 @functools.lru_cache(maxsize=64)
-def lim_tokens(s, maxlen=10, mode="centre", encoding="cl100k_base"):
+def lim_tokens(s, maxlen=10, mode="centre", encoding="cl100k_im"):
 	if maxlen is None:
 		return s
 	if type(s) is not str:
 		s = str(s)
 	enc = get_encoding(encoding)
-	tokens = enc.encode(s)
+	tokens = enc.encode(s, allowed_special=set(enc._special_tokens))
 	over = (len(tokens) - maxlen) / 2
 	if over > 0:
 		if mode == "centre":
@@ -4624,17 +4638,17 @@ def lim_tokens(s, maxlen=10, mode="centre", encoding="cl100k_base"):
 			s = enc.decode(tokens[:maxlen - 3]) + "..."
 	return s.strip()
 
-async def tik_encode_a(s, encoding="cl100k_base"):
+async def tik_encode_a(s, encoding="cl100k_im"):
 	if len(s) > 1024:
 		return await asubmit(tik_encode, s, encoding=encoding, priority=2)
 	return tik_encode(s, encoding=encoding)
 
-async def tik_decode_a(t, encoding="cl100k_base"):
+async def tik_decode_a(t, encoding="cl100k_im"):
 	if len(t) > 256:
 		return await asubmit(tik_decode, t, encoding=encoding, priority=2)
 	return tik_decode(t, encoding=encoding)
 
-async def tcount(s, model="gpt-3.5-turbo"):
+async def tcount(s, model="cl100k_im"):
 	enc = await tik_encode_a(s, encoding=model)
 	return len(enc)
 
@@ -4671,7 +4685,17 @@ def m_str(m):
 		return "<|user|>: " + content
 	return m.name + ": " + content
 
-def chatml(m):
+def im_sep(mode="im"):
+	if mode == "im":
+		start = "<|im_start|>"
+		end = "<|im_end|>"
+	else:
+		start = "▀"
+		end = "▄"
+	return start, end
+
+def chatml(m, mode="im"):
+	s, e = im_sep(mode)
 	if type(m) is dict:
 		m = cdict(m)
 	content = str(getattr(m, "content", ""))
@@ -4683,9 +4707,9 @@ def chatml(m):
 	name, role = getattr(m, "name", None), (getattr(m, "role", None) or "user")
 	if not name:
 		if ": " not in content:
-			return f"<|im_start|>{role}\n" + content + "<|im_end|>"
+			return f"{s}{role}\n" + content + e
 		name, content = content.split(": ", 1)
-	return f"<|im_start|>{role} name={name}\n" + content + "<|im_end|>"
+	return f"{s}{role} name={name}\n" + content + e
 
 def m_name(m):
 	if not m.get("name"):
