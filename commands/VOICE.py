@@ -1842,6 +1842,7 @@ class AudioDownloader:
 
 	@functools.lru_cache(maxsize=64)
 	def extract_audio_video(self, url):
+		title = url.split("?", 1)[0].rsplit("/", 1)[-1].split("#", 1)[0]
 		with reqs.next().get(url, headers=Request.header(), stream=True) as resp:
 			resp.raise_for_status()
 			ct = resp.headers.get("Content-Type")
@@ -1888,7 +1889,6 @@ class AudioDownloader:
 				elif out:
 					return out[0]
 			elif ct.split("/", 1)[0] in ("audio", "video", "image"):
-				title = url.split("?", 1)[0].rsplit("/", 1)[-1]
 				return dict(url=url, webpage_url=url, title=title, direct=True)
 
 	# Repeatedly makes calls to youtube-dl until there is no more data to be collected.
@@ -1978,9 +1978,91 @@ class AudioDownloader:
 			out.append(temp)
 		return out
 
+	def extract_alt(self, url):
+		if "dropbox.com" in url and "?dl=0" in url:
+			return url.replace("?dl=0", "?dl=1")
+		if is_imgur_url(url):
+			first = url.split("#", 1)[0].split("?", 1)[0]
+			if not first.endswith(".jpg"):
+				first += ".jpg"
+			return first
+		if is_giphy_url(url):
+			first = url.split("#", 1)[0].split("?", 1)[0]
+			item = first[first.rindex("/") + 1:]
+			return f"https://media2.giphy.com/media/{item}/giphy.gif"
+		if is_youtube_url(url):
+			if "?v=" in url:
+				vid = url.split("?v=", 1)[-1]
+			else:
+				vid = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
+			return f"https://i.ytimg.com/vi/{vid}/maxresdefault.jpg"
+		if is_redgifs_url(url):
+			vid = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
+			return f"https://api.redgifs.com/v2/gifs/{vid}/sd.m3u8"
+		if any(maps((is_discord_url, is_emoji_url, is_youtube_url, is_youtube_stream), url)):
+			return url
+		if is_reddit_url(url):
+			url = url.replace("www.reddit.com", "vxreddit.com")
+		try:
+			resp = reqs.next().get(url, headers=Request.header(), stream=True)
+			resp.raise_for_status()
+		except:
+			print_exc()
+			return
+		url = as_str(resp.url)
+		head = fcdict(resp.headers)
+		ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
+		if is_redgifs_url(url):
+			vid = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
+			return f"https://api.redgifs.com/v2/gifs/{vid}/sd.m3u8"
+		elif "text/html" in ctype:
+			rit = resp.iter_content(65536)
+			data = next(rit)
+			s = as_str(data)
+			res = None
+			try:
+				s = s[s.index("<meta") + 5:]
+				if 'property="og:video" content="' in s:
+					try:
+						search = 'property="og:video" content="'
+						s = s[s.index(search) + len(search):]
+						res = s[:s.index('"')]
+					except ValueError:
+						pass
+				if not res and 'property="og:image" content="' in s:
+					try:
+						search = 'property="og:image" content="'
+						s = s[s.index(search) + len(search):]
+						res = s[:s.index('"')]
+					except ValueError:
+						pass
+				if not res:
+					search = 'http-equiv="refresh" content="'
+					s = s[s.index(search) + len(search):]
+					s = s[:s.index('"')]
+					res = None
+					for k in s.split(";"):
+						temp = k.strip()
+						if temp.casefold().startswith("url="):
+							res = temp[4:]
+							break
+					if not res:
+						raise ValueError
+			except ValueError:
+				pass
+			else:
+				if res.startswith("/"):
+					res = url.split("://", 1)[0] + ":/" + res
+				print(res)
+				return res
+
 	# Extracts audio information from a single URL.
 	def extract_from(self, url):
-		if is_discord_url(url):
+		if is_discord_message_link(url):
+			urls = await_fut(self.bot.follow_url(url))
+			if urls:
+				url = urls[0]
+		if is_discord_attachment(url):
 			title = url.split("?", 1)[0].rsplit("/", 1)[-1]
 			if title.rsplit(".", 1)[-1] in ("ogg", "ts", "webm", "mp4", "avi", "mov"):
 				url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
@@ -1990,32 +2072,44 @@ class AudioDownloader:
 			if "." in title:
 				title = title[:title.rindex(".")]
 			return dict(url=url, webpage_url=url, title=title, direct=True)
+		ex = None
 		try:
 			if self.blocked_yt > utc():
 				raise PermissionError
 			if url.startswith("https://www.youtube.com/search") or url.startswith("https://www.youtube.com/results"):
 				url = url.split("=", 1)[1].split("&", 1)[0]
 			self.youtube_dl_x += 1
-			return self.downloader.extract_info(url, download=False, process=False)
-		except Exception as ex:
+			resp = self.downloader.extract_info(url, download=False, process=False)
+		except Exception as exc:
+			ex = exc
+			resp = None
 			s = str(ex).casefold()
-			if "unsupported url:" in s:
-				out = self.extract_audio_video(url)
-				if out:
-					return out
-				raise
-			elif not isinstance(ex, youtube_dl.DownloadError) or self.ydl_errors(s):
+			if isinstance(ex, PermissionError) or self.ydl_errors(s):
 				if "429" in s:
 					self.blocked_yt = utc() + 3600
 				if has_ytd:
 					try:
-						entries = self.extract_backup(url)
+						resp = self.extract_backup(url)
 					except (TypeError, youtube_dl.DownloadError):
 						raise FileNotFoundError(f"Unable to fetch audio data: {repr(ex)}")
-				else:
-					raise
-			else:
-				raise
+		if resp and not resp.get("direct", False):
+			return resp
+		title = url.split("?", 1)[0].rsplit("/", 1)[-1].split("#", 1)[0]
+		fut2 = create_future_ex(self.extract_alt, url)
+		fut3 = create_future_ex(self.extract_audio_video, url)
+		if not resp:
+			resp3 = fut3.result()
+			if resp3:
+				return resp3
+			url2 = fut2.result() or url
+			return dict(url=url2, webpage_url=url, title=title, direct=True)
+		resp3 = fut3.result()
+		if resp3:
+			return resp3
+		url = fut2.result()
+		if url:
+			resp["url"] = url
+		return resp
 
 	# Extracts info from a URL or search, adjusting accordingly.
 	def extract_info(self, item, count=1, search=False, mode=None):
@@ -2039,6 +2133,8 @@ class AudioDownloader:
 				return self.downloader.extract_info(f"scsearch{c}:{item}", download=False, process=False)
 			except Exception as ex:
 				raise ConnectionError(exc + repr(ex))
+		if is_url(item) or not search and "search:" not in item:
+			return self.extract_from(item)
 		if item[:9] == "spsearch:":
 			query = "https://api.spotify.com/v1/search?type=track%2Cshow_audio%2Cepisode_audio&include_external=audio&limit=1&q=" + url_parse(item[9:])
 			resp = reqs.next().get(query, headers=self.spotify_header).json()
@@ -2079,8 +2175,6 @@ class AudioDownloader:
 			else:
 				item = "ytsearch:" + "".join(c if c.isascii() and c != ":" else "_" for c in f"{name} ~ {artists}")
 				self.other_x += 1
-		elif is_url(item) or not search:
-			return self.extract_from(item)
 		self.youtube_dl_x += 1
 		return self.downloader.extract_info(item, download=False, process=False)
 
@@ -2486,11 +2580,11 @@ class AudioDownloader:
 		return out[:count]
 
 	# Performs a search, storing and using cached search results for efficiency.
-	def search(self, item, force=False, mode=None, images=False, count=1):
+	def search(self, item, force=False, mode=None, images=False, count=1, follow=True):
 		item = verify_search(item)
-		if not is_main_thread():
+		if follow and not is_main_thread():
 			with tracebacksuppressor:
-				items = await_fut(self.bot.follow_url(item, images=images))
+				items = await_fut(self.bot.follow_url(item, images=images, ytd=False))
 				if items:
 					item = items[0]
 		if mode is None and count == 1:
@@ -2614,7 +2708,7 @@ class AudioDownloader:
 			stream = set_dict(data[0], "stream", data[0].url)
 			icon = set_dict(data[0], "icon", data[0].url)
 			entry.update(data[0])
-		if not searched and (stream.startswith("ytsearch:") or stream.startswith("https://cf-hls-media.sndcdn.com/") or expired(stream)):
+		if not searched and (stream.startswith("https://cf-hls-media.sndcdn.com/") or expired(stream)):
 			data = self.extract(entry["url"])
 			stream = set_dict(data[0], "stream", data[0].url)
 			icon = set_dict(data[0], "icon", data[0].url)
@@ -2654,7 +2748,7 @@ class AudioDownloader:
 				live = not entry.get("duration") or entry["duration"] > 960
 			seekable = not entry.get("duration") or entry["duration"] < inf
 			cf = isnan(entry.get("duration") or nan) or not (stream.startswith("https://cf-hls-media.sndcdn.com/") or is_youtube_stream(stream))
-			if asap > 1 and not f.proc and live and 960 < (entry.get("duration") or 0) < 4200:
+			if 0:#asap > 1 and not f.proc and live and 960 < (entry.get("duration") or 0) < 4200:
 				esubmit(f.load, check_fmt=cf, webpage_url=entry["url"], live=False, seekable=seekable, duration=entry.get("duration"), asap=False)
 			try:
 				f.load(stream, check_fmt=cf, webpage_url=entry["url"], live=live, seekable=seekable, duration=entry.get("duration"), asap=asap)
@@ -2908,7 +3002,7 @@ class AudioDownloader:
 				fn = "cache/~" + h + ".ts"
 				out2 = "cache/~" + h + ".opus"
 				if not os.path.exists(fn):
-					b = await_fut(process_image("ytdl", "$", [urls[0], True], cap="ytdl", timeout=600))
+					b = await_fut(process_image("ytdl", "$", [urls[0], True], cap="ytdl", timeout=3600))
 					if not os.path.exists(fn) or not os.path.getsize(fn):
 						with open(fn, "wb") as f:
 							f.write(b)
@@ -3431,6 +3525,9 @@ class AudioDownloader:
 				i.update(it)
 				if i.get("stream") not in (None, "none"):
 					return True
+		if i.get("direct"):
+			i["stream"] = i.get("url")
+			return True
 		with self.semaphore:
 			try:
 				data = self.extract_true(item)
@@ -6002,6 +6099,7 @@ class UpdateAudio(Database):
 	async def _bot_ready_(self, bot, **void):
 		globals()["bot"] = bot
 		ytdl.bot = bot
+		bot.ytdl = ytdl
 		ytdl.ytd_blocked.attach(bot.data.inaccessible)
 		try:
 			await asubmit(subprocess.check_output, ("./ffmpeg",))

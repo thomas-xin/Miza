@@ -940,7 +940,7 @@ class CreateGIF(Command):
 					urls = await bot.follow_url(url, best=True, allow=True, reactions=False, limit=None)
 					found.extend(urls)
 					continue
-				urls = await bot.follow_url(url, best=True, allow=True, limit=1)
+				urls = await bot.follow_url(url, best=True, images=True, allow=True, limit=1)
 				url = urls[0]
 				if "channels" not in url:
 					with tracebacksuppressor:
@@ -963,7 +963,7 @@ class CreateGIF(Command):
 class Resize(Command):
 	name = ["ImageScale", "Scale", "Rescale", "ImageResize", "Scale2x", "SwinIR", "Denoise", "Enhance", "Refine", "Copy", "Jumbo"]
 	description = "Changes size of supplied image, using an optional scaling operation."
-	usage = "<0:url> <1:size(?:resolution|multiplier)>* <-1:mode(nearest|linear|hamming|bicubic|lanczos|scale2x|swinir|crop|auto)>?"
+	usage = "<0:url> <1:size(?:resolution|multiplier|filesize)>* <-1:mode(nearest|linear|hamming|bicubic|lanczos|scale2x|swinir|crop|auto)>?"
 	example = ("scale https://mizabot.xyz/favicon 4", "resize https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 2048x2048 scale2x")
 	no_parse = True
 	rate_limit = (8, 13)
@@ -1025,9 +1025,13 @@ class Resize(Command):
 					op = "swinir"
 				else:
 					op = "auto"
+			fl = None
+			x = y = 1
 			value = " ".join(args).strip()
 			if not value:
-				x = y = 1
+				pass
+			elif value.endswith("b") or value.endswith("B"):
+				fl = byte_unscale(value[:-1])
 			else:
 				# Parse width and height multipliers
 				if "x" in value or "X" in value or "*" in value or "×" in value or ":" in value:
@@ -1068,6 +1072,8 @@ class Resize(Command):
 				func = "IBASU"
 				cap = "sdxl"
 			resp = await process_image(url, func, [x, y, op, "-f", fmt], cap=cap, timeout=_timeout)
+			if fl:
+				resp = await bot.optimise_image(resp, fsize=fl, fmt=fmt)
 			fn = resp
 			if isinstance(fn, str) and "." in fn:
 				fmt = "." + fn.rsplit(".", 1)[-1]

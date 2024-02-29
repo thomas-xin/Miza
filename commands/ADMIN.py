@@ -1873,46 +1873,10 @@ class CreateEmoji(Command):
 			if not name:
 				name = "emoji_" + str(len(guild.emojis))
 			# print(name, url)
-			image = resp = await bot.get_request(url, timeout=60)
+			image = await bot.get_request(url, timeout=60)
 			if len(image) > 1073741824:
 				raise OverflowError("Max file size to load is 1GB.")
-			if len(image) > 262144 or not is_image(url):
-				# ts = ts_us()
-				# path = "cache/" + str(ts)
-				# with open(path, "wb") as f:
-					# await asubmit(f.write, image, timeout=18)
-				o_image = image
-				verified = False
-				width = 128
-				while len(image) > 262144 or not verified:
-					print("RESIZE:", width)
-					try:
-						resp = await process_image(o_image, "resize_max", [width, 2, "-o"], timeout=30, retries=2)
-					except:
-						raise
-					else:
-						fn = resp
-						if isinstance(fn, str):
-							if not os.path.exists(fn) or not os.path.getsize(fn):
-								break
-							r = os.path.getsize(fn) / 262144
-							if r > 1:
-								width = min(width - 1, floor(width / sqrt(r)))
-								continue
-							with open(fn, "rb") as f:
-								image = await asubmit(f.read, timeout=18)
-						else:
-							image = fn
-							if not image:
-								break
-							r = len(image) / 262144
-							if r > 1:
-								width = min(width - 1, floor(width / sqrt(r)))
-								continue
-						verified = True
-					finally:
-						with suppress():
-							os.remove(fn)
+			image = await bot.optimise_image(image, size=262144, msize=128, fmt="gif")
 			emoji = await guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
 			# This reaction indicates the emoji was created successfully
 			with suppress(discord.Forbidden):

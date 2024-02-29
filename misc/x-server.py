@@ -669,7 +669,7 @@ class Server:
 			if a2.startswith(".temp$@"):
 				a2 = a2[7:]
 				a3 = True
-				if not st.st_size:
+				if not st.st_size or st.st_size > 48 * 1048576:
 					with tracebacksuppressor:
 						os.remove(p)
 					p = find_file(path, cwd=("saves/filehost"), ind=ind)
@@ -811,7 +811,7 @@ class Server:
 									if a3:
 										self.serving.setdefault(p, weakref.WeakSet()).add(f)
 									return resp
-								if info[1] > 256 * 1048576:
+								if info[1] > 48 * 1048576:
 									if endpoint != "n":
 										raise cp.HTTPRedirect(f"https://stream.miza-stream.workers.dev/?i={orig_path}", status=307)
 									return self.dyn_serve(urls, size=info[1])
@@ -1145,7 +1145,7 @@ class Server:
 			b = []
 			it = resp.iter_content(65536)
 			with suppress(StopIteration):
-				while sum(map(len, b)) < 8388608:
+				while sum(map(len, b)) < 25165824:
 					temp = next(it)
 					b.append(temp)
 					yield temp
@@ -2994,6 +2994,65 @@ max-height: 100%;
 <img src="{url}" class="center">
 </body>
 </html>"""
+
+	@cp.expose
+	@cp.tools.accept(media="multipart/form-data")
+	@cp.tools.accept(media="application/json")
+	def v1(self, *path, **kwargs):
+		cp.response.headers.update(SHEADERS)
+		cp.response.headers["Content-Type"] = "application/json"
+		if not path:
+			path = ["models"]
+		if path[0] == "models":
+			return orjson.dumps(dict(
+				object="list", data=[
+					dict(
+						id="Miza/miza-3",
+						object="model",
+						created=1709095736,
+						owned_by="txin",
+						root="Miza/miza-3",
+						parent=None,
+						permission=[],
+					),
+					dict(
+						id="Miza/miza-2",
+						object="model",
+						created=1709095735,
+						owned_by="txin",
+						root="Miza/miza-2",
+						parent=None,
+						permission=[],
+					),
+					dict(
+						id="Miza/miza-1",
+						object="model",
+						created=1709095734,
+						owned_by="txin",
+						root="Miza/miza-1",
+						parent=None,
+						permission=[],
+					),
+				],
+			))
+		if path[0] == "chat" and path[1] == "completions":
+			if not kwargs.get("messages") and not kwargs.get("prompt"):
+				b = cp.request.body.fp.read()
+				if b:
+					kwargs.update(orjson.loads(b))
+			messages = kwargs.get("messages")
+			if not messages:
+				prompt = kwargs.pop("prompt", None)
+				if not prompt:
+					raise SyntaxError("messages")
+				kwargs["messages"] = [dict(role="user", content=prompt)]
+			data = orjson.dumps(kwargs)
+			resp = self.bot_exec(f"bot.chat_completion(**orjson.loads({data}))")
+			if isinstance(resp, list):
+				return b"\n\n".join(orjson.dumps(r) for r in resp)
+			return orjson.dumps(resp)
+		raise NotImplementedError(path)
+
 
 # @app.after_request
 # def custom_header(response):

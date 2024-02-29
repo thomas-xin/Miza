@@ -118,6 +118,7 @@ class Restart(Command):
 						voice = member.voice
 						if voice:
 							futs.append(csubmit(member.move_to(None)))
+				await save
 				print("Goodbye.")
 				with suppress(NameError, AttributeError):
 					PRINT.flush()
@@ -126,7 +127,6 @@ class Restart(Command):
 					await asubmit(retry, os.remove, "log.txt", attempts=8, delay=0.1)
 				await asyncio.gather(*futs, return_exceptions=True)
 				await kill
-				await save
 		if name.casefold() == "shutdown":
 			touch(bot.shutdown)
 		else:

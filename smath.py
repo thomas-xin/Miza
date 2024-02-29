@@ -1236,7 +1236,7 @@ def num_parse(s):
 
 
 __scales = ("", "k", "M", "G", "T", "P", "E", "Z", "Y")
-
+__uscales = [s.lower() for s in __scales]
 def byte_scale(n, ratio=1024):
 	e = 0
 	while n >= ratio:
@@ -1245,7 +1245,15 @@ def byte_scale(n, ratio=1024):
 		if e >= len(__scales) - 1:
 			break
 	return f"{round(n, 4)} {__scales[e]}"
-
+def byte_unscale(s, ratio=1024):
+	num_part = regexp(r"^[0-9]+").findall(s)
+	if not num_part:
+		n = 1
+	else:
+		n = num_part[0]
+		s = s[len(n):]
+		n = round_min(n)
+	return round_min(n * ratio ** __uscales.index(s.lower()))
 
 
 # Returns a string representation of a number with a limited amount of characters, using scientific notation when required.

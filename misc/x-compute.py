@@ -3263,7 +3263,7 @@ def evalImg(url, operation, args):
 						break
 					new["duration"] += max(image.info.get("duration", 0), 1000 / 240)
 				fps = 1000 * f / new["duration"]
-				fpl = 15 if opt else 30
+				fpl = 15 if opt and image.width * image.height <= 16384 else 30
 				step = 1
 				while fps / step >= fpl:
 					step += 0.25
@@ -3359,7 +3359,7 @@ def evalImg(url, operation, args):
 						vf += "reserve_transparent=1:"
 					else:
 						vf += "reserve_transparent=0:"
-					if opt:
+					if opt and first.width * first.height <= 16384:
 						frames = list(frames)
 						fr = frames.copy()
 						first = fr.pop(0)
@@ -3489,7 +3489,7 @@ def evalImg(url, operation, args):
 			else:
 				proc.stdin.close()
 				proc.wait()
-			if fmt == "gif":
+			if fmt == "gif" and first.width * first.height <= 1048576:
 				if os.name == "nt":
 					if not os.path.exists("misc/gifsicle.exe") or os.path.getsize("misc/gifsicle.exe") < 4096:
 						import requests

@@ -1854,7 +1854,7 @@
 				"Resize"
 			],
 			"description": "Changes size of supplied image, using an optional scaling operation.",
-			"usage": "<0:url> <1:size(?:resolution|multiplier)>* <-1:mode(nearest|linear|hamming|bicubic|lanczos|scale2x|swinir|crop|auto)>?",
+			"usage": "<0:url> <1:size(?:resolution|multiplier|filesize)>* <-1:mode(nearest|linear|hamming|bicubic|lanczos|scale2x|swinir|crop|auto)>?",
 			"level": "0",
 			"rate_limit": "(8, 13)",
 			"example": [

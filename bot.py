@@ -1423,9 +1423,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return await self.id_from_message(self.cache.messages[m_id].content)
 		return verify_id(m_id)
 
+	ytdl = None
 	# Finds URLs in a string, following any discord message links found.
 	# followed = llcache
-	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, emojis=True, reactions=False, allow=False, limit=None, no_cache=False):
+	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, emojis=True, reactions=False, allow=False, limit=None, no_cache=False, ytd=True):
 		self.followed = self.llcache
 		if limit is not None and limit <= 0:
 			return []
@@ -1524,95 +1525,22 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								lost.append(m.content)
 							elif preserve:
 								lost.append(u)
-			elif is_imgur_url(url):
-				first = url.split("#", 1)[0].split("?", 1)[0]
-				if not first.endswith(".jpg"):
-					first += ".jpg"
-				out.append(first)
-			elif is_giphy_url(url):
-				first = url.split("#", 1)[0].split("?", 1)[0]
-				item = first[first.rindex("/") + 1:]
-				out.append(f"https://media2.giphy.com/media/{item}/giphy.gif")
-			elif images and is_youtube_url(url):
-				if "?v=" in url:
-					vid = url.split("?v=", 1)[-1]
+			elif ytd and self.ytdl:
+				resp = await create_future(self.ytdl.search, url, follow=False)
+				resp = resp[0]
+				if not resp.get("direct"):
+					await create_future(self.ytdl.get_stream, resp, download=False, force=True)
+				if resp.get("video"):
+					url = resp["video"]
+				elif images and resp.get("thumbnail"):
+					url = resp["thumbnail"]
+				elif not images and resp.get("stream"):
+					url = resp["stream"]
+				elif resp["url"] != url:
+					url = resp["url"]
 				else:
-					vid = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
-				out.append(f"https://i.ytimg.com/vi/{vid}/maxresdefault.jpg")
-			elif is_redgifs_url(url):
-				vid = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
-				out.append(f"https://api.redgifs.com/v2/gifs/{vid}/sd.m3u8")
-			elif any(maps((is_discord_url, is_emoji_url, is_youtube_url, is_youtube_stream), url)):
+					url = resp.get("video") or resp.get("stream") or resp.get("thumbnail") or resp.get("url")
 				out.append(url)
-			else:
-				found = False
-				if is_reddit_url(url):
-					url = url.replace("www.reddit.com", "vxreddit.com")
-				skip = False
-				if url in self.mimes:
-					skip = "text/html" not in self.mimes[url]
-				if not skip:
-					resp = None
-					try:
-						resp = await asubmit(reqs.next().get, url, headers=Request.header(), stream=True)
-						resp.raise_for_status()
-					except:
-						print_exc()
-						no_cache = True
-					if not resp:
-						continue
-					u_url = url
-					url = as_str(resp.url)
-					head = fcdict(resp.headers)
-					ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
-					if is_redgifs_url(url):
-						vid = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
-						out.append(f"https://api.redgifs.com/v2/gifs/{vid}/sd.m3u8")
-					elif "text/html" in ctype:
-						rit = resp.iter_content(65536)
-						data = await asubmit(next, rit)
-						s = as_str(data)
-						res = None
-						try:
-							s = s[s.index("<meta") + 5:]
-							if 'property="og:video" content="' in s:
-								try:
-									search = 'property="og:video" content="'
-									s = s[s.index(search) + len(search):]
-									res = s[:s.index('"')]
-								except ValueError:
-									pass
-							if not res and 'property="og:image" content="' in s:
-								try:
-									search = 'property="og:image" content="'
-									s = s[s.index(search) + len(search):]
-									res = s[:s.index('"')]
-								except ValueError:
-									pass
-							if not res:
-								search = 'http-equiv="refresh" content="'
-								s = s[s.index(search) + len(search):]
-								s = s[:s.index('"')]
-								res = None
-								for k in s.split(";"):
-									temp = k.strip()
-									if temp.casefold().startswith("url="):
-										res = temp[4:]
-										break
-								if not res:
-									raise ValueError
-						except ValueError:
-							pass
-						else:
-							found = True
-							if res.startswith("/"):
-								res = url.split("://", 1)[0] + ":/" + res
-							print(res)
-							out.append(res)
-					else:
-						self.mimes[u_url] = self.mimes[url] = ctype
-				if not found:
-					out.append(url)
 		if lost:
 			out.extend(lost)
 		if not out:
@@ -1796,6 +1724,40 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			e = cdict(id=e, animated=animated)
 		return min_emoji(e)
 
+	async def optimise_image(self, image, fsize=25165824, msize=None, fmt="mp4"):
+		if not msize and len(image) < fsize and magic.from_buffer(image).split("/", 1)[0] in ("image", "video"):
+			return image
+		ts = ts_us()
+		fn = f"cache/{ts}~oi"
+		with open(fn, "wb") as f:
+			f.write(image)
+		cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", fn)
+		print(cmd)
+		out = subprocess.check_output(cmd)
+		w, h = map(int, out.split(b"x"))
+		print(len(image), fsize, msize, w, h)
+		if not msize:
+			width = isqrt(w * h * fsize / len(image))
+		else:
+			if msize == isqrt(w * h) and len(image) < fsize and magic.from_buffer(image).split("/", 1)[0] in ("image", "video"):
+				return image
+			width = msize
+		o_image = image
+		verified = False
+		while len(image) > fsize or not verified:
+			print("RESIZE:", width)
+			resp = await process_image(o_image, "resize_max", [width, bool(msize), "-o", "-f", fmt], timeout=30, retries=2)
+			if not resp:
+				break
+			image = resp
+			r = len(image) / fsize
+			if r > 1:
+				width = min(width - 1, floor(width / sqrt(r)))
+				continue
+			verified = True
+		print("opt:", len(image))
+		return image
+
 	llcache = Cache(timeout=43200, trash=256)
 	browse_locations = {
 		-11: "nz-en",	# New Zealand
@@ -1925,13 +1887,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	def instruct_structure(self, messages, exclude_first=True, fmt="alpaca", assistant=None):
 		if fmt == "mistral":
 			ins = tuple(map(m_str, messages))
-			stops = ["</s>", "[INST", "<|system|>:", f"{assistant}:"]
+			stops = ["</s>", "[INST", "<|system|>:"]
 			prompt = "\n\n".join(s if m.get("role") == "assistant" else f"[INST]{s}[/INST]" for s, m in zip(ins, messages))
 			if assistant:
 				prompt += f"\n\n{assistant}:"
 		elif fmt == "alpaca":
 			ins = tuple(map(m_str, messages))
-			stops = ["### Instruction:", "### Response:", "<|system|>:", f"{assistant}:"]
+			stops = ["### Instruction:", "### Response:"]
 			if exclude_first:
 				prompt = ins[0] + "\n\n### Input:\n" + "\n\n".join(ins[1:-1]) + "\n\n### Instruction:\n" + ins[-1] + "\n\n### Response:"
 			else:
@@ -1941,23 +1903,58 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		elif fmt == "chatml":
 			ins = tuple(map(chatml, messages))
 			stops = ["<|im_start|>", "<|im_end|>"]
-			prompt = "\n".join(ins) + "\n<|im_start|>"
+			prompt = "\n".join(ins) + "\n<|im_start|>assistant"
 			if assistant:
-				prompt += f"assistant name={assistant}"
-		elif fmt == "chatcc":
+				prompt += f" name={assistant}"
+		elif fmt == "blockml":
 			ins = [chatml(m, "cc") for m in messages]
 			stops = im_sep("cc")
-			prompt = "\n".join(ins) + "\n" + stops[0]
+			prompt = "\n".join(ins) + "\n" + stops[0] + "assistant"
 			if assistant:
-				prompt += f"assistant name={assistant}"
+				prompt += f" name={assistant}"
 		else:
 			raise NotImplementedError(fmt)
 		return prompt, stops
 
+	async def cut_to(self, messages, limit=1024, exclude_first=True, best=False):
+		if not messages:
+			return messages
+		messages = list(messages)
+		if exclude_first:
+			sm = messages.pop(0)
+		mes = []
+		count = 0
+		i = -1
+		for i, m in reversed(tuple(enumerate(messages))):
+			c = await tcount(m_repr(m))
+			if c + count > limit / 5 and not m.get("tool_calls") and m.get("role") != "tool":
+				break
+			mes.append(m)
+			count += c
+		summ = "Summary of prior conversation:\n"
+		s = "\n\n".join(m_str(m) for m in (messages[:len(messages) - i] if i > 0 else messages))
+		c = await tcount(summ + s)
+		if c + count <= limit / 3:
+			if exclude_first:
+				messages.insert(0, sm)
+			return messages
+		ml = round_random(limit / 6)
+		Ml = round_random(limit / 4)
+		s2 = await self.summarise(s, min_length=ml, max_length=Ml, best=best + 1)
+		summ += s2
+		messages = mes[::-1]
+		messages.insert(0, cdict(
+			role="system",
+			content=summ,
+		))
+		if exclude_first:
+			messages.insert(0, sm)
+		return messages
+
 	ai_endpoints = cdict(
-		openai="https://api.openai.com/v1/",
-		together="https://api.together.xyz/v1/",
-		fireworks="https://api.fireworks.ai/inference/v1/",
+		openai="https://api.openai.com/v1",
+		together="https://api.together.xyz/v1",
+		fireworks="https://api.fireworks.ai/inference/v1",
 	)
 	ai_available = {
 		"firefunction-v1": {
@@ -2026,12 +2023,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			body = cdict()
 			if api == "fireworks":
 				kwa.pop("frequency_penalty", None)
-				kwa.pop("repetition_penalty", None)
 				kwa.pop("presence_penalty", None)
-			elif "repetition_penalty" in kwa:
-				body["repetition_penalty"] = kwa.pop("repetition_penalty")
-			elif "frequency_penalty" in kwa and api != "openai":
+				kwa.pop("repetition_penalty", None)
+			elif api == "together":
+				kwa.pop("frequency_penalty", None)
+				kwa.pop("presence_penalty", None)
+			elif api == "openai":
+				kwa.pop("repetition_penalty", None)
+			elif "frequency_penalty" in kwa:
 				body["repetition_penalty"] = ((kwa.pop("frequency_penalty", 0.25) + kwa.pop("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
+			if "repetition_penalty" in kwa:
+				body["repetition_penalty"] = kwa.pop("repetition_penalty")
 			if api != "openai":
 				kwa.pop("user", None)
 			if body:
@@ -2046,11 +2048,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					self.api_blocked[(api, model)] = True
 				if not exc:
 					exc = ex
-				print(repr(ex))
+				print(api + "-" + kwa["model"] + ":", repr(ex))
 				continue
 		raise (exc or RuntimeError("Unknown error occured."))
 
 	async def function_call(self, *args, rev_nsfw=True, **kwargs):
+		h = shash((args, kwargs))
+		try:
+			return self.llcache[h]
+		except KeyError:
+			pass
 		models = [
 			"gpt-3.5-turbo-0125",
 			"firefunction-v1",
@@ -2070,12 +2077,305 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		for model in models:
 			kwargs["model"] = model
 			try:
-				return await self.llm("chat.completions.create", *args, **kwargs)
+				resp = await self.llm("chat.completions.create", *args, **kwargs)
+				if not resp.choices[0].message.content and not resp.choices[0].message.tool_calls:
+					raise ValueError(resp)
 			except Exception as ex:
 				if not exc:
 					exc = ex
 				print(repr(ex))
+			else:
+				self.llcache[h] = resp
+				return resp
 		raise (exc or RuntimeError("Unknown error occured."))
+
+	async def chat_completion(self, messages, model="miza-1", frequency_penalty=None, presence_penalty=None, repetition_penalty=None, max_tokens=256, temperature=0.7, top_p=0.9, tools=None, tool_choice=None, router=None, stops=(), user=None, stream=False, **void):
+		if void:
+			print("VOID:", void)
+		modlvl = ["miza-1", "miza-2", "miza-3"].index(model.rsplit("/", 1)[-1])
+		messages = [cdict(m) for m in messages]
+		messages = await self.cut_to(messages, 8000 if modlvl >= 2 else 4000)
+		length = await count_to(messages)
+		tmp = temperature
+		tpp = top_p
+		fp = frequency_penalty
+		pp = presence_penalty
+		rp = repetition_penalty
+		if not rp:
+			if not fp and not pp:
+				fp = 0.6
+				pp = 0.4
+			rp = ((fp + pp) / 4 + 1) ** (1 / log2(2 + length / 8))
+		elif not fp and not pp:
+			fp = rp - 1
+			pp = 0
+		raws = [m for m in messages if not m.get("tool_calls") and m.get("role") != "tool"]
+		mid_cut = await self.cut_to(messages, 3000)
+		snippet = await self.cut_to(raws, 800 if modlvl >= 2 else 400)
+		mid_length = await count_to(mid_cut)
+		text = ""
+		ustr = str(hash(str(user) or self.user.name))
+		if tool_choice == "auto":
+			tool_choice = None
+		data = dict(
+			messages=snippet,
+			temperature=tmp,
+			top_p=tpp,
+			frequency_penalty=fp,
+			presence_penalty=pp,
+			repetition_penalty=rp,
+			max_tokens=min(256, max_tokens),
+			user=ustr,
+		)
+		if not router and not tools:
+			router = TOOLS
+		if not router and tools:
+			router = [f["function"]["name"] for f in tools if "function" in f]
+		if tool_choice:
+			if tool_choice == "any":
+				data["model"] = "firefunction-v1"
+				data["tools"] = tools
+			else:
+				data["tools"] = [t for t in tools if t["function"]["name"] == tool_choice["function"]["name"]]
+		else:
+			data["tools"] = [{
+				"type": "function", "function": {
+					"name": "reply",
+					"description": "Replies to the message. Please choose an appropriate assistant based on the user's request!",
+					"parameters": {
+						"type": "object", "properties": {
+							"assistant": {
+								"type": "string",
+								"description": '''Enter "formal" for facts, knowledge, advice or assistance, and "casual" for banter or roleplay.''',
+								"enum": ["formal", "casual"],
+							},
+						},
+						"required": ["assistant"],
+			}}}]
+			if router:
+				data["tools"][0]["function"]["parameters"]["properties"]["tool"] = {
+					"type": "string",
+					"description": 'Searches available tools to assist user; e.g. "image" for image generation.',
+					"enum": list(router),
+				}
+		if data.get("tools"):
+			data["tool_choice"] = tool_choice or {"type": "function", "function": {"name": "reply"}}
+		resp = await self.function_call(**data, timeout=60)
+		print("ChatCompletions:", model, snippet, resp)
+		message = resp.choices[0].message
+		if not message.tool_calls:
+			st = await count_to(snippet)
+			ct = await tcount(message.content)
+			return cdict(
+				id=cid,
+				choices=[cdict(
+					finish_reason=choice.finish_reason,
+					index=0,
+					logprobs=None,
+					text=message.content,
+					message=cdict(message),
+				)],
+				usage=cdict(
+					completion_tokens=ct,
+					prompt_tokens=st,
+					total_tokens=ct + st,
+				),
+			)
+		call = message.tool_calls[0].function
+		cargs = orjson.loads(call.arguments)
+		ftools = cargs.get("tool")
+		if ftools:
+			if tools:
+				ftools = [t for t in tools if t["function"]["name"] == ftools]
+			else:
+				ftools = router[ftools]
+		if modlvl >= 2:
+			formal = "gpt-4-0125-preview"
+			formal_backup = "gpt-4"
+			casual = "goliath-120b"
+			casual_backup = "gpt-3.5-turbo-instruct"
+		else:
+			formal = "gpt-3.5-turbo-0125"
+			formal_backup = "firefunction-v1"
+			casual = "mythomax-13b"
+			casual_backup = "stripedhyena-nous-7b"
+		is_formal = cargs["assistant"] == "formal"
+		has_function = is_formal
+		assistant = formal if is_formal else casual
+		assistant_backup = formal_backup if is_formal else casual_backup
+		selection = messages if is_formal else mid_cut
+		ml = min(max(256, min(4096, 8192 - length)) if is_formal else max(256, min(2048, 4096 - mid_length)), max_tokens)
+		resp = None
+		if not has_function and ftools:
+			data = dict(
+				model=formal,
+				messages=snippet,
+				temperature=tmp,
+				top_p=tpp,
+				frequency_penalty=fp,
+				presence_penalty=pp,
+				repetition_penalty=rp,
+				max_tokens=ml,
+				tools=ftools,
+				user=ustr,
+			)
+			try:
+				resp = await self.function_call(**data, timeout=30)
+				if not resp.choices[0].message.content.strip() and not resp.choices[0].message.tool_calls:
+					raise ValueError(resp)
+			except openai.BadRequestError:
+				raise
+			except:
+				print_exc()
+				data["model"] = formal_backup
+				resp = await self.function_call(**data, timeout=30)
+			print("LI:", resp)
+			if not getattr(resp.choices[0].message, "tool_calls", None):
+				resp = None
+		if not resp and has_function:
+			data = dict(
+				model=assistant,
+				messages=selection,
+				temperature=tmp,
+				top_p=tpp,
+				frequency_penalty=fp,
+				presence_penalty=pp,
+				repetition_penalty=rp,
+				max_tokens=ml,
+				user=ustr,
+			)
+			if ftools:
+				data["tools"] = ftools
+			try:
+				resp = await self.function_call(**data, rev_nsfw=False, timeout=90)
+				if not resp.choices[0].message.content.strip() and not resp.choices[0].message.tool_calls:
+					raise ValueError(resp)
+			except openai.BadRequestError:
+				raise
+			except:
+				print_exc()
+				data["model"] = assistant_backup
+				resp = await self.function_call(**data, rev_nsfw=False, timeout=90)
+			print("LL:", resp)
+		redo = False
+		cid = hex(ts_us()).removeprefix("0x") + "-Miza"
+		out = resp
+		if resp:
+			m = cdict(resp.choices[0].message)
+			m.content = m.get("content") or ""
+			text = m["content"]
+			if not text and not m.get("tool_calls"):
+				redo = True
+			elif len(text) >= 2 and text[-1] in ",: " or text.endswith(' "') or text.endswith('\n"'):
+				redo = True
+			if text and modlvl >= 1:
+				if not has_function:
+					text = ""
+					redo = True
+				else:
+					match = self.decensor.search(text)
+					if match:
+						i = match.start()
+						if "." in text[:i]:
+							text = text[:i].rsplit(".", 1)[0] + "."
+							a = await tcount(text)
+							if a < 64:
+								text = ""
+						else:
+							text = ""
+						redo = True
+			text = text.strip()
+		else:
+			redo = True
+		if redo:
+			assistant = casual
+			assistant_backup = casual_backup
+			instruct_formats = {
+				"mistral-7b": "mistral",
+				"mixtral-8x7b-instruct": "blockml",
+				"stripedhyena-7b": "chatml",
+				"mythomax-13b": "blockml",
+				"goliath-120b": "blockml",
+				"wizard-70b": "blockml",
+			}
+			fmt = instruct_formats.get(assistant, "chatml")
+			assistant_messages = [m for m in messages if m.get("role") == "assistant"]
+			if not assistant_messages:
+				bot_name = None
+			else:
+				assistant_names = [(m.get("name") or (m["content"].split(":", 1)[0] if ":" in m["content"] else "")) for m in assistant_messages]
+				bot_names = [n for n in assistant_names if n]
+				if not bot_names:
+					bot_name = None
+				else:
+					bot_name = bot_names[-1]
+			prompt, stopn = self.instruct_structure(selection, fmt=fmt, assistant=bot_name)
+			if text:
+				prompt += " " + text
+			data = dict(
+				model=assistant,
+				prompt=prompt,
+				temperature=tmp,
+				top_p=tpp,
+				frequency_penalty=fp,
+				presence_penalty=pp,
+				repetition_penalty=rp,
+				max_tokens=ml,
+				stop=list(set([*stops, *stopn])),
+				user=ustr,
+			)
+			print("CC:", data)
+			try:
+				resp = await self.llm("completions.create", **data, timeout=240)
+				if not resp.choices[0].text.strip():
+					raise ValueError(resp)
+			except openai.BadRequestError:
+				raise
+			except:
+				print_exc()
+				data["model"] = assistant_backup
+				resp = await self.llm("completions.create", **data, timeout=240)
+			print("LM:", resp)
+			out = resp
+			if text:
+				text += " "
+			text += resp.choices[0].text
+			text = text.strip()
+		choice = out.choices[0]
+		message = getattr(choice, "message", None)
+		ct = await tcount(text or "")
+		resp = cdict(
+			id=cid,
+			choices=[cdict(
+				finish_reason=choice.finish_reason,
+				index=0,
+				logprobs=None,
+				text=text or None,
+			)],
+			usage=cdict(
+				completion_tokens=ct,
+				prompt_tokens=length,
+				total_tokens=ct + length,
+			),
+			model=f"Miza/{model}",
+		)
+		if stream:
+			resp.choices[0].delta = cdict(
+				content=text or None,
+				role=getattr(message, "role", "assistant"),
+				**(dict(name=message.name) if getattr(message, "name", None) else {}),
+				tool_calls=getattr(message, "tool_calls", None),
+			)
+			resp["object"] = "chat.completion.chunk"
+		else:
+			resp.choices[0].message = cdict(
+				content=text or None,
+				role=getattr(message, "role", "assistant"),
+				**(dict(name=message.name) if getattr(message, "name", None) else {}),
+				tool_calls=getattr(message, "tool_calls", None),
+			)
+			resp["object"] = "chat.completion"
+		return resp
 
 	async def instruct(self, data, best=False, skip=False, prune=True, cache=True):
 		data["prompt"] = data.get("prompt") or data.pop("inputs", None) or data.pop("input", None)
@@ -2341,9 +2641,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						if p1:
 							prompts.append(p1)
 				else:
-					if p1:
+					if p1 and len(p1) > 8:
 						prompts.append(p1)
-					if p2:
+					if p2 and len(p2) > 8:
 						prompts.append(p2)
 			nprompts = []
 			ts = utc()
@@ -3105,9 +3405,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if self.users_updated:
 			self.usernames = {str(user): user for user in self.cache.users.values()}
 
+	sub_channels = {}
 	def update_subs(self):
 		self.sub_guilds = dict(self._guilds) or self.sub_guilds
-		self.sub_channels = dict(chain.from_iterable(guild._channels.items() for guild in self.sub_guilds.values())) or self.sub_channels
+		sc = self.sub_channels
+		self.sub_channels = dict(chain.from_iterable(guild._channels.items() for guild in self.sub_guilds.values())) or sc
+		self.sub_channels.update(sc)
 		if not hasattr(self, "guilds_ready") or not self.guilds_ready.done():
 			return
 		for guild in self.guilds:
@@ -4486,7 +4789,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						text += "!"
 				# Status iterates through 5 possible choices
 				status = self.statuses[self.status_iter]
-				if "blacklist" in self.data and self.data.blacklist.get(0):
+				if 0 and "blacklist" in self.data and self.data.blacklist.get(0):
 					status = None
 					activity = discord.Game(name=text)
 				elif status is discord.Streaming:
@@ -4601,6 +4904,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if ((u_perm <= -inf or not self.bot_ready) and mentioning) and not cpy.startswith("~~"):
 			# print(f"Ignoring command from blacklisted user {user} ({u_id}): {lim_str(message.content, 256)}")
 			if not self.ready:
+				print("BOUNCED:", user, message.content)
 				create_task(send_with_react(
 					channel,
 					"I am currently in the process of restarting, please hold tight!",
@@ -4608,6 +4912,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					reference=message,
 				))
 			else:
+				print("BOUNCED:", user, message.content)
 				create_task(send_with_react(
 					channel,
 					"Sorry, you are currently not permitted to request my services.",
@@ -7635,6 +7940,7 @@ def update_file_cache():
 		attachments.discard(a_id)
 
 def as_file(file, filename=None, ext=None, rename=True):
+	fn = None
 	if rename:
 		fn = round(ts_us())
 		for fi in os.listdir("saves/filehost"):
@@ -7694,6 +8000,7 @@ def as_file(file, filename=None, ext=None, rename=True):
 	#     url1 += fn
 	# if ext and "." not in url1:
 	#     url1 += "." + ext
+	print("AS_FILE:", file, filename, fn, url1)
 	return url1, url2
 
 def is_file(url):

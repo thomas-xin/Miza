@@ -2321,6 +2321,8 @@ def discord_expired(url):
 		return ts < utc() + 21600 + 60
 
 def expired(stream):
+	if not is_url(stream):
+		return True
 	if is_youtube_url(stream):
 		return True
 	if discord_expired(stream):
@@ -4722,6 +4724,155 @@ def m_name(m):
 
 async def count_to(messages):
 	return await tcount("\n\n".join(map(m_repr, messages)))
+
+
+TOOLS = {
+	"knowledge/internet": [{
+		"type": "function", "function": {
+			"name": "browse",
+			"description": "Searches internet browser, or visits given URL. Please search for results in the US when location is relevant!",
+			"parameters": {
+				"type": "object", "properties": {
+					"query": {
+						"type": "string",
+						"description": 'Query, eg. "Who won the 2025 world cup?", "https://youtu.be/dQw4w9WgXcQ"',
+					},
+				},
+				"required": ["query"],
+	}}}, {
+		"type": "function", "function": {
+			"name": "wolfram_alpha",
+			"description": "Queries Wolfram Alpha. Must use for advanced math questions.",
+			"parameters": {
+				"type": "object", "properties": {
+					"query": {
+						"type": "string",
+						"description": 'Query, eg. "Real solutions for x^3-6x^2+12", "eigenvalues of {{2,3,-3},{4,2,-4},{4,3,-5}}"',
+					},
+				},
+				"required": ["query"],
+	}}}, {
+		"type": "function", "function": {
+			"name": "sympy",
+			"description": "Queries the Sympy algebraic library. Faster than Wolfram Alpha for simple math operations.",
+			"parameters": {
+				"type": "object", "properties": {
+					"query": {
+						"type": "string",
+						"description": 'Query, eg. "factorint(57336415063790604359)", "randint(1,100)"',
+					},
+				},
+				"required": ["query"],
+	}}}, {
+		"type": "function", "function": {
+			"name": "myinfo",
+			"description": "Retrieves basic information about yourself and your creators/owners (default) or another user and their profile. Use this only when required!",
+			"parameters": {
+				"type": "object", "properties": {
+					"user": {
+						"type": "string",
+						"description": "Username, e.g. Dottie",
+					},
+				},
+	}}}, {
+		"type": "function", "function": {
+			"name": "recall",
+			"description": "Recalls previous messages from the conversation history.",
+			"parameters": {
+				"type": "object", "properties": {
+					"user": {
+						"type": "string",
+						"description": '''Query, e.g. "Jack's birthday, age, gender"''',
+					},
+				},
+	}}}],
+	"image": [{
+		"type": "function", "function": {
+			"name": "txt2img",
+			"description": "Creates an image of the input caption. Please be descriptive!!",
+			"parameters": {
+				"type": "object", "properties": {
+					"prompt": {
+						"type": "string",
+						"description": "Prompt, eg. Brilliant view of a futuristic city in an alien world, glowing spaceships, 8k fantasy art",
+					},
+				},
+				"required": ["prompt"],
+	}}}],
+	"calendar": [{
+		"type": "function", "function": {
+			"name": "reminder",
+			"description": "Sets a reminder for the user.",
+			"parameters": {
+				"type": "object", "properties": {
+					"message": {
+						"type": "string",
+						"description": "Message, eg. Remember to take your meds!",
+					},
+					"delay": {
+						"type": "string",
+						"description": "Delay, eg. 3 days 3.9 seconds",
+					},
+				},
+				"required": ["message", "delay"],
+	}}}],
+	"audio": [{
+		"type": "function", "function": {
+			"name": "play",
+			"description": "Searches and plays a song in the nearest voice channel.",
+			"parameters": {
+				"type": "object", "properties": {
+					"query": {
+						"type": "string",
+						"description": "Name or URL, eg. Rick Astley - Never gonna give you up",
+					},
+				},
+				"required": ["query"],
+	}}}, {
+		"type": "function", "function": {
+			"name": "audio",
+			"description": "Adjusts audio settings for current music player.",
+			"parameters": {
+				"type": "object", "properties": {
+					"mode": {
+						"type": "string",
+						"enum": ["volume", "reverb", "pitch", "speed", "pan", "bassboost", "compressor", "chorus", "nightcore", "bitrate"],
+					},
+					"value": {
+						"type": ["number", "string"],
+						"description": "New value percentage, eg. 300",
+					},
+				},
+				"required": ["mode", "value"],
+	}}}, {
+		"type": "function", "function": {
+			"name": "astate",
+			"description": "Adjusts music player state.",
+			"parameters": {
+				"type": "object", "properties": {
+					"mode": {
+						"type": "string",
+						"enum": ["pause", "loop", "repeat", "shuffle", "quit", "reset"],
+					},
+					"value": {
+						"type": "boolean",
+					},
+				},
+				"required": ["mode", "value"],
+	}}}, {
+		"type": "function", "function": {
+			"name": "askip",
+			"description": "Skips music player songs.",
+			"parameters": {
+				"type": "object", "properties": {
+					"range": {
+						"type": "boolean",
+						"description": "Python indexing syntax, eg. 0 or 1:6",
+					},
+				},
+				"required": ["range"],
+	}}}],
+}
 
 
 class CacheItem:
