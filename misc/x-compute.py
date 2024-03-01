@@ -2863,7 +2863,7 @@ def write_video(proc, data):
 	except:
 		print(traceback.format_exc(), end="")
 
-def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None):
+def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 	if b[:4] == b"<svg" or b[:5] == b"<?xml":
 		import wand, wand.image
 		with wand.image.Image() as im:
@@ -2962,6 +2962,14 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None):
 				fps = maxframes / dur
 				framedur = 1000 / fps
 				cmd3 = ["ffmpeg", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps}", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
+				print(cmd3)
+				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
+			elif size[0] * size[1] > msize ** 2:
+				proc.terminate()
+				w, h = max_size(*size, maxsize=msize)
+				w = round(w / 2) * 2
+				h = round(h / 2) * 2
+				cmd3 = ["ffmpeg", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"scale={w}:{h}:flags=lanczos", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
 				print(cmd3)
 				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
 			elif not nogif and bytecount > 32 * 1073741824:
@@ -3143,7 +3151,7 @@ if Image:
 				return getattr(self._images[self._position], key)
 
 
-def get_image(url, out=None, nodel=False, nogif=False, maxframes=inf):
+def get_image(url, out=None, nodel=False, nogif=False, maxframes=inf, msize=None):
 	if isinstance(url, Image.Image):
 		return url
 	out = out or url
@@ -3163,7 +3171,7 @@ def get_image(url, out=None, nodel=False, nogif=False, maxframes=inf):
 				data = get_request(url)
 			if len(data) > 8589934592:
 				raise OverflowError("Max file size to load is 8GB.")
-			image = from_bytes(data, save, nogif=nogif, maxframes=maxframes, orig=url)
+			image = from_bytes(data, save, nogif=nogif, maxframes=maxframes, orig=url, msize=msize)
 			# CACHE[url] = image
 		else:
 			if os.path.getsize(url) > 8589934592:
@@ -3175,11 +3183,11 @@ def get_image(url, out=None, nodel=False, nogif=False, maxframes=inf):
 			# 		os.remove(url)
 			# 	except:
 			# 		pass
-			image = from_bytes(data, save, nogif=nogif, maxframes=maxframes)
+			image = from_bytes(data, save, nogif=nogif, maxframes=maxframes, msize=msize)
 	else:
 		if len(url) > 8589934592:
 			raise OverflowError("Max file size to load is 8GB.")
-		image = from_bytes(url, maxframes=maxframes)
+		image = from_bytes(url, maxframes=maxframes, msize=msize)
 	return image
 
 
@@ -3225,17 +3233,21 @@ def evalImg(url, operation, args):
 				nodel = args.pop(-1)
 			else:
 				nodel = False
-			image = get_image(url, out, nodel=nodel, nogif=nogif, maxframes=maxframes)
+			if operation == "resize_max":
+				msize = args[1]
+			else:
+				msize = None
+			image = get_image(url, out, nodel=nodel, nogif=nogif, maxframes=maxframes, msize=msize)
 		# print("AOPER:", image, args)
 		# -gif is a special case where the output is always an animated format (gif, mp4, mkv etc)
 		if args and args[-1] == "-gif":
 			args.pop(-1)
 			if fmt in ("default", "png", "jpg", "jpeg", "bmp", "webp"):
 				fmt = "gif"
-			if fmt == "gif" and np.prod(image.size) > 262144:
-				size = max_size(*image.size, 512)
-				if size != image.size:
-					image = ImageSequence.open(image, func=resize_to, args=size)
+			# if fmt == "gif" and np.prod(image.size) > 262144:
+			# 	size = max_size(*image.size, 512)
+			# 	if size != image.size:
+			# 		image = ImageSequence.open(image, func=resize_to, args=size)
 			new = eval(operation)(image, *args)
 			# print("GIF:", new)
 		else:

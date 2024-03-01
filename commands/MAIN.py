@@ -1162,21 +1162,19 @@ class Upload(Command):
 		if not args:
 			out = [self.bot.raw_webserver + "/files"]
 		else:
-			waited = False
 			futs = deque()
 			for url in args:
 				if name in ("files", "preserve", "preserveattachmentlinks") and is_discord_attachment(url):
 					a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-					if not waited and a_id not in self.bot.data.attachments:
-						waited = True
-						await asyncio.sleep(2)
+					if a_id not in self.bot.data.attachments:
+						url = await self.bot.renew_attachment(url)
 					found = None
 					for attachment in message.attachments:
 						if attachment.id == a_id:
 							found = attachment
 							break
 					if found:
-						url = self.bot.preserve_into(channel, message, a_id, ext=found.url)
+						url = self.bot.preserve_into(message.channel.id, message.id, a_id, ext=found.url)
 						futs.append(as_fut(url))
 						continue
 					if a_id in self.bot.data.attachments:

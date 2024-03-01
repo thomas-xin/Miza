@@ -669,7 +669,7 @@ class Server:
 			if a2.startswith(".temp$@"):
 				a2 = a2[7:]
 				a3 = True
-				if not st.st_size or st.st_size > 48 * 1048576:
+				if not st.st_size or st.st_size > 48 * 1048576 or st.st_size == 147408:
 					with tracebacksuppressor:
 						os.remove(p)
 					p = find_file(path, cwd=("saves/filehost"), ind=ind)
@@ -773,7 +773,20 @@ class Server:
 							# print(urls)
 							if len(urls) == 1:
 								if not is_url(urls[0]):
-									p = find_file(urls[0], cwd=("cache", "saves/filehost"))
+									p = find_file(urls[0], cwd=("cache", "saves/filehost"), ind=ind)
+									fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
+									ax = filename or fn
+									a2 = url_unparse(ax)
+									if a2.startswith(".temp$@"):
+										a2 = a2[7:]
+										a3 = True
+										if not st.st_size or st.st_size > 48 * 1048576 or st.st_size == 147408:
+											with tracebacksuppressor:
+												os.remove(p)
+											p = find_file(path, cwd=("saves/filehost"), ind=ind)
+											mime = get_mime(p)
+											st = os.stat(p)
+											a3 = False
 									urls = self._fileinfo(f"@{urls[0]}").get("chunks", ())
 								if download and ("Cf-Worker" not in cp.request.headers or not is_discord_attachment(url)):
 									raise cp.HTTPRedirect(urls[0], status="307")
@@ -2241,8 +2254,9 @@ class Server:
 			+ (f'<!--SHA={ha1}-->' if ha1 else "")
 			+ '</html>'
 		)
+		pn = True
 		with suppress(FileNotFoundError):
-			while True:
+			while pn:
 				pn = find_file(ts, cwd="saves/filehost")
 				os.remove(pn)
 		with open(fn, "w", encoding="utf-8") as f:

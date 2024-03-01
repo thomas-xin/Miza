@@ -681,7 +681,7 @@ def nop2(s):
 class FileHashDict(collections.abc.MutableMapping):
 
 	sem = Semaphore(64, 128, 0.3, 1)
-	cache_size = 256
+	cache_size = 4096
 	encoder = [nop2, nop2]
 
 	def __init__(self, *args, path="", encode=None, decode=None, **kwargs):
@@ -800,8 +800,10 @@ class FileHashDict(collections.abc.MutableMapping):
 	def __getitem__(self, k):
 		if k in self.deleted:
 			raise KeyError(k)
-		with suppress(KeyError):
+		try:
 			return self.data[k]
+		except KeyError:
+			pass
 		fn = self.key_path(k)
 		if not os.path.exists(fn):
 			if k != "~":
@@ -925,6 +927,7 @@ class FileHashDict(collections.abc.MutableMapping):
 		return self
 
 	def clear(self):
+		print("WARNING: Clearing", self.path)
 		self.iter = None
 		self.modified.clear()
 		self.deleted.clear()
@@ -5251,7 +5254,6 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
 		self.update(force=True)
 		bot.data.pop(self, None)
 		bot.database.pop(self, None)
-		self.data.clear()
 
 
 class ImagePool:

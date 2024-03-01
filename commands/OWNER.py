@@ -551,6 +551,8 @@ class UpdateExec(Database):
 			if is_url(url):
 				try:
 					out[i] = self.bot.data.proxies[uhash(url)]
+					if discord_expired(out[i]):
+						raise KeyError(out[i])
 				except KeyError:
 					if not sendable:
 						out[i] = url

@@ -1057,7 +1057,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				m = self.data.message_cache.load_message(m_id)
 		if m:
 			if m.attachments:
-				if any(expired(str(a.url)) for a in m.attachments):
+				if any(discord_expired(str(a.url)) for a in m.attachments):
 					if channel:
 						if isinstance(channel, int):
 							channel = self.cache.channels.get(channel)
@@ -1179,7 +1179,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			a_id = url
 			tup = self.data.attachments.get(a_id)
 			if is_url(tup):
-				return tup
+				return await self.backup_url(tup)
 			if not tup:
 				return "https://mizabot.xyz/notfound.png"
 			c_id, m_id = tup
@@ -1189,11 +1189,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if not m_id:
 			m_id = self.data.attachments.get(a_id)
 			if is_url(m_id):
-				return m_id
+				return await self.backup_url(m_id)
 			if isinstance(m_id, (tuple, list)):
 				c_id, m_id = m_id
 		if not m_id:
-			return url.rstrip("&")
+			return await self.backup_url(url)
 		channel = await self.fetch_channel(c_id)
 		try:
 			message = self.data.message_cache.load_message(m_id)
@@ -1208,13 +1208,24 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			message = await channel.fetch_message(m_id)
 		except:
 			print_exc()
-			return url.rstrip("&")
+			return await self.backup_url(url)
 		self.add_message(message, force=True)
 		for attachment in message.attachments:
 			if attachment.id == a_id:
 				return str(attachment.url).rstrip("&")
-		# raise FileNotFoundError(f"Attachment {a_id} disappeared.")
-		return url.rstrip("&")
+		return await self.backup_url(url)
+
+	async def backup_url(self, url):
+		a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+		u = url.rstrip("&")
+		if discord_expired(u):
+			u2 = None
+			with tracebacksuppressor:
+				u2 = await self.data.exec.aproxy(u.split("?", 1)[0])
+			if u2:
+				self.data.attachments[a_id] = url
+				return u2
+		return u
 
 	async def delete_attachments(self, aids=()):
 		futs = []
@@ -1346,39 +1357,40 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return "⬜" * position + "⬛" * (length - position)
 
 	async def history(self, channel, limit=200, before=None, after=None, care=True):
-		c = self.in_cache(verify_id(channel))
-		if c is None:
-			c = channel
-		if channel is None:
-			return
-		if not is_channel(channel):
-			channel = await self.get_dm(channel)
 		found = set()
-		if "channel_cache" in self.data:
-			async for message in self.data.channel_cache.grab(channel.id, as_message=care, force=False):
-				if isinstance(message, int):
-					message = cdict(id=message)
-				if before:
-					if message.id >= time_snowflake(before):
-						continue
-				if after:
-					if message.id <= time_snowflake(after):
-						break
-				found.add(message.id)
-				yield message
-				if limit is not None and len(found) >= limit:
-					return
-		if type(before) is int:
-			before = cdict(id=before)
-		if type(after) is int:
-			after = cdict(id=after)
-		if getattr(channel, "simulated", None):
-			return
+		# c = self.in_cache(verify_id(channel))
+		# if c is None:
+		# 	c = channel
+		# if channel is None:
+		# 	return
+		# if not is_channel(channel):
+		# 	channel = await self.get_dm(channel)
+		# if "channel_cache" in self.data:
+		# 	async for message in self.data.channel_cache.grab(channel.id, as_message=care, force=False):
+		# 		if isinstance(message, int):
+		# 			message = cdict(id=message)
+		# 		if before:
+		# 			if message.id >= time_snowflake(before):
+		# 				continue
+		# 		if after:
+		# 			if message.id <= time_snowflake(after):
+		# 				break
+		# 		found.add(message.id)
+		# 		yield message
+		# 		if limit is not None and len(found) >= limit:
+		# 			return
+		# if type(before) is int:
+		# 	before = cdict(id=before)
+		# if type(after) is int:
+		# 	after = cdict(id=after)
+		# if getattr(channel, "simulated", None):
+		# 	return
 		async for message in discord.abc.Messageable.history(channel, limit=limit, before=before, after=after):
-			if message.id not in found:
-				self.add_message(message, files=False, force=True)
-				found.add(message.id)
-				yield message
+			if message.id in found:
+				continue
+			self.add_message(message, files=False, force=True)
+			found.add(message.id)
+			yield message
 
 	async def get_last_message(self, channel, key=None):
 		m_id = getattr(channel, "last_message_id", None)
@@ -1456,7 +1468,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			pass
 		for url in urls:
 			if discord_expired(url):
-				await self.renew_attachment(url)
+				url = await self.renew_attachment(url)
 			u = getattr(url, "url", None)
 			if u:
 				url = u
@@ -1469,6 +1481,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				except:
 					print_exc()
 				else:
+					if preserve:
+						for a in m.attachments:
+							self.preserve_into(c.id, m.id, a.id, ext=a.url)
 					# All attachments should be valid URLs
 					if best:
 						found.extend(best_url(a) for a in m.attachments)
@@ -1726,10 +1741,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			e = cdict(id=e, animated=animated)
 		return min_emoji(e)
 
-	async def optimise_image(self, image, fsize=25165824, msize=None, fmt="mp4", duration=None):
+	async def optimise_image(self, image, fsize=25165824, msize=None, fmt="mp4", duration=None, timeout=3600):
 		ts = ts_us()
 		fn = f"cache/{ts}~oi"
-		if is_url(image):
+		if isinstance(image, str) and is_url(image):
 			subprocess.run([sys.executable, "downloader.py", "-threads", "3", image, f"../{fn}"], cwd="misc")
 			mime = magic.from_file(fn)
 			size = os.path.getsize(fn)
@@ -1776,22 +1791,26 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						else:
 							devid = random.randint(0, ceil(torch.cuda.device_count() / 2))
 						args.extend(("-hwaccel_device", str(devid)))
-					args.extend(("-i", fi, "-c", "copy", f2))
+					args.extend(("-i", fi, "-c", "copy"))
+					if hwaccel == "cuda":
+						if fmt == "mp4":
+							args.extend(("-c:v", "h264_nvenc"))
+						elif fmt in ("webm", "ts"):
+							args.extend(("-c:v", "av1_nvenc"))
+					args.append(f2)
 					fn = f2
+					print(args)
+					proc = await asyncio.create_subprocess_exec(*args)
+					async with asyncio.timeout(timeout):
+						await proc.wait()
 			dur = float(dur)
 			bps = floor(fsize / dur * 7.5) # 7.5 bits per byte?
 			f2 = fn + "~"
 			args = ["./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-hwaccel", hwaccel, "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,fd,http,https,tcp,tls"]
-			if hwaccel == "cuda" and torch:
-				if "av1_nvenc" in args:
-					devid = random.choice([i for i in range(torch.cuda.device_count()) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor) >= (8, 9)])
-				else:
-					devid = random.randint(0, ceil(torch.cuda.device_count() / 2))
-				args.extend(("-hwaccel_device", str(devid)))
 			args.extend(("-i", fi, "-pix_fmt", "yuv420p", "-f", fmt, "-b:v", str(bps), "-c:a", "copy", f2))
 			print(args)
 			proc = await asyncio.create_subprocess_exec(*args)
-			async with asyncio.timeout(600):
+			async with asyncio.timeout(timeout):
 				await proc.wait()
 			try:
 				with open(f2, "rb") as f:
@@ -1824,7 +1843,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if duration is not None:
 				args += ["-d", duration]
 			args += ["-f", fmt]
-			resp = await process_image(o_image, "resize_max", args, timeout=30, retries=2)
+			resp = await process_image(o_image, "resize_max", args, timeout=timeout, retries=2)
 			if not resp:
 				break
 			image = resp
@@ -2176,7 +2195,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return resp
 		raise (exc or RuntimeError("Unknown error occured."))
 
-	async def chat_completion(self, messages, model="miza-1", frequency_penalty=None, presence_penalty=None, repetition_penalty=None, max_tokens=256, temperature=0.7, top_p=0.9, tools=None, tool_choice=None, router=None, stops=(), user=None, stream=False, **void):
+	async def chat_completion(self, messages, model="miza-1", frequency_penalty=None, presence_penalty=None, repetition_penalty=None, max_tokens=256, temperature=0.7, top_p=0.9, tools=None, tool_choice=None, router=None, stops=(), user=None, name=None, stream=False, **void):
 		if void:
 			print("VOID:", void)
 		modlvl = ["miza-1", "miza-2", "miza-3"].index(model.rsplit("/", 1)[-1])
@@ -2389,7 +2408,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			}
 			fmt = instruct_formats.get(assistant, "chatml")
 			assistant_messages = [m for m in messages if m.get("role") == "assistant"]
-			if not assistant_messages:
+			if name:
+				bot_name = name
+			elif not assistant_messages:
 				bot_name = None
 			else:
 				assistant_names = [(m.get("name") or (m["content"].split(":", 1)[0] if ":" in m["content"] else "")) for m in assistant_messages]
@@ -6625,8 +6646,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if k == "type":
 					return discord.enums.try_enum(discord.MessageType, d.get("type", 0))
 				if k == "attachments":
-					self.attachments = [discord.Attachment(data=a, state=bot._state) for a in d.get("attachments", ())]
+					self.attachments = attachments = [discord.Attachment(data=a, state=bot._state) for a in d.get("attachments", ())]
 					apply_stickers(self, d)
+					return attachments
 				if k == "embeds":
 					return [discord.Embed.from_dict(a) for a in d.get("embeds", ())]
 				if k == "system_content" and not d.get("type"):
