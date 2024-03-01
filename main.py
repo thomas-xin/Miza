@@ -100,11 +100,11 @@ if os.name == "nt":
 			"https://cdn.discordapp.com/attachments/886856504135802890/1084164385146155018/c.b",
 			"https://cdn.discordapp.com/attachments/886856504135802890/1084164385754337391/c.b",
 			"https://cdn.discordapp.com/attachments/886856504135802890/1084164386593181736/c.b",
-			"ffmpeg.zip",
+			"../cache/ffmpeg.zip",
 		], cwd="misc")
 		import zipfile, io
 		print("Download complete; extracting new FFmpeg installation...")
-		f = "misc/ffmpeg.zip"
+		f = "cache/ffmpeg.zip"
 		with zipfile.ZipFile(f) as z:
 			names = [name for name in z.namelist() if "bin/" in name and (".exe" in name or ".dll" in name)]
 			for i, name in enumerate(names):
@@ -125,9 +125,9 @@ if os.name == "nt":
 			os.mkdir("misc/poppler")
 		except FileExistsError:
 			pass
-		subprocess.run([sys.executable, "downloader.py", "https://cdn.discordapp.com/attachments/1091275350740320258/1107280656347705404/poppler.zip", "poppler.zip"], cwd="misc")
+		subprocess.run([sys.executable, "downloader.py", "https://cdn.discordapp.com/attachments/1091275350740320258/1107280656347705404/poppler.zip", "../cache/poppler.zip"], cwd="misc")
 		import zipfile, io
-		f = "misc/poppler.zip"
+		f = "cache/poppler.zip"
 		print("Download complete; extracting new Poppler installation...")
 		if os.path.exists(f):
 			with zipfile.ZipFile(f) as z:

@@ -1071,7 +1071,9 @@ class Resize(Command):
 			if op == "swinir":
 				func = "IBASU"
 				cap = "sdxl"
-			resp = await process_image(url, func, [x, y, op, "-f", fmt], cap=cap, timeout=_timeout)
+			resp = url
+			if not fl or not x == y == 1:
+				resp = await process_image(resp, func, [x, y, op, "-f", fmt], cap=cap, timeout=_timeout)
 			if fl:
 				resp = await bot.optimise_image(resp, fsize=fl, fmt=fmt)
 			fn = resp

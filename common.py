@@ -494,6 +494,7 @@ try:
 except AttributeError:
 	CE2 = concurrent.futures.CancelledError
 TE = subprocess.TimeoutExpired
+CPE = subprocess.CalledProcessError
 
 
 class ArgumentError(LookupError):
@@ -2383,6 +2384,7 @@ VIDEO_FORMS = {
 	".mpg": True,
 	".mpeg": True,
 	".mpv": True,
+	".m3u8": True,
 }
 def is_video(url):
 	if "." in url:
@@ -2463,6 +2465,36 @@ def simple_mimes(b, mime=True):
 	return "text/plain" if mime else "txt"
 
 
+special_mimes = {
+	"avi": "x-msvideo",
+	"bin": "octet-stream",
+	"bz": "x-bzip",
+	"bz2": "x-bzip2",
+	"jpeg": "jpg",
+	"javascript": "js",
+	"mpeg": "mpg",
+	"php": "x-httpd-php",
+	"rar": "vnd.rar",
+	"svg": "svg+xml",
+	"tar": "x-tar",
+	"mp2t": "ts",
+	"plain": "txt",
+	"7z": "x-7z-compressed",
+}
+
+def mime_equiv(a, b):
+	if a == b:
+		return True
+	a = a.split("/", 1)[-1]
+	b = b.split("/", 1)[-1]
+	if a == b:
+		return True
+	a, b = sorted((a, b))
+	if a == "jpeg" and b == "jpg":
+		return True
+	return special_mimes.get(a) == b
+
+
 def from_file(path, mime=True):
 	path = filetype.get_bytes(path)
 	if mime:
@@ -2479,6 +2511,8 @@ def from_file(path, mime=True):
 		out = simple_mimes(path, mime)
 	if out == "application/octet-stream" and path.startswith(b'ECDC'):
 		return "audio/ecdc"
+	if out == "text/plain" and path.startswith(b"#EXTM3U"):
+		return "video/m3u8"
 	return out
 
 magic = cdict(

@@ -1528,6 +1528,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			elif ytd and self.ytdl:
 				resp = await create_future(self.ytdl.search, url, follow=False)
 				resp = resp[0]
+				if isinstance(resp, str):
+					raise evalEX(resp)
 				if not resp.get("direct"):
 					await create_future(self.ytdl.get_stream, resp, download=False, force=True)
 				if resp.get("video"):
@@ -1724,39 +1726,123 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			e = cdict(id=e, animated=animated)
 		return min_emoji(e)
 
-	async def optimise_image(self, image, fsize=25165824, msize=None, fmt="mp4"):
-		if not msize and len(image) < fsize and magic.from_buffer(image).split("/", 1)[0] in ("image", "video"):
-			return image
+	async def optimise_image(self, image, fsize=25165824, msize=None, fmt="mp4", duration=None):
 		ts = ts_us()
 		fn = f"cache/{ts}~oi"
-		with open(fn, "wb") as f:
-			f.write(image)
-		cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", fn)
-		print(cmd)
-		out = subprocess.check_output(cmd)
-		w, h = map(int, out.split(b"x"))
-		print(len(image), fsize, msize, w, h)
-		if not msize:
-			width = isqrt(w * h * fsize / len(image))
+		if is_url(image):
+			subprocess.run([sys.executable, "downloader.py", "-threads", "3", image, f"../{fn}"], cwd="misc")
+			mime = magic.from_file(fn)
+			size = os.path.getsize(fn)
+			if mime != "video/m3u8":
+				image = fn
+		elif isinstance(image, str):
+			fn = image
+			mime = magic.from_file(fn)
+			size = os.path.getsize(fn)
 		else:
-			if msize == isqrt(w * h) and len(image) < fsize and magic.from_buffer(image).split("/", 1)[0] in ("image", "video"):
+			mime = magic.from_buffer(image)
+			size = len(image)
+		if mime != "video/m3u8" and not msize and size < fsize and mime.split("/", 1)[0] in ("image", "video") and mime_equiv(mime, fmt):
+			if isinstance(image, str) and os.path.exists(fn):
+				with open(fn, "rb") as f:
+					return f.read()
+			return image
+		if not os.path.exists(fn):
+			with open(fn, "wb") as f:
+				f.write(image)
+		if mime.split("/", 1)[0] == "video" and VIDEO_FORMS.get("." + fmt):
+			fi = image if isinstance(image, str) else fn
+			cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "format=duration", "-of", "csv=s=x:p=0", fi)
+			print(cmd)
+			try:
+				dur = await create_future(subprocess.check_output, cmd)
+			except CPE:
+				dur = ""
+			if not dur.strip():
+				cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration", "-of", "csv=s=x:p=0", fi)
+				print(cmd)
+				try:
+					dur = await create_future(subprocess.check_output, cmd)
+				except CPE:
+					dur = ""
+				if not dur.strip():
+					f2 = f"cache/{ts}~oi.ts"
+					args = ["./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-hwaccel", hwaccel, "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,fd,http,https,tcp,tls"]
+					if duration is not None:
+						args.extend(("-to", str(duration)))
+					if hwaccel == "cuda" and torch:
+						if "av1_nvenc" in args:
+							devid = random.choice([i for i in range(torch.cuda.device_count()) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor) >= (8, 9)])
+						else:
+							devid = random.randint(0, ceil(torch.cuda.device_count() / 2))
+						args.extend(("-hwaccel_device", str(devid)))
+					args.extend(("-i", fi, "-c", "copy", f2))
+					fn = f2
+			dur = float(dur)
+			bps = floor(fsize / dur * 7.5) # 7.5 bits per byte?
+			f2 = fn + "~"
+			args = ["./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-hwaccel", hwaccel, "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,fd,http,https,tcp,tls"]
+			if hwaccel == "cuda" and torch:
+				if "av1_nvenc" in args:
+					devid = random.choice([i for i in range(torch.cuda.device_count()) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor) >= (8, 9)])
+				else:
+					devid = random.randint(0, ceil(torch.cuda.device_count() / 2))
+				args.extend(("-hwaccel_device", str(devid)))
+			args.extend(("-i", fi, "-pix_fmt", "yuv420p", "-f", fmt, "-b:v", str(bps), "-c:a", "copy", f2))
+			print(args)
+			proc = await asyncio.create_subprocess_exec(*args)
+			async with asyncio.timeout(600):
+				await proc.wait()
+			try:
+				with open(f2, "rb") as f:
+					return f.read()
+			finally:
+				with tracebacksuppressor:
+					os.remove(fn)
+					os.remove(f2)
+		cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", fn)
+		print(cmd)
+		out = await create_future(subprocess.check_output, cmd)
+		w, h = map(int, out.split(b"x"))
+		print(size, fsize, msize, w, h)
+		if not msize:
+			width = isqrt(w * h * fsize / size)
+		else:
+			if msize == isqrt(w * h) and size < fsize and mime.split("/", 1)[0] in ("image", "video") and mime_equiv(mime, fmt):
+				if isinstance(image, str) and os.path.exists(fn):
+					with open(fn, "rb") as f:
+						return f.read()
+				with tracebacksuppressor:
+					os.remove(fn)
 				return image
 			width = msize
 		o_image = image
 		verified = False
-		while len(image) > fsize or not verified:
+		while size > fsize or not verified:
 			print("RESIZE:", width)
-			resp = await process_image(o_image, "resize_max", [width, bool(msize), "-o", "-f", fmt], timeout=30, retries=2)
+			args = [width, bool(msize), "-o"]
+			if duration is not None:
+				args += ["-d", duration]
+			args += ["-f", fmt]
+			resp = await process_image(o_image, "resize_max", args, timeout=30, retries=2)
 			if not resp:
 				break
 			image = resp
-			r = len(image) / fsize
+			size = len(image)
+			r = size / fsize
 			if r > 1:
 				width = min(width - 1, floor(width / sqrt(r)))
 				continue
 			verified = True
-		print("opt:", len(image))
-		return image
+		print("opt:", size)
+		try:
+			if isinstance(image, str) and os.path.exists(fn):
+				with open(fn, "rb") as f:
+					return f.read()
+			return image
+		finally:
+			with tracebacksuppressor:
+				os.remove(fn)
 
 	llcache = Cache(timeout=43200, trash=256)
 	browse_locations = {
@@ -2078,7 +2164,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			kwargs["model"] = model
 			try:
 				resp = await self.llm("chat.completions.create", *args, **kwargs)
-				if not resp.choices[0].message.content and not resp.choices[0].message.tool_calls:
+				m = resp.choices[0].message
+				if (not m.content or not m.content.strip()) and not m.tool_calls:
 					raise ValueError(resp)
 			except Exception as ex:
 				if not exc:
@@ -2221,7 +2308,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			)
 			try:
 				resp = await self.function_call(**data, timeout=30)
-				if not resp.choices[0].message.content.strip() and not resp.choices[0].message.tool_calls:
+				m = resp.choices[0].message
+				if (not m.content or not m.content.strip()) and not m.tool_calls:
 					raise ValueError(resp)
 			except openai.BadRequestError:
 				raise
@@ -2230,7 +2318,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				data["model"] = formal_backup
 				resp = await self.function_call(**data, timeout=30)
 			print("LI:", resp)
-			if not getattr(resp.choices[0].message, "tool_calls", None):
+			if not getattr(m, "tool_calls", None):
 				resp = None
 		if not resp and has_function:
 			data = dict(
@@ -2248,7 +2336,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				data["tools"] = ftools
 			try:
 				resp = await self.function_call(**data, rev_nsfw=False, timeout=90)
-				if not resp.choices[0].message.content.strip() and not resp.choices[0].message.tool_calls:
+				m = resp.choices[0].message
+				if (not m.content or not m.content.strip()) and not m.tool_calls:
 					raise ValueError(resp)
 			except openai.BadRequestError:
 				raise

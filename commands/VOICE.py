@@ -1430,7 +1430,7 @@ class AudioDownloader:
 					with requests.head(url, headers=Request.header(), stream=True) as resp:
 						url = resp.url
 						name = url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-						ctype = resp.headers.get("Content-Type")
+						ctype = resp.headers.get("Content-Type") or "text/plain"
 						if ctype.startswith("video") or ctype.startswith("audio"):
 							return dict(
 								id=name,
@@ -3392,7 +3392,7 @@ class AudioDownloader:
 					print(args)
 					proc = psutil.Popen(args, stderr=subprocess.PIPE)
 					proc.wait()
-			except subprocess.CalledProcessError as ex:
+			except CPE as ex:
 				# Attempt to convert file from org if FFmpeg failed
 				try:
 					url = ast[0]
@@ -3410,7 +3410,7 @@ class AudioDownloader:
 				try:
 					resp = subprocess.run(args, stderr=subprocess.PIPE)
 					resp.check_returncode()
-				except subprocess.CalledProcessError as ex:
+				except CPE as ex:
 					if resp.stderr:
 						raise RuntimeError(*ex.args, resp.stderr)
 					raise ex
@@ -3439,7 +3439,7 @@ class AudioDownloader:
 						try:
 							resp = subprocess.run(args)
 							resp.check_returncode()
-						except subprocess.CalledProcessError as ex:
+						except CPE as ex:
 							if resp.stderr:
 								raise RuntimeError(*ex.args, resp.stderr)
 							raise ex
@@ -3623,7 +3623,7 @@ class Queue(Command):
 		async with discord.context_managers.Typing(channel):
 			# Perform search concurrently, may contain multiple URLs
 			out = None
-			urls = await bot.follow_url(argv, allow=True, images=False)
+			urls = await bot.follow_url(argv, allow=True, images=False, ytd=False)
 			if urls:
 				if len(urls) == 1:
 					argv = urls[0]
@@ -5586,7 +5586,7 @@ class Download(Command):
 			argv = verify_search(argv)
 			res = []
 			# Input may be a URL or set of URLs, in which case we attempt to find the first one
-			urls = await bot.follow_url(argv, allow=True, images=False)
+			urls = await bot.follow_url(argv, allow=True, images=False, ytd=False)
 			if urls:
 				if not concat and not multi:
 					urls = (urls[0],)
@@ -6103,7 +6103,7 @@ class UpdateAudio(Database):
 		ytdl.ytd_blocked.attach(bot.data.inaccessible)
 		try:
 			await asubmit(subprocess.check_output, ("./ffmpeg",))
-		except subprocess.CalledProcessError:
+		except CPE:
 			pass
 		except FileNotFoundError:
 			print("WARNING: FFmpeg not found. Unable to convert and play audio.")

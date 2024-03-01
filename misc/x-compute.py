@@ -232,6 +232,8 @@ def from_file(path, mime=True):
 		out = simple_mimes(path, mime)
 	if out == "application/octet-stream" and path.startswith(b'ECDC'):
 		return "audio/ecdc"
+	if out == "text/plain" and path.startswith(b"#EXTM3U"):
+		return "video/m3u8"
 	return out
 
 class magic:
@@ -2861,7 +2863,7 @@ def write_video(proc, data):
 	except:
 		print(traceback.format_exc(), end="")
 
-def from_bytes(b, save=None, nogif=False, maxframes=inf):
+def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None):
 	if b[:4] == b"<svg" or b[:5] == b"<?xml":
 		import wand, wand.image
 		with wand.image.Image() as im:
@@ -2909,9 +2911,12 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf):
 		if mime.split("/", 1)[0] in ("image", "video"):
 			fmt = "rgba" if mime.split("/", 1)[0] == "image" else "rgb24"
 			ts = time.time_ns() // 1000
-			fn = "cache/" + str(ts)
-			with open(fn, "wb") as f:
-				f.write(data)
+			if mime == "video/m3u8" and orig:
+				fn = orig
+			else:
+				fn = "cache/" + str(ts)
+				with open(fn, "wb") as f:
+					f.write(data)
 			cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate,duration", "-of", "csv=s=x:p=0", fn)
 			print(cmd)
 			p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -3158,7 +3163,7 @@ def get_image(url, out=None, nodel=False, nogif=False, maxframes=inf):
 				data = get_request(url)
 			if len(data) > 8589934592:
 				raise OverflowError("Max file size to load is 8GB.")
-			image = from_bytes(data, save, nogif=nogif, maxframes=maxframes)
+			image = from_bytes(data, save, nogif=nogif, maxframes=maxframes, orig=url)
 			# CACHE[url] = image
 		else:
 			if os.path.getsize(url) > 8589934592:
