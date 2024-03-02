@@ -247,7 +247,7 @@ class Server:
 			rpath = "/" + rpath
 		rquery = cp.request.query_string
 		irl = f"{self.state['/']}/u{rpath}"
-		if irl not in self.ucache or discord_expired(self.ucache[irl][1]):
+		if irl not in self.ucache or discord_expired(self.ucache[irl][1]) or self.ucache[irl][1] == "https://mizabot.xyz/notfound.png" and time.time() - self.ucache[irl][0] > 30:
 			headers = dict(cp.request.headers)
 			headers.pop("Connection", None)
 			headers.pop("Transfer-Encoding", None)
