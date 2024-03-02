@@ -670,12 +670,17 @@ class Server:
 				a2 = a2[7:]
 				a3 = True
 				if not st.st_size or st.st_size > 48 * 1048576 or st.st_size == 147408:
-					with tracebacksuppressor:
-						os.remove(p)
-					p = find_file(path, cwd=("saves/filehost"), ind=ind)
-					mime = get_mime(p)
-					st = os.stat(p)
-					a3 = False
+					try:
+						p2 = find_file(path, cwd=("saves/filehost"), ind=ind)
+					except FileNotFoundError:
+						p2 = None
+					if p2:
+						with tracebacksuppressor:
+							os.remove(p)
+						p = p2
+						mime = get_mime(p)
+						st = os.stat(p)
+						a3 = False
 			else:
 				a3 = False
 			cp.response.headers["Attachment-Filename"] = a2

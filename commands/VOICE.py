@@ -2782,7 +2782,7 @@ class AudioDownloader:
 			entry["ex"] = repr(ex)
 
 	# Video concatenation algorithm; supports different formats, codecs, resolutions, aspect ratios and framerates
-	def concat_video(self, urls, fmt, start, end, auds, message=None):
+	def concat_video(self, urls, fmt, start, end, message=None):
 		urls = list(urls)
 		ts = ts_us()
 		# Collect information on first video stream; use this as the baseline for all other streams to concatenate
@@ -2829,10 +2829,11 @@ class AudioDownloader:
 				args.extend(("-c:v", "h264_nvenc"))
 			elif fmt in ("webm", "ts"):
 				args.extend(("-c:v", "av1_nvenc"))
+		name = url_parse(info["name"])
 		if len(urls) > 1:
-			outf = f"{info['name']} +{len(urls) - 1}.{fmt}"
+			outf = f"{name} +{len(urls) - 1}.{fmt}"
 		else:
-			outf = f"{info['name']}.{fmt}"
+			outf = f"{name}.{fmt}"
 		fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
 		fnv = f"cache/V{ts}~" + outf.translate(filetrans)
 		args.append(fnv)
@@ -2897,12 +2898,14 @@ class AudioDownloader:
 							s = round_min(float(start))
 						if str(end) != "None":
 							e = round_min(min(float(end), 86400))
-						args = [sys.executable, "misc/lightning.py", video, str(s), str(e), fnv]
+						fnv2 = f"cache/V{ts}~2" + outf.translate(filetrans)
+						args = [sys.executable, "misc/lightning.py", video, str(s), str(e), fnv2]
 						print(args)
 						force_kill(proc)
 						proc = psutil.Popen(args, stdin=subprocess.PIPE)
 						proc.wait()
-						duration = get_duration(fnv)
+						duration = get_duration(fnv2)
+						fnv = fnv2
 					else:
 						print(args)
 						pin = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=1048576)

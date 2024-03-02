@@ -4673,7 +4673,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			expendable = sorted(expendable, key=lambda f: ((t - max(f.stat().st_atime, f.stat().st_mtime)) // 3600, f.stat().st_size), reverse=True)
 			if not expendable:
 				return 0
-			while stats.free < 81 * 1073741824 or len(expendable) > 8192 or (t - expendable[0].stat().st_atime) > 3600 * 12:
+			while stats.free < 81 * 1073741824 or len(expendable) > 8192 or (t - expendable[0].stat().st_atime) > 3600 * 24:
 				with tracebacksuppressor:
 					os.remove(expendable.pop(0).path)
 					i += 1
@@ -5349,7 +5349,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							except:
 								pass
 						command.used.pop(u_id, None)
-						out_fut = self.send_exception(channel, ex, message)
+						out_fut = self.send_exception(channel, ex, reference=message)
 						return remaining
 					# Represents all other errors
 					except Exception as ex:
@@ -5360,7 +5360,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								pass
 						command.used.pop(u_id, None)
 						print_exc()
-						out_fut = self.send_exception(channel, ex, message, op=op)
+						out_fut = self.send_exception(channel, ex, reference=message, op=op)
 					if out_fut is not None and getattr(message, "simulated", None):
 						await out_fut
 			elif getattr(message, "simulated", None):
@@ -6722,9 +6722,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if exc_type and exc_value:
 					for exception in self.exceptions:
 						if issubclass(type(exc_value), exception):
-							bot.send_exception(self.sendable, exc_value, self.reference)
+							bot.send_exception(self.sendable, exc_value, reference=self.reference)
 							return True
-					bot.send_exception(self.sendable, exc_value, self.reference)
+					bot.send_exception(self.sendable, exc_value, reference=self.reference)
 					with tracebacksuppressor:
 						raise exc_value
 				return True
@@ -8063,7 +8063,7 @@ def update_file_cache():
 		attachments.discard(a_id)
 
 def as_file(file, filename=None, ext=None, rename=True):
-	fn = None
+	fn = fo = None
 	if rename:
 		fn = round(ts_us())
 		for fi in os.listdir("saves/filehost"):
@@ -8116,14 +8116,9 @@ def as_file(file, filename=None, ext=None, rename=True):
 	else:
 		b = fn.bit_length() + 7 >> 3
 		fn = as_str(base64.urlsafe_b64encode(fn.to_bytes(b, "big"))).rstrip("=")
-	url1 = f"{bot.raw_webserver}/file/{fn}"
+	url1 = f"{bot.raw_webserver}/p/{fn}"
 	url2 = f"{bot.raw_webserver}/d/{fn}"
-	# if filename:
-	#     fn = "/" + (str(file) if filename is None else lim_str(filename, 64).translate(filetrans))
-	#     url1 += fn
-	# if ext and "." not in url1:
-	#     url1 += "." + ext
-	print("AS_FILE:", file, filename, fn, url1)
+	print("AS_FILE:", file, filename, fn, fo, url1)
 	return url1, url2
 
 def is_file(url):
