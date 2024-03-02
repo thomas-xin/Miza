@@ -1461,7 +1461,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			medias = ("video", "image", "thumbnail")
 		else:
 			medias = "video"
-		tup = shash((urls, best, preserve, images, emojis, reactions, allow))
+		tup = shash((urls, best, preserve, images, emojis, reactions, allow, ytd))
 		try:
 			return list(self.followed[tup])[:limit]
 		except KeyError:
@@ -1520,7 +1520,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 									if is_url(u):
 										found.append(u)
 					if not found and (not images or not reactions and reactions is not None):
-						found = await self.follow_url(url, it, best=best, preserve=preserve, images=True, emojis=True, reactions=2, allow=True, limit=limit)
+						found = await self.follow_url(url, it, best=best, preserve=preserve, images=True, emojis=True, reactions=2, allow=True, limit=limit, ytd=ytd)
 						for u in found:
 							if u not in it:
 								it[u] = True
@@ -1533,7 +1533,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							it[u] = True
 							if not len(it) & 255:
 								await asyncio.sleep(0.2)
-							found2 = await self.follow_url(u, it, best=best, preserve=preserve, images=images, emojis=emojis, reactions=reactions, allow=allow, limit=limit)
+							found2 = await self.follow_url(u, it, best=best, preserve=preserve, images=images, emojis=emojis, reactions=reactions, allow=allow, limit=limit, ytd=ytd)
 							if len(found2):
 								out.extend(found2)
 							elif allow and m.content:
@@ -2011,12 +2011,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			prompt = "\n".join(ins) + "\n<|im_start|>assistant"
 			if assistant:
 				prompt += f" name={assistant}"
+			prompt += "\n"
 		elif fmt == "blockml":
 			ins = [chatml(m, "cc") for m in messages]
 			stops = im_sep("cc")
 			prompt = "\n".join(ins) + "\n" + stops[0] + "assistant"
 			if assistant:
 				prompt += f" name={assistant}"
+			prompt += "\n"
 		else:
 			raise NotImplementedError(fmt)
 		return prompt, stops
@@ -2195,7 +2197,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return resp
 		raise (exc or RuntimeError("Unknown error occured."))
 
-	async def chat_completion(self, messages, model="miza-1", frequency_penalty=None, presence_penalty=None, repetition_penalty=None, max_tokens=256, temperature=0.7, top_p=0.9, tools=None, tool_choice=None, router=None, stops=(), user=None, name=None, stream=False, **void):
+	async def chat_completion(self, messages, model="miza-1", frequency_penalty=None, presence_penalty=None, repetition_penalty=None, max_tokens=256, temperature=0.7, top_p=0.9, tools=None, tool_choice=None, router=None, stops=(), user=None, assistant_name=None, stream=False, **void):
 		if void:
 			print("VOID:", void)
 		modlvl = ["miza-1", "miza-2", "miza-3"].index(model.rsplit("/", 1)[-1])
@@ -2224,6 +2226,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if tool_choice == "auto":
 			tool_choice = None
 		data = dict(
+			model="firefunction-v1",
 			messages=snippet,
 			temperature=tmp,
 			top_p=tpp,
@@ -2261,12 +2264,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if router:
 				data["tools"][0]["function"]["parameters"]["properties"]["tool"] = {
 					"type": "string",
-					"description": 'Searches available tools to assist user; e.g. "image" for image generation.',
-					"enum": list(router),
+					"description": 'Searches available tools to assist user; e.g. "recall" to search previous messages.',
+					"enum": list(router) + ["none"],
 				}
+				data["tools"][0]["function"]["parameters"]["required"].append("tool")
 		if data.get("tools"):
 			data["tool_choice"] = tool_choice or {"type": "function", "function": {"name": "reply"}}
-		resp = await self.function_call(**data, timeout=60)
+		resp = await self.function_call(**data, rev_nsfw=False, timeout=60)
 		print("ChatCompletions:", model, snippet, resp)
 		message = resp.choices[0].message
 		if not message.tool_calls:
@@ -2290,6 +2294,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		call = message.tool_calls[0].function
 		cargs = orjson.loads(call.arguments)
 		ftools = cargs.get("tool")
+		if ftools == "none":
+			ftools = None
 		if ftools:
 			if tools:
 				ftools = [t for t in tools if t["function"]["name"] == ftools]
@@ -2408,8 +2414,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			}
 			fmt = instruct_formats.get(assistant, "chatml")
 			assistant_messages = [m for m in messages if m.get("role") == "assistant"]
-			if name:
-				bot_name = name
+			if assistant_name:
+				bot_name = assistant_name
 			elif not assistant_messages:
 				bot_name = None
 			else:
@@ -6907,10 +6913,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 			if isinstance(before, datetime.datetime):
 				before = cdict(id=utils.time_snowflake(before, high=False))
+			elif isinstance(before, (str, int)):
+				before = cdict(id=int(before))
 			if isinstance(after, datetime.datetime):
 				after = cdict(id=utils.time_snowflake(after, high=True))
+			elif isinstance(after, (str, int)):
+				after = cdict(id=int(after))
 			if isinstance(around, datetime.datetime):
 				around = cdict(id=utils.time_snowflake(around))
+			elif isinstance(around, (str, int)):
+				around = cdict(id=int(around))
 
 			if oldest_first is None:
 				reverse = after is not None

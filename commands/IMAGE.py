@@ -1551,7 +1551,7 @@ class Art(Command):
 			"--guidance-scale": "7",
 			"--eta": "0.8",
 			"--aspect-ratio": "0",
-			"--negative-prompt": "watermark, blurry, distorted, disfigured, bad anatomy, poorly drawn, low quality, ugly",
+			"--negative-prompt": None,
 		}
 		inpaint = "i" in flags or name == "inpaint"
 		specified = set()
@@ -1647,6 +1647,7 @@ class Art(Command):
 			if flagged:
 				print("Flagged:", resp)
 				kwargs["--nsfw"] = True
+		kwargs["--negative-prompt"] = ", ".join(set(("watermark", "blurry", "distorted", "disfigured", "bad anatomy", "poorly drawn", "low quality", "ugly")).difference(prompt.split()))
 
 		if not bot.verify_integrity(message):
 			return

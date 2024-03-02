@@ -36,10 +36,13 @@ e_dur = lambda d: float(d) if type(d) is str else (d if d is not None else 300)
 
 # Gets the best icon/thumbnail for a queue entry.
 def get_best_icon(entry):
-	with suppress(KeyError):
+	try:
 		return entry["thumbnail"]
-	with suppress(KeyError):
-		return entry["icon"]
+	except KeyError:
+		try:
+			return entry["icon"]
+		except KeyError:
+			pass
 	try:
 		thumbnails = entry["thumbnails"]
 	except KeyError:
@@ -67,8 +70,10 @@ def get_best_icon(entry):
 
 # Gets the best audio file download link for a queue entry.
 def get_best_audio(entry):
-	with suppress(KeyError):
+	try:
 		return entry["stream"]
+	except KeyError:
+		pass
 	best = -inf
 	try:
 		fmts = entry["formats"]
@@ -91,6 +96,8 @@ def get_best_audio(entry):
 		vcodec = fmt.get("vcodec", "none")
 		if vcodec not in (None, "none"):
 			q -= 1
+		else:
+			q = fmt.get("tbr", 0) or q
 		u = as_str(fmt["url"])
 		if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
 			replace = False
@@ -123,8 +130,10 @@ def get_best_audio(entry):
 
 # Gets the best video file download link for a queue entry.
 def get_best_video(entry):
-	with suppress(KeyError):
-		return entry["stream"]
+	try:
+		return entry["video"]
+	except KeyError:
+		pass
 	best = -inf
 	try:
 		fmts = entry["formats"]
@@ -873,9 +882,8 @@ class AudioQueue(alist):
 		q = self
 		s = self.auds.stats
 		if q:
+			temp = q[0]
 			if not (s.repeat and repeated):
-				if s.loop:
-					temp = q[0]
 				q.popleft()
 				if s.shuffle and shuffled:
 					if len(q) > 1:
@@ -884,6 +892,8 @@ class AudioQueue(alist):
 						q.appendleft(temp)
 				if s.loop and looped:
 					q.append(temp)
+		else:
+			temp = None
 		# If no queue entries found but there is a default playlist assigned, load a random entry from that
 		if not q:
 			if not self.playlist:
@@ -897,7 +907,7 @@ class AudioQueue(alist):
 				e.skips = ()
 				ytdl.get_stream(e, asap=2)
 				q.appendleft(e)
-		else:
+		elif temp != self[0]:
 			self.announce_play(self[0])
 		self.update_load()
 
@@ -1946,7 +1956,8 @@ class AudioDownloader:
 				raise
 			elif not isinstance(ex, youtube_dl.DownloadError) or self.ydl_errors(s):
 				if "429" in s:
-					self.blocked_yt = utc() + 3600
+					print_exc()
+					self.blocked_yt = utc() + 60
 				if has_ytd:
 					try:
 						entries = self.extract_backup(url)
@@ -2086,7 +2097,8 @@ class AudioDownloader:
 			s = str(ex).casefold()
 			if isinstance(ex, PermissionError) or self.ydl_errors(s):
 				if "429" in s:
-					self.blocked_yt = utc() + 3600
+					print_exc()
+					self.blocked_yt = utc() + 60
 				if has_ytd:
 					try:
 						resp = self.extract_backup(url)
@@ -2582,7 +2594,7 @@ class AudioDownloader:
 	# Performs a search, storing and using cached search results for efficiency.
 	def search(self, item, force=False, mode=None, images=False, count=1, follow=True):
 		item = verify_search(item)
-		if follow and not is_main_thread():
+		if follow and not is_main_thread() and is_discord_message_link(item):
 			with tracebacksuppressor:
 				items = await_fut(self.bot.follow_url(item, images=images, ytd=False))
 				if items:
@@ -5419,23 +5431,69 @@ def extract_lyrics(s):
 
 
 # Main helper function to fetch song lyrics from genius.com searches
-async def get_lyrics(item):
+async def get_lyrics(item, url=None):
+	name = None
+	description = None
+	if url:
+		resp = ytdl.extract_from(url)
+		name = resp.get("title") or resp["webpage_url"].rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
+		if "description" in resp:
+			description = resp["description"]
+			lyr = []
+			spl = resp["description"].splitlines()
+			for i, line in enumerate(spl):
+				if to_alphanumeric(full_prune(line)).strip() == "lyrics":
+					para = []
+					for j, line in enumerate(spl[i + 1:]):
+						line = line.strip()
+						if line and not to_alphanumeric(line).strip():
+							break
+						if find_urls(line):
+							if para and para[-1].endswith(":") or para[-1].startswith("#"):
+								para.pop(-1)
+							break
+						para.append(line)
+					if len(para) >= 3:
+						lyr.extend(para)
+			lyrics = "\n".join(lyr).strip()
+			if lyrics:
+				print("lyrics_raw", lyrics)
+				return name, lyrics
+		if resp.get("automatic_captions"):
+			lang = "en"
+			if "formats" in resp:
+				lang = None
+				for fmt in resp["formats"]:
+					if fmt.get("language"):
+						lang = fmt["language"]
+						break
+			for cap in shuffle(resp["automatic_captions"][lang]):
+				if "json" in cap["ext"]:
+					break
+			with tracebacksuppressor:
+				data = await Request(cap["url"], aio=True, json=True, timeout=18)
+				lyr = []
+				for event in data["events"]:
+					para = "".join(seg.get("utf8", "") for seg in event.get("segs", ()))
+					lyr.append(para)
+				lyrics = "".join(lyr).strip()
+				if lyrics:
+					print("lyrics_captions", lyrics)
+					return name, lyrics
 	url = f"https://genius.com/api/search/multi?q={item}"
 	for i in range(2):
-		header = {"User-Agent": f"Mozilla/5.{random.randint(1, 9)} (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"}
 		data = {"q": item}
-		rdata = await Request(url, data=data, headers=header, aio=True, json=True, timeout=18)
+		rdata = await Request(url, data=data, aio=True, json=True, timeout=18)
 		hits = chain(*(sect["hits"] for sect in rdata["response"]["sections"]))
-		name = None
 		path = None
 		for h in hits:
 			with tracebacksuppressor:
-				name = h["result"]["title"]
+				name = h["result"]["title"] or name
 				path = h["result"]["api_path"]
 				break
-		if path and name:
+		if path:
 			s = "https://genius.com" + path
-			page = await Request(s, headers=header, decode=True, aio=True)
+			page = await Request(s, decode=True, aio=True)
 			text = page
 			html = await asubmit(BeautifulSoup, text, "html.parser", timeout=18)
 			lyricobj = html.find('div', class_='lyrics')
@@ -5453,6 +5511,9 @@ async def get_lyrics(item):
 				print_exc()
 				print(s)
 				print(text)
+	if description:
+		print("lyrics_description", description)
+		return name, description
 	raise LookupError(f"No results for {item}.")
 
 
@@ -5475,13 +5536,15 @@ class Lyrics(Command):
 				auds = bot.data.audio.players[guild.id]
 				if not auds.queue:
 					raise LookupError
-				argv = auds.queue[0].name
+				argv = auds.queue[0].url
 			except LookupError:
 				raise IndexError("Queue not found. Please input a search term, URL, or file.")
 		# Extract song name if input is a URL, otherwise search song name directly
-		urls = await bot.follow_url(argv, allow=True, images=False)
+		url = None
+		urls = await bot.follow_url(argv, allow=True, images=False, ytd=False)
 		if urls:
-			resp = await asubmit(ytdl.search, urls[0], timeout=18)
+			url = urls[0]
+			resp = await asubmit(ytdl.search, url, timeout=18)
 			if type(resp) is str:
 				raise evalEX(resp)
 			search = resp[0].name
@@ -5504,7 +5567,7 @@ class Lyrics(Command):
 				item = search
 		async with discord.context_managers.Typing(channel):
 			try:
-				name, lyrics = await get_lyrics(item)
+				name, lyrics = await get_lyrics(item, url=url)
 			except KeyError:
 				print_exc()
 				raise KeyError(f"Invalid response from genius.com for {item}")

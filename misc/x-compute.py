@@ -2507,7 +2507,7 @@ if CAPS.intersection(("sd", "sdxl", "sdcc")):
 		if torch.cuda.get_device_properties(device).total_memory <= 11 * 1073741824:
 			args.append("--medvram")
 		print(args, webui_dir)
-		time.sleep(DEV * 5)
+		time.sleep(DEV * 3)
 		while True:
 			proc = psutil.Popen(args, cwd=webui_dir, stdout=sys.__stderr__, stderr=subprocess.STDOUT)
 			start = time.time()
@@ -2656,7 +2656,7 @@ if CAPS.intersection(("sd", "sdxl", "sdcc")):
 		steps = int(kwargs.get("--num-inference-steps", 38))
 		rsteps = steps // 10 * 2
 		msteps = steps - rsteps
-		ms = 768
+		ms = 1024
 		if aspect_ratio != 0:
 			x, y = max_size(aspect_ratio, 1, ms, force=True)
 		elif im:
@@ -2670,9 +2670,9 @@ if CAPS.intersection(("sd", "sdxl", "sdcc")):
 		# 	x, y = max_size(*mask.size, ms, force=True)
 		else:
 			x = y = ms
-		d = 48
+		d = 64
 		w, h = (x // d * d, y // d * d)
-		r = 4 / 3
+		r = 1
 		# print(x, y, w, h, im.size)
 		payload = dict(
 			model=model,

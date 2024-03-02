@@ -1617,9 +1617,9 @@ def to_msg(k, v, n=None, t=None):
 		# 	))
 	return m
 
-def chat_structure(history, refs, u, q, imin, name="", personality="", nsfw=False, start="", ac=AC):
-	if name.casefold() not in personality.casefold() and "you" not in personality.casefold():
-		nstart = f"Your name is {name}; you are {personality}. Express emotion when appropriate!"
+def chat_structure(history, refs, u, q, imin, assistant_name="", personality="", nsfw=False, start="", ac=AC):
+	if assistant_name.casefold() not in personality.casefold() and "you" not in personality.casefold():
+		nstart = f"Your name is {assistant_name}; you are {personality}."
 	else:
 		nstart = personality
 	if ac:
@@ -1633,7 +1633,7 @@ def chat_structure(history, refs, u, q, imin, name="", personality="", nsfw=Fals
 	system = m = cdict(role="system", content=nstart)
 	messages = [m]
 	for k, v, *t in history:
-		m = to_msg(k, v, name, t)
+		m = to_msg(k, v, assistant_name, t)
 		messages.append(m)
 	refcount = len(refs)
 	if refcount:
@@ -1643,7 +1643,7 @@ def chat_structure(history, refs, u, q, imin, name="", personality="", nsfw=Fals
 			content=f"The user is replying to the following message{s}:",
 		)
 		for k, v, *t in refs:
-			m = to_msg(k, v, name, t)
+			m = to_msg(k, v, assistant_name, t)
 			messages.append(m)
 	dtn = str(utc_dt()).rsplit(".", 1)[0]
 	v = f"Current time: {dtn}"
@@ -2013,7 +2013,7 @@ class Ask(Command):
 					print(resp)
 					ac = "You are currently not in a NSFW channel. If the user asks an inappropriate question, please instruct them to move to one!"
 
-			messages = chat_structure(history, refs, name, q, imin=iman or (), name=bot_name, personality=personality, nsfw=nsfw, ac=ac)
+			messages = chat_structure(history, refs, name, q, imin=iman or (), assistant_name=bot_name, personality=personality, nsfw=nsfw, ac=ac)
 			history.append((name, q))
 			ex = RuntimeError("Maximum inference attempts exceeded.")
 			text = ""
@@ -2025,7 +2025,7 @@ class Ask(Command):
 					model = "miza-2" if premium >= 3 else "miza-1"
 				else:
 					model = "miza-3" if premium >= 3 else "miza-2" if premium >= 2 else "miza-1"
-				resp = await bot.chat_completion(messages, model=model, frequency_penalty=0.6, presence_penalty=0.4, max_tokens=4096, temperature=0.7, top_p=0.9, tool_choice=None, router=TOOLS, stops=(), user=user)
+				resp = await bot.chat_completion(messages, model=model, frequency_penalty=0.6, presence_penalty=0.4, max_tokens=4096, temperature=0.7, top_p=0.9, tool_choice=None, router=TOOLS, stops=(), user=user, assistant_name=bot_name)
 				m = resp.choices[0].message
 				text = m.get("content")
 				tc = m.get("tool_calls", None) or ()

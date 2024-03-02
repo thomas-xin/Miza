@@ -927,7 +927,8 @@ class FileHashDict(collections.abc.MutableMapping):
 		return self
 
 	def clear(self):
-		print("WARNING: Clearing", self.path)
+		if len(self):
+			print("WARNING: Clearing", self.path)
 		self.iter = None
 		self.modified.clear()
 		self.deleted.clear()
@@ -4814,7 +4815,7 @@ TOOLS = {
 	}}}, {
 		"type": "function", "function": {
 			"name": "recall",
-			"description": "Recalls previous messages from the conversation history.",
+			"description": "Recalls previous messages from conversation history.",
 			"parameters": {
 				"type": "object", "properties": {
 					"user": {
