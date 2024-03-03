@@ -2280,7 +2280,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				data["tools"][0]["function"]["parameters"]["required"].append("tool")
 		if data.get("tools"):
 			data["tool_choice"] = tool_choice or {"type": "function", "function": {"name": "reply"}}
-		resp = await self.function_call(**data, rev_nsfw=False, timeout=60)
+		resp = await self.function_call(**data, timeout=60)
 		print("ChatCompletions:", model, snippet, resp)
 		message = resp.choices[0].message
 		if not message.tool_calls:
