@@ -2129,7 +2129,7 @@ class UpdateDogpiles(Database):
 		stopped = False
 		broken = False
 		hist = []
-		async for m in self.bot.history(message.channel, limit=100):
+		async for m in self.bot.history(message.channel, use_cache=True, limit=100):
 			if m.id == message.id:
 				continue
 			c = zwremove(m.content)

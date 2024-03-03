@@ -1356,35 +1356,36 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		position = min(length, round(length * ratio))
 		return "⬜" * position + "⬛" * (length - position)
 
-	async def history(self, channel, limit=200, before=None, after=None, care=True):
+	async def history(self, channel, limit=200, before=None, after=None, use_cache=False, care=True):
 		found = set()
-		# c = self.in_cache(verify_id(channel))
-		# if c is None:
-		# 	c = channel
-		# if channel is None:
-		# 	return
-		# if not is_channel(channel):
-		# 	channel = await self.get_dm(channel)
-		# if "channel_cache" in self.data:
-		# 	async for message in self.data.channel_cache.grab(channel.id, as_message=care, force=False):
-		# 		if isinstance(message, int):
-		# 			message = cdict(id=message)
-		# 		if before:
-		# 			if message.id >= time_snowflake(before):
-		# 				continue
-		# 		if after:
-		# 			if message.id <= time_snowflake(after):
-		# 				break
-		# 		found.add(message.id)
-		# 		yield message
-		# 		if limit is not None and len(found) >= limit:
-		# 			return
-		# if type(before) is int:
-		# 	before = cdict(id=before)
-		# if type(after) is int:
-		# 	after = cdict(id=after)
-		# if getattr(channel, "simulated", None):
-		# 	return
+		if use_cache:
+			c = self.in_cache(verify_id(channel))
+			if c is None:
+				c = channel
+			if channel is None:
+				return
+			if not is_channel(channel):
+				channel = await self.get_dm(channel)
+			if "channel_cache" in self.data:
+				async for message in self.data.channel_cache.grab(channel.id, as_message=care, force=False):
+					if isinstance(message, int):
+						message = cdict(id=message)
+					if before:
+						if message.id >= time_snowflake(before):
+							continue
+					if after:
+						if message.id <= time_snowflake(after):
+							break
+					found.add(message.id)
+					yield message
+					if limit is not None and len(found) >= limit:
+						return
+			if type(before) is int:
+				before = cdict(id=before)
+			if type(after) is int:
+				after = cdict(id=after)
+			if getattr(channel, "simulated", None):
+				return
 		async for message in discord.abc.Messageable.history(channel, limit=limit, before=before, after=after):
 			if message.id in found:
 				continue
@@ -2011,14 +2012,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			prompt = "\n".join(ins) + "\n<|im_start|>assistant"
 			if assistant:
 				prompt += f" name={assistant}"
-			prompt += "\n"
 		elif fmt == "blockml":
 			ins = [chatml(m, "cc") for m in messages]
 			stops = im_sep("cc")
 			prompt = "\n".join(ins) + "\n" + stops[0] + "assistant"
 			if assistant:
 				prompt += f" name={assistant}"
-			prompt += "\n"
 		else:
 			raise NotImplementedError(fmt)
 		return prompt, stops
@@ -6833,7 +6832,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 		discord.gateway.DiscordWebSocket.received_message = received_message
 
-		def _get_guild_channel(self, data, g_id=None):
+		def _get_guild_channel(self, data, guild_id=None):
 			channel_id = int(data["channel_id"])
 			try:
 				channel = bot.cache.channels[channel_id]
@@ -6842,7 +6841,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			else:
 				return channel, getattr(channel, "guild", None)
 			try:
-				guild = self._get_guild(int(g_id or data["guild_id"]))
+				guild = self._get_guild(int(guild_id or data["guild_id"]))
 			except KeyError:
 				channel = discord.DMChannel._from_message(self, channel_id)
 				guild = None

@@ -175,7 +175,7 @@ class UpdateAutoEmojis(Database):
 					spl = [emi]
 			if len(spl) == 1:
 				ems = spl[0]
-				m2 = await self.bot.history(message.channel, limit=1, before=message.id).__anext__()
+				m2 = await self.bot.history(message.channel, limit=5, before=message.id, use_cache=not self.bot.is_trusted(guild)).__anext__()
 			else:
 				m2 = None
 				if m_id:
