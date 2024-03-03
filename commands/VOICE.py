@@ -6157,7 +6157,7 @@ class UpdateAudio(Database):
 					reason += "."
 				reason += " Apologies for any inconvenience! 🎵"
 			else:
-				reason = ""
+				reason = f"🎵 Automatically disconnected from {sqr_md(auds.guild)}.🎵"
 			with tracebacksuppressor:
 				await asubmit(auds.kill, reason=css_md(reason) if reason else None, remove=False)
 

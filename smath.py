@@ -268,6 +268,7 @@ capwords = lambda s, spl=None: (" " if spl is None else spl).join(w.capitalize()
 
 
 def choice(*args):
+	"Custom random.choice implementation that also accepts non-ordered sequences."
 	if not args:
 		return
 	it = args if len(args) > 1 or not issubclass(type(args[0]), collections.abc.Sized) else args[0]
@@ -284,8 +285,8 @@ def choice(*args):
 	return random.choice(it)
 
 
-# Shuffles an iterable, in-place if possible, returning it.
 def shuffle(it):
+	"Shuffles an iterable, in-place if possible, returning it."
 	if type(it) is list:
 		random.shuffle(it)
 		return it
@@ -844,8 +845,8 @@ def sub_dict(d, key):
 	return output
 
 
-# Casts a number to integers if the conversion would not alter the value.
 def round_min(x):
+	"Casts a number to integers if the conversion would not alter the value."
 	if isinstance(x, int):
 		return x
 	if isinstance(x, str):
@@ -989,6 +990,7 @@ def _predict_next(seq):
 		return round_min(seq[-1] * b)
 
 def predict_next(seq, limit=12):
+	"Predicts the next number in a sequence. Works on most combinations of linear, polynomial, exponential and fibonacci equations."
 	seq = np.array(deque(astype(x, mpf) for x in seq), dtype=object)
 	for i in range(min(8, limit), 1 + max(8, min(len(seq), limit))):
 		temp = _predict_next(seq[-i:])
@@ -996,8 +998,8 @@ def predict_next(seq, limit=12):
 			return temp
 
 
-# Performs super-sampling linear interpolation.
 def supersample(a, size):
+	"Performs super-sampling linear interpolation."
 	n = len(a)
 	if n == size:
 		return a
@@ -1066,8 +1068,8 @@ def scale_ratio(x, y):
 	return 0
 
 
-# Returns a python range object but automatically reversing if the direction is not specified.
 def xrange(a, b=None, c=None):
+	"Returns a python range object but automatically reversing if the direction is not specified."
 	if b == None:
 		b = round(a)
 		a = 0
@@ -1079,8 +1081,8 @@ def xrange(a, b=None, c=None):
 	return range(floor(a), ceil(b), c)
 
 
-# Returns the Roman Numeral representation of an integer.
 def roman_numerals(num, order=0):
+	"Returns the Roman Numeral representation of an integer."
 	num = num if type(num) is int else int(num)
 	carry = 0
 	over = ""
@@ -1207,8 +1209,8 @@ NumWords = {
 	"inf": inf
 }
 
-# Parses English words as numbers.
 def num_parse(s):
+	"Parses English words as numbers."
 	out = 0
 	words = single_space(s).casefold().split()
 	i = 0
@@ -1256,8 +1258,8 @@ def byte_unscale(s, ratio=1024):
 	return round_min(n * ratio ** __uscales.index(s.lower()))
 
 
-# Returns a string representation of a number with a limited amount of characters, using scientific notation when required.
 def exp_num(num, maxlen=10, decimals=0):
+	"Returns a string representation of a number with a limited amount of characters, using scientific notation when required."
 	if not is_finite(num):
 		if num.real > 0:
 			return "inf"
@@ -1294,8 +1296,8 @@ def exp_num(num, maxlen=10, decimals=0):
 		return n + s + "e+" + str(numlen)
 
 
-# Rounds a number to a certain amount of decimal places, appending 0s if the number is too short.
 def round_at(num, prec):
+	"Rounds a number to a certain amount of decimal places, appending 0s if the number is too short."
 	if prec > 0:
 		s = str(round(num.real, round(prec)))
 		if "." in s:
@@ -1307,8 +1309,8 @@ def round_at(num, prec):
 	return str(round(num.real))
 
 
-# Limits a string to a maximum length, cutting from the middle and replacing with ".." when possible.
 def lim_str(s, maxlen=10, mode="centre"):
+	"Limits a string to a maximum length, cutting from the middle and replacing with \"..\" when possible."
 	if maxlen is None:
 		return s
 	if type(s) is not str:
@@ -1323,8 +1325,8 @@ def lim_str(s, maxlen=10, mode="centre"):
 	return s
 
 
-# Attempts to convert an iterable to a string if it isn't already
 def verify_string(s):
+	"Attempts to convert an iterable to a string if it isn't already."
 	if type(s) is str:
 		return s
 	with suppress(TypeError):
@@ -1834,8 +1836,8 @@ def int_key(d):
 	return c
 
 
-# Time functions
 class DynamicDT:
+	"A datetime-compatible object that enables dynamic conversions and arithmetic operations with non-datetime objects, as well as unlimited range."
 
 	__slots__ = ("_dt", "_offset", "_ts", "tzinfo")
 
@@ -2139,8 +2141,8 @@ TIMEUNITS = {
 	"second": 1,
 }
 
-# Converts a time input in seconds to a list of time intervals.
 def time_convert(s):
+	"Converts a time input in seconds to a list of time intervals."
 	if not is_finite(s):
 		high = "galactic years"
 		return [str(s) + " " + high]
@@ -2186,8 +2188,8 @@ def month_days(year, month):
 
 strnum = lambda num: str(round(num, 6))
 
-# Returns a representation of a time interval using days:hours:minutes:seconds.
 def time_disp(s, rounded=True):
+	"Returns a representation of a time interval using days:hours:minutes:seconds."
 	if not is_finite(s):
 		return str(s)
 	if rounded:
@@ -2211,8 +2213,8 @@ def time_disp(s, rounded=True):
 		output = "0:" + output
 	return output
 
-# Converts a time interval represented using days:hours:minutes:seconds, to a value in seconds.
 def time_parse(ts):
+	"Converts a time interval represented using days:hours:minutes:seconds, to a value in seconds."
 	if ts == "N/A":
 		return inf
 	data = ts.split(":")
@@ -2222,6 +2224,7 @@ def time_parse(ts):
 	return round_min(sum(float(count) * mult for count, mult in zip(data, reversed(mults[:len(data)]))))
 
 def time_sum(t2, t1):
+	"Computes the sum of two time intervals, producing a string."
 	out = ""
 	galactic_years = 0
 	millennia = 0
@@ -2299,6 +2302,7 @@ def time_sum(t2, t1):
 	return out.strip()
 
 def time_diff(t2, t1):
+	"Computes the difference between two time intervals, producing a string."
 	out = ""
 	galactic_years = 0
 	millennia = 0
@@ -2378,6 +2382,7 @@ def time_diff(t2, t1):
 	return out.strip()
 
 def dyn_time_diff(t2, t1):
+	"Computes the difference between two time intervals, producing a DynamicDT object."
 	if isnan(t2) or isnan(t1):
 		return "NaN"
 	if t2 >= inf:
@@ -2418,7 +2423,6 @@ def parse_fs(fs):
 
 
 RE = cdict()
-
 def regexp(s, flags=0):
 	global RE
 	if issubclass(type(s), re.Pattern):
@@ -2435,8 +2439,8 @@ def regexp(s, flags=0):
 word_count = lambda s: 1 + sum(1 for _ in regexp("\\W+").finditer(s))
 single_space = lambda s: regexp("\\s\\s+").sub(" ", s)
 
-# A fuzzy substring search that returns the ratio of characters matched between two strings.
 def fuzzy_substring(sub, s, match_start=False, match_length=True):
+	"A fuzzy substring search that returns the ratio of characters matched between two strings."
 	if not match_length and s in sub:
 		return 1
 	if s.startswith(sub):
@@ -2473,8 +2477,8 @@ def fuzzy_substring(sub, s, match_start=False, match_length=True):
 	ratio = max(0, match / len(s))
 	return ratio
 
-# Replaces words in a string from a mapping similar to str.replace, but performs operation both ways.
 def replace_map(s, mapping):
+	"Replaces words in a string from a mapping similar to str.replace, but performs operation both ways."
 	temps = {k: chr(65535 - i) for i, k in enumerate(mapping.keys())}
 	trans = "".maketrans({chr(65535 - i): mapping[k] for i, k in enumerate(mapping.keys())})
 	for key, value in temps.items():
@@ -2544,8 +2548,8 @@ def bxor(b1, b2):
 	return (x ^ y).tobytes()
 
 
-# Manages a dict object and uses pickle to save and load it.
 class pickled(collections.abc.Callable):
+	"Manages a dict object and uses pickle to save and load it."
 
 	def __init__(self, obj=None, ignore=()):
 		self.data = obj

@@ -139,6 +139,7 @@ def as_fut(obj):
 
 
 class EmptyContext(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
+	"An empty context manager that has no effect. Serves as compatibility with dynamically replaceable contexts."
 	__enter__ = lambda self, *args: self
 	__exit__ = lambda *args: None
 	__aenter__ = lambda self, *args: as_fut(self)
@@ -150,8 +151,8 @@ emptyctx = EmptyContext()
 
 SEMS = {}
 
-# Manages concurrency limits, similar to asyncio.Semaphore, but has a secondary threshold for enqueued tasks, as well as an optional rate limiter.
 class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
+	"Manages concurrency limits, similar to asyncio.Semaphore, but has a secondary threshold for enqueued tasks, as well as an optional rate limiter. Compatible with both sync and async contexts."
 
 	__slots__ = ("limit", "buffer", "fut", "active", "passive", "rate_limit", "rate_bin", "last", "trace", "weak")
 
@@ -351,8 +352,8 @@ class SemaphoreOverflowError(RuntimeError):
 	__slots__ = ()
 
 
-# A context manager that sends exception tracebacks to stdout.
 class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
+	"A context manager that sends exception tracebacks to stdout."
 
 	def __init__(self, *args, fn=print_exc, **kwargs):
 		self.fn = fn
@@ -383,8 +384,8 @@ class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.Abstract
 tracebacksuppressor = TracebackSuppressor()
 
 
-# A context manager that delays the return of a function call.
 class Delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
+	"A context manager that delays the return of a function call."
 
 	def __init__(self, duration=0):
 		self.duration = duration
@@ -405,8 +406,8 @@ class Delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextMa
 			await asyncio.sleep(remaining)
 
 
-# A context manager that monitors the amount of time taken for a designated section of code.
 class MemoryTimer(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
+	"A context manager that monitors the amount of time taken for a designated section of code."
 
 	timers = cdict()
 
@@ -580,10 +581,10 @@ def bytes2zip(data, lzma=False):
 	# return b.getbuffer()
 
 
-# Safer than raw eval, more powerful than json.loads
 eval_json = lambda s: copy.deepcopy(_eval_json(s))
 @functools.lru_cache(maxsize=2)
 def _eval_json(s):
+	"Safer than raw eval, more powerful than json.loads. No global variables are provided."
 	if type(s) is memoryview:
 		s = bytes(s)
 	try:
@@ -598,6 +599,7 @@ def _eval_json(s):
 
 @functools.lru_cache(maxsize=8)
 def select_and_loads(s, mode="safe", size=None):
+	"Automatically decodes data from JSON or Pickle, decompressing if necessary."
 	if not s:
 		raise ValueError("Data must not be empty.")
 	if size and size < len(s):
@@ -613,18 +615,6 @@ def select_and_loads(s, mode="safe", size=None):
 			raise
 	if s[:1] in (b"~", b"!") or zipfile.is_zipfile(io.BytesIO(s)):
 		s = zip2bytes(s)
-	# b = io.BytesIO(s)
-	# if zipfile.is_zipfile(b):
-	#     if len(s) > 1048576:
-	#         print(f"Loading zip file of size {len(s)}...")
-	#     b.seek(0)
-	#     with ZipFile(b, allowZip64=True, strict_timestamps=False) as z:
-	#         n = z.namelist()[0]
-	#         if size:
-	#             x = z.getinfo(n).file_size
-	#             if size < x:
-	#                 raise OverflowError(f"Data input size too large ({x} > {size}).")
-	#         s = z.read(n)
 	data = None
 	if not s:
 		return data
@@ -649,6 +639,7 @@ def select_and_loads(s, mode="safe", size=None):
 	return data
 
 def select_and_dumps(data, mode="safe", compress=True):
+	"Automatically serialises data as JSON or Pickle, compressing if beneficial."
 	if mode == "unsafe":
 		try:
 			if len(data) and isinstance(data, dict) and not isinstance(next(iter(data)), str):
@@ -679,6 +670,7 @@ def nop2(s):
 	return s
 
 class FileHashDict(collections.abc.MutableMapping):
+	"A dictionary-compatible object that represents a mapping to SQL tables stored on disk."
 
 	sem = Semaphore(64, 128, 0.3, 1)
 	cache_size = 4096
@@ -908,6 +900,7 @@ class FileHashDict(collections.abc.MutableMapping):
 		return v
 
 	def update(self, other):
+		"Updates this database with data from a dictionary-compatible object."
 		self.modified.update(other)
 		self.deleted.difference_update(other)
 		self.data.update(other)
@@ -915,6 +908,7 @@ class FileHashDict(collections.abc.MutableMapping):
 		return self
 
 	def fill(self, other):
+		"Replaces all the data in this database with data from a dictionary-compatible object."
 		if not other:
 			return self.clear()
 		self.iter = None
@@ -927,6 +921,7 @@ class FileHashDict(collections.abc.MutableMapping):
 		return self
 
 	def clear(self):
+		"Empties the database. Affects both memory and disk layers."
 		if len(self):
 			print("WARNING: Clearing", self.path)
 		self.iter = None
@@ -949,7 +944,7 @@ class FileHashDict(collections.abc.MutableMapping):
 		return self
 
 	def __update__(self):
-		# print("DATABASE:", self.path)
+		"Saves all changes to the database."
 		modified = set(self.modified)
 		self.modified.clear()
 		deleted = set(self.deleted)
@@ -1022,6 +1017,7 @@ class FileHashDict(collections.abc.MutableMapping):
 		return inter
 
 	def vacuum(self):
+		"Commits and vacuums the database in its current state, freeing up disk space."
 		with self.db_sem:
 			self.db.commit()
 			self.db.close()
@@ -1032,6 +1028,7 @@ class FileHashDict(collections.abc.MutableMapping):
 
 
 def safe_save(fn, s):
+	"Writes data to a file, creating a temporary backup which is then swapped with the destination file. This operation is less susceptible to corruption upon a crash."
 	if os.path.exists(fn):
 		with open(fn + "\x7f", "wb") as f:
 			f.write(s)
@@ -1048,9 +1045,9 @@ def safe_save(fn, s):
 			f.write(s)
 
 
-# Decodes HTML encoded characters in a string.
 @functools.lru_cache(maxsize=8)
 def html_decode(s):
+	"Decodes HTML encoded characters in a string."
 	while len(s) > 7:
 		try:
 			i = s.index("&#")
@@ -1081,6 +1078,7 @@ def html_decode(s):
 
 
 def restructure_buttons(buttons):
+	"Combines unstructured list of buttons into groups compatible with Discord API."
 	if not buttons:
 		return buttons
 	if issubclass(type(buttons[0]), collections.abc.Mapping):
@@ -1174,6 +1172,7 @@ def restructure_buttons(buttons):
 
 
 async def interaction_response(bot, message, content=None, embed=None, embeds=(), components=None, buttons=None, ephemeral=False):
+	"Uses the raw Discord HTTP API to post/send an interaction message."
 	if getattr(message, "deferred", False):
 		return interaction_patch(bot, message, content, embed, embeds, components, buttons, ephemeral)
 	if hasattr(embed, "to_dict"):
@@ -1222,6 +1221,7 @@ async def interaction_response(bot, message, content=None, embed=None, embeds=()
 	return message
 
 async def interaction_patch(bot, message, content=None, embed=None, embeds=(), components=None, buttons=None, ephemeral=False):
+	"Uses the raw Discord HTTP API to patch/edit an interaction message."
 	if hasattr(embed, "to_dict"):
 		embed = embed.to_dict()
 	if embed:
@@ -1316,14 +1316,15 @@ role_mention = lambda r_id: f"<@&{r_id}>"
 channel_repr = lambda s: as_str(s) if not isinstance(s, discord.abc.GuildChannel) else str(s)
 
 
-# Counts the number of lines in a file.
 def line_count(fn):
+	"Counts the number of lines in a file."
 	with open(fn, "r", encoding="utf-8") as f:
 		data = f.read()
 	return (len(data), data.count("\n") + 1)
 
 
 def split_across(s, lim=2000, prefix=""):
+	"Splits a string into segments according to given limit. Prefers splitting across paragraphs/lines than words/characters."
 	state = 0
 	n = len(prefix)
 	out = []
@@ -1750,11 +1751,11 @@ def get_url(obj, f=to_webp) -> str:
 	if found:
 		return BASE_LOGO
 
-# Finds the best URL for a discord object's icon, prioritizing proxy_url for images if applicable.
+# Finds the best URL for a Discord object's icon, prioritizing proxy_url for images if applicable.
 proxy_url = lambda obj: get_url(obj) or (obj.proxy_url if is_image(obj.proxy_url) else obj.url)
-# Finds the best URL for a discord object's icon.
+# Finds the best URL for a Discord object's icon.
 best_url = lambda obj: get_url(obj) or getattr(obj, "url", None) or BASE_LOGO
-# Finds the worst URL for a discord object's icon.
+# Finds the worst URL for a Discord object's icon.
 worst_url = lambda obj: get_url(obj, to_webp_ex) or getattr(obj, "url", None) or BASE_LOGO
 
 allow_gif = lambda url: url + ".gif" if "." not in url.rsplit("/", 1)[-1] and "?" not in url else url
@@ -1914,8 +1915,8 @@ def message_link(message):
 	return f"https://discord.com/channels/{g_id}/{message.channel.id}/{message.id}"
 
 
-# Applies stickers to a message based on its discord data.
 def apply_stickers(message, data=None):
+	"Applies stickers to a message based on its Discord data. Each individual sticker is treated as a separate embed."
 	if not data and not getattr(message, "stickers", None):
 		return message
 	has = set()
@@ -1948,7 +1949,6 @@ def apply_stickers(message, data=None):
 			emb.set_image(url=url)
 			message.embeds.append(emb)
 	return message
-
 
 try:
 	EmptyEmbed = discord.embeds._EmptyEmbed
@@ -2326,6 +2326,7 @@ def discord_expired(url):
 		return ts < utc() + 21600 + 60
 
 def expired(stream):
+	"Detects whether a URL is expired. Works for YouTube and Discord download links."
 	if not is_url(stream):
 		return True
 	if is_youtube_url(stream):
@@ -2340,6 +2341,7 @@ def expired(stream):
 			return True
 
 def is_discord_message_link(url):
+	"Detects whether a Discord link represents a channel or message link."
 	check = url[:64]
 	return "channels/" in check and "discord" in check
 
@@ -2347,11 +2349,11 @@ verify_url = lambda url: url if is_url(url) else url_parse(url)
 
 
 def maps(funcs, *args, **kwargs):
+	"A map-compatible function that takes and iterates through multiple functions in a list as the first argument."
 	for func in funcs:
 		yield func(*args, **kwargs)
 
 
-# Checks if a URL contains a valid image extension, and removes it if possible.
 IMAGE_FORMS = {
 	".gif": True,
 	".png": True,
@@ -2362,6 +2364,7 @@ IMAGE_FORMS = {
 	".webp": True,
 }
 def is_image(url):
+	"Checks whether a url or filename ends with an image file extension. Returns a ternary True/False/None value where True indicates a positive match, False indicates a possible match, and None indicates no match."
 	if url:
 		url = url.split("?", 1)[0]
 		if "." in url:
@@ -2391,10 +2394,13 @@ VIDEO_FORMS = {
 	".m3u8": True,
 }
 def is_video(url):
-	if "." in url:
-		url = url[url.rindex("."):]
-		url = url.casefold()
-		return VIDEO_FORMS.get(url)
+	"Checks whether a url or filename ends with a video file extension. Returns a ternary True/False/None value where True indicates a positive match, False indicates a possible match, and None indicates no match."
+	if url:
+		url = url.split("?", 1)[0]
+		if "." in url:
+			url = url[url.rindex("."):]
+			url = url.casefold()
+			return VIDEO_FORMS.get(url)
 
 AUDIO_FORMS = {
 	".mp3": True,
@@ -2412,6 +2418,7 @@ AUDIO_FORMS = {
 	".mp4": False,
 }
 def is_audio(url):
+	"Checks whether a url or filename ends with an audio file extension. Returns a ternary True/False/None value where True indicates a positive match, False indicates a possible match, and None indicates no match."
 	if url:
 		url = url.split("?", 1)[0]
 		if "." in url:
@@ -2457,6 +2464,7 @@ def load_mimes():
 				mimesplitter[len(data)][data] = (ext, mime)
 
 def simple_mimes(b, mime=True):
+	"Low-latency function that detects mimetype from first few bytes. Less accurate than from_file."
 	mimesplitter = globals()["mimesplitter"]
 	for k, v in reversed(mimesplitter.items()):
 		out = v.get(b[:k])
@@ -2487,6 +2495,7 @@ special_mimes = {
 }
 
 def mime_equiv(a, b):
+	"Checks if a mimetype matches a given file extension. Required as some do not match."
 	if a == b:
 		return True
 	a = a.split("/", 1)[-1]
@@ -2500,6 +2509,7 @@ def mime_equiv(a, b):
 
 
 def from_file(path, mime=True):
+	"Detects mimetype of file or buffer. Includes custom .jar, .ecdc, .m3u8 detection."
 	path = filetype.get_bytes(path)
 	if mime:
 		out = filetype.guess_mime(path)
@@ -2584,6 +2594,7 @@ PROC_RESP = {}#weakref.WeakValueDictionary()
 sub_count = lambda: sum(is_strict_running(p) for p in PROCS.values())
 
 def is_strict_running(proc):
+	"Detects if a process is truly running. Zombie processes are treated as dead."
 	if not proc:
 		return
 	try:
@@ -2616,6 +2627,7 @@ def is_strict_running(proc):
 
 @tracebacksuppressor(psutil.NoSuchProcess)
 def force_kill(proc):
+	"Force kills a process, trying all available methods. Does not error if process does not exist."
 	if not proc:
 		return
 	if getattr(proc, "fut", None) and not proc.fut.done():
@@ -2868,6 +2880,7 @@ FIRST_LOAD = True
 # sdcc			GPU >400k, VRAM >15GB			V100, RTX3090, A4000, RTX4080, L4
 # exl2			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
 def spec2cap():
+	"Automatically calculates list of capabilities from device specs. Uses benchmark results if available."
 	global FIRST_LOAD
 	g = 1073741824
 	try:
@@ -3010,6 +3023,7 @@ def spec2cap():
 # raise
 
 def proc_start():
+	"Starts designated subprocesses using computed device specifications and capabilities."
 	if torch and os.environ.get("AI_FEATURES", True):
 		globals()["DC"] = torch.cuda.device_count()
 		COMPUTE_LOAD = AUTH.get("compute_load", [])
@@ -3037,13 +3051,15 @@ def proc_start():
 			CAPS.pop(n)
 
 def device_cap(i, resolve=False):
-    di = torch.cuda.get_device_capability(i)
-    if resolve:
-        return 1.15 ** (di[0] * 10 + di[1])
-    return di
+	"Gets scaled CUDA compute capability."
+	di = torch.cuda.get_device_capability(i)
+	if resolve:
+		return 1.15 ** (di[0] * 10 + di[1])
+	return di
 
 last_task_time = 0
 async def sub_submit(cap, command, _timeout=12, retries=1):
+	"Enqueues a compute task on the subprocess pool, and waits for it to complete."
 	t = utc()
 	td = t - last_task_time
 	globals()["last_task_time"] = t
@@ -3083,6 +3099,7 @@ async def sub_submit(cap, command, _timeout=12, retries=1):
 	raise ex2
 
 def sub_kill(start=True, force=False):
+	"Kills all compute subprocesses, restarting them automatically if necessary."
 	for p in PROCS.values():
 		if is_strict_running(p):
 			if not force:
@@ -3105,6 +3122,7 @@ def sub_kill(start=True, force=False):
 lambdassert = "lambda:1+1"
 
 async def _sub_submit(proc, command, _timeout=12):
+	"Internal function to pass a compute task to a subprocess."
 	ts = ts_us()
 	while ts in PROC_RESP:
 		ts += 1
@@ -3166,12 +3184,12 @@ async def _sub_submit(proc, command, _timeout=12):
 SUB_WAITING = None
 
 
-# Sends an operation to the math subprocess pool.
 def process_math(expr, prec=64, rat=False, timeout=12, variables=None, retries=0):
+	"Sends an operation to the math subprocess pool."
 	return sub_submit("math", (expr, "%", prec, rat, variables), _timeout=timeout, retries=retries)
 
-# Sends an operation to the image subprocess pool.
 def process_image(image, operation="$", args=[], cap="image", timeout=36, retries=1):
+	"Sends an operation to the image subprocess pool."
 	args = astype(args, list)
 	for i, a in enumerate(args):
 		if type(a) is mpf:
@@ -3270,13 +3288,9 @@ athreads.pools.append(import_exc)
 
 def get_event_loop():
 	return eloop
-	try:
-		return asyncio.get_running_loop()
-	except:
-		return eloop
 
-# Creates an asyncio Future that waits on a multithreaded one.
 def wrap_future(fut, loop=None, shield=False, thread_safe=True):
+	"Creates an asyncio Future that waits on a multithreaded one."
 	if getattr(fut, "done", None) and fut.done():
 		res = fut.result()
 		if res is None:
@@ -3331,8 +3345,8 @@ def create_thread(func, *args, **kwargs):
 	return t
 tsubmit = create_thread
 
-# Runs a function call in a parallel thread, returning a future object waiting on the output.
 def create_future_ex(func, *args, timeout=None, priority=False, **kwargs):
+	"Runs a function call in a parallel thread, returning a future object waiting on the output."
 	try:
 		kwargs["timeout"] = kwargs.pop("_timeout_")
 	except KeyError:
@@ -3343,8 +3357,8 @@ def create_future_ex(func, *args, timeout=None, priority=False, **kwargs):
 	return fut
 esubmit = create_future_ex
 
-# Forces the operation to be a coroutine regardless of whether it is or not. Regular functions are executed in the thread pool.
 async def _create_future(obj, *args, loop, timeout, priority, **kwargs):
+	"Forces the operation to be a coroutine regardless of whether it is or not. Regular functions are executed in the thread pool."
 	for i in range(256):
 		if not asyncio.iscoroutinefunction(obj):
 			break
@@ -3364,8 +3378,8 @@ async def _create_future(obj, *args, loop, timeout, priority, **kwargs):
 			obj = await obj
 	return obj
 
-# High level future asyncio creation function that takes both sync and async functions, as well as coroutines directly.
 def create_future(obj, *args, loop=None, timeout=None, priority=False, **kwargs):
+	"High level future asyncio creation function that accepts both sync and async functions, as well as coroutines directly."
 	if loop is None:
 		loop = get_event_loop()
 	fut = _create_future(obj, *args, loop=loop, timeout=timeout, priority=priority, **kwargs)
@@ -3374,8 +3388,8 @@ def create_future(obj, *args, loop=None, timeout=None, priority=False, **kwargs)
 	return fut
 asubmit = create_future
 
-# Creates an asyncio Task object from an awaitable object.
 def create_task(fut, *args, loop=None, **kwargs):
+	"Creates an asyncio Task object from an awaitable object."
 	if loop is None:
 		loop = get_event_loop()
 	return asyncio.ensure_future(fut, *args, loop=loop, **kwargs)
@@ -3386,8 +3400,8 @@ async def _await_fut(fut, ret):
 	ret.set_result(out)
 	return ret
 
-# Blocking call that waits for a single asyncio future to complete, do *not* call from main asyncio loop
 def await_fut(fut, timeout=None):
+	"Blocking call that waits for a single asyncio future to complete, do *not* call from main asyncio loop."
 	return convert_fut(fut).result(timeout=timeout)
 
 def convert_fut(fut):
@@ -3423,8 +3437,8 @@ async def traceback_coro(fut, *args):
 def trace(fut, *args):
 	return create_task(traceback_coro(fut, *args))
 
-# A function that takes a coroutine, and calls a second function if it takes longer than the specified delay.
 async def delayed_callback(fut, delay, func, *args, repeat=False, exc=False, **kwargs):
+	"A function that takes a coroutine/task, and calls a second function if it takes longer than the specified delay."
 	await asyncio.sleep(delay / 2)
 	if not fut.done():
 		await asyncio.sleep(delay / 2)
@@ -3448,10 +3462,12 @@ async def delayed_callback(fut, delay, func, *args, repeat=False, exc=False, **k
 
 @tracebacksuppressor
 def exec_tb(s, *args, **kwargs):
+	"Executes a string as code, providing a traceback upon exception."
 	exec(s, *args, **kwargs)
 
 
 def p2n(b):
+	"Converts a urlsafe-base64 string to big-endian integer."
 	try:
 		if isinstance(b, str):
 			b = b.encode("ascii")
@@ -3462,11 +3478,12 @@ def p2n(b):
 		raise FileNotFoundError(*ex.args)
 
 def n2p(n):
+	"Converts a big-endian integer to unpadded urlsafe-base64 representation."
 	c = n.bit_length() + 7 >> 3
 	return base64.urlsafe_b64encode(n.to_bytes(c, "big")).rstrip(b"=").decode("ascii")
 
 def find_file(path, cwd="saves/filehost", ind="\x7f"):
-	# if no file name is inputted, return no content
+	"Finds a matching file starting with the given path. Mostly used for filehost."
 	if not path:
 		raise EOFError
 	# do not include "." in the path name
@@ -3483,6 +3500,7 @@ def find_file(path, cwd="saves/filehost", ind="\x7f"):
 
 
 class open2(io.IOBase):
+	"A file-compatible open function that wraps already open files."
 
 	__slots__ = ("fp", "fn", "mode", "filename")
 
@@ -3509,6 +3527,7 @@ class open2(io.IOBase):
 		self.fp = None
 
 class CompatFile(discord.File):
+	"A discord.File implementation that is compatible with files, bytes, memoryview, and buffer objects."
 
 	def __init__(self, fp, filename=None, description=None, spoiler=False):
 		if type(fp) in (bytes, memoryview):
@@ -3561,6 +3580,7 @@ class CompatFile(discord.File):
 			self._closer()
 
 class DownloadingFile(io.IOBase):
+	"A buffer indicating a file that is currently being written. Calls to read() when there is no more data but the write is not yet complete will block until either condition is met."
 
 	__slots__ = ("fp", "fn", "mode", "filename", "af")
 
@@ -3625,6 +3645,7 @@ class DownloadingFile(io.IOBase):
 		self.fp = None
 
 class ForwardedRequest(io.IOBase):
+	"A requests-compatible buffer that caches read data to enable seeking."
 
 	__slots__ = ("fp", "resp", "size", "pos", "it")
 
@@ -3688,6 +3709,7 @@ class ForwardedRequest(io.IOBase):
 		self.fp = None
 
 class FileStreamer(io.BufferedRandom, contextlib.AbstractContextManager):
+	"A buffer-compatible file object that treats multiple files or buffers as a single concatenated one."
 
 	def __init__(self, *objs, filename=None):
 		self.pos = 0
@@ -3751,6 +3773,7 @@ class FileStreamer(io.BufferedRandom, contextlib.AbstractContextManager):
 	__exit__ = lambda self, *args: self.close()
 
 class PipedProcess:
+	"A custom subprocess/psutil-compatible Process implementation that invokes multiple processes simultaneously, automatically piping their stdin/stdout data. All stderr output is captured in the destination stdout."
 
 	procs = ()
 	stdin = stdout = stderr = None
@@ -3825,6 +3848,7 @@ class PipedProcess:
 			return "terminated"
 
 class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.AbstractContextManager):
+	"A Sequence implementation that attempts to turn buffer objects into indexable array-like objects."
 
 	BUF = 262144
 	iter = None
@@ -3963,8 +3987,10 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
 	def load(self, k):
 		if self.finished:
 			return self.data.getbuffer()[k:k + self.BUF]
-		with suppress(KeyError):
+		try:
 			return self.buffer[k]
+		except KeyError:
+			pass
 		seek = getattr(self.data, "seek", None)
 		if seek:
 			if self.iter is not None and k + self.BUF >= self.high:
@@ -4058,6 +4084,7 @@ def parse_ratelimit_header(headers):
 
 
 def proxy_download(url, fn=None, refuse_html=True, timeout=720):
+	"Downloads a file through proxysite.com; possibly outdated implementation."
 	downloading = globals().setdefault("proxy-download", {})
 	try:
 		fut = downloading[url]
@@ -4105,8 +4132,8 @@ def proxy_download(url, fn=None, refuse_html=True, timeout=720):
 	# return o_url
 
 
-# Runs ffprobe on a file or url, returning the duration if possible.
 def get_duration_simple(filename, _timeout=12):
+	"Runs ffprobe on a file or url, returning the duration if possible."
 	command = (
 		"./ffprobe",
 		"-v",
@@ -4141,47 +4168,43 @@ def get_duration_simple(filename, _timeout=12):
 			bps = float(resp[1])
 	return dur, bps
 
-DUR_CACHE = {}
+@functools.lru_cache(maxsize=256)
 def get_duration(filename):
-	if filename:
-		with suppress(KeyError):
-			return DUR_CACHE[filename]
-		dur, bps = get_duration_simple(filename, 4)
-		if not dur and is_url(filename):
-			with reqs.next().get(filename, headers=Request.header(), stream=True) as resp:
-				head = fcdict(resp.headers)
-				if "Content-Length" not in head:
-					dur = get_duration_simple(filename, 20)[0]
-					DUR_CACHE[filename] = dur
-					return dur
-				if bps:
-					print(head, bps, sep="\n")
-					return (int(head["Content-Length"]) << 3) / bps
-				ctype = [e.strip() for e in head.get("Content-Type", "").split(";") if "/" in e][0]
-				if ctype.split("/", 1)[0] not in ("audio", "video") or ctype == "audio/midi":
-					DUR_CACHE[filename] = nan
-					return nan
-				it = resp.iter_content(65536)
-				data = next(it)
-			ident = str(magic.from_buffer(data))
-			print(head, ident, sep="\n")
-			try:
-				bitrate = regexp("[0-9.]+\\s.?bps").findall(ident)[0].casefold()
-			except IndexError:
-				dur = get_duration_simple(filename, 16)[0]
-				DUR_CACHE[filename] = dur
+	"Gets the duration of an audio/video file using metadata, bitrate, filesize etc. Falls back to FFMPEG"
+	if not filename:
+		return
+	dur, bps = get_duration_simple(filename, 4)
+	if not dur and is_url(filename):
+		with reqs.next().get(filename, headers=Request.header(), stream=True) as resp:
+			head = fcdict(resp.headers)
+			if "Content-Length" not in head:
+				dur = get_duration_simple(filename, 20)[0]
 				return dur
-			bps, key = bitrate.split(None, 1)
-			bps = float(bps)
-			if key.startswith("k"):
-				bps *= 1e3
-			elif key.startswith("m"):
-				bps *= 1e6
-			elif key.startswith("g"):
-				bps *= 1e9
-			dur = (int(head["Content-Length"]) << 3) / bps
-		DUR_CACHE[filename] = dur
-		return dur
+			if bps:
+				print(head, bps, sep="\n")
+				return (int(head["Content-Length"]) << 3) / bps
+			ctype = [e.strip() for e in head.get("Content-Type", "").split(";") if "/" in e][0]
+			if ctype.split("/", 1)[0] not in ("audio", "video") or ctype == "audio/midi":
+				return nan
+			it = resp.iter_content(65536)
+			data = next(it)
+		ident = str(magic.from_buffer(data))
+		print(head, ident, sep="\n")
+		try:
+			bitrate = regexp("[0-9.]+\\s.?bps").findall(ident)[0].casefold()
+		except IndexError:
+			dur = get_duration_simple(filename, 16)[0]
+			return dur
+		bps, key = bitrate.split(None, 1)
+		bps = float(bps)
+		if key.startswith("k"):
+			bps *= 1e3
+		elif key.startswith("m"):
+			bps *= 1e6
+		elif key.startswith("g"):
+			bps *= 1e9
+		dur = (int(head["Content-Length"]) << 3) / bps
+	return dur
 
 
 # Manages both sync and async web requests.
@@ -4193,6 +4216,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 
 	@classmethod
 	def header(cls, base=(), **fields):
+		"Creates a custom HTTP request header with randomised properties that spoof anti-scraping sites."
 		head = {
 			"User-Agent": f"Mozilla/5.{random.randint(1, 9)} (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
@@ -4249,6 +4273,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				return resp.content
 
 	def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, proxy=False, aio=False, session=None, ssl=True, authorise=False):
+		"Creates and executes a HTTP request, returning the body in bytes, string or JSON format. Raises an exception if status code is below 200 or above 399"
 		if headers is None:
 			headers = {}
 		if authorise:
@@ -4317,6 +4342,7 @@ emoji_translate = {}
 emoji_replace = {}
 em_trans = {}
 def reload_emojis():
+	"Initial load from cache; keeps this if load_emojis function fails"
 	global emoji_translate, emoji_replace, em_trans
 	if not os.path.exists("misc/emojis.json"):
 		return
@@ -4329,6 +4355,7 @@ def reload_emojis():
 
 @tracebacksuppressor
 def load_emojis():
+	"Loads list of unicode emojis from emojipedia (most up-to-date free source). Note the divergence between twemoji and discord"
 	global emoji_translate, emoji_replace, em_trans
 	if os.path.exists("misc/emojis.json") and utc() - os.path.getmtime("misc/emojis.json") < 86400:
 		return
@@ -4336,6 +4363,7 @@ def load_emojis():
 		"https://emojipedia.org/api/graphql",
 		data=orjson.dumps(dict(
 			operationName="vendorHistoricEmojiV1",
+			query="\n    query vendorHistoricEmojiV1(\n      $slug: Slug!\n      $version: Slug = null\n      $status: VendorHistoricEmojiStatus = null\n      $lang: Language\n    ) {\n      vendorHistoricEmoji_v1(slug: $slug, version: $version, status: $status, lang: $lang) {\n        ...vendorHistoricEmojiResource\n      }\n    }\n    \n  fragment vendorHistoricEmojiImageFragment on VendorHistoricEmojiImage {\n    slug\n    image {\n      source\n      description\n      useOriginalImage\n    }\n    status\n  }\n\n    \n  fragment vendorHistoricEmojiResource on VendorHistoricEmoji {\n    items {\n      category {\n        slug\n        title\n\n        representingEmoji {\n          code\n        }\n      }\n      images {\n        ...vendorHistoricEmojiImageFragment\n      }\n    }\n    statuses\n  }\n\n  ",
 			variables=dict(
 				lang="EN",
 				slug="twitter",
@@ -4367,6 +4395,7 @@ def load_emojis():
 			"https://emojipedia.org/api/graphql",
 			data=orjson.dumps(dict(
 				operationName="vendorHistoricEmojiV1",
+				query="\n    query vendorHistoricEmojiV1(\n      $slug: Slug!\n      $version: Slug = null\n      $status: VendorHistoricEmojiStatus = null\n      $lang: Language\n    ) {\n      vendorHistoricEmoji_v1(slug: $slug, version: $version, status: $status, lang: $lang) {\n        ...vendorHistoricEmojiResource\n      }\n    }\n    \n  fragment vendorHistoricEmojiImageFragment on VendorHistoricEmojiImage {\n    slug\n    image {\n      source\n      description\n      useOriginalImage\n    }\n    status\n  }\n\n    \n  fragment vendorHistoricEmojiResource on VendorHistoricEmoji {\n    items {\n      category {\n        slug\n        title\n\n        representingEmoji {\n          code\n        }\n      }\n      images {\n        ...vendorHistoricEmojiImageFragment\n      }\n    }\n    statuses\n  }\n\n  ",
 				variables=dict(
 					lang="EN",
 					slug="discord",
@@ -4405,6 +4434,7 @@ def translate_emojis(s):
 
 @functools.lru_cache(maxsize=4)
 def replace_emojis(s):
+	"Replaces all emojis in a string with their respective URLs"
 	for emoji, url in emoji_replace.items():
 		if emoji in s:
 			s = s.replace(emoji, url)
@@ -4412,6 +4442,7 @@ def replace_emojis(s):
 
 @functools.lru_cache(maxsize=4)
 def find_emojis_ex(s):
+	"Finds all emojis in a string, both unicode and discord-exclusive representations"
 	out = {}
 	for emoji, url in emoji_replace.items():
 		try:
@@ -4425,6 +4456,10 @@ def find_emojis_ex(s):
 		except KeyError:
 			continue
 		out[i] = url
+	found = find_emojis(s)
+	for e in found:
+		i = s.index(e)
+		out[i] = e
 	return [t[1] for t in sorted(out.items())]
 
 HEARTS = ["❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
@@ -4493,6 +4528,7 @@ def time_repr(t, mode=None):
 	return f"<t:{t}:{mode}>"
 
 def parse_with_now(expr):
+	"Attempts to parse a time expression that may contain the string \"now\" indicating current time."
 	if not expr or expr.strip().casefold() == "now":
 		return utc_ddt()
 	bc = False
@@ -4558,8 +4594,8 @@ def parse_with_now(expr):
 		return DynamicDT.fromdatetime(dt.replace(year=year)).set_offset(offs)
 	return DynamicDT.fromdatetime(dt)
 
-# Parses a time expression, with an optional timezone input at the end.
 def tzparse(expr):
+	"Parses a time expression, with an optional timezone input at the end."
 	try:
 		s = float(expr)
 	except ValueError:
@@ -4663,6 +4699,7 @@ def tik_decode(t, encoding="cl100k_im"):
 
 @functools.lru_cache(maxsize=64)
 def lim_tokens(s, maxlen=10, mode="centre", encoding="cl100k_im"):
+	"Limits a string to a maximum amount of tokens, cutting from the middle and replacing with \"..\" when possible."
 	if maxlen is None:
 		return s
 	if type(s) is not str:
@@ -4920,6 +4957,7 @@ class CacheItem:
 		self.value = value
 
 class Cache(cdict):
+	"A dictionary-compatible object where the key-value pairs expire after a specified delay. Implements stale-while-revaluate protocol."
 	__slots__ = ("timeout", "tmap", "soonest", "waiting", "lost", "trash", "db")
 
 	def __init__(self, *args, timeout=60, trash=8, **kwargs):
@@ -5047,8 +5085,8 @@ __filetrans = {
 filetrans = "".maketrans(__filetrans)
 
 
-# Basic inheritable class for all bot commands.
 class Command(collections.abc.Hashable, collections.abc.Callable):
+	"Basic abstract inheritable class for all bot commands."
 	description = ""
 	usage = ""
 	min_level = 0
@@ -5129,8 +5167,8 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
 				bot.commands.pop(alias, None)
 
 
-# Basic inheritable class for all bot databases.
 class Database(collections.abc.MutableMapping, collections.abc.Hashable, collections.abc.Callable):
+	"Basic abstract inheritable class for all bot databases."
 	bot = None
 	rate_limit = 3
 	name = "data"
@@ -5271,8 +5309,8 @@ class ImagePool:
 
 
 if __name__ != "__mp_main__":
-	# Redirects all print operations to target files, limiting the amount of operations that can occur in any given amount of time for efficiency.
 	class __logPrinter:
+		"Redirects all print operations to target files, limiting the amount of operations that can occur in any given amount of time for efficiency."
 
 		ignored_messages = {
 			"A decoder-only architecture is being used, but right-padding was detected! For correct generation results, please set `padding_side='left'` when initializing the tokenizer.",

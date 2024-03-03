@@ -24,8 +24,8 @@ if __name__ != "__mp_main__":
 	heartbeat_proc = psutil.Popen([python, "misc/heartbeat.py"])
 
 
-# Main class containing all global bot data.
 class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Callable):
+	"Main class containing all global bot data."
 
 	github = AUTH.get("github") or "https://github.com/thomas-xin/Miza"
 	rcc_invite = AUTH.get("rcc_invite") or "https://discord.gg/cbKQKAr"
@@ -82,7 +82,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	active_categories = set(AUTH.setdefault("active_categories", ["MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "WEBHOOK", "FUN"]))
 
 	def __init__(self, cache_size=65536, timeout=24):
-		# Initializes client (first in __mro__ of class inheritance)
+		"Initializes client (first in __mro__ of class inheritance)"
 		self.start_time = utc()
 		self.monkey_patch()
 		super().__init__(
@@ -426,8 +426,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		else:
 			self.audio = None
 
-	# Starts up client.
 	def run(self):
+		"Starts up client."
 		print(f"Logging in...")
 		try:
 			self.audio_client_start = asubmit(self.start_audio_client, priority=True)
@@ -439,18 +439,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		finally:
 			self.setshutdown()
 
-	# A reimplementation of the print builtin function.
 	def print(self, *args, sep=" ", end="\n"):
+		"A reimplementation of the print builtin function."
 		sys.__stdout__.write(str(sep).join(str(i) for i in args) + end)
 
-	# Closes the bot, preventing all events.
 	def close(self):
+		"Closes the bot, preventing all events."
 		self.closed = True
 		return create_task(super().close())
 
-	# A garbage collector for empty and unassigned objects in the database.
 	@tracebacksuppressor(SemaphoreOverflowError)
 	async def garbage_collect(self, obj):
+		"A garbage collector for empty and unassigned objects in the database."
 		if not self.ready or hasattr(obj, "no_delete") or not any(hasattr(obj, i) for i in ("guild", "user", "channel", "garbage")) and not getattr(obj, "garbage_collect", None):
 			return
 		with MemoryTimer("gc_" + obj.name):
@@ -488,9 +488,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					print(f"Deleting {key} from {obj}...")
 					data.pop(key, None)
 
-	# Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async.
 	@tracebacksuppressor
 	async def send_event(self, ev, *args, exc=False, **kwargs):
+		"Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async."
 		if self.closed:
 			return
 		with MemoryTimer(ev):
@@ -508,9 +508,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					out.append(res)
 			return out
 
-	# Gets the full list of invites from a guild, if applicable.
 	@tracebacksuppressor(default=[])
 	async def get_full_invites(self, guild):
+		"Gets the full list of invites from a guild, if applicable."
 		member = guild.get_member(self.id)
 		if member.guild_permissions.create_instant_invite:
 			invitedata = await Request(
@@ -523,8 +523,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return sorted(invites, key=lambda invite: (invite.max_age == 0, -abs(invite.max_uses - invite.uses), len(invite.url)))
 		return []
 
-	# Gets the first accessable text channel in the target guild.
 	def get_first_sendable(self, guild, member):
+		"Gets the first accessable text channel in the target guild."
 		if member is None:
 			return guild.owner
 		found = {}
@@ -547,36 +547,36 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return guild.owner
 		return channel
 
-	# Returns a discord object if it is in any of the internal cache.
 	def in_cache(self, o_id):
+		"Returns a discord object if it is in any of the internal cache."
 		cache = self.cache
 		try:
-			return self.cache.users[o_id]
+			return cache.users[o_id]
 		except KeyError:
 			pass
 		try:
-			return self.cache.channels[o_id]
+			return cache.channels[o_id]
 		except KeyError:
 			pass
 		try:
-			return self.cache.guilds[o_id]
+			return cache.guilds[o_id]
 		except KeyError:
 			pass
 		try:
-			return self.cache.roles[o_id]
+			return cache.roles[o_id]
 		except KeyError:
 			pass
 		try:
-			return self.cache.emojis[o_id]
+			return cache.emojis[o_id]
 		except KeyError:
 			pass
 		try:
-			return self.data.mimics[o_id]
+			return data.mimics[o_id]
 		except KeyError:
 			pass
 
-	# Fetches either a user or channel object from ID, using the bot cache when possible.
 	async def fetch_messageable(self, s_id):
+		"Fetches either a user or channel object from ID, using the bot cache when possible."
 		if type(s_id) is not int:
 			try:
 				s_id = int(s_id)
@@ -595,8 +595,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		self.cache.users[s_id] = user
 		return user
 
-	# Fetches a user from ID, using the bot cache when possible.
 	async def _fetch_user(self, u_id):
+		"Fetches a user from ID, using the bot cache when possible."
 		async with self.user_semaphore:
 			user = await super().fetch_user(u_id)
 			self.cache.users[u_id] = user
@@ -644,8 +644,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if u_id not in self.cache.users:
 					create_task(self.auser2cache(u_id))
 
-	# Gets a user from ID, using the bot cache.
 	def get_user(self, u_id, replace=False):
+		"Gets a user from ID, using the bot cache."
 		if type(u_id) is not int:
 			try:
 				u_id = int(u_id)
@@ -796,8 +796,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			)
 		raise LookupError(f"No results for {query}.")
 
-	# Fetches a member in the target server by ID or name lookup.
 	async def fetch_member_ex(self, u_id, guild=None, allow_banned=True, fuzzy=1 / 3):
+		"Fetches a member in the target server by ID or name lookup."
 		if type(u_id) is not int and u_id.isnumeric():
 			with suppress(TypeError, ValueError):
 				u_id = int(u_id)
@@ -825,8 +825,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return await self.query_members(members, u_id, fuzzy=fuzzy)
 		return member
 
-	# Fetches the first seen instance of the target user as a member in any shared server.
 	def fetch_member(self, u_id, guild=None, find_others=False):
+		"Fetches the first seen instance of the target user as a member in any shared server."
 		return asubmit(self.get_member, u_id, guild, find_others)
 
 	def get_member(self, u_id, guild=None, find_others=True):
@@ -864,8 +864,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			self.cache.members[u_id] = member
 		return member
 
-	# Fetches a guild from ID, using the bot cache when possible.
 	async def fetch_guild(self, g_id, follow_invites=True):
+		"Fetches a guild from ID, using the bot cache when possible."
 		if type(g_id) is not int:
 			try:
 				g_id = int(g_id)
@@ -903,8 +903,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		# self.cache.guilds[g_id] = guild
 		return guild
 
-	# Fetches a channel from ID, using the bot cache when possible.
 	async def _fetch_channel(self, c_id):
+		"Fetches a channel from ID, using the bot cache when possible."
 		channel = await super().fetch_channel(c_id)
 		self.cache.channels[c_id] = channel
 		return channel
@@ -1150,6 +1150,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return url
 
 	async def delete_attachment(self, url, m_id=None):
+		"Deletes a cached attachment by URL or ID."
 		if isinstance(url, int):
 			a_id = url
 			tup = self.data.attachments.get(a_id)
@@ -1171,10 +1172,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return False
 		channel = await self.fetch_channel(c_id)
 		message = await self.fetch_message(channel, m_id)
-		await self.silent_delete(message)
+		if message.author.id == self.user.id:
+			await self.silent_delete(message)
 		return True
 
 	async def renew_attachment(self, url, m_id=None):
+		"Renews a cached attachment URL by either re-fetching the message, or failing that, proxying its embed preview."
 		if isinstance(url, int):
 			a_id = url
 			tup = self.data.attachments.get(a_id)
@@ -1228,6 +1231,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return u
 
 	async def delete_attachments(self, aids=()):
+		"Deletes a list of cached attachments asynchronously."
 		futs = []
 		for a_id in aids:
 			fut = self.delete_attachment(a_id)
@@ -1235,14 +1239,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return await asyncio.gather(*futs)
 
 	async def renew_attachments(self, aids=()):
+		"Renews a list of cached attachments asynchronously."
 		futs = []
 		for a_id in aids:
 			fut = self.renew_attachment(a_id)
 			futs.append(fut)
 		return await asyncio.gather(*futs)
 
-	# Fetches a role from ID and guild, using the bot cache when possible.
 	async def fetch_role(self, r_id, guild=None):
+		"Fetches a role from ID and guild, using the bot cache when possible."
 		if type(r_id) is not int:
 			try:
 				r_id = int(r_id)
@@ -1264,8 +1269,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		self.cache.roles[r_id] = role
 		return role
 
-	# Fetches an emoji from ID and guild, using the bot cache when possible.
 	async def fetch_emoji(self, e_id, guild=None):
+		"Fetches an emoji from ID and guild, using the bot cache when possible."
 		if type(e_id) is not int:
 			try:
 				e_id = int(e_id)
@@ -1437,9 +1442,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return verify_id(m_id)
 
 	ytdl = None
-	# Finds URLs in a string, following any discord message links found.
 	# followed = llcache
 	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, emojis=True, reactions=False, allow=False, limit=None, no_cache=False, ytd=True):
+		"Finds URLs in a string, following any discord message links found. Traces all the way to raw file stream if \"ytd\" parameter is set."
 		self.followed = self.llcache
 		if limit is not None and limit <= 0:
 			return []
@@ -1586,6 +1591,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	emoji_stuff = {}
 	def is_animated(self, e, verify=False):
+		"Detects whether an emoji is usable, and if so, animated. Returns a ternary True/False/None value where True represents an emoji that is both usable and animated, False for a usable non-animated emoji, and None for unusable emojis."
 		if type(e) in (int, str):
 			try:
 				emoji = self.cache.emojis[e]
@@ -1619,6 +1625,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return emoji.animated
 
 	async def proxy_emojis(self, msg, guild=None, user=None, is_webhook=False, return_pops=False, lim=1936):
+		"Retrieves and maps user's emoji list on target string. Used for ~AutoEmoji and compatibility with other commands."
 		orig = self.bot.data.emojilists.get(user.id, {}) if user else {}
 		emojis = emoji = None
 		regex = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
@@ -1743,6 +1750,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return min_emoji(e)
 
 	async def optimise_image(self, image, fsize=25165824, msize=None, fmt="mp4", duration=None, timeout=3600):
+		"Optimises the target image or video file to fit within the \"fsize\" size, or \"msize\" resolution. Optional format and duration parameters."
 		ts = ts_us()
 		fn = f"cache/{ts}~oi"
 		if isinstance(image, str) and is_url(image):
@@ -1892,6 +1900,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		12: "nz-en",	# New Zealand
 	}
 	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60, screenshot=False, best=False):
+		"Browses the internet using DuckDuckGo or Microsoft Edge. Returns an image if screenshot is set to True."
 		if not region:
 			if timezone is None:
 				if "users" in self.data:
@@ -2197,6 +2206,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		raise (exc or RuntimeError("Unknown error occured."))
 
 	async def chat_completion(self, messages, model="miza-1", frequency_penalty=None, presence_penalty=None, repetition_penalty=None, max_tokens=256, temperature=0.7, top_p=0.9, tools=None, tool_choice=None, router=None, stops=(), user=None, assistant_name=None, stream=False, **void):
+		"OpenAI-compatible Chat Completion function. Autoselects model using a function call, then routes to tools and target model as required."
 		if void:
 			print("VOID:", void)
 		modlvl = ["miza-1", "miza-2", "miza-3"].index(model.rsplit("/", 1)[-1])
@@ -2226,6 +2236,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			tool_choice = None
 		data = dict(
 			model="firefunction-v1",
+			rev_nsfw=False,
 			messages=snippet,
 			temperature=tmp,
 			top_p=tpp,
@@ -2305,11 +2316,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			formal_backup = "gpt-4"
 			casual = "goliath-120b"
 			casual_backup = "gpt-3.5-turbo-instruct"
+		elif modlvl >= 1:
+			formal = "gpt-3.5-turbo-0125"
+			formal_backup = "firefunction-v1"
+			casual = "goliath-120b"
+			casual_backup = "gpt-3.5-turbo-instruct"
 		else:
 			formal = "gpt-3.5-turbo-0125"
 			formal_backup = "firefunction-v1"
 			casual = "mythomax-13b"
-			casual_backup = "stripedhyena-nous-7b"
+			casual_backup = "goliath-120b"
 		is_formal = cargs["assistant"] == "formal"
 		has_function = is_formal
 		assistant = formal if is_formal else casual
@@ -2600,6 +2616,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return t
 
 	async def summarise(self, q, min_length=128, max_length=192, best=True):
+		"Produces an AI-generated summary of input text. Model used is controlled by \"best\" parameter."
 		if min_length > max_length - 1:
 			min_length = max_length - 1
 		if q and sum(c.isascii() for c in q) / len(q) > 0.75:
@@ -2678,6 +2695,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	analysed = {}
 	async def caption(self, url, best=False, screenshot=False, timeout=24):
+		"Produces an AI-generated caption for an image. Model used is determined by \"best\" argument."
 		if "analysed" in self.data:
 			self.analysed = self.data.analysed
 		h = shash(url)
@@ -2883,6 +2901,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	caption_prompt = "Please describe this image in detail; be descriptive but concise!"
 	description_prompt = "Please describe this <IMAGE> in detail:\n- Transcribe text if present, but do not mention there not being text\n- Note details if obvious such as gender and race of characters\n- Be descriptive but concise"
 	async def gpt4v(self, url, name=None, best=False):
+		"Requests an image description from GPT4-Vision."
 		if isinstance(url, str):
 			resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True)
 			if resp.headers.get("Content-Type") in ("image/png", "image/gif", "image/jpeg", "image/webp") and float(resp.headers.get("Content-Length", inf)) < 20 * 1e6:
@@ -3047,8 +3066,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		print("NeVa:", out)
 		return out
 
-	# Follows a message link, replacing emojis and user mentions with their icon URLs.
 	async def follow_to_image(self, url, follow=True):
+		"Follows a message link, replacing emojis and user mentions with their icon URLs."
 		temp = find_urls(url)
 		if temp:
 			return temp
@@ -3074,8 +3093,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			out = find_urls(translate_emojis(replace_emojis(url)))
 		return out
 
-		# Sends a message to a channel, then edits to add links to all attached files.
 	async def send_with_file(self, channel, msg=None, file=None, filename=None, embed=None, best=False, rename=True, reference=None, reacts=""):
+		"Sends a message to a channel, then edits to add links to all attached files. Automatically transfers excessively large files to filehost."
 		if not msg:
 			msg = ""
 		f = None
@@ -3170,8 +3189,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						await message.add_reaction(react)
 		return message
 
-	# Inserts a message into the bot cache, discarding existing ones if full.
 	def add_message(self, message, files=True, cache=True, force=False):
+		"Inserts a message into the bot cache, discarding existing ones if full."
 		if self.closed:
 			return message
 		try:
@@ -3218,8 +3237,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		# 		self.data.attachments[a.id] = (message.channel.id, message.id)
 		return message
 
-	# Deletes a message from the bot cache.
 	def remove_message(self, message):
+		"Deletes a message from the bot cache."
 		self.cache.messages.pop(message.id, None)
 		if not message.author.bot:
 			s = message_repr(message, username=True)
@@ -3475,8 +3494,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			emb.timestamp = message.edited_at or message.created_at
 		return emb
 
-	# Limits a cache to a certain amount, discarding oldest entries first.
 	def limit_cache(self, cache=None, limit=None):
+		"Limits a cache to a certain amount, discarding oldest entries first."
 		if limit is None:
 			limit = self.cache_size
 		if cache is not None:
@@ -3501,8 +3520,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		self.limit_cache("deleted", limit=16384)
 		self.limit_cache("banned", 4096)
 
-	# Updates bot cache from the discord.py client cache, using automatic feeding to mitigate the need for slow dict.update() operations.
 	def update_cache_feed(self):
+		"Updates bot cache from the discord.py client cache, using automatic feeding to mitigate the need for slow dict.update() operations."
 		self.cache.guilds._feed = (self._guilds, getattr(self, "sub_guilds", {}))
 		self.cache.emojis._feed = (self._emojis,)
 		self.cache.users._feed = (self._users,)
@@ -3533,8 +3552,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				print("Incorrect member count:", guild, len(guild._members), guild.member_count)
 				create_task(self.load_guild_http(guild))
 
-	# Gets the target bot prefix for the target guild, return the default one if none exists.
 	def get_prefix(self, guild):
+		"Gets the target bot prefix for the target guild, return the default one if none exists."
 		try:
 			g_id = guild.id
 		except AttributeError:
@@ -3546,8 +3565,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return self.data.prefixes[g_id]
 		return self.prefix
 
-	# Gets effective permission level for the target user in a certain guild, taking into account roles.
 	def get_perms(self, user, guild=None):
+		"Gets effective permission level for the target user in a certain guild, taking into account roles."
 		try:
 			u_id = user.id
 		except AttributeError:
@@ -3595,8 +3614,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			perm = -inf
 		return perm
 
-	# Gets effective permission level for the target role in a certain guild, taking into account permission values.
 	def get_role_perms(self, role, guild):
+		"Gets effective permission level for the target role in a certain guild, taking into account permission values."
 		if role.permissions.administrator:
 			return inf
 		with suppress(KeyError):
@@ -3617,8 +3636,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return 1
 		return -1
 
-	# Sets the permission value for a snowflake in a guild to a value.
 	def set_perms(self, user, guild, value):
+		"Sets the permission value for a snowflake in a guild to a value."
 		perms = self.data.perms
 		try:
 			u_id = user.id
@@ -3628,8 +3647,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		g_perm[u_id] = round_min(value)
 		self.data.perms.update(guild.id)
 
-	# Removes the permission value for a snowflake in a guild.
 	def remove_perms(self, user, guild):
+		"Removes the permission value for a snowflake in a guild."
 		perms = self.data.perms
 		try:
 			u_id = user.id
@@ -3643,6 +3662,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			self.data.perms.pop(guild.id, None)
 
 	def get_enabled(self, channel):
+		"Retrieves the list of enabled command categories for a channel."
 		guild = getattr(channel, "guild", None)
 		if not guild and hasattr(channel, "member_count"):
 			guild = channel
@@ -3658,8 +3678,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			enabled = self.categories.keys()
 		return enabled
 
-	# Checks whether a member's status was changed.
 	def status_changed(self, before, after):
+		"Checks whether a member's status was changed."
 		if before.activity != after.activity:
 			return True
 		for attr in ("status", "desktop_status", "web_status", "mobile_status"):
@@ -3668,8 +3688,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return False
 		return True
 
-	# Checks whether a member's status was updated by themselves.
 	def status_updated(self, before, after):
+		"Checks whether a member's status was updated by themselves."
 		if before.activity != after.activity:
 			return True
 		for attr in ("status", "desktop_status", "web_status", "mobile_status"):
@@ -3683,8 +3703,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return False
 		return True
 
-	# Checks if a message has been flagged as deleted by the deleted cache.
 	def is_deleted(self, message):
+		"Checks if a message has been flagged as deleted by the deleted cache."
 		try:
 			m_id = int(message.id)
 		except AttributeError:
@@ -3702,8 +3722,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return False
 		return True
 
-	# Logs if a message has been deleted.
 	def log_delete(self, message, no_log=False):
+		"Logs if a message has been deleted."
 		if not message:
 			return
 		try:
@@ -3712,8 +3732,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			m_id = int(message)
 		self.cache.deleted[m_id] = no_log + 2
 
-	# Silently deletes a message, bypassing logs.
 	async def silent_delete(self, message, exc=False, no_log=False, delay=None):
+		"Silently deletes a message, bypassing logs."
 		if not message:
 			return
 		if type(message) is int:
@@ -3771,8 +3791,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	# Checks if a user is an owner of the bot.
 	is_owner = lambda self, user: verify_id(user) in self.owners
 
-	# Checks if a guild is trusted by the bot.
 	def is_trusted(self, guild):
+		"Checks if a guild is trusted by the bot."
 		try:
 			trusted = self.data.trusted
 		except (AttributeError, KeyError):
@@ -3799,8 +3819,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		trusted[i].add(None)
 		return min(2, len(trusted[i]))
 
-	# Checks a user's premium subscription level.
 	def premium_level(self, user, absolute=False):
+		"Retrieves a user's premium subscription level."
 		if self.is_owner(user):
 			return 5
 		try:
@@ -3876,8 +3896,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		await user.send(f"Thank you for donating ${amount}! Your account has been credited 💎 {dias}!")
 		return True
 
-	# Checks if a user is blacklisted from the bot.
 	def is_blacklisted(self, user):
+		"Checks if a user is blacklisted from the bot."
 		u_id = verify_id(user)
 		if self.is_owner(u_id) or u_id == self.id:
 			return False
@@ -3980,8 +4000,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		"Y": 1 << 80,
 	}
 
-	# Evaluates a math formula to a float value, using a math process from the subprocess pool when necessary.
 	async def eval_math(self, expr, default=0, op=True):
+		"Evaluates a math formula to a float value, using a math process from the subprocess pool when necessary."
 		expr = as_str(expr)
 		if op:
 			# Allow mathematical operations on a default value
@@ -4039,8 +4059,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return float(x)
 		return x
 
-	# Evaluates a math formula to a list of answers, using a math process from the subprocess pool when necessary.
 	async def solve_math(self, f, prec=128, r=False, timeout=16, variables=None, nlp=False):
+		"Evaluates a math formula to a list of answers, using a math process from the subprocess pool when necessary."
 		res = await process_math(f.strip(), int(prec), int(r), timeout=timeout, variables=variables)
 		if nlp:
 			return f"{f} = {res[0]}"
@@ -4064,8 +4084,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	connectors = re.compile(r"\s(?:and|at)\s", re.I)
 	alphabet = frozenset("abcdefghijklmnopqrstuvwxyz")
 
-	# Evaluates a time input, using a math process from the subprocess pool when necessary.
 	async def eval_time(self, expr, default=0, op=True):
+		"Evaluates a time input, using a math process from the subprocess pool when necessary."
 		if op:
 			# Allow mathematical operations on a default value
 			_op = None
@@ -4187,8 +4207,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				t = int(t)
 		return t
 
-	# Updates the bot's stored external IP address.
 	def update_ip(self, ip):
+		"Updates the bot's stored external IP address."
 		if regexp("^([0-9]{1,3}\\.){3}[0-9]{1,3}$").search(ip):
 			self.ip = ip
 			new_ip = f"https://{self.ip}:{PORT}"
@@ -4201,16 +4221,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return (url,)
 		return regexp("^https?:\\/\\/(?:[A-Za-z]+\\.)?mizabot\\.xyz").findall(url)
 
-	# Gets the external IP address from api.ipify.org
 	ip_sem = Semaphore(1, 1, rate_limit=60)
 	async def get_ip(self):
+		"Gets the external IP address from api.ipify.org"
 		if not self.ip_sem.busy:
 			async with self.ip_sem:
 				self.ip = await Request("https://api.ipify.org", bypass=False, ssl=False, decode=True, timeout=3, aio=True)
 		return self.ip
 
-	# Gets the CPU and memory usage of a process over a period of 1 second.
 	async def get_proc_state(self, proc):
+		"Gets the CPU and memory usage of a process over a period of 1 second."
 		with suppress(psutil.NoSuchProcess):
 			c = await asubmit(proc.cpu_percent, priority=True)
 			if not c:
@@ -4532,9 +4552,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			"Misc info": misc_stats,
 		}
 
-	# Loads a module containing commands and databases by name.
 	@tracebacksuppressor
 	def get_module(self, module):
+		"Loads a module containing commands and databases by name."
 		f = module
 		if "." in f:
 			f = f[:f.rindex(".")]
@@ -4640,10 +4660,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return all(fut.result() for fut in modload)
 		return self.get_module(mod + ".py")
 
-	# Loads all modules in the commands folder and initializes bot commands and databases.
 	size = fcdict()
 	size2 = fcdict()
 	def get_modules(self):
+		"Loads all modules in the commands folder and initializes bot commands and databases."
 		files = [i for i in os.listdir("commands") if is_code(i) and i.rsplit(".", 1)[0] in self.active_categories]
 		self.categories = fcdict()
 		self.dbitems = fcdict()
@@ -4712,8 +4732,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			print("Backup database failed!", fn)
 		return fn
 
-	# Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down.
 	def update(self, force=False):
+		"Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down."
 		if force:
 			self.update_embeds(True)
 		saved = alist()
@@ -4765,8 +4785,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	zw_callback = zwencode("callback")
 
-	# Operates on reactions on special messages, calling the _callback_ methods of commands when necessary.
 	async def react_callback(self, message, reaction, user):
+		"Operates on reactions on special messages, calling the _callback_ methods of commands when necessary."
 		if message.author.id == self.id:
 			if self.closed:
 				return
@@ -4938,8 +4958,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				# Member update events are not sent through for the current user, so manually send a _seen_ event
 				await self.seen(self.user, event="misc", raw="Changing their status")
 
-	# Handles all updates to the bot. Manages the bot's status and activity on discord, and updates all databases.
 	async def handle_update(self, force=False):
+		"Handles all updates to the bot. Manages the bot's status and activity on discord, and updates all databases."
 		if utc() - self.last_check > 3 or force:
 			semaphore = self.semaphore if not force else emptyctx
 			with suppress(SemaphoreOverflowError):
@@ -4951,8 +4971,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							if not u._semaphore.busy:
 								trace(asubmit(u, priority=True))
 
-	# Processes a message, runs all necessary commands and bot events. May be called from another source.
 	async def process_message(self, message, msg=None, edit=True, orig=None, loop=False, slash=False, min_perm=None):
+		"Processes a message, runs all necessary commands and bot events. May be called from another source."
 		if self.closed:
 			return 0
 		msg = msg if msg is not None else message.content
@@ -5523,16 +5543,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		self.users_updated = True
 		print("Guilds loaded.")
 
-	# Adds a webhook to the bot's user and webhook cache.
 	def add_webhook(self, w):
+		"Inserts a webhook into the bot's user and webhook cache."
 		return self.data.webhooks.add(w)
 
-	# Loads all webhooks in the target channel.
 	def load_channel_webhooks(self, channel, force=False, bypass=False):
+		"Loads all webhooks in the target channel."
 		return self.data.webhooks.get(channel, force=force, bypass=bypass)
 
-	# Gets a valid webhook for the target channel, creating a new one when necessary.
 	async def ensure_webhook(self, channel, force=False, bypass=False, fill=False):
+		"Gets a valid webhook for the target channel, creating a new one when necessary."
 		wlist = await self.load_channel_webhooks(channel, force=force, bypass=bypass)
 		try:
 			if fill:
@@ -5559,8 +5579,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return await w.edit(name=self.name, avatar=data)
 		return w
 
-	# Sends a message to the target channel, using a random webhook from that channel.
 	async def send_as_webhook(self, channel, *args, recurse=True, **kwargs):
+		"Sends a message to the target channel, using a random webhook from that channel."
 		if recurse and "exec" in self.data:
 			try:
 				avatar_url = kwargs.pop("avatar_url")
@@ -5648,8 +5668,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				await message.add_reaction(react)
 		return message
 
-	# Sends a list of embeds to the target sendable, using a webhook when possible.
 	async def _send_embeds(self, sendable, embeds, reacts=None, reference=None, force=True, exc=True):
+		"Sends a list of embeds to the target sendable, using a webhook when possible."
 		s_id = verify_id(sendable)
 		sendable = await self.fetch_messageable(s_id)
 		if exc:
@@ -5767,8 +5787,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				# aio=True,
 			# )
 
-	# Adds embeds to the embed sender, waiting for the next update event.
 	def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None, exc=True, bottleneck=False):
+		"Adds embeds to the embed sender, waiting for the next update event."
 		if embeds is not None and not issubclass(type(embeds), collections.abc.Collection):
 			embeds = (embeds,)
 		elif embeds:
@@ -5934,8 +5954,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					embs[i].url = img
 		return self.send_embeds(channel, embeds=embs, reacts=reacts, reference=reference, exc=exc, bottleneck=bottleneck)
 
-	# Updates all embed senders.
 	def update_embeds(self, force=False):
+		"Updates all embed senders."
 		sent = False
 		for s_id in self.embed_senders:
 			embeds = self.embed_senders[s_id]
@@ -5957,8 +5977,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			sent = True
 		return sent
 
-	# The fast update loop that runs almost 24 times per second. Used for events where timing is important.
 	async def fast_loop(self):
+		"The fast update loop that runs almost 24 times per second. Used for events where timing is important."
 
 		async def event_call(freq):
 			for i in range(freq):
@@ -5977,11 +5997,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						await self.send_event("_call_")
 				self.update_users()
 
-	# The slow update loop that runs once every 3 seconds.
 	uptime = 0
 	up_bps = down_bps = 0
 	total_bytes = 0
 	async def slow_loop(self):
+		"The slow update loop that runs once every 3 seconds."
 		await asyncio.sleep(2)
 		ninter = 3
 		sem = Semaphore(1, 1, rate_limit=ninter, sync=True)
@@ -6045,8 +6065,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							self.bitrate = 0
 							self.total_bytes = 0
 
-	# The lazy update loop that runs once every 3~5 seconds.
 	async def lazy_loop(self):
+		"The lazy update loop that runs once every 3~5 seconds."
 		await asyncio.sleep(5)
 		while not self.closed:
 			async with Delay(random.random() * 8 + 3):
@@ -6055,8 +6075,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					with MemoryTimer("handle_update"):
 						await self.handle_update()
 
-	# The slowest update loop that runs once every 5 minutes. Used for slow operations, such as the bot database autosave event.
 	async def global_loop(self):
+		"The slowest update loop that runs once every 5 minutes. Used for slow operations, such as the bot database autosave event."
 		while not self.closed:
 			async with Delay(300):
 				async with tracebacksuppressor:
@@ -6103,9 +6123,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						with tracebacksuppressor:
 							await fut
 
-	# Heartbeat loop: Repeatedly renames a file to inform the watchdog process that the bot's event loop is still running.
 	@tracebacksuppressor
 	async def heartbeat_loop(self):
+		"Heartbeat loop: Repeatedly renames a file to inform the watchdog process that the bot's event loop is still running."
 		print("Heartbeat Loop initiated.")
 		while not self.closed:
 			async with Delay(0.2):
@@ -6114,8 +6134,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					with tracebacksuppressor(FileNotFoundError, PermissionError):
 						os.rename(self.heartbeat, self.heartbeat_ack)
 
-	# User seen event
 	async def seen(self, *args, delay=0, event=None, **kwargs):
+		"User seen event"
 		for arg in args:
 			if arg:
 				await self.send_event("_seen_", user=arg, delay=delay, event=event, **kwargs)
@@ -6126,8 +6146,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			self.add_message(message, files=False, force=True)
 		return message
 
-	# Deletes own messages if any of the "X" emojis are reacted by a user with delete message permission level, or if the message originally contained the corresponding reaction from the bot.
 	async def check_to_delete(self, message, reaction, user):
+		"Deletes own messages if any of the \"X\" emojis are reacted by a user with delete message permission level, or if the message originally contained the corresponding reaction from the bot."
 		if user.id == self.id:
 			return
 		message = await self.ensure_reactions(message)
@@ -6184,8 +6204,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						await self.silent_delete(message, exc=True)
 						await self.send_event("_delete_", message=message)
 
-	# Handles a new sent message, calls process_message and sends an error if an exception occurs.
 	async def handle_message(self, message, edit=True):
+		"Handles a new sent message, calls process_message and sends an error if an exception occurs."
 		if message.author.id != self.user.id:
 			for i, a in enumerate(message.attachments):
 				if a.filename == "message.txt":
@@ -6202,8 +6222,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	def set_classes(self):
 		bot = self
 
-		# For compatibility with guild objects, takes a user and DM channel.
 		class UserGuild(discord.Object):
+			"For compatibility with guild objects, takes a user and DM channel."
 
 			class UserChannel(discord.abc.PrivateChannel):
 
@@ -6271,8 +6291,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			ghost = True
 			is_channel = True
 
-		# Represents a deleted/not found user.
 		class GhostUser(discord.abc.Snowflake):
+			"Represents a deleted/not found user."
 
 			__repr__ = lambda self: f"<Ghost User id={self.id} name='{self.name}' discriminator='{self.discriminator}' bot=False>"
 			__str__ = discord.user.BaseUser.__str__
@@ -6402,8 +6422,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 		GhostUser.bot = False
 
-		# Represents a deleted/not found message.
 		class GhostMessage(discord.abc.Snowflake):
+			"Represents a deleted/not found message."
 
 			content = bold(css_md(uni_str("[MESSAGE DATA NOT FOUND]"), force=True))
 
@@ -6454,6 +6474,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			deleted = True
 
 		class ExtendedMessage:
+			"discord.py-compatible message object that enables insertion of additional attributes."
 
 			__slots__ = ("__dict__",)
 
@@ -6543,6 +6564,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return object.__getattribute__(m, k)
 
 		class LoadedMessage(discord.Message):
+			"discord.py-compatible message object that enables dynamic creation."
 
 			def __getattr__(self, k):
 				if k not in ("mentions", "role_mentions"):
@@ -6553,6 +6575,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					return []
 
 		class CachedMessage(discord.abc.Snowflake):
+			"discord.py-compatible message object that enables fast loading."
 
 			__slots__ = ("_data", "id", "created_at", "author", "channel", "channel_id", "deleted", "attachments", "sem")
 
@@ -6709,8 +6732,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			popitem = data.popitem
 			clear = data.clear
 
-		# A context manager that sends exception tracebacks to a sendable.
 		class ExceptionSender(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
+			"A context manager that sends exception tracebacks to a messageable."
 
 			def __init__(self, sendable, *args, reference=None, **kwargs):
 				self.sendable = sendable
@@ -7111,8 +7134,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		)
 
 	async def missing_perms(self, messageable, reference):
-		guild = messageable.guild
-		channel = messageable
 		message = reference
 		user = message.author
 		link = message_link(message)
@@ -7166,7 +7187,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	async def reaction_clear(self, raw, data):
 		channel = await self.fetch_channel(raw.channel_id)
 		message = await self.fetch_message(raw.message_id, channel=channel)
-		user = message.author
 		old_reactions = message.reactions.copy()
 		message.reactions.clear()
 		self.dispatch("reaction_clear", message, old_reactions)
@@ -7827,6 +7847,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 
 class AudioClientInterface:
+	"The interface between the main bot process and the voice subprocess. Controls all VC operations through stdin/stdout pipes."
 
 	clients = weakref.WeakValueDictionary()
 	returns = {}
@@ -8172,6 +8193,7 @@ def webserver_communicate(bot):
 
 
 class SimulatedMessage:
+	"discord.py-compatible message object used for simulated messages, either from slash commands or API."
 
 	def __init__(self, bot, content, t, name, nick=None, recursive=True):
 		self._state = bot._state
