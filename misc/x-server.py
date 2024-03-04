@@ -3023,6 +3023,57 @@ max-height: 100%;
 		if not path:
 			path = ["models"]
 		if path[0] == "models":
+			if "info" in kwargs:
+				gpu = self.bot_exec("bot.status()")["system"]["gpu"]
+				gpus = {}
+				for p in gpu.values():
+					k = p["name"].removeprefix("NVIDIA ").removeprefix("Nvidia ").removeprefix("AMD ").removeprefix("GeForce ").removeprefix("Quadro ").removeprefix("Tesla ")
+					try:
+						gpus[k] += 1
+					except KeyError:
+						gpus[k] = 1
+				ip = self.bot_exec("bot.ip")
+				data = get_geo(ip)
+				tz = data["timezone"]
+				return orjson.dumps([{
+					"modelInstanceConfig": {
+						"appearsIn": [],
+						"order": 0
+					},
+					"_id": "668999031359537205",
+					"name": "Miza/miza-3",
+					"display_name": "Miza (Large)",
+					"display_type": "chat",
+					"description": "This is a system incorporating a router and function calling in order to incorporate features not normally seen in models. Included models are gpt-4-0125-preview, gpt-4-vision-preview, firefunction-v1, firellava, gpt-3.5-turbo-0125, goliath-120b, gpt-3.5-turbo-instruct and nous-hermes-2-mixtral-8x7b-dpo.",
+					"license": "other",
+					"creator_organization": "Miza",
+					"hardware_label": ", ".join((f"{v}x {k}" if v > 1 else k) for k, v in gpus.items()),
+					"num_parameters": 1099511627776,
+					"show_in_playground": True,
+					"isFeaturedModel": True,
+					"context_length": 16384,
+					"config": {
+						"prompt_format": "<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n",
+						"stop": [
+							"<|im_end|>"
+						],
+						"chat_template": "{% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}",
+						"add_generation_prompt": True,
+					},
+					"pricing": {
+						"input": 1500,
+						"output": 2000,
+						"hourly": 0
+					},
+					"created_at": "2024-03-04T07:31:55.464728Z",
+					"update_at": "2024-03-04T07:31:55.464728Z",
+					"instances": [{
+						"host": tz.casefold(),
+					}],
+					"access": "",
+					"link": "",
+					"descriptionLink": "",
+				}])
 			return orjson.dumps(dict(
 				object="list", data=[
 					dict(

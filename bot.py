@@ -122,7 +122,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		self.load_semaphore = Semaphore(5, inf, rate_limit=1)
 		self.user_semaphore = Semaphore(64, inf, rate_limit=8)
 		self.cache_semaphore = Semaphore(1, 1, rate_limit=30)
-		self.command_semaphore = Semaphore(262144, 16384)
+		self.command_semaphore = Semaphore(262144, 16384, rate_limit=5)
 		print("Time:", datetime.datetime.now())
 		print("Initializing...")
 		# O(1) time complexity for searching directory
@@ -571,7 +571,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		except KeyError:
 			pass
 		try:
-			return data.mimics[o_id]
+			return self.data.mimics[o_id]
 		except KeyError:
 			pass
 
@@ -2081,6 +2081,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		"goliath-120b": {
 			"https://fdigsujdfigsd-plsbuild.hf.space/v1": "TheBloke/goliath-120b-GPTQ",
 		},
+		"nous-hermes-2-mixtral-8x7b-dpo": {
+			"together": "NousResearch/nous-hermes-2-mixtral-8x7b-dpo",
+			"fireworks": "accounts/fireworks/models/nous-hermes-2-mixtral-8x7b-dpo-fp8",
+		},
 		"mixtral-8x7b-instruct": {
 			"together": "mistralai/Mixtral-8x7B-Instruct-v0.1",
 			"fireworks": "accounts/fireworks/models/mixtral-8x7b-instruct",
@@ -2103,6 +2107,23 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		"wizard-70b": {
 			"together": "WizardLM/WizardLM-70B-V1.0",
 		},
+	}
+	is_chat = {
+		"gpt-4-0125-preview",
+		"gpt-4-vision-preview",
+		"gpt-4",
+		"gpt-3.5-turbo-0125",
+		"gpt-3.5-turbo",
+		"nous-hermes-2-mixtral-8x7b-dpo",
+		"mixtral-8x7b-instruct",
+		"mythomax-13b",
+		"stripedhyena-nous-7b",
+	}
+	contexts = {
+		"nous-hermes-2-mixtral-8x7b-dpo": 32768,
+		"mixtral-8x7b-instruct": 32768,
+		"firefunction-v1": 32768,
+		"mistral-7b": 32768,
 	}
 	api_map = cdict()
 	api_blocked = Cache(timeout=720, trash=0)
@@ -2205,13 +2226,78 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return resp
 		raise (exc or RuntimeError("Unknown error occured."))
 
+	async def force_chat(self, model, messages, text=None, assistant_name=None, **kwargs):
+		if model in self.is_chat:
+			return await self.llm("chat.completions.create", model=model, messages=messages, **kwargs)
+		instruct_formats = {
+			"mistral-7b": "mistral",
+			"goliath-120b": "blockml",
+			"wizard-70b": "blockml",
+		}
+		fmt = instruct_formats.get(model, "chatml")
+		assistant_messages = [m for m in messages if m.get("role") == "assistant"]
+		if assistant_name:
+			bot_name = assistant_name
+		elif not assistant_messages:
+			bot_name = None
+		else:
+			assistant_names = [(m.get("name") or (m["content"].split(":", 1)[0] if ":" in m["content"] else "")) for m in assistant_messages]
+			bot_names = [n for n in assistant_names if n]
+			if not bot_names:
+				bot_name = None
+			else:
+				bot_name = bot_names[-1]
+		prompt, stopn = self.instruct_structure(messages, fmt=fmt, assistant=bot_name)
+		if text:
+			prompt += " " + text
+		data = dict(
+			model=model,
+			prompt=prompt,
+			**kwargs,
+		)
+		print("CC:", data)
+		resp = await self.llm("completions.create", **data)
+		choice = resp.choices[0]
+		return cdict(
+			id=resp.id,
+			choices=[cdict(
+				finish_reason=choice.finish_reason,
+				index=0,
+				logprobs=None,
+				text=choice.text,
+				message=cdict(role="assistant", content=choice.text),
+			)],
+			usage=resp.usage,
+		)
+
+	miza_map = {
+		"miza-3": dict(
+			formal="gpt-4-0125-preview",
+			formal_backup="gpt-4",
+			casual="goliath-120b",
+			casual_backup="gpt-3.5-turbo-instruct",
+		),
+		"miza-2": dict(
+			formal="gpt-3.5-turbo-0125",
+			formal_backup="firefunction-v1",
+			casual="nous-hermes-2-mixtral-8x7b-dpo",
+			casual_backup="gpt-3.5-turbo-instruct",
+		),
+		"miza-1": dict(
+			formal="gpt-3.5-turbo-0125",
+			formal_backup="firefunction-v1",
+			casual="mythomax-13b",
+			casual_backup="stripedhyena-nous-7b",
+		),
+	}
+
 	async def chat_completion(self, messages, model="miza-1", frequency_penalty=None, presence_penalty=None, repetition_penalty=None, max_tokens=256, temperature=0.7, top_p=0.9, tools=None, tool_choice=None, router=None, stops=(), user=None, assistant_name=None, stream=False, **void):
 		"OpenAI-compatible Chat Completion function. Autoselects model using a function call, then routes to tools and target model as required."
 		if void:
 			print("VOID:", void)
 		modlvl = ["miza-1", "miza-2", "miza-3"].index(model.rsplit("/", 1)[-1])
 		messages = [cdict(m) for m in messages]
-		messages = await self.cut_to(messages, 8000 if modlvl >= 2 else 4000)
+		messages = await self.cut_to(messages, 12000 if modlvl >= 2 else 8000)
 		length = await count_to(messages)
 		tmp = temperature
 		tpp = top_p
@@ -2227,9 +2313,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			fp = rp - 1
 			pp = 0
 		raws = [m for m in messages if not m.get("tool_calls") and m.get("role") != "tool"]
-		mid_cut = await self.cut_to(messages, 3000)
 		snippet = await self.cut_to(raws, 800 if modlvl >= 2 else 400)
-		mid_length = await count_to(mid_cut)
 		text = ""
 		ustr = str(hash(str(user) or self.user.name))
 		if tool_choice == "auto":
@@ -2311,27 +2395,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				ftools = [t for t in tools if t["function"]["name"] == ftools]
 			else:
 				ftools = router[ftools]
-		if modlvl >= 2:
-			formal = "gpt-4-0125-preview"
-			formal_backup = "gpt-4"
-			casual = "goliath-120b"
-			casual_backup = "gpt-3.5-turbo-instruct"
-		elif modlvl >= 1:
-			formal = "gpt-3.5-turbo-0125"
-			formal_backup = "firefunction-v1"
-			casual = "goliath-120b"
-			casual_backup = "gpt-3.5-turbo-instruct"
-		else:
-			formal = "gpt-3.5-turbo-0125"
-			formal_backup = "firefunction-v1"
-			casual = "mythomax-13b"
-			casual_backup = "goliath-120b"
+		formal, formal_backup, casual, casual_backup = self.miza_map[model].values()
 		is_formal = cargs["assistant"] == "formal"
 		has_function = is_formal
 		assistant = formal if is_formal else casual
 		assistant_backup = formal_backup if is_formal else casual_backup
-		selection = messages if is_formal else mid_cut
-		ml = min(max(256, min(4096, 8192 - length)) if is_formal else max(256, min(2048, 4096 - mid_length)), max_tokens)
+		ml = min(max(256, min(4096, 16384 - length)), max_tokens)
 		resp = None
 		if not has_function and ftools:
 			data = dict(
@@ -2363,7 +2432,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if not resp and has_function:
 			data = dict(
 				model=assistant,
-				messages=selection,
+				messages=messages,
 				temperature=tmp,
 				top_p=tpp,
 				frequency_penalty=fp,
@@ -2419,58 +2488,46 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if redo:
 			assistant = casual
 			assistant_backup = casual_backup
-			instruct_formats = {
-				"mistral-7b": "mistral",
-				"mixtral-8x7b-instruct": "blockml",
-				"stripedhyena-7b": "chatml",
-				"mythomax-13b": "blockml",
-				"goliath-120b": "blockml",
-				"wizard-70b": "blockml",
-			}
-			fmt = instruct_formats.get(assistant, "chatml")
-			assistant_messages = [m for m in messages if m.get("role") == "assistant"]
-			if assistant_name:
-				bot_name = assistant_name
-			elif not assistant_messages:
-				bot_name = None
-			else:
-				assistant_names = [(m.get("name") or (m["content"].split(":", 1)[0] if ":" in m["content"] else "")) for m in assistant_messages]
-				bot_names = [n for n in assistant_names if n]
-				if not bot_names:
-					bot_name = None
-				else:
-					bot_name = bot_names[-1]
-			prompt, stopn = self.instruct_structure(selection, fmt=fmt, assistant=bot_name)
-			if text:
-				prompt += " " + text
+			ctx = self.contexts.get(assistant, 4096)
+			selection = await self.cut_to(messages, ctx * 2 / 3)
+			length = await count_to(selection)
+			ml = min(max(256, min(4096, ctx - length)), max_tokens)
 			data = dict(
 				model=assistant,
-				prompt=prompt,
+				messages=selection,
+				assistant_name=assistant_name,
+				text=text,
 				temperature=tmp,
 				top_p=tpp,
 				frequency_penalty=fp,
 				presence_penalty=pp,
 				repetition_penalty=rp,
 				max_tokens=ml,
-				stop=list(set([*stops, *stopn])),
 				user=ustr,
 			)
-			print("CC:", data)
 			try:
-				resp = await self.llm("completions.create", **data, timeout=240)
-				if not resp.choices[0].text.strip():
+				resp = await self.force_chat(**data, timeout=240)
+				m = resp.choices[0].message
+				if (not m.content or not m.content.strip()) and not m.tool_calls:
 					raise ValueError(resp)
 			except openai.BadRequestError:
 				raise
 			except:
 				print_exc()
 				data["model"] = assistant_backup
-				resp = await self.llm("completions.create", **data, timeout=240)
+				ctx2 = self.contexts.get(assistant_backup, 4096)
+				if ctx != ctx2:
+					selection = await self.cut_to(messages, ctx2 * 2 / 3)
+					length = await count_to(selection)
+					ml = min(max(256, min(4096, ctx - length)), max_tokens)
+					data["messages"] = selection
+					data["max_tokens"] = ml
+				resp = await self.force_chat(**data, timeout=240)
 			print("LM:", resp)
 			out = resp
 			if text:
 				text += " "
-			text += resp.choices[0].text
+			text += resp.choices[0].message.content
 			text = text.strip()
 		choice = out.choices[0]
 		message = getattr(choice, "message", None)
@@ -2551,7 +2608,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			dec = res.flagged
 		else:
 			dec = True
-		if AUTH.get("together_key") and not self.together_sem.full and best <= 1 and not skip and dec:
+		if best <= 1 and not skip and dec:
 			rp = ((inputs.get("frequency_penalty", 0.25) + inputs.get("presence_penalty", 0.25)) / 4 + 1) ** (1 / log2(2 + c / 8))
 			m = "mixtral-8x7b-instruct" if best else "stripedhyena-nous-7b"
 			p = inputs["prompt"]
@@ -2570,21 +2627,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return response.choices[0].text
 			except:
 				print_exc()
-		if AUTH.get("fireworks_key") and not self.fireworks_sem.full and best <= 1 and not skip and dec:
-			data = cdict(
-				prompt=self.restruct(inputs["prompt"]),
-				model="mixtral-8x7b-instruct",
-				temperature=inputs.get("temperature", 0.8) * 2 / 3,
-				top_p=inputs.get("top_p", 1),
-				max_tokens=inputs.get("max_tokens", 1024),
-			)
-			try:
-				async with self.fireworks_sem:
-					response = await self.llm("completions.create", **data, timeout=30)
-				return response.choices[0].text
-			except:
-				print_exc()
-		if best >= 2 and dec:
+		elif best >= 2 and dec:
 			data = cdict(
 				prompt=inputs["prompt"],
 				model="goliath-120b",
@@ -2600,7 +2643,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return response.choices[0].text
 			except:
 				print_exc()
-		if "instruct" not in inputs["model"]:
+		if model in self.is_chat:
 			prompt = inputs.pop("prompt")
 			inputs["messages"] = [dict(role="user", content=prompt)]
 			async with asyncio.timeout(70):
@@ -5289,7 +5332,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								create_task(delayed_callback(future, sqrt(3), self._state.http.send_typing, channel.id, repeat=True))
 							if slash or getattr(message, "slash", None):
 								create_task(delayed_callback(future, 1, self.defer_interaction, message, ephemeral=getattr(command, "ephemeral", False)))
-							with self.command_semaphore:
+							csem = emptyctx if isnan(command.min_level) else self.command_semaphore
+							async with csem:
 								response = await future
 						# Send bot event: user has executed command
 						await self.send_event("_command_", user=user, command=command, loop=loop, message=message)
@@ -5403,10 +5447,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return remaining
 
 	@tracebacksuppressor
-	async def process_http_command(self, t, name, nick, command):
+	async def process_http_command(self, t, ip, tz, command):
 		url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
 		out = "[]"
-		message = SimulatedMessage(self, command, t, name, nick)
+		message = SimulatedMessage(self, command, t, ip, "user")
 		self.cache.users[message.author.id] = message.author
 		after = await self.process_message(message, msg=command, slash=True)
 		if after != -1:

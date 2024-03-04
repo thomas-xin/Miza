@@ -821,7 +821,13 @@ def add_dict(a, b, replace=True, insert=None):
 			if issubclass(type(temp), collections.abc.MutableMapping) or issubclass(type(b[k]), collections.abc.MutableMapping):
 				r[k] = add_dict(b[k], temp, replace)
 				continue
-			r[k] = b[k] + temp
+			try:
+				r[k] = b[k] + temp
+			except OverflowError:
+				if isinstance(temp, (int, float)):
+					r[k] = mpf(b[k]) + temp
+				else:
+					raise
 	return r
 
 # Increments a key value pair in a dictionary, replacing if nonexistent.

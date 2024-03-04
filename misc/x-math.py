@@ -1223,9 +1223,14 @@ def evalSym(f, prec=64, r=False, variables=None):
 		pass
 	# Solve any sums and round off floats when possible
 	for i in sympy.preorder_traversal(f):
-		if isinstance(i, (sympy.Number, float, np.floating)):
+		if isinstance(i, (sympy.Number, float, np.floating)) and math.log10(i) < BF_PREC:
 			try:
 				f = f.subs(i, rounder(i))
+			except:
+				pass
+		elif isinstance(f, (sympy.Integer, int, np.integer)) and math.log10(i) > BF_PREC:
+			try:
+				f = f.subs(i, sympy.N(f, BF_PREC))
 			except:
 				pass
 		elif hasattr(i, "doit"):
@@ -1242,7 +1247,7 @@ def evalSym(f, prec=64, r=False, variables=None):
 	# Select list of answers to return based on the desired float precision level
 	if isinstance(f, (str, bool, tuple, list, dict, np.ndarray)):
 		return [f]
-	if isinstance(f, (sympy.Integer, float, int, np.number)):
+	if isinstance(f, (sympy.Float, sympy.Integer, float, int, np.number)):
 		return [f]
 	# if isinstance(f, sympy.Rational) and math.log10(max(f.p, f.q)) > prec and math.log10(f) <= prec:
 	# 	return [f.evalf(prec, chop=True)]
@@ -1256,7 +1261,7 @@ def evalSym(f, prec=64, r=False, variables=None):
 		except TypeError:
 			e = y
 			for i in sympy.preorder_traversal(e):
-				if isinstance(i, (sympy.Float, float, np.floating)):
+				if isinstance(i, (sympy.Float, float, np.floating)) and math.log10(i) < BF_PREC:
 					e = e.subs(i, rounder(i))
 		if r:
 			p = prettyAns(f)

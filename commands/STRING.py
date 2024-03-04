@@ -2018,10 +2018,10 @@ class Ask(Command):
 			ex = RuntimeError("Maximum inference attempts exceeded.")
 			text = ""
 			fn_msg = None
-			for att in range(2):
+			for att in range(4):
 				if not bot.verify_integrity(message):
 					return
-				if att:
+				if att >= 3:
 					model = "miza-2" if premium >= 3 else "miza-1"
 				else:
 					model = "miza-3" if premium >= 3 else "miza-2" if premium >= 2 else "miza-1"
@@ -2076,11 +2076,11 @@ class Ask(Command):
 							res = repr(ex)
 						else:
 							succ = True
-							c = await tcount(res)
-							ra = 1 if premium < 2 else 1.5 if premium < 5 else 2
-							if c > round(1440 * ra):
-								res = await bot.summarise(q=q + "\n" + res, max_length=round(1296 * ra), min_length=round(1024 * ra), best=premium >= 4)
-								res = res.replace("\n", ". ").replace(": ", " -")
+							# c = await tcount(res)
+							# ra = 1 if premium < 2 else 1.5 if premium < 5 else 2
+							# if c > round(1440 * ra):
+							# 	res = await bot.summarise(q=q + "\n" + res, max_length=round(1296 * ra), min_length=round(1024 * ra), best=premium >= 4)
+							# 	res = res.replace("\n", ". ").replace(": ", " -")
 							res = res.strip()
 						rs_msg = cdict(role="tool", name=name, content=res, tool_call_id=tid)
 						messages.append(rs_msg)

@@ -48,17 +48,21 @@ class Restart(Command):
 			resp = await asubmit(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			print(resp.stdout)
 			print(resp.stderr)
-		if argv == "when free":
+		if argv in ("wait", "when free"):
+			await send_with_reply(channel, content="*Waiting to " + name + "...*", reference=message)
 			busy = True
 			while busy:
-				busy = False
-				for vc in bot.audio.clients.values():
-					try:
-						if vc.is_playing():
-							busy = True
-					except:
-						print_exc()
-				await asyncio.sleep(1)
+				busy = bot.command_semaphore.active
+				if not busy and bot.audio.players:
+					for auds in bot.audio.players.values():
+						try:
+							if auds.queue:
+								busy = True
+								break
+						except:
+							print_exc()
+				if busy:
+					await asyncio.sleep(1)
 		elif argv:
 			# Restart announcements for when a time input is specified
 			if argv.startswith("in"):
