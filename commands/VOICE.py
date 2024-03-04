@@ -74,7 +74,7 @@ def get_best_audio(entry):
 		return entry["stream"]
 	except KeyError:
 		pass
-	best = -inf
+	best = (-inf,)
 	try:
 		fmts = entry["formats"]
 	except KeyError:
@@ -93,11 +93,7 @@ def get_best_audio(entry):
 				q = fmt["asr"] / 1000
 			elif fmt.get("audio_channels"):
 				q = fmt["audio_channels"]
-		vcodec = fmt.get("vcodec", "none")
-		if vcodec not in (None, "none"):
-			q -= 1
-		else:
-			q = fmt.get("tbr", 0) or q
+		q = (fmt.get("acodec") in ("opus", "vorbis"), fmt.get("vcodec") in (None, "none"), fmt.get("tbr", 0) or q)
 		u = as_str(fmt["url"])
 		if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
 			replace = False
@@ -134,7 +130,7 @@ def get_best_video(entry):
 		return entry["video"]
 	except KeyError:
 		pass
-	best = -inf
+	best = (-inf,)
 	try:
 		fmts = entry["formats"]
 	except KeyError:
@@ -148,9 +144,7 @@ def get_best_video(entry):
 		q = fmt.get("height", 0)
 		if not isinstance(q, (int, float)):
 			q = 0
-		vcodec = fmt.get("vcodec", "none")
-		if vcodec in (None, "none"):
-			q -= 1
+		q = (fmt.get("vcodec") not in (None, "none"), fmt.get("tbr", 0) or q)
 		u = as_str(fmt["url"])
 		if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
 			replace = False
@@ -3328,6 +3322,8 @@ class AudioDownloader:
 				fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
 			elif fmt == "mkv":
 				fmt = "matroska"
+			elif fmt == "ts":
+				fmt = "mpegts"
 			if not copy and ast:
 				args.extend(("-b:a", str(br)))
 				if len(ast) == 1:
@@ -3342,6 +3338,8 @@ class AudioDownloader:
 				c = "-c:v" if size else "-c"
 				if container == "mkv":
 					container = "matroska"
+				if container == "ts":
+					container = "mpegts"
 				if hwaccel == "cuda":
 					if fmt == "mp4":
 						fmt = "h264_nvenc"

@@ -1552,7 +1552,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if isinstance(resp, str):
 					raise evalEX(resp)
 				if not resp.get("direct"):
-					await create_future(self.ytdl.get_stream, resp, download=False, force=True)
+					with tracebacksuppressor:
+						await create_future(self.ytdl.get_stream, resp, download=False, force=True)
 				if resp.get("video"):
 					url = resp["video"]
 				elif images and resp.get("thumbnail"):
@@ -1924,7 +1925,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					assert search in s
 					res = "[{" + s.split(search, 1)[-1].split("}]);DDG.duckbar.load('", 1)[0] + "}]"
 					data = orjson.loads(res)
-					return "\n\n".join((e.get("c", "") + "\n" + html_decode(e.get("a", ""))).strip() for e in data)
+					return "\n\n".join((e.get("c", "") + "\n" + html_decode(e.get("a", ""))).strip() for e in data).strip()
 			return await process_image("BROWSE", "$", [argv, not screenshot], cap="browse", timeout=timeout, retries=2)
 		return await self.llcache.retrieve_from(shash((argv, screenshot, best)), retrieval, argv, region, screenshot, best)
 
@@ -4097,7 +4098,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			try:
 				x = round_min(eval_json(x))
 			except:
-				raise ex
+				x = None
+		if x is None:
+			raise ValueError(f'Could not evaluate expression "{expr}" as number.')
 		if type(x) is not int and len(str(x)) <= 16:
 			return float(x)
 		return x

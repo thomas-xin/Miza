@@ -503,7 +503,11 @@ class AudioFile:
 			fmt = "webm"
 			cdc = "libopus"
 			cdc2 = "opus"
-		if fmt == "ogg":
+		elif fmt == "ts":
+			fmt = "mpegts"
+			cdc = "libopus"
+			cdc2 = "opus"
+		elif fmt == "ogg":
 			cdc = "libopus"
 			cdc2 = "opus"
 			# cdc = "libvorbis"

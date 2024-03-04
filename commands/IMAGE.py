@@ -1043,11 +1043,11 @@ class Resize(Command):
 					spl = value.split()
 				x = spl.pop(0)
 				if x != "-":
-					x = round_min(x)
+					x = await bot.eval_math(x)
 				if spl:
 					y = spl.pop(0)
 					if y != "-":
-						y = round_min(y)
+						y = await bot.eval_math(y)
 				else:
 					y = "-"
 				if func == "resize_mult":

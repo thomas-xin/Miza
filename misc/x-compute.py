@@ -2964,7 +2964,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 				cmd3 = ["ffmpeg", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps}", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
 				print(cmd3)
 				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
-			elif dur > 1 and size[0] * size[1] > msize ** 2:
+			elif dur > 1 and msize and size[0] * size[1] > msize ** 2:
 				proc.terminate()
 				w, h = max_size(*size, maxsize=msize)
 				w = round(w / 2) * 2

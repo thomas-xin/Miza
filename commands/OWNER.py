@@ -49,20 +49,28 @@ class Restart(Command):
 			print(resp.stdout)
 			print(resp.stderr)
 		if argv in ("wait", "when free"):
-			await send_with_reply(channel, content="*Waiting to " + name + "...*", reference=message)
+			m = None
 			busy = True
 			while busy:
+				lb = busy
 				busy = bot.command_semaphore.active
-				if not busy and bot.audio.players:
+				if bot.audio.players:
 					for auds in bot.audio.players.values():
 						try:
 							if auds.queue:
-								busy = True
-								break
-						except:
-							print_exc()
+								busy += 1
+						except Exception as ex:
+							print(repr(ex))
 				if busy:
+					if busy != lb:
+						content = f"*Waiting to {name} ({busy})...*"
+						if not m:
+							m = await send_with_reply(channel, content=content, reference=message)
+						else:
+							m = await m.edit(content=content)
 					await asyncio.sleep(1)
+			if m:
+				create_task(m.edit(content=f"*Waiting to {name} (complete)*"))
 		elif argv:
 			# Restart announcements for when a time input is specified
 			if argv.startswith("in"):

@@ -1450,12 +1450,12 @@ class Server:
 					fmt = "opus" if d else "webm"
 				if fmt == "weba":
 					fmt = "webm"
-				if fmt not in ("mp3", "opus", "webm", "ogg", "wav"):
+				if fmt not in ("mp3", "opus", "webm", "ts", "ogg", "wav"):
 					raise TypeError(fmt)
 				fmt = "." + fmt
 				self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.search({repr(q)})[0]")
 				stream = self.bot_exec(f"VOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False)")
-				if fmt in ("webm", "weba"):
+				if fmt in ("ts", "webm", "weba"):
 					raise cp.HTTPRedirect(stream, status="307")
 				test = self.bot_exec(f"str(bot.audio.returns[{t}])")
 				if not test or test[0] not in ("([{"):

@@ -2522,18 +2522,16 @@ def bytes2b64(b, alt_char_set=False):
 	if type(b) is str:
 		b = b.encode("utf-8")
 	if alt_char_set:
-		b = base64.urlsafe_b64encode(b)
-		return b.rstrip(b"=")
-	return base64.b64encode(b)
+		return base64.urlsafe_b64encode(b).rstrip(b"=").replace(b"-", b"+")
+	return base64.b64encode(b).rstrip(b"=")
 
 # Converts a base 64 string to a bytes object.
 def b642bytes(b, alt_char_set=False):
 	if type(b) is str:
 		b = b.encode("utf-8")
+	b += b"=" * (4 - (len(b) & 3) & 3)
 	if alt_char_set:
-		if not b.endswith(b"="):
-			b += b"=="
-		return base64.urlsafe_b64decode(b)
+		return base64.urlsafe_b64decode(b.replace(b"+", b"-"))
 	return base64.b64decode(b)
 
 if sys.version_info[0] >= 3 and sys.version_info[1] >= 9:

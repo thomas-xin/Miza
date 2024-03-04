@@ -1230,7 +1230,7 @@ def evalSym(f, prec=64, r=False, variables=None):
 				pass
 		elif isinstance(f, (sympy.Integer, int, np.integer)) and math.log10(i) > BF_PREC:
 			try:
-				f = f.subs(i, sympy.N(f, BF_PREC))
+				f = f.subs(i, sympy.N(f, prec))
 			except:
 				pass
 		elif hasattr(i, "doit"):

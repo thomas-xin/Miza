@@ -5085,6 +5085,7 @@ class Cache(cdict):
 		else:
 			if isinstance(resp, CacheItem):
 				return await resp.value
+			return resp
 		fut = create_task(self.retrieve_into(k, func, *args, **kwargs))
 		try:
 			resp = self.retrieve(k)

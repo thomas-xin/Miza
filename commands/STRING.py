@@ -2018,6 +2018,7 @@ class Ask(Command):
 			ex = RuntimeError("Maximum inference attempts exceeded.")
 			text = ""
 			fn_msg = None
+			ucid = set()
 			for att in range(4):
 				if not bot.verify_integrity(message):
 					return
@@ -2030,8 +2031,7 @@ class Ask(Command):
 				text = m.get("content")
 				tc = m.get("tool_calls", None) or ()
 				resend = False
-				ucid = set()
-				for n, fc in enumerate(tuple(tc)):
+				for n, fc in enumerate(tc):
 					if n >= 8:
 						break
 					name = fc.function.name
@@ -2076,11 +2076,11 @@ class Ask(Command):
 							res = repr(ex)
 						else:
 							succ = True
-							# c = await tcount(res)
-							# ra = 1 if premium < 2 else 1.5 if premium < 5 else 2
-							# if c > round(1440 * ra):
-							# 	res = await bot.summarise(q=q + "\n" + res, max_length=round(1296 * ra), min_length=round(1024 * ra), best=premium >= 4)
-							# 	res = res.replace("\n", ". ").replace(": ", " -")
+							c = await tcount(res)
+							ra = 1 if premium < 2 else 1.5 if premium < 5 else 2
+							if c > round(4000 * ra):
+								res = await bot.summarise(q=q + "\n" + res, max_length=round(4800 * ra), min_length=round(3200 * ra), best=premium >= 4)
+								res = res.replace("\n", ". ").replace(": ", " -")
 							res = res.strip()
 						rs_msg = cdict(role="tool", name=name, content=res, tool_call_id=tid)
 						messages.append(rs_msg)
@@ -2730,6 +2730,8 @@ class Search(Command):
 	description = "Searches the web for an item."
 	usage = "<string>"
 	example = ("google en passant",)
+	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	rate_limit = (10, 16)
 	typing = True
 	slash = True
@@ -2737,5 +2739,65 @@ class Search(Command):
 	no_parse = True
 
 	async def __call__(self, bot, channel, user, argv, message, **void):
+		data = bytes2b64(argv.encode("utf-8"), alt_char_set=True).decode("ascii")
+		out = f'*```callback-string-search-{user.id}_0_{data}-\nSearching "{argv}"...```*'
+		buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+		return await send_with_reply(message.channel, message, content=out, buttons=buttons)
+
+	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+		u_id, pos, data = vals.split("_", 2)
+		if reaction and u_id != user.id and perm < 1:
+			return
+		if reaction not in self.directions and reaction is not None:
+			return
+		guild = message.guild
+		user = await bot.fetch_user(u_id)
+		pos = int(pos)
+		argv = b642bytes(data.encode("ascii"), alt_char_set=True).decode("utf-8")
 		s = await bot.browse(argv, uid=user.id)
-		self.bot.send_as_embeds(channel, s, title=f"Search results for {json.dumps(argv)}:", author=get_author(user), reference=message)
+		rems = s.split("\n\n")
+		page = 8
+		last = max(0, len(rems) - page)
+		if reaction is not None:
+			i = self.directions.index(reaction)
+			if i == 0:
+				new = 0
+			elif i == 1:
+				new = max(0, pos - page)
+			elif i == 2:
+				new = min(last, pos + page)
+			elif i == 3:
+				new = last
+			else:
+				new = pos
+			pos = new
+		content = message.content
+		if not content:
+			content = message.embeds[0].description
+		i = content.index("callback")
+		content = "*```" + "\n" * ("\n" in content[:i]) + (
+			"callback-string-search-"
+			+ str(u_id) + "_" + str(pos) + "_" + str(data)
+			+ f'-\nSearch results for "{argv}":```*'
+		)
+		if not rems:
+			msg = ""
+		else:
+			t = utc()
+			msg = iter2str(
+				rems[pos:pos + page],
+				left="`【",
+				right="】`",
+				offset=pos,
+			)
+		colour = await self.bot.get_colour(user)
+		emb = discord.Embed(
+			description=content + msg,
+			colour=colour,
+		).set_author(**get_author(user))
+		more = len(rems) - pos - page
+		if more > 0:
+			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
+		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		if hasattr(message, "int_token"):
+			await bot.ignore_interaction(message)

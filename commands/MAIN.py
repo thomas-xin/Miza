@@ -1219,7 +1219,7 @@ class Reminder(Command):
 		try:
 			msg = msg[msg.casefold().index(name) + len(name):]
 		except ValueError:
-			print_exc(msg)
+			pass
 			# msg = msg.casefold().split(None, 1)[-1]
 		orig = argv
 		argv = msg.strip()
@@ -1547,6 +1547,7 @@ class Reminder(Command):
 				key=lambda x: lim_str(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + no_md(x["msg"]), 96) + "` ➡️ " + (user_mention(x["u_id"]) if "u_id" in x else time_until(x["t"])),
 				left="`【",
 				right="】`",
+				offset=pos,
 			)
 		colour = await self.bot.get_colour(user)
 		emb = discord.Embed(
@@ -1657,7 +1658,7 @@ class Note(Command):
 			msg = ""
 		else:
 			content += f"{len(curr)} note(s) currently assigned for {str(user).replace('`', '')}:```*"
-			msg = iter2str(tuple(curr)[pos:pos + page], left="`【", right="】`")
+			msg = iter2str(tuple(curr)[pos:pos + page], left="`【", right="】`", offset=pos)
 		colour = await self.bot.get_colour(user)
 		emb = discord.Embed(
 			description=content + msg,
