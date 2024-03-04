@@ -2643,7 +2643,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return response.choices[0].text
 			except:
 				print_exc()
-		if model in self.is_chat:
+		if data["model"] in self.is_chat:
 			prompt = inputs.pop("prompt")
 			inputs["messages"] = [dict(role="user", content=prompt)]
 			async with asyncio.timeout(70):
