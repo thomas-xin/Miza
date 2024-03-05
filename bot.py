@@ -4499,8 +4499,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		# futs.append(fut)
 		t = utc()
 		if self.latency != self.lll:
-			self.lll = self.latency
-			self.api_latency = self.api_latency * 2 / 3 + self.lll / 3
+			self.api_latency = self.lll = self.latency
 			self.llc = t
 		elif t - self.llc < 5:
 			pass
