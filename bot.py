@@ -4376,6 +4376,20 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		gtempb = [pynvml.nvmlDeviceGetTemperatureThreshold(d, 0) for d in handles]
 		return gname, gcore, gmems, gutil, gpowa, gpowb, gtempa, gtempb
 
+	wmt = 0
+	wmv = 0
+	def get_wmem(self, mused=0):
+		t = utc()
+		if t - self.wmt > 60:
+			f1 = esubmit(subprocess.check_output, "wmic OS get TotalVirtualMemorySize /Value")
+			fvms = subprocess.check_output("wmic OS get FreeVirtualMemory /Value")
+			tvms = f1.result()
+			tvms = int(tvms.strip().decode("ascii").removeprefix("TotalVirtualMemorySize="))
+			fvms = int(fvms.strip().decode("ascii").removeprefix("FreeVirtualMemory="))
+			self.wmv = (tvms - fvms) * 1024 - mused
+			self.wmt = utc()
+		return self.wmv
+
 	async def get_current_stats(self):
 		global WMI
 		import psutil, cpuinfo
@@ -4401,11 +4415,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		# with tracebacksuppressor(asyncio.TimeoutError, asyncio.CancelledError):
 		# 	ip = await fut
 		if os.name == "nt":
-			tvms = await asubmit(subprocess.check_output, "wmic OS get TotalVirtualMemorySize /Value")
-			tvms = int(tvms.strip().decode("ascii").removeprefix("TotalVirtualMemorySize="))
-			fvms = await asubmit(subprocess.check_output, "wmic OS get FreeVirtualMemory /Value")
-			fvms = int(fvms.strip().decode("ascii").removeprefix("FreeVirtualMemory="))
-			cswap = (tvms - fvms) * 1024 - psutil.virtual_memory().used
+			minfo = await f2
+			cswap = await asubmit(self.get_wmem, minfo.used)
 			if cswap > sinfo.used:
 				class mtemp:
 					def __init__(self, used, total):
