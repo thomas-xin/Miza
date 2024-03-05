@@ -4400,6 +4400,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		ip = "127.0.0.1"
 		# with tracebacksuppressor(asyncio.TimeoutError, asyncio.CancelledError):
 		# 	ip = await fut
+		if os.name == "nt":
+			tvms = await asubmit(subprocess.check_output, "wmic OS get TotalVirtualMemorySize /Value")
+			tvms = int(tvms.strip().decode("ascii").removeprefix("TotalVirtualMemorySize="))
+			fvms = await asubmit(subprocess.check_output, "wmic OS get FreeVirtualMemory /Value")
+			fvms = int(fvms.strip().decode("ascii").removeprefix("FreeVirtualMemory="))
+			cswap = (tvms - fvms) * 1024 - psutil.virtual_memory().used
+			if cswap > sinfo.used:
+				class mtemp:
+					def __init__(self, used, total):
+						self.used, self.total = used, total
+				sinfo = mtemp(used=cswap, total=sinfo.total)
 		t = utc()
 		ram_name = globals().get("RAM_NAME") or "RAM"
 		if os.name == "nt" and not globals().get("WMI"):
@@ -4410,16 +4421,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				print_exc()
 				globals()["WMI"] = False
 		if globals().get("WMI") is not False:
-			if not globals().get("wOS"):  
-				OS = globals()["wOS"] = WMI.Win32_Operatingsystem()[0]
-			else:
-				OS = globals()["wOS"]
-			cswap = (int(OS.TotalVirtualMemorySize) - int(OS.FreeVirtualMemory)) * 1024 - psutil.virtual_memory().used
-			if cswap > sinfo.used:
-				class mtemp:
-					def __init__(self, used, total):
-						self.used, self.total = used, total
-				sinfo = mtemp(used=cswap, total=sinfo.total)
 			if ram_name == "RAM":
 				if not globals().get("wRAM"):  
 					ram = globals()["wRAM"] = WMI.Win32_PhysicalMemory()[0]
@@ -4490,17 +4491,28 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	_cpuinfo = None
 	api_latency = inf
+	lll = inf
+	llc = 0
 	async def get_system_stats(self):
 		# futs = []
 		fut = create_task(self.get_current_stats())
 		# futs.append(fut)
-		try:
-			t = utc()
-			resp = await Request.sessions.next().head(f"https://discord.com/api/{api}/users/@me", timeout=4)
-			self.api_latency = utc() - t
-		except Exception as ex:
-			self.api_exc = ex
-			self.api_latency *= 2
+		t = utc()
+		if self.latency != self.lll:
+			self.lll = self.latency
+			self.api_latency = self.api_latency * 2 / 3 + self.lll / 3
+			self.llc = t
+		elif t - self.llc < 5:
+			pass
+		else:
+			try:
+				await Request.sessions.next().head(f"https://discord.com/api/{api}/users/@me", timeout=4)
+				self.api_latency = self.api_latency * 2 / 3 + (utc() - t) / 3
+			except Exception as ex:
+				self.api_exc = ex
+				self.api_latency *= 2
+			else:
+				self.llc = utc()
 		try:
 			audio_players = len(self.audio.players)
 		except:
@@ -7313,6 +7325,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		create_task(self.fast_loop())
 		self.initialisation_complete = True
 		print("Initialisation complete.")
+		eloop.slow_callback_duration = 0.5
+		eloop._debug = True
 
 	async def flatten_into_cache(self, history):
 		data = {}
