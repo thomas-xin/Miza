@@ -366,7 +366,7 @@ def simplify_recurring(r, prec=100):
 	if digits > prec * 2:
 		return
 	transient = max(temp.get(2, 0), temp.get(5, 0))
-	s = str(r_evalf(r, transient + digits * 3))
+	s = str(r_evalf(r, transient + digits * 3 + 2))
 	dec = s.split(".", 1)[-1][transient:]
 	if len(dec) < digits * 2:
 		return
