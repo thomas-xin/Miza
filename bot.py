@@ -6376,7 +6376,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			is_friend = lambda self: None
 			is_blocked = lambda self: None
 			colour = color = discord.Colour(16777215)
-			_avatar = None
+			_avatar = _avatar_decoration = None
 			name = "[USER DATA NOT FOUND]"
 			nick = None
 			global_name = None
