@@ -3287,6 +3287,12 @@ athreads = concurrent.futures.exc_worker = MultiThreadPool(pool_count=2, thread_
 athreads.pools.append(import_exc)
 
 def get_event_loop():
+	try:
+		return asyncio.get_running_loop()
+	except RuntimeError:
+		pass
+	except:
+		print_exc()
 	return eloop
 
 def wrap_future(fut, loop=None, shield=False, thread_safe=True):
@@ -5085,7 +5091,6 @@ class Cache(cdict):
 		else:
 			if isinstance(resp, CacheItem):
 				return await resp.value
-			return resp
 		fut = create_task(self.retrieve_into(k, func, *args, **kwargs))
 		try:
 			resp = self.retrieve(k)

@@ -320,7 +320,7 @@ def pow(a, b):
 	if isinstance(a, sympy.Integer) and isinstance(a, sympy.Integer):
 		return _pow(a, b)
 	temp = _pow(r_evalf(a, BF_PREC), b)
-	if math.log10(abs(temp)) > BF_PREC:
+	if temp != 0 and math.log10(abs(temp)) > BF_PREC:
 		return temp
 	return _pow(a, b)
 
@@ -346,7 +346,6 @@ def simplify_recurring(r, prec=100):
 	if all(i in (2, 5) for i in temp):
 		return
 	tq = np.prod([k ** v for k, v in temp.items() if k not in (2, 5)], dtype=object)
-	print("SR:", r)
 	try:
 		pr = sympy.ntheory.residue_ntheory.is_primitive_root(10, tq)
 	except ValueError:
@@ -1223,12 +1222,12 @@ def evalSym(f, prec=64, r=False, variables=None):
 		pass
 	# Solve any sums and round off floats when possible
 	for i in sympy.preorder_traversal(f):
-		if isinstance(i, (sympy.Number, float, np.floating)) and math.log10(i) < BF_PREC:
+		if isinstance(i, (sympy.Number, float, np.floating)) and i != 0 and math.log10(abs(i)) < BF_PREC:
 			try:
 				f = f.subs(i, rounder(i))
 			except:
 				pass
-		elif isinstance(f, (sympy.Integer, int, np.integer)) and math.log10(i) > BF_PREC:
+		elif isinstance(f, (sympy.Integer, int, np.integer)) and i != 0 and math.log10(abs(i)) > BF_PREC:
 			try:
 				f = f.subs(i, sympy.N(f, prec))
 			except:
@@ -1261,7 +1260,7 @@ def evalSym(f, prec=64, r=False, variables=None):
 		except TypeError:
 			e = y
 			for i in sympy.preorder_traversal(e):
-				if isinstance(i, (sympy.Float, float, np.floating)) and math.log10(i) < BF_PREC:
+				if isinstance(i, (sympy.Float, float, np.floating)) and i != 0 and math.log10(abs(i)) < BF_PREC:
 					e = e.subs(i, rounder(i))
 		if r:
 			p = prettyAns(f)

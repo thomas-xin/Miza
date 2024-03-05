@@ -85,6 +85,14 @@ def get_best_audio(entry):
 		url = entry["webpage_url"]
 	replace = True
 	for fmt in fmts:
+		q = (
+			fmt.get("acodec") in ("opus", "vorbis"),
+			fmt.get("vcodec") in (None, "none"),
+			-abs(fmt["audio_channels"] - 2) if isinstance(fmt.get("audio_channels"), (int, float)) else -inf,
+			fmt["abr"] if isinstance(fmt.get("abr"), (int, float)) else -inf,
+			fmt["tbr"] if not isinstance(fmt.get("abr"), (int, float)) and isinstance(fmt.get("tbr"), (int, float)) else -inf,
+			fmt["asr"] if isinstance(fmt.get("asr"), (int, float)) else -inf,
+		)
 		q = fmt.get("abr", 0)
 		if not isinstance(q, (int, float)):
 			q = 0
@@ -125,7 +133,7 @@ def get_best_audio(entry):
 
 
 # Gets the best video file download link for a queue entry.
-def get_best_video(entry):
+def get_best_video(entry, hq=True):
 	try:
 		return entry["video"]
 	except KeyError:
@@ -141,10 +149,13 @@ def get_best_video(entry):
 		url = entry["webpage_url"]
 	replace = True
 	for fmt in fmts:
-		q = fmt.get("height", 0)
-		if not isinstance(q, (int, float)):
-			q = 0
-		q = (fmt.get("vcodec") not in (None, "none"), fmt.get("tbr", 0) or q)
+		q = (
+			fmt.get("vcodec") not in (None, "none"),
+			fmt.get("protocol") != "m3u8_native" if not hq else False,
+			-abs(fmt["fps"] - (90 if hq else 42)) if isinstance(fmt.get("fps"), (int, float)) else -inf,
+			-abs(fmt["height"] - (1600 if hq else 720)) if isinstance(fmt.get("height"), (int, float)) else -inf,
+			fmt["tbr"] if isinstance(fmt.get("tbr"), (int, float)) else -inf,
+		)
 		u = as_str(fmt["url"])
 		if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
 			replace = False

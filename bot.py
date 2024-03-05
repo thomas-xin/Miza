@@ -96,8 +96,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			allowed_mentions=self.allowed_mentions,
 			assume_unsync_clock=True,
 		)
-		# with suppress(AttributeError):
-		# 	create_task(super()._async_setup_hook())
+		create_task(super()._async_setup_hook())
 		self.cache_size = cache_size
 		# Base cache: contains all other caches
 		self.cache = fcdict((c, fdict()) for c in self.caches)
@@ -5192,7 +5191,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							# Commands by default always parse unicode fonts as regular text unless otherwise specified.
 							argv = await self.proxy_emojis(argv, guild=guild, user=user, is_webhook=getattr(message, "webhook_id", None), lim=inf)
 							if not hasattr(command, "no_parse"):
-								argv = unicode_prune(argv)
+								argv = unicode_prune(argv.strip("`"))
 							argv = argv.strip()
 							# Parse command flags (this is a bit of a mess)
 							if hasattr(command, "flags"):
@@ -5512,13 +5511,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				try:
 					out = json.dumps(dict(result=output), cls=MultiEncoder)
 				except TypeError:
-					try:
-						out = orjson.dumps(dict(result=repr(output)))
-					except TypeError:
-						out = repr(dict(result=output))
+					out = orjson.dumps(dict(result=repr(output)))
 		except Exception as ex:
+			print(repr(ex))
 			out = orjson.dumps(dict(error=repr(ex)))
-		# print(url, out)
+		self.print(url, out)
 		try:
 			await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False, timeout=16)
 		except aiohttp.client_exceptions.ClientConnectorError:
@@ -6365,7 +6362,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			joined_at = premium_since = None
 			timed_out_until = None
 			communication_disabled_until = None
-			_client_status = _status = {None: "offline"}
+			_client_status = _status = cdict({None: "offline", "_status": "offline"})
 			pending = False
 			ghost = True
 			roles = ()

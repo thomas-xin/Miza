@@ -50,7 +50,7 @@ class Restart(Command):
 			print(resp.stderr)
 		if argv in ("wait", "when free"):
 			m = None
-			busy = True
+			busy = -inf
 			while busy:
 				lb = busy
 				busy = bot.command_semaphore.active
@@ -585,7 +585,7 @@ class UpdateExec(Database):
 		return out if len(out) > 1 else out[0]
 
 	hmac_sem = Semaphore(5, 1, rate_limit=5)
-	async def stash(self, fn, start=0, end=inf, filename=None, dont=False):
+	async def stash(self, fn, start=0, end=inf, filename=None, dont=False, raw=True):
 		bot = self.bot
 		fns = [fn] if isinstance(fn, (str, bytes, memoryview, io.BytesIO, discord.File)) else fn
 		print("Stash", lim_str(str(fns), 256), start, end, filename)
@@ -627,7 +627,10 @@ class UpdateExec(Database):
 						print_exc()
 						f.seek(i)
 					else:
-						u = self.bot.preserve_attachment(url) + "?S=" + str(len(b))
+						if raw:
+							u = url
+						else:
+							u = self.bot.preserve_attachment(url) + "?S=" + str(len(b))
 						urls.append(u)
 						i = f.tell()
 						continue
@@ -676,7 +679,10 @@ class UpdateExec(Database):
 							continue
 					# message = await bot.send_as_webhook(channel, fstr, files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
 					for a, bs in zip(message.attachments, sizes):
-						u = self.bot.preserve_into(channel.id, message.id, a.id, ext=a.url) + "?S=" + str(bs)
+						if raw:
+							u = self.bot.preserve_as_long(channel.id, message.id, a.id, ext=a.url) + "?S=" + str(bs)
+						else:
+							u = self.bot.preserve_into(channel.id, message.id, a.id, ext=a.url) + "?S=" + str(bs)
 						urls.append(u)
 						# u = str(a.url).rstrip("&")
 						# u += "?" if "?" not in u else "&"
@@ -744,9 +750,12 @@ class UpdateExec(Database):
 				if force or not xrand(16):
 
 					def verify(url, uhu):
-						with reqs.next().head(url, headers=headers, stream=True) as resp:
-							if resp.status_code not in range(200, 400):
-								bot.data.proxies.pop(uhu, None)
+						try:
+							with reqs.next().head(url, headers=headers, stream=True, timeout=12) as resp:
+								resp.raise_for_status()
+						except:
+							print_exc()
+							bot.data.proxies.pop(uhu, None)
 
 					if force:
 						await asubmit(verify, out[i], uhu)
@@ -767,7 +776,7 @@ class UpdateExec(Database):
 						fn += ".webp"
 					elif fn.endswith(".pnglarge") or fn.endswith(".jpglarge"):
 						fn = fn[:-5]
-					files[i] = cdict(fut=asubmit(reqs.next().get, url, stream=True), filename=fn, url=url)
+					files[i] = cdict(fut=asubmit(reqs.next().get, url, stream=True, timeout=24), filename=fn, url=url)
 				else:
 					out[i] = url
 		failed = [None] * len(urls)
