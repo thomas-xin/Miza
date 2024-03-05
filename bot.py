@@ -96,7 +96,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			allowed_mentions=self.allowed_mentions,
 			assume_unsync_clock=True,
 		)
-		create_task(super()._async_setup_hook())
+		with suppress(AttributeError):
+			csubmit(super()._async_setup_hook())
 		self.cache_size = cache_size
 		# Base cache: contains all other caches
 		self.cache = fcdict((c, fdict()) for c in self.caches)
@@ -452,7 +453,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		"A garbage collector for empty and unassigned objects in the database."
 		if not self.ready or hasattr(obj, "no_delete") or not any(hasattr(obj, i) for i in ("guild", "user", "channel", "garbage")) and not getattr(obj, "garbage_collect", None):
 			return
-		with MemoryTimer("gc_" + obj.name):
+		with MemoryTimer(f"{obj.name}-gc"):
 			async with obj._garbage_semaphore:
 				data = obj.data
 				if getattr(obj, "garbage_collect", None):
@@ -492,20 +493,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		"Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async."
 		if self.closed:
 			return
-		with MemoryTimer(ev):
+		with MemoryTimer(f"{ev}-event"):
 			ctx = emptyctx if exc else tracebacksuppressor
 			events = self.events.get(ev, ())
 			if len(events) == 1:
 				with ctx:
 					return await asubmit(events[0](*args, **kwargs))
 				return
-			futs = [asubmit(func(*args, **kwargs)) for func in events]
-			out = deque()
-			for fut in futs:
-				with ctx:
-					res = await fut
-					out.append(res)
-			return out
+			with ctx:
+				return await asyncio.gather(*(asubmit(func(*args, **kwargs)) for func in events))
 
 	@tracebacksuppressor(default=[])
 	async def get_full_invites(self, guild):
@@ -1754,7 +1750,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		ts = ts_us()
 		fn = f"cache/{ts}~oi"
 		if isinstance(image, str) and is_url(image):
-			subprocess.run([sys.executable, "downloader.py", "-threads", "3", image, f"../{fn}"], cwd="misc")
+			try:
+				subprocess.run([sys.executable, "downloader.py", "-threads", "3", image, f"../{fn}"], cwd="misc")
+			except subprocess.CalledProcessError:
+				print_exc()
+			if not os.path.exists(fn) or not os.path.getsize(fn):
+				b = await Request(image, aio=True)
+				with open(fn, "wb") as f:
+					f.write(b)
 			mime = magic.from_file(fn)
 			size = os.path.getsize(fn)
 			if mime != "video/m3u8":
@@ -1774,7 +1777,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if not os.path.exists(fn):
 			with open(fn, "wb") as f:
 				f.write(image)
-		if mime.split("/", 1)[0] == "video" and VIDEO_FORMS.get("." + fmt):
+		if mime.split("/", 1)[0] == "video" and (VIDEO_FORMS.get("." + fmt) or mime == "video/m3u8"):
 			fi = image if isinstance(image, str) else fn
 			cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "format=duration", "-of", "csv=s=x:p=0", fi)
 			print(cmd)
@@ -1800,34 +1803,37 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						else:
 							devid = random.randint(0, ceil(torch.cuda.device_count() / 2))
 						args.extend(("-hwaccel_device", str(devid)))
-					args.extend(("-i", fi, "-c", "copy"))
-					if hwaccel == "cuda":
-						if fmt == "mp4":
-							args.extend(("-c:v", "h264_nvenc"))
-						elif fmt in ("webm", "ts"):
-							args.extend(("-c:v", "av1_nvenc"))
-					args.append(f2)
+					args.extend(("-i", fi, "-c", "copy", f2))
 					fn = f2
 					print(args)
 					proc = await asyncio.create_subprocess_exec(*args)
 					async with asyncio.timeout(timeout):
 						await proc.wait()
-			dur = float(dur)
-			bps = floor(fsize / dur * 7.5) # 7.5 bits per byte?
-			f2 = fn + "~"
-			args = ["./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-hwaccel", hwaccel, "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,fd,http,https,tcp,tls"]
-			args.extend(("-i", fi, "-pix_fmt", "yuv420p", "-f", fmt, "-b:v", str(bps), "-c:a", "copy", f2))
-			print(args)
-			proc = await asyncio.create_subprocess_exec(*args)
-			async with asyncio.timeout(timeout):
-				await proc.wait()
-			try:
-				with open(f2, "rb") as f:
-					return f.read()
-			finally:
-				with tracebacksuppressor:
-					os.remove(fn)
-					os.remove(f2)
+			if VIDEO_FORMS.get("." + fmt):
+				dur = float(dur)
+				bps = floor(fsize / dur * 7.5) # 7.5 bits per byte?
+				f2 = fn + "~"
+				args = ["./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-hwaccel", hwaccel, "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,fd,http,https,tcp,tls"]
+				args.extend(("-i", fi, "-pix_fmt", "yuv420p", "-f", fmt, "-b:v", str(bps), "-c:a", "copy"))
+				if hwaccel == "cuda":
+					if fmt == "mp4":
+						args.extend(("-c:v", "h264_nvenc"))
+					elif fmt == "ts":
+						args.extend(("-c:v", "h265_nvenc"))
+					elif fmt == "webm":
+						args.extend(("-c:v", "av1_nvenc"))
+				args.append(f2)
+				print(args)
+				proc = await asyncio.create_subprocess_exec(*args)
+				async with asyncio.timeout(timeout):
+					await proc.wait()
+				try:
+					with open(f2, "rb") as f:
+						return f.read()
+				finally:
+					with tracebacksuppressor:
+						os.remove(fn)
+						os.remove(f2)
 		cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", fn)
 		print(cmd)
 		out = await create_future(subprocess.check_output, cmd)
@@ -4474,12 +4480,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	_cpuinfo = None
 	api_latency = inf
 	async def get_system_stats(self):
-		t = utc()
 		# futs = []
 		fut = create_task(self.get_current_stats())
 		# futs.append(fut)
 		try:
-			resp = await Request.sessions.next().head(f"https://discord.com/api/{api}", timeout=4)
+			t = utc()
+			resp = await Request.sessions.next().head(f"https://discord.com/api/{api}/users/@me", timeout=4)
 			self.api_latency = utc() - t
 		except Exception as ex:
 			self.api_exc = ex
@@ -4785,7 +4791,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		with tracebacksuppressor:
 			for i, u in self.data.items():
 				if getattr(u, "update", None):
-					with MemoryTimer(str(u)):
+					with MemoryTimer(f"{u}-update"):
 						if u.update(force=True):
 							saved.append(i)
 							time.sleep(0.05)

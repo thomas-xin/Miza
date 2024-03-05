@@ -721,6 +721,7 @@ class UpdateExec(Database):
 		print("Deleted", deleted)
 		return deleted
 
+	seen = Cache(timeout=86400)
 	async def uproxy(self, *urls, collapse=True, force=False, ext=True):
 		if urls == ("https://cdn.discordapp.com/embed/avatars/0.png",):
 			return urls
@@ -747,20 +748,19 @@ class UpdateExec(Database):
 				if is_discord_attachment(out[i]):
 					with tracebacksuppressor:
 						out[i] = bot.preserve_attachment(out[i], ext=ext and out[i])
-				if force or not xrand(16):
 
-					def verify(url, uhu):
-						try:
-							with reqs.next().head(url, headers=headers, stream=True, timeout=12) as resp:
-								resp.raise_for_status()
-						except:
-							print_exc()
-							bot.data.proxies.pop(uhu, None)
-
-					if force:
-						await asubmit(verify, out[i], uhu)
+				def verify(url, uhu):
+					try:
+						with reqs.next().head(url, headers=headers, stream=True, timeout=12) as resp:
+							resp.raise_for_status()
+					except:
+						print_exc()
+						bot.data.proxies.pop(uhu, None)
 					else:
-						esubmit(verify, out[i], uhu)
+						self.seen[i] = True
+
+				if (force or not i & 15) and i not in self.seen:
+					esubmit(verify, out[i], uhu)
 			except KeyError:
 				if not sendable:
 					out[i] = url

@@ -428,7 +428,7 @@ class MemoryTimer(contextlib.AbstractContextManager, contextlib.AbstractAsyncCon
 		try:
 			self.timers[self.name].append(taken)
 		except KeyError:
-			self.timers[self.name] = t = deque(maxlen=8)
+			self.timers[self.name] = t = deque(maxlen=100)
 			t.append(taken)
 
 	__aenter__ = lambda self: emptyfut
@@ -533,8 +533,10 @@ if not enc_key:
 	with open("auth.json", "w", encoding="utf-8") as f:
 		json.dump(AUTH, f, indent="\t")
 
+openai = None
 if os.environ.get("AI_FEATURES", True):
-	import openai
+	with tracebacksuppressor:
+		import openai
 
 enc_key += "=="
 enc_box = nacl.secret.SecretBox(base64.b64decode(enc_key)[:32])
@@ -2786,7 +2788,7 @@ async def proc_distribute(proc):
 					caps = proc.caps
 				tasks = bot.distribute(caps, {}, resps, ip=f"127.0.0.1-{proc.n}")
 				resps.clear()
-		await asyncio.sleep(0.01)
+		await asyncio.sleep(0.05)
 
 proc_args = (python, "misc/x-compute.py")
 
@@ -5022,6 +5024,8 @@ class Cache(cdict):
 		object.__setattr__(self, "db", db)
 		object.__setattr__(self, "tmap", db["__tmap"])
 		self.clear()
+		if self.waiting:
+			self.waiting.cancel()
 		fut = create_task(waited_coro(self._update(), self.timeout))
 		object.__setattr__(self, "waiting", fut)
 		t = utc() + self.timeout
@@ -5038,6 +5042,8 @@ class Cache(cdict):
 			if t <= tmap[k] + timeout:
 				ts = tmap[k] + timeout
 				object.__setattr__(self, "soonest", ts)
+				if self.waiting:
+					self.waiting.cancel()
 				fut = create_task(waited_coro(self._update(), ts - t))
 				object.__setattr__(self, "waiting", fut)
 				break
@@ -5069,6 +5075,8 @@ class Cache(cdict):
 		ts = t + timeout
 		if ts < self.soonest:
 			object.__setattr__(self, "soonest", ts)
+			if self.waiting:
+				self.waiting.cancel()
 			fut = create_task(waited_coro(self._update(), timeout))
 			waiting = self.waiting
 			if waiting:

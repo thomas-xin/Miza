@@ -1007,7 +1007,7 @@ class Resize(Command):
 			if fmt2 not in ("mp4", "gif"):
 				if is_url(url):
 					resp = await asubmit(requests.head, url, headers=Request.header(), stream=True)
-					fmt2 = resp.headers["Content-Type"].rsplit("/", 1)[-1]
+					fmt2 = resp.headers.get("Content-Type", "").rsplit("/", 1)[-1]
 					if fmt2 not in ("mp4", "gif"):
 						fmt2 = "mp4"
 				else:

@@ -1503,7 +1503,7 @@ class UpdateRelays(Database):
 
 	async def _nocommand_(self, message, **void):
 		bot = self.bot
-		if message.reference and message.reference.resolved and message.reference.resolved.author.id == bot.id and message.reference.resolved.content.startswith("*```callback-admin-relay-"):
+		if message.reference and getattr(message.reference.resolved, "author", None) and message.reference.resolved.author.id == bot.id and message.reference.resolved.content.startswith("*```callback-admin-relay-"):
 			tup = message.reference.resolved.content.removeprefix("*```callback-admin-relay-").split("\n", 1)[0].rstrip("-").split("_")
 		else:
 			return

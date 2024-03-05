@@ -2110,7 +2110,10 @@ class AudioDownloader:
 					except (TypeError, youtube_dl.DownloadError):
 						raise FileNotFoundError(f"Unable to fetch audio data: {repr(ex)}")
 		if resp and not resp.get("direct", False):
-			return resp
+			if is_redgifs_url(resp.get("webpage_url" or resp.get("url"))):
+				url = resp["webpage_url"]
+			else:
+				return resp
 		title = url.split("?", 1)[0].rsplit("/", 1)[-1].split("#", 1)[0]
 		fut2 = create_future_ex(self.extract_alt, url)
 		fut3 = create_future_ex(self.extract_audio_video, url)

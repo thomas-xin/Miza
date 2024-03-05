@@ -977,7 +977,8 @@ class AudioClient(discord.Client):
 			guild_subscriptions=False,
 			intents=self.intents,
 		)
-		csubmit(super()._async_setup_hook())
+		with suppress(AttributeError):
+			csubmit(super()._async_setup_hook())
 		self._globals = globals()
 
 client = AudioClient()
