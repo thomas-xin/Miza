@@ -4361,6 +4361,21 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		await process_image(lambdassert, "$", (), cap=cap, timeout=timeout)
 		return sum(c == cap for c, i in self.capfrom)
 
+	def get_nvml(self):
+		import pynvml
+		pynvml.nvmlInit()
+		dc = pynvml.nvmlDeviceGetCount()
+		handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
+		gname = [pynvml.nvmlDeviceGetName(d) for d in handles]
+		gcore = [pynvml.nvmlDeviceGetNumGpuCores(d) for d in handles]
+		gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
+		gutil = [pynvml.nvmlDeviceGetUtilizationRates(d) for d in handles]
+		gpowa = [pynvml.nvmlDeviceGetPowerUsage(d) for d in handles]
+		gpowb = [pynvml.nvmlDeviceGetEnforcedPowerLimit(d) for d in handles]
+		gtempa = [pynvml.nvmlDeviceGetTemperature(d, 0) for d in handles]
+		gtempb = [pynvml.nvmlDeviceGetTemperatureThreshold(d, 0) for d in handles]
+		return gname, gcore, gmems, gutil, gpowa, gpowb, gtempa, gtempb
+
 	async def get_current_stats(self):
 		global WMI
 		import psutil, cpuinfo
@@ -4368,28 +4383,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		cinfo = self._cpuinfo
 		if not cinfo:
 			cinfo = self._cpuinfo = await asubmit(cpuinfo.get_cpu_info)
-		cpercent = psutil.cpu_percent()
+		f1 = asubmit(psutil.cpu_percent)
+		f2 = asubmit(psutil.virtual_memory)
+		f3 = asubmit(psutil.swap_memory)
 		try:
-			import pynvml
-			pynvml.nvmlInit()
-			dc = pynvml.nvmlDeviceGetCount()
-			handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
-			gname = [pynvml.nvmlDeviceGetName(d) for d in handles]
-			gcore = [pynvml.nvmlDeviceGetNumGpuCores(d) for d in handles]
-			gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
-			gutil = [pynvml.nvmlDeviceGetUtilizationRates(d) for d in handles]
-			gpowa = [pynvml.nvmlDeviceGetPowerUsage(d) for d in handles]
-			gpowb = [pynvml.nvmlDeviceGetEnforcedPowerLimit(d) for d in handles]
-			gtempa = [pynvml.nvmlDeviceGetTemperature(d, 0) for d in handles]
-			gtempb = [pynvml.nvmlDeviceGetTemperatureThreshold(d, 0) for d in handles]
+			gname, gcore, gmems, gutil, gpowa, gpowb, gtempa, gtempb = await asubmit(self.get_nvml)
 		except:
 			gname = []
-		minfo = psutil.virtual_memory()
-		sinfo = psutil.swap_memory()
+		cpercent, minfo, sinfo = await asyncio.gather(f1, f2, f3)
 		dinfo = {}
 		for p in psutil.disk_partitions(all=False):
 			try:
-				dinfo[p.mountpoint] = psutil.disk_usage(p.mountpoint)
+				dinfo[p.mountpoint] = await asubmit(psutil.disk_usage, p.mountpoint)
 			except OSError:
 				pass
 		ip = "127.0.0.1"
@@ -4405,7 +4410,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				print_exc()
 				globals()["WMI"] = False
 		if globals().get("WMI") is not False:
-			OS = WMI.Win32_Operatingsystem()[0]
+			if not globals().get("wOS"):  
+				OS = globals()["wOS"] = WMI.Win32_Operatingsystem()[0]
+			else:
+				OS = globals()["wOS"]
 			cswap = (int(OS.TotalVirtualMemorySize) - int(OS.FreeVirtualMemory)) * 1024 - psutil.virtual_memory().used
 			if cswap > sinfo.used:
 				class mtemp:
@@ -4413,7 +4421,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						self.used, self.total = used, total
 				sinfo = mtemp(used=cswap, total=sinfo.total)
 			if ram_name == "RAM":
-				ram = WMI.Win32_PhysicalMemory()[0]
+				if not globals().get("wRAM"):  
+					ram = globals()["wRAM"] = WMI.Win32_PhysicalMemory()[0]
+				else:
+					ram = globals()["wRAM"]
 				ram_speed = ram.ConfiguredClockSpeed
 				ram_type = ram.SMBIOSMemoryType
 				try:

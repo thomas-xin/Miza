@@ -3400,7 +3400,9 @@ def create_task(fut, *args, loop=None, **kwargs):
 	"Creates an asyncio Task object from an awaitable object."
 	if loop is None:
 		loop = get_event_loop()
-	return asyncio.ensure_future(fut, *args, loop=loop, **kwargs)
+	if not is_main_thread():
+		return asyncio.run_coroutine_threadsafe(fut, loop=loop, **kwargs)
+	return asyncio.ensure_future(fut, loop=loop, **kwargs)
 fsubmit = csubmit = create_task
 
 async def _await_fut(fut, ret):
