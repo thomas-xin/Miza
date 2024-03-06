@@ -852,7 +852,7 @@
 				"Verifier",
 				"RoleGiver"
 			],
-			"description": "Adds an automated role giver to the current channel. Triggered by a keyword in messages, only applicable to users with permission level >= 0 and account age >= 7d.",
+			"description": "Adds an automated role giver to the current channel. Triggered by a keyword in messages, only applicable to users with permission level >= 0 and account age >= 7d. Searches for word if only word characters, any substring if non-word characters are included, or regex if trigger begins and ends with a slash (/).",
 			"usage": "<0:react_to>? <1:role>? <delete_messages(-x)>?",
 			"level": "3",
 			"rate_limit": "(9, 12)",
@@ -2131,7 +2131,7 @@
 				"AutoReact",
 				"React"
 			],
-			"description": "Causes Miza to automatically assign a reaction to messages containing the substring.",
+			"description": "Causes Miza to automatically assign a reaction to messages containing the trigger. Triggered by a keyword in messages, only applicable to non-command messages. Searches for word if only word characters, any substring if non-word characters are included, or regex if trigger begins and ends with a slash (/).",
 			"usage": "<0:react_to>? <1:react_data>? <disable(-d)>?",
 			"level": "0",
 			"rate_limit": "(4, 6)",

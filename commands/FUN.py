@@ -1874,7 +1874,7 @@ class React(Command):
 	server_only = True
 	name = ["AutoReact"]
 	min_level = 0
-	description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the substring."
+	description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the trigger. Triggered by a keyword in messages, only applicable to non-command messages. Searches for word if only word characters, any substring if non-word characters are included, or regex if trigger begins and ends with a slash (/)."
 	usage = "<0:react_to>? <1:react_data>? <disable(-d)>?"
 	example = ("react cat 🐱", "react ?d dog", "react remove 1")
 	flags = "aedzf"
@@ -1928,10 +1928,16 @@ class React(Command):
 		lim = 64 << bot.is_trusted(guild.id) * 2 + 1
 		if curr.count() >= lim:
 			raise OverflowError(f"React list for {guild} has reached the maximum of {lim} items. Please remove an item to add another.")
-		# Limit substring length to 64
-		a = unicode_prune(" ".join(args[:-1])).casefold()
-		if len(a) > 64:
-			raise OverflowError("Maximum allowed string length is 64 characters.")
+		# Limit substring length to 256
+		a = " ".join(args[:-1]).strip()
+		if len(a) > 256:
+			raise OverflowError(f"Search substring too long ({len(a)} > 256).")
+		if not a:
+			raise ValueError("Input string must not be empty.")
+		if len(a) > 2 and a[0] == a[-1] == "/":
+			re.compile(a[1:-1])
+		else:
+			a = full_prune(a)
 		e_id = await bot.id_from_message(args[-1])
 		if isinstance(e_id, int):
 			emoji = await bot.fetch_emoji(e_id)
@@ -2016,7 +2022,22 @@ class UpdateReacts(Database):
 		words = clean_words = None
 		full = clean_full = None
 		for k in following:
-			if is_alphanumeric(k) and " " not in k:
+			if not k:
+				following.pop(k, None)
+				continue
+			i = k
+			if len(k) > 3 and k[0] == k[-1] == "/":
+				x = message.content
+				y = message.clean_content
+				rk = k[1:-1]
+				if len(k) * len(x) > 4096:
+					tup = await process_image("lambda rk, x, y: ((xi := re.search(rk, x)) and xi.group(), (yi := re.search(rk, y)) and yi.group())", "$", [rk, x, y], timeout=4)
+				else:
+					tup = ((xi := re.search(rk, x)) and xi.group(), (yi := re.search(rk, y)) and yi.group())
+				k = tup[0] or tup[1] or None
+				if not k:
+					continue
+			elif is_alphanumeric(k) and " " not in k:
 				if words is None:
 					words = text.split()
 				x = words
@@ -2032,10 +2053,10 @@ class UpdateReacts(Database):
 				y = clean_full
 			# Store position for each keyword found
 			if k in x:
-				emojis = following[k]
+				emojis = following[i]
 				reacting[x.index(k) / len(x)] = emojis
 			elif k in y:
-				emojis = following[k]
+				emojis = following[i]
 				reacting[y.index(k) / len(y)] = emojis
 		try:
 			guild = await self.bot.fetch_guild(g_id)

@@ -2037,7 +2037,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			raise NotImplementedError(fmt)
 		return prompt, stops
 
-	async def cut_to(self, messages, limit=1024, exclude_first=True, best=False):
+	async def cut_to(self, messages, limit=1024, exclude_first=True, best=False, fast=False):
 		if not messages:
 			return messages
 		messages = list(messages)
@@ -2061,7 +2061,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return messages
 		ml = round_random(limit / 6)
 		Ml = round_random(limit / 4)
-		s2 = await self.summarise(s, min_length=ml, max_length=Ml, best=best + 1)
+		if not false:
+			s2 = await self.summarise(s, min_length=ml, max_length=Ml, best=best + 1)
+		else:
+			s2 = await lim_tokens(s, ml + Ml >> 1)
 		summ += s2
 		messages = mes[::-1]
 		messages.insert(0, cdict(
@@ -2319,7 +2322,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			fp = rp - 1
 			pp = 0
 		raws = [m for m in messages if not m.get("tool_calls") and m.get("role") != "tool"]
-		snippet = await self.cut_to(raws, 800 if modlvl >= 2 else 400)
+		snippet = await self.cut_to(raws, 800 if modlvl >= 2 else 400, fast=True)
 		text = ""
 		ustr = str(hash(str(user) or self.user.name))
 		if tool_choice == "auto":
@@ -2523,7 +2526,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				data["model"] = assistant_backup
 				ctx2 = self.contexts.get(assistant_backup, 4096)
 				if ctx != ctx2:
-					selection = await self.cut_to(messages, ctx2 * 2 / 3)
+					selection = await self.cut_to(selection, ctx2 * 2 / 3, fast=True)
 					length = await count_to(selection)
 					ml = min(max(256, min(4096, ctx - length)), max_tokens)
 					data["messages"] = selection

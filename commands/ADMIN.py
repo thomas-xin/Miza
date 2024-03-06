@@ -629,7 +629,7 @@ class RoleGiver(Command):
 	name = ["Verifier"]
 	min_level = 3
 	min_display = "3+"
-	description = "Adds an automated role giver to the current channel. Triggered by a keyword in messages, only applicable to users with permission level >= 0 and account age >= 7d."
+	description = "Adds an automated role giver to the current channel. Triggered by a keyword in messages, only applicable to users with permission level >= 0 and account age >= 7d. Searches for word if only word characters, any substring if non-word characters are included, or regex if trigger begins and ends with a slash (/)."
 	usage = "<0:react_to>? <1:role>? <delete_messages(-x)>?"
 	example = ("rolegiver lol lol_role", "rolegiver n*gger muted")
 	flags = "aedx"
@@ -659,9 +659,16 @@ class RoleGiver(Command):
 			return f"Currently active rolegivers in {channel_mention(channel.id)}:\n{ini_md(iter2str(assigned, key=key))}"
 		if sum(len(alist[0]) for alist in assigned) >= 8:
 			raise OverflowError(f"Rolegiver list for #{channel} has reached the maximum of 8 items. Please remove an item to add another.")
-		react = args[0].casefold()
-		if len(react) > 256:
-			raise OverflowError(f"Search substring too long ({len(react)} > 256).")
+		# Limit substring length to 256
+		a = args[0].strip()
+		if len(a) > 256:
+			raise OverflowError(f"Search substring too long ({len(a)} > 256).")
+		if not a:
+			raise ValueError("Input string must not be empty.")
+		if len(a) > 2 and a[0] == a[-1] == "/":
+			re.compile(a[1:-1])
+		else:
+			a = full_prune(a)
 		r = verify_id(unicode_prune(" ".join(args[1:])))
 		if len(guild.roles) <= 1:
 			guild.roles = await guild.fetch_roles()
@@ -683,11 +690,11 @@ class RoleGiver(Command):
 				raise LookupError("Member data not found for this server.")
 			if memb.top_role <= role:
 				raise PermissionError("Target role is higher than your highest role.")
-		alist = set_dict(assigned, react, [[], False])
+		alist = set_dict(assigned, a, [[], False])
 		alist[1] |= "x" in flags
 		alist[0].append(role.id) 
 		update(channel.id)
-		return italics(css_md(f"Added {sqr_md(react)} ➡️ {sqr_md(role)} to {sqr_md(channel.name)}."))
+		return italics(css_md(f"Added {sqr_md(a)} ➡️ {sqr_md(role)} to {sqr_md(channel.name)}."))
 
 
 class AutoRole(Command):
@@ -3064,7 +3071,16 @@ class UpdateRolegivers(Database):
 			return
 		assigned = self.data.get(message.channel.id, ())
 		for k in assigned:
-			if not ((k in text) if is_alphanumeric(k) else (k in message.content.casefold())):
+			if len(k) > 3 and k[0] == k[-1] == "/":
+				x = message.content
+				rk = k[1:-1]
+				if len(k) * len(x) > 4096:
+					res = await process_image("lambda rk, x: bool(re.search(rk, x))", "$", [rk, x], timeout=4)
+				else:
+					res = bool(re.search(rk, x))
+				if not res:
+					continue
+			elif not ((k in text) if is_alphanumeric(k) else (k in message.content.casefold())):
 				continue
 			al = assigned[k]
 			for r in al[0]:
