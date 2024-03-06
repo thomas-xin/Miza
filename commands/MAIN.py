@@ -1236,7 +1236,14 @@ class Reminder(Command):
 			if not len(rems):
 				return ini_md(f"No {word} currently set for {sqr_md(sendable)}.")
 			if not orig:
-				i = 0
+				if "f" not in flags:
+					raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(rems))} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
+				rems.clear()
+				bot.data.reminders.pop(sendable.id, None)
+				with suppress(IndexError):
+					bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
+				update(sendable.id)
+				return italics(css_md(f"Successfully cleared all {word} for {sqr_md(sendable)}."))
 			else:
 				i = await bot.eval_math(orig)
 			i %= len(rems)
@@ -1248,17 +1255,6 @@ class Reminder(Command):
 					bot.data.reminders.listed.insort((rems[0]["t"], sendable.id), key=lambda x: x[0])
 			update(sendable.id)
 			return ini_md(f"Successfully removed {sqr_md(lim_str(x['msg'], 128))} from {word} list for {sqr_md(sendable)}.")
-		elif "r" in flags:
-			if not len(rems):
-				return ini_md(f"No {word} currently set for {sqr_md(sendable)}.")
-			if "f" not in flags:
-				raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(rems))} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
-			rems.clear()
-			bot.data.reminders.pop(sendable.id, None)
-			with suppress(IndexError):
-				bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
-			update(sendable.id)
-			return italics(css_md(f"Successfully cleared all {word} for {sqr_md(sendable)}."))
 		if not argv:
 			# Set callback message for scrollable list
 			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
