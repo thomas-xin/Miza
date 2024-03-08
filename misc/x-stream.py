@@ -155,12 +155,12 @@ class Server:
 			if path:
 				irl = HOST + "/fi/" + path
 				if irl not in self.ucache or time.time() - self.ucache[irl][0] > 3600:
-					with self.session.get(irl) as resp:
+					with self.session.get(irl, timeout=30) as resp:
 						info = resp.json()
 					self.ucache[irl] = [time.time(), info]
 				elif time.time() - self.ucache[irl][0] > 60:
 					def cache_temp():
-						with self.session.get(irl) as resp:
+						with self.session.get(irl, timeout=30) as resp:
 							info = resp.json()
 						self.ucache[irl] = [time.time(), info]
 					exc.submit(cache_temp)
@@ -253,7 +253,7 @@ class Server:
 			headers.pop("Transfer-Encoding", None)
 			headers["X-Real-Ip"] = cp.request.remote.ip
 			try:
-				with self.session.head(irl, headers=headers, verify=False, allow_redirects=False) as resp:
+				with self.session.head(irl, headers=headers, verify=False, allow_redirects=False, timeout=30) as resp:
 					url = resp.headers.get("Location") or irl
 			except Exception as ex:
 				print("Error:", repr(ex))
@@ -268,7 +268,7 @@ class Server:
 				headers.pop("Connection", None)
 				headers.pop("Transfer-Encoding", None)
 				headers["X-Real-Ip"] = cp.request.remote.ip
-				with self.session.head(irl, headers=headers, verify=False, allow_redirects=False) as resp:
+				with self.session.head(irl, headers=headers, verify=False, allow_redirects=False, timeout=30) as resp:
 					url = resp.headers.get("Location") or irl
 				self.ucache[irl] = [time.time(), url]
 			exc.submit(cache_temp)
@@ -302,6 +302,7 @@ class Server:
 			stream=True,
 			verify=False,
 			allow_redirects=False,
+			timeout=3600,
 		)
 		if resp.status_code in range(300, 400):
 			raise cp.HTTPRedirect(resp.headers.get("Location") or url, resp.status_code)
@@ -341,6 +342,7 @@ class Server:
 			data=body,
 			stream=True,
 			verify=False,
+			timeout=60,
 		)
 		cp.response.headers.update(resp.headers)
 		cp.response.headers.pop("Connection", None)
@@ -361,7 +363,7 @@ class Server:
 		except KeyError:
 			if len(self.cache) > 128:
 				self.cache.pop(next(iter(self.cache)))
-			data = self.cache[info] = requests.get(info).json()
+			data = self.cache[info] = requests.get(info, timeout=30).json()
 		info = [data["filename"], data["size"], data["mimetype"]]
 		urls = data.get("chunks") or [data["dl"]]
 		size = info[1]
@@ -432,7 +434,7 @@ class Server:
 					elif u.startswith("https://cdn.discord"):
 						ns = 8388608
 					else:
-						resp = reqs.head(u, headers=headers)
+						resp = reqs.head(u, headers=headers, timeout=45)
 						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 					if pos + ns <= start:
 						pos += ns
@@ -451,7 +453,7 @@ class Server:
 						h2["range"] = f"bytes={s}-{e}"
 						ex2 = None
 						for i in range(3):
-							resp = reqs.get(u, headers=h2, stream=True)
+							resp = reqs.get(u, headers=h2, stream=True, timeout=30)
 							if resp.status_code == 416:
 								yield b""
 								return
