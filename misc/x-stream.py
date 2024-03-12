@@ -277,6 +277,7 @@ class Server:
 			url = self.ucache[irl][1]
 		if rquery:
 			rquery = "?" + rquery if "?" not in url else "&" + rquery
+			url += rquery
 		raise cp.HTTPRedirect(url, 307)
 
 	@cp.expose
