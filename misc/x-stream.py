@@ -246,6 +246,8 @@ class Server:
 		if rpath:
 			rpath = "/" + rpath
 		rquery = cp.request.query_string
+		if rquery:
+			rquery = "?" + rquery
 		irl = f"{self.state['/']}/u{rpath}"
 		if irl not in self.ucache or discord_expired(self.ucache[irl][1]) or (irl == self.ucache[irl][1] or self.ucache[irl][1] == "https://mizabot.xyz/notfound.png" and time.time() - self.ucache[irl][0] > 30):
 			headers = dict(cp.request.headers)
@@ -255,7 +257,7 @@ class Server:
 			try:
 				with self.session.head(irl, headers=headers, verify=False, allow_redirects=False, timeout=30) as resp:
 					resp.raise_for_status()
-					url = resp.headers.get("Location") or irl
+					url = resp.headers.get("Location") or f"{self.state['/']}/u{rpath}{rquery}"
 			except Exception as ex:
 				print("Error:", repr(ex))
 				if irl in self.ucache:
@@ -271,14 +273,13 @@ class Server:
 				headers["X-Real-Ip"] = cp.request.remote.ip
 				with self.session.head(irl, headers=headers, verify=False, allow_redirects=False, timeout=30) as resp:
 					resp.raise_for_status()
-					url = resp.headers.get("Location") or irl
+					url = resp.headers.get("Location") or f"{self.state['/']}/u{rpath}{rquery}"
 				self.ucache[irl] = [time.time(), url]
 			exc.submit(cache_temp)
 			url = self.ucache[irl][1]
 		else:
 			url = self.ucache[irl][1]
 		if rquery:
-			rquery = "?" + rquery if "?" not in url else "&" + rquery
 			url += rquery
 		raise cp.HTTPRedirect(url, 307)
 
