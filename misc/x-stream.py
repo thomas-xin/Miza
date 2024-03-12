@@ -247,13 +247,14 @@ class Server:
 			rpath = "/" + rpath
 		rquery = cp.request.query_string
 		irl = f"{self.state['/']}/u{rpath}"
-		if irl not in self.ucache or discord_expired(self.ucache[irl][1]) or self.ucache[irl][1] == "https://mizabot.xyz/notfound.png" and time.time() - self.ucache[irl][0] > 30:
+		if irl not in self.ucache or discord_expired(self.ucache[irl][1]) or (irl == self.ucache[irl][1] or self.ucache[irl][1] == "https://mizabot.xyz/notfound.png" and time.time() - self.ucache[irl][0] > 30):
 			headers = dict(cp.request.headers)
 			headers.pop("Connection", None)
 			headers.pop("Transfer-Encoding", None)
 			headers["X-Real-Ip"] = cp.request.remote.ip
 			try:
 				with self.session.head(irl, headers=headers, verify=False, allow_redirects=False, timeout=30) as resp:
+					resp.raise_for_status()
 					url = resp.headers.get("Location") or irl
 			except Exception as ex:
 				print("Error:", repr(ex))
@@ -269,6 +270,7 @@ class Server:
 				headers.pop("Transfer-Encoding", None)
 				headers["X-Real-Ip"] = cp.request.remote.ip
 				with self.session.head(irl, headers=headers, verify=False, allow_redirects=False, timeout=30) as resp:
+					resp.raise_for_status()
 					url = resp.headers.get("Location") or irl
 				self.ucache[irl] = [time.time(), url]
 			exc.submit(cache_temp)
