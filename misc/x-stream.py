@@ -112,7 +112,7 @@ def discord_expired(url):
 			ts = int(temp, 16)
 		except ValueError:
 			return True
-		return ts < utc() + 21600 + 60
+		return ts < time.time() + 21600 + 60
 
 
 class Server:
