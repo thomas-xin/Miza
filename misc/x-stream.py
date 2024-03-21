@@ -112,11 +112,12 @@ def discord_expired(url):
 			ts = int(temp, 16)
 		except ValueError:
 			return True
-		return ts < time.time() + 60
+		return ts < utc() + 21600 + 60
 
 
 class Server:
 
+	token = ""
 	cache = {}
 	ucache = {}
 	if os.path.exists("temp.json") and os.path.getsize("temp.json"):
@@ -201,7 +202,8 @@ class Server:
 		return data
 
 	@cp.expose
-	def heartbeat(self, key, uri=""):
+	def heartbeat(self, key, token, uri=""):
+		self.token = token
 		assert key == discord_secret
 		uri = uri or f"https://IP:{webserver_port}"
 		uri = uri.replace("IP", cp.request.remote.ip)
@@ -240,6 +242,43 @@ class Server:
 			self.cache[rpath] = b = f.read()
 		return b
 
+	def cache_temp(self, irl, rpath, rquery):
+		headers = dict(cp.request.headers)
+		headers.pop("Connection", None)
+		headers.pop("Transfer-Encoding", None)
+		headers["X-Real-Ip"] = cp.request.remote.ip
+		url = None
+		try:
+			if self.token and "~" in rpath:
+				import base64
+				c, m, a = rpath.lstrip("/").split("?", 1)[0].split(".", 1)[0].split("~")
+				c_id = int.from_bytes(base64.urlsafe_b64decode(c + "=="), "big")
+				m_id = int.from_bytes(base64.urlsafe_b64decode(m + "=="), "big")
+				a_id = int.from_bytes(base64.urlsafe_b64decode(a + "=="), "big")
+				with self.session.get(
+					f"https://discord.com/api/v10/channels/{c_id}/messages/{m_id}",
+					headers=dict(Authorization=f"Bot {self.token}"),
+				) as resp:
+					resp.raise_for_status()
+					attachments = resp.json()["attachments"]
+				for attachment in attachments:
+					if int(attachment["id"]) == a_id:
+						url = str(attachment["url"])
+						if discord_expired(url):
+							url = None
+			if not url:
+				with self.session.head(irl, headers=headers, verify=False, allow_redirects=False, timeout=30) as resp:
+					resp.raise_for_status()
+					url = resp.headers.get("Location") or f"{self.state['/']}/u{rpath}{rquery}"
+		except Exception as ex:
+			print("Error:", repr(ex))
+			if irl in self.ucache:
+				url = self.ucache[irl][1]
+			else:
+				url = "https://mizabot.xyz/notfound.png"
+		self.ucache[irl] = [time.time(), url]
+		return url
+
 	@cp.expose(("u",))
 	def unproxy(self, *path, **query):
 		rpath = "/".join(path)
@@ -250,32 +289,9 @@ class Server:
 			rquery = "?" + rquery
 		irl = f"{self.state['/']}/u{rpath}"
 		if irl not in self.ucache or discord_expired(self.ucache[irl][1]) or (irl == self.ucache[irl][1] or self.ucache[irl][1] == "https://mizabot.xyz/notfound.png" and time.time() - self.ucache[irl][0] > 30):
-			headers = dict(cp.request.headers)
-			headers.pop("Connection", None)
-			headers.pop("Transfer-Encoding", None)
-			headers["X-Real-Ip"] = cp.request.remote.ip
-			try:
-				with self.session.head(irl, headers=headers, verify=False, allow_redirects=False, timeout=30) as resp:
-					resp.raise_for_status()
-					url = resp.headers.get("Location") or f"{self.state['/']}/u{rpath}{rquery}"
-			except Exception as ex:
-				print("Error:", repr(ex))
-				if irl in self.ucache:
-					url = self.ucache[irl][1]
-				else:
-					url = "https://mizabot.xyz/notfound.png"
-			self.ucache[irl] = [time.time(), url]
-		elif time.time() - self.ucache[irl][0] > 43200:
-			def cache_temp():
-				headers = dict(cp.request.headers)
-				headers.pop("Connection", None)
-				headers.pop("Transfer-Encoding", None)
-				headers["X-Real-Ip"] = cp.request.remote.ip
-				with self.session.head(irl, headers=headers, verify=False, allow_redirects=False, timeout=30) as resp:
-					resp.raise_for_status()
-					url = resp.headers.get("Location") or f"{self.state['/']}/u{rpath}{rquery}"
-				self.ucache[irl] = [time.time(), url]
-			exc.submit(cache_temp)
+			url = self.cache_temp(irl, rpath, rquery)
+		elif time.time() - self.ucache[irl][0] > 86400:
+			exc.submit(self.cache_temp, irl, rpath, rquery)
 			url = self.ucache[irl][1]
 		else:
 			url = self.ucache[irl][1]
