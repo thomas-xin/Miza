@@ -296,6 +296,8 @@ class Server:
 		else:
 			url = self.ucache[irl][1]
 		if rquery:
+			if "?" in url:
+				rquery = "&" + rquery.lstrip("?")
 			url += rquery
 		raise cp.HTTPRedirect(url, 307)
 
