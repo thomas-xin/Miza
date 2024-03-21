@@ -267,7 +267,7 @@ class Server:
 						if discord_expired(url):
 							url = None
 			if not url:
-				if "?" in url:
+				if "?" in irl:
 					rquery = "&" + rquery.lstrip("?")
 				url = irl + rquery
 				with self.session.head(url, headers=headers, verify=False, allow_redirects=False, timeout=30) as resp:
