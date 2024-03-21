@@ -267,9 +267,12 @@ class Server:
 						if discord_expired(url):
 							url = None
 			if not url:
-				with self.session.head(irl, headers=headers, verify=False, allow_redirects=False, timeout=30) as resp:
+				if "?" in url:
+					rquery = "&" + rquery.lstrip("?")
+				url = irl + rquery
+				with self.session.head(url, headers=headers, verify=False, allow_redirects=False, timeout=30) as resp:
 					resp.raise_for_status()
-					url = resp.headers.get("Location") or f"{self.state['/']}/u{rpath}{rquery}"
+					url = resp.headers.get("Location") or url
 		except Exception as ex:
 			print("Error:", repr(ex))
 			if irl in self.ucache:
