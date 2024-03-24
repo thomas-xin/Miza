@@ -327,7 +327,7 @@ class Server:
 			stream=True,
 			verify=False,
 			allow_redirects=False,
-			timeout=3600,
+			timeout=60,
 		)
 		if resp.status_code in range(300, 400):
 			raise cp.HTTPRedirect(resp.headers.get("Location") or url, resp.status_code)
