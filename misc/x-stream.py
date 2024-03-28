@@ -118,6 +118,7 @@ def discord_expired(url):
 class Server:
 
 	token = ""
+	channels = []
 	cache = {}
 	ucache = {}
 	if os.path.exists("temp.json") and os.path.getsize("temp.json"):
@@ -202,8 +203,9 @@ class Server:
 		return data
 
 	@cp.expose
-	def heartbeat(self, key, token, uri=""):
-		self.token = token
+	def heartbeat(self, key, token="", channels="", uri=""):
+		self.token = token or self.token
+		self.channels = channels.split(",") if channels else self.channels
 		assert key == discord_secret
 		uri = uri or f"https://IP:{webserver_port}"
 		uri = uri.replace("IP", cp.request.remote.ip)
@@ -242,6 +244,61 @@ class Server:
 			self.cache[rpath] = b = f.read()
 		return b
 
+	uindex = 0
+	unproxying = []
+	unproxy_running = concurrent.futures.Future()
+	unproxy_running.set_result(None)
+	def unproxy_into(self, *urls):
+		self.unproxying.extend(urls)
+		if self.unproxy_running.done():
+			self.unproxy_running = concurrent.futures.Future()
+			exc.submit(self.unproxying_into)
+		return self.unproxy_running
+
+	def unproxying_into(self):
+		futs = []
+		while self.unproxying:
+			cid = self.channels[self.uindex % len(self.channels)]
+			self.uindex += 1
+			urllist, self.unproxying = self.unproxying[:10], self.unproxying[10:]
+			fut = exc.submit(self.unproxy_within, cid, urllist)
+			futs.append(fut)
+			time.sleep(1.5 / len(self.channels))
+		for fut in futs:
+			try:
+				fut.result()
+			except:
+				pass
+		try:
+			self.unproxy_running.set_result(None)
+		except concurrent.futures.InvalidStateError:
+			pass
+
+	def unproxy_within(self, cid, urllist):
+		try:
+			u2s = [url.split("?url=", 1)[-1].split("&", 1)[0] for url in urllist]
+			embeds = [dict(image=dict(url=url)) for url in u2s]
+			resp = requests.post(
+				f"https://discord.com/api/v10/channels/{cid}/messages",
+				data=json.dumps(dict(embeds=embeds)).encode("utf-8"),
+				headers={"Content-Type": "application/json", "Authorization": "Bot " + AUTH["alt_token"]},
+			)
+			resp.raise_for_status()
+			message = resp.json()
+			for irl, emb in zip(urllist, message["embeds"]):
+				self.ucache[irl] = [time.time(), emb["image"]["url"]]
+		except Exception as ex:
+			fut, self.unproxy_running = self.unproxy_running, concurrent.futures.Future()
+			try:
+				fut.set_exception(ex)
+			except concurrent.futures.InvalidStateError:
+				pass
+		else:
+			try:
+				fut.set_result(None)
+			except concurrent.futures.InvalidStateError:
+				pass
+
 	def cache_temp(self, irl, rpath, rquery):
 		headers = dict(cp.request.headers)
 		headers.pop("Connection", None)
@@ -249,23 +306,32 @@ class Server:
 		headers["X-Real-Ip"] = cp.request.remote.ip
 		url = None
 		try:
-			if self.token and "~" in rpath:
-				import base64
-				c, m, a = rpath.lstrip("/").split("?", 1)[0].split(".", 1)[0].split("~")
-				c_id = int.from_bytes(base64.urlsafe_b64decode(c + "=="), "big")
-				m_id = int.from_bytes(base64.urlsafe_b64decode(m + "=="), "big")
-				a_id = int.from_bytes(base64.urlsafe_b64decode(a + "=="), "big")
-				with self.session.get(
-					f"https://discord.com/api/v10/channels/{c_id}/messages/{m_id}",
-					headers=dict(Authorization=f"Bot {self.token}"),
-				) as resp:
-					resp.raise_for_status()
-					attachments = resp.json()["attachments"]
-				for attachment in attachments:
-					if int(attachment["id"]) == a_id:
-						url = str(attachment["url"])
-						if discord_expired(url):
-							url = None
+			if self.token and "~" in rpath or "?url=" in rpath:
+				if "?url=" in irl:
+					fut = self.unproxy_into2(irl)
+					fut.result()
+					while irl not in self.ucache and not self.unproxy_running.done():
+						self.unproxy_running.result()
+					if irl not in self.ucache:
+						raise KeyError(irl)
+					return self.ucache[irl][1]
+				else:
+					import base64
+					c, m, a = rpath.lstrip("/").split("?", 1)[0].split(".", 1)[0].split("~")
+					c_id = int.from_bytes(base64.urlsafe_b64decode(c + "=="), "big")
+					m_id = int.from_bytes(base64.urlsafe_b64decode(m + "=="), "big")
+					a_id = int.from_bytes(base64.urlsafe_b64decode(a + "=="), "big")
+					with self.session.get(
+						f"https://discord.com/api/v10/channels/{c_id}/messages/{m_id}",
+						headers=dict(Authorization=f"Bot {self.token}"),
+					) as resp:
+						resp.raise_for_status()
+						attachments = resp.json()["attachments"]
+					for attachment in attachments:
+						if int(attachment["id"]) == a_id:
+							url = str(attachment["url"])
+							if discord_expired(url):
+								url = None
 			if not url:
 				if "?" in irl:
 					rquery = "&" + rquery.lstrip("?")
@@ -288,9 +354,14 @@ class Server:
 		if rpath:
 			rpath = "/" + rpath
 		rquery = cp.request.query_string
+		equery = ""
 		if rquery:
 			rquery = "?" + rquery
-		irl = f"{self.state['/']}/u{rpath}"
+			if "url=" in rquery:
+				equery = "?url=" + rquery.split("url=", 1)[-1].split("&", 1)[0]
+				left, right = rquery.split("url=", 1)
+				rquery = (left.rstrip("?&") + "&" + right.split("&", 1)[-1]).rstrip("&")
+		irl = f"{self.state['/']}/u{rpath}{equery}"
 		if irl not in self.ucache or discord_expired(self.ucache[irl][1]) or (irl == self.ucache[irl][1] or self.ucache[irl][1] == "https://mizabot.xyz/notfound.png" and time.time() - self.ucache[irl][0] > 30):
 			url = self.cache_temp(irl, rpath, rquery)
 		elif time.time() - self.ucache[irl][0] > 86400:
