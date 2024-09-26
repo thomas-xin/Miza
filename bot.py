@@ -1204,12 +1204,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				_c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
 				a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 				if a_id in self.data.attachments:
-					return self.webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii") + ext
+					return self.webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii") + fn
 			a_id = ts_us()
 			while a_id in self.data.attachments:
 				a_id += 1
 			self.data.attachments[a_id] = url
-		return self.webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii") + ext
+		return self.webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii") + fn
 
 	def preserve_into(self, c, m, a, fn=None):
 		if fn and "://" in fn:
@@ -1224,7 +1224,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			fn = "." + fn
 		a_id = verify_id(a)
 		self.data.attachments[a_id] = (verify_id(c), verify_id(m))
-		return self.webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii") + ext
+		return self.webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii") + fn
 
 	def preserve_as_long(self, c_id, m_id, a_id, fn=None):
 		if fn and is_url(fn) and ("exec" not in self.data or not is_discord_attachment(fn)):
@@ -1233,7 +1233,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			fn = fn.split("?", 1)[0].rsplit("/", 1)[-1]
 		else:
 			fn = ""
-		return self.webserver + "/u/" + encode_attachment(c_id, m_id, a_id, fn=fn)
+		return self.webserver + "/u/" + encode_attachment(c_id, m_id, a_id, fn)
 
 	async def renew_from_long(cself, c, m, a):
 		c_id = int.from_bytes(base64.urlsafe_b64decode(c + "=="), "big")

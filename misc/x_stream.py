@@ -9,8 +9,8 @@ from urllib.parse import unquote_plus
 import cherrypy as cp
 from cherrypy._cpdispatch import Dispatcher
 import requests
-from misc.asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
-from misc.util import attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES
+from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
+from .util import attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES
 
 tsubmit(eloop.run_forever)
 ADDRESS = "0.0.0.0"
