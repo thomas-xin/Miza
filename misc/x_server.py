@@ -1009,7 +1009,8 @@ class Server:
 			if "." in aid:
 				aid = aid.split(".", 1)[0]
 			with tracebacksuppressor:
-				aid = int.from_bytes(base64.urlsafe_b64decode(id + "=="), "big")
+				aid = int.from_bytes(base64.urlsafe_b64decode(aid + "=="), "big")
+			assert isinstance(aid, int) or aid.isnumeric()
 			url = interface.run(f"bot.renew_attachment({aid})", timeout=60, cache=21600) or url
 		return self.proxy_if(url)
 
