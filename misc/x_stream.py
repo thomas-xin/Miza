@@ -10,7 +10,7 @@ import cherrypy as cp
 from cherrypy._cpdispatch import Dispatcher
 import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
-from .util import attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES, Request
+from .util import attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
 
 csubmit(Request._init_())
 tsubmit(eloop.run_forever)
@@ -51,8 +51,6 @@ config = {
 		"request.dispatch": EndpointRedirects(),
 	},
 }
-DOMAIN_CERT = "domain.cert.pem"
-PRIVATE_KEY = "private.key.pem"
 if os.path.exists(DOMAIN_CERT) and os.path.exists(PRIVATE_KEY):
 	config["global"]["server.ssl_certificate"] = DOMAIN_CERT
 	config["global"]["server.ssl_private_key"] = PRIVATE_KEY
