@@ -185,7 +185,7 @@ class Server:
 		self.channels = data.get("channels") or self.channels
 		AUTH["discord_token"] = token
 		AUTH["proxy_channels"] = self.channels
-		save_auth("AUTH")
+		save_auth(AUTH)
 		if domain_cert and private_key:
 			print("SSL:", domain_cert, private_key, sep="\n")
 			with open(DOMAIN_CERT, "w") as f:
