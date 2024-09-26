@@ -1,7 +1,7 @@
 # Make linter shut up lol
 if "common" not in globals():
-	import common
-	from common import *
+	import misc.common as common
+	from misc.common import *
 print = PRINT
 
 
@@ -90,7 +90,7 @@ class AutoEmoji(Command):
 		more = len(curr) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(message.edit(content=content, embed=emb))
+		csubmit(bot.edit_message(message, content=content, embed=emb))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -138,32 +138,33 @@ class UpdateAutoEmojis(Database):
 			return
 		if message.guild and not message.guild.get_member(message.author.id) or not message.content or getattr(message, "webhook_id", None) or message.content.count("```") > 1:
 			return
+		bot = self.bot
 		emojis = find_emojis(message.content)
 		for e in emojis:
 			name, e_id = e.split(":")[1:]
 			e_id = int("".join(regexp("[0-9]+").findall(e_id)))
 			anim = e.startswith("<a:")
-			self.bot.emoji_stuff[e_id] = anim
-			emoji = self.bot.cache.emojis.get(e_id)
+			bot.emoji_stuff[e_id] = anim
+			emoji = bot.cache.emojis.get(e_id)
 			if emoji:
 				name = emoji.name
 			if not message.webhook_id:
-				self.bot.data.emojinames[e_id] = name
-				orig = self.bot.data.emojilists.setdefault(message.author.id, {})
+				bot.data.emojinames[e_id] = name
+				orig = bot.data.emojilists.setdefault(message.author.id, {})
 				orig[name] = e_id
-				self.bot.data.emojilists.update(message.author.id)
 				if message.guild:
-					orig = self.bot.data.emojilists.setdefault(message.guild.id, {})
+					orig = bot.data.emojilists.setdefault(message.guild.id, {})
 					orig[name] = e_id
-					self.bot.data.emojilists.update(message.guild.id)
 		if not message.guild:
 			return
 		guild = message.guild
-		if not self.get(guild.id) and guild.id not in self and (559426966151757824 in guild._members or not guild.me.guild_permissions.manage_messages or not guild.me.guild_permissions.manage_webhooks):
+		if not self.get(guild.id, True) or (559426966151757824 in guild._members or not guild.me.guild_permissions.manage_messages or not guild.me.guild_permissions.manage_webhooks):
 			return
+		if "emojis" in bot.data:
+			await bot.data.emojis.load_own()
 		m_id = None
 		msg = message.content
-		orig = self.bot.data.emojilists.get(message.author.id, {})
+		orig = bot.data.emojilists.get(message.author.id, {})
 		emojis = None
 		# long = len(msg) > 32
 		if msg.startswith("+"):
@@ -175,19 +176,19 @@ class UpdateAutoEmojis(Database):
 					spl = [emi]
 			if len(spl) == 1:
 				ems = spl[0]
-				m2 = await self.bot.history(message.channel, limit=5, before=message.id, use_cache=not self.bot.is_trusted(guild)).__anext__()
+				m2 = await bot.history(message.channel, limit=5, before=message.id, use_cache=not bot.is_trusted(guild)).__anext__()
 			else:
 				m2 = None
 				if m_id:
 					m_id = int(m_id)
 			if not m2 and m_id:
 				try:
-					m2 = await self.bot.fetch_message(m_id, message.channel)
+					m2 = await bot.fetch_message(m_id, message.channel)
 				except LookupError:
 					m2 = None
 			if m2:
-				ems = regexp("<a?:[A-Za-z0-9\\-~_]{1,32}").sub("", ems.replace(" ", "").replace("\\", "")).replace(">", ":")
-				possible = regexp(":[A-Za-z0-9\\-~_]{1,32}:|[^\\x00-\\x7F]").findall(ems)
+				ems = regexp(r"<a?:[A-Za-z0-9\-~_]{1,32}").sub("", ems.replace(" ", "").replace("\\", "")).replace(">", ":")
+				possible = regexp(r":[A-Za-z0-9\-~_]{1,32}:|[^\x00-\x7F]").findall(ems)
 				s = ems
 				for word in possible:
 					s = s.replace(word, "")
@@ -204,7 +205,7 @@ class UpdateAutoEmojis(Database):
 					else:
 						emoji = emojis.get(name)
 					if not emoji:
-						r1 = regexp("^[A-Za-z0-9\\-~_]{1,32}$")
+						r1 = regexp(r"^[A-Za-z0-9\-~_]{1,32}$")
 						if r1.fullmatch(name):
 							if name.isnumeric():
 								emoji = int(name)
@@ -222,76 +223,73 @@ class UpdateAutoEmojis(Database):
 											emoji = emojis.get(name)
 					if emoji:
 						if type(emoji) is int:
-							e_id = await self.bot.id_from_message(emoji)
-							emoji = self.bot.cache.emojis.get(e_id)
+							e_id = await bot.id_from_message(emoji)
+							emoji = bot.cache.emojis.get(e_id)
 						futs.append(m2.add_reaction(emoji))
-						orig = self.bot.data.emojilists.setdefault(message.author.id, {})
+						orig = bot.data.emojilists.setdefault(message.author.id, {})
 						if getattr(emoji, "id", None):
 							orig[name] = emoji.id
-							self.bot.data.emojilists.update(message.author.id)
-							self.bot.data.emojinames[emoji.id] = name
+							bot.data.emojinames[emoji.id] = name
 				if futs:
-					futs.append(self.bot.silent_delete(message))
-					await asyncio.gather(*futs)
+					futs.append(bot.silent_delete(message))
+					await gather(*futs)
 					return
 		if message.content.count(":") < 2:
 			return
-		msg, pops, emoji = await self.bot.proxy_emojis(msg, guild=guild, user=message.author, is_webhook=message.webhook_id, return_pops=True)
-		if not msg or msg == message.content:
+		msg, pops, replaceds = await bot.proxy_emojis(msg, guild=guild, user=message.author, is_webhook=message.webhook_id, return_pops=True)
+		if not msg or msg == message.content or not replaceds:
 			return
 		msg = escape_everyone(msg).strip("\u200b")
 		if not msg or msg == message.content or len(msg) > 2000:
 			return
 		if not recursive:
 			return msg
+		replacemap = {e.name: e for e in replaceds}
 		files = deque()
 		for a in message.attachments:
-			b = await self.bot.get_request(a.url, full=False)
+			b = await bot.get_request(a.url, full=False)
 			files.append(CompatFile(seq(b), filename=a.filename))
-		csubmit(self.bot.silent_delete(message))
-		url = await self.bot.get_proxy_url(message.author)
-		m = await self.bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
-		regex = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
+		csubmit(bot.silent_delete(message))
+		url = await bot.get_proxy_url(message.author)
+		m = await bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
+		regex = regexp(r"(?:^|^[^<\\`]|[^<][^\\`]|.[^a\\`\[])(:[A-Za-z0-9\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>\]`])")
 		if recursive and regex.search(m.content):
 			m = await m.edit(content=msg)
-			print(m, m.content)
-			if m.content == ":_:":
-				if emoji:
-					fmt = "gif" if emoji.animated else "png"
-					url = f"https://cdn.discordapp.com/emojis/{emoji.id}.{fmt}?quality=lossless&size=48"
-					await m.edit(content=url)
-					self.pop(m.channel.id)
-					return
-			if recursive and regex.search(m.content):
-				for k in tuple(pops):
-					if str(k[1]) not in m.content:
-						orig.pop(k[0], None)
-					else:
-						pops.discard(k)
-				if pops:
+			print("R1:", m, m.content)
+			if (res := regex.search(m.content)):
+				msg = m.content
+				while res:
+					em = res.group()
+					name = em.split(":", 2)[1]
+					em = f":{name}:"
+					try:
+						e = replacemap[em]
+					except KeyError:
+						e = replaceds[-1]
+					url = await bot.emoji_to_url(e)
+					if msg == em:
+						msg = f"[{name}]({url}?size=48&name={name})"
+						break
+					msg = msg.replace(em, f"[{name}]({url}?size=24&name={name})")
+					res = regex.search(msg)
+				m = await m.edit(content=msg)
+				print("R2:", m, m.content)
+				if regex.search(m.content):
+					for k in tuple(pops):
+						if str(k[1]) not in m.content:
+							orig.pop(k[0], None)
+						else:
+							pops.discard(k)
 					print("Removed emojis:", pops)
-					msg = await self._nocommand_(message, recursive=False)
-					if msg:
-						m = await m.edit(content=msg)
-						if m.content == ":_:":
-							if emoji:
-								fmt = "gif" if emoji.animated else "png"
-								url = f"https://cdn.discordapp.com/emojis/{emoji.id}.{fmt}?quality=lossless&size=48"
-								await m.edit(content=url)
-								self.pop(m.channel.id)
-								return
-						if regex.search(m.content):
-							emb = discord.Embed()
-							emb.set_author(**get_author(self.bot.user))
-							emb.description = (
-								"Psst! It appears as though AutoEmoji has failed to convert an emoji."
-								+ " To fix this, either delete my webhook for this channel and create a new one manually, add the emoji to this server, or invite me to the server containing said emoji!"
-							)
-							await m.edit(embed=emb)
-							self.pop(m.channel.id)
-							self.bot.data.webhooks.temp.pop(m.channel.id, None)
-						# csubmit(self.bot.silent_delete(m))
-						# m2 = await self.bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
+					emb = discord.Embed()
+					emb.set_author(**get_author(bot.user))
+					emb.description = (
+						"Psst! It appears as though AutoEmoji has failed to convert an emoji."
+						+ " To fix this, either delete my webhook for this channel and create a new one manually, add the emoji to this server, or invite me to the server containing said emoji!"
+					)
+					await m.edit(embed=emb)
+					self.pop(m.channel.id)
+					bot.data.webhooks.temp.pop(m.channel.id, None)
 
 
 class EmojiList(Command):
@@ -299,7 +297,6 @@ class EmojiList(Command):
 	usage = "<action(add|delete)>? <name>? <id>?"
 	example = ("emojilist add how https://cdn.discordapp.com/emojis/645188934267043840.gif", "emojilist remove why")
 	flags = "aed"
-	no_parse = True
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	rate_limit = (4, 6)
@@ -329,7 +326,6 @@ class EmojiList(Command):
 			if animated is None:
 				raise LookupError(f"Emoji {e_id} does not exist.")
 			bot.data.emojilists.setdefault(user.id, {})[name] = e_id
-			bot.data.emojilists.update(user.id)
 			return ini_md(f"Successfully added emoji alias {sqr_md(name)}: {sqr_md(e_id)} for {sqr_md(user)}.")
 		buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
 		await send_with_reply(
@@ -383,7 +379,6 @@ class EmojiList(Command):
 						me = ""
 				except LookupError:
 					following[user.id].pop(k)
-					following.update(user.id)
 					return
 				return f"({v})` {me}"
 
@@ -420,7 +415,7 @@ class EmojiList(Command):
 		more = len(curr) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -439,11 +434,9 @@ class MimicConfig(Command):
 	description = "Modifies an existing webhook mimic's attributes."
 	usage = "<0:mimic_id> <target(prefix|name|avatar|description|gender|birthday)>? <1:new>?"
 	example = ("mconfig 692369756941978254 name test2",)
-	no_parse = True
 	rate_limit = (4, 5)
 
 	async def __call__(self, bot, user, message, perm, flags, args, **void):
-		update = bot.data.mimics.update
 		mimicdb = bot.data.mimics
 		mimics = set_dict(mimicdb, user.id, {})
 		prefix = args.pop(0)
@@ -538,8 +531,6 @@ class MimicConfig(Command):
 					raise OverflowError("Must be 512 or fewer in length.")
 			name = mimic.name
 			mimic[setting] = new
-			update(m_id)
-			update(user.id)
 		if noret:
 			return
 		if output:
@@ -553,13 +544,11 @@ class Mimic(Command):
 	usage = "<0:prefix>? <1:user|name>? <2:url>? <delete(-d)>?"
 	example = ("mimic %miza @Miza", "rp %%test Test https://cdn.discordapp.com/embed/avatars/0.png", "plural -d %lol%")
 	flags = "aedzf"
-	no_parse = True
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	rate_limit = (6, 7)
 
 	async def __call__(self, bot, message, user, perm, flags, args, argv, **void):
-		update = self.data.mimics.update
 		mimicdb = bot.data.mimics
 		args.extend(best_url(a) for a in reversed(message.attachments))
 		if len(args) == 1 and "d" not in flags:
@@ -595,7 +584,6 @@ class Mimic(Command):
 					mimic = mimicdb.pop(m_id)
 				else:
 					mimics.pop(prefix)
-					update(user.id)
 					raise KeyError
 				if not mlist:
 					mimics.pop(prefix)
@@ -611,7 +599,6 @@ class Mimic(Command):
 					with suppress(ValueError, IndexError):
 						mimics[prefix].remove(m_id)
 				mimicdb.pop(mimic.id)
-			update(user.id)
 			return italics(css_md(f"Successfully removed webhook mimic {sqr_md(mimic.name if mimic else prefix)} for {sqr_md(user)}."))
 		if not prefix:
 			raise IndexError("Prefix must not be empty.")
@@ -686,8 +673,6 @@ class Mimic(Command):
 			mimics[prefix].append(m_id)
 		else:
 			mimics[prefix] = [m_id]
-		update(m_id)
-		update(u_id)
 		out = f"Successfully added webhook mimic {sqr_md(mimic.name)} with prefix {sqr_md(mimic.prefix)} and ID {sqr_md(mimic.id)}"
 		if dop is not None:
 			out += f", bound to user [{user_mention(dop) if type(dop) is int else f'<{dop}>'}]"
@@ -699,15 +684,12 @@ class Mimic(Command):
 			return
 		if reaction not in self.directions and reaction is not None:
 			return
-		guild = message.guild
-		update = self.data.mimics.update
 		mimicdb = bot.data.mimics
 		user = await bot.fetch_user(u_id)
 		mimics = mimicdb.get(user.id, {})
 		for k in tuple(mimics):
 			if not mimics[k]:
 				mimics.pop(k)
-				update(user.id)
 		page = 24
 		last = max(0, len(mimics) - page)
 		if reaction is not None:
@@ -748,7 +730,7 @@ class Mimic(Command):
 		more = len(mimics) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -761,7 +743,6 @@ class MimicSend(Command):
 	no_parse = True
 
 	async def __call__(self, bot, channel, message, user, perm, argv, args, **void):
-		update = bot.data.mimics.update
 		mimicdb = bot.data.mimics
 		mimics = set_dict(mimicdb, user.id, {})
 		prefix = args.pop(0)

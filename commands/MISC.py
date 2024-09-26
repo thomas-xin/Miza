@@ -1,7 +1,7 @@
 # Make linter shut up lol
 if "common" not in globals():
-	import common
-	from common import *
+	import misc.common as common
+	from misc.common import *
 print = PRINT
 
 import csv, knackpy
@@ -231,7 +231,7 @@ class CS_num2val(Command):
 			length = 4
 		else:
 			length = await bot.eval_math(" ".join(args[1:]))
-		return css_md(str(num_to_tsc_value(int(args[0], 0), length)))
+		return css_md(as_str(num_to_tsc_value(int(args[0], 0), length)))
 
 
 class CS_val2num(Command):
@@ -242,7 +242,7 @@ class CS_val2num(Command):
 	rate_limit = 1
 
 	async def __call__(self, bot, args, user, **void):
-		return css_md(str(tsc_value_to_num(args[0])))
+		return css_md(as_str(tsc_value_to_num(args[0])))
 
 
 class CS_hex2xml(Command):
@@ -321,7 +321,6 @@ class CS_npc(Command):
 	usage = "<query> <condensed(-c)>?"
 	example = ("cs_npc misery",)
 	flags = "c"
-	no_parse = True
 	rate_limit = 2
 
 	async def __call__(self, bot, args, flags, **void):
@@ -360,8 +359,7 @@ class CS_npc(Command):
 	# usage = "<query> <condensed(-c)>?"
 	# example = ("cs_oob key",)
 	# flags = "c"
-	# no_parse = True
-	# rate_limit = 2
+	# # rate_limit = 2
 
 	# async def __call__(self, args, flags, **void):
 		# lim = ("c" not in flags) * 40 + 20
@@ -399,7 +397,6 @@ class CS_mod(Command):
 	description = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
 	usage = "<query>"
 	example = ("cs_mod critter",)
-	no_parse = True
 	rate_limit = (3, 7)
 
 	async def __call__(self, channel, user, args, **void):
@@ -429,10 +426,10 @@ class CS_Database(Database):
 	name = "cs_database"
 	no_file = True
 
-	async def __call__(self, **void):
-		entity_list.update()
-		# tsc_list.update()
-		douclub.update()
+	# async def __call__(self, **void):
+	# 	entity_list.update()
+	# 	# tsc_list.update()
+	# 	douclub.update()
 
 
 class Wav2Png(Command):
@@ -456,9 +453,9 @@ class Wav2Png(Command):
 		fn = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
 		ts = ts_us()
 		ext = "png" if name == "wav2png" else "wav"
-		dest = f"cache/&{ts}." + ext
+		dest = f"{TEMP_PATH}/&{ts}." + ext
 		w2p = "wav2png" if name == "wav2png" else "png2wav"
-		args = [python, w2p + ".py", url, "../" + dest]
+		args = [python, w2p + ".py", url, dest]
 		async with discord.context_managers.Typing(channel):
 			print(args)
 			proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL)
@@ -526,7 +523,7 @@ class SpectralPulse(Command):
 		n1 = name + ".mp4"
 		n2 = name + ".png"
 		ts = ts_us()
-		dest = f"cache/&{ts}"
+		dest = f"{TEMP_PATH}/&{ts}"
 		fn1 = dest + ".mp4"
 		fn2 = dest + ".png"
 		args = [
@@ -583,210 +580,6 @@ class BTD6Paragon(Command):
 		if not args:
 			raise ArgumentError("Input string is empty.")
 		return "\xad" + paragon_calc.parse(args)
-
-
-class DeviantArt(Command):
-	server_only = True
-	name = ["DASubscribe"]
-	min_level = 2
-	description = "Subscribes to a DeviantArt Gallery, reposting links to all new posts."
-	usage = "<action(add|remove)>? <url> <reversed(-r)>?"
-	flags = "raed"
-	rate_limit = 4
-
-	async def __call__(self, argv, flags, channel, guild, bot, **void):
-		data = bot.data.deviantart
-		update = bot.data.deviantart.update
-		if not argv:
-			assigned = data.get(channel.id, ())
-			if not assigned:
-				return ini_md(f"No currently subscribed DeviantArt Galleries for {sqr_md(channel)}.")
-			if "d" in flags:
-				data.pop(channel.id, None)
-				return css_md(f"Successfully removed all DeviantArt Gallery subscriptions from {sqr_md(channel)}.")
-			return f"Currently subscribed DeviantArt Galleries for {sqr_md(channel)}:{ini_md(iter2str(assigned, key=lambda x: x['user']))}"
-		urls = await bot.follow_url(argv, images=False, allow=True)
-		if not urls:
-			raise ArgumentError("Please input a valid URL.")
-		url = urls[0]
-		if "deviantart.com" not in url:
-			raise ArgumentError("Please input a DeviantArt Gallery URL.")
-		# Parse DeviantArt gallery URls
-		url = url[url.index("deviantart.com") + 15:]
-		spl = url.split("/")
-		user = spl[0]
-		if spl[1] != "gallery":
-			raise ArgumentError("Only Gallery URLs are supported.")
-		content = spl[2].split("&", 1)[0]
-		folder = no_md(spl[-1].split("&", 1)[0])
-		# Gallery may be an ID or "all"
-		try:
-			content = int(content)
-		except (ValueError, TypeError):
-			if content in (user, "all"):
-				content = user
-			else:
-				raise TypeError("Invalid Gallery type.")
-		if content in self.data.get(channel.id, {}):
-			raise KeyError(f"Already subscribed to {user}: {folder}")
-		if "d" in flags:
-			try:
-				data.get(channel.id).pop(content)
-			except KeyError:
-				raise KeyError(f"Not currently subscribed to {user}: {folder}")
-			else:
-				if channel.id in data and not data[channel.id]:
-					data.pop(channel.id)
-				return css_md(f"Successfully unsubscribed from {sqr_md(user)}: {sqr_md(folder)}.")
-		set_dict(data, channel.id, {}).__setitem__(content, {"user": user, "type": "gallery", "reversed": ("r" in flags), "entries": {}})
-		update(channel.id)
-		out = f"Successfully subscribed to {sqr_md(user)}: {sqr_md(folder)}"
-		if "r" in flags:
-			out += ", posting in reverse order"
-		return css_md(out + ".")
-
-
-class UpdateDeviantArt(Database):
-	name = "deviantart"
-
-	async def processPart(self, found, c_id):
-		bot = self.bot
-		try:
-			channel = await bot.fetch_channel(c_id)
-		except (LookupError, discord.NotFound):
-			self.data.pop(c_id, None)
-			return
-		try:
-			assigned = self.data.get(c_id)
-			if assigned is None:
-				return
-			embs = deque()
-			for content in assigned:
-				if content not in found:
-					continue
-				items = found[content]
-				entries = assigned[content]["entries"]
-				new = tuple(items)
-				orig = tuple(entries)
-				# O(n) comparison
-				if assigned[content].get("reversed", False):
-					it = reversed(new)
-				else:
-					it = new
-				for i in it:
-					if i not in entries:
-						entries[i] = True
-						self.update(c_id)
-						home = "https://www.deviantart.com/" + items[i][2]
-						emb = discord.Embed(
-							colour=discord.Colour(1),
-							description="*🔔 New Deviation from " + items[i][2] + " 🔔*\n" + items[i][0],
-						).set_image(url=items[i][1]).set_author(name=items[i][2], url=home, icon_url=items[i][3])
-						embs.append(emb)
-				for i in orig:
-					if i not in items:
-						entries.pop(i)
-						self.update(c_id)
-		except:
-			print(found)
-			print_exc()
-		else:
-			bot.send_embeds(channel, embs)
-
-	async def fetch_gallery(self, folder, username):
-		base = "https://www.deviantart.com/_napi/da-user-profile/api/gallery/contents?username="
-		# "all" galleries require different URL options
-		if type(folder) is str:
-			f_id = "&all_folder=true&mode=oldest"
-		else:
-			f_id = "&folderid=" + str(folder)
-		url = base + username + f_id
-		# Binary search algorithm to improve search time for entire galleries to O(log n)
-		maxitems = 2147483647
-		r = 0
-		t = utc()
-		found = {}
-		futs = deque()
-		page = 24
-		# Begin with quaternary search (powers of 4) to estimate lowest power of 2 greater than or equal to gallery page count
-		with suppress(StopIteration):
-			for i in range(2 + int(math.log2(maxitems / page))):
-				curr = 1 << i
-				search = url + f"&offset={curr * page}&limit={page}"
-				futs.append((curr, Request(search, timeout=20, json=True, aio=True)))
-				if i & 1:
-					for x, fut in futs:
-						try:
-							resp = await fut
-						except ConnectionError as ex:
-							if ex.errno >= 500:
-								return
-							raise
-						if resp.get("results"):
-							found[x] = resp
-						if not resp.get("hasMore"):
-							curr = x
-							raise StopIteration
-				r += 1
-		# Once the end has been reached, use binary search to estimate the page count again, being off by at most 8 pages
-		check = 1 << max(0, i - 2)
-		while check > 4:
-			x = curr - check
-			search = url + f"&offset={x * page}&limit={page}"
-			resp = await Request(search, json=True, aio=True)
-			if resp.get("results"):
-				found[x] = resp
-			r += 1
-			if not resp.get("hasMore"):
-				curr = x
-			check >>= 1
-		futs = deque()
-		for i in range(curr + 1):
-			if i not in found:
-				search = url + f"&offset={i * page}&limit={page}"
-				futs.append((i, Request(search, json=True, aio=True)))
-				r += 1
-		for x, fut in futs:
-			resp = await fut
-			if resp.get("results"):
-				found[x] = resp
-		# Collect all page results into a single list
-		results = (resp.get("results", ()) for resp in found.values())
-		items = {}
-		for res in itertools.chain(*results):
-			deviation = res["deviation"]
-			media = deviation["media"]
-			prettyName = media["prettyName"]
-			orig = media["baseUri"]
-			extra = ""
-			token = "?token=" + media["token"][0]
-			# Attempt to find largest available format for media
-			for t in reversed(media["types"]):
-				if t["t"].casefold() == "fullview":
-					if "c" in t:
-						extra = "/" + t["c"].replace("<prettyName>", prettyName)
-						break
-			image_url = orig + extra + token
-			items[deviation["deviationId"]] = (deviation["url"], image_url, deviation["author"]["username"], deviation["author"]["usericon"])
-		return items
-
-	async def __call__(self):
-		t = set_dict(self.__dict__, "time", 0)
-		# Fetches once every 5 minutes
-		if utc() - t < 300:
-			return
-		self.time = inf
-		conts = {i: a[i]["user"] for a in tuple(self.data.values()) for i in a}
-		total = {}
-		attempts, successes = 0, 0
-		for folder, username in conts.items():
-			with tracebacksuppressor:
-				items = await self.fetch_gallery(folder, username)
-				if items:
-					total[folder] = items
-		for c_id in tuple(self.data):
-			csubmit(self.processPart(total, c_id))
-		self.time = utc()
 
 
 def load_douclub():

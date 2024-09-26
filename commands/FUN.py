@@ -1,10 +1,29 @@
 # Make linter shut up lol
 if "common" not in globals():
-	import common
-	from common import *
+	import misc.common as common
+	from misc.common import *
 print = PRINT
 
-import nekos, akinator
+
+# import collections
+# import copy
+# import functools
+# import math
+# import random
+# import akinator
+# import discord
+import nekos
+# import numpy as np
+# from collections import deque
+# from itertools import repeat
+# from random import choice
+# from misc.asyncs import Semaphore, csubmit
+# from misc.smath import b642bytes, bytes2b64, xrand
+# from misc.types import demap, cdict, T, as_str
+# from misc.util import AUTH, Request
+# from misc.common import api, PRINT, Command, get_author, EDIT_SEM, restructure_buttons, recursive_coro, send_with_react
+# print = PRINT
+
 try:
 	from akinator.async_aki import Akinator as async_akinator
 except (AttributeError, ModuleNotFoundError):
@@ -450,7 +469,7 @@ class Text2048(Command):
 						emb.description += "+" + rew
 				emb.set_footer(text=f"Score: {fscore}")
 				# Clear buttons and announce game over message
-				sem = getattr(message, "sem", None)
+				sem = T(message).get("sem")
 				if not sem:
 					try:
 						sem = EDIT_SEM[message.channel.id]
@@ -547,7 +566,7 @@ class Text2048(Command):
 					dis.add((2, -1))
 			for x, y in dis:
 				buttons[y][x].disabled = True
-			sem = getattr(message, "sem", None)
+			sem = T(message).get("sem")
 			if not sem:
 				try:
 					sem = EDIT_SEM[message.channel.id]
@@ -809,7 +828,7 @@ class Snake(Command):
 				grid[game.pos] = 1
 				embed.description = description + snaek_bwain(game)
 				embed.set_footer(text=f"Score: {game.len - 1}")
-				await message.edit(embed=embed)
+				await bot.edit_message(message, embed=embed)
 				tailc = np.sum(game.grid < 0)
 				if tailc >= cells - 1:
 					rew = cells ** 2 / 32 * 4
@@ -933,7 +952,7 @@ class SlotMachine(Command):
 					bets = await bot.as_rewards(bet)
 					bals = await bot.as_rewards(gold)
 					emb.description = f"```css\n[Slot Machine]```{emoj}\nBet: {bets}\nBalance: {bals}"
-					await message.edit(content=None, embed=emb)
+					await bot.edit_message(message, content=None, embed=emb)
 			ctx = Delay(1) if not skip else emptyctx
 			while wheel_order:
 				async with ctx:
@@ -960,9 +979,14 @@ class SlotMachine(Command):
 					bets = await bot.as_rewards(bet)
 					bals = await bot.as_rewards(gold)
 					emb.description = f"{start}[Slot Machine]```{emoj}\nBet: {bets}\nBalance: {bals}{end}"
-					await message.edit(embed=emb)
+					await bot.edit_message(message, embed=emb)
 
 
+sparkle_values = demap(
+	normal="sparkles",
+	rare="sparkles_rare",
+	legendary="sparkles_legendary",
+)
 barter_values = demap(
 	enchanted_book=0,
 	enchanted_iron_boots=1,
@@ -1048,7 +1072,7 @@ class Barter(Command):
 				counts = counts.astype(dtype)
 				await asubmit(np.add.at, totals, ids, counts)
 			mult, amount = divmod(amount, 16777216)
-			if not is_finite(amount):
+			if not isfinite(amount):
 				amount = 0
 			mult = dtype(mult)
 			totals = np.multiply(totals, mult, out=totals)
@@ -1257,7 +1281,7 @@ class Uno(Command):
 					embed=emb,
 					ephemeral=True,
 				))
-				return await message.edit(content=content, embed=embed)
+				return await bot.edit_message(message, content=content, embed=embed)
 			# Already joined
 			hand = hands[players.index(user.id)]
 			s = ""
@@ -1328,7 +1352,7 @@ class Uno(Command):
 					content=s,
 					ephemeral=True,
 				))
-				sem = getattr(message, "sem", None)
+				sem = T(message).get("sem")
 				if not sem:
 					try:
 						sem = EDIT_SEM[message.channel.id]
@@ -1401,7 +1425,8 @@ class Uno(Command):
 				playable = list(playable)
 				self.sort(playable)
 				pickup = max(1, draw)
-				es = await asyncio.gather(*(bot.data.emojis.grab(c + ".png") for c in playable))
+				futs = [bot.data.emojis.grab(c + ".png") for c in playable]
+				es = await gather(*futs)
 				buttons = [cdict(emoji=e, custom_id=f"~{message.id}~{c}", style=3) for c, e in zip(playable, es)]
 				buttons.append(cdict(emoji="📤", name=f"Pickup {pickup}", custom_id=f"~{message.id}~!", style=4))
 
@@ -1484,7 +1509,7 @@ class Uno(Command):
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
 
-				csubmit(message.edit(content=content, embed=embed))
+				csubmit(bot.edit_message(message, content=content, embed=embed))
 				return await interaction_response(
 					bot=bot,
 					message=message,
@@ -1521,7 +1546,7 @@ class Uno(Command):
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
 
-				csubmit(message.edit(content=content, embed=embed))
+				csubmit(bot.edit_message(message, content=content, embed=embed))
 				return await interaction_patch(
 					bot=bot,
 					message=message,
@@ -1557,7 +1582,7 @@ class Uno(Command):
 				t += await bot.data.emojis.emoji_as(card + ".png")
 			embed.clear_fields()
 			embed.add_field(name="Previous turn", value=t or "\xad")
-			csubmit(message.edit(content=content, embed=embed))
+			csubmit(bot.edit_message(message, content=content, embed=embed))
 			return await interaction_patch(
 				bot=bot,
 				message=message,
@@ -1602,7 +1627,7 @@ class Uno(Command):
 						t += await bot.data.emojis.emoji_as(card + ".png")
 					embed.clear_fields()
 					embed.add_field(name="Previous turn", value=t or "\xad")
-					csubmit(message.edit(content=content, embed=embed))
+					csubmit(bot.edit_message(message, content=content, embed=embed))
 					return await interaction_patch(
 						bot=bot,
 						message=message,
@@ -1641,7 +1666,8 @@ class Uno(Command):
 				playable = [c for c in set(hand) if c[1] == last[1]]
 				if playable:
 					self.sort(playable)
-					es = await asyncio.gather(*(bot.data.emojis.grab(c + ".png") for c in playable))
+					futs = [bot.data.emojis.grab(c + ".png") for c in playable]
+					es = await gather(*futs)
 					buttons = [cdict(emoji=e, custom_id=f"~{message.id}~{c}", style=3) for c, e in zip(playable, es)]
 					buttons.append(cdict(emoji="⏭️", name=f"Pass", custom_id=f"~{message.id}~@", style=4))
 
@@ -1656,7 +1682,7 @@ class Uno(Command):
 					embed.clear_fields()
 					embed.add_field(name="Previous turn", value=t or "\xad")
 
-					csubmit(message.edit(content=content, embed=embed))
+					csubmit(bot.edit_message(message, content=content, embed=embed))
 					return await interaction_patch(
 						bot=bot,
 						message=message,
@@ -1691,7 +1717,7 @@ class Uno(Command):
 					t += await bot.data.emojis.emoji_as(card + ".png")
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
-				csubmit(message.edit(content=content, embed=embed))
+				csubmit(bot.edit_message(message, content=content, embed=embed))
 				return await interaction_patch(
 					bot=bot,
 					message=message,
@@ -1701,7 +1727,8 @@ class Uno(Command):
 			playable = [c for c in set(hand) if c == last or last[1] == "X" and c[1] == "Y"]
 			if playable:
 				self.sort(playable)
-				es = await asyncio.gather(*(bot.data.emojis.grab(c + ".png") for c in playable))
+				futs = [bot.data.emojis.grab(c + ".png") for c in playable]
+				es = await gather(*futs)
 				buttons = [cdict(emoji=e, custom_id=f"~{message.id}~{c}", style=3) for c, e in zip(playable, es)]
 				buttons.append(cdict(emoji="⏭️", name=f"Pass", custom_id=f"~{message.id}~@", style=4))
 
@@ -1716,7 +1743,7 @@ class Uno(Command):
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
 
-				csubmit(message.edit(content=content, embed=embed))
+				csubmit(bot.edit_message(message, content=content, embed=embed))
 				return await interaction_patch(
 					bot=bot,
 					message=message,
@@ -1741,7 +1768,7 @@ class Uno(Command):
 			embed.clear_fields()
 			embed.add_field(name="Previous turn", value=t or "\xad")
 
-			csubmit(message.edit(content=content, embed=embed))
+			csubmit(bot.edit_message(message, content=content, embed=embed))
 			return await interaction_patch(
 				bot=bot,
 				message=message,
@@ -1874,80 +1901,120 @@ class React(Command):
 	server_only = True
 	name = ["AutoReact"]
 	min_level = 0
-	description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the trigger. Triggered by a keyword in messages, only applicable to non-command messages. Searches for word if only word characters, any substring if non-word characters are included, or regex if trigger begins and ends with a slash (/)."
-	usage = "<0:react_to>? <1:react_data>? <disable(-d)>?"
-	example = ("react cat 🐱", "react ?d dog", "react remove 1")
-	flags = "aedzf"
-	no_parse = True
+	description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the trigger. Triggered by a keyword in messages, only applicable to non-command messages."
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("view", "add", "remove"),
+				accepts=dict(enable="add", disable="remove", create="add", delete="remove"),
+			),
+			description="Action to perform",
+			example="enable",
+		),
+		keyword=cdict(
+			type="word",
+			description="Keyword(s) to search. Uses words if only word characters, any substring if non-word characters are included, or regex if trigger begins and ends with a slash (/)",
+			example="cat",
+			aliases=["t", "trigger"],
+		),
+		emoji=cdict(
+			type="emoji",
+			description="Emoji to add as reaction. Use `-d --emoji` to remove by emoji rather than keyword",
+			example="🐱",
+		),
+		preprocess=cdict(
+			type="word",
+			description='Preprocess the message, allowing customisation of rules based on USERNAME, NICKNAME, CONTENT and ID; for example, to replicate the conditions for sparkle react, use `--preprocess "{ID}"` and `--keyword "/0{3}$/"`',
+			example="{NICKNAME} {ID}",
+			default="{CONTENT}",
+		),
+	)
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	rate_limit = (4, 6)
 	slash = True
+	default_preprocess = "{CONTENT}"
 
-	async def __call__(self, bot, flags, guild, message, user, name, perm, argv, args, **void):
-		update = self.data.reacts.update
-		following = bot.data.reacts
-		curr = set_dict(following, guild.id, mdict())
-		if type(curr) is not mdict:
-			following[guild.id] = curr = mdict(curr)
-		if not argv:
-			if "d" in flags:
-				if perm < 2:
-					raise self.perm_error(perm, 2, "for command " + name)
-				# This deletes all auto reacts for the current guild
-				if "f" not in flags and len(curr) > 1:
-					raise InterruptedError(css_md(sqr_md(f"WARNING: {len(curr)} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), force=True))
-				if guild.id in following:
-					following.pop(guild.id)
-				return italics(css_md(f"Successfully removed all {sqr_md(len(curr))} auto reacts for {sqr_md(guild)}."))
+	def react_repr(self, func, preprocess, keyword, emoji):
+		s = ""
+		if preprocess and preprocess != self.default_preprocess:
+			s += as_str(func(preprocess))
+		if keyword:
+			if s:
+				s += " 🔀 "
+			s += as_str(func(keyword))
+		if emoji:
+			if s:
+				s += " ➡️ "
+			s += as_str(func(emoji))
+		if not s:
+			s = "all auto reacts"
+		return s
+
+	def as_list(self, main):
+		out = []
+		for preprocess, values in main.items():
+			for keyword, emojis in values.items():
+				out.extend([preprocess, values, emoji] for emoji in emojis)
+		return out
+
+	async def __call__(self, bot, _guild, _user, _message, _name, _perm, mode, keyword, emoji, preprocess, **void):
+		reacts = bot.data.reacts
+		main = reacts.coercedefault(_guild.id, alist, alist())
+		if not keyword and not emoji and mode != "remove":
 			# Set callback message for scrollable list
 			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-			await send_with_reply(
-				None,
-				message,
-				"*```" + "\n" * ("z" in flags) + "callback-fun-react-"
-				+ str(user.id) + "_0"
-				+ "-\nLoading React database...```*",
+			return cdict(
+				content=self.pageinit(_user.id),
 				buttons=buttons,
 			)
-			return
-		if perm < 2:
-			raise self.perm_error(perm, 2, "for command " + name)
-		if "d" in flags:
-			a = full_prune(argv)
-			if a not in curr and a.isnumeric() and int(a) < len(curr):
-				a = tuple(curr)[int(a)]
-				curr.pop(a)
-				update(guild.id)
-				return italics(css_md(f"Removed {sqr_md(a)} from the auto react list for {sqr_md(guild)}."))
-			if a in curr:
-				curr.pop(a)
-				update(guild.id)
-				return italics(css_md(f"Removed {sqr_md(a)} from the auto react list for {sqr_md(guild)}."))
-			raise LookupError(f"{a} is not in the auto react list.")
-		lim = 64 << bot.is_trusted(guild.id) * 2 + 1
-		if curr.count() >= lim:
-			raise OverflowError(f"React list for {guild} has reached the maximum of {lim} items. Please remove an item to add another.")
-		# Limit substring length to 256
-		a = " ".join(args[:-1]).strip()
-		if len(a) > 256:
-			raise OverflowError(f"Search substring too long ({len(a)} > 256).")
-		if not a:
-			raise ValueError("Input string must not be empty.")
-		if len(a) > 2 and a[0] == a[-1] == "/":
-			re.compile(a[1:-1])
-		else:
-			a = full_prune(a)
-		e_id = await bot.id_from_message(args[-1])
-		if isinstance(e_id, int):
-			emoji = await bot.fetch_emoji(e_id)
-		else:
-			emoji = e_id
-		# This reaction indicates that the emoji was valid
-		await message.add_reaction(emoji)
-		curr.append(a, str(emoji))
-		following[guild.id] = mdict({i: curr[i] for i in sorted(curr)})
-		return css_md(f"Added {sqr_md(a)} ➡️ {sqr_md(emoji)} to the auto react list for {sqr_md(guild)}.")
+		if keyword:
+			if len(keyword) > 2 and keyword[0] == keyword[-1] == "/":
+				re.compile(keyword[1:-1])
+			else:
+				keyword = full_prune(keyword)
+		if _perm < 2:
+			raise self.perm_error(_perm, 2, "for command " + _name)
+		if emoji:
+			if isinstance(emoji, int):
+				emoji = await bot.fetch_emoji(emoji)
+				emoji = str(emoji)
+				# This reaction indicates that the emoji was valid
+				await _message.add_reaction(emoji)
+		json_repr = self.react_repr(maybe_json, preprocess, keyword, emoji)
+		sqr_repr = self.react_repr(sqr_md, preprocess, keyword, emoji)
+		if mode == "remove":
+			pops = deque()
+			for i, tup in enumerate(main):
+				if preprocess and preprocess != self.default_preprocess and preprocess != tup[0]:
+					continue
+				if keyword and keyword != tup[1]:
+					continue
+				if emoji and emoji != tup[2]:
+					continue
+				pops.append(i)
+			if not pops:
+				raise LookupError(f"{json_repr} is not in the auto react list.")
+			main.pops(pops)
+			instances = sqr_repr if len(pops) == 1 else f"[{len(pops)}] instances of {sqr_repr}"
+			return italics(css_md(f"Removed {instances} from the auto react list for {sqr_md(_guild)}."))
+		if not emoji:
+			raise ArgumentError("Please input emoji by ID, indicator or URL.")
+		lim = 128 << bot.is_trusted(_guild.id) * 2 + 1
+		if len(main) >= lim:
+			raise OverflowError(f"React list for {_guild} has reached the maximum of {lim} items. Please remove an item to add another.")
+		if not keyword:
+			raise ValueError("Keyword string must not be empty.")
+		# Limit substring length to 512
+		if len(keyword) > 512 or preprocess and len(preprocess) > 512:
+			raise OverflowError(f"Search substring too long ({len(keyword)} > 512).")
+		tup = (preprocess, keyword, emoji)
+		if tup in main:
+			raise FileExistsError(f"{json_repr} is already in the auto react list.")
+		main.append(tup)
+		main.sort()
+		return css_md(f"Added {sqr_repr} to the auto react list for {sqr_md(_guild)}.")
 
 	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
 		u_id, pos = list(map(int, vals.split("_", 1)))
@@ -1956,79 +2023,80 @@ class React(Command):
 		if reaction not in self.directions and reaction is not None:
 			return
 		guild = message.guild
-		user = await bot.fetch_user(u_id)
-		following = bot.data.reacts
-		curr = following.get(guild.id, mdict())
-		page = 16
-		last = max(0, len(curr) - page)
+		main = bot.data.reacts.get(guild.id, [])
+		colour = await bot.get_colour(guild)
 		if reaction is not None:
-			i = self.directions.index(reaction)
-			if i == 0:
-				new = 0
-			elif i == 1:
-				new = max(0, pos - page)
-			elif i == 2:
-				new = min(last, pos + page)
-			elif i == 3:
-				new = last
-			else:
-				new = pos
-			pos = new
-		content = message.content
-		if not content:
-			content = message.embeds[0].description
-		i = content.index("callback")
-		content = "*```" + "\n" * ("\n" in content[:i]) + (
-			"callback-fun-react-"
-			+ str(u_id) + "_" + str(pos)
-			+ "-\n"
-		)
-		if not curr:
-			content += f"No currently assigned auto reactions for {str(guild).replace('`', '')}.```*"
-			msg = ""
+			direction = self.directions.index(reaction)
 		else:
-			content += f"{len(curr)} auto reactions currently assigned for {str(guild).replace('`', '')}:```*"
-			key = lambda x: ", ".join(map(str, x))
-			msg = ini_md(iter2str({f"{i}][{k}": curr[k] for i, k in enumerate(tuple(curr)[pos:pos + page], pos)}, key=key))
-		colour = await self.bot.data.colours.get(worst_url(guild))
-		emb = discord.Embed(
-			description=content + msg,
-			colour=colour,
-		)
-		emb.set_author(**get_author(user))
-		more = len(curr) - pos - page
-		if more > 0:
-			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+			direction = None
+		name = f"auto reactions currently assigned for {str(guild).replace('`', '')}"
+		def key(curr, pos, page):
+			return ini_md("\n".join(sqr_md(i) + ": " + self.react_repr(lambda x: x, p, k, e) for i, (p, k, e) in enumerate(tuple(main)[pos:pos + page], pos)))
+		emb = self.paginate(main, u_id, name=name, pos=pos, page=16, direction=direction, key=key, colour=colour, author=get_author(user))
+		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
 
 class UpdateReacts(Database):
 	name = "reacts"
+	default_preprocess = "{CONTENT}"
+
+	def fixup(self):
+		for g, main in self.items():
+			if isinstance(main, dict):
+				temp = alist()
+				for k, v in main.items():
+					if isinstance(v, list_like):
+						for e in v:
+							temp.append([self.default_preprocess, k, e])
+					else:
+						temp.append([self.default_preprocess, k, v])
+				self[g] = temp
+
+	def preprocess(self, p, message):
+		full = message.content
+		clean = message.clean_content
+		alnum = to_alphanumeric(full)
+		lower = to_alphanumeric(clean).casefold()
+		p = p.replace("{ID}", str(message.id)).replace("{USERNAME}", message.author.name).replace("{NICKNAME}", message.author.display_name)
+		return (
+			p.replace("{CONTENT}", full),
+			p.replace("{CONTENT}", clean),
+			p.replace("{CONTENT}", alnum),
+			p.replace("{CONTENT}", lower),
+		)
+
+	def remove_by_emoji(self, guild, emoji):
+		try:
+			main = self.data[guild.id]
+		except LookupError:
+			return
+		pops = deque()
+		for i, (p, k, e) in enumerate(main):
+			if e == emoji:
+				pops.append(i)
+		main.pops(pops)
 
 	@tracebacksuppressor(ZeroDivisionError)
-	async def _nocommand_(self, text, text2, edit, orig, message, **void):
-		if message.guild is None or not orig:
+	async def _nocommand_(self, text, text2, edit, message, **void):
+		if message.guild is None:
 			return
 		g_id = message.guild.id
 		data = self.data
 		if g_id not in data:
 			return
-		following = self.data[g_id]
-		if type(following) != mdict:
-			following = self.data[g_id] = mdict(following)
-		reacting = {}
-		words = clean_words = None
-		full = clean_full = None
-		for k in following:
-			if not k:
-				following.pop(k, None)
-				continue
-			i = k
+		main = self.data.coerce(g_id, alist, alist())
+		reacting = mdict()
+		cp = None
+		full = clean_full = alnum = lower = None
+		for p, k, e in main:
+			x = y = ()
+			if p != cp:
+				cp = p
+				full, clean_full, alnum, lower = self.preprocess(p, message)
 			if len(k) > 3 and k[0] == k[-1] == "/":
-				x = message.content
-				y = message.clean_content
+				x, y = full, clean_full
 				rk = k[1:-1]
 				if len(k) * len(x) > 4096:
 					tup = await process_image("lambda rk, x, y: ((xi := re.search(rk, x)) and xi.group(), (yi := re.search(rk, y)) and yi.group())", "$", [rk, x, y], timeout=4)
@@ -2038,30 +2106,21 @@ class UpdateReacts(Database):
 				if not k:
 					continue
 			elif is_alphanumeric(k) and " " not in k:
-				if words is None:
-					words = text.split()
-				x = words
-				if clean_words is None:
-					clean_words = text2.split()
-				y = clean_words
+				x = lower.split()
+				y = alnum.casefold().split()
 			else:
-				if full is None:
-					full = full_prune(message.content)
 				x = full
-				if clean_full is None:
-					clean_full = full_prune(message.clean_content)
 				y = clean_full
 			# Store position for each keyword found
 			if k in x:
-				emojis = following[i]
-				reacting[x.index(k) / len(x)] = emojis
+				reacting.add(x.index(k) / len(x), e)
 			elif k in y:
-				emojis = following[i]
-				reacting[y.index(k) / len(y)] = emojis
-		try:
-			guild = await self.bot.fetch_guild(g_id)
-		except discord.Forbidden:
-			self.pop(g_id, None)
+				reacting.add(y.index(k) / len(y), e)
+			else:
+				continue
+			if p != self.default_preprocess:
+				print(g_id, message.author, (p, k, e))
+		guild = message.guild
 		# Reactions sorted by their order of appearance in the message
 		for r in sorted(reacting):
 			for react in reacting[r]:
@@ -2071,18 +2130,15 @@ class UpdateReacts(Database):
 					try:
 						react = await self.bot.fetch_emoji(react, guild=guild)
 					except (LookupError, discord.NotFound):
-						emojis.remove(react)
-						self.update(g_id)
+						self.remove_by_emoji(guild, react)
 						continue
 				try:
 					await message.add_reaction(react)
 				except discord.HTTPException as ex:
 					if "10014" in repr(ex):
-						emojis.remove(react)
-						self.update(g_id)
+						self.remove_by_emoji(guild, react)
 				except LookupError:
-					emojis.remove(react)
-					self.update(g_id)
+					self.remove_by_emoji(guild, react)
 
 
 class Dogpile(Command):
@@ -2124,7 +2180,7 @@ class UpdateDogpiles(Database):
 			return
 		u_id = message.author.id
 		c_id = message.channel.id
-		content = zwremove(message.content)
+		content = readstring(message.content)
 		if not content:
 			return
 		numbers = ()
@@ -2153,7 +2209,7 @@ class UpdateDogpiles(Database):
 		async for m in self.bot.history(message.channel, use_cache=True, limit=100):
 			if m.id == message.id:
 				continue
-			c = zwremove(m.content)
+			c = readstring(m.content)
 			if not c:
 				break
 			if c not in curr and count < 3:
@@ -2207,7 +2263,7 @@ class UpdateDogpiles(Database):
 			return
 		n = None
 		if number and type(number) is not str:
-			n = await self.bot.eval_math(f"predict_next({list(numbers)})")
+			n = await asubmit(predict_next, numbers)
 			if type(n) is int:
 				s = str(n)
 				for i in range(3, len(s) + 1):
@@ -2226,7 +2282,7 @@ class UpdateDogpiles(Database):
 					content = chr(ord(last_number) - add)
 				else:
 					if n is None:
-						n = await self.bot.eval_math(f"predict_next({list(numbers)})")
+						n = await asubmit(predict_next, numbers)
 					if not n:
 						return
 					content = str(n)
@@ -2271,9 +2327,7 @@ class DadJoke(Command):
 					following.pop(guild.id, None)
 			else:
 				curr.pop(mode, None)
-				if curr:
-					following.update(guild.id)
-				else:
+				if not curr:
 					following.pop(guild.id, None)
 			return css_md(f"Disabled dadjoke ({mode}) for {sqr_md(guild)}.")
 		if "e" in flags or "a" in flags:
@@ -2281,10 +2335,9 @@ class DadJoke(Command):
 				following[guild.id] = dict(nick=chance, resp=chance)
 			else:
 				curr[mode] = chance
-				following.update(guild.id)
 			return css_md(f"Set dadjoke ({mode}) for {sqr_md(guild)} to {chance}%.")
 		if curr:
-			key = lambda p: f"{round(p / 100, 1)}%"
+			key = lambda p: f"{round(p, 1)}%"
 			return ini_md(f"Dadjoke nicknaming settings for {sqr_md(guild)}:{iter2str(curr, key=key)}")
 		return ini_md(f'Dadjoke nicknaming is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
 
@@ -2360,7 +2413,7 @@ class Daily(Command):
 			bar = await bot.create_progress_bar(10, field.progress / field.required)
 			rewards = await bot.as_rewards(field.get("diamonds", None), field.get("gold", None))
 			emb.add_field(name=field.name, value=f"{bar} `{floor(field.progress)}/{field.required}`\nRewards: {rewards}", inline=False)
-		return await message.edit(embed=emb)
+		return await bot.edit_message(message, embed=emb)
 
 
 class UpdateDailies(Database):
@@ -2389,7 +2442,6 @@ class UpdateDailies(Database):
 				pops.add(i)
 		if pops:
 			quests.pops(pops)
-			self.update(user.id)
 		return data
 	
 	def add_quest(self, weight, action, name, x=1, gold=0, diamonds=0, **kwargs):
@@ -2465,7 +2517,7 @@ class UpdateDailies(Database):
 		if user.id == self.bot.id or self.bot.is_blacklisted(user.id):
 			return ()
 		xp = self.bot.data.users.get_xp(user)
-		if not is_finite(xp):
+		if not isfinite(xp):
 			return ()
 		level = self.bot.data.users.xp_to_level(xp)
 		quests = alist()
@@ -2485,13 +2537,12 @@ class UpdateDailies(Database):
 		data = self.get(user)
 		quests = data["quests"]
 		for i in range(min(5, len(quests))):
-			quest = quests[i]
+			quest = T(quests).coerce(i, cdict)
 			if quest.action == action:
 				if callable(value):
 					value(quest)
 				else:
 					quest.progress += value
-				self.update(user.id)
 
 	async def valid_message(self, message):
 		user = message.author
@@ -2499,11 +2550,11 @@ class UpdateDailies(Database):
 		self.progress_quests(user, "text", get_message_length(message))
 		self.progress_quests(user, "word", get_message_words(message))
 		self.progress_quests(user, "url", len(message.attachments) + len(message.embeds) + len(find_urls(message.content)))
-		if getattr(message, "reference", None):
+		if T(message).get("reference"):
 			self.progress_quests(user, "reply")
 		
 		def progress_channel(quest):
-			channels = quest.setdefault("channels", set())
+			channels = T(quest).coercedefault("channels", set, set())
 			channels.add(message.channel.id)
 			quest.progress = len(channels)
 
@@ -2520,7 +2571,7 @@ class UpdateDailies(Database):
 			self.progress_quests(user, "command")
 
 			def progress_category(quest):
-				if quest.catg == command.catg.casefold():
+				if quest.catg == command.category.casefold():
 					quest.progress += 1
 
 			self.progress_quests(user, "category", progress_category)
@@ -2542,95 +2593,112 @@ class UpdateDailies(Database):
 			self.progress_quests(message.author, "reacted")
 
 
-class Wallet(Command):
-	name = ["Level", "Bal", "Balance", "Trial"]
-	description = "Shows the target users' wallet."
-	usage = "<user>*"
-	flags = "t"
-	example = ("bal", "wallet @Miza")
+class Premium(Command):
+	name = ["Level", "Bal", "Balance", "Wallet"]
+	description = "Shows the target users' wallet, and their premium subscription status (if applicable)."
+	schema = cdict(
+		user=cdict(
+			type="user",
+			description="User to view",
+			example="668999031359537205",
+		),
+		logging=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("none", "auto", "all"),
+			),
+			description='Controls how frequently premium quota usage is logged after commands; "none" disables all logging, "auto" will log at powers of 3 or increments of $1, and "all" will log all usage and associated costs',
+			example="all",
+		),
+	)
 	rate_limit = (3, 4)
 	multi = True
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, bot, name, flags, args, argv, argl, user, guild, channel, **void):
-		if name == "trial" or "t" in flags:
-			premium = bot.premium_level(user, absolute=True)
-			if premium >= 2:
-				raise OverflowError("You already have a registered premium subscription and are permitted to use all features without additional costs.")
-			data = bot.data.users.get(user.id, {})
-			if data.get("trial") and not argv:
-				data.pop("trial", 0)
-				bot.premium_level(user)
-				bot.data.users.update(user.id)
-				return css_md(f"Successfully disabled trial mode for {sqr_md(user)}.")
-			elif data.get("diamonds", 0) < 1:
-				raise PermissionError("Insufficient funds. Requires at least 1 diamond 💎 to activate.")
+	async def __call__(self, bot, _guild, _channel, _message, _perm, _user, user, logging, **void):
+		user = user or _user
+		data = bot.data.users.get(user.id, {})
+		if logging:
+			if user.id != _user.id and not isnan(_perm):
+				raise PermissionError("Modifying settings of other users is not permitted.")
+			if logging == "auto":
+				data.pop("logging", None)
 			else:
-				if argv:
-					key = argv
-					import openai
-					openai.api_key = key
-					resp = openai.Moderation.create(
-						input="lol",
-					)
-					data["openai_key"] = key
-				if data.get("openai_key"):
-					data["trial"] = 3
-					enable_message = (
-						"You now have access to all premium Lv3 features, with cost directly transferred to your OpenAI account. "
-						+ "GPT-4 access is supported even if not available through the key, however such quota debts incurred may be stored and used by other users. "
-						+ "Use this command again with no arguments to disable.\n"
-					)
-				else:
-					data["trial"] = 2
-					enable_message = (
-						"You now have access to all premium Lv2 features, with a quota at the cost of your diamond currency (💎). "
-						+ "It will automatically be disabled when you run out; check your balance using ~wallet.\n"
-					)
-				bot.premium_level(user)
-				bot.data.users.update(user.id)
-				return css_md(
-					f"Successfully enabled trial mode for {sqr_md(user)}.\n"
-					+ enable_message
-					+ f"Be sure to assign an OpenAI key if you would like to fund your own use of Lv3 premium!"
-				)
-		users = await bot.find_users(argl, args, user, guild)
-		if not users:
-			raise LookupError("No results found.")
-		for user in users:
-			data = bot.data.users.get(user.id, {})
-			xp = bot.data.users.get_xp(user)
-			level = bot.data.users.xp_to_level(xp)
-			xp_curr = bot.data.users.xp_required(level)
-			xp_next = bot.data.users.xp_required(level + 1)
-			ratio = (xp - xp_curr) / (xp_next - xp_curr)
-			gold = data.get("gold", 0)
-			diamonds = data.get("diamonds", 0)
-			bar = await bot.create_progress_bar(18, ratio)
-			xp = floor(xp)
-			bal = await bot.as_rewards(diamonds, gold)
-			description = f"{bar}\n`Lv {level}`\n`XP {xp}/{xp_next}`\n{bal}"
-			ingots = data.get("ingots", 0)
-			if ingots:
-				ingot = await bot.data.emojis.emoji_as("gold_ingot.gif")
-				description += f" {ingot} {ingots}"
-			lv = bot.premium_level(user)
-			lv2 = bot.premium_level(user, absolute=True)
-			if lv2 > 0:
-				description += f"\n{bot.name} Premium Supporter Lv{lv2} " + "💎" * lv2
-			elif lv > 0:
-				description += f"\n{bot.name} Trial Supporter Lv{lv} " + "💎" * lv
-			minecraft = data.get("minecraft", 0)
-			if minecraft:
-				items = deque()
-				for i, c in sorted(minecraft.items()):
-					s = await bot.data.emojis.emoji_as(barter_values[i] + ".gif")
-					s += f" {c}"
-					items.append(s)
-				description += "\n" + " ".join(items)
-			url = await self.bot.get_proxy_url(user)
-			bot.send_as_embeds(channel, description, thumbnail=url, author=get_author(user))
+				data["logging"] = logging
+			return italics(css_md(f"Premium quota usage logging for {sqr_md(user)} has been set to {sqr_md(logging)}."))
+		xp = bot.data.users.get_xp(user)
+		level = bot.data.users.xp_to_level(xp)
+		xp_curr = bot.data.users.xp_required(level)
+		xp_next = bot.data.users.xp_required(level + 1)
+		ratio = (xp - xp_curr) / (xp_next - xp_curr)
+		gold = data.get("gold", 0)
+		diamonds = data.get("diamonds", 0)
+		bar = await bot.create_progress_bar(18, ratio)
+		xp = floor(xp) if isfinite(xp) else xp
+		bal = await bot.as_rewards(diamonds, gold)
+		description = f"{bar}\n`Lv {level}`\n`XP {xp}/{xp_next}`\n{bal}"
+		ingots = data.get("ingots", 0)
+		if ingots:
+			ingot = await bot.data.emojis.emoji_as("gold_ingot.gif")
+			description += f" {ingot} {ingots}"
+		lv = bot.premium_level(user)
+		lv2 = bot.premium_level(user, absolute=True)
+		if lv2 > 5:
+			lv2 = 5
+		if lv2 > 0:
+			description += f"\n{bot.name} Premium Supporter Lv{lv2} " + "💎" * lv2
+		elif lv > 0:
+			description += f"\n{bot.name} Trial Supporter Lv{lv} " + "💎" * lv
+		nc = "\n"
+		if data.get("payg") and data.get("usages"):
+			totals = {}
+			c = mpf(0)
+			for tup in data["usages"]:
+				t = str(tup[1]) + ":" + str(tup[2])
+				v = mpf(tup[-1])
+				try:
+					totals[t] += v
+				except KeyError:
+					totals[t] = v
+				c += v
+			description += f"\nPremium invoice pending: `${c}`: {ini_md(iter2str(totals))}"
+			nc = " "
+		elif data.get("credit"):
+			c = data["credit"]
+			q = round(mpf(c) * 1000)
+			description += f"\nPremium credit remaining: `{q}` (`${c}`)"
+		else:
+			premium = bot.premium_context(user, _guild)
+			premium.require(0)
+			freebies = T(data).coerce("freebies", list, [])
+			freelim = bot.premium_limit(premium.value)
+			q = max(0, freelim - len(freebies))
+			c = mpf(q) / 1000
+			if freebies:
+				s = f", next refresh {time_repr(86400 + freebies[0])}"
+			else:
+				s = ""
+			description += f"\nPremium credit remaining: `{q}` (`${c}`){s}"
+		description += f"{nc}Premium logging mode: `{data.get('logging', 'auto')}`"
+		sparkles = data.get("sparkles", 0)
+		if sparkles:
+			items = deque()
+			for i, c in sorted(sparkles.items()):
+				s = await bot.data.emojis.emoji_as(sparkle_values[i] + ".gif")
+				s += f" {c}"
+				items.append(s)
+			description += "\n" + " ".join(items)
+		minecraft = data.get("minecraft", 0)
+		if minecraft:
+			items = deque()
+			for i, c in sorted(minecraft.items()):
+				s = await bot.data.emojis.emoji_as(barter_values[i] + ".gif")
+				s += f" {c}"
+				items.append(s)
+			description += "\n" + " ".join(items)
+		url = await self.bot.get_proxy_url(user)
+		bot.send_as_embeds(_channel, description, thumbnail=url, author=get_author(user), reference=_message)
 
 	join_cache = {}
 
@@ -2651,7 +2719,7 @@ class Wallet(Command):
 
 
 class Shop(Command):
-	name = ["Upgrade", "Premium", "Premiums", "UpgradeServer"]
+	name = ["Upgrade", "UpgradeServer"]
 	description = "Displays the shop system, or purchases an item."
 	usage = "<item>?"
 	example = ("shop", "shop upgrade_server", "upgrade_server")
@@ -2755,9 +2823,7 @@ class Shop(Command):
 						bot.data.trusted[guild.id] = {None}
 					elif count < 2:
 						bot.data.premiums[user.id]["gl"].discard(guild.id)
-						bot.data.premiums.update(user.id)
 						bot.data.trusted[guild.id].discard(user.id)
-						bot.data.trusted.update(guild.id)
 						await message.channel.send(f"```{sqr_md(guild)} has been removed from your promoted server list.```", reference=message)
 						return
 					else:
@@ -2783,6 +2849,18 @@ class Shop(Command):
 class Cat(ImagePool, Command):
 	name = ["🐱", "Gato", "Meow", "Kitty", "Kitten"]
 	description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it. Be sure to check out ⟨WEBSERVER⟩/cats!"
+	schema = cdict(
+		embed=cdict(
+			type="bool",
+			description="Whether to send the message as an embed",
+			default=True,
+		),
+		code=cdict(
+			type="integer",
+			description="HTTP status code to display an image from https://http.cat",
+			example="404",
+		),
+	)
 	database = "cats"
 	slash = True
 	http_nums = {
@@ -2815,12 +2893,12 @@ class Cat(ImagePool, Command):
 			url = d["file" if x == 1 and alexflipnote_key else "url"]
 		return url
 
-	async def __call__(self, bot, channel, flags, argv, message, **void):
-		if argv.isnumeric() and int(argv) in self.http_nums:
-			url = f"https://http.cat/{int(argv)}"
-			self.bot.send_as_embeds(channel, image=url, reference=message)
-			return
-		return await super().__call__(bot, channel, flags, message)
+	async def __call__(self, bot, embed, code, **void):
+		if code:
+			assert code in self.http_nums, f"http.cat does not have status code {code}."
+			url = f"https://http.cat/{code}"
+			return await super().send(url, embed=embed)
+		return await super().__call__(bot=bot, embed=embed)
 
 
 class Dog(ImagePool, Command):
@@ -2981,7 +3059,6 @@ class ImageSearch(ImagePool, Command):
 			for url in images:
 				if url not in data:
 					data.add(url)
-					self.bot.data.imagepools.update(file)
 			return images
 
 		if file not in self.bot.data.imagepools.finished:
@@ -3037,7 +3114,6 @@ class Giphy(ImagePool, Command):
 			for url in images:
 				if url not in data:
 					data.add(url)
-					self.bot.data.imagepools.update(file)
 			return images
 
 		if file not in self.bot.data.imagepools.finished:
@@ -3061,7 +3137,6 @@ class Rickroll(Command):
 	description = "Generates a link that embeds a thumbnail, but redirects to a separate YouTube video once played."
 	usage = "<thumbnail>? <video>?"
 	example = ("rickroll https://i.ytimg.com/kJQP7kiw5Fk/maxresdefault.jpg", "rickroll https://i.ytimg.com/kJQP7kiw5Fk/maxresdefault.jpg https://www.youtube.com/watch?v=wDgQdr8ZkTw")
-	no_parse = True
 	rate_limit = (6, 9)
 	ephemeral = True
 
@@ -3261,7 +3336,7 @@ class RPS(Command):
 			+ response
 		)
 		emb.set_author(**get_author(user))
-		csubmit(message.edit(embed=emb))
+		csubmit(bot.edit_message(message, embed=emb))
 		await bot.ignore_interaction(message)
 
 
@@ -3272,7 +3347,6 @@ class UpdateRPS(Database):
 class HOW(Command):
 	description = ":3"
 	rate_limit = (0, 1)
-	no_parse = True
 	ephemeral = True
 
 	def __call__(self, channel, message, **void):
@@ -3293,9 +3367,33 @@ HEADERS = {
 def _parse_response(response):
 	if response == '{["completion" => "KO - UNAUTHORIZED"]}':
 		return {"completion": "KO - UNAUTHORIZED"}
-	return json.loads(",".join(response.replace("=>", ":").split("(", 1)[-1:])[:-1])
-async_akinator.parse_response = lambda self, response: _parse_response(response)
-akinator.Akinator.parse_response = lambda self, response: _parse_response(response)
+	return orjson.loads(",".join(response.replace("=>", ":").split("(", 1)[-1:])[:-1])
+async def _auto_get_region(self, lang, theme):
+	server_regex = regexp(r"""[{"translated_theme_name":".*?","urlWs":"https:\/\/srv[0-9]+\.akinator\.com:[0-9]+\/ws","subject_id":"[0-9]+"}]""")
+	uri = lang + ".akinator.com"
+
+	bad_list = ["https://srv12.akinator.com:9398/ws"]
+	for i in range(3):
+		async with self.client_session.get("https://" + uri) as w:
+			t = await w.text()
+			match = await asubmit(server_regex.search, t)
+
+		if not match:
+			raise ConnectionError("Unable to find active Akinator websocket, please try again later.")
+		parsed = json.loads(match.group().split("'arrUrlThemesToPlay', ")[-1])
+
+		if theme == "c":
+			server = next((i for i in parsed if i["subject_id"] == "1"), None)["urlWs"]
+		elif theme == "a":
+			server = next((i for i in parsed if i["subject_id"] == "14"), None)["urlWs"]
+		elif theme == "o":
+			server = next((i for i in parsed if i["subject_id"] == "2"), None)["urlWs"]
+
+		if server not in bad_list:
+			return {"uri": uri, "server": server}
+	raise TimeoutError
+async_akinator.parse_response = _parse_response
+async_akinator._auto_get_region = _auto_get_region
 
 class Akinator(Command):
 	name = ["Aki"]
@@ -3309,10 +3407,10 @@ class Akinator(Command):
 
 	async def compatible_akinator(self, language, child_mode=False):
 		try:
-			aki = async_akinator(language=akinator.Language.from_str(language), child_mode=child_mode)
+			aki = await asubmit(async_akinator, language=language, child_mode=child_mode)
 			await aki.start_game()
 		except:
-			aki = async_akinator()
+			aki = await asubmit(async_akinator)
 			if not self.session:
 				self.session = aiohttp.ClientSession()
 			try:
@@ -3519,7 +3617,7 @@ class Akinator(Command):
 			bot.data.akinators[aki.signature] = aki
 			aki.__dict__.setdefault("no", set())
 
-		div = 1
+		# div = 1
 		if (aki.progression >= 80 or guess) and not aki.step >= 79 and not win and not guessing:
 			if not aki.guesses:
 				await aki.win()
@@ -3546,7 +3644,7 @@ class Akinator(Command):
 			gold = aki.step * 4
 			bot.data.users.add_gold(user, gold)
 			desc = "+" + await bot.as_rewards(gold)
-			if getattr(aki, "last_guess", None):
+			if T(aki).get("last_guess"):
 				emb.set_image(url=aki.last_guess["absolute_picture_path"])
 			emb.set_thumbnail(url=self.victory_image)
 			callback = "none"
@@ -3564,7 +3662,7 @@ class Akinator(Command):
 				question = f"I'm {round(aki.progression, 2)}% sure it's..."
 			else:
 				question = f"I'm ({round(aki.progression, 1)}%) thinking of..."
-			emb.title = f"Akinator"
+			emb.title = "Akinator"
 			desc = "\xad" + bold(guess["name"]) + "\n" + italics(guess["description"])
 			buttons = [self.buttons[0], self.buttons[4]]
 			if guess.get("absolute_picture_path"):
@@ -3590,7 +3688,7 @@ class Akinator(Command):
 				emb.set_thumbnail(url=self.images[i])
 			buttons = self.buttons
 		if callback == "none":
-			if win and getattr(aki, "last_guess", None):
+			if win and T(aki).get("last_guess"):
 				emb.title = aki.last_guess["name"] + " (" + aki.last_guess["description"] + ")"
 			else:
 				emb.title = "Akinator: Game ended"
@@ -3610,7 +3708,7 @@ class Akinator(Command):
 			+ bar
 		)
 		emb.set_author(**get_author(user))
-		sem = getattr(message, "sem", None)
+		sem = T(message).get("sem")
 		if not sem:
 			try:
 				sem = EDIT_SEM[message.channel.id]
@@ -3630,7 +3728,7 @@ class Akinator(Command):
 			)
 
 
-class UpdateAkinator(Database):
+class UpdateAkinators(Database):
 	name = "akinators"
 	no_file = True
 	no_delete = True
@@ -3648,15 +3746,15 @@ class UpdateAkinator(Database):
 		while self.akinators and t > self.akinators[0].timestamp + 240:
 			self.akinators.popleft()
 		async with self.sem:
-			while len(self.akinators) < 2:
+			while len(self.akinators) < 1:
 				try:
 					aki = await self.bot.commands.akinator[0].compatible_akinator(language="en", child_mode=False)
-				except:
+				except Exception:
 					return
 				self.akinators.append(aki)
 			for k, aki in tuple(self.data.items()):
 				if t > aki.timestamp + 960:
 					self.data.pop(k)
 
-	def __call__(self, **void):
-		return self.ensure_akinators()
+	# def __call__(self, **void):
+	# 	return self.ensure_akinators()

@@ -1,8 +1,22 @@
 #!/usr/bin/python3
 
-import sympy, mpmath, math, time, os, sys, subprocess, psutil, traceback, random
-import collections, itertools, pickle, base64, ast, re
-import sympy.stats, scipy.stats
+import sympy
+import mpmath
+import math
+import time
+import os
+import sys
+import subprocess
+import psutil
+import traceback
+import random
+import collections
+import itertools
+import base64
+import ast
+import re
+import sympy.stats
+import scipy.stats
 import numpy as np
 import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
@@ -320,7 +334,7 @@ def pow(a, b):
 	if isinstance(a, sympy.Integer) and isinstance(a, sympy.Integer):
 		return _pow(a, b)
 	temp = _pow(r_evalf(a, BF_PREC), b)
-	if temp != 0 and math.log10(abs(temp)) > BF_PREC:
+	if l10(temp) > BF_PREC:
 		return temp
 	return _pow(a, b)
 
@@ -339,7 +353,7 @@ def carmichael(n):
 def simplify_recurring(r, prec=100):
 	p, q = r.p, r.q
 	try:
-		temp = _factorint(q, timeout=1)
+		temp = _factorint(q, timeout=2)
 	except subprocess.TimeoutExpired as ex:
 		print(repr(ex))
 		return
@@ -363,10 +377,11 @@ def simplify_recurring(r, prec=100):
 			if f < prec * 16 and divisible(10 ** f - 1, tq):
 				digits = f
 				break
-	if digits > prec * 2:
+	start = max(1, l10(p) - l10(q)) + 2
+	if start + digits > prec * 2:
 		return
 	transient = max(temp.get(2, 0), temp.get(5, 0))
-	s = str(r_evalf(r, transient + digits * 3 + 2))
+	s = str(r_evalf(r, math.ceil(transient + start + digits * 2)))
 	dec = s.split(".", 1)[-1][transient:]
 	if len(dec) < digits * 2:
 		return
@@ -383,7 +398,7 @@ class FakeFloat(sympy.Rational):
 
 	def __new__(cls, p, q=1, r=None):
 		obj = sympy.Expr.__new__(cls)
-		if math.log10(max(abs(p), abs(q))) > BF_PREC:
+		if l10(p) > BF_PREC or l10(q) > BF_PREC:
 			return r_evalf(obj, BF_PREC, chop=True)
 		obj.p, obj.q = p, q
 		r = r or simplify_recurring(obj, prec=BF_PREC)
@@ -411,7 +426,7 @@ def evalf_true(n, prec=100, **void):
 def _print_Fraction(self, expr):
 	if expr.q == 1:
 		return expr.p
-	if math.log10(max(expr.p, expr.q)) > BF_PREC:
+	if l10(expr.p) > BF_PREC or l10(expr.q) > BF_PREC:
 		return r_evalf(expr, BF_PREC, chop=True)
 	if self._settings.get("sympy_integers", False):
 		return "S(%s)/%s" % (expr.p, expr.q)
@@ -420,7 +435,7 @@ def _print_Fraction(self, expr):
 def _pprint_Fraction(self, expr):
 	if expr.q == 1:
 		return self._print_Atom(expr.p)
-	if math.log10(max(expr.p, expr.q)) > BF_PREC:
+	if l10(expr.p) > BF_PREC or l10(expr.q) > BF_PREC:
 		return self._print_Float(r_evalf(expr, BF_PREC, chop=True))
 	p, q = expr.p, expr.q
 	if abs(p) >= 10 and abs(q) >= 10:
@@ -493,34 +508,45 @@ def array(*args, **kwargs):
 		return np.asanyarray(arr, **kwargs)
 	return np.array(args, **kwargs)
 
-def _predict_next(seq):
-	if len(seq) < 2:
-		return
-	if np.min(seq) == np.max(seq):
-		return round_min(seq[0])
-	if len(seq) < 3:
-		return
-	if len(seq) > 4 and all(seq[2:] - seq[1:-1] == seq[:-2]):
-		return round_min(seq[-1] + seq[-2])
-	a = _predict_next(seq[1:] - seq[:-1])
-	if a is not None:
-		return round_min(seq[-1] + a)
-	if len(seq) < 4 or 0 in seq[:-1]:
-		return
-	b = _predict_next(seq[1:] / seq[:-1])
-	if b is not None:
-		return round_min(seq[-1] * b)
+if os.name != "nt":
+	def _predict_next(seq):
+		if len(seq) < 2:
+			return
+		if np.min(seq) == np.max(seq):
+			return seq[0]
+		if len(seq) < 3:
+			return
+		if len(seq) > 4 and all(seq[2:] - seq[1:-1] == seq[:-2]):
+			return seq[-1] + seq[-2]
+		a = _predict_next(seq[1:] - seq[:-1])
+		if a is not None:
+			return seq[-1] + a
+		if len(seq) < 4 or 0 in seq[:-1]:
+			return
+		b = _predict_next(seq[1:] / seq[:-1])
+		if b is not None:
+			return seq[-1] * b
 
-def predict_next(seq, limit=12):
-	seq = np.array(deque(astype(x, mpf) for x in seq), dtype=object)
-	for i in range(min(8, limit), 1 + max(8, min(len(seq), limit))):
-		temp = _predict_next(seq[-i:])
-		if temp is not None:
-			return temp
-	for i in range(min(8, limit) - 1, 3, -1):
-		temp = _predict_next(seq[-i:])
-		if temp is not None:
-			return temp
+	def predict_next(seq, limit=12):
+		"Predicts the next number in a sequence. Works on most combinations of linear, polynomial, exponential and fibonacci equations."
+		seq = np.array(seq, dtype=np.float64)
+		for i in range(min(8, limit), 1 + max(8, min(len(seq), limit))):
+			temp = _predict_next(seq[-i:])
+			if temp is not None:
+				return round_min(temp)
+else:
+	sys.path.append("misc")
+	import accel
+
+	def predict_next(seq, limit=12):
+		"Predicts the next number in a sequence. Works on most combinations of linear, polynomial, exponential and fibonacci equations."
+		seq = list(map(float, seq))
+		if len(seq) > limit:
+			seq = seq[-limit:]
+		try:
+			return round_min(accel.predict_next(seq))
+		except ValueError:
+			return
 
 # Multiple variable limit
 def lim(f, kwargs=None, **_vars):
@@ -772,6 +798,9 @@ def rounder(x):
 	try:
 		if isinstance(x, (int, sympy.Integer)):
 			return x
+		print(x, l10(x), BF_PREC)
+		if l10(x) * 1.25 >= BF_PREC:
+			return x
 		y = int(x)
 		if x == y:
 			return y
@@ -952,8 +981,6 @@ _globals.update({
 	"derive": sympy.diff,
 	"phase": sympy.arg,
 	"ceil": sympy.ceiling,
-	"min": sympy.Min,
-	"max": sympy.Max,
 	"sort": sort,
 	"sorted": sort,
 	"fac": fac,
@@ -1128,6 +1155,20 @@ replacers = {
 
 ftrans = "".maketrans(translators)
 
+def l10(n):
+	if n == 0:
+		return 0
+	try:
+		r = abs(n)
+		m = math.log10(r)
+		if not math.isfinite(m):
+			m = sympy.log(r, 10).p
+	except Exception:
+		return math.nan
+	if math.isnan(m):
+		return math.nan
+	return m
+
 
 # Use more conventional names for non-finite outputs
 
@@ -1164,9 +1205,9 @@ def evalSym(f, prec=64, r=False, variables=None):
 		return ["\n".join(lines)]
 	global BF_PREC
 	random.seed(time.time_ns())
-	BF_PREC = sympy.ceiling(int(prec) * 1.25)
+	BF_PREC = sympy.ceiling(prec * 1.25).p
 	mp.dps = BF_PREC
-	sys.set_int_max_str_digits(max(1024, BF_PREC * 256))
+	sys.set_int_max_str_digits(max(1024, min(2147483647, BF_PREC * 64)))
 	r = int(r)
 	prec = int(prec)
 	y = f
@@ -1178,7 +1219,7 @@ def evalSym(f, prec=64, r=False, variables=None):
 		if "\\" in y:
 			raise SyntaxError
 		f = parser.parse_expr(
-			bf_parse(f),
+			f,
 			local_dict=None,
 			global_dict=env,
 			transformations=sym_tr,
@@ -1187,11 +1228,11 @@ def evalSym(f, prec=64, r=False, variables=None):
 	except SyntaxError:
 		try:
 			f = latex.parse_latex(y)
-		except:
+		except Exception:
 			f = None
 			try:
 				f = latex.parse_latex(f)
-			except:
+			except Exception:
 				pass
 		if not f:
 			raise
@@ -1200,67 +1241,65 @@ def evalSym(f, prec=64, r=False, variables=None):
 		if isinstance(i, (sympy.Number, float, np.floating)):
 			try:
 				f = f.subs(i, rounder(i))
-			except:
+			except Exception:
 				pass
 		elif hasattr(i, "doit"):
 			try:
 				i2 = i.doit()
-			except:
+			except Exception:
 				continue
 			if i == i2 and str(i) == str(i2):
 				continue
 			try:
 				f = f.subs(i, i2)
-			except:
+			except Exception:
 				continue
 	# If the requested expression evaluates to a plot, return it
 	if isinstance(f, Plot) or f is plt or type(f) is str:
 		return (f,)
 	try:
 		f = sympy.simplify(f)
-	except:
+	except Exception:
 		pass
 	# Solve any sums and round off floats when possible
 	for i in sympy.preorder_traversal(f):
-		if isinstance(i, (sympy.Number, float, np.floating)) and i != 0 and math.log10(abs(i)) < BF_PREC:
+		if isinstance(i, (sympy.Number, float, np.floating)) and l10(i) < BF_PREC:
 			try:
 				f = f.subs(i, rounder(i))
-			except:
+			except Exception:
 				pass
-		elif isinstance(f, (sympy.Integer, int, np.integer)) and i != 0 and math.log10(abs(i)) > BF_PREC:
+		elif isinstance(f, (sympy.Integer, int, np.integer)) and l10(i) > BF_PREC:
 			try:
 				f = f.subs(i, sympy.N(f, prec))
-			except:
+			except Exception:
 				pass
 		elif hasattr(i, "doit"):
 			try:
 				i2 = i.doit()
-			except:
+			except Exception:
 				continue
 			if i == i2 and str(i) == str(i2):
 				continue
 			try:
 				f = f.subs(i, i2)
-			except:
+			except Exception:
 				continue
 	# Select list of answers to return based on the desired float precision level
-	if isinstance(f, (str, bool, tuple, list, dict, np.ndarray)):
+	if isinstance(f, (str, bool, tuple, list, dict, np.ndarray, int, sympy.Integer)):
 		return [f]
-	if isinstance(f, (sympy.Float, sympy.Integer, float, int, np.number)):
-		return [f]
-	# if isinstance(f, sympy.Rational) and math.log10(max(f.p, f.q)) > prec and math.log10(f) <= prec:
-	# 	return [f.evalf(prec, chop=True)]
+	if isinstance(f, (sympy.Float, float, np.number)):
+		return [rounder(f)]
 	if prec:
 		try:
 			y = f.evalf(prec, chop=False)
-		except:
+		except Exception:
 			y = f
 		try:
 			e = rounder(y)
 		except TypeError:
 			e = y
 			for i in sympy.preorder_traversal(e):
-				if isinstance(i, (sympy.Float, float, np.floating)) and i != 0 and math.log10(abs(i)) < BF_PREC:
+				if isinstance(i, (sympy.Float, float, np.floating)) and l10(i) < BF_PREC:
 					e = e.subs(i, rounder(i))
 		if r:
 			p = prettyAns(f)
@@ -1269,7 +1308,7 @@ def evalSym(f, prec=64, r=False, variables=None):
 			return [f, p]
 		p = prettyAns(f)
 		f = repr(e)
-		if re.fullmatch(f"-?[0-9]*\.[0-9]*0", f):
+		if re.search(r"-?[0-9]*\.[0-9]*0$", f):
 			return [f.rstrip(".0")]
 		if len(f) > 1 and f[-1].isnumeric() and p.startswith(f[:-1]):
 			return [e]
@@ -1314,16 +1353,16 @@ def procResp(resp):
 	return s
 
 
+esafe = lambda s, binary=False: (d := as_str(s).replace("\n", "\uffff")) and (d.encode("utf-8") if binary else d)
+dsafe = lambda s: s.decode("utf-8").replace("\uffff", "\n")
+
 def evaluate(ts, args):
-	try:
-		if isinstance(args, (str, bytes, memoryview)):
-			args = literal_eval(base64.b64decode(args))
-		resp = evalSym(*args)
-		out = procResp(resp)
-		sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n".encode("utf-8"))
-	except Exception as ex:
-		sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))\n".encode("utf-8"))
-		sys.stdout.buffer.write(f"~print({args},{repr(traceback.format_exc())},sep='\\n',end='')\n".encode("utf-8"))
+	if isinstance(args, (str, bytes, memoryview)):
+		args = literal_eval(base64.b64decode(args))
+	resp = evalSym(*args)
+	out = procResp(resp)
+	resp = esafe(repr(out))
+	sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({resp})\n".encode("utf-8"))
 	sys.stdout.flush()
 
 

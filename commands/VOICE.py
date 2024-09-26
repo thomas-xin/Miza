@@ -1,7 +1,7 @@
 # Make linter shut up lol
 if "common" not in globals():
-	import common
-	from common import *
+	import misc.common as common
+	from misc.common import *
 print = PRINT
 
 try:
@@ -20,6 +20,7 @@ except:
 else:
 	has_ytd = True
 from bs4 import BeautifulSoup
+
 with tracebacksuppressor:
 	import openai
 	import googletrans
@@ -31,7 +32,10 @@ SAMPLE_RATE = 48000
 
 
 # Gets estimated duration from duration stored in queue entry
-e_dur = lambda d: float(d) if type(d) is str else (d if d is not None else 300)
+def e_dur(d):
+	return float(d) if type(d) is str else d if d is not None else 300
+def e_dur_2(e):
+	return min(e_dur(e.get("duration")), e.get("skip_after", inf))
 
 
 # Gets the best icon/thumbnail for a queue entry.
@@ -45,6 +49,8 @@ def get_best_icon(entry):
 			pass
 	try:
 		thumbnails = entry["thumbnails"]
+		if not thumbnails:
+			raise KeyError(thumbnails)
 	except KeyError:
 		try:
 			url = entry["webpage_url"]
@@ -63,7 +69,7 @@ def get_best_icon(entry):
 			entry["thumbnail"] = f"https://i.ytimg.com/vi/{vid}/maxresdefault.jpg"
 			return entry["thumbnail"]
 		if ytdl.bot.is_webserver_url(url):
-			return ytdl.bot.raw_webserver + "/static/mizaleaf.png"
+			return ytdl.bot.webserver + "/static/mizaleaf.png"
 		return url
 	return sorted(thumbnails, key=lambda x: float(x.get("width", x.get("preference", 0) * 4096)), reverse=True)[0]["url"]
 
@@ -187,13 +193,15 @@ def get_best_video(entry, hq=True):
 
 
 # Joins a voice channel and returns the associated audio player.
-async def auto_join(guild, channel, user, bot, preparing=False, vc=None, ignore=False):
+async def auto_join(guild, channel, user, bot, preparing=False, vc=None, ignore=False, message=None):
+	ytdl.bot = bot
+	bot.ytdl = ytdl
 	user = guild._members.get(user.id) or user
 	if not ignore and not getattr(user, "voice", None):
 		g = vc.guild if vc else guild
 		perm = bot.get_perms(user, g)
 		if perm < 1:
-			raise Command.perm_error(Command, perm, 1, f"to remotely operate audio player for {g} without joining voice")
+			raise Command.perm_error(perm, 1, f"to remotely operate audio player for {g} without joining voice")
 	if type(channel) in (str, int):
 		channel = await bot.fetch_channel(channel)
 	if guild.id not in bot.data.audio.players:
@@ -201,7 +209,7 @@ async def auto_join(guild, channel, user, bot, preparing=False, vc=None, ignore=
 			raise LookupError("Unable to find voice channel.")
 		for func in bot.commands.connect:
 			try:
-				await func(user=user, channel=channel, vc=vc)
+				await func(bot=bot, _user=user, _channel=channel, _message=message, vc=vc)
 			except (discord.ClientException, AttributeError):
 				pass
 	try:
@@ -221,20 +229,8 @@ async def disconnect_members(bot, guild, members, channel=None):
 		with suppress(KeyError):
 			auds = bot.data.audio.players[guild.id]
 			await asubmit(auds.kill)
-	futs = (member.move_to(None) for member in members)
-	await asyncio.gather(*futs)
-
-
-# Checks if the user is alone in voice chat (excluding bots).
-def is_alone(auds, user):
-	try:
-		channel = auds.acsi.channel
-	except AttributeError:
-		return True
-	for m in channel.members:
-		if m.id != user.id and not m.bot and m.voice and m.voice.channel.id == channel.id:
-			return False
-	return True
+	futs = [member.move_to(None) for member in members]
+	await gather(*futs)
 
 
 # Replaces youtube search queries in youtube-dl with actual youtube search links.
@@ -266,7 +262,7 @@ lyric_trans = re.compile(
 class CustomAudio(collections.abc.Hashable):
 
 	# Default player settings
-	max_bitrate = 196608
+	max_bitrate = 192000
 	defaults = {
 		"volume": 1,
 		"reverb": 0,
@@ -277,7 +273,7 @@ class CustomAudio(collections.abc.Hashable):
 		"compressor": 0,
 		"chorus": 0,
 		"resample": 0,
-		"bitrate": 131072 / 100,
+		"bitrate": 192000 / 100,
 		"loop": False,
 		"repeat": False,
 		"shuffle": False,
@@ -307,7 +303,22 @@ class CustomAudio(collections.abc.Hashable):
 		self.queue.auds = self
 		self.semaphore = Semaphore(1, 4, rate_limit=1 / 8)
 		self.announcer = Semaphore(1, 1, rate_limit=1 / 3)
-		self.search_sem = Semaphore(1, 1, rate_limit=1)
+		self.search_sem = Semaphore(1, 0, rate_limit=1)
+
+	@classmethod
+	def new(cls, vc, text=None):
+		joining = False
+		if isinstance(vc, int):
+			vc = bot.get_channel(vc)
+		guild = vc.guild
+		if guild.id not in bot.data.audio.players:
+			auds = bot.data.audio.players[guild.id] = cls(text)
+			auds.join(vc)
+		else:
+			auds = bot.data.audio.players[guild.id]
+			if not auds.acsi or auds.acsi.channel != vc:
+				csubmit(auds.move_unmute(auds.acsi, vc))
+		return auds, joining
 
 	def join(self, channel=None):
 		if channel:
@@ -315,7 +326,7 @@ class CustomAudio(collections.abc.Hashable):
 				self.guild = guild = channel.guild
 				if not bot.is_trusted(guild):
 					self.queue.maxitems = 8192
-				bot.data.audio.players[guild.id] = self
+				# bot.data.audio.players[guild.id] = self
 				self.stats.update(bot.data.audiosettings.get(guild.id, {}))
 			self.timeout = utc()
 			return csubmit(self.connect_to(channel))
@@ -323,7 +334,7 @@ class CustomAudio(collections.abc.Hashable):
 	def __str__(self):
 		classname = str(self.__class__).replace("'>", "")
 		classname = classname[classname.index("'") + 1:]
-		return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>: " + "{" + f'"acsi": {self.acsi}, "queue": {len(self.queue)}, "stats": {self.stats}, "source": {self.source}' + "}"
+		return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>: " + "{" + f'"acsi": {self.acsi}, "queue": {len(self.queue)}, "audience": {len(self.audience)}, "stats": {self.stats}, "source": {self.source}' + "}"
 
 	__hash__ = lambda self: self.guild.id
 
@@ -349,6 +360,24 @@ class CustomAudio(collections.abc.Hashable):
 		data.update(dir(self.queue))
 		return data
 
+	@property
+	def audience(self):
+		try:
+			channel = self.acsi.channel
+		except AttributeError:
+			return []
+		return [m for m in channel.members if not m.bot]
+
+	def is_empty(self):
+		return not self.acsi or not self.queue or len(self.audience) < 1
+
+	# Checks if the user is alone in voice chat (excluding bots).
+	def is_alone(self, user):
+		for m in self.audience:
+			if m.id != user.id and not m.bot and m.voice and m.voice.channel.id == self.acsi.channel.id:
+				return False
+		return True
+
 	def has_options(self):
 		stats = self.stats
 		return stats.volume != 1 or stats.reverb != 0 or stats.pitch != 0 or stats.speed != 1 or stats.pan != 1 or stats.bassboost != 0 or stats.compressor != 0 or stats.chorus != 0 or stats.resample != 0
@@ -367,7 +396,7 @@ class CustomAudio(collections.abc.Hashable):
 			if paused:
 				d["paused"] = self.paused
 			if js:
-				d = orjson.dumps(d)
+				d = json_dumps(d)
 				if len(d) > 2097152:
 					d = bytes2zip(d)
 					return d, "dump.zip"
@@ -378,14 +407,14 @@ class CustomAudio(collections.abc.Hashable):
 		return self.stats.speed < 0
 
 	def _speed(self):
-		return abs(self.stats.speed)
+		return abs(self.stats.speed) * 2 ** (self.stats.resample / 12)
 
 	def _epos(self):
 		if not self.fut.done():
 			return (0, 0)
 		pos = self.acsi.pos
 		if not pos[1] and self.queue:
-			dur = e_dur(self.queue[0].get("duration"))
+			dur = e_dur_2(self.queue[0])
 			return min(dur, pos[0]), dur
 		elif pos[1] is None:
 			return (0, 0)
@@ -457,7 +486,7 @@ class CustomAudio(collections.abc.Hashable):
 			else:
 				if src:
 					# Only stop and replace audio source when the next one is buffered successfully and readable
-					self.acsi.play(src, after=self.queue.advance)
+					self.acsi.play(src)
 					self.last_play = utc()
 		else:
 			self.stop()
@@ -479,7 +508,30 @@ class CustomAudio(collections.abc.Hashable):
 		self.next = source
 		source.readable.result(timeout=12)
 		src = source.create_reader(0, auds=self)
-		self.acsi.enqueue(src, after=self.queue.advance)
+		self.acsi.enqueue(src)
+
+	@tracebacksuppressor
+	def check_source(self):
+		if self.source:
+			return
+		try:
+			if not self.bot.audio.run(f"bool(AP.from_guild({self.guild.id}).queue)"):
+				raise IndexError
+			live = self.bot.audio.run(f"AP.from_guild({self.guild.id}).queue[0][0].af.live")
+		except IndexError:
+			return
+		if live:
+			return
+		fn = f"{TEMP_PATH}/audio/" + self.bot.audio.run(f"AP.from_guild({self.guild.id}).queue[0][0].af.file")
+		if not os.path.exists(fn) or not os.path.getsize(fn):
+			return
+		f = AudioFileLink.reload(fn)
+		self.source = f
+
+	@tracebacksuppressor
+	def after(self):
+		self.fut.result(timeout=7)
+		return self.queue.advance()
 
 	# Seeks current song position.
 	def seek(self, pos):
@@ -494,6 +546,8 @@ class CustomAudio(collections.abc.Hashable):
 
 	# Sends a deletable message to the audio player's text channel.
 	def announce(self, *args, aio=False, dump=False, **kwargs):
+		if not self.text:
+			return
 		if self.queue and dump and (len(self.queue) > 1 or self.queue[0].get("skips") != ()):
 			resp, fn = self.get_dump(js=True)
 			f = CompatFile(resp, filename=fn)
@@ -509,9 +563,9 @@ class CustomAudio(collections.abc.Hashable):
 		if self.acsi:
 			with tracebacksuppressor(AttributeError):
 				self.acsi.kill()
-		fut = csubmit(self.bot.audio.asubmit(f"players.pop({self.guild.id},None)"))
+		fut = self.bot.audio.submit(f"AP.players.pop({self.guild.id},None)")
 		if wait:
-			await_fut(fut)
+			fut.result()
 			while self.guild.me.voice:
 				await_fut(self.guild.change_voice_state(channel=None))
 		elif self.guild.me and self.guild.me.voice:
@@ -524,7 +578,7 @@ class CustomAudio(collections.abc.Hashable):
 				reason = css_md(f"🎵 Successfully disconnected from {sqr_md(self.guild)}. 🎵")
 			if reason:
 				self.announce(reason, dump=True, reference=initiator)
-		if remove:
+		if remove and self.channel:
 			self.bot.data.audio.pop(self.channel.id, None)
 
 	# Update event, ensures audio is playing correctly and moves, leaves, or rejoins voice when necessary.
@@ -598,11 +652,12 @@ class CustomAudio(collections.abc.Hashable):
 				await acsi.start()
 				# print(acsi)
 				self.acsi = acsi
-				self.fut.set_result(self.acsi)
 			except Exception as ex:
 				print_exc()
 				self.fut.set_exception(ex)
-		self.queue._init_(auds=self)
+			else:
+				self.queue._init_(auds=self)
+				self.fut.set_result(self.acsi)
 		self.timeout = utc()
 		if channel:
 			self.max_bitrate = channel.bitrate
@@ -634,7 +689,7 @@ class CustomAudio(collections.abc.Hashable):
 			args = []
 		options = deque()
 		# This must be first, else the filter will not initialize properly
-		if not is_finite(stats.compressor):
+		if not isfinite(stats.compressor):
 			options.extend(("anoisesrc=a=.001953125:c=brown", "amerge"))
 		# Reverses song, this may be very resource consuming
 		if self.stats.speed < 0:
@@ -820,7 +875,7 @@ class AudioQueue(alist):
 			raise
 		if self.sem.is_busy():
 			return
-		if not auds.source and self:
+		if self:
 			e = self[0]
 			source = None
 			with self.sem:
@@ -829,12 +884,19 @@ class AudioQueue(alist):
 			if self.sem.is_busy():
 				self.sem.wait()
 			if not source:
-				e["url"] = ""
+				e["invalid"] = True
 				return self.update_load()
-			with self.sem:
-				self.announce_play(e)
-				self.auds.play(source, pos=auds.seek_pos)
+			if source:
+				auds.check_source()
+				if not auds.source or source.stream != auds.source.stream:
+					if self.sem.is_busy():
+						self.sem.wait()
+					with self.sem:
+						self.announce_play(e)
+						self.auds.play(source, pos=auds.seek_pos)
 		if not auds.next and auds.source and len(self) > 1 and not self.sem2.is_busy():
+			if self.sem.is_busy():
+				self.sem.wait()
 			with self.sem:
 				with self.sem2:
 					e = self[1]
@@ -853,7 +915,7 @@ class AudioQueue(alist):
 
 	# Update queue, loading all file streams that would be played soon
 	def update_load(self):
-		self.wait.result()
+		self.wait.result(timeout=30)
 		q = self
 		if q:
 			dels = deque()
@@ -862,7 +924,7 @@ class AudioQueue(alist):
 					break
 				if "file" in e:
 					e.file.ensure_time()
-				if not e.get("url"):
+				if not e.get("url") or e.get("invalid"):
 					if not self.auds.stats.quiet:
 						msg = f"A problem occured while loading {sqr_md(e.name)}, and it has been automatically removed from the queue."
 						if e.get("ex"):
@@ -901,17 +963,22 @@ class AudioQueue(alist):
 			temp = None
 		# If no queue entries found but there is a default playlist assigned, load a random entry from that
 		if not q:
-			if not self.playlist:
-				t = self.bot.data.playlists.get(self.auds.guild.id, ())
-				if t:
-					self.playlist = shuffle(t)
-			if self.playlist:
-				p = self.playlist.pop()
-				e = cdict(p)
-				e.u_id = self.bot.id
-				e.skips = ()
-				ytdl.get_stream(e, asap=2)
-				q.appendleft(e)
+			if self.auds.stats.stay:
+				cnt = inf
+			else:
+				cnt = sum(1 for m in self.acsi.channel.members if not m.bot)
+			if cnt:
+				if not self.playlist:
+					t = self.bot.data.playlists.get(self.auds.guild.id, ())
+					if t:
+						self.playlist = shuffle(t.copy())
+				if self.playlist:
+					p = self.playlist.pop()
+					e = cdict(p)
+					e.u_id = self.bot.id
+					e.skips = ()
+					ytdl.get_stream(e, asap=2)
+					q.appendleft(e)
 		elif temp != self[0]:
 			self.announce_play(self[0])
 		self.update_load()
@@ -931,13 +998,13 @@ class AudioQueue(alist):
 		return self
 
 	# Enqueue items at target position, starting audio playback if queue was previously empty.
-	def enqueue(self, items, position=-1):
+	def enqueue(self, items, position=-1, stride=1):
 		with self.auds.semaphore:
 			if len(items) > self.maxitems:
 				items = astype(items, (list, alist))[:self.maxitems]
 			if not self:
 				self.auds.reset(start=False)
-			if position == -1 or not self:
+			if stride == 1 and (position == -1 or position > len(self) or not self):
 				self.extend(items)
 			else:
 				if position < 1:
@@ -945,17 +1012,32 @@ class AudioQueue(alist):
 				elif position < 2:
 					self.auds.clear_next()
 				self.rotate(-position)
-				self.extend(items)
-				self.rotate(len(items) + position)
+				rotpos = position
+				if stride == 1:
+					self.extend(items)
+					rotpos += len(items)
+				else:
+					temp = alist([None] * (len(items) * abs(stride)))
+					temp[::stride] = items
+					sli = temp.view == None
+					inserts = self[:len(items) * (abs(stride) - 1)]
+					i = -1
+					while not sli[i] or np.sum(sli) > len(inserts):
+						sli[i] = False
+						i -= 1
+					print(len(temp), len(sli), len(inserts))
+					temp.view[sli] = inserts
+					temp = temp.view[temp.view != None]
+					temp = np.concatenate([temp, self[len(items) * (abs(stride) - 1):]])
+					self.fill(temp)
+				self.rotate(rotpos)
 			self.verify()
 			esubmit(self.update_load, timeout=120)
 			return self
 
 
 # runs org2xm on a file, with an optional custom sample bank.
-def org2xm(org, dat=None):
-	# if os.name != "nt":
-	#     raise OSError("org2xm is only available on Windows.")
+def org2xm(org):
 	if not org or not isinstance(org, (bytes, memoryview)):
 		if not is_url(org):
 			raise TypeError("Invalid input URL.")
@@ -967,41 +1049,22 @@ def org2xm(org, dat=None):
 		if org[:4] != b"Org-":
 			raise ValueError("Invalid file header.")
 		data = org
-	# Set compatibility option if file is not of org2 format.
-	compat = data[:6] != b"Org-02"
 	ts = ts_us()
 	# Write org data to file.
-	r_org = "cache/" + str(ts) + ".org"
+	r_org = f"{TEMP_PATH}/" + str(ts) + ".org"
 	with open(r_org, "wb") as f:
 		f.write(data)
-	r_dat = "cache/" + str(ts) + ".dat"
-	orig = False
-	# Load custom sample bank if specified
-	if dat is not None and is_url(dat):
-		dat = verify_url(dat)
-		with open(r_dat, "wb") as f:
-			dat = Request(dat)
-			f.write(dat)
-	else:
-		if type(dat) is bytes and dat:
-			with open(r_dat, "wb") as f:
-				f.write(dat)
-		else:
-			r_dat = "misc/ORG210EN.DAT"
-			orig = True
-	args = ["misc/org2xm", r_org, r_dat]
-	if compat:
-		args.append("c")
-	subprocess.check_output(args)
-	r_xm = f"cache/{ts}.xm"
-	if not os.path.exists(r_xm):
+	args = ["misc/OrgExport", r_org, "48000", "0"]
+	print(args)
+	subprocess.check_output(args, stdin=subprocess.DEVNULL)
+	r_wav = f"{TEMP_PATH}/{ts}.wav"
+	if not os.path.exists(r_wav):
 		raise FileNotFoundError("Unable to locate converted file.")
-	if not os.path.getsize(r_xm):
+	if not os.path.getsize(r_wav):
 		raise RuntimeError("Converted file is empty.")
-	for f in (r_org, r_dat)[:2 - orig]:
-		with suppress():
-			os.remove(f)
-	return r_xm
+	with suppress():
+		os.remove(r_org)
+	return r_wav
 
 def mid2mp3(mid):
 	url = Request(
@@ -1024,29 +1087,31 @@ def mid2mp3(mid):
 			if test == b"d":
 				break
 	ts = ts_us()
-	r_mp3 = f"cache/{ts}.mp3"
+	r_mp3 = f"{TEMP_PATH}/{ts}.mp3"
 	with open(r_mp3, "wb") as f:
 		f.write(Request(f"https://hostfast.onlineconverter.com/file/{fn}/download"))
 	return r_mp3
 
 def png2wav(png):
 	ts = ts_us()
-	r_png = f"cache/{ts}"
-	r_wav = f"cache/{ts}.wav"
-	args = [sys.executable, "png2wav.py", "../" + r_png, "../" + r_wav]
+	r_png = f"{TEMP_PATH}/{ts}"
+	r_wav = f"{TEMP_PATH}/{ts}.wav"
+	args = [sys.executable, "png2wav.py", r_png, r_wav]
 	with open(r_png, "wb") as f:
 		f.write(png)
 	print(args)
 	subprocess.run(args, cwd="misc", stderr=subprocess.PIPE)
 	return r_wav
 
-def ecdc_encode(ecdc, bitrate="24k", name=None, source=None):
+def ecdc_encode(ecdc, bitrate="24k", name=None, source=None, thumbnail=None):
 	if isinstance(ecdc, str):
 		with open(ecdc, "rb") as f:
 			ecdc = f.read()
-	b = await_fut(process_image("ecdc_encode", "$", [ecdc, bitrate, name, source], cap="ecdc", timeout=300))
+	if source and thumbnail and unyt(thumbnail) == unyt(source):
+		thumbnail = None
+	b = await_fut(process_image("ecdc_encode", "$", [ecdc, bitrate, name, source, thumbnail], cap="ecdc", timeout=300))
 	ts = ts_us()
-	out = f"cache/{ts}.ecdc"
+	out = f"{TEMP_PATH}/{ts}.ecdc"
 	with open(out, "wb") as f:
 		f.write(b)
 	return out
@@ -1058,7 +1123,32 @@ def ecdc_decode(ecdc, out=None):
 			ecdc = f.read()
 	b = await_fut(process_image("ecdc_decode", "$", [ecdc, fmt], cap="ecdc", timeout=300))
 	ts = ts_us()
-	out = out or f"cache/{ts}.{fmt}"
+	out = out or f"{TEMP_PATH}/{ts}.{fmt}"
+	with open(out, "wb") as f:
+		f.write(b)
+	return out
+
+async def ecdc_encode_a(ecdc, bitrate="24k", name=None, source=None, thumbnail=None):
+	if isinstance(ecdc, str):
+		with open(ecdc, "rb") as f:
+			ecdc = f.read()
+	if source and thumbnail and unyt(thumbnail) == unyt(source):
+		thumbnail = None
+	b = await process_image("ecdc_encode", "$", [ecdc, bitrate, name, source, thumbnail], cap="ecdc", timeout=300)
+	ts = ts_us()
+	out = f"{TEMP_PATH}/{ts}.ecdc"
+	with open(out, "wb") as f:
+		f.write(b)
+	return out
+
+async def ecdc_decode_a(ecdc, out=None):
+	fmt = out.rsplit(".", 1)[-1] if out else "opus"
+	if isinstance(ecdc, str):
+		with open(ecdc, "rb") as f:
+			ecdc = f.read()
+	b = await process_image("ecdc_decode", "$", [ecdc, fmt], cap="ecdc", timeout=300)
+	ts = ts_us()
+	out = out or f"{TEMP_PATH}/{ts}.{fmt}"
 	with open(out, "wb") as f:
 		f.write(b)
 	return out
@@ -1088,7 +1178,7 @@ class AudioFileLink:
 	dur = None
 	started = False
 
-	def __init__(self, fn, stream=None, wasfile=None):
+	def __init__(self, fn, stream=None, wasfile=None, source=None):
 		self.fn = self.file = fn
 		self.stream = stream
 		self.streaming = Future()
@@ -1098,9 +1188,8 @@ class AudioFileLink:
 		if wasfile:
 			self.readable.set_result(self)
 			self.started = True
-		source = bot.audio.submit(f"!AudioFile({repr(fn)},{repr(stream)},{repr(wasfile)})")
+		bot.audio.run(f"AudioFile({repr(fn)},{repr(stream)},{repr(wasfile)},{repr(source)})")
 		self.assign = deque()
-		# print("Loaded source", source)
 
 	def __getattr__(self, k):
 		if k == "__await__":
@@ -1111,7 +1200,7 @@ class AudioFileLink:
 			pass
 		if not bot.audio:
 			raise AttributeError("Audio client not active.")
-		return bot.audio.submit(f"cache['{self.fn}'].{k}")
+		return bot.audio.run(f"cache['{self.fn}'].{k}")
 
 	def load(self, stream=None, check_fmt=False, force=False, webpage_url=None, live=False, seekable=True, duration=None, asap=True):
 		if stream:
@@ -1124,7 +1213,7 @@ class AudioFileLink:
 		self.live = live
 		self.seekable = seekable
 		self.webpage_url = webpage_url
-		timeout = 48 if asap else 300
+		timeout = 600
 		if not asap:
 			ytdl.download_file(self.webpage_url, fmt="opus")
 			self.started = True
@@ -1135,7 +1224,7 @@ class AudioFileLink:
 			except concurrent.futures.InvalidStateError:
 				pass
 			return
-		bot.audio.submit(f"!cache['{self.fn}'].load(" + ",".join(repr(i) for i in (stream, check_fmt, force, webpage_url, live, seekable, duration, asap)) + ")", timeout=timeout)
+		bot.audio.run(f"cache['{self.fn}'].load(" + ",".join(repr(i) for i in (stream, check_fmt, force, webpage_url, live, seekable, duration, asap)) + ")", timeout=timeout)
 		self.started = True
 		if duration:
 			self.dur = duration
@@ -1146,7 +1235,7 @@ class AudioFileLink:
 
 	def create_reader(self, pos, auds=None):
 		if auds is not None:
-			if auds.paused or abs(auds.stats.speed) < 0.005:
+			if auds.paused or abs(auds.speed) < 0.005:
 				return
 			stats = cdict(auds.stats)
 			stats.max_bitrate = auds.max_bitrate
@@ -1156,19 +1245,33 @@ class AudioFileLink:
 			ident = None
 			options = ()
 		ts = ts_us()
-		bot.audio.submit(f"!cache['{self.fn}'].create_reader({repr(pos)},{repr(ident)},{repr(options)},{ts})")
+		bot.audio.run(f"cache['{self.fn}'].create_reader({repr(pos)},{repr(ident)},{repr(options)},{ts})")
 		return ts
 
 	def duration(self):
 		if not self.dur:
-			self.dur = bot.audio.submit(f"cache['{self.fn}'].duration()")
+			self.dur = bot.audio.run(f"cache['{self.fn}'].duration()")
 		return self.dur
+
+	@classmethod
+	def reload(cls, fn):
+		file = fn.rsplit("/", 1)[-1]
+		try:
+			return ytdl.cache[file]
+		except KeyError:
+			pass
+		if os.path.exists(fn) and os.path.getsize(fn):
+			print("Reloading audio", fn)
+			ytdl.cache[file] = f = cls(file, fn, wasfile=True)
+			return f
 
 	def ensure_time(self):
 		try:
-			return bot.audio.submit(f"cache['{self.fn}'].ensure_time()")
+			return bot.audio.run(f"cache['{self.fn}'].ensure_time()")
 		except KeyError:
 			ytdl.cache.pop(self.fn, None)
+			fn = f"{TEMP_PATH}/audio/" + self.fn
+			esubmit(self.reload, fn)
 
 	def update(self):
 		# Newly loaded files have their duration estimates copied to all queue entries containing them
@@ -1179,10 +1282,10 @@ class AudioFileLink:
 					for e in self.assign:
 						e["duration"] = dur
 					self.assign.clear()
-		return bot.audio.submit(f"cache['{self.fn}'].update()")
+		return bot.audio.run(f"cache['{self.fn}'].update()")
 
 	def destroy(self):
-		bot.audio.submit(f"cache['{self.fn}'].destroy()")
+		bot.audio.run(f"cache['{self.fn}'].destroy()")
 		ytdl.cache.pop(self.fn, None)
 
 	# ctime = 0
@@ -1191,11 +1294,10 @@ class AudioFileLink:
 		# 	self.ctime = utc()
 		# if utc() - self.ctime > 60:
 		# 	return True
-		return self.started and (getattr(self, "loaded", None) or bot.audio.submit(f"cache['{self.fn}'].proc_expired"))
+		return self.started and (getattr(self, "loaded", None) or bot.audio.run(f"cache['{self.fn}'].proc_expired"))
 
 class AudioClientSubInterface:
 
-	afters = None
 	bot = channel = None
 
 	@classmethod
@@ -1208,7 +1310,7 @@ class AudioClientSubInterface:
 		else:
 			auds = None
 		if guild.me and guild.me.voice:
-			c_id = bot.audio.submit(f"getattr(getattr(client.get_guild({guild.id}).voice_client,'channel',None),'id',None)")
+			c_id = bot.audio.run(f"getattr(getattr(client.get_guild({guild.id}).voice_client,'channel',None),'id',None)")
 			if c_id:
 				self = cls(auds)
 				self.guild = guild
@@ -1216,18 +1318,13 @@ class AudioClientSubInterface:
 				bot.audio.clients[guild.id] = self
 				return self
 
-	@classmethod
-	def after(cls, key):
-		cls.ensure_bot(cls)
-		cls.afters[key]()
-
 	_pos = (0, 0)
 	@property
 	def pos(self):
 		try:
 			if not self.auds or not self.auds.vc:
 				raise AttributeError
-			self._pos = self.bot.audio.submit(f"AP.from_guild({self.guild.id}).pos")
+			self._pos = self.bot.audio.run(f"AP.from_guild({self.guild.id}).pos")
 		except AttributeError:
 			pass
 		return self._pos
@@ -1240,8 +1337,6 @@ class AudioClientSubInterface:
 			cls.bot = auds.bot
 		elif not cls.bot:
 			cls.bot = bot
-		if cls.bot:
-			cls.afters = cls.bot.audio.__dict__.setdefault("afters", {})
 
 	def __init__(self, auds, channel=None, reconnect=True):
 		self.ensure_bot(auds)
@@ -1256,13 +1351,13 @@ class AudioClientSubInterface:
 	async def start(self):
 		if self.channel:
 			bot = self.bot
-			await bot.audio.asubmit(f"!await AP.join({self.channel.id})")
+			await bot.audio.asubmit(f"await AP.join({self.channel.id})")
 			bot.audio.clients[self.guild.id] = self
 
 	def __str__(self):
 		classname = str(self.__class__).replace("'>", "")
 		classname = classname[classname.index("'") + 1:]
-		return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>: " + "{" + f'"guild": {self.guild}, "pos": {self.pos}' + "}"
+		return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>: " + "PAUSED " * bool(self.auds.paused) + "{" + f'"guild": {self.guild}, "pos": {self.pos}' + "}"
 
 	def __getattr__(self, k):
 		if k in ("__await__"):
@@ -1273,19 +1368,21 @@ class AudioClientSubInterface:
 			pass
 		if not self.bot.audio:
 			raise AttributeError("Audio client not active.")
-		return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).{k}")
+		return self.bot.audio.run(f"AP.from_guild({self.guild.id}).{k}")
 
-	def enqueue(self, src, after=None):
+	def enqueue(self, src):
 		self.ensure_bot()
 		if src is None:
 			return
 		if self.auds.source:
 			s1 = self.auds.source.stream
 			try:
-				s2 = self.bot.audio.submit(f"AP.from_guild({self.guild.id}).queue[0][0].af.stream")
+				if not self.bot.audio.run(f"bool(AP.from_guild({self.guild.id}).queue)"):
+					raise IndexError
+				s2 = self.bot.audio.run(f"AP.from_guild({self.guild.id}).queue[0][0].af.stream")
 			except IndexError:
 				self.auds.play(self.auds.source, self.auds.pos)
-				s2 = self.bot.audio.submit(f"AP.from_guild({self.guild.id}).queue[0][0].af.stream")
+				s2 = self.bot.audio.run(f"AP.from_guild({self.guild.id}).queue[0][0].af.stream")
 			if s1 != s2:
 				print(f"{self.guild} ({self.guild.id}): ACSI stream mismatch! Attempting fix...")
 				if self.auds.next and s2 == self.auds.next.stream:
@@ -1296,47 +1393,39 @@ class AudioClientSubInterface:
 					self.auds.play(self.auds.source, self.auds.pos)
 					if not self.auds.next:
 						return
-		key = ts_us()
-		if after:
-			self.afters[key] = after
-			return esubmit(self.bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}],after=lambda *args: submit('VOICE.ACSI.after({key})'))")
-		return esubmit(self.bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}])")
+		return esubmit(self.bot.audio.run, f"AP.from_guild({self.guild.id}).enqueue(AP.sources[{repr(src)}],after=lambda *args: interface.submit('VOICE.CustomAudio.new({self.channel.id})[0].after()'))")
 
-	def play(self, src, after=None):
+	def play(self, src):
 		self.ensure_bot()
 		if src is None:
 			return
-		key = ts_us()
-		if after:
-			self.afters[key] = after
-			return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}],after=lambda *args: submit('VOICE.ACSI.after({key})'))")
-		return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}])")
+		return esubmit(self.bot.audio.run, f"AP.from_guild({self.guild.id}).play(AP.sources[{repr(src)}],after=lambda *args: interface.submit('VOICE.CustomAudio.new({self.channel.id})[0].after()'))")
 
 	def connect(self, reconnect=True, timeout=60):
-		return csubmit(self.bot.audio.asubmit(f"!await AP.from_guild({self.guild.id}).connect(reconnect={reconnect},timeout={timeout})"))
+		return csubmit(self.bot.audio.asubmit(f"await AP.from_guild({self.guild.id}).connect(reconnect={reconnect},timeout={timeout})"))
 
 	async def disconnect(self, force=False):
-		await self.bot.audio.asubmit(f"!await AP.from_guild({self.guild.id}).disconnect(force={force})")
+		await self.bot.audio.asubmit(f"await AP.from_guild({self.guild.id}).disconnect(force={force})")
 		self.bot.audio.clients.pop(self.guild.id)
 		self.channel = None
 
 	async def move_to(self, channel=None):
 		if not channel:
 			return await self.disconnect(force=True)
-		await self.bot.audio.asubmit(f"!await AP.from_guild({self.guild.id}).move_to(client.get_channel({channel.id}))")
+		await self.bot.audio.asubmit(f"await AP.from_guild({self.guild.id}).move_to(client.get_channel({channel.id}))")
 		self.channel = channel
 
 	async def listen(self):
 		if self.listening:
 			return
 		self.listening = True
-		await self.bot.audio.asubmit(f"!AP.from_guild({self.guild.id}).listen()")
+		await self.bot.audio.asubmit(f"AP.from_guild({self.guild.id}).listen()")
 
 	async def deafen(self):
 		if not self.listening:
 			return
 		self.listening = False
-		await self.bot.audio.asubmit(f"!AP.from_guild({self.guild.id}).deafen()")
+		await self.bot.audio.asubmit(f"AP.from_guild({self.guild.id}).deafen()")
 
 	def is_connected(self):
 		try:
@@ -1352,14 +1441,14 @@ class AudioClientSubInterface:
 
 	def is_playing(self):
 		try:
-			return self._is_playing()
-		except (AttributeError, TypeError):
+			return self._is_playing(timeout=0.5) or False
+		except (AttributeError, TypeError, T2):
 			return False
 
 ACSI = AudioClientSubInterface
 
 for attr in ("read", "skip", "stop", "pause", "resume", "clear_source", "clear_next", "clear", "kill", "_is_connected", "_is_paused", "_is_playing"):
-	setattr(ACSI, attr, eval("""lambda self: self.bot.audio.submit(f"AP.from_guild({self.guild.id}).""" + f"""{attr.lstrip('_')}()")"""))
+	setattr(ACSI, attr, eval("""lambda self, timeout=None: self.bot.audio.run(f"AP.from_guild({self.guild.id}).""" + f"""{attr.lstrip('_')}()", timeout=timeout)"""))
 
 
 # Manages all audio searching and downloading.
@@ -1393,9 +1482,9 @@ class AudioDownloader:
 		self.searched = Cache(timeout=3600, trash=256)
 		self.semaphore = Semaphore(4, 128)
 		self.download_sem = Semaphore(16, 64, rate_limit=0.5)
-		esubmit(self.update_dl)
 		esubmit(self.setup_pages)
 		esubmit(self.set_cookie)
+		self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
 
 	# Fetches youtube playlist page codes, split into pages of 10 items
 	def setup_pages(self):
@@ -1412,37 +1501,56 @@ class AudioDownloader:
 			self.youtube_base = f"CONSENT=YES+{resp}"
 			self.youtube_x += 1
 
+	@property
 	def youtube_header(self):
 		headers = Request.header()
 		if self.youtube_base:
 			headers["Cookie"] = self.youtube_base + "%03d" % random.randint(0, 999) + ";"
 		return headers
 
-	# Initializes youtube_dl object as well as spotify tokens, every 720 seconds.
-	@tracebacksuppressor
-	def update_dl(self):
-		if utc() - self.lastclear > 720:
-			self.lastclear = utc()
-			self.youtube_dl_x += 1
-			self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
-			self.spotify_x += 1
-			token = await_fut(aretry(Request, "https://open.spotify.com/get_access_token", aio=True, attempts=8, delay=5))
-			self.spotify_header = {"authorization": f"Bearer {orjson.loads(token[:512])['accessToken']}"}
-			self.other_x += 1
+	spothead_sem = Semaphore(10, inf, rate_limit=2)
+	spot_backs = []
+	@property
+	def spotify_header(self):
+		headers = Request.header()
+		backs = shuffle(self.spot_backs)
+		for head in tuple(backs):
+			if utc() + 60 > float(head.accessTokenExpirationTimestampMs) / 1000:
+				self.spot_backs.remove(head)
+			if not head.sem.busy:
+				with head.sem:
+					headers.Authorization = "Bearer " + head.accessToken
+				return headers
+		if not self.spothead_sem.active:
+			with self.spothead_sem:
+				resp = proxy.content_or("https://open.spotify.com/get_access_token", headers=Request.header(), timeout=10)
+		else:
+			with self.spothead_sem:
+				resp = reqs.next().get("https://open.spotify.com/get_access_token", headers=Request.header(), timeout=20)
+		resp.raise_for_status()
+		head = cdict(orjson.loads(resp.content))
+		head.sem = Semaphore(20, 1, rate_limit=5)
+		self.spot_backs.append(head)
+		with head.sem:
+			headers.Authorization = "Bearer " + head.accessToken
+		return headers
 
 	ytd_blocked = Cache(timeout=3600)
 	backup_sem = Semaphore(2, 256, rate_limit=1)
 	# Gets data from yt-download.org, and adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
 	def extract_backup(self, url, video=False):
-		if url in self.ytd_blocked:
-			raise self.ytd_blocked[url]
+		url = verify_url(url)
+		try:
+			ex = self.ytd_blocked[url]
+		except KeyError:
+			pass
+		else:
+			raise ex.__class__(*ex.args)
 		entry = None
-		ourl = url
 		try:
 			with self.backup_sem:
-				url = verify_url(url)
 				if is_url(url) and not is_youtube_url(url):
-					with requests.head(url, headers=Request.header(), stream=True) as resp:
+					with reqs.next().head(url, headers=Request.header(), stream=True, timeout=30) as resp:
 						url = resp.url
 						name = url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
 						ctype = resp.headers.get("Content-Type") or "text/plain"
@@ -1470,9 +1578,25 @@ class AudioDownloader:
 							return d
 					raise TypeError("Unsupported URL.")
 				if ":" in url:
-					url = url.rsplit("/", 1)[-1].split("v=", 1)[-1].split("&", 1)[0]
-				webpage_url = f"https://www.youtube.com/watch?v={url}"
-				if video:
+					vid = url.rsplit("/", 1)[-1].split("v=", 1)[-1].split("?", 1)[0].split("&", 1)[0]
+				entry = None
+				webpage_url = f"https://youtu.be/{vid}"
+				if webpage_url in self.bot.data.ytd:
+					title, stream, duration = self.bot.data.ytd[webpage_url]
+					entry = dict(
+						formats=[dict(
+							abr=256,
+							url=stream,
+						)],
+						duration=duration,
+						title=title,
+						webpage_url=webpage_url,
+					)
+				if entry:
+					pass
+				elif video:
+					if not has_ytd:
+						raise FileNotFoundError(webpage_url)
 					title, stream = yt_download(webpage_url, fmt="mp4", timeout=720)
 					entry = dict(
 						formats=[dict(
@@ -1484,84 +1608,28 @@ class AudioDownloader:
 						webpage_url=webpage_url,
 					)
 				else:
+					if not has_ytd:
+						raise FileNotFoundError(webpage_url)
 					title, stream = yt_download(webpage_url, fmt="mp3", timeout=720)
+					duration = os.path.getsize(stream) / 256000 * 8
+					if os.path.exists(stream) and os.path.getsize(stream):
+						pn, stream = self.bot.as_file(stream, filename=title, rename=vid)
+					self.bot.data.ytd[webpage_url] = (title, stream, duration)
 					entry = dict(
 						formats=[dict(
 							abr=256,
 							url=stream,
 						)],
-						duration=os.path.getsize(stream) / 256000 * 8,
+						duration=duration,
 						title=title,
 						webpage_url=webpage_url,
 					)
 			print("Successfully resolved with yt-download.")
 		except Exception as ex:
-			self.ytd_blocked[ourl] = ex
+			self.ytd_blocked[url] = ex
 			if not entry:
 				raise
 		return entry
-
-	# Returns part of a spotify playlist.
-	def get_spotify_part(self, url):
-		try:
-			d = Request(url, headers=self.spotify_header, json=True)
-		except ConnectionError:
-			d = None
-		if not d:
-			self.update_dl()
-			d = Request(url, headers=self.spotify_header, json=True)
-		return self.export_spotify_part(d)
-
-	async def get_spotify_part_async(self, url):
-		try:
-			d = await Request(url, headers=self.spotify_header, json=True, aio=True)
-		except ConnectionError:
-			d = None
-		if not d:
-			await asubmit(self.update_dl)
-			d = await Request(url, headers=self.spotify_header, json=True, aio=True)
-		return self.export_spotify_part(d)
-
-	def export_spotify_part(self, d):
-		self.spotify_x += 1
-		out = deque()
-		with suppress(KeyError):
-			d = d["tracks"]
-		try:
-			items = d["items"]
-			total = d.get("total", 0)
-		except KeyError:
-			if "type" in d:
-				items = (d,)
-				total = 1
-			else:
-				items = []
-				total = 0
-		for item in items:
-			try:
-				track = item["track"]
-			except KeyError:
-				try:
-					track = item["episode"]
-				except KeyError:
-					if "id" in item:
-						track = item
-					else:
-						continue
-			name = track.get("name", track["id"])
-			artists = ", ".join(a["name"] for a in track.get("artists", []))
-			dur = track.get("duration_ms")
-			if dur:
-				dur /= 1000
-			temp = cdict(
-				name=name,
-				url="ytsearch:" + "".join(c if c.isascii() and c != ":" else "_" for c in f"{name} ~ {artists}"),
-				id=track["id"],
-				duration=dur,
-				research=True,
-			)
-			out.append(temp)
-		return out, total
 
 	# Returns a list of formatted queue entries from a YouTube playlist renderer.
 	def extract_playlist_items(self, items):
@@ -1603,9 +1671,9 @@ class AudioDownloader:
 			try:
 				data = Request(
 					"https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
-					headers=self.youtube_header(),
+					headers=self.youtube_header,
 					method="POST",
-					data=orjson.dumps(dict(
+					data=json_dumps(dict(
 						context=ctx,
 						continuation=token,
 					)),
@@ -1623,9 +1691,9 @@ class AudioDownloader:
 		self.youtube_x += 1
 		data = await Request(
 			"https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
-			headers=self.youtube_header(),
+			headers=self.youtube_header,
 			method="POST",
-			data=orjson.dumps(dict(
+			data=json_dumps(dict(
 				context=ctx,
 				continuation=token,
 			)),
@@ -1671,7 +1739,7 @@ class AudioDownloader:
 	# Returns a full youtube playlist.
 	def get_youtube_playlist(self, p_id):
 		self.youtube_x += 1
-		resp = Request(f"https://www.youtube.com/playlist?list={p_id}", headers=self.youtube_header())
+		resp = Request(f"https://www.youtube.com/playlist?list={p_id}", headers=self.youtube_header)
 		client = {}
 		try:
 			ytcfg = resp[resp.index(b"ytcfg.set"):]
@@ -1742,7 +1810,7 @@ class AudioDownloader:
 			return self.get_soundcloud_likes(url)
 		api = "https://api-v2.soundcloud.com/"
 
-		resp = requests.get(url, headers=Request.header())
+		resp = reqs.next().get(url, headers=Request.header(), timeout=10)
 		resp.raise_for_status()
 		s = resp.text
 		if s[0] == "{" and s[-1] == "}":
@@ -1781,7 +1849,7 @@ class AudioDownloader:
 		if emap:
 			ids = ",".join(map(str, emap))
 			url = f"{api}tracks?ids={ids}&client_id={self.soundcloud_token}"
-			resp = requests.get(url, headers=Request.header())
+			resp = reqs.next().get(url, headers=Request.header(), timeout=10)
 			if not resp.content:
 				resp.raise_for_status()
 			for t, p in zip(resp.json(), emap.values()):
@@ -1802,7 +1870,7 @@ class AudioDownloader:
 		if url.startswith(uapi):
 			uid = url[len(uapi):].split("?", 1)[0]
 		else:
-			resp = requests.get(url, headers=Request.header())
+			resp = reqs.next().get(url, headers=Request.header(), timeout=20)
 			resp.raise_for_status()
 			s = resp.text
 			search = 'content="soundcloud://users:'
@@ -1811,9 +1879,9 @@ class AudioDownloader:
 
 		futs = []
 		entries = []
+		url = f"{api}users/{uid}/likes?client_id={self.soundcloud_token}&limit={lim}"
 		while True:
-			url = f"{api}users/{uid}/likes?client_id={self.soundcloud_token}&limit={lim}"
-			resp = requests.get(url, headers=Request.header())
+			resp = reqs.next().get(url, headers=Request.header(), timeout=20)
 			if not resp.content:
 				resp.raise_for_status()
 			data = resp.json()
@@ -1850,6 +1918,113 @@ class AudioDownloader:
 				break
 		return entries
 
+	# Returns part of a spotify playlist.
+	def get_spotify_part(self, url):
+		resp = reqs.next().get(url, headers=self.spotify_header, timeout=20)
+		if resp.status_code not in range(200, 400):
+			resp = proxy.content_or(url, headers=self.spotify_header, timeout=25)
+			resp.raise_for_status()
+		return self.export_spotify_part(resp.json())
+
+	def export_spotify_part(self, d):
+		self.spotify_x += 1
+		out = deque()
+		with suppress(KeyError):
+			d = d["tracks"]
+		try:
+			items = d["items"]
+			total = d.get("total", 0)
+		except KeyError:
+			if "type" in d:
+				items = (d,)
+				total = 1
+			else:
+				items = []
+				total = 0
+		for item in items:
+			try:
+				track = item["track"]
+			except KeyError:
+				try:
+					track = item["episode"]
+				except KeyError:
+					if "id" in item:
+						track = item
+					else:
+						continue
+			name = track.get("name", track["id"])
+			dur = track.get("duration_ms")
+			if dur:
+				dur /= 1000
+			temp = cdict(
+				name=name,
+				url=f"https://open.spotify.com/track/{track['id']}",
+				icon=sorted(track["album"]["images"], key=lambda di: di.get("height", 0), reverse=True)[0]["url"] if "album" in track and track["album"].get("images") else None,
+				id=track["id"],
+				duration=dur,
+			)
+			out.append(temp)
+		return out, total
+
+	def get_spotify_playlist(self, url):
+		item = url.split("?", 1)[0]
+		# Spotify playlist searches contain up to 100 items each
+		if "playlist" in item:
+			url = item[item.index("playlist"):]
+			url = url[url.index("/") + 1:]
+			key = url.split("/", 1)[0]
+			url = f"https://api.spotify.com/v1/playlists/{key}/tracks?type=track,episode"
+			page = 100
+		# Spotify album searches contain up to 50 items each
+		elif "album" in item:
+			url = item[item.index("album"):]
+			url = url[url.index("/") + 1:]
+			key = url.split("/", 1)[0]
+			url = f"https://api.spotify.com/v1/albums/{key}/tracks?type=track,episode"
+			page = 50
+		# Single track links also supported
+		elif "track" in item:
+			url = item[item.index("track"):]
+			url = url[url.index("/") + 1:]
+			key = url.split("/", 1)[0]
+			url = f"https://api.spotify.com/v1/tracks/{key}"
+			page = 1
+		# Single episode links also supported
+		elif "episode" in item:
+			url = item[item.index("episode"):]
+			url = url[url.index("/") + 1:]
+			key = url.split("/", 1)[0]
+			url = f"https://api.spotify.com/v1/episodes/{key}"
+			page = 1
+		else:
+			raise TypeError("Unsupported Spotify URL.")
+		if page == 1:
+			return self.get_spotify_part(url)[0]
+		search = f"{url}&offset=0&limit={page}"
+		entries, count = self.get_spotify_part(search)
+		if count > page:
+			futs = deque()
+			for curr in range(page, count, page):
+				search = f"{url}&offset={curr}&limit={page}"
+				fut = esubmit(self.get_spotify_part, search)
+				futs.append(fut)
+				time.sleep(0.0625)
+			while futs:
+				entries.extend(futs.popleft().result()[0])
+		v_id = None
+		for x in ("?highlight=spotify:track:", "&highlight=spotify:track:"):
+			if x in url:
+				v_id = url[url.index(x) + len(x):]
+				v_id = v_id.split("&", 1)[0]
+				break
+		if v_id:
+			entries = deque(entries)
+			for i, e in enumerate(entries):
+				if v_id == e.get("id"):
+					entries.rotate(-i)
+					break
+		return entries
+
 	def ydl_errors(self, s):
 		return "this video has been removed" not in s and "private video" not in s and "has been terminated" not in s and ("Video unavailable" not in s or not self.backup_sem.active)
 
@@ -1858,7 +2033,7 @@ class AudioDownloader:
 	@functools.lru_cache(maxsize=64)
 	def extract_audio_video(self, url):
 		title = url.split("?", 1)[0].rsplit("/", 1)[-1].split("#", 1)[0]
-		with reqs.next().get(url, headers=Request.header(), stream=True) as resp:
+		with reqs.next().get(url, headers=Request.header(), stream=True, timeout=30) as resp:
 			resp.raise_for_status()
 			ct = resp.headers.get("Content-Type")
 			if ct == "text/html":
@@ -1937,41 +2112,7 @@ class AudioDownloader:
 					url = resp["url"]
 				except KeyError:
 					url = resp["id"]
-		if is_discord_url(url):
-			title = url.split("?", 1)[0].rsplit("/", 1)[-1]
-			if title.rsplit(".", 1)[-1] in ("ogg", "ts", "webm", "mp4", "avi", "mov"):
-				url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
-				with reqs.next().get(url2, headers=Request.header(), stream=True) as resp:
-					if resp.status_code in range(200, 400):
-						url = url2
-			if "." in title:
-				title = title[:title.rindex(".")]
-			return dict(url=url, name=title, direct=True)
-		try:
-			if self.blocked_yt > utc():
-				raise PermissionError
-			self.youtube_dl_x += 1
-			entries = self.downloader.extract_info(url, download=False, process=True)
-		except Exception as ex:
-			s = str(ex).casefold()
-			if "unsupported url:" in s:
-				out = self.extract_audio_video(url)
-				if out:
-					return out
-				raise
-			elif not isinstance(ex, youtube_dl.DownloadError) or self.ydl_errors(s):
-				if "429" in s:
-					print_exc()
-					self.blocked_yt = utc() + 60
-				if has_ytd:
-					try:
-						entries = self.extract_backup(url)
-					except (TypeError, youtube_dl.DownloadError):
-						raise FileNotFoundError(f"Unable to fetch audio data: {repr(ex)}")
-				else:
-					raise
-			else:
-				raise
+		entries = self.extract_from(url, process=True)
 		if "entries" in entries:
 			entries = entries["entries"]
 		else:
@@ -1980,7 +2121,7 @@ class AudioDownloader:
 		for entry in entries:
 			temp = cdict(
 				name=entry["title"],
-				url=entry["webpage_url"],
+				url=entry.get("webpage_url") or entry["url"],
 				duration=entry.get("duration"),
 				stream=get_best_audio(entry),
 				icon=get_best_icon(entry),
@@ -1993,6 +2134,19 @@ class AudioDownloader:
 					temp.duration = round_min(durstr[0])
 			out.append(temp)
 		return out
+
+	def extract_redgifs(self, url):
+		vid = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
+		if vid.isnumeric():
+			url = f"https://www.redgifs.com/ifr/{vid}"
+			with requests.get(url, headers=Request.header()) as resp:
+				resp.raise_for_status()
+				s = resp.text
+			search = '<link rel="canonical" href="'
+			i = s.index(search)
+			url = s[i + len(search):].split('"', 1)[0]
+			vid = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
+		return f"https://api.redgifs.com/v2/gifs/{vid}/hd.m3u8"
 
 	def extract_alt(self, url):
 		if "dropbox.com" in url and "?dl=0" in url:
@@ -2013,14 +2167,13 @@ class AudioDownloader:
 				vid = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
 			return f"https://i.ytimg.com/vi/{vid}/maxresdefault.jpg"
 		if is_redgifs_url(url):
-			vid = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
-			return f"https://api.redgifs.com/v2/gifs/{vid}/sd.m3u8"
+			return self.extract_redgifs(url)
 		if any(maps((is_discord_url, is_emoji_url, is_youtube_url, is_youtube_stream), url)):
 			return url
 		if is_reddit_url(url):
 			url = url.replace("www.reddit.com", "vxreddit.com")
 		try:
-			resp = reqs.next().get(url, headers=Request.header(), stream=True)
+			resp = reqs.next().get(url, headers=Request.header(), stream=True, timeout=30)
 			resp.raise_for_status()
 		except:
 			print_exc()
@@ -2029,8 +2182,7 @@ class AudioDownloader:
 		head = fcdict(resp.headers)
 		ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
 		if is_redgifs_url(url):
-			vid = url.split("#", 1)[0].split("?", 1)[0].rsplit("/", 1)[-1]
-			return f"https://api.redgifs.com/v2/gifs/{vid}/sd.m3u8"
+			return self.extract_redgifs(url)
 		elif "text/html" in ctype:
 			rit = resp.iter_content(65536)
 			data = next(rit)
@@ -2073,18 +2225,31 @@ class AudioDownloader:
 				return res
 
 	# Extracts audio information from a single URL.
-	def extract_from(self, url):
+	def extract_from(self, url, process=False):
+		o_url = url
+		if url.startswith("https://open.spotify.com/track/"):
+			url = "https://api.spotifydown.com/download/" + url.removeprefix("https://open.spotify.com/track/").split("?", 1)[0].split("/", 1)[0]
+		if url.startswith("https://api.spotifydown.com/download/"):
+			headers = Request.header()
+			headers.update({
+				"Origin": "https://spotifydown.com/",
+				"Referer": "https://spotifydown.com/",
+			})
+			with reqs.next().get(url, headers=headers, timeout=60) as resp:
+				resp.raise_for_status()
+				data = resp.json()
+				return dict(url=o_url, formats=[dict(url=data["link"])], thumbnail=data["metadata"].get("cover"), title=data["metadata"]["title"], direct=True)
 		if is_discord_message_link(url):
 			urls = await_fut(self.bot.follow_url(url))
 			if urls:
 				url = urls[0]
 		if is_discord_attachment(url):
 			title = url.split("?", 1)[0].rsplit("/", 1)[-1]
-			if title.rsplit(".", 1)[-1] in ("ogg", "ts", "webm", "mp4", "avi", "mov"):
-				url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
-				with reqs.next().get(url2, headers=Request.header(), stream=True) as resp:
-					if resp.status_code in range(200, 400):
-						url = url2
+			# if title.rsplit(".", 1)[-1] in ("ogg", "ts", "webm", "mp4", "avi", "mov"):
+			# 	url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
+			# 	with reqs.next().get(url2, headers=Request.header(), stream=True, timeout=30) as resp:
+			# 		if resp.status_code in range(200, 400):
+			# 			url = url2
 			if "." in title:
 				title = title[:title.rindex(".")]
 			return dict(url=url, webpage_url=url, title=title, direct=True)
@@ -2095,21 +2260,23 @@ class AudioDownloader:
 			if url.startswith("https://www.youtube.com/search") or url.startswith("https://www.youtube.com/results"):
 				url = url.split("=", 1)[1].split("&", 1)[0]
 			self.youtube_dl_x += 1
-			resp = self.downloader.extract_info(url, download=False, process=False)
+			resp = self.downloader.extract_info(url, download=False, process=process)
 		except Exception as exc:
 			ex = exc
 			resp = None
 			s = str(ex).casefold()
-			if isinstance(ex, PermissionError) or self.ydl_errors(s):
+			if isinstance(ex, PermissionError) or self.ydl_errors(s) or is_youtube_url(url):
 				if "429" in s:
 					print_exc()
 					self.blocked_yt = utc() + 60
-				if has_ytd and "unsupported url" not in s:
+				if "unsupported url" not in s:
 					try:
 						resp = self.extract_backup(url)
 					except (TypeError, youtube_dl.DownloadError):
-						raise FileNotFoundError(f"Unable to fetch audio data: {repr(ex)}")
-		if resp and not resp.get("direct", False):
+						pass
+				if not resp:
+					raise FileNotFoundError(f"Unable to fetch audio data: {repr(ex)}")
+		if resp and not resp.get("direct", False) and resp.get("extractor") != "RedGifs":
 			if is_redgifs_url(resp.get("webpage_url" or resp.get("url"))):
 				url = resp["webpage_url"]
 			else:
@@ -2128,11 +2295,13 @@ class AudioDownloader:
 			return resp3
 		url = fut2.result()
 		if url:
-			resp["url"] = url
+			resp["formats"] = [dict(url=url)]
 		return resp
 
 	# Extracts info from a URL or search, adjusting accordingly.
 	def extract_info(self, item, count=1, search=False, mode=None):
+		if not item.strip():
+			return
 		if (mode or search) and item[:9] not in ("ytsearch:", "scsearch:", "spsearch:", "bcsearch:") and not is_url(item):
 			if count == 1:
 				c = ""
@@ -2157,7 +2326,7 @@ class AudioDownloader:
 			return self.extract_from(item)
 		if item[:9] == "spsearch:":
 			query = "https://api.spotify.com/v1/search?type=track%2Cshow_audio%2Cepisode_audio&include_external=audio&limit=1&q=" + url_parse(item[9:])
-			resp = reqs.next().get(query, headers=self.spotify_header).json()
+			resp = reqs.next().get(query, headers=self.spotify_header, timeout=20).json()
 			try:
 				track = resp["tracks"]["items"][0]
 				name = track.get("name", track["id"])
@@ -2165,11 +2334,13 @@ class AudioDownloader:
 			except LookupError:
 				return dict(_type="playlist", entries=[])
 			else:
-				item = "ytsearch:" + "".join(c if c.isascii() and c != ":" else "_" for c in f"{name} ~ {artists}")
+				item = f"https://open.spotify.com/track/{track['id']}"
+				# item = f"https://api.spotifydown.com/download/{track['id']}"
+				# item = "ytsearch:" + "".join(c if c.isascii() and c != ":" else "_" for c in f"{name} ~ {artists}")
 				self.spotify_x += 1
 		elif item[:9] == "bcsearch:":
 			query = "https://bandcamp.com/search?q=" + url_parse(item[9:])
-			resp = reqs.next().get(query).content
+			resp = reqs.next().get(query, timeout=20).content
 			try:
 				resp = resp.split(b'<ul class="result-items">', 1)[1]
 				tracks = resp.split(b"<!-- search result type=")
@@ -2203,6 +2374,10 @@ class AudioDownloader:
 		try:
 			page = None
 			output = deque()
+			ecdc = ecdc_exists(item)
+			if ecdc:
+				info = ecdc_info(ecdc)
+				return [cdict(name=info.get("Name"), duration=info.get("Duration"), icon=info.get("Thumbnail"), url=info.Source)]
 			if is_url(item) and discord_expired(item):
 				item = await_fut(bot.renew_attachment(item))
 			elif "youtube.com" in item or "youtu.be/" in item:
@@ -2232,86 +2407,20 @@ class AudioDownloader:
 				with tracebacksuppressor:
 					return self.get_soundcloud_playlist(item)
 			elif regexp("(play|open|api)\\.spotify\\.com").search(item):
-				# Spotify playlist searches contain up to 100 items each
-				if "playlist" in item:
-					url = item[item.index("playlist"):]
-					url = url[url.index("/") + 1:]
-					key = url.split("/", 1)[0]
-					url = f"https://api.spotify.com/v1/playlists/{key}/tracks?type=track,episode"
-					page = 100
-				# Spotify album searches contain up to 50 items each
-				elif "album" in item:
-					url = item[item.index("album"):]
-					url = url[url.index("/") + 1:]
-					key = url.split("/", 1)[0]
-					url = f"https://api.spotify.com/v1/albums/{key}/tracks?type=track,episode"
-					page = 50
-				# Single track links also supported
-				elif "track" in item:
-					url = item[item.index("track"):]
-					url = url[url.index("/") + 1:]
-					key = url.split("/", 1)[0]
-					url = f"https://api.spotify.com/v1/tracks/{key}"
-					page = 1
-				# Single episode links also supported
-				elif "episode" in item:
-					url = item[item.index("episode"):]
-					url = url[url.index("/") + 1:]
-					key = url.split("/", 1)[0]
-					url = f"https://api.spotify.com/v1/episodes/{key}"
-					page = 1
-				else:
-					raise TypeError("Unsupported Spotify URL.")
-				if page == 1:
-					output.extend(self.get_spotify_part(url)[0])
-				else:
-					futs = deque()
-					maxitems = 10000
-					# Optimized searching with lookaheads
-					for i, curr in enumerate(range(0, maxitems, page)):
-						with Delay(0.03125):
-							if curr >= maxitems:
-								break
-							search = f"{url}&offset={curr}&limit={page}"
-							if is_main_thread() or i < 8:
-								fut = esubmit(self.get_spotify_part, search, timeout=90)
-							else:
-								fut = convert_fut(self.get_spotify_part_async(search))
-							print("Sent 1 spotify search.")
-							futs.append(fut)
-							if not (i < 1 or math.log2(i + 1) % 1) or not i & 7:
-								while futs:
-									fut = futs.popleft()
-									res = fut.result()
-									if not i:
-										maxitems = res[1] + page
-									if not res[0]:
-										maxitems = 0
-										futs.clear()
-										break
-									output += res[0]
-					while futs:
-						output.extend(futs.popleft().result()[0])
-					# Scroll to highlighted entry if possible
-					v_id = None
-					for x in ("?highlight=spotify:track:", "&highlight=spotify:track:"):
-						if x in item:
-							v_id = item[item.index(x) + len(x):]
-							v_id = v_id.split("&", 1)[0]
-							break
-					if v_id:
-						for i, e in enumerate(output):
-							if v_id == e.get("id"):
-								output.rotate(-i)
-								break
+				with tracebacksuppressor:
+					return self.get_spotify_playlist(item)
 			# Only proceed if no items have already been found (from playlists in this case)
 			if not len(output):
-				if item in self.ytd_blocked:
-					raise self.ytd_blocked[url]
 				resp = None
 				# Allow loading of files output by ~dump
 				if is_url(item):
 					url = verify_url(item)
+					try:
+						ex = self.ytd_blocked[url]
+					except KeyError:
+						pass
+					else:
+						raise ex.__class__(*ex.args)
 					utest = url.split("?", 1)[0]
 					if utest[-5:] == ".json" or utest[-4:] in (".txt", ".zip"):
 						s = await_fut(self.bot.get_request(url))
@@ -2380,6 +2489,7 @@ class AudioDownloader:
 					else:
 						found = False
 						for entry in entries:
+							temp = None
 							if not found:
 								# Extract full data from first item only
 								try:
@@ -2416,7 +2526,7 @@ class AudioDownloader:
 									except:
 										dur = None
 									url = entry.get("webpage_url", entry.get("url", entry.get("id")))
-									if not url:
+									if not url or entry.get("invalid"):
 										continue
 									temp = {
 										"name": title,
@@ -2426,7 +2536,8 @@ class AudioDownloader:
 									if not is_url(url):
 										if entry.get("ie_key", "").casefold() == "youtube":
 											temp["url"] = f"https://www.youtube.com/watch?v={url}"
-							output.append(cdict(temp))
+							if temp:
+								output.append(cdict(temp))
 				else:
 					# Single item results must contain full data, we take advantage of that here
 					name = resp.get("title") or resp["webpage_url"].rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
@@ -2543,7 +2654,7 @@ class AudioDownloader:
 							title = title[:title.rindex(".")]
 						found = False
 					url = entry.get("webpage_url", entry.get("url", entry.get("id")))
-					if not url:
+					if not url or entry.get("invalid"):
 						continue
 					if entry.get("duration"):
 						dur = float(entry["duration"])
@@ -2557,7 +2668,7 @@ class AudioDownloader:
 		if not out:
 			url = f"https://www.youtube.com/results?search_query={verify_url(query)}"
 			self.youtube_x += 1
-			resp = Request(url, headers=self.youtube_header(), timeout=12)
+			resp = Request(url, headers=self.youtube_header, timeout=12)
 			result = None
 			s = resp
 			with suppress(ValueError):
@@ -2580,7 +2691,7 @@ class AudioDownloader:
 						name = full_prune(entry.name)
 						aname = to_alphanumeric(name)
 						spl = aname.split()
-						if entry.duration < 960 or "extended" in q or "hour" in q or "extended" not in spl and "hour" not in spl and "hours" not in spl:
+						if ("remix" in q or "cover" in q) == ("remix" in spl or "cover" in spl) and (entry.duration < 960 or ("extended" in q or "hour" in q) == ("extended" in spl or "hour" in spl or "hours" in spl)):
 							if fuzzy_substring(aname, q, match_length=False) >= 0.5:
 								high.append(entry)
 								continue
@@ -2622,13 +2733,6 @@ class AudioDownloader:
 		with self.semaphore:
 			try:
 				output = None
-				remote = AUTH.get("remote-servers", ())
-				if 0 and remote:
-					with tracebacksuppressor:
-						addr = choice(remote)
-						resp = requests.get(f"https://{addr}/stat/?api=ytdl&q={urllib.parse.quote_plus(item)}", verify=False)
-						resp.raise_for_status()
-						output = [cdict(e) for e in resp.json()]
 				if not output:
 					output = self.extract(item, force, mode=mode, count=count)
 				self.searched[item] = output
@@ -2641,8 +2745,9 @@ class AudioDownloader:
 	def get_stream(self, entry, video=False, force=False, download=True, callback=None, asap=True):
 		if isinstance(entry, str):
 			entry = dict(url=entry)
-		if not entry.get("url"):
-			raise FileNotFoundError
+		if not entry.get("url") or entry.get("invalid"):
+			print(entry)
+			raise entry.get("ex") or FileNotFoundError
 		try:
 			entry.update(self.searched[entry["url"]][0])
 		except KeyError:
@@ -2657,25 +2762,27 @@ class AudioDownloader:
 		url = unyt(url)
 		h = shash(url)
 		if type(download) is str:
-			fn = "~" + h + download
+			file = "~" + h + download
+			force = 2
 		else:
-			fn = "~" + h + ".opus"
+			file = "~" + h + ".opus"
 		# Use cached file if one already exists
-		if self.cache.get(fn) or not download:
-			if video:
-				entry["video"] = stream
-			else:
-				entry["stream"] = stream
-			entry["icon"] = icon
-			# Files may have a callback set for when they are loaded
-			if callback is not None:
-				esubmit(callback)
-			f = self.cache.get(fn)
-			if f is not None:
+		if force < 2:
+			fn = f"{TEMP_PATH}/audio/" + file
+			f = AudioFileLink.reload(fn)
+			if f:
+				if video:
+					entry["video"] = stream
+				else:
+					entry["stream"] = stream
+				entry["icon"] = icon
+				# Files may have a callback set for when they are loaded
+				if callback is not None:
+					esubmit(callback)
 				# Assign file duration estimate to queue entry
 				# This could be done better, this current implementation is technically not thread-safe
 				try:
-					if not os.path.exists("cache/" + f.file):
+					if not os.path.exists(f"{TEMP_PATH}/audio/" + f.file):
 						raise KeyError
 					entry["file"] = f
 					if f.loaded:
@@ -2685,9 +2792,9 @@ class AudioDownloader:
 					# Touch file to indicate usage
 					f.ensure_time()
 					f.readable.result(timeout=16)
-				except KeyError:
+				except (KeyError, AttributeError):
 					f = None
-			if f or (not force and not download):
+			if f:
 				return f
 		# "none" indicates stream is currently loading
 		if stream == "none" and not force:
@@ -2696,51 +2803,27 @@ class AudioDownloader:
 			entry["video"] = "none"
 		else:
 			entry["stream"] = "none"
-		searched = False
-		# If "research" tag is set, entry does not contain full data and requires another search
-		if "research" in entry:
-			try:
-				self.extract_single(entry)
-				searched = True
-				entry.pop("research", None)
-			except Exception as ex:
-				print_exc()
-				entry.pop("research", None)
-				entry["url"] = ""
-				entry["ex"] = repr(ex)
-				raise
-			else:
-				if video:
-					stream = entry.get("video")
-				else:
-					stream = entry.get("stream")
-				icon = entry.get("icon", None)
-		# If stream is still not found or is a soundcloud audio fragment playlist file, perform secondary youtube-dl search
-		if stream in (None, "none"):
-			data = self.search(entry["url"])
-			if type(data) is str:
-				try:
-					data = evalEX(data)
-				except Exception as ex:
-					entry["url"] = ""
-					entry["ex"] = repr(ex)
-					raise
-			stream = set_dict(data[0], "stream", data[0].url)
-			icon = set_dict(data[0], "icon", data[0].url)
-			entry.update(data[0])
-		if not searched and (stream.startswith("https://cf-hls-media.sndcdn.com/") or expired(stream)):
-			data = self.extract(entry["url"])
-			stream = set_dict(data[0], "stream", data[0].url)
-			icon = set_dict(data[0], "icon", data[0].url)
-			entry.update(data[0])
-		# Otherwise attempt to start file download
 		try:
-			if stream.startswith("ytsearch:") or stream in (None, "none"):
-				self.extract_single(entry, force=True)
+			if expired(stream) or stream.startswith("https://cf-hls-media.sndcdn.com/"):
+				try:
+					self.extract_single(entry, force=True)
+					if entry.get("stream") in (None, "none"):
+						raise
+				except:
+					url = entry.get("url")
+					if not url:
+						raise
+					ecdc = ecdc_exists(url)
+					if not ecdc:
+						raise
+					entry["stream"] = ecdc
+					entry.pop("invalid", None)
+					entry.pop("ex", None)
 				if video:
 					stream = entry.get("video")
 				else:
 					stream = entry.get("stream")
+				icon = get_best_icon(entry) or icon
 				if stream in (None, "none"):
 					raise FileNotFoundError("Unable to locate appropriate file stream.")
 			if video:
@@ -2761,19 +2844,17 @@ class AudioDownloader:
 				self.searched[entry["url"]][0].update(entry)
 			if not download:
 				return entry
-			self.cache[fn] = f = AudioFileLink(fn)
+			self.cache[file] = f = AudioFileLink(file, source=unyt(entry["url"]))
 			if type(download) is str:
 				live = False
 			else:
 				live = not entry.get("duration") or entry["duration"] > 960
 			seekable = not entry.get("duration") or entry["duration"] < inf
 			cf = isnan(entry.get("duration") or nan) or not (stream.startswith("https://cf-hls-media.sndcdn.com/") or is_youtube_stream(stream))
-			if 0:#asap > 1 and not f.proc and live and 960 < (entry.get("duration") or 0) < 4200:
-				esubmit(f.load, check_fmt=cf, webpage_url=entry["url"], live=False, seekable=seekable, duration=entry.get("duration"), asap=False)
 			try:
 				f.load(stream, check_fmt=cf, webpage_url=entry["url"], live=live, seekable=seekable, duration=entry.get("duration"), asap=asap)
 			except:
-				self.cache.pop(fn, None)
+				self.cache.pop(file, None)
 				raise
 			# Assign file duration estimate to queue entry
 			f.assign.append(entry)
@@ -2786,8 +2867,34 @@ class AudioDownloader:
 		except Exception as ex:
 			# Remove entry URL if loading failed
 			print_exc()
-			entry["url"] = ""
+			entry["invalid"] = True
 			entry["ex"] = repr(ex)
+
+	@tracebacksuppressor
+	def complete(self, url, fh):
+		fn = f"{TEMP_PATH}/audio/{fh}"
+		assert os.path.exists(fn)
+		br = ecdc_br(fn)
+		resp = self.search(url)[0]
+		url = unyt(resp["url"])
+		out = ecdc_dir + "!" + shash(url) + "~" + str(br) + ".ecdc"
+		if os.path.exists(out) and os.path.getsize(out):
+			info = ecdc_info(out)
+			if (not resp.get("name") or info.get("Name") == resp["name"]) and (not resp.get("duration") or abs(info.get("Duration", 0) - resp["duration"]) < 1):
+				icon = get_best_icon(resp)
+				if (not icon or icon == info.get("Thumbnail")):
+					return
+		res = ecdc_encode(fn, br, resp["name"], url, get_best_icon(resp))
+		assert os.path.exists(res)
+		try:
+			os.rename(res, out)
+		except (OSError, PermissionError):
+			with open(res, "rb") as f:
+				b = f.read()
+			with open(out, "wb") as f:
+				f.write(b)
+		print("ECDC out:", url, br, res, out)
+		return ecdc_exists(url, exc=True, force=out)
 
 	# Video concatenation algorithm; supports different formats, codecs, resolutions, aspect ratios and framerates
 	def concat_video(self, urls, fmt, start, end, message=None):
@@ -2813,7 +2920,7 @@ class AudioDownloader:
 			data = self.extract_backup(info["url"], video=True)
 			video = info["video"] = get_best_video(data)
 		vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,width,height,avg_frame_rate", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
-		codec, *size, fps = vidinfo.splitlines()
+		codec, *size, fps = vidinfo.splitlines()[:4]
 		size = [int(x) for x in size]
 		w2, h2 = size
 		# FFprobe returns fps as a fraction
@@ -2831,7 +2938,7 @@ class AudioDownloader:
 				end = round_min(min(float(end), 86400))
 				args.extend(("-to", str(end)))
 		args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-an", "-i", "-", "-pix_fmt", "yuv420p", "-crf", "28"))
-		afile = f"cache/-{ts}-.pcm"
+		afile = f"{TEMP_PATH}/-{ts}-.pcm"
 		if hwaccel == "cuda":
 			if fmt == "mp4":
 				args.extend(("-c:v", "h264_nvenc"))
@@ -2842,8 +2949,8 @@ class AudioDownloader:
 			outf = f"{name} +{len(urls) - 1}.{fmt}"
 		else:
 			outf = f"{name}.{fmt}"
-		fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
-		fnv = f"cache/V{ts}~" + outf.translate(filetrans)
+		fn = f"{TEMP_PATH}/\x7f{ts}~" + outf.translate(filetrans)
+		fnv = f"{TEMP_PATH}/V{ts}~" + outf.translate(filetrans)
 		args.append(fnv)
 		print(args)
 		proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
@@ -2889,7 +2996,7 @@ class AudioDownloader:
 					args.extend(("-i", video))
 					# Tell FFmpeg to match fps/frame count as much as possible
 					vf = f"fps={fps}"
-					w1, h1 = map(int, vidinfo.splitlines())
+					w1, h1 = map(int, vidinfo.splitlines()[:2])
 					# If video needs resizing, keep aspect ratio while adding black padding as required
 					if w1 != w2 or h1 != h2:
 						r = min(w2 / w1, h2 / h1)
@@ -2906,7 +3013,7 @@ class AudioDownloader:
 							s = round_min(float(start))
 						if str(end) != "None":
 							e = round_min(min(float(end), 86400))
-						fnv2 = f"cache/V{ts}~2" + outf.translate(filetrans)
+						fnv2 = f"{TEMP_PATH}/V{ts}~2" + outf.translate(filetrans)
 						args = [sys.executable, "misc/lightning.py", video, str(s), str(e), fnv2]
 						print(args)
 						force_kill(proc)
@@ -2929,6 +3036,7 @@ class AudioDownloader:
 							fsize += len(b)
 						# Calculate duration and exact amount of audio samples to use, minimising possibility of desyncs
 						duration = fsize / np.prod(size) / 3 / fps
+					duration = duration or 0
 					amax = round_random(duration * SAMPLE_RATE) * 2 * 2
 					cfn = fut.result()[0]
 					# Write audio to the raw pcm as desired; trim if there is too much, pad with zeros if not enough
@@ -2962,7 +3070,7 @@ class AudioDownloader:
 		args = ["./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"]
 		args.extend(("-i", fnv, "-f", "s16le", "-ac", "2", "-ar", str(SAMPLE_RATE), "-i", afile))
 		ac = "aac" if fmt == "mp4" else "libopus"
-		args.extend(("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", ac, "-b:a", "192k", fn))
+		args.extend(("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", ac, "-b:a", "192000", fn))
 		print(args)
 		proc = psutil.Popen(args, stderr=subprocess.PIPE)
 		with suppress():
@@ -3022,15 +3130,15 @@ class AudioDownloader:
 					enough = True
 			if enough:
 				h = shash(url)
-				fn = "cache/~" + h + ".ts"
-				out2 = "cache/~" + h + ".opus"
+				fn = f"{TEMP_PATH}/audio/~" + h + ".ts"
+				out2 = f"{TEMP_PATH}/audio/~" + h + ".opus"
 				if not os.path.exists(fn):
 					b = await_fut(process_image("ytdl", "$", [urls[0], True], cap="ytdl", timeout=3600))
 					if not os.path.exists(fn) or not os.path.getsize(fn):
 						with open(fn, "wb") as f:
 							f.write(b)
 				h2 = shash(url + ("~S" * silenceremove))
-				out = "cache/~" + h2 + "." + fmt
+				out = f"{TEMP_PATH}/audio/~" + h2 + "." + fmt
 				args = ()
 				if not os.path.exists(out) or not os.path.getsize(out):
 					args = [ffmpeg, "-hide_banner", "-v", "error", "-y", "-vn", "-i", fn, "-map_metadata", "-1"]
@@ -3039,18 +3147,18 @@ class AudioDownloader:
 					if silenceremove:
 						args.extend(("-af", "silenceremove=start_periods=1:start_duration=1:start_threshold=-50dB:start_silence=1:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
 						if fmt == "mp3":
-							args.extend(("-b:a", "196608", out))
+							args.extend(("-b:a", "256000", out))
 						elif fmt == "ogg":
-							args.extend(("-b:a", "196608", "-c:a", "libopus", out))
+							args.extend(("-b:a", "192000", "-c:a", "libopus", out))
 						elif fmt == "wav":
 							args.extend(("-ar", str(SAMPLE_RATE), "-ac", "2", out))
 						elif fmt == "pcm":
 							args.extend(("-f", "s16le", "-ar", str(SAMPLE_RATE), "-ac", "2", out))
 						else:
-							args.extend(("-b:a", "196608", "-c:a", "libopus", out))
+							args.extend(("-b:a", "192000", "-c:a", "libopus", out))
 					else:
 						if fmt == "mp3":
-							args.extend(("-b:a", "196608", out))
+							args.extend(("-b:a", "256000", out))
 						elif fmt == "ogg":
 							args.extend(("-c:a", "copy", out))
 						elif fmt == "wav":
@@ -3071,26 +3179,13 @@ class AudioDownloader:
 						return rename, rename
 					os.rename(out, rename)
 					return rename, rename
-				file = out2.removeprefix("cache/")
-				self.cache[file] = AudioFileLink(file, out2, wasfile=True)
+				file = out2.removeprefix(f"{TEMP_PATH}/audio/")
+				self.cache[out2] = AudioFileLink(file, out2, wasfile=True, source=url)
 				if ecdc:
-					try:
-						dur, bps = get_duration_simple(out)
-					except:
-						print_exc()
-						bps = 196608
-					if not bps:
-						br = 24
-					elif bps < 48000:
-						br = 6
-					elif bps < 96000:
-						br = 12
-					else:
-						br = 24
-						print("BPS:", bps)
-					if not os.path.exists(cachedir + "/ecdc"):
-						os.mkdir(cachedir + "/ecdc")
-					out3 = cachedir + "/ecdc/!" + h + "~" + str(br) + ".ecdc"
+					br = ecdc_br(out)
+					if not os.path.exists(ecdc_dir):
+						os.mkdir(ecdc_dir)
+					out3 = ecdc_dir + "!" + h + "~" + str(br) + ".ecdc"
 					res = self.search(url)
 					if type(res) is str:
 						raise evalex(res)
@@ -3099,19 +3194,19 @@ class AudioDownloader:
 					if not os.path.exists(out3) or not os.path.getsize(out3):
 						with open(out, "rb") as f:
 							b = f.read()
-						fn = ecdc_encode(b, br, name, url)
+						fn = ecdc_encode(b, br, name, url, get_best_icon(info))
 						if os.path.exists(out3):
 							os.remove(out3)
 						try:
 							os.rename(fn, out3)
-						except OSError:
+						except (OSError, PermissionError):
 							with open(fn, "rb") as f:
 								b = f.read()
 							with open(out3, "wb") as f:
 								f.write(b)
 					return out3, name.translate(filetrans) + ".ecdc"
 				if topng:
-					out3 = "cache/~" + h + "." + ofmt
+					out3 = f"{TEMP_PATH}/audio/~" + h + "." + ofmt
 					if not os.path.exists(out3) or not os.path.getsize(out3):
 						args = [python, "wav2png.py", os.path.abspath(out2), "../" + out3]
 						print(args)
@@ -3141,11 +3236,11 @@ class AudioDownloader:
 					outf = f"{info['name']}.{fmt}"
 					outft = outf.translate(filetrans)
 					if child:
-						fn = f"cache/C{ts}~{outft}"
+						fn = f"{TEMP_PATH}/C{ts}~{outft}"
 					else:
-						fn = f"cache/\x7f{ts}~{outft}"
+						fn = f"{TEMP_PATH}/\x7f{ts}~{outft}"
 				if not (vid and info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
-					self.get_stream(info, video=vid, force=True, download=False)
+					self.get_stream(info, video=vid, force=2, download=False)
 				if "yt_live_broadcast" in info["stream"] and "force_finished" in info["stream"]:
 					self.downloader.params["outtmpl"]["default"] = fn
 					self.downloader.download(info["url"])
@@ -3166,8 +3261,8 @@ class AudioDownloader:
 						except:
 							c = 0
 						if c == 1:
-							ft = f"cache/-{ts}-.mp4"
-							with requests.get(video, stream=True) as resp:
+							ft = f"{TEMP_PATH}/-{ts}-.mp4"
+							with reqs.next().get(video, stream=True, timeout=20) as resp:
 								with open(ft, "wb") as f:
 									it = resp.iter_content(262144)
 									try:
@@ -3226,16 +3321,16 @@ class AudioDownloader:
 						t = ts
 						for i, url in enumerate(vst):
 							if codec_map[url] != selcodec:
-								selc, width, height = selcodec.splitlines()
+								selc, width, height = selcodec.splitlines()[:3]
 								t += 1
-								s2, w2, h2 = codec_map[url].splitlines()
+								s2, w2, h2 = codec_map[url].splitlines()[:3]
 								if selc == "av1" or selc.startswith("vp"):
 									container = "webm"
 								elif selc.startswith("h26"):
 									container = "mp4"
 								vst[i] = self.download_file(url, selc, size=((w2, h2), (width, height)), auds=auds, ts=t, container=container, message=message)[0].rsplit("/", 1)[-1]
 					vsc = "\n".join(f"file '{i}'" for i in vst)
-					vsf = f"cache/{ts}~video.concat"
+					vsf = f"{TEMP_PATH}/{ts}~video.concat"
 					with open(vsf, "w", encoding="utf-8") as f:
 						f.write(vsc)
 					args.extend(("-f", "concat"))
@@ -3246,7 +3341,7 @@ class AudioDownloader:
 			else:
 				stream = ast[0]["stream"]
 				# if child and not stream.startswith("https://cf-hls-media.sndcdn.com/"):
-				#     fii = f"cache/{ts}~proxy"
+				#     fii = f"{TEMP_PATH}/{ts}~proxy"
 				#     with tracebacksuppressor:
 				#         stream = proxy_download(stream, fii, timeout=86400)
 				asf = asc = stream
@@ -3310,14 +3405,14 @@ class AudioDownloader:
 				args.extend(("-c:a", "adpcm_ms"))
 				fmt = "wav" if fmt == "adpcm" else "vox"
 				outf = f"{info['name']}.{fmt}"
-				fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
+				fn = f"{TEMP_PATH}/\x7f{ts}~" + outf.translate(filetrans)
 			elif fmt == "ogg":
 				args.extend(("-c:a", "libopus"))
 			elif fmt == "weba":
 				fmt = "webm"
 				args.extend(("-c:a", "libopus"))
 				outf = f"{info['name']}.{fmt}"
-				fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
+				fn = f"{TEMP_PATH}/\x7f{ts}~" + outf.translate(filetrans)
 			elif fmt == "pcm":
 				fmt = "s16le"
 			elif fmt == "mp2":
@@ -3333,7 +3428,7 @@ class AudioDownloader:
 				ac = "1"
 				br = "256"
 				outf = f"{info['name']}.wav"
-				fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
+				fn = f"{TEMP_PATH}/\x7f{ts}~" + outf.translate(filetrans)
 			elif fmt == "mkv":
 				fmt = "matroska"
 			elif fmt == "ts":
@@ -3348,7 +3443,7 @@ class AudioDownloader:
 				args.extend(("-c", "copy", fn))
 			elif container:
 				outf = f"{info['name']}.{container}"
-				fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
+				fn = f"{TEMP_PATH}/\x7f{ts}~" + outf.translate(filetrans)
 				c = "-c:v" if size else "-c"
 				if container == "mkv":
 					container = "matroska"
@@ -3395,7 +3490,7 @@ class AudioDownloader:
 							cfn = fut.result(timeout=600)[0]
 							print(cfn)
 							ress.append(cfn)
-					concf = f"cache/{ts}~concat.txt"
+					concf = f"{TEMP_PATH}/{ts}~concat.txt"
 					with open(concf, "w", encoding="utf-8") as f:
 						for cfn in ress:
 							f.write(f"file '{cfn.split('/', 1)[-1]}'\n")
@@ -3450,9 +3545,9 @@ class AudioDownloader:
 					dur = e_dur(get_duration(fn))
 					if dur < odur - 1:
 						ts += 1
-						fn, fn2 = f"cache/\x7f{ts}~{outft}", fn
+						fn, fn2 = f"{TEMP_PATH}/\x7f{ts}~{outft}", fn
 						times = ceil(odur / dur)
-						loopf = f"cache/{ts - 1}~loop.txt"
+						loopf = f"{TEMP_PATH}/{ts - 1}~loop.txt"
 						with open(loopf, "w", encoding="utf-8") as f:
 							f.write(f"file '{fn2.split('/', 1)[-1]}'\n" * times)
 						args = [
@@ -3482,30 +3577,17 @@ class AudioDownloader:
 					if not os.path.exists(out3) or not os.path.getsize(out3):
 						with open(fn, "rb") as f:
 							b = f.read()
-						try:
-							dur, bps = get_duration_simple(fn)
-						except:
-							print_exc()
-							bps = 196608
-						if not bps:
-							br = 24
-						elif bps < 48000:
-							br = 6
-						elif bps < 96000:
-							br = 12
-						else:
-							br = 24
-							print("BPS:", bps)
+						br = ecdc_br(fn)
 						url = urls[0]
 						res = self.search(url)
 						if type(res) is str:
 							raise evalex(res)
 						info = res[0]
 						name = info.get("name")
-						fn = ecdc_encode(b, br, name, url)
+						fn = ecdc_encode(b, br, name, url, get_best_icon(info))
 						try:
 							os.rename(fn, out3)
-						except OSError:
+						except (OSError, PermissionError):
 							with open(fn, "rb") as f:
 								b = f.read()
 							with open(out3, "wb") as f:
@@ -3545,7 +3627,7 @@ class AudioDownloader:
 
 	# Extracts full data for a single entry. Uses cached results for optimization.
 	def extract_single(self, i, force=False):
-		item = i.url
+		item = i["url"]
 		if not force:
 			if item in self.searched and not item.startswith("ytsearch:"):
 				it = self.searched[item][0]
@@ -3571,17 +3653,15 @@ class AudioDownloader:
 					icon=data.get("icon") or get_best_icon(data),
 					video=data.get("video") or get_best_video(data),
 				)]
-				try:
-					out[0].duration = data["duration"]
-				except KeyError:
-					pass
+				out[0].duration = data.get("duration") or i.get("duration")
 				self.searched[item] = out
 				it = out[0]
 				i.update(it)
 			except Exception as ex:
-				i.url = ""
-				i.ex = repr(ex)
-				print_exc(item)
+				i["invalid"] = True
+				i["ex"] = repr(ex)
+				print(item)
+				print_exc()
 				return False
 		return True
 
@@ -3593,10 +3673,42 @@ class Queue(Command):
 	name = ["▶️", "P", "Q", "Play", "PlayNow", "PlayNext", "Enqueue", "Search&Play"]
 	alias = name + ["LS"]
 	description = "Shows the music queue, or plays a song in voice."
-	usage = "<url>* <force(-f)|budge(-b)|random(-r)|verbose(-v)>*"
-	example = ("play despacito", "queue", "enqueue https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-	flags = "hvfbrz"
-	no_parse = True
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("all", "first", "random", "last", "now", "next"),
+				accepts=dict(force="now", budge="next"),
+			),
+			description="Determines which song(s) to add if the link resolves to a playlist",
+			example="next",
+			default="all",
+		),
+		query=cdict(
+			type="string",
+			description="Song by name or URL",
+			example="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+			default=None,
+		),
+		index=cdict(
+			type="index",
+			description="Position to insert song(s)",
+			example="4",
+			default=[-1],
+		),
+		limit=cdict(
+			type="time",
+			description="maximum playback duration; subsequent audio skipped autonatically",
+		),
+	)
+	macros = cdict(
+		PlayNow=cdict(
+			mode="now",
+		),
+		PlayNext=cdict(
+			mode="next",
+		),
+	)
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	_timeout_ = 2
@@ -3606,17 +3718,17 @@ class Queue(Command):
 	msgcmd = ("Search & Play",)
 	exact = False
 
-	async def __call__(self, bot, user, perm, message, channel, guild, flags, name, argv, comment="", **void):
-		# This command is a bit of a mess
-		argv += " ".join(best_url(a) for a in message.attachments)
-		if not argv:
-			auds = await auto_join(guild, channel, user, bot, ignore=True)
+	async def __call__(self, bot, _user, _perm, _message, _channel, _guild, _name, _comment, mode="all", query=None, index=-1, limit=None, **void):
+		if not query:
+			auds = await auto_join(_guild, _channel, _user, bot, ignore=True)
 			q = auds.queue
-			v = "v" in flags
-			if not v and len(q) and auds.paused & 1 and "p" in name:
+			if len(q) and auds.paused & 1 and _name.startswith("p"):
 				auds.resume()
 				esubmit(auds.queue.update_load, timeout=120)
-				return css_md(f"Successfully resumed audio playback in {sqr_md(guild)}."), 1
+				return cdict(
+					content=css_md(f"Successfully resumed audio playback in {sqr_md(_guild)}."),
+					reacts="❎",
+				)
 			if not len(q):
 				auds.preparing = False
 				esubmit(auds.update, timeout=180)
@@ -3624,45 +3736,37 @@ class Queue(Command):
 			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
 			await send_with_reply(
 				None,
-				message,
-				"*```" + "\n" * ("z" in flags) + "callback-voice-queue-"
-				+ str(user.id) + "_0_" + str(int(v))
+				_message,
+				"*```" + "callback-voice-queue-"
+				+ str(_user.id) + "_0_" + "0"
 				+ "-\nLoading Queue...```*",
 				buttons=buttons,
 			)
 			return
+		if mode == "now":
+			index = [0]
+		elif mode == "next":
+			index = [1]
 		# Get audio player as fast as possible, scheduling it to join asynchronously if necessary
 		try:
-			auds = bot.data.audio.players[guild.id]
-			auds.channel = channel
+			auds = bot.data.audio.players[_guild.id]
+			auds.channel = _channel
 			future = None
+			ytdl.bot = bot
 		except KeyError:
-			future = csubmit(auto_join(guild, channel, user, bot, preparing=True))
-		if name == "playnext":
-			if not isinstance(flags, dict):
-				flags = dict.fromkeys(flags, True)
-			flags["b"] = True
-		elif name == "playnow":
-			if not isinstance(flags, dict):
-				flags = dict.fromkeys(flags, True)
-			flags["f"] = True
+			future = csubmit(auto_join(_guild, _channel, _user, bot, preparing=True))
 		# Start typing event asynchronously to avoid delays
-		async with discord.context_managers.Typing(channel):
+		async with discord.context_managers.Typing(_channel):
 			# Perform search concurrently, may contain multiple URLs
 			out = None
-			urls = await bot.follow_url(argv, allow=True, images=False, ytd=False)
+			urls = await bot.follow_url(query, allow=True, images=False, ytd=False)
 			if urls:
 				if len(urls) == 1:
-					argv = urls[0]
-					if is_discord_message_link(argv):
-						spl = argv.rsplit("/", 2)
-						channel = await bot.fetch_channel(spl[-2])
-						msg = await bot.fetch_message(spl[-1], channel)
-						argv = msg.content
+					query = urls[0]
 				else:
 					out = [asubmit(ytdl.search, url) for url in urls]
 			if out is None:
-				resp = await asubmit(ytdl.search, argv, timeout=180)
+				resp = await asubmit(ytdl.search, query, timeout=180)
 			else:
 				resp = deque()
 				for fut in out:
@@ -3673,81 +3777,109 @@ class Queue(Command):
 			# Wait for audio player to finish loading if necessary
 			if future is not None:
 				auds = await future
-		if "f" in flags or "b" in flags:
-			if not is_alone(auds, user) and perm < 1:
-				raise self.perm_error(perm, 1, "to force play while other users are in voice")
-		if auds.stats.quiet & 2:
-			set_dict(flags, "h", 1)
-		elapsed, length = auds.epos
+		if index[0] != -1:
+			if not auds.is_alone(_user) and _perm < 1:
+				raise self.perm_error(_perm, 1, "to force insert while other users are in voice")
 		q = auds.queue
+		elapsed, length = auds.epos
 		# Raise exceptions returned by searches
 		if type(resp) is str:
 			raise evalEX(resp)
-		if "r" in flags:
-			resp = (choice(resp),)
+		if not resp:
+			raise LookupError(f"No results for {query}.")
+		if len(resp) > 1:
+			if mode == "first":
+				resp = [resp[0]]
+			elif mode == "last":
+				resp = [resp[-1]]
+			elif mode == "random":
+				resp = [choice(resp)]
+		index = index and list(index)
+		if not index:
+			index = [len(q) + 1]
+		elif index[0] is None:
+			index[0] = 0
+		elif index[0] < 0:
+			index[0] += len(q) + 1
+		start = index[0]
+		stride = 1 if len(index) < 3 or index[2] is None else index[2]
+		end = index[1] if len(index) > 1 else None
+		resp = resp[:(end - start) // stride] if end is not None else resp
+		if auds.stats.shuffle:
+			resp = shuffle(resp)
 		# Assign search results to queue entries
-		added = deque()
-		names = []
+		items = alist()
+		total_dur = 0
+		limit = inf if limit is None else limit
 		for i, e in enumerate(resp, 1):
 			if i > 262144:
 				break
-			try:
-				name = e["name"]
-			except:
-				print(e)
-				raise
-			url = e["url"]
-			temp = {
-				# "hash": e.hash,
-				"name": name,
-				"url": url,
-				"duration": e.get("duration"),
-				"u_id": user.id,
-				"skips": deque(),
-			}
+			temp = cdict(
+				name=e["name"],
+				url=e["url"],
+				duration=e.get("duration"),
+				u_id=_user.id,
+				skips=deque(),
+			)
 			if "research" in e:
-				temp["research"] = True
-			added.append(cdict(temp))
-			names.append(no_md(name))
-			if not i & 16383:
-				await asyncio.sleep(0.2)
-		# Prepare to enqueue entries
-		if "b" not in flags:
-			total_duration = 0
-			for e in q:
-				total_duration += e_dur(e.duration)
-			if auds.reverse and auds.queue:
-				total_duration += elapsed - length
-			else:
-				total_duration -= elapsed
-		if auds.stats.shuffle:
-			added = shuffle(added)
-		tdur = 3
-		if "f" in flags:
-			# Force play moves currently playing item, which means we have to unset the "played" tag from currently playing entries to allow them to play again
-			auds.queue.enqueue(added, 0)
-			total_duration = tdur
-		elif "b" in flags:
-			auds.queue.enqueue(added, 1)
-			total_duration = max(3, length - elapsed if q else 0)
+				temp.research = True
+			elif "stream" in e:
+				temp.stream = e["stream"]
+				temp.icon = e.get("icon")
+			items.append(temp)
+			dur = e_dur(temp.duration) if i < len(resp) - 1 or temp.get("duration") else inf
+			if dur + total_dur > limit:
+				temp.skip_after = limit - total_dur
+				total_dur = limit
+				break
+			total_dur += dur
+		estimated = sum(e_dur_2(e) for e in q[1:(start if start > 0 else None)])
+		if start > 0:
+			estimated += elapsed - length if auds.reverse and auds.queue else length - elapsed
+		delay = 0
+		if items[0].url not in ytdl.searched:
+			delay = 5
+		elif not stream_exists(items[0].url):
+			delay = 1
+		total_duration = max(delay, estimated / auds.speed)
+		stride = 1
+		if len(index) > 1:
+			end = index[1] - index[0] if index[1] is not None else len(items)
+			if len(index) > 2:
+				stride = index[2] or stride
+			items = items[:end // stride]
+		icon = get_best_icon(resp[0])
+		if icon:
+			colour = await bot.get_colour(icon)
 		else:
-			auds.queue.enqueue(added, -1)
-			total_duration = max(total_duration / auds.speed, tdur)
-		if not names:
-			raise LookupError(f"No results for {argv}.")
-		if "v" in flags:
-			names = no_md(alist(i.name + ": " + time_disp(e_dur(i.duration)) for i in added))
-		elif len(names) == 1:
-			names = names[0]
+			colour = 0
+		emb = discord.Embed(colour=colour)
+		if icon:
+			emb.set_thumbnail(url=icon)
+		title = no_md(resp[0]["name"])
+		if len(items) > 1:
+			title += f" (+{len(items) - 1})"
+		emb.title = title
+		emb.url = resp[0]["url"]
+		adding = "Added to the queue!" if len(items) == 1 else f"{len(items)} items added!"
+		if stride != 1:
+			positions = ":".join(str(i) if i is not None else "" for i in index)
+			posstr = f"Positions {positions};"
+		elif start < len(q):
+			posstr = f"Position {start};"
 		else:
-			names = f"{len(names)} items"
-		if "h" not in flags:
-			if auds.paused:
-				p = f"\nNote: Player is currently paused. Use {bot.get_prefix(guild)}resume to resume!"
-			else:
-				p = ""
-			s = comment + "\n" + css_md(f"🎶 Added {sqr_md(names)} to the queue! Estimated time until playing: {sqr_md(time_until(utc() + total_duration))}. 🎶{p}")
-			return await send_with_react(channel, s, reference=message, reacts="❎")
+			posstr = "Estimated"
+		final_duration = e_dur_2(items[0]) if len(items) == 1 else sum(e_dur_2(e) for e in items)
+		durstr = "" if not final_duration else f" ({sec2time(final_duration)})"
+		emb.description = f"🎶 {adding} 🎶{durstr}\n*{posstr} time to play: {time_repr(utc() + total_duration)}.*"
+		if auds.paused:
+			emb.description += f"\nNote: Player is currently paused. Use {bot.get_prefix(_guild)}resume to resume!"
+		auds.queue.enqueue(items, start, stride=stride)
+		return cdict(
+			content=_comment,
+			embed=emb,
+			reacts="❎",
+		)
 
 	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
 		u_id, pos, v = list(map(int, vals.split("_", 2)))
@@ -3787,11 +3919,11 @@ class Queue(Command):
 		if not q:
 			stime = "0"
 		elif auds.stats.loop:
-			stime = "inf (loop)"
+			stime = "undefined (loop)"
 		elif auds.stats.repeat:
-			stime = "inf (repeat)"
+			stime = "undefined (repeat)"
 		elif auds.paused:
-			stime = "inf (paused)"
+			stime = "undefined (paused)"
 		else:
 			if auds.reverse and q:
 				totalTime = elapsed - length
@@ -3799,9 +3931,9 @@ class Queue(Command):
 				totalTime = -elapsed
 			i = 0
 			for e in q:
-				totalTime += e_dur(e.duration)
+				totalTime += e_dur_2(e)
 				if i < pos:
-					startTime += e_dur(e.duration)
+					startTime += e_dur_2(e)
 				if not 1 + i & 32767:
 					await asyncio.sleep(0.1)
 				i += 1
@@ -3846,7 +3978,7 @@ class Queue(Command):
 				space = int(math.log10(len(q))) - int(math.log10(max(1, i)))
 				curr = "`" + " " * space
 				ename = no_md(e.name)
-				curr += f'【{i}】`{"[`" + no_md(lim_str(ename + " " * (maxlen - len(ename)), maxlen)) + "`]"}({ensure_url(e.url)})` ({time_disp(e_dur(e.duration))})`'
+				curr += f'【{i}】`{"[`" + no_md(lim_str(ename + " " * (maxlen - len(ename)), maxlen)) + "`]"}({ensure_url(e.url)})` ({time_disp(e_dur_2(e))})`'
 				if v:
 					try:
 						u = bot.cache.users[e.u_id]
@@ -3870,14 +4002,14 @@ class Queue(Command):
 						else:
 							curr += "{" + estimate + "}"
 					else:
-						curr += "Remaining time: [" + time_until(utc() + (estim + e_dur(e.duration)) / auds.speed) + "]"
+						curr += "Remaining time: [" + time_until(utc() + (estim + e_dur_2(e)) / auds.speed) + "]"
 					curr += "```"
 				curr += "\n"
 				if len(embstr) + len(curr) > 4096 - len(emb.description):
 					break
 				embstr += curr
 				if i <= 1 or not auds.stats.shuffle:
-					currTime += e_dur(e.duration)
+					currTime += e_dur_2(e)
 				if not 1 + 1 & 4095:
 					await asyncio.sleep(0.3)
 				i += 1
@@ -3885,7 +4017,7 @@ class Queue(Command):
 		more = len(q) - i
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -3895,77 +4027,133 @@ class Playlist(Command):
 	name = ["DefaultPlaylist", "PL"]
 	min_display = "0~2"
 	description = "Shows, appends, or removes from the default playlist."
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("show", "add", "sort", "remove", "clear"),
+				aliases=dict(insert="add", delete="remove", display="show"),
+			),
+			description="Indicates whether to add or remove item(s)",
+			example="remove",
+		),
+		urls=cdict(
+			type="url",
+			description="Song or playlist by URL",
+			example="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+			multiple=True,
+		),
+		index=cdict(
+			type="index",
+			description="Position to insert or remove song(s)",
+			example="4",
+		),
+	)
 	usage = "<mode(add|remove)>? <search_links>*"
 	example = ("playlist add https://www.youtube.com/watch?v=wDgQdr8ZkTw", "playlist remove 6")
 	flags = "aedzf"
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	rate_limit = (7, 11)
-	typing = True
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, user, argv, guild, flags, channel, message, perm, **void):
-		update = self.bot.data.playlists.update
-		bot = self.bot
-		if argv or "d" in flags:
+	async def __call__(self, bot, _message, _user, _guild, _perm, mode, urls, index, **void):
+		playlists = bot.data.playlists
+		if urls or mode in ("add", "remove", "clear"):
 			req = 2
-			if perm < req:
-				reason = f"to modify default playlist for {guild.name}"
-				raise self.perm_error(perm, req, reason)
-		pl = set_dict(bot.data.playlists, guild.id, [])
-		if not argv:
-			if "d" in flags:
-				# This deletes all default playlist entries for the current guild
-				if "f" not in flags and len(pl) > 1:
-					raise InterruptedError(css_md(sqr_md(f"WARNING: {len(pl)} ENTRIES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), force=True))
-				bot.data.playlists.pop(guild.id)
-				return italics(css_md(f"Successfully removed all {sqr_md(len(pl))} entries from the default playlist for {sqr_md(guild)}."))
+			if _perm < req:
+				reason = f"to modify default playlist for {_guild.name}"
+				raise self.perm_error(_perm, req, reason)
+		pl = playlists.setdefault(_guild.id, [])
+		if mode in (None, "show") and not urls and not index:
 			# Set callback message for scrollable list
 			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
 			await send_with_reply(
 				None,
-				message,
-				"*```" + "\n" * ("z" in flags) + "callback-voice-playlist-"
-				+ str(user.id) + "_0"
+				_message,
+				"*```" + "callback-voice-playlist-"
+				+ str(_user.id) + "_0"
 				+ "-\nLoading Playlist database...```*",
 				buttons=buttons,
 			)
 			return
-		if "d" in flags:
-			# Can only remove by index atm
-			i = await bot.eval_math(argv)
-			temp = pl[i]
-			pl.pop(i)
-			update(guild.id)
-			return italics(css_md(f"Removed {sqr_md(temp.name)} from the default playlist for {sqr_md(guild)}."))
-		lim = 8 << self.bot.is_trusted(guild.id) * 2 + 1
+		if mode == "sort":
+			playlists[_guild.id] = sorted(pl)
+			return italics(css_md(f"Successfully sorted default playlist for {sqr_md(_guild)}."))
+		if mode == "clear":
+			playlists.pop(_guild.id)
+			return italics(css_md(f"Successfully removed all {sqr_md(len(pl))} entries from the default playlist for {sqr_md(_guild)}."))
+		index = index and list(index)
+		if not index:
+			index = [len(pl) + 1]
+		elif index[0] is None:
+			index[0] = 0
+		elif index[0] < 0:
+			index[0] += len(pl) + 1
+		if mode == "remove":
+			count = len(pl)
+			removed = "Undefined"
+			if not index:
+				pass
+			elif len(index) == 1:
+				removed = pl.pop(index[0])
+			elif len(index) == 2:
+				removed = pl[index[0]]
+				pl = pl[:index[0]] + pl[index[1]:]
+			else:
+				urls.extend(pl[index[0]:index[1]:index[2]])
+			pl = alist(pl)
+			if urls:
+				removed = urls[0]
+			for url in urls:
+				pl.remove(url)
+			playlists[_guild.id] = list(pl)
+			added = count - len(pl)
+			if added > 1:
+				removed += f" (+{added})"
+			return italics(css_md(f"Successfully removed {sqr_md(removed)} from the default playlist for {sqr_md(guild)}."))
+		lim = 4096 << self.bot.is_trusted(_guild.id) * 2 + 1
 		if len(pl) >= lim:
-			raise OverflowError(f"Playlist for {guild} has reached the maximum of {lim} items. Please remove an item to add another.")
-		urls = await bot.follow_url(argv, allow=True, images=False)
-		if urls:
-			argv = urls[0]
-		async with discord.context_managers.Typing(channel):
-		# Unlike ~queue this command only supports a single URL/search
-			resp = await asubmit(ytdl.search, argv, timeout=180)
-		if type(resp) is str:
-			raise evalEX(resp)
-		# Assign search results to default playlist entries
-		names = []
-		for e in resp:
-			name = e.name
-			names.append(no_md(name))
-			pl.append(cdict(
-				name=name,
-				url=e.url,
-				duration=e.duration,
-			))
-		if not names:
-			raise LookupError(f"No results for {argv}.")
-		pl.sort(key=lambda x: x["name"].casefold())
-		update(guild.id)
-		stuff = str(len(names)) + " items" if len(names) > 3 else ', '.join(names)
-		return css_md(f"Added {sqr_md(stuff)} to the default playlist for {sqr_md(guild)}.")
+			raise OverflowError(f"Playlist for {_guild} has reached the maximum of {lim} items. Please remove an item to add another.")
+		futs = [asubmit(ytdl.search, url, timeout=180) for url in urls]
+		resps = await gather(*futs)
+		resp = list(itertools.chain(*resps))
+		if not resp:
+			raise LookupError(f"No results for {urls}.")
+		start = index[0]
+		stride = 1 if len(index) < 3 or index[2] is None else index[2]
+		end = index[1] if len(index) > 1 else None
+		resp = resp[:(end - start) // stride] if end is not None else resp
+		items = [cdict(name=e.name, url=e.url, duration=e.duration) for e in resp]
+		pl = alist(pl)
+		pl.rotate(-start)
+		temp = alist([None] * (len(items) * abs(stride)))
+		temp[::stride] = items
+		sli = temp.view == None
+		inserts = pl[:len(items) * (abs(stride) - 1)]
+		i = -1
+		while not sli[i] or np.sum(sli) > len(inserts):
+			sli[i] = False
+			i -= 1
+			if i <= -len(sli):
+				break
+		print(len(temp), len(sli), len(inserts))
+		temp.view[sli] = inserts
+		temp = temp.view[temp.view != None]
+		temp = np.concatenate([temp, pl[len(items) * (abs(stride) - 1):]])
+		pl.fill(temp)
+		pl.rotate(start)
+		playlists[_guild.id] = list(pl)
+		stuff = str(len(items)) + " items" if len(items) > 1 else items[0].name
+		if stride != 1:
+			positions = ":".join(str(i) if i is not None else "" for i in index)
+			ins = f", at positions {positions}"
+		elif start < len(pl):
+			ins = f", at position {start}"
+		else:
+			ins = ""
+		return css_md(f"Added {sqr_md(stuff)} to the default playlist for {sqr_md(_guild)}{ins}.")
 
 	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
 		u_id, pos = list(map(int, vals.split("_", 1)))
@@ -4004,11 +4192,11 @@ class Playlist(Command):
 			content += f"No currently enabled default playlist for {str(guild).replace('`', '')}.```*"
 			msg = ""
 		else:
-			pl.sort(key=lambda x: x["name"].casefold())
+			# pl.sort(key=lambda x: x["name"].casefold())
 			content += f"{len(pl)} item(s) in default playlist for {str(guild).replace('`', '')}:```*"
 			key = lambda x: lim_str(sqr_md(x["name"]) + "(" + x["url"] + ")", 1900 / page)
 			msg = iter2str(pl[pos:pos + page], key=key, offset=pos, left="`【", right="】`")
-		colour = await self.bot.get_colour(guild)
+		colour = await bot.get_colour(guild)
 		emb = discord.Embed(
 			description=content + msg,
 			colour=colour,
@@ -4017,115 +4205,122 @@ class Playlist(Command):
 		more = len(pl) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
 
 class Connect(Command):
 	server_only = True
-	name = ["📲", "🎤", "🎵", "🎶", "📴", "📛", "Summon", "J", "Join", "DC", "Disconnect", "Leave", "Yeet", "Move", "Reconnect", "Listen", "Deafen"]
-	# Because Rythm also has this alias :P
-	alias = name + ["FuckOff"]
+	name = ["📲", "🎤", "🎵", "🎶", "Summon", "J", "Join", "Move", "Reconnect"]
 	description = "Summons the bot into a voice channel, or advises it to leave."
-	example = ("join", "connect 247184721262411777", "leave")
-	usage = "<channel>?"
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("connect", "disconnect", "listen", "deafen"),
+				aliases=dict(join="connect", leave="disconnect"),
+			),
+			description="Action to perform",
+			example="remove",
+			default="connect",
+		),
+		channel=cdict(
+			type="channel",
+			description="Target channel to join (defaults to voice channel of closest proximity)",
+			example="#Voice",
+		),
+	)
+	macros = cdict(
+		Leave=cdict(
+			mode="disconnect",
+		),
+		Disconnect=cdict(
+			mode="disconnect",
+		),
+		DC=cdict(
+			mode="disconnect",
+		),
+		Yeet=cdict(
+			mode="disconnect",
+		),
+		FuckOff=cdict(
+			mode="disconnect",
+		),
+		Listen=cdict(
+			mode="listen",
+		),
+		Deafen=cdict(
+			mode="deafen",
+		),
+	)
 	rate_limit = (3, 4)
-	slash = ("Join", "Leave")
+	slash = ("Connect", "Leave")
 
-	async def __call__(self, user, channel, name="join", argv="", vc=None, message=None, **void):
-		bot = self.bot
-		joining = False
-		if name in ("dc", "disconnect", "leave", "yeet", "fuckoff", "📴", "📛"):
+	async def __call__(self, bot, _user, _channel, _message=None, _perm=0, channel=None, mode="connect", vc=None, **void):
+		if mode == "disconnect":
 			vc_ = None
-		elif argv or name == "move":
-			c_id = verify_id(argv)
-			if not isinstance(c_id, int):
-				raise TypeError(f"Invalid channel identifier: {c_id}")
-			if not c_id > 0:
-				vc_ = None
-			else:
-				vc_ = await bot.fetch_channel(c_id)
+		elif channel:
+			vc_ = channel
 		else:
 			# If voice channel is already selected, use that
 			if vc is not None:
 				vc_ = vc
 			else:
-				vc_ = select_voice_channel(user, channel)
+				vc_ = select_voice_channel(_user, _channel)
 		# target guild may be different from source guild
 		if vc_ is None:
-			guild = channel.guild
+			guild = _channel.guild
 		else:
 			guild = vc_.guild
 		# Use permission level in target guild to make sure user is able to perform command
-		perm = bot.get_perms(user, guild)
-		if perm < 0:
-			raise self.perm_error(perm, 0, f"for command {self.name} in {guild}")
+		if _perm < 0:
+			raise self.perm_error(_perm, 0, f"for command {self.name} in {guild}")
 		# If no voice channel is selected, perform disconnect
 		if vc_ is None:
-			if argv:
-				if perm < 2:
-					raise self.perm_error(perm, 2, f"for command {self.name} in {guild}")
-				u_id = verify_id(argv)
-				try:
-					t_user = await bot.fetch_user_member(u_id, guild)
-				except (LookupError):
-					t_role = guild.get_role(u_id)
-					if t_role is None:
-						raise LookupError(f"No results for {u_id}.")
-					members = [member for member in t_role.members if member.voice is not None]
-					if not members:
-						return code_md("No members to disconnect.")
-					await disconnect_members(bot, guild, members)
-					if len(members) == 1:
-						return ini_md(f"Disconnected {sqr_md(members[0])} from {sqr_md(guild)}."), 1
-					return ini_md(f"Disconnected {sqr_md(str(members) + ' members')} from {sqr_md(guild)}."), 1
-				member = guild.get_member(t_user.id)
-				if not member or member.voice is None:
-					return code_md("No members to disconnect.")
-				await disconnect_members(bot, guild, (member,))
-				return ini_md(f"Disconnected {sqr_md(member)} from {sqr_md(guild)}."), 1
+			# if argv:
+			# 	if _perm < 2:
+			# 		raise self.perm_error(_perm, 2, f"for command {self.name} in {guild}")
+			# 	u_id = verify_id(argv)
+			# 	try:
+			# 		t_user = await bot.fetch_user_member(u_id, guild)
+			# 	except (LookupError):
+			# 		t_role = guild.get_role(u_id)
+			# 		if t_role is None:
+			# 			raise LookupError(f"No results for {u_id}.")
+			# 		members = [member for member in t_role.members if member.voice is not None]
+			# 		if not members:
+			# 			return code_md("No members to disconnect.")
+			# 		await disconnect_members(bot, guild, members)
+			# 		if len(members) == 1:
+			# 			return cdict(content=css_md(f"Disconnected {sqr_md(members[0])} from {sqr_md(guild)}."), reacts="❎")
+			# 		return cdict(content=css_md(f"Disconnected {sqr_md(str(members) + ' members')} from {sqr_md(guild)}."), reacts="❎")
+			# 	member = guild.get_member(t_user.id)
+			# 	if not member or member.voice is None:
+			# 		return code_md("No members to disconnect.")
+			# 	await disconnect_members(bot, guild, (member,))
+			# 	return cdict(content=css_md(f"Disconnected {sqr_md(member)} from {sqr_md(guild)}."), reacts="❎")
 			try:
 				auds = bot.data.audio.players[guild.id]
 			except KeyError:
+				if guild.me.voice:
+					await disconnect_members(bot, guild, (guild.me,))
+					return cdict(content=css_md(f"🎵 Successfully disconnected from {sqr_md(guild)}.🎵"), reacts="❎")
 				raise LookupError("Unable to find voice channel.")
-			auds.text = channel
-			if not is_alone(auds, user) and perm < 1:
-				raise self.perm_error(perm, 1, "to disconnect while other users are in voice")
-			return await asubmit(auds.kill, initiator=message)
+			auds.text = _channel
+			if not auds.is_alone(_user) and auds.queue and _perm < 1:
+				raise self.perm_error(_perm, 1, "to disconnect while other users are in voice")
+			return await asubmit(auds.kill, initiator=_message)
 		if not vc_.permissions_for(guild.me).connect:
 			raise ConnectionError("Insufficient permissions to connect to voice channel.")
-		# if vc_.permissions_for(guild.me).manage_channels:
-			# if guild.id in bot.data.audio.players:
-				# br = round(bot.data.audio.players[guild.id].stats.bitrate * 100)
-			# else:
-				# br = CustomAudio.max_bitrate
-			# if vc_.type is discord.ChannelType.stage_voice:
-				# bitrate = min(br, 64000)
-			# else:
-				# bitrate = min(br, guild.bitrate_limit)
-			# if vc_.bitrate < bitrate:
-				# try:
-					# await vc_.edit(bitrate=bitrate, reason="I deliver maximum quality audio only! :3")
-				# except:
-					# print_exc()
 		# Create audio source if none already exists
-		if guild.id not in bot.data.audio.players:
-			globals()["bot"] = bot
-			auds = CustomAudio(channel)
-			auds.join(vc_)
-			joining = True
-		else:
-			auds = bot.data.audio.players[guild.id]
-			if not auds.acsi or auds.acsi.channel != vc_:
-				await auds.move_unmute(auds.acsi, vc_)
-				joining = True
+		auds, joining = CustomAudio.new(vc_, text=_channel)
 		if not guild.me:
 			raise RuntimeError("Server not detected!")
 		if guild.me.voice is None:
-			for i in range(1, 17):
+			for i in range(1, 14):
 				try:
-					await bot.wait_for("voice_state_update", check=lambda member, before, after: member.id == bot.id and after, timeout=1)
+					await bot.wait_for("voice_state_update", check=lambda member, before, after: member.id == bot.id and after, timeout=i)
 				except (T0, T1, T2):
 					if guild.me.voice is None and auds.acsi is None:
 						if i >= 16:
@@ -4140,154 +4335,165 @@ class Connect(Command):
 					auds.speak()
 			elif member.voice.deaf or member.voice.mute or member.voice.afk:
 				csubmit(member.edit(mute=False))
-		if name == "listen":
+		if mode == "listen":
 			auds.listen()
-			return css_md(f"🎵 Connected and listening to {sqr_md(vc_)} in {sqr_md(guild)}! 🎵"), 1
-		if name == "deafen":
+			return cdict(content=ini_md(f"🎵 Connected and listening to {sqr_md(vc_)} in {sqr_md(guild)}! 🎵"), reacts="❎")
+		if mode == "deafen":
 			auds.deafen()
-			return css_md(f"🎵 No longer listening in {sqr_md(guild)}. 🎵"), 1
+			return cdict(content=css_md(f"🎵 No longer listening in {sqr_md(guild)}. 🎵"), reacts="❎")
 		if joining:
 			# Send update event to bot audio database upon joining
 			csubmit(bot.data.audio(guild=guild))
-			return css_md(f"🎵 Successfully connected to {sqr_md(vc_)} in {sqr_md(guild)}. 🎵"), 1
+			return cdict(content=ini_md(f"🎵 Successfully connected to {sqr_md(vc_)} in {sqr_md(guild)}. 🎵"), reacts="❎")
 
 
 class Skip(Command):
 	server_only = True
-	name = ["⏭", "🚫", "S", "SK", "FS", "CQ", "ForceSkip", "Remove", "Rem", "ClearQueue", "Clear"]
+	name = ["⏭", "🚫", "S", "SK"]
 	min_display = "0~1"
 	description = "Removes an entry or range of entries from the voice channel queue."
-	usage = "<queue_positions[0]>* <force(-f)|vote(-v)>*"
-	example = ("skip", "fs", "skip 1 2 3", "skip 3..9", "skip 90:50:-1", "remove 9", "clear")
-	flags = "fhv"
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("auto", "vote", "force"),
+			),
+			description="Skip mode; force skips voting and bypasses repeats, but requires trusted priviledge level for other users' songs",
+			example="force",
+			default="auto",
+		),
+		slices=cdict(
+			type="index",
+			description="Entry or sequence of entries to remove; accepts one or more slice indicators such as 1..100 or 6:73:4",
+			example="0 1 2..4 5:8:1",
+			default=[[0]],
+			multiple=True,
+		),
+		after=cdict(
+			type="time",
+			description="Skips the song(s) after the provided timestamp rather than immediately; requires trusted priviledge level for other users' songs",
+		),
+	)
+	macros = cdict(
+		VoteSkip=cdict(
+			mode="vote",
+		),
+		ForceSkip=cdict(
+			mode="force",
+		),
+		FS=cdict(
+			mode="force",
+		),
+		Remove=cdict(
+			mode="force",
+		),
+		Rem=cdict(
+			mode="force",
+		),
+		ClearQueue=cdict(
+			mode="force",
+			slices=[[None, None]],
+		),
+		Clear=cdict(
+			mode="force",
+			slices=[[None, None]],
+		),
+		SkipAll=cdict(
+			slices=[[None, None]],
+		),
+		Shorten=cdict(
+			after=300,
+		),
+	)
 	rate_limit = (3.5, 5)
 	slash = True
 
-	async def __call__(self, bot, channel, user, perm, name, args, argv, guild, flags, message, **void):
-		if guild.id not in bot.data.audio.players:
+	async def __call__(self, bot, _guild, _channel, _user, _perm, mode, slices, after, **void):
+		if _guild.id not in bot.data.audio.players:
 			raise LookupError("Currently not playing in a voice channel.")
-		auds = bot.data.audio.players[guild.id]
-		auds.text = channel
-		# ~clear is an alias for ~skip -f inf
-		if name.startswith("c"):
-			argv = "inf"
-			args = [argv]
-		if name[0] in "rcf" or "f" in flags:
-			if not is_alone(auds, user) and perm < 1:
-				raise self.perm_error(perm, 1, "to force skip while other users are in voice")
+		if _perm < 1 and not getattr(_user, "voice", None):
+			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
+		auds = bot.data.audio.players[_guild.id]
+		auds.text = _channel
 		count = len(auds.queue)
 		if not count:
 			raise IndexError("Queue is currently empty.")
-		# Default to currently playing item
-		if not argv:
-			elems = [0]
-		# Accept range/slice inputs
-		elif ":" in argv or ".." in argv:
-			while "..." in argv:
-				argv = regexp("\\.{3,}").sub("..", argv)
-			l = argv.replace("..", ":").split(":")
-			it = None
-			if len(l) > 3:
-				raise ArgumentError("Too many arguments for range input.")
-			elif len(l) > 2:
-				num = await bot.eval_math(l[0])
-				it = int(round(num))
-			if l[0]:
-				num = await bot.eval_math(l[0])
-				if num > count:
-					num = count
-				else:
-					num = round(num) % count
-				left = num
+		# Calculate required vote count based on amount of non-bot members in voice
+		members = sum(1 for m in auds.acsi.channel.members if not m.bot)
+		required = 1 + members >> 1
+		qsize = len(auds.queue)
+		targets = set()
+		for spl in slices:
+			if not spl:
+				continue
+			spl = list(spl)
+			if spl[0] is None:
+				spl[0] = 0
+			if len(spl) >= 2 and spl[1] is None:
+				spl[1] = qsize
+			if len(spl) == 1:
+				target = (x for x in spl if x < qsize)
+			elif len(spl) >= 3:
+				target = range(*slice(*spl).indices(qsize))
 			else:
-				left = 0
-			if l[1]:
-				num = await bot.eval_math(l[1])
-				if num > count:
-					num = count
+				target = range(*slice(*sorted(spl)).indices(qsize))
+			targets.update(target)
+		print(targets)
+		dups = []
+		votes = []
+		skips = []
+		for i in targets:
+			entry = auds.queue[i]
+			if _user.id in entry.get("skips", ()):
+				if len(entry.get("skips", ())) >= required:
+					skips.append(i)
+					if after is not None:
+						entry.skip_after = after
 				else:
-					num = round(num) % count
-				right = num
+					dups.append(i)
+			elif len(entry.get("skips", ())) + 1 >= required:
+				skips.append(i)
+				if after is not None:
+					entry.skip_after = after
 			else:
-				right = count
-			elems = xrange(left, right, it)
+				vote = mode == "vote" or mode == "auto" and entry.get("u_id") not in (_user.id, bot.id)
+				if vote:
+					T(entry).coercedefault("skips", set, set()).add(_user.id)
+					votes.append(i)
+				elif _perm < 1 and entry.get("u_id") not in (_user.id, bot.id):
+					raise self.perm_error(_perm, 1, f"to force-skip other users' entries")
+				else:
+					skips.append(i)
+					if after is not None:
+						entry.skip_after = after
+		desc = []
+		if dups:
+			desc.append(f"Entry {dups[0]} ({auds.queue[dups[0]].name}) has already been voted for, `{len(votes)}/{required}`." if len(dups) == 1 else f"{len(dups)} entries have already been voted for.")
+		if votes:
+			desc.append(f"Voted to skip entry {votes[0]} ({auds.queue[votes[0]].name}), `{len(votes)}/{required}`." if len(votes) == 1 else f"Voted to skip {len(votes)} entries.")
+		if after is None:
+			lost = auds.queue.pops(skips)
+			if mode != "force":
+				if auds.stats.loop or auds.stats.repeat:
+					auds.queue.extend(lost)
+				desc.append(f"Skipped entry {skips[0]} ({lost[0].name})." if len(skips) == 1 else f"Skipped all ({len(skips)}) entries." if not auds.queue else f"Skipped {len(skips)} entries.")
+			else:
+				desc.append(f"Removed entry {skips[0]} ({lost[0].name})." if len(skips) == 1 else f"Removed all ({len(skips)}) entries." if not auds.queue else f"Removed {len(skips)} entries.")
+			if 1 in skips:
+				auds.clear_next()
+			# If first item is skipped, advance queue and update audio player
+			if 0 in skips:
+				auds.clear_source()
+				esubmit(auds.reset)
 		else:
-			# Accept multiple single indices
-			elems = [0] * len(args)
-			for i in range(len(args)):
-				elems[i] = await bot.eval_math(args[i])
-		if not "f" in flags:
-			valid = True
-			for e in elems:
-				if not is_finite(e):
-					valid = False
-					break
-			if not valid:
-				elems = range(count)
-		async with auds.semaphore:
-			# Calculate required vote count based on amount of non-bot members in voice
-			members = sum(1 for m in auds.acsi.channel.members if not m.bot)
-			required = 1 + members >> 1
-			response = ""
-			i = 1
-			for pos in elems:
-				pos = float(pos)
-				try:
-					# If infinite entries are selected and force flag is set, remove all items
-					if not is_finite(pos):
-						if name[0] in "rcf" or "f" in flags:
-							auds.queue.clear()
-							await asubmit(auds.reset, start=False)
-							if "h" not in flags:
-								return italics(fix_md("Removed all items from the queue.")), 1
-							return
-						raise LookupError
-					curr = auds.queue[pos]
-				except LookupError:
-					response += "\n" + repr(IndexError(f"Entry {pos} is out of range."))
-					continue
-				# Add skips if voting
-				if issubclass(type(curr.skips), collections.abc.MutableSequence):
-					if name[0] in "rcf" or "f" in flags or user.id == curr["u_id"] and not "v" in flags:
-						curr.skips = None
-					elif user.id not in curr.skips:
-						curr.skips.append(user.id)
-				elif "v" in flags:
-					curr.skips = deque([user.id])
-				else:
-					curr.skips = None
-				if curr.skips is not None:
-					if len(response) > 1200:
-						response = lim_str(response, 1200)
-					else:
-						response += f"Voted to remove {sqr_md(curr.name)}: {sqr_md(str(len(curr.skips)) + '/' + str(required))}.\n"
-				if not i & 8191:
-					await asyncio.sleep(0.2)
-				i += 1
-			# Get list of items to remove from the queue, based on whether they have sufficient amount of skips
-			pops = set()
-			count = 0
-			i = 0
-			while i < len(auds.queue):
-				song = auds.queue[i]
-				if song.skips is None or len(song.skips) >= required:
-					pops.add(i)
-					if count < 4:
-						response += f"{sqr_md(song.name)} has been removed from the queue.\n"
-					count += 1
-				i += 1
-			if pops:
-				auds.queue.pops(pops)
-				if 1 in pops:
-					auds.clear_next()
-				# If first item is skipped, advance queue and update audio player
-				if 0 in pops:
-					auds.clear_source()
-					await asubmit(auds.reset)
-			if "h" not in flags:
-				if count >= 4:
-					return italics(css_md(f"{sqr_md(count)} items have been removed from the queue."))
-				return css_md(response), 1
+			desc.append((f"Entry {skips[0]} ({auds.queue[skips[0]].name})" if len(skips) == 1 else f"{len(skips)} entries") + f" will automatically skip at timestamp {sec2time(after)}.")
+		colour = await bot.get_colour(_user)
+		emb = discord.Embed(colour=colour)
+		emb.description = "\n- ".join(desc)
+		return cdict(
+			embed=emb,
+			reacts="❎",
+		)
 
 
 class Pause(Command):
@@ -4300,13 +4506,13 @@ class Pause(Command):
 	rate_limit = (3, 4)
 	slash = True
 
-	async def __call__(self, bot, name, guild, user, perm, channel, message, flags, comment="", **void):
+	async def __call__(self, bot, _comment, name, guild, user, perm, channel, message, flags, **void):
 		if guild.id not in bot.data.audio.players:
 			raise LookupError("Currently not playing in a voice channel.")
 		auds = bot.data.audio.players[guild.id]
 		auds.text = channel
 		if name in ("pause", "stop", "⏸️", "⏯️", "⏹️"):
-			if not is_alone(auds, user) and perm < 1:
+			if not auds.is_alone(user) and perm < 1:
 				raise self.perm_error(perm, 1, f"to {name} while other users are in voice")
 		if name in ("resume", "unpause"):
 			await asubmit(auds.resume)
@@ -4322,8 +4528,8 @@ class Pause(Command):
 			word = "paused" if auds.paused else "resumed"
 		if "h" not in flags:
 			s = css_md(f"Successfully {word} audio playback in {sqr_md(guild)}.")
-			if comment:
-				s = comment + "\n" + s
+			if _comment:
+				s = _comment + "\n" + s
 			return await send_with_react(channel, s, reference=message, reacts="❎")
 
 
@@ -4343,7 +4549,7 @@ class Seek(Command):
 			raise LookupError("Currently not playing in a voice channel.")
 		auds = bot.data.audio.players[guild.id]
 		auds.text = channel
-		if not is_alone(auds, user) and perm < 1:
+		if not auds.is_alone(user) and perm < 1:
 			raise self.perm_error(perm, 1, "to seek while other users are in voice")
 		# ~replay always seeks to position 0
 		if name == "replay":
@@ -4373,7 +4579,7 @@ class Dump(Command):
 	rate_limit = (1, 2)
 	slash = True
 
-	async def __call__(self, guild, channel, user, bot, perm, name, argv, flags, message, vc=None, noannouncefirst=False, **void):
+	async def __call__(self, guild, channel, user, bot, perm, name, argv, flags, message, vc=None, noannouncefirst=False, reset=True, **void):
 		auds = await auto_join(guild, channel, user, bot, vc=vc)
 		# ~save is the same as ~dump without an argument
 		if argv == "" and not message.attachments or name in ("save", "export"):
@@ -4385,7 +4591,7 @@ class Dump(Command):
 				f = CompatFile(resp, filename=fn)
 			csubmit(bot.send_with_file(channel, f"Queue data for {bold(str(guild))}:", f, reference=message))
 			return
-		if not is_alone(auds, user) and perm < 1:
+		if not auds.is_alone(user) and perm < 1:
 			raise self.perm_error(perm, 1, "to load new queue while other users are in voice")
 		if isinstance(argv, str):
 			if message.attachments:
@@ -4439,7 +4645,7 @@ class Dump(Command):
 					d["stats"][k] = mpf(v)
 		if noannouncefirst:
 			d["queue"][0]["noannounce"] = True
-		if "a" not in flags:
+		if "a" not in flags and reset:
 			# Basic dump, replaces current queue
 			if auds.queue:
 				auds.queue.clear()
@@ -4535,7 +4741,7 @@ class AudioSettings(Command):
 		add_dict(self.map, {k.casefold(): self.aliasExt[k] for k in self.aliasExt})
 		super().__init__(*args)
 
-	async def __call__(self, bot, channel, user, guild, flags, name, argv, perm, message, comment="", **void):
+	async def __call__(self, bot, _comment, channel, user, guild, flags, name, argv, perm, message, **void):
 		auds = await auto_join(guild, channel, user, bot)
 		ops = alist()
 		op1 = self.map[name]
@@ -4588,7 +4794,7 @@ class AudioSettings(Command):
 			orig = auds.stats[op]
 			num = round_min(100 * orig)
 			return css_md(f"Current audio {op} setting in {sqr_md(guild)}: [{num}].")
-		if not is_alone(auds, user) and perm < 1:
+		if not auds.is_alone(user) and perm < 1:
 			raise self.perm_error(perm, 1, "to modify audio settings while other users are in voice")
 		# No audio setting selected
 		if not ops:
@@ -4641,7 +4847,6 @@ class AudioSettings(Command):
 				orig = bool(orig)
 				if "f" in flags:
 					bot.data.audiosettings.setdefault(guild.id, {})[op] = new
-					bot.data.audiosettings.update(guild.id)
 			else:
 				if op == "bitrate":
 					if val > CustomAudio.max_bitrate:
@@ -4657,7 +4862,6 @@ class AudioSettings(Command):
 				origStats[op] = val
 				if "f" in flags:
 					bot.data.audiosettings.setdefault(guild.id, {})[op] = val
-					bot.data.audiosettings.update(guild.id)
 			if auds.queue:
 				if type(op) is str and op not in "loop repeat shuffle quiet stay":
 					# Attempt to adjust audio setting by re-initializing FFmpeg player
@@ -4673,8 +4877,8 @@ class AudioSettings(Command):
 			s += f"\n{changed} audio {op} setting from {sqr_md(orig)} to {sqr_md(new)}."
 		if "h" not in flags:
 			s = css_md(s)
-			if comment:
-				s = comment + "\n" + s
+			if _comment:
+				s = _comment + "\n" + s
 			return await send_with_react(channel, s, reference=message, reacts="❎")
 
 
@@ -4698,7 +4902,7 @@ class Jump(Command):
 		else:
 			amount = await bot.eval_math(argv)
 		if len(auds.queue) > 1 and amount:
-			if not is_alone(auds, user) and perm < 1:
+			if not auds.is_alone(user) and perm < 1:
 				raise self.perm_error(perm, 1, "to rotate queue while other users are in voice")
 			async with auds.semaphore:
 				# Clear "played" tag of current item
@@ -4725,7 +4929,7 @@ class Shuffle(Command):
 		if not auds.queue:
 			raise IndexError("Queue is currently empty.")
 		auds.text = channel
-		if not is_alone(auds, user) and perm < 1:
+		if not auds.is_alone(user) and perm < 1:
 			raise self.perm_error(perm, 1, "to shuffle queue while other users are in voice")
 		async with auds.semaphore:
 			if "f" in flags or "s" in flags:
@@ -4755,7 +4959,7 @@ class Dedup(Command):
 		if not auds.queue:
 			raise IndexError("Queue is currently empty.")
 		auds.text = channel
-		if not is_alone(auds, user) and perm < 1:
+		if not auds.is_alone(user) and perm < 1:
 			raise self.perm_error(perm, 1, "to removed duplicate items from queue while other users are in voice")
 		async with auds.semaphore:
 			if auds.queue:
@@ -4789,7 +4993,7 @@ class Reverse(Command):
 		if not auds.queue:
 			raise IndexError("Queue is currently empty.")
 		auds.text = channel
-		if not is_alone(auds, user) and perm < 1:
+		if not auds.is_alone(user) and perm < 1:
 			raise self.perm_error(perm, 1, "to reverse queue while other users are in voice")
 		async with auds.semaphore:
 			reverse(auds.queue)
@@ -5048,7 +5252,7 @@ class Radio(Command):
 					freq = round_min(round(float(section[:section.index("<")].replace("&nbsp;", "").strip()) * coeff, 6))
 					field = [freq, ""]
 					curr, section = section.split("</tr>", 1)
-					for station in regexp('(?:<td class=(?:dx)?fsta2?>|\s{2,})<a href="').split(curr)[1:]:
+					for station in regexp(r'(?:<td class=(?:dx)?fsta2?>|\s{2,})<a href="').split(curr)[1:]:
 						if field[1]:
 							field[1] += "\n"
 						href, station = station.split('"', 1)
@@ -5064,68 +5268,8 @@ class Radio(Command):
 		bot.send_as_embeds(channel, title=title, thumbnail=country.icon, fields=sorted(fields), author=get_author(bot.user), reference=message)
 
 
-# class UpdateRadioMaps(Database):
-# 	name = "radiomaps"
-
-
-# class Party(Command):
-# 	server_only = True
-# 	min_level = 2
-# 	name = ["YTT"]
-# 	description = "Generates an activity party link in the nearest voice channel!"
-# 	usage = "<mode(poker|betrayal|youtube|fishington|chess)>?"
-# 	example = ("ytt", "party poker")
-# 	rate_limit = (10, 14)
-# 	sem = Semaphore(2, 8, rate_limit=8)
-# 	names = fcdict((
-# 		("Poker", 755827207812677713),
-# 		("Poker Night", 755827207812677713),
-# 		("YouTube", 755600276941176913),
-# 		("YouTube Together", 755600276941176913),
-# 		("Betrayal", 773336526917861400),
-# 		("Betrayal.io", 773336526917861400),
-# 		("Fishington", 814288819477020702),
-# 		("Fishington.io", 814288819477020702),
-# 		("Chess", 832012586023256104),
-# 	))
-# 	ephemeral = True
-
-# 	async def __call__(self, bot, guild, channel, user, argv, **void):
-# 		vc = select_voice_channel(user, channel)
-# 		if not argv:
-# 			argv = "YouTube"
-# 		try:
-# 			aid = self.names[argv]
-# 		except KeyError:
-# 			if not argv.isnumeric():
-# 				raise KeyError(f"Unsupported party application: {argv}")
-# 			aid = int(argv)
-# 		# invites = await bot.get_full_invites(guild)
-# 		# for invite in invites:
-# 		#     if invite.max_age == invite.max_uses == 0:
-# 		#         c = invite.get("channel", {})
-# 		#         if c.get("id") == vc.id:
-# 		#             app = invite.get("target_application")
-# 		#             if app:
-# 		#                 if app.get("id") == aid:
-# 		#                     return f"https://discord.gg/{invite.code}"
-# 		async with self.sem:
-# 			data = await Request(
-# 				f"https://discord.com/api/{api}/channels/{vc.id}/invites",
-# 				method="POST",
-# 				data=dict(
-# 					max_age=0,
-# 					max_uses=0,
-# 					target_application_id=aid,
-# 					target_type=2,
-# 					temporary=False,
-# 					validate=None,
-# 				),
-# 				authorise=True,
-# 				aio=True,
-# 				json=True
-# 			)
-# 		return f"https://discord.gg/{data['code']}"
+class UpdateRadioMaps(Database):
+	name = "radiomaps"
 
 
 class Player(Command):
@@ -5370,7 +5514,8 @@ class Player(Command):
 			timestamp=utc_dt(),
 		).set_author(**get_author(self.bot.user))
 		if message and last and message.id == last.id:
-			await message.edit(
+			await bot.edit_message(
+				message,
 				embed=emb,
 			)
 		else:
@@ -5393,11 +5538,11 @@ class Player(Command):
 				buttons=buttons,
 			)
 			auds.player.message = message
-			await bot.silent_delete(temp, no_log=True)
+			await bot.silent_delete(temp)
 		if auds.queue and not auds.paused & 1:
 			p = auds.epos
 			maxdel = p[1] - p[0] + 2
-			delay = min(maxdel, p[1] / self.barsize / 2 / abs(auds.stats.speed))
+			delay = min(maxdel, p[1] / self.barsize / 2 / auds.speed)
 			if delay > 10:
 				delay = 10
 			elif delay < 5:
@@ -5449,7 +5594,7 @@ def extract_lyrics(s):
 async def get_lyrics(item, url=None):
 	name = None
 	description = None
-	if url:
+	if is_url(url):
 		resp = ytdl.extract_from(url)
 		name = resp.get("title") or resp["webpage_url"].rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
 		if "description" in resp:
@@ -5482,19 +5627,20 @@ async def get_lyrics(item, url=None):
 					if fmt.get("language"):
 						lang = fmt["language"]
 						break
-			for cap in shuffle(resp["automatic_captions"][lang]):
-				if "json" in cap["ext"]:
-					break
-			with tracebacksuppressor:
-				data = await Request(cap["url"], aio=True, json=True, timeout=18)
-				lyr = []
-				for event in data["events"]:
-					para = "".join(seg.get("utf8", "") for seg in event.get("segs", ()))
-					lyr.append(para)
-				lyrics = "".join(lyr).strip()
-				if lyrics:
-					print("lyrics_captions", lyrics)
-					return name, lyrics
+			if lang in resp["automatic_captions"]:
+				for cap in shuffle(resp["automatic_captions"][lang]):
+					if "json" in cap["ext"]:
+						break
+				with tracebacksuppressor:
+					data = await Request(cap["url"], aio=True, json=True, timeout=18)
+					lyr = []
+					for event in data["events"]:
+						para = "".join(seg.get("utf8", "") for seg in event.get("segs", ()))
+						lyr.append(para)
+					lyrics = "".join(lyr).strip()
+					if lyrics:
+						print("lyrics_captions", lyrics)
+						return name, lyrics
 	url = f"https://genius.com/api/search/multi?q={item}"
 	for i in range(2):
 		data = {"q": item}
@@ -5721,7 +5867,7 @@ class Download(Command):
 						child=len(entry) > 1,
 						message=message,
 					))
-				fn = f"cache/{ts_us()}.zip"
+				fn = f"{FAST_PATH}/{ts_us()}.zip"
 				with zipfile.ZipFile(fn, "w", zipfile.ZIP_STORED, allowZip64=True, strict_timestamps=False) as z:
 					for fut in futs:
 						f, out = await wrap_future(fut)
@@ -5774,7 +5920,7 @@ class Download(Command):
 			desc += ", Audio settings: {ON}"
 		desc += "```*"
 		# Encode URL list into bytes and then custom base64 representation, hide in code box header
-		url_bytes = orjson.dumps([e["url"] for e in res])
+		url_bytes = json_dumps([e["url"] for e in res])
 		url_enc = as_str(bytes2b64(url_bytes, True))
 		vals = f"{user.id}_{len(res)}_{fmt}_{int(bool(a))}_{start}_{end}_{int(bool(b))}"
 		msg = "*```" + "\n" * ("z" in flags) + "callback-voice-download-" + vals + "-" + url_enc + "\n" + desc
@@ -5876,7 +6022,8 @@ class Download(Command):
 						#         aio=True,
 						#     )
 					if len(data) <= 1:
-						csubmit(message.edit(
+						csubmit(bot.edit_message(
+							message,
 							content=ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
 							embed=None,
 						))
@@ -5888,6 +6035,10 @@ class Download(Command):
 						f = await bot.get_request(download, timeout=3600)
 						out = name + "." + (fmt if fmt != "weba" else "webm")
 				if not f:
+					try:
+						reference = await bot.fetch_reference(message)
+					except (LookupError, discord.NotFound):
+						reference = None
 					f, out = await asubmit(
 						ytdl.download_file,
 						url,
@@ -5896,10 +6047,11 @@ class Download(Command):
 						end=end,
 						auds=auds,
 						silenceremove=silenceremove,
-						message=message.reference.cached_message if message.reference else None,
+						message=reference,
 					)
 				if not simulated:
-					csubmit(message.edit(
+					csubmit(bot.edit_message(
+						message,
 						content=css_md(f"Uploading {sqr_md(out)}..."),
 						embed=None,
 					))
@@ -5920,7 +6072,7 @@ class Download(Command):
 				with suppress():
 					os.remove(f)
 			if not simulated:
-				csubmit(bot.silent_delete(message, no_log=True))
+				csubmit(bot.silent_delete(message))
 
 
 class Transcribe(Command):
@@ -5934,6 +6086,7 @@ class Transcribe(Command):
 	typing = True
 	slash = True
 	ephemeral = True
+	maintenance = True
 
 	async def __call__(self, bot, channel, guild, message, argv, flags, user, **void):
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
@@ -5990,7 +6143,8 @@ class Transcribe(Command):
 			text = await process_image("whisper", "$", [stream], cap="whisper", timeout=3600)
 		if dest:
 			if m:
-				csubmit(m.edit(
+				csubmit(bot.edit_message(
+					m,
 					content=css_md(f"Translating {name}..."),
 					embed=None,
 				))
@@ -6004,13 +6158,12 @@ class Transcribe(Command):
 		emb.colour = await bot.get_colour(user)
 		emb.set_author(**get_author(user))
 		if m:
-			csubmit(bot.silent_delete(m, no_log=True))
+			csubmit(bot.silent_delete(m))
 		bot.send_as_embeds(channel, text, author=get_author(user), reference=message)
 
 
 class UpdateAudio(Database):
 	name = "audio"
-	destroyed = False
 
 	def __load__(self):
 		self.players = cdict()
@@ -6065,15 +6218,16 @@ class UpdateAudio(Database):
 	async def _dc(self, member):
 		await member.move_to(None)
 
-	def update_vc(self, guild):
+	async def update_vc(self, guild):
 		m = guild.me
-		if m:
+		if isinstance(m, discord.Member):
 			if guild.id not in self.players:
 				if m.voice is not None:
 					acsi = AudioClientSubInterface.from_guild(guild)
 					if acsi is not None:
-						return asubmit(acsi.kill)
-					return guild.change_voice_state(channel=None)
+						auds = CustomAudio(m.voice.channel)
+						return
+					return await guild.change_voice_state(channel=None)
 			else:
 				if m.voice is not None:
 					vc_ = m.voice.channel
@@ -6081,56 +6235,50 @@ class UpdateAudio(Database):
 					if perm.mute_members:
 						if vc_.type is discord.ChannelType.stage_voice:
 							if m.voice.suppress or m.voice.requested_to_speak_at:
-								return self.bot.audio.players[guild.id].speak()
+								return await self.bot.audio.players[guild.id].speak()
 						elif m.voice.deaf or m.voice.mute or m.voice.afk:
-							return m.edit(mute=False)
-		return emptyfut
+							return await m.edit(mute=False)
 
 	# Updates all voice clients
-	@tracebacksuppressor(SemaphoreOverflowError)
 	async def __call__(self, guild=None, **void):
 		bot = self.bot
-		async with self._semaphore:
-			# Ensure all voice clients are not muted, disconnect ones without matching audio players
-			if guild is not None:
-				csubmit(self.update_vc(guild))
-			else:
-				[csubmit(self.update_vc(g)) for g in bot.cache.guilds.values()]
+		# if not self._semaphore.busy:
+		# 	async with self._semaphore:
+		# 		# Ensure all voice clients are not muted, disconnect ones without matching audio players
+		# 		if guild is not None:
+		# 			csubmit(self.update_vc(guild))
+		# 		else:
+		# 			[csubmit(self.update_vc(g)) for g in bot.cache.guilds.values()]
 		# Update audio players
 		if guild is not None:
 			if guild.id in self.players:
 				auds = self.players[guild.id]
 				esubmit(auds.update)
 		else:
-			async with Delay(0.5):
-				a = 1
-				futs = deque()
-				for g in tuple(self.players):
-					with tracebacksuppressor(KeyError):
-						auds = self.players[g]
-						futs.append(asubmit(auds.update, priority=True))
-						futs.append(csubmit(self.research(auds)))
-						if auds.queue and not auds.paused and "dailies" in bot.data:
-							if auds.ts is not None and auds.acsi:
-								for member in auds.acsi.channel.members:
-									if member.id != bot.id:
-										vs = member.voice
-										if vs is not None and not vs.deaf and not vs.self_deaf:
-											bot.data.users.add_gold(member, 0.25)
-											bot.data.dailies.progress_quests(member, "music", utc() - auds.ts)
-							auds.ts = utc()
-						else:
-							auds.ts = None
-					if not a & 15:
-						await asyncio.sleep(0.2)
-					a += 1
-				for fut in futs:
-					with tracebacksuppressor:
-						await fut
-			await bot.audio.asubmit("ytdl.update()")
-		esubmit(ytd.update)
-		esubmit(ytdl.update_dl, priority=True)
-		if not self.backup_sem.busy and not self.destroyed:
+			futs = deque()
+			for g in tuple(self.players):
+				with tracebacksuppressor(KeyError):
+					auds = self.players[g]
+					futs.append(asubmit(auds.update, priority=True))
+					futs.append(csubmit(self.research(auds)))
+					if auds.queue and not auds.paused and "dailies" in bot.data:
+						if auds.ts is not None and auds.acsi:
+							for member in auds.acsi.channel.members:
+								if member.id != bot.id:
+									vs = member.voice
+									if vs is not None and not vs.deaf and not vs.self_deaf:
+										bot.data.users.add_gold(member, 0.25)
+										bot.data.dailies.progress_quests(member, "music", utc() - auds.ts)
+						auds.ts = utc()
+					else:
+						auds.ts = None
+			for fut in futs:
+				with tracebacksuppressor:
+					await fut
+			# if bot.audio:
+			# 	await asubmit(bot.audio.run, "ytdl.update()")
+		# esubmit(ytd.update)
+		if not self.backup_sem.busy:
 			async with self.backup_sem:
 				await self.backup()
 
@@ -6139,27 +6287,29 @@ class UpdateAudio(Database):
 			if auds.queue and not auds.paused:
 				esubmit(auds.announce, *args, aio=True, **kwargs)
 
+	backed = False
 	backup_sem = Semaphore(1, 0, rate_limit=30)
 	async def backup(self, force=False):
-		if not self.bot.ready or "blacklist" in self.bot.data and self.bot.data.blacklist.get(0):
+		if self.backed or not self.bot.ready or bot.maintenance:
 			return
 		temp = {}
 		for auds in tuple(self.players.values()):
-			if not auds.acsi or not auds.queue:
+			if auds.is_empty():
 				continue
 			d, _ = await asubmit(auds.get_dump, True, True)
-			temp[auds.acsi.channel.id] = dict(dump=d, channel=auds.text.id)
+			try:
+				temp[auds.acsi.channel.id] = dict(dump=d, channel=auds.text.id)
+			except AttributeError:
+				pass
 		self.fill(temp)
 		if force:
-			await asubmit(self.update, force=True, priority=True)
+			await asubmit(self.sync, force=True, priority=True)
 
 	# Stores all currently playing audio data to temporary database when bot shuts down
-	async def _destroy_(self, **void):
-		self.destroyed = True
+	async def _destroy_(self, shutdown=False, **void):
 		await self.backup(force=True)
-		for file in tuple(ytdl.cache.values()):
-			if not file.loaded:
-				await asubmit(file.destroy)
+		if not shutdown:
+			return
 		for auds in tuple(self.players.values()):
 			if auds.queue and not auds.paused:
 				reason = "🎵 Temporarily disconnecting for maintenance"
@@ -6171,35 +6321,35 @@ class UpdateAudio(Database):
 			else:
 				reason = f"🎵 Automatically disconnected from {sqr_md(auds.guild)}.🎵"
 			with tracebacksuppressor:
-				await asubmit(auds.kill, reason=css_md(reason) if reason else None, remove=False)
+				await asubmit(auds.kill, reason=css_md(reason) if reason else None, remove=False, timeout=8)
 
 	# Restores all audio players from temporary database when applicable
-	async def _bot_ready_(self, bot, **void):
+	async def _ready_(self, bot, **void):
 		globals()["bot"] = bot
 		ytdl.bot = bot
 		bot.ytdl = ytdl
-		ytdl.ytd_blocked.attach(bot.data.inaccessible)
+		ytdl.ytd_blocked.attach(bot.data.inaccessible.data)
 		try:
 			await asubmit(subprocess.check_output, ("./ffmpeg",))
 		except CPE:
 			pass
 		except FileNotFoundError:
 			print("WARNING: FFmpeg not found. Unable to convert and play audio.")
-		while bot.audio is None:
-			await asyncio.sleep(0.5)
-		await wrap_future(bot.audio.fut)
-		count = 0
-		for file in os.listdir("cache"):
-			if file.startswith("~") and file not in ytdl.cache:
-				ytdl.cache[file] = f = await asubmit(AudioFileLink, file, "cache/" + file, wasfile=True)
-				count += 1
-		if count:
-			print(f"Successfully reinstated {count} audio file{'s' if count != 1 else ''}")
-		if "blacklist" in self.bot.data and self.bot.data.blacklist.get(0):
+		if bot.maintenance:
 			return
+		keys = await bot.audio.asubmit("[ap.vc.channel.id for ap in AP.players.values()]")
+		for key in keys:
+			try:
+				vc = await bot.fetch_channel(key)
+			except Exception:
+				print_exc()
+				continue
+			CustomAudio.new(vc)
 		for k, v in self.data.items():
 			with tracebacksuppressor:
 				vc = await bot.fetch_channel(k)
+				if sum(1 for m in vc.members if not m.bot) < 1:
+					continue
 				channel = await bot.fetch_channel(v["channel"])
 				guild = channel.guild
 				bot = bot
@@ -6220,6 +6370,10 @@ class UpdateAudio(Database):
 						print("Auto-loading queue of", len(argv["queue"]), "items to", guild)
 						csubmit(dump(guild, channel, user, bot, perm, name, argv, flags, message, vc=vc, noannouncefirst=True))
 		# self.data.clear()
+
+
+class UpdateYTD(Database):
+	name = "ytd"
 
 
 class UpdatePlaylists(Database):

@@ -1,8 +1,17 @@
-import os, sys
+import os
+import sys
 python = sys.executable
 
 os.system("color")
-srgb = lambda r, g, b, s: f"\033[38;2;{r};{g};{b}m{s}\033[0m"
+def srgb(r, g, b, s):
+	return f"\x1b[38;2;{r};{g};{b}m{s}\x1b[0m"
+
+if "-nw" in sys.argv:
+	sys.argv.remove("-nw")
+	rewrite = False
+else:
+	rewrite = True
+keep = True
 
 if "-i" in sys.argv:
 	INT = True
@@ -20,17 +29,23 @@ if len(sys.argv) > 1:
 	if is_cuda:
 		import os
 		os.environ["CUDA_VISIBLE_DEVICES"] = device.split(":", 1)[-1]
-		device = "cuda:0"
-	import torch, time, math
+		cuda = "cuda:0"
+	else:
+		cuda = "cpu"
+	import torch
+	import time
+	import math
 	from torch.utils import benchmark
+	BATCH = 256
 	def walltime(stmt, arg_dict, duration=1):
-		return benchmark.Timer(stmt=stmt, globals=arg_dict).blocked_autorange(min_run_time=duration).median
+		return sum(benchmark.Timer(stmt=stmt, globals=arg_dict).timeit(BATCH).raw_times) / BATCH
 	if not is_cuda:
 		import concurrent.futures
 		exc = concurrent.futures.ProcessPoolExecutor(max_workers=core)
 	if __name__ == "__main__":
-		count = 4096
-		mark = lambda *args: temp.append(time.time())
+		count = 64 * (math.cbrt(core) if is_cuda else 1)
+		def mark(*args):
+			return temp.append(time.time())
 		while True:
 			taken = 0
 			temp = []
@@ -45,10 +60,10 @@ if len(sys.argv) > 1:
 			else:
 				it = 1
 			c = 2 ** n
-			# print(c)
-			a = torch.randn(c, c, dtype=torch.float32, device="cuda" if is_cuda else "cpu").to(dtype)
-			b = torch.randn(c, c, dtype=torch.float32, device="cuda" if is_cuda else "cpu").to(dtype)
-			# print("DEVICE:", device, count, len(a), c, it)
+			a = torch.randn(c, c, dtype=dtype, device=cuda)
+			b = torch.randn(c, c, dtype=dtype, device=cuda)
+			sys.stderr.write(str(("DEVICE:", device, count, len(a), c, it)) + "\n")
+			sys.stderr.flush()
 			for i in range(it):
 				if is_cuda:
 					t = walltime('a @ b', dict(a=a, b=b))
@@ -61,15 +76,23 @@ if len(sys.argv) > 1:
 						futs.append(fut)
 					for fut in futs:
 						t += fut.result()
-						# sys.stderr.write(f"{t} {core}\n")
 					t /= core ** 2
+				# sys.stderr.write(f"{t} {core}\n")
+				# sys.stderr.flush()
 				temp.append(2 * c ** 3 / t)
 				if not is_cuda:
 					t *= core
 				taken += t
-			del a, b
-			if taken < 5 and count < 65536:
-				count = min(65536, max(count * 2, round(math.sqrt(5 / taken) * count)))
+				# t1 = a * b
+				# t2 = a * b
+				# assert torch.all(t1 == t2)
+			del a
+			del b
+			req = 5 / BATCH
+			if taken < req:
+				count = round(max(count * math.cbrt(2), count * math.cbrt(req / (taken + 1 / 1000))))
+				sys.stderr.write(str((device, taken, count)) + "\n")
+				sys.stderr.flush()
 				continue
 			break
 		if not is_cuda:
@@ -103,89 +126,61 @@ if len(sys.argv) > 1:
 
 DC = 0
 if not is_sub:
+	import subprocess
 	print(srgb(0, 0, 255, "Scanning hardware..."))
 
-	import subprocess
 	try:
 		import pynvml
 	except ImportError:
-		subprocess.run([python, "-m", "pip", "install", "pynvml", "--upgrade", "--user"])
+		subprocess.run([python, "-m", "pip", "install", "pynvml", "--upgrade"])
 
 	print(srgb(0, 255, 255, "Loading..."))
 	import pynvml
 	try:
-		# raise
 		pynvml.nvmlInit()
 		DC = pynvml.nvmlDeviceGetCount()
-	except:
+	except Exception:
 		DC = 0
-	# if not DC:
-		# print(srgb(255, 0, 0, "WARNING: No NVIDIA GPUs detected. Please install one for AI compute acceleration."))
+	if not DC:
+		print(srgb(255, 0, 0, "WARNING: No NVIDIA GPUs detected. Please install one for AI compute acceleration."))
+
+	try:
+		import cpuinfo
+		import psutil
+		if DC:
+			import torch
+			import torchvision
+			if not torch.cuda.is_available() or not torchvision._HAS_OPS:
+				raise ImportError
+	except ImportError:
+		subprocess.run([python, "-m", "pip", "install", "py-cpuinfo", "--upgrade"])
+		subprocess.run([python, "-m", "pip", "install", "psutil", "--upgrade"])
+		if DC:
+			subprocess.run([python, "-m", "pip", "install", "torch", "torchvision", "torchaudio", "--upgrade", "--index-url", "https://download.pytorch.org/whl/cu121"])
+			import torch
+		import cpuinfo
+		import psutil
 
 	compute_load = []
 	compute_order = []
 
 	import json
-	keep = True
 	if __name__ != "__main__" and os.path.exists("auth.json"):
-		try:
-			import pkg_resources
-		except:
-			import traceback
-			print(srgb(255, 0, 0, traceback.format_exc()), end="")
-			subprocess.run(["pip", "install", "setuptools", "--upgrade", "--user"])
-			import pkg_resources
+		import importlib.metadata
 
-		try:
-			import cpuinfo, psutil
-			if DC:
-				import torch, torchvision, xformers
-				if not torch.cuda.is_available() or not torchvision._HAS_OPS:
-					raise ImportError
-		except ImportError:
-			subprocess.run([python, "-m", "pip", "install", "py-cpuinfo", "--upgrade", "--user"])
-			subprocess.run([python, "-m", "pip", "install", "psutil", "--upgrade", "--user"])
-			if DC:
-				subprocess.run([python, "-m", "pip", "install", "xformers", "--upgrade", "--user", "--index-url", "https://download.pytorch.org/whl/cu121"])
-				subprocess.run([python, "-m", "pip", "install", "torchvision", "torchaudio", "--upgrade", "--user", "--index-url", "https://download.pytorch.org/whl/cu121"])
-				try:
-					assert pkg_resources.get_distribution("exllamav2").version >= "0.0.8"
-				except (pkg_resources.DistributionNotFound, AssertionError):
-					vi = f"{sys.version_info.major}{sys.version_info.minor}"
-					oi = "win_amd64" if os.name == "nt" else "linux_x86_64"
-					subprocess.run([python, "-m", "pip", "install", "--upgrade", "--user", f"https://github.com/turboderp/exllamav2/releases/download/v0.0.8/exllamav2-0.0.8+cu121-cp{vi}-cp{vi}-{oi}.whl"])
-				import torch
-			import cpuinfo, psutil
-
-		req = ["diffusers"]
+		req = []
 		if DC:
 			req.append("accelerate")
-		# if os.name == "nt":
-		# 	req.append("bitsandbytes-windows")
-		# else:
-		# 	req.append("bitsandbytes")
 		for mn in req:
 			try:
-				pkg_resources.get_distribution(mn)
-			except:
-				subprocess.run([python, "-m", "pip", "install", mn, "--upgrade", "--user"])
-		# if os.name == "nt":
-		# 	try:
-		# 		pkg_resources.get_distribution("bitsandbytes")
-		# 	except:
-		# 		try:
-		# 			dist = pkg_resources.get_distribution("bitsandbytes-windows")
-		# 			fold = dist.module_path + "/bitsandbytes_windows-" + dist.version + ".dist-info"
-		# 			if os.path.exists(fold):
-		# 				os.rename(fold, fold.replace("_windows", ""))
-		# 		except:
-		# 			import traceback
-		# 			print(srgb(255, 0, 0, traceback.format_exc()), end="")
+				importlib.metadata.version(mn)
+			except Exception:
+				subprocess.run([python, "-m", "pip", "install", mn, "--upgrade"])
 
 		with open("auth.json", "rb") as f:
 			try:
 				data = json.load(f)
-			except:
+			except json.JSONDecodeError:
 				data = {}
 		compute_load = data.get("compute_load")
 		compute_order = data.get("compute_order")
@@ -198,16 +193,23 @@ if not is_sub:
 		compute_order = []
 
 		import time
-		if DC > 2:
-			import torch, time
+		handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(DC)]
+		bwidths = [1073741824 / 8 / 8 * 2 ** pynvml.nvmlDeviceGetCurrPcieLinkGeneration(d) * pynvml.nvmlDeviceGetCurrPcieLinkWidth(d) for d in handles]
+		if DC > 1:
+			import torch
+			import time
 			devices = list(range(DC - 1, -1, -1))
 
 			for i in devices:
 				print(f"Initialising device {i}...")
-				a = torch.zeros(1, dtype=torch.uint8, device=i)
+				try:
+					a = torch.ones(1, dtype=torch.uint8, device=i)
+				except RuntimeError as ex:
+					print(f"Device {i}:", repr(ex))
+					a = torch.ones(1, dtype=torch.float32, device=i)
 				del a
 
-			i = sorted(devices, key=lambda i: (d := torch.cuda.get_device_properties(i)) and (d.major * d.multi_processor_count * d.total_memory), reverse=True)[0]
+			i = sorted(reversed(devices), key=lambda i: (d := torch.cuda.get_device_properties(i)) and (d.major * d.multi_processor_count * d.total_memory), reverse=True)[0]
 			compute_order.append(i)
 			devices.remove(i)
 			f = i
@@ -217,12 +219,13 @@ if not is_sub:
 				shortest = torch.inf
 				j = i
 				for i in devices:
-					a = torch.randint(0, 255, (1073741824,), dtype=torch.uint8, device=j)
-					t = time.time()
-					b = a.to(i)
-					t = time.time() - t
-					del a
-					print(i, t)
+					t = 1 / bwidths[i] / torch.cuda.get_device_properties(i).total_memory
+					# a = torch.randint(0, 255, (1073741824,), dtype=torch.uint8, device=j)
+					# t = time.time()
+					# b = a.to(i)
+					# t = time.time() - t
+					# del a
+					# print(i, t)
 					if t < shortest:
 						shortest = t
 						best = i
@@ -299,11 +302,11 @@ if not is_sub:
 		if not os.path.exists("auth.json"):
 			keep = False
 
-	if keep:
+	if keep and rewrite:
 		with open("auth.json", "rb+") as f:
 			try:
 				data = json.load(f)
-			except:
+			except json.JSONDecodeError:
 				data = {}
 			data["compute_load"] = compute_load
 			data["compute_order"] = compute_order

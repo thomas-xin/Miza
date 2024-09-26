@@ -1,7 +1,7 @@
 # Make linter shut up lol
 if "common" not in globals():
-	import common
-	from common import *
+	import misc.common as common
+	from misc.common import *
 print = PRINT
 
 import nekos, rule34, pybooru
@@ -305,7 +305,7 @@ class Neko(Command):
 					async with self.moe_sem:
 						resp = await Request(
 							"https://nekos.moe/api/v1/images/search",
-							data=orjson.dumps(dict(nsfw=False, limit=50, skip=xrand(10) * 50, sort="newest", artist="", uploader="")),
+							data=json_dumps(dict(nsfw=False, limit=50, skip=xrand(10) * 50, sort="newest", artist="", uploader="")),
 							headers={"Content-Type": "application/json"},
 							method="POST",
 							json=True,
@@ -410,7 +410,6 @@ class Lewd(Command):
 	usage = "<query> <verbose(-v)>?"
 	example = ("lewd pokemon",)
 	flags = "v"
-	no_parse = True
 	rate_limit = (1, 6)
 
 	async def __call__(self, bot, args, flags, message, channel, **void):
@@ -437,27 +436,34 @@ class Verify(Command):
 	name = ["AgeVerify"]
 	min_level = 0
 	description = "Verifies your account age as 18+, allowing you to access NSFW-restricted commands within DM channels."
-	usage = "<mode(enable|disable)>?"
-	example = ("verify enable", "verify disable")
-	flags = "aed"
-	no_parse = True
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("enable", "disable", "view"),
+			),
+			description="Determines whether to enable, disable, or view verification status",
+			example="enable",
+			default="view",
+		),
+	)
 	rate_limit = (1, 6)
 
-	async def __call__(self, bot, user, channel, guild, name, flags, **void):
+	async def __call__(self, bot, _guild, _user, _nsfw, _name, mode, **void):
 		following = bot.data.nsfw
-		if not bot.is_nsfw(channel):
-			if user.id not in following:
+		if not _nsfw:
+			if _user.id not in following:
 				raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels, or for users who have posted in at least one {uni_str('NSFW')} channel shared with {bot.name}.")
-		curr = following.get(user.id)
-		if "d" in flags:
-			following[user.id] = False
-			return italics(css_md(f"Disabled NSFW DMs for {sqr_md(user)}."))
-		elif "e" in flags or "a" in flags:
-			following[user.id] = True
-			return italics(css_md(f"Enabled NSFW DMs for {sqr_md(user)}."))
+		curr = following.get(_user.id)
+		if mode == "disable":
+			following[_user.id] = False
+			return italics(css_md(f"Disabled age-verified DMs for {sqr_md(_user)}."))
+		elif mode == "enable":
+			following[_user.id] = True
+			return italics(css_md(f"Enabled age-verified DMs for {sqr_md(_user)}."))
 		if not curr:
-			return ini_md(f'NSFW DMs are currently disabled for {sqr_md(user)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
-		return ini_md(f"NSFW DMs are currently enabled for {sqr_md(user)}.")
+			return ini_md(f'Age-verified DMs are currently disabled for {sqr_md(_user)}. Use "{bot.get_prefix(_guild)}{_name} enable" to enable.')
+		return ini_md(f"Age-verified DMs are currently enabled for {sqr_md(_user)}.")
 
 
 class UpdateNSFW(Database):

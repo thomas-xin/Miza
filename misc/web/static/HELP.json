@@ -2,14 +2,14 @@
 	"MAIN": {
 		"Help": {
 			"aliases": [
+				"Help",
 				"\u2753",
 				"\u2754",
 				"?",
-				"Halp",
-				"Help"
+				"Halp"
 			],
 			"description": "Shows a list of usable commands, or gives a detailed description of a command.",
-			"usage": "<category(Admin|Fun|Image|Main|String|Voice|Webhook)>? <command>?",
+			"usage": "<category(['admin', 'ai', 'fun', 'image', 'main', 'string', 'voice', 'webhook'])>? <command>?",
 			"level": "0",
 			"rate_limit": "(3, 5)",
 			"example": [
@@ -18,78 +18,44 @@
 			],
 			"timeout": "24"
 		},
-		"Perms": {
-			"aliases": [
-				"DefaultPerms",
-				"ChangePerms",
-				"Perm",
-				"ChangePerm",
-				"Permissions",
-				"Perms"
-			],
-			"description": "Shows or changes a user's permission level.",
-			"usage": "<0:user>* <1:new_level|default(-d)>?",
-			"level": "0",
-			"rate_limit": "(5, 8)",
-			"example": [
-				"perms steven 2",
-				"perms 201548633244565504 ?d"
-			],
-			"timeout": "24"
-		},
-		"EnabledCommands": {
-			"aliases": [
-				"EC",
-				"Enable",
-				"Disable",
-				"EnabledCommands"
-			],
-			"description": "Shows, enables, or disables a command category in the current channel.",
-			"usage": "<mode(enable|disable|clear)>? <category>? <server-wide(-s)>? <list(-l)>?",
-			"level": "0",
-			"rate_limit": "(5, 8)",
-			"example": [
-				"enable fun ",
-				"ec disable main",
-				"ec -l"
-			],
-			"timeout": "24"
-		},
-		"Prefix": {
-			"aliases": [
-				"ChangePrefix",
-				"Prefix"
-			],
-			"description": "Shows or changes the prefix for Miza's commands for this server.",
-			"usage": "<new_prefix>? <default(-d)>?",
-			"level": "0",
-			"rate_limit": "(5, 8)",
-			"example": [
-				"prefix !",
-				"change_prefix >",
-				"prefix -d"
-			],
-			"timeout": "24"
-		},
 		"Loop": {
 			"aliases": [
 				"Loop"
 			],
-			"description": "Loops a command. Delete the original message to terminate the loop if necessary.",
-			"usage": "<0:iterations> <1:command>+",
+			"description": "Loops a command. Delete the original message to terminate the loop if necessary. Subject to regular command restrictions and rate limits.",
+			"usage": "",
 			"level": "1",
 			"rate_limit": "(10, 15)",
-			"example": [
-				"loop 3 ~cat",
-				"loop 8 ~sharpen"
+			"example": [],
+			"timeout": "288"
+		},
+		"Edit": {
+			"aliases": [
+				"Edit"
 			],
+			"description": "Edits an existing bot message using new output from a command. Subject to regular command restrictions and rate limits.",
+			"usage": "",
+			"level": "1",
+			"rate_limit": "(10, 15)",
+			"example": [],
+			"timeout": "288"
+		},
+		"Pipe": {
+			"aliases": [
+				"Pipe"
+			],
+			"description": "Redirects the output of one command into another. Subject to regular command restrictions and rate limits.",
+			"usage": "",
+			"level": "1",
+			"rate_limit": "(10, 15)",
+			"example": [],
 			"timeout": "288"
 		},
 		"Avatar": {
 			"aliases": [
+				"Avatar",
 				"PFP",
-				"Icon",
-				"Avatar"
+				"Icon"
 			],
 			"description": "Sends a link to the avatar of a user or server.",
 			"usage": "<objects>*",
@@ -104,12 +70,12 @@
 		},
 		"Info": {
 			"aliases": [
+				"Info",
 				"\ud83d\udd0d",
 				"\ud83d\udd0e",
 				"UserInfo",
 				"ServerInfo",
-				"WhoIs",
-				"Info"
+				"WhoIs"
 			],
 			"description": "Shows information about the target user or server.",
 			"usage": "<user>* <verbose(-v)>?",
@@ -123,9 +89,9 @@
 		},
 		"Profile": {
 			"aliases": [
+				"Profile",
 				"User",
-				"UserProfile",
-				"Profile"
+				"UserProfile"
 			],
 			"description": "Shows or edits a user profile on Miza.",
 			"usage": "<user>? <mode(description|thumbnail|timezone|birthday)>? <value>? <delete(-d)>?",
@@ -141,9 +107,9 @@
 		},
 		"Activity": {
 			"aliases": [
+				"Activity",
 				"Recent",
-				"Log",
-				"Activity"
+				"Log"
 			],
 			"description": "Shows recent Discord activity for the targeted user, server, or channel.",
 			"usage": "<user>? <verbose(-v)>?",
@@ -157,9 +123,9 @@
 		},
 		"Status": {
 			"aliases": [
+				"Status",
 				"State",
-				"Ping",
-				"Status"
+				"Ping"
 			],
 			"description": "Shows the bot's current internal program state.",
 			"usage": "<mode(enable|disable)>?",
@@ -173,10 +139,10 @@
 		},
 		"Invite": {
 			"aliases": [
+				"Invite",
 				"Website",
 				"BotInfo",
-				"InviteLink",
-				"Invite"
+				"InviteLink"
 			],
 			"description": "Sends a link to Miza's homepage, github and invite code, as well as an invite link to the current server if applicable.",
 			"usage": "",
@@ -189,11 +155,11 @@
 		},
 		"Upload": {
 			"aliases": [
+				"Upload",
 				"Filehost",
 				"Files",
 				"Preserve",
-				"PreserveAttachmentLinks",
-				"Upload"
+				"PreserveAttachmentLinks"
 			],
 			"description": "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to Miza's webserver's upload page: https://mizabot.xyz/files",
 			"usage": "<url>?",
@@ -207,13 +173,13 @@
 		},
 		"Reminder": {
 			"aliases": [
+				"Reminder",
 				"Announcement",
 				"Announcements",
 				"Announce",
 				"RemindMe",
 				"Reminders",
-				"Remind",
-				"Reminder"
+				"Remind"
 			],
 			"description": "Sets a reminder for a certain date and time.",
 			"usage": "<1:message>? <0:time[30s]>? <urgent(-u)>? <delete(-d)>?",
@@ -229,9 +195,9 @@
 		},
 		"Note": {
 			"aliases": [
+				"Note",
 				"Trash",
-				"Notes",
-				"Note"
+				"Notes"
 			],
 			"description": "Takes note of a given string and allows you to view and edit a to-do list!",
 			"usage": "<mode(edit|delete)>? <target(id|note)>?",
@@ -248,27 +214,27 @@
 	"STRING": {
 		"Translate": {
 			"aliases": [
-				"TR",
-				"Translate"
+				"Translate",
+				"TR"
 			],
 			"description": "Translates a string into another language.",
-			"usage": "<0:engine(chatgpt|mixtral|google)>? <2:src_language>? <1:dest_languages>* <-1:string>",
+			"usage": "<0:engine(google|command-r-plus|gpt-3.5-turbo-instruct)>? <2:src_language>? <1:dest_languages>* <-1:string>",
 			"level": "0",
 			"rate_limit": "(6, 9)",
 			"example": [
 				"translate english \u4f60\u597d",
-				"tr mixtral chinese bonjour, comment-t'appelles-tu?",
-				"translate chatgpt auto spanish french italian thank you!"
+				"tr gpt-4m chinese bonjour, comment-t'appelles-tu?",
+				"translate gpt-3.5-turbo-instruct auto spanish french italian thank you!"
 			],
 			"timeout": "24"
 		},
 		"Translator": {
 			"aliases": [
-				"AutoTranslate",
-				"Translator"
+				"Translator",
+				"AutoTranslate"
 			],
 			"description": "Adds an automated translator to the current channel. Specify a list of languages to translate between, and optionally a translation engine. All non-command messages that do not begin with \"#\" will be passed through the translator.",
-			"usage": "<0:engine(google|mixtral|chatgpt)>? <1:languages>* <disable(-d)>?",
+			"usage": "<0:engine(google|command-r-plus|gpt-3.5-turbo-instruct)>? <1:languages>* <disable(-d)>?",
 			"level": "2",
 			"rate_limit": "(9, 12)",
 			"example": [
@@ -279,6 +245,7 @@
 		},
 		"Math": {
 			"aliases": [
+				"Math",
 				"\ud83d\udd22",
 				"M",
 				"PY",
@@ -288,8 +255,7 @@
 				"Plot3D",
 				"Factor",
 				"Factorise",
-				"Factorize",
-				"Math"
+				"Factorize"
 			],
 			"description": "Evaluates a math formula.",
 			"usage": "<string> <verbose(-v)|rationalize(-r)>? <show_variables(-l)|clear_variables(-c)>?",
@@ -307,6 +273,7 @@
 		},
 		"Unicode": {
 			"aliases": [
+				"Unicode",
 				"Uni2Hex",
 				"U2H",
 				"HexEncode",
@@ -348,8 +315,7 @@
 				"B85Encode",
 				"B852Uni",
 				"85B",
-				"B85Decode",
-				"Unicode"
+				"B85Decode"
 			],
 			"description": "Converts unicode text to hexadecimal or binary numbers.",
 			"usage": "<string>",
@@ -364,12 +330,12 @@
 		},
 		"ID2Time": {
 			"aliases": [
+				"ID2Time",
 				"I2T",
 				"CreateTime",
 				"Timestamp",
 				"Time2ID",
-				"T2I",
-				"ID2Time"
+				"T2I"
 			],
 			"description": "Converts a discord ID to its corresponding UTC time.",
 			"usage": "<string>",
@@ -383,13 +349,13 @@
 		},
 		"Fancy": {
 			"aliases": [
+				"Fancy",
 				"Chaos",
 				"ZalgoText",
 				"Zalgo",
 				"FormatText",
 				"Format",
-				"FancyText",
-				"Fancy"
+				"FancyText"
 			],
 			"description": "Creates fun string translations using unicode fonts.",
 			"usage": "<string>",
@@ -404,9 +370,9 @@
 		},
 		"UnFancy": {
 			"aliases": [
+				"UnFancy",
 				"UnFormat",
-				"UnZalgo",
-				"UnFancy"
+				"UnZalgo"
 			],
 			"description": "Removes unicode formatting and diacritic characters from inputted text.",
 			"usage": "<string>",
@@ -419,10 +385,10 @@
 		},
 		"OwOify": {
 			"aliases": [
+				"OwOify",
 				"UwU",
 				"OwO",
-				"UwUify",
-				"OwOify"
+				"UwUify"
 			],
 			"description": "Applies the owo/uwu text filter to a string.",
 			"usage": "<string> <aggressive(-a)>? <basic(-b)>?",
@@ -449,9 +415,9 @@
 		},
 		"Char2Emoji": {
 			"aliases": [
+				"Char2Emoji",
 				"C2E",
-				"Char2Emoj",
-				"Char2Emoji"
+				"Char2Emoj"
 			],
 			"description": "Makes emoji blocks using a string.",
 			"usage": "<0:string> <1:emoji_1> <2:emoji_2>?",
@@ -475,11 +441,11 @@
 		},
 		"EmojiCrypt": {
 			"aliases": [
+				"EmojiCrypt",
 				"EncryptEmoji",
 				"DecryptEmoji",
 				"EmojiEncrypt",
-				"EmojiDecrypt",
-				"EmojiCrypt"
+				"EmojiDecrypt"
 			],
 			"description": "Encrypts the input text or file into smileys.",
 			"usage": "<string> <mode(encrypt|decrypt)> <encrypted(-p)>? <-1:password>",
@@ -490,6 +456,7 @@
 		},
 		"Time": {
 			"aliases": [
+				"Time",
 				"\ud83d\udd70\ufe0f",
 				"\u23f0",
 				"\u23f2\ufe0f",
@@ -497,8 +464,7 @@
 				"GMT",
 				"T",
 				"EstimateTime",
-				"EstimateTimezone",
-				"Time"
+				"EstimateTimezone"
 			],
 			"description": "Shows the current time at a certain GMT/UTC offset, or the current time for a user. Be sure to check out https://mizabot.xyz/time!",
 			"usage": "<target(?:offset_hours|user)>?",
@@ -527,12 +493,12 @@
 		},
 		"Identify": {
 			"aliases": [
+				"Identify",
 				"\ud83d\udcc2",
 				"Magic",
 				"Mime",
 				"FileType",
-				"IdentifyFiles",
-				"Identify"
+				"IdentifyFiles"
 			],
 			"description": "Detects the type, mime, and optionally details of an input file.",
 			"usage": "<url>*",
@@ -545,10 +511,10 @@
 		},
 		"Follow": {
 			"aliases": [
+				"Follow",
 				"\ud83d\udeb6",
 				"Follow_URL",
-				"Redirect",
-				"Follow"
+				"Redirect"
 			],
 			"description": "Follows a discord message link and/or finds URLs in a string.",
 			"usage": "<url>*",
@@ -561,11 +527,11 @@
 		},
 		"Match": {
 			"aliases": [
+				"Match",
 				"RE",
 				"RegEx",
 				"RexExp",
-				"GREP",
-				"Match"
+				"GREP"
 			],
 			"description": "matches two strings using Linux-style RegExp, or computes the match ratio of two strings.",
 			"usage": "<0:string1> <1:string2>?",
@@ -579,10 +545,10 @@
 		},
 		"Describe": {
 			"aliases": [
+				"Describe",
 				"Description",
 				"Image2Text",
-				"Clip",
-				"Describe"
+				"Clip"
 			],
 			"description": "Describes the input image.",
 			"usage": "<url>",
@@ -593,78 +559,11 @@
 			],
 			"timeout": "576"
 		},
-		"Ask": {
-			"aliases": [
-				"Miqumaid",
-				"Mixtral",
-				"Mistral",
-				"Wizard",
-				"Euryale",
-				"WizCode",
-				"Emerhyst",
-				"MLewd",
-				"Mythalion",
-				"Pyg",
-				"Pygmalion",
-				"Llama",
-				"Davinci",
-				"GPT3",
-				"GPT3a",
-				"GPT4",
-				"GPT4a",
-				"Ask"
-			],
-			"description": "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!",
-			"usage": "<string>",
-			"level": "0",
-			"rate_limit": "(12, 16)",
-			"example": [
-				"ask what's the date?",
-				"gpt3 what is the square root of 3721?",
-				"pyg can I have a hug?"
-			],
-			"timeout": "576"
-		},
-		"Personality": {
-			"aliases": [
-				"ResetChat",
-				"ClearChat",
-				"ChangePersonality",
-				"Personality"
-			],
-			"description": "Customises my personality for ~ask in the current server. Uses the largest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Miqumaid, Mixtral, Mistral, Wizard, Emerhyst, Mythalion, and Mythomax are currently the alternate models enabled.",
-			"usage": "<traits>* <default(-d)>?",
-			"level": "2",
-			"rate_limit": "(18, 24)",
-			"example": [
-				"personality MythoMax; mischievous, cunning",
-				"personality Mixtral; dry, sarcastic, snarky",
-				"personality Auto; sweet, loving",
-				"personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive."
-			],
-			"timeout": "24"
-		},
-		"Instruct": {
-			"aliases": [
-				"Complete",
-				"Completion",
-				"Instruct"
-			],
-			"description": "Similar to ~ask, but functions as instruct rather than chat.",
-			"usage": "<string>+",
-			"level": "0",
-			"rate_limit": "(2, 3)",
-			"example": [
-				"instruct Once upon a time,",
-				"complete Answer the following conversation as the robot!\n\nhuman: Hi!\nrobot: Heya, nice to meet you! How can I help?\nhuman: What's the square root of 289?\nrobot:"
-			],
-			"timeout": "24"
-		},
 		"Random": {
 			"aliases": [
+				"Random",
 				"choice",
-				"choose",
-				"Random"
+				"choose"
 			],
 			"description": "Randomizes a set of arguments.",
 			"usage": "<string>+",
@@ -678,10 +577,10 @@
 		},
 		"Rate": {
 			"aliases": [
+				"Rate",
 				"Rating",
 				"Rank",
-				"Ranking",
-				"Rate"
+				"Ranking"
 			],
 			"description": "Rates a given object with a random value out of 10!",
 			"usage": "<string>",
@@ -694,12 +593,12 @@
 		},
 		"WordCount": {
 			"aliases": [
+				"WordCount",
 				"Lc",
 				"Wc",
 				"Cc",
 				"Character_Count",
-				"Line_Count",
-				"WordCount"
+				"Line_Count"
 			],
 			"description": "Simple command that returns the word and character count of a supplied message. message.txt files work too!",
 			"usage": "<string>",
@@ -713,8 +612,8 @@
 		},
 		"Topic": {
 			"aliases": [
-				"Question",
-				"Topic"
+				"Topic",
+				"Question"
 			],
 			"description": "Asks a random question.",
 			"usage": "<relationship(-r)>? <pickup-line(-p)>? <nsfw-pickup-line(-n)>?",
@@ -728,9 +627,9 @@
 		},
 		"Fact": {
 			"aliases": [
+				"Fact",
 				"DailyFact",
-				"UselessFact",
-				"Fact"
+				"UselessFact"
 			],
 			"description": "Provides a random fact.",
 			"usage": "",
@@ -739,11 +638,25 @@
 			"example": [],
 			"timeout": "24"
 		},
+		"BubbleWrap": {
+			"aliases": [
+				"BubbleWrap",
+				"Pop",
+				"Bubble",
+				"Bubbles"
+			],
+			"description": "Creates a sheet of bubble wrap using spoilers.",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(3, 5)",
+			"example": [],
+			"timeout": "24"
+		},
 		"Urban": {
 			"aliases": [
+				"Urban",
 				"\ud83d\udcd6",
-				"UrbanDictionary",
-				"Urban"
+				"UrbanDictionary"
 			],
 			"description": "Searches Urban Dictionary for an item.",
 			"usage": "<string>",
@@ -754,71 +667,80 @@
 			],
 			"timeout": "24"
 		},
-		"Search": {
+		"Browse": {
 			"aliases": [
+				"Browse",
 				"\ud83e\udd86",
 				"\ud83c\udf10",
 				"Google",
-				"Bing",
-				"DuckDuckGo",
-				"Browse",
-				"Search"
+				"Browser"
 			],
-			"description": "Searches the web for an item.",
-			"usage": "<string>",
+			"description": "Searches the web, and displays as text or image.",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 16)",
-			"example": [
-				"google en passant"
-			],
+			"example": [],
 			"timeout": "24"
 		}
 	},
 	"ADMIN": {
+		"Perms": {
+			"aliases": [
+				"Perms",
+				"DefaultPerms",
+				"ChangePerms",
+				"Perm",
+				"ChangePerm",
+				"Permissions"
+			],
+			"description": "Shows or changes a user's permission level. Server Administrators bypass this.",
+			"usage": "<0:user>* <1:new_level|default(-d)>?",
+			"level": "0",
+			"rate_limit": "(5, 8)",
+			"example": [
+				"perms steven 2",
+				"perms 201548633244565504 ?d"
+			],
+			"timeout": "24"
+		},
 		"Purge": {
 			"aliases": [
+				"Purge",
 				"\ud83d\uddd1",
 				"Del",
 				"Delete",
-				"Purge_Range",
-				"Purge"
+				"Purge_Range"
 			],
 			"description": "Deletes a number or range of messages from a certain user in current channel.",
-			"usage": "<1:user>? <range(-r)> <0:count/slice[1]>? <ignore_restrictions(-i)>??",
+			"usage": "",
 			"level": "3",
 			"rate_limit": "(7, 12)",
-			"example": [
-				"purge @Miza 3",
-				"purge 50",
-				"purge_range 1038565892185222287 1128125804136579235"
-			],
+			"example": [],
 			"timeout": "384"
 		},
 		"Mute": {
 			"aliases": [
+				"Mute",
 				"\ud83d\udd07",
 				"Revoke",
 				"Silence",
 				"UnMute",
 				"Timeout",
-				"Mutes",
-				"Mute"
+				"Mutes"
 			],
 			"description": "Mutes a user for a certain amount of time, with an optional reason.",
-			"usage": "<0:user>* <1:time>? <2:reason>?",
+			"usage": "",
 			"level": "3",
 			"rate_limit": "(9, 16)",
-			"example": [
-				"mute @Miza 1h for being naughty"
-			],
+			"example": [],
 			"timeout": "384"
 		},
 		"Ban": {
 			"aliases": [
+				"Ban",
 				"\ud83d\udd28",
 				"Bans",
-				"Unban",
-				"Ban"
+				"Unban"
 			],
 			"description": "Bans a user for a certain amount of time, with an optional reason.",
 			"usage": "<0:user>* <1:time>? <2:reason>?",
@@ -831,26 +753,23 @@
 		},
 		"RoleSelect": {
 			"aliases": [
+				"RoleSelect",
 				"ReactionRoles",
 				"RoleButtons",
 				"RoleSelection",
-				"RoleSelector",
-				"RoleSelect"
+				"RoleSelector"
 			],
 			"description": "Creates a message that allows users to self-assign roles from a specified list.",
-			"usage": "<roles>+",
+			"usage": "",
 			"level": "3",
 			"rate_limit": "(9, 12)",
-			"example": [
-				"roleselect A B C",
-				"reactionroles \"role 1\", \"role 2\", \"role 3\""
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"RoleGiver": {
 			"aliases": [
-				"Verifier",
-				"RoleGiver"
+				"RoleGiver",
+				"Verifier"
 			],
 			"description": "Adds an automated role giver to the current channel. Triggered by a keyword in messages, only applicable to users with permission level >= 0 and account age >= 7d. Searches for word if only word characters, any substring if non-word characters are included, or regex if trigger begins and ends with a slash (/).",
 			"usage": "<0:react_to>? <1:role>? <delete_messages(-x)>?",
@@ -864,8 +783,8 @@
 		},
 		"AutoRole": {
 			"aliases": [
-				"InstaRole",
-				"AutoRole"
+				"AutoRole",
+				"InstaRole"
 			],
 			"description": "Causes any new user joining the server to automatically gain the targeted role. Input multiple roles to create a randomized role giver.",
 			"usage": "<role>? <update_all(-x)>? <disable(-d)>?",
@@ -879,9 +798,9 @@
 		},
 		"RolePreserver": {
 			"aliases": [
+				"RolePreserver",
 				"\ud83d\udd75\ufe0f",
-				"StickyRoles",
-				"RolePreserver"
+				"StickyRoles"
 			],
 			"description": "Causes Miza to save roles for all users, and re-add them when they leave and rejoin.",
 			"usage": "<mode(enable|disable)>?",
@@ -895,9 +814,9 @@
 		},
 		"NickPreserver": {
 			"aliases": [
+				"NickPreserver",
 				"StickyNicks",
-				"NicknamePreserver",
-				"NickPreserver"
+				"NicknamePreserver"
 			],
 			"description": "Causes Miza to save nicknames for all users, and re-add them when they leave and rejoin.",
 			"usage": "<mode(enable|disable)>?",
@@ -911,11 +830,11 @@
 		},
 		"ThreadPreserver": {
 			"aliases": [
+				"ThreadPreserver",
 				"KeepAlive",
 				"ThreadBump",
 				"AutoBump",
-				"UnArchive",
-				"ThreadPreserver"
+				"UnArchive"
 			],
 			"description": "Causes Miza to \"bump\" (revive) the current thread when auto-archived.",
 			"usage": "<mode(enable|disable)>?",
@@ -929,9 +848,9 @@
 		},
 		"Lockdown": {
 			"aliases": [
+				"Lockdown",
 				"\ud83d\udd12",
-				"\u2623\ufe0f",
-				"Lockdown"
+				"\u2623\ufe0f"
 			],
 			"description": "Completely locks down the server by removing send message permissions for all users, revoking all invites, and archiving all threads.",
 			"usage": "",
@@ -942,9 +861,9 @@
 		},
 		"Archive": {
 			"aliases": [
+				"Archive",
 				"ArchiveServer",
-				"DownloadServer",
-				"Archive"
+				"DownloadServer"
 			],
 			"description": "Archives all messages, attachments and users into a .zip folder. Defaults to entire server if no channel specified, requires server permission level 3 as well as a Lv2 or above Miza subscription to perform, and may take a significant amount of time.",
 			"usage": "<server|channel>? <start-id>? <end-id>? <token>?",
@@ -955,29 +874,26 @@
 		},
 		"UserLog": {
 			"aliases": [
-				"MemberLog",
-				"UserLog"
+				"UserLog",
+				"MemberLog"
 			],
 			"description": "Causes Miza to log user and member events from the server, in the current channel.",
-			"usage": "<mode(enable|disable)>?",
+			"usage": "",
 			"level": "3",
 			"rate_limit": "1",
-			"example": [
-				"userlog enable"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"MessageLog": {
 			"aliases": [
-				"MessageLog"
+				"MessageLog",
+				"MemberLog"
 			],
-			"description": "Causes Miza to log message events from the server, in the current channel.",
-			"usage": "<mode(enable|disable)>?",
+			"description": "Causes Miza to log message and file events from the server, in the current channel.",
+			"usage": "",
 			"level": "3",
 			"rate_limit": "1",
-			"example": [
-				"messagelog enable"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"StarBoard": {
@@ -996,9 +912,9 @@
 		},
 		"Crosspost": {
 			"aliases": [
+				"Crosspost",
 				"Repost",
-				"Subscribe",
-				"Crosspost"
+				"Subscribe"
 			],
 			"description": "Causes Miza to automatically crosspost all messages from the target channel, into the current channel.",
 			"usage": "<channel> <disable(-d)>?",
@@ -1012,9 +928,9 @@
 		},
 		"Publish": {
 			"aliases": [
+				"Publish",
 				"News",
-				"AutoPublish",
-				"Publish"
+				"AutoPublish"
 			],
 			"description": "Causes Miza to automatically publish all posted messages in the current channel.",
 			"usage": "<mode(enable|disable)>? <force(-x)>?",
@@ -1028,8 +944,8 @@
 		},
 		"Relay": {
 			"aliases": [
-				"Forward",
-				"Relay"
+				"Relay",
+				"Forward"
 			],
 			"description": "Causes Miza to send the target user(s) a DM that enables them to communicate through the current channel.",
 			"usage": "<user>* <disable(-d)>?",
@@ -1041,14 +957,44 @@
 			],
 			"timeout": "24"
 		},
+		"EnabledCommands": {
+			"aliases": [
+				"EnabledCommands",
+				"EC",
+				"Enable",
+				"Disable"
+			],
+			"description": "Shows, enables, or disables a command category in the current channel.",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(5, 8)",
+			"example": [],
+			"timeout": "24"
+		},
+		"Prefix": {
+			"aliases": [
+				"Prefix",
+				"ChangePrefix"
+			],
+			"description": "Shows or changes the prefix for Miza's commands for this server.",
+			"usage": "<new_prefix>? <default(-d)>?",
+			"level": "0",
+			"rate_limit": "(5, 8)",
+			"example": [
+				"prefix !",
+				"change_prefix >",
+				"prefix -d"
+			],
+			"timeout": "24"
+		},
 		"CreateEmoji": {
 			"aliases": [
+				"CreateEmoji",
 				"EmojiCreate",
 				"EmojiCopy",
 				"CopyEmoji",
 				"Emote",
-				"Emoji",
-				"CreateEmoji"
+				"Emoji"
 			],
 			"description": "Creates a custom emoji from a URL or attached file.",
 			"usage": "<1:name>+ <0:url>",
@@ -1061,11 +1007,11 @@
 		},
 		"CreateSticker": {
 			"aliases": [
+				"CreateSticker",
 				"StickerCreate",
 				"StickerCopy",
 				"CopySticker",
-				"Sticker",
-				"CreateSticker"
+				"Sticker"
 			],
 			"description": "Creates a custom sticker from a URL or attached file.",
 			"usage": "<1:name>+ <0:url>",
@@ -1078,9 +1024,9 @@
 		},
 		"ScanEmoji": {
 			"aliases": [
+				"ScanEmoji",
 				"EmojiScan",
-				"ScanEmojis",
-				"ScanEmoji"
+				"ScanEmojis"
 			],
 			"description": "Scans all the emojis in the current server for potential issues.",
 			"usage": "<count>?",
@@ -1093,11 +1039,11 @@
 		},
 		"ThreadList": {
 			"aliases": [
+				"ThreadList",
 				"ListThreads",
 				"Threads",
 				"ReviveThreads",
-				"ReviveAll",
-				"ThreadList"
+				"ReviveAll"
 			],
 			"description": "Shows or revives all threads in the current server.",
 			"usage": "",
@@ -1110,6 +1056,7 @@
 	"VOICE": {
 		"Queue": {
 			"aliases": [
+				"Queue",
 				"\u25b6\ufe0f",
 				"P",
 				"Q",
@@ -1118,25 +1065,20 @@
 				"PlayNext",
 				"Enqueue",
 				"Search&Play",
-				"LS",
-				"Queue"
+				"LS"
 			],
 			"description": "Shows the music queue, or plays a song in voice.",
-			"usage": "<url>* <force(-f)|budge(-b)|random(-r)|verbose(-v)>*",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(3.5, 5)",
-			"example": [
-				"play despacito",
-				"queue",
-				"enqueue https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-			],
+			"example": [],
 			"timeout": "48"
 		},
 		"Playlist": {
 			"aliases": [
+				"Playlist",
 				"DefaultPlaylist",
-				"PL",
-				"Playlist"
+				"PL"
 			],
 			"description": "Shows, appends, or removes from the default playlist.",
 			"usage": "<mode(add|remove)>? <search_links>*",
@@ -1150,76 +1092,64 @@
 		},
 		"Connect": {
 			"aliases": [
+				"Connect",
 				"\ud83d\udcf2",
 				"\ud83c\udfa4",
 				"\ud83c\udfb5",
 				"\ud83c\udfb6",
-				"\ud83d\udcf4",
-				"\ud83d\udcdb",
 				"Summon",
 				"J",
 				"Join",
-				"DC",
-				"Disconnect",
-				"Leave",
-				"Yeet",
 				"Move",
 				"Reconnect",
-				"Listen",
-				"Deafen",
+				"Leave",
+				"Disconnect",
+				"DC",
+				"Yeet",
 				"FuckOff",
-				"Connect"
+				"Listen",
+				"Deafen"
 			],
 			"description": "Summons the bot into a voice channel, or advises it to leave.",
-			"usage": "<channel>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(3, 4)",
-			"example": [
-				"join",
-				"connect 247184721262411777",
-				"leave"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Skip": {
 			"aliases": [
+				"Skip",
 				"\u23ed",
 				"\ud83d\udeab",
 				"S",
 				"SK",
-				"FS",
-				"CQ",
+				"VoteSkip",
 				"ForceSkip",
+				"FS",
 				"Remove",
 				"Rem",
 				"ClearQueue",
 				"Clear",
-				"Skip"
+				"SkipAll",
+				"Shorten"
 			],
 			"description": "Removes an entry or range of entries from the voice channel queue.",
-			"usage": "<queue_positions[0]>* <force(-f)|vote(-v)>*",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(3.5, 5)",
-			"example": [
-				"skip",
-				"fs",
-				"skip 1 2 3",
-				"skip 3..9",
-				"skip 90:50:-1",
-				"remove 9",
-				"clear"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Pause": {
 			"aliases": [
+				"Pause",
 				"\u23f8\ufe0f",
 				"\u23ef\ufe0f",
 				"\u23f9\ufe0f",
 				"Resume",
 				"Unpause",
-				"Stop",
-				"Pause"
+				"Stop"
 			],
 			"description": "Pauses, stops, or resumes audio playing.",
 			"usage": "",
@@ -1234,9 +1164,9 @@
 		},
 		"Seek": {
 			"aliases": [
+				"Seek",
 				"\u2194\ufe0f",
-				"Replay",
-				"Seek"
+				"Replay"
 			],
 			"description": "Seeks to a position in the current audio file.",
 			"usage": "<position[0]>?",
@@ -1252,12 +1182,12 @@
 		},
 		"Dump": {
 			"aliases": [
+				"Dump",
 				"Export",
 				"Import",
 				"Save",
 				"Load",
-				"Dujmp\u00f6",
-				"Dump"
+				"Dujmp\u00f6"
 			],
 			"description": "Saves or loads the currently playing audio queue state.",
 			"usage": "<data>? <append(-a)|song_positions(-x)>*",
@@ -1271,6 +1201,7 @@
 		},
 		"AudioSettings": {
 			"aliases": [
+				"AudioSettings",
 				"Volume",
 				"Speed",
 				"Pitch",
@@ -1323,8 +1254,7 @@
 				"\ud83e\udd2b",
 				"\ud83d\udd15",
 				"24/7",
-				"\u267b",
-				"AudioSettings"
+				"\u267b"
 			],
 			"description": "Changes the current audio settings for this server. Some settings are very flexible; volume and bassboost are unlimited, speed and nightcore can be negative, etc.",
 			"usage": "<value>? <volume(-v)|speed(-s)|pitch(-p)|pan(-e)|bassboost(-b)|reverb(-r)|compressor(-c)|chorus(-u)|nightcore(-n)|bitrate(-i)|loop(-l)|repeat(-1)|shuffle(-x)|quiet(-q)|stay(-t)>* <force_permanent(-f)>? <disable(-d)>?",
@@ -1344,11 +1274,11 @@
 		},
 		"Jump": {
 			"aliases": [
+				"Jump",
 				"\ud83d\udd04",
 				"Roll",
 				"Next",
-				"RotateQueue",
-				"Jump"
+				"RotateQueue"
 			],
 			"description": "Rotates the queue to the left by a certain amount of steps.",
 			"usage": "<position[1]>?",
@@ -1362,9 +1292,9 @@
 		},
 		"Shuffle": {
 			"aliases": [
+				"Shuffle",
 				"\ud83d\udd00",
-				"Scramble",
-				"Shuffle"
+				"Scramble"
 			],
 			"description": "Shuffles the audio queue. Leaves the current song untouched unless ?f is specified.",
 			"usage": "<force_full_shuffle(-f)>?",
@@ -1375,10 +1305,10 @@
 		},
 		"Dedup": {
 			"aliases": [
+				"Dedup",
 				"Unique",
 				"Deduplicate",
-				"RemoveDuplicates",
-				"Dedup"
+				"RemoveDuplicates"
 			],
 			"description": "Removes all duplicate items from the audio queue.",
 			"usage": "",
@@ -1411,8 +1341,8 @@
 		},
 		"VoiceNuke": {
 			"aliases": [
-				"\u2622\ufe0f",
-				"VoiceNuke"
+				"VoiceNuke",
+				"\u2622\ufe0f"
 			],
 			"description": "Removes all users from voice channels in the current server.",
 			"usage": "",
@@ -1423,8 +1353,8 @@
 		},
 		"Radio": {
 			"aliases": [
-				"FM",
-				"Radio"
+				"Radio",
+				"FM"
 			],
 			"description": "Searches for a radio station livestream on https://worldradiomap.com that can be played on Miza.",
 			"usage": "<0:country>? <2:state>? <1:city>?",
@@ -1439,10 +1369,10 @@
 		},
 		"Player": {
 			"aliases": [
+				"Player",
 				"NP",
 				"NowPlaying",
-				"Playing",
-				"Player"
+				"Playing"
 			],
 			"description": "Creates an auto-updating virtual audio player for the current server.",
 			"usage": "<mode(enable|disable)>?",
@@ -1456,8 +1386,8 @@
 		},
 		"Lyrics": {
 			"aliases": [
-				"SongLyrics",
-				"Lyrics"
+				"Lyrics",
+				"SongLyrics"
 			],
 			"description": "Searches genius.com for lyrics of a song.",
 			"usage": "<search_link>* <verbose(-v)>?",
@@ -1472,6 +1402,7 @@
 		},
 		"Download": {
 			"aliases": [
+				"Download",
 				"\ud83d\udce5",
 				"YTSearch",
 				"YTDL",
@@ -1485,8 +1416,7 @@
 				"\ud83c\udf3d\ud83d\udc31",
 				"ConvertORG",
 				"Org2xm",
-				"Convert",
-				"Download"
+				"Convert"
 			],
 			"description": "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link. Will extend (loop) if trimmed past the end. The \"-\" character is used to omit parameters for ~trim.",
 			"usage": "<0:search_links>* <multi_output(-m)|trim(-t)>? <-3:trim_start[-]>? <-2:trim_end[-]>? <-1:out_format[mp4]>? <concatenate(-c)|remove_silence(-r)|apply_settings(-a)|verbose_search(-v)>*",
@@ -1501,10 +1431,10 @@
 		},
 		"Transcribe": {
 			"aliases": [
+				"Transcribe",
 				"Whisper",
 				"TranscribeAudio",
-				"Caption",
-				"Transcribe"
+				"Caption"
 			],
 			"description": "Downloads a song from a link, automatically transcribing to English, or a provided language if applicable.",
 			"usage": "<1:language[en]>? <0:search_link>",
@@ -1518,37 +1448,9 @@
 		}
 	},
 	"IMAGE": {
-		"ImageAdjust": {
-			"aliases": [
-				"Saturation",
-				"Saturate",
-				"Contrast",
-				"Brightness",
-				"Brighten",
-				"Lighten",
-				"Lightness",
-				"Luminance",
-				"Luminosity",
-				"Sharpness",
-				"Sharpen",
-				"HueShift",
-				"Hue",
-				"Blur",
-				"Gaussian",
-				"ImageAdjust"
-			],
-			"description": "Applies an adjustment filter to the supplied image.",
-			"usage": "<0:url> <1:multiplier[2]>?",
-			"level": "0",
-			"rate_limit": "(5, 9)",
-			"example": [
-				"saturate https://mizabot.xyz/favicon",
-				"hue https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 0.8"
-			],
-			"timeout": "72"
-		},
 		"ColourDeficiency": {
 			"aliases": [
+				"ColourDeficiency",
 				"ColorBlind",
 				"ColourBlind",
 				"ColorBlindness",
@@ -1561,443 +1463,250 @@
 				"Tritanopia",
 				"Tritanomaly",
 				"Achromatopsia",
-				"Achromatonomaly",
-				"ColourDeficiency"
+				"Achromatonomaly"
 			],
 			"description": "Applies a colourblindness filter to the target image.",
-			"usage": "<0:url> <mode(protanopia|protanomaly|deuteranopia|deuteranomaly|tritanopia|tritanomaly|achromatopsia|achromatonomaly)>? <1:ratio[0.9]>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(6, 10)",
-			"example": [
-				"colourdeficiency tritanomaly https://mizabot.xyz/favicon",
-				"colourblind protanopia https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png"
-			],
+			"example": [],
 			"timeout": "84.0"
-		},
-		"Invert": {
-			"aliases": [
-				"Negate",
-				"Invert"
-			],
-			"description": "Inverts supplied image.",
-			"usage": "<url>",
-			"level": "0",
-			"rate_limit": "(5, 7)",
-			"example": [
-				"invert https://mizabot.xyz/favicon"
-			],
-			"timeout": "72"
-		},
-		"GreyScale": {
-			"aliases": [
-				"GrayScale",
-				"GreyScale"
-			],
-			"description": "Greyscales supplied image.",
-			"usage": "<url>",
-			"level": "0",
-			"rate_limit": "(5, 7)",
-			"example": [
-				"greyscale https://mizabot.xyz/favicon"
-			],
-			"timeout": "72"
 		},
 		"EdgeDetect": {
 			"aliases": [
+				"EdgeDetect",
 				"Laplacian",
 				"Canny",
 				"Depth",
-				"DepthMap",
-				"Edges",
-				"Edge",
-				"EdgeDetect"
+				"DepthMap"
 			],
 			"description": "Applies an edge or depth detection algorithm to the image.",
-			"usage": "<url>",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(5, 7)",
-			"example": [
-				"laplacian https://mizabot.xyz/favicon"
-			],
+			"example": [],
 			"timeout": "72"
 		},
 		"ColourSpace": {
 			"aliases": [
-				"ColorSpace",
-				"ColourSpace"
+				"ColourSpace",
+				"ColorSpace"
 			],
 			"description": "Changes the colour space of the supplied image.",
-			"usage": "<0:url> <2:source(rgb|cmy|xyz|hsv|hsl|hsi|lab|luv|yiq|yuv)>? <1:dest(hsv|hsl|hsi|lab|luv|yiq|yuv|rgb|cmy|xyz)>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(7, 11)",
-			"example": [
-				"colourspace https://mizabot.xyz/favicon rgb hsv",
-				"colorspace https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png cmy hsi"
-			],
+			"example": [],
 			"timeout": "96"
 		},
-		"Magik": {
+		"GMagik": {
 			"aliases": [
-				"Distort",
-				"Magik"
+				"GMagik",
+				"Magik",
+				"Liquefy"
 			],
 			"description": "Applies the Magik image filter to supplied image.",
-			"usage": "<0:url> <cell_count[7]>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(8, 12)",
-			"example": [
-				"magik https://mizabot.xyz/favicon",
-				"magik https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 3"
-			],
-			"timeout": "96"
-		},
-		"Colour": {
-			"aliases": [
-				"RGB",
-				"HSV",
-				"HSL",
-				"CMY",
-				"LAB",
-				"LUV",
-				"XYZ",
-				"Color",
-				"Colour"
-			],
-			"description": "Creates a 128x128 image filled with the target colour.",
-			"usage": "<colour>",
-			"level": "0",
-			"rate_limit": "(3, 5)",
-			"example": [
-				"colour bf7fff",
-				"rgb (50, 150, 250)",
-				"hsv 50 20 30",
-				"color blue"
-			],
-			"timeout": "24"
+			"example": [],
+			"timeout": "168"
 		},
 		"Gradient": {
 			"aliases": [
-				"Gradient"
+				"Gradient",
+				"RainbowGradient"
 			],
 			"description": "Generates a gradient with a specific shape.",
-			"usage": "<mode(linear|radial|conical|spiral|polygon)>? <0:count[1]>? <-1:colour[white]>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 6)",
-			"example": [
-				"gradient radial red",
-				"gradient linear green"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Average": {
 			"aliases": [
-				"AverageColour",
-				"Average"
+				"Average",
+				"AverageColour"
 			],
 			"description": "Computes the average pixel colour in RGB for the supplied image.",
-			"usage": "<url>",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(5, 7)",
-			"example": [
-				"average https://mizabot.xyz/favicon"
-			],
+			"example": [],
 			"timeout": "48"
 		},
 		"QR": {
 			"aliases": [
-				"RainbowQR",
-				"QR"
+				"QR",
+				"RainbowQR"
 			],
 			"description": "Creates a QR code image from an input string, optionally adding a rainbow swirl effect.",
-			"usage": "<string>",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(8, 11)",
-			"example": [
-				"QR https://mizabot.xyz/favicon",
-				"rainbow_qr you found the funny!"
-			],
+			"example": [],
 			"timeout": "96"
 		},
 		"Rainbow": {
 			"aliases": [
-				"RainbowGIF",
-				"Gay",
-				"Shiny",
-				"Rainbow"
+				"Rainbow",
+				"Gay"
 			],
 			"description": "Creates a .gif image from repeatedly hueshifting supplied image.",
-			"usage": "<0:url> <1:duration[2]>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 13)",
-			"example": [
-				"rainbow https://mizabot.xyz/favicon",
-				"rainbow https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 6"
-			],
-			"timeout": "192"
+			"example": [],
+			"timeout": "96"
 		},
 		"Scroll": {
 			"aliases": [
-				"Parallax",
-				"Offset",
-				"ScrollGIF",
-				"Scroll"
+				"Scroll",
+				"Parallax"
 			],
 			"description": "Creates a .gif image from repeatedly shifting supplied image in a specified direction.",
-			"usage": "<0:url> <1:direction[left]>? <2:duration[2]>? <3:fps[32]>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 13)",
-			"example": [
-				"scroll https://mizabot.xyz/favicon",
-				"scroll https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png down 4"
-			],
-			"timeout": "192"
+			"example": [],
+			"timeout": "96"
 		},
 		"Spin": {
 			"aliases": [
-				"SpinGIF",
-				"Spin"
+				"Spin",
+				"Rotate"
 			],
-			"description": "Creates a .gif image from repeatedly rotating supplied image.",
-			"usage": "<0:url> <1:duration[2]>?",
+			"description": "Creates an animation from repeatedly rotating supplied image.",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 13)",
-			"example": [
-				"spin https://mizabot.xyz/favicon",
-				"spin https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 3"
-			],
-			"timeout": "192"
+			"example": [],
+			"timeout": "96"
 		},
 		"Orbit": {
 			"aliases": [
+				"Orbit",
 				"Orbital",
-				"Orbitals",
-				"Orbit"
+				"Orbitals"
 			],
 			"description": "Renders a ring of orbiting sprites of the supplied image.",
-			"usage": "<0:url>+ <1:orbital_count[5]>? <2:duration[2]>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(16, 22)",
-			"example": [
-				"orbitals https://mizabot.xyz/favicon",
-				"orbit https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 3 10"
-			],
+			"example": [],
 			"timeout": "312"
 		},
 		"Pet": {
 			"aliases": [
+				"Pet",
 				"PetPet",
 				"Attack",
-				"PatGIF",
-				"Pat",
-				"PetGIF",
-				"Pet"
+				"Pat"
 			],
 			"description": "Creates a .gif image from applying the Petpet generator to the supplied image.",
-			"usage": "<0:url> <1:squish[0.1]>? <2:duration[0.25]>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 13)",
-			"example": [
-				"pet https://mizabot.xyz/favicon",
-				"pet https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 3"
-			],
-			"timeout": "192"
-		},
-		"GMagik": {
-			"aliases": [
-				"Liquefy",
-				"Crumple",
-				"Crush",
-				"MagikGIF",
-				"GMagik"
-			],
-			"description": "Repeatedly applies the Magik image filter to supplied image.",
-			"usage": "<0:url> <cell_size[7]>? <iterations[64]>? <duration[2]>?",
-			"level": "0",
-			"rate_limit": "(11, 14)",
-			"example": [
-				"gmagik https://mizabot.xyz/favicon",
-				"liquefy https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 36"
-			],
-			"timeout": "192"
-		},
-		"CreateGIF": {
-			"aliases": [
-				"Animate",
-				"GIF",
-				"Frames",
-				"ImageSequence",
-				"CreateGIF"
-			],
-			"description": "Combines multiple supplied images, and/or optionally a video, into an animated image, image sequence, or video.",
-			"usage": "<0:url>+ <-2:fps[20]>? <-1:format[gif]>?",
-			"level": "0",
-			"rate_limit": "(12, 16)",
-			"example": [
-				"gif https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-				"gif https://discord.com/assets/7c010dc6da25c012643ea22c1f002bb4.svg https://discord.com/assets/66f6c781fe86c346fbaf3390618668fc.svg https://discord.com/assets/626aaed496ac12bbdb68a86b46871a1f.svg -r 3"
-			],
-			"timeout": "480"
+			"example": [],
+			"timeout": "120"
 		},
 		"Resize": {
 			"aliases": [
-				"ImageScale",
+				"Resize",
 				"Scale",
 				"Rescale",
-				"ImageResize",
 				"Scale2x",
-				"SwinIR",
-				"Denoise",
-				"Enhance",
-				"Refine",
-				"Copy",
 				"Jumbo",
-				"Resize"
+				"GIF"
 			],
 			"description": "Changes size of supplied image, using an optional scaling operation.",
-			"usage": "<0:url> <1:size(?:resolution|multiplier|filesize)>* <-1:mode(nearest|linear|hamming|bicubic|lanczos|scale2x|swinir|crop|auto)>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(8, 13)",
-			"example": [
-				"scale https://mizabot.xyz/favicon 4",
-				"resize https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 2048x2048 scale2x"
-			],
+			"example": [],
 			"timeout": "96"
 		},
 		"Crop": {
 			"aliases": [
-				"ImageCut",
-				"Cut",
-				"ImageCrop",
-				"Crop"
+				"Crop",
+				"Cut"
 			],
-			"description": "Crops the supplied image to a given size, expanding if necessary. Measurements are in pixels; use \"-\" to omit a value.",
-			"usage": "<0:url> <1:left> <2:top> <3:right> <4:bottom>",
+			"description": "Crops the supplied image to a given size, expanding if necessary. Use \"-\" to omit measurements.",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 9)",
-			"example": [
-				"crop https://mizabot.xyz/favicon 10 - 20 10",
-				"cut https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 120 120 -120 -120 webp"
-			],
+			"example": [],
 			"timeout": "96"
 		},
-		"Rotate": {
+		"Adjust": {
 			"aliases": [
-				"Orientate",
-				"Orientation",
-				"Transpose",
-				"Rotate"
+				"Adjust",
+				"Fill",
+				"HueShift",
+				"Invert",
+				"GreyScale",
+				"Lightness",
+				"Lighten",
+				"Luma",
+				"Brightness",
+				"Brighten"
 			],
-			"description": "Rotates an image. Defaults to counterclockwise rotation.",
-			"usage": "<0:url> <1:angle[90]>?",
-			"level": "0",
-			"rate_limit": "(8, 13)",
-			"example": [
-				"rotate https://mizabot.xyz/favicon 90",
-				"rotate https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 123.456"
-			],
-			"timeout": "72"
-		},
-		"Fill": {
-			"aliases": [
-				"ImageFill",
-				"FillChannel",
-				"FillImage",
-				"Fill"
-			],
-			"description": "Fills an optional amount of channels in the target image with an optional value.",
-			"usage": "<0:url> <channels(r|g|b|c|m|y|h|s|v|a)>* <-1:value[0]>?",
+			"description": "Adjusts an optional amount of channels in the target image with a given operation and optional value.",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(7, 10)",
-			"example": [
-				"fill https://mizabot.xyz/favicon gb 255",
-				"fill https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png r 0"
-			],
-			"timeout": "72"
+			"example": [],
+			"timeout": "96"
 		},
 		"Blend": {
 			"aliases": [
-				"ImageBlend",
-				"ImageOP",
 				"Blend"
 			],
 			"description": "Combines the two supplied images, using an optional blend operation.",
-			"usage": "<0:url1> <1:url2> <mode(normal|replace|add|sub|mul|div|mod|and|or|xor|nand|nor|xnor|difference|overlay|screen|soft|hard|lighten|darken|plusdarken|overflow|lighting|burn|linearburn|dodge|hue|sat|lum|colour|extract|merge)>? <3:opacity[0.5/1]>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(13, 17)",
-			"example": [
-				"blend https://mizabot.xyz/favicon https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png overflow"
-			],
+			"example": [],
 			"timeout": "168"
 		},
 		"Steganography": {
 			"aliases": [
+				"Steganography",
 				"Watermark",
 				"Copyright",
 				"Ownership",
 				"NFT",
-				"C",
-				"\u00a9",
-				"Steganography"
+				"\u00a9"
 			],
 			"description": "Tags an image with your discord user, or a message (input a user ID to tag another user). Raises an error if the image already has a tag.",
-			"usage": "<0:url> <1:data>? <2:message>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(12, 15)",
-			"example": [
-				"watermark https://mizabot.xyz/favicon",
-				"nft https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 201548633244565504"
-			],
+			"example": [],
 			"timeout": "144"
 		},
 		"OCR": {
 			"aliases": [
+				"OCR",
 				"Tesseract",
 				"Read",
-				"Image2Text",
-				"OCR"
+				"Image2Text"
 			],
 			"description": "Attempts to read text in an image using Optical Character Recognition AI.",
-			"usage": "<url>",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 15)",
-			"example": [
-				"ocr https://opengraph.githubassets.com/c3922b6d44ff4a498c1607bec89b70a1c755e2d44d115bec93b5bb981aa1ad36/tesseract-ocr/tesseract"
-			],
+			"example": [],
 			"timeout": "24"
-		},
-		"Art": {
-			"aliases": [
-				"AIArt",
-				"Inpaint",
-				"Morph",
-				"ControlNet",
-				"StableDiffusion",
-				"SDXL",
-				"Dalle",
-				"Dalle2",
-				"Dalle3",
-				"Dream",
-				"Imagine",
-				"Inspire",
-				"Art"
-			],
-			"description": "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system for image prompts. Configurable parameters are --strength, --guidance-scale, --aspect-ratio and --negative-prompt.",
-			"usage": "<0:prompt> <inpaint(-i)|morph(-m)>? <single(-s)>? <raw(-r)>?",
-			"level": "0",
-			"rate_limit": "(45, 60)",
-			"example": [
-				"art cute kitten",
-				"art https://mizabot.xyz/favicon"
-			],
-			"timeout": "3600"
 		}
 	},
 	"FUN": {
 		"Text2048": {
 			"aliases": [
+				"Text2048",
 				"2048",
-				"\ud83c\udfae",
-				"Text2048"
+				"\ud83c\udfae"
 			],
 			"description": "Plays a game of 2048 using buttons. Gained points are rewarded as gold.",
 			"usage": "<0:dimension_sizes[4x4]|dimension_count[2]>* <public(-p)|special_tiles(-s)|insanity_mode(-i)|easy_mode(-e)>*",
@@ -2013,9 +1722,9 @@
 		},
 		"Snake": {
 			"aliases": [
+				"Snake",
 				"Snaek",
-				"\ud83d\udc0d",
-				"Snake"
+				"\ud83d\udc0d"
 			],
 			"description": "Plays a game of Snake using buttons!",
 			"usage": "<dimensions[8x8]>* <public(-p)|insanity_mode(-i)>*",
@@ -2030,8 +1739,8 @@
 		},
 		"SlotMachine": {
 			"aliases": [
-				"Slots",
-				"SlotMachine"
+				"SlotMachine",
+				"Slots"
 			],
 			"description": "Plays a slot machine game. Costs gold to play, can yield gold and diamonds.",
 			"usage": "<bet[50]>? <skip_animation(-s)>?",
@@ -2080,6 +1789,7 @@
 		},
 		"Matchmaking": {
 			"aliases": [
+				"Matchmaking",
 				"Ship",
 				"\u2764\ufe0f",
 				"\ud83e\udde1",
@@ -2094,8 +1804,7 @@
 				"\ud83e\udd0e",
 				"\u2763\ufe0f",
 				"\ud83d\udc95",
-				"\ud83d\udc96",
-				"Matchmaking"
+				"\ud83d\udc96"
 			],
 			"description": "Ships two provided objects with a randomised percent.",
 			"usage": "<objects>*",
@@ -2109,13 +1818,13 @@
 		},
 		"Pay": {
 			"aliases": [
+				"Pay",
 				"GiveCoins",
 				"GiveGold",
 				"GiveDiamond",
 				"GiveDiamonds",
 				"\ud83e\ude99",
-				"\ud83d\udc8e",
-				"Pay"
+				"\ud83d\udc8e"
 			],
 			"description": "Pays a specified amount of coins or diamonds to the target user.",
 			"usage": "<0:user> <1:amount[1]>? <-1:diamonds(\ud83d\udc8e)>?",
@@ -2128,18 +1837,14 @@
 		},
 		"React": {
 			"aliases": [
-				"AutoReact",
-				"React"
+				"React",
+				"AutoReact"
 			],
-			"description": "Causes Miza to automatically assign a reaction to messages containing the trigger. Triggered by a keyword in messages, only applicable to non-command messages. Searches for word if only word characters, any substring if non-word characters are included, or regex if trigger begins and ends with a slash (/).",
-			"usage": "<0:react_to>? <1:react_data>? <disable(-d)>?",
+			"description": "Causes Miza to automatically assign a reaction to messages containing the trigger. Triggered by a keyword in messages, only applicable to non-command messages.",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 6)",
-			"example": [
-				"react cat \ud83d\udc31",
-				"react ?d dog",
-				"react remove 1"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Dogpile": {
@@ -2171,12 +1876,12 @@
 		},
 		"Daily": {
 			"aliases": [
+				"Daily",
 				"Quests",
 				"Quest",
 				"Tasks",
 				"Challenges",
-				"Dailies",
-				"Daily"
+				"Dailies"
 			],
 			"description": "Shows your list of daily quests.",
 			"usage": "",
@@ -2185,31 +1890,26 @@
 			"example": [],
 			"timeout": "24"
 		},
-		"Wallet": {
+		"Premium": {
 			"aliases": [
+				"Premium",
 				"Level",
 				"Bal",
 				"Balance",
-				"Trial",
 				"Wallet"
 			],
-			"description": "Shows the target users' wallet.",
-			"usage": "<user>*",
+			"description": "Shows the target users' wallet, and their premium subscription status (if applicable).",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(3, 4)",
-			"example": [
-				"bal",
-				"wallet @Miza"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Shop": {
 			"aliases": [
+				"Shop",
 				"Upgrade",
-				"Premium",
-				"Premiums",
-				"UpgradeServer",
-				"Shop"
+				"UpgradeServer"
 			],
 			"description": "Displays the shop system, or purchases an item.",
 			"usage": "<item>?",
@@ -2224,15 +1924,15 @@
 		},
 		"Cat": {
 			"aliases": [
+				"Cat",
 				"\ud83d\udc31",
 				"Gato",
 				"Meow",
 				"Kitty",
-				"Kitten",
-				"Cat"
+				"Kitten"
 			],
 			"description": "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it. Be sure to check out https://mizabot.xyz/cats!",
-			"usage": "<verbose{?v}>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
@@ -2240,16 +1940,16 @@
 		},
 		"Dog": {
 			"aliases": [
+				"Dog",
 				"\ud83d\udc36",
 				"Woof",
 				"Doggy",
 				"Doggo",
 				"Puppy",
-				"Puppo",
-				"Dog"
+				"Puppo"
 			],
 			"description": "Pulls a random image from images.dog.ceo, api.alexflipnote.dev/dogs, or cdn.nekos.life/woof, and embeds it. Be sure to check out https://mizabot.xyz/dogs!",
-			"usage": "<verbose{?v}>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
@@ -2257,11 +1957,11 @@
 		},
 		"8Ball": {
 			"aliases": [
-				"\ud83c\udfb1",
-				"8Ball"
+				"8Ball",
+				"\ud83c\udfb1"
 			],
 			"description": "Pulls a random image from cdn.nekos.life/8ball, and embeds it.",
-			"usage": "<verbose{?v}>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
@@ -2272,7 +1972,7 @@
 				"XKCD"
 			],
 			"description": "Pulls a random image from xkcd.com and embeds it.",
-			"usage": "<verbose{?v}>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
@@ -2283,7 +1983,7 @@
 				"Turnoff"
 			],
 			"description": "Pulls a random image from turnoff.us and embeds it.",
-			"usage": "<verbose{?v}>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
@@ -2291,11 +1991,11 @@
 		},
 		"Inspiro": {
 			"aliases": [
-				"InspiroBot",
-				"Inspiro"
+				"Inspiro",
+				"InspiroBot"
 			],
 			"description": "Pulls a random image from inspirobot.me and embeds it.",
-			"usage": "<verbose{?v}>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
@@ -2303,15 +2003,15 @@
 		},
 		"ImageSearch": {
 			"aliases": [
+				"ImageSearch",
 				"\ud83d\uddbc",
 				"\ud83e\uddc1",
 				"ImgSearch",
 				"Muffin",
-				"Muffins",
-				"ImageSearch"
+				"Muffins"
 			],
 			"description": "Pulls a random image from a search on gettyimages.co.uk and unsplash.com, using tags.",
-			"usage": "<verbose{?v}>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(2, 4)",
 			"example": [
@@ -2322,11 +2022,11 @@
 		},
 		"Giphy": {
 			"aliases": [
-				"GIFSearch",
-				"Giphy"
+				"Giphy",
+				"GIFSearch"
 			],
 			"description": "Pulls a random image from a search on giphy.com using tags.",
-			"usage": "<verbose{?v}>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(2, 4)",
 			"example": [
@@ -2336,10 +2036,10 @@
 		},
 		"Rickroll": {
 			"aliases": [
+				"Rickroll",
 				"Thumbnail",
 				"FakeThumbnail",
-				"FakeVideo",
-				"Rickroll"
+				"FakeVideo"
 			],
 			"description": "Generates a link that embeds a thumbnail, but redirects to a separate YouTube video once played.",
 			"usage": "<thumbnail>? <video>?",
@@ -2353,8 +2053,8 @@
 		},
 		"RPS": {
 			"aliases": [
-				"Rockpaperscissors",
-				"RPS"
+				"RPS",
+				"Rockpaperscissors"
 			],
 			"description": "A randomised game of Rock-Paper-Scissors!",
 			"usage": "<move(rock|paper|scissors)>?",
@@ -2379,8 +2079,8 @@
 		},
 		"Akinator": {
 			"aliases": [
-				"Aki",
-				"Akinator"
+				"Akinator",
+				"Aki"
 			],
 			"description": "Think about a real or fictional character. I will try to guess who it is!",
 			"usage": "<language[en]>? <child_friendly(-c)>?",
@@ -2396,8 +2096,8 @@
 	"OWNER": {
 		"Reload": {
 			"aliases": [
-				"Unload",
-				"Reload"
+				"Reload",
+				"Unload"
 			],
 			"description": "Reloads a specified module.",
 			"usage": "",
@@ -2409,22 +2109,19 @@
 			],
 			"timeout": "inf"
 		},
-		"Restart": {
+		"Shutdown": {
 			"aliases": [
 				"Shutdown",
+				"Maintain",
+				"Restart",
 				"Reboot",
-				"Update",
-				"Restart"
+				"Update"
 			],
 			"description": "Restarts, reloads, or shuts down Miza, with an optional delay.",
-			"usage": "<delay>?",
+			"usage": "",
 			"level": "nan",
 			"rate_limit": "(2, 3)",
-			"example": [
-				"shutdown",
-				"update",
-				"restart"
-			],
+			"example": [],
 			"timeout": "inf"
 		},
 		"Execute": {
@@ -2442,24 +2139,23 @@
 		},
 		"Exec": {
 			"aliases": [
-				"Eval",
-				"Exec"
+				"Exec",
+				"Aexec",
+				"Aeval",
+				"Eval"
 			],
 			"description": "Causes all messages by the bot owner(s) in the current channel to be executed as python code on Miza.",
-			"usage": "<mode(enable|disable)>? <type(virtual)>?",
+			"usage": "",
 			"level": "nan",
 			"rate_limit": "(2, 3)",
-			"example": [
-				"exec enable",
-				"exec ?d"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"SetAvatar": {
 			"aliases": [
+				"SetAvatar",
 				"ChangeAvatar",
-				"UpdateAvatar",
-				"SetAvatar"
+				"UpdateAvatar"
 			],
 			"description": "Changes Miza's current avatar.",
 			"usage": "<avatar_url>?",
@@ -2475,7 +2171,7 @@
 				"Maintenance"
 			],
 			"description": "Toggles Maintenance mode, which will block all use of commands for all servers except the current one while active.",
-			"usage": "<disable(-d)>",
+			"usage": "",
 			"level": "nan",
 			"rate_limit": "(2, 3)",
 			"example": [],
@@ -2483,9 +2179,9 @@
 		},
 		"Suspend": {
 			"aliases": [
+				"Suspend",
 				"Block",
-				"Blacklist",
-				"Suspend"
+				"Blacklist"
 			],
 			"description": "Prevents a user from accessing Miza's commands. Overrides <perms>.",
 			"usage": "<0:user> <disable(-d)>",
@@ -2500,8 +2196,8 @@
 	"NSFW": {
 		"Neko": {
 			"aliases": [
-				"Nya",
-				"Neko"
+				"Neko",
+				"Nya"
 			],
 			"description": "Pulls a random image from nekos.life and embeds it.",
 			"usage": "<tags[neko]>? <verbose(-v)|random(-r)|list(-l)>?",
@@ -2515,8 +2211,8 @@
 		},
 		"Lewd": {
 			"aliases": [
-				"NSFW",
-				"Lewd"
+				"Lewd",
+				"NSFW"
 			],
 			"description": "Pulls a random image from a search on Rule34 and e621, and embeds it.",
 			"usage": "<query> <verbose(-v)>?",
@@ -2529,27 +2225,24 @@
 		},
 		"Verify": {
 			"aliases": [
-				"AgeVerify",
-				"Verify"
+				"Verify",
+				"AgeVerify"
 			],
 			"description": "Verifies your account age as 18+, allowing you to access NSFW-restricted commands within DM channels.",
-			"usage": "<mode(enable|disable)>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(1, 6)",
-			"example": [
-				"verify enable",
-				"verify disable"
-			],
+			"example": [],
 			"timeout": "24"
 		}
 	},
 	"MISC": {
 		"CS_mem2flag": {
 			"aliases": [
+				"CS_mem2flag",
 				"mem2flag",
 				"m2f",
-				"CS_m2f",
-				"CS_mem2flag"
+				"CS_m2f"
 			],
 			"description": "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value.",
 			"usage": "<0:address> <1:value[1]>?",
@@ -2562,10 +2255,10 @@
 		},
 		"CS_flag2mem": {
 			"aliases": [
+				"CS_flag2mem",
 				"flag2mem",
 				"f2m",
-				"CS_f2m",
-				"CS_flag2mem"
+				"CS_f2m"
 			],
 			"description": "Returns the memory offset and specific bit pointed to by a given flag number.",
 			"usage": "<flag>",
@@ -2578,10 +2271,10 @@
 		},
 		"CS_num2val": {
 			"aliases": [
+				"CS_num2val",
 				"num2val",
 				"n2v",
-				"CS_n2v",
-				"CS_num2val"
+				"CS_n2v"
 			],
 			"description": "Returns a TSC value representing the desired number, within a certain number of characters.",
 			"usage": "<0:number> <1:length[4]>?",
@@ -2594,10 +2287,10 @@
 		},
 		"CS_val2num": {
 			"aliases": [
+				"CS_val2num",
 				"val2num",
 				"v2n",
-				"CS_v2n",
-				"CS_val2num"
+				"CS_v2n"
 			],
 			"description": "Returns the number encoded by a given TSC value.",
 			"usage": "<tsc_value>",
@@ -2610,10 +2303,10 @@
 		},
 		"CS_hex2xml": {
 			"aliases": [
+				"CS_hex2xml",
 				"hex2xml",
 				"h2x",
-				"CS_h2x",
-				"CS_hex2xml"
+				"CS_h2x"
 			],
 			"description": "Converts a given Cave Story hex patch to an xml file readable by Booster's Lab.",
 			"usage": "<hex_data>",
@@ -2626,11 +2319,11 @@
 		},
 		"CS_npc": {
 			"aliases": [
+				"CS_npc",
 				"npc",
 				"cs_bul",
 				"cs_sfx",
-				"cs_mus",
-				"CS_npc"
+				"cs_mus"
 			],
 			"description": "Searches the Cave Story NPC list for an NPC/bullet/effect/music by name or ID.",
 			"usage": "<query> <condensed(-c)>?",
@@ -2643,8 +2336,8 @@
 		},
 		"CS_mod": {
 			"aliases": [
-				"CS_search",
-				"CS_mod"
+				"CS_mod",
+				"CS_search"
 			],
 			"description": "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item.",
 			"usage": "<query>",
@@ -2657,9 +2350,9 @@
 		},
 		"Wav2Png": {
 			"aliases": [
+				"Wav2Png",
 				"Png2Wav",
-				"Png2Mp3",
-				"Wav2Png"
+				"Png2Mp3"
 			],
 			"description": "Runs wav2png on the input URL. See https://github.com/thomas-xin/Audio-Image-Converter for more info, or to run it yourself!",
 			"usage": "<0:search_links>",
@@ -2687,9 +2380,9 @@
 		},
 		"MCEnchant": {
 			"aliases": [
+				"MCEnchant",
 				"Enchant",
-				"GenerateEnchant",
-				"MCEnchant"
+				"GenerateEnchant"
 			],
 			"description": "Given an item and custom enchant values, generates a Minecraft /give command. An old misc command brought back.",
 			"usage": "<item> <enchantment(?:name/level)>*",
@@ -2704,9 +2397,9 @@
 		},
 		"BTD6Paragon": {
 			"aliases": [
+				"BTD6Paragon",
 				"Paragon",
-				"GenerateParagon",
-				"BTD6Paragon"
+				"GenerateParagon"
 			],
 			"description": "Given a tower and provided parameters, generates a list of Bloons TD 6 optimised paragon sacrifices. Parameters are \"p\" for pops, \"g\" for cash generated, \"t\" for Geraldo totems, and \"l\" for additional tower limit.",
 			"usage": "<tower> <sacrifices>* <parameters>*",
@@ -2717,18 +2410,6 @@
 				"paragon boat 400000p 30l",
 				"paragon monkey_ace 2x500 2x050 2x005"
 			],
-			"timeout": "24"
-		},
-		"DeviantArt": {
-			"aliases": [
-				"DASubscribe",
-				"DeviantArt"
-			],
-			"description": "Subscribes to a DeviantArt Gallery, reposting links to all new posts.",
-			"usage": "<action(add|remove)>? <url> <reversed(-r)>?",
-			"level": "2",
-			"rate_limit": "4",
-			"example": [],
 			"timeout": "24"
 		}
 	}

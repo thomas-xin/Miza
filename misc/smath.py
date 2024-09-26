@@ -1,8 +1,10 @@
 """
 Adds many useful math-related functions.
 """
-
-import os, contextlib, concurrent.futures
+# ruff: noqa: E402 F401 E731
+import os
+import contextlib
+import concurrent.futures
 from concurrent.futures import thread
 
 def _adjust_thread_count(self):
@@ -44,164 +46,46 @@ def _adjust_thread_count(self):
 
 concurrent.futures.ThreadPoolExecutor._adjust_thread_count = lambda self: _adjust_thread_count(self)
 
-import_exc = concurrent.futures.ThreadPoolExecutor(max_workers=48)
-submit = import_exc.submit
+import sys
+import collections
+import time
+import traceback
+import numpy as np
+import dateutil
+import datetime
+import colormath
+import functools
+import pytz
+import copy
+import io
+import random
+import fractions
+import mpmath
+import colorsys
+import re
+import hashlib
+import base64
+import itertools
 
-class MultiAutoImporter:
-
-	class ImportedModule:
-
-		def __init__(self, module, pool, _globals, start=True):
-			object.__setattr__(self, "__module", module)
-			if start:
-				fut = pool.submit(__import__, module)
-				object.__setattr__(self, "__fut", fut)
-			object.__setattr__(self, "__globals", _globals)
-
-		def __getattr__(self, k):
-			m = self.force()
-			return getattr(m, k)
-
-		def __setattr__(self, k, v):
-			m = self.force()
-			return setattr(m, k, v)
-
-		def force(self):
-			module = object.__getattribute__(self, "__module")
-			_globals = object.__getattribute__(self, "__globals")
-			try:
-				_globals[module] = m = object.__getattribute__(self, "__fut").result()
-			except AttributeError:
-				_globals[module] = m = __import__(module)
-			return m
-
-	def __init__(self, *args, pool=None, _globals=None):
-		self.pool = pool
-		if not _globals:
-			_globals = globals()
-		args = " ".join(args).replace(",", " ").split()
-		if not pool:
-			_globals.update((k, __import__(k)) for k in args)
-		else:
-			futs = []
-			for arg in args:
-				futs.append(self.ImportedModule(arg, pool, _globals, start=len(futs) < 3))
-			self.futs = futs
-			_globals.update(zip(args, futs))
-			submit(self.scan)
-
-	def scan(self):
-		for i, sub in enumerate(self.futs):
-			object.__getattribute__(sub, "__fut").result()
-			for j in range(i + 1, len(self.futs)):
-				try:
-					object.__getattribute__(self.futs[j], "__fut")
-				except AttributeError:
-					module = object.__getattribute__(self.futs[j], "__module")
-					fut = self.pool.submit(__import__, module)
-					# sys.stderr.write(str(fut) + "\n")
-					object.__setattr__(self.futs[j], "__fut", fut)
-					break
-
-common_modules = (
-	"sys",
-	"collections",
-	"time",
-	"requests",
-	"traceback",
-	"numpy",
-	"sympy",
-	"dateutil",
-	"datetime",
-	"colormath",
-	"pytz",
-	"ast",
-	"copy",
-	"pickle",
-	"io",
-	"random",
-	"cmath",
-	"fractions",
-	"mpmath",
-	"shlex",
-	"colorsys",
-	"re",
-	"hashlib",
-	"base64",
-	"itertools",
-)
-
-MultiAutoImporter(
-	*common_modules,
-	pool=import_exc,
-	_globals=globals(),
-)
-if __name__ == "__lint__":
-	import sys, collections, time, requests, traceback, numpy, sympy, dateutil, datetime, colormath, pytz, ast, copy, pickle, io, random, cmath, fractions, mpmath, shlex, colorsys, re, hashlib, base64, itertools
-
-collections2f = "misc/collections2.py"
-
-def update_collections2():
-	with requests.get("https://raw.githubusercontent.com/thomas-xin/Python-Extra-Classes/main/full.py") as resp:
-		b = resp.content
-	with open(collections2f, "wb") as f:
-		f.write(b)
-	print("collections2.py updated.")
-	if "alist" in globals():
-		return
-	exec(compile(b, "collections2.py", "exec"), globals())
-
-if not os.path.exists(collections2f):
-	update_collections2()
-with open(collections2f, "rb") as f:
-	b = f.read()
-if time.time() - os.path.getmtime(collections2f) > 3600:
-	import_exc.submit(update_collections2)
-if __name__ == "__lint__":
-	from misc.collections2 import *
+from misc.types import Dummy, astype, as_str, nested_tuple, alist, arange, afull, azero, aempty, cdict, fdict, demap, universal_set, exclusive_range, exclusive_set, ZeroEnc, is_zero_enc, zwencode, zwdecode, zwremove, UNIFMTS, unfont, DIACRITICS, zalgo_array, zalgo_map, uni_str, unicode_prune, full_prune, fcdict, mdict, msdict, regexp, suppress, nop, nofunc, none, literal_eval, lim_str, utc, ts_us, round_random, try_int, safe_eval, round_min #noqa: E402 F401
 
 import math
-from math import *
-dateutil.force()
-sympy.force()
-colormath.force()
+from contextlib import closing
+from itertools import repeat
 from dateutil import parser as tparser
-from sympy.parsing.sympy_parser import parse_expr
 from colormath import color_objects, color_conversions
 
 if not hasattr(time, "time_ns"):
 	time.time_ns = lambda: int(time.time() * 1e9)
 
-
-suppress = lambda *args, **kwargs: contextlib.suppress(BaseException) if not args and not kwargs else contextlib.suppress(*args + tuple(kwargs.values()))
-closing = contextlib.closing
-repeat = itertools.repeat
-chain = itertools.chain
-
-
 print_exc = lambda *args: sys.stdout.write(("\n".join(as_str(i) for i in args) + "\n" if args else "") + traceback.format_exc())
 
-loop = lambda x: repeat(None, x)
-
-def try_int(i):
-	if type(i) is str and not i.isnumeric():
-		return i
-	try:
-		return int(i)
-	except:
-		return i
-
-array = numpy.array
-np = numpy
-exec(compile(b, "collections2.py", "exec"), globals())
+array = np.array
 try:
 	np.float80 = np.longdouble
 except AttributeError:
 	np.float80 = np.float64
 deque = collections.deque
-
-ts_us = lambda: time.time_ns() // 1000
-utc = lambda: time.time_ns() / 1e9
 
 random.seed(random.randint(0, (1 << 32) - 1) - time.time_ns())
 mp = mpmath.mp
@@ -217,28 +101,14 @@ mpc = mpmath.mpc
 Mat = mat = matrix = mpmath.matrix
 
 math.round = round
-inf = Infinity = math.inf
-nan = math.nan
-eval_const = {
-	"none": None,
-	"null": None,
-	"NULL": None,
-	"true": True,
-	"false": False,
-	"TRUE": True,
-	"FALSE": False,
-	"inf": inf,
-	"nan": nan,
-	"Infinity": inf,
-}
-
-# Not completely safe, but much safer than regular eval
-safe_eval = lambda s: eval(as_str(s).replace("__", ""), {}, eval_const) if not s.isnumeric() else int(s)
+Infinity = math.inf
+from cmath import phase, polar, infj, isfinite, isnan # noqa: F403
+from math import inf, nan, pi, e, tau, sin, cos, tan, sinh, cosh, tanh, asin, acos, atan, asinh, acosh, atanh, atan2, hypot, erf, erfc, exp, log, log10, log2, modf, sqrt # noqa: F403
 
 null = None
-i = I = j = J = 1j
-π = pi = mp.pi
-E = e = mp.e
+i = I = j = J = 1j # noqa: E741
+π = pi
+E = e
 c = 299792458
 lP = 1.61625518e-35
 mP = 2.17643524e-8
@@ -246,201 +116,13 @@ tP = 5.39124760e-44
 h = 6.62607015e-34
 G = 6.6743015e-11
 g = 9.80665
-tau = pi * 2
 d2r = mp.degree
 phi = mp.phi
 euler = mp.euler
 twinprime = mp.twinprime
 
-Function = sympy.Function
-Symbol = sympy.Symbol
-factorize = factorint = prime_factors = sympy.ntheory.factorint
-mobius = sympy.ntheory.mobius
-
 TRUE, FALSE = True, False
 true, false = True, False
-
-
-nop = lambda *void1, **void2: None
-nofunc = lambda arg, *void1, **void2: arg
-
-capwords = lambda s, spl=None: (" " if spl is None else spl).join(w.capitalize() for w in s.split(spl))
-
-
-def choice(*args):
-	"Custom random.choice implementation that also accepts non-ordered sequences."
-	if not args:
-		return
-	it = args if len(args) > 1 or not issubclass(type(args[0]), collections.abc.Sized) else args[0]
-	if not issubclass(type(it), collections.abc.Sequence):
-		if not issubclass(type(it), collections.abc.Sized):
-			it = tuple(it)
-		else:
-			size = len(it)
-			it = iter(it)
-			i = xrand(size)
-			for _ in loop(i):
-				next(it)
-			return next(it)
-	return random.choice(it)
-
-
-def shuffle(it):
-	"Shuffles an iterable, in-place if possible, returning it."
-	if type(it) is list:
-		random.shuffle(it)
-		return it
-	elif type(it) is tuple:
-		it = list(it)
-		random.shuffle(it)
-		return it
-	elif type(it) is dict:
-		ir = shuffle(list(it))
-		new = {}
-		for i in ir:
-			new[i] = it[i]
-		it.clear()
-		it.update(new)
-		return it
-	elif type(it) is deque:
-		it = list(it)
-		random.shuffle(it)
-		return deque(it)
-	elif isinstance(it, alist):
-		temp = it.shuffle()
-		it.data = temp.data
-		it.offs = temp.offs
-		it.size = temp.size
-		del temp
-		return it
-	else:
-		try:
-			it = list(it)
-			random.shuffle(it)
-			return it
-		except TypeError:
-			raise TypeError(f"Shuffling {type(it)} is not supported.")
-
-# Reverses an iterable, in-place if possible, returning it.
-def reverse(it):
-	if type(it) is list:
-		return list(reversed(it))
-	elif type(it) is tuple:
-		return list(reversed(it))
-	elif type(it) is dict:
-		ir = tuple(reversed(it))
-		new = {}
-		for i in ir:
-			new[i] = it[i]
-		it.clear()
-		it.update(new)
-		return it
-	elif type(it) is deque:
-		return deque(reversed(it))
-	elif isinstance(it, alist):
-		temp = it.reverse()
-		it.data = temp.data
-		it.offs = temp.offs
-		it.hash = None
-		del temp
-		return it
-	else:
-		try:
-			return list(reversed(it))
-		except TypeError:
-			raise TypeError(f"Reversing {type(it)} is not supported.")
-
-# Sorts an iterable with an optional key, in-place if possible, returning it.
-def sort(it, key=None, reverse=False):
-	if type(it) is list:
-		it.sort(key=key, reverse=reverse)
-		return it
-	elif type(it) is tuple:
-		it = sorted(it, key=key, reverse=reverse)
-		return it
-	elif issubclass(type(it), collections.abc.Mapping):
-		keys = sorted(it, key=it.get if key is None else lambda x: key(it.get(x)))
-		if reverse:
-			keys = reversed(keys)
-		items = tuple((i, it[i]) for i in keys)
-		it.clear()
-		it.__init__(items)
-		return it
-	elif type(it) is deque:
-		it = sorted(it, key=key, reverse=reverse)
-		return deque(it)
-	elif isinstance(it, alist):
-		it.__init__(sorted(it, key=key, reverse=reverse))
-		it.hash = None
-		return it
-	else:
-		try:
-			it = list(it)
-			it.sort(key=key, reverse=reverse)
-			return it
-		except TypeError:
-			raise TypeError(f"Sorting {type(it)} is not supported.")
-
-
-literal_eval = lambda s: ast.literal_eval(as_str(s).lstrip())
-
-phase = cmath.phase
-sin = mpmath.sin
-cos = mpmath.cos
-tan = mpmath.tan
-sec = mpmath.sec
-csc = mpmath.csc
-cot = mpmath.cot
-sinh = mpmath.sinh
-cosh = mpmath.cosh
-tanh = mpmath.tanh
-sech = mpmath.sech
-csch = mpmath.csch
-coth = mpmath.coth
-asin = mpmath.asin
-acos = mpmath.acos
-atan = mpmath.atan
-asec = mpmath.asec
-acsc = mpmath.acsc
-acot = mpmath.acot
-asinh = mpmath.asinh
-acosh = mpmath.acosh
-atanh = mpmath.atanh
-asech = mpmath.asech
-acsch = mpmath.acsch
-acoth = mpmath.acoth
-sinc = mpmath.sinc
-atan2 = mpmath.atan2
-ei = mpmath.ei
-e1 = mpmath.e1
-en = mpmath.expint
-li = mpmath.li
-si = mpmath.si
-ci = mpmath.ci
-shi = mpmath.shi
-chi = mpmath.chi
-erf = mpmath.erf
-erfc = mpmath.erfc
-erfi = mpmath.erfi
-aerf = mpmath.erfinv
-npdf = mpmath.npdf
-ncdf = mpmath.ncdf
-fac = factorial = mpmath.fac
-fib = fibonacci = mpmath.fib
-trib = tribonacci = sympy.tribonacci
-luc = lucas = sympy.lucas
-harm = harmonic = sympy.harmonic
-ber = bernoulli = mpmath.bernoulli
-eul = eulernum = mpmath.eulernum
-sqrt = mpmath.sqrt
-hypot = mpmath.hypot
-cbrt = mpmath.cbrt
-root = mpmath.root
-exp = mpmath.exp
-expi = expj = mpmath.expj
-log = mpmath.log
-ln = mpmath.ln
-frac = sympy.frac
 
 # Returns a generator iterating through bits and their respective positions in an int.
 bits = lambda x: (i for i in range((x if type(x) is int else int(x)).bit_length()) if x & (1 << i))
@@ -476,39 +158,26 @@ def round(x, y=None):
 	if isinstance(x, int):
 		return x
 	try:
-		if is_finite(x):
+		if isfinite(x):
 			try:
 				if x == int(x):
 					return int(x)
 				if y is None:
 					return int(math.round(x))
-			except:
+			except (TypeError, ValueError, OverflowError):
 				pass
 			return round_min(math.round(x, y))
 		else:
 			return x
-	except:
+	except Exception:
 		pass
 	if isinstance(x, complex):
 		return round(x.real, y) + round(x.imag, y) * 1j
 	try:
 		return math.round(x, y)
-	except:
+	except (TypeError, ValueError, OverflowError):
 		pass
 	return x
-
-# Rounds a number to the nearest integer, with a probability determined by the fractional part.
-def round_random(x):
-	try:
-		y = int(x)
-	except (ValueError, TypeError):
-		return x
-	if y == x:
-		return y
-	x -= y
-	if random.random() <= x:
-		y += 1
-	return y
 
 # Rounds x to the nearest multiple of y.
 round_multiple = lambda x, y=1: round_min(math.round(x / y) * y) if y else x
@@ -561,7 +230,6 @@ saw = lambda x: (x / pi + 1) % 2 - 1
 # Triangle wave function with period 2π.
 tri = lambda x: (abs((0.5 - x / pi) % 2 - 1)) * 2 - 1
 
-
 # Sign function of a number.
 sgn = lambda x: 1 if x > 0 else (-1 if x < 0 else 0)
 
@@ -573,8 +241,15 @@ def xrand(x, y=None, z=0):
 	if y is None:
 		y = 0
 	if x == y:
-		return x
-	return random.randint(round_random(min(x, y)), round_random(max(x, y)) - 1) + z
+		return x + z
+	if x > y:
+		x, y = y, x
+	if isinstance(x, int) and isinstance(y, int):
+		return random.randint(x, y - 1) + z
+	x, y = round_random(x), round_random(y)
+	if x >= y:
+		return x + z
+	return random.randint(x, y - 1) + z
 
 # Returns a floating point number reduced to a power.
 rrand = lambda x=1, y=0: frand(x) ** (1 - y)
@@ -592,167 +267,6 @@ def modular_inv(a, b):
 		a, b = d[1], a
 		x, y = y, x - (d[0]) * y
 	return (x, 1)
-
-
-# Computes Pisano period of an integer.
-def pisano_period(x):
-	a, b = 0, 1
-	for i in range(0, x * x):
-		a, b = b, (a + b) % x
-		if a == 0 and b == 1:
-			return i + 1
-
-
-# Computes Jacobi value of two numbers.
-def jacobi(a, n):
-	if a == 0 or n < 0:
-		return 0
-	x = 1
-	if a < 0:
-		a = -a
-		if n & 3 == 3:
-			x = -x
-	if a == 1:
-		return x
-	while a:
-		if a < 0:
-			a = -a
-			if n & 3 == 3:
-				x = -x
-		while not a & 1:
-			a >>= 1
-			if n & 7 == 3 or n & 7 == 5:
-				x = -x
-		a, n = n, a
-		if a & 3 == 3 and n & 3 == 3:
-			x = -x
-		a %= n
-		if a > n >> 1:
-			a -= n
-	if n == 1:
-		return x
-	return 0
-
-
-# Generator that iterates through numbers 6n±1
-def next6np(start=0):
-	if start <= 2:
-		yield 2
-	if start <= 3:
-		yield 3
-	x = start - start % 6 + 6
-	if x > 6 and x - start >= 5:
-		yield x - 5
-	while True:
-		yield x - 1
-		yield x + 1
-		x += 6
-
-
-# Checks if a number is prime using multiple probability tests limited to O(log^2(n)) iterations.
-def is_prime(n):
-
-	def divisibility(n):
-		t = min(n, 2 + ceil(log(n) ** 2))
-		g = next6np()
-		while True:
-			p = next(g)
-			if p >= t:
-				break
-			if n % p == 0:
-				return False
-		return True
-
-	def fermat(n):
-		t = min(n, 2 + ceil(log(n)))
-		g = next6np()
-		while True:
-			p = next(g)
-			if p >= t:
-				break
-			if pow(p, n - 1, n) != 1:
-				return False
-		return True
-
-	def miller(n):
-		d = n - 1
-		while d & 1 == 0:
-			d >>= 1
-		t = min(n, 2 + ceil(log(n)))
-		g = next6np()
-		while True:
-			p = next(g)
-			if p >= t:
-				break
-			x = pow(p, d, n)
-			if x == 1 or x == n - 1:
-				continue
-			while n != d + 1:
-				x = (x * x) % n
-				d <<= 1
-				if x == 1:
-					return False
-				if x == n - 1:
-					break
-			if n == d + 1:
-				return False
-		return True
-
-	def solovoy_strassen(n):
-		t = min(n, 2 + ceil(log(n)))
-		g = next6np()
-		while True:
-			p = next(g)
-			if p >= t:
-				break
-			j = (n + jacobi(p, n)) % n
-			if j == 0:
-				return False
-			m = pow(p, (n - 1) >> 1, n)
-			if m != j:
-				return False
-		return True
-
-	i = int(n)
-	if n == i:
-		n = i
-		if n < 2:
-			return False
-		if n <= 3:
-			return True
-		t = n % 6
-		if t != 1 and t != 5:
-			return False
-		if not divisibility(n):
-			return False
-		if not fermat(n):
-			return False
-		if not miller(n):
-			return False
-		if not solovoy_strassen(n):
-			return False
-		return True
-	return None
-
-# Generates a number of prime numbers between a and b.
-def generate_primes(a=2, b=inf, c=1):
-	primes = alist()
-	a = round(a)
-	b = round(b)
-	if b is None:
-		a, b = 0, a
-	if a > b:
-		a, b = b, a
-	a = max(1, a)
-	g = next6np(a)
-	while c:
-		p = next(g)
-		if p >= b:
-			break
-		if is_prime(p):
-			c -= 1
-			primes.append(p)
-	return primes
 
 
 # Returns the sum of an iterable, using the values rather than keys for dictionaries.
@@ -850,39 +364,6 @@ def sub_dict(d, key):
 		output.pop(k, None)
 	return output
 
-
-def round_min(x):
-	"Casts a number to integers if the conversion would not alter the value."
-	if isinstance(x, int):
-		return x
-	if isinstance(x, str):
-		if not x:
-			return
-		if x[0] == "-" and x[1:].isnumeric():
-			return -int(x[1:])
-		if x.isnumeric():
-			return int(x)
-		if "." in x:
-			x = x.strip("0")
-			if x == ".":
-				return 0
-			x = float(x)
-		else:
-			try:
-				return int(x)
-			except ValueError:
-				return float(x)
-	if isinstance(x, complex):
-		if x.imag == 0:
-			return round_min(x.real)
-		else:
-			return round_min(complex(x).real) + round_min(complex(x).imag) * (1j)
-	if math.isfinite(x):
-		y = int(x)
-		if x == y:
-			return y
-	return x
-
 # Rounds a number to various fractional positions if possible.
 def close_round(n):
 	rounds = [0.125, 0.375, 0.625, 0.875, 0.25, 0.5, 0.75, 1 / 3, 2 / 3]
@@ -906,23 +387,6 @@ def to_frac(num, limit=2147483647):
 	if frac[0] == 0:
 		return [1, limit]
 	return frac
-
-
-def astype(obj, types, *args, **kwargs):
-	if isinstance(types, tuple):
-		tl = tuple(t for t in types if isinstance(t, type))
-	else:
-		tl = None
-	tl = tl or types
-	try:
-		if not isinstance(obj, tl):
-			raise TypeError
-	except TypeError:
-		t = types[0] if isinstance(types, tuple) else types
-		if callable(t):
-			return t(obj, *args, **kwargs)
-		return t
-	return obj
 
 
 gcd = math.gcd
@@ -953,19 +417,12 @@ else:
 		try:
 			while True:
 				x = [i for j in x for i in j]
-		except:
+		except Exception:
 			if 0 in x:
 				raise ValueError("Cannot find LCM of zero.")
 			while len(x) > 1:
 				x = [lcm2(x[i], x[-i - 1]) for i in range(ceil(len(x) / 2))]
 		return x[-1]
-
-def lcmRange(x):
-	primes = generate_primes(1, x, -1)
-	y = 1
-	for p in primes:
-		y *= p ** floor(log(x, p))
-	return y
 
 def fold(f, it):
 	out = None
@@ -977,31 +434,45 @@ def fold(f, it):
 	return out
 
 
-def _predict_next(seq):
-	if len(seq) < 2:
-		return
-	if np.min(seq) == np.max(seq):
-		return round_min(seq[0])
-	if len(seq) < 3:
-		return
-	if len(seq) > 4 and all(seq[2:] - seq[1:-1] == seq[:-2]):
-		return round_min(seq[-1] + seq[-2])
-	a = _predict_next(seq[1:] - seq[:-1])
-	if a is not None:
-		return round_min(seq[-1] + a)
-	if len(seq) < 4 or 0 in seq[:-1]:
-		return
-	b = _predict_next(seq[1:] / seq[:-1])
-	if b is not None:
-		return round_min(seq[-1] * b)
+if os.name != "nt":
+	def _predict_next(seq):
+		if len(seq) < 2:
+			return
+		if np.min(seq) == np.max(seq):
+			return seq[0]
+		if len(seq) < 3:
+			return
+		if len(seq) > 4 and all(seq[2:] - seq[1:-1] == seq[:-2]):
+			return seq[-1] + seq[-2]
+		a = _predict_next(seq[1:] - seq[:-1])
+		if a is not None:
+			return seq[-1] + a
+		if len(seq) < 4 or 0 in seq[:-1]:
+			return
+		b = _predict_next(seq[1:] / seq[:-1])
+		if b is not None:
+			return seq[-1] * b
 
-def predict_next(seq, limit=12):
-	"Predicts the next number in a sequence. Works on most combinations of linear, polynomial, exponential and fibonacci equations."
-	seq = np.array(deque(astype(x, mpf) for x in seq), dtype=object)
-	for i in range(min(8, limit), 1 + max(8, min(len(seq), limit))):
-		temp = _predict_next(seq[-i:])
-		if temp is not None:
-			return temp
+	def predict_next(seq, limit=12):
+		"Predicts the next number in a sequence. Works on most combinations of linear, polynomial, exponential and fibonacci equations."
+		seq = np.array(seq, dtype=np.float64)
+		for i in range(min(8, limit), 1 + max(8, min(len(seq), limit))):
+			temp = _predict_next(seq[-i:])
+			if temp is not None:
+				return round_min(temp)
+else:
+	sys.path.append("misc")
+	import accel
+
+	def predict_next(seq, limit=12):
+		"Predicts the next number in a sequence. Works on most combinations of linear, polynomial, exponential and fibonacci equations."
+		seq = list(map(float, seq))
+		if len(seq) > limit:
+			seq = seq[-limit:]
+		try:
+			return round_min(accel.predict_next(seq))
+		except ValueError:
+			return
 
 
 def supersample(a, size):
@@ -1041,21 +512,6 @@ def pulse(x, y=0.5):
 	x *= 0.5 / len(x) * (x < p) + 0.5 / (1 - len(x)) * (x >= p)
 	return x
 
-
-isnan = cmath.isnan
-
-
-# Checks if a number is finite in value.
-def is_finite(x):
-	if type(x) is int:
-		return True
-	if type(x) is complex:
-		return not (cmath.isinf(x) or cmath.isnan(x))
-	with suppress():
-		return x.is_finite()
-	return math.isfinite(x)
-
-
 # Inverse exponential function to approach a destination smoothly.
 def approach(x, y, z, threshold=0.125):
 	if z <= 1:
@@ -1076,10 +532,10 @@ def scale_ratio(x, y):
 
 def xrange(a, b=None, c=None):
 	"Returns a python range object but automatically reversing if the direction is not specified."
-	if b == None:
+	if b is None:
 		b = round(a)
 		a = 0
-	if c == None:
+	if c is None:
 		if a > b:
 			c = -1
 		else:
@@ -1243,30 +699,9 @@ def num_parse(s):
 	return out
 
 
-__scales = ("", "k", "M", "G", "T", "P", "E", "Z", "Y")
-__uscales = [s.lower() for s in __scales]
-def byte_scale(n, ratio=1024):
-	e = 0
-	while n >= ratio:
-		n /= ratio
-		e += 1
-		if e >= len(__scales) - 1:
-			break
-	return f"{round(n, 4)} {__scales[e]}"
-def byte_unscale(s, ratio=1024):
-	num_part = regexp(r"^[0-9]+").findall(s)
-	if not num_part:
-		n = 1
-	else:
-		n = num_part[0]
-		s = s[len(n):]
-		n = round_min(n)
-	return round_min(n * ratio ** __uscales.index(s.lower()))
-
-
 def exp_num(num, maxlen=10, decimals=0):
 	"Returns a string representation of a number with a limited amount of characters, using scientific notation when required."
-	if not is_finite(num):
+	if not isfinite(num):
 		if num.real > 0:
 			return "inf"
 		elif num.real < 0:
@@ -1284,7 +719,7 @@ def exp_num(num, maxlen=10, decimals=0):
 		n = ""
 	try:
 		numlen = floor(num.log10())
-	except:
+	except (AttributeError, TypeError, ValueError, OverflowError):
 		numlen = floor(math.log10(max(0.001, num)))
 	if log(max(0.001, num), 10) <= maxlen - decimals:
 		return n + round_at(num, min(maxlen - numlen - 2 - len(n), decimals))
@@ -1292,7 +727,7 @@ def exp_num(num, maxlen=10, decimals=0):
 		if numlen > 0:
 			try:
 				loglen = floor(numlen.log10())
-			except:
+			except (AttributeError, TypeError, ValueError, OverflowError):
 				loglen = floor(math.log10(numlen)) + len(n)
 		else:
 			loglen = 0
@@ -1315,22 +750,6 @@ def round_at(num, prec):
 	return str(round(num.real))
 
 
-def lim_str(s, maxlen=10, mode="centre"):
-	"Limits a string to a maximum length, cutting from the middle and replacing with \"..\" when possible."
-	if maxlen is None:
-		return s
-	if type(s) is not str:
-		s = str(s)
-	over = (len(s) - maxlen) / 2
-	if over > 0:
-		if mode == "centre":
-			half = len(s) / 2
-			s = s[:ceil(half - over - 1)] + ".." + s[ceil(half + over + 1):]
-		else:
-			s = s[:maxlen - 3] + "..."
-	return s
-
-
 def verify_string(s):
 	"Attempts to convert an iterable to a string if it isn't already."
 	if type(s) is str:
@@ -1345,7 +764,7 @@ hue2colour = lambda a, offset=0: adj_colour(colorsys.hsv_to_rgb((a / 1536) % 1, 
 
 # Converts a colour tuple to a single integer.
 def colour2raw(*c):
-	while len(c) == 1:
+	while isinstance(c, (bytes, tuple, list)) and len(c) == 1:
 		c = c[0]
 	if len(c) == 3:
 		return (c[0] << 16) + (c[1] << 8) + c[2]
@@ -1469,7 +888,7 @@ def list_permutation(dest):
 def product(*nums):
 	try:
 		return np.prod(nums)
-	except:
+	except Exception:
 		p = 1
 		for i in nums:
 			p *= i
@@ -1544,11 +963,11 @@ def in_rect(pos, rect, edge=0):
 # Moves a position into a rect based on the position it should be in.
 def move_to_rect(pos, rect, edge=0):
 	p = list(pos)
-	if not all(is_finite(i) for i in pos):
+	if not all(isfinite(i) for i in pos):
 		return p, True, True
 	dest_rect = convert_rect(rect, 0)
 	lr, ud = False, False
-	for _ in loop(4):
+	for _ in repeat(4):
 		diff = p[0] - dest_rect[0] - edge
 		if diff <= 0:
 			p[0] = dest_rect[0] - diff + edge
@@ -1603,7 +1022,7 @@ def disp2time(r, s, d):
 def predict_trajectory(src, dest, vel, spd, dec=1, boundary=None, edge=0):
 	pos = array(dest)
 	dist = hypot(*(src - dest))
-	for _ in loop(64):
+	for _ in repeat(64):
 		time = disp2time(dec, spd, dist)
 		new_pos = dest + vel * min(time, 1 << 32)
 		if boundary:
@@ -1766,6 +1185,17 @@ def harmonics2array(period, harmonics, func="sin(x)"):
 	return result
 
 
+# Autodetect max image size, keeping aspect ratio
+def max_size(w, h, maxsize, force=False):
+	s = w * h
+	m = maxsize * maxsize
+	if s > m or force:
+		r = (m / s) ** 0.5
+		w = round(w * r)
+		h = round(h * r)
+	return w, h
+
+
 # Limits a string to an amount of lines.
 def lim_line(s, lim):
 	curr = s
@@ -1800,7 +1230,7 @@ def iter2str(it, key=None, limit=3840, offset=0, left="[", right="]", sep=" "):
 			len(it)
 		except TypeError:
 			it = alist(i for i in it)
-	except:
+	except Exception:
 		it = alist(it)
 	if issubclass(type(it), collections.abc.Mapping):
 		keys = it.keys()
@@ -1845,7 +1275,7 @@ def int_key(d):
 class DynamicDT:
 	"A datetime-compatible object that enables dynamic conversions and arithmetic operations with non-datetime objects, as well as unlimited range."
 
-	__slots__ = ("_dt", "_offset", "_ts", "tzinfo")
+	__slots__ = ("__weakref__", "_dt", "_offset", "_ts", "tzinfo")
 
 	def __getstate__(self):
 		return self.timestamp(), getattr(self, "tzinfo", None)
@@ -2149,7 +1579,7 @@ TIMEUNITS = {
 
 def time_convert(s):
 	"Converts a time input in seconds to a list of time intervals."
-	if not is_finite(s):
+	if not isfinite(s):
 		high = "galactic years"
 		return [str(s) + " " + high]
 	r = s < 0
@@ -2196,7 +1626,7 @@ strnum = lambda num: str(round(num, 6))
 
 def time_disp(s, rounded=True):
 	"Returns a representation of a time interval using days:hours:minutes:seconds."
-	if not is_finite(s):
+	if not isfinite(s):
 		return str(s)
 	if rounded:
 		s = round(s)
@@ -2427,24 +1857,56 @@ def parse_fs(fs):
 		scale = 1
 	return float(fs.split(None, 1)[0]) * scale
 
-
-RE = cdict()
-def regexp(s, flags=0):
-	global RE
-	if issubclass(type(s), re.Pattern):
-		return s
-	s = as_str(s)
-	t = f"{s}\x00{flags}"
-	try:
-		return RE[t]
-	except KeyError:
-		RE[t] = re.compile(s, flags)
-	return RE[t]
-
+obf = {
+	"A": "А",
+	"B": "В",
+	"C": "С",
+	"E": "Е",
+	"H": "Н",
+	"I": "І",
+	"K": "К",
+	"O": "О",
+	"P": "Р",
+	"S": "Ѕ",
+	"T": "Т",
+	"X": "Х",
+	"Y": "Ү",
+	"a": "а",
+	"c": "с",
+	"e": "е",
+	"i": "і",
+	"o": "о",
+	"p": "р",
+	"s": "ѕ",
+	"x": "х",
+	"y": "у",
+}
+obfuscator = "".maketrans(obf)
+deobfuscator = "".maketrans({v: k for k, v in obf.items()})
+def _obfuscate(s):
+	a = np.array(tuple(s))
+	m = np.random.randint(0, 2, size=len(a), dtype=bool)
+	a[m] = tuple("".join(a[m]).translate(obfuscator))
+	return "".join(a)
+def obfuscate(s):
+	reg = regexp(r"""(?:http|hxxp|ftp|fxp)s?:\/\/[^\s`|"'\])>]+|:\w+:""")
+	out = []
+	while s:
+		match = reg.search(s)
+		if not match:
+			out.append(_obfuscate(s))
+			break
+		s1, e1 = match.start(), match.end()
+		out.append(_obfuscate(s[:s1]))
+		out.append(s[s1:e1])
+		s = s[e1:]
+	return "".join(out)
+deobfuscate = lambda s: s.translate(deobfuscator)
 
 word_count = lambda s: 1 + sum(1 for _ in regexp("\\W+").finditer(s))
 single_space = lambda s: regexp("\\s\\s+").sub(" ", s)
 
+@functools.lru_cache(maxsize=256)
 def fuzzy_substring(sub, s, match_start=False, match_length=True):
 	"A fuzzy substring search that returns the ratio of characters matched between two strings."
 	if not match_length and s in sub:
@@ -2529,64 +1991,14 @@ def bytes2b64(b, alt_char_set=False):
 def b642bytes(b, alt_char_set=False):
 	if type(b) is str:
 		b = b.encode("utf-8")
+	if (b.index(b"=") if b.endswith(b"=") else len(b)) & 3 == 1:
+		b = b.rstrip(b"=") + b"A"
 	b += b"=" * (4 - (len(b) & 3) & 3)
 	if alt_char_set:
 		return base64.urlsafe_b64decode(b.replace(b"+", b"-"))
 	return base64.b64decode(b)
 
-if sys.version_info[0] >= 3 and sys.version_info[1] >= 9:
-	randbytes = random.randbytes
-else:
-	randbytes = lambda size: np.random.randint(0, 256, size=size, dtype=np.uint8).data
-
-# SHA256 operations: base64 and base16.
-shash = lambda s: base64.urlsafe_b64encode(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).rstrip(b"=").decode("ascii")
-uhash = lambda s: shash(s) if len(s) > 43 else s
-hhash = lambda s: hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).hexdigest()
-ihash = lambda s: int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little") % 4294967296 - 2147483648
-nhash = lambda s: int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little")
-
 def bxor(b1, b2):
 	x = np.frombuffer(b1, dtype=np.uint8)
 	y = np.frombuffer(b2, dtype=np.uint8)
 	return (x ^ y).tobytes()
-
-
-class pickled(collections.abc.Callable):
-	"Manages a dict object and uses pickle to save and load it."
-
-	def __init__(self, obj=None, ignore=()):
-		self.data = obj
-		self.ignores = set(ignore)
-		self.__str__ = obj.__str__
-
-	def __getattr__(self, key):
-		try:
-			return self.__getattribute__(key)
-		except AttributeError:
-			pass
-		return getattr(self.__getattribute__("data"), key)
-
-	def __dir__(self):
-		data = set(object.__dir__(self))
-		data.update(dir(self.data))
-		return data
-
-	def __call__(self):
-		return self
-
-	def ignore(self, item):
-		self.ignores.add(item)
-
-	def __repr__(self):
-		c = dict(self.data)
-		for i in self.ignores:
-			c.pop(i)
-		d = pickle.dumps(c)
-		if len(d) > 1048576:
-			return "None"
-		return (
-			"pickled(pickle.loads(hex2Bytes('''"
-			+ bytes2hex(d, space=False)
-			+ "''')))"
-		)

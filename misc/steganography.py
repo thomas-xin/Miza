@@ -1,14 +1,16 @@
 import concurrent.futures
-exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-fut = exc.submit(__import__, "numpy")
-import os, sys, random, time, base64
+import sys
+import random
+import time
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 try:
 	import pillow_heif
 	pillow_heif.register_heif_opener()
-except:
+except Exception:
 	pass
+exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+fut = exc.submit(__import__, "numpy")
 
 Resampling = getattr(Image, "Resampling", Image)
 Transpose = getattr(Image, "Transpose", Image)
@@ -27,116 +29,8 @@ def round_random(x):
 		y += 1
 	return y
 
-invert = lambda b: bytes(i ^ 255 for i in b)
-
-# Reduces an image to a 4-bit black and white 4x4 square, then bitcrushes to 1-bit leaving 2 bytes total
-def hash_reduce(l):
-	# amax = np.max(l)
-	aavg = np.mean(l)
-	# amin = np.min(l)
-	# if amax <= amin:
-		# amax = amin + 1
-	im = Image.fromarray(l, mode="L")
-	im = im.resize((4, 4), resample=Resampling.LANCZOS)
-	out = []
-	for ia in (np.floor(aavg), np.ceil(aavg)):
-		i2 = im.point(lambda x: int(x >= ia))
-		bi = np.array(i2, dtype=np.uint8).ravel()
-		bo = np.zeros(len(bi) // 8, dtype=np.uint8)
-		for i in range(8):
-			bo += bi[i::8] << (7 - i)
-		out.append(bo)
-	# print(aavg, out)
-	return out
-
-# Reduces an image to a 12-bit rgb 32x32 square, returning an additional greyscale luma component
-def split_to(im):
-	hi = im.resize((32, 32), resample=Resampling.LANCZOS)
-	g = hi.convert("L")
-	h, s, l = hsl_split(hi, convert=False, dtype=np.float32)
-	return (np.uint8(a) >> 4 for a in (h, s, l, g))
-
-def hash_to(im, msg, skip=False):
-	if skip:
-		h, s, l, g = split_to(im)
-		rhs = hash_reduce(g)
-	else:
-		h, s, l, g, rhs = compare_to(im, msg)
-	sl = s + (l << 4)
-	hg = h + (g << 4)
-	hb = hg.tobytes() + sl.tobytes()
-	for rh in rhs:
-		i = 0
-		fd = f"iman/{rh[0]}/{rh[1]}.txt"
-		# for i, fd in enumerate((f"iman/{rh[0]}/{rh[1]}.txt", f"iman/{255 - rh[0]}/{255 - rh[1]}.txt")):
-		s = base64.b64encode(hb).rstrip(b"=").decode("ascii") + f";{i}:" + msg + "\n"
-		folder = fd.rsplit("/", 1)[0]
-		if not os.path.exists(folder):
-			os.mkdir(folder)
-		with open(fd, "a", encoding="utf-8") as f:
-			f.write(s)
-
-def compare_to(im, msg):
-	tups = list(split_to(im))
-	g = tups[-1]
-	rhs = hash_reduce(g)
-	# rhs = [[18, 237]]
-	# rhs = [[247, 19]]
-	for rh in rhs:
-		fd = f"iman/{rh[0]}/{rh[1]}.txt"
-		if os.path.exists(fd):
-			break
-
-	if os.path.exists(fd):
-		with open(fd, "r", encoding="utf-8") as f:
-			d = f.readlines()
-
-		h, s, l, g = map(np.float32, tups)
-		for line in d:
-			i = line.index(":")
-			k, v = line[:i], line[i + 1:]
-			if k[-2] == ";":
-				inverted = int(k[-1])
-				k = k[:-2]
-			else:
-				inverted = False
-			v = v[:-1]
-			hb2 = np.frombuffer(base64.b64decode(k.encode("ascii") + b"=="), dtype=np.uint8)
-			half = len(hb2) >> 1
-			hg2, sl2 = hb2[:half].reshape((32, 32)), hb2[half:].reshape((32, 32))
-			h2 = hg2 & 15
-			g2 = hg2 >> 4
-			s2 = sl2 & 15
-			l2 = sl2 >> 4
-
-			# print(h)
-			# print(s)
-			# print(l)
-			h2, l2, s2, g2 = map(np.float32, (h2, l2, s2, g2))
-			heff = np.sqrt(900 - (30 - s) * (30 - s2)) / 30
-			# print(np.abs(np.abs(h - h2) - 8))
-			hd = np.sum((8 - np.abs(np.abs(h - h2) - 8)) * heff) / 8 / 1024
-			seff = np.sqrt(900 - (30 - l) * (30 - l2)) / 30
-			sd = np.sum(np.abs(s - s2) * seff) / 15 / 1024
-			if inverted:
-				gd = np.sum(np.abs(15 - g - g2)) / 15 / 1024
-				ld = np.sum(np.abs(15 - l - l2)) / 15 / 1024
-			else:
-				gd = np.sum(np.abs(g - g2)) / 15 / 1024
-				ld = np.sum(np.abs(l - l2)) / 15 / 1024
-			# print(np.abs(l - l2))
-
-			# print(hd, sd, ld, gd, inverted)
-			R = (hd + sd) / 2 + min(ld, gd * 2)
-			# print(rh, R, v)
-			if R <= 0.05:
-				if v == msg:
-					print("No copyright detected.")
-					raise SystemExit
-				print("Copyright detected in hashing:", v)
-				raise SystemExit
-
-	return *tups, rhs
+def invert(b):
+	return bytes(i ^ 255 for i in b)
 
 test = "-t" in sys.argv
 if test:
@@ -165,7 +59,7 @@ if not its:
 	its = 100 // (len(msg.encode("utf-8")) + 2)
 	# print(its)
 if fn.startswith("https://") or fn.startswith("http://"):
-	import requests, io
+	import requests, io # noqa: E401
 	im = Image.open(io.BytesIO(requests.get(fn).content))
 	fn = fn.rsplit("/", 1)[-1]
 else:
@@ -268,7 +162,7 @@ def rgb_split(image, dtype=np.uint8):
 
 def hsv_split(image, convert=True, partial=False, dtype=np.uint8):
 	channels = rgb_split(image, dtype=np.uint16)
-	R, G, B = channels
+	R, _G, _B = channels
 	m = np.min(channels, 0)
 	M = np.max(channels, 0)
 	C = M - m #chroma
@@ -304,7 +198,7 @@ def hsv_split(image, convert=True, partial=False, dtype=np.uint8):
 	return out
 
 def hsl_split(image, convert=True, dtype=np.uint8):
-	H, M, m, C, Cmsk, channels = hsv_split(image, partial=True, dtype=dtype)
+	H, M, m, C, Cmsk, _channels = hsv_split(image, partial=True, dtype=dtype)
 
 	# Luminance
 	L = np.mean((M, m), 0, dtype=np.int16)
@@ -547,10 +441,10 @@ try:
 		raise ValueError
 	if len(b) < its:
 		raise ValueError
-	l = len(b) // its
+	lenience = len(b) // its
 	dups = []
 	for i in range(its):
-		bi = b[i * l:i * l + l]
+		bi = b[i * lenience:i * lenience + lenience]
 		if i & 1:
 			bi ^= 255
 		dups.append(bi)
@@ -559,13 +453,13 @@ try:
 	errs = 0
 	confidences = []
 	d = []
-	for i in range(l):
+	for i in range(lenience):
 		u, c = np.unique(dups[i], return_counts=True)
 		a = np.argsort(c)
 		m = np.max(c)
 		confidences.append(m)
 		if sum(c == m) > 1:
-			if errs >= l / 2:
+			if errs >= lenience / 2:
 				raise ValueError
 			errs += 1
 			li = sorted(n for n in u if 32 <= n < 128)
@@ -602,4 +496,4 @@ except (ValueError, UnicodeDecodeError):
 else:
 	# if i_entropy >= ie_req:
 		# hash_to(im, s, skip=True)
-	print(f"Copyright detected in steganography:", s)
+	print(f"Copyright detected in steganography: {s}")

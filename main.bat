@@ -1,1 +1,1 @@
-cmd /k py main.py
+cmd /k py %~dp0/main.py py %~dp0/bot.py

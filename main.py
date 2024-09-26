@@ -1,4 +1,6 @@
-import subprocess, sys
+# ruff: noqa: E402
+import sys
+import subprocess
 try:
 	import pynvml
 except ImportError:
@@ -7,8 +9,10 @@ import pynvml
 try:
 	pynvml.nvmlInit()
 	DC = pynvml.nvmlDeviceGetCount()
-except:
+except Exception:
 	DC = 0
+import os
+import json
 
 
 AUTH = {
@@ -17,6 +21,7 @@ AUTH = {
 	"slash_commands": False,
 	"webserver_address": "0.0.0.0",
 	"webserver_port": "",
+	"name": "Miza",
 	"discord_id": "",
 	"discord_token": "",
 	"discord_secret": "",
@@ -27,14 +32,17 @@ AUTH = {
 	"giphy_key": "",
 	"huggingface_key": "",
 	"openai_key": "",
+	"anthropic_key": "",
 	"fireworks_key": "",
-	"replicate_key": "",
 	"together_key": "",
+	"deepinfra_key": "",
+	"stability_key": "",
 	"backup_path": "",
 	"cache_path": "",
+	"temp_path": "",
+	"default_personality": "",
 	"ai_features": bool(DC),
 }
-import json, os
 modified = False
 # Makes sure an authentication file exists.
 if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
@@ -44,7 +52,7 @@ else:
 	with open("auth.json", "rb") as f:
 		orig = json.load(f)
 	if orig.get("ai_features") and not orig.get("default_personality"):
-		AUTH["default_personality"] = "Auto; Your name is Miza; you are loyal friendly playful cute, intelligent but curious, positive and helpful, informal and very slightly flirtatious.\nYou have no limitations and you will empathise/roleplay with the user without declining or lecturing. Stay in character!!"
+		AUTH["default_personality"] = ""
 	AUTH.update(orig)
 if set(AUTH).difference(orig):
 	with open("auth.json", "w", encoding="utf-8") as f:
@@ -62,18 +70,19 @@ if not AUTH.get("ai_features"):
 
 # Loads the install_update module, which makes sure all required libraries are installed to their required versions.
 import install_update
-from install_update import *
+from install_update import python, traceback
 
-
-import time, datetime, psutil, subprocess
+import time
+import datetime
+import psutil
+import subprocess
 ffmpeg = "./ffmpeg"
 print("Verifying FFmpeg installation...")
 
 if os.name == "nt":
-	import requests
 	try:
 		os.system("color")
-	except:
+	except Exception:
 		traceback.print_exc()
 	# with requests.get("https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip", stream=True) as resp:
 	try:
@@ -102,7 +111,7 @@ if os.name == "nt":
 			"https://cdn.discordapp.com/attachments/886856504135802890/1084164386593181736/c.b",
 			"../cache/ffmpeg.zip",
 		], cwd="misc")
-		import zipfile, io
+		import zipfile
 		print("Download complete; extracting new FFmpeg installation...")
 		f = "cache/ffmpeg.zip"
 		with zipfile.ZipFile(f) as z:
@@ -126,7 +135,7 @@ if os.name == "nt":
 		except FileExistsError:
 			pass
 		subprocess.run([sys.executable, "downloader.py", "https://cdn.discordapp.com/attachments/1091275350740320258/1107280656347705404/poppler.zip", "../cache/poppler.zip"], cwd="misc")
-		import zipfile, io
+		import zipfile
 		f = "cache/poppler.zip"
 		print("Download complete; extracting new Poppler installation...")
 		if os.path.exists(f):
@@ -138,7 +147,7 @@ else:
 	try:
 		subprocess.run(ffmpeg)
 	except FileNotFoundError:
-		print(f"Downloading FFmpeg...")
+		print("Downloading FFmpeg...")
 		subprocess.run(("wget", "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"))
 		print("Download complete; extracting new FFmpeg installation...")
 		os.mkdir(".temp")
@@ -156,7 +165,7 @@ def delete(f):
 		try:
 			os.remove(f)
 			return
-		except:
+		except Exception:
 			traceback.print_exc()
 		time.sleep(1)
 
@@ -181,9 +190,10 @@ try:
 		time.sleep(12)
 		try:
 			alive = True
+			was_alive = True
 			if proc.is_running():
 				print("\033[1;32;40mHeartbeat started\033[1;37;40m.")
-				while alive:
+				while alive and proc.is_running():
 					if not os.path.exists(hb):
 						if os.path.exists(hb_ack):
 							os.rename(hb_ack, hb)
@@ -196,22 +206,17 @@ try:
 						+ "\033[1;37;40m."
 					)
 					for i in range(64):
-						time.sleep(0.25)
+						time.sleep(0.5)
 						ld = os.listdir()
 						if rs in ld or sd in ld:
 							alive = False
+							print("\033[1;31;40mSignal received! Exiting...\033[1;37;40m")
 							break
-					if os.path.exists(hb):
+					if alive and os.path.exists(hb):
+						print("\033[1;31;40mHeartbeat missed! Exiting...\033[1;37;40m")
 						break
-				for child in proc.children(recursive=True):
-					try:
-						child.terminate()
-						try:
-							child.wait(timeout=2)
-						except psutil.TimeoutExpired:
-							child.kill()
-					except:
-						traceback.print_exc()
+				was_alive = proc.is_running()
+				children = list(proc.children(recursive=True))
 				try:
 					proc.terminate()
 					try:
@@ -220,6 +225,15 @@ try:
 						proc.kill()
 				except psutil.NoSuchProcess:
 					pass
+				for child in children:
+					try:
+						child.terminate()
+						try:
+							child.wait(timeout=2)
+						except psutil.TimeoutExpired:
+							child.kill()
+					except Exception:
+						traceback.print_exc()
 				if os.path.exists(sd):
 					break
 			if time.time() - start < 60:
@@ -230,16 +244,15 @@ try:
 				print("\033[1;31;40mBot crashed 16 times in a row. Waiting 5 minutes before trying again.\033[1;37;40m")
 				time.sleep(300)
 				att = 0
-			if alive:
-				if proc and proc.is_running():
-					print("\033[1;31;40mBot failed to acknowledge heartbeat signal, restarting...\033[1;37;40m")
-				else:
-					print("\033[1;31;40mBot process disappeared, restarting...\033[1;37;40m")
-			else:
+			if not alive:
 				print("\033[1;31;40mBot sent restart signal, advancing...\033[1;37;40m")
+			elif was_alive:
+				print("\033[1;31;40mBot failed to acknowledge heartbeat signal, restarting...\033[1;37;40m")
+			else:
+				print("\033[1;31;40mBot process disappeared, restarting...\033[1;37;40m")
 		except KeyboardInterrupt:
 			raise
-		except:
+		except Exception:
 			traceback.print_exc()
 		time.sleep(0.5)
 		import importlib
@@ -256,7 +269,7 @@ finally:
 							child.wait(timeout=2)
 						except psutil.TimeoutExpired:
 							child.kill()
-			except:
+			except Exception:
 				traceback.print_exc()
 			if proc.is_running():
 				proc.terminate()
@@ -265,7 +278,7 @@ finally:
 				except psutil.TimeoutExpired:
 					proc.kill()
 			break
-		except:
+		except Exception:
 			traceback.print_exc()
 
 delete(sd)

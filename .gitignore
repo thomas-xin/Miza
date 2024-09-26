@@ -23,6 +23,10 @@ misc/msedgedriver
 training.txt
 config.json
 misc/poppler
+misc/rust/dist
+misc/rust/target
+misc/rust/venv
+misc/rust/Cargo.lock
 ffmpeg.exe
 ffplay.exe
 ffprobe.exe

@@ -1,7 +1,7 @@
 # Make linter shut up lol
 if "common" not in globals():
-	import common
-	from common import *
+	import misc.common as common
+	from misc.common import *
 print = PRINT
 
 
@@ -31,79 +31,96 @@ class Reload(Command):
 		return f"Error reloading{mod}. Please see log for more info."
 
 
-class Restart(Command):
-	name = ["Shutdown", "Reboot", "Update"]
+class Shutdown(Command):
+	name = ["Maintain", "Restart", "Reboot", "Update"]
 	min_level = nan
 	description = "Restarts, reloads, or shuts down ⟨MIZA⟩, with an optional delay."
-	example = ("shutdown", "update", "restart")
-	usage = "<delay>?"
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("maintain", "reboot", "shutdown", "update"),
+				accepts=dict(restart="reboot", wait="maintain"),
+			),
+			description="Image supplied by URL or attachment",
+			example="https://mizabot.xyz/favicon",
+			default="maintain",
+		),
+		delay=cdict(
+			type="time",
+			description="Time to wait",
+			aliases=["d"],
+			default=0,
+		),
+	)
+	typing = True
 	_timeout_ = inf
 
-	async def __call__(self, message, channel, guild, user, argv, name, **void):
-		bot = self.bot
-		client = bot.client
-		await message.add_reaction("❗")
+	async def __call__(self, bot, _message, _channel, _user, mode, delay, **void):
+		t = utc()
+		await _message.add_reaction("❗")
 		save = None
-		if name == "update":
+		if mode == "update":
 			resp = await asubmit(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			print(resp.stdout)
 			print(resp.stderr)
-		if argv in ("wait", "when free"):
+		if mode == "maintain":
 			m = None
 			busy = -inf
-			while busy:
-				lb = busy
-				busy = bot.command_semaphore.active
-				if bot.audio.players:
-					for auds in bot.audio.players.values():
-						try:
-							if auds.queue:
-								busy += 1
-						except Exception as ex:
-							print(repr(ex))
-				if busy:
-					if busy != lb:
-						content = f"*Waiting to {name} ({busy})...*"
-						if not m:
-							m = await send_with_reply(channel, content=content, reference=message)
-						else:
-							m = await m.edit(content=content)
-					await asyncio.sleep(1)
+			with tracebacksuppressor:
+				async with discord.context_managers.Typing(_channel):
+					while busy:
+						lb = busy
+						busy = bot.command_semaphore.active
+						if busy:
+							if busy != lb:
+								content = f"*Waiting until idle ({busy})...*"
+								if not m:
+									m = await send_with_reply(_channel, content=content, reference=_message)
+								else:
+									m = await bot.edit_message(m, content=content)
+							await asyncio.sleep(1)
 			if m:
-				create_task(m.edit(content=f"*Waiting to {name} (complete)*"))
-		elif argv:
+				csubmit(bot.edit_message(m, content=f"*Waiting until idle (complete)*"))
+		delay -= utc() - t
+		if delay > 0:
 			# Restart announcements for when a time input is specified
-			if argv.startswith("in"):
-				argv = argv[2:].lstrip()
-				wait = await bot.eval_time(argv)
-				await send_with_reply(channel, content="*Preparing to " + name + " in " + sec2time(wait) + "...*", reference=message)
-				emb = discord.Embed(colour=discord.Colour(1))
-				url = await bot.get_proxy_url(bot.user)
-				emb.set_author(name=str(bot.user), url=bot.github, icon_url=url)
-				emb.description = f"I will be {'shutting down' if name == 'shutdown' else 'restarting'} in {sec2time(wait)}, apologies for any inconvenience..."
-				await bot.send_event("_announce_", embed=emb)
-				save = csubmit(bot.send_event("_save_"))
-				if wait > 0:
-					await asyncio.sleep(wait)
-		if name == "shutdown":
-			await send_with_reply(channel, content="Shutting down... :wave:", reference=message)
-		else:
-			await send_with_reply(channel, content="Restarting... :wave:", reference=message)
+			with tracebacksuppressor:
+				async with discord.context_managers.Typing(_channel):
+					async with Delay(delay):
+						await send_with_reply(_channel, content="*Preparing to " + mode + " in " + sec2time(delay) + "...*", reference=_message)
+						emb = discord.Embed(colour=discord.Colour(1))
+						url = await bot.get_proxy_url(bot.user)
+						emb.set_author(name=str(bot.user), url=bot.github, icon_url=url)
+						emb.description = f"I will be {'shutting down' if mode == 'shutdown' else 'restarting'} in {sec2time(delay)}, apologies for any inconvenience..."
+						await bot.send_event("_announce_", embed=emb)
+						save = csubmit(bot.send_event("_save_"))
+		with tracebacksuppressor:
+			if mode == "shutdown":
+				await send_with_reply(_channel, content="Shutting down... :wave:", reference=_message)
+			else:
+				await send_with_reply(_channel, content="Restarting... :wave:", reference=_message)
+		return await self.confirm_shutdown(_channel, _user, save=save, mode=mode)
+
+	async def confirm_shutdown(self, _channel=None, _user=None, save=None, mode="restart"):
+		bot = self.bot
+		client = bot.client
+		bot.closing = True
 		if save is None:
 			print("Saving message cache...")
 			save = csubmit(bot.send_event("_save_"))
+		ctx = discord.context_managers.Typing(_channel) if _channel else emptyctx
 		async with Delay(1):
-			async with discord.context_managers.Typing(channel):
+			async with ctx:
 				# Call _destroy_ bot event to indicate to all databases the imminent shutdown
 				print("Destroying database memory...")
-				await bot.send_event("_destroy_", shutdown=True)
+				with tracebacksuppressor:
+					await bot.send_event("_destroy_", shutdown=mode == "shutdown")
 				# Save any database that has not already been autosaved
 				print("Saving all databases...")
-				await asubmit(bot.handle_update, force=True, priority=True)
-				await asubmit(bot.update, force=True, priority=True)
-				# Kill the audio player client
-				print("Shutting down audio client...")
-				kill = asubmit(bot.audio.kill, timeout=16, priority=True)
+				with tracebacksuppressor:
+					await asubmit(bot.handle_update, force=True, priority=True)
+					await asubmit(bot.update, force=True, priority=True)
 				# Send the bot "offline"
 				bot.closed = True
 				print("Going offline...")
@@ -114,32 +131,20 @@ class Restart(Command):
 				print("Killing math and image subprocesses...")
 				with tracebacksuppressor:
 					try:
-						await asubmit(sub_kill, start=False, timeout=8, priority=True)
-					except:
+						await asubmit(sub_kill, start=False, timeout=2, priority=True)
+					except Exception:
 						await asubmit(sub_kill, start=False, force=True, timeout=8, priority=True)
-				# Kill the webserver
-				print("Killing webserver...")
+				print("Waiting on save...")
 				with tracebacksuppressor:
-					await asubmit(force_kill, bot.server, timeout=16, priority=True)
-				# Disconnect as many voice clients as possible
-				print("Disconnecting remaining voice clients...")
-				futs = deque()
-				for guild in client.guilds:
-					member = guild.get_member(client.user.id)
-					if member:
-						voice = member.voice
-						if voice:
-							futs.append(csubmit(member.move_to(None)))
-				await save
+					await save
 				print("Goodbye.")
 				with suppress(NameError, AttributeError):
 					PRINT.flush()
 					PRINT.close(force=True)
 				with tracebacksuppressor:
 					await asubmit(retry, os.remove, "log.txt", attempts=8, delay=0.1)
-				await asyncio.gather(*futs, return_exceptions=True)
-				await kill
-		if name.casefold() == "shutdown":
+				# await gather(*futs, return_exceptions=True)
+		if mode and mode.casefold() == "shutdown":
 			touch(bot.shutdown)
 		else:
 			touch(bot.restart)
@@ -149,11 +154,11 @@ class Restart(Command):
 		del client
 		del bot
 		f = lambda x: mpf("1.8070890240038886796397791962945558584863687305069e-12") * x + mpf("6214315.6770607604120060484376689964637894379472455")
-		code = round(f(user.id), 16)
+		code = round(f(_user.id), 16)
 		if type(code) is not int:
 			raise SystemExit
-		name = as_str(code.to_bytes(3, "little"))
-		raise SystemExit(f"Why you keep throwin' me offline {name} >:(")
+		nick = as_str(code.to_bytes(3, "little"))
+		raise SystemExit(f"Why you keep throwin' me offline {nick} >:(")
 
 
 class Execute(Command):
@@ -228,23 +233,20 @@ class Execute(Command):
 			fake_message = copy.copy(message)
 			fake_message.content = argv
 			fake_message.channel = c
-			g = getattr(c, "guild", None)
+			g = T(c).get("guild")
 			fake_message.guild = g
 			if g:
 				fake_message.author = g.get_member(u.id) or u
 			else:
 				fake_message.author = u
 			futs.append(bot.process_message(fake_message, argv, min_perm=-inf if "i" in flags else perm))
-		await asyncio.gather(*futs)
+		await gather(*futs)
 
 
 class Exec(Command):
-	name = ["Eval"]
+	name = ["Aexec", "Aeval", "Eval"]
 	min_level = nan
 	description = "Causes all messages by the bot owner(s) in the current channel to be executed as python code on ⟨MIZA⟩."
-	usage = "<mode(enable|disable)>? <type(virtual)>?"
-	example = ("exec enable", "exec ?d")
-	flags = "aed"
 	# Different types of terminals for different purposes
 	terminal_types = demap(dict(
 		null=0,
@@ -256,39 +258,71 @@ class Exec(Command):
 		shell=32,
 		chat=64,
 	))
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("view", "enable", "disable"),
+			),
+			description="Action to perform",
+			example="enable",
+			default="view"
+		),
+		type=cdict(
+			type="enum",
+			validation=cdict(
+				enum=tuple(terminal_types.a),
+			),
+			description="Terminal mode",
+			example="virtual",
+			default="null",
+		),
+		code=cdict(
+			type="text",
+			description="Code to evaluate directly",
+			example="1 + 1",
+		),
+	)
 
-	def __call__(self, bot, flags, argv, message, channel, **void):
-		if not argv:
-			argv = 0
-		try:
-			num = int(argv)
-		except (TypeError, ValueError):
-			out = argv.casefold()
-			num = self.terminal_types[out]
-		else:
-			out = self.terminal_types[num]
-		if "e" in flags or "a" in flags:
-			if num in (0, "null"):
-				num = 4
+	async def __call__(self, bot, _channel, _message, mode, type, code, **void):
+		num = self.terminal_types[type]
+		execd = bot.data.exec
+		if mode == "enable":
+			num = num or 4
 			try:
-				bot.data.exec[channel.id] |= num
+				execd[_channel.id] |= num
 			except KeyError:
-				bot.data.exec[channel.id] = num
+				execd[_channel.id] = num
 			# Test bitwise flags for enabled terminals
-			out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec[channel.id]))
-			csubmit(message.add_reaction("❗"))
-			return css_md(f"{sqr_md(out)} terminal now enabled in {sqr_md(channel)}.")
-		elif "d" in flags:
+			out = ", ".join(self.terminal_types.get(1 << i) for i in bits(execd[_channel.id]))
+			csubmit(_message.add_reaction("❗"))
+			attachment_cache["@channels"] = [k for k, v in execd.items() if v & 16]
+			return css_md(f"{sqr_md(out)} terminal now enabled in {sqr_md(_channel)}.")
+		if mode == "disable":
 			with suppress(KeyError):
-				if num in (0, "null"):
+				if not num:
 					# Test bitwise flags for enabled terminals
-					out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec.pop(channel.id, 0, force=True)))
+					out = ", ".join(self.terminal_types.get(1 << i) for i in bits(execd.pop(_channel.id, 0, force=True)))
 				else:
-					bot.data.exec[channel.id] &= -num - 1
-					if not bot.data.exec[channel.id]:
-						bot.data.exec.pop(channel.id)
+					execd[_channel.id] &= -num - 1
+					if not execd[_channel.id]:
+						execd.pop(_channel.id)
+			attachment_cache["@channels"] = [k for k, v in execd.items() if v & 16]
 			return css_md(f"Successfully removed {sqr_md(out)} terminal.")
-		out = iter2str({k: ", ".join(self.terminal_types.get(1 << i) for i in bits(v)) for k, v in bot.data.exec.items()})
+		if code:
+			proc = code.translate(execd.qtrans)
+			try:
+				csubmit(_message.add_reaction("❗"))
+				result = await execd.procFunc(_message, proc, bot, term=4)
+				output = str(result)
+				return cdict(content=output, prefix="```\n", suffix="```")
+			except BaseException as ex:
+				tb = T(ex).get("original_traceback") or traceback.format_exc()
+				return cdict(
+					content=execd.prepare_string(tb),
+					reacts="❎",
+				)
+		out = iter2str({k: ", ".join(self.terminal_types.get(1 << i) for i in bits(v)) for k, v in sorted(execd.items())})
 		return f"**Terminals currently enabled:**{ini_md(out)}"
 
 
@@ -322,6 +356,8 @@ class UpdateExec(Database):
 		self.listeners[channel.id] = fut = Future()
 		return fut.result(timeout=86400)
 
+	psem = Semaphore(1, 64)
+
 	# Asynchronously evaluates Python code
 	async def procFunc(self, message, proc, bot, term=0):
 		proc = as_str(proc)
@@ -345,11 +381,13 @@ class UpdateExec(Database):
 				member=message.author,
 				message=message,
 			))
-			with suppress():
+			try:
 				glob["auds"] = bot.data.audio.players[message.guild.id]
-		if term & 32 or proc.startswith("!"):
-			if not term & 32:
-				proc = proc.removeprefix("!")
+				glob["ytdl"] = bot.ytdl = ytdl = bot._globals["VOICE"].ytdl
+				ytdl.bot = bot
+			except (AttributeError, KeyError):
+				pass
+		if term & 32:
 			proc = await asyncio.create_subprocess_shell(proc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, limit=65536)
 			out = await proc.stdout.read()
 			err = await proc.stderr.read()
@@ -357,33 +395,11 @@ class UpdateExec(Database):
 			if output:
 				glob["_"] = output
 			return output
-		if "\n" not in proc:
-			if proc.startswith("await "):
-				proc = proc[6:]
-		# Run concurrently to avoid blocking bot itself
-		# Attempt eval first, then exec
-		code = None
-		with suppress(SyntaxError):
-			code = compile(proc, "<terminal>", "eval", optimize=2)
-		if code is None:
-			with suppress(SyntaxError):
-				code = compile(proc, "<terminal>", "exec", optimize=2)
-			if code is None:
-				_ = glob.get("_")
-				defs = False
-				lines = proc.splitlines()
-				for line in lines:
-					if line.startswith("def ") or line.startswith("async def "):
-						defs = True
-				func = "async def _():\n\tlocals().update(globals())\n"
-				func += "\n".join(("\tglobals().update(locals())\n" if not defs and line.strip().startswith("return") else "") + "\t" + line for line in lines)
-				func += "\n\tglobals().update(locals())"
-				code2 = compile(func, "<terminal>", "exec", optimize=2)
-				eval(code2, glob)
-				output = await glob["_"]()
-				glob["_"] = _
-		if code is not None:
-			output = await asubmit(eval, code, glob, priority=True)
+		if self.psem.busy:
+			output = await asubmit(aeval, proc, glob, priority=-1)
+		else:
+			async with self.psem:
+				output = await asubmit(aeval, proc, glob, priority=3)
 		# Output sent to "_" variable if used
 		if output is not None:
 			glob["_"] = output
@@ -393,7 +409,7 @@ class UpdateExec(Database):
 		# Autodeletes after a delay
 		channel = await self.bot.fetch_channel(c_id)
 		message = await channel.send(**kwargs)
-		if is_finite(delete_after):
+		if isfinite(delete_after):
 			csubmit(self.bot.silent_delete(message, no_log=True, delay=delete_after))
 
 	# async def _typing_(self, user, channel, **void):
@@ -463,17 +479,12 @@ class UpdateExec(Database):
 					csubmit(message.add_reaction("❗"))
 					result = await self.procFunc(message, proc, bot, term=f)
 					output = str(result)
-					if len(output) > 24000:
-						f = CompatFile(output.encode("utf-8"), filename="message.txt")
-						await bot.send_with_file(channel, "Response over 24,000 characters.", file=f, reference=message)
-					elif len(output) > 1993:
-						bot.send_as_embeds(channel, output, md=code_md, reference=message)
-					else:
-						await send_with_reply(channel, message, self.prepare_string(output, fmt=""))
-				except:
-					await send_with_react(channel, self.prepare_string(traceback.format_exc()), reacts="❎", reference=message)
+					await bot.respond_with(cdict(content=output, prefix="```\n", suffix="```"), message=message)
+				except BaseException as ex:
+					tb = T(ex).get("original_traceback") or traceback.format_exc()
+					await send_with_react(channel, self.prepare_string(tb), reacts="❎", reference=message)
 		# Relay DM messages
-		elif message.guild is None and getattr(message.channel, "recipient", None):
+		elif message.guild is None and T(message.channel).get("recipient"):
 			v = bot.data.blacklist.get(message.author.id) or 0
 			if v > 1:
 				return await channel.send(
@@ -497,8 +508,16 @@ class UpdateExec(Database):
 					if channel is not None:
 						self.bot.send_embeds(channel, embed=emb)
 
+	def __load__(self, **void):
+		sendable = list(c_id for c_id, flag in self.data.items() if flag & 16)
+		AUTH["proxy_channels"] = sendable
+		save_auth(AUTH)
+		misc.util.attachment_cache.init()
+
 	# All logs that normally print to stdout/stderr now send to the assigned log channels
 	def _log_(self, msg, **void):
+		if not self.bot or self.bot.api_latency > 6:
+			return
 		msg = msg.strip()
 		if msg:
 			invalid = set()
@@ -517,28 +536,51 @@ class UpdateExec(Database):
 			if self.bot.ready:
 				[self.data.pop(i) for i in invalid]
 
-	async def _proxy(self, url, whole=False):
+	counter = {}
+	async def renew(self, url):
+		if not is_discord_attachment(url):
+			return url
 		bot = self.bot
+		h = uhash(url) + "~"
+		if self.counter.get(h, 0) >= 3:
+			return url
+		if h in self.seen:
+			url = self.seen[h]
+			if not discord_expired(url):
+				return url
 		sendable = list(c_id for c_id, flag in self.data.items() if flag & 16)
 		if not sendable:
 			return url
 		c_id = choice(sendable)
 		channel = await bot.fetch_channel(c_id)
+		embed = discord.Embed(colour=rand_colour())
+		embed.set_thumbnail(url=url)
+		message = await bot.send_as_webhook(channel, url, embed=embed)
+		self.seen[h] = url = message.embeds[0].thumbnail.url
+		if discord_expired(url):
+			try:
+				self.counter[h] += 1
+			except KeyError:
+				self.counter[h] = 1
+		csubmit(bot.silent_delete(message))
+		return url
+
+	async def _proxy(self, url, whole=False):
+		bot = self.bot
+		sendable = list(c_id for c_id, flag in self.data.items() if flag & 16)
+		if not sendable:
+			return url
+		name = url2fn(url)
+		if not IMAGE_FORMS.get(name.rsplit(".", 1)[-1]):
+			return await self.uproxy(url)
+		c_id = choice(sendable)
+		channel = await bot.fetch_channel(c_id)
 		m = channel.guild.me
-		aurl = await bot.get_proxy_url(m)
-		message = await bot.send_as_webhook(channel, url, username=m.display_name, avatar_url=aurl)
+		embed = discord.Embed(colour=rand_colour())
+		embed.set_thumbnail(url=url)
+		message = await bot.send_as_webhook(channel, url, embed=embed, username=m.display_name)
 		if not message.embeds:
-			fut = csubmit(asyncio.wait_for(bot.wait_for("raw_message_edit", check=lambda m: [m_id == message.id and getattr(self.bot.cache.messages.get(m_id), "embeds", None) for m_id in (getattr(m, "id", None) or getattr(m, "message_id", None),)][0]), timeout=12))
-			for i in range(120):
-				try:
-					message = fut.result()
-				except ISE:
-					message = await self.bot.fetch_message(message.id, channel)
-					if message.embeds:
-						break
-				else:
-					break
-				await asyncio.sleep(0.1)
+			return await self.uproxy(url)
 		if whole:
 			return message
 		return message.embeds[0].thumbnail.proxy_url
@@ -551,7 +593,6 @@ class UpdateExec(Database):
 			except KeyError:
 				new = await_fut(self._proxy(url))
 				self.bot.data.proxies[h] = new
-				# self.bot.data.proxies.update(0)
 				return new
 		return url
 	
@@ -580,7 +621,6 @@ class UpdateExec(Database):
 						self.bot.data.proxies[uhash(urls[i])] = out[i] = message.embeds[c].thumbnail.proxy_url
 					except IndexError:
 						break
-					# self.bot.data.proxies.update(0)
 					c += 1
 		return out if len(out) > 1 else out[0]
 
@@ -680,9 +720,9 @@ class UpdateExec(Database):
 					# message = await bot.send_as_webhook(channel, fstr, files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
 					for a, bs in zip(message.attachments, sizes):
 						if raw:
-							u = self.bot.preserve_as_long(channel.id, message.id, a.id, ext=a.url) + "?S=" + str(bs)
+							u = self.bot.preserve_as_long(channel.id, message.id, a.id, fn=a.url) + "?S=" + str(bs)
 						else:
-							u = self.bot.preserve_into(channel.id, message.id, a.id, ext=a.url) + "?S=" + str(bs)
+							u = self.bot.preserve_into(channel.id, message.id, a.id, fn=a.url) + "?S=" + str(bs)
 						urls.append(u)
 						# u = str(a.url).rstrip("&")
 						# u += "?" if "?" not in u else "&"
@@ -722,9 +762,9 @@ class UpdateExec(Database):
 		return deleted
 
 	seen = Cache(timeout=86400)
-	async def uproxy(self, *urls, collapse=True, force=False, ext=True):
+	async def uproxy(self, *urls, collapse=True, force=False, keep=True, use_fn=True):
 		if urls == ("https://cdn.discordapp.com/embed/avatars/0.png",):
-			return urls
+			return urls[0]
 		out = [None] * len(urls)
 		files = [None] * len(urls)
 		sendable = [c_id for c_id, flag in self.data.items() if flag & 16]
@@ -732,12 +772,14 @@ class UpdateExec(Database):
 		headers["User-Agent"] += " MizaUnproxy/1.0.0"
 		bot = self.bot
 		for i, url in enumerate(urls):
-			if isinstance(url, (bytes, memoryview)):
+			if isinstance(url, byte_like):
 				files[i] = cdict(fut=as_fut(url), filename="untitled.webp")
 				continue
+			if isinstance(url, CompatFile):
+				files[i] = cdict(fut=as_fut(url.fp.read()), filename=url.filename)
 			if not is_url(url):
 				continue
-			if not force and url.startswith(bot.raw_webserver + "/u/"):
+			if not force and url.startswith(bot.webserver + "/u/") or url.startswith(bot.raw_webserver + "/u/"):
 				out[i] = url
 				continue
 			try:
@@ -747,11 +789,11 @@ class UpdateExec(Database):
 					raise KeyError
 				if is_discord_attachment(out[i]):
 					with tracebacksuppressor:
-						out[i] = bot.preserve_attachment(out[i], ext=ext and out[i])
+						out[i] = bot.preserve_attachment(out[i], fn=use_fn and out[i])
 
 				def verify(url, uhu):
 					try:
-						with reqs.next().head(url, headers=headers, stream=True, timeout=12) as resp:
+						with reqs.next().head(url, headers=headers, stream=True, verify=False, timeout=12) as resp:
 							resp.raise_for_status()
 					except:
 						print_exc()
@@ -776,7 +818,7 @@ class UpdateExec(Database):
 						fn += ".webp"
 					elif fn.endswith(".pnglarge") or fn.endswith(".jpglarge"):
 						fn = fn[:-5]
-					files[i] = cdict(fut=asubmit(reqs.next().get, url, stream=True, timeout=24), filename=fn, url=url)
+					files[i] = cdict(fut=asubmit(proxy.content_or, url, stream=True, timeout=24), filename=fn, url=url)
 				else:
 					out[i] = url
 		failed = [None] * len(urls)
@@ -814,17 +856,18 @@ class UpdateExec(Database):
 					else:
 						a = message.attachments[c]
 						try:
-							url = bot.preserve_as_long(channel.id, message.id, a.id, ext=ext and a.url)
+							url = bot.preserve_as_long(channel.id, message.id, a.id, fn=use_fn and a.url)
 						except:
 							print_exc()
 							url = str(message.attachments[c].url)
-					try:
-						bot.data.proxies[uhash(urls[i])] = out[i] = url
-					except IndexError:
-						break
-					# bot.data.proxies.update(0)
+					out[i] = url
+					if keep:
+						try:
+							bot.data.proxies[uhash(urls[i])] = url
+						except IndexError:
+							break
 					with suppress(KeyError, RuntimeError):
-						self.temp.pop(urls[i]).set_result(out[i])
+						self.temp.pop(urls[i]).set_result(url)
 					c += 1
 		if collapse:
 			return out if len(out) > 1 else out[0]
@@ -854,17 +897,12 @@ class UpdateExec(Database):
 
 	def _destroy_(self, **void):
 		with suppress(LookupError, AttributeError):
-			PRINT.funcs.remove(self._log_)
+			PRINT.funcs.discard(self._log_)
 
 
 class UpdateProxies(Database):
 	name = "proxies"
 	limit = 65536
-
-	# def __load__(self, **void):
-	#     if 0 not in self:
-	#         self.clear()
-	#         self[0] = {}
 
 
 class SetAvatar(Command):
@@ -945,7 +983,6 @@ class UpdatePremiums(Database):
 		d = self[uid]
 		if d["lv"] != lv:
 			d["lv"] = lv
-			self.update(uid)
 		pl = self.prem_limit(lv)
 		if len(d["gl"]) > pl:
 			while len(d["gl"]) > pl:
@@ -954,9 +991,7 @@ class UpdatePremiums(Database):
 					self.bot.data.trusted[i].discard(uid)
 					if not self.bot.data.trusted[i]:
 						self.bot.data.trusted.pop(i, None)
-					self.bot.data.trusted.update(i)
 				print(i, "subscription lost from", uid)
-			self.update(uid)
 		for i in d["gl"]:
 			self.bot.data.trusted.setdefault(i, {None}).add(uid)
 		if not lv:
@@ -984,56 +1019,64 @@ class UpdatePremiums(Database):
 			i = gl.pop()
 			rm.append(i)
 			self.bot.data.trusted[i].discard(user.id)
-		self.update(user.id)
-		self.bot.data.trusted.update(guild.id)
 		return rm
-
-
-class UpdateTokenBalances(Database):
-	name = "token_balances"
 
 
 class UpdateCosts(Database):
 	name = "costs"
 
-	def put(self, i, cost):
-		try:
-			self[i] += cost
-		except KeyError:
-			self[i] = cost
-		self.update(i)
+
+class UpdateUsage(Database):
+	name = "usage"
+
+	def add(self, command):
+		s = str(utc_dt().date())
+		usage = self.setdefault(s, {})
+		name = command if isinstance(command, str) else command.parse_name()
+		add_dict(usage, {name: 1})
 
 
 class UpdateColours(Database):
 	name = "colours"
-	limit = 65536
 
-	async def get(self, url, threshold=True):
-		if not url:
-			return 0
-		if is_discord_url(url) and "avatars" in url[:48]:
-			key = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
-		else:
-			key = uhash(url.split("?", 1)[0])
-		if isinstance(self.data.get("colours"), dict):
-			self.data.update(self.pop("colours"))
-			self.update()
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.cache = Cache(timeout=86400 * 30, trash=65536)
+		self.cache.attach(self)
+
+	async def _get(self, url, threshold=True):
 		try:
-			out = self[key]
-		except KeyError:
-			try:
-				resp = await process_image(url, "get_colour", ["-nogif"], timeout=20)
-			except TypeError:
-				print_exc()
-				return 0
-			self[key] = out = [round(i) for i in eval_json(resp)]
-		raw = colour2raw(out)
+			resp = await process_image(url, "get_colour", ["-nogif"], timeout=20)
+		except TypeError:
+			return 0
+		out = [round(i) for i in resp]
+		try:
+			raw = colour2raw(out)
+		except Exception:
+			print_exc()
+			return 0
+		print("GC:", url, out, raw)
 		if threshold:
 			if raw == 0:
 				return 1
 			elif raw == 16777215:
 				return 16777214
 		return raw
+
+	async def get(self, url, threshold=True):
+		if not url:
+			return 0
+		if url.startswith("https://i.ytimg.com/vi/"):
+			vid = url.removeprefix("https://i.ytimg.com/vi/").split("?", 1)[0].split("/", 1)[0]
+			url = key = f"https://i.ytimg.com/vi/{vid}/3.jpg"
+		elif is_discord_url(url) and "avatars" in url[:48]:
+			key = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
+		else:
+			key = url.split("?", 1)[0]
+		resp = await self.cache.retrieve_from(uhash(key), self._get, url, threshold)
+		if isinstance(resp, (discord.Colour, int)):
+			return resp
+		return 0
 
 
 class UpdateChannelCache(Database):
@@ -1047,17 +1090,22 @@ class UpdateChannelCache(Database):
 		c_id = verify_id(channel)
 		min_time = time_snowflake(dtn() - datetime.timedelta(days=14))
 		deletable = False
-		for m_id in sorted(self.get(c_id, ()), reverse=True):
+		s = self.get(c_id, ())
+		if isinstance(s, set):
+			s = self[c_id] = sorted(s, reverse=True)
+		for m_id in s:
+			if m_id in self.bot.data.deleted.cache:
+				continue
 			if as_message:
 				try:
 					if m_id < min_time:
 						raise OverflowError
 					message = await self.bot.fetch_message(m_id, channel=channel if force else None)
-					if getattr(message, "deleted", None):
+					if T(message).get("deleted"):
 						continue
 				except (discord.NotFound, discord.Forbidden, OverflowError):
 					if deletable:
-						self.data[c_id].discard(m_id)
+						self.data[c_id].remove(m_id)
 				except (TypeError, ValueError, LookupError, discord.HTTPException):
 					if not force:
 						break
@@ -1068,22 +1116,52 @@ class UpdateChannelCache(Database):
 			else:
 				yield m_id
 
+	async def splice(self, channel, messages):
+		if not messages or hasattr(channel, "simulated"):
+			return []
+		c_id = verify_id(channel)
+		iids = sorted(m.id for m in messages)
+		mids = sorted(self.get(c_id, ()))
+		i = bisect.bisect_left(mids, iids[0])
+		j = bisect.bisect_right(mids, iids[-1])
+		min_id = time_snowflake(cdict(timestamp=lambda: utc() - 14 * 86400))
+		midl = mids[:i]
+		if mids and mids[0] < min_id:
+			k = bisect.bisect_right(mids, min_id)
+			midl = midl[k:]
+		mids = list(itertools.chain(midl, iids, mids[j:]))
+		mids.reverse()
+		self[c_id] = mids
+		return mids
+
 	def add(self, c_id, m_id):
-		s = self.data.setdefault(c_id, set())
+		s = self.data.get(c_id, ())
+		if not isinstance(s, set):
+			s = set(s)
 		s.add(m_id)
-		self.update(c_id)
 		while len(s) > 32768:
 			try:
 				s.discard(next(iter(s)))
 			except RuntimeError:
 				pass
+		self[c_id] = s
 	
 	def _delete_(self, message, **void):
 		try:
-			self.data[message.channel.id].discard(message.id)
-			self.update(message.channel.id)
-		except (AttributeError, KeyError):
+			self.data[message.channel.id].remove(message.id)
+		except (AttributeError, KeyError, ValueError):
 			pass
+
+
+class UpdateDeleted(Database):
+	name = "deleted"
+	cache = {}
+
+	async def __load__(self, **void):
+		cache = self.cache
+		self.cache = Cache(timeout=86400 * 7, trash=1)
+		self.cache.update(cache)
+		self.cache.attach(self.data)
 
 
 class UpdateChannelHistories(Database):
@@ -1097,17 +1175,20 @@ class UpdateChannelHistories(Database):
 		c_id = verify_id(channel)
 		min_time = time_snowflake(dtn() - datetime.timedelta(days=14))
 		deletable = False
-		for m_id in sorted(self.data.get(c_id, ()), reverse=True):
+		s = self.get(c_id, ())
+		if isinstance(s, set):
+			s = self[c_id] = sorted(s, reverse=True)
+		for m_id in s:
 			if as_message:
 				try:
 					if m_id < min_time:
 						raise OverflowError
 					message = await self.bot.fetch_message(m_id, channel=channel if force else None)
-					if getattr(message, "deleted", None):
+					if T(message).get("deleted"):
 						continue
 				except (discord.NotFound, discord.Forbidden, OverflowError):
 					if deletable:
-						self.data[c_id].discard(m_id)
+						self.data[c_id].remove(m_id)
 				except (TypeError, ValueError, LookupError, discord.HTTPException):
 					if not force:
 						break
@@ -1120,35 +1201,44 @@ class UpdateChannelHistories(Database):
 
 	def add(self, c_id, m_id):
 		s = self.data.setdefault(c_id, set())
+		if not isinstance(s, set):
+			s = set(s)
 		s.add(m_id)
-		self.update(c_id)
 		while len(s) > 32768:
 			try:
 				s.discard(next(iter(s)))
 			except RuntimeError:
 				pass
+		self[c_id] = s
 	
 	def _delete_(self, message, **void):
 		try:
-			self.data[message.channel.id].discard(message.id)
-			self.update(message.channel.id)
-		except (AttributeError, KeyError):
+			self.data[message.channel.id].remove(message.id)
+		except (AttributeError, KeyError, ValueError):
 			pass
 
 
 class Maintenance(Command):
 	min_level = nan
 	description = "Toggles Maintenance mode, which will block all use of commands for all servers except the current one while active."
-	usage = "<disable(-d)>"
-	flags = "aed"
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("enable", "disable"),
+			),
+			description="New state to apply",
+			example="disable",
+		),
+	)
 
-	async def __call__(self, bot, guild, flags, **void):
-		if "d" in flags:
+	async def __call__(self, bot, _guild, mode, **void):
+		if mode == "disable":
 			bot.data.blacklist.pop(0)
 			return css_md(f"Maintenance mode deactivated.")
-		if "a" in flags or "e" in flags:
-			bot.data.blacklist[0] = guild.id
-			return css_md(f"Maintenance mode activated. No longer serving commands outside of {sqr_md(guild)}.")
+		if mode == "enable":
+			bot.data.blacklist[0] = _guild.id
+			return css_md(f"Maintenance mode activated. No longer serving commands outside of {sqr_md(_guild)}.")
 		maintenance = bot.data.blacklist.get(0)
 		return css_md(f"Maintenance mode: {sqr_md(maintenance)}")
 
@@ -1183,29 +1273,101 @@ class UpdateBlacklist(Database):
 
 class UpdateEmojis(Database):
 	name = "emojis"
+	sem2 = Semaphore(1, inf, rate_limit=1)
+	sem3 = Semaphore(1, inf, rate_limit=1)
+	emojidata = None
+
+	async def load_own(self):
+		while self.sem2.busy:
+			await asyncio.sleep(1)
+		if self.emojidata:
+			return self.emojidata
+		bot = self.bot
+		async with self.sem2:
+			emojidata = self.emojidata = await Request(
+				f"https://discord.com/api/{api}/applications/{bot.id}/emojis",
+				authorise=True,
+				json=True,
+				aio=True,
+				timeout=32,
+			)
+			fns = set(chain(*(t[2] for t in os.walk("misc/emojis"))))
+			for edata in emojidata["items"]:
+				name2 = edata["name"]
+				for fn in fns:
+					if fn.startswith(name2):
+						name2 = fn
+						break
+				else:
+					continue
+				emoji = discord.Emoji(guild=bot.user, state=bot._state, data=edata)
+				emoji.application_id = bot.id
+				self.data[name2] = emoji.id
+				bot.cache.emojis[emoji.id] = emoji
+		return self.emojidata
 
 	async def grab(self, name):
-		while not self.bot.bot_ready:
+		bot = self.bot
+		while not bot.bot_ready:
 			await asyncio.sleep(2)
 		ename = name.rsplit(".", 1)[0]
 		animated = name.endswith(".gif")
-		with suppress(KeyError):
-			emoji = self.bot.cache.emojis[self.data[name]]
-			if not emoji or self.bot.ready and emoji.id not in (e.id for e in emoji.guild.emojis):
+		try:
+			emoji = bot.cache.emojis[self.data[name]]
+			if not emoji or bot.ready and not getattr(emoji, "application_id", None) and (not getattr(emoji, "available", True) or emoji.id not in (e.id for e in emoji.guild.emojis)):
 				raise KeyError
+		except KeyError:
+			pass
+		else:
 			return emoji
-		guilds, limits = self.bot.get_available_guild(animated=animated, return_all=True)
+		emojidata = await self.load_own()
+		if self.data.get(name) and self.data[name] in bot.cache.emojis:
+			emoji = bot.cache.emojis[self.data[name]]
+			if not emoji or bot.ready and not getattr(emoji, "application_id", None) and (not getattr(emoji, "available", True) or emoji.id not in (e.id for e in emoji.guild.emojis)):
+				pass
+			else:
+				return emoji
+		guilds, limits = bot.get_available_guild(animated=animated, return_all=True)
 		for guild in guilds:
 			for emoji in guild.emojis:
 				if emoji.name == ename and emoji.animated == animated:
+					if not emoji or bot.ready and not getattr(emoji, "application_id", None) and (not getattr(emoji, "available", True) or emoji.id not in (e.id for e in emoji.guild.emojis)):
+						continue
+					self.data[name] = emoji.id
+					bot.cache.emojis[emoji.id] = emoji
 					return emoji
+		if emojidata is not None and len(emojidata["items"]) < 2000:
+			with open(f"misc/emojis/{name}", "rb") as f:
+				b = await asubmit(f.read)
+			b2 = await bot.to_data_url(b)
+			async with self.sem3:
+				edata = await Request(
+					f"https://discord.com/api/{api}/applications/{bot.id}/emojis",
+					method="POST",
+					data=orjson.dumps(dict(
+						name=ename,
+						image=b2,
+					)),
+					headers={
+						"Content-Type": "application/json",
+					},
+					authorise=True,
+					json=True,
+					aio=True,
+					timeout=32,
+				)
+			emoji = discord.Emoji(guild=bot.user, state=bot._state, data=edata)
+			emoji.application_id = bot.id
+			self.data[name] = emoji.id
+			bot.cache.emojis[emoji.id] = emoji
+			return emoji
 		if not sum(limits):
 			raise LookupError("Unable to find suitable guild for the required emoji.")
 		with open(f"misc/emojis/{name}", "rb") as f:
 			b = await asubmit(f.read)
 		emoji = await guilds[0].create_custom_emoji(name=ename, image=b)
 		self.data[name] = emoji.id
-		self.bot.cache.emojis[emoji.id] = emoji
+		bot.cache.emojis[emoji.id] = emoji
 		return emoji
 
 	async def emoji_as(self, s):
@@ -1213,9 +1375,9 @@ class UpdateEmojis(Database):
 		return min_emoji(e)
 
 	async def create_progress_bar(self, length, ratio):
-		start_bar = await asyncio.gather(*[self.emoji_as(f"start_bar_{i}.gif") for i in range(5)])
-		mid_bar = await asyncio.gather(*[self.emoji_as(f"mid_bar_{i}.gif") for i in range(5)])
-		end_bar = await asyncio.gather(*[self.emoji_as(f"end_bar_{i}.gif") for i in range(5)])
+		start_bar = await gather(*[self.emoji_as(f"start_bar_{i}.gif") for i in range(5)])
+		mid_bar = await gather(*[self.emoji_as(f"mid_bar_{i}.gif") for i in range(5)])
+		end_bar = await gather(*[self.emoji_as(f"end_bar_{i}.gif") for i in range(5)])
 		high = length * 4
 		position = min(high, round(ratio * high))
 		items = deque()
@@ -1243,13 +1405,12 @@ class UpdateImagePools(Database):
 		finished = self.data.setdefault("finished", set())
 		if self.finished:
 			finished.update(self.finished)
-			self.update("finished")
 		self.finished = finished
 
 	@tracebacksuppressor
 	async def load_until(self, key, func, threshold, args=()):
 		async with self.sem:
-			data = set_dict(self.data, key, alist())
+			data = self.data.coercedefault(key, alist, alist())
 			failed = 0
 			for i in range(threshold << 1):
 				if len(data) > threshold or failed > threshold >> 1:
@@ -1263,14 +1424,12 @@ class UpdateImagePools(Database):
 						if url not in data:
 							data.add(url)
 							failed = 0
-							self.update(key)
 						else:
 							failed += 1
 				except:
 					failed += 8
 					print_exc()
 			self.finished.add(key)
-			self.update("finished")
 			data.uniq(sort=None)
 
 	async def proc(self, key, func, args=()):
@@ -1286,14 +1445,13 @@ class UpdateImagePools(Database):
 					raise AttributeError(url)
 				if url not in data:
 					data.add(url)
-					self.update(key)
 			return url
 
 	async def get(self, key, func, threshold=1024, args=()):
 		if key not in self.loading:
 			self.loading.add(key)
 			csubmit(self.load_until(key, func, threshold, args=args))
-		data = set_dict(self.data, key, alist())
+		data = self.coercedefault(key, alist, alist())
 		if not data or key not in self.finished and (len(data) < threshold >> 1 or len(data) < threshold and xrand(2)):
 			out = await func(*args)
 			if not out:
@@ -1304,7 +1462,6 @@ class UpdateImagePools(Database):
 				url = url.strip()
 				if url not in data:
 					data.add(url)
-					self.update(key)
 			return url
 		if not self.sem.is_busy():
 			csubmit(self.proc(key, func, args=args))
@@ -1323,8 +1480,23 @@ class UpdateInsights(Database):
 	name = "insights"
 
 
+class UpdateInfo(Database):
+	name = "info"
+
+
 class UpdateUptimes(Database):
 	name = "uptimes"
+
+
+class UpdateOnceoffs(Database):
+	name = "onceoffs"
+
+	def use(self, key, timeout=60):
+		t = utc()
+		if t - self.get(key, 0) > timeout:
+			self[key] = t
+			return True
+		return False
 
 
 class UpdateEmojiStats(Database):
@@ -1343,13 +1515,15 @@ class UpdateGuilds(Database):
 	forced = set()
 
 	def cache_guild(self, guild):
+		if T(guild).get("unavailable", False) or T(guild).get("ghost") or T(guild).get("simulated"):
+			return guild._members.values()
 		mdata = []
 		ts = utc()
 		for m in guild._members.values():
 			cm = cdict(
 				name=m.name,
 				nick=m.nick,
-				global_name=getattr(m, "global_name", None),
+				global_name=T(m).get("global_name"),
 				id=m.id,
 				gp=m.guild_permissions.value,
 				rids=list(m._roles),
@@ -1358,26 +1532,56 @@ class UpdateGuilds(Database):
 				cm.bot = True
 			if m._avatar:
 				cm._a = m._avatar
-			tou = getattr(m, "timed_out_until", None)
+			tou = T(m).get("timed_out_until")
 			if tou and ts - tou.timestamp() > 0:
 				cm.tou = tou.timestamp()
 			mdata.append(cm)
-		self[guild.id] = mdata
+		gdata = cdict(
+			id=guild.id,
+			name=guild.name,
+			icon=guild.icon and str(guild.icon),
+			description=guild.description,
+			_member_count=len(mdata),
+			features=guild.features,
+			banner=guild.banner and str(guild.banner),
+			owner_id=guild.owner_id,
+			filesize_limit=guild.filesize_limit,
+			members=mdata,
+		)
+		self[guild.id] = gdata
 		return mdata
 
-	def _ready_(self, **void):
+	def __load__(self, **void):
 		bot = self.bot
-		for guild in bot.cache.guilds.values():
+		for k, v in self.items():
 			with tracebacksuppressor:
-				if guild.id in self:
-					self.load_guild(guild)
+				g = self.get(k)
+				if not isinstance(g, dict):
+					continue
+				guild = bot.UserGuild()
+				guild._members = {}
+				guild._roles = {}
+				guild._channels = {}
+				guild._threads = {}
+				guild.channels = []
+				guild.text_channels = []
+				guild.voice_channels = []
+				guild.categories = []
+				guild.me = bot.user
+				guild.__dict__.update(g)
+				self.load_guild(guild)
+				bot.cache.guilds[guild.id] = guild
 
 	def load_guild(self, guild):
-		mdata = self.get(guild.id, [])
+		bot = self.bot
+		gdata = self.get(guild.id, {})
+		if not isinstance(gdata, dict):
+			gdata = dict(members=gdata)
+		mdata = gdata["members"]
 		for cm in map(cdict, mdata):
-			if cm.id in guild._members:
+			if cm.id in guild._members and isinstance(guild._members[cm.id], discord.Member):
 				continue
-			m = self.bot.GhostUser()
+			m = bot.GhostUser()
 			m.id = cm.id
 			m.name = cm.name
 			m.nick = cm.get("nick")
@@ -1386,13 +1590,15 @@ class UpdateGuilds(Database):
 			m.guild = guild
 			m.roles = list(filter(bool, map(guild._roles.get, cm.get("rids", ()))))
 			if guild.id not in cm.get("rids", ()):
-				r = guild._roles.get(guild.id) or discord.Role(guild=guild, state=self.bot._state, data=dict(id=guild.id, name="@everyone"))
+				r = guild._roles.get(guild.id) or discord.Role(guild=guild, state=T(bot).get("_state"), data=dict(id=guild.id, name="@everyone"))
 				m.roles.append(r)
 			m.bot = cm.get("bot", False)
-			m._avatar = getattr(cm, "_a", None)
-			if getattr(cm, "tou", None):
+			m._avatar = T(cm).get("_a")
+			if T(cm).get("tou"):
 				m.timed_out_until = datetime.datetime.utcfromtimestamp(cm.tou).replace(tzinfo=datetime.timezone.utc)
 			guild._members[m.id] = m
+		if isinstance(guild, dict):
+			guild["owner"] = guild._members.get(guild.owner_id)
 		return guild._members
 
 	def register(self, guild, force=True):
@@ -1401,10 +1607,6 @@ class UpdateGuilds(Database):
 		elif guild.id not in self.forced:
 			return
 		return self.cache_guild(guild)
-
-
-class UpdateLLCache(Database):
-	name = "llcache"
 
 
 class UpdateDrives(Database):

@@ -1,7 +1,4 @@
-import os, sys, time, subprocess, psutil, numpy
-from PIL import Image
-Image.MAX_IMAGE_PIXELS = 4294967296
-np = numpy
+import os, sys, time, subprocess
 
 is_url = lambda url: "://" in url and url.split("://", 1)[0].rstrip("s") in ("http", "hxxp", "ftp", "fxp")
 ffmpeg_start = ("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-fflags", "+discardcorrupt+fastseek+genpts+igndts+flush_packets", "-err_detect", "ignore_err", "-hwaccel", "auto", "-vn")
@@ -31,9 +28,26 @@ ffmpeg_probe = (
 	"default=nokey=1:noprint_wrappers=1",
 	fn,
 )
-duration = float(subprocess.check_output(ffmpeg_probe))
+try:
+	print(ffmpeg_probe)
+	duration = float(subprocess.check_output(ffmpeg_probe))
+except ValueError:
+	ffmpeg_probe = (
+		"ffprobe",
+		"-v",
+		"error",
+		"-select_streams",
+		"a:0",
+		"-show_entries",
+		"stream=duration",
+		"-of",
+		"default=nokey=1:noprint_wrappers=1",
+		fn,
+	)
+	print(ffmpeg_probe)
+	duration = float(subprocess.check_output(ffmpeg_probe))
 frames = duration * 48000
-req = int(np.sqrt(frames)) * 8
+req = int(frames ** 0.5) * 8
 ffts = req // 8
 dfts = ffts // 2 + 1
 # print(dfts, ffts)
@@ -43,13 +57,17 @@ if os.path.exists(fi):
 	os.remove(fi)
 
 cmd = ffmpeg_start + ("-i", fn, "-f", "f32le", "-ac", "2", "-ar", "48k", fi)
-p = psutil.Popen(cmd, stderr=subprocess.PIPE)
+p = subprocess.Popen(cmd)
+
+import numpy as np
+from PIL import Image
+Image.MAX_IMAGE_PIXELS = 4294967296
 
 time.sleep(0.1)
 while True:
 	if os.path.exists(fi) and os.path.getsize(fi) >= 96000:
 		break
-	if not p.is_running():
+	if p.poll() is not None:
 		raise RuntimeError(p.stderr.read().decode("utf-8"))
 	time.sleep(0.01)
 f = open(fi, "rb")
@@ -58,7 +76,8 @@ random = np.random.default_rng(0)
 # Randomly rounds with weighted distribution; i.e. 1.6 rounds to 2 with 60% chance, 1 with 40% chance
 def round_random(x):
 	x = np.asanyarray(x)
-	if "itemp" not in globals() or len(itemp) != len(x):
+	itemp = globals().get("itemp")
+	if itemp is None or len(itemp) != len(x):
 		# Needs space to store temporary values
 		globals()["itemp"] = np.empty(len(x), dtype=np.uint8)
 		globals()["ftemp"] = np.empty(len(x), dtype=np.float32)
@@ -67,7 +86,7 @@ def round_random(x):
 	# fractional part
 	x -= y
 	# 0~1 distribution
-	z = random.random(len(x), dtype=np.float32, out=ftemp)
+	z = random.random(len(x), dtype=np.float32, out=globals()["ftemp"])
 	y[z <= x] += 1
 	return y
 
@@ -76,7 +95,7 @@ rat = np.log2(1.03125)
 columns = []
 while True:
 	b = f.read(req)
-	while len(b) < req and p.is_running() and p.status() != "zombie":
+	while len(b) < req and p.poll() is None:
 		time.sleep(0.1)
 		b += f.read(req - len(b))
 	if not b:

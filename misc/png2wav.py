@@ -1,7 +1,4 @@
-import os, sys, time, subprocess, numpy, requests
-from PIL import Image
-Image.MAX_IMAGE_PIXELS = 4294967296
-np = numpy
+import os, sys, time, subprocess
 
 is_url = lambda url: "://" in url and url.split("://", 1)[0].rstrip("s") in ("http", "hxxp", "ftp", "fxp")
 ffmpeg_start = ("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-fflags", "+discardcorrupt+fastseek+genpts+igndts+flush_packets", "-err_detect", "ignore_err", "-hwaccel", "auto", "-vn")
@@ -24,6 +21,7 @@ else:
 if is_url(fn):
 	fi, fn = fn, "temp.tmp"
 	try:
+		import requests
 		with requests.get(fi, stream=True) as resp:
 			it = resp.iter_content(1048576)
 			with open(fn, "wb") as f:
@@ -37,13 +35,17 @@ if is_url(fn):
 
 if not pcm:
 	cmd = ffmpeg_start + ("-f", "f32le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "192k", fo)
-	p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+	p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 else:
 	f = open(fo, "wb")
+
+import numpy as np
+from PIL import Image
+Image.MAX_IMAGE_PIXELS = 4294967296
+
 img = Image.open(fn)
 dfts = img.height >> 1
 ffts = dfts - 1 << 1
-# print(dfts, ffts)
 if hsv:
 	img = img.convert("HSV")
 
@@ -68,6 +70,7 @@ for img in columns.swapaxes(0, 1):
 		arr = np.empty(ffts << 1, dtype=np.float32)
 	arr[::2] = left
 	arr[1::2] = right
+	np.clip(arr, -1, 1, out=arr)
 	if pcm:
 		arr *= 32767
 		if e16 is None or len(e16) != len(arr):

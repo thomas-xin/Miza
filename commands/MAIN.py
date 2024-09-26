@@ -1,13 +1,9 @@
 # Make linter shut up lol
 if "common" not in globals():
-	import common
-	from common import *
+	import misc.common as common
+	from misc.common import *
 print = PRINT
 
-
-# Default and standard command categories to enable.
-basic_commands = frozenset(("main", "string", "admin"))
-standard_commands = default_commands = basic_commands.union(("voice", "image", "webhook", "fun"))
 
 help_colours = fcdict({
 	None: 0xfffffe,
@@ -18,6 +14,7 @@ help_colours = fcdict({
 	"image": 0xffff00,
 	"webhook": 0xff007f,
 	"fun": 0x00ffff,
+	"ai": 0x007fff,
 	"owner": 0xbf7fff,
 	"nsfw": 0xff9f9f,
 	"misc": 0x007f00,
@@ -31,6 +28,7 @@ help_emojis = fcdict((
 	("image", "🖼"),
 	("webhook", "🕸️"),
 	("fun", "🙃"),
+	("ai", "🤖"),
 	("owner", "💜"),
 	("nsfw", "🔞"),
 	("misc", "🌌"),
@@ -44,6 +42,7 @@ help_descriptions = fcdict((
 	("image", "Create or edit images, animations, and videos"),
 	("webhook", "Webhook-related commands and management"),
 	("fun", "Text-based games and other fun features"),
+	("ai", "Commands mostly focused on generative artificial intelligence"),
 	("owner", "Restricted owner-only commands; highly volatile"),
 	("nsfw", "Not Safe For Work; only usable in 18+ channels"),
 	("misc", "Miscellaneous, mostly not relevant to Discord and restricted to trusted servers"),
@@ -53,123 +52,113 @@ help_descriptions = fcdict((
 class Help(Command):
 	name = ["❓", "❔", "?", "Halp"]
 	description = "Shows a list of usable commands, or gives a detailed description of a command."
-	cats = "|".join(c.capitalize() for c in sorted(standard_commands))
+	cats = [c for c in sorted(standard_commands)]
+	schema = cdict(
+		category=cdict(
+			type="enum",
+			validation=cdict(
+				enum=cats,
+				accepts=dict(owner="owner", misc="misc", nsfw="nsfw"),
+			),
+			description="Command category to search",
+			example="image",
+		),
+		command=cdict(
+			type="string",
+			description="Help on a specific command",
+			example="download",
+		),
+	)
 	usage = f"<category({cats})>? <command>?"
 	example = ("help string", "help waifu2x")
 	flags = "v"
 	rate_limit = (3, 5)
-	no_parse = True
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, bot, args, user, message, original=None, **void):
-		bot = self.bot
-		guild = message.guild
-		channel = message.channel
-		prefix = "/" if getattr(message, "slash", None) else bot.get_prefix(guild)
+	async def __call__(self, bot, _guild, _channel, _message, _user, _nsfw, category, command, original=None, **void):
+		prefix = "/" if getattr(_message, "slash", None) else bot.get_prefix(_guild)
 		if " " in prefix:
 			prefix += " "
 		embed = discord.Embed()
-		embed.set_author(name="❓ Help ❓", icon_url=best_url(user), url=bot.webserver)
-		argv = full_prune("".join(args)).replace("*", "").replace("_", "").replace("||", "")
-		comm = None
-		if argv in bot.categories:
-			catg = argv
-		elif argv in bot.commands:
-			comm = argv
-			catg = bot.commands[argv][0].catg.casefold()
-		elif argv.startswith(prefix):
-			argv = argv[len(prefix):].lstrip()
-			if argv in bot.categories:
-				catg = argv
-			elif argv in bot.commands:
-				comm = argv
-				catg = bot.commands[argv][0].catg.casefold()
-		else:
-			catg = None
-		if catg not in bot.categories:
-			catg = None
+		embed.set_author(name="❓ Help ❓", icon_url=best_url(_user), url=bot.webserver)
+		if command and command not in bot.commands:
+			raise KeyError(f'Command "{command}" does not exist.')
 		content = None
-		enabled = bot.get_enabled(channel)
-		category_repr = lambda catg: catg.capitalize() + (" [DISABLED]" if catg.lower() not in enabled else "")
-		if comm:
-			com = bot.commands[comm][0]
+		enabled = bot.get_enabled(_channel)
+		category_repr = lambda catg: (catg.capitalize() if len(catg) > 2 else catg.upper()) + (" [[DISABLED]]" if catg.lower() not in enabled else "")
+		if command:
+			com = bot.commands[command][0]
 			a = ", ".join(n.strip("_") for n in com.name) or "[none]"
 			content = (
-				f"[Category] {category_repr(com.catg)}\n"
-				+ f"[Usage] {prefix}{com.parse_name()} {com.usage}\n"
-				+ f"[Aliases] {a}\n"
-				+ f"[Effect] {com.parse_description()}\n"
-				+ f"[Level] {com.min_display}"
+				f"[[Category]] {colourise(category_repr(com.category), fg='white')}\n"
+				+ f"[[Aliases]] {a}\n"
+				+ f"[[Effect]] {colourise(com.parse_description(), fg='white')}\n"
+				+ f"[[Usage]] {colourise(prefix, fg='white')}{com.parse_usage()}\n"
+				+ f"[[Level]] {colourise(com.min_display)}"
 			)
-			x = com.rate_limit
-			if x:
-				if user.id in bot.owners:
-					x = 0
-				elif isinstance(x, collections.abc.Sequence):
-					x = x[not bot.is_trusted(getattr(guild, "id", 0))]
-					x /= 2 ** bot.premium_level(user)
-				content += f"\n[Rate Limit] {sec2time(x)}"
-			if getattr(com, "example", None):
-				example = com.example
-				if isinstance(example, str):
-					example = [example]
-				exs = []
-				for ex in example:
-					exs.append(prefix + ex.replace("~", prefix))
-				content += "\n[Examples]\n" + "\n".join(exs)
-			content = ini_md(content)
+			rl = com.rate_limit
+			if rl:
+				rl = rl[bool(bot.is_trusted(_guild))] if isinstance(rl, (tuple, list)) else rl
+				pm = bot.premium_multiplier(bot.premium_level(_user))
+				rl /= pm
+				content += f"\n[[Rate Limit]] {colourise(sec2time(rl), fg='yellow')}"
+			content += f"\n[[Example]] {colourise(prefix, fg='white')}{com.parse_example()}"
+			if not com.schema or getattr(com, "maintenance", False):
+				content += colourise("\nNote: This command may currently be under maintenance. Full functionality is not guaranteed!", fg='red')
+			content = ansi_md(content)
 		else:
 			content = (
 				f"Yo! Use the menu below to select from my command list!\n"
-				+ f"Alternatively, visit [`mizatlas`]({bot.raw_webserver}/mizatlas) for a full command list and tester.\n\n"
+				+ f"Alternatively, visit [`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\n\n"
 				+ f"If you're an admin and wish to disable me in a particular channel, check out `{prefix}ec`!\n"
 				+ f"Want to try the premium features, unsure about anything, or have a bug to report? check out the [`support server`]({bot.rcc_invite})!\n"
 				+ f"Finally, donate to me or purchase a subscription [`here`]({bot.kofi_url})! Any support is greatly appreciated!"
 			)
-		embed.colour = discord.Colour(help_colours[catg])
-		if not catg:
-			coms = chain.from_iterable(v for k, v in bot.categories.items() if k in standard_commands)
+		embed.colour = discord.Colour(help_colours[category])
+		categories = visible_commands if _nsfw else standard_commands
+		if not category:
+			coms = chain.from_iterable(v for k, v in bot.categories.items() if k in categories)
 		else:
-			coms = bot.categories[catg]
+			coms = bot.categories[category]
 		coms = sorted(coms, key=lambda c: c.parse_name())
 		catsel = [cdict(
 			emoji=cdict(id=None, name=help_emojis[c]),
 			label=category_repr(c),
 			value=c,
 			description=help_descriptions[c],
-			default=catg == c,
-		) for c in standard_commands if c in bot.categories]
+			default=category == c,
+		) for c in categories if c in bot.categories]
 		comsel = [cdict(
 			emoji=cdict(id=None, name=c.emoji) if getattr(c, "emoji", None) else None,
 			label=lim_str(prefix + " " * (" " in prefix) + c.parse_name(), 25, mode=None),
 			value=c.parse_name().casefold(),
 			description=lim_str(c.parse_description(), 50, mode=None),
-			default=comm and com == c,
+			default=command and com == c,
 		) for i, c in enumerate(coms) if i < 25]
 		catmenu = cdict(
 			type=3,
 			custom_id="\x7f0",
 			options=catsel,
 			min_values=0,
-			placeholder=category_repr(catg) if catg else "Choose a category...",
+			placeholder=category_repr(category) if category else "Choose a category...",
 		)
 		commenu = cdict(
 			type=3,
 			custom_id="\x7f1",
 			options=comsel,
 			min_values=0,
-			placeholder=com.parse_name() if comm else "Choose a command...",
+			placeholder=com.parse_name() if command else "Choose a command...",
 		)
 		buttons = [[catmenu], [commenu]]
 		if content:
-			embed.description = f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```" + content
+			embed.description = f"```callback-main-help-{_user.id}-\n{_user.display_name} has asked for help!```" + content
 		if original:
-			if getattr(message, "int_id", None):
+			if getattr(_message, "int_id", None):
 				await interaction_patch(bot, original, embed=embed, buttons=buttons)
 			else:
-				if getattr(message, "slash", None):
-					csubmit(bot.ignore_interaction, message)
+				if getattr(_message, "slash", None):
+					csubmit(bot.ignore_interaction, _message)
 				await Request(
 					f"https://discord.com/api/{api}/channels/{original.channel.id}/messages/{original.id}",
 					data=dict(
@@ -184,230 +173,24 @@ class Help(Command):
 		# elif getattr(message, "slash", None):
 		#     await interaction_response(bot, message, embed=embed, buttons=buttons, ephemeral=True)
 		else:
-			await send_with_reply(channel, message, embed=embed, buttons=buttons, ephemeral=True)
+			await send_with_reply(_channel, _message, embed=embed, buttons=buttons, ephemeral=True)
 		return
 
 	async def _callback_(self, message, reaction, user, vals, perm, **void):
 		u_id = int(vals)
 		if reaction is None or u_id != user.id and perm < 3:
 			return
-		await self.__call__(self.bot, as_str(reaction), user, message=message, original=message)
-
-
-class Perms(Command):
-	server_only = True
-	name = ["DefaultPerms", "ChangePerms", "Perm", "ChangePerm", "Permissions"]
-	description = "Shows or changes a user's permission level."
-	usage = "<0:user>* <1:new_level|default(-d)>?"
-	example = ("perms steven 2", "perms 201548633244565504 ?d")
-	flags = "fhd"
-	rate_limit = (5, 8)
-	multi = True
-	slash = True
-	ephemeral = True
-
-	def perm_display(self, value):
-		if isinstance(value, str):
-			pass
-		elif not value <= inf:
-			return "nan (Bot Owner)"
-		elif req >= inf:
-			return "inf (Administrator)"
-		elif req >= 3:
-			return f"{req} (Ban Members or Manage Channels/Server)"
-		elif req >= 2:
-			return f"{req} (Manage Messages/Threads/Nicknames/Roles/Webhooks/Emojis/Events)"
-		elif req >= 1:
-			return f"{req} (View Audit Log/Server Insights or Move/Mute/Deafen Members or Mention Everyone)"
-		elif req >= 0:
-			return f"{req} (Member)"
-		return f"{req} (Guest)"
-
-	async def __call__(self, bot, args, argl, user, name, perm, channel, guild, flags, **void):
-		if name == "defaultperms":
-			users = (guild.get_role(guild.id),)
-		else:
-			# Get target user from first argument
-			users = await bot.find_users(argl, args, user, guild, roles=True)
-		if not users:
-			raise LookupError("No results found.")
-		msgs = []
-		try:
-			for t_user in users:
-				t_perm = round_min(bot.get_perms(t_user, guild))
-				# If permission level is given, attempt to change permission level, otherwise get current permission level
-				if args or "d" in flags:
-					name = str(t_user)
-					if "d" in flags:
-						o_perm = round_min(bot.get_perms(t_user, guild))
-						bot.remove_perms(t_user, guild)
-						c_perm = round_min(bot.get_perms(t_user, guild))
-						m_perm = max(abs(t_perm), abs(c_perm), 2) + 1
-						if not perm < m_perm and not isnan(m_perm):
-							msgs.append(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(self.perm_display(t_perm))} to the default value of {sqr_md(self.perm_display(c_perm))}."))
-							continue
-						reason = f"to change permissions for {name} in {guild} from {self.perm_display(t_perm)} to {self.perm_display(c_perm)}"
-						bot.set_perms(t_user, guild, o_perm)
-						raise self.perm_error(perm, m_perm, reason)
-					orig = t_perm
-					expr = " ".join(args)
-					num = await bot.eval_math(expr, orig)
-					c_perm = round_min(num)
-					if t_perm is nan or isnan(c_perm):
-						m_perm = nan
-					else:
-						# Required permission to change is absolute level + 1, with a minimum of 3
-						m_perm = max(abs(t_perm), abs(c_perm), 2) + 1
-					if not perm < m_perm and not isnan(m_perm):
-						if not m_perm < inf and guild.owner_id != user.id and not isnan(perm):
-							raise PermissionError("Must be server owner to assign non-finite permission level.")
-						bot.set_perms(t_user, guild, c_perm)
-						if "h" in flags:
-							continue
-						msgs.append(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(self.perm_display(t_perm))} to {sqr_md(self.perm_display(c_perm))}."))
-						continue
-					reason = f"to change permissions for {name} in {guild} from {self.perm_display(t_perm)} to {self.perm_display(c_perm)}"
-					raise self.perm_error(perm, m_perm, reason)
-				msgs.append(css_md(f"Current permissions for {sqr_md(t_user)} in {sqr_md(guild)}: {sqr_md(self.perm_display(t_perm))}."))
-		finally:
-			return "".join(msgs)
-
-
-class EnabledCommands(Command):
-	server_only = True
-	name = ["EC", "Enable", "Disable"]
-	min_display = "0~3"
-	description = "Shows, enables, or disables a command category in the current channel."
-	usage = "<mode(enable|disable|clear)>? <category>? <server-wide(-s)>? <list(-l)>?"
-	example = ("enable fun ", "ec disable main", "ec -l")
-	flags = "aedlhrs"
-	rate_limit = (5, 8)
-	slash = True
-	ephemeral = True
-	exact = False
-
-	def __call__(self, argv, args, flags, user, channel, guild, perm, name, **void):
 		bot = self.bot
-		update = bot.data.enabled.update
-		enabled = bot.data.enabled
-		if name == "enable":
-			flags["e"] = 1
-		elif name == "disable":
-			flags["d"] = 1
-		if "s" in flags:
-			target = guild
-			mention = lambda *args: str(guild)
+		category = as_str(reaction)
+		if category in bot.commands:
+			command = category
+			category = bot.commands[command][0].category
+		elif category in bot.categories:
+			command = None
 		else:
-			target = channel
-			mention = channel_mention
-		# Flags to change enabled commands list
-		if any(k in flags for k in "acder"):
-			req = 3
-			if perm < req:
-				reason = f"to change enabled command list for {channel_repr(target)}"
-				raise self.perm_error(perm, req, reason)
-		else:
-			req = 0
-		if not args or argv.casefold() == "all" or "r" in flags:
-			if "l" in flags:
-				return css_md(f"Standard command categories:\n[{', '.join(standard_commands)}]")
-			if "e" in flags or "a" in flags:
-				categories = set(standard_commands)
-				if target.id in enabled:
-					enabled[target.id] = categories.union(enabled[target.id])
-				else:
-					enabled[target.id] = categories
-				if "h" in flags:
-					return
-				return css_md(f"Enabled all standard command categories in {sqr_md(target)}.")
-			if "r" in flags:
-				enabled.pop(target.id, None)
-				if "h" in flags:
-					return
-				return css_md(f"Reset enabled status of all commands in {sqr_md(target)}.")
-			if "d" in flags:
-				enabled[target.id] = set()
-				if "h" in flags:
-					return
-				return css_md(f"Disabled all commands in {sqr_md(target)}.")
-			temp = bot.get_enabled(target)
-			if not temp:
-				return ini_md(f"No currently enabled commands in {sqr_md(target)}.")
-			return f"Currently enabled command categories in {mention(target.id)}:\n{ini_md(iter2str(temp))}"
-		if not req:
-			catg = argv.casefold()
-			# if not bot.is_trusted(guild) and catg not in standard_commands:
-				# raise PermissionError(f"Elevated server priviliges required for specified command category.")
-			if catg not in bot.categories:
-				raise LookupError(f"Unknown command category {argv}.")
-			if catg in bot.get_enabled(target):
-				return css_md(f"Command category {sqr_md(catg)} is currently enabled in {sqr_md(target)}.")
-			return css_md(f'Command category {sqr_md(catg)} is currently disabled in {sqr_md(target)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
-		args = [i.casefold() for i in args]
-		for catg in args:
-			# if not bot.is_trusted(guild) and catg not in standard_commands:
-				# raise PermissionError(f"Elevated server priviliges required for specified command category.")
-			if not catg in bot.categories:
-				raise LookupError(f"Unknown command category {catg}.")
-		curr = set(bot.get_enabled(target))
-		for catg in args:
-			if "d" not in flags:
-				if catg not in curr:
-					if isinstance(curr, set):
-						curr.add(catg)
-					else:
-						curr.append(catg)
-			else:
-				if catg in curr:
-					curr.remove(catg)
-		enabled[target.id] = astype(curr, set)
-		check = astype(curr, (frozenset, set))
-		if check == default_commands:
-			enabled.pop(target.id)
-		if "h" in flags:
-			return
-		category = "category" if len(args) == 1 else "categories"
-		action = "Enabled" if "d" not in flags else "Disabled"
-		return css_md(f"{action} command {category} {sqr_md(', '.join(args))} in {sqr_md(target)}.")
-
-
-class Prefix(Command):
-	name = ["ChangePrefix"]
-	min_display = "0~3"
-	description = "Shows or changes the prefix for ⟨MIZA⟩'s commands for this server."
-	usage = "<new_prefix>? <default(-d)>?"
-	example = ("prefix !", "change_prefix >", "prefix -d")
-	flags = "hd"
-	rate_limit = (5, 8)
-	umap = {c: "" for c in ZeroEnc}
-	umap["\u200a"] = ""
-	utrans = "".maketrans(umap)
-	slash = True
-	ephemeral = True
-	exact = False
-
-	def __call__(self, argv, guild, perm, bot, flags, **void):
-		pref = bot.data.prefixes
-		update = self.data.prefixes.update
-		if "d" in flags:
-			if guild.id in pref:
-				pref.pop(guild.id)
-			return css_md(f"Successfully reset command prefix for {sqr_md(guild)}.")
-		if not argv:
-			return css_md(f"Current command prefix for {sqr_md(guild)}: {sqr_md(bot.get_prefix(guild))}.")
-		req = 3
-		if perm < req:
-			reason = f"to change command prefix for {guild}"
-			raise self.perm_error(perm, req, reason)
-		prefix = argv
-		if not prefix.isalnum():
-			prefix = prefix.translate(self.utrans)
-		# Backslash is not allowed, it is used to escape commands normally
-		if prefix.startswith("\\"):
-			raise TypeError("Prefix must not begin with backslash.")
-		pref[guild.id] = prefix
-		if "h" not in flags:
-			return css_md(f"Successfully changed command prefix for {sqr_md(guild)} to {sqr_md(argv)}.")
+			return await bot.ignore_interaction(message)
+		channel = message.channel
+		await self.__call__(bot, _guild=message.guild, _channel=channel, _message=message, _user=user, _nsfw=bot.is_nsfw(channel), category=category, command=command, original=message)
 
 
 class Loop(Command):
@@ -415,65 +198,183 @@ class Loop(Command):
 	_timeout_ = 12
 	min_level = 1
 	min_display = "1+"
-	description = "Loops a command. Delete the original message to terminate the loop if necessary."
-	usage = "<0:iterations> <1:command>+"
-	example = ("loop 3 ~cat", "loop 8 ~sharpen")
+	description = "Loops a command. Delete the original message to terminate the loop if necessary. Subject to regular command restrictions and rate limits."
+	schema = cdict(
+		iterations=cdict(
+			type="integer",
+			validation="[1, 256]",
+			description="Amount of times to perform target command",
+			example="4",
+		),
+		command=cdict(
+			type="string",
+			description="Command and arguments to run",
+			example="~cat",
+		),
+	)
 	rate_limit = (10, 15)
-	active = set()
+	recursive = True
 
-	async def __call__(self, args, argv, message, channel, bot, perm, user, guild, **void):
-		try:
-			num = await bot.eval_math(args[0])
-			iters = round(num)
-		except:
-			print_exc()
-			num = None
-		if num is None:
+	async def __call__(self, bot, _channel, _message, _perm, iterations, command, **void):
+		if not iterations:
 			# Ah yes, I made this error specifically for people trying to use this command to loop songs 🙃
-			raise ArgumentError("Please input loop iterations, then target command. For looping songs in voice, consider using the aliases LoopQueue and Repeat under the AudioSettings command.")
+			raise ArgumentError("Please input loop iterations using the -i flag, followed by target command. For looping songs in voice, consider using the aliases LoopQueue and Repeat under the AudioSettings command.")
 		# Bot owner bypasses restrictions
-		if not isnan(perm):
-			if channel.id in self.active:
+		if not isnan(_perm):
+			if _channel.id in self.active:
 				raise PermissionError("Only one loop may be active in a channel at any time.")
-			elif iters > 64 and not bot.is_trusted(guild.id):
-				raise PermissionError("Server premium level 1 or higher required to execute loop of greater than 64 iterations; please see {bot.kofi_url} for more info!")
-			elif iters > 256:
-				raise PermissionError("Loops cannot be more than 256 iterations.")
-		func = func2 = " ".join(args[1:])
-		func = func.lstrip()
-		if not isnan(perm):
-			# Detects when an attempt is made to loop the loop command
-			for n in self.name:
-				if (
-					(bot.get_prefix(guild) + n).upper() in func.replace(" ", "").upper()
-				) or (
-					(str(bot.id) + ">" + n).upper() in func.replace(" ", "").upper()
-				):
-					raise PermissionError("Loops must not be nested.")
-		func2 = func2.split(None, 1)[-1]
-		csubmit(send_with_react(
-			channel,
-			italics(css_md(f"Looping {sqr_md(func)} {iters} time{'s' if iters != 1 else ''}...")),
-			reacts=["❎"],
-			reference=message,
-		))
-		fake_message = copy.copy(message)
-		fake_message.content = func2
-		self.active.add(channel.id)
-		try:
-			for i in range(iters):
-				if not bot.verify_integrity(message):
-					return
-				loop = i < iters - 1
-				t = utc()
-				# Calls process_message with the argument containing the looped command.
-				delay = await bot.process_message(fake_message, func, loop=loop)
-				# Must abide by command rate limit rules
-				delay = delay + t - utc()
-				if delay > 0:
-					await asyncio.sleep(delay)
-		finally:
-			self.active.discard(channel.id)
+		content = f"Running `{no_md(command)}` {iterations} time{'s' if iterations != 1 else ''}..."
+		message = await send_with_reply(_channel, _message, content)
+		manager = await bot.StreamedMessage.attach(message)
+		await bot.require_integrity(_message)
+		fake_message = copy.copy(_message)
+		fake_message.content = command
+		done = deque()
+		futs = deque()
+		for i in range(iterations):
+			async for command, command_check, argv, from_mention in bot.parse_command(fake_message):
+				while len(futs) >= 3:
+					fut = futs.popleft()
+					await fut
+					done.append(fut)
+				fut = csubmit(bot.run_command(command, message=fake_message, argv=argv, command_check=command_check, respond=False, allow_recursion=False))
+				futs.append(fut)
+		response = None
+		t = 0
+		for fut in chain(done, futs):
+			await bot.require_integrity(_message)
+			try:
+				response = await fut
+			# Represents any timeout error that occurs
+			except (T0, T1, T2, CE):
+				print(command, argv)
+				raise TimeoutError("Request timed out.")
+			if fut:
+				await fut
+			if not response:
+				continue
+			done = i >= iterations - 1
+			t2 = utc()
+			if done or t2 - t > 1:
+				fut = csubmit(bot.respond_with(response, message=fake_message, command=command, manager=manager, done=done))
+			continue
+		assert response, "No response was captured. (Make sure you inputted the command correctly!)"
+		if fut:
+			await fut
+		await bot.edit_message(message, content=message.content + " (done!)")
+
+
+class Edit(Command):
+	time_consuming = 3
+	_timeout_ = 12
+	min_level = 1
+	min_display = "1+"
+	description = "Edits an existing bot message using new output from a command. Subject to regular command restrictions and rate limits."
+	schema = cdict(
+		target=cdict(
+			type="message",
+			description="Target message; must be visible to the bot, and must use full message links if older than 2 weeks.",
+			example="https://discord.com/channels/247184721262411776/247184721262411776/803501099633737758",
+		),
+		command=cdict(
+			type="string",
+			description="Command and arguments to run",
+			example="~cat",
+		),
+	)
+	rate_limit = (10, 15)
+	recursive = True
+
+	async def __call__(self, bot, _channel, _message, _user, _perm, target, command, **void):
+		if target.author.id != bot.id:
+			raise PermissionError("Target message must belong to me.")
+		if _perm < 3:
+			if not getattr(target, "reference", None):
+				raise self.perm_error(_perm, 3, "to edit commands not associated to your user")
+			reference = await bot.fetch_reference(target)
+			if reference.author.id != _user.id:
+				raise self.perm_error(_perm, 3, "to edit commands not associated to your user")
+		content = f"Running `{no_md(command)}` on {target.jump_url}..."
+		message = await send_with_reply(_channel, _message, content)
+		manager = await bot.StreamedMessage.attach(target, replace=True)
+		fake_message = copy.copy(_message)
+		fake_message.content = command
+		response = None
+		async for command, command_check, argv, from_mention in bot.parse_command(fake_message):
+			await bot.require_integrity(_message)
+			try:
+				response = await bot.run_command(command, message=fake_message, argv=argv, command_check=command_check, respond=False, allow_recursion=True)
+			# Represents any timeout error that occurs
+			except (T0, T1, T2, CE):
+				print(command, argv)
+				raise TimeoutError("Request timed out.")
+			await bot.respond_with(response, message=fake_message, command=command, manager=manager)
+		assert response, "No response was captured. (Make sure you inputted the command correctly!)"
+		await bot.edit_message(message, content=message.content + " (done!)")
+
+
+class Pipe(Command):
+	time_consuming = 3
+	_timeout_ = 12
+	min_level = 1
+	min_display = "1+"
+	description = "Redirects the output of one command into another. Subject to regular command restrictions and rate limits."
+	schema = cdict(
+		pipeline=cdict(
+			type="string",
+			description="Pipeline syntax, specified as `first` | `second` | `third` etc",
+			example="~gradient spiral (0,255,255) (255,255,255) --repetitions 5 --space hsv | ~rainbow",
+		),
+	)
+	rate_limit = (10, 15)
+	recursive = True
+	maintenance = True
+
+	async def __call__(self, bot, _channel, _message, _user, _perm, pipeline, **void):
+		if not pipeline:
+			raise ArgumentError("Please input at least one target command.")
+		pipe = [s.strip() for s in pipeline.split("|")]
+		run = " | ".join(f"`{cmd}`" for cmd in pipe)
+		content = f"Running {run}..."
+		message = await send_with_reply(_channel, _message, content)
+		fake_message = copy.copy(_message)
+		fake_message.content = pipe.pop(0)
+		response = None
+		async for command, command_check, argv, from_mention in bot.parse_command(fake_message):
+			await bot.require_integrity(_message)
+			try:
+				response = await bot.run_command(command, message=fake_message, argv=argv, command_check=command_check, respond=False, allow_recursion=True)
+			# Represents any timeout error that occurs
+			except (T0, T1, T2, CE):
+				print(command, argv)
+				raise TimeoutError("Request timed out.")
+		while pipe:
+			second = pipe.pop(0)
+			if response:
+				inter = await bot.respond_with(response, message=fake_message, command=command)
+				print("RW:", inter)
+				original = inter.content
+				fake_message = copy.copy(inter)
+				fake_message.content = second + "\n" + json.dumps(original)
+				manager = await bot.StreamedMessage.attach(fake_message)
+			else:
+				original = ""
+				fake_message.content = second
+				manager = None
+			if second:
+				async for command, command_check, argv, from_mention in bot.parse_command(fake_message):
+					await bot.require_integrity(_message)
+					try:
+						response = await bot.run_command(command, message=fake_message, argv=argv, command_check=command_check, respond=False, allow_recursion=True)
+					# Represents any timeout error that occurs
+					except (T0, T1, T2, CE):
+						print(command, argv)
+						raise TimeoutError("Request timed out.")
+				if response:
+					fake_message.content = original
+					await bot.respond_with(response, message=fake_message, command=command, manager=manager)
+		assert response, "No response was captured. (Make sure you inputted the command correctly!)"
+		await bot.edit_message(message, content=message.content + " (done!)")
 
 
 class Avatar(Command):
@@ -596,7 +497,7 @@ class Info(Command):
 	usercmd = True
 	exact = False
 
-	async def getGuildData(self, g, flags={}):
+	async def getGuildData(self, g, flags={}, is_current=False):
 		bot = self.bot
 		url = await bot.get_proxy_url(g, force=True)
 		name = g.name
@@ -619,8 +520,8 @@ class Info(Command):
 			d += f"\n{bot.name} Premium Upgraded Lv{lv} " + "💎" * lv
 			if lv < 2:
 				d += f"; Visit {bot.kofi_url} to upgrade!"
-		else:
-			d += f"\nNo {bot.name} Premium Upgrades! Visit {bot.kofi_url} to purchase one!"
+		elif is_current:
+			d += f"\nNo {bot.name} Premium Upgrades! Visit {bot.kofi_url} for more info!"
 		emb.description = d
 		emb.add_field(name="Server ID", value=str(g.id), inline=0)
 		emb.add_field(name="Creation time", value=time_repr(g.created_at), inline=1)
@@ -638,7 +539,7 @@ class Info(Command):
 			if x > t + v + c:
 				channelinfo += f"\nOther: {x - (t + v + c)}"
 			emb.add_field(name=f"Channels ({x + t2})", value=channelinfo, inline=1)
-		with suppress(AttributeError):
+		try:
 			a = r = 0
 			m = len(g._members)
 			for member in g.members:
@@ -648,6 +549,10 @@ class Info(Command):
 					r += len(member.roles) > 1
 			memberinfo = f"Admins: {a}\nOther roles: {r}\nNo roles: {m - a - r}"
 			emb.add_field(name=f"Member count ({m})", value=memberinfo, inline=1)
+		except AttributeError:
+			if getattr(g, "member_count", None):
+				m = g.member_count
+				emb.add_field(name=f"Member count ({m})", value="N/A", inline=1)
 		with suppress(AttributeError):
 			r = len(g._roles)
 			a = sum(1 for r in g._roles.values() if r.permissions.administrator and not r.is_default())
@@ -694,7 +599,7 @@ class Info(Command):
 					if argv:
 						if is_url(argv) or argv.startswith("discord.gg/"):
 							g = await bot.fetch_guild(argv)
-							emb = await self.getGuildData(g, flags)
+							emb = await self.getGuildData(g, flags, is_current=guild.id == g.id)
 							embs.add(emb)
 							raise StopIteration
 						u_id = argv
@@ -786,7 +691,9 @@ class Info(Command):
 						is_sys = True
 					lv = bot.premium_level(u)
 					lv2 = bot.premium_level(u, absolute=True)
-					if lv2 > 0:
+					if not isfinite(lv2):
+						pass
+					elif lv2 > 0:
 						st.append(f"{bot.name} Premium Supporter Lv{lv2} " + "💎" * lv2)
 					elif lv > 0:
 						st.append(f"{bot.name} Trial Supporter Lv{lv} " + "💎" * lv)
@@ -903,7 +810,6 @@ class Profile(Command):
 	example = ("profile 201548633244565504", "profile timezone singapore", "profile thumbnail https://cdn.discordapp.com/emojis/879989027711877130.gif", "user")
 	flags = "d"
 	rate_limit = (4, 6)
-	no_parse = True
 	slash = True
 	ephemeral = True
 	usercmd = True
@@ -952,7 +858,6 @@ class Profile(Command):
 			if birthday:
 				if not isinstance(birthday, DynamicDT):
 					birthday = profile["birthday"] = DynamicDT.fromdatetime(birthday)
-					bot.data.users.update(target.id)
 				now = DynamicDT.utcfromtimestamp(t)
 				birthday_in = next_date(birthday)
 				if timezone:
@@ -971,7 +876,6 @@ class Profile(Command):
 			return
 		if setting != "description" and value.casefold() in ("undefined", "remove", "rem", "reset", "unset", "delete", "clear", "null", "none") or "d" in flags:
 			profile.pop(setting, None)
-			bot.data.users.update(user.id)
 			return css_md(f"Successfully removed {setting} for {sqr_md(user)}.")
 		if value is None:
 			return ini_md(f"Currently set {setting} for {sqr_md(user)}: {sqr_md(bot.data.users.get(user.id, EMPTY).get(setting))}.")
@@ -994,7 +898,6 @@ class Profile(Command):
 			offs, year = divmod(dt.year, 400)
 			value = DynamicDT(year + 2000, dt.month, dt.day, tzinfo=datetime.timezone.utc).set_offset(offs * 400 - 2000)
 		bot.data.users.setdefault(user.id, {})[setting] = value
-		bot.data.users.update(user.id)
 		if type(value) is DynamicDT:
 			value = value.as_date()
 		elif setting.startswith("time") and value is not None:
@@ -1054,7 +957,6 @@ class Status(Command):
 			if perm < 2:
 				raise PermissionError("Permission level 2 or higher required to unset auto-updating status.")
 			bot.data.messages.pop(channel.id)
-			bot.data.messages.update(channel.id)
 			return fix_md("Successfully disabled status updates.")
 		elif "a" not in flags and "e" not in flags:
 			return await self._callback2_(channel)
@@ -1062,7 +964,6 @@ class Status(Command):
 			raise PermissionError("Permission level 2 or higher required to set auto-updating status.")
 		message = await channel.send(italics(code_md("Loading bot status...")))
 		set_dict(bot.data.messages, channel.id, {})[message.id] = cdict(t=0, command="bot.commands.status[0]")
-		bot.data.messages.update(channel.id)
 
 	async def _callback2_(self, channel, m_id=None, msg=None, colour=None, **void):
 		bot = self.bot
@@ -1083,6 +984,7 @@ class Status(Command):
 					return f"{n}\n[`{x2}`]({x})"
 				return f"{n}\n`{x}`"
 			s = await bot.status(simplified=True)
+			s["Discord info"]["Current shard"] = bot.guild_shard(T(T(channel).get("guild")).get("id", 0))
 			for k, v in s.items():
 				emb.add_field(
 					name=k,
@@ -1106,7 +1008,7 @@ class Status(Command):
 							csubmit(bot.silent_delete(m))
 							raise StopIteration
 						break
-				func = lambda *args, **kwargs: message.edit(*args, content=None, **kwargs)
+				func = lambda *args, **kwargs: bot.edit_message(message, *args, content=None, **kwargs)
 		try:
 			message = await func(embed=emb)
 		except discord.HTTPException as ex:
@@ -1160,7 +1062,7 @@ class Upload(Command):
 			argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
 		args = await self.bot.follow_url(argv)
 		if not args:
-			out = [self.bot.raw_webserver + "/files"]
+			out = [self.bot.webserver + "/files"]
 		else:
 			futs = deque()
 			for url in args:
@@ -1179,11 +1081,11 @@ class Upload(Command):
 						continue
 					if a_id in self.bot.data.attachments:
 						u = await self.bot.renew_attachment(a_id)
-						futs.append(as_fut(self.bot.preserve_attachment(a_id, ext=u)))
+						futs.append(as_fut(self.bot.preserve_attachment(a_id, fn=u)))
 						continue
 				futs.append(Request(self.bot.raw_webserver + "/upload_url?url=" + url_parse(url), decode=True, aio=True, ssl=False, timeout=1200))
 				await asyncio.sleep(0.1)
-			out = await asyncio.gather(*futs)
+			out = await gather(*futs)
 		return await send_with_reply(channel, message, "\n".join("<" + u + ">" for u in out), ephemeral=True)
 
 
@@ -1198,14 +1100,13 @@ class Reminder(Command):
 	rate_limit = (8, 13)
 	keywords = ["on", "at", "in", "when", "event"]
 	keydict = {re.compile(f"(^|[^a-z0-9]){i[::-1]}([^a-z0-9]|$)", re.I): None for i in keywords}
-	no_parse = True
 	timefind = None
 	slash = True
 
 	def __load__(self):
-		self.timefind = re.compile("(?:(?:(?:[0-9]+:)+[0-9.]+\\s*(?:am|pm)?|" + self.bot.num_words + "|[\\s\-+*\\/^%.,0-9]+\\s*(?:am|pm|s|m|h|d|w|y|century|centuries|millenium|millenia|(?:second|sec|minute|min|hour|hr|day|week|wk|month|mo|year|yr|decade|galactic[\\s\\-_]year)s?))\\s*)+$", re.I)
+		self.timefind = re.compile(r"(?:(?:(?:[0-9]+:)+[0-9.]+\s*(?:am|pm)?|" + self.bot.num_words + r"|[\s\-+*\\/^%.,0-9]+\s*(?:am|pm|s|m|h|d|w|y|century|centuries|millenium|millenia|(?:second|sec|minute|min|hour|hr|day|week|wk|month|mo|year|yr|decade|galactic[\s\-_]year)s?))\s*)+$", re.I)
 
-	async def __call__(self, name, message, flags, bot, user, guild, perm, argv, args, comment="", **void):
+	async def __call__(self, _comment, name, message, flags, bot, user, guild, perm, argv, args, **void):
 		if not argv:
 			msg = ""
 		elif len(args) == 1:
@@ -1231,7 +1132,6 @@ class Reminder(Command):
 			sendable = user
 			word = "reminders"
 		rems = bot.data.reminders.get(sendable.id, [])
-		update = bot.data.reminders.update
 		if "d" in flags:
 			if not len(rems):
 				return ini_md(f"No {word} currently set for {sqr_md(sendable)}.")
@@ -1240,20 +1140,18 @@ class Reminder(Command):
 					raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(rems))} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
 				rems.clear()
 				bot.data.reminders.pop(sendable.id, None)
-				with suppress(IndexError):
+				with suppress(ValueError):
 					bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
-				update(sendable.id)
 				return italics(css_md(f"Successfully cleared all {word} for {sqr_md(sendable)}."))
 			else:
 				i = await bot.eval_math(orig)
 			i %= len(rems)
 			x = rems.pop(i)
 			if i == 0:
-				with suppress(IndexError):
+				with suppress(ValueError):
 					bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
 				if rems:
 					bot.data.reminders.listed.insort((rems[0]["t"], sendable.id), key=lambda x: x[0])
-			update(sendable.id)
 			return ini_md(f"Successfully removed {sqr_md(lim_str(x['msg'], 128))} from {word} list for {sqr_md(sendable)}.")
 		if not argv:
 			# Set callback message for scrollable list
@@ -1457,7 +1355,6 @@ class Reminder(Command):
 			s = "$" + str(t)
 			seq = set_dict(bot.data.reminders, s, deque())
 			seq.append(sendable.id)
-			update(s)
 		else:
 			# Schedule for an event at a certain time
 			rem = cdict(
@@ -1470,18 +1367,17 @@ class Reminder(Command):
 			rem.recur = recur
 		# Sort list of reminders
 		bot.data.reminders[sendable.id] = sort(rems, key=lambda x: x["t"])
-		with suppress(IndexError):
+		with suppress(ValueError):
 			# Remove existing schedule
 			bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
 		# Insert back into bot schedule
 		tup = (bot.data.reminders[sendable.id][0]["t"], sendable.id)
-		if is_finite(tup[0]):
+		if isfinite(tup[0]):
 			bot.data.reminders.listed.insort(tup, key=lambda x: x[0])
-		update(sendable.id)
 		emb = discord.Embed(description=msg)
 		emb.colour = await bot.get_colour(remind_as)
 		emb.set_author(name=username, url=url, icon_url=url)
-		out = comment + "\n```css\nSuccessfully set "
+		out = _comment + "\n```css\nSuccessfully set "
 		if urgent:
 			out += "urgent "
 		if "announce" in name:
@@ -1490,13 +1386,20 @@ class Reminder(Command):
 			out += f"reminder for {sqr_md(sendable)}"
 		if not urgent and recur:
 			out += f" every {sqr_md(sec2time(recur))},"
+		ts = None
 		if keyed:
 			out += f" upon next event from {sqr_md(user_mention(t))}"
+			ts = None
 		else:
-			out += f" in {sqr_md(time_until(t + utc()))}"
+			ts = t + utc()
+			out += f" in {sqr_md(time_until(ts))}"
 		out += ":```"
-		return await send_with_reply(message.channel, message, content=out, embed=emb)
-		# return dict(content=out, embed=emb)
+		if ts:
+			out += time_repr(ts)
+		return cdict(
+			content=out,
+			embed=emb
+		)
 
 	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
 		u_id, pos, s_id = list(map(int, vals.split("_", 2)))
@@ -1553,7 +1456,7 @@ class Reminder(Command):
 		more = len(rems) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -1589,8 +1492,6 @@ class Note(Command):
 			argv = rank_format(int(argv))
 			if not note_userbase.get(user.id):
 				note_userbase.discard(user.id)
-			else:
-				note_userbase.update(user.id)
 			return ini_md(f"Successfully removed {argv} note: {sqr_md(n)}")
 		elif not argv:
 			# Set callback message for scrollable list
@@ -1611,8 +1512,6 @@ class Note(Command):
 			note_userbase[user.id].append(argv)
 		except KeyError:
 			note_userbase[user.id] = [argv]
-		else:
-			note_userbase.update(user.id)
 		notecount = rank_format(len(note_userbase[user.id]) - 1)
 		return ini_md(f"Successfully added {notecount} note for [{user}]!")
 
@@ -1664,7 +1563,7 @@ class Note(Command):
 		more = len(curr) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -1690,7 +1589,6 @@ class UpdateUrgentReminders(Database):
 						break
 					with suppress(StopIteration):
 						listed.popleft()
-						self.update("listed")
 						c_id = p[1]
 						m_id = p[2]
 						emb = p[3]
@@ -1723,7 +1621,6 @@ class UpdateUrgentReminders(Database):
 						await message.add_reaction("✅")
 						p[2] = message.id
 						listed.insort(p, key=lambda x: x)
-						self.update("listed")
 			await asyncio.sleep(1)
 
 
@@ -1749,7 +1646,6 @@ class UpdateReminders(Database):
 		message = await channel.send(embed=embed)
 		await message.add_reaction("✅")
 		self.bot.data.urgentreminders.data["listed"].insort([t + wait, channel.id, message.id, embed, wait], key=lambda x: x)
-		self.bot.data.urgentreminders.update()
 
 	async def __call__(self):
 		if utc() - self.t >= 4800:
@@ -1780,7 +1676,6 @@ class UpdateReminders(Database):
 				continue
 			# Grab target from database
 			x = cdict(temp.pop(0))
-			self.update(u_id)
 			if not temp:
 				self.data.pop(u_id)
 			else:
@@ -1828,12 +1723,11 @@ class UpdateReminders(Database):
 							else:
 								csubmit(self.recurrent_message(ch, emb, x.get("recur", 60)))
 							pops.add(len(rems) - i)
-						elif is_finite(x["t"]):
+						elif isfinite(x["t"]):
 							break
 					it = [rems[i] for i in range(len(rems)) if i not in pops]
 					rems.clear()
 					rems.extend(it)
-					self.update(u_id)
 					if not rems:
 						self.data.pop(u_id)
 			with suppress(KeyError):
@@ -1844,22 +1738,14 @@ class UpdateNotes(Database):
 	name = "notes"
 
 
-class UpdatePrefix(Database):
-	name = "prefixes"
-
-
-class UpdateEnabled(Database):
-	name = "enabled"
-
-
 class UpdateMessages(Database):
 	name = "messages"
-	semaphore = Semaphore(8, 1, delay=1, rate_limit=3)
+	semaphore = Semaphore(8, 1, rate_limit=3)
 	closed = False
 	hue = 0
 
 	async def wrap_semaphore(self, func, *args, **kwargs):
-		with tracebacksuppressor(SemaphoreOverflowError):
+		if not self.semaphore.busy:
 			async with self.semaphore:
 				return await func(*args, **kwargs)
 
@@ -1905,7 +1791,9 @@ class UpdateFlavour(Database):
 		i = xrand(7)
 		facts = self.bot.data.users.facts
 		questions = self.bot.data.users.questions
-		useless = self.bot.data.useless.setdefault(0, alist())
+		useless = self.bot.data.useless.setdefault(0, ())
+		if not isinstance(useless, alist):
+			useless = self.bot.data.useless[0] = alist(useless)
 		if i < 3 - q and facts:
 			text = choice(facts)
 			if not p:
@@ -1919,7 +1807,7 @@ class UpdateFlavour(Database):
 			out = f"\nRandom question: `{text}`"
 		else:
 			try:
-				if not useless or not xrand(len(useless) / 8):
+				if not len(useless) or not xrand(len(useless) / 8):
 					raise KeyError
 			except KeyError:
 				s = str(datetime.datetime.fromtimestamp(xrand(1462456800, utc())).date())
@@ -1956,7 +1844,7 @@ class UpdateUsers(Database):
 			if type(key) is str:
 				if key.startswith("#"):
 					c_id = int(key[1:].rstrip("\x7f"))
-					if c_id not in bot.cache.channels:
+					if c_id not in bot.cache.channels and c_id not in bot.cache.guilds:
 						print(f"Deleting {key} from {self}...")
 						data.pop(key, None)
 						await asyncio.sleep(0.1)
@@ -1976,7 +1864,7 @@ class UpdateUsers(Database):
 			data.pop(key, None)
 
 	def __load__(self):
-		self.semaphore = Semaphore(1, 1, rate_limit=120)
+		self.semaphore = Semaphore(1, 0, rate_limit=120)
 		self.facts = None
 		self.flavour_buffer = deque()
 		self.flavour_set = set()
@@ -2124,7 +2012,7 @@ class UpdateUsers(Database):
 
 	async def __call__(self):
 		changed = False
-		with tracebacksuppressor(SemaphoreOverflowError):
+		if not self.semaphore.busy:
 			async with self.semaphore:
 				for i in range(64):
 					out = await self.bot.data.flavour.get()
@@ -2140,7 +2028,6 @@ class UpdateUsers(Database):
 
 	def _offline_(self, user, **void):
 		set_dict(self.data, user.id, {})["last_offline"] = utc()
-		self.update(user.id)
 
 	# User seen, add event to activity database
 	def _seen_(self, user, delay, event, count=1, raw=None, **void):
@@ -2153,7 +2040,6 @@ class UpdateUsers(Database):
 			add_dict(self.data, {u_id: {"last_seen": 0}})
 			self.data[u_id]["last_seen"] = utc() + delay
 			self.data[u_id]["last_action"] = raw
-		self.update(u_id)
 
 	# User executed command, add to activity database
 	def _command_(self, user, loop, command, **void):
@@ -2163,11 +2049,6 @@ class UpdateUsers(Database):
 		self.data.get(user.id, EMPTY).pop("last_mention", None)
 		if not loop:
 			self.add_xp(user, getattr(command, "xp", xrand(6, 14)))
-
-	async def react_sparkle(self, message):
-		bot = self.bot
-		react = await bot.data.emojis.grab("sparkles.gif")
-		return await message.add_reaction(react)
 
 	def _send_(self, message, **void):
 		user = message.author
@@ -2188,21 +2069,32 @@ class UpdateUsers(Database):
 		else:
 			self.data.get(user.id, EMPTY).pop("last_typing", None)
 		if message.id % 1000 == 0:
-			self.add_diamonds(user, points)
-			points *= 1000
-			# csubmit(message.add_reaction("✨"))
 			if self.bot.data.enabled.get(message.channel.id, True):
-				csubmit(self.react_sparkle(message))
-			print(f"{user} has triggered the rare message bonus in {message.guild}!")
+				if message.id % 1000000 == 0:
+					self.add_diamonds(user, points * 10000)
+					add_dict(self.data.setdefault(user.id, {}).setdefault("sparkles", {}), {"legendary": 1})
+					csubmit(self.bot.react_with(message, "sparkles_legendary.gif"))
+					print(f"{user} has obtained legendary sparkles in {message.guild}!")
+				elif message.id % 25000 == 0:
+					self.add_diamonds(user, points * 50)
+					add_dict(self.data.setdefault(user.id, {}).setdefault("sparkles", {}), {"rare": 1})
+					csubmit(self.bot.react_with(message, "sparkles_rare.gif"))
+					print(f"{user} has obtained rare sparkles in {message.guild}!")
+				else:
+					self.add_diamonds(user, points)
+					add_dict(self.data.setdefault(user.id, {}).setdefault("sparkles", {}), {"normal": 1})
+					csubmit(self.bot.react_with(message, "sparkles.gif"))
+					print(f"{user} has obtained sparkles in {message.guild}!")
+			points *= 1000
 		else:
 			self.add_gold(user, points)
 		self.add_xp(user, points)
 		if "dailies" in self.bot.data:
 			csubmit(self.bot.data.dailies.valid_message(message))
 
-	async def _mention_(self, user, message, msg, **void):
+	async def _mention_(self, user, message, **void):
 		bot = self.bot
-		mentions = self.mentionspam.findall(msg)
+		mentions = self.mentionspam.findall(message.content)
 		t = utc()
 		out = None
 		if len(mentions) >= xrand(8, 12) and self.data.get(user.id, EMPTY).get("last_mention", 0) > 3:
@@ -2216,7 +2108,6 @@ class UpdateUsers(Database):
 			await bot.seen(user, event="misc", raw="Being naughty")
 			add_dict(self.data, {user.id: {"last_mention": 1}})
 			self.data[user.id]["last_used"] = t
-			self.update(user.id)
 			with suppress():
 				message.noresponse = True
 			raise CommandCancelledError
@@ -2229,22 +2120,21 @@ class UpdateUsers(Database):
 				set_dict(self.data, self.bot.id, {})["xp"] = inf
 				self.data[self.bot.id]["gold"] = inf
 				self.data[self.bot.id]["diamonds"] = inf
-				self.update(self.bot.id)
 			return inf
 		return self.data.get(user.id, EMPTY).get("xp", 0)
 
 	def xp_to_level(self, xp):
-		if is_finite(xp):
+		if isfinite(xp):
 			return int((xp * 3 / 2000) ** (2 / 3)) + 1
 		return xp
 
 	def xp_to_next(self, level):
-		if is_finite(level):
+		if isfinite(level):
 			return ceil(math.sqrt(level - 1) * 1000)
 		return level
 
 	def xp_required(self, level):
-		if is_finite(level):
+		if isfinite(level):
 			return ceil((level - 1) ** 1.5 * 2000 / 3)
 		return level
 
@@ -2255,35 +2145,31 @@ class UpdateUsers(Database):
 	def add_xp(self, user, amount, multiplier=True):
 		if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
 			pl = self.bot.premium_level(user)
-			amount *= self.bot.premium_multiplier(pl)
+			amount *= min(5, self.bot.premium_multiplier(pl))
 			add_dict(set_dict(self.data, user.id, {}), {"xp": amount})
 			if "dailies" in self.bot.data:
 				self.bot.data.dailies.progress_quests(user, "xp", amount)
-			self.update(user.id)
 
 	def add_gold(self, user, amount, multiplier=True):
 		if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
 			pl = self.bot.premium_level(user, absolute=True)
-			amount *= self.bot.premium_multiplier(pl)
+			amount *= min(5, self.bot.premium_multiplier(pl))
 			add_dict(set_dict(self.data, user.id, {}), {"gold": amount})
 			if amount < 0 and self[user.id]["gold"] < 0:
 				self[user.id]["gold"] = 0
-			self.update(user.id)
 
 	def add_diamonds(self, user, amount, multiplier=True):
 		if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
 			pl = self.bot.premium_level(user, absolute=True)
-			amount *= self.bot.premium_multiplier(pl)
+			amount *= min(5, self.bot.premium_multiplier(pl))
 			add_dict(set_dict(self.data, user.id, {}), {"diamonds": amount})
 			if amount > 0 and "dailies" in self.bot.data:
 				self.bot.data.dailies.progress_quests(user, "diamond", amount)
 			if amount < 0 and self[user.id]["diamonds"] < 0:
 				self[user.id]["diamonds"] = 0
-			self.update(user.id)
 
 	async def _typing_(self, user, **void):
-		set_dict(self.data, user.id, {})["last_typing"] = utc()
-		self.update(user.id)
+		self.data.setdefault(user.id, {})["last_typing"] = utc()
 
 	async def _nocommand_(self, message, msg, force=False, flags=(), truemention=True, perm=0, **void):
 		if getattr(message, "noresponse", False):
@@ -2292,151 +2178,6 @@ class UpdateUsers(Database):
 		user = message.author
 		channel = message.channel
 		guild = message.guild
-		if force or bot.is_mentioned(message, bot, guild):
-			if user.bot:
-				with suppress(AttributeError):
-					async for m in bot.data.channel_cache.grab(channel):
-						user = m.author
-						if bot.get_perms(user.id, guild) <= -inf:
-							return
-						if not user.bot:
-							break
-			if message.reference and message.reference.resolved and message.reference.resolved.author.id == bot.id and message.reference.resolved.content.startswith("*```callback-admin-relay-"):
-				return
-			if not isnan(perm) and "blacklist" in self.bot.data:
-				gid = bot.data.blacklist.get(0)
-				if gid and gid != getattr(guild, "id", None):
-					csubmit(send_with_react(
-						channel,
-						"I am currently under maintenance, please stay tuned!",
-						reacts="❎",
-						reference=message,
-					))
-					return
-			send = lambda *args, **kwargs: send_with_reply(channel, not flags and message, *args, **kwargs)
-			out = None
-			count = self.data.get(user.id, EMPTY).get("last_talk", 0)
-			# Simulates a randomized conversation
-			if count < 5:
-				csubmit(message.add_reaction("👀"))
-			if "ask" in bot.commands and ("string" in bot.get_enabled(channel) or not perm < inf):
-				argv = message.clean_content.strip()
-				me = guild.me if guild else bot
-				argv = argv.removeprefix(f"@{me.display_name}")
-				argv = argv.removesuffix(f"@{me.display_name}")
-				argv = argv.strip()
-				with bot.ExceptionSender(channel, reference=message):
-					u_perm = bot.get_perms(user.id, guild)
-					u_id = user.id
-					for ask in bot.commands.ask:
-						sem = emptyctx
-						command = ask
-						req = command.min_level
-						if not isnan(u_perm):
-							if not u_perm >= req:
-								raise command.perm_error(u_perm, req, "for command ask")
-							rl = command.rate_limit
-							if rl:
-								pm = bot.premium_multiplier(bot.premium_level(user))
-								if user.id in bot.owners:
-									rl = 0
-									pm = inf
-								elif isinstance(rl, collections.abc.Sequence):
-									rl = rl[not bot.is_trusted(getattr(guild, "id", 0))]
-									rl /= pm
-								# remaining += rl
-								burst = ceil(pm + 2)
-								rlv = ceil(rl * burst)
-								sem = command.used.get(u_id)
-								if sem is None or sem.rate_limit != rlv:
-									sem = command.used[u_id] = Semaphore(burst, burst, rate_limit=rlv)
-								if sem.full and sem.reset_after:
-									raise TooManyRequests(f"Command has a rate limit of {sec2time(rl)} with a burst+queue of {burst}; please wait {sec2time(sem.reset_after)}.")
-						async with sem:
-							m = await ask(bot, message, guild, channel, user, argv, name="ask", flags=flags)
-						if m and "exec" in bot.data and not message.guild and ("blacklist" not in bot.data or (bot.data.blacklist.get(user.id) or 0) < 1):
-							await bot.data.exec._nocommand_(message=m)
-				return
-			if count:
-				if count < 2 or count == 2 and xrand(2):
-					# Starts conversations
-					out = choice(
-						f"So, {user.display_name}, how's your day been?",
-						f"How do you do, {user.name}?",
-						f"How are you today, {user.name}?",
-						"What's up?",
-						"Can I entertain you with a little something today?",
-					)
-				elif count < 16 or random.random() > math.atan(max(0, count / 8 - 3)) / 4:
-					# General messages
-					if (count < 6 or self.mentionspam.sub("", msg).strip()) and random.random() < 0.5:
-						out = choice((f"'sup, {user.display_name}?", f"There you are, {user.name}!", "Oh yeah!", "👋", f"Hey, {user.display_name}!"))
-					else:
-						out = ""
-				elif count < 24:
-					# Occasional late message
-					if random.random() < 0.4:
-						out = choice(
-							"You seem rather bored... I may only be as good as my programming allows me to be, but I'll try my best to fix that! 🎆",
-							"You must be bored, allow me to entertain you! 🍿",
-						)
-					else:
-						out = ""
-				else:
-					# Late conversation messages
-					out = choice(
-						"It's been a fun conversation, but don't you have anything better to do? 🌞",
-						"This is what I was made for, I can do it forever, but you're only a human, take a break! 😅",
-						f"Woah, have you checked the time? We've been talking for {count + 1} messages! 😮"
-					)
-			elif utc() - self.data.get(user.id, EMPTY).get("last_used", inf) >= 259200:
-				# Triggers for users not seen in 3 days or longer
-				out = choice((f"Long time no see, {user.name}!", f"Great to see you again, {user.display_name}!", f"It's been a while, {user.name}!"))
-			if out is not None:
-				guild = message.guild
-				# Add randomized flavour text if in conversation
-				if not xrand(4):
-					front = choice(
-						"Random question",
-						"Question for you",
-						"Conversation starter",
-					)
-					out += f"\n{front}: `{choice(self.questions)}`"
-				elif self.flavour_buffer:
-					out += self.flavour_buffer.popleft()
-				else:
-					out += choice(self.flavour)
-			else:
-				# Help message greetings
-				i = xrand(7)
-				if i == 0:
-					out = "I have been summoned!"
-				elif i == 1:
-					out = f"Hey there! Name's {bot.name}!"
-				elif i == 2:
-					out = f"Hello {user.name}, nice to see you! Can I help you?"
-				elif i == 3:
-					out = f"Howdy, {user.display_name}!"
-				elif i == 4:
-					out = f"Greetings, {user.name}! May I be of service?"
-				elif i == 5:
-					out = f"Hi, {user.name}! What can I do for you today?"
-				else:
-					out = f"Yo, what's good, {user.display_name}? Need me for anything?"
-				prefix = bot.get_prefix(message.guild)
-				out += f" Use `{prefix}help` or `/help` for help!"
-				send = lambda *args, **kwargs: send_with_react(channel, *args, reacts="❎", reference=not flags and message, **kwargs)
-			add_dict(self.data, {user.id: {"last_talk": 1, "last_mention": 1}})
-			self.data[user.id]["last_used"] = utc()
-			await send(out)
-			await bot.seen(user, event="misc", raw="Talking to me")
-			self.add_xp(user, xrand(12, 20))
-			if "dailies" in bot.data:
-				bot.data.dailies.progress_quests(user, "talk")
-		else:
-			if not self.data.get(user.id, EMPTY).get("last_mention") and random.random() > 0.6:
-				self.data.get(user.id, EMPTY).pop("last_talk", None)
-			self.data.get(user.id, EMPTY).pop("last_mention", None)
 		if not getattr(message, "simulated", None):
 			self.data.setdefault(user.id, {})["last_channel"] = channel.id
 			stored = self.data[user.id].setdefault("stored", {})
@@ -2458,11 +2199,67 @@ class UpdateUsers(Database):
 						m = await bot.fetch_message(m_id, c)
 					except (discord.NotFound, LookupError):
 						stored.pop(c_id, None)
-						stored[channel.id] = message.id
 					except:
 						print_exc()
 						stored.pop(c_id, None)
-						stored[channel.id] = message.id
 			if channel.id in bot.cache.channels:
 				stored[channel.id] = message.id
-		self.update(user.id)
+		if force or bot.is_mentioned(message, bot, guild):
+			if user.bot:
+				with suppress(AttributeError):
+					async for m in bot.data.channel_cache.grab(channel):
+						user = m.author
+						if bot.get_perms(user.id, guild) <= -inf:
+							return
+						if not user.bot:
+							break
+			try:
+				reference = await bot.fetch_reference(message)
+			except (LookupError, discord.NotFound):
+				pass
+			else:
+				if reference.author.id == bot.id and reference.content.startswith("*```callback-admin-relay-"):
+					return
+			out = None
+			count = self.data.get(user.id, EMPTY).get("last_talk", 0)
+			if count < 5:
+				csubmit(message.add_reaction("👀"))
+			if "ask" in bot.commands and ("ai" in bot.get_enabled(channel) or not perm < inf):
+				argv = message.clean_content.strip()
+				me = getattr(guild, "me", bot.user)
+				argv = argv.removeprefix(f"@{me.display_name}")
+				argv = argv.removesuffix(f"@{me.display_name}")
+				argv = argv.strip()
+				with bot.ExceptionSender(message.channel, reference=message):
+					await bot.run_command(bot.commands.ask[0], dict(prompt=argv), message=message)
+				return
+			# Help message greetings
+			i = xrand(7)
+			if i == 0:
+				out = "I have been summoned!"
+			elif i == 1:
+				out = f"Hey there! Name's {bot.name}!"
+			elif i == 2:
+				out = f"Hello {user.name}, nice to see you! Can I help you?"
+			elif i == 3:
+				out = f"Howdy, {user.display_name}!"
+			elif i == 4:
+				out = f"Greetings, {user.name}! May I be of service?"
+			elif i == 5:
+				out = f"Hi, {user.name}! What can I do for you today?"
+			else:
+				out = f"Yo, what's good, {user.display_name}? Need me for anything?"
+			prefix = bot.get_prefix(message.guild)
+			out += f"\n-# Use `{prefix}help` or `/help` for help!"
+			send = lambda *args, **kwargs: send_with_react(channel, *args, reacts="❎", reference=not flags and message, **kwargs)
+			add_dict(self.data, {user.id: {"last_talk": 1, "last_mention": 1}})
+			self.data[user.id]["last_used"] = utc()
+			await send(out)
+			await bot.seen(user, event="misc", raw="Talking to me")
+			self.add_xp(user, xrand(12, 20))
+			if "dailies" in bot.data:
+				bot.data.dailies.progress_quests(user, "talk")
+		else:
+			if not self.data.get(user.id, EMPTY).get("last_mention") and random.random() > 0.6:
+				self.data.get(user.id, EMPTY).pop("last_talk", None)
+			self.data.get(user.id, EMPTY).pop("last_mention", None)

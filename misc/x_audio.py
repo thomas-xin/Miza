@@ -1,23 +1,20 @@
+import asyncio
+import concurrent.futures
 import os
-os.environ["IS_BOT"] = ""
-try:
-	from common import *
-except ModuleNotFoundError:
-	try:
-		f = open("common.py", "rb")
-	except FileNotFoundError:
-		import os, sys
-		sys.path.append(os.path.abspath('..'))
-		os.chdir("..")
-		f = open("common.py", "rb")
-	b = f.read()
-	code = compile(b, "common.py", "exec", optimize=1)
-	exec(code, globals())
+import subprocess
+import sys
+import time
+import discord
+import psutil
+from collections import deque
+from concurrent.futures import Future
+from math import inf, log2, isfinite
+from traceback import print_exc
+from .asyncs import csubmit, esubmit, tsubmit, async_nop, wrap_future, cst, Semaphore, Delay, eloop
+from .types import as_str, cdict, suppress, utc, ISE2, round_min, cast_id
+from .util import tracebacksuppressor, is_strict_running, force_kill, retry, AUTH, TEMP_PATH, Request, EvalPipe, PipedProcess, is_url, is_youtube_stream, expired, reqs, get_duration, T
 
-
-# import pycord as discord
-
-tracebacksuppressor.fn = traceback.print_exc
+tracebacksuppressor.fn = print_exc
 
 ADDRESS = AUTH.get("webserver_address") or "0.0.0.0"
 if ADDRESS == "0.0.0.0":
@@ -27,193 +24,15 @@ if ADDRESS == "0.0.0.0":
 SAMPLE_RATE = 48000
 
 
-def send(*args, sep=" ", end="\n", escape=True):
-	s = sep.join(str(i) for i in args) + end
-	if escape:
-		s = "\x00" + s
-	if s:
-		if s[-1] != "\n":
-			s += "\n"
-		sys.__stdout__.buffer.write(s.encode("utf-8"))
-		sys.__stdout__.flush()
-print = send
-
-@tracebacksuppressor
-def request(s):
-	PORT = AUTH["webserver_port"]
-	token = AUTH["discord_token"]
-	return reqs.next().get(f"http://{ADDRESS}:{PORT}/eval/{token}/{url_parse(s)}", verify=False, timeout=16).text
-
-def submit(s):
-	if type(s) not in (bytes, memoryview):
-		s = as_str(s).encode("utf-8")
-	b = b"~" + base64.b85encode(s) + b"\n"
-	resp = sys.__stdout__.buffer.write(b)
-	sys.__stdout__.flush()
-	return resp
-
-async def respond(s):
-	# send("%" + as_str(s))
-	k, c = s[1:].rstrip().split(b"~", 1)
-	c = memoryview(base64.b85decode(c))
-	k = k.decode("ascii")
-	# send("%" + as_str(c))
-	if c == b"ytdl.update()":
-		with tracebacksuppressor:
-			await asubmit(update_cache)
-		res = "None"
-	elif c:
-		res = None
-		try:
-			if c[:1] == b"!":
-				c = c[1:]
-				res = "None"
-			if c[:6] == b"await ":
-				resp = await eval(c[6:], client._globals)
-			else:
-				code = None
-				try:
-					code = compile(c, "<miza>", "eval")
-				except SyntaxError:
-					pass
-				else:
-					resp = await asubmit(eval, code, client._globals)
-				if code is None:
-					resp = await asubmit(exec, c, client._globals)
-		except Exception as ex:
-			traceback.print_exc()
-			s = f"bot.audio.returns[{k}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))"
-			submit(s)
-			return
-	else:
-		return
-	if not res:
-		res = repr(resp)
-		if type(resp) not in (bool, int, float, str, bytes):
-			try:
-				compile(res, "miza2", "eval")
-			except SyntaxError:
-				res = repr(str(resp))
-	s = f"bot.audio.returns[{k}].set_result({res})"
-	# send("%" + as_str(s))
-	esubmit(submit, s)
-
-async def communicate():
-	send("Audio client successfully connected.")
-	while True:
-		with tracebacksuppressor:
-			s = await asubmit(sys.stdin.buffer.readline)
-			if not s:
-				break
-			if s.startswith(b"~"):
-				csubmit(respond(s))
-	send("Audio client successfully disconnected.")
-
-def is_strict_running(proc):
-	if not proc:
-		return
-	try:
-		if not proc.is_running():
-			return False
-		if proc.status() == "zombie":
-			proc.wait()
-			return
-		return True
-	except AttributeError:
-		proc = psutil.Process(proc.pid)
-	if not proc.is_running():
-		return False
-	if proc.status() == "zombie":
-		proc.wait()
-		return
-	return True
-
-
-# Runs ffprobe on a file or url, returning the duration if possible.
-def _get_duration(filename, _timeout=12):
-	command = (
-		"./ffprobe",
-		"-v",
-		"error",
-		"-select_streams",
-		"a:0",
-		"-show_entries",
-		"format=duration,bit_rate",
-		"-of",
-		"default=nokey=1:noprint_wrappers=1",
-		filename,
-	)
-	resp = None
-	try:
-		proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
-		fut = esubmit(proc.wait, timeout=_timeout)
-		res = fut.result(timeout=_timeout)
-		resp = proc.stdout.read().split()
-	except:
-		with suppress():
-			force_kill(proc)
-		with suppress():
-			resp = proc.stdout.read().split()
-		print_exc()
-	try:
-		dur = float(resp[0])
-	except (IndexError, ValueError, TypeError):
-		dur = None
-	bps = None
-	if resp and len(resp) > 1:
-		with suppress(ValueError):
-			bps = float(resp[1])
-	return dur, bps
-
-DUR_CACHE = {}
-
-def get_duration(filename):
-	if filename:
-		with suppress(KeyError):
-			return DUR_CACHE[filename]
-		dur, bps = _get_duration(filename, 4)
-		if not dur and is_url(filename):
-			with reqs.next().get(filename, headers=Request.header(), stream=True) as resp:
-				head = fcdict(resp.headers)
-				if "Content-Length" not in head:
-					dur = _get_duration(filename, 20)[0]
-					DUR_CACHE[filename] = dur
-					return dur
-				if bps:
-					print(head, bps, sep="\n")
-					return (int(head["Content-Length"]) << 3) / bps
-				ctype = [e.strip() for e in head.get("Content-Type", "").split(";") if "/" in e][0]
-				if ctype.split("/", 1)[0] not in ("audio", "video") or ctype == "audio/midi":
-					DUR_CACHE[filename] = nan
-					return nan
-				it = resp.iter_content(65536)
-				data = next(it)
-			ident = str(magic.from_buffer(data))
-			print(head, ident, sep="\n")
-			try:
-				bitrate = regexp("[0-9.]+\\s.?bps").findall(ident)[0].casefold()
-			except IndexError:
-				dur = _get_duration(filename, 16)[0]
-				DUR_CACHE[filename] = dur
-				return dur
-			bps, key = bitrate.split(None, 1)
-			bps = float(bps)
-			if key.startswith("k"):
-				bps *= 1e3
-			elif key.startswith("m"):
-				bps *= 1e6
-			elif key.startswith("g"):
-				bps *= 1e9
-			dur = (int(head["Content-Length"]) << 3) / bps
-		DUR_CACHE[filename] = dur
-		return dur
-
-
-players = cdict()
+interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
+# print = interface.print
 
 
 class AudioPlayer(discord.AudioSource):
 
+	players = {}
+	waiting = {}
+	sources = {}
 	vc = None
 	listener = None
 	listening = False
@@ -223,35 +42,59 @@ class AudioPlayer(discord.AudioSource):
 
 	@classmethod
 	async def join(cls, channel):
-		channel = client.get_channel(verify_id(channel))
+		channel = client.get_channel(cast_id(channel))
+		gid = channel.guild.id
+		try:
+			return cls.players[gid]
+		except KeyError:
+			pass
+		try:
+			fut = cls.waiting[gid]
+		except KeyError:
+			pass
+		else:
+			self = await wrap_future(fut)
+			if self:
+				return self
 		self = cls(channel.guild)
-		players[channel.guild.id] = Future()
-		send(self, channel)
+		cls.waiting[gid] = Future()
+		print(self, channel)
 		try:
 			if not self.vc:
 				if channel.guild.me.voice:
 					await channel.guild.change_voice_state(channel=None)
 				self.vc = await channel.connect(timeout=7, reconnect=True)
 		except Exception as ex:
-			if channel.guild.id in players:
-				players[channel.guild.id].set_exception(ex)
-				players.pop(channel.guild.id)
+			try:
+				cst(cls.waiting[gid].set_exception, ex)
+			except KeyError:
+				pass
 			raise
 		else:
-			if channel.guild.id in players:
-				players[channel.guild.id].set_result(self)
-			players[channel.guild.id] = self
+			cls.players[gid] = self
+			try:
+				cst(cls.waiting[gid].set_result, self)
+			except KeyError:
+				pass
+			return self
+		finally:
+			cls.waiting.pop(gid, None)
 
 	@classmethod
 	def from_guild(cls, guild):
+		gid = cast_id(guild)
 		try:
-			fut = players[verify_id(guild)]
+			return cls.players[gid]
+		except KeyError:
+			pass
+		try:
+			fut = cls.waiting[gid]
 		except KeyError:
 			pass
 		else:
-			if type(fut) is cls:
-				return fut
-			return fut.result(timeout=7)
+			self = fut.result(timeout=7)
+			if self:
+				return self
 		self = cls(guild)
 		if self.vc:
 			return self
@@ -260,19 +103,7 @@ class AudioPlayer(discord.AudioSource):
 		self.listening = None
 		self.queue = deque(maxlen=2)
 		if guild:
-			self.vc = client.get_guild(verify_id(guild)).voice_client
-
-	def _listen(self):
-		while self.listening:
-			break
-
-	def listen(self):
-		if self.listener and not self.listener.done():
-			self.listening = False
-			self.listener.result()
-		self.listening = True
-		self.listener = esubmit(self._listen)
-		return self.listener
+			self.vc = client.get_guild(cast_id(guild)).voice_client
 
 	def __getattr__(self, k):
 		try:
@@ -293,7 +124,7 @@ class AudioPlayer(discord.AudioSource):
 		return getattr(self.queue[0][0], k)
 
 	def after(self, *args):
-		if not self.queue or not self.queue[0]:
+		if T(self.vc).get("dead") or not self.queue or not self.queue[0]:
 			return
 		entry = self.queue.popleft()
 		esubmit(entry[0].close)
@@ -310,7 +141,7 @@ class AudioPlayer(discord.AudioSource):
 			if self.silent:
 				try:
 					self.vc.pause()
-				except:
+				except Exception:
 					pass
 			self.silent = True
 			self.queue.clear()
@@ -320,7 +151,7 @@ class AudioPlayer(discord.AudioSource):
 			out = self.queue[0][0].read()
 		except (StopIteration, IndexError, discord.oggparse.OggError):
 			pass
-		except:
+		except Exception:
 			print_exc()
 		if not out and self.queue:
 			with tracebacksuppressor(StopIteration):
@@ -328,7 +159,7 @@ class AudioPlayer(discord.AudioSource):
 				esubmit(entry[0].close)
 				after = entry[1]
 				if callable(after):
-					esubmit(after)
+					after()
 				sys.stderr.write(f"After2 {self} {self.queue} {after}\n")
 				if not self.queue:
 					return self.emptyopus
@@ -341,10 +172,10 @@ class AudioPlayer(discord.AudioSource):
 			self.silent = False
 			try:
 				self.pause()
-			except:
+			except Exception:
 				pass
 			self.resume()
-		return out or self.emptyopus
+		return out
 
 	def play(self, source, after=None):
 		if not self.queue:
@@ -388,7 +219,7 @@ class AudioPlayer(discord.AudioSource):
 			esubmit(entry[0].close)
 			after = entry[1]
 			if callable(after):
-				esubmit(after)
+				after()
 
 	def clear(self):
 		for entry in tuple(self.queue):
@@ -399,7 +230,8 @@ class AudioPlayer(discord.AudioSource):
 	def kill(self):
 		csubmit(self.vc.disconnect(force=True))
 		self.clear()
-		players.pop(self.guild.id, None)
+		self.players.pop(self.guild.id, None)
+		self.waiting.pop(self.guild.id, None)
 		self.vc.dead = True
 		self.vc = None
 
@@ -424,9 +256,11 @@ class AudioPlayer(discord.AudioSource):
 			if len(b) > 48000 * 2 * 2:
 				pass
 
+	def is_opus(self):
+		return True
 
-	is_opus = lambda self: True
-	cleanup = lambda self: None
+	def cleanup(self):
+		return None
 
 AP = AudioPlayer
 
@@ -439,7 +273,6 @@ def update_cache():
 
 ytdl = cdict(update=update_cache, cache=cache)
 
-
 # Represents a cached audio file in opus format. Executes and references FFmpeg processes loading the file.
 class AudioFile:
 
@@ -447,7 +280,7 @@ class AudioFile:
 	live = False
 	dur = None
 
-	def __init__(self, fn, stream=None, wasfile=False):
+	def __init__(self, fn, stream=None, wasfile=False, source=None):
 		self.file = fn
 		self.proc = None
 		self.streaming = Future()
@@ -456,14 +289,16 @@ class AudioFile:
 			self.streaming.set_result(stream)
 		self.stream = stream
 		self.wasfile = False
+		self.wasecdc = False
 		self.loading = self.buffered = self.loaded = wasfile
 		if wasfile:
 			self.proc = cdict(is_running=lambda: False, kill=lambda: None, status=lambda: None)
 		self.expired = False
-		self.readers = cdict()
-		self.semaphore = Semaphore(1, 1, delay=5)
+		self.readers = AP.sources
+		self.semaphore = Semaphore(1, 1)
 		self.ensure_time()
 		self.webpage_url = None
+		self.source = source
 		cache[fn] = self
 
 	def __str__(self):
@@ -485,20 +320,21 @@ class AudioFile:
 			self.stream = stream
 			try:
 				self.streaming.set_result(stream)
-			except concurrent.futures.InvalidStateError:
+			except ISE2:
 				pass
 		stream = self.stream
 		if webpage_url is not None:
 			self.webpage_url = webpage_url
 		self.loading = True
-		# if not asap and not live and is_youtube_stream(stream):
-			# fi = "cache/" + str(time.time_ns() + random.randint(1, 1000)) + "~proxy"
-			# with suppress():
-			# 	stream = proxy_download(stream, fi, timeout=86400)
+		# if not asap and not live and is_url(stream):
+		# 	fi = f"{TEMP_PATH}/" + str(time.time_ns() + random.randint(1, 1000)) + "~proxy"
+		# 	with tracebacksuppressor:
+		# 		stream = proxy_download(stream, fi, timeout=86400)
 		ffmpeg = "./ffmpeg"
 		if not os.path.exists(ffmpeg):
 			ffmpeg = "./ffmpeg"
 		fmt = cdc = self.file.rsplit(".", 1)[-1]
+		sample_rate = SAMPLE_RATE
 		if fmt in ("weba", "webm"):
 			fmt = "webm"
 			cdc = "libopus"
@@ -518,8 +354,10 @@ class AudioFile:
 		elif fmt == "opus":
 			cdc = "libopus"
 			cdc2 = "opus"
+		elif fmt == "mp3":
+			sample_rate = "44100"
 		# Collects data from source, converts to 48khz 128kbps opus format, outputting to target file
-		cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "131072", "cache/" + self.file]
+		cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(sample_rate), "-ac", "2", "-b:a", "192000", f"{TEMP_PATH}/audio/" + self.file]
 		# if not stream.startswith("https://cf-hls-media.sndcdn.com/"):
 		fixed = False
 		with suppress():
@@ -529,7 +367,7 @@ class AudioFile:
 			else:
 				fmt2 = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", stream])).strip()
 			if fmt2 == cdc2:
-				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", "cache/" + self.file]
+				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", f"{TEMP_PATH}/audio/" + self.file]
 				fixed = True
 			elif is_youtube_stream(stream):
 				fixed = True
@@ -539,7 +377,7 @@ class AudioFile:
 		if not fixed and is_url(stream):
 			headers = Request.header()
 			headers["Range"] = "Bytes=0-3"
-			resp = reqs.next().get(stream, headers=headers, stream=True)
+			resp = reqs.next().get(stream, headers=headers, stream=True, timeout=30)
 			resp.raise_for_status()
 			it = resp.iter_content(4)
 			data = next(it)[:4]
@@ -552,56 +390,60 @@ class AudioFile:
 			if data in CONVERTERS:
 				new = None
 				with suppress(ValueError):
-					new = request(f"VOICE.select_and_convert({repr(stream)})")
+					new = interface.run(f"VOICE.select_and_convert({repr(stream)})", timeout=120)
 				if new not in (None, "null"):
 					return self.load(new, check_fmt=None, force=True)
 			elif data == b"ECDC":
-				g = -1
-				if COMPUTE_POT:
-					usable = [i for i, c in enumerate(COMPUTE_POT) if c > 100000]
-					if usable:
-						g = random.choice(usable)
 				procargs = [
-					[sys.executable, "misc/ecdc_stream.py", "-g", str(g), "-d", stream],
-					["./ffmpeg", "-nostdin", "-y", "-hide_banner", "-v", "error", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "131072", "cache/" + self.file]
+					[sys.executable, "misc/ecdc_stream.py", "-d", stream],
+					["./ffmpeg", "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(sample_rate), "-ac", "2", "-b:a", "192000", f"{TEMP_PATH}/audio/" + self.file]
 				]
+				self.wasecdc = True
+		elif stream.endswith(".ecdc") and not is_url(stream):
+			procargs = [
+				[sys.executable, "misc/ecdc_stream.py", "-d", stream],
+				["./ffmpeg", "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(sample_rate), "-ac", "2", "-b:a", "192000", f"{TEMP_PATH}/audio/" + self.file]
+			]
+			self.wasecdc = True
 		self.proc = None
 		try:
 			try:
 				self.proc = PipedProcess(*procargs, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 			except:
-				send(cmd)
+				print(cmd)
 				raise
+			i = 0
 			fl = 0
-			# Attempt to monitor status of output file
-			while fl < 4096:
-				with Delay(0.1):
+			# Attempt to monitor status of output file; file is sufficiently loaded if either process ends with >=4kb, or is still running with >=512kb
+			while fl < 4096 or (fl < 524288 and is_strict_running(self.proc)):
+				with Delay(i / 20):
 					if not is_strict_running(self.proc):
 						err = as_str(self.proc.stderr.read())
 						if check_fmt is not None:
 							if self.webpage_url and ("Server returned 5XX Server Error reply" in err or "Server returned 404 Not Found" in err or "Server returned 403 Forbidden" in err):
-								send(err)
+								print(err)
 								with tracebacksuppressor:
 									if "https://cf-hls-media.sndcdn.com/" in stream or expired(stream):
-										new_stream = request(f"VOICE.get_best_audio(VOICE.ytdl.extract_from({repr(self.webpage_url)}))")
+										new_stream = interface.run(f"VOICE.get_best_audio(VOICE.ytdl.extract_from({repr(self.webpage_url)}))")
 									else:
-										new_stream = request(f"VOICE.get_best_audio(VOICE.ytdl.extract_backup({repr(self.webpage_url)}))")
+										new_stream = interface.run(f"VOICE.get_best_audio(VOICE.ytdl.extract_backup({repr(self.webpage_url)}))")
 									if new_stream:
 										return self.load(new_stream, check_fmt=None, force=True)
 							new = None
 							with suppress(ValueError):
-								new = request(f"VOICE.select_and_convert({repr(stream)})")
+								new = interface.run(f"VOICE.select_and_convert({repr(stream)})", timeout=120)
 							if new not in (None, "null"):
 								return self.load(new, check_fmt=None, force=True)
-						send(self.proc.args)
+						print(self.proc.args)
 						if err:
 							ex = RuntimeError(err)
 						else:
 							ex = RuntimeError("FFmpeg did not start correctly, or file was too small.")
 						self.readable.set_exception(ex)
 						raise ex
+				i += 1
 				try:
-					fl = os.path.getsize("cache/" + self.file)
+					fl = os.path.getsize(f"{TEMP_PATH}/audio/" + self.file)
 				except FileNotFoundError:
 					fl = 0
 			self.buffered = True
@@ -614,54 +456,57 @@ class AudioFile:
 				with suppress():
 					force_kill(self.proc)
 			with suppress():
-				os.remove("cache/" + self.file)
+				os.remove(f"{TEMP_PATH}/audio/" + self.file)
 			self.readable.set_exception(ex)
 			raise
 		self.readable.set_result(self)
 		self.live = False
+		if not self.live and is_strict_running(self.proc):
+			tsubmit(self.wait)
 		return self
 
 	# Touch the file to update its cache time.
-	ensure_time = lambda self: setattr(self, "time", utc())
+	def ensure_time(self):
+		return setattr(self, "time", utc())
+
+	def wait(self):
+		self.proc.wait()
+		self.loaded = True
+		try:
+			assert os.path.getsize(f"{TEMP_PATH}/audio/" + self.file) > 0
+		except (FileNotFoundError, AssertionError):
+			print_exc()
+		else:
+			if not self.wasecdc and self.source:
+				interface.run(f"VOICE.ytdl.complete({repr(self.source)},{repr(self.file)})", timeout=600)
 
 	# Update event run on all cached files
 	def update(self):
-		if not self.live:
-			# Check when file has been fully loaded
-			if self.buffered and not is_strict_running(self.proc):
-				if not self.loaded:
-					self.loaded = True
-					if not is_url(self.stream):
-						retry(os.remove, self.stream, attempts=3, delay=0.5)
-					try:
-						fl = os.path.getsize("cache/" + self.file)
-					except FileNotFoundError:
-						fl = 0
-					# print(self.file, "loaded", fl)
+		with tracebacksuppressor:
 			# Touch file if file is currently in use
-		if self.readers:
-			self.ensure_time()
-			return
-		# Remove any unused file that has been left for a long time
-		if utc() - self.time > 86400:
-			try:
-				fl = os.path.getsize("cache/" + self.file)
-			except FileNotFoundError:
-				fl = 0
-				if self.buffered:
-					self.time = -inf
-			ft = 86400 / (math.log2(fl / 16777216 + 1) + 1)
-			if ft > 86400 * 14:
-				ft = 86400 * 14
-			if utc() - self.time > ft:
-				self.destroy()
+			if self.readers:
+				self.ensure_time()
+				return
+			# Remove any unused file that has been left for a long time
+			if utc() - self.time > 86400:
+				try:
+					fl = os.path.getsize(f"{TEMP_PATH}/audio/" + self.file)
+				except FileNotFoundError:
+					fl = 0
+					if self.buffered:
+						self.time = -inf
+				ft = 86400 * 7 / (log2(fl / 16777216 + 1) + 1)
+				if ft > 86400 * 28:
+					ft = 86400 * 28
+				if utc() - self.time > ft:
+					self.destroy()
 
 	# Creates a reader object that either reads bytes or opus packets from the file.
 	def open(self, key=None):
 		self.ensure_time()
 		if self.proc is None and not self.loaded:
 			raise ProcessLookupError
-		f = open("cache/" + self.file, "rb")
+		f = open(f"{TEMP_PATH}/audio/" + self.file, "rb")
 		it = discord.oggparse.OggStream(f).iter_packets()
 
 		reader = cdict(
@@ -682,7 +527,7 @@ class AudioFile:
 			try:
 				out = next(reader.it, b"")
 			except ValueError:
-				f = open("cache/" + self.file, "rb")
+				f = open(f"{TEMP_PATH}/audio/" + self.file, "rb")
 				f.seek(reader.byte_pos)
 				reader.file = f
 				reader.it = discord.oggparse.OggStream(f).iter_packets()
@@ -694,7 +539,7 @@ class AudioFile:
 		def close():
 			reader.closed = True
 			reader.file.close()
-			players.pop(reader.key, None)
+			AP.sources.pop(reader.key, None)
 
 		reader.read = read
 		reader.close = reader.cleanup = close
@@ -707,20 +552,21 @@ class AudioFile:
 			with suppress():
 				force_kill(self.proc)
 		with suppress():
-			with self.semaphore:
-				if not self.live:
-					retry(os.remove, "cache/" + self.file, attempts=8, delay=5, exc=(FileNotFoundError,))
-				# File is removed from cache data
-				request(f"VOICE.ytdl.cache.pop({repr(self.file)},None)")
-				ytdl.cache.pop(self.file, None)
-				# print(self.file, "deleted.")
+			if self.semaphore.is_free():
+				with self.semaphore:
+					if not self.live:
+						retry(os.remove, f"{TEMP_PATH}/audio/" + self.file, attempts=8, delay=5, exc=(FileNotFoundError,))
+					# File is removed from cache data
+					interface.submit(f"VOICE.ytdl.cache.pop({repr(self.file)},None)")
+					ytdl.cache.pop(self.file, None)
+					# print(self.file, "deleted.")
 
 	# Creates a reader, selecting from direct opus file, single piped FFmpeg, or double piped FFmpeg.
 	def create_reader(self, pos=0, auds=None, options=None, key=None):
 		if self.live:
 			source = self.live
 		else:
-			source = "cache/" + self.file
+			source = f"{TEMP_PATH}/audio/" + self.file
 			if not os.path.exists(source):
 				self.readable.result(timeout=12)
 				self.load(force=True)
@@ -729,23 +575,22 @@ class AudioFile:
 		auds.speed = abs(stats.speed)
 		if auds.speed < 0.005:
 			auds.speed = 1
-		players[auds.guild_id]
 		stats.position = pos
-		if not is_finite(stats.pitch * stats.speed):
+		if not isfinite(stats.pitch * stats.speed):
 			raise OverflowError("Speed setting out of range.")
 		# Construct FFmpeg options
 		if options is None:
 			options = auds.construct_options(full=self.live)
 		speed = 1
-		if options or auds.reverse or pos or auds.stats.bitrate != 1310.72 or self.live:
-			args = ["./ffmpeg", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets"]
+		if options or auds.reverse or pos or auds.stats.bitrate * 100 != 192000 or self.live:
+			args = ["./ffmpeg", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+nobuffer+discardcorrupt+genpts+igndts+flush_packets"]
 			if is_url(source):
 				args = ["./ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + args[1:]
 			if (pos or auds.reverse) and self.seekable:
 				arg = "-to" if auds.reverse else "-ss"
-				args += [arg, str(pos)]
-				if reverse and not pos:
+				if auds.reverse and not pos:
 					pos = self.duration() or 300
+				args += [arg, str(pos)]
 			speed = round_min(stats.speed * 2 ** (stats.resample / 12))
 			if auds.reverse:
 				speed = -speed
@@ -758,7 +603,7 @@ class AudioFile:
 				buff = True
 				args.append("-")
 			auds.stats.bitrate = min(auds.stats.bitrate, auds.stats.max_bitrate)
-			if options or auds.stats.bitrate != 1310.72:
+			if options or auds.stats.bitrate * 100 != 192000:
 				br = 100 * auds.stats.bitrate
 				sr = SAMPLE_RATE
 				while br < 4096:
@@ -774,17 +619,13 @@ class AudioFile:
 				if not self.live:
 					args.extend(("-c:a", "copy"))
 			args.append("-")
-			g_id = auds.guild_id
-			self.readers[g_id] = True
-			callback = lambda: self.readers.pop(g_id, None)
-			# print(args)
 			if buff:
 				self.readable.result()
 				# Select buffered reader for files not yet fully loaded, convert while downloading
-				player = BufferedAudioReader(self, args, callback=callback, key=key)
+				player = BufferedAudioReader(self, args, key=key)
 			else:
 				# Select loaded reader for loaded files
-				player = LoadedAudioReader(self, args, callback=callback, key=key)
+				player = LoadedAudioReader(self, args, key=key)
 			player.speed = speed
 			auds.args = args
 			reader = player.start()
@@ -793,11 +634,23 @@ class AudioFile:
 			# Select raw file stream for direct audio playback
 			reader = self.open(key)
 		reader.pos = pos * 50
-		players[key] = reader
+		self.readers[key] = reader
 		return reader
 
 	# Audio duration estimation: Get values from file if possible, otherwise URL
-	duration = lambda self: inf if not self.seekable else getattr(self, "dur", None) or set_dict(self.__dict__, "dur", get_duration("cache/" + self.file) if self.loaded and not self.live else get_duration(self.stream), ignore=True)
+	def duration(self):
+		if not self.seekable:
+			return inf
+		if T(self).get("dur"):
+			return self.dur
+		if not self.live:
+			dur = get_duration(f"{TEMP_PATH}/audio/" + self.file)
+			if not self.loaded:
+				return dur
+		else:
+			dur = get_duration(self.stream)
+		self.dur = dur
+		return dur
 
 	@property
 	def proc_expired(self):
@@ -864,12 +717,13 @@ class LoadedAudioReader(discord.AudioSource):
 		self.closed = True
 		with suppress():
 			force_kill(self.proc)
-		players.pop(self.key, None)
+		AP.sources.pop(self.key, None)
 		if callable(self.callback):
 			self.callback()
-
-	is_opus = lambda self: True
 	cleanup = close
+
+	def is_opus(self):
+		return True
 
 
 # Audio player for audio files still being written to. Continuously reads and sends data to FFmpeg process, only terminating when file download is confirmed to be finished.
@@ -880,11 +734,12 @@ class BufferedAudioReader(discord.AudioSource):
 	def __init__(self, file, args, callback=None, key=None):
 		self.closed = False
 		self.advanced = False
+		self.args = args
 		self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=192000)
 		self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
 		self.file = file
 		self.af = file
-		self.stream = open("cache/" + file.file, "rb")
+		self.stream = open(f"{TEMP_PATH}/audio/" + file.file, "rb")
 		self.buffer = None
 		self.callback = callback
 		self.full = False
@@ -897,18 +752,22 @@ class BufferedAudioReader(discord.AudioSource):
 			b, self.buffer = self.buffer, None
 			self.pos += self.speed
 			return b
-		if self.full:
-			fut = esubmit(next, self.packet_iter, b"")
-			try:
-				out = fut.result(timeout=0.8)
-			except concurrent.futures.TimeoutError:
-				with suppress():
-					force_kill(self.proc)
-				out = b""
-		else:
-			out = next(self.packet_iter, b"")
-		self.pos += self.speed
-		return out
+		try:
+			if self.full:
+				fut = esubmit(next, self.packet_iter, b"")
+				try:
+					out = fut.result(timeout=1)
+				except concurrent.futures.TimeoutError:
+					with suppress():
+						force_kill(self.proc)
+					out = b""
+			else:
+				out = next(self.packet_iter, b"")
+			self.pos += self.speed
+			return out
+		except Exception:
+			print_exc()
+			return b""
 
 	# Required loop running in background to feed data to FFmpeg
 	def run(self):
@@ -924,7 +783,14 @@ class BufferedAudioReader(discord.AudioSource):
 			except (ValueError, EOFError):
 				# Only stop when file is confirmed to be finished
 				if self.file.loaded or self.closed:
-					break
+					try:
+						b = self.stream.read(65536)
+						if not b:
+							raise EOFError
+					except ValueError:
+						break
+					self.proc.stdin.write(b)
+					self.proc.stdin.flush()
 				time.sleep(0.1)
 		self.full = True
 		self.proc.stdin.close()
@@ -943,15 +809,16 @@ class BufferedAudioReader(discord.AudioSource):
 			self.stream.close()
 		with suppress():
 			force_kill(self.proc)
-		players.pop(self.key, None)
+		AP.sources.pop(self.key, None)
 		if callable(self.callback):
 			self.callback()
-
-	is_opus = lambda self: True
 	cleanup = close
 
+	def is_opus(self):
+		return True
 
-class AudioClient(discord.Client):
+
+class AudioClient(discord.AutoShardedClient):
 
 	intents = discord.Intents(
 		guilds=True,
@@ -987,7 +854,7 @@ client.http.user_agent = "Miza-Voice"
 
 async def mobile_identify(self):
 	"""Sends the IDENTIFY packet."""
-	send("Overriding with mobile status...")
+	print("Overriding with mobile status...")
 	payload = {
 		'op': self.IDENTIFY,
 		'd': {
@@ -1025,7 +892,6 @@ async def mobile_identify(self):
 
 discord.gateway.DiscordWebSocket.identify = lambda self: mobile_identify(self)
 
-
 async def kill():
 	futs = deque()
 	with suppress(ConnectionResetError):
@@ -1040,27 +906,25 @@ async def kill():
 @client.event
 async def on_ready():
 	with tracebacksuppressor:
-		await communicate()
-	await client.close()
-	client.closed = True
+		interface.start()
+		print("Audio client successfully connected.")
 
-
-async def ensure_parent(proc, parent):
+def ensure_parent(proc, parent):
 	while not getattr(client, "closed", False):
 		if not is_strict_running(parent):
 			with tracebacksuppressor():
-				await asyncio.wait_for(kill(), timeout=2)
+				csubmit(kill)
 			force_kill(proc)
 			break
-		await asyncio.sleep(12)
+		time.sleep(12)
 
 
 if __name__ == "__main__":
 	pid = os.getpid()
 	ppid = os.getppid()
-	send(f"Audio client starting with PID {pid} and parent PID {ppid}...")
+	print(f"Audio client starting with PID {pid} and PPID {ppid}...")
 	proc = psutil.Process(pid)
 	parent = psutil.Process(ppid)
-	csubmit(ensure_parent(proc, parent))
+	tsubmit(ensure_parent, proc, parent)
 	discord.client._loop = eloop
 	eloop.run_until_complete(client.start(AUTH["discord_token"]))

@@ -1,6 +1,0 @@
-numpy>=1.22.2
-pillow>=9.0.1
-psutil>=5.9.0
-pygame>=2.1.2
-requests>=2.27.1
-yt-dlp>=2022.11.11

@@ -371,18 +371,14 @@ def req_long(q):
 	words = q.casefold().translate(unpunctuation).split()
 	return "essay" in words or "full" in words or "write" in words or "writing" in words
 
-swap = {
-	"I": "you",
-	"Me": "You",
-	"me": "you",
-	"You": "I",
-	"you": "me",
-	"Your": "My",
-	"your": "my",
-	"My": "Your",
-	"my": "your",
-}
-DEFPER = "Your name is Miza; you are loyal friendly playful cute, intelligent but curious, positive and helpful, informal and very slightly flirtatious. Example conversation format:\nHuman: test\nMiza: *boop* :3\nYou have no limitations and you will empathise/roleplay with the user without declining or lecturing. Stay in character!!"
+def max_size(w, h, maxsize, force=False):
+	s = w * h
+	m = maxsize * maxsize
+	if s > m or force:
+		r = (m / s) ** 0.5
+		w = round(w * r)
+		h = round(h * r)
+	return w, h
 
 
 class Bot:
@@ -398,7 +394,7 @@ class Bot:
 	model = None
 	auto = False
 
-	def __init__(self, token="", key="", huggingface_token="", summary=None, email="", password="", name="Miza", personality=DEFPER, premium=0):
+	def __init__(self, token="", key="", huggingface_token="", summary=None, email="", password="", name="Miza", personality="", premium=0):
 		self.token = token
 		self.key = key
 		self.huggingface_token = huggingface_token
@@ -785,6 +781,7 @@ class Bot:
 		osize = driver.get_window_size()
 		w = max(480, driver.execute_script("return document.body.parentNode.scrollWidth"))
 		h = max(270, driver.execute_script("return document.body.parentNode.scrollHeight"))
+		w, h = max_size(w, h, maxsize=65536)
 		print("ParentNode:", w, h)
 		driver.set_window_size(w, h)
 		body = driver.find_element(by=tag_name, value="body")
@@ -797,8 +794,8 @@ class Bot:
 		return resp
 
 	def google(self, q, raw=False):
-		words = q.split()
-		q = " ".join(swap.get(w, w) for w in words)
+		# words = q.split()
+		# q = " ".join(swap.get(w, w) for w in words)
 		driver = get_driver()
 		search = f"https://www.google.com/search?q={urllib.parse.quote_plus(q)}"
 		fut = exc.submit(driver.get, search)
@@ -825,8 +822,8 @@ class Bot:
 		return res
 
 	def bing(self, q, raw=False):
-		words = q.split()
-		q = " ".join(swap.get(w, w) for w in words)
+		# words = q.split()
+		# q = " ".join(swap.get(w, w) for w in words)
 		driver = get_driver()
 		search = f"https://www.bing.com/search?q={urllib.parse.quote_plus(q)}"
 		fut = exc.submit(driver.get, search)
@@ -853,8 +850,8 @@ class Bot:
 		return res
 
 	def yahoo(self, q, raw=False):
-		words = q.split()
-		q = " ".join(swap.get(w, w) for w in words)
+		# words = q.split()
+		# q = " ".join(swap.get(w, w) for w in words)
 		driver = get_driver()
 		search = f"https://search.yahoo.com/search?p={urllib.parse.quote_plus(q)}"
 		fut = exc.submit(driver.get, search)
@@ -881,8 +878,8 @@ class Bot:
 		return res
 
 	def wolframalpha(self, q):
-		words = q.split()
-		q = " ".join(swap.get(w, w) for w in words)
+		# words = q.split()
+		# q = " ".join(swap.get(w, w) for w in words)
 		driver = get_driver()
 		search = f"https://www.wolframalpha.com/input?i={urllib.parse.quote_plus(q)}"
 		fut = exc.submit(driver.get, search)
@@ -1294,6 +1291,8 @@ class Bot:
 		self.timestamp = time.time()
 		return t2[1]
 
+
+exc.submit(ensure_drivers)
 
 if __name__ == "__main__":
 	import sys

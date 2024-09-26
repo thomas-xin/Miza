@@ -1,0 +1,171 @@
+{
+  "4": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Negative Prompt"
+    }
+  },
+  "5": {
+    "inputs": {
+      "seed": 47373905525817,
+      "steps": 5,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "normal",
+      "denoise": 1,
+      "model": [
+        "40",
+        0
+      ],
+      "positive": [
+        "44",
+        0
+      ],
+      "negative": [
+        "4",
+        0
+      ],
+      "latent_image": [
+        "36",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "7": {
+    "inputs": {
+      "samples": [
+        "5",
+        0
+      ],
+      "vae": [
+        "39",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "20": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 4
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "28": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "35": {
+    "inputs": {
+      "image": "1718655972010681.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "36": {
+    "inputs": {
+      "pixels": [
+        "38",
+        0
+      ],
+      "vae": [
+        "39",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  },
+  "38": {
+    "inputs": {
+      "amount": 4,
+      "image": [
+        "35",
+        0
+      ]
+    },
+    "class_type": "RepeatImageBatch",
+    "_meta": {
+      "title": "RepeatImageBatch"
+    }
+  },
+  "39": {
+    "inputs": {
+      "vae_name": "ae.sft",
+      "device": "cuda:6"
+    },
+    "class_type": "VAELoaderMultiGPU",
+    "_meta": {
+      "title": "Load VAE (Multi-GPU)"
+    }
+  },
+  "40": {
+    "inputs": {
+      "ckpt_name": "flux1SchnellMergedWith_v10.safetensors",
+      "device": "cuda:3"
+    },
+    "class_type": "CheckpointLoaderMultiGPU",
+    "_meta": {
+      "title": "Load Checkpoint (Multi-GPU)"
+    }
+  },
+  "42": {
+    "inputs": {
+      "clip_name1": "clip_l.safetensors",
+      "clip_name2": "t5xxl_fp16.safetensors",
+      "type": "flux",
+      "device": "cuda:5"
+    },
+    "class_type": "DualCLIPLoaderMultiGPU",
+    "_meta": {
+      "title": "DualCLIPLoader (Multi-GPU)"
+    }
+  },
+  "44": {
+    "inputs": {
+      "clip_l": "",
+      "t5xxl": "",
+      "guidance": 3.5,
+      "clip": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncodeFlux",
+    "_meta": {
+      "title": "CLIPTextEncodeFlux"
+    }
+  }
+}

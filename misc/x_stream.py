@@ -1,12 +1,21 @@
-import requests, logging, random, datetime, time, os, sys, re, json, concurrent.futures, urllib.parse
-import cherrypy as cp
+import datetime
+import json
+import logging
+import os
+import random
+import subprocess
+import time
 from traceback import print_exc
-url_unparse = urllib.parse.unquote_plus
+from urllib.parse import unquote_plus
+import cherrypy as cp
+from cherrypy._cpdispatch import Dispatcher
+import requests
+from misc.asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
+from misc.util import attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES
 
-exc = concurrent.futures.ThreadPoolExecutor(max_workers=128)
+tsubmit(eloop.run_forever)
 ADDRESS = "0.0.0.0"
 PORT = 443
-from cherrypy._cpdispatch import Dispatcher
 
 class EndpointRedirects(Dispatcher):
 
@@ -42,9 +51,11 @@ config = {
 		"request.dispatch": EndpointRedirects(),
 	},
 }
-if os.path.exists("domain.cert.pem") and os.path.exists("private.key.pem"):
-	config["global"]["server.ssl_certificate"] = "domain.cert.pem"
-	config["global"]["server.ssl_private_key"] = "private.key.pem"
+DOMAIN_CERT = "domain.cert.pem"
+PRIVATE_KEY = "private.key.pem"
+if os.path.exists(DOMAIN_CERT) and os.path.exists(PRIVATE_KEY):
+	config["global"]["server.ssl_certificate"] = DOMAIN_CERT
+	config["global"]["server.ssl_private_key"] = PRIVATE_KEY
 if os.path.exists("auth.json"):
 	with open("auth.json", "rb") as f:
 		AUTH = json.load(f)
@@ -68,51 +79,6 @@ CHEADERS = {"Cache-Control": "public, max-age=3600, stale-while-revalidate=10737
 SHEADERS = {"Cache-Control": "public, max-age=5, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
 CHEADERS.update(HEADERS)
 SHEADERS.update(HEADERS)
-
-MIMES = dict(
-	bin="application/octet-stream",
-	css="text/css",
-	json="application/json",
-	js="application/javascript",
-	txt="text/plain",
-	html="text/html",
-	svg="image/svg+xml",
-	ico="image/x-icon",
-	png="image/png",
-	jpg="image/jpeg",
-	gif="image/gif",
-	webp="image/webp",
-	webm="video/webm",
-	mp3="audio/mpeg",
-	ogg="audio/ogg",
-	opus="audio/opus",
-	flac="audio/flac",
-	wav="audio/x-wav",
-	mp4="video/mp4",
-)
-
-__scales = ("", "k", "M", "G", "T", "P", "E", "Z", "Y")
-
-def byte_scale(n, ratio=1024):
-	e = 0
-	while n >= ratio:
-		n /= ratio
-		e += 1
-		if e >= len(__scales) - 1:
-			break
-	return f"{round(n, 4)} {__scales[e]}"
-
-is_discord_attachment = lambda url: url and re.search("^https?:\\/\\/(?:[A-Za-z]{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/attachments\\/", url)
-def discord_expired(url):
-	if is_discord_attachment(url):
-		if "?ex=" not in url and "&ex=" not in url:
-			return True
-		temp = url.replace("?ex=", "&ex=").split("&ex=", 1)[-1].split("&", 1)[0]
-		try:
-			ts = int(temp, 16)
-		except ValueError:
-			return True
-		return ts < time.time() + 21600 + 60
 
 
 class Server:
@@ -165,7 +131,7 @@ class Server:
 						with self.session.get(irl, timeout=30) as resp:
 							info = resp.json()
 						self.ucache[irl] = [time.time(), info]
-					exc.submit(cache_temp)
+					esubmit(cache_temp)
 					info = self.ucache[irl][1]
 				else:
 					info = self.ucache[irl][1]
@@ -173,7 +139,7 @@ class Server:
 				mim = info["mimetype"]
 				attachment = filename or fn
 				size = info["size"]
-				a2 = url_unparse(attachment).removeprefix(".temp$@")
+				a2 = unquote_plus(attachment).removeprefix(".temp$@")
 				f_url = info["raw"]
 				description = mim + f", {byte_scale(size)}B"
 				meta = '<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">'
@@ -203,7 +169,7 @@ class Server:
 		return data
 
 	@cp.expose
-	def heartbeat(self, key, token="", channels="", uri=""):
+	def heartbeat(self, key, token="", channels="", uri="", domain_cert="", private_key="", **kwargs):
 		self.token = token or self.token
 		self.channels = channels.split(",") if channels else self.channels
 		assert key == discord_secret
@@ -217,6 +183,13 @@ class Server:
 			for k, v in tuple(self.ucache.items()):
 				if isinstance(v, list) and discord_expired(v[1]):
 					self.ucache.pop(k, None)
+		if domain_cert and private_key:
+			with open(DOMAIN_CERT, "w") as f:
+				f.write(domain_cert)
+			with open(PRIVATE_KEY, "w") as f:
+				f.write(PRIVATE_KEY)
+			subprocess.Popen()
+			cp.engine.exit()
 		return "💜"
 
 	@cp.expose
@@ -244,135 +217,27 @@ class Server:
 			self.cache[rpath] = b = f.read()
 		return b
 
-	uindex = 0
-	unproxying = []
-	unproxy_running = concurrent.futures.Future()
-	unproxy_running.set_result(None)
-	def unproxy_into(self, *urls):
-		self.unproxying.extend(urls)
-		if self.unproxy_running.done():
-			self.unproxy_running = concurrent.futures.Future()
-			exc.submit(self.unproxying_into)
-		return self.unproxy_running
-
-	def unproxying_into(self):
-		futs = []
-		while self.unproxying:
-			cid = self.channels[self.uindex % len(self.channels)]
-			self.uindex += 1
-			urllist, self.unproxying = self.unproxying[:10], self.unproxying[10:]
-			fut = exc.submit(self.unproxy_within, cid, urllist)
-			futs.append(fut)
-			time.sleep(1.5 / len(self.channels))
-		for fut in futs:
-			try:
-				fut.result()
-			except:
-				pass
-		try:
-			self.unproxy_running.set_result(None)
-		except concurrent.futures.InvalidStateError:
-			pass
-
-	def unproxy_within(self, cid, urllist):
-		try:
-			u2s = [url.split("?url=", 1)[-1].split("&", 1)[0] for url in urllist]
-			embeds = [dict(image=dict(url=url)) for url in u2s]
-			resp = requests.post(
-				f"https://discord.com/api/v10/channels/{cid}/messages",
-				data=json.dumps(dict(embeds=embeds)).encode("utf-8"),
-				headers={"Content-Type": "application/json", "Authorization": "Bot " + AUTH["alt_token"]},
-			)
-			resp.raise_for_status()
-			message = resp.json()
-			for irl, emb in zip(urllist, message["embeds"]):
-				self.ucache[irl] = [time.time(), emb["image"]["url"]]
-		except Exception as ex:
-			fut, self.unproxy_running = self.unproxy_running, concurrent.futures.Future()
-			try:
-				fut.set_exception(ex)
-			except concurrent.futures.InvalidStateError:
-				pass
-		else:
-			try:
-				fut.set_result(None)
-			except concurrent.futures.InvalidStateError:
-				pass
-
-	def cache_temp(self, irl, rpath, rquery):
-		headers = dict(cp.request.headers)
-		headers.pop("Connection", None)
-		headers.pop("Transfer-Encoding", None)
-		headers["X-Real-Ip"] = cp.request.remote.ip
-		url = None
-		try:
-			if self.token and "~" in rpath or "?url=" in rpath:
-				if "?url=" in irl:
-					fut = self.unproxy_into2(irl)
-					fut.result()
-					while irl not in self.ucache and not self.unproxy_running.done():
-						self.unproxy_running.result()
-					if irl not in self.ucache:
-						raise KeyError(irl)
-					return self.ucache[irl][1]
-				else:
-					import base64
-					c, m, a = rpath.lstrip("/").split("?", 1)[0].split(".", 1)[0].split("~")
-					c_id = int.from_bytes(base64.urlsafe_b64decode(c + "=="), "big")
-					m_id = int.from_bytes(base64.urlsafe_b64decode(m + "=="), "big")
-					a_id = int.from_bytes(base64.urlsafe_b64decode(a + "=="), "big")
-					with self.session.get(
-						f"https://discord.com/api/v10/channels/{c_id}/messages/{m_id}",
-						headers=dict(Authorization=f"Bot {self.token}"),
-					) as resp:
-						resp.raise_for_status()
-						attachments = resp.json()["attachments"]
-					for attachment in attachments:
-						if int(attachment["id"]) == a_id:
-							url = str(attachment["url"])
-							if discord_expired(url):
-								url = None
-			if not url:
-				if "?" in irl:
-					rquery = "&" + rquery.lstrip("?")
-				url = irl + rquery
-				with self.session.head(url, headers=headers, verify=False, allow_redirects=False, timeout=30) as resp:
-					resp.raise_for_status()
-					url = resp.headers.get("Location") or url
-		except Exception as ex:
-			print("Error:", repr(ex))
-			if irl in self.ucache:
-				url = self.ucache[irl][1]
-			else:
-				url = "https://mizabot.xyz/notfound.png"
-		self.ucache[irl] = [time.time(), url]
-		return url
+	def proxy_if(self, url):
+		if "Cf-Worker" in cp.request.headers and is_discord_attachment(url):
+			return self.proxy(url=url)
+		raise cp.HTTPRedirect(url, 307)
 
 	@cp.expose(("u",))
-	def unproxy(self, *path, **query):
+	def unproxy(self, *path, url=None, **query):
+		if url:
+			return self.proxy_if(url)
 		rpath = "/".join(path)
 		if rpath:
 			rpath = "/" + rpath
-		rquery = cp.request.query_string
-		equery = ""
-		if rquery:
-			rquery = "?" + rquery
-			if "url=" in rquery:
-				equery = "?url=" + rquery.split("url=", 1)[-1].split("&", 1)[0]
-				left, right = rquery.split("url=", 1)
-				rquery = (left.rstrip("?&") + "&" + right.split("&", 1)[-1]).rstrip("&")
-		irl = f"{self.state['/']}/u{rpath}{equery}"
-		if irl not in self.ucache or discord_expired(self.ucache[irl][1]) or (irl == self.ucache[irl][1] or self.ucache[irl][1] == "https://mizabot.xyz/notfound.png" and time.time() - self.ucache[irl][0] > 30):
-			url = self.cache_temp(irl, rpath, rquery)
-		elif time.time() - self.ucache[irl][0] > 86400:
-			exc.submit(self.cache_temp, irl, rpath, rquery)
-			url = self.ucache[irl][1]
-		else:
-			url = self.ucache[irl][1]
-		if rquery:
-			if "?" in url:
-				rquery = "&" + rquery.lstrip("?")
-			url += rquery
+		rquery = cp.request.query_string and "?" + cp.request.query_string
+		if len(path) == 1 and path[0].count("~") == 2:
+			fut = csubmit(attachment_cache.obtain(*path[0].rsplit(".", 1)[0].split("~", 2)))
+			return self.proxy_if(await_fut(fut))
+		if len(path) == 2 and path[0].count("~") == 0:
+			c_id, m_id, a_id, fn = decode_attachment("/".join(path))
+			fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
+			return self.proxy_if(await_fut(fut))
+		url = f"{self.state['/']}/u{rpath}{rquery}"
 		raise cp.HTTPRedirect(url, 307)
 
 	@cp.expose
@@ -418,7 +283,7 @@ class Server:
 			return "Expected proxy URL."
 		try:
 			body = cp.request.body.fp.read()
-		except:
+		except Exception:
 			print_exc()
 			body = None
 		headers = {
@@ -496,7 +361,7 @@ class Server:
 					end = int(end) + 1
 					length += end - start
 					ranges.append((start, end))
-			except:
+			except Exception:
 				pass
 		if ranges:
 			cp.response.status = 206
@@ -575,7 +440,7 @@ class Server:
 
 					if len(futs) > 1:
 						yield from futs.pop(0).result()
-					fut = exc.submit(get_chunk, u, headers, start, end, pos, ns, big)
+					fut = esubmit(get_chunk, u, headers, start, end, pos, ns, big)
 					futs.append(fut)
 					pos = 0
 					start = 0
@@ -591,7 +456,7 @@ if __name__ == "__main__":
 	logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(message)s')
 	app = Server()
 	self = server = cp.Application(app, "/", config)
-	# exc.submit(app.update_net)
+	# esubmit(app.update_net)
 	# if os.path.exists("x-distribute.py"):
 	# 	import subprocess
 	# 	subprocess.Popen([sys.executable, "x-distribute.py"])
