@@ -10,7 +10,7 @@ import cherrypy as cp
 from cherrypy._cpdispatch import Dispatcher
 import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
-from .util import attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
+from .util import AUTH, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
 
 csubmit(Request._init_())
 tsubmit(eloop.run_forever)
@@ -54,9 +54,7 @@ config = {
 if os.path.exists(DOMAIN_CERT) and os.path.exists(PRIVATE_KEY):
 	config["global"]["server.ssl_certificate"] = DOMAIN_CERT
 	config["global"]["server.ssl_private_key"] = PRIVATE_KEY
-if os.path.exists("auth.json"):
-	with open("auth.json", "rb") as f:
-		AUTH = json.load(f)
+if AUTH:
 	discord_secret = AUTH.get("discord_secret") or ""
 	webserver_port = AUTH.get("webserver_port") or "9801"
 else:
@@ -167,9 +165,9 @@ class Server:
 		return data
 
 	@cp.expose
-	def heartbeat(self, key, token="", channels="", uri="", domain_cert="", private_key="", **kwargs):
+	@cp.tools.json_in()
+	def heartbeat(self, key, token="", uri="", **kwargs):
 		self.token = token or self.token
-		self.channels = channels.split(",") if channels else self.channels
 		assert key == discord_secret
 		uri = uri or f"https://IP:{webserver_port}"
 		uri = uri.replace("IP", cp.request.remote.ip)
@@ -181,6 +179,12 @@ class Server:
 			for k, v in tuple(self.ucache.items()):
 				if isinstance(v, list) and discord_expired(v[1]):
 					self.ucache.pop(k, None)
+		domain_cert = cp.request.json.get("domain_cert")
+		private_key = cp.request.json.get("private_key")
+		self.channels = cp.request.json.get("channels") or self.channels
+		AUTH["discord_token"] = token
+		AUTH["proxy_channels"] = self.channels
+		save_auth("AUTH")
 		if domain_cert and private_key:
 			print("SSL:", domain_cert, private_key, sep="\n")
 			with open(DOMAIN_CERT, "w") as f:

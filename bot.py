@@ -6689,10 +6689,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				pk = f.read()
 		for addr in AUTH.get("remote_servers", ()):
 			token = AUTH.get("alt_token") or self.token
-			channels = ",".join(str(k) for k, v in bot.data.exec.items() if v & 16)
+			channels = [k for k, v in bot.data.exec.items() if v & 16]
 			fut = csubmit(Request(
-				f"https://{addr}/heartbeat?key={url_parse(key)}&token={token}&channels={channels}&uri={url_parse(uri)}",
-				data=dict(domain_cert=dc, private_key=pk),
+				f"https://{addr}/heartbeat?key={url_parse(key)}&token={token}&uri={url_parse(uri)}",
+				headers={"content-type": "application/json"},
+				data=orjson.dumps(dict(domain_cert=dc, private_key=pk, channels=channels)),
 				aio=True,
 				ssl=False,
 			))
