@@ -6675,6 +6675,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					with MemoryTimer("handle_update"):
 						await self.handle_update()
 
+	@tracebacksuppressor
 	async def worker_heartbeat(self):
 		futs = []
 		key = AUTH.get("discord_secret") or ""
@@ -6682,9 +6683,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		uri = "https://api.mizabot.xyz"
 		dc = pk = ""
 		if DOMAIN_CERT and PRIVATE_KEY:
-			with open(DOMAIN_CERT, "rb") as f:
+			with open(DOMAIN_CERT, "r", encoding="utf-8") as f:
 				dc = f.read()
-			with open(PRIVATE_KEY, "rb") as f:
+			with open(PRIVATE_KEY, "r", encoding="utf-8") as f:
 				pk = f.read()
 		for addr in AUTH.get("remote_servers", ()):
 			token = AUTH.get("alt_token") or self.token
@@ -6696,6 +6697,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				ssl=False,
 			))
 			futs.append(fut)
+		await gather(*futs)
 		return futs
 
 	async def global_loop(self):

@@ -50,6 +50,7 @@ PORT = AUTH.get("webserver_port") or 80
 IND = "\x7f"
 
 
+csubmit(Request._init_())
 tsubmit(eloop.run_forever)
 interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
 # print = interface.print
@@ -997,7 +998,7 @@ class Server:
 	def unproxy(self, *path, url=None, **kwargs):
 		if not url:
 			if len(path) == 1 and path[0].count("~") == 2:
-				fut = csubmit(attachment_cache.obtain(*path[0].rsplit(".", 1)[0].split("~", 2)))
+				fut = csubmit(attachment_cache.obtain(*path[0].rsplit(".", 1)[0].split("~", 2), ""))
 				return self.proxy_if(await_fut(fut))
 			if len(path) == 2 and path[0].count("~") == 0:
 				c_id, m_id, a_id, fn = decode_attachment("/".join(path))

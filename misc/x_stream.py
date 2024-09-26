@@ -10,8 +10,9 @@ import cherrypy as cp
 from cherrypy._cpdispatch import Dispatcher
 import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
-from .util import attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES
+from .util import attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES, Request
 
+csubmit(Request._init_())
 tsubmit(eloop.run_forever)
 ADDRESS = "0.0.0.0"
 PORT = 443
