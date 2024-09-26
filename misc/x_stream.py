@@ -233,7 +233,7 @@ class Server:
 			rpath = "/" + rpath
 		rquery = cp.request.query_string and "?" + cp.request.query_string
 		if len(path) == 1 and path[0].count("~") == 2:
-			fut = csubmit(attachment_cache.obtain(*path[0].rsplit(".", 1)[0].split("~", 2)))
+			fut = csubmit(attachment_cache.obtain(*path[0].split(".", 1)[0].split("~", 2)))
 			return self.proxy_if(await_fut(fut))
 		if len(path) == 2 and path[0].count("~") == 0:
 			c_id, m_id, a_id, fn = decode_attachment("/".join(path))
