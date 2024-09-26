@@ -3749,14 +3749,19 @@ def parse_ratelimit_header(headers) -> number:
 class ProxyManager:
 
 	def __init__(self):
-		from fp.fp import FreeProxy
+		try:
+			from fp.fp import FreeProxy
+		except Exception:
+			print_exc()
+			self.fp = None
+		else:
+			self.fp = FreeProxy()
 		self.ctime = 0
 		self.proxies = set()
 		self.ptime = 0
 		self.bad_proxies = set()
 		self.btime = 0
 		self.sem = Semaphore(2, inf, rate_limit=1)
-		self.fp = FreeProxy()
 
 	@property
 	def fresh(self) -> bool:
@@ -3765,6 +3770,8 @@ class ProxyManager:
 	def get_proxy(self, retry=True) -> str:
 		if self.fresh:
 			return random.choice(tuple(self.proxies))
+		if not self.fp:
+			return
 		with self.sem:
 			while not self.proxies or utc() - self.ptime > 240:
 				i = random.randint(1, 3)
