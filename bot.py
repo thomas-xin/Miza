@@ -1187,17 +1187,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return as_file(*args, **kwargs)
 
 	@functools.lru_cache(maxsize=64)
-	def preserve_attachment(self, a_id, ext=None):
-		if ext and "://" in ext:
-			u = ext.split("?", 1)[0].rsplit("/", 1)[-1]
+	def preserve_attachment(self, a_id, fn=None):
+		if fn and "://" in fn:
+			u = fn.split("?", 1)[0].rsplit("/", 1)[-1]
 			if "." in u:
-				ext = "." + u.rsplit(".", 1)[-1]
+				fn = "." + u.rsplit(".", 1)[-1]
 			else:
-				ext = ""
-		elif not ext:
-			ext = ""
-		elif "." not in ext:
-			ext = "." + ext
+				fn = ""
+		elif not fn:
+			fn = ""
+		elif "." not in fn:
+			fn = "." + fn
 		if is_url(a_id):
 			url = a_id
 			if is_discord_attachment(url):
@@ -1211,17 +1211,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.data.attachments[a_id] = url
 		return self.webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii") + ext
 
-	def preserve_into(self, c, m, a, ext=None):
-		if ext and "://" in ext:
-			u = ext.split("?", 1)[0].rsplit("/", 1)[-1]
+	def preserve_into(self, c, m, a, fn=None):
+		if fn and "://" in fn:
+			u = fn.split("?", 1)[0].rsplit("/", 1)[-1]
 			if "." in u:
-				ext = "." + u.rsplit(".", 1)[-1]
+				fn = "." + u.rsplit(".", 1)[-1]
 			else:
-				ext = ""
-		elif not ext:
-			ext = ""
-		elif "." not in ext:
-			ext = "." + ext
+				fn = ""
+		elif not fn:
+			fn = ""
+		elif "." not in fn:
+			fn = "." + fn
 		a_id = verify_id(a)
 		self.data.attachments[a_id] = (verify_id(c), verify_id(m))
 		return self.webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii") + ext
