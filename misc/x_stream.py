@@ -182,10 +182,11 @@ class Server:
 				if isinstance(v, list) and discord_expired(v[1]):
 					self.ucache.pop(k, None)
 		if domain_cert and private_key:
+			print("SSL:", domain_cert, private_key, sep="\n")
 			with open(DOMAIN_CERT, "w") as f:
 				f.write(domain_cert)
 			with open(PRIVATE_KEY, "w") as f:
-				f.write(PRIVATE_KEY)
+				f.write(private_key)
 		return "💜"
 
 	@cp.expose
