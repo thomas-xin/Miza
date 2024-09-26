@@ -6729,9 +6729,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							)
 					with MemoryTimer("update"):
 						await asubmit(self.update, priority=True)
-					for fut in futs:
-						with tracebacksuppressor:
-							await fut
 
 	@tracebacksuppressor
 	async def heartbeat(self):
