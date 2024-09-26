@@ -3941,7 +3941,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		return choice(self.sessions)
 
 	async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True, timeout=24) -> bytes | str | json_like:
-		self._init_()
+		await self._init_()
 		async with self.semaphore:
 			req = session or (self.sessions.next() if ssl else self.nossl)
 			resp = await req.request(method.upper(), url, headers=headers, data=data, timeout=timeout)
