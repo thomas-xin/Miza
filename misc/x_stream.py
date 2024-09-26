@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import random
-import subprocess
 import time
 from traceback import print_exc
 from urllib.parse import unquote_plus
@@ -188,8 +187,6 @@ class Server:
 				f.write(domain_cert)
 			with open(PRIVATE_KEY, "w") as f:
 				f.write(PRIVATE_KEY)
-			subprocess.Popen()
-			cp.engine.exit()
 		return "💜"
 
 	@cp.expose
@@ -456,9 +453,5 @@ if __name__ == "__main__":
 	logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(message)s')
 	app = Server()
 	self = server = cp.Application(app, "/", config)
-	# esubmit(app.update_net)
-	# if os.path.exists("x-distribute.py"):
-	# 	import subprocess
-	# 	subprocess.Popen([sys.executable, "x-distribute.py"])
 	cp.quickstart(server, "/", config)
 	# waitress.serve(server, threads=128, host=ADDRESS, port=PORT, url_scheme="https")
