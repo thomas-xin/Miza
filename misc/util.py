@@ -30,7 +30,10 @@ import filetype
 import nacl.secret
 import numpy as np
 import orjson
-import pynvml
+try:
+	import pynvml
+except Exception:
+	pynvml = None
 import requests
 import tiktoken
 from collections import deque
@@ -2712,7 +2715,7 @@ class AttachmentCache(Cache):
 	headers = {"Content-Type": "application/json", "Authorization": "Bot " + AUTH["discord_token"]}
 	alt_headers = {"Authorization": "Bot " + AUTH["alt_token"]}
 	exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-	sess = aiohttp.ClientSession()
+	sess = None
 	fut = None
 	queue = []
 	channels = set()
@@ -2801,6 +2804,7 @@ class AttachmentCache(Cache):
 	async def create(self, *data):
 		if not self.channels:
 			raise RuntimeError("Proxy channel list required.")
+		self.sess = self.sess or aiohttp.ClientSession()
 		form_data = aiohttp.FormData(quote_fields=False)
 		payload = dict(
 			content="test",
@@ -3914,6 +3918,8 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 
 	@tracebacksuppressor
 	async def _init_(self) -> "RequestManager":
+		if utc() - self.ts < 86400:
+			return self
 		if self.sessions:
 			for session in self.sessions:
 				await session.close()
@@ -3928,6 +3934,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		return choice(self.sessions)
 
 	async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True, timeout=24) -> bytes | str | json_like:
+		self._init_()
 		async with self.semaphore:
 			req = session or (self.sessions.next() if ssl else self.nossl)
 			resp = await req.request(method.upper(), url, headers=headers, data=data, timeout=timeout)

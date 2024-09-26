@@ -8952,7 +8952,6 @@ if __name__ == "__main__":
 				print("Logging started.")
 				initialise_ppe()
 				esubmit(proc_start)
-				csubmit(Request._init_())
 				discord.client._loop = eloop
 				self = miza = bot = client = BOT[0] = Bot()
 				miza.http.user_agent = "Miza"
