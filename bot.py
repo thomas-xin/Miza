@@ -6692,6 +6692,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			channels = [k for k, v in bot.data.exec.items() if v & 16]
 			fut = csubmit(Request(
 				f"https://{addr}/heartbeat?key={url_parse(key)}&token={token}&uri={url_parse(uri)}",
+				method="POST",
 				headers={"content-type": "application/json"},
 				data=orjson.dumps(dict(domain_cert=dc, private_key=pk, channels=channels)),
 				aio=True,

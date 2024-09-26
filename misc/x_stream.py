@@ -8,7 +8,6 @@ from traceback import print_exc
 from urllib.parse import unquote_plus
 import cherrypy as cp
 from cherrypy._cpdispatch import Dispatcher
-import orjson
 import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
 from .util import AUTH, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
@@ -180,7 +179,7 @@ class Server:
 			for k, v in tuple(self.ucache.items()):
 				if isinstance(v, list) and discord_expired(v[1]):
 					self.ucache.pop(k, None)
-		data = orjson.loads(cp.request.body.read())
+		data = cp.request.json or {}
 		domain_cert = data.get("domain_cert")
 		private_key = data.get("private_key")
 		self.channels = data.get("channels") or self.channels
