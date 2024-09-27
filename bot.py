@@ -6697,7 +6697,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				token=self.token,
 				alt_token=AUTH.get("alt_token") or self.token,
 			))
-			encoded = base64.b64encode(encrypt(data)).rstrip(b"=")
+			encoded = base64.b64encode(encrypt(data)).rstrip(b"=").decode("ascii")
 			fut = csubmit(Request(
 				f"https://{addr}/heartbeat?key={url_parse(key)}&uri={url_parse(uri)}",
 				method="POST",

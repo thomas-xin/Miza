@@ -181,7 +181,9 @@ class Server:
 				if isinstance(v, list) and discord_expired(v[1]):
 					self.ucache.pop(k, None)
 		data = cp.request.json or {}
-		data = decrypt(base64.b64decode(data["data"]))
+		data = decrypt(base64.b64decode(data["data"].encode("ascii") + b"=="))
+		if data:
+			print("Authorised:", data)
 		self.token = data.get("token") or self.token
 		self.alt_token = data.get("alt_token") or self.alt_token
 		domain_cert = data.get("domain_cert")
@@ -192,7 +194,6 @@ class Server:
 		AUTH["proxy_channels"] = self.channels
 		save_auth(AUTH)
 		if domain_cert and private_key:
-			print("SSL:", domain_cert, private_key, sep="\n")
 			with open(DOMAIN_CERT, "w") as f:
 				f.write(domain_cert)
 			with open(PRIVATE_KEY, "w") as f:
