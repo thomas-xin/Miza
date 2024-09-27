@@ -9,6 +9,7 @@ from traceback import print_exc
 from urllib.parse import unquote_plus
 import cherrypy as cp
 from cherrypy._cpdispatch import Dispatcher
+import orjson
 import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
 from .util import AUTH, decrypt, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
@@ -181,7 +182,7 @@ class Server:
 				if isinstance(v, list) and discord_expired(v[1]):
 					self.ucache.pop(k, None)
 		data = cp.request.json or {}
-		data = decrypt(base64.b64decode(data["data"].encode("ascii") + b"=="))
+		data = orjson.loads(decrypt(base64.b64decode(data["data"].encode("ascii") + b"==")))
 		if data:
 			print("Authorised:", data)
 		self.token = data.get("token") or self.token
