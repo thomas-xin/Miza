@@ -1631,7 +1631,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				else:
 					if preserve:
 						for a in m.attachments:
-							self.preserve_into(c.id, m.id, a.id, ext=a.url)
+							self.preserve_into(c.id, m.id, a.id, fn=a.url)
 					# All attachments should be valid URLs
 					if best:
 						found.extend(best_url(a) for a in m.attachments)

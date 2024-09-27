@@ -227,6 +227,7 @@ class Server:
 		return b
 
 	def proxy_if(self, url):
+		assert isinstance(url, str), url
 		if "Cf-Worker" in cp.request.headers and is_discord_attachment(url):
 			return self.proxy(url=url)
 		raise cp.HTTPRedirect(url, 307)
