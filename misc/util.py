@@ -2740,10 +2740,11 @@ class AttachmentCache(Cache):
 			embeds = [dict(image=dict(url=url)) for url in urls]
 			last = self.last
 			n = 0
+			resp = None
 			try:
 				if last:
-					tup = choice(self.last)
-					self.last.discard(tup)
+					tup = choice(last)
+					last.discard(tup)
 					cid, mid, n = tup
 					heads = self.alt_headers if n else self.headers
 					resp = requests.patch(
@@ -2764,6 +2765,7 @@ class AttachmentCache(Cache):
 				message = resp.json()
 				mid = message["id"]
 			except Exception as ex:
+				print(resp and resp.content)
 				for task in tasks:
 					task[0].set_exception(ex)
 				continue
