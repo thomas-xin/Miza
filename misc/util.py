@@ -2771,9 +2771,9 @@ class AttachmentCache(Cache):
 					task[0].set_exception(ex)
 				continue
 			last.add((cid, mid, n))
-			for (c, k) in tuple(last):
+			for (c, k, n) in tuple(last):
 				if utc() - snowflake_time_2(int(k)).timestamp() > 3600 * 12:
-					last.remove((c, k))
+					last.remove((c, k, n))
 			for task, emb in zip(tasks, message["embeds"]):
 				task[0].set_result(emb["image"]["url"])
 
