@@ -2739,11 +2739,13 @@ class AttachmentCache(Cache):
 			urls = [task[1].split("?url=", 1)[-1].split("&", 1)[0] for task in tasks]
 			embeds = [dict(image=dict(url=url)) for url in urls]
 			last = self.last
+			n = 0
 			try:
 				if last:
 					tup = choice(self.last)
 					self.last.discard(tup)
-					cid, mid, heads = tup
+					cid, mid, n = tup
+					heads = self.alt_headers if n else self.headers
 					resp = requests.patch(
 						f"https://discord.com/api/v10/channels/{cid}/messages/{mid}",
 						data=json_dumps(dict(embeds=embeds)),
@@ -2751,12 +2753,13 @@ class AttachmentCache(Cache):
 					)
 				else:
 					cid = choice(self.channels)
+					n = random.randint(0, 1)
+					heads = self.alt_headers if n else self.headers
 					resp = requests.post(
 						f"https://discord.com/api/v10/channels/{cid}/messages",
 						data=json_dumps(dict(embeds=embeds)),
 						headers=heads,
 					)
-					heads = choice((self.headers, self.alt_headers))
 				resp.raise_for_status()
 				message = resp.json()
 				mid = message["id"]
@@ -2764,7 +2767,7 @@ class AttachmentCache(Cache):
 				for task in tasks:
 					task[0].set_exception(ex)
 				continue
-			last.add((cid, mid, heads))
+			last.add((cid, mid, n))
 			for (c, k) in tuple(last):
 				if utc() - snowflake_time_2(int(k)).timestamp() > 3600 * 12:
 					last.remove((c, k))
