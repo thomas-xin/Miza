@@ -1771,7 +1771,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			emoji = e
 		return emoji.animated
 
-	async def proxy_emojis(self, msg, guild=None, user=None, is_webhook=False, return_pops=False, lim=1936):
+	async def proxy_emojis(self, msg, guild=None, user=None, is_webhook=False, return_pops=False, lim=400):
 		"Retrieves and maps user's emoji list on target string. Used for ~AutoEmoji and compatibility with other commands."
 		orig = self.bot.data.emojilists.get(user.id, {}) if user else {}
 		emojis = emoji = None
@@ -6179,13 +6179,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		try:
 			if fill:
 				while len(wlist) < fill:
-					data = self.avatar_data = data or await self.optimise_image(get_author(self.user).url, 1048576)
-					w = await channel.create_webhook(name=self.name, avatar=data, reason="Auto Webhook")
+					# data = self.avatar_data = data or await self.optimise_image(get_author(self.user).url, 1048576)
+					w = await channel.create_webhook(name=self.name, avatar=None, reason="Auto Webhook")
 					w = self.add_webhook(w)
 					wlist.append(w)
 			if not wlist:
-				data = self.avatar_data = data or await self.optimise_image(get_author(self.user).url, 1048576)
-				w = await channel.create_webhook(name=self.name, avatar=data, reason="Auto Webhook")
+				# data = self.avatar_data = data or await self.optimise_image(get_author(self.user).url, 1048576)
+				w = await channel.create_webhook(name=self.name, avatar=None, reason="Auto Webhook")
 				w = self.add_webhook(w)
 			else:
 				wlist.sort(key=lambda w: (getattr(w, "user", None) != self.user, random.random()), reverse=True)
@@ -6196,9 +6196,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				wlist = await self.load_channel_webhooks(channel, force=True, bypass=bypass)
 				wlist.sort(key=lambda w: (getattr(w, "user", None) != self.user, random.random()), reverse=True)
 				w = wlist[0]
-		if not w.avatar or str(w.avatar) == "https://cdn.discordapp.com/embed/avatars/0.png":
-			data = self.avatar_data = data or await self.optimise_image(get_author(self.user).url, 1048576, fmt="webp", anim=False)
-			return await w.edit(name=self.name, avatar=data)
+		# if not w.avatar or str(w.avatar) == "https://cdn.discordapp.com/embed/avatars/0.png":
+		# 	data = self.avatar_data = data or await self.optimise_image(get_author(self.user).url, 1048576, fmt="webp", anim=False)
+		# 	return await w.edit(name=self.name, avatar=data)
 		return w
 
 	async def send_as_webhook(self, channel, *args, recurse=True, **kwargs):
@@ -6690,11 +6690,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		for addr in AUTH.get("remote_servers", ()):
 			token = AUTH.get("alt_token") or self.token
 			channels = [k for k, v in bot.data.exec.items() if v & 16]
+			data = orjson.dumps(dict(
+				domain_cert=dc,
+				private_key=pk,
+				channels=channels,
+				token=self.token,
+				alt_token=AUTH.get("alt_token") or self.token,
+			))
+			encoded = base64.b64encode(encrypt(data)).rstrip(b"=")
 			fut = csubmit(Request(
-				f"https://{addr}/heartbeat?key={url_parse(key)}&token={token}&uri={url_parse(uri)}",
+				f"https://{addr}/heartbeat?key={url_parse(key)}&uri={url_parse(uri)}",
 				method="POST",
 				headers={"content-type": "application/json"},
-				data=orjson.dumps(dict(domain_cert=dc, private_key=pk, channels=channels)),
+				data=orjson.dumps(dict(data=encoded)),
 				aio=True,
 				ssl=False,
 			))

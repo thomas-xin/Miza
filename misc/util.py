@@ -2712,8 +2712,10 @@ api = "v10"
 class AttachmentCache(Cache):
 	min_size = 262144
 	max_size = 25165824
-	headers = {"Content-Type": "application/json", "Authorization": "Bot " + AUTH["discord_token"]}
-	alt_headers = {"Authorization": "Bot " + AUTH["alt_token"]}
+	discord_token = AUTH["discord_token"]
+	alt_token = AUTH.get("alt_token", discord_token)
+	headers = {"Content-Type": "application/json", "Authorization": "Bot " + discord_token}
+	alt_headers = {"Authorization": "Bot " + alt_token}
 	exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 	sess = None
 	fut = None
@@ -2767,10 +2769,13 @@ class AttachmentCache(Cache):
 				task[0].set_result(emb["image"]["url"])
 
 	async def get_attachment(self, c_id, m_id, a_id, fn):
+		heads = self.headers if c_id not in self.channels else self.alt_headers
 		if not self.channels or not fn:
+			if not m_id:
+				raise LookupError("Insufficient information to retrieve attachment.")
 			data = await Request(
 				f"https://discord.com/api/v10/channels/{c_id}/messages/{m_id}",
-				headers=self.headers,
+				headers=heads,
 				bypass=False,
 				aio=True,
 				json=True,
@@ -2823,7 +2828,8 @@ class AttachmentCache(Cache):
 			)
 		cid = choice(self.channels)
 		url = f"https://discord.com/api/v10/channels/{cid}/messages"
-		resp = await self.sess.request("POST", url, headers=self.alt_headers, data=form_data, timeout=120)
+		heads = choice((self.headers, self.alt_headers))
+		resp = await self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
 		data = await resp.json()
 		cid = int(data["channel_id"])
 		mid = int(data["id"])

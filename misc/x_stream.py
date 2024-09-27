@@ -1,3 +1,4 @@
+import base64
 import datetime
 import json
 import logging
@@ -10,7 +11,7 @@ import cherrypy as cp
 from cherrypy._cpdispatch import Dispatcher
 import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
-from .util import AUTH, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
+from .util import AUTH, decrypt, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
 
 csubmit(Request._init_())
 tsubmit(eloop.run_forever)
@@ -80,6 +81,7 @@ SHEADERS.update(HEADERS)
 class Server:
 
 	token = ""
+	alt_token = ""
 	channels = []
 	cache = {}
 	ucache = {}
@@ -166,8 +168,7 @@ class Server:
 
 	@cp.expose
 	@cp.tools.json_in()
-	def heartbeat(self, key, token="", uri="", **kwargs):
-		self.token = token or self.token
+	def heartbeat(self, key, uri="", **kwargs):
 		assert key == discord_secret
 		uri = uri or f"https://IP:{webserver_port}"
 		uri = uri.replace("IP", cp.request.remote.ip)
@@ -180,10 +181,14 @@ class Server:
 				if isinstance(v, list) and discord_expired(v[1]):
 					self.ucache.pop(k, None)
 		data = cp.request.json or {}
+		data = decrypt(base64.b64decode(data["data"]))
+		self.token = data.get("token") or self.token
+		self.alt_token = data.get("alt_token") or self.alt_token
 		domain_cert = data.get("domain_cert")
 		private_key = data.get("private_key")
 		self.channels = data.get("channels") or self.channels
-		AUTH["discord_token"] = token
+		AUTH["discord_token"] = self.token
+		AUTH["alt_token"] = self.alt_token
 		AUTH["proxy_channels"] = self.channels
 		save_auth(AUTH)
 		if domain_cert and private_key:
