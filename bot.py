@@ -5191,13 +5191,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					kwargs[k] = [r] if v.get("multiple") else r
 					continue
 				raise ArgumentError(f"Argument {k} ({v.description}) is required.")
+		oj = 0
 		pops = []
 		for i, a in enumerate(args):
 			for k, v in schema.items():
 				if k in kwargs and not v.get("multiple"):
 					if v.type in ("text", "string"):
 						if a in oargs:
-							j = oargs.index(a)
+							j = oargs.index(a, oj)
+							oj = j
 							kwargs[k] = (kwargs.get(k) or "") + ws[j] + a
 							append_lws = (k, j + 1)
 							pops.append(i)
@@ -5235,13 +5237,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				pops.append(i)
 				break
 		args.pops(pops)
+		oj = 0
 		pops = []
 		for i, a in enumerate(args):
 			for k, v in schema.items():
 				if k in kwargs and not v.get("multiple"):
 					if v.type in ("text", "string"):
 						if a in oargs:
-							j = oargs.index(a)
+							j = oargs.index(a, oj)
+							oj = j
 							kwargs[k] = (kwargs.get(k) or "") + ws[j] + a
 							append_lws = (k, j + 1)
 							pops.append(i)
@@ -5270,13 +5274,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				pops.append(i)
 				break
 		args.pops(pops)
+		oj = 0
 		pops = []
 		for i, a in enumerate(args):
 			for k, v in schema.items():
 				if k in kwargs and not v.get("multiple"):
 					if v.type in ("word", "text", "string"):
 						if a in oargs:
-							j = oargs.index(a)
+							j = oargs.index(a, oj)
+							oj = j
 							kwargs[k] = (kwargs.get(k) or "") + ws[j] + a
 							append_lws = (k, j + 1)
 							pops.append(i)
