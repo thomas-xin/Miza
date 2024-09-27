@@ -2765,7 +2765,8 @@ class AttachmentCache(Cache):
 				message = resp.json()
 				mid = message["id"]
 			except Exception as ex:
-				print(resp and resp.content)
+				if resp is not None:
+					print(resp.content)
 				for task in tasks:
 					task[0].set_exception(ex)
 				continue
