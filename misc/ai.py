@@ -400,7 +400,15 @@ decensor = regexp(r"(?:i am unable to|i'm unable to|i cannot|i can't|i am not ab
 
 def nsfw_flagged(resp):
 	cat = resp.categories
-	return cat.harassment or cat.hate or cat.sexual or cat.self_harm or cat.violence_graphic
+	flagged = ("harassment", "hate", "sexual", "self_harm", "violence_graphic", "illicit_violent")
+	found = []
+	for flag in flagged:
+		if getattr(cat, flag):
+			score = getattr(resp.category_scores, flag)
+			found.append((score, flag + f"({round(score * 100)}%)"))
+	if not found:
+		return
+	return max(found)[-1]
 
 def m_repr(m):
 	if not isinstance(m, dict):
@@ -2404,13 +2412,21 @@ async def collect_stream(resp):
 
 cache = CACHE = Cache(timeout=86400 * 14, persist="ai.cache")
 
-async def moderate(input="", premium_context=[]):
-	if isinstance(input, (tuple, list)):
-		input = instruct_structure(input, fmt="chatml")
-	input = as_str(input)
-	async def moderate_into(input):
-		resp = await get_oai("moderations.create")(input=input)
+async def moderate(text="", image="", input="", premium_context=[]):
+	if isinstance(text, (tuple, list)):
+		text = instruct_structure(text, fmt="chatml")
+	text = lim_tokens(as_str(text), 24576)
+	async def moderate_into(text, image):
+		if not image:
+			input = text
+		else:
+			input = []
+			if text:
+				input.append(dict(type="text", text=text))
+			if image:
+				input.append(dict(type="image_url", image_url=dict(url=image)))
+		resp = await get_oai("moderations.create")(model="omni-moderation-latest", input=input)
 		premium_context.append(["openai", resp.model, "0.00001"])
 		return resp
-	resp = await CACHE.retrieve_from("moderate-" + shash(input), moderate_into, input)
+	resp = await CACHE.retrieve_from("moderate-" + shash(text) + "-" + shash(image), moderate_into, text, image)
 	return resp.results[0]

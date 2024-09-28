@@ -7,7 +7,7 @@ import os
 print("BOT:", __name__)
 if __name__ != "__mp_main__":
 	os.environ["IS_BOT"] = "1"
-import misc.common as common
+from misc import common, asyncs
 from misc.common import * # noqa: F403
 import pdb
 
@@ -1991,7 +1991,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			mod2 = kwargs.get("messages")
 			pc = kwargs.get("premium_context", [])
 			futs = [ai.moderate(mod1, premium_context=pc), ai.moderate(mod2, premium_context=pc)]
-			r1, r2 = await gather(futs)
+			r1, r2 = await gather(*futs)
 			is_nsfw = nsfw_flagged(r1) or nsfw_flagged(r2)
 		if is_nsfw:
 			models = reversed(models)
@@ -2913,9 +2913,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		sizelim = 82944 if small else 1638400
 		dimlim = 256 if small else 1024
 		if isinstance(url, str):
-			if url.startswith("data:") or not is_url(url):
+			if url.startswith("data:"):
 				return url
-			_resp, mime, name, d = await self.req_data(url, screenshot=True)
+			if not is_url(url):
+				if not os.path.exists(url):
+					return url
+				with open(url, "rb") as f:
+					d = await asubmit(f.read)
+				mime = magic.from_buffer(d)
+				name = url.replace("\\", "/").rsplit("/", 1)
+			else:
+				_resp, mime, name, d = await self.req_data(url, screenshot=True)
 			lim = 5 * 1048576 * 3 / 4
 			p = 2 if len(d) > 1048576 else 0
 			if mime not in ("image/png", "image/gif", "image/jpeg", "image/webp") or len(d) > lim or np.prod(await asubmit(get_image_size, d, priority=p)) > sizelim:
@@ -8977,9 +8985,9 @@ if __name__ == "__main__":
 				sub_kill(start=False, force=True)
 			sys.__stdout__.write("MAIN PROCESS EXITING...")
 			common.MEM_LOCK.close()
-			athreads.shutdown(wait=False)
-			bthreads.shutdown(wait=False)
-			pthreads.shutdown(wait=False)
-			mthreads.shutdown(wait=False)
+			misc.asyncs.athreads.shutdown(wait=False)
+			misc.asyncs.bthreads.shutdown(wait=False)
+			misc.asyncs.pthreads.shutdown(wait=False)
+			misc.asyncs.mthreads.shutdown(wait=False)
 	print = _print
 	sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__

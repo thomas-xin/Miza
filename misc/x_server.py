@@ -997,7 +997,7 @@ class Server:
 				return False
 			if "Cf-Worker" in cp.request.headers:
 				return True
-			if cp.request.headers.get("Referer") == "https://toyhou.se/":
+			if cp.request.headers.get("Referer"):
 				return True
 			return False
 

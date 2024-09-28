@@ -950,7 +950,7 @@ class Imagine(Command):
 			flagged = nsfw_flagged(resp)
 			if not nsfw and flagged:
 				raise PermissionError(
-					"Apologies, my AI has detected that your input may be inappropriate.\n"
+					f"Apologies, my AI has detected that your input may be inappropriate: {flagged}.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
 			if flagged:
