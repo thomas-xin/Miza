@@ -991,7 +991,17 @@ class Server:
 
 	def proxy_if(self, url):
 		assert isinstance(url, str), url
-		if "Cf-Worker" in cp.request.headers and is_discord_attachment(url):
+
+		def requires_proxy():
+			if not is_discord_attachment(url):
+				return False
+			if "Cf-Worker" in cp.request.headers:
+				return True
+			if cp.request.headers.get("Referer") == "https://toyhou.se/":
+				return True
+			return False
+
+		if requires_proxy():
 			return self.proxy(url=url)
 		raise cp.HTTPRedirect(url, 307)
 

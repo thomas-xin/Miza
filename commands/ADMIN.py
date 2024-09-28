@@ -2546,9 +2546,9 @@ class UpdateUserLogs(Database):
 				for i, url in enumerate(urls):
 					if url:
 						if i:
-							a_url = url + (".gif" if a_url.split("?", 1)[0].endswith(".gif") else "")
+							a_url = url
 						else:
-							b_url = url + (".gif" if b_url.split("?", 1)[0].endswith(".gif") else "")
+							b_url = url
 			emb.add_field(
 				name="Icon",
 				value=f"[Before]({b_url}) ➡️ [After]({a_url})",
