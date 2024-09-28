@@ -2816,8 +2816,9 @@ class AttachmentCache(Cache):
 			m_id = int.from_bytes(base64.urlsafe_b64decode(m_id + "=="), "big")
 			a_id = int.from_bytes(base64.urlsafe_b64decode(a_id + "=="), "big")
 		try:
-			return self[a_id]
-		except KeyError:
+			resp = self[a_id]
+			assert isinstance(resp, str) and not discord_expired(resp)
+		except (KeyError, AssertionError):
 			return await self.retrieve_from(a_id, self.get_attachment, c_id, m_id, a_id, fn)
 
 	async def create(self, *data):
