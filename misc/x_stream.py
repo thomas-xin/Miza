@@ -12,7 +12,7 @@ from cherrypy._cpdispatch import Dispatcher
 import orjson
 import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
-from .util import AUTH, decrypt, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY, CacheItem
+from .util import AUTH, decrypt, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
 
 csubmit(Request._init_())
 tsubmit(eloop.run_forever)
@@ -227,8 +227,6 @@ class Server:
 		return b
 
 	def proxy_if(self, url):
-		if isinstance(url, CacheItem):
-			print(url.value)
 		assert isinstance(url, str), url
 		if "Cf-Worker" in cp.request.headers and is_discord_attachment(url):
 			return self.proxy(url=url)

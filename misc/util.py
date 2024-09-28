@@ -2715,7 +2715,7 @@ class AttachmentCache(Cache):
 	discord_token = AUTH["discord_token"]
 	alt_token = AUTH.get("alt_token", discord_token)
 	headers = {"Content-Type": "application/json", "Authorization": "Bot " + discord_token}
-	alt_headers = {"Authorization": "Bot " + alt_token}
+	alt_headers = {"Content-Type": "application/json", "Authorization": "Bot " + alt_token}
 	exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 	sess = None
 	fut = None
@@ -2770,12 +2770,17 @@ class AttachmentCache(Cache):
 				for task in tasks:
 					task[0].set_exception(ex)
 				continue
-			last.add((cid, mid, n))
-			for (c, k, n) in tuple(last):
-				if utc() - snowflake_time_2(int(k)).timestamp() > 3600 * 12:
-					last.remove((c, k, n))
+			esubmit(self.set_last, (cid, mid, n))
 			for task, emb in zip(tasks, message["embeds"]):
 				task[0].set_result(emb["image"]["url"])
+
+	def set_last(self, tup):
+		time.sleep(1)
+		last = self.last
+		last.add(tup)
+		for (c, k, n) in tuple(last):
+			if utc() - snowflake_time_2(int(k)).timestamp() > 3600 * 12:
+				last.remove((c, k, n))
 
 	async def get_attachment(self, c_id, m_id, a_id, fn):
 		heads = self.headers if c_id not in self.channels else self.alt_headers
