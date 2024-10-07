@@ -497,7 +497,9 @@
 				"\ud83d\udcc2",
 				"Magic",
 				"Mime",
+				"MimeType",
 				"FileType",
+				"FileInfo",
 				"IdentifyFiles"
 			],
 			"description": "Detects the type, mime, and optionally details of an input file.",
@@ -1890,15 +1892,16 @@
 			"example": [],
 			"timeout": "24"
 		},
-		"Premium": {
+		"Stats": {
 			"aliases": [
-				"Premium",
+				"Stats",
 				"Level",
 				"Bal",
 				"Balance",
-				"Wallet"
+				"Wallet",
+				"premium"
 			],
-			"description": "Shows the target users' wallet, and their premium subscription status (if applicable).",
+			"description": "Shows the target users' stats, and their wallet and premium subscription status (if applicable).",
 			"usage": "",
 			"level": "0",
 			"rate_limit": "(3, 4)",

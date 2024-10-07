@@ -2593,10 +2593,17 @@ class UpdateDailies(Database):
 			self.progress_quests(message.author, "reacted")
 
 
-class Premium(Command):
+class Stats(Command):
 	name = ["Level", "Bal", "Balance", "Wallet"]
-	description = "Shows the target users' wallet, and their premium subscription status (if applicable)."
+	description = "Shows the target users' stats, and their wallet and premium subscription status (if applicable)."
 	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("wallet", "premium"),
+			),
+			default="wallet",
+		),
 		user=cdict(
 			type="user",
 			description="User to view",
@@ -2611,12 +2618,17 @@ class Premium(Command):
 			example="all",
 		),
 	)
+	macros = cdict(
+		premium=cdict(
+			mode="premium",
+		),
+	)
 	rate_limit = (3, 4)
 	multi = True
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, bot, _guild, _channel, _message, _perm, _user, user, logging, **void):
+	async def __call__(self, bot, _guild, _channel, _message, _perm, _user, mode, user, logging, **void):
 		user = user or _user
 		data = bot.data.users.get(user.id, {})
 		if logging:
@@ -2642,45 +2654,46 @@ class Premium(Command):
 		if ingots:
 			ingot = await bot.data.emojis.emoji_as("gold_ingot.gif")
 			description += f" {ingot} {ingots}"
-		lv = bot.premium_level(user)
-		lv2 = bot.premium_level(user, absolute=True)
-		if lv2 > 5:
-			lv2 = 5
-		if lv2 > 0:
-			description += f"\n{bot.name} Premium Supporter Lv{lv2} " + "💎" * lv2
-		elif lv > 0:
-			description += f"\n{bot.name} Trial Supporter Lv{lv} " + "💎" * lv
-		nc = "\n"
-		if data.get("payg") and data.get("usages"):
-			totals = {}
-			c = mpf(0)
-			for tup in data["usages"]:
-				t = str(tup[1]) + ":" + str(tup[2])
-				v = mpf(tup[-1])
-				try:
-					totals[t] += v
-				except KeyError:
-					totals[t] = v
-				c += v
-			description += f"\nPremium invoice pending: `${c}`: {ini_md(iter2str(totals))}"
-			nc = " "
-		elif data.get("credit"):
-			c = data["credit"]
-			q = round(mpf(c) * 1000)
-			description += f"\nPremium credit remaining: `{q}` (`${c}`)"
-		else:
-			premium = bot.premium_context(user, _guild)
-			premium.require(0)
-			freebies = T(data).coerce("freebies", list, [])
-			freelim = bot.premium_limit(premium.value)
-			q = max(0, freelim - len(freebies))
-			c = mpf(q) / 1000
-			if freebies:
-				s = f", next refresh {time_repr(86400 + freebies[0])}"
+		if mode == "premium":
+			lv = bot.premium_level(user)
+			lv2 = bot.premium_level(user, absolute=True)
+			if lv2 > 5:
+				lv2 = 5
+			if lv2 > 0:
+				description += f"\n{bot.name} Premium Supporter Lv{lv2} " + "💎" * lv2
+			elif lv > 0:
+				description += f"\n{bot.name} Trial Supporter Lv{lv} " + "💎" * lv
+			nc = "\n"
+			if data.get("payg") and data.get("usages"):
+				totals = {}
+				c = mpf(0)
+				for tup in data["usages"]:
+					t = str(tup[1]) + ":" + str(tup[2])
+					v = mpf(tup[-1])
+					try:
+						totals[t] += v
+					except KeyError:
+						totals[t] = v
+					c += v
+				description += f"\nPremium invoice pending: `${c}`: {ini_md(iter2str(totals))}"
+				nc = " "
+			elif data.get("credit"):
+				c = data["credit"]
+				q = round(mpf(c) * 1000)
+				description += f"\nPremium credit remaining: `{q}` (`${c}`)"
 			else:
-				s = ""
-			description += f"\nPremium credit remaining: `{q}` (`${c}`){s}"
-		description += f"{nc}Premium logging mode: `{data.get('logging', 'auto')}`"
+				premium = bot.premium_context(user, _guild)
+				premium.require(0)
+				freebies = T(data).coerce("freebies", list, [])
+				freelim = bot.premium_limit(premium.value)
+				q = max(0, freelim - len(freebies))
+				c = mpf(q) / 1000
+				if freebies:
+					s = f", next refresh {time_repr(86400 + freebies[0])}"
+				else:
+					s = ""
+				description += f"\nPremium credit remaining: `{q}` (`${c}`){s}"
+			description += f"{nc}Premium logging mode: `{data.get('logging', 'auto')}`"
 		sparkles = data.get("sparkles", 0)
 		if sparkles:
 			items = deque()

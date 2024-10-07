@@ -1322,20 +1322,187 @@ def gifsicle(out, info=None):
 			return out2
 	return out
 
-def save_into(im, size, fmt, fs, r=0):
+def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, vf=""):
+	anim = count > 1
+	command = []
+	if fmt in ("gif", "apng"):
+		command.extend(("-gifflags", "-offsetting"))
+		if (w, h) != first.size:
+			vf += f"scale={w}:{h}:flags=area,"
+			if mode == "rgba":
+				vf += "format=rgba,"
+		vf += "split[s0][s1];[s0]palettegen="
+		if mode == "RGBA":
+			vf += "reserve_transparent=1:"
+		else:
+			vf += "reserve_transparent=0:"
+		if opt and first.width * first.height <= 16384:
+			frames = list(frames)
+			new["frames"] = frames
+			fr = frames.copy()
+			first = fr.pop(0)
+			last = fr.pop(-1)
+			cols = set()
+			cols.add((0, 0, 0))
+			random.shuffle(fr)
+			fr = [first, last, *fr]
+			c = min(len(fr), max(5, floor(sqrt(len(fr)))))
+			for i, f in enumerate(fr[:c]):
+				if isinstance(f, Image.Image):
+					im = f.resize((7, 7), resample=Resampling.NEAREST)
+					R, G, B = np.asanyarray(im).T[:3]
+					for r, g, b in zip(R.ravel(), G.ravel(), B.ravel()):
+						l = max(r, g, b)
+						if l < 1:
+							continue
+						t = tuple(min(255, round(log2(x / l * 255 + 1) * 8) * 4) for x in (r, g, b))
+						if t not in cols:
+							cols.add(t)
+			mc = min(128, max(4, 2 ** ceil(log2(len(cols)) + 1)))
+			vf += f"max_colors={mc}:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra3:diff_mode=rectangle"
+		elif count > 4096:
+			vf += "max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle"
+		else:
+			vf += "stats_mode=diff[p];[s1][p]paletteuse=dither=sierra3:diff_mode=rectangle"
+		if "A" in mode:
+			vf += ":alpha_threshold=128"
+		if vf:
+			command.extend(("-vf", vf))
+		if anim:
+			if fmt == "apng":
+				command.extend(("-plays", "0"))
+			else:
+				command.extend(("-loop", "0"))
+		command.extend(("-f", fmt))
+	elif fmt == "avif":
+		lossless = not anim and not opt
+		if not anim:
+			command.extend(("-vframes", "1", "-r", "1"))
+		if (w, h) != first.size:
+			vf += f"scale={w}:{h}:flags=area"
+			if mode == "RGBA":
+				vf += "format=rgba,"
+		bitrate = min(floor(fs / duration * 1000 * 7.5), 99999999) # use 7.5 bits per byte
+		pix = "rgb24" if lossless else "yuv420p"
+		if mode == "RGBA":
+			cv = ("-c:v:0", "libsvtav1", "-pix_fmt:v:0", "yuv420p") if not h & 1 and not w & 1 else ("-c:v:0", "libaom-av1", "-pix_fmt:v:0", pix, "-usage", "realtime", "-cpu-used", "3")
+			b1 = floor(bitrate * 3 / 4)
+			b2 = floor(bitrate / 4)
+			command.extend(("-filter_complex", vf + "[scaled];" + "[scaled]split=2[v1][v2];[v2]alphaextract[v2]", "-map", "[v1]", "-map", "[v2]", "-f", "avif", *cv, "-b:v:0", str(b1), "-c:v:1", "libaom-av1", "-pix_fmt:1", "gray", "-b:v:1", str(b2), "-usage", "realtime", "-cpu-used", "3", "-y", "-g", "300"))
+		else:
+			if vf:
+				command.extend(("-vf", vf))
+			cv = ("-c:v", "libsvtav1", "-pix_fmt", "yuv420p") if not h & 1 and not w & 1 else ("-c:v", "libaom-av1", "-pix_fmt", pix, "-usage", "realtime", "-cpu-used", "3")
+			command.extend(("-f", "avif", *cv, "-b:v", str(bitrate)))
+		if anim:
+			command.extend(("-loop", "0", "-q:v", "24"))
+		elif lossless:
+			command.extend(("-lossless", "1"))
+		else:
+			command.extend(("-q:v", "24"))
+	elif fmt == "webp":
+		lossless = not anim and not opt
+		if not anim:
+			command.extend(("-vframes", "1", "-r", "1"))
+		if (w, h) != first.size:
+			vf += f"scale={w}:{h}:flags=area,"
+			if mode == "rgba":
+				vf += "format=rgba"
+			command.extend(("-vf", vf))
+		pix = ("rgba" if lossless else "yuva420p") if mode == "RGBA" else ("rgb24" if lossless else "yuv420p")
+		if mode == "RGBA":
+			command.extend(("-c:v", "libwebp_anim" if anim else "libwebp", "-pix_fmt", pix, "-pred", "mixed"))
+		else:
+			command.extend(("-c:v", "libwebp_anim" if anim else "libwebp", "-pix_fmt", pix, "-pred", "mixed"))
+		command.extend(("-f", "webp", "-compression_level", "6"))
+		if anim:
+			command.extend(("-loop", "0", "-q:v", "24"))
+		elif lossless:
+			command.extend(("-lossless", "1"))
+		else:
+			command.extend(("-q:v", "24"))
+	elif fmt == "png":
+		command.extend(("-vframes", "1"))
+		if (w, h) != first.size:
+			vf += f"scale={w}:{h}:flags=area,"
+			if mode == "rgba":
+				vf += "format=rgba"
+			command.extend(("-vf", vf))
+		if mode == "RGBA":
+			command.extend(("-c:v", "png", "-pix_fmt", "rgba", "-pred", "mixed", "-compression_level", "6"))
+		else:
+			command.extend(("-c:v", "png", "-pix_fmt", "rgb24", "-pred", "mixed", "-compression_level", "6"))
+		command.extend(("-f", "image2pipe"))
+	elif fmt == "jpg":
+		command.extend(("-vframes", "1"))
+		if (w, h) != first.size:
+			vf += f"scale={w}:{h}:flags=area"
+			command.extend(("-vf", vf))
+		if mode == "RGBA":
+			command.extend(("-c:v", "mjpeg", "-pix_fmt", "yuva420p", "-pred", "mixed"))
+		else:
+			command.extend(("-c:v", "mjpeg", "-pix_fmt", "yuv420p", "-pred", "mixed"))
+		command.extend(("-f", "image2pipe"))
+	else:
+		if (w, h) != first.size:
+			vf += f"scale={w}:{h}:flags=area,"
+			if mode == "rgba":
+				vf += "format=rgba"
+			command.extend(("-vf", vf))
+		if getattr(first, "audio", None):
+			command.extend(("-i", first.audio["url"]))
+			if first.audio["codec"] not in ("mp3", "mpeg", "ogg", "opus", "aac"):
+				command.extend(("-c:a", "libopus", "-b:a", "224k"))
+			else:
+				command.extend(("-c:a", "copy"))
+		else:
+			command.extend(("-c:a", "copy"))
+		if first.width & 1 or first.height & 1:
+			w = round(first.width / 2) * 2
+			h = round(first.height / 2) * 2
+			command.extend(("-vf", f"scale={w}:{h}:flags=bicubic"))
+		bitrate = min(floor(fs / duration * 1000 * 7.5), 99999999) # use 7.5 bits per byte
+		command.extend(("-b:v", str(bitrate)))
+		if mode == "RGBA":
+			# nvenc not supporting yuva!!
+			# if hwaccel == "cuda" and devid != -1:
+			# 	command.extend(("-pix_fmt", "yuva420p", "-c:v", "av1_nvenc"))
+			# else:
+			command.extend(("-pix_fmt", "yuva420p", "-c:v", "libsvtav1"))
+			# fmt = "webm"
+		else:
+			if hwaccel == "cuda":
+				command.extend(("-pix_fmt", "yuv420p", "-c:v", "h264_nvenc"))
+			else:
+				command.extend(("-pix_fmt", "yuv420p", "-c:v", "h264"))
+			# fmt = "mp4"
+		command.extend(("-f", fmt))
+	return command, fmt
+
+def save_into(im, size, fmt, fs, r=0, opt=False):
+	assert size[0] and size[1]
 	thresh = 0.984375
 	heavy = r > thresh or np.prod(size) <= 1048576
-	if "RGB" in im.mode and np.prod(size) > 65536:
-		fmt = dict(jpg="mjpeg", gif="png").get(fmt.lower(), fmt)
+	if "RGB" in im.mode and np.prod(size) > 65536 or fmt not in ("png", "jpg", "webp", "gif"):
 		b = np.asanyarray(im, dtype=np.uint8).data
 		pix = "rgb24" if im.mode == "RGB" else "rgba"
-		vf = ()
-		if im.size != tuple(size):
-			flag = "lanczos" if heavy else "bicublin"
-			vf = ("-vf", f"scale={size[0]}:{size[1]}:flags={flag}")
-		args =["ffmpeg", "-hide_banner", "-v", "error", "-f", "rawvideo", "-video_size", "x".join(map(str, im.size)), "-pix_fmt", pix, "-i", "-", *vf, "-f", "image2pipe", "-c:v", fmt, "-lossless", "1" if fmt != "mjpeg" else "0", "-compression_level", "6" if heavy else "4", "-pred", "mixed", "-"]
-		print(args)
-		return subprocess.run(args, stdout=subprocess.PIPE, input=b).stdout
+		args = ["ffmpeg", "-hide_banner", "-v", "error", "-f", "rawvideo", "-pix_fmt", pix, "-video_size", "x".join(map(str, im.size)), "-i", "-"]
+		opts, fmt = ffmpeg_opts({}, iter([im]), 1, im.mode, im, fmt, floor(fs * (r or 1)), *size, 1000, opt)
+		args.extend(opts)
+		print(im, len(b))
+		if fmt in ("png", "jpg", "webp"):
+			args.append("-")
+			print(args)
+			return subprocess.run(args, stdout=subprocess.PIPE, input=b).stdout
+		else:
+			ts = time.time_ns() // 1000
+			out = "cache/" + str(ts) + "." + fmt
+			args.append(out)
+			print(args)
+			subprocess.run(args, input=b)
+			assert os.path.exists(out) and os.path.getsize(out)
+			with open(out, "rb") as f:
+				return f.read()
 	fmt = dict(jpg="jpeg", gif="png").get(fmt.lower(), fmt)
 	if im.size != tuple(size):
 		im = im.resize(size, resample=Resampling.LANCZOS if np.prod(size) <= 1048676 else Resampling.BICUBIC)
@@ -1362,48 +1529,16 @@ def save_into(im, size, fmt, fs, r=0):
 		im.save(out, format=fmt, optimize=True)
 	return out.getbuffer()
 
-def anim_into(out, new, size, fmt, fs, r=0):
-	thresh = 0.875
-	if "." in out:
-		out2 = out.rsplit(".", 1)[0] + "~2." + out.rsplit(".", 1)[-1]
-	else:
-		out2 = out + "~2"
-	heavy = r > thresh or np.prod(size) <= 1048576
+def anim_into(out, new, first, size, fmt, fs, r=0):
+	assert size[0] and size[1]
 	command = ["ffmpeg", "-nostdin", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel, "-i", out]
 	mode = new["mode"]
-	flag = "lanczos" if heavy else "bicublin"
-	vf = f"scale={size[0]}:{size[1]}:flags={flag}"
-	if fmt in ("gif", "apng"):
-		command.extend(("-gifflags", "-offsetting"))
-		vf += ",split[s0][s1];[s0]palettegen="
-		if mode == "RGBA":
-			vf += "reserve_transparent=1:"
-		else:
-			vf += "reserve_transparent=0:"
-		if new["count"] > 4096:
-			vf += "max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle"
-		else:
-			vf += "stats_mode=diff[p];[s1][p]paletteuse=dither=sierra3:diff_mode=rectangle"
-		if "A" in mode:
-			vf += ":alpha_threshold=128"
-		if vf:
-			command.extend(("-vf", vf))
-		if fmt == "apng":
-			command.extend(("-plays", "0"))
-		else:
-			command.extend(("-loop", "0"))
-		command.extend(("-f", fmt))
+	opts, fmt = ffmpeg_opts(new, new["frames"], new["count"], mode, first, fmt, fs, *size, new["duration"], True)
+	command.extend(opts)
+	if "." in out:
+		out2 = out.rsplit(".", 1)[0] + "~2." + fmt
 	else:
-		command.extend(("-vf", vf))
-		if new["count"] > 1:
-			command.extend(("-c:v", "libwebp_anim"))
-		else:
-			command.extend(("-c:v", "libwebp"))
-		if mode == "RGBA":
-			command.extend(("-pix_fmt", "yuva420p"))
-		else:
-			command.extend(("-pix_fmt", "yuv420p"))
-		command.extend(("-lossless", "0", "-compression_level", "6", "-loop", "0"))
+		out2 = out + "~2"
 	command.append(out2)
 	print(command)
 	subprocess.run(command, timeout=240)
@@ -1507,6 +1642,7 @@ def evalImg(url, operation, args):
 		else:
 			video = True
 		duration = new["duration"]
+		count = new.get("count", 1)
 		if dur:
 			dur *= new["count"] / (new["count"] + 1)
 			if duration > dur:
@@ -1559,85 +1695,9 @@ def evalImg(url, operation, args):
 					"-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
 					"-video_size", "x".join(map(str, size)), "-i", "-",
 				])
-				if fmt in ("gif", "apng"):
-					command.extend(("-gifflags", "-offsetting"))
-					vf = "split[s0][s1];[s0]palettegen="
-					if mode == "RGBA":
-						vf += "reserve_transparent=1:"
-					else:
-						vf += "reserve_transparent=0:"
-					if opt and first.width * first.height <= 16384:
-						frames = list(frames)
-						fr = frames.copy()
-						first = fr.pop(0)
-						last = fr.pop(-1)
-						cols = set()
-						cols.add((0, 0, 0))
-						random.shuffle(fr)
-						fr = [first, last, *fr]
-						c = min(len(fr), max(5, floor(sqrt(len(fr)))))
-						for i, f in enumerate(fr[:c]):
-							if isinstance(f, Image.Image):
-								im = f.resize((7, 7), resample=Resampling.NEAREST)
-								R, G, B = np.asanyarray(im).T[:3]
-								for r, g, b in zip(R.ravel(), G.ravel(), B.ravel()):
-									l = max(r, g, b)
-									if l < 1:
-										continue
-									t = tuple(min(255, round(log2(x / l * 255 + 1) * 8) * 4) for x in (r, g, b))
-									if t not in cols:
-										cols.add(t)
-						mc = min(128, max(4, 2 ** ceil(log2(len(cols)) + 1)))
-						vf += f"max_colors={mc}:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra3:diff_mode=rectangle"
-					elif new["count"] > 4096:
-						vf += "max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle"
-					else:
-						vf += "stats_mode=diff[p];[s1][p]paletteuse=dither=sierra3:diff_mode=rectangle"
-					if "A" in mode:
-						vf += ":alpha_threshold=128"
-					if vf:
-						command.extend(("-vf", vf))
-					if fmt == "apng":
-						command.extend(("-plays", "0"))
-					else:
-						command.extend(("-loop", "0"))
-					command.extend(("-f", fmt))
-				elif fmt == "webp":
-					if mode == "RGBA":
-						command.extend(("-c:v", "libwebp_anim", "-pix_fmt", "yuva420p"))
-					else:
-						command.extend(("-c:v", "libwebp", "-pix_fmt", "yuv420p"))
-					command.extend(("-lossless", "0", "-q:v", "24", "-loop", "0"))
-				else:
-					if getattr(first, "audio", None):
-						command.extend(("-i", first.audio["url"]))
-						if first.audio["codec"] not in ("mp3", "mpeg", "ogg", "opus", "aac"):
-							command.extend(("-c:a", "libopus", "-b:a", "224k"))
-						else:
-							command.extend(("-c:a", "copy"))
-					else:
-						command.extend(("-c:a", "copy"))
-					if first.width & 1 or first.height & 1:
-						w = round(first.width / 2) * 2
-						h = round(first.height / 2) * 2
-						command.extend(("-vf", f"scale={w}:{h}:flags=bicubic"))
-					bitrate = floor(fs / duration * 1000 * 7.5) # use 7.5 bits per byte
-					command.extend(("-b:v", str(bitrate)))
-					if mode == "RGBA":
-						if hwaccel == "cuda" and devid != -1:
-							command.extend(("-pix_fmt", "yuva420p", "-c:v", "av1_nvenc"))
-						else:
-							command.extend(("-pix_fmt", "yuva420p", "-c:v", "libsvtav1"))
-						# fmt = "webm"
-					else:
-						if hwaccel == "cuda":
-							command.extend(("-pix_fmt", "yuv420p", "-c:v", "h264_nvenc"))
-						else:
-							command.extend(("-pix_fmt", "yuv420p", "-c:v", "h264"))
-						# fmt = "mp4"
-					# command.append("-shortest")
-					out = "cache/" + str(ts) + "." + fmt
-				command.append(out)
+				opts, fmt = ffmpeg_opts(new, frames, count, mode, first, fmt, fs, *size, duration, opt)
+				command.extend(opts)
+				command.append("cache/" + str(ts) + "." + fmt)
 				print(command)
 				env = dict(os.environ)
 				env.pop("CUDA_VISIBLE_DEVICES", None)
@@ -1659,7 +1719,7 @@ def evalImg(url, operation, args):
 						if fmt == "zip":
 							b = save_into(frame, frame.size, cdc, inf)
 						else:
-							b = frame.tobytes()
+							b = np.asanyarray(frame, dtype=np.uint8).data
 					elif type(frame) is io.BytesIO:
 						frame.seek(0)
 						if fmt == "zip":
@@ -1721,7 +1781,7 @@ def evalImg(url, operation, args):
 						if (w, h) in seen:
 							out, r = seen[(w, h)]
 						else:
-							out = anim_into(orig, new, (w, h), fmt, fs, r=r)
+							out = anim_into(orig, new, first, (w, h), fmt, fs, r=r)
 							r = fs / len(out)
 							print("RA:", w, h, scale, len(out), r)
 							seen[(w, h)] = out, r
@@ -1739,7 +1799,7 @@ def evalImg(url, operation, args):
 						if (w, h) in seen:
 							out, r = seen[(w, h)]
 						else:
-							out = anim_into(orig, new, (w, h), fmt, fs, r=r)
+							out = anim_into(orig, new, first, (w, h), fmt, fs, r=r)
 							r = fs / len(out)
 							print("RB:", w, h, scale, len(out), r)
 							seen[(w, h)] = out, r
@@ -1787,7 +1847,7 @@ def evalImg(url, operation, args):
 				if (w, h) in seen:
 					out, r = seen[(w, h)]
 				else:
-					out = save_into(new, (w, h), fmt, fs, r=r)
+					out = save_into(new, (w, h), fmt, fs, r=r, opt=True)
 					r = fs / len(out)
 					print("RA:", w, h, scale, len(out), r)
 					seen[(w, h)] = out, r
@@ -1805,7 +1865,7 @@ def evalImg(url, operation, args):
 				if (w, h) in seen:
 					out, r = seen[(w, h)]
 				else:
-					out = save_into(new, (w, h), fmt, fs, r=r)
+					out = save_into(new, (w, h), fmt, fs, r=r, opt=True)
 					r = fs / len(out)
 					print("RB:", w, h, scale, len(out), r)
 					seen[(w, h)] = out, r

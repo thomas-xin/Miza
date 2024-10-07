@@ -1076,7 +1076,7 @@ class Upload(Command):
 							found = attachment
 							break
 					if found:
-						url = self.bot.preserve_into(message.channel.id, message.id, a_id, ext=found.url)
+						url = self.bot.preserve_as_long(message.channel.id, message.id, a_id, fn=url)
 						futs.append(as_fut(url))
 						continue
 					if a_id in self.bot.data.attachments:

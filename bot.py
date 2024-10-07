@@ -55,7 +55,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	discord_icon = BASE_LOGO
 	twitch_url = "https://www.twitch.tv/-"
 	webserver = AUTH.get("webserver") or "https://mizabot.xyz"
-	kofi_url = AUTH.get("kofi_url") or "https://ko-fi.com/waveplasma"
+	kofi_url = AUTH.get("kofi_url") or "https://ko-fi.com/waveplasma/tiers"
 	rapidapi_url = AUTH.get("rapidapi_url") or "https://rapidapi.com/thomas-xin/api/miza"
 	raw_webserver = AUTH.get("raw_webserver") or "https://api.mizabot.xyz"
 	heartbeat_rec = "heartbeat.tmp"
@@ -186,6 +186,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		shards = max(1, ceil(x / log10(x) / 100 / s)) * s
 		print("Automatic shards:", shards)
 		assert data["session_start_limit"]["remaining"] > shards
+		self.monkey_patch()
 		super().__init__(
 			loop=eloop,
 			_loop=eloop,
@@ -199,7 +200,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		)
 		self.shard_count = shards
 		self.set_client_events()
-		self.monkey_patch()
 		with suppress(AttributeError):
 			csubmit(super()._async_setup_hook())
 		globals()["messages"] = self.messages = self.MessageCache()
@@ -1335,7 +1335,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if discord_expired(u):
 			u2 = None
 			with tracebacksuppressor:
-				u2 = await self.data.exec.renew(u.split("?", 1)[0])
+				u2 = await attachment_cache.obtain(url=u.split("?", 1)[0], m_id=0)
 			if u2:
 				self.data.attachments[a_id] = url
 				return u2
@@ -2308,11 +2308,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		2: cdict(
-			instructive="gpt-4",
+			instructive="claude-3.5-sonnet",
 			casual="gpt-4",
 			nsfw="command-r-plus",
 			backup="euryale-70b",
-			retry="claude-3.5-sonnet",
+			retry="gpt-4",
 			function="gpt-4m",
 			vision="gpt-4",
 			target="auto",
@@ -5234,6 +5234,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					taken = True
 				elif not hs and v.type == "index" and re.fullmatch(r"(?:[\-0-9]+|:|\.{2,}){1,5}", a):
 					taken = True
+				elif not hs and v.type in ("number", "integer") and re.fullmatch(r"[-+]?\b\d+(\.\d+)?([eE][-+]?\d+)?\b|\b\d+\.\d*|\.\d+([eE][-+]?\d+)?\b", a):
+					taken = True
 				elif v.type == "string":
 					taken = True
 				if not taken:
@@ -6798,9 +6800,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				await self.send_event("_seen_", user=arg, delay=delay, event=event, **kwargs)
 
 	async def ensure_reactions(self, message):
-		if not message.reactions or all(reaction.count == 1 for reaction in message.reactions) or isinstance(message, self.CachedMessage):
-			message = await discord.abc.Messageable.fetch_message(message.channel, message.id)
-			self.add_message(message, files=False, force=True)
+		if not message.reactions or all(reaction.count == 1 for reaction in message.reactions) or isinstance(message, self.CachedMessage | self.LoadedMessage) or isinstance(message.author, cdict | self.GhostUser):
+			with tracebacksuppressor:
+				message = await discord.abc.Messageable.fetch_message(message.channel, message.id)
+				self.add_message(message, files=False, force=True)
 		return message
 
 	async def react_with(self, message, name):
@@ -6813,7 +6816,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Deletes own messages if any of the \"X\" emojis are reacted by a user with delete message permission level, or if the message originally contained the corresponding reaction from the bot."
 		if user.id == self.id:
 			return
-		message = await self.ensure_reactions(message)
 		if str(reaction) not in "❌✖️🇽❎🔳🔲":
 			return
 		if str(reaction) in "🔳🔲" and (not message.attachments and not message.embeds or "exec" not in self.data):
@@ -7817,6 +7819,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				raw.member = discord.Member(data=member_data, guild=guild, state=self)
 			else:
 				raw.member = None
+
 			self.dispatch("raw_reaction_add", raw)
 			csubmit(bot.reaction_add(raw, data))
 		discord.state.ConnectionState.parse_message_reaction_add = parse_message_reaction_add
@@ -7826,6 +7829,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			emoji_id = utils._get_as_snowflake(emoji, "id")
 			emoji = discord.PartialEmoji.with_state(self, id=emoji_id, animated=emoji.get("animated", False), name=emoji["name"])
 			raw = discord.RawReactionActionEvent(data, emoji, "REACTION_REMOVE")
+
+			member_data = data.get("member")
+			if member_data:
+				guild = self._get_guild(raw.guild_id)
+				raw.member = discord.Member(data=member_data, guild=guild, state=self)
+			else:
+				raw.member = None
+
 			self.dispatch("raw_reaction_remove", raw)
 			csubmit(bot.reaction_remove(raw, data))
 		discord.state.ConnectionState.parse_message_reaction_remove = parse_message_reaction_remove
@@ -7945,44 +7956,47 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return await user.send(embed=emb)
 
 	async def reaction_add(self, raw, data):
-		channel = await self.fetch_channel(raw.channel_id)
-		user = await self.fetch_user(raw.user_id)
-		emoji = self._upgrade_partial_emoji(raw.emoji)
-		try:
-			message = await self.fetch_message(raw.message_id)
-		except LookupError:
-			message = await discord.abc.Messageable.fetch_message(channel, raw.message_id)
-			reaction = message._add_reaction(data, emoji, user.id)
-			if reaction.count > 1:
-				reaction.count -= 1
-		else:
-			reaction = message._add_reaction(data, emoji, user.id)
-		self.dispatch("reaction_add", reaction, user)
-		self.add_message(message, files=False, force=True)
+		with tracebacksuppressor:
+			channel = await self.fetch_channel(raw.channel_id)
+			user = await self.fetch_user(raw.user_id)
+			emoji = self._upgrade_partial_emoji(raw.emoji)
+			try:
+				message = await self.fetch_message(raw.message_id)
+			except LookupError:
+				message = await discord.abc.Messageable.fetch_message(channel, raw.message_id)
+				reaction = message._add_reaction(data, emoji, user.id)
+				if reaction.count > 1:
+					reaction.count -= 1
+			else:
+				reaction = message._add_reaction(data, emoji, user.id)
+			await self.ensure_reactions(message)
+			self.dispatch("reaction_add", reaction, user)
+			self.add_message(message, files=False, force=True)
 
 	async def reaction_remove(self, raw, data):
-		channel = await self.fetch_channel(raw.channel_id)
-		user = await self.fetch_user(raw.user_id)
-		emoji = self._upgrade_partial_emoji(raw.emoji)
-		reaction = None
-		try:
-			message = await self.fetch_message(raw.message_id)
-		except LookupError:
-			message = await discord.abc.Messageable.fetch_message(channel, raw.message_id)
-			reaction = message._add_reaction(data, emoji, user.id)
-			if reaction.count > 1:
-				reaction.count -= 1
-		else:
-			with tracebacksuppressor(ValueError):
+		with tracebacksuppressor:
+			channel = await self.fetch_channel(raw.channel_id)
+			user = await self.fetch_user(raw.user_id)
+			emoji = self._upgrade_partial_emoji(raw.emoji)
+			reaction = None
+			try:
+				message = await self.fetch_message(raw.message_id)
+			except LookupError:
+				message = await discord.abc.Messageable.fetch_message(channel, raw.message_id)
+				reaction = message._add_reaction(data, emoji, user.id)
+				if reaction.count > 1:
+					reaction.count -= 1
+			else:
+				with tracebacksuppressor(ValueError):
+					reaction = message._remove_reaction(data, emoji, user.id)
+			if not reaction:
+				message = await discord.abc.Messageable.fetch_message(channel, raw.message_id)
+				reaction = message._add_reaction(data, emoji, user.id)
+				if reaction.count > 1:
+					reaction.count -= 1
 				reaction = message._remove_reaction(data, emoji, user.id)
-		if not reaction:
-			message = await discord.abc.Messageable.fetch_message(channel, raw.message_id)
-			reaction = message._add_reaction(data, emoji, user.id)
-			if reaction.count > 1:
-				reaction.count -= 1
-			reaction = message._remove_reaction(data, emoji, user.id)
-		self.dispatch("reaction_remove", reaction, user)
-		self.add_message(message, files=False, force=True)
+			self.dispatch("reaction_remove", reaction, user)
+			self.add_message(message, files=False, force=True)
 	
 	async def reaction_clear(self, raw, data):
 		channel = await self.fetch_channel(raw.channel_id)
@@ -8181,17 +8195,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 		# Reaction add event: uses raw payloads rather than discord.py message cache. calls _seen_ bot database event.
 		@self.event
-		async def on_raw_reaction_add(payload):
-			try:
-				channel = await self.fetch_channel(payload.channel_id)
-				user = await self.fetch_user(payload.user_id)
-				message = await self.fetch_message(payload.message_id, channel=channel)
-			except discord.NotFound:
-				return
-			emoji = self._upgrade_partial_emoji(payload.emoji)
+		async def on_reaction_add(reaction, user):
+			message = reaction.message
+			channel = message.channel
+			emoji = reaction.emoji
 			if user.id == self.deleted_user:
 				print("Deleted user RAW_REACTION_ADD", channel, user, message, emoji, channel.id, message.id)
-			await self.seen(user, message.channel, message.guild, event="reaction", raw="Adding a reaction")
+			await self.seen(user, channel, message.guild, event="reaction", raw="Adding a reaction")
 			if user.id != self.id:
 				if "users" in self.data:
 					self.data.users.add_xp(user, xrand(4, 7))
@@ -8203,17 +8213,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 		# Reaction remove event: uses raw payloads rather than discord.py message cache. calls _seen_ bot database event.
 		@self.event
-		async def on_raw_reaction_remove(payload):
-			try:
-				channel = await self.fetch_channel(payload.channel_id)
-				user = await self.fetch_user(payload.user_id)
-				message = await self.fetch_message(payload.message_id, channel=channel)
-			except discord.NotFound:
-				return
-			emoji = payload.emoji
+		async def on_reaction_remove(reaction, user):
+			message = reaction.message
+			channel = message.channel
+			emoji = reaction.emoji
 			if user.id == self.deleted_user:
 				print("Deleted user RAW_REACTION_REMOVE", channel, user, message, emoji, channel.id, message.id)
-			await self.seen(user, message.channel, message.guild, event="reaction", raw="Removing a reaction")
+			await self.seen(user, channel, message.guild, event="reaction", raw="Removing a reaction")
 			if user.id != self.id:
 				reaction = str(emoji)
 				await self.react_callback(message, reaction, user)

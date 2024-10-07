@@ -491,21 +491,24 @@ def simple_mimes(b, mime=True):
 	return "text/plain" if mime else "txt"
 
 def from_file(path, mime=True):
+	"Detects mimetype of file or buffer. Includes custom .jar, .ecdc, .m3u8 detection."
 	path = filetype.get_bytes(path)
 	if mime:
 		out = filetype.guess_mime(path)
 	else:
 		out = filetype.guess_extension(path)
-	if out and out.split("/", 1)[-1] == "zip" and type(path) is str and path.endswith(".jar"):
+	if out and out.split("/", 1)[-1] == "zip" and isinstance(path, str) and path.endswith(".jar"):
 		return "application/java-archive"
 	if not out:
-		if type(path) is not bytes:
-			if type(path) is str:
+		if not isinstance(path, bytes):
+			if isinstance(path, str):
 				raise TypeError(path)
 			path = bytes(path)
 		out = simple_mimes(path, mime)
 	if out == "application/octet-stream" and path.startswith(b'ECDC'):
 		return "audio/ecdc"
+	if out == "application/octet-stream" and path.startswith(b'\x00\x00\x00,ftypavis'):
+		return "image/avif"
 	if out == "text/plain" and path.startswith(b"#EXTM3U"):
 		return "video/m3u8"
 	return out

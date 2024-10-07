@@ -100,7 +100,6 @@ class Purge(Command):
 			type="integer",
 			description="Maximum amount of messages to delete. Defaults to infinite if range is specified, else 1. Does NOT include the message invoking the command.",
 			example="123",
-			default=inf,
 		),
 		range=cdict(
 			type="index",
@@ -113,7 +112,7 @@ class Purge(Command):
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, bot, _message, _channel, _guild, user, count, range, **void):
+	async def __call__(self, bot, _message, _channel, _guild, user=None, count=None, range=None, **void):
 		if not count and not range:
 			raise ValueError("Please enter a valid amount of messages to delete.")
 		if count is None:
@@ -137,7 +136,7 @@ class Purge(Command):
 			right += 1
 		deleting = alist()
 		found = set()
-		if left <= _message.id <= right:
+		if left <= _message.id <= right and not getattr(_message, "simulated", None) and not getattr(_message, "slash", None):
 			deleting.append(_message)
 			found.add(_message.id)
 			count += 1
@@ -172,7 +171,7 @@ class Purge(Command):
 					delcount += 1
 		async with bot.guild_semaphore:
 			async for m in bot.history(_channel, limit=count, after=left, before=right):
-				if len(deleting) >= count:
+				if len(found) >= count:
 					break
 				if user and m.author.id != user.id:
 					continue
@@ -2379,6 +2378,7 @@ class UpdateUserLogs(Database):
 				csubmit(self._member_update_(before, after, guild))
 
 	async def _member_update_(self, before, after, guild=None):
+		bot = self.bot
 		if guild is None:
 			guild = after.guild
 		# Make sure user is in guild
@@ -2400,6 +2400,7 @@ class UpdateUserLogs(Database):
 			self.data.pop(guild.id)
 			return
 		emb = discord.Embed()
+		files = []
 		emb.description = f"{user_mention(after.id)} has been updated:"
 		colour = [0] * 3
 		# Add fields for every update to the member data
@@ -2445,33 +2446,46 @@ class UpdateUserLogs(Database):
 			bk = bk.key
 		if hasattr(ak, "key"):
 			ak = ak.key
+		a_url = best_url(after)
+		b_url = None
+		if "exec" in bot.data:
+			with tracebacksuppressor:
+				af = await bot.data.exec.uproxy(a_url, collapse=True, mode="download")
+				if isinstance(af, byte_like):
+					fn = a_url.split("?", 1)[0].rsplit("/", 1)[-1]
+					files.append(CompatFile(af, filename=fn))
+					a_url = "attachment://" + fn
 		if bk != ak:
 			b_url = best_url(before)
-			a_url = best_url(after)
-			if "exec" in self.bot.data:
-				urls = ()
+			if "exec" in bot.data:
 				with tracebacksuppressor:
-					urls = await self.bot.data.exec.uproxy(b_url, a_url, collapse=False)
-				for i, url in enumerate(urls):
-					if url:
-						if i:
-							a_url = url + (".gif" if a_url.split("?", 1)[0].endswith(".gif") else "")
-						else:
-							b_url = url + (".gif" if b_url.split("?", 1)[0].endswith(".gif") else "")
+					bf = await bot.data.exec.uproxy(b_url, collapse=True, mode="download")
+					if isinstance(bf, byte_like):
+						fn = b_url.split("?", 1)[0].rsplit("/", 1)[-1]
+						files.append(CompatFile(bf, filename=fn))
+						b_url = "attachment://" + fn
 			emb.add_field(
 				name="Avatar",
 				value=f"[Before]({b_url}) ➡️ [After]({a_url})",
 			)
-			emb.set_thumbnail(url=a_url)
+			emb.set_thumbnail(url=b_url)
 			change = True
 			colour[2] += 255
 		if not change:
 			return
-		b_url = await self.bot.get_proxy_url(before)
-		a_url = await self.bot.get_proxy_url(after)
 		emb.set_author(name=str(after), icon_url=a_url, url=a_url)
 		emb.colour = colour2raw(colour)
-		self.bot.send_embeds(channel, emb)
+		message = await channel.send(embed=emb, files=files)
+		if "exec" in bot.data:
+			with tracebacksuppressor:
+				ua = message.embeds[0].author.icon_url
+				if is_discord_attachment(ua):
+					a_url = bot.data.exec.uregister(best_url(after), ua, message.id)
+				ub = message.embeds[0].thumbnail and message.embeds[0].thumbnail.url
+				if is_discord_attachment(ub):
+					b_url = bot.data.exec.uregister(best_url(before), ub, message.id)
+					emb.fields[-1].value = f"[Before]({b_url}) ➡️ [After]({a_url})"
+					await message.edit(embed=emb)
 
 	async def _channel_update_(self, before, after, guild, **void):
 		if guild.id not in self.data:
@@ -3369,7 +3383,7 @@ class UpdateStarboards(Database):
 				text, link = embed.description.rsplit("\n\n", 1)
 				description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in reacts if str(r.emoji) in table) + "   " + link
 				embed.description = lim_str(description, 4096)
-				await selfbot.edit_message(m, content=None, embed=embed)
+				await self.bot.edit_message(m, content=None, embed=embed)
 			except (discord.NotFound, discord.Forbidden):
 				table[None].pop(message.id, None)
 			else:

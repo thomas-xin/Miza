@@ -716,6 +716,8 @@ IMAGE_FORMS = {
 	"tiff": False,
 	"webp": True,
 	"heic": False,
+	"heif": True,
+	"avif": True,
 	"ico": False,
 }
 def is_image(url):
@@ -738,6 +740,7 @@ VIDEO_FORMS = {
 	"gifv": True,
 	"apng": False,
 	"avi": True,
+	"avif": False,
 	"mov": True,
 	"qt": True,
 	"wmv": True,
@@ -801,6 +804,7 @@ VISUAL_FORMS = {
 	"ogg": False,
 	"gifv": True,
 	"avi": True,
+	"avif": True,
 	"mov": True,
 	"qt": True,
 	"wmv": True,
@@ -956,6 +960,8 @@ def from_file(path, mime=True):
 		out = simple_mimes(path, mime)
 	if out == "application/octet-stream" and path.startswith(b'ECDC'):
 		return "audio/ecdc"
+	if out == "application/octet-stream" and path.startswith(b'\x00\x00\x00,ftypavis'):
+		return "image/avif"
 	if out == "text/plain" and path.startswith(b"#EXTM3U"):
 		return "video/m3u8"
 	return out
@@ -2736,7 +2742,7 @@ class AttachmentCache(Cache):
 	def update_queue(self):
 		while self.queue:
 			tasks, self.queue = self.queue[:10], self.queue[10:]
-			urls = [task[1].split("?url=", 1)[-1].split("&", 1)[0] for task in tasks]
+			urls = [task[1].split("?url=", 1)[-1].replace("?", "&").replace("%", "&").split("&", 1)[0] for task in tasks]
 			embeds = [dict(image=dict(url=url)) for url in urls]
 			last = self.last
 			n = 0
@@ -2771,8 +2777,18 @@ class AttachmentCache(Cache):
 					task[0].set_exception(ex)
 				continue
 			esubmit(self.set_last, (cid, mid, n))
-			for task, emb in zip(tasks, message["embeds"]):
-				task[0].set_result(emb["image"]["url"])
+			futs = []
+			for emb in message["embeds"]:
+				url = emb["image"]["url"]
+				futs.append(esubmit(requests.head, url, verify=False))
+			for task, fut in zip(tasks, futs):
+				resp = fut.result()
+				try:
+					resp.raise_for_status()
+				except Exception as ex:
+					task[0].set_exception(ex)
+				else:
+					task[0].set_result(resp.url)
 
 	def set_last(self, tup):
 		time.sleep(1)
@@ -2802,7 +2818,7 @@ class AttachmentCache(Cache):
 		url, _ = merge_url(c_id, m_id, a_id, fn)
 		task = [fut, url]
 		self.queue.append(task)
-		if self.fut is None or self.fut.done():
+		if self.fut is None or self.fut.done() or len(self.queue) > 10:
 			self.fut = self.exc.submit(self.update_queue)
 		return await wrap_future(fut)
 

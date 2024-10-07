@@ -762,116 +762,48 @@ class UpdateExec(Database):
 		return deleted
 
 	seen = Cache(timeout=86400)
-	async def uproxy(self, *urls, collapse=True, force=False, keep=True, use_fn=True):
-		if urls == ("https://cdn.discordapp.com/embed/avatars/0.png",):
-			return urls[0]
-		out = [None] * len(urls)
-		files = [None] * len(urls)
-		sendable = [c_id for c_id, flag in self.data.items() if flag & 16]
-		headers = Request.header()
-		headers["User-Agent"] += " MizaUnproxy/1.0.0"
+	async def uproxy(self, *urls, collapse=True, mode="upload", **kwargs):
 		bot = self.bot
-		for i, url in enumerate(urls):
+		async def proxy_url(url):
 			if isinstance(url, byte_like):
-				files[i] = cdict(fut=as_fut(url), filename="untitled.webp")
-				continue
-			if isinstance(url, CompatFile):
-				files[i] = cdict(fut=as_fut(url.fp.read()), filename=url.filename)
-			if not is_url(url):
-				continue
-			if not force and url.startswith(bot.webserver + "/u/") or url.startswith(bot.raw_webserver + "/u/"):
-				out[i] = url
-				continue
-			try:
+				data = url
+			elif isinstance(url, CompatFile):
+				data = url.fp.read()
+			elif not is_url(url):
+				raise TypeError(url)
+			elif url.startswith(bot.webserver + "/u/") or url.startswith(bot.raw_webserver + "/u/") or url.startswith("https://cdn.discordapp.com/embed/avatars/"):
+				return url
+			else:
 				uhu = uhash(url)
-				out[i] = bot.data.proxies[uhu]
-				if not out[i]:
-					raise KeyError
-				if is_discord_attachment(out[i]):
-					with tracebacksuppressor:
-						out[i] = bot.preserve_attachment(out[i], fn=use_fn and out[i])
-
-				def verify(url, uhu):
-					try:
-						with reqs.next().head(url, headers=headers, stream=True, verify=False, timeout=12) as resp:
-							resp.raise_for_status()
-					except:
-						print_exc()
-						bot.data.proxies.pop(uhu, None)
-					else:
-						self.seen[i] = True
-
-				if (force or not i & 15) and i not in self.seen:
-					esubmit(verify, out[i], uhu)
-			except KeyError:
-				if not sendable:
-					out[i] = url
-					continue
 				try:
-					async with asyncio.timeout(12):
-						url = await wrap_future(self.temp[url], shield=True)
-				except (KeyError, T1):
-					if url not in self.temp:
-						self.temp[url] = Future()
-					fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
-					if "." not in fn:
-						fn += ".webp"
-					elif fn.endswith(".pnglarge") or fn.endswith(".jpglarge"):
-						fn = fn[:-5]
-					files[i] = cdict(fut=asubmit(proxy.content_or, url, stream=True, timeout=24), filename=fn, url=url)
-				else:
-					out[i] = url
-		failed = [None] * len(urls)
-		for i, fut in enumerate(files):
-			if not fut:
-				continue
-			try:
-				data = await fut.fut
-				try:
-					if len(data) > 25165824:
-						raise ConnectionError
-				except TypeError:
+					url2 = bot.data.proxies[uhu]
+				except KeyError:
 					pass
-				files[i] = CompatFile(seq(data), filename=fut.filename)
-			except ConnectionError:
-				files[i] = None
-				failed[i] = True
-			except:
-				files[i] = None
-				failed[i] = True
-				print_exc()
-		fs = [i for i in files if i]
-		if fs:
-			with tracebacksuppressor:
-				c_id = choice([c_id for c_id, flag in self.data.items() if flag & 16])
-				channel = await bot.fetch_channel(c_id)
-				m = channel.guild.me
-				message = await bot.send_as_webhook(channel, files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
-				c = 0
-				for i, f in enumerate(files):
-					if not f or failed[i]:
-						continue
-					if not message.attachments[c].size:
-						url = urls[i]
-					else:
-						a = message.attachments[c]
-						try:
-							url = bot.preserve_as_long(channel.id, message.id, a.id, fn=use_fn and a.url)
-						except:
-							print_exc()
-							url = str(message.attachments[c].url)
-					out[i] = url
-					if keep:
-						try:
-							bot.data.proxies[uhash(urls[i])] = url
-						except IndexError:
-							break
-					with suppress(KeyError, RuntimeError):
-						self.temp.pop(urls[i]).set_result(url)
-					c += 1
-		if collapse:
-			return out if len(out) > 1 else out[0]
-		return out
+				else:
+					if is_discord_attachment(url2):
+						url2 = bot.data.proxies[uhu] = shorten_attachment(url2, 0)
+					return url2
+				if mode == "raise":
+					raise FileNotFoundError(url)
+				elif mode == "download":
+					return await bot.get_request(url)
+				elif mode == "upload":
+					data = await bot.get_request(url)
+				else:
+					return
+			_, out = await attachment_cache.create(data)
+			assert out
+			return shorten_attachment(*out[0])
+		if collapse and len(urls) == 1:
+			return await proxy_url(urls[0])
+		return await gather(*map(proxy_url, urls))
+
+	def uregister(self, k, url, m_id=0):
+		bot = self.bot
+		uhu = uhash(k)
+		url = shorten_attachment(url, m_id)
+		bot.data.proxies[uhu] = url
+		return url
 	
 	def cproxy(self, url):
 		if url in self.temp:

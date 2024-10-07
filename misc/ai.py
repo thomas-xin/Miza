@@ -656,7 +656,7 @@ async def cut_to(messages, limit=1024, softlim=256, exclude_first=True, best=Fal
 			messages.insert(0, sm)
 		return messages
 	ml = max(64, round_random(softlim - count))
-	Ml = max(64, round_random(limit - count))
+	Ml = max(1024, round_random(limit - count))
 	if best:
 		if best < 2:
 			Ml = ml * 2
@@ -2187,6 +2187,19 @@ def untool(message):
 	message.content = content.strip() if isinstance(content, string_like) else content
 	return message
 
+def unimage(message):
+	if not message.content or isinstance(message.content, string_like):
+		return message
+	message = cdict(message)
+	content = ""
+	for cont in message.content:
+		if cont.get("type") == "text":
+			if content:
+				content += "\n\n"
+			content += cont["text"]
+	message.content = content
+	return message
+
 
 CL100K_IM = {
 	"o1-preview-2024-09-12",
@@ -2290,8 +2303,8 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 					yield await self.pass_item(item)
 		print("aiter pricing:", self.tokens, self.costs)
 
-
 def instruct_structure(messages, exclude_first=True, fmt="alpaca", assistant=None):
+	messages = list(map(unimage, messages))
 	if fmt == "mistral":
 		ins = tuple(map(mistral, messages))
 		stops = ["</s>", "[INST", "[/INST"]

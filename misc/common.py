@@ -2171,6 +2171,10 @@ def load_emojis():
 					if i >= len(e) - 1 or not e2.isascii():
 						ntrans[e2] = name
 						etrans[e2] = url
+				e2 = "".join(c for c in e if ord(c) not in range(0x2000, 0x2070) and ord(c) not in range(0xfe00, 0xffff))
+				if e != e2:
+					ntrans.setdefault(e2, name)
+					etrans.setdefault(e2, url)
 	b = json_dumps(etrans)
 	with open("misc/emojis.json", "wb") as f:
 		f.write(b)
@@ -2197,7 +2201,7 @@ def replace_emojis(s):
 
 @functools.lru_cache(maxsize=4)
 def find_emojis_ex(s, cast_urls=True):
-	"Finds all emojis in a string, both unicode and discord-exclusive representations"
+	"Finds all emojis in a string, both unicode and discord-exclusive representations. Prioritises multi-character emojis if possible."
 	out = {}
 	for emoji, url in emoji_replace.items():
 		try:
@@ -2208,7 +2212,11 @@ def find_emojis_ex(s, cast_urls=True):
 			out[i] = url.rstrip()
 		else:
 			out[i] = emoji
+		for j in range(1, len(out[i])):
+			out[i + j] = None
 	for i, c in enumerate(s):
+		if i in out:
+			continue
 		try:
 			url = emoji_translate[c]
 		except KeyError:
@@ -2220,8 +2228,8 @@ def find_emojis_ex(s, cast_urls=True):
 	found = find_emojis(s)
 	for e in found:
 		i = s.index(e)
-		out[i] = e
-	return [t[1] for t in sorted(out.items())]
+		out.setdefault(i, e)
+	return [t[1] for t in sorted(out.items()) if t[1]]
 
 HEARTS = ["❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
 
@@ -2795,12 +2803,15 @@ def get_wmem(mused=0):
 	global WMT, WMV
 	t = utc()
 	if t - WMT > 60:
-		f1 = esubmit(subprocess.check_output, "wmic OS get TotalVirtualMemorySize /Value")
-		fvms = subprocess.check_output("wmic OS get FreeVirtualMemory /Value")
-		tvms = f1.result()
-		tvms = int(tvms.strip().decode("ascii").removeprefix("TotalVirtualMemorySize="))
-		fvms = int(fvms.strip().decode("ascii").removeprefix("FreeVirtualMemory="))
-		WMV = (tvms - fvms) * 1024 - mused
+		try:
+			f1 = esubmit(subprocess.check_output, "wmic OS get TotalVirtualMemorySize /Value")
+			fvms = subprocess.check_output("wmic OS get FreeVirtualMemory /Value")
+			tvms = f1.result()
+			tvms = int(tvms.strip().decode("ascii").removeprefix("TotalVirtualMemorySize="))
+			fvms = int(fvms.strip().decode("ascii").removeprefix("FreeVirtualMemory="))
+			WMV = (tvms - fvms) * 1024 - mused
+		except Exception:
+			WMV = 0
 		WMT = utc()
 	return WMV
 

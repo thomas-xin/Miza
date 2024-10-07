@@ -22,6 +22,7 @@ import cherrypy
 import numpy as np
 import orjson
 import psutil
+import requests
 from collections import deque
 from concurrent.futures import Future
 from math import inf, ceil
@@ -470,6 +471,8 @@ def true_ip(request=None):
 
 
 class Server:
+
+	session = requests.Session()
 
 	serving = {}
 	def _fileinfo(self, path, **void):

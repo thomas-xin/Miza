@@ -1093,7 +1093,7 @@ class Timezone(Command):
 
 
 class Identify(Command):
-	name = ["📂", "Magic", "Mime", "FileType", "IdentifyFiles"]
+	name = ["📂", "Magic", "Mime", "MimeType", "FileType", "FileInfo", "IdentifyFiles"]
 	description = "Detects the type, mime, and optionally details of an input file."
 	usage = "<url>*"
 	example = ("identify https://raw.githubusercontent.com/thomas-xin/Image-Test/master/title-rainbow.webp",)
