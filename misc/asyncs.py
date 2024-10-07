@@ -37,7 +37,7 @@ collections.__dict__.update(collections.abc.__dict__)
 def as_fut(obj):
 	if obj is None:
 		return emptyfut
-	fut = asyncio.Future()
+	fut = asyncio.Future(loop=eloop)
 	cst(fut.set_result, obj)
 	return fut
 

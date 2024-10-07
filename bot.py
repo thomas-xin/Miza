@@ -3483,9 +3483,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			urls = list(chain(("(" + e.url + ")" for e in message.embeds if e.url), ("[" + best_url(a) + "]" for a in message.attachments)))
 			items = []
 			for i in range((len(urls) + 9) // 10):
-				temp = urls[i * 10:i * 10 + 10]
-				temp2 = await self.data.exec.uproxy(*temp, collapse=False)
-				items.extend(temp2[x] or temp[x] for x in range(len(temp)))
+				with tracebacksuppressor:
+					temp = urls[i * 10:i * 10 + 10]
+					temp2 = await self.data.exec.uproxy(*temp, collapse=False)
+					items.extend(temp2[x] or temp[x] for x in range(len(temp)))
 			emb.description = lim_str("\n".join(items), 4096)
 		if link:
 			link = message_link(message)

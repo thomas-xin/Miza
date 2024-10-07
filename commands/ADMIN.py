@@ -2367,11 +2367,11 @@ class UpdateUserLogs(Database):
 				break
 		if not found:
 			return
-		b_url = best_url(before)
-		a_url = best_url(after)
-		if b_url != a_url:
-			with tracebacksuppressor:
-				urls = await self.bot.data.exec.uproxy(b_url, a_url)
+		# b_url = best_url(before)
+		# a_url = best_url(after)
+		# if b_url != a_url:
+		# 	with tracebacksuppressor:
+		# 		urls = await self.bot.data.exec.uproxy(b_url, a_url)
 		for g_id in self.data:
 			guild = self.bot.cache.guilds.get(g_id)
 			if guild:
@@ -2455,6 +2455,8 @@ class UpdateUserLogs(Database):
 					fn = a_url.split("?", 1)[0].rsplit("/", 1)[-1]
 					files.append(CompatFile(af, filename=fn))
 					a_url = "attachment://" + fn
+				else:
+					a_url = af
 		if bk != ak:
 			b_url = best_url(before)
 			if "exec" in bot.data:
@@ -2464,6 +2466,8 @@ class UpdateUserLogs(Database):
 						fn = b_url.split("?", 1)[0].rsplit("/", 1)[-1]
 						files.append(CompatFile(bf, filename=fn))
 						b_url = "attachment://" + fn
+					else:
+						b_url = af
 			emb.add_field(
 				name="Avatar",
 				value=f"[Before]({b_url}) ➡️ [After]({a_url})",
@@ -3152,42 +3156,6 @@ class UpdateMessageLogs(Database):
 			emb.colour = discord.Colour(0x7F007F)
 			embs.append(emb)
 		self.bot.send_embeds(channel, embs)
-
-
-# class UpdateFileLogs(Database):
-# 	name = "logF"
-
-# 	async def _delete_(self, message, **void):
-# 		if self.bot.is_deleted(message) > 1:
-# 			return
-# 		if not message.attachments:
-# 			return
-# 		guild = message.guild
-# 		if guild.id not in self.data:
-# 			return
-# 		c_id = self.data[guild.id]
-# 		try:
-# 			channel = await self.bot.fetch_channel(c_id)
-# 		except (EOFError, discord.NotFound):
-# 			self.data.pop(guild.id)
-# 			return
-# 		# Attempt to recover files from their proxy URLs, otherwise send the original URLs
-# 		msg = deque()
-# 		fils = []
-# 		for a in message.attachments:
-# 			try:
-# 				b = await self.bot.get_attachment(a.url, full=False, allow_proxy=True)
-# 				fil = CompatFile(seq(b), filename=str(a).rsplit("/", 1)[-1])
-# 				fils.append(fil)
-# 			except:
-# 				msg.append(proxy_url(a))
-# 		colour = await self.bot.get_colour(message.author)
-# 		emb = discord.Embed(colour=colour)
-# 		emb.description = f"File{'s' if len(fils) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"
-# 		msg = "\n".join(msg) if msg else None
-# 		if len(fils) == 1:
-# 			return await self.bot.send_with_file(channel, msg, embed=emb, file=fils[0])
-# 		await channel.send(msg, embed=emb, files=fils)
 
 
 class UpdatePublishers(Database):
