@@ -766,6 +766,7 @@ class UpdateExec(Database):
 		bot = self.bot
 		async def proxy_url(url):
 			uhu = None
+			data = None
 			if isinstance(url, byte_like):
 				data = url
 			elif isinstance(url, CompatFile):
@@ -796,15 +797,16 @@ class UpdateExec(Database):
 			if isinstance(url, str) and bot.webserver:
 				url2 = await Request(bot.webserver + "/reupload?url=" + quote_plus(url) + "&filename=" + fn, aio=True, decode=True)
 			else:
-				resp = await asubmit(
-					reqs.next().get,
-					url,
-					headers=Request.header(),
-					stream=True,
-					verify=False,
-					timeout=60,
-				)
-				data = seq(resp)
+				if not data:
+					resp = await asubmit(
+						reqs.next().get,
+						url,
+						headers=Request.header(),
+						stream=True,
+						verify=False,
+						timeout=60,
+					)
+					data = seq(resp)
 				url2 = await attachment_cache.create(data, filename=fn, channel=channel)
 			assert url2
 			if uhu:
