@@ -794,7 +794,7 @@ class UpdateExec(Database):
 					return
 			fn = filename or (url2fn(url) if isinstance(url, str) else "b")
 			if isinstance(url, str) and bot.webserver:
-				url2 = await Request(bot.webserver + "/reupload?url=" + quote_plus(url) + "&filename=" + fn, text=True)
+				url2 = await Request(bot.webserver + "/reupload?url=" + quote_plus(url) + "&filename=" + fn, aio=True, decode=True)
 			else:
 				resp = await asubmit(
 					reqs.next().get,
