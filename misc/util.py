@@ -2832,13 +2832,14 @@ class AttachmentCache(Cache):
 			m_id = int.from_bytes(base64.urlsafe_b64decode(m_id + "=="), "big")
 			a_id = int.from_bytes(base64.urlsafe_b64decode(a_id + "=="), "big")
 		try:
+			resp = self[a_id]
+			assert isinstance(resp, str) and not discord_expired(resp) and url2fn(resp) == fn
+		except KeyError:
 			resp = await self.retrieve_from(a_id, self.get_attachment, c_id, m_id, a_id, fn)
-			assert isinstance(resp, str) and not discord_expired(resp)
-			return resp
-		except (KeyError, AssertionError):
+		except AssertionError:
 			resp = await self.get_attachment(c_id, m_id, a_id, fn)
 			self[a_id] = resp
-			return resp
+		return resp
 
 	async def create(self, *data, filename="b", channel=None, content="", collapse=True):
 		if not self.channels:

@@ -2835,7 +2835,7 @@ class UpdateMessageCache(Database):
 						ename, eid = str(reaction.emoji).rsplit(":", 1)
 						eid = int(eid.removesuffix(">"))
 						ename = ename.split(":", 1)[-1]
-						r = dict(emoji=dict(id=eid, name=name))
+						r = dict(emoji=dict(id=eid, name=ename))
 					if reaction.count != 1:
 						r["count"] = reaction.count
 					if reaction.me:
