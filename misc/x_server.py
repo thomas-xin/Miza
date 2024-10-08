@@ -1042,6 +1042,7 @@ class Server:
 			verify=False,
 			timeout=60,
 		)
+		cp.response.status = resp.status_code
 		cp.response.headers.update(resp.headers)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
