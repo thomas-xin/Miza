@@ -31,7 +31,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, newfut, esubmit, tsubmit, csubmit, await_fut, CloseableAsyncIterator
 from .smath import supersample, xrand
-from .types import as_str, astype, cdict, suppress, round_min, lim_str, full_prune, literal_eval, regexp, loop, json_dumps, alist
+from .types import as_str, astype, cdict, suppress, round_min, lim_str, full_prune, literal_eval, regexp, loop, json_dumps, alist, resume
 from .util import hwaccel, fcdict, ihash, nhash, shash, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, find_file, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, smart_split, seq, proxy, Request, magic, is_discord_attachment, discord_expired, unyt, ecdc_exists, get_duration, evalex, evalEX, DownloadingFile, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, attachment_cache
 
 
@@ -1010,7 +1010,9 @@ class Server:
 				return False
 			if "Cf-Worker" in cp.request.headers:
 				return True
-			if cp.request.headers.get("Sec-Fetch-Mode") or cp.request.headers.get("Referer"):
+			if (mode := cp.request.headers.get("Sec-Fetch-Mode")):
+				return mode.casefold() != "cors"
+			if cp.request.headers.get("Referer"):
 				return True
 			return False
 
@@ -1043,17 +1045,16 @@ class Server:
 		cp.response.headers.update(resp.headers)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
-
-		def respond_with_content_type(resp):
+		if is_discord_attachment(url):
+			cp.response.headers.pop("Content-Disposition", None)
+		if resp.headers.get("Content-Type", "application/octet-stream") == "application/octet-stream":
 			it = resp.iter_content(65536)
 			b = next(it)
 			mime = magic.from_buffer(b)
 			cp.response.headers.pop("Content-Type", None)
 			cp.response.headers["Content-Type"] = mime
-			yield b
-			yield from it
-
-		return respond_with_content_type(resp) if resp.headers.get("Content-Type", "application/octet-stream") == "application/octet-stream" else resp.iter_content(65536)
+			return resume(b, it)
+		return resp.iter_content(65536)
 
 	@tracebacksuppressor
 	def renew_url(self, url, mid=None):

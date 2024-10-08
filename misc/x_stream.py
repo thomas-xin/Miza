@@ -12,6 +12,7 @@ from cherrypy._cpdispatch import Dispatcher
 import orjson
 import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
+from .types import resume
 from .util import AUTH, magic, decrypt, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, url2fn, byte_scale, seq, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
 
 csubmit(Request._init_())
@@ -278,7 +279,9 @@ class Server:
 				return False
 			if "Cf-Worker" in cp.request.headers:
 				return True
-			if cp.request.headers.get("Sec-Fetch-Mode") or cp.request.headers.get("Referer"):
+			if (mode := cp.request.headers.get("Sec-Fetch-Mode")):
+				return mode.casefold() != "cors"
+			if cp.request.headers.get("Referer"):
 				return True
 			return False
 
@@ -311,17 +314,16 @@ class Server:
 		cp.response.headers.update(resp.headers)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
-
-		def respond_with_content_type(resp):
+		if is_discord_attachment(url):
+			cp.response.headers.pop("Content-Disposition", None)
+		if resp.headers.get("Content-Type", "application/octet-stream") == "application/octet-stream":
 			it = resp.iter_content(65536)
 			b = next(it)
 			mime = magic.from_buffer(b)
 			cp.response.headers.pop("Content-Type", None)
 			cp.response.headers["Content-Type"] = mime
-			yield b
-			yield from it
-
-		return respond_with_content_type(resp) if resp.headers.get("Content-Type", "application/octet-stream") == "application/octet-stream" else resp.iter_content(65536)
+			return resume(b, it)
+		return resp.iter_content(65536)
 
 	@cp.expose
 	# @cp.tools.accept(media="multipart/form-data")

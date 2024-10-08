@@ -1279,6 +1279,11 @@ def regexp(s, flags=0) -> re.Pattern:
 def loop(n):
 	return repeat(None, n)
 
+def resume(im, *its):
+	yield im
+	for it in its:
+		yield from it
+
 @hashable_args
 @functools.lru_cache(maxsize=256)
 def suppress(*args, **kwargs) -> contextlib.suppress:
