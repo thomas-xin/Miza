@@ -2777,18 +2777,21 @@ class AttachmentCache(Cache):
 					task[0].set_exception(ex)
 				continue
 			esubmit(self.set_last, (cid, mid, n))
-			futs = []
-			for emb in message["embeds"]:
+			for task, emb in zip(tasks, message["embeds"]):
 				url = emb["image"]["url"]
-				futs.append(esubmit(requests.head, url, verify=False))
-			for task, fut in zip(tasks, futs):
-				resp = fut.result()
-				try:
-					resp.raise_for_status()
-				except Exception as ex:
-					task[0].set_exception(ex)
-				else:
-					task[0].set_result(resp.url)
+				task[0].set_result(url)
+			# futs = []
+			# for emb in message["embeds"]:
+			# 	url = emb["image"]["url"]
+			# 	futs.append(esubmit(requests.head, url, verify=False))
+			# for task, fut in zip(tasks, futs):
+			# 	resp = fut.result()
+			# 	try:
+			# 		resp.raise_for_status()
+			# 	except Exception as ex:
+			# 		task[0].set_exception(ex)
+			# 	else:
+			# 		task[0].set_result(resp.url)
 
 	def set_last(self, tup):
 		time.sleep(1)
