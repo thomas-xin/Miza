@@ -12,7 +12,7 @@ from cherrypy._cpdispatch import Dispatcher
 import orjson
 import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
-from .util import AUTH, decrypt, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, url2fn, byte_scale, seq, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
+from .util import AUTH, magic, decrypt, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, url2fn, byte_scale, seq, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
 
 csubmit(Request._init_())
 tsubmit(eloop.run_forever)
@@ -226,22 +226,6 @@ class Server:
 			self.cache[rpath] = b = f.read()
 		return b
 
-	def proxy_if(self, url):
-		assert isinstance(url, str), url
-
-		def requires_proxy():
-			if not is_discord_attachment(url):
-				return False
-			if "Cf-Worker" in cp.request.headers:
-				return True
-			if cp.request.headers.get("Referer"):
-				return True
-			return False
-
-		if requires_proxy():
-			return self.proxy(url=url)
-		raise cp.HTTPRedirect(url, 307)
-
 	@cp.expose(("u",))
 	def unproxy(self, *path, url=None, **query):
 		if url:
@@ -286,6 +270,22 @@ class Server:
 		fut = attachment_cache.create(seq(resp), filename=filename or url2fn(url))
 		return await_fut(fut)
 
+	def proxy_if(self, url):
+		assert isinstance(url, str), url
+
+		def requires_proxy():
+			if not is_discord_attachment(url):
+				return False
+			if "Cf-Worker" in cp.request.headers:
+				return True
+			if cp.request.headers.get("Sec-Fetch-Mode") or cp.request.headers.get("Referer"):
+				return True
+			return False
+
+		if requires_proxy():
+			return self.proxy(url=url)
+		raise cp.HTTPRedirect(url, 307)
+
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	def proxy(self, url=None, **void):
@@ -311,7 +311,17 @@ class Server:
 		cp.response.headers.update(resp.headers)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
-		return resp.iter_content(65536)
+
+		def respond_with_content_type(resp):
+			it = resp.iter_content(65536)
+			b = next(it)
+			mime = magic.from_buffer(b)
+			cp.response.headers.pop("Content-Type", None)
+			cp.response.headers["Content-Type"] = mime
+			yield b
+			yield from it
+
+		return respond_with_content_type(resp) if resp.headers.get("Content-Type", "application/octet-stream") == "application/octet-stream" else resp.iter_content(65536)
 
 	@cp.expose
 	# @cp.tools.accept(media="multipart/form-data")
