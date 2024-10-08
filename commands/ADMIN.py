@@ -2467,7 +2467,7 @@ class UpdateUserLogs(Database):
 						files.append(CompatFile(bf, filename=fn))
 						b_url = "attachment://" + fn
 					else:
-						b_url = af
+						b_url = bf
 			emb.add_field(
 				name="Avatar",
 				value=f"[Before]({b_url}) ➡️ [After]({a_url})",
@@ -2479,6 +2479,7 @@ class UpdateUserLogs(Database):
 			return
 		emb.set_author(name=str(after), icon_url=a_url, url=a_url)
 		emb.colour = colour2raw(colour)
+		print("MU:", emb, a_url, b_url, files)
 		message = await channel.send(embed=emb, files=files)
 		if "exec" in bot.data:
 			with tracebacksuppressor:
@@ -2829,12 +2830,17 @@ class UpdateMessageCache(Database):
 				reactions = []
 				for reaction in message.reactions:
 					if not reaction.is_custom_emoji():
-						r = dict(emoji=dict(id=None, name=str(reaction)))
-						if reaction.count != 1:
-							r["count"] = reaction.count
-						if reaction.me:
-							r["me"] = reaction.me
-						reactions.append(r)
+						r = dict(emoji=dict(id=None, name=str(reaction.emoji)))
+					else:
+						eid, ename = str(reaction.emoji).rsplit(":", 1)
+						eid = int(eid.split(":", 1)[-1])
+						ename = ename.removesuffix(">")
+						r = dict(emoji=dict(id=eid, name=name))
+					if reaction.count != 1:
+						r["count"] = reaction.count
+					if reaction.me:
+						r["me"] = reaction.me
+					reactions.append(r)
 				if reactions:
 					m["reactions"] = reactions
 				try:
@@ -2970,24 +2976,6 @@ class UpdateMessageLogs(Database):
 		self.bot.data.message_cache.finished = True
 		self.bot.data.message_cache.setmtime()
 		print("Loading new messages completed.")
-
-	# async def _command_(self, message, **void):
-	#     if not T(message).get("slash"):
-	#         return
-	#     guild = message.guild
-	#     if not guild or guild.id not in self.data:
-	#         return
-	#     c_id = self.data[guild.id]
-	#     try:
-	#         channel = await self.bot.fetch_channel(c_id)
-	#     except (EOFError, discord.NotFound):
-	#         self.data.pop(guild.id)
-	#         return
-	#     emb = await self.bot.as_embed(message, link=True)
-	#     emb.colour = discord.Colour(0x00FFFF)
-	#     action = f"**Slash command executed in** {channel_mention(message.channel.id)}:\n"
-	#     emb.description = lim_str(action + (emb.description or ""), 4096)
-	#     self.bot.send_embeds(channel, emb)
 
 	# Edit events are rather straightforward to log
 	async def _edit_(self, before, after, force=False, **void):

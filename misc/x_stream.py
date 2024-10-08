@@ -12,7 +12,7 @@ from cherrypy._cpdispatch import Dispatcher
 import orjson
 import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
-from .util import AUTH, decrypt, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, byte_scale, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
+from .util import AUTH, decrypt, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, url2fn, byte_scale, seq, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
 
 csubmit(Request._init_())
 tsubmit(eloop.run_forever)
@@ -261,6 +261,59 @@ class Server:
 		raise cp.HTTPRedirect(url, 307)
 
 	@cp.expose
+	@cp.tools.accept(media="multipart/form-data")
+	def reupload(self, url=None, **void):
+		if not url:
+			return "Expected proxy URL."
+		try:
+			body = cp.request.body.fp.read()
+		except Exception:
+			print_exc()
+			body = None
+		headers = Request.header()
+		if cp.request.headers.get("Range"):
+			headers["Range"] = cp.request.headers["Range"]
+		resp = self.session.request(
+			cp.request.method.upper(),
+			url,
+			headers=headers,
+			data=body,
+			stream=True,
+			verify=False,
+			timeout=60,
+		)
+		resp.raise_for_status()
+		fut = attachment_cache.create(seq(resp), filename=url2fn(url))
+		return await_fut(fut)
+
+	@cp.expose
+	@cp.tools.accept(media="multipart/form-data")
+	def proxy(self, url=None, **void):
+		if not url:
+			return "Expected proxy URL."
+		try:
+			body = cp.request.body.fp.read()
+		except Exception:
+			print_exc()
+			body = None
+		headers = Request.header()
+		if cp.request.headers.get("Range"):
+			headers["Range"] = cp.request.headers["Range"]
+		resp = self.session.request(
+			cp.request.method.upper(),
+			url,
+			headers=headers,
+			data=body,
+			stream=True,
+			verify=False,
+			timeout=60,
+		)
+		cp.response.headers.update(resp.headers)
+		cp.response.headers.pop("Connection", None)
+		cp.response.headers.pop("Transfer-Encoding", None)
+		return resp.iter_content(65536)
+
+	@cp.expose
 	# @cp.tools.accept(media="multipart/form-data")
 	def backend(self, *path, **query):
 		rpath = "/".join(path)
@@ -294,40 +347,6 @@ class Server:
 			print("HEADERS:", cp.response.headers)
 			return resp.content
 		print("HEADERS:", cp.response.headers)
-		return resp.iter_content(65536)
-
-	@cp.expose
-	@cp.tools.accept(media="multipart/form-data")
-	def proxy(self, url=None, **void):
-		if not url:
-			return "Expected proxy URL."
-		try:
-			body = cp.request.body.fp.read()
-		except Exception:
-			print_exc()
-			body = None
-		headers = {
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-			"DNT": "1",
-			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
-			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in range(4)),
-		}
-		headers.pop("Connection", None)
-		headers.pop("Transfer-Encoding", None)
-		if cp.request.headers.get("Range"):
-			headers["Range"] = cp.request.headers["Range"]
-		resp = self.session.request(
-			cp.request.method.upper(),
-			url,
-			headers=headers,
-			data=body,
-			stream=True,
-			verify=False,
-			timeout=60,
-		)
-		cp.response.headers.update(resp.headers)
-		cp.response.headers.pop("Connection", None)
-		cp.response.headers.pop("Transfer-Encoding", None)
 		return resp.iter_content(65536)
 
 	@cp.expose

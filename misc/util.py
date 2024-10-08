@@ -24,7 +24,6 @@ import subprocess
 import sys
 import threading
 import time
-import urllib
 import zipfile
 import filetype
 import nacl.secret
@@ -38,6 +37,7 @@ import requests
 import tiktoken
 from collections import deque
 from math import ceil, comb, inf, isfinite, isqrt
+from urllib.parse import quote_plus, unquote_plus
 from traceback import format_exc, print_exc
 from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, fcdict, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, T2, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, MultiEncoder, sublist_index # noqa: F401
 from misc.asyncs import cst, await_fut, wrap_future, awaitable, reflatten, asubmit, csubmit, esubmit, tsubmit, waited_coro, Future, Semaphore
@@ -578,10 +578,10 @@ def unyt(s):
 	if not is_url(s):
 		return s
 	if (s.startswith("https://mizabot.xyz/u") or s.startswith("https://api.mizabot.xyz/u")) and ("?url=" in s or "&url=" in s):
-		s = urllib.parse.unquote_plus(s.replace("&url=", "?url=", 1).split("?url=", 1)[-1])
+		s = unquote_plus(s.replace("&url=", "?url=", 1).split("?url=", 1)[-1])
 	if s.startswith("https://mizabot.xyz/ytdl") or s.startswith("https://api.mizabot.xyz/ytdl"):
 		if "?d=" in s or "?v=" in s:
-			s = urllib.parse.unquote_plus(s.replace("?v=", "?d=", 1).split("?d=", 1)[-1])
+			s = unquote_plus(s.replace("?v=", "?d=", 1).split("?d=", 1)[-1])
 		else:
 			s = re.sub(r"https?:\/\/(?:\w{1,5}\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)|https?:\/\/(?:api\.)?mizabot\.xyz\/ytdl\?[vd]=(?:https:\/\/youtu\.be\/|https%3A%2F%2Fyoutu\.be%2F)", "https://youtu.be/", re.sub(r"[\?&]si=[\w\-]+", "", s))
 		s = s.split("&", 1)[0]
@@ -1021,8 +1021,8 @@ def find_file(path, cwd="saves/filehost", ind="\x7f"):
 				return wd + "/" + fi
 	raise FileNotFoundError(404, path)
 
-url_parse = urllib.parse.quote_plus
-url_unparse = urllib.parse.unquote_plus
+url_parse = quote_plus
+url_unparse = unquote_plus
 
 def stream_exists(url, fmt="opus"):
 	url = unyt(url)
@@ -1094,7 +1094,7 @@ def ecdc_br(fn):
 	return br
 
 def verify_url(url):
-	return url if is_url(url) else url_parse(url)
+	return url if is_url(url) else quote_plus(url)
 
 __scales = ("", "k", "M", "G", "T", "P", "E", "Z", "Y")
 __uscales = [s.lower() for s in __scales]
@@ -2840,16 +2840,16 @@ class AttachmentCache(Cache):
 			self[a_id] = resp
 			return resp
 
-	async def create(self, *data):
+	async def create(self, *data, filename="b", channel=None, content="", collapse=True):
 		if not self.channels:
 			raise RuntimeError("Proxy channel list required.")
 		self.sess = self.sess or aiohttp.ClientSession()
 		form_data = aiohttp.FormData(quote_fields=False)
 		payload = dict(
-			content="test",
+			content=content,
 			attachments=[dict(
 				id=i,
-				filename="b",
+				filename=filename,
 			) for i in range(len(data))],
 		)
 		form_data.add_field(name="payload_json", value=json_dumpstr(payload))
@@ -2857,13 +2857,15 @@ class AttachmentCache(Cache):
 			form_data.add_field(
 				name=f"files[{i}]",
 				value=b,
-				filename="b",
+				filename=filename,
 				content_type="application/octet-stream",
 			)
-		cid = choice(self.channels)
+		cid = getattr(channel, "id", channel) if channel else choice(self.channels)
 		url = f"https://discord.com/api/v10/channels/{cid}/messages"
-		heads = choice((self.headers, self.alt_headers))
+		heads = dict(choice((self.headers, self.alt_headers)))
+		heads.pop("Content-Type")
 		resp = await self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
+		resp.raise_for_status()
 		data = await resp.json()
 		cid = int(data["channel_id"])
 		mid = int(data["id"])
@@ -2871,8 +2873,10 @@ class AttachmentCache(Cache):
 		for a in data["attachments"]:
 			aid = int(a["id"])
 			fn = a["filename"]
-			out.append((cid, mid, aid, fn))
-		return resp, out
+			out.append(shorten_attachment(cid, mid, aid, fn))
+		if len(out) == 1 and collapse:
+			return out[0]
+		return out
 
 attachment_cache = AttachmentCache(timeout=3600 * 12 , trash=inf, persist="attachment.cache")
 

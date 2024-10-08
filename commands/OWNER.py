@@ -762,9 +762,10 @@ class UpdateExec(Database):
 		return deleted
 
 	seen = Cache(timeout=86400)
-	async def uproxy(self, *urls, collapse=True, mode="upload", **kwargs):
+	async def uproxy(self, *urls, collapse=True, mode="upload", filename=None, channel=None, **kwargs):
 		bot = self.bot
 		async def proxy_url(url):
+			uhu = None
 			if isinstance(url, byte_like):
 				data = url
 			elif isinstance(url, CompatFile):
@@ -788,12 +789,27 @@ class UpdateExec(Database):
 				elif mode == "download":
 					return await bot.get_request(url)
 				elif mode == "upload":
-					data = await bot.get_request(url)
+					pass
 				else:
 					return
-			_, out = await attachment_cache.create(data)
-			assert out
-			return shorten_attachment(*out[0])
+			fn = filename or (url2fn(url) if isinstance(url, str) else "b")
+			if isinstance(url, str) and bot.webserver:
+				url2 = await Request(bot.webserver + "/reupload?url=" + quote_plus(url) + "&filename=" + fn)
+			else:
+				resp = await asubmit(
+					reqs.next().get,
+					url,
+					headers=Request.header(),
+					stream=True,
+					verify=False,
+					timeout=60,
+				)
+				data = seq(resp)
+				url2 = await attachment_cache.create(data, filename=fn, channel=channel)
+			assert url2
+			if uhu:
+				bot.data.proxies[uhu] = url2
+			return url2
 		if collapse and len(urls) == 1:
 			return await proxy_url(urls[0])
 		return await gather(*map(proxy_url, urls))

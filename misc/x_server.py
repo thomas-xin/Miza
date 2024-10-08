@@ -32,7 +32,7 @@ from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, newfut, esubmit, tsubmit, csubmit, await_fut, CloseableAsyncIterator
 from .smath import supersample, xrand
 from .types import as_str, astype, cdict, suppress, round_min, lim_str, full_prune, literal_eval, regexp, loop, json_dumps, alist
-from .util import hwaccel, fcdict, ihash, nhash, shash, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, find_file, get_mime, ecdc_dir, url_parse, url_unparse, smart_split, proxy, Request, magic, is_discord_attachment, discord_expired, unyt, ecdc_exists, get_duration, evalex, evalEX, DownloadingFile, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, attachment_cache
+from .util import hwaccel, fcdict, ihash, nhash, shash, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, find_file, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, smart_split, seq, proxy, Request, magic, is_discord_attachment, discord_expired, unyt, ecdc_exists, get_duration, evalex, evalEX, DownloadingFile, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, attachment_cache
 
 
 try:
@@ -958,40 +958,6 @@ class Server:
 					return
 				yield b
 
-	@cp.expose
-	@cp.tools.accept(media="multipart/form-data")
-	def proxy(self, url=None, **void):
-		if not url:
-			return "Expected proxy URL."
-		try:
-			body = cp.request.body.fp.read()
-		except Exception:
-			print_exc()
-			body = None
-		headers = {
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-			"DNT": "1",
-			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
-			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in range(4)),
-		}
-		headers.pop("Connection", None)
-		headers.pop("Transfer-Encoding", None)
-		if cp.request.headers.get("Range"):
-			headers["Range"] = cp.request.headers["Range"]
-		resp = self.session.request(
-			cp.request.method.upper(),
-			url,
-			headers=headers,
-			data=body,
-			stream=True,
-			verify=False,
-			timeout=60,
-		)
-		cp.response.headers.update(resp.headers)
-		cp.response.headers.pop("Connection", None)
-		cp.response.headers.pop("Transfer-Encoding", None)
-		return resp.iter_content(65536)
-
 	def proxy_if(self, url):
 		assert isinstance(url, str), url
 
@@ -1009,24 +975,75 @@ class Server:
 		raise cp.HTTPRedirect(url, 307)
 
 	@cp.expose(("u",))
-	def unproxy(self, *path, url=None, **kwargs):
+	def unproxy(self, *path, url=None, **query):
+		if url:
+			return self.proxy_if(url)
+		rpath = "/".join(path)
+		if rpath:
+			rpath = "/" + rpath
+		rquery = cp.request.query_string and "?" + cp.request.query_string
+		if len(path) == 1 and path[0].count("~") == 2:
+			fut = csubmit(attachment_cache.obtain(*path[0].split(".", 1)[0].split("~", 2)))
+			return self.proxy_if(await_fut(fut))
+		if len(path) == 2 and path[0].count("~") == 0:
+			c_id, m_id, a_id, fn = decode_attachment("/".join(path))
+			fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
+			return self.proxy_if(await_fut(fut))
+		url = f"{self.state['/']}/u{rpath}{rquery}"
+		raise cp.HTTPRedirect(url, 307)
+
+	@cp.expose
+	@cp.tools.accept(media="multipart/form-data")
+	def reupload(self, url=None, filename=None, **void):
 		if not url:
-			if len(path) == 1 and path[0].count("~") == 2:
-				fut = csubmit(attachment_cache.obtain(*path[0].split(".", 1)[0].split("~", 2), ""))
-				return self.proxy_if(await_fut(fut))
-			if len(path) == 2 and path[0].count("~") == 0:
-				c_id, m_id, a_id, fn = decode_attachment("/".join(path))
-				fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
-				return self.proxy_if(await_fut(fut))
-			assert len(path) == 1 and "~" not in path
-			aid = path[0]
-			if "." in aid:
-				aid = aid.split(".", 1)[0]
-			with tracebacksuppressor:
-				aid = int.from_bytes(base64.urlsafe_b64decode(aid + "=="), "big")
-			assert isinstance(aid, int) or aid.isnumeric()
-			url = interface.run(f"bot.renew_attachment({aid})", timeout=60, cache=21600) or url
-		return self.proxy_if(url)
+			return "Expected proxy URL."
+		try:
+			body = cp.request.body.fp.read()
+		except Exception:
+			print_exc()
+			body = None
+		headers = Request.header()
+		if cp.request.headers.get("Range"):
+			headers["Range"] = cp.request.headers["Range"]
+		resp = self.session.request(
+			cp.request.method.upper(),
+			url,
+			headers=headers,
+			data=body,
+			stream=True,
+			verify=False,
+			timeout=60,
+		)
+		resp.raise_for_status()
+		fut = attachment_cache.create(seq(resp), filename=filename or url2fn(url))
+		return await_fut(fut)
+
+	@cp.expose
+	@cp.tools.accept(media="multipart/form-data")
+	def proxy(self, url=None, **void):
+		if not url:
+			return "Expected proxy URL."
+		try:
+			body = cp.request.body.fp.read()
+		except Exception:
+			print_exc()
+			body = None
+		headers = Request.header()
+		if cp.request.headers.get("Range"):
+			headers["Range"] = cp.request.headers["Range"]
+		resp = self.session.request(
+			cp.request.method.upper(),
+			url,
+			headers=headers,
+			data=body,
+			stream=True,
+			verify=False,
+			timeout=60,
+		)
+		cp.response.headers.update(resp.headers)
+		cp.response.headers.pop("Connection", None)
+		cp.response.headers.pop("Transfer-Encoding", None)
+		return resp.iter_content(65536)
 
 	@tracebacksuppressor
 	def renew_url(self, url, mid=None):

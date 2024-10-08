@@ -3373,7 +3373,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if is_image(url):
 					url = await self.data.exec.uproxy(url)
 					emb.url = url
-					# url = allow_gif(url)
 					emb.set_image(url=url)
 					if link:
 						link = message_link(message)
@@ -3390,11 +3389,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					emb.url = emb2.url
 				if emb2.image:
 					url = await self.data.exec.uproxy(emb2.image.url)
-					# url = allow_gif(url)
 					emb.set_image(url=url)
 				if emb2.thumbnail:
 					url = await self.data.exec.uproxy(emb2.thumbnail.url)
-					# url = allow_gif(url)
 					emb.set_thumbnail(url=url)
 				for f in emb2.fields:
 					if f:
@@ -3428,12 +3425,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						return emb
 		emb.description = content
 		if len(message.embeds) > 1 or content:
-			urls = list(chain(("(" + e.url + ")" for e in message.embeds[1:] if e.url), ("[" + best_url(a) + "]" for a in message.attachments)))
+			urls = [e.url for e in message.embeds if e.url] + [best_url(a) for a in message.attachments]
 			items = []
 			for i in range((len(urls) + 9) // 10):
 				temp = urls[i * 10:i * 10 + 10]
 				temp2 = await self.data.exec.uproxy(*temp, collapse=False)
-				items.extend(temp2[x] or temp[x] for x in range(len(temp)))
+				items.extend("(" + temp2[x] + ")" if temp2[x] else "[" + temp[x] + "]" for x in range(len(temp)))
 		else:
 			items = None
 		if items:
@@ -3480,13 +3477,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					emb.remove_field(-1)
 				break
 		if not emb.description:
-			urls = list(chain(("(" + e.url + ")" for e in message.embeds if e.url), ("[" + best_url(a) + "]" for a in message.attachments)))
+			urls = [e.url for e in message.embeds if e.url] + [best_url(a) for a in message.attachments]
 			items = []
 			for i in range((len(urls) + 9) // 10):
 				with tracebacksuppressor:
 					temp = urls[i * 10:i * 10 + 10]
 					temp2 = await self.data.exec.uproxy(*temp, collapse=False)
-					items.extend(temp2[x] or temp[x] for x in range(len(temp)))
+					items.extend("(" + temp2[x] + ")" if temp2[x] else "[" + temp[x] + "]" for x in range(len(temp)))
 			emb.description = lim_str("\n".join(items), 4096)
 		if link:
 			link = message_link(message)
@@ -6801,9 +6798,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				await self.send_event("_seen_", user=arg, delay=delay, event=event, **kwargs)
 
 	async def ensure_reactions(self, message):
-		if not message.reactions or all(reaction.count == 1 for reaction in message.reactions) or isinstance(message, self.CachedMessage | self.LoadedMessage) or isinstance(message.author, cdict | self.GhostUser):
-			with tracebacksuppressor:
+		if not message.reactions or isinstance(message, self.CachedMessage | self.LoadedMessage) or isinstance(message.author, cdict | self.GhostUser):
+			try:
 				message = await discord.abc.Messageable.fetch_message(message.channel, message.id)
+			except (LookupError, discord.NotFound):
+				pass
+			else:
 				self.add_message(message, files=False, force=True)
 		return message
 
