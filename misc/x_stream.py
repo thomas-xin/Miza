@@ -262,7 +262,7 @@ class Server:
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
-	def reupload(self, url=None, **void):
+	def reupload(self, url=None, filename=None, **void):
 		if not url:
 			return "Expected proxy URL."
 		try:
@@ -283,7 +283,7 @@ class Server:
 			timeout=60,
 		)
 		resp.raise_for_status()
-		fut = attachment_cache.create(seq(resp), filename=url2fn(url))
+		fut = attachment_cache.create(seq(resp), filename=filename or url2fn(url))
 		return await_fut(fut)
 
 	@cp.expose
