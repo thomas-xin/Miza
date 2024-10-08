@@ -2832,9 +2832,9 @@ class UpdateMessageCache(Database):
 					if not reaction.is_custom_emoji():
 						r = dict(emoji=dict(id=None, name=str(reaction.emoji)))
 					else:
-						eid, ename = str(reaction.emoji).rsplit(":", 1)
-						eid = int(eid.split(":", 1)[-1])
-						ename = ename.removesuffix(">")
+						ename, eid = str(reaction.emoji).rsplit(":", 1)
+						eid = int(eid.removesuffix(">"))
+						ename = ename.split(":", 1)[-1]
 						r = dict(emoji=dict(id=eid, name=name))
 					if reaction.count != 1:
 						r["count"] = reaction.count
