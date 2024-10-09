@@ -2477,7 +2477,7 @@ class UpdateUserLogs(Database):
 			colour[2] += 255
 		if not change:
 			return
-		emb.set_author(name=str(after), icon_url=a_url, url=a_url)
+		emb.set_author(name=str(after), icon_url=a_url, url=a_url if is_url(a_url) else None)
 		emb.colour = colour2raw(colour)
 		print("MU:", emb, a_url, b_url, files)
 		message = await channel.send(embed=emb, files=files)
@@ -2490,6 +2490,7 @@ class UpdateUserLogs(Database):
 				if is_discord_attachment(ub):
 					b_url = bot.data.exec.uregister(best_url(before), ub, message.id)
 					emb.fields[-1].value = f"[Before]({b_url}) ➡️ [After]({a_url})"
+					emb.set_author(name=str(after), icon_url=a_url, url=a_url)
 					await message.edit(embed=emb)
 
 	async def _channel_update_(self, before, after, guild, **void):

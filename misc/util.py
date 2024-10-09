@@ -1887,16 +1887,23 @@ class seq(io.BufferedRandom, collections.abc.Sequence, contextlib.AbstractContex
 		self.closer = T(obj).get("close")
 		self.high = 0
 		self.finished = False
-		if isinstance(obj, io.IOBase):
+		if isinstance(obj, io.IOBase) or hasattr(obj, "read"):
 			if isinstance(obj, io.BytesIO):
 				self.data = obj
+				self.finished = True
 			elif hasattr(obj, "getbuffer"):
 				self.data = io.BytesIO(obj.getbuffer())
+				self.finished = True
 			else:
-				obj.seek(0)
-				self.data = io.BytesIO(obj.read())
-				obj.seek(0)
-			self.finished = True
+				if hasattr(obj, "seek"):
+					obj.seek(0)
+				def obj_iter(fp):
+					b = fp.read(self.BUF)
+					if not b:
+						raise StopIteration
+					yield b
+				self.iter = obj_iter(obj)
+				self.data = io.BytesIO()
 		elif isinstance(obj, bytes) or isinstance(obj, bytearray) or isinstance(obj, memoryview):
 			self.data = io.BytesIO(obj)
 			self.high = len(obj)
@@ -2844,11 +2851,12 @@ class AttachmentCache(Cache):
 			self[a_id] = resp
 		return resp
 
-	async def create(self, *data, filename="b", channel=None, content="", collapse=True):
+	async def create(self, *data, filename=None, channel=None, content="", collapse=True):
 		if not self.channels:
 			raise RuntimeError("Proxy channel list required.")
 		self.sess = self.sess or aiohttp.ClientSession()
 		form_data = aiohttp.FormData(quote_fields=False)
+		filename = filename or "b"
 		payload = dict(
 			content=content,
 			attachments=[dict(

@@ -979,27 +979,28 @@ class Server:
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	def reupload(self, url=None, filename=None, **void):
-		if not url:
-			return "Expected proxy URL."
 		try:
-			body = cp.request.body.fp.read()
+			resp = cp.request.body.fp
 		except Exception:
 			print_exc()
-			body = None
-		headers = Request.header()
-		if cp.request.headers.get("Range"):
-			headers["Range"] = cp.request.headers["Range"]
-		resp = self.session.request(
-			cp.request.method.upper(),
-			url,
-			headers=headers,
-			data=body,
-			stream=True,
-			verify=False,
-			timeout=60,
-		)
-		resp.raise_for_status()
-		fut = attachment_cache.create(seq(resp), filename=filename or url2fn(url))
+			resp = None
+		if not resp or int(cp.request.headers.get("Content-Length", 0)) < 1:
+			if not url:
+				return "Expected input URL or data."
+			headers = Request.header()
+			if cp.request.headers.get("Range"):
+				headers["Range"] = cp.request.headers["Range"]
+			resp = self.session.request(
+				cp.request.method.upper(),
+				url,
+				headers=headers,
+				stream=True,
+				verify=False,
+				timeout=60,
+			)
+			resp.raise_for_status()
+		fn = filename or (url2fn(url) if url else None)
+		fut = attachment_cache.create(seq(resp), filename=fn)
 		return await_fut(fut)
 
 	def proxy_if(self, url):

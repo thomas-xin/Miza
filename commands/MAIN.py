@@ -1047,7 +1047,7 @@ class Invite(Command):
 
 
 class Upload(Command):
-	name = ["Filehost", "Files", "Preserve", "PreserveAttachmentLinks"]
+	name = ["Filehost", "Preserve"]
 	description = "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to ⟨MIZA⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
 	usage = "<url>?"
 	example = ("preserve https://cdn.discordapp.com/attachments/911168940246442006/1026474858705588224/6e74595fa98e9c52e2fab6ece4639604.png", "files")
@@ -1066,7 +1066,7 @@ class Upload(Command):
 		else:
 			futs = deque()
 			for url in args:
-				if name in ("files", "preserve", "preserveattachmentlinks") and is_discord_attachment(url):
+				if name == "preserve" and is_discord_attachment(url):
 					a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 					if a_id not in self.bot.data.attachments:
 						url = await self.bot.renew_attachment(url)
@@ -1083,7 +1083,7 @@ class Upload(Command):
 						u = await self.bot.renew_attachment(a_id)
 						futs.append(as_fut(self.bot.preserve_attachment(a_id, fn=u)))
 						continue
-				futs.append(Request(self.bot.raw_webserver + "/upload_url?url=" + url_parse(url), decode=True, aio=True, ssl=False, timeout=1200))
+				futs.append(Request(self.bot.webserver + "/reupload?url=" + quote_plus(url), decode=True, aio=True, ssl=False, timeout=1200))
 				await asyncio.sleep(0.1)
 			out = await gather(*futs)
 		return await send_with_reply(channel, message, "\n".join("<" + u + ">" for u in out), ephemeral=True)
