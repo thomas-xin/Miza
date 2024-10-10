@@ -1079,10 +1079,10 @@ class Upload(Command):
 						url = self.bot.preserve_as_long(message.channel.id, message.id, a_id, fn=url)
 						futs.append(as_fut(url))
 						continue
-					if a_id in self.bot.data.attachments:
-						u = await self.bot.renew_attachment(a_id)
-						futs.append(as_fut(self.bot.preserve_attachment(a_id, fn=u)))
-						continue
+					# if a_id in self.bot.data.attachments:
+					# 	u = await self.bot.renew_attachment(a_id)
+					# 	futs.append(as_fut(self.bot.preserve_attachment(a_id, fn=u)))
+					# 	continue
 				futs.append(Request(self.bot.webserver + "/reupload?url=" + quote_plus(url), decode=True, aio=True, ssl=False, timeout=1200))
 				await asyncio.sleep(0.1)
 			out = await gather(*futs)

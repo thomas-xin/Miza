@@ -2457,6 +2457,7 @@ class UpdateUserLogs(Database):
 					a_url = "attachment://" + fn
 				else:
 					a_url = af
+		requires_edit = False
 		if bk != ak:
 			b_url = best_url(before)
 			if "exec" in bot.data:
@@ -2472,25 +2473,28 @@ class UpdateUserLogs(Database):
 				name="Avatar",
 				value=f"[Before]({b_url}) ➡️ [After]({a_url})",
 			)
+			requires_edit = not is_url(b_url) or not is_url(a_url)
 			emb.set_thumbnail(url=b_url)
 			change = True
 			colour[2] += 255
 		if not change:
 			return
+		ua, ub = a_url, b_url
 		emb.set_author(name=str(after), icon_url=a_url, url=a_url if is_url(a_url) else None)
 		emb.colour = colour2raw(colour)
 		print("MU:", emb, a_url, b_url, files)
 		message = await channel.send(embed=emb, files=files)
 		if "exec" in bot.data:
 			with tracebacksuppressor:
-				ua = message.embeds[0].author.icon_url
-				if is_discord_attachment(ua):
-					a_url = bot.data.exec.uregister(best_url(after), ua, message.id)
-				ub = message.embeds[0].thumbnail and message.embeds[0].thumbnail.url
-				if is_discord_attachment(ub):
-					b_url = bot.data.exec.uregister(best_url(before), ub, message.id)
+				ua2 = message.embeds[0].author.icon_url
+				if is_discord_attachment(ua2):
+					a_url = bot.data.exec.uregister(best_url(after), ua2, message.id)
+				ub2 = message.embeds[0].thumbnail and message.embeds[0].thumbnail.url
+				if is_discord_attachment(ub2):
+					b_url = bot.data.exec.uregister(best_url(before), ub2, message.id)
+				if requires_edit:
 					emb.fields[-1].value = f"[Before]({b_url}) ➡️ [After]({a_url})"
-					emb.set_author(name=str(after), icon_url=a_url, url=a_url)
+					emb.set_author(name=str(after), icon_url=ua, url=a_url)
 					await message.edit(embed=emb)
 
 	async def _channel_update_(self, before, after, guild, **void):

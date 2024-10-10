@@ -1718,8 +1718,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		out = tuple(out)
 		if not no_cache:
 			self.followed[tup] = out
-			while len(self.followed) > 4096:
-				with suppress():
+			with tracebacksuppressor:
+				while len(self.followed) > 4096:
+				# with suppress():
 					self.followed.pop(next(iter(self.followed)))
 		if limit is not None:
 			return out[:limit]

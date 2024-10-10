@@ -157,9 +157,7 @@
 			"aliases": [
 				"Upload",
 				"Filehost",
-				"Files",
-				"Preserve",
-				"PreserveAttachmentLinks"
+				"Preserve"
 			],
 			"description": "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to Miza's webserver's upload page: https://mizabot.xyz/files",
 			"usage": "<url>?",

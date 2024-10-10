@@ -2506,6 +2506,7 @@ class Cache(dict):
 		object.__setattr__(self, "timeout2", timeout2)
 		object.__setattr__(self, "lost", {})
 		object.__setattr__(self, "trash", trash)
+		object.__setattr__(self, "db", None)
 		if self:
 			ts = time.time() + timeout
 			tmap = {k: ts for k in self}
@@ -2519,7 +2520,6 @@ class Cache(dict):
 		else:
 			fut = None
 		object.__setattr__(self, "waiting", fut)
-		object.__setattr__(self, "db", None)
 		if persist is not None:
 			path = f"cache/{persist}"
 			db = FileHashDict(path=path, automut=False, autosave=3600)
@@ -2570,6 +2570,16 @@ class Cache(dict):
 		if self.db:
 			self.db.sync()
 		return self
+
+	def __iter__(self):
+		if self.db is not None:
+			return iter(self.db)
+		return super().__iter__()
+
+	def __len__(self):
+		if self.db is not None:
+			return len(self.db)
+		return super().__len__()
 
 	def __getitem__(self, k):
 		if self.db is not None:
@@ -2857,35 +2867,38 @@ class AttachmentCache(Cache):
 		self.sess = self.sess or aiohttp.ClientSession()
 		form_data = aiohttp.FormData(quote_fields=False)
 		filename = filename or "b"
-		payload = dict(
-			content=content,
-			attachments=[dict(
-				id=i,
-				filename=filename,
-			) for i in range(len(data))],
-		)
-		form_data.add_field(name="payload_json", value=json_dumpstr(payload))
-		for i, b in enumerate(data):
-			form_data.add_field(
-				name=f"files[{i}]",
-				value=b,
-				filename=filename,
-				content_type="application/octet-stream",
-			)
-		cid = getattr(channel, "id", channel) if channel else choice(self.channels)
-		url = f"https://discord.com/api/v10/channels/{cid}/messages"
-		heads = dict(choice((self.headers, self.alt_headers)))
-		heads.pop("Content-Type")
-		resp = await self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
-		resp.raise_for_status()
-		data = await resp.json()
-		cid = int(data["channel_id"])
-		mid = int(data["id"])
 		out = []
-		for a in data["attachments"]:
-			aid = int(a["id"])
-			fn = a["filename"]
-			out.append(shorten_attachment(cid, mid, aid, fn))
+		while data:
+			temp, data = data[:10], data[10:]
+			payload = dict(
+				content=content,
+				attachments=[dict(
+					id=i,
+					filename=filename if not i else "b",
+				) for i in range(len(temp))],
+			)
+			form_data.add_field(name="payload_json", value=json_dumpstr(payload))
+			for i, b in enumerate(temp):
+				form_data.add_field(
+					name=f"files[{i}]",
+					value=b,
+					filename=filename if not i else "b",
+					content_type="application/octet-stream",
+				)
+			cid = getattr(channel, "id", channel) if channel else choice(self.channels)
+			url = f"https://discord.com/api/v10/channels/{cid}/messages"
+			heads = dict(choice((self.headers, self.alt_headers)))
+			heads.pop("Content-Type")
+			resp = await self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
+			resp.raise_for_status()
+			message = await resp.json()
+			cid = int(message["channel_id"])
+			mid = int(message["id"])
+			for a in message["attachments"]:
+				aid = int(a["id"])
+				fn = a["filename"]
+				out.append(shorten_attachment(cid, mid, aid, fn))
+			filename = "b"
 		if len(out) == 1 and collapse:
 			return out[0]
 		return out
@@ -2894,7 +2907,47 @@ attachment_cache = AttachmentCache(timeout=3600 * 12 , trash=inf, persist="attac
 
 
 class ChunkSystem(FileHashDict):
-	pass
+
+	session = requests.Session()
+
+	def combine(self, urls):
+		size = 0
+		url = urls[0]
+		if len(urls) > 1:
+			last = urls[-1]
+			fut = esubmit(self.session.head(
+				last,
+				headers=Request.header(),
+				stream=True,
+				verify=False,
+				timeout=60,
+			))
+		resp = self.session.get(
+			url,
+			headers=Request.header(),
+			stream=True,
+			verify=False,
+			timeout=60,
+		)
+		if resp.headers.get("Content-Type", "application/octet-stream") == "application/octet-stream":
+			it = resp.iter_content(65536)
+			b = next(it)
+			mime = magic.from_buffer(b)
+		else:
+			mime = resp.headers["Content-Type"]
+		size += int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 1))
+		if len(urls) > 1:
+			size += attachment_cache.max_size * len(urls) - 2
+			resp2 = fut.result()
+			size += int(resp2.headers.get("Content-Length") or resp2.headers.get("x-goog-stored-content-length", 1))
+		return cdict(
+			filename=url2fn(url),
+			size=size,
+			mimetype=mime,
+			chunks=urls,
+		)
+
+chunk_system = ChunkSystem()
 
 
 class FileSystem(FileHashDict):

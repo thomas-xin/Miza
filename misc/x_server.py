@@ -330,7 +330,8 @@ def error_handler(exc=None):
 	cp.response.status = status
 	cp.response.headers.update(head)
 	cp.response.headers.pop("Connection", None)
-	print(repr(exc), cp.response.headers)
+	print_exc()
+	print(cp.response.headers)
 	cp.response.body = body
 
 config = {
@@ -973,8 +974,13 @@ class Server:
 			c_id, m_id, a_id, fn = decode_attachment("/".join(path))
 			fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
 			return self.proxy_if(await_fut(fut))
-		url = f"{self.state['/']}/u{rpath}{rquery}"
-		raise cp.HTTPRedirect(url, 307)
+		if hasattr(self, "state"):
+			url = f"{self.state['/']}/u{rpath}{rquery}"
+			raise cp.HTTPRedirect(url, 307)
+		assert len(path) == 1
+		aid = p2n(path[0])
+		resp = interface.run(f"bot.renew_attachment({aid})")
+		return self.proxy_if(resp)
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")

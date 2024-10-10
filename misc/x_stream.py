@@ -13,7 +13,7 @@ import orjson
 import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
 from .types import resume
-from .util import AUTH, magic, decrypt, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, url2fn, byte_scale, seq, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
+from .util import AUTH, magic, decrypt, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, url2fn, p2n, byte_scale, seq, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
 
 csubmit(Request._init_())
 tsubmit(eloop.run_forever)
@@ -242,8 +242,13 @@ class Server:
 			c_id, m_id, a_id, fn = decode_attachment("/".join(path))
 			fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
 			return self.proxy_if(await_fut(fut))
-		url = f"{self.state['/']}/u{rpath}{rquery}"
-		raise cp.HTTPRedirect(url, 307)
+		if hasattr(self, "state"):
+			url = f"{self.state['/']}/u{rpath}{rquery}"
+			raise cp.HTTPRedirect(url, 307)
+		assert len(path) == 1
+		aid = p2n(path[0])
+		resp = interface.run(f"bot.renew_attachment({aid})")
+		return self.proxy_if(resp)
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
