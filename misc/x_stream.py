@@ -11,9 +11,9 @@ import cherrypy as cp
 from cherrypy._cpdispatch import Dispatcher
 import orjson
 import requests
-from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
+from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut, gather
 from .types import resume
-from .util import AUTH, magic, decrypt, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, url2fn, p2n, byte_scale, seq, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
+from .util import AUTH, magic, shash, decrypt, zip2bytes, bytes2zip, enc_box, save_auth, attachment_cache, upload_cache, decode_attachment, expand_attachment, is_discord_attachment, discord_expired, url2fn, p2n, byte_scale, seq, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
 
 interface = None
 csubmit(Request._init_())
@@ -202,7 +202,6 @@ class Server:
 		domain_cert = data.get("domain_cert")
 		private_key = data.get("private_key")
 		self.channels = data.get("channels") or self.channels
-		AUTH["encryption_key"] = data.get("encryption_key")
 		AUTH["discord_token"] = self.token
 		AUTH["alt_token"] = self.alt_token
 		AUTH["proxy_channels"] = self.channels
@@ -239,13 +238,11 @@ class Server:
 			self.cache[rpath] = b = f.read()
 		return b
 
-	@cp.expose(("f", "d"))
-	def download(self):
-		pass
-
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	def upload(self, filename="b", hash="", position=0, size=0):
+		position = int(position)
+		size = int(size)
 		h = true_ip() + hash
 		try:
 			resp = cp.request.body.fp
@@ -257,16 +254,19 @@ class Server:
 		if not size or not resp or int(cp.request.headers.get("Content-Length", 0)) < 1:
 			if h in upload_cache:
 				return json_dumps(list(upload_cache[h].keys()))
-			return "Expected input data."
+			return b"Expected input data."
 		assert position == 0 or h in upload_cache
 		assert not position % attachment_cache.max_size
 		if h not in upload_cache:
-			upload_cache[h] = cdict(info=cdict(filename=filename, mimetype=cp.request.headers.get("mimetype", "application/octet-stream"), size=size, chunks=[]), chunkinfo={}, required=RangeSet(0, size))
+			private_key = os.urandom(8)
+			hashable = private_key + b"~" + enc_box._key
+			public_key = shash(hashable)
+			upload_cache[h] = cdict(info=cdict(filename=filename, mimetype=cp.request.headers.get("mimetype", "application/octet-stream"), size=size, key=public_key, chunks=[]), chunkinfo={}, required=RangeSet(0, size), key=private_key)
 
 		def start_upload(position):
 			yield b"{"
 			while True:
-				fn = filename if position == 0 else "b"
+				fn = filename if position == 0 else "c"
 				b = resp.read(attachment_cache.max_size)
 				if not b:
 					break
@@ -278,12 +278,53 @@ class Server:
 				upload_cache[h].required.remove(position, position + len(b))
 				position += len(b)
 				if not upload_cache[h].required:
-					info = upload_cache[h].info
-					info["chunks"] = [v for k, v in sorted(info.pop("chunkinfo").items())]
-					data = bytes2zip(json_dumps(info))
-					yield upload_cache[h]
+					break
+			if not upload_cache[h].required:
+				upload_cache[h].info["chunks"] = [v for k, v in sorted(upload_cache[h].chunkinfo.items())]
+				print("INFO:", upload_cache[h])
+				data = json_dumps(upload_cache[h].info)
+				data2 = bytes2zip(data)
+				if len(data2) <= len(data) / 2:
+					data = data2
+				fut = attachment_cache.create(data, filename=filename, editable=True)
+				url = await_fut(fut) + "?key=" + base64.urlsafe_b64encode(upload_cache[h].key).rstrip(b"=").decode("ascii")
+				yield b'"url":"' + url.encode("utf-8") + b'"'
 			yield b"}"
 		return start_upload(position)
+
+	@cp.expose
+	def delete(self, *path, key=None):
+		assert len(path) == 2 and path[0].count("~") == 0
+		assert key, "File Key Required."
+		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
+		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
+		url = await_fut(fut)
+		resp = self.session.get(
+			url,
+			headers=Request.header(),
+			verify=False,
+			timeout=60,
+		)
+		resp.raise_for_status()
+		try:
+			data = zip2bytes(resp.content)
+		except Exception:
+			data = resp.content
+		info = orjson.loads(data)
+		hashable = base64.urlsafe_b64decode(key + "=") + b"~" + enc_box._key
+		public_key = shash(hashable)
+		assert public_key == info["key"], "File Key Mismatch."
+		deletes = set()
+		deletes.add((c_id, m_id))
+		for url in info["chunks"]:
+			c_id, m_id, a_id, fn = expand_attachment(url)
+			deletes.add((c_id, m_id))
+		print("DELETES:", deletes)
+		futs = []
+		for c_id, m_id in deletes:
+			fut = csubmit(attachment_cache.delete(c_id, m_id))
+			futs.append(fut)
+		await_fut(gather(*futs))
 
 	@cp.expose(("u",))
 	def unproxy(self, *path, url=None, **query):
