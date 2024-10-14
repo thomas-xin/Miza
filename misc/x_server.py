@@ -29,10 +29,10 @@ from math import inf, ceil
 from traceback import print_exc
 from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
-from .asyncs import Semaphore, SemaphoreOverflowError, eloop, newfut, esubmit, tsubmit, csubmit, await_fut, CloseableAsyncIterator
+from .asyncs import Semaphore, SemaphoreOverflowError, eloop, newfut, esubmit, tsubmit, csubmit, await_fut, gather, CloseableAsyncIterator
 from .smath import supersample, xrand
 from .types import as_str, astype, cdict, suppress, round_min, lim_str, full_prune, literal_eval, regexp, loop, json_dumps, alist, resume, RangeSet
-from .util import hwaccel, fcdict, ihash, nhash, shash, bytes2zip, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, find_file, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, smart_split, seq, proxy, Request, magic, is_discord_attachment, discord_expired, unyt, ecdc_exists, get_duration, evalex, evalEX, DownloadingFile, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, attachment_cache, upload_cache
+from .util import hwaccel, fcdict, ihash, nhash, shash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, find_file, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, smart_split, seq, proxy, Request, magic, is_discord_attachment, discord_expired, unyt, ecdc_exists, get_duration, evalex, evalEX, DownloadingFile, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, attachment_cache, expand_attachment, upload_cache
 
 
 try:
@@ -1000,16 +1000,50 @@ class Server:
 					break
 			if not upload_cache[h].required:
 				upload_cache[h].info["chunks"] = [v for k, v in sorted(upload_cache[h].chunkinfo.items())]
-				print(upload_cache[h])
+				print("INFO:", upload_cache[h])
 				data = json_dumps(upload_cache[h].info)
 				data2 = bytes2zip(data)
 				if len(data2) <= len(data) / 2:
 					data = data2
-				fut = attachment_cache.create(data, filename=filename)
+				fut = attachment_cache.create(data, filename=filename, editable=True)
 				url = await_fut(fut) + "?key=" + base64.urlsafe_b64encode(upload_cache[h].key).rstrip(b"=").decode("ascii")
 				yield b'"url":"' + url.encode("utf-8") + b'"'
 			yield b"}"
 		return start_upload(position)
+
+	@cp.expose
+	def delete(self, *path, key=None):
+		assert len(path) == 2 and path[0].count("~") == 0
+		assert key, "File Key Required."
+		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
+		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
+		url = await_fut(fut)
+		resp = self.session.get(
+			url,
+			headers=Request.header(),
+			verify=False,
+			timeout=60,
+		)
+		resp.raise_for_status()
+		try:
+			data = zip2bytes(resp.content)
+		except Exception:
+			data = resp.content
+		info = orjson.loads(data)
+		hashable = base64.urlsafe_b64decode(key + "=") + b"~" + enc_box._key
+		public_key = shash(hashable)
+		assert public_key == info["key"], "File Key Mismatch."
+		deletes = set()
+		deletes.add((c_id, m_id))
+		for url in info["chunks"]:
+			c_id, m_id, a_id, fn = expand_attachment(url)
+			deletes.add((c_id, m_id))
+		print("DELETES:", deletes)
+		futs = []
+		for c_id, m_id in deletes:
+			fut = csubmit(attachment_cache.delete(c_id, m_id))
+			futs.append(fut)
+		await_fut(gather(*futs))
 
 	@cp.expose(("u",))
 	def unproxy(self, *path, url=None, **query):
@@ -2541,47 +2575,6 @@ class Server:
 						if not newref:
 							newref = fid
 							os.rename(p2, p2.replace("$ $", "$" + ha1[:4] + ha1[-4:] + "$", 1))
-
-	@cp.expose
-	@hostmap
-	def delete(self, path, key=None, **kwargs):
-		if not key:
-			raise PermissionError("Key not found.")
-		ots = p2n(path)
-		path = str(ots)
-		p = find_file(path, cwd=(f"{TEMP_PATH}/filehost", "saves/filehost"))
-		replaceable = self.remove_replacer(ots, key)
-		if not replaceable:
-			if p.split("~", 1)[-1].startswith(".temp$@"):
-				if p in self.serving:
-					for f in self.serving.pop(p):
-						f.close()
-					time.sleep(0.2)
-				os.remove(p)
-				p = find_file(path)
-			if not p.split("~", 1)[-1].startswith(".forward$"):
-				return os.remove(p)
-			with open(p, "r", encoding="utf-8") as f:
-				orig = f.read()
-			if key != orig.split("<!--KEY=", 1)[-1].split("-->", 1)[0]:
-				raise PermissionError("Incorrect key.")
-			self.delete_link(p, text=orig)
-		else:
-			os.remove(p)
-		if not replaceable:
-			urls = orjson.loads(orig.split("<!--URL=", 1)[-1].split("-->", 1)[0])
-			interface.run(f"bot.data.exec.delete({repr(urls)})")
-		cp.response.headers.update(HEADERS)
-		return """<!DOCTYPE html><html>
-<meta http-equiv="refresh" content="0;URL=/">
-<body onload="myFunction()" style="background-color:#000">
-<script>
-function myFunction() {
-alert("File successfully deleted. Returning to home.");
-}
-</script>
-</body>
-</html>"""
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")

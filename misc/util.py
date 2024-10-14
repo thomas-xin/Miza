@@ -1264,7 +1264,7 @@ def shorten_attachment(c_id, m_id, a_id, fn):
 	return "https://mizabot.xyz/u/" + encode_attachment(c_id, m_id, a_id, fn)
 def expand_attachment(url):
 	assert "/u/" in url
-	encoded = url.split("?", 1)[0].split("/r/", 1)[-1]
+	encoded = url.split("?", 1)[0].split("/u/", 1)[-1]
 	return decode_attachment(encoded)
 
 def p2n(b):
@@ -2853,13 +2853,13 @@ class AttachmentCache(Cache):
 	async def obtain(self, c_id=None, m_id=None, a_id=None, fn=None, url=None):
 		if url:
 			c_id, m_id, a_id, fn = split_url(url, m_id)
-		if not a_id:
-			raise ValueError("Attachment ID must be provided.")
 		ac = self.attachment_count
 		if isinstance(c_id, str) and not c_id.isnumeric():
 			c_id = int.from_bytes(base64.urlsafe_b64decode(c_id + "=="), "big")
 			m_id = int.from_bytes(base64.urlsafe_b64decode(m_id + "=="), "big")
 			a_id = int.from_bytes(base64.urlsafe_b64decode(a_id + "=="), "big")
+		if not a_id:
+			a_id = 0
 		key = a_id if a_id >= ac else m_id * ac + a_id
 		try:
 			resp = self[key]
@@ -2880,7 +2880,7 @@ class AttachmentCache(Cache):
 		resp = await self.sess.request("DELETE", url, headers=heads, timeout=120)
 		resp.raise_for_status()
 
-	async def create(self, *data, filename=None, channel=None, content="", collapse=True, edit=False):
+	async def create(self, *data, filename=None, channel=None, content="", collapse=True, editable=False):
 		if not self.channels:
 			raise RuntimeError("Proxy channel list required.")
 		ac = self.attachment_count
@@ -2915,7 +2915,7 @@ class AttachmentCache(Cache):
 			cid = int(message["channel_id"])
 			mid = int(message["id"])
 			for i, a in enumerate(message["attachments"]):
-				aid = i if edit else int(a["id"])
+				aid = i if editable else int(a["id"])
 				fn = a["filename"]
 				out.append(shorten_attachment(cid, mid, aid, fn))
 			filename = "b"
