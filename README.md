@@ -55,6 +55,11 @@ Sections     | Explanations
 
 <br>
 
+# Notice:
+This README is currently out-of-date relative to development of this project, and will not be updated until the current intensive phase of maintenance is complete. Please refer to the support Discord server for any required technical support and questions!
+
+<br>
+
 <a id="Hosting-Miza"></a>
 ## Hosting Miza
 
@@ -98,45 +103,6 @@ git clone https://github.com/thomas-xin/Miza.git
 
 <br>
 
-<a id="AI-Support"></a>
-## AI/Machine Learning features:
-<img alt="ChatGPT Logo" src="https://cdn.discordapp.com/attachments/1111010485647712348/1142085216656183336/ChatGPT-8958828c.png">
-
-- Toggle on/off using the `auth.json` key `"ai_features"`
-- Throughout 2021~2023, Miza has been equipped with support for various open source as well as proprietary AI models.
-  - Early models began with GPT-2, Roberta and Dialogpt, but those have since been deprecated and discontinued.
-- As of August 2023, Miza supports the following models:
-  - Bloom-176B (API)
-  - Stable Diffusion v1.5 (API)
-  - Dall-E 2 (API, fees apply)
-  - GPT-4 (API, fees apply)
-  - GPT-3.5 Turbo (API, fees apply)
-  - GPT-3.5 Davinci (API, fees apply, deprecated)
-  - GPT-3.5 Curie (API, fees apply, deprecated)
-  - NVIDIA NeVA (API, fees apply)
-  - Instructblip-Vicuna (API, fees apply)
-  - OpenAI Whisper (API, fees apply)
-  - Airochronos-33B (Locally hosted, ~40GB VRAM)
-  - GPlatty-33B (Locally hosted, ~40GB VRAM)
-  - Wizard-Vicuna-30B (Locally hosted, ~40GB VRAM)
-  - Hippogriff-30B (Locally hosted, ~40GB VRAM)
-  - Manticore-13B (Locally hosted, ~16GB VRAM)
-  - Pygmalion-13B (Locally hosted, ~16GB VRAM)
-  - Stable Diffusion XL v1.0 (Locally hosted, ~12GB VRAM)
-  - Stable Diffusion v1.5 (Locally hosted, ~6GB VRAM)
-  - Encodec (Locally hosted, ~100MB RAM)
-- Locally hosted models do not incur fees, but they require substantial amounts of GPU memory, as well as compute power.
-  - Multiple weaker GPUs may be utilised, however at the moment the underlying frameworks do not appear to have NVLink support, meaning high PCIe bandwidth is necessary for some models, espcially if VRAM is insufficient and offloading is required. Miza makes an attempt to sort available GPUs by bandwidth and VRAM, but this is often not perfect.
-    - Worthy of note is that most of Miza's AI compute is done using **FP16**, **BF16** and **FP8**, using PyTorch as the main framework. This means GPUs with native support for these data types is preferred. GPUs with at least 10GB of VRAM are officially supported. For NVIDIA cards, this means Pascal series or above is necessary (>= 1080ti/P5000/P40), Volta/Turing series or above is recommended (>= 2080ti/T5000/V100/T4), Ampere series or above is preferred (>= 3060/A2000/A2), and Ada/Hopper series or above is helpful for AV1 acceleration on WEBM files (>= 4060ti/Ada4000/L4/H100).
-    - AMD/Intel GPU support may be possible on Linux. However, due to driver compatibility issues, Miza currently does not officially support this use case.
-    - For hobbyists, typically the best value compute devices are RTX 4090, RTX 3090ti, RTX 3090, or RTX 3060, all of which may be purchased second hand, and may be combined. For those with much higher budgets, A40/L40/A6000/Ada6000/A100/H100 are excellent for AI inference, and will be more efficient for space, stability, and power consumption.
-    - Run the `benchmark.py` file within the main project directory to enable Miza to make the most efficient use of GPU resources. The order of task priority will be automatically distributed according to FP16 TFLOPS, as well as data transfer rate, which will be used to sort optimal device order for models that do not fit on single GPUs.
-  - The main Miza bot's API use is funded by premium subscriptions, with GPT-4 being the most costly. Several methods of context optimisation have been implemented, including embeddings and summarisation (also hosted locally).
-  - Miza's framework also supports image captioning (currently utilising Clip-VIT and PyTesseract, as GPT-4's multimodal support has yet to be publicly released), function application (only OpenAI Chat models) with Google Search, WolframAlpha, and Miza's Voice API.
-- Distributed compute support (utilisation of multiple machines/servers) is currently being implemented, but is not yet officially supported as it has inconsistent stalling issues.
-
-<br>
-
 <a id="Common-Issues"></a>
 ### Common Issues & FAQ:
 
@@ -150,10 +116,9 @@ git clone https://github.com/thomas-xin/Miza.git
 <a id="Memory-Requirements"></a>
 #### Memory requirements:
 * The main Discord bot uses around 2GB of CPU RAM, which increases depending on the amount of Discord servers being loaded.
-* Stable Diffusion XL offloading utilises around 12GB extra RAM per GPU when swapping from VRAM.
 * Most other features utilise minimal amounts of RAM, although subprocesses may temporarily use a few extra GB during heavy loads (such as file conversion)
 * VRAM (GPU RAM) requirements vary depending on the ML models invoked. Depending on demand up to 100GB may be utilised at a time.
-* For comparison, the official Miza currently runs on 60GB of GDDR6X, 24GB of GDDR6, 24GB of GDDR5X, 80GB of DDR5, and 192GB of NVMe swap.
+* For comparison, the official Miza currently runs on 112GB of GDDR6X, 24GB of GDDR6, 64GB of DDR5, and 192GB of NVMe swap.
 
 <a id="Logs"></a>
 #### Logs

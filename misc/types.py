@@ -269,6 +269,12 @@ def azero(size):
 def aempty(size):
 	return alist(np.empty(size, dtype=object))
 
+byte_like = bytes | bytearray | memoryview | MemoryBytes
+list_like = list | tuple | set | frozenset | alist | np.ndarray
+string_like = byte_like | str
+number = int | float | np.number
+json_like = dict | list_like | str | number | bool | None
+
 
 class cdict(dict):
 	
@@ -560,6 +566,116 @@ def exclusive_set(range, *excluded):
 	return frozenset(i for i in range if i not in ex)
 
 
+class RangeSet(collections.abc.Iterable):
+
+	__slots__ = ("ranges",)
+
+	def __init__(self, start=0, stop=0):
+		if isinstance(start, list_like):
+			self.ranges = [((r, r + 1) if isinstance(r, number) else tuple(r)) for r in start]
+		else:
+			self.ranges = []
+			self.add(start, stop)
+
+	def __repr__(self):
+		return self.__class__.__name__ + "(" + repr(self.ranges) + ")"
+
+	def __contains__(self, key):
+		if isinstance(key, slice | range):
+			start, stop = key.start, key.stop
+			for left, right in self.ranges:
+				if left > start:
+					break
+				if right > stop:
+					return True
+			return False
+		for left, right in self.ranges:
+			if left > key:
+				break
+			if right > key:
+				return True
+		return False
+
+	def __len__(self):
+		return sum(right - left for left, right in self.ranges)
+
+	def __bool__(self):
+		return bool(self.ranges)
+
+	def __iter__(self):
+		for left, right in self.ranges:
+			yield from range(left, right)
+
+	def add(self, start, stop=None):
+		if stop is None:
+			stop = start + 1
+		assert start <= stop
+		if start == stop or range(start, stop) in self:
+			return self
+		self.ranges.append((start, stop))
+		self.ranges.sort()
+		i = 0
+		while i < len(self.ranges) - 1:
+			l1, r1 = self.ranges[i]
+			l2, r2 = self.ranges[i + 1]
+			if r1 >= l2:
+				self.ranges[i] = [l1, max(r1, r2)]
+				self.ranges.pop(i + 1)
+			else:
+				i += 1
+		return self
+
+	def remove(self, start, stop=None):
+		if stop is None:
+			stop = start + 1
+		assert start <= stop
+		if start == stop:
+			return self
+		i = 0
+		while i < len(self.ranges):
+			left, right = self.ranges[i]
+			if left >= stop:
+				break
+			if right <= start:
+				i += 1
+				continue
+			if left >= start:
+				left = stop
+				if left >= right:
+					self.ranges.pop(i)
+					continue
+				self.ranges[i] = (left, right)
+				i += 1
+				continue
+			if right <= stop:
+				right = start
+				self.ranges[i] = (left, right)
+				i += 1
+				continue
+			l1, r1 = left, start
+			l2, r2 = stop, right
+			self.ranges[i] = (l1, r1)
+			self.ranges.insert(i + 1, (l2, r2))
+			i += 2
+		return self
+
+	def update(self, others):
+		for obj in others:
+			if isinstance(obj, list_like):
+				self.add(*obj)
+			else:
+				self.add(obj)
+		return self
+
+	def difference_update(self, others):
+		for obj in others:
+			if isinstance(obj, list_like):
+				self.remove(*obj)
+			else:
+				self.remove(obj)
+		return self
+
+
 # Experimental invisible Zero-Width character encoder.
 ZeroEnc = "\xad\u061c\u180e\u200b\u200c\u200d\u200e\u200f\u2060\u2061\u2062\u2063\u2064\u2065\u2066\u2067\u2068\u2069\u206a\u206b\u206c\u206d\u206e\u206f\ufe0f\ufeff"
 __zeroEncoder = demap({chr(i + 97): c for i, c in enumerate(ZeroEnc)})
@@ -669,21 +785,26 @@ for c in tuple(__umap):
 	if c in UNIFMTS[-1]:
 		__umap.pop(c)
 __trans = "".maketrans(__umap)
-extra_zalgos = (
-	range(768, 880),
-	range(1155, 1162),
-	exclusive_range(range(1425, 1478), 1470, 1472, 1475),
-	range(1552, 1560),
-	range(1619, 1632),
-	exclusive_range(range(1750, 1774), 1757, 1758, 1765, 1766, 1769),
-	exclusive_range(range(2260, 2304), 2274),
-	range(7616, 7627),
-	(8432,),
-	range(11744, 11776),
-	(42607,), range(42612, 42622), (42654, 42655),
-	range(65056, 65060),
-)
-zalgo_array = np.concatenate(extra_zalgos)
+zalgo_array = np.array(list(
+	RangeSet([
+		(768, 880),
+		(1155, 1162),
+		(1425, 1478),
+		(1552, 1560),
+		(1619, 1632),
+		(1750, 1774),
+		(2260, 2304),
+		(7616, 7627),
+		8432,
+		(11744, 11776),
+		42607, (42612, 42622), (42654, 42655),
+		(65056, 65060),
+	]).difference_update([
+		1470, 1472, 1475,
+		1757, 1758, 1765, 1766, 1769,
+		2274,
+	])
+))
 zalgo_map = {n: "" for n in zalgo_array}
 __trans.update(zalgo_map)
 __unitrans = ["".maketrans({UNIFMTS[-1][x]: UNIFMTS[i][x] for x in range(len(UNIFMTS[-1]))}) for i in range(len(UNIFMTS) - 1)]
@@ -875,12 +996,6 @@ class msdict(cdict):
 		for k, v in kwargs:
 			self.extend(k, v)
 
-
-byte_like = bytes | bytearray | memoryview | MemoryBytes
-list_like = list | tuple | set | frozenset | alist | np.ndarray
-string_like = byte_like | str
-number = int | float | np.number
-json_like = dict | list_like | str | number | bool | None
 
 def json_default(obj):
 	if isinstance(obj, datetime.datetime):

@@ -1321,11 +1321,15 @@ def zip2bytes(data):
 	with zipfile.ZipFile(data, allowZip64=True, strict_timestamps=False) as z:
 		return z.read(z.namelist()[0])
 
-def bytes2zip(data, lzma=False):
-	if lzma:
-		import lzma
-		return b"~" + lzma.compress(data)
+def bytes2zip(data, lzma=True):
 	import zlib
+	if lzma:
+		a = b"!" + zlib.compress(data)
+		import lzma
+		b = b"~" + lzma.compress(data)
+		if len(b) < len(a):
+			return b
+		return a
 	return b"!" + zlib.compress(data)
 
 @always_copy
@@ -2735,6 +2739,8 @@ api = "v10"
 class AttachmentCache(Cache):
 	min_size = 262144
 	max_size = 25165824
+	attachment_count = 10
+	embed_count = 10
 	discord_token = AUTH["discord_token"]
 	alt_token = AUTH.get("alt_token", discord_token)
 	headers = {"Content-Type": "application/json", "Authorization": "Bot " + discord_token}
@@ -2757,8 +2763,9 @@ class AttachmentCache(Cache):
 
 	@tracebacksuppressor
 	def update_queue(self):
+		ec = self.embed_count
 		while self.queue:
-			tasks, self.queue = self.queue[:10], self.queue[10:]
+			tasks, self.queue = self.queue[:ec], self.queue[ec:]
 			urls = [task[1].split("?url=", 1)[-1].replace("?", "&").replace("%", "&").split("&", 1)[0] for task in tasks]
 			embeds = [dict(image=dict(url=url)) for url in urls]
 			last = self.last
@@ -2771,7 +2778,7 @@ class AttachmentCache(Cache):
 					cid, mid, n = tup
 					heads = self.alt_headers if n else self.headers
 					resp = requests.patch(
-						f"https://discord.com/api/v10/channels/{cid}/messages/{mid}",
+						f"https://discord.com/api/{api}/channels/{cid}/messages/{mid}",
 						data=json_dumps(dict(embeds=embeds)),
 						headers=heads,
 					)
@@ -2780,7 +2787,7 @@ class AttachmentCache(Cache):
 					n = random.randint(0, 1)
 					heads = self.alt_headers if n else self.headers
 					resp = requests.post(
-						f"https://discord.com/api/v10/channels/{cid}/messages",
+						f"https://discord.com/api/{api}/channels/{cid}/messages",
 						data=json_dumps(dict(embeds=embeds)),
 						headers=heads,
 					)
@@ -2819,26 +2826,27 @@ class AttachmentCache(Cache):
 				last.remove((c, k, n))
 
 	async def get_attachment(self, c_id, m_id, a_id, fn):
+		ac = self.attachment_count
 		heads = self.headers if c_id not in self.channels else self.alt_headers
-		if not self.channels or not fn:
+		if not self.channels or not fn or a_id < ac:
 			if not m_id:
 				raise LookupError("Insufficient information to retrieve attachment.")
 			data = await Request(
-				f"https://discord.com/api/v10/channels/{c_id}/messages/{m_id}",
+				f"https://discord.com/api/{api}/channels/{c_id}/messages/{m_id}",
 				headers=heads,
 				bypass=False,
 				aio=True,
 				json=True,
 			)
-			for a in data["attachments"]:
-				if int(a["id"]) == a_id:
+			for i, a in enumerate(data["attachments"]):
+				if a_id in (i, int(a["id"])):
 					return a["url"]
 			raise KeyError(a_id)
 		fut = Future()
 		url, _ = merge_url(c_id, m_id, a_id, fn)
 		task = [fut, url]
 		self.queue.append(task)
-		if self.fut is None or self.fut.done() or len(self.queue) > 10:
+		if self.fut is None or self.fut.done() or len(self.queue) > ac:
 			self.fut = self.exc.submit(self.update_queue)
 		return await wrap_future(fut)
 
@@ -2847,29 +2855,41 @@ class AttachmentCache(Cache):
 			c_id, m_id, a_id, fn = split_url(url, m_id)
 		if not a_id:
 			raise ValueError("Attachment ID must be provided.")
+		ac = self.attachment_count
 		if isinstance(c_id, str) and not c_id.isnumeric():
 			c_id = int.from_bytes(base64.urlsafe_b64decode(c_id + "=="), "big")
 			m_id = int.from_bytes(base64.urlsafe_b64decode(m_id + "=="), "big")
 			a_id = int.from_bytes(base64.urlsafe_b64decode(a_id + "=="), "big")
+		key = a_id if a_id >= ac else m_id * ac + a_id
 		try:
-			resp = self[a_id]
+			resp = self[key]
 			assert isinstance(resp, str) and not discord_expired(resp) and url2fn(resp) == fn
 		except KeyError:
-			resp = await self.retrieve_from(a_id, self.get_attachment, c_id, m_id, a_id, fn)
+			resp = await self.retrieve_from(key, self.get_attachment, c_id, m_id, a_id, fn)
 		except AssertionError:
 			resp = await self.get_attachment(c_id, m_id, a_id, fn)
-			self[a_id] = resp
+			self[key] = resp
 		return resp
 
-	async def create(self, *data, filename=None, channel=None, content="", collapse=True):
+	async def delete(self, c_id, m_id, url=None):
+		if url:
+			c_id, m_id, *_ = split_url(url, m_id)
+		self.sess = self.sess or aiohttp.ClientSession()
+		heads = dict(choice((self.headers, self.alt_headers)))
+		url = f"https://discord.com/api/{api}/channels/{c_id}/messages/{m_id}"
+		resp = await self.sess.request("DELETE", url, headers=heads, timeout=120)
+		resp.raise_for_status()
+
+	async def create(self, *data, filename=None, channel=None, content="", collapse=True, edit=False):
 		if not self.channels:
 			raise RuntimeError("Proxy channel list required.")
+		ac = self.attachment_count
 		self.sess = self.sess or aiohttp.ClientSession()
 		form_data = aiohttp.FormData(quote_fields=False)
 		filename = filename or "b"
 		out = []
 		while data:
-			temp, data = data[:10], data[10:]
+			temp, data = data[:ac], data[ac:]
 			payload = dict(
 				content=content,
 				attachments=[dict(
@@ -2886,7 +2906,7 @@ class AttachmentCache(Cache):
 					content_type="application/octet-stream",
 				)
 			cid = getattr(channel, "id", channel) if channel else choice(self.channels)
-			url = f"https://discord.com/api/v10/channels/{cid}/messages"
+			url = f"https://discord.com/api/{api}/channels/{cid}/messages"
 			heads = dict(choice((self.headers, self.alt_headers)))
 			heads.pop("Content-Type")
 			resp = await self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
@@ -2894,8 +2914,8 @@ class AttachmentCache(Cache):
 			message = await resp.json()
 			cid = int(message["channel_id"])
 			mid = int(message["id"])
-			for a in message["attachments"]:
-				aid = int(a["id"])
+			for i, a in enumerate(message["attachments"]):
+				aid = i if edit else int(a["id"])
 				fn = a["filename"]
 				out.append(shorten_attachment(cid, mid, aid, fn))
 			filename = "b"
@@ -2903,7 +2923,49 @@ class AttachmentCache(Cache):
 			return out[0]
 		return out
 
-attachment_cache = AttachmentCache(timeout=3600 * 12 , trash=inf, persist="attachment.cache")
+	async def edit(self, c_id, m_id, *data, url=None, filename=None, content="", collapse=True):
+		if url:
+			c_id, m_id, *_ = split_url(url, m_id)
+		ac = self.attachment_count
+		self.sess = self.sess or aiohttp.ClientSession()
+		form_data = aiohttp.FormData(quote_fields=False)
+		filename = filename or "b"
+		out = []
+		assert len(data) <= ac
+		payload = dict(
+			content=content,
+			attachments=[dict(
+				id=i,
+				filename=filename if not i else "b",
+			) for i in range(len(data))],
+		)
+		form_data.add_field(name="payload_json", value=json_dumpstr(payload))
+		for i, b in enumerate(data):
+			form_data.add_field(
+				name=f"files[{i}]",
+				value=b,
+				filename=filename if not i else "b",
+				content_type="application/octet-stream",
+			)
+		cid, mid = c_id, m_id
+		url = f"https://discord.com/api/{api}/channels/{cid}/messages/{mid}"
+		heads = self.headers if c_id not in self.channels else self.alt_headers
+		heads.pop("Content-Type")
+		resp = await self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
+		resp.raise_for_status()
+		message = await resp.json()
+		cid = int(message["channel_id"])
+		mid = int(message["id"])
+		for i, a in enumerate(message["attachments"]):
+			aid = i
+			fn = a["filename"]
+			out.append(shorten_attachment(cid, mid, aid, fn))
+		if len(out) == 1 and collapse:
+			return out[0]
+		return out
+
+attachment_cache = AttachmentCache(timeout=3600 * 12 , trash=0, persist="attachment.cache")
+upload_cache = Cache(timeout=86400 * 30, trash=1, persist="upload.cache")
 
 
 class ChunkSystem(FileHashDict):

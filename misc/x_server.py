@@ -31,8 +31,8 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, newfut, esubmit, tsubmit, csubmit, await_fut, CloseableAsyncIterator
 from .smath import supersample, xrand
-from .types import as_str, astype, cdict, suppress, round_min, lim_str, full_prune, literal_eval, regexp, loop, json_dumps, alist, resume
-from .util import hwaccel, fcdict, ihash, nhash, shash, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, find_file, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, smart_split, seq, proxy, Request, magic, is_discord_attachment, discord_expired, unyt, ecdc_exists, get_duration, evalex, evalEX, DownloadingFile, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, attachment_cache
+from .types import as_str, astype, cdict, suppress, round_min, lim_str, full_prune, literal_eval, regexp, loop, json_dumps, alist, resume, RangeSet
+from .util import hwaccel, fcdict, ihash, nhash, shash, bytes2zip, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, find_file, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, smart_split, seq, proxy, Request, magic, is_discord_attachment, discord_expired, unyt, ecdc_exists, get_duration, evalex, evalEX, DownloadingFile, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, attachment_cache, upload_cache
 
 
 try:
@@ -253,8 +253,6 @@ class EndpointRedirects(Dispatcher):
 				p = "get_ip"
 			elif p[:2] == "f/":
 				p = "raw/" + p[2:]
-			elif p == "upload":
-				p = "files"
 			elif p == "api/mpinsights":
 				p = "api_mpinsights"
 			elif p.startswith("api/"):
@@ -958,6 +956,60 @@ class Server:
 				if not b:
 					return
 				yield b
+
+	@cp.expose
+	@cp.tools.accept(media="multipart/form-data")
+	def upload(self, filename="b", hash="", position=0, size=0):
+		position = int(position)
+		size = int(size)
+		h = true_ip() + hash
+		try:
+			resp = cp.request.body.fp
+		except Exception:
+			print_exc()
+			resp = None
+		cp.response.headers.update(HEADERS)
+		cp.response.headers["Content-Type"] = "application/json"
+		if not size or not resp or int(cp.request.headers.get("Content-Length", 0)) < 1:
+			if h in upload_cache:
+				return json_dumps(list(upload_cache[h].keys()))
+			return b"Expected input data."
+		assert position == 0 or h in upload_cache
+		assert not position % attachment_cache.max_size
+		if h not in upload_cache:
+			private_key = os.urandom(8)
+			hashable = private_key + b"~" + enc_box._key
+			public_key = shash(hashable)
+			upload_cache[h] = cdict(info=cdict(filename=filename, mimetype=cp.request.headers.get("mimetype", "application/octet-stream"), size=size, key=public_key, chunks=[]), chunkinfo={}, required=RangeSet(0, size), key=private_key)
+
+		def start_upload(position):
+			yield b"{"
+			while True:
+				fn = filename if position == 0 else "c"
+				b = resp.read(attachment_cache.max_size)
+				if not b:
+					break
+				if position == 0:
+					upload_cache[h].info.mimetype = magic.from_buffer(b)
+				fut = attachment_cache.create(b, filename=fn)
+				url = await_fut(fut)
+				upload_cache[h].chunkinfo[position] = url
+				upload_cache[h].required.remove(position, position + len(b))
+				position += len(b)
+				if not upload_cache[h].required:
+					break
+			if not upload_cache[h].required:
+				upload_cache[h].info["chunks"] = [v for k, v in sorted(upload_cache[h].chunkinfo.items())]
+				print(upload_cache[h])
+				data = json_dumps(upload_cache[h].info)
+				data2 = bytes2zip(data)
+				if len(data2) <= len(data) / 2:
+					data = data2
+				fut = attachment_cache.create(data, filename=filename)
+				url = await_fut(fut) + "?key=" + base64.urlsafe_b64encode(upload_cache[h].key).rstrip(b"=").decode("ascii")
+				yield b'"url":"' + url.encode("utf-8") + b'"'
+			yield b"}"
+		return start_upload(position)
 
 	@cp.expose(("u",))
 	def unproxy(self, *path, url=None, **query):

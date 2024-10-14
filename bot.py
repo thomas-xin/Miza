@@ -1682,34 +1682,47 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 								lost.append(m.content)
 							elif preserve:
 								lost.append(u)
-			elif url.endswith(".txt"):
+			elif is_discord_attachment(url):
 				out.append(url)
-			elif ytd and self.ytdl:
-				self.ytdl.bot = self
-				try:
-					resp = await create_future(self.ytdl.search, url, follow=False)
-					if not resp:
-						raise FileNotFoundError(url)
-				except Exception as ex:
-					print(repr(ex))
-				else:
-					resp = resp[0]
-					if isinstance(resp, str):
-						print("FU:", resp)
+			else:
+				fut = None
+				if ytd and self.ytdl:
+					self.ytdl.bot = self
+					fut = create_future(self.ytdl.search, url, follow=False)
+				resp = await create_future(
+					reqs.next().head,
+					url,
+					headers=Request.header(),
+					verify=False,
+					stream=True,
+				)
+				if resp.headers.get("Content-Type", None) not in ("text/html", "application/json"):
+					url = resp.url
+				elif fut:
+					try:
+						resp = await fut
+						if not resp:
+							raise FileNotFoundError(url)
+					except Exception as ex:
+						print(repr(ex))
 					else:
-						if not resp.get("direct"):
-							with tracebacksuppressor:
-								await create_future(self.ytdl.get_stream, resp, download=False, force=True)
-						if resp.get("video"):
-							url = resp["video"]
-						elif images and resp.get("thumbnail"):
-							url = resp["thumbnail"]
-						elif not images and resp.get("stream"):
-							url = resp["stream"]
-						elif resp["url"] != url:
-							url = resp["url"]
+						resp = resp[0]
+						if isinstance(resp, str):
+							print("FU:", resp)
 						else:
-							url = resp.get("video") or resp.get("stream") or resp.get("thumbnail") or resp.get("url")
+							if not resp.get("direct"):
+								with tracebacksuppressor:
+									await create_future(self.ytdl.get_stream, resp, download=False, force=True)
+							if resp.get("video"):
+								url = resp["video"]
+							elif images and resp.get("thumbnail"):
+								url = resp["thumbnail"]
+							elif not images and resp.get("stream"):
+								url = resp["stream"]
+							elif resp["url"] != url:
+								url = resp["url"]
+							else:
+								url = resp.get("video") or resp.get("stream") or resp.get("thumbnail") or resp.get("url")
 				out.append(url)
 		if lost:
 			out.extend(lost)
@@ -2301,7 +2314,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		1: cdict(
 			instructive="gpt-4m",
 			casual="gpt-4m",
-			nsfw="euryale-70b",
+			nsfw="llama-3-70b",
 			backup="reflection-llama-3-70b",
 			retry="gpt-4",
 			function="gpt-4m",
@@ -2312,7 +2325,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			instructive="claude-3.5-sonnet",
 			casual="gpt-4",
 			nsfw="command-r-plus",
-			backup="euryale-70b",
+			backup="llama-3-70b",
 			retry="gpt-4",
 			function="gpt-4m",
 			vision="gpt-4",
@@ -3363,46 +3376,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return url
 
 	async def as_embed(self, message, link=False, colour=False) -> discord.Embed:
+		message = await self.ensure_reactions(message)
 		emb = discord.Embed(description="").set_author(**get_author(message.author))
 		if colour:
 			col = await self.get_colour(message.author)
 			emb.colour = col
 		content = message.content or message.system_content
-		if not content:
-			if len(message.attachments) == 1:
-				url = message.attachments[0].url
-				if is_image(url):
-					url = await self.data.exec.uproxy(url)
-					emb.url = url
-					emb.set_image(url=url)
-					if link:
-						link = message_link(message)
-						emb.description = lim_str(f"{emb.description}\n\n[View Message]({link})", 4096)
-						emb.timestamp = message.edited_at or message.created_at
-					return emb
-			elif not message.attachments and len(message.embeds) == 1:
-				emb2 = message.embeds[0]
-				if emb2.description != EmptyEmbed and emb2.description:
-					emb.description = emb2.description
-				if emb2.title:
-					emb.title = emb2.title
-				if emb2.url:
-					emb.url = emb2.url
-				if emb2.image:
-					url = await self.data.exec.uproxy(emb2.image.url)
-					emb.set_image(url=url)
-				if emb2.thumbnail:
-					url = await self.data.exec.uproxy(emb2.thumbnail.url)
-					emb.set_thumbnail(url=url)
-				for f in emb2.fields:
-					if f:
-						emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
-				if link:
-					link = message_link(message)
-					emb.description = lim_str(f"{emb.description}\n\n[View Message]({link})", 4096)
-					emb.timestamp = message.edited_at or message.created_at
-				return emb
-		else:
+		if content:
 			urls = await self.follow_url(content)
 			if urls:
 				with tracebacksuppressor:
@@ -3425,35 +3405,36 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							emb.timestamp = message.edited_at or message.created_at
 						return emb
 		emb.description = content
-		if len(message.embeds) > 1 or content:
-			urls = [e.url for e in message.embeds if e.url] + [best_url(a) for a in message.attachments]
-			items = []
-			for i in range((len(urls) + 9) // 10):
-				temp = urls[i * 10:i * 10 + 10]
-				temp2 = await self.data.exec.uproxy(*temp, collapse=False)
-				items.extend("(" + temp2[x] + ")" if temp2[x] else "[" + temp[x] + "]" for x in range(len(temp)))
-		else:
-			items = None
-		if items:
-			if emb.description in items:
-				emb.description = lim_str("\n".join(items), 4096)
-			elif emb.description or items:
-				emb.description = lim_str(emb.description + "\n" + "\n".join(items), 4096)
 		image = None
+		thumbnail = None
 		for a in message.attachments:
 			url = a.url
 			if is_image(url) is not None:
-				image = await self.data.exec.uproxy(url)
-		if not image and message.embeds:
+				if not image:
+					image = await self.data.exec.uproxy(url)
+				else:
+					thumbnail = await self.data.exec.uproxy(url)
+		if message.embeds:
 			for e in message.embeds:
+				if not content:
+					if e.description and e.description != EmptyEmbed:
+						content = e.description
+					for f in emb2.fields:
+						if f:
+							emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
 				if e.image:
-					image = await self.data.exec.uproxy(e.image.url)
+					if not image:
+						image = await self.data.exec.uproxy(e.image.url)
+					else:
+						thumbnail = await self.data.exec.uproxy(e.image.url)
+					break
 				if e.thumbnail:
-					image = await self.data.exec.uproxy(e.thumbnail.url)
+					thumbnail = await self.data.exec.uproxy(e.thumbnail.url)
 		if image:
 			emb.url = image
-			# image = allow_gif(image)
 			emb.set_image(url=image)
+		if thumbnail:
+			emb.set_thumbnail(url=thumbnail)
 		for e in message.embeds:
 			if len(emb.fields) >= 25:
 				break
@@ -3477,15 +3458,23 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				while len(emb) > 6000:
 					emb.remove_field(-1)
 				break
-		if not emb.description:
-			urls = [e.url for e in message.embeds if e.url] + [best_url(a) for a in message.attachments]
-			items = []
-			for i in range((len(urls) + 9) // 10):
-				with tracebacksuppressor:
-					temp = urls[i * 10:i * 10 + 10]
-					temp2 = await self.data.exec.uproxy(*temp, collapse=False)
-					items.extend("(" + temp2[x] + ")" if temp2[x] else "[" + temp[x] + "]" for x in range(len(temp)))
-			emb.description = lim_str("\n".join(items), 4096)
+		urls = [e.url for e in message.embeds if e.url] + [best_url(a) for a in message.attachments]
+		items = []
+		for i in range((len(urls) + 9) // 10):
+			temp = urls[i * 10:i * 10 + 10]
+			temp2 = await self.data.exec.uproxy(*temp, collapse=False)
+			def as_link(url1, url2):
+				if image in (url1, url2) or thumbnail in (url1, url2):
+					return
+				if url1 == url2:
+					return "(" + url2 + ")"
+				return "[" + url2 + "]"
+			items.extend(filter(bool, (as_link(u1, u2) for u1, u2 in zip(temp, temp2))))
+		if items:
+			if emb.description in items:
+				emb.description = lim_str("\n".join(items), 4096)
+			elif emb.description or items:
+				emb.description = lim_str(emb.description + "\n" + "\n".join(items), 4096)
 		if link:
 			link = message_link(message)
 			emb.description = lim_str(f"{emb.description}\n\n[View Message]({link})", 4096)
@@ -7971,7 +7960,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					reaction.count -= 1
 			else:
 				reaction = message._add_reaction(data, emoji, user.id)
-			await self.ensure_reactions(message)
+			message = await self.ensure_reactions(message)
 			self.dispatch("reaction_add", reaction, user)
 			self.add_message(message, files=False, force=True)
 

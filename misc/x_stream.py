@@ -15,6 +15,7 @@ from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
 from .types import resume
 from .util import AUTH, magic, decrypt, save_auth, attachment_cache, decode_attachment, is_discord_attachment, discord_expired, url2fn, p2n, byte_scale, seq, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
 
+interface = None
 csubmit(Request._init_())
 tsubmit(eloop.run_forever)
 ADDRESS = "0.0.0.0"
@@ -33,7 +34,7 @@ class EndpointRedirects(Dispatcher):
 				p = "raw/index.html"
 		elif os.path.exists(f"misc/web/{p}"):
 			p = "raw/" + p
-		elif first not in ("proxy", "u", "unproxy", "reupload", "stream", "heartbeat", "backend", "debug"):
+		elif first not in ("proxy", "f", "d", "upload", "u", "unproxy", "reupload", "stream", "heartbeat", "backend", "debug"):
 			p = "backend/" + p
 		p = "/" + p
 		return super().__call__(p)
@@ -78,6 +79,16 @@ CHEADERS = {"Cache-Control": "public, max-age=3600, stale-while-revalidate=10737
 SHEADERS = {"Cache-Control": "public, max-age=5, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
 CHEADERS.update(HEADERS)
 SHEADERS.update(HEADERS)
+
+def true_ip(request=None):
+	request = request or cp.request
+	ip = request.headers["Remote-Addr"]
+	if ip == "127.0.0.1":
+		ip = request.headers.get("X-Real-Ip") or ip
+	if ip == "127.0.0.1":
+		ip = request.remote.ip
+	cp.serving.request.remote.ip = request.remote.ip = ip
+	return ip
 
 
 class Server:
@@ -191,6 +202,7 @@ class Server:
 		domain_cert = data.get("domain_cert")
 		private_key = data.get("private_key")
 		self.channels = data.get("channels") or self.channels
+		AUTH["encryption_key"] = data.get("encryption_key")
 		AUTH["discord_token"] = self.token
 		AUTH["alt_token"] = self.alt_token
 		AUTH["proxy_channels"] = self.channels
@@ -226,6 +238,52 @@ class Server:
 		with open(rpath, "rb") as f:
 			self.cache[rpath] = b = f.read()
 		return b
+
+	@cp.expose(("f", "d"))
+	def download(self):
+		pass
+
+	@cp.expose
+	@cp.tools.accept(media="multipart/form-data")
+	def upload(self, filename="b", hash="", position=0, size=0):
+		h = true_ip() + hash
+		try:
+			resp = cp.request.body.fp
+		except Exception:
+			print_exc()
+			resp = None
+		cp.response.headers.update(HEADERS)
+		cp.response.headers["Content-Type"] = "application/json"
+		if not size or not resp or int(cp.request.headers.get("Content-Length", 0)) < 1:
+			if h in upload_cache:
+				return json_dumps(list(upload_cache[h].keys()))
+			return "Expected input data."
+		assert position == 0 or h in upload_cache
+		assert not position % attachment_cache.max_size
+		if h not in upload_cache:
+			upload_cache[h] = cdict(info=cdict(filename=filename, mimetype=cp.request.headers.get("mimetype", "application/octet-stream"), size=size, chunks=[]), chunkinfo={}, required=RangeSet(0, size))
+
+		def start_upload(position):
+			yield b"{"
+			while True:
+				fn = filename if position == 0 else "b"
+				b = resp.read(attachment_cache.max_size)
+				if not b:
+					break
+				if position == 0:
+					upload_cache[h].info.mimetype = magic.from_buffer(b)
+				fut = attachment_cache.create(b, filename=fn)
+				url = await_fut(fut)
+				upload_cache[h].chunkinfo[position] = url
+				upload_cache[h].required.remove(position, position + len(b))
+				position += len(b)
+				if not upload_cache[h].required:
+					info = upload_cache[h].info
+					info["chunks"] = [v for k, v in sorted(info.pop("chunkinfo").items())]
+					data = bytes2zip(json_dumps(info))
+					yield upload_cache[h]
+			yield b"}"
+		return start_upload(position)
 
 	@cp.expose(("u",))
 	def unproxy(self, *path, url=None, **query):
