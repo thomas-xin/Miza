@@ -31,7 +31,7 @@ from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut, gather, CloseableAsyncIterator
 from .smath import supersample, xrand
 from .types import byte_like, as_str, astype, cdict, suppress, round_min, full_prune, literal_eval, regexp, loop, json_dumps, alist, resume, RangeSet, MemoryBytes
-from .util import hwaccel, fcdict, nhash, shash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, smart_split, seq, Request, magic, is_discord_attachment, unyt, ecdc_exists, get_duration, evalex, evalEX, DownloadingFile, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, attachment_cache, expand_attachment, shorten_attachment, upload_cache
+from .util import hwaccel, fcdict, nhash, shash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, smart_split, seq, Request, magic, is_discord_attachment, unyt, ecdc_exists, get_duration, evalex, evalEX, DownloadingFile, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, attachment_cache, expand_attachment, shorten_attachment, upload_cache, download_cache
 
 
 try:
@@ -504,15 +504,24 @@ class Server:
 		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
 		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
 		url = await_fut(fut)
-		resp = self.session.get(
-			url,
-			headers=Request.header(),
-			verify=False,
-			timeout=60,
-			stream=True,
-		)
-		resp.raise_for_status()
-		data = seq(resp)
+		callback = None
+		try:
+			info = download_cache[url]
+		except KeyError:
+			resp = self.session.get(
+				url,
+				headers=Request.header(),
+				verify=False,
+				timeout=60,
+				stream=True,
+			)
+			resp.raise_for_status()
+			data = seq(resp)
+
+			def callback(data):
+				download_cache[url] = bytes(data)
+		else:
+			data = MemoryBytes(info)
 		length, i = decode_leb128(data, mode="index")
 		content = data[i:i + length]
 		try:
@@ -527,13 +536,11 @@ class Server:
 		cp.response.headers["Attachment-Filename"] = info.filename
 		cp.response.headers["Content-Type"] = info.mimetype
 		cp.response.headers["ETag"] = json_dumps(f"{info.get('timestamp', 0)};{info.get('hash', info.filename)}")
-		head = data[i + length:]
-		head = bytes(head)
-		return self.dyn_serve(list(info.chunks), size=info.size, head=head)
+		return self.dyn_serve(list(info.chunks), size=info.size, head=cdict(data=data, index=i + length), callback=callback)
 	download._cp_config = {"response.stream": True}
 
 	@tracebacksuppressor
-	def dyn_serve(self, urls, size=0, head=None):
+	def dyn_serve(self, urls, size=0, head=None, callback=None):
 		brange = cp.request.headers.get("Range", "").removeprefix("bytes=")
 		headers = fcdict(cp.request.headers)
 		headers.pop("Remote-Addr", None)
@@ -572,14 +579,15 @@ class Server:
 		cp.response.headers["Content-Range"] = cr
 		cp.response.headers["Content-Length"] = str(length)
 		cp.response.headers["Accept-Ranges"] = "bytes"
-		if head:
-			if not cp.response.headers.get("Content-Type"):
-				cp.response.headers["Content-Type"] = magic.from_buffer(head)
-			urls.insert(0, head)
-		return self._dyn_serve(urls, ranges, headers)
+		return self._dyn_serve(urls, ranges, headers, head=head, callback=callback)
 
 	@tracebacksuppressor(GeneratorExit)
-	def _dyn_serve(self, urls, ranges, headers):
+	def _dyn_serve(self, urls, ranges, headers, head=None, callback=None):
+		if head:
+			data = head.data[head.index:]
+			urls.insert(0, bytes(data))
+			if callback:
+				callback(head.data)
 		for start, end in ranges:
 			pos = 0
 			rems = urls.copy()

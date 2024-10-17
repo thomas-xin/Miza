@@ -3004,6 +3004,7 @@ class AttachmentCache(Cache):
 
 attachment_cache = AttachmentCache(timeout=3600 * 12 , trash=0, persist="attachment.cache")
 upload_cache = Cache(timeout=86400 * 30, trash=1, persist="upload.cache")
+download_cache = Cache(timeout=60, trash=0, persist="download.cache")
 
 
 class ChunkSystem(FileHashDict):
