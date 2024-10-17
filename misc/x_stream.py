@@ -297,7 +297,6 @@ class Server:
 		cp.response.headers["ETag"] = json_dumps(f"{info.get('timestamp', 0)};{info.get('hash', info.filename)}")
 		head = data[i + length:]
 		head = bytes(head)
-		print(head)
 		return self.dyn_serve(list(info.chunks), size=info.size, head=head)
 	download._cp_config = {"response.stream": True}
 
