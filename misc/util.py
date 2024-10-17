@@ -2032,7 +2032,10 @@ class seq(io.BufferedRandom, collections.abc.Sequence, contextlib.AbstractContex
 	def __iter__(self):
 		i = 0
 		while True:
-			x = self[i]
+			try:
+				x = self[i]
+			except IndexError:
+				break
 			if x:
 				yield x
 			else:
