@@ -12,8 +12,8 @@ from cherrypy._cpdispatch import Dispatcher
 import orjson
 import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut, gather
-from .types import resume
-from .util import AUTH, magic, shash, decrypt, zip2bytes, bytes2zip, enc_box, save_auth, attachment_cache, upload_cache, decode_attachment, expand_attachment, is_discord_attachment, discord_expired, url2fn, p2n, byte_scale, seq, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY
+from .types import resume, cdict, fcdict, json_dumps, byte_like, utc
+from .util import AUTH, tracebacksuppressor, magic, shash, decrypt, zip2bytes, bytes2zip, enc_box, save_auth, attachment_cache, upload_cache, decode_attachment, expand_attachment, shorten_attachment, is_discord_attachment, discord_expired, url2fn, p2n, byte_scale, leb128, decode_leb128, seq, MIMES, Request, reqs, RangeSet, MemoryBytes, DOMAIN_CERT, PRIVATE_KEY
 
 interface = None
 csubmit(Request._init_())
@@ -238,63 +238,263 @@ class Server:
 			self.cache[rpath] = b = f.read()
 		return b
 
+	@cp.expose(("fi",))
+	def fileinfo(self, *path, **void):
+		cp.response.headers.update(SHEADERS)
+		assert len(path) in (1, 2) and path[0].count("~") == 0
+		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
+		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
+		url = await_fut(fut)
+		resp = self.session.get(
+			url,
+			headers=Request.header(),
+			verify=False,
+			timeout=60,
+			stream=True,
+		)
+		resp.raise_for_status()
+		data = seq(resp)
+		length, i = decode_leb128(data, mode="index")
+		content = data[i:i + length]
+		try:
+			encoded = zip2bytes(content)
+		except Exception:
+			encoded = content
+		cp.response.headers["Content-Type"] = "application/json"
+		return bytes(encoded)
+
+	@cp.expose
+	def download(self, *path, download="1", **void):
+		cp.response.headers.update(SHEADERS)
+		assert len(path) in (1, 2) and path[0].count("~") == 0
+		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
+		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
+		url = await_fut(fut)
+		resp = self.session.get(
+			url,
+			headers=Request.header(),
+			verify=False,
+			timeout=60,
+			stream=True,
+		)
+		resp.raise_for_status()
+		data = seq(resp)
+		length, i = decode_leb128(data, mode="index")
+		content = data[i:i + length]
+		try:
+			encoded = zip2bytes(content)
+		except Exception:
+			encoded = content
+		info = cdict(orjson.loads(encoded))
+		endpoint = cp.url(qs=cp.request.query_string, base="")[1:].split("/", 1)[0]
+		download = (download and download[0] not in "0fFnN") and endpoint.startswith("d")
+		if download:
+			cp.response.headers["Content-Disposition"] = "attachment; " * bool(download) + "filename=" + json.dumps(info.filename)
+		cp.response.headers["Attachment-Filename"] = info.filename
+		cp.response.headers["Content-Type"] = info.mimetype
+		cp.response.headers["ETag"] = json_dumps(f"{info.get('timestamp', 0)};{info.get('hash', info.filename)}")
+		head = data[i + length:]
+		head = bytes(head)
+		print(head)
+		return self.dyn_serve(list(info.chunks), size=info.size, head=head)
+	download._cp_config = {"response.stream": True}
+
+	@tracebacksuppressor
+	def dyn_serve(self, urls, size=0, head=None):
+		brange = cp.request.headers.get("Range", "").removeprefix("bytes=")
+		headers = fcdict(cp.request.headers)
+		headers.pop("Remote-Addr", None)
+		headers.pop("Host", None)
+		headers.pop("Range", None)
+		headers.update(Request.header())
+		ranges = []
+		length = 0
+		if brange:
+			try:
+				branges = brange.split(",")
+				for s in branges:
+					start, end = s.split("-", 1)
+					if not start:
+						if not end:
+							continue
+						start = size - int(end)
+						end = size - 1
+					elif not end:
+						end = size - 1
+					start = int(start)
+					end = int(end) + 1
+					length += end - start
+					ranges.append((start, end))
+			except Exception:
+				pass
+		if ranges:
+			cp.response.status = 206
+		else:
+			cp.response.status = 200
+			ranges.append((0, size))
+			length = size
+		if not size:
+			size = "*"
+		cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size}" for start, end in ranges)
+		cp.response.headers["Content-Range"] = cr
+		cp.response.headers["Content-Length"] = str(length)
+		cp.response.headers["Accept-Ranges"] = "bytes"
+		if head:
+			if not cp.response.headers.get("Content-Type"):
+				cp.response.headers["Content-Type"] = magic.from_buffer(head)
+			urls.insert(0, head)
+		return self._dyn_serve(urls, ranges, headers)
+
+	@tracebacksuppressor(GeneratorExit)
+	def _dyn_serve(self, urls, ranges, headers):
+		for start, end in ranges:
+			pos = 0
+			rems = urls.copy()
+			futs = []
+			big = False
+			while rems:
+				u = rems.pop(0)
+				if isinstance(u, byte_like):
+					ns = len(u)
+				elif "?size=" in u or "&size=" in u:
+					u, ns = u.replace("?size=", "&size=").split("&size=", 1)
+					ns = int(ns)
+				elif "?S=" in u or "&S=" in u:
+					u, ns = u.replace("?S=", "&S=").split("&S=", 1)
+					ns = int(ns)
+				elif u.startswith("https://s3-us-west-2"):
+					ns = 503316480
+				elif u.startswith("https://cdn.discord"):
+					ns = 8388608
+				else:
+					resp = reqs.next().head(u, headers=headers, timeout=20)
+					ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
+				if pos + ns <= start:
+					pos += ns
+					continue
+				if pos >= end:
+					break
+
+				def get_chunk(u, h, start, end, pos, ns, big):
+					s = start - pos
+					e = end - pos
+					if isinstance(u, byte_like):
+						yield u[s:e]
+						return
+					if e >= ns:
+						e = ""
+					else:
+						e -= 1
+					h2 = dict(h.items())
+					h2["range"] = f"bytes={s}-{e}"
+					ex2 = None
+					for i in range(3):
+						resp = reqs.next().get(u, headers=h2, stream=True, timeout=20)
+						if resp.status_code == 416:
+							yield b""
+							return
+						try:
+							resp.raise_for_status()
+						except Exception as ex:
+							ex2 = ex
+						else:
+							break
+					if ex2:
+						raise ex2
+					if resp.status_code != 206:
+						ms = min(ns, end - pos - s)
+						if len(resp.content) > ms:
+							yield resp.content[s:(e or len(resp.content))]
+							return
+						yield resp.content
+						return
+					if big:
+						yield from resp.iter_content(262144)
+						return
+					yield from resp.iter_content(65536)
+
+				if len(futs) > 1:
+					yield from futs.pop(0).result()
+				fut = esubmit(get_chunk, u, headers, start, end, pos, ns, big)
+				futs.append(fut)
+				pos = 0
+				start = 0
+				end -= start + ns
+				big = True
+			for fut in futs:
+				yield from fut.result()
+
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	def upload(self, filename="b", hash="", position=0, size=0):
 		position = int(position)
-		size = int(size)
+		size2 = int(cp.request.headers.get("Content-Length", 0))
+		size = int(size) or size2
 		h = true_ip() + hash
 		try:
-			resp = cp.request.body.fp
+			fp = cp.request.body.fp
 		except Exception:
 			print_exc()
-			resp = None
+			fp = None
 		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
-		if not size or not resp or int(cp.request.headers.get("Content-Length", 0)) < 1:
+		if not size or not fp:
 			if h in upload_cache:
 				return json_dumps(list(upload_cache[h].keys()))
 			return b"Expected input data."
+		if size > 1 << 40:
+			return b"Maximum filesize is 1TB."
 		assert position == 0 or h in upload_cache
 		assert not position % attachment_cache.max_size
 		if h not in upload_cache:
 			private_key = os.urandom(8)
 			hashable = private_key + b"~" + enc_box._key
 			public_key = shash(hashable)
-			upload_cache[h] = cdict(info=cdict(filename=filename, mimetype=cp.request.headers.get("mimetype", "application/octet-stream"), size=size, key=public_key, chunks=[]), chunkinfo={}, required=RangeSet(0, size), key=private_key)
+			upload_cache[h] = cdict(info=cdict(filename=filename, mimetype=cp.request.headers.get("mimetype", "application/octet-stream"), hash="", timestamp=utc(), size=size, key=public_key, chunks=[]), chunkinfo={}, required=RangeSet(0, size), key=private_key)
 
 		def start_upload(position):
+			if position == 0:
+				head = fp.read(attachment_cache.max_size // 2)
+				upload_cache[h].info.mimetype = magic.from_buffer(head)
+				upload_cache[h].info.hash = shash(head)
+				upload_cache[h].head = head
+				upload_cache[h].required.remove(0, len(head))
+				position += len(head)
 			yield b"{"
-			while True:
-				fn = filename if position == 0 else "c"
-				b = resp.read(attachment_cache.max_size)
+			while upload_cache[h].required:
+				fn = "c"
+				b = fp.read(attachment_cache.max_size)
 				if not b:
 					break
-				if position == 0:
-					upload_cache[h].info.mimetype = magic.from_buffer(b)
 				fut = attachment_cache.create(b, filename=fn)
 				url = await_fut(fut)
-				upload_cache[h].chunkinfo[position] = url
+				cid, mid, aid, fn = expand_attachment(url)
+				uchunk = shorten_attachment(cid, mid, aid, fn, size=len(b))
+				upload_cache[h].chunkinfo[position] = uchunk
 				upload_cache[h].required.remove(position, position + len(b))
 				position += len(b)
-				if not upload_cache[h].required:
-					break
 			if not upload_cache[h].required:
 				upload_cache[h].info["chunks"] = [v for k, v in sorted(upload_cache[h].chunkinfo.items())]
 				print("INFO:", upload_cache[h])
 				data = json_dumps(upload_cache[h].info)
-				data2 = bytes2zip(data)
-				if len(data2) <= len(data) / 2:
-					data = data2
-				fut = attachment_cache.create(data, filename=filename, editable=True)
-				url = await_fut(fut) + "?key=" + base64.urlsafe_b64encode(upload_cache[h].key).rstrip(b"=").decode("ascii")
-				yield b'"url":"' + url.encode("utf-8") + b'"'
+				if len(data) > 262144:
+					data2 = bytes2zip(data)
+					if len(data2) <= len(data) / 2 or len(data) >= attachment_cache.max_size // 4:
+						data = data2
+				encoded = leb128(len(data)) + data
+				head = upload_cache[h].head
+				assert len(encoded) + len(head) <= attachment_cache.max_size
+				fut = attachment_cache.create(encoded + head, filename=filename, editable=True)
+				url = await_fut(fut)
+				cid, mid, aid, fn = expand_attachment(url)
+				uhead = shorten_attachment(cid, mid, aid, fn, mode="p") + "?key=" + base64.urlsafe_b64encode(upload_cache[h].key).rstrip(b"=").decode("ascii")
+				yield b'"url":"' + uhead.encode("utf-8") + b'"'
 			yield b"}"
 		return start_upload(position)
 
 	@cp.expose
 	def delete(self, *path, key=None):
-		assert len(path) == 2 and path[0].count("~") == 0
+		assert len(path) in (1, 2) and path[0].count("~") == 0
 		assert key, "File Key Required."
 		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
 		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
@@ -304,12 +504,16 @@ class Server:
 			headers=Request.header(),
 			verify=False,
 			timeout=60,
+			stream=True,
 		)
 		resp.raise_for_status()
+		data = seq(resp)
+		length, i = decode_leb128(data, mode="index")
+		content = data[i:i + length]
 		try:
-			data = zip2bytes(resp.content)
+			data = zip2bytes(content)
 		except Exception:
-			data = resp.content
+			data = content
 		info = orjson.loads(data)
 		hashable = base64.urlsafe_b64decode(key + "=") + b"~" + enc_box._key
 		public_key = shash(hashable)
@@ -422,10 +626,16 @@ class Server:
 		cp.response.headers.pop("Transfer-Encoding", None)
 		if is_discord_attachment(url):
 			cp.response.headers.pop("Content-Disposition", None)
-		if resp.headers.get("Content-Type", "application/octet-stream") == "application/octet-stream":
+			cp.response.headers.update(CHEADERS)
+		ctype = resp.headers.get("Content-Type", "application/octet-stream")
+		if ctype in ("text/html", "text/html; charset=utf-8", "application/octet-stream"):
 			it = resp.iter_content(65536)
 			b = next(it)
 			mime = magic.from_buffer(b)
+			if mime == "application/octet-stream":
+				a = MemoryBytes(b)[:128]
+				if sum(32 <= c < 128 for c in a) >= len(a) * 7 / 8:
+					mime = "text/plain"
 			cp.response.headers.pop("Content-Type", None)
 			cp.response.headers["Content-Type"] = mime
 			return resume(b, it)
@@ -533,81 +743,6 @@ class Server:
 		cp.response.headers["Content-Length"] = str(length)
 		cp.response.headers["Accept-Ranges"] = "bytes"
 		return self._dyn_serve(urls, ranges, headers)
-
-	def _dyn_serve(self, urls, ranges, headers):
-		reqs = requests.Session()
-		try:
-			for start, end in ranges:
-				pos = 0
-				rems = urls.copy()
-				futs = []
-				big = False
-				while rems:
-					u = rems.pop(0)
-					if "?size=" in u:
-						u, ns = u.split("?size=", 1)
-						ns = int(ns)
-					elif u.startswith("https://s3-us-west-2"):
-						ns = 503316480
-					elif u.startswith("https://cdn.discord"):
-						ns = 8388608
-					else:
-						resp = reqs.head(u, headers=headers, timeout=45)
-						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
-					if pos + ns <= start:
-						pos += ns
-						continue
-					if pos >= end:
-						break
-
-					def get_chunk(u, h, start, end, pos, ns, big):
-						s = start - pos
-						e = end - pos
-						if e >= ns:
-							e = ""
-						else:
-							e -= 1
-						h2 = dict(h.items())
-						h2["range"] = f"bytes={s}-{e}"
-						ex2 = None
-						for i in range(3):
-							resp = reqs.get(u, headers=h2, stream=True, timeout=30)
-							if resp.status_code == 416:
-								yield b""
-								return
-							try:
-								resp.raise_for_status()
-							except Exception as ex:
-								ex2 = ex
-							else:
-								break
-						if ex2:
-							raise ex2
-						if resp.status_code != 206:
-							ms = min(ns, end - pos - s)
-							if len(resp.content) > ms:
-								yield resp.content[s:(e or len(resp.content))]
-								return
-							yield resp.content
-							return
-						if big:
-							yield from resp.iter_content(262144)
-							return
-						yield from resp.iter_content(65536)
-
-					if len(futs) > 1:
-						yield from futs.pop(0).result()
-					fut = esubmit(get_chunk, u, headers, start, end, pos, ns, big)
-					futs.append(fut)
-					pos = 0
-					start = 0
-					end -= start + ns
-					big = True
-				for fut in futs:
-					yield from fut.result()
-		except GeneratorExit:
-			pass
-
 
 if __name__ == "__main__":
 	logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(message)s')

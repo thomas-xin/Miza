@@ -54,11 +54,33 @@ available = {
 		"together": ("meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo", ("5", "5")),
 		None: "qwen-72b",
 	},
+	"llama-3-90b": {
+		"deepinfra": ("meta-llama/Llama-3.2-11B-Vision-Instruct", ("0.35", "0.4")),
+		"together": ("meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo", ("1.2", "1.2")),
+		None: "llama-3-70b",
+	},
+	"llama-3-70b": {
+		"deepinfra": ("meta-llama/Meta-Llama-3.1-70B-Instruct", ("0.52", "0.75")),
+		"together": ("meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", ("0.88", "0.88")),
+		"fireworks": ("accounts/fireworks/models/llama-v3p1-70b-instruct", ("0.9", "0.9")),
+		None: "lzlv-70b",
+	},
+	"llama-3-11b": {
+		"deepinfra": ("meta-llama/Llama-3.2-11B-Vision-Instruct", ("0.055", "0.055")),
+		"together": ("meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo", ("0.18", "0.18")),
+		None: "llama-3-8b",
+	},
+	"llama-3-8b": {
+		"deepinfra": ("meta-llama/Meta-Llama-3.1-8B-Instruct", ("0.1", "0.1")),
+		"fireworks": ("accounts/fireworks/models/llama-v3p1-8b-instruct", ("0.2", "0.2")),
+		"together": ("meta-llama/Meta-Llama-3.1-8B-Instruct", ("0.2", "0.2")),
+		None: "command-r",
+	},
 	"command-r-plus": {
 		"cohere_trial": ("command-r-plus", ("0.25", "1.25")),
 		"mizabot": ("command-r-plus-h6t2", ("0.5", "2.5")),
 		"cohere": ("command-r-plus-08-2024", ("2.5", "10")),
-		None: "llama-3-70b",
+		None: "qwen-72b",
 	},
 	"command-r": {
 		"cohere_trial": ("command-r", ("0.05", "0.25")),
@@ -71,8 +93,8 @@ available = {
 		None: "firefunction-v2",
 	},
 	"qwen-72b": {
-		"together": ("Qwen/Qwen2-72B-Instruct", ("0.9", "0.9")),
-		"deepinfra": ("Qwen/Qwen2-72B-Instruct", ("0.56", "0.77")),
+		"deepinfra": ("Qwen/Qwen2.5-72B-Instruct", ("0.35", "0.4")),
+		"together": ("Qwen/Qwen2.5-72B-Instruct-Turbo", ("1.2", "1.2")),
 		None: "llama-3-70b",
 	},
 	"o1": {
@@ -85,11 +107,11 @@ available = {
 	},
 	"gpt-4m": {
 		"openai": ("gpt-4o-mini-2024-07-18", ("0.15", "0.6")),
-		None: "gpt-4",
+		None: "llama-3-90b",
 	},
 	"gpt-4": {
 		"openai": ("gpt-4o-2024-08-06", ("2.5", "10")),
-		None: "claude-3.5-sonnet",
+		None: "llama-3-90b",
 	},
 	"gpt-3.5-turbo-instruct": {
 		"openai": ("gpt-3.5-turbo-instruct", ("1.5", "2")),
@@ -119,7 +141,6 @@ available = {
 		"deepinfra": ("databricks/dbrx-instruct", ("0.6", "0.6")),
 		"together": ("databricks/dbrx-instruct", ("1.2", "1.2")),
 		"fireworks": ("accounts/fireworks/models/dbrx-instruct", ("1.6", "1.6")),
-		None: "llama-3-70b",
 	},
 	"wizard-8x22b": {
 		"deepinfra": ("microsoft/WizardLM-2-8x22B", ("0.65", "0.65")),
@@ -147,12 +168,6 @@ available = {
 		"mizabot": ("NeverSleep/Llama-3-Lumimaid-70B-v0.1-alt-GGUF", ("0.2", "1")),
 		None: "llama-3-70b",
 	},
-	"llama-3-70b": {
-		"deepinfra": ("meta-llama/Meta-Llama-3.1-70B-Instruct", ("0.52", "0.75")),
-		"together": ("meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", ("0.88", "0.88")),
-		"fireworks": ("accounts/fireworks/models/llama-v3p1-70b-instruct", ("0.9", "0.9")),
-		None: "lzlv-70b",
-	},
 	"lzlv-70b": {
 		"deepinfra": ("lizpreciatior/lzlv_70b_fp16_hf", ("0.59", "0.79")),
 	},
@@ -167,12 +182,6 @@ available = {
 		"fireworks": ("accounts/fireworks/models/mythomax-l2-13b", ("0.2", "0.2")),
 		"together": ("Gryphe/MythoMax-L2-13b", ("0.30", "0.30")),
 		None: "llama-3-8b",
-	},
-	"llama-3-8b": {
-		"deepinfra": ("meta-llama/Meta-Llama-3.1-8B-Instruct", ("0.1", "0.1")),
-		"fireworks": ("accounts/fireworks/models/llama-v3p1-8b-instruct", ("0.2", "0.2")),
-		"together": ("meta-llama/Meta-Llama-3.1-8B-Instruct", ("0.2", "0.2")),
-		None: "command-r",
 	},
 	"stripedhyena-nous-7b": {
 		"together": ("togethercomputer/StripedHyena-Nous-7B", ("0.2", "0.2")),
@@ -194,7 +203,9 @@ is_chat = {
 	"command-r-plus",
 	"35b-beta-long",
 	"llama-3-8b",
+	"llama-3-11b",
 	"llama-3-70b",
+	"llama-3-90b",
 	"llama-3-405b",
 	"reflection-llama-3-70b",
 	"euryale-70b",
@@ -231,7 +242,9 @@ is_completion = {
 	"miquliz-120b",
 	"gpt-3.5-turbo-instruct",
 	"llama-3-8b",
+	"llama-3-11b",
 	"llama-3-70b",
+	"llama-3-90b",
 	"llama-3-405b",
 	"reflection-llama-3-70b",
 	"euryale-70b",
@@ -280,6 +293,8 @@ is_vision = {
 	"claude-3-sonnet-20240229",
 	"claude-3-haiku",
 	"claude-3-haiku-20240307",
+	"llama-3-11b",
+	"llama-3-90b",
 	"o1",
 	"o1-mini",
 	"gpt-4",
@@ -323,7 +338,9 @@ instruct_formats = {
 	"mixtral-8x22b-instruct": "mistral",
 	"wizard-8x22b": "mistral",
 	"llama-3-405b": "llamav3",
+	"llama-3-90b": "llamav3",
 	"llama-3-70b": "llamav3",
+	"llama-3-11b": "llamav3",
 	"llama-3-8b": "llamav3",
 	"phi-4b": "llamav3",
 }
@@ -338,7 +355,9 @@ contexts = {
 	"35b-beta-long": 14336,
 	"qwen-72b": 32768,
 	"llama-3-8b": 131072,
+	"llama-3-11b": 131072,
 	"llama-3-70b": 131072,
+	"llama-3-90b": 131072,
 	"llama-3-405b": 131072,
 	"o1": 128000,
 	"o1-mini": 128000,

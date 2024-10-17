@@ -1382,7 +1382,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			vf += f"scale={w}:{h}:flags=area"
 			if mode == "RGBA":
 				vf += "format=rgba,"
-		bitrate = min(floor(fs / duration * 1000 * 7.5), 99999999) # use 7.5 bits per byte
+		bitrate = floor(min(fs / duration * 1000 * 7.5, 99999999)) # use 7.5 bits per byte
 		pix = "rgb24" if lossless else "yuv420p"
 		if mode == "RGBA":
 			cv = ("-c:v:0", "libsvtav1", "-pix_fmt:v:0", "yuv420p") if not h & 1 and not w & 1 else ("-c:v:0", "libaom-av1", "-pix_fmt:v:0", pix, "-usage", "realtime", "-cpu-used", "3")
@@ -1461,7 +1461,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			w = round(first.width / 2) * 2
 			h = round(first.height / 2) * 2
 			command.extend(("-vf", f"scale={w}:{h}:flags=bicubic"))
-		bitrate = min(floor(fs / duration * 1000 * 7.5), 99999999) # use 7.5 bits per byte
+		bitrate = floor(min(fs / duration * 1000 * 7.5, 99999999)) # use 7.5 bits per byte
 		command.extend(("-b:v", str(bitrate)))
 		if mode == "RGBA":
 			# nvenc not supporting yuva!!
@@ -1487,7 +1487,7 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 		b = np.asanyarray(im, dtype=np.uint8).data
 		pix = "rgb24" if im.mode == "RGB" else "rgba"
 		args = ["ffmpeg", "-hide_banner", "-v", "error", "-f", "rawvideo", "-pix_fmt", pix, "-video_size", "x".join(map(str, im.size)), "-i", "-"]
-		opts, fmt = ffmpeg_opts({}, iter([im]), 1, im.mode, im, fmt, floor(fs * (r or 1)), *size, 1000, opt)
+		opts, fmt = ffmpeg_opts({}, iter([im]), 1, im.mode, im, fmt, fs * (r or 1), *size, 1000, opt)
 		args.extend(opts)
 		print(im, len(b))
 		if fmt in ("png", "jpg", "webp"):
@@ -1561,9 +1561,13 @@ def evalImg(url, operation, args):
 	fs = inf
 	dur = None
 	maxframes = inf
+	nogif = False
 	if len(args) > 1 and args[-2] == "-f":
 		fmt = args.pop(-1) or fmt
 		args.pop(-1)
+		if fmt in statics:
+			maxframes = 1
+			nogif = True
 	if len(args) > 1 and args[-2] == "-fs":
 		fs = floor(float(args.pop(-1)))
 		args.pop(-1)
@@ -1584,7 +1588,6 @@ def evalImg(url, operation, args):
 		args.pop(-1)
 	else:
 		bg = False
-	nogif = False
 	if operation != "$":
 		# print("IOPER:", operation, args)
 		if args and args[0] == "-nogif":

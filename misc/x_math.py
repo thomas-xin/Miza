@@ -3,6 +3,7 @@
 import sympy
 import mpmath
 import math
+from math import isfinite
 import time
 import os
 import sys
@@ -519,12 +520,12 @@ if os.name != "nt":
 		if len(seq) > 4 and all(seq[2:] - seq[1:-1] == seq[:-2]):
 			return seq[-1] + seq[-2]
 		a = _predict_next(seq[1:] - seq[:-1])
-		if a is not None:
+		if a is not None and isfinite(a):
 			return seq[-1] + a
 		if len(seq) < 4 or 0 in seq[:-1]:
 			return
 		b = _predict_next(seq[1:] / seq[:-1])
-		if b is not None:
+		if b is not None and isfinite(b):
 			return seq[-1] * b
 
 	def predict_next(seq, limit=12):
@@ -532,7 +533,7 @@ if os.name != "nt":
 		seq = np.array(seq, dtype=np.float64)
 		for i in range(min(8, limit), 1 + max(8, min(len(seq), limit))):
 			temp = _predict_next(seq[-i:])
-			if temp is not None:
+			if temp is not None and isfinite(temp):
 				return round_min(temp)
 else:
 	sys.path.append("misc")
@@ -544,9 +545,11 @@ else:
 		if len(seq) > limit:
 			seq = seq[-limit:]
 		try:
-			return round_min(accel.predict_next(seq))
+			temp = accel.predict_next(seq)
 		except ValueError:
 			return
+		if temp is not None and isfinite(temp):
+			return round_min(temp)
 
 # Multiple variable limit
 def lim(f, kwargs=None, **_vars):

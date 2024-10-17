@@ -2171,10 +2171,12 @@ class UpdateUsers(Database):
 	async def _typing_(self, user, **void):
 		self.data.setdefault(user.id, {})["last_typing"] = utc()
 
-	async def _nocommand_(self, message, msg, force=False, flags=(), truemention=True, perm=0, **void):
+	async def _nocommand_(self, message, msg, force=False, flags=(), before=None, truemention=True, perm=0, **void):
 		if getattr(message, "noresponse", False):
 			return
 		bot = self.bot
+		if isinstance(before, bot.GhostMessage):
+			return
 		user = message.author
 		channel = message.channel
 		guild = message.guild

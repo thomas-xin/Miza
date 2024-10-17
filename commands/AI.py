@@ -196,7 +196,7 @@ class Ask(Command):
 				if input_message:
 					messagelist.append(input_message)
 				m = None
-				async for resp in bot.chat_completion(messagelist, model=model, frequency_penalty=pdata.frequency_penalty, presence_penalty=0.5, max_tokens=4096, temperature=pdata.temperature, top_p=pdata.top_p, tool_choice=None, tools=TOOLS, model_router=MODEL_ROUTER, tool_router=TOOL_ROUTER, stop=(), user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
+				async for resp in bot.chat_completion(messagelist, model=model, frequency_penalty=pdata.frequency_penalty, presence_penalty=pdata.frequency_penalty * 2 / 3, max_tokens=4096, temperature=pdata.temperature, top_p=pdata.top_p, tool_choice=None, tools=TOOLS, model_router=MODEL_ROUTER, tool_router=TOOL_ROUTER, stop=(), user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
 					if isinstance(resp, dict):
 						if resp.get("cargs"):
 							props.cargs = resp["cargs"]
@@ -501,7 +501,7 @@ DEFPER = "Your name is {{char}}; your personality is intelligent, mischievous an
 class Personality(Command):
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
 	min_level = 2
-	description = "Customises my personality for ~ask and @mentions in the current server. Note that with the increased complexity of the chatbot, a clear description of who the bot is should be provided."
+	description = "Customises my personality for ~ask and @mentions in the current channel. Note that with the increased complexity of the chatbot, a clear description of who the bot is should be provided."
 	schema = cdict(
 		description=cdict(
 			type="string",
@@ -561,7 +561,7 @@ class Personality(Command):
 		if description == "DEFAULT":
 			bot.data.personalities.pop(_channel.id, None)
 			return css_md(f"Personality settings for {sqr_md(_channel)} have been reset.")
-		if not description and temperature is None and stream is None and not cutoff:
+		if not description and frequency_penalty is None and temperature is None and top_p is None and stream is None and not cutoff:
 			p = self.retrieve(_channel)
 			return ini_md(f"Current personality settings for {sqr_md(_channel)}:{iter2str(p)}\n(Use {bot.get_prefix(_channel.guild)}personality DEFAULT to reset).")
 		if description and (len(description) > 4096 or len(description) > 512 and _premium.value < 2):

@@ -174,9 +174,9 @@ class ImageSequence(Image.Image):
 		else:
 			self._images = images
 			[im.load() for im in images]
+		dur2 = images[0].info.get("total_duration", 0)
 		for i1, i2 in zip(self._images, images):
-			if "duration" in i2.info:
-				i1.info["duration"] = max(i2.info.get("duration", 0), 1000 / 40)
+			i1.info["duration"] = max(i2.info.get("duration", dur2), 1000 / 40)
 		self._position = 0
 
 	def __len__(self):
@@ -234,6 +234,10 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 		pass
 	else:
 		pillow_heif.register_heif_opener()
+	try:
+		import pillow_avif
+	except ImportError:
+		pass
 	mime = magic.from_buffer(data)
 	if mime == "application/zip":
 		z = zipfile.ZipFile(io.BytesIO(data), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False)
@@ -248,13 +252,45 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 	fcount = None
 	proc = None
 	try:
-		if not wand or mime.split("/", 1)[0] == "image" and mime.split("/", 1)[-1] in "blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal webp wmf xbm".split():
+		if not wand or mime.split("/", 1)[0] == "image" and mime.split("/", 1)[-1] in "apng avif blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal webp wmf xbm".split():
 			try:
-				return Image.open(out)
+				im = Image.open(out)
 			except PIL.UnidentifiedImageError:
 				if not b:
 					raise FileNotFoundError("image file not found")
-				out.seek(0)   
+				out.seek(0)
+			else:
+				try:
+					im.seek(1)
+				except EOFError:
+					im.seek(0)
+				else:
+					im.seek(0)
+					if not im.info.get("duration"):
+						ts = time.time_ns() // 1000
+						if mime == "video/m3u8" and orig:
+							fn = orig
+						else:
+							fn = "cache/" + str(ts)
+							with open(fn, "wb") as f:
+								f.write(data)
+						cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration", "-show_entries", "format=duration", "-of", "csv=s=x:p=0", fn)
+						p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+						res = as_str(p.stdout.read()).strip()
+						if res:
+							r1, r2, *_ = res.splitlines()
+							dur = None
+							try:
+								dur = float(r1)
+							except (ValueError, TypeError, SyntaxError, ZeroDivisionError):
+								try:
+									dur = float(r2)
+								except (ValueError, TypeError, SyntaxError, ZeroDivisionError):
+									pass
+							if dur:
+								im.info["total_duration"] = dur * 1000
+								print("TD:", dur * 1000)
+				return im
 		if mime.split("/", 1)[0] in ("image", "video"):
 			fmt = "rgba" if mime.split("/", 1)[0] == "image" else "rgb24"
 			ts = time.time_ns() // 1000
@@ -264,7 +300,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 				fn = "cache/" + str(ts)
 				with open(fn, "wb") as f:
 					f.write(data)
-			cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate,duration,nb_frames", "-of", "csv=s=x:p=0", fn)
+			cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate,duration,nb_frames", "-show_entries", "format=duration", "-of", "csv=s=x:p=0", fn)
 			print(cmd)
 			p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			cmd2 = ["ffmpeg", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y"]
@@ -281,15 +317,15 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 				res = as_str(p.stdout.read()).strip()
 				if not res:
 					raise TypeError(f'Filetype "{mime}" is not supported.')
-				info = res.split("x", 4)
+				r1, r2, *_ = res.splitlines()
+				info = r1.split("x", 4)
 			except:
 				print(as_str(p.stderr.read()), end="")
 				raise
 			print(info)
 			size = tuple(map(int, info[:2]))
 			if info[3] == "N/A":
-				cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "format=duration", "-of", "csv=p=0", fn)
-				info[3] = subprocess.check_output(cmd)
+				info[3] = r2
 			try:
 				dur = float(info[3])
 			except (ValueError, TypeError, SyntaxError, ZeroDivisionError):
@@ -297,18 +333,26 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 			if not size[0] or not size[1] or not dur:
 				raise InterruptedError(info)
 			if info[2] == "N/A":
-				fps = 30
+				fps = 0
 			else:
 				import fractions
-				fps = float(fractions.Fraction(info[2]))
-			framedur = 1000 / fps
-			bcount = 4 if fmt == "rgba" else 3
-			bcount *= int(np.prod(size))
-			bytecount = bcount * dur * fps
+				try:
+					fps = float(fractions.Fraction(info[2]))
+				except (ZeroDivisionError, OverflowError):
+					fps = 0
 			try:
 				fcount = int(info[4])
 			except ValueError:
 				fcount = inf
+			if not fps:
+				if isfinite(fcount):
+					fps = fcount / dur
+				else:
+					fps = 30
+			framedur = 1000 / fps
+			bcount = 4 if fmt == "rgba" else 3
+			bcount *= int(np.prod(size))
+			bytecount = bcount * dur * fps
 			if fps * dur > maxframes:
 				proc.terminate()
 				fcount = floor(maxframes / dur / fps * fcount)
@@ -1132,13 +1176,15 @@ def properties(im) -> tuple: # frames, duration, fps
 			return im.frameprops
 	except AttributeError:
 		pass
-	duration = 0
+	total_duration = im.info.get("total_duration", 0)
+	duration = total_duration
 	for f in range(2147483648):
 		try:
 			im.seek(f)
 		except EOFError:
 			break
-		duration += max(im.info.get("duration", 50), 1)
+		if not total_duration:
+			duration += max(im.info.get("duration", 50), 1)
 	fps = f / duration * 1000
 	return max(1, f), max(50, duration) / 1000, fps
 

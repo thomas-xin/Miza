@@ -1148,8 +1148,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		messages = await flatten(discord.abc.Messageable.history(channel, limit=101, around=cdict(id=m_id)))
 		data = {m.id: m for m in messages}
 		self.cache.messages.update(data)
-		return apply_stickers(data[m_id])
-	async def fetch_message(self, m_id, channel=None):
+		return data[m_id]
+	async def fetch_message(self, m_id, channel=None, old=False):
 		if not isinstance(m_id, int):
 			try:
 				m_id = int(m_id)
@@ -1161,7 +1161,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not m and "message_cache" in self.data:
 			with suppress(KeyError):
 				m = await asubmit(self.data.message_cache.load_message, m_id)
-		if m:
+		if m and not old:
 			if m.attachments:
 				if any(discord_expired(str(a.url)) for a in m.attachments):
 					if channel:
@@ -1641,8 +1641,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if emojis:
 						temp = await self.follow_to_image(m.content, follow=reactions)
 						found.extend(filter(is_url, temp))
+					for s in T(m).get("stickers", ()):
+						found.append(s.url)
 					# Attempt to find URLs in embed contents
-					apply_stickers(m)
 					for e in m.embeds:
 						for a in medias:
 							obj = T(e).get(a)
@@ -2308,14 +2309,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			backup="llama-3-8b",
 			retry="auto",
 			function="firefunction-v2",
-			vision="phi-4b",
+			vision="llama-3-11b",
 			target="auto",
 		),
 		1: cdict(
 			instructive="gpt-4m",
-			casual="gpt-4m",
-			nsfw="llama-3-70b",
-			backup="reflection-llama-3-70b",
+			casual="qwen-72b",
+			nsfw="llama-3-11b",
+			backup="claude-3.5-sonnet",
 			retry="gpt-4",
 			function="gpt-4m",
 			vision="claude-3-haiku",
@@ -2324,8 +2325,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		2: cdict(
 			instructive="claude-3.5-sonnet",
 			casual="gpt-4",
-			nsfw="command-r-plus",
-			backup="llama-3-70b",
+			nsfw="llama-3-90b",
+			backup="qwen-72b",
 			retry="gpt-4",
 			function="gpt-4m",
 			vision="gpt-4",
@@ -2393,6 +2394,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		assistant_name = props.get("name")
 		cargs = props.get("cargs") or {}
 		is_nsfw = cargs.get("nsfw")
+		message = None
 		if not cargs:
 			content = messages[-1].content
 			mod = await ai.moderate(messages[-3:], premium_context=premium_context)
@@ -2441,6 +2443,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print_exc()
 				message = None
 			print("SCAN:", cargs, message)
+		if message:
 			directly_answer = True
 			for tc in tuple(message.tool_calls or ()):
 				if tc.function.name == "directly_answer":
@@ -3228,7 +3231,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if files and (not message.author.bot or message.webhook_id):
 				if (utc_dt() - created_at).total_seconds() < 7200:
 					csubmit(self.tag_message(message))
-			apply_stickers(message)
 			self.cache.messages[message.id] = message
 			if (utc_dt() - created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
 				self.data.message_cache.save_message(message)
@@ -3414,22 +3416,26 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					image = await self.data.exec.uproxy(url)
 				else:
 					thumbnail = await self.data.exec.uproxy(url)
-		if message.embeds:
-			for e in message.embeds:
-				if not content:
-					if e.description and e.description != EmptyEmbed:
-						content = e.description
-					for f in emb2.fields:
-						if f:
-							emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
-				if e.image:
-					if not image:
-						image = await self.data.exec.uproxy(e.image.url)
-					else:
-						thumbnail = await self.data.exec.uproxy(e.image.url)
-					break
-				if e.thumbnail:
-					thumbnail = await self.data.exec.uproxy(e.thumbnail.url)
+		for s in T(m).get("stickers", ()):
+			if not image:
+				image = s.url
+			else:
+				thumbnail = s.url
+		for e in message.embeds:
+			if not content:
+				if e.description and e.description != EmptyEmbed:
+					content = e.description
+				for f in emb2.fields:
+					if f:
+						emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
+			if e.image:
+				if not image:
+					image = await self.data.exec.uproxy(e.image.url)
+				else:
+					thumbnail = await self.data.exec.uproxy(e.image.url)
+				break
+			if e.thumbnail:
+				thumbnail = await self.data.exec.uproxy(e.thumbnail.url)
 		if image:
 			emb.url = image
 			emb.set_image(url=image)
@@ -5708,7 +5714,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				argv = await self.proxy_emojis(argv, guild=message.guild, user=user, is_webhook=getattr(message, "webhook_id", None), lim=inf)
 				yield command, command_check, argv, from_mention
 
-	async def process_message(self, message, edit=True, min_perm=None, kwargs=None):
+	async def process_message(self, message, before=None, min_perm=None, kwargs=None):
 		"Processes a message, runs all necessary commands and bot events. May be called from another source."
 		if self.closing:
 			return 0
@@ -5720,7 +5726,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return 0
 
 		truemention = True
-		if self.id in (member.id for member in message.mentions):
+		if self.id in (member.id for member in message.mentions) and not isinstance(before, self.GhostMessage):
 			try:
 				m = await self.fetch_reference(message)
 			except (LookupError, discord.NotFound):
@@ -5774,7 +5780,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					msg = message.content
 					temp = to_alphanumeric(msg).casefold()
 					temp2 = to_alphanumeric(message.clean_content or msg).casefold()
-					await self.send_event("_nocommand_", text=temp, text2=temp2, edit=edit, msg=msg, message=message, perm=self.get_perms(user, guild), truemention=truemention)
+					await self.send_event("_nocommand_", text=temp, text2=temp2, edit=bool(before), before=before, msg=msg, message=message, perm=self.get_perms(user, guild), truemention=truemention)
 			return 0
 		# Return the delay before the message can be called again. This is calculated by the rate limit of the command.
 		return 0
@@ -6734,15 +6740,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					await asyncio.sleep(1)
 					await self.send_event("_minute_loop_")
 					esubmit(self.cache_reduce, priority=True)
-					await asyncio.sleep(1)
-					if self.server and self.server.writable:
-						with tracebacksuppressor(T0, T1, T2):
-							await Request(
-								f"http://127.0.0.1:{PORT}/api_update_replacers",
-								method="GET",
-								aio=True,
-								ssl=False,
-							)
 					with MemoryTimer("update"):
 						await asubmit(self.update, priority=True)
 
@@ -6871,7 +6868,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						await self.silent_delete(message, exc=True)
 						await self.send_event("_delete_", message=message)
 
-	async def handle_message(self, message, before=None, edit=True):
+	async def handle_message(self, message, before=None):
 		"Handles a new sent message, calls process_message and sends an error if an exception occurs."
 		if message.author.id != self.user.id:
 			for i, a in enumerate(message.attachments):
@@ -6880,7 +6877,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if message.content:
 						message.content += " "
 					message.content += as_str(b)
-		await self.process_message(message, edit=edit)
+		await self.process_message(message, before=before)
 
 	def set_classes(self):
 		bot = self
@@ -7178,7 +7175,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					except Exception:
 						print_exc()
 				message = discord.Message(channel=channel, data=copy.deepcopy(data), state=bot._state)
-				apply_stickers(message, data)
 				self = cls(message)
 				self._data = data
 				return self
@@ -7484,7 +7480,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				except:
 					print(d)
 					raise
-				apply_stickers(message, d)
 				if not getattr(message, "author", None):
 					message.author = author
 				return message
@@ -7531,7 +7526,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					return discord.enums.try_enum(discord.MessageType, d.get("type", 0))
 				if k == "attachments":
 					self.attachments = attachments = [discord.Attachment(data=a, state=bot._state) for a in d.get("attachments", ())]
-					apply_stickers(self, d)
 					return attachments
 				if k == "embeds":
 					return [discord.Embed.from_dict(a) for a in d.get("embeds", ())]
@@ -8258,7 +8252,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			fut = csubmit(self.seen(user, channel, guild, event="message", raw="Sending a message"))
 			await self.react_callback(message, None, user)
 			await fut
-			await self.handle_message(message, False)
+			await self.handle_message(message)
 
 		# Socket response event: if the event was an interaction, create a virtual message with the arguments as the content, then process as if it were a regular command.
 		@self.event
@@ -8391,7 +8385,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				after = await self.fetch_message(m_id, payload.channel_id)
 			else:
 				try:
-					before = await self.fetch_message(m_id)
+					before = await self.fetch_message(m_id, old=True)
 				except LookupError:
 					# If message was not in cache, create a ghost message object to represent old message.
 					c_id = data.get("channel_id")

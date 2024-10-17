@@ -592,7 +592,7 @@ def is_discord_message_link(url) -> bool:
 	"Detects whether a Discord link represents a channel or message link."
 	check = url[:64]
 	return "channels/" in check and "discord" in check
-def discord_expired(url):
+def discord_expired(url, early=21600 + 60):
 	if is_discord_attachment(url):
 		if "?ex=" not in url and "&ex=" not in url:
 			return True
@@ -601,7 +601,7 @@ def discord_expired(url):
 			ts = int(temp, 16)
 		except ValueError:
 			return True
-		return ts < utc() + 21600 + 60
+		return ts < utc() + early
 def expired(stream):
 	if not stream:
 		return True
@@ -945,24 +945,24 @@ def get_ext(f):
 
 def from_file(path, mime=True):
 	"Detects mimetype of file or buffer. Includes custom .jar, .ecdc, .m3u8 detection."
-	path = filetype.get_bytes(path)
+	data = filetype.get_bytes(path)
 	if mime:
-		out = filetype.guess_mime(path)
+		out = filetype.guess_mime(data)
 	else:
-		out = filetype.guess_extension(path)
-	if out and out.split("/", 1)[-1] == "zip" and isinstance(path, str) and path.endswith(".jar"):
+		out = filetype.guess_extension(data)
+	if out and out.split("/", 1)[-1] == "zip" and isinstance(data, str) and data.endswith(".jar"):
 		return "application/java-archive"
 	if not out:
-		if not isinstance(path, bytes):
-			if isinstance(path, str):
-				raise TypeError(path)
-			path = bytes(path)
-		out = simple_mimes(path, mime)
-	if out == "application/octet-stream" and path.startswith(b'ECDC'):
+		if not isinstance(data, bytes):
+			if isinstance(data, str):
+				raise TypeError(data)
+			data = bytes(data)
+		out = simple_mimes(data, mime)
+	if out == "application/octet-stream" and data.startswith(b'ECDC'):
 		return "audio/ecdc"
-	if out == "application/octet-stream" and path.startswith(b'\x00\x00\x00,ftypavis'):
+	if out == "application/octet-stream" and data.startswith(b'\x00\x00\x00,ftypavis'):
 		return "image/avif"
-	if out == "text/plain" and path.startswith(b"#EXTM3U"):
+	if out == "text/plain" and data.startswith(b"#EXTM3U"):
 		return "video/m3u8"
 	return out
 
@@ -1155,7 +1155,7 @@ def leb128(n):
 		if n:
 			data[-1] |= 128
 	return data or b"\x00"
-def decode_leb128(data):
+def decode_leb128(data, mode="cut"): # mode: cut | index
 	i = n = 0
 	shift = 0
 	for i, byte in enumerate(data):
@@ -1164,7 +1164,9 @@ def decode_leb128(data):
 			break
 		else:
 			shift += 7
-	return n, data[i + 1:]
+	if mode == "cut":
+		return n, data[i + 1:]
+	return n, i + 1
 
 def szudzik(x, y):
 	if x < y:
@@ -1196,7 +1198,7 @@ def deinterleave(z, n=1):
 			X[i % n] |= 1 << i // n
 	return X
 
-def encode_snowflake(*args):
+def encode_snowflake(*args, store_count=False):
 	timestamps = []
 	ids = []
 	increments = []
@@ -1213,13 +1215,26 @@ def encode_snowflake(*args):
 	increment = interleave(*increments)
 	z2 = szudzik(z1, increment)
 	encoded = leb128(z2) + n2b(timestamp)
+	# 127 indicates extra padding byte
+	# <127 indicates snowflake count
+	# >127 indicates predetermined count
+	if store_count:
+		assert 1 < len(args) < 127
+		encoded = bytes([len(args)]) + encoded
+	elif encoded[0] < 128:
+		encoded = b"\x7f" + encoded
 	return base64.urlsafe_b64encode(encoded).rstrip(b"=").decode("ascii")
 def decode_snowflake(data, n=1):
 	if isinstance(data, str):
 		data = data.encode("ascii")
 	if len(data) & 3:
 		data += b"=="
-	z2, b = decode_leb128(base64.urlsafe_b64decode(data))
+	decoded = base64.urlsafe_b64decode(data)
+	if 1 < decoded[0] < 127:
+		n, decoded = decoded[0], decoded[1:]
+	elif decoded[0] == 127:
+		decoded = decoded[1:]
+	z2, b = decode_leb128(decoded)
 	timestamp = b2n(b)
 	z1, increment = iszudzik(z2)
 	increments = deinterleave(increment, n)
@@ -1254,17 +1269,28 @@ def split_attachment(func) -> collections.abc.Callable:
 
 @split_attachment
 def encode_attachment(c_id, m_id, a_id, fn):
+	if a_id == 0:
+		return encode_snowflake(*map(int, (c_id, m_id)), store_count=True) + "/" + fn
 	return encode_snowflake(*map(int, (c_id, m_id, a_id))) + "/" + fn
 def decode_attachment(encoded):
 	data, *fn = encoded.split("/", 1)
-	return (*decode_snowflake(data, 3), *fn)
+	ids = list(decode_snowflake(data, 3))
+	while len(ids) < 3:
+		ids.append(0)
+	ids.extend(fn)
+	return ids
 
 @split_attachment
-def shorten_attachment(c_id, m_id, a_id, fn):
-	return "https://mizabot.xyz/u/" + encode_attachment(c_id, m_id, a_id, fn)
+def shorten_attachment(c_id, m_id, a_id, fn, mode="u", size=0):
+	url = f"https://mizabot.xyz/{mode}/" + encode_attachment(c_id, m_id, a_id, fn)
+	if size:
+		url += f"?size={size}"
+	return url
 def expand_attachment(url):
-	assert "/u/" in url
-	encoded = url.split("?", 1)[0].split("/u/", 1)[-1]
+	assert "//" in url
+	regs = regexp(r"\/\w\/").split(url.split("?", 1)[0], 1)
+	assert len(regs) == 2
+	encoded = regs[-1]
 	return decode_attachment(encoded)
 
 def p2n(b):
@@ -2166,7 +2192,11 @@ class FileHashDict(collections.abc.MutableMapping):
 			self.db = None
 		self.db = sqlite3.connect(self.path, check_same_thread=False)
 		self.cur = alist([self.db.cursor() for i in range(self.max_concurrency)])
-		self.cur[-1].execute(f"CREATE TABLE IF NOT EXISTS '{self.internal}' (key VARCHAR(256) PRIMARY KEY, value BLOB)")
+		try:
+			self.cur[-1].execute(f"CREATE TABLE IF NOT EXISTS '{self.internal}' (key VARCHAR(256) PRIMARY KEY, value BLOB)")
+		except Exception:
+			print("Error in database", self)
+			raise
 		self.cur[-1].execute(f"CREATE UNIQUE INDEX IF NOT EXISTS idx_key ON '{self.internal}' (key)")
 		self.codb = set(try_int(r[0]) for r in self.cur[-1].execute(f"SELECT key FROM '{self.internal}'") if r)
 		# print("Loaded cursor", self)
@@ -2860,10 +2890,15 @@ class AttachmentCache(Cache):
 			a_id = int.from_bytes(base64.urlsafe_b64decode(a_id + "=="), "big")
 		if not a_id:
 			a_id = 0
-		key = a_id if a_id >= ac else m_id * ac + a_id
+		if a_id >= ac:
+			key = a_id
+			early = 43200 + 60
+		else:
+			key = m_id * ac + a_id
+			early = 86400 - 60
 		try:
 			resp = self[key]
-			assert isinstance(resp, str) and not discord_expired(resp) and url2fn(resp) == fn
+			assert isinstance(resp, str) and not discord_expired(resp, early) and url2fn(resp) == fn
 		except KeyError:
 			resp = await self.retrieve_from(key, self.get_attachment, c_id, m_id, a_id, fn)
 		except AssertionError:
@@ -2907,7 +2942,10 @@ class AttachmentCache(Cache):
 				)
 			cid = getattr(channel, "id", channel) if channel else choice(self.channels)
 			url = f"https://discord.com/api/{api}/channels/{cid}/messages"
-			heads = dict(choice((self.headers, self.alt_headers)))
+			if editable:
+				heads = dict(self.headers)
+			else:
+				heads = dict(choice((self.headers, self.alt_headers)))
 			heads.pop("Content-Type")
 			resp = await self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
 			resp.raise_for_status()
@@ -2949,9 +2987,9 @@ class AttachmentCache(Cache):
 			)
 		cid, mid = c_id, m_id
 		url = f"https://discord.com/api/{api}/channels/{cid}/messages/{mid}"
-		heads = self.headers if c_id not in self.channels else self.alt_headers
+		heads = self.headers
 		heads.pop("Content-Type")
-		resp = await self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
+		resp = await self.sess.request("PATCH", url, headers=heads, data=form_data, timeout=120)
 		resp.raise_for_status()
 		message = await resp.json()
 		cid = int(message["channel_id"])

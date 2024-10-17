@@ -15,7 +15,6 @@ import subprocess
 import sys
 import time
 import urllib
-import weakref
 import zipfile
 import cheroot
 import cherrypy
@@ -25,14 +24,14 @@ import psutil
 import requests
 from collections import deque
 from concurrent.futures import Future
-from math import inf, ceil
+from math import ceil
 from traceback import print_exc
 from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
-from .asyncs import Semaphore, SemaphoreOverflowError, eloop, newfut, esubmit, tsubmit, csubmit, await_fut, gather, CloseableAsyncIterator
+from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut, gather, CloseableAsyncIterator
 from .smath import supersample, xrand
-from .types import as_str, astype, cdict, suppress, round_min, lim_str, full_prune, literal_eval, regexp, loop, json_dumps, alist, resume, RangeSet
-from .util import hwaccel, fcdict, ihash, nhash, shash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, find_file, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, smart_split, seq, proxy, Request, magic, is_discord_attachment, discord_expired, unyt, ecdc_exists, get_duration, evalex, evalEX, DownloadingFile, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, attachment_cache, expand_attachment, upload_cache
+from .types import byte_like, as_str, astype, cdict, suppress, round_min, full_prune, literal_eval, regexp, loop, json_dumps, alist, resume, RangeSet, MemoryBytes
+from .util import hwaccel, fcdict, nhash, shash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, smart_split, seq, Request, magic, is_discord_attachment, unyt, ecdc_exists, get_duration, evalex, evalEX, DownloadingFile, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, attachment_cache, expand_attachment, shorten_attachment, upload_cache
 
 
 try:
@@ -251,12 +250,8 @@ class EndpointRedirects(Dispatcher):
 		while p:
 			if p == "ip":
 				p = "get_ip"
-			elif p[:2] == "f/":
-				p = "raw/" + p[2:]
-			elif p == "api/mpinsights":
-				p = "api_mpinsights"
-			elif p.startswith("api/"):
-				p = p.removeprefix("api/")
+			elif p.split("/", 1)[0] in ("f", "d"):
+				p = "download/" + p.split("/", 1)[-1]
 			elif p in actually_static:
 				p = "static/" + p
 			elif p in mapped_static:
@@ -352,8 +347,6 @@ config = {
 }
 DOMAIN_CERT = "domain.cert.pem"
 PRIVATE_KEY = "private.key.pem"
-def hostmap(func):
-	return func
 
 HEADERS = {
 	"X-Content-Type-Options": "nosniff",
@@ -404,32 +397,6 @@ def fetch_static(path, ignore=False):
 			print_exc()
 		raise
 
-est_time = utc()
-est_last = -inf
-
-@tracebacksuppressor
-def estimate_life():
-	return inf
-	global est_time, est_last
-	hosted = sorted(int(f[1:].split("~", 1)[0]) / 1e6 for f in os.listdir(f"{TEMP_PATH}/filehost") if f.startswith(IND))
-	if not hosted:
-		est_last = -inf
-		ts = 0
-	else:
-		ts = hosted[0]
-	res = interface.run("bot.storage_ratio", cache=60)
-	try:
-		last = (utc() - ts) / res
-	except ZeroDivisionError:
-		last = inf
-	print(last)
-	est_time = utc() - last
-	est_last = utc()
-
-# estimate_life_after = lambda t: time.sleep(t) or estimate_life()
-
-# esubmit(estimate_life_after, 10)
-
 geo_sem = Semaphore(90, 256, rate_limit=60)
 geo_count = 0
 IP = None
@@ -473,130 +440,12 @@ class Server:
 
 	session = requests.Session()
 
-	serving = {}
-	def _fileinfo(self, path, **void):
-		# orig_path = path
-		ind = IND
-		if path.startswith("!"):
-			ind = "!"
-			path = path[1:]
-		elif not path.startswith("@"):
-			b = path.lstrip("~").split(".", 1)[0]
-			path = str(p2n(b))
-		else:
-			path = path[1:]
-		p = find_file(path, cwd=("saves/filehost", f"{TEMP_PATH}/filehost"), ind=ind)
-		mime = get_mime(p)
-		f_url = API + "/f/" + n2p(int(path))
-		st = os.stat(p)
-		fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
-		if fn.startswith(".temp$@"):
-			fn = fn[7:]
-			a3 = True
-		else:
-			try:
-				_p2 = find_file(path, cwd=f"{TEMP_PATH}/filehost", ind=ind)
-			except FileNotFoundError:
-				a3 = False
-			else:
-				a3 = True
-		# t = utc()
-		# ti = max(st.st_atime + 30 * 86400, st.st_ctime + 60 * 86400, t)
-		d = dict(
-			id=p.rsplit("/", 1)[-1].split("~", 1)[0].lstrip(IND),
-			filename=fn,
-			ttl=-1,
-			size=st.st_size,
-			mimetype=mime,
-			raw=f_url,
-			dl=f_url.replace("/f/", "/d/", 1),
-			timestamp=max(st.st_mtime, st.st_ctime),
-			in_cache=a3,
-		)
-		# print(p)
-		if "$" in p and p.split("$", 1)[0].endswith("~.forward") and mime == "text/html":
-			with open(p, "r", encoding="utf-8") as f:
-				resp = f.read(1048576)
-			s = resp
-			# print(s)
-			search = "<!DOCTYPE HTML><!--"
-			if s.startswith(search):
-				s = s[len(search):]
-				search = '--><html><meta'
-				try:
-					s = s[:s.index(search)]
-				except ValueError:
-					pass
-				else:
-					url, _code, ftype = orjson.loads(s)
-					if ftype == 3:
-						s = resp.split("/>", 1)[-1]
-						infd, urld, _ = s.split("-->", 2)
-						info = orjson.loads(infd.removeprefix("<!--"))
-						urls = orjson.loads(urld.removeprefix("<!--").removeprefix("URL="))
-						d["filename"] = info[0]
-						d["size"] = info[1]
-						d["mimetype"] = info[2]
-						urls = [remap_url(url) for url in urls]
-						# print(urls)
-						if len(urls) == 1 and not is_url(urls[0]):
-							urls = self._fileinfo(f"@{urls[0]}").get("chunks", ())
-						d["chunks"] = urls
-					else:
-						d["original_url"] = url
-		return d
-
-	lfc = {}
-	@cp.expose(("fi",))
-	@hostmap
-	def fileinfo(self, path, **kwargs):
-		cp.response.headers.update(SHEADERS)
-		d = self._fileinfo(path)
-		cp.response.headers["Content-Type"] = "application/json"
-		if d.get("chunks") and ("Cf-Worker" in cp.request.headers or kwargs.get("cf")):
-			if path in self.lfc and utc() - self.lfc[path].get("t", 0) <= 80000:
-				d["chunks"] = self.lfc[path]["chunks"]
-			else:
-				chunkt = []
-				o_urls = []
-				chunkset = []
-				chunkmap = {}
-				for url in d["chunks"]:
-					if not url.startswith(API) or "/u/" not in url or "?S=" not in url:
-						chunkt.append(url)
-						continue
-					id = url.rsplit("/", 1)[-1].split("?", 1)[0]
-					with tracebacksuppressor:
-						id = int.from_bytes(base64.urlsafe_b64decode(id + "=="), "big")
-					chunkset.append(id)
-					chunkt.append(id)
-					o_urls.append(url)
-				if chunkset:
-					a_urls = interface.run(f"bot.renew_attachments({chunkset})", cache=60)
-					print("CHUNKSET:", len(chunkset), len(a_urls))
-					for id, aurl, url in zip(chunkset, a_urls, o_urls):
-						if int(url.rsplit("?S=", 1)[-1]) <= 25165824:
-							purl = "https://proxy.mizabot.xyz/proxy?S=" + url.rsplit("?S=", 1)[-1] + "&url=" + urllib.parse.quote_plus(aurl)
-						elif "?S=" not in aurl:
-							purl = aurl + "?S=" + url.rsplit("?S=", 1)[-1]
-						else:
-							purl = aurl
-						chunkmap[id] = purl
-				d["chunks"] = chunks = [chunkmap.get(u, u) for u in chunkt]
-				self.lfc[path] = cdict(t=utc(), chunks=chunks)
-				print(ts_us(), chunks)
-		return json_dumps(d)
-
-	image_loaders = {}
-
 	@cp.expose(("0",))
-	@hostmap
 	def rickroll(self, *void1, **void2):
 		raise cp.HTTPRedirect(rickroll, status=301)
 
 	opipe = None
 	@cp.expose
-	@hostmap
 	@cp.tools.accept(media="multipart/form-data")
 	def detect(self, image=None):
 		if image is None:
@@ -623,397 +472,263 @@ class Server:
 		print("DET:", image.size, out)
 		return out
 
-	@cp.expose(("images", "image", "i", "view", "v", "raw", "r", "n", "f", "d"))
-	@hostmap
-	def download(self, path, filename=None, download=None, **void):
-		if path in ("hacks", "mods", "files", "download", "static"):
-			print(true_ip() + " was rickrolled 🙃")
-			return self.rickroll()
-		orig_path = path
-		ind = IND
-		p = None
+	@cp.expose(("fi",))
+	def fileinfo(self, *path, **void):
 		cp.response.headers.update(SHEADERS)
-		if path.startswith("!"):
-			ind = "!"
-			path = path[1:]
-		elif not path.startswith("@"):
-			b = path.lstrip("~").split(".", 1)[0].encode("ascii") + b"=="
-			if b.startswith(b"dQ"):
-				c = b[2:]
-				path = str(p2n(c))
-				try:
-					p = find_file(path, ind=ind)
-				except FileNotFoundError:
-					pass
-				else:
-					url = HOST + "/i/" + c.rstrip(b"=").decode("ascii", "replace") + ".gif"
-					return f"""<!DOCTYPE html>
-<html><head>
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<meta property="og:type" content="video.other">
-<meta property="twitter:player" content="https://www.youtube.com/embed/dQw4w9WgXcQ">
-<meta property="og:video:type" content="text/html">
-<meta property="og:video:width" content="960">
-<meta property="og:video:height" content="720">
-<meta name="twitter:image" content="{url}">
-<meta http-equiv="refresh" content="0;url=https://www.youtube.com/watch?v=dQw4w9WgXcQ">
-</head><body></body></html>"""
-			path = str(p2n(b))
-		else:
-			path = path[1:]
-		if not p:
-			p = find_file(path, cwd=(f"{TEMP_PATH}/filehost", "saves/filehost"), ind=ind)
-		sem = SEMAPHORES.get(p)
-		if not sem:
-			while len(SEMAPHORES) >= 4096:
-				sem = SEMAPHORES.pop(next(iter(SEMAPHORES)))
-				if sem.is_busy():
-					raise SemaphoreOverflowError
-			sem = SEMAPHORES[p] = Semaphore(256, 256, rate_limit=4)
-		with sem:
-			endpoint = cp.url(qs=cp.request.query_string, base="")[1:].split("/", 1)[0]
-			download = download and download[0] not in "0fFnN" or endpoint.startswith("d")
-			mime = get_mime(p)
-			st = os.stat(p)
-			fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
-			attachment = filename or fn
-			a2 = url_unparse(attachment)
-			if a2.startswith(".temp$@"):
-				a2 = a2[7:]
-				a3 = True
-				if not st.st_size or st.st_size > 48 * 1048576 or st.st_size == 147408:
-					try:
-						p2 = find_file(path, cwd=("saves/filehost"), ind=ind)
-					except FileNotFoundError:
-						p2 = None
-					if p2:
-						with tracebacksuppressor:
-							os.remove(p)
-						p = p2
-						mime = get_mime(p)
-						st = os.stat(p)
-						a3 = False
-			else:
-				a3 = False
-			cp.response.headers["Attachment-Filename"] = a2
-			proc = None
-			if endpoint.startswith("r") and mime.split("/", 1)[0] in ("video", "audio"):
-				preview = f"{TEMP_PATH}/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".webm"
-				image_loaders = self.image_loaders
-				if (not os.path.exists(preview) or not os.path.getsize(preview)) and preview not in image_loaders:
-					args = ("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", hwaccel, "-f", "lavfi", "-an", "-i", "color=size=640x96:rate=1:color=#bf7fff", "-vn", "-i", p, "-pix_fmt", "yuv420p", "-f", "webm", "-crf", "50", "-c:a", "libopus", "-b:a", "96k", "-shortest", preview)
-					print(args)
-					proc = psutil.Popen(args)
-					image_loaders[preview] = proc
-				else:
-					proc = preview
-				cp.response.headers["Content-Type"] = "video/webm"
-			elif endpoint.startswith("i") and mime.split("/", 1)[0] in ("image", "video"):
-				preview = f"{TEMP_PATH}/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".png"
-				image_loaders = self.image_loaders
-				if (not os.path.exists(preview) or not os.path.getsize(preview)) and preview not in image_loaders:
-					args = ("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", hwaccel, "-an", "-i", p, "-loop", "0", "-fs", "1048576", "-vf", "scale=240:-1", "-vframes", "1", preview)
-					print(args)
-					proc = psutil.Popen(args)
-					image_loaders[preview] = proc
-				else:
-					proc = preview
-				cp.response.headers["Content-Type"] = "image/png"
-			elif not os.path.exists(p):
-				raise FileNotFoundError(404, p)
-			elif "$" in p and p.split("$", 1)[0].endswith("~.forward") and mime == "text/html" and os.path.getsize(p) < 1048576:
-				with open(p, "r", encoding="utf-8") as f:
-					resp = f.read(1048576)
-				s = resp
-				search = "<!DOCTYPE HTML><!--"
-				if s.startswith(search):
-					s = s[len(search):]
-					search = '--><html><meta'
-					try:
-						s = s[:s.index(search)]
-					except ValueError:
-						pass
-					else:
-						url, code, ftype = orjson.loads(s)
-						if ftype == 1:
-							data = resp.encode("utf-8")
-							cp.response.headers["Location"] = url
-							cp.response.headers["Content-Type"] = mime
-							cp.response.headers["Content-Length"] = len(data)
-							cp.response.headers["ETag"] = create_etag(data)
-							cp.response.status = int(code)
-							return data
-						elif ftype == 2:
-							headers = fcdict(cp.request.headers)
-							headers.pop("Remote-Addr", None)
-							headers.pop("Host", None)
-							headers.update(Request.header())
-							resp = proxy.get(url, headers=headers, stream=True, timeout=60)
-							resp.raw.decode_content = False
-							headers = fcdict(resp.headers)
-							cd = headers.get("Content-Disposition")
-							if cd:
-								if not download:
-									headers["Content-Disposition"] = cd.replace("attachment;", "").strip()
-								elif "attachment" not in cd:
-									headers["Content-Disposition"] = "attachment;" + cd
-							elif download:
-								headers["Content-Disposition"] = "attachment"
-							cp.response.headers.update(("-".join(w.capitalize() for w in k.split("-")), v) for k, v in headers.items())
-							print(s)
-							print(headers)
-							print(cp.response.headers)
-							cp.response.status = int(resp.status_code)
-							if float(fcdict(resp.headers).get("Content-Length", inf)) <= 16777216:
-								b = resp.content
-								cp.response.headers["Content-Type"] = magic.from_buffer(b)
-								return b
-							f = resp.raw
-							# f = ForwardedRequest(resp, 98304)
-							return cp.lib.file_generator(f, 262144)
-						elif ftype == 3:
-							s = resp.split("/>", 1)[-1]
-							infd, urld, _ = s.split("-->", 2)
-							info = orjson.loads(infd.removeprefix("<!--"))
-							urls = orjson.loads(urld.removeprefix("<!--URL="))
-							disp = "filename=" + info[0]
-							cp.response.headers["Content-Disposition"] = disp
-							# cp.response.headers["Content-Length"] = info[1]
-							cp.response.headers["Content-Type"] = mime = info[2]
-							# referrer = cp.request.headers.get("Referer")
-							# print(p, len(urls), referrer)
-							cp.response.headers["Attachment-Filename"] = info[0]
-							if cp.request.method == "HEAD":
-								cp.response.headers["Content-Length"] = info[1]
-								return
-							urls = [remap_url(url) for url in urls]
-							# print(urls)
-							if len(urls) == 1:
-								url = urls[0]
-								if not is_url(url):
-									p = find_file(url, cwd=(f"{TEMP_PATH}/filehost", "saves/filehost"), ind=ind)
-									fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
-									ax = filename or fn
-									a2 = url_unparse(ax)
-									if a2.startswith(".temp$@"):
-										a2 = a2[7:]
-										a3 = True
-										if not st.st_size or st.st_size > 48 * 1048576 or st.st_size == 147408:
-											with tracebacksuppressor:
-												os.remove(p)
-											p = find_file(path, cwd=("saves/filehost"), ind=ind)
-											mime = get_mime(p)
-											st = os.stat(p)
-											a3 = False
-									urls = self._fileinfo(f"@{url}").get("chunks", ())
-									url = urls[0]
-								if mime.split("/", 1)[-1] not in ("html", "txt") and (url.startswith(HOST) or url.startswith(API)):
-									u = url.split("://", 1)[-1].split("/", 2)[-1]
-									print("U:", u)
-									if "?S=" in u:
-										u, s = u.split("?S=", 1)
-									# else:
-									# 	s = inf
-									# if float(s) < 1048576:
-									return self.unproxy(u)
-									# raise cp.HTTPRedirect(url, status="307")
-								if download and ("Cf-Worker" not in cp.request.headers or not is_discord_attachment(url)):
-									raise cp.HTTPRedirect(url, status="307")
-							cp.response.headers.pop("Accept-Ranges", None)
-							stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", f"{TEMP_PATH}/filehost/")
-							pn = stn + "~.temp$@" + info[0]
-							dl = HOST + "/d/" + orig_path
-							print("END:", endpoint, mime, dl)
-							if endpoint.startswith("r") and mime.split("/", 1)[0] in ("video", "audio"):
-								preview = f"{TEMP_PATH}/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".webm"
-								image_loaders = self.image_loaders
-								if (not os.path.exists(preview) or not os.path.getsize(preview)) and preview not in image_loaders:
-									args = ("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", hwaccel, "-f", "lavfi", "-an", "-i", "color=size=640x96:rate=1:color=#bf7fff", "-vn", "-i", dl, "-pix_fmt", "yuv420p", "-f", "webm", "-crf", "50", "-c:a", "libopus", "-b:a", "96k", "-shortest", preview)
-									print(args)
-									proc = psutil.Popen(args)
-									image_loaders[preview] = proc
-								else:
-									proc = preview
-								cp.response.headers["Content-Type"] = "video/webm"
-							elif endpoint.startswith("i") and mime.split("/", 1)[0] in ("image", "video"):
-								preview = f"{TEMP_PATH}/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".png"
-								image_loaders = self.image_loaders
-								if (not os.path.exists(preview) or not os.path.getsize(preview)) and preview not in image_loaders:
-									args = ("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", hwaccel, "-an", "-to", "1", "-i", dl, "-loop", "0", "-fs", "1048576", "-vf", "scale=240:-1", "-vframes", "1", preview)
-									print(args)
-									proc = psutil.Popen(args)
-									image_loaders[preview] = proc
-								else:
-									proc = preview
-								cp.response.headers["Content-Type"] = "image/png"
-							if not proc:
-								if os.path.exists(pn):
-									f = open(pn, "rb")
-									resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=info[0])
-									if a3:
-										self.serving.setdefault(p, weakref.WeakSet()).add(f)
-									return resp
-								if info[1] > 48 * 1048576:
-									if endpoint != "n":
-										raise cp.HTTPRedirect(f"https://stream.miza-stream.workers.dev/?i={orig_path}", status=307)
-									return self.dyn_serve(urls, size=info[1])
-								return self.concat(p, urls, name=info[0], mime=info[2], stn=stn)
-			if proc:
-				cp.response.headers["ETag"] = create_etag(p)
-				while preview in image_loaders and (not os.path.exists(preview) or os.path.getsize(preview) < 4096) and is_strict_running(image_loaders[preview]):
-					time.sleep(0.05)
-				f = None
-				if preview in image_loaders and not is_strict_running(image_loaders[preview]) or preview not in image_loaders and os.path.exists(preview):
-					cp.response.headers["Content-Length"] = os.path.getsize(preview)
-				elif preview in image_loaders:
-					f = DownloadingFile(
-						preview,
-						af=lambda: not is_strict_running(image_loaders[preview]),
-					)
-					print("PREVIEW:", f)
-				s = inf
-				if not f:
-					s = os.path.getsize(preview)
-					if s:
-						f = open(preview, "rb")
-					else:
-						cp.response.headers["Content-Type"] = get_mime(p)
-						f = open(p, "rb")
-						s = os.path.getsize(p)
-				if s < 1048576:
-					return f.read()
-				if s < 67108864:
-					f = io.BytesIO(f.read())
-				return cp.lib.file_generator(f, 262144)
-			f = open(p, "rb")
-			s = os.path.getsize(p)
-			if s < 67108864:
-				cp.response.headers["Content-Type"] = mime
-				cp.response.headers["Content-Disposition"] = "attachment; " * bool(download) + "filename=" + json.dumps(a2)
-				if s < 1048576:
-					return f.read()
-				f = io.BytesIO(f.read())
-				return cp.lib.static._serve_fileobj(f, content_type=mime, content_length=s)
-			resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=a2)
-			if a3:
-				self.serving.setdefault(p, weakref.WeakSet()).add(f)
-			return resp
+		assert len(path) in (1, 2) and path[0].count("~") == 0
+		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
+		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
+		url = await_fut(fut)
+		resp = self.session.get(
+			url,
+			headers=Request.header(),
+			verify=False,
+			timeout=60,
+			stream=True,
+		)
+		resp.raise_for_status()
+		data = seq(resp)
+		length, i = decode_leb128(data, mode="index")
+		content = data[i:i + length]
+		try:
+			encoded = zip2bytes(content)
+		except Exception:
+			encoded = content
+		cp.response.headers["Content-Type"] = "application/json"
+		return bytes(encoded)
+
+	@cp.expose
+	def download(self, *path, download="1", **void):
+		cp.response.headers.update(SHEADERS)
+		assert len(path) in (1, 2) and path[0].count("~") == 0
+		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
+		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
+		url = await_fut(fut)
+		resp = self.session.get(
+			url,
+			headers=Request.header(),
+			verify=False,
+			timeout=60,
+			stream=True,
+		)
+		resp.raise_for_status()
+		data = seq(resp)
+		length, i = decode_leb128(data, mode="index")
+		content = data[i:i + length]
+		try:
+			encoded = zip2bytes(content)
+		except Exception:
+			encoded = content
+		info = cdict(orjson.loads(encoded))
+		endpoint = cp.url(qs=cp.request.query_string, base="")[1:].split("/", 1)[0]
+		download = (download and download[0] not in "0fFnN") and endpoint.startswith("d")
+		if download:
+			cp.response.headers["Content-Disposition"] = "attachment; " * bool(download) + "filename=" + json.dumps(info.filename)
+		cp.response.headers["Attachment-Filename"] = info.filename
+		cp.response.headers["Content-Type"] = info.mimetype
+		cp.response.headers["ETag"] = json_dumps(f"{info.get('timestamp', 0)};{info.get('hash', info.filename)}")
+		head = data[i + length:]
+		head = bytes(head)
+		print(head)
+		return self.dyn_serve(list(info.chunks), size=info.size, head=head)
 	download._cp_config = {"response.stream": True}
 
-	def concat(self, fn, urls, name="", download=False, mime=None, stn="", waiter=False):
-		on = stn + "!.temp$@" + name
-		pn = stn + "~.temp$@" + name
-		if waiter and os.path.exists(pn) and os.path.getsize(pn):
-			return newfut
-		try:
-			fut = self.serving[on]
-			for i in range(3):
-				if os.path.exists(on):
-					break
-				time.sleep(1)
-			else:
-				if not os.path.exists(on) and not os.path.exists(pn):
-					self.serving.pop(on, None)
-					raise KeyError
-		except KeyError:
-			if waiter:
-				return esubmit(self._concat, urls, on, pn)
-			return self._peek(urls, on, pn, name, download, mime)
-		if waiter:
-			return fut
-		return self.wconcat(on, pn, name, download, mime, fut)
+	@tracebacksuppressor
+	def dyn_serve(self, urls, size=0, head=None):
+		brange = cp.request.headers.get("Range", "").removeprefix("bytes=")
+		headers = fcdict(cp.request.headers)
+		headers.pop("Remote-Addr", None)
+		headers.pop("Host", None)
+		headers.pop("Range", None)
+		headers.update(Request.header())
+		ranges = []
+		length = 0
+		if brange:
+			try:
+				branges = brange.split(",")
+				for s in branges:
+					start, end = s.split("-", 1)
+					if not start:
+						if not end:
+							continue
+						start = size - int(end)
+						end = size - 1
+					elif not end:
+						end = size - 1
+					start = int(start)
+					end = int(end) + 1
+					length += end - start
+					ranges.append((start, end))
+			except Exception:
+				pass
+		if ranges:
+			cp.response.status = 206
+		else:
+			cp.response.status = 200
+			ranges.append((0, size))
+			length = size
+		if not size:
+			size = "*"
+		cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size}" for start, end in ranges)
+		cp.response.headers["Content-Range"] = cr
+		cp.response.headers["Content-Length"] = str(length)
+		cp.response.headers["Accept-Ranges"] = "bytes"
+		if head:
+			if not cp.response.headers.get("Content-Type"):
+				cp.response.headers["Content-Type"] = magic.from_buffer(head)
+			urls.insert(0, head)
+		return self._dyn_serve(urls, ranges, headers)
 
-	def wconcat(self, on, pn, name, download, mime, fut, start=0):
-		for i in range(120):
-			if os.path.exists(pn):
-				break
-			if os.path.exists(on) and self.serving.get(on + "~buffer", 0) >= start or fut.done():
-				break
-			time.sleep(0.5)
-		if os.path.exists(pn):
-			with open(pn, "rb") as f:
-				if start:
-					f.seek(start)
-				resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=name)
-				self.serving.setdefault(pn, weakref.WeakSet()).add(f)
-				yield from resp
-			self.serving.setdefault(pn, weakref.WeakSet()).discard(f)
-			return
-		with open(on, "rb") as f:
-			if start:
-				f.seek(start)
-			while not fut.done() and on in self.serving:
-				if f.tell() + 262144 >= self.serving.get(on + "~buffer", 0):
-					time.sleep(2)
+	@tracebacksuppressor(GeneratorExit)
+	def _dyn_serve(self, urls, ranges, headers):
+		for start, end in ranges:
+			pos = 0
+			rems = urls.copy()
+			futs = []
+			big = False
+			while rems:
+				u = rems.pop(0)
+				if isinstance(u, byte_like):
+					ns = len(u)
+				elif "?size=" in u or "&size=" in u:
+					u, ns = u.replace("?size=", "&size=").split("&size=", 1)
+					ns = int(ns)
+				elif "?S=" in u or "&S=" in u:
+					u, ns = u.replace("?S=", "&S=").split("&S=", 1)
+					ns = int(ns)
+				elif u.startswith("https://s3-us-west-2"):
+					ns = 503316480
+				elif u.startswith("https://cdn.discord"):
+					ns = 8388608
+				else:
+					resp = reqs.next().head(u, headers=headers, timeout=20)
+					ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
+				if pos + ns <= start:
+					pos += ns
 					continue
-				b = f.read(262144)
-				if not b:
-					continue
-				yield b
-			while True:
-				b = f.read(262144)
-				if not b:
-					return
-				yield b
+				if pos >= end:
+					break
+
+				def get_chunk(u, h, start, end, pos, ns, big):
+					s = start - pos
+					e = end - pos
+					if isinstance(u, byte_like):
+						yield u[s:e]
+						return
+					if e >= ns:
+						e = ""
+					else:
+						e -= 1
+					h2 = dict(h.items())
+					h2["range"] = f"bytes={s}-{e}"
+					ex2 = None
+					for i in range(3):
+						resp = reqs.next().get(u, headers=h2, stream=True, timeout=20)
+						if resp.status_code == 416:
+							yield b""
+							return
+						try:
+							resp.raise_for_status()
+						except Exception as ex:
+							ex2 = ex
+						else:
+							break
+					if ex2:
+						raise ex2
+					if resp.status_code != 206:
+						ms = min(ns, end - pos - s)
+						if len(resp.content) > ms:
+							yield resp.content[s:(e or len(resp.content))]
+							return
+						yield resp.content
+						return
+					if big:
+						yield from resp.iter_content(262144)
+						return
+					yield from resp.iter_content(65536)
+
+				if len(futs) > 1:
+					yield from futs.pop(0).result()
+				fut = esubmit(get_chunk, u, headers, start, end, pos, ns, big)
+				futs.append(fut)
+				pos = 0
+				start = 0
+				end -= start + ns
+				big = True
+			for fut in futs:
+				yield from fut.result()
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	def upload(self, filename="b", hash="", position=0, size=0):
 		position = int(position)
-		size = int(size)
+		size2 = int(cp.request.headers.get("Content-Length", 0))
+		size = int(size) or size2
 		h = true_ip() + hash
 		try:
-			resp = cp.request.body.fp
+			fp = cp.request.body.fp
 		except Exception:
 			print_exc()
-			resp = None
+			fp = None
 		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
-		if not size or not resp or int(cp.request.headers.get("Content-Length", 0)) < 1:
+		if not size or not fp:
 			if h in upload_cache:
 				return json_dumps(list(upload_cache[h].keys()))
 			return b"Expected input data."
+		if size > 1 << 40:
+			return b"Maximum filesize is 1TB."
 		assert position == 0 or h in upload_cache
 		assert not position % attachment_cache.max_size
 		if h not in upload_cache:
 			private_key = os.urandom(8)
 			hashable = private_key + b"~" + enc_box._key
 			public_key = shash(hashable)
-			upload_cache[h] = cdict(info=cdict(filename=filename, mimetype=cp.request.headers.get("mimetype", "application/octet-stream"), size=size, key=public_key, chunks=[]), chunkinfo={}, required=RangeSet(0, size), key=private_key)
+			upload_cache[h] = cdict(info=cdict(filename=filename, mimetype=cp.request.headers.get("mimetype", "application/octet-stream"), hash="", timestamp=utc(), size=size, key=public_key, chunks=[]), chunkinfo={}, required=RangeSet(0, size), key=private_key)
 
 		def start_upload(position):
+			if position == 0:
+				head = fp.read(attachment_cache.max_size // 2)
+				upload_cache[h].info.mimetype = magic.from_buffer(head)
+				upload_cache[h].info.hash = shash(head)
+				upload_cache[h].head = head
+				upload_cache[h].required.remove(0, len(head))
+				position += len(head)
 			yield b"{"
-			while True:
-				fn = filename if position == 0 else "c"
-				b = resp.read(attachment_cache.max_size)
+			while upload_cache[h].required:
+				fn = "c"
+				b = fp.read(attachment_cache.max_size)
 				if not b:
 					break
-				if position == 0:
-					upload_cache[h].info.mimetype = magic.from_buffer(b)
 				fut = attachment_cache.create(b, filename=fn)
 				url = await_fut(fut)
-				upload_cache[h].chunkinfo[position] = url
+				cid, mid, aid, fn = expand_attachment(url)
+				uchunk = shorten_attachment(cid, mid, aid, fn, size=len(b))
+				upload_cache[h].chunkinfo[position] = uchunk
 				upload_cache[h].required.remove(position, position + len(b))
 				position += len(b)
-				if not upload_cache[h].required:
-					break
 			if not upload_cache[h].required:
 				upload_cache[h].info["chunks"] = [v for k, v in sorted(upload_cache[h].chunkinfo.items())]
 				print("INFO:", upload_cache[h])
 				data = json_dumps(upload_cache[h].info)
-				data2 = bytes2zip(data)
-				if len(data2) <= len(data) / 2:
-					data = data2
-				fut = attachment_cache.create(data, filename=filename, editable=True)
-				url = await_fut(fut) + "?key=" + base64.urlsafe_b64encode(upload_cache[h].key).rstrip(b"=").decode("ascii")
-				yield b'"url":"' + url.encode("utf-8") + b'"'
+				if len(data) > 262144:
+					data2 = bytes2zip(data)
+					if len(data2) <= len(data) / 2 or len(data) >= attachment_cache.max_size // 4:
+						data = data2
+				encoded = leb128(len(data)) + data
+				head = upload_cache[h].head
+				assert len(encoded) + len(head) <= attachment_cache.max_size
+				fut = attachment_cache.create(encoded + head, filename=filename, editable=True)
+				url = await_fut(fut)
+				cid, mid, aid, fn = expand_attachment(url)
+				uhead = shorten_attachment(cid, mid, aid, fn, mode="p") + "?key=" + base64.urlsafe_b64encode(upload_cache[h].key).rstrip(b"=").decode("ascii")
+				yield b'"url":"' + uhead.encode("utf-8") + b'"'
 			yield b"}"
 		return start_upload(position)
 
 	@cp.expose
 	def delete(self, *path, key=None):
-		assert len(path) == 2 and path[0].count("~") == 0
+		assert len(path) in (1, 2) and path[0].count("~") == 0
 		assert key, "File Key Required."
 		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
 		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
@@ -1023,12 +738,16 @@ class Server:
 			headers=Request.header(),
 			verify=False,
 			timeout=60,
+			stream=True,
 		)
 		resp.raise_for_status()
+		data = seq(resp)
+		length, i = decode_leb128(data, mode="index")
+		content = data[i:i + length]
 		try:
-			data = zip2bytes(resp.content)
+			data = zip2bytes(content)
 		except Exception:
-			data = resp.content
+			data = content
 		info = orjson.loads(data)
 		hashable = base64.urlsafe_b64decode(key + "=") + b"~" + enc_box._key
 		public_key = shash(hashable)
@@ -1141,290 +860,22 @@ class Server:
 		cp.response.headers.pop("Transfer-Encoding", None)
 		if is_discord_attachment(url):
 			cp.response.headers.pop("Content-Disposition", None)
-		if resp.headers.get("Content-Type", "application/octet-stream") == "application/octet-stream":
+			cp.response.headers.update(CHEADERS)
+		ctype = resp.headers.get("Content-Type", "application/octet-stream")
+		if ctype in ("text/html", "text/html; charset=utf-8", "application/octet-stream"):
 			it = resp.iter_content(65536)
 			b = next(it)
 			mime = magic.from_buffer(b)
+			if mime == "application/octet-stream":
+				a = MemoryBytes(b)[:128]
+				if sum(32 <= c < 128 for c in a) >= len(a) * 7 / 8:
+					mime = "text/plain"
 			cp.response.headers.pop("Content-Type", None)
 			cp.response.headers["Content-Type"] = mime
 			return resume(b, it)
 		return resp.iter_content(65536)
 
-	@tracebacksuppressor
-	def renew_url(self, url, mid=None):
-		if discord_expired(url):
-			if not mid and "&mid=" in url:
-				mid = int(url.split("&mid=", 1)[-1].split("&", 1)[0])
-			if mid:
-				return interface.run(f"bot.renew_attachment({repr(url)},m_id={mid})", timeout=60, cache=21600)
-			return interface.run(f"bot.renew_attachment({repr(url)})", timeout=60, cache=21600)
-		return url
-
-	def dstream(self, url, fn=None):
-		headers = fcdict(cp.request.headers)
-		headers.pop("Remote-Addr", None)
-		headers.pop("Host", None)
-		r = headers.pop("Range", None)
-		headers.update(Request.header())
-		if fn:
-			f = open(fn + "~", "wb")
-		with reqs.next().get(url, headers=headers, stream=True, timeout=30) as resp:
-			resp.raise_for_status()
-			size = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 1))
-			if r:
-				start, end = r.removeprefix("bytes=").split("-", 1)
-				if not start:
-					if not end:
-						return
-					start = size - int(end)
-					end = size - 1
-				elif not end:
-					end = size - 1
-				start, end = int(start), min(int(end) + 1, size)
-			else:
-				start = 0
-				end = size
-			rr = f"bytes {start}-{end - 1}/{size}"
-			print(r, rr)
-			cp.response.headers["Range"] = rr
-			cp.response.headers["Content-Length"] = end - start + 1
-			cp.response.headers["x-goog-stored-content-length"] = size
-			it = resp.iter_content(65536)
-			pos = 0
-			try:
-				while True:
-					b = ob = next(it)
-					if pos + len(ob) > end:
-						if pos >= end:
-							b = b""
-						else:
-							b = b[:end - pos]
-					pos += len(ob)
-					if start:
-						b2 = b[start:]
-						start -= len(b) - len(b2)
-						b = b2
-					if b:
-						yield b
-					if fn:
-						f.write(ob)
-			except StopIteration:
-				pass
-		if fn:
-			f.close()
-			with tracebacksuppressor:
-				if os.path.exists(fn):
-					return
-					# os.remove(fn)
-				os.rename(fn + "~", fn)
-
-	@tracebacksuppressor
-	def dyn_serve(self, urls, size=0):
-		brange = cp.request.headers.get("Range", "").removeprefix("bytes=")
-		headers = fcdict(cp.request.headers)
-		headers.pop("Remote-Addr", None)
-		headers.pop("Host", None)
-		headers.pop("Range", None)
-		headers.update(Request.header())
-		ranges = []
-		length = 0
-		if brange:
-			try:
-				branges = brange.split(",")
-				for s in branges:
-					start, end = s.split("-", 1)
-					if not start:
-						if not end:
-							continue
-						start = size - int(end)
-						end = size - 1
-					elif not end:
-						end = size - 1
-					start = int(start)
-					end = int(end) + 1
-					length += end - start
-					ranges.append((start, end))
-			except Exception:
-				pass
-		if ranges:
-			cp.response.status = 206
-		else:
-			cp.response.status = 200
-			ranges.append((0, size))
-			length = size
-		if not size:
-			size = "*"
-		cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size}" for start, end in ranges)
-		cp.response.headers["Content-Range"] = cr
-		cp.response.headers["Content-Length"] = str(length)
-		cp.response.headers["Accept-Ranges"] = "bytes"
-		return self._dyn_serve(urls, ranges, headers)
-
-	@tracebacksuppressor(GeneratorExit)
-	def _dyn_serve(self, urls, ranges, headers):
-		# print(headers, ranges)
-		for start, end in ranges:
-			pos = 0
-			rems = urls.copy()
-			futs = []
-			big = False
-			while rems:
-				uo = rems.pop(0)
-				u = self.renew_url(uo)
-				# print(uo, u)
-				if "?size=" in u or "&size=" in u:
-					u, ns = u.replace("?size=", "&size=").split("&size=", 1)
-					ns = int(ns)
-				elif "?S=" in u or "&S=" in u:
-					u, ns = u.replace("?S=", "&S=").split("&S=", 1)
-					ns = int(ns)
-				elif u.startswith("https://s3-us-west-2"):
-					ns = 503316480
-				elif u.startswith("https://cdn.discord"):
-					ns = 8388608
-				else:
-					resp = reqs.next().head(u, headers=headers, timeout=20)
-					ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
-				if pos + ns <= start:
-					pos += ns
-					continue
-				if pos >= end:
-					break
-
-				def get_chunk(u, h, start, end, pos, ns, big):
-					s = start - pos
-					e = end - pos
-					if e >= ns:
-						e = ""
-					else:
-						e -= 1
-					h2 = dict(h.items())
-					h2["range"] = f"bytes={s}-{e}"
-					# print(u, r)
-					ex2 = None
-					for i in range(3):
-						resp = reqs.next().get(u, headers=h2, stream=True, timeout=20)
-						if resp.status_code == 416:
-							yield b""
-							return
-						try:
-							resp.raise_for_status()
-						except Exception as ex:
-							ex2 = ex
-						else:
-							break
-					if ex2:
-						raise ex2
-					if resp.status_code != 206:
-						ms = min(ns, end - pos - s)
-						if len(resp.content) > ms:
-							yield resp.content[s:(e or len(resp.content))]
-							return
-						yield resp.content
-						return
-					if big:
-						yield from resp.iter_content(262144)
-						return
-					yield from resp.iter_content(65536)
-
-				if len(futs) > 1:
-					yield from futs.pop(0).result()
-				fut = esubmit(get_chunk, u, headers, start, end, pos, ns, big)
-				futs.append(fut)
-				pos = 0
-				start = 0
-				end -= start + ns
-				big = True
-			for fut in futs:
-				yield from fut.result()
-
-	def _peek(self, urls, on, pn, name, download, mime):
-		headers = fcdict(cp.request.headers)
-		headers.pop("Remote-Addr", None)
-		headers.pop("Host", None)
-		headers.pop("Range", None)
-		headers.update(Request.header())
-		urls[0] = self.renew_url(urls[0])
-		with reqs.next().get(urls[0], headers=headers, stream=True, timeout=30) as resp:
-			resp.raise_for_status()
-			b = []
-			it = resp.iter_content(65536)
-			with suppress(StopIteration):
-				while sum(map(len, b)) < 25165824:
-					temp = next(it)
-					b.append(temp)
-					yield temp
-			b = b"".join(b)
-			print("PreCat", urls[0], resp, len(b))
-		fut = esubmit(self._concat, urls, on, pn)
-		self.serving[on] = fut
-		yield from self.wconcat(on, pn, name, download, mime, fut, start=len(b))
-
-	@tracebacksuppressor
-	def _concat(self, urls, on, pn):
-		print("Cat", urls)
-		headers = fcdict(cp.request.headers)
-		headers.pop("Remote-Addr", None)
-		headers.pop("Host", None)
-		headers.pop("Range", None)
-		headers.update(Request.header())
-		buf = 0
-		pos = 0
-		futs = []
-		with open(on, "wb") as f:
-			for url in urls:
-				url = self.renew_url(url)
-				if len(futs) >= 16 or futs and futs[0].done():
-					fut = futs.pop(0)
-					fut.result()
-					buf += fut.buf
-					self.serving[on + "~buffer"] = buf
-				for i in range(16):
-					try:
-						resp = reqs.next().get(url, headers=headers, stream=True, timeout=30)
-						if resp.status_code in (403, 404):
-							raise FileNotFoundError
-						resp.raise_for_status()
-						break
-					except FileNotFoundError:
-						break
-					except Exception:
-						print_exc()
-					time.sleep(i ** 2 + 1)
-				bsize = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
-				fs = pos + bsize
-				f.truncate(fs)
-				fut = esubmit(self.chunk_into, resp, on, pos)
-				fut.buf = bsize
-				futs.append(fut)
-				pos = fs
-		for fut in futs:
-			fut.result()
-			buf += fut.buf
-			self.serving[on + "~buffer"] = buf
-		try:
-			os.rename(on, pn)
-		except PermissionError:
-			esubmit(self.rename_after, on, pn)
-
-	def rename_after(self, on, pn):
-		try:
-			while True:
-				try:
-					os.rename(on, pn)
-				except PermissionError:
-					time.sleep(1)
-		finally:
-			self.serving.pop(on, None)
-			self.serving.pop(on + "~buffer", None)
-
-	def chunk_into(self, resp, on, pos):
-		with open(on, "rb+") as f:
-			f.seek(pos)
-			f.write(resp.content)
-
 	@cp.expose
-	@hostmap
 	def static(self, *filepath):
 		if not filepath:
 			if cp.request.remote.ip == "127.0.0.1":
@@ -1452,7 +903,6 @@ class Server:
 		return data
 
 	@cp.expose
-	@hostmap
 	def summarise(self, s, min_length=128, max_length=192):
 		v = interface.run(f"STRING.summarise({json.dumps(s)},min_length={min_length},max_length={max_length})", cache=60)
 		b = v.encode("utf-8")
@@ -1465,7 +915,6 @@ class Server:
 	ecdc_running = {}
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
-	@hostmap
 	def encodec(self, url="", name="", source="", thumbnail="", bitrate="auto", inference=False, urls=()):
 		cp.response.headers.update(SHEADERS)
 		if not os.path.exists(ecdc_dir):
@@ -1583,7 +1032,6 @@ class Server:
 			fut.set_result(None)
 
 	@cp.expose
-	@hostmap
 	def decodec(self, url, fmt="opus"):
 		cp.response.headers.update(SHEADERS)
 		if isinstance(url, list):
@@ -1619,7 +1067,6 @@ class Server:
 
 	ydl_sems = {}
 	@cp.expose
-	@hostmap
 	def ytdl(self, **kwargs):
 		cp.response.headers.update(HEADERS)
 		d = kwargs.get("d") or kwargs.get("download")
@@ -1728,7 +1175,6 @@ class Server:
 	ytdl._cp_config = {"response.stream": True}
 
 	@cp.expose
-	@hostmap
 	def ytdlp(self, url, fmt="mp4", start="", end=""):
 		cp.response.headers.update(HEADERS)
 		if not url:
@@ -1745,7 +1191,6 @@ class Server:
 		raise cp.HTTPRedirect(url, status="307")
 
 	@cp.expose
-	@hostmap
 	def ytdlc(self, *urls, fmt="mp4", multi="true", **kwargs):
 		cp.response.headers.update(HEADERS)
 		m = "" if multi in ("false", "False") else "-m"
@@ -1770,7 +1215,6 @@ class Server:
 		raise cp.HTTPRedirect(url, status="307")
 
 	@cp.expose
-	@hostmap
 	def specexec(self, url, **kwargs):
 		cp.response.headers.update(HEADERS)
 		argv = " ".join(itertools.chain(*kwargs.items()))
@@ -1780,7 +1224,6 @@ class Server:
 		raise cp.HTTPRedirect(url, status="307")
 
 	@cp.expose
-	@hostmap
 	def filelist(self, path=None):
 		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
@@ -1819,13 +1262,11 @@ class Server:
 		return json_dumps(fdata)
 
 	@cp.expose
-	@hostmap
 	def teapot(self, *args, **kwargs):
 		cp.response.headers.update(HEADERS)
 		raise IsADirectoryError("I'm a teapot.")
 
 	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
-	@hostmap
 	def index(self, path=None, filename=None, *args, code=None, **kwargs):
 		url = HOST + "/" + cp.url(qs=cp.request.query_string).rstrip("/").split("//", 1)[-1].split("/", 1)[-1]
 		if "/p/" in url:
@@ -1884,7 +1325,6 @@ class Server:
 		return data
 
 	@cp.expose(("favicon", "favicon.ico"))
-	@hostmap
 	def favicon_ico(self, *args, **kwargs):
 		data, mime = fetch_static("icon.ico")
 		cp.response.headers.update(CHEADERS)
@@ -1904,7 +1344,6 @@ class Server:
 				return resp
 
 	@cp.expose
-	@hostmap
 	def get_ip(self, *args, **kwargs):
 		esubmit(app.get_ip_ex)
 		data = json_dumps(dict(
@@ -1918,175 +1357,8 @@ class Server:
 		return data
 
 	@cp.expose
-	@hostmap
 	def error(self, code=400):
 		raise ConnectionError(int(code))
-
-	@cp.expose(("upload_single",))
-	@hostmap
-	def upload_chunk(self, **kwargs):
-		name = cp.request.headers.get("x-file-name", "untitled")
-		cp.response.headers.update(HEADERS)
-		s = true_ip() + "%" + name
-		h = ihash(s) % 2 ** 48
-		single = "/upload_single" in cp.url()
-		xi = int(cp.request.headers.get("x-index", 0))
-		mfs = int(cp.request.headers.get("x-total", 0))
-		if mfs > 1125899906842624:
-			raise OverflowError
-		if not xi:
-			print(s)
-		n = f"{TEMP_PATH}/{h}%"
-		fn = n + str(xi)
-		print(fn)
-		csize = 83886080
-		with open(fn, "wb") as f:
-			if single:
-				pos = 0
-				g = cp.request.body.fp
-				urls = []
-				while True:
-					b = g.read(csize)
-					if not b:
-						break
-					f.write(b)
-					if f.tell() > pos + csize:
-						url1 = interface.run(f"bot.data.exec.stash({repr(fn)}, start={pos}, end={pos + csize})")
-						urls.extend(url1)
-						pos += csize
-				if f.tell() > pos:
-					url1 = interface.run(f"bot.data.exec.stash({repr(fn)}, start={pos})")
-					urls.extend(url1)
-				size = os.path.getsize(fn)
-				mime = get_mime(fn)
-				fn = f"{TEMP_PATH}/{h}%!"
-				urls = [map_url(url) for url in urls]
-				print(urls)
-				assert urls
-				code = 307
-				ftype = 3
-				url = ""
-				n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-				key = n2p(n)
-				s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta/><!--["{name}","{size}","{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}--></html>'
-				with open(fn, "w", encoding="utf-8") as f:
-					f.write(s)
-				return self.merge(name=name, index=1)
-			shutil.copyfileobj(cp.request.body.fp, f, 262144 if mfs >= 1073741824 else 65536)
-
-	chunk_file = "misc/chunking.json"
-	try:
-		if not os.path.exists(chunk_file):
-			chunking = {}
-		else:
-			with open(chunk_file, "rb") as f:
-				b = f.read()
-			chunking = orjson.loads(b)
-	except Exception:
-		print_exc()
-		chunking = {}
-	merge_sem = Semaphore(1, inf)
-
-	@tracebacksuppressor
-	def update_merge(self):
-		d = self.chunking.copy()
-		available = set()
-		for k, v in tuple(d.items()):
-			if isinstance(v, Future):
-				d.pop(k)
-			if k[-1] == "%":
-				if utc() - v.setdefault("timestamp", utc()) > 86400 * 7:
-					d.pop(k)
-				else:
-					available.add(k)
-		for k in tuple(d):
-			if k[-1] != "%" and k.split("%", 1)[0] + "%" not in available:
-				d.pop(k)
-		with self.merge_sem:
-			b = json_dumps(d)
-			if not os.path.exists(self.chunk_file):
-				with open(self.chunk_file, "wb") as f:
-					f.write(b)
-			else:
-				with open(self.chunk_file, "rb+") as f:
-					f.truncate(len(b))
-					f.seek(0)
-					f.write(b)
-
-	merged = {}
-	@cp.expose
-	@cp.tools.accept(media="multipart/form-data")
-	@hostmap
-	def merge(self, **kwargs):
-		cp.response.headers.update(HEADERS)
-		kwargs = fcdict(kwargs)
-		key = kwargs.get("?key")
-		ts = int(kwargs.get("?ts") or time.time_ns() // 1000)
-		x_name = kwargs.get("x-file-name") or cp.request.headers.get("x-file-name", "untitled")
-		name = kwargs.get("name") or x_name
-		s = true_ip() + "%" + x_name
-		print(s)
-		# mfs = int(kwargs.get("x-total") or cp.request.headers.get("x-total", 0))
-		h = ihash(s) % 2 ** 48
-		nh = n = f"{TEMP_PATH}/{h}%"
-		if self.merged.get(nh):
-			return
-		self.merged[nh] = True
-		q = ""
-		try:
-			fn = f"saves/filehost/{IND}{ts}~" + name
-			r = n + "!"
-			print("Merge", fn)
-			high = int(kwargs.get("index") or cp.request.headers.get("x-index", 0))
-			if high == 0 and os.path.exists(r):
-				tn = fn.split("~", 1)[0] + "~.forward$" + str(os.path.getsize(r))
-				with open(r, "r", encoding="utf-8") as f:
-					with open(tn, "w", encoding="utf-8") as g:
-						s = f.read()
-						url = HOST + "/f/" + n2p(ts)
-						s = s.replace('""', f'"{url}"', 1)
-						g.write(s)
-				key = key or s.split("<!--KEY=", 1)[-1].split("-->", 1)[0]
-				q = f"?key={key}"
-				if os.path.exists(n + "0"):
-					fn = f"{TEMP_PATH}/filehost/{IND}{ts}" + "~.temp$@" + name
-					if os.path.exists(fn):
-						os.remove(fn)
-					os.rename(n + "0", fn)
-			else:
-				of = nh + "0"
-				fn = f"{TEMP_PATH}/filehost/{IND}{ts}~.temp$@{name}"
-				if os.path.exists(fn):
-					os.remove(fn)
-				os.rename(of, fn)
-				if high > 1:
-					with open(fn, "ab") as f:
-						for i in range(1, high):
-							gn = nh + str(i)
-							with open(gn, "rb") as g:
-								shutil.copyfileobj(g, f, 65536)
-				if not key:
-					n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-					key = n2p(n)
-				q = f"?key={key}"
-				if os.path.getsize(fn) < 256 * 1048576:
-					self.register_replacer(ts, key)
-		finally:
-			self.merged.pop(nh, None)
-		self.update_merge()
-		return "/p/" + n2p(ts) + q
-
-	@cp.expose
-	@hostmap
-	def upload_url(self, **kwargs):
-		ts = time.time_ns() // 1000
-		url = kwargs["url"]
-		fn = f"{TEMP_PATH}/filehost/{IND}{ts}~.temp$@" + url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
-		subprocess.run([sys.executable, "downloader.py", "-threads", "3", url, fn], cwd="misc")
-		# b = ts.bit_length() + 7 >> 3
-		ts, _key = self.register_replacer(ts)
-		cp.response.headers.update(HEADERS)
-		return HOST + "/p/" + n2p(ts)
 
 	def optimise_video(self, of, size, mime):
 		print("Convert", of, mime, size)
@@ -2265,320 +1537,8 @@ class Server:
 			print_exc()
 		return ""
 
-	def replace_file(self, fn, key=None, delay=0, name=None, urls=None, mids=None):
-		if not os.path.exists(fn):
-			return
-		print("Replace", fn)
-		of = fn
-		try:
-			ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
-		except ValueError:
-			ts = time.time_ns() // 1000
-		try:
-			assert os.path.exists(find_file(ts, cwd="saves/filehost"))
-		except Exception:
-			pass
-		else:
-			return
-		# if os.path.exists(fn) and not urls:
-		# 	return url + f"?key={key}"
-		ha1 = ha2 = self.hash_file(of)
-		if ha1:
-			ha2 = ha1[:4] + ha1[-4:]
-			for fp in os.listdir("saves/filehost"):
-				fl = fp.split("~", 1)[-1]
-				if not fl.startswith(".forward$"):
-					continue
-				fl = fl.split("$", 1)[-1]
-				if "$" not in fl:
-					continue
-				fh2 = fl.split("$", 2)[1].strip()
-				if fh2 != ha2:
-					continue
-				with open("saves/filehost/" + fp, "r+", encoding="utf-8") as f:
-					sn = f.read()
-					if "<!--SHA=" not in sn:
-						continue
-					s = sn.split("<!--SHA=", 1)[-1]
-					fh1, s = s.split("-->", 1)
-					if fh1 != ha1:
-						continue
-					if s.startswith("<!--REF="):
-						s = s.removeprefix("<!--REF=")
-						refs = set(orjson.loads(s.split("-->", 1)[0]))
-						refs.add(ts)
-					else:
-						refs = [ts]
-					i = sn.index("<!--SHA=") + len("<!--SHA=") + len(fh1) + len("-->")
-					f.seek(i)
-					f.write(f'<!--REF=[{",".join(map(str, refs))}]--></html>')
-					t2 = int(fp.split("~", 1)[0].rsplit(IND, 1)[-1])
-					urls = [t2]
-					# mids = []
-					ha1 = ha2 = ""
-					break
-		size = os.path.getsize(of)
-		mime = get_mime(of)
-		if not urls:
-			if size > 256 * 1048576:
-				with tracebacksuppressor(StopIteration):
-					if mime.split("/", 1)[0] == "video" or mime in ("image/gif", "image/apng"):
-						of = self.optimise_video(of, size, mime)
-					elif mime in ("image/bmp", "image/tiff", "image/xbm", "image/heic", "image/heif"):
-						of = self.optimise_image(of, size, mime)
-					else:
-						raise StopIteration
-					size = os.path.getsize(of)
-					mime = get_mime(of)
-		if not name:
-			name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
-			if name.startswith(".forward$"):
-				raise PermissionError
-			if name.startswith(".temp$@"):
-				name = name[7:]
-		url = HOST + "/f/" + n2p(ts)
-		n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-		key = key or n2p(n)
-		na2 = lim_str(name, 96).replace("$", "-")
-		fn = f"saves/filehost/{IND}{ts}~.forward${size}${ha2 or ' '}${na2}.$"
-		if urls:
-			pass
-		elif size > 0:
-			self.register_replacer(ts, key)
-			urls = interface.run(f"bot.data.exec.stash({repr(of)})")
-			if not self.in_replacer(ts, key):
-				interface.run(f"bot.data.exec.delete({repr(urls)})")
-				return
-			print(urls)
-			assert urls
-		else:
-			urls = []
-		urls = [map_url(url) for url in urls]
-		code = 307
-		ftype = 3
-		jdn = json.dumps(name).replace("<", '"\u003c"').replace(">", '"\u003e"')
-		s = (
-			f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0;URL={url}"/>'
-			+ f'<!--[{jdn},{size},"{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}-->'
-			+ (f'<!--SHA={ha1}-->' if ha1 else "")
-			+ '</html>'
-		)
-		pn = True
-		with suppress(FileNotFoundError):
-			while pn:
-				pn = find_file(ts, cwd="saves/filehost")
-				os.remove(pn)
-		with open(fn, "w", encoding="utf-8") as f:
-			f.write(s)
-		on = f"{TEMP_PATH}/filehost/{IND}{ts}~.temp$@" + name
-		if of != on:
-			os.rename(of, on)
-		self.remove_replacer(ts, key)
-		return url + f"?key={key}"
-
-	def bump(self):
-		for fp in os.listdir("saves/filehost"):
-			p = "saves/filehost/" + fp
-			with open(p, "r", encoding="utf-8") as f:
-				sn = f.read()
-			s = sn.split("/>", 1)[-1]
-			spl = s.split("-->", 4)
-			if len(spl) >= 5:
-				infd, urld, key, _midd, _ = spl[:5]
-			elif len(spl) >= 3:
-				infd, urld, _ = spl[:3]
-				key = ""
-				# midd = "[]"
-			else:
-				continue
-			info = orjson.loads(infd.removeprefix("<!--"))
-			urls = orjson.loads(urld.removeprefix("<!--").removeprefix("URL="))
-			while key.startswith("<!--KEY="):
-				key = key[8:]
-			urls = [remap_url(url) for url in urls]
-			if not is_url(urls[0]):
-				continue
-			stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", f"{TEMP_PATH}/")
-			pn = stn + "~.temp$@" + info[0]
-			self.concat(pn, urls, name=info[0], mime=info[2], stn=stn, waiter=True).result()
-			if fp.count("$") >= 4:
-				continue
-			self.replace_file(pn, name=info[0], key=key, urls=urls)
-
-	@cp.expose
-	@hostmap
-	def api_register_replacer(self, ts, key):
-		if cp.request.remote.ip != "127.0.0.1":
-			raise PermissionError
-		return self.register_replacer(ts, key)
-
-	replacer_sem = Semaphore(1, inf, rate_limit=0.0625)
-	def register_replacer(self, ts, key=None):
-		if not key:
-			n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-			n2p(n)
-		with self.replacer_sem:
-			with open("saves/filehost/-1.txt", "a", encoding="ascii") as f:
-				f.write(f"{ts}:{key}\n")
-		return (ts, key)
-
-	def in_replacer(self, ts, key):
-		if not os.path.exists("saves/filehost/-1.txt") or not os.path.getsize("saves/filehost/-1.txt"):
-			return
-		with self.replacer_sem:
-			with open("saves/filehost/-1.txt", "r", encoding="ascii") as f:
-				lines = f.readlines()
-		line = f"{ts}:{key}\n"
-		return line in lines
-
-	def remove_replacer(self, ts, key):
-		if not os.path.exists("saves/filehost/-1.txt") or not os.path.getsize("saves/filehost/-1.txt"):
-			return
-		with self.replacer_sem:
-			with open("saves/filehost/-1.txt", "r+", encoding="ascii") as f:
-				lines = set(f.readlines())
-				line = f"{ts}:{key}\n"
-				if line not in lines:
-					return False
-				lines.discard(line)
-				s = "".join(lines)
-				f.truncate(len(s))
-				f.seek(0)
-				f.write(s)
-		return True
-
-	replace_fut = None
-	@cp.expose
-	@hostmap
-	def api_update_replacers(self):
-		if cp.request.remote.ip != "127.0.0.1":
-			raise PermissionError
-		if self.replace_fut and not self.replace_fut.done():
-			return
-		self.replace_fut = esubmit(self.update_replacers)
-
-	def update_replacers(self):
-		if not os.path.exists("saves/filehost/-1.txt") or not os.path.getsize("saves/filehost/-1.txt"):
-			return
-		with self.replacer_sem:
-			with open("saves/filehost/-1.txt", "r", encoding="ascii") as f:
-				lines = f.readlines()
-		for line in set(lines):
-			ts, key = line.rstrip().split(":", 1)
-			try:
-				fn = find_file(ts, cwd=TEMP_PATH, ind=IND)
-				self.replace_file(fn, key)
-			except Exception:
-				print_exc()
-			finally:
-				self.remove_replacer(ts, key)
-
-	edited = {}
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
-	@hostmap
-	def edit(self, path, key=None, **kwargs):
-		if not key:
-			raise PermissionError("Key not found.")
-		cp.response.headers.update(HEADERS)
-		ots = p2n(path)
-		path = str(ots)
-		p = find_file(path, cwd=(f"{TEMP_PATH}/filehost", "saves/filehost"))
-		replaceable = self.remove_replacer(ots, key)
-		if not replaceable:
-			if p.split("~", 1)[-1].startswith(".temp$@"):
-				if p in self.serving:
-					for f in self.serving.pop(p):
-						f.close()
-					time.sleep(0.5)
-				if os.path.exists(p):
-					try:
-						os.remove(p)
-					except Exception:
-						print_exc()
-						return f"{HOST}/error/500"
-				p = find_file(path)
-			if not p.split("~", 1)[-1].startswith(".forward$"):
-				raise TypeError("File is not editable.")
-			with open(p, "r", encoding="utf-8") as f:
-				orig = f.read()
-			if key != orig.split("<!--KEY=", 1)[-1].split("-->", 1)[0]:
-				raise PermissionError("Incorrect key.")
-			self.delete_link(p, orig)
-		else:
-			if p.split("~", 1)[-1].startswith(".temp$@"):
-				if p in self.serving:
-					for f in self.serving.pop(p):
-						f.close()
-					time.sleep(0.2)
-				with tracebacksuppressor:
-					os.remove(p)
-			else:
-				os.remove(p)
-		if self.edited.get(ots):
-			return
-		self.edited[ots] = True
-		try:
-			if not replaceable:
-				urls = orjson.loads(orig.split("<!--URL=", 1)[-1].split("-->", 1)[0])
-				interface.run(f"bot.data.exec.delete({repr(urls)})")
-			kwargs["?ts"] = ots
-			kwargs["?key"] = key
-			url = self.merge(**kwargs)
-		finally:
-			self.edited.pop(ots, None)
-		print("Edited", url)
-		return url
-
-	def delete_link(self, p, text=None):
-		if not text:
-			with open(p, "r", encoding="utf-8") as f:
-				text = f.read()
-		os.remove(p)
-		s = text.split("/>", 1)[-1]
-		_infd, urld, _k, _midd, ext  = s.split("-->", 4)
-		# info = orjson.loads(infd.removeprefix("<!--"))
-		urls = orjson.loads(urld.removeprefix("<!--URL="))
-		spl = ext.split("-->")
-		if len(spl) > 1:
-			ha1 = spl[0].removeprefix("<!--SHA=")
-			if len(spl) > 2:
-				fids = orjson.loads(spl[1].removeprefix("<!--REF="))
-				newref = None
-				for fid in fids:
-					with tracebacksuppressor(FileNotFoundError):
-						p2 = find_file(fid, "saves/filehost")
-						with open(p2, "r+", encoding="utf-8") as f:
-							sn = f.read()
-							if not newref:
-								i = sn.index("<!--URL=") + len("<!--URL=")
-								u, s = sn[i:].split("-->", 1)
-								url1 = orjson.loads(u)
-								if is_url(url1[0]):
-									continue
-								f.seek(i)
-								f.write(json.dumps(urls, separators=(",", ":")))
-								f.write(s)
-								f.seek(0)
-								sn = f.read()
-								i = sn.index("<!--SHA=") + len("<!--SHA=")
-								s = sn[i:].split("-->", 1)[-1]
-								f.seek(i)
-								f.write(f"<!--SHA={ha1}-->")
-								f.write(s)
-							else:
-								i = sn.index("<!--URL=") + len("<!--URL=")
-								s = sn[i:].split("-->", 1)[-1]
-								f.seek(i)
-								f.write(json.dumps([newref], separators=(",", ":")))
-								f.write(s)
-						if not newref:
-							newref = fid
-							os.rename(p2, p2.replace("$ $", "$" + ha1[:4] + ha1[-4:] + "$", 1))
-
-	@cp.expose
-	@cp.tools.accept(media="multipart/form-data")
-	@hostmap
 	def forward(self, **kwargs):
 		ts = time.time_ns() // 1000
 		fn = f"saves/filehost/{IND}{ts}~.forward$"
@@ -2609,7 +1569,6 @@ class Server:
 		raise cp.HTTPRedirect(url, status=307)
 
 	@cp.expose
-	@hostmap
 	def backup(self, token="~"):
 		at = AUTH.get("discord_token")
 		if token != at:
@@ -2621,7 +1580,6 @@ class Server:
 	backup._cp_config = {"response.stream": True}
 
 	@cp.expose(("eval", "exec"))
-	@hostmap
 	def execute(self, token, *args, **kwargs):
 		if token != AUTH.get("discord_token"):
 			raise InterruptedError
@@ -2638,7 +1596,6 @@ class Server:
 		return res.encode("utf-8")
 
 	@cp.expose
-	@hostmap
 	def eval2(self, token, *args, **kwargs):
 		if token != AUTH.get("discord_token"):
 			raise InterruptedError
@@ -2684,7 +1641,6 @@ class Server:
 	mpresponse = {}
 
 	@cp.expose
-	@hostmap
 	def mphb(self, playing=None):
 		mpdata = self.mpdata
 		ip = true_ip()
@@ -2737,7 +1693,6 @@ class Server:
 	mpimg = {}
 
 	@cp.expose
-	@hostmap
 	def api_mpinsights(self):
 		values = self.mpget()
 		for i in range(3):
@@ -2770,7 +1725,6 @@ class Server:
 		))
 
 	@cp.expose
-	@hostmap
 	def status(self, interval=None):
 		if not interval:
 			cp.request.no_log = True
@@ -2781,7 +1735,6 @@ class Server:
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
-	@hostmap
 	def distribute(self, caps="[]", stat="{}", resp="{}", token="", id=""):
 		ip = true_ip()
 		at = AUTH.get("discord_token")
@@ -2918,7 +1871,6 @@ class Server:
 			time.sleep(60)
 
 	@cp.expose
-	@hostmap
 	def donation(self, data=None):
 		# ip = true_ip()
 		data = data or cp.request.json
@@ -2962,7 +1914,6 @@ class Server:
 
 	rapidapi = 0
 	@cp.expose(("commands",))
-	@hostmap
 	def command(self, content="", input="", timeout=420, redirect=""):
 		ip = true_ip()
 		if "\x7f" in content and ip in ("127.0.0.1", ADDRESS, T(self).get("ip", None)):
@@ -3007,7 +1958,6 @@ class Server:
 		return json_dumps(j)
 
 	@cp.expose(("cat", "cats", "dog", "dogs", "neko", "nekos", "giphy"))
-	@hostmap
 	def imagepool(self, tag="", refresh=60):
 		name = cp.url(base="").rsplit("/", 1)[-1]
 		command = name.rstrip("s")
