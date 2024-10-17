@@ -499,7 +499,7 @@ class Server:
 
 	@cp.expose
 	def download(self, *path, download="1", **void):
-		cp.response.headers.update(SHEADERS)
+		cp.response.headers.update(CHEADERS)
 		assert len(path) in (1, 2) and path[0].count("~") == 0
 		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
 		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
@@ -527,7 +527,7 @@ class Server:
 		try:
 			encoded = zip2bytes(content)
 		except Exception:
-			encoded = content
+			encoded = bytes(content)
 		info = cdict(orjson.loads(encoded))
 		endpoint = cp.url(qs=cp.request.query_string, base="")[1:].split("/", 1)[0]
 		download = (download and download[0] not in "0fFnN") and endpoint.startswith("d")
@@ -622,6 +622,7 @@ class Server:
 					if isinstance(u, byte_like):
 						yield u[s:e]
 						return
+					print(u)
 					if e >= ns:
 						e = ""
 					else:
