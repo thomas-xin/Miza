@@ -287,7 +287,8 @@ class Server:
 			data = seq(resp)
 
 			def callback(data):
-				download_cache[url] = bytes(data)
+				data.seek(0)
+				download_cache[url] = bytes(data.read())
 		else:
 			data = MemoryBytes(info)
 		length, i = decode_leb128(data, mode="index")
