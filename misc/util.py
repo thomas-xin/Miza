@@ -570,6 +570,7 @@ def is_giphy_url(url): return url and regexp("^https?:\\/\\/giphy.com/gifs/[\\w\
 def is_miza_url(url): return url and regexp("^https?:\\/\\/(?:\\w+\\.)?mizabot.xyz").findall(url)
 def is_youtube_url(url): return url and regexp("^https?:\\/\\/(?:\\w{1,5}\\.)?youtu(?:\\.be|be\\.com)\\/[^\\s<>`|\"']+").findall(url)
 def is_youtube_stream(url): return url and regexp("^https?:\\/\\/r+[0-9]+---.{2}-[\\w\\-]{4,}\\.googlevideo\\.com").findall(url)
+def is_soundcloud_stream(url): return url and regexp("^https?:\\/\\/(?:[\\w\\-]*)?media\\.sndcdn\\.com\\/[^\\s<>`|\"']+").findall(url)
 def is_deviantart_url(url): return url and regexp("^https?:\\/\\/(?:www\\.)?deviantart\\.com\\/[^\\\\s<>`|\"']+").findall(url)
 def is_reddit_url(url): return url and regexp("^https?:\\/\\/(?:\\w{2,3}\\.)?reddit.com\\/r\\/[^/\\W]+\\/").findall(url)
 def is_redgifs_url(url): return url and regexp("^https?:\\/\\/(?:\\w{2,3}\\.)?redgifs.com\\/\\w{2,6}\\/[^/\\W]+").findall(url)
@@ -612,6 +613,8 @@ def expired(stream):
 	if is_youtube_url(stream):
 		return True
 	if is_redgifs_url(stream):
+		return True
+	if is_soundcloud_stream(stream):
 		return True
 	if stream.startswith("ytsearch:"):
 		return True

@@ -565,7 +565,8 @@ class CustomAudio(collections.abc.Hashable):
 				self.acsi.kill()
 		fut = self.bot.audio.submit(f"AP.players.pop({self.guild.id},None)")
 		if wait:
-			fut.result()
+			with tracebacksuppressor:
+				fut.result()
 			while self.guild.me.voice:
 				await_fut(self.guild.change_voice_state(channel=None))
 		elif self.guild.me and self.guild.me.voice:

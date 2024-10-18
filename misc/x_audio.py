@@ -12,7 +12,7 @@ from math import inf, log2, isfinite
 from traceback import print_exc
 from .asyncs import csubmit, esubmit, tsubmit, async_nop, wrap_future, cst, Semaphore, Delay, eloop
 from .types import as_str, cdict, suppress, utc, ISE2, round_min, cast_id
-from .util import tracebacksuppressor, is_strict_running, force_kill, retry, AUTH, TEMP_PATH, Request, EvalPipe, PipedProcess, is_url, is_youtube_stream, expired, reqs, get_duration, T
+from .util import tracebacksuppressor, is_strict_running, force_kill, retry, AUTH, TEMP_PATH, Request, EvalPipe, PipedProcess, is_url, is_youtube_stream, is_soundcloud_stream, expired, reqs, get_duration, T
 
 tracebacksuppressor.fn = print_exc
 
@@ -358,7 +358,6 @@ class AudioFile:
 			sample_rate = "44100"
 		# Collects data from source, converts to 48khz 128kbps opus format, outputting to target file
 		cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(sample_rate), "-ac", "2", "-b:a", "192000", f"{TEMP_PATH}/audio/" + self.file]
-		# if not stream.startswith("https://cf-hls-media.sndcdn.com/"):
 		fixed = False
 		with suppress():
 			if stream.startswith("https://www.yt-download.org/download/"):
@@ -369,42 +368,37 @@ class AudioFile:
 			if fmt2 == cdc2:
 				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", f"{TEMP_PATH}/audio/" + self.file]
 				fixed = True
-			elif is_youtube_stream(stream):
+			elif is_youtube_stream(stream) or is_soundcloud_stream(stream):
 				fixed = True
 		if is_url(stream):
 			cmd = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + cmd[1:]
 		procargs = [cmd]
 		if not fixed and is_url(stream):
-			headers = Request.header()
-			headers["Range"] = "Bytes=0-3"
-			resp = reqs.next().get(stream, headers=headers, stream=True, timeout=30)
-			resp.raise_for_status()
-			it = resp.iter_content(4)
-			data = next(it)[:4]
-			if not data:
-				raise EOFError(stream)
-			CONVERTERS = (
-				b"MThd",
-				b"Org-",
-			)
-			if data in CONVERTERS:
-				new = None
-				with suppress(ValueError):
-					new = interface.run(f"VOICE.select_and_convert({repr(stream)})", timeout=120)
-				if new not in (None, "null"):
-					return self.load(new, check_fmt=None, force=True)
-			elif data == b"ECDC":
-				procargs = [
-					[sys.executable, "misc/ecdc_stream.py", "-d", stream],
-					["./ffmpeg", "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(sample_rate), "-ac", "2", "-b:a", "192000", f"{TEMP_PATH}/audio/" + self.file]
-				]
-				self.wasecdc = True
-		elif stream.endswith(".ecdc") and not is_url(stream):
-			procargs = [
-				[sys.executable, "misc/ecdc_stream.py", "-d", stream],
-				["./ffmpeg", "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(sample_rate), "-ac", "2", "-b:a", "192000", f"{TEMP_PATH}/audio/" + self.file]
-			]
-			self.wasecdc = True
+			with tracebacksuppressor:
+				headers = Request.header()
+				headers["Range"] = "bytes=0-3"
+				resp = reqs.next().get(stream, headers=headers, stream=True, timeout=30)
+				resp.raise_for_status()
+				it = resp.iter_content(4)
+				data = next(it)[:4]
+				if not data:
+					raise EOFError(stream)
+				CONVERTERS = (
+					b"MThd",
+					b"Org-",
+				)
+				if data in CONVERTERS:
+					new = None
+					with suppress(ValueError):
+						new = interface.run(f"VOICE.select_and_convert({repr(stream)})", timeout=120)
+					if new not in (None, "null"):
+						return self.load(new, check_fmt=None, force=True)
+				elif data == b"ECDC":
+					procargs = [
+						[sys.executable, "misc/ecdc_stream.py", "-d", stream],
+						["./ffmpeg", "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(sample_rate), "-ac", "2", "-b:a", "192000", f"{TEMP_PATH}/audio/" + self.file]
+					]
+					self.wasecdc = True
 		self.proc = None
 		try:
 			try:
