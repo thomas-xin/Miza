@@ -2300,7 +2300,7 @@ class FileHashDict(collections.abc.MutableMapping):
 		except KeyError:
 			pass
 		else:
-			if self.automut:
+			if self.automut and not isinstance(value, collections.abc.Hashable):
 				self.modified.add(k)
 				self.modify()
 			return value
@@ -2312,7 +2312,7 @@ class FileHashDict(collections.abc.MutableMapping):
 			d = self.decode(s)
 			value = select_and_loads(d)
 			self.data[k] = value
-			if self.automut:
+			if self.automut and not isinstance(value, collections.abc.Hashable):
 				self.modified.add(k)
 				self.modify()
 			return value
