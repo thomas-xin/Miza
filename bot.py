@@ -3911,12 +3911,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if pl2 < 4:
 			return 250
 		if pl2 < 5:
-			return 375
-		if pl2 < 6:
 			return 500
+		if pl2 < 6:
+			return 1000
 		if pl2 < 7:
-			return 750
-		return 1000
+			return 1500
+		return 2000
 
 	class PremiumContext(contextlib.AbstractContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 		def __init__(self, user, target=None, value=0, cost=0):

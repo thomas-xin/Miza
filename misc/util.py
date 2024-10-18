@@ -1278,6 +1278,8 @@ def decode_attachment(encoded):
 	while len(ids) < 3:
 		ids.append(0)
 	ids.extend(fn)
+	if len(ids) < 4:
+		ids.append("")
 	return ids
 
 @split_attachment

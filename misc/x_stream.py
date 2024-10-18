@@ -247,21 +247,26 @@ class Server:
 		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
 		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
 		url = await_fut(fut)
-		resp = self.session.get(
-			url,
-			headers=Request.header(),
-			verify=False,
-			timeout=60,
-			stream=True,
-		)
-		resp.raise_for_status()
-		data = seq(resp)
+		try:
+			info = download_cache[url]
+		except KeyError:
+			resp = self.session.get(
+				url,
+				headers=Request.header(),
+				verify=False,
+				timeout=60,
+				stream=True,
+			)
+			resp.raise_for_status()
+			data = seq(resp)
+		else:
+			data = MemoryBytes(info)
 		length, i = decode_leb128(data, mode="index")
 		content = data[i:i + length]
 		try:
 			encoded = zip2bytes(content)
 		except Exception:
-			encoded = content
+			encoded = bytes(content)
 		cp.response.headers["Content-Type"] = "application/json"
 		return bytes(encoded)
 
