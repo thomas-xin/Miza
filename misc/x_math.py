@@ -17,7 +17,6 @@ import base64
 import ast
 import re
 import sympy.stats
-import scipy.stats
 import numpy as np
 import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
@@ -62,7 +61,7 @@ def TryWrapper(func):
 	def __call__(*args, **kwargs):
 		try:
 			return func(*args, **kwargs)
-		except:
+		except Exception:
 			print(traceback.format_exc(), end="")
 	return __call__
 
@@ -510,6 +509,15 @@ def array(*args, **kwargs):
 	return np.array(args, **kwargs)
 
 if os.name != "nt":
+	accel = None
+else:
+	sys.path.append("misc")
+	try:
+		import accel
+	except ImportError:
+		accel = None
+
+if accel is None:
 	def _predict_next(seq):
 		if len(seq) < 2:
 			return
@@ -525,7 +533,7 @@ if os.name != "nt":
 		if len(seq) < 4 or 0 in seq[:-1]:
 			return
 		b = _predict_next(seq[1:] / seq[:-1])
-		if b is not None and isfinite(b):
+		if b is not None and isfinite(a):
 			return seq[-1] * b
 
 	def predict_next(seq, limit=12):
@@ -536,9 +544,6 @@ if os.name != "nt":
 			if temp is not None and isfinite(temp):
 				return round_min(temp)
 else:
-	sys.path.append("misc")
-	import accel
-
 	def predict_next(seq, limit=12):
 		"Predicts the next number in a sequence. Works on most combinations of linear, polynomial, exponential and fibonacci equations."
 		seq = list(map(float, seq))
@@ -606,7 +611,7 @@ def _integrate(*args, **kwargs):
 		if b.startswith("incorrect syntax:"):
 			raise SyntaxError(b)
 		s = b.strip("$; \r\n")
-	except:
+	except Exception:
 		if proc.is_running():
 			proc.kill()
 		globals().pop("MAXIMA", None)
@@ -621,7 +626,7 @@ def integrate(*args, **kwargs):
 				ans = _integrate(*args, **kwargs)
 				if not ans:
 					raise EOFError
-			except:
+			except Exception:
 				pass
 			else:
 				return ans
@@ -645,7 +650,7 @@ def _dsolve(*args, **kwargs):
 		if b.startswith("incorrect syntax:"):
 			raise SyntaxError(b)
 		s = b.strip("$; \r\n").replace("%c", "0").replace("%e", "e")
-	except:
+	except Exception:
 		if proc.is_running():
 			proc.kill()
 		globals().pop("MAXIMA", None)
@@ -659,7 +664,7 @@ def dsolve(*args, **kwargs):
 				ans = _dsolve(*args, **kwargs)
 				if not ans:
 					raise EOFError
-			except:
+			except Exception:
 				pass
 			else:
 				return ans
@@ -668,10 +673,19 @@ def dsolve(*args, **kwargs):
 		return sympy.integrate(*plotArgs(args), sympy.Symbol("x"))
 
 fac = sympy.factorial
-ncr = lambda n, k: 0 if k > n else fac(n) / fac(k) / fac(n - k)
-npr = lambda n, k: 0 if k > n else fac(n) / fac(n - k)
-normcdf = lambda x: 0.5 * sympy.erfc(-x / sympy.sqrt(2))
-norminv = lambda x: -sympy.sqrt(2) * sympy.erfcinv(2 * x)
+def ncr(n, k):
+	return 0 if k > n else fac(n) / fac(k) / fac(n - k)
+def npr(n, k):
+	return 0 if k > n else fac(n) / fac(n - k)
+def normcdf(x):
+	return 0.5 * sympy.erfc(-x / sympy.sqrt(2))
+def norminv(x):
+	return -sympy.sqrt(2) * sympy.erfcinv(2 * x)
+
+def mode(a):
+	vals, counts = np.unique(a, return_counts=True)
+	index = np.argmax(counts)
+	return vals[index]
 
 def lcm(*nums):
 	while len(nums) > 1:
@@ -807,7 +821,7 @@ def rounder(x):
 		y = int(x)
 		if x == y:
 			return y
-	except:
+	except Exception:
 		pass
 	return x
 round_min = rounder
@@ -821,7 +835,7 @@ def _unsafe(ufunc, *args, **kwargs):
 		if "has no attribute 'dtype'" in ex2:
 			try:
 				args = [np.asanyarray(a) for a in args]
-			except:
+			except Exception:
 				raise ex
 			try:
 				return ufunc(*args, **kwargs)
@@ -843,9 +857,10 @@ def _unsafe(ufunc, *args, **kwargs):
 		args = [a if not isinstance(a, np.ndarray) else np.asanyarray(a, np.float64) for a in args]
 		kwargs = {k: (v if not isinstance(v, np.ndarray) else np.asanyarray(v, np.float64)) for k, v in kwargs.items()}
 		return ufunc(*args, **kwargs)
-	except:
+	except Exception:
 		raise ex
-autocast = lambda ufunc: lambda *args, **kwargs: _unsafe(ufunc, *args, **kwargs)
+def autocast(ufunc):
+	return lambda *args, **kwargs: _unsafe(ufunc, *args, **kwargs)
 
 
 # Allowed functions for ~math
@@ -917,7 +932,7 @@ _globals.update({
 	"ptp": np.ptp,
 	"mean": np.mean,
 	"median": np.median,
-	"mode": scipy.stats.mode,
+	"mode": mode,
 	"std": lambda a: sympy.sqrt(np.var(a)),
 	"var": np.var,
 	"corrcoef": np.corrcoef,
@@ -1294,9 +1309,13 @@ def evalSym(f, prec=64, r=False, variables=None):
 		return [rounder(f)]
 	if prec:
 		try:
-			y = f.evalf(prec, chop=False)
+			f2 = f.evalf(prec + 4, chop=False)
 		except Exception:
-			y = f
+			f2 = f
+		try:
+			y = f2.evalf(prec, chop=True)
+		except Exception:
+			y = f2
 		try:
 			e = rounder(y)
 		except TypeError:

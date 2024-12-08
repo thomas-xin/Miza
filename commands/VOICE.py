@@ -3938,7 +3938,7 @@ class Queue(Command):
 				if not 1 + i & 32767:
 					await asyncio.sleep(0.1)
 				i += 1
-			stime = time_until(utc() + totalTime / auds.speed)
+			stime = time_delta(totalTime / auds.speed)
 		cnt = len(q)
 		info = (
 			str(cnt) + " item" + "s" * (cnt != 1) + "\nEstimated total duration: "
@@ -3997,13 +3997,13 @@ class Queue(Command):
 				if v:
 					if estim > 0:
 						curr += "Time until playing: "
-						estimate = time_until(utc() + estim / auds.speed)
+						estimate = time_delta(estim / auds.speed)
 						if i <= 1 or not auds.stats.shuffle:
 							curr += "[" + estimate + "]"
 						else:
 							curr += "{" + estimate + "}"
 					else:
-						curr += "Remaining time: [" + time_until(utc() + (estim + e_dur_2(e)) / auds.speed) + "]"
+						curr += "Remaining time: [" + time_delta((estim + e_dur_2(e)) / auds.speed) + "]"
 					curr += "```"
 				curr += "\n"
 				if len(embstr) + len(curr) > 4096 - len(emb.description):
@@ -4093,27 +4093,15 @@ class Playlist(Command):
 		elif index[0] < 0:
 			index[0] += len(pl) + 1
 		if mode == "remove":
-			count = len(pl)
-			removed = "Undefined"
-			if not index:
-				pass
-			elif len(index) == 1:
-				removed = pl.pop(index[0])
-			elif len(index) == 2:
-				removed = pl[index[0]]
-				pl = pl[:index[0]] + pl[index[1]:]
-			else:
-				urls.extend(pl[index[0]:index[1]:index[2]])
-			pl = alist(pl)
-			if urls:
-				removed = urls[0]
-			for url in urls:
-				pl.remove(url)
+			targets = RangeSet.parse(index, len(pl))
+			assert targets, "Please input valid indices."
+			removed = pl[targets[0]].get("name", "Unknown")
+			if len(targets) > 1:
+				removed += f" (+{len(targets) - 1})"
+			pl = astype(pl, alist)
+			pl.pops(removed)
 			playlists[_guild.id] = list(pl)
-			added = count - len(pl)
-			if added > 1:
-				removed += f" (+{added})"
-			return italics(css_md(f"Successfully removed {sqr_md(removed)} from the default playlist for {sqr_md(guild)}."))
+			return italics(css_md(f"Successfully removed {sqr_md(removed)} from the default playlist for {sqr_md(_guild)}."))
 		lim = 4096 << self.bot.is_trusted(_guild.id) * 2 + 1
 		if len(pl) >= lim:
 			raise OverflowError(f"Playlist for {_guild} has reached the maximum of {lim} items. Please remove an item to add another.")
@@ -4423,23 +4411,7 @@ class Skip(Command):
 		members = sum(1 for m in auds.acsi.channel.members if not m.bot)
 		required = 1 + members >> 1
 		qsize = len(auds.queue)
-		targets = set()
-		for spl in slices:
-			if not spl:
-				continue
-			spl = list(spl)
-			if spl[0] is None:
-				spl[0] = 0
-			if len(spl) >= 2 and spl[1] is None:
-				spl[1] = qsize
-			if len(spl) == 1:
-				target = (x for x in spl if x < qsize)
-			elif len(spl) >= 3:
-				target = range(*slice(*spl).indices(qsize))
-			else:
-				target = range(*slice(*sorted(spl)).indices(qsize))
-			targets.update(target)
-		print(targets)
+		targets = RangeSet.parse(slices, qsize)
 		dups = []
 		votes = []
 		skips = []
@@ -4469,17 +4441,17 @@ class Skip(Command):
 						entry.skip_after = after
 		desc = []
 		if dups:
-			desc.append(f"Entry {dups[0]} ({auds.queue[dups[0]].name}) has already been voted for, `{len(votes)}/{required}`." if len(dups) == 1 else f"{len(dups)} entries have already been voted for.")
+			desc.append(f"Entry {dups[0]} (`{auds.queue[dups[0]].name}`) has already been voted for, `{len(votes)}/{required}`." if len(dups) == 1 else f"{len(dups)} entries have already been voted for.")
 		if votes:
-			desc.append(f"Voted to skip entry {votes[0]} ({auds.queue[votes[0]].name}), `{len(votes)}/{required}`." if len(votes) == 1 else f"Voted to skip {len(votes)} entries.")
+			desc.append(f"Voted to skip entry {votes[0]} (`{auds.queue[votes[0]].name}`), `{len(votes)}/{required}`." if len(votes) == 1 else f"Voted to skip {len(votes)} entries.")
 		if after is None:
 			lost = auds.queue.pops(skips)
 			if mode != "force":
 				if auds.stats.loop or auds.stats.repeat:
 					auds.queue.extend(lost)
-				desc.append(f"Skipped entry {skips[0]} ({lost[0].name})." if len(skips) == 1 else f"Skipped all ({len(skips)}) entries." if not auds.queue else f"Skipped {len(skips)} entries.")
+				desc.append(f"Skipped entry {skips[0]} (`{lost[0].name}`)." if len(skips) == 1 else f"Skipped all ({len(skips)}) entries." if not auds.queue else f"Skipped {len(skips)} entries.")
 			else:
-				desc.append(f"Removed entry {skips[0]} ({lost[0].name})." if len(skips) == 1 else f"Removed all ({len(skips)}) entries." if not auds.queue else f"Removed {len(skips)} entries.")
+				desc.append(f"Removed entry {skips[0]} (`{lost[0].name}`)." if len(skips) == 1 else f"Removed all ({len(skips)}) entries." if not auds.queue else f"Removed {len(skips)} entries.")
 			if 1 in skips:
 				auds.clear_next()
 			# If first item is skipped, advance queue and update audio player
@@ -4487,7 +4459,7 @@ class Skip(Command):
 				auds.clear_source()
 				esubmit(auds.reset)
 		else:
-			desc.append((f"Entry {skips[0]} ({auds.queue[skips[0]].name})" if len(skips) == 1 else f"{len(skips)} entries") + f" will automatically skip at timestamp {sec2time(after)}.")
+			desc.append((f"Entry {skips[0]} (`{auds.queue[skips[0]].name}`)" if len(skips) == 1 else f"{len(skips)} entries") + f" will automatically skip at timestamp {sec2time(after)}.")
 		colour = await bot.get_colour(_user)
 		emb = discord.Embed(colour=colour)
 		emb.description = "\n- ".join(desc)

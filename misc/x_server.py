@@ -741,7 +741,7 @@ class Server:
 		return start_upload(position)
 
 	@cp.expose
-	def delete(self, *path, key=None):
+	def delete(self, *path, key=None, **void):
 		assert len(path) in (1, 2) and path[0].count("~") == 0
 		assert key, "File Key Required."
 		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
@@ -777,6 +777,41 @@ class Server:
 			fut = csubmit(attachment_cache.delete(c_id, m_id))
 			futs.append(fut)
 		await_fut(gather(*futs))
+
+	@cp.expose
+	def edit(self, *path, key=None, **void):
+		cp.response.headers.update(CHEADERS)
+		assert len(path) in (1, 2) and path[0].count("~") == 0
+		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
+		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
+		url = await_fut(fut)
+		callback = None
+		try:
+			info = download_cache[url]
+		except KeyError:
+			resp = self.session.get(
+				url,
+				headers=Request.header(),
+				verify=False,
+				timeout=60,
+				stream=True,
+			)
+			resp.raise_for_status()
+			data = seq(resp)
+
+			def callback(data):
+				data.seek(0)
+				download_cache[url] = bytes(data.read())
+		else:
+			data = MemoryBytes(info)
+		length, i = decode_leb128(data, mode="index")
+		content = data[i:i + length]
+		try:
+			encoded = zip2bytes(content)
+		except Exception:
+			encoded = bytes(content)
+		info = cdict(orjson.loads(encoded))
+		return str(info)
 
 	@cp.expose(("u",))
 	def unproxy(self, *path, url=None, **query):

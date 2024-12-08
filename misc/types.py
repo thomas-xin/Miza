@@ -209,6 +209,49 @@ class MemoryBytes:
 		return self.__class__(self.tobytes().lower())
 
 
+def sublist_index(lst, sub, start=0, end=None):
+	if not sub:
+		return start
+	if end is None:
+		end = len(lst)
+	if hasattr(lst, "index"):
+		i = start
+		while i < end - len(sub) + 1:
+			try:
+				i = lst.index(sub[0], i, end - len(sub) + 1)
+			except ValueError:
+				break
+			if all(lst[i + j] == sub[j] for j in range(1, len(sub))):
+				return i
+			i += 1
+	else:
+		for i in range(start, end):
+			if all(lst[i + j] == sub[j] for j in range(len(sub))):
+				return i
+	raise ValueError("Sublist not found.")
+
+def sublist_rindex(lst, sub, start=0, end=None):
+	if not sub:
+		return start
+	if end is None:
+		end = len(lst)
+	if hasattr(lst, "rindex"):
+		i = end - len(sub)
+		while i >= start:
+			try:
+				i = lst.rindex(sub[0], start, i + 1)
+			except ValueError:
+				break
+			if all(lst[i + j] == sub[j] for j in range(1, len(sub))):
+				return i
+			i -= 1
+	else:
+		for i in range(end - len(sub), start - 1, -1):
+			if all(lst[i + j] == sub[j] for j in range(len(sub))):
+				return i
+	raise ValueError("Sublist not found.")
+
+
 class Dummy(BaseException):
 	__slots__ = ("__weakref__",)
 	def __bool__(self):
@@ -582,7 +625,7 @@ class RangeSet(collections.abc.Iterable):
 
 	def __contains__(self, key):
 		if isinstance(key, slice | range):
-			start, stop = key.start, key.stop
+			start, stop = (key.start, key.stop) if key.step >= 0 else ((k2 := range(key.start, key.stop, key.step)[::-1]).start, k2.stop)
 			for left, right in self.ranges:
 				if left > start:
 					break
@@ -606,6 +649,25 @@ class RangeSet(collections.abc.Iterable):
 		for left, right in self.ranges:
 			yield from range(left, right)
 
+	def __getitem__(self, k):
+		if isinstance(k, slice):
+			k = range(*k.indices(len(self)))
+			# if k.step < 0:
+			# 	k = k[::-1]
+			out = self.__class__()
+			for i, x in enumerate(self):
+				if i in k:
+					out.add(x)
+			return out
+		if not isinstance(k, int):
+			raise TypeError(k)
+		i = 0
+		for r in self.ranges:
+			if k - i < r[1] - r[0]:
+				return k - i + r[0]
+			i += r[1] - r[0]
+		raise IndexError(k)
+
 	def add(self, start, stop=None):
 		if stop is None:
 			stop = start + 1
@@ -619,7 +681,7 @@ class RangeSet(collections.abc.Iterable):
 			l1, r1 = self.ranges[i]
 			l2, r2 = self.ranges[i + 1]
 			if r1 >= l2:
-				self.ranges[i] = [l1, max(r1, r2)]
+				self.ranges[i] = (l1, max(r1, r2))
 				self.ranges.pop(i + 1)
 			else:
 				i += 1
@@ -673,6 +735,39 @@ class RangeSet(collections.abc.Iterable):
 				self.remove(*obj)
 			else:
 				self.remove(obj)
+		return self
+
+	@classmethod
+	def parse(cls, slices, size):
+		self = cls()
+		for spl in slices:
+			if not spl:
+				continue
+			spl = list(spl)
+			if spl[0] is None:
+				spl[0] = 0
+			if len(spl) >= 2 and spl[1] is None:
+				spl[1] = size
+			if len(spl) == 1:
+				n = spl[0]
+				if n >= size or n < -size:
+					continue
+				if n < 0:
+					self.add(n + size)
+				else:
+					self.add(n)
+			elif len(spl) >= 3:
+				target = range(*slice(*spl).indices(size))
+				if target.step == 1:
+					self.add(target.start, target.stop)
+				elif target.step == -1:
+					target = target[::-1]
+					self.add(target.start, target.stop)
+				else:
+					for n in target:
+						self.add(n)
+			else:
+				self.add(*slice(*sorted(spl)).indices(size))
 		return self
 
 
@@ -1042,47 +1137,6 @@ def always_copy(func) -> collections.abc.Callable:
 		return copy.deepcopy(func(*args, **kwargs))
 	return wrapper
 
-def sublist_index(lst, sub, start=0, end=None):
-	if not sub:
-		return start
-	if end is None:
-		end = len(lst)
-	if hasattr(lst, "index"):
-		i = start
-		while i < end - len(sub) + 1:
-			try:
-				i = lst.index(sub[0], i, end - len(sub) + 1)
-			except ValueError:
-				break
-			if all(lst[i + j] == sub[j] for j in range(1, len(sub))):
-				return i
-			i += 1
-	else:
-		for i in range(start, end):
-			if all(lst[i + j] == sub[j] for j in range(len(sub))):
-				return i
-	raise ValueError("Sublist not found.")
-
-def sublist_rindex(lst, sub, start=0, end=None):
-	if not sub:
-		return start
-	if end is None:
-		end = len(lst)
-	if hasattr(lst, "rindex"):
-		i = end - len(sub)
-		while i >= start:
-			try:
-				i = lst.rindex(sub[0], start, i + 1)
-			except ValueError:
-				break
-			if all(lst[i + j] == sub[j] for j in range(1, len(sub))):
-				return i
-			i -= 1
-	else:
-		for i in range(end - len(sub), start - 1, -1):
-			if all(lst[i + j] == sub[j] for j in range(len(sub))):
-				return i
-	raise ValueError("Sublist not found.")
 
 # Rounds a number to the nearest integer, with a probability determined by the fractional part.
 def round_random(x) -> int:
@@ -1098,7 +1152,7 @@ def round_random(x) -> int:
 	return y
 
 def round_min(x) -> number:
-	"Casts a number to integers if the conversion would not alter the value."
+	"Casts a number to integer if the conversion would not alter the value."
 	if x is None:
 		return x
 	if isinstance(x, int):

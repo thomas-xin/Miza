@@ -33,14 +33,27 @@ Transpose = getattr(Image, "Transpose", Image)
 Transform = getattr(Image, "Transform", Image)
 Image.MAX_IMAGE_PIXELS = 4294967296
 GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_DIFFERENT_PALETTE_ONLY
+
+DC = 0
+torch = None
 try:
-	import torch
+	import pynvml  # noqa: E402
+	pynvml.nvmlInit()
+	DC = pynvml.nvmlDeviceGetCount()
+	if not os.environ.get("AI_FEATURES", True):
+		raise StopIteration("AI features disabled.")
 except Exception:
-	torch = None
-	hwaccel = "d3d11va" if os.name == "nt" else "auto"
-else:
-	hwaccel = "cuda" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
-	torch.backends.cuda.matmul.allow_tf32 = True
+	print_exc()
+hwaccel = "cuda" if DC else "d3d11va" if os.name == "nt" else "auto"
+
+# try:
+# 	import torch
+# except Exception:
+# 	torch = None
+# 	hwaccel = "d3d11va" if os.name == "nt" else "auto"
+# else:
+# 	hwaccel = "cuda" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
+# 	torch.backends.cuda.matmul.allow_tf32 = True
 
 if not hasattr(time, "time_ns"):
 	time.time_ns = lambda: int(time.time() * 1e9)
@@ -235,7 +248,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 	else:
 		pillow_heif.register_heif_opener()
 	try:
-		import pillow_avif
+		import pillow_avif  # noqa: F401
 	except ImportError:
 		pass
 	mime = magic.from_buffer(data)
@@ -2351,3 +2364,36 @@ def expand_mask(image2, radius=4):
 			outmask |= temp
 	outim = Image.fromarray(outmask, mode="L")
 	return outim
+
+
+def ectoplasm(url, message, force=False):
+	import ectoplasm
+	fn = None
+	if isinstance(url, str):
+		if not is_url(url):
+			fn = url
+			with open(fn, "rb") as f:
+				b = f.read()
+		else:
+			b = get_request(url)
+	else:
+		b = url
+	if isinstance(b, bytes):
+		image = from_bytes(b)
+	else:
+		image = b
+	if not fn:
+		ts = time.time_ns() // 1000
+		fn = "cache/" + str(ts)
+	if not force or not message:
+		with open(fn, "wb") as f:
+			f.write(b)
+		try:
+			resp = ectoplasm.decode_image(image, path=fn)
+		except Exception:
+			resp = b""
+		if resp or not message:
+			return resp
+	im = ectoplasm.encode_image(image, message)
+	ectoplasm.save_image(im, message, fn)
+	return fn

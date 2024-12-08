@@ -10,9 +10,10 @@ import orjson
 import requests
 import yt_dlp as ytd
 from misc.types import alist, as_str, cdict, full_prune, json_dumps, round_min, to_alphanumeric, tracebacksuppressor
+from misc.smath import time_parse, fuzzy_substring
 from misc.asyncs import esubmit
 from misc.util import (
-	python, shuffle, utc, proxy, leb128,
+	python, shuffle, utc, proxy, leb128, verify_search,
 	find_urls, is_url, is_discord_url, is_image, is_miza_url, is_youtube_url,
 	EvalPipe, FileHashDict, Request, Semaphore
 )

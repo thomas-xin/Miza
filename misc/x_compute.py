@@ -589,32 +589,32 @@ if "caption" in CAPS:
 		a2 = Canny(a, 100, 200)
 		return fromarray(a2)
 
-if "summ" in CAPS:
-	if 0:
-		from transformers import pipeline
-		smp = pipeline("summarization", model="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", device=0, torch_dtype=torch.float16)
-		print(smp)
+# if "summ" in CAPS:
+# 	if 0:
+# 		from transformers import pipeline
+# 		smp = pipeline("summarization", model="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", device=0, torch_dtype=torch.float16)
+# 		print(smp)
 
-		def summarise(s1, min_length=128, max_length=192, rm=True, do_sample=True):
-			s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
-			# exc.submit(ensure_gc, 20)
-			if rm:
-				return re.sub(r"(?:in )?(?:the|this|some)? *(?:article|essay|page|study|text|report|topic)[s, ]*(?:also mentions|we discuss|we look at|is about|includes|is based on)? *", "", s2, flags=re.I)
-			return s2
+# 		def summarise(s1, min_length=128, max_length=192, rm=True, do_sample=True):
+# 			s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
+# 			# exc.submit(ensure_gc, 20)
+# 			if rm:
+# 				return re.sub(r"(?:in )?(?:the|this|some)? *(?:article|essay|page|study|text|report|topic)[s, ]*(?:also mentions|we discuss|we look at|is about|includes|is based on)? *", "", s2, flags=re.I)
+# 			return s2
 
-	device, dtype = determine_cuda(1073741824, priority=None)
-	device = f"cuda:{device}" if device >= 0 else "cpu"
-	from sentence_transformers import SentenceTransformer
-	Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device=device)
-	if torch and dtype == torch.float16 and torch.cuda.get_device_properties(device).major >= 7:
-		try:
-			Embedder = Embedder.half()
-		except (RuntimeError, NotImplementedError):
-			pass
-	def embedding(s):
-		a = Embedder.encode(s).astype(np.float16)
-		exc.submit(ensure_gc, 20)
-		return a.data
+# 	device, dtype = determine_cuda(1073741824, priority=None)
+# 	device = f"cuda:{device}" if device >= 0 else "cpu"
+# 	from sentence_transformers import SentenceTransformer
+# 	Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device=device)
+# 	if torch and dtype == torch.float16 and torch.cuda.get_device_properties(device).major >= 7:
+# 		try:
+# 			Embedder = Embedder.half()
+# 		except (RuntimeError, NotImplementedError):
+# 			pass
+# 	def embedding(s):
+# 		a = Embedder.encode(s).astype(np.float16)
+# 		exc.submit(ensure_gc, 20)
+# 		return a.data
 
 if 0 and "whisper" in CAPS:
 	special_languages = {
@@ -1223,15 +1223,14 @@ if "browse" in CAPS:
 			return_driver(driver)
 
 if CAPS.intersection(("sd", "sdxl", "scc")):
-	import torch
-	torch.backends.cuda.matmul.allow_tf32 = True
-
 	EXT1 = None
 	def depth(im):
 		global EXT1, EXT2, DPT1, DPT2
 		if im.mode != "RGB":
 			im = im.convert("RGB")
 		im = resize_max(im, 1024)
+		import torch
+		torch.backends.cuda.matmul.allow_tf32 = True
 		from transformers import DPTImageProcessor, DPTForDepthEstimation, GLPNImageProcessor, GLPNForDepthEstimation
 		if not EXT1:
 			EXT1 = backup_model(DPTImageProcessor.from_pretrained, "Intel/dpt-hybrid-midas", torch_dtype=torch.float16, device=0)

@@ -201,7 +201,7 @@ class Mute(Command):
 			example="668999031359537205",
 		),
 		duration=cdict(
-			type="time",
+			type="datetime",
 			description="Mute duration (immediately unmutes if set to 0)",
 			example="3 months 6d 15h 9:59.3",
 		),
@@ -844,7 +844,6 @@ class RoleGiver(Command):
 	min_display = "3+"
 	description = "Adds an automated role giver to the current channel. Triggered by a keyword in messages, only applicable to users with permission level >= 0 and account age >= 7d. Searches for word if only word characters, any substring if non-word characters are included, or regex if trigger begins and ends with a slash (/)."
 	usage = "<0:react_to>? <1:role>? <delete_messages(-x)>?"
-	example = ("rolegiver lol lol_role", "rolegiver n*gger muted")
 	flags = "aedx"
 	rate_limit = (9, 12)
 
@@ -1951,46 +1950,44 @@ class ServerProtector(Database):
 			if cnt[u_id] > 5:
 				csubmit(self.targetWarn(u_id, guild, f"banning `({cnt[u_id]})`"))
 
-	async def call(self, message, fn, known=None):
-		fut = csubmit(process_image("detect_c2pa", "$", [fn], cap="image"))
-		args = (
-			sys.executable,
-			"misc/steganography.py",
-			fn,
-		)
-		text = ""
-		det = None
-		if not known:
-			proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd(), limit=65536, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	async def scan(self, message, url, known=None, **void):
+		resp = known or await process_image("ectoplasm", "$", [url, b"", "-f", "png"], cap="caption", timeout=60)
+		if not resp:
+			return
+
+		def analyse(resp):
+			print("META:", resp)
+			if not isinstance(resp, bytes):
+				return False
+			if resp.startswith(b'{"'):
+				try:
+					data = orjson.loads(resp)
+				except Exception:
+					pass
+				else:
+					try:
+						issuer = data["manifests"][data["active_manifest"]]["signature_info"]["issuer"]
+					except KeyError:
+						pass
+					else:
+						if issuer in ("Miza", "OpenAI", "StabilityAI"):
+							return True
+					if str(data.get("issuer_id") or data.get("copyright")) == str(self.bot.id):
+						return True
+			elif resp.startswith(b"{'prompt':"):
+				return True
+			return False
+
+		if analyse(resp):
 			try:
-				async with asyncio.timeout(3200):
-					await proc.wait()
-			except (T0, T1, T2):
-				with tracebacksuppressor:
-					force_kill(proc)
-				raise
-		if known:
-			text = known
-		else:
-			data = await proc.stdout.read()
-			text = data.decode("utf-8", "replace").strip().rsplit("\n", 1)[-1]
-		flagged = (str(self.bot.id), "OpenAI", "StabilityAI")
-		if text.startswith("Copyright detected"):
-			print(text)
-			det = text.split(": ", 1)[-1]
-		if det not in flagged:
-			with suppress():
-				det = await fut
-		if det in flagged:
-			try:
-				await self.bot.react_with(message, "ai_art.gif")
+				await self.bot.react_with(message, "ai_generated.gif")
 			except Exception:
 				print_exc()
 				try:
 					await message.reply("-# *This image was generated using AI.*")
 				except:
 					await message.channel.send("-# " + user_mention(message.author) + ": " + "*This image was generated using AI.*")
-			return det
+			return resp
 
 
 class EnabledCommands(Command):

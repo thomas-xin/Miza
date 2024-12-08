@@ -31,7 +31,7 @@ def cast_rp(fp, pp, model=None):
 	if model in ("miquliz-120b", "miquliz-120b-v2.0"):
 		s = 3
 	else:
-		s = 1.5
+		s = 1
 	return ((fp + pp) / 8 + 1) ** (0.125 * s)
 available = {
 	"claude-3-opus": {
@@ -39,17 +39,14 @@ available = {
 		None: "gpt-4",
 	},
 	"claude-3.5-sonnet": {
-		"anthropic": ("claude-3-5-sonnet-20240620", ("3", "15")),
+		"anthropic": ("claude-3-5-sonnet-20241022", ("3", "15")),
 	},
-	"claude-3-sonnet": {
-		"anthropic": ("claude-3-sonnet-20240229", ("3", "15")),
+	"claude-3.5-haiku": {
+		"anthropic": ("claude-3-5-haiku-20241022", ("1", "5")),
 		None: "gpt-4m",
 	},
-	"claude-3-haiku": {
-		"anthropic": ("claude-3-haiku-20240307", ("0.25", "1.25")),
-	},
 	"llama-3-405b": {
-		"deepinfra": ("meta-llama/Meta-Llama-3.1-405B-Instruct", ("2.7", "2.7")),
+		"deepinfra": ("meta-llama/Meta-Llama-3.1-405B-Instruct", ("1.79", "1.79")),
 		"fireworks": ("accounts/fireworks/models/llama-v3p1-405b-instruct", ("3", "3")),
 		"together": ("meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo", ("5", "5")),
 		None: "qwen-72b",
@@ -60,7 +57,7 @@ available = {
 		None: "llama-3-70b",
 	},
 	"llama-3-70b": {
-		"deepinfra": ("meta-llama/Meta-Llama-3.1-70B-Instruct", ("0.52", "0.75")),
+		"deepinfra": ("meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", ("0.13", "0.4")),
 		"together": ("meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", ("0.88", "0.88")),
 		"fireworks": ("accounts/fireworks/models/llama-v3p1-70b-instruct", ("0.9", "0.9")),
 		None: "lzlv-70b",
@@ -71,7 +68,7 @@ available = {
 		None: "llama-3-8b",
 	},
 	"llama-3-8b": {
-		"deepinfra": ("meta-llama/Meta-Llama-3.1-8B-Instruct", ("0.1", "0.1")),
+		"deepinfra": ("meta-llama/Meta-Llama-3.1-8B-Instruct", ("0.03", "0.05")),
 		"fireworks": ("accounts/fireworks/models/llama-v3p1-8b-instruct", ("0.2", "0.2")),
 		"together": ("meta-llama/Meta-Llama-3.1-8B-Instruct", ("0.2", "0.2")),
 		None: "command-r",
@@ -106,12 +103,12 @@ available = {
 		None: "gpt-4m",
 	},
 	"gpt-4m": {
-		"openai": ("gpt-4o-mini-2024-07-18", ("0.15", "0.6")),
-		None: "llama-3-90b",
+		"openai": ("gpt-4o-mini", ("0.15", "0.6")),
+		None: "claude-3-haiku",
 	},
 	"gpt-4": {
-		"openai": ("gpt-4o-2024-08-06", ("2.5", "10")),
-		None: "llama-3-90b",
+		"openai": ("chatgpt-4o-latest", ("2.5", "10")),
+		None: "claude-3.5-sonnet",
 	},
 	"gpt-3.5-turbo-instruct": {
 		"openai": ("gpt-3.5-turbo-instruct", ("1.5", "2")),
@@ -123,11 +120,11 @@ available = {
 	},
 	"firefunction-v1": {
 		"fireworks": ("accounts/fireworks/models/firefunction-v1", ("0.5", "0.5")),
-		None: "gpt-3.5",
+		None: "gpt-4m",
 	},
 	"firefunction-v2": {
 		"fireworks": ("accounts/fireworks/models/firefunction-v2", ("0.9", "0.9")),
-		None: "firefunction-v1",
+		None: "gpt-4m",
 	},
 	"firellava-13b": {
 		"fireworks": ("accounts/fireworks/models/firellava-13b", ("0.2", "0.2")),
@@ -192,7 +189,9 @@ available = {
 # tags: is_chat, is_completion, is_function, is_vision, is_premium
 is_chat = {
 	"claude-3.5-sonnet",
-	"claude-3-5-sonnet-20240620",
+	"claude-3-5-sonnet-20241022",
+	"claude-3.5-haiku",
+	"claude-3-5-haiku-20241022",
 	"claude-3-opus",
 	"claude-3-opus-20240229",
 	"claude-3-sonnet",
@@ -214,8 +213,10 @@ is_chat = {
 	"o1",
 	"o1-mini",
 	"gpt-4",
+	"chatgpt-4o-latest",
 	"gpt-4o-2024-05-13",
 	"gpt-4m",
+	"gpt-4o-mini",
 	"gpt-4o-mini-2024-07-18",
 	"gpt-4-turbo-2024-04-09",
 	"gpt-4-0125-preview",
@@ -260,7 +261,9 @@ is_completion = {
 }
 is_function = {
 	"claude-3.5-sonnet",
-	"claude-3-5-sonnet-20240620",
+	"claude-3-5-sonnet-20241022",
+	"claude-3.5-haiku",
+	"claude-3-5-haiku-20241022",
 	"claude-3-opus",
 	"claude-3-opus-20240229",
 	"claude-3-sonnet",
@@ -273,8 +276,10 @@ is_function = {
 	"o1",
 	"o1-mini",
 	"gpt-4",
+	"chatgpt-4o-latest",
 	"gpt-4o-2024-05-13",
 	"gpt-4m",
+	"gpt-4o-mini",
 	"gpt-4o-mini-2024-07-18",
 	"gpt-4-turbo-2024-04-09",
 	"gpt-4-0125-preview",
@@ -286,7 +291,7 @@ is_function = {
 }
 is_vision = {
 	"claude-3.5-sonnet",
-	"claude-3-5-sonnet-20240620",
+	"claude-3-5-sonnet-20241022",
 	"claude-3-opus",
 	"claude-3-opus-20240229",
 	"claude-3-sonnet",
@@ -298,8 +303,10 @@ is_vision = {
 	"o1",
 	"o1-mini",
 	"gpt-4",
+	"chatgpt-4o-latest",
 	"gpt-4o-2024-05-13",
 	"gpt-4m",
+	"gpt-4o-mini",
 	"gpt-4o-mini-2024-07-18",
 	"gpt-4-turbo-2024-04-09",
 	"gpt-4-vision-preview",
@@ -316,6 +323,7 @@ is_premium = {
 	"llama-3-405b",
 	"o1",
 	"o1-mini",
+	"chatgpt-4o-latest",
 	"gpt-4o-2024-05-13",
 	"gpt-4-turbo-2024-04-09",
 	"gpt-4-0125-preview",
@@ -347,6 +355,7 @@ instruct_formats = {
 # Default context: 4096
 contexts = {
 	"claude-3.5-sonnet": 200000,
+	"claude-3.5-haiku": 200000,
 	"claude-3-opus": 200000,
 	"claude-3-sonnet": 200000,
 	"claude-3-haiku": 200000,
@@ -362,8 +371,10 @@ contexts = {
 	"o1": 128000,
 	"o1-mini": 128000,
 	"gpt-4": 128000,
+	"chatgpt-4o-latest": 128000,
 	"gpt-4o-2024-05-13": 128000,
 	"gpt-4m": 128000,
+	"gpt-4o-mini": 128000,
 	"gpt-4o-mini-2024-07-18": 128000,
 	"gpt-4-turbo-2024-04-09": 128000,
 	"gpt-4-0125-preview": 128000,
@@ -675,12 +686,8 @@ async def cut_to(messages, limit=1024, softlim=256, exclude_first=True, best=Fal
 			messages.insert(0, sm)
 		return messages
 	ml = max(64, round_random(softlim - count))
-	Ml = max(1024, round_random(limit - count))
 	if best:
-		if best < 2:
-			Ml = ml * 2
-		s2 = await asubmit(lim_tokens, s, Ml, mode="right", priority=2)
-		s2 = await summarise(s2, min_length=ml, max_length=Ml, best=True, prompt=prompt, premium_context=premium_context)
+		s2 = await summarise(s, min_length=ml, best=True, prompt=prompt, premium_context=premium_context)
 	else:
 		s2 = await asubmit(lim_tokens, s, ml, mode="right", priority=2)
 	summ += s2
@@ -693,7 +700,7 @@ async def cut_to(messages, limit=1024, softlim=256, exclude_first=True, best=Fal
 		messages.insert(0, sm)
 	return messages
 
-async def summarise(q, min_length=192, max_length=6144, padding=128, best=True, prompt=None, premium_context=[]):
+async def summarise(q, min_length=192, max_length=98304, padding=128, best=True, prompt=None, premium_context=[]):
 	"Produces an AI-generated summary of input text. Model used is controlled by \"best\" parameter."
 	split_length = max_length - padding
 	summ_length = min(min_length, split_length - 1)
@@ -718,7 +725,7 @@ async def summarise(q, min_length=192, max_length=6144, padding=128, best=True, 
 async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium_context=[]):
 	if len(s) <= max_length:
 		return s
-	s = lim_tokens(s, 49152, mode="right")
+	s = lim_tokens(s, 98304, mode="right")
 	if best:
 		with tracebacksuppressor:
 			s2 = s
@@ -729,8 +736,8 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 			else:
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive summary of the text above!\n\n### Response:'
 			ml = round_random(max_length)
-			# c = await tcount(prompt)
-			model = "gpt-4m"# if c + ml > 8192 else "llama-3-8b"
+			c = await tcount(prompt)
+			model = "gpt-4m" if c + ml < 8192 else "llama-3-8b"
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
 			resp = await instruct(data, best=True, skip=True)
 			resp = resp.strip()
@@ -1453,7 +1460,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 
 async def instruct(data, best=False, skip=False, prune=True, cache=True, user=None):
 	data["prompt"] = data.get("prompt") or data.pop("inputs", None) or data.pop("input", None)
-	key = shash(str((data["prompt"], data.get("model", "claude-3-haiku"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
+	key = shash(str((data["prompt"], data.get("model", "claude-3.5-haiku"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
 	if cache:
 		tup = await CACHE.retrieve_from(key, _instruct2, data, best=best, skip=skip, prune=prune, user=user)
 		if tup[1] >= best:
@@ -1494,7 +1501,7 @@ async def _instruct(data, best=False, skip=False, user=None):
 		dec = True and not skip
 	if dec:
 		inputs["model"] = "auto" if best else "llama-3-8b"
-	if data.get("model", "claude-3-haiku") in is_chat:
+	if data.get("model", "claude-3.5-haiku") in is_chat:
 		prompt = inputs.pop("prompt")
 		inputs["messages"] = [cdict(role="user", content=prompt)]
 		async with asyncio.timeout(70):
@@ -2059,6 +2066,7 @@ def to_claude(messages, tools=None):
 				content += "</invoke>\n"
 			content += "</function_calls>"
 			m.content = content
+		m.pop("tool_call_id", None)
 		images = []
 		content = ""
 		if isinstance(m.content, list):
@@ -2223,8 +2231,10 @@ def unimage(message):
 CL100K_IM = {
 	"o1-preview-2024-09-12",
 	"o1-mini-2024-09-12",
-	"gpt-4o-mini-2024-07-18",
+	"chatgpt-4o-latest",
 	"gpt-4o-2024-05-13",
+	"gpt-4o-mini",
+	"gpt-4o-mini-2024-07-18",
 	"gpt-4-turbo-2024-04-09",
 	"gpt-3.5-turbo-0125",
 	"quill-72b",

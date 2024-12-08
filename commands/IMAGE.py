@@ -219,7 +219,7 @@ class GMagik(Command):
 			default=7,
 		),
 		duration=cdict(
-			type="time",
+			type="timedelta",
 			validation="[-3600, 3600]",
 			description="The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
 			example="1:26.3",
@@ -272,7 +272,7 @@ class GMagik(Command):
 	_timeout_ = 7
 
 	async def __call__(self, _timeout, url, intensity, cells, duration, speed, fps, filesize, format, **void):
-		resp = await process_image(url, "magik_map", [[], duration / speed, fps, intensity, cells], timeout=_timeout)
+		resp = await process_image(url, "magik_map", [[], float(duration) / speed, fps, intensity, cells], timeout=_timeout)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -442,7 +442,7 @@ class QR(Command):
 			default=2,
 		),
 		duration=cdict(
-			type="time",
+			type="timedelta",
 			validation="[-3600, 3600]",
 			description="The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
 			example="1:26.3",
@@ -492,7 +492,7 @@ class QR(Command):
 
 	async def __call__(self, _timeout, mode, text, arms, duration, speed, fps, filesize, format, **void):
 		duration = duration if mode != "normal" else 0
-		resp = await process_image("to_qr", "$", [text, arms, duration / speed, fps, "-fs", filesize, "-f", format], timeout=_timeout)
+		resp = await process_image("to_qr", "$", [text, arms, float(duration) / speed, fps, "-fs", filesize, "-f", format], timeout=_timeout)
 		name = "QR." + get_ext(resp)
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
@@ -518,7 +518,7 @@ class Rainbow(Command):
 			default="hsv",
 		),
 		duration=cdict(
-			type="time",
+			type="timedelta",
 			validation="[-3600, 3600]",
 			description="The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
 			example="1:26.3",
@@ -561,7 +561,7 @@ class Rainbow(Command):
 	_timeout_ = 4
 
 	async def __call__(self, _timeout, url, mode, duration, speed, fps, filesize, format, **void):
-		resp = await process_image(url, "rainbow_map", [[], duration / speed, fps, mode, "-fs", filesize, "-f", format], timeout=_timeout)
+		resp = await process_image(url, "rainbow_map", [[], float(duration) / speed, fps, mode, "-fs", filesize, "-f", format], timeout=_timeout)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -589,7 +589,7 @@ class Scroll(Command):
 			default="left",
 		),
 		duration=cdict(
-			type="time",
+			type="timedelta",
 			validation="[-3600, 3600]",
 			description="The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
 			example="1:26.3",
@@ -632,7 +632,7 @@ class Scroll(Command):
 	_timeout_ = 4
 
 	async def __call__(self, _timeout, url, direction, duration, speed, fps, filesize, format, **void):
-		resp = await process_image(url, "scroll_map", [[], duration / speed, fps, direction, "-fs", filesize, "-f", format], timeout=_timeout)
+		resp = await process_image(url, "scroll_map", [[], float(duration) / speed, fps, direction, "-fs", filesize, "-f", format], timeout=_timeout)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -662,7 +662,7 @@ class Spin(Command):
 			default=True,
 		),
 		duration=cdict(
-			type="time",
+			type="timedelta",
 			validation="[-3600, 3600]",
 			description="The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
 			example="1:26.3",
@@ -711,7 +711,7 @@ class Spin(Command):
 	_timeout_ = 4
 
 	async def __call__(self, _timeout, url, angle, circle, duration, speed, fps, filesize, format, **void):
-		resp = await process_image(url, "spin_map", [[], duration / speed, fps, angle, circle, "-fs", filesize, "-f", format], timeout=_timeout)
+		resp = await process_image(url, "spin_map", [[], float(duration) / speed, fps, angle, circle, "-fs", filesize, "-f", format], timeout=_timeout)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -736,7 +736,7 @@ class Orbit(Command):
 			example="5",
 		),
 		duration=cdict(
-			type="time",
+			type="timedelta",
 			validation="[-3600, 3600]",
 			description="The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
 			example="1:26.3",
@@ -780,7 +780,7 @@ class Orbit(Command):
 
 	async def __call__(self, _timeout, urls, count, duration, speed, fps, filesize, format, **void):
 		url = urls.pop(0)
-		resp = await process_image(url, "orbit_map", [urls, duration / speed, fps, count, "-fs", filesize, "-f", format], timeout=_timeout)
+		resp = await process_image(url, "orbit_map", [urls, float(duration) / speed, fps, count, "-fs", filesize, "-f", format], timeout=_timeout)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -805,7 +805,7 @@ class Pet(Command):
 			default=0.1,
 		),
 		duration=cdict(
-			type="time",
+			type="timedelta",
 			validation="[-3600, 3600]",
 			description="The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
 			example="1:26.3",
@@ -848,7 +848,7 @@ class Pet(Command):
 	_timeout_ = 5
 
 	async def __call__(self, _timeout, url, squish, duration, speed, fps, filesize, format, **void):
-		resp = await process_image(url, "pet_map", [[], duration / speed, fps, squish, "-fs", filesize, "-f", format], timeout=_timeout)
+		resp = await process_image(url, "pet_map", [[], float(duration) / speed, fps, squish, "-fs", filesize, "-f", format], timeout=_timeout)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -896,7 +896,7 @@ class Resize(Command):
 			example="2073600",
 		),
 		duration=cdict(
-			type="time",
+			type="timedelta",
 			validation="[-3600, 3600]",
 			description="The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
 			example="1:26.3",
@@ -1210,8 +1210,8 @@ class Blend(Command):
 
 
 class Steganography(Command):
-	name = ["Watermark", "Copyright", "Ownership", "NFT","©"]
-	description = "Tags an image with your discord user, or a message (input a user ID to tag another user). Raises an error if the image already has a tag."
+	name = ["Watermark", "Copyright", "Ownership", "©"]
+	description = "Reads an image's tagged information, or embeds a message into an image (input a user ID to tag as a Discord user). Aborts if image already has a known tag."
 	schema = cdict(
 		url=cdict(
 			type="image",
@@ -1230,93 +1230,16 @@ class Steganography(Command):
 	_timeout_ = 6
 
 	async def __call__(self, bot, _user, url, info, **void):
-		b = await bot.get_request(url)
-		if info:
-			n = verify_id(info)
-			if isinstance(n, int):
-				try:
-					user = await bot.fetch_user(n)
-				except:
-					pass
-				else:
-					info = str(user.id)
-		else:
-			info = str(_user.id)
-		resp = await self.call(b, info)
+		resp = await process_image(url, "ectoplasm", ["-nogif", info, "-f", "png"], cap="caption", timeout=60)
+		if isinstance(resp, bytes):
+			msg = resp[1:]
+			emb = discord.Embed()
+			emb.set_title("Detected Tag")
+			emb.description = msg.decode("utf-8", "replace")
+			return cdict(embed=emb)
 		fn = url2fn(url)
-		name = replace_ext(fn, get_ext(resp))
-		return cdict(content=f'Successfully created image with encoded message "{info}".', file=CompatFile(resp, filename=name), reacts="🔳")
-
-	async def call(self, b, msg=""):
-		ts = hash(b)
-		if isinstance(b, str):
-			fn = b
-		else:
-			fn = f"{FAST_PATH}/{ts}.png"
-			with open(fn, "wb") as f:
-				await asubmit(f.write, b)
-		args = (
-			sys.executable,
-			"misc/steganography.py",
-			fn,
-			msg,
-			"-o",
-			f"{FAST_PATH}/{ts}~1.png",
-		)
-		print(args)
-		proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd(), limit=65536, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		try:
-			async with asyncio.timeout(3200):
-				await proc.wait()
-		except (T0, T1, T2):
-			with tracebacksuppressor:
-				force_kill(proc)
-			raise
-		data = await proc.stdout.read()
-		text = data.decode("utf-8", "replace").strip()
-		if text.startswith("Copyright detected"):
-			i = text.split(": ", 1)[-1]
-			if i.isnumeric():
-				i = int(i)
-				try:
-					u = await self.bot.fetch_user(i)
-				except:
-					pass
-				else:
-					pe = PermissionError(f"Copyright detected; image belongs to {user_mention(u.id)}")
-					pe.no_react = True
-					raise pe
-			pe = PermissionError(text.replace("Copyright detected", "Text detected", 1))
-			pe.no_react = True
-			raise pe
-		return f"{FAST_PATH}/{ts}~1.png"
-
-	async def _callback_(self, bot, message, reaction, user, vals, **void):
-		u_id, c_id, m_id = map(int, vals.split("_", 2))
-		if user.id != u_id:
-			return
-		if reaction.decode("utf-8", "replace") != "🗑️":
-			return
-		m = message
-		channel = await bot.fetch_channel(c_id)
-		message = await bot.fetch_message(m_id, channel)
-		await bot.silent_delete(message)
-		guild = message.guild
-		if guild and "logM" in bot.data and guild.id in bot.data.logM:
-			c_id = bot.data.logM[guild.id]
-			try:
-				c = await self.bot.fetch_channel(c_id)
-			except (EOFError, discord.NotFound):
-				bot.data.logM.pop(guild.id)
-				return
-			emb = await bot.as_embed(message, link=True)
-			emb.colour = discord.Colour(0x00FF00)
-			action = f"{user_mention(u_id)} **deleted a copyrighted image deleted from** {channel_mention(channel.id)}:\n"
-			emb.description = lim_str(action + emb.description, 4096)
-			emb.timestamp = message.created_at
-			self.bot.send_embeds(c, emb)
-		await m.reply("Message has been successfully taken down.")
-
+		name = replace_ext(fn, "png")
+		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 class OCR(Command):
 	name = ["Tesseract", "Read", "Image2Text"]

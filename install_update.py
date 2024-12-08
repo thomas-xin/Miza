@@ -40,23 +40,23 @@ if os.name == "nt":
 	modlist.append("wmi>=1.5.1")
 if os.environ.get("AI_FEATURES", True):
 	modlist.extend((
-		"accelerate>=0.22.0",
-		"clip-interrogator>=0.6.0",
-		"diffusers>=0.19.0",
+		# "accelerate>=0.22.0",
+		# "clip-interrogator>=0.6.0",
+		# "diffusers>=0.19.0",
 		# "fasttext-langdetect>=1.0.5",
 		"openai>=1.23.2",
 		"opencv-python>=4.8.0.74",
-		"protobuf==3.20.3",
+		# "protobuf==3.20.3",
 		"pytesseract>=0.3.10",
-		"replicate>=0.11.0",
+		# "replicate>=0.11.0",
 		"safetensors>=0.3.1",
-		"sentencepiece>=0.1.99",
-		"sentence-transformers>=2.2.2",
-		"soundfile>=0.12.1",
+		# "sentencepiece>=0.1.99",
+		# "sentence-transformers>=2.2.2",
+		# "soundfile>=0.12.1",
 		"tokenizers>=0.13.3",
 		# "torch>=2.1.1",
 		"transformers>=4.31.0",
-		"tomesd>=0.1.3",
+		# "tomesd>=0.1.3",
 	))
 
 # Parsed requirements.txt
@@ -106,20 +106,20 @@ except Exception:
 	print_exc()
 	subprocess.run([python, "-m", "pip", "install", "googletrans==4.0.0rc1", "--upgrade"])
 
-if os.environ.get("AI_FEATURES", True):
-	try:
-		assert importlib.metadata.version("encodec") >= "0.1.2a3"
-	except (importlib.metadata.PackageNotFoundError, AssertionError):
-		subprocess.run([python, "-m", "pip", "install", "git+https://github.com/facebookresearch/encodec", "--upgrade"])
-	try:
-		if sys.version_info.major == 3 and sys.version_info.minor >= 12:
-			pass
-		else:
-			assert importlib.metadata.version("xformers") >= "0.0.25"
-		assert importlib.metadata.version("torch") >= "2.2.2"
-	except (importlib.metadata.PackageNotFoundError, AssertionError):
-		subprocess.run([python, "-m", "pip", "install", "xformers", "--upgrade"])
-		subprocess.run([python, "-m", "pip", "install", "torch", "torchvision", "torchaudio", "--upgrade", "--index-url", "https://download.pytorch.org/whl/cu121"])
+# if os.environ.get("AI_FEATURES", True):
+# 	try:
+# 		assert importlib.metadata.version("encodec") >= "0.1.2a3"
+# 	except (importlib.metadata.PackageNotFoundError, AssertionError):
+# 		subprocess.run([python, "-m", "pip", "install", "git+https://github.com/facebookresearch/encodec", "--upgrade"])
+# 	try:
+# 		if sys.version_info.major == 3 and sys.version_info.minor >= 12:
+# 			pass
+# 		else:
+# 			assert importlib.metadata.version("xformers") >= "0.0.25"
+# 		assert importlib.metadata.version("torch") >= "2.2.2"
+# 	except (importlib.metadata.PackageNotFoundError, AssertionError):
+# 		subprocess.run([python, "-m", "pip", "install", "xformers", "--upgrade"])
+# 		subprocess.run([python, "-m", "pip", "install", "torch", "torchvision", "torchaudio", "--upgrade", "--index-url", "https://download.pytorch.org/whl/cu121"])
 
 if installing:
 	subprocess.run([python, "-m", "pip", "install", "-r", "requirements.txt"])

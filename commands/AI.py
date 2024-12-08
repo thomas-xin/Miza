@@ -55,7 +55,7 @@ class Ask(Command):
 	tips = (
 		"*Tip: By using generative AI, you are assumed to comply with the [ToS](<https://github.com/thomas-xin/Miza/wiki/Terms-of-Service>).*",
 		"*Tip: The chatbot feature is designed to incorporate multiple SOTA models in addition to internet-based interactions. For direct interaction with the raw LLMs, check out ~instruct.*",
-		"*Tip: I automatically scan the referenced message, as well as any text and images from within up to 48 messages in the current channel. None of the data is collected/sold, but if you would prefer a response without messages included for the sake of clarity or quota cost, there is always the option of creating a new thread/channel.*",
+		"*Tip: I automatically scan the referenced message, as well as any text and images from within up to 192 messages in the current channel. None of the data is collected/sold, but if you would prefer a response without messages included for the sake of clarity or quota cost, there is always the option of creating a new thread/channel.*",
 		"*Tip: My personality prompt and message streaming are among several parameters that may be modified. Check out ~help personality for more info. Note that an improperly constructed prompt may be detrimental to response quality, and that giving me a nickname may also have an effect.*",
 		"*Tip: I automatically try to correct inaccurate responses when possible. However, this is not foolproof; if you would like this feature more actively applied to counteract censorship, please move to a NSFW channel or use ~verify if in DMs.*",
 		"*Tip: Many of my capabilities are not readily available due to cost reasons. You can gain access by donating through one of the premium subscriptions available, which serves to approximately fund individual usage. A pay-as-you-go subscription priced around the real-world costs of involved commands is in the works!*",
@@ -128,7 +128,7 @@ class Ask(Command):
 			)
 		else:
 			reference = None
-		hislim = 96 if _premium.value >= 4 else 48
+		hislim = 192 if _premium.value >= 4 else 96
 		if not simulated:
 			async for m in bot.history(_channel, limit=hislim):
 				if m.id < pdata.cutoff:
@@ -201,8 +201,8 @@ class Ask(Command):
 						if resp.get("cargs"):
 							props.cargs = resp["cargs"]
 						if resp.get("usage"):
-							usage[0] = resp.usage.get("prompt_tokens", 0)
-							usage[1] = resp.usage.get("completion_tokens", 0)
+							usage[0] = T(resp.usage).get("prompt_tokens", 0)
+							usage[1] = T(resp.usage).get("completion_tokens", 0)
 						m = resp.choices[0].delta
 						temp = m.content or ""
 						if temp:
@@ -290,7 +290,7 @@ class Ask(Command):
 							c = await tcount(res)
 							ra = 1 if premium.value < 2 else 1.5 if premium.value < 5 else 2
 							if c > round(4000 * ra):
-								res = await bot.summarise(res, max_length=round(4800 * ra), min_length=round(3200 * ra), best=2 if premium.value >= 2 else 1, prompt=prompt)
+								res = await bot.summarise(res, max_length=round(19600 * ra), min_length=round(3200 * ra), best=2 if premium.value >= 2 else 1, prompt=prompt)
 								res = res.replace("\n", ". ").replace(": ", " -")
 							res = res.strip()
 						rs_msg = cdict(role="tool", name=name, content=res, tool_call_id=tid)
@@ -496,7 +496,7 @@ class Ask(Command):
 		return await message.remove_reaction("🗑️", self.bot.user)
 
 
-DEFPER = "Your name is {{char}}; your personality is intelligent, mischievous and playful but loyal and wholesome. Your task is to answer the user(s) with creative and natural-feeling responses (not too corny), in first person as if you were a human. You are free to make up your own preferences and show emotion, but you should always answer {{user}}, matching the language used."
+DEFPER = "Your name is \"{{char}}\"; your personality is intelligent, cute, mischievous and playful. Your task is to answer the user(s) with creative and natural-feeling responses (be wholesome where possible, and not too corny), in first person as if you were a human. You are free to make up your own preferences and show emotion, but you should always answer the user named \"{{user}}\", matching the language used."
 
 class Personality(Command):
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
@@ -898,7 +898,6 @@ class Imagine(Command):
 				comfyui_n += v.get("weight", 1)
 	else:
 		comfyui_data = None
-	maintenance = True
 
 	async def __call__(self, bot, _user, _channel, _message, _perm, _premium, _prefix, _comment, model, mode, url, prompt, mask, num_inference_steps, high_quality, strength, guidance_scale, aspect_ratio, negative_prompt, count, **void):
 		if not torch:
@@ -1194,7 +1193,7 @@ class Imagine(Command):
 				data = copy.deepcopy(self.comfyui_data)
 				seed = ts_us()
 				steps = max(1, round_random(num_inference_steps / 8))
-				mname = data["prompt"]["40"]["inputs"]["ckpt_name"].removesuffix(".safetensors")
+				resp_model = data["prompt"]["40"]["inputs"]["ckpt_name"].removesuffix(".safetensors")
 				data["prompt"]["5"]["inputs"].update(dict(
 					seed=seed,
 					steps=steps,
@@ -1271,7 +1270,7 @@ class Imagine(Command):
 					raise FileNotFoundError("Unexpected error retrieving image.")
 				pnames.extend([prompt] * n)
 				futs.extend(as_fut(target + f"/{seed}_{'%05d' % i}_.png") for i in range(1, n + 1))
-				_premium.append(["mizabot", mname, cost])
+				_premium.append(["mizabot", resp_model, cost])
 		ffuts = []
 		exc = RuntimeError("Unknown error occured.")
 		for tup, prompt in zip(futs, pnames):
@@ -1293,7 +1292,14 @@ class Imagine(Command):
 					assert os.path.exists(fn)
 					# with open(fn, "rb") as f:
 					# 	fn = f.read()
-			ffut = csubmit(bot.commands.steganography[0].call(fn, str(bot.id)))
+			meta = cdict(
+				issuer=bot.name,
+				issuer_id=bot.id,
+				type="AI_GENERATED",
+				engine=resp_model,
+				prompt=oprompt,
+			)
+			ffut = csubmit(process_image(fn, "ectoplasm", ["-nogif", orjson.dumps(meta), 1, "-f", "png"], cap="caption", timeout=60))
 			ffut.prompt = prompt
 			ffut.back = fn
 			ffuts.append(ffut)
@@ -1303,8 +1309,8 @@ class Imagine(Command):
 		for ffut in ffuts:
 			prompt = ffut.prompt
 			fn = ffut.back
-			with tracebacksuppressor:
-				fn = await ffut
+			fn = await ffut
+			assert fn
 			files.append(CompatFile(fn, filename=prompt + ".png", description=prompt))
 		embs = []
 		emb = discord.Embed(colour=rand_colour())

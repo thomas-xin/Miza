@@ -806,103 +806,119 @@ class Info(Command):
 class Profile(Command):
 	name = ["User", "UserProfile"]
 	description = "Shows or edits a user profile on ⟨MIZA⟩."
-	usage = "<user>? <mode(description|thumbnail|timezone|birthday)>? <value>? <delete(-d)>?"
-	example = ("profile 201548633244565504", "profile timezone singapore", "profile thumbnail https://cdn.discordapp.com/emojis/879989027711877130.gif", "user")
-	flags = "d"
+	schema = cdict(
+		user=cdict(
+			type="user",
+			description="Target user to retrieve profile from",
+			example="201548633244565504",
+		),
+		description=cdict(
+			type="text",
+			description="Profile description. Will show up in embeds",
+			example="You should play Cave Story, it's a good game",
+		),
+		pronouns=cdict(
+			type="text",
+			description="Optional field containing any text; will show above description when set",
+			example="he/she/they",
+		),
+		website=cdict(
+			type="url",
+			description="Optional field denoting a redirect when the profile is clicked on",
+			example="https://mizabot.xyz",
+		),
+		icon=cdict(
+			type="visual",
+			description="Thumbnail to display on corner of embeds",
+			example="https://mizabot.xyz/favicon",
+		),
+		timezone=cdict(
+			type="text",
+			description='Timezone. Used in datetime calculations where applicable; supports both city/state names (e.g. "London") and abbreviations (e.g. "AET"). Daylight savings is automatically calculated for non-fixed timezones',
+			example="US/Eastern",
+		),
+		birthday=cdict(
+			type="datetime",
+			description="Birthday date; affected by the timezone parameter",
+			example="february 29th",
+		),
+	)
 	rate_limit = (4, 6)
 	slash = True
 	ephemeral = True
 	usercmd = True
-	exact = False
-	amap = dict(
-		desc="description",
-		description="description",
-		thumb="thumbnail",
-		icon="thumbnail",
-		image="thumbnail",
-		thumbnail="thumbnail",
-		time="timezone",
-		timezone="timezone",
-		birth="birthday",
-		birthday="birthday",
-	)
+	maintenance = True
 
-	async def __call__(self, user, args, argv, flags, channel, guild, bot, message, **void):
-		if message.attachments:
-			args += [best_url(a) for a in message.attachments]
-			argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
-		setting = None
-		if not args:
-			target = user
-		elif args[0] in self.amap:
-			target = user
-			setting = self.amap[args.pop(0)]
-			if not args:
-				value = None
-			else:
-				value = argv[len(setting) + 1:]
+	async def __call__(self, bot, _user, user, description, pronouns, website, icon, timezone, birthday, **void):
+		target = user or _user
+		is_owner = target.id == _user.id
+		updated = False
+		profile = T(bot.data.users).coercedefault(target.id, cdict, cdict())
+
+		def raise_unless_owner():
+			nonlocal updated
+			if not is_owner:
+				raise PermissionError("Modification of other users' profiles is not allowed.")
+			updated = True
+
+		if description is not None:
+			raise_unless_owner()
+			profile.description = description
+		if pronouns is not None:
+			raise_unless_owner()
+			profile.pronouns = pronouns
+		if website is not None:
+			raise_unless_owner()
+			profile.website = website
+		if icon is not None:
+			raise_unless_owner()
+			profile.icon = icon
+		if timezone is not None:
+			raise_unless_owner()
+			assert get_timezone(timezone)
+			profile.timezone = timezone
+		if birthday is not None:
+			raise_unless_owner()
+			profile.birthday = birthday
+
+		colour = await bot.get_colour(target)
+		emb = discord.Embed(colour=colour)
+		emb.set_author(**get_author(target))
+		emb.description = profile.get("description", "")
+		emb.title = "Updated Profile" if updated else "Profile"
+		url = profile.get("website")
+		if url:
+			emb.url = emb.author.url = url
+		icon = profile.get("icon") or profile.get("thumbnail")
+		if icon:
+			emb.set_thumbnail(url=icon)
+		c = 1
+		tzinfo = self.bot.data.users.get_timezone(target.id)
+		if tzinfo is None:
+			tzinfo, c = self.bot.data.users.estimate_timezone(target.id)
+			estimated = True
 		else:
-			target = await bot.fetch_user_member(" ".join(args), guild)
-		profile = bot.data.users.get(target.id, EMPTY)
-		if setting is None:
-			description = profile.get("description", "")
-			if description and is_url(description.rsplit(None, 1)[-1]):
-				description += "\n"
-			thumbnail = profile.get("thumbnail")
-			birthday = profile.get("birthday")
-			timezone = profile.get("timezone")
-			t = utc()
-			if timezone:
-				td = as_timezone(timezone)
-				description += ini_md(f"Current time: {sqr_md(utc_ft(t + td))}")
-			if birthday:
-				if not isinstance(birthday, DynamicDT):
-					birthday = profile["birthday"] = DynamicDT.fromdatetime(birthday)
-				now = DynamicDT.utcfromtimestamp(t)
-				birthday_in = next_date(birthday)
-				if timezone:
-					birthday -= td
-					birthday_in -= datetime.timedelta(seconds=td)
-				description += ini_md(f"Age: {sqr_md(time_diff(now, birthday))}\nBirthday in: {sqr_md(time_diff(birthday_in, now))}")
-			fields = set()
-			for field in ("timezone", "birthday"):
-				value = profile.get(field)
-				if isinstance(value, DynamicDT):
-					value = value.as_date()
-				elif field == "timezone" and value is not None:
-					value = timezone_repr(value)
-				fields.add((field, value, False))
-			bot.send_as_embeds(channel, description, thumbnail=thumbnail, fields=fields, author=get_author(target), reference=message)
-			return
-		if setting != "description" and value.casefold() in ("undefined", "remove", "rem", "reset", "unset", "delete", "clear", "null", "none") or "d" in flags:
-			profile.pop(setting, None)
-			return css_md(f"Successfully removed {setting} for {sqr_md(user)}.")
-		if value is None:
-			return ini_md(f"Currently set {setting} for {sqr_md(user)}: {sqr_md(bot.data.users.get(user.id, EMPTY).get(setting))}.")
-		if setting == "description":
-			if len(value) > 3072:
-				raise OverflowError("Description must be 3072 or fewer in length.")
-		elif setting == "thumbnail":
-			urls = await bot.follow_url(value)
-			if not urls:
-				raise ValueError("Thumbnail must be an attachment or URL.")
-			value = urls[0]
-		elif setting.startswith("time"):
-			value = value.casefold()
-			try:
-				as_timezone(value)
-			except KeyError:
-				raise ArgumentError(f"Entered value could not be recognized as a timezone location or abbreviation. Use {bot.get_prefix(guild)}timezone list for list.")
-		else:
-			dt = tzparse(value)
-			offs, year = divmod(dt.year, 400)
-			value = DynamicDT(year + 2000, dt.month, dt.day, tzinfo=datetime.timezone.utc).set_offset(offs * 400 - 2000)
-		bot.data.users.setdefault(user.id, {})[setting] = value
-		if type(value) is DynamicDT:
-			value = value.as_date()
-		elif setting.startswith("time") and value is not None:
-			value = timezone_repr(value)
-		return css_md(f"Successfully changed {setting} for {sqr_md(user)} to {sqr_md(value)}.")
+			estimated = False
+		t = DynamicDT.unix()
+		if tzinfo:
+			ts = f"`{DynamicDT.fromtimestamp(t, tz=tzinfo)}`"
+			if estimated:
+				ts += f"\nEstimated from Discord activity ({round(c * 100)}% confidence)"
+			emb.add_field(name="Time", value=ts)
+		birthday = profile.get("birthday")
+		if birthday:
+			if not isinstance(birthday, DynamicDT):
+				birthday = profile["birthday"] = DynamicDT.fromdatetime(birthday)
+			birthday = birthday.replace(tzinfo=tzinfo)
+			temp = birthday.replace(time=0)
+			now = DynamicDT.fromtimestamp(t, tz=tzinfo)
+			temp = temp.add_years(now.year - temp.year)
+			while now > temp:
+				temp = temp + TimeDelta(years=1)
+			ts = temp.as_rel_discord()
+			bi = birthday.as_discord()
+			emb.add_field(name="Birthday", value=bi + "\n" + ts)
+		return cdict(embed=emb)
 
 
 class Activity(Command):
@@ -1091,280 +1107,107 @@ class Upload(Command):
 
 class Reminder(Command):
 	name = ["Announcement", "Announcements", "Announce", "RemindMe", "Reminders", "Remind"]
-	description = "Sets a reminder for a certain date and time."
-	usage = "<1:message>? <0:time[30s]>? <urgent(-u)>? <delete(-d)>?"
-	flags = "aedurf"
-	example = ("remindme test in 3 hours 27 mins", "remind urgently submit ticket on 3 june 2023", "announce look at me! in 10 minutes", "remind every 8h take meds in 2d")
+	description = "Sets a reminder for a certain date and time in the future."
+	schema = cdict(
+		message=cdict(
+			type="text",
+			description="Message to receive. Will show up as an embed",
+			example="Doctor's appointment",
+		),
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("reminder", "announcement", "urgent"),
+				accepts={"remind": "reminder", "announce": "announcement", "urgently": "urgent"},
+			),
+			description="Reminders are sent as direct messages, announcements are sent to the origin channel, urgent reminders will continuously update a direct message until the acknowledged by a reaction",
+			default="reminder",
+		),
+		icon=cdict(
+			type="visual",
+			description="Thumbnail to display on corner of embed",
+			example="https://mizabot.xyz/favicon",
+		),
+		delay=cdict(
+			type="timedelta",
+			description="Optional field containing any text; will show above description when set",
+			example="35 minutes and 6.25 seconds before 3am next tuesday",
+		),
+		remove=cdict(
+			type="index",
+			description="Index of reminder(s) to delete",
+			example="3..7",
+		),
+	)
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	rate_limit = (8, 13)
-	keywords = ["on", "at", "in", "when", "event"]
-	keydict = {re.compile(f"(^|[^a-z0-9]){i[::-1]}([^a-z0-9]|$)", re.I): None for i in keywords}
-	timefind = None
 	slash = True
 
-	def __load__(self):
-		self.timefind = re.compile(r"(?:(?:(?:[0-9]+:)+[0-9.]+\s*(?:am|pm)?|" + self.bot.num_words + r"|[\s\-+*\\/^%.,0-9]+\s*(?:am|pm|s|m|h|d|w|y|century|centuries|millenium|millenia|(?:second|sec|minute|min|hour|hr|day|week|wk|month|mo|year|yr|decade|galactic[\s\-_]year)s?))\s*)+$", re.I)
-
-	async def __call__(self, _comment, name, message, flags, bot, user, guild, perm, argv, args, **void):
-		if not argv:
-			msg = ""
-		elif len(args) == 1:
-			msg = "".join(args) + " in 30s"
-		elif getattr(message, "slash", None) and args:
-			msg = "in " + args.pop(-1)
-			if args:
-				msg = " ".join(args) + " " + msg
-		else:
-			msg = message.content
-		try:
-			msg = msg[msg.casefold().index(name) + len(name):]
-		except ValueError:
-			pass
-			# msg = msg.casefold().split(None, 1)[-1]
-		orig = argv
-		argv = msg.strip()
-		args = argv.split()
-		if "announce" in name:
-			sendable = message.channel
-			word = "announcements"
-		else:
-			sendable = user
-			word = "reminders"
+	async def __call__(self, bot, _message, _comment, _channel, _user, mode="reminder", message=None, icon=None, delay=None, remove=None, **void):
+		sendable = _channel if mode == "announce" else _user
 		rems = bot.data.reminders.get(sendable.id, [])
-		if "d" in flags:
+		if remove is not None:
 			if not len(rems):
-				return ini_md(f"No {word} currently set for {sqr_md(sendable)}.")
-			if not orig:
-				if "f" not in flags:
-					raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(rems))} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
-				rems.clear()
-				bot.data.reminders.pop(sendable.id, None)
-				with suppress(ValueError):
-					bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
-				return italics(css_md(f"Successfully cleared all {word} for {sqr_md(sendable)}."))
-			else:
-				i = await bot.eval_math(orig)
-			i %= len(rems)
-			x = rems.pop(i)
-			if i == 0:
+				return ini_md(f"No {mode}s currently set for {sqr_md(sendable)}.")
+			targets = RangeSet.parse(remove, len(rems))
+			assert targets, "Please input valid indices."
+			removed = (r := rems[targets[0]]).msg + "; " + r.t
+			if len(targets) > 1:
+				removed += f" (+{len(targets) - 1})"
+			rems = astype(rems, alist)
+			rems.pops(targets)
+			bot.data.reminders[sendable.id] = rems
+			if 0 in targets:
 				with suppress(ValueError):
 					bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
 				if rems:
 					bot.data.reminders.listed.insort((rems[0]["t"], sendable.id), key=lambda x: x[0])
 			return ini_md(f"Successfully removed {sqr_md(lim_str(x['msg'], 128))} from {word} list for {sqr_md(sendable)}.")
-		if not argv:
+		if message is None and icon is None and delay is None:
 			# Set callback message for scrollable list
 			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
 			await send_with_reply(
 				None,
-				message,
-				"*```" + "\n" * ("z" in flags) + "callback-main-reminder-"
-				+ str(user.id) + "_0_" + str(sendable.id)
+				_message,
+				"*```callback-main-reminder-"
+				+ str(_user.id) + "_0_" + str(sendable.id)
 				+ "-\nLoading Reminder database...```*",
 				buttons=buttons,
 			)
 			return
-		if len(rems) >= 64:
-			raise OverflowError(f"You have reached the maximum of 64 {word}. Please remove one to add another.")
-		for f in "aeu":
-			if f in flags:
-				for c in (f, f.upper()):
-					for q in "?-+":
-						argv = argv.replace(q + c + " ", "").replace(" " + q + c, "")
-		urgent = "u" in flags
-		recur = 60 if urgent else None
-		remind_as = user
-		# This parser is so unnecessarily long for what it does...
-		keyed = False
-		for i in range(256):
-			temp = argv.casefold()
-			if name == "remind" and temp.startswith("me "):
-				argv = argv[3:]
-				temp = argv.casefold()
-			if temp.startswith("every ") and " " in argv[6:]:
-				duration, argv = argv[6:].split(None, 1)
-				recur = await bot.eval_time(duration)
-				temp = argv.casefold()
-			elif temp.startswith("urgently ") or temp.startswith("urgent "):
-				argv = argv.split(None, 1)[1]
-				temp = argv.casefold()
-				recur = 60
-				urgent = True
-			if temp.startswith("as ") and " " in argv[3:]:
-				query, argv = argv[3:].split(None, 1)
-				remind_as = await self.bot.fetch_user_member(query, guild)
-				temp = argv.casefold()
-			if temp.startswith("to "):
-				argv = argv[3:]
-				temp = argv.casefold()
-			elif temp.startswith("that "):
-				argv = argv[5:]
-				temp = argv.casefold()
-			spl = None
-			keywords = dict(self.keydict)
-			# Reversed regex search
-			temp2 = temp[::-1]
-			for k in tuple(keywords):
-				try:
-					i = re.search(k, temp2).end()
-					if not i:
-						raise ValueError
-				except (ValueError, AttributeError):
-					keywords.pop(k)
-				else:
-					keywords[k] = i
-			# Sort found keywords by position
-			indices = sorted(keywords, key=lambda k: keywords[k])
-			if indices:
-				foundkey = {self.keywords[tuple(self.keydict).index(indices[0])]: True}
-			else:
-				foundkey = cdict(get=lambda *void: None)
-			if foundkey.get("event"):
-				if " event " in argv:
-					spl = argv.rsplit(" event ", 1)
-				elif temp.startswith("event "):
-					spl = [argv[6:]]
-					msg = ""
-				if spl is not None:
-					msg = " event ".join(spl[:-1])
-					t = verify_id(spl[-1])
-					keyed = True
-					break
-			if foundkey.get("when"):
-				if temp.endswith("is online"):
-					argv = argv[:-9]
-				if " when " in argv:
-					spl = argv.rsplit(" when ", 1)
-				elif temp.startswith("when "):
-					spl = [argv[5:]]
-					msg = ""
-				if spl is not None:
-					msg = " when ".join(spl[:-1])
-					t = verify_id(spl[-1])
-					keyed = True
-					break
-			if foundkey.get("in"):
-				if " in " in argv:
-					spl = argv.rsplit(" in ", 1)
-				elif temp.startswith("in "):
-					spl = [argv[3:]]
-					msg = ""
-				if spl is not None:
-					msg = " in ".join(spl[:-1])
-					t = await bot.eval_time(spl[-1])
-					break
-			if foundkey.get("at"):
-				if " at " in argv:
-					spl = argv.rsplit(" at ", 1)
-				elif temp.startswith("at "):
-					spl = [argv[3:]]
-					msg = ""
-				if spl is not None:
-					if len(spl) > 1:
-						spl2 = spl[0].rsplit(None, 1)
-						if spl2[-1] in ("today", "tomorrow", "yesterday"):
-							spl[0] = "" if len(spl2) <= 1 else spl2[0]
-							spl[-1] = "tomorrow " + spl[-1]
-					msg = " at ".join(spl[:-1])
-					t = utc_ts(tzparse(spl[-1])) - utc()
-					break
-			if foundkey.get("on"):
-				if " on " in argv:
-					spl = argv.rsplit(" on ", 1)
-				elif temp.startswith("on "):
-					spl = [argv[3:]]
-					msg = ""
-				if spl is not None:
-					msg = " on ".join(spl[:-1])
-					t = utc_ts(tzparse(spl[-1])) - utc()
-					break
-			if "today" in argv or "tomorrow" in argv or "yesterday" in argv:
-				t = 0
-				if " " in argv:
-					args = argv.split()
-					for i in (0, -1):
-						arg = args[i]
-						with suppress(KeyError):
-							t = as_timezone(arg)
-							args.pop(i)
-							expr = " ".join(args)
-							break
-					#     h = 0
-					# t += h * 3600
-				match = re.search(self.timefind, argv)
-				if match:
-					i = match.start()
-					spl = [argv[:i], argv[i:]]
-					msg = spl[0]
-					t += utc_ts(tzparse(spl[1])) - utc()
-					break
-				msg = " ".join(args[:-1])
-				t = utc_ts(tzparse(args[-1])) - utc()
-				break
-			t = 0
-			if " " in argv:
-				args = argv.split()
-				for i in (0, -1):
-					arg = args[i]
-					with suppress(KeyError):
-						t = as_timezone(arg)
-						args.pop(i)
-						expr = " ".join(args)
-						break
-				#     h = 0
-				# t += h * 3600
-			match = re.search(self.timefind, argv)
-			if match:
-				i = match.start()
-				j = match.end()
-				spl = [argv[:i], argv[i:j], argv[j:]]
-				msg = spl[0] + spl[-1]
-				t += await bot.eval_time(spl[1])
-				break
-			msg = " ".join(args[:-1])
-			t = await bot.eval_time(args[-1])
-			break
-		if keyed:
-			u = await bot.fetch_user_member(t, guild)
-			t = u.id
-		msg = msg.strip()
-		if not msg:
-			if "announce" in name:
-				msg = "[SAMPLE ANNOUNCEMENT]"
-			else:
-				msg = "[SAMPLE REMINDER]"
-			if urgent:
+		if not message:
+			message = "[SAMPLE ANNOUNCEMENT]" if mode == "announcement" else "[SAMPLE REMINDER]"
+			if mode == "urgent":
 				msg = bold(css_md(msg, force=True))
 			else:
 				msg = bold(ini_md(msg))
-		elif len(msg) > 4096:
-			raise OverflowError(f"Input message too long ({len(msg)} > 4096).")
-		username = str(remind_as)
-		url = await bot.get_proxy_url(remind_as)
-		ts = utc()
-		if keyed:
-			# Schedule for an event from a user
-			rem = cdict(
-				user=remind_as.id,
-				msg=msg,
-				u_id=t,
-				t=inf,
-			)
-			rems.append(rem)
-			s = "$" + str(t)
-			seq = set_dict(bot.data.reminders, s, deque())
-			seq.append(sendable.id)
-		else:
-			# Schedule for an event at a certain time
-			rem = cdict(
-				user=remind_as.id,
-				msg=msg,
-				t=t + ts,
-			)
-			rems.append(rem)
+		elif len(message) > 4096:
+			raise OverflowError(f"Input message too long ({len(message)} > 4096).")
+			# # Schedule for an event from a user
+			# rem = cdict(
+			# 	user=remind_as.id,
+			# 	msg=msg,
+			# 	u_id=t,
+			# 	t=inf,
+			# )
+			# rems.append(rem)
+			# s = "$" + str(t)
+			# seq = set_dict(bot.data.reminders, s, deque())
+			# seq.append(sendable.id)
+		dt = DynamicDT.utcnow() + delay
+		rem = cdict(
+			user=_user.id,
+			msg=message,
+			t=dt.timestamp_fraction(),
+			ref=(_message.channel.id, _message.id),
+		)
+		recur = 60 if mode == "urgent" else None
 		if recur:
 			rem.recur = recur
+		if icon:
+			rem.icon = icon
+		rems.append(rem)
 		# Sort list of reminders
 		bot.data.reminders[sendable.id] = sort(rems, key=lambda x: x["t"])
 		with suppress(ValueError):
@@ -1374,28 +1217,25 @@ class Reminder(Command):
 		tup = (bot.data.reminders[sendable.id][0]["t"], sendable.id)
 		if isfinite(tup[0]):
 			bot.data.reminders.listed.insort(tup, key=lambda x: x[0])
-		emb = discord.Embed(description=msg)
-		emb.colour = await bot.get_colour(remind_as)
-		emb.set_author(name=username, url=url, icon_url=url)
+		emb = discord.Embed(description=message)
+		if icon:
+			emb.set_thumbnail(url=icon)
+		emb.colour = await bot.get_colour(_user)
+		emb.set_author(**get_author(_user))
 		out = _comment + "\n```css\nSuccessfully set "
-		if urgent:
+		if mode == "urgent":
 			out += "urgent "
-		if "announce" in name:
+		if mode == "announcement":
 			out += f"announcement for {sqr_md(sendable)}"
 		else:
 			out += f"reminder for {sqr_md(sendable)}"
-		if not urgent and recur:
+		if mode != "urgent" and recur:
 			out += f" every {sqr_md(sec2time(recur))},"
-		ts = None
-		if keyed:
-			out += f" upon next event from {sqr_md(user_mention(t))}"
-			ts = None
-		else:
-			ts = t + utc()
-			out += f" in {sqr_md(time_until(ts))}"
+			# out += f" upon next event from {sqr_md(user_mention(t))}"
+			# ts = None
 		out += ":```"
-		if ts:
-			out += time_repr(ts)
+		if dt:
+			out += dt.as_rel_discord()
 		return cdict(
 			content=out,
 			embed=emb
@@ -1407,7 +1247,6 @@ class Reminder(Command):
 			return
 		if reaction not in self.directions and reaction is not None:
 			return
-		guild = message.guild
 		user = await bot.fetch_user(u_id)
 		rems = bot.data.reminders.get(s_id, [])
 		sendable = await bot.fetch_messageable(s_id)
@@ -1439,7 +1278,6 @@ class Reminder(Command):
 			content += f"Schedule for {str(sendable).replace('`', '')} is currently empty.```*"
 			msg = ""
 		else:
-			t = utc()
 			content += f"{len(rems)} message{'s' if len(rems) != 1 else ''} currently scheduled for {str(sendable).replace('`', '')}:```*"
 			msg = iter2str(
 				rems[pos:pos + page],
@@ -1633,17 +1471,17 @@ class UpdateReminders(Database):
 		# This exists so that checking next scheduled item is O(1)
 		for i in tuple(d):
 			try:
-				assert d[i][0]["t"]
-			except:
+				assert d[i][0]["t"] is not None
+			except Exception:
 				print_exc()
 				d.pop(i, None)
 		gen = ((block[0]["t"], i) for i, block in d.items() if block and isinstance(block[0], dict) and block[0].get("t") is not None)
 		self.listed = alist(sorted(gen, key=lambda x: x[0]))
 		self.t = utc()
 
-	async def recurrent_message(self, channel, embed, wait=60):
+	async def recurrent_message(self, channel, embed, wait=60, reference=None):
 		t = utc()
-		message = await channel.send(embed=embed)
+		message = await channel.send(embed=embed, reference=reference)
 		await message.add_reaction("✅")
 		self.bot.data.urgentreminders.data["listed"].insort([t + wait, channel.id, message.id, embed, wait], key=lambda x: x)
 
@@ -1684,16 +1522,28 @@ class UpdateReminders(Database):
 			# print(self.listed)
 			# Send reminder to target user/channel
 			ch = await self.bot.fetch_messageable(u_id)
+			if not self.bot.permissions_in(ch).send_messages:
+				continue
 			emb = discord.Embed(description=x.msg)
 			try:
 				u = self.bot.get_user(x["user"], replace=True)
 			except KeyError:
 				u = x
 			emb.set_author(**get_author(u))
+			if x.get("icon"):
+				emb.set_thumbnail(url=x["icon"])
+			reference = None
+			if x.get("ref"):
+				try:
+					channel = await self.bot.fetch_message(x["ref"][0])
+					assert channel.id == ch.id
+					reference = await self.bot.fetch_message(channel, x["ref"][1])
+				except Exception:
+					pass
 			if not x.get("recur"):
-				self.bot.send_embeds(ch, emb)
+				csubmit(ch.send(embed=emb, reference=reference))
 			else:
-				csubmit(self.recurrent_message(ch, emb, x.get("recur", 60)))
+				csubmit(self.recurrent_message(ch, emb, x.get("recur", 60), reference=reference))
 
 	# Seen event: runs when users perform discord actions
 	async def _seen_(self, user, **void):
@@ -1948,12 +1798,12 @@ class UpdateUsers(Database):
 	def get_timezone(self, u_id):
 		timezone = self.data.get(u_id, EMPTY).get("timezone")
 		if timezone is not None:
-			return round_min(as_timezone(timezone) / 3600)
+			return get_timezone(timezone)
 
 	def estimate_timezone(self, u_id):
 		data = self.data.get(u_id, EMPTY).get("recent")
 		if not data:
-			return 0, 0
+			return datetime.timezone.utc, 0
 		hour = round_min(int(utc() // self.interval) / self.scale)
 		self.clear_events(data, hour - self.hours)
 		start = hour - self.hours
@@ -2008,7 +1858,7 @@ class UpdateUsers(Database):
 		else:
 			estimated = 0
 		# print(estimated, inactive, activity)
-		return estimated, min(1, len(data) / self.hours)
+		return get_timezone(estimated), min(1, len(data) / self.hours)
 
 	async def __call__(self):
 		changed = False
@@ -2070,8 +1920,13 @@ class UpdateUsers(Database):
 			self.data.get(user.id, EMPTY).pop("last_typing", None)
 		if message.id % 1000 == 0:
 			if self.bot.data.enabled.get(message.channel.id, True):
-				if message.id % 1000000 == 0:
+				if message.id % 1000000000 == 0:
 					self.add_diamonds(user, points * 10000)
+					add_dict(self.data.setdefault(user.id, {}).setdefault("sparkles", {}), {"secret": 1})
+					csubmit(self.bot.react_with(message, "sparkles_secret.gif"))
+					print(f"{user} has obtained secret sparkles in {message.guild}!")
+				elif message.id % 1000000 == 0:
+					self.add_diamonds(user, points * 1000)
 					add_dict(self.data.setdefault(user.id, {}).setdefault("sparkles", {}), {"legendary": 1})
 					csubmit(self.bot.react_with(message, "sparkles_legendary.gif"))
 					print(f"{user} has obtained legendary sparkles in {message.guild}!")
@@ -2226,12 +2081,12 @@ class UpdateUsers(Database):
 			count = self.data.get(user.id, EMPTY).get("last_talk", 0)
 			if count < 5:
 				csubmit(message.add_reaction("👀"))
+			argv = message.clean_content.strip()
+			me = getattr(guild, "me", bot.user)
+			argv = argv.removeprefix(f"@{me.display_name}")
+			argv = argv.removesuffix(f"@{me.display_name}")
+			argv = argv.strip()
 			if "ask" in bot.commands and ("ai" in bot.get_enabled(channel) or not perm < inf):
-				argv = message.clean_content.strip()
-				me = getattr(guild, "me", bot.user)
-				argv = argv.removeprefix(f"@{me.display_name}")
-				argv = argv.removesuffix(f"@{me.display_name}")
-				argv = argv.strip()
 				with bot.ExceptionSender(message.channel, reference=message):
 					await bot.run_command(bot.commands.ask[0], dict(prompt=argv), message=message)
 				return
@@ -2252,7 +2107,9 @@ class UpdateUsers(Database):
 			else:
 				out = f"Yo, what's good, {user.display_name}? Need me for anything?"
 			prefix = bot.get_prefix(message.guild)
-			out += f"\n-# Use `{prefix}help` or `/help` for help!"
+			out += f"\n> Use `{prefix}help` or `/help` for help!"
+			if argv:
+				out += f"\n-# If your intention was to chat with me, my AI is not currently enabled in this channel! If you are a moderator and wish to enable it, use `{prefix}ec --enable AI`."
 			send = lambda *args, **kwargs: send_with_react(channel, *args, reacts="❎", reference=not flags and message, **kwargs)
 			add_dict(self.data, {user.id: {"last_talk": 1, "last_mention": 1}})
 			self.data[user.id]["last_used"] = utc()

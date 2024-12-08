@@ -34,7 +34,6 @@ try:
 except Exception:
 	pynvml = None
 import requests
-import tiktoken
 from collections import deque
 from math import ceil, comb, inf, isfinite, isqrt
 from urllib.parse import quote_plus, unquote_plus
@@ -204,20 +203,36 @@ def ihash(s): return int.from_bytes(hashlib.md5(s if type(s) is bytes else as_st
 def nhash(s): return int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little")
 
 
-cl100k_base = tiktoken.get_encoding("cl100k_base")
-cl100k_im = tiktoken.Encoding(
-    name="cl100k_im",
-    pat_str=cl100k_base._pat_str,
-    mergeable_ranks=cl100k_base._mergeable_ranks,
-    special_tokens={
-        **cl100k_base._special_tokens,
-        "<|im_start|>": 100264,
-        "<|im_end|>": 100265,
-    },
-)
+# Strips <> characters from URLs.
+def strip_acc(url):
+	if url.startswith("<") and url[-1] == ">":
+		s = url[1:-1]
+		if is_url(s):
+			return s
+	return url
+
+__smap = {"|": "", "*": ""}
+__strans = "".maketrans(__smap)
+def verify_search(f):
+	return strip_acc(single_space(f.strip().translate(__strans)))
+COMM = "\\#$%"
+
 
 @functools.lru_cache(maxsize=64)
 def get_encoding(e):
+	global tiktoken, cl100k_base, cl100k_im
+	import tiktoken
+	cl100k_base = tiktoken.get_encoding("cl100k_base")
+	cl100k_im = tiktoken.Encoding(
+		name="cl100k_im",
+		pat_str=cl100k_base._pat_str,
+		mergeable_ranks=cl100k_base._mergeable_ranks,
+		special_tokens={
+			**cl100k_base._special_tokens,
+			"<|im_start|>": 100264,
+			"<|im_end|>": 100265,
+		},
+	)
 	if e == "llamav2":
 		from transformers import AutoTokenizer
 		return AutoTokenizer.from_pretrained("wolfram/miquliz-120b-v2.0", use_fast=True)
@@ -503,12 +518,12 @@ def smart_split(s, rws=False):
 					break
 				t = smart_shlex(tup[-1])
 				continue
-			if not w or w == t.eof:
+			if w is None or w == t.eof:
 				break
 			out.append(w)
 	except ValueError:
 		out = si.split()
-	out = [apply_translator(w, smart_map, reverse=True) for w in out if w]
+	out = [apply_translator(w, smart_map, reverse=True) for w in out]
 	if rws:
 		whites = []
 		for w in out:
@@ -3408,19 +3423,6 @@ def fuzzy_substring(sub, s, match_start=False, match_length=True):
 	ratio = max(0, match / len(s))
 	return ratio
 
-# Strips <> characters from URLs.
-def strip_acc(url):
-	if url.startswith("<") and url[-1] == ">":
-		s = url[1:-1]
-		if is_url(s):
-			return s
-	return url
-
-__smap = {"|": "", "*": ""}
-__strans = "".maketrans(__smap)
-def verify_search(f):
-	return strip_acc(single_space(f.strip().translate(__strans)))
-
 
 RAINBOW = [
 	"\x1b[38;5;196m",
@@ -3809,7 +3811,7 @@ class EvalPipe:
 			self.thread.result()
 
 	def kill(self):
-		ex = CCE("Response disconnected. If this error occurs during a command, it is likely due to maintenance!")
+		ex = RuntimeError("Subprocess killed.")
 		for resp in tuple(self.responses.values()):
 			with suppress(ISE):
 				resp.set_exception(ex)

@@ -36,7 +36,7 @@ class EndpointRedirects(Dispatcher):
 			p = "raw/" + p
 		elif first in ("f", "d"):
 			p = "download/" + p.split("/", 1)[-1]
-		elif first not in ("fi", "fileinfo", "proxy", "upload", "u", "unproxy", "reupload", "stream", "heartbeat", "backend", "debug"):
+		elif first not in ("fi", "fileinfo", "proxy", "upload", "delete", "edit", "u", "unproxy", "reupload", "stream", "heartbeat", "backend", "debug"):
 			p = "backend/" + p
 		p = "/" + p
 		return super().__call__(p)

@@ -94,15 +94,10 @@
 				"UserProfile"
 			],
 			"description": "Shows or edits a user profile on Miza.",
-			"usage": "<user>? <mode(description|thumbnail|timezone|birthday)>? <value>? <delete(-d)>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 6)",
-			"example": [
-				"profile 201548633244565504",
-				"profile timezone singapore",
-				"profile thumbnail https://cdn.discordapp.com/emojis/879989027711877130.gif",
-				"user"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Activity": {
@@ -179,16 +174,11 @@
 				"Reminders",
 				"Remind"
 			],
-			"description": "Sets a reminder for a certain date and time.",
-			"usage": "<1:message>? <0:time[30s]>? <urgent(-u)>? <delete(-d)>?",
+			"description": "Sets a reminder for a certain date and time in the future.",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(8, 13)",
-			"example": [
-				"remindme test in 3 hours 27 mins",
-				"remind urgently submit ticket on 3 june 2023",
-				"announce look at me! in 10 minutes",
-				"remind every 8h take meds in 2d"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Note": {
@@ -464,29 +454,11 @@
 				"EstimateTime",
 				"EstimateTimezone"
 			],
-			"description": "Shows the current time at a certain GMT/UTC offset, or the current time for a user. Be sure to check out https://mizabot.xyz/time!",
-			"usage": "<target(?:offset_hours|user)>?",
+			"description": "Shows the current time at a certain GMT/UTC offset, or the current time for a user.",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(3, 5)",
-			"example": [
-				"time mst",
-				"utc-10",
-				"time Miza"
-			],
-			"timeout": "24"
-		},
-		"Timezone": {
-			"aliases": [
-				"Timezone"
-			],
-			"description": "Shows the current time in a certain timezone. Be sure to check out https://mizabot.xyz/time!",
-			"usage": "<timezone> <list(-l)>?",
-			"level": "0",
-			"rate_limit": "(3, 5)",
-			"example": [
-				"timezone ?l",
-				"timezone pacific"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Identify": {
@@ -775,10 +747,7 @@
 			"usage": "<0:react_to>? <1:role>? <delete_messages(-x)>?",
 			"level": "3",
 			"rate_limit": "(9, 12)",
-			"example": [
-				"rolegiver lol lol_role",
-				"rolegiver n*gger muted"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"AutoRole": {
@@ -1676,10 +1645,9 @@
 				"Watermark",
 				"Copyright",
 				"Ownership",
-				"NFT",
 				"\u00a9"
 			],
-			"description": "Tags an image with your discord user, or a message (input a user ID to tag another user). Raises an error if the image already has a tag.",
+			"description": "Reads an image's tagged information, or embeds a message into an image (input a user ID to tag as a Discord user). Aborts if image already has a known tag.",
 			"usage": "",
 			"level": "0",
 			"rate_limit": "(12, 15)",

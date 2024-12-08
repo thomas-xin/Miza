@@ -31,7 +31,7 @@ import pdb
 # from misc.smath import xrand
 # from misc.types import cdict, fdict, fcdict, mdict, alist, azero, round_min, full_prune, suppress, tracebacksuppressor
 # from misc.util import AUTH, TEMP_PATH, FAST_PATH, PORT, PROC, EvalPipe, python, utc, T, lim_str, regexp, Request, reqs, is_strict_running, force_kill
-# from misc.common import api, get_colour_list, load_emojis, load_timezones, touch, BASE_LOGO, closing, MemoryTimer
+# from misc.common import api, get_colour_list, load_emojis, touch, BASE_LOGO, closing, MemoryTimer
 
 
 # import tracemalloc
@@ -44,7 +44,6 @@ if ADDRESS == "0.0.0.0":
 if __name__ != "__mp_main__":
 	esubmit(get_colour_list)
 	esubmit(load_emojis)
-	esubmit(load_timezones)
 
 
 class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collections.abc.Callable):
@@ -1475,6 +1474,32 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		position = min(length, round(length * ratio))
 		return "⬜" * position + "⬛" * (length - position)
 
+	def permissions_in(self, obj):
+		user = self.user
+		guild = obj
+		if hasattr(guild, "members"):
+			user = ([m for m in guild.members if m.id == user.id] or [user])[0]
+		if hasattr(guild, "guild"):
+			guild = guild.guild
+		if hasattr(guild, "get_member"):
+			try:
+				user = guild.get_member(user.id) or user
+			except Exception:
+				pass
+		if hasattr(obj, "permissions_for"):
+			try:
+				return obj.permissions_for(user)
+			except AttributeError:
+				pass
+		if hasattr(user, "permissions_in"):
+			try:
+				return obj.permissions_in(obj)
+			except Exception:
+				return obj.permissions_in(guild)
+		if hasattr(obj, "recipient") or hasattr(obj, "dm_channel"):
+			return discord.Permissions(2147483647)
+		return discord.Permissions(0)
+
 	hiscache = {}
 	async def history(self, channel, limit=200, before=None, after=None, use_cache=True, care=True):
 		c_id = verify_id(channel)
@@ -1501,7 +1526,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return
 		found = set()
 		if use_cache:
-			if "channel_cache" in self.data and (not limit or limit > self.hiscache.get(c_id, 0)):
+			if "channel_cache" in self.data and (not limit or limit > self.hiscache.get(c_id, 0)) and self.permissions_in(channel).read_message_history:
 				hist = await flatten(discord.abc.Messageable.history(channel, limit=limit, before=before, after=after, oldest_first=False))
 				await self.data.channel_cache.splice(channel, hist)
 				self.hiscache[c_id] = len(hist)
@@ -1523,14 +1548,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					yield message
 					if limit is not None and len(found) >= limit:
 						return
-		async for message in discord.abc.Messageable.history(channel, limit=limit, before=before, after=after, oldest_first=False):
-			if message.id in found:
-				continue
-			self.data.deleted.cache.pop(message.id, None)
-			self.hiscache.pop(c_id, None)
-			self.add_message(message, files=False, force=True)
-			found.add(message.id)
-			yield message
+		if self.permissions_in(channel).read_message_history:
+			async for message in discord.abc.Messageable.history(channel, limit=limit, before=before, after=after, oldest_first=False):
+				if message.id in found:
+					continue
+				self.data.deleted.cache.pop(message.id, None)
+				self.hiscache.pop(c_id, None)
+				self.add_message(message, files=False, force=True)
+				found.add(message.id)
+				yield message
 
 	async def get_last_message(self, channel, key=None):
 		m_id = T(channel).get("last_message_id")
@@ -1957,6 +1983,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					timezone, confidence = self.data.users.estimate_timezone(uid)
 					if confidence < 1 / 256:
 						timezone = None
+			if timezone is not None:
+				timezone = round(get_offset(timezone) / 3600)
 			region = self.browse_locations.get(timezone, "us-en")
 		async def retrieval(argv, region="us-en", screenshot=False, best=False):
 			if not is_url(argv):
@@ -2313,20 +2341,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		1: cdict(
-			instructive="gpt-4m",
-			casual="qwen-72b",
-			nsfw="llama-3-11b",
-			backup="claude-3.5-sonnet",
+			instructive="gpt-4",
+			casual="gpt-4m",
+			nsfw="qwen-72b",
+			backup="gpt-4",
 			retry="gpt-4",
 			function="gpt-4m",
-			vision="claude-3-haiku",
+			vision="claude-3.5-haiku",
 			target="auto",
 		),
 		2: cdict(
 			instructive="claude-3.5-sonnet",
 			casual="gpt-4",
-			nsfw="llama-3-90b",
-			backup="qwen-72b",
+			nsfw="qwen-72b",
+			backup="gpt-4",
 			retry="gpt-4",
 			function="gpt-4m",
 			vision="gpt-4",
@@ -2347,12 +2375,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			messages.insert(0, cdict(role="system", content=system))
 		prompt = [m.content for m in messages if m.get("role") == "user"][-1]
 		if modlvl > 2:
-			maxlim = 60000
+			maxlim = 196608
 			minlim = 4800
 			snip = 540
 			best = 2
 		elif modlvl > 1:
-			maxlim = 24000
+			maxlim = 98304
 			minlim = 2400
 			snip = 360
 			best = 1
@@ -2415,6 +2443,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					users += 1
 					if users > 1:
 						break
+			toolcheck.append(messages[0])
 			toolcheck.reverse()
 			toolcheck = await self.caption_into(toolcheck, model=modelist.function, premium_context=premium_context)
 			mode = None
@@ -2943,7 +2972,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				_resp, mime, name, d = await self.req_data(url, screenshot=True)
 			lim = 5 * 1048576 * 3 / 4
 			p = 2 if len(d) > 1048576 else 0
-			if mime not in ("image/png", "image/gif", "image/jpeg", "image/webp") or len(d) > lim or np.prod(await asubmit(get_image_size, d, priority=p)) > sizelim:
+			if mime not in ("image/png", "image/gif", "image/webp") or len(d) > lim or np.prod(await asubmit(get_image_size, d, priority=p)) > sizelim:
 				if mime.split("/", 1)[0] not in ("image", "video"):
 					if len(d) > 288 and mime not in ("text/plain", "text/html"):
 						d = d[:128] + b".." + d[-128:]
@@ -2971,7 +3000,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
-		model="claude-3.5-sonnet" if best >= 2 else "claude-3-haiku"
+		model="claude-3.5-sonnet" if best >= 2 else "claude-3.5-haiku"
 		messages = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
@@ -3273,7 +3302,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			fn = f"{TEMP_PATH}/attachments/{attachment.id}.{ext}"
 			if fn in self.cache.attachments:
 				if self.cache.attachments[fn]:
-					await self.data.prot.call(message, fn, known=self.cache.attachments[fn])
+					await self.data.prot.scan(message, fn, known=self.cache.attachments[fn])
 				return
 			if not os.path.exists(fn):
 				data = await self.get_attachment(str(attachment.url))
@@ -3282,7 +3311,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				with open(fn, "wb") as f:
 					await asubmit(f.write, data)
 			if get_mime(fn).startswith("image/"):
-				res = await self.data.prot.call(message, fn)
+				res = await self.data.prot.scan(message, fn)
 			else:
 				res = ""
 			self.cache.attachments[fn] = res
@@ -3425,7 +3454,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if not content:
 				if e.description and e.description != EmptyEmbed:
 					content = e.description
-				for f in emb2.fields:
+				for f in e.fields:
 					if f:
 						emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
 			if e.image:
@@ -5226,7 +5255,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					taken = True
 				elif not hs and v.type == "resolution" and re.fullmatch(r"-?[0-9]+[:x*]-?[0-9]+", a):
 					taken = True
-				elif not hs and v.type == "index" and re.fullmatch(r"(?:[\-0-9]+|:|\.{2,}){1,5}", a):
+				elif not hs and v.type == "index" and (a.casefold() == "all" or re.fullmatch(r"(?:[\-0-9]+|:|\.{2,}){1,5}", a)):
 					taken = True
 				elif not hs and v.type in ("number", "integer") and re.fullmatch(r"[-+]?\b\d+(\.\d+)?([eE][-+]?\d+)?\b|\b\d+\.\d*|\.\d+([eE][-+]?\d+)?\b", a):
 					taken = True
@@ -5263,7 +5292,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					taken = True
 				elif v.type == "message" and a.isnumeric():
 					taken = True
-				elif v.type in ("time", "number", "integer") and any(c.isnumeric() for c in a):
+				elif v.type in ("datetime", "timedelta"):
+					taken = True
+				elif v.type in ("number", "integer") and any(c.isnumeric() for c in a):
 					taken = True
 				elif v.type in ("mentionable", "user", "channel", "guild", "role"):
 					taken = True
@@ -5388,12 +5419,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						v = int(v)
 				except Exception as ex:
 					raise err(ex.__class__, k, v)
-		elif info.type == "time":
-			if not isinstance(v, (int, float, np.number)):
-				try:
-					v = await self.eval_time(full_prune(v))
-				except Exception as ex:
-					raise err(ex.__class__, k, v)
+		elif info.type == "datetime":
+			try:
+				v = DynamicDT.parse(v)
+			except Exception as ex:
+				raise err(ex.__class__, k, v)
+		elif info.type == "timedelta":
+			try:
+				v = DynamicDT.parse_delta(v)
+			except Exception as ex:
+				raise err(ex.__class__, k, v)
 		elif info.type == "resolution":
 			try:
 				def round_or_omit(s):
@@ -5404,10 +5439,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			except Exception as ex:
 				raise err(ex.__class__, k, v)
 		elif info.type == "index":
-			try:
-				v = tuple(int(x) if x else None for x in re.split(r"(?:\.{2,}|:)", v))
-			except Exception as ex:
-				raise err(ex.__class__, k, v)
+			if v.casefold == "all":
+				v = [None, None]
+			else:
+				try:
+					v = tuple(int(x) if x else None for x in re.split(r"(?:\.{2,}|:)", v))
+				except Exception as ex:
+					raise err(ex.__class__, k, v)
 		elif info.type == "colour":
 			try:
 				v = parse_colour(full_prune(v))
@@ -6032,6 +6070,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def load_guild(self, guild):
 		if not self.chunk_guild_sems:
 			self.chunk_guild_sems = [Semaphore(3, inf, rate_limit=0.5) for i in range(self.shard_count)]
+		if "guilds" in self.data:
+			self.data.guilds.update_guild(guild)
 		finished = False
 		async with self.load_guild_sem:
 			member_count = getattr(guild, "_member_count", None) or len(guild._members)
@@ -6786,12 +6826,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def ensure_reactions(self, message):
 		if not message.reactions or isinstance(message, self.CachedMessage | self.LoadedMessage) or isinstance(message.author, cdict | self.GhostUser):
-			try:
-				message = await discord.abc.Messageable.fetch_message(message.channel, message.id)
-			except (LookupError, discord.NotFound):
-				pass
-			else:
-				self.add_message(message, files=False, force=True)
+			if self.permissions_in(message.channel).read_message_history:
+				try:
+					message = await discord.abc.Messageable.fetch_message(message.channel, message.id)
+				except (LookupError, discord.NotFound):
+					pass
+				else:
+					self.add_message(message, files=False, force=True)
 		return message
 
 	async def react_with(self, message, name):
@@ -7622,7 +7663,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		bot = self
 
 		discord.http.Route.BASE = f"https://discord.com/api/{api}"
-		discord.Member.permissions_in = lambda self, channel: discord.Permissions.none() if not getattr(channel, "permissions_for", None) else channel.permissions_for(self)
+		discord.Member.permissions_in = lambda self, channel: discord.Permissions.none() if not getattr(self, "roles", None) else discord.Permissions(fold(int.__or__, (role.permissions.value for role in self.roles))) if not getattr(channel, "permissions_for", None) else channel.permissions_for(self)
 		discord.VoiceChannel._get_channel = lambda self: as_fut(self)
 		discord.user.BaseUser.__str__ = lambda self: self.name if self.discriminator in (None, 0, "", "0") else f"{self.name}#{self.discriminator}"
 

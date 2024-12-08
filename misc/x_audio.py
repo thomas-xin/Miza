@@ -4,7 +4,6 @@ import os
 import subprocess
 import sys
 import time
-import discord
 import psutil
 from collections import deque
 from concurrent.futures import Future
@@ -13,6 +12,10 @@ from traceback import print_exc
 from .asyncs import csubmit, esubmit, tsubmit, async_nop, wrap_future, cst, Semaphore, Delay, eloop
 from .types import as_str, cdict, suppress, utc, ISE2, round_min, cast_id
 from .util import tracebacksuppressor, is_strict_running, force_kill, retry, AUTH, TEMP_PATH, Request, EvalPipe, PipedProcess, is_url, is_youtube_stream, is_soundcloud_stream, expired, reqs, get_duration, T
+
+# VERY HACKY removes deprecated audioop dependency for discord.py; this would cause volume transformations to fail but Miza uses FFmpeg for them anyway
+sys.modules["audioop"] = sys
+import discord  # noqa: E402
 
 tracebacksuppressor.fn = print_exc
 

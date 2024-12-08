@@ -984,112 +984,51 @@ class EmojiCrypt(Command):
 
 class Time(Command):
 	name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T", "EstimateTime", "EstimateTimezone"]
-	description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user. Be sure to check out ⟨WEBSERVER⟩/time!"
-	usage = "<target(?:offset_hours|user)>?"
-	example = ("time mst", "utc-10", "time Miza")
+	description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user."
+	schema = cdict(
+		input=cdict(
+			type="string",
+			description="Time input to parse",
+			example="last sunday 3pm hawaii",
+			default="",
+		),
+		user=cdict(
+			type="user",
+			description="Target user to retrieve timezone from. Will use automatically estimated timezone if not provided",
+			example="201548633244565504",
+		),
+	)
 	rate_limit = (3, 5)
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, name, channel, guild, argv, args, user, **void):
-		u = user
-		s = 0
-		# Only check for timezones if the command was called with alias "estimate_time", "estimate_timezone", "t", or "time"
-		if "estimate" in name:
-			if argv:
-				try:
-					if not argv.isnumeric():
-						raise KeyError
-					user = self.bot.cache.guilds[int(argv)]
-				except KeyError:
-					try:
-						user = self.bot.cache.channels[verify_id(argv)]
-					except KeyError:
-						user = await self.bot.fetch_user_member(argv, guild)
-			argv = None
-		if args and name in "time":
-			try:
-				i = None
-				with suppress(ValueError):
-					i = argv.index("-")
-				with suppress(ValueError):
-					j = argv.index("+")
-					if i is None:
-						i = j
-					else:
-						i = min(i, j)
-				if i is not None:
-					s = as_timezone(argv[:i])
-					argv = argv[i:]
-				else:
-					s = as_timezone(argv)
-					argv = "0"
-			except KeyError:
-				user = await self.bot.fetch_user_member(argv, guild)
-				argv = None
-		elif name in TIMEZONES:
-			s = TIMEZONES.get(name, 0)
-		estimated = None
-		c = 0
-		if argv:
-			h = await self.bot.eval_math(argv)
-		elif "estimate" in name:
-			if is_channel(user):
-				h, c = self.bot.data.users.estimate_timezone("#" + str(user.id))
-			else:
-				h, c = self.bot.data.users.estimate_timezone(user.id)
+	async def __call__(self, _user, input, user, **void):
+		user = user or _user
+		c = 1
+		tzinfo = self.bot.data.users.get_timezone(user.id)
+		if tzinfo is None:
+			tzinfo, c = self.bot.data.users.estimate_timezone(user.id)
 			estimated = True
-		elif name in "time":
-			h = self.bot.data.users.get_timezone(user.id)
-			if h is None:
-				h, c = self.bot.data.users.estimate_timezone(user.id)
-				estimated = True
-			else:
-				estimated = False
 		else:
-			h = 0
-		hrs = round_min(h + s / 3600)
-		if hrs:
-			if abs(hrs) > 17531640:
-				t = utc_ddt()
-				t += hrs * 3600
-			else:
-				t = utc_dt()
-				t += datetime.timedelta(hours=hrs)
-		else:
-			t = utc_dt()
-		if hrs >= 0:
-			hrs = "+" + str(hrs)
-		out = f"Current time at UTC/GMT{hrs}: {sqr_md(t)}."
+			estimated = False
+		dt2 = DynamicDT.now(tz=tzinfo)
+		dt = DynamicDT.parse(input, timestamp=dt2.timestamp_fraction(), timezone=get_name(tzinfo))
+		colour = await self.bot.get_colour(user)
+		emb = discord.Embed(colour=colour)
+		emb.add_field(name="Parsed As", value="`" + ", ".join(dt.parsed_as) + "`")
+		tzstats = italics(get_name(tzinfo))
 		if estimated:
-			out += f"\nUsing timezone automatically estimated from {sqr_md(user)}'s discord activity ({round(c * 100)}% confidence)."
-		elif estimated is not None:
-			out += f"\nUsing timezone assigned by {sqr_md(user)}."
-		return ini_md(out)
-
-
-class Timezone(Command):
-	description = "Shows the current time in a certain timezone. Be sure to check out ⟨WEBSERVER⟩/time!"
-	usage = "<timezone> <list(-l)>?"
-	example = ("timezone ?l", "timezone pacific")
-	rate_limit = (3, 5)
-	ephemeral = True
-
-	async def __call__(self, channel, argv, message, **void):
-		if not argv:
-			return await self.bot.commands.time[0]("timezone", channel, channel.guild, "", [], message.author)
-		if argv.startswith("-l") or argv.startswith("list"):
-			fields = deque()
-			for k, v in COUNTRIES.items():
-				fields.append((k, ", ".join(v), False))
-			self.bot.send_as_embeds(channel, description=f"[Click here to find your timezone]({self.bot.webserver}/time)", title="Timezone list", fields=fields, author=get_author(self.bot.user), reference=message)
-			return
-		secs = as_timezone(argv)
-		t = utc_dt() + datetime.timedelta(seconds=secs)
-		h = round_min(secs / 3600)
-		if not h < 0:
-			h = "+" + str(h)
-		return ini_md(f"Current time at UTC/GMT{h}: {sqr_md(t)}.")
+			tzstats += f" {user_mention(user.id)}, estimated ({round(c * 100)}% confidence)"
+		else:
+			tzstats += f" {user_mention(user.id)}, assigned"
+		emb.add_field(name="Local Timezone", value=tzstats)
+		emb.add_field(name="Displayed Time", value=str(dt))
+		emb.add_field(name="Unix Timestamp", value=f"`{dt.timestamp()}`")
+		emb.add_field(name="ISO Timestamp", value=f"`{dt.as_iso()}`")
+		emb.add_field(name="Time Delta", value=f"`{dt - dt2}`")
+		emb.add_field(name="Live Timestamp", value=dt.as_discord())
+		emb.add_field(name="Live Delta", value=dt.as_rel_discord())
+		return cdict(embed=emb)
 
 
 class Identify(Command):
@@ -1504,7 +1443,10 @@ class BubbleWrap(Command):
 	ephemeral = True
 
 	async def __call__(self, size, **void):
-		return cdict(content="||pop!||" * size)
+		bubbles = np.array(["||pop!||"] * size)
+		boos = np.random.randint(0, 1000, size=size)
+		bubbles[boos == 0] = "||boo!||"
+		return cdict(content="".join(bubbles))
 
 
 class Urban(Command):

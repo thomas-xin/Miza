@@ -13,7 +13,11 @@ if __name__ != "__mp_main__":
 	from misc import smath
 	from misc.smath import *
 
-import psutil, subprocess, weakref, zipfile, urllib, discord, asyncio, json, pickle, functools, orjson, aiohttp, threading, shutil, filetype, inspect, sqlite3, argparse, bisect, httpx
+import psutil, subprocess, weakref, zipfile, urllib, asyncio, json, pickle, functools, orjson, aiohttp, threading, shutil, filetype, inspect, sqlite3, argparse, bisect, httpx
+
+# VERY HACKY removes deprecated audioop dependency for discord.py; this would cause volume transformations to fail but Miza uses FFmpeg for them anyway
+sys.modules["audioop"] = sys
+import discord  # noqa: E402
 
 from misc.asyncs import *
 
@@ -29,8 +33,8 @@ import urllib.request, urllib.parse
 
 DC = 0
 torch = None
-import pynvml
 try:
+	import pynvml
 	pynvml.nvmlInit()
 	DC = pynvml.nvmlDeviceGetCount()
 	if not os.environ.get("AI_FEATURES", True):
@@ -1490,20 +1494,6 @@ def verify_id(obj):
 	return int(obj)
 
 
-# Strips <> characters from URLs.
-def strip_acc(url):
-	if url.startswith("<") and url[-1] == ">":
-		s = url[1:-1]
-		if is_url(s):
-			return s
-	return url
-
-__smap = {"|": "", "*": ""}
-__strans = "".maketrans(__smap)
-verify_search = lambda f: strip_acc(single_space(f.strip().translate(__strans)))
-COMM = "\\#$%"
-
-
 status_text = {
 	discord.Status.online: "Online",
 	discord.Status.idle: "Idle",
@@ -2233,185 +2223,6 @@ def find_emojis_ex(s, cast_urls=True):
 
 HEARTS = ["❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
 
-
-# Stores and manages timezones information.
-TIMEZONES = cdict()
-
-@tracebacksuppressor
-def load_timezones():
-	with open("misc/timezones.txt", "rb") as f:
-		data = as_str(f.read())
-		for line in data.splitlines():
-			info = line.split("\t")
-			abb = info[0].casefold()
-			if len(abb) >= 3 and (abb not in TIMEZONES or "(unofficial)" not in info[1]):
-				temp = info[-1].replace("\\", "/")
-				curr = sorted([round((1 - (i[3] == "−") * 2) * (time_parse(i[4:]) if ":" in i else float(i[4:]) * 60) * 60) for i in temp.split("/") if i.startswith("UTC")])
-				if len(curr) == 1:
-					curr = curr[0]
-				TIMEZONES[abb] = curr
-		print(f"Successfully loaded {len(TIMEZONES)} timezones.")
-
-def is_dst(dt=None, timezone="UTC"):
-	if dt is None:
-		dt = utc_dt()
-	timezone = pytz.timezone(timezone)
-	timezone_aware_date = timezone.localize(dt, is_dst=None)
-	return timezone_aware_date.tzinfo._dst.seconds != 0
-
-def get_timezone(tz):
-	s = TIMEZONES[tz]
-	if issubclass(type(s), collections.abc.Collection):
-		return s[is_dst(timezone=tz.upper())]
-	return s
-
-def as_timezone(tz):
-	if not tz:
-		raise KeyError
-	with suppress(KeyError):
-		return round((city_time(tz).timestamp() - utc()) / 60) * 60
-	a = tz
-	h = 0
-	for op in ("+-"):
-		with suppress(ValueError):
-			i = a.index(op)
-			h += float(a[i:])
-			a = a[:i]
-			break
-	tz = a.casefold()
-	return round_min(get_timezone(tz) + h * 3600)
-
-def timezone_repr(tz):
-	if tz in ZONES:
-		return capwords(tz)
-	return tz.upper()
-
-def time_repr(t, mode=None):
-	if hasattr(t, "timestamp"):
-		t = t.timestamp
-		if callable(t):
-			t = t()
-	if not isfinite(t):
-		return str(t)
-	t = round(t)
-	if not mode:
-		mode = "R"
-	return f"<t:{t}:{mode}>"
-
-def parse_with_now(expr):
-	"Attempts to parse a time expression that may contain the string \"now\" indicating current time."
-	if not expr or expr.strip().casefold() == "now":
-		return utc_ddt()
-	bc = False
-	if expr[-3:].casefold() == " ad":
-		expr = expr[:-3]
-	elif expr[-5:].casefold() == " a.d.":
-		expr = expr[:-5]
-	if expr[-3:].casefold() == " bc":
-		expr = expr[:-3]
-		bc = True
-	elif expr[-5:].casefold() == " b.c.":
-		expr = expr[:-5]
-		bc = True
-	try:
-		dt = tparser.parse(expr).replace(tzinfo=datetime.timezone.utc)
-	except Exception as ex:
-		print(ex)
-		s = str(ex).split(":", 1)[0]
-		if s.startswith("year "):
-			s = s[5:]
-			if s.endswith(" is out of range"):
-				s = s[:-16]
-				y = int(s)
-				if bc:
-					y = -y
-				offs, year = divmod(y, 400)
-				offs = offs * 400 - 2000
-				year += 2000
-				expr = regexp("0*" + s).sub(str(year), expr, 1)
-				dt = tparser.parse(expr).replace(tzinfo=datetime.timezone.utc)
-				return DynamicDT.fromdatetime(dt).set_offset(offs)
-		elif s.startswith("Python int too large to convert to C"):
-			y = int(regexp("[0-9]{10,}").findall(expr)[0])
-			if bc:
-				y = -y
-			offs, year = divmod(y, 400)
-			offs = offs * 400 - 2000
-			year += 2000
-			expr = regexp("[0-9]{10,}").sub(str(year), expr, 1)
-			dt = tparser.parse(expr).replace(tzinfo=datetime.timezone.utc)
-			return DynamicDT.fromdatetime(dt).set_offset(offs)
-		elif s.startswith("Unknown string format") or s.startswith("month must be in"):
-			try:
-				y = int(regexp("[0-9]{5,}").findall(expr)[0])
-			except IndexError:
-				y = None
-			if y is None:
-				raise
-			if bc:
-				y = -y
-			offs, year = divmod(y, 400)
-			offs = offs * 400 - 2000
-			year += 2000
-			expr = regexp("[0-9]{5,}").sub(str(year), expr, 1)
-			dt = tparser.parse(expr).replace(tzinfo=datetime.timezone.utc)
-			return DynamicDT.fromdatetime(dt).set_offset(offs)
-		raise
-	if bc:
-		y = -dt.year
-		offs, year = divmod(y, 400)
-		offs = offs * 400 - 2000
-		year += 2000
-		return DynamicDT.fromdatetime(dt.replace(year=year)).set_offset(offs)
-	return DynamicDT.fromdatetime(dt)
-
-def tzparse(expr):
-	"Parses a time expression, with an optional timezone input at the end."
-	try:
-		s = float(expr)
-	except ValueError:
-		expr = expr.strip()
-		day = None
-		if "today" in expr:
-			day = 0
-			expr = expr.replace("today", "")
-		elif "tomorrow" in expr:
-			day = 1
-			expr = expr.replace("tomorrow", "")
-		elif "yesterday" in expr:
-			day = -1
-			expr = expr.replace("yesterday", "")
-		if " " in expr:
-			t = 0
-			try:
-				args = shlex.split(expr)
-			except ValueError:
-				args = expr.split()
-			for i in (0, -1):
-				arg = args[i]
-				with suppress(KeyError):
-					t = as_timezone(arg)
-					args.pop(i)
-					expr = " ".join(args)
-					break
-				h = 0
-			t = parse_with_now(expr) - (h * 3600 + t)
-		else:
-			t = parse_with_now(expr)
-		if day is not None:
-			curr = utc_ddt() + day * 86400
-			one_day = 86400
-			while t < curr:
-				t += one_day
-			while (t - curr).total_seconds() > one_day:
-				t -= one_day
-		return t
-	if not isfinite(s) or abs(s) >= 1 << 31:
-		try:
-			s = int(expr.split(".", 1)[0])
-		except (TypeError, ValueError):
-			pass
-	return utc_dft(s)
 
 readstring = lambda s: deobfuscate(zwremove(s))
 

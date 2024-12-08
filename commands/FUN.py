@@ -2178,6 +2178,8 @@ class UpdateDogpiles(Database):
 		dogpile = following.get(g_id, True)
 		if not dogpile:
 			return
+		if not message.guild.me or not message.guild.me.permissions_in(message.channel).send_messages:
+			return
 		u_id = message.author.id
 		c_id = message.channel.id
 		content = readstring(message.content)
@@ -2235,7 +2237,7 @@ class UpdateDogpiles(Database):
 					try:
 						n = round_min(c)
 					except ValueError:
-						nums = sorted(self.reg.findall(c), key=lambda s: -len(s))
+						nums = sorted(filter(self.reg.fullmatch, c.split()), key=lambda s: -len(s))
 						if nums:
 							n = round_min(nums[0])
 						else:
@@ -2265,7 +2267,7 @@ class UpdateDogpiles(Database):
 		if number and type(number) is not str:
 			n = await asubmit(predict_next, numbers)
 			if type(n) is int:
-				s = str(n)
+				s = str(abs(n))
 				for i in range(3, len(s) + 1):
 					x = await asubmit(predict_next, list(map(int, s)), limit=i)
 					if x is not None:
@@ -2427,8 +2429,8 @@ class UpdateDailies(Database):
 
 	def get(self, user):
 		data = self.data.get(user.id)
-		if not data or utc() - data.get("time", 0) >= 86400:
-			data = self.data[user.id] = dict(quests=self.generate(user), time=zerot())
+		if not data or not isinstance(data.get("time", 0), number) or utc() - data.get("time", 0) >= 86400:
+			data = self.data[user.id] = dict(quests=self.generate(user), time=utc_ts(zerot()))
 		return data
 
 	def collect(self, user):
@@ -2687,7 +2689,7 @@ class Stats(Command):
 				freebies = T(data).coerce("freebies", list, [])
 				freelim = bot.premium_limit(premium.value)
 				q = max(0, freelim - len(freebies))
-				c = mpf(q) / 1000
+				c = round_min(mpf(q) / 1000)
 				if freebies:
 					s = f", next refresh {time_repr(86400 + freebies[0])}"
 				else:

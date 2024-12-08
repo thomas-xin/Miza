@@ -47,7 +47,7 @@ class Shutdown(Command):
 			default="maintain",
 		),
 		delay=cdict(
-			type="time",
+			type="timedelta",
 			description="Time to wait",
 			aliases=["d"],
 			default=0,
@@ -82,7 +82,7 @@ class Shutdown(Command):
 							await asyncio.sleep(1)
 			if m:
 				csubmit(bot.edit_message(m, content=f"*Waiting until idle (complete)*"))
-		delay -= utc() - t
+		delay = float(delay) - (utc() - t)
 		if delay > 0:
 			# Restart announcements for when a time input is specified
 			with tracebacksuppressor:
@@ -299,11 +299,12 @@ class Exec(Command):
 			attachment_cache["@channels"] = [k for k, v in execd.items() if v & 16]
 			return css_md(f"{sqr_md(out)} terminal now enabled in {sqr_md(_channel)}.")
 		if mode == "disable":
-			with suppress(KeyError):
-				if not num:
-					# Test bitwise flags for enabled terminals
-					out = ", ".join(self.terminal_types.get(1 << i) for i in bits(execd.pop(_channel.id, 0, force=True)))
-				else:
+			if not num:
+				# Test bitwise flags for enabled terminals
+				out = ", ".join(self.terminal_types.get(1 << i) for i in bits(execd.pop(_channel.id, 0, force=True)))
+			else:
+				out = ", ".join(self.terminal_types.get(1 << i) for i in bits(num))
+				with suppress(KeyError):
 					execd[_channel.id] &= -num - 1
 					if not execd[_channel.id]:
 						execd.pop(_channel.id)
@@ -1499,6 +1500,7 @@ class UpdateGuilds(Database):
 			members=mdata,
 		)
 		self[guild.id] = gdata
+		self.bot.cache.guilds[guild.id] = guild
 		return mdata
 
 	def __load__(self, **void):
@@ -1509,6 +1511,7 @@ class UpdateGuilds(Database):
 				if not isinstance(g, dict):
 					continue
 				guild = bot.UserGuild()
+				guild.channel = bot.user
 				guild._members = {}
 				guild._roles = {}
 				guild._channels = {}
@@ -1550,6 +1553,15 @@ class UpdateGuilds(Database):
 		if isinstance(guild, dict):
 			guild["owner"] = guild._members.get(guild.owner_id)
 		return guild._members
+
+	def update_guild(self, guild):
+		bot = self.bot
+		if guild.id in bot.cache.guilds:
+			members = bot.cache.guilds[guild.id]._members
+			guild._members.update(members)
+			guild._member_count = len(guild._members)
+		bot.cache.guilds[guild.id] = guild
+		return guild
 
 	def register(self, guild, force=True):
 		if force:

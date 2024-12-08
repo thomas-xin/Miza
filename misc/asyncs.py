@@ -353,7 +353,7 @@ async def unflatten(it):
 def reflatten(ait):
 	try:
 		while True:
-			yield await_fut(anext(ait))
+			yield await_fut(anext(ait))  # noqa: F821
 	except StopAsyncIteration:
 		pass
 
