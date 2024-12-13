@@ -1454,7 +1454,7 @@ class UpdateUrgentReminders(Database):
 										raise StopIteration
 						reference = None
 						content = None
-						if len(p) > 5:
+						if len(p) > 5 and p[5]:
 							url = p[5]
 							spl = url[url.index("channels/") + 9:].replace("?", "/").split("/", 2)
 							try:
@@ -1496,7 +1496,7 @@ class UpdateReminders(Database):
 		t = utc()
 		message = await channel.send(content, embed=embed, reference=reference)
 		await message.add_reaction("✅")
-		self.bot.data.urgentreminders.coercedefault("listed", alist, alist()).insort([t + wait, channel.id, message.id, embed, wait, reflink], key=lambda x: x)
+		self.bot.data.urgentreminders.coercedefault("listed", alist, alist()).insort([t + wait, channel.id, message.id, embed, wait, reflink], key=lambda x: x[:3])
 
 	async def __call__(self):
 		if utc() - self.t >= 4800:
@@ -1547,6 +1547,7 @@ class UpdateReminders(Database):
 				emb.set_thumbnail(url=x["icon"])
 			reference = None
 			content = None
+			jump_url = None
 			if x.get("ref"):
 				try:
 					channel = await self.bot.fetch_channel(x["ref"][0])
@@ -1554,13 +1555,14 @@ class UpdateReminders(Database):
 				except Exception:
 					pass
 				else:
+					jump_url = reference.jump_url
 					if channel.id != ch.id:
-						content = "> " + reference.jump_url
+						content = "> " + jump_url
 						reference = None
 			if not x.get("recur"):
 				csubmit(ch.send(content, embed=emb, reference=reference))
 			else:
-				csubmit(self.recurrent_message(ch, content, emb, x.get("recur", 60), reference=reference, reflink=reference.jump_url if reference else None))
+				csubmit(self.recurrent_message(ch, content, emb, x.get("recur", 60), reference=reference, reflink=jump_url))
 
 	# Seen event: runs when users perform discord actions
 	async def _seen_(self, user, **void):
