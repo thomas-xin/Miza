@@ -1163,7 +1163,7 @@ class Reminder(Command):
 				if rems:
 					bot.data.reminders.listed.insort((rems[0]["t"], sendable.id), key=lambda x: x[0])
 			return ini_md(f"Successfully removed {sqr_md(lim_str(x['msg'], 128))} from {word} list for {sqr_md(sendable)}.")
-		if message is None and icon is None and delay is None:
+		if message is None and icon is None and time is None:
 			# Set callback message for scrollable list
 			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
 			await send_with_reply(
@@ -1176,11 +1176,11 @@ class Reminder(Command):
 			)
 			return
 		if not message:
-			message = "[SAMPLE ANNOUNCEMENT]" if mode == "announcement" else "[SAMPLE REMINDER]"
+			msg = "[SAMPLE ANNOUNCEMENT]" if mode == "announcement" else "[SAMPLE REMINDER]"
 			if mode == "urgent":
-				msg = bold(css_md(msg, force=True))
+				message = bold(css_md(msg, force=True))
 			else:
-				msg = bold(ini_md(msg))
+				message = bold(ini_md(msg))
 		elif len(message) > 4096:
 			raise OverflowError(f"Input message too long ({len(message)} > 4096).")
 			# # Schedule for an event from a user
@@ -1452,7 +1452,21 @@ class UpdateUrgentReminders(Database):
 								async for u in react.users():
 									if u.id != self.bot.id:
 										raise StopIteration
-						fut = csubmit(channel.send(embed=emb))
+						reference = None
+						content = None
+						if len(p) > 5:
+							url = p[5]
+							spl = url[url.index("channels/") + 9:].replace("?", "/").split("/", 2)
+							try:
+								ch = await self.fetch_channel(spl[1])
+								reference = await self.fetch_message(spl[2], ch)
+							except Exception:
+								pass
+							else:
+								if channel.id != ch.id:
+									content = "> " + reference.jump_url
+									reference = None
+						fut = csubmit(channel.send(content, embed=emb, reference=reference))
 						await self.bot.silent_delete(message)
 						message = await fut
 						await message.add_reaction("✅")
@@ -1478,11 +1492,11 @@ class UpdateReminders(Database):
 		self.listed = alist(sorted(gen, key=lambda x: x[0]))
 		self.t = utc()
 
-	async def recurrent_message(self, channel, content, embed, wait=60, reference=None):
+	async def recurrent_message(self, channel, content, embed, wait=60, reference=None, reflink=None):
 		t = utc()
 		message = await channel.send(content, embed=embed, reference=reference)
 		await message.add_reaction("✅")
-		self.bot.data.urgentreminders.coercedefault("listed", alist, alist()).insort([t + wait, channel.id, message.id, embed, wait], key=lambda x: x)
+		self.bot.data.urgentreminders.coercedefault("listed", alist, alist()).insort([t + wait, channel.id, message.id, embed, wait, reflink], key=lambda x: x)
 
 	async def __call__(self):
 		if utc() - self.t >= 4800:
@@ -1535,18 +1549,18 @@ class UpdateReminders(Database):
 			content = None
 			if x.get("ref"):
 				try:
-					channel = await self.bot.fetch_message(x["ref"][0])
-					reference = await self.bot.fetch_message(channel, x["ref"][1])
+					channel = await self.bot.fetch_channel(x["ref"][0])
+					reference = await self.bot.fetch_message(x["ref"][1], channel)
 				except Exception:
 					pass
 				else:
 					if channel.id != ch.id:
-						reference = None
 						content = "> " + reference.jump_url
+						reference = None
 			if not x.get("recur"):
 				csubmit(ch.send(content, embed=emb, reference=reference))
 			else:
-				csubmit(self.recurrent_message(ch, content, emb, x.get("recur", 60), reference=reference))
+				csubmit(self.recurrent_message(ch, content, emb, x.get("recur", 60), reference=reference, reflink=reference.jump_url if reference else None))
 
 	# Seen event: runs when users perform discord actions
 	async def _seen_(self, user, **void):

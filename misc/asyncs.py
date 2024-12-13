@@ -368,9 +368,17 @@ async def delayed_coro(fut, duration=None):
 	async with Delay(duration):
 		return await fut
 
+def delayed_sync(fut, duration=None):
+	with Delay(duration):
+		return fut.result()
+
 async def waited_coro(fut, duration=None):
 	await asyncio.sleep(duration)
 	return await fut
+
+def waited_sync(fut, duration=None):
+	time.sleep(duration)
+	return fut.result()
 
 async def traceback_coro(fut, *args):
 	try:

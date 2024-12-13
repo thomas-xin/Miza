@@ -2610,7 +2610,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					temp = tmpcut
 					tlen = tmplen
 				else:
-					temp = tmpcut = await ai.cut_to(messages, 2048, 1024, best=True, premium_context=premium_context)
+					temp = tmpcut = await ai.cut_to(messages, 65536, ctx // 3, best=True, premium_context=premium_context)
 					tmplen = await count_to(tmpcut)
 					tlen = tmplen = ceil(tmplen * 1.1) + 4 * len(tmpcut)
 			else:
@@ -8867,9 +8867,9 @@ if __name__ == "__main__":
 					miza.run()
 			sys.__stdout__.write("MAIN PROCESS EXITING...")
 			common.MEM_LOCK.close()
-			misc.asyncs.athreads.shutdown(wait=False)
-			misc.asyncs.bthreads.shutdown(wait=False)
-			misc.asyncs.pthreads.shutdown(wait=False)
-			misc.asyncs.mthreads.shutdown(wait=False)
+			asyncs.athreads.shutdown(wait=False)
+			asyncs.bthreads.shutdown(wait=False)
+			asyncs.pthreads.shutdown(wait=False)
+			asyncs.mthreads.shutdown(wait=False)
 	print = _print
 	sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__

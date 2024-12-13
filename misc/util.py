@@ -39,7 +39,7 @@ from math import ceil, comb, inf, isfinite, isqrt
 from urllib.parse import quote_plus, unquote_plus
 from traceback import format_exc, print_exc
 from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, fcdict, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, T2, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, MultiEncoder, sublist_index # noqa: F401
-from misc.asyncs import cst, await_fut, wrap_future, awaitable, reflatten, asubmit, csubmit, esubmit, tsubmit, waited_coro, Future, Semaphore
+from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, asubmit, csubmit, esubmit, tsubmit, waited_sync, Future, Semaphore
 
 try:
 	from random import randbytes
@@ -2297,6 +2297,7 @@ class FileHashDict(collections.abc.MutableMapping):
 				gen.difference_update(self.deleted)
 			if self.codb:
 				gen.update(self.codb)
+			gen.discard("--datestr")
 			self.iter = alist(gen)
 		return self.iter
 
@@ -2468,6 +2469,13 @@ class FileHashDict(collections.abc.MutableMapping):
 
 	def sync(self):
 		"Saves all changes to the database."
+		vac = False
+		datestr = str(datetime.datetime.now(tz=datetime.timezone.utc).date())
+		if datestr != self.get("--datestr", None):
+			vac = True
+			self.data["--datestr"] = datestr
+			self.modified.add("--datestr")
+			self.deleted.discard("--datestr")
 		modified = set(self.modified)
 		self.modified.clear()
 		deleted = set(self.deleted)
@@ -2530,9 +2538,7 @@ class FileHashDict(collections.abc.MutableMapping):
 			while len(self.data) > self.cache_size:
 				with suppress(KeyError, RuntimeError):
 					self.data.pop(next(iter(self.data)))
-		datestr = str(datetime.datetime.now(tz=datetime.timezone.utc).date())
-		if datestr != getattr(self, "datestr", None):
-			self.datestr = datestr
+		if vac:
 			self.vacuum()
 		return inter
 
@@ -2584,7 +2590,7 @@ class Cache(dict):
 			object.__setattr__(self, "soonest", inf)
 		object.__setattr__(self, "tmap", tmap)
 		if self:
-			fut = csubmit(waited_coro(self._update(), timeout))
+			fut = esubmit(waited_sync, self._update, timeout)
 		else:
 			fut = None
 		object.__setattr__(self, "waiting", fut)
@@ -2602,15 +2608,15 @@ class Cache(dict):
 		object.__setattr__(self, "tmap", db["__tmap"])
 		super().clear()
 		if self.waiting:
-			cst(self.waiting.cancel)
-		fut = csubmit(waited_coro(self._update(), self.timeout))
+			self.waiting.cancel()
+		fut = esubmit(waited_sync, self._update, self.timeout)
 		object.__setattr__(self, "waiting", fut)
 		t = time.time() + self.timeout
 		for k in self.db:
 			if k not in self.tmap:
 				self.tmap[k] = t
 
-	async def _update(self):
+	def _update(self):
 		tmap = self.tmap
 		timeout = self.timeout
 		lost = self.lost
@@ -2621,8 +2627,8 @@ class Cache(dict):
 				ts = tmap[k] + timeout
 				object.__setattr__(self, "soonest", ts)
 				if self.waiting:
-					cst(self.waiting.cancel)
-				fut = csubmit(waited_coro(self._update(), ts - t))
+					self.waiting.cancel()
+				fut = esubmit(waited_sync, self._update, ts - t)
 				object.__setattr__(self, "waiting", fut)
 				break
 			popcount += 1
@@ -2669,10 +2675,10 @@ class Cache(dict):
 		if ts < self.soonest:
 			object.__setattr__(self, "soonest", ts)
 			if self.waiting:
-				cst(self.waiting.cancel)
-			fut = csubmit(waited_coro(self._update(), timeout))
+				self.waiting.cancel()
+			fut = esubmit(waited_sync, self._update, ts - t)
 			if self.waiting:
-				cst(self.waiting.cancel)
+				self.waiting.cancel()
 			object.__setattr__(self, "waiting", fut)
 		self.tmap[k] = ts
 
