@@ -45,6 +45,10 @@ available = {
 		"anthropic": ("claude-3-5-haiku-20241022", ("1", "5")),
 		None: "gpt-4m",
 	},
+	"claude-3-haiku": {
+		"anthropic": ("claude-3-haiku-20240307", ("1", "5")),
+		None: "gpt-4m",
+	},
 	"llama-3-405b": {
 		"deepinfra": ("meta-llama/Meta-Llama-3.1-405B-Instruct", ("1.79", "1.79")),
 		"fireworks": ("accounts/fireworks/models/llama-v3p1-405b-instruct", ("3", "3")),
@@ -57,9 +61,9 @@ available = {
 		None: "llama-3-70b",
 	},
 	"llama-3-70b": {
-		"deepinfra": ("meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", ("0.13", "0.4")),
-		"together": ("meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", ("0.88", "0.88")),
-		"fireworks": ("accounts/fireworks/models/llama-v3p1-70b-instruct", ("0.9", "0.9")),
+		"fireworks": ("accounts/fireworks/models/llama-v3p3-70b-instruct", ("0.9", "0.9")),
+		"deepinfra": ("meta-llama/Llama-3.3-70B-Instruct", ("0.23", "0.4")),
+		"together": ("meta-llama/Llama-3.3-70B-Instruct-Turbo", ("0.88", "0.88")),
 		None: "lzlv-70b",
 	},
 	"llama-3-11b": {
@@ -504,7 +508,7 @@ def chatml(m, mode="im"):
 			name = name.removeprefix("name=").strip()
 		else:
 			return f"{s}{role}\n" + content + e
-	return f"{s}{role} name={name}\n" + content + e
+	return f"{s}{role} name={name}\n\n" + content + e
 
 def llamav3(m):
 	s, e = "<|start_header_id|>", "<|eot_id|>"
@@ -551,7 +555,7 @@ def cohere(m):
 			name = name.removeprefix("name=").strip()
 		else:
 			return f"{s}\n" + content + e
-	return f"{s}name={name}\n" + content + e
+	return f"{s}name={name}\n\n" + content + e
 
 def mistral(m):
 	if not isinstance(m, cdict):
@@ -575,7 +579,7 @@ def mistral(m):
 			name = name.removeprefix("name=").strip()
 		else:
 			return f"{s}{role}\n" + content + e
-	return f"{s}{role} name={name}\n" + content + e
+	return f"{s}{role} name={name}\n\n" + content + e
 
 def vicuna(m):
 	if not isinstance(m, cdict):
@@ -925,9 +929,9 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 							m2 = cdict(m)
 							name = m2.pop("name")
 							if isinstance(m2.content, list):
-								m2.content = [cdict(type="text", text=f"name={name}\n{c.text}") if c.get("type") == "text" else c for c in m2.content]
+								m2.content = [cdict(type="text", text=f"name={name}\n\n{c.text}") if c.get("type") == "text" else c for c in m2.content]
 							else:
-								m2.content = f"name={name}\n{m2.content}"
+								m2.content = f"name={name}\n\n{m2.content}"
 							m = m2
 						messages.append(m)
 					kwa["messages"] = messages
@@ -940,9 +944,9 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 								m2 = cdict(m)
 								name = m2.pop("name")
 								if isinstance(m2.content, list):
-									m2.content = [cdict(type="text", text=f"name={name}\n{c.text}") if c.get("type") == "text" else c for c in m2.content]
+									m2.content = [cdict(type="text", text=f"name={name}\n\n{c.text}") if c.get("type") == "text" else c for c in m2.content]
 								else:
-									m2.content = f"name={name}\n{m2.content}"
+									m2.content = f"name={name}\n\n{m2.content}"
 								m = m2
 						messages.append(m)
 					tcid = set()
@@ -1460,7 +1464,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 
 async def instruct(data, best=False, skip=False, prune=True, cache=True, user=None):
 	data["prompt"] = data.get("prompt") or data.pop("inputs", None) or data.pop("input", None)
-	key = shash(str((data["prompt"], data.get("model", "claude-3.5-haiku"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
+	key = shash(str((data["prompt"], data.get("model", "gpt-4m"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
 	if cache:
 		tup = await CACHE.retrieve_from(key, _instruct2, data, best=best, skip=skip, prune=prune, user=user)
 		if tup[1] >= best:
@@ -1501,7 +1505,7 @@ async def _instruct(data, best=False, skip=False, user=None):
 		dec = True and not skip
 	if dec:
 		inputs["model"] = "auto" if best else "llama-3-8b"
-	if data.get("model", "claude-3.5-haiku") in is_chat:
+	if data.get("model", "gpt-4m") in is_chat:
 		prompt = inputs.pop("prompt")
 		inputs["messages"] = [cdict(role="user", content=prompt)]
 		async with asyncio.timeout(70):
@@ -1616,9 +1620,9 @@ f_reminder = {
 					"type": "string",
 					"description": "Message, eg. Remember to take your meds!",
 				},
-				"delay": {
+				"time": {
 					"type": "string",
-					"description": "Delay, eg. 3 days 3.9 seconds",
+					"description": "Datetime, eg. 3 days 3.9 seconds after next april 7th",
 				},
 			},
 			"required": ["message", "delay"],
@@ -2089,7 +2093,7 @@ def to_claude(messages, tools=None):
 		content = (content or "").strip()
 		if m.get("name"):
 			if m.get("role") == "user":
-				content = "name=" + m.pop("name") + "\n" + content
+				content = "name=" + m.pop("name") + "\n\n" + content
 			else:
 				m.pop("name", None)
 		if images and m.get("role") == "user":

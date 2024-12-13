@@ -310,6 +310,7 @@ class CustomAudio(collections.abc.Hashable):
 		joining = False
 		if isinstance(vc, int):
 			vc = bot.get_channel(vc)
+		assert vc
 		guild = vc.guild
 		if guild.id not in bot.data.audio.players:
 			auds = bot.data.audio.players[guild.id] = cls(text)
@@ -2873,6 +2874,7 @@ class AudioDownloader:
 
 	@tracebacksuppressor
 	def complete(self, url, fh):
+		return None
 		fn = f"{TEMP_PATH}/audio/{fh}"
 		assert os.path.exists(fn)
 		br = ecdc_br(fn)

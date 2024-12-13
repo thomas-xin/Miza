@@ -184,6 +184,13 @@ def force_kill(proc):
 	except psutil.TimeoutExpired:
 		proc.kill()
 
+def get_free_port():
+	engaged = set(s.laddr.port for s in psutil.net_connections())
+	choices = set(range(32768, 65536)).difference(engaged)
+	if not choices:
+		raise ValueError("No inbound TCP ports available.")
+	return random.choice(tuple(choices))
+
 def esafe(s, binary=False):
 	return (d := as_str(s).replace("\n", "\uffff")) and (d.encode("utf-8") if binary else d)
 def dsafe(s):
@@ -196,7 +203,7 @@ def quit(*args, **kwargs): force_kill(PROC)
 
 
 # SHA256 operations: base64 and base16.
-def shash(s): return base64.urlsafe_b64encode(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).rstrip(b"=").decode("ascii")
+def shash(s): return e64(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).decode("ascii")
 def uhash(s): return shash(s) if len(s) > 43 or not s.isalnum() else s
 def hhash(s): return hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).hexdigest()
 def ihash(s): return int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little") % 4294967296 - 2147483648
@@ -1134,6 +1141,16 @@ def byte_unscale(s, ratio=1024):
 		n = round_min(n)
 	return round_min(n * ratio ** __uscales.index(s.lower()))
 
+def e64(b):
+	return base64.urlsafe_b64encode(b).rstrip(b"=")
+
+def b64(b):
+	if isinstance(b, str):
+		b = b.encode("ascii")
+	if len(b) & 3:
+		b += b"=="
+	return base64.urlsafe_b64decode(b)
+
 def cantor(*x):
 	n = len(x)
 	p = 0
@@ -1151,11 +1168,9 @@ def encode_filename(fn):
 	fn = fn.encode("ascii").replace(b"-", b"--").replace(b".", b"-_")
 	if fn.endswith(b"A"):
 		fn += b"_"
-	if len(fn) & 3:
-		fn += b"A=="
-	return base64.urlsafe_b64decode(fn)
+	return b64(fn)
 def decode_filename(b):
-	fn = base64.urlsafe_b64encode(b).rstrip(b"==").removesuffix(b"A")
+	fn = e64(b).removesuffix(b"A")
 	fn = fn.replace(b"-_", b".").replace(b"--", b"-")
 	return fn.rstrip(b"_").decode("ascii")
 
@@ -1241,13 +1256,9 @@ def encode_snowflake(*args, store_count=False):
 		encoded = bytes([len(args)]) + encoded
 	elif encoded[0] < 128:
 		encoded = b"\x7f" + encoded
-	return base64.urlsafe_b64encode(encoded).rstrip(b"=").decode("ascii")
+	return e64(encoded).decode("ascii")
 def decode_snowflake(data, n=1):
-	if isinstance(data, str):
-		data = data.encode("ascii")
-	if len(data) & 3:
-		data += b"=="
-	decoded = base64.urlsafe_b64decode(data)
+	decoded = b64(data)
 	if 1 < decoded[0] < 127:
 		n, decoded = decoded[0], decoded[1:]
 	elif decoded[0] == 127:
@@ -1315,15 +1326,10 @@ def expand_attachment(url):
 
 def p2n(b):
 	"Converts a urlsafe-base64 string to big-endian integer."
-	if isinstance(b, str):
-		b = b.encode("ascii")
-	if len(b) % 4:
-		b += b"=="
-	return b2n(base64.urlsafe_b64decode(b))
+	return b2n(b64(b))
 def n2p(n):
 	"Converts a big-endian integer to unpadded urlsafe-base64 representation."
-	b = n2b(n)
-	return base64.urlsafe_b64encode(b).rstrip(b"=").decode("ascii")
+	return e64(n2b(n))
 
 
 enc_key = None
@@ -1331,14 +1337,14 @@ with tracebacksuppressor:
 	enc_key = AUTH["encryption_key"]
 
 if not enc_key:
-	enc_key = (AUTH.get("discord_secret") or AUTH.get("discord_token") or as_str(base64.b64encode(randbytes(32)).rstrip(b"="))).replace(".", "A").replace("_", "a").replace("-", "a")[:43]
+	enc_key = (AUTH.get("discord_secret") or AUTH.get("discord_token") or e64(randbytes(32)).decode("ascii")).replace(".", "A").replace("_", "a").replace("-", "a")[:43]
 	while len(enc_key) < 43:
 		enc_key += "A"
 	AUTH["encryption_key"] = enc_key 
 	save_auth(AUTH)
 
 enc_key += "=="
-enc_box = nacl.secret.SecretBox(base64.b64decode(enc_key)[:32])
+enc_box = nacl.secret.SecretBox(b64(enc_key)[:32])
 
 def encrypt(s): 
 	if not isinstance(s, byte_like):
@@ -1378,13 +1384,13 @@ def bytes2zip(data, lzma=True):
 		return a
 	return b"!" + zlib.compress(data)
 
-@always_copy
-@functools.lru_cache(maxsize=256)
 def eval_json(s):
 	"Safer than raw eval, more powerful than json.loads. No global variables are provided."
-	if isinstance(s, memoryview):
-		s = s.tobytes()
-	if isinstance(s, byte_like) and s.startswith(b"b'") and s.endswith(b"'") or isinstance(s, str) and s.startswith("b'") and s.endswith("'"):
+	if not isinstance(s, str | bytes):
+		s = bytes(s)
+	if isinstance(s, byte_like) and s.startswith(b'b64("') and s.endswith(b'")'):
+		return b64(s[5:-2])
+	if isinstance(s, byte_like) and s.startswith(b"b'") and s.endswith(b"'"):
 		return safe_eval(s)
 	try:
 		return orjson.loads(s)
@@ -1401,11 +1407,11 @@ def eval_json(s):
 
 def maybe_json(d):
 	if isinstance(d, BaseException):
-		return repr(d)
+		return repr(d).encode("utf-8")
 	if isinstance(d, byte_like):
 		if not isinstance(d, bytes):
 			d = bytes(d)
-		return repr(d)
+		return (b'b64("' + e64(d) + b'")')
 	try:
 		return json_dumps(d)
 	except TypeError:
@@ -2326,6 +2332,7 @@ class FileHashDict(collections.abc.MutableMapping):
 			with self.db_sem:
 				s = next(self.cur.next().execute(f"SELECT value FROM '{self.internal}' WHERE key=?", [k]))[0]
 			if not s:
+				self.deleted.add(k)
 				raise RuntimeError(f"Found empty value for key {k} in {self.internal}")
 			d = self.decode(s)
 			value = select_and_loads(d)
@@ -2523,6 +2530,10 @@ class FileHashDict(collections.abc.MutableMapping):
 			while len(self.data) > self.cache_size:
 				with suppress(KeyError, RuntimeError):
 					self.data.pop(next(iter(self.data)))
+		datestr = str(datetime.datetime.now(tz=datetime.timezone.utc).date())
+		if datestr != getattr(self, "datestr", None):
+			self.datestr = datestr
+			self.vacuum()
 		return inter
 
 	def unload(self):
@@ -2908,9 +2919,9 @@ class AttachmentCache(Cache):
 			c_id, m_id, a_id, fn = split_url(url, m_id)
 		ac = self.attachment_count
 		if isinstance(c_id, str) and not c_id.isnumeric():
-			c_id = int.from_bytes(base64.urlsafe_b64decode(c_id + "=="), "big")
-			m_id = int.from_bytes(base64.urlsafe_b64decode(m_id + "=="), "big")
-			a_id = int.from_bytes(base64.urlsafe_b64decode(a_id + "=="), "big")
+			c_id = int.from_bytes(b64(c_id), "big")
+			m_id = int.from_bytes(b64(m_id), "big")
+			a_id = int.from_bytes(b64(a_id), "big")
 		if not a_id:
 			a_id = 0
 		if a_id >= ac:
@@ -3248,6 +3259,8 @@ async def aretry(func, *args, attempts=5, delay=1, exc=(), **kwargs):
 
 # Evaluates an an expression, returning it if it is an exception.
 def evalex(exc, glob=None, loc=None):
+	if not isinstance(exc, str | bytes):
+		exc = bytes(exc)
 	try:
 		ex = eval(exc, glob, loc)
 	except (SyntaxError, NameError):
@@ -3274,6 +3287,7 @@ def evalFX(exc):
 # Much more powerful exec function that can evaluate async expressions, is thread-safe, and always returns the value on the last line even without a return statement specified.
 def aexec(s, glob=None, filename="<aexec>"):
 	glob = glob or globals()
+	s = as_str(s)
 	if s.startswith("!"):
 		proc = subprocess.run(s[1:], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		output = (as_str(proc.stdout) + "\n" + as_str(proc.stderr)).strip()
@@ -3450,13 +3464,13 @@ MEMS = {}
 @tracebacksuppressor
 def share_bytes(sender, b):
 	if len(b) <= 65536 - 1:
-		return sender(b"\x00" + b)
+		return sender(b"\x01" + b)
 	mem = multiprocessing.shared_memory.SharedMemory(create=True, size=len(b))
 	print(mem)
 	MEMS[mem.name] = mem
 	mem.buf[:len(b)] = b
 	try:
-		return sender(b"\x01" + len(b).to_bytes(8, "little") + mem.name.encode("utf-8"))
+		return sender(b"\x02" + len(b).to_bytes(8, "little") + mem.name.encode("utf-8"))
 	except:
 		mem.close()
 		raise
@@ -3466,10 +3480,11 @@ def receive_bytes(receiver, unlink):
 	b = receiver()
 	if not b:
 		return b
-	if b[0] == 0:
+	if b[0] == 1:
 		return MemoryBytes(b)[1:]
 	mode, size, name = b[:1], b[1:9], b[9:]
-	assert mode[0] == 1
+	if mode[0] != 2:
+		return b
 	size = int.from_bytes(size, "little")
 	name = as_str(name)
 	mem = multiprocessing.shared_memory.SharedMemory(create=False, name=name)
@@ -3488,6 +3503,7 @@ class PipeableIterator(collections.abc.Iterator):
 		self.i = 0
 		self.stop_index = inf
 		self.condition = threading.Condition()
+		self.buffer = None
 
 	def __next__(self):
 		while self.i >= len(self.items) and self.condition is not None:
@@ -3503,21 +3519,35 @@ class PipeableIterator(collections.abc.Iterator):
 	def append(self, item):
 		self.items.append(item)
 		with self.condition:
-			self.condition.notify_all()
+			self.condition.notify()
 
 	def terminate(self):
 		self.stop_index = len(self.items)
 		if self.condition is None:
-			return
+			return self
 		condition, self.condition = self.condition, None
 		with condition:
 			condition.notify_all()
+		return self
+	close = terminate
+
+	def read(self, n=None):
+		if n is None:
+			return (self.buffer or b"") + b"".join(self)
+		b = self.buffer or b""
+		while len(b) < n:
+			try:
+				b += next(self)
+			except StopIteration:
+				break
+		b, self.buffer = b[:n], b[n:]
+		return b
 
 class EvalPipe:
 
 	MEMS = globals()["MEMS"]
 
-	def __init__(self, p_alive, p_in, p_out, p_kill=None, p_join=None, writable=True, start=True, pad_newline=True, glob=globals(), id=0, server=None):
+	def __init__(self, p_alive, p_in, p_out, p_kill=None, p_join=None, writable=True, start=True, glob=globals(), id=0, server=None):
 		self.rlock = threading.Lock()
 		self.wlock = threading.Lock()
 		self.responses = {}
@@ -3528,7 +3558,6 @@ class EvalPipe:
 		self.p_kill = p_kill
 		self.p_join = p_join
 		self.writable = writable
-		self.pad_newline = pad_newline
 		self.cache = {}
 		self.glob = glob
 		self.id = id
@@ -3539,23 +3568,24 @@ class EvalPipe:
 
 	key = b"EvalPipe"
 	@classmethod
-	def connect(cls, args, port, glob=globals(), timeout=60):
+	def connect(cls, args, port, independent=True, glob=globals(), timeout=60):
 		addr = ("127.0.0.1", port)
 		print("EvalPipe connecting to", addr)
 		try:
 			conn = multiprocessing.connection.Client(addr, authkey=cls.key)
 		except ConnectionRefusedError:
-			script = None
-			ts = ts_us()
-			if os.name == "nt":
-				argstr = " ".join(map(json_dumpstr, args)) + "\nexit /b"
-				script = f"cache\\{ts}.bat"
-				with open(script, "w") as f:
-					f.write(argstr)
-				args = f"wt -w 0 -d %cd% cmd /s/c {script}"
-			else:
-				argstr = " ".join(map(json_dumpstr, args))
-				args = ["xterm", "-e", argstr]
+			if independent:
+				script = None
+				ts = ts_us()
+				if os.name == "nt":
+					argstr = " ".join(map(json_dumpstr, args)) + "\nexit /b"
+					script = f"cache\\{ts}.bat"
+					with open(script, "w") as f:
+						f.write(argstr)
+					args = f"wt -w 0 -d %cd% cmd /s/c {script}"
+				else:
+					argstr = " ".join(map(json_dumpstr, args))
+					args = ["xterm", "-e", argstr]
 			print(args)
 			subprocess.Popen(args, shell=isinstance(args, str))
 			for i in range(timeout):
@@ -3579,16 +3609,16 @@ class EvalPipe:
 			proc.wait,
 			glob=glob,
 			id=port,
-			pad_newline=False,
 		)
 		self.p_out = lambda: receive_bytes(conn.recv_bytes, unlink=lambda name: self.submit(f"EvalPipe.MEMS.pop({repr(name)}).close()"))
+		self.proc = proc
 		return self
 
 	@classmethod
-	def listen(cls, port, glob=globals(), start=False):
+	def listen(cls, port=0, glob=globals(), start=False):
 		addr = ("127.0.0.1", port)
 		server = multiprocessing.connection.Listener(addr, authkey=cls.key)
-		print("EvalPipe listening on", addr)
+		print("EvalPipe listening on", server.address)
 		return cls(
 			lambda: True,
 			None,
@@ -3598,7 +3628,6 @@ class EvalPipe:
 			writable=False,
 			glob=glob,
 			id=port + 3,
-			pad_newline=False,
 			server=server,
 			start=start,
 		)
@@ -3606,9 +3635,10 @@ class EvalPipe:
 	@classmethod
 	def from_proc(cls, proc, glob=globals()):
 		flushin = Flush(proc.stdin)
+		print("EvalPipe connecting on", proc.pid)
 		return cls(
 			proc.is_running,
-			flushin.write,
+			lambda b: flushin.write(b.rstrip(b"\n") + b"\n"),
 			proc.stdout.readline,
 			proc.terminate,
 			proc.wait,
@@ -3619,9 +3649,10 @@ class EvalPipe:
 	@classmethod
 	def from_stdin(cls, start=False, glob=globals()):
 		flushout = Flush(sys.__stdout__.buffer, flush=sys.__stdout__.flush)
+		print("EvalPipe listening from", os.getpid())
 		return cls(
 			lambda: not sys.__stdin__.closed,
-			flushout.write,
+			lambda b: flushout.write(b.rstrip(b"\n") + b"\n"),
 			sys.__stdin__.buffer.readline,
 			sys.exit,
 			start=start,
@@ -3629,10 +3660,13 @@ class EvalPipe:
 			id=os.getpid() + 3,
 		)
 
-	def start(self):
+	def start(self, background=True):
 		if self.thread:
-			return
+			return self.thread
+		if not background:
+			return self.communicating()
 		self.thread = tsubmit(self.communicating)
+		return self.thread
 
 	def ensure_writable(self, timeout=12):
 		assert self.p_alive()
@@ -3652,14 +3686,18 @@ class EvalPipe:
 				raise TimeoutError(timeout)
 		assert self.p_alive()
 
-	def submit(self, s) -> Future:
+	def submit(self, s, priority=False) -> Future:
 		self.ensure_writable()
 		with self.rlock:
-			mr = bool(self.responses) and max(self.responses)
-			mi = bool(self.iterators) and max(self.iterators)
+			mr = bool(self.responses) and max(max(self.responses), -min(self.responses))
+			mi = bool(self.iterators) and max(max(self.iterators), -min(self.iterators))
 			i = max(mr, mi) + 1
+			if priority:
+				i = -i
 			fut = self.responses[i] = Future()
-		b = f"~>{i}:".encode("ascii") + esafe(s, binary=True)
+		if isinstance(s, str):
+			s = s.encode("utf-8")
+		b = f"~>{i}:".encode("ascii") + s
 		self.send(b)
 		return fut
 
@@ -3697,8 +3735,6 @@ class EvalPipe:
 		sys.__stderr__.flush()
 
 	def send(self, b):
-		if self.pad_newline:
-			b += b"\n"
 		# self.debug(RAINBOW[self.id % len(RAINBOW)] + str(b) + WHITE + "\n")
 		with self.wlock:
 			return self.p_in(b)
@@ -3710,7 +3746,7 @@ class EvalPipe:
 		except BaseException as ex:
 			print_exc()
 			s = maybe_json(ex)
-			b = f"<~{i}:!:".encode("ascii") + esafe(s, binary=True)
+			b = f"<~{i}:!:".encode("ascii") + s
 			self.send(b)
 			return
 		if isinstance(resp, collections.abc.AsyncIterator):
@@ -3718,13 +3754,13 @@ class EvalPipe:
 		if isinstance(resp, collections.abc.Iterator):
 			for x in resp:
 				s = maybe_json(x)
-				b = f"<~{i}:#:".encode("ascii") + esafe(s, binary=True)
+				b = f"<~{i}:#:".encode("ascii") + s
 				self.send(b)
 			b = f"<~{i}:$".encode("ascii")
 			self.send(b)
 			return
 		s = maybe_json(resp)
-		b = f"<~{i}:@:".encode("ascii") + esafe(s, binary=True)
+		b = f"<~{i}:@:".encode("ascii") + s
 		self.send(b)
 
 	# Communication; `~>{id}:{msg}` input, `<~{id}:!:{msg}` error output, `<~{id}:@:{msg}` success output, `<~{id}:#:{msg}` iterator output, `<~{id}:$` iterator end
@@ -3750,19 +3786,20 @@ class EvalPipe:
 					if not b:
 						break
 					b = MemoryBytes(b)
-					if self.pad_newline:
-						b = b[:-1]
 					if b.startswith(b"~>"):
 						b = b[2:]
 						sep = b.index(b":")
-						i, s = int(b[:sep]), dsafe(b[sep + 1:])
-						esubmit(self.compute, i, s, priority=1)
+						i, s = int(b[:sep]), b[sep + 1:].decode("utf-8")
+						if i < 0:
+							self.compute(i, s)
+						else:
+							esubmit(self.compute, i, s, priority=1)
 						continue
 					if b.startswith(b"<~"):
 						b = b[2:]
 						sep = b.index(b":")
-						i, ind, s = int(b[:sep]), chr(b[sep + 1]), dsafe(b[sep + 3:])
-						if i not in self.responses:
+						i, ind, s = int(b[:sep]), chr(b[sep + 1]), b[sep + 3:]
+						if i not in self.responses and i not in self.iterators:
 							continue
 						if ind == "#":
 							cur = eval_json(s)
@@ -3772,6 +3809,7 @@ class EvalPipe:
 								except KeyError:
 									res = PipeableIterator([cur])
 									self.responses.pop(i).set_result(res)
+									self.iterators[i] = res
 						elif ind == "@":
 							res = eval_json(s)
 							with self.rlock:
@@ -3787,7 +3825,10 @@ class EvalPipe:
 									raise KeyError("Uncaught error", ex)
 						elif ind == "$":
 							with self.rlock:
-								self.iterators.pop(i).terminate()
+								try:
+									self.iterators.pop(i).terminate()
+								except KeyError:
+									self.responses.pop(i).set_result(PipeableIterator([]).terminate())
 						else:
 							raise NotImplementedError("Unrecognised output", lim_str(s, 262144))
 						continue
@@ -3818,6 +3859,8 @@ class EvalPipe:
 		self.responses.clear()
 		for resp in tuple(self.iterators.values()):
 			resp.terminate()
+		if self.server:
+			self.server.close()
 		self.iterators.clear()
 		if self.p_kill:
 			with tracebacksuppressor:

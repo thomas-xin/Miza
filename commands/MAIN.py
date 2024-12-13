@@ -847,7 +847,6 @@ class Profile(Command):
 	slash = True
 	ephemeral = True
 	usercmd = True
-	maintenance = True
 
 	async def __call__(self, bot, _user, user, description, pronouns, website, icon, timezone, birthday, **void):
 		target = user or _user
@@ -1128,8 +1127,8 @@ class Reminder(Command):
 			description="Thumbnail to display on corner of embed",
 			example="https://mizabot.xyz/favicon",
 		),
-		delay=cdict(
-			type="timedelta",
+		time=cdict(
+			type="datetime",
 			description="Optional field containing any text; will show above description when set",
 			example="35 minutes and 6.25 seconds before 3am next tuesday",
 		),
@@ -1144,7 +1143,7 @@ class Reminder(Command):
 	rate_limit = (8, 13)
 	slash = True
 
-	async def __call__(self, bot, _message, _comment, _channel, _user, mode="reminder", message=None, icon=None, delay=None, remove=None, **void):
+	async def __call__(self, bot, _message, _comment, _channel, _user, mode="reminder", message=None, icon=None, time=None, remove=None, **void):
 		sendable = _channel if mode == "announce" else _user
 		rems = bot.data.reminders.get(sendable.id, [])
 		if remove is not None:
@@ -1195,11 +1194,11 @@ class Reminder(Command):
 			# s = "$" + str(t)
 			# seq = set_dict(bot.data.reminders, s, deque())
 			# seq.append(sendable.id)
-		dt = DynamicDT.utcnow() + delay
+		dt = time
 		rem = cdict(
 			user=_user.id,
 			msg=message,
-			t=dt.timestamp_fraction(),
+			t=dt.timestamp_exact(),
 			ref=(_message.channel.id, _message.id),
 		)
 		recur = 60 if mode == "urgent" else None
@@ -1479,11 +1478,11 @@ class UpdateReminders(Database):
 		self.listed = alist(sorted(gen, key=lambda x: x[0]))
 		self.t = utc()
 
-	async def recurrent_message(self, channel, embed, wait=60, reference=None):
+	async def recurrent_message(self, channel, content, embed, wait=60, reference=None):
 		t = utc()
-		message = await channel.send(embed=embed, reference=reference)
+		message = await channel.send(content, embed=embed, reference=reference)
 		await message.add_reaction("✅")
-		self.bot.data.urgentreminders.data["listed"].insort([t + wait, channel.id, message.id, embed, wait], key=lambda x: x)
+		self.bot.data.urgentreminders.coercedefault("listed", alist, alist()).insort([t + wait, channel.id, message.id, embed, wait], key=lambda x: x)
 
 	async def __call__(self):
 		if utc() - self.t >= 4800:
@@ -1533,17 +1532,21 @@ class UpdateReminders(Database):
 			if x.get("icon"):
 				emb.set_thumbnail(url=x["icon"])
 			reference = None
+			content = None
 			if x.get("ref"):
 				try:
 					channel = await self.bot.fetch_message(x["ref"][0])
-					assert channel.id == ch.id
 					reference = await self.bot.fetch_message(channel, x["ref"][1])
 				except Exception:
 					pass
+				else:
+					if channel.id != ch.id:
+						reference = None
+						content = "> " + reference.jump_url
 			if not x.get("recur"):
-				csubmit(ch.send(embed=emb, reference=reference))
+				csubmit(ch.send(content, embed=emb, reference=reference))
 			else:
-				csubmit(self.recurrent_message(ch, emb, x.get("recur", 60), reference=reference))
+				csubmit(self.recurrent_message(ch, content, emb, x.get("recur", 60), reference=reference))
 
 	# Seen event: runs when users perform discord actions
 	async def _seen_(self, user, **void):

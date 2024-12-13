@@ -64,8 +64,6 @@ class Ask(Command):
 	)
 
 	async def __call__(self, bot, _message, _guild, _channel, _user, _nsfw, _prefix, _premium, prompt, model, **void):
-		if not torch:
-			raise NotImplementedError("AI features are currently disabled, sorry!")
 		await bot.require_integrity(_message)
 		self.description = f"Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. See {bot.kofi_url} for premium tier chatbot specifications; check using ~serverinfo, or apply it with ~premium!"
 		add_dict(bot.data.users, {_user.id: {"last_talk": 1, "last_mention": 1}})
@@ -407,8 +405,8 @@ class Ask(Command):
 						yield s
 						call = {"func": "imagine", "prompt": argv, "count": 4, "comment": text}
 					elif name == "reminder":
-						argv = str(kwargs.message) + " in " + str(kwargs.delay)
-						call = {"func": "remind", "message": kwargs.message, "delay": kwargs.delay, "comment": text}
+						argv = str(kwargs.message) + " -t " + str(kwargs.time)
+						call = {"func": "remind", "message": kwargs.message, "time": kwargs.time, "comment": text}
 					elif name == "play":
 						call = {"func": "play", "query": kwargs.query, "comment": text}
 					elif name == "audio":
@@ -900,8 +898,6 @@ class Imagine(Command):
 		comfyui_data = None
 
 	async def __call__(self, bot, _user, _channel, _message, _perm, _premium, _prefix, _comment, model, mode, url, prompt, mask, num_inference_steps, high_quality, strength, guidance_scale, aspect_ratio, negative_prompt, count, **void):
-		if not torch:
-			raise NotImplementedError("AI features are currently disabled, sorry!")
 		model = model or "auto"
 		mode = mode or ("raw" if url or mask else "preprocess")
 		aspect_ratio = 0 if not aspect_ratio[0] or not aspect_ratio[1] else aspect_ratio[0] / aspect_ratio[1]

@@ -23,7 +23,6 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
 import io
 import time
-import threading
 import concurrent.futures
 import asyncio
 import itertools
@@ -37,17 +36,20 @@ import ast
 import base64
 import hashlib
 import random
-import urllib.request
+import urllib
 import numpy as np
 from contextlib import suppress
 from math import inf, floor, ceil, log2, log10
 from traceback import print_exc
 sys.path.append("misc")
+from misc.util import EvalPipe
+
+if __name__ == "__main__":
+	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
+	print = interface.print
 
 cdict = dict
 utc = time.time
-def print(*args, sep=" ", end="\n"):
-	return sys.stdout.buffer.write(f"~print({repr(sep.join(map(str, args)))},end={repr(end)})\n".encode("utf-8")) or sys.stdout.flush()
 
 def as_str(s):
 	if type(s) in (bytes, bytearray, memoryview):
@@ -116,31 +118,31 @@ def convert_fut(fut):
 	return ret
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-if len(sys.argv) > 1 and sys.argv[1]:
-	os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
-	DEVICES = list(map(int, sys.argv[1].split(",")))
+if len(sys.argv) > 2 and sys.argv[2]:
+	os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[2]
+	DEVICES = list(map(int, sys.argv[2].split(",")))
 	DEV = DEVICES[0]
 else:
 	DEVICES = []
 	DEV = -1
-if len(sys.argv) > 2:
-	CAPS = set(sys.argv[2].split(","))
+if len(sys.argv) > 3:
+	CAPS = set(sys.argv[3].split(","))
 else:
 	CAPS = frozenset()
-if len(sys.argv) > 3:
-	COMPUTE_LOAD = orjson.loads(sys.argv[3])
+if len(sys.argv) > 4:
+	COMPUTE_LOAD = orjson.loads(sys.argv[4])
 else:
 	COMPUTE_LOAD = []
-if len(sys.argv) > 4:
-	COMPUTE_CAPS = orjson.loads(sys.argv[4])
+if len(sys.argv) > 5:
+	COMPUTE_CAPS = orjson.loads(sys.argv[5])
 else:
 	COMPUTE_CAPS = []
-if len(sys.argv) > 5:
-	COMPUTE_ORDER = [i for i in orjson.loads(sys.argv[5]) if i in DEVICES]
+if len(sys.argv) > 6:
+	COMPUTE_ORDER = [i for i in orjson.loads(sys.argv[6]) if i in DEVICES]
 else:
 	COMPUTE_ORDER = []
-if len(sys.argv) > 6:
-	IT = int(sys.argv[6])
+if len(sys.argv) > 7:
+	IT = int(sys.argv[7])
 else:
 	IT = 0
 
@@ -947,280 +949,54 @@ def max_size(w, h, maxsize, force=False):
 	return w, h
 
 if "browse" in CAPS:
-	import selenium
-	from selenium import webdriver
+	import playwright  # noqa: F401
+	sp = None
+	browsers = {}
+	def new_playwright_page(browser="firefox", viewport=dict(width=480, height=320)):
+		try:
+			return browsers[browser].new_page()
+		except KeyError:
+			if sp is None:
+				from playwright.sync_api import sync_playwright
+				globals()["sp"] = sync_playwright().start()
+			browsers[browser] = getattr(sp, browser).launch(headless=True)
+		return browsers[browser].new_page(viewport=viewport)
 
 	url_match = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
 	def is_url(url):
 		return url_match.search(url)
 
-	drivers = selenium.__dict__.setdefault("-drivers", [])
-	class_name = webdriver.common.by.By.CLASS_NAME
-	css_selector = webdriver.common.by.By.CSS_SELECTOR
-	xpath = webdriver.common.by.By.XPATH
-	tag_name = webdriver.common.by.By.TAG_NAME
-	driver_path = "misc/msedgedriver.exe"
-	browsers = dict(
-		edge=dict(
-			driver=webdriver.edge.webdriver.WebDriver,
-			service=webdriver.edge.service.Service,
-			options=webdriver.EdgeOptions,
-			path=driver_path,
-		),
-	)
-	browser = browsers["edge"]
-
-	def create_driver():
-		ts = time.time_ns()
-		folder = os.path.join(os.getcwd(), f"d~{ts}")
-		service = browser["service"](browser["path"])
-		options = browser["options"]()
-		options.add_argument("--headless")
-		options.add_argument("--disable-gpu")
-		options.add_argument("--no-sandbox")
-		options.add_argument("--deny-permission-prompts")
-		options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36")
-		prefs = {
-			"download.default_directory" : folder,
-			"profile.managed_default_content_settings.geolocation": 2,
-		}
-		options.add_experimental_option("prefs", prefs)
-
-		try:
-			driver = browser["driver"](
-				service=service,
-				options=options,
-			)
-		except selenium.common.SessionNotCreatedException as ex:
-			if "Current browser version is " in (s := repr(ex)):
-				v = s.split("Current browser version is ", 1)[-1].split(None, 1)[0]
-				if os.name == "nt":
-					url = f"https://msedgedriver.azureedge.net/{v}/edgedriver_win64.zip"
-					import requests, io, zipfile
-					with requests.get(url, headers={"User-Agent": "Mozilla/6.0"}) as resp:
-						with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
-							with z.open("msedgedriver.exe") as fi:
-								with open("misc/msedgedriver.exe", "wb") as fo:
-									b = fi.read()
-									fo.write(b)
-				else:
-					url = f"https://msedgedriver.azureedge.net/{v}/edgedriver_linux64.zip"
-					import requests, io, zipfile
-					with requests.get(url, headers={"User-Agent": "Mozilla/6.0"}) as resp:
-						with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
-							with z.open("msedgedriver") as fi:
-								with open("misc/msedgedriver", "wb") as fo:
-									b = fi.read()
-									fo.write(b)
-				driver = browser["driver"](
-					service=service,
-					options=options,
-				)
-			else:
-				raise
-		except selenium.common.WebDriverException as ex:
-			argv = " ".join(ex.args)
-			search = "unrecognized Microsoft Edge version"
-			if search in argv and "Chrome" in argv:
-				v = argv.split("Stacktrace", 1)[0].rsplit("/", 1)[-1].strip()
-				if os.name == "nt":
-					url = f"https://chromedriver.storage.googleapis.com/{v}/chromedriver_win32.zip"
-					import requests, io, zipfile
-					with requests.get(url, headers={"User-Agent": "Mozilla/6.0"}) as resp:
-						with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
-							with z.open("msedgedriver.exe") as fi:
-								with open("misc/msedgedriver.exe", "wb") as fo:
-									b = fi.read()
-									fo.write(b)
-				else:
-					url = f"https://chromedriver.storage.googleapis.com/{v}/chromedriver_linux64.zip"
-					import requests, io, zipfile
-					with requests.get(url, headers={"User-Agent": "Mozilla/6.0"}) as resp:
-						with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
-							with z.open("msedgedriver") as fi:
-								with open("misc/msedgedriver", "wb") as fo:
-									b = fi.read()
-									fo.write(b)
-				driver = browser["driver"](
-					service=service,
-					options=options,
-				)
-			else:
-				raise
-		driver.folder = folder
-		driver.get("file://")
-		return driver
-
-	LAST_DRIVER = 0
-	def ensure_drivers():
-		globals()["LAST_DRIVER"] = time.time()
-		while len(drivers) < 1:
-			drivers.append(exc.submit(create_driver))
-			time.sleep(1)
-	def get_driver():
-		globals()["LAST_DRIVER"] = time.time()
-		if not drivers:
-			drivers.append(exc.submit(create_driver))
-		try:
-			driver = drivers.pop(0)
-			if hasattr(driver, "result"):
-				driver = driver.result()
-		except selenium.common.exceptions.WebDriverException:
-			print_exc()
-			driver = create_driver()
-		else:
-			try:
-				exc.submit(getattr, driver, "title").result(timeout=0.5)
-			except Exception:
-				print_exc()
-				driver = create_driver()
-		# exc.submit(ensure_drivers)
-		return driver
-	def return_driver(d):
-		d.get("file://")
-		drivers.insert(0, d)
-	def update():
-		if time.time() - LAST_DRIVER >= 3600:
-			globals()["LAST_DRIVER"] = time.time()
-			if not drivers:
-				return
-			try:
-				d = drivers.pop(0)
-				if hasattr(d, "result"):
-					d = d.result()
-			except Exception:
-				pass
-			else:
-				drivers.clear()
-				return_driver(d)
-
 	def browse(q, text=True):
 		if not is_url(q):
-			return search(q)
-		driver = get_driver()
-		try:
-			fut = exc.submit(driver.get, q)
-			fut.result(timeout=32)
-		except Exception:
-			print("Browse: Timed out.")
-			return_driver(driver)
-			return ""
-		time.sleep(1)
-		try:
-			elem = driver.find_element(by=tag_name, value="body")
-		except Exception:
-			print("Browse: Body missing.")
-			return_driver(driver)
-			return ""
-		if text:
-			resp = elem.text
-			return_driver(driver)
-			return resp
-		osize = driver.get_window_size()
-
-		w = max(960, driver.execute_script("return document.body.parentNode.scrollWidth"))
-		h = max(540, driver.execute_script("return document.body.parentNode.scrollHeight"))
-		w, h = max_size(w, h, maxsize=65536)
-		print("ParentNode:", w, h)
-		driver.set_window_size(w, h)
-		time.sleep(0.5)
-
-		w = max(960, driver.execute_script("return document.body.parentNode.scrollWidth"))
-		h = max(540, driver.execute_script("return document.body.parentNode.scrollHeight"))
-		w, h = max_size(w, h, maxsize=1048576)
-		print("ParentNode:", w, h)
-		driver.set_window_size(w, h)
-		time.sleep(0.5)
-
-		body = driver.find_element(by=tag_name, value="body")
-		if body.size["width"] * body.size["height"] <= 1:
-			resp = driver.get_screenshot_as_png()
-		else:
-			resp = body.screenshot_as_png
-		driver.set_window_size(osize["width"], osize["height"])
-		return_driver(driver)
-		return resp
+			raise ValueError(q)
+		with new_playwright_page("chromium", dict(width=960, height=540)) as page:
+			page.goto(q, timeout=30000)
+			time.sleep(0.25)
+			bbox = page.locator("html").bounding_box()
+			w = max(960, ceil(bbox["width"]))
+			h = max(540, ceil(bbox["height"]))
+			if w != 960 or h != 540:
+				page.set_viewport_size(dict(width=w, height=h))
+				time.sleep(0.25)
+				bbox = page.locator("html").bounding_box()
+				w2 = max(960, ceil(bbox["width"]))
+				h2 = max(540, ceil(bbox["height"]))
+				if w != w2 or h != h2:
+					page.set_viewport_size(dict(width=w2, height=h2))
+					time.sleep(0.25)
+			return page.screenshot()
 
 	def wolframalpha(q):
-		driver = get_driver()
-		search = f"https://www.wolframalpha.com/input?i={urllib.parse.quote_plus(q)}"
-		fut = exc.submit(driver.get, search)
-		fut.result(timeout=16)
-		time.sleep(8)
-
-		lines = []
-		e1 = driver.find_elements(by=webdriver.common.by.By.TAG_NAME, value="h2")[:-1]
-		e2 = driver.find_elements(by=webdriver.common.by.By.TAG_NAME, value="img")[2:]
-		while e1 or e2:
-			if e1:
-				lines.append(e1.pop(0).text)
-			if e2:
-				lines.append(e2.pop(0).get_attribute("alt"))
-		return_driver(driver)
-		return "\n".join(lines)
-
-	def search(q, raw=False):
-		engine = random.choice(("google", "bing", "yahoo"))
-
-		def valid_response(t):
-			t = t.strip()
-			if t in ("View all", "See more", "Videos", "PREVIEW", "Feedback", "?", "？", "•", "·"):
-				return False
-			if t.startswith("Images for "):
-				return False
-			if t.startswith("Missing: "):
-				return False
-			if not t:
-				return False
-			return t
-
-		driver = get_driver()
-		try:
-			if engine == "google":
-				search = f"https://www.google.com/search?q={urllib.parse.quote_plus(q)}"
-			elif engine == "bing":
-				search = f"https://www.bing.com/search?q={urllib.parse.quote_plus(q)}"
-			else:
-				engine = f"https://search.yahoo.com/search?p={urllib.parse.quote_plus(q)}"
-			fut = exc.submit(driver.get, search)
-			fut.result(timeout=16)
-			time.sleep(1)
-
-			if engine == "google":
-				try:
-					elem = driver.find_element(by=webdriver.common.by.By.ID, value="rso")
-				except Exception:
-					print("Google: Timed out.")
-					return ""
-				res = elem.text
-				calcs = res.startswith("Calculator result\n")
-				if calcs:
-					return " ".join(res.split("\n", 3)[1:3])
-			elif engine == "bing":
-				try:
-					elem = driver.find_element(by=webdriver.common.by.By.ID, value="b_results")
-				except Exception:
-					print("Bing: Timed out.")
-					return ""
-				res = elem.text
-				calcs = driver.find_elements(by=webdriver.common.by.By.ID, value="rcCalB")
-				if calcs:
-					return " ".join(res.split("\n", 3)[:2])
-			else:
-				try:
-					elem = driver.find_element(by=webdriver.common.by.By.CLASS_NAME, value="searchCenterMiddle")
-				except Exception:
-					print("Yahoo: Timed out.")
-					return ""
-				res = elem.text
-				# print("Yahoo response:", res)
-				calcs = driver.find_elements(by=webdriver.common.by.By.ID, value="appMathCalculator")
-				if calcs:
-					return " ".join(res.split("\n", 3)[:2])
-			# print("Search response:", res)
-			return "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
-		finally:
-			return_driver(driver)
+		with new_playwright_page() as page:
+			page.goto(f"https://www.wolframalpha.com/input?i={urllib.parse.quote_plus(q)}", timeout=4000)
+			for i in range(30):
+				time.sleep(1)
+				elems = page.locator("h2, img").all()
+				texts = [e.text_content() or e.get_attribute("alt") for e in elems]
+				text = "\n".join(filter(bool, texts)).strip()
+				if text:
+					return text
+			raise TimeoutError(q)
 
 if CAPS.intersection(("sd", "sdxl", "scc")):
 	EXT1 = None
@@ -1881,143 +1657,26 @@ def evalImg(url, operation, args):
 		return new[1:]
 	return new
 
-
-ILLEGAL_EXCS = (BrokenPipeError, OSError, RuntimeError, TimeoutError, asyncio.TimeoutError, concurrent.futures.TimeoutError)
-
-esafe = lambda s, binary=False: (d := as_str(s).replace("\n", "\uffff")) and (d.encode("utf-8") if binary else d)
-dsafe = lambda s: s.decode("utf-8").replace("\uffff", "\n")
-
-def evaluate(ts, args):
-	try:
-		out = evalImg(*args)
-		if out and isinstance(out, (tuple, list)) and isinstance(out[0], (io.BytesIO, memoryview, Image.Image)):
-			if isinstance(out[0], io.BytesIO):
-				for i in range(len(out)):
-					out[i].seek(i)
-					out[i] = out[i].read()
-			elif isinstance(out[0], memoryview):
-				for i in range(len(out)):
-					out[i] = bytes(out[i])
-			elif isinstance(out[0], Image.Image):
-				for i in range(len(out)):
-					out[i] = save_into(out[i], out[i].size, "png", inf)
-		elif isinstance(out, io.BytesIO):
-			out.seek(0)
-			out = out.read()
-		elif isinstance(out, memoryview):
-			out = bytes(out)
-		resp = esafe(repr(out))
-		sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({resp})\n".encode("utf-8"))
-	except BaseException as ex:
-		if isinstance(ex, SystemExit):
-			raise
-		if isinstance(ex, ILLEGAL_EXCS):
-			ex = SystemError(ex.__class__.__name__, *ex.args)
-		resp = esafe(repr(ex))
-		sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception({resp})\n".encode("utf-8"))
-		sa = lim_str(args, 256)
-		resp = esafe(repr(traceback.format_exc()))
-		sys.stdout.buffer.write(f"~print({repr(sa)},{resp},sep='\\n',end='')\n".encode("utf-8"))
-		traceback.print_exc()
-	sys.stdout.flush()
+def evaluate_image(args):
+	out = evalImg(*args)
+	if out and isinstance(out, (tuple, list)) and isinstance(out[0], (io.BytesIO, memoryview, Image.Image)):
+		if isinstance(out[0], io.BytesIO):
+			for i in range(len(out)):
+				out[i].seek(i)
+				out[i] = out[i].read()
+		elif isinstance(out[0], memoryview):
+			for i in range(len(out)):
+				out[i] = bytes(out[i])
+		elif isinstance(out[0], Image.Image):
+			for i in range(len(out)):
+				out[i] = save_into(out[i], out[i].size, "png", inf)
+	elif isinstance(out, io.BytesIO):
+		out.seek(0)
+		out = out.read()
+	elif isinstance(out, memoryview):
+		out = bytes(out)
+	return out
 
 
-# exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
-# loop = asyncio.new_event_loop()
 if __name__ == "__main__":
-
-	def ensure_parent():
-		parent = psutil.Process(os.getppid())
-		while True:
-			if not is_strict_running(parent):
-				p = psutil.Process()
-				for c in p.children(True):
-					c.terminate()
-					try:
-						c.wait(timeout=2)
-					except psutil.TimeoutExpired:
-						c.kill()
-				p.terminate()
-				break
-			time.sleep(12)
-
-	def process_cmd(argv):
-		argv = dsafe(argv.rstrip())
-		if argv[0] == "~":
-			ts, s = argv[1:].split("~", 1)
-			d = s
-			try:
-				d = s.encode("utf-8")
-				if b"pickle." in d:
-					import pickle
-					globals()["pickle"] = pickle
-				args = eval(d)
-				if args[1] == "&":
-					args[1] = "$"
-					evaluate(ts, args)
-				elif args[1] == "%":
-					args.pop(1)
-					x_math.evaluate(ts, args)
-				else:
-					exc.submit(evaluate, ts, args)
-			except BaseException as ex:
-				if isinstance(ex, SystemExit):
-					raise
-				if isinstance(ex, ILLEGAL_EXCS):
-					ex = SystemError(ex.__class__.__name__, *ex.args)
-				resp = esafe(repr(ex))
-				sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception({resp})\n".encode("utf-8"))
-				sa = lim_str(s, 256)
-				resp = esafe(repr(sa))
-				sys.stdout.buffer.write(f"~print({resp}, end='')\n".encode("utf-8"))
-				resp = esafe(repr(traceback.format_exc()))
-				sys.stdout.buffer.write(f"~print({resp}, end='')\n".encode("utf-8"))
-				traceback.print_exc()
-				sys.stdout.flush()
-			while len(CACHE) > 32:
-				try:
-					CACHE.pop(next(iter(CACHE)))
-				except RuntimeError:
-					pass
-		else:
-			resp = esafe(repr(argv))
-			sys.stdout.buffer.write(f"~print({resp},end='')\n".encode("utf-8"))
-			sys.stdout.flush()
-
-	def update_loop():
-		sys.stdout.buffer.write("~print('',end='')\n".encode("utf-8") * 2)
-		sys.stdout.flush()
-		while True:
-			argv = sys.stdin.buffer.readline()
-			if not argv:
-				raise SystemExit
-			process_cmd(argv)
-
-	# asyncio.set_event_loop(loop)
-	# asyncio.main_new_loop = loop
-	threading.Thread(target=ensure_parent, daemon=True).start()
-	# import pyglet, time
-	# window = pyglet.window.Window(100, 100)
-	# try:
-	# 	for i in range(5):
-	# 		window.dispatch_events()
-	# 		window.set_caption(" ".join(sys.argv))
-	# 		time.sleep(1)
-	# finally:
-	# 	window.close()
-
-	# import pygame, time
-	# pygame.init()
-	# s = " ".join(sys.argv)
-	# try:
-	# 	pygame.display.set_caption(s)
-	# 	window = pygame.display.set_mode((320, 240))
-	# 	time.sleep(5)
-	# 	pygame.display.iconify()
-	# 	for i in range(10):
-	# 		pygame.event.clear()
-	# 		pygame.display.set_caption(s)
-	# finally:
-	# 	pygame.display.quit()
-	# 	pygame.quit()
-	update_loop()
+	interface.start(background=False)

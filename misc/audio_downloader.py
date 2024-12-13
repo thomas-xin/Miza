@@ -15,7 +15,7 @@ from misc.asyncs import esubmit
 from misc.util import (
 	python, shuffle, utc, proxy, leb128, verify_search,
 	find_urls, is_url, is_discord_url, is_image, is_miza_url, is_youtube_url,
-	EvalPipe, FileHashDict, Request, Semaphore
+	EvalPipe, FileHashDict, Request, Semaphore, Cache
 )
 
 # Gets the best icon/thumbnail for a queue entry.

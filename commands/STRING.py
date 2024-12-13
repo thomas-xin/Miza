@@ -1012,7 +1012,7 @@ class Time(Command):
 		else:
 			estimated = False
 		dt2 = DynamicDT.now(tz=tzinfo)
-		dt = DynamicDT.parse(input, timestamp=dt2.timestamp_fraction(), timezone=get_name(tzinfo))
+		dt = DynamicDT.parse(input, timestamp=dt2.timestamp_exact(), timezone=get_name(tzinfo))
 		colour = await self.bot.get_colour(user)
 		emb = discord.Embed(colour=colour)
 		emb.add_field(name="Parsed As", value="`" + ", ".join(dt.parsed_as) + "`")

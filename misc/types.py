@@ -208,6 +208,12 @@ class MemoryBytes:
 	def lower(self):
 		return self.__class__(self.tobytes().lower())
 
+	def encode(self, encoding=""):
+		return self.tobytes()
+
+	def decode(self, encoding="utf-8", errors="strict"):
+		return self.tobytes().decode(encoding, errors)
+
 
 def sublist_index(lst, sub, start=0, end=None):
 	if not sub:

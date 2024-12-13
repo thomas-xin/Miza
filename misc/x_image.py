@@ -7,7 +7,6 @@ import os
 import random
 import re
 import subprocess
-import sys
 import time
 from traceback import print_exc
 import zipfile
@@ -57,9 +56,6 @@ hwaccel = "cuda" if DC else "d3d11va" if os.name == "nt" else "auto"
 
 if not hasattr(time, "time_ns"):
 	time.time_ns = lambda: int(time.time() * 1e9)
-
-def print(*args, sep=" ", end="\n"):
-	return sys.stderr.write(sep.join(map(str, args)) + end) or sys.stderr.flush()
 
 requests = requests.Session()
 
@@ -2382,12 +2378,19 @@ def ectoplasm(url, message, force=False):
 		image = from_bytes(b)
 	else:
 		image = b
+		i = io.BytesIO()
+		image.save(i, "png")
+		i.seek(0)
+		b = i.read()
 	if not fn:
 		ts = time.time_ns() // 1000
-		fn = "cache/" + str(ts)
+		fn = "cache/" + str(ts) + ".png"
 	if not force or not message:
 		with open(fn, "wb") as f:
 			f.write(b)
+		print(ectoplasm, image, fn)
+		import sys
+		sys.stdout.flush()
 		try:
 			resp = ectoplasm.decode_image(image, path=fn)
 		except Exception:

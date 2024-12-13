@@ -127,13 +127,6 @@ class Shutdown(Command):
 				with tracebacksuppressor:
 					async with asyncio.timeout(3):
 						await bot.change_presence(status=discord.Status.invisible)
-				# Kill math and image subprocesses
-				print("Killing math and image subprocesses...")
-				with tracebacksuppressor:
-					try:
-						await asubmit(sub_kill, start=False, timeout=2, priority=True)
-					except Exception:
-						await asubmit(sub_kill, start=False, force=True, timeout=8, priority=True)
 				print("Waiting on save...")
 				with tracebacksuppressor:
 					await save
@@ -1503,25 +1496,26 @@ class UpdateGuilds(Database):
 		self.bot.cache.guilds[guild.id] = guild
 		return mdata
 
-	def __load__(self, **void):
+	def __bot_ready__(self, **void):
 		bot = self.bot
 		for k, v in self.items():
 			with tracebacksuppressor:
 				g = self.get(k)
 				if not isinstance(g, dict):
 					continue
-				guild = bot.UserGuild()
-				guild.channel = bot.user
-				guild._members = {}
-				guild._roles = {}
-				guild._channels = {}
-				guild._threads = {}
-				guild.channels = []
-				guild.text_channels = []
-				guild.voice_channels = []
-				guild.categories = []
-				guild.me = bot.user
-				guild.__dict__.update(g)
+				if k not in bot.cache.guilds:
+					guild = bot.UserGuild()
+					guild.channel = bot.user
+					guild._members = {}
+					guild._roles = {}
+					guild._channels = {}
+					guild._threads = {}
+					guild.channels = []
+					guild.text_channels = []
+					guild.voice_channels = []
+					guild.categories = []
+					guild.me = bot.user
+					guild.__dict__.update(g)
 				self.load_guild(guild)
 				bot.cache.guilds[guild.id] = guild
 

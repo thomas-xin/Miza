@@ -27,8 +27,9 @@ if ADDRESS == "0.0.0.0":
 SAMPLE_RATE = 48000
 
 
-interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
-# print = interface.print
+if __name__ == "__main__":
+	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
+	print = interface.print
 
 
 class AudioPlayer(discord.AudioSource):

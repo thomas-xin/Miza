@@ -190,7 +190,7 @@ def shutdown_thread_after(thread, fut):
 	fut.result()
 	return thread.shutdown(wait=True)
 
-def create_thread(func, *args, **kwargs) -> threading.Thread:
+def create_thread(func, *args, **kwargs) -> Future:
 	fut = Future()
 	def target():
 		try:

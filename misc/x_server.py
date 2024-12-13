@@ -52,8 +52,9 @@ IND = "\x7f"
 
 csubmit(Request._init_())
 tsubmit(eloop.run_forever)
-interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
-# print = interface.print
+if __name__ == "__main__":
+	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
+	print = interface.print
 
 
 def create_etag(data):

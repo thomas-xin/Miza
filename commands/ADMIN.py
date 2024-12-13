@@ -1951,7 +1951,7 @@ class ServerProtector(Database):
 				csubmit(self.targetWarn(u_id, guild, f"banning `({cnt[u_id]})`"))
 
 	async def scan(self, message, url, known=None, **void):
-		resp = known or await process_image("ectoplasm", "$", [url, b"", "-f", "png"], cap="caption", timeout=60)
+		resp = known or await process_image("ectoplasm", "$", [url, b"", "-f", "png"], cap="caption", priority=True, timeout=60)
 		if not resp:
 			return
 
@@ -1972,7 +1972,7 @@ class ServerProtector(Database):
 					else:
 						if issuer in ("Miza", "OpenAI", "StabilityAI"):
 							return True
-					if str(data.get("issuer_id") or data.get("copyright")) == str(self.bot.id):
+					if str(data.get("issuer_id") or data.get("copyright")) == str(self.bot.id) or data.get("type") == "AI_GENERATED":
 						return True
 			elif resp.startswith(b"{'prompt':"):
 				return True

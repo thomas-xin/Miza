@@ -1513,136 +1513,13 @@ status_order = tuple(status_text)
 
 # Subprocess pool for resource-consuming operations.
 PROCS = {}
-PROC_RESP = {} #weakref.WeakValueDictionary()
+PROCS_BY_CAPS = {}
 
 # Gets amount of processes running in pool.
 sub_count = lambda: sum(is_strict_running(p) for p in PROCS.values())
 
-def proc_communicate(proc):
-	b = proc.stdout.readline()
-	if b == b"#R\n":
-		return csubmit(start_proc(proc))
-	while proc:
-		with tracebacksuppressor:
-			if not is_strict_running(proc):
-				return
-			b = proc.stdout.readline()
-			if b == b"#R\n":
-				return csubmit(start_proc(proc))
-			if not b:
-				return
-		s = dsafe(b.rstrip())
-		try:
-			if s and s[:1] == "~":
-				c = evalex(s[1:], globals())
-				if isinstance(c, (str, bytes, memoryview)):
-					exec_tb(c, globals())
-			else:
-				print(lim_str(as_str(s), 262144))
-		except Exception:
-			print_exc()
-			print(lim_str(as_str(s), 262144))
 
-async def proc_distribute(proc):
-	bot = BOT[0]
-	tasks = ()
-	while True:
-		exc = None
-		with tracebacksuppressor:
-			if not is_strict_running(proc):
-				return
-			if not tasks:
-				ack, proc.ack = proc.ack, False
-				if not ack:
-					try:
-						async with asyncio.timeout(60):
-							async with proc.cv:
-								await proc.cv.wait()
-					except T1:
-						pass
-					except CCE as ex:
-						exc = ex
-				tasks = bot.distribute(proc.caps, {}, {}, ip=f"127.0.0.1-{proc.n}")
-				if not tasks:
-					await asyncio.sleep(1 / 6)
-					continue
-			if exc:
-				raise exc
-			resps = {}
-			futs = []
-			while tasks or futs:
-				if not is_strict_running(proc):
-					return
-				for task in tasks:
-					i, _cap, command, timeout = task
-					# print("NEW TASK:", proc, i, bot.compute_wait, lim_str(str(command), 64), frand())
-					if "nvram" in proc.caps:
-						for p2 in PROCS.values():
-							if p2 and p2.pid != proc.pid and p2.used and "vram" in p2.caps and set(p2.di).intersection(proc.di):
-								if utc() - p2.used < 10:
-									await asyncio.sleep(5)
-								try:
-									async with asyncio.timeout(timeout):
-										await start_proc(p2, wait=True)
-								except:
-									csubmit(asyncio.shield(start_proc(p2, wait=True, timeout=3600)))
-									raise
-					elif "vram" in proc.caps:
-						for p2 in PROCS.values():
-							if p2 and p2.pid != proc.pid and p2.used and "nvram" in p2.caps and set(p2.di).intersection(proc.di):
-								if utc() - p2.used < 10:
-									await asyncio.sleep(5)
-								try:
-									async with asyncio.timeout(timeout):
-										await start_proc(p2, wait=True)
-								except:
-									csubmit(asyncio.shield(start_proc(p2, wait=True, timeout=3600)))
-									raise
-					fut = csubmit(_sub_submit(proc, command, _timeout=timeout))
-					fut.ts = i
-					futs.append(fut)
-					if proc.used:
-						proc.used = utc()
-					if len(command) > 1 and command[1] == "&":
-						with suppress():
-							await fut
-				# print(proc, tasks, [fut.ts for fut in futs], futs)
-				futd = {i for i, fut in enumerate(futs) if fut.done()}
-				for i in futd:
-					fut = futs[i]
-					while is_strict_running(proc):
-						try:
-							async with asyncio.timeout(6):
-								resp = await asyncio.shield(fut)
-						except Exception as ex:
-							if not fut.done():
-								continue
-							resps[fut.ts] = ex
-						else:
-							resps[fut.ts] = resp
-						break
-					if not is_strict_running(proc):
-						for i in futd:
-							fut = futs[i]
-							if fut.done():
-								resps[fut.ts] = fut.result()
-						break
-					proc.used = utc()
-				futs = [futs[i] for i in range(len(futs)) if i not in futd]
-				if futs and not resps:
-					delay = 1 + proc.sem.active
-					with tracebacksuppressor(T1):
-						async with asyncio.timeout(delay):
-							await asyncio.shield(futs[0])
-				if not is_strict_running(proc) or proc.sem.busy:
-					caps = ()
-				else:
-					caps = proc.caps
-				tasks = bot.distribute(caps, {}, resps, ip=f"127.0.0.1-{proc.n}")
-				resps.clear()
-		await asyncio.sleep(0.05)
-
-proc_args = (python, "misc/x_compute.py")
+proc_args = (python, "-m", "misc.x_compute")
 
 COMPUTE_LOAD = AUTH.get("compute_load", []).copy()
 COMPUTE_POT = COMPUTE_LOAD.copy()
@@ -1665,59 +1542,58 @@ if COMPUTE_LOAD:
 		print("Compute load distribution:", COMPUTE_LOAD)
 		print("Compute pool order:", COMPUTE_ORDER)
 
-RESTARTING = {}
 async def start_proc(n, di=(), caps="ytdl", it=0, wait=False, timeout=None):
 	if hasattr(n, "caps"):
 		n, di, caps, it = n.n, n.di, n.caps, it + 1
 	if n in PROCS:
 		proc = PROCS[n]
 		if is_strict_running(proc):
-			PROCS[n] = False
-			RESTARTING[n] = proc
 			it = max(it, proc.it + 1)
-			if wait:
-				with tracebacksuppressor:
-					if timeout is None:
-						await proc.sem.afinish()
-					else:
-						async with asyncio.timeout(timeout):
-							await proc.sem.afinish()
-				if timeout and proc.sem.active and utc() - proc.used < 60:
-					raise CCE("Process schedule conflict.")
-			await create_future(force_kill, proc)
+			proc.pipe.kill()
 		elif PROCS[n] is False:
 			return
-	args = list(proc_args)
+		for c in caps:
+			PROCS_BY_CAPS[c].remove(proc)
+		PROCS[n] = False
+	port = await asubmit(get_free_port)
+	args = proc_args
+	for c in caps:
+		args = AUTH.get("cap_versions", {}).get(c) or args
+	args = list(args)
+	args.append(str(port))
 	args.append(",".join(map(str, di)))
 	args.append(",".join(caps))
 	args.append(json_dumps(COMPUTE_LOAD).decode("ascii"))
 	properties = [torch.cuda.get_device_properties(i) for i in range(DC)]
-	args.append(json_dumps([(p.major, p.minor) for p in properties]))
+	args.append(json_dumps([(p.major, p.minor) for p in properties]).decode("ascii"))
 	args.append(json_dumps(COMPUTE_ORDER).decode("ascii"))
 	args.append(str(it))
-	print(args)
-	proc = psutil.Popen(
+	pipe = await asubmit(
+		EvalPipe.connect,
 		args,
-		stdin=subprocess.PIPE,
-		stdout=subprocess.PIPE,
-		stderr=None,
-		bufsize=None,
+		port,
+		glob=globals(),
+		independent=False,
 	)
-	if "load" in caps:
-		return
+	proc = pipe.proc
 	proc.n = n
 	proc.di = di
 	proc.caps = caps
 	proc.it = it
 	# proc.is_running = lambda: not proc.returncode
 	proc.sem = Semaphore(8, inf)
-	proc.comm = tsubmit(proc_communicate, proc)
-	proc.dist = csubmit(proc_distribute(proc))
-	proc.cv = asyncio.Condition()
-	proc.ack = False
-	proc.used = 0
 	PROCS[n] = proc
+	proc.pipe = pipe
+	for c in caps:
+		PROCS_BY_CAPS.setdefault(c, []).append(proc)
 	return proc
+
+async def restart_workers():
+	futs = []
+	for proc in PROCS.values():
+		futs.append(start_proc(proc))
+	return await gather(*futs)
+
 
 IS_MAIN = True
 FIRST_LOAD = True
@@ -1889,145 +1765,29 @@ def device_cap(i, resolve=False):
 		return 1.15 ** (di[0] * 10 + di[1])
 	return di
 
-last_task_time = 0
-async def sub_submit(cap, command, _timeout=12, retries=1):
-	"Enqueues a compute task on the subprocess pool, and waits for it to complete."
-	t = utc()
-	td = t - last_task_time
-	globals()["last_task_time"] = t
-	bot = BOT[0]
-	ex2 = RuntimeError("Maximum compute attempts exceeded.")
-	for i in range(round_random(retries) + 1):
-		task = Future()
-		task.cap = cap
-		task.command = command
-		task.timeout = _timeout
-		queue = bot.compute_queue.setdefault(cap, set())
-		queue.add(task)
-		procs = filter(bool, PROCS.values())
-		for proc in sorted(procs, key=lambda proc: (proc.sem.active, (0 in proc.di or "nvram" in proc.caps) and not proc.used and td < 60, -device_cap(proc.di[0], resolve=True) * COMPUTE_POT[proc.di[0]] if COMPUTE_POT and proc.di else random.random())):
-			if not proc:
-				continue
-			if cap in proc.caps:
-				proc.ack = True
-				async with proc.cv:
-					proc.cv.notify_all()
-		try:
-			async with asyncio.timeout((_timeout or inf) + 1):
-				return await wrap_future(task)
-		except (T1, CE) as ex:
-			task.set_exception(ex)
-			queue.discard(task)
-			ts = getattr(task, "ts", None)
-			if ts:
-				bot.compute_wait.pop(ts, None)
-			elif isinstance(ex, CE):
-				raise CCE(*ex.args)
-			else:
-				raise EnvironmentError(repr(ex))
-			ex2 = ex
-			print(lim_str((task, task.cap, task.command, task.timeout), 256))
-			print_exc()
-			await asyncio.sleep(i)
-			continue
-	raise ex2
 
-pssem = Semaphore(1, 0, rate_limit=1)
-def sub_kill(start=True, force=False):
-	"Kills all compute subprocesses, restarting them automatically if necessary."
-	for p in tuple(PROCS.values()):
-		if is_strict_running(p):
-			if not force:
-				with tracebacksuppressor:
-					p.sem.finish()
-			force_kill(p)
-	PROCS.clear()
-	PROC_RESP.clear()
-	bot = BOT[0]
-	for k, v in bot.compute_wait.items():
-		cst(v.cancel)
-	for k, v in bot.compute_queue.items():
-		for w in v:
-			cst(w.cancel)
-	bot.compute_wait.clear()
-	bot.compute_queue.clear()
-	if start:
-		with pssem:
-			return proc_start()
-
-lambdassert = "lambda:1+1"
-
-async def _sub_submit(proc, command, _timeout=12):
-	"Internal function to pass a compute task to a subprocess."
-	ts = ts_us()
-	while ts in PROC_RESP:
-		ts += 1
-	PROC_RESP[ts] = fut = Future()
-	comm = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
-	resp = esafe(comm)
-	s = f"~{ts}~{resp}\n".encode("utf-8")
-	# print("SS:", lim_str(s, 128))
-	sem = proc.sem
-	await sem()
-	async with sem:
-		proc.last_task = s
-		try:
-			await asubmit(Flush(proc.stdin).write, s)
-			fut = PROC_RESP[ts]
-			tries = ceil(_timeout / 3) if _timeout and isfinite(_timeout) else 3600
-			ex2 = None
-			for i in range(tries):
-				if not is_strict_running(proc):
-					raise CCE("Retrying as process disappeared.")
-				if ts not in PROC_RESP:
-					raise CCE("Response disconnected. If this error occurs during a command, it is likely due to maintenance!")
-				try:
-					async with asyncio.timeout(min(4, i + 1)):
-						resp = await wrap_future(fut)
-				except T1 as ex:
-					if command[0] == lambdassert and command[1] in "$&" and command[2] in ("[]", "()"):
-						raise StopIteration("Temporary wait cancelled.")
-					if i >= tries - 1:
-						ex2 = ex
-						break
-				except CE:
-					raise
-				except Exception as ex:
-					ex2 = ex
-					break
-				else:
-					break
-			else:
-				raise OSError("Max waits exceeded.")
-			if ex2:
-				raise ex2
-		except (BrokenPipeError, OSError, RuntimeError) as ex:
-			if not fut.done():
-				fut.set_exception(ex)
-			if isinstance(ex, RuntimeError):
-				if "OutOfMemoryError" in repr(ex):
-					pass
-				else:
-					raise
-			print("Killing process", lim_str((proc, command, ex), 384))
-			csubmit(start_proc(proc))
-			raise
-		except StopIteration as ex:
-			if not fut.done():
-				fut.set_exception(ex)
-			raise TimeoutError(*ex.args)
-		finally:
-			PROC_RESP.pop(ts, None)
-	return resp
-
-SUB_WAITING = None
-
+async def proc_eval(s, caps, priority=False, timeout=12):
+	procs = PROCS_BY_CAPS[caps[0]]
+	for p in procs:
+		if not set(caps).difference(p.caps):
+			break
+	else:
+		raise RuntimeError("No suitable worker process for task.")
+	fut = p.pipe.submit(s, priority=priority)
+	try:
+		return await asyncio.wait_for(wrap_future(fut), timeout=timeout)
+	except Exception:
+		if not fut.done():
+			print(f"Process {p} timed out, restarting!")
+			csubmit(start_proc(p))
+		raise
 
 def process_math(expr, prec=64, rat=False, timeout=12, variables=None, retries=0):
 	"Sends an operation to the math subprocess pool."
-	return sub_submit("math", (expr, "%", prec, rat, variables), _timeout=timeout, retries=retries)
+	cmd = [expr, prec, rat, variables]
+	return proc_eval(f"x_math.evaluate({repr(cmd)})", caps=["math"], timeout=timeout)
 
-def process_image(image, operation="$", args=[], cap="image", timeout=60, retries=1):
+def process_image(image, operation="$", args=[], cap="image", priority=False, timeout=60, retries=1):
 	"Sends an operation to the image subprocess pool."
 	args = astype(args, list)
 	for i, a in enumerate(args):
@@ -2044,8 +1804,8 @@ def process_image(image, operation="$", args=[], cap="image", timeout=60, retrie
 			return arg
 		return repr(arg)
 
-	command = "[" + ",".join(map(as_arg, args)) + "]"
-	return sub_submit(cap, (image, operation, command), _timeout=timeout, retries=retries)
+	argi = "[" + ",".join(map(as_arg, args)) + "]"
+	return proc_eval(f"evaluate_image([{repr(image)},{repr(operation)},{argi}])", caps=[cap], priority=priority, timeout=timeout)
 
 async def delayed_callback(fut, delay, func, *args, repeat=False, exc=False, **kwargs):
 	"A function that takes a coroutine/task, and calls a second function if it takes longer than the specified delay."

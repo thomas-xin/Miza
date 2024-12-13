@@ -79,7 +79,7 @@ utc_ft = lambda s: datetime.datetime.fromtimestamp(s, tz=datetime.timezone.utc).
 utc_dt = lambda: datetime.datetime.now(tz=datetime.timezone.utc).replace(tzinfo=None)
 utc_ddt = lambda: DynamicDT.utcnow()
 zerot = lambda: utc_dt().replace(hour=0, minute=0, second=0)
-sec2time = lambda s: str(TimeDelta(seconds=s))
+sec2time = lambda s: str(TimeDelta(seconds=round(s, 4)))
 time_repr = lambda s: f"<t:{round(s)}:R>"
 time_delta = lambda s: str(((dt := DynamicDT.utcnow()) + s) - dt)
 time_until = lambda s: str(DynamicDT.utcnow() - DynamicDT.utcfromtimestamp(s))
@@ -470,7 +470,7 @@ if accel is None:
 		if len(seq) < 4 or 0 in seq[:-1]:
 			return
 		b = _predict_next(seq[1:] / seq[:-1])
-		if b is not None and isfinite(a):
+		if b is not None and isfinite(b):
 			return seq[-1] * b
 
 	def predict_next(seq, limit=12):

@@ -2342,9 +2342,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		),
 		1: cdict(
 			instructive="gpt-4",
-			casual="gpt-4m",
-			nsfw="qwen-72b",
-			backup="gpt-4",
+			casual="llama-3-70b",
+			nsfw="llama-3-70b",
+			backup="qwen-72b",
 			retry="gpt-4",
 			function="gpt-4m",
 			vision="claude-3.5-haiku",
@@ -2353,8 +2353,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		2: cdict(
 			instructive="claude-3.5-sonnet",
 			casual="gpt-4",
-			nsfw="qwen-72b",
-			backup="gpt-4",
+			nsfw="llama-3-70b",
+			backup="qwen-72b",
 			retry="gpt-4",
 			function="gpt-4m",
 			vision="gpt-4",
@@ -3000,7 +3000,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
-		model="claude-3.5-sonnet" if best >= 2 else "claude-3.5-haiku"
+		model="claude-3.5-sonnet" if best >= 2 else "claude-3-haiku"
 		messages = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
@@ -4287,152 +4287,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return f"{f} = {res[0]}"
 		return res
 
-	TimeChecks = {
-		"galactic years": ("gy", "galactic year", "galactic years"),
-		"millennia": ("ml", "millenium", "millenia"),
-		"centuries": ("c", "century", "centuries"),
-		"decades": ("dc", "decade", "decades"),
-		"years": ("y", "year", "years"),
-		"months": ("mo", "mth", "month", "mos", "mths", "months"),
-		"weeks": ("w", "wk", "week", "wks", "weeks"),
-		"days": ("d", "day", "days"),
-		"hours": ("h", "hr", "hour", "hrs", "hours"),
-		"minutes": ("m", "min", "minute", "mins", "minutes"),
-		"seconds": ("s", "sec", "second", "secs", "seconds"),
-	}
-	num_words = r"(?:(?:(?:[0-9\.]+|[a-z]{1,}illion)|thousand|hundred|ten|eleven|twelve|(?:thir|four|fif|six|seven|eigh|nine)teen|(?:twen|thir|for|fif|six|seven|eigh|nine)ty|zero|one|two|three|four|five|six|seven|eight|nine)\s*)"
-	numericals = re.compile(r"^(?:" + num_words + r"|(?:a|an)\s*)(?:" + num_words + r")*", re.I)
-	connectors = re.compile(r"\s(?:and|at)\s", re.I)
-	alphabet = frozenset("abcdefghijklmnopqrstuvwxyz")
-
-	async def eval_time(self, expr, default=0, op=True):
-		"Evaluates a time input, using a math process from the subprocess pool when necessary."
-		if op:
-			# Allow mathematical operations on a default value
-			_op = None
-			for op, at in self.op.items():
-				if expr.startswith(op):
-					expr = expr[len(op):].strip(" ")
-					_op = at
-			num = await self.eval_time(expr, op=False)
-			if _op is not None:
-				num = getattr(float(default), _op)(num)
-			return num
-		t = 0
-		if expr and " " in expr:
-			# Parse timezones first
-			args = smart_split(expr)
-			for a in (args[0], args[-1]):
-				tz = a.casefold()
-				if tz in TIMEZONES:
-					t = -get_timezone(tz)
-					expr = expr.replace(a, "").strip()
-					break
-		if expr and ":" in expr:
-			# Try to evaluate time indicators
-			args = smart_split(expr)
-			for a in args:
-				if ":" not in a:
-					continue
-				temp = 0
-				data = a.split(":")
-				mult = 1
-				while len(data):
-					temp += await self.eval_math(data.pop(-1)) * mult
-					if mult <= 60:
-						mult *= 60
-					elif mult <= 3600:
-						mult *= 24
-					elif len(data):
-						raise TypeError(f"Too many time arguments found in indicator {a}.")
-				t += temp
-				expr = expr.replace(a, "").strip()
-		if expr:
-			day = None
-			try:
-				try:
-					t += float(expr)
-				except (TypeError, ValueError, OverflowError):
-					# Otherwise move on to main parser
-					f = single_space(self.connectors.sub(" ", expr.replace(",", " "))).casefold()
-					if "today" in f:
-						day = 0
-						f = f.replace("today", "")
-					elif "tomorrow" in f:
-						day = 1
-						f = f.replace("tomorrow", "")
-					elif "yesterday" in f:
-						day = -1
-						f = f.replace("yesterday", "")
-					if day is not None:
-						raise StopIteration
-					dd = {}
-					td = {}
-					for tc in self.TimeChecks:
-						for check in reversed(self.TimeChecks[tc]):
-							if check in f:
-								i = f.index(check)
-								isnt = i + len(check) < len(f) and f[i + len(check)] in self.alphabet
-								if isnt or not i or f[i - 1] in self.alphabet:
-									continue
-								temp = f[:i]
-								f = f[i + len(check):].strip()
-								match = self.numericals.search(temp)
-								if match:
-									i = match.end()
-									n = num_parse(temp[:i])
-									temp = temp[i:].strip()
-									if temp:
-										f = f"{temp} {f}"
-								else:
-									n = await self.eval_math(temp)
-								if tc == "weeks":
-									add_dict(td, {"days": n * 7})
-								elif tc in ("days", "hours", "minutes", "seconds"):
-									add_dict(td, {tc: n})
-								else:
-									add_dict(dd, {tc: n})
-					temp = f.strip()
-					if temp:
-						match = self.numericals.search(temp)
-						if match:
-							i = match.end()
-							n = num_parse(temp[:i])
-							temp = temp[i:].strip()
-							if temp:
-								n = await self.eval_math(f"{n} {temp}")
-						else:
-							n = await self.eval_math(temp)
-						t += n
-					t += td.get("seconds", 0)
-					t += td.get("minutes", 0) * 60
-					t += td.get("hours", 0) * 3600
-					t += td.get("days", 0) * 86400
-					if dd:
-						ts = utc()
-						dt = utc_dft(ts)
-						years = dd.get("years", 0) + dd.get("decades", 0) * 10 + dd.get("centuries", 0) * 100 + dd.get("millennia", 0) * 1000 + dd.get("galactic years", 0) * 226814
-						dt = dt.add_years(years)
-						months = dd.get("months", 0)
-						dt = dt.add_months(months)
-						t += round(dt.timestamp()) - ts
-			except Exception:
-				# Use datetime parser if regular parser fails
-				raw = tzparse(f if f else expr)
-				if day is not None:
-					curr = utc() + day * 86400
-					while raw < curr:
-						raw += 86400
-					while raw - curr > 86400:
-						raw -= 86400
-				t = (raw - utc_ddt()).total_seconds()
-		if not isinstance(t, (int, float)):
-			try:
-				t = round_min(float(t))
-			except OverflowError:
-				t = int(t)
-		return t
-
 	def update_ip(self, ip):
 		"Updates the bot's stored external IP address."
 		if regexp("^([0-9]{1,3}\\.){3}[0-9]{1,3}$").search(ip):
@@ -4760,7 +4614,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	def reload(self, mod=None):
 		if not mod:
-			sub_kill()
 			modload = deque()
 			files = [i for i in os.listdir("commands") if is_code(i) and i.rsplit(".", 1)[0] in self.active_categories]
 			for f in files:
@@ -4883,8 +4736,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			fut = self.send_event("_save_")
 			await_fut(fut)
 		if day:
-			for u in self.data.values():
-				u.vacuum()
 			self.backup()
 			futs = deque()
 			for u in self.data.values():
@@ -5151,7 +5002,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				for a in all_aliases:
 					if "_" in a:
 						names.append("--" + a.replace("_", "-"))
-				if k[0] in chars and "-" + k[0] not in names:
+				if k[0] in chars and "-" + k[0] not in used:
 					names.append("-" + k[0])
 					chars.remove(k[0])
 				used.update(names)
@@ -9014,7 +8865,6 @@ if __name__ == "__main__":
 				miza.miza = miza
 				with miza:
 					miza.run()
-				sub_kill(start=False, force=True)
 			sys.__stdout__.write("MAIN PROCESS EXITING...")
 			common.MEM_LOCK.close()
 			misc.asyncs.athreads.shutdown(wait=False)

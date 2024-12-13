@@ -533,7 +533,7 @@ if accel is None:
 		if len(seq) < 4 or 0 in seq[:-1]:
 			return
 		b = _predict_next(seq[1:] / seq[:-1])
-		if b is not None and isfinite(a):
+		if b is not None and isfinite(b):
 			return seq[-1] * b
 
 	def predict_next(seq, limit=12):
@@ -1374,42 +1374,9 @@ def procResp(resp):
 		s = [repr(i) if type(i) is not str else i for i in resp]
 	return s
 
-
-esafe = lambda s, binary=False: (d := as_str(s).replace("\n", "\uffff")) and (d.encode("utf-8") if binary else d)
-dsafe = lambda s: s.decode("utf-8").replace("\uffff", "\n")
-
-def evaluate(ts, args):
+def evaluate(args):
 	if isinstance(args, (str, bytes, memoryview)):
 		args = literal_eval(base64.b64decode(args))
 	resp = evalSym(*args)
 	out = procResp(resp)
-	resp = esafe(repr(out))
-	sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({resp})\n".encode("utf-8"))
-	sys.stdout.flush()
-
-
-if __name__ == "__main__":
-	def ensure_parent():
-		parent = psutil.Process(os.getppid())
-		while True:
-			if not parent.is_running() or parent.status() == "zombie":
-				p = psutil.Process()
-				for c in p.children(True):
-					c.terminate()
-					try:
-						c.wait(timeout=2)
-					except psutil.TimeoutExpired:
-						c.kill()
-				p.terminate()
-				break
-			time.sleep(12)
-	import threading
-	threading.Thread(target=ensure_parent, daemon=True).start()
-	while True:
-		argv = sys.stdin.readline()
-		if not argv:
-			raise SystemExit
-		argv = argv.rstrip()
-		if argv[0] == "~":
-			ts, args = argv[1:].split("~", 1)
-			evaluate(ts, args.encode("ascii"))
+	return out

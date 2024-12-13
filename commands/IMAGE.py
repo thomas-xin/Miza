@@ -1210,7 +1210,7 @@ class Blend(Command):
 
 
 class Steganography(Command):
-	name = ["Watermark", "Copyright", "Ownership", "©"]
+	name = ["Ectoplasm", "Watermark", "Copyright", "Ownership", "©"]
 	description = "Reads an image's tagged information, or embeds a message into an image (input a user ID to tag as a Discord user). Aborts if image already has a known tag."
 	schema = cdict(
 		url=cdict(
@@ -1220,7 +1220,7 @@ class Steganography(Command):
 			aliases=["i"],
 			required=True,
 		),
-		info=cdict(
+		data=cdict(
 			type="string",
 			description="Message to encode",
 			example="This image was produced by X in collaboration with Y",
@@ -1229,8 +1229,8 @@ class Steganography(Command):
 	rate_limit = (12, 15)
 	_timeout_ = 6
 
-	async def __call__(self, bot, _user, url, info, **void):
-		resp = await process_image(url, "ectoplasm", ["-nogif", info, "-f", "png"], cap="caption", timeout=60)
+	async def __call__(self, bot, _user, url, data, **void):
+		resp = await process_image("ectoplasm", "$", ["-nogif", url, data, "-f", "png"], cap="caption", priority=True, timeout=60)
 		if isinstance(resp, bytes):
 			msg = resp[1:]
 			emb = discord.Embed()
@@ -1240,6 +1240,7 @@ class Steganography(Command):
 		fn = url2fn(url)
 		name = replace_ext(fn, "png")
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
+
 
 class OCR(Command):
 	name = ["Tesseract", "Read", "Image2Text"]
