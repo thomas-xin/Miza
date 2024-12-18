@@ -1109,7 +1109,7 @@ class Reminder(Command):
 	description = "Sets a reminder for a certain date and time in the future."
 	schema = cdict(
 		message=cdict(
-			type="text",
+			type="word",
 			description="Message to receive. Will show up as an embed",
 			example="Doctor's appointment",
 		),
@@ -1237,7 +1237,7 @@ class Reminder(Command):
 			out += dt.as_rel_discord()
 		return cdict(
 			content=out,
-			embed=emb
+			embed=emb,
 		)
 
 	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
@@ -1471,7 +1471,7 @@ class UpdateUrgentReminders(Database):
 						message = await fut
 						await message.add_reaction("✅")
 						p[2] = message.id
-						listed.insort(p, key=lambda x: x)
+						listed.insort(p, key=lambda x: x[:3])
 			await asyncio.sleep(1)
 
 

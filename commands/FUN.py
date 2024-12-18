@@ -2178,7 +2178,7 @@ class UpdateDogpiles(Database):
 		dogpile = following.get(g_id, True)
 		if not dogpile:
 			return
-		if not message.guild.me or not message.guild.me.permissions_in(message.channel).send_messages:
+		if not message.guild.me or not self.bot.permissions_in(message.channel).send_messages:
 			return
 		u_id = message.author.id
 		c_id = message.channel.id

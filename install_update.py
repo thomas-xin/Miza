@@ -70,6 +70,8 @@ for mod in modlist:
 				if op in mod:
 					name, version = mod.split(op)
 					break
+			if name == "yt-dlp":
+				raise StopIteration
 			v = importlib.metadata.version(name)
 			if version is not None:
 				try:

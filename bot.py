@@ -1489,13 +1489,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if hasattr(obj, "permissions_for"):
 			try:
 				return obj.permissions_for(user)
-			except AttributeError:
+			except (AttributeError, discord.errors.ClientException):
 				pass
 		if hasattr(user, "permissions_in"):
 			try:
-				return obj.permissions_in(obj)
+				return user.permissions_in(obj)
 			except Exception:
-				return obj.permissions_in(guild)
+				try:
+					return obj.permissions_in(guild)
+				except discord.errors.ClientException:
+					pass
 		if hasattr(obj, "recipient") or hasattr(obj, "dm_channel"):
 			return discord.Permissions(2147483647)
 		return discord.Permissions(0)
@@ -1601,7 +1604,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return await self.id_from_message(self.cache.messages[m_id].content)
 		return verify_id(m_id)
 
-	ytdl = None
 	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, emojis=True, reactions=False, allow=False, limit=None, no_cache=False, ytd=True):
 		"Finds URLs in a string, following any discord message links found. Traces all the way to raw file stream if \"ytd\" parameter is set."
 		self.followed = ai.cache
@@ -1712,10 +1714,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			elif is_discord_attachment(url):
 				out.append(url)
 			else:
-				fut = None
-				if ytd and self.ytdl:
-					self.ytdl.bot = self
-					fut = create_future(self.ytdl.search, url, follow=False)
 				resp = await create_future(
 					reqs.next().head,
 					url,
@@ -1725,9 +1723,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				)
 				if resp.headers.get("Content-Type", None) not in ("text/html", "application/json"):
 					url = resp.url
-				elif fut:
+				elif ytd and self.audio:
 					try:
-						resp = await fut
+						resp = await self.audio.asubmit(f"ytdl.search({repr(url)})")
 						if not resp:
 							raise FileNotFoundError(url)
 					except Exception as ex:
@@ -1737,15 +1735,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						if isinstance(resp, str):
 							print("FU:", resp)
 						else:
-							if not resp.get("direct"):
-								with tracebacksuppressor:
-									await create_future(self.ytdl.get_stream, resp, download=False, force=True)
 							if resp.get("video"):
 								url = resp["video"]
 							elif images and resp.get("thumbnail"):
 								url = resp["thumbnail"]
-							elif not images and resp.get("stream"):
-								url = resp["stream"]
 							elif resp["url"] != url:
 								url = resp["url"]
 							else:
@@ -4050,7 +4043,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						s = f"Command incurred cost of `{cost}` (`${dcost}`); `{q}` premium credits remaining."
 					else:
 						s = " (next refresh " + time_repr(86400 + freebies[0]) + ")" if freebies else ""
-						s = f"Command incurred cost of `{cost}`; `{rem}/{freelim}` free quota remaining today{s}."
+						s = f"Command incurred cost of `{cost}`; `{rem}/{freelim}`{' free' if self.value <= 1 else ''} quota remaining today{s}."
 					desc = f"{s}\nIf you're able to contribute towards [funding](<{bot.kofi_url}>) my hosting costs it would mean the world to us, and ensure that I can continue providing up-to-date tools and entertainment.\nEvery little bit helps due to the size of my audience!\nSee /premium to check usage stats{or_adjust}."
 				emb = discord.Embed(colour=rand_colour())
 				emb.set_author(**get_author(bot.user))
@@ -4121,7 +4114,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return (self.data.blacklist.get(u_id) or 0) > 1
 		return True
 
-	dangerous_command = bold(css_md(uni_str('[WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. REPEAT COMMAND WITH "?f" FLAG TO CONFIRM.]'), force=True))
+	dangerous_command = bold(ansi_md(colourise(uni_str('[WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. REPEAT COMMAND WITH "?f" FLAG TO CONFIRM.]'), fg="red")))
 
 	mmap = {
 		"“": '"',
@@ -4406,12 +4399,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				self.llc = utc()
 		try:
-			audio_players = len(self.audio.players)
+			audio_players, playing_players = await self.audio.asubmit("len(AP.players),sum(p.is_playing() for p in AP.players.values())")
 		except AttributeError:
-			audio_players = active_audio_players = playing_audio_players = "N/A"
-		else:
-			active_audio_players = sum(bool(auds.queue and not auds.paused) for auds in tuple(self.audio.players.values()))
-			playing_audio_players = sum(auds.is_playing() for auds in tuple(self.audio.players.values()))
+			audio_players = playing_players = playing_audio_players = "N/A"
 		files = os.listdir("misc")
 		for f in files:
 			path = "misc/" + f
@@ -4443,7 +4433,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			},
 			"misc": {
 				"Active commands": self.command_semaphore.active,
-				"Voice (Conn|Act|Stream)": f"{audio_players}|{active_audio_players}|{playing_audio_players}",
+				"Voice (Conn|Play)": f"{audio_players}|{playing_players}",
 				"Total data transmitted": self.total_bytes,
 				"Hosted storage": self.total_hosted,
 				"System time": datetime.datetime.now(),
@@ -4643,9 +4633,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return modload
 
 	def clear_cache(self):
-		if self.ytdl:
-			if self.ytdl.download_sem.active:
-				return 0
 		if self.cache_semaphore.busy:
 			return 0
 		with self.cache_semaphore:
@@ -8623,65 +8610,16 @@ def update_file_cache():
 		attachments.discard(a_id)
 
 def as_file(file, filename=None, ext=None, rename=True):
-	fn = fo = None
-	if rename:
-		if isinstance(rename, int) and rename >= 2:
-			out = fn = rename
-		else:
-			fn = round(ts_us())
-			for fi in os.listdir("saves/filehost"):
-				if fi.startswith(f"{IND}{fn}~"):
-					fn += 1
-			out = str(fn)
-	if hasattr(file, "fp"):
-		fp = getattr(file, "_fp", file.fp)
-		if type(fp) in (str, bytes):
-			rename = True
-			filename = file.filename or filename
-			file = fp
-			if isinstance(file, bytes):
-				file = as_str(file)
-		else:
-			fp.seek(0)
-			filename = file.filename or filename
-			file = fp.read()
-	if issubclass(type(file), bytes):
-		with open(f"{TEMP_PATH}/temp{out}", "wb") as f:
-			f.write(file)
-		file = f"{TEMP_PATH}/temp{out}"
-		rename = True
-	if rename:
-		fo = f"{TEMP_PATH}/filehost/{IND}{out}~.temp$@{lim_str(filename, 64).translate(filetrans)}"
-		for i in range(10):
-			with suppress(PermissionError, OSError):
-				os.rename(file, fo)
-				break
-			time.sleep(0.3)
-		else:
-			with open(file, "rb") as f:
-				b = f.read()
-			with open(fo, "wb") as f:
-				f.write(b)
-		n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-		key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
-		csubmit(Request(
-			f"http://127.0.0.1:{PORT}/api_register_replacer?ts={out}&key={key}",
-			method="PUT",
-			aio=True,
-			ssl=False,
-		))
-	else:
-		fn = file.rsplit("/", 1)[-1][1:].rsplit(".", 1)[0].split("~", 1)[0]
-	try:
-		fn = int(fn)
-	except ValueError:
-		pass
-	else:
-		b = fn.bit_length() + 7 >> 3
-		fn = as_str(base64.urlsafe_b64encode(fn.to_bytes(b, "big"))).rstrip("=")
-	url1 = f"{bot.webserver}/p/{fn}"
-	url2 = f"{bot.webserver}/d/{fn}"
-	print("AS_FILE:", file, filename, fn, fo, url1)
+	if isinstance(file, str):
+		file = open(file, "rb")
+	url1 = url2 = Request(
+		f"https://api.mizabot.xyz/upload?filename={filename}&hash={filename}",
+		method="POST",
+		data=file,
+		ssl=False,
+		json=True,
+	).content["url"].replace("/p/", "/f/").split("?", 1)[0]
+	print("AS_FILE:", url1)
 	return url1, url2
 
 def is_file(url):

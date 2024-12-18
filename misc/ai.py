@@ -1504,7 +1504,7 @@ async def _instruct(data, best=False, skip=False, user=None):
 	else:
 		dec = True and not skip
 	if dec:
-		inputs["model"] = "auto" if best else "llama-3-8b"
+		inputs["model"] = "auto" if best else "llama-3-70b"
 	if data.get("model", "gpt-4m") in is_chat:
 		prompt = inputs.pop("prompt")
 		inputs["messages"] = [cdict(role="user", content=prompt)]
@@ -1625,7 +1625,7 @@ f_reminder = {
 					"description": "Datetime, eg. 3 days 3.9 seconds after next april 7th",
 				},
 			},
-			"required": ["message", "delay"],
+			"required": ["message", "time"],
 }}}
 f_play = {
 	"type": "function", "function": {

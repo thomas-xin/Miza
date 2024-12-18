@@ -1,25 +1,30 @@
 import ast
 import asyncio
 import collections.abc
+from collections import deque
 import concurrent.futures
 import contextlib
 import copy
 import datetime
 import functools
+from itertools import chain, repeat # noqa: F401
+from math import ceil, floor, inf, nan, isfinite
 import json
 import random
 import re
 import subprocess
 import time
+from traceback import print_exc
 import numpy as np
 import orjson
-from math import ceil, floor, inf, nan, isfinite
-from itertools import chain, repeat # noqa: F401
-from traceback import print_exc
 from misc.ring_vector import RingVector
 
+UNIQUE_TS = 0
 def ts_us():
-	return time.time_ns() // 1000
+	global UNIQUE_TS
+	ts = max(UNIQUE_TS + 1, time.time_ns())
+	UNIQUE_TS = ts
+	return ts
 def utc():
 	return time.time_ns() / 1000000000.0
 
@@ -773,7 +778,8 @@ class RangeSet(collections.abc.Iterable):
 					for n in target:
 						self.add(n)
 			else:
-				self.add(*slice(*sorted(spl)).indices(size))
+				spl = [x if x >= 0 else x + size for x in spl]
+				self.add(*slice(*sorted(spl)).indices(size)[:2])
 		return self
 
 
@@ -1103,13 +1109,13 @@ def json_default(obj):
 		return obj.strftime("%Y-%m-%dT%H:%M:%S")
 	if isinstance(obj, np.number):
 		return obj.item()
-	if isinstance(obj, (set, frozenset, alist, np.ndarray)):
+	if isinstance(obj, (set, frozenset, alist, deque, np.ndarray)):
 		return list(obj)
 	raise TypeError(obj)
 
 class MultiEncoder(json.JSONEncoder):
 	def default(self, obj):
-		return json_default(obj) or json.JSONEncoder.default(self, obj)
+		return json_default(obj)
 
 def json_dumps(obj, *args, **kwargs):
 	return orjson.dumps(obj, *args, default=json_default, **kwargs)

@@ -506,7 +506,7 @@ class UpdateExec(Database):
 		sendable = list(c_id for c_id, flag in self.data.items() if flag & 16)
 		AUTH["proxy_channels"] = sendable
 		save_auth(AUTH)
-		misc.util.attachment_cache.init()
+		misc.caches.attachment_cache.init()
 
 	# All logs that normally print to stdout/stderr now send to the assigned log channels
 	def _log_(self, msg, **void):

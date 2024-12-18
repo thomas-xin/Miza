@@ -106,6 +106,9 @@ except Exception:
 hwaccel = "cuda" if DC else "d3d11va" if os.name == "nt" else "auto"
 
 
+api = "v10"
+
+
 async def require_predicate(predicate):
 	if not predicate:
 		return
@@ -204,7 +207,7 @@ def quit(*args, **kwargs): force_kill(PROC)
 
 # SHA256 operations: base64 and base16.
 def shash(s): return e64(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).decode("ascii")
-def uhash(s): return shash(s) if len(s) > 43 or not s.isalnum() else s
+def uhash(s): return sorted([shash(s), quote_plus(s.removeprefix("https://"))], key=len)[0]
 def hhash(s): return hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).hexdigest()
 def ihash(s): return int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little") % 4294967296 - 2147483648
 def nhash(s): return int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little")
@@ -221,7 +224,7 @@ def strip_acc(url):
 __smap = {"|": "", "*": ""}
 __strans = "".maketrans(__smap)
 def verify_search(f):
-	return strip_acc(single_space(f.strip().translate(__strans)))
+	return unyt(strip_acc(single_space(f.strip().translate(__strans))))
 COMM = "\\#$%"
 
 
@@ -330,6 +333,135 @@ def tlen(s, model="cl100k_im") -> int:
 	if len(s) <= 65536:
 		return _tlen(s)
 	return len(tik_encode(s, encoding=model))
+
+# Escapes syntax in code highlighting markdown.
+ESCAPE_T = {
+	"[": "⦍",
+	"]": "⦎",
+	"@": "＠",
+	"`": "",
+	";": ";",
+}
+__emap = "".maketrans(ESCAPE_T)
+
+ESCAPE_T2 = {
+	"@": "＠",
+	"`": "",
+	"#": "♯",
+	";": ";",
+}
+__emap2 = "".maketrans(ESCAPE_T2)
+
+# Discord markdown format helper functions
+def no_md(s):
+	return str(s).translate(__emap)
+def clr_md(s):
+	return str(s).translate(__emap2)
+def sqr_md(s):
+	return f"[#{no_md(s)}]" if hasattr(s, "send") and not hasattr(s, "bot") else f"[{no_md(s)}]"
+
+def italics(s):
+	if not isinstance(s, str):
+		s = str(s)
+	if "*" not in s:
+		s = f"*{s}*"
+	return s
+
+def bold(s):
+	if not isinstance(s, str):
+		s = str(s)
+	if "**" not in s:
+		s = f"**{s}**"
+	return s
+
+def single_md(s):
+	return f"`{s}`"
+def code_md(s):
+	return f"```\n{s}```" if s else "``` ```"
+def py_md(s):
+	return f"```py\n{s}```" if s else "``` ```"
+def ini_md(s):
+	return f"```ini\n{s}```" if s else "``` ```"
+def css_md(s, force=False):
+	return (f"```css\n{s}```".replace("'", "’").replace('"', "”") if force else ini_md(s)) if s else "``` ```"
+def fix_md(s):
+	return f"```fix\n{s}```" if s else "``` ```"
+def ansi_md(s):
+	if not s:
+		return "``` ```"
+	s = s.replace("[[", colourise("[", fg="cyan") + colourise("", fg="blue")).replace("]]", colourise("]", fg="cyan") + colourise())
+	return f"```ansi\n{s}```"
+
+fgmap = cdict(
+	black=30,
+	red=31,
+	green=32,
+	yellow=33,
+	blue=34,
+	magenta=35,
+	cyan=36,
+	white=37,
+)
+bgmap = cdict(
+	black=40,
+	red=41,
+	green=42,
+	yellow=43,
+	blue=44,
+	magenta=45,
+	cyan=46,
+	white=47,
+)
+def colourise(s=None, fg=None, bg=None):
+	s = as_str(s) if s is not None else ""
+	if not bg:
+		if not fg:
+			return "\033[0m" + s
+		return f"\033[0;{fgmap.get(fg, fg)}m" + s
+	if not fg:
+		return f"\033[0;{bgmap.get(bg, bg)}m" + s
+	return f"\033[{fgmap.get(fg, fg)};{bgmap.get(bg, bg)}m" + s
+colourised_quotes = r"""'"`“”"""
+colourised_splits = r"""\/\\|\-~:#@"""
+def colourise_brackets(s=None, a=None, b=None, c=None):
+	out = ""
+	while s:
+		match = re.search(r"""[\(\[\{<⟨⟪【『⌊⌈](?:.*?)[\)\]\}>⟩⟫】』⌋⌉]|['"`“](?:.*?)['"`”]|[\/\\|\-~:#@]""", s)
+		if not match:
+			break
+		if match.end() - match.start() == 1 and match.group() in colourised_splits:
+			out += colourise(s[:match.start()], fg=a)
+			out += colourise(match.group(), fg=c or b)
+			s = s[match.end():]
+			continue
+		out += colourise(s[:match.start()], fg=a)
+		opening = s[match.start()]
+		out += colourise(opening, fg=b if opening in colourised_quotes else (c or b))
+		out += colourise(s[match.start() + 1:match.end() - 1], fg=b)
+		closing = s[match.end() - 1]
+		out += colourise(closing, fg=b if closing in colourised_quotes else (c or b))
+		s = s[match.end():]
+	return out + colourise(s, fg=a)
+
+# Discord object mention formatting
+def user_mention(u_id):
+	return f"<@{u_id}>"
+def user_pc_mention(u_id):
+	return f"<@!{u_id}>"
+def channel_mention(c_id):
+	return f"<#{c_id}>"
+def role_mention(r_id):
+	return f"<@&{r_id}>"
+def auto_mention(obj):
+	if getattr(obj, "mention", None):
+		return obj.mention
+	if getattr(obj, "avatar", None):
+		return user_mention(obj.id)
+	if getattr(obj, "permissions", None):
+		return role_mention(obj.id)
+	if getattr(obj, "send", None):
+		return channel_mention(obj.id)
+	return str(obj.id)
 
 @functools.lru_cache(maxsize=64)
 def html_decode(s) -> str:
@@ -595,8 +727,8 @@ def is_youtube_stream(url): return url and regexp("^https?:\\/\\/r+[0-9]+---.{2}
 def is_soundcloud_stream(url): return url and regexp("^https?:\\/\\/(?:[\\w\\-]*)?media\\.sndcdn\\.com\\/[^\\s<>`|\"']+").findall(url)
 def is_deviantart_url(url): return url and regexp("^https?:\\/\\/(?:www\\.)?deviantart\\.com\\/[^\\\\s<>`|\"']+").findall(url)
 def is_reddit_url(url): return url and regexp("^https?:\\/\\/(?:\\w{2,3}\\.)?reddit.com\\/r\\/[^/\\W]+\\/").findall(url)
-def is_redgifs_url(url): return url and regexp("^https?:\\/\\/(?:\\w{2,3}\\.)?redgifs.com\\/\\w{2,6}\\/[^/\\W]+").findall(url)
 def is_emoji_url(url): return url and url.startswith("https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/")
+def is_spotify_url(url): return url and regexp("^https?:\\/\\/(?:play|open|api)\\.spotify\\.com\\/").findall(url)
 def unyt(s):
 	if not is_url(s):
 		return s
@@ -633,8 +765,6 @@ def expired(stream):
 	if discord_expired(stream):
 		return True
 	if is_youtube_url(stream):
-		return True
-	if is_redgifs_url(stream):
 		return True
 	if is_soundcloud_stream(stream):
 		return True
@@ -729,6 +859,17 @@ def get_image_size(b):
 		if not out or b"x" not in out:
 			raise
 	return list(map(int, out.split(b"x")))
+
+def rename(src, dst):
+	if os.path.exists(dst):
+		os.remove(dst)
+	try:
+		return os.rename(src, dst)
+	except OSError as ex:
+		if ex.args and ex.args[0] == 18:
+			with open(dst, "wb") as fdst:
+				with open(src, "rb") as fsrc:
+					shutil.copyfileobj(fsrc, fdst)
 
 IMAGE_FORMS = {
 	"auto": None,
@@ -1312,8 +1453,8 @@ def decode_attachment(encoded):
 	return ids
 
 @split_attachment
-def shorten_attachment(c_id, m_id, a_id, fn, mode="u", size=0):
-	url = f"https://mizabot.xyz/{mode}/" + encode_attachment(c_id, m_id, a_id, fn)
+def shorten_attachment(c_id, m_id, a_id, fn, mode="u", size=0, base="https://mizabot.xyz"):
+	url = f"{base}/{mode}/" + encode_attachment(c_id, m_id, a_id, fn)
 	if size:
 		url += f"?size={size}"
 	return url
@@ -1390,11 +1531,17 @@ def eval_json(s):
 		s = bytes(s)
 	if isinstance(s, byte_like) and s.startswith(b'b64("') and s.endswith(b'")'):
 		return b64(s[5:-2])
-	if isinstance(s, byte_like) and s.startswith(b"b'") and s.endswith(b"'"):
-		return safe_eval(s)
 	try:
-		return orjson.loads(s)
-	except Exception:
+		if len(s) > 24 * 1048576:
+			return orjson.loads(s)
+		else:
+			return json.loads(s)
+	except orjson.JSONDecodeError:
+		try:
+			import json5
+			return json5.loads(s)
+		except ValueError:
+			pass
 		cond = ("__" not in s or "." not in s) if isinstance(s, str) else (b"__" not in s or b"." not in s)
 		if cond:
 			try:
@@ -1413,7 +1560,7 @@ def maybe_json(d):
 			d = bytes(d)
 		return (b'b64("' + e64(d) + b'")')
 	try:
-		return json_dumps(d)
+		return json.dumps(d, cls=MultiEncoder).encode("ascii")
 	except TypeError:
 		return json_dumps(repr(d))
 
@@ -1613,10 +1760,6 @@ class DownloadingFile(io.IOBase):
 
 
 def get_duration_2(filename, _timeout=12):
-	if filename.startswith("https://api.mizabot.xyz/ytdl"):
-		url = filename.replace("?v=", "?q=").replace("?d=", "?q=")
-		resp = reqs.next().get(url, timeout=20)
-		return resp.json()[0].get("duration"), None, "ts"
 	command = (
 		"./ffprobe",
 		"-v",
@@ -1624,7 +1767,7 @@ def get_duration_2(filename, _timeout=12):
 		"-select_streams",
 		"a:0",
 		"-show_entries",
-		"stream=codec_name",
+		"stream=codec_name,duration",
 		"-show_entries",
 		"format=duration,bit_rate",
 		"-of",
@@ -1648,11 +1791,14 @@ def get_duration_2(filename, _timeout=12):
 	try:
 		dur = float(resp[1])
 	except (IndexError, ValueError, TypeError):
-		dur = None
+		try:
+			dur = float(resp[2])
+		except (IndexError, ValueError, TypeError):
+			dur = None
 	bps = None
-	if resp and len(resp) > 2:
+	if resp and len(resp) > 3:
 		with suppress(ValueError):
-			bps = float(resp[2])
+			bps = float(resp[3])
 	return dur, bps, cdc
 
 def get_duration_simple(filename, _timeout=12):
@@ -1663,6 +1809,8 @@ def get_duration_simple(filename, _timeout=12):
 		"error",
 		"-select_streams",
 		"a:0",
+		"-show_entries",
+		"stream=duration",
 		"-show_entries",
 		"format=duration,bit_rate",
 		"-of",
@@ -1684,11 +1832,14 @@ def get_duration_simple(filename, _timeout=12):
 	try:
 		dur = float(resp[0])
 	except (IndexError, ValueError, TypeError):
-		dur = None
+		try:
+			dur = float(resp[1])
+		except (IndexError, ValueError, TypeError):
+			dur = None
 	bps = None
-	if resp and len(resp) > 1:
+	if resp and len(resp) > 2:
 		with suppress(ValueError):
-			bps = float(resp[1])
+			bps = float(resp[2])
 	return dur, bps
 
 def get_duration(filename):
@@ -2188,11 +2339,11 @@ class FileHashDict(collections.abc.MutableMapping):
 			self.encoder[1] = decode
 		path = path.rstrip("/")
 		self.internal = path
-		self.path = path + ".sql3"
+		self.path = os.path.abspath(path + ".sql3")
 		self.modified = set()
 		self.deleted = set()
 		self.iter = None
-		if path and os.path.exists(path) and os.path.isdir(path) and os.path.exists(path + "/~~"):
+		if os.path.exists(path) and os.path.isdir(path) and os.path.exists(path + "/~~"):
 			os.rename(path + "/~~", self.path)
 			shutil.rmtree(path)
 		self.load_cursor()
@@ -2574,7 +2725,7 @@ class Cache(dict):
 	"A dictionary-compatible object where the key-value pairs expire after a specified delay. Implements stale-while-revaluate protocol."
 	# __slots__ = ("timeout", "timeout2", "tmap", "soonest", "waiting", "lost", "trash", "db")
 
-	def __init__(self, *args, timeout=60, timeout2=8, trash=4096, persist=None, **kwargs):
+	def __init__(self, *args, timeout=60, timeout2=8, trash=4096, persist=None, autosave=3600, **kwargs):
 		super().__init__(*args, **kwargs)
 		object.__setattr__(self, "timeout", timeout)
 		object.__setattr__(self, "timeout2", timeout2)
@@ -2582,7 +2733,7 @@ class Cache(dict):
 		object.__setattr__(self, "trash", trash)
 		object.__setattr__(self, "db", None)
 		if self:
-			ts = time.time() + timeout
+			ts = time.time()
 			tmap = {k: ts for k in self}
 			object.__setattr__(self, "soonest", ts)
 		else:
@@ -2595,8 +2746,8 @@ class Cache(dict):
 			fut = None
 		object.__setattr__(self, "waiting", fut)
 		if persist is not None:
-			path = f"cache/{persist}"
-			db = FileHashDict(path=path, automut=False, autosave=3600)
+			path = f"{persistdir}/{persist}"
+			db = FileHashDict(path=path, automut=False, autosave=autosave)
 			self.attach(db)
 
 	def attach(self, db):
@@ -2611,7 +2762,7 @@ class Cache(dict):
 			self.waiting.cancel()
 		fut = esubmit(waited_sync, self._update, self.timeout)
 		object.__setattr__(self, "waiting", fut)
-		t = time.time() + self.timeout
+		t = time.time()
 		for k in self.db:
 			if k not in self.tmap:
 				self.tmap[k] = t
@@ -2623,13 +2774,16 @@ class Cache(dict):
 		popcount = 0
 		t = time.time()
 		for k in sorted(tmap, key=tmap.__getitem__):
-			if t <= tmap[k] + timeout:
-				ts = tmap[k] + timeout
+			if not isfinite(timeout):
+				continue
+			if t < tmap.get(k, inf) + timeout:
+				ts = tmap.get(k, inf) + timeout
 				object.__setattr__(self, "soonest", ts)
 				if self.waiting:
 					self.waiting.cancel()
-				fut = esubmit(waited_sync, self._update, ts - t)
-				object.__setattr__(self, "waiting", fut)
+				if isfinite(ts):
+					fut = esubmit(waited_sync, self._update, ts - t)
+					object.__setattr__(self, "waiting", fut)
 				break
 			popcount += 1
 			tmap.pop(k)
@@ -2670,13 +2824,12 @@ class Cache(dict):
 			self.db.__setitem__(k, v)
 		self.lost.pop(k, None)
 		timeout = self.timeout2 if is_exception(v) else self.timeout
-		t = time.time()
-		ts = t + timeout
-		if ts < self.soonest:
+		ts = time.time()
+		if isfinite(timeout) and ts < self.soonest:
 			object.__setattr__(self, "soonest", ts)
 			if self.waiting:
 				self.waiting.cancel()
-			fut = esubmit(waited_sync, self._update, ts - t)
+			fut = esubmit(waited_sync, self._update, timeout)
 			if self.waiting:
 				self.waiting.cancel()
 			object.__setattr__(self, "waiting", fut)
@@ -2686,8 +2839,7 @@ class Cache(dict):
 		super().update(self, other)
 		t = time.time()
 		for k, v in other.items():
-			timeout = self.timeout2 if is_exception(v) else self.timeout
-			self.tmap[k] = t + timeout
+			self.tmap[k] = t
 		return self
 
 	def pop(self, k, v=Dummy):
@@ -2802,293 +2954,6 @@ def time_snowflake(dt, high=None):
 
 def ip2int(ip):
 	return int.from_bytes(b"\x00" + bytes(int(i) for i in ip.split(".")), "big")
-
-api = "v10"
-
-
-class AttachmentCache(Cache):
-	min_size = 262144
-	max_size = 25165824
-	attachment_count = 10
-	embed_count = 10
-	discord_token = AUTH["discord_token"]
-	alt_token = AUTH.get("alt_token", discord_token)
-	headers = {"Content-Type": "application/json", "Authorization": "Bot " + discord_token}
-	alt_headers = {"Content-Type": "application/json", "Authorization": "Bot " + alt_token}
-	exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-	sess = None
-	fut = None
-	queue = []
-	channels = set()
-	last = set()
-
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		self.init()
-
-	def init(self):
-		self.channels.clear()
-		self.channels.update(AUTH.get("proxy_channels", ()))
-		return self.channels
-
-	@tracebacksuppressor
-	def update_queue(self):
-		ec = self.embed_count
-		while self.queue:
-			tasks, self.queue = self.queue[:ec], self.queue[ec:]
-			urls = [task[1].split("?url=", 1)[-1].replace("?", "&").replace("%", "&").split("&", 1)[0] for task in tasks]
-			embeds = [dict(image=dict(url=url)) for url in urls]
-			last = self.last
-			n = 0
-			resp = None
-			try:
-				if last:
-					tup = choice(last)
-					last.discard(tup)
-					cid, mid, n = tup
-					heads = self.alt_headers if n else self.headers
-					resp = requests.patch(
-						f"https://discord.com/api/{api}/channels/{cid}/messages/{mid}",
-						data=json_dumps(dict(embeds=embeds)),
-						headers=heads,
-					)
-				else:
-					cid = choice(self.channels)
-					n = random.randint(0, 1)
-					heads = self.alt_headers if n else self.headers
-					resp = requests.post(
-						f"https://discord.com/api/{api}/channels/{cid}/messages",
-						data=json_dumps(dict(embeds=embeds)),
-						headers=heads,
-					)
-				resp.raise_for_status()
-				message = resp.json()
-				mid = message["id"]
-			except Exception as ex:
-				if resp is not None:
-					print(resp.content)
-				for task in tasks:
-					task[0].set_exception(ex)
-				continue
-			esubmit(self.set_last, (cid, mid, n))
-			for task, emb in zip(tasks, message["embeds"]):
-				url = emb["image"]["url"]
-				task[0].set_result(url)
-			# futs = []
-			# for emb in message["embeds"]:
-			# 	url = emb["image"]["url"]
-			# 	futs.append(esubmit(requests.head, url, verify=False))
-			# for task, fut in zip(tasks, futs):
-			# 	resp = fut.result()
-			# 	try:
-			# 		resp.raise_for_status()
-			# 	except Exception as ex:
-			# 		task[0].set_exception(ex)
-			# 	else:
-			# 		task[0].set_result(resp.url)
-
-	def set_last(self, tup):
-		time.sleep(1)
-		last = self.last
-		last.add(tup)
-		for (c, k, n) in tuple(last):
-			if utc() - snowflake_time_2(int(k)).timestamp() > 3600 * 12:
-				last.remove((c, k, n))
-
-	async def get_attachment(self, c_id, m_id, a_id, fn):
-		ac = self.attachment_count
-		heads = self.headers if c_id not in self.channels else self.alt_headers
-		if not self.channels or not fn or a_id < ac:
-			if not m_id:
-				raise LookupError("Insufficient information to retrieve attachment.")
-			data = await Request(
-				f"https://discord.com/api/{api}/channels/{c_id}/messages/{m_id}",
-				headers=heads,
-				bypass=False,
-				aio=True,
-				json=True,
-			)
-			for i, a in enumerate(data["attachments"]):
-				if a_id in (i, int(a["id"])):
-					return a["url"]
-			raise KeyError(a_id)
-		fut = Future()
-		url, _ = merge_url(c_id, m_id, a_id, fn)
-		task = [fut, url]
-		self.queue.append(task)
-		if self.fut is None or self.fut.done() or len(self.queue) > ac:
-			self.fut = self.exc.submit(self.update_queue)
-		return await wrap_future(fut)
-
-	async def obtain(self, c_id=None, m_id=None, a_id=None, fn=None, url=None):
-		if url:
-			c_id, m_id, a_id, fn = split_url(url, m_id)
-		ac = self.attachment_count
-		if isinstance(c_id, str) and not c_id.isnumeric():
-			c_id = int.from_bytes(b64(c_id), "big")
-			m_id = int.from_bytes(b64(m_id), "big")
-			a_id = int.from_bytes(b64(a_id), "big")
-		if not a_id:
-			a_id = 0
-		if a_id >= ac:
-			key = a_id
-			early = 43200 + 60
-		else:
-			key = m_id * ac + a_id
-			early = 86400 - 60
-		try:
-			resp = self[key]
-			assert isinstance(resp, str) and not discord_expired(resp, early) and url2fn(resp) == fn
-		except KeyError:
-			resp = await self.retrieve_from(key, self.get_attachment, c_id, m_id, a_id, fn)
-		except AssertionError:
-			resp = await self.get_attachment(c_id, m_id, a_id, fn)
-			self[key] = resp
-		return resp
-
-	async def delete(self, c_id, m_id, url=None):
-		if url:
-			c_id, m_id, *_ = split_url(url, m_id)
-		self.sess = self.sess or aiohttp.ClientSession()
-		heads = dict(choice((self.headers, self.alt_headers)))
-		url = f"https://discord.com/api/{api}/channels/{c_id}/messages/{m_id}"
-		resp = await self.sess.request("DELETE", url, headers=heads, timeout=120)
-		resp.raise_for_status()
-
-	async def create(self, *data, filename=None, channel=None, content="", collapse=True, editable=False):
-		if not self.channels:
-			raise RuntimeError("Proxy channel list required.")
-		ac = self.attachment_count
-		self.sess = self.sess or aiohttp.ClientSession()
-		form_data = aiohttp.FormData(quote_fields=False)
-		filename = filename or "b"
-		out = []
-		while data:
-			temp, data = data[:ac], data[ac:]
-			payload = dict(
-				content=content,
-				attachments=[dict(
-					id=i,
-					filename=filename if not i else "b",
-				) for i in range(len(temp))],
-			)
-			form_data.add_field(name="payload_json", value=json_dumpstr(payload))
-			for i, b in enumerate(temp):
-				form_data.add_field(
-					name=f"files[{i}]",
-					value=b,
-					filename=filename if not i else "b",
-					content_type="application/octet-stream",
-				)
-			cid = getattr(channel, "id", channel) if channel else choice(self.channels)
-			url = f"https://discord.com/api/{api}/channels/{cid}/messages"
-			if editable:
-				heads = dict(self.headers)
-			else:
-				heads = dict(choice((self.headers, self.alt_headers)))
-			heads.pop("Content-Type")
-			resp = await self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
-			resp.raise_for_status()
-			message = await resp.json()
-			cid = int(message["channel_id"])
-			mid = int(message["id"])
-			for i, a in enumerate(message["attachments"]):
-				aid = i if editable else int(a["id"])
-				fn = a["filename"]
-				out.append(shorten_attachment(cid, mid, aid, fn))
-			filename = "b"
-		if len(out) == 1 and collapse:
-			return out[0]
-		return out
-
-	async def edit(self, c_id, m_id, *data, url=None, filename=None, content="", collapse=True):
-		if url:
-			c_id, m_id, *_ = split_url(url, m_id)
-		ac = self.attachment_count
-		self.sess = self.sess or aiohttp.ClientSession()
-		form_data = aiohttp.FormData(quote_fields=False)
-		filename = filename or "b"
-		out = []
-		assert len(data) <= ac
-		payload = dict(
-			content=content,
-			attachments=[dict(
-				id=i,
-				filename=filename if not i else "b",
-			) for i in range(len(data))],
-		)
-		form_data.add_field(name="payload_json", value=json_dumpstr(payload))
-		for i, b in enumerate(data):
-			form_data.add_field(
-				name=f"files[{i}]",
-				value=b,
-				filename=filename if not i else "b",
-				content_type="application/octet-stream",
-			)
-		cid, mid = c_id, m_id
-		url = f"https://discord.com/api/{api}/channels/{cid}/messages/{mid}"
-		heads = self.headers
-		heads.pop("Content-Type")
-		resp = await self.sess.request("PATCH", url, headers=heads, data=form_data, timeout=120)
-		resp.raise_for_status()
-		message = await resp.json()
-		cid = int(message["channel_id"])
-		mid = int(message["id"])
-		for i, a in enumerate(message["attachments"]):
-			aid = i
-			fn = a["filename"]
-			out.append(shorten_attachment(cid, mid, aid, fn))
-		if len(out) == 1 and collapse:
-			return out[0]
-		return out
-
-attachment_cache = AttachmentCache(timeout=3600 * 12 , trash=0, persist="attachment.cache")
-upload_cache = Cache(timeout=86400 * 30, trash=1, persist="upload.cache")
-download_cache = Cache(timeout=60, trash=0, persist="download.cache")
-
-
-class ChunkSystem(FileHashDict):
-
-	session = requests.Session()
-
-	def combine(self, urls):
-		size = 0
-		url = urls[0]
-		if len(urls) > 1:
-			last = urls[-1]
-			fut = esubmit(self.session.head(
-				last,
-				headers=Request.header(),
-				stream=True,
-				verify=False,
-				timeout=60,
-			))
-		resp = self.session.get(
-			url,
-			headers=Request.header(),
-			stream=True,
-			verify=False,
-			timeout=60,
-		)
-		if resp.headers.get("Content-Type", "application/octet-stream") == "application/octet-stream":
-			it = resp.iter_content(65536)
-			b = next(it)
-			mime = magic.from_buffer(b)
-		else:
-			mime = resp.headers["Content-Type"]
-		size += int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 1))
-		if len(urls) > 1:
-			size += attachment_cache.max_size * len(urls) - 2
-			resp2 = fut.result()
-			size += int(resp2.headers.get("Content-Length") or resp2.headers.get("x-goog-stored-content-length", 1))
-		return cdict(
-			filename=url2fn(url),
-			size=size,
-			mimetype=mime,
-			chunks=urls,
-		)
-
-chunk_system = ChunkSystem(path=TEMP_PATH + "/chunks")
 
 
 def choice(*args):
@@ -3565,6 +3430,7 @@ class EvalPipe:
 		self.p_join = p_join
 		self.writable = writable
 		self.cache = {}
+		glob.update(dict(true=True, false=False, null=None))
 		self.glob = glob
 		self.id = id
 		self.thread = None
@@ -3675,22 +3541,22 @@ class EvalPipe:
 		return self.thread
 
 	def ensure_writable(self, timeout=12):
-		assert self.p_alive()
+		assert self.p_alive(), "No running worker process."
 		t = utc()
 		while not self.writable:
 			time.sleep(1)
 			if timeout and utc() - t > timeout:
 				raise TimeoutError(timeout)
-		assert self.p_alive()
+		assert self.p_alive(), "No running worker process."
 
 	async def a_ensure_writable(self, timeout=12):
-		assert self.p_alive()
+		assert self.p_alive(), "No running worker process."
 		t = utc()
 		while not self.writable:
 			await asyncio.sleep(1)
 			if timeout and utc() - t > timeout:
 				raise TimeoutError(timeout)
-		assert self.p_alive()
+		assert self.p_alive(), "No running worker process."
 
 	def submit(self, s, priority=False) -> Future:
 		self.ensure_writable()
@@ -3707,7 +3573,7 @@ class EvalPipe:
 		self.send(b)
 		return fut
 
-	def run(self, s, timeout=12, cache=None):
+	def run(self, s, timeout=30, cache=None):
 		self.ensure_writable(timeout=timeout)
 		if cache:
 			t = utc()
@@ -4078,9 +3944,8 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		return cdict(head)
 	headers = header
 
-	@tracebacksuppressor
-	async def _init_(self) -> "RequestManager":
-		if utc() - self.ts < 86400:
+	async def _init_(self):
+		if self.sessions and utc() - self.ts < 86400:
 			return self
 		if self.sessions:
 			for session in self.sessions:
@@ -4127,7 +3992,6 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 
 	def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, proxy=False, aio=False, session=None, ssl=True, authorise=False) -> bytes | str | json_like:
 		"Creates and executes a HTTP request, returning the body in bytes, string or JSON format. Raises an exception if status code is below 200 or above 399"
-		# print(url)
 		if headers is None:
 			headers = {}
 		if authorise:
@@ -4140,7 +4004,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 			if data and (isinstance(data, (list, dict)) or (data[:1] in '[{"') if isinstance(data, str) else (data[:1] in b'[{"' if isinstance(data, (bytes, memoryview)) else False)):
 				headers["Content-Type"] = "application/json"
 			if aio:
-				session = self.sessions.next()
+				session = None
 			else:
 				session = requests
 		elif bypass:
@@ -4192,5 +4056,17 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 
 Request = RequestManager()
 get_request = Request.__call__
+
+sp = None
+browsers = {}
+def new_playwright_page(browser="firefox", viewport=dict(width=480, height=320)):
+	try:
+		return browsers[browser].new_page()
+	except KeyError:
+		if sp is None:
+			from playwright.sync_api import sync_playwright
+			globals()["sp"] = sync_playwright().start()
+		browsers[browser] = getattr(sp, browser).launch(headless=True)
+	return browsers[browser].new_page(viewport=viewport)
 
 esubmit(load_mimes)

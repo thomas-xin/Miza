@@ -42,7 +42,7 @@ from contextlib import suppress
 from math import inf, floor, ceil, log2, log10
 from traceback import print_exc
 sys.path.append("misc")
-from misc.util import EvalPipe
+from misc.util import EvalPipe, new_playwright_page
 
 if __name__ == "__main__":
 	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
@@ -950,17 +950,6 @@ def max_size(w, h, maxsize, force=False):
 
 if "browse" in CAPS:
 	import playwright  # noqa: F401
-	sp = None
-	browsers = {}
-	def new_playwright_page(browser="firefox", viewport=dict(width=480, height=320)):
-		try:
-			return browsers[browser].new_page()
-		except KeyError:
-			if sp is None:
-				from playwright.sync_api import sync_playwright
-				globals()["sp"] = sync_playwright().start()
-			browsers[browser] = getattr(sp, browser).launch(headless=True)
-		return browsers[browser].new_page(viewport=viewport)
 
 	url_match = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
 	def is_url(url):
@@ -989,12 +978,13 @@ if "browse" in CAPS:
 	def wolframalpha(q):
 		with new_playwright_page() as page:
 			page.goto(f"https://www.wolframalpha.com/input?i={urllib.parse.quote_plus(q)}", timeout=4000)
+			time.sleep(8)
 			for i in range(30):
 				time.sleep(1)
 				elems = page.locator("h2, img").all()
 				texts = [e.text_content() or e.get_attribute("alt") for e in elems]
 				text = "\n".join(filter(bool, texts)).strip()
-				if text:
+				if text and len(texts) >= 2:
 					return text
 			raise TimeoutError(q)
 

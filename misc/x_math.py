@@ -8,7 +8,6 @@ import time
 import os
 import sys
 import subprocess
-import psutil
 import traceback
 import random
 import collections
@@ -30,7 +29,8 @@ if not hasattr(time, "time_ns"):
 deque = collections.deque
 
 getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
-print = lambda *args, sep=" ", end="\n": sys.stdout.buffer.write(f"~print({repr(sep.join(map(str, args)))},end={repr(end)})\n".encode("utf-8"))
+def print(*args, sep=" ", end="\n"):
+	return sys.stdout.buffer.write(f"~print({repr(sep.join(map(str, args)))},end={repr(end)})\n".encode("utf-8"))
 
 
 def as_str(s):
@@ -38,7 +38,8 @@ def as_str(s):
 		return bytes(s).decode("utf-8", "replace")
 	return str(s)
 
-literal_eval = lambda s: ast.literal_eval(as_str(s).lstrip())
+def literal_eval(s):
+	return ast.literal_eval(as_str(s).lstrip())
 
 
 BF_PREC = 256
@@ -100,12 +101,14 @@ def bf_evaluate(code):
 		codeptr += 1
 	return "".join(out)
 
-cleanup = lambda code: "".join(filter(lambda x: x in ".,[]<>+-", code))
+def cleanup(code):
+	return "".join(filter(lambda x: x in ".,[]<>+-", code))
 
 def buildbracemap(code):
 	temp_bracestack, bracemap = deque(), {}
 	for position, command in enumerate(code):
-		if command == "[": temp_bracestack.append(position)
+		if command == "[":
+			temp_bracestack.append(position)
 		if command == "]":
 			start = temp_bracestack.pop()
 			bracemap[start] = position
@@ -148,7 +151,8 @@ def bf_parse(s):
 						s = s[:i] + "(" + s[i + 1:] + ")"
 	return s
 
-_bf = lambda s: bf_evaluate(s)
+def _bf(s):
+	return bf_evaluate(s)
 
 
 # Values in seconds of various time intervals.
@@ -196,7 +200,8 @@ def time_convert(s):
 	return taken
 
 # Returns the string representation of a time value in seconds, in word form.
-sec2time = lambda s: " ".join(time_convert(s))
+def sec2time(s):
+	return " ".join(time_convert(s))
 
 # Returns the Roman Numeral representation of an integer.
 def roman_numerals(num, order=0):
@@ -205,7 +210,6 @@ def roman_numerals(num, order=0):
 		raise ValueError("Number is not legally representable in Roman Numerals.")
 	carry = 0
 	over = ""
-	sym = ""
 	output = ""
 	if num >= 4000:
 		carry = num // 1000
@@ -323,9 +327,9 @@ sympy.erfcinv.inverse = sympy.erfc
 sympy.erfc.inverse = sympy.erfcinv
 
 r_evalf = sympy.Rational.evalf
-from sympy.solvers.diophantine.diophantine import divisible
-from sympy.printing.pretty.pretty import PrettyPrinter
-from sympy.printing.pretty.stringpict import prettyForm
+from sympy.solvers.diophantine.diophantine import divisible  # noqa: E402
+from sympy.printing.pretty.pretty import PrettyPrinter  # noqa: E402
+from sympy.printing.pretty.stringpict import prettyForm  # noqa: E402
 
 _pow = sympy.Float.__pow__
 

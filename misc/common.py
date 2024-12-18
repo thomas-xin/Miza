@@ -12,6 +12,7 @@ from misc.util import *
 if __name__ != "__mp_main__":
 	from misc import smath
 	from misc.smath import *
+	from misc.caches import *
 
 import psutil, subprocess, weakref, zipfile, urllib, asyncio, json, pickle, functools, orjson, aiohttp, threading, shutil, filetype, inspect, sqlite3, argparse, bisect, httpx
 
@@ -273,102 +274,6 @@ async def interaction_patch(bot, message, content=None, embed=None, embeds=(), c
 		message.embeds = [discord.Embed.from_dict(embed)] if embed else message.embeds
 	return message
 
-
-# Escapes syntax in code highlighting markdown.
-
-ESCAPE_T = {
-	"[": "⦍",
-	"]": "⦎",
-	"@": "＠",
-	"`": "",
-	";": ";",
-}
-__emap = "".maketrans(ESCAPE_T)
-
-ESCAPE_T2 = {
-	"@": "＠",
-	"`": "",
-	"#": "♯",
-	";": ";",
-}
-__emap2 = "".maketrans(ESCAPE_T2)
-
-# Discord markdown format helper functions
-no_md = lambda s: str(s).translate(__emap)
-clr_md = lambda s: str(s).translate(__emap2)
-sqr_md = lambda s: f"[{no_md(s)}]" if not isinstance(s, discord.abc.GuildChannel) else f"[#{no_md(s)}]"
-
-def italics(s):
-	if not isinstance(s, str):
-		s = str(s)
-	if "*" not in s:
-		s = f"*{s}*"
-	return s
-
-def bold(s):
-	if not isinstance(s, str):
-		s = str(s)
-	if "**" not in s:
-		s = f"**{s}**"
-	return s
-
-single_md = lambda s: f"`{s}`"
-code_md = lambda s: f"```\n{s}```" if s else "``` ```"
-py_md = lambda s: f"```py\n{s}```" if s else "``` ```"
-ini_md = lambda s: f"```ini\n{s}```" if s else "``` ```"
-css_md = lambda s, force=False: (f"```css\n{s}```".replace("'", "\u2019").replace('"', "\u201d") if force else ini_md(s)) if s else "``` ```"
-fix_md = lambda s: f"```fix\n{s}```" if s else "``` ```"
-def ansi_md(s):
-	if not s:
-		return "``` ```"
-	s = s.replace("[[", colourise("[", fg="cyan") + colourise("", fg="blue")).replace("]]", colourise("]", fg="cyan") + colourise())
-	return f"```ansi\n{s}```"
-
-fgmap = cdict(
-	black=30,
-	red=31,
-	green=32,
-	yellow=33,
-	blue=34,
-	magenta=35,
-	cyan=36,
-	white=37,
-)
-bgmap = cdict(
-	black=40,
-	red=41,
-	green=42,
-	yellow=43,
-	blue=44,
-	magenta=45,
-	cyan=46,
-	white=47,
-)
-def colourise(s=None, fg=None, bg=None):
-	s = as_str(s) if s is not None else ""
-	if not bg:
-		if not fg:
-			return "\033[0m" + s
-		return f"\033[0;{fgmap.get(fg, fg)}m" + s
-	if not fg:
-		return f"\033[0;{bgmap.get(bg, bg)}m" + s
-	return f"\033[{fgmap.get(fg, fg)};{bgmap.get(bg, bg)}m" + s
-
-# Discord object mention formatting
-user_mention = lambda u_id: f"<@{u_id}>"
-user_pc_mention = lambda u_id: f"<@!{u_id}>"
-channel_mention = lambda c_id: f"<#{c_id}>"
-role_mention = lambda r_id: f"<@&{r_id}>"
-def auto_mention(obj):
-	if getattr(obj, "mention", None):
-		return obj.mention
-	if getattr(obj, "avatar", None):
-		return user_mention(obj.id)
-	if getattr(obj, "permissions", None):
-		return role_mention(obj.id)
-	if getattr(obj, "send", None):
-		return channel_mention(obj.id)
-	return str(obj.id)
 
 channel_repr = lambda s: as_str(s) if not isinstance(s, discord.abc.GuildChannel) else str(s)
 

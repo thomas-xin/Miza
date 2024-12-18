@@ -2,20 +2,23 @@ from collections import deque
 from concurrent.futures import Future
 from contextlib import suppress
 from math import ceil, inf
+import os
 import random
+import re
 import time
 from urllib.parse import quote_plus
 from traceback import print_exc
 import orjson
 import requests
 import yt_dlp as ytd
-from misc.types import alist, as_str, cdict, full_prune, json_dumps, round_min, to_alphanumeric, tracebacksuppressor
-from misc.smath import time_parse, fuzzy_substring
-from misc.asyncs import esubmit
-from misc.util import (
-	python, shuffle, utc, proxy, leb128, verify_search,
-	find_urls, is_url, is_discord_url, is_image, is_miza_url, is_youtube_url,
-	EvalPipe, FileHashDict, Request, Semaphore, Cache
+from .types import alist, as_str, cdict, full_prune, json_dumps, round_min, to_alphanumeric, tracebacksuppressor, ts_us
+from .smath import time_parse, fuzzy_substring
+from .asyncs import esubmit
+from .util import (
+	python, shuffle, utc, proxy, leb128, verify_search, json_dumpstr, new_playwright_page, get_free_port,
+	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration_2,
+	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url, is_imgur_url, is_giphy_url,
+	EvalPipe, Cache, Request, Semaphore, CACHE_PATH
 )
 
 # Gets the best icon/thumbnail for a queue entry.
@@ -38,7 +41,7 @@ def get_best_icon(entry):
 			url = entry["url"]
 		if not url:
 			return ""
-		if is_discord_url(url):
+		if is_discord_attachment(url):
 			if not is_image(url):
 				return "https://cdn.discordapp.com/embed/avatars/0.png"
 		if is_youtube_url(url):
@@ -50,12 +53,16 @@ def get_best_icon(entry):
 			return entry["thumbnail"]
 		if is_miza_url(url):
 			return "https://mizabot.xyz/static/mizaleaf.png"
-		return url
-	return sorted(thumbnails, key=lambda x: float(x.get("width", x.get("preference", 0) * 4096)), reverse=True)[0]["url"]
+		return ""
+	return sorted(
+		thumbnails,
+		key=lambda x: float(x.get("width", x.get("preference", 0) * 4096)),
+		reverse=True,
+	)[0]["url"]
 # Gets the best audio file download link for a queue entry.
 def get_best_audio(entry):
 	try:
-		return entry["stream"]
+		return entry["audio"]
 	except KeyError:
 		pass
 	best = (-inf,)
@@ -63,10 +70,8 @@ def get_best_audio(entry):
 		fmts = entry["formats"]
 	except KeyError:
 		fmts = ()
-	try:
-		url = entry["url"]
-	except KeyError:
-		url = entry["webpage_url"]
+	url = None
+	cdc = None
 	replace = True
 	for fmt in fmts:
 		q = (
@@ -90,12 +95,10 @@ def get_best_audio(entry):
 		if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
 			replace = False
 		if q > best or replace:
+			cdc = fmt.get("acodec")
 			best = q
 			url = fmt["url"]
-	if "dropbox.com" in url:
-		if "?dl=0" in url:
-			url = url.replace("?dl=0", "?dl=1")
-	if url.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
+	if url and url.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
 		resp = Request(url)
 		fmts = alist()
 		with suppress(ValueError, KeyError):
@@ -111,9 +114,7 @@ def get_best_audio(entry):
 				fmts.append(fmt)
 		entry["formats"] = fmts
 		return get_best_audio(entry)
-	if not url:
-		raise KeyError("URL not found.")
-	return url
+	return url, cdc
 # Gets the best video file download link for a queue entry.
 def get_best_video(entry, hq=True):
 	try:
@@ -125,10 +126,8 @@ def get_best_video(entry, hq=True):
 		fmts = entry["formats"]
 	except KeyError:
 		fmts = ()
-	try:
-		url = entry["url"]
-	except KeyError:
-		url = entry["webpage_url"]
+	url = None
+	cdc = None
 	replace = True
 	for fmt in fmts:
 		q = (
@@ -142,12 +141,10 @@ def get_best_video(entry, hq=True):
 		if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
 			replace = False
 		if q > best or replace:
+			cdc = fmt.get("vcodec")
 			best = q
 			url = fmt["url"]
-	if "dropbox.com" in url:
-		if "?dl=0" in url:
-			url = url.replace("?dl=0", "?dl=1")
-	if url.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
+	if url and url.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
 		resp = Request(url)
 		fmts = alist()
 		with suppress(ValueError, KeyError):
@@ -163,9 +160,7 @@ def get_best_video(entry, hq=True):
 				fmts.append(fmt)
 		entry["formats"] = fmts
 		return get_best_video(entry)
-	if not url:
-		raise KeyError("URL not found.")
-	return url
+	return url, cdc
 def get_best_lyrics(resp):
 	if "description" in resp:
 		lyr = []
@@ -210,62 +205,43 @@ def get_best_lyrics(resp):
 				if lyrics:
 					print("lyrics_captions", lyrics)
 					return lyrics
-def simplify_entry(entry):
-	if "title" in entry:
-		title = entry["title"]
-	else:
-		title = entry["url"].rsplit("/", 1)[-1]
-		if "." in title:
-			title = title[:title.rindex(".")]
-	url = entry.get("webpage_url", entry.get("url", entry.get("id")))
-	if not url or entry.get("invalid"):
-		return
-	if not is_url(url):
-		if entry.get("ie_key", "").casefold() == "youtube":
-			url = f"https://youtu.be/{url}"
-	if entry.get("duration"):
-		dur = float(entry["duration"])
-	else:
-		dur = None
-	temp = cdict(name=title, url=url, duration=dur)
-	icon = get_best_icon(entry)
-	if icon:
-		temp["icon"] = icon
-	if "formats" in entry:
-		temp["stream"] = get_best_audio(entry)
-		temp["video"] = get_best_video(entry)
-	lyrics = get_best_lyrics(entry)
-	if lyrics:
-		temp["lyrics"] = lyrics
-	return temp
 
 
 class AudioDownloader:
 
 	def __init__(self):
-		self.worker_count = 3
-		self.workers = alist()
-		for i in range(self.worker_count):
-			worker = EvalPipe.connect(
-				[python, "-m", "misc.x_ytdl", str(8011 + i)],
-				8011 + i,
-				glob=globals(),
-			)
-			self.workers.append(worker)
 		self.session = requests.Session()
-		self.cache = FileHashDict(path="cache/ytdl.cache", automut=False, autosave=120)
+		self.search_cache = Cache(timeout=inf, timeout2=60, persist="ytdl.search.cache", autosave=60)
 		self.futs = [
 			esubmit(self.set_cookie),
 		]
+		self.worker_count = 2
+		self.workers = alist()
+		self.start_workers()
+
+	def start_workers(self):
+		while len(self.workers) < self.worker_count:
+			port = get_free_port()
+			worker = EvalPipe.connect(
+				[python, "-m", "misc.x_ytdl", str(port)],
+				port,
+				glob=globals(),
+				independent=False,
+			)
+			self.workers.append(worker)
 
 	def submit(self, s):
+		if not self.workers:
+			self.start_workers()
 		return self.workers.next().submit(s)
 
 	def run(self, s):
+		if not self.workers:
+			self.start_workers()
 		return self.workers.next().run(s)
 
 	def extract_info(self, url, download=False, process=True):
-		return self.run(f"ytdl.extract_info({json_dumps(url)},download={download},process={process})")
+		return self.run(f"extract_info({json_dumpstr(url)},download={download},process={process})")
 
 	def set_cookie(self):
 		self.youtube_base = "CONSENT=YES+cb.20210328-17-p0.en+FX"
@@ -285,7 +261,7 @@ class AudioDownloader:
 	# Returns a list of formatted queue entries from a YouTube playlist renderer.
 	def extract_playlist_items(self, items):
 		token = None
-		out = deque()
+		out = []
 		for data in items:
 			try:
 				video = data["playlistVideoRenderer"]
@@ -420,7 +396,7 @@ class AudioDownloader:
 				token = self.produce_continuation(p_id, page + 1)
 			for fut in futs:
 				entries.extend(fut.result()[0])
-		out = deque()
+		out = []
 		urls = set()
 		for entry in entries:
 			if entry.url not in urls:
@@ -577,7 +553,7 @@ class AudioDownloader:
 			resp.raise_for_status()
 		return self.export_spotify_part(resp.json())
 	def export_spotify_part(self, d):
-		out = deque()
+		out = []
 		try:
 			d = d["tracks"]
 		except KeyError:
@@ -673,6 +649,7 @@ class AudioDownloader:
 				if v_id == e.get("id"):
 					entries.rotate(-i)
 					break
+			entries = list(entries)
 		return entries
 
 	def ydl_errors(self, s):
@@ -728,35 +705,39 @@ class AudioDownloader:
 					if entry is not None:
 						results.append(entry)
 		return sorted(results, key=lambda entry: entry.views, reverse=True)
-	def search_yt(self, query, skip=False, count=1):
+	def ytsearch(self, query, skip=False, count=1):
 		out = alist()
 		if not skip:
-			resp = self.extract_info(f"ytsearch{count}:" + query, process=False)
-			if resp.get("_type", None) == "url":
-				resp = self.extract_from(resp["url"])
-			if resp.get("_type", None) == "playlist":
-				entries = list(resp["entries"])
+			try:
+				resp = self.extract_info(f"ytsearch{count}:" + query, process=False)
+				if resp.get("_type", None) == "url":
+					resp = self.extract_info(resp["url"], process=True)
+			except Exception:
+				print_exc()
 			else:
-				entries = [resp]
-			for entry in entries:
-				if "title" in entry:
-					title = entry["title"]
+				if resp.get("_type", None) == "playlist":
+					entries = resp["entries"]
 				else:
-					title = entry["url"].rsplit("/", 1)[-1]
-					if "." in title:
-						title = title[:title.rindex(".")]
-				url = entry.get("webpage_url", entry.get("url", entry.get("id")))
-				if not url or entry.get("invalid"):
-					continue
-				if entry.get("duration"):
-					dur = float(entry["duration"])
-				else:
-					dur = None
-				temp = cdict(name=title, url=url, duration=dur)
-				if not is_url(url):
-					if entry.get("ie_key", "").casefold() == "youtube":
-						temp["url"] = f"https://youtu.be/{url}"
-				out.append(temp)
+					entries = [resp]
+				for entry in entries:
+					if "title" in entry:
+						title = entry["title"]
+					else:
+						title = entry["url"].rsplit("/", 1)[-1]
+						if "." in title:
+							title = title[:title.rindex(".")]
+					url = entry.get("webpage_url", entry.get("url", entry.get("id")))
+					if not url:
+						continue
+					if entry.get("duration"):
+						dur = float(entry["duration"])
+					else:
+						dur = None
+					temp = cdict(name=title, url=url, duration=dur)
+					if not is_url(url):
+						if entry.get("ie_key", "").casefold() == "youtube":
+							temp["url"] = f"https://youtu.be/{url}"
+					out.append(temp)
 		if not out:
 			url = f"https://www.youtube.com/results?search_query={quote_plus(query)}"
 			resp = Request(url, headers=self.youtube_header, timeout=12)
@@ -801,7 +782,7 @@ class AudioDownloader:
 		out = alist()
 		resp = self.extract_info(f"scsearch{count}:" + query, process=False)
 		if resp.get("_type", None) == "url":
-			resp = self.extract_from(resp["url"])
+			resp = self.extract_info(resp["url"], process=True)
 		if resp.get("_type", None) == "playlist":
 			entries = list(resp["entries"])
 		else:
@@ -814,17 +795,17 @@ class AudioDownloader:
 				if "." in title:
 					title = title[:title.rindex(".")]
 			url = entry.get("webpage_url", entry.get("url", entry.get("id")))
-			if not url or entry.get("invalid"):
+			if not url:
 				continue
 			if entry.get("duration"):
 				dur = float(entry["duration"])
 			else:
 				dur = None
 			temp = cdict(name=title, url=url, duration=dur)
-			if not is_url(url):
-				if entry.get("ie_key", "").casefold() == "youtube":
-					temp["url"] = f"https://www.youtube.com/watch?v={url}"
 			out.append(temp)
+			if len(out) >= count:
+				break
+		return out
 	def spsearch(self, query, count=1):
 		query = f"https://api.spotify.com/v1/search?type=track%2Cshow_audio%2Cepisode_audio&include_external=audio&limit={count}&q=" + quote_plus(query)
 		resp = self.session.get(query, headers=self.spotify_header, timeout=20).json()
@@ -864,35 +845,252 @@ class AudioDownloader:
 					entry.url = track.split(b'href="', 1)[1].split(b'"', 1)[0].split(b"?", 1)[0].decode("utf-8", "replace")
 					if ttype == b"track":
 						out.append(entry)
-						break
-			if not out:
-				raise LookupError(entry)
+						if len(out) >= count:
+							break
 			return out
 		except (LookupError, ValueError):
-			return dict(_type="playlist", entries=[])
+			return []
+
+	def get_audio(self, entry, asap=None):
+		assert not is_spotify_url(entry.url), "Spotify is temporarily unsupported, sorry!"
+		url = entry.get("orig") or entry["url"]
+		d = entry.get("duration")
+		if asap is None:
+			asap = d and d > 72
+		if asap or d is None or d > 960:
+			stream, cdc = get_best_audio(entry)
+			if not expired(stream):
+				return stream, cdc, entry["duration"]
+			entry2 = self.search(url, force=True)[0]
+			entry.update(entry2)
+			stream, cdc = get_best_audio(entry)
+			if not expired(stream):
+				return stream, cdc, entry["duration"]
+		ts = ts_us()
+		fn = f"{CACHE_PATH}/{ts}.opus"
+		ydl_opts = dict(
+			format="bestaudio/best",
+			default_search="auto",
+			source_address="0.0.0.0",
+			final_ext="opus",
+			cachedir=CACHE_PATH,
+			outtmpl=fn,
+			windowsfilenames=True,
+			postprocessors=[dict(
+				key="FFmpegExtractAudio",
+				preferredcodec="opus",
+			)],
+		)
+		if is_discord_attachment(url) or is_miza_url(url):
+			if discord_expired(url):
+				url = shorten_attachment(url, 0)
+			dur, _bps, cdc = get_duration_2(url)
+			return url, cdc, dur
+		dur = self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)})['duration']")
+		assert os.path.exists(fn) and os.path.getsize(fn)
+		return fn, "opus", dur
+
+	def preprocess(self, url, mode, count):
+		output = deque()
+		if is_url(url):
+			if is_discord_attachment(url):
+				if discord_expired(url):
+					url = shorten_attachment(url, 0)
+				temp = cdict(
+					name=url2fn(url),
+					url=url
+				)
+				output.append(temp)
+			elif "youtube.com/" in url or "youtu.be/" in url:
+				p_id = None
+				for x in ("?list=", "&list="):
+					if x in url:
+						p_id = url[url.index(x) + len(x):]
+						p_id = p_id.split("&", 1)[0]
+						break
+				if p_id:
+					with tracebacksuppressor:
+						output.extend(self.get_youtube_playlist(p_id))
+						# Scroll to highlighted entry if possible
+						v_id = None
+						for x in ("?v=", "&v="):
+							if x in url:
+								v_id = url[url.index(x) + len(x):]
+								v_id = v_id.split("&", 1)[0]
+								break
+						if v_id:
+							for i, e in enumerate(output):
+								if v_id in e.url:
+									output.rotate(-i)
+									break
+						return output
+			elif re.match(r"^https:\/\/soundcloud\.com\/[A-Za-z0-9]+\/sets\/", url) or re.match(r"^https:\/\/soundcloud\.com\/[A-Za-z0-9]+\/likes", url) or re.match(r"^https:\/\/api-v2\.soundcloud\.com\/users\/[0-9]+\/likes", url):
+				with tracebacksuppressor:
+					return self.get_soundcloud_playlist(url)
+			elif is_spotify_url(url):
+				with tracebacksuppressor:
+					return self.get_spotify_playlist(url)
+		else:
+			if ":" not in url:
+				mode = mode or "yt"
+				url = f"{mode}search:{url}"
+			check, search = url.split(":", 1)
+			for mode in ("ytsearch", "scsearch", "spsearch", "bcsearch"):
+				if check == mode:
+					output.extend(getattr(self, mode)(search, count=count))
+					break
+				elif check.startswith(mode) and check[len(mode):].isnumeric():
+					output.extend(getattr(self, mode)(search, count=max(count, int(check[len(mode):]))))
+					break
+		return list(output)
+
+	# Main extract function, able to extract from youtube playlists much faster than youtube-dl using youtube API, as well as ability to follow spotify links.
+	def extract(self, url, mode=None, count=1):
+		output = self.preprocess(url, mode=mode, count=count)
+		# Only proceed if no items have already been found (from playlists in this case)
+		if not len(output):
+			resp = None
+			# Allow loading of files output by ~dump
+			if is_url(url):
+				utest = url.split("?", 1)[0]
+				if utest[-5:] == ".json" or utest[-4:] in (".txt", ".zip"):
+					b = Request(url)
+					try:
+						d = orjson.loads(b)
+					except orjson.JSONDecodeError:
+						d = [url for url in as_str(b).splitlines() if is_url(url)]
+						if not d:
+							raise
+						q = [dict(name=url.split("?", 1)[0].rsplit("/", 1)[-1], url=url) for url in d]
+					else:
+						q = d["queue"][:262144]
+					return [cdict(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
+			# Otherwise call automatic extract_info function
+			if not resp:
+				resp = self.extract_info(url, process=False)
+			if not resp:
+				return []
+			if resp.get("_type") == "url":
+				resp = self.extract_info(resp["url"], process=True)
+			if resp is None or not len(resp):
+				raise LookupError(f"No results for {url}")
+			# Check if result is a playlist
+			if resp.get("_type") == "playlist":
+				entries = list(resp["entries"])
+				for i, entry in enumerate(entries):
+					temp = None
+					if not i:
+						# Extract full data from first item only
+						try:
+							if "url" in entry:
+								temp = self.extract(entry["url"])[0]
+							elif "formats" in entry:
+								temp = cdict({
+									"name": resp["title"],
+									"url": resp.get("webpage_url", url),
+									"duration": inf,
+									"audio": get_best_audio(entry),
+									"icon": get_best_icon(entry),
+									"video": get_best_video(entry),
+								})
+						except Exception:
+							print_exc()
+							continue
+					else:
+						with tracebacksuppressor:
+							if "title" in entry:
+								title = entry["title"]
+							else:
+								title = entry["url"].rsplit("/", 1)[-1]
+								if "." in title:
+									title = title[:title.rindex(".")]
+							try:
+								dur = round_min(entry["duration"])
+							except Exception:
+								dur = None
+							url = entry.get("webpage_url", entry.get("url", entry.get("id")))
+							if not url:
+								continue
+							temp = {
+								"name": title,
+								"url": url,
+								"duration": dur,
+							}
+							if not is_url(url):
+								if entry.get("ie_key", "").casefold() == "youtube":
+									temp["url"] = f"https://youtu.be/{url}"
+					if temp:
+						output.append(cdict(temp))
+			else:
+				# Single item results must contain full data, we take advantage of that here
+				name = resp.get("title") or resp["webpage_url"].rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
+				url = resp.get("webpage_url") or resp["url"]
+				dur = resp.get("duration")
+				temp = cdict({
+					"name": name,
+					"url": url,
+					"duration": dur,
+					"audio": get_best_audio(resp),
+					"icon": get_best_icon(resp),
+					"video": get_best_video(resp),
+				})
+				audio = temp.audio
+				if "googlevideo" in audio[:64]:
+					durstr = re.findall(r"[&?]dur=([0-9\.]+)", audio)
+					if durstr:
+						temp.duration = round_min(durstr[0])
+				output.append(temp)
+		return output
+
+	def search_into(self, retrieval, item, mode, count):
+		temp = self.extract(item, mode=mode, count=count)
+		for e in temp:
+			url = unyt(e["url"])
+			if url != e["url"]:
+				e["url"], e["orig"] = url, e["url"]
+		self.search_cache[retrieval] = temp
+		return temp
 
 	# Performs a search, storing and using cached search results for efficiency.
-	def search(self, item, force=False, mode=None, images=False, count=1, follow=True):
-		item = verify_search(item)
-		if mode is None and count == 1:
+	def search(self, item, force=False, mode=None, count=1):
+		key = verify_search(item)
+		retrieval = json_dumpstr([key, mode, count])
+		temp = None
+		age = inf
+		try:
+			temp = self.search_cache[retrieval]
+		except KeyError:
 			try:
-				return self.searched[item]
+				temp = self.search_cache.retrieve(retrieval)
 			except KeyError:
 				pass
+		else:
+			age = self.search_cache.age(retrieval)
+		if age > 86400 or not temp or force:
+			temp = self.search_into(retrieval, item, mode, count) or temp
+		elif age > 720:
+			esubmit(self.search_into, retrieval, item, mode, count)
+		if not temp:
+			raise FileNotFoundError(f'No results for {item}.')
+		return temp
+
+	def is_cached(self, item):
+		item = verify_search(item)
+		retrieval = json_dumpstr([item, None, 1])
+		try:
+			temp = self.search_cache[retrieval][0]
+		except KeyError:
 			try:
-				output = self.searched.retrieve(item)
+				temp = self.search_cache.retrieve(retrieval)[0]
 			except KeyError:
 				pass
 			else:
-				esubmit(self.search, item, force=force, mode=mode, images=images, count=count)
-				return output
-		with self.semaphore:
-			try:
-				output = None
-				if not output:
-					output = self.extract(item, force, mode=mode, count=count)
-				self.searched[item] = output
-				return output
-			except Exception as ex:
-				print_exc()
-				return repr(ex)
+				return 1 + (not expired(get_best_audio(temp)[0]))
+		else:
+			return 1 + (not expired(get_best_audio(temp)[0]))
+		return 0
+
+	def close(self):
+		for worker in self.workers:
+			worker.terminate()
+		self.workers.clear()

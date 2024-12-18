@@ -2598,9 +2598,9 @@ class UpdateUserLogs(Database):
 		emb = discord.Embed(colour=16777214)
 		emb.set_author(**get_author(user))
 		emb.description = f"{user_mention(user.id)} has joined the server."
-		age = utc() - utc_ts(user.created_at)
+		age = DynamicDT.now() - user.created_at
 		if age < 86400 * 7:
-			emb.description += f"\n⚠️ Account is {time_diff(utc_dt(), user.created_at)} old. ⚠️"
+			emb.description += f"\n⚠️ Account is {age} old. ⚠️"
 		self.bot.send_embeds(channel, emb)
 
 	async def _leave_(self, user, **void):

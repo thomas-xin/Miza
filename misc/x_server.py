@@ -31,7 +31,8 @@ from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut, gather, CloseableAsyncIterator
 from .smath import supersample, xrand
 from .types import byte_like, as_str, astype, cdict, suppress, round_min, full_prune, literal_eval, regexp, loop, json_dumps, alist, resume, RangeSet, MemoryBytes
-from .util import hwaccel, fcdict, nhash, shash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, smart_split, seq, Request, magic, is_discord_attachment, unyt, ecdc_exists, get_duration, evalex, evalEX, DownloadingFile, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, attachment_cache, expand_attachment, shorten_attachment, upload_cache, download_cache
+from .util import hwaccel, fcdict, nhash, shash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, smart_split, seq, Request, magic, is_discord_attachment, unyt, ecdc_exists, get_duration, evalex, evalEX, DownloadingFile, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, expand_attachment, shorten_attachment
+from .caches import attachment_cache, upload_cache, download_cache
 
 
 try:

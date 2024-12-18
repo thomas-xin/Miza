@@ -1100,8 +1100,10 @@
 				"Rem",
 				"ClearQueue",
 				"Clear",
+				"Stop",
 				"SkipAll",
-				"Shorten"
+				"Shorten",
+				"\u23f9\ufe0f"
 			],
 			"description": "Removes an entry or range of entries from the voice channel queue.",
 			"usage": "",
@@ -1110,25 +1112,21 @@
 			"example": [],
 			"timeout": "24"
 		},
-		"Pause": {
+		"AudioState": {
 			"aliases": [
-				"Pause",
-				"\u23f8\ufe0f",
+				"AudioState",
 				"\u23ef\ufe0f",
-				"\u23f9\ufe0f",
+				"\u23f8\ufe0f",
+				"Toggle",
+				"Pause",
 				"Resume",
-				"Unpause",
-				"Stop"
+				"Unpause"
 			],
-			"description": "Pauses, stops, or resumes audio playing.",
+			"description": "Adjusts boolean states of the audio player",
 			"usage": "",
 			"level": "0",
 			"rate_limit": "(3, 4)",
-			"example": [
-				"pause",
-				"resume",
-				"stop"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Seek": {
@@ -1138,15 +1136,10 @@
 				"Replay"
 			],
 			"description": "Seeks to a position in the current audio file.",
-			"usage": "<position[0]>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
-			"example": [
-				"replay",
-				"seek 5m30",
-				"seek 3:41",
-				"seek 123"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Dump": {
@@ -1159,13 +1152,10 @@
 				"Dujmp\u00f6"
 			],
 			"description": "Saves or loads the currently playing audio queue state.",
-			"usage": "<data>? <append(-a)|song_positions(-x)>*",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(1, 2)",
-			"example": [
-				"save",
-				"dump https://cdn.discordapp.com/attachments/731709481863479436/1052210287303999528/dump.json"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"AudioSettings": {
