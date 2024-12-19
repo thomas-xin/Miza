@@ -1,3 +1,4 @@
+import asyncio
 from collections import deque
 import concurrent.futures
 from concurrent.futures import Future
@@ -13,7 +14,7 @@ from traceback import print_exc
 from urllib.parse import quote_plus
 import numpy as np
 import psutil
-from .asyncs import csubmit, esubmit, wrap_future, cst, eloop
+from .asyncs import csubmit, esubmit, asubmit, wrap_future, cst, eloop
 from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_str, astype
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, TEMP_PATH, EvalPipe, Request, api,
@@ -79,16 +80,17 @@ class AudioPlayer(discord.AudioSource):
 	last_activity = inf
 
 	@classmethod
-	async def join(cls, vcc, channel):
+	async def join(cls, vcc, channel=None):
 		globals()["client"] = await wrap_future(client_fut)
 		cid = cast_id(vcc)
 		vcc = client.get_channel(cid)
 		if not vcc:
 			vcc = await client.fetch_channel(cid)
-		cid = cast_id(channel)
-		channel = client.get_channel(cid)
-		if not channel:
-			channel = await client.fetch_channel(cid)
+		if channel is not None:
+			cid = cast_id(channel)
+			channel = client.get_channel(cid)
+			if not channel:
+				channel = await client.fetch_channel(cid)
 		gid = vcc.guild.id
 		self = None
 		try:
@@ -107,7 +109,10 @@ class AudioPlayer(discord.AudioSource):
 		except KeyError:
 			pass
 		else:
-			self = await wrap_future(fut)
+			try:
+				self = await asyncio.wait_for(wrap_future(fut), timeout=7)
+			except asyncio.TimeoutError:
+				pass
 			if not self.vc.is_connected():
 				self.vc = None
 		if self and self.vc:
@@ -181,13 +186,25 @@ class AudioPlayer(discord.AudioSource):
 			return cls.players[gid]
 		except KeyError:
 			pass
-		fut = cls.waiting[gid]
-		self = fut.result(timeout=7)
-		if self:
-			return self
-		self = cls(guild)
-		if self.vc:
-			return self
+		try:
+			fut = cls.waiting[gid]
+		except KeyError:
+			pass
+		else:
+			try:
+				self = fut.result(timeout=7)
+			except concurrent.futures.TimeoutError:
+				self = None
+			if self and self.vc:
+				return self
+		guild = client.get_guild(gid)
+		if not guild or not guild.me or not guild.me.voice or not guild.me.voice.channel:
+			raise KeyError(gid)
+		vcc = guild.me.voice.channel
+		self = cls(vcc)
+		cls.waiting[gid] = Future()
+		csubmit(self.join_into(vcc))
+		return self
 
 	@classmethod
 	async def disconnect(cls, guild):
@@ -202,9 +219,8 @@ class AudioPlayer(discord.AudioSource):
 		else:
 			if not self.fut.done():
 				self.fut.set_exception(StopIteration("Voice disconnected."))
-			self.queue.clear()
 			self.settings.update(self.defaults)
-			self.playing.clear()
+			self.clear()
 			if self.vc:
 				self.vc.stop()
 				await self.vc.disconnect()
@@ -215,6 +231,8 @@ class AudioPlayer(discord.AudioSource):
 
 	async def leave(self, reason=None):
 		csubmit(self.disconnect(self.vcc.guild))
+		if not self.channel:
+			return
 		r = f": {colourise(reason, fg='yellow')}{colourise()}" if reason else ""
 		s = ansi_md(
 			f"{colourise('🎵', fg='blue')}{colourise()} Automatically disconnected from {colourise(self.channel.guild, fg='magenta')}{colourise()}{r}. {colourise('🎵', fg='blue')}{colourise()}"
@@ -426,7 +444,7 @@ class AudioPlayer(discord.AudioSource):
 		return args
 
 	async def announce_play(self, entry):
-		if not self.channel.permissions_for(self.channel.guild.me).send_messages:
+		if not self.channel or not self.channel.permissions_for(self.channel.guild.me).send_messages:
 			return
 		try:
 			u = await self.fetch_user(entry.u_id)
@@ -441,12 +459,40 @@ class AudioPlayer(discord.AudioSource):
 		return await self.announce(s)
 
 	async def announce(self, s):
-		if self.settings.get("quiet") or not self.channel.permissions_for(self.channel.guild.me).send_messages:
+		if not self.channel or self.settings.get("quiet") or not self.channel.permissions_for(self.channel.guild.me).send_messages:
 			return
 		message = await self.channel.send(s)
 		if self.channel.permissions_for(self.channel.guild.me).add_reactions:
 			csubmit(message.add_reaction("❎"))
 		return message
+
+	updating_activity = None
+	def update_activity(self):
+		if self.updating_activity:
+			self.updating_activity.cancel()
+		if self.settings.stay:
+			return
+		listeners = interface.run(f"sum(not m.bot and m.voice and not m.voice.deaf for m in client.get_channel({self.vcc.id}).members)")
+		if listeners == 0:
+			self.updating_activity = csubmit(self._updating_activity())
+	async def _updating_activity(self):
+		await asyncio.sleep(240)
+		listeners = interface.run(f"sum(not m.bot and m.voice and not m.voice.deaf for m in client.get_channel({self.vcc.id}).members)")
+		if listeners == 0:
+			await self.leave("All channels empty")
+
+	updating_streaming = None
+	def update_streaming(self):
+		if self.updating_streaming:
+			self.updating_streaming.cancel()
+		if self.settings.stay:
+			return
+		if len(self.queue) == 0:
+			self.updating_streaming = csubmit(self._updating_streaming())
+	async def _updating_streaming(self):
+		await asyncio.sleep(3600)
+		if len(self.queue) == 0:
+			await self.leave("Queue empty")
 
 	def read(self):
 		if not self.playing:
@@ -457,18 +503,12 @@ class AudioPlayer(discord.AudioSource):
 					pass
 			self.silent = True
 			return self.emptyopus * 3
-		# t = utc()
-		# inac = t - self.last_activity
-		# if inac > 240:
-		# 	if sum(1 for m in self.vcc.members if not m.bot):
-		# 		self.last_activity = t
-		# 	else:
-		# 		csubmit(self.leave("All channels empty."))
 		new = False
 		out = b""
 		try:
-			new = self.playing[0].new
-			out = self.playing[0].read()
+			if not self.queue or not self.playing:
+				raise IndexError
+			new, out = self.playing[0].new, self.playing[0].read()
 		except (StopIteration, IndexError, discord.oggparse.OggError):
 			pass
 		except Exception:
@@ -480,6 +520,8 @@ class AudioPlayer(discord.AudioSource):
 			self.last_played = utc()
 		if (not out or self.playing[0].pos / 50 >= self.queue[0].get("end", inf)) and (self.playing and self.queue):
 			self.skip(0, loop=self.settings.loop, repeat=self.settings.repeat, shuffle=self.settings.shuffle)
+			if not out and self.playing:
+				return self.read()
 		if not out:
 			out = self.emptyopus
 		if out == self.emptyopus:
@@ -537,9 +579,9 @@ class AudioPlayer(discord.AudioSource):
 			if self.playing:
 				self.playing.popleft().close()
 		if loop:
-			self.queue.extend(resp)
 			if shuffle:
 				self.queue[len(self.queue) // 2:].shuffle()
+			self.queue.extend(resp)
 		esubmit(self.ensure_play)
 		return resp
 
@@ -549,13 +591,18 @@ class AudioPlayer(discord.AudioSource):
 		was_paused = self.settings.pause
 		self.pause()
 		source = AF.load(self.queue[0]).create_reader(self, pos=pos)
+		source.new = False
 		self.playing[0], _ = source, self.playing[0].close()
 		if not was_paused:
 			self.resume()
 		self.ensure_play()
 
-	def ensure_play(self):
+	# force=0: normal (only play if not currently playing)
+	# force=1: always regenerate readers (this updates audio settings)
+	# force=2: always restarts songs from beginning
+	def ensure_play(self, force=0):
 		with self.ensure_lock:
+			pos = None
 			if len(self.queue) > MAX_QUEUE + 2048:
 				self.queue.fill(self.queue[1 - MAX_QUEUE:].appendleft(self.queue[0]))
 			elif len(self.queue) > MAX_QUEUE:
@@ -563,12 +610,16 @@ class AudioPlayer(discord.AudioSource):
 				while len(self.queue) > MAX_QUEUE:
 					self.queue.pop()
 				self.queue.rotate(1)
-			if len(self.playing) > 1 and len(self.queue) > 1 and self.playing[1].af.url != self.queue[1].url:
-				self.playing.pop()
-			if self.playing and self.queue and self.playing[0].af.url != self.queue[0].url:
-				self.playing.popleft()
+			if len(self.playing) > 1 and (force or (len(self.queue) > 1 and self.playing[1].af.url != self.queue[1].url)):
+				self.playing.pop().close()
+			if self.playing and (force or self.queue and self.playing[0].af.url != self.queue[0].url):
+				temp = self.playing.popleft().close()
+				if force == 1 and temp.af.url == self.queue[0].url:
+					pos = temp.pos / 50
 			if not self.playing and self.queue:
-				source = AF.load(self.queue[0]).create_reader(self, pos=self.queue[0].get("start", 0))
+				source = AF.load(self.queue[0]).create_reader(self, pos=pos if pos is not None else self.queue[0].get("start", 0))
+				if pos is not None:
+					source.new = False
 				self.playing.append(source)
 			if self.playing and not self.settings.pause:
 				self.fut.result()
@@ -581,11 +632,13 @@ class AudioPlayer(discord.AudioSource):
 				source = AF.load(self.queue[1], asap=False).create_reader(self, pos=self.queue[1].get("start", 0))
 				if len(self.playing) == 1 and len(self.queue) > 1 and self.queue[1].url == source.af.url:
 					self.playing.append(source)
+		if not self.queue:
+			self.update_streaming()
 
 	def clear(self):
-		for entry in tuple(self.queue):
-			if entry:
-				entry[0].close()
+		for entry in tuple(self.playing):
+			entry.close()
+		self.playing.clear()
 		self.queue.clear()
 
 	def kill(self):
@@ -813,7 +866,7 @@ class AudioFile:
 			if pos or auds.reverse:
 				arg = "-to" if auds.reverse else "-ss"
 				if auds.reverse and not pos:
-					pos = self.duration() or 300
+					pos = self.duration or 300
 				args += [arg, str(pos)]
 			speed = round_min(auds.settings.speed * 2 ** (auds.settings.resample / 12))
 			if auds.reverse:
@@ -1086,6 +1139,19 @@ async def on_connect():
 		client_fut.set_result(client)
 	with tracebacksuppressor:
 		print("Audio client successfully connected.")
+
+@client.event
+async def on_voice_state_update(member, before, after):
+	guild = member.guild
+	try:
+		a = await asubmit(AP.from_guild, guild.id)
+	except KeyError:
+		return
+	if member.bot:
+		return
+	if member.voice is not None and not after.deaf:
+		return
+	a.update_activity()
 
 
 if __name__ == "__main__":

@@ -86,7 +86,8 @@ class Help(Command):
 			raise KeyError(f'Command "{command}" does not exist.')
 		content = None
 		enabled = bot.get_enabled(_channel)
-		category_repr = lambda catg: (catg.capitalize() if len(catg) > 2 else catg.upper()) + (" [[DISABLED]]" if catg.lower() not in enabled else "")
+		def category_repr(catg):
+			return (catg.capitalize() if len(catg) > 2 else catg.upper()) + (" [[DISABLED]]" if catg.lower() not in enabled else "")
 		if command:
 			com = bot.commands[command][0]
 			a = ", ".join(n.strip("_") for n in com.name) or "[none]"
@@ -109,7 +110,7 @@ class Help(Command):
 			content = ansi_md(content)
 		else:
 			content = (
-				f"Yo! Use the menu below to select from my command list!\n"
+				"Yo! Use the menu below to select from my command list!\n"
 				+ f"Alternatively, visit [`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\n\n"
 				+ f"If you're an admin and wish to disable me in a particular channel, check out `{prefix}ec`!\n"
 				+ f"Want to try the premium features, unsure about anything, or have a bug to report? check out the [`support server`]({bot.rcc_invite})!\n"
@@ -958,7 +959,7 @@ class Activity(Command):
 
 
 class Status(Command):
-	name = ["State", "Ping"]
+	name = ["Ping"]
 	description = "Shows the bot's current internal program state."
 	usage = "<mode(enable|disable)>?"
 	example = ("status", "status enable")

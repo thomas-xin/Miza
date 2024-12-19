@@ -302,7 +302,7 @@ class Queue(Command):
 			await fut
 			q, paused = await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).queue,a.settings.pause")
 			if len(q) and paused and ("▶️" in _name or _name.startswith("p")):
-				await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).settings.__setitem__('pause',False),a.ensure_play()")
+				await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).settings.__setitem__('pause',False)\nreturn a.ensure_play()")
 				return cdict(
 					content=css_md(f"Successfully resumed audio playback in {sqr_md(_guild)}."),
 					reacts="❎",
@@ -983,17 +983,25 @@ class Skip(Command):
 		)
 
 
+audio_states = ("pause", "loop", "repeat", "shuffle", "quiet", "stay")
+audio_settings = ("volume", "speed", "pitch", "pan", "bassboost", "reverb", "compressor", "chorus", "resample", "bitrate")
+percentage_settings = ("volume", "speed", "pitch", "pan", "bassboost", "reverb", "compressor", "chorus", "resample")
+def audio_key(d):
+	return {k: f"{v * 100}%" if k in percentage_settings else v for k, v in d.items()}
+
 class AudioState(Command):
 	server_only = True
+	name = ["State"]
 	min_display = "0~1"
 	description = "Adjusts boolean states of the audio player"
 	schema = cdict(
 		mode=cdict(
 			type="enum",
 			validation=cdict(
-				enum=("pause", "loop", "repeat", "shuffle", "quiet", "stay"),
+				enum=audio_states,
+				accepts=dict(reset=None),
 			),
-			description="Action to perform",
+			description="Setting to modify",
 			example="shuffle",
 		),
 		value=cdict(
@@ -1031,6 +1039,9 @@ class AudioState(Command):
 		"Shuffler": cdict(
 			mode="shuffle",
 		),
+		"AutoShuffle": cdict(
+			mode="shuffle",
+		),
 		"Quiet": cdict(
 			mode="quiet",
 		),
@@ -1040,18 +1051,29 @@ class AudioState(Command):
 		"24/7": cdict(
 			mode="stay",
 		),
+		"A": cdict(),
+		"Reset": cdict(
+			mode=None,
+			value=True,
+		),
 	}
 	rate_limit = (3, 4)
 	slash = True
 
 	async def __call__(self, bot, _comment, _guild, _user, _perm, mode, value, **void):
 		try:
-			cid, settings = await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).vcc.id, a.settings")
+			cid, settings = await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).vcc.id,a.settings")
 		except KeyError:
 			raise LookupError("Currently not playing in a voice channel.")
 		vc_ = await bot.fetch_channel(cid)
 		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
+		if not mode:
+			if value:
+				await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).settings.update(AP.defaults)\nreturn a.ensure_play(1)")
+				return italics(css_md(f"Successfully reset all audio settings for {sqr_md(_guild)}."))
+			d = audio_key(settings) # {k: v for k, v in settings.items() if k in audio_states}
+			return f"Current audio states for **{escape_markdown(_guild.name)}**:\n{ini_md(iter2str(d))}"
 		if value is None:
 			value = not settings.get(mode)
 		await bot.audio.asubmit(f"AP.from_guild({_guild.id}).settings.{mode} = {value}")
@@ -1063,6 +1085,170 @@ class AudioState(Command):
 				content = css_md(f"Successfully resumed audio playback in {sqr_md(_guild)}.")
 		else:
 			content = css_md(f"{sqr_md(mode.capitalize())} status for audio playback in {sqr_md(_guild)} has been updated to {sqr_md(value)}.")
+		if _comment:
+			content = _comment + "\n" + content
+		return cdict(
+			content=content,
+			reacts="❎",
+		)
+
+
+class AudioSettings(Command):
+	server_only = True
+	name = ["Settings"]
+	min_display = "0~1"
+	description = "Adjusts variable settings of the audio player"
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=audio_settings,
+				accepts=dict(nightcore="resample", reset=None),
+			),
+			description="Setting to modify",
+			example="bassboost",
+		),
+		value=cdict(
+			type="number",
+			description="Specify a value; all settings except bitrate are represented using percentages",
+			example="200",
+		),
+	)
+	macros = {
+		"Volume": cdict(
+			mode="volume",
+		),
+		"Vol": cdict(
+			mode="volume",
+		),
+		"V": cdict(
+			mode="volume",
+		),
+		"🔉": cdict(
+			mode="volume",
+			value=25,
+		),
+		"🔊": cdict(
+			mode="volume",
+			value=100,
+		),
+		"📢": cdict(
+			mode="volume",
+			value=400,
+		),
+		"Speed": cdict(
+			mode="speed",
+		),
+		"SP": cdict(
+			mode="speed",
+		),
+		"⏩": cdict(
+			mode="speed",
+			value=200,
+		),
+		"Rewind": cdict(
+			mode="speed",
+			value=-100,
+		),
+		"Rew": cdict(
+			mode="speed",
+			value=-100,
+		),
+		"⏪": cdict(
+			mode="speed",
+			value=-100,
+		),
+		"Pitch": cdict(
+			mode="pitch",
+		),
+		"Transpose": cdict(
+			mode="pitch",
+		),
+		"↕️": cdict(
+			mode="pitch",
+		),
+		"Pan": cdict(
+			mode="pan",
+		),
+		"Bassboost": cdict(
+			mode="bassboost",
+		),
+		"BB": cdict(
+			mode="bassboost",
+		),
+		"🥁": cdict(
+			mode="bassboost",
+		),
+		"Reverb": cdict(
+			mode="reverb",
+		),
+		"RV": cdict(
+			mode="reverb",
+		),
+		"📉": cdict(
+			mode="reverb",
+		),
+		"Compressor": cdict(
+			mode="compressor",
+		),
+		"CO": cdict(
+			mode="compressor",
+		),
+		"🗜": cdict(
+			mode="compressor",
+		),
+		"Chorus": cdict(
+			mode="chorus",
+		),
+		"CH": cdict(
+			mode="chorus",
+		),
+		"📊": cdict(
+			mode="chorus",
+		),
+		"Resample": cdict(
+			mode="resample",
+		),
+		"Nightcore": cdict(
+			mode="resample",
+		),
+		"NC": cdict(
+			mode="resample",
+		),
+		"Bitrate": cdict(
+			mode="bitrate",
+		),
+		"BPS": cdict(
+			mode="bitrate",
+		),
+		"BR": cdict(
+			mode="bitrate",
+		),
+	}
+
+	async def __call__(self, bot, _comment, _guild, _user, _perm, mode, value, **void):
+		try:
+			cid, settings = await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).vcc.id,a.settings")
+		except KeyError:
+			raise LookupError("Currently not playing in a voice channel.")
+		vc_ = await bot.fetch_channel(cid)
+		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
+			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
+		if not mode:
+			if value:
+				await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).settings.update(AP.defaults)\nreturn a.ensure_play(1)")
+				return italics(css_md(f"Successfully reset all audio settings for {sqr_md(_guild)}."))
+			d = audio_key(settings) # {k: v for k, v in settings.items() if k in audio_settings}
+			return f"Current audio settings for **{escape_markdown(_guild.name)}**:\n{ini_md(iter2str(d))}"
+		if value is None:
+			value = await bot.audio.asubmit(f"AP.defaults[{repr(mode)}]")
+		if mode in percentage_settings:
+			valstr = f"{value}%"
+			value /= 100
+		else:
+			valstr = str(value)
+		await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).settings.{mode} = {value}\nreturn a.ensure_play(1)")
+		content = css_md(f"{sqr_md(mode.capitalize())} setting for audio playback in {sqr_md(_guild)} has been updated to {sqr_md(valstr)}.")
 		if _comment:
 			content = _comment + "\n" + content
 		return cdict(
@@ -1145,232 +1331,13 @@ class Dump(Command):
 					settings["bitrate"] *= 100
 			await bot.audio.asubmit(f"AP.from_guild({_guild.id}).settings.update({maybe_json(settings).decode('ascii')})")
 			await bot.audio.asubmit(f"AP.from_guild({_guild.id}).queue.fill(map(cdict, {maybe_json(d['queue']).decode('utf-8')}))")
-			await bot.audio.asubmit(f"AP.from_guild({_guild.id}).ensure_play()")
+			await bot.audio.asubmit(f"AP.from_guild({_guild.id}).ensure_play(2)")
 			return cdict(
 				content=italics(css_md(f"Successfully loaded audio data for {sqr_md(_guild)}.")),
 				reacts="❎",
 			)
 		data = await bot.audio.asubmit(f"maybe_json(dict(settings=a.settings,queue=(a := AP.from_guild({_guild.id})).queue))")
 		return cdict(file=CompatFile(data, filename="dump.json"), reacts="❎")
-
-
-class AudioSettings(Command):
-	server_only = True
-	# Aliases are a mess lol
-	aliasMap = {
-		"Volume": "volume",
-		"Speed": "speed",
-		"Pitch": "pitch",
-		"Pan": "pan",
-		"BassBoost": "bassboost",
-		"Reverb": "reverb",
-		"Compressor": "compressor",
-		"Chorus": "chorus",
-		"NightCore": "resample",
-		"Resample": "resample",
-		"Bitrate": "bitrate",
-		"LoopQueue": "loop",
-		"LoopQ": "loop",
-		"Repeat": "repeat",
-		"ShuffleQueue": "shuffle",
-		"AutoShuffle": "shuffle",
-		"Quiet": "quiet",
-		"Stay": "stay",
-		"Reset": "reset",
-	}
-	aliasExt = {
-		"AudioSettings": None,
-		"Audio": None,
-		# "A": None,
-		"Vol": "volume",
-		"V": "volume",
-		"🔉": "volume",
-		"🔊": "volume",
-		"📢": "volume",
-		"SP": "speed",
-		"⏩": "speed",
-		"rewind": "rewind",
-		"⏪": "rewind",
-		"PI": "pitch",
-		"↕️": "pitch",
-		"PN": "pan",
-		"BB": "bassboost",
-		"🥁": "bassboost",
-		"RV": "reverb",
-		"📉": "reverb",
-		"CO": "compressor",
-		"🗜": "compressor",
-		"CH": "chorus",
-		"📊": "chorus",
-		"NC": "resample",
-		"BPS": "bitrate",
-		"BR": "bitrate",
-		"LQ": "loop",
-		"🔁": "loop",
-		"LoopOne": "repeat",
-		"🔂": "repeat",
-		"L1": "repeat",
-		"SQ": "shuffle",
-		"🤫": "quiet",
-		"🔕": "quiet",
-		"24/7": "stay",
-		"♻": "reset",
-	}
-	rate_limit = (3.5, 5)
-	slash = True
-	maintenance = True
-
-	def __init__(self, *args):
-		self.alias = list(self.aliasMap) + list(self.aliasExt)[1:]
-		self.name = list(self.aliasMap)
-		self.min_display = "0~2"
-		self.description = "Changes the current audio settings for this server. Some settings are very flexible; volume and bassboost are unlimited, speed and nightcore can be negative, etc."
-		self.usage = "<value>? <volume(-v)|speed(-s)|pitch(-p)|pan(-e)|bassboost(-b)|reverb(-r)|compressor(-c)|chorus(-u)|nightcore(-n)|bitrate(-i)|loop(-l)|repeat(-1)|shuffle(-x)|quiet(-q)|stay(-t)>* <force_permanent(-f)>? <disable(-d)>?"
-		self.example = ("volume 150", "speed 200", "pitch -400", "reverb -f 320", "chorus -d", "bitrate 19600", "repeat 1", "stay 1")
-		self.flags = "vspebrcunil1xqtfdh"
-		self.map = {k.casefold(): self.aliasMap[k] for k in self.aliasMap}
-		add_dict(self.map, {k.casefold(): self.aliasExt[k] for k in self.aliasExt})
-		super().__init__(*args)
-
-	async def __call__(self, bot, _comment, channel, user, guild, flags, name, argv, perm, message, **void):
-		auds = await auto_join(guild, channel, user, bot)
-		ops = alist()
-		op1 = self.map[name]
-		if op1 == "reset":
-			flags.clear()
-			flags["d"] = True
-		elif op1 is not None:
-			ops.append(op1)
-		disable = "d" in flags
-		# yanderedev code moment 🙃🙃🙃
-		if "v" in flags:
-			ops.append("volume")
-		if "s" in flags:
-			ops.append("speed")
-		if "p" in flags:
-			ops.append("pitch")
-		if "e" in flags:
-			ops.append("pan")
-		if "b" in flags:
-			ops.append("bassboost")
-		if "r" in flags:
-			ops.append("reverb")
-		if "c" in flags:
-			ops.append("compressor")
-		if "u" in flags:
-			ops.append("chorus")
-		if "n" in flags:
-			ops.append("resample")
-		if "i" in flags:
-			ops.append("bitrate")
-		if "l" in flags:
-			ops.append("loop")
-		if "1" in flags:
-			ops.append("repeat")
-		if "x" in flags:
-			ops.append("shuffle")
-		if "q" in flags:
-			ops.append("quiet")
-		if "t" in flags:
-			ops.append("stay")
-		# If no number input given, show audio setting
-		if not disable and not argv and (len(ops) != 1 or ops[-1] not in "rewind loop repeat shuffle quiet stay"):
-			if len(ops) == 1:
-				op = ops[0]
-			else:
-				key = lambda x: x if type(x) is bool else round_min(100 * x)
-				d = dict(auds.settings)
-				d.pop("position", None)
-				return f"Current audio settings for **{escape_markdown(guild.name)}**:\n{ini_md(iter2str(d, key=key))}"
-			orig = auds.settings[op]
-			num = round_min(100 * orig)
-			return css_md(f"Current audio {op} setting in {sqr_md(guild)}: [{num}].")
-		if not auds.is_alone(user) and perm < 1:
-			raise self.perm_error(perm, 1, "to modify audio settings while other users are in voice")
-		# No audio setting selected
-		if not ops:
-			if disable:
-				# Disables all audio settings
-				pos = auds.pos
-				res = False
-				for k, v in auds.defaults.items():
-					if k != "volume" and auds.settings.get(k) != v:
-						res = True
-						break
-				auds.settings = cdict(auds.defaults)
-				if "f" in flags:
-					bot.data.audiosettings.pop(guild.id, None)
-				if auds.queue and res:
-					auds.clear_next()
-					await asubmit(auds.play, auds.source, pos, timeout=18)
-				succ = "Permanently" if "f" in flags else "Successfully"
-				return italics(css_md(f"{succ} reset all audio settings for {sqr_md(guild)}."))
-			else:
-				# Default to volume
-				ops.append("volume")
-		s = ""
-		for op in ops:
-			# These audio settings automatically invert when used
-			if type(op) is str:
-				if op in "loop repeat shuffle quiet stay" and not argv:
-					argv = str(not auds.settings[op])
-				elif op == "rewind":
-					argv = "100"
-			if op == "rewind":
-				op = "speed"
-				argv = "- " + argv
-			# This disables one or more audio settings
-			if disable:
-				val = auds.defaults[op]
-				if type(val) is not bool:
-					val *= 100
-				argv = str(val)
-			# Values should be scaled by 100 to indicate percentage
-			origsettings = auds.settings
-			orig = round_min(origsettings[op] * 100)
-			if argv.endswith("%"):
-				argv = argv[:-1]
-			num = await bot.eval_math(argv, orig)
-			new = round_min(num)
-			val = round_min(num / 100)
-			if op in "loop repeat shuffle quiet stay":
-				origsettings[op] = new = bool(val)
-				orig = bool(orig)
-				if "f" in flags:
-					bot.data.audiosettings.setdefault(guild.id, {})[op] = new
-			else:
-				if op == "bitrate":
-					if val > CustomAudio.max_bitrate:
-						raise PermissionError(f"Maximum permitted bitrate is {CustomAudio.max_bitrate}.")
-					elif val < 5.12:
-						raise ValueError("Bitrate must be equal to or above 512.")
-				elif op == "speed":
-					if abs(val * 2 ** (origsettings.get("resample", 0) / 12)) > 16:
-						raise OverflowError("Maximum permitted speed is 1600%.")
-				elif op == "resample":
-					if abs(origsettings.get("speed", 1) * 2 ** (val / 12)) > 16:
-						raise OverflowError("Maximum permitted speed is 1600%.")
-				origsettings[op] = val
-				if "f" in flags:
-					bot.data.audiosettings.setdefault(guild.id, {})[op] = val
-			if auds.queue:
-				if type(op) is str and op not in "loop repeat shuffle quiet stay":
-					# Attempt to adjust audio setting by re-initializing FFmpeg player
-					auds.clear_next()
-					try:
-						await asubmit(auds.play, auds.source, auds.pos, timeout=12)
-					except (T0, T1, T2):
-						if auds.source:
-							print(auds.args)
-						await asubmit(auds.stop, timeout=18)
-						raise RuntimeError("Unable to adjust audio setting.")
-			changed = "Permanently changed" if "f" in flags else "Changed"
-			s += f"\n{changed} audio {op} setting from {sqr_md(orig)} to {sqr_md(new)}."
-		if "h" not in flags:
-			s = css_md(s)
-			if _comment:
-				s = _comment + "\n" + s
-			return await send_with_react(channel, s, reference=message, reacts="❎")
 
 
 class Jump(Command):
