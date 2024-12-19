@@ -3108,7 +3108,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			out = [url.rstrip() for url in find_urls(translate_emojis(replace_emojis(url)))]
 		return out
 
-	async def send_with_file(self, channel, msg=None, file=None, filename=None, embed=None, best=False, rename=True, reference=None, reacts=""):
+	async def send_with_file(self, channel, msg=None, file=None, filename=None, embed=None, best=False, rename=True, reference=None, reacts="", tts=False):
 		"Sends a message to a channel, then edits to add links to all attached files. Automatically transfers excessively large files to filehost."
 		if not msg:
 			msg = ""
@@ -3160,9 +3160,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				urls = await asubmit(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
 				if hasattr(channel, "simulated"):
 					urls = (urls[0],)
-				message = await send_with_reply(channel, reference, (msg + ("" if msg.endswith("```") else "\n") + urls[0]).strip(), embed=embed)
+				message = await send_with_reply(channel, reference, (msg + ("" if msg.endswith("```") else "\n") + urls[0]).strip(), embed=embed, tts=tts)
 			else:
-				message = await send_with_reply(channel, reference, msg, embed=embed, file=file)
+				message = await send_with_reply(channel, reference, msg, embed=embed, file=file, tts=tts)
 				if filename is not None:
 					if hasattr(filename, "filename"):
 						filename = filename.filename
@@ -5676,6 +5676,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				prefix = response.pop("prefix", None) or ""
 				suffix = response.pop("suffix", None) or ""
 				content = response.pop("content", None) or ""
+				tts = response.pop("tts", False) or False
 				def get_prefix():
 					return prefix if not bypass_prefix or none(content.startswith(b) for b in bypass_prefix) else ""
 				def get_suffix():
@@ -5798,7 +5799,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						ms = split_across(content, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix))
 						content = ms[-1] if ms else "\xad"
 						for t in ms[:-1]:
-							csubmit(send_with_react(channel, t, reference=reference))
+							csubmit(send_with_react(channel, t, reference=reference, tts=tts))
 							reference = None
 							await asyncio.sleep(0.125)
 				else:
@@ -5812,6 +5813,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						embed=response.get("embed"),
 						reference=reference,
 						reacts=response.get("reacts"),
+						tts=tts,
 					)
 				return await send_with_react(
 					response.get("channel") or channel,
@@ -5824,6 +5826,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					buttons=response.get("buttons"),
 					reacts=response.get("reacts"),
 					ephemeral=getattr(command, "ephemeral", False),
+					tts=tts,
 				)
 			return response
 

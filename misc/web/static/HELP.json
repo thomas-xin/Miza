@@ -1120,7 +1120,12 @@
 				"Toggle",
 				"Pause",
 				"Resume",
-				"Unpause"
+				"Unpause",
+				"Repeat",
+				"Shuffler",
+				"Quiet",
+				"Stay",
+				"24/7"
 			],
 			"description": "Adjusts boolean states of the audio player",
 			"usage": "",

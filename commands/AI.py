@@ -144,7 +144,7 @@ class Ask(Command):
 		print("ASK:", _channel.id, input_message)
 		bp = ["> ", "# ", "## ", "### "]
 		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, _prefix, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, model, nsfw, bp)
-		if pdata.stream:
+		if pdata.stream and not pdata.tts:
 			return cdict(
 				content=fut,
 				prefix="\xad",
@@ -155,7 +155,8 @@ class Ask(Command):
 			return "\xad"
 		elif isinstance(temp[-1], dict) and (temp[-1].content.startswith("\r") or len(temp) == 1):
 			resp = temp[-1]
-			resp.content = resp.content.strip()
+			resp["content"] = resp["content"].strip()
+			resp["tts"] = pdata.tts
 			return resp
 		raise RuntimeError(temp)
 
@@ -527,6 +528,11 @@ class Personality(Command):
 		stream=cdict(
 			type="bool",
 			description="Determines whether the response should be edited, or delayed until complete",
+			example="false",
+		),
+		tts=cdict(
+			type="bool",
+			description="Whether the output should trigger Discord TTS. Incompatible with streamed editing",
 			example="true",
 		),
 		cutoff=cdict(
@@ -546,6 +552,7 @@ class Personality(Command):
 			temperature=0.8,
 			top_p=0.9,
 			stream=True,
+			tts=False,
 			cutoff=0,
 		)
 		p = self.bot.data.personalities.get(channel.id)
@@ -555,11 +562,11 @@ class Personality(Command):
 			per.update(p)
 		return per
 
-	async def __call__(self, bot, _nsfw, _channel, _premium, _name, description, frequency_penalty, temperature, top_p, stream, cutoff, **void):
+	async def __call__(self, bot, _nsfw, _channel, _premium, _name, description, frequency_penalty, temperature, top_p, stream, tts, cutoff, **void):
 		if description == "DEFAULT":
 			bot.data.personalities.pop(_channel.id, None)
 			return css_md(f"Personality settings for {sqr_md(_channel)} have been reset.")
-		if not description and frequency_penalty is None and temperature is None and top_p is None and stream is None and not cutoff:
+		if not description and frequency_penalty is None and temperature is None and top_p is None and stream is None and tts is None and not cutoff:
 			p = self.retrieve(_channel)
 			return ini_md(f"Current personality settings for {sqr_md(_channel)}:{iter2str(p)}\n(Use {bot.get_prefix(_channel.guild)}personality DEFAULT to reset).")
 		if description and (len(description) > 4096 or len(description) > 512 and _premium.value < 2):
@@ -583,6 +590,8 @@ class Personality(Command):
 			p.top_p = top_p
 		if stream is not None:
 			p.stream = stream
+		if tts is not None:
+			p.tts = tts
 		if cutoff is None and "reset" in _name:
 			cutoff = -1
 		if cutoff is not None:
