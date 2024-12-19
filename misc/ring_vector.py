@@ -1152,23 +1152,23 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 
 	# Removes all duplicate values from the list. Makes use of frozensets and numpy.unique when maintaining order is not required.
 	@writing_with(order=True)
-	def removedups(self, sort=None):
+	def removedups(self, sort=None, key=None):
 		if not self:
 			return self
-		if sort:
+		if not key and sort:
 			try:
 				temp = chain(*map(np.unique, self.views))
 			except TypeError:
 				temp = sorted(self.to_frozenset())
 			self._sorted = True
-		elif sort is None:
+		elif not key and sort is None:
 			temp = self.to_frozenset()
 			self._sorted = False
 		else:
 			temp = deque()
 			found = set()
 			for x in self:
-				y = nested_tuple(x)
+				y = (key or nested_tuple)(x)
 				if y not in found:
 					found.add(y)
 					temp.append(x)

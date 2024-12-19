@@ -570,6 +570,7 @@ class AudioPlayer(discord.AudioSource):
 		esubmit(self.ensure_play)
 		return self
 
+	shuffler = 0
 	def skip(self, indices=0, loop=False, repeat=False, shuffle=False):
 		if isinstance(indices, int):
 			indices = [indices]
@@ -584,7 +585,12 @@ class AudioPlayer(discord.AudioSource):
 				self.playing.popleft().close()
 		if loop:
 			if shuffle:
-				self.queue[len(self.queue) // 2:].shuffle()
+				if not self.shuffler:
+					self.queue[2:].shuffle()
+				shuffler = self.shuffler + 1
+				if shuffler >= len(self.queue):
+					shuffler = 0
+				self.shuffler = shuffler
 			self.queue.extend(resp)
 		esubmit(self.ensure_play)
 		return resp

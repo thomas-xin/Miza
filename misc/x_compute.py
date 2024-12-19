@@ -841,7 +841,8 @@ if "ytdl" in CAPS:
 			raise KeyError("URL not found.")
 		return url
 
-	shash = lambda s: base64.urlsafe_b64encode(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).rstrip(b"=").decode("ascii")
+	def shash(s):
+		return base64.urlsafe_b64encode(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).rstrip(b"=").decode("ascii")
 
 	def format_selector(ctx):
 		formats = ctx.get('formats')[::-1]

@@ -1257,38 +1257,6 @@ class AudioSettings(Command):
 		)
 
 
-class Seek(Command):
-	server_only = True
-	name = ["↔️", "Replay"]
-	min_display = "0~1"
-	description = "Seeks to a position in the current audio file."
-	schema = cdict(
-		position=cdict(
-			type="timedelta",
-			description="Seek position",
-			example="3m59.2s",
-			default="0",
-		),
-	)
-	rate_limit = (0.5, 3)
-	slash = True
-
-	async def __call__(self, bot, _guild, _user, _perm, position, **void):
-		try:
-			cid = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).vcc.id")
-		except KeyError:
-			raise LookupError("Currently not playing in a voice channel.")
-		vc_ = await bot.fetch_channel(cid)
-		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
-			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
-		await bot.audio.asubmit(f"(e := AP.from_guild({_guild.id}).queue[0]).pop('start',0),e.pop('end',0)")
-		await bot.audio.asubmit(f"AP.from_guild({_guild.id}).seek({position.total_seconds()})")
-		return cdict(
-			content=italics(css_md(f"Successfully moved audio position to {sqr_md(position)}.")),
-			reacts="❎",
-		)
-
-
 class Dump(Command):
 	server_only = True
 	name = ["Export", "Import", "Save", "Load"]
@@ -1340,126 +1308,118 @@ class Dump(Command):
 		return cdict(file=CompatFile(data, filename="dump.json"), reacts="❎")
 
 
+class Seek(Command):
+	server_only = True
+	name = ["↔️", "Replay"]
+	min_display = "0~1"
+	description = "Seeks to a position in the current audio file."
+	schema = cdict(
+		position=cdict(
+			type="timedelta",
+			description="Seek position",
+			example="3m59.2s",
+			default="0",
+		),
+	)
+	rate_limit = (0.5, 3)
+	slash = True
+
+	async def __call__(self, bot, _guild, _user, _perm, position, **void):
+		try:
+			cid = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).vcc.id")
+		except KeyError:
+			raise LookupError("Currently not playing in a voice channel.")
+		vc_ = await bot.fetch_channel(cid)
+		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
+			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
+		await bot.audio.asubmit(f"(e := AP.from_guild({_guild.id}).queue[0]).pop('start',0),e.pop('end',0)")
+		await bot.audio.asubmit(f"AP.from_guild({_guild.id}).seek({position.total_seconds()})")
+		return cdict(
+			content=italics(css_md(f"Successfully moved audio position to {sqr_md(position)}.")),
+			reacts="❎",
+		)
+
+
 class Jump(Command):
 	server_only = True
 	name = ["🔄", "Roll", "Next", "RotateQueue"]
 	min_display = "0~1"
 	description = "Rotates the queue to the left by a certain amount of steps."
-	usage = "<position[1]>?"
-	example = ("jump 6", "roll -3")
-	flags = "h"
-	rate_limit = (4, 9)
+	schema = cdict(
+		position=cdict(
+			type="integer",
+			description="Jump position",
+			example="-3",
+			default="0",
+		),
+	)
+	rate_limit = (0.5, 3)
+	slash = True
 
-	async def __call__(self, perm, argv, flags, guild, channel, user, bot, **void):
-		if guild.id not in bot.data.audio.players:
+	async def __call__(self, bot, _guild, _user, _perm, position, **void):
+		try:
+			cid = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).vcc.id")
+		except KeyError:
 			raise LookupError("Currently not playing in a voice channel.")
-		auds = bot.data.audio.players[guild.id]
-		auds.text = channel
-		if not argv:
-			amount = 1
-		else:
-			amount = await bot.eval_math(argv)
-		if len(auds.queue) > 1 and amount:
-			if not auds.is_alone(user) and perm < 1:
-				raise self.perm_error(perm, 1, "to rotate queue while other users are in voice")
-			async with auds.semaphore:
-				# Clear "played" tag of current item
-				auds.queue.rotate(-amount)
-				await asubmit(auds.reset)
-		if "h" not in flags:
-			return italics(css_md(f"Successfully rotated queue [{amount}] step{'s' if amount != 1 else ''}.")), 1
+		vc_ = await bot.fetch_channel(cid)
+		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
+			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
+		await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).queue.rotate({-position}),a.ensure_play(2)")
+		return cdict(
+			content=italics(css_md(f"Successfully rotated queue {sqr_md(position)} step{'s' if abs(position) != 1 else ''}.")),
+			reacts="❎",
+		)
 
 
 class Shuffle(Command):
 	server_only = True
 	name = ["🔀", "Scramble"]
 	min_display = "0~1"
-	description = "Shuffles the audio queue. Leaves the current song untouched unless ?f is specified."
-	usage = "<force_full_shuffle(-f)>?"
-	flags = "fsh"
-	rate_limit = (4, 9)
+	description = "Immediately shuffles the queue. See ~autoshuffle for an automatic, non-disruptive version"
+	schema = cdict()
+	rate_limit = (0.5, 3)
 	slash = True
 
-	async def __call__(self, perm, flags, guild, channel, user, bot, **void):
-		if guild.id not in bot.data.audio.players:
+	async def __call__(self, bot, _guild, _user, _perm, **void):
+		try:
+			cid = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).vcc.id")
+		except KeyError:
 			raise LookupError("Currently not playing in a voice channel.")
-		auds = bot.data.audio.players[guild.id]
-		if not auds.queue:
-			raise IndexError("Queue is currently empty.")
-		auds.text = channel
-		if not auds.is_alone(user) and perm < 1:
-			raise self.perm_error(perm, 1, "to shuffle queue while other users are in voice")
-		async with auds.semaphore:
-			if "f" in flags or "s" in flags:
-				# Clear "played" tag of current item
-				shuffle(auds.queue)
-				await asubmit(auds.reset)
-			else:
-				temp = auds.queue.popleft()
-				shuffle(auds.queue)
-				auds.queue.appendleft(temp)
-		if "h" not in flags:
-			return italics(css_md(f"Successfully shuffled queue for {sqr_md(guild)}.")), 1
+		vc_ = await bot.fetch_channel(cid)
+		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
+			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
+		await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).queue.shuffle(),a.ensure_play(2)")
+		return cdict(
+			content=italics(css_md(f"Successfully shuffled queue for {sqr_md(_guild)}.")),
+			reacts="❎",
+		)
 
 
 class Dedup(Command):
 	server_only = True
 	name = ["Unique", "Deduplicate", "RemoveDuplicates"]
 	min_display = "0~1"
-	description = "Removes all duplicate items from the audio queue."
-	flags = "h"
-	rate_limit = (4, 9)
-	maintenance = True
+	description = "Removes all duplicate elements from the queue."
+	schema = cdict()
+	rate_limit = (0.5, 3)
+	slash = True
 
-	async def __call__(self, perm, flags, guild, channel, user, bot, **void):
-		if guild.id not in bot.data.audio.players:
+	async def __call__(self, bot, _guild, _user, _perm, **void):
+		try:
+			cid = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).vcc.id")
+		except KeyError:
 			raise LookupError("Currently not playing in a voice channel.")
-		auds = bot.data.audio.players[guild.id]
-		if not auds.queue:
-			raise IndexError("Queue is currently empty.")
-		auds.text = channel
-		if not auds.is_alone(user) and perm < 1:
-			raise self.perm_error(perm, 1, "to removed duplicate items from queue while other users are in voice")
-		async with auds.semaphore:
-			if auds.queue:
-				queue = auds.queue
-				orig = queue[0]
-				pops = deque()
-				found = set()
-				for i, e in enumerate(queue):
-					if e["url"] in found:
-						pops.append(i)
-					else:
-						found.add(e["url"])
-				queue.pops(pops)
-				if orig != queue[0]:
-					await asubmit(auds.reset)
-		if "h" not in flags:
-			return italics(css_md(f"Successfully removed duplicate items from queue for {sqr_md(guild)}.")), 1
-
-
-class Reverse(Command):
-	server_only = True
-	min_display = "0~1"
-	description = "Reverses the audio queue direction."
-	flags = "h"
-	rate_limit = (4, 9)
-	maintenance = True
-
-	async def __call__(self, perm, flags, guild, channel, user, bot, **void):
-		if guild.id not in bot.data.audio.players:
-			raise LookupError("Currently not playing in a voice channel.")
-		auds = bot.data.audio.players[guild.id]
-		if not auds.queue:
-			raise IndexError("Queue is currently empty.")
-		auds.text = channel
-		if not auds.is_alone(user) and perm < 1:
-			raise self.perm_error(perm, 1, "to reverse queue while other users are in voice")
-		async with auds.semaphore:
-			reverse(auds.queue)
-			auds.queue.rotate(-1)
-		if "h" not in flags:
-			return italics(css_md(f"Successfully reversed queue for {sqr_md(guild)}.")), 1
+		vc_ = await bot.fetch_channel(cid)
+		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
+			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
+		lx, ly, *_ = await bot.audio.asubmit(f"len((a := AP.from_guild({_guild.id})).queue),len(a.queue.removedups(key=lambda e: e.url)),a.ensure_play()")
+		if lx <= ly:
+			raise LookupError("No duplicate elements in queue.")
+		n = lx - ly
+		return cdict(
+			content=italics(css_md(f"Successfully removed {sqr_md(n)} duplicate item{'s' if n != 1 else ''} from queue for {sqr_md(_guild)}.")),
+			reacts="❎",
+		)
 
 
 class UnmuteAll(Command):
@@ -1467,18 +1427,15 @@ class UnmuteAll(Command):
 	time_consuming = True
 	min_level = 3
 	description = "Disables server mute/deafen for all members."
-	flags = "h"
 	rate_limit = 10
-	maintenance = True
 
-	async def __call__(self, guild, flags, **void):
+	async def __call__(self, guild, **void):
 		for vc in guild.voice_channels:
 			for user in vc.members:
 				if user.voice is not None:
 					if user.voice.deaf or user.voice.mute or user.voice.afk:
 						csubmit(user.edit(mute=False, deafen=False))
-		if "h" not in flags:
-			return italics(css_md(f"Successfully unmuted all users in voice channels in {sqr_md(guild)}.")), 1
+		return italics(css_md(f"Successfully unmuted all users in voice channels in {sqr_md(guild)}.")), 1
 
 
 class VoiceNuke(Command):
@@ -1487,12 +1444,10 @@ class VoiceNuke(Command):
 	min_level = 3
 	name = ["☢️"]
 	description = "Removes all users from voice channels in the current server."
-	flags = "h"
 	rate_limit = 10
 	ephemeral = True
-	maintenance = True
 
-	async def __call__(self, guild, flags, **void):
+	async def __call__(self, guild, **void):
 		connected = set()
 		for vc in voice_channels(guild):
 			for user in vc.members:
@@ -1500,8 +1455,7 @@ class VoiceNuke(Command):
 					if user.voice is not None:
 						connected.add(user)
 		await disconnect_members(self.bot, guild, connected)
-		if "h" not in flags:
-			return italics(css_md(f"Successfully removed all users from voice channels in {sqr_md(guild)}.")), 1
+		return italics(css_md(f"Successfully removed all users from voice channels in {sqr_md(guild)}.")), 1
 
 
 class Radio(Command):
