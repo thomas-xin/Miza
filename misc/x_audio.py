@@ -165,6 +165,8 @@ class AudioPlayer(discord.AudioSource):
 	@classmethod
 	async def ensure_speak(cls, vcc):
 		member = vcc.guild.me
+		if not member:
+			return
 		if member.voice is not None and vcc.permissions_for(member).mute_members and vcc.type is discord.ChannelType.stage_voice:
 			if member.voice.suppress or member.voice.requested_to_speak_at:
 				await cls.speak(vcc)
@@ -470,6 +472,7 @@ class AudioPlayer(discord.AudioSource):
 	def update_activity(self):
 		if self.updating_activity:
 			self.updating_activity.cancel()
+			self.updating_activity = None
 		if self.settings.stay:
 			return
 		listeners = interface.run(f"sum(not m.bot and m.voice and not m.voice.deaf for m in client.get_channel({self.vcc.id}).members)")
@@ -485,6 +488,7 @@ class AudioPlayer(discord.AudioSource):
 	def update_streaming(self):
 		if self.updating_streaming:
 			self.updating_streaming.cancel()
+			self.updating_streaming = None
 		if self.settings.stay:
 			return
 		if len(self.queue) == 0:
@@ -1139,6 +1143,16 @@ async def on_connect():
 		client_fut.set_result(client)
 	with tracebacksuppressor:
 		print("Audio client successfully connected.")
+
+@client.event
+async def on_ready():
+	for guild in client.guilds:
+		if guild.me and guild.me.voice:
+			try:
+				a = await asubmit(AP.from_guild, guild.id)
+			except KeyError:
+				return
+			a.update_activity()
 
 @client.event
 async def on_voice_state_update(member, before, after):
