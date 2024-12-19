@@ -5784,7 +5784,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							response["content"] = cc
 					content = (response.pop("content", None) or "").lstrip("\r")
 				total_length = len(get_prefix()) + len(content) + len(get_suffix())
-				if total_length > msglen:
+				if total_length > msglen or tts:
 					if total_length > maxlen:
 						data = content.encode("utf-8")
 						file2 = CompatFile(data, filename="message.txt")
@@ -5796,7 +5796,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							file = file2
 						content = "Response too long for message."
 					else:
-						ms = split_across(content, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix))
+						if tts:
+							ms = split_across(content, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), lim=32, mode="tlen")
+						else:
+							ms = split_across(content, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), lim=msglen)
 						content = ms[-1] if ms else "\xad"
 						for t in ms[:-1]:
 							csubmit(send_with_react(channel, t, reference=reference, tts=tts))

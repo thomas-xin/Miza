@@ -722,8 +722,8 @@ class AudioFile:
 				self.stream = self.path
 				self.duration = get_duration(self.stream)
 				return self
-			stream, codec, duration = ytdl.get_audio(entry, asap=asap)
-			if not is_url(stream) and codec == "opus":
+			stream, codec, duration, channels = ytdl.get_audio(entry, asap=asap)
+			if not is_url(stream) and codec == "opus" and channels == 2:
 				rename(stream, self.path)
 				self.stream = self.path
 				self.duration = get_duration(self.stream) or duration
@@ -735,7 +735,7 @@ class AudioFile:
 			ffmpeg = "ffmpeg"
 			sample_rate = SAMPLE_RATE
 			cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(sample_rate), "-ac", "2", "-b:a", "192000", "-"]
-			if codec == "opus":
+			if codec == "opus" and channels == 2:
 				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "copy", "-"]
 			if is_url(stream):
 				cmd = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + cmd[1:]

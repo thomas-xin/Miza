@@ -72,6 +72,7 @@ def get_best_audio(entry):
 		fmts = ()
 	url = None
 	cdc = None
+	ac = 0
 	replace = True
 	for fmt in fmts:
 		q = (
@@ -95,6 +96,7 @@ def get_best_audio(entry):
 		if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
 			replace = False
 		if q > best or replace:
+			ac = fmt.get("audio_channels", 0)
 			cdc = fmt.get("acodec")
 			best = q
 			url = fmt["url"]
@@ -114,7 +116,7 @@ def get_best_audio(entry):
 				fmts.append(fmt)
 		entry["formats"] = fmts
 		return get_best_audio(entry)
-	return url, cdc
+	return url, cdc, ac
 # Gets the best video file download link for a queue entry.
 def get_best_video(entry, hq=True):
 	try:
@@ -858,18 +860,18 @@ class AudioDownloader:
 		if asap is None:
 			asap = d and d > 72
 		if asap or d is None or d > 960:
-			stream, cdc = get_best_audio(entry)
+			stream, cdc, *ac = get_best_audio(entry)
 			if not expired(stream):
-				return stream, cdc, entry["duration"]
+				return stream, cdc, entry["duration"], ac[0] if ac else 0
 			entry2 = self.search(url, force=True)[0]
 			entry.update(entry2)
-			stream, cdc = get_best_audio(entry)
+			stream, cdc, *ac = get_best_audio(entry)
 			if not expired(stream):
-				return stream, cdc, entry["duration"]
+				return stream, cdc, entry["duration"], ac[0] if ac else 0
 		ts = ts_us()
 		fn = f"{CACHE_PATH}/{ts}.opus"
 		ydl_opts = dict(
-			format="bestaudio/best",
+			format="bestaudio[acodec=opus][audio_channels=2]/bestaudio[audio_channels=2]/worstvideo[acodec!=none]",
 			default_search="auto",
 			source_address="0.0.0.0",
 			final_ext="opus",
@@ -884,11 +886,11 @@ class AudioDownloader:
 		if is_discord_attachment(url) or is_miza_url(url):
 			if discord_expired(url):
 				url = shorten_attachment(url, 0)
-			dur, _bps, cdc = get_duration_2(url)
-			return url, cdc, dur
+			dur, _bps, cdc, ac = get_duration_2(url)
+			return url, cdc, dur, ac
 		dur = self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)})['duration']")
 		assert os.path.exists(fn) and os.path.getsize(fn)
-		return fn, "opus", dur
+		return fn, "opus", dur, 2
 
 	def preprocess(self, url, mode, count):
 		output = deque()

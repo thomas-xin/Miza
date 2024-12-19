@@ -2665,31 +2665,6 @@ class UpdateAudio(Database):
 	def __load__(self):
 		self.players = cdict()
 
-	# Searches for and extracts incomplete queue entries
-	@tracebacksuppressor
-	async def research(self, auds):
-		if auds.search_sem.is_busy():
-			return
-		async with auds.search_sem:
-			searched = 0
-			q = auds.queue
-			async with Delay(2):
-				for i, e in enumerate(q, 1):
-					if searched >= 1 or i > 12:
-						break
-					if "research" in e:
-						try:
-							await asubmit(ytdl.extract_single, e, timeout=18)
-							e.pop("research", None)
-							searched += 1
-						except:
-							e.pop("research", None)
-							print_exc()
-							break
-						e.pop("id", None)
-					if "research" not in e and not e.get("duration") and "stream" in e:
-						e["duration"] = await asubmit(get_duration, e["stream"])
-
 	# Delays audio player display message by 15 seconds when a user types in the target channel
 	async def _typing_(self, channel, user, **void):
 		if getattr(channel, "guild", None) is None:

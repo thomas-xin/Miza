@@ -1240,7 +1240,7 @@ def ecdc_info(fn):
 def ecdc_br(fn):
 	bps = None
 	try:
-		_dur, bps, cdc = get_duration_2(fn)
+		_dur, bps, cdc, *_ = get_duration_2(fn)
 	except Exception:
 		print_exc()
 	else:
@@ -1767,7 +1767,7 @@ def get_duration_2(filename, _timeout=12):
 		"-select_streams",
 		"a:0",
 		"-show_entries",
-		"stream=codec_name,duration",
+		"stream=codec_name,channels,duration",
 		"-show_entries",
 		"format=duration,bit_rate",
 		"-of",
@@ -1789,17 +1789,21 @@ def get_duration_2(filename, _timeout=12):
 	except (IndexError, ValueError, TypeError):
 		cdc = "auto"
 	try:
-		dur = float(resp[1])
+		ac = int(resp[1].rstrip())
+	except (IndexError, ValueError, TypeError):
+		ac = 0
+	try:
+		dur = float(resp[2])
 	except (IndexError, ValueError, TypeError):
 		try:
-			dur = float(resp[2])
+			dur = float(resp[3])
 		except (IndexError, ValueError, TypeError):
 			dur = None
 	bps = None
-	if resp and len(resp) > 3:
+	if resp and len(resp) > 4:
 		with suppress(ValueError):
-			bps = float(resp[3])
-	return dur, bps, cdc
+			bps = float(resp[4])
+	return dur, bps, cdc, ac
 
 def get_duration_simple(filename, _timeout=12):
 	"Runs ffprobe on a file or url, returning the duration if possible."
