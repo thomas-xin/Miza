@@ -2175,6 +2175,9 @@ class Database(Importable, collections.abc.MutableMapping):
 		return self.data[k]
 	def __delitem__(self, k):
 		return self.data.__delitem__(k)
+	@property
+	def db(self):
+		return self.data.db
 
 	keys = lambda self: self.data.keys()
 	items = lambda self: self.data.items()

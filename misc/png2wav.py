@@ -58,9 +58,9 @@ for img in columns.swapaxes(0, 1):
 	phase = hue
 	sat[sat == 0] = 255
 	np.subtract(255, sat, out=sat)
-	np.power(1.03125, sat, out=sat)
+	np.power(1.03125, val, out=val)
 	val *= sat
-	val *= ffts * 2 / 255 / 4096
+	val *= ffts * 2 / 255 / 8192
 	cpl = np.multiply(phase, 1j)
 	np.exp(cpl, out=cpl)
 	cpl *= val

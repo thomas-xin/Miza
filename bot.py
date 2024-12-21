@@ -516,7 +516,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.audio.terminate()
 		if os.path.exists("misc/x_audio.py"):
 			print("Starting audio client...")
-			self.audio = AudioClientInterface.connect(
+			self.audio = EvalPipe.connect(
 				[python, "-m", "misc.x_audio", "6561"],
 				6561,
 				glob=globals(),
@@ -1182,8 +1182,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		except AttributeError as ex:
 			raise LookupError(*ex.args)
 
-	def as_file(self, *args, **kwargs):
-		return as_file(*args, **kwargs)
+	def as_file(self, file, filename=None):
+		if isinstance(file, str):
+			file = open(file, "rb")
+		url = Request(
+			f"https://api.mizabot.xyz/upload?filename={filename}&hash={filename}",
+			method="POST",
+			timeout=3600,
+			data=file,
+			ssl=False,
+			json=True,
+		)["url"].replace("/p/", "/f/").split("?", 1)[0]
+		print("AS_FILE:", url)
+		return url
 
 	@functools.lru_cache(maxsize=64)
 	def preserve_attachment(self, a_id, fn=None):
@@ -1932,14 +1943,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def optimise_image(self, image, fsize=25165824, msize=None, fmt="auto", duration=None, anim=True, timeout=3600):
 		"Optimises the target image or video file to fit within the \"fsize\" size, or \"msize\" resolution. Optional format and duration parameters."
-		print("RESIZE:", msize)
+		# print("RESIZE:", msize)
 		args = [[], None, None, "max", msize, None, "-o"]
 		if not anim:
 			args.insert(0, "-nogif")
 		elif duration is not None:
 			args += ["-d", duration]
 		args += ["-fs", fsize, "-f", fmt]
-		print(args)
+		# print(args)
 		return await process_image(image, "resize_map", args, timeout=timeout, retries=2)
 
 	browse_locations = {
@@ -1994,9 +2005,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					search = "DDG.pageLayout.load('d',[{"
 					assert search in s
 					res = "[{" + s.split(search, 1)[-1].split("}]);DDG.duckbar.load('", 1)[0] + "}]"
-					data = orjson.loads(res)
+					try:
+						data = orjson.loads(res)
+					except orjson.JSONDecodeError:
+						return res.strip()
 					return "\n\n".join((e.get("c", "") + "\n" + html_decode(e.get("a", ""))).strip() for e in data).strip()
-			print("TO:", timeout)
 			return await process_image("browse", "$", [argv, not screenshot], cap="browse", timeout=timeout, retries=2)
 		urls = find_urls(argv)
 		if not urls:
@@ -3153,14 +3166,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					f = filename if filename and not hasattr(file, "fp") else getattr(file, "_fp", None) or data
 				if not isinstance(f, str):
 					f = as_str(f)
-				if "." in f:
-					ext = f.rsplit(".", 1)[-1]
-				else:
-					ext = None
-				urls = await asubmit(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
-				if hasattr(channel, "simulated"):
-					urls = (urls[0],)
-				message = await send_with_reply(channel, reference, (msg + ("" if msg.endswith("```") else "\n") + urls[0]).strip(), embed=embed, tts=tts)
+				url = await asubmit(self.as_file, file if getattr(file, "_fp", None) else f, filename=filename)
+				message = await send_with_reply(channel, reference, (msg + ("" if msg.endswith("```") else "\n") + url).strip(), embed=embed, tts=tts)
 			else:
 				message = await send_with_reply(channel, reference, msg, embed=embed, file=file, tts=tts)
 				if filename is not None:
@@ -3361,16 +3368,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return
 
 	async def get_request(self, url, limit=None, full=True, timeout=12):
-		fn = is_file(url)
-		if fn:
-			if limit:
-				size = os.path.getsize(fn)
-				if size > limit:
-					raise OverflowError(f"Supplied file too large ({size}) > ({limit})")
-			if not full:
-				return open(url, "rb")
-			with open(url, "rb") as f:
-				return await asubmit(f.read)
+		if is_miza_attachment(url):
+			ids = expand_attachment(url)
+			url = await attachment_cache.obtain(*ids)
 		data = await self.get_attachment(url, full=full)
 		if data is not None:
 			return data
@@ -4399,7 +4399,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				self.llc = utc()
 		try:
-			audio_players, playing_players = await self.audio.asubmit("len(AP.players),sum(p.is_playing() for p in AP.players.values())")
+			audio_players, playing_players = await self.audio.asubmit("len(AP.players),sum(bool(p.queue) and p.is_playing() for p in AP.players.values())")
 		except AttributeError:
 			audio_players = playing_players = playing_audio_players = "N/A"
 		files = os.listdir("misc")
@@ -4433,7 +4433,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			},
 			"misc": {
 				"Active commands": self.command_semaphore.active,
-				"Voice (Conn|Play)": f"{audio_players}|{playing_players}",
+				"Voice (connected, playing)": f"{audio_players}|{playing_players}",
 				"Total data transmitted": self.total_bytes,
 				"Hosted storage": self.total_hosted,
 				"System time": datetime.datetime.now(),
@@ -5052,7 +5052,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				elif v.type == "role":
 					if getattr(user, "roles", None):
 						r = user.roles[-1]
-				elif v.type in ("media", "audio") and self.audio.players.get(guild.id):
+				elif v.type in ("media", "audio") and guild.me.voice:
 					auds = bot.data.audio.players[guild.id]
 					if auds.queue and auds.queue[0].url:
 						r = auds.queue[0].url
@@ -5093,7 +5093,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					taken = True
 				elif not hs and v.type == "resolution" and re.fullmatch(r"-?[0-9]+[:x*]-?[0-9]+", a):
 					taken = True
-				elif not hs and v.type == "index" and (a.casefold() == "all" or re.fullmatch(r"(?:[\-0-9]+|:|\.{2,}){1,5}", a)):
+				elif not hs and v.type == "index" and (a.casefold() == "all" or re.fullmatch(r"(?:[\-0-9]+|[:\-]|\.{2,}){1,5}", a)):
 					taken = True
 				elif not hs and v.type in ("number", "integer") and re.fullmatch(r"[-+]?\b\d+(\.\d+)?([eE][-+]?\d+)?\b|\b\d+\.\d*|\.\d+([eE][-+]?\d+)?\b", a):
 					taken = True
@@ -5281,7 +5281,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				v = [None, None]
 			else:
 				try:
-					v = tuple(int(x) if x else None for x in re.split(r"(?:\.{2,}|:)", v))
+					if re.fullmatch(r"[0-9]+-[0-9]+", v):
+						v = tuple(map(int, v.split("-", 1)))
+					else:
+						v = tuple(int(x) if x else None for x in re.split(r"(?:\.{2,}|:)", v))
 				except Exception as ex:
 					raise err(ex.__class__, k, v)
 		elif info.type == "colour":
@@ -8596,17 +8599,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			await self.send_event("_ban_", user=user, guild=guild)
 
 
-class AudioClientInterface(EvalPipe):
-	"The interface between the main bot process and the voice subprocess. Controls all VC operations through stdin/stdout pipes."
-
-	clients = weakref.WeakValueDictionary()
-	returns = {}
-
-	@property
-	def players(self):
-		return bot.data.audio.players
-
-
 @tracebacksuppressor
 def update_file_cache():
 	attachments = {t for t in bot.cache.attachments.items() if isinstance(t[-1], bytes)}
@@ -8614,32 +8606,6 @@ def update_file_cache():
 		a_id = next(iter(attachments))
 		self.cache.attachments[a_id] = a_id
 		attachments.discard(a_id)
-
-def as_file(file, filename=None, ext=None, rename=True):
-	if isinstance(file, str):
-		file = open(file, "rb")
-	url1 = url2 = Request(
-		f"https://api.mizabot.xyz/upload?filename={filename}&hash={filename}",
-		method="POST",
-		data=file,
-		ssl=False,
-		json=True,
-	).content["url"].replace("/p/", "/f/").split("?", 1)[0]
-	print("AS_FILE:", url1)
-	return url1, url2
-
-def is_file(url):
-	for start in (f"{bot.webserver}/", f"{bot.raw_webserver}/", f"https://{bot.ip}:{PORT}/"):
-		if url.startswith(start):
-			u = url[len(start):]
-			endpoint = u.split("/", 1)[0]
-			if endpoint in ("view", "file", "files", "download"):
-				path = u.split("/", 2)[1].split("?", 1)[0]
-				# fn = f"{IND}{path}"
-				for file in os.listdir("saves/filehost"):
-					if file.rsplit(".", 1)[0].split("~", 1)[0][1:] == path:
-						return f"saves/filehost/{file}"
-	return None
 
 
 class SimulatedMessage:
@@ -8723,7 +8689,7 @@ class SimulatedMessage:
 		else:
 			ofiles = []
 			for file in files:
-				f = await asubmit(as_file, file)
+				f = await asubmit(self.as_file, file)
 				ofiles.append(f)
 			kwargs["files"] = ofiles
 		self.response.append(kwargs)

@@ -148,6 +148,8 @@ else:
 
 if CAPS.intersection(("browse", "image", "caption", "video", "sd", "sdxl", "scc")):
 	from math import *
+	import x_image
+	x_image.print = print
 	from x_image import *
 	from PIL import Image
 else:

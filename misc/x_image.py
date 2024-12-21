@@ -1,7 +1,9 @@
 import collections
 import concurrent.futures
 import contextlib
+import fractions
 import io
+import itertools
 from math import ceil, floor, inf, sqrt, tau, log2, sin, cos, pi, isfinite
 import os
 import random
@@ -183,9 +185,9 @@ class ImageSequence(Image.Image):
 		else:
 			self._images = images
 			[im.load() for im in images]
-		dur2 = images[0].info.get("total_duration", 0)
+		dur2 = images[0].info.get("total_duration", 0) / len(images)
 		for i1, i2 in zip(self._images, images):
-			i1.info["duration"] = max(i2.info.get("duration", dur2), 1000 / 40)
+			i1.info["duration"] = i2.info.get("duration", dur2) or 25
 		self._position = 0
 
 	def __len__(self):
@@ -261,7 +263,9 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 	fcount = None
 	proc = None
 	try:
-		if not wand or mime.split("/", 1)[0] == "image" and mime.split("/", 1)[-1] in "apng avif blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal webp wmf xbm".split():
+		print(mime, len(b))
+		left, right = mime.split("/", 1)[0], mime.split("/", 1)[-1]
+		if not wand or left == "image" and right in "apng avif blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal wmf xbm".split():
 			try:
 				im = Image.open(out)
 			except PIL.UnidentifiedImageError:
@@ -283,11 +287,13 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 							fn = "cache/" + str(ts)
 							with open(fn, "wb") as f:
 								f.write(data)
-						cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration", "-show_entries", "format=duration", "-of", "csv=s=x:p=0", fn)
-						p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+						cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=avg_frame_rate,duration", "-show_entries", "format=duration", "-of", "csv=s=x:p=0", fn)
+						print(cmd)
+						p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
 						res = as_str(p.stdout.read()).strip()
+						print("RES:", res)
 						if res:
-							r1, r2, *_ = res.splitlines()
+							r0, r1, r2, *_ = res.replace("x", "\n").splitlines()
 							dur = None
 							try:
 								dur = float(r1)
@@ -298,10 +304,25 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 									pass
 							if dur:
 								im.info["total_duration"] = dur * 1000
-								print("TD:", dur * 1000)
+								print("TD:", im.info["total_duration"])
+							elif r0 != "N/A":
+								try:
+									fps = float(fractions.Fraction(r0))
+								except (ZeroDivisionError, OverflowError):
+									pass
+								else:
+									i = 0
+									for i in itertools.count(1):
+										try:
+											im.seek(i)
+										except EOFError:
+											break
+									im.seek(0)
+									im.info["total_duration"] = i / fps * 1000
+									print("TD:", im.info["total_duration"])
 				return im
-		if mime.split("/", 1)[0] in ("image", "video"):
-			fmt = "rgba" if mime.split("/", 1)[0] == "image" else "rgb24"
+		if left in ("image", "video") and right != "webp":
+			fmt = "rgba" if left == "image" else "rgb24"
 			ts = time.time_ns() // 1000
 			if mime == "video/m3u8" and orig:
 				fn = orig
@@ -344,7 +365,6 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 			if info[2] == "N/A":
 				fps = 0
 			else:
-				import fractions
 				try:
 					fps = float(fractions.Fraction(info[2]))
 				except (ZeroDivisionError, OverflowError):
@@ -394,7 +414,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 			if nogif:
 				fcount = dur = fps = 1
 			assert fcount >= 1
-			if not isfinite(fcount) or fcount < 3 or bcount * fcount < 16777216:
+			if not isfinite(fcount) or fcount < 3 or bcount * fcount < 268435456 or len(b) < 16777216:
 				images = deque()
 				while True:
 					b = proc.stdout.read(bcount)
@@ -416,7 +436,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 			proc.terminate()
 	else:
 		exc = TypeError(f'Filetype "{mime}" is not supported.')
-	if not wand or mime.split("/", 1)[-1] in ("gif", "webp", "ico", "x-icon"):
+	if not wand or right in ("ico", "x-icon"):
 		ib = io.BytesIO(b)
 		return Image.open(ib)
 	def wand_iter():
@@ -435,6 +455,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 				exc = None
 			if exc:
 				raise exc
+			tps = img.ticks_per_second
 			frames = []
 			for frame in wand.sequence.Sequence(img):
 				if not frame:
@@ -442,6 +463,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 				with wand.image.Image(frame) as fi:
 					ib = io.BytesIO(fi.make_blob("png32"))
 				im = Image.open(ib)
+				im.info["duration"] = 1000 * frame.delay / tps
 				frames.append(im)
 				yield im
 			if not frames:
@@ -841,15 +863,14 @@ def optimise(im, keep_rgb=True, recurse=True, max_frames=60):
 			return im
 		if im.mode == "LA":
 			A = im.getchannel("A")
-			if (a := np.min(A)) >= 254:
+			if np.min(A) >= 254:
 				return (im := im.convert("L"))
 			return im
 		if im.mode == "RGBA":
 			if keep_rgb:
 				A = im.getchannel("A")
-				if (a := np.min(A)) >= 254:
+				if np.min(A) >= 254:
 					return (im := im.convert("RGB"))
-				print("UO:", a)
 				return im
 			R, G, B, A = im.split()
 			r, g, b = np.asarray(R, dtype=np.uint8), np.asarray(G, dtype=np.uint8), np.asarray(B, dtype=np.uint8)
@@ -859,13 +880,11 @@ def optimise(im, keep_rgb=True, recurse=True, max_frames=60):
 				if np.max(distGB) <= 2:
 					distBR = np.abs(b.ravel() - r.ravel())
 					if np.max(distBR) <= 2:
-						if (a := np.min(A)) >= 254:
+						if np.min(A) >= 254:
 							return im.convert("L")
-						print("UO:", a)
 						return (im := im.convert("LA"))
-			if (a := np.min(A)) >= 254:
+			if np.min(A) >= 254:
 				return (im := im.convert("RGB"))
-			print("UO:", a)
 			return im
 		if keep_rgb:
 			if im.mode != "RGB":
@@ -1194,9 +1213,13 @@ def properties(im) -> tuple: # frames, duration, fps
 			break
 		if not total_duration:
 			duration += max(im.info.get("duration", 50), 1)
+	duration = duration or 50
+	while duration < 20:
+		duration *= 2
 	fps = f / duration * 1000
-	return max(1, f), max(50, duration) / 1000, fps
-
+	props = (max(1, f), duration / 1000, fps)
+	print("PROPS:", props)
+	return props
 
 def sync_fps(props, duration=None, fps=None):
 	d = max(t[1] for t in props)
@@ -2388,7 +2411,6 @@ def ectoplasm(url, message, force=False):
 	if not force or not message:
 		with open(fn, "wb") as f:
 			f.write(b)
-		print(ectoplasm, image, fn)
 		import sys
 		sys.stdout.flush()
 		try:

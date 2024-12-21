@@ -388,8 +388,8 @@ class Queue(Command):
 				duration=e.get("duration"),
 				u_id=_user.id,
 			)
-			if "research" in e:
-				temp.research = True
+			if e.get("orig"):
+				temp["orig"] = e["orig"]
 			elif "stream" in e:
 				temp.stream = e["stream"]
 				temp.icon = e.get("icon")
@@ -443,7 +443,7 @@ class Queue(Command):
 			posstr = f"Position {qstart};"
 		else:
 			posstr = "Estimated"
-		final_duration = sum(e_dur_2(e) for e in items)
+		final_duration = sum(e_dur_2(e) for e in items) if len(items) != 1 else items[0].get("duration")
 		durstr = "" if not final_duration else f" ({sec2time(final_duration)})"
 		emb.description = f"🎶 {adding} 🎶{durstr}\n*{posstr} time to play: {(DynamicDT.now() + total_duration).as_rel_discord()}.*"
 		if paused:
@@ -836,16 +836,14 @@ class Connect(Command):
 			# if not auds.is_alone(_user) and auds.queue and _perm < 1:
 			# 	raise self.perm_error(_perm, 1, "to disconnect while other users are in voice")
 			try:
-				await bot.audio.asubmit(f"AP.disconnect({guild.id})")
+				await bot.audio.asubmit(f"AP.disconnect({guild.id},announce=True)")
 			except KeyError:
 				raise LookupError("Not currently in a voice channel.")
-			else:
-				return cdict(content=css_md(f"🎵 Successfully disconnected from {sqr_md(guild)}. 🎵"), reacts="❎")
+			return
 		if not vc_.permissions_for(guild.me).connect:
 			raise ConnectionError("Insufficient permissions to connect to voice channel.")
 		# Create audio source if none already exists
-		await bot.audio.asubmit(f"AP.join({vc_.id})")
-		return cdict(content=ini_md(f"🎵 Successfully connected to {sqr_md(vc_)} in {sqr_md(guild)}. 🎵"), reacts="❎")
+		await bot.audio.asubmit(f"AP.join({vc_.id},announce=True)")
 
 
 class Skip(Command):
@@ -1033,7 +1031,19 @@ class AudioState(Command):
 			mode="pause",
 			value=False,
 		),
+		"LoopQueue": cdict(
+			mode="loop",
+		),
+		"LQ": cdict(
+			mode="loop",
+		),
+		"RepeatAll": cdict(
+			mode="loop",
+		),
 		"Repeat": cdict(
+			mode="repeat",
+		),
+		"RepeatOne": cdict(
 			mode="repeat",
 		),
 		"Shuffler": cdict(
@@ -1259,26 +1269,56 @@ class AudioSettings(Command):
 
 class Dump(Command):
 	server_only = True
-	name = ["Export", "Import", "Save", "Load"]
-	alias = name + ["Dujmpö"]
+	name = ["Dujmpö"]
 	min_display = "0~1"
 	description = "Saves or loads the currently playing audio queue state."
 	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("save", "load"),
+			),
+			description="Whether to save or load queue",
+			example="load",
+		),
 		url=cdict(
 			type="url",
 			description="Queue data to load",
 			example="https://cdn.discordapp.com/attachments/731709481863479436/1052210287303999528/dump.json",
 		),
 	)
+	macros = cdict(
+		Export=cdict(
+			mode="save",
+		),
+		Save=cdict(
+			mode="save",
+		),
+		Import=cdict(
+			mode="load",
+		),
+		Load=cdict(
+			mode="load",
+		),
+		Restore=cdict(
+			mode="load",
+		),
+	)
 	rate_limit = (1, 2)
 	slash = True
 
-	async def __call__(self, bot, _guild, _channel, _user, _perm, url, **void):
+	async def __call__(self, bot, _guild, _channel, _user, _perm, mode, url, **void):
 		vc_ = select_voice_channel(_user, _channel)
 		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
 		await bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id})")
-		if url:
+		if url or mode == "load":
+			if mode == "save":
+				raise TypeError("Unexpected file input for saving.")
+			if not url:
+				async for message in bot.history(_channel, limit=300):
+					if message.author.id == bot.id and message.attachments and message.attachments[0].url.split("?", 1)[0].endswith("/dump.json"):
+						url = message.attachments[0].url
 			s = await self.bot.get_request(url)
 			try:
 				d = await asubmit(select_and_loads, s, size=268435456)

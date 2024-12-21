@@ -3,6 +3,7 @@ import ast
 import asyncio
 import base64
 import collections
+from collections import deque
 import concurrent.futures
 import contextlib
 import datetime
@@ -10,6 +11,7 @@ import functools
 import hashlib
 import io
 import json
+from math import ceil, comb, inf, isfinite, isqrt
 import multiprocessing.connection
 import multiprocessing.shared_memory
 import os
@@ -24,7 +26,10 @@ import subprocess
 import sys
 import threading
 import time
+from traceback import format_exc, print_exc
+from urllib.parse import quote_plus, unquote_plus
 import zipfile
+from dynamic_dt import DynamicDT
 import filetype
 import nacl.secret
 import numpy as np
@@ -34,10 +39,6 @@ try:
 except Exception:
 	pynvml = None
 import requests
-from collections import deque
-from math import ceil, comb, inf, isfinite, isqrt
-from urllib.parse import quote_plus, unquote_plus
-from traceback import format_exc, print_exc
 from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, fcdict, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, T2, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, MultiEncoder, sublist_index # noqa: F401
 from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, asubmit, csubmit, esubmit, tsubmit, waited_sync, Future, Semaphore
 
@@ -88,6 +89,8 @@ PORT = AUTH.get("webserver_port", 80)
 if PORT:
 	PORT = int(PORT)
 IND = "\x7f"
+
+compat_python = AUTH.get("compat_python") or python
 
 _globals = globals()
 def save_auth(auth):
@@ -422,11 +425,11 @@ def colourise(s=None, fg=None, bg=None):
 		return f"\033[0;{bgmap.get(bg, bg)}m" + s
 	return f"\033[{fgmap.get(fg, fg)};{bgmap.get(bg, bg)}m" + s
 colourised_quotes = r"""'"`“”"""
-colourised_splits = r"""\/\\|\-~:#@"""
+colourised_splits = r"""'\/\\|\-~:#@"""
 def colourise_brackets(s=None, a=None, b=None, c=None):
 	out = ""
 	while s:
-		match = re.search(r"""[\(\[\{<⟨⟪【『⌊⌈](?:.*?)[\)\]\}>⟩⟫】』⌋⌉]|['"`“](?:.*?)['"`”]|[\/\\|\-~:#@]""", s)
+		match = re.search(r"""[\(\[\{<⟨⟪【『⌊⌈](?:.*?)[\)\]\}>⟩⟫】』⌋⌉]|["`“](?:.*?)["`”]|['\/\\|\-~:#@]""", s)
 		if not match:
 			break
 		if match.end() - match.start() == 1 and match.group() in colourised_splits:
@@ -722,6 +725,7 @@ def is_tenor_url(url): return url and regexp("^https?:\\/\\/tenor.com(?:\\/view)
 def is_imgur_url(url): return url and regexp("^https?:\\/\\/(?:\\w\\.)?imgur.com/[\\w\\-]+").findall(url)
 def is_giphy_url(url): return url and regexp("^https?:\\/\\/giphy.com/gifs/[\\w\\-]+").findall(url)
 def is_miza_url(url): return url and regexp("^https?:\\/\\/(?:\\w+\\.)?mizabot.xyz").findall(url)
+def is_miza_attachment(url): return url and regexp("^https?:\\/\\/(?:\\w+\\.)?mizabot.xyz\\/\\w\\/").findall(url)
 def is_youtube_url(url): return url and regexp("^https?:\\/\\/(?:\\w{1,5}\\.)?youtu(?:\\.be|be\\.com)\\/[^\\s<>`|\"']+").findall(url)
 def is_youtube_stream(url): return url and regexp("^https?:\\/\\/r+[0-9]+---.{2}-[\\w\\-]{4,}\\.googlevideo\\.com").findall(url)
 def is_soundcloud_stream(url): return url and regexp("^https?:\\/\\/(?:[\\w\\-]*)?media\\.sndcdn\\.com\\/[^\\s<>`|\"']+").findall(url)
@@ -1109,14 +1113,15 @@ def get_ext(f):
 	mime = from_file(f)
 	return mime_into(mime)
 
-def from_file(path, mime=True):
+def from_file(path, filename=None, mime=True):
 	"Detects mimetype of file or buffer. Includes custom .jar, .ecdc, .m3u8 detection."
 	data = filetype.get_bytes(path)
 	if mime:
 		out = filetype.guess_mime(data)
 	else:
 		out = filetype.guess_extension(data)
-	if out and out.split("/", 1)[-1] == "zip" and isinstance(data, str) and data.endswith(".jar"):
+	filename = filename or (path if isinstance(path, str) else "")
+	if out and out.split("/", 1)[-1] == "zip" and filename.endswith(".jar"):
 		return "application/java-archive"
 	if not out:
 		if not isinstance(data, bytes):
@@ -1124,10 +1129,15 @@ def from_file(path, mime=True):
 				raise TypeError(data)
 			data = bytes(data)
 		out = simple_mimes(data, mime)
-	if out == "application/octet-stream" and data.startswith(b'ECDC'):
-		return "audio/ecdc"
-	if out == "application/octet-stream" and data.startswith(b'\x00\x00\x00,ftypavis'):
-		return "image/avif"
+	if out in ("application/octet-stream", "application/vnd.lotus-organizer"):
+		if data.startswith(b'ECDC'):
+			return "audio/x-ecdc"
+		if data.startswith(b"MThd"):
+			return "audio/midi"
+		if data.startswith(b"Org-"):
+			return "audio/x-org"
+		if data.startswith(b'\x00\x00\x00,ftypavis'):
+			return "image/avif"
 	if out == "text/plain" and data.startswith(b"#EXTM3U"):
 		return "video/m3u8"
 	return out
@@ -3446,7 +3456,7 @@ class EvalPipe:
 	@classmethod
 	def connect(cls, args, port, independent=True, glob=globals(), timeout=60):
 		addr = ("127.0.0.1", port)
-		print("EvalPipe connecting to", addr)
+		print(f"{DynamicDT.now()}: EvalPipe connecting to", addr)
 		try:
 			conn = multiprocessing.connection.Client(addr, authkey=cls.key)
 		except ConnectionRefusedError:
@@ -3473,7 +3483,7 @@ class EvalPipe:
 					break
 			else:
 				raise
-		print("New connection:", conn)
+		print(f"{DynamicDT.now()}: New connection:", conn)
 		assert conn.readable and conn.writable
 		pid = conn.recv()
 		proc = psutil.Process(pid)
@@ -3494,7 +3504,7 @@ class EvalPipe:
 	def listen(cls, port=0, glob=globals(), start=False):
 		addr = ("127.0.0.1", port)
 		server = multiprocessing.connection.Listener(addr, authkey=cls.key)
-		print("EvalPipe listening on", server.address)
+		print(f"{DynamicDT.now()}: EvalPipe listening on", server.address)
 		return cls(
 			lambda: True,
 			None,
@@ -3511,7 +3521,7 @@ class EvalPipe:
 	@classmethod
 	def from_proc(cls, proc, glob=globals()):
 		flushin = Flush(proc.stdin)
-		print("EvalPipe connecting on", proc.pid)
+		print(f"{DynamicDT.now()}: EvalPipe connecting on", proc.pid)
 		return cls(
 			proc.is_running,
 			lambda b: flushin.write(b.rstrip(b"\n") + b"\n"),
@@ -3525,7 +3535,7 @@ class EvalPipe:
 	@classmethod
 	def from_stdin(cls, start=False, glob=globals()):
 		flushout = Flush(sys.__stdout__.buffer, flush=sys.__stdout__.flush)
-		print("EvalPipe listening from", os.getpid())
+		print(f"{DynamicDT.now()}: EvalPipe listening from", os.getpid())
 		return cls(
 			lambda: not sys.__stdin__.closed,
 			lambda b: flushout.write(b.rstrip(b"\n") + b"\n"),

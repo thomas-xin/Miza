@@ -5,9 +5,10 @@ from math import ceil, inf
 import os
 import random
 import re
+import subprocess
 import time
-from urllib.parse import quote_plus
 from traceback import print_exc
+from urllib.parse import quote_plus
 import orjson
 import requests
 import yt_dlp as ytd
@@ -15,10 +16,10 @@ from .types import alist, as_str, cdict, full_prune, json_dumps, round_min, to_a
 from .smath import time_parse, fuzzy_substring
 from .asyncs import esubmit
 from .util import (
-	python, shuffle, utc, proxy, leb128, verify_search, json_dumpstr, new_playwright_page, get_free_port,
+	python, compat_python, shuffle, utc, proxy, leb128, verify_search, json_dumpstr, new_playwright_page, get_free_port,
 	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration_2,
 	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url, is_imgur_url, is_giphy_url,
-	EvalPipe, Cache, Request, Semaphore, CACHE_PATH
+	EvalPipe, PipedProcess, Cache, Request, Semaphore, CACHE_PATH, magic
 )
 
 # Gets the best icon/thumbnail for a queue entry.
@@ -62,9 +63,15 @@ def get_best_icon(entry):
 # Gets the best audio file download link for a queue entry.
 def get_best_audio(entry):
 	try:
-		return entry["audio"]
+		a = entry["audio"]
 	except KeyError:
 		pass
+	else:
+		if len(a) < 2:
+			return a[0], None, 0
+		if len(a) < 3:
+			return a[0], a[1], 0
+		return a
 	best = (-inf,)
 	try:
 		fmts = entry["formats"]
@@ -854,22 +861,99 @@ class AudioDownloader:
 			return []
 
 	def get_audio(self, entry, asap=None):
-		assert not is_spotify_url(entry.url), "Spotify is temporarily unsupported, sorry!"
 		url = entry.get("orig") or entry["url"]
+		assert not is_spotify_url(url), "Spotify is temporarily unsupported, sorry!"
+		ts = ts_us()
+		fn = f"{CACHE_PATH}/{ts}.opus"
 		d = entry.get("duration")
 		if asap is None:
 			asap = d and d > 72
+		print("GA:", url, asap, d)
 		if asap or d is None or d > 960:
-			stream, cdc, *ac = get_best_audio(entry)
-			if not expired(stream):
-				return stream, cdc, entry["duration"], ac[0] if ac else 0
+			stream, cdc, ac = get_best_audio(entry)
+			print(stream, cdc, ac)
+			if cdc and not expired(stream):
+				return stream, cdc, entry["duration"], ac
 			entry2 = self.search(url, force=True)[0]
 			entry.update(entry2)
-			stream, cdc, *ac = get_best_audio(entry)
-			if not expired(stream):
-				return stream, cdc, entry["duration"], ac[0] if ac else 0
-		ts = ts_us()
-		fn = f"{CACHE_PATH}/{ts}.opus"
+			stream, cdc, ac = get_best_audio(entry2)
+			if cdc and stream:
+				return stream, cdc, entry["duration"], ac
+			print(stream, cdc, ac)
+			with requests.get(url, headers=Request.header(), stream=True) as resp:
+				head = resp.headers
+				ct = head.get("Content-Type")
+				b = b""
+				it = resp.iter_content(65536)
+				if not ct or ct in ("application/octet-stream", "application/vnd.lotus-organizer"):
+					b = next(it)
+					ct = magic.from_buffer(b)
+
+				def copy_to_file(fn2):
+					nonlocal b
+					with open(fn2, "wb") as f:
+						while True:
+							f.write(b)
+							try:
+								b = next(it)
+							except StopIteration:
+								break
+							if not b:
+								break
+					return fn2
+
+				print(resp, ct, url, stream, head)
+				left, right = ct.split("/", 1)[0], ct.split("/", 1)[-1]
+				if left == "image":
+					r_im = f"{CACHE_PATH}/{ts}.{right}"
+					copy_to_file(r_im)
+					args = [python, "png2wav.py", r_im, fn]
+					print(args)
+					res = subprocess.run(args, cwd="misc", stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
+					if not os.path.exists(fn) or not os.path.getsize(fn):
+						raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
+					dur, _bps, cdc, ac = get_duration_2(fn)
+					return fn, cdc, dur, ac
+				if ct in ("audio/x-ecdc", "audio/ecdc"):
+					r_ecdc = f"{CACHE_PATH}/{ts}.ecdc"
+					copy_to_file(r_ecdc)
+					args1 = [compat_python, "misc/ecdc_stream.py", "-b", "0", "-d", r_ecdc]
+					args2 = ["ffmpeg", "-v", "error", "-hide_banner", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "96k", fn]
+					print(args1, args2)
+					res = PipedProcess(args1, args2, stderr=subprocess.PIPE).wait()
+					if not os.path.exists(fn) or not os.path.getsize(fn):
+						raise RuntimeError(as_str(res.stderr.read()) or "Unable to locate converted file.")
+					dur, _bps, cdc, ac = get_duration_2(fn)
+					return fn, cdc, dur, ac
+				if ct in ("audio/x-org", "audio/org"):
+					r_org = f"{CACHE_PATH}/{ts}.org"
+					r_wav = f"{CACHE_PATH}/{ts}.wav"
+					copy_to_file(r_org)
+					args = ["OrgExport", r_org, "48000", "0"]
+					print(args)
+					res = subprocess.run(args, cwd="misc", stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
+					if not os.path.exists(r_wav) or not os.path.getsize(r_wav):
+						raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
+					dur, _bps, cdc, ac = get_duration_2(r_wav)
+					return r_wav, cdc, dur, ac
+				if ct in ("audio/x-midi", "audio/midi", "audio/sp-midi"):
+					r_mid = f"{CACHE_PATH}/{ts}.mid"
+					r_wav = f"{CACHE_PATH}/{ts}.wav"
+					copy_to_file(r_mid)
+					args = [os.path.abspath("misc/fluidsynth/fluidsynth"), os.path.abspath("misc/fluidsynth/gm64.sf2"), "-g", "1", "-F", r_wav, r_mid]
+					print(args)
+					res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
+					if not os.path.exists(r_wav) or not os.path.getsize(r_wav):
+						raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
+					dur, _bps, cdc, ac = get_duration_2(r_wav)
+					return r_wav, cdc, dur, ac
+				if left == "audio":
+					try:
+						dur, _bps, cdc, ac = get_duration_2(url)
+					except Exception:
+						pass
+					else:
+						return url, cdc, dur, ac
 		ydl_opts = dict(
 			format="bestaudio[acodec=opus][audio_channels=2]/bestaudio[audio_channels=2]/worstvideo[acodec!=none]",
 			default_search="auto",
@@ -888,7 +972,7 @@ class AudioDownloader:
 				url = shorten_attachment(url, 0)
 			dur, _bps, cdc, ac = get_duration_2(url)
 			return url, cdc, dur, ac
-		dur = self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)})['duration']")
+		dur = self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True)['duration']")
 		assert os.path.exists(fn) and os.path.getsize(fn)
 		return fn, "opus", dur, 2
 

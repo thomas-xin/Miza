@@ -219,7 +219,7 @@ class Loop(Command):
 	async def __call__(self, bot, _channel, _message, _perm, iterations, command, **void):
 		if not iterations:
 			# Ah yes, I made this error specifically for people trying to use this command to loop songs 🙃
-			raise ArgumentError("Please input loop iterations using the -i flag, followed by target command. For looping songs in voice, consider using the aliases LoopQueue and Repeat under the AudioSettings command.")
+			raise ArgumentError("Please input loop iterations using the -i flag, followed by target command. For looping songs in voice, consider using the aliases LoopQueue and Repeat under the AudioState command.")
 		# Bot owner bypasses restrictions
 		if not isnan(_perm):
 			if _channel.id in self.active:
@@ -1417,7 +1417,7 @@ class UpdateUrgentReminders(Database):
 		csubmit(self.update_urgents())
 
 	async def update_urgents(self):
-		while True:
+		while self.db is not None:
 			with tracebacksuppressor:
 				t = utc()
 				listed = self.data["listed"]

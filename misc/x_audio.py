@@ -80,7 +80,7 @@ class AudioPlayer(discord.AudioSource):
 	last_activity = inf
 
 	@classmethod
-	async def join(cls, vcc, channel=None):
+	async def join(cls, vcc, channel=None, announce=False):
 		globals()["client"] = await wrap_future(client_fut)
 		cid = cast_id(vcc)
 		vcc = client.get_channel(cid)
@@ -124,10 +124,10 @@ class AudioPlayer(discord.AudioSource):
 		else:
 			self.channel = channel
 		cls.waiting[gid] = Future()
-		csubmit(self.join_into(vcc))
+		csubmit(self.join_into(vcc, announce=announce))
 		return self
 
-	async def join_into(self, vcc):
+	async def join_into(self, vcc, announce=False):
 		print(self, vcc)
 		if self.fut.done():
 			self.fut = Future()
@@ -136,7 +136,7 @@ class AudioPlayer(discord.AudioSource):
 		try:
 			await self.ensure_speak(vcc)
 			if not self.vc:
-				if member.voice:
+				if member and member.voice:
 					await vcc.guild.change_voice_state(channel=None)
 				self.vc = await vcc.connect(timeout=12, reconnect=True)
 		except Exception as ex:
@@ -158,6 +158,11 @@ class AudioPlayer(discord.AudioSource):
 			if member.voice is not None and vcc.permissions_for(member).mute_members:
 				if member.voice.deaf or member.voice.mute or member.voice.afk:
 					csubmit(member.edit(mute=False))
+			if announce:
+				s = ansi_md(
+					f"{colourise('🎵', fg='blue')}{colourise()} Successfully connected to {colourise(self.channel.guild, fg='magenta')}{colourise()}. {colourise('🎵', fg='blue')}{colourise()}"
+				)
+				csubmit(self.announce(s))
 			return self
 		finally:
 			self.waiting.pop(gid, None)
@@ -209,27 +214,36 @@ class AudioPlayer(discord.AudioSource):
 		return self
 
 	@classmethod
-	async def disconnect(cls, guild):
+	async def disconnect(cls, guild, announce=False):
 		gid = cast_id(guild)
 		guild = client.get_guild(gid)
 		if not guild or not guild.me or not guild.me.voice:
 			raise KeyError(gid)
+		si = StopIteration("Voice disconnected.")
+		wait = cls.waiting.pop(gid, None)
+		if wait and not wait.done():
+			wait.set_exception(si)
 		try:
-			self = cls.players[gid]
+			self = cls.players.pop(gid)
 		except KeyError:
 			pass
 		else:
 			if not self.fut.done():
-				self.fut.set_exception(StopIteration("Voice disconnected."))
+				self.fut.set_exception(si)
 			self.settings.update(self.defaults)
 			self.clear()
 			if self.vc:
 				self.vc.stop()
 				await self.vc.disconnect()
 		if guild.me.guild_permissions.move_members:
-			csubmit(guild.me.move_to(None))
+			await guild.me.move_to(None)
 		elif guild.me.voice:
-			csubmit(guild.change_voice_state(channel=None))
+			await guild.change_voice_state(channel=None)
+		if announce:
+			s = ansi_md(
+				f"{colourise('🎵', fg='blue')}{colourise()} Successfully disconnected from {colourise(self.channel.guild, fg='magenta')}{colourise()}. {colourise('🎵', fg='blue')}{colourise()}"
+			)
+			return await self.announce(s)
 
 	async def leave(self, reason=None):
 		csubmit(self.disconnect(self.vcc.guild))
@@ -475,14 +489,14 @@ class AudioPlayer(discord.AudioSource):
 			self.updating_activity = None
 		if self.settings.stay:
 			return
-		listeners = interface.run(f"sum(not m.bot and m.voice and not m.voice.deaf for m in client.get_channel({self.vcc.id}).members)")
-		if listeners == 0:
+		listeners, connected = interface.run(f"(c := client.get_channel({self.vcc.id})) and sum(not m.bot and m.voice and not m.voice.deaf for m in c.members),bool(c.guild.me.voice)")
+		if listeners == 0 and connected:
 			self.updating_activity = csubmit(self._updating_activity())
 	async def _updating_activity(self):
-		await asyncio.sleep(240)
-		listeners = interface.run(f"sum(not m.bot and m.voice and not m.voice.deaf for m in client.get_channel({self.vcc.id}).members)")
-		if listeners == 0:
-			await self.leave("All channels empty")
+		await asyncio.sleep(300)
+		listeners, connected = interface.run(f"(c := client.get_channel({self.vcc.id})) and sum(not m.bot and m.voice and not m.voice.deaf for m in c.members),bool(c.guild.me.voice)")
+		if listeners == 0 and connected:
+			await self.leave("Channel empty")
 
 	updating_streaming = None
 	def update_streaming(self):
@@ -491,11 +505,13 @@ class AudioPlayer(discord.AudioSource):
 			self.updating_streaming = None
 		if self.settings.stay:
 			return
-		if len(self.queue) == 0:
+		connected = interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+		if len(self.queue) == 0 and connected:
 			self.updating_streaming = csubmit(self._updating_streaming())
 	async def _updating_streaming(self):
 		await asyncio.sleep(3600)
-		if len(self.queue) == 0:
+		connected = interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+		if len(self.queue) == 0 and connected:
 			await self.leave("Queue empty")
 
 	def read(self):
@@ -627,7 +643,17 @@ class AudioPlayer(discord.AudioSource):
 				if force == 1 and temp.af.url == self.queue[0].url:
 					pos = temp.pos / 50
 			if not self.playing and self.queue:
-				source = AF.load(self.queue[0]).create_reader(self, pos=pos if pos is not None else self.queue[0].get("start", 0))
+				entry = self.queue[0]
+				try:
+					source = AF.load(entry).create_reader(self, pos=pos if pos is not None else entry.get("start", 0))
+				except Exception as ex:
+					print_exc()
+					s = italics(ansi_md(
+						f"{colourise('❗', fg='blue')}{colourise()} An error occured while loading {colourise_brackets(entry.name, 'red', 'green', 'magenta')}{colourise()}, and it has been removed automatically. {colourise('❗', fg='blue')}{colourise()}\n"
+						+ f"Exception: {colourise_brackets(repr(ex), 'red', 'magenta', 'yellow')}"
+					))
+					csubmit(self.announce(s))
+					return self.skip()
 				if pos is not None:
 					source.new = False
 				self.playing.append(source)
@@ -650,14 +676,10 @@ class AudioPlayer(discord.AudioSource):
 			entry.close()
 		self.playing.clear()
 		self.queue.clear()
-
-	def kill(self):
-		csubmit(self.vc.disconnect(force=True))
-		self.clear()
-		self.players.pop(self.guild.id, None)
-		self.waiting.pop(self.guild.id, None)
-		self.vc.dead = True
-		self.vc = None
+		if self.updating_activity:
+			self.updating_activity.cancel()
+		if self.updating_streaming:
+			self.updating_streaming.cancel()
 
 	def is_opus(self):
 		return True
@@ -674,6 +696,7 @@ class PipedReader(io.IOBase):
 		self.pl = pl
 		self.pos = 0
 
+	@tracebacksuppressor
 	def read(self, nbytes=None):
 		if nbytes is None:
 			while not isfinite(self.pl.end):
@@ -683,7 +706,8 @@ class PipedReader(io.IOBase):
 				if self.pos:
 					f.seek(self.pos)
 				try:
-					return f.read()
+					b = f.read()
+					return b
 				finally:
 					self.pos = f.tell()
 		while self.pl.buffer < self.pos + nbytes and not isfinite(self.pl.end):
@@ -694,12 +718,13 @@ class PipedReader(io.IOBase):
 				if self.pos:
 					f.seek(self.pos)
 				try:
-					return f.read(nbytes)
+					b = f.read(nbytes)
+					return b
 				finally:
 					self.pos = f.tell()
 
 	def close(self):
-		return
+		return self
 
 class PipedLoader:
 
@@ -772,9 +797,14 @@ class AudioFile:
 	def load(cls, entry, asap=True):
 		url = unyt(entry["url"])
 		try:
-			return cls.cached[url].result()
+			fut = cls.cached[url]
 		except KeyError:
 			pass
+		else:
+			try:
+				return fut.result()
+			except Exception:
+				pass
 		cls.cached[url] = Future()
 		try:
 			self = cls()
@@ -815,6 +845,7 @@ class AudioFile:
 			return self
 		except Exception as ex:
 			cls.cached[url].set_exception(ex)
+			raise
 		finally:
 			if not cls.cached[url].done():
 				cls.cached[url].set_result(self)
@@ -858,6 +889,7 @@ class AudioFile:
 		def close():
 			reader.closed = True
 			reader.file.close()
+			return reader
 
 		reader.read = read
 		reader.close = reader.cleanup = close
@@ -983,6 +1015,7 @@ class LoadedAudioReader(discord.AudioSource):
 	def close(self, *void1, **void2):
 		self.closed = True
 		force_kill(self.proc)
+		return self
 	cleanup = close
 
 	def is_opus(self):
@@ -1052,6 +1085,7 @@ class BufferedAudioReader(discord.AudioSource):
 		self.closed = True
 		self.stream.close()
 		force_kill(self.proc)
+		return self
 	cleanup = close
 
 	def is_opus(self):
@@ -1153,12 +1187,11 @@ async def on_connect():
 @client.event
 async def on_ready():
 	for guild in client.guilds:
-		if guild.me and guild.me.voice:
-			try:
-				a = await asubmit(AP.from_guild, guild.id)
-			except KeyError:
-				return
-			a.update_activity()
+		try:
+			a = await asubmit(AP.from_guild, guild.id)
+		except KeyError:
+			return
+		a.update_activity()
 
 @client.event
 async def on_voice_state_update(member, before, after):

@@ -1,6 +1,10 @@
-import os, sys, time, subprocess
+import os
+import sys
+import time
+import subprocess
 
-is_url = lambda url: "://" in url and url.split("://", 1)[0].rstrip("s") in ("http", "hxxp", "ftp", "fxp")
+def is_url(url):
+	return "://" in url and url.split("://", 1)[0].rstrip("s") in ("http", "hxxp", "ftp", "fxp")
 ffmpeg_start = ("ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-fflags", "+discardcorrupt+fastseek+genpts+igndts+flush_packets", "-err_detect", "ignore_err", "-hwaccel", "auto", "-vn")
 
 hsv = sys.argv[-1] != "-hsv"
@@ -29,7 +33,6 @@ ffmpeg_probe = (
 	fn,
 )
 try:
-	print(ffmpeg_probe)
 	duration = float(subprocess.check_output(ffmpeg_probe))
 except ValueError:
 	ffmpeg_probe = (
@@ -44,7 +47,6 @@ except ValueError:
 		"default=nokey=1:noprint_wrappers=1",
 		fn,
 	)
-	print(ffmpeg_probe)
 	duration = float(subprocess.check_output(ffmpeg_probe))
 frames = duration * 48000
 req = int(frames ** 0.5) * 8
@@ -123,25 +125,27 @@ while True:
 	amp[1::2] = ramp
 	phase[::2] = lpha
 	phase[1::2] = rpha
-	amp *= 255 * 4096 / len(arr)
-	amp2 = np.log2(amp / 255, out=amp2)
+	amp *= 255 * 8192 / len(arr)
+	norm = min(np.mean(amp) / 32, np.max(amp) / 512)
+	mask = amp > norm
+	amp2 = np.log2(amp / 96, out=amp2)
 	np.multiply(amp2, 1 / rat, out=amp2)
-	np.clip(amp2, 0, 254, out=amp2)
+	np.clip(amp2, 0, 255, out=amp2)
+	amp2[mask] = np.clip(amp2[mask], 32, None)
 	ampi[:] = np.ceil(amp2, out=amp3, casting="unsafe")
 	np.power(1 / 1.03125, ampi, out=ampe)
 	amp *= ampe
-	np.clip(amp, None, 255, out=amp)
 	np.round(amp, out=amp)
-	np.subtract(255, amp3, out=amp3)
 	phase *= 128 / np.pi
 	phase += 128
 	size = (1, len(amp))
-	ampi = round_random(phase)
-	hue = Image.frombuffer("L", size, ampi.tobytes())
-	ampi = amp3
-	sat = Image.frombuffer("L", size, ampi.tobytes())
-	ampi = round_random(amp)
-	val = Image.frombuffer("L", size, ampi.data)
+	temp = round_random(phase)
+	hue = Image.frombuffer("L", size, temp.tobytes())
+	temp = amp.astype(np.uint8) ^ 255
+	temp[temp == 0] = 1
+	sat = Image.frombuffer("L", size, temp.tobytes())
+	temp = amp3
+	val = Image.frombuffer("L", size, temp.data)
 	img = Image.merge("HSV" if hsv else "RGB", (hue, sat, val))
 	columns.append(img)
 

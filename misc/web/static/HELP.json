@@ -1121,12 +1121,17 @@
 				"Pause",
 				"Resume",
 				"Unpause",
+				"LoopQueue",
+				"LQ",
+				"RepeatAll",
 				"Repeat",
+				"RepeatOne",
 				"Shuffler",
 				"AutoShuffle",
 				"Quiet",
 				"Stay",
 				"24/7",
+				"A",
 				"Reset"
 			],
 			"description": "Adjusts boolean states of the audio player",
@@ -1182,6 +1187,23 @@
 			"example": [],
 			"timeout": "24"
 		},
+		"Dump": {
+			"aliases": [
+				"Dump",
+				"Dujmp\u00f6",
+				"Export",
+				"Save",
+				"Import",
+				"Load",
+				"Restore"
+			],
+			"description": "Saves or loads the currently playing audio queue state.",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(1, 2)",
+			"example": [],
+			"timeout": "24"
+		},
 		"Seek": {
 			"aliases": [
 				"Seek",
@@ -1195,22 +1217,6 @@
 			"example": [],
 			"timeout": "24"
 		},
-		"Dump": {
-			"aliases": [
-				"Dump",
-				"Export",
-				"Import",
-				"Save",
-				"Load",
-				"Dujmp\u00f6"
-			],
-			"description": "Saves or loads the currently playing audio queue state.",
-			"usage": "",
-			"level": "0",
-			"rate_limit": "(1, 2)",
-			"example": [],
-			"timeout": "24"
-		},
 		"Jump": {
 			"aliases": [
 				"Jump",
@@ -1220,13 +1226,10 @@
 				"RotateQueue"
 			],
 			"description": "Rotates the queue to the left by a certain amount of steps.",
-			"usage": "<position[1]>?",
+			"usage": "",
 			"level": "0",
-			"rate_limit": "(4, 9)",
-			"example": [
-				"jump 6",
-				"roll -3"
-			],
+			"rate_limit": "(0.5, 3)",
+			"example": [],
 			"timeout": "24"
 		},
 		"Shuffle": {
@@ -1235,10 +1238,10 @@
 				"\ud83d\udd00",
 				"Scramble"
 			],
-			"description": "Shuffles the audio queue. Leaves the current song untouched unless ?f is specified.",
-			"usage": "<force_full_shuffle(-f)>?",
+			"description": "Immediately shuffles the queue. See ~autoshuffle for an automatic, non-disruptive version",
+			"usage": "",
 			"level": "0",
-			"rate_limit": "(4, 9)",
+			"rate_limit": "(0.5, 3)",
 			"example": [],
 			"timeout": "24"
 		},
@@ -1249,21 +1252,10 @@
 				"Deduplicate",
 				"RemoveDuplicates"
 			],
-			"description": "Removes all duplicate items from the audio queue.",
+			"description": "Removes all duplicate elements from the queue.",
 			"usage": "",
 			"level": "0",
-			"rate_limit": "(4, 9)",
-			"example": [],
-			"timeout": "24"
-		},
-		"Reverse": {
-			"aliases": [
-				"Reverse"
-			],
-			"description": "Reverses the audio queue direction.",
-			"usage": "",
-			"level": "0",
-			"rate_limit": "(4, 9)",
+			"rate_limit": "(0.5, 3)",
 			"example": [],
 			"timeout": "24"
 		},
