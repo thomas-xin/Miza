@@ -71,6 +71,7 @@ class AudioPlayer(discord.AudioSource):
 	waiting = {}
 	sources = {}
 	users = {}
+	fetched = {}
 	vc = None
 	args = None
 	# Empty opus packet data
@@ -95,9 +96,9 @@ class AudioPlayer(discord.AudioSource):
 		if user is not None:
 			uid = cast_id(user)
 			member = vcc.guild.get_member(uid)
-			print(uid, member, vcc, vcc.guild, channel, cls.fetched)
-			if uid not in cls.fetched and (not member or not member.voice):
-				cls.fetched.add(uid)
+			print(uid, member, vcc, vcc.guild, channel, cls.fetched.get(gid))
+			if uid not in cls.fetched.get(gid, ()) and (not member or not member.voice):
+				cls.fetched.setdefault(gid, set()).add(uid)
 				try:
 					data = await Request(
 						f"https://discord.com/api/{api}/guilds/{gid}/voice-states/{uid}",
@@ -296,7 +297,6 @@ class AudioPlayer(discord.AudioSource):
 		if vcc:
 			self.vc = client.get_guild(cast_id(vcc.guild)).voice_client
 		self.channel = channel
-		self.fetched = set()
 
 	def __getattr__(self, k):
 		try:
