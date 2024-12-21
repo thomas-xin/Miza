@@ -1956,21 +1956,25 @@ class ServerProtector(Database):
 			return
 
 		def analyse(resp):
-			print("META:", resp)
+			print("META:", type(resp), resp)
 			if not isinstance(resp, bytes):
 				return False
-			if resp.startswith(b'{"'):
+			if re.search(r'^{\s*"', as_str(resp[:64])):
 				try:
 					data = orjson.loads(resp)
 				except Exception:
-					pass
+					print_exc()
 				else:
 					try:
 						issuer = data["manifests"][data["active_manifest"]]["signature_info"]["issuer"]
 					except KeyError:
 						pass
 					else:
-						if issuer in ("Miza", "OpenAI", "StabilityAI"):
+						try:
+							software_agent = data["manifests"][data["active_manifest"]]["signature_info"]["issuer"]
+						except KeyError:
+							software_agent = None
+						if issuer in ("Miza", "OpenAI", "StabilityAI") or software_agent == ("Adobe Firefly", "DALL·E"):
 							return True
 					if str(data.get("issuer_id") or data.get("copyright")) == str(self.bot.id) or data.get("type") == "AI_GENERATED":
 						return True
