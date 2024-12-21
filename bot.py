@@ -5186,7 +5186,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			m = verify_id(v)
 			if info.type == "mentionable":
 				if isinstance(m, int):
-					v = self.in_cache[m]
+					v = self.in_cache(m)
 				elif isinstance(m, int):
 					v = await self.fetch_messageable(m)
 				else:

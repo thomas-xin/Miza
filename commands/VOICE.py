@@ -297,7 +297,7 @@ class Queue(Command):
 		vc_ = select_voice_channel(_user, _channel)
 		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
-		fut = csubmit(bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id})"))
+		fut = csubmit(bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id})"))
 		if not query:
 			await fut
 			q, paused = await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).queue,a.settings.pause")
@@ -843,7 +843,7 @@ class Connect(Command):
 		if not vc_.permissions_for(guild.me).connect:
 			raise ConnectionError("Insufficient permissions to connect to voice channel.")
 		# Create audio source if none already exists
-		await bot.audio.asubmit(f"AP.join({vc_.id},announce=True)")
+		await bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id},announce=True)")
 
 
 class Skip(Command):
@@ -1311,7 +1311,7 @@ class Dump(Command):
 		vc_ = select_voice_channel(_user, _channel)
 		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
-		await bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id})")
+		await bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id})")
 		if url or mode == "load":
 			if mode == "save":
 				raise TypeError("Unexpected file input for saving.")
@@ -1344,7 +1344,7 @@ class Dump(Command):
 				content=italics(css_md(f"Successfully loaded audio data for {sqr_md(_guild)}.")),
 				reacts="❎",
 			)
-		data = await bot.audio.asubmit(f"maybe_json(dict(settings=a.settings,queue=(a := AP.from_guild({_guild.id})).queue))")
+		data = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).get_dump()")
 		return cdict(file=CompatFile(data, filename="dump.json"), reacts="❎")
 
 
