@@ -734,6 +734,7 @@ if 0 and "whisper" in CAPS:
 
 if "math" in CAPS:
 	import x_math
+	x_image.print = print
 
 if "ytdl" in CAPS:
 	IMAGE_FORMS = {

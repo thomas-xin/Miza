@@ -1293,11 +1293,17 @@ def byte_unscale(s, ratio=1024):
 	return round_min(n * ratio ** __uscales.index(s.lower()))
 
 def e64(b):
+	if isinstance(b, str):
+		b = b.encode("utf-8")
+	elif isinstance(b, MemoryBytes):
+		b = bytes(b)
 	return base64.urlsafe_b64encode(b).rstrip(b"=")
 
 def b64(b):
 	if isinstance(b, str):
 		b = b.encode("ascii")
+	elif isinstance(b, MemoryBytes):
+		b = bytes(b)
 	if len(b) & 3:
 		b += b"=="
 	return base64.urlsafe_b64decode(b)
@@ -1566,7 +1572,7 @@ def maybe_json(d):
 	if isinstance(d, BaseException):
 		return repr(d).encode("utf-8")
 	if isinstance(d, byte_like):
-		if not isinstance(d, bytes):
+		if not isinstance(d, (bytes, memoryview, bytearray)):
 			d = bytes(d)
 		return (b'b64("' + e64(d) + b'")')
 	try:

@@ -165,6 +165,7 @@ class AudioPlayer(discord.AudioSource):
 			except KeyError:
 				pass
 			self.fut.set_exception(ex)
+			self.players.pop(gid, None)
 			raise
 		else:
 			self.last_played = utc()
@@ -273,7 +274,7 @@ class AudioPlayer(discord.AudioSource):
 		s = ansi_md(
 			f"{colourise('🎵', fg='blue')}{colourise()} Automatically disconnected from {colourise(self.channel.guild, fg='magenta')}{colourise()}{r}. {colourise('🎵', fg='blue')}{colourise()}"
 		)
-		return await self.announce(s, dump=True)
+		return await self.announce(s, dump=dump)
 
 	@classmethod
 	async def fetch_user(cls, u_id):
@@ -532,12 +533,18 @@ class AudioPlayer(discord.AudioSource):
 
 	async def _updating_activity(self):
 		self.pause()
-		await asyncio.sleep(300)
+		await asyncio.sleep(120)
 		connected = interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
 		if connected:
-			listeners = sum(not m.bot and m.voice and not m.voice.deaf for m in self.vcc.members)
+			listeners = sum(not m.bot and m.voice for m in self.vcc.members)
 			if listeners == 0:
 				await self.leave("Channel empty", dump=len(self.queue) > 0)
+			await asyncio.sleep(3480)
+			connected = interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+			if connected:
+				listeners = sum(not m.bot and m.voice and not m.voice.deaf for m in self.vcc.members)
+				if listeners == 0:
+					await self.leave("Channel empty", dump=len(self.queue) > 0)
 
 	updating_streaming = None
 	def update_streaming(self):

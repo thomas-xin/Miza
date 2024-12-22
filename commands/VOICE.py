@@ -464,7 +464,7 @@ class Queue(Command):
 			return
 		user = await bot.fetch_user(u_id)
 		guild = message.guild
-		q, settings, paused, reverse, (elapsed, length) = await bot.audio.asubmit(f"(a := AP.from_guild({guild.id})).queue, a.settings, a.settings.pause, a.reverse, a.epos")
+		q, settings, paused, reverse, (elapsed, length) = await bot.audio.asubmit(f"(a := AP.from_guild({guild.id})).queue,a.settings,a.settings.pause,a.reverse,a.epos")
 		settings = astype(settings, cdict)
 		last = max(0, len(q) - 10)
 		if reaction is not None:
@@ -526,11 +526,17 @@ class Queue(Command):
 		)
 		emb.set_author(**get_author(user))
 		if q:
-			icon = get_best_icon(q[0])
+			if not reaction:
+				icon = get_best_icon(q)
+			else:
+				icon = await bot.audio.asubmit(f"ytdl.get_thumbnail({json_dumpstr(q[0])},pos={elapsed})")
 		else:
 			icon = ""
 		if icon:
-			emb.set_thumbnail(url=icon)
+			if isinstance(icon, str):
+				emb.set_thumbnail(url=icon)
+			else:
+				emb.set_thumbnail(url="attachment://thumb.jpg")
 		embstr = ""
 		curr_time = start_time
 		i = pos
@@ -582,7 +588,9 @@ class Queue(Command):
 		more = len(q) - i
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		file = CompatFile(icon, filename="thumb.jpg") if isinstance(icon, byte_like) else None
+		filed = {"file": file} if file else {}
+		csubmit(bot.edit_message(message, **filed, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -1315,10 +1323,13 @@ class Dump(Command):
 		if url or mode == "load":
 			if mode == "save":
 				raise TypeError("Unexpected file input for saving.")
+			link = None
 			if not url:
 				async for message in bot.history(_channel, limit=300):
 					if message.author.id == bot.id and message.attachments and message.attachments[0].url.split("?", 1)[0].endswith("/dump.json"):
 						url = message.attachments[0].url
+						link = message.jump_url
+						break
 			s = await self.bot.get_request(url)
 			try:
 				d = await asubmit(select_and_loads, s, size=268435456)
@@ -1341,7 +1352,7 @@ class Dump(Command):
 			await bot.audio.asubmit(f"AP.from_guild({_guild.id}).queue.fill(map(cdict, {maybe_json(d['queue']).decode('utf-8')}))")
 			await bot.audio.asubmit(f"AP.from_guild({_guild.id}).ensure_play(2)")
 			return cdict(
-				content=italics(css_md(f"Successfully loaded audio data for {sqr_md(_guild)}.")),
+				content=(link + "\n" if link else "") + italics(css_md(f"Successfully loaded audio data for {sqr_md(_guild)}.")),
 				reacts="❎",
 			)
 		data = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).get_dump()")

@@ -29,8 +29,6 @@ if not hasattr(time, "time_ns"):
 deque = collections.deque
 
 getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
-def print(*args, sep=" ", end="\n"):
-	return sys.stdout.buffer.write(f"~print({repr(sep.join(map(str, args)))},end={repr(end)})\n".encode("utf-8"))
 
 
 def as_str(s):
@@ -1240,12 +1238,12 @@ def evalSym(f, prec=64, r=False, variables=None):
 	try:
 		if "\\" in y:
 			raise SyntaxError
-		f = parser.parse_expr(
+		s = parser.stringify_expr(
 			f,
-			local_dict=None,
+			local_dict={},
 			global_dict=env,
 			transformations=sym_tr,
-			evaluate=True,
+			# evaluate=True,
 		)
 	except SyntaxError:
 		try:
@@ -1258,6 +1256,18 @@ def evalSym(f, prec=64, r=False, variables=None):
 				pass
 		if not f:
 			raise
+	else:
+		a = ast.parse(s, mode="eval")
+		class BannedAttributes(ast.NodeTransformer):
+			def visit_Attribute(self, node):
+				if isinstance(node.attr, str):
+					if node.attr.startswith("__") and node.attr.endswith("__"):
+						node.attr = node.attr.strip("_")
+					return node
+				raise AttributeError(node.attr)
+		BannedAttributes().visit(a)
+		code = compile(a, filename="<math-input>", mode="eval")
+		f = eval(code, env)
 	# Solve any sums and round off floats when possible
 	for i in sympy.preorder_traversal(f):
 		if isinstance(i, (sympy.Number, float, np.floating)):

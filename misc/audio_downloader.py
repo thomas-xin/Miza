@@ -221,6 +221,7 @@ class AudioDownloader:
 	def __init__(self):
 		self.session = requests.Session()
 		self.search_cache = Cache(timeout=inf, timeout2=60, persist="ytdl.search.cache", autosave=60)
+		self.extract_cache = Cache(timeout=3600, timeout2=8)
 		self.futs = [
 			esubmit(self.set_cookie),
 		]
@@ -250,7 +251,19 @@ class AudioDownloader:
 		return self.workers.next().run(s)
 
 	def extract_info(self, url, download=False, process=True):
-		return self.run(f"extract_info({json_dumpstr(url)},download={download},process={process})")
+		try:
+			return self.extract_cache[url]
+		except KeyError:
+			pass
+		resp = self.extract_cache[url] = self.run(f"extract_info({json_dumpstr(url)},download={download},process={process})")
+		return resp
+
+	def get_thumbnail(self, entry, pos=0):
+		url = entry.get("url")
+		if not is_youtube_url(url):
+			return get_best_icon(entry)
+		info = self.extract_info(url)
+		return self.run(f"get_storyboard({repr(info)},pos={pos})")
 
 	def set_cookie(self):
 		self.youtube_base = "CONSENT=YES+cb.20210328-17-p0.en+FX"
