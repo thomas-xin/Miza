@@ -539,13 +539,6 @@ class AudioPlayer(discord.AudioSource):
 			listeners = sum(not m.bot and m.voice for m in self.vcc.members)
 			if listeners == 0:
 				await self.leave("Channel empty", dump=len(self.queue) > 0)
-				return
-			await asyncio.sleep(3480)
-			connected = interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
-			if connected:
-				listeners = sum(not m.bot and m.voice and not (m.voice.deaf or m.voice.self_deaf) for m in self.vcc.members)
-				if listeners == 0:
-					await self.leave("Channel empty", dump=len(self.queue) > 0)
 
 	updating_streaming = None
 	def update_streaming(self):
