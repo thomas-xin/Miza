@@ -1609,6 +1609,8 @@ def select_and_loads(s, encrypted=False, size=None):
 	data = None
 	if not s:
 		return data
+	if s[0] == 128:
+		return pickle.loads(s)
 	if data is None:
 		tcls = None
 		if s[0] in b"$" and s[1] in b"[":
