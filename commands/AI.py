@@ -830,7 +830,7 @@ class Imagine(Command):
 			validation="[0, 1]",
 			description="Denoising strength",
 			example="0.6",
-			default=0.75,
+			default=0.875,
 		),
 		guidance_scale=cdict(
 			type="number",

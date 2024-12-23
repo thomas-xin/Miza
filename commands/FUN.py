@@ -2908,7 +2908,7 @@ class Cat(ImagePool, Command):
 			url = d["file" if x == 1 and alexflipnote_key else "url"]
 		return url
 
-	async def __call__(self, bot, embed, code, **void):
+	async def __call__(self, bot, embed, code=None, **void):
 		if code:
 			assert code in self.http_nums, f"http.cat does not have status code {code}."
 			url = f"https://http.cat/{code}"
@@ -2950,10 +2950,17 @@ class Dog(ImagePool, Command):
 class _8Ball(ImagePool, Command):
 	name = ["🎱"]
 	description = "Pulls a random image from cdn.nekos.life/8ball, and embeds it."
+	schema = cdict(
+		embed=cdict(
+			type="bool",
+			description="Whether to send the message as an embed",
+			default=True,
+		),
+	)
 	database = "8ball"
 	rate_limit = (0.5, 3)
 
-	def __call__(self, channel, flags, **void):
+	async def __call__(self, channel, embed, **void):
 		e_id = choice(
 			"Absolutely",
 			"Ask_Again",
@@ -2972,9 +2979,7 @@ class _8Ball(ImagePool, Command):
 			"count_on_it",
 		)
 		url = f"https://cdn.nekos.life/8ball/{e_id}.png"
-		if "v" in flags:
-			return escape_roles(url)
-		self.bot.send_as_embeds(channel, image=url)
+		return await self.send(url, embed=embed)
 
 
 class XKCD(ImagePool, Command):

@@ -557,29 +557,12 @@ class Queue(Command):
 						u = await bot.fetch_user(e.u_id)
 						name = u.display_name
 				curr += "\n" + css_md(sqr_md(name))
-			# if reverse and len(q):
-			# 	estim = curr_time + elapsed - length
-			# else:
-			# 	estim = curr_time - elapsed
-			# if v:
-			# 	if estim > 0:
-			# 		curr += "Time until playing: "
-			# 		estimate = time_delta(estim / abs(settings.speed))
-			# 		if i <= 1 or not settings.shuffle:
-			# 			curr += "[" + estimate + "]"
-			# 		else:
-			# 			curr += "{" + estimate + "}"
-			# 	else:
-			# 		curr += "Remaining time: [" + time_delta((estim + e_dur_2(e)) / abs(settings.speed)) + "]"
-			# 	curr += "```"
 			curr += "\n"
 			if len(embstr) + len(curr) > 4096 - len(emb.description):
 				break
 			embstr += curr
 			if i <= 1 or not settings.shuffle:
 				curr_time += e_dur_2(e)
-			if not 1 + 1 & 4095:
-				await asyncio.sleep(0.3)
 			i += 1
 		emb.description += embstr
 		more = len(q) - i
@@ -2630,140 +2613,27 @@ class Transcribe(Command):
 
 class UpdateAudio(Database):
 	name = "audio"
-
-	def __load__(self):
-		self.players = cdict()
-
-	# Delays audio player display message by 15 seconds when a user types in the target channel
-	async def _typing_(self, channel, user, **void):
-		if getattr(channel, "guild", None) is None:
-			return
-		if channel.guild.id in self.players and user.id != self.bot.id:
-			auds = self.players[channel.guild.id]
-			if auds.player is not None and channel.id == auds.channel.id:
-				t = utc() + 15
-				if auds.player.time < t:
-					auds.player.time = t
-
-	# Delays audio player display message by 10 seconds when a user sends a message in the target channel
-	async def _send_(self, message, **void):
-		if message.guild.id in self.players and message.author.id != self.bot.id:
-			auds = self.players[message.guild.id]
-			if auds.player is not None and message.channel.id == auds.channel.id:
-				t = utc() + 10
-				if auds.player.time < t:
-					auds.player.time = t
-
-	# Makes 1 attempt to disconnect a single member from voice.
-	@tracebacksuppressor(discord.Forbidden)
-	async def _dc(self, member):
-		await member.move_to(None)
-
-	async def update_vc(self, guild):
-		m = guild.me
-		if isinstance(m, discord.Member):
-			if guild.id not in self.players:
-				if m.voice is not None:
-					acsi = AudioClientSubInterface.from_guild(guild)
-					if acsi is not None:
-						auds = CustomAudio(m.voice.channel)
-						return
-					return await guild.change_voice_state(channel=None)
-			else:
-				if m.voice is not None:
-					vc_ = m.voice.channel
-					perm = m.permissions_in(vc_)
-					if perm.mute_members:
-						if vc_.type is discord.ChannelType.stage_voice:
-							if m.voice.suppress or m.voice.requested_to_speak_at:
-								return await self.bot.audio.players[guild.id].speak()
-						elif m.voice.deaf or m.voice.mute or m.voice.afk:
-							return await m.edit(mute=False)
+	timestamp = utc()
 
 	# Updates all voice clients
 	async def __call__(self, guild=None, **void):
-		return
+		t = utc()
+		td, self.timestamp = t - self.timestamp, t
 		bot = self.bot
-		# if not self._semaphore.busy:
-		# 	async with self._semaphore:
-		# 		# Ensure all voice clients are not muted, disconnect ones without matching audio players
-		# 		if guild is not None:
-		# 			csubmit(self.update_vc(guild))
-		# 		else:
-		# 			[csubmit(self.update_vc(g)) for g in bot.cache.guilds.values()]
-		# Update audio players
-		if guild is not None:
-			if guild.id in self.players:
-				auds = self.players[guild.id]
-				esubmit(auds.update)
-		else:
-			futs = deque()
-			for g in tuple(self.players):
-				with tracebacksuppressor(KeyError):
-					auds = self.players[g]
-					futs.append(asubmit(auds.update, priority=True))
-					futs.append(csubmit(self.research(auds)))
-					if auds.queue and not auds.paused and "dailies" in bot.data:
-						if auds.ts is not None and auds.acsi:
-							for member in auds.acsi.channel.members:
-								if member.id != bot.id:
-									vs = member.voice
-									if vs is not None and not vs.deaf and not vs.self_deaf:
-										bot.data.users.add_gold(member, 0.25)
-										bot.data.dailies.progress_quests(member, "music", utc() - auds.ts)
-						auds.ts = utc()
-					else:
-						auds.ts = None
-			for fut in futs:
-				with tracebacksuppressor:
-					await fut
-			# if bot.audio:
-			# 	await asubmit(bot.audio.run, "ytdl.update()")
-		# esubmit(ytd.update)
-		if not self.backup_sem.busy:
-			async with self.backup_sem:
-				await self.backup()
-
-	def _announce_(self, *args, **kwargs):
-		for auds in self.players.values():
-			if auds.queue and not auds.paused:
-				esubmit(auds.announce, *args, aio=True, **kwargs)
-
-	backed = False
-	backup_sem = Semaphore(1, 0, rate_limit=30)
-	async def backup(self, force=False):
-		if self.backed or not self.bot.ready or bot.maintenance:
-			return
-		temp = {}
-		for auds in tuple(self.players.values()):
-			if auds.is_empty():
+		try:
+			player_states = await bot.audio.asubmit("[(k,v.vc and v.vc.is_playing(),{m.id for m in v.vcc.members if (mv := m.voice) and not m.voice.deaf and not m.voice.self_deaf}) for k,v in AP.players.items()]")
+		except AttributeError:
+			player_states = ()
+		for state in player_states:
+			gid, playing, uids = state
+			if gid not in bot.cache.guilds or not playing:
 				continue
-			d, _ = await asubmit(auds.get_dump, True, True)
-			try:
-				temp[auds.acsi.channel.id] = dict(dump=d, channel=auds.text.id)
-			except AttributeError:
-				pass
-		self.fill(temp)
-		if force:
-			await asubmit(self.sync, force=True, priority=True)
-
-	# Stores all currently playing audio data to temporary database when bot shuts down
-	async def _destroy_(self, shutdown=False, **void):
-		await self.backup(force=True)
-		if not shutdown:
-			return
-		for auds in tuple(self.players.values()):
-			if auds.queue and not auds.paused:
-				reason = "🎵 Temporarily disconnecting for maintenance"
-				if auds.queue:
-					reason += " (Queue saved | use ~load or ~play on this link to reload anytime)."
-				else:
-					reason += "."
-				reason += " Apologies for any inconvenience! 🎵"
-			else:
-				reason = f"🎵 Automatically disconnected from {sqr_md(auds.guild)}.🎵"
-			with tracebacksuppressor:
-				await asubmit(auds.kill, reason=css_md(reason) if reason else None, remove=False, timeout=8)
+			guild = await bot.fetch_guild(gid)
+			for uid in uids:
+				if uid != bot.id:
+					member = guild.get_member(uid) or bot.cache.users[uid]
+					bot.data.users.add_gold(member, td / 10)
+					bot.data.dailies.progress_quests(member, "music", td)
 
 	# Restores all audio players from temporary database when applicable
 	async def _ready_(self, bot, **void):

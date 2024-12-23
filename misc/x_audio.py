@@ -24,7 +24,7 @@ from .util import (
 from .audio_downloader import AudioDownloader
 
 # VERY HACKY removes deprecated audioop dependency for discord.py; this would cause volume transformations to fail but Miza uses FFmpeg for them anyway
-sys.modules["audioop"] = sys
+sys.modules["audioop"] = sys.__class__("audioop")
 import discord  # noqa: E402
 
 tracebacksuppressor.fn = print_exc
@@ -45,7 +45,7 @@ if __name__ == "__main__":
 
 ytdl = None
 client_fut = Future()
-ytdl_fut = esubmit(AudioDownloader)
+ytdl_fut = esubmit(AudioDownloader, workers=1)
 
 class AudioPlayer(discord.AudioSource):
 

@@ -220,7 +220,7 @@ def get_best_lyrics(resp):
 
 class AudioDownloader:
 
-	def __init__(self):
+	def __init__(self, workers=1):
 		self.session = requests.Session()
 		self.search_cache = Cache(timeout=inf, timeout2=60, persist="ytdl.search.cache", autosave=60)
 		self.thumbnail_cache = Cache(timeout=inf, timeout2=60, persist="ytdl.thumbnail.cache", autosave=60)
@@ -228,7 +228,7 @@ class AudioDownloader:
 		self.futs = [
 			esubmit(self.set_cookie),
 		]
-		self.worker_count = 2
+		self.worker_count = workers
 		self.workers = alist()
 		self.start_workers()
 
@@ -275,9 +275,9 @@ class AudioDownloader:
 		with io.BytesIO(b) as b:
 			with zipfile.ZipFile(b, "r") as z:
 				filelist = z.filelist
-				found = [(abs(pos - int(zi.filename.split(".", 1)[0])), zi.filename) for zi in filelist]
+				found = [((diff := pos - int(zi.filename.split(".", 1)[0])) < 0, abs(diff), zi.filename) for zi in filelist]
 				closest = min(found)
-				return z.read(closest[1])
+				return z.read(closest[-1])
 
 	def set_cookie(self):
 		self.youtube_base = "CONSENT=YES+cb.20210328-17-p0.en+FX"

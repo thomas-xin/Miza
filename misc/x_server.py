@@ -2008,51 +2008,21 @@ class Server:
 		cp.response.headers.update(HEADERS)
 		return json_dumps(j)
 
-	@cp.expose(("cat", "cats", "dog", "dogs", "neko", "nekos", "giphy"))
+	@cp.expose(("cat", "cats", "dog", "dogs", "neko", "nekos"))
 	def imagepool(self, tag="", refresh=60):
 		name = cp.url(base="").rsplit("/", 1)[-1]
 		command = name.rstrip("s")
-		argv = tag
-		try:
-			args = smart_split(argv)
-		except ValueError:
-			args = argv.split()
-		url = interface.run(f"bot.commands.{command}[0](bot=bot,channel=None,flags='v',args={repr(args)},argv={repr(argv)})")
-		refresh = float(refresh or 60)
+		info = interface.run(f"bot.commands.{command}[0](bot=bot,embed=False)")
 		if fcdict(cp.request.headers).get("Accept") == "application/json":
-			return url
+			return info
+		url = info["url"]
+		if refresh:
+			refresh_url = f"{API}/{name}"
+			if tag:
+				refresh_url += f"/{tag}"
+			refresh_info = f'<meta http-equiv="refresh" content="{refresh};URL={refresh_url}">'
 		cp.response.headers.update(HEADERS)
-		return f"""<!DOCTYPE html>
-<html>
-<head>
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
-<meta property="og:image" content="{url}">
-<meta http-equiv="refresh" content="{refresh}; URL={cp.url(qs=cp.request.query_string)}">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>""" + """
-img {
-display: block;
-margin-left: auto;
-margin-right: auto;
-margin-top: auto;
-margin-bottom: auto;
-}
-.center {
-margin: 0;
-position: absolute;
-top: 50%;
-left: 50%;
--ms-transform: translate(-50%, -50%);
-transform: translate(-50%, -50%);
-max-width: 100%;
-max-height: 100%;		
-}""" + f"""
-</style>
-</head>
-<body style="background-color:black;">
-<img src="{url}" class="center">
-</body>
-</html>"""
+		return f"""<!DOCTYPE html><html><head><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script><meta property="og:image" content="{url}">{refresh_info}<meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="background-color:black;"><img src="{url}" style="margin:0;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);max-width:100%;max-height:100%"></body></html>"""
 
 	class V1Cache:
 		def __init__(self, end=2048, soft=8192, hard=30720):

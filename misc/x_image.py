@@ -263,7 +263,6 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 	fcount = None
 	proc = None
 	try:
-		print(mime, len(b))
 		left, right = mime.split("/", 1)[0], mime.split("/", 1)[-1]
 		if not wand or left == "image" and right in "apng avif blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal wmf xbm".split():
 			try:
