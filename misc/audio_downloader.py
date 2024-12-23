@@ -1,6 +1,7 @@
 from collections import deque
 from concurrent.futures import Future
 from contextlib import suppress
+import io
 from math import ceil, inf
 import os
 import random
@@ -9,6 +10,7 @@ import subprocess
 import time
 from traceback import print_exc
 from urllib.parse import quote_plus
+import zipfile
 import orjson
 import requests
 import yt_dlp as ytd
@@ -221,7 +223,8 @@ class AudioDownloader:
 	def __init__(self):
 		self.session = requests.Session()
 		self.search_cache = Cache(timeout=inf, timeout2=60, persist="ytdl.search.cache", autosave=60)
-		self.extract_cache = Cache(timeout=3600, timeout2=8)
+		self.thumbnail_cache = Cache(timeout=inf, timeout2=60, persist="ytdl.thumbnail.cache", autosave=60)
+		self.extract_cache = Cache(timeout=120, timeout2=8)
 		self.futs = [
 			esubmit(self.set_cookie),
 		]
@@ -263,7 +266,18 @@ class AudioDownloader:
 		if not is_youtube_url(url):
 			return get_best_icon(entry)
 		info = self.extract_info(url)
-		return self.run(f"get_storyboard({repr(info)},pos={pos})")
+		try:
+			b = self.thumbnail_cache[url]
+		except KeyError:
+			b = self.thumbnail_cache[url] = self.run(f"get_full_storyboard({repr(info)})")
+		if isinstance(b, str):
+			return b
+		with io.BytesIO(b) as b:
+			with zipfile.ZipFile(b, "r") as z:
+				filelist = z.filelist
+				found = [(abs(pos - int(zi.filename.split(".", 1)[0])), zi.filename) for zi in filelist]
+				closest = min(found)
+				return z.read(closest[1])
 
 	def set_cookie(self):
 		self.youtube_base = "CONSENT=YES+cb.20210328-17-p0.en+FX"

@@ -526,10 +526,7 @@ class Queue(Command):
 		)
 		emb.set_author(**get_author(user))
 		if q:
-			if not reaction:
-				icon = get_best_icon(q)
-			else:
-				icon = await bot.audio.asubmit(f"ytdl.get_thumbnail({json_dumpstr(q[0])},pos={elapsed})")
+			icon = await bot.audio.asubmit(f"ytdl.get_thumbnail({json_dumpstr(q[0])},pos={elapsed})")
 		else:
 			icon = ""
 		if icon:
@@ -590,7 +587,7 @@ class Queue(Command):
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
 		file = CompatFile(icon, filename="thumb.jpg") if isinstance(icon, byte_like) else None
 		filed = {"file": file} if file else {}
-		csubmit(bot.edit_message(message, **filed, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		csubmit(bot.edit_message(message, **filed, attachments=[], content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 

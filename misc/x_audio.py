@@ -177,7 +177,7 @@ class AudioPlayer(discord.AudioSource):
 			self.fut.set_result(None)
 			await self.ensure_speak(vcc)
 			if member.voice is not None and vcc.permissions_for(member).mute_members:
-				if member.voice.deaf or member.voice.mute or member.voice.afk:
+				if member.voice.deaf or member.voice.self_deaf or member.voice.mute or member.voice.afk:
 					csubmit(member.edit(mute=False))
 			if announce:
 				s = ansi_md(
@@ -525,7 +525,7 @@ class AudioPlayer(discord.AudioSource):
 			return
 		connected = interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
 		if connected:
-			listeners = sum(not m.bot and m.voice and not m.voice.deaf for m in self.vcc.members)
+			listeners = sum(not m.bot and m.voice and not (m.voice.deaf or m.voice.self_deaf) for m in self.vcc.members)
 			if listeners == 0:
 				self.updating_activity = csubmit(self._updating_activity())
 			elif not self.settings.pause:
@@ -539,10 +539,11 @@ class AudioPlayer(discord.AudioSource):
 			listeners = sum(not m.bot and m.voice for m in self.vcc.members)
 			if listeners == 0:
 				await self.leave("Channel empty", dump=len(self.queue) > 0)
+				return
 			await asyncio.sleep(3480)
 			connected = interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
 			if connected:
-				listeners = sum(not m.bot and m.voice and not m.voice.deaf for m in self.vcc.members)
+				listeners = sum(not m.bot and m.voice and not (m.voice.deaf or m.voice.self_deaf) for m in self.vcc.members)
 				if listeners == 0:
 					await self.leave("Channel empty", dump=len(self.queue) > 0)
 

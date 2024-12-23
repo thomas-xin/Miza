@@ -1602,14 +1602,13 @@ def select_and_loads(s, encrypted=False, size=None):
 			pass
 		except:
 			raise
+	if s[0] == 128:
+		return pickle.loads(s)
 	if s[:1] in (b"~", b"!") or zipfile.is_zipfile(io.BytesIO(s)):
 		s = zip2bytes(s)
 	data = None
 	if not s:
 		return data
-	with tracebacksuppressor:
-		if s[0] == 128:
-			return pickle.loads(s)
 	if data is None:
 		tcls = None
 		if s[0] in b"$" and s[1] in b"[":
@@ -3176,6 +3175,8 @@ def evalFX(exc):
 	raise RuntimeError(ex)
 
 # Much more powerful exec function that can evaluate async expressions, is thread-safe, and always returns the value on the last line even without a return statement specified.
+__eval__ = eval
+__exec__ = exec
 def aexec(s, glob=None, filename="<aexec>"):
 	glob = glob or globals()
 	s = as_str(s)
@@ -3214,7 +3215,7 @@ def aexec(s, glob=None, filename="<aexec>"):
 		except Exception as ex:
 			raise PropagateTraceback.cast(ex, format_exc())
 		else:
-			exec(code, glob)
+			__exec__(code, glob)
 		if code is None:
 			_ = glob.get("_")
 			outside = ast.parse("""async def _():
@@ -3228,7 +3229,7 @@ def aexec(s, glob=None, filename="<aexec>"):
 			outside.body[0].body[0].finalbody.append(finalise)
 			try:
 				code = compile(outside, filename=filename, mode="exec")
-				exec(code, glob)
+				__exec__(code, glob)
 			except Exception as ex:
 				raise PropagateTraceback.cast(ex, format_exc())
 			else:
@@ -3236,7 +3237,7 @@ def aexec(s, glob=None, filename="<aexec>"):
 			glob["_"] = _
 	if end:
 		try:
-			fut = eval(end, glob)
+			fut = __eval__(end, glob)
 			if awaitable(fut):
 				fut = await_fut(asubmit(fut))
 		except Exception as ex:
@@ -3760,6 +3761,7 @@ class EvalPipe:
 		self.p_alive = lambda: False
 		self.thread.result()
 	terminate = kill
+
 
 def prioritise(proc):
 	try:

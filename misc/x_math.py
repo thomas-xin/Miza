@@ -1261,7 +1261,7 @@ def evalSym(f, prec=64, r=False, variables=None):
 		class BannedAttributes(ast.NodeTransformer):
 			def visit_Attribute(self, node):
 				if isinstance(node.attr, str):
-					if node.attr.startswith("__") and node.attr.endswith("__"):
+					if node.attr.startswith("_") or node.attr.endswith("_"):
 						node.attr = node.attr.strip("_")
 					return node
 				raise AttributeError(node.attr)

@@ -1,6 +1,7 @@
 import io
 import sys
 from traceback import print_exc
+import zipfile
 import requests
 from PIL import Image
 try:
@@ -11,7 +12,7 @@ except ImportError as ex:
 	except ImportError:
 		raise ex
 from .types import list_like
-from .util import EvalPipe
+from .util import EvalPipe, esubmit
 
 ydl_opts = {
 	# "verbose": 1,
@@ -35,36 +36,46 @@ def extract_info(url, download=False, process=True):
 		resp["entries"] = list(resp["entries"])
 	return resp
 
-def get_storyboard(info, pos=0):
+def get_full_storyboard(info):
 	try:
 		storyboard = [f for f in info["formats"] if "storyboard" in f.get("format")][-1]
 	except LookupError:
 		print_exc()
 		return info["thumbnail"]
-	images_per_storyboard = storyboard["rows"] * storyboard["columns"]
-	duration = info["duration"]
-	fragments = list(storyboard["fragments"])
-	last_duration = duration - sum(frag["duration"] for frag in fragments[:-1])
-	last_count = round(last_duration / fragments[0]["duration"])
-	curr = 0
-	while True:
-		frag = fragments.pop(0)
-		if not fragments or curr + frag["duration"] > pos:
-			count = images_per_storyboard if fragments else last_count
-			if count <= 1:
-				return frag["url"]
-			index = max(min(round((pos - curr) / frag["duration"] * count), count - 1), 0)
-			row = index // storyboard["columns"]
-			col = index % storyboard["columns"]
-			width = storyboard["width"]
-			height = storyboard["height"]
-			with requests.get(frag["url"], headers=storyboard["http_headers"], stream=True) as resp:
+	b2 = io.BytesIO()
+	with zipfile.ZipFile(b2, "w", compression=zipfile.ZIP_STORED) as z:
+		images_per_storyboard = storyboard["rows"] * storyboard["columns"]
+		duration = info["duration"]
+		fragments = storyboard["fragments"]
+		last_duration = duration - sum(frag["duration"] for frag in fragments[:-1])
+		last_count = round(last_duration / fragments[0]["duration"])
+		futs = [esubmit(
+			requests.get,
+			frag["url"],
+			headers=storyboard["http_headers"],
+			stream=True,
+		) for frag in fragments]
+		curr = 0
+		for i, fut in enumerate(futs):
+			if i == len(futs) - 1:
+				count = last_count
+			else:
+				count = images_per_storyboard
+			frag = fragments[i]
+			with fut.result() as resp:
 				im = Image.open(resp.raw)
-				im = im.crop((col * width, row * height, col * width + width, row * height + height))
-				b = io.BytesIO()
-				im.save(b, "JPEG", quality=75)
-				return b.getbuffer()
-		curr += frag["duration"]
+				for index in range(count):
+					curr2 = curr + index * frag["duration"] / count
+					row = index // storyboard["columns"]
+					col = index % storyboard["columns"]
+					width = storyboard["width"]
+					height = storyboard["height"]
+					imc = im.crop((col * width, row * height, col * width + width, row * height + height))
+					b = io.BytesIO()
+					imc.save(b, "JPEG", quality=75)
+					z.writestr(f"{round(curr2)}.jpg", b.getbuffer())
+			curr += frag["duration"]
+	return b2.getbuffer()
 
 
 if __name__ == "__main__":
