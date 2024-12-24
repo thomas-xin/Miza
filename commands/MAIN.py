@@ -2108,7 +2108,7 @@ class UpdateUsers(Database):
 			argv = argv.strip()
 			if "ask" in bot.commands and ("ai" in bot.get_enabled(channel) or not perm < inf):
 				with bot.ExceptionSender(message.channel, reference=message):
-					await bot.run_command(bot.commands.ask[0], dict(prompt=argv), message=message)
+					await bot.run_command(bot.commands.ask[0], dict(prompt=argv), message=message, respond=True)
 				return
 			# Help message greetings
 			i = xrand(7)

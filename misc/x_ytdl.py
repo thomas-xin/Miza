@@ -77,6 +77,50 @@ def get_full_storyboard(info):
 			curr += frag["duration"]
 	return b2.getbuffer()
 
+class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
+
+	def __init__(self, downloader=None, codec=None, format=None):
+		super().__init__(downloader)
+		self.codec = codec
+		self.format = format
+
+	@ytd.postprocessor.PostProcessor._restrict_to(images=False)
+	def run(self, info):
+		filename, source_ext = info['filepath'], info['ext'].lower()
+		if source_ext == self.format:
+			return [], info
+		outpath = ytd.utils.replace_extension(filename, self.format, source_ext)
+		if self.format == "mp4":
+			self.run_ffmpeg(filename, outpath, ["-f", self.format, "-c", "copy"])
+		else:
+			self.run_ffmpeg(filename, outpath, ["-f", self.format, "-c:v", self.codec, "-b:v", "3072k", "-c:a", "libopus", "-b:a", "160k"])
+		return [], info
+
+class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
+
+	def __init__(self, downloader=None, codec=None, format=None):
+		super().__init__(downloader)
+		self.codec = codec
+		self.format = format
+
+	@ytd.postprocessor.PostProcessor._restrict_to(images=False)
+	def run(self, info):
+		filename, source_ext = info['filepath'], info['ext'].lower()
+		if source_ext == self.format:
+			return [], info
+		source_codec = self.get_audio_codec(filename)
+		outpath = ytd.utils.replace_extension(filename, self.format, source_ext)
+		if source_codec == self.codec:
+			self.run_ffmpeg(filename, outpath, ["-vn", "-f", self.format, "-c", "copy"])
+		else:
+			A = ytd.postprocessor.ffmpeg.ACODECS
+			acodec = A[self.codec][1] or A[self.codec][0]
+			self.run_ffmpeg(filename, outpath, ["-vn", "-f", self.format, "-c:a", acodec, "-b:a", "160k"])
+		return [], info
+
+ytd.postprocessor.__dict__["FFmpegCustomVideoConvertorPP"] = FFmpegCustomVideoConvertorPP
+ytd.postprocessor.__dict__["FFmpegCustomAudioConvertorPP"] = FFmpegCustomAudioConvertorPP
+
 
 if __name__ == "__main__":
 	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())

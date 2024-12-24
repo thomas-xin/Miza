@@ -29,11 +29,11 @@ from traceback import print_exc
 from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut, gather, CloseableAsyncIterator
-from .smath import supersample, xrand
+from .smath import supersample, xrand, raw2colour
 from .types import byte_like, as_str, astype, cdict, suppress, round_min, full_prune, literal_eval, regexp, loop, json_dumps, alist, resume, RangeSet, MemoryBytes
-from .util import hwaccel, fcdict, nhash, shash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, smart_split, seq, Request, magic, is_discord_attachment, unyt, ecdc_exists, get_duration, evalex, evalEX, DownloadingFile, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, expand_attachment, shorten_attachment
-from .caches import attachment_cache, upload_cache, download_cache
-
+from .util import hwaccel, fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, seq, Cache, Request, magic, is_discord_attachment, unyt, ecdc_exists, get_duration, evalex, CACHE_PATH, VIDEO_FORMS, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, expand_attachment, shorten_attachment
+from .caches import attachment_cache, upload_cache, download_cache, colour_cache
+from .audio_downloader import AudioDownloader, get_best_icon
 
 try:
 	RAPIDAPI_SECRET = AUTH["rapidapi_secret"]
@@ -375,18 +375,24 @@ def fetch_static(path, ignore=False):
 	while path.startswith("../"):
 		path = path[3:]
 	try:
+		fn = f"misc/web/{path}"
+		fn2 = fn + ".zip"
+		if os.path.exists(fn2):
+			ts = os.path.getmtime(fn2)
+		else:
+			ts = os.path.getmtime(fn)
 		try:
-			data = STATIC[path]
+			data, ts2 = STATIC[path]
+			if ts2 < ts:
+				raise KeyError
 		except KeyError:
-			fn = f"misc/web/{path}"
-			fn2 = fn + ".zip"
 			if os.path.exists(fn2) and zipfile.is_zipfile(fn2):
-				with zipfile.ZipFile(fn2, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
+				with zipfile.ZipFile(fn2, allowZip64=True, strict_timestamps=False) as z:
 					data = z.read(path.rsplit("/", 1)[-1])
 			else:
 				with open(fn, "rb") as f:
 					data = f.read()
-			STATIC[path] = data
+			STATIC[path] = (data, ts)
 		fmt = path.rsplit(".", 1)[-1].casefold()
 		try:
 			mime = MIMES[fmt]
@@ -1116,7 +1122,8 @@ class Server:
 			fut = self.ecdc_running.pop(out, None)
 			fut.set_result(None)
 
-	ydl_sems = {}
+	ydl_sems = Cache(timeout=8)
+	ydl = None
 	@cp.expose
 	def ytdl(self, **kwargs):
 		cp.response.headers.update(HEADERS)
@@ -1132,94 +1139,53 @@ class Server:
 			v = unyt(v)
 		if is_url(d):
 			d = unyt(d)
-		t = ts_us()
 		ip = true_ip()
+		if not self.ydl:
+			self.ydl = AudioDownloader()
 		if v:
-			sem = self.ydl_sems.setdefault(ip, Semaphore(64, 256, rate_limit=8))
-			asap = kwargs.get("asap") or not sem.active
-			with sem:
-				exists = False
-				fmt = kwargs.get("fmt")
-				if not fmt:
-					fmt = "opus" if d else "webm"
-				if fmt == "weba":
-					fmt = "webm"
-				if fmt not in ("mp3", "opus", "webm", "ts", "ogg", "wav"):
-					raise TypeError(fmt)
-				name = q.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-				fmt2 = "." + fmt
-				if is_url(q):
-					url = q
-					url = unyt(url)
-					h = shash(url)
-					fn = "~" + h + fmt2
-					fni = f"{TEMP_PATH}/audio/" + fn
-					if os.path.exists(fni) and os.path.getsize(fni) and utc() - os.path.getmtime(fni) >= 3:
-						print("Cache hit, skipping...")
-						exists = True
-				if not exists:
-					interface.run(f"bot.audio.returns[{t}]=VOICE.ytdl.search({repr(q)})[0]")
-					stream = interface.run(f"str(VOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False))", timeout=120)
-					if fmt in ("ts", "webm", "weba") and is_url(stream):
-						raise cp.HTTPRedirect(stream, status="307")
-					test = interface.run(f"str(bot.audio.returns[{t}])")
-					if not test or test[0] not in ("([{"):
-						print("YTDL Invalid:", test)
-						raise FileNotFoundError
-					name, url = interface.run(f"(bot.audio.returns[{t}].get('name'),bot.audio.returns[{t}].get('url'))")
-					if not name or not url:
-						raise FileNotFoundError(500, v)
-					url = unyt(url)
-					h = shash(url)
-					fn = "~" + h + fmt2
-					fni = f"{TEMP_PATH}/audio/" + fn
-					if os.path.exists(fni) and os.path.getsize(fni) and utc() - os.path.getmtime(fni) >= 3:
-						print("Cache hit, skipping...")
-						exists = True
-				if not exists:
-					interface.run(f"bot.audio.returns[{t}]=VOICE.ytdl.get_stream(bot.audio.returns[{t}],download={repr(fmt2)},asap={asap},force=1)", timeout=120)
-
-				def af():
-					if not os.path.exists(fni):
-						return
-					if not os.path.getsize(fni):
-						return
-					if utc() - os.path.getmtime(fni) < 3:
-						return
-					try:
-						res = interface.run(f"bool(bot.audio.returns[{t}].is_finished())")
-						# print(t, res, type(res))
-					except Exception:
-						print_exc()
-						return True
-					return res is not False
-
-				cp.response.headers.update(CHEADERS)
-				if exists or af():
-					f = open(fni, "rb")
-					interface.run(f"bot.audio.returns.pop({t},None)")
-					print("Cache exists, skipping...")
-				else:
-					if not os.path.exists(fni):
-						fni = interface.run(f"bot.audio.returns[{t}].file")
-					req = 1073741824 if fmt == "mp3" else 4096
-					f = DownloadingFile(fni, af=af, min_buffer=req)
-					if d:
-						cp.response.status = 202
-					cp.response.headers["Content-Type"] = f"audio/{fmt}"
-					cp.response.headers["Content-Disposition"] = "attachment; " * bool(d) + "filename=" + json.dumps(name + fmt2)
-					cp.response.headers.pop("Accept-Ranges", None)
-					print("Cache miss, waiting...")
-					return cp.lib.file_generator(f, req)
-				# cp.response.headers["Content-Type"] = f"audio/{fmt}"
-			return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt}", disposition="attachment" if d else "", name=name + fmt2)
-		else:
-			count = 1 if is_url(q) else kwargs.get("count", 10)
-			res = interface.run(f"[VOICE.copy_entry(e) for e in VOICE.ytdl.search({repr(q)},count={count}) if isinstance(e, dict)]")
-			if not res:
-				res = interface.run(f"VOICE.ytdl.search({repr(q)},count={count})")
-				if isinstance(res, str):
-					res = evalEX(res)
+			fmt = kwargs.get("fmt")
+			assert fmt in ("mp4", "webm", "ogg", "opus", "mp3")
+			fn = f"{CACHE_PATH}/{uhash(v)}.{fmt}"
+			print(fn)
+			if not os.path.exists(fn) or not os.path.getsize(fn):
+				sem = self.ydl_sems.setdefault(ip, Semaphore(64, 256, rate_limit=8))
+				with sem:
+					if VIDEO_FORMS.get(fmt) is None:
+						fstr = f"bestaudio[vcodec=none][ext={fmt}][audio_channels=2]/bestaudio[audio_channels=2]/worstvideo[acodec!=none]"
+						postprocessors = [dict(
+							key="FFmpegCustomAudioConvertor",
+							format=fmt,
+							codec="opus" if fmt == "ogg" else fmt,
+						)]
+					else:
+						fstr = f"bestvideo[ext={fmt}]+bestaudio[acodec=opus]/best[ext={fmt}]/best"
+						postprocessors = [dict(
+							key="FFmpegCustomVideoConvertor",
+							format=fmt,
+							codec="libsvtav1",
+						)]
+					ydl_opts = dict(
+						format=fstr,
+						default_search="auto",
+						source_address="0.0.0.0",
+						final_ext=fmt,
+						cachedir=CACHE_PATH,
+						outtmpl=fn,
+						windowsfilenames=True,
+						postprocessors=postprocessors,
+					)
+					title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(q)},download=True)['title']", timeout=3600)
+					assert os.path.exists(fn), "Download unsuccessful."
+			else:
+				entry = self.ydl.search(q)[0]
+				title = entry["name"]
+			cp.response.headers.update(CHEADERS)
+			f = open(fn, "rb")
+			return cp.lib.static.serve_fileobj(f, name=f"{title}.{fmt}", content_type=MIMES[fmt], disposition="attachment")
+		sem = self.ydl_sems.setdefault(ip, Semaphore(64, 256, rate_limit=8))
+		with sem:
+			entries = self.ydl.search(q, count=12)
+		res = [dict(name=e["name"], url=e["url"], duration=e.get("duration"), icon=get_best_icon(e)) for e in entries]
 		cp.response.headers.update(CHEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
 		return json_dumps(res)
@@ -2023,6 +1989,13 @@ class Server:
 			refresh_info = f'<meta http-equiv="refresh" content="{refresh};URL={refresh_url}">'
 		cp.response.headers.update(HEADERS)
 		return f"""<!DOCTYPE html><html><head><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script><meta property="og:image" content="{url}">{refresh_info}<meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="background-color:black;"><img src="{url}" style="margin:0;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);max-width:100%;max-height:100%"></body></html>"""
+
+	@cp.expose
+	def mean_colour(self, url=""):
+		resp = colour_cache.obtain(url)
+		cp.response.headers["Content-Type"] = "application/json"
+		cp.response.headers.update(SHEADERS)
+		return json_dumps(dict(colour=resp))
 
 	class V1Cache:
 		def __init__(self, end=2048, soft=8192, hard=30720):

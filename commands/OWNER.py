@@ -982,17 +982,10 @@ class UpdateUsage(Database):
 
 class UpdateColours(Database):
 	name = "colours"
-
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		self.cache = Cache(timeout=86400 * 30, trash=65536)
-		self.cache.attach(self)
+	no_file = True
 
 	async def _get(self, url, threshold=True):
-		try:
-			resp = await process_image(url, "get_colour", ["-nogif"], timeout=20)
-		except TypeError:
-			return 0
+		resp = await asubmit(colour_cache.obtain, url)
 		out = [round(i) for i in resp]
 		try:
 			raw = colour2raw(out)
@@ -1010,14 +1003,7 @@ class UpdateColours(Database):
 	async def get(self, url, threshold=True):
 		if not url:
 			return 0
-		if url.startswith("https://i.ytimg.com/vi/"):
-			vid = url.removeprefix("https://i.ytimg.com/vi/").split("?", 1)[0].split("/", 1)[0]
-			url = key = f"https://i.ytimg.com/vi/{vid}/3.jpg"
-		elif is_discord_url(url) and "avatars" in url[:48]:
-			key = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
-		else:
-			key = url.split("?", 1)[0]
-		resp = await self.cache.retrieve_from(uhash(key), self._get, url, threshold)
+		resp = await self._get(url, threshold)
 		if isinstance(resp, (discord.Colour, int)):
 			return resp
 		return 0

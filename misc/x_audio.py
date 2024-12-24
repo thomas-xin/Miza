@@ -18,8 +18,8 @@ from .asyncs import csubmit, esubmit, asubmit, wrap_future, cst, eloop
 from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_str, astype
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, TEMP_PATH, EvalPipe, Request, api,
-	italics, ansi_md, colourise, colourise_brackets, maybe_json,  # noqa: F401
-	is_url, unyt, url2fn, get_duration, rename, uhash,
+	italics, ansi_md, colourise, colourise_brackets, maybe_json,
+	is_url, unyt, url2fn, get_duration, rename, uhash, expired,
 )
 from .audio_downloader import AudioDownloader
 
@@ -533,7 +533,7 @@ class AudioPlayer(discord.AudioSource):
 
 	async def _updating_activity(self):
 		self.pause()
-		await asyncio.sleep(120)
+		await asyncio.sleep(300)
 		connected = interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
 		if connected:
 			listeners = sum(not m.bot and m.voice for m in self.vcc.members)
@@ -551,7 +551,7 @@ class AudioPlayer(discord.AudioSource):
 		if len(self.queue) == 0 and connected:
 			self.updating_streaming = csubmit(self._updating_streaming())
 	async def _updating_streaming(self):
-		await asyncio.sleep(3600)
+		await asyncio.sleep(300)
 		connected = interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
 		if len(self.queue) == 0 and connected:
 			await self.leave("Queue empty")
@@ -845,9 +845,17 @@ class AudioFile:
 			pass
 		else:
 			try:
-				return fut.result()
+				self = fut.result()
 			except Exception:
 				pass
+			else:
+				if isinstance(self.stream, str):
+					if not is_url(self.stream) and not os.path.exists(self.stream):
+						self = None
+					if is_url(self.stream) and expired(self.stream):
+						self = None
+				if self:
+					return self
 		cls.cached[url] = Future()
 		try:
 			self = cls()

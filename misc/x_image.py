@@ -810,7 +810,6 @@ def target_p(image):
 def remove_p(image):
 	if image.mode == "P":
 		mode = "RGBA" if has_transparency(image) else "RGB"
-		print("RP:", mode)
 		return image.convert(mode)
 	return image
 

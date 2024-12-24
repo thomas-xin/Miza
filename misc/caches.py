@@ -1,15 +1,103 @@
 import aiohttp
 import concurrent.futures
 import random
+import re
 import time
+from traceback import print_exc
+import numpy as np
+from PIL import Image
 import requests
-from misc.types import utc
+from misc.types import utc, as_str
 from misc.asyncs import esubmit, wrap_future, Future
 from misc.util import (
     Cache, AUTH, Request, api,
-    tracebacksuppressor, choice, json_dumps, json_dumpstr, b64,
+    tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, uhash,
     snowflake_time_2, shorten_attachment, merge_url, split_url, discord_expired, url2fn
 )
+
+def has_transparency(image):
+	assert image.mode == "P"
+	transparent = image.info.get("transparency", -1)
+	if transparent != -1:
+		return True
+	for tup in image.getcolors():
+		if len(tup) in (2, 4):
+			alpha = tup[-1]
+			if alpha < 254:
+				return True
+	return False
+def remove_p(image):
+	if image.mode == "P":
+		mode = "RGBA" if has_transparency(image) else "RGB"
+		return image.convert(mode)
+	return image
+def split_rgba(image):
+	image = remove_p(image)
+	if image.mode == "RGBA":
+		a = np.asanyarray(image, dtype=np.uint8)
+		aa = a.T[3]
+		if np.min(aa) >= 254:
+			A = None
+		else:
+			A = Image.fromarray(aa.T)
+		image = Image.fromarray(a.T[:3].T, mode="RGB")
+	else:
+		A = None
+	return image, A
+def get_colour(image):
+	rgb, A = split_rgba(image)
+	if A:
+		a = np.array(A, dtype=np.float32)
+		a *= 1 / 255
+		sumA = np.sum(a)
+		if sumA == 0:
+			return [0, 0, 0]
+		return [(np.sum(np.multiply(c.T, a)) / sumA).item() for c in np.asanyarray(rgb, dtype=np.uint8).T]
+	return [np.mean(c).item() for c in np.asanyarray(rgb, dtype=np.uint8).T]
+def parse_colour(s):
+	hex_match = re.match(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$', s)
+	if hex_match:
+		hex_value = hex_match.group(1)
+		if len(hex_value) == 3:
+			r, g, b = [int(char * 2, 16) for char in hex_value]
+		else:
+			r, g, b = [int(hex_value[i:i+2], 16) for i in (0, 2, 4)]
+		return (r, g, b)
+	rgb_match = re.match(r'^rgb\(\s*(\d+),\s*(\d+),\s*(\d+)\s*\)$', s)
+	if rgb_match:
+		r, g, b = map(int, rgb_match.groups())
+		return (r, g, b)
+	raise ValueError(s)
+
+class ColourCache(Cache):
+
+	def obtain(self, url):
+		k = uhash(url)
+		try:
+			return tuple(self[k])
+		except KeyError:
+			try:
+				with requests.get(url, headers=Request.header(), stream=True) as resp:
+					mime = resp.headers.get("Content-Type", "")
+					if "text/html" in mime:
+						it = resp.iter_content(65536)
+						s = as_str(next(it))
+						try:
+							bc = s.split("background-color:", 1)[1]
+						except IndexError:
+							c = self[k] = (255, 255, 255)
+						else:
+							bc = bc.replace(";", " ").split(None, 1)[0]
+							c = self[k] = parse_colour(bc)
+					else:
+						im = Image.open(resp.raw)
+						c = self[k] = get_colour(im)
+			except Exception:
+				print_exc()
+				return (0, 0, 0)
+			return c
+
+colour_cache = ColourCache(timeout=86400 * 7, trash=1, persist="colour.cache")
 
 
 class AttachmentCache(Cache):

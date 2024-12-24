@@ -865,9 +865,11 @@ def get_image_size(b):
 	return list(map(int, out.split(b"x")))
 
 def rename(src, dst):
-	if os.path.exists(dst):
-		os.remove(dst)
 	try:
+		return os.replace(src, dst)
+	except FileExistsError:
+		if os.path.exists(dst):
+			os.remove(dst)
 		return os.rename(src, dst)
 	except OSError as ex:
 		if ex.args and ex.args[0] == 18:
@@ -905,7 +907,6 @@ VIDEO_FORMS = {
 	"f4v": False,
 	"flv": True,
 	"ogv": True,
-	"ogg": False,
 	"gif": False,
 	"gifv": True,
 	"apng": False,
@@ -943,6 +944,7 @@ AUDIO_FORMS = {
 	"vox": True,
 	"ts": False,
 	"webm": False,
+	"weba": True,
 	"mp4": False,
 	"pcm": False,
 }
@@ -1022,6 +1024,7 @@ MIMES = cdict(
 	webp="image/webp",
 	ts="video/ts",
 	webm="video/mp2t",
+	weba="audio/weba",
 	qt="video/quicktime",
 	mp3="audio/mpeg",
 	ogg="audio/ogg",
@@ -2884,6 +2887,17 @@ class Cache(dict):
 			self.tmap.pop(k, None)
 			return inf
 		return utc() - self.tmap.get(k, -inf)
+
+	def setdefault(self, k, v, timeout=None):
+		try:
+			resp = self[k]
+		except KeyError:
+			self[k] = v
+			return v
+		if timeout is not None and self.age(k) > timeout:
+			self[k] = v
+			return v
+		return resp
 
 	def retrieve(self, k):
 		return self.lost.pop(k)

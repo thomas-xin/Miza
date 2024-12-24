@@ -52,8 +52,8 @@ def get_best_icon(entry):
 				vid = url.split("?v=", 1)[-1]
 			else:
 				vid = url.rsplit("/", 1)[-1].split("?", 1)[0]
-			entry["thumbnail"] = f"https://i.ytimg.com/vi/{vid}/maxresdefault.jpg"
-			return entry["thumbnail"]
+			entry["icon"] = f"https://i.ytimg.com/vi_webp/{vid}/hqdefault.webp"
+			return entry["icon"]
 		if is_miza_url(url):
 			return "https://mizabot.xyz/static/mizaleaf.png"
 		return ""
@@ -248,10 +248,10 @@ class AudioDownloader:
 			self.start_workers()
 		return self.workers.next().submit(s)
 
-	def run(self, s):
+	def run(self, s, timeout=None):
 		if not self.workers:
 			self.start_workers()
-		return self.workers.next().run(s)
+		return self.workers.next().run(s, timeout=timeout)
 
 	def extract_info(self, url, download=False, process=True):
 		try:
@@ -453,7 +453,7 @@ class AudioDownloader:
 				with head.sem:
 					headers.Authorization = "Bearer " + head.accessToken
 				return headers
-		if not self.spothead_sem.active:
+		if self.spothead_sem.active:
 			with self.spothead_sem:
 				resp = proxy.content_or("https://open.spotify.com/get_access_token", headers=Request.header(), timeout=10)
 		else:
@@ -845,6 +845,9 @@ class AudioDownloader:
 	def spsearch(self, query, count=1):
 		query = f"https://api.spotify.com/v1/search?type=track%2Cshow_audio%2Cepisode_audio&include_external=audio&limit={count}&q=" + quote_plus(query)
 		resp = self.session.get(query, headers=self.spotify_header, timeout=20).json()
+		if "tracks" not in resp:
+			print(resp)
+			return []
 		out = alist()
 		for track in resp["tracks"]["items"]:
 			try:
@@ -909,7 +912,7 @@ class AudioDownloader:
 			print(stream, cdc, ac)
 			with requests.get(url, headers=Request.header(), stream=True) as resp:
 				head = resp.headers
-				ct = head.get("Content-Type")
+				ct = head.get("Content-Type", "").split(";", 1)[0]
 				b = b""
 				it = resp.iter_content(65536)
 				if not ct or ct in ("application/octet-stream", "application/vnd.lotus-organizer"):
@@ -982,7 +985,7 @@ class AudioDownloader:
 					else:
 						return url, cdc, dur, ac
 		ydl_opts = dict(
-			format="bestaudio[acodec=opus][audio_channels=2]/bestaudio[audio_channels=2]/worstvideo[acodec!=none]",
+			format="bestaudio[vcodec=none][acodec=opus][audio_channels=2]/bestaudio[audio_channels=2]/worstvideo[acodec!=none]",
 			default_search="auto",
 			source_address="0.0.0.0",
 			final_ext="opus",
@@ -1044,17 +1047,26 @@ class AudioDownloader:
 				with tracebacksuppressor:
 					return self.get_spotify_playlist(url)
 		else:
+			urls = []
 			if ":" not in url:
-				mode = mode or "yt"
-				url = f"{mode}search:{url}"
-			check, search = url.split(":", 1)
-			for mode in ("ytsearch", "scsearch", "spsearch", "bcsearch"):
-				if check == mode:
-					output.extend(getattr(self, mode)(search, count=count))
-					break
-				elif check.startswith(mode) and check[len(mode):].isnumeric():
-					output.extend(getattr(self, mode)(search, count=max(count, int(check[len(mode):]))))
-					break
+				if not mode and count >= 4:
+					half = ceil(count / 2)
+					urls.append(f"ytsearch{half}:{url}")
+					quarter = ceil((count - half) / 2)
+					urls.append(f"scsearch{quarter}:{url}")
+					# remainder = count - half - quarter
+					# urls.append(f"spsearch{remainder}:{url}")
+				else:
+					urls.append(f"{mode or 'yt'}search{count}:{url}")
+			for url in urls:
+				check, search = url.split(":", 1)
+				for mode in ("ytsearch", "scsearch", "spsearch", "bcsearch"):
+					if check == mode:
+						output.extend(getattr(self, mode)(search, count=count))
+						break
+					elif check.startswith(mode) and check[len(mode):].isnumeric():
+						output.extend(getattr(self, mode)(search, count=int(check[len(mode):])))
+						break
 		return list(output)
 
 	# Main extract function, able to extract from youtube playlists much faster than youtube-dl using youtube API, as well as ability to follow spotify links.

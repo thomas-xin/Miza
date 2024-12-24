@@ -41,8 +41,8 @@ def get_best_icon(entry):
 				vid = url.split("?v=", 1)[-1]
 			else:
 				vid = url.rsplit("/", 1)[-1].split("?", 1)[0]
-			entry["thumbnail"] = f"https://i.ytimg.com/vi/{vid}/maxresdefault.jpg"
-			return entry["thumbnail"]
+			entry["icon"] = f"https://i.ytimg.com/vi_webp/{vid}/hqdefault.webp"
+			return entry["icon"]
 		if is_miza_url(url):
 			return "https://mizabot.xyz/static/mizaleaf.png"
 		return ""

@@ -1732,7 +1732,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					verify=False,
 					stream=True,
 				)
-				if resp.headers.get("Content-Type", None) not in ("text/html", "application/json"):
+				if resp.headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html", "application/json"):
 					url = resp.url
 				elif ytd and self.audio:
 					try:
@@ -3877,6 +3877,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	def premium_level(self, user, absolute=False):
 		"Retrieves a user's premium subscription level."
+		if not user:
+			return 0
 		if self.is_owner(user):
 			return inf
 		try:
@@ -4975,14 +4977,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				flags=flags,
 			)
 		oargs = tuple(args)
-		if message.attachments:
+		if message and message.attachments:
 			args = [best_url(a) for a in message.attachments] + args
 		parser = getattr(command, "parser", None)
 		if not parser:
 			used = set()
 			chars = set("abcdefghijklmnopqrstuvwxyz")
 			parser = command.parser = argparse.ArgumentParser(prog=command.__name__, description=command.description, prefix_chars="-", exit_on_error=False, add_help=False)
-			parser.error = lambda message: throw(ArgumentError(message))
+			parser.error = lambda msg: throw(ArgumentError(msg))
 			for k, v in reversed(schema.items()):
 				all_aliases = [k, *v.get("aliases", ())]
 				names = [("-" if len(x) == 1 else "--") + x for x in all_aliases]
@@ -5042,7 +5044,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						r = url
 				elif v.type == "message":
 					reference = getattr(message, "reference", None)
-					r = await self.fetch_message(reference.message_id, message.channel)
+					if reference:
+						r = await self.fetch_message(reference.message_id, message.channel)
+					else:
+						r = message
 				elif v.type in ("mentionable", "user"):
 					r = user
 				elif v.type == "channel":
@@ -5196,6 +5201,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			elif info.type == "channel":
 				if isinstance(m, int):
 					v = await self.fetch_channel(m)
+				elif not guild:
+					raise TypeError("Channels must be specified by ID outside of servers.")
 				else:
 					v = await str_lookup(
 						guild.channels,
@@ -5209,6 +5216,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			elif info.type == "role":
 				if isinstance(m, int):
 					v = await self.fetch_role(m, guild)
+				elif not guild:
+					raise TypeError("Roles must be specified by ID outside of servers.")
 				else:
 					v = await str_lookup(
 						guild.roles,
@@ -5358,13 +5367,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return validation.accepts[v]
 		return v
 
-	async def run_command(self, command, kwargs=None, message=None, argv=None, comment=None, slash=False, command_check=None, user=None, channel=None, guild=None, min_perm=None, respond=True, allow_recursion=True):
-		user = user or message.author
+	async def run_command(self, command, kwargs=None, message=None, argv=None, comment=None, slash=False, command_check=None, user=None, channel=None, guild=None, min_perm=None, respond=False, allow_recursion=True):
+		user = user or (message.author if message else self.GhostUser())
 		if message and user:
 			print(f"{message.channel.id}: {user} ({user.id}) issued {command} {kwargs or argv}")
 		if not self.ready:
 			await wrap_future(self.connect_ready)
-		channel = channel or message.channel
+		channel = channel or (message.channel if message else None)
 		guild = guild or getattr(channel, "guild", None)
 		if user.id == self.id:
 			prefix = self.prefix
@@ -5373,8 +5382,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		command_check = command_check or command.name[0].casefold()
 		# Make sure server-only commands can only be run in servers.
 		if guild is None or getattr(guild, "ghost", None):
-			channel = await self.fetch_channel(channel.id)
-			guild = guild or getattr(channel, "guild", None)
+			if channel:
+				channel = await self.fetch_channel(channel.id)
+				guild = guild or getattr(channel, "guild", None)
 			if getattr(command, "server_only", False) and (guild is None or getattr(guild, "ghost", None)):
 				raise ReferenceError("This command is only available in servers.")
 		req = command.min_level
@@ -5400,11 +5410,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				))
 				return
 			elif not bot.ready:
-				csubmit(message.add_reaction("🔜"))
+				if message:
+					csubmit(message.add_reaction("🔜"))
 				await wrap_future(bot.full_ready)
-				channel = await bot.fetch_channel(channel.id)
-				guild = getattr(channel, "guild", None) or guild
-				u_perm = max(min_perm, bot.get_perms(user.id, guild)) if min_perm is not None else bot.get_perms(user.id, guild)
+				if channel:
+					channel = await bot.fetch_channel(channel.id)
+					guild = getattr(channel, "guild", None) or guild
+					u_perm = max(min_perm, bot.get_perms(user.id, guild)) if min_perm is not None else bot.get_perms(user.id, guild)
 			elif u_perm <= -inf:
 				print("REFUSED:", user, message.content)
 				csubmit(send_with_react(
@@ -5422,12 +5434,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if rl:
 				rl = rl[bool(self.is_trusted(guild))] if isinstance(rl, (tuple, list)) else rl
 				pm = bot.premium_multiplier(self.premium_level(user))
+				uid = user.id if user else None
 				rl /= pm
 				burst = ceil(pm + 2)
 				rlv = ceil(rl * burst)
-				sem = command.used.get(user.id)
+				sem = command.used.get(uid)
 				if sem is None or sem.rate_limit > rlv or not sem.active and sem.rate_limit < rlv:
-					sem = command.used[user.id] = Semaphore(burst, burst, rate_limit=rlv)
+					sem = command.used[uid] = Semaphore(burst, burst, rate_limit=rlv)
 				if sem.full and sem.reset_after:
 					raise TooManyRequests(f"Command has a rate limit of {sec2time(rl)} with a burst+queue of {burst}; please wait {sec2time(sem.reset_after)}.")
 		# Assign "guild" as an object that mimics the discord.py guild if there is none
@@ -5461,7 +5474,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				timeout = getattr(command, "_timeout_", 1) * self.timeout
 				if timeout >= inf:
 					timeout = None
-				elif self.is_trusted(message.guild):
+				elif message and self.is_trusted(message.guild):
 					timeout *= 2
 				timeout *= self.premium_multiplier(self.premium_level(user))
 			premium = self.premium_context(user, guild=guild)
@@ -5491,7 +5504,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				pass
 			self.data.usage.add(command)
 			# Add a callback to typing in the channel if the command takes too long
-			if fut is None and not hasattr(command, "typing") and not getattr(message, "simulated", False):
+			if fut is None and not hasattr(command, "typing") and channel and not getattr(message, "simulated", False):
 				csubmit(delayed_callback(future, sqrt(3), self._state.http.send_typing, channel.id, repeat=7, exc=True))
 			if slash or getattr(message, "slash", None):
 				csubmit(delayed_callback(future, 1, self.defer_interaction, message, ephemeral=getattr(command, "ephemeral", False)))
@@ -5623,7 +5636,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			run += 1
 			out_fut = None
 			try:
-				await self.run_command(command, kwargs, message=message, argv=argv, command_check=command_check, min_perm=min_perm)
+				await self.run_command(command, kwargs, message=message, argv=argv, command_check=command_check, min_perm=min_perm, respond=True)
 			# Represents any timeout error that occurs
 			except (T0, T1, T2, CE):
 				print(command, argv)
@@ -6777,6 +6790,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 				def __init__(self, channel, **void):
 					self.channel = channel
+					self.id = channel.id if channel else 0
 
 				def __dir__(self):
 					data = set(object.__dir__(self))
@@ -6819,6 +6833,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				self.fetch_member = bot.fetch_user
 				self.get_member = self._members.get
 				self.voice_client = None
+				self.id = channel.id if channel else user.id if user else 0
 
 			def __dir__(self):
 				data = set(object.__dir__(self))
@@ -8200,7 +8215,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						message.noref = True
 						message.deleted = False
 						try:
-							await self.run_command(command, kwargs, message=message, slash=True)
+							await self.run_command(command, kwargs, message=message, slash=True, respond=True)
 						finally:
 							message.deleted = True
 					elif d["type"] == 3:

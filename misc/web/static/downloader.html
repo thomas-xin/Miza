@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>All-Purpose Media Downloader</title>
+	<style>
+body {
+	font-family: Comic Sans MS, sans-serif;
+	margin-top: 5vh;
+	padding: 0;
+	position: relative;
+	display: grid;
+	align-items: start;
+	justify-content: center;
+	background-color: black;
+	color: white;
+}
+.container {
+	margin: 4px;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: center;
+	max-width: 90vw;
+	background-color: #001f3f;
+	padding: 16px;
+	border-radius: 0px 20px 0px 20px;
+	border: solid 2px #00ffff;
+}
+.entry {
+	width: 320px;
+	margin: 4px;
+	display: grid;
+	place-items: center;
+	background-color: #003f3f;
+	border: solid 2px #00ff7f;
+	padding: 16px;
+	border-radius: 8px;
+}
+h1, h2 {
+	margin: 0 0 8px 0;
+}
+h3 {
+	margin: 4px 0 0 0;
+	color: #00ffff;
+}
+input {
+	background-color: #000000;
+	color: #bf7fff;
+	accent-color: #ff0000;
+}
+label {
+	color: #bf7fff;
+}
+button {
+	margin-top: 8px;
+	position: relative;
+	left: 50%;
+	transform: translate(-50%, 0px);
+	padding: 10px 15px;
+	border: none;
+	background-color: #0056b3;
+	color: #ffffff;
+	border-radius: 5px;
+	cursor: pointer;
+}
+button:hover {
+	background-color: #007bff;
+}
+#fileInfo {
+	margin-top: 20px;
+}
+a {
+	color: #007bff;
+	text-decoration: none;
+}
+a:hover {
+	text-decoration: underline;
+}
+	</style>
+</head>
+<body>
+	<div class="container">
+		<div>
+			<h1>Download Media</h1>
+			<h3>Name or URL</h3>
+			<input type="text" id="query" style="min-width:320px; width:60vw" onchange="debouncedSearch()" value="" required>
+			<h3>Format</h3>
+			
+			<input type="radio" id="mp4" name="output-format" value="mp4" checked><label for="mp4">mp4</label><br />
+			<input type="radio" id="webm" name="output-format" value="webm"><label for="webm">webm</label><br />
+			<input type="radio" id="ogg" name="output-format" value="ogg"><label for="ogg">ogg</label><br />
+			<input type="radio" id="opus" name="output-format" value="opus"><label for="opus">opus</label><br />
+			<input type="radio" id="mp3" name="output-format" value="mp3"><label for="mp3">mp3</label>
+		</div>
+	</div>
+	<div id="previews" class="container" style="display:none">
+	</div>
+	<button id="submit" style="width:60%; display:none" onclick="download()">Download</button>
+</body>
+<script>
+function timeDisp(s, rounded = true) {
+	"Returns a representation of a time interval using days:hours:minutes:seconds.";
+	if (!isFinite(s)) {
+		return String(s);
+	}
+	if (rounded) {
+		s = Math.round(s);
+	}
+	let output = String(s % 60);
+	if (output.length < 2) {
+		output = "0" + output;
+	}
+	if (s >= 60) {
+		let temp = String(Math.floor(s / 60) % 60);
+		if (temp.length < 2 && s >= 3600) {
+			temp = "0" + temp;
+		}
+		output = temp + ":" + output;
+		if (s >= 3600) {
+			temp = String(Math.floor(s / 3600) % 24);
+			if (temp.length < 2 && s >= 86400) {
+				temp = "0" + temp;
+			}
+			output = temp + ":" + output;
+			if (s >= 86400) {
+				output = String(Math.floor(s / 86400)) + ":" + output;
+			}
+		}
+	} else {
+		output = "0:" + output;
+	}
+	return output;
+}
+function rgbToHsl(r, g, b) {
+	r /= 255;
+	g /= 255;
+	b /= 255;
+	const max = Math.max(r, g, b);
+	const min = Math.min(r, g, b);
+	let h, s, l = (max + min) / 2;
+	if (max === min) {
+		h = s = 0;
+	} else {
+		const d = max - min;
+		s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+		switch (max) {
+			case r:
+				h = (g - b) / d + (g < b ? 6 : 0);
+				break;
+			case g:
+				h = (b - r) / d + 2;
+				break;
+			case b:
+				h = (r - g) / d + 4;
+				break;
+		}
+		h /= 6;
+	}
+	return [h * 360, s * 100, l * 100];
+}
+function debounce(func, delay) {
+	let timeoutId;
+	let lastSent = Date.now();
+	return function(...args) {
+		if (timeoutId) {
+			clearTimeout(timeoutId);
+		}
+		const currentTime = Date.now();
+		const delta = currentTime - lastSent;
+		lastSent = currentTime;
+		const usedDelay = Math.min(delta, delay) + delay;
+		timeoutId = setTimeout(() => {
+			func.apply(this, args);
+		}, usedDelay);
+	};
+}
+function updateSearched() {
+	previews = document.getElementById("previews");
+	submit = document.getElementById("submit");
+	query = document.getElementById("query").value;
+	previews.style.display = "none";
+	// console.log(query);
+	if (!query) return;
+	previews.textContent = "Loading...";
+	previews.style.display = "block";
+	component = encodeURIComponent(query);
+	fetch(`/ytdl?q=${component}`).then((response) => response.json()).then((data) => {
+		previews.style.display = "none";
+		previews.textContent = "";
+		// console.log(data);
+		data.forEach((e, i) => {
+			const preview = document.createElement("div");
+			preview.className = "entry";
+			title = document.createElement("p");
+			title.style.margin = "0";
+			check = document.createElement("input");
+			check.type = "checkbox";
+			check.checked = !i || query.startsWith("https://");
+			title.appendChild(check);
+			href = document.createElement("a");
+			href.textContent = e["name"]
+			href.href = e["url"]
+			title.appendChild(href);
+			preview.appendChild(title);
+			if (e["duration"]) {
+				dur = document.createElement("span");
+				dur.textContent = "(" + timeDisp(e["duration"]) + ")";
+				preview.appendChild(dur);
+			}
+			icon = document.createElement("img");
+			icon.width = 320;
+			icon.src = e["icon"];
+			component = encodeURIComponent(e["icon"]);
+			fetch(`/mean_colour?url=${component}`).then((response) => response.json()).then((data) => {
+				// console.log(data);
+				[r, g, b] = data["colour"];
+				[h, s, l] = rgbToHsl(r, g, b);
+				// preview.style.backgroundColor = `hsl(${h},${s}%,25%)`;
+				// preview.style.border = `solid 2px hsl(${h},${s}%,50%)`;
+				preview.animate(
+					[
+						{ backgroundColor: "#003f3f", border: "solid 2px #00ff7f" },
+						{ backgroundColor: `hsl(${h},${s}%,25%)`, border: `solid 2px hsl(${h},${s}%,50%)` }
+					],
+					{ duration: 500, easing: "linear", fill: "forwards" },
+				);
+			});
+			preview.appendChild(icon);
+			previews.appendChild(preview);
+		});
+		previews.style.display = data ? "flex" : "none";
+		submit.style.display = data ? "block" : "none";
+	});
+}
+const debouncedSearch = debounce(updateSearched, 250);
+document.getElementById("query").value = "";
+function download() {
+	submit = document.getElementById("submit");
+	submit.textContent = "Loading...";
+	submit.disabled = true;
+	Array.from(document.body.children).forEach((e, i) => {
+		if (!i || !e.children.length) return;
+		check = e.children[0].children[0].children[0];
+		if (!check.checked) return;
+		fmt = document.querySelector('input[name="output-format"]:checked').value;
+		a = document.createElement("a");
+		a.href = "/ytdl?d=" + encodeURIComponent(e.children[0].children[0].children[1].href) + "&fmt=" + fmt;
+		a.click();
+	});
+	setTimeout(() => {
+		submit.disabled = false;
+		submit.textContent = "Download";
+	}, 3000);
+}
+</script>
+</html>

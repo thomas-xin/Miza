@@ -434,7 +434,8 @@ class Math(Command):
 			fn = resp["file"]
 			f = CompatFile(fn, filename=query + ".png")
 			return cdict(file=f)
-		answer = "\n".join(a for a in map(str, resp) if a != query.strip())
+		assert resp, "Response empty."
+		answer = "\n".join(a for a in map(str, resp) if a != query.strip()) or str(resp[0])
 		if var is not None:
 			env = bot.data.variables.setdefault(_user.id, {})
 			env[var] = resp[0]

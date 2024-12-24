@@ -1241,9 +1241,9 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			# fmt = "webm"
 		else:
 			if hwaccel == "cuda":
-				command.extend(("-pix_fmt", "yuv420p", "-c:v", "h264_nvenc"))
+				command.extend(("-pix_fmt", "yuv420p", "-c:v", "hevc_nvenc"))
 			else:
-				command.extend(("-pix_fmt", "yuv420p", "-c:v", "h264"))
+				command.extend(("-pix_fmt", "yuv420p", "-c:v", "h265"))
 			# fmt = "mp4"
 		command.extend(("-f", fmt))
 	return command, fmt
