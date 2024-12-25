@@ -1242,7 +1242,7 @@ class AudioSettings(Command):
 			value = await bot.audio.asubmit(f"AP.defaults[{repr(mode)}]")
 		if mode in percentage_settings:
 			valstr = f"{value}%"
-			value = round_min(value)
+			value = round_min(value / 100)
 		else:
 			valstr = str(value)
 		await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).settings.{mode} = {value}\nreturn a.ensure_play(1)")
