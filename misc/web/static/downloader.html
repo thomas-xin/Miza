@@ -126,6 +126,18 @@ a:hover {
 	border-radius: 5px;
 	z-index: -1;
 }
+.time-input {
+	font-family: Agbalumo, cursive, sans-serif;
+	font-size: 16px;
+	display: inline-block;
+	background: transparent;
+	color: #7fffff;
+	border: none;
+	padding: 0;
+	width: 60px;
+	max-width: 96px;
+	text-align: center;
+}
 	</style>
 </head>
 <body>
@@ -149,6 +161,7 @@ a:hover {
 		<span>Download</span>
 		<div class="progress-bar"></div>
 	</button>
+	<span id="text-measure" style="position:absolute; visibility:hidden; white-space:pre"></span>
 </body>
 <script>
 //download.js v4.2, by dandavis; 2008-2017. [MIT] see http://danml.com/download.html for tests/usage
@@ -187,6 +200,17 @@ function timeDisp(s, rounded = true) {
 	}
 	return output;
 }
+
+function timeParse(s) {
+	"Returns the number of seconds represented by a time interval string.";
+	let parts = s.split(":");
+	let output = 0;
+	for (let i = 0; i < parts.length; i++) {
+		output += parseInt(parts[i], 10) * Math.pow(60, parts.length - i - 1);
+	}
+	return output;
+}
+
 function rgbToHsl(r, g, b) {
 	r /= 255;
 	g /= 255;
@@ -214,9 +238,11 @@ function rgbToHsl(r, g, b) {
 	}
 	return [h * 360, s * 100, l * 100];
 }
+
 function isLoaded(image) {
 	return image.complete && image.naturalHeight !== 0;
 }
+
 function debounce(func, delay) {
 	let timeoutId;
 	let lastSent = Date.now();
@@ -233,6 +259,7 @@ function debounce(func, delay) {
 		}, usedDelay);
 	};
 }
+
 var lastSearch = "";
 function updateSearched() {
 	previews = document.getElementById("previews");
@@ -242,6 +269,7 @@ function updateSearched() {
 	if (query == lastSearch) return;
 	submit.querySelector("span").textContent = "Download";
 	submit.disabled = false;
+	submit.error = false;
 	const progressBar = submit.querySelector(".progress-bar");
 	progressBar.style.width = "0%";
 	lastSearch = query;
@@ -254,141 +282,7 @@ function updateSearched() {
 		previews.style.display = "none";
 		previews.textContent = "";
 		data.forEach((e, i) => {
-			const preview = document.createElement("div");
-			name = e.name;
-			preview.name = name;
-			preview.url = e.url;
-			preview.className = "entry";
-			title = document.createElement("p");
-			title.style.margin = "0";
-			check = document.createElement("input");
-			check.type = "checkbox";
-			check.checked = !i || query.startsWith("https://");
-			check.addEventListener("change", updateCount);
-			title.appendChild(check);
-			href = document.createElement("a");
-			href.textContent = name;
-			href.href = e.url;
-			title.appendChild(href);
-			preview.appendChild(title);
-			const icon = document.createElement("img");
-			icon.width = 320;
-			icon.setAttribute("loading", "lazy");
-			preview.appendChild(icon);
-			let dur;
-			if (e.duration) {
-				preview.duration = e.duration;
-				dur = document.createElement("span");
-				dur.style.lineHeight = "8px";
-				dur.textContent = timeDisp(preview.duration);
-				preview.appendChild(dur);
-			}
-			component = encodeURIComponent(e.icon);
-			icon.onload = () => {
-				fetch(`/mean_colour?url=${component}`).then((response) => response.json()).then((data) => {
-					[r, g, b] = data.colour;
-					[h, s, l] = rgbToHsl(r, g, b);
-					preview.animate(
-						[
-							{ background: "linear-gradient(135deg, #003f3f, #005f5f)", border: "solid 2px #00ff7f" },
-							{ background: `linear-gradient(135deg, hsl(${h},${s}%,25%), hsl(${h},${s}%,35%))`, border: `solid 2px hsl(${h},${s}%,50%)` }
-						],
-						{ duration: 500, easing: "linear", fill: "forwards" },
-					);
-					s2 = 100 - (100 - s) / 2;
-					if (!e["duration"]) return;
-					const progressContainer = document.createElement("div");
-					progressContainer.className = "progress-container";
-					progressContainer.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,12.5%), hsl(${h},${s2}%,22.5%))`;
-					const progressBar = document.createElement("div");
-					progressBar.className = "progress-bar";
-					progressBar.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,50%), hsl(${h},${s2}%,60%))`;
-					const progressStart = document.createElement("div");
-					progressStart.className = "progress-thumb";
-					progressStart.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
-					const progressEnd = document.createElement("div");
-					progressEnd.className = "progress-thumb";
-					progressEnd.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
-
-					preview.updateProgress = () => {
-						if (preview.startP > preview.endP) {
-							[preview.startP, preview.endP] = [preview.endP, preview.startP];
-						} else if (preview.startP > preview.endP) {
-							if (preview.endP >= 100) preview.startP -= 0.01;
-							else preview.endP += 0.01;
-						}
-						preview.start = preview.startP * preview.duration / 100;
-						preview.end = preview.endP * preview.duration / 100;
-						length = preview.endP - preview.startP;
-						progressStart.style.left = `${preview.startP}%`;
-						progressBar.style.left = `${preview.startP}%`;
-						progressBar.style.width = `${length}%`;
-						progressEnd.style.left = `${preview.endP}%`;
-						if (preview.startP != 0 || preview.endP != 100) {
-							dur.textContent = timeDisp(preview.start) + "-" + timeDisp(preview.end) + "/" + timeDisp(preview.duration);
-						} else {
-							dur.textContent = timeDisp(preview.duration);
-						}
-					}
-					preview.startP = 0;
-					preview.endP = 100;
-
-					preview.calculateProgress = (event) => {
-						rect = progressContainer.getBoundingClientRect();
-						offsetX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
-						progress = (offsetX / rect.width) * 100;
-						return progress;
-					}
-					progressContainer.addEventListener('mousedown', (event) => {
-						event.preventDefault();
-						progress = preview.calculateProgress(event);
-						if (Math.abs(progress - preview.startP) < Math.abs(progress - preview.endP)) {
-							const progressStartDrag = (event) => {
-								if (progressStart.dragging) {
-									const progress = preview.calculateProgress(event);
-									preview.startP = progress;
-									preview.updateProgress();
-								}
-							}
-							document.addEventListener('mousemove', progressStartDrag);
-							document.addEventListener('mouseup', () => {
-								progressStart.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
-								progressStart.dragging = false;
-								document.removeEventListener('mousemove', progressStartDrag);
-							}, { once: true });
-							progressStart.style.background = "#ffffff";
-							progressStart.dragging = true;
-							preview.startP = progress;
-							preview.updateProgress();
-						} else {
-							const progressEndDrag = (event) => {
-								if (progressEnd.dragging) {
-									const progress = preview.calculateProgress(event);
-									preview.endP = progress;
-									preview.updateProgress();
-								}
-							}
-							document.addEventListener('mousemove', progressEndDrag);
-							document.addEventListener('mouseup', () => {
-								progressEnd.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
-								progressEnd.dragging = false;
-								document.removeEventListener('mousemove', progressEndDrag);
-							}, { once: true });
-							progressEnd.style.background = "#ffffff";
-							progressEnd.dragging = true;
-							preview.endP = progress;
-							preview.updateProgress();
-						}
-					});
-					progressContainer.appendChild(progressBar);
-					progressContainer.appendChild(progressStart);
-					progressContainer.appendChild(progressEnd);
-					preview.insertBefore(progressContainer, dur);
-
-					preview.updateProgress();
-				});
-			}
-			icon.src = e.icon;
+			const preview = createPreviewElement(e, i, query);
 			previews.appendChild(preview);
 		});
 		updateCount();
@@ -398,6 +292,7 @@ function updateSearched() {
 }
 const debouncedSearch = debounce(updateSearched, 500);
 document.getElementById("query").value = lastSearch;
+
 function updateCount() {
 	count = 0;
 	children = document.getElementById("previews").children;
@@ -407,6 +302,7 @@ function updateCount() {
 	});
 	document.getElementById("submit").querySelector("span").textContent = `Download (${count}/${children.length})`;
 }
+
 function downloadAll() {
 	submit = document.getElementById("submit");
 	submit.querySelector("span").textContent = "Loading...";
@@ -429,10 +325,12 @@ function downloadAll() {
 			href += "&end=" + preview.end;
 		}
 		setTimeout(() => {
+			if (submit.error) return;
 			fetch(href).then((response) => {
 				if (!response.ok) {
 					console.error(response.statusText);
 					submit.querySelector("span").textContent = `Error: ${response.statusText}`;
+					submit.error = true;
 					progressBar.style.width = "100%";
 					progressBar.style.background = "linear-gradient(135deg, #ff0000, #ff7f00)";
 					return;
@@ -454,6 +352,192 @@ function downloadAll() {
 		}, delay);
 		delay += (preview.duration || 300) * 10;
 	});
+}
+
+function updateProgressFromInput(preview) {
+	const startInput = preview.querySelector('.start-time');
+	const endInput = preview.querySelector('.end-time');
+	let startTime = timeParse(startInput.value);
+	let endTime = timeParse(endInput.value);
+	if (startTime < 0) {
+		startTime = 0;
+	} else if (startTime > preview.duration) {
+		startTime = preview.duration;
+	}
+	preview.startP = (startTime / preview.duration) * 100;
+	preview.endP = (endTime / preview.duration) * 100;
+	preview.updateProgress();
+}
+
+function updateInputWidth(input) {
+	const text = input.value;
+	const measure = document.getElementById("text-measure");
+	measure.textContent = text;
+	const width = measure.offsetWidth;
+	input.style.width = `${width}px`;
+}
+
+function createPreviewElement(e, i, query) {
+	const preview = document.createElement("div");
+	preview.name = e.name;
+	preview.url = e.url;
+	preview.className = "entry";
+	title = document.createElement("p");
+	title.style.margin = "0";
+	check = document.createElement("input");
+	check.type = "checkbox";
+	check.checked = !i || query.startsWith("https://");
+	check.addEventListener("change", updateCount);
+	title.appendChild(check);
+	href = document.createElement("a");
+	href.textContent = e.name;
+	href.href = e.url;
+	title.appendChild(href);
+	preview.appendChild(title);
+	const icon = document.createElement("img");
+	icon.width = 320;
+	icon.setAttribute("loading", "lazy");
+	preview.appendChild(icon);
+	let dur;
+	if (e.duration) {
+		preview.duration = e.duration;
+		dur = document.createElement("span");
+		dur.style.lineHeight = "8px";
+
+		const startInput = document.createElement("input");
+		startInput.type = "text";
+		startInput.className = "time-input start-time";
+		startInput.value = "00:00:00";
+		startInput.addEventListener("change", () => updateProgressFromInput(preview));
+		updateInputWidth(startInput);
+		dur.appendChild(startInput);
+	
+		const dash = document.createElement("span");
+		dash.textContent = " - ";
+		dur.appendChild(dash);
+
+		const endInput = document.createElement("input");
+		endInput.type = "text";
+		endInput.className = "time-input end-time";
+		endInput.value = timeDisp(preview.duration);
+		endInput.addEventListener("change", () => updateProgressFromInput(preview));
+		updateInputWidth(endInput);
+		dur.appendChild(endInput);
+
+		const timeRange = document.createElement("span");
+		timeRange.textContent = "/" + timeDisp(preview.duration);
+		dur.appendChild(timeRange);
+
+		preview.appendChild(dur);
+	}
+	component = encodeURIComponent(e.icon);
+	icon.onload = () => {
+		fetch(`/mean_colour?url=${component}`).then((response) => response.json()).then((data) => {
+			[r, g, b] = data.colour;
+			[h, s, l] = rgbToHsl(r, g, b);
+			preview.animate(
+				[
+					{ background: "linear-gradient(135deg, #003f3f, #005f5f)", border: "solid 2px #00ff7f" },
+					{ background: `linear-gradient(135deg, hsl(${h},${s}%,25%), hsl(${h},${s}%,35%))`, border: `solid 2px hsl(${h},${s}%,50%)` }
+				],
+				{ duration: 500, easing: "linear", fill: "forwards" },
+			);
+			s2 = 100 - (100 - s) / 2;
+			if (!e["duration"]) return;
+			const progressContainer = document.createElement("div");
+			progressContainer.className = "progress-container";
+			progressContainer.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,12.5%), hsl(${h},${s2}%,22.5%))`;
+			const progressBar = document.createElement("div");
+			progressBar.className = "progress-bar";
+			progressBar.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,50%), hsl(${h},${s2}%,60%))`;
+			const progressStart = document.createElement("div");
+			progressStart.className = "progress-thumb";
+			progressStart.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
+			const progressEnd = document.createElement("div");
+			progressEnd.className = "progress-thumb";
+			progressEnd.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
+
+			preview.updateProgress = () => {
+				if (preview.startP > preview.endP) {
+					[preview.startP, preview.endP] = [preview.endP, preview.startP];
+				} else if (preview.startP > preview.endP) {
+					if (preview.endP >= 100) preview.startP -= 0.01;
+					else preview.endP += 0.01;
+				}
+				preview.start = preview.startP * preview.duration / 100;
+				preview.end = preview.endP * preview.duration / 100;
+				length = preview.endP - preview.startP;
+				progressStart.style.left = `${preview.startP}%`;
+				progressBar.style.left = `${preview.startP}%`;
+				progressBar.style.width = `${length}%`;
+				progressEnd.style.left = `${preview.endP}%`;
+				const startInput = preview.querySelector('.start-time');
+				const endInput = preview.querySelector('.end-time');
+				startInput.value = timeDisp(preview.start);
+				endInput.value = timeDisp(preview.end);
+				updateInputWidth(startInput);
+				updateInputWidth(endInput);
+			}
+			preview.startP = 0;
+			preview.endP = 100;
+
+			preview.calculateProgress = (event) => {
+				rect = progressContainer.getBoundingClientRect();
+				offsetX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+				progress = (offsetX / rect.width) * 100;
+				return progress;
+			}
+			progressContainer.addEventListener('mousedown', (event) => {
+				event.preventDefault();
+				progress = preview.calculateProgress(event);
+				if (Math.abs(progress - preview.startP) < Math.abs(progress - preview.endP)) {
+					const progressStartDrag = (event) => {
+						if (progressStart.dragging) {
+							const progress = preview.calculateProgress(event);
+							preview.startP = progress;
+							preview.updateProgress();
+						}
+					}
+					document.addEventListener('mousemove', progressStartDrag);
+					document.addEventListener('mouseup', () => {
+						progressStart.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
+						progressStart.dragging = false;
+						document.removeEventListener('mousemove', progressStartDrag);
+					}, { once: true });
+					progressStart.style.background = "#ffffff";
+					progressStart.dragging = true;
+					preview.startP = progress;
+					preview.updateProgress();
+				} else {
+					const progressEndDrag = (event) => {
+						if (progressEnd.dragging) {
+							const progress = preview.calculateProgress(event);
+							preview.endP = progress;
+							preview.updateProgress();
+						}
+					}
+					document.addEventListener('mousemove', progressEndDrag);
+					document.addEventListener('mouseup', () => {
+						progressEnd.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
+						progressEnd.dragging = false;
+						document.removeEventListener('mousemove', progressEndDrag);
+					}, { once: true });
+					progressEnd.style.background = "#ffffff";
+					progressEnd.dragging = true;
+					preview.endP = progress;
+					preview.updateProgress();
+				}
+			});
+			progressContainer.appendChild(progressBar);
+			progressContainer.appendChild(progressStart);
+			progressContainer.appendChild(progressEnd);
+			preview.insertBefore(progressContainer, dur);
+
+			preview.updateProgress();
+		});
+	}
+	icon.src = e.icon;
+	return preview;
 }
 </script>
 </html>

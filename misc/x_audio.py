@@ -20,7 +20,7 @@ from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, TEMP_PATH, FileHashDict, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, maybe_json, select_and_loads,
-	is_url, unyt, url2fn, get_duration, rename, uhash, expired,
+	is_url, unyt, url2fn, get_duration, rename, uhash, expired, b64,  # noqa: F401
 )
 from .audio_downloader import AudioDownloader
 
@@ -610,7 +610,7 @@ class AudioPlayer(discord.AudioSource):
 			data["settings"] = setts
 		elapsed, _length = self.epos
 		if elapsed:
-			data["settings"]["pos"] = elapsed
+			data.setdefault("settings", {})["pos"] = elapsed
 		return maybe_json(data)
 
 	def load_dump(self, b, uid=None, universal=False):

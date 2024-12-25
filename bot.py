@@ -7009,6 +7009,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				try:
 					w = bot.cache.users[self.webhook_id]
 					webhook = getattr(w, "webhook", w)
+					if not getattr(webhook, "token", None):
+						raise KeyError("Webhook token not found.")
 				except KeyError:
 					webhook = await bot.fetch_webhook(self.webhook_id)
 					bot.data.webhooks.add(webhook)

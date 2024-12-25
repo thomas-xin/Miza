@@ -1315,7 +1315,7 @@ class Dump(Command):
 						link = message.jump_url
 						break
 			b = await self.bot.get_request(url)
-			queue = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).load_dump({maybe_json(b)},{_user.id})")
+			queue = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).load_dump({maybe_json(b).decode('ascii')},{_user.id})")
 			count = len(queue)
 			return cdict(
 				content=(link + "\n" if link else "") + italics(css_md(f"Successfully loaded audio data ({count} item{'s' if count != 1 else ''}) for {sqr_md(_guild)}.")),
