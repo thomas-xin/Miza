@@ -508,7 +508,7 @@ class Queue(Command):
 				if not 1 + i & 32767:
 					await asyncio.sleep(0.1)
 				i += 1
-			stime = time_delta(total_time / abs(settings.speed))
+			stime = sec2time(total_time / abs(settings.speed))
 		cnt = len(q)
 		info = (
 			str(cnt) + " item" + "s" * (cnt != 1) + "\nEstimated total duration: "
@@ -526,7 +526,11 @@ class Queue(Command):
 		)
 		emb.set_author(**get_author(user))
 		if q:
-			icon = await bot.audio.asubmit(f"ytdl.get_thumbnail({json_dumpstr(q[0])},pos={elapsed})")
+			try:
+				icon = await bot.audio.asubmit(f"ytdl.get_thumbnail({json_dumpstr(q[0])},pos={elapsed})")
+			except Exception:
+				print_exc()
+				icon = get_best_icon(q[0])
 		else:
 			icon = ""
 		if icon:
@@ -1310,29 +1314,11 @@ class Dump(Command):
 						url = message.attachments[0].url
 						link = message.jump_url
 						break
-			s = await self.bot.get_request(url)
-			try:
-				d = await asubmit(select_and_loads, s, size=268435456)
-			except orjson.JSONDecodeError:
-				d = [url for url in as_str(s).splitlines() if is_url(url)]
-				if not d:
-					raise
-				d = [dict(name=url2fn(url), url=url) for url in d]
-			if isinstance(d, list):
-				d = dict(queue=d)
-			for e in d["queue"]:
-				e.setdefault("u_id", _user.id)
-				e["url"] = unyt(e["url"])
-			settings = d.get("settings")
-			if not settings:
-				settings = d.get("stats", {})
-				if settings.get("bitrate"):
-					settings["bitrate"] *= 100
-			await bot.audio.asubmit(f"AP.from_guild({_guild.id}).settings.update({maybe_json(settings).decode('ascii')})")
-			await bot.audio.asubmit(f"AP.from_guild({_guild.id}).queue.fill(map(cdict, {maybe_json(d['queue']).decode('utf-8')}))")
-			await bot.audio.asubmit(f"AP.from_guild({_guild.id}).ensure_play(2)")
+			b = await self.bot.get_request(url)
+			queue = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).load_dump({maybe_json(b)},{_user.id})")
+			count = len(queue)
 			return cdict(
-				content=(link + "\n" if link else "") + italics(css_md(f"Successfully loaded audio data for {sqr_md(_guild)}.")),
+				content=(link + "\n" if link else "") + italics(css_md(f"Successfully loaded audio data ({count} item{'s' if count != 1 else ''}) for {sqr_md(_guild)}.")),
 				reacts="❎",
 			)
 		data = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).get_dump()")
@@ -2207,9 +2193,9 @@ class Download(Command):
 	msgcmd = ("Download as mp3",)
 	ephemeral = True
 	exact = False
-	maintenance = True
 
 	async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
+		raise NotImplementedError("This command is currently disabled for maintenance. Please use the web version at https://api.mizabot.xyz/downloader.html for now!")
 		fmt = default_fmt = "mp3"
 		if name in ("af", "audiofilter"):
 			set_dict(flags, "a", 1)

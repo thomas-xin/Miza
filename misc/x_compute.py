@@ -906,7 +906,7 @@ if "ytdl" in CAPS:
 				if not os.path.exists(fn):
 					try:
 						ydl.download(url)
-					except:
+					except Exception:
 						traceback.print_exc()
 				if not os.path.exists(fn):
 					part = fn + ".part"

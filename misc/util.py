@@ -1341,6 +1341,7 @@ def n2b(n):
 	return n.to_bytes(c, "big")
 
 def leb128(n):
+	"Encodes an integer using LEB128."
 	data = bytearray()
 	while n:
 		data.append(n & 127)
@@ -1349,6 +1350,7 @@ def leb128(n):
 			data[-1] |= 128
 	return data or b"\x00"
 def decode_leb128(data, mode="cut"): # mode: cut | index
+	"Decodes an integer from LEB128 encoded data; optionally returns the remaining data."
 	i = n = 0
 	shift = 0
 	for i, byte in enumerate(data):
@@ -1362,10 +1364,12 @@ def decode_leb128(data, mode="cut"): # mode: cut | index
 	return n, i + 1
 
 def szudzik(x, y):
+	"Szudzik's pairing function."
 	if x < y:
 		return y * y + x
 	return x * x + x + y
 def iszudzik(z):
+	"Inverse of Szudzik's pairing function."
 	w = isqrt(z)
 	t = z - w * w
 	if t < w:
@@ -1373,6 +1377,7 @@ def iszudzik(z):
 	return w, t - w
 
 def interleave(*X):
+	"Bit interleaves a list of integers."
 	m = max(x.bit_length() for x in X)
 	z = 0
 	X2 = list(X)
@@ -1384,6 +1389,7 @@ def interleave(*X):
 			z |= b << e * n + i
 	return z
 def deinterleave(z, n=1):
+	"Unpacks a bit interleaved integer into a list of integers."
 	m = z.bit_length()
 	X = [0] * n
 	for i in range(m):
@@ -1392,6 +1398,27 @@ def deinterleave(z, n=1):
 	return X
 
 def encode_snowflake(*args, store_count=False):
+	"""
+	Encodes a list of snowflake IDs into a compact string representation.
+
+	Args:
+		*args: Variable length argument list of snowflake IDs to encode.
+		store_count (bool): If True, stores the count of snowflake IDs in the encoded string.
+							If False, uses a padding byte or predetermined count.
+
+	Returns:
+		str: The encoded string representation of the snowflake IDs.
+
+	Raises:
+		AssertionError: If store_count is True and the number of snowflake IDs is not between 2 and 126 inclusive.
+
+	Notes:
+		- The function extracts the timestamp, worker ID, process ID, and increment from each snowflake ID.
+		- It interleaves these components and encodes them using LEB128 and Szudzik's pairing function.
+		- The encoded string is then base64 encoded and returned.
+		- If store_count is True, the count of snowflake IDs is stored in the encoded string.
+		- If store_count is False and the first byte of the encoded string is less than 128, a padding byte (0x7f) is added.
+	"""
 	timestamps = []
 	ids = []
 	increments = []
@@ -1418,6 +1445,24 @@ def encode_snowflake(*args, store_count=False):
 		encoded = b"\x7f" + encoded
 	return e64(encoded).decode("ascii")
 def decode_snowflake(data, n=1):
+	"""
+	Decodes a snowflake ID into its constituent parts.
+
+	Args:
+		data (str): The base64 encoded snowflake ID.
+		n (int, optional): The number of IDs to decode. Defaults to 1.
+
+	Returns:
+		list: A list of decoded snowflake IDs, each represented as an integer.
+
+	Raises:
+		ValueError: If the input data is not valid base64 or if decoding fails.
+
+	Note:
+		The function assumes the input data is a valid base64 encoded string.
+		It decodes the string, extracts the timestamp, worker ID, process ID,
+		and increment values, and then reconstructs the original snowflake IDs.
+	"""
 	decoded = b64(data)
 	if 1 < decoded[0] < 127:
 		n, decoded = decoded[0], decoded[1:]

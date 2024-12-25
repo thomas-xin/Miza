@@ -34,7 +34,7 @@ def time_disp(s):
 
 def time_parse(ts):
 	if ts == "N/A":
-		return inf
+		return float("inf")
 	data = ts.split(":")
 	if len(data) >= 5: 
 		raise TypeError("Too many time arguments.")

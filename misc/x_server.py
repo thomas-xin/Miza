@@ -6,7 +6,6 @@ import itertools
 import json
 import logging
 import os
-import pickle
 import random
 import shutil
 import socket
@@ -18,20 +17,17 @@ import urllib
 import zipfile
 import cheroot
 import cherrypy
-import numpy as np
 import orjson
 import psutil
 import requests
-from collections import deque
 from concurrent.futures import Future
 from math import ceil
 from traceback import print_exc
 from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
-from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut, gather, CloseableAsyncIterator
-from .smath import supersample, xrand, raw2colour
-from .types import byte_like, as_str, astype, cdict, suppress, round_min, full_prune, literal_eval, regexp, loop, json_dumps, alist, resume, RangeSet, MemoryBytes
-from .util import hwaccel, fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, is_strict_running, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, seq, Cache, Request, magic, is_discord_attachment, unyt, ecdc_exists, get_duration, evalex, CACHE_PATH, VIDEO_FORMS, T, tik_encode, tik_decode, longest_prefix, longest_common_substring, sublist_index, byte_scale, decode_attachment, expand_attachment, shorten_attachment
+from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut, gather
+from .types import byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, RangeSet, MemoryBytes
+from .util import hwaccel, fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, is_youtube_url, seq, Cache, Request, magic, is_discord_attachment, unyt, ecdc_exists, get_duration, CACHE_PATH, VIDEO_FORMS, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment
 from .caches import attachment_cache, upload_cache, download_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -405,6 +401,8 @@ def fetch_static(path, ignore=False):
 			print_exc()
 		raise
 
+ytdl = None
+
 geo_sem = Semaphore(90, 256, rate_limit=60)
 geo_count = 0
 IP = None
@@ -477,7 +475,6 @@ class Server:
 		data = pipe(image, threshold=1 / 3)
 		cp.response.headers["Content-Type"] = "application/json"
 		out = json_dumps(data)
-		print("DET:", image.size, out)
 		return out
 
 	@cp.expose(("fi",))
@@ -617,10 +614,6 @@ class Server:
 				elif "?S=" in u or "&S=" in u:
 					u, ns = u.replace("?S=", "&S=").split("&S=", 1)
 					ns = int(ns)
-				elif u.startswith("https://s3-us-west-2"):
-					ns = 503316480
-				elif u.startswith("https://cdn.discord"):
-					ns = 8388608
 				else:
 					resp = reqs.next().head(u, headers=headers, timeout=20)
 					ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
@@ -636,7 +629,6 @@ class Server:
 					if isinstance(u, byte_like):
 						yield u[s:e]
 						return
-					print(u)
 					if e >= ns:
 						e = ""
 					else:
@@ -1142,7 +1134,7 @@ class Server:
 		ip = true_ip()
 		print("/ytdl", ip, q)
 		if not self.ydl:
-			self.ydl = AudioDownloader()
+			self.ydl = globals()["ytdl"] = AudioDownloader()
 		if v:
 			fmt = kwargs.get("fmt")
 			assert fmt in ("mp4", "webm", "ogg", "opus", "mp3")
@@ -1206,6 +1198,24 @@ class Server:
 		cp.response.headers["Content-Type"] = "application/json"
 		return json_dumps(res)
 	ytdl._cp_config = {"response.stream": True}
+
+	@cp.expose
+	def youtube_thumbnail(self, url, pos=0):
+		if not is_youtube_url(url):
+			raise TypeError("Invalid YouTube URL.")
+		url = unyt(url)
+		entry = self.ydl.search(url)[0]
+		try:
+			resp = self.ydl.get_thumbnail(entry, pos=pos)
+		except Exception:
+			print_exc()
+			resp = get_best_icon(entry)
+		cp.response.headers.update(CHEADERS)
+		if isinstance(resp, byte_like):
+			cp.response.headers["Content-Type"] = "image/jpeg"
+			return resp
+		assert is_url(resp)
+		return self.proxy(url=resp)
 
 	@cp.expose
 	def mean_colour(self, url=""):
@@ -1611,265 +1621,6 @@ class Server:
 			cp.response.headers["Content-Type"] = "text/plain"
 		return res.encode("utf-8")
 
-	try:
-		with open("saves/mpdata.json", "rb") as f:
-			mpdata = json.load(f)
-	except FileNotFoundError:
-		mpdata = {}
-	except Exception:
-		if os.path.exists("saves/mpdata\x7f\x7f.json"):
-			with open("saves/mpdata\x7f\x7f.json", "rb") as f:
-				mpdata = json.load(f)
-		else:
-			mpdata = {}
-			print_exc()
-	mpdata_updated = False
-
-	try:
-		with open("saves/mpact.json", "rb") as f:
-			mpact = pickle.load(f)
-	except FileNotFoundError:
-		mpact = {}
-	except Exception:
-		if os.path.exists("saves/mpact\x7f\x7f.json"):
-			with open("saves/mpact\x7f\x7f.json", "rb") as f:
-				mpact = pickle.load(f)
-		else:
-			mpact = {}
-			print_exc()
-
-	mpresponse = {}
-
-	@cp.expose
-	def mphb(self, playing=None):
-		mpdata = self.mpdata
-		ip = true_ip()
-		t = utc()
-		try:
-			if playing is None or cp.request.method.casefold() != "patch" or cp.request.headers["User-Agent"] != "Miza Player":
-				raise KeyError
-		except KeyError:
-			if ip in mpdata:
-				d = t - mpdata[ip][1]
-				if d < 60:
-					mpdata[ip][0] += d
-				mpdata[ip][1] = min(mpdata[ip][1], t - 60)
-				d = t - mpdata[ip][3]
-				if d < 60:
-					mpdata[ip][2] += d
-				mpdata[ip][3] = min(mpdata[ip][3], t - 60)
-			cp.response.status = 450
-			return ""
-		cp.request.no_log = True
-		if ip not in mpdata:
-			mpdata[ip] = [0,] * 4
-		d = t - mpdata[ip][1]
-		if d < 60:
-			mpdata[ip][0] += d
-		mpdata[ip][1] = t
-		if full_prune(playing) == "true":
-			d = t - mpdata[ip][3]
-			if d < 60:
-				mpdata[ip][2] += d
-			mpdata[ip][3] = t
-		else:
-			d = t - mpdata[ip][3]
-			if d < 60:
-				mpdata[ip][2] += d
-			mpdata[ip][3] = min(mpdata[ip][3], t - 60)
-		if not self.mpdata_updated:
-			self.mpdata_updated = True
-			esubmit(self.mpdata_update)
-		cp.response.headers.update(HEADERS)
-		try:
-			resp = self.mpresponse.pop(ip)
-		except KeyError:
-			try:
-				resp = self.mpresponse[None]
-			except KeyError:
-				return "💜"
-		return "".join(chr(xrand(32, 127)) + chr(xrand(48, 96)) + c for c in resp.replace("$$$", "\n")[::-1])
-
-	mpimg = {}
-
-	@cp.expose
-	def api_mpinsights(self):
-		values = self.mpget()
-		for i in range(3):
-			values[i] = int(values[i])
-		self.ensure_mpins()
-		histories = [None] * len(values)
-		hours = histories.copy()
-		for k in range(len(histories)):
-			width = np.clip(len(self.ins_data[k]), 3, 96)
-			histories[k] = list(supersample(self.ins_data[k], width))
-			hours[k] = len(self.ins_data[k])
-		cp.response.headers.update(HEADERS)
-		return json_dumps(dict(
-			current=dict(
-				live_users=values[2],
-				active_users=values[1],
-				total_users=values[0],
-				total_playtime=values[4],
-				total_use_time=values[3],
-				average_playtime=values[5],
-			),
-			historical=dict(
-				live_users=[histories[2], hours[2]],
-				active_users=[histories[1], hours[2]],
-				total_users=[histories[0], hours[2]],
-				total_playtime=[histories[4], hours[2]],
-				total_use_time=[histories[3], hours[2]],
-				average_playtime=[histories[5], hours[2]],
-			),
-		))
-
-	@cp.expose
-	def status(self, interval=None):
-		if not interval:
-			cp.request.no_log = True
-		status = interface.run(f"bot.status(interval={interval})", cache=3)
-		cp.response.headers.update(HEADERS)
-		cp.response.headers["Content-Type"] = "application/json"
-		return json_dumps(status)
-
-	@cp.expose
-	@cp.tools.accept(media="multipart/form-data")
-	def distribute(self, caps="[]", stat="{}", resp="{}", token="", id=""):
-		ip = true_ip()
-		at = AUTH.get("discord_token")
-		verified = int(at == token)
-		if not caps.startswith("["):
-			caps = base64.urlsafe_b64decode(caps + "==")
-		caps = orjson.loads(caps)
-		if not verified:
-			caps = list(set(caps).difference(("gptq", "agpt")))
-		if not stat.startswith("{"):
-			stat = base64.urlsafe_b64decode(stat + "==").decode("utf-8", "replace")
-		stat = orjson.loads(stat.replace("<IP>", ip))
-		t = utc()
-		for k, v in stat.items():
-			for i, d in v.items():
-				if abs(t - d.get("time", 0)) > 10:
-					d["time"] = t - 10
-		if not resp:
-			resp = cp.request.body.fp.read()
-		elif not resp.startswith("{"):
-			resp = base64.urlsafe_b64decode(resp + "==")
-		resp = literal_eval(resp)
-		for k, v in resp.items():
-			if isinstance(v, str):
-				if v.startswith("ERR:"):
-					resp[k] = evalex(v[4:])
-				elif v.startswith("RES:"):
-					resp[k] = v[4:]
-		if not resp:
-			cp.request.no_log = True
-		caps = json_dumps(caps).decode("ascii")
-		stat = json_dumps(stat).decode("utf-8", "replace")
-		resp = repr(resp)
-		idp = ip + "-" + id
-		tasks, shards = interface.run(f"(bot.distribute({caps},{stat},{resp},{repr(idp)}),len(bot.status_data.system['cpu']))")
-		data = dict(tasks=tasks, next_delay=max(1, shards - 1))
-		cp.response.headers.update(HEADERS)
-		cp.response.headers["Content-Type"] = "application/json"
-		return json_dumps(data)
-
-	def ensure_mpins(self):
-		try:
-			ins_time = T(self).get("ins_time", 0)
-			t = utc()
-			if t - ins_time >= 30:
-				self.mpimg.clear()
-				self.ins_wait = Future()
-				k = self.mpact.keys()
-				data = [deque() for i in range(len(next(reversed(self.mpact.values()))))]
-				values = ()
-				for i in range(min(k), max(k) + 1):
-					values = self.mpact.get(i) or values
-					for j, v in enumerate(values):
-						data[j].append(v)
-				self.ins_data = data
-				self.ins_time = t
-				self.ins_wait.set_result(None)
-				self.ins_wait = None
-		except Exception:
-			print_exc()
-
-	# names = ("total_users", "active_users", "live_users", "active_seconds", "live_seconds", "seconds_per_user")
-	def mpget(self):
-		mpdata = self.mpdata
-		values = [len(mpdata), 0, 0, 0, 0, 0]
-		t = utc()
-		for active, atime, listen, ltime in mpdata.values():
-			values[1] += t - atime < 60
-			values[2] += t - ltime < 60
-			values[3] += active
-			values[4] += listen
-		if not values[0]:
-			values[5] = 0
-		else:
-			values[5] = values[4] / values[0]
-		return values
-
-	def mpdata_update(self):
-		try:
-			time.sleep(20)
-			self.mpdata_updated = False
-			if not os.path.exists("saves/mpdata.json"):
-				with open("saves/mpdata.json", "w") as f:
-					json.dump(self.mpdata, f)
-			else:
-				with open("saves/mpdata\x7f.json", "w") as f:
-					json.dump(self.mpdata, f)
-				with open("saves/mpdata\x7f.json", "rb") as f:
-					if f.read(1) in (b"\x00", b" ", b""):
-						raise ValueError
-				if os.path.exists("saves/mpdata\x7f\x7f.json"):
-					os.remove("saves/mpdata\x7f\x7f.json")
-				os.rename("saves/mpdata.json", "saves/mpdata\x7f\x7f.json")
-				os.rename("saves/mpdata\x7f.json", "saves/mpdata.json")
-		except Exception:
-			print_exc()
-
-	def mpact_update(self):
-		try:
-			time.sleep(20)
-			self.mpact_updated = False
-			if not os.path.exists("saves/mpact.json"):
-				with open("saves/mpact.json", "wb") as f:
-					pickle.dump(self.mpact, f)
-			else:
-				with open("saves/mpact\x7f.json", "wb") as f:
-					pickle.dump(self.mpact, f)
-				with open("saves/mpact\x7f.json", "rb") as f:
-					if f.read(1) in (b"\x00", b" ", b""):
-						raise ValueError
-				if os.path.exists("saves/mpact\x7f\x7f.json"):
-					os.remove("saves/mpact\x7f\x7f.json")
-				os.rename("saves/mpact.json", "saves/mpact\x7f\x7f.json")
-				os.rename("saves/mpact\x7f.json", "saves/mpact.json")
-		except Exception:
-			print_exc()
-
-	def mp_activity(self):
-		try:
-			self.act_time = os.path.getmtime("saves/mpact.json") // 3600
-		except FileNotFoundError:
-			self.act_time = 0
-		while True:
-			try:
-				t = int(utc() // 3600)
-				if t > self.act_time:
-					self.act_time = t
-					values = self.mpget()
-					self.mpact[t] = values
-					self.mpact_update()
-					self.mpimg.clear()
-			except Exception:
-				print_exc()
-			time.sleep(60)
-
 	@cp.expose
 	def donation(self, data=None):
 		# ip = true_ip()
@@ -1933,12 +1684,6 @@ class Server:
 				return b"\xf0\x9f\x92\x9c"
 		content = input or urllib.parse.unquote(cp.url(base="", qs=cp.request.query_string).rstrip("?").split("/", 1)[-1].removeprefix("api/").split("/", 1)[-1])
 		print("/command", ip, content)
-		# if "DNT" in (k.upper() for k in cp.request.headers):
-		#	 random.seed(ip)
-		#	 ip = ".".join(str(xrand(1, 255)) for _ in loop(4))
-		#	 random.seed(ts_us())
-		#	 tz = "Anonymous (DNT enabled)"
-		# else:
 		try:
 			secret = cp.request.headers["X-RapidAPI-Proxy-Secret"]
 			if secret != RAPIDAPI_SECRET:
@@ -1946,7 +1691,7 @@ class Server:
 		except KeyError:
 			_data = get_geo(ip)
 		else:
-			ip = ".".join(str(xrand(1, 255)) for _ in loop(4))
+			ip = "0.0.0.0"
 			self.rapidapi += 1
 		if " " not in content:
 			content += " "
@@ -1973,171 +1718,171 @@ class Server:
 		cp.response.headers.update(HEADERS)
 		return f"""<!DOCTYPE html><html><head><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script><meta property="og:image" content="{url}">{refresh_info}<meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="background-color:black;"><img src="{url}" style="margin:0;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);max-width:100%;max-height:100%"></body></html>"""
 
-	class V1Cache:
-		def __init__(self, end=2048, soft=8192, hard=30720):
-			self.end = end
-			self.soft = soft
-			self.hard = hard
-			self.data = alist()
-			self.cache = set()
-		def pad_into(self, tokens, max_tokens=0, padding=(), sentinel=()):
-			if not tokens:
-				return tokens
-			t = utc()
-			tokens = astype(tokens, tuple)
-			if tokens in self.cache:
-				return tokens
-			max_context = min(len(tokens) * 2, self.hard - max_tokens)
-			try:
-				if len(tokens) <= self.soft:
-					# Within soft limit; directly forwarded
-					return tokens
-				target = None
-				high = 0
-				for t, v in reversed(self.data):
-					i = longest_prefix(tokens, v)
-					if i > high:
-						high = i
-						target = v
-				out = []
-				if high:
-					if len(tokens) - high <= self.soft:
-						# Sufficiently matched; directly forwarded
-						return tokens
-					if sentinel:
-						try:
-							sublist_index(tokens[:high], sentinel)
-						except ValueError:
-							tokens = tokens[high:]
-							left = self.soft - self.end
-							tokens = target[:high] + tokens[:left] + padding + tokens[-self.end:]
-							print("Sentinel mismatch:", sentinel, len(tokens))
-							return tokens
-					# Match existing cached string; matched part must be `>= input / 2 and >= 8k`, unmatched part must be `<= 8k`
-					out.append(target[:high])
-					tokens, target = tokens[high:], target[high:]
-					sub = longest_common_substring(tokens, target)
-					if high + sub >= len(tokens) / 2 and high + sub >= self.soft:
-						i2 = sublist_index(tokens, sub)
-						if i2 <= self.soft:
-							i3 = sublist_index(target, sub)
-							if i3 <= self.soft:
-								right = tokens[i2 + len(sub):]
-								out.append(target[:i3])
-								out.append(sub)
-								if len(right) <= self.soft:
-									out.append(right)
-								else:
-									left = self.soft - self.end
-									out.append(right[:left])
-									out.append(padding)
-									out.append(right[-self.end:])
-								res = tuple(itertools.chain(*out))
-								overflow = len(res) - max_context
-								if overflow > 0:
-									tokens = res[:-self.soft] + padding + res[-self.end + overflow:]
-								else:
-									tokens = res
-								return tokens
-					left = self.soft - self.end
-					out.append(tokens[:left])
-					out.append(padding)
-					out.append(tokens[-self.end:])
-					tokens = tuple(itertools.chain(*out))
-					return tokens
-				# Full cache miss; use `first 6k + padding + last 2k` tokens
-				left = self.soft - self.end
-				tokens = tokens[:left] + padding + tokens[-self.end:]
-				return tokens
-			finally:
-				if tokens in self.cache:
-					self.data.remove(tokens, key=lambda t: t[1])
-				else:
-					self.cache.add(tokens)
-				self.data.append(([t, tokens]))
-				while sum(len(t[1]) for t in self.data) + max_tokens > self.hard + self.soft:
-					temp = self.data.popleft()
-					self.cache.discard(temp[1])
-	v1_cache = V1Cache()
-	temp_model = "command-r-plus"
-	token_bans = set()#{153083, 165936, 182443, 205177, 253893, 255999}
-	@cp.expose
-	def inference(self, version=None, *path, **kwargs):
-		if version != "v1":
-			raise NotImplementedError(version)
-		model = self.temp_model
-		fmt = "cl100k_im"
-		if not path:
-			path = ["models"]
-		endpoint = "/".join(path)
-		url = "http://127.0.0.1:2242/v1/" + endpoint
-		headers = cp.request.headers
-		headers["X-Forwarded-For"] = true_ip()
-		data = cp.request.body.fp.read()
-		if data and endpoint.casefold() == "completions":
-			try:
-				d = orjson.loads(data)
-			except Exception:
-				pass
-			else:
-				if AUTH.get("mizabot_key") and headers.get("Authorization") == f"Bearer {AUTH['mizabot_key']}":
-					print("Authorised LLM")
-				else:
-					prompt = d.get("prompt")
-					if prompt and len(prompt) > 8192:
-						tokens = tik_encode(prompt, encoding=fmt)
-						padding = tuple(tik_encode("...\n\n...", encoding=fmt))
-						sentinel = tuple(tik_encode("<START>", encoding=fmt))
-						print(len(tokens))
-						tokens = self.v1_cache.pad_into(tokens, max_tokens=d.get("max_tokens", 256), padding=padding, sentinel=sentinel)
-						print(len(tokens))
-						prompt = tik_decode(tokens, encoding=fmt)
-						d["prompt"] = prompt
-				d["model"] = model
-				if self.token_bans:
-					d["custom_token_bans"] = set(d.get("custom_token_bans", [])).union(self.token_bans)
-				data = json_dumps(d)
-		method = cp.request.method
-		resp = getattr(reqs.next(), method.casefold())(
-			url,
-			headers=headers,
-			data=data,
-			stream=True,
-		)
-		headers = fcdict(resp.headers)
-		headers.update(HEADERS)
-		headers.pop("Connection", None)
-		headers.pop("Content-Length", None)
-		headers.pop("Transfer-Encoding", None)
-		for k, v in headers.items():
-			cp.response.headers[k] = v
-		print(resp, cp.response.headers)
-		if resp.headers.get("Transfer-Encoding") == "chunked":
-			def gen(resp):
-				try:
-					for line in resp.iter_lines():
-						if cp.request.closed:
-							break
-						yield line + b"\n"
-				except (StopIteration, GeneratorExit):
-					pass
-				resp.close()
-			return CloseableAsyncIterator(gen(resp), resp.close)
-		if astype(path, list) == ["models"]:
-			data = resp.json()
-			self.temp_model = model = data["data"][0]["id"]
-			data["data"][0]["id"] = f"{model}-h6t2"
-			return json_dumps(data)
-		return resp.content
-	inference._cp_config = {"response.stream": True}
+	# class V1Cache:
+	# 	def __init__(self, end=2048, soft=8192, hard=30720):
+	# 		self.end = end
+	# 		self.soft = soft
+	# 		self.hard = hard
+	# 		self.data = alist()
+	# 		self.cache = set()
+	# 	def pad_into(self, tokens, max_tokens=0, padding=(), sentinel=()):
+	# 		if not tokens:
+	# 			return tokens
+	# 		t = utc()
+	# 		tokens = astype(tokens, tuple)
+	# 		if tokens in self.cache:
+	# 			return tokens
+	# 		max_context = min(len(tokens) * 2, self.hard - max_tokens)
+	# 		try:
+	# 			if len(tokens) <= self.soft:
+	# 				# Within soft limit; directly forwarded
+	# 				return tokens
+	# 			target = None
+	# 			high = 0
+	# 			for t, v in reversed(self.data):
+	# 				i = longest_prefix(tokens, v)
+	# 				if i > high:
+	# 					high = i
+	# 					target = v
+	# 			out = []
+	# 			if high:
+	# 				if len(tokens) - high <= self.soft:
+	# 					# Sufficiently matched; directly forwarded
+	# 					return tokens
+	# 				if sentinel:
+	# 					try:
+	# 						sublist_index(tokens[:high], sentinel)
+	# 					except ValueError:
+	# 						tokens = tokens[high:]
+	# 						left = self.soft - self.end
+	# 						tokens = target[:high] + tokens[:left] + padding + tokens[-self.end:]
+	# 						print("Sentinel mismatch:", sentinel, len(tokens))
+	# 						return tokens
+	# 				# Match existing cached string; matched part must be `>= input / 2 and >= 8k`, unmatched part must be `<= 8k`
+	# 				out.append(target[:high])
+	# 				tokens, target = tokens[high:], target[high:]
+	# 				sub = longest_common_substring(tokens, target)
+	# 				if high + sub >= len(tokens) / 2 and high + sub >= self.soft:
+	# 					i2 = sublist_index(tokens, sub)
+	# 					if i2 <= self.soft:
+	# 						i3 = sublist_index(target, sub)
+	# 						if i3 <= self.soft:
+	# 							right = tokens[i2 + len(sub):]
+	# 							out.append(target[:i3])
+	# 							out.append(sub)
+	# 							if len(right) <= self.soft:
+	# 								out.append(right)
+	# 							else:
+	# 								left = self.soft - self.end
+	# 								out.append(right[:left])
+	# 								out.append(padding)
+	# 								out.append(right[-self.end:])
+	# 							res = tuple(itertools.chain(*out))
+	# 							overflow = len(res) - max_context
+	# 							if overflow > 0:
+	# 								tokens = res[:-self.soft] + padding + res[-self.end + overflow:]
+	# 							else:
+	# 								tokens = res
+	# 							return tokens
+	# 				left = self.soft - self.end
+	# 				out.append(tokens[:left])
+	# 				out.append(padding)
+	# 				out.append(tokens[-self.end:])
+	# 				tokens = tuple(itertools.chain(*out))
+	# 				return tokens
+	# 			# Full cache miss; use `first 6k + padding + last 2k` tokens
+	# 			left = self.soft - self.end
+	# 			tokens = tokens[:left] + padding + tokens[-self.end:]
+	# 			return tokens
+	# 		finally:
+	# 			if tokens in self.cache:
+	# 				self.data.remove(tokens, key=lambda t: t[1])
+	# 			else:
+	# 				self.cache.add(tokens)
+	# 			self.data.append(([t, tokens]))
+	# 			while sum(len(t[1]) for t in self.data) + max_tokens > self.hard + self.soft:
+	# 				temp = self.data.popleft()
+	# 				self.cache.discard(temp[1])
+	# v1_cache = V1Cache()
+	# temp_model = "command-r-plus"
+	# token_bans = set()#{153083, 165936, 182443, 205177, 253893, 255999}
+	# @cp.expose
+	# def inference(self, version=None, *path, **kwargs):
+	# 	if version != "v1":
+	# 		raise NotImplementedError(version)
+	# 	model = self.temp_model
+	# 	fmt = "cl100k_im"
+	# 	if not path:
+	# 		path = ["models"]
+	# 	endpoint = "/".join(path)
+	# 	url = "http://127.0.0.1:2242/v1/" + endpoint
+	# 	headers = cp.request.headers
+	# 	headers["X-Forwarded-For"] = true_ip()
+	# 	data = cp.request.body.fp.read()
+	# 	if data and endpoint.casefold() == "completions":
+	# 		try:
+	# 			d = orjson.loads(data)
+	# 		except Exception:
+	# 			pass
+	# 		else:
+	# 			if AUTH.get("mizabot_key") and headers.get("Authorization") == f"Bearer {AUTH['mizabot_key']}":
+	# 				print("Authorised LLM")
+	# 				pass
+	# 			else:
+	# 				prompt = d.get("prompt")
+	# 				if prompt and len(prompt) > 8192:
+	# 					tokens = tik_encode(prompt, encoding=fmt)
+	# 					padding = tuple(tik_encode("...\n\n...", encoding=fmt))
+	# 					sentinel = tuple(tik_encode("<START>", encoding=fmt))
+	# 					print(len(tokens))
+	# 					tokens = self.v1_cache.pad_into(tokens, max_tokens=d.get("max_tokens", 256), padding=padding, sentinel=sentinel)
+	# 					print(len(tokens))
+	# 					prompt = tik_decode(tokens, encoding=fmt)
+	# 					d["prompt"] = prompt
+	# 			d["model"] = model
+	# 			if self.token_bans:
+	# 				d["custom_token_bans"] = set(d.get("custom_token_bans", [])).union(self.token_bans)
+	# 			data = json_dumps(d)
+	# 	method = cp.request.method
+	# 	resp = getattr(reqs.next(), method.casefold())(
+	# 		url,
+	# 		headers=headers,
+	# 		data=data,
+	# 		stream=True,
+	# 	)
+	# 	headers = fcdict(resp.headers)
+	# 	headers.update(HEADERS)
+	# 	headers.pop("Connection", None)
+	# 	headers.pop("Content-Length", None)
+	# 	headers.pop("Transfer-Encoding", None)
+	# 	for k, v in headers.items():
+	# 		cp.response.headers[k] = v
+	# 	print(resp, cp.response.headers)
+	# 	if resp.headers.get("Transfer-Encoding") == "chunked":
+	# 		def gen(resp):
+	# 			try:
+	# 				for line in resp.iter_lines():
+	# 					if cp.request.closed:
+	# 						break
+	# 					yield line + b"\n"
+	# 			except (StopIteration, GeneratorExit):
+	# 				pass
+	# 			resp.close()
+	# 		return CloseableAsyncIterator(gen(resp), resp.close)
+	# 	if astype(path, list) == ["models"]:
+	# 		data = resp.json()
+	# 		self.temp_model = model = data["data"][0]["id"]
+	# 		data["data"][0]["id"] = f"{model}-h6t2"
+	# 		return json_dumps(data)
+	# 	return resp.content
+	# inference._cp_config = {"response.stream": True}
 
+def terminate():
+	if ytdl:
+		ytdl.close()
+	cp.engine.exit()
+	return sys.exit()
 
-def ensure_parent(proc, parent):
-	while True:
-		if not is_strict_running(parent):
-			force_kill(proc)
-			break
-		time.sleep(12)
 
 if __name__ == "__main__":
 	# logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(message)s')
@@ -2146,10 +1891,8 @@ if __name__ == "__main__":
 	print(f"Webserver starting on port {PORT}, with PID {pid} and parent PID {ppid}...")
 	proc = psutil.Process(pid)
 	parent = psutil.Process(ppid)
-	tsubmit(ensure_parent, proc, parent)
 	app = Server()
 	self = server = cp.Application(app, "/", config)
-	tsubmit(app.mp_activity)
 	esubmit(app.get_ip_ex)
 	interface.start()
 	cp.quickstart(server, "/", config)

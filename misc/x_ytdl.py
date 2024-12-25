@@ -13,7 +13,7 @@ except ImportError as ex:
 	except ImportError:
 		raise ex
 from .types import list_like
-from .util import EvalPipe, esubmit, python
+from .util import Request, EvalPipe, esubmit, python
 
 ydl_opts = {
 	"quiet": 1,
@@ -38,8 +38,28 @@ def extract_info(url, download=False, process=True):
 	return resp
 
 def get_full_storyboard(info):
+	"""
+	Extracts and processes the storyboard images from the provided video information.
+
+	Args:
+		info (dict): A dictionary containing video information, including formats, duration, and storyboard details.
+
+	Returns:
+		bytes: A byte buffer containing the storyboard images in a ZIP archive. If an error occurs, returns the thumbnail image URL.
+
+	Raises:
+		LookupError: If no storyboard format is found in the provided video information.
+
+	The function performs the following steps:
+		1. Extracts the storyboard format from the video information.
+		2. Creates a ZIP archive to store the storyboard images.
+		3. Calculates the number of images per storyboard and the duration of each fragment.
+		4. Downloads the storyboard fragments concurrently.
+		5. Processes each fragment to extract individual images and saves them in the ZIP archive.
+	"""
 	try:
-		storyboard = [f for f in info["formats"] if "storyboard" in f.get("format")][-1]
+		storyboards = [f for f in info["formats"] if (f.get("format") and "storyboard" in f.get("format")) or f.get("format_note") == "storyboard"]
+		storyboard = sorted(storyboards, key=lambda x: x.get("height"))[-1]
 	except LookupError:
 		print_exc()
 		return info["thumbnail"]
@@ -53,7 +73,7 @@ def get_full_storyboard(info):
 		futs = [esubmit(
 			requests.get,
 			frag["url"],
-			headers=storyboard["http_headers"],
+			headers=storyboard.get("http_headers") or Request.header(),
 			stream=True,
 		) for frag in fragments]
 		curr = 0
@@ -79,6 +99,7 @@ def get_full_storyboard(info):
 	return b2.getbuffer()
 
 class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
+	"Replace the default FFmpegPostProcessor with one that supports seeking as well as custom video formats and codecs."
 
 	def __init__(self, downloader=None, codec=None, format=None, start=None, end=None):
 		super().__init__(downloader)
@@ -126,6 +147,7 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 		return [], info
 
 class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
+	"Replace the default FFmpegPostProcessor with one that supports seeking as well as custom audio codecs and formats."
 
 	def __init__(self, downloader=None, codec=None, format=None, start=None, end=None):
 		super().__init__(downloader)

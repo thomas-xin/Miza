@@ -107,6 +107,34 @@ colour_cache = ColourCache(timeout=86400 * 7, trash=1, persist="colour.cache")
 
 
 class AttachmentCache(Cache):
+	"""
+	A class to manage caching of attachments and embeds for a Discord bot.
+	Attributes:
+		min_size (int): Minimum size of the cache.
+		max_size (int): Maximum size of the cache.
+		attachment_count (int): Number of attachments to handle.
+		embed_count (int): Number of embeds to handle.
+		discord_token (str): Discord bot token.
+		alt_token (str): Alternative Discord bot token.
+		headers (dict): HTTP headers for requests using the main token.
+		alt_headers (dict): HTTP headers for requests using the alternative token.
+		exc (concurrent.futures.ThreadPoolExecutor): Thread pool executor for handling tasks.
+		sess (aiohttp.ClientSession): HTTP session for making asynchronous requests.
+		fut (concurrent.futures.Future): Future object for managing asynchronous tasks.
+		queue (list): Queue of tasks to be processed.
+		channels (set): Set of channels to be used for posting messages.
+		last (set): Set of last used messages for updating embeds.
+	Methods:
+		__init__(*args, **kwargs): Initializes the cache and calls the init method.
+		init(): Initializes the channels set with proxy channels from the AUTH configuration.
+		update_queue(): Updates the queue by processing tasks and sending requests to Discord API.
+		set_last(tup): Adds a tuple to the last set and removes old entries.
+		get_attachment(c_id, m_id, a_id, fn): Retrieves an attachment URL asynchronously.
+		obtain(c_id=None, m_id=None, a_id=None, fn=None, url=None): Obtains an attachment URL, either from cache or by retrieving it.
+		delete(c_id, m_id, url=None): Deletes a message from a channel asynchronously.
+		create(*data, filename=None, channel=None, content="", collapse=True, editable=False): Creates a new message with attachments in a channel asynchronously.
+		edit(c_id, m_id, *data, url=None, filename=None, content="", collapse=True): Edits an existing message with new attachments in a channel asynchronously.
+	"""
 	min_size = 262144
 	max_size = 25165824
 	attachment_count = 10

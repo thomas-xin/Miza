@@ -12,18 +12,19 @@ import sys
 import threading
 from traceback import print_exc
 from urllib.parse import quote_plus
+import orjson
 import numpy as np
 import psutil
 from .asyncs import csubmit, esubmit, asubmit, wrap_future, cst, eloop
 from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_str, astype
 from .util import (
-	tracebacksuppressor, force_kill, AUTH, TEMP_PATH, EvalPipe, Request, api,
-	italics, ansi_md, colourise, colourise_brackets, maybe_json,
+	tracebacksuppressor, force_kill, AUTH, TEMP_PATH, FileHashDict, EvalPipe, Request, api,
+	italics, ansi_md, colourise, colourise_brackets, maybe_json, select_and_loads,
 	is_url, unyt, url2fn, get_duration, rename, uhash, expired,
 )
 from .audio_downloader import AudioDownloader
 
-# VERY HACKY removes deprecated audioop dependency for discord.py; this would cause volume transformations to fail but Miza uses FFmpeg for them anyway
+# VERY HACKY removes deprecated audioop dependency for discord.py; this would cause volume transformations to fail but we use FFmpeg for them anyway
 sys.modules["audioop"] = sys.__class__("audioop")
 import discord  # noqa: E402
 
@@ -48,7 +49,87 @@ client_fut = Future()
 ytdl_fut = esubmit(AudioDownloader, workers=1)
 
 class AudioPlayer(discord.AudioSource):
+	"""
+	AudioPlayer class for managing audio playback in a Discord voice channel.
+	Attributes:
+		cache (FileHashDict): Cache for storing player data.
+		defaults (dict): Default settings for the audio player.
+		players (dict): Dictionary of active players.
+		waiting (dict): Dictionary of waiting futures for players.
+		futs (dict): Dictionary of futures for player operations.
+		sources (dict): Dictionary of audio sources.
+		users (dict): Dictionary of fetched users.
+		fetched (dict): Dictionary of fetched user states.
+		vc (discord.VoiceClient): Voice client for the player.
+		args (list): Arguments for FFmpeg.
+		emptyopus (bytes): Empty opus packet data.
+		silent (bool): Indicates if the player is silent.
+		last_played (float): Timestamp of the last played audio.
+		last_activity (float): Timestamp of the last activity.
+	Methods:
+		join(cls, vcc, channel=None, user=None, announce=False):
+			Joins a voice channel and returns an AudioPlayer instance.
+		join_into(self, vcc, announce=False):
+			Connects to a voice channel and initializes the player.
+		find_user(cls, guild, user):
+			Finds a user in a guild.
+		ensure_speak(cls, vcc):
+			Ensures the bot has permission to speak in the voice channel.
+		speak(cls, vcc):
+			Requests permission to speak in a stage voice channel.
+		from_guild(cls, guild):
+			Retrieves an AudioPlayer instance from a guild.
+		disconnect(cls, guild, announce=False):
+			Disconnects from a voice channel.
+		leave(self, reason=None, dump=False):
+			Leaves the voice channel with an optional reason.
+		fetch_user(cls, u_id):
+			Fetches a user by their ID.
+		__init__(self, vcc=None, channel=None, queue=[], settings={}):
+			Initializes an AudioPlayer instance.
+		__getattr__(self, k):
+			Retrieves an attribute from the voice client or the current playing source.
+		epos(self):
+			Returns the current position and duration of the playing audio.
+		reverse(self):
+			Indicates if the audio is being played in reverse.
+		construct_options(self, full=True):
+			Constructs FFmpeg options based on the audio settings.
+		announce_play(self, entry):
+			Announces the currently playing audio.
+		announce(self, s, dump=False):
+			Sends an announcement message in the text channel.
+		get_dump(self):
+			Returns a JSON dump of the current queue and settings.
+		load_dump(self, b, uid=None, universal=False):
+			Loads a JSON dump into the player.
+		update_activity(self):
+			Updates the activity status of the player.
+		_updating_activity(self):
+			Pauses the player if the channel is empty for a certain period.
+		update_streaming(self):
+			Updates the streaming status of the player.
+		_updating_streaming(self):
+			Leaves the voice channel if the queue is empty for a certain period.
+		read(self):
+			Reads audio data from the current playing source.
+		enqueue(self, items, start=-1, stride=1):
+			Adds items to the queue.
+		skip(self, indices=0, loop=False, repeat=False, shuffle=False):
+			Skips the current playing audio.
+		seek(self, pos=0):
+			Seeks to a specific position in the current playing audio.
+		ensure_play(self, force=0):
+			Ensures the player is playing audio.
+		clear(self):
+			Clears the queue and stops playback.
+		is_opus(self):
+			Indicates if the audio is in opus format.
+		cleanup(self):
+			Cleans up resources used by the player.
+	"""
 
+	cache = FileHashDict(path="cache/vc.players")
 	defaults = {
 		"volume": 1,
 		"reverb": 0,
@@ -69,6 +150,7 @@ class AudioPlayer(discord.AudioSource):
 	}
 	players = {}
 	waiting = {}
+	futs = {}
 	sources = {}
 	users = {}
 	fetched = {}
@@ -94,24 +176,7 @@ class AudioPlayer(discord.AudioSource):
 				channel = await client.fetch_channel(cid)
 		gid = vcc.guild.id
 		if user is not None:
-			uid = cast_id(user)
-			member = vcc.guild.get_member(uid)
-			print(uid, member, vcc, vcc.guild, channel, cls.fetched.get(gid))
-			if uid not in cls.fetched.get(gid, ()) and (not member or not member.voice):
-				cls.fetched.setdefault(gid, set()).add(uid)
-				try:
-					data = await Request(
-						f"https://discord.com/api/{api}/guilds/{gid}/voice-states/{uid}",
-						authorise=True,
-						json=True,
-						aio=True,
-						timeout=32,
-					)
-				except ConnectionError:
-					pass
-				else:
-					print(data)
-					client._connection.parse_voice_state_update(data)
+			await cls.find_user(vcc.guild, user)
 		self = None
 		try:
 			self = cls.players[gid]
@@ -144,7 +209,8 @@ class AudioPlayer(discord.AudioSource):
 		else:
 			self.channel = channel
 		cls.waiting[gid] = Future()
-		csubmit(self.join_into(vcc, announce=announce))
+		cls.futs[gid] = csubmit(self.join_into(vcc, announce=announce))
+		cls.futs[gid].debug = self
 		return self
 
 	async def join_into(self, vcc, announce=False):
@@ -176,7 +242,7 @@ class AudioPlayer(discord.AudioSource):
 				pass
 			self.fut.set_result(None)
 			await self.ensure_speak(vcc)
-			if member.voice is not None and vcc.permissions_for(member).mute_members:
+			if member and member.voice is not None and vcc.permissions_for(member).mute_members:
 				if member.voice.deaf or member.voice.self_deaf or member.voice.mute or member.voice.afk:
 					csubmit(member.edit(mute=False))
 			if announce:
@@ -187,6 +253,32 @@ class AudioPlayer(discord.AudioSource):
 			return self
 		finally:
 			self.waiting.pop(gid, None)
+			self.futs.pop(gid, None)
+
+	@classmethod
+	async def find_user(cls, guild, user):
+		uid = cast_id(user)
+		if uid == client.user.id:
+			return
+		gid = cast_id(guild)
+		guild = client.get_guild(gid) or await client.fetch_guild(gid)
+		member = guild.get_member(uid)
+		if uid not in cls.fetched.get(gid, ()) and (not member or not member.voice):
+			print(uid, member, cls.fetched.get(gid))
+			cls.fetched.setdefault(gid, set()).add(uid)
+			try:
+				data = await Request(
+					f"https://discord.com/api/{api}/guilds/{gid}/voice-states/{uid}",
+					authorise=True,
+					json=True,
+					aio=True,
+					timeout=32,
+				)
+			except ConnectionError:
+				pass
+			else:
+				print(data)
+				client._connection.parse_voice_state_update(data)
 
 	@classmethod
 	async def ensure_speak(cls, vcc):
@@ -516,7 +608,42 @@ class AudioPlayer(discord.AudioSource):
 				setts.pop(k)
 		if setts:
 			data["settings"] = setts
+		elapsed, _length = self.epos
+		if elapsed:
+			data["settings"]["pos"] = elapsed
 		return maybe_json(data)
+
+	def load_dump(self, b, uid=None, universal=False):
+		try:
+			d = select_and_loads(b, size=268435456)
+		except orjson.JSONDecodeError:
+			d = [url for url in as_str(b).splitlines() if is_url(url)]
+			if not d:
+				raise
+			d = [dict(name=url2fn(url), url=url) for url in d]
+		if isinstance(d, list):
+			d = dict(queue=d)
+		for e in d["queue"]:
+			if uid:
+				e.setdefault("u_id", uid)
+			e["url"] = unyt(e["url"])
+		settings = d.get("settings")
+		if not settings:
+			settings = d.get("stats", {})
+			if settings.get("bitrate"):
+				settings["bitrate"] *= 100
+		# In universal mode, all settings are copied to the player
+		if not universal:
+			settings.pop("pause", None)
+			settings.pop("pos", None)
+		pos = settings.pop("pos", None)
+		self.settings.update({k: v for k, v in settings.items() if k in self.defaults})
+		self.queue.fill(map(cdict, d["queue"]))
+		if pos is not None:
+			esubmit(self.seek, pos)
+		else:
+			esubmit(self.ensure_play, 2)
+		return list(self.queue)
 
 	updating_activity = None
 	def update_activity(self):
@@ -656,15 +783,19 @@ class AudioPlayer(discord.AudioSource):
 		return resp
 
 	def seek(self, pos=0):
-		if not self.queue or not self.playing:
+		if not self.queue:
 			return
-		self.pause()
-		source = AF.load(self.queue[0]).create_reader(self, pos=pos)
-		source.new = False
-		self.playing[0], _ = source, self.playing[0].close()
-		if not self.settings.pause:
-			self.resume()
-		self.ensure_play()
+		with self.ensure_lock:
+			self.pause()
+			source = AF.load(self.queue[0]).create_reader(self, pos=pos)
+			source.new = False
+			if self.playing:
+				self.playing[0], _ = source, self.playing[0].close()
+			else:
+				self.playing.append(source)
+			if not self.settings.pause:
+				self.resume()
+		return self.ensure_play()
 
 	# force=0: normal (only play if not currently playing)
 	# force=1: always regenerate readers (this updates audio settings)
@@ -736,6 +867,20 @@ AP = AudioPlayer
 
 
 class PipedReader(io.IOBase):
+	"""
+	A custom IOBase class that reads data from a piped source.
+	Attributes:
+		pl: An object containing the piped data and synchronization primitives.
+		pos: The current position in the piped data.
+	Methods:
+		__init__(pl):
+			Initializes the PipedReader with the given piped data object.
+		read(nbytes=None):
+			Reads data from the piped source. If nbytes is None, reads until the end of the piped data.
+			If nbytes is specified, reads up to nbytes bytes from the current position.
+		close():
+			Closes the PipedReader. This method is a no-op and returns the PipedReader instance.
+	"""
 
 	def __init__(self, pl):
 		self.pl = pl
@@ -775,6 +920,26 @@ class PipedReader(io.IOBase):
 		return self
 
 class PipedLoader:
+	"""
+	A class to handle loading data from a file-like object and writing it to a temporary file, 
+	which is then renamed to the target path upon completion.
+	Attributes:
+		buffer (int): The current size of the buffer.
+		end (float): The end position of the buffer.
+		fp (file-like object): The file-like object to read from.
+		path (str): The target path to write the data to.
+		temp (str): The temporary file path.
+		file (file object): The file object for the temporary file.
+		cv (threading.Condition): A condition variable for synchronization.
+		lock (threading.Lock): A lock for thread-safe operations.
+		callback (callable): A callback function to be called upon completion.
+	Methods:
+		loading():
+			Reads data from the file-like object in chunks and writes it to the temporary file.
+			Renames the temporary file to the target path upon completion.
+		open():
+			Returns a PipedReader instance for reading the loaded data.
+	"""
 
 	def __init__(self, fp, path, efp=None, callback=None):
 		self.buffer = 0
@@ -834,8 +999,28 @@ class PipedLoader:
 		return PipedReader(self)
 
 
-# Represents a cached audio file in opus format. Executes and references FFmpeg processes loading the file.
 class AudioFile:
+	"""
+	A class to represent an audio file with caching and streaming capabilities.
+	Attributes
+	----------
+	cached : dict
+		A class-level dictionary to cache audio files.
+	Methods
+	-------
+	__str__():
+		Returns a string representation of the AudioFile object.
+	load(entry, asap=True):
+		Class method to load an audio file from a given entry.
+	live():
+		Property to check if the audio file is a live stream.
+	open():
+		Creates a reader object that reads bytes or opus packets from the file.
+	create_reader(auds, pos=0):
+		Creates a reader, selecting from direct opus file, single piped FFmpeg, or double piped FFmpeg.
+	proc_expired():
+		Property to check if the FFmpeg process has expired.
+	"""
 
 	cached = {}
 
@@ -1019,8 +1204,27 @@ class AudioFile:
 		return not self.proc or not self.proc.is_running()
 
 
-# Audio reader for fully loaded files. FFmpeg with single pipe for output.
 class LoadedAudioReader(discord.AudioSource):
+	"""
+	LoadedAudioReader is a custom audio source class for discord.py that reads audio data from a file using a subprocess.
+	Attributes:
+		speed (int): The speed at which the audio is read. Default is 1.
+		closed (bool): Indicates if the audio reader is closed.
+		args (list): The arguments for the subprocess.
+		proc (psutil.Popen): The subprocess for reading audio data.
+		packet_iter (iterator): An iterator for reading packets from the Ogg stream.
+		af (file): The audio file.
+		file (file): The audio file.
+		pos (int): The current position in the audio stream.
+		new (bool): Indicates if the audio reader is new.
+	Methods:
+		__init__(file, args): Initializes the LoadedAudioReader with the given file and arguments.
+		read(): Reads the next packet of audio data.
+		start(): Starts reading audio data and returns the audio reader.
+		close(*void1, **void2): Closes the audio reader and terminates the subprocess.
+		cleanup(*void1, **void2): Alias for the close method.
+		is_opus(): Returns True indicating the audio is in Opus format.
+	"""
 
 	speed = 1
 
@@ -1083,8 +1287,35 @@ class LoadedAudioReader(discord.AudioSource):
 AF = AudioFile
 
 
-# Audio player for audio files still being written to. Continuously reads and sends data to FFmpeg process, only terminating when file download is confirmed to be finished.
 class BufferedAudioReader(discord.AudioSource):
+	"""
+	BufferedAudioReader is a custom audio source for Discord that reads audio data from a file and streams it using FFmpeg.
+	Attributes:
+		speed (int): The speed at which the audio is read. Default is 1.
+		closed (bool): Indicates whether the audio reader is closed.
+		args (list): Arguments for the FFmpeg process.
+		proc (psutil.Popen): The FFmpeg process.
+		packet_iter (iterator): Iterator for Ogg packets.
+		file (str): The file path of the audio file.
+		af (str): Alias for the file path.
+		stream (file object): The audio stream.
+		pos (int): The current position in the audio stream.
+		new (bool): Indicates whether the audio stream is new.
+		buffer (bytes): Buffer for audio data.
+	Methods:
+		__init__(file, args, stream):
+			Initializes the BufferedAudioReader with the given file, arguments, and stream.
+		read():
+			Reads the next packet of audio data.
+		run():
+			Continuously reads data from the stream and writes it to the FFmpeg process.
+		start():
+			Starts the audio reader by running the loading loop in a parallel thread.
+		close():
+			Closes the audio reader and terminates the FFmpeg process.
+		is_opus():
+			Returns True, indicating that the audio is in Opus format.
+	"""
 
 	speed = 1
 
@@ -1152,6 +1383,16 @@ class BufferedAudioReader(discord.AudioSource):
 
 
 class AudioClient(discord.AutoShardedClient):
+	"""
+	AudioClient is a subclass of discord.AutoShardedClient designed to handle audio-related functionalities.
+	Attributes:
+		intents (discord.Intents): The intents configuration for the client, specifying which events the bot should receive.
+	Methods:
+		__init__(): Initializes the AudioClient instance with specific configurations such as event loop, heartbeat timeout, and status.
+	Note:
+		- The client is configured with specific intents to optimize performance and limit the events received.
+		- The initialization includes setting up the event loop and other configurations necessary for the client's operation.
+	"""
 
 	intents = discord.Intents(
 		guilds=True,
@@ -1238,9 +1479,19 @@ async def kill():
 
 @client.event
 async def on_connect():
-	if not client_fut.done():
-		client_fut.set_result(client)
 	with tracebacksuppressor:
+		if not client_fut.done():
+			client_fut.set_result(client)
+			# Restore audio players from cache
+			print(AP.cache.keys())
+			for gid in tuple(AP.cache):
+				vcci, ci, dump, mis = AP.cache[gid]
+				print(vcci, ci, len(dump), mis)
+				a = await AP.join(vcci, ci)
+				a.load_dump(dump, universal=True)
+				for mid in mis:
+					await a.find_user(gid, mid)
+				AP.cache.pop(gid, None)
 		print("Audio client successfully connected.")
 
 @client.event
@@ -1251,6 +1502,7 @@ async def on_ready():
 		except KeyError:
 			return
 		a.update_activity()
+	AP.cache.sync()
 
 @client.event
 async def on_voice_state_update(member, before, after):
@@ -1263,6 +1515,20 @@ async def on_voice_state_update(member, before, after):
 		return
 	a.update_activity()
 
+async def terminate():
+	for k, a in tuple(AP.players.items()):
+		if a.queue:
+			AP.cache[k] = (a.vcc.id, a.channel and a.channel.id, a.get_dump(), [m.id for m in a.vcc.members])
+		await a.leave(
+			reason="Temporary maintenance",
+			dump=bool(a.queue),
+		)
+	fut = csubmit(client.close())
+	AP.cache.sync()
+	await asubmit(ytdl.close)
+	await fut
+	return sys.exit()
+
 
 if __name__ == "__main__":
 	pid = os.getpid()
@@ -1274,12 +1540,5 @@ if __name__ == "__main__":
 		globals()["ytdl"] = fut.result()
 
 	ytdl_fut.add_done_callback(startup)
-
-	import atexit
-	def cleanup():
-		if ytdl:
-			ytdl.cache.db.sync()
-	atexit.register(cleanup)
-
 	discord.client._loop = eloop
 	eloop.run_until_complete(client.start(AUTH["discord_token"]))

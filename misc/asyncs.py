@@ -777,7 +777,7 @@ class SemaphoreOverflowError(RuntimeError):
 
 
 class Delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
-	"A context manager that delays the return of a function call."
+	"A context manager that delays the return of a function call, using the elapsed time as reference."
 
 	def __init__(self, duration=0):
 		self.duration = duration

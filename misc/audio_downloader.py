@@ -1220,3 +1220,4 @@ class AudioDownloader:
 		for worker in self.workers:
 			worker.terminate()
 		self.workers.clear()
+		self.search_cache.db.sync()

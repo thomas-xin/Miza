@@ -2,10 +2,19 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta content="Media Downloader" property="og:title">
+	<meta content="Download or convert any audio or video file here!" property="og:description">
+	<meta content="https://mizabot.xyz/downloader" property="og:url">
+	<meta property="og:image" content="https://nerdist.com/wp-content/uploads/2020/07/maxresdefault.jpg">
+	<meta content="#000000" data-react-helmet="true" name="theme-color">
 	<title>All-Purpose Media Downloader</title>
 	<link href='https://fonts.googleapis.com/css?family=Agbalumo' rel='stylesheet'>
 	<style>
+html {
+	height: 100%;
+	background: linear-gradient(135deg, #000000, #001f3f);
+}
 body {
 	font-family: Agbalumo, cursive, sans-serif;
 	margin-top: 5vh;
@@ -14,7 +23,6 @@ body {
 	display: grid;
 	align-items: start;
 	justify-content: center;
-	background-color: #000000;
 	color: white;
 }
 .container {
@@ -24,7 +32,7 @@ body {
 	align-items: center;
 	justify-content: center;
 	max-width: 90vw;
-	background-color: #001f3f;
+	background: linear-gradient(135deg, #001f3f, #003f3f);
 	padding: 16px;
 	border-radius: 0px 20px 0px 20px;
 	border: solid 2px #00ffff;
@@ -34,8 +42,8 @@ body {
 	margin: 4px;
 	display: grid;
 	place-items: center;
-	background-color: #003f3f;
-	border: solid 2px #00ff7f;
+	background: linear-gradient(135deg, #3f3f3f, #5f5f5f);
+	border: solid 2px #ffffff;
 	padding: 12px;
 	border-radius: 8px;
 }
@@ -61,13 +69,13 @@ button {
 	transform: translate(-50%, 0px);
 	padding: 10px 15px;
 	border: none;
-	background-color: #0056b3;
+	background: linear-gradient(135deg, #003fbf, #007fff);
 	color: #ffffff;
 	border-radius: 5px;
 	cursor: pointer;
 }
 button:hover {
-	background-color: #007bff;
+	background: linear-gradient(135deg, #007fff, #00bfff);
 }
 #fileInfo {
 	margin-top: 20px;
@@ -82,14 +90,14 @@ a:hover {
 .progress-container {
 	width: 90%;
 	height: 8px;
-	background-color: #000000;
+	background: linear-gradient(135deg, #000000, #001f3f);
 	border-radius: 10px;
 	position: relative;
 	margin: 8px;
 }
 .progress-bar {
 	height: 100%;
-	background-color: #7f7f7f;
+	background: linear-gradient(135deg, #7f7f7f, #bfbfbf);
 	border-radius: 4px;
 	position: absolute;
 	width: 0%;
@@ -103,6 +111,21 @@ a:hover {
 	top: 50%;
 	transform: translate(-50%, -50%);
 	cursor: pointer;
+}
+#submit {
+	position: relative;
+	width: 60%;
+	display: none;
+}
+#submit .progress-bar {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 0;
+	height: 100%;
+	background: linear-gradient(135deg, #00ffff, #00bfff);
+	border-radius: 5px;
+	z-index: -1;
 }
 	</style>
 </head>
@@ -123,9 +146,15 @@ a:hover {
 	</div>
 	<div id="previews" class="container" style="display:none">
 	</div>
-	<button id="submit" style="width:60%; display:none" onclick="download()">Download</button>
+	<button id="submit" onclick="downloadAll()">
+		<span>Download</span>
+		<div class="progress-bar"></div>
+	</button>
 </body>
 <script>
+//download.js v4.2, by dandavis; 2008-2017. [MIT] see http://danml.com/download.html for tests/usage
+;(function(r,l){"function"==typeof define&&define.amd?define([],l):"object"==typeof exports?module.exports=l():r.download=l()})(this,function(){return function l(a,e,k){function q(a){var h=a.split(/[:;,]/);a=h[1];var h=("base64"==h[2]?atob:decodeURIComponent)(h.pop()),d=h.length,b=0,c=new Uint8Array(d);for(b;b<d;++b)c[b]=h.charCodeAt(b);return new f([c],{type:a})}function m(a,b){if("download"in d)return d.href=a,d.setAttribute("download",n),d.className="download-js-link",d.innerHTML="downloading...",d.style.display="none",document.body.appendChild(d),setTimeout(function(){d.click(),document.body.removeChild(d),!0===b&&setTimeout(function(){g.URL.revokeObjectURL(d.href)},250)},66),!0;if(/(Version)\/(\d+)\.(\d+)(?:\.(\d+))?.*Safari\//.test(navigator.userAgent))return/^data:/.test(a)&&(a="data:"+a.replace(/^data:([\w\/\-\+]+)/,"application/octet-stream")),!window.open(a)&&confirm("Displaying New Document\n\nUse Save As... to download, then click back to return to this page.")&&(location.href=a),!0;var c=document.createElement("iframe");document.body.appendChild(c),!b&&/^data:/.test(a)&&(a="data:"+a.replace(/^data:([\w\/\-\+]+)/,"application/octet-stream")),c.src=a,setTimeout(function(){document.body.removeChild(c)},333)}var g=window,b=k||"application/octet-stream",c=!e&&!k&&a,d=document.createElement("a");k=function(a){return String(a)};var f=g.Blob||g.MozBlob||g.WebKitBlob||k,n=e||"download",f=f.call?f.bind(g):Blob;"true"===String(this)&&(a=[a,b],b=a[0],a=a[1]);if(c&&2048>c.length&&(n=c.split("/").pop().split("?")[0],d.href=c,-1!==d.href.indexOf(c))){var p=new XMLHttpRequest;return p.open("GET",c,!0),p.responseType="blob",p.onload=function(a){l(a.target.response,n,"application/octet-stream")},setTimeout(function(){p.send()},0),p}if(/^data:([\w+-]+\/[\w+.-]+)?[,;]/.test(a)){if(!(2096103.424<a.length&&f!==k))return navigator.msSaveBlob?navigator.msSaveBlob(q(a),n):m(a);a=q(a),b=a.type||"application/octet-stream"}else if(/([\x80-\xff])/.test(a)){e=0;var c=new Uint8Array(a.length),t=c.length;for(e;e<t;++e)c[e]=a.charCodeAt(e);a=new f([c],{type:b})}a=a instanceof f?a:new f([a],{type:b});if(navigator.msSaveBlob)return navigator.msSaveBlob(a,n);if(g.URL)m(g.URL.createObjectURL(a),!0);else{if("string"==typeof a||a.constructor===k)try{return m("data:"+b+";base64,"+g.btoa(a))}catch(h){return m("data:"+b+","+encodeURIComponent(a))}b=new FileReader,b.onload=function(a){m(this.result)},b.readAsDataURL(a)}return!0}});
+
 function timeDisp(s, rounded = true) {
 	"Returns a representation of a time interval using days:hours:minutes:seconds.";
 	if (!isFinite(s)) {
@@ -210,10 +239,11 @@ function updateSearched() {
 	previews = document.getElementById("previews");
 	submit = document.getElementById("submit");
 	query = document.getElementById("query").value;
+	submit = document.getElementById("submit");
+	submit.querySelector("span").textContent = "Download";
 	if (query == lastSearch) return;
 	lastSearch = query;
 	previews.style.display = "none";
-	// console.log(query);
 	if (!query) return;
 	previews.textContent = "Loading...";
 	previews.style.display = "block";
@@ -221,11 +251,11 @@ function updateSearched() {
 	fetch(`/ytdl?q=${component}`).then((response) => response.json()).then((data) => {
 		previews.style.display = "none";
 		previews.textContent = "";
-		// console.log(data);
 		data.forEach((e, i) => {
 			const preview = document.createElement("div");
 			name = e.name;
 			preview.name = name;
+			preview.url = e.url;
 			preview.className = "entry";
 			title = document.createElement("p");
 			title.style.margin = "0";
@@ -256,8 +286,8 @@ function updateSearched() {
 				[h, s, l] = rgbToHsl(r, g, b);
 				preview.animate(
 					[
-						{ backgroundColor: "#003f3f", border: "solid 2px #00ff7f" },
-						{ backgroundColor: `hsl(${h},${s}%,25%)`, border: `solid 2px hsl(${h},${s}%,50%)` }
+						{ background: "linear-gradient(135deg, #003f3f, #005f5f)", border: "solid 2px #00ff7f" },
+						{ background: `linear-gradient(135deg, hsl(${h},${s}%,25%), hsl(${h},${s}%,35%))`, border: `solid 2px hsl(${h},${s}%,50%)` }
 					],
 					{ duration: 500, easing: "linear", fill: "forwards" },
 				);
@@ -266,16 +296,16 @@ function updateSearched() {
 					if (!e["duration"]) return;
 					const progressContainer = document.createElement("div");
 					progressContainer.className = "progress-container";
-					progressContainer.style.backgroundColor = `hsl(${h},${s2}%,12.5%)`;
+					progressContainer.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,12.5%), hsl(${h},${s2}%,22.5%))`;
 					const progressBar = document.createElement("div");
 					progressBar.className = "progress-bar";
-					progressBar.style.backgroundColor = `hsl(${h},${s2}%,50%)`;
+					progressBar.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,50%), hsl(${h},${s2}%,60%))`;
 					const progressStart = document.createElement("div");
 					progressStart.className = "progress-thumb";
-					progressStart.style.backgroundColor = `hsl(${h},${s2}%,75%)`;
+					progressStart.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
 					const progressEnd = document.createElement("div");
 					progressEnd.className = "progress-thumb";
-					progressEnd.style.backgroundColor = `hsl(${h},${s2}%,75%)`;
+					progressEnd.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
 
 					preview.updateProgress = () => {
 						if (preview.startP > preview.endP) {
@@ -319,11 +349,11 @@ function updateSearched() {
 							}
 							document.addEventListener('mousemove', progressStartDrag);
 							document.addEventListener('mouseup', () => {
-								progressStart.style.backgroundColor = `hsl(${h},${s2}%,75%)`;
+								progressStart.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
 								progressStart.dragging = false;
 								document.removeEventListener('mousemove', progressStartDrag);
 							}, { once: true });
-							progressStart.style.backgroundColor = "#ffffff";
+							progressStart.style.background = "#ffffff";
 							progressStart.dragging = true;
 							preview.startP = progress;
 							preview.updateProgress();
@@ -337,11 +367,11 @@ function updateSearched() {
 							}
 							document.addEventListener('mousemove', progressEndDrag);
 							document.addEventListener('mouseup', () => {
-								progressEnd.style.backgroundColor = `hsl(${h},${s2}%,75%)`;
+								progressEnd.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
 								progressEnd.dragging = false;
 								document.removeEventListener('mousemove', progressEndDrag);
 							}, { once: true });
-							progressEnd.style.backgroundColor = "#ffffff";
+							progressEnd.style.background = "#ffffff";
 							progressEnd.dragging = true;
 							preview.endP = progress;
 							preview.updateProgress();
@@ -368,28 +398,37 @@ function updateSearched() {
 }
 const debouncedSearch = debounce(updateSearched, 500);
 document.getElementById("query").value = lastSearch;
-function download() {
+function downloadAll() {
 	submit = document.getElementById("submit");
-	submit.textContent = "Loading...";
+	submit.querySelector("span").textContent = "Loading...";
 	submit.disabled = true;
-	Array.from(document.getElementById("previews").children).forEach((preview, i) => {
+	children = document.getElementById("previews").children;
+	count = children.length;
+	let delay = 0;
+	let successful = 0;
+	const progressBar = submit.querySelector(".progress-bar");
+	fmt = document.querySelector('input[name="output-format"]:checked').value;
+	Array.from(children).forEach((preview, i) => {
 		check = preview.children[0].children[0];
 		if (!check.checked) return;
-		fmt = document.querySelector('input[name="output-format"]:checked').value;
-		a = document.createElement("a");
-		a.href = "/ytdl?d=" + encodeURIComponent(preview.children[0].children[1].href) + "&fmt=" + fmt;
-		if (preview.start) {
-			a.href += "&start=" + preview.start;
-		}
-		if (preview.end && preview.end != preview.duration) {
-			a.href += "&end=" + preview.end;
-		}
-		a.click();
+		const href = "/ytdl?d=" + encodeURIComponent(preview.url) + "&fmt=" + fmt;
+		setTimeout(() => {
+			fetch(href).then((response) => response.blob()).then((blob) => {
+				download(blob, preview.name + "." + fmt);
+				successful++;
+				submit.querySelector("span").textContent = `Downloading (${successful}/${count})...`;
+				progressBar.style.width = `${(successful / count) * 100}%`;
+				if (successful >= count) {
+					setTimeout(() => {
+						submit.disabled = false;
+						submit.querySelector("span").textContent = "Download (Complete)";
+						progressBar.style.width = "0%";
+					}, 1000);
+				}
+			});
+		}, delay);
+		delay += (preview.duration || 300) * 10;
 	});
-	setTimeout(() => {
-		submit.disabled = false;
-		submit.textContent = "Download";
-	}, 3000);
 }
 </script>
 </html>

@@ -331,8 +331,7 @@ json_like = dict | list_like | str | number | bool | None
 
 
 class cdict(dict):
-	
-	"""Class-based dictionary, with attributes corresponding to keys."""
+	"""Class-like dictionary, with attributes corresponding to keys."""
 
 	__slots__ = ("__weakref__",)
 
@@ -621,6 +620,7 @@ def exclusive_set(range, *excluded):
 
 
 class RangeSet(collections.abc.Iterable):
+	"""A set of ranges of integers. Ranges are stored as mutually exclusive tuples of (start, stop), and may be iterated as if they were a single range."""
 
 	__slots__ = ("ranges",)
 
@@ -1218,10 +1218,20 @@ eval_const = {
 	"Infinity": inf,
 }
 
-# Not completely safe, but much safer than regular eval
 @functools.lru_cache(maxsize=64)
 def safe_eval(s):
-	return eval(as_str(s).replace("__", ""), {}, eval_const) if not (isinstance(s, str) and s.isnumeric()) else int(s)
+	"""Safely evaluates a string as a Python expression. Builtins and private attributes are stripped."""
+	a = ast.parse(s, mode="eval")
+	class BannedAttributes(ast.NodeTransformer):
+		def visit_Attribute(self, node):
+			if isinstance(node.attr, str):
+				if node.attr.startswith("_") or node.attr.endswith("_"):
+					node.attr = node.attr.strip("_")
+				return node
+			raise AttributeError(node.attr)
+	BannedAttributes().visit(a)
+	code = compile(a, filename="<math-input>", mode="eval")
+	return eval(code, {}, eval_const)
 
 def nop(*void1, **void2) -> None:
 	return None
@@ -1237,6 +1247,7 @@ def is_exception(e):
 	return isinstance(e, BaseException) or isinstance(e, type) and issubclass(e, BaseException)
 
 def coerce(data, k, cls=None, default=Dummy):
+	"""Coerces a value in a dictionary to a specified type. The type should be a callable that returns the coerced value."""
 	try:
 		v = data[k]
 	except LookupError:
@@ -1249,6 +1260,7 @@ def coerce(data, k, cls=None, default=Dummy):
 	return v
 
 def coercedefault(data, k, cls=None, default=Dummy):
+	"""Coerces a value in a dictionary to a specified type. The type should be a callable that returns the coerced value. Unlike coerce, this function will also set the default value if the key is not found."""
 	try:
 		v = data[k]
 	except LookupError:
@@ -1319,6 +1331,7 @@ TMR = TooManyRequests
 CCE = CommandCancelledError
 
 class T(object):
+	"A generic helper class for managing types, attributes, and methods."
 
 	__slots__ = ("obj",)
 
@@ -1393,7 +1406,7 @@ class T(object):
 		return updatedefault(self, other)
 
 class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
-	"A context manager that sends exception tracebacks to stdout."
+	"A context manager that sends exception tracebacks to stderr."
 
 	def __init__(self, *args, fn=print_exc, **kwargs):
 		self.fn = fn

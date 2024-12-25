@@ -217,6 +217,25 @@ class ImageSequence(Image.Image):
 			return getattr(im, key)
 
 def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
+	"""
+	Convert a byte stream into an image or image sequence.
+
+	Parameters:
+	b (bytes): The byte stream to convert.
+	save (str, optional): Path to save the image. Defaults to None.
+	nogif (bool, optional): If True, only the first frame of the image is processed. Defaults to False.
+	maxframes (int, optional): Maximum number of frames to process. Defaults to inf.
+	orig (str, optional): Original file path, used for specific formats like m3u8. Defaults to None.
+	msize (int, optional): Maximum size for the image. Defaults to None.
+
+	Returns:
+	Image or ImageSequence: The resulting image or sequence of images.
+
+	Raises:
+	FileNotFoundError: If the image file is not found.
+	TypeError: If the file type is not supported.
+	RuntimeError: If an error occurs during processing.
+	"""
 	if b[:4] == b"<svg" or b[:5] == b"<?xml":
 		import wand
 		import wand.image
@@ -650,6 +669,7 @@ def from_colour(colour, size=128, key=None):
 	return Image.new("RGB" + "A" * (len(colour) > 3), (size, size), tuple(colour))
 
 def from_gradient(shape, colour, background, repetitions=1, size=960, colourspace="rgb", output="pil"):
+	"Generates an image from a gradient."
 	if len(colour) > 3 or len(background) > 3:
 		if len(colour) < 4:
 			colour = (*colour, background[3])
@@ -814,6 +834,21 @@ def remove_p(image):
 	return image
 
 def optimise(im, keep_rgb=True, recurse=True, max_frames=60):
+	"""
+	Optimizes the given image or sequence of images by converting their modes based on certain conditions.
+
+	Parameters:
+	im (PIL.Image or iterable): The image or sequence of images to be optimized.
+	keep_rgb (bool, optional): If True, keeps the image in RGB mode if possible. Defaults to True.
+	recurse (bool, optional): If True, allows recursion for sequences of images. Defaults to True.
+	max_frames (int, optional): The maximum number of frames to process in a sequence. Defaults to 60.
+
+	Returns:
+	PIL.Image or list: The optimized image or list of optimized images.
+
+	Raises:
+	TypeError: If the input is not an image or a sequence of images, or if the image is a dictionary.
+	"""
 	try:
 		if not recurse:
 			raise TypeError
@@ -1234,6 +1269,23 @@ def sync_fps(props, duration=None, fps=None):
 	return seconds, fps, prog
 
 def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", retrieve=False, **kwargs):
+	"""
+	Synchronizes and maps a function over a sequence of images.
+	Args:
+		images (list): List of image URLs or image objects.
+		*args: Additional positional arguments to pass to the mapping function.
+		func (callable): Function to apply to the synchronized images.
+		duration (float, optional): Duration in seconds for the synchronization. Defaults to None.
+		fps (int, optional): Frames per second for the synchronization. Defaults to None.
+		keep_size (str, optional): Determines how to handle image sizes. Options are "exact", "approx", or None. Defaults to "approx".
+		retrieve (bool, optional): If True, retrieves images from URLs. Defaults to False.
+		**kwargs: Additional keyword arguments to pass to the mapping function.
+	Returns:
+		dict: A dictionary containing:
+			- 'duration' (int): Duration in milliseconds.
+			- 'count' (int): Number of frames.
+			- 'frames' (generator): Generator yielding the mapped frames.
+	"""
 	if retrieve:
 		sources = [get_image(url) for url in images]
 	else:
@@ -1257,7 +1309,6 @@ def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", r
 	else:
 		others = sources[1:]
 	mapped_sources = (sources[0], *others)
-	print("SIZES:", keep_size, [im.size for im in mapped_sources])
 	def map_iter():
 		for i in range(count):
 			ims = []
@@ -1306,7 +1357,7 @@ def rainbow_map(images, mode, progress=0, **kwargs):
 @sync_animations
 def pet_map(images, squeeze, progress=0, **kwargs):
 	image = images[0]
-	pet = get_image("https://mizabot.xyz/u/EBjYrqCEUDw", cache=True)
+	pet = get_image("https://mizabot.xyz/u/2omMy8VUGJ5GOH3AIJxw3wJ5yQrU/EBjYrqCEUDw.zip", cache=True)
 	w, h = image.width * 2.5, image.height * 2.5
 	if w < 256 and h < 256:
 		w, h = max_size(w, h, 256, force=True)
@@ -1320,7 +1371,6 @@ def pet_map(images, squeeze, progress=0, **kwargs):
 	im.paste(image.resize((round_random(wm * w), round_random(hm * h)), resample=Resampling.LANCZOS), (round_random(ox * w), round_random(oy * h)))
 	i = floor(progress * len(pet))
 	pet.seek(i)
-	print("PET:", pet, pet.im, pet.resize, len(pet), pet._position, pet._images[pet._position])
 	pet2 = pet.resize((w, h), resample=Resampling.LANCZOS)
 	im.paste(pet2, mask=pet2)
 	return im.resize((round(w / 2), round(h / 2)), resample=Resampling.LANCZOS)
@@ -1350,6 +1400,24 @@ def scroll_map(images, direction, progress=0, **kwargs):
 	return ImageChops.offset(image, xm, ym)
 
 def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=None, **kwargs):
+	"""
+	Resize an image or a sequence of images based on the specified parameters.
+	Parameters:
+	image (PIL.Image.Image): The image to be resized.
+	extras (list): Additional images to be processed.
+	duration (int): Duration of the output in milliseconds.
+	fps (int): Frames per second for the output.
+	operation (str): The type of resizing operation ('rel', 'max', 'mult', 'set').
+	x (int or float): The target width or scaling factor.
+	y (int or float): The target height or scaling factor.
+	mode (str, optional): The resizing mode ('auto', 'nearest', 'linear', 'cubic', 'area', 'hamming', 'lanczos', 'crop'). Default is 'auto'.
+	area (int, optional): The target area for resizing. Default is None.
+	**kwargs: Additional keyword arguments.
+	Returns:
+	PIL.Image.Image or dict: The resized image or a dictionary containing the resized frames and metadata if processing a sequence of images.
+	Raises:
+	RuntimeError: If there is an error during the resizing process.
+	"""
 	prop = properties(image)
 	duration, fps, prog = sync_fps([prop], duration, fps)
 	if operation == "rel":

@@ -496,10 +496,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	server = None
 	server_start_sem = Semaphore(1, 0, rate_limit=5)
 	def start_webserver(self):
-		if self.closing:
-			return
 		with self.server_start_sem:
 			if self.server:
+				try:
+					self.server.run("terminate()", timeout=8)
+				except Exception:
+					print_exc()
 				self.server.terminate()
 			if os.path.exists("misc/x_server.py") and PORT:
 				print("Starting webserver...")
@@ -513,6 +515,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	def start_audio_client(self):
 		if self.audio:
+			try:
+				self.audio.run("terminate()", timeout=8)
+			except Exception:
+				print_exc()
 			self.audio.terminate()
 		if os.path.exists("misc/x_audio.py"):
 			print("Starting audio client...")
@@ -1032,100 +1038,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if not isinstance(channel, discord.abc.PrivateChannel):
 				self.cache.channels[c_id] = channel
 			return channel
-		channel = self.cache.channels[c_id] = cdict(
-			id=c_id,
-			name=f"<#{c_id}>",
-			mention=f"<#{c_id}>",
-			guild=None,
-			_data=dict(id=c_id),
-			_state=self._state,
-			_members={self.id: self.user},
-			_type=11,
-			type=11,
-			guild_id=None,
-			owner_id=self.id,
-			owner=self.user,
-			parent_id=None,
-			parent=None,
-			last_message_id=None,
-			message_count=1,
-			member_count=1,
-			slowmode_delay=0,
-			me=self.user,
-			locked=False,
-			archived=False,
-			archiver_id=None,
-			auto_archive_duration=inf,
-			archive_timestamp=inf,
-			permissions_for=lambda *args: 0,
-			join=async_nop,
-			leave=async_nop,
-		)
-		channel.update(dict(
-			thread=channel,
-			_get_channel=lambda: as_fut(channel),
-			is_private=lambda: channel._type == 12,
-			is_news=lambda: channel._type == 10,
-			is_nsfw=lambda: is_nsfw(channel.parent),
-			delete_messages=lambda *args, **kwargs: discord.channel.TextChannel.delete_messages(channel, *args, **kwargs),
-			purge=lambda *args, **kwargs: discord.channel.TextChannel.purge(channel, *args, **kwargs),
-			edit=lambda *args, **kwargs: discord.channel.TextChannel.edit(channel, *args, **kwargs),
-			add_user=lambda user: Request(
-				f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/{verify_id(user)}",
-				method="PUT",
-				authorise=True,
-				aio=True,
-			),
-			remove_user=lambda user: Request(
-				f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/{verify_id(user)}",
-				method="DELETE",
-				authorise=True,
-				aio=True,
-			),
-			delete=lambda reason=None: discord.abc.GuildChannel.delete(channel, reason=reason),
-			_add_member=lambda member: self._members.__setitem__(member.id, member),
-			_pop_member=lambda m_id: self._members.pop(m_id, None),
-			send=lambda *args, **kwargs: discord.abc.Messageable.send(channel, *args, **kwargs),
-			trigger_typing=lambda: self._state.http.send_typing(channel.id),
-			typing=lambda: discord.abc.Messageable.typing(channel),
-			fetch_message=lambda id: discord.abc.Messageable.fetch_message(channel, id),
-			pins=lambda: discord.abc.Messageable.pins(channel),
-			history=lambda *args, **kwargs: discord.abc.Messageable.history(channel, *args, **kwargs),
-		))
-		csubmit(self.manage_thread(channel))
-		return channel
-
-	async def manage_thread(self, channel):
-		Request(
-			f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/@me",
-			method="POST",
-			authorise=True,
-			aio=True,
-		)
-		data = await Request(
-			f"https://discord.com/api/{api}/channels/{channel.id}",
-			authorise=True,
-			aio=True,
-			json=True,
-		)
-		channel.guild_id = int(data["guild_id"])
-		channel.guild = self.get_guild(channel.guild_id)
-		channel.parent_id = int(data.get("parent_id", 0))
-		channel.parent = channel.guild.get_channel(channel.parent_id) or self.get_channel(channel.parent_id)
-		channel.permissions_for = channel.parent.permissions_for
-		channel.owner_id = int(data.get("owner_id", 0))
-		channel.owner = channel.guild.get_member(channel.owner_id) or self.get_user(channel.owner_id)
-		channel.type = data["type"]
-		channel.name = data["name"]
-		channel.last_message_id = int(data.get("last_message_id") or 0) or None
-		channel.slowmode_delay = data.get("rate_limit_per_user") or 0
-		channel.message_count = data.get("message_count", 0)
-		channel.member_count = data.get("member_count", 0)
-		meta = data.get("thread_metadata", {})
-		channel.update(meta)
-		if channel.get("archiver_id"):
-			channel.archiver_id = int(channel.archiver_id)
-		channel.locked = channel.get("locked")
+		raise KeyError(f"Channel {c_id} not found.")
 
 	async def refresh_message(self, message):
 		message = await self._fetch_message(message.id, message.channel)
@@ -5756,7 +5669,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 												blocked = True
 										try:
 											new_content = add_content(old_content, content)
-											fut = csubmit(manager.update(new_content, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), force=False, done=False))
+											if len(new_content) >= 32 or "." in new_content:
+												fut = csubmit(manager.update(new_content, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), force=False, done=False))
 										except OverflowError:
 											blocked = True
 										else:
@@ -7156,6 +7070,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 		class StreamedMessage:
 			"Semi discord.py-compatible message object that enables management of multiple messages in sequence."
+			"Extensively used by LLM features."
 
 			def __init__(self, channel=None, reference=None, msglen=2000, maxlen=10000, obfuscate=False):
 				self.content = ""
@@ -7522,6 +7437,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		bot.ExceptionSender = ExceptionSender
 
 	def monkey_patch(self):
+		"Extends discord.py's features using our bot class, allowing access to caches/databases on disk and fixing several issues."
 		bot = self
 
 		discord.http.Route.BASE = f"https://discord.com/api/{api}"

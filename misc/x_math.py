@@ -1257,6 +1257,7 @@ def evalSym(f, prec=64, r=False, variables=None):
 		if not f:
 			raise
 	else:
+		# Required blacklist for underscore-encapsulated attributes as sympy reintroduced the ability to obtain them in parse_expr, causing possible arbitrary code execution exploits, e.g. `sqrt.__builtins__["eval"]('1 + 1')`. To prevent this, we borrow ast.NodeTransformer to remove any attributes that start or end with an underscore.
 		a = ast.parse(s, mode="eval")
 		class BannedAttributes(ast.NodeTransformer):
 			def visit_Attribute(self, node):
