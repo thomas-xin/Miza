@@ -1880,8 +1880,7 @@ class Server:
 def terminate():
 	if ytdl:
 		ytdl.close()
-	cp.engine.exit()
-	return sys.exit()
+	return cp.engine.exit()
 
 
 if __name__ == "__main__":

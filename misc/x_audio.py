@@ -1526,8 +1526,7 @@ async def terminate():
 	fut = csubmit(client.close())
 	AP.cache.sync()
 	await asubmit(ytdl.close)
-	await fut
-	return sys.exit()
+	return await fut
 
 
 if __name__ == "__main__":

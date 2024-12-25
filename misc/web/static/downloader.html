@@ -6,7 +6,7 @@
 	<meta content="Media Downloader" property="og:title">
 	<meta content="Download or convert any audio or video file here!" property="og:description">
 	<meta content="https://mizabot.xyz/downloader" property="og:url">
-	<meta property="og:image" content="https://nerdist.com/wp-content/uploads/2020/07/maxresdefault.jpg">
+	<meta property="og:image" content="https://api.mizabot.xyz/mizaleaf.png">
 	<meta content="#000000" data-react-helmet="true" name="theme-color">
 	<title>All-Purpose Media Downloader</title>
 	<link href='https://fonts.googleapis.com/css?family=Agbalumo' rel='stylesheet'>
@@ -123,7 +123,6 @@ a:hover {
 	left: 0;
 	width: 0;
 	height: 100%;
-	background: linear-gradient(135deg, #00ffff, #00bfff);
 	border-radius: 5px;
 	z-index: -1;
 }
@@ -240,8 +239,11 @@ function updateSearched() {
 	submit = document.getElementById("submit");
 	query = document.getElementById("query").value;
 	submit = document.getElementById("submit");
-	submit.querySelector("span").textContent = "Download";
 	if (query == lastSearch) return;
+	submit.querySelector("span").textContent = "Download";
+	submit.disabled = false;
+	const progressBar = submit.querySelector(".progress-bar");
+	progressBar.style.width = "0%";
 	lastSearch = query;
 	previews.style.display = "none";
 	if (!query) return;
@@ -262,6 +264,7 @@ function updateSearched() {
 			check = document.createElement("input");
 			check.type = "checkbox";
 			check.checked = !i || query.startsWith("https://");
+			check.addEventListener("change", updateCount);
 			title.appendChild(check);
 			href = document.createElement("a");
 			href.textContent = name;
@@ -270,7 +273,7 @@ function updateSearched() {
 			preview.appendChild(title);
 			const icon = document.createElement("img");
 			icon.width = 320;
-			icon.src = e.icon;
+			icon.setAttribute("loading", "lazy");
 			preview.appendChild(icon);
 			let dur;
 			if (e.duration) {
@@ -281,17 +284,17 @@ function updateSearched() {
 				preview.appendChild(dur);
 			}
 			component = encodeURIComponent(e.icon);
-			fetch(`/mean_colour?url=${component}`).then((response) => response.json()).then((data) => {
-				[r, g, b] = data.colour;
-				[h, s, l] = rgbToHsl(r, g, b);
-				preview.animate(
-					[
-						{ background: "linear-gradient(135deg, #003f3f, #005f5f)", border: "solid 2px #00ff7f" },
-						{ background: `linear-gradient(135deg, hsl(${h},${s}%,25%), hsl(${h},${s}%,35%))`, border: `solid 2px hsl(${h},${s}%,50%)` }
-					],
-					{ duration: 500, easing: "linear", fill: "forwards" },
-				);
-				preview.loadTrimmer = () => {
+			icon.onload = () => {
+				fetch(`/mean_colour?url=${component}`).then((response) => response.json()).then((data) => {
+					[r, g, b] = data.colour;
+					[h, s, l] = rgbToHsl(r, g, b);
+					preview.animate(
+						[
+							{ background: "linear-gradient(135deg, #003f3f, #005f5f)", border: "solid 2px #00ff7f" },
+							{ background: `linear-gradient(135deg, hsl(${h},${s}%,25%), hsl(${h},${s}%,35%))`, border: `solid 2px hsl(${h},${s}%,50%)` }
+						],
+						{ duration: 500, easing: "linear", fill: "forwards" },
+					);
 					s2 = 100 - (100 - s) / 2;
 					if (!e["duration"]) return;
 					const progressContainer = document.createElement("div");
@@ -383,27 +386,33 @@ function updateSearched() {
 					preview.insertBefore(progressContainer, dur);
 
 					preview.updateProgress();
-				}
-				if (isLoaded(icon)) {
-					preview.loadTrimmer();
-				} else {
-					icon.onload = preview.loadTrimmer;
-				}
-			});
+				});
+			}
+			icon.src = e.icon;
 			previews.appendChild(preview);
 		});
+		updateCount();
 		previews.style.display = data ? "flex" : "none";
 		submit.style.display = data ? "block" : "none";
 	});
 }
 const debouncedSearch = debounce(updateSearched, 500);
 document.getElementById("query").value = lastSearch;
+function updateCount() {
+	count = 0;
+	children = document.getElementById("previews").children;
+	Array.from(children).forEach((preview) => {
+		check = preview.children[0].children[0];
+		if (check.checked) count++;
+	});
+	document.getElementById("submit").querySelector("span").textContent = `Download (${count}/${children.length})`;
+}
 function downloadAll() {
 	submit = document.getElementById("submit");
 	submit.querySelector("span").textContent = "Loading...";
 	submit.disabled = true;
 	children = document.getElementById("previews").children;
-	count = children.length;
+	let count = 0;
 	let delay = 0;
 	let successful = 0;
 	const progressBar = submit.querySelector(".progress-bar");
@@ -411,20 +420,36 @@ function downloadAll() {
 	Array.from(children).forEach((preview, i) => {
 		check = preview.children[0].children[0];
 		if (!check.checked) return;
-		const href = "/ytdl?d=" + encodeURIComponent(preview.url) + "&fmt=" + fmt;
+		count++;
+		let href = "/ytdl?d=" + encodeURIComponent(preview.url) + "&fmt=" + fmt;
+		if (preview.start) {
+			href += "&start=" + preview.start;
+		}
+		if (preview.end && preview.end != preview.duration) {
+			href += "&end=" + preview.end;
+		}
 		setTimeout(() => {
-			fetch(href).then((response) => response.blob()).then((blob) => {
-				download(blob, preview.name + "." + fmt);
-				successful++;
-				submit.querySelector("span").textContent = `Downloading (${successful}/${count})...`;
-				progressBar.style.width = `${(successful / count) * 100}%`;
-				if (successful >= count) {
-					setTimeout(() => {
-						submit.disabled = false;
-						submit.querySelector("span").textContent = "Download (Complete)";
-						progressBar.style.width = "0%";
-					}, 1000);
+			fetch(href).then((response) => {
+				if (!response.ok) {
+					console.error(response.statusText);
+					submit.querySelector("span").textContent = `Error: ${response.statusText}`;
+					progressBar.style.width = "100%";
+					progressBar.style.background = "linear-gradient(135deg, #ff0000, #ff7f00)";
+					return;
 				}
+				response.blob().then((blob) => {
+					download(blob, preview.name + "." + fmt);
+					successful++;
+					submit.querySelector("span").textContent = `Downloading (${successful}/${count})...`;
+					progressBar.style.background = "linear-gradient(135deg, #00bfff, #00ffff)";
+					progressBar.style.width = `${(successful / count) * 100}%`;
+					if (successful >= count) {
+						setTimeout(() => {
+							submit.disabled = false;
+							submit.querySelector("span").textContent = "Download (Complete)";
+						}, 1000);
+					}
+				});
 			});
 		}, delay);
 		delay += (preview.duration || 300) * 10;

@@ -177,7 +177,8 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 		if not input_args and source_codec == self.codec:
 			output_args.extend(["-c", "copy"])
 		else:
-			output_args.extend(["-c:a", acodec, "-b:a", "160k"])
+			bitrate = 224 if self.codec == "mp3" else 192 if self.codec == "aac" else 160
+			output_args.extend(["-c:a", acodec, "-b:a", f"{bitrate}k"])
 		self.real_run_ffmpeg(
 			[[filename, input_args]],
 			[[outpath, output_args]],
