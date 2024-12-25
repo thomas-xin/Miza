@@ -55,6 +55,10 @@ def get_colour(image):
 		return [(np.sum(np.multiply(c.T, a)) / sumA).item() for c in np.asanyarray(rgb, dtype=np.uint8).T]
 	return [np.mean(c).item() for c in np.asanyarray(rgb, dtype=np.uint8).T]
 def parse_colour(s):
+	if s == "black":
+		return (0, 0, 0)
+	if s == "white":
+		return (255, 255, 255)
 	hex_match = re.match(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$', s)
 	if hex_match:
 		hex_value = hex_match.group(1)
@@ -72,6 +76,8 @@ def parse_colour(s):
 class ColourCache(Cache):
 
 	def obtain(self, url):
+		if not url:
+			return (0, 0, 0)
 		k = uhash(url)
 		try:
 			return tuple(self[k])

@@ -992,6 +992,7 @@ class AudioDownloader:
 			cachedir=CACHE_PATH,
 			outtmpl=fn,
 			windowsfilenames=True,
+			cookiesfrombrowser=["firefox"],
 			postprocessors=[dict(
 				key="FFmpegExtractAudio",
 				preferredcodec="opus",

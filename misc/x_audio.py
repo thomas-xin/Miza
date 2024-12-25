@@ -59,7 +59,7 @@ class AudioPlayer(discord.AudioSource):
 		"compressor": 0,
 		"chorus": 0,
 		"resample": 0,
-		"bitrate": 192000,
+		"bitrate": 160000,
 		"pause": False,
 		"loop": False,
 		"repeat": False,
@@ -271,6 +271,8 @@ class AudioPlayer(discord.AudioSource):
 		if not self.channel:
 			return
 		r = f": {colourise(reason, fg='yellow')}{colourise()}" if reason else ""
+		if dump:
+			r += " (use ~load to restore)"
 		s = ansi_md(
 			f"{colourise('🎵', fg='blue')}{colourise()} Automatically disconnected from {colourise(self.channel.guild, fg='magenta')}{colourise()}{r}. {colourise('🎵', fg='blue')}{colourise()}"
 		)
@@ -753,18 +755,21 @@ class PipedReader(io.IOBase):
 					return b
 				finally:
 					self.pos = f.tell()
-		while self.pl.buffer < self.pos + nbytes and not isfinite(self.pl.end):
-			with self.pl.cv:
-				self.pl.cv.wait()
-		with self.pl.lock:
-			with open(self.pl.temp, "rb") as f:
-				if self.pos:
-					f.seek(self.pos)
-				try:
-					b = f.read(nbytes)
-					return b
-				finally:
-					self.pos = f.tell()
+		b = b""
+		while self.pos < self.pl.end:
+			while self.pl.buffer < self.pos + nbytes and not isfinite(self.pl.end):
+				with self.pl.cv:
+					self.pl.cv.wait()
+			with self.pl.lock:
+				with open(self.pl.temp, "rb") as f:
+					if self.pos:
+						f.seek(self.pos)
+					try:
+						b += f.read(nbytes)
+						if len(b) >= nbytes:
+							return b
+					finally:
+						self.pos = f.tell()
 
 	def close(self):
 		return self
@@ -791,7 +796,9 @@ class PipedLoader:
 			raise
 		else:
 			self.file.write(b)
+			self.file.flush()
 			self.buffer += 1
+			assert os.path.getsize(self.temp) == 1
 		if efp:
 			esubmit(shutil.copyfileobj, efp, sys.stderr)
 		esubmit(self.loading)
@@ -806,6 +813,7 @@ class PipedLoader:
 				if not b:
 					break
 				self.file.write(b)
+				self.file.flush()
 				with self.cv:
 					self.buffer += len(b)
 					self.cv.notify_all()
@@ -952,7 +960,7 @@ class AudioFile:
 		# Construct FFmpeg options
 		options = auds.construct_options(full=self.live)
 		speed = 1
-		if options or pos or auds.settings.bitrate != 192000 or self.live or not isinstance(self.stream, str):
+		if options or pos or auds.settings.bitrate < auds.defaults["bitrate"] or self.live or not isinstance(self.stream, str):
 			args = ["./ffmpeg", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+nobuffer+discardcorrupt+genpts+igndts+flush_packets"]
 			if is_url(source):
 				args = ["./ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + args[1:]
@@ -973,7 +981,7 @@ class AudioFile:
 				buff = True
 				args.append("-")
 			auds.settings.bitrate = min(auds.settings.bitrate, MAX_BITRATE)
-			if options or auds.settings.bitrate != 192000:
+			if options or auds.settings.bitrate <= auds.defaults["bitrate"]:
 				br = auds.settings.bitrate
 				sr = SAMPLE_RATE
 				while br < 512:

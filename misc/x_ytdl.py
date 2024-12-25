@@ -1,4 +1,5 @@
 import io
+import subprocess
 import sys
 from traceback import print_exc
 import zipfile
@@ -12,10 +13,9 @@ except ImportError as ex:
 	except ImportError:
 		raise ex
 from .types import list_like
-from .util import EvalPipe, esubmit
+from .util import EvalPipe, esubmit, python
 
 ydl_opts = {
-	# "verbose": 1,
 	"quiet": 1,
 	"format": "bestvideo+bestaudio/best",
 	"overwrites": 1,
@@ -27,6 +27,7 @@ ydl_opts = {
 	"ignoreerrors": 0,
 	"default_search": "auto",
 	"source_address": "0.0.0.0",
+	"cookiesfrombrowser": ["firefox"],
 }
 ytdl = ytd.YoutubeDL(ydl_opts)
 
@@ -79,43 +80,86 @@ def get_full_storyboard(info):
 
 class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 
-	def __init__(self, downloader=None, codec=None, format=None):
+	def __init__(self, downloader=None, codec=None, format=None, start=None, end=None):
 		super().__init__(downloader)
 		self.codec = codec
 		self.format = format
+		self.start = start
+		self.end = end
 
 	@ytd.postprocessor.PostProcessor._restrict_to(images=False)
 	def run(self, info):
 		filename, source_ext = info['filepath'], info['ext'].lower()
-		if source_ext == self.format:
+		if source_ext == self.format and self.start == self.end == None:  # noqa: E711
 			return [], info
-		outpath = ytd.utils.replace_extension(filename, self.format, source_ext)
+		name = filename.rsplit(".", 1)[0]
+		if self.start is not None or self.end is not None:
+			name += f"~{self.start}-{self.end}"
+		outpath = name + "." + self.format
+		temp_path = filename.rsplit(".", 1)[0] + "~." + self.format
+		input_args = []
 		if self.format == "mp4":
-			self.run_ffmpeg(filename, outpath, ["-f", self.format, "-c", "copy"])
+			output_args = ["-f", self.format, "-c", "copy"]
+			lightning = self.start is not None or self.end is not None
+			if self.end is not None:
+				input_args.extend(["-to", str(self.end)])
+				temp_path = filename.rsplit(".", 1)[0] + f"~None~{self.end}~." + self.format
 		else:
-			self.run_ffmpeg(filename, outpath, ["-f", self.format, "-c:v", self.codec, "-b:v", "3072k", "-c:a", "libopus", "-b:a", "160k"])
+			if self.start is not None:
+				input_args.extend(["-ss", str(self.start)])
+			if self.end is not None:
+				input_args.extend(["-to", str(self.end)])
+			output_args = ["-f", self.format, "-c:v", self.codec, "-b:v", "3072k", "-c:a", "libopus", "-b:a", "160k"]
+			lightning = False
+		if not lightning:
+			temp_path = outpath
+		self.real_run_ffmpeg(
+			[[filename, input_args]],
+			[[temp_path, output_args]],
+		)
+		if lightning:
+			start = str(self.start) if self.start is not None else "0"
+			end = str(self.end) if self.end is not None else "86400"
+			args = [python, "misc/lightning.py", temp_path, start, end, outpath]
+			subprocess.run(args)
+			return [temp_path], info
 		return [], info
 
 class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 
-	def __init__(self, downloader=None, codec=None, format=None):
+	def __init__(self, downloader=None, codec=None, format=None, start=None, end=None):
 		super().__init__(downloader)
 		self.codec = codec
 		self.format = format
+		self.start = start
+		self.end = end
 
 	@ytd.postprocessor.PostProcessor._restrict_to(images=False)
 	def run(self, info):
 		filename, source_ext = info['filepath'], info['ext'].lower()
-		if source_ext == self.format:
+		if source_ext == self.format and self.start == self.end == None:  # noqa: E711
 			return [], info
+		name = filename.rsplit(".", 1)[0]
+		if self.start is not None or self.end is not None:
+			name += f"~{self.start}-{self.end}"
+		outpath = name + "." + self.format
 		source_codec = self.get_audio_codec(filename)
-		outpath = ytd.utils.replace_extension(filename, self.format, source_ext)
-		if source_codec == self.codec:
-			self.run_ffmpeg(filename, outpath, ["-vn", "-f", self.format, "-c", "copy"])
+		A = ytd.postprocessor.ffmpeg.ACODECS
+		acodec = A[self.codec][1] or A[self.codec][0]
+		input_args = []
+		output_args = []
+		if self.start is not None:
+			input_args.extend(["-ss", str(self.start)])
+		if self.end is not None:
+			input_args.extend(["-to", str(self.end)])
+		if not input_args and source_codec == self.codec:
+			output_args.extend(["-c", "copy"])
 		else:
-			A = ytd.postprocessor.ffmpeg.ACODECS
-			acodec = A[self.codec][1] or A[self.codec][0]
-			self.run_ffmpeg(filename, outpath, ["-vn", "-f", self.format, "-c:a", acodec, "-b:a", "160k"])
+			output_args.extend(["-c:a", acodec, "-b:a", "160k"])
+		self.real_run_ffmpeg(
+			[[filename, input_args]],
+			[[outpath, output_args]],
+		)
 		return [], info
 
 ytd.postprocessor.__dict__["FFmpegCustomVideoConvertorPP"] = FFmpegCustomVideoConvertorPP

@@ -1140,13 +1140,24 @@ class Server:
 		if is_url(d):
 			d = unyt(d)
 		ip = true_ip()
+		print("/ytdl", ip, q)
 		if not self.ydl:
 			self.ydl = AudioDownloader()
 		if v:
 			fmt = kwargs.get("fmt")
 			assert fmt in ("mp4", "webm", "ogg", "opus", "mp3")
-			fn = f"{CACHE_PATH}/{uhash(v)}.{fmt}"
-			print(fn)
+			tmpl = f"{CACHE_PATH}/{uhash(v)}.{fmt}"
+			start = kwargs.get("start")
+			end = kwargs.get("end")
+			if start is not None:
+				start = round_min(round(float(start), 3))
+			if end is not None:
+				end = round_min(round(float(end), 3))
+			name = tmpl.rsplit(".", 1)[0]
+			if start is not None or end is not None:
+				name += f"~{start}-{end}"
+			fn = name + "." + fmt
+			print(tmpl, fn)
 			if not os.path.exists(fn) or not os.path.getsize(fn):
 				sem = self.ydl_sems.setdefault(ip, Semaphore(64, 256, rate_limit=8))
 				with sem:
@@ -1156,6 +1167,8 @@ class Server:
 							key="FFmpegCustomAudioConvertor",
 							format=fmt,
 							codec="opus" if fmt == "ogg" else fmt,
+							start=start,
+							end=end,
 						)]
 					else:
 						fstr = f"bestvideo[ext={fmt}]+bestaudio[acodec=opus]/best[ext={fmt}]/best"
@@ -1163,6 +1176,8 @@ class Server:
 							key="FFmpegCustomVideoConvertor",
 							format=fmt,
 							codec="libsvtav1",
+							start=start,
+							end=end,
 						)]
 					ydl_opts = dict(
 						format=fstr,
@@ -1170,8 +1185,9 @@ class Server:
 						source_address="0.0.0.0",
 						final_ext=fmt,
 						cachedir=CACHE_PATH,
-						outtmpl=fn,
+						outtmpl=tmpl,
 						windowsfilenames=True,
+						cookiesfrombrowser=["firefox"],
 						postprocessors=postprocessors,
 					)
 					title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(q)},download=True)['title']", timeout=3600)
@@ -1192,44 +1208,11 @@ class Server:
 	ytdl._cp_config = {"response.stream": True}
 
 	@cp.expose
-	def ytdlp(self, url, fmt="mp4", start="", end=""):
-		cp.response.headers.update(HEADERS)
-		if not url:
-			cp.response.status = 204
-			return
-		fmt = fmt.strip() or "mp4"
-		if fmt not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp"):
-			raise TypeError
-		start = start.strip() or "-"
-		end = end.strip() or "-"
-		b = self.command(input=f"trim {url} {start} {end} as {fmt}")
-		data = orjson.loads(b)
-		url = data[0]["content"]
-		raise cp.HTTPRedirect(url, status="307")
-
-	@cp.expose
-	def ytdlc(self, *urls, fmt="mp4", multi="true", **kwargs):
-		cp.response.headers.update(HEADERS)
-		m = "" if multi in ("false", "False") else "-m"
-		kwurls = []
-		for k, v in kwargs.items():
-			if k.startswith("u") and k[1:].isnumeric():
-				kwurls.append((int(k[1:]), v))
-		urls = astype(urls, list)
-		urls.extend(v for k, v in sorted(kwurls))
-		urls = [url.strip() for url in urls]
-		urls = [url for url in urls if url]
-		if not any(urls):
-			cp.response.status = 204
-			return
-		fmt = fmt.strip() or "mp4"
-		if fmt not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp"):
-			raise TypeError
-		url = " ".join(urls)
-		b = self.command(input=f"concat {m} {url} as {fmt}")
-		data = orjson.loads(b)
-		url = data[0]["content"]
-		raise cp.HTTPRedirect(url, status="307")
+	def mean_colour(self, url=""):
+		resp = colour_cache.obtain(url)
+		cp.response.headers["Content-Type"] = "application/json"
+		cp.response.headers.update(SHEADERS)
+		return json_dumps(dict(colour=resp))
 
 	@cp.expose
 	def specexec(self, url, **kwargs):
@@ -1989,13 +1972,6 @@ class Server:
 			refresh_info = f'<meta http-equiv="refresh" content="{refresh};URL={refresh_url}">'
 		cp.response.headers.update(HEADERS)
 		return f"""<!DOCTYPE html><html><head><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script><meta property="og:image" content="{url}">{refresh_info}<meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="background-color:black;"><img src="{url}" style="margin:0;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);max-width:100%;max-height:100%"></body></html>"""
-
-	@cp.expose
-	def mean_colour(self, url=""):
-		resp = colour_cache.obtain(url)
-		cp.response.headers["Content-Type"] = "application/json"
-		cp.response.headers.update(SHEADERS)
-		return json_dumps(dict(colour=resp))
 
 	class V1Cache:
 		def __init__(self, end=2048, soft=8192, hard=30720):

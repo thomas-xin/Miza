@@ -4,16 +4,17 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>All-Purpose Media Downloader</title>
+	<link href='https://fonts.googleapis.com/css?family=Agbalumo' rel='stylesheet'>
 	<style>
 body {
-	font-family: Comic Sans MS, sans-serif;
+	font-family: Agbalumo, cursive, sans-serif;
 	margin-top: 5vh;
 	padding: 0;
 	position: relative;
 	display: grid;
 	align-items: start;
 	justify-content: center;
-	background-color: black;
+	background-color: #000000;
 	color: white;
 }
 .container {
@@ -35,7 +36,7 @@ body {
 	place-items: center;
 	background-color: #003f3f;
 	border: solid 2px #00ff7f;
-	padding: 16px;
+	padding: 12px;
 	border-radius: 8px;
 }
 h1, h2 {
@@ -78,6 +79,31 @@ a {
 a:hover {
 	text-decoration: underline;
 }
+.progress-container {
+	width: 90%;
+	height: 8px;
+	background-color: #000000;
+	border-radius: 10px;
+	position: relative;
+	margin: 8px;
+}
+.progress-bar {
+	height: 100%;
+	background-color: #7f7f7f;
+	border-radius: 4px;
+	position: absolute;
+	width: 0%;
+}
+.progress-thumb {
+	width: 12px;
+	height: 12px;
+	background-color: #ffffff;
+	border-radius: 50%;
+	position: absolute;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	cursor: pointer;
+}
 	</style>
 </head>
 <body>
@@ -85,14 +111,14 @@ a:hover {
 		<div>
 			<h1>Download Media</h1>
 			<h3>Name or URL</h3>
-			<input type="text" id="query" style="min-width:320px; width:60vw" onchange="debouncedSearch()" value="" required>
+			<input type="text" id="query" style="min-width:320px; width:60vw" oninput="debouncedSearch()" onchange="debouncedSearch()" value="" required>
 			<h3>Format</h3>
 			
 			<input type="radio" id="mp4" name="output-format" value="mp4" checked><label for="mp4">mp4</label><br />
 			<input type="radio" id="webm" name="output-format" value="webm"><label for="webm">webm</label><br />
-			<input type="radio" id="ogg" name="output-format" value="ogg"><label for="ogg">ogg</label><br />
-			<input type="radio" id="opus" name="output-format" value="opus"><label for="opus">opus</label><br />
-			<input type="radio" id="mp3" name="output-format" value="mp3"><label for="mp3">mp3</label>
+			<input type="radio" id="opus" name="output-format" value="opus"><label for="opus">opus (audio)</label><br />
+			<input type="radio" id="ogg" name="output-format" value="ogg"><label for="ogg">ogg (audio)</label><br />
+			<input type="radio" id="mp3" name="output-format" value="mp3"><label for="mp3">mp3 (audio)</label>
 		</div>
 	</div>
 	<div id="previews" class="container" style="display:none">
@@ -160,6 +186,9 @@ function rgbToHsl(r, g, b) {
 	}
 	return [h * 360, s * 100, l * 100];
 }
+function isLoaded(image) {
+	return image.complete && image.naturalHeight !== 0;
+}
 function debounce(func, delay) {
 	let timeoutId;
 	let lastSent = Date.now();
@@ -176,10 +205,13 @@ function debounce(func, delay) {
 		}, usedDelay);
 	};
 }
+var lastSearch = "";
 function updateSearched() {
 	previews = document.getElementById("previews");
 	submit = document.getElementById("submit");
 	query = document.getElementById("query").value;
+	if (query == lastSearch) return;
+	lastSearch = query;
 	previews.style.display = "none";
 	// console.log(query);
 	if (!query) return;
@@ -192,6 +224,8 @@ function updateSearched() {
 		// console.log(data);
 		data.forEach((e, i) => {
 			const preview = document.createElement("div");
+			name = e.name;
+			preview.name = name;
 			preview.className = "entry";
 			title = document.createElement("p");
 			title.style.margin = "0";
@@ -200,25 +234,26 @@ function updateSearched() {
 			check.checked = !i || query.startsWith("https://");
 			title.appendChild(check);
 			href = document.createElement("a");
-			href.textContent = e["name"]
-			href.href = e["url"]
+			href.textContent = name;
+			href.href = e.url;
 			title.appendChild(href);
 			preview.appendChild(title);
-			if (e["duration"]) {
+			const icon = document.createElement("img");
+			icon.width = 320;
+			icon.src = e.icon;
+			preview.appendChild(icon);
+			let dur;
+			if (e.duration) {
+				preview.duration = e.duration;
 				dur = document.createElement("span");
-				dur.textContent = "(" + timeDisp(e["duration"]) + ")";
+				dur.style.lineHeight = "8px";
+				dur.textContent = timeDisp(preview.duration);
 				preview.appendChild(dur);
 			}
-			icon = document.createElement("img");
-			icon.width = 320;
-			icon.src = e["icon"];
-			component = encodeURIComponent(e["icon"]);
+			component = encodeURIComponent(e.icon);
 			fetch(`/mean_colour?url=${component}`).then((response) => response.json()).then((data) => {
-				// console.log(data);
-				[r, g, b] = data["colour"];
+				[r, g, b] = data.colour;
 				[h, s, l] = rgbToHsl(r, g, b);
-				// preview.style.backgroundColor = `hsl(${h},${s}%,25%)`;
-				// preview.style.border = `solid 2px hsl(${h},${s}%,50%)`;
 				preview.animate(
 					[
 						{ backgroundColor: "#003f3f", border: "solid 2px #00ff7f" },
@@ -226,27 +261,129 @@ function updateSearched() {
 					],
 					{ duration: 500, easing: "linear", fill: "forwards" },
 				);
+				preview.loadTrimmer = () => {
+					s2 = 100 - (100 - s) / 2;
+					if (!e["duration"]) return;
+					const progressContainer = document.createElement("div");
+					progressContainer.className = "progress-container";
+					progressContainer.style.backgroundColor = `hsl(${h},${s2}%,12.5%)`;
+					const progressBar = document.createElement("div");
+					progressBar.className = "progress-bar";
+					progressBar.style.backgroundColor = `hsl(${h},${s2}%,50%)`;
+					const progressStart = document.createElement("div");
+					progressStart.className = "progress-thumb";
+					progressStart.style.backgroundColor = `hsl(${h},${s2}%,75%)`;
+					const progressEnd = document.createElement("div");
+					progressEnd.className = "progress-thumb";
+					progressEnd.style.backgroundColor = `hsl(${h},${s2}%,75%)`;
+
+					preview.updateProgress = () => {
+						if (preview.startP > preview.endP) {
+							[preview.startP, preview.endP] = [preview.endP, preview.startP];
+						} else if (preview.startP > preview.endP) {
+							if (preview.endP >= 100) preview.startP -= 0.01;
+							else preview.endP += 0.01;
+						}
+						preview.start = preview.startP * preview.duration / 100;
+						preview.end = preview.endP * preview.duration / 100;
+						length = preview.endP - preview.startP;
+						progressStart.style.left = `${preview.startP}%`;
+						progressBar.style.left = `${preview.startP}%`;
+						progressBar.style.width = `${length}%`;
+						progressEnd.style.left = `${preview.endP}%`;
+						if (preview.startP != 0 || preview.endP != 100) {
+							dur.textContent = timeDisp(preview.start) + "-" + timeDisp(preview.end) + "/" + timeDisp(preview.duration);
+						} else {
+							dur.textContent = timeDisp(preview.duration);
+						}
+					}
+					preview.startP = 0;
+					preview.endP = 100;
+
+					preview.calculateProgress = (event) => {
+						rect = progressContainer.getBoundingClientRect();
+						offsetX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+						progress = (offsetX / rect.width) * 100;
+						return progress;
+					}
+					progressContainer.addEventListener('mousedown', (event) => {
+						event.preventDefault();
+						progress = preview.calculateProgress(event);
+						if (Math.abs(progress - preview.startP) < Math.abs(progress - preview.endP)) {
+							const progressStartDrag = (event) => {
+								if (progressStart.dragging) {
+									const progress = preview.calculateProgress(event);
+									preview.startP = progress;
+									preview.updateProgress();
+								}
+							}
+							document.addEventListener('mousemove', progressStartDrag);
+							document.addEventListener('mouseup', () => {
+								progressStart.style.backgroundColor = `hsl(${h},${s2}%,75%)`;
+								progressStart.dragging = false;
+								document.removeEventListener('mousemove', progressStartDrag);
+							}, { once: true });
+							progressStart.style.backgroundColor = "#ffffff";
+							progressStart.dragging = true;
+							preview.startP = progress;
+							preview.updateProgress();
+						} else {
+							const progressEndDrag = (event) => {
+								if (progressEnd.dragging) {
+									const progress = preview.calculateProgress(event);
+									preview.endP = progress;
+									preview.updateProgress();
+								}
+							}
+							document.addEventListener('mousemove', progressEndDrag);
+							document.addEventListener('mouseup', () => {
+								progressEnd.style.backgroundColor = `hsl(${h},${s2}%,75%)`;
+								progressEnd.dragging = false;
+								document.removeEventListener('mousemove', progressEndDrag);
+							}, { once: true });
+							progressEnd.style.backgroundColor = "#ffffff";
+							progressEnd.dragging = true;
+							preview.endP = progress;
+							preview.updateProgress();
+						}
+					});
+					progressContainer.appendChild(progressBar);
+					progressContainer.appendChild(progressStart);
+					progressContainer.appendChild(progressEnd);
+					preview.insertBefore(progressContainer, dur);
+
+					preview.updateProgress();
+				}
+				if (isLoaded(icon)) {
+					preview.loadTrimmer();
+				} else {
+					icon.onload = preview.loadTrimmer;
+				}
 			});
-			preview.appendChild(icon);
 			previews.appendChild(preview);
 		});
 		previews.style.display = data ? "flex" : "none";
 		submit.style.display = data ? "block" : "none";
 	});
 }
-const debouncedSearch = debounce(updateSearched, 250);
-document.getElementById("query").value = "";
+const debouncedSearch = debounce(updateSearched, 500);
+document.getElementById("query").value = lastSearch;
 function download() {
 	submit = document.getElementById("submit");
 	submit.textContent = "Loading...";
 	submit.disabled = true;
-	Array.from(document.body.children).forEach((e, i) => {
-		if (!i || !e.children.length) return;
-		check = e.children[0].children[0].children[0];
+	Array.from(document.getElementById("previews").children).forEach((preview, i) => {
+		check = preview.children[0].children[0];
 		if (!check.checked) return;
 		fmt = document.querySelector('input[name="output-format"]:checked').value;
 		a = document.createElement("a");
-		a.href = "/ytdl?d=" + encodeURIComponent(e.children[0].children[0].children[1].href) + "&fmt=" + fmt;
+		a.href = "/ytdl?d=" + encodeURIComponent(preview.children[0].children[1].href) + "&fmt=" + fmt;
+		if (preview.start) {
+			a.href += "&start=" + preview.start;
+		}
+		if (preview.end && preview.end != preview.duration) {
+			a.href += "&end=" + preview.end;
+		}
 		a.click();
 	});
 	setTimeout(() => {

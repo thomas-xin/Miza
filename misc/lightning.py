@@ -1,4 +1,6 @@
-import subprocess, os, sys
+import subprocess
+import os
+import sys
 
 def round_min(x):
 	y = int(x)
@@ -6,7 +8,8 @@ def round_min(x):
 		return y
 	return x
 
-strnum = lambda num: str(round_min(round(num, 6)))
+def strnum(num):
+	return str(round_min(round(num, 6)))
 
 def time_disp(s):
 	s = float(s)
@@ -81,7 +84,7 @@ else:
 			import ast
 			fn = ast.literal_eval(fn)
 		name, fmt = fn.rsplit(".", 1) if "." in fn else (fn, "mp4")
-	except:
+	except Exception:
 		easygui.exceptionbox()
 		raise SystemExit
 while name and ".." in name:
@@ -120,6 +123,8 @@ try:
 		cproc = subprocess.Popen(["ffprobe", "-skip_frame", "nokey", "-select_streams", "v:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", "-i", fi], stdout=subprocess.PIPE)
 		fps = subprocess.check_output(["ffprobe", "-skip_frame", "nokey", "-select_streams", "v:0", "-show_entries", "stream=avg_frame_rate", "-of", "default=nokey=1:noprint_wrappers=1", "-i", fi]).strip().split(b"\n", 1)[0].decode("ascii")
 		cdc = cproc.stdout.read().strip().split(b"\n", 1)[0].strip().decode("ascii")
+		if cdc == "av1":
+			cdc = "libsvtav1"
 		if not fps or fps == "N/A":
 			fps = 1000
 		else:
@@ -177,11 +182,11 @@ try:
 					continue
 				try:
 					os.remove(fd)
-				except:
+				except Exception:
 					pass
 	if not os.path.exists(fn) or not os.path.getsize(fn):
 		raise RuntimeError("Unable to save file. Please check log for info.")
-except:
+except Exception:
 	if not easygui:
 		raise
 	easygui.exceptionbox()
