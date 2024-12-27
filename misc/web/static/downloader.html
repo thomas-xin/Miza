@@ -570,12 +570,13 @@ function createPreviewElement(e, i, query) {
 	return preview;
 }
 document.addEventListener("keydown", (event) => {
+	query = document.getElementById("query");
 	if (event.key == "Enter") {
 		updateSearched();
 	} else if (event.key == "Escape") {
-		document.getElementById("query").value = "";
+		query.value = "";
 		updateSearched();
-	} else if (event.key == "a" && (event.ctrlKey || event.metaKey) && document.activeElement != document.getElementById("query")) {
+	} else if (event.key == "a" && (event.ctrlKey || event.metaKey) && document.activeElement != query) {
 		event.preventDefault();
 		children = document.getElementById("previews").children;
 		checkedAmount = 0;
@@ -589,6 +590,12 @@ document.addEventListener("keydown", (event) => {
 			check.checked = shouldCheck;
 		});
 		updateCount();
+	} else if (event.key == "d" && (event.ctrlKey || event.metaKey) && document.activeElement != query) {
+		event.preventDefault();
+		downloadAll();
+	} else if (!query.value && event.key == "Tab") {
+		query.value = query.placeholder;
+		updateSearched();
 	}
 });
 </script>

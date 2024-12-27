@@ -1199,7 +1199,7 @@ class AudioFile:
 				buff = True
 				args.append("-")
 			auds.settings.bitrate = min(auds.settings.bitrate, MAX_BITRATE)
-			if options or auds.settings.bitrate <= auds.defaults["bitrate"]:
+			if options or auds.settings.bitrate < auds.defaults["bitrate"]:
 				br = auds.settings.bitrate
 				sr = SAMPLE_RATE
 				while br < 512:
