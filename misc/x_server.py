@@ -1219,7 +1219,7 @@ class Server:
 	@cp.expose
 	def specexec(self, url, **kwargs):
 		cp.response.headers.update(HEADERS)
-		argv = " ".join(itertools.chain(*kwargs.items()))
+		argv = " ".join(itertools.chain.from_iterable(kwargs.items()))
 		b = self.command(input=f"spectralpulse {url} {argv}")
 		data = orjson.loads(b)
 		url = data[0]["content"].replace("/d/", "/f/")

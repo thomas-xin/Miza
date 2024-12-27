@@ -528,7 +528,7 @@ class SpectralPulse(Command):
 		fn2 = dest + ".png"
 		args = [
 			python, "misc/spectralpulse/main.py",
-			*itertools.chain(*kwargs.items()),
+			*itertools.chain.from_iterable(kwargs.items()),
 			"-dest", dest, url,
 		]
 		async with discord.context_managers.Typing(channel):

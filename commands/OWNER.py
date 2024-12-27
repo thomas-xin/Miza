@@ -1059,7 +1059,7 @@ class UpdateChannelCache(Database):
 		if mids and mids[0] < min_id:
 			k = bisect.bisect_right(mids, min_id)
 			midl = midl[k:]
-		mids = list(itertools.chain(midl, iids, mids[j:]))
+		mids = list(chain(midl, iids, mids[j:]))
 		mids.reverse()
 		self[c_id] = mids
 		return mids
@@ -1221,7 +1221,7 @@ class UpdateEmojis(Database):
 				aio=True,
 				timeout=32,
 			)
-			fns = set(chain(*(t[2] for t in os.walk("misc/emojis"))))
+			fns = set(chain.from_iterable(t[2] for t in os.walk("misc/emojis")))
 			for edata in emojidata["items"]:
 				name2 = edata["name"]
 				for fn in fns:

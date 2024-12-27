@@ -663,7 +663,7 @@ class Playlist(Command):
 			raise OverflowError(f"Playlist for {_guild} has reached the maximum of {lim} items. Please remove an item to add another.")
 		futs = [csubmit(bot.audio.asubmit(f"ytdl.search({repr(url)})")) for url in urls]
 		resps = await gather(*futs)
-		resp = list(itertools.chain(*resps))
+		resp = list(itertools.chain.from_iterable(resps))
 		if not resp:
 			raise LookupError(f"No results for {urls}.")
 		start = index[0]
@@ -2079,7 +2079,7 @@ async def get_lyrics(item, url=None):
 	for i in range(2):
 		data = {"q": item}
 		rdata = await Request(url, data=data, aio=True, json=True, timeout=18)
-		hits = chain(*(sect["hits"] for sect in rdata["response"]["sections"]))
+		hits = chain.from_iterable(sect["hits"] for sect in rdata["response"]["sections"])
 		path = None
 		for h in hits:
 			with tracebacksuppressor:

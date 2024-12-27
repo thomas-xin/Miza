@@ -3532,7 +3532,7 @@ class ThreadList(Command):
 					))
 		for fut in futs:
 			await fut
-		for data in itertools.chain(*(fut.result().get("threads", ()) for fut in futs)):
+		for data in itertools.chain.from_iterable(fut.result().get("threads", ()) for fut in futs):
 			factory, ch_type = discord.client._threaded_channel_factory(data['type'])
 			if factory is None:
 				raise discord.InvalidData('Unknown channel type {type} for channel ID {id}.'.format_map(data))

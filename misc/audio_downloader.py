@@ -2,6 +2,7 @@ from collections import deque
 from concurrent.futures import Future
 from contextlib import suppress
 import io
+import itertools
 from math import ceil, inf
 import os
 import random
@@ -624,7 +625,7 @@ class AudioDownloader:
 				name=name,
 				url=f"https://open.spotify.com/track/{track['id']}",
 				icon=sorted(track["album"]["images"], key=lambda di: di.get("height", 0), reverse=True)[0]["url"] if "album" in track and track["album"].get("images") else None,
-				artist=track.get("artists", [{"name": "Unknown"}])[0]["name"],
+				artist=track.get("artists") and track["artists"][0]["name"],
 				id=track["id"],
 				duration=dur,
 			)
@@ -916,6 +917,7 @@ class AudioDownloader:
 				name2 = to_alphanumeric(full_prune(entry2.name))
 				artist1 = to_alphanumeric(full_prune(artist))
 				artist2 = to_alphanumeric(full_prune(entry2.get("artist", "")))
+				# If the Bandcamp search result is a good match, we use that instead.
 				if fuzzy_substring(name1, name2, match_length=False) >= 0.5 and fuzzy_substring(artist1, artist2, match_length=False) >= 0.5:
 					stream, cdc, dur, ac = self.get_audio(entry2, asap=True)
 					if stream:
@@ -1011,6 +1013,7 @@ class AudioDownloader:
 					return url, cdc, dur, ac
 
 	def get_audio(self, entry, asap=None, fmt=None, start=None, end=None):
+		"""Gets a valid audio stream (URL or file) from a given entry, with optional trimming."""
 		url = entry.get("orig") or entry["url"]
 		ts = ts_us()
 		ext = fmt or "opus"
@@ -1028,7 +1031,7 @@ class AudioDownloader:
 				entry2 = self.search(url, force=True)[0]
 				entry.update(entry2)
 				stream, cdc, ac = get_best_audio(entry2)
-				if entry.get("duration") and cdc and stream:
+				if entry.get("duration") and cdc and stream and d is not None:
 					return stream, cdc, entry["duration"], ac
 				result = self.handle_special_audio(entry, url, ts, fn)
 				if result:
@@ -1151,15 +1154,19 @@ class AudioDownloader:
 					urls.append(f"bcsearch{remainder}:{url}")
 				else:
 					urls.append(f"{mode or 'yt'}search{count}:{url}")
+			futs = deque()
 			for url in urls:
 				check, search = url.split(":", 1)
 				for mode in ("ytsearch", "scsearch", "spsearch", "bcsearch"):
 					if check == mode:
-						output.extend(getattr(self, mode)(search, count=count))
+						fut = esubmit(getattr(self, mode), search, count=count)
+						futs.append(fut)
 						break
 					elif check.startswith(mode) and check[len(mode):].isnumeric():
-						output.extend(getattr(self, mode)(search, count=int(check[len(mode):])))
+						fut = esubmit(getattr(self, mode), search, count=int(check[len(mode):]))
+						futs.append(fut)
 						break
+			output.extend(itertools.chain.from_iterable(f.result() for f in futs))
 		return list(output)
 
 	# Main extract function, able to extract from youtube playlists much faster than youtube-dl using youtube API, as well as ability to follow spotify links.

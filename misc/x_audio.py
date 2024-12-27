@@ -428,12 +428,12 @@ class AudioPlayer(discord.AudioSource):
 	def reverse(self):
 		return self.settings.speed < 0
 
-	# Constructs array of FFmpeg options using the audio settings.
+	# Constructs array of FFmpeg options using the audio settings. FFmpeg's arguments are not directly exposed to the user, as they are not very user-friendly.
 	def construct_options(self, full=True):
 		settings = self.settings
 		for k, v in settings.items():
 			settings[k] = round_min(v)
-		# Pitch setting is in semitones, so frequency is on an exponential scale
+		# Pitch setting is in semitones, so frequency is on an exponential scale (2^(1/12) per semitone)
 		pitchscale = 2 ** ((settings.pitch + settings.resample) / 12)
 		reverb = settings.reverb
 		volume = settings.volume
@@ -445,7 +445,8 @@ class AudioPlayer(discord.AudioSource):
 		# This must be first, else the filter will not initialize properly
 		if not isfinite(settings.compressor):
 			options.extend(("anoisesrc=a=.001953125:c=brown", "amerge"))
-		# Reverses song, this may be very resource consuming
+		# Reverses song, this may be very resource consuming as FFmpeg will read the entire file into memory
+		# TODO: Implement chunked reverse
 		if self.reverse:
 			options.append("areverse")
 		# Adjusts song tempo relative to speed, pitch, and nightcore settings
@@ -473,6 +474,7 @@ class AudioPlayer(discord.AudioSource):
 				options.append("aresample=" + str(SAMPLE_RATE))
 			options.append("asetrate=" + str(SAMPLE_RATE * pitchscale))
 		# Chorus setting, this is a bit of a mess
+		# TODO: Make this sound better
 		if settings.chorus:
 			chorus = abs(settings.chorus)
 			ch = min(16, chorus)
@@ -553,6 +555,7 @@ class AudioPlayer(discord.AudioSource):
 				dry = 1 - wet
 				options.append("[2]amix=weights=" + str(round(dry, 6)) + " " + str(round(-wet, 6)))
 			d = [round(1 - i ** 1.3 / (i ** 1.3 + coeff), 4) for i in range(2, 18, 2)]
+			# We pick up to four arbitrary but spaced-out pairs of delay and decay values to produce a natural-sounding effect
 			options.append(f"aecho=1:1:400|630:{d[0]}|{d[1]}")
 			if d[2] >= 0.05:
 				options.append(f"aecho=1:1:870|1150:{d[2]}|{d[3]}")
@@ -560,7 +563,7 @@ class AudioPlayer(discord.AudioSource):
 					options.append(f"aecho=1:1:1410|1760:{d[4]}|{d[5]}")
 					if d[6] >= 0.07:
 						options.append(f"aecho=1:1:2080|2320:{d[6]}|{d[7]}")
-		# Pan setting, uses extrastereo and volume filters to balance
+		# Pan setting, uses extrastereo and volume filters to balance (as extrastereo will otherwise mess with the overall volume)
 		if settings.pan != 1:
 			pan = min(10000, max(-10000, settings.pan))
 			while abs(abs(pan) - 1) > 0.001:
@@ -574,6 +577,7 @@ class AudioPlayer(discord.AudioSource):
 		if volume != 1:
 			options.append("volume=" + str(round(volume, 7)))
 		# Soft clip audio using atan, reverb filter requires -filter_complex rather than -af option
+		# Clipping is bypassed if compressor is enabled; instead we use a limiter such that if the volume is also set higher than 100%, the limiter will take effect instead.
 		if options:
 			if settings.compressor:
 				options.append("alimiter")
@@ -656,13 +660,15 @@ class AudioPlayer(discord.AudioSource):
 
 	updating_activity = None
 	def update_activity(self):
+		"""Updates whether there are people listening; timeout after 5 minutes of inactivity."""
 		if self.updating_activity:
 			self.updating_activity.cancel()
 			self.updating_activity = None
 		if self.settings.stay:
 			return
-		connected = interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
 		if connected:
+			# Handle special case of only deafened users; they are not counted as listeners but will still keep the bot in the channel, paused instead
 			listeners = sum(not m.bot and m.voice and not (m.voice.deaf or m.voice.self_deaf) for m in self.vcc.members)
 			if listeners == 0:
 				self.updating_activity = csubmit(self._updating_activity())
@@ -672,7 +678,7 @@ class AudioPlayer(discord.AudioSource):
 	async def _updating_activity(self):
 		self.pause()
 		await asyncio.sleep(300)
-		connected = interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
 		if connected:
 			listeners = sum(not m.bot and m.voice for m in self.vcc.members)
 			if listeners == 0:
@@ -680,21 +686,23 @@ class AudioPlayer(discord.AudioSource):
 
 	updating_streaming = None
 	def update_streaming(self):
+		"""Updates whether we're streaming audio; timeout after 5 minutes of inactivity."""
 		if self.updating_streaming:
 			self.updating_streaming.cancel()
 			self.updating_streaming = None
 		if self.settings.stay:
 			return
-		connected = interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
 		if len(self.queue) == 0 and connected:
 			self.updating_streaming = csubmit(self._updating_streaming())
 	async def _updating_streaming(self):
 		await asyncio.sleep(300)
-		connected = interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
 		if len(self.queue) == 0 and connected:
 			await self.leave("Queue empty")
 
 	def read(self):
+		"""Overrides discord.AudioSource read method to read audio data from the current playing source. Handles EOF, automatically skipping songs that have ended."""
 		if not self.playing or self.settings.pause:
 			if self.silent:
 				try:
@@ -736,6 +744,7 @@ class AudioPlayer(discord.AudioSource):
 		return out
 
 	def enqueue(self, items, start=-1, stride=1):
+		"""Inserts items into the queue, respecting the start and stride parameters where applicable."""
 		if len(items) > MAX_QUEUE:
 			items = astype(items, (list, alist))[:MAX_QUEUE]
 		items = list(astype(e, cdict) for e in items)
@@ -768,6 +777,7 @@ class AudioPlayer(discord.AudioSource):
 
 	shuffler = 0
 	def skip(self, indices=0, loop=False, repeat=False, shuffle=False):
+		"""Skips items in the queue, respecting the loop, repeat, and shuffle parameters where applicable."""
 		with self.ensure_lock:
 			if isinstance(indices, int):
 				indices = [indices]
@@ -793,6 +803,7 @@ class AudioPlayer(discord.AudioSource):
 		return resp
 
 	def seek(self, pos=0):
+		"""Seeks to a specific position in the current playing audio."""
 		if not self.queue:
 			return
 		with self.ensure_lock:
@@ -811,6 +822,7 @@ class AudioPlayer(discord.AudioSource):
 	# force=1: always regenerate readers (this updates audio settings)
 	# force=2: always restarts songs from beginning
 	def ensure_play(self, force=0):
+		"""Ensures that the player is playing audio when it should be. Called when the queue is modified, reloaded, or resumed."""
 		with self.ensure_lock:
 			pos = None
 			if len(self.queue) > MAX_QUEUE + 2048:
@@ -867,6 +879,7 @@ class AudioPlayer(discord.AudioSource):
 			self.update_activity()
 
 	def clear(self):
+		"""Clears the queue and stops all audio."""
 		for entry in tuple(self.playing):
 			entry.close()
 		self.playing.clear()

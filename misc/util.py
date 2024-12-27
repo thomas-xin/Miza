@@ -500,12 +500,36 @@ def html_decode(s) -> str:
 @hashable_args
 @functools.lru_cache(maxsize=256)
 def split_across(s, lim=2000, prefix="", suffix="", mode="len", bypass=((), ()), close_codeboxes=True) -> list:
-	"Splits a string into segments according to given length limit. Prefers splitting across paragraphs/lines than words/characters."
+	"""Splits a string into segments that fit within a specified length limit, considering prefixes, suffixes and code blocks.
+	Args:
+		s (str): The string to split.
+		lim (int, optional): Maximum length limit for each segment. Defaults to 2000.
+		prefix (str, optional): String to prepend to each segment. Defaults to "".
+		suffix (str, optional): String to append to each segment. Defaults to "".
+		mode (str, optional): Length calculation mode - "len" for character count or "tlen" for token length. Defaults to "len".
+		bypass (tuple, optional): Two tuples containing strings - if segment starts with any string in first tuple, 
+								prefix is bypassed; if segment ends with any string in second tuple, suffix is bypassed. 
+								Defaults to ((), ()).
+		close_codeboxes (bool, optional): Whether to automatically close unclosed code blocks. Defaults to True.
+	Returns:
+		list: List of string segments, each within the specified length limit including prefix/suffix.
+	Examples:
+		>>> split_across("Long text here", lim=10)
+		['Long text', 'here']
+		>>> split_across("```code\nstuff```", prefix="Pre: ")
+		['Pre: ```code\nstuff```']
+	Notes:
+		- Attempts to split on natural boundaries (paragraphs, sentences, spaces) when possible
+		- Handles code blocks (```) intelligently, ensuring they're properly closed
+		- Can bypass prefix/suffix for specific string patterns
+		- Supports both character length and token length counting modes
+	"""
 	cb = "```"
 	if cb in suffix:
 		close_codeboxes = False
 	current_codebox = ""
 	s = s.replace("\r\n", "\n")
+	# Natural boundaries in order of preference
 	splitters = ["\n\n", "\n", "\t", "? ", "! ", ". ", " "]
 
 	if mode == "len":
@@ -513,6 +537,7 @@ def split_across(s, lim=2000, prefix="", suffix="", mode="len", bypass=((), ()),
 	elif mode == "tlen":
 		@functools.lru_cache(maxsize=64)
 		def raw_len(s):
+			# Borrows the tiktoken encoding for token length calculation
 			return tlen(s)
 	else:
 		raise NotImplementedError(f"split_across: Unsupported mode {mode}")
@@ -578,8 +603,8 @@ def split_across(s, lim=2000, prefix="", suffix="", mode="len", bypass=((), ()),
 	temp = ""
 	found = None
 	while s:
+		# Keep track of a "budget" for how much we can add to the current segment. Note that we need the `required_len` function to account for the prefix/suffix, and possible code blocks that need to be closed.
 		budget = max(1, lim - required_len(temp) + 1)
-		# print(budget)
 		if mode == "len":
 			checker = s[:budget]
 		else:
@@ -645,6 +670,31 @@ def smart_shlex(s):
 	t.quotes = t.escapedquotes = "'\"`" + "".join(smart_map.values())
 	return t
 def smart_split(s, rws=False):
+	"""Splits a string using a smart tokenizer that respects quotes and escapes.
+
+	This function implements a more sophisticated string splitting algorithm that handles:
+	- Quoted strings (both single and double quotes)
+	- Escaped characters
+	- Special characters and spaces
+
+	Args:
+		s (str): The input string to split
+		rws (bool, optional): If True, returns both tokens and whitespace. Defaults to False.
+
+	Returns:
+		Union[alist, Tuple[list, list]]: 
+			If rws=False: Returns an alist (array-list) of tokens
+			If rws=True: Returns a tuple of (tokens, whitespace), where whitespace contains
+			the separating whitespace between tokens including leading/trailing spaces
+
+	Examples:
+		>>> smart_split('hello "world with spaces"')
+		['hello', 'world with spaces']
+		>>> smart_split('cmd "quoted \\"nested\\" arg"') 
+		['cmd', 'quoted "nested" arg']
+		>>> smart_split('a b c', rws=True)
+		(['a', 'b', 'c'], [' ', ' ', ' ', ''])
+	"""
 	si = apply_translator(s, smart_map)
 	try:
 		t = smart_shlex(si)

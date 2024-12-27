@@ -1385,7 +1385,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if rem > 0:
 					found[x][rem] = guild
 		if return_all:
-			valids = list(itertools.chain(*(v.values() for v in found)))
+			valids = list(itertools.chain.from_iterable(v.values() for v in found))
 			return valids, [guild.emoji_limit - len(deque(e for e in guild.emojis if e.animated == animated)) for guild in valids]
 		for i, f in enumerate(found):
 			if f:
@@ -4355,7 +4355,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				"System time": datetime.datetime.now(),
 				"Uptime (past week)": self.uptime,
 				"Uptime (current)": time_disp(utc() - self.start_time),
-				"Command count": len(set(itertools.chain(*self.commands.values()))),
+				"Command count": len(set(itertools.chain.from_iterable(self.commands.values()))),
 				"Code size": [x.item() for x in size],
 			},
 		})
@@ -5593,7 +5593,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	
 	async def respond_with(self, response, message=None, command=None, manager=None, done=True):
 		with self.command_semaphore:
+			# Limit for regular Discord messages, beyond which we'll need to split the text into multiple messages
 			msglen = 2000
+			# Maximum length we'll allow for a set of messages, beyond which the text will instead be uploaded as a file
 			maxlen = 12000
 			if response and isinstance(response, str):
 				response = cdict(content=response)
@@ -5667,6 +5669,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 											try:
 												await fut
 											except InterruptedError:
+												# If the StreamedMessage is interrupted, it is most likely from another user sending a new message. We block the current stream and buffer all other content until we have the full message.
 												blocked = True
 										try:
 											new_content = add_content(old_content, content)
@@ -5701,6 +5704,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						new_content = add_content(old_content, content)
 						await manager.update(new_content, embeds=embeds, files=files, buttons=buttons, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), reacts=reacts, done=done, force=force)
 					except (OverflowError, InterruptedError):
+						# If the StreamedMessage was interrupted or exceeded the maximum length, we wipe the original and force a new message. This ensures the list of messages stays contiguous, which improves readability.
 						csubmit(manager.delete())
 					else:
 						messages = await manager.collect()
@@ -5728,6 +5732,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						content = "Response too long for message."
 					else:
 						if tts:
+							# For TTS mode, we split the message into smaller chunks to ensure the message is read out correctly. Unlike the regular limit of 2000 characters which is known, the TTS limit is not well documented and may vary between clients. We impose an arbitrary limit of 32 LLM tokens instead, which has yet to be reported to fail.
 							ms = split_across(content, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), lim=32, mode="tlen")
 						else:
 							ms = split_across(content, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), lim=msglen)
@@ -6617,7 +6622,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return await message.add_reaction(react)
 
 	async def check_to_delete(self, message, reaction, user):
-		"Deletes own messages if any of the \"X\" emojis are reacted by a user with delete message permission level, or if the message originally contained the corresponding reaction from the bot."
+		"Deletes own messages if any of the \"X\" emojis are reacted by a user with delete message permission level. Spoilers own messages if any of the square button emojis are reacted by a user with spoiler message permission level. Messages replying to a user automatically grants them permission to perform these actions."
 		if user.id == self.id:
 			return
 		if str(reaction) not in "❌✖️🇽❎🔳🔲":
@@ -6631,8 +6636,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if not u_perm < 3:
 					check = True
 				else:
+					# Handle special case where a message may be part of a set of StreamedMessage instances, where only the first will actually have the reference
+					message2 = message
+					async for temp in self.history(message.channel, before=message, limit=10):
+						if temp.author.id != self.id:
+							break
+						if temp.reference:
+							message2 = temp
 					try:
-						reference = await self.fetch_reference(message)
+						reference = await self.fetch_reference(message2)
 					except (LookupError, discord.NotFound):
 						for react in message.reactions:
 							if str(reaction) == str(react) and react.me:
@@ -7097,6 +7109,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 			@classmethod
 			async def attach(cls, message, replace=False, **kwargs):
+				"Creates a StreamedMessage object from a discord.Message object."
 				if isinstance(message, cls):
 					message.msglen = kwargs.get("msglen", 2000)
 					message.maxlen = kwargs.get("maxlen", 2000)
@@ -7136,6 +7149,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return self
 
 			def update(self, content, embeds=[], files=[], buttons=[], prefix="", suffix="", bypass=((), ()), reacts=[], force=True, done=True):
+				"Updates the StreamedMessage object with new content, embeds, files, and buttons. If force is True, the message will be sent even if it exceeds the maximum length, as a file."
 				if not done and self.content and not content.strip() and not self.content.endswith(" <<<"):
 					content = self.content + " <<<"
 				content = readstring(content).strip()
@@ -7158,10 +7172,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 			async def _update(self, content, embeds, files, buttons, prefix, suffix, bypass, reacts, force, done):
 				ms = split_across(content, lim=self.msglen, prefix=prefix, suffix=suffix, bypass=bypass)
-				# required_messages = 0
-				# embed_map = []
-				# while embeds:
-					
 				futs = []
 				while len(ms) < len(self.messages):
 					fut = csubmit(bot.silent_delete(self.messages.pop(-1)))
@@ -7212,6 +7222,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return self
 
 			async def assert_last(self, assertion=True):
+				"Asserts that the last message in the StreamedMessage object is the same as the last message in the channel. If assertion is True, an error will be raised if the last message is not the same."
 				if not self.messages:
 					return
 				await self.collect()
