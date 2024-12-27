@@ -33,6 +33,7 @@ def cast_rp(fp, pp, model=None):
 	else:
 		s = 1
 	return ((fp + pp) / 8 + 1) ** (0.125 * s)
+# List of language models and their respective providers, as well as pricing per million input/output tokens
 available = {
 	"claude-3-opus": {
 		"anthropic": ("claude-3-opus-20240229", ("15", "75")),

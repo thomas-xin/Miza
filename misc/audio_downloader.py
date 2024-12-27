@@ -20,9 +20,9 @@ from .types import alist, as_str, cdict, full_prune, json_dumps, round_min, to_a
 from .smath import time_parse, fuzzy_substring
 from .asyncs import esubmit
 from .util import (
-	python, compat_python, shuffle, utc, proxy, leb128, verify_search, json_dumpstr, new_playwright_page, get_free_port,
+	python, compat_python, shuffle, utc, proxy, leb128, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration_2, html_decode,
-	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url, is_imgur_url, is_giphy_url,
+	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url,
 	EvalPipe, PipedProcess, Cache, Request, Semaphore, CACHE_PATH, magic, rename,
 )
 
@@ -1013,7 +1013,7 @@ class AudioDownloader:
 					return url, cdc, dur, ac
 
 	def get_audio(self, entry, asap=None, fmt=None, start=None, end=None):
-		"""Gets a valid audio stream (URL or file) from a given entry, with optional trimming."""
+		"""Gets a valid audio stream (URL or file) from a given entry, with optional trimming. In ASAP (as soon as possible) mode, prefer URLs."""
 		url = entry.get("orig") or entry["url"]
 		ts = ts_us()
 		ext = fmt or "opus"
@@ -1031,7 +1031,7 @@ class AudioDownloader:
 				entry2 = self.search(url, force=True)[0]
 				entry.update(entry2)
 				stream, cdc, ac = get_best_audio(entry2)
-				if entry.get("duration") and cdc and stream and d is not None:
+				if entry.get("duration") and cdc and stream and (d is not None or asap):
 					return stream, cdc, entry["duration"], ac
 				result = self.handle_special_audio(entry, url, ts, fn)
 				if result:
@@ -1066,8 +1066,10 @@ class AudioDownloader:
 				rename(fn2, fn)
 				dur, _bps, cdc, ac = get_duration_2(fn)
 				return fn, cdc, dur, ac
+		codec = "opus" if ext == "ogg" else ext
 		ydl_opts = dict(
-			format="bestaudio[vcodec=none][acodec=opus][audio_channels=2]/bestaudio[audio_channels=2]/bestaudio/worstvideo[acodec!=none]",
+			# Prefer selected codec, but fallback to best audio if not available
+			format=f"bestaudio[vcodec=none][acodec={codec}][audio_channels=2]/bestaudio[audio_channels=2]/bestaudio/worstvideo[acodec!=none]",
 			default_search="auto",
 			source_address="0.0.0.0",
 			final_ext=ext,
@@ -1076,25 +1078,26 @@ class AudioDownloader:
 			windowsfilenames=True,
 			cookiesfrombrowser=["firefox"],
 			postprocessors=[dict(
+				# Use our custom FFmpeg audio convertor to ensure consistent audio codec, and allow trimming if necessary
 				key="FFmpegCustomAudioConvertor",
 				format=ext,
-				codec="opus" if ext == "ogg" else ext,
+				codec=codec,
 				start=start,
 				end=end,
 			)]
 		)
 		if not fmt and (is_discord_attachment(url) or is_miza_url(url)):
 			if discord_expired(url):
+				# Just in case a Discord attachment expires in the short time between checking and downloading
 				url = shorten_attachment(url, 0)
 			dur, _bps, cdc, ac = get_duration_2(url)
 			if dur:
 				entry["duration"] = dur
 			return url, cdc, dur, ac
-		entry2 = self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True)")
+		entry2 = self.run(f"entry_from_ytdl(ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True))")
 		entry.update(dict(
-			name=entry2.get("title"),
-			url=entry2.get("webpage_url") or entry.get("url"),
-			thumbnail=get_best_icon(entry2),
+			name=entry2.get("name"),
+			icon=get_best_icon(entry2),
 			duration=entry2.get("duration"),
 		))
 		assert os.path.exists(fn) and os.path.getsize(fn)

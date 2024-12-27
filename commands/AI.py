@@ -747,9 +747,9 @@ class Instruct(Command):
 				else:
 					model = "gpt-3.5-turbo-instruct"
 			if model in ("claude-3-opus", "o1"):
-				_premium.require(4)
-			elif model in ("gpt-4", "yi-large", "o1-mini"):
 				_premium.require(3)
+			elif model in ("gpt-4", "yi-large", "o1-mini"):
+				_premium.require(2)
 			elif model in ("dbrx-instruct", "claude-3.5-sonnet", "claude-3-sonnet", "gpt-3.5", "gpt-4m", "lzlv-70b", "llama-3-70b", "command-r-plus"):
 				_premium.require(2)
 		resp = await bot.force_completion(model=model, prompt=prompt, stream=True, timeout=120, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, max_tokens=max_tokens, premium_context=_premium, allow_alt=False, **kwargs)

@@ -528,7 +528,7 @@ def split_across(s, lim=2000, prefix="", suffix="", mode="len", bypass=((), ()),
 	if cb in suffix:
 		close_codeboxes = False
 	current_codebox = ""
-	s = s.replace("\r\n", "\n")
+	s = s.replace("\r\n", "\n").replace("\f", "\n\n")
 	# Natural boundaries in order of preference
 	splitters = ["\n\n", "\n", "\t", "? ", "! ", ". ", " "]
 
@@ -541,7 +541,6 @@ def split_across(s, lim=2000, prefix="", suffix="", mode="len", bypass=((), ()),
 			return tlen(s)
 	else:
 		raise NotImplementedError(f"split_across: Unsupported mode {mode}")
-	@functools.lru_cache(maxsize=64)
 	def required_len(s):
 		c = raw_len(s)
 		if bypass[0] and any(s.startswith(w) for w in bypass[0]):
@@ -582,7 +581,7 @@ def split_across(s, lim=2000, prefix="", suffix="", mode="len", bypass=((), ()),
 			try:
 				i = s.rindex(cut)
 			except ValueError:
-				pass #splitters.remove(cut)
+				pass
 			else:
 				yield s[:i], cut
 	def try_one(s, cut):
@@ -592,12 +591,18 @@ def split_across(s, lim=2000, prefix="", suffix="", mode="len", bypass=((), ()),
 			return s, ""
 		else:
 			return s[:i], cut
+	def from_budget(s, budget):
+		if mode == "len":
+			return s[:budget]
+		# Assume 8 characters per token, then actually cut down after encoding. This means tokens over 8 characters will cut into the budget, but this is a reasonable approximation that doesn't require reencoding the entire string each time.
+		return tik_decode(tik_encode(s[:budget * 8])[:budget])
 
 	if close_codeboxes:
 		if "\n" in s and "#" in s and cb in s:
 			pattern = re.compile(rf"^((?:[#\-\s]|[0-9]+\.\s).*{cb})", re.MULTILINE)
 			s = pattern.sub(lambda x: x.group(1).lstrip()[:-3] + ("\n" + cb), s)
 	if required_len(s) <= lim:
+		# If the entire string fits within the limit, return it as a single segment
 		return [complete(s)[0]]
 	out = []
 	temp = ""
@@ -605,18 +610,18 @@ def split_across(s, lim=2000, prefix="", suffix="", mode="len", bypass=((), ()),
 	while s:
 		# Keep track of a "budget" for how much we can add to the current segment. Note that we need the `required_len` function to account for the prefix/suffix, and possible code blocks that need to be closed.
 		budget = max(1, lim - required_len(temp) + 1)
-		if mode == "len":
-			checker = s[:budget]
-		else:
-			checker = tik_decode(tik_encode(s[:budget * 8])[:budget])
+		checker = from_budget(s, budget)
 		if found is not None:
+			# If we already found a natural boundary, try to cut more segments using that same boundary
 			cur, cut = try_one(checker, found)
-			if required_len(temp) + raw_len(cur) > lim or required_len(new := temp + cur) > lim:
+			if required_len(new := temp + cur) > lim:
+				# If a single higher-priority segment exceeds half the limit, we just cut it off and move on, otherwise try to add more smaller segments until we reach the limit. This eliminates the case where an extremely short segment is separated by a high priority delimiter, such as a double newline, which would lead to very short segments being present in the output. In essence, don't be too conservative with splitting.
 				if required_len(temp) > lim / 2:
 					text, current_codebox = complete(temp)
 					out.append(text)
 					temp = ""
 					found = None
+					s = s.lstrip()
 					continue
 			else:
 				s = s[len(cur + cut):]
@@ -624,26 +629,27 @@ def split_across(s, lim=2000, prefix="", suffix="", mode="len", bypass=((), ()),
 				temp = new + cut
 				continue
 		for cur, cut in tries(checker):
-			if required_len(temp) + raw_len(cur) > lim or required_len(new := temp + cur) > lim:
+			if required_len(new := temp + cur) > lim:
 				continue
 			s = s[len(cur + cut):]
 			found = cut
 			temp = new + cut
 			break
 		else:
-			if mode == "len":
-				n_required = lim - required_len(temp)
-				temp = temp + checker[:n_required]
-				s = s[n_required:]
-			else:
-				n_required = lim - required_len(temp)
-				tokens = tik_encode(checker)
-				temp = temp + tik_decode(tokens[:n_required])
-				s = s[len(tik_decode(tokens[n_required:])):]
+			n_required = lim - required_len(temp)
+			if n_required >= lim / 2:
+				if mode == "len":
+					temp = temp + checker[:n_required]
+					s = s[n_required:]
+				else:
+					tokens = tik_encode(checker)
+					temp = temp + tik_decode(tokens[:n_required])
+					s = s[len(tik_decode(tokens[n_required:])):]
 			text, current_codebox = complete(temp)
 			out.append(text)
 			temp = ""
 			found = None
+			s = s.lstrip()
 			continue
 	if temp:
 		out.append(complete(temp)[0])

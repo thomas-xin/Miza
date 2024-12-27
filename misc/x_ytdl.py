@@ -15,7 +15,7 @@ except ImportError as ex:
 	except ImportError:
 		raise ex
 from .types import list_like
-from .util import Request, EvalPipe, esubmit, python, new_playwright_page, is_spotify_url
+from .util import Request, EvalPipe, esubmit, python, new_playwright_page
 
 ydl_opts = {
 	"quiet": 1,
@@ -32,6 +32,14 @@ ydl_opts = {
 	"cookiesfrombrowser": ["firefox"],
 }
 ytdl = ytd.YoutubeDL(ydl_opts)
+
+def entry_from_ytdl(resp):
+	return dict(
+		name=resp.get("title"),
+		url=resp.get("webpage_url") or resp.get("url"),
+		thumbnails=resp.get("thumbnails") or [resp.get("thumbnail")],
+		duration=resp.get("duration"),
+	)
 
 def extract_info(url, download=False, process=True):
 	resp = ytdl.extract_info(url, download=download, process=process)
