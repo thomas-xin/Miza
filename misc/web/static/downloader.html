@@ -14,6 +14,8 @@
 html {
 	height: 100%;
 	background: linear-gradient(135deg, #000000, #001f3f);
+	background-size: cover;
+	background-attachment: fixed;
 }
 body {
 	font-family: Agbalumo, cursive, sans-serif;
@@ -135,7 +137,7 @@ a:hover {
 	border: none;
 	padding: 0;
 	width: 60px;
-	max-width: 96px;
+	max-width: 128px;
 	text-align: center;
 }
 	</style>
@@ -145,7 +147,7 @@ a:hover {
 		<div>
 			<h1>Download Media</h1>
 			<h3>Name or URL</h3>
-			<input type="text" id="query" style="min-width:320px; width:60vw" oninput="debouncedSearch()" onchange="debouncedSearch()" value="" required>
+			<input type="text" id="query" style="min-width:320px; width:60vw; font-size: 24px; font-family: Agbalumo, cursive, sans-serif" oninput="debouncedSearch()" onchange="debouncedSearch()" value="" placeholder="https://youtu.be/dQw4w9WgXcQ" required>
 			<h3>Format</h3>
 			
 			<input type="radio" id="mp4" name="output-format" value="mp4" checked><label for="mp4">mp4</label><br />
@@ -167,7 +169,7 @@ a:hover {
 //download.js v4.2, by dandavis; 2008-2017. [MIT] see http://danml.com/download.html for tests/usage
 ;(function(r,l){"function"==typeof define&&define.amd?define([],l):"object"==typeof exports?module.exports=l():r.download=l()})(this,function(){return function l(a,e,k){function q(a){var h=a.split(/[:;,]/);a=h[1];var h=("base64"==h[2]?atob:decodeURIComponent)(h.pop()),d=h.length,b=0,c=new Uint8Array(d);for(b;b<d;++b)c[b]=h.charCodeAt(b);return new f([c],{type:a})}function m(a,b){if("download"in d)return d.href=a,d.setAttribute("download",n),d.className="download-js-link",d.innerHTML="downloading...",d.style.display="none",document.body.appendChild(d),setTimeout(function(){d.click(),document.body.removeChild(d),!0===b&&setTimeout(function(){g.URL.revokeObjectURL(d.href)},250)},66),!0;if(/(Version)\/(\d+)\.(\d+)(?:\.(\d+))?.*Safari\//.test(navigator.userAgent))return/^data:/.test(a)&&(a="data:"+a.replace(/^data:([\w\/\-\+]+)/,"application/octet-stream")),!window.open(a)&&confirm("Displaying New Document\n\nUse Save As... to download, then click back to return to this page.")&&(location.href=a),!0;var c=document.createElement("iframe");document.body.appendChild(c),!b&&/^data:/.test(a)&&(a="data:"+a.replace(/^data:([\w\/\-\+]+)/,"application/octet-stream")),c.src=a,setTimeout(function(){document.body.removeChild(c)},333)}var g=window,b=k||"application/octet-stream",c=!e&&!k&&a,d=document.createElement("a");k=function(a){return String(a)};var f=g.Blob||g.MozBlob||g.WebKitBlob||k,n=e||"download",f=f.call?f.bind(g):Blob;"true"===String(this)&&(a=[a,b],b=a[0],a=a[1]);if(c&&2048>c.length&&(n=c.split("/").pop().split("?")[0],d.href=c,-1!==d.href.indexOf(c))){var p=new XMLHttpRequest;return p.open("GET",c,!0),p.responseType="blob",p.onload=function(a){l(a.target.response,n,"application/octet-stream")},setTimeout(function(){p.send()},0),p}if(/^data:([\w+-]+\/[\w+.-]+)?[,;]/.test(a)){if(!(2096103.424<a.length&&f!==k))return navigator.msSaveBlob?navigator.msSaveBlob(q(a),n):m(a);a=q(a),b=a.type||"application/octet-stream"}else if(/([\x80-\xff])/.test(a)){e=0;var c=new Uint8Array(a.length),t=c.length;for(e;e<t;++e)c[e]=a.charCodeAt(e);a=new f([c],{type:b})}a=a instanceof f?a:new f([a],{type:b});if(navigator.msSaveBlob)return navigator.msSaveBlob(a,n);if(g.URL)m(g.URL.createObjectURL(a),!0);else{if("string"==typeof a||a.constructor===k)try{return m("data:"+b+";base64,"+g.btoa(a))}catch(h){return m("data:"+b+","+encodeURIComponent(a))}b=new FileReader,b.onload=function(a){m(this.result)},b.readAsDataURL(a)}return!0}});
 
-function timeDisp(s, rounded = true) {
+function timeDisp(s, rounded=false) {
 	"Returns a representation of a time interval using days:hours:minutes:seconds.";
 	if (!isFinite(s)) {
 		return String(s);
@@ -175,19 +177,23 @@ function timeDisp(s, rounded = true) {
 	if (rounded) {
 		s = Math.round(s);
 	}
-	let output = String(s % 60);
-	if (output.length < 2) {
+	const v = s % 60;
+	const v2 = parseInt(v, 10);
+	let output = v == v2 ? v2 : v.toPrecision(2);
+	if (v < 10) {
 		output = "0" + output;
 	}
 	if (s >= 60) {
-		let temp = String(Math.floor(s / 60) % 60);
-		if (temp.length < 2 && s >= 3600) {
+		const v = Math.floor(s / 60) % 60;
+		let temp = String(v);
+		if (v < 10 && s >= 3600) {
 			temp = "0" + temp;
 		}
 		output = temp + ":" + output;
 		if (s >= 3600) {
-			temp = String(Math.floor(s / 3600) % 24);
-			if (temp.length < 2 && s >= 86400) {
+			const v = Math.floor(s / 3600) % 24;
+			temp = String(v);
+			if (v < 10 && s >= 86400) {
 				temp = "0" + temp;
 			}
 			output = temp + ":" + output;
@@ -204,10 +210,22 @@ function timeDisp(s, rounded = true) {
 function timeParse(s) {
 	"Returns the number of seconds represented by a time interval string.";
 	let parts = s.split(":");
+	let days = 0;
+	if (parts.length > 3) {
+		days = parseInt(parts[0], 10);
+		parts = parts.slice(1);
+	}
 	let output = 0;
 	for (let i = 0; i < parts.length; i++) {
-		output += parseInt(parts[i], 10) * Math.pow(60, parts.length - i - 1);
+		let n;
+		if (i == parts.length - 1) {
+			n = parseFloat(parts[i]);
+		} else {
+			n = parseInt(parts[i], 10);
+		}
+		output += n * Math.pow(60, parts.length - i - 1);
 	}
+	output += days * 86400;
 	return output;
 }
 
@@ -306,10 +324,11 @@ function updateCount() {
 function downloadAll() {
 	submit = document.getElementById("submit");
 	submit.querySelector("span").textContent = "Loading...";
+	submit.querySelector(".progress-bar").style.width = "0%";
 	submit.disabled = true;
 	children = document.getElementById("previews").children;
 	let count = 0;
-	let delay = 0;
+	let delay = 1;
 	let successful = 0;
 	const progressBar = submit.querySelector(".progress-bar");
 	fmt = document.querySelector('input[name="output-format"]:checked').value;
@@ -318,11 +337,14 @@ function downloadAll() {
 		if (!check.checked) return;
 		count++;
 		let href = "/ytdl?d=" + encodeURIComponent(preview.url) + "&fmt=" + fmt;
-		if (preview.start) {
+		if (Math.abs(preview.start) > 0.01) {
 			href += "&start=" + preview.start;
 		}
-		if (preview.end && preview.end != preview.duration) {
+		if (preview.end && Math.abs(preview.end - preview.duration) > 0.01) {
 			href += "&end=" + preview.end;
+		}
+		if (i == children.length - 1) {
+			submit.querySelector("span").textContent = `Downloading (0/${count})...`;
 		}
 		setTimeout(() => {
 			if (submit.error) return;
@@ -366,7 +388,7 @@ function updateProgressFromInput(preview) {
 	}
 	preview.startP = (startTime / preview.duration) * 100;
 	preview.endP = (endTime / preview.duration) * 100;
-	preview.updateProgress();
+	preview.updateProgress(false);
 }
 
 function updateInputWidth(input) {
@@ -384,20 +406,27 @@ function createPreviewElement(e, i, query) {
 	preview.className = "entry";
 	title = document.createElement("p");
 	title.style.margin = "0";
-	check = document.createElement("input");
+	const check = document.createElement("input");
 	check.type = "checkbox";
 	check.checked = !i || query.startsWith("https://");
 	check.addEventListener("change", updateCount);
 	title.appendChild(check);
-	href = document.createElement("a");
+	const href = document.createElement("a");
 	href.textContent = e.name;
 	href.href = e.url;
+	href.target = "_blank";
 	title.appendChild(href);
 	preview.appendChild(title);
 	const icon = document.createElement("img");
 	icon.width = 320;
 	icon.setAttribute("loading", "lazy");
-	preview.appendChild(icon);
+	icon.addEventListener("click", () => {
+		check.checked = !check.checked;
+		updateCount();
+	});
+	icon.addEventListener("dblclick", () => {
+		href.click();
+	});
 	let dur;
 	if (e.duration) {
 		preview.duration = e.duration;
@@ -407,12 +436,13 @@ function createPreviewElement(e, i, query) {
 		const startInput = document.createElement("input");
 		startInput.type = "text";
 		startInput.className = "time-input start-time";
-		startInput.value = "00:00:00";
+		startInput.value = "0:00";
 		startInput.addEventListener("change", () => updateProgressFromInput(preview));
 		updateInputWidth(startInput);
 		dur.appendChild(startInput);
 	
 		const dash = document.createElement("span");
+		dash.style.margin = "0";
 		dash.textContent = " - ";
 		dur.appendChild(dash);
 
@@ -427,10 +457,8 @@ function createPreviewElement(e, i, query) {
 		const timeRange = document.createElement("span");
 		timeRange.textContent = "/" + timeDisp(preview.duration);
 		dur.appendChild(timeRange);
-
-		preview.appendChild(dur);
 	}
-	component = encodeURIComponent(e.icon);
+	const component = encodeURIComponent(e.icon);
 	icon.onload = () => {
 		fetch(`/mean_colour?url=${component}`).then((response) => response.json()).then((data) => {
 			[r, g, b] = data.colour;
@@ -457,7 +485,7 @@ function createPreviewElement(e, i, query) {
 			progressEnd.className = "progress-thumb";
 			progressEnd.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
 
-			preview.updateProgress = () => {
+			preview.updateProgress = (rounded=true) => {
 				if (preview.startP > preview.endP) {
 					[preview.startP, preview.endP] = [preview.endP, preview.startP];
 				} else if (preview.startP > preview.endP) {
@@ -473,8 +501,8 @@ function createPreviewElement(e, i, query) {
 				progressEnd.style.left = `${preview.endP}%`;
 				const startInput = preview.querySelector('.start-time');
 				const endInput = preview.querySelector('.end-time');
-				startInput.value = timeDisp(preview.start);
-				endInput.value = timeDisp(preview.end);
+				startInput.value = timeDisp(preview.start, rounded);
+				endInput.value = timeDisp(preview.end, rounded);
 				updateInputWidth(startInput);
 				updateInputWidth(endInput);
 			}
@@ -537,7 +565,31 @@ function createPreviewElement(e, i, query) {
 		});
 	}
 	icon.src = e.icon;
+	preview.appendChild(icon);
+	if (dur) preview.appendChild(dur);
 	return preview;
 }
+document.addEventListener("keydown", (event) => {
+	if (event.key == "Enter") {
+		updateSearched();
+	} else if (event.key == "Escape") {
+		document.getElementById("query").value = "";
+		updateSearched();
+	} else if (event.key == "a" && (event.ctrlKey || event.metaKey) && document.activeElement != document.getElementById("query")) {
+		event.preventDefault();
+		children = document.getElementById("previews").children;
+		checkedAmount = 0;
+		Array.from(children).forEach((preview) => {
+			check = preview.children[0].children[0];
+			if (check.checked) checkedAmount++;
+		});
+		shouldCheck = checkedAmount <= children.length / 2;
+		Array.from(children).forEach((preview) => {
+			check = preview.children[0].children[0];
+			check.checked = shouldCheck;
+		});
+		updateCount();
+	}
+});
 </script>
 </html>

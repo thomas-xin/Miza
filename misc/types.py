@@ -30,6 +30,25 @@ def utc():
 
 
 class MemoryBytes:
+	"""A memory-efficient wrapper for byte-like objects that provides bytes-like interface.
+	This class wraps byte-like objects (bytes, bytearray, memoryview) and provides
+	a consistent interface similar to bytes while maintaining memory efficiency by
+	using memoryview internally. It lazily converts to bytes only when necessary.
+	Attributes:
+		view (memoryview): Direct access to the underlying memoryview object.
+	Args:
+		data (Union[bytes, bytearray, memoryview, MemoryBytes]): The byte-like data to wrap.
+	Raises:
+		TypeError: If the input is not a byte-like object.
+	Examples:
+		>>> mb = MemoryBytes(b'Hello')
+		>>> mb[1:3]
+		MemoryBytes(b'el')
+		>>> mb.upper()
+		MemoryBytes(b'HELLO')
+		>>> mb.decode()
+		'Hello'
+	"""
 
 	__slots__ = ("__weakref__", "_mv", "_b")
 
@@ -620,7 +639,28 @@ def exclusive_set(range, *excluded):
 
 
 class RangeSet(collections.abc.Iterable):
-	"""A set of ranges of integers. Ranges are stored as mutually exclusive tuples of (start, stop), and may be iterated as if they were a single range."""
+	"""A class representing a set of continuous ranges of integers.
+	RangeSet manages ordered collections of non-overlapping integer ranges. It supports basic set operations
+	and provides efficient range-based manipulation.
+	Attributes:
+		ranges (list): A sorted list of tuples, where each tuple contains (start, stop) values representing ranges.
+	Examples:
+		>>> rs = RangeSet(1, 5)  # Creates range [1,5)
+		>>> rs.add(7, 9)         # Adds range [7,9)
+		>>> 3 in rs              # True
+		>>> 6 in rs              # False
+		>>> len(rs)              # 6 (total count of integers in ranges)
+		>>> list(rs)             # [1, 2, 3, 4, 7, 8]
+	Args:
+		start: If int, the start of initial range. If iterable, treated as collection of ranges.
+		stop (int, optional): The end of initial range if start is int. Defaults to start + 1.
+	Methods:
+		add(start, stop=None): Adds a range to the set, merging overlapping ranges.
+		remove(start, stop=None): Removes a range from the set, splitting existing ranges if needed.
+		update(others): Updates set with ranges from multiple iterables.
+		difference_update(others): Removes ranges specified in multiple iterables.
+		parse(slices, size): Class method to create RangeSet from slice notations.
+	"""
 
 	__slots__ = ("ranges",)
 
@@ -1331,7 +1371,32 @@ TMR = TooManyRequests
 CCE = CommandCancelledError
 
 class T(object):
-	"A generic helper class for managing types, attributes, and methods."
+	"""
+	A wrapper class that provides various utility methods for an object.
+	Attributes:
+		obj: The object being wrapped.
+	Methods:
+		if_instance(t, func):
+			Executes a function if the wrapped object is an instance of the specified type.
+		if_not_instance(t, func):
+			Executes a function if the wrapped object is not an instance of the specified type.
+		if_is(t, func):
+			Executes a function if the wrapped object is the specified object.
+		if_is_not(t, func):
+			Executes a function if the wrapped object is not the specified object.
+		get(k, default=None):
+			Retrieves an attribute or item from the wrapped object, with a default value if not found.
+		__getitem__(k):
+			Retrieves an item from the wrapped object using the indexing operator.
+		__setitem__(k, v):
+			Sets an item in the wrapped object using the indexing operator.
+		coerce(k, cls=None, default=Dummy):
+			Coerces the value of the specified key to a given class, with a default value if not found.
+		coercedefault(k, cls=None, default=Dummy):
+			Coerces the value of the specified key to a given class, with a default value if not found.
+		updatedefault(other):
+			Updates the wrapped object with values from another object, using default values if necessary.
+	"""
 
 	__slots__ = ("obj",)
 
@@ -1406,7 +1471,32 @@ class T(object):
 		return updatedefault(self, other)
 
 class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
-	"A context manager that sends exception tracebacks to stderr."
+	"""A context manager that suppresses specified exceptions and optionally traces them.
+	This class implements both synchronous and asynchronous context management,
+	can be used as a decorator, and can be called to create new instances.
+	Args:
+		*args: Variable length argument list of exception types to suppress.
+		fn (callable, optional): Function to call when an unhandled exception occurs. 
+			Defaults to print_exc.
+		**kwargs: Arbitrary keyword arguments of additional exception types to suppress.
+	Examples:
+		>>> # As a context manager
+		>>> with TracebackSuppressor(ValueError, ZeroDivisionError):
+		...     1/0  # This exception will be suppressed
+		>>> # As a decorator
+		>>> @TracebackSuppressor(ValueError)
+		... def my_function():
+		...     raise ValueError()
+		>>> # As an async context manager
+		>>> async with TracebackSuppressor(ConnectionError):
+		...     await async_operation()
+	Returns:
+		When used as a decorator, returns a wrapped function that suppresses specified exceptions.
+		When called with exception types, returns a new TracebackSuppressor instance.
+	Notes:
+		- Non-Exception subclasses are not suppressed
+		- When an unhandled exception occurs, the specified fn (default: print_exc) is called
+	"""
 
 	def __init__(self, *args, fn=print_exc, **kwargs):
 		self.fn = fn

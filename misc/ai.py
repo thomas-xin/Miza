@@ -94,6 +94,7 @@ available = {
 		None: "firefunction-v2",
 	},
 	"qwen-72b": {
+		"fireworks": ("accounts/fireworks/models/qwen2p5-72b-instruct", ("0.9", "0.9")),
 		"deepinfra": ("Qwen/Qwen2.5-72B-Instruct", ("0.35", "0.4")),
 		"together": ("Qwen/Qwen2.5-72B-Instruct-Turbo", ("1.2", "1.2")),
 		None: "llama-3-70b",

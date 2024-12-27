@@ -11,6 +11,7 @@ import time
 from traceback import print_exc
 from urllib.parse import quote_plus
 import zipfile
+import httpx
 import orjson
 import requests
 import yt_dlp as ytd
@@ -19,9 +20,9 @@ from .smath import time_parse, fuzzy_substring
 from .asyncs import esubmit
 from .util import (
 	python, compat_python, shuffle, utc, proxy, leb128, verify_search, json_dumpstr, new_playwright_page, get_free_port,
-	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration_2,
+	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration_2, html_decode,
 	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url, is_imgur_url, is_giphy_url,
-	EvalPipe, PipedProcess, Cache, Request, Semaphore, CACHE_PATH, magic
+	EvalPipe, PipedProcess, Cache, Request, Semaphore, CACHE_PATH, magic, rename,
 )
 
 # Gets the best icon/thumbnail for a queue entry.
@@ -52,7 +53,7 @@ def get_best_icon(entry):
 				vid = url.split("?v=", 1)[-1]
 			else:
 				vid = url.rsplit("/", 1)[-1].split("?", 1)[0]
-			entry["icon"] = f"https://i.ytimg.com/vi_webp/{vid}/hqdefault.webp"
+			entry["icon"] = f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg"
 			return entry["icon"]
 		if is_miza_url(url):
 			return "https://mizabot.xyz/static/mizaleaf.png"
@@ -248,10 +249,10 @@ class AudioDownloader:
 			self.start_workers()
 		return self.workers.next().submit(s)
 
-	def run(self, s, timeout=None):
+	def run(self, s, timeout=None, priority=False):
 		if not self.workers:
 			self.start_workers()
-		return self.workers.next().run(s, timeout=timeout)
+		return self.workers.next().run(s, timeout=timeout, priority=priority)
 
 	def extract_info(self, url, download=False, process=True):
 		try:
@@ -623,6 +624,7 @@ class AudioDownloader:
 				name=name,
 				url=f"https://open.spotify.com/track/{track['id']}",
 				icon=sorted(track["album"]["images"], key=lambda di: di.get("height", 0), reverse=True)[0]["url"] if "album" in track and track["album"].get("images") else None,
+				artist=track.get("artists", [{"name": "Unknown"}])[0]["name"],
 				id=track["id"],
 				duration=dur,
 			)
@@ -838,51 +840,62 @@ class AudioDownloader:
 			else:
 				dur = None
 			temp = cdict(name=title, url=url, duration=dur)
+			icon = get_best_icon(entry)
+			if icon:
+				temp.icon = icon
 			out.append(temp)
 			if len(out) >= count:
 				break
 		return out
 	def spsearch(self, query, count=1):
-		query = f"https://api.spotify.com/v1/search?type=track%2Cshow_audio%2Cepisode_audio&include_external=audio&limit={count}&q=" + quote_plus(query)
-		resp = self.session.get(query, headers=self.spotify_header, timeout=20).json()
-		if "tracks" not in resp:
-			print(resp)
-			return []
-		out = alist()
-		for track in resp["tracks"]["items"]:
-			try:
-				name = track.get("name", track["id"])
-			except LookupError:
-				continue
-			else:
-				item = f"https://open.spotify.com/track/{track['id']}"
-			out.append(cdict(
-				name=name,
-				url=item,
-			))
-			if len(out) >= count:
-				break
-		return out
+		# Currently favour searching Bandcamp over Spotify due to downloaders for the former being more reliable.
+		return self.bcsearch(query, count)
+		# query = f"https://api.spotify.com/v1/search?type=track%2Cshow_audio%2Cepisode_audio&include_external=audio&limit={count}&q=" + quote_plus(query)
+		# resp = self.session.get(query, headers=self.spotify_header, timeout=20).json()
+		# if "tracks" not in resp:
+		# 	print(resp)
+		# 	return []
+		# out = alist()
+		# for track in resp["tracks"]["items"]:
+		# 	try:
+		# 		name = track.get("name", track["id"])
+		# 	except LookupError:
+		# 		continue
+		# 	else:
+		# 		item = f"https://open.spotify.com/track/{track['id']}"
+		# 	out.append(cdict(
+		# 		name=name,
+		# 		url=item,
+		# 	))
+		# 	if len(out) >= count:
+		# 		break
+		# return out
 	def bcsearch(self, query, count=1):
-		query = "https://bandcamp.com/search?q=" + quote_plus(query)
-		resp = self.session.get(query, timeout=20).content
+		query = "https://bandcamp.com/search?q=" + quote_plus(query) + "&item_type=t"
+		content = httpx.get(query, headers=Request.header(), timeout=20).content # Bandcamp requires HTTP/2 meaning requests is not suitable
 		out = alist()
 		try:
-			resp = resp.split(b'<ul class="result-items">', 1)[1]
-			tracks = resp.split(b"<!-- search result type=")
-			entry = cdict()
+			content = content.split(b'<ul class="result-items">', 1)[1]
+			tracks = content.split(b"<!-- search result type=")
 			for track in tracks:
+				entry = cdict()
 				if track.startswith(b"track id=") or track.startswith(b"album id="):
 					ttype = track[:5]
 					try:
 						track = track.split(b'<img src="', 1)[1]
-						entry.icon = track[:track.index(b'">')].decode("utf-8", "replace")
+						entry.icon = as_str(track[:track.index(b'">')])
 					except ValueError:
 						pass
 					track = track.split(b'<div class="heading">', 1)[1]
-					entry.name = track.split(b">", 1)[1].split(b"<", 1)[0].strip().decode("utf-8", "replace")
-					entry.url = track.split(b'href="', 1)[1].split(b'"', 1)[0].split(b"?", 1)[0].decode("utf-8", "replace")
+					entry.name = as_str(track.split(b">", 1)[1].split(b"<", 1)[0].strip())
+					entry.url = as_str(track.split(b'href="', 1)[1].split(b'"', 1)[0].split(b"?", 1)[0])
 					if ttype == b"track":
+						track = track.split(b'<div class="subhead">', 1)[1]
+						artist = as_str(track.split(b"<", 1)[0].strip())
+						entry.artist = html_decode(artist.rsplit("by ", 1)[-1])
+						if out and out[-1].name == entry.name and out[-1].artist == entry.artist:
+							# Bandcamp search results are often cluttered with duplicates, so we skip them.
+							continue
 						out.append(entry)
 						if len(out) >= count:
 							break
@@ -890,120 +903,197 @@ class AudioDownloader:
 		except (LookupError, ValueError):
 			return []
 
-	def get_audio(self, entry, asap=None):
+	def handle_spotify(self, entry, url, ts, fn):
+		assert is_spotify_url(url), "Not a Spotify URL."
+		# If we have the track artist, attempt to find a better match on Bandcamp. The Spotify downloaders are spotty (no pun intended), so those are kept as the fallback instead.
+		artist = entry.get("artist")
+		if artist:
+			query = f"{artist}: {entry['name']}"
+			results = self.bcsearch(query)
+			if results:
+				entry2 = results[0]
+				name1 = to_alphanumeric(full_prune(entry["name"]))
+				name2 = to_alphanumeric(full_prune(entry2.name))
+				artist1 = to_alphanumeric(full_prune(artist))
+				artist2 = to_alphanumeric(full_prune(entry2.get("artist", "")))
+				if fuzzy_substring(name1, name2, match_length=False) >= 0.5 and fuzzy_substring(artist1, artist2, match_length=False) >= 0.5:
+					stream, cdc, dur, ac = self.get_audio(entry2, asap=True)
+					if stream:
+						entry.update(entry2)
+						return stream, cdc, dur, ac
+		r_mp3 = f"{CACHE_PATH}/{ts}.mp3"
+		fn2 = self.run(f"get_audio_spotify({json_dumpstr(url)},{json_dumpstr(r_mp3)})", priority=True)
+		dur, _bps, cdc, ac = get_duration_2(fn2)
+		entry["duration"] = dur
+		return fn2, cdc, dur, ac
+
+	def handle_special_audio(self, entry, url, ts, fn):
+		"""Handles special audio formats unsupported by FFmpeg, such as spotify URLs, spectrogram images, as well as ecdc, org, and midi files."""
+		if is_spotify_url(url):
+			return self.handle_spotify(entry, url, ts, fn)
+		with requests.get(url, headers=Request.header(), stream=True) as resp:
+			head = resp.headers
+			ct = head.get("Content-Type", "").split(";", 1)[0]
+			b = b""
+			it = resp.iter_content(65536)
+			if not ct or ct in ("application/octet-stream", "application/vnd.lotus-organizer"):
+				b = next(it)
+				ct = magic.from_buffer(b)
+
+			def copy_to_file(fn2):
+				nonlocal b
+				with open(fn2, "wb") as f:
+					while True:
+						f.write(b)
+						try:
+							b = next(it)
+						except StopIteration:
+							break
+						if not b:
+							break
+				return fn2
+
+			left, right = ct.split("/", 1)[0], ct.split("/", 1)[-1]
+			if left == "image":
+				r_im = f"{CACHE_PATH}/{ts}.{right}"
+				copy_to_file(r_im)
+				args = [python, "png2wav.py", r_im, fn]
+				print(args)
+				res = subprocess.run(args, cwd="misc", stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
+				if not os.path.exists(fn) or not os.path.getsize(fn):
+					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
+				dur, _bps, cdc, ac = get_duration_2(fn)
+				entry["duration"] = dur
+				return fn, cdc, dur, ac
+			if ct in ("audio/x-ecdc", "audio/ecdc"):
+				r_ecdc = f"{CACHE_PATH}/{ts}.ecdc"
+				copy_to_file(r_ecdc)
+				args1 = [compat_python, "misc/ecdc_stream.py", "-b", "0", "-d", r_ecdc]
+				args2 = ["ffmpeg", "-v", "error", "-hide_banner", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "96k", fn]
+				print(args1, args2)
+				res = PipedProcess(args1, args2, stderr=subprocess.PIPE).wait()
+				if not os.path.exists(fn) or not os.path.getsize(fn):
+					raise RuntimeError(as_str(res.stderr.read()) or "Unable to locate converted file.")
+				dur, _bps, cdc, ac = get_duration_2(fn)
+				entry["duration"] = dur
+				return fn, cdc, dur, ac
+			if ct in ("audio/x-org", "audio/org"):
+				r_org = f"{CACHE_PATH}/{ts}.org"
+				r_wav = f"{CACHE_PATH}/{ts}.wav"
+				copy_to_file(r_org)
+				args = ["OrgExport", r_org, "48000", "0"]
+				print(args)
+				res = subprocess.run(args, cwd="misc", stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
+				if not os.path.exists(r_wav) or not os.path.getsize(r_wav):
+					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
+				dur, _bps, cdc, ac = get_duration_2(r_wav)
+				entry["duration"] = dur
+				return r_wav, cdc, dur, ac
+			if ct in ("audio/x-midi", "audio/midi", "audio/sp-midi"):
+				r_mid = f"{CACHE_PATH}/{ts}.mid"
+				r_wav = f"{CACHE_PATH}/{ts}.wav"
+				copy_to_file(r_mid)
+				args = [os.path.abspath("misc/fluidsynth/fluidsynth"), os.path.abspath("misc/fluidsynth/gm64.sf2"), "-g", "1", "-F", r_wav, r_mid]
+				print(args)
+				res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
+				if not os.path.exists(r_wav) or not os.path.getsize(r_wav):
+					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
+				dur, _bps, cdc, ac = get_duration_2(r_wav)
+				entry["duration"] = dur
+				return r_wav, cdc, dur, ac
+			if left == "audio":
+				try:
+					dur, _bps, cdc, ac = get_duration_2(url)
+				except Exception:
+					pass
+				else:
+					entry["duration"] = dur
+					return url, cdc, dur, ac
+
+	def get_audio(self, entry, asap=None, fmt=None, start=None, end=None):
 		url = entry.get("orig") or entry["url"]
-		assert not is_spotify_url(url), "Spotify is temporarily unsupported, sorry!"
 		ts = ts_us()
-		fn = f"{CACHE_PATH}/{ts}.opus"
+		ext = fmt or "opus"
+		fn = f"{CACHE_PATH}/{ts}.{ext}"
 		d = entry.get("duration")
 		if asap is None:
 			asap = d and d > 72
-		print("GA:", url, asap, d)
-		if asap or d is None or d > 960:
-			stream, cdc, ac = get_best_audio(entry)
-			print(stream, cdc, ac)
-			if cdc and not expired(stream):
-				return stream, cdc, entry["duration"], ac
-			entry2 = self.search(url, force=True)[0]
-			entry.update(entry2)
-			stream, cdc, ac = get_best_audio(entry2)
-			if cdc and stream:
-				return stream, cdc, entry["duration"], ac
-			print(stream, cdc, ac)
-			with requests.get(url, headers=Request.header(), stream=True) as resp:
-				head = resp.headers
-				ct = head.get("Content-Type", "").split(";", 1)[0]
-				b = b""
-				it = resp.iter_content(65536)
-				if not ct or ct in ("application/octet-stream", "application/vnd.lotus-organizer"):
-					b = next(it)
-					ct = magic.from_buffer(b)
-
-				def copy_to_file(fn2):
-					nonlocal b
-					with open(fn2, "wb") as f:
-						while True:
-							f.write(b)
-							try:
-								b = next(it)
-							except StopIteration:
-								break
-							if not b:
-								break
-					return fn2
-
-				print(resp, ct, url, stream, head)
-				left, right = ct.split("/", 1)[0], ct.split("/", 1)[-1]
-				if left == "image":
-					r_im = f"{CACHE_PATH}/{ts}.{right}"
-					copy_to_file(r_im)
-					args = [python, "png2wav.py", r_im, fn]
-					print(args)
-					res = subprocess.run(args, cwd="misc", stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
-					if not os.path.exists(fn) or not os.path.getsize(fn):
-						raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
+		special_checked = False
+		if not fmt and (asap or d is None or d > 960):
+			# If format is not specified, try to stream the audio from URL if possible
+			with tracebacksuppressor:
+				stream, cdc, ac = get_best_audio(entry)
+				if entry.get("duration") and cdc and not expired(stream):
+					return stream, cdc, entry["duration"], ac
+				entry2 = self.search(url, force=True)[0]
+				entry.update(entry2)
+				stream, cdc, ac = get_best_audio(entry2)
+				if entry.get("duration") and cdc and stream:
+					return stream, cdc, entry["duration"], ac
+				result = self.handle_special_audio(entry, url, ts, fn)
+				if result:
+					return result
+				special_checked = True
+		if not special_checked:
+			result = self.handle_special_audio(entry, url, ts, fn)
+			if result:
+				if not fmt:
+					return result
+				# If format is specified, always produce a file, and allow trimming if necessary
+				url, cdc, dur, ac = result
+				tmpl = f"{CACHE_PATH}/{ts}"
+				if start is not None or end is not None:
+					tmpl += f"~{start}-{end}"
+				fn = f"{tmpl}.{fmt}"
+				if os.path.exists(fn) and os.path.getsize(fn):
 					dur, _bps, cdc, ac = get_duration_2(fn)
+					print(f"Trimmed audio file already exists: {fn}")
 					return fn, cdc, dur, ac
-				if ct in ("audio/x-ecdc", "audio/ecdc"):
-					r_ecdc = f"{CACHE_PATH}/{ts}.ecdc"
-					copy_to_file(r_ecdc)
-					args1 = [compat_python, "misc/ecdc_stream.py", "-b", "0", "-d", r_ecdc]
-					args2 = ["ffmpeg", "-v", "error", "-hide_banner", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "96k", fn]
-					print(args1, args2)
-					res = PipedProcess(args1, args2, stderr=subprocess.PIPE).wait()
-					if not os.path.exists(fn) or not os.path.getsize(fn):
-						raise RuntimeError(as_str(res.stderr.read()) or "Unable to locate converted file.")
-					dur, _bps, cdc, ac = get_duration_2(fn)
-					return fn, cdc, dur, ac
-				if ct in ("audio/x-org", "audio/org"):
-					r_org = f"{CACHE_PATH}/{ts}.org"
-					r_wav = f"{CACHE_PATH}/{ts}.wav"
-					copy_to_file(r_org)
-					args = ["OrgExport", r_org, "48000", "0"]
-					print(args)
-					res = subprocess.run(args, cwd="misc", stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
-					if not os.path.exists(r_wav) or not os.path.getsize(r_wav):
-						raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
-					dur, _bps, cdc, ac = get_duration_2(r_wav)
-					return r_wav, cdc, dur, ac
-				if ct in ("audio/x-midi", "audio/midi", "audio/sp-midi"):
-					r_mid = f"{CACHE_PATH}/{ts}.mid"
-					r_wav = f"{CACHE_PATH}/{ts}.wav"
-					copy_to_file(r_mid)
-					args = [os.path.abspath("misc/fluidsynth/fluidsynth"), os.path.abspath("misc/fluidsynth/gm64.sf2"), "-g", "1", "-F", r_wav, r_mid]
-					print(args)
-					res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
-					if not os.path.exists(r_wav) or not os.path.getsize(r_wav):
-						raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
-					dur, _bps, cdc, ac = get_duration_2(r_wav)
-					return r_wav, cdc, dur, ac
-				if left == "audio":
-					try:
-						dur, _bps, cdc, ac = get_duration_2(url)
-					except Exception:
-						pass
-					else:
-						return url, cdc, dur, ac
+				fn2 = f"{tmpl}~.{fmt}"
+				args = ["ffmpeg", "-v", "error", "-hide_banner", "-vn"]
+				if start:
+					args.extend(["-ss", str(start)])
+				if end:
+					args.extend(["-to", str(end)])
+				args.extend(["-i", url, "-b:a", "96k", fn2])
+				print(args)
+				res = subprocess.run(args, stderr=subprocess.PIPE)
+				if not os.path.exists(fn2) or not os.path.getsize(fn2):
+					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
+				rename(fn2, fn)
+				dur, _bps, cdc, ac = get_duration_2(fn)
+				return fn, cdc, dur, ac
 		ydl_opts = dict(
-			format="bestaudio[vcodec=none][acodec=opus][audio_channels=2]/bestaudio[audio_channels=2]/worstvideo[acodec!=none]",
+			format="bestaudio[vcodec=none][acodec=opus][audio_channels=2]/bestaudio[audio_channels=2]/bestaudio/worstvideo[acodec!=none]",
 			default_search="auto",
 			source_address="0.0.0.0",
-			final_ext="opus",
+			final_ext=ext,
 			cachedir=CACHE_PATH,
 			outtmpl=fn,
 			windowsfilenames=True,
 			cookiesfrombrowser=["firefox"],
 			postprocessors=[dict(
-				key="FFmpegExtractAudio",
-				preferredcodec="opus",
-			)],
+				key="FFmpegCustomAudioConvertor",
+				format=ext,
+				codec="opus" if ext == "ogg" else ext,
+				start=start,
+				end=end,
+			)]
 		)
-		if is_discord_attachment(url) or is_miza_url(url):
+		if not fmt and (is_discord_attachment(url) or is_miza_url(url)):
 			if discord_expired(url):
 				url = shorten_attachment(url, 0)
 			dur, _bps, cdc, ac = get_duration_2(url)
+			if dur:
+				entry["duration"] = dur
 			return url, cdc, dur, ac
-		dur = self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True)['duration']")
+		entry2 = self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True)")
+		entry.update(dict(
+			name=entry2.get("title"),
+			url=entry2.get("webpage_url") or entry.get("url"),
+			thumbnail=get_best_icon(entry2),
+			duration=entry2.get("duration"),
+		))
 		assert os.path.exists(fn) and os.path.getsize(fn)
 		return fn, "opus", dur, 2
 
@@ -1012,6 +1102,7 @@ class AudioDownloader:
 		if is_url(url):
 			if is_discord_attachment(url):
 				if discord_expired(url):
+					# For expired Discord attachments, shorten the URL using our reverse proxy and try that instead
 					url = shorten_attachment(url, 0)
 				temp = cdict(
 					name=url2fn(url),
@@ -1051,12 +1142,13 @@ class AudioDownloader:
 			urls = []
 			if ":" not in url:
 				if not mode and count >= 4:
+					# If no search mode is specified, split the search into 4 parts: 2 for YouTube, 1 for SoundCloud, and 1 for Bandcamp
 					half = ceil(count / 2)
 					urls.append(f"ytsearch{half}:{url}")
 					quarter = ceil((count - half) / 2)
 					urls.append(f"scsearch{quarter}:{url}")
-					# remainder = count - half - quarter
-					# urls.append(f"spsearch{remainder}:{url}")
+					remainder = count - half - quarter
+					urls.append(f"bcsearch{remainder}:{url}")
 				else:
 					urls.append(f"{mode or 'yt'}search{count}:{url}")
 			for url in urls:
@@ -1161,7 +1253,7 @@ class AudioDownloader:
 					"video": get_best_video(resp),
 				})
 				audio = temp.audio
-				if "googlevideo" in audio[:64]:
+				if not dur and "googlevideo" in audio[:64]:
 					durstr = re.findall(r"[&?]dur=([0-9\.]+)", audio)
 					if durstr:
 						temp.duration = round_min(durstr[0])
@@ -1180,6 +1272,7 @@ class AudioDownloader:
 	# Performs a search, storing and using cached search results for efficiency.
 	def search(self, item, force=False, mode=None, count=1):
 		key = verify_search(item)
+		# Force key to be a string, eliminating shenanigans where tuples are serialised as lists within the cache and then fail to retrieve due to hashability
 		retrieval = json_dumpstr([key, mode, count])
 		temp = None
 		age = inf
@@ -1193,8 +1286,10 @@ class AudioDownloader:
 		else:
 			age = self.search_cache.age(retrieval)
 		if age > 86400 or not temp or force:
+			# For entries older than 1 day, prioritise searching first, fallback to cached results if necessary
 			temp = self.search_into(retrieval, item, mode, count) or temp
 		elif age > 720:
+			# For entries older than 12 minutes, search in the background (stale-while-revalidate)
 			esubmit(self.search_into, retrieval, item, mode, count)
 		if not temp:
 			raise FileNotFoundError(f'No results for {item}.')

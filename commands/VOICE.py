@@ -41,7 +41,7 @@ def get_best_icon(entry):
 				vid = url.split("?v=", 1)[-1]
 			else:
 				vid = url.rsplit("/", 1)[-1].split("?", 1)[0]
-			entry["icon"] = f"https://i.ytimg.com/vi_webp/{vid}/hqdefault.webp"
+			entry["icon"] = f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg"
 			return entry["icon"]
 		if is_miza_url(url):
 			return "https://mizabot.xyz/static/mizaleaf.png"
@@ -835,7 +835,7 @@ class Connect(Command):
 		if not vc_.permissions_for(guild.me).connect:
 			raise ConnectionError("Insufficient permissions to connect to voice channel.")
 		# Create audio source if none already exists
-		await bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id},announce=True)")
+		await bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id},announce=1)")
 
 
 class Skip(Command):
@@ -2182,11 +2182,30 @@ class Lyrics(Command):
 class Download(Command):
 	time_consuming = True
 	_timeout_ = 75
-	name = ["📥", "YTSearch", "YTDL", "DownloadAsMP3", "Youtube_DL", "AF", "AudioFilter", "Trim", "Concat", "Concatenate", "🌽🐱", "ConvertORG", "Org2xm", "Convert"]
-	description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link. Will extend (loop) if trimmed past the end. The \"-\" character is used to omit parameters for ~trim."
-	usage = "<0:search_links>* <multi_output(-m)|trim(-t)>? <-3:trim_start[-]>? <-2:trim_end[-]>? <-1:out_format[mp4]>? <concatenate(-c)|remove_silence(-r)|apply_settings(-a)|verbose_search(-v)>*"
-	example = ("download https://www.youtube.com/watch?v=kJQP7kiw5Fk mp3", "trim https://www.youtube.com/watch?v=dQw4w9WgXcQ 1m 3m as mp4", "concatenate https://www.youtube.com/watch?v=kJQP7kiw5Fk https://www.youtube.com/watch?v=dQw4w9WgXcQ webm")
-	flags = "avtzcrm"
+	name = ["📥", "Search", "YTDL", "Convert", "Trim", "ConvertOrg"]
+	description = "Searches and/or downloads a song from a YouTube/SoundCloud query or stream link."
+	schema = cdict(
+		query=cdict(
+			type="string",
+			description="The search query or URL of the song to download.",
+		),
+		format=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("mp3", "opus", "ogg", "flac", "wav", "weba"),
+			),
+			description="Output format of the downloaded file.",
+			default="opus",
+		),
+		start=cdict(
+			type="timedelta",
+			description="The start time to trim the file at.",
+		),
+		end=cdict(
+			type="timedelta",
+			description="The end time to trim the file at.",
+		),
+	)
 	rate_limit = (30, 45)
 	typing = True
 	slash = True
@@ -2194,194 +2213,23 @@ class Download(Command):
 	ephemeral = True
 	exact = False
 
-	async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
-		raise NotImplementedError("This command is currently disabled for maintenance. Please use the web version at https://api.mizabot.xyz/downloader.html for now!")
-		fmt = default_fmt = "mp3"
-		if name in ("af", "audiofilter"):
-			set_dict(flags, "a", 1)
-		# Prioritize attachments in message
-		for a in message.attachments:
-			argv = a.url + " " + argv
-		direct = getattr(message, "simulated", None) or name == "org2xm"
-		concat = "concat" in name or "c" in flags or name == "🌽🐱"
-		multi = "m" in flags
-		start = end = None
-		# Attempt to download items in queue if no search query provided
-		if not argv:
-			try:
-				auds = bot.data.audio.players[guild.id]
-				if not auds.queue:
-					raise LookupError
-				res = [{"name": e.name, "url": e.url} for e in auds.queue[:10]]
-				fmt = "ogg"
-				desc = f"Current items in queue for {guild}:"
-			except:
-				raise IndexError("Queue not found. Please input a search term, URL, or file.")
-		else:
-			# Parse search query, detecting file format selection if possible
-			if " " in argv:
-				spl = smart_split(argv)
-				if len(spl) >= 1:
-					fmt = spl[-1].lstrip(".")
-					if fmt.casefold() not in ("mp3", "ecdc", "opus", "ogg", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "ts", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp", "png", "jpg", "webp"):
-						fmt = default_fmt
-					else:
-						if spl[-2] in ("as", "to"):
-							spl.pop(-1)
-						argv = " ".join(spl[:-1])
-			if name == "trim" or "t" in flags:
-				try:
-					argv, start, end = argv.rsplit(None, 2)
-				except ValueError:
-					raise ArgumentError("Please input search term followed by trim start and end.")
-				if start == "-":
-					start = None
-				else:
-					start = await bot.eval_time(start)
-				if end == "-":
-					end = None
-				else:
-					end = await bot.eval_time(end)
-			argv = verify_search(argv)
-			res = []
-			# Input may be a URL or set of URLs, in which case we attempt to find the first one
-			urls = await bot.follow_url(argv, allow=True, images=False, ytd=False)
-			if urls:
-				if not concat and not multi:
-					urls = (urls[0],)
-				futs = deque()
-				for e in urls:
-					futs.append(asubmit(ytdl.extract, e, timeout=120))
-				for fut in futs:
-					temp = await fut
-					res.extend(temp)
-				direct = len(res) == 1 or concat or multi
-			if not res:
-				# 2 youtube results per soundcloud result, increased with verbose flag, followed by 1 spotify and 1 bandcamp
-				sc = min(4, flags.get("v", 0) + 1)
-				yt = min(6, sc << 1)
-				futs = deque()
-				futs.append(asubmit(ytdl.search, argv, mode="yt", count=yt))
-				futs.append(asubmit(ytdl.search, argv, mode="sc", count=sc))
-				futs.append(asubmit(ytdl.search, "spsearch:" + argv.split("spsearch:", 1)[-1].replace(":", "-"), mode="sp"))
-				futs.append(asubmit(ytdl.search, "bcsearch:" + argv.split("bcsearch:", 1)[-1].replace(":", "-"), mode="bc"))
-				for fut in futs:
-					temp = await fut
-					if type(temp) is not str:
-						res.extend(temp)
-			if not res:
-				raise LookupError(f"No results for {argv}.")
-			if not concat and not multi:
-				res = res[:10]
-			desc = f"Search results for {argv}:"
-		a = flags.get("a", 0)
-		b = flags.get("r", 0)
-		if multi:
-			entry = [e["url"] for e in res]
-			print(entry)
-			futs = []
-			async with discord.context_managers.Typing(channel):
-				try:
-					if a:
-						auds = bot.data.audio.players[guild.id]
-					else:
-						auds = None
-				except LookupError:
-					auds = None
-				for i, url in enumerate(entry):
-					if i >= 12:
-						await wrap_future(futs[i - 12])
-					futs.append(esubmit(
-						ytdl.download_file,
-						url,
-						fmt=fmt,
-						start=start,
-						end=end,
-						auds=auds,
-						silenceremove=b,
-						child=len(entry) > 1,
-						message=message,
-					))
-				fn = f"{FAST_PATH}/{ts_us()}.zip"
-				with zipfile.ZipFile(fn, "w", zipfile.ZIP_STORED, allowZip64=True, strict_timestamps=False) as z:
-					for fut in futs:
-						f, out = await wrap_future(fut)
-						z.write(f, arcname=f.rsplit("/", 1)[-1])
-				csubmit(bot.send_with_file(
-					channel=channel,
-					msg="",
-					file=fn,
-					filename="download.zip",
-					rename=True,
-					reference=message,
-				))
+	async def __call__(self, bot, query, format, start, end, **void):
+		raise NotImplementedError("This command is currently disabled for maintenance. Please use the web version at https://api.mizabot.xyz/static/downloader.html for now!")
+		if not query:
+			raise IndexError("Please input a search term or URL.")
+		res = await Request(
+			f"https://api.mizabot.xyz/ytdl?q={quote_plus(query)}",
+			json=True,
+			aio=True,
+		)
+		if not res:
+			raise LookupError(f"No results found for {query}.")
+		if len(res) == 1 and is_url(query):
+			# If only one result is found and the input is a URL, directly download it
+			# TODO: Implement direct download
 			return
-		if concat:
-			entry = [e["url"] for e in res]
-			print(entry)
-			async with discord.context_managers.Typing(channel):
-				try:
-					if a:
-						auds = bot.data.audio.players[guild.id]
-					else:
-						auds = None
-				except LookupError:
-					auds = None
-				f, out = await asubmit(
-					ytdl.download_file,
-					entry,
-					fmt=fmt,
-					start=start,
-					end=end,
-					auds=auds,
-					silenceremove=b,
-					message=message,
-				)
-				csubmit(bot.send_with_file(
-					channel=channel,
-					msg="",
-					file=f,
-					filename=out,
-					rename=True,
-					reference=message,
-				))
-			return
-		desc += "\nDestination format: {." + fmt + "}"
-		if start is not None or end is not None:
-			desc += f"\nTrim: [{'-' if start is None else start} ~> {'-' if end is None else end}]"
-		if b:
-			desc += ", Silence remover: {ON}"
-		if a:
-			desc += ", Audio settings: {ON}"
-		desc += "```*"
-		# Encode URL list into bytes and then custom base64 representation, hide in code box header
-		url_bytes = json_dumps([e["url"] for e in res])
-		url_enc = as_str(bytes2b64(url_bytes, True))
-		vals = f"{user.id}_{len(res)}_{fmt}_{int(bool(a))}_{start}_{end}_{int(bool(b))}"
-		msg = "*```" + "\n" * ("z" in flags) + "callback-voice-download-" + vals + "-" + url_enc + "\n" + desc
-		emb = discord.Embed(colour=rand_colour())
-		emb.set_author(**get_author(user))
-		emb.description = "\n".join(f"`【{i}】` [{escape_markdown(e['name'])}]({ensure_url(e['url'])})" for i, e in enumerate(res))
-		if getattr(message, "simulated", None):
-			sent = bot._globals["SimulatedMessage"](bot, msg, ts_us(), message.name, message.nick)
-			sent.embeds = [emb]
-			sent.edit = sent.send = message.send
-		else:
-			sent = await send_with_reply(channel, message, msg, embed=emb)
-		if direct:
-			# Automatically proceed to download and convert immediately
-			await self._callback_(
-				message=sent,
-				guild=guild,
-				channel=channel,
-				reaction=b"0\xef\xb8\x8f\xe2\x83\xa3",
-				bot=bot,
-				perm=3,
-				vals=vals,
-				argv=url_enc,
-				user=user,
-			)
-			return
+		# If multiple results are found, display them for selection
+		# TODO: Implement selection
 		# Add reaction numbers corresponding to search results for selection
 		for i in range(len(res)):
 			await sent.add_reaction(str(i) + as_str(b"\xef\xb8\x8f\xe2\x83\xa3"))

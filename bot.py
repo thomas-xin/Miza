@@ -2263,8 +2263,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		1: cdict(
 			instructive="gpt-4",
 			casual="llama-3-70b",
-			nsfw="llama-3-70b",
-			backup="qwen-72b",
+			nsfw="qwen-72b",
+			backup="llama-3-70b",
 			retry="gpt-4",
 			function="gpt-4m",
 			vision="claude-3.5-haiku",
@@ -2273,8 +2273,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		2: cdict(
 			instructive="claude-3.5-sonnet",
 			casual="gpt-4",
-			nsfw="llama-3-70b",
-			backup="qwen-72b",
+			nsfw="qwen-72b",
+			backup="llama-3-70b",
 			retry="gpt-4",
 			function="gpt-4m",
 			vision="gpt-4",

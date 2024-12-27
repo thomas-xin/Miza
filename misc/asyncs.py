@@ -294,6 +294,7 @@ def pipe_fut(src, dest):
 	return res
 
 async def gather(*futs, return_exceptions=False):
+	"Same functionality as asyncio.gather, but with fallback to main thread if called from a non-asyncio loop."
 	if not is_main_thread() and any(map(asyncio.iscoroutine, futs)):
 		futs = [asyncio.run_coroutine_threadsafe(fut, loop=get_event_loop()) for fut in futs]
 		out = []
@@ -450,6 +451,34 @@ class CloseableAsyncIterator:
 		self.close()
 
 class Mutex:
+	"""A thread-safe and async-compatible mutex lock implementation.
+	This class provides both synchronous and asynchronous locking mechanisms using a combination
+	of threading.Lock and asyncio.Condition.
+	Attributes:
+		lock (threading.Lock): The underlying threading lock object
+		locked (bool): Current state of the mutex
+		cond (threading.Condition): Condition variable for synchronous operations
+		acond (asyncio.Condition): Condition variable for asynchronous operations
+	Methods:
+		signal(): Notifies waiting threads/coroutines that the lock has been released
+		acquire_sync(): Synchronously acquires the mutex lock
+		release_sync(): Synchronously releases the mutex lock
+		acquire_async(): Asynchronously acquires the mutex lock
+		release_async(): Asynchronously releases the mutex lock
+	Example:
+		# Synchronous usage
+		mutex = Mutex()
+		mutex.acquire_sync()
+			# Critical section
+			pass
+			mutex.release_sync()
+		# Asynchronous usage
+		mutex = Mutex()
+		await mutex.acquire_async()
+			# Critical section
+			pass
+			await mutex.release_async()
+	"""
 
 	def __init__(self):
 		self.lock = threading.Lock()
@@ -504,7 +533,36 @@ class Mutex:
 		return self.signal()
 
 class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
-	"Manages concurrency limits, similar to asyncio.Semaphore, but has a secondary threshold for enqueued tasks, as well as an optional rate limiter. Compatible with both sync and async contexts."
+	"""A flexible synchronization primitive that combines features of threading and asyncio semaphores.
+	This Semaphore implementation provides both synchronous and asynchronous context manager interfaces,
+	with additional rate limiting and LIFO/FIFO queueing capabilities.
+	Args:
+		limit (int, optional): Maximum number of concurrent active operations. Defaults to 256.
+		buffer (int, optional): Maximum number of waiting operations. Defaults to 32.
+		rate_limit (float, optional): Time in seconds between allowed operations. Defaults to None.
+		sync (bool, optional): Whether to synchronize with rate_limit boundaries. Defaults to False.
+		lifo (bool, optional): Whether to use LIFO instead of FIFO ordering. Defaults to False.
+	Attributes:
+		active (int): Current number of active operations
+		passive (int): Current number of waiting operations
+		paused (bool): Whether the semaphore is currently paused
+		rate_bin (collections.deque): Timestamps of recent operations for rate limiting
+		reset_after (float): Time until rate limit resets
+	Example:
+		```
+		# Synchronous usage
+		with Semaphore(limit=5) as sem:
+			# Protected code here
+		# Asynchronous usage
+		async with Semaphore(limit=5) as sem:
+			# Protected async code here
+		# Rate limited usage
+		sem = Semaphore(limit=100, rate_limit=1.0)  # 100 operations per second
+		```
+	Raises:
+		SemaphoreOverflowError: When buffer limit is exceeded
+		SystemError: On unexpected underflow of active or passive counters
+	"""
 
 	__slots__ = ("limit", "buffer", "active", "passive", "rate_limit", "rate_bin", "lifo", "traces", "tempfut")
 	TRACE = 0
@@ -777,7 +835,32 @@ class SemaphoreOverflowError(RuntimeError):
 
 
 class Delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
-	"A context manager that delays the return of a function call, using the elapsed time as reference."
+	"""A context manager and decorator for creating delays in both synchronous and asynchronous code.
+	This class implements a delay mechanism that can be used as a context manager,
+	decorator, or callable in both synchronous and asynchronous contexts. It ensures
+	a minimum duration passes between entering and exiting the context.
+	Args:
+		duration (float, optional): The minimum time in seconds that should elapse. Defaults to 0.
+	Examples:
+		As a context manager:
+			>>> with Delay(1):
+			...     do_something()  # This block will take at least 1 second
+		As an async context manager:
+			>>> async with Delay(1):
+			...     await do_something()  # This block will take at least 1 second
+		As a decorator:
+			>>> @Delay(1)
+			... def function():
+			...     pass  # This function will take at least 1 second
+		As an async decorator:
+			>>> @Delay(1)
+			... async def async_function():
+			...     pass  # This function will take at least 1 second
+		As a callable:
+			>>> delay = Delay(1)
+			>>> do_something()
+			>>> delay()  # Will sleep for remaining time if less than 1 second has passed
+	"""
 
 	def __init__(self, duration=0):
 		self.duration = duration

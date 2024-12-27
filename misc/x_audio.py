@@ -11,7 +11,7 @@ import subprocess
 import sys
 import threading
 from traceback import print_exc
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, unquote_plus
 import orjson
 import numpy as np
 import psutil
@@ -67,9 +67,9 @@ class AudioPlayer(discord.AudioSource):
 		last_played (float): Timestamp of the last played audio.
 		last_activity (float): Timestamp of the last activity.
 	Methods:
-		join(cls, vcc, channel=None, user=None, announce=False):
+		join(cls, vcc, channel=None, user=None, announce=0):
 			Joins a voice channel and returns an AudioPlayer instance.
-		join_into(self, vcc, announce=False):
+		join_into(self, vcc, announce=0):
 			Connects to a voice channel and initializes the player.
 		find_user(cls, guild, user):
 			Finds a user in a guild.
@@ -163,7 +163,7 @@ class AudioPlayer(discord.AudioSource):
 	last_activity = inf
 
 	@classmethod
-	async def join(cls, vcc, channel=None, user=None, announce=False):
+	async def join(cls, vcc, channel=None, user=None, announce=0):
 		globals()["client"] = await wrap_future(client_fut)
 		cid = cast_id(vcc)
 		vcc = client.get_channel(cid)
@@ -213,7 +213,7 @@ class AudioPlayer(discord.AudioSource):
 		cls.futs[gid].debug = self
 		return self
 
-	async def join_into(self, vcc, announce=False):
+	async def join_into(self, vcc, announce=0):
 		print(self, vcc)
 		if self.fut.done():
 			self.fut = Future()
@@ -224,7 +224,14 @@ class AudioPlayer(discord.AudioSource):
 			if not self.vc:
 				if member and member.voice:
 					await vcc.guild.change_voice_state(channel=None)
-				self.vc = await vcc.connect(timeout=12, reconnect=True)
+				try:
+					self.vc = await vcc.connect(timeout=12, reconnect=True)
+				except discord.ClientException:
+					if member and member.guild_permissions.move_members:
+						await member.move_to(None)
+					else:
+						await vcc.guild.change_voice_state(channel=None)
+					self.vc = await vcc.connect(timeout=12, reconnect=True)
 		except Exception as ex:
 			try:
 				cst(self.waiting[gid].set_exception, ex)
@@ -246,8 +253,9 @@ class AudioPlayer(discord.AudioSource):
 				if member.voice.deaf or member.voice.self_deaf or member.voice.mute or member.voice.afk:
 					csubmit(member.edit(mute=False))
 			if announce:
+				connected = "connected" if announce == 1 else "reconnected"
 				s = ansi_md(
-					f"{colourise('🎵', fg='blue')}{colourise()} Successfully connected to {colourise(self.channel.guild, fg='magenta')}{colourise()}. {colourise('🎵', fg='blue')}{colourise()}"
+					f"{colourise('🎵', fg='blue')}{colourise()} Successfully {connected} to {colourise(self.channel.guild, fg='magenta')}{colourise()}. {colourise('🎵', fg='blue')}{colourise()}"
 				)
 				csubmit(self.announce(s))
 			return self
@@ -266,6 +274,7 @@ class AudioPlayer(discord.AudioSource):
 		if uid not in cls.fetched.get(gid, ()) and (not member or not member.voice):
 			print(uid, member, cls.fetched.get(gid))
 			cls.fetched.setdefault(gid, set()).add(uid)
+			# Manually fetch voice state, as discord.py does not do this automatically
 			try:
 				data = await Request(
 					f"https://discord.com/api/{api}/guilds/{gid}/voice-states/{uid}",
@@ -387,7 +396,7 @@ class AudioPlayer(discord.AudioSource):
 		self.settings.update(settings)
 		self.playing = deque(maxlen=2)
 		self.fut = Future()
-		self.ensure_lock = threading.Lock()
+		self.ensure_lock = threading.RLock()
 		self.vcc = vcc
 		if vcc:
 			self.vc = client.get_guild(cast_id(vcc.guild)).voice_client
@@ -686,7 +695,7 @@ class AudioPlayer(discord.AudioSource):
 			await self.leave("Queue empty")
 
 	def read(self):
-		if not self.playing:
+		if not self.playing or self.settings.pause:
 			if self.silent:
 				try:
 					self.vc.pause()
@@ -759,26 +768,27 @@ class AudioPlayer(discord.AudioSource):
 
 	shuffler = 0
 	def skip(self, indices=0, loop=False, repeat=False, shuffle=False):
-		if isinstance(indices, int):
-			indices = [indices]
-		resp = []
-		if not repeat:
-			resp = self.queue.pops(indices)
-		if 1 in indices:
-			if len(self.playing) > 1:
-				self.playing.pop().close()
-		if 0 in indices:
-			if self.playing:
-				self.playing.popleft().close()
-		if loop:
-			if shuffle:
-				if not self.shuffler:
-					self.queue[2:].shuffle()
-				shuffler = self.shuffler + 1
-				if shuffler >= len(self.queue):
-					shuffler = 0
-				self.shuffler = shuffler
-			self.queue.extend(resp)
+		with self.ensure_lock:
+			if isinstance(indices, int):
+				indices = [indices]
+			resp = []
+			if not repeat:
+				resp = self.queue.pops(indices)
+			if 1 in indices:
+				if len(self.playing) > 1:
+					self.playing.pop().close()
+			if 0 in indices:
+				if self.playing:
+					self.playing.popleft().close()
+			if loop:
+				if shuffle:
+					if not self.shuffler:
+						self.queue[2:].shuffle()
+					shuffler = self.shuffler + 1
+					if shuffler >= len(self.queue):
+						shuffler = 0
+					self.shuffler = shuffler
+				self.queue.extend(resp)
 		esubmit(self.ensure_play)
 		return resp
 
@@ -839,7 +849,16 @@ class AudioPlayer(discord.AudioSource):
 			elif self.settings.pause and self.vc.is_playing():
 				self.vc.pause()
 			if len(self.playing) == 1 and len(self.queue) > 1:
-				source = AF.load(self.queue[1], asap=False).create_reader(self, pos=self.queue[1].get("start", 0))
+				try:
+					source = AF.load(self.queue[1], asap=False).create_reader(self, pos=self.queue[1].get("start", 0))
+				except Exception as ex:
+					print_exc()
+					s = italics(ansi_md(
+						f"{colourise('❗', fg='blue')}{colourise()} An error occured while loading {colourise_brackets(self.queue[1].name, 'red', 'green', 'magenta')}{colourise()}, and it has been removed automatically. {colourise('❗', fg='blue')}{colourise()}\n"
+						+ f"Exception: {colourise_brackets(repr(ex), 'red', 'magenta', 'yellow')}"
+					))
+					csubmit(self.announce(s))
+					return self.skip(1)
 				if len(self.playing) == 1 and len(self.queue) > 1 and self.queue[1].url == source.af.url:
 					self.playing.append(source)
 		if not self.queue:
@@ -1027,7 +1046,7 @@ class AudioFile:
 	def __str__(self):
 		classname = str(self.__class__).replace("'>", "")
 		classname = classname[classname.index("'") + 1:]
-		return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>"
+		return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}, linked to {self.path}>"
 
 	@classmethod
 	def load(cls, entry, asap=True):
@@ -1048,26 +1067,40 @@ class AudioFile:
 					if is_url(self.stream) and expired(self.stream):
 						self = None
 				if self:
+					if not is_url(self.stream) and os.path.exists(self.stream):
+						if not entry.get("duration"):
+							entry["duration"] = get_duration(self.stream) or self.duration
+							name, _url = map(unquote_plus, self.stream.rsplit("/", 1)[-1].rsplit(" ", 1))
+							entry["name"] = name
 					return self
 		cls.cached[url] = Future()
 		try:
 			self = cls()
 			self.url = url
+			# Sometimes entries may have a corrupted name, so we need to fetch a new search using the URL
+			if not entry.get("duration") and (not entry.get("name") or entry["name"] == entry["url"].rsplit("/", 1)[-1].split("?", 1)[0]):
+				results = ytdl.search(entry["url"])
+				if results:
+					entry.update(results[0])
 			name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
 			self.path = f"{TEMP_PATH}/audio/{name} {uhash(url)}.opus"
 			if os.path.exists(self.path) and os.path.getsize(self.path):
 				self.stream = self.path
 				self.duration = get_duration(self.stream)
+				if not entry.get("duration"):
+					entry["duration"] = self.duration
 				return self
 			stream, codec, duration, channels = ytdl.get_audio(entry, asap=asap)
+			name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
+			self.path = f"{TEMP_PATH}/audio/{name} {uhash(url)}.opus"
 			if not is_url(stream) and codec == "opus" and channels == 2:
 				rename(stream, self.path)
 				self.stream = self.path
-				self.duration = get_duration(self.stream) or duration
+				self.duration = entry["duration"] = get_duration(self.stream) or duration
 				return self
 			if duration is None or duration > 960:
 				self.stream = stream
-				self.duration = duration
+				self.duration = entry["duration"] = duration
 				return self
 			ffmpeg = "ffmpeg"
 			sample_rate = SAMPLE_RATE
@@ -1082,10 +1115,10 @@ class AudioFile:
 
 			def callback(file):
 				self.stream = file
-				self.duration = get_duration(self.stream) or self.duration
+				self.duration = entry["duration"] = get_duration(self.stream) or self.duration
 
 			self.stream = PipedLoader(proc.stdout, self.path, efp=proc.stderr, callback=callback)
-			self.duration = duration
+			self.duration = entry["duration"] = duration
 			return self
 		except Exception as ex:
 			cls.cached[url].set_exception(ex)
@@ -1477,21 +1510,35 @@ async def kill():
 	sys.stdin.close()
 	return await client.close()
 
+async def reload_player(gid):
+	with tracebacksuppressor:
+		vcci, ci, dump, mis = AP.cache[gid]
+		print(vcci, ci, len(dump), mis)
+		a = await AP.join(vcci, ci, announce=2)
+		a.load_dump(dump, universal=True)
+		# Annoying quirk of Discord API where list of members in voice is not directly retrievable; we must have a list of member IDs (or fetch every single user in the server, which is not feasible). This of course means members that join while the bot is offline will not be loaded into the audio player. However, this is a rare occurrence and can be mitigated by affected users simply rejoining the voice channel, or using the join or play commands, which notify the bot of their presence.
+		for mid in mis:
+			await a.find_user(gid, mid)
+		AP.cache.pop(gid, None)
+
+async def unload_player(gid):
+	with tracebacksuppressor:
+		a = AP.players[gid]
+		if a.queue:
+			AP.cache[gid] = (a.vcc.id, a.channel and a.channel.id, a.get_dump(), [m.id for m in a.vcc.members])
+		await a.leave(
+			reason="Temporary maintenance",
+			dump=bool(a.queue),
+		)
+
 @client.event
 async def on_connect():
 	with tracebacksuppressor:
 		if not client_fut.done():
 			client_fut.set_result(client)
-			# Restore audio players from cache
+			# Restore audio players from our cache on disk
 			print(AP.cache.keys())
-			for gid in tuple(AP.cache):
-				vcci, ci, dump, mis = AP.cache[gid]
-				print(vcci, ci, len(dump), mis)
-				a = await AP.join(vcci, ci)
-				a.load_dump(dump, universal=True)
-				for mid in mis:
-					await a.find_user(gid, mid)
-				AP.cache.pop(gid, None)
+			await asyncio.gather(*(reload_player(gid) for gid in AP.cache.keys()))
 		print("Audio client successfully connected.")
 
 @client.event
@@ -1516,17 +1563,11 @@ async def on_voice_state_update(member, before, after):
 	a.update_activity()
 
 async def terminate():
-	for k, a in tuple(AP.players.items()):
-		if a.queue:
-			AP.cache[k] = (a.vcc.id, a.channel and a.channel.id, a.get_dump(), [m.id for m in a.vcc.members])
-		await a.leave(
-			reason="Temporary maintenance",
-			dump=bool(a.queue),
-		)
-	fut = csubmit(client.close())
-	AP.cache.sync()
+	# Unload all audio players and preserve their state in our cache on disk
+	await asyncio.gather(*(unload_player(gid) for gid in AP.players.keys()))
 	await asubmit(ytdl.close)
-	return await fut
+	AP.cache.sync()
+	return await client.close()
 
 
 if __name__ == "__main__":

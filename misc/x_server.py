@@ -27,7 +27,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut, gather
 from .types import byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, RangeSet, MemoryBytes
-from .util import hwaccel, fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, url_unparse, url2fn, is_youtube_url, seq, Cache, Request, magic, is_discord_attachment, unyt, ecdc_exists, get_duration, CACHE_PATH, VIDEO_FORMS, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment
+from .util import hwaccel, fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, rename, url_unparse, url2fn, is_youtube_url, seq, Cache, Request, magic, is_discord_attachment, unyt, ecdc_exists, get_duration, CACHE_PATH, VIDEO_FORMS, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment
 from .caches import attachment_cache, upload_cache, download_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -1067,13 +1067,7 @@ class Server:
 			assert os.path.exists(fn) and os.path.getsize(fn)
 			res = interface.run(f"VOICE.ecdc_encode({repr(fn)},{repr(bitrate)},{repr(name)},{repr(source)},{repr(thumbnail)})")
 			assert os.path.exists(res)
-			try:
-				os.rename(res, out)
-			except OSError:
-				with open(res, "rb") as f:
-					b = f.read()
-				with open(out, "wb") as f:
-					f.write(b)
+			rename(res, out)
 			f = open(out, "rb")
 			return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
 		finally:
@@ -1136,7 +1130,7 @@ class Server:
 		if not self.ydl:
 			self.ydl = globals()["ytdl"] = AudioDownloader()
 		if v:
-			fmt = kwargs.get("fmt")
+			fmt = kwargs.get("fmt", "opus")
 			assert fmt in ("mp4", "webm", "ogg", "opus", "mp3")
 			tmpl = f"{CACHE_PATH}/{uhash(v)}.{fmt}"
 			start = kwargs.get("start")
@@ -1153,15 +1147,13 @@ class Server:
 			if not os.path.exists(fn) or not os.path.getsize(fn):
 				sem = self.ydl_sems.setdefault(ip, Semaphore(64, 256, rate_limit=8))
 				with sem:
+					# Separate video and audio formats
 					if VIDEO_FORMS.get(fmt) is None:
-						fstr = f"bestaudio[vcodec=none][ext={fmt}][audio_channels=2]/bestaudio[audio_channels=2]/worstvideo[acodec!=none]"
-						postprocessors = [dict(
-							key="FFmpegCustomAudioConvertor",
-							format=fmt,
-							codec="opus" if fmt == "ogg" else fmt,
-							start=start,
-							end=end,
-						)]
+						entry = self.ydl.search(v)[0]
+						fn2, _cdc, _dur, _ac = self.ydl.get_audio(entry, fmt=fmt, start=start, end=end)
+						if fn != fn2:
+							rename(fn2, fn)
+						title = entry["name"]
 					else:
 						fstr = f"bestvideo[ext={fmt}]+bestaudio[acodec=opus]/best[ext={fmt}]/best"
 						postprocessors = [dict(
@@ -1171,18 +1163,18 @@ class Server:
 							start=start,
 							end=end,
 						)]
-					ydl_opts = dict(
-						format=fstr,
-						default_search="auto",
-						source_address="0.0.0.0",
-						final_ext=fmt,
-						cachedir=CACHE_PATH,
-						outtmpl=tmpl,
-						windowsfilenames=True,
-						cookiesfrombrowser=["firefox"],
-						postprocessors=postprocessors,
-					)
-					title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(q)},download=True)['title']", timeout=3600)
+						ydl_opts = dict(
+							format=fstr,
+							default_search="auto",
+							source_address="0.0.0.0",
+							final_ext=fmt,
+							cachedir=CACHE_PATH,
+							outtmpl=tmpl,
+							windowsfilenames=True,
+							cookiesfrombrowser=["firefox"],
+							postprocessors=postprocessors,
+						)
+						title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(v)},download=True)['title']", timeout=3600)
 					assert os.path.exists(fn), "Download unsuccessful."
 			else:
 				entry = self.ydl.search(q)[0]

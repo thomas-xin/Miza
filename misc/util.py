@@ -734,6 +734,7 @@ def is_reddit_url(url): return url and regexp("^https?:\\/\\/(?:\\w{2,3}\\.)?red
 def is_emoji_url(url): return url and url.startswith("https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/")
 def is_spotify_url(url): return url and regexp("^https?:\\/\\/(?:play|open|api)\\.spotify\\.com\\/").findall(url)
 def unyt(s):
+	"Produces a unique URL, such as converting all instances of https://www.youtube.com/watch?v=video to https://youtu.be/video. This is useful for caching and deduplication."
 	if not is_url(s):
 		return s
 	if (s.startswith("https://mizabot.xyz/u") or s.startswith("https://api.mizabot.xyz/u")) and ("?url=" in s or "&url=" in s):
@@ -744,7 +745,7 @@ def unyt(s):
 		else:
 			s = re.sub(r"https?:\/\/(?:\w{1,5}\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)|https?:\/\/(?:api\.)?mizabot\.xyz\/ytdl\?[vd]=(?:https:\/\/youtu\.be\/|https%3A%2F%2Fyoutu\.be%2F)", "https://youtu.be/", re.sub(r"[\?&]si=[\w\-]+", "", s))
 		s = s.split("&", 1)[0]
-	if is_discord_attachment(s):
+	if is_discord_attachment(s) or is_spotify_url(s):
 		s = s.split("?", 1)[0]
 	return re.sub(r"https?:\/\/(?:\w{1,5}\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)", "https://youtu.be/", re.sub(r"[\?&]si=[\w\-]+", "", s))
 def is_discord_message_link(url) -> bool:
@@ -865,6 +866,26 @@ def get_image_size(b):
 	return list(map(int, out.split(b"x")))
 
 def rename(src, dst):
+	"""
+	Rename a file or directory from src to dst.
+
+	This function attempts to rename a file or directory from the source path
+	(src) to the destination path (dst). If the destination already exists,
+	it will be removed before renaming. If the rename operation fails due to
+	an OSError with error code 18 (cross-device link), the function will
+	manually copy the file contents from src to dst.
+
+	Args:
+		src (str): The source path of the file or directory to be renamed.
+		dst (str): The destination path where the file or directory should be renamed to.
+
+	Returns:
+		None
+
+	Raises:
+		PermissionError: If the destination exists and cannot be removed.
+		OSError: If any other error occurs during the rename operation.
+	"""
 	try:
 		return os.replace(src, dst)
 	except FileExistsError:
@@ -1871,7 +1892,7 @@ def get_duration_2(filename, _timeout=12):
 	return dur, bps, cdc, ac
 
 def get_duration_simple(filename, _timeout=12):
-	"Runs ffprobe on a file or url, returning the duration if possible."
+	"Runs FFprobe on a file or url, returning the duration if possible."
 	command = (
 		"./ffprobe",
 		"-v",
@@ -1912,7 +1933,7 @@ def get_duration_simple(filename, _timeout=12):
 	return dur, bps
 
 def get_duration(filename):
-	"Gets the duration of an audio/video file using metadata, bitrate, filesize etc. Falls back to FFMPEG"
+	"Gets the duration of an audio/video file using metadata, bitrate, filesize etc. Falls back to FFmpeg if necessary."
 	if not filename:
 		return
 	dur, bps = get_duration_simple(filename, 4)
@@ -2078,7 +2099,28 @@ class FileStreamer(io.BufferedRandom, contextlib.AbstractContextManager):
 	__exit__ = lambda self, *args: self.close()	# noqa: E731
 
 class PipedProcess:
-	"A custom subprocess/psutil-compatible Process implementation that invokes multiple processes simultaneously, automatically piping their stdin/stdout data. All stderr output is captured in the destination stdout."
+	"""A class for managing piped subprocesses.
+	This class allows creating and managing a chain of subprocess where the output of each process
+	is piped to the input of the next process in the chain.
+	Attributes:
+		procs (tuple): Tuple of running processes.
+		stdin: Standard input stream of first process.
+		stdout: Standard output stream of last process.
+		stderr: Standard error stream of last process.
+		pid: Process ID of the first process in the chain.
+	Examples:
+		>>> # Chain 'cat file.txt' and 'grep pattern'
+		>>> p = PipedProcess(['cat', 'file.txt'], ['grep', 'pattern'], stdout=subprocess.PIPE)
+		>>> p.wait()  # Wait for all processes to complete
+		>>> print(p.stdout.read().decode()) # Print the output of the last process
+	Args:
+		*args: Command arguments for each process in the chain.
+		stdin: Custom stdin for first process. Defaults to None.
+		stdout: Custom stdout for last process. Defaults to None.
+		stderr: Custom stderr for last process. Defaults to None.
+		cwd (str): Working directory for processes. Defaults to current directory.
+		bufsize (int): Buffer size for pipe operations. Defaults to 4096.
+	"""
 
 	procs = ()
 	stdin = stdout = stderr = None
@@ -2550,11 +2592,14 @@ class FileHashDict(collections.abc.MutableMapping):
 				self.modify()
 			return value
 		if k in self.codb:
-			with self.db_sem:
-				s = next(self.cur.next().execute(f"SELECT value FROM '{self.internal}' WHERE key=?", [k]))[0]
+			try:
+				with self.db_sem:
+					s = next(self.cur.next().execute(f"SELECT value FROM '{self.internal}' WHERE key=?", [k]))[0]
+			except StopIteration:
+				raise KeyError(k)
 			if not s:
 				self.deleted.add(k)
-				raise RuntimeError(f"Found empty value for key {k} in {self.internal}")
+				raise KeyError(k)
 			d = self.decode(s)
 			value = select_and_loads(d)
 			self.data[k] = value
@@ -3416,6 +3461,27 @@ MEMS = {}
 
 @tracebacksuppressor
 def share_bytes(sender, b):
+	"""Shares bytes with a sender, either directly or through shared memory.
+
+	This function attempts to send bytes to a sender. If the bytes are small enough
+	(less than 65535 bytes), they are sent directly. For larger data, the function
+	uses shared memory to transfer the bytes.
+
+	Args:
+		sender: A callable that accepts bytes as an argument and sends them.
+		b: The bytes to be shared/sent.
+
+	Returns:
+		The result of the sender function call.
+
+	Raises:
+		Any exceptions that may occur during the sending process.
+
+	Note:
+		- For direct sending (small data), prepends b'\x01' to the data
+		- For shared memory (large data), prepends b'\x02' followed by size and memory name
+		- Shared memory objects are stored in a MEMS dictionary using the memory name as key
+	"""
 	if len(b) <= 65536 - 1:
 		return sender(b"\x01" + b)
 	mem = multiprocessing.shared_memory.SharedMemory(create=True, size=len(b))
@@ -3430,6 +3496,27 @@ def share_bytes(sender, b):
 
 @tracebacksuppressor
 def receive_bytes(receiver, unlink):
+	"""Receives and processes bytes from a receiver function, handling both regular and shared memory data.
+
+	This function processes incoming bytes and supports two modes of data transfer:
+	- Mode 1: Direct memory bytes transfer
+	- Mode 2: Shared memory transfer using multiprocessing.shared_memory
+
+	Args:
+		receiver (callable): A function that returns bytes data when called
+		unlink (callable): A function to handle cleanup of shared memory resources
+
+	Returns:
+		bytes: The processed bytes data from either direct transfer or shared memory.
+		If the receiver returns empty data, returns the empty data directly.
+
+	Note:
+		For Mode 2 (shared memory):
+		- First byte indicates mode
+		- Next 8 bytes represent size in little-endian
+		- Remaining bytes contain the shared memory name
+		The shared memory is automatically unlinked after reading.
+	"""
 	b = receiver()
 	if not b:
 		return b
@@ -3450,6 +3537,21 @@ def receive_bytes(receiver, unlink):
 
 
 class PipeableIterator(collections.abc.Iterator):
+	"""A threaded iterator class that allows for dynamic item appending and termination.
+	This iterator can be used as a pipe, allowing items to be appended while iterating.
+	The iterator will wait for new items when the current items are exhausted, unless terminated.
+	Attributes:
+		items (list): The list of items to iterate over
+		i (int): The current iteration index
+		stop_index (float): The index at which iteration should stop
+		condition (threading.Condition): Thread synchronization condition
+		buffer (bytes): Buffer for read operations
+	Methods:
+		append(item): Adds an item to the iterator
+		terminate(): Stops the iterator from accepting new items
+		close(): Alias for terminate()
+		read(n=None): Reads n bytes from the iterator, or all bytes if n is None
+	"""
 
 	def __init__(self, items=None):
 		self.items = items or []
@@ -3497,6 +3599,52 @@ class PipeableIterator(collections.abc.Iterator):
 		return b
 
 class EvalPipe:
+	"""A bidirectional communication pipe for evaluating Python code across processes.
+	This class implements a robust communication protocol for executing Python code
+	between processes, supporting synchronous and asynchronous operations, iterators,
+	and error handling.
+	Attributes:
+		MEMS (dict): Global memory storage dictionary
+		key (bytes): Authentication key for connections
+		rlock (threading.Lock): Lock for reading operations
+		wlock (threading.Lock): Lock for writing operations
+		responses (dict): Storage for response futures
+		iterators (dict): Storage for iterator responses
+		cache (dict): Cache for computed results
+		writable (bool): Whether the pipe can accept write operations
+		glob (dict): Global namespace for code evaluation
+		id (int): Unique identifier for the pipe
+		thread (Thread): Background communication thread
+		server (Listener): Optional server for accepting connections
+	Methods:
+		connect(args, port, independent=True, glob=globals(), timeout=60):
+			Creates a client connection to a running EvalPipe server.
+		listen(port=0, glob=globals(), start=False):
+			Creates a server instance listening for client connections.
+		from_proc(proc, glob=globals()):
+			Creates a pipe from an existing process with stdin/stdout.
+		from_stdin(start=False, glob=globals()):
+			Creates a pipe using current process stdin/stdout.
+		start(background=True):
+			Starts the communication thread.
+		submit(s, priority=False) -> Future:
+			Submits code for execution and returns a Future.
+		run(s, timeout=30, cache=None):
+			Executes code and waits for result with optional caching.
+		asubmit(s):
+			Async version of submit().
+		print(*args, sep=" ", end="\n"):
+			Prints to the pipe with proper encoding.
+		kill():
+			Terminates the pipe and cleans up resources.
+	Protocol:
+		Input format: ~>{id}:{msg}
+		Output formats:
+		- Error: <~{id}:!:{msg}
+		- Success: <~{id}:@:{msg}
+		- Iterator item: <~{id}:#:{msg}
+		- Iterator end: <~{id}:$
+	"""
 
 	MEMS = globals()["MEMS"]
 
@@ -3542,7 +3690,10 @@ class EvalPipe:
 					args = ["xterm", "-e", argstr]
 			print(args)
 			subprocess.Popen(args, shell=isinstance(args, str))
+			t = utc()
 			for i in range(timeout):
+				if utc() - t > timeout:
+					raise TimeoutError(timeout)
 				try:
 					conn = multiprocessing.connection.Client(addr, authkey=cls.key)
 				except ConnectionRefusedError:
@@ -3655,7 +3806,7 @@ class EvalPipe:
 		self.send(b)
 		return fut
 
-	def run(self, s, timeout=30, cache=None):
+	def run(self, s, timeout=30, cache=None, priority=False):
 		self.ensure_writable(timeout=timeout)
 		if cache:
 			t = utc()
@@ -3666,14 +3817,14 @@ class EvalPipe:
 			else:
 				if t - t2 <= cache:
 					return res
-			res = self.submit(s).result(timeout=timeout)
+			res = self.submit(s, priority=priority).result(timeout=timeout)
 			self.cache[s] = (res, t)
 			return res
-		return self.submit(s).result(timeout=timeout)
+		return self.submit(s, priority=priority).result(timeout=timeout)
 
-	async def asubmit(self, s):
+	async def asubmit(self, s, priority=False):
 		await self.a_ensure_writable()
-		return await wrap_future(self.submit(s))
+		return await wrap_future(self.submit(s, priority=priority))
 
 	def print(self, *args, sep=" ", end="\n"):
 		b = ("\x00" + sep.join(map(str, args)) + end).encode("utf-8")
@@ -4142,14 +4293,14 @@ get_request = Request.__call__
 
 sp = None
 browsers = {}
-def new_playwright_page(browser="firefox", viewport=dict(width=480, height=320)):
+def new_playwright_page(browser="firefox", viewport=dict(width=480, height=320), headless=True):
 	try:
 		return browsers[browser].new_page()
 	except KeyError:
 		if sp is None:
 			from playwright.sync_api import sync_playwright
 			globals()["sp"] = sync_playwright().start()
-		browsers[browser] = getattr(sp, browser).launch(headless=True)
+		browsers[browser] = getattr(sp, browser).launch(headless=headless)
 	return browsers[browser].new_page(viewport=viewport)
 
 esubmit(load_mimes)

@@ -63,7 +63,34 @@ class ReadWriteLock:
 
 
 class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
-	"""Custom list-like data structure that incorporates the functionality of numpy arrays, but implements buffer references and circular buffers. O(1) insertion/removal from ends, O(1) lookup, O(n) insertion/removal from centre, and O(log n) search for sorted lists, without heavily impacting non-sorted lists."""
+	"""A mutable sequence implementation that uses a ring buffer with numpy arrays.
+	Provides efficient operations for both ends of the sequence, and numpy-accelerated arithmetic operations.
+	The ring buffer allows for O(1) operations on both ends of the sequence while maintaining
+	contiguous memory access patterns. The underlying numpy array provides vectorized operations
+	and efficient memory usage.
+	Features:
+	- O(1) append/pop operations on both ends
+	- Thread-safe operations with read/write locks
+	- Numpy-accelerated arithmetic and comparison operations  
+	- Set-like operations (union, intersection etc.)
+	- Sorting and searching capabilities
+	- Automatic memory management with reserve/reallocation
+	The buffer wraps around at the edges to avoid copying, using modulo arithmetic to track
+	positions. When more space is needed, the buffer is reallocated with extra capacity.
+	Args:
+		*args: Initial sequence of items, or a single item
+		dtype: numpy dtype for the underlying array (default: object)
+		device: Device to store array on (does not actually do anything, it exists solely for compatibility with other libraries, e.g. PyTorch)
+	Examples:
+		>>> rv = RingVector([1,2,3])
+		>>> rv.appendleft(0)  # O(1) prepend
+		>>> rv.append(4)      # O(1) append
+		>>> rv[0]            # O(1) random access
+		0
+		>>> rv + [5,6]      # Arithmetic operations
+		RingVector([5,7,8,9,10])
+		>>> rv.rotate(2)    # Efficient rotation
+	"""
 
 	__slots__ = ("__weakref__", "_lock", "buffer", "offset", "length", "_view", "_margin", "_hash", "_frozenset", "_queries", "_sorted", "_index")
 
@@ -290,7 +317,7 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 			return self._view[0]
 		raise AttributeError
 
-	# Returns the left and right "slices" of the array. Only returns one slice if array doesn't wrap, returns nothing if no elements exist at all.
+	# Returns the left and right "slices" of the array. Only returns one slice if array doesn't wrap, returns empty tuple if no elements exist at all.
 	@property
 	@reading
 	def views(self) -> tuple:

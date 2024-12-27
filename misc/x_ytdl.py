@@ -1,10 +1,12 @@
 import io
+import os
 import subprocess
 import sys
 from traceback import print_exc
 import zipfile
 import requests
 from PIL import Image
+# Allow fallback (although not recommended as generally the up-to-date version is necessary for most sites)
 try:
 	import yt_dlp as ytd
 except ImportError as ex:
@@ -13,7 +15,7 @@ except ImportError as ex:
 	except ImportError:
 		raise ex
 from .types import list_like
-from .util import Request, EvalPipe, esubmit, python
+from .util import Request, EvalPipe, esubmit, python, new_playwright_page, is_spotify_url
 
 ydl_opts = {
 	"quiet": 1,
@@ -37,6 +39,28 @@ def extract_info(url, download=False, process=True):
 		resp["entries"] = list(resp["entries"])
 	return resp
 
+def get_audio_spotify(url, fn):
+	downloader = "https://spotifymate.com"
+	page = new_playwright_page()
+	with page:
+		page.goto(downloader)
+		inputs = page.locator("#url")
+		inputs.fill(url)
+		page.locator("#send").click()
+		success = page.locator(".is-success").first
+		if not success:
+			raise RuntimeError("Failed to download Spotify audio.")
+		stream = success.get_attribute("href")
+	if not stream:
+		raise RuntimeError("Failed to download Spotify audio.")
+	with requests.get(stream, headers=Request.header(), stream=True) as resp:
+		resp.raise_for_status()
+		with open(fn, "wb") as f:
+			for chunk in resp.iter_content(65536):
+				f.write(chunk)
+	assert os.path.exists(fn) and os.path.getsize(fn), "Failed to download Spotify audio."
+	return fn
+
 def get_full_storyboard(info):
 	"""
 	Extracts and processes the storyboard images from the provided video information.
@@ -45,10 +69,8 @@ def get_full_storyboard(info):
 		info (dict): A dictionary containing video information, including formats, duration, and storyboard details.
 
 	Returns:
-		bytes: A byte buffer containing the storyboard images in a ZIP archive. If an error occurs, returns the thumbnail image URL.
-
-	Raises:
-		LookupError: If no storyboard format is found in the provided video information.
+		bytes: A byte buffer containing the storyboard images in a ZIP archive.
+		str: The URL of the video thumbnail if the storyboard could not be extracted.
 
 	The function performs the following steps:
 		1. Extracts the storyboard format from the video information.
@@ -84,6 +106,8 @@ def get_full_storyboard(info):
 				count = images_per_storyboard
 			frag = fragments[i]
 			with fut.result() as resp:
+				if not resp.ok:
+					return info["thumbnail"]
 				im = Image.open(resp.raw)
 				for index in range(count):
 					curr2 = curr + index * frag["duration"] / count
@@ -99,14 +123,15 @@ def get_full_storyboard(info):
 	return b2.getbuffer()
 
 class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
-	"Replace the default FFmpegPostProcessor with one that supports seeking as well as custom video formats and codecs."
+	"Replace the default FFmpegPostProcessor with one that supports seeking as well as custom video formats and codecs. Additionally supports adding a thumbnail to purely audio files as the cover image."
 
-	def __init__(self, downloader=None, codec=None, format=None, start=None, end=None):
+	def __init__(self, downloader=None, codec=None, format=None, start=None, end=None, thumbnail=None):
 		super().__init__(downloader)
 		self.codec = codec
 		self.format = format
 		self.start = start
 		self.end = end
+		self.thumbnail = thumbnail
 
 	@ytd.postprocessor.PostProcessor._restrict_to(images=False)
 	def run(self, info):
@@ -116,8 +141,11 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 		name = filename.rsplit(".", 1)[0]
 		if self.start is not None or self.end is not None:
 			name += f"~{self.start}-{self.end}"
+		if self.thumbnail:
+			name += "~i"
 		outpath = name + "." + self.format
 		temp_path = filename.rsplit(".", 1)[0] + "~." + self.format
+		before = []
 		input_args = []
 		if self.format == "mp4":
 			output_args = ["-f", self.format, "-c", "copy"]
@@ -130,15 +158,27 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 				input_args.extend(["-ss", str(self.start)])
 			if self.end is not None:
 				input_args.extend(["-to", str(self.end)])
-			output_args = ["-f", self.format, "-c:v", self.codec, "-b:v", "3072k", "-c:a", "libopus", "-b:a", "160k"]
+			output_args = ["-f", self.format, "-c:v", self.codec, "-b:v", "3072k"]
+			if self.format == "mp4":
+				# MP4 supports just about any audio codec, but WebM and MKV do not. We assume the audio codec is not WMA, as it is highly unlikely any website would use it for streaming videos.
+				output_args.extend(["-c:a", "copy"])
+			else:
+				output_args.extend(["-c:a", "libopus", "-b:a", "160k"])
 			lightning = False
+		if self.thumbnail:
+			before_filename = self.thumbnail
+			before_args = ["-loop", "1"]
+			output_args.extend("-shortest")
+			before.append([before_filename, before_args])
 		if not lightning:
 			temp_path = outpath
 		self.real_run_ffmpeg(
-			[[filename, input_args]],
+			[*before, [filename, input_args]],
 			[[temp_path, output_args]],
 		)
 		if lightning:
+			# Run lightning-trim script to trim the video, as simple FFmpeg trims often do not play properly (such as black screens at the start).
+			# Lightning-trim computes the nearest keyframe after the start time, and forces a reencode for any cut-off frames occuring before said keyframe.
 			start = str(self.start) if self.start is not None else "0"
 			end = str(self.end) if self.end is not None else "86400"
 			args = [python, "misc/lightning.py", temp_path, start, end, outpath]
@@ -174,9 +214,10 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			input_args.extend(["-ss", str(self.start)])
 		if self.end is not None:
 			input_args.extend(["-to", str(self.end)])
-		if not input_args and source_codec == self.codec:
+		if source_codec == self.codec:
 			output_args.extend(["-c", "copy"])
 		else:
+			# Default to 192k for AAC, 160k for Opus, and 224k for MP3
 			bitrate = 224 if self.codec == "mp3" else 192 if self.codec == "aac" else 160
 			output_args.extend(["-c:a", acodec, "-b:a", f"{bitrate}k"])
 		self.real_run_ffmpeg(
