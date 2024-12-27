@@ -1098,7 +1098,7 @@ class AudioDownloader:
 			duration=entry2.get("duration"),
 		))
 		assert os.path.exists(fn) and os.path.getsize(fn)
-		return fn, "opus", dur, 2
+		return fn, "opus", entry["duration"], 2
 
 	def preprocess(self, url, mode, count):
 		output = deque()
