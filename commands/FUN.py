@@ -1122,7 +1122,7 @@ class Barter(Command):
 # 	server_only = True
 # 	name = ["Sparkles", "Outbreak", "PokemonOutbreak"]
 # 	min_level = 2
-# 	description = "Toggles or changes the mode of ⟨MIZA⟩'s random special reactions. Sparkles (default) has a 1 in 1000 chance of reacting to any message with a sparkle reaction and granting diamonds, while "
+# 	description = "Toggles or changes the mode of ⟨BOT⟩'s random special reactions. Sparkles (default) has a 1 in 1000 chance of reacting to any message with a sparkle reaction and granting diamonds, while "
 # 	usage = "(enable|disable|clear)?"
 # 	example = ("sparkles disable", "outbreak enable")
 # 	flags = "aed"
@@ -1901,7 +1901,7 @@ class React(Command):
 	server_only = True
 	name = ["AutoReact"]
 	min_level = 0
-	description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the trigger. Triggered by a keyword in messages, only applicable to non-command messages."
+	description = "Causes ⟨BOT⟩ to automatically assign a reaction to messages containing the trigger. Triggered by a keyword in messages, only applicable to non-command messages."
 	schema = cdict(
 		mode=cdict(
 			type="enum",
@@ -2144,7 +2144,7 @@ class UpdateReacts(Database):
 class Dogpile(Command):
 	server_only = True
 	min_level = 2
-	description = "Causes ⟨MIZA⟩ to automatically imitate users when 3+ of the same messages are posted in a row. Grants XP and gold when triggered. Enabled by default."
+	description = "Causes ⟨BOT⟩ to automatically imitate users when 3+ of the same messages are posted in a row. Grants XP and gold when triggered. Enabled by default."
 	usage = "<mode(enable|disable)>?"
 	example = ("dogpile enable",)
 	flags = "aed"
@@ -2302,7 +2302,7 @@ class UpdateDogpiles(Database):
 class DadJoke(Command):
 	server_only = True
 	min_level = 3
-	description = "Causes ⟨MIZA⟩ to automatically nickname a user whenever they say \"I am <something>\" or some variant."
+	description = "Causes ⟨BOT⟩ to automatically nickname a user whenever they say \"I am <something>\" or some variant."
 	usage = "<mode(enable|disable)>? <target(nickname|response|all)>? <chance[100]>?"
 	example = ("dadjoke enable", "dadjoke disable")
 	flags = "aed"

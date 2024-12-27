@@ -2284,6 +2284,19 @@
 			],
 			"timeout": "360"
 		},
+		"AudioSeparator": {
+			"aliases": [
+				"AudioSeparator",
+				"Extract",
+				"Separate"
+			],
+			"description": "Runs Audio-Separator on the input URL. See https://github.com/nomadkaraoke/python-audio-separator for more info, or to run it yourself!",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(20, 40)",
+			"example": [],
+			"timeout": "84.0"
+		},
 		"SpectralPulse": {
 			"aliases": [
 				"SpectralPulse"

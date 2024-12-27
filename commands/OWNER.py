@@ -34,7 +34,7 @@ class Reload(Command):
 class Shutdown(Command):
 	name = ["Maintain", "Restart", "Reboot", "Update"]
 	min_level = nan
-	description = "Restarts, reloads, or shuts down ⟨MIZA⟩, with an optional delay."
+	description = "Restarts, reloads, or shuts down ⟨BOT⟩, with an optional delay."
 	schema = cdict(
 		mode=cdict(
 			type="enum",
@@ -239,7 +239,7 @@ class Execute(Command):
 class Exec(Command):
 	name = ["Aexec", "Aeval", "Eval"]
 	min_level = nan
-	description = "Causes all messages by the bot owner(s) in the current channel to be executed as python code on ⟨MIZA⟩."
+	description = "Causes all messages by the bot owner(s) in the current channel to be executed as python code on ⟨BOT⟩."
 	# Different types of terminals for different purposes
 	terminal_types = demap(dict(
 		null=0,
@@ -852,7 +852,7 @@ class UpdateProxies(Database):
 class SetAvatar(Command):
 	name = ["ChangeAvatar", "UpdateAvatar"]
 	min_level = nan
-	description = "Changes ⟨MIZA⟩'s current avatar."
+	description = "Changes ⟨BOT⟩'s current avatar."
 	usage = "<avatar_url>?"
 	example = ("setavatar https://mizabot.xyz/favicon",)
 
@@ -1176,7 +1176,7 @@ class Maintenance(Command):
 class Suspend(Command):
 	name = ["Block", "Blacklist"]
 	min_level = nan
-	description = "Prevents a user from accessing ⟨MIZA⟩'s commands. Overrides <perms>."
+	description = "Prevents a user from accessing ⟨BOT⟩'s commands. Overrides <perms>."
 	usage = "<0:user> <disable(-d)>"
 	example = ("block 201548633244565504",)
 	flags = "aed"

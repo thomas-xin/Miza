@@ -806,7 +806,7 @@ class Info(Command):
 
 class Profile(Command):
 	name = ["User", "UserProfile"]
-	description = "Shows or edits a user profile on ⟨MIZA⟩."
+	description = "Shows or edits a user profile on ⟨BOT⟩."
 	schema = cdict(
 		user=cdict(
 			type="user",
@@ -1037,7 +1037,7 @@ class Status(Command):
 
 class Invite(Command):
 	name = ["Website", "BotInfo", "InviteLink"]
-	description = "Sends a link to ⟨MIZA⟩'s homepage, github and invite code, as well as an invite link to the current server if applicable."
+	description = "Sends a link to ⟨BOT⟩'s homepage, github and invite code, as well as an invite link to the current server if applicable."
 	example = ("invite",)
 	rate_limit = (9, 13)
 	slash = True
@@ -1064,7 +1064,7 @@ class Invite(Command):
 
 class Upload(Command):
 	name = ["Filehost", "Preserve"]
-	description = "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to ⟨MIZA⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
+	description = "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to ⟨BOT⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
 	usage = "<url>?"
 	example = ("preserve https://cdn.discordapp.com/attachments/911168940246442006/1026474858705588224/6e74595fa98e9c52e2fab6ece4639604.png", "files")
 	rate_limit = (12, 17)

@@ -30,7 +30,7 @@ class Translate(Command):
 	rate_limit = (6, 9)
 	slash = True
 	ephemeral = True
-	LLMs = ("google", "mixtral-8x22b", "gpt-3.5", "gpt-3.5-turbo-instruct", "gpt-4m", "claude-3.5-sonnet", "claude-3-sonnet", "command-r", "command-r-plus")
+	LLMs = ("google", "mixtral-8x22b", "gpt-3.5", "gpt-3.5-turbo-instruct", "gpt-4m", "claude-3.5-sonnet", "claude-3-sonnet", "command-r", "command-r-plus", "deepseek-v3")
 	if googletrans:
 		languages = demap(googletrans.LANGUAGES)
 		trans = googletrans.Translator()

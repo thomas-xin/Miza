@@ -1477,7 +1477,7 @@ class VoiceNuke(Command):
 
 class Radio(Command):
 	name = ["FM"]
-	description = "Searches for a radio station livestream on https://worldradiomap.com that can be played on ⟨MIZA⟩."
+	description = "Searches for a radio station livestream on https://worldradiomap.com that can be played on ⟨BOT⟩."
 	usage = "<0:country>? <2:state>? <1:city>?"
 	example = ("radio", "radio australia", "radio Canada Ottawa,_on")
 	rate_limit = (6, 8)
@@ -2213,10 +2213,32 @@ class Download(Command):
 	ephemeral = True
 	exact = False
 
-	async def __call__(self, bot, query, format, start, end, **void):
-		raise NotImplementedError("This command is currently disabled for maintenance. Please use the web version at https://api.mizabot.xyz/static/downloader.html for now!")
+	async def download_single(self, channel, message, url, fmt, start, end, **void):
+		downloader_url = f"https://api.mizabot.xyz/ytdl?d={quote_plus(url)}&fmt={fmt}"
+		if start:
+			downloader_url += f"&start={start}"
+		if end:
+			downloader_url += f"&end={end}"
+		fut = csubmit(send_with_reply(
+			channel,
+			reference=message,
+			content=italics(ini_md(f"Downloading and converting {sqr_md(url)}...")),
+		))
+		resp = await asubmit(requests.get, downloader_url, verify=False)
+		response = await fut
+		print(resp.headers)
+		file = CompatFile(resp.content, resp.headers["Content-Disposition"].split("filename=", 1)[-1].strip('"'))
+		response = await self.bot.edit_message(
+			response,
+			content=italics(ini_md(f"Uploading {file.filename}...")),
+		)
+		await self.bot.send_with_file(channel, file=file, reference=message)
+		await self.bot.silent_delete(response)
+
+	async def __call__(self, bot, _channel, _message, query, format, start, end, **void):
 		if not query:
 			raise IndexError("Please input a search term or URL.")
+		query = verify_search(query)
 		res = await Request(
 			f"https://api.mizabot.xyz/ytdl?q={quote_plus(query)}",
 			json=True,
@@ -2227,9 +2249,17 @@ class Download(Command):
 		if len(res) == 1 and is_url(query):
 			# If only one result is found and the input is a URL, directly download it
 			# TODO: Implement direct download
-			return
+			return await self.download_single(
+				channel=_channel,
+				message=_message,
+				url=query,
+				fmt=format or "opus",
+				start=start,
+				end=end,
+			)
 		# If multiple results are found, display them for selection
 		# TODO: Implement selection
+		raise NotImplementedError("Multiple results found, selection not yet implemented. Please use the web version at https://api.mizabot.xyz/static/downloader.html for now!")
 		# Add reaction numbers corresponding to search results for selection
 		for i in range(len(res)):
 			await sent.add_reaction(str(i) + as_str(b"\xef\xb8\x8f\xe2\x83\xa3"))

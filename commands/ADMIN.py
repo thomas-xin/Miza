@@ -1021,7 +1021,7 @@ class RolePreserver(Command):
 	name = ["🕵️", "StickyRoles"]
 	min_level = 3
 	min_display = "3+"
-	description = "Causes ⟨MIZA⟩ to save roles for all users, and re-add them when they leave and rejoin."
+	description = "Causes ⟨BOT⟩ to save roles for all users, and re-add them when they leave and rejoin."
 	usage = "<mode(enable|disable)>?"
 	example = ("rolepreserver enable", "stickyroles disable")
 	flags = "aed"
@@ -1053,7 +1053,7 @@ class NickPreserver(Command):
 	name = ["StickyNicks", "NicknamePreserver"]
 	min_level = 3
 	min_display = "3+"
-	description = "Causes ⟨MIZA⟩ to save nicknames for all users, and re-add them when they leave and rejoin."
+	description = "Causes ⟨BOT⟩ to save nicknames for all users, and re-add them when they leave and rejoin."
 	usage = "<mode(enable|disable)>?"
 	example = ("nickpreserver enable", "stickynicks disable")
 	rate_limit = (9, 12)
@@ -1083,7 +1083,7 @@ class ThreadPreserver(Command):
 	name = ["KeepAlive", "ThreadBump", "AutoBump", "UnArchive"]
 	min_level = 3
 	min_display = "3+"
-	description = 'Causes ⟨MIZA⟩ to "bump" (revive) the current thread when auto-archived.'
+	description = 'Causes ⟨BOT⟩ to "bump" (revive) the current thread when auto-archived.'
 	usage = "<mode(enable|disable)>?"
 	example = ("keepalive enable", "threadpreserver disable")
 	rate_limit = (9, 12)
@@ -1152,7 +1152,7 @@ class Archive(Command):
 	_timeout_ = 3600
 	name = ["ArchiveServer", "DownloadServer"]
 	min_level = 3
-	description = "Archives all messages, attachments and users into a .zip folder. Defaults to entire server if no channel specified, requires server permission level 3 as well as a Lv2 or above ⟨MIZA⟩ subscription to perform, and may take a significant amount of time."
+	description = "Archives all messages, attachments and users into a .zip folder. Defaults to entire server if no channel specified, requires server permission level 3 as well as a Lv2 or above ⟨BOT⟩ subscription to perform, and may take a significant amount of time."
 	usage = "<server|channel>? <start-id>? <end-id>? <token>?"
 	flags = "f"
 	rate_limit = 172800
@@ -1270,7 +1270,7 @@ class UserLog(Command):
 	server_only = True
 	name = ["MemberLog"]
 	min_level = 3
-	description = "Causes ⟨MIZA⟩ to log user and member events from the server, in the current channel."
+	description = "Causes ⟨BOT⟩ to log user and member events from the server, in the current channel."
 	schema = cdict(
 		mode=cdict(
 			type="enum",
@@ -1304,7 +1304,7 @@ class MessageLog(Command):
 	server_only = True
 	name = ["MemberLog"]
 	min_level = 3
-	description = "Causes ⟨MIZA⟩ to log message and file events from the server, in the current channel."
+	description = "Causes ⟨BOT⟩ to log message and file events from the server, in the current channel."
 	schema = cdict(
 		mode=cdict(
 			type="enum",
@@ -1337,7 +1337,7 @@ class MessageLog(Command):
 class StarBoard(Command):
 	server_only = True
 	min_level = 2
-	description = "Causes ⟨MIZA⟩ to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel."
+	description = "Causes ⟨BOT⟩ to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel."
 	usage = "<0:reaction> <1:react_count[1]>? <enable_channel(-e)|disable_channel(-d)>? <-1:channel_ids>*"
 	example = ("starboard 🐱 6", "starboard disable")
 	flags = "aed"
@@ -1502,7 +1502,7 @@ class Crosspost(Command):
 	server_only = True
 	name = ["Repost", "Subscribe"]
 	min_level = 3
-	description = "Causes ⟨MIZA⟩ to automatically crosspost all messages from the target channel, into the current channel."
+	description = "Causes ⟨BOT⟩ to automatically crosspost all messages from the target channel, into the current channel."
 	usage = "<channel> <disable(-d)>?"
 	example = ("crosspost 683634093464092672", "crosspost -d #general")
 	flags = "aed"
@@ -1601,7 +1601,7 @@ class Publish(Command):
 	server_only = True
 	name = ["News", "AutoPublish"]
 	min_level = 3
-	description = "Causes ⟨MIZA⟩ to automatically publish all posted messages in the current channel."
+	description = "Causes ⟨BOT⟩ to automatically publish all posted messages in the current channel."
 	usage = "<mode(enable|disable)>? <force(-x)>?"
 	example = ("publish enable", "news disable")
 	flags = "aedx"
@@ -1642,7 +1642,7 @@ class Relay(Command):
 	server_only = True
 	name = ["Forward"]
 	min_level = 4
-	description = "Causes ⟨MIZA⟩ to send the target user(s) a DM that enables them to communicate through the current channel."
+	description = "Causes ⟨BOT⟩ to send the target user(s) a DM that enables them to communicate through the current channel."
 	usage = "<user>* <disable(-d)>?"
 	example = ("relay @Miza Sorry, you have been banned from this server. Reply to this message to appeal!", "relay -d 201548633244565504")
 	flags = "aedf"
@@ -2105,7 +2105,7 @@ class EnabledCommands(Command):
 class Prefix(Command):
 	name = ["ChangePrefix"]
 	min_display = "0~3"
-	description = "Shows or changes the prefix for ⟨MIZA⟩'s commands for this server."
+	description = "Shows or changes the prefix for ⟨BOT⟩'s commands for this server."
 	usage = "<new_prefix>? <default(-d)>?"
 	example = ("prefix !", "change_prefix >", "prefix -d")
 	flags = "hd"

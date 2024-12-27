@@ -1958,7 +1958,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			is_nsfw = nsfw_flagged(r1) or nsfw_flagged(r2)
 		if is_nsfw:
 			models = reversed(models)
-		kwargs["messages"] = await fut
+		kwargs["messages"], _model = await fut
 		exc = None
 		for model in models:
 			kwargs["model"] = model
@@ -2017,14 +2017,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				yield s
 		return CloseableAsyncIterator(_completion(resp, strip), resp.close)
 
-	async def force_chat(self, model, messages, text=None, assistant_name=None, stream=False, max_tokens=1024, **kwargs):
+	async def force_chat(self, model, messages, text=None, assistant_name=None, stream=False, max_tokens=1024, vision_model=None, **kwargs):
 		await ai.ensure_models()
 		ctx = ai.contexts.get(model, 4096)
-		messages = await self.caption_into(messages, model=model, premium_context=kwargs.get("premium_context", []))
-		if model in ai.is_chat:
+		messages, vision_model = await self.caption_into(messages, model=model, backup_model=vision_model, premium_context=kwargs.get("premium_context", []))
+		if vision_model in ai.is_chat:
 			count = await count_to(messages)
 			max_tokens = min(max_tokens, ctx - count - 64)
-			return await ai.llm("chat.completions.create", model=model, messages=messages, stream=stream, max_tokens=max_tokens, **kwargs)
+			return await ai.llm("chat.completions.create", model=vision_model, messages=messages, stream=stream, max_tokens=max_tokens, **kwargs)
 		fmt = ai.instruct_formats.get(model, "chatml")
 		assistant_messages = [m for m in messages if m.get("content") and m.get("role") == "assistant"]
 		if assistant_name:
@@ -2131,7 +2131,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			usage=resp.usage,
 		)
 
-	async def caption_into(self, _messages, model=None, premium_context=[]):
+	async def caption_into(self, _messages, model=None, backup_model=None, premium_context=[]):
 		print("CI:", model, lim_str(_messages, 1024))
 		context = ai.contexts.get(model, 4096)
 		messages = [cdict(m) for m in _messages]
@@ -2177,6 +2177,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if model in ai.is_vision and m.get("role") != "assistant":
 				futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
 				extracts[i] = csubmit(gather(*futs))
+			elif backup_model and i == 0 and m.get("role") != "assistant":
+				futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
+				extracts[i] = csubmit(gather(*futs))
+				model = backup_model
 			else:
 				best = 2 if model in ai.is_premium and m.get("new") else 0
 				futs = [self.caption(url, best=best, premium_context=premium_context) for url in urls]
@@ -2211,7 +2215,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				m.content.extend(images)
 		for m in messages:
 			m.pop("new", None)
-		return messages
+		return messages, model
 
 	async def classify(self, content, examples=[], model="embed-multilingual-v3.0", premium_context=[]):
 		if model == "embed-multilingual-v3.0" and len(content) > 1024:
@@ -2251,6 +2255,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	model_levels = {
 		0: cdict(
+			reasoning="deepseek-v3",
 			instructive="gpt-4m",
 			casual="gpt-4m",
 			nsfw="mythomax-13b",
@@ -2261,8 +2266,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		1: cdict(
-			instructive="gpt-4",
-			casual="llama-3-70b",
+			reasoning="o1-mini",
+			instructive="deepseek-v3",
+			casual="deepseek-v3",
 			nsfw="qwen-72b",
 			backup="llama-3-70b",
 			retry="gpt-4",
@@ -2271,12 +2277,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		2: cdict(
+			reasoning="o1",
 			instructive="claude-3.5-sonnet",
-			casual="gpt-4",
+			casual="deepseek-v3",
 			nsfw="qwen-72b",
 			backup="llama-3-70b",
 			retry="gpt-4",
-			function="gpt-4m",
+			function="deepseek-v3",
 			vision="gpt-4",
 			target="auto",
 		),
@@ -2365,12 +2372,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						break
 			toolcheck.append(messages[0])
 			toolcheck.reverse()
-			toolcheck = await self.caption_into(toolcheck, model=modelist.function, premium_context=premium_context)
+			toolcheck, toolmodel = await self.caption_into(toolcheck, model=modelist.function, premium_context=premium_context)
 			mode = None
 			label = "instructive"
 			try:
 				resp = await self.function_call(
-					model=modelist.function,
+					model=toolmodel,
 					messages=toolcheck,
 					temperature=tmp,
 					top_p=tpp,
@@ -2439,6 +2446,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						total_tokens=ct + st,
 					),
 					cargs=cargs,
+					modelist=modelist,
 				)
 				return
 			if mode:
@@ -2539,6 +2547,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			ml = min(max(256, min(8192, ctx - tlen)), max_tokens)
 			data = dict(
 				model=assistant,
+				vision_model=modelist.vision,
 				messages=temp,
 				assistant_name=assistant_name,
 				temperature=tmp,
@@ -2921,7 +2930,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			]),
 		]
 		model="claude-3.5-sonnet" if best >= 2 else "claude-3-haiku"
-		messages = await self.caption_into(messages, model=model, premium_context=premium_context)
+		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
 			messages=messages,
@@ -2957,7 +2966,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			]),
 		]
 		model = "gpt-4" if best else "gpt-4m"
-		messages = await self.caption_into(messages, model=model, premium_context=premium_context)
+		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
 			messages=messages,
@@ -2988,7 +2997,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			]),
 		]
 		model = "phi-4b"
-		messages = await self.caption_into(messages, model=model, premium_context=premium_context)
+		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
 			messages=messages,
@@ -3291,6 +3300,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not full:
 			return await asubmit(reqs.next().get, url, headers=Request.header(), stream=True, _timeout_=30)
 		return await Request(url, timeout=timeout, aio=True, ssl=False)
+
+	async def get_file(self, url, limit=None, full=True, timeout=12):
+		# Helper function to get a file from a URL. We use the ts_us() function to generate a unique filename starting with the current timestamp.
+		content = await self.get_request(url, limit=limit, full=full, timeout=timeout)
+		ts = ts_us()
+		fn = f"{CACHE_PATH}/{ts}.bin"
+		with open(fn, "wb") as f:
+			await asubmit(f.write, content)
+		return fn
 
 	def get_colour(self, user) -> int:
 		if user is None:

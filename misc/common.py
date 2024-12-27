@@ -1979,7 +1979,7 @@ class Command(Importable):
 	__call__ = lambda self, **void: None
 
 	parse_name = lambda self: self.__name__.strip("_")
-	parse_description = lambda self: self.description.replace('⟨MIZA⟩', self.bot.user.name).replace('⟨WEBSERVER⟩', self.bot.webserver)
+	parse_description = lambda self: self.description.replace('⟨BOT⟩', self.bot.user.name).replace('⟨WEBSERVER⟩', self.bot.webserver)
 
 	def parse_usage(self):
 		schema = self.schema

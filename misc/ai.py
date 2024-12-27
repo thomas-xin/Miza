@@ -18,6 +18,7 @@ print("AI:", __name__)
 
 endpoints = cdict(
 	openai="https://api.openai.com/v1",
+	deepseek="https://api.deepseek.com/v1",
 	anthropic="https://api.anthropic.com/v1",
 	cohere="https://api.cohere.ai/v1",
 	cohere_trial="https://api.cohere.ai/v1",
@@ -49,6 +50,10 @@ available = {
 	"claude-3-haiku": {
 		"anthropic": ("claude-3-haiku-20240307", ("1", "5")),
 		None: "gpt-4m",
+	},
+	"deepseek-v3": {
+		"deepseek": ("deepseek-chat", ("0.14", "0.28")),
+		None: "gpt-4",
 	},
 	"llama-3-405b": {
 		"deepinfra": ("meta-llama/Meta-Llama-3.1-405B-Instruct", ("1.79", "1.79")),
@@ -101,11 +106,15 @@ available = {
 		None: "llama-3-70b",
 	},
 	"o1": {
-		"openai": ("o1-preview-2024-09-12", ("15", "60")),
+		"openai": ("o1", ("15", "60")),
+		None: "gpt-4",
+	},
+	"o1-preview": {
+		"openai": ("o1-preview", ("15", "60")),
 		None: "gpt-4",
 	},
 	"o1-mini": {
-		"openai": ("o1-mini-2024-09-12", ("3", "12")),
+		"openai": ("o1-mini", ("3", "12")),
 		None: "gpt-4m",
 	},
 	"gpt-4m": {
@@ -217,6 +226,7 @@ is_chat = {
 	"lzlv-70b",
 	"qwen-72b",
 	"o1",
+	"o1-preview",
 	"o1-mini",
 	"gpt-4",
 	"chatgpt-4o-latest",
@@ -230,6 +240,7 @@ is_chat = {
 	"gpt-3.5",
 	"gpt-3.5-turbo-0125",
 	"gpt-3.5-turbo",
+	"deepseek-v3",
 	"firefunction-v2",
 	"firefunction-v1",
 	"firellava-13b",
@@ -280,6 +291,7 @@ is_function = {
 	"command-r-plus",
 	"35b-beta-long",
 	"o1",
+	"o1-preview",
 	"o1-mini",
 	"gpt-4",
 	"chatgpt-4o-latest",
@@ -292,6 +304,7 @@ is_function = {
 	"gpt-3.5",
 	"gpt-3.5-turbo-0125",
 	"gpt-3.5-turbo",
+	"deepseek-v3",
 	"firefunction-v2",
 	"firefunction-v1",
 }
@@ -307,7 +320,7 @@ is_vision = {
 	"llama-3-11b",
 	"llama-3-90b",
 	"o1",
-	"o1-mini",
+	"o1-preview",
 	"gpt-4",
 	"chatgpt-4o-latest",
 	"gpt-4o-2024-05-13",
@@ -328,6 +341,7 @@ is_premium = {
 	"claude-3-sonnet-20240229",
 	"llama-3-405b",
 	"o1",
+	"o1-preview",
 	"o1-mini",
 	"chatgpt-4o-latest",
 	"gpt-4o-2024-05-13",
@@ -375,6 +389,7 @@ contexts = {
 	"llama-3-90b": 131072,
 	"llama-3-405b": 131072,
 	"o1": 128000,
+	"o1-preview": 128000,
 	"o1-mini": 128000,
 	"gpt-4": 128000,
 	"chatgpt-4o-latest": 128000,
@@ -388,6 +403,7 @@ contexts = {
 	"gpt-3.5": 16384,
 	"gpt-3.5-turbo-0125": 16384,
 	"gpt-3.5-turbo-instruct": 4096,
+	"deepseek-v3": 64000,
 	"dbrx-instruct": 32768,
 	"miquliz-120b": 32768,
 	"reflection-llama-3-70b": 8192,
@@ -1526,7 +1542,7 @@ f_browse = {
 			"type": "object", "properties": {
 				"query": {
 					"type": "string",
-					"description": 'Query, eg. "Who won the 2026 world cup?", "https://youtu.be/dQw4w9WgXcQ", "Weather in San Francisco',
+					"description": 'Query, eg. "Who won the 2026 world cup?", "https://youtu.be/dQw4w9WgXcQ", "Weather in San Francisco"',
 				},
 			},
 			"required": ["query"],
@@ -1540,6 +1556,19 @@ f_wolfram_alpha = {
 				"query": {
 					"type": "string",
 					"description": 'Query, eg. "Real solutions for x^3-6x^2+12", "eigenvalues of {{2,3,-3},{4,2,-4},{4,3,-5}}", "randint(1,100)"',
+				},
+			},
+			"required": ["query"],
+}}}
+f_reasoning = {
+	"type": "function", "function": {
+		"name": "reasoning",
+		"description": "Requests for a slower, more powerful language model to provide reasoning. Use if you are unsure about, or if a user is pointing out a flaw in your logic.",
+		"parameters": {
+			"type": "object", "properties": {
+				"query": {
+					"type": "string",
+					"description": 'Query, eg. "oyfjdnisdr rtqwainr acxz mynzbhhx -> Think step by step. Use the example above to decode: oyekaijzdf aaptcg suaokybhai ouow aqht mynznvaatzacdfoulxxz"',
 				},
 			},
 			"required": ["query"],
@@ -1707,6 +1736,7 @@ TOOLS = {
 	"knowledge_internet": [
 		f_browse,
 		f_wolfram_alpha,
+		f_reasoning,
 		# f_sympy,
 		f_myinfo,
 		f_txt2img,
@@ -1719,6 +1749,7 @@ TOOLS = {
 	"calculator": [
 		f_browse,
 		f_wolfram_alpha,
+		f_reasoning,
 		# f_sympy,
 	],
 	"calendar": [
@@ -2235,14 +2266,16 @@ def unimage(message):
 
 
 CL100K_IM = {
-	"o1-preview-2024-09-12",
-	"o1-mini-2024-09-12",
+	"o1",
+	"o1-preview",
+	"o1-mini",
 	"chatgpt-4o-latest",
 	"gpt-4o-2024-05-13",
 	"gpt-4o-mini",
 	"gpt-4o-mini-2024-07-18",
 	"gpt-4-turbo-2024-04-09",
 	"gpt-3.5-turbo-0125",
+	"deepseek-v3",
 	"quill-72b",
 	"databricks/dbrx-instruct",
 	"meta-llama/Meta-Llama-3-70B-Instruct",

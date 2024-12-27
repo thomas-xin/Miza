@@ -1552,17 +1552,18 @@ async def on_connect():
 			# Restore audio players from our cache on disk
 			print(AP.cache.keys())
 			await asyncio.gather(*(reload_player(gid) for gid in AP.cache.keys()))
+		for guild in client.guilds:
+			try:
+				a = await asubmit(AP.from_guild, guild.id)
+			except KeyError:
+				return
+			a.update_activity()
+		AP.cache.sync()
 		print("Audio client successfully connected.")
 
 @client.event
 async def on_ready():
-	for guild in client.guilds:
-		try:
-			a = await asubmit(AP.from_guild, guild.id)
-		except KeyError:
-			return
-		a.update_activity()
-	AP.cache.sync()
+	print("Audio client ready.")
 
 @client.event
 async def on_voice_state_update(member, before, after):

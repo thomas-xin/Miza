@@ -500,7 +500,8 @@ def html_decode(s) -> str:
 @hashable_args
 @functools.lru_cache(maxsize=256)
 def split_across(s, lim=2000, prefix="", suffix="", mode="len", bypass=((), ()), close_codeboxes=True) -> list:
-	"""Splits a string into segments that fit within a specified length limit, considering prefixes, suffixes and code blocks.
+	"""
+	Splits a string into segments that fit within a specified length limit, considering prefixes, suffixes and code blocks.
 	Args:
 		s (str): The string to split.
 		lim (int, optional): Maximum length limit for each segment. Defaults to 2000.
@@ -3854,6 +3855,8 @@ class EvalPipe:
 			mi = bool(self.iterators) and max(max(self.iterators), -min(self.iterators))
 			i = max(mr, mi) + 1
 			if priority:
+				# For high-priority tasks, use negative indices; the worker will assign these to its main thread.
+				# Also required for compatibility with libraries that fail if the main thread is not used.
 				i = -i
 			fut = self.responses[i] = Future()
 		if isinstance(s, str):

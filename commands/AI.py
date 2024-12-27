@@ -195,6 +195,7 @@ class Ask(Command):
 				if input_message:
 					messagelist.append(input_message)
 				m = None
+				modelist = None
 				async for resp in bot.chat_completion(messagelist, model=model, frequency_penalty=pdata.frequency_penalty, presence_penalty=pdata.frequency_penalty * 2 / 3, max_tokens=4096, temperature=pdata.temperature, top_p=pdata.top_p, tool_choice=None, tools=TOOLS, model_router=MODEL_ROUTER, tool_router=TOOL_ROUTER, stop=(), user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
 					if isinstance(resp, dict):
 						if resp.get("cargs"):
@@ -210,6 +211,7 @@ class Ask(Command):
 							else:
 								text += temp
 						if getattr(m, "tool_calls", None):
+							modelist = getattr(m, "modelist", None) or modelist
 							break
 					else:
 						if resp.startswith("\r"):
@@ -315,6 +317,36 @@ class Ask(Command):
 						succ = await rag(name, tid, fut)
 						if not succ:
 							name = "wolfram_alpha"
+					elif name == "reasoning":
+						async def reasoning(q):
+							model = modelist.reasoning if modelist else "o1-mini"
+							if "o1" in model:
+								mt = dict(
+									max_completion_tokens=16384,
+								)
+							else:
+								mt = dict(
+									max_tokens=2048,
+								)
+							resp = await ai.llm(
+								"chat.completions.create",
+								model=model,
+								messages=[
+									cdict(
+										role="user",
+										content=q,
+									),
+								],
+								**mt,
+								premium_context=premium,
+							)
+							return resp.choices[0].message.content
+						argv = kwargs.get("query") or " ".join(kwargs.values())
+						s = f'\n> Thinking "{argv}"...'
+						text += s
+						yield s
+						fut = reasoning(argv)
+						succ = await rag(name, tid, fut)
 					if name == "wolfram_alpha":
 						argv = kwargs.get("query") or " ".join(kwargs.values())
 						s = f'\n> Calculating "{argv}"...'
@@ -614,11 +646,11 @@ class Instruct(Command):
 		model=cdict(
 			type="enum",
 			validation=cdict(
-				enum=["auto", "gpt-3.5", "gpt-4", "gpt-4m", "o1-mini", "o1", "mythomax-13b", "lzlv-70b", "mixtral-8x7b-instruct", "claude-3-opus", "claude-3.5-sonnet", "claude-3-sonnet", "claude-3-haiku", "command-r", "command-r-plus", "35b-beta-long", "qwen-72b", "dbrx-instruct", "mixtral-8x22b-instruct", "wizard-8x22b", "llama-3-8b", "llama-3-70b", "llama-3-405b"],
-				accepts={"llama": "llama-3-70b", "haiku": "claude-3-haiku", "gpt3.5": "gpt-3.5", "sonnet": "claude-3.5-sonnet", "dbrx": "dbrx-instruct", "gpt4": "gpt-4", "gpt-4o": "gpt-4", "gpt-4o-mini": "gpt-4m", "opus": "claude-3-opus"},
+				enum=["auto", "deepseek-v3", "gpt-3.5", "gpt-4", "gpt-4m", "o1-mini", "o1", "mythomax-13b", "lzlv-70b", "mixtral-8x7b-instruct", "claude-3-opus", "claude-3.5-sonnet", "claude-3-sonnet", "claude-3-haiku", "command-r", "command-r-plus", "35b-beta-long", "qwen-72b", "dbrx-instruct", "mixtral-8x22b-instruct", "wizard-8x22b", "llama-3-8b", "llama-3-70b", "llama-3-405b"],
+				accepts={"llama": "llama-3-70b", "haiku": "claude-3-haiku", "deepseek": "deepseek-v3", "gpt3.5": "gpt-3.5", "sonnet": "claude-3.5-sonnet", "dbrx": "dbrx-instruct", "gpt4": "gpt-4", "gpt-4o": "gpt-4", "gpt-4o-mini": "gpt-4m", "opus": "claude-3-opus"},
 			),
 			description="Target LLM to invoke",
-			example="gpt-4m",
+			example="deepseek",
 		),
 		prompt=cdict(
 			type="string",
@@ -674,6 +706,9 @@ class Instruct(Command):
 		),
 		GPT3=cdict(
 			model="gpt-3.5",
+		),
+		Deepseek=cdict(
+			model="deepseek-v3",
 		),
 		Claude=cdict(
 			model="claude-3.5-sonnet",
@@ -740,7 +775,7 @@ class Instruct(Command):
 			kwargs["api"] = oai
 		else:
 			if not model:
-				model = "gpt-4m" if _premium.value < 3 else "gpt-4"
+				model = "deepseek-v3"
 			if model == "gpt-3.5":
 				if prompt and prompt[-1] in ".?!":
 					model = "gpt-3.5"
@@ -748,10 +783,10 @@ class Instruct(Command):
 					model = "gpt-3.5-turbo-instruct"
 			if model in ("claude-3-opus", "o1"):
 				_premium.require(3)
-			elif model in ("gpt-4", "yi-large", "o1-mini"):
+			elif model in ("claude-3.5-sonnet", "claude-3-sonnet", "command-r-plus", "gpt-4", "yi-large", "o1-mini"):
 				_premium.require(2)
-			elif model in ("dbrx-instruct", "claude-3.5-sonnet", "claude-3-sonnet", "gpt-3.5", "gpt-4m", "lzlv-70b", "llama-3-70b", "command-r-plus"):
-				_premium.require(2)
+			elif model in ("dbrx-instruct", "gpt-3.5", "deepseek-v3", "gpt-4m", "lzlv-70b", "llama-3-70b"):
+				_premium.require(1)
 		resp = await bot.force_completion(model=model, prompt=prompt, stream=True, timeout=120, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, max_tokens=max_tokens, premium_context=_premium, allow_alt=False, **kwargs)
 		try:
 			_message.__dict__.setdefault("inits", []).append(resp)
