@@ -1314,6 +1314,8 @@ class Dump(Command):
 						url = message.attachments[0].url
 						link = message.jump_url
 						break
+				if not url:
+					raise LookupError("No valid dump file provided or found.")
 			b = await self.bot.get_request(url)
 			queue = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).load_dump({maybe_json(b).decode('ascii')},{_user.id})")
 			count = len(queue)

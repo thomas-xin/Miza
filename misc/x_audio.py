@@ -184,7 +184,7 @@ class AudioPlayer(discord.AudioSource):
 			pass
 		else:
 			if not self.vc.is_connected():
-				self.vc = None
+				await self.force_disconnect(vcc.guild)
 		if self and self.vc:
 			await cls.ensure_speak(vcc)
 			self.channel = channel
@@ -199,7 +199,7 @@ class AudioPlayer(discord.AudioSource):
 			except asyncio.TimeoutError:
 				pass
 			if not self.vc.is_connected():
-				self.vc = None
+				await self.force_disconnect(vcc.guild)
 		if self and self.vc:
 			await cls.ensure_speak(vcc)
 			self.channel = channel
@@ -222,16 +222,11 @@ class AudioPlayer(discord.AudioSource):
 		try:
 			await self.ensure_speak(vcc)
 			if not self.vc:
-				if member and member.voice:
-					await vcc.guild.change_voice_state(channel=None)
 				try:
-					self.vc = await vcc.connect(timeout=12, reconnect=True)
-				except discord.ClientException:
-					if member and member.guild_permissions.move_members:
-						await member.move_to(None)
-					else:
-						await vcc.guild.change_voice_state(channel=None)
-					self.vc = await vcc.connect(timeout=12, reconnect=True)
+					self.vc = await vcc.connect(timeout=7, reconnect=True)
+				except (discord.ClientException, asyncio.TimeoutError):
+					await self.force_disconnect(vcc.guild)
+					self.vc = await vcc.connect(timeout=7, reconnect=True)
 		except Exception as ex:
 			try:
 				cst(self.waiting[gid].set_exception, ex)
@@ -300,11 +295,23 @@ class AudioPlayer(discord.AudioSource):
 
 	@classmethod
 	async def speak(cls, vcc):
+		"""Overrides speaking permissions in a stage voice channel."""
 		return await Request(
 			f"https://discord.com/api/{api}/guilds/{vcc.guild.id}/voice-states/@me",
 			method="PATCH",
 			authorise=True,
 			data={"suppress": False, "request_to_speak_timestamp": None, "channel_id": vcc.id},
+			aio=True,
+		)
+
+	@classmethod
+	async def force_disconnect(cls, guild):
+		"""Forcibly disconnects the bot from a voice channel, regardless of the current state of discord.py's cache."""
+		return await Request(
+			f"https://discord.com/api/{api}/guilds/{guild.id}/members/{client.user.id}",
+			method="PATCH",
+			authorise=True,
+			data={"channel_id": None},
 			aio=True,
 		)
 
@@ -357,10 +364,7 @@ class AudioPlayer(discord.AudioSource):
 			if self.vc:
 				self.vc.stop()
 				await self.vc.disconnect()
-		if guild.me.guild_permissions.move_members:
-			await guild.me.move_to(None)
-		elif guild.me.voice:
-			await guild.change_voice_state(channel=None)
+		await cls.force_disconnect(guild)
 		if announce:
 			s = ansi_md(
 				f"{colourise('🎵', fg='blue')}{colourise()} Successfully disconnected from {colourise(self.channel.guild, fg='magenta')}{colourise()}. {colourise('🎵', fg='blue')}{colourise()}"
@@ -603,7 +607,7 @@ class AudioPlayer(discord.AudioSource):
 		return await self.announce(s)
 
 	async def announce(self, s, dump=False):
-		if not self.channel or self.settings.get("quiet") or not self.channel.permissions_for(self.channel.guild.me).send_messages:
+		if not dump and (not self.channel or self.settings.get("quiet") or not self.channel.permissions_for(self.channel.guild.me).send_messages):
 			return
 		if dump:
 			b = self.get_dump()
