@@ -1264,71 +1264,28 @@ class Match(Command):
 class Describe(Command):
 	name = ["Description", "Image2Text", "Clip"]
 	description = "Describes the input image."
-	usage = "<url>"
-	example = ("describe https://cdn.discordapp.com/attachments/1088007891195265074/1097359599889289216/6e74595fa98e9c52e2fab6ece4639604.webp",)
+	schema = cdict(
+		url=cdict(
+			type="visual",
+			description="Image, animation or video, supplied by URL or attachment",
+			example="https://mizabot.xyz/favicon",
+			aliases=["i"],
+			required=True,
+		),
+	)
 	rate_limit = (4, 5)
-	_timeout_ = 24
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, bot, message, channel, guild, user, argv, **void):
-		if message.attachments:
-			argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
-		try:
-			url = argv
-			urls = await bot.follow_url(url, best=True, allow=True, limit=1)
-			if not urls:
-				urls = await bot.follow_to_image(argv)
-				if not urls:
-					urls = await bot.follow_to_image(url)
-					if not urls:
-						raise ArgumentError
-			url = urls[0]
-		except (LookupError, ArgumentError):
-			if not argv:
-				url = None
-				try:
-					url = await bot.get_last_image(message.channel)
-				except FileNotFoundError:
-					raise ArgumentError("Please input an image by URL or attachment.")
-			else:
-				raise ArgumentError("Please input an image by URL or attachment.")
-		s = None
-		if is_discord_message_link(url):
-			try:
-				spl = url[url.index("channels/") + 9:].replace("?", "/").split("/", 2)
-				c = await self.bot.fetch_channel(spl[1])
-				m = await self.bot.fetch_message(spl[2], c)
-			except:
-				print_exc()
-			else:
-				s = m.content
-				for e in m.attachments:
-					s += "\n" + e.url
-				for e in m.embeds:
-					if e.title:
-						s += "\n## " + e.title
-					if e.thumbnail and e.thumbnail.url:
-						s += "\n" + e.thumbnail.url
-					if e.description:
-						s += "\n" + e.description
-					if e.image and e.image.url:
-						s += "\n" + e.image.url
-					for f in e.fields:
-						s += "\n### " + f.name
-						s += "\n" + f.value
-					if e.footer and e.footer.text:
-						s += "\n" + e.footer.text
-				return s.strip()
-		if not s:
-			premium = bot.premium_context(user, guild)
-			fut = asubmit(reqs.next().head, url, headers=Request.header(), stream=True)
-			cap = await self.bot.caption(url, best=3 if premium.value >= 4 else 2, premium_context=premium, timeout=24)
-			s = "\n\n".join(filter(bool, cap)).strip()
-			resp = await fut
-			name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
-			author = get_author(user)
-		await bot.send_as_embeds(channel, title=name, author=author, description=s, reference=message)
+	async def __call__(self, bot, _user, _premium, url, **void):
+		fut = asubmit(reqs.next().head, url, headers=Request.header(), stream=True)
+		cap = await self.bot.caption(url, best=3 if _premium.value >= 4 else 2, premium_context=_premium, timeout=24)
+		s = "\n\n".join(filter(bool, cap)).strip()
+		resp = await fut
+		name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
+		return cdict(
+			embed=discord.Embed(description=s, title=name).set_author(**get_author(_user)),
+		)
 
 
 class Random(Command):

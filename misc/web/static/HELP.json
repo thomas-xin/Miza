@@ -522,13 +522,11 @@
 				"Clip"
 			],
 			"description": "Describes the input image.",
-			"usage": "<url>",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 5)",
-			"example": [
-				"describe https://cdn.discordapp.com/attachments/1088007891195265074/1097359599889289216/6e74595fa98e9c52e2fab6ece4639604.webp"
-			],
-			"timeout": "576"
+			"example": [],
+			"timeout": "24"
 		},
 		"Random": {
 			"aliases": [
@@ -1197,7 +1195,7 @@
 				"Load",
 				"Restore"
 			],
-			"description": "Saves or loads the currently playing audio queue state.",
+			"description": "Saves or loads the currently playing audio, including queue and settings, as a re-usable checkpoint file.",
 			"usage": "",
 			"level": "0",
 			"rate_limit": "(1, 2)",

@@ -915,6 +915,8 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 			kwa.pop("repetition_penalty", None)
 		elif sapi in ("cohere", "cohere_trial"):
 			kwa.pop("repetition_penalty", None)
+		elif sapi in ("deepseek",):
+			kwa.pop("repetition_penalty", None)
 		elif sapi == "anthropic":
 			pass
 		if "repetition_penalty" in kwa:

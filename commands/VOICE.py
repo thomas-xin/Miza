@@ -1263,7 +1263,7 @@ class Dump(Command):
 	server_only = True
 	name = ["Dujmpö"]
 	min_display = "0~1"
-	description = "Saves or loads the currently playing audio queue state."
+	description = "Saves or loads the currently playing audio, including queue and settings, as a re-usable checkpoint file."
 	schema = cdict(
 		mode=cdict(
 			type="enum",
@@ -2187,9 +2187,9 @@ class Download(Command):
 	name = ["📥", "Search", "YTDL", "Convert", "Trim", "ConvertOrg"]
 	description = "Searches and/or downloads a song from a YouTube/SoundCloud query or stream link."
 	schema = cdict(
-		query=cdict(
-			type="string",
-			description="The search query or URL of the song to download.",
+		url=cdict(
+			type="url",
+			description="The URL of a song or playlist to download."
 		),
 		format=cdict(
 			type="enum",
@@ -2198,6 +2198,10 @@ class Download(Command):
 			),
 			description="Output format of the downloaded file.",
 			default="opus",
+		),
+		query=cdict(
+			type="text",
+			description="A search query to look for a song or video.",
 		),
 		start=cdict(
 			type="timedelta",
@@ -2237,24 +2241,27 @@ class Download(Command):
 		await self.bot.send_with_file(channel, file=file, reference=message)
 		await self.bot.silent_delete(response)
 
-	async def __call__(self, bot, _channel, _message, query, format, start, end, **void):
-		if not query:
+	async def __call__(self, bot, _channel, _message, url, format, query, start, end, **void):
+		if not query and not url:
 			raise IndexError("Please input a search term or URL.")
-		query = verify_search(query)
-		res = await Request(
-			f"https://api.mizabot.xyz/ytdl?q={quote_plus(query)}",
-			json=True,
-			aio=True,
-		)
-		if not res:
-			raise LookupError(f"No results found for {query}.")
-		if len(res) == 1 and is_url(query):
+		if query and not url:
+			query = verify_search(query)
+			res = await Request(
+				f"https://api.mizabot.xyz/ytdl?q={quote_plus(query)}",
+				json=True,
+				aio=True,
+			)
+			if not res:
+				raise LookupError(f"No results found for {query}.")
+			if len(res) == 1:
+				url = res[0].url
+		if url:
 			# If only one result is found and the input is a URL, directly download it
 			# TODO: Implement direct download
 			return await self.download_single(
 				channel=_channel,
 				message=_message,
-				url=query,
+				url=url,
 				fmt=format or "opus",
 				start=start,
 				end=end,

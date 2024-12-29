@@ -1099,6 +1099,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def as_file(self, file, filename=None):
 		if isinstance(file, str):
 			file = open(file, "rb")
+		elif hasattr(file, "fp"):
+			file = file.fp
 		url = Request(
 			f"https://api.mizabot.xyz/upload?filename={filename}&hash={filename}",
 			method="POST",
@@ -1622,7 +1624,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 									if is_url(u):
 										found.append(u)
 					if found:
-						for u in found:
+						for u in filter(bool, found):
 							# Do not attempt to find the same URL twice
 							if u in it:
 								continue
@@ -1667,7 +1669,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							elif resp["url"] != url:
 								url = resp["url"]
 							else:
-								url = resp.get("video") or resp.get("stream") or resp.get("thumbnail") or resp.get("url")
+								url = resp.get("video") or resp.get("stream") or resp.get("thumbnail") or resp.get("url") or url
 				out.append(url)
 		if lost:
 			out.extend(lost)
@@ -4966,7 +4968,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if getattr(message, "reference", None):
 						urls = await self.follow_url(message, ytd=False)
 						if urls and not is_discord_message_link(urls[0]):
-							url = url
+							url = urls[0]
 					if not url:
 						try:
 							url = await bot.get_last_image(message.channel)

@@ -15,7 +15,7 @@ from urllib.parse import quote_plus, unquote_plus
 import orjson
 import numpy as np
 import psutil
-from .asyncs import csubmit, esubmit, asubmit, wrap_future, cst, eloop
+from .asyncs import csubmit, esubmit, asubmit, wrap_future, cst, eloop, Delay
 from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_str, astype
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, TEMP_PATH, FileHashDict, EvalPipe, Request, api,
@@ -730,7 +730,7 @@ class AudioPlayer(discord.AudioSource):
 				self.playing[0].new = False
 				csubmit(self.announce_play(self.queue[0]))
 			self.last_played = utc()
-		if (not out or self.playing[0].pos / 50 >= self.queue[0].get("end", inf)) and (self.playing and self.queue):
+		if (self.playing and self.queue) and (not out or self.playing[0].pos / 50 >= self.queue[0].get("end", inf)):
 			self.skip(0, loop=self.settings.loop, repeat=self.settings.repeat, shuffle=self.settings.shuffle)
 			if not out and self.playing:
 				return self.read()
@@ -885,13 +885,20 @@ class AudioPlayer(discord.AudioSource):
 	def clear(self):
 		"""Clears the queue and stops all audio."""
 		for entry in tuple(self.playing):
-			entry.close()
+			try:
+				entry.close()
+			except Exception:
+				print_exc()
 		self.playing.clear()
 		self.queue.clear()
 		if self.updating_activity:
 			self.updating_activity.cancel()
 		if self.updating_streaming:
 			self.updating_streaming.cancel()
+
+	def backup(self):
+		if self.queue and self.vcc:
+			AP.cache[self.vcc.guild.id] = (self.vcc.id, self.channel and self.channel.id, self.get_dump(), [m.id for m in self.vcc.members])
 
 	def is_opus(self):
 		return True
@@ -1541,12 +1548,26 @@ async def reload_player(gid):
 async def unload_player(gid):
 	with tracebacksuppressor:
 		a = AP.players[gid]
-		if a.queue:
-			AP.cache[gid] = (a.vcc.id, a.channel and a.channel.id, a.get_dump(), [m.id for m in a.vcc.members])
+		a.backup()
 		await a.leave(
 			reason="Temporary maintenance",
 			dump=bool(a.queue),
 		)
+
+async def autosave_loop():
+	while not client.is_closed():
+		with tracebacksuppressor:
+			await client.wait_until_ready()
+			async with Delay(60):
+				for guild in client.guilds:
+					try:
+						a = await asubmit(AP.from_guild, guild.id)
+					except KeyError:
+						AP.cache.pop(guild.id, None)
+						continue
+					a.backup()
+					a.update_activity()
+				AP.cache.sync()
 
 @client.event
 async def on_connect():
@@ -1556,12 +1577,6 @@ async def on_connect():
 			# Restore audio players from our cache on disk
 			print(AP.cache.keys())
 			await asyncio.gather(*(reload_player(gid) for gid in AP.cache.keys()))
-		for guild in client.guilds:
-			try:
-				a = await asubmit(AP.from_guild, guild.id)
-			except KeyError:
-				return
-			a.update_activity()
 		AP.cache.sync()
 		print("Audio client successfully connected.")
 
@@ -1599,4 +1614,5 @@ if __name__ == "__main__":
 
 	ytdl_fut.add_done_callback(startup)
 	discord.client._loop = eloop
+	csubmit(autosave_loop())
 	eloop.run_until_complete(client.start(AUTH["discord_token"]))
