@@ -2233,7 +2233,7 @@ class Download(Command):
 		resp = await asubmit(requests.get, downloader_url, verify=False)
 		response = await fut
 		print(resp.headers)
-		file = CompatFile(resp.content, resp.headers["Content-Disposition"].split("filename=", 1)[-1].strip('"'))
+		file = CompatFile(resp.content, resp.headers["Content-Disposition"].split("=", 1)[-1].strip('"'))
 		response = await self.bot.edit_message(
 			response,
 			content=italics(ini_md(f"Uploading {file.filename}...")),

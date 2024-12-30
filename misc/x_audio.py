@@ -185,6 +185,7 @@ class AudioPlayer(discord.AudioSource):
 		else:
 			if not self.vc.is_connected():
 				await self.force_disconnect(vcc.guild)
+				self.vc = None
 		if self and self.vc:
 			await cls.ensure_speak(vcc)
 			self.channel = channel
@@ -200,6 +201,7 @@ class AudioPlayer(discord.AudioSource):
 				pass
 			if not self.vc.is_connected():
 				await self.force_disconnect(vcc.guild)
+				self.vc = None
 		if self and self.vc:
 			await cls.ensure_speak(vcc)
 			self.channel = channel
