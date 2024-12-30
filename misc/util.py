@@ -3492,6 +3492,43 @@ def fuzzy_substring(sub, s, match_start=False, match_length=True):
 	ratio = max(0, match / len(s))
 	return ratio
 
+def longest_sublist(lst, predicate):
+	"Returns the longest contiguous sublist of a list that satisfies a predicate. For example, if the predicate is `lambda a: all(a[i] < a[i + 1] for i in range(len(a) - 1))`, the function will return the longest sorted sublist. Note that for our implementation, we may sometimes need to keep two buffers for the sliding window, as a contiguous sublist may not fulfil the predicate if cut off; for example, if our predicate is instead a function which parses a string and returns a time delta, it may consider the string `2 hours` and `3 minutes` as valid, but not `2 hours 3`, so we would need to keep the first buffer temporarily to be able to validate the string `2 hours 3 minutes`."
+	if not lst:
+		return [], -1
+	max_len = 0
+	max_start = 0
+	curr_len = 0
+	curr_start = 0
+	curr_buf = []
+	prev_buf = []
+	for i in range(len(lst)):
+		curr_buf.append(lst[i])
+		if predicate(curr_buf):
+			if prev_buf:
+				if predicate(prev_buf + curr_buf):
+					curr_buf = prev_buf + curr_buf
+					curr_start -= len(prev_buf)
+					prev_buf = []
+				else:
+					prev_buf = []
+			curr_len = len(curr_buf)
+			if curr_len > max_len:
+				max_len = curr_len
+				max_start = curr_start
+		else:
+			prev_buf = curr_buf[:-1]
+			curr_buf = [lst[i]]
+			curr_start = i
+	if len(curr_buf) > max_len and predicate(curr_buf):
+		return curr_buf, curr_start
+	if len(prev_buf) + len(curr_buf) > max_len and predicate(prev_buf + curr_buf):
+		return prev_buf + curr_buf, curr_start - len(prev_buf)
+	final = lst[max_start:max_start + max_len]
+	if predicate(final):
+		return final, max_start
+	return [], -1
+
 
 RAINBOW = [
 	"\x1b[38;5;196m",

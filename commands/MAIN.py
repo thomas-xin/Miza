@@ -1110,7 +1110,7 @@ class Reminder(Command):
 	description = "Sets a reminder for a certain date and time in the future."
 	schema = cdict(
 		message=cdict(
-			type="word",
+			type="string",
 			description="Message to receive. Will show up as an embed",
 			example="Doctor's appointment",
 		),
@@ -1195,6 +1195,8 @@ class Reminder(Command):
 			# s = "$" + str(t)
 			# seq = set_dict(bot.data.reminders, s, deque())
 			# seq.append(sendable.id)
+		elif time is None:
+			raise ValueError("Please input a valid time.")
 		dt = time
 		rem = cdict(
 			user=_user.id,

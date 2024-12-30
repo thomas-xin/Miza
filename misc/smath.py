@@ -79,10 +79,11 @@ utc_ft = lambda s: datetime.datetime.fromtimestamp(s, tz=datetime.timezone.utc).
 utc_dt = lambda: datetime.datetime.now(tz=datetime.timezone.utc).replace(tzinfo=None)
 utc_ddt = lambda: DynamicDT.utcnow()
 zerot = lambda: utc_dt().replace(hour=0, minute=0, second=0)
-sec2time = lambda s: str(TimeDelta(seconds=round(s, 4)))
+sec2time = lambda s: str(TimeDelta(seconds=fractions.Fraction(round(s * 10000), 10000)))
 time_repr = lambda s, mode="R": f"<t:{round(s)}:{mode}>"
 time_delta = lambda s: str(TimeDelta(seconds=s))
-time_until = lambda s: str(DynamicDT.utcnow() - DynamicDT.utcfromtimestamp(s))
+time_until = lambda s: str(DynamicDT.utcfromtimestamp(s) - DynamicDT.utcnow())
+time_after = lambda s: str(DynamicDT.utcnow() - DynamicDT.utcfromtimestamp(s))
 utc_ts = lambda s: s.replace(tzinfo=datetime.timezone.utc).timestamp()
 to_utc = lambda dt: dt.replace(tzinfo=datetime.timezone.utc)
 

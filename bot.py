@@ -2176,10 +2176,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		for i, (m, urls) in enumerate(zip(messages, follows)):
 			if not urls:
 				continue
+			if m.get("url"):
+				for url in list(urls) + [m.get("url")]:
+					if not url:
+						continue
+					m.content = m.content.replace(url, "", 1).strip()
 			if model in ai.is_vision and m.get("role") != "assistant":
 				futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
 				extracts[i] = csubmit(gather(*futs))
-			elif backup_model and i == 0 and m.get("role") != "assistant":
+			elif i == 0 and backup_model and backup_model in is_vision and m.get("role") != "assistant":
 				futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
 				extracts[i] = csubmit(gather(*futs))
 				model = backup_model
@@ -2374,7 +2379,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						break
 			toolcheck.append(messages[0])
 			toolcheck.reverse()
-			toolcheck, toolmodel = await self.caption_into(toolcheck, model=modelist.function, premium_context=premium_context)
+			vision_alt = modelist.vision if modelist.function not in is_vision and modelist.vision in is_function else modelist.function
+			toolcheck, toolmodel = await self.caption_into(toolcheck, model=modelist.function, backup_model=vision_alt, premium_context=premium_context)
 			mode = None
 			label = "instructive"
 			try:
@@ -4958,47 +4964,37 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if "-" in k:
 				kwargs[k.replace("-", "_")] = kwargs.pop(k)
 		args = alist(spl[0]._get_args() + spl[1])
-		if not args:
+		if args:
 			for k, v in schema.items():
-				if k in kwargs or not v.get("required"):
+				if k in kwargs:
 					continue
 				r = None
-				if v.type in ("image", "visual", "video"):
-					url = None
-					if getattr(message, "reference", None):
-						urls = await self.follow_url(message, ytd=False)
-						if urls and not is_discord_message_link(urls[0]):
-							url = urls[0]
-					if not url:
+				# Datetime and timedelta are greedy arguments that attempt to match as many contiguous words as possible; e.g. "2021 12 31" turns into a single datetime object
+				if v.type == "datetime":
+					def try_parse_date(s):
 						try:
-							url = await bot.get_last_image(message.channel)
-						except FileNotFoundError:
-							pass
-					if url:
-						r = url
-				elif v.type == "message":
-					reference = getattr(message, "reference", None)
-					if reference:
-						r = await self.fetch_message(reference.message_id, message.channel)
-					else:
-						r = message
-				elif v.type in ("mentionable", "user"):
-					r = user
-				elif v.type == "channel":
-					r = channel
-				elif v.type == "guild":
-					r = guild
-				elif v.type == "role":
-					if getattr(user, "roles", None):
-						r = user.roles[-1]
-				elif v.type in ("media", "audio") and guild.me.voice:
-					auds = bot.data.audio.players[guild.id]
-					if auds.queue and auds.queue[0].url:
-						r = auds.queue[0].url
+							DynamicDT.parse(s)
+						except Exception:
+							return False
+						return True
+					extracted, index = longest_sublist(args, lambda x: try_parse_date(" ".join(x)))
+					if extracted:
+						r = DynamicDT.parse(" ".join(extracted))
+						args.pops(range(index, index + len(extracted)))
+				elif v.type == "timedelta":
+					def try_parse_timedelta(s):
+						try:
+							DynamicDT.parse_delta(s)
+						except Exception:
+							return False
+						return True
+					extracted, index = longest_sublist(args, lambda x: try_parse_timedelta(" ".join(x)))
+					if extracted:
+						r = DynamicDT.parse_delta(" ".join(extracted))
+						args.pops(range(index, index + len(extracted)))
 				if r:
 					kwargs[k] = [r] if v.get("multiple") else r
 					continue
-				raise ArgumentError(f"Argument {k} ({v.description}) is required.")
 		oj = 0
 		pops = []
 		for i, a in enumerate(args):
@@ -5111,6 +5107,47 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				kwargs[k] = args.pop(0)
 				if not args:
 					break
+		if not args:
+			for k, v in schema.items():
+				if k in kwargs or not v.get("required"):
+					continue
+				r = None
+				if v.type in ("image", "visual", "video"):
+					url = None
+					if getattr(message, "reference", None):
+						urls = await self.follow_url(message, ytd=False)
+						if urls and not is_discord_message_link(urls[0]):
+							url = urls[0]
+					if not url:
+						try:
+							url = await bot.get_last_image(message.channel)
+						except FileNotFoundError:
+							pass
+					if url:
+						r = url
+				elif v.type == "message":
+					reference = getattr(message, "reference", None)
+					if reference:
+						r = await self.fetch_message(reference.message_id, message.channel)
+					else:
+						r = message
+				elif v.type in ("mentionable", "user"):
+					r = user
+				elif v.type == "channel":
+					r = channel
+				elif v.type == "guild":
+					r = guild
+				elif v.type == "role":
+					if getattr(user, "roles", None):
+						r = user.roles[-1]
+				elif v.type in ("media", "audio") and guild.me.voice:
+					auds = bot.data.audio.players[guild.id]
+					if auds.queue and auds.queue[0].url:
+						r = auds.queue[0].url
+				if r:
+					kwargs[k] = [r] if v.get("multiple") else r
+					continue
+				raise ArgumentError(f"Argument {k} ({v.description}) is required.")
 		if append_lws:
 			k, j = append_lws
 			if j < len(ws):

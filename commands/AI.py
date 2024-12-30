@@ -291,7 +291,7 @@ class Ask(Command):
 							c = await tcount(res)
 							ra = 1 if premium.value < 2 else 1.5 if premium.value < 5 else 2
 							if c > round(4000 * ra):
-								res = await bot.summarise(res, max_length=round(19600 * ra), min_length=round(3200 * ra), best=2 if premium.value >= 2 else 1, prompt=prompt)
+								res = await ai.summarise(res, max_length=round(19600 * ra), min_length=round(3200 * ra), best=2 if premium.value >= 2 else 1, prompt=prompt)
 								res = res.replace("\n", ". ").replace(": ", " -")
 							res = res.strip()
 						rs_msg = cdict(role="tool", name=name, content=res, tool_call_id=tid)

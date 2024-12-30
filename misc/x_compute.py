@@ -1240,10 +1240,10 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			command.extend(("-pix_fmt", "yuva420p", "-c:v", "libsvtav1"))
 			# fmt = "webm"
 		else:
-			if hwaccel == "cuda":
-				command.extend(("-pix_fmt", "yuv420p", "-c:v", "hevc_nvenc"))
-			else:
-				command.extend(("-pix_fmt", "yuv420p", "-c:v", "h265"))
+			# if hwaccel == "cuda":
+			# 	command.extend(("-pix_fmt", "yuv420p", "-c:v", "hevc_nvenc"))
+			# else:
+			command.extend(("-pix_fmt", "yuv420p", "-c:v", "libsvtav1"))
 			# fmt = "mp4"
 		command.extend(("-f", fmt))
 	return command, fmt
@@ -1438,7 +1438,7 @@ def evalImg(url, operation, args):
 			if fmt == "auto":
 				if getattr(first, "audio", None) or new["count"] * np.prod(size) > 1073741824:
 					fmt = "mp4"
-					cdc = "h264"
+					cdc = "libsvtav1"
 				else:
 					fmt = "gif"
 			out = "cache/" + str(ts) + "." + fmt
