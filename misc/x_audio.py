@@ -357,7 +357,7 @@ class AudioPlayer(discord.AudioSource):
 		try:
 			self = cls.players.pop(gid)
 		except KeyError:
-			pass
+			await cls.force_disconnect(guild)
 		else:
 			if not self.fut.done():
 				self.fut.set_exception(si)
@@ -366,7 +366,6 @@ class AudioPlayer(discord.AudioSource):
 			if self.vc:
 				self.vc.stop()
 				await self.vc.disconnect()
-		await cls.force_disconnect(guild)
 		if announce:
 			s = ansi_md(
 				f"{colourise('🎵', fg='blue')}{colourise()} Successfully disconnected from {colourise(self.channel.guild, fg='magenta')}{colourise()}. {colourise('🎵', fg='blue')}{colourise()}"
@@ -1562,13 +1561,15 @@ async def autosave_loop():
 			await client.wait_until_ready()
 			async with Delay(60):
 				for guild in client.guilds:
-					try:
-						a = await asubmit(AP.from_guild, guild.id)
-					except KeyError:
+					a = AP.players.get(guild.id)
+					if not a:
 						AP.cache.pop(guild.id, None)
 						continue
 					a.backup()
-					a.update_activity()
+					if a.updating_activity is None:
+						a.update_activity()
+					if a.updating_streaming is None:
+						a.update_streaming()
 				AP.cache.sync()
 
 @client.event

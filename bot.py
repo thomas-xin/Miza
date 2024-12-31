@@ -4341,8 +4341,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				self.llc = utc()
 		try:
-			audio_players, playing_players = await self.audio.asubmit("len(AP.players),sum(bool(p.vc) and bool(p.queue) and p.is_playing() for p in AP.players.values())")
-		except AttributeError:
+			audio_players, playing_players = await asyncio.wait_for(self.audio.asubmit("len(AP.players),sum(bool(p.vc) and bool(p.queue) and p.is_playing() for p in AP.players.values())"), timeout=2)
+		except (AttributeError, asyncio.TimeoutError):
 			audio_players = playing_players = playing_audio_players = "N/A"
 		files = os.listdir("misc")
 		for f in files:
