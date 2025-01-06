@@ -21,6 +21,7 @@ import random
 import re
 import shlex
 import shutil
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -191,11 +192,12 @@ def force_kill(proc):
 		proc.kill()
 
 def get_free_port():
-	engaged = set(s.laddr.port for s in psutil.net_connections())
-	choices = set(range(32768, 65536)).difference(engaged)
-	if not choices:
-		raise ValueError("No inbound TCP ports available.")
-	return random.choice(tuple(choices))
+	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	try:
+		sock.bind(("127.0.0.1", 0))
+		return sock.getsockname()[-1]
+	finally:
+		sock.close()
 
 def esafe(s, binary=False):
 	return (d := as_str(s).replace("\n", "\uffff")) and (d.encode("utf-8") if binary else d)
@@ -3742,7 +3744,7 @@ class EvalPipe:
 
 	MEMS = globals()["MEMS"]
 
-	def __init__(self, p_alive, p_in, p_out, p_kill=None, p_join=None, writable=True, start=True, glob=globals(), id=0, server=None):
+	def __init__(self, p_alive, p_in, p_out, p_kill=None, p_join=None, writable=True, start=True, glob=globals(), id=0, server=None, address=None, port=None):
 		self.rlock = threading.Lock()
 		self.wlock = threading.Lock()
 		self.responses = {}
@@ -3759,13 +3761,15 @@ class EvalPipe:
 		self.id = id
 		self.thread = None
 		self.server = server
+		self.address = address
+		self.port = port
 		if start:
 			self.start()
 
 	key = b"EvalPipe"
 	@classmethod
-	def connect(cls, args, port, independent=True, glob=globals(), timeout=60):
-		addr = ("127.0.0.1", port)
+	def connect(cls, args, port, address="127.0.0.1", independent=True, glob=globals(), timeout=60):
+		addr = (address, port)
 		print(f"{DynamicDT.now()}: EvalPipe connecting to", addr)
 		try:
 			conn = multiprocessing.connection.Client(addr, authkey=cls.key)
@@ -3802,21 +3806,37 @@ class EvalPipe:
 		proc = psutil.Process(pid)
 		self = cls(
 			proc.is_running,
-			lambda b: share_bytes(conn.send_bytes, b),
+			(lambda b: share_bytes(conn.send_bytes, b)) if address == "127.0.0.1" else conn.send_bytes,
 			None,
 			proc.terminate,
 			proc.wait,
 			glob=glob,
 			id=port,
+			address=address,
+			port=port,
 		)
-		self.p_out = lambda: receive_bytes(conn.recv_bytes, unlink=lambda name: self.submit(f"EvalPipe.MEMS.pop({repr(name)}).close()"))
+		self.p_out = (lambda: receive_bytes(conn.recv_bytes, unlink=lambda name: self.submit(f"EvalPipe.MEMS.pop({repr(name)}).close()"))) if address == "127.0.0.1" else conn.recv_bytes
 		self.proc = proc
 		return self
 
 	@classmethod
-	def listen(cls, port=0, glob=globals(), start=False):
-		addr = ("127.0.0.1", port)
-		server = multiprocessing.connection.Listener(addr, authkey=cls.key)
+	def listen(cls, port=0, address="127.0.0.1", glob=globals(), start=False):
+		addr = (address, port)
+		attempts = 4
+		for i in range(attempts):
+			try:
+				server = multiprocessing.connection.Listener(addr, authkey=cls.key)
+			except PermissionError:
+				if i < attempts - 1:
+					time.sleep(i ** 2 + 1)
+					continue
+				print("Failed address:", address, port)
+				raise
+			except Exception:
+				print("Failed address:", address, port)
+				raise
+			else:
+				break
 		print(f"{DynamicDT.now()}: EvalPipe listening on", server.address)
 		return cls(
 			lambda: True,
@@ -3829,6 +3849,8 @@ class EvalPipe:
 			id=port + 3,
 			server=server,
 			start=start,
+			address=address,
+			port=port,
 		)
 
 	@classmethod
@@ -3974,8 +3996,8 @@ class EvalPipe:
 					conn = self.server.accept()
 					print("New connection:", conn)
 					conn.send(os.getpid())
-					self.p_in = lambda b: share_bytes(conn.send_bytes, b)
-					self.p_out = lambda: receive_bytes(conn.recv_bytes, unlink=lambda name: self.run(f"EvalPipe.MEMS.pop({repr(name)}).close()"))
+					self.p_in = (lambda b: share_bytes(conn.send_bytes, b)) if self.address == "127.0.0.1" else conn.send_bytes
+					self.p_out = (lambda: receive_bytes(conn.recv_bytes, unlink=lambda name: self.run(f"EvalPipe.MEMS.pop({repr(name)}).close()"))) if self.address == "127.0.0.1" else conn.recv_bytes
 					self.p_kill = conn.close
 					self.p_join = lambda: None
 					self.writable = True

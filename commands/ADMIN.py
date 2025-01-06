@@ -85,6 +85,7 @@ class Perms(Command):
 
 
 class Purge(Command):
+	server_only = True
 	time_consuming = True
 	_timeout_ = 16
 	name = ["🗑", "Del", "Delete", "Purge_Range"]

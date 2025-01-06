@@ -1573,7 +1573,7 @@ def spec2cap(skip=False):
 		caps = [[], "math"]
 		if cc > 3 and ram > (rm * 8 - 2) * g and ffmpeg:
 			caps.append("image")
-		if cc > 5 and ram > (rm * 32 - 2) * g and tesseract:
+		if cc > 5 and ram > (rm * 14 - 2) * g and tesseract:
 			caps.append("caption")
 		mc -= 1
 		rm += 1
@@ -1906,6 +1906,8 @@ class Command(Importable):
 	"Basic abstract inheritable class for all bot commands."
 	description = ""
 	schema = None
+	server_only = False
+	nsfw = False
 	usage = ""
 	min_level = 0
 	rate_limit = (2, 3)

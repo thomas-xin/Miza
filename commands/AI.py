@@ -98,7 +98,11 @@ class Ask(Command):
 		else:
 			ac = "You are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, please use disclaimers in your response, and point users in the correct direction."
 		personality += "\n" + ac
-		personality += f"\nCurrent Time/Knowledge Cutoff: {utc_dt()}"
+		tzinfo = self.bot.data.users.get_timezone(_user.id)
+		if tzinfo is None:
+			tzinfo, _c = self.bot.data.users.estimate_timezone(_user.id)
+		dt = DynamicDT.now(tz=tzinfo)
+		personality += f"\nCurrent Time/Knowledge Cutoff: {dt.as_full()}"
 		system_message = cdict(
 			role="system",
 			content=personality,
@@ -984,17 +988,17 @@ class Imagine(Command):
 				prompt = "imagine art " + str(ts_us())[::-1] if mode == "preprocess" else "art"
 		if mode == "caption":
 			url = mask = None
+		mod_resp = await ai.moderate("Create an image of: " + prompt, premium_context=_premium)
 		if prompt and not nsfw:
-			resp = await ai.moderate("Create an image of: " + prompt, premium_context=_premium)
-			flagged = nsfw_flagged(resp)
+			flagged = nsfw_flagged(mod_resp)
 			if not nsfw and flagged:
 				raise PermissionError(
 					f"Apologies, my AI has detected that your input may be inappropriate: {flagged}.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
 			if flagged:
-				print("Flagged:", resp)
-				if resp.categories.sexual:
+				print("Flagged:", mod_resp)
+				if mod_resp.categories.sexual:
 					nsfw_prompt = True
 			negative_prompt = negative_prompt or ", ".join(set(("watermark", "blurry", "distorted", "disfigured", "bad anatomy", "poorly drawn")).difference(smart_split(prompt)))
 		if not prompt:
@@ -1082,63 +1086,74 @@ class Imagine(Command):
 		# print("PROMPT:", eprompts or prompt)
 		await bot.require_integrity(_message)
 
-		if amount2 < amount:
-			if model in ("dalle3", "dalle2"):
-				dalle = "2" if model == "dalle2" else "3"
-				ar = float(aspect_ratio) or 1
-				if url:
-					raise NotImplementedError(f"Dall·E {model} interface currently does not support image prompts.")
-				resp_model = f"dall-e-{dalle}"
-				if model == "dalle2":
-					if max(ar, 1 / ar) < 1.1:
-						size = "1024x1024"
-					else:
-						raise ValueError(f"Dall·E {model} interface currently only supports 1:1 aspect ratio.")
-					prompt = eprompts.next()
-					prompt = lim_str(prompt, 1000)
-					c = amount - amount2
-					response = await ai.get_oai("images.generate")(
+		if amount2 < amount and model in ("dalle3", "dalle2"):
+			dalle = "2" if model == "dalle2" else "3"
+			ar = float(aspect_ratio) or 1
+			if url:
+				raise NotImplementedError(f"Dall·E {model} interface currently does not support image prompts.")
+			resp_model = f"dall-e-{dalle}"
+			if model == "dalle2":
+				if max(ar, 1 / ar) < 1.1:
+					size = "1024x1024"
+				else:
+					raise ValueError(f"Dall·E {model} interface currently only supports 1:1 aspect ratio.")
+				prompt = eprompts.next()
+				prompt = lim_str(prompt, 1000)
+				c = amount - amount2
+				response = await ai.get_oai("images.generate")(
+					model=resp_model,
+					prompt=prompt,
+					size=size,
+					n=c,
+					user=str(hash(str(_user))),
+				)
+				images = response.data
+				cost = "0.02"
+				if c > 1:
+					cost = str(mpf(cost) * c)
+				_premium.append(["openai", resp_model, cost])
+				pnames.extend([prompt] * len(images))
+			elif model == "dalle3":
+				if max(ar, 1 / ar) < 1.1:
+					size = "1024x1024"
+				elif max(ar / 1.75, 1.75 / ar) < 1.1:
+					size = "1792x1024"
+				elif max(ar * 1.75, 1 / 1.75 / ar) < 1.1:
+					size = "1024x1792"
+				else:
+					raise ValueError(f"Dall·E {model} interface currently only supports 1:1, 7:4 and 4:7 aspect ratios.")
+				q = "hd" if high_quality else "standard"
+				futn = []
+				for i in range(amount - amount2):
+					fut = csubmit(ai.get_oai("images.generate")(
 						model=resp_model,
-						prompt=prompt,
+						prompt=lim_str(eprompts.next(), 4000),
 						size=size,
-						n=c,
+						quality=q,
+						n=1,
+						style="natural" if i else "vivid",
 						user=str(hash(str(_user))),
-					)
-					images = response.data
-					cost = "0.02"
-					if c > 1:
-						cost = str(mpf(cost) * c)
-					_premium.append(["openai", resp_model, cost])
-					pnames.extend([prompt] * len(images))
-				elif model == "dalle3":
-					if max(ar, 1 / ar) < 1.1:
-						size = "1024x1024"
-					elif max(ar / 1.75, 1.75 / ar) < 1.1:
-						size = "1792x1024"
-					elif max(ar * 1.75, 1 / 1.75 / ar) < 1.1:
-						size = "1024x1792"
-					else:
-						raise ValueError(f"Dall·E {model} interface currently only supports 1:1, 7:4 and 4:7 aspect ratios.")
-					q = "hd" if high_quality else "standard"
-					futn = []
-					for i in range(amount - amount2):
-						fut = csubmit(ai.get_oai("images.generate")(
-							model=resp_model,
+					))
+					futn.append(fut)
+				images = []
+				for fut in futn:
+					try:
+						response = await fut
+					except openai.RateLimitError:
+						print_exc()
+						await asyncio.sleep(60)
+						response = await ai.get_oai("images.generate")(
+							model=f"dall-e-{dalle}",
 							prompt=lim_str(eprompts.next(), 4000),
 							size=size,
-							quality=q,
+							quality="standard",
 							n=1,
-							style="natural" if i else "vivid",
+							style="natural",
 							user=str(hash(str(_user))),
-						))
-						futn.append(fut)
-					images = []
-					for fut in futn:
+						)
+					except Exception:
+						print_exc()
 						try:
-							response = await fut
-						except openai.RateLimitError:
-							print_exc()
-							await asyncio.sleep(60)
 							response = await ai.get_oai("images.generate")(
 								model=f"dall-e-{dalle}",
 								prompt=lim_str(eprompts.next(), 4000),
@@ -1149,32 +1164,106 @@ class Imagine(Command):
 								user=str(hash(str(_user))),
 							)
 						except Exception:
+							if amount <= 1:
+								raise
 							print_exc()
-							try:
-								response = await ai.get_oai("images.generate")(
-									model=f"dall-e-{dalle}",
-									prompt=lim_str(eprompts.next(), 4000),
-									size=size,
-									quality="standard",
-									n=1,
-									style="natural",
-									user=str(hash(str(_user))),
-								)
-							except Exception:
-								if amount <= 1:
-									raise
-								print_exc()
-								print("SKIPPED")
-								continue
-						images.append(response.data[0])
-						pnames.append(response.data[0].revised_prompt)
-						if size == "1024x1024":
-							cost = "0.08" if q == "hd" else "0.04"
-						else:
-							cost = "0.12" if q == "hd" else "0.08"
-						_premium.append(["openai", resp_model, cost])
-				futs.extend(csubmit(Request(im.url, timeout=48, aio=True)) for im in images)
-				amount2 += len(images)
+							print("SKIPPED")
+							continue
+					images.append(response.data[0])
+					pnames.append(response.data[0].revised_prompt)
+					if size == "1024x1024":
+						cost = "0.08" if q == "hd" else "0.04"
+					else:
+						cost = "0.12" if q == "hd" else "0.08"
+					_premium.append(["openai", resp_model, cost])
+			futs.extend(csubmit(Request(im.url, timeout=48, aio=True)) for im in images)
+			amount2 += len(images)
+		if amount2 < amount and (AUTH.get("deepinfra_key") and not url or AUTH.get("together_key")):
+			use_together = bool(AUTH.get("together_key")) and not mod_resp.flagged
+			if url:
+				url = await bot.to_data_url(url)
+			resp_model = "black-forest-labs/FLUX.1-redux" if url else "black-forest-labs/FLUX.1-schnell-Free" if use_together else "black-forest-labs/FLUX-1-schnell"
+			c = amount - amount2
+			ms = 1024 if high_quality else 768
+			x, y = max_size(aspect_ratio or 1, 1, ms, force=True)
+			if x > 2048:
+				y *= 2048 / x
+				x = 2048
+			if y > 2048:
+				x *= 2048 / y
+				y = 2048
+			if x < 128:
+				x = 128
+			if y < 128:
+				y = 128
+			d = 2
+			w, h = (round(x / d) * d, round(y / d) * d)
+			queue = []
+			c2 = c
+			while c2 > 0:
+				n = round_random(min(4, c2, amount / dups))
+				p = eprompts.next()
+				steps = max(1, round_random(num_inference_steps / 8))
+				if use_together:
+					fut = csubmit(Request(
+						"https://api.together.xyz/v1/images/generations",
+						method="POST",
+						headers={"Content-Type": "application/json", "Authorization": "Bearer " + AUTH["together_key"]},
+						data=orjson.dumps(dict(
+							model=resp_model,
+							prompt=p,
+							n=n,
+							steps=min(4, steps),
+							width=w,
+							height=h,
+							response_format="b64_json",
+							image_base64=[url] if url else [],
+						)),
+						json=True,
+						aio=True,
+						timeout=60,
+					))
+				else:
+					fut = csubmit(Request(
+						f"https://api.deepinfra.com/v1/inference/{resp_model}",
+						method="POST",
+						headers={"Content-Type": "application/json", "Authorization": "Bearer " + AUTH["deepinfra_key"]},
+						data=orjson.dumps(dict(
+							prompt=p,
+							num_images=n,
+							num_inference_steps=steps,
+							width=w,
+							height=h,
+						)),
+						json=True,
+						aio=True,
+						timeout=60,
+					))
+				pnames.extend([p] * n)
+				queue.append(fut)
+				c2 -= n
+				cost = mpf("0.0005") * (steps * w * h / 1048576)
+				_premium.append(["deepinfra", resp_model, cost])
+
+			def b64_data(b):
+				if isinstance(b, dict):
+					b = b["b64_json"]
+				if isinstance(b, str):
+					b = b.encode("ascii")
+				elif isinstance(b, MemoryBytes):
+					b = bytes(b)
+				b = b.split(b"base64,", 1)[-1]
+				if len(b) & 3:
+					b += b"=="
+				return base64.b64decode(b)
+
+			for fut in queue:
+				data = await fut
+				images = data["data"] if use_together else data["images"]
+				for imd in images:
+					imd = b64_data(imd)
+					futs.append(as_fut(imd))
+					amount2 += 1
 		if amount2 < amount:
 			c = amount - amount2
 			counts = []
@@ -1325,6 +1414,12 @@ class Imagine(Command):
 			fn = tup[0]
 			if not fn:
 				continue
+			if isinstance(fn, bytes):
+				ts = ts_us()
+				fn2 = f"{CACHE_PATH}/{ts}.png"
+				with open(fn2, "wb") as f:
+					f.write(fn)
+				fn = fn2
 			if isinstance(fn, str):
 				if is_url(fn):
 					fn = await Request(fn, timeout=24, aio=True)

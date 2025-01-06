@@ -409,6 +409,8 @@ class Queue(Command):
 		if q and qstart > 0:
 			estimated += e_remainder(elapsed, length, q[0], reverse)
 		delay = 0
+		print(items)
+		assert len(items), "No valid items to add to queue."
 		cache_level = bot.audio.run(f"ytdl.is_cached({repr(items[0].url)})")
 		print(items[0].url, cache_level)
 		if not cache_level:

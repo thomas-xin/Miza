@@ -1130,11 +1130,26 @@ class Server:
 		if not self.ydl:
 			self.ydl = globals()["ytdl"] = AudioDownloader()
 		if v:
-			fmt = kwargs.get("fmt", "opus")
+			fmt = kwargs.get("fmt")
+			if not fmt:
+				accept = cp.request.headers.get("Accept", "").lower().replace(";", ",").split(",")
+				if "audio/ogg" in accept:
+					fmt = "ogg"
+				elif "audio/mp3" in accept:
+					fmt = "mp3"
+				elif "text/html" in accept:
+					# Most likely a browser; browsers tend to support ogg but may refuse opus, so we pass opus codec in ogg container. Avoid passing webm as that would produce the full video.
+					fmt = "ogg"
+				else:
+					fmt = "opus"
 			assert fmt in ("mp4", "webm", "ogg", "opus", "mp3")
 			tmpl = f"{CACHE_PATH}/{uhash(v)}.{fmt}"
 			start = kwargs.get("start")
 			end = kwargs.get("end")
+			if start == "-":
+				start = None
+			if end == "-":
+				end = None
 			if start is not None:
 				start = round_min(round(float(start), 3))
 			if end is not None:
@@ -1181,7 +1196,7 @@ class Server:
 				title = entry["name"]
 			cp.response.headers.update(CHEADERS)
 			f = open(fn, "rb")
-			return cp.lib.static.serve_fileobj(f, name=f"{title}.{fmt}", content_type=MIMES[fmt], disposition="attachment")
+			return cp.lib.static.serve_fileobj(f, name=f"{title}.{fmt}", content_type=MIMES[fmt], disposition="inline")
 		sem = self.ydl_sems.setdefault(ip, Semaphore(64, 256, rate_limit=8))
 		with sem:
 			entries = self.ydl.search(q, count=12)

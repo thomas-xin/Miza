@@ -355,6 +355,7 @@ class Gradient(Command):
 		),
 	)
 	rate_limit = (4, 6)
+	slash = True
 
 	async def __call__(self, _timeout, mode, colour, background, repetitions, size, colourspace, filesize, format, **void):
 		resp = await process_image("from_gradient", "$", [mode, colour, background, repetitions, size, colourspace, "-fs", filesize, "-f", format], timeout=_timeout)
@@ -488,7 +489,7 @@ class QR(Command):
 	)
 	rate_limit = (8, 11)
 	_timeout_ = 4
-	maintenance = True
+	slash = True
 
 	async def __call__(self, _timeout, mode, text, arms, duration, speed, fps, filesize, format, **void):
 		duration = duration if mode != "normal" else 0
@@ -559,6 +560,7 @@ class Rainbow(Command):
 	)
 	rate_limit = (10, 13)
 	_timeout_ = 4
+	slash = True
 
 	async def __call__(self, _timeout, url, mode, duration, speed, fps, filesize, format, **void):
 		resp = await process_image(url, "rainbow_map", [[], float(duration) / speed, fps, mode, "-fs", filesize, "-f", format], timeout=_timeout)
@@ -630,6 +632,7 @@ class Scroll(Command):
 	)
 	rate_limit = (10, 13)
 	_timeout_ = 4
+	slash = True
 
 	async def __call__(self, _timeout, url, direction, duration, speed, fps, filesize, format, **void):
 		resp = await process_image(url, "scroll_map", [[], float(duration) / speed, fps, direction, "-fs", filesize, "-f", format], timeout=_timeout)
@@ -709,6 +712,7 @@ class Spin(Command):
 	)
 	rate_limit = (10, 13)
 	_timeout_ = 4
+	slash = True
 
 	async def __call__(self, _timeout, url, angle, circle, duration, speed, fps, filesize, format, **void):
 		resp = await process_image(url, "spin_map", [[], float(duration) / speed, fps, angle, circle, "-fs", filesize, "-f", format], timeout=_timeout)
@@ -846,6 +850,7 @@ class Pet(Command):
 	)
 	rate_limit = (10, 13)
 	_timeout_ = 5
+	slash = True
 
 	async def __call__(self, _timeout, url, squish, duration, speed, fps, filesize, format, **void):
 		resp = await process_image(url, "pet_map", [[], float(duration) / speed, fps, squish, "-fs", filesize, "-f", format], timeout=_timeout)

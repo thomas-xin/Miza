@@ -1212,22 +1212,20 @@ def round_min(x) -> number:
 	if isinstance(x, str):
 		if not x:
 			return nan
-		if "." in x:
+		if "/" in x:
+			p, q = x.split("/")
+			x = float(p) / float(q)
+		elif "." in x:
 			x = float(x)
 		else:
 			try:
 				return int(x)
 			except ValueError:
 				x = float(x)
-	if isinstance(x, complex):
-		if x.imag == 0:
-			return round_min(x.real)
-		else:
-			return round_min(complex(x).real) + round_min(complex(x).imag) * (1j)
-	if isfinite(x):
-		y = int(x)
-		if x == y:
-			return y
+	if isinstance(x, np.number):
+		x = x.item()
+	if x.is_integer():
+		return int(x)
 	return x
 
 @functools.lru_cache(maxsize=64)

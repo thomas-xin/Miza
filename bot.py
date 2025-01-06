@@ -261,7 +261,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				)
 				if v.type in ("url", "image", "visual", "video", "audio", "media"):
 					accepts_attachments = True
-				if v.get("required") or v.get("required_slash"):
+					arg.pop("required", None)
+				elif v.get("required") or v.get("required_slash"):
 					arg.required = True
 				if v.get("multiple"):
 					continue
@@ -348,6 +349,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						arg["type"] = 9
 					elif arg["name"] == "url":
 						accepts_attachments = True
+						arg.pop("required", None)
 					out.append(arg)
 		if accepts_attachments:
 			arg = dict(type=11, name="attachment", description="Attachment in place of URL")
@@ -358,18 +360,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	@tracebacksuppressor
 	def create_command(self, data):
 		with self.slash_sem:
-			for i in range(16):
+			attempts = 16
+			for i in range(attempts):
 				resp = reqs.next().post(
 					f"https://discord.com/api/{api}/applications/{self.id}/commands",
 					headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
 					data=json_dumps(data),
 					timeout=30,
 				)
-				if resp.status_code == 429:
-					time.sleep(20)
+				if resp.status_code == 429 and i < attempts - 1:
+					time.sleep(2 ** (i + 4))
 					continue
-				if resp.status_code not in range(200, 400):
-					print("\n", data, " ", ConnectionError(f"Error {resp.status_code}", resp.text), "\n", sep="")
+				resp.raise_for_status()
 				print("SLASH CREATE:", resp.text)
 				return
 
@@ -381,11 +383,31 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				headers=dict(Authorization="Bot " + self.token),
 				timeout=30,
 			)
-			if resp.status_code not in range(200, 400):
-				raise ConnectionError(f"Error {resp.status_code}", resp.text)
+			resp.raise_for_status()
 			commands = dict((int(c["id"]), c) for c in resp.json() if str(c.get("application_id")) == str(self.id))
 			if commands:
 				print(f"Successfully loaded {len(commands)} application command{'s' if len(commands) != 1 else ''}.")
+
+		def recursively_equal(opt1, opt2):
+			for k, v in opt1.items():
+				if isinstance(v, dict):
+					if not opt2.get(k) or not recursively_equal(v, opt2[k]):
+						return False
+				elif isinstance(v, list):
+					if not v:
+						if opt2.get(k):
+							return False
+					elif not opt2.get(k):
+						return False
+					elif isinstance(v[0], dict):
+						if not all(recursively_equal(x, y) for x, y in zip(v, opt2[k])):
+							return False
+					elif not all(x == y for x, y in zip(v, opt2[k])):
+						return False
+				elif opt2.get(k) != v:
+					return False
+			return True
+
 		for catg in self.categories.values():
 			if not AUTH.get("slash_commands"):
 				break
@@ -424,31 +446,35 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						for name in (full_prune(i) for i in aliases):
 							description = lim_str(command.parse_description(), 100)
 							options = self.command_options(command)
-							command_data = dict(name=name, description=description, type=1)
+							command_data = dict(name=name, description=description, type=1, nsfw=getattr(command, "nsfw", False))
+							if getattr(command, "server_only", False):
+								command_data["contexts"] = [0]
+							else:
+								command_data["contexts"] = [0, 1, 2]
+							command_data["integration_types"] = [0, 1]
 							if options:
 								command_data["options"] = options
 							found = False
 							for i, curr in list(commands.items()):
 								if curr["name"] == name and curr["type"] == command_data["type"]:
-									compare = self.command_options(command)
-									if curr["description"] != description or (compare and curr["options"] != compare or not compare and curr.get("options")):
+									if not recursively_equal(command_data, curr):
+										print(command_data)
 										print(curr)
 										print(f"{curr['name']}'s slash command does not match, removing...")
 										with self.slash_sem:
-											for att in range(16):
+											attempts = 16
+											for i in range(attempts):
 												resp = reqs.next().delete(
 													f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}",
 													headers=dict(Authorization="Bot " + self.token),
 													timeout=30,
 												)
-												if resp.status_code == 429:
-													time.sleep(att + 1)
+												if resp.status_code == 429 and i < attempts - 1:
+													time.sleep(2 ** (i + 4))
 													continue
-												if resp.status_code not in range(200, 400):
-													raise ConnectionError(f"Error {resp.status_code}", resp.text)
+												resp.raise_for_status()
 												break
 									else:
-										# print(f"{curr['name']}'s slash command matches, ignoring...")
 										found = True
 									commands.pop(i, None)
 									break
@@ -467,8 +493,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					headers=dict(Authorization="Bot " + self.token),
 					timeout=30,
 				)
-				if resp.status_code not in range(200, 400):
-					raise ConnectionError(f"Error {resp.status_code}", resp.text)
+				resp.raise_for_status()
 
 	async def create_main_website(self, first=False):
 		if first:
@@ -1869,6 +1894,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# print(args)
 		return await process_image(image, "resize_map", args, timeout=timeout, retries=2)
 
+	# Map of search engine locations for browsing the internet. As we do not have access to the user's IP address, we estimate their timezone and use that to approximate their location.
 	browse_locations = {
 		-11: "nz-en",	# New Zealand
 		-10: "nz-en",
@@ -2166,7 +2192,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		for i, fut in enumerate(follows):
 			if not fut:
 				continue
-			urls = await fut
+			try:
+				urls = await fut
+			except Exception:
+				if not i:
+					raise
+				print_exc()
+				continue
 			urls = [url for url in urls if not is_discord_message_link(url)]
 			if not urls:
 				continue
@@ -4166,6 +4198,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				num = getattr(mpf(default), _op)(num)
 			return num
 		f = expr.strip()
+		if re.fullmatch(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?(?:\/\d*\.?\d+)?", f):
+			return round_min(f)
 		try:
 			if not f:
 				return 0
@@ -5030,7 +5064,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					taken = True
 				elif not hs and v.type == "index" and (a.casefold() == "all" or re.fullmatch(r"(?:[\-0-9]+|[:\-]|\.{2,}){1,5}", a)):
 					taken = True
-				elif not hs and v.type in ("number", "integer") and re.fullmatch(r"[-+]?\b\d+(\.\d+)?([eE][-+]?\d+)?\b|\b\d+\.\d*|\.\d+([eE][-+]?\d+)?\b", a):
+				elif not hs and v.type in ("number", "integer") and re.fullmatch(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?(?:\/\d*\.?\d+)?", a):
 					taken = True
 				elif v.type == "string":
 					taken = True
@@ -5351,9 +5385,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		else:
 			prefix = self.get_prefix(guild)
 		command_check = command_check or command.name[0].casefold()
+		if getattr(command, "nsfw", False) and not bot.is_nsfw(channel):
+			if hasattr(channel, "recipient"):
+				raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels. Please verify your age using ~verify within a NSFW channel to enable NSFW in DMs.")
+			raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels.")
 		# Make sure server-only commands can only be run in servers.
 		if guild is None or getattr(guild, "ghost", None):
 			if channel:
+				if channel.id not in self.cache.channels:
+					self.cache.channels[channel.id] = channel
 				channel = await self.fetch_channel(channel.id)
 				guild = guild or getattr(channel, "guild", None)
 			if getattr(command, "server_only", False) and (guild is None or getattr(guild, "ghost", None)):
@@ -5721,7 +5761,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 										task = csubmit(anext(it))
 									resp = await asyncio.wait_for(asyncio.shield(task), timeout=d)
 								except (T0, T1, CE):
-									if not blocked and edit and not fut or fut.done():
+									if not blocked and edit and (not fut or fut.done()):
 										if fut:
 											try:
 												await fut
@@ -8184,7 +8224,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 								message.channel = channel = msg.channel or message.channel
 						try:
 							channel = self.force_channel(d["channel_id"])
-							guild = await self.fetch_guild(d["guild_id"])
+							try:
+								guild = await self.fetch_guild(d["guild_id"])
+							except (LookupError, discord.NotFound):
+								raise KeyError
 							message.guild = guild
 							author = guild.get_member(author.id)
 							if author:
@@ -8222,8 +8265,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						channel = None
 						try:
 							channel = self.force_channel(d["channel_id"])
-							guild = await self.fetch_guild(d["guild_id"])
-							user = guild.get_member(user.id) or user
+							try:
+								guild = await self.fetch_guild(d["guild_id"])
+							except (LookupError, discord.NotFound):
+								raise KeyError
+							user = (guild.get_member(user.id) if guild else None) or user
 						except KeyError:
 							if user is None:
 								raise

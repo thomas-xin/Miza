@@ -141,8 +141,12 @@ class ImageSequence(Image.Image):
 
 	@classmethod
 	def cast(cls, image, **kwargs):
-		if isinstance(image, dict) and not isinstance(image["frames"], (tuple, list)):
-			return cls.fromiter(image["frames"], frameprops=(image["count"], image["duration"], image["count"] / image["duration"]), **kwargs)
+		if isinstance(image, cls):
+			return image
+		if isinstance(image, dict):
+			if not isinstance(image["frames"], (tuple, list)):
+				return cls.fromiter(image["frames"], frameprops=(image["count"], image["duration"], image["count"] / image["duration"]), **kwargs)
+			return cls.fromiter(image["frames"], frameprops=(len(image["frames"]), image["duration"], len(image["frames"]) / image["duration"]), **kwargs)
 		if isinstance(image, (tuple, list)):
 			return cls(*image, **kwargs)
 		return cls(image, **kwargs)
@@ -174,6 +178,9 @@ class ImageSequence(Image.Image):
 				return im
 			copy = False
 		return cls(*images, copy=copy, func=func, args=args)
+
+	def __repr__(self):
+		return f"<{self.__class__.__name__} frames={len(self)} mode={self.mode} size={self.size} extra_info={properties(self)}>"
 
 	def __init__(self, *images, copy=False, func=None, args=()):
 		if func:
@@ -351,7 +358,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 			cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate,duration,nb_frames", "-show_entries", "format=duration", "-of", "csv=s=x:p=0", fn)
 			print(cmd)
 			p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-			cmd2 = ["ffmpeg", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y"]
+			cmd2 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y"]
 			if nogif:
 				cmd2.extend(("-to", "1"))
 			cmd2 += ["-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0"]
@@ -359,7 +366,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 				cmd2.extend(("-vframes", "1"))
 			cmd2.append("-")
 			print(cmd2)
-			proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
+			proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
 			mode = "RGBA" if fmt == "rgba" else "RGB"
 			try:
 				res = as_str(p.stdout.read()).strip()
@@ -370,7 +377,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 			except:
 				print(as_str(p.stderr.read()), end="")
 				raise
-			print(info)
+			print("Image info:", info)
 			size = tuple(map(int, info[:2]))
 			if info[3] == "N/A":
 				info[3] = r2
@@ -405,17 +412,17 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 				fcount = floor(maxframes / dur / fps * fcount)
 				fps = maxframes / dur
 				framedur = 1000 / fps
-				cmd3 = ["ffmpeg", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps}", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
+				cmd3 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps}", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
 				print(cmd3)
-				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
+				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
 			elif dur > 1 and msize and size[0] * size[1] > msize ** 2:
 				proc.terminate()
 				w, h = max_size(*size, maxsize=msize)
 				w = round(w / 2) * 2
 				h = round(h / 2) * 2
-				cmd3 = ["ffmpeg", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"scale={w}:{h}:flags=lanczos", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
+				cmd3 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"scale={w}:{h}:flags=lanczos", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
 				print(cmd3)
-				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
+				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
 			elif not nogif and bytecount > 32 * 1073741824:
 				proc.terminate()
 				scale = sqrt((32 * 1073741824) / bytecount)
@@ -426,13 +433,14 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 				framedur = 1000 / fps
 				bcount = 4 if fmt == "rgba" else 3
 				bcount *= int(np.prod(size))
-				cmd3 = ["ffmpeg", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps},scale={w}:{h}:flags=bicublin", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
+				cmd3 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps},scale={w}:{h}:flags=bicublin", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
 				print(cmd3)
-				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
+				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
 			if nogif:
 				fcount = dur = fps = 1
 			assert fcount >= 1
 			if not isfinite(fcount) or fcount < 3 or bcount * fcount < 268435456 or len(b) < 16777216:
+				print("Decoding directly:", proc, mode, size, (fcount, dur, fps))
 				images = deque()
 				while True:
 					b = proc.stdout.read(bcount)
@@ -445,10 +453,10 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 					proc.wait(timeout=2)
 					return ImageSequence.open(*images)
 				raise RuntimeError(as_str(proc.stderr.read()))
+			print("Decoding lazily:", proc, mode, size, (fcount, dur, fps))
 			return ImageSequence.pipe(proc.stdout, mode, size, (fcount, dur, fps), close=proc.terminate)
-	# except:
-	# 	pass
 	except Exception as ex:
+		print(repr(ex))
 		exc = ex
 		if proc and proc.is_running():
 			proc.terminate()
@@ -815,6 +823,7 @@ def resume(im, *its):
 		yield from it
 
 def has_transparency(image):
+	"Checks if a palette image has transparency. We assume that an image has transparency if it has a transparency index, or an even number of channels (indicating modes LA or RGBA)."
 	assert image.mode == "P"
 	transparent = image.info.get("transparency", -1)
 	if transparent != -1:
@@ -822,12 +831,14 @@ def has_transparency(image):
 	for tup in image.getcolors():
 		if len(tup) in (2, 4):
 			alpha = tup[-1]
+			# Introduce a slight fuzzy check; an alpha value of 254 is considered opaque.
 			if alpha < 254:
 				return True
 	return False
 def target_p(image):
 	return ("RGBA" if has_transparency(image) else "RGB") if image.mode == "P" else image.mode
 def remove_p(image):
+	"Removes the palette from an image, accounting for transparency."
 	if image.mode == "P":
 		mode = "RGBA" if has_transparency(image) else "RGB"
 		return image.convert(mode)
@@ -984,7 +995,6 @@ def downsample(im, lenience=5, maxsize=16384, minsize=48, keep_alpha=True):
 	ex = 0
 	r = sqrt(max(2, w * h / maxsize / maxsize))
 	mr = 1
-	# print(e, w, h, r, ex)
 	for i in range(64):
 		if w > h:
 			x = roundown(min(lx - 1, w / r))
@@ -1006,7 +1016,6 @@ def downsample(im, lenience=5, maxsize=16384, minsize=48, keep_alpha=True):
 		es[r] = e
 		Me = max(Me, e)
 		mr = min(mr, e / Me)
-		# print(e, x, y, r, ex)
 		if mr < 1 - 1 / thresh / 1.5 or ex > lenience - 1:
 			r *= 2 ** 0.125
 		elif mr < 1 - 1 / thresh / 2 or ex > lenience - 2:
@@ -1271,6 +1280,7 @@ def sync_fps(props, duration=None, fps=None):
 def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", retrieve=False, **kwargs):
 	"""
 	Synchronizes and maps a function over a sequence of images.
+	The images may be static (repeated if necessary), or animated, in which case a heuristically determined set of frames will be used.
 	Args:
 		images (list): List of image URLs or image objects.
 		*args: Additional positional arguments to pass to the mapping function.
@@ -1315,7 +1325,13 @@ def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", r
 			for im, prop in zip(mapped_sources, props):
 				maxframes = prop[0]
 				mult = round(seconds / prop[1])
-				im.seek(floor(i / count * mult * maxframes) % maxframes)
+				n = floor(i / count * mult * maxframes)
+				try:
+					im.seek(n % maxframes)
+				except Exception:
+					print(f"Seek error: {n}, {n % maxframes}, {maxframes}")
+					print(f"Current frame: {i}, {props}, {mapped_sources}")
+					raise
 				ims.append(im)
 			yield func(ims, *args, props=props, progress=prog * i / count % 1 if count > 1 else 1, count=count, seed=seed, **kwargs)
 
@@ -1453,7 +1469,7 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 		mode = "area" if image.width * image.height > w * h else "nearest" if image.width * image.height <= 16384 else "cubic" if w * h > 1048576 else "lanczos"
 	maxframes = prop[0]
 	maxsize = w * h
-	if not extras and mode in ("nearest", "linear", "cubic", "area", "hamming", "lanczos", "crop") and maxframes > 1 and maxsize * maxframes > 8388608 or mode in ("spline", "gauss"):
+	if mode in ("nearest", "linear", "cubic", "area", "hamming", "lanczos", "crop") and maxframes > 1 and maxsize * maxframes > 8388608 or mode in ("spline", "gauss"):
 		fmt = "rgb24" if target_p(image) in ("HSV", "RGB") else "rgba"
 		if mode == "nearest":
 			mode = "neighbor"
@@ -1491,11 +1507,8 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 			buf = reversed(list(buf))
 		return dict(duration=1000 * duration, count=prop[0], frames=buf)
 
-	def resize_iterator(images, **kwargs):
-		image = remove_p(images[0])
-		func = resize_mult if operation == "mult" else resize_to
-		return func(image, x, y, mode)
-	return map_sync([image, *extras], func=resize_iterator, duration=duration, fps=fps * prog, keep_size=None)
+	func = resize_mult if operation == "mult" else resize_to
+	return dict(duration=1000 * duration, count=prop[0], frames=map(func, image, [x] * prop[0], [y] * prop[0], [mode] * prop[0]))
 
 def orbit_map(image, extras, duration, fps, count):
 	symmetry = count or (1 if extras else 5)
@@ -1836,11 +1849,12 @@ def _blend_map(images, operation, opacity, props=(), **kwargs):
 		if opacity == 0:
 			return i1, a1
 		if operation == "blend":
-			return (i1 * a1 * opacity + i2 * a2 * (1 - opacity)) / (a1 + a2), (a1 + a2) * 0.5
+			o1, o2 = min(1, opacity * 2), min(1, (1 - opacity) * 2)
+			return (i1 * a1 * o1 + i2 * a2 * o2) / (a1 + a2), np.maximum(a1, a2)
 		elif operation == "replace":
-			return i1 * opacity + i2 * (1 - opacity), (a1 + a2) * 0.5
+			return i1 * opacity + i2 * (1 - opacity), (a1 + a2) / 2
 		elif operation == "add":
-			return i1 * opacity * 2 + i2 * (1 - opacity) * 2, np.maximum(a1, a2)
+			return i1 * opacity * 2 + i2 * (1 - opacity) * 2, a1 + a2
 		elif operation == "mul":
 			return i1 ** (opacity * 2) * i2 ** ((1 - opacity) * 2), a1 * a2
 		elif operation == "sub":
@@ -1874,6 +1888,8 @@ def _blend_map(images, operation, opacity, props=(), **kwargs):
 			a2 = np.ones((im.height, im.width), dtype=dtype)
 		a2 = a2.reshape((im2.height, im2.width, 1))
 		rgb, a1 = blend_mut(rgb, a1, rgb2, a2)
+		np.nan_to_num(rgb, copy=False)
+		np.nan_to_num(a1, copy=False)
 
 	a1 *= 255
 	a1 = quantise_into(a1, clip=(0, 255), in_place=True).reshape(a1.shape[:2])

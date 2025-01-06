@@ -674,7 +674,7 @@ class AudioPlayer(discord.AudioSource):
 		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
 		if connected:
 			# Handle special case of only deafened users; they are not counted as listeners but will still keep the bot in the channel, paused instead
-			listeners = sum(not m.bot and m.voice and not (m.voice.deaf or m.voice.self_deaf) for m in self.vcc.members)
+			listeners = sum(not m.bot and bool(m.voice) and not (m.voice.deaf or m.voice.self_deaf) for m in self.vcc.members)
 			if listeners == 0:
 				self.updating_activity = csubmit(self._updating_activity())
 			elif not self.settings.pause:
@@ -685,7 +685,7 @@ class AudioPlayer(discord.AudioSource):
 		await asyncio.sleep(300)
 		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
 		if connected:
-			listeners = sum(not m.bot and m.voice for m in self.vcc.members)
+			listeners = sum(not m.bot and bool(m.voice) for m in self.vcc.members)
 			if listeners == 0:
 				await self.leave("Channel empty", dump=len(self.queue) > 0)
 
@@ -1418,6 +1418,8 @@ class BufferedAudioReader(discord.AudioSource):
 				self.proc.stdin.write(b)
 				self.proc.stdin.flush()
 			self.proc.stdin.close()
+		except BrokenPipeError:
+			return
 		except Exception:
 			print_exc()
 
@@ -1580,7 +1582,6 @@ async def on_connect():
 			# Restore audio players from our cache on disk
 			print(AP.cache.keys())
 			await asyncio.gather(*(reload_player(gid) for gid in AP.cache.keys()))
-		AP.cache.sync()
 		print("Audio client successfully connected.")
 
 @client.event

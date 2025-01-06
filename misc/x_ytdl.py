@@ -106,6 +106,7 @@ def get_full_storyboard(info):
 			headers=storyboard.get("http_headers") or Request.header(),
 			stream=True,
 		) for frag in fragments]
+		timestamps = set()
 		curr = 0
 		for i, fut in enumerate(futs):
 			if i == len(futs) - 1:
@@ -119,6 +120,11 @@ def get_full_storyboard(info):
 				im = Image.open(resp.raw)
 				for index in range(count):
 					curr2 = curr + index * frag["duration"] / count
+					timestamp = round(curr2)
+					# Skip duplicate timestamps
+					if timestamp in timestamps:
+						continue
+					timestamps.add(timestamp)
 					row = index // storyboard["columns"]
 					col = index % storyboard["columns"]
 					width = storyboard["width"]
@@ -126,7 +132,7 @@ def get_full_storyboard(info):
 					imc = im.crop((col * width, row * height, col * width + width, row * height + height))
 					b = io.BytesIO()
 					imc.save(b, "JPEG", quality=75)
-					z.writestr(f"{round(curr2)}.jpg", b.getbuffer())
+					z.writestr(f"{timestamp}.jpg", b.getbuffer())
 			curr += frag["duration"]
 	return b2.getbuffer()
 
@@ -171,7 +177,7 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 				# MP4 supports just about any audio codec, but WebM and MKV do not. We assume the audio codec is not WMA, as it is highly unlikely any website would use it for streaming videos.
 				output_args.extend(["-c:a", "copy"])
 			else:
-				output_args.extend(["-c:a", "libopus", "-b:a", "160k"])
+				output_args.extend(["-c:a", "libopus", "-b:a", "160k", "-ar", "48k"])
 			lightning = False
 		if self.thumbnail:
 			before_filename = self.thumbnail
@@ -227,7 +233,9 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 		else:
 			# Default to 192k for AAC, 160k for Opus, and 224k for MP3
 			bitrate = 224 if self.codec == "mp3" else 192 if self.codec == "aac" else 160
-			output_args.extend(["-c:a", acodec, "-b:a", f"{bitrate}k"])
+			# Default to 44100 Hz for MP3, 48000 Hz for everything else
+			sample_rate = 44100 if self.codec == "mp3" else 48000
+			output_args.extend(["-c:a", acodec, "-b:a", f"{bitrate}k", "-ar", f"{sample_rate}"])
 		self.real_run_ffmpeg(
 			[[filename, input_args]],
 			[[outpath, output_args]],
