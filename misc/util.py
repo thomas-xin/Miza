@@ -9,6 +9,7 @@ import contextlib
 import datetime
 import functools
 import hashlib
+import html
 import io
 import json
 from math import ceil, comb, inf, isfinite, isqrt
@@ -471,33 +472,7 @@ def auto_mention(obj):
 @functools.lru_cache(maxsize=64)
 def html_decode(s) -> str:
 	"Decodes HTML encoded characters in a string."
-	while len(s) > 7:
-		try:
-			i = s.index("&#")
-		except ValueError:
-			break
-		try:
-			if s[i + 2] == "x":
-				base = 16
-				p = i + 3
-			else:
-				base = 10
-				p = i + 2
-			for a in range(p, p + 16):
-				c = s[a]
-				if c == ";":
-					v = int(s[p:a], base)
-					break
-				elif not c.isnumeric() and c not in "abcdefABCDEF":
-					break
-			c = chr(v)
-			s = s[:i] + c + s[a + 1:]
-		except (ValueError, NameError, IndexError):
-			s = s[:i + 1] + "\u200b" + s[i + 1:]
-			continue
-	s = s.replace("<b>", "**").replace("</b>", "**").replace("<i>", "*").replace("</i>", "*").replace("<u>", "*").replace("</u>", "*")
-	s = s.replace("\u200b", "").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-	return s.replace("&quot;", '"').replace("&apos;", "'")
+	return html.unescape(s)
 
 @hashable_args
 @functools.lru_cache(maxsize=256)
@@ -2187,15 +2162,15 @@ class PipedProcess:
 	def __init__(self, *args, stdin=None, stdout=None, stderr=None, cwd=".", bufsize=4096):
 		if not args:
 			return
-		self.exc = concurrent.futures.ThreadPoolExecutor(max_workers=len(args) - 1) if len(args) > 1 else None
 		self.procs = []
+		proc = None
 		for i, arg in enumerate(args):
 			first = not i
 			last = i >= len(args) - 1
-			si = stdin if first else subprocess.PIPE
+			si = stdin if first else proc.stdout
 			so = stdout if last else subprocess.PIPE
 			se = stderr if last else None
-			proc = psutil.Popen(arg, stdin=si, stdout=so, stderr=se, cwd=cwd, bufsize=bufsize * 256)
+			proc = psutil.Popen(arg, stdin=si, stdout=so, stderr=se, cwd=cwd, bufsize=bufsize * 256, shell=isinstance(arg, str))
 			if first:
 				self.stdin = proc.stdin
 				self.args = arg
@@ -2203,30 +2178,7 @@ class PipedProcess:
 				self.stdout = proc.stdout
 				self.stderr = proc.stderr
 			self.procs.append(proc)
-		for i in range(len(args) - 1):
-			self.exc.submit(self.pipe, i, bufsize=bufsize)
 		self.pid = self.procs[0].pid
-
-	def pipe(self, i, bufsize=4096):
-		try:
-			proc = self.procs[i]
-			proc2 = self.procs[i + 1]
-			si = 0
-			while proc.is_running() and proc2.is_running():
-				b = proc.stdout.read(si * (si + 1) * bufsize // 8 + bufsize)
-				if not b:
-					break
-				proc2.stdin.write(b)
-				proc2.stdin.flush()
-				si += 1
-			if proc2.is_running():
-				proc2.stdin.close()
-		except Exception:
-			print_exc()
-			if not proc.is_running() or not proc2.is_running():
-				self.terminate()
-		if self.exc:
-			self.exc.shutdown(wait=False)
 
 	def is_running(self):
 		for proc in self.procs:

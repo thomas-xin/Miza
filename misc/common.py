@@ -187,7 +187,7 @@ def restructure_buttons(buttons):
 async def interaction_response(bot, message, content=None, embed=None, embeds=(), components=None, buttons=None, ephemeral=False):
 	"Uses the raw Discord HTTP API to post/send an interaction message."
 	if getattr(message, "deferred", False):
-		return interaction_patch(bot, message, content, embed, embeds, components, buttons, ephemeral)
+		return interaction_post(bot, message, content, embed, embeds, components, buttons, ephemeral)
 	if hasattr(embed, "to_dict"):
 		embed = embed.to_dict()
 	if embed:
@@ -222,19 +222,10 @@ async def interaction_response(bot, message, content=None, embed=None, embeds=()
 			M = discord.Message
 		message = M(state=bot._state, channel=message.channel, data=eval_json(resp))
 		bot.add_message(message, files=False, force=True)
-	# else:
-	#     m = bot.GhostMessage()
-	#     m.id = message.id
-	#     m.content = content
-	#     m.embeds = embeds
-	#     m.ephemeral = ephemeral
-	#     if getattr(message, "slash", False):
-	#         m.slash = message.slash
-	#     bot.add_message(message, files=False, force=True)
 	return message
 
-async def interaction_patch(bot, message, content=None, embed=None, embeds=(), components=None, buttons=None, ephemeral=False):
-	"Uses the raw Discord HTTP API to patch/edit an interaction message."
+async def interaction_post(bot, message, content=None, embed=None, embeds=(), components=None, buttons=None, ephemeral=False):
+	"Uses the raw Discord HTTP API to post/send a deferred interaction message."
 	if hasattr(embed, "to_dict"):
 		embed = embed.to_dict()
 	if embed:
@@ -257,6 +248,43 @@ async def interaction_patch(bot, message, content=None, embed=None, embeds=(), c
 			),
 		)),
 		method="POST",
+		authorise=True,
+		aio=True,
+	)
+	# print("INTERACTION_POST", resp)
+	bot = BOT[0]
+	if resp:
+		if bot:
+			M = bot.ExtendedMessage.new
+		else:
+			M = discord.Message
+		message = M(state=bot._state, channel=message.channel, data=eval_json(resp))
+		bot.add_message(message, files=False, force=True)
+	elif getattr(message, "simulated", False):
+		message.content = content or message.content
+		message.embeds = [discord.Embed.from_dict(embed)] if embed else message.embeds
+	return message
+
+async def interaction_patch(bot, message, content=None, embed=None, embeds=(), components=None, buttons=None, ephemeral=False):
+	"Uses the raw Discord HTTP API to patch/edit an interaction message."
+	if hasattr(embed, "to_dict"):
+		embed = embed.to_dict()
+	if embed:
+		embeds = astype(embeds, list)
+		embeds.append(embed)
+	if not getattr(message, "int_id", None):
+		message.int_id = message.id
+	if not getattr(message, "int_token", None):
+		message.int_token = message.slash
+	mid = message.id or "@original"
+	resp = await Request(
+		f"https://discord.com/api/{api}/webhooks/{bot.id}/{message.int_token}/messages/{mid}",
+		data=json_dumps(dict(
+			content=content,
+			embeds=embeds,
+			components=components or restructure_buttons(buttons),
+		)),
+		method="PATCH",
 		authorise=True,
 		aio=True,
 	)

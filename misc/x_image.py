@@ -179,6 +179,9 @@ class ImageSequence(Image.Image):
 			copy = False
 		return cls(*images, copy=copy, func=func, args=args)
 
+	def __iter__(self):
+		return iter(self._images)
+
 	def __repr__(self):
 		return f"<{self.__class__.__name__} frames={len(self)} mode={self.mode} size={self.size} extra_info={properties(self)}>"
 
@@ -1508,7 +1511,7 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 		return dict(duration=1000 * duration, count=prop[0], frames=buf)
 
 	func = resize_mult if operation == "mult" else resize_to
-	return dict(duration=1000 * duration, count=prop[0], frames=map(func, image, [x] * prop[0], [y] * prop[0], [mode] * prop[0]))
+	return dict(duration=1000 * duration, count=prop[0], frames=map(func, ImageSequence.cast(image), [x] * prop[0], [y] * prop[0], [mode] * prop[0]))
 
 def orbit_map(image, extras, duration, fps, count):
 	symmetry = count or (1 if extras else 5)

@@ -992,7 +992,6 @@ class UpdateColours(Database):
 		except Exception:
 			print_exc()
 			return 0
-		print("GC:", url, out, raw)
 		if threshold:
 			if raw == 0:
 				return 1

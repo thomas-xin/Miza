@@ -10,7 +10,6 @@ print = PRINT
 # import functools
 # import math
 # import random
-# import akinator
 # import discord
 import nekos
 # import numpy as np
@@ -25,39 +24,22 @@ import nekos
 # print = PRINT
 
 try:
-	from akinator.async_aki import Akinator as async_akinator
+	from akipy.async_akipy import Akinator as AsyncAkinator
 except (AttributeError, ModuleNotFoundError):
-	from akinator import AsyncAkinator
-
-	class async_akinator:
-
-		def __init__(self, *args, **kwargs):
-			self.__dict__["aki"] = AsyncAkinator(*args, **kwargs)
-
-		def __getattr__(self, k):
-			try:
-				return self.__getattribute__(k)
-			except AttributeError:
-				return getattr(self.aki, k)
-
-		def __setattr__(self, k, v):
-			try:
-				return setattr(self.aki, k, v)
-			except AttributeError:
-				self.__dict__[k] = v
+	from akinator.async_aki import Akinator as AsyncAkinator
 
 try:
 	alexflipnote_key = AUTH["alexflipnote_key"]
 	if not alexflipnote_key:
 		raise
-except:
+except KeyError:
 	alexflipnote_key = None
 	print("WARNING: alexflipnote_key not found. Unable to use API to generate images.")
 try:
 	giphy_key = AUTH["giphy_key"]
 	if not giphy_key:
 		raise
-except:
+except KeyError:
 	giphy_key = None
 	print("WARNING: giphy_key not found. Unable to use API to search images.")
 
@@ -119,7 +101,8 @@ class ND2048(collections.abc.MutableSequence):
 		self.flags = flags
 		self.spawn(max(2, self.data.size // 6), flag_override=0)
 
-	__repr__ = lambda self: self.__class__.__name__ + ".load(" + repr(self.serialise()) + ")"
+	def __repr__(self):
+		return self.__class__.__name__ + ".load(" + repr(self.serialise()) + ")"
 
 	# Displays game board for dimensions N <= 4
 	def __str__(self):
@@ -157,7 +140,8 @@ class ND2048(collections.abc.MutableSequence):
 		return self.data.__str__()
 
 	# Calulates effective total score (value of a tile 2 ^ x is (2 ^ x)(x - 1)
-	score = lambda self: np.sum([(g - 1) * (1 << g) for g in [self.data[self.data > 1].astype(object)]])
+	def score(self):
+		return np.sum([(g - 1) * (1 << g) for g in [self.data[self.data > 1].astype(object)]])
 
 	# Randomly spawns tiles on a board, based on the game's settings. May be overridden by the flag_override argument.
 	def spawn(self, count=1, flag_override=None):
@@ -3373,9 +3357,6 @@ class HOW(Command):
 		self.bot.send_as_embeds(channel, image="https://mizabot.xyz/u/EFz0uPvEMFE.gif", reference=message)
 
 
-EXCLUDE_URL = "{}/exclusion?callback=jQuery331023608747682107778_{}&childMod={}&session={}&signature={}&step={}&frontaddr={}&question_filter={}&forward_answer=1&_={}"
-CHOICE_URL = "{}/choice?callback=jQuery331023608747682107778_{}&childMod={}&session={}&signature={}&step={}&frontaddr={}&question_filter={}&element={}&duel_allowed=1&_={}"
-
 HEADERS = {
 	"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
 	"Accept-Encoding": "gzip, deflate",
@@ -3384,61 +3365,31 @@ HEADERS = {
 	"x-requested-with": "XMLHttpRequest",
 }
 
-def _parse_response(response):
-	if response == '{["completion" => "KO - UNAUTHORIZED"]}':
-		return {"completion": "KO - UNAUTHORIZED"}
-	return orjson.loads(",".join(response.replace("=>", ":").split("(", 1)[-1:])[:-1])
-async def _auto_get_region(self, lang, theme):
-	server_regex = regexp(r"""[{"translated_theme_name":".*?","urlWs":"https:\/\/srv[0-9]+\.akinator\.com:[0-9]+\/ws","subject_id":"[0-9]+"}]""")
-	uri = lang + ".akinator.com"
-
-	bad_list = ["https://srv12.akinator.com:9398/ws"]
-	for i in range(3):
-		async with self.client_session.get("https://" + uri) as w:
-			t = await w.text()
-			match = await asubmit(server_regex.search, t)
-
-		if not match:
-			raise ConnectionError("Unable to find active Akinator websocket, please try again later.")
-		parsed = json.loads(match.group().split("'arrUrlThemesToPlay', ")[-1])
-
-		if theme == "c":
-			server = next((i for i in parsed if i["subject_id"] == "1"), None)["urlWs"]
-		elif theme == "a":
-			server = next((i for i in parsed if i["subject_id"] == "14"), None)["urlWs"]
-		elif theme == "o":
-			server = next((i for i in parsed if i["subject_id"] == "2"), None)["urlWs"]
-
-		if server not in bad_list:
-			return {"uri": uri, "server": server}
-	raise TimeoutError
-async_akinator.parse_response = _parse_response
-async_akinator._auto_get_region = _auto_get_region
 
 class Akinator(Command):
 	name = ["Aki"]
 	description = "Think about a real or fictional character. I will try to guess who it is!"
-	usage = "<language[en]>? <child_friendly(-c)>?"
-	example = ("akinator", "akinator -c en")
-	flags = "c"
+	schema = cdict(
+		language=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("en", "ar", "cn", "de", "es", "fr", "il", "it", "jp", "kr", "nl", "pl", "pt", "ru", "tr", "id", "vi"),
+			),
+			description="Language used by Akinator",
+			default="en",
+		),
+		child_friendly=cdict(
+			type="bool",
+			description="Whether to enable child-friendly mode. Defaults to the current channel's age restriction state.",
+			example="true",
+		),
+	)
 	slash = True
 	rate_limit = (12, 16)
-	session = None
 
 	async def compatible_akinator(self, language, child_mode=False):
-		try:
-			aki = await asubmit(async_akinator, language=language, child_mode=child_mode)
-			await aki.start_game()
-		except:
-			aki = await asubmit(async_akinator)
-			if not self.session:
-				self.session = aiohttp.ClientSession()
-			try:
-				await aki.start_game(language=language, child_mode=child_mode, client_session=self.session)
-			except RuntimeError:
-				self.session.close()
-				self.session = None
-				raise
+		aki = AsyncAkinator()
+		await aki.start_game(language=language, child_mode=child_mode)
 		aki.timestamp = utc()
 		return aki
 
@@ -3449,28 +3400,9 @@ class Akinator(Command):
 		cdict(emoji="🙁", name="Probably not", style=1),
 		cdict(emoji="👎", name="No", style=1),
 		cdict(emoji="↩️", name="Undo", style=1),
-		cdict(emoji="🤔", name="Guess", style=1),
 		cdict(emoji="🔃", name="Restart", style=1),
 		cdict(emoji="⏏️", name="End", style=1),
 	]
-
-	images = [
-		"https://mizabot.xyz/u/EEsIkmtEEKo", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/vrai_decouragement.png",
-		"https://mizabot.xyz/u/EEsIc9jEMJY", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/surprise.png",
-		"https://mizabot.xyz/u/EEsMUT1EEDw", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/leger_decouragement.png",
-		"https://mizabot.xyz/u/EEsIXxyEQAA", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/concentration_intense.png",
-		"https://mizabot.xyz/u/EEsIRIXEIDI", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/inspiration_legere.png",
-		"https://mizabot.xyz/u/EEsIKp-EUCg", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/serein.png",
-		"https://mizabot.xyz/u/EEsIB0BEEEY", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/defi.png",
-		"https://mizabot.xyz/u/EEsIqFTEUG4", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/inspiration_forte.png",
-		"https://mizabot.xyz/u/EEsIukLEMKA", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/mobile.png",
-		"https://mizabot.xyz/u/EEsIwwGEEFE", #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/confiant.png",
-	]
-	start_image = "https://en.akinator.com/bundles/elokencesite/images/akinator.png"
-	default_image = "https://mizabot.xyz/u/EEsIB0BEEEY" #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/defi.png"
-	defeat_image = "https://mizabot.xyz/u/EEsI5iPEEFA" #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/deception.png"
-	check_image = "https://mizabot.xyz/u/EEsIwwGEEFE" #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/confiant.png"
-	victory_image = "https://mizabot.xyz/u/EEsJAGzEUDw" #"https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/triomphe.png"
 
 	button_equiv = {
 		"Yes": 0,
@@ -3479,38 +3411,38 @@ class Akinator(Command):
 		"Probably": 3,
 		"Probably not": 4,
 		"Undo": "undo",
-		"Guess": "guess",
 		"Restart": "restart",
 		"End": "end",
 	}
 
-	async def __call__(self, bot, user, message, channel, args, flags, **void):
-		akinators = bot.data.akinators.akinators
-		if args:
-			language = full_prune(args.pop(0))
-		else:
-			language = "en"
-		if language in ("", "en", "eng", "english") and "c" not in flags and akinators:
-			aki = akinators.popleft()
-		else:
-			aki = await self.compatible_akinator(language=language, child_mode="c" in flags)
-		bot.data.akinators[aki.signature] = aki
+	def get_sig(self, aki):
+		return e64(base64.b64decode(aki.signature)).decode("ascii").replace("-", "+")
 
-		colour = await bot.get_colour(user)
+	async def __call__(self, bot, _user, _nsfw, language, child_friendly, **void):
+		if child_friendly is None:
+			child_friendly = not _nsfw
+		aki = await self.compatible_akinator(language=language, child_mode=child_friendly)
+		sig = self.get_sig(aki)
+		bot.data.akinators[sig] = aki
+
+		colour = await bot.get_colour(aki.akitude_url)
 		emb = discord.Embed(colour=colour)
-		emb.title = f"Akinator: Question {aki.step + 1}"
-		bar = await bot.create_progress_bar(18, 0)
+		emb.title = f"Akinator: Question {int(aki.step) + 1}"
+		bar = await bot.create_progress_bar(18, aki.confidence)
 		emb.description = (
-			f"*```callback-fun-akinator-{user.id}_{aki.signature}_0-\n"
-			+ f"{aki.question}```*"
+			f"*```callback-fun-akinator-{_user.id}_{sig}-\n"
+			+ f"{str(aki)}```*"
 			+ bar
 		)
-		emb.set_thumbnail(url=self.default_image)
-		emb.set_author(**get_author(user))
-		await send_with_react(channel, "", embed=emb, buttons=self.buttons, reference=message)
+		emb.set_thumbnail(url=aki.akitude_url)
+		emb.set_author(**get_author(_user))
+		return cdict(
+			embed=emb,
+			buttons=self.buttons,
+		)
 
 	async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
-		u_id, sig, guessing = map(int, vals.split("_", 2))
+		u_id, sig = vals.split("_", 1)
 		if u_id != user.id and u_id != 0 and perm < 3:
 			return
 		r = as_str(reaction)
@@ -3520,261 +3452,73 @@ class Akinator(Command):
 			return
 
 		aki = bot.data.akinators.get(sig)
-		if aki:
-			aki.__dict__.setdefault("no", set())
-		else:
-			# colour = await bot.get_colour(user)
-			# emb = discord.Embed(colour=colour)
-			# emb.title = message.embeds[0].title
-			# emb.description = message.embeds[0].description.replace("callback-", "none-")
-			# if message.embeds[0].image:
-			#     emb.set_image(message.embeds[0].image.url)
-			# csubmit(message.edit(embed=emb))
-			# raise TimeoutError("Akinator game has expired. Please create a new one to proceed!")
+		if not aki:
+			print("Akinator not found, restarting:", sig)
 			ans = "restart"
-		csubmit(bot.ignore_interaction(message))
+		csubmit(bot.defer_interaction(message, mode="patch"))
 
 		callback = "callback"
 
-		win = False
-		guess = False
-		if guessing and ans == 0:
-			ans = "end"
-			await aki.win()
-			for data in aki.guesses:
-				if data["id"] not in aki.no:
-					guess = data
-					break
-			else:
-				guess = aki.first_guess
-			resp = await Request(
-				CHOICE_URL.format(
-					aki.server,
-					int(aki.timestamp),
-					str(aki.child_mode).lower(),
-					aki.session,
-					aki.signature,
-					aki.step,
-					aki.frontaddr,
-					aki.question_filter,
-					guess["id"],
-					int(aki.timestamp) + aki.step + 1,
-				),
-				headers=HEADERS,
-				decode=True,
-				aio=True,
-			)
-			resp = aki.parse_response(resp)
-			print(resp)
-			if resp["completion"] != "OK":
-				with tracebacksuppressor:
-					akinator.utils.raise_connection_error(resp["completion"])
-			win = max(1, int(resp["parameters"]["element_informations"]["times_selected"]))
-		if guessing and ans == 1:
-			if aki.step >= 79:
-				ans = "end"
-			if not aki.guesses:
-				await aki.win()
-			for data in aki.guesses:
-				if data["id"] not in aki.no:
-					aki.no.add(data["id"])
-					break
-			else:
-				aki.no.add("\x7f" + str(data["id"]))
-			resp = await Request(
-				EXCLUDE_URL.format(
-					aki.server,
-					int(aki.timestamp),
-					str(aki.child_mode).lower(),
-					aki.session,
-					aki.signature,
-					aki.step,
-					aki.frontaddr,
-					aki.question_filter,
-					int(aki.timestamp) + aki.step + 1,
-				),
-				headers=HEADERS,
-				decode=True,
-				aio=True,
-			)
-			await aki.win()
-			resp = aki.parse_response(resp)
-			print(resp)
-			if resp["completion"] == "OK":
-				aki._update(resp)
-				aki.no.clear()
-			else:
-				with tracebacksuppressor:
-					akinator.utils.raise_connection_error(resp["completion"])
-		elif isinstance(ans, int):
-			try:
-				await aki.answer(ans)
-			except json.JSONDecodeError:
-				await aki.answer(ans)
-			if not guessing and aki.step >= 79:
-				guess = True
+		if isinstance(ans, int):
+			await aki.answer(ans)
 		elif ans == "undo":
 			await aki.back()
-			aki.no.clear()
-		elif ans == "guess":
-			guess = True
-		elif ans == "end":
-			if guessing and aki.step >= 79:
-				guess = None
-			else:
-				guess = True
-			callback = "none"
-			bot.data.akinators.pop(aki.signature, None)
 		elif ans == "restart":
-			if aki:
-				bot.data.akinators.pop(aki.signature, None)
-				lang = language=aki.uri.split(".", 1)[0]
-				child = aki.child_mode
-			else:
-				lang = "en"
-				child = False
+			bot.data.akinators.pop(sig, None)
+			lang = T(aki).get("language") or "en"
+			child = T(aki).get("child_mode") or not bot.is_nsfw(message.channel)
 			aki = await self.compatible_akinator(language=lang, child_mode=child)
-			bot.data.akinators[aki.signature] = aki
-			aki.__dict__.setdefault("no", set())
+			sig = self.get_sig(aki)
+			bot.data.akinators[sig] = aki
+		elif ans == "end":
+			aki.finished = True
+			aki.win = False
+			aki.question = "Game exited. Thanks for playing!"
+		else:
+			raise RuntimeError(f"Unexpected input: {ans}")
+		print(ans, aki)
 
-		# div = 1
-		if (aki.progression >= 80 or guess) and not aki.step >= 79 and not win and not guessing:
-			if not aki.guesses:
-				await aki.win()
-			for data in aki.guesses:
-				if data["id"] in aki.no:
-					continue
-				guess = data
-				break
-			else:
-				if (guess or aki.progression >= 95) and aki.first_guess:
-					guess = aki.first_guess
-					if "\x7f" + str(guess["id"]) in aki.no:
-						aki.step = 79
-						guess = None
-		print(aki.step, aki.progression, aki.guesses, aki.no, sep="\n")
-
-		colour = await bot.get_colour(user)
+		photo = aki.photo if aki.win else aki.akitude_url
+		colour = await bot.get_colour(photo)
 		emb = discord.Embed(colour=colour)
 
 		desc = ""
-		if win:
-			aki.progression = 100
-			question = f"Great! Guessed right once more ({rank_format(win)} time with this character)! I love playing with you!"
-			gold = aki.step * 4
-			bot.data.users.add_gold(user, gold)
-			desc = "+" + await bot.as_rewards(gold)
-			if T(aki).get("last_guess"):
-				emb.set_image(url=aki.last_guess["absolute_picture_path"])
-			emb.set_thumbnail(url=self.victory_image)
-			callback = "none"
-		elif guess and not guessing:
-			if isinstance(guess, bool):
-				if not aki.guesses:
-					await aki.win()
-				for data in aki.guesses:
-					if data["id"] not in aki.no:
-						guess = data
-						break
-				else:
-					guess = aki.first_guess
-			if aki.progression >= 90:
-				question = f"I'm {round(aki.progression, 2)}% sure it's..."
-			else:
-				question = f"I'm ({round(aki.progression, 1)}%) thinking of..."
-			emb.title = "Akinator"
-			desc = "\xad" + bold(guess["name"]) + "\n" + italics(guess["description"])
-			buttons = [self.buttons[0], self.buttons[4]]
-			if guess.get("absolute_picture_path"):
-				aki.last_guess = guess
-				emb.set_image(url=aki.last_guess["absolute_picture_path"])
-				emb.set_thumbnail(url=self.check_image)
-		else:
-			emb.title = f"Akinator: Question {aki.step + 1}"
-			if aki.step >= 79:
-				question = "Bravo! You have defeated me! Play the game again on the [Akinator website](https://en.akinator.com/game) to add the character you were thinking of, and I'll remember for next time!"
-				gold = aki.step * 5
-				bot.data.users.add_gold(user, gold)
-				desc = "+" + await bot.as_rewards(gold)
-				emb.set_image(url=self.defeat_image)
-				callback = "none"
-			else:
-				question = aki.question
-				i = round_random(((40 - aki.step) / 160 + aki.progression / 100 + (random.random() * 2 - 1) / 4) * (len(self.images) - 1))
-				if i < 0:
-					i = 0
-				if i > len(self.images) - 1:
-					i = len(self.images) - 1
-				emb.set_thumbnail(url=self.images[i])
-			buttons = self.buttons
-		if callback == "none":
-			if win and T(aki).get("last_guess"):
-				emb.title = aki.last_guess["name"] + " (" + aki.last_guess["description"] + ")"
+		if aki.finished:
+			desc = str(aki)
+			buttons = (self.buttons[-2],)
+			if aki.win:
+				emb.title = f"Akinator: {aki.name_proposition} ({aki.description_proposition})"
+				emb.set_image(url=photo)
 			else:
 				emb.title = "Akinator: Game ended"
-			buttons = (self.buttons[-2],)
-			callback = "callback"
+				emb.set_thumbnail(url=akitude_url)
+		else:
+			desc = str(aki)
+			emb.title = f"Akinator: Question {int(aki.step) + 1}"
+			emb.set_thumbnail(url=photo)
+			if aki.win:
+				buttons = [self.buttons[0], *self.buttons[4:]]
+			else:
+				buttons = self.buttons
 		if desc:
 			desc += "\n"
-		else:
-			desc = ""
 
-		guessing = int(bool(guess and not guessing))
-		bar = await bot.create_progress_bar(18, aki.progression / 100)
+		bar = await bot.create_progress_bar(18, aki.confidence)
+		sig = self.get_sig(aki)
 		emb.description = (
-			f"*```{callback}-fun-akinator-{user.id}_{aki.signature}_{guessing}-\n"
-			+ f"{question}```*"
-			+ desc
+			f"*```{callback}-fun-akinator-{user.id}_{sig}-\n"
+			+ f"{desc}```*"
 			+ bar
 		)
 		emb.set_author(**get_author(user))
-		sem = T(message).get("sem")
-		if not sem:
-			try:
-				sem = EDIT_SEM[message.channel.id]
-			except KeyError:
-				sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
-		async with sem:
-			return await Request(
-				f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-				data=dict(
-					embeds=[emb.to_dict()],
-					components=restructure_buttons(buttons),
-				),
-				method="PATCH",
-				authorise=True,
-				aio=True,
-				timeout=12,
-			)
+		return await interaction_patch(
+			bot=bot,
+			message=message,
+			embed=emb,
+			buttons=buttons,
+		)
 
 
 class UpdateAkinators(Database):
 	name = "akinators"
 	no_file = True
-	no_delete = True
-
-	sem = Semaphore(1, 1, rate_limit=60)
-
-	def __load__(self):
-		self.akinators = deque()
-		csubmit(self.ensure_akinators())
-
-	async def ensure_akinators(self):
-		if self.sem.busy:
-			return
-		t = utc()
-		while self.akinators and t > self.akinators[0].timestamp + 240:
-			self.akinators.popleft()
-		async with self.sem:
-			while len(self.akinators) < 1:
-				try:
-					aki = await self.bot.commands.akinator[0].compatible_akinator(language="en", child_mode=False)
-				except Exception:
-					return
-				self.akinators.append(aki)
-			for k, aki in tuple(self.data.items()):
-				if t > aki.timestamp + 960:
-					self.data.pop(k)
-
-	# def __call__(self, **void):
-	# 	return self.ensure_akinators()

@@ -1135,7 +1135,7 @@
 			"description": "Adjusts boolean states of the audio player",
 			"usage": "",
 			"level": "0",
-			"rate_limit": "(3, 4)",
+			"rate_limit": "(2, 4)",
 			"example": [],
 			"timeout": "24"
 		},
@@ -1181,7 +1181,7 @@
 			"description": "Adjusts variable settings of the audio player",
 			"usage": "",
 			"level": "0",
-			"rate_limit": "(2, 3)",
+			"rate_limit": "(4, 8)",
 			"example": [],
 			"timeout": "24"
 		},
@@ -2001,13 +2001,10 @@
 				"Aki"
 			],
 			"description": "Think about a real or fictional character. I will try to guess who it is!",
-			"usage": "<language[en]>? <child_friendly(-c)>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(12, 16)",
-			"example": [
-				"akinator",
-				"akinator -c en"
-			],
+			"example": [],
 			"timeout": "24"
 		}
 	},

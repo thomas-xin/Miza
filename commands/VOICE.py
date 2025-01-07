@@ -1061,7 +1061,7 @@ class AudioState(Command):
 			value=True,
 		),
 	}
-	rate_limit = (3, 4)
+	rate_limit = (2, 4)
 	slash = True
 
 	async def __call__(self, bot, _comment, _guild, _user, _perm, mode, value, **void):
@@ -1229,6 +1229,8 @@ class AudioSettings(Command):
 			mode="bitrate",
 		),
 	}
+	rate_limit = (4, 8)
+	slash = True
 
 	async def __call__(self, bot, _comment, _guild, _user, _perm, mode, value, **void):
 		try:

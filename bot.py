@@ -5013,8 +5013,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						return True
 					extracted, index = longest_sublist(args, lambda x: try_parse_date(" ".join(x)))
 					if extracted:
-						r = DynamicDT.parse(" ".join(extracted))
-						args.pops(range(index, index + len(extracted)))
+						check = " ".join(extracted)
+						if not check.replace(" ", "").isnumeric():
+							r = DynamicDT.parse(check)
+							args.pops(range(index, index + len(extracted)))
 				elif v.type == "timedelta":
 					def try_parse_timedelta(s):
 						try:
@@ -5024,8 +5026,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						return True
 					extracted, index = longest_sublist(args, lambda x: try_parse_timedelta(" ".join(x)))
 					if extracted:
-						r = DynamicDT.parse_delta(" ".join(extracted))
-						args.pops(range(index, index + len(extracted)))
+						check = " ".join(extracted)
+						if not check.replace(" ", "").isnumeric():
+							r = DynamicDT.parse_delta(" ".join(extracted))
+							args.pops(range(index, index + len(extracted)))
 				if r:
 					kwargs[k] = [r] if v.get("multiple") else r
 					continue
@@ -5400,6 +5404,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				raise ReferenceError("This command is only available in servers.")
 		req = command.min_level
 		sem = emptyctx
+		if not bot.ready:
+			if message:
+				csubmit(message.add_reaction("🔜"))
+			await wrap_future(bot.full_ready)
+			if channel:
+				channel = await bot.fetch_channel(channel.id)
+				guild = getattr(channel, "guild", None) or guild
+			csubmit(message.remove_reaction("🔜", self.me))
 		u_perm = max(min_perm, self.get_perms(user.id, guild)) if min_perm is not None else self.get_perms(user.id, guild)
 		if not isnan(u_perm):
 			enabled = self.get_enabled(channel)
@@ -5420,14 +5432,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					reference=message,
 				))
 				return
-			elif not bot.ready:
-				if message:
-					csubmit(message.add_reaction("🔜"))
-				await wrap_future(bot.full_ready)
-				if channel:
-					channel = await bot.fetch_channel(channel.id)
-					guild = getattr(channel, "guild", None) or guild
-					u_perm = max(min_perm, bot.get_perms(user.id, guild)) if min_perm is not None else bot.get_perms(user.id, guild)
 			elif u_perm <= -inf:
 				print("REFUSED:", user, message.content)
 				csubmit(send_with_react(
@@ -6030,22 +6034,22 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		print(len(guilds), "guilds loaded.")
 
 	inter_cache = Cache(timeout=900, trash=0)
-	async def defer_interaction(self, message, ephemeral=False):
-		with suppress():
+	async def defer_interaction(self, message, ephemeral=False, mode="post"):
+		with tracebacksuppressor:
 			if hasattr(message, "int_id"):
 				int_id, int_token = message.int_id, message.int_token
 			elif hasattr(message, "slash"):
 				int_id, int_token = message.id, message.slash
 			else:
 				return
-			await Request(
+			data = await Request(
 				f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
 				method="POST",
 				authorise=True,
-				data='{"type":5,"data":{"flags":64}}' if ephemeral else '{"type":5}',
+				data='{"type":5,"data":{"flags":64}}' if ephemeral else '{"type":5}' if mode == "post" else '{"type":6}',
 				aio=True,
 			)
-			print("Deferred:", message.id)
+			print("Deferred:", message.id, data)
 			self.inter_cache[int_id] = int_token
 			self.inter_cache[message.id] = int_token
 			message.deferred = int_token
@@ -6055,40 +6059,33 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				self.cache.messages[message.id] = message
 			return message
 
-	@tracebacksuppressor(ConnectionError)
 	async def ignore_interaction(self, message, skip=False):
-		if hasattr(message, "int_id"):
-			int_id, int_token = message.int_id, message.int_token
-			if getattr(message, "deferred", None):
-				self.inter_cache[int_id] = int_token
-			self.inter_cache[message.id] = int_token
-		elif hasattr(message, "slash"):
-			int_id, int_token = message.id, message.slash
-		else:
-			return
-		m = None
-		try:
-			if skip:
-				raise ConnectionError(400)
-			await Request(
-				f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
-				method="POST",
-				authorise=True,
-				data='{"type":6}',
-				aio=True,
-			)
-		except ConnectionError:
-			m = await send_with_reply(getattr(message, "channel", None), message, "\xad", ephemeral=False)
-		print("II:", m)
-		if m and not getattr(m, "ephemeral", False):
-			await self.silent_delete(m)
-		# else:
-			# await Request(
-				# f"https://discord.com/api/{api}/webhooks/{self.id}/{int_token}/messages/@original",
-				# method="DELETE",
-				# authorise=True,
-				# aio=True,
-			# )
+		with tracebacksuppressor:
+			if hasattr(message, "int_id"):
+				int_id, int_token = message.int_id, message.int_token
+				if getattr(message, "deferred", None):
+					self.inter_cache[int_id] = int_token
+				self.inter_cache[message.id] = int_token
+			elif hasattr(message, "slash"):
+				int_id, int_token = message.id, message.slash
+			else:
+				return
+			m = None
+			try:
+				if skip:
+					raise ConnectionError(400)
+				m = await Request(
+					f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
+					method="POST",
+					authorise=True,
+					data='{"type":6}',
+					aio=True,
+				)
+			except ConnectionError:
+				m = await send_with_reply(getattr(message, "channel", None), message, "\xad", ephemeral=False)
+			print("Ignored:", m)
+			if m and not isinstance(m, bytes) and not getattr(m, "ephemeral", False):
+				await self.silent_delete(m)
 
 	def add_webhook(self, w):
 		"Inserts a webhook into the bot's user and webhook cache."

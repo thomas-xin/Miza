@@ -1,4 +1,4 @@
-akinator>=1.1.1
+akipy>=0.2.0
 antlr4-python3-runtime>=4.13.2
 asyncio>=3.4.3
 async-timeout>=5.0.1

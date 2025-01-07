@@ -101,6 +101,7 @@ class ColourCache(Cache):
 			except Exception:
 				print_exc()
 				return (0, 0, 0)
+			print("GC:", url, c)
 			return c
 
 colour_cache = ColourCache(timeout=86400 * 7, trash=1, persist="colour.cache")
