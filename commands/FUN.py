@@ -3443,6 +3443,7 @@ class Akinator(Command):
 
 	async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
 		u_id, sig = vals.split("_", 1)
+		u_id = int(u_id)
 		if u_id != user.id and u_id != 0 and perm < 3:
 			return
 		r = as_str(reaction)
@@ -3491,7 +3492,7 @@ class Akinator(Command):
 				emb.set_image(url=photo)
 			else:
 				emb.title = "Akinator: Game ended"
-				emb.set_thumbnail(url=akitude_url)
+				emb.set_thumbnail(url=photo)
 		else:
 			desc = str(aki)
 			emb.title = f"Akinator: Question {int(aki.step) + 1}"

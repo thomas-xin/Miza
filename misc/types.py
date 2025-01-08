@@ -8,7 +8,7 @@ import copy
 import datetime
 import functools
 from itertools import chain, repeat # noqa: F401
-from math import ceil, floor, inf, nan, isfinite
+from math import ceil, floor, inf, nan
 import json
 import random
 import re
@@ -18,6 +18,9 @@ from traceback import print_exc
 import numpy as np
 import orjson
 from misc.ring_vector import RingVector
+
+if not hasattr(time, "time_ns"):
+	time.time_ns = lambda: int(time.time() * 1e9)
 
 UNIQUE_TS = 0
 def ts_us():

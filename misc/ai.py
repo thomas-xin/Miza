@@ -1565,7 +1565,7 @@ f_wolfram_alpha = {
 f_reasoning = {
 	"type": "function", "function": {
 		"name": "reasoning",
-		"description": "Requests for a slower, more powerful language model to provide reasoning. Use if you are unsure about, or if a user is pointing out a flaw in your logic.",
+		"description": "Requests for a slower, more powerful language model to provide reasoning. Use if you are unsure about, or if a user is pointing out a flaw in your logic. Make sure to pass all relevant information!",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {
