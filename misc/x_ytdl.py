@@ -161,18 +161,31 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 		temp_path = filename.rsplit(".", 1)[0] + "~." + self.format
 		before = []
 		input_args = []
-		if self.format == "mp4":
+		if self.format == "mp4" and info.get("vcodec", "none") not in ("none", "png", "jpeg", "gif"):
 			output_args = ["-f", self.format, "-c", "copy"]
 			lightning = self.start is not None or self.end is not None
 			if self.end is not None:
 				input_args.extend(["-to", str(self.end)])
 				temp_path = filename.rsplit(".", 1)[0] + f"~None~{self.end}~." + self.format
+		elif self.format in ("avif", "webp", "gif", "apng"):
+			if self.start is not None:
+				input_args.extend(["-ss", str(self.start)])
+			if self.end is not None:
+				input_args.extend(["-to", str(self.end)])
+			if self.format == "avif":
+				codecs = ["-c:v", "libsvtav1"]
+			elif self.format == "webp":
+				codecs = ["-c:v", "libwebp"]
+			else:
+				codecs = []
+			output_args = ["-f", self.format, *codecs, "-b:v", "2M", "-an"]
+			lightning = False
 		else:
 			if self.start is not None:
 				input_args.extend(["-ss", str(self.start)])
 			if self.end is not None:
 				input_args.extend(["-to", str(self.end)])
-			output_args = ["-f", self.format, "-c:v", self.codec, "-b:v", "3072k"]
+			output_args = ["-f", self.format, "-c:v", self.codec, "-b:v", "2M"]
 			if self.format == "mp4":
 				# MP4 supports just about any audio codec, but WebM and MKV do not. We assume the audio codec is not WMA, as it is highly unlikely any website would use it for streaming videos.
 				output_args.extend(["-c:a", "copy"])

@@ -42,6 +42,7 @@ MAX_QUEUE = 262144
 
 if __name__ == "__main__":
 	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
+	interface2 = EvalPipe.from_stdin(glob=globals())
 	print = interface.print
 
 ytdl = None
@@ -851,7 +852,7 @@ class AudioPlayer(discord.AudioSource):
 					print_exc()
 					s = italics(ansi_md(
 						f"{colourise('❗', fg='blue')}{colourise()} An error occured while loading {colourise_brackets(entry.name, 'red', 'green', 'magenta')}{colourise()}, and it has been removed automatically. {colourise('❗', fg='blue')}{colourise()}\n"
-						+ f"Exception: {colourise_brackets(repr(ex), 'red', 'magenta', 'yellow')}"
+						+ f"Exception: {colourise_brackets(lim_str(repr(ex), 1024), 'red', 'magenta', 'yellow')}"
 					))
 					csubmit(self.announce(s))
 					return self.skip()
@@ -1007,7 +1008,7 @@ class PipedLoader:
 			self.file.write(b)
 			self.file.flush()
 			self.buffer += 1
-			assert os.path.getsize(self.temp) == 1
+			assert os.path.getsize(self.temp) == 1, "Expected non-empty file"
 		if efp:
 			esubmit(shutil.copyfileobj, efp, sys.stderr)
 		esubmit(self.loading)
@@ -1136,13 +1137,25 @@ class AudioFile:
 				cmd = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + cmd[1:]
 			print(cmd)
 			proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=None)
-			assert proc.is_running()
+			assert proc.is_running(), "FFmpeg process failed to start"
 
 			def callback(file):
 				self.stream = file
 				self.duration = entry["duration"] = get_duration(self.stream) or self.duration
 
-			self.stream = PipedLoader(proc.stdout, self.path, efp=proc.stderr, callback=callback)
+			try:
+				self.stream = PipedLoader(proc.stdout, self.path, efp=proc.stderr, callback=callback)
+			except RuntimeError as ex:
+				if asap and "Server returned 403 Forbidden (access denied)" in str(ex):
+					stream, codec, duration, channels = ytdl.get_audio(entry, asap=False)
+					name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
+					self.path = f"{TEMP_PATH}/audio/{name} {uhash(url)}.opus"
+					assert not is_url(stream) and codec == "opus" and channels == 2, f"Unexpected stream format: {stream} {codec} {channels}"
+					rename(stream, self.path)
+					self.stream = self.path
+					self.duration = entry["duration"] = get_duration(self.stream) or duration
+					return self
+				raise
 			self.duration = entry["duration"] = duration
 			return self
 		except Exception as ex:
@@ -1158,7 +1171,7 @@ class AudioFile:
 
 	# Creates a reader object that either reads bytes or opus packets from the file.
 	def open(self):
-		assert isinstance(self.stream, str) and not is_url(self.stream) and os.path.exists(self.stream) and os.path.getsize(self.stream)
+		assert isinstance(self.stream, str) and not is_url(self.stream) and os.path.exists(self.stream) and os.path.getsize(self.stream), "File not found or empty"
 		f = open(self.stream, "rb")
 		it = discord.oggparse.OggStream(f).iter_packets()
 
@@ -1614,6 +1627,7 @@ if __name__ == "__main__":
 
 	def startup(fut):
 		interface.start()
+		interface2.start()
 		globals()["ytdl"] = fut.result()
 
 	ytdl_fut.add_done_callback(startup)

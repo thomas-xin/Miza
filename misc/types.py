@@ -725,7 +725,7 @@ class RangeSet(collections.abc.Iterable):
 	def add(self, start, stop=None):
 		if stop is None:
 			stop = start + 1
-		assert start <= stop
+		assert start <= stop, "Start must be less than or equal to stop."
 		if start == stop or range(start, stop) in self:
 			return self
 		self.ranges.append((start, stop))
@@ -744,7 +744,7 @@ class RangeSet(collections.abc.Iterable):
 	def remove(self, start, stop=None):
 		if stop is None:
 			stop = start + 1
-		assert start <= stop
+		assert start <= stop, "Start must be less than or equal to stop."
 		if start == stop:
 			return self
 		i = 0

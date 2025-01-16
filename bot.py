@@ -185,7 +185,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		s = max(1, data["shards"])
 		shards = max(1, ceil(x / log10(x) / 100 / s)) * s
 		print("Automatic shards:", shards)
-		assert data["session_start_limit"]["remaining"] > shards
+		assert data["session_start_limit"]["remaining"] > shards, "Insufficient session quota."
 		self.monkey_patch()
 		super().__init__(
 			loop=eloop,
@@ -1083,8 +1083,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		with suppress(TypeError):
 			int(channel)
 			channel = await self.fetch_channel(channel)
+		# This method is only called when a message is not found in the cache. This means that it is likely either out of range of cache or was produced during downtime, meaning surrounding messages may not be cached either. We preemtively fetch the surrounding messages to prepare for future requests, or requests that may involve the surrounding messages.
 		messages = await flatten(discord.abc.Messageable.history(channel, limit=101, around=cdict(id=m_id)))
 		data = {m.id: m for m in messages}
+		min_id = min(data)
+		if min_id != m_id:
+			left = await flatten(discord.abc.Messageable.history(channel, limit=100, before=cdict(id=min_id)))
+			data.update({m.id: m for m in left})
+		max_id = max(data)
+		if max_id != m_id:
+			right = await flatten(discord.abc.Messageable.history(channel, limit=100, after=cdict(id=max_id)))
+			data.update({m.id: m for m in right})
 		self.cache.messages.update(data)
 		return data[m_id]
 	async def fetch_message(self, m_id, channel=None, old=False):
@@ -1618,9 +1627,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					else:
 						found.extend(a.url for a in m.attachments)
 					found.extend(find_urls(m.content))
-					if emojis:
-						temp = await self.follow_to_image(m.content, follow=reactions)
-						found.extend(filter(is_url, temp))
 					for s in T(m).get("stickers", ()):
 						found.append(s.url)
 					# Attempt to find URLs in embed contents
@@ -1637,6 +1643,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 									break
 					# Attempt to find URLs in embed descriptions
 					[found.extend(find_urls(e.description)) for e in m.embeds if e.description]
+					if emojis:
+						temp = await self.follow_to_image(m.content, follow=reactions)
+						found.extend(filter(is_url, temp))
 					if images:
 						if reactions:
 							m = await self.ensure_reactions(m)
@@ -1921,37 +1930,27 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		11: "au-en",
 		12: "nz-en",	# New Zealand
 	}
-	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60, screenshot=False, best=False):
+	from duckduckgo_search import DDGS
+	ddgs = DDGS()
+	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60, screenshot=False, include_hrefs=False, best=False):
 		"Browses the internet using DuckDuckGo or Microsoft Edge. Returns an image if screenshot is set to True."
 		if not region:
 			if timezone is None:
 				if "users" in self.data:
 					timezone, confidence = self.data.users.estimate_timezone(uid)
-					if confidence < 1 / 256:
+					if confidence < 0.5:
 						timezone = None
 			if timezone is not None:
 				timezone = round(get_offset(timezone) / 3600)
-			region = self.browse_locations.get(timezone, "us-en")
-		async def retrieval(argv, region="us-en", screenshot=False, best=False):
+			region = self.browse_locations.get(timezone, "wt-wt")
+		async def retrieval(argv, region="wt-wt", screenshot=False, best=False):
 			if not is_url(argv):
-				query = urllib.parse.quote_plus(argv)
-				url = f"https://duckduckgo.com/?q={query}&kl={region}&kp=-2&kz=1&kav=1&kf=-1&kaf=1&km=l&ko=s&k1=1"
-				print("Browse:", url)
+				print("Browse query:", repr(argv))
 				with tracebacksuppressor:
-					s = await Request(url, decode=True, aio=True)
-					search = 'id="deep_preload_script" src="'
-					assert search in s
-					url = s.split(search, 1)[-1].split('"', 1)[0]
-					print("Browse:", url)
-					s = await Request(url, decode=True, aio=True)
-					search = "DDG.pageLayout.load('d',[{"
-					assert search in s
-					res = "[{" + s.split(search, 1)[-1].split("}]);DDG.duckbar.load('", 1)[0] + "}]"
-					try:
-						data = orjson.loads(res)
-					except orjson.JSONDecodeError:
-						return res.strip()
-					return "\n\n".join((e.get("c", "") + "\n" + html_decode(e.get("a", ""))).strip() for e in data).strip()
+					data = await asubmit(self.ddgs.text, argv, safesearch="off", region=region, max_results=20 if best else 10)
+					if include_hrefs:
+						return "\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).strip()
+					return "\n\n".join((e.get("title", "") + "\n" + e.get("body", "")).strip() for e in data).strip()
 			return await process_image("browse", "$", [argv, not screenshot], cap="browse", timeout=timeout, retries=2)
 		urls = find_urls(argv)
 		if not urls:
@@ -1969,7 +1968,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				pass
 		if backup_models:
 			models.extend((
-				"firefunction-v2",
+				"deepseek-v3",
 			))
 		if model:
 			if model in models:
@@ -2300,7 +2299,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			nsfw="mythomax-13b",
 			backup="llama-3-8b",
 			retry="auto",
-			function="firefunction-v2",
+			function="deepseek-v3",
 			vision="llama-3-11b",
 			target="auto",
 		),
@@ -3371,8 +3370,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				url = (await self.data.exec.uproxy(url, force=force)) or url
 		return url
 
-	async def as_embed(self, message, link=False, colour=False) -> discord.Embed:
-		message = await self.ensure_reactions(message)
+	async def as_embed(self, message, link=False, colour=False, refresh=True) -> discord.Embed:
+		if refresh:
+			message = await self.ensure_reactions(message)
 		emb = discord.Embed(description="").set_author(**get_author(message.author))
 		if colour:
 			col = await self.get_colour(message.author)
@@ -4993,7 +4993,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		kwargs = cdict((k, v) for k, v in spl[0]._get_kwargs() if v is not None)
 		if o_kwargs:
 			kwargs.update(o_kwargs)
-		print("OK:", kwargs)
 		for k, v in tuple(kwargs.items()):
 			if "-" in k:
 				kwargs[k.replace("-", "_")] = kwargs.pop(k)
@@ -5411,7 +5410,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if channel:
 				channel = await bot.fetch_channel(channel.id)
 				guild = getattr(channel, "guild", None) or guild
-			csubmit(message.remove_reaction("🔜", self.me))
+			csubmit(message.remove_reaction("🔜", self.user))
 		u_perm = max(min_perm, self.get_perms(user.id, guild)) if min_perm is not None else self.get_perms(user.id, guild)
 		if not isnan(u_perm):
 			enabled = self.get_enabled(channel)
@@ -5722,10 +5721,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					else:
 						manager = self.StreamedMessage(channel, reference=reference, msglen=msglen, maxlen=maxlen)
 						old_content = ""
-					embeds = manager.embeds + (response.get("embeds") or ([response["embed"]] if response.get("embed") else None) or [])
-					files = manager.files + (response.get("files") or ([response["file"]] if response.get("file") else None) or [])
-					reacts = response.get("reacts")
-					buttons = manager.buttons + (response.get("buttons") or [])
 
 					def add_content(old_content, content):
 						if not old_content:
@@ -5796,7 +5791,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						except StopAsyncIteration:
 							pass
 					content = content.strip()
-					print("STOP:", content)
+					embeds = manager.embeds + (response.get("embeds") or ([response["embed"]] if response.get("embed") else None) or [])
+					files = manager.files + (response.get("files") or ([response["file"]] if response.get("file") else None) or [])
+					reacts = response.get("reacts")
+					buttons = manager.buttons + (response.get("buttons") or [])
+					print("STOP:", content, embeds, files, reacts, buttons)
 					total_length = len(get_prefix()) + len(content) + len(get_suffix())
 					if fut:
 						with tracebacksuppressor:
@@ -7063,13 +7062,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			activity = None
 			system_content = clean_content = ""
 			edited_at = None
-			jump_url = "https://discord.com/channels/-1/-1/-1"
 			is_system = lambda self: None
 			slash = None
 
 			@property
 			def created_at(self):
 				return snowflake_time_3(self.id)
+
+			@property
+			def jump_url(self):
+				channel = getattr(self, "channel", None)
+				guild = getattr(self, "guild", None) or getattr(channel, "guild", None)
+				if not guild or not channel:
+					return "https://discord.com/channels/-1/-1/-1"
+				return f"https://discord.com/channels/{self.guild.id}/{self.channel.id}/{self.id}"
 
 			edit = delete
 			publish = delete
@@ -7112,6 +7118,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						print(args)
 						print(kwargs)
 						raise
+				if self.webhook_id == bot.id:
+					return await discord.Message.edit(self, *args, **kwargs)
 				try:
 					w = bot.cache.users[self.webhook_id]
 					webhook = getattr(w, "webhook", w)
@@ -7120,8 +7128,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				except KeyError:
 					webhook = await bot.fetch_webhook(self.webhook_id)
 					bot.data.webhooks.add(webhook)
-				if webhook.id == bot.id:
-					return await discord.Message.edit(self, *args, **kwargs)
 				data = kwargs
 				if args:
 					data["content"] = " ".join(args)
@@ -8371,7 +8377,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					after.sem.delay_for(20)
 			self.add_message(after, files=False, force=2)
 			if before.author.id == self.deleted_user or after.author.id == self.deleted_user:
-				print("Deleted user RAW_MESSAGE_EDIT", after.channel, before.author, after.author, before, after, after.channel.id, after.id)
+				print("Deleted User RAW_MESSAGE_EDIT", after.channel, before.author, after.author, before, after, after.channel.id, after.id)
 			if raw or before.content != after.content:
 				if "users" in self.data:
 					self.data.users.add_xp(after.author, xrand(1, 4))

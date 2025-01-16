@@ -112,8 +112,8 @@ class ImageSequence(Image.Image):
 	@classmethod
 	def pipe(cls, pipe, mode, size, frameprops, close=None):
 		self = cls.fromiter(cls.iter(pipe, mode, size, frameprops), frameprops=frameprops, close=close)
-		assert self.mode == mode
-		assert self.size == size
+		assert self.mode == mode, f"{self.mode} != {mode}"
+		assert self.size == size, f"{self.size} != {size}"
 		return self
 
 	@classmethod
@@ -441,7 +441,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
 			if nogif:
 				fcount = dur = fps = 1
-			assert fcount >= 1
+			assert fcount >= 1, f"Invalid frame count: {fcount}"
 			if not isfinite(fcount) or fcount < 3 or bcount * fcount < 268435456 or len(b) < 16777216:
 				print("Decoding directly:", proc, mode, size, (fcount, dur, fps))
 				images = deque()
@@ -827,7 +827,7 @@ def resume(im, *its):
 
 def has_transparency(image):
 	"Checks if a palette image has transparency. We assume that an image has transparency if it has a transparency index, or an even number of channels (indicating modes LA or RGBA)."
-	assert image.mode == "P"
+	assert image.mode == "P", "Expected a palette image."
 	transparent = image.info.get("transparency", -1)
 	if transparent != -1:
 		return True

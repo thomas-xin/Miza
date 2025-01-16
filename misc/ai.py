@@ -48,11 +48,13 @@ available = {
 		None: "gpt-4m",
 	},
 	"claude-3-haiku": {
-		"anthropic": ("claude-3-haiku-20240307", ("1", "5")),
+		"anthropic": ("claude-3-haiku-20240307", ("0.25", "1.25")),
 		None: "gpt-4m",
 	},
 	"deepseek-v3": {
 		"deepseek": ("deepseek-chat", ("0.14", "0.28")),
+		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
+		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
 		None: "gpt-4",
 	},
 	"llama-3-405b": {
@@ -1549,19 +1551,6 @@ f_browse = {
 			},
 			"required": ["query"],
 }}}
-f_wolfram_alpha = {
-	"type": "function", "function": {
-		"name": "wolfram_alpha",
-		"description": "Queries the Wolfram Alpha engine. Only use for mathematics equations to ensure correctness of answers.",
-		"parameters": {
-			"type": "object", "properties": {
-				"query": {
-					"type": "string",
-					"description": 'Query, eg. "Real solutions for x^3-6x^2+12", "eigenvalues of {{2,3,-3},{4,2,-4},{4,3,-5}}", "randint(1,100)"',
-				},
-			},
-			"required": ["query"],
-}}}
 f_reasoning = {
 	"type": "function", "function": {
 		"name": "reasoning",
@@ -1575,10 +1564,23 @@ f_reasoning = {
 			},
 			"required": ["query"],
 }}}
+f_wolfram_alpha = {
+	"type": "function", "function": {
+		"name": "wolfram_alpha",
+		"description": "Queries the Wolfram Alpha engine. Only use for mathematics equations to ensure correctness of answers.",
+		"parameters": {
+			"type": "object", "properties": {
+				"query": {
+					"type": "string",
+					"description": 'Query, eg. "Real solutions for x^3-6x^2+12", "eigenvalues of {{2,3,-3},{4,2,-4},{4,3,-5}}", "Glaisher–Kinkelin constant to 100 decimal places"',
+				},
+			},
+			"required": ["query"],
+}}}
 f_sympy = {
 	"type": "function", "function": {
 		"name": "sympy",
-		"description": "Queries the Sympy algebraic library. Use in place of Wolfram Alpha only for single functions.",
+		"description": "Queries the Sympy algebraic library. Faster than Wolfram Alpha, but does NOT handle natural language.",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {
@@ -1737,9 +1739,9 @@ f_default = {
 TOOLS = {
 	"knowledge_internet": [
 		f_browse,
-		f_wolfram_alpha,
 		f_reasoning,
-		# f_sympy,
+		f_wolfram_alpha,
+		f_sympy,
 		f_myinfo,
 		f_txt2img,
 	],
@@ -1750,9 +1752,9 @@ TOOLS = {
 	],
 	"calculator": [
 		f_browse,
-		f_wolfram_alpha,
 		f_reasoning,
-		# f_sympy,
+		f_wolfram_alpha,
+		f_sympy,
 	],
 	"calendar": [
 		f_reminder,

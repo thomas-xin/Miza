@@ -70,8 +70,6 @@ for mod in modlist:
 				if op in mod:
 					name, version = mod.split(op)
 					break
-			if name == "yt-dlp":
-				raise StopIteration
 			v = importlib.metadata.version(name)
 			if version is not None:
 				try:
@@ -125,5 +123,7 @@ except Exception:
 
 if installing:
 	subprocess.run([python, "-m", "pip", "install", "-r", "requirements.txt"])
+
+subprocess.run([python, "-m", "pip", "install", "--upgrade", "--pre", "yt-dlp"])
 
 print("Installer terminated.")

@@ -1957,7 +1957,6 @@ class ServerProtector(Database):
 			return
 
 		def analyse(resp):
-			print("META:", type(resp), resp)
 			if not isinstance(resp, bytes):
 				return False
 			if re.search(r'^{\s*"', as_str(resp[:64])):
@@ -1983,7 +1982,9 @@ class ServerProtector(Database):
 				return True
 			return False
 
-		if analyse(resp):
+		is_ai = analyse(resp)
+		print("META:", type(resp), is_ai, resp)
+		if is_ai:
 			try:
 				await self.bot.react_with(message, "ai_generated.gif")
 			except Exception:
@@ -2993,9 +2994,9 @@ class UpdateMessageLogs(Database):
 			self.data.pop(guild.id)
 			return
 		emb = await self.bot.as_embed(after)
-		emb2 = await self.bot.as_embed(before)
+		emb2 = await self.bot.as_embed(before, refresh=False)
 		emb.colour = discord.Colour(0x0000FF)
-		action = f"**Message edited in** {channel_mention(after.channel.id)}:\n[View Message](https://discord.com/channels/{guild.id}/{after.channel.id}/{after.id})"
+		action = f"**Message edited in** {channel_mention(after.channel.id)}:\n[View Message]({after.jump_url})"
 		emb.add_field(name="Before", value=lim_str(emb2.description, 1024))
 		emb.add_field(name="After", value=lim_str(emb.description, 1024))
 		emb.description = action

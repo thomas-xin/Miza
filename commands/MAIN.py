@@ -1868,7 +1868,6 @@ class UpdateUsers(Database):
 				estimated -= 24
 		else:
 			estimated = 0
-		# print(estimated, inactive, activity)
 		return get_timezone(estimated), min(1, len(data) / self.hours)
 
 	async def __call__(self):

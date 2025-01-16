@@ -2198,7 +2198,7 @@ class Download(Command):
 		format=cdict(
 			type="enum",
 			validation=cdict(
-				enum=("mp3", "opus", "ogg", "flac", "wav", "weba"),
+				enum=("mp4", "mkv", "webm", "avif", "webp", "gif", "ogg", "opus", "mp3"),
 			),
 			description="Output format of the downloaded file.",
 			default="opus",

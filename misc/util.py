@@ -1077,6 +1077,7 @@ MIMES = cdict(
 	jpg="image/jpeg",
 	gif="image/gif",
 	webp="image/webp",
+	avif="image/avif",
 	ts="video/ts",
 	webm="video/mp2t",
 	weba="audio/weba",
@@ -1087,6 +1088,7 @@ MIMES = cdict(
 	flac="audio/flac",
 	wav="audio/x-wav",
 	mp4="video/mp4",
+	zip="application/zip",
 )
 
 def load_mimes():
@@ -1494,7 +1496,7 @@ def encode_snowflake(*args, store_count=False):
 	# <127 indicates snowflake count
 	# >127 indicates predetermined count
 	if store_count:
-		assert 1 < len(args) < 127
+		assert 1 < len(args) < 127, "Snowflake count must be between 2 and 126."
 		encoded = bytes([len(args)]) + encoded
 	elif encoded[0] < 128:
 		encoded = b"\x7f" + encoded
@@ -1578,9 +1580,9 @@ def shorten_attachment(c_id, m_id, a_id, fn, mode="u", size=0, base="https://miz
 		url += f"?size={size}"
 	return url
 def expand_attachment(url):
-	assert "//" in url
+	assert "//" in url, "Expected shortened URL."
 	regs = regexp(r"\/\w\/").split(url.split("?", 1)[0], 1)
-	assert len(regs) == 2
+	assert len(regs) == 2, "Invalid shortened URL."
 	encoded = regs[-1]
 	return decode_attachment(encoded)
 
@@ -3447,7 +3449,7 @@ def fuzzy_substring(sub, s, match_start=False, match_length=True):
 	return ratio
 
 def longest_sublist(lst, predicate):
-	"Returns the longest contiguous sublist of a list that satisfies a predicate. For example, if the predicate is `lambda a: all(a[i] < a[i + 1] for i in range(len(a) - 1))`, the function will return the longest sorted sublist. Note that for our implementation, we may sometimes need to keep two buffers for the sliding window, as a contiguous sublist may not fulfil the predicate if cut off; for example, if our predicate is instead a function which parses a string and returns a time delta, it may consider the string `2 hours` and `3 minutes` as valid, but not `2 hours 3`, so we would need to keep the first buffer temporarily to be able to validate the string `2 hours 3 minutes`."
+	"Returns the longest contiguous sublist of a list that satisfies a predicate. For example, if the predicate is `lambda a: all(a[i] < a[i + 1] for i in range(len(a) - 1))`, the function will return the longest sorted sublist. Note that for our implementation, we may sometimes need to perform backtracking with the sliding window, as a contiguous sublist may not fulfil the predicate if cut off; for example, if our predicate is instead a function which parses a string and returns a time delta, it may consider the strings `2 hours` and `3 minutes` as valid, but not `2 hours 3`, so we would need to backtrack at `3 minutes` to the previous predicate-satisfying sublist to be able to correctly identify the string `2 hours 3 minutes`."
 	if not lst:
 		return [], -1
 	max_len = 0
@@ -3455,29 +3457,32 @@ def longest_sublist(lst, predicate):
 	curr_len = 0
 	curr_start = 0
 	curr_buf = []
-	prev_buf = []
+	prev_bufs = []
 	for i in range(len(lst)):
 		curr_buf.append(lst[i])
 		if predicate(curr_buf):
-			if prev_buf:
+			# Since the predicate is satisfied, we backtrack to see if we can extend the current buffer with any of the previous buffers
+			for prev_buf in reversed(prev_bufs):
 				if predicate(prev_buf + curr_buf):
 					curr_buf = prev_buf + curr_buf
 					curr_start -= len(prev_buf)
-					prev_buf = []
 				else:
-					prev_buf = []
+					break
+			prev_bufs.clear()
 			curr_len = len(curr_buf)
 			if curr_len > max_len:
 				max_len = curr_len
 				max_start = curr_start
 		else:
-			prev_buf = curr_buf[:-1]
+			prev_bufs.append(curr_buf[:-1])
 			curr_buf = [lst[i]]
 			curr_start = i
 	if len(curr_buf) > max_len and predicate(curr_buf):
 		return curr_buf, curr_start
-	if len(prev_buf) + len(curr_buf) > max_len and predicate(prev_buf + curr_buf):
-		return prev_buf + curr_buf, curr_start - len(prev_buf)
+	while prev_bufs and predicate(prev_bufs[-1] + curr_buf):
+		prev_buf = prev_bufs.pop(-1)
+		curr_buf = prev_buf + curr_buf
+		curr_start -= len(prev_buf)
 	final = lst[max_start:max_start + max_len]
 	if predicate(final):
 		return final, max_start
@@ -3739,7 +3744,7 @@ class EvalPipe:
 					argstr = " ".join(map(json_dumpstr, args))
 					args = ["xterm", "-e", argstr]
 			print(args)
-			subprocess.Popen(args, shell=isinstance(args, str))
+			subprocess.Popen(args, shell=isinstance(args, str), stdin=subprocess.DEVNULL, stdout=None, stderr=None)
 			t = utc()
 			for i in range(timeout):
 				if utc() - t > timeout:
@@ -3753,7 +3758,7 @@ class EvalPipe:
 			else:
 				raise
 		print(f"{DynamicDT.now()}: New connection:", conn)
-		assert conn.readable and conn.writable
+		assert conn.readable and conn.writable, "Connection must be readable and writable."
 		pid = conn.recv()
 		proc = psutil.Process(pid)
 		self = cls(
@@ -4125,7 +4130,7 @@ class ProxyManager:
 			futs = [esubmit(self.check_proxy, p) for p in proxies]
 			for i, (p, fut) in enumerate(zip(proxies, futs)):
 				try:
-					assert fut.result(timeout=6)[0] == 105
+					assert fut.result(timeout=6)[0] == 105, f"Proxy {p} returned incorrect data."
 				except (IndexError, AssertionError, T2):
 					self.proxies.discard(p)
 					self.bad_proxies.add(p)

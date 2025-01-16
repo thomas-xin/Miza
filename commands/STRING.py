@@ -984,7 +984,7 @@ class EmojiCrypt(Command):
 
 
 class Time(Command):
-	name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T", "EstimateTime", "EstimateTimezone"]
+	name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T"]
 	description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user."
 	schema = cdict(
 		input=cdict(
@@ -998,15 +998,28 @@ class Time(Command):
 			description="Target user to retrieve timezone from. Will use automatically estimated timezone if not provided",
 			example="201548633244565504",
 		),
+		estimate=cdict(
+			type="bool",
+			description="Force a timezone estimate, even if a timezone is assigned",
+			default=False,
+		)
+	)
+	macros = cdict(
+		EstimateTime=cdict(
+			estimate=True,
+		),
+		EstimateTimezone=cdict(
+			estimate=True,
+		),
 	)
 	rate_limit = (3, 5)
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, _user, input, user, **void):
+	async def __call__(self, _user, input, user, estimate, **void):
 		user = user or _user
 		c = 1
-		tzinfo = self.bot.data.users.get_timezone(user.id)
+		tzinfo = self.bot.data.users.get_timezone(user.id) if not estimate else None
 		if tzinfo is None:
 			tzinfo, c = self.bot.data.users.estimate_timezone(user.id)
 			estimated = True
@@ -1492,7 +1505,7 @@ class Browse(Command):
 		ss = True if int(m) == 0 else False
 		urls = await bot.follow_url(argv, ytd=False)
 		argv = urls[0] if urls else argv
-		s = await bot.browse(argv, uid=user.id, screenshot=ss)
+		s = await bot.browse(argv, uid=user.id, screenshot=ss, include_hrefs=True)
 		ref = getattr(getattr(message, "reference", None), "cached_message", None)
 		if isinstance(s, bytes):
 			csubmit(bot.silent_delete(message))

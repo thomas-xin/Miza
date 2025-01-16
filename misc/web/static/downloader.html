@@ -140,6 +140,13 @@ a:hover {
 	max-width: 128px;
 	text-align: center;
 }
+.format-container {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 0;
+	justify-content: left;
+}
 	</style>
 </head>
 <body>
@@ -148,13 +155,26 @@ a:hover {
 			<h1>Download Media</h1>
 			<h3>Name or URL</h3>
 			<input type="text" id="query" style="min-width:320px; width:60vw; font-size: 24px; font-family: Agbalumo, cursive, sans-serif" oninput="debouncedSearch()" onchange="debouncedSearch()" value="" placeholder="https://youtu.be/dQw4w9WgXcQ" required>
+
 			<h3>Format</h3>
-			
-			<input type="radio" id="mp4" name="output-format" value="mp4" checked><label for="mp4">mp4</label><br />
-			<input type="radio" id="webm" name="output-format" value="webm"><label for="webm">webm</label><br />
-			<input type="radio" id="opus" name="output-format" value="opus"><label for="opus">opus (audio)</label><br />
-			<input type="radio" id="ogg" name="output-format" value="ogg"><label for="ogg">ogg (audio)</label><br />
-			<input type="radio" id="mp3" name="output-format" value="mp3"><label for="mp3">mp3 (audio)</label>
+			Full
+			<div class="format-container">
+				<label for="mp4"><input type="radio" id="mp4" name="output-format" value="mp4" checked>mp4</label>
+				<label for="mkv"><input type="radio" id="mkv" name="output-format" value="mkv">mkv</label>
+				<label for="webm"><input type="radio" id="webm" name="output-format" value="webm">webm</label>
+			</div>
+			Image Only
+			<div class="format-container">
+				<label for="avif"><input type="radio" id="avif" name="output-format" value="avif">avif</label>
+				<label for="webp"><input type="radio" id="webp" name="output-format" value="webp">webp</label>
+				<label for="gif"><input type="radio" id="gif" name="output-format" value="gif">gif</label>
+			</div>
+			Audio Only
+			<div class="format-container">
+				<label for="opus"><input type="radio" id="opus" name="output-format" value="opus">opus</label>
+				<label for="ogg"><input type="radio" id="ogg" name="output-format" value="ogg">ogg</label>
+				<label for="mp3"><input type="radio" id="mp3" name="output-format" value="mp3">mp3</label>
+			</div>
 		</div>
 	</div>
 	<div id="previews" class="container" style="display:none">
@@ -293,19 +313,32 @@ function updateSearched() {
 	lastSearch = query;
 	previews.style.display = "none";
 	if (!query) return;
+	previews.style.color = "#ffffff";
 	previews.textContent = "Loading...";
 	previews.style.display = "block";
 	component = encodeURIComponent(query);
-	fetch(`/ytdl?q=${component}`).then((response) => response.json()).then((data) => {
-		previews.style.display = "none";
-		previews.textContent = "";
-		data.forEach((e, i) => {
-			const preview = createPreviewElement(e, i, query);
-			previews.appendChild(preview);
+	fetch(`/ytdl?q=${component}`).then((response) => {
+		if (!response.ok) {
+			setError(response);
+			previews.textContent = "Error: " + response.statusText;
+			previews.style.color = "#ff0000";
+			return;
+		}
+		response.json().then((data) => {
+			if (!data) {
+				previews.textContent = "No results found.";
+				return;
+			}
+			previews.style.display = "none";
+			previews.textContent = "";
+			data.forEach((e, i) => {
+				const preview = createPreviewElement(e, i, query);
+				previews.appendChild(preview);
+			});
+			updateCount();
+			previews.style.display = data ? "flex" : "none";
+			submit.style.display = data ? "block" : "none";
 		});
-		updateCount();
-		previews.style.display = data ? "flex" : "none";
-		submit.style.display = data ? "block" : "none";
 	});
 }
 const debouncedSearch = debounce(updateSearched, 500);
@@ -321,9 +354,18 @@ function updateCount() {
 	document.getElementById("submit").querySelector("span").textContent = `Download (${count}/${children.length})`;
 }
 
+function setError(response) {
+	console.error(response.statusText);
+	submit.querySelector("span").textContent = `Error: ${response.statusText}`;
+	submit.error = true;
+	const progressBar = submit.querySelector(".progress-bar");
+	progressBar.style.width = "100%";
+	progressBar.style.background = "linear-gradient(135deg, #ff0000, #ff7f00)";
+}
+
 function downloadAll() {
 	submit = document.getElementById("submit");
-	submit.querySelector("span").textContent = "Loading...";
+	submit.querySelector("span").textContent = "Processing...";
 	submit.querySelector(".progress-bar").style.width = "0%";
 	submit.disabled = true;
 	children = document.getElementById("previews").children;
@@ -350,11 +392,7 @@ function downloadAll() {
 			if (submit.error) return;
 			fetch(href).then((response) => {
 				if (!response.ok) {
-					console.error(response.statusText);
-					submit.querySelector("span").textContent = `Error: ${response.statusText}`;
-					submit.error = true;
-					progressBar.style.width = "100%";
-					progressBar.style.background = "linear-gradient(135deg, #ff0000, #ff7f00)";
+					setError(response);
 					return;
 				}
 				response.blob().then((blob) => {

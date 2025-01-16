@@ -262,7 +262,12 @@ class Ask(Command):
 					# 	tid += "0"
 					# ucid.add(tid)
 					fc.id = tid
-					kwargs = cdict(eval_json(fc.function.arguments))
+					try:
+						kwargs = cdict(eval_json(fc.function.arguments))
+					except Exception:
+						print("Tool Call Error:", fc.function.arguments)
+						print_exc()
+						continue
 					kwargs.pop("description", None)
 					kwargs.pop("required", None)
 					call = None
@@ -353,7 +358,7 @@ class Ask(Command):
 						succ = await rag(name, tid, fut)
 					if name == "wolfram_alpha":
 						argv = kwargs.get("query") or " ".join(kwargs.values())
-						s = f'\n> Calculating "{argv}"...'
+						s = f'\n> Solving "{argv}"...'
 						text += s
 						yield s
 						fut = process_image("wolframalpha", "$", [argv], cap="browse", timeout=60, retries=2)
@@ -369,12 +374,12 @@ class Ask(Command):
 							if not u2:
 								u2 = bot
 							if u2.id == bot.id:
-								if pdata.description == DEFPER and bot_name == bot.user.display_name:
-									res = "- You are `Miza`, a multipurpose, multimodal bot that operates on platforms such as Discord.\n- Your appearance is based on the witch-girl `Misery` from `Cave Story`.\n- Your creator is <@201548633244565504>, and you have a website at https://mizabot.xyz which a guide on your capabilities!"
+								if pdata.description == DEFPER and bot_name == bot.user.display_name and bot.id == 668999031359537205:
+									res = "- You are `Miza`, a multipurpose, multimodal bot that operates on social platforms such as Discord.\n- Your appearance is based on the witch-girl `Misery` from `Cave Story`.\n- Your creator is <@201548633244565504>, and you have a website at https://mizabot.xyz which a guide on your capabilities!"
 								else:
 									cap = await self.bot.caption(best_url(u2), best=2 if premium.value >= 4 else 0, timeout=24)
 									s = "\n\n".join(filter(bool, cap)).strip()
-									res = f"- You are `{u2.name}`, a multipurpose, multimodal bot that operates on platforms such as Discord.\n- Your appearance is based on `{s}`."
+									res = f"- You are `{u2.name}`, a multipurpose, multimodal bot that operates on social platforms such as Discord.\n- Your appearance is based on `{s}`."
 									if bot.owners:
 										i = next(iter(bot.owners))
 										um = user_mention(i)
@@ -390,44 +395,6 @@ class Ask(Command):
 						yield s
 						fut = myinfo(argv)
 						succ = await rag(name, tid, fut)
-					# elif name == "recall":
-					# 	async def recall(argv):
-					# 		if not mapd:
-					# 			return
-					# 		try:
-					# 			await bot.lambdassert("math")
-					# 		except:
-					# 			print_exc()
-					# 			return
-					# 		resp = await bot.embedding(argv)
-					# 		data = resp.data
-					# 		em = base64.b64encode(data).decode("ascii")
-					# 		objs = list(t for t in ((k, embd[k]) for k in mapd if k in embd) if t[1] and len(t[1]) == len(em))
-					# 		if not objs:
-					# 			return
-					# 		outs = []
-					# 		keys = [t[0] for t in objs]
-					# 		ems = [t[1] for t in objs]
-					# 		print("EM:", len(ems))
-					# 		argsort = await bot.rank_embeddings(ems, em)
-					# 		n = 8
-					# 		argi = argsort[:n]
-					# 		print("ARGI:", argi)
-					# 		for i in sorted(argi, key=keys.__getitem__, reverse=True):
-					# 			k = keys[i]
-					# 			ki = int(k)
-					# 			if ki in ignores or not mapd.get(k):
-					# 				continue
-					# 			temp = mapd[k].copy()
-					# 			while len(temp):
-					# 				ename, econtent = temp[:2]
-					# 				temp = temp[2:]
-					# 				outs.insert(0, (ename, econtent))
-					# 			ignores.add(ki)
-					# 		return "\n\n".join(reversed(outs))
-					# 	argv = kwargs.get("query") or " ".join(kwargs.values())
-					# 	fut = recall(argv)
-					# 	succ = await rag(name, tid, fut)
 					elif name == "img2txt":
 						argv = kwargs.get("query") or " ".join(kwargs.values())
 						s = f'\n> Interpreting "{argv}"...'
@@ -481,7 +448,11 @@ class Ask(Command):
 								call[k] = v.get("default")
 					resp = await bot.run_command(command, call, message=fake_message, comment=comment, respond=False)
 					if resp:
-						response = resp if isinstance(resp, dict) else dict(content=resp)
+						print("Intermediate:", resp)
+						if isinstance(resp, dict):
+							response.update(resp)
+						else:
+							response.content = resp
 						rtext = response.get("content", "")
 						text = ("\r" + rtext).strip()
 						tc = None
@@ -1178,25 +1149,27 @@ class Imagine(Command):
 					_premium.append(["openai", resp_model, cost])
 			futs.extend(csubmit(Request(im.url, timeout=48, aio=True)) for im in images)
 			amount2 += len(images)
-		if amount2 < amount and (AUTH.get("deepinfra_key") and not url or AUTH.get("together_key")):
-			use_together = bool(AUTH.get("together_key")) and not mod_resp.flagged
+		if amount2 < amount and not url and (AUTH.get("deepinfra_key") or AUTH.get("together_key")):
+			use_together = False #bool(AUTH.get("together_key")) and not mod_resp.flagged
 			if url:
 				url = await bot.to_data_url(url)
 			resp_model = "black-forest-labs/FLUX.1-redux" if url else "black-forest-labs/FLUX.1-schnell-Free" if use_together else "black-forest-labs/FLUX-1-schnell"
 			c = amount - amount2
 			ms = 1024 if high_quality else 768
 			x, y = max_size(aspect_ratio or 1, 1, ms, force=True)
-			if x > 2048:
-				y *= 2048 / x
-				x = 2048
-			if y > 2048:
-				x *= 2048 / y
-				y = 2048
-			if x < 128:
-				x = 128
-			if y < 128:
-				y = 128
-			d = 2
+			max_width = 1792 if use_together else 2048
+			min_width = 64 if use_together else 128
+			if x > max_width:
+				y *= max_width / x
+				x = max_width
+			if y > max_width:
+				x *= max_width / y
+				y = max_width
+			if x < min_width:
+				x = min_width
+			if y < min_width:
+				y = min_width
+			d = 16
 			w, h = (round(x / d) * d, round(y / d) * d)
 			queue = []
 			c2 = c

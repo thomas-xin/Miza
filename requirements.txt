@@ -10,6 +10,7 @@ CherryPy>=18.10.0
 colormath>=3.0.0
 cython>=3.0.11
 discord>=2.3.2
+duckduckgo-search>=7.2.1
 dynamic-datetime>=0.0.8
 ectoplasm-steganography>=0.0.9
 filetype>=1.2.0

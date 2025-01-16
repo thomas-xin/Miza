@@ -1142,7 +1142,7 @@ class Server:
 					fmt = "ogg"
 				else:
 					fmt = "opus"
-			assert fmt in ("mp4", "webm", "ogg", "opus", "mp3")
+			assert fmt in ("mp4", "mkv", "webm", "avif", "webp", "gif", "ogg", "opus", "mp3"), f"Format {fmt} currently not supported."
 			tmpl = f"{CACHE_PATH}/{uhash(v)}.{fmt}"
 			start = kwargs.get("start")
 			end = kwargs.get("end")
@@ -1163,14 +1163,17 @@ class Server:
 				sem = self.ydl_sems.setdefault(ip, Semaphore(64, 256, rate_limit=8))
 				with sem:
 					# Separate video and audio formats
-					if VIDEO_FORMS.get(fmt) is None:
+					if fmt in ("ogg", "opus", "mp3"):
 						entry = self.ydl.search(v)[0]
 						fn2, _cdc, _dur, _ac = self.ydl.get_audio(entry, fmt=fmt, start=start, end=end)
 						if fn != fn2:
 							rename(fn2, fn)
 						title = entry["name"]
 					else:
-						fstr = f"bestvideo[ext={fmt}]+bestaudio[acodec=opus]/best[ext={fmt}]/best"
+						if fmt in ("avif", "webp", "gif"):
+							fstr = f"bestvideo[ext={fmt}]/bestvideo[acodec=none]/bestvideo"
+						else:
+							fstr = f"bestvideo[ext={fmt}]+bestaudio[acodec=opus]/best[ext={fmt}]/best/bestvideo+bestaudio/bestvideo"
 						postprocessors = [dict(
 							key="FFmpegCustomVideoConvertor",
 							format=fmt,

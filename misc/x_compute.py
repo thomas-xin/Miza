@@ -215,6 +215,9 @@ if "video" in CAPS:
 
 if "math" in CAPS:
 	import matplotlib.pyplot as plt
+	plt.style.use("dark_background")
+	plt.rcParams["figure.dpi"] = 96
+	plt.rcParams["figure.figsize"] = (16, 16)
 	# For the ~activity command.
 	special_colours = {
 		"message": (0, 0, 1),
@@ -226,9 +229,7 @@ if "math" in CAPS:
 
 	def plt_special(d, user=None, **void):
 		hours = 336
-		plt.style.use("dark_background")
 		plt.rcParams["figure.figsize"] = (24, 9)
-		plt.rcParams["figure.dpi"] = 96
 		plt.xlim(-hours, 0)
 		temp = np.zeros(len(next(iter(d.values()))))
 		width = hours / len(temp)
@@ -248,7 +249,9 @@ if "math" in CAPS:
 		out = f"cache/{ts}.png"
 		plt.savefig(out)
 		plt.clf()
-		return "$" + out
+		plt.rcParams["figure.figsize"] = (16, 16)
+		with open(out, "rb") as f:
+			return f.read()
 
 	def plt_mp(arr, hours, name):
 		if hours >= 336:
@@ -271,11 +274,11 @@ if "math" in CAPS:
 		x = np.linspace(-hours, 0, len(arr))
 		plt.plot(x, arr, "-w")
 		plt.xlabel(word.capitalize())
-		ts = time.time_ns() // 1000
 		out = f"misc/{name}.png"
 		plt.savefig(out)
 		plt.clf()
-		return out
+		with open(out, "rb") as f:
+			return f.read()
 
 	def rank_embeddings(embs, emb, temp=0.5):
 		btest = base64.b64decode(emb)
@@ -1249,7 +1252,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 	return command, fmt
 
 def save_into(im, size, fmt, fs, r=0, opt=False):
-	assert size[0] and size[1]
+	assert size[0] and size[1], f"Expected non-zero size, got {size}"
 	thresh = 0.984375
 	heavy = r > thresh or np.prod(size) <= 1048576
 	if "RGB" in im.mode and np.prod(size) > 65536 or fmt not in ("png", "jpg", "webp", "gif"):
@@ -1269,7 +1272,7 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 			args.append(out)
 			print(args)
 			subprocess.run(args, input=b)
-			assert os.path.exists(out) and os.path.getsize(out)
+			assert os.path.exists(out) and os.path.getsize(out), f"Expected output file {out}"
 			with open(out, "rb") as f:
 				return f.read()
 	fmt = dict(jpg="jpeg", gif="png").get(fmt.lower(), fmt)
@@ -1299,7 +1302,7 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 	return out.getbuffer()
 
 def anim_into(out, new, first, size, fmt, fs, r=0):
-	assert size[0] and size[1]
+	assert size[0] and size[1], f"Expected non-zero size, got {size}"
 	command = ["ffmpeg", "-nostdin", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel, "-i", out]
 	mode = new["mode"]
 	opts, fmt = ffmpeg_opts(new, new["frames"], new["count"], mode, first, fmt, fs, *size, new["duration"], True)
@@ -1311,7 +1314,7 @@ def anim_into(out, new, first, size, fmt, fs, r=0):
 	command.append(out2)
 	print(command)
 	subprocess.run(command, timeout=240)
-	assert os.path.exists(out2)
+	assert os.path.exists(out2), f"Expected output file {out2}"
 	if "A" not in mode and np.prod(size) * new["count"] <= 67108864 and os.path.getsize(out2) < fs * 3:
 		out = gifsicle(out2, new)
 	else:
@@ -1357,7 +1360,7 @@ def evalImg(url, operation, args):
 		args.pop(-1)
 	else:
 		bg = False
-	if operation != "$":
+	if operation not in ("$", "&"):
 		# print("IOPER:", operation, args)
 		if args and args[0] == "-nogif":
 			nogif = args.pop(0)
@@ -1581,7 +1584,7 @@ def evalImg(url, operation, args):
 							lower_bound = scale
 					print("F:", w, h, scale, len(out), r)
 			if isinstance(out, str):
-				assert os.path.exists(out), out
+				assert os.path.exists(out), f"Expected output file {out}"
 				with open(out, "rb") as f:
 					return f.read()
 			return out

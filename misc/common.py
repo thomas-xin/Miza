@@ -979,7 +979,7 @@ def message_link(message):
 	except AttributeError:
 		pass
 	guild = getattr(message, "guild", None)
-	g_id = getattr(guild, "id", 0)
+	g_id = getattr(guild, "id", -1)
 	return f"https://discord.com/channels/{g_id}/{message.channel.id}/{message.id}"
 
 

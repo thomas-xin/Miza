@@ -16,7 +16,7 @@ from misc.util import (
 )
 
 def has_transparency(image):
-	assert image.mode == "P"
+	assert image.mode == "P", "Expected a palette image."
 	transparent = image.info.get("transparency", -1)
 	if transparent != -1:
 		return True
