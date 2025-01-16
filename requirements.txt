@@ -18,7 +18,8 @@ free-proxy>=1.1.3
 gmpy2>=2.2.1
 googletrans==4.0.0rc1
 httpx>=0.28.1
-h11==0.13.0
+h11>=0.14.0
+h2>=4.1.0
 imagesize>=1.4.1
 inspiro>=0.0.3
 knackpy>=1.1.1
@@ -26,6 +27,7 @@ markdownify>=0.14.1
 matplotlib>=3.9.3
 mpmath>=1.3.0
 nekos.py>=1.1.0
+niquests>=3.12.1
 numpy>=1.26.3
 orjson>=3.10.12
 pdf2image>=1.17.0

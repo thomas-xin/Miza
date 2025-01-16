@@ -154,7 +154,7 @@ a:hover {
 		<div>
 			<h1>Download Media</h1>
 			<h3>Name or URL</h3>
-			<input type="text" id="query" style="min-width:320px; width:60vw; font-size: 24px; font-family: Agbalumo, cursive, sans-serif" oninput="debouncedSearch()" onchange="debouncedSearch()" value="" placeholder="https://youtu.be/dQw4w9WgXcQ" required>
+			<input type="text" id="query" style="min-width:320px; width:60vw; font-size: 24px; font-family: Agbalumo, cursive, sans-serif" oninput="debouncedSearch()" onchange="debouncedSearch()" value="" required>
 
 			<h3>Format</h3>
 			Full
@@ -249,6 +249,40 @@ function timeParse(s) {
 	return output;
 }
 
+const colorCache = {};
+const tempCanvas = document.createElement('canvas');
+tempCanvas.width = 256;
+tempCanvas.height = 144;
+const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+function getMeanColour(element) {
+	if (!element.height) return [255, 255, 255];
+	const src = element.src;
+	if (element.animated == false) {
+		const color = colorCache[src];
+		if (color) {
+			return color;
+		}
+	}
+	tempCtx.drawImage(element, 0, 0, element.width / 2, element.height / 2);
+	const imageData = tempCtx.getImageData(0, 0, element.width / 2, element.height / 2);
+	const data = imageData.data;
+	let r = 0, g = 0, b = 0;
+	let pixelCount = 0;
+	for (let i = 0; i < data.length; i += 4) {
+		const a = data[i + 3] != null ? data[i + 3] : 1;
+		r += data[i] * a;
+		g += data[i + 1] * a;
+		b += data[i + 2] * a;
+		pixelCount += a;
+	}
+	r = Math.round(r / pixelCount);
+	g = Math.round(g / pixelCount);
+	b = Math.round(b / pixelCount);
+	const result = [r, g, b];
+	colorCache[src] = result;
+	return result;
+}
+
 function rgbToHsl(r, g, b) {
 	r /= 255;
 	g /= 255;
@@ -277,6 +311,21 @@ function rgbToHsl(r, g, b) {
 	return [h * 360, s * 100, l * 100];
 }
 
+function randomChoice(array) {
+	return array[Math.floor(Math.random() * array.length)];
+}
+
+function randomisePlaceholder() {
+	query = document.getElementById("query");
+	placeholders = [
+		"Shortest video on YouTube",
+		"https://youtu.be/dQw4w9WgXcQ",
+		"https://www.youtube.com/watch?v=rYEDA3JcQqw&list=PLIhpvUtDlwVRBWBxq8f1xds0d2cyXr-Mu",
+		"https://www.youtube.com/watch?v=xwH4oVnuIAs&list=PLyCPVqscXyJmPtGxea4DcfQfzI0cIZ4lx",
+	];
+	query.placeholder = randomChoice(placeholders);
+}
+
 function isLoaded(image) {
 	return image.complete && image.naturalHeight !== 0;
 }
@@ -302,21 +351,22 @@ var lastSearch = "";
 function updateSearched() {
 	previews = document.getElementById("previews");
 	submit = document.getElementById("submit");
-	query = document.getElementById("query").value;
+	query = document.getElementById("query");
 	submit = document.getElementById("submit");
-	if (query == lastSearch) return;
+	if (query.value == lastSearch) return;
 	submit.querySelector("span").textContent = "Download";
 	submit.disabled = false;
 	submit.error = false;
 	const progressBar = submit.querySelector(".progress-bar");
 	progressBar.style.width = "0%";
-	lastSearch = query;
+	lastSearch = query.value;
 	previews.style.display = "none";
-	if (!query) return;
+	if (!query.value) return;
+	randomisePlaceholder();
 	previews.style.color = "#ffffff";
 	previews.textContent = "Loading...";
 	previews.style.display = "block";
-	component = encodeURIComponent(query);
+	component = encodeURIComponent(query.value);
 	fetch(`/ytdl?q=${component}`).then((response) => {
 		if (!response.ok) {
 			setError(response);
@@ -332,7 +382,7 @@ function updateSearched() {
 			previews.style.display = "none";
 			previews.textContent = "";
 			data.forEach((e, i) => {
-				const preview = createPreviewElement(e, i, query);
+				const preview = createPreviewElement(e, i, query.value);
 				previews.appendChild(preview);
 			});
 			updateCount();
@@ -498,8 +548,8 @@ function createPreviewElement(e, i, query) {
 	}
 	const component = encodeURIComponent(e.icon);
 	icon.onload = () => {
-		fetch(`/mean_colour?url=${component}`).then((response) => response.json()).then((data) => {
-			[r, g, b] = data.colour;
+		function updateEntry(preview, colour) {
+			[r, g, b] = colour;
 			[h, s, l] = rgbToHsl(r, g, b);
 			preview.animate(
 				[
@@ -600,8 +650,13 @@ function createPreviewElement(e, i, query) {
 			preview.insertBefore(progressContainer, dur);
 
 			preview.updateProgress();
+		}
+		// updateEntry(preview, getMeanColour(icon));
+		fetch(`/mean_colour?url=${component}`).then((response) => response.json()).then((data) => {
+			updateEntry(preview, data.colour);
 		});
 	}
+	// icon.crossOrigin = "Anonymous";
 	icon.src = e.icon;
 	preview.appendChild(icon);
 	if (dur) preview.appendChild(dur);
@@ -637,5 +692,7 @@ document.addEventListener("keydown", (event) => {
 		updateSearched();
 	}
 });
+
+randomisePlaceholder();
 </script>
 </html>

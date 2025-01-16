@@ -10,7 +10,7 @@ from urllib.parse import unquote_plus
 import cherrypy as cp
 from cherrypy._cpdispatch import Dispatcher
 import orjson
-import requests
+import niquests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut, gather
 from .types import resume, cdict, fcdict, json_dumps, byte_like, utc, RangeSet, MemoryBytes
 from .util import AUTH, tracebacksuppressor, magic, shash, decrypt, zip2bytes, bytes2zip, enc_box, save_auth, decode_attachment, expand_attachment, shorten_attachment, is_discord_attachment, discord_expired, url2fn, p2n, byte_scale, leb128, decode_leb128, seq, MIMES, Request, reqs, DOMAIN_CERT, PRIVATE_KEY
@@ -106,7 +106,7 @@ class Server:
 			state = json.load(f)
 	else:
 		state = {"/": f"https://api.mizabot.xyz:{webserver_port}"}
-	session = requests.Session()
+	session = niquests.Session()
 
 	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
 	def index(self, path=None, filename=None, *args, code=None, **kwargs):
@@ -708,7 +708,7 @@ class Server:
 		except KeyError:
 			if len(self.cache) > 128:
 				self.cache.pop(next(iter(self.cache)))
-			data = self.cache[info] = requests.get(info, timeout=30).json()
+			data = self.cache[info] = niquests.get(info, timeout=30).json()
 		info = [data["filename"], data["size"], data["mimetype"]]
 		urls = data.get("chunks") or [data["dl"]]
 		size = info[1]

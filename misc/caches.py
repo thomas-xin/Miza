@@ -6,7 +6,7 @@ import time
 from traceback import print_exc
 import numpy as np
 from PIL import Image
-import requests
+import niquests
 from misc.types import utc, as_str
 from misc.asyncs import esubmit, wrap_future, Future
 from misc.util import (
@@ -83,7 +83,7 @@ class ColourCache(Cache):
 			return tuple(self[k])
 		except KeyError:
 			try:
-				with requests.get(url, headers=Request.header(), stream=True) as resp:
+				with niquests.get(url, headers=Request.header(), stream=True) as resp:
 					mime = resp.headers.get("Content-Type", "")
 					if "text/html" in mime:
 						it = resp.iter_content(65536)
@@ -176,7 +176,7 @@ class AttachmentCache(Cache):
 					last.discard(tup)
 					cid, mid, n = tup
 					heads = self.alt_headers if n else self.headers
-					resp = requests.patch(
+					resp = niquests.patch(
 						f"https://discord.com/api/{api}/channels/{cid}/messages/{mid}",
 						data=json_dumps(dict(embeds=embeds)),
 						headers=heads,
@@ -185,7 +185,7 @@ class AttachmentCache(Cache):
 					cid = choice(self.channels)
 					n = random.randint(0, 1)
 					heads = self.alt_headers if n else self.headers
-					resp = requests.post(
+					resp = niquests.post(
 						f"https://discord.com/api/{api}/channels/{cid}/messages",
 						data=json_dumps(dict(embeds=embeds)),
 						headers=heads,

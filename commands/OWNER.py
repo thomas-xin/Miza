@@ -1086,7 +1086,7 @@ class UpdateDeleted(Database):
 	name = "deleted"
 	cache = {}
 
-	async def __load__(self, **void):
+	def __load__(self, **void):
 		cache = self.cache
 		self.cache = Cache(timeout=86400 * 7, trash=1)
 		self.cache.update(cache)

@@ -713,15 +713,15 @@ def gcd(*nums):
 
 if os.name == "nt":
 	if not os.path.exists("misc/ecm.exe") or os.path.getsize("misc/ecm.exe") < 4096:
-		import requests
-		with requests.get("https://cdn.discordapp.com/attachments/703579929840844891/1103723891815362600/ecm.exe") as resp:
+		import niquests
+		with niquests.get("https://cdn.discordapp.com/attachments/703579929840844891/1103723891815362600/ecm.exe") as resp:
 			b = resp.content
 		with open("misc/ecm.exe", "wb") as f:
 			f.write(b)
 else:
 	if not os.path.exists("misc/ecm") or os.path.getsize("misc/ecm") < 4096:
-		import requests
-		with requests.get("https://cdn.discordapp.com/attachments/703579929840844891/1103729122909376562/ecm") as resp:
+		import niquests
+		with niquests.get("https://cdn.discordapp.com/attachments/703579929840844891/1103729122909376562/ecm") as resp:
 			b = resp.content
 		with open("misc/ecm", "wb") as f:
 			f.write(b)

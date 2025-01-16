@@ -4,7 +4,7 @@ import subprocess
 import sys
 from traceback import print_exc
 import zipfile
-import requests
+import niquests
 from PIL import Image
 # Allow fallback (although not recommended as generally the up-to-date version is necessary for most sites)
 try:
@@ -61,7 +61,7 @@ def get_audio_spotify(url, fn):
 		stream = success.get_attribute("href")
 	if not stream:
 		raise RuntimeError("Failed to download Spotify audio.")
-	with requests.get(stream, headers=Request.header(), stream=True) as resp:
+	with niquests.get(stream, headers=Request.header(), stream=True) as resp:
 		resp.raise_for_status()
 		with open(fn, "wb") as f:
 			for chunk in resp.iter_content(65536):
@@ -101,7 +101,7 @@ def get_full_storyboard(info):
 		last_duration = duration - sum(frag["duration"] for frag in fragments[:-1])
 		last_count = round(last_duration / fragments[0]["duration"])
 		futs = [esubmit(
-			requests.get,
+			niquests.get,
 			frag["url"],
 			headers=storyboard.get("http_headers") or Request.header(),
 			stream=True,

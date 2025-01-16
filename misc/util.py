@@ -40,7 +40,8 @@ try:
 	import pynvml
 except Exception:
 	pynvml = None
-import requests
+import niquests
+import requests # noqa: F401
 from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, fcdict, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, T2, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, MultiEncoder, sublist_index # noqa: F401
 from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, asubmit, csubmit, esubmit, tsubmit, waited_sync, Future, Semaphore
 
@@ -1777,7 +1778,7 @@ def safe_save(fn, s):
 			f.write(s)
 
 
-reqs = alist(requests.Session() for i in range(6))
+reqs = alist(niquests.Session() for i in range(6))
 
 class open2(io.IOBase):
 	"A file-compatible open function that wraps already open files."
@@ -2419,7 +2420,7 @@ class Stream(io.IOBase):
 		if self.resp:
 			with suppress(Exception):
 				self.resp.close()
-		self.resp = requests.get(self.url, stream=True)
+		self.resp = niquests.get(self.url, stream=True)
 		self.iter = self.resp.iter_content(self.BUF)
 
 	def refill(self):
@@ -2963,7 +2964,7 @@ class Cache(dict):
 		self.tmap[k] = ts
 
 	def update(self, other):
-		super().update(self, other)
+		super().update(other)
 		t = time.time()
 		for k, v in other.items():
 			self.tmap[k] = t
@@ -4315,7 +4316,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 			if aio:
 				session = None
 			else:
-				session = requests
+				session = niquests
 		elif bypass:
 			if "user-agent" not in headers and "User-Agent" not in headers:
 				headers["User-Agent"] = f"Mozilla/5.{random.randint(1, 9)} (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
@@ -4339,7 +4340,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				req = reqs.next()
 				resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
 			else:
-				req = requests
+				req = niquests
 				resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
 			if resp.status_code >= 400:
 				if not resp.content or magic.from_buffer(resp.content).startswith("text/"):

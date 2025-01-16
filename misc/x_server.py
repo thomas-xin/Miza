@@ -19,7 +19,7 @@ import cheroot
 import cherrypy
 import orjson
 import psutil
-import requests
+import niquests
 from concurrent.futures import Future
 from math import ceil
 from traceback import print_exc
@@ -27,7 +27,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut, gather
 from .types import byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, RangeSet, MemoryBytes
-from .util import hwaccel, fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, rename, url_unparse, url2fn, is_youtube_url, seq, Cache, Request, magic, is_discord_attachment, unyt, ecdc_exists, get_duration, CACHE_PATH, VIDEO_FORMS, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment
+from .util import hwaccel, fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, rename, url_unparse, url2fn, is_youtube_url, seq, Cache, Request, magic, is_discord_attachment, unyt, ecdc_exists, get_duration, CACHE_PATH, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment
 from .caches import attachment_cache, upload_cache, download_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -444,7 +444,7 @@ def true_ip(request=None):
 
 class Server:
 
-	session = requests.Session()
+	session = niquests.Session()
 
 	@cp.expose(("0",))
 	def rickroll(self, *void1, **void2):

@@ -31,7 +31,7 @@ import psutil
 import collections
 import traceback
 import re
-import requests
+import niquests
 import ast
 import base64
 import hashlib
@@ -48,6 +48,7 @@ if __name__ == "__main__":
 	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
 	print = interface.print
 
+requests = niquests.Session()
 cdict = dict
 utc = time.time
 
@@ -158,8 +159,6 @@ else:
 
 	if not hasattr(time, "time_ns"):
 		time.time_ns = lambda: int(time.time() * 1e9)
-
-	requests = requests.Session()
 
 
 def enumerate_with_next(iterable):
@@ -1063,14 +1062,12 @@ def write_video(proc, data):
 def gifsicle(out, info=None):
 	if os.name == "nt":
 		if not os.path.exists("misc/gifsicle.exe") or os.path.getsize("misc/gifsicle.exe") < 4096:
-			import requests
 			with requests.get("https://mizabot.xyz/u/EN8_fQ2CAKs.exe") as resp:
 				b = resp.content
 			with open("misc/gifsicle.exe", "wb") as f:
 				f.write(b)
 	else:
 		if not os.path.exists("misc/gifsicle") or os.path.getsize("misc/gifsicle") < 4096:
-			import requests
 			with requests.get("https://cdn.discordapp.com/attachments/1093723058386256022/1152254899694870599/gifsicle-static") as resp:
 				b = resp.content
 			with open("misc/gifsicle", "wb") as f:

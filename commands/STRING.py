@@ -34,7 +34,7 @@ class Translate(Command):
 	if googletrans:
 		languages = demap(googletrans.LANGUAGES)
 		trans = googletrans.Translator()
-		trans.client = s = requests.Session()
+		trans.client = s = niquests.Session()
 		renamed = dict(chinese="zh-cn", zh="zh-cn", auto="auto", automatic="auto", none="auto", null="auto")
 
 	async def __call__(self, bot, guild, channel, args, user, message, **void):

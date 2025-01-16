@@ -12,9 +12,8 @@ import time
 from traceback import print_exc
 from urllib.parse import quote_plus
 import zipfile
-import httpx
 import orjson
-import requests
+import niquests
 import yt_dlp as ytd
 from .types import alist, as_str, cdict, full_prune, json_dumps, round_min, to_alphanumeric, tracebacksuppressor, ts_us
 from .smath import time_parse, fuzzy_substring
@@ -223,7 +222,7 @@ def get_best_lyrics(resp):
 class AudioDownloader:
 
 	def __init__(self, workers=1):
-		self.session = requests.Session()
+		self.session = niquests.Session()
 		self.search_cache = Cache(timeout=inf, timeout2=60, persist="ytdl.search.cache", autosave=60)
 		self.thumbnail_cache = Cache(timeout=inf, timeout2=60, persist="ytdl.thumbnail.cache", autosave=60)
 		self.extract_cache = Cache(timeout=120, timeout2=8)
@@ -873,7 +872,7 @@ class AudioDownloader:
 		# return out
 	def bcsearch(self, query, count=1):
 		query = "https://bandcamp.com/search?q=" + quote_plus(query) + "&item_type=t"
-		content = httpx.get(query, headers=Request.header(), timeout=20).content # Bandcamp requires HTTP/2 meaning requests is not suitable
+		content = niquests.get(query, headers=Request.header(), timeout=20).content
 		out = alist()
 		try:
 			content = content.split(b'<ul class="result-items">', 1)[1]
@@ -933,7 +932,7 @@ class AudioDownloader:
 		"""Handles special audio formats unsupported by FFmpeg, such as spotify URLs, spectrogram images, as well as ecdc, org, and midi files."""
 		if is_spotify_url(url):
 			return self.handle_spotify(entry, url, ts, fn)
-		with requests.get(url, headers=Request.header(), stream=True) as resp:
+		with niquests.get(url, headers=Request.header(), stream=True) as resp:
 			head = resp.headers
 			ct = head.get("Content-Type", "").split(";", 1)[0]
 			b = b""

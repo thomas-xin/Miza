@@ -18,7 +18,7 @@ import filetype
 import numpy as np
 import orjson
 import psutil
-import requests
+import niquests
 try:
 	# This module apparently does not exist on Linux
 	import colorspace
@@ -59,7 +59,7 @@ hwaccel = "cuda" if DC else "d3d11va" if os.name == "nt" else "auto"
 if not hasattr(time, "time_ns"):
 	time.time_ns = lambda: int(time.time() * 1e9)
 
-requests = requests.Session()
+requests = niquests.Session()
 
 def as_str(s):
 	if type(s) in (bytes, bytearray, memoryview):

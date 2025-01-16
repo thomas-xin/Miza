@@ -1172,14 +1172,14 @@ class Archive(Command):
 					else:
 						headers = {"Authorization": "Bot " + token, "Content-Type": "application/json"}
 						resp = await create_future(
-							requests.get,
+							niquests.get,
 							"https://discord.com/api/v10/users/@me",
 							headers=headers,
 						)
 					if not resp or resp.status_code == 401:
 						headers = {"Authorization": token, "Content-Type": "application/json"}
 						resp = await create_future(
-							requests.get,
+							niquests.get,
 							"https://discord.com/api/v10/users/@me",
 							headers=headers,
 						)
