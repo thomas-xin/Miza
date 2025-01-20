@@ -1275,7 +1275,7 @@
 			],
 			"description": "Removes all users from voice channels in the current server.",
 			"usage": "",
-			"level": "3",
+			"level": "2",
 			"rate_limit": "10",
 			"example": [],
 			"timeout": "24"

@@ -10,7 +10,7 @@ import niquests
 from misc.types import utc, as_str
 from misc.asyncs import esubmit, wrap_future, Future
 from misc.util import (
-    Cache, AUTH, Request, api,
+    Cache, CACHE_FILESIZE, AUTH, Request, api,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, uhash,
     snowflake_time_2, shorten_attachment, merge_url, split_url, discord_expired, url2fn
 )
@@ -137,7 +137,7 @@ class AttachmentCache(Cache):
 		edit(c_id, m_id, *data, url=None, filename=None, content="", collapse=True): Edits an existing message with new attachments in a channel asynchronously.
 	"""
 	min_size = 262144
-	max_size = 25165824
+	max_size = CACHE_FILESIZE
 	attachment_count = 10
 	embed_count = 10
 	discord_token = AUTH["discord_token"]

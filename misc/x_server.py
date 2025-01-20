@@ -139,56 +139,6 @@ def access(self):
 	url = cp.url(qs=request.query_string)
 	print(true_ip(), request.method, url, request.headers)
 	return
-	"""
-	request = cp.serving.request
-	if T(request).get("no_log"):
-		return
-	# remote = request.remote
-	response = cp.serving.response
-	outheaders = response.headers
-	inheaders = request.headers
-	if response.output_status is None:
-		status = '-'
-	else:
-		status = response.output_status.split(b' ', 1)[0]
-		status = status.decode('ISO-8859-1')
-
-	atoms = {
-		'h': true_ip(),
-		'l': '-',
-		'u': T(request).get('login') or '-',
-		't': self.time(),
-		'r': request.request_line,
-		's': status,
-		'b': str(dict.get(inheaders, 'Range', '') or '-') + "/" + str(dict.get(outheaders, 'Content-Length', '') or '-'),
-		'f': dict.get(inheaders, 'Referer', ''),
-		'a': dict.get(inheaders, 'User-Agent', ''),
-		'o': dict.get(inheaders, 'Host', '-'),
-		'i': request.unique_id,
-		'z': cp._cplogging.LazyRfc3339UtcTime(),
-	}
-	for k, v in atoms.items():
-		if not isinstance(v, str):
-			v = str(v)
-		v = v.replace('"', '\\"').encode('utf8')
-		# Fortunately, repr(str) escapes unprintable chars, \n, \t, etc
-		# and backslash for us. All we have to do is strip the quotes.
-		v = repr(v)[2:-1]
-
-		# in python 3.0 the repr of bytes (as returned by encode)
-		# uses double \'s.  But then the logger escapes them yet, again
-		# resulting in quadruple slashes.  Remove the extra one here.
-		v = v.replace('\\\\', '\\')
-
-		# Escape double-quote.
-		atoms[k] = v
-
-	try:
-		self.access_log.log(
-			logging.INFO, self.access_log_format.format(**atoms))
-	except Exception:
-		self(traceback=True)
-	"""
 cp._cplogging.LogManager.access = access
 
 def process_headers(self):
@@ -291,6 +241,8 @@ def error_handler(exc=None):
 		status = 418
 	elif isinstance(exc, ConnectionError) or isinstance(exc, type) and issubclass(exc, ConnectionError) and exc.args and isinstance(exc.args[0], int):
 		status = exc.args[0]
+	elif isinstance(exc, niquests.exceptions.HTTPError):
+		status = exc.response.status_code
 	else:
 		status = error_map.get(exc) or error_map.get(exc.__class__) or 500
 	if status == 418:
@@ -731,7 +683,7 @@ class Server:
 						data = data2
 				encoded = leb128(len(data)) + data
 				head = upload_cache[h].head
-				assert len(encoded) + len(head) <= attachment_cache.max_size
+				assert len(encoded) + len(head) <= attachment_cache.max_size, f"Unable to encode file header: {len(encoded) + len(head)} > {attachment_cache.max_size}"
 				fut = attachment_cache.create(encoded + head, filename=filename, editable=True)
 				url = await_fut(fut)
 				cid, mid, aid, fn = expand_attachment(url)
@@ -1142,7 +1094,7 @@ class Server:
 					fmt = "ogg"
 				else:
 					fmt = "opus"
-			assert fmt in ("mp4", "mkv", "webm", "avif", "webp", "gif", "ogg", "opus", "mp3"), f"Format {fmt} currently not supported."
+			assert fmt in ("mp4", "mkv", "webm", "avif", "webp", "gif", "ogg", "opus", "mp3", "flac", "wav"), f"Format {fmt} currently not supported."
 			tmpl = f"{CACHE_PATH}/{uhash(v)}.{fmt}"
 			start = kwargs.get("start")
 			end = kwargs.get("end")
@@ -1163,7 +1115,7 @@ class Server:
 				sem = self.ydl_sems.setdefault(ip, Semaphore(64, 256, rate_limit=8))
 				with sem:
 					# Separate video and audio formats
-					if fmt in ("ogg", "opus", "mp3"):
+					if fmt in ("ogg", "opus", "mp3", "flac", "wav"):
 						entry = self.ydl.search(v)[0]
 						fn2, _cdc, _dur, _ac = self.ydl.get_audio(entry, fmt=fmt, start=start, end=end)
 						if fn != fn2:
@@ -1728,164 +1680,6 @@ class Server:
 		cp.response.headers.update(HEADERS)
 		return f"""<!DOCTYPE html><html><head><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script><meta property="og:image" content="{url}">{refresh_info}<meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="background-color:black;"><img src="{url}" style="margin:0;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);max-width:100%;max-height:100%"></body></html>"""
 
-	# class V1Cache:
-	# 	def __init__(self, end=2048, soft=8192, hard=30720):
-	# 		self.end = end
-	# 		self.soft = soft
-	# 		self.hard = hard
-	# 		self.data = alist()
-	# 		self.cache = set()
-	# 	def pad_into(self, tokens, max_tokens=0, padding=(), sentinel=()):
-	# 		if not tokens:
-	# 			return tokens
-	# 		t = utc()
-	# 		tokens = astype(tokens, tuple)
-	# 		if tokens in self.cache:
-	# 			return tokens
-	# 		max_context = min(len(tokens) * 2, self.hard - max_tokens)
-	# 		try:
-	# 			if len(tokens) <= self.soft:
-	# 				# Within soft limit; directly forwarded
-	# 				return tokens
-	# 			target = None
-	# 			high = 0
-	# 			for t, v in reversed(self.data):
-	# 				i = longest_prefix(tokens, v)
-	# 				if i > high:
-	# 					high = i
-	# 					target = v
-	# 			out = []
-	# 			if high:
-	# 				if len(tokens) - high <= self.soft:
-	# 					# Sufficiently matched; directly forwarded
-	# 					return tokens
-	# 				if sentinel:
-	# 					try:
-	# 						sublist_index(tokens[:high], sentinel)
-	# 					except ValueError:
-	# 						tokens = tokens[high:]
-	# 						left = self.soft - self.end
-	# 						tokens = target[:high] + tokens[:left] + padding + tokens[-self.end:]
-	# 						print("Sentinel mismatch:", sentinel, len(tokens))
-	# 						return tokens
-	# 				# Match existing cached string; matched part must be `>= input / 2 and >= 8k`, unmatched part must be `<= 8k`
-	# 				out.append(target[:high])
-	# 				tokens, target = tokens[high:], target[high:]
-	# 				sub = longest_common_substring(tokens, target)
-	# 				if high + sub >= len(tokens) / 2 and high + sub >= self.soft:
-	# 					i2 = sublist_index(tokens, sub)
-	# 					if i2 <= self.soft:
-	# 						i3 = sublist_index(target, sub)
-	# 						if i3 <= self.soft:
-	# 							right = tokens[i2 + len(sub):]
-	# 							out.append(target[:i3])
-	# 							out.append(sub)
-	# 							if len(right) <= self.soft:
-	# 								out.append(right)
-	# 							else:
-	# 								left = self.soft - self.end
-	# 								out.append(right[:left])
-	# 								out.append(padding)
-	# 								out.append(right[-self.end:])
-	# 							res = tuple(itertools.chain(*out))
-	# 							overflow = len(res) - max_context
-	# 							if overflow > 0:
-	# 								tokens = res[:-self.soft] + padding + res[-self.end + overflow:]
-	# 							else:
-	# 								tokens = res
-	# 							return tokens
-	# 				left = self.soft - self.end
-	# 				out.append(tokens[:left])
-	# 				out.append(padding)
-	# 				out.append(tokens[-self.end:])
-	# 				tokens = tuple(itertools.chain(*out))
-	# 				return tokens
-	# 			# Full cache miss; use `first 6k + padding + last 2k` tokens
-	# 			left = self.soft - self.end
-	# 			tokens = tokens[:left] + padding + tokens[-self.end:]
-	# 			return tokens
-	# 		finally:
-	# 			if tokens in self.cache:
-	# 				self.data.remove(tokens, key=lambda t: t[1])
-	# 			else:
-	# 				self.cache.add(tokens)
-	# 			self.data.append(([t, tokens]))
-	# 			while sum(len(t[1]) for t in self.data) + max_tokens > self.hard + self.soft:
-	# 				temp = self.data.popleft()
-	# 				self.cache.discard(temp[1])
-	# v1_cache = V1Cache()
-	# temp_model = "command-r-plus"
-	# token_bans = set()#{153083, 165936, 182443, 205177, 253893, 255999}
-	# @cp.expose
-	# def inference(self, version=None, *path, **kwargs):
-	# 	if version != "v1":
-	# 		raise NotImplementedError(version)
-	# 	model = self.temp_model
-	# 	fmt = "cl100k_im"
-	# 	if not path:
-	# 		path = ["models"]
-	# 	endpoint = "/".join(path)
-	# 	url = "http://127.0.0.1:2242/v1/" + endpoint
-	# 	headers = cp.request.headers
-	# 	headers["X-Forwarded-For"] = true_ip()
-	# 	data = cp.request.body.fp.read()
-	# 	if data and endpoint.casefold() == "completions":
-	# 		try:
-	# 			d = orjson.loads(data)
-	# 		except Exception:
-	# 			pass
-	# 		else:
-	# 			if AUTH.get("mizabot_key") and headers.get("Authorization") == f"Bearer {AUTH['mizabot_key']}":
-	# 				print("Authorised LLM")
-	# 				pass
-	# 			else:
-	# 				prompt = d.get("prompt")
-	# 				if prompt and len(prompt) > 8192:
-	# 					tokens = tik_encode(prompt, encoding=fmt)
-	# 					padding = tuple(tik_encode("...\n\n...", encoding=fmt))
-	# 					sentinel = tuple(tik_encode("<START>", encoding=fmt))
-	# 					print(len(tokens))
-	# 					tokens = self.v1_cache.pad_into(tokens, max_tokens=d.get("max_tokens", 256), padding=padding, sentinel=sentinel)
-	# 					print(len(tokens))
-	# 					prompt = tik_decode(tokens, encoding=fmt)
-	# 					d["prompt"] = prompt
-	# 			d["model"] = model
-	# 			if self.token_bans:
-	# 				d["custom_token_bans"] = set(d.get("custom_token_bans", [])).union(self.token_bans)
-	# 			data = json_dumps(d)
-	# 	method = cp.request.method
-	# 	resp = getattr(reqs.next(), method.casefold())(
-	# 		url,
-	# 		headers=headers,
-	# 		data=data,
-	# 		stream=True,
-	# 	)
-	# 	headers = fcdict(resp.headers)
-	# 	headers.update(HEADERS)
-	# 	headers.pop("Connection", None)
-	# 	headers.pop("Content-Length", None)
-	# 	headers.pop("Transfer-Encoding", None)
-	# 	for k, v in headers.items():
-	# 		cp.response.headers[k] = v
-	# 	print(resp, cp.response.headers)
-	# 	if resp.headers.get("Transfer-Encoding") == "chunked":
-	# 		def gen(resp):
-	# 			try:
-	# 				for line in resp.iter_lines():
-	# 					if cp.request.closed:
-	# 						break
-	# 					yield line + b"\n"
-	# 			except (StopIteration, GeneratorExit):
-	# 				pass
-	# 			resp.close()
-	# 		return CloseableAsyncIterator(gen(resp), resp.close)
-	# 	if astype(path, list) == ["models"]:
-	# 		data = resp.json()
-	# 		self.temp_model = model = data["data"][0]["id"]
-	# 		data["data"][0]["id"] = f"{model}-h6t2"
-	# 		return json_dumps(data)
-	# 	return resp.content
-	# inference._cp_config = {"response.stream": True}
 
 def terminate():
 	if ytdl:

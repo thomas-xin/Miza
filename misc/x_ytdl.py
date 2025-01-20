@@ -241,13 +241,15 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			input_args.extend(["-ss", str(self.start)])
 		if self.end is not None:
 			input_args.extend(["-to", str(self.end)])
-		if source_codec == self.codec:
+		if source_codec == self.codec or source_codec.startswith("pcm_") and self.codec == "wav":
 			output_args.extend(["-c", "copy"])
 		else:
 			# Default to 192k for AAC, 160k for Opus, and 224k for MP3
 			bitrate = 224 if self.codec == "mp3" else 192 if self.codec == "aac" else 160
 			# Default to 44100 Hz for MP3, 48000 Hz for everything else
 			sample_rate = 44100 if self.codec == "mp3" else 48000
+			if acodec == "wav":
+				acodec = "pcm_s16le"
 			output_args.extend(["-c:a", acodec, "-b:a", f"{bitrate}k", "-ar", f"{sample_rate}"])
 		self.real_run_ffmpeg(
 			[[filename, input_args]],

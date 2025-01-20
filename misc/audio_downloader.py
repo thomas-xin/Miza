@@ -982,9 +982,9 @@ class AudioDownloader:
 				r_org = f"{CACHE_PATH}/{ts}.org"
 				r_wav = f"{CACHE_PATH}/{ts}.wav"
 				copy_to_file(r_org)
-				args = ["OrgExport", r_org, "48000", "0"]
+				args = ["orgexport202.exe", r_org, "48000", "0"]
 				print(args)
-				res = subprocess.run(args, cwd="misc", stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
+				res = subprocess.run(args, cwd="misc", stdin=subprocess.DEVNULL, stderr=subprocess.PIPE, shell=True)
 				if not os.path.exists(r_wav) or not os.path.getsize(r_wav):
 					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
 				dur, _bps, cdc, ac = get_duration_2(r_wav)

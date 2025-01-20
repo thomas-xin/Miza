@@ -53,10 +53,6 @@ def get_best_icon(entry):
 	)[0]["url"]
 
 async def disconnect_members(bot, guild, members, channel=None):
-	if bot.id in (member.id for member in members):
-		with suppress(KeyError):
-			auds = bot.data.audio.players[guild.id]
-			await asubmit(auds.kill)
 	futs = [member.move_to(None) for member in members]
 	await gather(*futs)
 
@@ -1464,7 +1460,7 @@ class UnmuteAll(Command):
 class VoiceNuke(Command):
 	server_only = True
 	time_consuming = True
-	min_level = 3
+	min_level = 2
 	name = ["☢️"]
 	description = "Removes all users from voice channels in the current server."
 	rate_limit = 10
@@ -2198,7 +2194,7 @@ class Download(Command):
 		format=cdict(
 			type="enum",
 			validation=cdict(
-				enum=("mp4", "mkv", "webm", "avif", "webp", "gif", "ogg", "opus", "mp3"),
+				enum=("mp4", "mkv", "webm", "avif", "webp", "gif", "ogg", "opus", "mp3", "flac", "wav"),
 			),
 			description="Output format of the downloaded file.",
 			default="opus",
@@ -2237,6 +2233,7 @@ class Download(Command):
 		resp = await asubmit(niquests.get, downloader_url, verify=False)
 		response = await fut
 		print(resp.headers)
+		resp.raise_for_status()
 		file = CompatFile(resp.content, resp.headers["Content-Disposition"].split("=", 1)[-1].strip('"'))
 		response = await self.bot.edit_message(
 			response,

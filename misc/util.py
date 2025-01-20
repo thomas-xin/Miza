@@ -1105,6 +1105,8 @@ def load_mimes():
 				mimesplitter[len(data)] = {}
 				mimesplitter[len(data)][data] = (ext, mime)
 
+mime_wait = esubmit(load_mimes)
+
 def simple_mimes(b, mime=True):
 	"Low-latency function that detects mimetype from first few bytes. Less accurate than from_file."
 	mimesplitter = globals()["mimesplitter"]
@@ -2162,7 +2164,7 @@ class PipedProcess:
 	procs = ()
 	stdin = stdout = stderr = None
 
-	def __init__(self, *args, stdin=None, stdout=None, stderr=None, cwd=".", bufsize=4096):
+	def __init__(self, *args, stdin=None, stdout=None, stderr=None, cwd=".", bufsize=4096, shell=False):
 		if not args:
 			return
 		self.procs = []
@@ -2173,7 +2175,7 @@ class PipedProcess:
 			si = stdin if first else proc.stdout
 			so = stdout if last else subprocess.PIPE
 			se = stderr if last else None
-			proc = psutil.Popen(arg, stdin=si, stdout=so, stderr=se, cwd=cwd, bufsize=bufsize * 256, shell=isinstance(arg, str))
+			proc = psutil.Popen(arg, stdin=si, stdout=so, stderr=se, cwd=cwd, bufsize=bufsize * 256, shell=shell or isinstance(arg, str))
 			if first:
 				self.stdin = proc.stdin
 				self.args = arg
@@ -4379,4 +4381,7 @@ def new_playwright_page(browser="firefox", viewport=dict(width=480, height=320),
 		browsers[browser] = getattr(sp, browser).launch(headless=headless)
 	return browsers[browser].new_page(viewport=viewport)
 
-esubmit(load_mimes)
+
+CACHE_FILESIZE = 10485760
+
+mime_wait.result()

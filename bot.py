@@ -1891,7 +1891,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			e = cdict(id=e, animated=animated)
 		return min_emoji(e)
 
-	async def optimise_image(self, image, fsize=25165824, msize=None, fmt="auto", duration=None, anim=True, timeout=3600):
+	async def optimise_image(self, image, fsize=CACHE_FILESIZE, msize=None, fmt="auto", duration=None, anim=True, timeout=3600):
 		"Optimises the target image or video file to fit within the \"fsize\" size, or \"msize\" resolution. Optional format and duration parameters."
 		# print("RESIZE:", msize)
 		args = [[], None, None, "max", msize, None, "-o"]
@@ -1930,8 +1930,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		11: "au-en",
 		12: "nz-en",	# New Zealand
 	}
-	from duckduckgo_search import DDGS
-	ddgs = DDGS()
+	import duckduckgo_search
+	ddgs = duckduckgo_search.DDGS()
 	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60, screenshot=False, include_hrefs=False, best=False):
 		"Browses the internet using DuckDuckGo or Microsoft Edge. Returns an image if screenshot is set to True."
 		if not region:
@@ -1947,7 +1947,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if not is_url(argv):
 				print("Browse query:", repr(argv))
 				with tracebacksuppressor:
-					data = await asubmit(self.ddgs.text, argv, safesearch="off", region=region, max_results=20 if best else 10)
+					try:
+						data = await asubmit(self.ddgs.text, argv, safesearch="off", region=region, max_results=20 if best else 10)
+					except duckduckgo_search.exceptions.DuckDuckGoSearchException:
+						data = await asubmit(self.ddgs.text, argv, safesearch="off", region="wt-wt", max_results=20 if best else 10, backend="lite")
 					if include_hrefs:
 						return "\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).strip()
 					return "\n\n".join((e.get("title", "") + "\n" + e.get("body", "")).strip() for e in data).strip()
@@ -3089,7 +3092,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			msg = ""
 		f = None
 		fsize = 0
-		size = 25165824
+		size = CACHE_FILESIZE
 		with suppress(AttributeError):
 			size = max(size, channel.guild.filesize_limit)
 		if getattr(channel, "simulated", None) or getattr(channel, "guild", None) and not channel.permissions_for(channel.guild.me).attach_files:
@@ -3111,7 +3114,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				f2 = file
 			if not filename:
-				filename = file
+				filename = getattr(file, "filename", None) or getattr(file, "name", None) or file
 			file = f2
 			fp = file.fp
 			fp.seek(0)
@@ -3386,7 +3389,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					resp = await asubmit(reqs.next().head, url, headers=Request.header(), _timeout_=12)
 					headers = fcdict(resp.headers)
 					if headers.get("Content-Type", "").split("/", 1)[0] == "image":
-						if float(headers.get("Content-Length", inf)) < 25165824:
+						if float(headers.get("Content-Length", inf)) < CACHE_FILESIZE:
 							url = await self.data.exec.uproxy(url)
 						else:
 							url = await self.data.exec.aproxy(url)
@@ -6875,7 +6878,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return
 			
 			get_role = lambda *args: None
-			filesize_limit = 25165824
+			filesize_limit = CACHE_FILESIZE
 			bitrate_limit = 98304
 			emoji_limit = 0
 			large = False

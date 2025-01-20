@@ -522,7 +522,7 @@ class UpdateExec(Database):
 						invalid.add(c_id)
 					elif len(msg) > 6000:
 						b = msg.encode("utf-8")
-						if len(b) > 25165824:
+						if len(b) > 8388608:
 							b = b[:4194304] + b[-4194304:]
 						csubmit(channel.send(file=CompatFile(b, filename="message.txt")))
 					else:
@@ -675,17 +675,17 @@ class UpdateExec(Database):
 					fn2 = filename or "c.b"
 					if b:
 						bm = memoryview(b)
-						if len(bm) > 25165824 * 8:
-							bm = bm[:25165824 * 8]
-						for n in range(0, len(bm), 25165824):
-							bi = bm[n:n + 25165824]
+						if len(bm) > CACHE_FILESIZE * 8:
+							bm = bm[:CACHE_FILESIZE * 8]
+						for n in range(0, len(bm), CACHE_FILESIZE):
+							bi = bm[n:n + CACHE_FILESIZE]
 							chunkf.append(bi)
 							fi = CompatFile(bi, filename=fn2)
 							fs.append(fi)
 							sizes.append(len(bi))
 						f.seek(i + len(bm))
 					while len(fs) < 8:
-						b = await asubmit(f.read, 25165824)
+						b = await asubmit(f.read, CACHE_FILESIZE)
 						if not b:
 							break
 						chunkf.append(b)

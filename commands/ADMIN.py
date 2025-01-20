@@ -3033,6 +3033,8 @@ class UpdateMessageLogs(Database):
 		guild = message.guild
 		if not guild or guild.id not in self.data:
 			return
+		if message.author.bot:
+			return
 		c_id = self.data[guild.id]
 		try:
 			channel = await self.bot.fetch_channel(c_id)
@@ -3091,6 +3093,9 @@ class UpdateMessageLogs(Database):
 		cu_id = cu.id
 		guild = messages[0].guild
 		if guild.id not in self.data:
+			return
+		messages = [m for m in messages if not m.author.bot]
+		if not messages:
 			return
 		c_id = self.data[guild.id]
 		try:
