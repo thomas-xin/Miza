@@ -13,7 +13,7 @@ import orjson
 import niquests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut, gather
 from .types import resume, cdict, fcdict, json_dumps, byte_like, utc, RangeSet, MemoryBytes
-from .util import AUTH, tracebacksuppressor, magic, shash, decrypt, zip2bytes, bytes2zip, enc_box, save_auth, decode_attachment, expand_attachment, shorten_attachment, is_discord_attachment, discord_expired, url2fn, p2n, byte_scale, leb128, decode_leb128, seq, MIMES, Request, reqs, DOMAIN_CERT, PRIVATE_KEY
+from .util import AUTH, tracebacksuppressor, magic, shash, decrypt, zip2bytes, bytes2zip, enc_box, save_auth, decode_attachment, expand_attachment, shorten_attachment, is_discord_attachment, is_miza_attachment, discord_expired, url2fn, p2n, byte_scale, leb128, decode_leb128, seq, MIMES, Request, reqs, DOMAIN_CERT, PRIVATE_KEY
 from .caches import attachment_cache, upload_cache, download_cache
 
 interface = None
@@ -241,6 +241,19 @@ class Server:
 			self.cache[rpath] = b = f.read()
 		return b
 
+	def get_with_retries(self, url, headers={}, timeout=3, retries=5):
+		for i in range(retries):
+			try:
+				resp = self.session.get(url, headers=headers, verify=i == 0, timeout=timeout)
+				resp.raise_for_status()
+			except Exception:
+				if i < retries - 1:
+					continue
+				raise
+			else:
+				return resp
+		return resp
+
 	@cp.expose(("fi",))
 	def fileinfo(self, *path, **void):
 		cp.response.headers.update(SHEADERS)
@@ -251,14 +264,7 @@ class Server:
 		try:
 			info = download_cache[url]
 		except KeyError:
-			resp = self.session.get(
-				url,
-				headers=Request.header(),
-				verify=False,
-				timeout=60,
-				stream=True,
-			)
-			resp.raise_for_status()
+			resp = self.get_with_retries(url, timeout=3)
 			data = seq(resp)
 		else:
 			data = MemoryBytes(info)
@@ -282,14 +288,7 @@ class Server:
 		try:
 			info = download_cache[url]
 		except KeyError:
-			resp = self.session.get(
-				url,
-				headers=Request.header(),
-				verify=False,
-				timeout=60,
-				stream=True,
-			)
-			resp.raise_for_status()
+			resp = self.get_with_retries(url, timeout=3)
 			data = seq(resp)
 
 			def callback(data):
@@ -363,7 +362,7 @@ class Server:
 			urls.insert(0, bytes(data))
 			if callback:
 				callback(head.data)
-		for start, end in ranges:
+		for i, (start, end) in enumerate(ranges):
 			pos = 0
 			rems = urls.copy()
 			futs = []
@@ -383,7 +382,7 @@ class Server:
 				elif u.startswith("https://cdn.discord"):
 					ns = 8388608
 				else:
-					resp = reqs.next().head(u, headers=headers, timeout=20)
+					resp = reqs.next().head(u, headers=headers, timeout=3)
 					ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 				if pos + ns <= start:
 					pos += ns
@@ -397,6 +396,9 @@ class Server:
 					if isinstance(u, byte_like):
 						yield u[s:e]
 						return
+					if is_miza_attachment(u) and (path := u.split("?", 1)[0].split("/u/", 1)[-1]) and len(path.split("/")) == 2 and path.count("~") == 0:
+						c_id, m_id, a_id, fn = decode_attachment(path)
+						u = await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn))
 					print(u)
 					if e >= ns:
 						e = ""
@@ -404,20 +406,7 @@ class Server:
 						e -= 1
 					h2 = dict(h.items())
 					h2["range"] = f"bytes={s}-{e}"
-					ex2 = None
-					for i in range(3):
-						resp = reqs.next().get(u, headers=h2, stream=True, timeout=20)
-						if resp.status_code == 416:
-							yield b""
-							return
-						try:
-							resp.raise_for_status()
-						except Exception as ex:
-							ex2 = ex
-						else:
-							break
-					if ex2:
-						raise ex2
+					resp = self.get_with_retries(u, headers=h2, timeout=3)
 					if resp.status_code != 206:
 						ms = min(ns, end - pos - s)
 						if len(resp.content) > ms:
@@ -430,7 +419,7 @@ class Server:
 						return
 					yield from resp.iter_content(65536)
 
-				if len(futs) > 1:
+				if len(futs) > i + 1:
 					yield from futs.pop(0).result()
 				fut = esubmit(get_chunk, u, headers, start, end, pos, ns, big)
 				futs.append(fut)
@@ -492,7 +481,9 @@ class Server:
 				position += len(b)
 			if not upload_cache[h].required:
 				upload_cache[h].info["chunks"] = [v for k, v in sorted(upload_cache[h].chunkinfo.items())]
-				print("INFO:", upload_cache[h])
+				debug_info = upload_cache[h].info.copy()
+				debug_info.pop("head", None)
+				print("INFO:", debug_info)
 				data = json_dumps(upload_cache[h].info)
 				if len(data) > 262144:
 					data2 = bytes2zip(data)
@@ -516,14 +507,7 @@ class Server:
 		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
 		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
 		url = await_fut(fut)
-		resp = self.session.get(
-			url,
-			headers=Request.header(),
-			verify=False,
-			timeout=60,
-			stream=True,
-		)
-		resp.raise_for_status()
+		resp = self.get_with_retries(url, timeout=3)
 		data = seq(resp)
 		length, i = decode_leb128(data, mode="index")
 		content = data[i:i + length]
@@ -584,15 +568,7 @@ class Server:
 			headers = Request.header()
 			if cp.request.headers.get("Range"):
 				headers["Range"] = cp.request.headers["Range"]
-			resp = self.session.request(
-				cp.request.method.upper(),
-				url,
-				headers=headers,
-				stream=True,
-				verify=False,
-				timeout=60,
-			)
-			resp.raise_for_status()
+			resp = self.get_with_retries(url, headers=headers, timeout=3)
 		fn = filename or (url2fn(url) if url else None)
 		fut = attachment_cache.create(seq(resp), filename=fn)
 		return await_fut(fut)
@@ -708,7 +684,7 @@ class Server:
 		except KeyError:
 			if len(self.cache) > 128:
 				self.cache.pop(next(iter(self.cache)))
-			data = self.cache[info] = niquests.get(info, timeout=30).json()
+			data = self.cache[info] = self.get_with_retries(info, timeout=5, retries=3).json()
 		info = [data["filename"], data["size"], data["mimetype"]]
 		urls = data.get("chunks") or [data["dl"]]
 		size = info[1]

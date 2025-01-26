@@ -191,16 +191,16 @@ class Ask(Command):
 				text = ""
 				messagelist = [messages[k] for k in sorted(messages) if not reference or k != reference.id]
 				messagelist.insert(0, system_message)
-				if function_message:
-					messagelist.append(function_message)
-					messagelist.extend(tool_responses)
 				if reply_message:
 					messagelist.append(reply_message)
 				if input_message:
 					messagelist.append(input_message)
+				if function_message:
+					messagelist.append(function_message)
+					messagelist.extend(tool_responses)
 				m = None
 				modelist = None
-				async for resp in bot.chat_completion(messagelist, model=model, frequency_penalty=pdata.frequency_penalty, presence_penalty=pdata.frequency_penalty * 2 / 3, max_tokens=4096, temperature=pdata.temperature, top_p=pdata.top_p, tool_choice=None, tools=TOOLS, model_router=MODEL_ROUTER, tool_router=TOOL_ROUTER, stop=(), user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
+				async for resp in bot.chat_completion(messagelist, model=model, frequency_penalty=pdata.frequency_penalty, presence_penalty=pdata.frequency_penalty * 2 / 3, max_tokens=16384, temperature=pdata.temperature, top_p=pdata.top_p, tool_choice=None, tools=TOOLS, model_router=MODEL_ROUTER, tool_router=TOOL_ROUTER, stop=(), user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
 					if isinstance(resp, dict):
 						if resp.get("cargs"):
 							props.cargs = resp["cargs"]
@@ -289,14 +289,19 @@ class Ask(Command):
 									function_message.tool_calls.append(c)
 						try:
 							res = await fut
-							succ = res and (isinstance(res, str) or res.get("content"))
+							succ = res and (isinstance(res, (str, bytes)) or res.get("content"))
 						except Exception as ex:
 							print_exc()
 							res = repr(ex)
 						else:
 							if not succ:
 								res = "[RESPONSE EMPTY OR REDACTED]"
-						if succ:
+						if succ and isinstance(res, bytes):
+							# bytes indicates an image, use GPT-4 to describe it
+							res = await bot.gpt4v(url=res, premium_context=premium)
+						elif succ and isinstance(res, dict):
+							res = res.get("content", "")
+						elif succ:
 							c = await tcount(res)
 							ra = 1 if premium.value < 2 else 1.5 if premium.value < 5 else 2
 							if c > round(4000 * ra):
@@ -328,8 +333,8 @@ class Ask(Command):
 							name = "wolfram_alpha"
 					elif name == "reasoning":
 						async def reasoning(q):
-							model = modelist.reasoning if modelist else "o1-mini"
-							if "o1" in model:
+							model = modelist.reasoning if modelist else "deepseek-r1"
+							if "o1" in model or "r1" in model:
 								mt = dict(
 									max_completion_tokens=16384,
 								)
@@ -348,8 +353,10 @@ class Ask(Command):
 								],
 								**mt,
 								premium_context=premium,
+								timeout=480,
 							)
-							return resp.choices[0].message.content
+							message = resp.choices[0].message
+							return T(message).get("reasoning_content") or message.content
 						argv = kwargs.get("query") or " ".join(kwargs.values())
 						s = f'\n> Thinking "{argv}"...'
 						text += s
@@ -1176,6 +1183,7 @@ class Imagine(Command):
 			while c2 > 0:
 				n = round_random(min(4, c2, amount / dups))
 				p = eprompts.next()
+				prompt = p.replace(" BREAK ", "\n")
 				steps = max(1, round_random(num_inference_steps / 8))
 				if use_together:
 					fut = csubmit(Request(
@@ -1184,7 +1192,7 @@ class Imagine(Command):
 						headers={"Content-Type": "application/json", "Authorization": "Bearer " + AUTH["together_key"]},
 						data=orjson.dumps(dict(
 							model=resp_model,
-							prompt=p,
+							prompt=prompt,
 							n=n,
 							steps=min(4, steps),
 							width=w,
@@ -1202,7 +1210,7 @@ class Imagine(Command):
 						method="POST",
 						headers={"Content-Type": "application/json", "Authorization": "Bearer " + AUTH["deepinfra_key"]},
 						data=orjson.dumps(dict(
-							prompt=p,
+							prompt=prompt,
 							num_images=n,
 							num_inference_steps=steps,
 							width=w,
@@ -1212,7 +1220,7 @@ class Imagine(Command):
 						aio=True,
 						timeout=60,
 					))
-				pnames.extend([p] * n)
+				pnames.extend([prompt] * n)
 				queue.append(fut)
 				c2 -= n
 				cost = mpf("0.0005") * (steps * w * h / 1048576)

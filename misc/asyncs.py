@@ -9,7 +9,7 @@ import threading
 import time
 import weakref
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, thread, _base
 from time import time as utc
 from traceback import print_exc
 
@@ -40,6 +40,92 @@ def as_fut(obj):
 	fut = asyncio.Future(loop=eloop)
 	cst(fut.set_result, obj)
 	return fut
+
+last_work = {}
+last_used = {}
+
+def _worker(executor_reference, work_queue, initializer, initargs):
+	if initializer is not None:
+		try:
+			initializer(*initargs)
+		except BaseException:
+			_base.LOGGER.critical('Exception in initializer:', exc_info=True)
+			executor = executor_reference()
+			if executor is not None:
+				executor._initializer_failed()
+			return
+	try:
+		i = thread.threading.get_ident()
+		last_used[i] = time.time()
+		while True:
+			t = time.time()
+			work_item = work_queue.get(block=True)
+			if work_item is not None:
+				tup = (i, work_item.fn, work_item.args)
+				last_work[i] = tup
+				last_used[i] = t
+				# print(tup)
+				work_item.run()
+				# Delete references to object. See issue16284
+				del work_item
+
+				# attempt to increment idle count
+				executor = executor_reference()
+				if executor is not None:
+					executor._idle_semaphore.release()
+				del executor
+				continue
+
+			executor = executor_reference()
+			# Exit if:
+			#   - The interpreter is shutting down OR
+			#   - The executor that owns the worker has been collected OR
+			#   - The executor that owns the worker has been shutdown.
+			if getattr(_base, "_shutdown", None) or executor is None or executor._shutdown:
+				# Flag the executor as shutting down as early as possible if it
+				# is not gc-ed yet.
+				if executor is not None:
+					executor._shutdown = True
+				# Notice other workers
+				work_queue.put(None)
+				return
+			del executor
+		print("Thread", i, "exited.")
+	except BaseException:
+		_base.LOGGER.critical('Exception in worker', exc_info=True)
+
+def _adjust_thread_count(self):
+	# if idle threads are available, don't spin new threads
+	try:
+		if self._idle_semaphore.acquire(timeout=0):
+			return
+	except AttributeError:
+		pass
+
+	# When the executor gets lost, the weakref callback will wake up
+	# the worker threads.
+	def weakref_cb(_, q=self._work_queue):
+		q.put(None)
+
+	num_threads = len(self._threads)
+	if num_threads < self._max_workers:
+		thread_name = '%s_%d' % (self._thread_name_prefix or self, num_threads)
+		t = thread.threading.Thread(
+			name=thread_name,
+			target=_worker,
+			args=(
+				thread.weakref.ref(self, weakref_cb),
+				self._work_queue,
+				self._initializer,
+				self._initargs,
+			),
+			daemon=True,
+		)
+		t.start()
+		self._threads.add(t)
+		thread._threads_queues[t] = self._work_queue
+
+concurrent.futures.ThreadPoolExecutor._adjust_thread_count = _adjust_thread_count
 
 
 # Thread pool manager for multithreaded operations.
@@ -878,3 +964,37 @@ class Delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextMa
 		remaining = self.duration - utc() + self.start
 		if remaining > 0:
 			await asyncio.sleep(remaining)
+
+
+class AsyncStreamWrapper:
+	def __init__(self, async_iterator):
+		self.async_iterator = async_iterator
+		self.buffer = bytearray()
+		self._closed = False
+
+	async def read(self, n=-1):
+		if self._closed:
+			raise ValueError("I/O operation on closed file.")
+		
+		async for chunk in self.async_iterator:
+			self.buffer.extend(chunk)
+			if n >= 0 and len(self.buffer) >= n:
+				break
+
+		if n < 0:  # Read all remaining data
+			data = bytes(self.buffer)
+			self.buffer.clear()
+		else:
+			data = bytes(self.buffer[:n])
+			self.buffer = self.buffer[n:]
+		
+		return data
+
+	def close(self):
+		self._closed = True
+
+	async def __aenter__(self):
+		return self
+
+	async def __aexit__(self, exc_type, exc_value, traceback):
+		self.close()

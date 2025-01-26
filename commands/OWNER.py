@@ -1221,11 +1221,13 @@ class UpdateEmojis(Database):
 				timeout=32,
 			)
 			fns = set(chain.from_iterable(t[2] for t in os.walk("misc/emojis")))
+			longest = {}
 			for edata in emojidata["items"]:
 				name2 = edata["name"]
 				for fn in fns:
-					if fn.startswith(name2):
+					if fn.startswith(name2) and len(fn) > len(longest.get(name2, "")):
 						name2 = fn
+						longest[fn] = name2
 						break
 				else:
 					continue
@@ -1262,6 +1264,14 @@ class UpdateEmojis(Database):
 				if emoji.name == ename and emoji.animated == animated:
 					if not emoji or bot.ready and not getattr(emoji, "application_id", None) and (not getattr(emoji, "available", True) or emoji.id not in (e.id for e in emoji.guild.emojis)):
 						continue
+					self.data[name] = emoji.id
+					bot.cache.emojis[emoji.id] = emoji
+					return emoji
+		if emojidata is not None:
+			for edata in emojidata["items"]:
+				if edata["name"] == ename and edata["animated"] == animated:
+					emoji = discord.Emoji(guild=bot.user, state=bot._state, data=edata)
+					emoji.application_id = bot.id
 					self.data[name] = emoji.id
 					bot.cache.emojis[emoji.id] = emoji
 					return emoji

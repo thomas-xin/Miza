@@ -1304,7 +1304,7 @@ class AudioDownloader:
 			raise FileNotFoundError(f'No results for {item}.')
 		return temp
 
-	def is_cached(self, item):
+	def in_cache(self, item):
 		item = verify_search(item)
 		retrieval = json_dumpstr([item, None, 1])
 		try:

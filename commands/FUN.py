@@ -970,6 +970,7 @@ sparkle_values = demap(
 	normal="sparkles",
 	rare="sparkles_rare",
 	legendary="sparkles_legendary",
+	secret="sparkles_secret",
 )
 barter_values = demap(
 	enchanted_book=0,

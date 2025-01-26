@@ -51,6 +51,10 @@ available = {
 		"anthropic": ("claude-3-haiku-20240307", ("0.25", "1.25")),
 		None: "gpt-4m",
 	},
+	"deepseek-r1": {
+		"deepseek": ("deepseek-reasoner", ("0.55", "2.19")),
+		None: "o1-preview",
+	},
 	"deepseek-v3": {
 		"deepseek": ("deepseek-chat", ("0.14", "0.28")),
 		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
@@ -242,6 +246,7 @@ is_chat = {
 	"gpt-3.5",
 	"gpt-3.5-turbo-0125",
 	"gpt-3.5-turbo",
+	"deepseek-r1",
 	"deepseek-v3",
 	"firefunction-v2",
 	"firefunction-v1",
@@ -405,6 +410,7 @@ contexts = {
 	"gpt-3.5": 16384,
 	"gpt-3.5-turbo-0125": 16384,
 	"gpt-3.5-turbo-instruct": 4096,
+	"deepseek-r1": 64000,
 	"deepseek-v3": 64000,
 	"dbrx-instruct": 32768,
 	"miquliz-120b": 32768,
@@ -459,7 +465,8 @@ def nsfw_flagged(resp):
 	for flag in flagged:
 		if getattr(cat, flag):
 			score = getattr(resp.category_scores, flag)
-			found.append((score, flag + f"({round(score * 100)}%)"))
+			if score >= 0.9:
+				found.append((score, flag + f"({round(score * 100)}%)"))
 	if not found:
 		return
 	return max(found)[-1]
@@ -787,6 +794,8 @@ async def ensure_models(force=False):
 		"NeverSleep/Llama-3-Lumimaid-70B-v0.1-alt-GGUF": "lumimaid-70b",
 	}
 	default = "gpt-4m"
+	return default
+	# The rest is currently disabled for now.
 	try:
 		try:
 			info = await Request(f"{endpoints['mizabot']}/models", aio=True, json=True)
@@ -941,6 +950,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 						if m.get("content") is None:
 							m = cdict(m)
 							m.content = ""
+						m = fix_tool(m)
 						messages.append(m)
 					kwa["messages"] = messages
 				if sapi in ("fireworks", "together", "deepinfra"):
@@ -957,7 +967,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 							m = m2
 						messages.append(m)
 					kwa["messages"] = messages
-				if sapi == "openai":
+				if sapi in ("openai", "deepseek"):
 					messages = []
 					for m in kwa["messages"]:
 						m2 = None
@@ -1554,7 +1564,7 @@ f_browse = {
 f_reasoning = {
 	"type": "function", "function": {
 		"name": "reasoning",
-		"description": "Requests for a slower, more powerful language model to provide reasoning. Use if you are unsure about, or if a user is pointing out a flaw in your logic. Make sure to pass all relevant information!",
+		"description": "Requests for a slower, more powerful language model to provide reasoning. Use if you are unsure about, or if a user is pointing out a flaw in your logic. Includes complex programming tasks. Make sure to pass all relevant information!",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {
@@ -2255,6 +2265,26 @@ def untool(message):
 	message.content = content.strip() if isinstance(content, string_like) else content
 	return message
 
+def fix_tool(message):
+	if not message.get("tool_calls") and message.get("role") != "tool":
+		return message
+	# Somewhat hacky workaround for incompatibility between tool call ID lengths for different LLM providers
+	seen = set()
+	if T(message).get("tool_call_id"):
+		temp_id = message.tool_call_id
+		if len(temp_id) > 40:
+			temp_id = temp_id[:40]
+		while temp_id in seen:
+			temp_id = temp_id[:-1] + chr(ord(temp_id[-1]) + 1)
+	for i, tc in enumerate(T(message).get("tool_calls", ())):
+		if len(tc.id) > 40:
+			tc.id = tc.id[:40]
+		if tc.id in seen:
+			tc.id = tc.id[:-1] + chr(ord(tc.id[-1]) + 1)
+		seen.add(tc.id)
+	return message
+
+
 def unimage(message):
 	if not message.content or isinstance(message.content, string_like):
 		return message
@@ -2279,6 +2309,7 @@ CL100K_IM = {
 	"gpt-4o-mini-2024-07-18",
 	"gpt-4-turbo-2024-04-09",
 	"gpt-3.5-turbo-0125",
+	"deepseek-r1",
 	"deepseek-v3",
 	"quill-72b",
 	"databricks/dbrx-instruct",

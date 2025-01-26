@@ -27,7 +27,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut, gather
 from .types import byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, RangeSet, MemoryBytes
-from .util import hwaccel, fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, rename, url_unparse, url2fn, is_youtube_url, seq, Cache, Request, magic, is_discord_attachment, unyt, ecdc_exists, get_duration, CACHE_PATH, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment
+from .util import hwaccel, fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, rename, url_unparse, url2fn, is_youtube_url, seq, Cache, Request, magic, is_discord_attachment, is_miza_attachment, unyt, ecdc_exists, get_duration, CACHE_PATH, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment
 from .caches import attachment_cache, upload_cache, download_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -429,6 +429,19 @@ class Server:
 		out = json_dumps(data)
 		return out
 
+	def get_with_retries(self, url, headers={}, timeout=3, retries=5):
+		for i in range(retries):
+			try:
+				resp = self.session.get(url, headers=headers, verify=i == 0, timeout=timeout)
+				resp.raise_for_status()
+			except Exception:
+				if i < retries - 1:
+					continue
+				raise
+			else:
+				return resp
+		return resp
+
 	@cp.expose(("fi",))
 	def fileinfo(self, *path, **void):
 		cp.response.headers.update(SHEADERS)
@@ -439,14 +452,7 @@ class Server:
 		try:
 			info = download_cache[url]
 		except KeyError:
-			resp = self.session.get(
-				url,
-				headers=Request.header(),
-				verify=False,
-				timeout=60,
-				stream=True,
-			)
-			resp.raise_for_status()
+			resp = self.get_with_retries(url, timeout=3)
 			data = seq(resp)
 		else:
 			data = MemoryBytes(info)
@@ -470,14 +476,7 @@ class Server:
 		try:
 			info = download_cache[url]
 		except KeyError:
-			resp = self.session.get(
-				url,
-				headers=Request.header(),
-				verify=False,
-				timeout=60,
-				stream=True,
-			)
-			resp.raise_for_status()
+			resp = self.get_with_retries(url, timeout=3)
 			data = seq(resp)
 
 			def callback(data):
@@ -551,7 +550,7 @@ class Server:
 			urls.insert(0, bytes(data))
 			if callback:
 				callback(head.data)
-		for start, end in ranges:
+		for i, (start, end) in enumerate(ranges):
 			pos = 0
 			rems = urls.copy()
 			futs = []
@@ -566,8 +565,12 @@ class Server:
 				elif "?S=" in u or "&S=" in u:
 					u, ns = u.replace("?S=", "&S=").split("&S=", 1)
 					ns = int(ns)
+				elif u.startswith("https://s3-us-west-2"):
+					ns = 503316480
+				elif u.startswith("https://cdn.discord"):
+					ns = 8388608
 				else:
-					resp = reqs.next().head(u, headers=headers, timeout=20)
+					resp = reqs.next().head(u, headers=headers, timeout=3)
 					ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 				if pos + ns <= start:
 					pos += ns
@@ -581,26 +584,17 @@ class Server:
 					if isinstance(u, byte_like):
 						yield u[s:e]
 						return
+					if is_miza_attachment(u) and (path := u.split("?", 1)[0].split("/u/", 1)[-1]) and len(path.split("/")) == 2 and path.count("~") == 0:
+						c_id, m_id, a_id, fn = decode_attachment(path)
+						u = await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn))
+					print(u)
 					if e >= ns:
 						e = ""
 					else:
 						e -= 1
 					h2 = dict(h.items())
 					h2["range"] = f"bytes={s}-{e}"
-					ex2 = None
-					for i in range(3):
-						resp = reqs.next().get(u, headers=h2, stream=True, timeout=20)
-						if resp.status_code == 416:
-							yield b""
-							return
-						try:
-							resp.raise_for_status()
-						except Exception as ex:
-							ex2 = ex
-						else:
-							break
-					if ex2:
-						raise ex2
+					resp = self.get_with_retries(u, headers=h2, timeout=3)
 					if resp.status_code != 206:
 						ms = min(ns, end - pos - s)
 						if len(resp.content) > ms:
@@ -613,7 +607,7 @@ class Server:
 						return
 					yield from resp.iter_content(65536)
 
-				if len(futs) > 1:
+				if len(futs) > i + 1:
 					yield from futs.pop(0).result()
 				fut = esubmit(get_chunk, u, headers, start, end, pos, ns, big)
 				futs.append(fut)
@@ -675,7 +669,9 @@ class Server:
 				position += len(b)
 			if not upload_cache[h].required:
 				upload_cache[h].info["chunks"] = [v for k, v in sorted(upload_cache[h].chunkinfo.items())]
-				print("INFO:", upload_cache[h])
+				debug_info = upload_cache[h].info.copy()
+				debug_info.pop("head", None)
+				print("INFO:", debug_info)
 				data = json_dumps(upload_cache[h].info)
 				if len(data) > 262144:
 					data2 = bytes2zip(data)
@@ -699,14 +695,7 @@ class Server:
 		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
 		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
 		url = await_fut(fut)
-		resp = self.session.get(
-			url,
-			headers=Request.header(),
-			verify=False,
-			timeout=60,
-			stream=True,
-		)
-		resp.raise_for_status()
+		resp = self.get_with_retries(url, timeout=3)
 		data = seq(resp)
 		length, i = decode_leb128(data, mode="index")
 		content = data[i:i + length]
@@ -741,14 +730,7 @@ class Server:
 		try:
 			info = download_cache[url]
 		except KeyError:
-			resp = self.session.get(
-				url,
-				headers=Request.header(),
-				verify=False,
-				timeout=60,
-				stream=True,
-			)
-			resp.raise_for_status()
+			resp = self.get_with_retries(url, timeout=3)
 			data = seq(resp)
 
 			def callback(data):
@@ -802,15 +784,7 @@ class Server:
 			headers = Request.header()
 			if cp.request.headers.get("Range"):
 				headers["Range"] = cp.request.headers["Range"]
-			resp = self.session.request(
-				cp.request.method.upper(),
-				url,
-				headers=headers,
-				stream=True,
-				verify=False,
-				timeout=60,
-			)
-			resp.raise_for_status()
+			resp = self.get_with_retries(url, headers=headers, timeout=3)
 		fn = filename or (url2fn(url) if url else None)
 		fut = attachment_cache.create(seq(resp), filename=fn)
 		return await_fut(fut)

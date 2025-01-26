@@ -2258,10 +2258,6 @@ class seq(io.BufferedRandom, collections.abc.Sequence, contextlib.AbstractContex
 	def __len__(self):
 		return self.limit or max(k + len(v) for k, v in self.buffer.items()) if self.buffer else 0
 
-	def __del__(self):
-		del self.buffer
-		del self.data
-
 	seekable = lambda self: True	# noqa: E731
 	readable = lambda self: True	# noqa: E731
 	writable = lambda self: False	# noqa: E731
@@ -4244,7 +4240,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 	def header(cls, base=(), **fields) -> cdict:
 		"Creates a custom HTTP request header with randomised properties that spoof anti-scraping sites."
 		head = {
-			"User-Agent": f"Mozilla/5.{random.randint(1, 9)} (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/",
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in loop(4)),
 			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in loop(4)),

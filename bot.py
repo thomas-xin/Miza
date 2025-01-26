@@ -1680,7 +1680,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					url,
 					headers=Request.header(),
 					verify=False,
-					stream=True,
 				)
 				if resp.headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html", "application/json"):
 					url = resp.url
@@ -1749,7 +1748,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if verify:
 					fut = esubmit(Request, base + "png", method="HEAD")
 				url = base + "gif"
-				with reqs.next().head(url, headers=Request.header(), stream=True, timeout=30) as resp:
+				with reqs.next().head(url, headers=Request.header(), timeout=30) as resp:
 					if resp.status_code in range(400, 500):
 						if not verify:
 							return False
@@ -1874,7 +1873,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def emoji_exists(self, e):
 		if type(e) in (int, str):
 			url = f"https://cdn.discordapp.com/emojis/{e}.png"
-			with reqs.next().head(url, headers=Request.header(), stream=True, timeout=30) as resp:
+			with reqs.next().head(url, headers=Request.header(), timeout=30) as resp:
 				if resp.status_code in range(400, 500):
 					self.emoji_stuff.pop(int(e), None)
 					return
@@ -2307,23 +2306,23 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		1: cdict(
-			reasoning="o1-mini",
+			reasoning="deepseek-r1",
 			instructive="deepseek-v3",
 			casual="deepseek-v3",
 			nsfw="qwen-72b",
 			backup="llama-3-70b",
 			retry="gpt-4",
-			function="gpt-4m",
+			function="deepseek-v3",
 			vision="claude-3.5-haiku",
 			target="auto",
 		),
 		2: cdict(
-			reasoning="o1",
-			instructive="claude-3.5-sonnet",
+			reasoning="deepseek-r1",
+			instructive="deepseek-v3",
 			casual="deepseek-v3",
 			nsfw="qwen-72b",
 			backup="llama-3-70b",
-			retry="gpt-4",
+			retry="claude-3.5-sonnet",
 			function="deepseek-v3",
 			vision="gpt-4",
 			target="auto",
@@ -2991,7 +2990,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		print("Claude3V:", out)
 		return out
 
-	async def gpt4v(self, url, name=None, best=False, question=None, premium_context=[]):
+	async def gpt4v(self, url, name=None, best=True, question=None, premium_context=[]):
 		"Requests an image description from GPT4-Vision."
 		data_url = await self.to_data_url(url)
 		if not data_url.startswith("data:"):
@@ -3182,7 +3181,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		urls = await self.renew_attachments(find_urls(message.content))
 		for url in urls:
 			if is_discord_attachment(url) and not discord_expired(url) or self.is_webserver_url(url):
-				resp = await asubmit(reqs.next().head, url, stream=True)
+				resp = await asubmit(reqs.next().head, url, headers=Request.header(), verify=False, timeout=30)
 				url = resp.headers.get("Location") or resp.url
 				if is_discord_attachment(url):
 					uid = url.rsplit("/", 2)[-2]
@@ -4517,7 +4516,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		fn = f"commands/{module}.py"
 		with open(fn, "rb") as f:
 			b = f.read()
-		code = compile(b, fn, "exec", optimize=1)
+		code = compile(b, fn, "exec")
 		exec(code, mod)
 		print(f"Evaluated module {module}...")
 		self._globals[module] = mod
@@ -4693,7 +4692,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		backup = AUTH.get("backup_path") or "backup"
 		if not os.path.exists(backup):
 			os.mkdir(backup)
-		fn = f"{backup}/saves.{datetime.datetime.utcnow().date()}.tar"
+		fn = f"{backup}/saves.{DynamicDT.utcnow().date()}.tar"
 		day = not os.path.exists(fn)
 		if day:
 			await_fut(self.send_event("_day_"))
@@ -5002,7 +5001,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		args = alist(spl[0]._get_args() + spl[1])
 		if args:
 			for k, v in schema.items():
-				if k in kwargs:
+				if k in kwargs or not v.get("greedy", True):
 					continue
 				r = None
 				# Datetime and timedelta are greedy arguments that attempt to match as many contiguous words as possible; e.g. "2021 12 31" turns into a single datetime object
@@ -6778,7 +6777,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							if futs:
 								datas = await gather(*futs)
 								fut = csubmit(self.edit_message(message, content="`LOADING...`", attachments=(), embeds=()))
-								urli = await self.data.exec.uproxy(*(CompatFile(d, filename=a.url.split("?", 1)[0].rsplit("/", 1)[-1]) for d, a in zip(datas, message.attachments)), collapse=False, keep=False)
+								urli = await self.data.exec.uproxy(*(CompatFile(d) for d, a in zip(datas, message.attachments)), collapse=False, keep=False, filename=a.url.split("?", 1)[0].rsplit("/", 1)[-1])
 								urli.extend(urls)
 								urls = urli
 							if urls:
@@ -8177,12 +8176,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Message send event: processes new message. calls _send_ and _seen_ bot database events.
 		@self.event
 		async def on_message(message):
+			channel = message.channel
+			if T(channel).get("guild") is None and T(channel).get("recipient") is None:
+				try:
+					channel = await self._fetch_channel(channel.id)
+				except discord.NotFound:
+					print(f"Channel {channel.id} not found.")
+				else:
+					message.channel = channel
 			self.add_message(message, force=True)
 			guild = message.guild
 			if guild:
 				csubmit(self.send_event("_send_", message=message))
 			user = message.author
-			channel = message.channel
 			if user.id == self.deleted_user:
 				print("Deleted user MESSAGE", channel, user, message, channel.id, message.id)
 			fut = csubmit(self.seen(user, channel, guild, event="message", raw="Sending a message"))

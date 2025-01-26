@@ -266,10 +266,12 @@ class Queue(Command):
 		start=cdict(
 			type="timedelta",
 			description="start position; automatically seeks when played",
+			greedy=False,
 		),
 		end=cdict(
 			type="timedelta",
 			description="end position; subsequent audio skipped autonatically",
+			greedy=False,
 		),
 	)
 	macros = cdict(
@@ -391,12 +393,14 @@ class Queue(Command):
 				temp.icon = e.get("icon")
 			dur = e_dur(temp.duration) if i < len(resp) - 1 or temp.get("duration") else inf
 			if dur + total_dur < start:
+				print(f"Skipping {temp.name} due to start position ({dur + total_dur} < {start}).")
 				total_dur += dur
 				continue
 			elif start:
 				temp.start = start
 			items.append(temp)
 			if dur + total_dur > end:
+				print(f"Ending queue at {temp.name} due to end position ({dur + total_dur} > {end}).")
 				temp.end = end - total_dur
 				total_dur = end
 				break
@@ -405,9 +409,8 @@ class Queue(Command):
 		if q and qstart > 0:
 			estimated += e_remainder(elapsed, length, q[0], reverse)
 		delay = 0
-		print(items)
 		assert len(items), "No valid items to add to queue."
-		cache_level = bot.audio.run(f"ytdl.is_cached({repr(items[0].url)})")
+		cache_level = bot.audio.run(f"ytdl.in_cache({repr(items[0].url)})")
 		print(items[0].url, cache_level)
 		if not cache_level:
 			delay = 5

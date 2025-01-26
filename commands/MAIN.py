@@ -977,7 +977,7 @@ class Status(Command):
 		emb = discord.Embed(colour=colour or rand_colour())
 		url = best_url(bot.user)
 		emb.set_author(name="Status", url=bot.webserver, icon_url=url)
-		emb.timestamp = utc_dt()
+		emb.timestamp = DynamicDT.utcnow()
 		if msg is None:
 			def subs(n, x):
 				if n == "Code size":

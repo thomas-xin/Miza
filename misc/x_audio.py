@@ -184,9 +184,10 @@ class AudioPlayer(discord.AudioSource):
 		except KeyError:
 			pass
 		else:
-			if not self.vc.is_connected():
-				await self.force_disconnect(vcc.guild)
-				self.vc = None
+			if not self or not self.vc.is_connected():
+				await cls.force_disconnect(vcc.guild)
+				if self:
+					self.vc = None
 		if self and self.vc:
 			await cls.ensure_speak(vcc)
 			self.channel = channel
@@ -200,9 +201,10 @@ class AudioPlayer(discord.AudioSource):
 				self = await asyncio.wait_for(wrap_future(fut), timeout=7)
 			except asyncio.TimeoutError:
 				pass
-			if not self.vc.is_connected():
-				await self.force_disconnect(vcc.guild)
-				self.vc = None
+			if not self or not self.vc.is_connected():
+				await cls.force_disconnect(vcc.guild)
+				if self:
+					self.vc = None
 		if self and self.vc:
 			await cls.ensure_speak(vcc)
 			self.channel = channel
@@ -317,6 +319,15 @@ class AudioPlayer(discord.AudioSource):
 			data={"channel_id": None},
 			aio=True,
 		)
+		# This removes the cached voice state, which is necessary for reconnecting to a voice channel after a disconnect
+		vc = client._connection._voice_clients.pop(guild.id, None)
+		if vc and vc.ws:
+			try:
+				await asyncio.wait_for(vc.ws.close(), timeout=7)
+			except Exception:
+				print_exc()
+		if vc and vc.socket:
+			vc.socket.close()
 
 	@classmethod
 	def from_guild(cls, guild):
@@ -414,7 +425,7 @@ class AudioPlayer(discord.AudioSource):
 		except AttributeError:
 			pass
 		if not self.vc and not self.fut.done():
-			self.fut.result()
+			self.fut.result(timeout=60)
 		try:
 			return getattr(self.vc, k)
 		except AttributeError:
@@ -672,6 +683,8 @@ class AudioPlayer(discord.AudioSource):
 			self.updating_activity = None
 		if self.settings.stay:
 			return
+		if not self.vc and not self.fut.done():
+			return
 		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
 		if connected:
 			# Handle special case of only deafened users; they are not counted as listeners but will still keep the bot in the channel, paused instead
@@ -697,6 +710,8 @@ class AudioPlayer(discord.AudioSource):
 			self.updating_streaming.cancel()
 			self.updating_streaming = None
 		if self.settings.stay:
+			return
+		if not self.vc and not self.fut.done():
 			return
 		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
 		if len(self.queue) == 0 and connected:
@@ -860,7 +875,7 @@ class AudioPlayer(discord.AudioSource):
 					source.new = False
 				self.playing.append(source)
 			if self.playing and not self.settings.pause:
-				self.fut.result()
+				self.fut.result(timeout=60)
 				self.last_played = utc()
 				if self.vc and not self.vc.is_playing():
 					self.vc.play(self)
@@ -1083,7 +1098,7 @@ class AudioFile:
 			pass
 		else:
 			try:
-				self = fut.result()
+				self = fut.result(timeout=60)
 			except Exception:
 				pass
 			else:
