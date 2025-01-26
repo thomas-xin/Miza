@@ -241,10 +241,10 @@ class Server:
 			self.cache[rpath] = b = f.read()
 		return b
 
-	def get_with_retries(self, url, headers={}, timeout=3, retries=5):
+	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
 		for i in range(retries):
 			try:
-				resp = self.session.get(url, headers=headers, verify=i == 0, timeout=timeout)
+				resp = self.session.get(url, headers=headers, data=data, verify=i == 0, timeout=timeout + i ** 2)
 				resp.raise_for_status()
 			except Exception:
 				if i < retries - 1:
@@ -604,15 +604,7 @@ class Server:
 		headers = Request.header()
 		if cp.request.headers.get("Range"):
 			headers["Range"] = cp.request.headers["Range"]
-		resp = self.session.request(
-			cp.request.method.upper(),
-			url,
-			headers=headers,
-			data=body,
-			stream=True,
-			verify=False,
-			timeout=60,
-		)
+		resp = self.get_with_retries(url, data=body, headers=headers, timeout=2)
 		cp.response.status = resp.status_code
 		cp.response.headers.update(resp.headers)
 		cp.response.headers.pop("Connection", None)
