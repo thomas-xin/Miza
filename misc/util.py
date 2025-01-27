@@ -4365,6 +4365,18 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 Request = RequestManager()
 get_request = Request.__call__
 
+def update_headers(headers, **fields):
+	"Updates a dictionary of HTTP headers with new fields. Case-insensitive."
+	lowers = {k.lower(): k for k in headers}
+	for k, v in fields.items():
+		k2 = k.lower()
+		if k2 in headers:
+			headers.pop(k2)
+		elif k2 in lowers:
+			headers.pop(lowers[k2])
+		headers[k] = v
+	return headers
+
 sp = None
 browsers = {}
 def new_playwright_page(browser="firefox", viewport=dict(width=480, height=320), headless=True):

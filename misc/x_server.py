@@ -27,7 +27,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut, gather
 from .types import byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, RangeSet, MemoryBytes
-from .util import hwaccel, fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, rename, url_unparse, url2fn, is_youtube_url, seq, Cache, Request, magic, is_discord_attachment, is_miza_attachment, unyt, ecdc_exists, get_duration, CACHE_PATH, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment
+from .util import hwaccel, fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, rename, url_unparse, url2fn, is_youtube_url, seq, Cache, Request, magic, is_discord_attachment, is_miza_attachment, unyt, ecdc_exists, get_duration, CACHE_PATH, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment, update_headers
 from .caches import attachment_cache, upload_cache, download_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -268,10 +268,10 @@ def error_handler(exc=None):
 		resp = errdata.get(status) or errdata.setdefault(status, reqs.next().get(f"https://http.cat/{status}", timeout=5))
 		head = resp.headers.copy()
 		body = resp.content
-	head.update(HEADERS)
+	update_headers(head, **HEADERS)
 	head["Content-Length"] = len(body)
 	cp.response.status = status
-	cp.response.headers.update(head)
+	update_headers(cp.response.headers, **head)
 	cp.response.headers.pop("Connection", None)
 	print_exc()
 	print(cp.response.headers)
@@ -444,7 +444,7 @@ class Server:
 
 	@cp.expose(("fi",))
 	def fileinfo(self, *path, **void):
-		cp.response.headers.update(SHEADERS)
+		update_headers(cp.response.headers, **SHEADERS)
 		assert len(path) in (1, 2) and path[0].count("~") == 0
 		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
 		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
@@ -467,7 +467,7 @@ class Server:
 
 	@cp.expose
 	def download(self, *path, download="1", **void):
-		cp.response.headers.update(CHEADERS)
+		update_headers(cp.response.headers, **CHEADERS)
 		assert len(path) in (1, 2) and path[0].count("~") == 0
 		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
 		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
@@ -508,7 +508,7 @@ class Server:
 		headers.pop("Remote-Addr", None)
 		headers.pop("Host", None)
 		headers.pop("Range", None)
-		headers.update(Request.header())
+		update_headers(headers, **Request.header())
 		ranges = []
 		length = 0
 		if brange:
@@ -630,7 +630,7 @@ class Server:
 		except Exception:
 			print_exc()
 			fp = None
-		cp.response.headers.update(HEADERS)
+		update_headers(cp.response.headers, **HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
 		if not size or not fp:
 			if h in upload_cache:
@@ -687,6 +687,7 @@ class Server:
 				yield b'"url":"' + uhead.encode("utf-8") + b'"'
 			yield b"}"
 		return start_upload(position)
+	upload._cp_config = {"response.stream": True}
 
 	@cp.expose
 	def delete(self, *path, key=None, **void):
@@ -721,7 +722,7 @@ class Server:
 
 	@cp.expose
 	def edit(self, *path, key=None, **void):
-		cp.response.headers.update(CHEADERS)
+		update_headers(cp.response.headers, **CHEADERS)
 		assert len(path) in (1, 2) and path[0].count("~") == 0
 		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
 		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
@@ -769,6 +770,7 @@ class Server:
 		aid = p2n(path[0])
 		resp = interface.run(f"bot.renew_attachment({aid})")
 		return self.proxy_if(resp)
+	unproxy._cp_config = {"response.stream": True}
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
@@ -822,13 +824,15 @@ class Server:
 			headers["Range"] = cp.request.headers["Range"]
 		resp = self.get_with_retries(url, headers=headers, data=body, timeout=2)
 		cp.response.status = resp.status_code
-		cp.response.headers.update(resp.headers)
+		update_headers(cp.response.headers, **resp.headers)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
 		if is_discord_attachment(url):
 			cp.response.headers.pop("Content-Disposition", None)
-			cp.response.headers.update(CHEADERS)
+			update_headers(cp.response.headers, **CHEADERS)
 		ctype = resp.headers.get("Content-Type", "application/octet-stream")
+		print(resp, resp.headers, resp.url, cp.response.headers)
+		print()
 		if ctype in ("text/html", "text/html; charset=utf-8", "application/octet-stream"):
 			it = resp.iter_content(65536)
 			b = next(it)
@@ -840,7 +844,8 @@ class Server:
 			cp.response.headers.pop("Content-Type", None)
 			cp.response.headers["Content-Type"] = mime
 			return resume(b, it)
-		return resp.iter_content(65536)
+		return resp.iter_content(49152)
+	proxy._cp_config = {"response.stream": True}
 
 	@cp.expose
 	def static(self, *filepath):
@@ -863,7 +868,7 @@ class Server:
 			raise FileNotFoundError(500, filepath)
 		if filename.strip("/") == "notfound.png":
 			cp.response.status = 404
-		cp.response.headers.update(CHEADERS)
+		update_headers(cp.response.headers, **CHEADERS)
 		cp.response.headers["Content-Type"] = mime
 		cp.response.headers["Content-Length"] = len(data)
 		cp.response.headers["ETag"] = create_etag(data)
@@ -873,7 +878,7 @@ class Server:
 	def summarise(self, s, min_length=128, max_length=192):
 		v = interface.run(f"STRING.summarise({json.dumps(s)},min_length={min_length},max_length={max_length})", cache=60)
 		b = v.encode("utf-8")
-		cp.response.headers.update(CHEADERS)
+		update_headers(cp.response.headers, **CHEADERS)
 		cp.response.headers["Content-Type"] = "text/plain"
 		cp.response.headers["Content-Length"] = len(b)
 		cp.response.headers["ETag"] = create_etag(b)
@@ -883,7 +888,7 @@ class Server:
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	def encodec(self, url="", name="", source="", thumbnail="", bitrate="auto", inference=False, urls=()):
-		cp.response.headers.update(SHEADERS)
+		update_headers(cp.response.headers, **SHEADERS)
 		if not os.path.exists(ecdc_dir):
 			os.mkdir(ecdc_dir)
 		if urls:
@@ -906,7 +911,7 @@ class Server:
 					outs.append(1)
 				else:
 					outs.append(0)
-			cp.response.headers.update(HEADERS)
+			update_headers(cp.response.headers, **HEADERS)
 			cp.response.headers["Content-Type"] = "application/json"
 			return json_dumps(outs)
 		if isinstance(url, list):
@@ -994,7 +999,7 @@ class Server:
 
 	@cp.expose
 	def decodec(self, url, fmt="opus"):
-		cp.response.headers.update(SHEADERS)
+		update_headers(cp.response.headers, **SHEADERS)
 		if isinstance(url, list):
 			url = url[0]
 		if is_discord_attachment(url):
@@ -1030,7 +1035,7 @@ class Server:
 	ydl = None
 	@cp.expose
 	def ytdl(self, **kwargs):
-		cp.response.headers.update(HEADERS)
+		update_headers(cp.response.headers, **HEADERS)
 		d = kwargs.get("d") or kwargs.get("download")
 		v = d or kwargs.get("v") or kwargs.get("view")
 		q = d or v or kwargs.get("q") or kwargs.get("query") or kwargs.get("s") or kwargs.get("search")
@@ -1115,14 +1120,14 @@ class Server:
 			else:
 				entry = self.ydl.search(q)[0]
 				title = entry["name"]
-			cp.response.headers.update(CHEADERS)
+			update_headers(cp.response.headers, **CHEADERS)
 			f = open(fn, "rb")
 			return cp.lib.static.serve_fileobj(f, name=f"{title}.{fmt}", content_type=MIMES[fmt], disposition="inline")
 		sem = self.ydl_sems.setdefault(ip, Semaphore(64, 256, rate_limit=8))
 		with sem:
 			entries = self.ydl.search(q, count=12)
 		res = [dict(name=e["name"], url=e["url"], duration=e.get("duration"), icon=get_best_icon(e)) for e in entries]
-		cp.response.headers.update(CHEADERS)
+		update_headers(cp.response.headers, **CHEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
 		return json_dumps(res)
 	ytdl._cp_config = {"response.stream": True}
@@ -1138,7 +1143,7 @@ class Server:
 		except Exception:
 			print_exc()
 			resp = get_best_icon(entry)
-		cp.response.headers.update(CHEADERS)
+		update_headers(cp.response.headers, **CHEADERS)
 		if isinstance(resp, byte_like):
 			cp.response.headers["Content-Type"] = "image/jpeg"
 			return resp
@@ -1149,12 +1154,12 @@ class Server:
 	def mean_colour(self, url=""):
 		resp = colour_cache.obtain(url)
 		cp.response.headers["Content-Type"] = "application/json"
-		cp.response.headers.update(SHEADERS)
+		update_headers(cp.response.headers, **SHEADERS)
 		return json_dumps(dict(colour=resp))
 
 	@cp.expose
 	def specexec(self, url, **kwargs):
-		cp.response.headers.update(HEADERS)
+		update_headers(cp.response.headers, **HEADERS)
 		argv = " ".join(itertools.chain.from_iterable(kwargs.items()))
 		b = self.command(input=f"spectralpulse {url} {argv}")
 		data = orjson.loads(b)
@@ -1163,7 +1168,7 @@ class Server:
 
 	@cp.expose
 	def filelist(self, path=None):
-		cp.response.headers.update(HEADERS)
+		update_headers(cp.response.headers, **HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
 		try:
 			sessid = int(cp.request.cookie["sessid"].value)
@@ -1201,7 +1206,7 @@ class Server:
 
 	@cp.expose
 	def teapot(self, *args, **kwargs):
-		cp.response.headers.update(HEADERS)
+		update_headers(cp.response.headers, **HEADERS)
 		raise IsADirectoryError("I'm a teapot.")
 
 	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
@@ -1256,7 +1261,7 @@ class Server:
 	<meta charset="utf-8"/><link rel="icon" href="/logo256.png"/><meta charset="utf-8"><meta name="author" content="Miza"><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#694777"/><link rel="apple-touch-icon" href="/logo256.png"/><link rel="manifest" href="/manifest.json"/>""" + meta
 			t = f'<title>{a2}</title><meta name="description" content="{description}"/>'
 			data = s.encode("utf-8") + t.encode("utf-8") + data[i:]
-		cp.response.headers.update(CHEADERS)
+		update_headers(cp.response.headers, **CHEADERS)
 		cp.response.headers["Content-Type"] = mime
 		cp.response.headers["Content-Length"] = len(data)
 		cp.response.headers["ETag"] = create_etag(data)
@@ -1265,7 +1270,7 @@ class Server:
 	@cp.expose(("favicon", "favicon.ico"))
 	def favicon_ico(self, *args, **kwargs):
 		data, mime = fetch_static("icon.ico")
-		cp.response.headers.update(CHEADERS)
+		update_headers(cp.response.headers, **CHEADERS)
 		cp.response.headers["Content-Type"] = mime
 		cp.response.headers["Content-Length"] = len(data)
 		cp.response.headers["ETag"] = create_etag(data)
@@ -1288,7 +1293,7 @@ class Server:
 			remote=true_ip(),
 			host=T(self).get("ip", "127.0.0.1"),
 		))
-		cp.response.headers.update(SHEADERS)
+		update_headers(cp.response.headers, **SHEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
 		cp.response.headers["Content-Length"] = len(data)
 		cp.response.headers["ETag"] = create_etag(data)
@@ -1503,7 +1508,7 @@ class Server:
 			)
 		with open(fn, "w", encoding="utf-8") as f:
 			f.write(s)
-		cp.response.headers.update(HEADERS)
+		update_headers(cp.response.headers, **HEADERS)
 		raise cp.HTTPRedirect(url, status=307)
 
 	@cp.expose
@@ -1513,7 +1518,7 @@ class Server:
 			if cp.url(base="").strip("/") != at:
 				raise InterruptedError
 		backup = interface.run("bot.backup()", cache=60)
-		cp.response.headers.update(CHEADERS)
+		update_headers(cp.response.headers, **CHEADERS)
 		return cp.lib.static.serve_file(backup, content_type="application/octet-stream", disposition="attachment")
 	backup._cp_config = {"response.stream": True}
 
@@ -1627,7 +1632,7 @@ class Server:
 		a = after - utc()
 		if a > 0:
 			cp.response.headers["Retry-After"] = a
-		cp.response.headers.update(HEADERS)
+		update_headers(cp.response.headers, **HEADERS)
 		return json_dumps(j)
 
 	@cp.expose(("cat", "cats", "dog", "dogs", "neko", "nekos"))
@@ -1643,7 +1648,7 @@ class Server:
 			if tag:
 				refresh_url += f"/{tag}"
 			refresh_info = f'<meta http-equiv="refresh" content="{refresh};URL={refresh_url}">'
-		cp.response.headers.update(HEADERS)
+		update_headers(cp.response.headers, **HEADERS)
 		return f"""<!DOCTYPE html><html><head><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script><meta property="og:image" content="{url}">{refresh_info}<meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="background-color:black;"><img src="{url}" style="margin:0;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);max-width:100%;max-height:100%"></body></html>"""
 
 

@@ -13,7 +13,7 @@ import orjson
 import niquests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut, gather
 from .types import resume, cdict, fcdict, json_dumps, byte_like, utc, RangeSet, MemoryBytes
-from .util import AUTH, tracebacksuppressor, magic, shash, decrypt, zip2bytes, bytes2zip, enc_box, save_auth, decode_attachment, expand_attachment, shorten_attachment, is_discord_attachment, is_miza_attachment, discord_expired, url2fn, p2n, byte_scale, leb128, decode_leb128, seq, MIMES, Request, reqs, DOMAIN_CERT, PRIVATE_KEY
+from .util import AUTH, tracebacksuppressor, magic, shash, decrypt, zip2bytes, bytes2zip, enc_box, save_auth, decode_attachment, expand_attachment, shorten_attachment, is_discord_attachment, is_miza_attachment, discord_expired, url2fn, p2n, byte_scale, leb128, decode_leb128, seq, MIMES, Request, reqs, DOMAIN_CERT, PRIVATE_KEY, update_headers
 from .caches import attachment_cache, upload_cache, download_cache
 
 interface = None
@@ -177,7 +177,7 @@ class Server:
 	<meta charset="utf-8"/><link rel="icon" href="/logo256.png"/><meta charset="utf-8"><meta name="author" content="Miza"><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#694777"/><link rel="apple-touch-icon" href="/logo256.png"/><link rel="manifest" href="/manifest.json"/>""" + meta
 			t = f'<title>{a2}</title><meta name="description" content="{description}"/>'
 			data = s.encode("utf-8") + t.encode("utf-8") + data[i:]
-		cp.response.headers.update(CHEADERS)
+		update_headers(cp.response.headers.update, **CHEADERS)
 		cp.response.headers["Content-Type"] = mime
 		cp.response.headers["Content-Length"] = len(data)
 		return data
@@ -231,7 +231,7 @@ class Server:
 	def raw(self, *path, **query):
 		rpath = "/".join(path)
 		rpath = "misc/web/" + (rpath or "index.html")
-		cp.response.headers.update(CHEADERS)
+		update_headers(cp.response.headers, **CHEADERS)
 		cp.response.headers["Content-Type"] = MIMES.get(rpath.rsplit(".", 1)[-1]) or "text/html"
 		if rpath.strip("/") == "notfound.png":
 			cp.response.status = 404
@@ -256,7 +256,7 @@ class Server:
 
 	@cp.expose(("fi",))
 	def fileinfo(self, *path, **void):
-		cp.response.headers.update(SHEADERS)
+		update_headers(cp.response.headers, **SHEADERS)
 		assert len(path) in (1, 2) and path[0].count("~") == 0
 		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
 		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
@@ -279,7 +279,7 @@ class Server:
 
 	@cp.expose
 	def download(self, *path, download="1", **void):
-		cp.response.headers.update(CHEADERS)
+		update_headers(cp.response.headers, **CHEADERS)
 		assert len(path) in (1, 2) and path[0].count("~") == 0
 		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
 		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
@@ -320,7 +320,7 @@ class Server:
 		headers.pop("Remote-Addr", None)
 		headers.pop("Host", None)
 		headers.pop("Range", None)
-		headers.update(Request.header())
+		update_headers(headers.update, **Request.header())
 		ranges = []
 		length = 0
 		if brange:
@@ -442,7 +442,7 @@ class Server:
 		except Exception:
 			print_exc()
 			fp = None
-		cp.response.headers.update(HEADERS)
+		update_headers(cp.response.headers, **HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
 		if not size or not fp:
 			if h in upload_cache:
@@ -499,6 +499,7 @@ class Server:
 				yield b'"url":"' + uhead.encode("utf-8") + b'"'
 			yield b"}"
 		return start_upload(position)
+	upload._cp_config = {"response.stream": True}
 
 	@cp.expose
 	def delete(self, *path, key=None):
@@ -553,6 +554,7 @@ class Server:
 		aid = p2n(path[0])
 		resp = interface.run(f"bot.renew_attachment({aid})")
 		return self.proxy_if(resp)
+	unproxy._cp_config = {"response.stream": True}
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
@@ -606,12 +608,12 @@ class Server:
 			headers["Range"] = cp.request.headers["Range"]
 		resp = self.get_with_retries(url, data=body, headers=headers, timeout=2)
 		cp.response.status = resp.status_code
-		cp.response.headers.update(resp.headers)
+		update_headers(cp.response.headers, **resp.headers)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
 		if is_discord_attachment(url):
 			cp.response.headers.pop("Content-Disposition", None)
-			cp.response.headers.update(CHEADERS)
+			update_headers(cp.response.headers, **CHEADERS)
 		ctype = resp.headers.get("Content-Type", "application/octet-stream")
 		if ctype in ("text/html", "text/html; charset=utf-8", "application/octet-stream"):
 			it = resp.iter_content(65536)
@@ -624,7 +626,8 @@ class Server:
 			cp.response.headers.pop("Content-Type", None)
 			cp.response.headers["Content-Type"] = mime
 			return resume(b, it)
-		return resp.iter_content(65536)
+		return resp.iter_content(49152)
+	proxy._cp_config = {"response.stream": True}
 
 	@cp.expose
 	# @cp.tools.accept(media="multipart/form-data")
@@ -653,7 +656,7 @@ class Server:
 		)
 		if resp.status_code in range(300, 400):
 			raise cp.HTTPRedirect(resp.headers.get("Location") or url, resp.status_code)
-		cp.response.headers.update(resp.headers)
+		update_headers(cp.response.headers, **resp.headers)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
 		if int(resp.headers.get("Content-Length") or 262145) <= 262144:
@@ -661,6 +664,7 @@ class Server:
 			return resp.content
 		print("HEADERS:", cp.response.headers)
 		return resp.iter_content(65536)
+	backend._cp_config = {"response.stream": True}
 
 	@cp.expose
 	def debug(self):
@@ -689,7 +693,7 @@ class Server:
 		headers.pop("Remote-Addr", None)
 		headers.pop("Host", None)
 		headers.pop("Range", None)
-		headers.update({
+		update_headers(headers, **{
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
@@ -728,6 +732,7 @@ class Server:
 		cp.response.headers["Content-Length"] = str(length)
 		cp.response.headers["Accept-Ranges"] = "bytes"
 		return self._dyn_serve(urls, ranges, headers)
+	stream._cp_config = {"response.stream": True}
 
 if __name__ == "__main__":
 	logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(message)s')
