@@ -4370,9 +4370,7 @@ def update_headers(headers, **fields):
 	lowers = {k.lower(): k for k in headers}
 	for k, v in fields.items():
 		k2 = k.lower()
-		if k2 in headers:
-			headers.pop(k2)
-		elif k2 in lowers:
+		if k2 in lowers:
 			headers.pop(lowers[k2])
 		headers[k] = v
 	return headers

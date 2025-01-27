@@ -603,9 +603,9 @@ class Server:
 						yield resp.content
 						return
 					if big:
-						yield from resp.iter_content(262144)
+						yield from resp.iter_content(1048576)
 						return
-					yield from resp.iter_content(65536)
+					yield from resp.iter_content(262144)
 
 				if len(futs) > i + 1:
 					yield from futs.pop(0).result()
@@ -831,10 +831,8 @@ class Server:
 			cp.response.headers.pop("Content-Disposition", None)
 			update_headers(cp.response.headers, **CHEADERS)
 		ctype = resp.headers.get("Content-Type", "application/octet-stream")
-		print(resp, resp.headers, resp.url, cp.response.headers)
-		print()
 		if ctype in ("text/html", "text/html; charset=utf-8", "application/octet-stream"):
-			it = resp.iter_content(65536)
+			it = resp.iter_content(262144)
 			b = next(it)
 			mime = magic.from_buffer(b)
 			if mime == "application/octet-stream":
@@ -844,7 +842,7 @@ class Server:
 			cp.response.headers.pop("Content-Type", None)
 			cp.response.headers["Content-Type"] = mime
 			return resume(b, it)
-		return resp.iter_content(49152)
+		return resp.iter_content(262144)
 	proxy._cp_config = {"response.stream": True}
 
 	@cp.expose
