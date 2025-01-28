@@ -1127,21 +1127,27 @@ class Reminder(Command):
 			description="Index of reminder(s) to delete",
 			example="3..7",
 		),
+		delete=cdict(
+			type="index",
+			description="Index of reminder(s) to delete",
+			example="3..7",
+		),
 	)
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	rate_limit = (8, 13)
 	slash = True
 
-	async def __call__(self, bot, _message, _comment, _channel, _user, mode="reminder", message=None, icon=None, time=None, remove=None, **void):
+	async def __call__(self, bot, _message, _comment, _channel, _user, mode="reminder", message=None, icon=None, time=None, remove=None, delete=None, **void):
 		sendable = _channel if mode == "announce" else _user
 		rems = bot.data.reminders.get(sendable.id, [])
+		remove = remove or delete
 		if remove is not None:
 			if not len(rems):
 				return ini_md(f"No {mode}s currently set for {sqr_md(sendable)}.")
-			targets = RangeSet.parse(remove, len(rems))
+			targets = RangeSet.parse([remove], len(rems))
 			assert targets, "Please input valid indices."
-			removed = (r := rems[targets[0]]).msg + "; " + r.t
+			removed = (r := rems[targets[0]]).msg + "; " + DynamicDT.utcfromtimestamp(r.t).as_full()
 			if len(targets) > 1:
 				removed += f" (+{len(targets) - 1})"
 			rems = astype(rems, alist)
@@ -1152,7 +1158,7 @@ class Reminder(Command):
 					bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
 				if rems:
 					bot.data.reminders.listed.insort((rems[0]["t"], sendable.id), key=lambda x: x[0])
-			return ini_md(f"Successfully removed {sqr_md(lim_str(x['msg'], 128))} from {word} list for {sqr_md(sendable)}.")
+			return ini_md(f"Successfully removed {sqr_md(removed)} from {mode} list for {sqr_md(sendable)}.")
 		if message is None and icon is None and time is None:
 			# Set callback message for scrollable list
 			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
@@ -1226,7 +1232,7 @@ class Reminder(Command):
 			# ts = None
 		out += ":```"
 		if dt:
-			out += dt.as_rel_discord()
+			out += dt.as_discord() + " (" + dt.as_rel_discord() + ")"
 		return cdict(
 			content=out,
 			embed=emb,

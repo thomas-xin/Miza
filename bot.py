@@ -2161,7 +2161,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		)
 
 	async def caption_into(self, _messages, model=None, backup_model=None, premium_context=[]):
-		print("CI:", model, lim_str(_messages, 1024))
+		print("CI:", model, backup_model, lim_str(_messages, 1024))
 		context = ai.contexts.get(model, 4096)
 		messages = [cdict(m) for m in _messages]
 		follows = [None] * len(messages)
@@ -2214,13 +2214,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if not url:
 						continue
 					m.content = m.content.replace(url, "", 1).strip()
+			print(model, model in ai.is_vision, i, backup_model, backup_model in ai.is_vision, m.get("role"))
 			if model in ai.is_vision and m.get("role") != "assistant":
 				futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
 				extracts[i] = csubmit(gather(*futs))
-			elif i == 0 and backup_model and backup_model in is_vision and m.get("role") != "assistant":
+			elif i >= len(messages) - 2 and backup_model and backup_model in ai.is_vision and m.get("role") != "assistant":
+				print("Auto-Selecting:", backup_model, m, urls)
 				futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
 				extracts[i] = csubmit(gather(*futs))
-				model = backup_model
+				if futs and extracts:
+					model = backup_model
 			else:
 				best = 2 if model in ai.is_premium and m.get("new") else 0
 				futs = [self.caption(url, best=best, premium_context=premium_context) for url in urls]
@@ -2412,7 +2415,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						break
 			toolcheck.append(messages[0])
 			toolcheck.reverse()
-			vision_alt = modelist.vision if modelist.function not in is_vision and modelist.vision in is_function else modelist.function
+			vision_alt = modelist.vision if modelist.function not in ai.is_vision and modelist.vision in ai.is_function else modelist.function
 			toolcheck, toolmodel = await self.caption_into(toolcheck, model=modelist.function, backup_model=vision_alt, premium_context=premium_context)
 			mode = None
 			label = "instructive"
@@ -2623,7 +2626,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print_exc()
 				refusal = True
 			else:
-				print("LL:", assistant, tlen, resp)
+				print("LL:", T(resp).get("model", assistant), tlen, resp)
 				message = None
 				written = False
 				try:

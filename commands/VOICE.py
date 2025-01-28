@@ -650,7 +650,7 @@ class Playlist(Command):
 		elif index[0] < 0:
 			index[0] += len(pl) + 1
 		if mode == "remove":
-			targets = RangeSet.parse(index, len(pl))
+			targets = RangeSet.parse([index], len(pl))
 			assert targets, "Please input valid indices."
 			removed = pl[targets[0]].get("name", "Unknown")
 			if len(targets) > 1:

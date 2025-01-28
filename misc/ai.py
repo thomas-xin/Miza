@@ -56,8 +56,8 @@ available = {
 		None: "o1-preview",
 	},
 	"deepseek-v3": {
-		"deepseek": ("deepseek-chat", ("0.14", "0.28")),
 		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
+		"deepseek": ("deepseek-chat", ("0.14", "0.28")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
 		None: "gpt-4",
 	},
@@ -128,7 +128,7 @@ available = {
 		None: "claude-3-haiku",
 	},
 	"gpt-4": {
-		"openai": ("chatgpt-4o-latest", ("2.5", "10")),
+		"openai": ("gpt-4o", ("2.5", "10")),
 		None: "claude-3.5-sonnet",
 	},
 	"gpt-3.5-turbo-instruct": {
@@ -2325,6 +2325,7 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 		self.input = input
 		self.output = ""
 		self.tokens = [0, 0]
+		self.model = model
 		self.costs = [utc(), api, model, "0"]
 		self.pricing = pricing or (m_input, m_output)
 		self.tokeniser = "cl100k_im" if model in CL100K_IM else "cohere" if model in ("command-r-", "command-r-plus", "command-r-plus-08-2024", "command-r-plus-h6t2") else "llamav2"

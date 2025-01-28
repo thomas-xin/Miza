@@ -1971,10 +1971,10 @@ class ServerProtector(Database):
 						pass
 					else:
 						try:
-							software_agent = data["manifests"][data["active_manifest"]]["signature_info"]["issuer"]
-						except KeyError:
+							software_agent = data["manifests"][data["active_manifest"]]["assertions"][0]["data"][0]["softwareAgent"]
+						except LookupError:
 							software_agent = None
-						if issuer in ("Miza", "OpenAI", "StabilityAI") or software_agent == ("Adobe Firefly", "DALL·E"):
+						if issuer in ("Miza", "OpenAI", "StabilityAI") or software_agent == ("Adobe Firefly", "DALL·E", "Bing Image Creator"):
 							return True
 					if str(data.get("issuer_id") or data.get("copyright")) == str(self.bot.id) or data.get("type") == "AI_GENERATED":
 						return True

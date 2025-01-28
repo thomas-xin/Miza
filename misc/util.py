@@ -3190,8 +3190,7 @@ def sort(it, key=None, reverse=False) -> collections.abc.Iterable:
 		it = sorted(it, key=key, reverse=reverse)
 		return deque(it)
 	elif isinstance(it, alist):
-		it.__init__(sorted(it, key=key, reverse=reverse))
-		it.hash = None
+		it.fill(sorted(it, key=key, reverse=reverse))
 		return it
 	else:
 		try:
