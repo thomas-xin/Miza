@@ -21,8 +21,8 @@ else:
 if is_url(fn):
 	fi, fn = fn, "temp.tmp"
 	try:
-		import niquests
-		with niquests.get(fi, stream=True) as resp:
+		import requests
+		with requests.get(fi, stream=True) as resp:
 			it = resp.iter_content(1048576)
 			with open(fn, "wb") as f:
 				while True:

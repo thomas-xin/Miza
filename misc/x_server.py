@@ -19,7 +19,7 @@ import cheroot
 import cherrypy
 import orjson
 import psutil
-import niquests
+import requests
 from concurrent.futures import Future
 from math import ceil
 from traceback import print_exc
@@ -241,7 +241,7 @@ def error_handler(exc=None):
 		status = 418
 	elif isinstance(exc, ConnectionError) or isinstance(exc, type) and issubclass(exc, ConnectionError) and exc.args and isinstance(exc.args[0], int):
 		status = exc.args[0]
-	elif isinstance(exc, niquests.exceptions.HTTPError):
+	elif isinstance(exc, requests.exceptions.HTTPError):
 		status = exc.response.status_code
 	else:
 		status = error_map.get(exc) or error_map.get(exc.__class__) or 500
@@ -396,7 +396,7 @@ def true_ip(request=None):
 
 class Server:
 
-	session = niquests.Session()
+	session = requests.Session()
 
 	@cp.expose(("0",))
 	def rickroll(self, *void1, **void2):
@@ -687,7 +687,6 @@ class Server:
 				yield b'"url":"' + uhead.encode("utf-8") + b'"'
 			yield b"}"
 		return start_upload(position)
-	upload._cp_config = {"response.stream": True}
 
 	@cp.expose
 	def delete(self, *path, key=None, **void):

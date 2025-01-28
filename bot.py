@@ -2822,14 +2822,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				text = "\r"
 		raise ex or RuntimeError("Maximum inference attempts exceeded (model likely encountered an infinite loop).")
 
-	async def req_data(self, url, screenshot=False):
+	async def req_data(self, url, screenshot=False, timeout=20):
 		resp = None
 		if isinstance(url, str):
 			if url.startswith("data:") and "base64," in url:
 				durl = url.split("base64,", 1)[-1].encode("ascii")
 				d = base64.b64decode(durl + b"==")
 			else:
-				resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True, _timeout_=30)
+				resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True, _timeout_=timeout)
 				resp.raise_for_status()
 				with resp:
 					d = await asubmit(getattr, resp, "content")
@@ -2839,7 +2839,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			name = None
 		mime = resp.headers.get("Content-Type", "") if resp else magic.from_buffer(d)
 		if mime == "text/html" and screenshot:
-			d = await self.browse(url, best=True, timeout=48, screenshot=True)
+			d = await self.browse(url, best=True, timeout=timeout + 8, screenshot=True)
 			mime = magic.from_buffer(d)
 		return resp, mime, name, d
 
@@ -2925,7 +2925,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			print_exc()
 		return await self.phi3v(url, question=question)
 
-	async def to_data_url(self, url, small=False):
+	async def to_data_url(self, url, small=False, timeout=8):
 		sizelim = 82944 if small else 1638400
 		dimlim = 256 if small else 1024
 		if isinstance(url, str):
@@ -2939,7 +2939,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				mime = magic.from_buffer(d)
 				name = url.replace("\\", "/").rsplit("/", 1)
 			else:
-				_resp, mime, name, d = await self.req_data(url, screenshot=True)
+				_resp, mime, name, d = await self.req_data(url, timeout=timeout, screenshot=True)
 			lim = 5 * 1048576 * 3 / 4
 			p = 2 if len(d) > 1048576 else 0
 			if mime not in ("image/png", "image/gif", "image/webp") or len(d) > lim or np.prod(await asubmit(get_image_size, d, priority=p)) > sizelim:
@@ -2948,7 +2948,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						d = d[:128] + b".." + d[-128:]
 					s = as_str(d)
 					return f'<file name="{name}">' + s + "</file>"
-				d = await process_image(d, "resize_max", [dimlim, False, "auto", "-bg", "-oz", "-fs", lim], timeout=20, retries=1)
+				d = await process_image(d, "resize_max", [dimlim, False, "auto", "-bg", "-oz", "-fs", lim], timeout=timeout, retries=1)
 		else:
 			d = url
 		mime = magic.from_buffer(d)

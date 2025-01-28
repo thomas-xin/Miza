@@ -768,7 +768,7 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive summary of the text above!\n\n### Response:'
 			ml = round_random(max_length)
 			c = await tcount(prompt)
-			model = "gpt-4m" if c + ml < 8192 else "llama-3-8b"
+			model = "deepseek-v3" if c + ml < 8192 else "llama-3-8b"
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
 			resp = await instruct(data, best=True, skip=True)
 			resp = resp.strip()
@@ -947,8 +947,8 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 				else:
 					messages = []
 					for m in kwa["messages"]:
+						m = cdict(m)
 						if m.get("content") is None:
-							m = cdict(m)
 							m.content = ""
 						m = fix_tool(m)
 						messages.append(m)

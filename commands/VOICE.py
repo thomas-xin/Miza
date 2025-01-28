@@ -2233,7 +2233,7 @@ class Download(Command):
 			reference=message,
 			content=italics(ini_md(f"Downloading and converting {sqr_md(url)}...")),
 		))
-		resp = await asubmit(niquests.get, downloader_url, verify=False)
+		resp = await asubmit(requests.get, downloader_url, verify=False)
 		response = await fut
 		print(resp.headers)
 		resp.raise_for_status()

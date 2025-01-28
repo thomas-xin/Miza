@@ -10,7 +10,7 @@ from urllib.parse import unquote_plus
 import cherrypy as cp
 from cherrypy._cpdispatch import Dispatcher
 import orjson
-import niquests
+import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut, gather
 from .types import resume, cdict, fcdict, json_dumps, byte_like, utc, RangeSet, MemoryBytes
 from .util import AUTH, tracebacksuppressor, magic, shash, decrypt, zip2bytes, bytes2zip, enc_box, save_auth, decode_attachment, expand_attachment, shorten_attachment, is_discord_attachment, is_miza_attachment, discord_expired, url2fn, p2n, byte_scale, leb128, decode_leb128, seq, MIMES, Request, reqs, DOMAIN_CERT, PRIVATE_KEY, update_headers
@@ -106,7 +106,7 @@ class Server:
 			state = json.load(f)
 	else:
 		state = {"/": f"https://api.mizabot.xyz:{webserver_port}"}
-	session = niquests.Session()
+	session = requests.Session()
 
 	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
 	def index(self, path=None, filename=None, *args, code=None, **kwargs):
