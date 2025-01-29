@@ -653,14 +653,14 @@ def _count_to(messages, model):
 			if value is None or isinstance(value, bool):
 				continue
 			if isinstance(value, str):
-				num_tokens += len(encoding.encode(value))
+				num_tokens += len(encoding.encode(value, allowed_special=encoding.special_tokens_set))
 			elif isinstance(value, dict):
-				num_tokens += len(encoding.encode(json_dumpstr(value)))
+				num_tokens += len(encoding.encode(json_dumpstr(value), allowed_special=encoding.special_tokens_set))
 			elif isinstance(value, (tuple, list)):
 				if key == "content":
 					for part in value:
 						if part.get("type") == "text":
-							num_tokens += len(encoding.encode(part["text"]))
+							num_tokens += len(encoding.encode(part["text"], allowed_special=encoding.special_tokens_set))
 							continue
 						if part.get("type") == "image_url":
 							if model == "cl100k_im" and part["image_url"].get("detail", "auto") == "low":
@@ -671,7 +671,7 @@ def _count_to(messages, model):
 							continue
 						raise RuntimeError(f"Unexpected object {json_dumpstr(part)} in message.")
 				else:
-					num_tokens += len(encoding.encode(json_dumpstr(value)))
+					num_tokens += len(encoding.encode(json_dumpstr(value), allowed_special=encoding.special_tokens_set))
 	return num_tokens + 3
 async def count_to(messages, model="cl100k_im"):
 	"""Return the number of tokens used by a list of messages."""

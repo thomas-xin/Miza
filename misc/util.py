@@ -634,6 +634,93 @@ def split_across(s, lim=2000, prefix="", suffix="", mode="len", bypass=((), ()),
 		out.append(complete(temp)[0])
 	return out
 
+def find_split_position(text, max_length, priority):
+	substring = text[:max_length]
+	for delimiter in priority:
+		index = substring.rfind(delimiter)
+		if index != -1 and index >= max_length / 2:
+			return index + len(delimiter)
+	return max_length
+
+def close_markdown(text):
+	text = text.rstrip()
+	closed = []
+	# Handle bold (**)
+	bold_count = len(re.findall(r'\*\*', text))
+	if bold_count & 1:
+		closed.append('**')
+		if text.endswith(closed[-1]):
+			text = text.removesuffix(closed[-1])
+		else:
+			text += closed[-1]
+
+	# Handle italic (*) - single asterisks not part of bold
+	italic_count = len(re.findall(r'(?<!\*)\*(?!\*)', text))
+	if italic_count & 1:
+		closed.append('*')
+		if text.endswith(closed[-1]):
+			text = text.removesuffix(closed[-1])
+		else:
+			text += closed[-1]
+
+	# Handle code blocks (```)
+	code_block_count = len(re.findall(r'```', text))
+	if code_block_count & 1:
+		# Code blocks are special because they can contain Markdown syntax; we need to copy the last detected opening sequence
+		last_open = text.rfind('```')
+		assert last_open != -1, "Unmatched closing code block detected"
+		closed.append(text[last_open:].split("\n", 1)[0] + "\n")
+		if text.endswith(closed[-1]):
+			text = text.removesuffix(closed[-1])
+		else:
+			text += "```"
+
+	# Handle inline code (`) - single backticks not part of code block
+	inline_code_count = len(re.findall(r'(?<!`)`(?!`)', text))
+	if inline_code_count & 1:
+		closed.append('`')
+		if text.endswith(closed[-1]):
+			text = text.removesuffix(closed[-1])
+		else:
+			text += closed[-1]
+
+	# Handle spoiler tags (||) - double pipes not part of code block
+	spoiler_count = len(re.findall(r'(?<!`)\|\|(?!`)', text))
+	if spoiler_count & 1:
+		closed.append('||')
+		if text.endswith(closed[-1]):
+			text = text.removesuffix(closed[-1])
+		else:
+			text += closed[-1]
+	return text, "".join(reversed(closed))
+
+def split_text(text, max_length=2000, priority=("\n\n", "\n", "\t", "? ", "! ", ". ", ", ", " "), prefix="", suffix=""):
+	chunks = []
+	opening = ""
+	while text:
+		if len(text) <= max_length:
+			chunks.append(close_markdown(text)[0])
+			break
+
+		for adjusted in range(max_length):
+			adjusted_max_length = max(max_length - adjusted, 1)
+
+			split_pos = find_split_position(text, adjusted_max_length, priority)
+			current_part = opening + text[:split_pos]
+			if not current_part.startswith(prefix):
+				current_part = prefix + current_part
+			remaining_text = text[split_pos:]
+
+			processed_part, new_opening = close_markdown(current_part)
+			if not processed_part.endswith(suffix):
+				processed_part += suffix
+			if len(processed_part) <= max_length:
+				opening = new_opening
+				break
+		chunks.append(processed_part)
+		text = remaining_text
+	return chunks
+
 def apply_translator(s, t, reverse=False):
 	if reverse:
 		for k, v in t.items():
@@ -4239,7 +4326,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 	def header(cls, base=(), **fields) -> cdict:
 		"Creates a custom HTTP request header with randomised properties that spoof anti-scraping sites."
 		head = {
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/",
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in loop(4)),
 			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in loop(4)),
@@ -4316,7 +4403,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				session = requests
 		elif bypass:
 			if "user-agent" not in headers and "User-Agent" not in headers:
-				headers["User-Agent"] = f"Mozilla/5.{random.randint(1, 9)} (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
+				headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
 				headers["X-Forwarded-For"] = ".".join(str(random.randint(1, 254)) for _ in loop(4))
 			headers["DNT"] = "1"
 		method = method.casefold()
@@ -4389,4 +4476,4 @@ def new_playwright_page(browser="firefox", viewport=dict(width=480, height=320),
 
 CACHE_FILESIZE = 10485760
 
-mime_wait.result()
+mime_wait.result(timeout=8)

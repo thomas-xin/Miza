@@ -580,7 +580,7 @@ class Personality(Command):
 		if description == "DEFAULT":
 			bot.data.personalities.pop(_channel.id, None)
 			return css_md(f"Personality settings for {sqr_md(_channel)} have been reset.")
-		if not description and frequency_penalty is None and temperature is None and top_p is None and stream is None and tts is None and not cutoff:
+		if not description and frequency_penalty is None and temperature is None and top_p is None and stream is None and tts is None and cutoff is None:
 			p = self.retrieve(_channel)
 			return ini_md(f"Current personality settings for {sqr_md(_channel)}:{iter2str(p)}\n(Use {bot.get_prefix(_channel.guild)}personality DEFAULT to reset).")
 		if description and (len(description) > 4096 or len(description) > 512 and _premium.value < 2):
@@ -628,8 +628,8 @@ class Instruct(Command):
 		model=cdict(
 			type="enum",
 			validation=cdict(
-				enum=["auto", "deepseek-v3", "gpt-3.5", "gpt-4", "gpt-4m", "o1-mini", "o1", "mythomax-13b", "lzlv-70b", "mixtral-8x7b-instruct", "claude-3-opus", "claude-3.5-sonnet", "claude-3-sonnet", "claude-3-haiku", "command-r", "command-r-plus", "35b-beta-long", "qwen-72b", "dbrx-instruct", "mixtral-8x22b-instruct", "wizard-8x22b", "llama-3-8b", "llama-3-70b", "llama-3-405b"],
-				accepts={"llama": "llama-3-70b", "haiku": "claude-3-haiku", "deepseek": "deepseek-v3", "gpt3.5": "gpt-3.5", "sonnet": "claude-3.5-sonnet", "dbrx": "dbrx-instruct", "gpt4": "gpt-4", "gpt-4o": "gpt-4", "gpt-4o-mini": "gpt-4m", "opus": "claude-3-opus"},
+				enum=["auto", "deepseek-r1", "deepseek-v3", "gpt-3.5", "gpt-4", "gpt-4m", "o1-mini", "o1-preview", "mythomax-13b", "lzlv-70b", "mixtral-8x7b-instruct", "claude-3-opus", "claude-3.5-sonnet", "claude-3-sonnet", "claude-3-haiku", "command-r", "command-r-plus", "35b-beta-long", "qwen-72b", "dbrx-instruct", "mixtral-8x22b-instruct", "wizard-8x22b", "llama-3-8b", "llama-3-70b", "llama-3-405b"],
+				accepts={"llama": "llama-3-70b", "haiku": "claude-3-haiku", "r1": "deepseek-r1", "deepseek": "deepseek-v3", "gpt3.5": "gpt-3.5", "sonnet": "claude-3.5-sonnet", "dbrx": "dbrx-instruct", "gpt4": "gpt-4", "gpt-4o": "gpt-4", "gpt-4o-mini": "gpt-4m", "opus": "claude-3-opus"},
 			),
 			description="Target LLM to invoke",
 			example="deepseek",
@@ -675,7 +675,7 @@ class Instruct(Command):
 	)
 	macros = cdict(
 		O1=cdict(
-			model="o1",
+			model="o1-preview",
 		),
 		O1M=cdict(
 			model="o1-mini",
@@ -688,6 +688,9 @@ class Instruct(Command):
 		),
 		GPT3=cdict(
 			model="gpt-3.5",
+		),
+		R1=cdict(
+			model="deepseek-r1",
 		),
 		Deepseek=cdict(
 			model="deepseek-v3",
@@ -763,13 +766,17 @@ class Instruct(Command):
 					model = "gpt-3.5"
 				else:
 					model = "gpt-3.5-turbo-instruct"
-			if model in ("claude-3-opus", "o1"):
+			if model in ("claude-3-opus", "o1", "o1-preview"):
 				_premium.require(3)
-			elif model in ("claude-3.5-sonnet", "claude-3-sonnet", "command-r-plus", "gpt-4", "yi-large", "o1-mini"):
+			elif model in ("claude-3.5-sonnet", "claude-3-sonnet", "command-r-plus", "gpt-4", "yi-large", "o1-mini", "r1"):
 				_premium.require(2)
 			elif model in ("dbrx-instruct", "gpt-3.5", "deepseek-v3", "gpt-4m", "lzlv-70b", "llama-3-70b"):
 				_premium.require(1)
-		resp = await bot.force_completion(model=model, prompt=prompt, stream=True, timeout=120, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, max_tokens=max_tokens, premium_context=_premium, allow_alt=False, **kwargs)
+		if model in ("deepseek-r1", "o1", "o1-preview", "o1-mini"):
+			kwargs["max_completion_tokens"] = max_tokens + 16384
+		else:
+			kwargs["max_tokens"] = max_tokens
+		resp = await bot.force_completion(model=model, prompt=prompt, stream=True, timeout=120, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, premium_context=_premium, allow_alt=False, **kwargs)
 		try:
 			_message.__dict__.setdefault("inits", []).append(resp)
 		except Exception:

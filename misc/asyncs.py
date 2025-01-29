@@ -9,7 +9,7 @@ import threading
 import time
 import weakref
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor, thread, _base
+from concurrent.futures import ThreadPoolExecutor, thread
 from time import time as utc
 from traceback import print_exc
 
@@ -41,59 +41,6 @@ def as_fut(obj):
 	cst(fut.set_result, obj)
 	return fut
 
-last_work = {}
-last_used = {}
-
-def _worker(executor_reference, work_queue, initializer, initargs):
-	if initializer is not None:
-		try:
-			initializer(*initargs)
-		except BaseException:
-			_base.LOGGER.critical('Exception in initializer:', exc_info=True)
-			executor = executor_reference()
-			if executor is not None:
-				executor._initializer_failed()
-			return
-	try:
-		i = thread.threading.get_ident()
-		last_used[i] = time.time()
-		while True:
-			t = time.time()
-			work_item = work_queue.get(block=True)
-			if work_item is not None:
-				tup = (i, work_item.fn, work_item.args)
-				last_work[i] = tup
-				last_used[i] = t
-				# print(tup)
-				work_item.run()
-				# Delete references to object. See issue16284
-				del work_item
-
-				# attempt to increment idle count
-				executor = executor_reference()
-				if executor is not None:
-					executor._idle_semaphore.release()
-				del executor
-				continue
-
-			executor = executor_reference()
-			# Exit if:
-			#   - The interpreter is shutting down OR
-			#   - The executor that owns the worker has been collected OR
-			#   - The executor that owns the worker has been shutdown.
-			if getattr(_base, "_shutdown", None) or executor is None or executor._shutdown:
-				# Flag the executor as shutting down as early as possible if it
-				# is not gc-ed yet.
-				if executor is not None:
-					executor._shutdown = True
-				# Notice other workers
-				work_queue.put(None)
-				return
-			del executor
-		print("Thread", i, "exited.")
-	except BaseException:
-		_base.LOGGER.critical('Exception in worker', exc_info=True)
-
 def _adjust_thread_count(self):
 	# if idle threads are available, don't spin new threads
 	try:
@@ -112,7 +59,7 @@ def _adjust_thread_count(self):
 		thread_name = '%s_%d' % (self._thread_name_prefix or self, num_threads)
 		t = thread.threading.Thread(
 			name=thread_name,
-			target=_worker,
+			target=thread._worker,
 			args=(
 				thread.weakref.ref(self, weakref_cb),
 				self._work_queue,

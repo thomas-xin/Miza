@@ -2219,11 +2219,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
 				extracts[i] = csubmit(gather(*futs))
 			elif i >= len(messages) - 2 and backup_model and backup_model in ai.is_vision and m.get("role") != "assistant":
-				print("Auto-Selecting:", backup_model, m, urls)
 				futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
 				extracts[i] = csubmit(gather(*futs))
 				if futs and extracts:
 					model = backup_model
+					print("Auto-Selecting:", backup_model, m, urls)
 			else:
 				best = 2 if model in ai.is_premium and m.get("new") else 0
 				futs = [self.caption(url, best=best, premium_context=premium_context) for url in urls]
@@ -2304,7 +2304,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			nsfw="mythomax-13b",
 			backup="llama-3-8b",
 			retry="auto",
-			function="deepseek-v3",
+			function="gpt-4m",
 			vision="llama-3-11b",
 			target="auto",
 		),
@@ -2315,8 +2315,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			nsfw="qwen-72b",
 			backup="llama-3-70b",
 			retry="gpt-4",
-			function="deepseek-v3",
-			vision="claude-3.5-haiku",
+			function="gpt-4m",
+			vision="gpt-4",
 			target="auto",
 		),
 		2: cdict(
@@ -2327,7 +2327,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			backup="llama-3-70b",
 			retry="claude-3.5-sonnet",
 			function="deepseek-v3",
-			vision="gpt-4",
+			vision="claude-3.5-sonnet",
 			target="auto",
 		),
 	}
@@ -5385,6 +5385,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if message and user:
 			print(f"{message.channel.id}: {user} ({user.id}) issued {command} {kwargs or argv}")
 		if not self.ready:
+			if message:
+				csubmit(message.add_reaction("🔜"))
 			await wrap_future(self.connect_ready)
 		channel = channel or (message.channel if message else None)
 		guild = guild or getattr(channel, "guild", None)
@@ -5393,7 +5395,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		else:
 			prefix = self.get_prefix(guild)
 		command_check = command_check or command.name[0].casefold()
-		if getattr(command, "nsfw", False) and not bot.is_nsfw(channel):
+		if getattr(command, "nsfw", False) and not self.is_nsfw(channel):
 			if hasattr(channel, "recipient"):
 				raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels. Please verify your age using ~verify within a NSFW channel to enable NSFW in DMs.")
 			raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels.")
@@ -5408,12 +5410,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				raise ReferenceError("This command is only available in servers.")
 		req = command.min_level
 		sem = emptyctx
-		if not bot.ready:
-			if message:
-				csubmit(message.add_reaction("🔜"))
-			await wrap_future(bot.full_ready)
+		if not self.ready:
+			await wrap_future(self.full_ready)
 			if channel:
-				channel = await bot.fetch_channel(channel.id)
+				channel = await self.fetch_channel(channel.id)
 				guild = getattr(channel, "guild", None) or guild
 			csubmit(message.remove_reaction("🔜", self.user))
 		u_perm = max(min_perm, self.get_perms(user.id, guild)) if min_perm is not None else self.get_perms(user.id, guild)
@@ -5426,12 +5426,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if not allow_recursion and T(command).get("recursive", False):
 				raise PermissionError("Nested recursive commands are not permitted.")
 			min_perm = None
-			gid = bot.data.blacklist.get(0)
+			gid = self.data.blacklist.get(0)
 			if gid and gid != guild.id and not isnan(u_perm):
 				print("BOUNCED:", user, message.content)
 				csubmit(send_with_react(
 					channel,
-					f"I am currently under maintenance, please [stay tuned](<{bot.rcc_invite}>)!",
+					f"I am currently under maintenance, please [stay tuned](<{self.rcc_invite}>)!",
 					reacts="❎",
 					reference=message,
 				))
@@ -5452,7 +5452,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			rl = command.rate_limit
 			if rl:
 				rl = rl[bool(self.is_trusted(guild))] if isinstance(rl, (tuple, list)) else rl
-				pm = bot.premium_multiplier(self.premium_level(user))
+				pm = self.premium_multiplier(self.premium_level(user))
 				uid = user.id if user else None
 				rl /= pm
 				burst = ceil(pm + 2)
@@ -5706,6 +5706,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				response = cdict(content=response)
 			force = bool(manager)
 			channel = manager.channel if manager else message.channel if hasattr(message, "channel") else response.get("channel")
+			guild = (manager.guild if manager else message.guild if hasattr(message, "guild") else response.get("guild")) or getattr(channel, "guild", None)
 			# Process response to command if there is one
 			if response and isinstance(response, dict):
 				bypass_prefix = response.pop("bypass_prefix", None)
@@ -5823,55 +5824,68 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						else:
 							response["content"] = cc
 					content = (response.pop("content", None) or "").lstrip("\r")
-				total_length = len(get_prefix()) + len(content) + len(get_suffix())
-				if total_length > msglen or tts:
-					if total_length > maxlen:
-						data = content.encode("utf-8")
-						file2 = CompatFile(data, filename="message.txt")
-						if file:
-							response["files"] = [file, file2]
-							file = None
+				original_nickname = None
+				try:
+					total_length = len(get_prefix()) + len(content) + len(get_suffix())
+					if total_length > msglen or tts:
+						if total_length > maxlen:
+							data = content.encode("utf-8")
+							file2 = CompatFile(data, filename="message.txt")
+							if file:
+								response["files"] = [file, file2]
+								file = None
+							else:
+								response.pop("files", None)
+								file = file2
+							content = "Response too long for message."
 						else:
-							response.pop("files", None)
-							file = file2
-						content = "Response too long for message."
+							if tts:
+								# For TTS mode, we split the message into smaller chunks to ensure the message is read out correctly. Unlike the regular limit of 2000 characters which is known, the TTS limit is not well documented and may vary between clients. We impose an arbitrary limit of 150 characters instead, which should be safe for most clients.
+								ms = split_text(content, prefix=prefix, suffix=suffix, max_length=150)
+							else:
+								ms = split_text(content, prefix=prefix, suffix=suffix, max_length=msglen)
+							content = ms[-1] if ms else "\xad"
+							futs = []
+							for i, t in enumerate(ms[:-1]):
+								if tts and i == 1 and channel and guild and guild.me.permissions_in(channel).change_nickname:
+									# If we've got more than one message in TTS mode, we automatically backup the bot's nickname and replace it with a backtick (silent character) to avoid it being read out alongside every message.
+									original_nickname = guild.me.display_name or "" # The "" is crucial to differentiate between None and an empty string.
+									await guild.me.edit(nick="`")
+								fut = csubmit(send_with_react(channel, t, reference=reference, tts=tts))
+								futs.append(fut)
+								reference = None
+								await asyncio.sleep(0.125)
+							await gather(*futs)
 					else:
-						if tts:
-							# For TTS mode, we split the message into smaller chunks to ensure the message is read out correctly. Unlike the regular limit of 2000 characters which is known, the TTS limit is not well documented and may vary between clients. We impose an arbitrary limit of 32 LLM tokens instead, which has yet to be reported to fail.
-							ms = split_across(content, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), lim=32, mode="tlen")
-						else:
-							ms = split_across(content, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), lim=msglen)
-						content = ms[-1] if ms else "\xad"
-						for t in ms[:-1]:
-							csubmit(send_with_react(channel, t, reference=reference, tts=tts))
-							reference = None
-							await asyncio.sleep(0.125)
-				else:
-					content = get_prefix() + content + get_suffix() or None
-				if file and not response.get("files") and not response.get("buttons"):
-					return await self.send_with_file(
+						content = get_prefix() + content + get_suffix() or None
+					if file and not response.get("files") and not response.get("buttons"):
+						return await self.send_with_file(
+							response.get("channel") or channel,
+							msg=content,
+							file=file,
+							filename=getattr(file, "filename", None),
+							embed=response.get("embed"),
+							reference=reference,
+							reacts=response.get("reacts"),
+							tts=tts,
+						)
+					return await send_with_react(
 						response.get("channel") or channel,
-						msg=content,
+						content=content,
 						file=file,
-						filename=getattr(file, "filename", None),
+						files=response.get("files"),
 						embed=response.get("embed"),
+						embeds=response.get("embeds"),
 						reference=reference,
+						buttons=response.get("buttons"),
 						reacts=response.get("reacts"),
+						ephemeral=getattr(command, "ephemeral", False),
 						tts=tts,
 					)
-				return await send_with_react(
-					response.get("channel") or channel,
-					content=content,
-					file=file,
-					files=response.get("files"),
-					embed=response.get("embed"),
-					embeds=response.get("embeds"),
-					reference=reference,
-					buttons=response.get("buttons"),
-					reacts=response.get("reacts"),
-					ephemeral=getattr(command, "ephemeral", False),
-					tts=tts,
-				)
+				finally:
+					if original_nickname is not None:
+						# If we've changed the bot's nickname, we restore it to its original state.
+						await guild.me.edit(nick=original_nickname)
 			return response
 
 	@tracebacksuppressor
@@ -6387,7 +6401,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				emb.set_author(name=author.name, url=author.url, icon_url=author.icon_url)
 		if description:
 			# Separate text into paragraphs, then lines, then words, then characters and attempt to add them one at a time, adding extra embeds when necessary
-			paragraphs = split_across(description, 4080)
+			paragraphs = split_text(description, max_length=4080)
 			for para in paragraphs[:-1]:
 				emb.description = md(para)
 				embs.append(emb)
@@ -6617,7 +6631,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				pk = f.read()
 		for addr in AUTH.get("remote_servers", ()):
 			token = AUTH.get("alt_token") or self.token
-			channels = [k for k, v in bot.data.exec.items() if v & 16]
+			channels = [k for k, v in self.data.exec.items() if v & 16]
 			data = orjson.dumps(dict(
 				domain_cert=dc,
 				private_key=pk,
@@ -7276,7 +7290,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return self._update(content, embeds, files, buttons, prefix, suffix, bypass, reacts, force, done)
 
 			async def _update(self, content, embeds, files, buttons, prefix, suffix, bypass, reacts, force, done):
-				ms = split_across(content, lim=self.msglen, prefix=prefix, suffix=suffix, bypass=bypass)
+				ms = split_text(content, max_length=self.msglen, prefix=prefix, suffix=suffix)
 				futs = []
 				while len(ms) < len(self.messages):
 					fut = csubmit(bot.silent_delete(self.messages.pop(-1)))
