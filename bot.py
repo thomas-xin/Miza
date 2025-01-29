@@ -5384,9 +5384,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		user = user or (message.author if message else self.GhostUser())
 		if message and user:
 			print(f"{message.channel.id}: {user} ({user.id}) issued {command} {kwargs or argv}")
+		soon_indicator = False
 		if not self.ready:
+			# If the bot is not currently ready (either loading or in maintenance), send an indicator and wait
 			if message:
 				csubmit(message.add_reaction("🔜"))
+				soon_indicator = True
 			await wrap_future(self.connect_ready)
 		channel = channel or (message.channel if message else None)
 		guild = guild or getattr(channel, "guild", None)
@@ -5415,6 +5418,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if channel:
 				channel = await self.fetch_channel(channel.id)
 				guild = getattr(channel, "guild", None) or guild
+		if soon_indicator:
+			# Remove the "soon" indicator since the bot is now ready
 			csubmit(message.remove_reaction("🔜", self.user))
 		u_perm = max(min_perm, self.get_perms(user.id, guild)) if min_perm is not None else self.get_perms(user.id, guild)
 		if not isnan(u_perm):
@@ -5849,7 +5854,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							for i, t in enumerate(ms[:-1]):
 								if tts and i == 1 and channel and guild and guild.me.permissions_in(channel).change_nickname:
 									# If we've got more than one message in TTS mode, we automatically backup the bot's nickname and replace it with a backtick (silent character) to avoid it being read out alongside every message.
-									original_nickname = guild.me.display_name or "" # The "" is crucial to differentiate between None and an empty string.
+									original_nickname = guild.me.nick or "" # The "" is crucial to differentiate between None and an empty string.
 									await guild.me.edit(nick="`")
 								fut = csubmit(send_with_react(channel, t, reference=reference, tts=tts))
 								futs.append(fut)
