@@ -507,7 +507,7 @@ def split_across(s, lim=2000, prefix="", suffix="", mode="len", bypass=((), ()),
 	if cb in suffix:
 		close_codeboxes = False
 	current_codebox = ""
-	s = s.replace("\r\n", "\n").replace("\f", "\n\n")
+	s = s.replace("\r\n", "\n").replace("\f", "\n\n").replace("\v", "\n\n")
 	# Natural boundaries in order of preference
 	splitters = ["\n\n", "\n", "\t", "? ", "! ", ". ", " "]
 
@@ -839,6 +839,11 @@ def capwords(s, spl=None):
 
 # This reminds me of Perl - Smudge
 def find_urls(url): return url and regexp("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\"'\\])>]+").findall(url)
+def find_urls_ex(url):
+	no_triple = re.sub(r'```.*?```', '', url, flags=re.DOTALL)
+	no_code = re.sub(r'`[^`]*`', '', no_triple, flags=re.DOTALL)
+	pattern = r'https?://[^\s]+'
+	return re.findall(pattern, no_code)
 def is_url(url): return url and isinstance(url, (str, bytes)) and regexp("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\"'\\])>]+$").fullmatch(url)
 def is_discord_url(url): return url and regexp("^https?:\\/\\/(?:\\w{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/").findall(url) + regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").findall(url)
 def is_discord_attachment(url): return url and regexp("^https?:\\/\\/(?:\\w{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/attachments\\/").search(str(url))
@@ -3133,8 +3138,9 @@ class Cache(dict):
 	def clear(self):
 		db = self.db
 		super().clear()
-		db.clear()
-		db.setdefault("__tmap", {})
+		if db:
+			db.clear()
+			db.setdefault("__tmap", {})
 		object.__setattr__(self, "tmap", db["__tmap"])
 
 

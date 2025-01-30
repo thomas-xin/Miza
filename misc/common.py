@@ -428,6 +428,7 @@ class CompatFile(discord.File):
 		if self._owner:
 			self._closer()
 
+
 REPLY_SEM = cdict()
 EDIT_SEM = cdict()
 # noreply = discord.AllowedMentions(replied_user=False)
@@ -981,6 +982,25 @@ def message_link(message):
 	guild = getattr(message, "guild", None)
 	g_id = getattr(guild, "id", -1)
 	return f"https://discord.com/channels/{g_id}/{message.channel.id}/{message.id}"
+
+breaks = "".maketrans({
+	"\n": " ",
+	"\r": " ",
+	"\t": " ",
+	"\v": " ",
+	"\f": " ",
+})
+def fake_reply(message):
+	"Simulates the appearance of a reply to a message. Required as Discord does not support replies for webhook messages, or messages from different channels."
+	content = message.content
+	if content.startswith("-# ⮣ ") and "\n" in content:
+		content = content.split("\n", 1)[-1]
+	if len(content) >= 100:
+		content = content[:100] + "…"
+	content = content.translate(breaks).strip()
+	if not content:
+		content = "…" if not message.attachments and not message.embeds else "[attachment]"
+	return f"-# ⮣ [**{message.author.display_name}** {content}]({message_link(message)})"
 
 
 def apply_stickers(message, data=None):

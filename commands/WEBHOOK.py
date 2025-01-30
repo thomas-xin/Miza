@@ -164,6 +164,7 @@ class UpdateAutoEmojis(Database):
 			await bot.data.emojis.load_own()
 		m_id = None
 		msg = message.content
+		ref = message.reference and await bot.fetch_reference(message)
 		orig = bot.data.emojilists.get(message.author.id, {})
 		emojis = None
 		# long = len(msg) > 32
@@ -251,7 +252,7 @@ class UpdateAutoEmojis(Database):
 			files.append(CompatFile(seq(b), filename=a.filename))
 		csubmit(bot.silent_delete(message))
 		url = await bot.get_proxy_url(message.author)
-		m = await bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
+		m = await bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url, reference=ref)
 		regex = regexp(r"(?:^|^[^<\\`]|[^<][^\\`]|.[^a\\`\[])(:[A-Za-z0-9\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>\]`])")
 		if recursive and regex.search(m.content):
 			m = await m.edit(content=msg)

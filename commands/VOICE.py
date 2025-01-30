@@ -293,7 +293,7 @@ class Queue(Command):
 
 	async def __call__(self, bot, _user, _perm, _message, _channel, _guild, _name, _comment, mode="all", query=None, index=-1, start=None, end=None, **void):
 		vc_ = select_voice_channel(_user, _channel)
-		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
+		if query and _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
 		fut = csubmit(bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id})"))
 		if not query:

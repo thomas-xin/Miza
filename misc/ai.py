@@ -17,11 +17,9 @@ print("AI:", __name__)
 
 
 endpoints = cdict(
+	openrouter="https://openrouter.ai/api/v1",
 	openai="https://api.openai.com/v1",
 	deepseek="https://api.deepseek.com/v1",
-	anthropic="https://api.anthropic.com/v1",
-	cohere="https://api.cohere.ai/v1",
-	cohere_trial="https://api.cohere.ai/v1",
 	together="https://api.together.xyz/v1",
 	fireworks="https://api.fireworks.ai/inference/v1",
 	deepinfra="https://api.deepinfra.com/v1/openai",
@@ -37,28 +35,37 @@ def cast_rp(fp, pp, model=None):
 # List of language models and their respective providers, as well as pricing per million input/output tokens
 available = {
 	"claude-3-opus": {
-		"anthropic": ("claude-3-opus-20240229", ("15", "75")),
+		"openrouter": ("anthropic/claude-3-opus", ("15", "75")),
 		None: "gpt-4",
 	},
 	"claude-3.5-sonnet": {
-		"anthropic": ("claude-3-5-sonnet-20241022", ("3", "15")),
+		"openrouter": ("anthropic/claude-3.5-sonnet", ("3", "15")),
+		None: "gpt-4",
 	},
 	"claude-3.5-haiku": {
-		"anthropic": ("claude-3-5-haiku-20241022", ("1", "5")),
+		"openrouter": ("anthropic/claude-3.5-haiku", ("1", "5")),
 		None: "gpt-4m",
 	},
 	"claude-3-haiku": {
-		"anthropic": ("claude-3-haiku-20240307", ("0.25", "1.25")),
+		"openrouter": ("anthropic/claude-3-haiku", ("0.25", "1.25")),
 		None: "gpt-4m",
 	},
 	"deepseek-r1": {
+		"deepinfra": ("deepseek-ai/DeepSeek-R1", ("0.85", "2.5")),
+		"openrouter": ("deepseek/deepseek-r1", ("0.85", "2.5")),
 		"deepseek": ("deepseek-reasoner", ("0.55", "2.19")),
 		None: "o1-preview",
 	},
 	"deepseek-v3": {
 		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
 		"deepseek": ("deepseek-chat", ("0.14", "0.28")),
+		"openrouter": ("deepseek/deepseek-chat", ("0.9", "1")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
+		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
+		None: "gpt-4",
+	},
+	"minimax-01": {
+		"openrouter": ("minimax/minimax-01", ("0.2", "1.1")),
 		None: "gpt-4",
 	},
 	"llama-3-405b": {
@@ -90,20 +97,15 @@ available = {
 		None: "command-r",
 	},
 	"command-r-plus": {
-		"cohere_trial": ("command-r-plus", ("0.25", "1.25")),
-		"mizabot": ("command-r-plus-h6t2", ("0.5", "2.5")),
-		"cohere": ("command-r-plus-08-2024", ("2.5", "10")),
-		None: "qwen-72b",
+		"openrouter": ("cohere/command-r-plus-08-2024", ("2.375", "9.5")),
+		None: "deepseek-v3",
 	},
 	"command-r": {
-		"cohere_trial": ("command-r", ("0.05", "0.25")),
-		"mizabot": ("CohereForAI/c4ai-command-r-v01", ("0.1", "0.5")),
-		"cohere": ("command-r", ("0.5", "1.5")),
-		None: "firefunction-v2",
+		"openrouter": ("cohere/command-r-08-2024", ("0.1425", "0.57")),
+		None: "deepseek-v3",
 	},
-	"35b-beta-long": {
-		"mizabot": ("CausalLM/35b-beta-long", ("0.1", "0.5")),
-		None: "firefunction-v2",
+	"magnum-72b": {
+		"openrouter": ("magnum-72b", ("1.875", "2.25")),
 	},
 	"qwen-72b": {
 		"fireworks": ("accounts/fireworks/models/qwen2p5-72b-instruct", ("0.9", "0.9")),
@@ -155,11 +157,6 @@ available = {
 		"fireworks": ("accounts/fireworks/models/phi-3-vision-128k-instruct", ("0.2", "0.2")),
 		None: "gpt-4m",
 	},
-	"dbrx-instruct": {
-		"deepinfra": ("databricks/dbrx-instruct", ("0.6", "0.6")),
-		"together": ("databricks/dbrx-instruct", ("1.2", "1.2")),
-		"fireworks": ("accounts/fireworks/models/dbrx-instruct", ("1.6", "1.6")),
-	},
 	"wizard-8x22b": {
 		"deepinfra": ("microsoft/WizardLM-2-8x22B", ("0.65", "0.65")),
 		None: "mixtral-8x22b-instruct",
@@ -170,21 +167,14 @@ available = {
 		"fireworks": ("accounts/fireworks/models/mixtral-8x22b-instruct", ("0.9", "0.9")),
 		None: "dbrx-instruct",
 	},
-	"miquliz-120b": {
-		"mizabot": ("wolfram/miquliz-120b-v2.0", ("1", "5")),
-		None: "command-r-plus",
-	},
 	"reflection-llama-3-70b": {
 		"deepinfra": ("mattshumer/Reflection-Llama-3.1-70B", ("0.35", "0.4")),
 		None: "llama-3-70b",
 	},
 	"euryale-70b": {
-		"deepinfra": ("Sao10K/L3-70B-Euryale-v2.1", ("0.35", "0.4")),
+		"openrouter": ("euryale-70b", ("0.7", "0.8")),
+		"deepinfra": ("Sao10K/L3-70B-Euryale-v2.1", ("0.7", "0.8")),
 		None: "lzlv-70b",
-	},
-	"lumimaid-70b": {
-		"mizabot": ("NeverSleep/Llama-3-Lumimaid-70B-v0.1-alt-GGUF", ("0.2", "1")),
-		None: "llama-3-70b",
 	},
 	"lzlv-70b": {
 		"deepinfra": ("lizpreciatior/lzlv_70b_fp16_hf", ("0.59", "0.79")),
@@ -194,16 +184,6 @@ available = {
 		"fireworks": ("accounts/fireworks/models/mixtral-8x7b-instruct", ("0.5", "0.5")),
 		"together": ("mistralai/Mixtral-8x7B-Instruct-v0.1", ("0.6", "0.6")),
 		None: "llama-3-8b",
-	},
-	"mythomax-13b": {
-		"deepinfra": ("Gryphe/MythoMax-L2-13b", ("0.12", "0.12")),
-		"fireworks": ("accounts/fireworks/models/mythomax-l2-13b", ("0.2", "0.2")),
-		"together": ("Gryphe/MythoMax-L2-13b", ("0.30", "0.30")),
-		None: "llama-3-8b",
-	},
-	"stripedhyena-nous-7b": {
-		"together": ("togethercomputer/StripedHyena-Nous-7B", ("0.2", "0.2")),
-		None: "mythomax-13b",
 	},
 }
 
@@ -230,6 +210,7 @@ is_chat = {
 	"reflection-llama-3-70b",
 	"euryale-70b",
 	"lzlv-70b",
+	"magnum-72b",
 	"qwen-72b",
 	"o1",
 	"o1-preview",
@@ -246,6 +227,7 @@ is_chat = {
 	"gpt-3.5",
 	"gpt-3.5-turbo-0125",
 	"gpt-3.5-turbo",
+	"minimax-01",
 	"deepseek-r1",
 	"deepseek-v3",
 	"firefunction-v2",
@@ -254,14 +236,12 @@ is_chat = {
 	"phi-4b",
 	"wizard-8x22b",
 	"mixtral-8x22b-instruct",
-	"nous-hermes-2-mixtral-8x7b-dpo",
 	"mixtral-8x7b-instruct",
-	"mythomax-13b",
-	"stripedhyena-nous-7b",
 }
 is_completion = {
 	"command-r-plus",
 	"35b-beta-long",
+	"magnum-72b",
 	"qwen-72b",
 	"dbrx-instruct",
 	"miquliz-120b",
@@ -277,11 +257,8 @@ is_completion = {
 	"phi-4b",
 	"wizard-8x22b",
 	"mixtral-8x22b-instruct",
-	"nous-hermes-2-mixtral-8x7b-dpo",
 	"mixtral-8x7b-instruct",
 	"mixtral-8x7b",
-	"mythomax-13b",
-	"stripedhyena-nous-7b",
 }
 is_function = {
 	"claude-3.5-sonnet",
@@ -336,6 +313,7 @@ is_vision = {
 	"gpt-4o-mini-2024-07-18",
 	"gpt-4-turbo-2024-04-09",
 	"gpt-4-vision-preview",
+	"minimax-01",
 	"firellava-13b",
 	"phi-4b",
 }
@@ -368,6 +346,7 @@ instruct_formats = {
 	"command-r-plus": "cohere",
 	"command-r-plus-08-2024": "cohere",
 	"command-r-plus-h6t2": "cohere",
+	"magnum-72b": "chatml",
 	"qwen-72b": "chatml",
 	"dbrx-instruct": "chatml",
 	"mixtral-8x22b-instruct": "mistral",
@@ -389,6 +368,7 @@ contexts = {
 	"command-r": 112000,
 	"command-r-plus": 112000,
 	"35b-beta-long": 14336,
+	"magnum-72b": 16384,
 	"qwen-72b": 32768,
 	"llama-3-8b": 131072,
 	"llama-3-11b": 131072,
@@ -410,6 +390,7 @@ contexts = {
 	"gpt-3.5": 16384,
 	"gpt-3.5-turbo-0125": 16384,
 	"gpt-3.5-turbo-instruct": 4096,
+	"minimax-01": 1000000,
 	"deepseek-r1": 64000,
 	"deepseek-v3": 64000,
 	"dbrx-instruct": 32768,
@@ -768,7 +749,7 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive summary of the text above!\n\n### Response:'
 			ml = round_random(max_length)
 			c = await tcount(prompt)
-			model = "deepseek-v3" if c + ml < 8192 else "llama-3-8b"
+			model = "minimax-01"
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
 			resp = await instruct(data, best=True, skip=True)
 			resp = resp.strip()
@@ -873,7 +854,6 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 		if (sapi, model) in api_blocked:
 			exc = api_blocked[(sapi, model)]
 			continue
-		is_cohere = model in ("command-r", "command-r-plus", "command-r-plus-08-2024", "command-r-plus-h6t2", "35b-beta-long", "CausalLM/35b-beta-long", "CohereForAI/c4ai-command-r-v01", "CohereForAI/c4ai-command-r-plus", "c4ai-command-r-plus-GPTQ", "alpindale/c4ai-command-r-plus-GPTQ")
 		sem = emptyctx
 		kwa = kwargs.copy()
 		kwa["model"] = model
@@ -886,12 +866,6 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 			rl = 48, 6
 		elif sapi == "deepinfra":
 			rl = 32, 8
-		elif sapi == "anthropic":
-			rl = 50, 60
-		elif sapi == "cohere_trial":
-			rl = 5, 3600
-		elif sapi == "cohere":
-			rl = 1000, 60
 		elif sapi == "openai":
 			rl = 5000, 60
 		if rl[0]:
@@ -902,7 +876,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 			caller = get_oai(func, api=api)
 		else:
 			caller = oai_method(api, func)
-		body = cdict()
+		body = cdict(kwargs.get("extra_body") or {})
 		if "repetition_penalty" not in kwa:
 			kwa["repetition_penalty"] = cast_rp(kwa.pop("frequency_penalty", 0.25), kwa.pop("presence_penalty", 0.25), model=model)
 		if sapi == "mizabot":
@@ -924,17 +898,13 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 			kwa.pop("repetition_penalty", None)
 		elif sapi == "openai":
 			kwa.pop("repetition_penalty", None)
-		elif sapi in ("cohere", "cohere_trial"):
-			kwa.pop("repetition_penalty", None)
 		elif sapi in ("deepseek",):
 			kwa.pop("repetition_penalty", None)
-		elif sapi == "anthropic":
-			pass
 		if "repetition_penalty" in kwa:
 			body["repetition_penalty"] = kwa.pop("repetition_penalty")
 		if not kwa.get("stop"):
 			kwa.pop("stop", None)
-		if sapi not in ("openai", "anthropic"):
+		if sapi not in ("openai",):
 			kwa.pop("user", None)
 		elif "user" in kwa:
 			kwa["user"] = str(hash(str(kwa["user"])))
@@ -1052,421 +1022,6 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 					if messages[-1].get("role") != "user":
 						messages[-1]["role"] = "user"
 					kwa["messages"] = messages
-			if is_cohere:
-				kwa.pop("tool_choice", None)
-				stop = set(kwa.get("stop") or ())
-				if "tools" in kwa:
-					tools = kwa.pop("tools")
-					systool = cohere_construct_tool_use_system_prompt(list(map(to_cohere_tool, tools)))
-					if kwa.get("messages"):
-						sm = cdict(role="system", content=systool)
-						if require_message:
-							for i, m in tuple(enumerate(kwa["messages"])):
-								if m.get("role") != "system":
-									kwa["messages"].insert(i, sm)
-									break
-						else:
-							kwa["messages"].append(sm)
-						# for i, m in reversed(tuple(enumerate(kwa["messages"]))):
-						# 	if m.get("role") == "user":
-						# 		kwa["messages"].insert(i, cdict(role="system", content=systool))
-						# 		break
-					elif kwa.get("prompt"):
-						kwa["prompt"] = systool + "\n\n" + kwa["prompt"]
-				else:
-					tools = []
-				if "messages" in kwa:
-					fmt = "chatml" if kwa["model"] in ("35b-beta-long", "CausalLM/35b-beta-long") else "cohere"
-					prompt, stopn = instruct_structure(kwa.pop("messages"), fmt=fmt)
-					stop.update(stopn)
-					kwa["prompt"] = prompt
-					was_chat = True
-				else:
-					was_chat = False
-				if sapi == "cohere_trial":
-					c = await tcount(kwa["prompt"])
-					if c + kwa.get("max_tokens", 1024) / 2 < 16384:
-						continue
-				elif sapi == "mizabot":
-					c = await tcount(kwa["prompt"])
-					if c + kwa.get("max_tokens", 1024) / 2 > 16384:
-						continue
-				if tools:
-					print("COHERE:", kwa["prompt"])
-				was_stream = kwa.pop("stream", False)
-				kwa["stream"] = True
-				stop.add("<EOS_TOKEN>")
-				kwa["stop"] = list(stop)
-				result = cdict(
-					id="0",
-					choices=[cdict(
-						finish_reason=None,
-						index=0,
-						logprobs=None,
-					)],
-					created=0,
-					model=kwa["model"],
-					object="text_completion",
-				)
-				if sapi in ("cohere", "cohere_trial"):
-					inputs = dict(
-						model=kwa["model"],
-						prompt=kwa["prompt"],
-						max_tokens=kwa.get("max_tokens", 1024),
-						p=kwa.get("top_p", 0.999),
-						temperature=kwa.get("temperature", 0.75),
-						frequency_penalty=kwa.get("frequency_penalty", 0),
-						truncate="START",
-						stream=True,
-					)
-					inputs["stop_sequences"] = list(stop)
-					headers = {
-						"Authorization": "Bearer " + AUTH["cohere_key"],
-						"content-type": "application/json",
-					}
-					resp = await asubmit(
-						reqs.next().post,
-						endpoints.get(sapi, sapi) + "/generate",
-						data=json_dumps(inputs),
-						headers=headers,
-						stream=True,
-						_timeout_=timeout,
-					)
-					try:
-						resp.raise_for_status()
-					except:
-						print(resp.text)
-						raise
-					async def stream_iter(resp):
-						it = wrap_iter(resp)
-						s = ""
-						text = ""
-						try:
-							async for b in unflatten(it):
-								if not b and "\n" not in s:
-									break
-								s += as_str(b)
-								while "\n" in s:
-									temp, s = s.split("\n", 1)
-									if temp.startswith("{"):
-										data = orjson.loads(temp)
-										if data["event_type"] == "text-generation":
-											text = data["text"]
-											result.choices[0].text = text
-										elif data["event_type"] == "stream-end":
-											result.choices[0].text = ""
-											response = data["response"]
-											result.id = response["id"]
-											if response.get("generations"):
-												gen = response["generations"][0]
-												text = gen["text"]
-												reason = gen.get("finish_reason")
-												if reason.lower() != "complete":
-													raise RuntimeError(reason)
-												result.choices[0].finish_reason = reason
-												meta = gen.get("meta")
-												if meta and meta.get("billed_units"):
-													result.usage = meta.get("billed_units")
-										else:
-											print("Unknown event", data)
-											continue
-										yield copy.deepcopy(result)
-						except CommandCancelledError:
-							pass
-					async with sem:
-						iterator = stream_iter(resp)
-				else:
-					caller = get_oai("completions.create", api=api)
-					async with sem:
-						iterator = await asyncio.wait_for(caller(*args, timeout=timeout, **kwa), timeout=timeout)
-				async def pipe_iter(it):
-					result = cdict(
-						id="0",
-						choices=[cdict(
-							finish_reason=None,
-							index=0,
-							logprobs=None,
-						)],
-						created=0,
-						model=kwa["model"],
-						object="chat.completion.chunk",
-					)
-					s = ""
-					text = ""
-					locked = False
-					try:
-						async for b in it:
-							if not b or not getattr(b, "choices", None) or not b.choices[0].text:
-								continue
-							s += b.choices[0].text
-							while "\n" in s or len(s) > 48:
-								if "\n" in s:
-									i = s.index("\n")
-									splitted = True
-								else:
-									i = 32
-									splitted = False
-								temp, s = s[:i + 1], s[i + 1:]
-								text += temp
-								if splitted and was_chat and temp.startswith("Action: ```"):
-									locked = True
-									continue
-								if not locked and temp:
-									if was_chat:
-										result.choices[0].delta = cdict(role="assistant", content=temp, tool_calls=None)
-									else:
-										result.choices[0].text = temp
-									yield copy.deepcopy(result)
-					except CommandCancelledError:
-						pass
-					if s:
-						temp = s
-						text += temp
-						if not was_chat or not locked and temp:
-							if was_chat:
-								result.choices[0].delta = cdict(role="assistant", content=temp, tool_calls=None)
-							else:
-								result.choices[0].text = temp
-							yield copy.deepcopy(result)
-					if not locked or not was_chat:
-						return
-					msg = cdict(role="assistant", content=text.strip())
-					message = from_cohere(msg)
-					if message.tool_calls:
-						has_da = any(t["function"]["name"] == "directly_answer" for t in tools)
-						directly_answer = False
-						for i, tc in enumerate(tuple(message.tool_calls)):
-							if tc.function.name == "directly_answer":
-								directly_answer = True
-								if not has_da:
-									message.tool_calls.pop(i)
-								break
-						if directly_answer and require_message and tools and not message.tool_calls:
-							inputs = dict(kwargs)
-							inputs.pop("tools")
-							inputs["stream"] = True
-							csubmit(it.close())
-							resp = await llm(func, *args, **inputs, timeout=timeout, premium_context=premium_context)
-							async for r in resp:
-								yield r
-							return
-					if message.content:
-						message.content = "\r" + message.content
-					result.choices[0].delta = message
-					yield result
-				inputs = kwa["prompt"]
-				stream = OpenAIPricingIterator(
-					pipe_iter(iterator),
-					getattr(iterator, "close", None),
-					premium_context=premium_context,
-					api=sapi,
-					model=model,
-					input=inputs,
-					pricing=pricing,
-				)
-				if was_stream:
-					return stream
-				return await collect_stream(stream)
-			elif sapi == "anthropic" and "messages" in kwa:
-				if kwa.get("stream"):
-					system, messages = to_claude(kwa["messages"], kwa.get("tools"))
-					stopn = ["\n\nHuman:", "\n\nAssistant", "</function_calls>"]
-					inputs = dict(
-						model=kwa["model"],
-						system=system,
-						messages=messages,
-						max_tokens=min(4096, kwa.get("max_tokens", 1024)),
-						stop_sequences=list(set(tuple(kwa.get("stop", ())) + tuple(stopn))),
-						temperature=kwa.get("temperature", 0.75),
-						stream=True,
-					)
-					headers = {
-						"x-api-key": AUTH["anthropic_key"],
-						"content-type": "application/json",
-						"anthropic-version": "2023-06-01",
-					}
-					async with sem:
-						resp = await asubmit(
-							reqs.next().post,
-							endpoints.get(sapi, sapi) + "/messages",
-							data=json_dumps(inputs),
-							headers=headers,
-							stream=True,
-							_timeout_=timeout,
-						)
-					try:
-						resp.raise_for_status()
-					except Exception:
-						print("Claude Inputs:", inputs)
-						print(resp.text)
-						raise
-					async def stream_iter(resp):
-						it = wrap_iter(resp)
-						result = cdict(
-							id="0",
-							choices=[cdict(
-								finish_reason=None,
-								index=0,
-								logprobs=None,
-							)],
-							created=0,
-							model=kwa["model"],
-							object="chat.completion.chunk",
-						)
-						s = ""
-						text = ""
-						locked = False
-						try:
-							async for b in unflatten(it):
-								if not b:
-									break
-								s += as_str(b)
-								while "\n" in s:
-									temp, s = s.split("\n", 1)
-									if temp.startswith("data:"):
-										data = orjson.loads(temp.split("data:", 1)[-1])
-										if data["type"] == "message_start":
-											message = data["message"]
-											result.id = message["id"]
-											result.usage = message["usage"]
-											result.model = message["model"]
-											result.choices[0].delta = cdict(
-												role=message.get("role") or "assistant",
-												content=message.get("content") or "",
-												tool_calls=None,
-											)
-											text = result.choices[0].delta.content
-										elif data["type"] == "content_block_start":
-											delta = data["content_block"]
-											if not delta.get("text"):
-												continue
-											result.choices[0].delta.content = delta["text"]
-											text += result.choices[0].delta.content
-										elif data["type"] == "content_block_delta":
-											delta = data["delta"]
-											if "stop_reason" in delta:
-												result.choices[0].finish_reason = delta["stop_reason"]
-											if "usage" in delta:
-												result.usage = delta["usage"]
-											if not delta.get("text"):
-												continue
-											result.choices[0].delta.content = delta["text"]
-											text += result.choices[0].delta.content
-										elif data["type"] == "message_delta":
-											delta = data["delta"]
-											if "stop_reason" in delta:
-												result.choices[0].finish_reason = delta["stop_reason"]
-											if "usage" in delta:
-												result.usage = delta["usage"]
-											if not delta.get("text"):
-												continue
-											result.choices[0].delta.content = delta["text"]
-											text += result.choices[0].delta.content
-										else:
-											print("Unknown event", data)
-											continue
-										if "<function_calls>" in text or "<invoke>" in text:
-											locked = True
-											continue
-										if "<function" in text or "<invoke" in text:
-											continue
-										if not locked and text:
-											if text.startswith("name") or text.startswith("Name"):
-												if "\n" not in text:
-													continue
-												naming, text = text.split("\n", 1)
-												if "=" not in naming:
-													text = naming + "\n" + text
-													locked = True
-													continue
-												result.choices[0].delta.content = text
-												result.choices[0].delta.name = naming.split("=", 1)[-1].rstrip()
-											yield copy.deepcopy(result)
-						except CommandCancelledError:
-							pass
-						if not locked:
-							return
-						if not result.choices[0].get("delta"):
-							return
-						msg = result.choices[0].delta
-						msg.content = text.strip()
-						message = from_claude(msg, messages=kwa["messages"], allowed_tools=kwa.get("tools"))
-						if message.content:
-							message.content = "\r" + message.content
-						result.choices[0].delta = message
-						yield result
-					return OpenAIPricingIterator(
-						stream_iter(resp),
-						resp.close,
-						premium_context=premium_context,
-						api="anthropic",
-						model=model,
-						input=(kwa["messages"], kwa.get("tools")),
-						pricing=pricing,
-					)
-				system, messages = to_claude(kwa["messages"], None)
-				tools = kwa.get("tools", [])
-				if tools:
-					tools = list(map(to_claude_tool, tools))
-				stopn = ["\n\nHuman:", "\n\nAssistant"]
-				inputs = dict(
-					model=kwa["model"],
-					system=system,
-					messages=messages,
-					tools=tools,
-					max_tokens=min(4096, kwa.get("max_tokens", 1024)),
-					stop_sequences=list(set(tuple(kwa.get("stop", ())) + tuple(stopn))),
-					temperature=kwa.get("temperature", 0.75),
-				)
-				headers = {
-					"x-api-key": AUTH["anthropic_key"],
-					"content-type": "application/json",
-					"anthropic-version": "2023-06-01",
-					"anthropic-beta": "tools-2024-04-04",
-				}
-				try:
-					async with sem:
-						resp = await Request(
-							endpoints.get(sapi, sapi) + "/messages",
-							method="POST",
-							data=json_dumps(inputs),
-							headers=headers,
-							json=True,
-							aio=True,
-							timeout=timeout,
-						)
-				except Exception:
-					print("Claude Inputs:", inputs)
-					raise
-				msg = cdict(role=resp.get("role", "assistant"), content=resp["content"])
-				if resp.get("tool_calls"):
-					msg["tool_calls"] = resp["tool_calls"]
-				else:
-					msg = from_claude(msg, messages=kwa["messages"], allowed_tools=kwa.get("tools"))
-				resp = cdict(
-					id=resp["id"],
-					choices=[cdict(
-						finish_reason=resp["stop_reason"],
-						index=0,
-						logprobs=None,
-						message=msg,
-					)],
-					created=getattr(resp, "created", None) or floor(utc()),
-					model=getattr(resp, "model", None) or model,
-					object="chat.completion",
-					usage=resp["usage"],
-					api="anthropic",
-				)
-				stream = OpenAIPricingIterator(
-					None,
-					None,
-					premium_context=premium_context,
-					api="anthropic",
-					model=model,
-					input=(kwa["messages"], kwa.get("tools")),
-					pricing=pricing,
-				)
-				return await stream.pass_item(resp)
 			async with sem:
 				response = await asyncio.wait_for(caller(*args, timeout=timeout, **kwa), timeout=timeout)
 			inputs = (kwa["messages"], kwa.get("tools")) if "messages" in kwa else kwa.get("prompt")
@@ -1780,128 +1335,6 @@ TOOLS = {
 TINFO = {
 	"calculator": "Use plain text when writing mathematical equations or formulas.",
 }
-QUESTION_EXAMPLES = {
-	"knowledge_internet": {
-		"instructive": {
-			"What's the current president of the United States?",
-			"who is elon musk?",
-			"can you explain the effects of artificial intelligence in the workplace",
-			"have you heard of the critter tower defence mod of cave story?",
-			"Please explain the terms of service",
-			'Decode following text:\n"PDpzdGFyZToxMDkzNjE3NTk5OTU2Mzk0MDQ0Pg"',
-			"What is the dead internet theory?",
-			"help me with thesis essay on social media addiction.",
-			"Best brand of laptop to buy 2025",
-			"difference between string theory and m theory:",
-			"what is the lifespan of an average dog?",
-			"Can you recommend some car insurance companies in Germany",
-			"melting point and tensile strength of iridium",
-			"whats the capital of brazil",
-			"cite some sources please",
-			"Is it true?",
-			"I'm referring to what you claimed here",
-			"that's not what i asked",
-		},
-		"casual": {
-			"google en passant",
-			"Top 10 Nintendo games",
-			"what celeste player just hit 10k youtube subscribers",
-			"Give me an inspirational quote from a James Cameron movie.",
-			"name an obscure hidden gem SNES title.",
-			"which youtube channel has the most subscribers?",
-			"opinion on latest language model",
-		},
-	},
-	"image_generation": {
-		"casual": {
-			"can you send a picture of what you look like?",
-			"/art box of puppies, cute 4k high quality",
-			"Generate an image of a boy with dragon wings",
-			"can you give me some example picture for inspiration?",
-			"that looks horrible, try again",
-			"More art please!",
-			"What would a cat with 9 tails look like?",
-			"Draw a fox",
-		},
-	},
-	"calculator": {
-		"instructive": {
-			"What's the square root of 6561",
-			"calculate pi to 700 places.",
-			"what is 4637,4938576934 + 210,293857502?",
-			"can you give me sample exam questions on volumes of rotation integration",
-			"find the derivative of 3^(x+2)/(x-1)",
-			"what number comes next in the sequence: 1 3 7 15 31",
-			"step by step solution to equation in this picture",
-			"Convert 100 fahrenheit to celsius",
-		},
-		"casual": {
-			"gimme a random number from 1 to 99999",
-			"can you roll a d20.",
-			"how many fingers do 5 hands have?",
-		},
-	},
-	"calendar": {
-		"instructive": {
-			"I have a test 3pm tomorrow, but I think I'll forget",
-			"I have a dentist appointment on the 26th of August.",
-		},
-		"casual": {
-			"Remind me in 5 minutes",
-			"hey, set an alarm for 30 seconds from now",
-			"The next spacex rocket launches in an hour, make an announcement when it's almost time!",
-			"Can you remind me in 3 days?",
-			"what's today's date?",
-			"Whats the time",
-			"current time in PDT.",
-		},
-	},
-	"audio_music": {
-		"casual": {
-			"can you play your favourite song?",
-			"what does that sound like",
-			"stop the song PLEASE",
-			"That's too loud!!",
-			"I can't hear, can you turn the volume up",
-			"can you bassboost the music, I think it would be funny",
-			"Can you play Spotify songs?",
-			"you can play music",
-			"/play interstellar no time for caution",
-			"Does this sound better in nightcore",
-		},
-	},
-	"none": {
-		"instructive": {
-			"how do i support a depressed family member",
-			"Are you sentient?",
-			"Write me code in Rust to calculate 10000th prime number.",
-			"Help me with my app in Unity, I need the background to be rotated",
-			'rewrite the sentence using the word "discombobulated"',
-			"what's wrong with this python code?\nimport math\nprint(math.sqrt(3 ** 2 - 4 ** 2))",
-			"I don't understand",
-			"Can I have advice? Nobody listens to me",
-			"i need you to tell me what to do",
-		},
-		"casual": {
-			"what's your opinion on lesbians",
-			"Please roleplay as Link from Legend of Zelda.",
-			"can you give him a hug?",
-			"can you write me a sad story with a happy ending?",
-			"what was the last thing i said",
-			"Do you wish to gain a physical body?",
-			"talk like you're darth vader",
-			"Are you better than Clyde",
-			"How are you?",
-		},
-	},
-}
-MODEL_ROUTER = []
-TOOL_ROUTER = []
-for t, v in QUESTION_EXAMPLES.items():
-	for m, e in v.items():
-		for text in e:
-			MODEL_ROUTER.append(dict(label=m, text=text))
-			TOOL_ROUTER.append(dict(label=t, text=text))
 
 
 def construct_format_parameters_prompt(parameters):
@@ -2182,74 +1615,6 @@ def to_claude(messages, tools=None):
 		print("IM:", lim_str(outs[-1], 1024))
 	return system, outs
 
-
-def to_cohere_function(tool):
-	tmap = dict(
-		string="str",
-		number="float",
-		integer="int",
-		boolean="bool",
-	)
-	args = ", ".join(k + ": " + tmap[v["type"]] for k, v in tool.parameter_definitions.items())
-	def get_description(v):
-		if v.get("enum"):
-			return f': enum ({", ".join(map(json_dumpstr, v["enum"]))}): {v.get("description", "")}'.rstrip()
-		return ": " + v["description"] if "description" in v else ""
-	if tool.parameter_definitions:
-		argh = "\n\n\tArgs:\n\t\t" + "\n\t\t".join(k + " (" + tmap[v["type"]] + ")" + get_description(v) for k, v in tool.parameter_definitions.items()) + '\n\t"""'
-	else:
-		argh = '\n\t"""\n\tpass'
-	return f'''```python
-def {tool.name}({args}) -> str:
-	"""{tool.description}{argh}
-```'''
-
-def cohere_construct_tool_use_system_prompt(tools):
-	return (
-		"## Available Tools\nYou have access to a set of tools you can use to answer the user's question. If relevant, please use them before answering, to ensure correcness of your responses!\n"
-		"\n"
-		+ "\n\n".join(to_cohere_function(tool) for tool in tools) + "\n\n"
-		+ "Write 'Action:' followed by a json-formatted list of actions that you want to perform in order to produce a good response to the user's last input. The list of actions you want to call should be formatted as a list of json objects, for example:\n"
-		+ """```json
-[
-	{
-		"tool_name": title of the tool in the specification,
-		"parameters": a dict of parameters to input into the tool as they are defined in the specs, or {} for no parameters
-	}
-]```"""
-	)
-
-def to_cohere_tool(tool):
-	function = tool["function"]
-	return cdict(
-		name=function["name"],
-		description=function["description"],
-		parameter_definitions=cdict(function["parameters"]["properties"]),
-	)
-
-def from_cohere(message):
-	content = message.content
-	print("FROM:", content)
-	message.tool_calls = tc = []
-	while True:
-		content = "\n" + content
-		spl = content.split("\nAction: ```json", 1)
-		if len(spl) <= 1 or "```" not in spl[1]:
-			message.content = "".join(spl).strip()
-			return message
-		act, content = spl[1].split("```", 1)
-		actions = orjson.loads(act)
-		tc.extend(cdict(
-			index=len(tc),
-			id=f"{len(tc) + 1}",
-			type="function",
-			function=cdict(
-				name=c.get("tool_name"),
-				arguments=json_dumpstr(c.get("parameters")),
-			),
-		) for c in actions)
-		content = spl[0].strip() + "\n\n" + content.strip()
-
 def untool(message):
 	content = message.content or ""
 	if message.get("role") == "tool":
@@ -2328,7 +1693,7 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 		self.model = model
 		self.costs = [utc(), api, model, "0"]
 		self.pricing = pricing or (m_input, m_output)
-		self.tokeniser = "cl100k_im" if model in CL100K_IM else "cohere" if model in ("command-r-", "command-r-plus", "command-r-plus-08-2024", "command-r-plus-h6t2") else "llamav2"
+		self.tokeniser = "cl100k_im" if model in CL100K_IM else "llamav2"
 
 	async def pass_item(self, item):
 		if item and item.choices and item.choices[0]:

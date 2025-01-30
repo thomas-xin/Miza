@@ -1971,7 +1971,16 @@ class ServerProtector(Database):
 						pass
 					else:
 						try:
-							software_agent = data["manifests"][data["active_manifest"]]["assertions"][0]["data"][0]["softwareAgent"]
+							software_agent = data["manifests"][data["active_manifest"]]["assertions"][0]
+							while "softwareAgent" not in software_agent:
+								curr = software_agent["data"]
+								if isinstance(curr, list):
+									software_agent = curr[0]
+								else:
+									software_agent = next(iter(curr.values()))
+									if isinstance(software_agent, list):
+										software_agent = software_agent[0]
+							software_agent = software_agent["softwareAgent"]
 						except LookupError:
 							software_agent = None
 						if issuer in ("Miza", "OpenAI", "StabilityAI") or software_agent == ("Adobe Firefly", "DALL·E", "Bing Image Creator"):

@@ -11,6 +11,7 @@ if __name__ != "__mp_main__":
 from misc import common, asyncs
 from misc.common import * # noqa: F403
 import pdb
+import duckduckgo_search
 
 # import asyncio
 # import collections
@@ -1126,7 +1127,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			raise LookupError("Message has no reference.")
 		reference = message.reference
 		try:
-			return await self.fetch_message(getattr(reference, "message_id", None) or reference.id, message.channel)
+			reference = await self.fetch_message(getattr(reference, "message_id", None) or reference.id, message.channel)
+			if reference.webhook_id:
+				# Force a re-fetch to refresh possibly changed information such as author.
+				return await reference.channel.fetch_message(reference.id)
+			return reference
 		except AttributeError as ex:
 			raise LookupError(*ex.args)
 
@@ -1573,7 +1578,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not isinstance(url, str) and hasattr(url, "channel"):
 			url = message_link(url)
 		if it is None or not is_url(url):
-			urls = find_urls(url)
+			urls = find_urls(url) if allow else find_urls_ex(url)
 			if not urls:
 				if images or emojis or reactions:
 					return await self.follow_to_image(url, follow=reactions)
@@ -1626,7 +1631,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						found.extend(best_url(a) for a in m.attachments)
 					else:
 						found.extend(a.url for a in m.attachments)
-					found.extend(find_urls(m.content))
+					found.extend(find_urls(m.content) if allow else find_urls_ex(m.content))
 					for s in T(m).get("stickers", ()):
 						found.append(s.url)
 					# Attempt to find URLs in embed contents
@@ -1642,7 +1647,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 									found.append(url)
 									break
 					# Attempt to find URLs in embed descriptions
-					[found.extend(find_urls(e.description)) for e in m.embeds if e.description]
+					[found.extend(find_urls(e.description) if allow else find_urls_ex(e.description)) for e in m.embeds if e.description]
 					if emojis:
 						temp = await self.follow_to_image(m.content, follow=reactions)
 						found.extend(filter(is_url, temp))
@@ -1929,7 +1934,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		11: "au-en",
 		12: "nz-en",	# New Zealand
 	}
-	import duckduckgo_search
 	ddgs = duckduckgo_search.DDGS()
 	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60, screenshot=False, include_hrefs=False, best=False):
 		"Browses the internet using DuckDuckGo or Microsoft Edge. Returns an image if screenshot is set to True."
@@ -2017,7 +2021,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if model in ai.is_completion or model not in ai.is_chat:
 			count = await tcount(prompt, model="llamav2")
 			max_tokens = min(max_tokens, ctx - count - 64)
-			resp = await ai.llm("completions.create", model=model, prompt=prompt, stream=True, max_tokens=max_tokens, **kwargs)
+			if "max_completion_tokens" not in kwargs:
+				kwargs["max_tokens"] = max_tokens
+			resp = await ai.llm("completions.create", model=model, prompt=prompt, stream=True, **kwargs)
 			async def _completion(resp, strip):
 				async for r in resp:
 					if not r.choices:
@@ -2033,7 +2039,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		messages = [cdict(role="user", content=prompt)]
 		count = await count_to(messages)
 		max_tokens = min(max_tokens, ctx - count - 64)
-		resp = await ai.llm("chat.completions.create", model=model, messages=messages, stream=True, max_tokens=max_tokens, **kwargs)
+		if "max_completion_tokens" not in kwargs:
+			kwargs["max_tokens"] = max_tokens
+		resp = await ai.llm("chat.completions.create", model=model, messages=messages, stream=True, **kwargs)
 		async def _completion(resp, strip):
 			async for r in resp:
 				if not r.choices:
@@ -2053,7 +2061,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if vision_model in ai.is_chat:
 			count = await count_to(messages)
 			max_tokens = min(max_tokens, ctx - count - 64)
-			return await ai.llm("chat.completions.create", model=vision_model, messages=messages, stream=stream, max_tokens=max_tokens, **kwargs)
+			if "max_completion_tokens" not in kwargs:
+				kwargs["max_tokens"] = max_tokens
+			return await ai.llm("chat.completions.create", model=vision_model, messages=messages, stream=stream, **kwargs)
 		fmt = ai.instruct_formats.get(model, "chatml")
 		assistant_messages = [m for m in messages if m.get("content") and m.get("role") == "assistant"]
 		if assistant_name:
@@ -2079,7 +2089,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		print("CC:", data)
 		count = await tcount(prompt, model="llamav2")
 		max_tokens = min(max_tokens, ctx - count - 64)
-		resp = await ai.llm("completions.create", stream=stream, max_tokens=max_tokens, **data)
+		if "max_completion_tokens" not in kwargs:
+			kwargs["max_tokens"] = max_tokens
+		resp = await ai.llm("completions.create", stream=stream, **data)
 		if stream:
 			async def stream_iter(resp):
 				name = None
@@ -2218,8 +2230,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if model in ai.is_vision and m.get("role") != "assistant":
 				futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
 				extracts[i] = csubmit(gather(*futs))
-			elif i >= len(messages) - 2 and backup_model and backup_model in ai.is_vision and m.get("role") != "assistant":
-				futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
+			elif m.get("new") and backup_model and backup_model in ai.is_vision and m.get("role") != "assistant":
+				futs = [self.to_data_url(url, small=False) for url in urls]
 				extracts[i] = csubmit(gather(*futs))
 				if futs and extracts:
 					model = backup_model
@@ -2311,8 +2323,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		1: cdict(
 			reasoning="deepseek-r1",
 			instructive="deepseek-v3",
-			casual="deepseek-v3",
-			nsfw="qwen-72b",
+			casual="minimax-01",
+			nsfw="minimax-01",
 			backup="llama-3-70b",
 			retry="gpt-4",
 			function="gpt-4m",
@@ -2322,8 +2334,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		2: cdict(
 			reasoning="deepseek-r1",
 			instructive="deepseek-v3",
-			casual="deepseek-v3",
-			nsfw="qwen-72b",
+			casual="minimax-01",
+			nsfw="magnum-72b",
 			backup="llama-3-70b",
 			retry="claude-3.5-sonnet",
 			function="deepseek-v3",
@@ -3181,7 +3193,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def tag_message(self, message):
 		for attachment in message.attachments:
 			csubmit(self.add_and_test(message, attachment))
-		urls = await self.renew_attachments(find_urls(message.content))
+		urls = await self.renew_attachments(find_urls_ex(message.content))
 		for url in urls:
 			if is_discord_attachment(url) and not discord_expired(url) or self.is_webserver_url(url):
 				resp = await asubmit(reqs.next().head, url, headers=Request.header(), verify=False, timeout=30)
@@ -3415,7 +3427,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					image = await self.data.exec.uproxy(url)
 				else:
 					thumbnail = await self.data.exec.uproxy(url)
-		for s in T(m).get("stickers", ()):
+		for s in T(message).get("stickers", ()):
 			if not image:
 				image = s.url
 			else:
@@ -6179,6 +6191,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					break
 			w = await self.ensure_webhook(mchannel, bypass=True)
 			kwargs.pop("wait", None)
+			args = list(args)
+			content = args.pop(0) if args else kwargs.get("content")
+			if kwargs.get("reference"):
+				content = fake_reply(kwargs.pop("reference")) + "\n" + (content or "")
+				content = content.strip()
+			else:
+				kwargs.pop("reference", None)
 			try:
 				async with getattr(w, "semaphore", emptyctx):
 					w = getattr(w, "webhook", w)
@@ -6189,7 +6208,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							message = await channel.send(*args, **kwargs)
 						else:
 							data = dict(
-								content=args[0] if args else kwargs.get("content"),
+								content=content,
 								username=kwargs.get("username"),
 								avatar_url=kwargs.get("avatar_url"),
 								tts=kwargs.get("tts"),
@@ -6209,8 +6228,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 								raise
 							message = self.ExtendedMessage.new(resp)
 					else:
-						kwargs.pop("reference", None)
-						message = await w.send(*args, wait=True, **kwargs)
+						message = await w.send(content, *args, wait=True, **kwargs)
 			except (discord.NotFound, discord.Forbidden):
 				w = await self.ensure_webhook(mchannel, force=True)
 				async with getattr(w, "semaphore", emptyctx):
@@ -6226,8 +6244,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						)
 						message = self.ExtendedMessage.new(resp)
 					else:
-						kwargs.pop("reference", None)
-						message = await w.send(*args, wait=True, **kwargs)
+						message = await w.send(content, *args, wait=True, **kwargs)
 			except discord.HTTPException as ex:
 				if "400 Bad Request" in repr(ex):
 					if "embeds" in kwargs:

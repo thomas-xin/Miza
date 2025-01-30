@@ -55,7 +55,7 @@ class Ask(Command):
 	tips = (
 		"*Tip: By using generative AI, you are assumed to comply with the [ToS](<https://github.com/thomas-xin/Miza/wiki/Terms-of-Service>).*",
 		"*Tip: The chatbot feature is designed to incorporate multiple SOTA models in addition to internet-based interactions. For direct interaction with the raw LLMs, check out ~instruct.*",
-		"*Tip: I automatically scan the referenced message, as well as any text and images from within up to 192 messages in the current channel. None of the data is collected/sold, but if you would prefer a response without messages included for the sake of clarity or quota cost, there is always the option of creating a new thread/channel.*",
+		"*Tip: I automatically scan the referenced message, as well as any text and images from within up to 96 messages in the current channel. None of the data is collected/sold, but if you would prefer a response without messages included for the sake of clarity or quota cost, there is always the option of creating a new thread/channel.*",
 		"*Tip: My personality prompt and message streaming are among several parameters that may be modified. Check out ~help personality for more info. Note that an improperly constructed prompt may be detrimental to response quality, and that giving me a nickname may also have an effect.*",
 		"*Tip: I automatically try to correct inaccurate responses when possible. However, this is not foolproof; if you would like this feature more actively applied to counteract censorship, please move to a NSFW channel or use ~verify if in DMs.*",
 		"*Tip: Many of my capabilities are not readily available due to cost reasons. You can gain access by donating through one of the premium subscriptions available, which serves to approximately fund individual usage. A pay-as-you-go subscription priced around the real-world costs of involved commands is in the works!*",
@@ -130,7 +130,7 @@ class Ask(Command):
 			)
 		else:
 			reference = None
-		hislim = 192 if _premium.value >= 4 else 96
+		hislim = 96 if _premium.value >= 4 else 48
 		if not simulated:
 			async for m in bot.history(_channel, limit=hislim):
 				if m.id < pdata.cutoff:
@@ -200,7 +200,7 @@ class Ask(Command):
 					messagelist.extend(tool_responses)
 				m = None
 				modelist = None
-				async for resp in bot.chat_completion(messagelist, model=model, frequency_penalty=pdata.frequency_penalty, presence_penalty=pdata.frequency_penalty * 2 / 3, max_tokens=16384, temperature=pdata.temperature, top_p=pdata.top_p, tool_choice=None, tools=TOOLS, model_router=MODEL_ROUTER, tool_router=TOOL_ROUTER, stop=(), user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
+				async for resp in bot.chat_completion(messagelist, model=model, frequency_penalty=pdata.frequency_penalty, presence_penalty=pdata.frequency_penalty * 2 / 3, max_tokens=16384, temperature=pdata.temperature, top_p=pdata.top_p, tool_choice=None, tools=TOOLS, stop=(), user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
 					if isinstance(resp, dict):
 						if resp.get("cargs"):
 							props.cargs = resp["cargs"]
@@ -562,7 +562,7 @@ class Personality(Command):
 	def retrieve(self, channel):
 		per = cdict(
 			description=DEFPER,
-			frequency_penalty=0.7,
+			frequency_penalty=0.3,
 			temperature=0.8,
 			top_p=0.9,
 			stream=True,
@@ -776,6 +776,8 @@ class Instruct(Command):
 			kwargs["max_completion_tokens"] = max_tokens + 16384
 		else:
 			kwargs["max_tokens"] = max_tokens
+		if not model:
+			raise ValueError("No model specified")
 		resp = await bot.force_completion(model=model, prompt=prompt, stream=True, timeout=120, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, premium_context=_premium, allow_alt=False, **kwargs)
 		try:
 			_message.__dict__.setdefault("inits", []).append(resp)
@@ -1005,7 +1007,7 @@ class Imagine(Command):
 					fut = csubmit(ai.instruct(
 						dict(
 							prompt=prompt,
-							model="gpt-4m",
+							model="minimax-01",
 							temperature=1,
 							max_tokens=200,
 							top_p=0.9,
