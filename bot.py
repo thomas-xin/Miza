@@ -1318,8 +1318,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Renews a list of cached attachments asynchronously."
 		futs = []
 		for a_id in aids:
-			if is_url(a_id) and not discord_expired(a_id):
-				futs.append(as_fut(a_id))
+			if is_url(a_id):
+				if not is_discord_attachment(a_id) or not discord_expired(a_id):
+					futs.append(as_fut(a_id))
+				else:
+					raise ValueError(f"Invalid attachment URL: {a_id}")
 				continue
 			fut = self.renew_attachment(a_id)
 			futs.append(fut)
