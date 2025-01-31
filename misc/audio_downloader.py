@@ -16,10 +16,10 @@ import orjson
 import niquests
 import yt_dlp as ytd
 from .types import alist, as_str, cdict, full_prune, json_dumps, round_min, to_alphanumeric, tracebacksuppressor, ts_us
-from .smath import time_parse, fuzzy_substring
+from .smath import time_parse
 from .asyncs import esubmit
 from .util import (
-	python, compat_python, shuffle, utc, proxy, leb128, verify_search, json_dumpstr, get_free_port,
+	python, compat_python, shuffle, utc, proxy, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration_2, html_decode,
 	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url,
 	EvalPipe, PipedProcess, Cache, Request, Semaphore, CACHE_PATH, magic, rename,
@@ -802,13 +802,13 @@ class AudioDownloader:
 						aname = to_alphanumeric(name)
 						spl = aname.split()
 						if ("remix" in q or "cover" in q) == ("remix" in spl or "cover" in spl) and (entry.duration < 960 or ("extended" in q or "hour" in q) == ("extended" in spl or "hour" in spl or "hours" in spl)):
-							if fuzzy_substring(aname, q, match_length=False) >= 0.5:
+							if string_similarity(aname, q) >= 0.5:
 								high.append(entry)
 								continue
 					low.append(entry)
 
 				def key(entry):
-					coeff = fuzzy_substring(to_alphanumeric(full_prune(entry.name)), q, match_length=False)
+					coeff = string_similarity(to_alphanumeric(full_prune(entry.name)), q)
 					if coeff < 0.5:
 						coeff = 0
 					return coeff
@@ -887,7 +887,7 @@ class AudioDownloader:
 					except ValueError:
 						pass
 					track = track.split(b'<div class="heading">', 1)[1]
-					entry.name = as_str(track.split(b">", 1)[1].split(b"<", 1)[0].strip())
+					entry.name = html_decode(as_str(track.split(b">", 1)[1].split(b"<", 1)[0].strip()))
 					entry.url = as_str(track.split(b'href="', 1)[1].split(b'"', 1)[0].split(b"?", 1)[0])
 					if ttype == b"track":
 						track = track.split(b'<div class="subhead">', 1)[1]
@@ -907,21 +907,33 @@ class AudioDownloader:
 		assert is_spotify_url(url), "Not a Spotify URL."
 		# If we have the track artist, attempt to find a better match on Bandcamp. The Spotify downloaders are spotty (no pun intended), so those are kept as the fallback instead.
 		artist = entry.get("artist")
+		if not artist:
+			res = self.get_spotify_playlist(url)
+			if res:
+				entry.update(res[0])
+				artist = entry.get("artist")
 		if artist:
 			query = f"{artist}: {entry['name']}"
-			results = self.bcsearch(query)
-			if results:
-				entry2 = results[0]
+			results = self.bcsearch(query, count=3)
+			final = None
+			match = 0
+			for entry2 in results:
 				name1 = to_alphanumeric(full_prune(entry["name"]))
 				name2 = to_alphanumeric(full_prune(entry2.name))
 				artist1 = to_alphanumeric(full_prune(artist))
 				artist2 = to_alphanumeric(full_prune(entry2.get("artist", "")))
 				# If the Bandcamp search result is a good match, we use that instead.
-				if fuzzy_substring(name1, name2, match_length=False) >= 0.5 and fuzzy_substring(artist1, artist2, match_length=False) >= 0.5:
-					stream, cdc, dur, ac = self.get_audio(entry2, asap=True)
-					if stream:
-						entry.update(entry2)
-						return stream, cdc, dur, ac
+				if (name_match := string_similarity(name1, name2)) >= 0.5 and (artist_match := string_similarity(artist1, artist2)) >= 0.5:
+					coeff = name_match * 0.6 + artist_match * 0.4
+					if coeff > match:
+						final = entry2
+						match = coeff
+			if final:
+				print(f"Matched Spotify track {url} to Bandcamp: {final.name} by {final.artist}, {match:.2%} match.")
+				stream, cdc, dur, ac = self.get_audio(final, asap=True)
+				if stream:
+					entry.update(final)
+					return stream, cdc, dur, ac
 		r_mp3 = f"{CACHE_PATH}/{ts}.mp3"
 		fn2 = self.run(f"get_audio_spotify({json_dumpstr(url)},{json_dumpstr(r_mp3)})", priority=True)
 		dur, _bps, cdc, ac = get_duration_2(fn2)

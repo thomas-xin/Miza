@@ -1175,7 +1175,7 @@ async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]
 				continue
 			if fuzzy:
 				for a, b in enumerate(qkey(c)):
-					match = fuzzy_substring(qlist[a], b)
+					match = string_similarity(qlist[a], b)
 					if match >= 1:
 						return i
 					elif match >= fuzzy and not match <= cache[a][0][0]:

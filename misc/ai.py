@@ -141,6 +141,10 @@ available = {
 		"openai": ("gpt-3.5-turbo-0125", ("0.5", "1.5")),
 		None: "command-r-plus",
 	},
+	"mistral-24b": {
+		"openrouter": ("mistralai/mistral-small-24b-instruct-2501", ("0.1", "0.3")),
+		None: "minimax-01",
+	},
 	"firefunction-v1": {
 		"fireworks": ("accounts/fireworks/models/firefunction-v1", ("0.5", "0.5")),
 		None: "gpt-4m",
@@ -230,6 +234,7 @@ is_chat = {
 	"minimax-01",
 	"deepseek-r1",
 	"deepseek-v3",
+	"mistral-24b",
 	"firefunction-v2",
 	"firefunction-v1",
 	"firellava-13b",
@@ -246,6 +251,7 @@ is_completion = {
 	"dbrx-instruct",
 	"miquliz-120b",
 	"gpt-3.5-turbo-instruct",
+	"mistral-24b",
 	"llama-3-8b",
 	"llama-3-11b",
 	"llama-3-70b",
@@ -289,6 +295,7 @@ is_function = {
 	"gpt-3.5-turbo-0125",
 	"gpt-3.5-turbo",
 	"deepseek-v3",
+	"mistral-24b",
 	"firefunction-v2",
 	"firefunction-v1",
 }
@@ -340,6 +347,7 @@ instruct_formats = {
 	"reflection-llama-3-70b": "llamav3",
 	"euryale-70b": "llamav3",
 	"lzlv-70b": "vicuna",
+	"mistral-24b": "mistral",
 	"miquliz-120b": "mistral",
 	"goliath-120b": "alpaca",
 	"command-r": "cohere",
@@ -393,6 +401,7 @@ contexts = {
 	"minimax-01": 1000000,
 	"deepseek-r1": 64000,
 	"deepseek-v3": 64000,
+	"mistral-24b": 32768,
 	"dbrx-instruct": 32768,
 	"miquliz-120b": 32768,
 	"reflection-llama-3-70b": 8192,
@@ -749,7 +758,8 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive summary of the text above!\n\n### Response:'
 			ml = round_random(max_length)
 			c = await tcount(prompt)
-			model = "minimax-01"
+			# Prefer mistral-small for summaries if possible due to its much faster throughput of >100 tokens/s, but fallback to minimax-01 if necessary (due to its higher token limit of 1 million).
+			model = "minimax-01" if c > 28672 else "mistral-24b"
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
 			resp = await instruct(data, best=True, skip=True)
 			resp = resp.strip()

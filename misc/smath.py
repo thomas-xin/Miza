@@ -80,7 +80,7 @@ utc_dt = lambda: datetime.datetime.now(tz=datetime.timezone.utc).replace(tzinfo=
 utc_ddt = lambda: DynamicDT.utcnow()
 zerot = lambda: utc_dt().replace(hour=0, minute=0, second=0)
 sec2time = lambda s: TimeDelta(seconds=s).to_string(precision=4)
-time_repr = lambda s, mode="R": f"<t:{round(s)}:{mode}>"
+time_repr = lambda s, mode="R": f"<t:{round(s.timestamp() if getattr(s, "timestamp", None) else s)}:{mode}>"
 time_delta = lambda s: str(TimeDelta(seconds=s))
 time_until = lambda s: str(DynamicDT.utcfromtimestamp(s) - DynamicDT.utcnow())
 time_after = lambda s: str(DynamicDT.utcnow() - DynamicDT.utcfromtimestamp(s))
@@ -1357,45 +1357,6 @@ deobfuscate = lambda s: s.translate(deobfuscator)
 
 word_count = lambda s: 1 + sum(1 for _ in regexp("\\W+").finditer(s))
 single_space = lambda s: regexp("\\s\\s+").sub(" ", s)
-
-@functools.lru_cache(maxsize=256)
-def fuzzy_substring(sub, s, match_start=False, match_length=True):
-	"A fuzzy substring search that returns the ratio of characters matched between two strings."
-	if not match_length and s in sub:
-		return 1
-	if s.startswith(sub):
-		return len(sub) / len(s) * 2
-	match = 0
-	if not match_start or sub and s.startswith(sub[0]):
-		found = [0] * len(s)
-		x = 0
-		for i, c in enumerate(sub):
-			temp = s[x:]
-			if temp.startswith(c):
-				if found[x] < 1:
-					match += 1
-					found[x] = 1
-				x += 1
-			elif c in temp:
-				y = temp.index(c)
-				x += y
-				if found[x] < 1:
-					found[x] = 1
-					match += 1 - y / len(s)
-				x += 1
-			else:
-				temp = s[:x]
-				if c in temp:
-					y = temp.rindex(c)
-					if found[y] < 1:
-						match += 1 - (x - y) / len(s)
-						found[y] = 1
-					x = y + 1
-		if len(sub) > len(s) and match_length:
-			match *= len(s) / len(sub)
-	# ratio = match / len(s)
-	ratio = max(0, match / len(s))
-	return ratio
 
 def replace_map(s, mapping):
 	"Replaces words in a string from a mapping similar to str.replace, but performs operation both ways."

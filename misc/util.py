@@ -3500,44 +3500,48 @@ def time_parse(ts):
 	mults = (1, 60, 3600, 86400)
 	return round_min(sum(float(count) * mult for count, mult in zip(data, reversed(mults[:len(data)]))))
 
+# Thank you to deepseek-r1 for improving on the old algorithm.
 @functools.lru_cache(maxsize=256)
-def fuzzy_substring(sub, s, match_start=False, match_length=True):
-	"A fuzzy substring search that returns the ratio of characters matched between two strings."
-	if not match_length and s in sub:
-		return 1
-	if s.startswith(sub):
-		return len(sub) / len(s) * 2
-	match = 0
-	if not match_start or sub and s.startswith(sub[0]):
-		found = [0] * len(s)
-		x = 0
-		for i, c in enumerate(sub):
-			temp = s[x:]
-			if temp.startswith(c):
-				if found[x] < 1:
-					match += 1
-					found[x] = 1
-				x += 1
-			elif c in temp:
-				y = temp.index(c)
-				x += y
-				if found[x] < 1:
-					found[x] = 1
-					match += 1 - y / len(s)
-				x += 1
+def string_similarity(s1, s2):
+	"""
+	Compare two strings by their similarity, with the following rules:
+	- Contiguous matching substrings yield a higher score.
+	- Mismatched characters and characters out of order are penalized.
+	- Erasures (deletions) are penalized less than substitutions.
+	"""
+	len1, len2 = len(s1), len(s2)
+	max_len = max(len1, len2)
+
+	# Initialize a DP table to store the similarity scores
+	dp = [[0] * (len2 + 1) for _ in range(len1 + 1)]
+
+	# Initialize the first row and column
+	for i in range(len1 + 1):
+		dp[i][0] = -i  # Penalize erasures in s1
+	for j in range(len2 + 1):
+		dp[0][j] = -j  # Penalize erasures in s2
+
+	# Fill the DP table
+	for i in range(1, len1 + 1):
+		for j in range(1, len2 + 1):
+			if s1[i - 1] == s2[j - 1]:
+				# Characters match: reward contiguous matches
+				dp[i][j] = dp[i - 1][j - 1] + 2
 			else:
-				temp = s[:x]
-				if c in temp:
-					y = temp.rindex(c)
-					if found[y] < 1:
-						match += 1 - (x - y) / len(s)
-						found[y] = 1
-					x = y + 1
-		if len(sub) > len(s) and match_length:
-			match *= len(s) / len(sub)
-	# ratio = match / len(s)
-	ratio = max(0, match / len(s))
-	return ratio
+				# Characters don't match: penalize substitutions and erasures
+				substitution = dp[i - 1][j - 1] - 1  # Penalize substitution
+				deletion = dp[i - 1][j] - 0.5        # Penalize erasure less
+				insertion = dp[i][j - 1] - 0.5       # Penalize erasure less
+				dp[i][j] = max(substitution, deletion, insertion)
+
+	# Normalize the score to a range of [0, 1]
+	# The maximum possible score is 2 * min(len1, len2) (if all characters match)
+	# The minimum possible score is -max_len (if all characters are mismatched or erased)
+	max_possible_score = 2 * min(len1, len2)
+	min_possible_score = -max_len
+	similarity = (dp[len1][len2] - min_possible_score) / (max_possible_score - min_possible_score)
+
+	return similarity
 
 def longest_sublist(lst, predicate):
 	"Returns the longest contiguous sublist of a list that satisfies a predicate. For example, if the predicate is `lambda a: all(a[i] < a[i + 1] for i in range(len(a) - 1))`, the function will return the longest sorted sublist. Note that for our implementation, we may sometimes need to perform backtracking with the sliding window, as a contiguous sublist may not fulfil the predicate if cut off; for example, if our predicate is instead a function which parses a string and returns a time delta, it may consider the strings `2 hours` and `3 minutes` as valid, but not `2 hours 3`, so we would need to backtrack at `3 minutes` to the previous predicate-satisfying sublist to be able to correctly identify the string `2 hours 3 minutes`."

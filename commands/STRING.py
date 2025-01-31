@@ -1267,9 +1267,9 @@ class Match(Command):
 			search = args.pop(0)
 			s = " ".join(args)
 			match = (
-				sqr_md(round_min(round(fuzzy_substring(search, s) * 100, 6))) + "% literal match,\n"
-				+ sqr_md(round_min(round(fuzzy_substring(search.casefold(), s.casefold()) * 100, 6))) + "% case-insensitive match,\n"
-				+ sqr_md(round_min(round(fuzzy_substring(full_prune(search), full_prune(s)) * 100, 6))) + "% unicode mapping match."
+				sqr_md(round_min(round(string_similarity(search, s) * 100, 6))) + "% literal match,\n"
+				+ sqr_md(round_min(round(string_similarity(search.casefold(), s.casefold()) * 100, 6))) + "% case-insensitive match,\n"
+				+ sqr_md(round_min(round(string_similarity(full_prune(search), full_prune(s)) * 100, 6))) + "% unicode mapping match."
 			)
 		return ini_md(match)
 

@@ -1263,7 +1263,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return "https://mizabot.xyz/notfound.png"
 			c_id, m_id = tup
 		else:
-			c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
+			try:
+				c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
+			except ValueError:
+				return url # Either not a discord attachment, or an attachment in DMs which cannot be renewed.
 			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 		if not m_id:
 			m_id = self.data.attachments.get(a_id)
@@ -2174,7 +2177,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		)
 
 	async def caption_into(self, _messages, model=None, backup_model=None, premium_context=[]):
-		print("CI:", model, backup_model, lim_str(_messages, 1024))
+		print("Resolving Images:", model, backup_model, lim_str(_messages, 1024))
 		context = ai.contexts.get(model, 4096)
 		messages = [cdict(m) for m in _messages]
 		follows = [None] * len(messages)
@@ -2209,15 +2212,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			try:
 				urls = await fut
 			except Exception:
-				if not i:
-					raise
 				print_exc()
 				continue
 			urls = [url for url in urls if not is_discord_message_link(url)]
 			if not urls:
 				continue
 			follows[i] = urls
-			print("CF:", lim_str(urls, 128))
 		extracts = [None] * len(messages)
 		for i, (m, urls) in enumerate(zip(messages, follows)):
 			if not urls:
@@ -2227,7 +2227,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if not url:
 						continue
 					m.content = m.content.replace(url, "", 1).strip()
-			print(model, model in ai.is_vision, i, backup_model, backup_model in ai.is_vision, m.get("role"))
 			if model in ai.is_vision and m.get("role") != "assistant":
 				futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
 				extracts[i] = csubmit(gather(*futs))
@@ -2248,12 +2247,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			try:
 				captions = await fut
 			except Exception as ex:
-				print("CIe:", repr(ex))
+				print("Caption Error:", repr(ex))
 				continue
 			images = []
 			for caption in captions:
 				if isinstance(caption, BaseException):
-					print("CCe:", repr(caption))
+					print("Caption Error:", repr(caption))
 					continue
 				if isinstance(caption, tuple):
 					caption = "<" + ":".join(caption) + ">"
@@ -2296,7 +2295,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			json=True,
 			timeout=24,
 		)
-		print("EVALUATE:", data)
+		print("EVALUATION:", data)
 		premium_context.append(["cohere", model, "0.00005"])
 		return data["classifications"][0]["prediction"]
 
@@ -2333,13 +2332,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		2: cdict(
-			reasoning="deepseek-r1",
+			reasoning="o1-preview",
 			instructive="deepseek-v3",
 			casual="minimax-01",
 			nsfw="magnum-72b",
 			backup="llama-3-70b",
 			retry="claude-3.5-sonnet",
-			function="deepseek-v3",
+			function="gpt-4",
 			vision="claude-3.5-sonnet",
 			target="auto",
 		),
@@ -2431,7 +2430,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			vision_alt = modelist.vision if modelist.function not in ai.is_vision and modelist.vision in ai.is_function else modelist.function
 			toolcheck, toolmodel = await self.caption_into(toolcheck, model=modelist.function, backup_model=vision_alt, premium_context=premium_context)
 			mode = None
-			label = "instructive"
+			label = "casual"
 			try:
 				resp = await self.function_call(
 					model=toolmodel,
@@ -2740,25 +2739,25 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if decensor and attempts < mA - 1:
 				if ai.decensor.search(text):
 					refusal = True
-				if not passable and not insufficient and not refusal and modlvl >= 1:
-					eval1 = await ai.moderate(text, premium_context=premium_context)
-					if not nsfw_flagged(eval1):
-						for m in reversed(messages):
-							if m.get("role") == "user":
-								break
-						else:
-							m = messages[-1]
-						m = cdict(m)
-						if m.content and isinstance(m.content, str):
-							m.content = lim_tokens(m.content, 512)
-						ms = [m, cdict(role="assistant", content=text)]
-						# ms = await ai.cut_to(ms, 400, 400, simple=True)
-						# ms.append(cdict(role="assistant", content=text))
-						arg = await self.evaluate(ms, premium_context=premium_context)
-						if arg == "refusal":
-							refusal = True
-						if arg == "insufficient":
-							insufficient = True
+				# if not passable and not insufficient and not refusal and modlvl >= 1:
+				# 	eval1 = await ai.moderate(text, premium_context=premium_context)
+				# 	if not nsfw_flagged(eval1):
+				# 		for m in reversed(messages):
+				# 			if m.get("role") == "user":
+				# 				break
+				# 		else:
+				# 			m = messages[-1]
+				# 		m = cdict(m)
+				# 		if m.content and isinstance(m.content, str):
+				# 			m.content = lim_tokens(m.content, 512)
+				# 		ms = [m, cdict(role="assistant", content=text)]
+				# 		# ms = await ai.cut_to(ms, 400, 400, simple=True)
+				# 		# ms.append(cdict(role="assistant", content=text))
+				# 		arg = await self.evaluate(ms, premium_context=premium_context)
+				# 		if arg == "refusal":
+				# 			refusal = True
+				# 		if arg == "insufficient":
+				# 			insufficient = True
 				if not last_successful:
 					last_successful = text
 				elif not refusal or not insufficient:
