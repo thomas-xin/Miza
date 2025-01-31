@@ -3663,13 +3663,20 @@ def predict_continuation(posts, min_score=0.5):
 	predicted_tokens = []
 	numeric_index = 0
 	for token in most_common_tokens:
-		if isinstance(token, number) and numeric_index < len(next_numerics):
-			predicted_tokens.append(next_numerics[numeric_index])
-			numeric_index += 1
+		if isinstance(token, number):
+			if numeric_index < len(next_numerics):
+				predicted_tokens.append(next_numerics[numeric_index])
+				numeric_index += 1
+			else:
+				return None  # Not enough numeric values to replace; mismatched sequence lengths
 		else:
 			predicted_tokens.append(token)
-	
-	return ''.join(map(str, predicted_tokens)).strip()
+
+	def show_token(token):
+		if isinstance(token, number):
+			return str(round_min(token))
+		return token
+	return ''.join(map(show_token, predicted_tokens)).strip()
 
 
 RAINBOW = [
