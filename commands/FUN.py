@@ -2180,10 +2180,14 @@ class UpdateDogpiles(Database):
 				break
 			if m.author.id == last_author_id:
 				break
-			if m.author.id == self.bot.id:
-				hist.clear()
 			last_author_id = m.author.id
-			hist.insert(0, c)
+			hist.append((m, c))
+		hist2 = []
+		for m, c in reversed(hist):
+			if m.author.id == self.bot.id:
+				hist2.clear()
+			hist2.append(c)
+		hist = hist2
 		prediction = None
 		for count in range(3, 12):
 			if count > len(hist):
