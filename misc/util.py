@@ -3624,8 +3624,8 @@ def predict_continuation(posts, min_score=0.5):
 		split_posts.append(tokens)
 	
 	# Extract non-numeric and numeric parts separately
-	non_numeric_parts = [' '.join(str(token) for token in tokens if not isinstance(token, float)) for tokens in split_posts]
-	numeric_parts = [[token for token in tokens if isinstance(token, float)] for tokens in split_posts]
+	non_numeric_parts = [' '.join(str(token) for token in tokens if not isinstance(token, number)) for tokens in split_posts]
+	numeric_parts = [[token for token in tokens if isinstance(token, number)] for tokens in split_posts]
 	
 	# Find the most common and closest matching non-numeric string
 	counts = defaultdict(int)
@@ -3654,7 +3654,7 @@ def predict_continuation(posts, min_score=0.5):
 	# Find the structure of the most common non-numeric string
 	most_common_tokens = None
 	for tokens in split_posts:
-		non_numeric_part = ' '.join(str(token) for token in tokens if not isinstance(token, float))
+		non_numeric_part = ' '.join(str(token) for token in tokens if not isinstance(token, number))
 		if non_numeric_part == most_common:
 			most_common_tokens = tokens
 			break
@@ -3663,7 +3663,7 @@ def predict_continuation(posts, min_score=0.5):
 	predicted_tokens = []
 	numeric_index = 0
 	for token in most_common_tokens:
-		if isinstance(token, float):
+		if isinstance(token, number) and numeric_index < len(next_numerics):
 			predicted_tokens.append(str(next_numerics[numeric_index]))
 			numeric_index += 1
 		else:

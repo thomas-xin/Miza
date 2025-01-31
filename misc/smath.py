@@ -447,7 +447,7 @@ def fold(f, it):
 
 
 def _predict_next(seq, limit=None):
-	if len(seq) < 2:
+	if len(seq) <= 2:
 		return None  # Not enough data to predict
 
 	# Ensure the sequence is a numpy array within length limits, and without None or NaN values
@@ -477,7 +477,7 @@ def _predict_next(seq, limit=None):
 	# Check for alternating sequences with two values
 	if len(seq) >= 3:
 		unique_values = np.unique(seq)
-		if len(unique_values) == 2:
+		if len(unique_values) == 2 and len(seq) > len(unique_values) * 2:
 			# Check if the sequence alternates between the two values
 			pattern = [unique_values[0], unique_values[1]]
 			expected = [pattern[i % 2] for i in range(len(seq))]
@@ -487,7 +487,7 @@ def _predict_next(seq, limit=None):
 	# Check for alternating sequences with three or more values
 	if len(seq) >= 4:
 		unique_values = np.unique(seq)
-		if len(unique_values) >= 3:
+		if len(unique_values) >= 3 and len(seq) > len(unique_values) * 2:
 			# Check if the sequence cycles through the unique values
 			pattern = unique_values.tolist()
 			expected = [pattern[i % len(pattern)] for i in range(len(seq))]

@@ -2188,6 +2188,7 @@ class UpdateDogpiles(Database):
 				hist2.clear()
 			hist2.append(c)
 		hist = hist2
+		hist.append(content)
 		prediction = None
 		for count in range(3, 12):
 			if count > len(hist):
