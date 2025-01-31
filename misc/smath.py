@@ -446,53 +446,76 @@ def fold(f, it):
 	return out
 
 
-if os.name != "nt":
-	accel = None
-else:
-	sys.path.append("misc")
-	try:
-		import accel
-	except ImportError:
-		accel = None
+def _predict_next(seq, limit=None):
+	if len(seq) < 2:
+		return None  # Not enough data to predict
 
-if accel is None:
-	def _predict_next(seq):
-		if len(seq) < 2:
-			return
-		if np.min(seq) == np.max(seq):
-			return seq[0]
-		if len(seq) < 3:
-			return
-		if len(seq) > 4 and all(seq[2:] - seq[1:-1] == seq[:-2]):
-			return seq[-1] + seq[-2]
-		a = _predict_next(seq[1:] - seq[:-1])
-		if a is not None and isfinite(a):
-			return seq[-1] + a
-		if len(seq) < 4 or 0 in seq[:-1]:
-			return
-		b = _predict_next(seq[1:] / seq[:-1])
-		if b is not None and isfinite(b):
-			return seq[-1] * b
+	# Ensure the sequence is a numpy array within length limits, and without None or NaN values
+	seq = np.asanyarray(seq, dtype=np.float64)
+	if limit is not None and len(seq) > limit:
+		seq = seq[-limit:]
 
-	def predict_next(seq, limit=12):
-		"Predicts the next number in a sequence. Works on most combinations of linear, polynomial, exponential and fibonacci equations."
-		seq = np.array(seq, dtype=np.float64)
-		for i in range(min(8, limit), 1 + max(8, min(len(seq), limit))):
-			temp = _predict_next(seq[-i:])
-			if temp is not None and isfinite(temp):
-				return round_min(temp)
-else:
-	def predict_next(seq, limit=12):
-		"Predicts the next number in a sequence. Works on most combinations of linear, polynomial, exponential and fibonacci equations."
-		seq = list(map(float, seq))
-		if len(seq) > limit:
-			seq = seq[-limit:]
-		try:
-			temp = accel.predict_next(seq)
-		except ValueError:
-			return
-		if temp is not None and isfinite(temp):
-			return round_min(temp)
+	# Check for constant sequence
+	if np.min(seq) == np.max(seq):
+		return seq[0]
+
+	# Check for arithmetic sequence (linear)
+	diffs = np.diff(seq)
+	if np.min(diffs) == np.max(diffs):
+		return seq[-1] + diffs[0]
+
+	# Check for Fibonacci-like sequence
+	if len(seq) >= 4 and all(seq[i] == seq[i - 1] + seq[i - 2] for i in range(2, len(seq))):
+		return seq[-1] + seq[-2]
+
+	# Check for geometric sequence (exponential)
+	if len(seq) >= 3 and not any(x == 0 for x in seq[:-1]):
+		ratios = np.array(seq[1:]) / np.array(seq[:-1])
+		if np.min(ratios) == np.max(ratios):
+			return seq[-1] * ratios[0]
+
+	# Check for alternating sequences with two values
+	if len(seq) >= 3:
+		unique_values = np.unique(seq)
+		if len(unique_values) == 2:
+			# Check if the sequence alternates between the two values
+			pattern = [unique_values[0], unique_values[1]]
+			expected = [pattern[i % 2] for i in range(len(seq))]
+			if np.array_equal(seq, expected):
+				return pattern[len(seq) % 2]
+
+	# Check for alternating sequences with three or more values
+	if len(seq) >= 4:
+		unique_values = np.unique(seq)
+		if len(unique_values) >= 3:
+			# Check if the sequence cycles through the unique values
+			pattern = unique_values.tolist()
+			expected = [pattern[i % len(pattern)] for i in range(len(seq))]
+			if np.array_equal(seq, expected):
+				return pattern[len(seq) % len(pattern)]
+
+	# Check for recursive patterns in differences
+	next_diff = _predict_next(diffs)
+	if next_diff is not None and isfinite(next_diff):
+		return seq[-1] + next_diff
+
+	# Check for recursive patterns in ratios
+	if len(seq) >= 3 and not any(x == 0 for x in seq[:-1]):
+		ratios = np.array(seq[1:]) / np.array(seq[:-1])
+		next_ratio = _predict_next(ratios)
+		if next_ratio is not None and isfinite(next_ratio):
+			return seq[-1] * next_ratio
+
+	# No pattern detected
+	return None
+
+
+def predict_next(seq, limit=None) -> int | float | None:
+	"""
+	Predict the next number in a numeric sequence.
+	Supports constant, arithmetic, geometric, Fibonacci, and alternating sequences.
+	"""
+	return round_min(_predict_next(seq, limit))
 
 
 def supersample(a, size):

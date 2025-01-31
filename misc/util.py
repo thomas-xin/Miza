@@ -3,7 +3,7 @@ import ast
 import asyncio
 import base64
 import collections
-from collections import deque
+from collections import deque, defaultdict
 import concurrent.futures
 import contextlib
 import datetime
@@ -42,6 +42,7 @@ except Exception:
 	pynvml = None
 # import niquests
 import requests
+from misc.smath import predict_next
 from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, fcdict, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, T2, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, MultiEncoder, sublist_index # noqa: F401
 from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, asubmit, csubmit, esubmit, tsubmit, waited_sync, Future, Semaphore
 
@@ -3510,6 +3511,8 @@ def string_similarity(s1, s2):
 	- Erasures (deletions) are penalized less than substitutions.
 	"""
 	len1, len2 = len(s1), len(s2)
+	if len1 == 0 or len2 == 0:
+		return 1 if s1 == s2 else 0
 	max_len = max(len1, len2)
 
 	# Initialize a DP table to store the similarity scores
@@ -3582,6 +3585,91 @@ def longest_sublist(lst, predicate):
 	if predicate(final):
 		return final, max_start
 	return [], -1
+
+# Thank you to deepseek-r1 for once again improving on another algorithm.
+def predict_continuation(posts, min_score=0.5):
+	"""
+	Predict the next post in a sequence of posts based on:
+	- The most common and closest matching non-numeric string.
+	- The continuation of the numeric sequence.
+	
+	Args:
+		posts (list): A list of strings representing the sequence of posts.
+		min_score (float): The minimum similarity score for a string to be considered a match.
+	
+	Returns:
+		str: The predicted next post, or None if no valid continuation is found.
+	"""
+	if not posts:
+		return None
+	
+	# Regular expression to match numeric substrings as individual words
+	numeric_pattern = re.compile(r'\b\d+(?:\.\d+)?\b')
+	
+	# Split each post into tokens (numeric and non-numeric parts)
+	split_posts = []
+	for post in posts:
+		tokens = []
+		last_end = 0
+		for match in numeric_pattern.finditer(post):
+			# Add non-numeric part before the numeric match
+			if match.start() > last_end:
+				tokens.append(post[last_end:match.start()])
+			# Add numeric part
+			tokens.append(float(match.group()))
+			last_end = match.end()
+		# Add non-numeric part after the last numeric match
+		if last_end < len(post):
+			tokens.append(post[last_end:])
+		split_posts.append(tokens)
+	
+	# Extract non-numeric and numeric parts separately
+	non_numeric_parts = [' '.join(str(token) for token in tokens if not isinstance(token, float)) for tokens in split_posts]
+	numeric_parts = [[token for token in tokens if isinstance(token, float)] for tokens in split_posts]
+	
+	# Find the most common and closest matching non-numeric string
+	counts = defaultdict(int)
+	for part in non_numeric_parts:
+		counts[part] += 1
+	
+	# Ensure the most common string appears at least twice
+	most_common = max(counts.keys(), key=lambda x: counts[x])
+	if counts[most_common] < 2:
+		return None  # Require at least two occurrences for a valid prediction
+	
+	# Check if the most common string is sufficiently similar to all non-numeric parts
+	for part in non_numeric_parts:
+		if string_similarity(most_common, part) < min_score:
+			return None  # A non-numeric part doesn't match sufficiently
+	
+	# Predict the next numeric values for each sequence
+	next_numerics = []
+	for i in range(len(numeric_parts[0])):
+		sequence = [parts[i] for parts in numeric_parts if i < len(parts)]
+		next_numeric = predict_next(sequence)
+		if next_numeric is None:
+			return None  # No valid numeric continuation for this sequence
+		next_numerics.append(next_numeric)
+	
+	# Find the structure of the most common non-numeric string
+	most_common_tokens = None
+	for tokens in split_posts:
+		non_numeric_part = ' '.join(str(token) for token in tokens if not isinstance(token, float))
+		if non_numeric_part == most_common:
+			most_common_tokens = tokens
+			break
+	
+	# Reconstruct the predicted post by replacing numeric tokens with predicted values
+	predicted_tokens = []
+	numeric_index = 0
+	for token in most_common_tokens:
+		if isinstance(token, float):
+			predicted_tokens.append(str(next_numerics[numeric_index]))
+			numeric_index += 1
+		else:
+			predicted_tokens.append(token)
+	
+	return ''.join(predicted_tokens).strip()
 
 
 RAINBOW = [

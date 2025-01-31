@@ -2154,7 +2154,6 @@ class Dogpile(Command):
 class UpdateDogpiles(Database):
 	name = "dogpiles"
 
-	reg = regexp(r"-?[0-9]+\.?[0-9]+|-?\.?[0-9]+")
 	async def _nocommand_(self, edit, message, **void):
 		if edit or message.guild is None or not message.content:
 			return
@@ -2166,32 +2165,12 @@ class UpdateDogpiles(Database):
 		if not message.guild.me or not self.bot.permissions_in(message.channel).send_messages:
 			return
 		u_id = message.author.id
-		c_id = message.channel.id
+		if u_id == self.bot.id:
+			return
 		content = readstring(message.content)
 		if not content:
 			return
-		numbers = ()
-		try:
-			number = round_min(content)
-		except ValueError:
-			nums = sorted(filter(self.reg.fullmatch, content.split()), key=lambda s: -len(s))
-			if nums:
-				number = round_min(nums[0])
-				numbers = deque((number,))
-			elif len(content) == 1:
-				last_number = number = content
-				add = None
-			else:
-				number = None
-		else:
-			numbers = deque((number,))
-		curr = content
-		fix = None
-		mcount = 0
-		count = 0
 		last_author_id = u_id
-		stopped = False
-		broken = False
 		hist = []
 		async for m in self.bot.history(message.channel, use_cache=True, limit=100):
 			if m.id == message.id:
@@ -2199,84 +2178,31 @@ class UpdateDogpiles(Database):
 			c = readstring(m.content)
 			if not c:
 				break
-			if c not in curr and count < 3:
-				broken = True
-			else:
-				spl = curr.split(c)
-				if not fix:
-					fix = spl
-				elif fix != spl and count < 3:
-					broken = True
-			curr = c
-			if number is not None:
-				if type(number) is str:
-					if len(c) != 1:
-						break
-					n = ord(c)
-					if add is None:
-						add = n - ord(number)
-					elif n - add != ord(number):
-						break
-					number = c
-				else:
-					try:
-						n = round_min(c)
-					except ValueError:
-						nums = sorted(filter(self.reg.fullmatch, c.split()), key=lambda s: -len(s))
-						if nums:
-							n = round_min(nums[0])
-						else:
-							break
-					except:
-						break
-					numbers.appendleft(n)
-			elif broken:
-				break
 			if m.author.id == last_author_id:
 				break
 			if m.author.id == self.bot.id:
-				stopped = True
-				if count >= 3:
-					count += 1
-			if not stopped:
-				count += 1
-			mcount += 1
-			if mcount >= 11:
-				break
+				hist.clear()
 			last_author_id = m.author.id
-			hist.append(c)
-		# print(content, count)
-		if count < 3:
-			return
-		n = None
-		if number and type(number) is not str:
-			n = await asubmit(predict_next, numbers)
-			if type(n) is int:
-				s = str(abs(n))
-				for i in range(3, len(s) + 1):
-					x = await asubmit(predict_next, list(map(int, s)), limit=i)
-					if x is not None:
-						count = (not x) + count << 1
+			hist.insert(0, c)
+		prediction = None
+		for count in range(3, 12):
+			if count > len(hist):
+				break
+			pred = predict_continuation(hist[-count:], min_score=1 / (count - 2))
+			if pred:
+				prediction = pred
+			else:
+				break
 		if random.random() >= 3 / (count + 0.5):
-			if not xrand(4096):
+			if random.random() < 1 / 4096:
 				content = "https://cdn.discordapp.com/attachments/321524006316539904/843707932989587476/secretsmall.gif"
 				csubmit(message.add_reaction("💎"))
 				self.bot.data.users.add_diamonds(message.author, 1000)
-			elif fix and not broken:
-				content = content.join(fix)
-			elif number is not None:
-				if type(number) is str:
-					content = chr(ord(last_number) - add)
-				else:
-					if n is None:
-						n = await asubmit(predict_next, numbers)
-					if not n:
-						return
-					content = str(n)
-			content = content.strip()
+			else:
+				content = prediction
 			if not content:
 				return
-			print("DOGPILE:", message.guild, message.channel, numbers, mcount, hist[::-1], content)
+			print("DOGPILE:", message.guild, message.channel, hist, content)
 			if content[0].isascii() and content[:2] != "<:" and not is_url(content):
 				content = lim_str("\u200b" + content, 2000)
 			csubmit(discord.abc.Messageable.send(message.channel, content, tts=message.tts))
