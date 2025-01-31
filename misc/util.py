@@ -3664,12 +3664,12 @@ def predict_continuation(posts, min_score=0.5):
 	numeric_index = 0
 	for token in most_common_tokens:
 		if isinstance(token, number) and numeric_index < len(next_numerics):
-			predicted_tokens.append(str(next_numerics[numeric_index]))
+			predicted_tokens.append(next_numerics[numeric_index])
 			numeric_index += 1
 		else:
 			predicted_tokens.append(token)
 	
-	return ''.join(predicted_tokens).strip()
+	return ''.join(map(str, predicted_tokens)).strip()
 
 
 RAINBOW = [

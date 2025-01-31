@@ -469,25 +469,16 @@ def _predict_next(seq, limit=None):
 		return seq[-1] + seq[-2]
 
 	# Check for geometric sequence (exponential)
+	ratios = []
 	if len(seq) >= 3 and not any(x == 0 for x in seq[:-1]):
 		ratios = np.array(seq[1:]) / np.array(seq[:-1])
 		if np.min(ratios) == np.max(ratios):
 			return seq[-1] * ratios[0]
 
-	# Check for alternating sequences with two values
-	if len(seq) >= 3:
-		unique_values = np.unique(seq)
-		if len(unique_values) == 2 and len(seq) > len(unique_values) * 2:
-			# Check if the sequence alternates between the two values
-			pattern = [unique_values[0], unique_values[1]]
-			expected = [pattern[i % 2] for i in range(len(seq))]
-			if np.array_equal(seq, expected):
-				return pattern[len(seq) % 2]
-
 	# Check for alternating sequences with three or more values
 	if len(seq) >= 4:
 		unique_values = np.unique(seq)
-		if len(unique_values) >= 3 and len(seq) > len(unique_values) * 2:
+		if len(unique_values) >= 2 and len(seq) > len(unique_values) * 2:
 			# Check if the sequence cycles through the unique values
 			pattern = unique_values.tolist()
 			expected = [pattern[i % len(pattern)] for i in range(len(seq))]
@@ -501,7 +492,6 @@ def _predict_next(seq, limit=None):
 
 	# Check for recursive patterns in ratios
 	if len(seq) >= 3 and not any(x == 0 for x in seq[:-1]):
-		ratios = np.array(seq[1:]) / np.array(seq[:-1])
 		next_ratio = _predict_next(ratios)
 		if next_ratio is not None and isfinite(next_ratio):
 			return seq[-1] * next_ratio
