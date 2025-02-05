@@ -1762,111 +1762,29 @@ def adjust_map(images, operation, value, channels, clip, **kwargs):
 	im = join_rgba(im, A)
 	return im
 
-# Image blend operations (this is a bit of a mess)
-blenders = {
-	"normal": "blend",
-	"blt": "blend",
-	"blit": "blend",
-	"blend": "blend",
-	"replace": "replace",
-	"+": "add",
-	"add": "add",
-	"addition": "add",
-	"additive": "add",
-	"-": "subtract",
-	"sub": "subtract",
-	"subtract": "subtract",
-	"subtraction": "subtract",
-	"subtractive": "subtract",
-	"*": "multiply",
-	"mul": "multiply",
-	"mult": "multiply",
-	"multiply": "multiply",
-	"multiplication": "multiply",
-	"multiplicative": "multiply",
-	"/": blend_modes.divide,
-	"div": blend_modes.divide,
-	"divide": blend_modes.divide,
-	"division": blend_modes.divide,
-	"divisive": blend_modes.divide,
-	"mod": "OP_X%Y",
-	"modulo": "OP_X%Y",
-	"%": "OP_X%Y",
-	"and": "OP_X&Y",
-	"&": "OP_X&Y",
-	"or": "OP_X|Y",
-	"|": "OP_X|Y",
-	"xor": "OP_X^Y",
-	"^": "OP_X^Y",
-	"nand": "OP_255-(X&Y)",
-	"~&": "OP_255-(X&Y)",
-	"nor": "OP_255-(X|Y)",
-	"~|": "OP_255-(X|Y)",
-	"xnor": "OP_255-(X^Y)",
-	"~^": "OP_255-(X^Y)",
-	"xand": "OP_255-(X^Y)",
-	"diff": "difference",
-	"difference": "difference",
-	"overlay": blend_modes.overlay,
-	"screen": "screen",
-	"soft": blend_modes.soft_light,
-	"softlight": blend_modes.soft_light,
-	"hard": blend_modes.hard_light,
-	"hardlight": blend_modes.hard_light,
-	"lighter": "lighter",
-	"lighten": "lighter",
-	"darker": "darker",
-	"darken": "darker",
-	"plusdarker": "OP_X+Y-255",
-	"plusdarken": "OP_X+Y-255",
-	"overflow": "OVERFLOW",
-	"lighting": "LIGHTING",
-	"extract": blend_modes.grain_extract,
-	"grainextract": blend_modes.grain_extract,
-	"merge": blend_modes.grain_merge,
-	"grainmerge": blend_modes.grain_merge,
-	"burn": "OP_255*(1-((255-Y)/X))",
-	"colorburn": "OP_255*(1-((255-Y)/X))",
-	"colourburn": "OP_255*(1-((255-Y)/X))",
-	"linearburn": "OP_(X+Y)-255",
-	"dodge": blend_modes.dodge,
-	"colordodge": blend_modes.dodge,
-	"colourdodge": blend_modes.dodge,
-	"lineardodge": "add",
-	"hue": "SP_HUE",
-	"sat": "SP_SAT",
-	"saturation": "SP_SAT",
-	"lightness": "SP_LIT",
-	"brightness": "SP_LIT",
-	"lum": "SP_LUM",
-	"luminosity": "SP_LUM",
-	"val": "SP_VAL",
-	"value": "SP_VAL",
-	"color": "SP_COL",
-	"colour": "SP_COL",
-	"alpha": "SP_ALP",
-}
+# TODO: Support all operations: `("blend", "replace", "add", "sub", "mul", "div", "mod", "and", "or", "xor", "nand", "nor", "xnor", "difference", "overlay", "screen", "soft", "hard", "lighten", "darken", "plusdarken", "overflow", "lighting", "burn", "linearburn", "dodge", "hue", "saturation", "lightness", "lum", "value", "colour", "extract", "merge", "alpha")`
+def blend_single(i1, a1, i2, a2, opacity, operation):
+	if opacity == 0:
+		return i1, a1
+	if operation == "blend":
+		o1, o2 = min(1, opacity * 2), min(1, (1 - opacity) * 2)
+		return (i1 * a1 * o1 + i2 * a2 * o2) / (a1 + a2), np.maximum(a1, a2)
+	elif operation == "replace":
+		return i1 * opacity + i2 * (1 - opacity), (a1 + a2) / 2
+	elif operation == "add":
+		return i1 * opacity * 2 + i2 * (1 - opacity) * 2, a1 + a2
+	elif operation == "mul":
+		return i1 ** (opacity * 2) * i2 ** ((1 - opacity) * 2), a1 * a2
+	elif operation == "sub":
+		return i1 * opacity - i2 * (1 - opacity), np.maximum(a1, a2)
+	elif operation == "div":
+		return i1 ** (opacity * 2) / i2 ** ((1 - opacity) * 2), a1 / a2
+	elif operation == "mod":
+		return i1 % i2, a1 % a2
+	else:
+		raise NotImplementedError(operation, "is not currently supported.")
+
 def _blend_map(images, operation, opacity, props=(), **kwargs):
-
-	def blend_mut(i1, a1, i2, a2):
-		if opacity == 0:
-			return i1, a1
-		if operation == "blend":
-			o1, o2 = min(1, opacity * 2), min(1, (1 - opacity) * 2)
-			return (i1 * a1 * o1 + i2 * a2 * o2) / (a1 + a2), np.maximum(a1, a2)
-		elif operation == "replace":
-			return i1 * opacity + i2 * (1 - opacity), (a1 + a2) / 2
-		elif operation == "add":
-			return i1 * opacity * 2 + i2 * (1 - opacity) * 2, a1 + a2
-		elif operation == "mul":
-			return i1 ** (opacity * 2) * i2 ** ((1 - opacity) * 2), a1 * a2
-		elif operation == "sub":
-			return i1 * opacity - i2 * (1 - opacity), np.maximum(a1, a2)
-		elif operation == "div":
-			return i1 ** (opacity * 2) / i2 ** ((1 - opacity) * 2), a1 / a2
-		else:
-			raise NotImplementedError(operation)
-
 	dtype = np.float32
 	image = images[0]
 	im, A = split_rgba(image)
@@ -1890,7 +1808,7 @@ def _blend_map(images, operation, opacity, props=(), **kwargs):
 		else:
 			a2 = np.ones((im.height, im.width), dtype=dtype)
 		a2 = a2.reshape((im2.height, im2.width, 1))
-		rgb, a1 = blend_mut(rgb, a1, rgb2, a2)
+		rgb, a1 = blend_single(rgb, a1, rgb2, a2, opacity, operation)
 		np.nan_to_num(rgb, copy=False)
 		np.nan_to_num(a1, copy=False)
 

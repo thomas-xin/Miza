@@ -105,13 +105,17 @@ available = {
 		None: "deepseek-v3",
 	},
 	"magnum-72b": {
-		"openrouter": ("magnum-72b", ("1.875", "2.25")),
+		"openrouter": ("anthracite-org/magnum-v4-72b", ("1.875", "2.25")),
 	},
 	"qwen-72b": {
 		"fireworks": ("accounts/fireworks/models/qwen2p5-72b-instruct", ("0.9", "0.9")),
 		"deepinfra": ("Qwen/Qwen2.5-72B-Instruct", ("0.35", "0.4")),
 		"together": ("Qwen/Qwen2.5-72B-Instruct-Turbo", ("1.2", "1.2")),
 		None: "llama-3-70b",
+	},
+	"o3-mini": {
+		"openai": ("o3-mini", ("1.1", "4.4")),
+		None: "gpt-4m",
 	},
 	"o1": {
 		"openai": ("o1", ("15", "60")),
@@ -122,7 +126,7 @@ available = {
 		None: "gpt-4",
 	},
 	"o1-mini": {
-		"openai": ("o1-mini", ("3", "12")),
+		"openai": ("o1-mini", ("1.1", "4.4")),
 		None: "gpt-4m",
 	},
 	"gpt-4m": {
@@ -130,6 +134,7 @@ available = {
 		None: "claude-3-haiku",
 	},
 	"gpt-4": {
+		"openrouter": ("openai/gpt-4o", ("2.5", "10")),
 		"openai": ("gpt-4o", ("2.5", "10")),
 		None: "claude-3.5-sonnet",
 	},
@@ -216,6 +221,7 @@ is_chat = {
 	"lzlv-70b",
 	"magnum-72b",
 	"qwen-72b",
+	"o3-mini",
 	"o1",
 	"o1-preview",
 	"o1-mini",
@@ -280,6 +286,7 @@ is_function = {
 	"command-r",
 	"command-r-plus",
 	"35b-beta-long",
+	"o3-mini",
 	"o1",
 	"o1-preview",
 	"o1-mini",
@@ -332,6 +339,7 @@ is_premium = {
 	"claude-3-sonnet",
 	"claude-3-sonnet-20240229",
 	"llama-3-405b",
+	"o3-mini",
 	"o1",
 	"o1-preview",
 	"o1-mini",
@@ -383,9 +391,10 @@ contexts = {
 	"llama-3-70b": 131072,
 	"llama-3-90b": 131072,
 	"llama-3-405b": 131072,
-	"o1": 128000,
-	"o1-preview": 128000,
-	"o1-mini": 128000,
+	"o3-mini": 200000,
+	"o1": 200000,
+	"o1-preview": 200000,
+	"o1-mini": 200000,
 	"gpt-4": 128000,
 	"chatgpt-4o-latest": 128000,
 	"gpt-4o-2024-05-13": 128000,
@@ -947,7 +956,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 							m = m2
 						messages.append(m)
 					kwa["messages"] = messages
-				if sapi in ("openai", "deepseek"):
+				if sapi in ("openai", "deepseek", "openrouter"):
 					messages = []
 					for m in kwa["messages"]:
 						m2 = None
@@ -955,7 +964,10 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 							if not oai_name.search(m.name):
 								m2 = cdict(m)
 								name = m2.pop("name")
-								if isinstance(m2.content, list):
+								name2 = name.replace(" ", "-")
+								if oai_name.search(name2):
+									m2.name = name2
+								elif isinstance(m2.content, list):
 									m2.content = [cdict(type="text", text=f"name={name}\n\n{c.text}") if c.get("type") == "text" else c for c in m2.content]
 								else:
 									m2.content = f"name={name}\n\n{m2.content}"
@@ -1204,6 +1216,10 @@ f_txt2img = {
 					"type": "string",
 					"description": "Prompt, eg. Brilliant view of a futuristic city in an alien world, glowing spaceships, 8k fantasy art",
 				},
+				"count": {
+					"type": "integer",
+					"description": "Amount of images to produce.",
+				},
 			},
 			"required": ["prompt"],
 }}}
@@ -1299,13 +1315,13 @@ f_askip = {
 f_default = {
 	"type": "function", "function": {
 		"name": "directly_answer",
-		"description": "Calls a standard chatbot to respond to the conversation. You must always use the `directly-answer` tool if calling the other tools is unnecessary.",
+		"description": "Calls a standard chatbot to respond to the conversation. You must always use this tool if no other tool is necessary.",
 		"parameters": {
 			"type": "object", "properties": {
 				"assistant": {
 					"type": "string",
 					"enum": ["instructive", "casual"],
-					"description": 'How the assistant should respond. Enter "instructive" for academic, knowledge or advice responses, "casual" for banter, roleplay, or simple questions.',
+					"description": 'How the assistant should respond. Enter "instructive" for academic, knowledge or advice responses, "casual" for banter, roleplay, or other simple questions.',
 				},
 			},
 			"required": ["assistant"],
@@ -1675,10 +1691,12 @@ def unimage(message):
 
 
 CL100K_IM = {
+	"o3-mini",
 	"o1",
 	"o1-preview",
 	"o1-mini",
 	"chatgpt-4o-latest",
+	"gpt-4o",
 	"gpt-4o-2024-05-13",
 	"gpt-4o-mini",
 	"gpt-4o-mini-2024-07-18",

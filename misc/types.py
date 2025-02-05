@@ -6,6 +6,7 @@ import concurrent.futures
 import contextlib
 import copy
 import datetime
+import fractions
 import functools
 from itertools import chain, repeat # noqa: F401
 from math import ceil, floor, inf, nan
@@ -348,7 +349,7 @@ def aempty(size):
 byte_like = bytes | bytearray | memoryview | MemoryBytes
 list_like = list | tuple | set | frozenset | alist | np.ndarray
 string_like = byte_like | str
-number = int | float | np.number
+number = int | float | np.number | fractions.Fraction
 json_like = dict | list_like | str | number | bool | None
 
 
@@ -1227,7 +1228,9 @@ def round_min(x) -> number:
 				x = float(x)
 	if isinstance(x, np.number):
 		x = x.item()
-	if x.is_integer():
+	if not hasattr(x, "is_integer"):
+		return int(x) if x == int(x) else x
+	elif x.is_integer():
 		return int(x)
 	return x
 

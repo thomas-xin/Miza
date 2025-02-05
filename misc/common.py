@@ -1163,7 +1163,7 @@ def strip_code_box(s):
 
 
 # A string lookup operation with an iterable, multiple attempts, and sorts by priority.
-async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)], loose=True, fuzzy=0):
+async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)], loose=True, fuzzy=0.5):
 	queries = qkey(query)
 	qlist = [q for q in queries if q]
 	if not qlist:
@@ -1180,16 +1180,6 @@ async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]
 						return i
 					elif match >= fuzzy and not match <= cache[a][0][0]:
 						cache[a][0] = [match, i]
-			elif fuzzy == 0:
-				for a, b in enumerate(qkey(c)):
-					if b == qlist[a]:
-						return i
-					elif b.startswith(qlist[a]):
-						if not len(b) >= cache[a][0][0]:
-							cache[a][0] = [len(b), i]
-					elif loose and qlist[a] in b:
-						if not len(b) >= cache[a][1][0]:
-							cache[a][1] = [len(b), i]
 			else:
 				for a, b in enumerate(qkey(c)):
 					if b == qlist[a]:
@@ -1235,35 +1225,14 @@ def userIter1(x):
 	yield str(x)
 
 def userQuery2(x):
-	yield str(x).casefold()
+	yield str(x)
 
 def userIter2(x):
-	yield str(x)
-	yield str(x.name).casefold()
+	yield str(x.name)
 	if T(x).get("global_name"):
-		yield str(x.global_name).casefold()
+		yield str(x.global_name)
 	if T(x).get("nick"):
-		yield str(x.nick).casefold()
-
-def userQuery3(x):
-	yield full_prune(x)
-
-def userIter3(x):
-	yield full_prune(x.name)
-	if T(x).get("global_name"):
-		yield full_prune(x.global_name)
-	if T(x).get("nick"):
-		yield full_prune(x.nick)
-
-def userQuery4(x):
-	yield to_alphanumeric(x).replace(" ", "").casefold()
-
-def userIter4(x):
-	yield to_alphanumeric(x.name).replace(" ", "").casefold()
-	if T(x).get("global_name"):
-		yield to_alphanumeric(x.global_name).replace(" ", "").casefold()
-	if T(x).get("nick"):
-		yield to_alphanumeric(x.nick).replace(" ", "").casefold()
+		yield str(x.nick)
 
 
 # Generates a random colour across the spectrum, in intervals of 128.

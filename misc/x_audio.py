@@ -184,7 +184,7 @@ class AudioPlayer(discord.AudioSource):
 		except KeyError:
 			pass
 		else:
-			if not self or not self.vc.is_connected():
+			if not self or self.vc and not self.vc.is_connected():
 				await cls.force_disconnect(vcc.guild)
 				if self:
 					self.vc = None
@@ -201,7 +201,7 @@ class AudioPlayer(discord.AudioSource):
 				self = await asyncio.wait_for(wrap_future(fut), timeout=7)
 			except asyncio.TimeoutError:
 				pass
-			if not self or not self.vc.is_connected():
+			if not self or self.vc and not self.vc.is_connected():
 				await cls.force_disconnect(vcc.guild)
 				if self:
 					self.vc = None
@@ -215,7 +215,6 @@ class AudioPlayer(discord.AudioSource):
 			self.channel = channel
 		cls.waiting[gid] = Future()
 		cls.futs[gid] = csubmit(self.join_into(vcc, announce=announce))
-		cls.futs[gid].debug = self
 		return self
 
 	async def join_into(self, vcc, announce=0):
@@ -226,7 +225,7 @@ class AudioPlayer(discord.AudioSource):
 		member = vcc.guild.me
 		try:
 			await self.ensure_speak(vcc)
-			if not self.vc:
+			if not self.vc or not self.vc.is_connected():
 				try:
 					self.vc = await vcc.connect(timeout=7, reconnect=True)
 				except (discord.ClientException, asyncio.TimeoutError):

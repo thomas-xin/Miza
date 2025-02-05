@@ -892,7 +892,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def query_members(self, members, query, fuzzy=0.5):
 		query = str(query)
-		fuz_base = None if fuzzy is None else 0
+		fuz_base = 0
 		with suppress(LookupError):
 			return await str_lookup(
 				members,
@@ -908,27 +908,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				query,
 				qkey=userQuery2,
 				ikey=userIter2,
-				fuzzy=fuz_base,
-			)
-		with suppress(LookupError):
-			return await str_lookup(
-				members,
-				query,
-				qkey=userQuery3,
-				ikey=userIter3,
-				fuzzy=fuz_base,
-			)
-		with suppress(LookupError):
-			return await str_lookup(
-				members,
-				query,
-				qkey=userQuery4,
-				ikey=userIter4,
 				fuzzy=fuzzy,
 			)
 		raise LookupError(f"No results for {query}.")
 
-	async def fetch_member_ex(self, u_id, guild=None, allow_banned=True, fuzzy=1 / 3):
+	async def fetch_member_ex(self, u_id, guild=None, allow_banned=True, fuzzy=0.5):
 		"Fetches a member in the target server by ID or name lookup."
 		if not isinstance(u_id, int) and u_id.isnumeric():
 			with suppress(TypeError, ValueError):
@@ -944,10 +928,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if member is None:
 					with suppress(LookupError):
 						member = await self.fetch_user(u_id)
+			try:
+				return self.usernames[u_id]
+			except KeyError:
+				pass
 			if member is None:
 				if not guild:
-					u_id = full_prune(str(u_id))
-					members = [u for u in bot.cache.users if full_prune(u.name) == u_id or T(u).get("global_name") and full_prune(u.global_name) == u_id]
+					raise LookupError("No guild or unique identifier provided.")
 				elif allow_banned:
 					members = await self.get_full_members(guild)
 				else:
@@ -2007,7 +1994,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print(repr(ex))
 			else:
 				if not stream:
-					m = resp.choices[0].message
+					try:
+						m = resp.choices[0].message
+					except Exception:
+						print(resp)
+						raise
 					if m.content and assistant_name:
 						content = m.content.strip()
 						if (content.startswith("name=") or content.startswith("Name=")) and "\n" in content:
@@ -2311,11 +2302,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	model_levels = {
 		0: cdict(
 			reasoning="deepseek-v3",
-			instructive="gpt-4m",
-			casual="gpt-4m",
+			instructive="minimax-01",
+			casual="minimax-01",
 			nsfw="mythomax-13b",
-			backup="llama-3-8b",
-			retry="auto",
+			backup="deepseek-v3",
+			retry="gpt-4m",
 			function="gpt-4m",
 			vision="llama-3-11b",
 			target="auto",
@@ -2325,18 +2316,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			instructive="deepseek-v3",
 			casual="minimax-01",
 			nsfw="minimax-01",
-			backup="llama-3-70b",
+			backup="magnum-72b",
 			retry="gpt-4",
 			function="gpt-4m",
 			vision="gpt-4",
 			target="auto",
 		),
 		2: cdict(
-			reasoning="o1-preview",
+			reasoning="o3-mini",
 			instructive="deepseek-v3",
-			casual="minimax-01",
+			casual="deepseek-v3",
 			nsfw="magnum-72b",
-			backup="llama-3-70b",
+			backup="minimax-01",
 			retry="claude-3.5-sonnet",
 			function="gpt-4",
 			vision="claude-3.5-sonnet",
@@ -2537,7 +2528,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			cargs["mode"] = label
 		decensor = not is_nsfw or allow_nsfw
 		tools = cargs.get("tools")
-		mode = cargs["mode"]
+		mode = cargs.get("mode", "casual")
 		if mode not in ("instructive", "casual", "nsfw"):
 			mode = "instructive"
 		# if mode != "nsfw":
@@ -2900,18 +2891,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					p1 = lim_str(text, 128)
 					if p1:
 						return ("Data", p1)
-			caption = None
-			if not caption and best >= 2:
-				with tracebacksuppressor:
-					caption = await self.gpt4v(url, name=name, best=best - 1, premium_context=premium_context)
-			if not caption and not best:
-				with tracebacksuppressor:
-					caption = await self.phi3v(url, premium_context=premium_context)
-			if not caption:
-				with tracebacksuppressor:
-					caption = await self.claude3v(url, name=name, best=best, premium_context=premium_context)
-			if not caption:
-				caption = await self.phi3v(url, premium_context=premium_context)
+			caption = await self.vision(url, name=name, best=best, premium_context=premium_context)
 			tup = ("Image", caption, best)
 			while len(self.analysed) >= 65536:
 				self.analysed.pop(next(iter(self.analysed)))
@@ -2930,15 +2910,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not urls:
 			raise FileNotFoundError("No image found.")
 		url = urls[0]
-		try:
-			return await self.claude3v(url, name=name, best=best, question=question)
-		except Exception:
-			print_exc()
-		try:
-			return await self.gpt4v(url, name=name, best=best, question=question)
-		except Exception:
-			print_exc()
-		return await self.phi3v(url, question=question)
+		return await self.vision(url, name=name, best=best, question=question)
 
 	async def to_data_url(self, url, small=False, timeout=8):
 		sizelim = 82944 if small else 1638400
@@ -2969,44 +2941,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		mime = magic.from_buffer(d)
 		return "data:" + mime + ";base64," + base64.b64encode(d).decode("ascii")
 
-	async def claude3v(self, url, name=None, best=False, question=None, premium_context=[]):
-		"Requests an image description from Claude-3-Vision."
-		data_url = await self.to_data_url(url)
-		if not data_url.startswith("data:"):
-			return data_url
-		if name:
-			iname = f'image "{name}"'
-		else:
-			iname = "image"
-		content = question or self.description_prompt.replace("<IMAGE>", iname)
-		messages = [
-			cdict(role="user", content=[
-				cdict(type="text", text=content),
-				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
-			]),
-		]
-		model="claude-3.5-sonnet" if best >= 2 else "claude-3-haiku"
-		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
-		data = cdict(
-			model=model,
-			messages=messages,
-			temperature=0.5,
-			max_tokens=512,
-			top_p=0.9,
-			frequency_penalty=0.6,
-			presence_penalty=0.8,
-			user=str(hash(self.name)),
-		)
-		async with asyncio.timeout(35):
-			response = await ai.llm("chat.completions.create", premium_context=premium_context, **data, timeout=45)
-		out = response.choices[0].message.content.strip()
-		if ai.decensor.search(out):
-			raise ValueError(f"Censored response {repr(out)}.")
-		print("Claude3V:", out)
-		return out
-
-	async def gpt4v(self, url, name=None, best=True, question=None, premium_context=[]):
-		"Requests an image description from GPT4-Vision."
+	async def vision(self, url, name=None, best=True, question=None, premium_context=[]):
+		"Requests an image description from a vision-supporting LLM."
 		data_url = await self.to_data_url(url)
 		if not data_url.startswith("data:"):
 			return data_url
@@ -3021,7 +2957,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best > 1 else "low")),
 			]),
 		]
-		model = "gpt-4" if best else "gpt-4m"
+		model = "gpt-4" if best else "minimax-01"
 		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
@@ -3033,44 +2969,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			presence_penalty=0.8,
 			user=str(hash(self.name)),
 		)
-		async with asyncio.timeout(35):
+		async with asyncio.timeout(30):
 			response = await ai.llm("chat.completions.create", premium_context=premium_context, **data, timeout=45)
 		out = response.choices[0].message.content.strip()
 		if ai.decensor.search(out):
 			raise ValueError(f"Censored response {repr(out)}.")
-		print("GPT4V:", out)
-		return out
-
-	async def phi3v(self, url, question=None, premium_context=[]):
-		data_url = await self.to_data_url(url)
-		if not data_url.startswith("data:"):
-			return data_url
-		content = question or self.caption_prompt
-		messages = [
-			cdict(role="user", content=[
-				cdict(type="text", text=content),
-				cdict(type="image_url", image_url=cdict(url=data_url)),
-			]),
-		]
-		model = "phi-4b"
-		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
-		data = cdict(
-			model=model,
-			messages=messages,
-			temperature=0.5,
-			max_tokens=256,
-			top_p=0.9,
-			frequency_penalty=0.6,
-			presence_penalty=0.8,
-			# n=1,
-		)
-		try:
-			response = await ai.llm("chat.completions.create", premium_context=premium_context, **data, timeout=30)
-		except:
-			raise
-		else:
-			out = response.choices[0].message.content.strip()
-			print("PHI3V:", out)
+		print("Vision Response:", out)
 		return out
 
 	async def follow_to_image(self, url, follow=True):
@@ -3196,13 +3100,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		urls = await self.renew_attachments(find_urls_ex(message.content))
 		for url in urls:
 			if is_discord_attachment(url) and not discord_expired(url) or self.is_webserver_url(url):
-				resp = await asubmit(reqs.next().head, url, headers=Request.header(), verify=False, timeout=30)
+				resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True, timeout=30)
 				url = resp.headers.get("Location") or resp.url
 				if is_discord_attachment(url):
 					uid = url.rsplit("/", 2)[-2]
 				else:
 					uid = url.split("?", 1)[0].rsplit("/", 1)[-1]
 				attachment = cdict(id=uid, name=url2fn(url), url=url, size=resp.headers.get("Content-Length", 1), read=lambda: self.get_request(url))
+				resp.close()
 				csubmit(self.add_and_test(message, attachment))
 
 	def add_message(self, message, files=True, cache=True, force=False):
@@ -3599,6 +3504,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return inf
 		if guild is None or hasattr(guild, "ghost"):
 			return inf
+		if hasattr(guild, "guild"):
+			guild = guild.guild
 		if u_id == guild.owner_id:
 			return inf
 		with suppress(KeyError):
@@ -5713,7 +5620,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Return the delay before the message can be called again. This is calculated by the rate limit of the command.
 		return 0
 	
-	async def respond_with(self, response, message=None, command=None, manager=None, done=True):
+	async def respond_with(self, response, message=None, command=None, manager=None, done=True, timeout=3600):
 		with self.command_semaphore:
 			# Limit for regular Discord messages, beyond which we'll need to split the text into multiple messages
 			msglen = 2000
@@ -5760,7 +5667,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						it = iterator()
 					else:
 						raise NotImplementedError(content)
-					ct = utc() + 1
+					start = utc()
+					ct = start + 1
 					async with discord.context_managers.Typing(channel):
 						content = await anext(it)
 						if isinstance(content, dict):
@@ -5781,7 +5689,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 										raise TimeoutError
 									if not task:
 										task = csubmit(anext(it))
-									resp = await asyncio.wait_for(asyncio.shield(task), timeout=d)
+									wait = asyncio.shield(task) if utc() < start + timeout else task
+									resp = await asyncio.wait_for(wait, timeout=d)
 								except (T0, T1, CE):
 									if not blocked and edit and (not fut or fut.done()):
 										if fut:

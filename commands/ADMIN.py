@@ -720,8 +720,8 @@ class RoleSelect(Command):
 					role = await str_lookup(
 						_guild.roles,
 						r.strip(),
-						qkey=userQuery3,
-						ikey=userIter3,
+						qkey=userQuery1,
+						ikey=userIter1,
 						fuzzy=2 / 3,
 					)
 					if em:
@@ -739,8 +739,8 @@ class RoleSelect(Command):
 					role = await str_lookup(
 						_guild.roles,
 						line.strip(),
-						qkey=userQuery3,
-						ikey=userIter3,
+						qkey=userQuery1,
+						ikey=userIter1,
 						fuzzy=2 / 3,
 					)
 					e = self.get_role_emoji(role)
@@ -750,8 +750,8 @@ class RoleSelect(Command):
 				role = await str_lookup(
 					_guild.roles,
 					line.split(e, 1)[-1],
-					qkey=userQuery3,
-					ikey=userIter3,
+					qkey=userQuery1,
+					ikey=userIter1,
 					fuzzy=2 / 3,
 				)
 				rolelist.append((e, role))
@@ -2047,7 +2047,7 @@ class EnabledCommands(Command):
 	ephemeral = True
 	exact = False
 
-	def __call__(self, bot, _channel, _guild, _perm, mode, category, apply_all, target, **void):
+	def __call__(self, bot, _channel, _user, _guild, _perm, mode, category, apply_all, target, **void):
 		enabled = bot.data.enabled
 		if category == [None]:
 			category = None
@@ -2064,6 +2064,7 @@ class EnabledCommands(Command):
 				return ini_md(f"No currently enabled commands in {sqr_md(target)}.")
 			return f"Currently enabled command categories in {auto_mention(target)}:\n{ini_md(iter2str(temp))}"
 		req = 3
+		_perm = bot.get_perms(_user, target)
 		if _perm < req:
 			reason = f"to change enabled command list for {channel_repr(target)}"
 			raise self.perm_error(_perm, req, reason)
@@ -2660,7 +2661,9 @@ class UpdateUserLogs(Database):
 		# Colour: Black
 		emb = discord.Embed(colour=1)
 		emb.set_author(**get_author(user))
-		if not bot.data.users.get(user.id, {}).get("deleted"):
+		if not bot.permissions_in(guild).view_audit_log:
+			pass
+		elif not bot.data.users.get(user.id, {}).get("deleted"):
 			# Check audit log to find whether user left or was kicked/banned
 			with tracebacksuppressor(StopIteration):
 				ts = utc()

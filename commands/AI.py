@@ -96,7 +96,7 @@ class Ask(Command):
 		if nsfw and "nsfw" not in personality.casefold():
 			ac = "You are currently in a NSFW-enabled channel. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise the needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
 		else:
-			ac = "You are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, please use disclaimers in your response, and point users in the correct direction."
+			ac = "You are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, please use disclaimers in your response, and mention this to the user if necessary."
 		personality += "\n" + ac
 		tzinfo = self.bot.data.users.get_timezone(_user.id)
 		if tzinfo is None:
@@ -334,7 +334,7 @@ class Ask(Command):
 					elif name == "reasoning":
 						async def reasoning(q):
 							model = modelist.reasoning if modelist else "deepseek-r1"
-							if "o1" in model or "r1" in model:
+							if "o1" in model or "r1" in model or "o3" in model:
 								mt = dict(
 									max_completion_tokens=16384,
 								)
@@ -353,7 +353,8 @@ class Ask(Command):
 								],
 								**mt,
 								premium_context=premium,
-								timeout=480,
+								reasoning_effort="high" if "o3" in model else "medium",
+								timeout=3600,
 							)
 							message = resp.choices[0].message
 							return T(message).get("reasoning_content") or message.content
@@ -414,7 +415,7 @@ class Ask(Command):
 						s = f'\n> Generating "{argv}"...'
 						text += s
 						yield s
-						call = {"func": "imagine", "prompt": argv, "count": 4, "comment": text}
+						call = {"func": "imagine", "prompt": argv, "count": kwargs.get("count") or 1, "comment": text}
 					elif name == "reminder":
 						argv = str(kwargs.message) + " -t " + str(kwargs.time)
 						call = {"func": "remind", "message": kwargs.message, "time": kwargs.time, "comment": text}

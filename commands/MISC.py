@@ -90,88 +90,38 @@ async def searchForums(query):
 
 class SheetPull:
 
-	def __init__(self, *urls):
+	def __init__(self, *urls, mode="csv"):
+		self.mode = mode
 		self.urls = urls
-		self.time = utc()
-		self.fut = esubmit(self.pull)
+		self.data = Cache(timeout=720, persist="cs.cache")
 
-	def update(self):
-		if self.fut.done() and utc() - self.time > 720:
-			self.fut = esubmit(self.pull, timeout=60)
-			self.time = utc()
-
-	@tracebacksuppressor
-	def pull(self):
-		futs = []
+	async def pull(self):
+		data = {}
 		for url in self.urls:
-			fut = esubmit(Request, url, timeout=32, decode=True)
-			futs.append(fut)
-		sdata = [[], utc()]
-		for fut in futs:
-			try:
-				text = fut.result()
-			except:
-				print_exc()
-				continue
-			data = text.splitlines()
-			columns = 0
-			# Splits rows and colums into cells
-			for i in range(len(data)):
-				line = data[i]
-				read = list(csv.reader(line, delimiter="\t"))
-				reli = []
-				curr = ""
-				for j in read:
-					if len(j) >= 2 and j[0] == j[1] == "":
-						if curr != "":
-							reli.append(curr)
-							curr = ""
-					else:
-						curr += "".join(j)
-				if curr != "":
-					reli.append(curr)
-				if len(reli):
-					columns = max(columns, len(reli))
-					sdata[0].append(reli)
-				for line in range(len(sdata[0])):
-					while len(sdata[0][line]) < columns:
-						sdata[0][line].append(" ")
-		self.data = sdata
-		self.time = utc()
+			s = await Request(url, aio=True, timeout=16, decode=True)
+			reader = csv.reader(s.splitlines(), delimiter="\t" if self.mode == "tsv" else ",")
+			data[url] = list(reader)[1:] # Skip header
+		return data
 
-	def search(self, query, lim=1024):
-		self.fut.result()
+	async def search(self, query, max_results=20):
 		output = []
-		query = query.casefold()
-		try:
-			int(query)
-			mode = 0
-		except ValueError:
-			mode = 1
-		if not mode:
-			for l in self.data[0]:
-				if l[0] == query:
-					temp = [lim_line(e, lim) for e in l]
-					output.append(temp)
-		else:
-			qlist = set(query.split())
-			for l in self.data[0]:
-				if len(l) >= 3:
-					found = True
-					for q in qlist:
-						tag = False
-						for i in l:
-							if q in i.casefold():
-								tag = True
-								break
-						if not tag:
-							found = False
-							break
-					if found:
-						temp = [lim_line(e, lim) for e in l]
-						if temp[2].replace(" ", ""):
-							output.append(temp)
-		return output
+		data = await self.data.retrieve_from(None, self.pull)
+		for file in data.values():
+			for line in file:
+				if not line:
+					continue
+				if query in line:
+					output.append([inf, line])
+				elif query.casefold() in " ".join(line).casefold():
+					output.append([100, line])
+				else:
+					try:
+						score = max(string_similarity(query, x) for x in line if x and not x.isnumeric())
+					except ValueError:
+						score = 0
+					output.append([score, line])
+		output.sort(reverse=True)
+		return [x[1] for x in output[:max_results]]
 
 
 # URLs of Google Sheets .csv download links
@@ -182,11 +132,8 @@ entity_list = SheetPull(
 	"https://github.com/CaveStoryModdingCommunity/CaveStoryLists/raw/main/CaveStoryBullets.tsv",
 	"https://github.com/CaveStoryModdingCommunity/CaveStoryLists/raw/main/CaveStoryCaretsEffects.tsv",
 	"https://github.com/CaveStoryModdingCommunity/CaveStoryLists/raw/main/CaveStoryMusicOrganya.tsv",
+	mode="tsv",
 )
-tsc_list = None
-#SheetPull(
-	# "https://doc-14-4k-sheets.googleusercontent.com/export/0kkibturffbtf6n5t6kgp354g8/uiqlnv185g9q1c1qflbg4micu4/1683637705000/109740720460488595700/109740720460488595700/1L2cX7k_dEmNxj9e6N2W-kvjWgi-hfnhOAIlv2d33GXs?format=csv&id=1L2cX7k_dEmNxj9e6N2W-kvjWgi-hfnhOAIlv2d33GXs&gid=0&dat=AKbbZ71DVExggMM4q4w7X0I_W1zGYshAjcjPf0Qfbncc5QLDjaMuGv9O6DO9GZWuF2bpY4hGnMhDLUhlRP61NNARDghn4b_xEJbR0u_O_HJ5PeMseJMtHw4TgElWBMMSzTDIIMao0qWRtosVB4LqKwpsE_CYBkN3W2hA4nNTVU1rSrgKF-C3Zkykav4uhogG2hXWMHIEoLcEP0mrQqjQOQQjtPYvbZQgb2pD6OtYWgaaz0L5nzJv6stK6xoKevRCxKU8STzizwKbKXEHYBiohqYo1R0rGYc-w8DyywupcLKymM40-tVGhEpdRsFd01ZKtHT0ZTJMuwciHXxSPBlQqQCs2_PzcZnung3NssCdRnQuilMbGw5Yr4OSfrf30lXZhlGH0SnXK7Gw6F9Jtwp9MkK8gdPOv8GURiQWbYXZX_7OEpgGFEdNwryxeBptWJkIQl-OC_eafA1n8dQ5A3xFkYyQLeLfwJVTuKOqql9RKm4w0UpiVcP27itGntPCw3Jaa5uOardMMcmfTOm84BTZ_qgbnkBYq9tiHd5UhkXwI865aan4SHd9VTVy3QLLRlD1bhNcgNdlPguWJ5_reYVBssu89xXpPgUGTGfUb-8jeTbIVT_RLcuwHs6_Bb9J4XmmhiLOiN0X7cZ_OP4mYu7pxYGOxLq9sAVVTp5Muw4ZSG6qncJOBhUmnZdmdW1APoebawXgce2xHOji0HJ4Hom5cZ7-Lmk0wJmtUYX8qdlNjnAYzhgm1aWqmaIWSJd2qhEtq3_B9_dtUVHn3R6t_kjDpw2hXEEaqs08Rcg890D_rQ3RC1qWAGv73T0X6HK-WLqm-UCUDD7QN_Cj81Y7T9LndJJxptmKZKtW_yC9vzm31gzd-8RNKAI6F37T9qvA38Z8DX87S2et5NFLjOfEo10zQtKhs_uiIHKKwp1F6qERCZgBDbubsQX5rVpAq6IhIgN1is8_ktIqiucuK9Ms5-ZHlB3tov1nOtFBJTukx_Ct_1tt1qyamEv6ekpLcOGMQXY"
-# )
 
 
 class CS_mem2flag(Command):
@@ -425,11 +372,6 @@ class CS_mod(Command):
 class CS_Database(Database):
 	name = "cs_database"
 	no_file = True
-
-	# async def __call__(self, **void):
-	# 	entity_list.update()
-	# 	# tsc_list.update()
-	# 	douclub.update()
 
 
 class Wav2Png(Command):

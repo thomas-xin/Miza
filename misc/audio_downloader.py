@@ -35,7 +35,7 @@ def get_best_icon(entry):
 		except KeyError:
 			pass
 	try:
-		thumbnails = entry["thumbnails"]
+		thumbnails = list(filter(bool, entry["thumbnails"]))
 		if not thumbnails:
 			raise KeyError(thumbnails)
 	except KeyError:
@@ -1080,7 +1080,7 @@ class AudioDownloader:
 		codec = "opus" if ext == "ogg" else ext
 		ydl_opts = dict(
 			# Prefer selected codec, but fallback to best audio if not available
-			format=f"bestaudio[vcodec=none][acodec={codec}][audio_channels=2]/bestaudio[audio_channels=2]/bestaudio/worstvideo[acodec!=none]",
+			format=f"bestaudio[vcodec=none][acodec={codec}][audio_channels=2]/bestaudio[audio_channels=2]/bestaudio/worstvideo[acodec!=none]/best",
 			default_search="auto",
 			source_address="0.0.0.0",
 			final_ext=ext,

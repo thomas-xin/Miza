@@ -446,12 +446,31 @@ def fold(f, it):
 	return out
 
 
+def display_to_precision(frac, precision=20):
+	"Converts a fraction to a string with a specified precision."
+	if not frac:
+		return "0"
+	if isinstance(frac, int):
+		return str(frac)
+	if isinstance(frac, float):
+		return str(round(frac, precision)).removesuffix(".0")
+	if precision <= 0:
+		return str(round(frac))
+	import decimal
+	with decimal.localcontext() as ctx:
+		ctx.prec = precision
+		d = decimal.Decimal(frac.numerator) / decimal.Decimal(frac.denominator)
+		return format(d, f".{precision}f").rstrip("0").removesuffix(".")
+
+
 def _predict_next(seq, limit=None):
 	if len(seq) <= 2:
 		return None  # Not enough data to predict
 
 	# Ensure the sequence is a numpy array within length limits, and without None or NaN values
-	seq = np.asanyarray(seq, dtype=np.float64)
+	if None in seq:
+		return None
+	seq = np.array(tuple(map(fractions.Fraction, seq)), dtype=object)
 	if limit is not None and len(seq) > limit:
 		seq = seq[-limit:]
 

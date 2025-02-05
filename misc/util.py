@@ -7,12 +7,13 @@ from collections import deque, defaultdict
 import concurrent.futures
 import contextlib
 import datetime
+import fractions
 import functools
 import hashlib
 import html
 import io
 import json
-from math import ceil, comb, inf, isfinite, isqrt
+from math import ceil, comb, inf, isfinite, isqrt, log10
 import multiprocessing.connection
 import multiprocessing.shared_memory
 import os
@@ -40,9 +41,9 @@ try:
 	import pynvml
 except Exception:
 	pynvml = None
-# import niquests
+import niquests
 import requests
-from misc.smath import predict_next
+from misc.smath import predict_next, display_to_precision, unicode_prune, full_prune
 from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, fcdict, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, T2, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, MultiEncoder, sublist_index # noqa: F401
 from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, asubmit, csubmit, esubmit, tsubmit, waited_sync, Future, Semaphore
 
@@ -3512,6 +3513,7 @@ def string_similarity(s1, s2):
 	"""
 	len1, len2 = len(s1), len(s2)
 	if len1 == 0 or len2 == 0:
+		# Avoid possible index or zero division errors later
 		return 1 if s1 == s2 else 0
 	max_len = max(len1, len2)
 
@@ -3527,14 +3529,39 @@ def string_similarity(s1, s2):
 	# Fill the DP table
 	for i in range(1, len1 + 1):
 		for j in range(1, len2 + 1):
-			if s1[i - 1] == s2[j - 1]:
-				# Characters match: reward contiguous matches
+			a, b = s1[i - 1], s2[j - 1]
+			if a == b:
+				# Characters match perfectly; highest reward
 				dp[i][j] = dp[i - 1][j - 1] + 2
+			elif not a.strip() and not b.strip():
+				# Both characters are whitespace
+				dp[i][j] = dp[i - 1][j - 1] + 1.75
+			elif a.isascii() and b.isascii() and a.lower() == b.lower():
+				# Characters match case-insensitively
+				dp[i][j] = dp[i - 1][j - 1] + 1.5
+			elif unicode_prune(a) == unicode_prune(b):
+				# Characters are similar in unicode (such as "o" vs "ö" or "𝓸")
+				dp[i][j] = dp[i - 1][j - 1] + 1
+			elif full_prune(a) == full_prune(b):
+				# Characters are similar in unicode but only match case-insensitively
+				dp[i][j] = dp[i - 1][j - 1] + 0.5
 			else:
+				if a.isdigit() and b.isdigit():
+					# No penalty but also no reward for mismatched digits
+					p = 0
+				elif not a.strip() or not b.strip():
+					# Less penalty for mismatched whitespace
+					p = 0.5
+				elif not a.isascii() or not b.isascii():
+					# Slightly less penalty for mismatched non-ASCII characters
+					p = 0.75
+				else:
+					# Normal penalty for other mismatched characters
+					p = 1
 				# Characters don't match: penalize substitutions and erasures
-				substitution = dp[i - 1][j - 1] - 1  # Penalize substitution
-				deletion = dp[i - 1][j] - 0.5        # Penalize erasure less
-				insertion = dp[i][j - 1] - 0.5       # Penalize erasure less
+				substitution = dp[i - 1][j - 1] - p      # Penalize substitution
+				deletion = dp[i - 1][j] - 0.5 * p        # Penalize erasure less
+				insertion = dp[i][j - 1] - 0.5 * p       # Penalize erasure less
 				dp[i][j] = max(substitution, deletion, insertion)
 
 	# Normalize the score to a range of [0, 1]
@@ -3616,7 +3643,7 @@ def predict_continuation(posts, min_score=0.5):
 			if match.start() > last_end:
 				tokens.append(post[last_end:match.start()])
 			# Add numeric part
-			tokens.append(float(match.group()))
+			tokens.append(fractions.Fraction(match.group()))
 			last_end = match.end()
 		# Add non-numeric part after the last numeric match
 		if last_end < len(post):
@@ -3674,7 +3701,10 @@ def predict_continuation(posts, min_score=0.5):
 
 	def show_token(token):
 		if isinstance(token, number):
-			return str(round_min(token))
+			scaled = float(token)
+			if not scaled:
+				return "0"  # Avoid log(0) in the next line
+			return display_to_precision(token, ceil(abs(log10(abs(scaled)))) + 6)  # max 6 decimal places or significant figures, whichever is higher
 		return token
 	return ''.join(map(show_token, predicted_tokens)).strip()
 
@@ -4452,6 +4482,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 			await self.nossl.close()
 		self.sessions = alist(aiohttp.ClientSession() for i in range(6))
 		self.nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
+		self.alt_sessions = alist(niquests.AsyncSession() for i in range(6))
 		self.ts = utc()
 		return self
 
@@ -4460,7 +4491,18 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		return choice(self.sessions)
 
 	async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True, timeout=24) -> bytes | str | json_like:
-		await self._init_()
+		if not self.ts:
+			await self._init_()
+		if not session and not is_discord_url(url):
+			req = self.alt_sessions.next()
+			resp = await req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
+			if resp.status_code >= 400:
+				raise ConnectionError(resp.status_code, (url, as_str(resp.content)))
+			if json:
+				return resp.json()
+			if decode:
+				return resp.text
+			return resp.content
 		async with self.semaphore:
 			req = session or (self.sessions.next() if ssl else self.nossl)
 			resp = await req.request(method.upper(), url, headers=headers, data=data, timeout=timeout)
