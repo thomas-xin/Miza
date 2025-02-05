@@ -80,7 +80,7 @@ utc_dt = lambda: datetime.datetime.now(tz=datetime.timezone.utc).replace(tzinfo=
 utc_ddt = lambda: DynamicDT.utcnow()
 zerot = lambda: utc_dt().replace(hour=0, minute=0, second=0)
 sec2time = lambda s: TimeDelta(seconds=s).to_string(precision=4)
-time_repr = lambda s, mode="R": f"<t:{round(s.timestamp() if getattr(s, "timestamp", None) else s)}:{mode}>"
+time_repr = lambda s, mode="R": f"<t:{round(s.timestamp() if getattr(s, 'timestamp', None) else s)}:{mode}>"
 time_delta = lambda s: str(TimeDelta(seconds=s))
 time_until = lambda s: str(DynamicDT.utcfromtimestamp(s) - DynamicDT.utcnow())
 time_after = lambda s: str(DynamicDT.utcnow() - DynamicDT.utcfromtimestamp(s))
