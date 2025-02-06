@@ -1,5 +1,4 @@
 import base64
-import concurrent.futures
 import datetime
 import io
 import itertools
@@ -21,13 +20,12 @@ import orjson
 import psutil
 import requests
 from concurrent.futures import Future
-from math import ceil
 from traceback import print_exc
 from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut, gather
 from .types import byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, RangeSet, MemoryBytes
-from .util import hwaccel, fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, force_kill, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, get_mime, ecdc_dir, url_parse, rename, url_unparse, url2fn, is_youtube_url, seq, Cache, Request, magic, is_discord_attachment, is_miza_attachment, unyt, ecdc_exists, get_duration, CACHE_PATH, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment, update_headers
+from .util import fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, ecdc_dir, url_parse, rename, url_unparse, url2fn, is_youtube_url, seq, Cache, Request, magic, is_discord_attachment, is_miza_attachment, unyt, ecdc_exists, CACHE_PATH, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment, update_headers, CODEC_FFMPEG
 from .caches import attachment_cache, upload_cache, download_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -1062,7 +1060,7 @@ class Server:
 					fmt = "ogg"
 				else:
 					fmt = "opus"
-			assert fmt in ("mp4", "mkv", "webm", "avif", "webp", "gif", "ogg", "opus", "mp3", "flac", "wav"), f"Format {fmt} currently not supported."
+			assert fmt in ("h264", "h265", "h266", "av1", "mp4", "mkv", "webm", "avif", "webp", "gif", "ogg", "opus", "mp3", "flac", "wav"), f"Format {fmt} currently not supported."
 			tmpl = f"{CACHE_PATH}/{uhash(v)}.{fmt}"
 			start = kwargs.get("start")
 			end = kwargs.get("end")
@@ -1097,7 +1095,7 @@ class Server:
 						postprocessors = [dict(
 							key="FFmpegCustomVideoConvertor",
 							format=fmt,
-							codec="libsvtav1",
+							codec=CODEC_FFMPEG.get(fmt, "libsvtav1"),
 							start=start,
 							end=end,
 						)]
@@ -1299,166 +1297,6 @@ class Server:
 	@cp.expose
 	def error(self, code=400):
 		raise ConnectionError(int(code))
-
-	def optimise_video(self, of, size, mime):
-		print("Convert", of, mime, size)
-		dur = get_duration(of)
-		if mime.split("/", 1)[-1] in ("mp4", "webm"):
-			if (not dur or dur > 3600) and (not size or size > 524288000):
-				raise StopIteration
-			if size / dur <= 1048576:
-				args = [
-					"./ffprobe",
-					"-v",
-					"error",
-					"-show_entries",
-					"stream=pix_fmt",
-					"-of",
-					"default=noprint_wrappers=1:nokey=1",
-					of,
-				]
-				resp = None
-				try:
-					proc = psutil.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
-					fut = esubmit(proc.wait, timeout=8)
-					_res = fut.result(timeout=8)
-					resp = proc.stdout.read()
-				except Exception:
-					with suppress():
-						force_kill(proc)
-					with suppress():
-						resp = proc.stdout.read()
-					print_exc()
-				if resp and resp.strip() == "yuv420p":
-					raise StopIteration
-		done = False
-		if dur > 60 and size <= 524288000 and mime.split("/", 1)[0] == "video":
-			with tracebacksuppressor:
-				header = Request.header()
-				header["origin"] = header["referer"] = "https://www.mp4compress.com/"
-				with open(of, "rb") as f:
-					resp = reqs.next().post(
-						"https://www.mp4compress.com/",
-						files=dict(upfile=(f"record{ts_us()}.mp4", f, "video/mp4"), submitfile=(None, "")),
-						headers=header,
-						timeout=720,
-					)
-				resp.raise_for_status()
-				if 'Completed: <a href="' not in resp.text:
-					s = resp.text.split('<form class="form" role="form" action="https://www.mp4compress.com/" method="post" enctype="multipart/form-data">', 1)[0]
-					s = s.rsplit("</p>", 1)[-1].strip()
-					if s:
-						print(s)
-					raise FileNotFoundError('Completed: <a href="')
-				url = resp.text.split('Completed: <a href="', 1)[-1].split('"', 1)[0]
-				print(url)
-				with reqs.next().get(
-					url,
-					headers=header,
-					stream=True,
-					timeout=720,
-				) as resp:
-					resp.raise_for_status()
-					it = resp.iter_content(65536)
-					fmt = "mp4"
-					fo = f"{of}.{fmt}"
-					with open(fo, "wb") as f:
-						with suppress(StopIteration):
-							while True:
-								b = next(it)
-								if not b:
-									break
-								f.write(b)
-				done = True
-		if not done:
-			args = [
-				"./ffmpeg",
-				"-hide_banner",
-				"-v",
-				"error",
-				"-nostdin",
-				"-y",
-				"-hwaccel",
-				hwaccel,
-				"-i",
-				of,
-				"-pix_fmt",
-				"yuv420p",
-			]
-			if dur <= 60:
-				fmt = "webm"
-				fo = f"{of}.{fmt}"
-				if hwaccel == "cuda":
-					args.extend(("-c:v", "av1_nvenc"))
-					import torch
-					devid = random.choice([i for i in range(torch.cuda.device_count()) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor) >= (8, 9)])
-					args = args[:1] + ["-hwaccel_device", str(devid)] + args[1:]
-				else:
-					args.extend(("-c:v", "libsvtav1"))
-				args.extend((
-					"-crf",
-					"42",
-					fo,
-				))
-			else:
-				fmt = "mp4"
-				fo = f"{of}.{fmt}"
-				if hwaccel == "cuda":
-					args.extend(("-c:v", "h264_nvenc"))
-					devid = random.randint(0, ceil(torch.cuda.device_count() / 2))
-					args = args[:1] + ["-hwaccel_device", str(devid)] + args[1:]
-				else:
-					args.extend(("-c:v", "h264"))
-				args.extend((
-					"-crf",
-					"30",
-					fo,
-				))
-			print(args)
-			proc = psutil.Popen(args, stdin=subprocess.DEVNULL)
-			fut = esubmit(proc.wait, timeout=120)
-			try:
-				fut.result(timeout=120)
-			except concurrent.futures.TimeoutError:
-				if proc.is_running() and os.path.exists(fo) and os.path.getsize(fo):
-					fut = None
-			if not fut:
-				fut = esubmit(proc.wait, timeout=3600)
-				fut.result(timeout=3600)
-		assert os.path.exists(fo) and os.path.getsize(fo) and os.path.getsize(fo) < size
-		name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
-		if name.startswith(".temp$@"):
-			name = name[7:]
-		try:
-			ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
-		except ValueError:
-			ts = time.time_ns() // 1000
-		name = name.rsplit(".", 1)[0]
-		os.remove(of)
-		of = f"{TEMP_PATH}/filehost/{IND}{ts}~.temp$@{name}.{fmt}"
-		os.rename(fo, of)
-		size = os.path.getsize(of)
-		mime = get_mime(of)
-		return of
-
-	def optimise_image(self, of, size, mime):
-		fmt = "webp"
-		fo = interface.run(f"process_image({repr(of)},resize_mult,[1,1,'auto','-f',{repr(fmt)}],timeout=120)")
-		assert os.path.exists(fo) and os.path.getsize(fo) and os.path.getsize(fo) < size
-		name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
-		if name.startswith(".temp$@"):
-			name = name[7:]
-		try:
-			ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
-		except ValueError:
-			ts = time.time_ns() // 1000
-		name = name.rsplit(".", 1)[0]
-		os.remove(of)
-		of = f"{TEMP_PATH}/filehost/{IND}{ts}~.temp$@{name}.{fmt}"
-		os.rename(fo, of)
-		size = os.path.getsize(of)
-		# mime = get_mime(of)
-		return of
 
 	def hash_file(self, fn):
 		if os.name != "nt":

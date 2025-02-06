@@ -42,7 +42,7 @@ from contextlib import suppress
 from math import inf, floor, ceil, log2, log10
 from traceback import print_exc
 sys.path.append("misc")
-from misc.util import EvalPipe, new_playwright_page
+from misc.util import EvalPipe, new_playwright_page, CODECS, CODEC_FFMPEG
 
 if __name__ == "__main__":
 	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
@@ -1232,19 +1232,14 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			command.extend(("-vf", f"scale={w}:{h}:flags=bicubic"))
 		bitrate = floor(min(fs / duration * 1000 * 7.5, 99999999)) # use 7.5 bits per byte
 		command.extend(("-b:v", str(bitrate)))
+		cdc = CODEC_FFMPEG.get(fmt, "libsvtav1")
+		fmt = CODECS.get(fmt, fmt)
 		if mode == "RGBA":
-			# nvenc not supporting yuva!!
-			# if hwaccel == "cuda" and devid != -1:
-			# 	command.extend(("-pix_fmt", "yuva420p", "-c:v", "av1_nvenc"))
-			# else:
-			command.extend(("-pix_fmt", "yuva420p", "-c:v", "libsvtav1"))
-			# fmt = "webm"
+			pix_fmt = "yuva444p" if cdc == "libsvtav1" else "yuva420p"
+			command.extend(("-pix_fmt", pix_fmt, "-c:v", cdc))
 		else:
-			# if hwaccel == "cuda":
-			# 	command.extend(("-pix_fmt", "yuv420p", "-c:v", "hevc_nvenc"))
-			# else:
-			command.extend(("-pix_fmt", "yuv420p", "-c:v", "libsvtav1"))
-			# fmt = "mp4"
+			pix_fmt = "yuv444p" if cdc == "libsvtav1" else "yuv420p"
+			command.extend(("-pix_fmt", pix_fmt, "-c:v", cdc))
 		command.extend(("-f", fmt))
 	return command, fmt
 
@@ -1305,7 +1300,7 @@ def anim_into(out, new, first, size, fmt, fs, r=0):
 	opts, fmt = ffmpeg_opts(new, new["frames"], new["count"], mode, first, fmt, fs, *size, new["duration"], True)
 	command.extend(opts)
 	if "." in out:
-		out2 = out.rsplit(".", 1)[0] + "~2." + fmt
+		out2 = out.rsplit(".", 1)[0] + "~2." + CODECS.get(fmt, fmt)
 	else:
 		out2 = out + "~2"
 	command.append(out2)
@@ -1441,7 +1436,7 @@ def evalImg(url, operation, args):
 					cdc = "libsvtav1"
 				else:
 					fmt = "gif"
-			out = "cache/" + str(ts) + "." + fmt
+			out = "cache/" + str(ts) + "." + CODECS.get(fmt, fmt)
 			mode = str(first.mode)
 			if mode == "P":
 				raise RuntimeError("Unexpected P mode image")
@@ -1469,7 +1464,7 @@ def evalImg(url, operation, args):
 				])
 				opts, fmt = ffmpeg_opts(new, frames, count, mode, first, fmt, fs, *size, duration, opt)
 				command.extend(opts)
-				command.append("cache/" + str(ts) + "." + fmt)
+				command.append("cache/" + str(ts) + "." + CODECS.get(fmt, fmt))
 				print(command)
 				env = dict(os.environ)
 				env.pop("CUDA_VISIBLE_DEVICES", None)

@@ -15,7 +15,7 @@ except ImportError as ex:
 	except ImportError:
 		raise ex
 from .types import list_like
-from .util import Request, EvalPipe, esubmit, python, new_playwright_page
+from .util import Request, EvalPipe, esubmit, python, new_playwright_page, CODECS
 
 ydl_opts = {
 	"quiet": 1,
@@ -181,11 +181,12 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			output_args = ["-f", self.format, *codecs, "-b:v", "2M", "-an"]
 			lightning = False
 		else:
+			fmt = CODECS.get(self.format, self.format)
 			if self.start is not None:
 				input_args.extend(["-ss", str(self.start)])
 			if self.end is not None:
 				input_args.extend(["-to", str(self.end)])
-			output_args = ["-f", self.format, "-c:v", self.codec, "-b:v", "2M"]
+			output_args = ["-f", fmt, "-c:v", self.codec, "-b:v", "2M"]
 			if self.format == "mp4":
 				# MP4 supports just about any audio codec, but WebM and MKV do not. We assume the audio codec is not WMA, as it is highly unlikely any website would use it for streaming videos.
 				output_args.extend(["-c:a", "copy"])
