@@ -282,10 +282,10 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 	except ImportError:
 		pass
 	mime = magic.from_buffer(data)
-	if mime == "application/tar":
-		z = tarfile.TarFile(io.BytesIO(data), strict_timestamps=False)
-		filenames = [f.filename for f in z.filelist if not f.is_dir()]
-		return ImageSequence.fromiter((Image.open(z.open(fn)) for fn in filenames), frameprops=(len(filenames), len(filenames) / 30, 30))
+	if mime in ("application/tar", "application/x-tar"):
+		t = tarfile.open(fileobj=io.BytesIO(data))
+		filenames = t.getmembers()
+		return ImageSequence.fromiter((Image.open(t.extractfile(fn)) for fn in filenames), frameprops=(len(filenames), len(filenames) / 30, 30))
 	elif mime == "application/zip":
 		z = zipfile.ZipFile(io.BytesIO(data), strict_timestamps=False)
 		filenames = [f.filename for f in z.filelist if not f.is_dir()]
@@ -1276,6 +1276,8 @@ def properties(im) -> tuple: # frames, duration, fps
 def sync_fps(props, duration=None, fps=None):
 	d = max(t[1] for t in props)
 	prog = 1
+	if duration == 0:
+		return 0, 1, 0
 	if duration and duration < 0:
 		duration = -duration
 		prog = -prog
@@ -1313,7 +1315,9 @@ def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", r
 	props = [properties(im) for im in sources]
 	seconds, fps, prog = sync_fps(props, duration, fps)
 	count = max(1, round(fps * seconds))
-	if duration:
+	if duration == 0:
+		count = 1
+	elif duration:
 		prog *= max(1, round(seconds / duration))
 	seed = time.time_ns() // 1000
 

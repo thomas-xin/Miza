@@ -845,7 +845,7 @@ class Server:
 	proxy._cp_config = {"response.stream": True}
 
 	@cp.expose
-	def static(self, *filepath):
+	def static(self, *filepath, **kwargs):
 		if not filepath:
 			if cp.request.remote.ip == "127.0.0.1":
 				STATIC.clear()

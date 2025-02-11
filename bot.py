@@ -1886,7 +1886,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def optimise_image(self, image, fsize=CACHE_FILESIZE, msize=None, fmt="auto", duration=None, anim=True, timeout=3600):
 		"Optimises the target image or video file to fit within the \"fsize\" size, or \"msize\" resolution. Optional format and duration parameters."
-		# print("RESIZE:", msize)
 		args = [[], None, None, "max", msize, None, "-o"]
 		if not anim:
 			args.insert(0, "-nogif")

@@ -792,7 +792,7 @@ class Orbit(Command):
 
 class Pet(Command):
 	name = ["PetPet", "Attack", "Pat"]
-	description = "Creates a .gif image from applying the Petpet generator to the supplied image."
+	description = "Creates an animation from applying the Petpet generator to the supplied image."
 	schema = cdict(
 		url=cdict(
 			type="visual",
@@ -854,6 +854,98 @@ class Pet(Command):
 
 	async def __call__(self, _timeout, url, squish, duration, speed, fps, filesize, format, **void):
 		resp = await process_image(url, "pet_map", [[], float(duration) / speed, fps, squish, "-fs", filesize, "-f", format], timeout=_timeout)
+		fn = url2fn(url)
+		name = replace_ext(fn, get_ext(resp))
+		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
+
+
+class Tesseract(Command):
+	name = ["4D", "Octachoron", "Hypercube"]
+	description = "Creates an animation from applying the image as a tesseract texture and rotating."
+	schema = cdict(
+		url=cdict(
+			type="visual",
+			description="Image, animation or video, supplied by URL or attachment",
+			example="https://mizabot.xyz/favicon",
+			aliases=["i"],
+			required=True,
+		),
+		size=cdict(
+			type="integer",
+			validation="[64, 1024]",
+			description="Maximum and minimum stretch factor",
+			example="256",
+			default=256,
+		),
+		duration=cdict(
+			type="timedelta",
+			validation="[-3600, 3600]",
+			description="The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+			example="1:26.3",
+			default=0.25,
+		),
+		speed=cdict(
+			type="number",
+			validation="[-60, 60]",
+			description="Inverse of duration; higher values reduce the duration",
+			example="3.[3]",
+			default=1,
+		),
+		fps=cdict(
+			type="number",
+			validation="(0, 256]",
+			description="The framerate of the animation (does not affect duration)",
+			example="120/7",
+			default=30,
+		),
+		filesize=cdict(
+			type="filesize",
+			validation="[1024, 1073741824]",
+			description="The maximum filesize in bytes",
+			example="10kb",
+			default=CACHE_FILESIZE,
+			aliases=["fs"],
+		),
+		format=cdict(
+			type="enum",
+			validation=cdict(
+				enum=tuple(VISUAL_FORMS),
+				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
+			),
+			description="The file format or codec of the output",
+			example="mp4",
+			default="auto",
+		),
+	)
+	rate_limit = (10, 13)
+	_timeout_ = 5
+	slash = True
+
+	def tesseract(self, data, size=512, timeout=30):
+		if isinstance(data, str):
+			fi = data
+		else:
+			fi = f"cache/{ts_us()}.png"
+			with open(fi, "wb") as f:
+				f.write(data)
+		fn = f"cache/{ts_us()}.tar"
+		page = new_playwright_page()
+		with page:
+			page.goto(f"https://api.mizabot.xyz/static/tesseract.html?render=&size={size}&texture=0")
+			with page.expect_file_chooser() as fc_info:
+				page.locator("#inp").click()
+			file_chooser = fc_info.value
+			file_chooser.set_files(fi)
+			with page.expect_download(timeout=timeout * 1000) as download_info:
+				page.locator("canvas").click()
+			download = download_info.value
+			download.save_as(fn)
+		return fn
+
+	async def __call__(self, _timeout, url, size, duration, speed, fps, filesize, format, **void):
+		data = await process_image(url, "resize_max", ["-nogif", size, 0, "auto", "-f", "png"], timeout=60)
+		resp = await asubmit(self.tesseract, data, size, timeout=_timeout)
+		resp = await process_image(resp, "resize_map", [[], duration, fps, "mult", 1, 1, "nearest", None, "-fs", filesize, "-f", format], cap="image", timeout=_timeout)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -949,7 +1041,6 @@ class Resize(Command):
 	slash = True
 
 	async def __call__(self, bot, _timeout, mode, url, resolution, multiplier, area, duration, fps, filesize, format, **void):
-		cap = "image"
 		if resolution:
 			if len(resolution) == 1:
 				x = y = resolution[0]
@@ -963,8 +1054,8 @@ class Resize(Command):
 			x = y = multiplier
 			func = "mult"
 		resp = url
-		if func != "mult" or not x == y == 1 or area:
-			resp = await process_image(resp, "resize_map", [[], duration, fps, func, x, y, mode, area, "-fs", filesize, "-f", format], cap=cap, timeout=_timeout)
+		if func != "mult" or not x == y == 1 or area or duration is not None or fps is not None:
+			resp = await process_image(resp, "resize_map", [[], duration, fps, func, x, y, mode, area, "-fs", filesize, "-f", format], cap="image", timeout=_timeout)
 		else:
 			resp = await bot.optimise_image(resp, fsize=filesize, fmt=format)
 		fn = url2fn(url)
@@ -1248,7 +1339,7 @@ class Steganography(Command):
 
 
 class OCR(Command):
-	name = ["Tesseract", "Read", "Image2Text"]
+	name = ["Read", "Image2Text"]
 	description = "Attempts to read text in an image using Optical Character Recognition AI."
 	schema = cdict(
 		url=cdict(

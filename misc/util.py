@@ -1803,7 +1803,7 @@ def maybe_json(d):
 	try:
 		return json.dumps(d, cls=MultiEncoder).encode("ascii")
 	except TypeError:
-		return json_dumps(repr(d)).encode("ascii")
+		return json_dumps(repr(d))
 
 def json_if(s):
 	if isinstance(s, str) and len(s.split(None, 1)) > 1:
@@ -4634,17 +4634,21 @@ def update_headers(headers, **fields):
 		headers[k] = v
 	return headers
 
-sp = None
+sps = {}
 browsers = {}
 def new_playwright_page(browser="firefox", viewport=dict(width=480, height=320), headless=True):
+	tid = threading.get_ident()
+	h = f"{browser}~{tid}~{int(headless)}"
 	try:
-		return browsers[browser].new_page()
+		return browsers[h].new_page()
 	except KeyError:
-		if sp is None:
+		try:
+			sp = sps[tid]
+		except KeyError:
 			from playwright.sync_api import sync_playwright
-			globals()["sp"] = sync_playwright().start()
-		browsers[browser] = getattr(sp, browser).launch(headless=headless)
-	return browsers[browser].new_page(viewport=viewport)
+			sp = sps[tid] = sync_playwright().start()
+		browsers[h] = getattr(sp, browser).launch(headless=headless)
+	return browsers[h].new_page(viewport=viewport)
 
 
 CACHE_FILESIZE = 10485760

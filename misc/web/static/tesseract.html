@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tesseract</title>
+  <style>
+    body { margin: 0; background-color: black }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+	<input type="file" id="inp">
+  <!-- three.js and helpers -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.16.0/dist/lil-gui.umd.min.js"></script>
+  <script src="CCapture.all.min.js"></script>
+  <!-- Replace this with your actual texture data URL -->
+  <script id="texture-data" type="text/plain">
+    data:image/webp;base64,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
+  </script>
+
+  <script>
+    // Grab texture URL and load it.
+	var url = window.location;
+	let params = new URLSearchParams(url.search);
+	const should_render = params.get("render");
+	const resolution = +(params.get("size") || 512);
+	var TEXTURE_URL = params.get("texture") || document.getElementById('texture-data').textContent.trim();
+    const loader = new THREE.TextureLoader();
+    var faceTexture;
+	const tex_fn = (texture) => {
+	  texture.magFilter = THREE.NearestFilter;
+      faceTexture = texture;
+      faceTexture.wrapS = faceTexture.wrapT = THREE.RepeatWrapping;
+      reload();
+    };
+    loader.load(TEXTURE_URL, tex_fn);
+	document.getElementById('inp').onchange = function(e) {
+	  TEXTURE_URL = URL.createObjectURL(this.files[0]);
+	  loader.load(TEXTURE_URL, tex_fn);
+	};
+	function failed() {
+	  console.error("The provided file couldn't be loaded as an Image media");
+	}
+
+	let capturer;
+	let recording = false;
+	let finished = false;
+	let frames = 0;
+    let tesseract;
+	let controls;
+	const outlineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
+	// Set up scene, camera, and renderer.
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        60, 1, 0.1, 1000
+      );
+      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+	  document.body.appendChild(renderer.domElement);
+    function reload() {
+		scene.children.shift();
+      renderer.setSize(resolution, resolution);
+	  renderer.domElement.style.position = "fixed";
+	  renderer.setClearColor( 0x000000, 0 );
+
+      // Parameters controlling our 4D rotations.
+      const rotationParams = {
+        xyAngle: 0,
+        zwAngle: 0,
+        xzAngle: 0,
+        autoRotate: true,
+        speed: 0.01
+      };
+
+      // Create our tesseract as a group of faces.
+      tesseract = createTesseractGeometry(faceTexture);
+      scene.add(tesseract);
+
+      // Set up camera and orbit controls.
+      camera.position.z = 2.4;
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+	  controls.enabled = false;
+      controls.enableDamping = true;
+	  controls.enablePan = false;
+	  controls.enableZoom = false;
+
+      // GUI to control rotations.
+      // const gui = new lil.GUI();
+      // gui.add(rotationParams, 'autoRotate');
+      // gui.add(rotationParams, 'speed', 0, 0.1);
+      // gui.add(rotationParams, 'xyAngle', 0, Math.PI * 2);
+      // gui.add(rotationParams, 'zwAngle', 0, Math.PI * 2);
+      // gui.add(rotationParams, 'xzAngle', 0, Math.PI * 2);
+
+	function startRender() {
+		if (recording) return;
+		capturer = new CCapture( { framerate: 24, format: 'png', workersPath: 'js/' } );
+		console.log(renderer);
+		console.log(capturer);
+		rotationParams.xyAngle = 0;
+		rotationParams.zwAngle = 0;
+		rotationParams.xzAngle = 0;
+		capturer.start();
+		recording = true;
+		frames = 0;
+	}
+	if (should_render) startRender();
+	  renderer.domElement.onclick = startRender;
+      // Animation loop.
+      function animate() {
+		if (!finished) {
+			requestAnimationFrame(animate);
+		}
+
+        if (rotationParams.autoRotate) {
+          rotationParams.xyAngle += rotationParams.speed;
+          rotationParams.zwAngle += rotationParams.speed * 0.8;
+          rotationParams.xzAngle += rotationParams.speed * 0.6;
+		  rotationParams.xyAngle %= 1;
+		  rotationParams.zwAngle %= 1;
+		  rotationParams.xzAngle %= 1;
+        }
+
+        // Update each face’s geometry (both the face and its outline)
+        tesseract.children.forEach((obj) => {
+          update4DFaceGeometry(obj, rotationParams.xyAngle * Math.PI * 2, rotationParams.zwAngle * Math.PI * 2, rotationParams.xzAngle * Math.PI * 2);
+        });
+
+        // Sort all faces (and outlines) so that those farther from the camera are drawn first.
+        tesseract.children.sort((a, b) => {
+          return computeDepth(b, camera) - computeDepth(a, camera);
+        });
+
+        controls.update();
+        renderer.render(scene, camera);
+		if (recording) {
+			capturer.capture(renderer.domElement);
+			frames++;
+			console.log(rotationParams);
+			if (frames >= 5 / rotationParams.speed) {
+				capturer.stop();
+				recording = false;
+				capturer.save();
+				finished = true;
+			}
+		}
+      }
+      animate();
+
+      // Update renderer size on window resize.
+      // window.addEventListener('resize', () => {
+      //   camera.aspect = window.innerWidth / window.innerHeight;
+      //   camera.updateProjectionMatrix();
+      //   renderer.setSize(window.innerWidth, window.innerHeight);
+      // });
+    }
+
+    // Create a group with one object for the face (mesh) and one for its outline (line loop).
+    function createTesseractGeometry(texture) {
+      const group = new THREE.Group();
+
+      // Material for the textured faces.
+      const textureMaterial = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 0.3333333333333333,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+
+      // For each face (from our precomputed 4D face data)
+      faces4DData.forEach((faceVertices, i) => {
+        // --- Face mesh geometry (4 vertices) ---
+        const faceGeometry = new THREE.BufferGeometry();
+        faceGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(4 * 3), 3));
+        // Set UV coordinates for the square texture.
+        faceGeometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+          0, 0,
+          1, 0,
+          1, 1,
+          0, 1
+        ]), 2));
+        // Create two triangles for the square.
+        faceGeometry.setIndex([0, 1, 2, 0, 2, 3]);
+        // Store which face (from faces4DData) this is.
+        faceGeometry.userData.faceIndex = i;
+        const faceMesh = new THREE.Mesh(faceGeometry, textureMaterial);
+        group.add(faceMesh);
+
+        // --- Outline geometry (line loop) ---
+        // We create 5 vertices so that the last equals the first (to close the loop).
+        const outlineGeometry = new THREE.BufferGeometry();
+        outlineGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(5 * 3), 3));
+        outlineGeometry.userData.faceIndex = i;
+        const outline = new THREE.LineLoop(outlineGeometry, outlineMaterial);
+        group.add(outline);
+      });
+
+      return group;
+    }
+
+    // Global 4D face data – each face is defined by 4 vertices (an array of 4 arrays [x,y,z,w]).
+    const faces4DData = generate4DFaces();
+
+    // Update the geometry for a given face object (either a Mesh or a LineLoop).
+    // It uses the corresponding original 4D coordinates from faces4DData.
+    function update4DFaceGeometry(object, xyRot, zwRot, xzRot) {
+      const faceIndex = object.geometry.userData.faceIndex;
+      if (faceIndex === undefined) {
+        console.error('Face data not found for object.');
+        return;
+      }
+      const original4D = faces4DData[faceIndex];
+      const positions = object.geometry.attributes.position.array;
+      // Determine how many vertices this geometry has.
+      // (4 for the face mesh; 5 for the outline which repeats the first vertex)
+      const vertexCount = positions.length / 3;
+
+      // Update the first 4 vertices.
+      for (let i = 0; i < 4; i++) {
+        let [x, y, z, w] = original4D[i];
+
+        // Apply rotation in the xy–plane.
+        [x, y] = [
+          x * Math.cos(xyRot) - y * Math.sin(xyRot),
+          x * Math.sin(xyRot) + y * Math.cos(xyRot)
+        ];
+
+        // Apply rotation in the zw–plane.
+        [z, w] = [
+          z * Math.cos(zwRot) - w * Math.sin(zwRot),
+          z * Math.sin(zwRot) + w * Math.cos(zwRot)
+        ];
+
+        // Apply rotation in the xz–plane.
+        [x, z] = [
+          x * Math.cos(xzRot) - z * Math.sin(xzRot),
+          x * Math.sin(xzRot) + z * Math.cos(xzRot)
+        ];
+
+        // A simple perspective projection from 4D to 3D.
+        const persp = 2 / (4 + w);
+        positions[i * 3]     = x * persp;
+        positions[i * 3 + 1] = y * persp;
+        positions[i * 3 + 2] = z * persp;
+      }
+
+      // If this is the outline geometry (with 5 vertices), copy the first vertex to the end.
+      if (vertexCount === 5) {
+        positions[12] = positions[0];
+        positions[13] = positions[1];
+        positions[14] = positions[2];
+      }
+      object.geometry.attributes.position.needsUpdate = true;
+    }
+
+    // Compute an average “depth” for an object from its geometry.
+    // We transform each vertex into world space and then average the distances from the camera.
+    function computeDepth(obj, camera) {
+      obj.updateMatrixWorld();
+      const posAttr = obj.geometry.attributes.position;
+      const count = posAttr.count;
+      let sum = 0;
+      const temp = new THREE.Vector3();
+      for (let i = 0; i < count; i++) {
+        temp.fromBufferAttribute(posAttr, i);
+        temp.applyMatrix4(obj.matrixWorld);
+        sum += camera.position.distanceTo(temp);
+      }
+      return sum / count;
+    }
+
+    // --- Generate 4D face data ---
+    // This function creates all square “faces” for a 4D hypercube (tesseract).
+    function generate4DFaces() {
+      const faces = [];
+      const axes = [0, 1, 2, 3]; // x, y, z, w
+      // Loop over all pairs of axes (the ones that will vary on the face).
+      for (let i = 0; i < 4; i++) {
+        for (let j = i + 1; j < 4; j++) {
+          const freeAxes = [i, j];
+          // The remaining axes are fixed.
+          const fixedAxes = axes.filter(a => freeAxes.indexOf(a) === -1);
+          // For each combination of fixed values (±1)
+          for (let fixed1 of [-1, 1]) {
+            for (let fixed2 of [-1, 1]) {
+              // Define the 4 vertices of a square in the free coordinate plane.
+              // The order is: (-1, -1), (1, -1), (1, 1), (-1, 1)
+              const freeCoords = [
+                [-1, -1],
+                [1, -1],
+                [1, 1],
+                [-1, 1]
+              ];
+              const face = [];
+              for (let k = 0; k < 4; k++) {
+                const vertex = [0, 0, 0, 0];
+                // Assign free coordinates.
+                vertex[freeAxes[0]] = freeCoords[k][0];
+                vertex[freeAxes[1]] = freeCoords[k][1];
+                // Assign fixed coordinates.
+                vertex[fixedAxes[0]] = fixed1;
+                vertex[fixedAxes[1]] = fixed2;
+                face.push(vertex);
+              }
+              faces.push(face);
+            }
+          }
+        }
+      }
+      return faces;
+    }
+  </script>
+</body>
+</html>

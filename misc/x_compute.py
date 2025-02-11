@@ -1307,7 +1307,8 @@ def anim_into(out, new, first, size, fmt, fs, r=0):
 	print(command)
 	subprocess.run(command, timeout=240)
 	assert os.path.exists(out2), f"Expected output file {out2}"
-	if "A" not in mode and np.prod(size) * new["count"] <= 67108864 and os.path.getsize(out2) < fs * 3:
+	print(os.path.getsize(out2), fs, np.prod(size) * new["count"])
+	if (fs >= 1048576 or "A" not in mode) and np.prod(size) * new["count"] <= 67108864 and os.path.getsize(out2) < fs * 3:
 		out = gifsicle(out2, new)
 	else:
 		out = out2
@@ -1530,7 +1531,8 @@ def evalImg(url, operation, args):
 				proc.stdin.close()
 				proc.wait()
 			if not archive:
-				if fmt == "gif" and "A" not in mode and first.width * first.height * new["count"] <= 67108864 and os.path.getsize(out) < fs * 3:
+				print(os.path.getsize(out), fs, np.prod(size) * new["count"])
+				if fmt == "gif" and (fs >= 1048576 or "A" not in mode) and first.width * first.height * new["count"] <= 67108864 and os.path.getsize(out) < fs * 3:
 					out = gifsicle(out, new)
 				new["mode"] = mode
 				new["frames"] = frames
