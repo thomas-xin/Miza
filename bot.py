@@ -1561,9 +1561,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return await self.id_from_message(self.cache.messages[m_id].content)
 		return verify_id(m_id)
 
-	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, emojis=True, reactions=False, allow=False, limit=None, no_cache=False, ytd=True):
+	followed = Cache(timeout=86400 * 7, persist="follow.cache")
+	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, emojis=True, reactions=False, allow=False, limit=None, no_cache=False, ytd=True) -> list:
 		"Finds URLs in a string, following any discord message links found. Traces all the way to raw file stream if \"ytd\" parameter is set."
-		self.followed = ai.cache
 		if limit is not None and limit <= 0:
 			return []
 		if not isinstance(url, str) and hasattr(url, "channel"):
@@ -1676,6 +1676,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					url,
 					headers=Request.header(),
 					verify=False,
+					allow_redirects=True,
 				)
 				if resp.headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html", "application/json"):
 					url = resp.url
@@ -1688,17 +1689,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						print(repr(ex))
 					else:
 						resp = resp[0]
-						if isinstance(resp, str):
-							print("FU:", resp)
+						if resp.get("video") and resp["video"][0]:
+							url = resp["video"][0]
+						elif images and resp.get("thumbnail"):
+							url = resp["thumbnail"]
+						elif resp["url"] != url:
+							url = resp["url"]
 						else:
-							if resp.get("video"):
-								url = resp["video"]
-							elif images and resp.get("thumbnail"):
-								url = resp["thumbnail"]
-							elif resp["url"] != url:
-								url = resp["url"]
-							else:
-								url = resp.get("video") or resp.get("stream") or resp.get("thumbnail") or resp.get("url") or url
+							url = resp.get("video") or resp.get("stream") or resp.get("thumbnail") or resp.get("url") or url
 				out.append(url)
 		if lost:
 			out.extend(lost)
@@ -1716,8 +1714,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return list(out)
 
 	@functools.lru_cache(maxsize=64)
-	def detect_mime(self, url):
-		resp = reqs.next().get(url, stream=True, timeout=30)
+	def detect_mime(self, url) -> tuple:
+		resp = reqs.next().get(url, stream=True, timeout=30, allow_redirects=True)
 		head = fcdict(resp.headers)
 		try:
 			return tuple(t.strip() for t in head.get("Content-Type", "").split(";"))
@@ -2312,7 +2310,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		1: cdict(
-			reasoning="deepseek-r1",
+			reasoning="o3-mini",
 			instructive="deepseek-v3",
 			casual="minimax-01",
 			nsfw="minimax-01",
@@ -2835,7 +2833,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				durl = url.split("base64,", 1)[-1].encode("ascii")
 				d = base64.b64decode(durl + b"==")
 			else:
-				resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True, _timeout_=timeout)
+				resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True, _timeout_=timeout, allow_redirects=True)
 				resp.raise_for_status()
 				with resp:
 					d = await asubmit(getattr, resp, "content")
@@ -2935,7 +2933,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						d = d[:128] + b".." + d[-128:]
 					s = as_str(d)
 					return f'<file name="{name}">' + s + "</file>"
-				d = await process_image(d, "resize_max", [dimlim, False, "auto", "-bg", "-oz", "-fs", lim], timeout=timeout, retries=1)
+				d = await process_image(d, "resize_max", [dimlim, False, "auto", "-bg", "-oz", "-fs", lim, "-f", "jpg"], timeout=timeout, retries=1)
 		else:
 			d = url
 		mime = magic.from_buffer(d)
@@ -3100,7 +3098,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		urls = await self.renew_attachments(find_urls_ex(message.content))
 		for url in urls:
 			if is_discord_attachment(url) and not discord_expired(url) or self.is_webserver_url(url):
-				resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True, timeout=30)
+				resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True, timeout=30, allow_redirects=True)
 				url = resp.headers.get("Location") or resp.url
 				if is_discord_attachment(url):
 					uid = url.rsplit("/", 2)[-2]
@@ -3248,7 +3246,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				data = await Request(url, timeout=18, aio=True, ssl=False)
 				await self.add_attachment(cdict(id=a_id), data=data)
 				return data
-			return await asubmit(reqs.next().get, url, stream=True, _timeout_=30)
+			return await asubmit(reqs.next().get, url, stream=True, _timeout_=30, allow_redirects=True)
 		return
 
 	async def get_request(self, url, limit=None, full=True, timeout=12):
@@ -3259,7 +3257,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if data is not None:
 			return data
 		if not full:
-			return await asubmit(reqs.next().get, url, headers=Request.header(), stream=True, _timeout_=30)
+			if is_discord_url(url):
+				try:
+					return await asubmit(reqs.next().get, url, headers=Request.header(), stream=True, _timeout_=3, allow_redirects=True)
+				except Exception:
+					print_exc()
+			return await asubmit(reqs.next().get, url, headers=Request.header(), stream=True, _timeout_=timeout, verify=False, allow_redirects=True)
+		if is_discord_url(url):
+			try:
+				return await Request(url, timeout=3, aio=True, ssl=True)
+			except Exception:
+				print_exc()
 		return await Request(url, timeout=timeout, aio=True, ssl=False)
 
 	async def get_file(self, url, limit=None, full=True, timeout=12):
@@ -3305,7 +3313,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if urls:
 				with tracebacksuppressor:
 					url = urls[0]
-					resp = await asubmit(reqs.next().head, url, headers=Request.header(), _timeout_=12)
+					resp = await asubmit(reqs.next().head, url, headers=Request.header(), _timeout_=12, allow_redirects=True)
 					headers = fcdict(resp.headers)
 					if headers.get("Content-Type", "").split("/", 1)[0] == "image":
 						if float(headers.get("Content-Length", inf)) < CACHE_FILESIZE:
@@ -4831,7 +4839,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def handle_update(self, force=False):
 		"Handles all updates to the bot. Manages the bot's status and activity on discord, and updates all databases."
 		sem = self.update_semaphore if not force else emptyctx
-		if sem.busy and not force:
+		if T(sem).get("busy") and not force:
 			return
 		async with sem:
 			if self.bot_ready:

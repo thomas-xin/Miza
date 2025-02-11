@@ -1071,6 +1071,7 @@ VIDEO_FORMS = {
 	"mpeg": True,
 	"mpv": True,
 	"m3u8": True,
+	"tar": False,
 	"zip": False,
 }
 def is_video(url):
@@ -1141,6 +1142,7 @@ VISUAL_FORMS = {
 	"mpv": True,
 	"m3u8": True,
 	"zip": False,
+	"tar": False,
 }
 MEDIA_FORMS = IMAGE_FORMS.copy()
 MEDIA_FORMS.update(VIDEO_FORMS)
@@ -1203,6 +1205,7 @@ MIMES = cdict(
 	flac="audio/flac",
 	wav="audio/x-wav",
 	mp4="video/mp4",
+	tar="application/tar",
 	zip="application/zip",
 )
 
@@ -1246,7 +1249,7 @@ special_mimes = {
 	"php": "x-httpd-php",
 	"rar": "vnd.rar",
 	"svg": "svg+xml",
-	"tar": "x-tar",
+	"tar": "tar",
 	"qt": "quicktime",
 	"ts": "mp2t",
 	"txt": "plain",
@@ -1800,7 +1803,7 @@ def maybe_json(d):
 	try:
 		return json.dumps(d, cls=MultiEncoder).encode("ascii")
 	except TypeError:
-		return json_dumps(repr(d))
+		return json_dumps(repr(d)).encode("ascii")
 
 def json_if(s):
 	if isinstance(s, str) and len(s.split(None, 1)) > 1:
@@ -3392,6 +3395,9 @@ def evalex(exc, glob=None, loc=None):
 			s = ast.literal_eval(s)
 		s = lim_str(s, 4096)
 		ex = RuntimeError(s)
+	if isinstance(ex, tuple):
+		print(ex[1])
+		ex = ex[0]
 	return ex
 
 # Evaluates an an expression, raising it if it is an exception.
@@ -4164,9 +4170,9 @@ class EvalPipe:
 		try:
 			resp = aexec(s, self.glob)
 		except BaseException as ex:
-			print_exc()
+			# print_exc()
 			s = maybe_json(ex)
-			b = f"<~{i}:!:".encode("ascii") + s
+			b = f"<~{i}:!:".encode("ascii") + b"(" + s + f",RuntimeError({repr(format_exc())}))".encode("utf-8")
 			self.send(b)
 			return
 		if isinstance(resp, collections.abc.AsyncIterator):

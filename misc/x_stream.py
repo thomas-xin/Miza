@@ -583,8 +583,10 @@ class Server:
 				return False
 			if "Cf-Worker" in cp.request.headers:
 				return True
+			if cp.request.headers.get("Sec-Fetch-Dest", "").casefold() == "document" and url.split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[-1] not in ("png", "gif", "webp", "jpg", "jpeg"):
+				return True
 			if (mode := cp.request.headers.get("Sec-Fetch-Mode")):
-				return mode.casefold() != "cors"
+				return mode.casefold() not in ("cors", "navigate") or cp.request.headers.get("Sec-Fetch-Site", "").casefold() not in ("none", "cross-site")
 			if cp.request.headers.get("Referer"):
 				return True
 			return False

@@ -629,7 +629,7 @@ class Instruct(Command):
 		model=cdict(
 			type="enum",
 			validation=cdict(
-				enum=["auto", "deepseek-r1", "deepseek-v3", "gpt-3.5", "gpt-4", "gpt-4m", "o1-mini", "o1-preview", "mythomax-13b", "lzlv-70b", "mixtral-8x7b-instruct", "claude-3-opus", "claude-3.5-sonnet", "claude-3-sonnet", "claude-3-haiku", "command-r", "command-r-plus", "35b-beta-long", "qwen-72b", "dbrx-instruct", "mixtral-8x22b-instruct", "wizard-8x22b", "llama-3-8b", "llama-3-70b", "llama-3-405b"],
+				enum=["auto", "deepseek-r1", "deepseek-v3", "gpt-3.5", "gpt-4", "gpt-4m", "o1-mini", "o1-preview", "o3-mini", "o1", "mythomax-13b", "lzlv-70b", "mixtral-8x7b-instruct", "claude-3-opus", "claude-3.5-sonnet", "claude-3-sonnet", "claude-3-haiku", "command-r", "command-r-plus", "35b-beta-long", "qwen-72b", "dbrx-instruct", "mixtral-8x22b-instruct", "wizard-8x22b", "llama-3-8b", "llama-3-70b", "llama-3-405b"],
 				accepts={"llama": "llama-3-70b", "haiku": "claude-3-haiku", "r1": "deepseek-r1", "deepseek": "deepseek-v3", "gpt3.5": "gpt-3.5", "sonnet": "claude-3.5-sonnet", "dbrx": "dbrx-instruct", "gpt4": "gpt-4", "gpt-4o": "gpt-4", "gpt-4o-mini": "gpt-4m", "opus": "claude-3-opus"},
 			),
 			description="Target LLM to invoke",
@@ -680,6 +680,9 @@ class Instruct(Command):
 		),
 		O1M=cdict(
 			model="o1-mini",
+		),
+		O3M=cdict(
+			model="o3-mini",
 		),
 		GPT4=cdict(
 			model="gpt-4",
@@ -773,7 +776,7 @@ class Instruct(Command):
 				_premium.require(2)
 			elif model in ("dbrx-instruct", "gpt-3.5", "deepseek-v3", "gpt-4m", "lzlv-70b", "llama-3-70b"):
 				_premium.require(1)
-		if model in ("deepseek-r1", "o1", "o1-preview", "o1-mini"):
+		if model in ("deepseek-r1", "o1", "o1-preview", "o1-mini", "o3", "o3-mini"):
 			kwargs["max_completion_tokens"] = max_tokens + 16384
 		else:
 			kwargs["max_tokens"] = max_tokens

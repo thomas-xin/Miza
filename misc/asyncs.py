@@ -428,22 +428,7 @@ def trace(fut, *args):
 def throw(exc):
 	raise exc
 
-
-class EmptyContext(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
-	"An empty context manager that has no effect. Serves as compatibility with dynamically replaceable contexts."
-	def __enter__(self, *args):
-		return self
-	def __exit__(*args):
-		pass
-	def __aenter__(self, *args):
-		return as_fut(self)
-	def __aexit__(*args):
-		return emptyfut
-	def __call__(self, *args):
-		return self
-	busy = False
-	active = False
-emptyctx = EmptyContext()
+emptyctx = contextlib.nullcontext()
 
 class CloseableAsyncIterator:
 

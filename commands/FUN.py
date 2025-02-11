@@ -2198,15 +2198,13 @@ class UpdateDogpiles(Database):
 				prediction = pred
 			else:
 				break
-		if random.random() >= 3 / (count + 0.5):
+		if random.random() >= 3 / (count + 0.5) and prediction:
 			if random.random() < 1 / 4096:
 				content = "https://cdn.discordapp.com/attachments/321524006316539904/843707932989587476/secretsmall.gif"
 				csubmit(message.add_reaction("💎"))
 				self.bot.data.users.add_diamonds(message.author, 1000)
 			else:
 				content = prediction
-			if not content:
-				return
 			print("DOGPILE:", message.guild, message.channel, hist, content)
 			if content[0].isascii() and content[:2] != "<:" and not is_url(content):
 				content = lim_str("\u200b" + content, 2000)

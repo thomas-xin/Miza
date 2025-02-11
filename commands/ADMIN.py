@@ -1983,7 +1983,7 @@ class ServerProtector(Database):
 							software_agent = software_agent["softwareAgent"]
 						except LookupError:
 							software_agent = None
-						if issuer in ("Miza", "OpenAI", "StabilityAI") or software_agent == ("Adobe Firefly", "DALL·E", "Bing Image Creator"):
+						if issuer in ("Miza", "OpenAI", "StabilityAI") or software_agent in ("Adobe Firefly", "DALL·E", "Bing Image Creator"):
 							return True
 					if str(data.get("issuer_id") or data.get("copyright")) == str(self.bot.id) or data.get("type") == "AI_GENERATED":
 						return True

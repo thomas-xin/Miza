@@ -9,10 +9,10 @@ import os
 import random
 import re
 import subprocess
+import tarfile
 import time
 from traceback import print_exc
 import zipfile
-import blend_modes
 import cv2
 import filetype
 import numpy as np
@@ -222,7 +222,10 @@ class ImageSequence(Image.Image):
 							self.close()
 						break
 			im = self._images[self._position]
-			if not im.im:
+			try:
+				if not im.im:
+					raise ValueError
+			except Exception:
 				im.load()
 			return getattr(im, key)
 
@@ -279,8 +282,12 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 	except ImportError:
 		pass
 	mime = magic.from_buffer(data)
-	if mime == "application/zip":
-		z = zipfile.ZipFile(io.BytesIO(data), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False)
+	if mime == "application/tar":
+		z = tarfile.TarFile(io.BytesIO(data), strict_timestamps=False)
+		filenames = [f.filename for f in z.filelist if not f.is_dir()]
+		return ImageSequence.fromiter((Image.open(z.open(fn)) for fn in filenames), frameprops=(len(filenames), len(filenames) / 30, 30))
+	elif mime == "application/zip":
+		z = zipfile.ZipFile(io.BytesIO(data), strict_timestamps=False)
 		filenames = [f.filename for f in z.filelist if not f.is_dir()]
 		return ImageSequence.fromiter((Image.open(z.open(fn)) for fn in filenames), frameprops=(len(filenames), len(filenames) / 30, 30))
 	try:
@@ -670,7 +677,7 @@ def get_request(url, return_headers=False):
 					with open(f"{fcache}/attachments/{fn}", "rb") as f:
 						print(f"Attachment {a_id} loaded from cache.")
 						return f.read()
-	with requests.get(url, headers=header(), stream=True, verify=False, timeout=12) as resp:
+	with requests.get(url, headers=header(), stream=True, verify=False, timeout=12, allow_redirects=True) as resp:
 		if return_headers:
 			return resp.content, resp.headers
 		return resp.content
@@ -1376,7 +1383,7 @@ def rainbow_map(images, mode, progress=0, **kwargs):
 @sync_animations
 def pet_map(images, squeeze, progress=0, **kwargs):
 	image = images[0]
-	pet = get_image("https://mizabot.xyz/u/2omMy8VUGJ5GOH3AIJxw3wJ5yQrU/EBjYrqCEUDw.zip", cache=True)
+	pet = get_image("https://api.mizabot.xyz/u/2omMy8VUGJ5GOH3AIJxw3wJ5yQrU/EBjYrqCEUDw.zip", cache=True)
 	w, h = image.width * 2.5, image.height * 2.5
 	if w < 256 and h < 256:
 		w, h = max_size(w, h, 256, force=True)

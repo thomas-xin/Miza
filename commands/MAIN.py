@@ -1146,7 +1146,7 @@ class Reminder(Command):
 			if not len(rems):
 				return ini_md(f"No {mode}s currently set for {sqr_md(sendable)}.")
 			targets = RangeSet.parse([remove], len(rems))
-			assert targets, "Please input valid indices."
+			assert targets, "No reminders at the specified index."
 			removed = (r := rems[targets[0]]).msg + "; " + DynamicDT.utcfromtimestamp(r.t).as_full()
 			if len(targets) > 1:
 				removed += f" (+{len(targets) - 1})"

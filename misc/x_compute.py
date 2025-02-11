@@ -1440,8 +1440,18 @@ def evalImg(url, operation, args):
 			mode = str(first.mode)
 			if mode == "P":
 				raise RuntimeError("Unexpected P mode image")
+			archive = False
 			if fmt == "zip":
+				import zipfile
 				resp = zipfile.ZipFile(out, "w", compression=zipfile.ZIP_STORED, allowZip64=True)
+				archive = resp.writestr
+			elif fmt == "tar":
+				import tarfile
+				resp = tarfile.TarFile(out, "w")
+				def archive(fn, data):
+					tarinfo = tarfile.TarInfo(name=fn)
+					tarinfo.size = len(data)
+					return resp.addfile(tarinfo, io.BytesIO(data))
 			else:
 				command = ["ffmpeg", "-nostdin", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel]
 				if hwaccel == "cuda":
@@ -1483,19 +1493,19 @@ def evalImg(url, operation, args):
 							i2 = gen_bg(size)
 							i3 = Image.alpha_composite(i2, frame)
 							frame = i3.convert("RGB")
-						if fmt == "zip":
+						if archive:
 							b = save_into(frame, frame.size, cdc, inf)
 						else:
 							b = np.asanyarray(frame, dtype=np.uint8).data
 					elif type(frame) is io.BytesIO:
 						frame.seek(0)
-						if fmt == "zip":
+						if archive:
 							with Image.open(frame) as im:
 								b = save_into(im, im.size, cdc, inf)
 						else:
 							b = frame.read()
 					else:
-						if fmt == "zip":
+						if archive:
 							with Image.open(io.BytesIO(frame)) as im:
 								b = save_into(im, im.size, cdc, inf)
 						else:
@@ -1508,18 +1518,18 @@ def evalImg(url, operation, args):
 				futs.append(exc.submit(save_frame, i, frame))
 			for i, fut in enumerate(futs):
 				b = fut.result()
-				if fmt == "zip":
+				if archive:
 					n = ceil(log10(new["count"]))
 					s = f"%0{n}d" % i
-					resp.writestr(f"{s}.{cdc}", data=b)
+					archive(f"{s}.{cdc}", data=b)
 				else:
 					proc.stdin.write(b)
-			if fmt == "zip":
+			if archive:
 				resp.close()
 			else:
 				proc.stdin.close()
 				proc.wait()
-			if fmt != "zip":
+			if not archive:
 				if fmt == "gif" and "A" not in mode and first.width * first.height * new["count"] <= 67108864 and os.path.getsize(out) < fs * 3:
 					out = gifsicle(out, new)
 				new["mode"] = mode
