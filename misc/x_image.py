@@ -485,7 +485,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 					background_color.resource,
 				)
 			try:
-				img.read(blob=b, resolution=1024, width=width, height=height)
+				img.read(blob=b, resolution=1024)
 			except Exception as ex:
 				exc.args = exc.args + (str(ex.__class__),) + ex.args
 			else:
