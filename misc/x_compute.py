@@ -1056,10 +1056,10 @@ def write_video(proc, data):
 			proc.stdin.write(data[i:i + 65536])
 			i += 65536
 		proc.stdin.close()
-	except:
+	except Exception:
 		print(traceback.format_exc(), end="")
 
-def gifsicle(out, info=None):
+def gifsicle(out, info=None, heavy=False):
 	if os.name == "nt":
 		if not os.path.exists("misc/gifsicle.exe") or os.path.getsize("misc/gifsicle.exe") < 4096:
 			with requests.get("https://mizabot.xyz/u/EN8_fQ2CAKs.exe") as resp:
@@ -1078,9 +1078,11 @@ def gifsicle(out, info=None):
 	else:
 		out2 = out + "~2"
 	args = ["misc/gifsicle"]
-	if info and info["count"] >= 256:
-		args.append("-O3")
-	args.extend(("--loopcount=forever", "--lossy=100", "-o", out2, out))
+	if heavy:
+		args.extend(("-O3", "--lossy=100", "--colors=64"))
+	else:
+		args.extend(("-O3", "--lossy=90"))
+	args.extend(("--dither", "--careful", "--loopcount=forever", "-o", out2, out))
 	print(args)
 	try:
 		subprocess.run(args, timeout=90)
@@ -1150,14 +1152,14 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 		if (w, h) != first.size:
 			vf += f"scale={w}:{h}:flags=area"
 			if mode == "RGBA":
-				vf += "format=rgba,"
+				vf += "format=rgba"
 		bitrate = floor(min(fs / duration * 1000 * 7.5, 99999999)) # use 7.5 bits per byte
 		pix = "rgb24" if lossless else "yuv420p"
 		if mode == "RGBA":
 			cv = ("-c:v:0", "libsvtav1", "-pix_fmt:v:0", "yuv420p") if not h & 1 and not w & 1 else ("-c:v:0", "libaom-av1", "-pix_fmt:v:0", pix, "-usage", "realtime", "-cpu-used", "3")
 			b1 = floor(bitrate * 3 / 4)
 			b2 = floor(bitrate / 4)
-			command.extend(("-filter_complex", vf + "[scaled];" + "[scaled]split=2[v1][v2];[v2]alphaextract[v2]", "-map", "[v1]", "-map", "[v2]", "-f", "avif", *cv, "-b:v:0", str(b1), "-c:v:1", "libaom-av1", "-pix_fmt:1", "gray", "-b:v:1", str(b2), "-usage", "realtime", "-cpu-used", "3", "-y", "-g", "300"))
+			command.extend(("-filter_complex", vf + "[0]split=2[v1][v2];[v2]alphaextract[v2]", "-map", "[v1]", "-map", "[v2]", "-f", "avif", *cv, "-b:v:0", str(b1), "-c:v:1", "libaom-av1", "-pix_fmt:1", "gray", "-b:v:1", str(b2), "-usage", "realtime", "-cpu-used", "3", "-y", "-g", "300"))
 		else:
 			if vf:
 				command.extend(("-vf", vf))
@@ -1309,7 +1311,7 @@ def anim_into(out, new, first, size, fmt, fs, r=0):
 	assert os.path.exists(out2), f"Expected output file {out2}"
 	print(os.path.getsize(out2), fs, np.prod(size) * new["count"])
 	if (fs >= 1048576 or "A" not in mode) and np.prod(size) * new["count"] <= 67108864 and os.path.getsize(out2) < fs * 3:
-		out = gifsicle(out2, new)
+		out = gifsicle(out2, new, heavy=os.path.getsize(out2) > fs * 1.5)
 	else:
 		out = out2
 	with open(out, "rb") as f:
@@ -1534,7 +1536,7 @@ def evalImg(url, operation, args):
 			if not archive:
 				print(os.path.getsize(out), fs, np.prod(size) * new["count"])
 				if fmt == "gif" and (fs >= 1048576 or "A" not in mode) and first.width * first.height * new["count"] <= 67108864 and os.path.getsize(out) < fs * 3:
-					out = gifsicle(out, new)
+					out = gifsicle(out, new, heavy=os.path.getsize(out) > fs * 1.5)
 				new["mode"] = mode
 				new["frames"] = frames
 				orig = out
