@@ -1549,7 +1549,9 @@
 				"Rescale",
 				"Scale2x",
 				"Jumbo",
-				"GIF"
+				"GIF",
+				"WebP",
+				"AVIF"
 			],
 			"description": "Changes size of supplied image, using an optional scaling operation.",
 			"usage": "",

@@ -311,7 +311,7 @@ class AudioPlayer(discord.AudioSource):
 	@classmethod
 	async def force_disconnect(cls, guild):
 		"""Forcibly disconnects the bot from a voice channel, regardless of the current state of discord.py's cache."""
-		return await Request(
+		resp = await Request(
 			f"https://discord.com/api/{api}/guilds/{guild.id}/members/{client.user.id}",
 			method="PATCH",
 			authorise=True,
@@ -327,6 +327,8 @@ class AudioPlayer(discord.AudioSource):
 				print_exc()
 		if vc and vc.socket:
 			vc.socket.close()
+		client._connection._remove_voice_client(guild.id)
+		return resp
 
 	@classmethod
 	def from_guild(cls, guild):

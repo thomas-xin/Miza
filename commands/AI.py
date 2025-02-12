@@ -298,7 +298,7 @@ class Ask(Command):
 								res = "[RESPONSE EMPTY OR REDACTED]"
 						if succ and isinstance(res, bytes):
 							# bytes indicates an image, use GPT-4 to describe it
-							res = await bot.gpt4v(url=res, premium_context=premium)
+							res = await bot.vision(url=res, premium_context=premium)
 						elif succ and isinstance(res, dict):
 							res = res.get("content", "")
 						elif succ:

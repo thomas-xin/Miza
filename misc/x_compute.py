@@ -1524,7 +1524,8 @@ def evalImg(url, operation, args):
 							b = save_into(im, im.size, cdc, inf)
 						else:
 							b = frame
-					real_frames.append(frame)
+					if not real_frames or fmt in ("gif", "webp", "apng", "avif"):
+						real_frames.append(frame)
 					return b
 				workers = [fut for fut in futs if not fut.done()]
 				if len(workers) >= 12:

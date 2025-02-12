@@ -896,7 +896,7 @@ def optimise(im, keep_rgb=True, recurse=True, max_frames=60):
 		except StopIteration:
 			return []
 		i0 = optimise(i0, keep_rgb=keep_rgb, recurse=False)
-		out = [i0]
+		out = []
 		orig = []
 		mode = i0.mode
 		changed = False
@@ -912,6 +912,7 @@ def optimise(im, keep_rgb=True, recurse=True, max_frames=60):
 				if i2.mode != mode:
 					return [im.convert(i2.mode) for im in resume(i0, orig, it)]
 			out.append(i2)
+		out.insert(0, i0)
 		return out
 	if isinstance(im, dict):
 		raise TypeError(im)
