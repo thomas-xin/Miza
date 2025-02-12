@@ -1035,6 +1035,12 @@ class Resize(Command):
 		GIF=cdict(
 			format="gif",
 		),
+		WebP=cdict(
+			format="webp",
+		),
+		AVIF=cdict(
+			format="avif",
+		),
 	)
 	rate_limit = (8, 13)
 	_timeout_ = 4

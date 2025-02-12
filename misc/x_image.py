@@ -903,7 +903,7 @@ def optimise(im, keep_rgb=True, recurse=True, max_frames=60):
 		for i, i2 in enumerate(it):
 			if i >= max_frames and not changed:
 				print("Unchanged:", mode, i0, i2)
-				return resume(i0, out, it)
+				return resume(i0, out, [i2], it)
 			orig.append(i2)
 			if i2.mode != mode:
 				changed = True
