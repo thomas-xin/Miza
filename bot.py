@@ -6582,14 +6582,28 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				alt_token=AUTH.get("alt_token") or self.token,
 			))
 			encoded = base64.b64encode(encrypt(data)).rstrip(b"=").decode("ascii")
-			fut = csubmit(Request(
-				f"https://{addr}/heartbeat?key={url_parse(key)}&uri={url_parse(uri)}",
-				method="POST",
-				headers={"content-type": "application/json"},
-				data=orjson.dumps(dict(data=encoded)),
-				aio=True,
-				ssl=False,
-			))
+			async def external_heartbeat():
+				try:
+					return await Request(
+						f"https://{addr}/heartbeat?key={url_parse(key)}&uri={url_parse(uri)}",
+						method="POST",
+						headers={"content-type": "application/json"},
+						data=orjson.dumps(dict(data=encoded)),
+						aio=True,
+						timeout=5,
+					)
+				except Exception:
+					print_exc()
+					return await Request(
+						f"https://{addr}/heartbeat?key={url_parse(key)}&uri={url_parse(uri)}",
+						method="POST",
+						headers={"content-type": "application/json"},
+						data=orjson.dumps(dict(data=encoded)),
+						aio=True,
+						ssl=False,
+						timeout=10,
+					)
+			fut = csubmit(external_heartbeat())
 			futs.append(fut)
 		await gather(*futs)
 		return futs

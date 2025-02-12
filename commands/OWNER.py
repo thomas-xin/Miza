@@ -250,6 +250,7 @@ class Exec(Command):
 		proxy=16,
 		shell=32,
 		chat=64,
+		lfproxy=128,
 	))
 	schema = cdict(
 		mode=cdict(
