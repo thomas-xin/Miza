@@ -177,7 +177,7 @@ class Server:
 	<meta charset="utf-8"/><link rel="icon" href="/logo256.png"/><meta charset="utf-8"><meta name="author" content="Miza"><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#694777"/><link rel="apple-touch-icon" href="/logo256.png"/><link rel="manifest" href="/manifest.json"/>""" + meta
 			t = f'<title>{a2}</title><meta name="description" content="{description}"/>'
 			data = s.encode("utf-8") + t.encode("utf-8") + data[i:]
-		update_headers(cp.response.headers.update, **CHEADERS)
+		update_headers(cp.response.headers, **CHEADERS)
 		cp.response.headers["Content-Type"] = mime
 		cp.response.headers["Content-Length"] = len(data)
 		return data
@@ -320,7 +320,7 @@ class Server:
 		headers.pop("Remote-Addr", None)
 		headers.pop("Host", None)
 		headers.pop("Range", None)
-		update_headers(headers.update, **Request.header())
+		update_headers(headers, **Request.header())
 		ranges = []
 		length = 0
 		if brange:
