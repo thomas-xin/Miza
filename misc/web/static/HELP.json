@@ -1470,7 +1470,7 @@
 				"Rainbow",
 				"Gay"
 			],
-			"description": "Creates a .gif image from repeatedly hueshifting supplied image.",
+			"description": "Creates an animation from repeatedly hueshifting supplied image.",
 			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 13)",
@@ -1482,7 +1482,7 @@
 				"Scroll",
 				"Parallax"
 			],
-			"description": "Creates a .gif image from repeatedly shifting supplied image in a specified direction.",
+			"description": "Creates an animation from repeatedly shifting supplied image in a specified direction.",
 			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 13)",

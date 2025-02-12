@@ -108,6 +108,7 @@ class Purge(Command):
 			example="1162630678890950746:1215499763089408030",
 		),
 	)
+	no_cancel = True
 	rate_limit = (7, 12)
 	multi = True
 	slash = True

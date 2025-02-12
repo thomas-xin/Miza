@@ -1185,7 +1185,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			command.extend(("-c:v", "libwebp_anim" if anim else "libwebp", "-pix_fmt", pix, "-pred", "mixed"))
 		else:
 			command.extend(("-c:v", "libwebp_anim" if anim else "libwebp", "-pix_fmt", pix, "-pred", "mixed"))
-		command.extend(("-f", "webp", "-compression_level", "6"))
+		command.extend(("-f", "webp", "-compression_level", "5"))
 		if anim:
 			command.extend(("-loop", "0", "-q:v", "24"))
 		elif lossless:
@@ -1200,9 +1200,9 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 				vf += "format=rgba"
 			command.extend(("-vf", vf))
 		if mode == "RGBA":
-			command.extend(("-c:v", "png", "-pix_fmt", "rgba", "-pred", "mixed", "-compression_level", "6"))
+			command.extend(("-c:v", "png", "-pix_fmt", "rgba", "-pred", "mixed", "-compression_level", "5"))
 		else:
-			command.extend(("-c:v", "png", "-pix_fmt", "rgb24", "-pred", "mixed", "-compression_level", "6"))
+			command.extend(("-c:v", "png", "-pix_fmt", "rgb24", "-pred", "mixed", "-compression_level", "5"))
 		command.extend(("-f", "image2pipe"))
 	elif fmt == "jpg":
 		command.extend(("-vframes", "1"))
@@ -1297,8 +1297,12 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 
 def anim_into(out, new, first, size, fmt, fs, r=0):
 	assert size[0] and size[1], f"Expected non-zero size, got {size}"
-	command = ["ffmpeg", "-nostdin", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel, "-i", out]
+	command = ["ffmpeg", "-nostdin", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel]
 	mode = new["mode"]
+	command.extend((
+		"-f", "rawvideo", "-framerate", str(new["fps"]), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
+		"-video_size", "x".join(map(str, first.size)), "-i", "-",
+	))
 	opts, fmt = ffmpeg_opts(new, new["frames"], new["count"], mode, first, fmt, fs, *size, new["duration"], True)
 	command.extend(opts)
 	if "." in out:
@@ -1307,10 +1311,15 @@ def anim_into(out, new, first, size, fmt, fs, r=0):
 		out2 = out + "~2"
 	command.append(out2)
 	print(command)
-	subprocess.run(command, timeout=240)
+	proc = psutil.Popen(command, stdin=subprocess.PIPE)
+	for frame in new["frames"]:
+		b = np.asanyarray(frame, dtype=np.uint8).data
+		proc.stdin.write(b)
+	proc.stdin.close()
+	proc.wait()
 	assert os.path.exists(out2), f"Expected output file {out2}"
 	print(os.path.getsize(out2), fs, np.prod(size) * new["count"])
-	if (fs >= 1048576 or "A" not in mode) and np.prod(size) * new["count"] <= 67108864 and os.path.getsize(out2) < fs * 3:
+	if fmt == "gif" and (fs >= 1048576 or "A" not in mode) and np.prod(size) * new["count"] <= 67108864 and os.path.getsize(out2) < fs * 3:
 		out = gifsicle(out2, new, heavy=os.path.getsize(out2) > fs * 1.5)
 	else:
 		out = out2
@@ -1422,6 +1431,12 @@ def evalImg(url, operation, args):
 				fmt, cdc = "zip", fmt
 			print("DURATION:", duration, new["count"])
 			fps = 1000 * new["count"] / duration
+			if round(fps, 2) == round(fps):
+				fps = round(fps)
+			else:
+				fps = round(fps, 4)
+			new["fps"] = fps
+			real_frames = []
 			if issubclass(type(frames), collections.abc.Sequence):
 				first = frames[0]
 			else:
@@ -1438,7 +1453,7 @@ def evalImg(url, operation, args):
 					fmt = "mp4"
 					cdc = "libsvtav1"
 				else:
-					fmt = "gif"
+					fmt = "webp"
 			out = "cache/" + str(ts) + "." + CODECS.get(fmt, fmt)
 			mode = str(first.mode)
 			if mode == "P":
@@ -1463,14 +1478,10 @@ def evalImg(url, operation, args):
 							devid = random.choice([i for i, c in enumerate(COMPUTE_CAPS) if c >= [8, 9]])
 						except IndexError:
 							devid = random.randint(0, len(COMPUTE_CAPS))
-							fmt = "gif"
+							fmt = "webp"
 					else:
 						devid = random.randint(0, ceil(len(COMPUTE_CAPS) / 2))
 					command.extend(("-hwaccel_device", str(devid)))
-				if round(fps, 2) == round(fps):
-					fps = round(fps)
-				else:
-					fps = round(fps, 4)
 				command.extend([
 					"-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
 					"-video_size", "x".join(map(str, size)), "-i", "-",
@@ -1502,17 +1513,18 @@ def evalImg(url, operation, args):
 							b = np.asanyarray(frame, dtype=np.uint8).data
 					elif type(frame) is io.BytesIO:
 						frame.seek(0)
+						im = Image.open(frame)
 						if archive:
-							with Image.open(frame) as im:
-								b = save_into(im, im.size, cdc, inf)
+							b = save_into(im, im.size, cdc, inf)
 						else:
 							b = frame.read()
 					else:
+						im = Image.open(io.BytesIO(frame))
 						if archive:
-							with Image.open(io.BytesIO(frame)) as im:
-								b = save_into(im, im.size, cdc, inf)
+							b = save_into(im, im.size, cdc, inf)
 						else:
 							b = frame
+					real_frames.append(frame)
 					return b
 				workers = [fut for fut in futs if not fut.done()]
 				if len(workers) >= 12:
@@ -1538,7 +1550,8 @@ def evalImg(url, operation, args):
 				if fmt == "gif" and (fs >= 1048576 or "A" not in mode) and first.width * first.height * new["count"] <= 67108864 and os.path.getsize(out) < fs * 3:
 					out = gifsicle(out, new, heavy=os.path.getsize(out) > fs * 1.5)
 				new["mode"] = mode
-				new["frames"] = frames
+				new["frames"] = real_frames
+				print("LEN:", len(real_frames))
 				orig = out
 				with open(orig, "rb") as f:
 					out = f.read()

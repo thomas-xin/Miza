@@ -500,7 +500,7 @@ class QR(Command):
 
 class Rainbow(Command):
 	name = ["Gay"]
-	description = "Creates a .gif image from repeatedly hueshifting supplied image."
+	description = "Creates an animation from repeatedly hueshifting supplied image."
 	schema = cdict(
 		url=cdict(
 			type="visual",
@@ -571,7 +571,7 @@ class Rainbow(Command):
 
 class Scroll(Command):
 	name = ["Parallax"]
-	description = "Creates a .gif image from repeatedly shifting supplied image in a specified direction."
+	description = "Creates an animation from repeatedly shifting supplied image in a specified direction."
 	schema = cdict(
 		url=cdict(
 			type="visual",
@@ -875,7 +875,7 @@ class Tesseract(Command):
 			validation="[64, 1024]",
 			description="Maximum and minimum stretch factor",
 			example="256",
-			default=256,
+			default=512,
 		),
 		duration=cdict(
 			type="timedelta",

@@ -3644,7 +3644,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			m_id = int(message)
 		if "deleted" not in self.data:
 			return False
-		return self.data.deleted.cache.get(m_id, False)
+		try:
+			return self.data.deleted.cache[m_id]
+		except KeyError:
+			return False
 
 	async def verify_integrity(self, message):
 		if self.is_deleted(message):
@@ -5448,10 +5451,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				**kwargs,						# Keyword arguments for schema-specified commands
 				timeout=timeout and timeout + 1,# timeout delay for the whole function
 			)
-			try:
-				message.__dict__.setdefault("inits", []).append(future)
-			except Exception:
-				pass
+			if not T(command).get("no_cancel"):
+				try:
+					message.__dict__.setdefault("inits", []).append(future)
+				except Exception:
+					pass
 			self.data.usage.add(command)
 			# Add a callback to typing in the channel if the command takes too long
 			if fut is None and not hasattr(command, "typing") and channel and not getattr(message, "simulated", False):
@@ -8393,7 +8397,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 		async def _on_raw_message_delete(payload):
 			if "deleted" in self.data:
-				self.data.deleted.cache[payload.message_id] = max(1, self.data.deleted.cache.get(payload.message_id, 0))
+				self.data.deleted.cache[payload.message_id] = max(1, self.is_deleted(payload.message_id))
 			try:
 				message = payload.cached_message
 				if not message:

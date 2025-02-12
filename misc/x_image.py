@@ -34,6 +34,7 @@ Transpose = getattr(Image, "Transpose", Image)
 Transform = getattr(Image, "Transform", Image)
 Image.MAX_IMAGE_PIXELS = 4294967296
 GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_DIFFERENT_PALETTE_ONLY
+from misc.util import get_image_size  # noqa: E402
 
 DC = 0
 torch = None
@@ -484,16 +485,18 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 					background_color.resource,
 				)
 			try:
-				img.read(blob=b, resolution=1024)
+				img.read(blob=b, resolution=1024, width=width, height=height)
 			except Exception as ex:
 				exc.args = exc.args + (str(ex.__class__),) + ex.args
 			else:
 				exc = None
 			if exc:
 				raise exc
+			img.coalesce()
+			seq = wand.sequence.Sequence(img)
 			tps = img.ticks_per_second
 			frames = []
-			for frame in wand.sequence.Sequence(img):
+			for frame in seq:
 				if not frame:
 					continue
 				with wand.image.Image(frame) as fi:
@@ -505,9 +508,9 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 			if not frames:
 				with wand.image.Image(img) as fi:
 					ib = io.BytesIO(fi.make_blob("png32"))
-				im = Image.open(ib)
+				im = Image.open(ib)          
 				frames.append(im)
-				yield im
+				yield im                 
 	if fcount and dur:
 		frameprops = (fcount, dur, fcount / dur)
 		return ImageSequence.fromiter(wand_iter(), frameprops=frameprops)
