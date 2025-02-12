@@ -16,6 +16,7 @@ import urllib
 import zipfile
 import cheroot
 import cherrypy
+import niquests
 import orjson
 import psutil
 import requests
@@ -395,6 +396,7 @@ def true_ip(request=None):
 class Server:
 
 	session = requests.Session()
+	session2 = niquests.Session()
 
 	@cp.expose(("0",))
 	def rickroll(self, *void1, **void2):
@@ -430,7 +432,8 @@ class Server:
 	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
 		for i in range(retries):
 			try:
-				resp = self.session.get(url, headers=headers, data=data, verify=i == 0, timeout=timeout + i ** 2)
+				session = self.session2 if url.startswith("https://") and i == 0 else self.session
+				resp = session.get(url, headers=headers, data=data, verify=i <= 1, timeout=timeout + i ** 2)
 				resp.raise_for_status()
 			except Exception:
 				if i < retries - 1:

@@ -9,6 +9,7 @@ from traceback import print_exc
 from urllib.parse import unquote_plus
 import cherrypy as cp
 from cherrypy._cpdispatch import Dispatcher
+import niquests
 import orjson
 import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut, gather
@@ -107,6 +108,7 @@ class Server:
 	else:
 		state = {"/": f"https://api.mizabot.xyz:{webserver_port}"}
 	session = requests.Session()
+	session2 = niquests.Session()
 
 	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
 	def index(self, path=None, filename=None, *args, code=None, **kwargs):
@@ -244,7 +246,8 @@ class Server:
 	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
 		for i in range(retries):
 			try:
-				resp = self.session.get(url, headers=headers, data=data, verify=i == 0, timeout=timeout + i ** 2)
+				session = self.session2 if url.startswith("https://") and i == 0 else self.session
+				resp = session.get(url, headers=headers, data=data, verify=i <= 1, timeout=timeout + i ** 2)
 				resp.raise_for_status()
 			except Exception:
 				if i < retries - 1:
