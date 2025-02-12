@@ -677,6 +677,13 @@ def get_request(url, return_headers=False):
 					with open(f"{fcache}/attachments/{fn}", "rb") as f:
 						print(f"Attachment {a_id} loaded from cache.")
 						return f.read()
+	try:
+		with requests.get(url, headers=header(), stream=True, timeout=3, allow_redirects=True) as resp:
+			if return_headers:
+				return resp.content, resp.headers
+			return resp.content
+	except Exception:
+		print_exc()
 	with requests.get(url, headers=header(), stream=True, verify=False, timeout=12, allow_redirects=True) as resp:
 		if return_headers:
 			return resp.content, resp.headers
@@ -1277,7 +1284,7 @@ def sync_fps(props, duration=None, fps=None):
 	d = max(t[1] for t in props)
 	prog = 1
 	if duration == 0:
-		return 0, 1, 0
+		return 1, 1, 0
 	if duration and duration < 0:
 		duration = -duration
 		prog = -prog

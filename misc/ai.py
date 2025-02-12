@@ -464,7 +464,7 @@ def nsfw_flagged(resp):
 	for flag in flagged:
 		if getattr(cat, flag):
 			score = getattr(resp.category_scores, flag)
-			if score >= 0.9:
+			if score >= 0.75:
 				found.append((score, flag + f"({round(score * 100)}%)"))
 	if not found:
 		return

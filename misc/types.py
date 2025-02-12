@@ -642,6 +642,13 @@ def exclusive_set(range, *excluded):
 	return frozenset(i for i in range if i not in ex)
 
 
+def obj2range(r):
+	if isinstance(r, number):
+		return (r, r + 1)
+	if isinstance(r, (range, slice)):
+		return (r.start, r.stop)
+	return tuple(r)
+
 class RangeSet(collections.abc.Iterable):
 	"""A class representing a set of continuous ranges of integers.
 	RangeSet manages ordered collections of non-overlapping integer ranges. It supports basic set operations
@@ -670,7 +677,7 @@ class RangeSet(collections.abc.Iterable):
 
 	def __init__(self, start=0, stop=0):
 		if isinstance(start, list_like):
-			self.ranges = [((r, r + 1) if isinstance(r, number) else tuple(r)) for r in start]
+			self.ranges = list(map(obj2range, start))
 		else:
 			self.ranges = []
 			self.add(start, stop)

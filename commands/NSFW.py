@@ -316,7 +316,7 @@ class Neko(Command):
 						print("nekos.moe", len(out))
 						return out
 				if "neko" not in self.nekobot_sem:
-					self.nekobot_sem.neko = Semaphore(56, 56, rate_limit=61, last=True)
+					self.nekobot_sem.neko = Semaphore(56, 56, rate_limit=61, lifo=True)
 				if xrand(2) and not self.nekobot_sem.neko.is_busy():
 					nekobot_sem = self.nekobot_sem.neko
 					async with nekobot_sem:
@@ -324,7 +324,7 @@ class Neko(Command):
 					return data["message"]
 			if (tag in nekobot_exclusive or tag in nekobot_shared and xrand(2)):
 				if tag not in self.nekobot_sem:
-					self.nekobot_sem[tag] = Semaphore(56, 56, rate_limit=61, last=True)
+					self.nekobot_sem[tag] = Semaphore(56, 56, rate_limit=61, lifo=True)
 				nekobot_sem = self.nekobot_sem[tag]
 				if tag in ("ass", "anal", "boobs", "thigh"):
 					tag = "h" + tag

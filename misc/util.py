@@ -1793,8 +1793,14 @@ def eval_json(s):
 				pass
 		raise
 
+bidict = __builtins__
+if not isinstance(bidict, dict):
+	bidict = bidict.__dict__
 def maybe_json(d):
 	if isinstance(d, BaseException):
+		cn = d.__class__.__name__
+		if cn not in bidict:
+			return f"RuntimeError({repr(cn)},{','.join(map(repr, d.args))})".encode("utf-8")
 		return repr(d).encode("utf-8")
 	if isinstance(d, byte_like):
 		if not isinstance(d, (bytes, memoryview, bytearray)):
@@ -3397,7 +3403,7 @@ def evalex(exc, glob=None, loc=None):
 		ex = RuntimeError(s)
 	if isinstance(ex, tuple):
 		print(ex[1])
-		ex = ex[0]
+		return ex[0]
 	return ex
 
 # Evaluates an an expression, raising it if it is an exception.
@@ -4170,7 +4176,6 @@ class EvalPipe:
 		try:
 			resp = aexec(s, self.glob)
 		except BaseException as ex:
-			# print_exc()
 			s = maybe_json(ex)
 			b = f"<~{i}:!:".encode("ascii") + b"(" + s + f",RuntimeError({repr(format_exc())}))".encode("utf-8")
 			self.send(b)

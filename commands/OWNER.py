@@ -1307,9 +1307,9 @@ class UpdateEmojis(Database):
 		bot.cache.emojis[emoji.id] = emoji
 		return emoji
 
-	async def emoji_as(self, s):
+	async def emoji_as(self, s, full=False):
 		e = await self.grab(s)
-		return min_emoji(e)
+		return min_emoji(e, full=full)
 
 	async def create_progress_bar(self, length, ratio):
 		start_bar = await gather(*[self.emoji_as(f"start_bar_{i}.gif") for i in range(5)])

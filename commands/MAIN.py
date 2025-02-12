@@ -1991,7 +1991,7 @@ class UpdateUsers(Database):
 
 	def xp_to_next(self, level):
 		if isfinite(level):
-			return ceil(math.sqrt(level - 1) * 1000)
+			return ceil(sqrt(level - 1) * 1000)
 		return level
 
 	def xp_required(self, level):

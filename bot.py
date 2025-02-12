@@ -1074,11 +1074,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# This method is only called when a message is not found in the cache. This means that it is likely either out of range of cache or was produced during downtime, meaning surrounding messages may not be cached either. We preemtively fetch the surrounding messages to prepare for future requests, or requests that may involve the surrounding messages.
 		messages = await flatten(discord.abc.Messageable.history(channel, limit=101, around=cdict(id=m_id)))
 		data = {m.id: m for m in messages}
-		min_id = min(data)
+		min_id = min(data, default=m_id)
 		if min_id != m_id:
 			left = await flatten(discord.abc.Messageable.history(channel, limit=100, before=cdict(id=min_id)))
 			data.update({m.id: m for m in left})
-		max_id = max(data)
+		max_id = max(data, default=m_id)
 		if max_id != m_id:
 			right = await flatten(discord.abc.Messageable.history(channel, limit=100, after=cdict(id=max_id)))
 			data.update({m.id: m for m in right})
@@ -1876,13 +1876,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return
 		return True
 
-	async def min_emoji(self, e):
+	async def min_emoji(self, e, full=False):
 		animated = await asubmit(self.is_animated, e, verify=True)
 		if animated is None:
 			raise LookupError(f"Emoji {e} does not exist.")
 		if type(e) in (int, str):
 			e = cdict(id=e, animated=animated)
-		return min_emoji(e)
+		return min_emoji(e, full=full)
 
 	async def optimise_image(self, image, fsize=CACHE_FILESIZE, msize=None, fmt="auto", duration=None, anim=True, timeout=3600):
 		"Optimises the target image or video file to fit within the \"fsize\" size, or \"msize\" resolution. Optional format and duration parameters."
@@ -4651,7 +4651,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if diamonds:
 			out.append(f"💎 {diamonds}")
 		if gold:
-			coin = await self.data.emojis.emoji_as("miza_coin.gif")
+			coin = await self.data.emojis.emoji_as("miza_coin.gif", full=True)
 			out.append(f"{coin} {gold}")
 		if out:
 			return " ".join(out)

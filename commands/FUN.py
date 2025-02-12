@@ -891,7 +891,7 @@ class SlotMachine(Command):
 		out = ""
 		for item in wheel:
 			if item is None:
-				out += await self.bot.data.emojis.emoji_as("slot_machine.gif")
+				out += await self.bot.data.emojis.emoji_as("slot_machine.gif", full=True)
 			else:
 				out += item
 		return out
@@ -2614,7 +2614,7 @@ class Stats(Command):
 		if sparkles:
 			items = deque()
 			for i, c in sorted(sparkles.items()):
-				s = await bot.data.emojis.emoji_as(sparkle_values[i] + ".gif")
+				s = await bot.data.emojis.emoji_as(sparkle_values[i] + ".gif", full=True)
 				s += f" {c}"
 				items.append(s)
 			description += "\n" + " ".join(items)

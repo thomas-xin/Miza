@@ -1517,6 +1517,7 @@ def evalImg(url, operation, args):
 					for fut in workers:
 						fut.result()
 				futs.append(exc.submit(save_frame, i, frame))
+			print(i)
 			for i, fut in enumerate(futs):
 				b = fut.result()
 				if archive:

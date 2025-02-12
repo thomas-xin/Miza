@@ -848,7 +848,7 @@ find_emojis = lambda s: regexp(r"<a?:[A-Za-z0-9\-~_]+:[0-9]+>").findall(s)
 find_users = lambda s: regexp(r"<@!?[0-9]+>").findall(s)
 
 
-def min_emoji(emoji):
+def min_emoji(emoji, full=False):
 	if not getattr(emoji, "id", None):
 		if getattr(emoji, "name", None):
 			return emoji.name
@@ -856,9 +856,10 @@ def min_emoji(emoji):
 		if emoji.isnumeric():
 			return f"<:_:{emoji}>"
 		return emoji
+	name = T(emoji).get("name", "_") if full else "_"
 	if emoji.animated:
-		return f"<a:_:{emoji.id}>"
-	return f"<:_:{emoji.id}>"
+		return f"<a:{name}:{emoji.id}>"
+	return f"<:{name}:{emoji.id}>"
 
 
 def get_random_emoji():
@@ -1762,68 +1763,22 @@ def exec_tb(s, *args, **kwargs):
 emoji_translate = {}
 emoji_replace = {}
 em_trans = {}
-def reload_emojis():
-	"Initial load from cache; keeps this if load_emojis function fails"
-	global emoji_translate, emoji_replace, em_trans
-	if not os.path.exists("misc/emojis.json"):
-		return
-	with open("misc/emojis.json", "rb") as f:
-		b = f.read()
-	etrans = orjson.loads(b)
-	emoji_translate = {k: v + " " for k, v in etrans.items() if len(k) == 1}
-	emoji_replace = {k: v + " " for k, v in etrans.items() if len(k) > 1}
-	em_trans = "".maketrans(emoji_translate)
-
-@tracebacksuppressor
-def load_emojis():
-	"Loads list of unicode emojis from emojipedia (most up-to-date free source). Note the divergence between twemoji and discord"
-	global emoji_translate, emoji_replace, em_trans
-	if os.path.exists("misc/emojis.json") and utc() - os.path.getmtime("misc/emojis.json") < 86400:
-		return
-	data = Request(
-		"https://emojipedia.org/api/graphql",
-		data=json_dumps(dict(
-			operationName="vendorHistoricEmojiV1",
-			query="\n    query vendorHistoricEmojiV1(\n      $slug: Slug!\n      $version: Slug = null\n      $status: VendorHistoricEmojiStatus = null\n      $lang: Language\n    ) {\n      vendorHistoricEmoji_v1(slug: $slug, version: $version, status: $status, lang: $lang) {\n        ...vendorHistoricEmojiResource\n      }\n    }\n    \n  fragment vendorHistoricEmojiImageFragment on VendorHistoricEmojiImage {\n    slug\n    image {\n      source\n      description\n      useOriginalImage\n    }\n    status\n  }\n\n    \n  fragment vendorHistoricEmojiResource on VendorHistoricEmoji {\n    items {\n      category {\n        slug\n        title\n\n        representingEmoji {\n          code\n        }\n      }\n      images {\n        ...vendorHistoricEmojiImageFragment\n      }\n    }\n    statuses\n  }\n\n  ",
-			variables=dict(
-				lang="EN",
-				slug="twitter",
-				version="twemoji-15.0.2",
-			),
-		)),
-		headers={"Content-Type": "application/json"},
-		method="POST",
-		json=True,
-		timeout=None,
-	)
-	emojis = []
-	urls = []
-	names = []
-	for category in data["data"]["vendorHistoricEmoji_v1"]["items"]:
-		for emoji in category["images"]:
-			name = emoji["slug"]
-			source = emoji["image"]["source"]
-			url = "https://em-content.zobj.net/" + source
-			e_id = source.rsplit(".", 1)[0].rsplit("_", 1)[-1]
-			e = "".join(chr(int(ei, 16)) for ei in e_id.split("-"))
-			for i in range(len(e)):
-				e2 = e[:i + 1]
-				if i >= len(e) - 1 or not e2.isascii():
-					emojis.append(e2)
-					urls.append(url)
-					names.append(name)
-	ntrans = dict(zip(emojis, names))
-	etrans = dict(zip(emojis, urls))
-	with tracebacksuppressor:
+discord_stripped = RangeSet([range(0x2000, 0x2070), range(0xfe00, 0xffff)])
+discord_stripmap = "".maketrans({k: "" for k in discord_stripped})
+emoji_cache = Cache(timeout=86400 * 7, trash=0, persist="follow.cache")
+_eop = "\n    query vendorHistoricEmojiV1(\n      $slug: Slug!\n      $version: Slug = null\n      $status: VendorHistoricEmojiStatus = null\n      $lang: Language\n    ) {\n      vendorHistoricEmoji_v1(slug: $slug, version: $version, status: $status, lang: $lang) {\n        ...vendorHistoricEmojiResource\n      }\n    }\n    \n  fragment vendorHistoricEmojiImageFragment on VendorHistoricEmojiImage {\n    slug\n    image {\n      source\n      description\n      useOriginalImage\n    }\n    status\n  }\n\n    \n  fragment vendorHistoricEmojiResource on VendorHistoricEmoji {\n    items {\n      category {\n        slug\n        title\n\n        representingEmoji {\n          code\n        }\n      }\n      images {\n        ...vendorHistoricEmojiImageFragment\n      }\n    }\n    statuses\n  }\n\n  "
+def request_emojis():
+	emojimap = {}
+	for slug, version in (("twitter", "twemoji-15.0.3"), ("discord", "15.1")):
 		data = Request(
 			"https://emojipedia.org/api/graphql",
 			data=json_dumps(dict(
 				operationName="vendorHistoricEmojiV1",
-				query="\n    query vendorHistoricEmojiV1(\n      $slug: Slug!\n      $version: Slug = null\n      $status: VendorHistoricEmojiStatus = null\n      $lang: Language\n    ) {\n      vendorHistoricEmoji_v1(slug: $slug, version: $version, status: $status, lang: $lang) {\n        ...vendorHistoricEmojiResource\n      }\n    }\n    \n  fragment vendorHistoricEmojiImageFragment on VendorHistoricEmojiImage {\n    slug\n    image {\n      source\n      description\n      useOriginalImage\n    }\n    status\n  }\n\n    \n  fragment vendorHistoricEmojiResource on VendorHistoricEmoji {\n    items {\n      category {\n        slug\n        title\n\n        representingEmoji {\n          code\n        }\n      }\n      images {\n        ...vendorHistoricEmojiImageFragment\n      }\n    }\n    statuses\n  }\n\n  ",
+				query=_eop,
 				variables=dict(
 					lang="EN",
-					slug="discord",
-					version="15.1",
+					slug="twitter",
+					version="twemoji-15.0.3",
 				),
 			)),
 			headers={"Content-Type": "application/json"},
@@ -1837,24 +1792,30 @@ def load_emojis():
 				source = emoji["image"]["source"]
 				url = "https://em-content.zobj.net/" + source
 				e_id = source.rsplit(".", 1)[0].rsplit("_", 1)[-1]
-				e = "".join(chr(int(ei, 16)) for ei in e_id.split("-"))
-				for i in range(len(e)):
-					e2 = e[:i + 1]
-					if i >= len(e) - 1 or not e2.isascii():
-						ntrans[e2] = name
-						etrans[e2] = url
-				e2 = "".join(c for c in e if ord(c) not in range(0x2000, 0x2070) and ord(c) not in range(0xfe00, 0xffff))
-				if e != e2:
-					ntrans.setdefault(e2, name)
-					etrans.setdefault(e2, url)
-	b = json_dumps(etrans)
-	with open("misc/emojis.json", "wb") as f:
-		f.write(b)
-	emoji_translate = {k: v + " " for k, v in etrans.items() if len(k) == 1}
-	emoji_replace = {k: v + " " for k, v in etrans.items() if len(k) > 1}
+				e = "".join(chr(int(i, 16)) for i in e_id.split("-"))
+				emojimap[e] = (name, url)
+				e2 = e.translate(discord_stripmap)
+				if e2 and not e2.isascii():
+					emojimap[e2] = (name, url)
+	emoji_cache["map"] = emojimap
+	return emojimap
+def load_emojilist():
+	try:
+		return emoji_cache["map"]
+	except KeyError:
+		return request_emojis()
+@tracebacksuppressor
+def load_emojis():
+	global emoji_translate, emoji_replace, em_trans
+	emap = load_emojilist()
+	for k, v in emap.items():
+		if len(k) == 1:
+			emoji_translate[k] = v[1] + " "
+		else:
+			emoji_replace[k] = v[1] + " "
 	em_trans = "".maketrans(emoji_translate)
-	print(f"Successfully loaded {len(etrans)} unicode emojis.")
-	return etrans
+	print(f"Successfully loaded {len(emap)} unicode emojis.")
+
 
 @functools.lru_cache(maxsize=4)
 def translate_emojis(s):
@@ -2544,5 +2505,4 @@ if __name__ != "__mp_main__":
 		close = lambda self, force=False: self.__setattr__("closed", force)
 		isatty = lambda self: False
 
-	esubmit(reload_emojis)
 	PRINT = __logPrinter("log.txt")
