@@ -117,6 +117,23 @@ hwaccel = "cuda" if DC else "d3d11va" if os.name == "nt" else "auto"
 api = "v10"
 
 
+def print_class(obj):
+	s = f"<{obj.__class__.__name__} object at 0x{hex(id(obj))[2:].upper()}"
+	atts = []
+	for k in dir(obj):
+		if k.startswith("__") and k.endswith("__"):
+			continue
+		try:
+			v = getattr(obj, k)
+		except AttributeError:
+			continue
+		if callable(v):
+			continue
+		atts.append(f"{k}={v}")
+	if not atts:
+		return s + ">"
+	return s + "; " + ", ".join(atts) + ">"
+
 async def require_predicate(predicate):
 	if not predicate:
 		return

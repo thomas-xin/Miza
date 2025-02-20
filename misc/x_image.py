@@ -508,9 +508,8 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 			if not frames:
 				with wand.image.Image(img) as fi:
 					ib = io.BytesIO(fi.make_blob("png32"))
-				im = Image.open(ib)          
-				frames.append(im)
-				yield im                 
+				im = Image.open(ib)
+				return im
 	if fcount and dur:
 		frameprops = (fcount, dur, fcount / dur)
 		return ImageSequence.fromiter(wand_iter(), frameprops=frameprops)
@@ -1116,6 +1115,8 @@ def resize_mult(image, x, y, mode="auto"):
 	return resize_to(image, w, h, mode)
 
 def resize_to(image, w, h, mode="auto"):
+	if isinstance(image, list):
+		print(image)
 	if w == "-":
 		if h == "-":
 			return image

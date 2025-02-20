@@ -58,8 +58,8 @@ available = {
 	},
 	"deepseek-v3": {
 		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
-		"deepseek": ("deepseek-chat", ("0.14", "0.28")),
 		"openrouter": ("deepseek/deepseek-chat", ("0.9", "1")),
+		"deepseek": ("deepseek-chat", ("0.27", "1.1")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
 		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
 		None: "gpt-4",
@@ -772,7 +772,7 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
 			resp = await instruct(data, best=True, skip=True)
 			resp = resp.strip()
-			print("Summ:", prompt, resp)
+			print("Summary:", resp)
 			if resp and not decensor.search(resp):
 				return resp
 	return lim_tokens(s, round_random(max_length * 2 / 3))

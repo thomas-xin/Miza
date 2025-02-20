@@ -14,24 +14,11 @@ except ImportError as ex:
 		import youtube_dl as ytd
 	except ImportError:
 		raise ex
-from .types import list_like
+from .types import list_like, utc
 from .util import Request, EvalPipe, esubmit, python, new_playwright_page, CODECS
 
-ydl_opts = {
-	"quiet": 1,
-	"format": "bestvideo+bestaudio/best",
-	"overwrites": 1,
-	"nocheckcertificate": 1,
-	"no_call_home": 1,
-	"nooverwrites": 1,
-	"noplaylist": 1,
-	"logtostderr": 0,
-	"ignoreerrors": 0,
-	"default_search": "auto",
-	"source_address": "0.0.0.0",
-	"cookiesfrombrowser": ["firefox"],
-}
-ytdl = ytd.YoutubeDL(ydl_opts)
+ts = 0
+ytdl = None
 
 def entry_from_ytdl(resp):
 	return dict(
@@ -42,6 +29,25 @@ def entry_from_ytdl(resp):
 	)
 
 def extract_info(url, download=False, process=True):
+	global ts, ytdl
+	ts2 = utc()
+	if ts2 - ts > 300:
+		ts = ts2
+		ydl_opts = {
+			"quiet": 1,
+			"format": "bestvideo+bestaudio/best",
+			"overwrites": 1,
+			"nocheckcertificate": 1,
+			"no_call_home": 1,
+			"nooverwrites": 1,
+			"noplaylist": 1,
+			"logtostderr": 0,
+			"ignoreerrors": 0,
+			"default_search": "auto",
+			"source_address": "0.0.0.0",
+			"cookiesfrombrowser": ["firefox"],
+		}
+		ytdl = ytd.YoutubeDL(ydl_opts)
 	resp = ytdl.extract_info(url, download=download, process=process)
 	if "entries" in resp and not isinstance(resp["entries"], list_like):
 		resp["entries"] = list(resp["entries"])

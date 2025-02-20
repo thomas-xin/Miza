@@ -5,8 +5,8 @@ import pickle
 import random
 import threading
 import unittest
-# import numpy as np
-from ring_vector import RingVector
+import numpy as np
+from misc.ring_vector import RingVector
 CustomArray = CustomList = CustomCircularBuffer = CircularBuffer = ThreadSafeList = RingVector
 
 
@@ -290,9 +290,7 @@ class TestCircularBuffer(unittest.TestCase):
 		for k, v in cases.items():
 			self.circular_buffer.fill([1, 2, 3, 4, 5, 6, 7, 8])
 			self.circular_buffer._move_range(*k)
-			print(self.circular_buffer.buffer)
 			self.assertEqual(self.circular_buffer, v)
-			print()
 
 	def test_random_inserts_removals(self):
 		operations = ['append', 'insert', 'remove', 'set', 'eq', 'ne', 'ge', 'gt', 'le', 'lt', 'rotate', 'add', 'sub', 'mul', 'div', 'pow', 'mod', 'round', 'sort', 'insort', 'clear', 'uniq', 'contains', 'serialise']
@@ -401,11 +399,6 @@ class TestCircularBuffer(unittest.TestCase):
 			if not self.circular_buffer:
 				continue
 			assert self.circular_buffer == expected, operation
-			# close = self.circular_buffer.isclose(expected)
-			# if np.all(close):
-			# 	continue
-			# indices = np.nonzero(close == 0)
-			# assert False, (operation, self.circular_buffer.shape, indices[0].shape, self.circular_buffer[indices], np.asanyarray(expected, dtype=np.float64)[indices])
 
 	def test_rigorous_inserts_removals(self):
 		size = 1000

@@ -213,6 +213,7 @@ class AudioPlayer(discord.AudioSource):
 			self = cls(vcc, channel)
 		else:
 			self.channel = channel
+		self.refresh()
 		cls.waiting[gid] = Future()
 		cls.futs[gid] = csubmit(self.join_into(vcc, announce=announce))
 		return self
@@ -880,6 +881,7 @@ class AudioPlayer(discord.AudioSource):
 				self.last_played = utc()
 				if self.vc and not self.vc.is_playing():
 					self.vc.play(self)
+				self.resume()
 			elif self.settings.pause and self.vc.is_playing():
 				self.vc.pause()
 			if len(self.playing) == 1 and len(self.queue) > 1:
@@ -909,6 +911,9 @@ class AudioPlayer(discord.AudioSource):
 				print_exc()
 		self.playing.clear()
 		self.queue.clear()
+		self.refresh()
+
+	def refresh(self):
 		if self.updating_activity:
 			self.updating_activity.cancel()
 		if self.updating_streaming:

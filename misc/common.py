@@ -1198,26 +1198,6 @@ async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]
 
 
 # Queries for searching members
-# Order of priority:
-"""
-ID (Full literal match)
-Username + Discriminator (Full literal match)
-Username (Full case-insensitive match)
-Nickname (Full case-insensitive match)
-Username + Discriminator (Full alphanumeric match)
-Nickname (Full alphanumeric match)
-Username + Discriminator (Starting literal match)
-Username (Starting case-insensitive match)
-Nickname (Starting case-insensitive match)
-Username + Discriminator (Starting alphanumeric match)
-Nickname (Starting alphanumeric match)
-Username + Discriminator (Substring literal match)
-Username (Substring case-insensitive match)
-Nickname (Substring case-insensitive match)
-Username + Discriminator (Substring alphanumeric match)
-Nickname (Substring alphanumeric match)
-"""
-# Results are automatically sorted by match length, randomized if a tie occurs.
 
 def userQuery1(x):
 	yield str(x)
@@ -1313,6 +1293,7 @@ colour_types = (
 	tertiary_colours,
 )
 
+colours_cache = Cache(timeout=86400 * 7, trash=0, persist="colours.cache")
 @tracebacksuppressor
 def get_colour_list():
 	global colour_names
@@ -1341,7 +1322,13 @@ def get_colour_list():
 				colour_names = cdict(colour_group)
 			else:
 				colour_names.update(colour_group)
+	colours_cache["map"] = colour_names
 	print(f"Successfully loaded {len(colour_names)} colour names.")
+def load_colour_list():
+	try:
+		return colours_cache["map"]
+	except KeyError:
+		return get_colour_list()
 
 def parse_colour(s, default=None):
 	ishex = isdec = False
@@ -1465,7 +1452,7 @@ if COMPUTE_LOAD:
 		print("Compute load distribution:", COMPUTE_LOAD)
 		print("Compute pool order:", COMPUTE_ORDER)
 
-async def start_proc(n, di=(), caps="ytdl", it=0, wait=False, timeout=None):
+async def start_proc(n, di=(), caps="image", it=0, wait=False, timeout=None):
 	if hasattr(n, "caps"):
 		n, di, caps, it = n.n, n.di, n.caps, it + 1
 	if n in PROCS:
@@ -1521,7 +1508,6 @@ async def restart_workers():
 IS_MAIN = True
 FIRST_LOAD = True
 # Spec requirements:
-# ytdl			FFMPEG							anything with internet
 # math			CPU >1							multithreading support
 # image			FFMPEG, CPU >3, RAM >6GB		multiprocessing support
 # browse		Windows, CPU >1, RAM >3GB		webdriver support
@@ -1563,8 +1549,6 @@ def spec2cap(skip=False):
 		tesseract = False
 	else:
 		tesseract = True
-	if ffmpeg:
-		caps.append("ytdl")
 	done = []
 	try:
 		import pynvml

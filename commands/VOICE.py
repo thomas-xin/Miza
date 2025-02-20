@@ -1434,7 +1434,7 @@ class Dedup(Command):
 		vc_ = await bot.fetch_channel(cid)
 		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
-		lx, ly, *_ = await bot.audio.asubmit(f"len((a := AP.from_guild({_guild.id})).queue),len(a.queue.removedups(key=lambda e: e.url)),a.ensure_play()")
+		lx, ly, *_ = await bot.audio.asubmit(f"len((a := AP.from_guild({_guild.id})).queue),len(a.queue.dedup(key=lambda e: e.url)),a.ensure_play()")
 		if lx <= ly:
 			raise LookupError("No duplicate elements in queue.")
 		n = lx - ly

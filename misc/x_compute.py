@@ -738,213 +738,6 @@ if "math" in CAPS:
 	import x_math
 	x_image.print = print
 
-if "ytdl" in CAPS:
-	IMAGE_FORMS = {
-		".gif": True,
-		".png": True,
-		".bmp": False,
-		".jpg": True,
-		".jpeg": True,
-		".tiff": False,
-		".webp": True,
-	}
-	def is_image(url):
-		if url:
-			url = url.split("?", 1)[0]
-			if "." in url:
-				url = url[url.rindex("."):]
-				url = url.casefold()
-				return IMAGE_FORMS.get(url)
-	is_youtube_url = lambda url: url and re.findall("^https?:\\/\\/(?:www\\.)?youtu(?:\\.be|be\\.com)\\/[^\\s<>`|\"']+", url)
-	def get_best_icon(entry):
-		with suppress(KeyError):
-			return entry["thumbnail"]
-		with suppress(KeyError):
-			return entry["icon"]
-		try:
-			thumbnails = entry["thumbnails"]
-		except KeyError:
-			try:
-				url = entry["webpage_url"]
-			except KeyError:
-				url = entry["url"]
-			if not url:
-				return ""
-			if is_discord_url(url):
-				if not is_image(url):
-					return "https://cdn.discordapp.com/embed/avatars/0.png"
-			if is_youtube_url(url):
-				if "?v=" in url:
-					vid = url.split("?v=", 1)[-1]
-				else:
-					vid = url.rsplit("/", 1)[-1].split("?", 1)[0]
-				entry["thumbnail"] = f"https://i.ytimg.com/vi/{vid}/maxresdefault.jpg"
-				return entry["thumbnail"]
-			return url
-		return sorted(thumbnails, key=lambda x: float(x.get("width", x.get("preference", 0) * 4096)), reverse=True)[0]["url"]
-
-	def get_best_audio(entry):
-		try:
-			return entry["stream"]
-		except KeyError:
-			pass
-		best = (-inf,)
-		try:
-			fmts = entry["formats"]
-		except KeyError:
-			fmts = ()
-		try:
-			url = entry["url"]
-		except KeyError:
-			url = entry["webpage_url"]
-		replace = True
-		for fmt in fmts:
-			q = (
-				fmt.get("acodec") in ("opus", "vorbis"),
-				fmt.get("vcodec") in (None, "none"),
-				-abs(fmt["audio_channels"] - 2) if isinstance(fmt.get("audio_channels"), (int, float)) else -inf,
-				fmt["abr"] if isinstance(fmt.get("abr"), (int, float)) else -inf,
-				fmt["tbr"] if not isinstance(fmt.get("abr"), (int, float)) and isinstance(fmt.get("tbr"), (int, float)) else -inf,
-				fmt["asr"] if isinstance(fmt.get("asr"), (int, float)) else -inf,
-			)
-			q = fmt.get("abr", 0)
-			if not isinstance(q, (int, float)):
-				q = 0
-			if q <= 0:
-				if fmt.get("asr"):
-					q = fmt["asr"] / 1000
-				elif fmt.get("audio_channels"):
-					q = fmt["audio_channels"]
-			q = (fmt.get("acodec") in ("opus", "vorbis"), fmt.get("vcodec") in (None, "none"), fmt.get("tbr", 0) or q)
-			u = as_str(fmt["url"])
-			if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
-				replace = False
-			if q > best or replace:
-				best = q
-				url = fmt["url"]
-		if "dropbox.com" in url:
-			if "?dl=0" in url:
-				url = url.replace("?dl=0", "?dl=1")
-		if url.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
-			import yt_dlp
-			resp = requests.get(url).content
-			fmts = []
-			with suppress(ValueError, KeyError):
-				while True:
-					search = b'<Representation id="'
-					resp = resp[resp.index(search) + len(search):]
-					f_id = as_str(resp[:resp.index(b'"')])
-					search = b"><BaseURL>"
-					resp = resp[resp.index(search) + len(search):]
-					stream = as_str(resp[:resp.index(b'</BaseURL>')])
-					fmt = dict(yt_dlp.extractor.youtube.YoutubeIE._formats[f_id])
-					fmt["url"] = stream
-					fmts.append(fmt)
-			entry["formats"] = fmts
-			return get_best_audio(entry)
-		if not url:
-			raise KeyError("URL not found.")
-		return url
-
-	def shash(s):
-		return base64.urlsafe_b64encode(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).rstrip(b"=").decode("ascii")
-
-	def format_selector(ctx):
-		formats = ctx.get('formats')[::-1]
-		# vcodec='none' means there is no video
-		try:
-			best_audio = next(f for f in formats if (f.get('acodec', 'none') != 'none' and f.get('vcodec', 'none') == 'none' and f.get('ext', 'none') in ("webm", "opus")))
-		except StopIteration:
-			best_audio = formats[0]
-		yield {
-			'format_id': best_audio["format_id"],
-			'ext': "webm",
-			'requested_formats': [best_audio],
-			'protocol': best_audio["protocol"],
-		}
-
-	def ytdl(q, download=False):
-		import yt_dlp
-		print("YTDL:", q)
-		params = dict(default_search="auto", source_address="0.0.0.0", final_ext="ts", format=format_selector)
-		ydl = yt_dlp.ydl = getattr(yt_dlp, "ydl", None) or yt_dlp.YoutubeDL(params)
-		res = ydl.extract_info(q, download=False, process=True)
-		if "entries" in res:
-			entries = res["entries"]
-		else:
-			entries = [res]
-		if download:
-			entry = entries[0]
-			url = entry["webpage_url"]
-			url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
-			fn = "cache/~" + shash(url) + ".ts"
-			if not os.path.exists(fn) or not os.path.getsize(fn):
-				ydl.params["outtmpl"] = dict(default=fn)
-				headers = header()
-				stream = get_best_audio(entry)
-				sys.stderr.write(stream + "\n")
-				if os.path.exists("cache") and not COMPUTE_ORDER:
-					dirlist = os.listdir("cache")
-					if len(dirlist) >= 1024:
-						random.shuffle(dirlist)
-						while len(dirlist) >= 1024:
-							try:
-								os.remove("cache/" + dirlist.pop(0))
-							except:
-								traceback.print_exc()
-				if not os.path.exists("cache"):
-					os.mkdir("cache")
-				args = ["ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-threads", "3", "-hide_banner", "-nostdin", "-v", "error", "-y", "-i", stream, "-map_metadata", "-1", "-vn", "-c:a", "copy", fn]
-				try:
-					print(args)
-					subprocess.check_output(args)
-					if not os.path.exists(fn):
-						raise RuntimeWarning(fn)
-				except (subprocess.CalledProcessError, RuntimeWarning):
-					traceback.print_exc()
-					args = ["ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240", "-threads", "3", "-hide_banner", "-nostdin", "-v", "error", "-y", "-i", stream, "-map_metadata", "-1", "-vn", "-c:a", "libopus", fn]
-					print(args)
-					subprocess.check_output(args)
-				if not os.path.exists(fn):
-					try:
-						ydl.download(url)
-					except Exception:
-						traceback.print_exc()
-				if not os.path.exists(fn):
-					part = fn + ".part"
-					sys.stderr.write(f"Incomplete download {part} {os.path.exists(part)}\n")
-					resp = requests.get(stream, headers=headers, verify=False, stream=True)
-					length = int(resp.headers["Content-Length"])
-					sys.stderr.write(f"{resp} {length}\n")
-					resp.raise_for_status()
-					b = resp.raw.read()
-					sys.stderr.write(f"LENGTH, {len(b)}, {length}\n")
-					while len(b) < length:
-						sys.stderr.write(f"{len(b)}\n")
-						headers["Range"] = f"bytes={len(b)}-"
-						resp = requests.get(stream, headers=headers, verify=False, stream=True)
-						resp.raise_for_status()
-						b += resp.raw.read()
-					if len(b) > length:
-						b = memoryview(b)[:length]
-					assert len(b)
-					with open(fn, "wb") as f:
-						f.write(b)
-					return b
-			else:
-				print(f"File {fn} already exists, skipping...")
-			assert os.path.exists(fn) and os.path.getsize(fn)
-			with open(fn, "rb") as f:
-				return f.read()
-		output = [dict(
-			name=entry["title"],
-			url=entry["webpage_url"],
-			duration=entry.get("duration"),
-			stream=get_best_audio(entry),
-			icon=get_best_icon(entry),
-		) for entry in entries]
-		return output
-
 def max_size(w, h, maxsize, force=False):
 	s = w * h
 	m = maxsize * maxsize
@@ -1185,7 +978,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			command.extend(("-c:v", "libwebp_anim" if anim else "libwebp", "-pix_fmt", pix, "-pred", "mixed"))
 		else:
 			command.extend(("-c:v", "libwebp_anim" if anim else "libwebp", "-pix_fmt", pix, "-pred", "mixed"))
-		command.extend(("-f", "webp", "-compression_level", "5"))
+		command.extend(("-f", "webp", "-compression_level", "6" if lossless else "5"))
 		if anim:
 			command.extend(("-loop", "0", "-q:v", "24"))
 		elif lossless:
@@ -1331,7 +1124,7 @@ statics = ("png", "bmp", "jpg", "heic", "ico", "icns", "j2k", "tga", "tiff", "pd
 # Main image operation function
 def evalImg(url, operation, args):
 	ts = time.time_ns() // 1000
-	out = "cache/" + str(ts) + ".png"
+	out = "cache/" + str(ts) + ".webp"
 	fmt = "auto"
 	cdc = "webp"
 	fs = inf
@@ -1613,7 +1406,7 @@ def evalImg(url, operation, args):
 			new = next(iter(new["frames"]))
 	if Image and isinstance(new, Image.Image):
 		if fmt == "auto":
-			fmt = "png"
+			fmt = "webp"
 		new = optimise(new, keep_rgb=False)
 		if bg and "A" in new.mode:
 			if new.mode != "RGBA":
@@ -1687,7 +1480,7 @@ def evaluate_image(args):
 				out[i] = bytes(out[i])
 		elif isinstance(out[0], Image.Image):
 			for i in range(len(out)):
-				out[i] = save_into(out[i], out[i].size, "png", inf)
+				out[i] = save_into(out[i], out[i].size, "webp", inf)
 	elif isinstance(out, io.BytesIO):
 		out.seek(0)
 		out = out.read()

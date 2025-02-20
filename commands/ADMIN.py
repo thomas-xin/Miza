@@ -3164,7 +3164,11 @@ class UpdateMessageLogs(Database):
 		#     emb.description += nextline
 		embs = deque((emb,))
 		for message in messages:
-			emb = await self.bot.as_embed(message, link=True)
+			try:
+				emb = await self.bot.as_embed(message, link=True)
+			except Exception:
+				print_exc()
+				continue
 			emb.colour = discord.Colour(0x7F007F)
 			embs.append(emb)
 		self.bot.send_embeds(channel, embs)

@@ -1051,47 +1051,45 @@ class Invite(Command):
 		self.bot.send_embeds(channel, embed=emb, reference=message)
 
 
-class Upload(Command):
-	name = ["Filehost", "Preserve"]
+class Preserve(Command):
 	description = "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to ⟨BOT⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
-	usage = "<url>?"
-	example = ("preserve https://cdn.discordapp.com/attachments/911168940246442006/1026474858705588224/6e74595fa98e9c52e2fab6ece4639604.png", "files")
+	schema = cdict(
+		urls=cdict(
+			type="url",
+			description="URL or attachment to preserve",
+			example="https://mizabot.xyz/favicon",
+			aliases=["i"],
+			multiple=True,
+			required=True,
+		),
+	)
 	rate_limit = (12, 17)
 	_timeout_ = 50
 	slash = ("Preserve",)
 	msgcmd = ("Preserve Attachment Links",)
 	ephemeral = True
 
-	async def __call__(self, name, channel, message, argv, **void):
-		if message.attachments:
-			argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
-		args = await self.bot.follow_url(argv)
-		if not args:
-			out = [self.bot.webserver + "/files"]
-		else:
-			futs = deque()
-			for url in args:
-				if name == "preserve" and is_discord_attachment(url):
-					a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-					if a_id not in self.bot.data.attachments:
-						url = await self.bot.renew_attachment(url)
-					found = None
-					for attachment in message.attachments:
-						if attachment.id == a_id:
-							found = attachment
-							break
-					if found:
-						url = self.bot.preserve_as_long(message.channel.id, message.id, a_id, fn=url)
-						futs.append(as_fut(url))
-						continue
-					# if a_id in self.bot.data.attachments:
-					# 	u = await self.bot.renew_attachment(a_id)
-					# 	futs.append(as_fut(self.bot.preserve_attachment(a_id, fn=u)))
-					# 	continue
-				futs.append(Request(self.bot.webserver + "/reupload?url=" + quote_plus(url), decode=True, aio=True, ssl=False, timeout=1200))
-				await asyncio.sleep(0.1)
-			out = await gather(*futs)
-		return await send_with_reply(channel, message, "\n".join("<" + u + ">" for u in out), ephemeral=True)
+	async def __call__(self, _channel, _message, urls, **void):
+		futs = deque()
+		for url in urls:
+			if is_discord_attachment(url):
+				a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+				found = None
+				for attachment in _message.attachments:
+					if attachment.id == a_id:
+						found = attachment
+						break
+				if found:
+					url = self.bot.preserve_as_long(_channel.id, _message.id, a_id, fn=url)
+					futs.append(as_fut(url))
+					continue
+				url = self.bot.preserve_as_long(_channel.id, 0, a_id, fn=url)
+				futs.append(as_fut(url))
+				continue
+			futs.append(Request(self.bot.webserver + "/reupload?url=" + quote_plus(url), decode=True, aio=True, ssl=False, timeout=1200))
+			await asyncio.sleep(0.1)
+		out = await gather(*futs)
+		return await send_with_reply(_channel, _message, "\n".join("<" + u + ">" for u in out), ephemeral=True)
 
 
 class Reminder(Command):

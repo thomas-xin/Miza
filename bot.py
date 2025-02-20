@@ -33,7 +33,7 @@ import duckduckgo_search
 # from misc.smath import xrand
 # from misc.types import cdict, fdict, fcdict, mdict, alist, azero, round_min, full_prune, suppress, tracebacksuppressor
 # from misc.util import AUTH, TEMP_PATH, FAST_PATH, PORT, PROC, EvalPipe, python, utc, T, lim_str, regexp, Request, reqs, is_strict_running, force_kill
-# from misc.common import api, get_colour_list, load_emojis, touch, BASE_LOGO, closing, MemoryTimer
+# from misc.common import api, load_colour_list, load_emojis, touch, BASE_LOGO, closing, MemoryTimer
 
 
 # import tracemalloc
@@ -44,7 +44,7 @@ if ADDRESS == "0.0.0.0":
 	ADDRESS = "127.0.0.1"
 
 if __name__ != "__mp_main__":
-	esubmit(get_colour_list)
+	esubmit(load_colour_list)
 	esubmit(load_emojis)
 
 
@@ -557,8 +557,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		else:
 			self.audio = None
 
+	@tracebacksuppressor
 	def run(self):
 		"Starts up client."
+		t = utc()
+		for i in itertools.count(1):
+			try:
+				requests.head(f"https://discord.com/api/{api}/users/@me", timeout=5).close()
+			except Exception:
+				print_exc()
+				time.sleep(i ** 2)
+				print(f"Unable to reach Discord API after {sec2time(utc() - t)}, retrying...")
+			else:
+				break
 		print("Logging in...")
 		try:
 			self.audio_client_start = asubmit(self.start_audio_client, priority=1)
@@ -1114,7 +1125,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			raise LookupError("Message has no reference.")
 		reference = message.reference
 		try:
-			reference = await self.fetch_message(getattr(reference, "message_id", None) or reference.id, message.channel)
+			mid = getattr(reference, "message_id", None) or getattr(reference, "id", None)
+			if not mid:
+				print("Reference not found!")
+				print_class(reference)
+				raise ValueError(reference)
+			reference = await self.fetch_message(mid, message.channel)
 			if reference.webhook_id:
 				# Force a re-fetch to refresh possibly changed information such as author.
 				return await reference.channel.fetch_message(reference.id)
@@ -1673,7 +1689,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				resp = await create_future(
 					reqs.next().head,
-					url,
+					unyt(url),
 					headers=Request.header(),
 					verify=False,
 					allow_redirects=True,
@@ -2321,7 +2337,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		),
 		2: cdict(
 			reasoning="o3-mini",
-			instructive="deepseek-v3",
+			instructive="gpt-4",
 			casual="deepseek-v3",
 			nsfw="magnum-72b",
 			backup="minimax-01",
@@ -2832,10 +2848,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				durl = url.split("base64,", 1)[-1].encode("ascii")
 				d = base64.b64decode(durl + b"==")
 			else:
-				resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True, _timeout_=timeout, allow_redirects=True)
-				resp.raise_for_status()
-				with resp:
-					d = await asubmit(getattr, resp, "content")
+				d = await self.get_request(url)
 			name = url.rsplit("/", 1)[-1].split("?", 1)[0]
 		else:
 			d = url
@@ -3391,7 +3404,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		items = []
 		for i in range((len(urls) + 9) // 10):
 			temp = urls[i * 10:i * 10 + 10]
-			temp2 = await self.data.exec.uproxy(*temp, collapse=False)
+			try:
+				temp2 = await self.data.exec.uproxy(*temp, collapse=False)
+			except Exception:
+				print_exc()
+				temp2 = temp
 			def as_link(url1, url2):
 				if image in (url1, url2) or thumbnail in (url1, url2):
 					return
@@ -5083,7 +5100,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if k in kwargs or not v.get("required"):
 					continue
 				r = None
-				if v.type in ("image", "visual", "video"):
+				if v.type in ("url", "image", "visual", "video"):
 					url = None
 					if getattr(message, "reference", None):
 						urls = await self.follow_url(message, ytd=False)

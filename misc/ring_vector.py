@@ -37,17 +37,38 @@ def is_equal(x, y):
 		return np.all(eq)
 
 
+class NonThreadBoundRLock:
+    def __init__(self):
+        import threading
+        self._counter = 0
+        self._internal_lock = threading.Lock()  # Protect counter
+        self._sem = threading.Semaphore(1)
+    def acquire(self):
+        with self._internal_lock:
+            if self._counter == 0:
+                self._sem.acquire()
+            self._counter += 1
+    def release(self):
+        with self._internal_lock:
+            if self._counter == 0:
+                raise RuntimeError("release() called on un-acquired lock")
+            self._counter -= 1
+            if self._counter == 0:
+                self._sem.release()
+
+
 class ReadWriteLock:
 	def __init__(self):
 		self.reader_count = 0
 		self.reader_lock = threading.RLock()  # Mutex for reader count
-		self.writer_lock = threading.RLock()  # Lock to ensure only one writer
+		# Use our NonThreadBoundRLock for writer operations.
+		self.writer_lock = NonThreadBoundRLock()
 
 	def acquire_read_lock(self):
 		with self.reader_lock:
 			self.reader_count += 1
 			if self.reader_count == 1:
-				self.writer_lock.acquire(timeout=10)
+				self.writer_lock.acquire()
 
 	def release_read_lock(self):
 		with self.reader_lock:
@@ -56,41 +77,13 @@ class ReadWriteLock:
 				self.writer_lock.release()
 
 	def acquire_write_lock(self):
-		self.writer_lock.acquire(timeout=10)
+		self.writer_lock.acquire()
 
 	def release_write_lock(self):
 		self.writer_lock.release()
 
 
 class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
-	"""A mutable sequence implementation that uses a ring buffer with numpy arrays.
-	Provides efficient operations for both ends of the sequence, and numpy-accelerated arithmetic operations.
-	The ring buffer allows for O(1) operations on both ends of the sequence while maintaining
-	contiguous memory access patterns. The underlying numpy array provides vectorized operations
-	and efficient memory usage.
-	Features:
-	- O(1) append/pop operations on both ends
-	- Thread-safe operations with read/write locks
-	- Numpy-accelerated arithmetic and comparison operations  
-	- Set-like operations (union, intersection etc.)
-	- Sorting and searching capabilities
-	- Automatic memory management with reserve/reallocation
-	The buffer wraps around at the edges to avoid copying, using modulo arithmetic to track
-	positions. When more space is needed, the buffer is reallocated with extra capacity.
-	Args:
-		*args: Initial sequence of items, or a single item
-		dtype: numpy dtype for the underlying array (default: object)
-		device: Device to store array on (does not actually do anything, it exists solely for compatibility with other libraries, e.g. PyTorch)
-	Examples:
-		>>> rv = RingVector([1,2,3])
-		>>> rv.appendleft(0)  # O(1) prepend
-		>>> rv.append(4)      # O(1) append
-		>>> rv[0]            # O(1) random access
-		0
-		>>> rv + [5,6]      # Arithmetic operations
-		RingVector([5,7,8,9,10])
-		>>> rv.rotate(2)    # Efficient rotation
-	"""
 
 	__slots__ = ("__weakref__", "_lock", "buffer", "offset", "length", "_view", "_margin", "_hash", "_frozenset", "_queries", "_sorted", "_index")
 
@@ -111,6 +104,7 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 	def acquire_write_lock(self):
 		return self.lock.acquire_write_lock()
 
+	# Cached attributes are reset whenever the array is modified
 	def release_write_lock(self, view=False, order=False, elements=False):
 		cleared = {"_view", "_margin", "_hash", "_frozenset", "_queries", "_sorted"}
 		if view:
@@ -363,10 +357,6 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 				return False
 		except TypeError:
 			return False
-		except Exception:
-			print(self)
-			print(self.buffer)
-			raise
 		try:
 			return self._check_sorted(1, self.length - 1, chunk=self.chunk_size(4096))
 		except TypeError:
@@ -690,7 +680,6 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 				return False
 			if isinstance(other, (set, frozenset, dict)):
 				return self.to_frozenset() == other
-				# return not len(self.symmetric_difference(other))
 			other = self.to_iterable(other)
 			return np.all(self._imut(np.equal, other))
 		except (TypeError, IndexError):
@@ -703,7 +692,6 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 				return True
 			if isinstance(other, (set, frozenset, dict)):
 				return self.to_frozenset() != other
-				# return len(self.symmetric_difference(other))
 			other = self.to_iterable(other)
 			return np.any(self._imut(np.not_equal, other))
 		except (TypeError, IndexError):
@@ -852,9 +840,9 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 	def fsize(self):
 		return self.capacity
 	def __iter__(self):
-		return chain(*self.views)
+		return chain.from_iterable(self.views)
 	def __reversed__(self):
-		return chain(*map(reversed, reversed(self.views)))
+		return chain.from_iterable(map(reversed, reversed(self.views)))
 
 	@reading
 	def next(self):
@@ -1179,12 +1167,12 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 
 	# Removes all duplicate values from the list. Makes use of frozensets and numpy.unique when maintaining order is not required.
 	@writing_with(order=True)
-	def removedups(self, sort=None, key=None):
+	def dedup(self, sort=None, key=None):
 		if not self:
 			return self
 		if not key and sort:
 			try:
-				temp = chain(*map(np.unique, self.views))
+				temp = np.unique(self.as_contiguous())
 			except TypeError:
 				temp = sorted(self.to_frozenset())
 			self._sorted = True
@@ -1201,7 +1189,7 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 					temp.append(x)
 		self.fill(temp, order=True)
 		return self
-	uniq = unique = removedups
+	uniq = unique = dedup
 
 	# Returns first matching value in list.
 	def index(self, value, key=None):
