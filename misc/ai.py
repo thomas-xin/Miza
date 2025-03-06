@@ -59,15 +59,15 @@ available = {
 		None: "gpt-4m",
 	},
 	"deepseek-r1": {
+		"openrouter": ("deepseek/deepseek-r1:free", ("0", "0")),
 		"deepseek": ("deepseek-reasoner", ("0.41167", "1.64333")),
 		"deepinfra": ("deepseek-ai/DeepSeek-R1", ("0.85", "2.5")),
-		"openrouter": ("deepseek/deepseek-r1", ("0.85", "2.5")),
 		None: "o1-preview",
 	},
 	"deepseek-v3": {
+		"openrouter": ("deepseek/deepseek-chat:free", ("0", "0")),
 		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
 		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
-		"openrouter": ("deepseek/deepseek-chat", ("0.9", "1")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
 		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
 		None: "gpt-4",

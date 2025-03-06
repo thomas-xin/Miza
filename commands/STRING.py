@@ -921,12 +921,13 @@ d(*⌒▽⌒*)b Happy
 		string=cdict(
 			type="string",
 			description="Extra message content to send",
+			greedy=False,
 		),
 	)
 	rate_limit = (1, 5)
 	slash = True
 
-	async def __call__(self, bot, _user, _slash, _channel, emoticon, position, string, **void):
+	async def __call__(self, bot, _user, _slash, _channel, _message, emoticon, position, string, **void):
 		insertion = self.em_mapper[emoticon]
 		if string:
 			msg = string.strip() + " " + insertion if position == "end" else insertion + " " + string.strip()
@@ -935,6 +936,7 @@ d(*⌒▽⌒*)b Happy
 		url = await self.bot.get_proxy_url(_user)
 		if _slash:
 			return cdict(content=msg)
+		csubmit(bot.silent_delete(_message))
 		await bot.send_as_webhook(_channel, msg, username=_user.display_name, avatar_url=url)
 
 

@@ -1376,22 +1376,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.cache.emojis[e_id] = emoji
 		return emoji
 
-	# Searches the bot database for a webhook mimic from ID.
+	# Searches the bot database for a webhook proxy from ID.
 	def get_mimic(self, m_id, user=None):
-		if "mimics" in self.data:
+		if user is not None:
 			with suppress(KeyError):
-				with suppress(ValueError, TypeError):
-					m_id = "&" + str(int(m_id))
-				mimic = self.data.mimics[m_id]
-				if not isinstance(mimic, cdict):
-					self.data.mimics[m_id] = mimic = cdict(mimic)
-				return mimic
-			if user is not None:
-				with suppress(KeyError):
-					mimics = self.data.mimics[user.id]
-					mlist = mimics[m_id]
-					return self.get_mimic(choice(mlist))
-		raise LookupError("Unable to find target mimic.")
+				mimics = self.data.mimics[user.id]
+				mlist = mimics[m_id]
+				return self.get_mimic(choice(mlist))
+		with suppress(KeyError):
+			if isinstance(m_id, int) or m_id.isnumeric():
+				m_id = "&" + str(int(m_id))
+			mimic = self.data.mimics[m_id]
+			if not isinstance(mimic, cdict):
+				self.data.mimics[m_id] = mimic = cdict(mimic)
+			return mimic
+		raise LookupError("Unable to find target proxy.")
 
 	# Gets the DM channel for the target user, creating a new one if none exists.
 	async def get_dm(self, user):
@@ -2208,7 +2207,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					else:
 						raise TypeError(c["type"])
 				follows[i] = as_fut(urls)
-			elif sum(f is not None for f in follows) < 4 and m.get("url"):
+			elif sum(f is not None for f in follows) < 4 and m.get("url") and j < 8:
 				extract = not is_discord_message_link(m.url) and not is_discord_attachment(m.url) and m.get("new")
 				follows[i] = csubmit(self.follow_url(m.url, ytd=extract))
 			m.pop("url", None)
@@ -3672,8 +3671,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return False
 
 	async def verify_integrity(self, message):
-		if self.is_deleted(message):
-			return False
+		v = self.is_deleted(message)
+		if v:
+			return v != 1
 		if hasattr(message, "simulated") or hasattr(message, "slash"):
 			curr_message = message
 		else:
@@ -3703,7 +3703,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.data.deleted.cache[m_id] = value
 
 	async def silent_delete(self, message, keep_log=False, exc=False, delay=None):
-		"Silently deletes a message, bypassing logs."
+		"Silently deletes a message, bypassing logs whilst enabling connected commands to continue executing."
 		if not message:
 			return
 		if delay:
@@ -4932,7 +4932,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				parser.add_argument(*names, action=action)
 			parser.has_string = []
 			for k, v in schema.items():
-				if v.get("type") == "string":
+				if v.get("type") == "string" and v.get("greedy", True):
 					parser.has_string.append(k)
 				if v.get("type") == "enum":
 					for e in v.validation.enum:
@@ -5026,7 +5026,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					taken = True
 				elif not hs and v.type in ("number", "integer") and re.fullmatch(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?(?:\/\d*\.?\d+)?", a):
 					taken = True
-				elif v.type == "string":
+				elif hs and v.type == "string":
 					taken = True
 				if not taken:
 					continue
@@ -5141,6 +5141,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if r:
 					kwargs[k] = [r] if v.get("multiple") else r
 					continue
+				print(kwargs)
 				raise ArgumentError(f"Argument {k} ({v.description}) is required.")
 		if append_lws:
 			k, j = append_lws

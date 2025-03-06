@@ -67,6 +67,7 @@ class Help(Command):
 			type="string",
 			description="Help on a specific command",
 			example="download",
+			greedy=False,
 		),
 	)
 	usage = f"<category({cats})>? <command>?"
@@ -1906,7 +1907,7 @@ class UpdateUsers(Database):
 		if not self.bot.get_enabled(message.channel):
 			return
 		size = get_message_length(message)
-		points = math.sqrt(size) + sum(1 for w in message.content.split() if len(w) > 1)
+		points = sqrt(size) + sum(1 for w in message.content.split() if len(w) > 1)
 		if points >= 32 and not message.attachments:
 			typing = self.data.get(user.id, EMPTY).get("last_typing", None)
 			if typing is None:

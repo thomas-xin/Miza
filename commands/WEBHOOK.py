@@ -430,129 +430,20 @@ class UpdateEmojiNames(Database):
 	name = "emojinames"
 
 
-class ProxyConfig(Command):
-	name = ["PluralConfig", "PConfig", "RPConfig", "MConfig"]
-	description = "Modifies an existing webhook proxy's attributes."
-	usage = "<0:mimic_id> <target(prefix|name|avatar|description|gender|birthday)>? <1:new>?"
-	example = ("mconfig 692369756941978254 name test2",)
-	rate_limit = (4, 5)
-
-	async def __call__(self, bot, user, message, perm, flags, args, **void):
-		mimicdb = bot.data.mimics
-		mimics = set_dict(mimicdb, user.id, {})
-		prefix = args.pop(0)
-		perm = bot.get_perms(user.id)
-		try:
-			mlist = mimics[prefix]
-			if mlist is None:
-				raise KeyError
-			mimlist = [bot.get_mimic(verify_id(p)) for p in mlist]
-		except KeyError:
-			mimic = bot.get_mimic(verify_id(prefix))
-			mimlist = [mimic]
-		try:
-			opt = args.pop(0).casefold()
-		except IndexError:
-			opt = None
-		if opt in ("name", "username", "nickname", "tag"):
-			setting = "name"
-		elif opt in ("avatar", "icon", "url", "pfp", "image", "img"):
-			setting = "url"
-		elif opt in ("status", "description"):
-			setting = "description"
-		elif opt in ("gender", "birthday", "prefix"):
-			setting = opt
-		elif opt in ("auto", "copy", "user", "auto", "user-id", "user_id"):
-			setting = "user"
-		elif is_url(opt):
-			args = [opt]
-			setting = "url"
-		elif opt:
-			raise TypeError("Invalid target attribute.")
-		if args:
-			new = " ".join(args)
-		else:
-			new = None
-		output = ""
-		noret = False
-		for mimic in mimlist:
-			mimic = await bot.data.mimics.update_mimic(mimic, message.guild)
-			if mimic.u_id != user.id and not isnan(perm):
-				raise PermissionError(f"Target mimic {mimic.name} does not belong to you.")
-			args.extend(best_url(a) for a in message.attachments)
-			if new is None:
-				if not opt:
-					emb = await bot.commands.info[0].getProxyData(mimic, "v")
-					bot.send_as_embeds(message.channel, emb)
-					noret = True
-				else:
-					output += f"Current {setting} for {sqr_md(mimic.name)}: {sqr_md(mimic[setting])}.\n"
-				continue
-			m_id = mimic.id
-			if setting == "birthday":
-				new = utc_ts(tzparse(new))
-			# This limit is actually to comply with webhook usernames
-			elif setting == "name":
-				if len(new) > 80:
-					raise OverflowError("Name must be 80 or fewer in length.")
-			# Prefixes must not be too long
-			elif setting == "prefix":
-				if len(new) > 16:
-					raise OverflowError("Prefix must be 16 or fewer in length.")
-				for prefix in mimics:
-					with suppress(ValueError, IndexError):
-						mimics[prefix].remove(m_id)
-				if new in mimics:
-					mimics[new].append(m_id)
-				else:
-					mimics[new] = [m_id]
-			elif setting == "url":
-				urls = await bot.follow_url(new, best=True)
-				new = urls[0]
-			# May assign a user to the mimic
-			elif setting == "user":
-				if new.casefold() in ("none", "null", "0", "false", "f"):
-					new = None
-				else:
-					mim = None
-					try:
-						mim = verify_id(new)
-						user = await bot.fetch_user(mim)
-						if user is None:
-							raise EOFError
-						new = user.id
-					except:
-						try:
-							mimi = bot.get_mimic(mim, user)
-							new = mimi.id
-						except:
-							raise LookupError("Target user or mimic ID not found.")
-			elif setting != "description":
-				if len(new) > 512:
-					raise OverflowError("Must be 512 or fewer in length.")
-			name = mimic.name
-			mimic[setting] = new
-		if noret:
-			return
-		if output:
-			return ini_md(output.rstrip())
-		return css_md(f"Changed {setting} for {sqr_md(', '.join(m.name for m in mimlist))} to {sqr_md(new)}.")
-
-
 class Proxy(Command):
-	name = ["Mimic", "Plural", "RolePlay", "RP"]
+	name = ["Mimic", "Plural", "RolePlay", "RP", "RPCreate"]
 	description = "Creates a webhook proxy from a name or user, or lists all proxies with their respective prefixes. Proxies are tied to their creator user, and require permission level of 1 to invoke."
 	schema = cdict(
 		prefix=cdict(
 			type="word",
 			description="Prefix used to invoke the proxy",
 			example="%test",
-			required=True,
 		),
 		name=cdict(
 			type="string",
 			description="Name of the proxy. Must be 80 or fewer in length",
 			example="Test Webhook",
+			greedy=False,
 		),
 		icon=cdict(
 			type="visual",
@@ -561,12 +452,12 @@ class Proxy(Command):
 		),
 		user=cdict(
 			type="user",
-			description="User account to clone, for mimic mode. Will always override both name and icon when applicable",
+			description="User account to clone, for mimic mode. Overrides both name and icon when applied",
 			example="668999031359537205",
 		),
 		delete=cdict(
 			type="word",
-			description="Prefix or ID of proxy to delete",
+			description='Prefix or ID of proxy to delete. Enter "-" to delete all',
 			example="%test",
 		),
 	)
@@ -575,50 +466,29 @@ class Proxy(Command):
 	rate_limit = (6, 7)
 	maintenance = True
 
-	async def __call__(self, bot, _user, prefix, name, icon, user, delete, **void):
+	async def __call__(self, bot, _user, _perm, prefix, name, icon, user, delete, **void):
 		mimicdb = bot.data.mimics
-		args.extend(best_url(a) for a in reversed(message.attachments))
-		if len(args) == 1 and "d" not in flags:
-			user = await bot.fetch_user(verify_id(argv))
-		mimics = set_dict(mimicdb, user.id, {})
-		if not argv or (len(args) == 1 and "d" not in flags):
-			if "d" in flags:
-				# This deletes all mimics for the current user
-				if "f" not in flags and len(mimics) > 1:
-					raise InterruptedError(css_md(sqr_md(f"WARNING: {len(mimics)} MIMICS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), force=True))
-				mimicdb.pop(user.id)
-				return italics(css_md(f"Successfully removed all {sqr_md(len(mimics))} webhook mimics for {sqr_md(user)}."))
-			# Set callback message for scrollable list
-			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-			await send_with_reply(
-				None,
-				message,
-				"*```" + "\n" * ("z" in flags) + "callback-webhook-mimic-"
-				+ str(user.id) + "_0"
-				+ "-\nLoading Proxy database...```*",
-				buttons=buttons,
-			)
-			return
-		u_id = user.id
-		prefix = args.pop(0)
-		if "d" in flags:
+		if delete:
+			if delete == "-":
+				mimics = mimicdb.pop(user.id)
+				for mlist in mimics.values():
+					for m_id in mlist:
+						mimicdb.pop(m_id, None)
+				return italics(css_md(f"Successfully removed all {sqr_md(len(mimics))} webhook proxies for {sqr_md(_user)}."))
+			mimics = mimicdb.get(user.id, {})
 			try:
 				mlist = mimics[prefix]
-				if mlist is None:
+				if not mlist:
 					raise KeyError
-				if len(mlist):
-					m_id = mlist.pop(0)
-					mimic = mimicdb.pop(m_id)
-				else:
-					mimics.pop(prefix)
-					raise KeyError
+				m_id = mlist.pop(0)
+				mimic = mimicdb.pop(m_id)
 				if not mlist:
 					mimics.pop(prefix)
 			except KeyError:
 				mimic = bot.get_mimic(prefix, user)
-				# Users are not allowed to delete mimics that do not belong to them
-				if not isnan(perm) and mimic.u_id != user.id:
-					raise PermissionError("Target mimic does not belong to you.")
+				# Users are not allowed to delete proxies that do not belong to them
+				if not isnan(_perm) and mimic.u_id != user.id:
+					raise PermissionError("Target proxy does not belong to you.")
 				mimics = mimicdb[mimic.u_id]
 				user = await bot.fetch_user(mimic.u_id)
 				m_id = mimic.id
@@ -626,83 +496,66 @@ class Proxy(Command):
 					with suppress(ValueError, IndexError):
 						mimics[prefix].remove(m_id)
 				mimicdb.pop(mimic.id)
-			return italics(css_md(f"Successfully removed webhook mimic {sqr_md(mimic.name if mimic else prefix)} for {sqr_md(user)}."))
+			return italics(css_md(f"Successfully removed webhook proxy {sqr_md(mimic.name if mimic else prefix)} for {sqr_md(_user)}."))
 		if not prefix:
+			if not name and not user:
+				# Set callback message for scrollable list
+				buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+				return cdict(
+					"*```callback-webhook-mimic-"
+					+ str(user.id) + "_0"
+					+ "-\nLoading Proxy database...```*",
+					buttons=buttons,
+				)
 			raise IndexError("Prefix must not be empty.")
-		if len(prefix) > 16:
-			raise OverflowError("Prefix must be 16 or fewer in length.")
+		if len(prefix) > 32:
+			raise OverflowError("Prefix must be 32 or fewer in length.")
 		if " " in prefix:
 			raise TypeError("Prefix must not contain spaces.")
-		# This limit is ridiculous. I like it.
-		if sum(len(i) for i in iter(mimics.values())) >= 32768:
+		mimics = mimicdb.setdefault(_user.id, {})
+		if sum(map(len, mimics.values())) >= 32768:
 			raise OverflowError(f"Proxy list for {user} has reached the maximum of 32768 items. Please remove an item to add another.")
-		dop = None
-		mid = discord.utils.time_snowflake(dtn())
-		ctime = utc()
+		dt = DynamicDT.utcnow()
+		mid = time_snowflake(dt)
 		m_id = "&" + str(mid)
-		mimic = None
-		# Attempt to create a new mimic, a mimic from a user, or a copy of an existing mimic.
-		if len(args):
-			if len(args) > 1:
-				urls = await bot.follow_url(args[-1], best=True)
-				url = urls[0]
-				name = " ".join(args[:-1])
-			else:
-				mim = 0
-				try:
-					mim = verify_id(args[-1])
-					user = await bot.fetch_user(mim)
-					if user is None:
-						raise EOFError
-					dop = user.id
-					name = user.name
-					url = await bot.get_proxy_url(user)
-				except:
-					try:
-						mimi = bot.get_mimic(mim, user)
-						dop = mimi.id
-						mimic = copy.deepcopy(mimi)
-						mimic.id = m_id
-						mimic.u_id = u_id
-						mimic.prefix = prefix
-						mimic.count = mimic.total = 0
-						mimic.created_at = ctime
-						mimic.auto = dop
-					except:
-						name = args[0]
-						url = "https://cdn.discordapp.com/embed/avatars/0.png"
-		else:
-			name = user.name
-			url = await bot.get_proxy_url(user)
-		# This limit is actually to comply with webhook usernames
-		if len(name) > 80:
-			raise OverflowError("Name must be 80 or fewer in length.")
-		while m_id in mimics:
+		while m_id in mimicdb:
 			mid += 1
 			m_id = "&" + str(mid)
-		if mimic is None:
+		mimic = None
+		# Attempt to create a new mimic, a mimic from a user, or a copy of an existing mimic.
+		if user:
+			name = user.name
+			url = await bot.get_proxy_url(user)
 			mimic = cdict(
 				id=m_id,
-				u_id=u_id,
+				u_id=_user.id,
 				prefix=prefix,
-				auto=dop,
+				clone=user.id,
 				name=name,
 				url=url,
-				description="",
-				gender="N/A",
-				birthday=ctime,
-				created_at=ctime,
+				created_at=dt.timestamp(),
+				count=0,
+				total=0,
+			)
+		else:
+			# This limit is actually to comply with webhook usernames
+			if len(name) > 80:
+				raise OverflowError("Name must be 80 or fewer in length.")
+			mimic = cdict(
+				id=m_id,
+				u_id=_user.id,
+				prefix=prefix,
+				name=name,
+				url=icon,
+				created_at=dt.timestamp(),
 				count=0,
 				total=0,
 			)
 		mimicdb[m_id] = mimic
-		if prefix in mimics:
-			mimics[prefix].append(m_id)
-		else:
-			mimics[prefix] = [m_id]
+		mimics.setdefault(prefix, []).append(m_id)
 		out = f"Successfully added webhook mimic {sqr_md(mimic.name)} with prefix {sqr_md(mimic.prefix)} and ID {sqr_md(mimic.id)}"
-		if dop is not None:
-			out += f", bound to user [{user_mention(dop) if type(dop) is int else f'<{dop}>'}]"
+		if user:
+			out += f", bound to user {sqr_md(user_mention(user))}"
 		return css_md(out)
 
 	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
@@ -746,7 +599,8 @@ class Proxy(Command):
 			msg = ""
 		else:
 			content += f"{len(mimics)} currently enabled webhook mimic(s) for {str(user).replace('`', '')}:```*"
-			key = lambda x: lim_str("⟨" + ", ".join(i + ": " + (str(no_md(mimicdb[i].get("name"))), "[<@" + str(mimicdb[i].get("auto", "None")) + ">]")[bool(mimicdb[i].get("auto"))] for i in iter(x)) + "⟩", 1900 / len(mimics))
+			def key(x):
+				return lim_str("⟨" + ", ".join(i + ": " + (str(no_md(mimicdb[i].get("name"))), "[<@" + str(mimicdb[i].get("auto", "None")) + ">]")[bool(mimicdb[i].get("auto"))] for i in iter(x)) + "⟩", 1900 / len(mimics))
 			msg = ini_md(iter2str({k: mimics[k] for k in sorted(mimics)[pos:pos + page]}, key=key))
 		colour = await bot.get_colour(user)
 		emb = discord.Embed(
@@ -762,68 +616,134 @@ class Proxy(Command):
 			await bot.ignore_interaction(message)
 
 
-class ProxySend(Command):
-	name = ["RPSend", "PluralSend"]
-	description = "Sends a message using a webhook proxy, to the target channel."
-	usage = "<0:mimic> <1:channel> <2:string>"
-	example = ("rpsend %test #bots this is a test", "proxysend !mimic #roleplay hi guys")
-	no_parse = True
+class ProxyConfig(Command):
+	name = ["PluralConfig", "MimicConfig", "RPConfig"]
+	description = "Modifies an existing webhook proxy's attributes."
+	schema = cdict(
+		proxy=cdict(
+			type="word",
+			description="Prefix or ID of proxy to invoke",
+			example="%test",
+			required=True,
+		),
+		prefix=cdict(
+			type="word",
+			description="New prefix used to invoke the proxy",
+			example="%test",
+		),
+		name=cdict(
+			type="string",
+			description="New name of the proxy. Must be 80 or fewer in length",
+			example="Test Webhook",
+			greedy=False,
+		),
+		icon=cdict(
+			type="visual",
+			description="New icon of the proxy, supplied by URL or attachment",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
+		),
+		user=cdict(
+			type="user",
+			description="New user account to clone, for mimic mode. Overrides both name and icon when applied",
+			example="668999031359537205",
+		),
+		personality=cdict(
+			type="string",
+			description="New personality of the character, to be used in the chatbot. Invoke using {PREFIX}+",
+			example="Your name is {{char}}, and you are an easily-annoyed dog who always barks at humans.",
+			greedy=False,
+		),
+		gender=cdict(
+			type="string",
+			description="New gender of the character, only affects viewing by info",
+			example="she/they",
+			greedy=False,
+		),
+		birthday=cdict(
+			type="date",
+			description="New birthday of the character, only affects viewing by info",
+			example="february 29th",
+		),
+	)
+	rate_limit = (4, 5)
 
-	async def __call__(self, bot, channel, message, user, perm, argv, args, **void):
-		mimicdb = bot.data.mimics
-		mimics = set_dict(mimicdb, user.id, {})
-		prefix = args.pop(0)
-		c_id = verify_id(args.pop(0))
-		channel = await bot.fetch_channel(c_id)
+	async def __call__(self, bot, _guild, _user, _perm, proxy, prefix, name, icon, user, personality, gender, birthday, **void):
+		mimics = bot.data.mimics.get(_user, {})
+		mimic = bot.get_mimic(proxy, _user)
+		mimic = await bot.data.mimics.update_mimic(mimic, _guild)
+		if mimic.u_id != _user.id and not isnan(_perm):
+			raise PermissionError(f"Target mimic {mimic.name} does not belong to you.")
+		m_id = mimic.id
+		if prefix is not None:
+			assert len(prefix) < 32, "Prefix must be 32 or fewer in length."
+			mimics[mimic.prefix].remove(m_id)
+			mimics.setdefault(prefix, []).append(m_id)
+			mimic.prefix = prefix
+		if name is not None:
+			assert len(name) < 80, "Name must be 80 or fewer in length."
+			mimic.name = name
+		if icon is not None:
+			mimic.url = icon
+		if user is not None:
+			mimic.clone = user
+		if personality is not None:
+			assert len(personality) < 2000, "Personality must be 2000 or fewer in length."
+			mimic.personality = personality
+		if gender is not None:
+			mimic.gender = gender
+		if birthday is not None:
+			mimic.birthday = birthday.timestamp()
+		return "**Updated proxy**:\n" + css_md(iter2str(mimic))
+
+
+class ProxySend(Command):
+	name = ["MimicSend", "RPSend", "PluralSend", "Invoke"]
+	description = "Sends a message using a webhook proxy, to the target channel."
+	schema = cdict(
+		proxy=cdict(
+			type="word",
+			description="Prefix or ID of proxy to invoke",
+			example="%test",
+			required=True,
+		),
+		channel=cdict(
+			type="channel",
+			description="Target channel to send to",
+			example="#general",
+			required=True,
+		),
+		message=cdict(
+			type="string",
+			description="Message to send",
+			example="Hello World!",
+			required=True,
+			greedy=False,
+		),
+		invoke=cdict(
+			type="bool",
+			description="Whether to invoke the proxy's AI, if applicable",
+			default=True,
+		),
+	)
+
+	async def __call__(self, bot, _user, _message, proxy, channel, message, invoke, **void):
+		assert getattr(channel, "guild", None), "Webhooks are only usable in servers."
 		guild = channel.guild
-		msg = argv.split(None, 2)[-1]
-		if not msg:
-			raise IndexError("Message is empty.")
-		perm = bot.get_perms(user.id, guild)
-		try:
-			mlist = mimics[prefix]
-			if mlist is None:
-				raise KeyError
-			m = [bot.get_mimic(verify_id(p)) for p in mlist]
-		except KeyError:
-			mimic = bot.get_mimic(verify_id(prefix))
-			m = [mimic]
+		mimic = bot.get_mimic(proxy, _user)
+		perm = bot.get_perms(_user.id, guild)
 		admin = not inf > perm
 		try:
 			enabled = bot.data.enabled[channel.id]
 		except KeyError:
 			enabled = bot.data.enabled.get(guild.id, ())
+		invoking = invoke and mimic.personality
 		# Because this command operates across channels and servers, we need to make sure these cannot be sent to channels without this command enabled
 		if not admin and ("webhook" not in enabled or perm < 1):
 			raise PermissionError("Not permitted to send into target channel.")
-		if m:
-			msg = escape_roles(msg)
-			if msg.startswith("/tts "):
-				msg = msg[5:]
-				tts = True
-			else:
-				tts = False
-			if guild and "logM" in bot.data and guild.id in bot.data.logM:
-				c_id = bot.data.logM[guild.id]
-				try:
-					c = await self.bot.fetch_channel(c_id)
-				except (EOFError, discord.NotFound):
-					bot.data.logM.pop(guild.id)
-					return
-				emb = await bot.as_embed(message, link=True)
-				emb.colour = discord.Colour(0x00FF00)
-				action = f"**Proxy invoked in** {channel_mention(channel.id)}:\n"
-				emb.description = lim_str(action + emb.description, 4096)
-				emb.timestamp = message.created_at
-				self.bot.send_embeds(c, emb)
-			for mimic in m:
-				await bot.data.mimics.update_mimic(mimic, guild)
-				name = mimic.name
-				url = mimic.url
-				await wait_on_none(bot.send_as_webhook(channel, msg, username=name, avatar_url=url, tts=tts))
-				mimic.count += 1
-				mimic.total += len(msg)
-			csubmit(message.add_reaction("👀"))
+		if not admin and ("ai" not in enabled and invoking):
+			raise PermissionError("AI is not enabled in target channel.")
+		csubmit(_message.add_reaction("👀"))
+		await bot.data.mimics.invoke_mimic(_message, mimic, channel, message, invoking)
 
 
 class UpdateMimics(Database):
@@ -834,87 +754,77 @@ class UpdateMimics(Database):
 		if not message.content:
 			return
 		user = message.author
-		if user.id in self.data:
-			bot = self.bot
-			perm = bot.get_perms(user.id, message.guild)
-			if perm < 1:
-				return
-			admin = not inf > perm
-			if message.guild is not None:
-				try:
-					enabled = bot.data.enabled[message.channel.id]
-				except KeyError:
-					enabled = ()
-			else:
-				enabled = list(bot.categories)
-			# User must have permission to use ~mimicsend in order to invoke by prefix
-			if not admin and "webhook" not in enabled:
-				return
-			database = self.data[user.id]
-			msg = message.content
-			with bot.ExceptionSender(message.channel, Exception, reference=message):
-				# Stack multiple messages to send, may be separated by newlines
-				sending = alist()
-				channel = message.channel
-				for line in msg.splitlines():
-					found = False
-					# O(1) time complexity per line regardless of how many mimics a user is assigned
-					if len(line) > 2 and " " in line:
-						i = line.index(" ")
-						prefix = line[:i]
-						if prefix in database:
-							mimics = database[prefix]
-							if mimics:
-								line = line[i + 1:].strip(" ")
-								for m in mimics:
-									sending.append(cdict(m_id=m, msg=line))
-								found = True
-					if not sending:
-						break
-					if not found:
-						sending[-1].msg += "\n" + line
+		guild = message.guild
+		if user.id not in self.data:
+			return
+		bot = self.bot
+		perm = bot.get_perms(user.id, guild)
+		if perm < 1:
+			return
+		admin = not inf > perm
+		if guild is not None:
+			try:
+				enabled = bot.data.enabled[message.channel.id]
+			except KeyError:
+				enabled = ()
+		else:
+			enabled = list(bot.categories)
+		# User must have permission to use ~mimicsend in order to invoke by prefix
+		if not admin and "webhook" not in enabled:
+			return
+		database = self.data[user.id]
+		msg = message.content
+		with bot.ExceptionSender(message.channel, Exception, reference=message):
+			# Stack multiple messages to send, may be separated by newlines
+			sending = alist()
+			channel = message.channel
+			for line in msg.splitlines():
+				found = False
+				# O(1) time complexity per line regardless of how many mimics a user is assigned
+				if len(line) > 2 and " " in line:
+					prefix, line = line.split(" ", 1)
+					if prefix in database:
+						mimics = database[prefix]
+						if mimics:
+							line = line.strip()
+							for m in mimics:
+								sending.append(cdict(m_id=m, msg=line))
+							found = True
+					elif (prefix := prefix.removesuffix("+")) in database:
+						mimics = database[prefix]
+						if mimics:
+							line = line.strip()
+							for m in mimics:
+								sending.append(cdict(m_id=m, msg=line, invoke=True))
+							found = True
 				if not sending:
-					return
-				guild = message.guild
-				csubmit(bot.silent_delete(message))
-				if guild and "logM" in bot.data and guild.id in bot.data.logM:
-					c_id = bot.data.logM[guild.id]
-					try:
-						c = await self.bot.fetch_channel(c_id)
-					except (EOFError, discord.NotFound):
-						bot.data.logM.pop(guild.id)
-						return
-					emb = await self.bot.as_embed(message, link=True)
-					emb.colour = discord.Colour(0x00FF00)
-					action = f"**Proxy invoked in** {channel_mention(channel.id)}:\n"
-					emb.description = lim_str(action + emb.description, 4096)
-					emb.timestamp = message.created_at
-					self.bot.send_embeds(c, emb)
-				for k in sending:
-					mimic = self.data[k.m_id]
-					mimic = await self.update_mimic(mimic, guild=guild)
-					name = mimic.name
-					url = mimic.url
-					msg = escape_roles(k.msg)
-					if msg.startswith("/tts "):
-						msg = msg[5:]
-						tts = True
-					else:
-						tts = False
-					await wait_on_none(bot.send_as_webhook(channel, msg, username=name, avatar_url=url, tts=tts))
-					mimic.count += 1
-					mimic.total += len(k.msg)
-					bot.data.users.add_xp(user, math.sqrt(len(msg)) * 2)
+					break
+				if not found:
+					sending[-1].msg += "\n" + line
+			if not sending:
+				return
+			for info in sending:
+				mimic = self.data[info.m_id]
+				invoke = info.get("invoke")
+				if not invoke:
+					csubmit(bot.silent_delete(message))
+				elif not mimic.get("personality"):
+					raise ValueError(f"Character must have a personality assigned to chat! Please see {bot.get_prefix(guild)}ProxyConfig for more info.")
+				await self.invoke_mimic(message, mimic, channel, info["msg"], invoke=invoke)
 
 	async def update_mimic(self, mimic, guild=None, it=None):
 		i = mimic["id"]
 		if not isinstance(mimic, cdict):
 			mimic = self[i] = cdict(mimic)
-		if mimic.setdefault("auto", None):
+		if "auto" in mimic:
+			mimic.clone = mimic.pop("auto")
+		if "description" in mimic:
+			mimic.personality = mimic.pop("description") or mimic.get("personality")
+		if mimic.get("clone"):
 			bot = self.bot
 			mim = 0
 			try:
-				mim = verify_id(mimic.auto)
+				mim = verify_id(mimic.clone)
 				if guild is not None:
 					user = guild.get_member(mim)
 				if user is None:
@@ -942,23 +852,150 @@ class UpdateMimics(Database):
 					mimic.url = "https://cdn.discordapp.com/embed/avatars/0.png"
 		return mimic
 
-	# @tracebacksuppressor(SemaphoreOverflowError)
-	# async def __call__(self):
-		# async with self._semaphore:
-			# async with Delay(120):
-				# Garbage collector for unassigned mimics
-				# i = 1
-				# for m_id in tuple(self.data):
-					# if type(m_id) is str:
-						# mimic = self.data[m_id]
-						# try:
-							# if mimic.u_id not in self.data or mimic.id not in self.data[mimic.u_id][mimic.prefix]:
-								# self.data.pop(m_id)
-						# except:
-							# self.data.pop(m_id)
-					# if not i % 8191:
-						# await asyncio.sleep(0.45)
-					# i += 1
+	async def invoke_mimic(self, message, mimic, channel, content, invoke=False):
+		bot = self.bot
+		guild = channel.guild
+		if guild and "logM" in bot.data and guild.id in bot.data.logM:
+			c_id = bot.data.logM[guild.id]
+			try:
+				c = await self.bot.fetch_channel(c_id)
+			except (LookupError, discord.NotFound):
+				bot.data.logM.pop(guild.id)
+				return
+			emb = await self.bot.as_embed(message, link=True)
+			emb.colour = discord.Colour(0x00FF00)
+			action = f"**Proxy invoked from** {channel_mention(message.channel.id)}:\n"
+			emb.description = lim_str(action + emb.description, 4096)
+			emb.timestamp = message.created_at
+			self.bot.send_embeds(c, emb)
+		mimic = await self.update_mimic(mimic, guild=guild)
+		name = mimic.name
+		url = mimic.url
+		if content.startswith("/tts "):
+			content = content[5:]
+			tts = True
+		else:
+			tts = False
+		user = message.author
+		if invoke:
+			try:
+				bot_name = guild.me.display_name
+			except (AttributeError, LookupError):
+				bot_name = bot.name
+			await bot.require_integrity(message)
+			premium = bot.premium_context(user, guild)
+			simulated = getattr(message, "simulated", False)
+			pdata = bot.commands.personality[0].retrieve(channel or guild)
+			if bot_name != bot.name:
+				name_repr = bot.name + f', nickname "{bot_name}"'
+			else:
+				name_repr = bot_name
+			personality = mimic.personality.replace("{{user}}", user.display_name).replace("{{char}}", name_repr)
+			if bot.is_nsfw(channel) and "nsfw" not in personality.casefold():
+				ac = "You are currently in a NSFW-enabled channel. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise the needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
+			else:
+				ac = "You are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, please use disclaimers in your response, and mention this to the user if necessary."
+			personality += "\n" + ac
+			tzinfo = self.bot.data.users.get_timezone(user.id)
+			if tzinfo is None:
+				tzinfo, _c = self.bot.data.users.estimate_timezone(user.id)
+			dt = DynamicDT.now(tz=tzinfo)
+			personality += f"\nCurrent Time/Knowledge Cutoff: {dt.as_full()}"
+			system_message = cdict(
+				role="system",
+				content=personality,
+			)
+			input_message = cdict(
+				role="user",
+				name=user.display_name,
+				content=content.strip(),
+				url=message_link(message),
+				new=True,
+			)
+			if getattr(message, "simulated", False):
+				input_message.pop("url")
+				input_message.pop("new")
+			reply_message = None
+			messages = {}
+			if getattr(message, "reference", None):
+				r = reference = message.reference.resolved
+				reply_message = cdict(
+					role="assistant" if r.author.bot else "user",
+					name=r.author.display_name,
+					content=readstring(r.clean_content),
+					url=message_link(r),
+					new=True,
+				)
+			else:
+				reference = None
+			hislim = 48 if premium.value >= 4 else 24
+			if not simulated:
+				def parse_chat(s):
+					if " " not in s:
+						return s
+					prefix, suffix = s.split(" ", 1)
+					if prefix.endswith("+"):
+						return suffix
+					return s
+				async for m in bot.history(channel, limit=hislim):
+					if m.id < pdata.cutoff:
+						break
+					if m.id in messages or m.id == message.id:
+						continue
+					chat_msg = cdict(
+						role="assistant" if m.author.bot else "user",
+						name=m.author.display_name,
+						content=parse_chat(readstring(m.clean_content)),
+						url=message_link(m),
+					)
+					messages[m.id] = chat_msg
+			await bot.require_integrity(message)
+			print("INVOKE:", channel.id, mimic, input_message)
+			messagelist = [messages[k] for k in sorted(messages) if not reference or k != reference.id]
+			messagelist.insert(0, system_message)
+			if reply_message:
+				messagelist.append(reply_message)
+			if input_message:
+				messagelist.append(input_message)
+			messages = await ai.cut_to(messagelist, 98304, 2400, best=1, prompt=content, premium_context=premium)
+			data = dict(
+				model="deepseek-v3",
+				vision_model="gpt-4",
+				messages=messages,
+				assistant_name=mimic.name,
+				temperature=1,
+				top_p=1,
+				frequency_penalty=0,
+				presence_penalty=0,
+				repetition_penalty=1,
+				max_tokens=2000,
+				user=str(hash(str(user) or bot.user.name)),
+				stop=(),
+			)
+			try:
+				resp = await bot.force_chat(**data, premium_context=premium, stream=False, timeout=90)
+			except openai.BadRequestError:
+				raise
+			print("IL:", T(resp).get("model", mimic.name), resp)
+			content = resp.choices[0].message.content
+			if tts:
+				ms = split_text(content, max_length=150)
+			else:
+				ms = split_text(content, max_length=2000)
+			content = ms[-1] if ms else "\xad"
+			futs = []
+			for i, t in enumerate(ms[:-1]):
+				if tts and i == 1 and channel and guild and guild.me.permissions_in(channel).change_nickname:
+					# If we've got more than one message in TTS mode, we automatically backup the bot's nickname and replace it with a backtick (silent character) to avoid it being read out alongside every message.
+					original_nickname = guild.me.nick or "" # The "" is crucial to differentiate between None and an empty string.
+					await guild.me.edit(nick="`")
+				fut = csubmit(bot.send_as_webhook(channel, t, username=name, avatar_url=url, tts=tts))
+				futs.append(fut)
+				await asyncio.sleep(0.125)
+			await gather(*futs)
+		await bot.send_as_webhook(channel, content, username=name, avatar_url=url, tts=tts)
+		mimic.count += 1
+		mimic.total += len(content)
 
 
 class UpdateWebhooks(Database):

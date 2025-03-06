@@ -417,9 +417,9 @@ class Hyperchoron(Command):
 	description = "Runs Hyperchoron on the input URL. See https://github.com/thomas-xin/hyperchoron for more info, or to run it yourself!"
 	schema = cdict(
 		url=cdict(
-			type="url",
-			description="URL or attachment to convert",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
+			type="audio",
+			description="Audio supplied by URL or attachment",
+			example="https://cocobeanzies.mizabot.xyz/music/rainbow-critter.webm",
 			aliases=["i"],
 			required=True,
 		),
@@ -443,9 +443,8 @@ class Hyperchoron(Command):
 	rate_limit = (10, 20)
 
 	async def __call__(self, bot, url, format, **void):
-		fi = await bot.get_file(url)
-		fo = replace_ext(fi, format.casefold())
-		args = [python, "hyperchoron.py", "-i", fi, "-o", fo]
+		fo = os.path.abspath(replace_ext(url2fn(url), format.casefold()))
+		args = [python, "hyperchoron.py", "-i", url, "-o", fo]
 		print(args)
 		proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 		try:
