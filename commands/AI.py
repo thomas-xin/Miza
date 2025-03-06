@@ -629,7 +629,7 @@ class Instruct(Command):
 		model=cdict(
 			type="enum",
 			validation=cdict(
-				enum=["auto", "deepseek-r1", "deepseek-v3", "gpt-3.5", "gpt-4", "gpt-4m", "o1-mini", "o1-preview", "o3-mini", "o1", "mythomax-13b", "lzlv-70b", "mixtral-8x7b-instruct", "claude-3-opus", "claude-3.5-sonnet", "claude-3-sonnet", "claude-3-haiku", "command-r", "command-r-plus", "35b-beta-long", "qwen-72b", "dbrx-instruct", "mixtral-8x22b-instruct", "wizard-8x22b", "llama-3-8b", "llama-3-70b", "llama-3-405b"],
+				enum=["auto", "deepseek-r1", "deepseek-v3", "gpt-3.5", "gpt-4", "gpt-4m", "o1-mini", "o1-preview", "o3-mini", "o1", "mythomax-13b", "lzlv-70b", "mixtral-8x7b-instruct", "claude-3-opus", "claude-3.7-sonnet-t", "claude-3.7-sonnet", "claude-3.5-sonnet", "claude-3-sonnet", "claude-3-haiku", "command-r", "command-r-plus", "35b-beta-long", "qwen-72b", "dbrx-instruct", "mixtral-8x22b-instruct", "wizard-8x22b", "llama-3-8b", "llama-3-70b", "llama-3-405b"],
 				accepts={"llama": "llama-3-70b", "haiku": "claude-3-haiku", "r1": "deepseek-r1", "deepseek": "deepseek-v3", "gpt3.5": "gpt-3.5", "sonnet": "claude-3.5-sonnet", "dbrx": "dbrx-instruct", "gpt4": "gpt-4", "gpt-4o": "gpt-4", "gpt-4o-mini": "gpt-4m", "opus": "claude-3-opus"},
 			),
 			description="Target LLM to invoke",
@@ -700,13 +700,13 @@ class Instruct(Command):
 			model="deepseek-v3",
 		),
 		Claude=cdict(
-			model="claude-3.5-sonnet",
+			model="claude-3.7-sonnet-t",
 		),
 		Opus=cdict(
 			model="claude-3-opus",
 		),
 		Sonnet=cdict(
-			model="claude-3.5-sonnet",
+			model="claude-3.7-sonnet-t",
 		),
 		Haiku=cdict(
 			model="claude-3-haiku",
@@ -770,9 +770,9 @@ class Instruct(Command):
 					model = "gpt-3.5"
 				else:
 					model = "gpt-3.5-turbo-instruct"
-			if model in ("claude-3-opus", "o1", "o1-preview"):
+			if model in ("claude-3-opus", "o1", "o1-preview", "claude-3.7-sonnet-t"):
 				_premium.require(3)
-			elif model in ("claude-3.5-sonnet", "claude-3-sonnet", "command-r-plus", "gpt-4", "yi-large", "o1-mini", "r1"):
+			elif model in ("claude-3.7-sonnet", "claude-3.5-sonnet", "command-r-plus", "gpt-4", "yi-large", "o1-mini", "r1"):
 				_premium.require(2)
 			elif model in ("dbrx-instruct", "gpt-3.5", "deepseek-v3", "gpt-4m", "lzlv-70b", "llama-3-70b"):
 				_premium.require(1)
@@ -825,7 +825,7 @@ class Imagine(Command):
 		url=cdict(
 			type="image",
 			description="Image supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 		),
 		prompt=cdict(
@@ -838,7 +838,7 @@ class Imagine(Command):
 		mask=cdict(
 			type="image",
 			description="Mask supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 		),
 		num_inference_steps=cdict(
 			type="number",
@@ -1028,7 +1028,7 @@ class Imagine(Command):
 				for fut in futi:
 					try:
 						s = await fut
-						assert len(s.strip()) > 12
+						assert len(s.strip()) > 12, f"Language model returned too short: {s}"
 					except Exception:
 						print_exc()
 						continue

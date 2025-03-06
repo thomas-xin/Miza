@@ -3280,11 +3280,12 @@ class UpdateRPS(Database):
 
 class HOW(Command):
 	description = ":3"
+	schema = cdict()
 	rate_limit = (0, 1)
 	ephemeral = True
 
-	def __call__(self, channel, message, **void):
-		self.bot.send_as_embeds(channel, image="https://mizabot.xyz/u/EFz0uPvEMFE.gif", reference=message)
+	def __call__(self, _channel, _message, **void):
+		self.bot.send_as_embeds(_channel, image="https://mizabot.xyz/u/nuHH3sBNGJ5wxO3_A_-J3G5wKte7/how_full.webp", reference=_message)
 
 
 HEADERS = {

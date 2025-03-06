@@ -149,7 +149,8 @@
 		},
 		"Preserve": {
 			"aliases": [
-				"Preserve"
+				"Preserve",
+				"PreserveAttachmentLinks"
 			],
 			"description": "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to Miza's webserver's upload page: https://mizabot.xyz/files",
 			"usage": "",
@@ -415,7 +416,7 @@
 				"Emoticon"
 			],
 			"description": "Sends an ASCII emoticon from a selection.",
-			"usage": "<-1:mode(Bear|Cat|Cheers|Com'ere|Cry|Disapprove|Embarrassed|FlipOff|Flower|Friends|Hai|Happy|HappyGary|Infatuated|Joy|Lenny|Mellow|Money|Sad|Salute|Shout|Smooch|Star|Studying|UwU)> <string>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(1, 5)",
 			"example": [],
@@ -1399,6 +1400,18 @@
 			"example": [],
 			"timeout": "72"
 		},
+		"Blur": {
+			"aliases": [
+				"Blur",
+				"Gaussian"
+			],
+			"description": "Applies a blur algorithm to the image.",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(5, 7)",
+			"example": [],
+			"timeout": "72"
+		},
 		"ColourSpace": {
 			"aliases": [
 				"ColourSpace",
@@ -2087,7 +2100,7 @@
 			"level": "nan",
 			"rate_limit": "(2, 3)",
 			"example": [
-				"setavatar https://mizabot.xyz/favicon"
+				"setavatar https://cdn.discordapp.com/embed/avatars/0.png"
 			],
 			"timeout": "24"
 		},
@@ -2285,8 +2298,22 @@
 			"rate_limit": "(20, 30)",
 			"example": [
 				"wav2png https://www.youtube.com/watch?v=IgOci6JXPIc",
-				"png2wav https://mizabot.xyz/favicon"
+				"png2wav https://cdn.discordapp.com/embed/avatars/0.png"
 			],
+			"timeout": "360"
+		},
+		"Hyperchoron": {
+			"aliases": [
+				"Hyperchoron",
+				"Png2Wav",
+				"Png2Mp3",
+				"Midi2Org"
+			],
+			"description": "Runs Hyperchoron on the input URL. See https://github.com/thomas-xin/hyperchoron for more info, or to run it yourself!",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(10, 20)",
+			"example": [],
 			"timeout": "360"
 		},
 		"AudioSeparator": {

@@ -43,7 +43,7 @@ class Shutdown(Command):
 				accepts=dict(restart="reboot", wait="maintain"),
 			),
 			description="Image supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			default="maintain",
 		),
 		delay=cdict(
@@ -855,7 +855,7 @@ class SetAvatar(Command):
 	min_level = nan
 	description = "Changes ⟨BOT⟩'s current avatar."
 	usage = "<avatar_url>?"
-	example = ("setavatar https://mizabot.xyz/favicon",)
+	example = ("setavatar https://cdn.discordapp.com/embed/avatars/0.png",)
 
 	async def __call__(self, bot, user, message, channel, args, **void):
 		# Checking if message has an attachment

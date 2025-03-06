@@ -430,9 +430,9 @@ class UpdateEmojiNames(Database):
 	name = "emojinames"
 
 
-class MimicConfig(Command):
+class ProxyConfig(Command):
 	name = ["PluralConfig", "PConfig", "RPConfig", "MConfig"]
-	description = "Modifies an existing webhook mimic's attributes."
+	description = "Modifies an existing webhook proxy's attributes."
 	usage = "<0:mimic_id> <target(prefix|name|avatar|description|gender|birthday)>? <1:new>?"
 	example = ("mconfig 692369756941978254 name test2",)
 	rate_limit = (4, 5)
@@ -482,7 +482,7 @@ class MimicConfig(Command):
 			args.extend(best_url(a) for a in message.attachments)
 			if new is None:
 				if not opt:
-					emb = await bot.commands.info[0].getMimicData(mimic, "v")
+					emb = await bot.commands.info[0].getProxyData(mimic, "v")
 					bot.send_as_embeds(message.channel, emb)
 					noret = True
 				else:
@@ -539,17 +539,43 @@ class MimicConfig(Command):
 		return css_md(f"Changed {setting} for {sqr_md(', '.join(m.name for m in mimlist))} to {sqr_md(new)}.")
 
 
-class Mimic(Command):
-	name = ["RolePlay", "Plural", "RP", "RPCreate"]
-	description = "Spawns a webhook mimic with an optional username and icon URL, or lists all mimics with their respective prefixes. Mimics require permission level of 1 to invoke."
-	usage = "<0:prefix>? <1:user|name>? <2:url>? <delete(-d)>?"
-	example = ("mimic %miza @Miza", "rp %%test Test https://cdn.discordapp.com/embed/avatars/0.png", "plural -d %lol%")
-	flags = "aedzf"
+class Proxy(Command):
+	name = ["Mimic", "Plural", "RolePlay", "RP"]
+	description = "Creates a webhook proxy from a name or user, or lists all proxies with their respective prefixes. Proxies are tied to their creator user, and require permission level of 1 to invoke."
+	schema = cdict(
+		prefix=cdict(
+			type="word",
+			description="Prefix used to invoke the proxy",
+			example="%test",
+			required=True,
+		),
+		name=cdict(
+			type="string",
+			description="Name of the proxy. Must be 80 or fewer in length",
+			example="Test Webhook",
+		),
+		icon=cdict(
+			type="visual",
+			description="Icon of the proxy, supplied by URL or attachment",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
+		),
+		user=cdict(
+			type="user",
+			description="User account to clone, for mimic mode. Will always override both name and icon when applicable",
+			example="668999031359537205",
+		),
+		delete=cdict(
+			type="word",
+			description="Prefix or ID of proxy to delete",
+			example="%test",
+		),
+	)
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	rate_limit = (6, 7)
+	maintenance = True
 
-	async def __call__(self, bot, message, user, perm, flags, args, argv, **void):
+	async def __call__(self, bot, _user, prefix, name, icon, user, delete, **void):
 		mimicdb = bot.data.mimics
 		args.extend(best_url(a) for a in reversed(message.attachments))
 		if len(args) == 1 and "d" not in flags:
@@ -569,7 +595,7 @@ class Mimic(Command):
 				message,
 				"*```" + "\n" * ("z" in flags) + "callback-webhook-mimic-"
 				+ str(user.id) + "_0"
-				+ "-\nLoading Mimic database...```*",
+				+ "-\nLoading Proxy database...```*",
 				buttons=buttons,
 			)
 			return
@@ -609,7 +635,7 @@ class Mimic(Command):
 			raise TypeError("Prefix must not contain spaces.")
 		# This limit is ridiculous. I like it.
 		if sum(len(i) for i in iter(mimics.values())) >= 32768:
-			raise OverflowError(f"Mimic list for {user} has reached the maximum of 32768 items. Please remove an item to add another.")
+			raise OverflowError(f"Proxy list for {user} has reached the maximum of 32768 items. Please remove an item to add another.")
 		dop = None
 		mid = discord.utils.time_snowflake(dtn())
 		ctime = utc()
@@ -736,11 +762,11 @@ class Mimic(Command):
 			await bot.ignore_interaction(message)
 
 
-class MimicSend(Command):
+class ProxySend(Command):
 	name = ["RPSend", "PluralSend"]
-	description = "Sends a message using a webhook mimic, to the target channel."
+	description = "Sends a message using a webhook proxy, to the target channel."
 	usage = "<0:mimic> <1:channel> <2:string>"
-	example = ("rpsend %test #bots this is a test", "mimicsend !mimic #roleplay hi guys")
+	example = ("rpsend %test #bots this is a test", "proxysend !mimic #roleplay hi guys")
 	no_parse = True
 
 	async def __call__(self, bot, channel, message, user, perm, argv, args, **void):
@@ -786,7 +812,7 @@ class MimicSend(Command):
 					return
 				emb = await bot.as_embed(message, link=True)
 				emb.colour = discord.Colour(0x00FF00)
-				action = f"**Mimic invoked in** {channel_mention(channel.id)}:\n"
+				action = f"**Proxy invoked in** {channel_mention(channel.id)}:\n"
 				emb.description = lim_str(action + emb.description, 4096)
 				emb.timestamp = message.created_at
 				self.bot.send_embeds(c, emb)
@@ -860,7 +886,7 @@ class UpdateMimics(Database):
 						return
 					emb = await self.bot.as_embed(message, link=True)
 					emb.colour = discord.Colour(0x00FF00)
-					action = f"**Mimic invoked in** {channel_mention(channel.id)}:\n"
+					action = f"**Proxy invoked in** {channel_mention(channel.id)}:\n"
 					emb.description = lim_str(action + emb.description, 4096)
 					emb.timestamp = message.created_at
 					self.bot.send_embeds(c, emb)

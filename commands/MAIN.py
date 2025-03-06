@@ -820,7 +820,7 @@ class Profile(Command):
 		icon=cdict(
 			type="visual",
 			description="Thumbnail to display on corner of embeds",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 		),
 		timezone=cdict(
 			type="text",
@@ -1052,12 +1052,13 @@ class Invite(Command):
 
 
 class Preserve(Command):
+	name = ["PreserveAttachmentLinks"]
 	description = "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to ⟨BOT⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
 	schema = cdict(
 		urls=cdict(
 			type="url",
 			description="URL or attachment to preserve",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			multiple=True,
 			required=True,
@@ -1113,17 +1114,12 @@ class Reminder(Command):
 		icon=cdict(
 			type="visual",
 			description="Thumbnail to display on corner of embed",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 		),
 		time=cdict(
 			type="datetime",
 			description="Optional field containing any text; will show above description when set",
 			example="35 minutes and 6.25 seconds before 3am next tuesday, EDT",
-		),
-		remove=cdict(
-			type="index",
-			description="Index of reminder(s) to delete",
-			example="3..7",
 		),
 		delete=cdict(
 			type="index",
@@ -1136,14 +1132,13 @@ class Reminder(Command):
 	rate_limit = (8, 13)
 	slash = True
 
-	async def __call__(self, bot, _message, _comment, _channel, _user, mode="reminder", message=None, icon=None, time=None, remove=None, delete=None, **void):
+	async def __call__(self, bot, _message, _comment, _channel, _user, mode="reminder", message=None, icon=None, time=None, delete=None, **void):
 		sendable = _channel if mode == "announce" else _user
 		rems = bot.data.reminders.get(sendable.id, [])
-		remove = remove or delete
-		if remove is not None:
+		if delete is not None:
 			if not len(rems):
 				return ini_md(f"No {mode}s currently set for {sqr_md(sendable)}.")
-			targets = RangeSet.parse([remove], len(rems))
+			targets = RangeSet.parse([delete], len(rems))
 			assert targets, "No reminders at the specified index."
 			removed = (r := rems[targets[0]]).msg + "; " + DynamicDT.utcfromtimestamp(r.t).as_full()
 			if len(targets) > 1:

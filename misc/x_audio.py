@@ -1114,7 +1114,7 @@ class AudioFile:
 					if is_url(self.stream) and expired(self.stream):
 						self = None
 				if self:
-					if not is_url(self.stream) and os.path.exists(self.stream):
+					if isinstance(self.stream, str) and not is_url(self.stream) and os.path.exists(self.stream):
 						if not entry.get("duration"):
 							entry["duration"] = get_duration(self.stream) or self.duration
 							name, _url = map(unquote_plus, self.stream.rsplit("/", 1)[-1].rsplit(" ", 1))

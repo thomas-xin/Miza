@@ -1477,17 +1477,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return discord.Permissions(0)
 
 	hiscache = {}
-	async def history(self, channel, limit=200, before=None, after=None, use_cache=True, care=True):
+	async def history(self, channel, limit=200, before=None, after=None, use_cache=True, full=True):
 		c_id = verify_id(channel)
 		c = self.in_cache(c_id)
 		if c is None:
 			c = channel
-		if channel is None:
+		if c is None:
 			return
+		if not is_channel(c):
+			c = await self.get_dm(c)
+		channel = c
+		c_id = c.id
 		if limit and not isfinite(limit):
 			limit = None
-		if not is_channel(channel):
-			channel = await self.get_dm(channel)
 		if type(before) in (int, float):
 			if not isfinite(before):
 				before = None
@@ -1511,7 +1513,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					yield message
 				return
 			if "channel_cache" in self.data:
-				async for message in self.data.channel_cache.grab(c_id, as_message=care, force=False):
+				async for message in self.data.channel_cache.grab(c_id, as_message=full, force=False):
 					if isinstance(message, int):
 						message = cdict(id=message)
 					if before:
@@ -2336,14 +2338,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		2: cdict(
-			reasoning="o3-mini",
-			instructive="gpt-4",
+			reasoning="claude-3.7-sonnet-t",
+			instructive="claude-3.7-sonnet",
 			casual="deepseek-v3",
 			nsfw="magnum-72b",
 			backup="minimax-01",
-			retry="claude-3.5-sonnet",
+			retry="claude-3.7-sonnet",
 			function="gpt-4",
-			vision="claude-3.5-sonnet",
+			vision="claude-3.7-sonnet",
 			target="auto",
 		),
 	}
@@ -2945,6 +2947,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						d = d[:128] + b".." + d[-128:]
 					s = as_str(d)
 					return f'<file name="{name}">' + s + "</file>"
+				assert isinstance(d, (str, bytes)), d
 				d = await process_image(d, "resize_max", [dimlim, False, "auto", "-bg", "-oz", "-fs", lim, "-f", "jpg"], timeout=timeout, retries=1)
 		else:
 			d = url
@@ -3284,9 +3287,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def get_file(self, url, limit=None, full=True, timeout=12):
 		# Helper function to get a file from a URL. We use the ts_us() function to generate a unique filename starting with the current timestamp.
+		fn = url2fn(url)
+		ext = fn.rsplit(".", 1)[-1] if "." in fn else "bin"
 		content = await self.get_request(url, limit=limit, full=full, timeout=timeout)
 		ts = ts_us()
-		fn = f"{CACHE_PATH}/{ts}.bin"
+		fn = f"{CACHE_PATH}/{ts}.{ext}"
 		with open(fn, "wb") as f:
 			await asubmit(f.write, content)
 		return fn
@@ -4943,7 +4948,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		spl = parser.parse_known_args(args)
 		kwargs = cdict((k, v) for k, v in spl[0]._get_kwargs() if v is not None)
 		if o_kwargs:
-			kwargs.update(o_kwargs)
+			for k, v in o_kwargs.items():
+				kwargs.setdefault(k, v)
 		for k, v in tuple(kwargs.items()):
 			if "-" in k:
 				kwargs[k.replace("-", "_")] = kwargs.pop(k)
@@ -5425,10 +5431,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if getattr(sem, "busy", None):
 			csubmit(message.add_reaction("🌡️"))
 		if command_check in command.macromap:
-			kv = command.macromap[command_check]
-			if kwargs is None:
-				kwargs = {}
-			kwargs.update(kv)
+			kv = command.macromap[command_check].copy()
+			if kwargs:
+				kv.update(kwargs)
+			kwargs = kv
 		kwargs = await self.extract_kwargs(argv, command, u_perm, user, message, channel, guild, command_check, kwargs)
 		comment = comment or ""
 		fut = None
@@ -5463,6 +5469,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				_guild=guild,					# guild data
 				_name=command_check,			# alias the command was called as
 				_comment=comment,
+				_slash=slash,
 				_looped=loop,					# whether this command was invoked as part of a loop
 				_timeout=timeout,				# timeout delay assigned to the command
 				**kwargs,						# Keyword arguments for schema-specified commands
@@ -8200,11 +8207,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if d["type"] == 2:
 						# print("SLASH:", cdata)
 						name = cdata["name"].replace(" ", "")
+						command = self.commands[name][0]
 						try:
-							command = self.commands[name][0]
 							usage = command.usage
 						except LookupError:
-							command = None
 							usage = ""
 						arguments = sorted(cdata.get("options", ()), key=lambda arg: ((i := usage.find(arg.get("name") or "")) < 0, i))
 						kwargs = {arg["name"]: arg["value"] for arg in arguments}

@@ -930,6 +930,10 @@ class Skip(Command):
 		skips = []
 		for i in targets:
 			entry = q[i]
+			if not entry:
+				q[i] = dict(name="null")
+				skips.append(i)
+				continue
 			if _user.id in entry.get("skips", ()):
 				if len(entry.get("skips", ())) >= required:
 					skips.append(i)
@@ -951,20 +955,21 @@ class Skip(Command):
 		if votes:
 			await bot.audio.asubmit(f"[e.setdefault('skips',set()).add({_user.id}) for e in AP.from_guild({_guild.id}).queue]")
 			desc.append(f"Voted to skip entry {votes[0]} (`{q[votes[0]]['name']}`), `{len(votes)}/{required}`." if len(votes) == 1 else f"Voted to skip {len(votes)} entries.")
-		if after is None:
-			if mode != "force":
-				lost = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).skip({skips},loop={settings.loop},repeat={settings.repeat},shuffle={settings.shuffle})")
-				desc.append(f"Skipped entry {skips[0]} (`{lost[0]['name']}`)." if len(skips) == 1 else f"Skipped all ({len(skips)}) entries." if not q else f"Skipped {len(skips)} entries.")
+		if skips:
+			if after is None:
+				if mode != "force":
+					lost = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).skip({skips},loop={settings.loop},repeat={settings.repeat},shuffle={settings.shuffle})")
+					desc.append(f"Skipped entry {skips[0]} (`{lost[0]['name']}`)." if len(skips) == 1 else f"Skipped all ({len(skips)}) entries." if not q else f"Skipped {len(skips)} entries.")
+				else:
+					lost = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).skip({skips})")
+					desc.append(f"Removed entry {skips[0]} (`{lost[0]['name']}`)." if len(skips) == 1 else f"Removed all ({len(skips)}) entries." if not q else f"Removed {len(skips)} entries.")
 			else:
-				lost = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).skip({skips})")
-				desc.append(f"Removed entry {skips[0]} (`{lost[0]['name']}`)." if len(skips) == 1 else f"Removed all ({len(skips)}) entries." if not q else f"Removed {len(skips)} entries.")
-		else:
-			temp = skips.copy()
-			if 0 in temp:
-				await bot.audio.asubmit(f"AP.from_guild({_guild.id}).queue[0].__setitem__('end',{elapsed + after.total_seconds()})")
-				temp.remove(0)
-			await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})) and [a.queue[i].__setitem__('end',{after.total_seconds()}) for i in {temp}]")
-			desc.append((f"Entry {skips[0]} (`{q[skips[0]]['name']}`)" if len(skips) == 1 else f"{len(skips)} entries") + f" will automatically skip after {after}.")
+				temp = skips.copy()
+				if 0 in temp:
+					await bot.audio.asubmit(f"AP.from_guild({_guild.id}).queue[0].__setitem__('end',{elapsed + after.total_seconds()})")
+					temp.remove(0)
+				await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})) and [a.queue[i].__setitem__('end',{after.total_seconds()}) for i in {temp}]")
+				desc.append((f"Entry {skips[0]} (`{q[skips[0]]['name']}`)" if len(skips) == 1 else f"{len(skips)} entries") + f" will automatically skip after {after}.")
 		colour = await bot.get_colour(_user)
 		emb = discord.Embed(colour=colour)
 		emb.description = "\n- ".join(desc)

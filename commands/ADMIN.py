@@ -175,7 +175,7 @@ class Purge(Command):
 						await bot.silent_delete(m, keep_log=True, exc=True)
 					delcount += 1
 		async with bot.guild_semaphore:
-			async for m in bot.history(_channel, limit=count, after=left, before=right):
+			async for m in bot.history(_channel, limit=count, after=left, before=right, full=False):
 				if len(found) >= count:
 					break
 				if user and m.author.id != user.id:

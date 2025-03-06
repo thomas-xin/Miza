@@ -1983,17 +1983,23 @@ def hcy_to_ycc(hcy_image):
 
 blurs = {
 	"box": ImageFilter.BoxBlur,
-	"boxblur": ImageFilter.BoxBlur,
 	"gaussian": ImageFilter.GaussianBlur,
-	"gaussianblur": ImageFilter.GaussianBlur,
 }
-
-def blur(image, filt="box", radius=2):
-	try:
-		_filt = blurs[filt.replace("_", "").casefold()]
-	except KeyError:
-		raise TypeError(f'Invalid image operation: "{filt}"')
-	return image.filter(_filt(radius))
+@sync_animations
+def blur_map(images, filt, radius=6, **kwargs):
+	image = images[0]
+	rgb, A = split_rgba(image)
+	if A:
+		a = np.array(A, dtype=np.float32)
+		a *= 1 / 255
+		sumA = np.sum(a)
+		if sumA == 0:
+			col = (0, 0, 0)
+		else:
+			col = tuple(round((np.sum(np.multiply(c.T, a)) / sumA).item() * 255) for c in np.asanyarray(rgb, dtype=np.uint8).T)
+		im = Image.new("RGBA", image.size, col)
+		image = Image.alpha_composite(im, image)
+	return images[0].filter(blurs[filt](radius))
 
 
 def invert(image):

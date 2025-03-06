@@ -873,7 +873,8 @@ class Char2Emoji(Command):
 
 class Emoticon(Command):
 	description = "Sends an ASCII emoticon from a selection."
-	em_map = {k: v for v, k in (line.rsplit(None, 1) for line in """( ͡° ͜ʖ ͡°) Lenny
+	em_map = {k: v for v, k in (line.rsplit(None, 1) for line in """
+( ͡° ͜ʖ ͡°) Lenny
 ಠ_ಠ Disapprove
 ฅ(^•ﻌ•^ฅ) Cat
 ʕ •ᴥ•ʔ Bear
@@ -897,32 +898,44 @@ class Emoticon(Command):
 ヽ(´ー`)人(´∇｀)人(`Д´)ノ Friends
 （･∀･)つ⑩ Money
 d(*⌒▽⌒*)b Happy
-(≧ロ≦) Shout""".splitlines())}
+(≧ロ≦) Shout
+""".splitlines() if line)}
 	em_mapper = fcdict(em_map)
-	modes = "|".join(sorted(em_map))
-	usage = f"<-1:mode({modes})> <string>?"
+	schema = cdict(
+		emoticon=cdict(
+			type="enum",
+			validation=cdict(
+				enum=tuple(sorted(em_mapper)),
+			),
+			description="Emoticon to insert",
+			required=True,
+		),
+		position=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("start", "end"),
+			),
+			description="Position to insert emoticon",
+			default="end",
+		),
+		string=cdict(
+			type="string",
+			description="Extra message content to send",
+		),
+	)
 	rate_limit = (1, 5)
 	slash = True
-	# ephemeral = True
 
-	async def __call__(self, bot, argv, channel, user, message, **void):
-		tup = argv.split(None, 1)
-		if len(tup) >= 2:
-			key, argv = tup
-			if key.startswith('"') and key.endswith('"'):
-				with suppress():
-					key = literal_eval(key)
-			resp = argv + " " + escape_markdown(self.em_mapper[key])
+	async def __call__(self, bot, _user, _slash, _channel, emoticon, position, string, **void):
+		insertion = self.em_mapper[emoticon]
+		if string:
+			msg = string.strip() + " " + insertion if position == "end" else insertion + " " + string.strip()
 		else:
-			key = argv
-			if key.startswith('"') and key.endswith('"'):
-				with suppress():
-					key = literal_eval(key)
-			resp = escape_markdown(self.em_mapper[key])
-		url = await self.bot.get_proxy_url(user)
-		if getattr(message, "slash", None):
-			csubmit(bot.ignore_interaction(message, skip=True))
-		await bot.send_as_webhook(channel, resp, username=user.display_name, avatar_url=url)
+			msg = insertion
+		url = await self.bot.get_proxy_url(_user)
+		if _slash:
+			return cdict(content=msg)
+		await bot.send_as_webhook(_channel, msg, username=_user.display_name, avatar_url=url)
 
 
 class EmojiCrypt(Command):
@@ -1281,7 +1294,7 @@ class Describe(Command):
 		url=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 		),

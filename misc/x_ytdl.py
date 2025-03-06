@@ -31,7 +31,7 @@ def entry_from_ytdl(resp):
 def extract_info(url, download=False, process=True):
 	global ts, ytdl
 	ts2 = utc()
-	if ts2 - ts > 300:
+	if not ytdl or ts2 - ts > 300:
 		ts = ts2
 		ydl_opts = {
 			"quiet": 1,
@@ -248,7 +248,7 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			input_args.extend(["-ss", str(self.start)])
 		if self.end is not None:
 			input_args.extend(["-to", str(self.end)])
-		if source_codec == self.codec or source_codec.startswith("pcm_") and self.codec == "wav":
+		if source_codec == self.codec or isinstance(source_codec, str) and source_codec.startswith("pcm_") and self.codec == "wav":
 			output_args.extend(["-c", "copy"])
 		else:
 			# Default to 192k for AAC, 160k for Opus, and 224k for MP3
@@ -264,8 +264,9 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 		)
 		return [], info
 
-ytd.postprocessor.__dict__["FFmpegCustomVideoConvertorPP"] = FFmpegCustomVideoConvertorPP
-ytd.postprocessor.__dict__["FFmpegCustomAudioConvertorPP"] = FFmpegCustomAudioConvertorPP
+for pp in (FFmpegCustomVideoConvertorPP, FFmpegCustomAudioConvertorPP):
+	ytd.postprocessor.postprocessors.__dict__[pp.__name__] = pp
+	ytd.postprocessor.postprocessors.value[pp.__name__] = pp
 
 
 if __name__ == "__main__":

@@ -38,6 +38,14 @@ available = {
 		"openrouter": ("anthropic/claude-3-opus", ("15", "75")),
 		None: "gpt-4",
 	},
+	"claude-3.7-sonnet-t": {
+		"openrouter": ("anthropic/claude-3.7-sonnet:thinking", ("3", "15")),
+		None: "o3-mini",
+	},
+	"claude-3.7-sonnet": {
+		"openrouter": ("anthropic/claude-3.7-sonnet", ("3", "15")),
+		None: "gpt-4",
+	},
 	"claude-3.5-sonnet": {
 		"openrouter": ("anthropic/claude-3.5-sonnet", ("3", "15")),
 		None: "gpt-4",
@@ -51,15 +59,15 @@ available = {
 		None: "gpt-4m",
 	},
 	"deepseek-r1": {
+		"deepseek": ("deepseek-reasoner", ("0.41167", "1.64333")),
 		"deepinfra": ("deepseek-ai/DeepSeek-R1", ("0.85", "2.5")),
 		"openrouter": ("deepseek/deepseek-r1", ("0.85", "2.5")),
-		"deepseek": ("deepseek-reasoner", ("0.55", "2.19")),
 		None: "o1-preview",
 	},
 	"deepseek-v3": {
+		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
 		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
 		"openrouter": ("deepseek/deepseek-chat", ("0.9", "1")),
-		"deepseek": ("deepseek-chat", ("0.27", "1.1")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
 		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
 		None: "gpt-4",
@@ -198,16 +206,13 @@ available = {
 
 # tags: is_chat, is_completion, is_function, is_vision, is_premium
 is_chat = {
+	"claude-3.7-sonnet-t",
+	"claude-3.7-sonnet",
 	"claude-3.5-sonnet",
-	"claude-3-5-sonnet-20241022",
 	"claude-3.5-haiku",
-	"claude-3-5-haiku-20241022",
 	"claude-3-opus",
-	"claude-3-opus-20240229",
 	"claude-3-sonnet",
-	"claude-3-sonnet-20240229",
 	"claude-3-haiku",
-	"claude-3-haiku-20240307",
 	"command-r",
 	"command-r-plus",
 	"35b-beta-long",
@@ -273,16 +278,13 @@ is_completion = {
 	"mixtral-8x7b",
 }
 is_function = {
+	"claude-3.7-sonnet-t",
+	"claude-3.7-sonnet",
 	"claude-3.5-sonnet",
-	"claude-3-5-sonnet-20241022",
 	"claude-3.5-haiku",
-	"claude-3-5-haiku-20241022",
 	"claude-3-opus",
-	"claude-3-opus-20240229",
 	"claude-3-sonnet",
-	"claude-3-sonnet-20240229",
 	"claude-3-haiku",
-	"claude-3-haiku-20240307",
 	"command-r",
 	"command-r-plus",
 	"35b-beta-long",
@@ -307,14 +309,12 @@ is_function = {
 	"firefunction-v1",
 }
 is_vision = {
+	"claude-3.7-sonnet-t",
+	"claude-3.7-sonnet",
 	"claude-3.5-sonnet",
-	"claude-3-5-sonnet-20241022",
 	"claude-3-opus",
-	"claude-3-opus-20240229",
 	"claude-3-sonnet",
-	"claude-3-sonnet-20240229",
 	"claude-3-haiku",
-	"claude-3-haiku-20240307",
 	"llama-3-11b",
 	"llama-3-90b",
 	"o1",
@@ -332,12 +332,11 @@ is_vision = {
 	"phi-4b",
 }
 is_premium = {
+	"claude-3.7-sonnet-t",
+	"claude-3.7-sonnet",
 	"claude-3.5-sonnet",
-	"claude-3-5-sonnet-20240620",
 	"claude-3-opus",
-	"claude-3-opus-20240229",
 	"claude-3-sonnet",
-	"claude-3-sonnet-20240229",
 	"llama-3-405b",
 	"o3-mini",
 	"o1",
@@ -376,6 +375,8 @@ instruct_formats = {
 }
 # Default context: 4096
 contexts = {
+	"claude-3.7-sonnet-t": 200000,
+	"claude-3.7-sonnet": 200000,
 	"claude-3.5-sonnet": 200000,
 	"claude-3.5-haiku": 200000,
 	"claude-3-opus": 200000,
@@ -896,6 +897,8 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 		else:
 			caller = oai_method(api, func)
 		body = cdict(kwargs.get("extra_body") or {})
+		if model in ("o1", "o1-preview", "o1-mini", "o3-mini", "claude-3.7-sonnet", "claude-3.7-sonnet:thinking"):
+			kwa.pop("temperature", None)
 		if "repetition_penalty" not in kwa:
 			kwa["repetition_penalty"] = cast_rp(kwa.pop("frequency_penalty", 0.25), kwa.pop("presence_penalty", 0.25), model=model)
 		if sapi == "mizabot":

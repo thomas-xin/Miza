@@ -27,7 +27,7 @@ class ColourDeficiency(Command):
 		url=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 		),
@@ -81,7 +81,7 @@ class EdgeDetect(Command):
 		url=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 		),
@@ -136,6 +136,65 @@ class EdgeDetect(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
+class Blur(Command):
+	description = "Applies a blur algorithm to the image."
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("gaussian",),
+			),
+			description="The algorithm to apply",
+			example="depth",
+			default="gaussian",
+		),
+		strength=cdict(
+			type="number",
+			validation="[0, 1048576]",
+			example="8",
+			default=6,
+		),
+		url=cdict(
+			type="visual",
+			description="Image, animation or video, supplied by URL or attachment",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
+			aliases=["i"],
+			required=True,
+		),
+		filesize=cdict(
+			type="filesize",
+			validation="[1024, 1073741824]",
+			description="The maximum filesize in bytes",
+			example="10kb",
+			default=CACHE_FILESIZE,
+			aliases=["fs"],
+		),
+		format=cdict(
+			type="enum",
+			validation=cdict(
+				enum=tuple(VISUAL_FORMS),
+				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
+			),
+			description="The file format or codec of the output",
+			example="mp4",
+			default="auto",
+		),
+	)
+	macros = cdict(
+		Gaussian=cdict(
+			mode="gaussian",
+		),
+	)
+	rate_limit = (5, 7)
+	_timeout_ = 3
+
+	async def __call__(self, _timeout, mode, strength, url, filesize, format, **void):
+		resp = await process_image(url, "blur_map", [[], None, None, mode, strength, "-fs", filesize, "-f", format], cap="image", timeout=_timeout)
+		fn = url2fn(url)
+		name = replace_ext(fn, get_ext(resp))
+		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
+
+
 class ColourSpace(Command):
 	name = ["ColorSpace"]
 	description = "Changes the colour space of the supplied image."
@@ -143,7 +202,7 @@ class ColourSpace(Command):
 		url=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 		),
@@ -200,7 +259,7 @@ class GMagik(Command):
 		url=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			# aliases=["i"],
 			required=True,
 		),
@@ -370,7 +429,7 @@ class Average(Command):
 		url=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 		),
@@ -505,7 +564,7 @@ class Rainbow(Command):
 		url=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 		),
@@ -576,7 +635,7 @@ class Scroll(Command):
 		url=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 		),
@@ -647,7 +706,7 @@ class Spin(Command):
 		url=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 		),
@@ -728,7 +787,7 @@ class Orbit(Command):
 		urls=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 			multiple=True,
@@ -797,7 +856,7 @@ class Pet(Command):
 		url=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 		),
@@ -866,7 +925,7 @@ class Tesseract(Command):
 		url=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 		),
@@ -968,7 +1027,7 @@ class Resize(Command):
 		url=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 		),
@@ -1076,7 +1135,7 @@ class Crop(Command):
 		url=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 		),
@@ -1144,7 +1203,7 @@ class Adjust(Command):
 		url=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 		),
@@ -1257,7 +1316,7 @@ class Blend(Command):
 		urls=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=2,
 			multiple=True,
@@ -1318,7 +1377,7 @@ class Steganography(Command):
 		url=cdict(
 			type="image",
 			description="Image supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 		),
@@ -1351,7 +1410,7 @@ class OCR(Command):
 		url=cdict(
 			type="image",
 			description="Image supplied by URL or attachment",
-			example="https://mizabot.xyz/favicon",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
 		),

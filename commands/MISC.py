@@ -379,7 +379,7 @@ class Wav2Png(Command):
 	name = ["Png2Wav", "Png2Mp3"]
 	description = "Runs wav2png on the input URL. See https://github.com/thomas-xin/Audio-Image-Converter for more info, or to run it yourself!"
 	usage = "<0:search_links>"
-	example = ("wav2png https://www.youtube.com/watch?v=IgOci6JXPIc", "png2wav https://mizabot.xyz/favicon")
+	example = ("wav2png https://www.youtube.com/watch?v=IgOci6JXPIc", "png2wav https://cdn.discordapp.com/embed/avatars/0.png")
 	rate_limit = (20, 30)
 	typing = True
 
@@ -409,6 +409,58 @@ class Wav2Png(Command):
 					force_kill(proc)
 				raise
 		await bot.send_with_file(channel, "", dest, filename=fn + "." + ext, reference=message)
+
+
+class Hyperchoron(Command):
+	_timeout_ = 15
+	name = ["Png2Wav", "Png2Mp3"]
+	description = "Runs Hyperchoron on the input URL. See https://github.com/thomas-xin/hyperchoron for more info, or to run it yourself!"
+	schema = cdict(
+		url=cdict(
+			type="url",
+			description="URL or attachment to convert",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
+			aliases=["i"],
+			required=True,
+		),
+		format=cdict(
+			type="enum",
+			validation=cdict(
+				enum=(
+					"mid", "csv", "nbs", "mcfunction", "litematic", "org",
+					"als", "amped", "dawproject", "flp", "mmp", "muse",
+					"sequence", "soundbridge", "rrp", "soundation",
+				),
+			),
+			default="nbs",
+		),
+	)
+	macros = cdict(
+		Midi2Org=cdict(
+			format="org",
+		),
+	)
+	rate_limit = (10, 20)
+
+	async def __call__(self, bot, url, format, **void):
+		fi = await bot.get_file(url)
+		fo = replace_ext(fi, format.casefold())
+		args = [python, "hyperchoron.py", "-i", fi, "-o", fo]
+		print(args)
+		proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+		try:
+			async with asyncio.timeout(3200):
+				stdout, stderr = await proc.communicate()
+		except (T0, T1, T2):
+			with tracebacksuppressor:
+				force_kill(proc)
+			raise
+		if proc.returncode != 0:
+			raise RuntimeError(stderr)
+		assert os.path.exists(fo) and os.path.getsize(fo), "No valid output detected!"
+		return cdict(
+			file=CompatFile(fo, filename=replace_ext(url2fn(url), format)),
+		)
 
 
 class AudioSeparator(Command):

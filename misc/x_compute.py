@@ -758,7 +758,7 @@ if "browse" in CAPS:
 		if not is_url(q):
 			raise ValueError(q)
 		with new_playwright_page("chromium", dict(width=960, height=540)) as page:
-			page.goto(q, timeout=30000)
+			page.goto(q, wait_until="domcontentloaded", timeout=30000)
 			time.sleep(0.25)
 			bbox = page.locator("html").bounding_box()
 			w = max(960, ceil(bbox["width"]))

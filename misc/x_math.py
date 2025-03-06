@@ -1290,10 +1290,10 @@ def evalSym(f, prec=64, r=False, variables=None):
 	# If the requested expression evaluates to a plot, return it
 	if isinstance(f, Plot) or f is plt or type(f) is str:
 		return (f,)
-	try:
-		f = sympy.simplify(f)
-	except Exception:
-		pass
+	# try:
+	# 	f = sympy.simplify(f)
+	# except Exception:
+	# 	pass
 	# Solve any sums and round off floats when possible
 	for i in sympy.preorder_traversal(f):
 		if isinstance(i, (sympy.Number, float, np.floating)) and l10(i) < BF_PREC:
@@ -1343,7 +1343,7 @@ def evalSym(f, prec=64, r=False, variables=None):
 			if p == repr(e):
 				return [f]
 			return [f, p]
-		p = prettyAns(f)
+		p = str(e)
 		f = repr(e)
 		if re.search(r"-?[0-9]*\.[0-9]*0$", f):
 			return [f.rstrip(".0")]
@@ -1351,12 +1351,12 @@ def evalSym(f, prec=64, r=False, variables=None):
 			return [e]
 		if p == f:
 			return [e]
-		return [e, p]
+		return [p]
 	else:
-		p = prettyAns(f)
+		p = prettyAns(f) if r else str(f)
 		if p == repr(f) or len(p) > 1 and p[-1].isnumeric() and repr(f).startswith(p[:-1]):
 			return [f]
-		return [f, p]
+		return [f, p] if r else [p]
 
 
 def procResp(resp):
