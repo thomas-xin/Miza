@@ -4830,7 +4830,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 								bot=self,
 							))
 							if interaction:
-								fut = csubmit(delayed_callback(future, 2, self.defer_interaction, message, mode="patch", ephemeral=getattr(message, "ephemeral", False), exc=False))
+								fut = csubmit(delayed_callback(future, 1, self.defer_interaction, message, mode="patch", ephemeral=getattr(message, "ephemeral", False), exc=False))
 							resp = await future
 						await self.send_event("_command_", user=user, command=f, loop=False, message=message)
 						if isinstance(resp, cdict):
@@ -4839,11 +4839,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 								print(r, d)
 								if not d:
 									await self.defer_interaction(message, mode="patch")
-								return await interaction_patch(
+								await interaction_patch(
 									bot=self,
 									message=message,
 									**resp,
 								)
+								break
 							csubmit(self.ignore_interaction(message))
 							await self.edit_message(
 								message,
@@ -5547,7 +5548,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if fut is None and not hasattr(command, "typing") and channel and not getattr(message, "simulated", False):
 				csubmit(delayed_callback(future, sqrt(3), self._state.http.send_typing, channel.id, repeat=7, exc=True))
 			if slash or getattr(message, "slash", None):
-				csubmit(delayed_callback(future, 2, self.defer_interaction, message, ephemeral=getattr(message, "ephemeral", False), exc=False))
+				csubmit(delayed_callback(future, 1, self.defer_interaction, message, ephemeral=getattr(message, "ephemeral", False), exc=False))
 			csem = emptyctx if isnan(command.min_level) else self.command_semaphore
 			async with csem:
 				response = await future
@@ -6094,6 +6095,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.inter_cache[int_id] = int_token
 			self.inter_cache[message.id] = int_token
 			message.deferred = int_token
+			message.method = mode
 			if self.cache.messages.get(message.id):
 				self.cache.messages[message.id].deferred = int_token
 			else:
@@ -6102,6 +6104,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def ignore_interaction(self, message, skip=False):
 		with tracebacksuppressor:
+			if getattr(message, "method", None) == "patch":
+				return
 			if hasattr(message, "int_id"):
 				int_id, int_token = message.int_id, message.int_token
 				if getattr(message, "deferred", None):
@@ -6129,6 +6133,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print("Ignored:", m)
 				if m and not getattr(m, "ephemeral", False):
 					await self.silent_delete(m)
+			else:
+				message.method = "patch"
 
 	def add_webhook(self, w):
 		"Inserts a webhook into the bot's user and webhook cache."
@@ -8367,6 +8373,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						else:
 							m_id = d["message"]["id"]
 						m = await self.fetch_message(m_id, channel)
+						if getattr(m, "method", None):
+							del m.method
 						add = False
 						if type(m) is not self.ExtendedMessage:
 							m = self.ExtendedMessage(m)

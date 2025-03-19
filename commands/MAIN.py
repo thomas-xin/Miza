@@ -71,9 +71,7 @@ class Help(Command):
 		),
 	)
 	usage = f"<category({cats})>? <command>?"
-	example = ("help string", "help waifu2x")
-	flags = "v"
-	rate_limit = (3, 5)
+	rate_limit = (0.25, 1)
 	slash = True
 	ephemeral = True
 

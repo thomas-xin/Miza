@@ -11,11 +11,8 @@
 			"description": "Shows a list of usable commands, or gives a detailed description of a command.",
 			"usage": "<category(['admin', 'ai', 'fun', 'image', 'main', 'string', 'voice', 'webhook'])>? <command>?",
 			"level": "0",
-			"rate_limit": "(3, 5)",
-			"example": [
-				"help string",
-				"help waifu2x"
-			],
+			"rate_limit": "(0, 1)",
+			"example": [],
 			"timeout": "24"
 		},
 		"Loop": {
