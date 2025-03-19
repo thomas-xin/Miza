@@ -1419,11 +1419,8 @@ class OCR(Command):
 	slash = ("Read")
 	ephemeral = True
 
-	async def __call__(self, url, **void):
-		fut = asubmit(__import__, "pytesseract")
-		resp = await process_image(url, "resize_max", ["-nogif", 4096, 0, "auto", "-f", "png"], timeout=60)
-		im = await asubmit(Image.open, io.BytesIO(resp))
-		pytesseract = await fut
-		text = await asubmit(pytesseract.image_to_string, im, config="--psm 1", timeout=8)
-		s = no_md(text)
-		return css_md(f"[Detected text]\n{s}.")
+	async def __call__(self, bot, _user, url, **void):
+		s = await bot.ocr(url)
+		return cdict(
+			embed=discord.Embed(description=s, title="Detected text").set_author(**get_author(_user)),
+		)

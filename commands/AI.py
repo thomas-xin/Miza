@@ -356,6 +356,7 @@ class Ask(Command):
 								reasoning_effort="high" if "o3" in model else "medium",
 								timeout=3600,
 							)
+							print(resp)
 							message = resp.choices[0].message
 							return T(message).get("reasoning_content") or message.content
 						argv = kwargs.get("query") or " ".join(kwargs.values())
@@ -408,7 +409,7 @@ class Ask(Command):
 						s = f'\n> Interpreting "{argv}"...'
 						text += s
 						yield s
-						fut = bot.vqa(input_message.url, question=argv)
+						fut = bot.vision(input_message.url, question=argv)
 						succ = await rag(name, tid, fut)
 					elif name == "txt2img":
 						argv = kwargs.get("description") or kwargs.get("prompt") or " ".join(kwargs.values())
@@ -629,8 +630,8 @@ class Instruct(Command):
 		model=cdict(
 			type="enum",
 			validation=cdict(
-				enum=["auto", "deepseek-r1", "deepseek-v3", "gpt-3.5", "gpt-4", "gpt-4m", "o1-mini", "o1-preview", "o3-mini", "o1", "mythomax-13b", "lzlv-70b", "mixtral-8x7b-instruct", "claude-3-opus", "claude-3.7-sonnet-t", "claude-3.7-sonnet", "claude-3.5-sonnet", "claude-3-sonnet", "claude-3-haiku", "command-r", "command-r-plus", "35b-beta-long", "qwen-72b", "dbrx-instruct", "mixtral-8x22b-instruct", "wizard-8x22b", "llama-3-8b", "llama-3-70b", "llama-3-405b"],
-				accepts={"llama": "llama-3-70b", "haiku": "claude-3-haiku", "r1": "deepseek-r1", "deepseek": "deepseek-v3", "gpt3.5": "gpt-3.5", "sonnet": "claude-3.5-sonnet", "dbrx": "dbrx-instruct", "gpt4": "gpt-4", "gpt-4o": "gpt-4", "gpt-4o-mini": "gpt-4m", "opus": "claude-3-opus"},
+				enum=list(ai.available),
+				accepts={"llama": "llama-3-70b", "haiku": "claude-3-haiku", "r1": "deepseek-r1", "deepseek": "deepseek-v3", "gpt3.5": "gpt-3.5", "sonnet": "claude-3.7-sonnet", "dbrx": "dbrx-instruct", "gpt4": "gpt-4", "gpt-4o": "gpt-4", "gpt-4o-mini": "gpt-4m", "opus": "claude-3-opus"},
 			),
 			description="Target LLM to invoke",
 			example="deepseek",
@@ -671,7 +672,7 @@ class Instruct(Command):
 			validation="[1, 65536]",
 			description="Maximum tokens to generate",
 			example="16384",
-			default=1024,
+			default=3072,
 		),
 	)
 	macros = cdict(
@@ -714,20 +715,8 @@ class Instruct(Command):
 		Llama=cdict(
 			model="llama-3-70b",
 		),
-		Mixtral=cdict(
-			model="mixtral-8x22b-instruct",
-		),
-		Wizard=cdict(
-			model="wizard-8x22b",
-		),
-		Command_R_Plus=cdict(
-			model="command-r-plus",
-		),
 		Qwen=cdict(
 			model="qwen-72b",
-		),
-		Lzlv=cdict(
-			model="lzlv-70b",
 		),
 	)
 	rate_limit = (12, 16)

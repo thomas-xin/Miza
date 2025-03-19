@@ -412,10 +412,14 @@ def css_md(s, force=False):
 	return (f"```css\n{s}```".replace("'", "’").replace('"', "”") if force else ini_md(s)) if s else "``` ```"
 def fix_md(s):
 	return f"```fix\n{s}```" if s else "``` ```"
-def ansi_md(s):
+def ansi_md(s, max_length=4096):
 	if not s:
 		return "``` ```"
-	s = s.replace("[[", colourise("[", fg="cyan") + colourise("", fg="blue")).replace("]]", colourise("]", fg="cyan") + colourise())
+	s2 = s.replace("[[", colourise("[", fg="cyan") + colourise("", fg="blue")).replace("]]", colourise("]", fg="cyan") + colourise())
+	if len(s2) <= max_length:
+		s = s2
+	else:
+		s = decolourise(s.replace("[[", "[").replace("]]", "]"))
 	return f"```ansi\n{s}```"
 
 fgmap = cdict(
@@ -449,6 +453,8 @@ def colourise(s=None, fg=None, bg=None):
 	return f"\033[{fgmap.get(fg, fg)};{bgmap.get(bg, bg)}m" + s
 colourised_quotes = r"""'"`“”"""
 colourised_splits = r"""'\/\\|\-~:#@"""
+def decolourise(s):
+	return re.sub("\033" + r"\[((?:\d+;)*\d+)?m", "", s)
 def colourise_brackets(s=None, a=None, b=None, c=None):
 	out = ""
 	while s:
@@ -995,7 +1001,7 @@ def get_image_size(b):
 		with Image.open(input) as im:
 			return im.size
 	except Exception as ex:
-		print(repr(ex))
+		print("Image size error:", repr(ex))
 		ts = ts_us()
 		temp = TEMP_PATH + f"/{ts}"
 		input.seek(0)
@@ -1242,7 +1248,7 @@ def load_mimes():
 mime_wait = esubmit(load_mimes)
 
 def simple_mimes(b, mime=True):
-	"Low-latency function that detects mimetype from first few bytes. Less accurate than from_file."
+	"Low-latency function that detects mimetype from first few bytes. Less accurate than mime_from_file."
 	mimesplitter = globals()["mimesplitter"]
 	for k, v in reversed(mimesplitter.items()):
 		out = v.get(b[:k])
@@ -1307,10 +1313,10 @@ __filetrans = {
 filetrans = "".maketrans(__filetrans)
 
 def get_ext(f):
-	mime = from_file(f)
+	mime = mime_from_file(f)
 	return mime_into(mime)
 
-def from_file(path, filename=None, mime=True):
+def mime_from_file(path, filename=None, mime=True):
 	"Detects mimetype of file or buffer. Includes custom .jar, .ecdc, .m3u8 detection."
 	data = filetype.get_bytes(path)
 	if mime:
@@ -1337,14 +1343,16 @@ def from_file(path, filename=None, mime=True):
 			return "image/avif"
 	if out == "text/plain" and data.startswith(b"#EXTM3U"):
 		return "video/m3u8"
+	if out == "image/jpeg":
+		return "image/jpg"
 	return out
 
 magic = cdict(
-	from_file=from_file,
-	from_buffer=from_file,
+	from_file=mime_from_file,
+	from_buffer=mime_from_file,
 	Magic=lambda mime, *args, **kwargs: cdict(
-		from_file=lambda b: from_file(b, mime),
-		from_buffer=lambda b: from_file(b, mime),
+		from_file=lambda b: mime_from_file(b, mime),
+		from_buffer=lambda b: mime_from_file(b, mime),
 	),
 )
 

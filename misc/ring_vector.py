@@ -88,6 +88,14 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 	__slots__ = ("__weakref__", "_lock", "buffer", "offset", "length", "_view", "_margin", "_hash", "_frozenset", "_queries", "_sorted", "_index")
 
 	@property
+	def idx_dtype(self):
+		if len(self) <= 2147483647:
+			return np.int32
+		if len(self) <= 9223372036854775807:
+			return np.int64
+		return object
+
+	@property
 	def lock(self) -> ReadWriteLock:
 		try:
 			return self._lock
@@ -1223,7 +1231,7 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 							indices.append(x - self.offset)
 						else:
 							break
-					indices = np.asanyarray(indices, dtype=np.int64)
+					indices = np.asanyarray(indices, dtype=self.idx_dtype)
 					indices %= self.length
 			else:
 				view = self.view
@@ -1337,7 +1345,7 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 	# Removes items according to an array of indices.
 	@writing_with(order=True)
 	def delitems(self, indices, keep=True):
-		indices = self.to_iterable(indices, match_length=False, dtype=np.int64)
+		indices = self.to_iterable(indices, match_length=False, dtype=self.idx_dtype)
 		if len(indices) < self.chunk_size(4):
 			if len(indices) < 1:
 				if keep:
@@ -1360,7 +1368,7 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 		if spl:
 			indices.sort()
 			right = spl[0]
-			i = np.searchsorted(indices, right[0])
+			i = np.searchsorted(indices, len(left))
 			left2 = np.delete(left, indices[:i])
 			indices[i:] -= len(left)
 			right2 = np.delete(right, indices[i:])

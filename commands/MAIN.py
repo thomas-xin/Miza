@@ -155,17 +155,10 @@ class Help(Command):
 		buttons = [[catmenu], [commenu]]
 		if content:
 			embed.description = f"```callback-main-help-{_user.id}-\n{_user.display_name} has asked for help!```" + content
-		if original:
-			if getattr(_message, "int_id", None):
-				await interaction_post(bot, original, embed=embed, buttons=buttons)
-			else:
-				await interaction_patch(bot, original, embed=embed, buttons=buttons)
-			return
-		# elif getattr(message, "slash", None):
-		#     await interaction_response(bot, message, embed=embed, buttons=buttons, ephemeral=True)
-		else:
-			await send_with_reply(_channel, _message, embed=embed, buttons=buttons, ephemeral=True)
-		return
+		return cdict(
+			embed=embed,
+			buttons=buttons,
+		)
 
 	async def _callback_(self, message, reaction, user, vals, perm, **void):
 		u_id = int(vals)
@@ -181,7 +174,7 @@ class Help(Command):
 		else:
 			return await bot.ignore_interaction(message)
 		channel = message.channel
-		await self.__call__(bot, _guild=message.guild, _channel=channel, _message=message, _user=user, _nsfw=bot.is_nsfw(channel), category=category, command=command, original=message)
+		return await self.__call__(bot, _guild=message.guild, _channel=channel, _message=message, _user=user, _nsfw=bot.is_nsfw(channel), category=category, command=command, original=message)
 
 
 class Loop(Command):
@@ -913,38 +906,16 @@ class Profile(Command):
 
 class Activity(Command):
 	name = ["Recent", "Log"]
-	description = "Shows recent Discord activity for the targeted user, server, or channel."
-	usage = "<user>? <verbose(-v)>?"
-	example = ("recent 201548633244565504", "log")
-	flags = "v"
+	description = "Shows your recent Discord activity"
+	schema = cdict()
 	rate_limit = (8, 11)
-	typing = True
 	slash = True
-	# usercmd = True
 
-	async def __call__(self, guild, user, argv="", flags="", channel=None, _timeout=90, **void):
-		bot = self.bot
-		u_id = None
-		if argv:
-			user = None
-			if "#" not in argv:
-				with suppress():
-					user = bot.cache.guilds[int(argv)]
-			if user is None:
-				try:
-					user = bot.cache.channels[verify_id(argv)]
-				except:
-					user = await bot.fetch_user_member(argv, guild)
-				else:
-					u_id = f"#{user.id}"
-		if not u_id:
-			u_id = user.id
-		data = await asubmit(bot.data.users.fetch_events, u_id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=_timeout)
-		ctx = discord.context_managers.Typing(channel) if channel else emptyctx
-		async with ctx:
-			resp = await process_image("plt_special", "&", (data, str(user)), cap="math")
-			fn = resp
-			f = CompatFile(fn, filename=f"{user.id}.png")
+	async def __call__(self, bot, _user, _timeout, **void):
+		data = await asubmit(bot.data.users.fetch_events, _user.id, interval=900, timeout=_timeout)
+		resp = await process_image("plt_special", "&", (data, str(_user)), cap="math")
+		fn = resp
+		f = CompatFile(fn, filename=f"{_user}.png")
 		return dict(file=f, filename=fn, best=True)
 
 
@@ -1777,7 +1748,8 @@ class UpdateUsers(Database):
 			except KeyError:
 				data[hour] = {event: count}
 
-	fetch_events = lambda self, u_id, interval=3600: {i: self.get_events(u_id, interval=interval, event=i) for i in ("message", "typing", "command", "reaction", "misc")}
+	def fetch_events(self, u_id, interval=3600):
+		return {i: self.get_events(u_id, interval=interval, event=i) for i in ("message", "typing", "command", "reaction", "misc")}
 
 	# Get all events of a certain type from a certain user, with specified intervals.
 	def get_events(self, u_id, interval=3600, event=None):

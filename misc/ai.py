@@ -1,28 +1,29 @@
 import asyncio
 import base64
-import copy
 import orjson
 import re
 import openai
 import numpy as np
 from collections import deque
-from math import ceil, floor, inf
+from math import ceil, inf
 from traceback import format_exc, print_exc
 from mpmath import mpf
-from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, CommandCancelledError, CE, tracebacksuppressor, utc, T, json_dumps, string_like
-from misc.util import AUTH, Cache, Request, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, reqs, shash, split_across, wrap_iter
-from misc.asyncs import asubmit, csubmit, emptyctx, gather, unflatten, Semaphore, CloseableAsyncIterator
+from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, CE, tracebacksuppressor, utc, T, string_like
+from misc.util import AUTH, Cache, Request, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across
+from misc.asyncs import asubmit, csubmit, emptyctx, gather, Semaphore, CloseableAsyncIterator
 
 print("AI:", __name__)
 
 
 endpoints = cdict(
 	openrouter="https://openrouter.ai/api/v1",
+	openrouter_="https://openrouter.ai/api/v1",
 	openai="https://api.openai.com/v1",
 	deepseek="https://api.deepseek.com/v1",
 	together="https://api.together.xyz/v1",
 	fireworks="https://api.fireworks.ai/inference/v1",
 	deepinfra="https://api.deepinfra.com/v1/openai",
+	mistral="https://api.mistral.ai/v1/",
 	mizabot="https://api.mizabot.xyz/inference/v1",
 )
 
@@ -64,13 +65,20 @@ available = {
 		"deepinfra": ("deepseek-ai/DeepSeek-R1", ("0.85", "2.5")),
 		None: "o1-preview",
 	},
+	"deepseek-v3-t": {
+		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
+		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
+		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
+		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
+		None: "gpt-4",
+	},
 	"deepseek-v3": {
 		"openrouter": ("deepseek/deepseek-chat:free", ("0", "0")),
 		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
 		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
 		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
-		None: "gpt-4",
+		None: "deepseek-v3-t",
 	},
 	"minimax-01": {
 		"openrouter": ("minimax/minimax-01", ("0.2", "1.1")),
@@ -154,9 +162,15 @@ available = {
 		"openai": ("gpt-3.5-turbo-0125", ("0.5", "1.5")),
 		None: "command-r-plus",
 	},
+	"skyfall-36b": {
+		"openrouter": ("thedrummer/skyfall-36b-v2", ("0.5", "0.5")),
+		None: "magnum-72b",
+	},
 	"mistral-24b": {
-		"openrouter": ("mistralai/mistral-small-24b-instruct-2501", ("0.1", "0.3")),
-		None: "minimax-01",
+		"mistral": ("mistral-small-latest", ("0", "0")),
+		"openrouter": ("mistralai/mistral-small-3.1-24b-instruct-2503", ("0.1", "0.3")),
+		"openrouter_": ("cognitivecomputations/dolphin3.0-mistral-24b:free", ("0", "0")),
+		None: "gpt-4m",
 	},
 	"firefunction-v1": {
 		"fireworks": ("accounts/fireworks/models/firefunction-v1", ("0.5", "0.5")),
@@ -244,7 +258,9 @@ is_chat = {
 	"gpt-3.5-turbo",
 	"minimax-01",
 	"deepseek-r1",
+	"deepseek-v3-t",
 	"deepseek-v3",
+	"skyfall-36b",
 	"mistral-24b",
 	"firefunction-v2",
 	"firefunction-v1",
@@ -262,7 +278,6 @@ is_completion = {
 	"dbrx-instruct",
 	"miquliz-120b",
 	"gpt-3.5-turbo-instruct",
-	"mistral-24b",
 	"llama-3-8b",
 	"llama-3-11b",
 	"llama-3-70b",
@@ -303,7 +318,7 @@ is_function = {
 	"gpt-3.5",
 	"gpt-3.5-turbo-0125",
 	"gpt-3.5-turbo",
-	"deepseek-v3",
+	"deepseek-v3-t",
 	"mistral-24b",
 	"firefunction-v2",
 	"firefunction-v1",
@@ -328,6 +343,7 @@ is_vision = {
 	"gpt-4-turbo-2024-04-09",
 	"gpt-4-vision-preview",
 	"minimax-01",
+	"mistral-24b",
 	"firellava-13b",
 	"phi-4b",
 }
@@ -354,6 +370,7 @@ instruct_formats = {
 	"reflection-llama-3-70b": "llamav3",
 	"euryale-70b": "llamav3",
 	"lzlv-70b": "vicuna",
+	"skyfall-36b": "mistral",
 	"mistral-24b": "mistral",
 	"miquliz-120b": "mistral",
 	"goliath-120b": "alpaca",
@@ -410,7 +427,9 @@ contexts = {
 	"gpt-3.5-turbo-instruct": 4096,
 	"minimax-01": 1000000,
 	"deepseek-r1": 64000,
+	"deepseek-v3-t": 64000,
 	"deepseek-v3": 64000,
+	"skyfall-36b": 32768,
 	"mistral-24b": 32768,
 	"dbrx-instruct": 32768,
 	"miquliz-120b": 32768,
@@ -708,7 +727,7 @@ async def cut_to(messages, limit=1024, softlim=256, exclude_first=True, best=Fal
 			messages.insert(0, sm)
 		return messages
 	summ = "Summary of prior conversation:\n"
-	s = "\n\n".join(m_str(m) for m in (messages[:i + 1] if i > 0 else messages))
+	s = "\n\n".join(m_str(m) for m in (messages[:i + 1] if i > 0 else messages) if m.content)
 	s = s.removeprefix(summ).removeprefix("system:").strip()
 	c = await tcount(summ + s)
 	c2 = await count_to(messages)
@@ -901,27 +920,27 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 			kwa.pop("temperature", None)
 		if "repetition_penalty" not in kwa:
 			kwa["repetition_penalty"] = cast_rp(kwa.pop("frequency_penalty", 0.25), kwa.pop("presence_penalty", 0.25), model=model)
-		if sapi == "mizabot":
-			tpp = kwa.get("top_p", 0.9)
-			mpp = max(0, 1 - tpp)
-			body["min_p"] = mpp
-			kwa["top_p"] = 0.999
-			kwa["temperature"] = kwa.get("temperature", 1) * (1 + mpp)
-			kwa.pop("frequency_penalty", None)
-			kwa.pop("presence_penalty", None)
-		elif sapi == "fireworks":
-			kwa.pop("repetition_penalty", None)
-			if kwa.get("tool_choice") == "required":
-				kwa["tool_choice"] = "any"
-		elif sapi == "together":
-			kwa.pop("frequency_penalty", None)
-			kwa.pop("presence_penalty", None)
-		elif sapi == "deepinfra":
-			kwa.pop("repetition_penalty", None)
-		elif sapi == "openai":
-			kwa.pop("repetition_penalty", None)
-		elif sapi in ("deepseek",):
-			kwa.pop("repetition_penalty", None)
+		match sapi:
+			case "mizabot":
+				tpp = kwa.get("top_p", 0.9)
+				mpp = max(0, 1 - tpp)
+				body["min_p"] = mpp
+				kwa["top_p"] = 0.999
+				kwa["temperature"] = kwa.get("temperature", 1) * (1 + mpp)
+				kwa.pop("frequency_penalty", None)
+				kwa.pop("presence_penalty", None)
+			case "fireworks":
+				kwa.pop("repetition_penalty", None)
+				if kwa.get("tool_choice") == "required":
+					kwa["tool_choice"] = "any"
+			case "together":
+				kwa.pop("frequency_penalty", None)
+				kwa.pop("presence_penalty", None)
+			case "mistral":
+				kwa.pop("repetition_penalty", None)
+				body.clear()
+			case "openai" | "deepseek" | "deepinfra":
+				kwa.pop("repetition_penalty", None)
 		if "repetition_penalty" in kwa:
 			body["repetition_penalty"] = kwa.pop("repetition_penalty")
 		if not kwa.get("stop"):
@@ -945,7 +964,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 						m = fix_tool(m)
 						messages.append(m)
 					kwa["messages"] = messages
-				if sapi in ("fireworks", "together", "deepinfra"):
+				if sapi in ("fireworks", "together", "deepinfra", "mistral"):
 					messages = []
 					for m in kwa["messages"]:
 						m2 = None
@@ -1170,7 +1189,7 @@ f_wolfram_alpha = {
 f_sympy = {
 	"type": "function", "function": {
 		"name": "sympy",
-		"description": "Queries the Sympy algebraic library. Faster than Wolfram Alpha, but does NOT handle natural language.",
+		"description": "Queries the Sympy algebraic library. Faster than Wolfram Alpha, but does NOT handle natural language, or other Python code.",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {
@@ -1318,16 +1337,16 @@ f_askip = {
 f_default = {
 	"type": "function", "function": {
 		"name": "directly_answer",
-		"description": "Calls a standard chatbot to respond to the conversation. You must always use this tool if no other tool is necessary.",
+		"description": "Indicates that you are preparing to draft up a text response. If no other tool is necessary, you MUST use this tool",
 		"parameters": {
 			"type": "object", "properties": {
-				"assistant": {
+				"format": {
 					"type": "string",
 					"enum": ["instructive", "casual"],
-					"description": 'How the assistant should respond. Enter "instructive" for academic, knowledge or advice responses, "casual" for banter, roleplay, or other simple questions.',
+					"description": 'The conversation format. Enter "instructive" for academic, knowledge or advice responses, "casual" for banter, roleplay, or simpler questions.',
 				},
 			},
-			"required": ["assistant"],
+			"required": ["format"],
 }}}
 
 TOOLS = {
@@ -1706,6 +1725,7 @@ CL100K_IM = {
 	"gpt-4-turbo-2024-04-09",
 	"gpt-3.5-turbo-0125",
 	"deepseek-r1",
+	"deepseek-v3-t",
 	"deepseek-v3",
 	"quill-72b",
 	"databricks/dbrx-instruct",

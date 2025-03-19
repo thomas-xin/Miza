@@ -654,11 +654,11 @@ class UpdateExec(Database):
 							resp.raise_for_status()
 							url = resp.json()["url"].split("?", 1)[0]
 					except StopIteration as ex:
-						print(repr(ex))
+						print("Stash error:", repr(ex))
 						if not b:
 							print_exc()
 							f.seek(i)
-					except:
+					except Exception:
 						print_exc()
 						f.seek(i)
 					else:
@@ -700,7 +700,7 @@ class UpdateExec(Database):
 					fstr = f"{fn.rsplit('/', 1)[-1]} ({i})"
 					try:
 						message = await channel.send(fstr, files=fs)
-					except:
+					except Exception:
 						print(channel, c_id)
 						print(sizes)
 						print_exc()

@@ -352,6 +352,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						accepts_attachments = True
 						arg.pop("required", None)
 					out.append(arg)
+		if getattr(command, "ephemeral", None):
+			arg = dict(type=5, name="ephemeral", description="Display response only for you")
+			out.append(arg)
 		if accepts_attachments:
 			arg = dict(type=11, name="attachment", description="Attachment in place of URL")
 			out.append(arg)
@@ -1979,7 +1982,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				pass
 		if backup_models:
 			models.extend((
-				"deepseek-v3",
+				"deepseek-v3-t",
 			))
 		if model:
 			if model in models:
@@ -2027,7 +2030,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def force_completion(self, model, prompt, stream=True, max_tokens=1024, strip=True, **kwargs):
 		await ai.ensure_models()
 		ctx = ai.contexts.get(model, 4096)
-		if model in ai.is_completion or model not in ai.is_chat:
+		is_question = prompt.endswith(".") or prompt.endswith("?")
+		if model in ai.is_completion and (not model in ai.is_chat or not is_question) or model not in ai.is_chat:
 			count = await tcount(prompt, model="llamav2")
 			max_tokens = min(max_tokens, ctx - count - 64)
 			if "max_completion_tokens" not in kwargs:
@@ -2321,30 +2325,30 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			nsfw="mythomax-13b",
 			backup="deepseek-v3",
 			retry="gpt-4m",
-			function="gpt-4m",
-			vision="llama-3-11b",
+			function="mistral-24b",
+			vision="mistral-24b",
 			target="auto",
 		),
 		1: cdict(
 			reasoning="o3-mini",
-			instructive="deepseek-v3",
-			casual="minimax-01",
-			nsfw="minimax-01",
-			backup="magnum-72b",
+			instructive="deepseek-v3-t",
+			casual="deepseek-v3",
+			nsfw="magnum-72b",
+			backup="minimax-01",
 			retry="gpt-4",
-			function="gpt-4m",
-			vision="gpt-4",
+			function="mistral-24b",
+			vision="mistral-24b",
 			target="auto",
 		),
 		2: cdict(
 			reasoning="claude-3.7-sonnet-t",
 			instructive="claude-3.7-sonnet",
-			casual="deepseek-v3",
+			casual="deepseek-v3-t",
 			nsfw="magnum-72b",
 			backup="minimax-01",
-			retry="claude-3.7-sonnet",
-			function="gpt-4",
-			vision="claude-3.7-sonnet",
+			retry="gpt-4",
+			function="mistral-24b",
+			vision="mistral-24b",
 			target="auto",
 		),
 	}
@@ -2435,7 +2439,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			vision_alt = modelist.vision if modelist.function not in ai.is_vision and modelist.vision in ai.is_function else modelist.function
 			toolcheck, toolmodel = await self.caption_into(toolcheck, model=modelist.function, backup_model=vision_alt, premium_context=premium_context)
 			mode = None
-			label = "casual"
+			label = "instructive"
 			try:
 				resp = await self.function_call(
 					model=toolmodel,
@@ -2470,8 +2474,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						print(tc.function.arguments)
 						print_exc()
 						args = {}
-					if args.get("assistant"):
-						mode = args["assistant"]
+					print(args)
+					if args.get("format"):
+						mode = args["format"]
 					message.tool_calls.remove(tc)
 					break
 				else:
@@ -2916,14 +2921,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	caption_prompt = "Please describe this image in detail; be descriptive but concise!"
 	description_prompt = "Please describe this <IMAGE> in detail:\n- Transcribe text if present, but do not mention there not being text\n- Note details if obvious such as gender and race of characters\n- Be descriptive but concise!"
 
-	async def vqa(self, url, name=None, best=False, question=None):
-		urls = await self.follow_url(url)
-		if not urls:
-			raise FileNotFoundError("No image found.")
-		url = urls[0]
-		return await self.vision(url, name=name, best=best, question=question)
-
-	async def to_data_url(self, url, small=False, timeout=8):
+	async def to_data_url(self, url, small=False, fmt="jpg", timeout=8):
 		sizelim = 82944 if small else 1638400
 		dimlim = 256 if small else 1024
 		if isinstance(url, str):
@@ -2940,20 +2938,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				_resp, mime, name, d = await self.req_data(url, timeout=timeout, screenshot=True)
 			lim = 5 * 1048576 * 3 / 4
 			p = 2 if len(d) > 1048576 else 0
-			if mime not in ("image/png", "image/gif", "image/webp") or len(d) > lim or np.prod(await asubmit(get_image_size, d, priority=p)) > sizelim:
+			if mime not in ("image/jpg", "image/jpeg", "image/png", "image/gif", "image/webp") or len(d) > lim or np.prod(await asubmit(get_image_size, d, priority=p)) > sizelim:
 				if mime.split("/", 1)[0] not in ("image", "video"):
 					if len(d) > 288 and mime not in ("text/plain", "text/html"):
 						d = d[:128] + b".." + d[-128:]
 					s = as_str(d)
 					return f'<file name="{name}">' + s + "</file>"
 				assert isinstance(d, (str, bytes)), d
-				d = await process_image(d, "resize_max", [dimlim, False, "auto", "-bg", "-oz", "-fs", lim, "-f", "jpg"], timeout=timeout, retries=1)
+				d = await process_image(d, "resize_max", [dimlim, False, "auto", "-bg", "-oz", "-fs", lim, "-f", fmt], timeout=timeout, retries=1)
 		else:
 			d = url
 		mime = magic.from_buffer(d)
 		return "data:" + mime + ";base64," + base64.b64encode(d).decode("ascii")
 
-	async def vision(self, url, name=None, best=True, question=None, premium_context=[]):
+	async def vision(self, url, name=None, best=True, model=None, question=None, premium_context=[]):
 		"Requests an image description from a vision-supporting LLM."
 		data_url = await self.to_data_url(url)
 		if not data_url.startswith("data:"):
@@ -2962,14 +2960,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			iname = f'image "{name}"'
 		else:
 			iname = "image"
-		content = question or self.description_prompt.replace("<IMAGE>", iname)
+		content = (question or self.description_prompt).replace("<IMAGE>", iname)
 		messages = [
 			cdict(role="user", content=[
 				cdict(type="text", text=content),
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best > 1 else "low")),
 			]),
 		]
-		model = "gpt-4" if best else "minimax-01"
+		model = model or ("minimax-01" if best else "mistral-24b")
 		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
@@ -2988,6 +2986,42 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			raise ValueError(f"Censored response {repr(out)}.")
 		print("Vision Response:", out)
 		return out
+
+	async def ocr(self, url):
+		data = await self.to_data_url(url)
+		mistral_key = AUTH.get("mistral_key")
+		s = None
+		if mistral_key:
+			mistral_headers = {"Content-Type": "application/json", "Authorization": f"Bearer {mistral_key}"}
+			resp = await Request(
+				"https://api.mistral.ai/v1/ocr",
+				method="POST",
+				headers=mistral_headers,
+				data=orjson.dumps(dict(
+					model="mistral-ocr-latest",
+					document=dict(type="image_url", image_url=data)
+				)),
+				json=True,
+				aio=True,
+			)
+			print(resp)
+			s = "\n\n".join(page["markdown"] for page in resp["pages"]).strip()
+			if s == "![img-0.jpeg](img-0.jpeg)":
+				s = None
+		if not s:
+			s = await self.vision(
+				data,
+				name=url2fn(url),
+				question="Please transcribe all text within this <IMAGE>, as accurately as possible. Leave all text in their original language, using unicode if necessary, and do NOT attempt to describe any other elements within the picture.",
+				model="mistral-24b",
+			)
+		if not s:
+			fut = asubmit(__import__, "pytesseract")
+			resp = await process_image(url, "resize_max", ["-nogif", 4096, 0, "auto", "-bg", "-oz", "-f", "jpg"], timeout=60)
+			im = await asubmit(Image.open, io.BytesIO(resp))
+			pytesseract = await fut
+			s = await asubmit(pytesseract.image_to_string, im, config="--psm 1", timeout=8)
+		return s
 
 	async def follow_to_image(self, url, follow=True):
 		"Follows a message link, replacing emojis and user mentions with their icon URLs."
@@ -4696,9 +4730,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				reacode = str(reaction).encode("utf-8")
 			else:
 				reacode = None
+			interaction = hasattr(message, "int_token")
 			# m = self.cache.messages.get(message.id)
 			if getattr(message, "_react_callback_", None):
-				await message._react_callback_(
+				resp = await message._react_callback_(
 					message=message,
 					channel=message.channel,
 					guild=message.guild,
@@ -4709,7 +4744,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					argv="",
 					bot=self,
 				)
-				# await self.send_event("_callback_", user=user, command=f, loop=False, message=message)
+				if isinstance(resp, cdict):
+					csubmit(self.ignore_interaction(message))
+					await self.edit_message(
+						message,
+						**resp,
+						allowed_mentions=discord.AllowedMentions.none(),
+					)
 				return
 			msg = message.content.strip("*")
 			if not msg and message.embeds:
@@ -4777,7 +4818,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							timeout *= 3
 						self.data.usage.add(f)
 						async with asyncio.timeout(timeout):
-							await f._callback_(
+							future = csubmit(f._callback_(
 								message=message,
 								channel=message.channel,
 								guild=message.guild,
@@ -4787,8 +4828,25 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 								vals=vals,
 								argv=argv,
 								bot=self,
-							)
+							))
+							if interaction:
+								if interaction:
+									csubmit(delayed_callback(future, 2, self.defer_interaction, message, ephemeral=getattr(message, "ephemeral", False), exc=False))
+							resp = await future
 						await self.send_event("_command_", user=user, command=f, loop=False, message=message)
+						if isinstance(resp, cdict):
+							if interaction and not resp.get("file"):
+								return await interaction_patch(
+									bot=self,
+									message=message,
+									**resp,
+								)
+							csubmit(self.ignore_interaction(message))
+							await self.edit_message(
+								message,
+								**resp,
+								allowed_mentions=discord.AllowedMentions.none(),
+							)
 						break
 			self.react_sem.pop(message.id, None)
 
@@ -5486,7 +5544,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if fut is None and not hasattr(command, "typing") and channel and not getattr(message, "simulated", False):
 				csubmit(delayed_callback(future, sqrt(3), self._state.http.send_typing, channel.id, repeat=7, exc=True))
 			if slash or getattr(message, "slash", None):
-				csubmit(delayed_callback(future, 1, self.defer_interaction, message, ephemeral=getattr(command, "ephemeral", False)))
+				csubmit(delayed_callback(future, 2, self.defer_interaction, message, ephemeral=getattr(message, "ephemeral", False), exc=False))
 			csem = emptyctx if isnan(command.min_level) else self.command_semaphore
 			async with csem:
 				response = await future
@@ -5841,7 +5899,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						reference=reference,
 						buttons=response.get("buttons"),
 						reacts=response.get("reacts"),
-						ephemeral=getattr(command, "ephemeral", False),
+						ephemeral=getattr(message, "ephemeral", False),
 						tts=tts,
 					)
 				finally:
@@ -6044,6 +6102,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if hasattr(message, "int_id"):
 				int_id, int_token = message.int_id, message.int_token
 				if getattr(message, "deferred", None):
+					int_token = message.deferred
 					self.inter_cache[int_id] = int_token
 				self.inter_cache[message.id] = int_token
 			elif hasattr(message, "slash"):
@@ -6062,10 +6121,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					aio=True,
 				)
 			except ConnectionError:
-				m = await send_with_reply(getattr(message, "channel", None), message, "\xad", ephemeral=False)
-			print("Ignored:", m)
-			if m and not isinstance(m, bytes) and not getattr(m, "ephemeral", False):
-				await self.silent_delete(m)
+				m = await interaction_response(self, message, "\xad")
+				# m = await send_with_reply(getattr(message, "channel", None), message, "\xad", ephemeral=False)
+				print("Ignored:", m)
+				if m and not getattr(m, "ephemeral", False):
+					await self.silent_delete(m)
 
 	def add_webhook(self, w):
 		"Inserts a webhook into the bot's user and webhook cache."
@@ -6232,6 +6292,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							if not m.guild_permissions.manage_webhooks:
 								return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
 			if single:
+				fut = None
 				for emb in embeds:
 					async with Delay(1 / 3):
 						if type(emb) is not discord.Embed:
@@ -6244,11 +6305,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							if not reference:
 								reference = r2
 							emb = discord.Embed.from_dict(emb)
-						if reacts or reference:
-							csubmit(send_with_react(sendable, embed=emb, reacts=reacts, reference=reference))
-						else:
-							csubmit(send_with_reply(sendable, embed=emb))
-				return
+						fut = csubmit(send_with_react(sendable, embed=emb, reacts=reacts, reference=reference))
+				return await fut
 			if force:
 				return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
 			embs = deque()
@@ -6287,17 +6345,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		elif not embeds:
 			return
 		if reference:
-			# if len(embeds) == 1:
-			# 	return csubmit(send_with_react(channel, embed=embeds[0], reference=reference, reacts=reacts))
-			if getattr(reference, "slash", None):
-				csubmit(self.ignore_interaction(reference, skip=True))
+			# print(reference, reference.__dict__)
+			if getattr(reference, "slash", False) and len(embeds) <= 10:
+				print("Sending embeds directly due to interaction token")
+				csubmit(self._send_embeds(channel, embeds, reacts, reference, exc=exc))
+				return
+			csubmit(self.ignore_interaction(reference, skip=True))
 		c_id = verify_id(channel)
 		user = self.cache.users.get(c_id)
 		if user is not None:
+			print("Sending embeds directly due to specified user")
 			csubmit(self._send_embeds(user, embeds, reacts, reference, exc=exc))
 			return
 		if not self.initialisation_complete:
 			embs, embeds = embeds[:10], embeds[10:]
+			print("Sending embeds directly due to incomplete initialisation")
 			csubmit(self._send_embeds(channel, embs, reacts, reference, exc=exc))
 		if reacts or reference:
 			embeds = [e.to_dict() for e in embeds]
@@ -7826,6 +7888,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		fields = None
 		if isinstance(ex, TooManyRequests):
 			fields = (("Running into the rate limit often?", f"Consider donating using one of the subscriptions from my [ko-fi]({self.kofi_url}), which will grant shorter rate limits amongst many feature improvements!"),)
+		elif isinstance(ex, (discord.HTTPException, ConnectionError)):
+			fields = ((str(ex.args[0]), "This error usually indicates that the remote server (possibly Discord) is rejecting the response. Please double check your inputs, or try again later!"),)
 		elif isinstance(ex, discord.Forbidden):
 			fields = (("403", "This error usually indicates that I am missing one or more necessary Discord permissions to perform this command!"),)
 		elif isinstance(ex, (CE, CE2)):
@@ -7840,8 +7904,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			fields = (("Unexpected or confusing error?", f"Use {self.get_prefix(getattr(messageable, 'guild', None))}help for help, or consider joining the [support server]({self.rcc_invite}) for bug reports!"),)
 		if reference and isinstance(ex, discord.Forbidden) and reference.guild and not messageable.permissions_for(reference.guild.me).send_messages:
 			return csubmit(self.missing_perms(messageable, reference))
+		title = f"⚠ {type(ex).__name__} ⚠"
+		description = "\n".join(as_str(i) for i in ex.args)
 		if (guild := getattr(messageable, "guild", None)) and not messageable.permissions_for(guild.me).embed_links:
-			content = f"⚠ {type(ex).__name__} ⚠" + "\n" + "\n".join(as_str(i) for i in ex.args)
+			content = (title + "\n" + description).strip()
 			if fields:
 				content += "\n> " + "\n> ".join((t := ((f["name"], f["value"]) if isinstance(f, dict) else f)) and ("### " + t[0] + "\n" + t[1]) for f in fields if f)
 			return csubmit(send_with_react(
@@ -7853,8 +7919,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		print(reference)
 		return self.send_as_embeds(
 			messageable,
-			description="\n".join(as_str(i) for i in ex.args),
-			title=f"⚠ {type(ex).__name__} ⚠",
+			description=description,
+			title=title,
 			fields=fields,
 			reacts=reacts,
 			reference=reference,
@@ -8253,8 +8319,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						message.channel = channel
 						message.noref = True
 						message.deleted = False
+						message.ephemeral = kwargs.pop("ephemeral", False) and getattr(command, "ephemeral", False)
 						try:
 							await self.run_command(command, kwargs, message=message, slash=True, respond=True)
+						except Exception as ex:
+							await self.send_exception(channel, ex, reference=message, comm=command)
 						finally:
 							message.deleted = True
 					elif d["type"] == 3:

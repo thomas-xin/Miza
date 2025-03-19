@@ -153,6 +153,7 @@ class Purge(Command):
 					for i, m in enumerate(deleting):
 						if t - discord.utils.snowflake_time(m.id).timestamp() > 14 * 86400 - 60:
 							break
+						m._state = bot._connection
 						dels.append(m)
 					if not dels:
 						raise StopIteration

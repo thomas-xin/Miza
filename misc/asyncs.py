@@ -414,6 +414,28 @@ def waited_sync(fut, duration=None):
 	time.sleep(duration)
 	return fut.result()
 
+async def delayed_callback(fut, delay, func, *args, repeat=False, exc=False, **kwargs):
+	"A function that takes a coroutine/task, and calls a second function if it takes longer than the specified delay."
+	await asyncio.sleep(delay / 2)
+	if not fut.done():
+		await asyncio.sleep(delay / 2)
+	try:
+		return fut.result()
+	except Exception as ex:
+		if exc and not isinstance(ex, asyncio.exceptions.InvalidStateError):
+			raise
+		while not fut.done():
+			async with Delay(repeat):
+				if hasattr(func, "__call__"):
+					res = func(*args, **kwargs)
+				else:
+					res = func
+				if awaitable(res):
+					await res
+			if not repeat:
+				break
+		return await fut
+
 async def traceback_coro(fut, *args):
 	try:
 		return await fut

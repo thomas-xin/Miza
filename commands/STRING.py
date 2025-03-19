@@ -30,7 +30,7 @@ class Translate(Command):
 	rate_limit = (6, 9)
 	slash = True
 	ephemeral = True
-	LLMs = ("google", "mixtral-8x22b", "gpt-3.5", "gpt-3.5-turbo-instruct", "gpt-4m", "claude-3.5-sonnet", "claude-3-sonnet", "command-r", "command-r-plus", "deepseek-v3")
+	LLMs = set(("google",) + tuple(ai.available))
 	if googletrans:
 		languages = demap(googletrans.LANGUAGES)
 		trans = googletrans.Translator()
@@ -46,10 +46,10 @@ class Translate(Command):
 		if spl[0].casefold() in self.LLMs:
 			engine = spl.pop(0).casefold()
 		elif spl[0].casefold() == "auto":
-			engine = "gpt-4m"
+			engine = "deepseek-v3"
 			spl.pop(0)
 		else:
-			engine = "gpt-4m"
+			engine = "deepseek-v3"
 		if len(spl) > 2 and (spl[1].casefold() in self.renamed or spl[1].casefold() in self.languages) and(src := (self.renamed.get(c := spl[0].casefold()) or (self.languages.get(c) and c))):
 			spl.pop(0)
 			src = lim_str(src, 32)
@@ -193,7 +193,7 @@ class Translate(Command):
 		prompt += ",".join((googletrans.LANGUAGES.get(lang) or lang).capitalize() for lang in dests)
 		if len(dests) > 1:
 			prompt += ', each beginning with "•"'
-		prompt += f', keeping formatting as accurate as possible, without adding extra text!{response}'
+		prompt += f', keeping formatting as accurate as possible, and do NOT add extra text!{response}'
 		try:
 			out = await ai.instruct(
 				data=dict(
@@ -216,7 +216,7 @@ class Translate(Command):
 			print("Instruct translate: Empty response, retrying...")
 			resp = await ai.llm(
 				"completions.create",
-				model="gpt-3.5-turbo-instruct",
+				model="gpt-4m",
 				prompt=prompt,
 				temperature=0.5,
 				max_tokens=2048,
@@ -1032,25 +1032,26 @@ class Time(Command):
 	ephemeral = True
 
 	async def __call__(self, _user, input, user, estimate, **void):
-		user = user or _user
+		target = user or _user
 		c = 1
-		tzinfo = self.bot.data.users.get_timezone(user.id) if not estimate else None
+		tzinfo = self.bot.data.users.get_timezone(target.id) if not estimate else None
 		if tzinfo is None:
-			tzinfo, c = self.bot.data.users.estimate_timezone(user.id)
+			tzinfo, c = self.bot.data.users.estimate_timezone(target.id)
 			estimated = True
 		else:
 			estimated = False
 		dt2 = DynamicDT.now(tz=tzinfo)
 		dt = DynamicDT.parse(input, timestamp=dt2.timestamp_exact(), timezone=get_name(tzinfo))
-		colour = await self.bot.get_colour(user)
+		colour = await self.bot.get_colour(target)
 		emb = discord.Embed(colour=colour)
 		emb.add_field(name="Parsed As", value="`" + ", ".join(dt.parsed_as) + "`")
-		tzstats = italics(get_name(tzinfo))
-		if estimated:
-			tzstats += f" {user_mention(user.id)}, estimated ({round(c * 100)}% confidence)"
-		else:
-			tzstats += f" {user_mention(user.id)}, assigned"
-		emb.add_field(name="Local Timezone", value=tzstats)
+		if user:
+			tzstats = italics(get_name(tzinfo))
+			if estimated:
+				tzstats += f" {user_mention(target.id)}, estimated ({round(c * 100)}% confidence)"
+			else:
+				tzstats += f" {user_mention(target.id)}, assigned"
+			emb.add_field(name="Local Timezone", value=tzstats)
 		emb.add_field(name="Displayed Time", value=str(dt))
 		emb.add_field(name="Unix Timestamp", value=f"`{dt.timestamp()}`")
 		emb.add_field(name="ISO Timestamp", value=f"`{dt.as_iso()}`")

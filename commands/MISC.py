@@ -443,7 +443,7 @@ class Hyperchoron(Command):
 	rate_limit = (10, 20)
 
 	async def __call__(self, bot, url, format, **void):
-		fo = os.path.abspath(replace_ext(url2fn(url), format.casefold()))
+		fo = os.path.abspath(TEMP_PATH + replace_ext(url2fn(url), format.casefold()))
 		args = [python, "hyperchoron.py", "-i", url, "-o", fo]
 		print(args)
 		proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)

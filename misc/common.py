@@ -187,7 +187,7 @@ def restructure_buttons(buttons):
 async def interaction_response(bot, message, content=None, embed=None, embeds=(), components=None, buttons=None, ephemeral=False):
 	"Uses the raw Discord HTTP API to post/send an interaction message."
 	if getattr(message, "deferred", False):
-		return interaction_post(bot, message, content, embed, embeds, components, buttons, ephemeral)
+		return await interaction_post(bot, message, content=content, embed=embed, embeds=embeds, components=components, buttons=buttons, ephemeral=ephemeral)
 	if hasattr(embed, "to_dict"):
 		embed = embed.to_dict()
 	if embed:
@@ -237,15 +237,12 @@ async def interaction_post(bot, message, content=None, embed=None, embeds=(), co
 		message.int_token = message.slash
 	ephemeral = ephemeral and 64
 	resp = await Request(
-		f"https://discord.com/api/{api}/interactions/{message.int_id}/{message.int_token}/callback",
+		f"https://discord.com/api/{api}/webhooks/{bot.id}/{message.int_token}",
 		data=json_dumps(dict(
-			type=7,
-			data=dict(
-				flags=ephemeral,
-				content=content,
-				embeds=embeds,
-				components=components or restructure_buttons(buttons),
-			),
+			flags=ephemeral,
+			content=content,
+			embeds=embeds,
+			components=components or restructure_buttons(buttons),
 		)),
 		method="POST",
 		authorise=True,
@@ -265,7 +262,7 @@ async def interaction_post(bot, message, content=None, embed=None, embeds=(), co
 		message.embeds = [discord.Embed.from_dict(embed)] if embed else message.embeds
 	return message
 
-async def interaction_patch(bot, message, content=None, embed=None, embeds=(), components=None, buttons=None, ephemeral=False):
+async def interaction_patch(bot, message, content=None, embed=None, embeds=(), attachments=None, components=None, buttons=None, ephemeral=False):
 	"Uses the raw Discord HTTP API to patch/edit an interaction message."
 	if hasattr(embed, "to_dict"):
 		embed = embed.to_dict()
@@ -277,12 +274,14 @@ async def interaction_patch(bot, message, content=None, embed=None, embeds=(), c
 	if not getattr(message, "int_token", None):
 		message.int_token = message.slash
 	mid = message.id or "@original"
+	attachment_info = {} if attachments is None else dict(attachments=attachments)
 	resp = await Request(
 		f"https://discord.com/api/{api}/webhooks/{bot.id}/{message.int_token}/messages/{mid}",
 		data=json_dumps(dict(
 			content=content,
 			embeds=embeds,
 			components=components or restructure_buttons(buttons),
+			**attachment_info,
 		)),
 		method="PATCH",
 		authorise=True,
@@ -453,7 +452,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 		sem = emptyctx
 		inter = True
 		if getattr(reference, "deferred", False) or getattr(reference, "int_id", reference.id) in bot.inter_cache:
-			url = f"https://discord.com/api/{api}/webhooks/{bot.id}/{bot.inter_cache.get(reference.id, reference.slash)}/messages/@original"
+			url = f"https://discord.com/api/{api}/webhooks/{bot.id}/{bot.inter_cache.get(reference.id, reference.slash)}"
 		else:
 			url = f"https://discord.com/api/{api}/interactions/{reference.id}/{reference.slash}/callback"
 		data = dict(
@@ -557,9 +556,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 	method = "post"
 	for i in range(xrand(3, 6)):
 		try:
-			method = "patch" if getattr(reference, "deferred", False) else "post"
-			if method == "patch":
-				url = f"https://discord.com/api/{api}/webhooks/{bot.id}/{reference.slash}/messages/@original"
+			if getattr(reference, "slash", False) and "webhooks" in url:
 				body = json_dumps(data["data"])
 			if files:
 				form = aiohttp.FormData()
@@ -719,6 +716,8 @@ async def manual_edit(message, **fields):
 	return message
 
 async def add_reacts(message, reacts):
+	if not reacts:
+		return message
 	futs = []
 	if reacts and not getattr(message, "ephemeral", False):
 		tempsem = Semaphore(5, inf, rate_limit=5)
@@ -1713,29 +1712,6 @@ def process_image(image, operation="$", args=[], cap="image", priority=False, ti
 
 	argi = "[" + ",".join(map(as_arg, args)) + "]"
 	return proc_eval(f"evaluate_image([{repr(image)},{repr(operation)},{argi}])", caps=[cap], priority=priority, timeout=timeout)
-
-async def delayed_callback(fut, delay, func, *args, repeat=False, exc=False, **kwargs):
-	"A function that takes a coroutine/task, and calls a second function if it takes longer than the specified delay."
-	await asyncio.sleep(delay / 2)
-	if not fut.done():
-		await asyncio.sleep(delay / 2)
-	try:
-		return fut.result()
-	except ISE:
-		while not fut.done():
-			async with Delay(repeat):
-				if hasattr(func, "__call__"):
-					res = func(*args, **kwargs)
-				else:
-					res = func
-				if awaitable(res):
-					await res
-			if not repeat:
-				break
-		return await fut
-	except Exception:
-		if exc:
-			raise
 
 
 @tracebacksuppressor

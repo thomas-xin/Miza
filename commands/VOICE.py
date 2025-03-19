@@ -300,22 +300,26 @@ class Queue(Command):
 			await fut
 			q, paused = await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).queue,a.settings.pause")
 			if len(q) and paused and ("▶️" in _name or _name.startswith("p")):
+				# With no item specified, the "play" alias is used for resuming rather than listing the queue
 				await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).settings.__setitem__('pause',False)\nreturn a.ensure_play()")
 				return cdict(
 					content=css_md(f"Successfully resumed audio playback in {sqr_md(_guild)}."),
 					reacts="❎",
 				)
-			# Set callback message for scrollable list
 			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-			await send_with_reply(
-				None,
-				_message,
-				"*```" + "callback-voice-queue-"
-				+ str(_user.id) + "_0_" + "0"
-				+ "-\nLoading Queue...```*",
+			resp = await self._callback_(
+				bot=bot,
+				message=None,
+				guild=_guild,
+				reaction=None,
+				user=_user,
+				perm=_perm,
+				vals=f"{_user.id}_0_0",
+			)
+			return cdict(
+				**resp,
 				buttons=buttons,
 			)
-			return
 		if mode == "now":
 			index = [0]
 		elif mode == "next":
@@ -457,14 +461,15 @@ class Queue(Command):
 			reacts="❎",
 		)
 
-	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+	async def _callback_(self, bot, message, guild, reaction, user, perm, vals, **void):
 		u_id, pos, v = list(map(int, vals.split("_", 2)))
+		if message and not reaction:
+			return
 		if reaction and u_id != user.id and perm < 1:
 			return
 		if reaction not in self.directions and reaction is not None:
 			return
 		user = await bot.fetch_user(u_id)
-		guild = message.guild
 		q, settings, paused, reverse, (elapsed, length) = await bot.audio.asubmit(f"(a := AP.from_guild({guild.id})).queue,a.settings,a.settings.pause,a.reverse,a.epos")
 		settings = astype(settings, cdict)
 		last = max(0, len(q) - 10)
@@ -481,14 +486,9 @@ class Queue(Command):
 			else:
 				new = pos
 			pos = new
-		content = message.content
-		if not content:
-			content = message.embeds[0].description
-		i = content.index("callback")
-		content = "```" + "\n" * ("\n" in content[:i]) + (
-			"callback-voice-queue-"
-			+ str(u_id) + "_" + str(pos) + "_" + str(int(v))
-			+ "-\nQueue for " + guild.name.replace("`", "") + ": "
+		content = (
+			f"```callback-voice-queue-{u_id}_{pos}_{int(v)}-\n"
+			+ "Queue for " + guild.name.replace("`", "") + ": "
 		)
 		start_time = 0
 		if not q:
@@ -526,14 +526,17 @@ class Queue(Command):
 			colour=rand_colour(),
 		)
 		emb.set_author(**get_author(user))
+		icon = ""
 		if q:
-			try:
-				icon = await bot.audio.asubmit(f"ytdl.get_thumbnail({json_dumpstr(q[0])},pos={elapsed})")
-			except Exception:
-				print_exc()
+			if q[0].get("has_storyboard") or reaction is not None and self.directions.index(reaction) == 4:
+				try:
+					icon = await bot.audio.asubmit(f"ytdl.get_thumbnail({json_dumpstr(q[0])},pos={elapsed})")
+				except Exception:
+					print_exc()
+				else:
+					q[0]["has_storyboard"] = True
+			if not icon:
 				icon = get_best_icon(q[0])
-		else:
-			icon = ""
 		if icon:
 			if isinstance(icon, str):
 				emb.set_thumbnail(url=icon)
@@ -575,9 +578,12 @@ class Queue(Command):
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
 		file = CompatFile(icon, filename="thumb.jpg") if isinstance(icon, byte_like) else None
 		filed = {"file": file} if file else {}
-		csubmit(bot.edit_message(message, **filed, attachments=[], content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-		if hasattr(message, "int_token"):
-			await bot.ignore_interaction(message)
+		return cdict(
+			**filed,
+			attachments=[],
+			content=None,
+			embed=emb,
+		)
 
 
 class Playlist(Command):
@@ -864,6 +870,7 @@ class Skip(Command):
 		after=cdict(
 			type="timedelta",
 			description="Skips the song(s) after the provided timestamp rather than immediately; requires trusted priviledge level for other users' songs",
+			greedy=False,
 		),
 	)
 	macros = cdict(

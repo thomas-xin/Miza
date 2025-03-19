@@ -106,14 +106,11 @@
 				"Recent",
 				"Log"
 			],
-			"description": "Shows recent Discord activity for the targeted user, server, or channel.",
-			"usage": "<user>? <verbose(-v)>?",
+			"description": "Shows your recent Discord activity",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(8, 11)",
-			"example": [
-				"recent 201548633244565504",
-				"log"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Status": {
