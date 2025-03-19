@@ -420,7 +420,7 @@ async def delayed_callback(fut, delay, func, *args, repeat=False, exc=False, **k
 	if not fut.done():
 		await asyncio.sleep(delay / 2)
 	try:
-		return fut.result()
+		return fut.result(), False
 	except Exception as ex:
 		if exc and not isinstance(ex, asyncio.exceptions.InvalidStateError):
 			raise
@@ -434,7 +434,7 @@ async def delayed_callback(fut, delay, func, *args, repeat=False, exc=False, **k
 					await res
 			if not repeat:
 				break
-		return await fut
+		return await fut, True
 
 async def traceback_coro(fut, *args):
 	try:

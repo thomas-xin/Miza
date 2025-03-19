@@ -4830,12 +4830,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 								bot=self,
 							))
 							if interaction:
-								if interaction:
-									csubmit(delayed_callback(future, 2, self.defer_interaction, message, ephemeral=getattr(message, "ephemeral", False), exc=False))
+								fut = csubmit(delayed_callback(future, 2, self.defer_interaction, message, mode="patch", ephemeral=getattr(message, "ephemeral", False), exc=False))
 							resp = await future
 						await self.send_event("_command_", user=user, command=f, loop=False, message=message)
 						if isinstance(resp, cdict):
 							if interaction and not resp.get("file"):
+								r, d = await fut
+								print(r, d)
+								if not d:
+									await self.defer_interaction(message, mode="patch")
 								return await interaction_patch(
 									bot=self,
 									message=message,

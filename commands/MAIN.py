@@ -87,8 +87,10 @@ class Help(Command):
 			raise KeyError(f'Command "{command}" does not exist.')
 		content = None
 		enabled = bot.get_enabled(_channel)
+
 		def category_repr(catg):
 			return (catg.capitalize() if len(catg) > 2 else catg.upper()) + (" [[DISABLED]]" if catg.lower() not in enabled else "")
+
 		if command:
 			com = bot.commands[command][0]
 			a = ", ".join(n.strip("_") for n in com.name) or "[none]"
