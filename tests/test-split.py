@@ -32,7 +32,7 @@ def close_markdown(text):
 	# Handle code blocks (```)
 	code_block_count = len(re.findall(r'```', text))
 	if code_block_count & 1:
-		# Code blocks are special because they can contain Markdown syntax; we need to copy the last detected opening sequence
+		# Code blocks are special because they may contain a format indicator; we need to copy the last detected opening sequence
 		last_open = text.rfind('```')
 		assert last_open != -1, "Unmatched closing code block detected"
 		closed.append(text[last_open:].split("\n", 1)[0] + "\n")
@@ -65,7 +65,7 @@ def split_text(text, max_length=2000, priority=("\n\n", "\n", "\t", "? ", "! ", 
 	opening = ""
 	while text:
 		if len(text) <= max_length:
-			chunks.append(close_markdown(text)[0])
+			chunks.append(close_markdown(opening + text)[0])
 			break
 
 		for adjusted in range(max_length):
@@ -115,6 +115,9 @@ This happens because each predation event reduces the total number of animals by
 
 # Sample spam text with spoiler and no natural boundaries
 ||aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa||
+
+```
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 """
 
 	chunks = split_text(
