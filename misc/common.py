@@ -1940,7 +1940,7 @@ class Command(Importable):
 					desc.append(f"{colourise('Default', fg='red')}{colourise(':', fg='white')} {colourise(json_if(v.default), fg='cyan')}")
 			if desc:
 				d = colourise("; ", fg="white").join(desc)
-				s += f" {colourise('(', fg='blue')}{d}{colourise(')', fg='blue')}"
+				s += " " + "\n".join(split_text(f"{colourise('(', fg='blue')}{d}{colourise(')', fg='blue')}", max_length=936))
 		return s
 
 	def parse_example(self):

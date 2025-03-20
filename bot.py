@@ -5405,6 +5405,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if message:
 				csubmit(message.add_reaction("🔜"))
 				soon_indicator = True
+				if slash or getattr(message, "slash", False):
+					await self.defer_interaction(message, ephemeral=getattr(message, "ephemeral", False))
 			await wrap_future(self.connect_ready)
 		channel = channel or (message.channel if message else None)
 		guild = guild or getattr(channel, "guild", None)
@@ -6301,7 +6303,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							if not m.guild_permissions.manage_webhooks:
 								return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
 			if single:
-				fut = None
+				futs = []
 				for emb in embeds:
 					async with Delay(1 / 3):
 						if type(emb) is not discord.Embed:
@@ -6315,7 +6317,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 								reference = r2
 							emb = discord.Embed.from_dict(emb)
 						fut = csubmit(send_with_react(sendable, embed=emb, reacts=reacts, reference=reference))
-				return await fut
+						futs.append(fut)
+				return await gather(*futs)
 			if force:
 				return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
 			embs = deque()
@@ -6342,6 +6345,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None, exc=True, bottleneck=False):
 		"Adds embeds to the embed sender, waiting for the next update event."
+		fut = fut_nop
 		if embeds is not None and not issubclass(type(embeds), collections.abc.Collection):
 			embeds = (embeds,)
 		elif embeds:
@@ -6352,24 +6356,27 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				embeds = (embed,)
 		elif not embeds:
-			return
+			return fut_nop
 		if reference:
 			# print(reference, reference.__dict__)
-			if getattr(reference, "slash", False) and len(embeds) <= 10:
+			if getattr(reference, "slash", False):
+				embs, embeds = embeds[:10], embeds[10:]
 				print("Sending embeds directly due to interaction token")
-				csubmit(self._send_embeds(channel, embeds, reacts, reference, exc=exc))
-				return
+				fut = csubmit(self._send_embeds(channel, embs, reacts, reference, exc=exc))
+				if not embeds:
+					return fut
 			csubmit(self.ignore_interaction(reference, skip=True))
 		c_id = verify_id(channel)
 		user = self.cache.users.get(c_id)
 		if user is not None:
 			print("Sending embeds directly due to specified user")
-			csubmit(self._send_embeds(user, embeds, reacts, reference, exc=exc))
-			return
+			return csubmit(self._send_embeds(user, embeds, reacts, reference, exc=exc))
 		if not self.initialisation_complete:
 			embs, embeds = embeds[:10], embeds[10:]
 			print("Sending embeds directly due to incomplete initialisation")
-			csubmit(self._send_embeds(channel, embs, reacts, reference, exc=exc))
+			fut = csubmit(self._send_embeds(channel, embs, reacts, reference, exc=exc))
+			if not embeds:
+				return fut
 		if reacts or reference:
 			embeds = [e.to_dict() for e in embeds]
 			for e in embeds:
@@ -6378,10 +6385,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		embs = set_dict(self.embed_senders, c_id, [])
 		lim = 16 if bottleneck else 2048
 		if len(embs) >= lim:
-			return
+			return fut
 		embs.extend(embeds)
 		if len(embs) > 2048:
 			self.embed_senders[c_id] = embs[-2048:]
+		return fut
 
 	def send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None, exc=True, bottleneck=False):
 		if type(description) is discord.Embed:
@@ -6514,7 +6522,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						embs.append(emb)
 					embs[i].set_image(url=img)
 					embs[i].url = img
-		return self.send_embeds(channel, embeds=embs, reacts=reacts, reference=reference, exc=exc, bottleneck=bottleneck)
+		return await self.send_embeds(channel, embeds=embs, reacts=reacts, reference=reference, exc=exc, bottleneck=bottleneck)
 
 	def update_embeds(self, force=False):
 		"Updates all embed senders."
@@ -7888,7 +7896,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if self.maintenance and not (reference and self.is_owner(reference.author)):
 			print(reference)
 			print_exc()
-			return
+			return fut_nop
 		if getattr(ex, "no_react", None):
 			reacts = ""
 		else:
@@ -7914,7 +7922,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if reference and isinstance(ex, discord.Forbidden) and reference.guild and not messageable.permissions_for(reference.guild.me).send_messages:
 			return csubmit(self.missing_perms(messageable, reference))
 		title = f"⚠ {type(ex).__name__} ⚠"
-		description = "\n".join(as_str(i) for i in ex.args)
+		description = "\n".join(as_str(i) for i in T(ex).get("args", ()))
 		if (guild := getattr(messageable, "guild", None)) and not messageable.permissions_for(guild.me).embed_links:
 			content = (title + "\n" + description).strip()
 			if fields:
@@ -8324,7 +8332,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							guild = T(channel).get("guild")
 						if not T(message).get("guild"):
 							message.guild = guild
-						message.content = " ".join(map(json.dumps, kwargs.values()))
+						message.content = f"/{name} " + " ".join(map(json.dumps, kwargs.values()))
 						message.channel = channel
 						message.noref = True
 						message.deleted = False
@@ -8332,7 +8340,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						try:
 							await self.run_command(command, kwargs, message=message, slash=True, respond=True)
 						except Exception as ex:
-							await self.send_exception(channel, ex, reference=message, comm=command)
+							if not getattr(message, "deferred", False):
+								await self.defer_interaction(message)
+							resp = await self.send_exception(channel, ex, reference=message, comm=command)
+							print("SC:", resp)
 						finally:
 							message.deleted = True
 					elif d["type"] == 3:
@@ -8390,6 +8401,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						await self.react_callback(m, custom_id, user)
 					else:
 						print("Unknown interaction:\n" + str(data))
+					print("Deleting interaction:", message)
 					for attr in ("slash", "int_id", "int_token"):
 						try:
 							delattr(message, attr)

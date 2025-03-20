@@ -281,6 +281,9 @@ class Queue(Command):
 		PlayNext=cdict(
 			mode="next",
 		),
+		PN=cdict(
+			mode="next",
+		),
 	)
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
@@ -409,7 +412,7 @@ class Queue(Command):
 				total_dur = end
 				break
 			total_dur += dur
-		estimated = sum(e_dur_2(e) for e in q[1:(qstart if qstart > 0 else None)])
+		estimated = sum(e_dur_2(e) for e in q[1:(qstart if qstart >= 0 else None)])
 		if q and qstart > 0:
 			estimated += e_remainder(elapsed, length, q[0], reverse)
 		delay = 0

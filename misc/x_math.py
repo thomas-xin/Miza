@@ -1346,11 +1346,11 @@ def evalSym(f, prec=64, r=False, variables=None):
 		p = str(e)
 		f = repr(e)
 		if re.search(r"-?[0-9]*\.[0-9]*0$", f):
-			return [f.rstrip(".0")]
+			f = f.rstrip(".0")
 		if len(f) > 1 and f[-1].isnumeric() and p.startswith(f[:-1]):
-			return [e]
+			return [f]
 		if p == f:
-			return [e]
+			return [f]
 		return [p]
 	else:
 		p = prettyAns(f) if r else str(f)
