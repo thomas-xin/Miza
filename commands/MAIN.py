@@ -1090,7 +1090,7 @@ class Reminder(Command):
 		),
 		time=cdict(
 			type="datetime",
-			description="Optional field containing any text; will show above description when set",
+			description="Time input to parse",
 			example="35 minutes and 6.25 seconds before 3am next tuesday, EDT",
 		),
 		delete=cdict(

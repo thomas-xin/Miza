@@ -1017,7 +1017,12 @@ class Time(Command):
 			type="bool",
 			description="Force a timezone estimate, even if a timezone is assigned",
 			default=False,
-		)
+		),
+		timezone=cdict(
+			type="word",
+			description="Target timezone to display input after conversion",
+			example="Europe/Stockholm",
+		),
 	)
 	macros = cdict(
 		EstimateTime=cdict(
@@ -1031,7 +1036,7 @@ class Time(Command):
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, _user, input, user, estimate, **void):
+	async def __call__(self, _user, input, user, estimate, timezone, **void):
 		target = user or _user
 		c = 1
 		tzinfo = self.bot.data.users.get_timezone(target.id) if not estimate else None
@@ -1045,7 +1050,11 @@ class Time(Command):
 		colour = await self.bot.get_colour(target)
 		emb = discord.Embed(colour=colour)
 		emb.add_field(name="Parsed As", value="`" + ", ".join(dt.parsed_as) + "`")
-		if user:
+		if timezone:
+			dt = dt.cast(get_timezone(timezone))
+			tzstats = italics(get_name(tzinfo))
+			emb.add_field(name="Local Timezone", value=tzstats)
+		elif user:
 			tzstats = italics(get_name(tzinfo))
 			if estimated:
 				tzstats += f" {user_mention(target.id)}, estimated ({round(c * 100)}% confidence)"

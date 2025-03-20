@@ -2967,7 +2967,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best > 1 else "low")),
 			]),
 		]
-		model = model or ("minimax-01" if best else "mistral-24b")
+		model = model or "mistral-24b"
 		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
