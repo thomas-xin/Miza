@@ -406,7 +406,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 				except (ZeroDivisionError, OverflowError):
 					fps = 0
 			try:
-				fcount = int(info[4])
+				fcount = int(info[4].removesuffix("x"))
 			except ValueError:
 				fcount = inf
 			if not fps:

@@ -22,7 +22,7 @@ from .util import (
 	python, compat_python, shuffle, utc, proxy, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration_2, html_decode,
 	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url,
-	EvalPipe, PipedProcess, Cache, Request, Semaphore, CACHE_PATH, magic, rename,
+	EvalPipe, PipedProcess, TimedCache, Request, Semaphore, CACHE_PATH, magic, rename,
 )
 
 # Gets the best icon/thumbnail for a queue entry.
@@ -223,9 +223,9 @@ class AudioDownloader:
 
 	def __init__(self, workers=1):
 		self.session = niquests.Session()
-		self.search_cache = Cache(timeout=inf, timeout2=60, persist="ytdl.search.cache", autosave=60)
-		self.thumbnail_cache = Cache(timeout=inf, timeout2=60, persist="ytdl.thumbnail.cache", autosave=60)
-		self.extract_cache = Cache(timeout=120, timeout2=8)
+		self.search_cache = TimedCache(timeout=inf, timeout2=60, persist="ytdl.search.cache", autosave=60)
+		self.thumbnail_cache = TimedCache(timeout=inf, timeout2=60, persist="ytdl.thumbnail.cache", autosave=60)
+		self.extract_cache = TimedCache(timeout=120, timeout2=8)
 		self.futs = [
 			esubmit(self.set_cookie),
 		]

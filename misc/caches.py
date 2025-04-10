@@ -1,5 +1,6 @@
 import aiohttp
 import concurrent.futures
+import diskcache
 import random
 import re
 import time
@@ -10,7 +11,7 @@ import niquests
 from misc.types import utc, as_str
 from misc.asyncs import esubmit, wrap_future, Future
 from misc.util import (
-    Cache, CACHE_FILESIZE, AUTH, Request, api,
+    retrieve_from, CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, uhash,
     snowflake_time_2, shorten_attachment, merge_url, split_url, discord_expired, url2fn
 )
@@ -73,7 +74,7 @@ def parse_colour(s):
 		return (r, g, b)
 	raise ValueError(s)
 
-class ColourCache(Cache):
+class ColourCache(diskcache.Cache):
 
 	def obtain(self, url):
 		if not url:
@@ -104,10 +105,8 @@ class ColourCache(Cache):
 			print("GC:", url, c)
 			return c
 
-colour_cache = ColourCache(timeout=86400 * 7, trash=1, persist="colour.cache")
 
-
-class AttachmentCache(Cache):
+class AttachmentCache(diskcache.Cache):
 	"""
 	A class to manage caching of attachments and embeds for a Discord bot.
 	Attributes:
@@ -269,7 +268,7 @@ class AttachmentCache(Cache):
 			resp = self[key]
 			assert isinstance(resp, str) and not discord_expired(resp, early) and url2fn(resp) == fn
 		except KeyError:
-			resp = await self.retrieve_from(key, self.get_attachment, c_id, m_id, a_id, fn)
+			resp = await retrieve_from(self, key, self.get_attachment, c_id, m_id, a_id, fn)
 		except AssertionError:
 			resp = await self.get_attachment(c_id, m_id, a_id, fn)
 			self[key] = resp
@@ -371,6 +370,7 @@ class AttachmentCache(Cache):
 			return out[0]
 		return out
 
-attachment_cache = AttachmentCache(timeout=3600 * 18 , trash=0, persist="attachment.cache")
-upload_cache = Cache(timeout=86400 * 30, trash=1, persist="upload.cache")
-download_cache = Cache(timeout=60, trash=0, persist="download.cache")
+colour_cache = ColourCache(directory=f"{CACHE_PATH}/colour", expiry=86400 * 7)
+attachment_cache = AttachmentCache(directory=f"{CACHE_PATH}/attachment", expiry=3600 * 18)
+upload_cache = diskcache.Cache(directory=f"{CACHE_PATH}/upload", expiry=86400 * 30)
+download_cache = diskcache.Cache(directory=f"{CACHE_PATH}/colour", expiry=60)

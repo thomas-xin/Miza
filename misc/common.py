@@ -52,6 +52,8 @@ escape_mentions = utils.escape_mentions
 escape_everyone = lambda s: s#s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere")
 escape_roles = lambda s: s#escape_everyone(s).replace("<@&", "<@\xad&")
 
+standard_roles = lambda member: [role for role in member.roles if not role.is_default()]
+
 
 class MemoryTimer(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 	"A context manager that monitors the amount of time taken for a designated section of code."
@@ -274,14 +276,15 @@ async def interaction_patch(bot, message, content=None, embed=None, embeds=(), a
 	if not getattr(message, "int_token", None):
 		message.int_token = message.slash
 	mid = message.id or "@original"
-	attachment_info = {} if attachments is None else dict(attachments=attachments)
+	extra = {} if attachments is None else dict(attachments=attachments)
+	if components or buttons:
+		extra["components"] = components or restructure_buttons(buttons)
 	resp = await Request(
 		f"https://discord.com/api/{api}/webhooks/{bot.id}/{message.int_token}/messages/{mid}",
 		data=json_dumps(dict(
 			content=content,
 			embeds=embeds,
-			components=components or restructure_buttons(buttons),
-			**attachment_info,
+			**extra,
 		)),
 		method="PATCH",
 		authorise=True,
@@ -1292,7 +1295,7 @@ colour_types = (
 	tertiary_colours,
 )
 
-colours_cache = Cache(timeout=86400 * 7, trash=0, persist="colours.cache")
+colourlist_cache = diskcache.Cache(directory=f"{CACHE_PATH}/colourlist", expiry=86400 * 7)
 @tracebacksuppressor
 def get_colour_list():
 	global colour_names
@@ -1321,11 +1324,11 @@ def get_colour_list():
 				colour_names = cdict(colour_group)
 			else:
 				colour_names.update(colour_group)
-	colours_cache["map"] = colour_names
+	colourlist_cache["map"] = colour_names
 	print(f"Successfully loaded {len(colour_names)} colour names.")
 def load_colour_list():
 	try:
-		return colours_cache["map"]
+		return colourlist_cache["map"]
 	except KeyError:
 		return get_colour_list()
 
@@ -1725,7 +1728,7 @@ emoji_replace = {}
 em_trans = {}
 discord_stripped = RangeSet([range(0x2000, 0x2070), range(0xfe00, 0xffff)])
 discord_stripmap = "".maketrans({k: "" for k in discord_stripped})
-emoji_cache = Cache(timeout=86400 * 7, trash=0, persist="follow.cache")
+emoji_cache = diskcache.Cache(directory=f"{CACHE_PATH}/follow", expiry=86400 * 7)
 _eop = "\n    query vendorHistoricEmojiV1(\n      $slug: Slug!\n      $version: Slug = null\n      $status: VendorHistoricEmojiStatus = null\n      $lang: Language\n    ) {\n      vendorHistoricEmoji_v1(slug: $slug, version: $version, status: $status, lang: $lang) {\n        ...vendorHistoricEmojiResource\n      }\n    }\n    \n  fragment vendorHistoricEmojiImageFragment on VendorHistoricEmojiImage {\n    slug\n    image {\n      source\n      description\n      useOriginalImage\n    }\n    status\n  }\n\n    \n  fragment vendorHistoricEmojiResource on VendorHistoricEmoji {\n    items {\n      category {\n        slug\n        title\n\n        representingEmoji {\n          code\n        }\n      }\n      images {\n        ...vendorHistoricEmojiImageFragment\n      }\n    }\n    statuses\n  }\n\n  "
 def request_emojis():
 	emojimap = {}

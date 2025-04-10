@@ -963,7 +963,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 		elif lossless:
 			command.extend(("-lossless", "1"))
 		else:
-			command.extend(("-q:v", "24"))
+			command.extend(("-q:v", "90"))
 	elif fmt == "webp":
 		lossless = not anim and not opt
 		if not anim:
@@ -984,7 +984,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 		elif lossless:
 			command.extend(("-lossless", "1"))
 		else:
-			command.extend(("-q:v", "24"))
+			command.extend(("-q:v", "90"))
 	elif fmt == "png":
 		command.extend(("-vframes", "1"))
 		if (w, h) != first.size:
@@ -1131,12 +1131,10 @@ def evalImg(url, operation, args):
 	dur = None
 	maxframes = inf
 	nogif = False
+	oz = False
 	if len(args) > 1 and args[-2] == "-f":
 		fmt = args.pop(-1) or fmt
 		args.pop(-1)
-		if fmt in statics:
-			maxframes = 1
-			nogif = True
 	if len(args) > 1 and args[-2] == "-fs":
 		fs = floor(float(args.pop(-1)))
 		args.pop(-1)
@@ -1147,11 +1145,15 @@ def evalImg(url, operation, args):
 		opt = True
 		args.pop(-1)
 	elif args and args[-1] == "-oz":
-		maxframes = 5
+		maxframes = 16
+		oz = True
 		opt = False
 		args.pop(-1)
 	else:
 		opt = False
+	if fmt in statics and not oz:
+		maxframes = 1
+		nogif = True
 	if args and args[-1] == "-bg":
 		bg = True
 		args.pop(-1)
@@ -1196,12 +1198,13 @@ def evalImg(url, operation, args):
 			else:
 				print("Output stat:", new, prop)
 	if isinstance(new, dict) and "frames" in new:
+		# print(nogif, oz, new)
 		frames = optimise(new["frames"])
 		if not frames:
 			raise EOFError("No image output detected.")
+		video = False
 		if nogif:
 			new["frames"] = [next(iter(frames))]
-			video = False
 		elif new["count"] == 1 or not new.get("duration"):
 			temp = next(iter(frames))
 			video = getattr(temp, "audio", None)
@@ -1211,6 +1214,23 @@ def evalImg(url, operation, args):
 				duration = dur = 3600000
 				new["count"] = 16
 				new["frames"] = [temp] * new["count"]
+		elif oz:
+			frames = list(frames)
+			first = frames[0]
+			count = min(new["count"], maxframes)
+			if len(frames) > count:
+				frames = [frames[round(i / (count - 1) * (len(frames) - 1))] for i in range(count)]
+			rows = ceil(sqrt(count))
+			cols = ceil(count / rows)
+			im = Image.new(first.mode, (first.width * cols, first.height * rows))
+			print("Template:", im)
+			for i, frame in enumerate(frames):
+				y = i // cols
+				x = i % cols
+				im.paste(frame, (x * first.width, y * first.height))
+			new["frames"] = [im]
+			new["count"] = 1
+			new["duration"] = 1000
 		else:
 			video = True
 		duration = new["duration"]

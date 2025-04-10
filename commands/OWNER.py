@@ -756,7 +756,7 @@ class UpdateExec(Database):
 		print("Deleted", deleted)
 		return deleted
 
-	seen = Cache(timeout=86400)
+	seen = TimedCache(timeout=86400)
 	async def uproxy(self, *urls, collapse=True, mode="upload", filename=None, channel=None, **kwargs):
 		bot = self.bot
 		async def proxy_url(url):
@@ -1089,7 +1089,7 @@ class UpdateDeleted(Database):
 
 	def __load__(self, **void):
 		cache = self.cache
-		self.cache = Cache(timeout=86400 * 7, trash=1)
+		self.cache = TimedCache(timeout=86400 * 7, trash=1)
 		self.cache.update(cache)
 		self.cache.attach(self.data)
 

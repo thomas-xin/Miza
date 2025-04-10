@@ -89,7 +89,7 @@ class Ask(Command):
 		simulated = getattr(_message, "simulated", False)
 		pdata = bot.commands.personality[0].retrieve(_channel or _guild)
 		if bot_name != bot.name:
-			name_repr = bot.name + f', nickname "{bot_name}"'
+			name_repr = bot.name + f', nicknamed "{bot_name}"'
 		else:
 			name_repr = bot_name
 		personality = pdata.description.replace("{{user}}", _user.display_name).replace("{{char}}", name_repr)
@@ -356,9 +356,10 @@ class Ask(Command):
 								reasoning_effort="high" if "o3" in model else "medium",
 								timeout=3600,
 							)
-							print(resp)
 							message = resp.choices[0].message
-							return T(message).get("reasoning_content") or message.content
+							s = T(message).get("reasoning_content") or message.content
+							print("Reasoning:", s)
+							return s
 						argv = kwargs.get("query") or " ".join(kwargs.values())
 						s = f'\n> Thinking "{argv}"...'
 						text += s
@@ -722,7 +723,7 @@ class Instruct(Command):
 	rate_limit = (12, 16)
 	slash = True
 	ephemeral = True
-	cache = Cache(timeout=720)
+	cache = TimedCache(timeout=720)
 
 	async def __call__(self, bot, _message, _premium, model, prompt, api, temperature, frequency_penalty, presence_penalty, max_tokens, **void):
 		kwargs = {}

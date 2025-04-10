@@ -530,7 +530,7 @@ class Info(Command):
 				if member.guild_permissions.administrator:
 					a += 1
 				else:
-					r += len(member.roles) > 1
+					r += bool(standard_roles(member))
 			memberinfo = f"Admins: {a}\nOther roles: {r}\nNo roles: {m - a - r}"
 			emb.add_field(name=f"Member count ({m})", value=memberinfo, inline=1)
 		except AttributeError:

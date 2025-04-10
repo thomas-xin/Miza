@@ -93,7 +93,7 @@ class SheetPull:
 	def __init__(self, *urls, mode="csv"):
 		self.mode = mode
 		self.urls = urls
-		self.data = Cache(timeout=720, persist="cs.cache")
+		self.data = diskcache.Cache(directory=f"{CACHE_PATH}/cs", expiry=720)
 
 	async def pull(self):
 		data = {}
@@ -105,7 +105,7 @@ class SheetPull:
 
 	async def search(self, query, max_results=20):
 		output = []
-		data = await self.data.retrieve_from(None, self.pull)
+		data = await retrieve_from(self.data, None, self.pull)
 		for file in data.values():
 			for line in file:
 				if not line:

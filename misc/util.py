@@ -7,6 +7,7 @@ from collections import deque, defaultdict
 import concurrent.futures
 import contextlib
 import datetime
+import diskcache
 import fractions
 import functools
 import hashlib
@@ -31,6 +32,7 @@ import threading
 import time
 from traceback import format_exc, print_exc
 from urllib.parse import quote_plus, unquote_plus
+import weakref
 import zipfile
 from dynamic_dt import DynamicDT
 import filetype
@@ -1343,8 +1345,8 @@ def mime_from_file(path, filename=None, mime=True):
 			return "image/avif"
 	if out == "text/plain" and data.startswith(b"#EXTM3U"):
 		return "video/m3u8"
-	if out == "image/jpeg":
-		return "image/jpg"
+	# if out == "image/jpeg":
+	# 	return "image/jpg"
 	return out
 
 magic = cdict(
@@ -2995,7 +2997,7 @@ class CacheItem:
 	def __init__(self, value):
 		self.value = value
 
-class Cache(dict):
+class TimedCache(dict):
 	"A dictionary-compatible object where the key-value pairs expire after a specified delay. Implements stale-while-revaluate protocol."
 	# __slots__ = ("timeout", "timeout2", "tmap", "soonest", "waiting", "lost", "trash", "db")
 
@@ -3198,6 +3200,48 @@ class Cache(dict):
 			db.clear()
 			db.setdefault("__tmap", {})
 		object.__setattr__(self, "tmap", db["__tmap"])
+
+
+def keys(d):
+	return tuple(d)
+diskcache.Cache.keys = keys
+
+def values(d):
+	return tuple(map(d.__getitem__, keys(d)))
+diskcache.Cache.values = values
+
+def items(d):
+	return tuple((k, d.__getitem__(k)) for k in keys(d))
+diskcache.Cache.items = items
+
+weak_retrieval = weakref.WeakValueDictionary()
+
+async def retrieve_into(d, k, func, *args, **kwargs):
+	resp = await asubmit(func, *args, **kwargs)
+	if hasattr(d, "expiry"):
+		d.set(k, resp, expire=d.expiry)
+	else:
+		d[k] = resp
+	return resp
+
+async def retrieve_from(d, k, func, *args, **kwargs):
+	try:
+		return d[k]
+	except KeyError:
+		pass
+	h = (id(d), k)
+	try:
+		fut = weak_retrieval[h]
+	except KeyError:
+		pass
+	else:
+		return await fut
+	fut = csubmit(retrieve_into(d, k, func, *args, **kwargs))
+	weak_retrieval[h] = fut
+	try:
+		return await fut
+	finally:
+		weak_retrieval.pop(h, None)
 
 
 DISCORD_EPOCH = 1420070400000 # 1 Jan 2015

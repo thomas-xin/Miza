@@ -1065,8 +1065,8 @@ class Time(Command):
 		emb.add_field(name="Unix Timestamp", value=f"`{dt.timestamp()}`")
 		emb.add_field(name="ISO Timestamp", value=f"`{dt.as_iso()}`")
 		emb.add_field(name="Time Delta", value=f"`{dt - dt2}`")
-		emb.add_field(name="Live Timestamp", value=dt.as_discord())
-		emb.add_field(name="Live Delta", value=dt.as_rel_discord())
+		emb.add_field(name="Live Timestamp", value=f"`{dt.as_discord()}`\n{dt.as_discord()}")
+		emb.add_field(name="Live Delta", value=f"`{dt.as_rel_discord()}`\n{dt.as_rel_discord()}")
 		return cdict(embed=emb)
 
 
@@ -1317,7 +1317,7 @@ class Describe(Command):
 
 	async def __call__(self, bot, _user, _premium, url, **void):
 		fut = asubmit(reqs.next().head, url, headers=Request.header(), stream=True)
-		cap = await self.bot.caption(url, best=3 if _premium.value >= 4 else 2, premium_context=_premium, timeout=24)
+		cap = await self.bot.caption(url, best=1, premium_context=_premium, timeout=24)
 		s = "\n\n".join(filter(bool, cap)).strip()
 		resp = await fut
 		name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
@@ -1530,7 +1530,7 @@ class Browse(Command):
 		ss = True if int(m) == 0 else False
 		urls = await bot.follow_url(argv, ytd=False)
 		argv = urls[0] if urls else argv
-		s = await bot.browse(argv, uid=user.id, screenshot=ss, include_hrefs=True)
+		s = await bot.browse(argv, uid=user.id, screenshot=ss, best=True, include_hrefs=True)
 		ref = getattr(getattr(message, "reference", None), "cached_message", None)
 		if isinstance(s, bytes):
 			csubmit(bot.silent_delete(message))

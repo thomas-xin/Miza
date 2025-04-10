@@ -375,11 +375,11 @@ class AudioPlayer(discord.AudioSource):
 		else:
 			if not self.fut.done():
 				self.fut.set_exception(si)
-			self.settings.update(self.defaults)
-			self.clear()
 			if self.vc:
 				self.vc.stop()
 				await self.vc.disconnect()
+		self.settings.update(self.defaults)
+		self.clear()
 		if announce:
 			s = ansi_md(
 				f"{colourise('🎵', fg='blue')}{colourise()} Successfully disconnected from {colourise(self.channel.guild, fg='magenta')}{colourise()}. {colourise('🎵', fg='blue')}{colourise()}"
@@ -699,6 +699,8 @@ class AudioPlayer(discord.AudioSource):
 	async def _updating_activity(self):
 		self.pause()
 		await asyncio.sleep(300)
+		if self is not self.players.get(self.vcc.guild.id):
+			return
 		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
 		if connected:
 			listeners = sum(not m.bot and bool(m.voice) for m in self.vcc.members)
@@ -720,6 +722,8 @@ class AudioPlayer(discord.AudioSource):
 			self.updating_streaming = csubmit(self._updating_streaming())
 	async def _updating_streaming(self):
 		await asyncio.sleep(300)
+		if self is not self.players.get(self.vcc.guild.id):
+			return
 		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
 		if len(self.queue) == 0 and connected:
 			await self.leave("Queue empty")
@@ -1430,7 +1434,7 @@ class BufferedAudioReader(discord.AudioSource):
 		try:
 			fut = esubmit(next, self.packet_iter, b"")
 			try:
-				out = fut.result(timeout=4)
+				out = fut.result(timeout=60)
 			except concurrent.futures.TimeoutError:
 				print_exc()
 				with suppress():

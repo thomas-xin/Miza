@@ -809,7 +809,7 @@ class RoleSelect(Command):
 		if role in user.roles:
 			removals = [role]
 			if isfinite(limit):
-				rids = {r.id for r in user.roles[1:]}
+				rids = {r.id for r in standard_roles(user)}
 				rids.remove(role.id)
 				has_after = rids.intersection(role_ids)
 				while len(has_after) > limit:
@@ -821,11 +821,11 @@ class RoleSelect(Command):
 			text = user.mention + ": Successfully removed " + ", ".join(role.mention for role in removals)
 			await interaction_response(bot, message, text, ephemeral=True)
 		else:
-			rolelist = set(user.roles[1:])
+			rolelist = set(standard_roles(user))
 			rolelist.add(role)
 			removals = []
 			if isfinite(limit):
-				rids = {r.id for r in user.roles[1:]}
+				rids = {r.id for r in standard_roles(user)}
 				has_after = rids.intersection(role_ids)
 				while len(has_after) + 1 > limit:
 					rid = choice(has_after)
@@ -894,7 +894,7 @@ class RoleGiver(Command):
 			role = guild.get_role(i)
 		else:
 			role = await str_lookup(
-				guild.roles[1:],
+				standard_roles(guild),
 				r,
 				qkey=lambda x: [str(x), full_prune(x.replace(" ", ""))],
 				fuzzy=0.125,
@@ -981,7 +981,7 @@ class AutoRole(Command):
 		if len(guild.roles) <= 1:
 			guild.roles = await guild.fetch_roles()
 			guild.roles.sort()
-		rolelist = guild.roles[1:]
+		rolelist = standard_roles(guild)
 		for r in rolenames:
 			if type(r) is int:
 				for i in rolelist:
@@ -1865,7 +1865,6 @@ class UpdateBans(Database):
 # Triggers upon 3 channel deletions in 2 minutes or 6 bans in 10 seconds
 class ServerProtector(Database):
 	name = "prot"
-	no_file = True
 
 	async def kickWarn(self, u_id, guild, owner, msg):
 		user = await self.bot.fetch_user(u_id)
@@ -1957,6 +1956,7 @@ class ServerProtector(Database):
 				csubmit(self.targetWarn(u_id, guild, f"banning `({cnt[u_id]})`"))
 
 	async def scan(self, message, url, known=None, **void):
+		self.data["scans"] = self.data.get("scans", 0) + 1
 		resp = known or await process_image("ectoplasm", "$", [url, b"", "-f", "png"], cap="caption", priority=True, timeout=60)
 		if not resp:
 			return
@@ -1999,6 +1999,7 @@ class ServerProtector(Database):
 		is_ai = analyse(resp)
 		print("META:", type(resp), is_ai, resp)
 		if is_ai:
+			self.data["pos"] = self.data.get("pos", 0) + 1
 			try:
 				await self.bot.react_with(message, "ai_generated.gif")
 			except Exception:
@@ -2714,8 +2715,7 @@ class UpdateUserLogs(Database):
 				emb.description += f"\nReason: *`{no_md(prune.reason)}`*"
 		else:
 			emb.description = f"{user_mention(user.id)} has left the server."
-		roles = T(user).get("roles") or ()
-		rchange = escape_markdown(", ".join(role_mention(r.id) for r in roles[1:]))
+		rchange = escape_markdown(", ".join(role_mention(r.id) for r in standard_roles(user)))
 		if rchange:
 			emb.add_field(name="Roles", value=rchange)
 		self.bot.send_embeds(channel, emb)
@@ -3447,6 +3447,7 @@ class UpdateAutoRoles(Database):
 		try:
 			await user.add_roles(*roles, reason="AutoRole", atomic=False)
 		except discord.Forbidden:
+			print_exc()
 			await user.add_roles(*roles, reason="AutoRole", atomic=True)
 		print(f"AutoRole: Granted {roles} to {user} in {guild}.")
 
@@ -3475,25 +3476,35 @@ class UpdateRolePreservers(Database):
 			nick = cdict(nick=self.bot.data.nickpreservers[guild.id][user.id])
 		except KeyError:
 			nick = {}
-		if (not nick or nick == user.display_name) and (not roles or {r.id for r in roles} == {r.id for r in user.roles[1:]}):
+		if (not nick or nick == user.display_name) and (not roles or {r.id for r in roles} == {r.id for r in standard_roles(user)}):
 			return
+		granted = []
 		try:
 			await user.edit(roles=roles, reason="RolePreserver", **nick)
+			granted.extend(roles)
 		except discord.Forbidden:
+			print_exc()
 			if nick:
 				csubmit(user.edit(nick=nick.nick, reason="NickPreserver"))
 			try:
 				await user.add_roles(*roles, reason="RolePreserver", atomic=False)
+				granted.extend(roles)
 			except discord.Forbidden:
-				await user.add_roles(*roles, reason="RolePreserver", atomic=True)
+				for role in roles:
+					try:
+						await user.add_roles(role, reason="RolePreserver", atomic=True)
+					except Exception:
+						print_exc()
+						print(f"RolePreserver: Failed to grant role: {role.id}, {role}")
+					granted.append(role)
 		self.data[guild.id].pop(user.id, None)
-		print(f"RolePreserver: Granted {roles} to {user} in {guild}.")
+		print(f"RolePreserver: Granted {granted} to {user} in {guild}.")
 
 	async def _leave_(self, user, guild, **void):
 		if guild.id not in self.data:
 			return
 		# roles[0] is always @everyone
-		roles = user.roles[1:]
+		roles = standard_roles(user)
 		if roles:
 			assigned = [role.id for role in roles]
 			print("_leave_", guild, user, assigned)

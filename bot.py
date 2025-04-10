@@ -90,6 +90,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		roles=False,
 		replied_user=False,
 	)
+	collecting = None
 	connect_ready = Future()
 	full_ready = Future()
 	socket_responses = deque(maxlen=256)
@@ -1581,44 +1582,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return await self.id_from_message(self.cache.messages[m_id].content)
 		return verify_id(m_id)
 
-	followed = Cache(timeout=86400 * 7, persist="follow.cache")
-	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, emojis=True, reactions=False, allow=False, limit=None, no_cache=False, ytd=True) -> list:
-		"Finds URLs in a string, following any discord message links found. Traces all the way to raw file stream if \"ytd\" parameter is set."
-		if limit is not None and limit <= 0:
-			return []
-		if not isinstance(url, str) and hasattr(url, "channel"):
-			url = message_link(url)
-		if it is None or not is_url(url):
-			urls = find_urls(url) if allow else find_urls_ex(url)
-			if not urls:
-				if images or emojis or reactions:
-					return await self.follow_to_image(url, follow=reactions)
-				return []
-			it = {}
-		else:
-			urls = [url]
-		urls = tuple(urls)
-		out = deque()
-		if preserve or allow:
-			lost = deque()
-		else:
-			lost = None
+	followed = diskcache.Cache(directory=f"{CACHE_PATH}/follow", expiry=86400 * 7)
+	async def _follow_url(self, urls, it=None, best=False, preserve=True, images=True, emojis=True, reactions=False, allow=False, limit=None, no_cache=False, ytd=True):
 		if images:
 			medias = ("video", "image", "thumbnail")
 		else:
 			medias = "video"
-		tup = shash((urls, best, preserve, images, emojis, reactions, allow, ytd))
-		try:
-			out = self.followed[tup]
-		except KeyError:
-			pass
-		else:
-			for i, url in enumerate(out):
-				if discord_expired(url):
-					if isinstance(out, tuple):
-						out = self.followed[tup] = list(out)
-					out[i] = await self.renew_attachment(url)
-			return out[:limit]
+		out = deque()
 		for url in urls:
 			if discord_expired(url):
 				url = await self.renew_attachment(url)
@@ -1684,10 +1654,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							found2 = await self.follow_url(u, it, best=best, preserve=preserve, images=images, emojis=emojis, reactions=reactions, allow=allow, limit=limit, ytd=ytd)
 							if len(found2):
 								out.extend(found2)
-							elif allow and m.content:
-								lost.append(m.content)
-							elif preserve:
-								lost.append(u)
+							# elif allow and m.content:
+							# 	lost.append(m.content)
+							# elif preserve:
+							# 	lost.append(u)
 			elif is_discord_attachment(url):
 				out.append(url)
 			else:
@@ -1711,27 +1681,47 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						resp = resp[0]
 						if resp.get("video") and resp["video"][0]:
 							url = resp["video"][0]
-						elif images and resp.get("thumbnail"):
-							url = resp["thumbnail"]
+						elif images and resp.get("icon"):
+							url = resp["icon"]
 						elif resp["url"] != url:
 							url = resp["url"]
 						else:
-							url = resp.get("video") or resp.get("stream") or resp.get("thumbnail") or resp.get("url") or url
+							url = resp.get("stream") or resp.get("icon") or resp.get("url") or url
 				out.append(url)
-		if lost:
-			out.extend(lost)
+		# if lost:
+		# 	out.extend(lost)
 		if not out:
 			out = urls
-		out = tuple(out)
-		if not no_cache:
-			self.followed[tup] = out
-			with tracebacksuppressor:
-				while len(self.followed) > 4096:
-				# with suppress():
-					self.followed.pop(next(iter(self.followed)))
-		if limit is not None:
-			return out[:limit]
-		return list(out)
+		return tuple(out)
+
+	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, emojis=True, reactions=False, allow=False, limit=None, no_cache=False, ytd=True) -> list:
+		"Finds URLs in a string, following any discord message links found. Traces all the way to raw file stream if \"ytd\" parameter is set."
+		if limit is not None and limit <= 0:
+			return []
+		if not isinstance(url, str) and hasattr(url, "channel"):
+			url = message_link(url)
+		if it is None or not is_url(url):
+			urls = find_urls(url) if allow else find_urls_ex(url)
+			if not urls:
+				if images or emojis or reactions:
+					return await self.follow_to_image(url, follow=reactions)
+				return []
+			it = {}
+		else:
+			urls = [url]
+		urls = tuple(urls)
+
+		if no_cache:
+			return await self._follow_url(urls, it=it, best=best, preserve=preserve, images=images, emojis=emojis, reactions=reactions, allow=allow, limit=limit, no_cache=no_cache, ytd=ytd)
+
+		tup = shash((urls, best, preserve, images, emojis, reactions, allow, ytd))
+		out = await retrieve_from(self.followed, tup, self._follow_url, urls, it=it, best=best, preserve=preserve, images=images, emojis=emojis, reactions=reactions, allow=allow, limit=limit, no_cache=no_cache, ytd=ytd)
+		for i, url in enumerate(out):
+			if discord_expired(url):
+				if isinstance(out, tuple):
+					out = self.followed[tup] = list(out)
+				out[i] = await self.renew_attachment(url)
+		return out[:limit]
 
 	@functools.lru_cache(maxsize=64)
 	def detect_mime(self, url) -> tuple:
@@ -1958,10 +1948,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if not is_url(argv):
 				print("Browse query:", repr(argv))
 				with tracebacksuppressor:
-					try:
-						data = await asubmit(self.ddgs.text, argv, safesearch="off", region=region, max_results=20 if best else 10)
-					except duckduckgo_search.exceptions.DuckDuckGoSearchException:
-						data = await asubmit(self.ddgs.text, argv, safesearch="off", region="wt-wt", max_results=20 if best else 10, backend="lite")
+					data = None
+					if best:
+						try:
+							data = await asubmit(self.ddgs.text, argv, safesearch="off", region=region, max_results=20 if best else 10)
+						except duckduckgo_search.exceptions.DuckDuckGoSearchException:
+							print_exc()
+					if not data:
+						resp = await asubmit(niquests.post, "https://lite.duckduckgo.com/lite/", data=dict(q=argv), headers=Request.header())
+						from bs4 import BeautifulSoup
+						data = BeautifulSoup(resp.content)
+						return data.get_text()
 					if include_hrefs:
 						return "\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).strip()
 					return "\n\n".join((e.get("title", "") + "\n" + e.get("body", "")).strip() for e in data).strip()
@@ -1969,7 +1966,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		urls = find_urls(argv)
 		if not urls:
 			urls.append(argv)
-		futs = [ai.cache.retrieve_from(shash((argv, screenshot, best)), retrieval, argv, region, screenshot, best) for argv in urls]
+		futs = [retrieve_from(ai.cache, shash((argv, screenshot, best)), retrieval, argv, region, screenshot, best) for argv in urls]
 		resp = await gather(*futs)
 		return "\n\n\n".join(resp) if isinstance(resp[0], str) else b"\n\n\n".join(resp)
 
@@ -2325,30 +2322,30 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			nsfw="mythomax-13b",
 			backup="deepseek-v3",
 			retry="gpt-4m",
-			function="mistral-24b",
+			function="gpt-4m",
 			vision="mistral-24b",
 			target="auto",
 		),
 		1: cdict(
 			reasoning="o3-mini",
 			instructive="deepseek-v3-t",
-			casual="deepseek-v3",
-			nsfw="magnum-72b",
-			backup="minimax-01",
-			retry="gpt-4",
-			function="mistral-24b",
-			vision="mistral-24b",
-			target="auto",
-		),
-		2: cdict(
-			reasoning="claude-3.7-sonnet-t",
-			instructive="claude-3.7-sonnet",
 			casual="deepseek-v3-t",
 			nsfw="magnum-72b",
 			backup="minimax-01",
 			retry="gpt-4",
-			function="mistral-24b",
-			vision="mistral-24b",
+			function="gpt-4m",
+			vision="gemini-2.0",
+			target="auto",
+		),
+		2: cdict(
+			reasoning="claude-3.7-sonnet-t",
+			instructive="gpt-4",
+			casual="deepseek-v3-t",
+			nsfw="magnum-72b",
+			backup="minimax-01",
+			retry="claude-3.7-sonnet",
+			function="gemini-2.0",
+			vision="claude-3.7-sonnet",
 			target="auto",
 		),
 	}
@@ -2865,61 +2862,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			mime = magic.from_buffer(d)
 		return resp, mime, name, d
 
-	analysed = Cache(timeout=86400 * 7, persist="caption.cache")
+	analysed = diskcache.Cache(directory=f"{CACHE_PATH}/caption", expiry=86400 * 7)
 	async def caption(self, url, best=False, screenshot=False, timeout=24, premium_context=[]):
 		"Produces an AI-generated caption for an image. Model used is determined by \"best\" argument."
-		h = shash(url)
-		try:
-			if isinstance(self.analysed[h], Future):
-				await wrap_future(self.analysed[h])
-			if isinstance(self.analysed[h], Future):
-				raise TypeError(self.analysed[h])
-			if self.analysed[h][-1] >= best:
-				return self.analysed[h][:-1]
-		except (LookupError, TypeError):
-			pass
-		if not torch or best is None:
-			return ("File", url.rsplit("/", 1)[-1].split("?", 1)[0] if isinstance(url, str) else "Unknown")
-		self.analysed[h] = fut = Future()
-		try:
-			_resp, mime, name, d = await self.req_data(url, screenshot=screenshot)
-			if mime.split("/", 1)[0] not in ("image", "video"):
-				# if mime.split("/", 1)[0] == "audio":
-				# 	with tracebacksuppressor:
-				# 		p1 = await process_image("whisper", "$", [d, "Miza"], cap="whisper", timeout=3600)
-				# 		if p1:
-				# 			tup = ("Voice", p1, True)
-				# 			self.analysed[h] = tup
-				# 			while len(self.analysed) > 65536:
-				# 				self.analysed.pop(next(iter(self.analysed)))
-				# 			return self.analysed[h][:-1] if self.analysed.get(h) else None
-				if mime == "text/plain":
-					with tracebacksuppressor:
-						p1 = await ai.summarise(as_str(d), min_length=4096, best=2, premium_context=premium_context)
-						if p1:
-							tup = ("Text", p1, True)
-							while len(self.analysed) >= 65536:
-								self.analysed.pop(next(iter(self.analysed)))
-							self.analysed[h] = tup
-							return tup[:-1] if tup else None
-				with tracebacksuppressor:
-					text = as_str(d)
-					p1 = lim_str(text, 128)
-					if p1:
-						return ("Data", p1)
-			caption = await self.vision(url, name=name, best=best, premium_context=premium_context)
-			tup = ("Image", caption, best)
-			while len(self.analysed) >= 65536:
-				self.analysed.pop(next(iter(self.analysed)))
-			self.analysed[h] = tup
-			return tup[:-1] if tup else None
-		finally:
-			fut.set_result(None)
-			if isinstance(self.analysed[h], Future):
-				self.analysed.pop(h)
+		h = shash((url, best))
+		s = await retrieve_from(self.analysed, h, self.vision, url, None, best, None, None, [], timeout)
+		return ("Image", s)
 
 	caption_prompt = "Please describe this image in detail; be descriptive but concise!"
-	description_prompt = "Please describe this <IMAGE> in detail:\n- Transcribe text if present, but do not mention there not being text\n- Note details if obvious such as gender and race of characters\n- Be descriptive but concise!"
+	description_prompt = "Please describe this <IMAGE> in detail:\n- The image may be a collage of frames representing a video, in which case it should be treated as one\n- Transcribe text if present, but do not mention there not being text\n- Note details especially for people/characters if present\n- Be descriptive but concise!"
 
 	async def to_data_url(self, url, small=False, fmt="jpg", timeout=8):
 		sizelim = 82944 if small else 1638400
@@ -2938,36 +2889,38 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				_resp, mime, name, d = await self.req_data(url, timeout=timeout, screenshot=True)
 			lim = 5 * 1048576 * 3 / 4
 			p = 2 if len(d) > 1048576 else 0
-			if mime not in ("image/jpg", "image/jpeg", "image/png", "image/gif", "image/webp") or len(d) > lim or np.prod(await asubmit(get_image_size, d, priority=p)) > sizelim:
+			if mime not in ("image/jpg", "image/jpeg", "image/png") or len(d) > lim or np.prod(await asubmit(get_image_size, d, priority=p)) > sizelim:
 				if mime.split("/", 1)[0] not in ("image", "video"):
 					if len(d) > 288 and mime not in ("text/plain", "text/html"):
 						d = d[:128] + b".." + d[-128:]
 					s = as_str(d)
 					return f'<file name="{name}">' + s + "</file>"
 				assert isinstance(d, (str, bytes)), d
-				d = await process_image(d, "resize_max", [dimlim, False, "auto", "-bg", "-oz", "-fs", lim, "-f", fmt], timeout=timeout, retries=1)
+				d = await process_image(d, "resize_map", [[], None, None, "rel", dimlim, "-", "auto", "-bg", "-oz", "-fs", lim, "-f", "jpg"], timeout=24)
 		else:
 			d = url
 		mime = magic.from_buffer(d)
 		return "data:" + mime + ";base64," + base64.b64encode(d).decode("ascii")
 
-	async def vision(self, url, name=None, best=True, model=None, question=None, premium_context=[]):
+	async def vision(self, url, name=None, best=True, model=None, question=None, premium_context=[], timeout=8):
 		"Requests an image description from a vision-supporting LLM."
-		data_url = await self.to_data_url(url)
-		if not data_url.startswith("data:"):
-			return data_url
 		if name:
 			iname = f'image "{name}"'
+		elif isinstance(url, str) and is_url(url):
+			iname = f"image {url2fn(url)}"
 		else:
 			iname = "image"
+		data_url = await self.to_data_url(url, timeout=timeout)
+		if not data_url.startswith("data:"):
+			return data_url
 		content = (question or self.description_prompt).replace("<IMAGE>", iname)
 		messages = [
 			cdict(role="user", content=[
 				cdict(type="text", text=content),
-				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best > 1 else "low")),
+				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
-		model = model or "mistral-24b"
+		model = model or ("claude-3.7-sonnet" if best else "mistral-24b")
 		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
@@ -2983,7 +2936,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			response = await ai.llm("chat.completions.create", premium_context=premium_context, **data, timeout=45)
 		out = response.choices[0].message.content.strip()
 		if ai.decensor.search(out):
-			raise ValueError(f"Censored response {repr(out)}.")
+			raise ValueError(f"Failed or censored response: {repr(out)}.")
 		print("Vision Response:", out)
 		return out
 
@@ -4282,7 +4235,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return size
 
 	caps = set()
-	capfrom = Cache(timeout=60, trash=0)
+	capfrom = TimedCache(timeout=60, trash=0)
 	last_pings = {}
 	compute_queue = {}
 	compute_wait = {}
@@ -4688,13 +4641,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if force or day:
 			fut = self.send_event("_save_")
 			await_fut(fut)
-		if day:
+		if day and (not self.collecting or self.collecting.done()):
 			self.backup()
 			futs = deque()
 			for u in self.data.values():
 				if not xrand(5) and not u._garbage_semaphore.busy:
 					futs.append(self.garbage_collect(u))
-			await_fut(gather(*futs))
+			self.collecting = csubmit(gather(*futs))
 
 	async def as_rewards(self, diamonds, gold=Dummy):
 		if diamonds and not isinstance(diamonds, int):
@@ -6077,7 +6030,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.users_updated = True
 		print(len(guilds), "guilds loaded.")
 
-	inter_cache = Cache(timeout=900, trash=0)
+	inter_cache = TimedCache(timeout=900, trash=0)
 	async def defer_interaction(self, message, ephemeral=False, mode="post"):
 		with tracebacksuppressor:
 			if hasattr(message, "int_id"):
@@ -6716,7 +6669,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"The slowest update loop that runs once every 5 minutes. Used for slow operations, such as the bot database autosave event."
 		while not self.closed:
 			async with Delay(300):
-				async with tracebacksuppressor:
+				with tracebacksuppressor:
 					await self.worker_heartbeat()
 					await asyncio.sleep(1)
 					with MemoryTimer("update_file_cache"):

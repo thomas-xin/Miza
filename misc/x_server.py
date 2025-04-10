@@ -26,7 +26,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut, gather
 from .types import byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, RangeSet, MemoryBytes
-from .util import fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, ecdc_dir, url_parse, rename, url_unparse, url2fn, is_youtube_url, seq, Cache, Request, magic, is_discord_attachment, is_miza_attachment, unyt, ecdc_exists, CACHE_PATH, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment, update_headers, CODEC_FFMPEG
+from .util import fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, ecdc_dir, url_parse, rename, url_unparse, url2fn, is_youtube_url, seq, TimedCache, Request, magic, is_discord_attachment, is_miza_attachment, unyt, ecdc_exists, CACHE_PATH, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment, update_headers, CODEC_FFMPEG
 from .caches import attachment_cache, upload_cache, download_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -1031,7 +1031,7 @@ class Server:
 			fut = self.ecdc_running.pop(out, None)
 			fut.set_result(None)
 
-	ydl_sems = Cache(timeout=8)
+	ydl_sems = TimedCache(timeout=8)
 	ydl = None
 	@cp.expose
 	def ytdl(self, **kwargs):

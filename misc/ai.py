@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import diskcache
 import orjson
 import re
 import openai
@@ -9,7 +10,7 @@ from math import ceil, inf
 from traceback import format_exc, print_exc
 from mpmath import mpf
 from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, CE, tracebacksuppressor, utc, T, string_like
-from misc.util import AUTH, Cache, Request, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across
+from misc.util import AUTH, CACHE_PATH, TimedCache, Request, retrieve_from, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across
 from misc.asyncs import asubmit, csubmit, emptyctx, gather, Semaphore, CloseableAsyncIterator
 
 print("AI:", __name__)
@@ -67,13 +68,13 @@ available = {
 	},
 	"deepseek-v3-t": {
 		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
-		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
+		"fireworks": ("accounts/fireworks/models/deepseek-v3-0324", ("0.9", "0.9")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
 		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
 		None: "gpt-4",
 	},
 	"deepseek-v3": {
-		"openrouter": ("deepseek/deepseek-chat:free", ("0", "0")),
+		"openrouter": ("deepseek/deepseek-chat-v3-0324:free", ("0", "0")),
 		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
 		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
@@ -129,6 +130,10 @@ available = {
 		"together": ("Qwen/Qwen2.5-72B-Instruct-Turbo", ("1.2", "1.2")),
 		None: "llama-3-70b",
 	},
+	"gemini-2.0": {
+		"openrouter": ("google/gemini-2.0-flash-001", ("0.1", "0.4")),
+		None: "gpt-4",
+	},
 	"o3-mini": {
 		"openai": ("o3-mini", ("1.1", "4.4")),
 		None: "gpt-4m",
@@ -150,8 +155,8 @@ available = {
 		None: "claude-3-haiku",
 	},
 	"gpt-4": {
-		"openrouter": ("openai/gpt-4o", ("2.5", "10")),
 		"openai": ("gpt-4o", ("2.5", "10")),
+		"openrouter": ("openai/gpt-4o", ("2.5", "10")),
 		None: "claude-3.5-sonnet",
 	},
 	"gpt-3.5-turbo-instruct": {
@@ -240,6 +245,7 @@ is_chat = {
 	"lzlv-70b",
 	"magnum-72b",
 	"qwen-72b",
+	"gemini-2.0",
 	"o3-mini",
 	"o1",
 	"o1-preview",
@@ -303,6 +309,7 @@ is_function = {
 	"command-r",
 	"command-r-plus",
 	"35b-beta-long",
+	"gemini-2.0",
 	"o3-mini",
 	"o1",
 	"o1-preview",
@@ -332,6 +339,7 @@ is_vision = {
 	"claude-3-haiku",
 	"llama-3-11b",
 	"llama-3-90b",
+	"gemini-2.0",
 	"o1",
 	"o1-preview",
 	"gpt-4",
@@ -409,6 +417,7 @@ contexts = {
 	"llama-3-70b": 131072,
 	"llama-3-90b": 131072,
 	"llama-3-405b": 131072,
+	"gemini-2.0": 1000000,
 	"o3-mini": 200000,
 	"o1": 200000,
 	"o1-preview": 200000,
@@ -451,7 +460,7 @@ contexts = {
 oai_name = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 api_map = cdict()
 api_sems = cdict()
-api_blocked = Cache(timeout=30, trash=0)
+api_blocked = TimedCache(timeout=30, trash=0)
 
 def oai_method(oai, func):
 	lookup = func.split(".")
@@ -787,8 +796,8 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive summary of the text above!\n\n### Response:'
 			ml = round_random(max_length)
 			c = await tcount(prompt)
-			# Prefer mistral-small for summaries if possible due to its much faster throughput of >100 tokens/s, but fallback to minimax-01 if necessary (due to its higher token limit of 1 million).
-			model = "minimax-01" if c > 28672 else "mistral-24b"
+			# Prefer mistral-small for summaries if possible due to its much faster throughput of >100 tokens/s, but fallback to gemini-2.0 if necessary (due to its higher token limit of 1 million).
+			model = "gemini-2.0" if c > 28672 else "mistral-24b"
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
 			resp = await instruct(data, best=True, skip=True)
 			resp = resp.strip()
@@ -1097,7 +1106,7 @@ async def instruct(data, best=False, skip=False, prune=True, cache=True, user=No
 	data["prompt"] = data.get("prompt") or data.pop("inputs", None) or data.pop("input", None)
 	key = shash(str((data["prompt"], data.get("model", "gpt-4m"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
 	if cache:
-		tup = await CACHE.retrieve_from(key, _instruct2, data, best=best, skip=skip, prune=prune, user=user)
+		tup = await retrieve_from(CACHE, key, _instruct2, data, best=best, skip=skip, prune=prune, user=user)
 		if tup[1] >= best:
 			return tup[0]
 	resp, best = await _instruct2(data, best=best, skip=skip, prune=prune, user=user)
@@ -1943,7 +1952,7 @@ async def collect_stream(resp):
 	return result
 
 
-cache = CACHE = Cache(timeout=86400 * 14, persist="ai.cache")
+cache = CACHE = diskcache.Cache(directory=f"{CACHE_PATH}/ai", expiry=86400 * 14)
 
 async def moderate(text="", image="", input="", premium_context=[]):
 	if isinstance(text, (tuple, list)):
@@ -1961,5 +1970,5 @@ async def moderate(text="", image="", input="", premium_context=[]):
 		resp = await get_oai("moderations.create")(model="omni-moderation-latest", input=input)
 		premium_context.append(["openai", resp.model, "0.00001"])
 		return resp
-	resp = await CACHE.retrieve_from("moderate-" + shash(text) + "-" + shash(image), moderate_into, text, image)
+	resp = await retrieve_from(CACHE, "moderate-" + shash(text) + "-" + shash(image), moderate_into, text, image)
 	return resp.results[0]

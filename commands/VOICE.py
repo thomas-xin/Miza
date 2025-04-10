@@ -1127,9 +1127,10 @@ class AudioSettings(Command):
 			example="bassboost",
 		),
 		value=cdict(
-			type="number",
-			description="Specify a value; all settings except bitrate are represented using percentages",
+			type="string",
+			description='Specify a value; all settings except bitrate are represented using percentages; enter "DEFAULT" to reset',
 			example="200",
+			greedy=False,
 		),
 	)
 	macros = {
@@ -1254,18 +1255,23 @@ class AudioSettings(Command):
 		vc_ = await bot.fetch_channel(cid)
 		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
-		if not mode:
+		if not mode or value is None:
 			if value:
 				await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).settings.update(AP.defaults)\nreturn a.ensure_play(1)")
 				return italics(css_md(f"Successfully reset all audio settings for {sqr_md(_guild)}."))
 			d = audio_key(settings) # {k: v for k, v in settings.items() if k in audio_settings}
 			return f"Current audio settings for **{escape_markdown(_guild.name)}**:\n{ini_md(iter2str(d))}"
-		if value is None:
+		if value == "DEFAULT":
 			value = await bot.audio.asubmit(f"AP.defaults[{repr(mode)}]")
+			if mode in percentage_settings:
+				value *= 100
+		else:
+			value = await bot.eval_math(full_prune(value))
 		if mode in percentage_settings:
 			valstr = f"{value}%"
 			value = round_min(value / 100)
 		else:
+			value = await bot.eval_math(full_prune(value))
 			valstr = str(value)
 		await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).settings.{mode} = {value}\nreturn a.ensure_play(1)")
 		content = css_md(f"{sqr_md(mode.capitalize())} setting for audio playback in {sqr_md(_guild)} has been updated to {sqr_md(valstr)}.")
