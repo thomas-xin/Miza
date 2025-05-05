@@ -838,7 +838,7 @@ class Connect(Command):
 			# if not auds.is_alone(_user) and auds.queue and _perm < 1:
 			# 	raise self.perm_error(_perm, 1, "to disconnect while other users are in voice")
 			try:
-				await bot.audio.asubmit(f"AP.disconnect({guild.id},announce=True)")
+				await bot.audio.asubmit(f"AP.disconnect({guild.id},announce=True,cid={_channel.id})")
 			except KeyError:
 				raise LookupError("Not currently in a voice channel.")
 			return
@@ -1483,22 +1483,26 @@ class UnmuteAll(Command):
 
 class VoiceNuke(Command):
 	server_only = True
-	time_consuming = True
-	min_level = 2
+	min_level = 0
+	min_display = "2?"
 	name = ["☢️"]
 	description = "Removes all users from voice channels in the current server."
+	schema = cdict()
 	rate_limit = 10
 	ephemeral = True
 
-	async def __call__(self, guild, **void):
+	async def __call__(self, _guild, _user, _perm, **void):
+		if _perm < 2:
+			await _user.move_to(None)
+			return italics(css_md(f"Successfully removed {_user} from voice channels in {sqr_md(_guild)}.")), 1
 		connected = set()
-		for vc in voice_channels(guild):
+		for vc in voice_channels(_guild):
 			for user in vc.members:
 				if user.id != self.bot.id:
 					if user.voice is not None:
 						connected.add(user)
-		await disconnect_members(self.bot, guild, connected)
-		return italics(css_md(f"Successfully removed all users from voice channels in {sqr_md(guild)}.")), 1
+		await disconnect_members(self.bot, _guild, connected)
+		return italics(css_md(f"Successfully removed all users from voice channels in {sqr_md(_guild)}.")), 1
 
 
 class Radio(Command):
@@ -2246,9 +2250,9 @@ class Download(Command):
 	async def download_single(self, channel, message, url, fmt, start, end, **void):
 		downloader_url = f"https://api.mizabot.xyz/ytdl?d={quote_plus(url)}&fmt={fmt}"
 		if start:
-			downloader_url += f"&start={start}"
+			downloader_url += f"&start={float(start)}"
 		if end:
-			downloader_url += f"&end={end}"
+			downloader_url += f"&end={float(end)}"
 		fut = csubmit(send_with_reply(
 			channel,
 			reference=message,

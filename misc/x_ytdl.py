@@ -168,7 +168,7 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 		before = []
 		input_args = []
 		if self.format == "mp4" and info.get("vcodec", "none") not in ("none", "png", "jpeg", "gif"):
-			output_args = ["-f", self.format, "-c", "copy"]
+			output_args = ["-f", self.format, "-c", "copy", "-loop", "0"]
 			lightning = self.start is not None or self.end is not None
 			if self.end is not None:
 				input_args.extend(["-to", str(self.end)])
@@ -184,7 +184,7 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 				codecs = ["-c:v", "libwebp"]
 			else:
 				codecs = []
-			output_args = ["-f", self.format, *codecs, "-b:v", "2M", "-an"]
+			output_args = ["-f", self.format, *codecs, "-b:v", "2M", "-an", "-loop", "0"]
 			lightning = False
 		else:
 			fmt = CODECS.get(self.format, self.format)

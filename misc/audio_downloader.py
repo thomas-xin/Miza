@@ -1078,6 +1078,7 @@ class AudioDownloader:
 				dur, _bps, cdc, ac = get_duration_2(fn)
 				return fn, cdc, dur, ac
 		codec = "opus" if ext == "ogg" else ext
+		# print("OUTTMPL:", fn)
 		ydl_opts = dict(
 			# Prefer selected codec, but fallback to best audio if not available
 			format=f"bestaudio[vcodec=none][acodec={codec}][audio_channels=2]/bestaudio[audio_channels=2]/bestaudio/worstvideo[acodec!=none]/best",
@@ -1097,6 +1098,8 @@ class AudioDownloader:
 				end=end,
 			)]
 		)
+		if start is not None or end is not None:
+			fn = f"{CACHE_PATH}/{ts}~{start}-{end}.{ext}"
 		if not fmt and (is_discord_attachment(url) or is_miza_url(url)):
 			if discord_expired(url):
 				# Just in case a Discord attachment expires in the short time between checking and downloading
@@ -1111,7 +1114,7 @@ class AudioDownloader:
 			icon=get_best_icon(entry2),
 			duration=entry2.get("duration"),
 		))
-		assert os.path.exists(fn) and os.path.getsize(fn)
+		assert os.path.exists(fn) and os.path.getsize(fn), fn
 		return fn, "opus", entry["duration"], 2
 
 	def preprocess(self, url, mode, count):

@@ -169,16 +169,25 @@ class CS_flag2mem(Command):
 class CS_num2val(Command):
 	name = ["num2val", "n2v", "CS_n2v"]
 	description = "Returns a TSC value representing the desired number, within a certain number of characters."
-	usage = "<0:number> <1:length[4]>?"
-	example = ("cs_n2v 12345",)
+	schema = cdict(
+		number=cdict(
+			type="integer",
+			validation="[-17776, 86658]",
+			description="The number to convert",
+			example="12345",
+			required=True,
+		),
+		length=cdict(
+			type="integer",
+			validation="[0, 1000)",
+			description="Number of available ASCII characters",
+			default=4,
+		),
+	)
 	rate_limit = 1
 
-	async def __call__(self, bot, args, user, **void):
-		if len(args) < 2:
-			length = 4
-		else:
-			length = await bot.eval_math(" ".join(args[1:]))
-		return css_md(as_str(num_to_tsc_value(int(args[0], 0), length)))
+	def __call__(self, number, length, **void):
+		return css_md(as_str(num_to_tsc_value(number, length)))
 
 
 class CS_val2num(Command):

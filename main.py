@@ -1,16 +1,6 @@
 # ruff: noqa: E402
 import sys
 import subprocess
-try:
-	import pynvml
-except ImportError:
-	subprocess.run([sys.executable, "-m", "pip", "install", "pynvml", "--upgrade", "--user"])
-import pynvml
-try:
-	pynvml.nvmlInit()
-	DC = pynvml.nvmlDeviceGetCount()
-except Exception:
-	DC = 0
 import os
 import json
 
@@ -37,7 +27,7 @@ AUTH = {
 	"cache_path": "",
 	"temp_path": "",
 	"default_personality": "",
-	"ai_features": bool(DC),
+	"ai_features": False,
 }
 modified = False
 # Makes sure an authentication file exists.
@@ -71,7 +61,6 @@ from install_update import python, traceback
 import time
 import datetime
 import psutil
-import subprocess
 ffmpeg = "./ffmpeg"
 print("Verifying FFmpeg installation...")
 
