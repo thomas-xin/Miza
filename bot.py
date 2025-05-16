@@ -1661,13 +1661,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			elif is_discord_attachment(url):
 				out.append(url)
 			else:
-				resp = await create_future(
-					reqs.next().head,
-					unyt(url),
-					headers=Request.header(),
-					verify=False,
-					allow_redirects=True,
-				)
+				try:
+					resp = await create_future(
+						reqs.next().head,
+						unyt(url),
+						headers=Request.header(),
+						verify=False,
+						allow_redirects=True,
+						_timeout_=5,
+					)
+				except Exception:
+					print_exc()
+					out.append(url)
+					continue
 				if resp.headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html", "application/json"):
 					url = resp.url
 				elif ytd and self.audio:
@@ -1955,10 +1961,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						except duckduckgo_search.exceptions.DuckDuckGoSearchException:
 							print_exc()
 					if not data:
-						resp = await asubmit(niquests.post, "https://lite.duckduckgo.com/lite/", data=dict(q=argv), headers=Request.header())
+						headers = Request.header()
+						headers.Referer = "https://duckduckgo.com"
+						headers.Accept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+						resp = await asubmit(niquests.post, "https://lite.duckduckgo.com/lite/", data=dict(q=argv), headers=headers)
 						from bs4 import BeautifulSoup
 						data = BeautifulSoup(resp.content)
-						return data.get_text()
+						return data.get_text().replace("\n\n\n\n", "\n\n").replace("\n\n\n\n", "\n\n")
 					if include_hrefs:
 						return "\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).strip()
 					return "\n\n".join((e.get("title", "") + "\n" + e.get("body", "")).strip() for e in data).strip()
@@ -2183,7 +2192,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		)
 
 	async def caption_into(self, _messages, model=None, backup_model=None, premium_context=[]):
-		print("Resolving Images:", model, backup_model, lim_str(_messages, 1024))
+		# print("Resolving Images:", model, backup_model, lim_str(_messages, 1024))
 		context = ai.contexts.get(model, 4096)
 		messages = [cdict(m) for m in _messages]
 		follows = [None] * len(messages)
@@ -2321,31 +2330,31 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			casual="minimax-01",
 			nsfw="mythomax-13b",
 			backup="deepseek-v3",
-			retry="gpt-4m",
-			function="gpt-4m",
+			retry="gpt-4.1-mini",
+			function="gpt-4.1-mini",
 			vision="mistral-24b",
 			target="auto",
 		),
 		1: cdict(
-			reasoning="o3-mini",
-			instructive="deepseek-v3-t",
+			reasoning="o4-mini",
+			instructive="gpt-4.1-mini",
 			casual="deepseek-v3-t",
-			nsfw="magnum-72b",
+			nsfw="grok-3-mini",
 			backup="minimax-01",
-			retry="gpt-4",
-			function="gpt-4m",
-			vision="gemini-2.0",
+			retry="gpt-4.1",
+			function="gpt-4.1-mini",
+			vision="gemini-2.5",
 			target="auto",
 		),
 		2: cdict(
-			reasoning="claude-3.7-sonnet-t",
-			instructive="gpt-4",
-			casual="deepseek-v3-t",
+			reasoning="gemini-2.5-t",
+			instructive="gpt-4.1",
+			casual="grok-3",
 			nsfw="magnum-72b",
 			backup="minimax-01",
 			retry="claude-3.7-sonnet",
-			function="gemini-2.0",
-			vision="claude-3.7-sonnet",
+			function="gpt-4.1",
+			vision="gemini-2.5",
 			target="auto",
 		),
 	}
@@ -2540,7 +2549,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if is_nsfw:
 				print(mod)
 			if is_nsfw:
-				label = "nsfw"
+				label = "nsfw" if allow_nsfw else "casual"
 			cargs["mode"] = label
 		decensor = not is_nsfw or allow_nsfw
 		tools = cargs.get("tools")
@@ -2580,7 +2589,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			cargs=cargs,
 		)
 		ex = None
-		print("ChatCompletions:", model, originals, (messages if originals != messages else None), cargs, sep="\n")
+		print("Chat completions:", model, ai.overview(messages), cargs, sep="\n")
 		tmpcut = None
 		for attempts in range(mA):
 			await require_predicate(predicate)
@@ -2645,7 +2654,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print_exc()
 				refusal = True
 			else:
-				print("LL:", T(resp).get("model", assistant), tlen, resp)
+				print("Response chosen:", T(resp).get("model", assistant), tlen, resp)
 				message = None
 				written = False
 				try:
@@ -2707,7 +2716,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							if passable:
 								yield "\r"
 							written = False
-				except (httpx.RemoteProtocolError, ConnectionError):
+				except (httpx.RemoteProtocolError, ConnectionError, openai.APIError):
 					print_exc()
 					insufficient = True
 				finally:
@@ -2773,7 +2782,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				finish_reason = "attempts"
 				text = draft.content if draft else last_successful
 				insufficient = refusal = False
-			print("Evaluation:", attempts, lim_str(text, 128), eval2, insufficient, refusal)
+			if insufficient or refusal:
+				print("Evaluation:", attempts, lim_str(text, 128), eval2, insufficient, refusal)
 			if not insufficient and not refusal and passable:
 				text = (text or "").rstrip().removesuffix("### End").removesuffix("### Response").removesuffix("<|im_end|>").rstrip().removesuffix("###").rstrip()
 				ct = await tcount(text)
@@ -2920,7 +2930,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
-		model = model or ("claude-3.7-sonnet" if best else "mistral-24b")
+		model = model or ("gemini-2.5" if best else "mistral-24b")
 		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
@@ -4572,18 +4582,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				atts = os.listdir(f"{TEMP_PATH}/{k}")
 				if len(atts) > 16384:
 					for a in atts[:-16384]:
-						os.remove(f"{TEMP_PATH}/{k}/" + a)
-						i += 1
+						with tracebacksuppressor:
+							os.remove(f"{TEMP_PATH}/{k}/" + a)
+							i += 1
 			for k in ("attachments", "audio", "filehost"):
 				atts = os.listdir(f"{FAST_PATH}/{k}")
 				if len(atts) > 4096:
 					for a in atts[:-4096]:
-						os.remove(f"{FAST_PATH}/{k}/" + a)
-						i += 1
+						with tracebacksuppressor:
+							os.remove(f"{FAST_PATH}/{k}/" + a)
+							i += 1
 			atts = os.listdir("misc/cache")
 			for a in atts:
-				os.remove(f"misc/cache/{a}")
-				i += 1
+				with tracebacksuppressor:
+					os.remove(f"misc/cache/{a}")
+					i += 1
 			if i > 1:
 				print(f"{i} cached files flagged for deletion.")
 			return i
@@ -4898,7 +4911,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		schema = command.schema
 		argv = argv or ""
 		args, ws = smart_split(argv, rws=True)
-		print("ARGS", args, ws)
+		print("ARGS:", args, ws)
 		append_lws = None
 		if schema is None:
 			flags = {}
@@ -5522,7 +5535,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			for arg in args:
 				for k, v in schema.items():
 					if v.get("multiple"):
-						kwargs.setdefault(k, []).append(arg)
+						args = kwargs.setdefault(k, [])
+						if not isinstance(args, list):
+							args = kwargs[k] = [args]
+						args.append(arg)
 						break
 					elif v.type in ("text", "string"):
 						kwargs[k] = (kwargs.get(k) or "") + arg

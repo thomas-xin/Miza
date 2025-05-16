@@ -190,6 +190,7 @@ class AudioPlayer(discord.AudioSource):
 					self.vc = None
 		if self and self.vc:
 			await cls.ensure_speak(vcc)
+			self.refresh()
 			self.channel = channel
 			return self
 		try:
@@ -207,6 +208,7 @@ class AudioPlayer(discord.AudioSource):
 					self.vc = None
 		if self and self.vc:
 			await cls.ensure_speak(vcc)
+			self.refresh()
 			self.channel = channel
 			return self
 		if not self:
@@ -288,6 +290,7 @@ class AudioPlayer(discord.AudioSource):
 			else:
 				print(data)
 				client._connection.parse_voice_state_update(data)
+				return data
 
 	@classmethod
 	async def ensure_speak(cls, vcc):
@@ -359,7 +362,7 @@ class AudioPlayer(discord.AudioSource):
 		return self
 
 	@classmethod
-	async def disconnect(cls, guild, announce=False):
+	async def disconnect(cls, guild, announce=False, cid=None):
 		gid = cast_id(guild)
 		guild = client.get_guild(gid)
 		if not guild or not guild.me or not guild.me.voice:
@@ -368,6 +371,7 @@ class AudioPlayer(discord.AudioSource):
 		wait = cls.waiting.pop(gid, None)
 		if wait and not wait.done():
 			wait.set_exception(si)
+		self = None
 		try:
 			self = cls.players.pop(gid)
 		except KeyError:
@@ -378,13 +382,18 @@ class AudioPlayer(discord.AudioSource):
 			if self.vc:
 				self.vc.stop()
 				await self.vc.disconnect()
-		self.settings.update(self.defaults)
-		self.clear()
+		if not self:
+			if not cid or not client.get_channel(cid):
+				return
+		else:
+			self.settings.update(self.defaults)
+			self.clear()
 		if announce:
+			channel = self.channel if self else client.get_channel(cid)
 			s = ansi_md(
-				f"{colourise('🎵', fg='blue')}{colourise()} Successfully disconnected from {colourise(self.channel.guild, fg='magenta')}{colourise()}. {colourise('🎵', fg='blue')}{colourise()}"
+				f"{colourise('🎵', fg='blue')}{colourise()} Successfully disconnected from {colourise(channel.guild, fg='magenta')}{colourise()}. {colourise('🎵', fg='blue')}{colourise()}"
 			)
-			return await self.announce(s)
+			return await cls.announce(self, s, channel=channel)
 
 	async def leave(self, reason=None, dump=False):
 		csubmit(self.disconnect(self.vcc.guild))
@@ -621,14 +630,16 @@ class AudioPlayer(discord.AudioSource):
 		))
 		return await self.announce(s)
 
-	async def announce(self, s, dump=False):
-		if not dump and (not self.channel or self.settings.get("quiet") or not self.channel.permissions_for(self.channel.guild.me).send_messages):
+	async def announce(self, s, dump=False, channel=None):
+		channel = channel or self.channel
+		if not dump and self and (not channel or self.settings.get("quiet") or not channel.permissions_for(channel.guild.me).send_messages):
 			return
 		if dump:
+			assert self, "No accessible queue to save!"
 			b = self.get_dump()
 			dump = discord.File(io.BytesIO(b), filename="dump.json")
-		message = await self.channel.send(s, file=dump or None)
-		if self.channel.permissions_for(self.channel.guild.me).add_reactions:
+		message = await channel.send(s, file=dump or None)
+		if channel.permissions_for(channel.guild.me).add_reactions:
 			csubmit(message.add_reaction("❎"))
 		return message
 
@@ -1102,6 +1113,7 @@ class AudioFile:
 	@classmethod
 	def load(cls, entry, asap=True):
 		url = unyt(entry["url"])
+		self = None
 		try:
 			fut = cls.cached[url]
 		except KeyError:
@@ -1579,7 +1591,12 @@ async def reload_player(gid):
 	with tracebacksuppressor:
 		vcci, ci, dump, mis = AP.cache[gid]
 		print(vcci, ci, len(dump), mis)
-		a = await AP.join(vcci, ci, announce=2)
+		try:
+			a = await AP.join(vcci, ci, announce=2)
+		except discord.HTTPException as ex:
+			if "403" in str(ex):
+				AP.cache.pop(gid, None)
+			raise
 		a.load_dump(dump, universal=True)
 		# Annoying quirk of Discord API where list of members in voice is not directly retrievable; we must have a list of member IDs (or fetch every single user in the server, which is not feasible). This of course means members that join while the bot is offline will not be loaded into the audio player. However, this is a rare occurrence and can be mitigated by affected users simply rejoining the voice channel, or using the join or play commands, which notify the bot of their presence.
 		for mid in mis:

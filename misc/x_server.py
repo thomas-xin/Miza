@@ -1093,6 +1093,17 @@ class Server:
 							rename(fn2, fn)
 						title = entry["name"]
 					else:
+						codec = CODEC_FFMPEG.get(fmt)
+						if codec:
+							cdc = fmt
+						if fmt in ("h264", "h265", "h266"):
+							fmt = "mp4"
+						if codec:
+							tmpl = f"{CACHE_PATH}/{uhash(v)}~{cdc}.{fmt}"
+							fn = name + "~" + cdc + "." + fmt
+						else:
+							tmpl = f"{CACHE_PATH}/{uhash(v)}.{fmt}"
+							fn = name + "." + fmt
 						if fmt in ("avif", "webp", "gif"):
 							fstr = f"bestvideo[ext={fmt}]/bestvideo[acodec=none]/bestvideo"
 						else:
@@ -1100,7 +1111,7 @@ class Server:
 						postprocessors = [dict(
 							key="FFmpegCustomVideoConvertor",
 							format=fmt,
-							codec=CODEC_FFMPEG.get(fmt, "libsvtav1"),
+							codec=codec,
 							start=start,
 							end=end,
 						)]
@@ -1116,7 +1127,7 @@ class Server:
 							postprocessors=postprocessors,
 						)
 						title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(v)},download=True)['title']", timeout=3600)
-					assert os.path.exists(fn), "Download unsuccessful."
+					assert os.path.exists(fn), f"Download unsuccessful: {fn}."
 			else:
 				entry = self.ydl.search(q)[0]
 				title = entry["name"]

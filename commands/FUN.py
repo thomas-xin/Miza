@@ -1982,6 +1982,7 @@ class React(Command):
 			if not pops:
 				raise LookupError(f"{json_repr} is not in the auto react list.")
 			main.pops(pops)
+			reacts[_guild.id] = main
 			instances = sqr_repr if len(pops) == 1 else f"[{len(pops)}] instances of {sqr_repr}"
 			return italics(css_md(f"Removed {instances} from the auto react list for {sqr_md(_guild)}."))
 		if not emoji:
@@ -1999,6 +2000,7 @@ class React(Command):
 			raise FileExistsError(f"{json_repr} is already in the auto react list.")
 		main.append(tup)
 		main.sort()
+		reacts[_guild.id] = main
 		return css_md(f"Added {sqr_repr} to the auto react list for {sqr_md(_guild)}.")
 
 	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):

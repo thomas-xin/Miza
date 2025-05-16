@@ -42,7 +42,7 @@ class Ask(Command):
 			validation=cdict(
 				enum=("small", "medium", "large"),
 			),
-			description="Determines which model tier to choose from; e.g. large includes top models such as GPT-4, Claude3-Opus and Command-R+, but incurs much higher costs",
+			description="Determines which model tier to choose from; e.g. large includes top models such as GPT-4.1, Claude3.7-Sonnet and Magnum-v4, but incurs much higher costs",
 			example="small",
 		),
 	)
@@ -297,7 +297,7 @@ class Ask(Command):
 							if not succ:
 								res = "[RESPONSE EMPTY OR REDACTED]"
 						if succ and isinstance(res, bytes):
-							# bytes indicates an image, use GPT-4 to describe it
+							# bytes indicates an image, use GPT-4.1 to describe it
 							res = await bot.vision(url=res, premium_context=premium)
 						elif succ and isinstance(res, dict):
 							res = res.get("content", "")
@@ -333,8 +333,8 @@ class Ask(Command):
 							name = "wolfram_alpha"
 					elif name == "reasoning":
 						async def reasoning(q):
-							model = modelist.reasoning if modelist else "deepseek-r1"
-							if "o1" in model or "r1" in model or "o3" in model:
+							model = modelist.reasoning if modelist else "o4-mini"
+							if model in ai.is_reasoning:
 								mt = dict(
 									max_completion_tokens=16384,
 								)
@@ -632,7 +632,7 @@ class Instruct(Command):
 			type="enum",
 			validation=cdict(
 				enum=list(ai.available),
-				accepts={"llama": "llama-3-70b", "haiku": "claude-3-haiku", "r1": "deepseek-r1", "deepseek": "deepseek-v3", "gpt3.5": "gpt-3.5", "sonnet": "claude-3.7-sonnet", "dbrx": "dbrx-instruct", "gpt4": "gpt-4", "gpt-4o": "gpt-4", "gpt-4o-mini": "gpt-4m", "opus": "claude-3-opus"},
+				accepts={"llama": "llama-3-70b", "haiku": "claude-3-haiku", "r1": "deepseek-r1", "deepseek": "deepseek-v3", "gpt3.5": "gpt-3.5", "sonnet": "claude-3.7-sonnet", "dbrx": "dbrx-instruct", "gpt4": "gpt-4.1", "gpt-4o": "gpt-4", "opus": "claude-3-opus"},
 			),
 			description="Target LLM to invoke",
 			example="deepseek",
@@ -686,11 +686,14 @@ class Instruct(Command):
 		O3M=cdict(
 			model="o3-mini",
 		),
+		O4M=cdict(
+			model="o4-mini",
+		),
 		GPT4=cdict(
-			model="gpt-4",
+			model="gpt-4.1",
 		),
 		GPT4M=cdict(
-			model="gpt-4m",
+			model="gpt-4.1-mini",
 		),
 		GPT3=cdict(
 			model="gpt-3.5",
@@ -762,11 +765,11 @@ class Instruct(Command):
 					model = "gpt-3.5-turbo-instruct"
 			if model in ("claude-3-opus", "o1", "o1-preview", "claude-3.7-sonnet-t"):
 				_premium.require(3)
-			elif model in ("claude-3.7-sonnet", "claude-3.5-sonnet", "command-r-plus", "gpt-4", "yi-large", "o1-mini", "r1"):
+			elif model in ("claude-3.7-sonnet", "claude-3.5-sonnet", "command-r-plus", "gpt-4.1", "yi-large", "o1-mini", "r1"):
 				_premium.require(2)
-			elif model in ("dbrx-instruct", "gpt-3.5", "deepseek-v3", "gpt-4m", "lzlv-70b", "llama-3-70b"):
+			elif model in ("dbrx-instruct", "gpt-3.5", "deepseek-v3", "gpt-4.1-mini", "lzlv-70b", "llama-3-70b"):
 				_premium.require(1)
-		if model in ("deepseek-r1", "o1", "o1-preview", "o1-mini", "o3", "o3-mini"):
+		if model in ("deepseek-r1", "o1", "o1-preview", "o1-mini", "o3", "o3-mini", "o4-mini"):
 			kwargs["max_completion_tokens"] = max_tokens + 16384
 		else:
 			kwargs["max_tokens"] = max_tokens
@@ -1026,7 +1029,7 @@ class Imagine(Command):
 			if len(resp.choices) < max(1, dups - 1):
 				resp2 = await ai.llm(
 					"chat.completions.create",
-					model="gpt-4m",
+					model="gpt-4.1-mini",
 					messages=[dict(role="user", content=prompt)],
 					temperature=1,
 					max_tokens=120,

@@ -25,7 +25,7 @@ class Translate(Command):
 	name = ["TR"]
 	description = "Translates a string into another language."
 	usage = "<0:engine(google|command-r-plus|gpt-3.5-turbo-instruct)>? <2:src_language>? <1:dest_languages>* <-1:string>"
-	example = ("translate english 你好", "tr gpt-4m chinese bonjour, comment-t'appelles-tu?", "translate gpt-3.5-turbo-instruct auto spanish french italian thank you!")
+	example = ("translate english 你好", "tr gpt-4.1-mini chinese bonjour, comment-t'appelles-tu?", "translate gpt-3.5-turbo-instruct auto spanish french italian thank you!")
 	flags = "v"
 	rate_limit = (6, 9)
 	slash = True
@@ -46,10 +46,10 @@ class Translate(Command):
 		if spl[0].casefold() in self.LLMs:
 			engine = spl.pop(0).casefold()
 		elif spl[0].casefold() == "auto":
-			engine = "deepseek-v3"
+			engine = "grok-3-mini"
 			spl.pop(0)
 		else:
-			engine = "deepseek-v3"
+			engine = "grok-3-mini"
 		if len(spl) > 2 and (spl[1].casefold() in self.renamed or spl[1].casefold() in self.languages) and(src := (self.renamed.get(c := spl[0].casefold()) or (self.languages.get(c) and c))):
 			spl.pop(0)
 			src = lim_str(src, 32)
@@ -214,18 +214,30 @@ class Translate(Command):
 			out = ""
 		if not out:
 			print("Instruct translate: Empty response, retrying...")
-			resp = await ai.llm(
-				"completions.create",
-				model="gpt-4m",
-				prompt=prompt,
-				temperature=0.5,
-				max_tokens=2048,
-				top_p=0.5,
-				frequency_penalty=0,
-				presence_penalty=0,
-				user=str(user.id),
+			out = await ai.instruct(
+				data=dict(
+					prompt=prompt,
+					model="gpt-4.1-mini",
+					temperature=0.5,
+					max_tokens=2048,
+					top_p=0.5,
+					user=str(user.id),
+					premium_context=bot.premium_context(user, guild),
+				),
+				skip=True,
 			)
-			out = resp.choices[0].text
+			# resp = await ai.llm(
+			# 	"completions.create",
+			# 	model="gpt-4.1-mini",
+			# 	prompt=prompt,
+			# 	temperature=0.5,
+			# 	max_tokens=2048,
+			# 	top_p=0.5,
+			# 	frequency_penalty=0,
+			# 	presence_penalty=0,
+			# 	user=str(user.id),
+			# )
+			# out = resp.choices[0].text
 		out = out.strip()
 		if out and out[0] == out[-1] == '"' and not text[0] == text[-1] == '"':
 			try:
@@ -239,7 +251,7 @@ class Translate(Command):
 			translated[i] = arg
 			try:
 				resp = await asubmit(self.trans.translate, arg, src=src, dest=dest)
-			except:
+			except Exception:
 				print_exc()
 				resp = None
 			if getattr(resp, "extra_data", None) and resp.extra_data.get("origin_pronunciation"):

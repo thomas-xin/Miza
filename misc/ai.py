@@ -38,27 +38,27 @@ def cast_rp(fp, pp, model=None):
 available = {
 	"claude-3-opus": {
 		"openrouter": ("anthropic/claude-3-opus", ("15", "75")),
-		None: "gpt-4",
+		None: "gpt-4.1",
 	},
 	"claude-3.7-sonnet-t": {
 		"openrouter": ("anthropic/claude-3.7-sonnet:thinking", ("3", "15")),
-		None: "o3-mini",
+		None: "o4-mini",
 	},
 	"claude-3.7-sonnet": {
 		"openrouter": ("anthropic/claude-3.7-sonnet", ("3", "15")),
-		None: "gpt-4",
+		None: "gpt-4.1",
 	},
 	"claude-3.5-sonnet": {
 		"openrouter": ("anthropic/claude-3.5-sonnet", ("3", "15")),
-		None: "gpt-4",
+		None: "gpt-4.1",
 	},
 	"claude-3.5-haiku": {
 		"openrouter": ("anthropic/claude-3.5-haiku", ("1", "5")),
-		None: "gpt-4m",
+		None: "gpt-4.1-mini",
 	},
 	"claude-3-haiku": {
 		"openrouter": ("anthropic/claude-3-haiku", ("0.25", "1.25")),
-		None: "gpt-4m",
+		None: "gpt-4.1-mini",
 	},
 	"deepseek-r1": {
 		"openrouter": ("deepseek/deepseek-r1:free", ("0", "0")),
@@ -71,7 +71,7 @@ available = {
 		"fireworks": ("accounts/fireworks/models/deepseek-v3-0324", ("0.9", "0.9")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
 		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
-		None: "gpt-4",
+		None: "gpt-4.1",
 	},
 	"deepseek-v3": {
 		"openrouter": ("deepseek/deepseek-chat-v3-0324:free", ("0", "0")),
@@ -83,7 +83,7 @@ available = {
 	},
 	"minimax-01": {
 		"openrouter": ("minimax/minimax-01", ("0.2", "1.1")),
-		None: "gpt-4",
+		None: "gpt-4.1",
 	},
 	"llama-3-405b": {
 		"deepinfra": ("meta-llama/Meta-Llama-3.1-405B-Instruct", ("1.79", "1.79")),
@@ -130,27 +130,59 @@ available = {
 		"together": ("Qwen/Qwen2.5-72B-Instruct-Turbo", ("1.2", "1.2")),
 		None: "llama-3-70b",
 	},
+	"gemini-2.5-t": {
+		"openrouter": ("google/gemini-2.5-pro-preview-03-25", ("1.25", "10")),
+		None: "gpt-4.1",
+	},
+	"gemini-2.5": {
+		"openrouter": ("google/gemini-2.5-flash-preview", ("0.15", "0.6")),
+		None: "gpt-4.1",
+	},
 	"gemini-2.0": {
 		"openrouter": ("google/gemini-2.0-flash-001", ("0.1", "0.4")),
-		None: "gpt-4",
+		None: "gpt-4.1",
+	},
+	"grok-3": {
+		"openrouter": ("x-ai/grok-3-beta", ("3", "15")),
+		None: "gpt-4.1",
+	},
+	"grok-3-mini": {
+		"openrouter": ("x-ai/grok-3-mini-beta", ("0.3", "0.5")),
+		None: "gpt-4.1-mini",
+	},
+	"o4-mini": {
+		"openai": ("o4-mini", ("1.1", "4.4")),
+		None: "gpt-4.1-mini",
+	},
+	"o3": {
+		"openai": ("o3", ("10", "40")),
+		None: "gpt-4.1",
 	},
 	"o3-mini": {
 		"openai": ("o3-mini", ("1.1", "4.4")),
-		None: "gpt-4m",
+		None: "gpt-4.1-mini",
 	},
 	"o1": {
 		"openai": ("o1", ("15", "60")),
-		None: "gpt-4",
+		None: "gpt-4.1",
 	},
 	"o1-preview": {
 		"openai": ("o1-preview", ("15", "60")),
-		None: "gpt-4",
+		None: "gpt-4.1",
 	},
 	"o1-mini": {
 		"openai": ("o1-mini", ("1.1", "4.4")),
-		None: "gpt-4m",
+		None: "gpt-4.1-mini",
 	},
-	"gpt-4m": {
+	"gpt-4.1-mini": {
+		"openai": ("gpt-4.1-mini", ("0.4", "1.6")),
+		None: "claude-3-haiku",
+	},
+	"gpt-4.1": {
+		"openai": ("gpt-4.1", ("2", "8")),
+		None: "claude-3.5-sonnet",
+	},
+	"gpt-4-mini": {
 		"openai": ("gpt-4o-mini", ("0.15", "0.6")),
 		None: "claude-3-haiku",
 	},
@@ -175,15 +207,15 @@ available = {
 		"mistral": ("mistral-small-latest", ("0", "0")),
 		"openrouter": ("mistralai/mistral-small-3.1-24b-instruct-2503", ("0.1", "0.3")),
 		"openrouter_": ("cognitivecomputations/dolphin3.0-mistral-24b:free", ("0", "0")),
-		None: "gpt-4m",
+		None: "gpt-4.1-mini",
 	},
 	"firefunction-v1": {
 		"fireworks": ("accounts/fireworks/models/firefunction-v1", ("0.5", "0.5")),
-		None: "gpt-4m",
+		None: "gpt-4.1-mini",
 	},
 	"firefunction-v2": {
 		"fireworks": ("accounts/fireworks/models/firefunction-v2", ("0.9", "0.9")),
-		None: "gpt-4m",
+		None: "gpt-4.1-mini",
 	},
 	"firellava-13b": {
 		"fireworks": ("accounts/fireworks/models/firellava-13b", ("0.2", "0.2")),
@@ -191,7 +223,7 @@ available = {
 	},
 	"phi-4b": {
 		"fireworks": ("accounts/fireworks/models/phi-3-vision-128k-instruct", ("0.2", "0.2")),
-		None: "gpt-4m",
+		None: "gpt-4.1-mini",
 	},
 	"wizard-8x22b": {
 		"deepinfra": ("microsoft/WizardLM-2-8x22B", ("0.65", "0.65")),
@@ -245,22 +277,23 @@ is_chat = {
 	"lzlv-70b",
 	"magnum-72b",
 	"qwen-72b",
+	"grok-3",
+	"grok-3-mini",
+	"gemini-2.5-t",
+	"gemini-2.5",
 	"gemini-2.0",
+	"o4-mini",
 	"o3-mini",
 	"o1",
 	"o1-preview",
 	"o1-mini",
+	"gpt-4.1",
+	"gpt-4.1-mini",
 	"gpt-4",
 	"chatgpt-4o-latest",
-	"gpt-4o-2024-05-13",
-	"gpt-4m",
+	"gpt-4-mini",
 	"gpt-4o-mini",
-	"gpt-4o-mini-2024-07-18",
-	"gpt-4-turbo-2024-04-09",
-	"gpt-4-0125-preview",
-	"gpt-4-vision-preview",
 	"gpt-3.5",
-	"gpt-3.5-turbo-0125",
 	"gpt-3.5-turbo",
 	"minimax-01",
 	"deepseek-r1",
@@ -298,6 +331,20 @@ is_completion = {
 	"mixtral-8x7b-instruct",
 	"mixtral-8x7b",
 }
+is_reasoning = {
+	"claude-3.7-sonnet:thinking",
+	"claude-3.7-sonnet-t",
+	"grok-3-mini",
+	"google/gemini-2.5-pro-preview-03-25",
+	"gemini-2.5-t",
+	"o4-mini",
+	"o3",
+	"o3-mini",
+	"o1",
+	"o1-preview",
+	"o1-mini",
+	"deepseek-r1",
+}
 is_function = {
 	"claude-3.7-sonnet-t",
 	"claude-3.7-sonnet",
@@ -309,21 +356,25 @@ is_function = {
 	"command-r",
 	"command-r-plus",
 	"35b-beta-long",
+	"grok-3",
+	"grok-3-mini",
+	"gemini-2.5-t",
+	"gemini-2.5",
 	"gemini-2.0",
+	"o4-mini",
+	"o3",
 	"o3-mini",
 	"o1",
 	"o1-preview",
 	"o1-mini",
+	"gpt-4.1",
+	"gpt-4.1-mini",
 	"gpt-4",
 	"chatgpt-4o-latest",
-	"gpt-4o-2024-05-13",
-	"gpt-4m",
+	"gpt-4-mini",
 	"gpt-4o-mini",
-	"gpt-4o-mini-2024-07-18",
-	"gpt-4-turbo-2024-04-09",
 	"gpt-4-0125-preview",
 	"gpt-3.5",
-	"gpt-3.5-turbo-0125",
 	"gpt-3.5-turbo",
 	"deepseek-v3-t",
 	"mistral-24b",
@@ -339,17 +390,19 @@ is_vision = {
 	"claude-3-haiku",
 	"llama-3-11b",
 	"llama-3-90b",
+	"grok-3",
+	"grok-3-mini",
+	"gemini-2.5-t",
+	"gemini-2.5",
 	"gemini-2.0",
 	"o1",
 	"o1-preview",
+	"gpt-4.1",
+	"gpt-4.1-mini",
 	"gpt-4",
 	"chatgpt-4o-latest",
-	"gpt-4o-2024-05-13",
-	"gpt-4m",
+	"gpt-4-mini",
 	"gpt-4o-mini",
-	"gpt-4o-mini-2024-07-18",
-	"gpt-4-turbo-2024-04-09",
-	"gpt-4-vision-preview",
 	"minimax-01",
 	"mistral-24b",
 	"firellava-13b",
@@ -362,15 +415,11 @@ is_premium = {
 	"claude-3-opus",
 	"claude-3-sonnet",
 	"llama-3-405b",
-	"o3-mini",
+	"gemini-2.5-t",
+	"o4-mini",
 	"o1",
 	"o1-preview",
 	"o1-mini",
-	"chatgpt-4o-latest",
-	"gpt-4o-2024-05-13",
-	"gpt-4-turbo-2024-04-09",
-	"gpt-4-0125-preview",
-	"gpt-4-vision-preview",
 	"command-r-plus",
 	"miquliz-120b",
 }
@@ -417,22 +466,23 @@ contexts = {
 	"llama-3-70b": 131072,
 	"llama-3-90b": 131072,
 	"llama-3-405b": 131072,
-	"gemini-2.0": 1000000,
+	"grok-3": 131072,
+	"grok-3-mini": 131072,
+	"gemini-2.5-t": 1048576,
+	"gemini-2.5": 1048576,
+	"gemini-2.0": 1048576,
+	"o4-mini": 200000,
 	"o3-mini": 200000,
 	"o1": 200000,
 	"o1-preview": 200000,
 	"o1-mini": 200000,
+	"gpt-4.1": 1048576,
+	"gpt-4.1-mini": 1048576,
 	"gpt-4": 128000,
 	"chatgpt-4o-latest": 128000,
-	"gpt-4o-2024-05-13": 128000,
-	"gpt-4m": 128000,
+	"gpt-4-mini": 128000,
 	"gpt-4o-mini": 128000,
-	"gpt-4o-mini-2024-07-18": 128000,
-	"gpt-4-turbo-2024-04-09": 128000,
-	"gpt-4-0125-preview": 128000,
-	"gpt-4-vision-preview": 128000,
 	"gpt-3.5": 16384,
-	"gpt-3.5-turbo-0125": 16384,
 	"gpt-3.5-turbo-instruct": 4096,
 	"minimax-01": 1000000,
 	"deepseek-r1": 64000,
@@ -671,6 +721,9 @@ def m_name(m):
 		return "user"
 	return m.name
 
+def overview(messages):
+	return "\n\n".join(map(m_str, (m for m in messages if m.content)))
+
 def _count_to(messages, model):
 	encoding = get_encoding(model)
 	tokens_per_message = 4
@@ -705,7 +758,7 @@ async def count_to(messages, model="cl100k_im"):
 	"""Return the number of tokens used by a list of messages."""
 	return await asubmit(_count_to, messages, model, priority=2)
 
-async def cut_to(messages, limit=1024, softlim=256, exclude_first=True, best=False, simple=False, prompt=None, premium_context=[]):
+async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=False, simple=False, prompt=None, premium_context=[]):
 	if not messages:
 		return messages
 	messages = list(messages)
@@ -736,7 +789,7 @@ async def cut_to(messages, limit=1024, softlim=256, exclude_first=True, best=Fal
 			messages.insert(0, sm)
 		return messages
 	summ = "Summary of prior conversation:\n"
-	s = "\n\n".join(m_str(m) for m in (messages[:i + 1] if i > 0 else messages) if m.content)
+	s = overview(messages[:i + 1] if i > 0 else messages)
 	s = s.removeprefix(summ).removeprefix("system:").strip()
 	c = await tcount(summ + s)
 	c2 = await count_to(messages)
@@ -759,7 +812,7 @@ async def cut_to(messages, limit=1024, softlim=256, exclude_first=True, best=Fal
 		messages.insert(0, sm)
 	return messages
 
-async def summarise(q, min_length=192, max_length=98304, padding=128, best=True, prompt=None, premium_context=[]):
+async def summarise(q, min_length=384, max_length=98304, padding=128, best=True, prompt=None, premium_context=[]):
 	"Produces an AI-generated summary of input text. Model used is controlled by \"best\" parameter."
 	split_length = max_length - padding
 	summ_length = min(min_length, split_length - 1)
@@ -767,7 +820,7 @@ async def summarise(q, min_length=192, max_length=98304, padding=128, best=True,
 	if c <= min_length:
 		return q
 	if c <= summ_length:
-		return await _summarise(q, summ_length, best=best, prompt=prompt, premium_context=premium_context)
+		q = await _summarise(q, summ_length, best=best, prompt=prompt, premium_context=premium_context)
 	splits = await asubmit(split_across, q, lim=split_length, mode="tlen", priority=2)
 	futs = []
 	for s in splits:
@@ -775,7 +828,7 @@ async def summarise(q, min_length=192, max_length=98304, padding=128, best=True,
 		futs.append(fut)
 	outs = await gather(*futs)
 	q = "\n\n".join(outs)
-	q = lim_tokens(q, summ_length)
+	q = lim_tokens(q, summ_length * 2)
 	c = await tcount(q)
 	if c <= min_length:
 		return q
@@ -796,8 +849,8 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive summary of the text above!\n\n### Response:'
 			ml = round_random(max_length)
 			c = await tcount(prompt)
-			# Prefer mistral-small for summaries if possible due to its much faster throughput of >100 tokens/s, but fallback to gemini-2.0 if necessary (due to its higher token limit of 1 million).
-			model = "gemini-2.0" if c > 28672 else "mistral-24b"
+			# Prefer mistral-small for summaries if possible due to its much faster throughput of >100 tokens/s, but fallback to gemini-2.5 if necessary (due to its higher token limit of 1 million).
+			model = "gemini-2.5" if c > 28672 else "mistral-24b"
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
 			resp = await instruct(data, best=True, skip=True)
 			resp = resp.strip()
@@ -822,7 +875,7 @@ async def ensure_models(force=False):
 		"quill-72b-h6t2": "quill-72b",
 		"NeverSleep/Llama-3-Lumimaid-70B-v0.1-alt-GGUF": "lumimaid-70b",
 	}
-	default = "gpt-4m"
+	default = "gpt-4.1-mini"
 	return default
 	# The rest is currently disabled for now.
 	try:
@@ -925,7 +978,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 		else:
 			caller = oai_method(api, func)
 		body = cdict(kwargs.get("extra_body") or {})
-		if model in ("o1", "o1-preview", "o1-mini", "o3-mini", "claude-3.7-sonnet", "claude-3.7-sonnet:thinking"):
+		if model in is_reasoning:
 			kwa.pop("temperature", None)
 		if "repetition_penalty" not in kwa:
 			kwa["repetition_penalty"] = cast_rp(kwa.pop("frequency_penalty", 0.25), kwa.pop("presence_penalty", 0.25), model=model)
@@ -1104,7 +1157,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 
 async def instruct(data, best=False, skip=False, prune=True, cache=True, user=None):
 	data["prompt"] = data.get("prompt") or data.pop("inputs", None) or data.pop("input", None)
-	key = shash(str((data["prompt"], data.get("model", "gpt-4m"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
+	key = shash(str((data["prompt"], data.get("model", "gpt-4.1-mini"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
 	if cache:
 		tup = await retrieve_from(CACHE, key, _instruct2, data, best=best, skip=skip, prune=prune, user=user)
 		if tup[1] >= best:
@@ -1128,7 +1181,7 @@ async def _instruct2(data, best=False, skip=False, prune=True, user=None):
 async def _instruct(data, best=False, skip=False, user=None):
 	# c = await tcount(data["prompt"])
 	inputs = dict(
-		model="gpt-4" if best >= 2 else "gpt-4m",
+		model="gpt-4.1" if best >= 2 else "gpt-4.1-mini",
 		temperature=0.75,
 		max_tokens=256,
 		top_p=0.999,
@@ -1145,7 +1198,7 @@ async def _instruct(data, best=False, skip=False, user=None):
 		dec = True and not skip
 	if dec:
 		inputs["model"] = "auto" if best else "llama-3-70b"
-	if data.get("model", "gpt-4m") in is_chat:
+	if data.get("model", "gpt-4.1-mini") in is_chat:
 		prompt = inputs.pop("prompt")
 		inputs["messages"] = [cdict(role="user", content=prompt)]
 		async with asyncio.timeout(70):
@@ -1722,17 +1775,16 @@ def unimage(message):
 
 
 CL100K_IM = {
+	"o4-mini",
 	"o3-mini",
 	"o1",
 	"o1-preview",
 	"o1-mini",
+	"gpt-4.1",
+	"gpt-4.1-mini",
 	"chatgpt-4o-latest",
 	"gpt-4o",
-	"gpt-4o-2024-05-13",
 	"gpt-4o-mini",
-	"gpt-4o-mini-2024-07-18",
-	"gpt-4-turbo-2024-04-09",
-	"gpt-3.5-turbo-0125",
 	"deepseek-r1",
 	"deepseek-v3-t",
 	"deepseek-v3",

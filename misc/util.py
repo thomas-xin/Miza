@@ -681,14 +681,15 @@ def close_markdown(text):
 		else:
 			text += closed[-1]
 
-	# Handle italic (*) - single asterisks not part of bold
-	italic_count = len(re.findall(r'(?<!\*)\*(?!\*)', text))
-	if italic_count & 1:
-		closed.append('*')
-		if text.endswith(closed[-1]):
-			text = text.removesuffix(closed[-1])
-		else:
-			text += closed[-1]
+	# Handle italic (*) - single asterisks not part of bold and code block
+	if "`" not in text:
+		italic_count = len(re.findall(r'(?<!\*)\*(?!\*)', text))
+		if italic_count & 1:
+			closed.append('*')
+			if text.endswith(closed[-1]):
+				text = text.removesuffix(closed[-1])
+			else:
+				text += closed[-1]
 
 	# Handle code blocks (```)
 	code_block_count = len(re.findall(r'```', text))

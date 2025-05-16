@@ -200,7 +200,7 @@
 			"rate_limit": "(6, 9)",
 			"example": [
 				"translate english \u4f60\u597d",
-				"tr gpt-4m chinese bonjour, comment-t'appelles-tu?",
+				"tr gpt-4.1-mini chinese bonjour, comment-t'appelles-tu?",
 				"translate gpt-3.5-turbo-instruct auto spanish french italian thank you!"
 			],
 			"timeout": "24"
@@ -1265,7 +1265,7 @@
 			],
 			"description": "Removes all users from voice channels in the current server.",
 			"usage": "",
-			"level": "2",
+			"level": "0",
 			"rate_limit": "10",
 			"example": [],
 			"timeout": "24"
@@ -2209,12 +2209,10 @@
 				"CS_n2v"
 			],
 			"description": "Returns a TSC value representing the desired number, within a certain number of characters.",
-			"usage": "<0:number> <1:length[4]>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "1",
-			"example": [
-				"cs_n2v 12345"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"CS_val2num": {

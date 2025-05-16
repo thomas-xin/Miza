@@ -415,7 +415,7 @@ class FakeFloat(sympy.Rational):
 	def is_Rational(self):
 		return hasattr(self, "recur")
 
-def evalf_true(n, prec=100, **void):
+def evalf_true(n, prec=100, *args, **void):
 	if isinstance(n, sympy.Float):
 		return n
 	if not isinstance(n, sympy.Rational):

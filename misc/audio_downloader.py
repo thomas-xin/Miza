@@ -1006,7 +1006,7 @@ class AudioDownloader:
 				r_mid = f"{CACHE_PATH}/{ts}.mid"
 				r_wav = f"{CACHE_PATH}/{ts}.wav"
 				copy_to_file(r_mid)
-				args = [os.path.abspath("misc/fluidsynth/fluidsynth"), os.path.abspath("misc/fluidsynth/gm64.sf2"), "-g", "1", "-F", r_wav, r_mid]
+				args = [os.path.abspath("misc/fluidsynth/fluidsynth"), "-g", "1", "-F", r_wav, "-n", os.path.abspath("misc/fluidsynth/gm64.sf2"), r_mid]
 				print(args)
 				res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 				if not os.path.exists(r_wav) or not os.path.getsize(r_wav):
@@ -1078,6 +1078,7 @@ class AudioDownloader:
 				dur, _bps, cdc, ac = get_duration_2(fn)
 				return fn, cdc, dur, ac
 		codec = "opus" if ext == "ogg" else ext
+		# print("OUTTMPL:", fn)
 		ydl_opts = dict(
 			# Prefer selected codec, but fallback to best audio if not available
 			format=f"bestaudio[vcodec=none][acodec={codec}][audio_channels=2]/bestaudio[audio_channels=2]/bestaudio/worstvideo[acodec!=none]/best",
@@ -1097,6 +1098,8 @@ class AudioDownloader:
 				end=end,
 			)]
 		)
+		if start is not None or end is not None:
+			fn = f"{CACHE_PATH}/{ts}~{start}-{end}.{ext}"
 		if not fmt and (is_discord_attachment(url) or is_miza_url(url)):
 			if discord_expired(url):
 				# Just in case a Discord attachment expires in the short time between checking and downloading
@@ -1111,7 +1114,7 @@ class AudioDownloader:
 			icon=get_best_icon(entry2),
 			duration=entry2.get("duration"),
 		))
-		assert os.path.exists(fn) and os.path.getsize(fn)
+		assert os.path.exists(fn) and os.path.getsize(fn), fn
 		return fn, "opus", entry["duration"], 2
 
 	def preprocess(self, url, mode, count):

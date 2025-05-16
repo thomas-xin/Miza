@@ -1285,16 +1285,16 @@ def evalImg(url, operation, args):
 					return resp.addfile(tarinfo, io.BytesIO(data))
 			else:
 				command = ["ffmpeg", "-nostdin", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel]
-				if hwaccel == "cuda":
-					if COMPUTE_CAPS:
-						try:
-							devid = random.choice([i for i, c in enumerate(COMPUTE_CAPS) if c >= [8, 9]])
-						except IndexError:
-							devid = random.randint(0, len(COMPUTE_CAPS))
-							fmt = "webp"
-					else:
-						devid = random.randint(0, ceil(len(COMPUTE_CAPS) / 2))
-					command.extend(("-hwaccel_device", str(devid)))
+				# if hwaccel == "cuda":
+				# 	if COMPUTE_CAPS:
+				# 		try:
+				# 			devid = random.choice([i for i, c in enumerate(COMPUTE_CAPS) if c >= [8, 9]])
+				# 		except IndexError:
+				# 			devid = random.randint(0, len(COMPUTE_CAPS))
+				# 			fmt = "webp"
+				# 	else:
+				# 		devid = random.randint(0, ceil(len(COMPUTE_CAPS) / 2))
+				# 	command.extend(("-hwaccel_device", str(devid)))
 				command.extend([
 					"-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
 					"-video_size", "x".join(map(str, size)), "-i", "-",
