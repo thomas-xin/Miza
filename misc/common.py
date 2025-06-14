@@ -1395,7 +1395,7 @@ def verify_id(obj):
 		return obj
 	if isinstance(obj, str):
 		with suppress(ValueError):
-			return int(obj.translate(__itrans))
+			return int(obj.rsplit(">", 1)[0].rsplit(":", 1)[-1].translate(__itrans))
 		return obj
 	with suppress(AttributeError):
 		return obj.recipient.id

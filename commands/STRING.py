@@ -217,7 +217,7 @@ class Translate(Command):
 			out = await ai.instruct(
 				data=dict(
 					prompt=prompt,
-					model="gpt-4.1-mini",
+					model="gemini-2.5-flash",
 					temperature=0.5,
 					max_tokens=2048,
 					top_p=0.5,

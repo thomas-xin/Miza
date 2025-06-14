@@ -966,6 +966,12 @@ class SlotMachine(Command):
 					await bot.edit_message(message, embed=emb)
 
 
+sparkle_odds = {
+	1000000000: "secret",
+	1000000: "legendary",
+	25000: "rare",
+	1000: "normal",
+}
 sparkle_values = demap(
 	normal="sparkles",
 	rare="sparkles_rare",

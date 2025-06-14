@@ -776,7 +776,7 @@ if "browse" in CAPS:
 
 	def wolframalpha(q):
 		with new_playwright_page() as page:
-			page.goto(f"https://www.wolframalpha.com/input?i={urllib.parse.quote_plus(q)}", timeout=4000)
+			page.goto(f"https://www.wolframalpha.com/input?i={urllib.parse.quote_plus(q)}", timeout=8000)
 			time.sleep(8)
 			for i in range(30):
 				time.sleep(1)

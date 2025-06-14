@@ -1763,9 +1763,37 @@ def encrypt(s):
 def decrypt(s):
 	if not isinstance(s, byte_like):
 		s = str(s).encode("utf-8")
-	if s[:8] == b">~MIZA~>":
-		return enc_box.decrypt(s[8:])
-	raise ValueError("Data header not found.")
+	assert s[:8] == b">~MIZA~>", "Data header not found."
+	return enc_box.decrypt(s[8:])
+estream_size = 1048576
+def encrypt_stream(s):
+	if not isinstance(s, byte_like):
+		s = str(s).encode("utf-8")
+	yield b">~MIZA+~>" + leb128(estream_size)
+	for i in range(0, len(s), estream_size):
+		yield enc_box.encrypt(s[i:i + estream_size])
+def decrypt_stream(b):
+	s = next(b)
+	while len(s) < 9:
+		s += next(b)
+	assert s[:9] == b">~MIZA+~>", "Data header not found."
+	s = s[9:]
+	try:
+		while len(s) < estream_size:
+			s += next(b)
+	except StopIteration:
+		pass
+	es, s = decode_leb128(s)
+	ss = es + enc_box.NONCE_SIZE + enc_box.MACBYTES
+	try:
+		while True:
+			while len(s) < ss:
+				s += next(b)
+			yield enc_box.decrypt(s[:ss])
+			s = s[ss:]
+	except StopIteration:
+		yield enc_box.decrypt(s)
+
 
 DOMAIN_CERT = AUTH.get("domain_cert")
 PRIVATE_KEY = AUTH.get("private_key")
@@ -3860,7 +3888,7 @@ def share_bytes(sender, b):
 	if len(b) <= 65536 - 1:
 		return sender(b"\x01" + b)
 	mem = multiprocessing.shared_memory.SharedMemory(create=True, size=len(b))
-	print(mem)
+	# print(mem)
 	MEMS[mem.name] = mem
 	mem.buf[:len(b)] = b
 	try:

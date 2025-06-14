@@ -451,7 +451,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 				fcount = dur = fps = 1
 			assert fcount >= 1, f"Invalid frame count: {fcount}"
 			if not isfinite(fcount) or fcount < 3 or bcount * fcount < 268435456 or len(b) < 16777216:
-				print("Decoding directly:", proc, mode, size, (fcount, dur, fps))
+				# print("Decoding directly:", proc, mode, size, (fcount, dur, fps))
 				images = deque()
 				while True:
 					b = proc.stdout.read(bcount)
@@ -464,7 +464,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 					proc.wait(timeout=2)
 					return ImageSequence.open(*images)
 				raise RuntimeError(as_str(proc.stderr.read()))
-			print("Decoding lazily:", proc, mode, size, (fcount, dur, fps))
+			# print("Decoding lazily:", proc, mode, size, (fcount, dur, fps))
 			return ImageSequence.pipe(proc.stdout, mode, size, (fcount, dur, fps), close=proc.terminate)
 	except Exception as ex:
 		print(repr(ex))
@@ -1461,6 +1461,10 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 	Raises:
 	RuntimeError: If there is an error during the resizing process.
 	"""
+	if extras:
+		image = ImageSequence.cast(image)
+		images = list(image) + list(map(get_image, extras))
+		image, extras = ImageSequence(*images), ()
 	prop = properties(image)
 	duration, fps, prog = sync_fps([prop], duration, fps)
 	if operation == "rel":

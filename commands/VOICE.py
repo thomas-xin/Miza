@@ -327,6 +327,9 @@ class Queue(Command):
 			index = [0]
 		elif mode == "next":
 			index = [1]
+		if index[0] != -1:
+			if _perm < 1 and {m.id for m in vc_.members}.difference([_user.id, bot.id]):
+				raise self.perm_error(_perm, 1, "to force insert while other users are in voice")
 		# Start typing event asynchronously to avoid delays
 		async with discord.context_managers.Typing(_channel):
 			# Perform search concurrently, may contain multiple URLs
@@ -348,10 +351,10 @@ class Queue(Command):
 						resp.extend(temp)
 			# Wait for audio player to finish loading if necessary
 			await fut
-		if index[0] != -1:
-			if _perm < 1 and {m.id for m in vc_.members}.difference([_user.id, bot.id]):
-				raise self.perm_error(_perm, 1, "to force insert while other users are in voice")
-		q, settings, paused, reverse, (elapsed, length) = await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).queue,a.settings,a.settings.pause,a.reverse,a.epos")
+		try:
+			q, settings, paused, reverse, (elapsed, length) = await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).queue,a.settings,a.settings.pause,a.reverse,a.epos")
+		except KeyError:
+			raise KeyError("Unable to communicate with voice client! (Please verify that I have permission to join the voice channel?)")
 		settings = astype(settings, cdict)
 		# Raise exceptions returned by searches
 		if type(resp) is str:
@@ -531,9 +534,12 @@ class Queue(Command):
 		emb.set_author(**get_author(user))
 		icon = ""
 		if q:
-			if q[0].get("has_storyboard") or reaction is not None and self.directions.index(reaction) == 4:
+			if q[0].get("has_storyboard") or reaction is not None:# and self.directions.index(reaction) == 4:
 				try:
-					icon = await bot.audio.asubmit(f"ytdl.get_thumbnail({json_dumpstr(q[0])},pos={elapsed})")
+					fut = csubmit(bot.audio.asubmit(f"ytdl.get_thumbnail({json_dumpstr(q[0])},pos={elapsed})"))
+					icon = await asyncio.wait_for(asyncio.shield(fut), timeout=0.5)
+				except asyncio.TimeoutError:
+					pass
 				except Exception:
 					print_exc()
 				else:
@@ -1375,7 +1381,10 @@ class Seek(Command):
 		vc_ = await bot.fetch_channel(cid)
 		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
-		await bot.audio.asubmit(f"(e := AP.from_guild({_guild.id}).queue[0]).pop('start',0),e.pop('end',0)")
+		try:
+			await bot.audio.asubmit(f"(e := AP.from_guild({_guild.id}).queue[0]).pop('start',0),e.pop('end',0)")
+		except LookupError:
+			raise LookupError("Unable to perform seek (Am I currently playing a song?)")
 		await bot.audio.asubmit(f"AP.from_guild({_guild.id}).seek({position.total_seconds()})")
 		return cdict(
 			content=italics(css_md(f"Successfully moved audio position to {sqr_md(position)}.")),

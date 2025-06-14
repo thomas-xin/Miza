@@ -512,7 +512,7 @@ class Ask(Command):
 		return await message.remove_reaction("🗑️", self.bot.user)
 
 
-DEFPER = "Your name is \"{{char}}\"; your personality is intelligent, cute, mischievous and playful. Your task is to answer the user(s) with creative and natural-feeling responses (be wholesome where possible, and not too corny), in first person as if you were a human. You are free to make up your own preferences and show emotion, but you should always answer the user named \"{{user}}\", matching the language used."
+DEFPER = "Your name is \"{{char}}\"; you are intelligent and playful. Your task is to answer the user(s) with creative and natural-feeling responses (be wholesome where possible, but not too corny), in first person as if you were a human. You are free to make up your own preferences and show emotion, but you should always answer the user named \"{{user}}\", matching the language used. Be concise where possible."
 
 class Personality(Command):
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
@@ -636,6 +636,7 @@ class Instruct(Command):
 			),
 			description="Target LLM to invoke",
 			example="deepseek",
+			default="gemini-2.5-flash-t",
 		),
 		prompt=cdict(
 			type="string",
@@ -701,6 +702,9 @@ class Instruct(Command):
 		R1=cdict(
 			model="deepseek-r1",
 		),
+		Gemini=cdict(
+			model="gemini-2.5-flash-t",
+		),
 		Deepseek=cdict(
 			model="deepseek-v3",
 		),
@@ -756,16 +760,9 @@ class Instruct(Command):
 			oai = openai.AsyncOpenAI(api_key=key, base_url=api)
 			kwargs["api"] = oai
 		else:
-			if not model:
-				model = "deepseek-v3"
-			if model == "gpt-3.5":
-				if prompt and prompt[-1] in ".?!":
-					model = "gpt-3.5"
-				else:
-					model = "gpt-3.5-turbo-instruct"
 			if model in ("claude-3-opus", "o1", "o1-preview", "claude-3.7-sonnet-t"):
 				_premium.require(3)
-			elif model in ("claude-3.7-sonnet", "claude-3.5-sonnet", "command-r-plus", "gpt-4.1", "yi-large", "o1-mini", "r1"):
+			elif model in ("claude-3.7-sonnet", "claude-3.5-sonnet", "command-r-plus", "gpt-4.1", "yi-large", "o1-mini", "r1", "gemini-2.5-pro"):
 				_premium.require(2)
 			elif model in ("dbrx-instruct", "gpt-3.5", "deepseek-v3", "gpt-4.1-mini", "lzlv-70b", "llama-3-70b"):
 				_premium.require(1)
@@ -1004,7 +1001,7 @@ class Imagine(Command):
 					fut = csubmit(ai.instruct(
 						dict(
 							prompt=prompt,
-							model="minimax-01",
+							model="gemini-2.5-flash",
 							temperature=1,
 							max_tokens=200,
 							top_p=0.9,

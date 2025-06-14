@@ -1874,9 +1874,10 @@ class UpdateUsers(Database):
 
 	def _send_(self, message, **void):
 		user = message.author
-		if user.id == self.bot.id or self.bot.get_perms(user, message.guild) <= -inf:
+		bot = self.bot
+		if user.id == bot.id or bot.get_perms(user, message.guild) <= -inf:
 			return
-		if not self.bot.get_enabled(message.channel):
+		if not bot.get_enabled(message.channel):
 			return
 		size = get_message_length(message)
 		points = sqrt(size) + sum(1 for w in message.content.split() if len(w) > 1)
@@ -1890,34 +1891,23 @@ class UpdateUsers(Database):
 				self.data.get(user.id, EMPTY).pop("last_typing", None)
 		else:
 			self.data.get(user.id, EMPTY).pop("last_typing", None)
-		if message.id % 1000 == 0:
-			if self.bot.data.enabled.get(message.channel.id, True):
-				if message.id % 1000000000 == 0:
-					self.add_diamonds(user, points * 10000)
-					add_dict(self.data.setdefault(user.id, {}).setdefault("sparkles", {}), {"secret": 1})
-					csubmit(self.bot.react_with(message, "sparkles_secret.gif"))
-					print(f"{user} has obtained secret sparkles in {message.guild}!")
-				elif message.id % 1000000 == 0:
-					self.add_diamonds(user, points * 1000)
-					add_dict(self.data.setdefault(user.id, {}).setdefault("sparkles", {}), {"legendary": 1})
-					csubmit(self.bot.react_with(message, "sparkles_legendary.gif"))
-					print(f"{user} has obtained legendary sparkles in {message.guild}!")
-				elif message.id % 25000 == 0:
-					self.add_diamonds(user, points * 50)
-					add_dict(self.data.setdefault(user.id, {}).setdefault("sparkles", {}), {"rare": 1})
-					csubmit(self.bot.react_with(message, "sparkles_rare.gif"))
-					print(f"{user} has obtained rare sparkles in {message.guild}!")
-				else:
-					self.add_diamonds(user, points)
-					add_dict(self.data.setdefault(user.id, {}).setdefault("sparkles", {}), {"normal": 1})
-					csubmit(self.bot.react_with(message, "sparkles.gif"))
-					print(f"{user} has obtained sparkles in {message.guild}!")
+		mid = message.id
+		if mid % 1000 == 0:
+			if bot.data.enabled.get(message.channel.id, True) and (fun := bot._globals.get("FUN")) is not None:
+				for k, v in fun.sparkle_odds.items():
+					if mid % k == 0:
+						self.add_diamonds(user, points * k / 1000)
+						add_dict(self.data.setdefault(user.id, {}).setdefault("sparkles", {}), {v: 1})
+						sparkle_name = fun.sparkle_values[v]
+						csubmit(self.bot.react_with(message, sparkle_name + ".gif"))
+						print(f"{user} has obtained {sparkle_name} in {message.guild}!")
+						break
 			points *= 1000
 		else:
 			self.add_gold(user, points)
 		self.add_xp(user, points)
-		if "dailies" in self.bot.data:
-			csubmit(self.bot.data.dailies.valid_message(message))
+		if "dailies" in bot.data:
+			csubmit(bot.data.dailies.valid_message(message))
 
 	async def _mention_(self, user, message, **void):
 		bot = self.bot

@@ -1066,7 +1066,10 @@ class Server:
 				else:
 					fmt = "opus"
 			assert fmt in ("h264", "h265", "h266", "av1", "mp4", "mkv", "webm", "avif", "webp", "gif", "ogg", "opus", "mp3", "flac", "wav"), f"Format {fmt} currently not supported."
-			tmpl = f"{CACHE_PATH}/{uhash(v)}.{fmt}"
+			entry = self.ydl.search(v)[0]
+			url = entry["url"]
+			v2 = unyt(url)
+			tmpl = f"{CACHE_PATH}/{uhash(v2)}.{fmt}"
 			start = kwargs.get("start")
 			end = kwargs.get("end")
 			if start == "-":
@@ -1087,7 +1090,6 @@ class Server:
 				with sem:
 					# Separate video and audio formats
 					if fmt in ("ogg", "opus", "mp3", "flac", "wav"):
-						entry = self.ydl.search(v)[0]
 						fn2, _cdc, _dur, _ac = self.ydl.get_audio(entry, fmt=fmt, start=start, end=end)
 						if fn != fn2:
 							rename(fn2, fn)
@@ -1099,13 +1101,13 @@ class Server:
 						if fmt in ("h264", "h265", "h266"):
 							fmt = "mp4"
 						if codec:
-							tmpl = f"{CACHE_PATH}/{uhash(v)}~{cdc}.{fmt}"
+							tmpl = f"{CACHE_PATH}/{uhash(v2)}~{cdc}.{fmt}"
 							fn = name + "~" + cdc + "." + fmt
 						else:
-							tmpl = f"{CACHE_PATH}/{uhash(v)}.{fmt}"
+							tmpl = f"{CACHE_PATH}/{uhash(v2)}.{fmt}"
 							fn = name + "." + fmt
 						if fmt in ("avif", "webp", "gif"):
-							fstr = f"bestvideo[ext={fmt}]/bestvideo[acodec=none]/bestvideo"
+							fstr = f"bestvideo[ext={fmt}]/bestvideo[acssodec=none]/bestvideo"
 						else:
 							fstr = f"bestvideo[ext={fmt}]+bestaudio[acodec=opus]/best[ext={fmt}]/best/bestvideo+bestaudio/bestvideo"
 						postprocessors = [dict(
@@ -1126,7 +1128,7 @@ class Server:
 							cookiesfrombrowser=["firefox"],
 							postprocessors=postprocessors,
 						)
-						title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(v)},download=True)['title']", timeout=3600)
+						title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True)['title']", timeout=3600)
 					assert os.path.exists(fn), f"Download unsuccessful: {fn}."
 			else:
 				entry = self.ydl.search(q)[0]

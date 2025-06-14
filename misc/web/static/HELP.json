@@ -857,13 +857,10 @@
 				"StarBoard"
 			],
 			"description": "Causes Miza to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel.",
-			"usage": "<0:reaction> <1:react_count[1]>? <enable_channel(-e)|disable_channel(-d)>? <-1:channel_ids>*",
+			"usage": "",
 			"level": "2",
 			"rate_limit": "1",
-			"example": [
-				"starboard \ud83d\udc31 6",
-				"starboard disable"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Crosspost": {

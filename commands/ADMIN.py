@@ -1344,32 +1344,65 @@ class StarBoard(Command):
 	server_only = True
 	min_level = 2
 	description = "Causes ⟨BOT⟩ to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel."
-	usage = "<0:reaction> <1:react_count[1]>? <enable_channel(-e)|disable_channel(-d)>? <-1:channel_ids>*"
-	example = ("starboard 🐱 6", "starboard disable")
-	flags = "aed"
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("view", "add", "remove"),
+				accepts=dict(enable="add", disable="remove", create="add", delete="remove"),
+			),
+			description="Action to perform",
+			example="enable",
+		),
+		emoji=cdict(
+			type="emoji",
+			description="Emoji to treat as starboard trigger.",
+			example="🐱",
+		),
+		special=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("SPARKLES",),
+				strict_case=True,
+			),
+			description="Overrides emoji; special categories of reactions",
+			example="SPARKLES",
+		),
+		count=cdict(
+			type="integer",
+			description="Amount of reactions required to trigger. Counts both regular and super reactions",
+			default=1,
+			example="3",
+		),
+		channel=cdict(
+			type="channel",
+			description="Channel to add or remove from ignore list; will not forward messages from channels within this list",
+			example="#Starboard",
+		)
+	)
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	rate_limit = 1
 
-	async def __call__(self, bot, args, user, message, channel, guild, flags, **void):
+	async def __call__(self, bot, _message, _channel, _guild, _user, mode, emoji, special, count, channel, **void):
 		data = bot.data.starboards
-		if "e" in flags or "d" in flags:
+		if mode in ("add", "remove"):
 			selected = []
-			if data.get(guild.id):
-				for k, t in data[guild.id].items():
-					if k and t[1] == channel.id:
+			if data.get(_guild.id):
+				for k, t in data[_guild.id].items():
+					if k and (not channel or t[1] == channel.id):
 						selected.append(k)
 			if not selected:
-				d = dict(data[guild.id])
+				d = dict(data[_guild.id])
 				d.pop(None, None)
 				if not d:
-					data.pop(guild.id, None)
-				return ini_md(f"Starboard reposting is currently disabled in {sqr_md(channel)}.")
+					data.pop(_guild.id, None)
+				return ini_md(f"Starboard reposting is currently disabled in {sqr_md(channel or _channel)}.")
 			emojis = []
-			for e_data, (count, c_id, *extra) in zip(selected, map(data[guild.id].get, selected)):
+			for e_data, (count, c_id, *extra) in zip(selected, map(data[_guild.id].get, selected)):
 				try:
 					e_id = int(e_data)
-				except:
+				except ValueError:
 					emoji = e_data
 				else:
 					emoji = await bot.fetch_emoji(e_id)
@@ -1379,65 +1412,47 @@ class StarBoard(Command):
 			else:
 				triggers = "trigger "
 			triggers += sqr_md(", ".join(emojis))
-			if not args:
-				if "d" in flags:
+			if not channel:
+				if mode == "remove":
 					for k in selected:
-						data[guild.id].pop(k, None)
-					d = dict(data[guild.id])
+						data[_guild.id].pop(k, None)
+					d = dict(data[_guild.id])
 					d.pop(None, None)
 					if not d:
-						data.pop(guild.id, None)
-					return italics(css_md(f"Disabled starboard {triggers} for {sqr_md(guild)}."))
+						data.pop(_guild.id, None)
+					return italics(css_md(f"Disabled starboard {triggers} for {sqr_md(_guild)}."))
 				for k in selected:
-					data[guild.id][k] = data[guild.id][k][:2]
+					data[_guild.id][k] = data[_guild.id][k][:2]
 				return italics(css_md(f"No longer exluding channels for starboard {triggers}."))
-			args = set(verify_id(a) for a in args)
-			if guild.id in args:
-				args.remove(guild.id)
-				args = set(c.id for c in guild.text_channels).difference(args)
-			channels = []
-			for c_id in args:
-				c = await bot.fetch_channel(c_id)
-				if c.guild.id != guild.id:
-					continue
-				channels.append(c)
-				for k in selected:
-					count, c_id2, *extra = data[guild.id][k]
-					if not extra:
-						extra = [set()]
-					disabled = extra[0]
-					if "d" in flags:
-						disabled.add(c_id)
-					else:
-						disabled.discard(c_id)
-					data[guild.id][k] = (count, c_id2, disabled)
-			channels = sqr_md(", ".join(map(str, sorted(channels, key=lambda c: c.id))))
-			now = "Now" if "d" in flags else "No longer"
-			return italics(css_md(f"{now} excluding {channels} from starboard {triggers}."))
-		if not args:
+			if channel.guild.id != _guild.id:
+				raise IndexError("Channel is not part of this server.")
+			for k in selected:
+				count, c_id2, *extra = data[_guild.id][k]
+				if not extra:
+					extra = [set()]
+				disabled = extra[0]
+				c_id = channel.id
+				if mode == "remove":
+					disabled.add(c_id)
+				else:
+					disabled.discard(c_id)
+				data[_guild.id][k] = (count, c_id2, disabled)
+			now = "Now" if mode == "remove" else "No longer"
+			return italics(css_md(f"{now} excluding {sqr_md(channel)} from starboard {triggers}."))
+		if not emoji and not special:
 			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
 			await send_with_reply(
 				None,
-				message,
-				"*```" + "\n" * ("z" in flags) + "callback-admin-starboard-"
-				+ str(user.id) + "_0"
+				_message,
+				"*```" + "\n" + "callback-admin-starboard-"
+				+ str(_user.id) + "_0"
 				+ "-\nLoading Starboard database...```*",
 				buttons=buttons,
 			)
 			return
-		e_data = args.pop(0)
-		try:
-			e_id = int(e_data)
-		except:
-			emoji = e_data
-		else:
-			emoji = await bot.fetch_emoji(e_id)
-		emoji = str(emoji)
-		if args:
-			count = await bot.eval_math(" ".join(args))
-		else:
-			count = 1
-		boards = data.setdefault(guild.id, {})
+		channel = channel or _channel
+		emoji = special if special else str(await bot.fetch_emoji(emoji, _guild))
+		boards = data.setdefault(_guild.id, {})
 		boards[emoji] = (count, channel.id, set([channel.id]))
 		return ini_md(f"Successfully added starboard to {sqr_md(channel)}, with trigger {sqr_md(emoji)}: {sqr_md(count)}.")
 
@@ -1448,7 +1463,7 @@ class StarBoard(Command):
 		if reaction not in self.directions and reaction is not None:
 			return
 		guild = message.guild
-		user = await bot.fetch_user(u_id)
+		# user = await bot.fetch_user(u_id)
 		data = bot.data.starboards
 		curr = data.setdefault(guild.id, {}).copy()
 		curr.pop(None, None)
@@ -1485,8 +1500,8 @@ class StarBoard(Command):
 			def disp(t):
 				disabled = ",".join(map(str, sorted(t[2])))
 				s = f"×{t[0]} -> {sqr_md(bot.get_channel(t[1]))} ![{disabled}]"
-				if len(t) > 2:
-					s += ", excludes " + ", ".join(sqr_md(bot.get_channel(i)) for i in t[2])
+				# if len(t) > 2:
+				# 	s += ", excludes " + ", ".join(sqr_md(bot.get_channel(i)) for i in t[2])
 				return s
 
 			msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=disp))
@@ -3286,11 +3301,20 @@ class UpdateCrossposts(Database):
 class UpdateStarboards(Database):
 	name = "starboards"
 	sems = {}
+	sparkle_ids = {}
+
+	async def _ready_(self, bot, **void):
+		if (fun := bot._globals.get("FUN")) is not None:
+			sparkle_emojis = await gather(*(bot.data.emojis.grab(t[1] + ".gif") for t in fun.sparkle_values))
+			self.sparkle_ids = {e.id: e.name for e in sparkle_emojis}
+			print("Sparkle IDs:", self.sparkle_ids)
 
 	async def _reaction_add_(self, message, react, **void):
 		if not message.guild or message.guild.id not in self.data:
 			return
 		table = self.data[message.guild.id]
+		if verify_id(react) in self.sparkle_ids:
+			react = "SPARKLES"
 		temp = table.get(react)
 		if not temp:
 			return
@@ -3301,7 +3325,7 @@ class UpdateStarboards(Database):
 		if not req < inf:
 			return
 		message = await self.bot.ensure_reactions(message)
-		count = sum(r.count for r in message.reactions if str(r.emoji) == react)
+		count = sum(r.count for r in message.reactions if str(r.emoji) == react) if react != "SPARKLES" else sum(r.count for r in message.reactions if getattr(r.emoji, "id", None) and r.emoji.id in self.sparkle_ids)
 		sem = self.sems.setdefault(message.guild.id, Semaphore(1, inf))
 		async with sem:
 			if message.id in table.get(None, ()):
@@ -3318,7 +3342,7 @@ class UpdateStarboards(Database):
 				if count >= req:# and count < req * 2 + 2:
 					embed = await self.bot.as_embed(message, link=True, colour=True)
 					text, link = embed.description.rsplit("\n\n", 1)
-					description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table) + "   " + link
+					description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table or "SPARKLES" in table and getattr(r.emoji, "id", None) and r.emoji.id in self.sparkle_ids) + "   " + link
 					embed.description = lim_str(description, 4096)
 					try:
 						channel = await self.bot.fetch_channel(table[react][1])
@@ -3336,7 +3360,7 @@ class UpdateStarboards(Database):
 					m = await self.bot.fetch_message(table[None][message.id], channel)
 					embed = await self.bot.as_embed(message, link=True, colour=True)
 					text, link = embed.description.rsplit("\n\n", 1)
-					description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table) + "   " + link
+					description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table or "SPARKLES" in table and getattr(r.emoji, "id", None) and r.emoji.id in self.sparkle_ids) + "   " + link
 					embed.description = lim_str(description, 4096)
 					await self.bot.edit_message(m, content=None, embed=embed)
 				except (discord.NotFound, discord.Forbidden):
@@ -3355,6 +3379,8 @@ class UpdateStarboards(Database):
 			return
 		if message.id not in table.get(None, {}):
 			return
+		if verify_id(react) in self.sparkle_ids:
+			react = "SPARKLES"
 		sem = self.sems.setdefault(message.guild.id, Semaphore(1, inf))
 		async with sem:
 			try:
@@ -3366,7 +3392,7 @@ class UpdateStarboards(Database):
 				m = await self.bot.fetch_message(table[None][message.id], channel)
 				embed = await self.bot.as_embed(message, link=True, colour=True)
 				text, link = embed.description.rsplit("\n\n", 1)
-				description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in reacts if str(r.emoji) in table) + "   " + link
+				description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in reacts if str(r.emoji) in table or "SPARKLES" in table and getattr(r.emoji, "id", None) and r.emoji.id in self.sparkle_ids) + "   " + link
 				embed.description = lim_str(description, 4096)
 				await self.bot.edit_message(m, content=None, embed=embed)
 			except (discord.NotFound, discord.Forbidden):

@@ -61,7 +61,7 @@ available = {
 		None: "gpt-4.1-mini",
 	},
 	"deepseek-r1": {
-		"openrouter": ("deepseek/deepseek-r1:free", ("0", "0")),
+		"openrouter": ("deepseek/deepseek/deepseek-r1-0528:free", ("0", "0")),
 		"deepseek": ("deepseek-reasoner", ("0.41167", "1.64333")),
 		"deepinfra": ("deepseek-ai/DeepSeek-R1", ("0.85", "2.5")),
 		None: "o1-preview",
@@ -130,12 +130,16 @@ available = {
 		"together": ("Qwen/Qwen2.5-72B-Instruct-Turbo", ("1.2", "1.2")),
 		None: "llama-3-70b",
 	},
-	"gemini-2.5-t": {
-		"openrouter": ("google/gemini-2.5-pro-preview-03-25", ("1.25", "10")),
+	"gemini-2.5-pro": {
+		"openrouter": ("google/gemini-2.5-pro-preview", ("1.25", "10")),
 		None: "gpt-4.1",
 	},
-	"gemini-2.5": {
-		"openrouter": ("google/gemini-2.5-flash-preview", ("0.15", "0.6")),
+	"gemini-2.5-flash-t": {
+		"openrouter": ("google/gemini-2.5-flash-preview-05-20:thinking", ("0.15", "3.5")),
+		None: "gpt-4.1",
+	},
+	"gemini-2.5-flash": {
+		"openrouter": ("google/gemini-2.5-flash-preview-05-20", ("0.15", "0.6")),
 		None: "gpt-4.1",
 	},
 	"gemini-2.0": {
@@ -209,6 +213,10 @@ available = {
 		"openrouter_": ("cognitivecomputations/dolphin3.0-mistral-24b:free", ("0", "0")),
 		None: "gpt-4.1-mini",
 	},
+	"caller-large": {
+		"openrouter": ("arcee-ai/caller-large", ("0.55", "0.8")),
+		None: "gpt-4.1-mini",
+	},
 	"firefunction-v1": {
 		"fireworks": ("accounts/fireworks/models/firefunction-v1", ("0.5", "0.5")),
 		None: "gpt-4.1-mini",
@@ -279,8 +287,9 @@ is_chat = {
 	"qwen-72b",
 	"grok-3",
 	"grok-3-mini",
-	"gemini-2.5-t",
-	"gemini-2.5",
+	"gemini-2.5-pro",
+	"gemini-2.5-flash-t",
+	"gemini-2.5-flash",
 	"gemini-2.0",
 	"o4-mini",
 	"o3-mini",
@@ -301,6 +310,7 @@ is_chat = {
 	"deepseek-v3",
 	"skyfall-36b",
 	"mistral-24b",
+	"caller-large",
 	"firefunction-v2",
 	"firefunction-v1",
 	"firellava-13b",
@@ -335,8 +345,8 @@ is_reasoning = {
 	"claude-3.7-sonnet:thinking",
 	"claude-3.7-sonnet-t",
 	"grok-3-mini",
-	"google/gemini-2.5-pro-preview-03-25",
-	"gemini-2.5-t",
+	"gemini-2.5-pro",
+	"gemini-2.5-flash-t",
 	"o4-mini",
 	"o3",
 	"o3-mini",
@@ -358,8 +368,9 @@ is_function = {
 	"35b-beta-long",
 	"grok-3",
 	"grok-3-mini",
-	"gemini-2.5-t",
-	"gemini-2.5",
+	"gemini-2.5-pro",
+	"gemini-2.5-flash-t",
+	"gemini-2.5-flash",
 	"gemini-2.0",
 	"o4-mini",
 	"o3",
@@ -378,6 +389,7 @@ is_function = {
 	"gpt-3.5-turbo",
 	"deepseek-v3-t",
 	"mistral-24b",
+	"caller-large",
 	"firefunction-v2",
 	"firefunction-v1",
 }
@@ -390,10 +402,9 @@ is_vision = {
 	"claude-3-haiku",
 	"llama-3-11b",
 	"llama-3-90b",
-	"grok-3",
-	"grok-3-mini",
-	"gemini-2.5-t",
-	"gemini-2.5",
+	"gemini-2.5-pro",
+	"gemini-2.5-flash-t",
+	"gemini-2.5-flash",
 	"gemini-2.0",
 	"o1",
 	"o1-preview",
@@ -415,7 +426,7 @@ is_premium = {
 	"claude-3-opus",
 	"claude-3-sonnet",
 	"llama-3-405b",
-	"gemini-2.5-t",
+	"gemini-2.5-pro",
 	"o4-mini",
 	"o1",
 	"o1-preview",
@@ -468,8 +479,9 @@ contexts = {
 	"llama-3-405b": 131072,
 	"grok-3": 131072,
 	"grok-3-mini": 131072,
-	"gemini-2.5-t": 1048576,
-	"gemini-2.5": 1048576,
+	"gemini-2.5-pro": 1048576,
+	"gemini-2.5-flash-t": 1048576,
+	"gemini-2.5-flash": 1048576,
 	"gemini-2.0": 1048576,
 	"o4-mini": 200000,
 	"o3-mini": 200000,
@@ -500,6 +512,7 @@ contexts = {
 	"nous-hermes-2-mixtral-8x7b-dpo": 32768,
 	"mixtral-8x7b-instruct": 32768,
 	"mixtral-8x7b": 32768,
+	"caller-large": 32768,
 	"firefunction-v2": 8192,
 	"firefunction-v1": 32768,
 	"firellava-13b": 4096,
@@ -850,7 +863,7 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 			ml = round_random(max_length)
 			c = await tcount(prompt)
 			# Prefer mistral-small for summaries if possible due to its much faster throughput of >100 tokens/s, but fallback to gemini-2.5 if necessary (due to its higher token limit of 1 million).
-			model = "gemini-2.5" if c > 28672 else "mistral-24b"
+			model = "gemini-2.5-flash" if c > 28672 else "mistral-24b"
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
 			resp = await instruct(data, best=True, skip=True)
 			resp = resp.strip()
@@ -1005,7 +1018,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 				kwa.pop("repetition_penalty", None)
 		if "repetition_penalty" in kwa:
 			body["repetition_penalty"] = kwa.pop("repetition_penalty")
-		if not kwa.get("stop"):
+		if not kwa.get("stop") or sapi == "openrouter":
 			kwa.pop("stop", None)
 		if sapi not in ("openai",):
 			kwa.pop("user", None)

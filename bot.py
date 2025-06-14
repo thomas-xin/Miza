@@ -1967,7 +1967,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						resp = await asubmit(niquests.post, "https://lite.duckduckgo.com/lite/", data=dict(q=argv), headers=headers)
 						from bs4 import BeautifulSoup
 						data = BeautifulSoup(resp.content)
-						return data.get_text().replace("\n\n\n\n", "\n\n").replace("\n\n\n\n", "\n\n")
+						text = re.sub("\n{2,}", "\n\n", data.get_text().split("Any Time\n", 1)[-1].split("Past Year\n", 1)[-1].strip())
+						return text
 					if include_hrefs:
 						return "\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).strip()
 					return "\n\n".join((e.get("title", "") + "\n" + e.get("body", "")).strip() for e in data).strip()
@@ -2326,7 +2327,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	model_levels = {
 		0: cdict(
 			reasoning="deepseek-v3",
-			instructive="minimax-01",
+			instructive="gemini-2.5-flash",
 			casual="minimax-01",
 			nsfw="mythomax-13b",
 			backup="deepseek-v3",
@@ -2336,25 +2337,25 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		1: cdict(
-			reasoning="o4-mini",
-			instructive="gpt-4.1-mini",
+			reasoning="gemini-2.5-flash-t",
+			instructive="gemini-2.5-flash",
 			casual="deepseek-v3-t",
 			nsfw="grok-3-mini",
 			backup="minimax-01",
 			retry="gpt-4.1",
-			function="gpt-4.1-mini",
-			vision="gemini-2.5",
+			function="caller-large",
+			vision="gemini-2.5-flash",
 			target="auto",
 		),
 		2: cdict(
-			reasoning="gemini-2.5-t",
-			instructive="gpt-4.1",
+			reasoning="gemini-2.5-pro",
+			instructive="gemini-2.5-flash-t",
 			casual="grok-3",
 			nsfw="magnum-72b",
-			backup="minimax-01",
+			backup="grok-3",
 			retry="claude-3.7-sonnet",
-			function="gpt-4.1",
-			vision="gemini-2.5",
+			function="gemini-2.5-flash-t",
+			vision="gemini-2.5-flash-t",
 			target="auto",
 		),
 	}
@@ -2362,9 +2363,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"OpenAI-compatible Chat Completion function. Autoselects model using a function call, then routes to tools and target model as required."
 		await ai.ensure_models()
 		await require_predicate(predicate)
-		originals = messages
-		if void:
-			print("VOID:", void)
 		modlvl = ["miza-1", "miza-2", "miza-3"].index(model.rsplit("/", 1)[-1])
 		modelist = self.model_levels[modlvl]
 		messages = [cdict(m) for m in messages]
@@ -2374,17 +2372,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if modlvl > 2:
 			maxlim = 196608
 			minlim = 4800
-			snip = 540
+			snip = 720
 			best = 2
 		elif modlvl > 1:
 			maxlim = 98304
 			minlim = 2400
-			snip = 360
+			snip = 480
 			best = 1
 		else:
 			maxlim = 3000
 			minlim = 600
-			snip = 200
+			snip = 240
 			best = 0
 		messages = await ai.cut_to(messages, maxlim, minlim, best=best, prompt=prompt, premium_context=premium_context)
 		length = await count_to(messages)
@@ -2930,7 +2928,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
-		model = model or ("gemini-2.5" if best else "mistral-24b")
+		model = model or ("gemini-2.5-flash" if best else "mistral-24b")
 		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
@@ -3021,7 +3019,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		fsize = 0
 		size = CACHE_FILESIZE
 		with suppress(AttributeError):
-			size = max(size, channel.guild.filesize_limit)
+			if channel.guild.filesize_limit > 26214400:
+				size = channel.guild.filesize_limit
 		if getattr(channel, "simulated", None) or getattr(channel, "guild", None) and not channel.permissions_for(channel.guild.me).attach_files:
 			size = -1
 		data = file
@@ -4911,7 +4910,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		schema = command.schema
 		argv = argv or ""
 		args, ws = smart_split(argv, rws=True)
-		print("ARGS:", args, ws)
+		# print("ARGS:", args, ws)
 		append_lws = None
 		if schema is None:
 			flags = {}
@@ -5348,7 +5347,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					raise ValueError(e.format(v))
 				raise ValueError(e)
 		elif validation.get("enum") or validation.get("accepts"):
-			v = full_prune(v)
+			v = v if validation.get("strict_case") else full_prune(v)
 			enum = validation.get("enum", ())
 			accepts = validation.get("accepts", ())
 			if v not in enum and v not in accepts:
@@ -5485,7 +5484,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					timeout *= 2
 				timeout *= self.premium_multiplier(self.premium_level(user))
 			premium = self.premium_context(user, guild=guild)
-			print("KWARGS:", kwargs)
+			# print("KWARGS:", kwargs)
 			# Create a future to run the command
 			future = asubmit(
 				command,						# command is a callable object, may be async or not
@@ -6651,6 +6650,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				domain_cert=dc,
 				private_key=pk,
 				channels=channels,
+				encryption_key=AUTH["encryption_key"],
 				token=self.token,
 				alt_token=AUTH.get("alt_token") or self.token,
 			))
@@ -8423,6 +8423,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						after._update(data)
 					else:
 						before.author = after.author
+					if len(after.embeds) == 1 and after.embeds[0].type != "rich" and find_urls(after.content):
+						print(f"Possible embed-only update on message {after.id}, ignoring...")
+						return
 					raw = True
 				else:
 					if type(before) is self.CachedMessage:

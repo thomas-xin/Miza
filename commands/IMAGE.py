@@ -1024,12 +1024,13 @@ class Resize(Command):
 			example="scale2x",
 			default="auto",
 		),
-		url=cdict(
+		urls=cdict(
 			type="visual",
 			description="Image, animation or video, supplied by URL or attachment",
 			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
+			multiple=True,
 		),
 		resolution=cdict(
 			type="resolution",
@@ -1105,7 +1106,7 @@ class Resize(Command):
 	_timeout_ = 4
 	slash = True
 
-	async def __call__(self, bot, _timeout, mode, url, resolution, multiplier, area, duration, fps, filesize, format, **void):
+	async def __call__(self, bot, _timeout, mode, urls, resolution, multiplier, area, duration, fps, filesize, format, **void):
 		if resolution:
 			if len(resolution) == 1:
 				x = y = resolution[0]
@@ -1118,12 +1119,12 @@ class Resize(Command):
 		else:
 			x = y = multiplier
 			func = "mult"
-		resp = url
-		if func != "mult" or not x == y == 1 or area or duration is not None or fps is not None:
-			resp = await process_image(resp, "resize_map", [[], duration, fps, func, x, y, mode, area, "-fs", filesize, "-f", format], cap="image", timeout=_timeout)
+		resp = urls[0]
+		if len(urls) > 1 or func != "mult" or not x == y == 1 or area or duration is not None or fps is not None:
+			resp = await process_image(resp, "resize_map", [urls[1:], duration, fps, func, x, y, mode, area, "-fs", filesize, "-f", format], cap="image", timeout=_timeout)
 		else:
 			resp = await bot.optimise_image(resp, fsize=filesize, fmt=format)
-		fn = url2fn(url)
+		fn = url2fn(urls[0])
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 

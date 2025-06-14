@@ -942,7 +942,7 @@ class AudioPlayer(discord.AudioSource):
 		return True
 
 	def cleanup(self):
-		return None
+		return self.clear()
 
 AP = AudioPlayer
 
@@ -1069,6 +1069,7 @@ class PipedLoader:
 						self.file.close()
 						rename(self.temp, self.path)
 					self.temp = self.path
+					assert self.buffer == os.path.getsize(self.path), f"{self.buffer} != {os.path.getsize(self.path)}"
 					self.end = self.buffer
 					if self.callback:
 						self.callback(self.path)
@@ -1636,6 +1637,7 @@ async def on_connect():
 			client_fut.set_result(client)
 			# Restore audio players from our cache on disk
 			print(AP.cache.keys())
+			await asyncio.gather(*(AP.force_disconnect(guild.id) for guild in client.guilds if guild.me and guild.me.voice is not None and guild.id not in AP.cache))
 			await asyncio.gather(*(reload_player(gid) for gid in AP.cache.keys()))
 		print("Audio client successfully connected.")
 
