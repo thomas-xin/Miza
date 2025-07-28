@@ -980,7 +980,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			command.extend(("-c:v", "libwebp_anim" if anim else "libwebp", "-pix_fmt", pix, "-pred", "mixed"))
 		command.extend(("-f", "webp", "-compression_level", "6" if lossless else "5"))
 		if anim:
-			command.extend(("-loop", "0", "-q:v", "24"))
+			command.extend(("-loop", "0", "-q:v", "75"))
 		elif lossless:
 			command.extend(("-lossless", "1"))
 		else:

@@ -81,6 +81,10 @@ available = {
 		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
 		None: "deepseek-v3-t",
 	},
+	"minimax-m1": {
+		"openrouter": ("minimax/minimax-m1", ("0.3", "1.65")),
+		None: "gpt-4.1",
+	},
 	"minimax-01": {
 		"openrouter": ("minimax/minimax-01", ("0.2", "1.1")),
 		None: "gpt-4.1",
@@ -131,27 +135,31 @@ available = {
 		None: "llama-3-70b",
 	},
 	"gemini-2.5-pro": {
-		"openrouter": ("google/gemini-2.5-pro-preview", ("1.25", "10")),
+		"openrouter": ("google/gemini-2.5-pro", ("1.25", "10")),
 		None: "gpt-4.1",
 	},
 	"gemini-2.5-flash-t": {
-		"openrouter": ("google/gemini-2.5-flash-preview-05-20:thinking", ("0.15", "3.5")),
+		"openrouter": ("google/gemini-2.5-flash", ("0.3", "2.5")),
 		None: "gpt-4.1",
 	},
 	"gemini-2.5-flash": {
-		"openrouter": ("google/gemini-2.5-flash-preview-05-20", ("0.15", "0.6")),
+		"openrouter": ("google/gemini-2.5-flash-lite", ("0.1", "0.4")),
 		None: "gpt-4.1",
 	},
 	"gemini-2.0": {
 		"openrouter": ("google/gemini-2.0-flash-001", ("0.1", "0.4")),
 		None: "gpt-4.1",
 	},
+	"grok-4": {
+		"openrouter": ("x-ai/grok-4", ("3", "15")),
+		None: "grok-3",
+	},
 	"grok-3": {
-		"openrouter": ("x-ai/grok-3-beta", ("3", "15")),
+		"openrouter": ("x-ai/grok-3", ("3", "15")),
 		None: "gpt-4.1",
 	},
 	"grok-3-mini": {
-		"openrouter": ("x-ai/grok-3-mini-beta", ("0.3", "0.5")),
+		"openrouter": ("x-ai/grok-3-mini", ("0.3", "0.5")),
 		None: "gpt-4.1-mini",
 	},
 	"o4-mini": {
@@ -211,6 +219,10 @@ available = {
 		"mistral": ("mistral-small-latest", ("0", "0")),
 		"openrouter": ("mistralai/mistral-small-3.1-24b-instruct-2503", ("0.1", "0.3")),
 		"openrouter_": ("cognitivecomputations/dolphin3.0-mistral-24b:free", ("0", "0")),
+		None: "gpt-4.1-mini",
+	},
+	"kimi-k2": {
+		"openrouter": ("moonshotai/kimi-k2", ("0.14", "2.49")),
 		None: "gpt-4.1-mini",
 	},
 	"caller-large": {
@@ -285,6 +297,7 @@ is_chat = {
 	"lzlv-70b",
 	"magnum-72b",
 	"qwen-72b",
+	"grok-4",
 	"grok-3",
 	"grok-3-mini",
 	"gemini-2.5-pro",
@@ -304,12 +317,14 @@ is_chat = {
 	"gpt-4o-mini",
 	"gpt-3.5",
 	"gpt-3.5-turbo",
+	"minimax-m1",
 	"minimax-01",
 	"deepseek-r1",
 	"deepseek-v3-t",
 	"deepseek-v3",
 	"skyfall-36b",
 	"mistral-24b",
+	"kimi-k2",
 	"caller-large",
 	"firefunction-v2",
 	"firefunction-v1",
@@ -344,6 +359,8 @@ is_completion = {
 is_reasoning = {
 	"claude-3.7-sonnet:thinking",
 	"claude-3.7-sonnet-t",
+	"grok-4",
+	"grok-3",
 	"grok-3-mini",
 	"gemini-2.5-pro",
 	"gemini-2.5-flash-t",
@@ -366,6 +383,7 @@ is_function = {
 	"command-r",
 	"command-r-plus",
 	"35b-beta-long",
+	"grok-4",
 	"grok-3",
 	"grok-3-mini",
 	"gemini-2.5-pro",
@@ -389,6 +407,7 @@ is_function = {
 	"gpt-3.5-turbo",
 	"deepseek-v3-t",
 	"mistral-24b",
+	"kimi-k2",
 	"caller-large",
 	"firefunction-v2",
 	"firefunction-v1",
@@ -402,6 +421,7 @@ is_vision = {
 	"claude-3-haiku",
 	"llama-3-11b",
 	"llama-3-90b",
+	"grok-4",
 	"gemini-2.5-pro",
 	"gemini-2.5-flash-t",
 	"gemini-2.5-flash",
@@ -414,6 +434,7 @@ is_vision = {
 	"chatgpt-4o-latest",
 	"gpt-4-mini",
 	"gpt-4o-mini",
+	"minimax-m1",
 	"minimax-01",
 	"mistral-24b",
 	"firellava-13b",
@@ -426,6 +447,7 @@ is_premium = {
 	"claude-3-opus",
 	"claude-3-sonnet",
 	"llama-3-405b",
+	"grok-4",
 	"gemini-2.5-pro",
 	"o4-mini",
 	"o1",
@@ -477,6 +499,7 @@ contexts = {
 	"llama-3-70b": 131072,
 	"llama-3-90b": 131072,
 	"llama-3-405b": 131072,
+	"grok-4": 262144,
 	"grok-3": 131072,
 	"grok-3-mini": 131072,
 	"gemini-2.5-pro": 1048576,
@@ -496,6 +519,7 @@ contexts = {
 	"gpt-4o-mini": 128000,
 	"gpt-3.5": 16384,
 	"gpt-3.5-turbo-instruct": 4096,
+	"minimax-m1": 1000000,
 	"minimax-01": 1000000,
 	"deepseek-r1": 64000,
 	"deepseek-v3-t": 64000,
@@ -512,6 +536,7 @@ contexts = {
 	"nous-hermes-2-mixtral-8x7b-dpo": 32768,
 	"mixtral-8x7b-instruct": 32768,
 	"mixtral-8x7b": 32768,
+	"kimi-k2": 131072,
 	"caller-large": 32768,
 	"firefunction-v2": 8192,
 	"firefunction-v1": 32768,
@@ -953,7 +978,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 				break
 			assert isinstance(minfo, str)
 			kwargs["model"] = minfo
-			return await llm(func, *args, timeout=timeout, premium_context=premium_context, require_message=require_message, **kwargs)
+			return await llm(func, *args, timeout=timeout, premium_context=premium_context, require_message=require_message, allow_alt=False, **kwargs)
 		if not isinstance(api, str):
 			sapi = as_str(api.base_url)
 		else:
@@ -1185,7 +1210,7 @@ async def _instruct2(data, best=False, skip=False, prune=True, user=None):
 	resp = await _instruct(data, best=best, skip=skip, user=user)
 	if prune:
 		resp = resp.strip()
-		resp2 = regexp(r"### (?:Input|Instruction|Response):?").split(resp, 1)[0].strip()
+		resp2 = regexp(r"### (?:Input|Instruction):?").split(resp, 1)[0].strip().split("### Response:", 1)[-1].strip()
 		if resp != resp2:
 			print("PRUNED:", resp, resp2, sep="::")
 			resp = resp2
@@ -1225,7 +1250,7 @@ async def _instruct(data, best=False, skip=False, user=None):
 f_browse = {
 	"type": "function", "function": {
 		"name": "browse",
-		"description": "Searches internet browser, or visits given URL. Use for knowledge or advice to validate facts and up-to-date information!",
+		"description": "Searches internet browser, or visits given URL. Avoid using on URLs for images that are already visible. Use for knowledge or advice to validate facts and up-to-date information!",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {
@@ -1427,7 +1452,6 @@ f_default = {
 TOOLS = {
 	"knowledge_internet": [
 		f_browse,
-		f_reasoning,
 		f_wolfram_alpha,
 		f_sympy,
 		f_myinfo,
@@ -1440,7 +1464,6 @@ TOOLS = {
 	],
 	"calculator": [
 		f_browse,
-		f_reasoning,
 		f_wolfram_alpha,
 		f_sympy,
 	],

@@ -950,6 +950,12 @@ def replace_ext(fn, ext="") -> str:
 		return fn + "." + ext
 	return fn.rsplit(".", 1)[0] + "." + ext
 
+scraper_blacklist = re.compile("|".join(map(re.escape, (
+	"ko-fi.com",
+	"spotify.com",
+	"artfight.net",
+))))
+
 def bytes2hex(b, space=True) -> str:
 	"Converts a bytes object to a hex string."
 	if type(b) is str:
@@ -4107,7 +4113,7 @@ class EvalPipe:
 					break
 			else:
 				raise
-		print(f"{DynamicDT.now()}: New connection:", conn)
+		print(f"{DynamicDT.now()}: Connection established:", conn)
 		assert conn.readable and conn.writable, "Connection must be readable and writable."
 		pid = conn.recv()
 		proc = psutil.Process(pid)
@@ -4300,7 +4306,7 @@ class EvalPipe:
 					self.writable = False
 					self.p_in = self.p_out = self.p_kill = self.p_join = None
 					conn = self.server.accept()
-					print("New connection:", conn)
+					print("Connection established:", conn)
 					conn.send(os.getpid())
 					self.p_in = (lambda b: share_bytes(conn.send_bytes, b)) if self.address == "127.0.0.1" else conn.send_bytes
 					self.p_out = (lambda: receive_bytes(conn.recv_bytes, unlink=lambda name: self.run(f"EvalPipe.MEMS.pop({repr(name)}).close()"))) if self.address == "127.0.0.1" else conn.recv_bytes
@@ -4381,7 +4387,7 @@ class EvalPipe:
 			self.thread.result()
 
 	def kill(self):
-		ex = RuntimeError("Subprocess killed.")
+		ex = RuntimeError("Subprocess killed (likely timeout).")
 		for resp in tuple(self.responses.values()):
 			with suppress(ISE):
 				resp.set_exception(ex)

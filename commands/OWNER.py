@@ -31,15 +31,15 @@ class Reload(Command):
 		return f"Error reloading{mod}. Please see log for more info."
 
 
-class Shutdown(Command):
-	name = ["Maintain", "Restart", "Reboot", "Update"]
+class Restart(Command):
+	name = ["Reboot"]
 	min_level = nan
 	description = "Restarts, reloads, or shuts down ⟨BOT⟩, with an optional delay."
 	schema = cdict(
 		mode=cdict(
 			type="enum",
 			validation=cdict(
-				enum=("maintain", "reboot", "shutdown", "update"),
+				enum=("workers", "audio", "server", "maintain", "reboot", "shutdown", "update"),
 				accepts=dict(restart="reboot", wait="maintain"),
 			),
 			description="Image supplied by URL or attachment",
@@ -53,12 +53,38 @@ class Shutdown(Command):
 			default=0,
 		),
 	)
+	macros = cdict(
+		Shutdown=cdict(
+			mode="shutdown",
+		),
+		Maintain=cdict(
+			mode="maintain",
+		),
+		Update=cdict(
+			mode="update",
+		),
+	)
 	typing = True
 	_timeout_ = inf
 
 	async def __call__(self, bot, _message, _channel, _user, mode, delay, **void):
 		t = utc()
 		await _message.add_reaction("❗")
+		if mode == "workers":
+			m = await send_with_reply(_channel, content="Restarting compute workers...", reference=_message)
+			await restart_workers()
+			await m.edit("Compute workers restarted successfully.")
+			return
+		if mode == "audio":
+			m = await send_with_reply(_channel, content="Restarting audio client...", reference=_message)
+			await asubmit(bot.start_audio_client)
+			await m.edit("Audio client restarted successfully.")
+			return
+		if mode == "server":
+			m = await send_with_reply(_channel, content="Restarting webserver...", reference=_message)
+			await asubmit(bot.start_webserver)
+			await m.edit("Webserver restarted successfully.")
+			return
 		save = None
 		if mode == "update":
 			resp = await asubmit(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -511,7 +537,7 @@ class UpdateExec(Database):
 
 	# All logs that normally print to stdout/stderr now send to the assigned log channels
 	def _log_(self, msg, **void):
-		if not self.bot or self.bot.api_latency > 6:
+		if not self.bot or self.bot.api_latency > 6 or self.backoff > utc():
 			return
 		msg = msg.strip()
 		if msg:
@@ -525,11 +551,23 @@ class UpdateExec(Database):
 						b = msg.encode("utf-8")
 						if len(b) > 8388608:
 							b = b[:4194304] + b[-4194304:]
-						csubmit(channel.send(file=CompatFile(b, filename="message.txt")))
+						csubmit(self.logto(channel, CompatFile(b, filename="message.txt")))
 					else:
 						self.bot.send_as_embeds(channel, msg, md=code_md, bottleneck=True)
 			if self.bot.ready:
 				[self.data.pop(i) for i in invalid]
+
+	backoff = 0
+	skip_until = 0
+	async def logto(self, channel, file):
+		try:
+			await channel.send(file=file)
+		except aiohttp.client_exceptions.ClientConnectorDNSError:
+			self.backoff = max(self.backoff * 2, 1)
+			self.skip_until = utc() + self.backoff
+		else:
+			self.backoff = 0
+			self.skip_until = 0
 
 	counter = {}
 	async def renew(self, url):
@@ -1231,7 +1269,7 @@ class UpdateEmojis(Database):
 				else:
 					continue
 				emoji = discord.Emoji(guild=bot.user, state=bot._state, data=edata)
-				emoji.application_id = bot.id
+				# emoji.application_id = bot.id
 				self.data[name] = emoji.id
 				bot.cache.emojis[emoji.id] = emoji
 		return self.emojidata
@@ -1240,11 +1278,20 @@ class UpdateEmojis(Database):
 		bot = self.bot
 		while not bot.bot_ready:
 			await asyncio.sleep(2)
+
+		def is_available(emoji):
+			if not emoji:
+				return
+			if bot.ready and getattr(emoji, "guild", None):
+				if not getattr(emoji, "available", True) or emoji.id not in (e.id for e in emoji.guild.emojis):
+					return False
+			return True
+
 		ename = name.rsplit(".", 1)[0]
 		animated = name.endswith(".gif")
 		try:
 			emoji = bot.cache.emojis[self.data[name]]
-			if not emoji or bot.ready and not getattr(emoji, "application_id", None) and (not getattr(emoji, "available", True) or emoji.id not in (e.id for e in emoji.guild.emojis)):
+			if not is_available(emoji):
 				raise KeyError
 		except KeyError:
 			pass
@@ -1253,7 +1300,7 @@ class UpdateEmojis(Database):
 		emojidata = await self.load_own()
 		if self.data.get(name) and self.data[name] in bot.cache.emojis:
 			emoji = bot.cache.emojis[self.data[name]]
-			if not emoji or bot.ready and not getattr(emoji, "application_id", None) and (not getattr(emoji, "available", True) or emoji.id not in (e.id for e in emoji.guild.emojis)):
+			if not is_available(emoji):
 				pass
 			else:
 				return emoji
@@ -1261,7 +1308,7 @@ class UpdateEmojis(Database):
 		for guild in guilds:
 			for emoji in guild.emojis:
 				if emoji.name == ename and emoji.animated == animated:
-					if not emoji or bot.ready and not getattr(emoji, "application_id", None) and (not getattr(emoji, "available", True) or emoji.id not in (e.id for e in emoji.guild.emojis)):
+					if not is_available(emoji):
 						continue
 					self.data[name] = emoji.id
 					bot.cache.emojis[emoji.id] = emoji
@@ -1270,7 +1317,7 @@ class UpdateEmojis(Database):
 			for edata in emojidata["items"]:
 				if edata["name"] == ename and edata["animated"] == animated:
 					emoji = discord.Emoji(guild=bot.user, state=bot._state, data=edata)
-					emoji.application_id = bot.id
+					# emoji.application_id = bot.id
 					self.data[name] = emoji.id
 					bot.cache.emojis[emoji.id] = emoji
 					return emoji

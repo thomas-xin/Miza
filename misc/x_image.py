@@ -6,6 +6,7 @@ import io
 import itertools
 from math import ceil, floor, inf, sqrt, tau, log2, sin, cos, pi, isfinite
 import os
+os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 import random
 import re
 import subprocess
@@ -198,7 +199,7 @@ class ImageSequence(Image.Image):
 			[im.load() for im in images]
 		dur2 = images[0].info.get("total_duration", 0) / len(images)
 		for i1, i2 in zip(self._images, images):
-			i1.info["duration"] = i2.info.get("duration", dur2) or 25
+			i1.info["duration"] = i2.info.get("duration", dur2)
 		self._position = 0
 
 	def __len__(self):
@@ -286,11 +287,11 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 	if mime in ("application/tar", "application/x-tar"):
 		t = tarfile.open(fileobj=io.BytesIO(data))
 		filenames = t.getmembers()
-		return ImageSequence.fromiter((Image.open(t.extractfile(fn)) for fn in filenames), frameprops=(len(filenames), len(filenames) / 30, 30))
+		return ImageSequence.fromiter((Image.open(t.extractfile(fn)) for fn in filenames))
 	elif mime == "application/zip":
 		z = zipfile.ZipFile(io.BytesIO(data), strict_timestamps=False)
 		filenames = [f.filename for f in z.filelist if not f.is_dir()]
-		return ImageSequence.fromiter((Image.open(z.open(fn)) for fn in filenames), frameprops=(len(filenames), len(filenames) / 30, 30))
+		return ImageSequence.fromiter((Image.open(z.open(fn)) for fn in filenames))
 	try:
 		import wand
 		import wand.image
@@ -327,7 +328,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 						print(cmd)
 						p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
 						res = as_str(p.stdout.read()).strip()
-						print("RES:", res)
+						# print("RES:", res)
 						if res:
 							r0, r1, r2, *_ = res.replace("x", "\n").splitlines()
 							dur = None
@@ -340,7 +341,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 									pass
 							if dur:
 								im.info["total_duration"] = dur * 1000
-								print("TD:", im.info["total_duration"])
+								# print("TD:", im.info["total_duration"])
 							elif r0 != "N/A":
 								try:
 									fps = float(fractions.Fraction(r0))
@@ -355,7 +356,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 											break
 									im.seek(0)
 									im.info["total_duration"] = i / fps * 1000
-									print("TD:", im.info["total_duration"])
+									# print("TD:", im.info["total_duration"])
 				return im
 		if left in ("image", "video") and right != "webp":
 			fmt = "rgba" if left == "image" else "rgb24"
@@ -1263,13 +1264,13 @@ def to_qr(s, repetitions=3, duration=4.8, fps=30):
 	return ImageChops.invert(im).convert("RGBA")
 
 
-def properties(im) -> tuple: # frames, duration, fps
+def properties(im, default_duration=None, default_fps=None) -> tuple: # frames, duration, fps
 	try:
-		if im.frameprops:
+		if im.frameprops and not default_duration and not default_fps:
 			return im.frameprops
 	except AttributeError:
 		pass
-	total_duration = im.info.get("total_duration", 0)
+	total_duration = im.info.get("total_duration", default_duration or 0)
 	duration = total_duration
 	for f in range(2147483648):
 		try:
@@ -1277,13 +1278,18 @@ def properties(im) -> tuple: # frames, duration, fps
 		except EOFError:
 			break
 		if not total_duration:
-			duration += max(im.info.get("duration", 50), 1)
-	duration = duration or 50
-	while duration < 20:
-		duration *= 2
-	fps = f / duration * 1000
+			duration += im.info.get("duration") or 1000 / (default_fps or 40)
+	if f <= 1:
+		fps = default_fps or 40
+		duration = default_duration or 1000 / fps
+	else:
+		fps = f / duration * 1000 if duration != 0 else 0
 	props = (max(1, f), duration / 1000, fps)
 	print("PROPS:", props)
+	try:
+		im.frameprops = props
+	except AttributeError:
+		pass
 	return props
 
 def sync_fps(props, duration=None, fps=None):
@@ -1325,7 +1331,7 @@ def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", r
 		sources = [get_image(url) for url in images]
 	else:
 		sources = images
-	props = [properties(im) for im in sources]
+	props = [properties(im, default_duration=duration, default_fps=fps) for im in sources]
 	seconds, fps, prog = sync_fps(props, duration, fps)
 	count = max(1, round(fps * seconds))
 	if duration == 0:
@@ -1465,7 +1471,7 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 		image = ImageSequence.cast(image)
 		images = list(image) + list(map(get_image, extras))
 		image, extras = ImageSequence(*images), ()
-	prop = properties(image)
+	prop = properties(image, default_duration=duration, default_fps=fps)
 	duration, fps, prog = sync_fps([prop], duration, fps)
 	if operation == "rel":
 		x, y = max_size(*image.size, maxsize=x, force=True)
@@ -1546,7 +1552,7 @@ def orbit_map(image, extras, duration, fps, count):
 	sources = [image, *(get_image(url) for url in extras)]
 	orbitals = sources * symmetry
 	orbital_count = len(orbitals)
-	props = [properties(im) for im in sources]
+	props = [properties(im, default_duration=duration, default_fps=fps) for im in sources]
 	if any(t[0] > 1 for t in props):
 		symmetry = 1
 	duration /= symmetry
@@ -2453,6 +2459,7 @@ def ectoplasm(url, message, force=False):
 		try:
 			resp = ectoplasm.decode_image(image, path=fn)
 		except Exception:
+			# raise
 			resp = b""
 		if resp or not message:
 			return resp

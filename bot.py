@@ -1661,6 +1661,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			elif is_discord_attachment(url):
 				out.append(url)
 			else:
+				if (match := scraper_blacklist.search(url)):
+					print("Interrupted:", match)
+					return [url]
 				try:
 					resp = await create_future(
 						reqs.next().head,
@@ -1989,7 +1992,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				pass
 		if backup_models:
 			models.extend((
-				"deepseek-v3-t",
+				"grok-3-mini",
 			))
 		if model:
 			if model in models:
@@ -2328,7 +2331,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		0: cdict(
 			reasoning="deepseek-v3",
 			instructive="gemini-2.5-flash",
-			casual="minimax-01",
+			casual="minimax-m1",
 			nsfw="mythomax-13b",
 			backup="deepseek-v3",
 			retry="gpt-4.1-mini",
@@ -2337,25 +2340,25 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		1: cdict(
-			reasoning="gemini-2.5-flash-t",
-			instructive="gemini-2.5-flash",
-			casual="deepseek-v3-t",
+			reasoning="grok-4",
+			instructive="kimi-k2",
+			casual="kimi-k2",
 			nsfw="grok-3-mini",
-			backup="minimax-01",
+			backup="minimax-m1",
 			retry="gpt-4.1",
-			function="caller-large",
+			function="gemini-2.5-flash-t",
 			vision="gemini-2.5-flash",
 			target="auto",
 		),
 		2: cdict(
 			reasoning="gemini-2.5-pro",
-			instructive="gemini-2.5-flash-t",
-			casual="grok-3",
-			nsfw="magnum-72b",
-			backup="grok-3",
-			retry="claude-3.7-sonnet",
-			function="gemini-2.5-flash-t",
-			vision="gemini-2.5-flash-t",
+			instructive="grok-4",
+			casual="grok-4",
+			nsfw="grok-4",
+			backup="minimax-m1",
+			retry="gemini-2.5-pro",
+			function="kimi-k2",
+			vision="grok-4",
 			target="auto",
 		),
 	}
@@ -2687,7 +2690,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 											of.name = (of.name or "") + tc.function.name
 										if tc.function.arguments:
 											of.arguments = (of.arguments or "") + tc.function.arguments
-						if T(delta).get("refusal") or text and attempts < mA - 1 and decensor and len(text) < 512 and ai.decensor.search(text):
+						if T(delta).get("refusal") or text and attempts < mA - 1 and decensor and len(text) < 512 and ai.decensor.search(text) or text.rstrip(": \n") == assistant_name:
 							refusal = True
 							break
 						if delta.content and not message.tool_calls:
@@ -2878,7 +2881,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return ("Image", s)
 
 	caption_prompt = "Please describe this image in detail; be descriptive but concise!"
-	description_prompt = "Please describe this <IMAGE> in detail:\n- The image may be a collage of frames representing a video, in which case it should be treated as one\n- Transcribe text if present, but do not mention there not being text\n- Note details especially for people/characters if present\n- Be descriptive but concise!"
+	description_prompt = "Please describe this <IMAGE> in detail:\n- The image may be a collage of frames representing a video, in which case it should be analysed as if it were one\n- Transcribe text if present, but do not mention there not being text\n- Note details especially for people/characters if present\n- Be descriptive but concise!"
 
 	async def to_data_url(self, url, small=False, fmt="jpg", timeout=8):
 		sizelim = 82944 if small else 1638400
@@ -2928,13 +2931,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
-		model = model or ("gemini-2.5-flash" if best else "mistral-24b")
+		model = model or ("grok-4" if best else "mistral-24b")
 		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
 			messages=messages,
 			temperature=0.5,
-			max_tokens=512,
+			max_tokens=2048,
 			top_p=0.9,
 			frequency_penalty=0.6,
 			presence_penalty=0.8,
@@ -3263,6 +3266,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if is_miza_attachment(url):
 			ids = expand_attachment(url)
 			url = await attachment_cache.obtain(*ids)
+		if (match := scraper_blacklist.search(url)):
+			raise InterruptedError(match)
 		data = await self.get_attachment(url, full=full)
 		if data is not None:
 			return data
@@ -4648,8 +4653,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		fn = f"{backup}/saves.{DynamicDT.utcnow().date()}.tar"
 		day = not os.path.exists(fn)
 		if day:
+			ytd_update = psutil.Popen([python, "-m", "pip", "install", "--upgrade", "--pre", "yt-dlp"])
 			await_fut(self.send_event("_day_"))
 			self.users_updated = True
+			ytd_update.wait()
 		if force or day:
 			fut = self.send_event("_save_")
 			await_fut(fut)
@@ -4948,8 +4955,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				for a in all_aliases:
 					if "_" in a:
 						names.append("--" + a.replace("_", "-"))
-				if k[0] in chars and "-" + k[0] not in used:
-					names.append("-" + k[0])
+				shortened = "-" + "".join(w[0] for w in k.split("_"))
+				if k[0] in chars and shortened not in used:
+					names.append(shortened)
 					chars.remove(k[0])
 				used.update(names)
 				if v.get("type") == "bool":
@@ -4963,7 +4971,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					parser.has_string.append(k)
 				if v.get("type") == "enum":
 					for e in v.validation.enum:
-						names = ["--" + e, "-" + e[0]]
+						names = ["--" + e, "-" + "".join(w[0] for w in e.split("_"))]
 						if "_" in e:
 							names.append("--" + e.replace("_", "-"))
 						names = [n for n in names if n not in used]
@@ -5188,22 +5196,48 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				elif isinstance(m, int):
 					v = await self.fetch_messageable(m)
 				else:
-					v = await self.fetch_member_ex(m, guild)
+					v2 = verify_id(m)
+					v = None
+					if isinstance(v2, int):
+						try:
+							v = await self.fetch_messageable(v2)
+						except Exception:
+							pass
+					if v is None:
+						v = await self.fetch_member_ex(m, guild)
 			elif info.type == "user":
-				v = await self.fetch_member_ex(m, guild)
+				v2 = verify_id(m)
+				v = None
+				if isinstance(v2, int):
+					v = guild.get_member(v2)
+					if v is None:
+						try:
+							v = await self.fetch_user(v2)
+						except Exception:
+							pass
+				if v is None:
+					v = await self.fetch_member_ex(m, guild)
 			elif info.type == "channel":
 				if isinstance(m, int):
 					v = await self.fetch_channel(m)
 				elif not guild:
 					raise TypeError("Channels must be specified by ID outside of servers.")
 				else:
-					v = await str_lookup(
-						guild.channels,
-						m,
-						qkey=userQuery1,
-						ikey=userIter1,
-						fuzzy=1 / 3,
-					)
+					v2 = verify_id(m)
+					v = None
+					if isinstance(v2, int):
+						try:
+							v = await self.fetch_channel(v2)
+						except Exception:
+							pass
+					if v is None:
+						v = await str_lookup(
+							guild.channels,
+							m,
+							qkey=userQuery1,
+							ikey=userIter1,
+							fuzzy=1 / 3,
+						)
 			elif info.type == "guild":
 				v = await self.fetch_guild(m)
 			elif info.type == "role":
@@ -5212,13 +5246,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				elif not guild:
 					raise TypeError("Roles must be specified by ID outside of servers.")
 				else:
-					v = await str_lookup(
-						guild.roles,
-						m,
-						qkey=userQuery1,
-						ikey=userIter1,
-						fuzzy=1 / 3,
-					)
+					v2 = verify_id(m)
+					v = None
+					if isinstance(v2, int):
+						try:
+							v = await self.fetch_role(v2, guild)
+						except Exception:
+							pass
+					if v is None:
+						v = await str_lookup(
+							guild.roles,
+							m,
+							qkey=userQuery1,
+							ikey=userIter1,
+							fuzzy=1 / 3,
+						)
 		elif info.type == "emoji":
 			if isinstance(v, string_like):
 				v = await self.id_from_message(v)
@@ -5361,9 +5403,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return v
 
 	async def run_command(self, command, kwargs=None, message=None, argv=None, comment=None, slash=False, command_check=None, user=None, channel=None, guild=None, min_perm=None, respond=False, allow_recursion=True):
+		command_check = command_check or command.name[0].casefold()
 		user = user or (message.author if message else self.GhostUser())
 		if message and user:
-			print(f"{message.channel.id}: {user} ({user.id}) issued {command} {kwargs or argv}")
+			print(f"{message.channel.id}: {user} ({user.id}) issued command {command_check} {kwargs or argv}")
 		soon_indicator = False
 		if not self.ready:
 			# If the bot is not currently ready (either loading or in maintenance), send an indicator and wait
@@ -5379,7 +5422,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			prefix = self.prefix
 		else:
 			prefix = self.get_prefix(guild)
-		command_check = command_check or command.name[0].casefold()
 		if getattr(command, "nsfw", False) and not self.is_nsfw(channel):
 			if hasattr(channel, "recipient"):
 				raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels. Please verify your age using ~verify within a NSFW channel to enable NSFW in DMs.")
@@ -5517,17 +5559,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if slash or getattr(message, "slash", None):
 				csubmit(delayed_callback(future, 1, self.defer_interaction, message, ephemeral=getattr(message, "ephemeral", False), exc=False))
 			csem = emptyctx if isnan(command.min_level) else self.command_semaphore
-			async with csem:
-				response = await future
-		await self.send_event("_command_", user=user, command=command, loop=loop, message=message)
-		if not respond:
-			return response
-		fut = csubmit(self.respond_with(response, message=message, command=command))
-		try:
-			message.__dict__.setdefault("inits", []).append(fut)
-		except Exception:
-			pass
-		return await fut
+		async with csem:
+			response = await future
+			await self.send_event("_command_", user=user, command=command, loop=loop, message=message)
+			if not respond:
+				return response
+			fut = csubmit(self.respond_with(response, message=message, command=command))
+			try:
+				message.__dict__.setdefault("inits", []).append(fut)
+			except Exception:
+				pass
+			return await fut
 
 	async def validate_schema(self, kwargs, schema, command_check="", argv="", args=(), guild=None):
 		if args:
@@ -5649,10 +5691,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			try:
 				await self.run_command(command, kwargs, message=message, argv=argv, command_check=command_check, min_perm=min_perm, respond=True)
 			# Represents any timeout error that occurs
-			except (T0, T1, T2, CE):
+			except CE:
 				print(command, argv)
-				raise TimeoutError("Request timed out.")
-			except (ArgumentError, TooManyRequests) as ex:
+				raise
+			except (T0, T1, T2, ArgumentError, TooManyRequests) as ex:
 				out_fut = self.send_exception(channel, ex, reference=message, comm=command)
 				return
 			# Represents all other errors
@@ -6359,7 +6401,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.embed_senders[c_id] = embs[-2048:]
 		return fut
 
-	def send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None, exc=True, bottleneck=False):
+	def send_as_embeds(self, channel=None, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None, exc=True, bottleneck=False):
 		if type(description) is discord.Embed:
 			emb = description
 			description = emb.description or None
@@ -6377,6 +6419,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			description = None
 		if not description and not fields and not thumbnail and not image and not images:
 			return fut_nop
+		if not channel:
+			if not reference:
+				raise ValueError("Channel not specified.")
+			channel = reference.channel
 		return csubmit(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour, reacts, reference, exc=exc, bottleneck=bottleneck))
 
 	async def _send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None, exc=True, bottleneck=False):
@@ -6964,7 +7010,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			joined_at = premium_since = None
 			timed_out_until = None
 			communication_disabled_until = None
-			_client_status = _status = cdict({None: "offline", "_status": "offline", "desktop": "false", "mobile": "false", "web": "false"})
+			_primary_guild = None
+			_avatar_decoration_data = None
+			_client_status = client_status = _status = cdict({None: "offline", "_status": "offline", "desktop": "false", "mobile": "false", "web": "false"})
 			pending = False
 			ghost = True
 			roles = ()
@@ -7409,7 +7457,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		class CachedMessage(discord.abc.Snowflake):
 			"discord.py-compatible message object that enables fast loading."
 
-			__slots__ = ("__weakref__", "_data", "id", "created_at", "author", "channel", "guild", "channel_id", "deleted", "attachments", "sem", "cached")
+			__slots__ = ("_data", "id", "created_at", "author", "channel", "guild", "channel_id", "deleted", "attachments", "sem", "cached")
 
 			def __init__(self, data):
 				self._data = data
@@ -7607,19 +7655,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		discord.VoiceChannel._get_channel = lambda self: as_fut(self)
 		discord.user.BaseUser.__str__ = lambda self: self.name if self.discriminator in (None, 0, "", "0") else f"{self.name}#{self.discriminator}"
 
-		recv_message = discord.gateway.DiscordWebSocket.received_message
-		async def received_message(self, msg, /):
-			if isinstance(msg, byte_like):
-				self._buffer.extend(msg)
-				if len(msg) < 4 or msg[-4:] != b"\x00\x00\xff\xff":
-					return
-				msg = self._zlib.decompress(self._buffer)
-				self._buffer = bytearray()
-			res = orjson.loads(msg)
-			bot.socket_responses.append(res)
-			self._dispatch("socket_response", res)
-			return await recv_message(self, as_str(msg))
-		discord.gateway.DiscordWebSocket.received_message = received_message
+		# recv_message = discord.gateway.DiscordWebSocket.received_message
+		# async def received_message(self, msg, /):
+		# 	if isinstance(msg, byte_like):
+		# 		self._buffer.extend(msg)
+		# 		if len(msg) < 4 or msg[-4:] != b"\x00\x00\xff\xff":
+		# 			return
+		# 		msg = self._zlib.decompress(self._buffer)
+		# 		self._buffer = bytearray()
+		# 	res = orjson.loads(msg)
+		# 	bot.socket_responses.append(res)
+		# 	self._dispatch("socket_response", res)
+		# 	return await recv_message(self, as_str(msg))
+		# discord.gateway.DiscordWebSocket.received_message = received_message
 
 		def _get_guild_channel(self, data, guild_id=None):
 			channel_id = int(data["channel_id"])
@@ -7639,16 +7687,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return channel or discord.PartialMessageable(state=self, id=channel_id), guild
 		discord.state.ConnectionState._get_guild_channel = _get_guild_channel
 
-		async def get_gateway(self, *, encoding="json", zlib=True):
-			try:
-				data = await self.request(discord.http.Route("GET", "/gateway"))
-			except discord.HTTPException as exc:
-				raise discord.GatewayNotFound() from exc
-			value = "{0}?encoding={1}&v=" + api[1:]
-			if zlib:
-				value += "&compress=zlib-stream"
-			return value.format(data["url"], encoding)
-		discord.http.HTTPClient.get_gateway = get_gateway
+		# async def get_gateway(self, *, encoding="json", zlib=True):
+		# 	try:
+		# 		data = await self.request(discord.http.Route("GET", "/gateway"))
+		# 	except discord.HTTPException as exc:
+		# 		raise discord.GatewayNotFound() from exc
+		# 	value = "{0}?encoding={1}&v=" + api[1:]
+		# 	if zlib:
+		# 		value += "&compress=zlib-stream"
+		# 	return value.format(data["url"], encoding)
+		# discord.http.HTTPClient.get_gateway = get_gateway
 
 		async def history(self, limit=100, before=None, after=None, around=None, oldest_first=None):
 			if not getattr(self, "channel", None):
@@ -8071,6 +8119,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.states[shard_id] = self.states[shard_id] or False
 			if none(s is None for s in self.states):
 				await on_full_connect()
+
+		async def on_ready():
+			print("discord.py ready.")
 
 		async def on_full_ready():
 			print("All clients ready.")

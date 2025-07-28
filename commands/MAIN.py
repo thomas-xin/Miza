@@ -177,6 +177,17 @@ class Help(Command):
 		return await self.__call__(bot, _guild=message.guild, _channel=channel, _message=message, _user=user, _nsfw=bot.is_nsfw(channel), category=category, command=command, original=message)
 
 
+class Hello(Command):
+	name = ["Hi", "👋", "Bye"]
+	description = "👋"
+	schema = cdict()
+	rate_limit = (0, 0)
+	ephemeral = True
+
+	def __call__(self, **void):
+		return "👋"
+
+
 class Loop(Command):
 	time_consuming = 3
 	_timeout_ = 12

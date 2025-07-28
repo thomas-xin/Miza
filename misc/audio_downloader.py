@@ -1006,7 +1006,7 @@ class AudioDownloader:
 				r_mid = f"{CACHE_PATH}/{ts}.mid"
 				r_wav = f"{CACHE_PATH}/{ts}.wav"
 				copy_to_file(r_mid)
-				args = [os.path.abspath("misc/fluidsynth/fluidsynth"), "-g", "1", "-F", r_wav, "-n", os.path.abspath("misc/fluidsynth/gm64.sf2"), r_mid]
+				args = [os.path.abspath("misc/fluidsynth/fluidsynth"), "-g", "1", "-F", r_wav, "-r", "48000", "-n", os.path.abspath("misc/fluidsynth/gm64.sf2"), r_mid]
 				print(args)
 				res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 				if not os.path.exists(r_wav) or not os.path.getsize(r_wav):
@@ -1156,6 +1156,7 @@ class AudioDownloader:
 				with tracebacksuppressor:
 					return self.get_soundcloud_playlist(url)
 			elif is_spotify_url(url):
+				raise AssertionError(url)
 				with tracebacksuppressor:
 					return self.get_spotify_playlist(url)
 		else:

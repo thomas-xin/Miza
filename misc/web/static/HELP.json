@@ -15,6 +15,20 @@
 			"example": [],
 			"timeout": "24"
 		},
+		"Hello": {
+			"aliases": [
+				"Hello",
+				"Hi",
+				"\ud83d\udc4b",
+				"Bye"
+			],
+			"description": "\ud83d\udc4b",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(0, 0)",
+			"example": [],
+			"timeout": "24"
+		},
 		"Loop": {
 			"aliases": [
 				"Loop"
@@ -328,21 +342,14 @@
 			"aliases": [
 				"Fancy",
 				"Chaos",
-				"ZalgoText",
 				"Zalgo",
-				"FormatText",
-				"Format",
-				"FancyText"
+				"Format"
 			],
 			"description": "Creates fun string translations using unicode fonts.",
-			"usage": "<string>",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 5)",
-			"example": [
-				"fancy This is a cool message",
-				"zalgo This is a cool message",
-				"format This is a cool message"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"UnFancy": {
@@ -352,12 +359,10 @@
 				"UnZalgo"
 			],
 			"description": "Removes unicode formatting and diacritic characters from inputted text.",
-			"usage": "<string>",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 5)",
-			"example": [
-				"unfancy T\u0315\u200b\u0304\u200bh\u200a\u05a0\u200b\u0311\u200b\u0321\u200b\u24d8\u200a\u036a\u200b\u2de7\u200b\u08ee\u200b\u24e2\u200a\u0331\u200b\u08f6\u200b\u1dc7\u200b \u200a\ua67a\u200b\u06ed\u200b\u2dfc\u200b\uff49\u200a\u0351\u200b\u2dfb\u200b\u030d\u200b\uff53\u200a\u0349\u200b\u08df\u200b\ua66f\u200b \u200a\u035a\u200b\u0616\u200b\u2de0\u200b\ud835\udd52\u200a\u05c5\u200b\u08f1\u200b\u0655\u200b \u200a\u036f\u200b\u2de1\u200b\u0356\u200b\ud835\udcec\u200a\u08ed\u200b\u0364\u200b\u0300\u200b\ud835\udcf8\u200a\u08dd\u200b\u0342\u200b\u0361\u200b\ud835\ude30\u200a\u0318\u200b\u032a\u200b\u1dc5\u200b\ud835\ude2d\u200a\u05a3\u200b\u0309\u200b\u0595\u200b \u200a\u059e\u200b\u2dee\u200b\u08e7\u200b\u163b\u200a\u0329\u200b\u2de5\u200b\u0334\u200b\u163f\u200a\u035f\u200b\u030e\u200b\ua674\u200b\ud835\ude9c\u200a\u08f6\u200b\u05ac\u200b\u034f\u200b\ud835\ude9c\u200a\u1dc3\u200b\u0598\u200b\u0349\u200b\ud835\ude56\u200a\u0612\u200b\u0591\u200b\u2df2\u200b\ud835\ude5c\u200a\u2de3\u200b\u0367\u200b\u0338\u200b\ud835\udc1e\u200a\u033e\u200b"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"OwOify": {
@@ -1795,14 +1800,11 @@
 			"aliases": [
 				"DadJoke"
 			],
-			"description": "Causes Miza to automatically nickname a user whenever they say \"I am <something>\" or some variant.",
-			"usage": "<mode(enable|disable)>? <target(nickname|response|all)>? <chance[100]>?",
+			"description": "Causes Miza to automatically call-out or nickname a user whenever they say \"I am <something>\" or some variant.",
+			"usage": "",
 			"level": "3",
 			"rate_limit": "0.5",
-			"example": [
-				"dadjoke enable",
-				"dadjoke disable"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Daily": {
@@ -2038,12 +2040,12 @@
 			],
 			"timeout": "inf"
 		},
-		"Shutdown": {
+		"Restart": {
 			"aliases": [
-				"Shutdown",
-				"Maintain",
 				"Restart",
 				"Reboot",
+				"Shutdown",
+				"Maintain",
 				"Update"
 			],
 			"description": "Restarts, reloads, or shuts down Miza, with an optional delay.",
@@ -2294,8 +2296,6 @@
 		"Hyperchoron": {
 			"aliases": [
 				"Hyperchoron",
-				"Png2Wav",
-				"Png2Mp3",
 				"Midi2Org"
 			],
 			"description": "Runs Hyperchoron on the input URL. See https://github.com/thomas-xin/hyperchoron for more info, or to run it yourself!",

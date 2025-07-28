@@ -606,10 +606,30 @@ class ID2Time(Command):
 
 
 class Fancy(Command):
-	name = ["Chaos", "ZalgoText", "Zalgo", "FormatText", "Format", "FancyText"]
+	name = ["Chaos"]
 	description = "Creates fun string translations using unicode fonts."
-	usage = "<string>"
-	example = ("fancy This is a cool message", "zalgo This is a cool message", "format This is a cool message")
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("fancy", "zalgo", "format"),
+			),
+			default="fancy",
+		),
+		text=cdict(
+			type="string",
+			example="This is a cool message",
+			required=True,
+		)
+	)
+	macros = cdict(
+		Zalgo=cdict(
+			mode="zalgo",
+		),
+		Format=cdict(
+			mode="format",
+		),
+	)
 	rate_limit = (4, 5)
 	slash = ("Fancy", "Zalgo", "Format")
 	ephemeral = True
@@ -622,42 +642,46 @@ class Fancy(Command):
 		return s[0] + "".join("".join(self.randz() + "\u200b" for i in range(x + 1 >> 1)) + c + "\u200a" + "".join(self.randz() + "\u200b" for i in range(x >> 1)) for c in s[1:])
 	formats = "".join(chr(i) for i in (0x30a, 0x325, 0x303, 0x330, 0x30c, 0x32d, 0x33d, 0x353, 0x35b, 0x20f0))
 
-	def __call__(self, channel, name, argv, message, **void):
-		if not argv:
-			raise ArgumentError("Input string is empty.")
+	def __call__(self, mode, text, **void):
 		fields = deque()
-		if "fancy" in name:
-			for i in range(len(UNIFMTS) - 1):
-				s = uni_str(argv, i)
-				if i == len(UNIFMTS) - 2:
-					s = s[::-1]
-				fields.append((f"Font {i + 1}", s + "\n"))
-		elif "format" in name:
-			for i, f in enumerate(self.formats):
-				s = "".join(c + f for c in argv)
-				fields.append((f"Format {i}", s + "\n"))
-			s = "".join("_" if c in " _" else c if c in "gjpqy" else c + chr(818) for c in argv)
-			fields.append((f"Format {i + 1}", s))
-		else:
-			for i in range(1, 9):
-				s = self.zalgo(argv, i)
-				fields.append((f"Level {i}", s + "\n"))
-		self.bot.send_as_embeds(channel, fields=fields, author=dict(name=lim_str(argv, 256)), reference=message)
+		match mode:
+			case "fancy":
+				for i in range(len(UNIFMTS) - 1):
+					s = uni_str(text, i)
+					if i == len(UNIFMTS) - 2:
+						s = s[::-1]
+					fields.append((f"Font {i + 1}", s + "\n"))
+			case "format":
+				for i, f in enumerate(self.formats):
+					s = "".join(c + f for c in text)
+					fields.append((f"Format {i}", s + "\n"))
+				s = "".join("_" if c in " _" else c if c in "gjpqy" else c + chr(818) for c in text)
+				fields.append((f"Format {i + 1}", s))
+			case "zalgo":
+				for i in range(1, 9):
+					s = self.zalgo(text, i)
+					fields.append((f"Level {i}", s + "\n"))
+			case _:
+				raise NotImplementedError(mode)
+		return cdict(embed=add_embed_fields(discord.Embed().set_author(name=lim_str(text, 256)), fields=fields))
 
 
 class UnFancy(Command):
 	name = ["UnFormat", "UnZalgo"]
 	description = "Removes unicode formatting and diacritic characters from inputted text."
-	usage = "<string>"
-	example = ("unfancy T̕​̄​h ֠​̑​̡​ⓘ ͪ​ⷧ​࣮​ⓢ ̱​ࣶ​᷇​  ꙺ​ۭ​ⷼ​ｉ ͑​ⷻ​̍​ｓ ͉​ࣟ​꙯​  ͚​ؖ​ⷠ​𝕒 ׅ​ࣱ​ٕ​  ͯ​ⷡ​͖​𝓬 ࣭​ͤ​̀​𝓸 ࣝ​͂​͡​𝘰 ̘​̪​᷅​𝘭 ֣​̉​֕​  ֞​ⷮ​ࣧ​ᘻ ̩​ⷥ​̴​ᘿ ͟​̎​ꙴ​𝚜 ࣶ​֬​͏​𝚜 ᷃​֘​͉​𝙖 ؒ​֑​ⷲ​𝙜 ⷣ​ͧ​̸​𝐞 ̾​",)
+	schema = cdict(
+		text=cdict(
+			type="string",
+			example=zwremove("T̕​̄​h ֠​̑​̡​ⓘ ͪ​ⷧ​࣮​ⓢ ̱​ࣶ​᷇​  ꙺ​ۭ​ⷼ​ｉ ͑​ⷻ​̍​ｓ ͉​ࣟ​꙯​  ͚​ؖ​ⷠ​𝕒 ׅ​ࣱ​ٕ​  ͯ​ⷡ​͖​𝓬 ࣭​ͤ​̀​𝓸 ࣝ​͂​͡​𝘰 ̘​̪​᷅​𝘭 ֣​̉​֕​  ֞​ⷮ​ࣧ​ᘻ ̩​ⷥ​̴​ᘿ ͟​̎​ꙴ​𝚜 ࣶ​֬​͏​𝚜 ᷃​֘​͉​𝙖 ؒ​֑​ⷲ​𝙜 ⷣ​ͧ​̸​𝐞 ̾​"),
+			required=True,
+		)
+	)
 	rate_limit = (4, 5)
 	slash = True
 	ephemeral = True
 
-	def __call__(self, argv, **void):
-		if not argv:
-			raise ArgumentError("Input string is empty.")
-		return fix_md(argv)
+	def __call__(self, text, **void):
+		return fix_md(unicode_prune(text))
 
 
 class OwOify(Command):

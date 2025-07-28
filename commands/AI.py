@@ -89,7 +89,7 @@ class Ask(Command):
 		simulated = getattr(_message, "simulated", False)
 		pdata = bot.commands.personality[0].retrieve(_channel or _guild)
 		if bot_name != bot.name:
-			name_repr = bot.name + f', nicknamed "{bot_name}"'
+			name_repr = bot.name + f", nicknamed '{bot_name}'"
 		else:
 			name_repr = bot_name
 		personality = pdata.description.replace("{{user}}", _user.display_name).replace("{{char}}", name_repr)
@@ -512,7 +512,7 @@ class Ask(Command):
 		return await message.remove_reaction("🗑️", self.bot.user)
 
 
-DEFPER = "Your name is \"{{char}}\"; you are intelligent and playful. Your task is to answer the user(s) with creative and natural-feeling responses (be wholesome where possible, but not too corny), in first person as if you were a human. You are free to make up your own preferences and show emotion, but you should always answer the user named \"{{user}}\", matching the language used. Be concise where possible."
+DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the user(s) with creative and natural-feeling responses (be wholesome where possible, but not too corny), in first person as if you were a human. You are free to make up your own preferences and show emotion, but you should always answer the user named \"{{user}}\", matching the language used. Be concise where possible."
 
 class Personality(Command):
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
@@ -636,7 +636,7 @@ class Instruct(Command):
 			),
 			description="Target LLM to invoke",
 			example="deepseek",
-			default="gemini-2.5-flash-t",
+			default="kimi-k2",
 		),
 		prompt=cdict(
 			type="string",
@@ -702,6 +702,9 @@ class Instruct(Command):
 		R1=cdict(
 			model="deepseek-r1",
 		),
+		Grok=cdict(
+			model="grok-4",
+		),
 		Gemini=cdict(
 			model="gemini-2.5-flash-t",
 		),
@@ -759,13 +762,6 @@ class Instruct(Command):
 			key = key or "x"
 			oai = openai.AsyncOpenAI(api_key=key, base_url=api)
 			kwargs["api"] = oai
-		else:
-			if model in ("claude-3-opus", "o1", "o1-preview", "claude-3.7-sonnet-t"):
-				_premium.require(3)
-			elif model in ("claude-3.7-sonnet", "claude-3.5-sonnet", "command-r-plus", "gpt-4.1", "yi-large", "o1-mini", "r1", "gemini-2.5-pro"):
-				_premium.require(2)
-			elif model in ("dbrx-instruct", "gpt-3.5", "deepseek-v3", "gpt-4.1-mini", "lzlv-70b", "llama-3-70b"):
-				_premium.require(1)
 		if model in ("deepseek-r1", "o1", "o1-preview", "o1-mini", "o3", "o3-mini", "o4-mini"):
 			kwargs["max_completion_tokens"] = max_tokens + 16384
 		else:
@@ -1041,7 +1037,6 @@ class Imagine(Command):
 					resp.choices.extend(cdict(text=choice.message.content) for choice in reversed(resp2.choices))
 				else:
 					resp = resp2
-			# print("REWRITE:", resp)
 			for e in resp.choices:
 				out = e.text.strip()
 				if ai.decensor.search(out):

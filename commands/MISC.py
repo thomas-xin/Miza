@@ -422,7 +422,6 @@ class Wav2Png(Command):
 
 class Hyperchoron(Command):
 	_timeout_ = 15
-	name = ["Png2Wav", "Png2Mp3"]
 	description = "Runs Hyperchoron on the input URL. See https://github.com/thomas-xin/hyperchoron for more info, or to run it yourself!"
 	schema = cdict(
 		url=cdict(

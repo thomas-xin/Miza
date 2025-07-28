@@ -18,7 +18,7 @@ import psutil, subprocess, weakref, zipfile, urllib, asyncio, json, pickle, func
 
 # VERY HACKY removes deprecated audioop dependency for discord.py; this would cause volume transformations to fail but Miza uses FFmpeg for them anyway
 sys.modules["audioop"] = sys
-import discord  # noqa: E402
+import discord, discord.utils, discord.file  # noqa: E402
 
 from misc.asyncs import *
 
@@ -529,7 +529,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 		url = f"https://discord.com/api/{api}/channels/{channel.id}/messages"
 		if getattr(channel, "dm_channel", None):
 			channel = channel.dm_channel
-		elif getattr(channel, "send", None) and getattr(channel, "guild", None) and not channel.permissions_for(channel.guild.me).read_message_history:
+		elif getattr(channel, "send", None) and getattr(channel, "guild", None) and channel.guild.me and not channel.permissions_for(channel.guild.me).read_message_history:
 			fields = {}
 			if embeds:
 				fields["embeds"] = [embed.to_dict() for embed in embeds]
@@ -864,15 +864,14 @@ def min_emoji(emoji, full=False):
 	return f"<:{name}:{emoji.id}>"
 
 
-def get_random_emoji():
-	d = [chr(c) for c in range(128512, 128568)]
-	d.extend(chr(c) for c in range(128577, 128580))
-	d.extend(chr(c) for c in range(129296, 129302))
-	d.extend(chr(c) for c in range(129312, 129318))
-	d.extend(chr(c) for c in range(129319, 129328))
-	d.extend(chr(c) for c in range(129392, 129399))
-	d.extend(chr(c) for c in (129303, 129400, 129402))
-	return random.choice(d)
+smileys = (
+	"😀,😃,😄,😁,😆,🥹,😅,😂,🤣,🥲,☺️,😊,😇,🙂,🙃,😉,😌,😍,🥰,😘,😗,😙,😚,😋,😛,😝,😜,🤪,🤨,🧐,🤓,😎,🥸,🤩,🥳,"
+	"😏,😒,😞,😔,😟,😕,🙁,☹️,😣,😖,😫,😩,🥺,😢,😭,😤,😠,😡,🤬,🤯,😳,🥵,🥶,😶‍🌫️,😱,😨,😰,😥,😓,🤗,🤔,🫣,🤭,🫢,🫡,"
+	"🤫,🫠,🤥,😶,🫥,😐,🫤,😑,🫨,🙂‍↔️,🙂‍↕️,😬,🙄,😯,😦,😧,😮,😲,🥱,😴,🤤,😪,😮‍💨,😵,😵‍💫,🤐,🥴,🤢,🤮,🤧,😷,🤒,🤕,🤑,🤠,"
+	"😈,👿,🤡"
+).split(",")
+def get_random_smiley():
+	return choice(smileys)
 
 
 def replace_map(s, mapping):
@@ -1045,6 +1044,23 @@ try:
 	EmptyEmbed = discord.embeds._EmptyEmbed
 except AttributeError:
 	EmptyEmbed = None
+
+def add_embed_fields(emb, fields):
+	if issubclass(type(fields), collections.abc.Mapping):
+		fields = fields.items()
+	for field in fields:
+		if issubclass(type(field), collections.abc.Mapping):
+			field = tuple(field.values())
+		elif not issubclass(type(field), collections.abc.Sequence):
+			try:
+				field = tuple(field)
+			except TypeError:
+				field = (field.name, field.value, getattr(field, "inline", None))
+		n = lim_str(field[0], 256)
+		v = lim_str(field[1], 1024)
+		i = True if len(field) < 3 else bool(field[2])
+		emb.add_field(name=n, value=v if v else "\u200b", inline=i)
+	return emb
 
 @functools.lru_cache(maxsize=4)
 def as_embed(message, link=False):
@@ -1958,6 +1974,7 @@ class Command(Importable):
 		s = self.parse_name().casefold()
 		values = []
 		u = set()
+		hgs = self.has_greedy_string()
 		for k, v in reversed(schema.items()):
 			val = v.get("example") or v.get("default")
 			if not val:
@@ -1973,7 +1990,7 @@ class Command(Importable):
 					values.append(f"{colourise('--' + k, fg='blue')}")
 				u.add(k2)
 			elif v.get("type") == "enum":
-				values.append(f"{colourise('--' + val, fg='blue')}")
+				values.append(f"{colourise('--' + val if hgs else val, fg='blue' if hgs else 'magenta')}")
 				u.add(k2)
 			elif not has_string and v.get("type") in ("url", "image", "visual", "video", "audio", "media", "filesize", "resolution", "index", "text", "string"):
 				values.append(f"{colourise(json_if(val))}")
@@ -1985,6 +2002,15 @@ class Command(Importable):
 				values.append(f"{colourise('--' + k, fg='cyan')} {colourise(json_if(val))}")
 		values.append(s)
 		return " ".join(reversed(values))
+
+	def has_greedy_string(self):
+		schema = self.schema
+		if not schema:
+			return False
+		for v in schema.values():
+			if v.get("type") in ("string", "datetime", "timedelta") and v.get("greedy", True):
+				return True
+		return False
 
 	def unload(self):
 		bot = self.bot

@@ -1839,9 +1839,9 @@ class Matchmaking(Command):
 			description = markdown(f"{shiptargets}❔ They score an [{uni_str('infinite%', 1)}]❕ 💜") + rainbow_heart
 		else:
 			if all(a == users[0] for a in users[1:]):
-				description = markdown(f"{shiptargets}❔ They [{percentage}%] love themselves❕ " + get_random_emoji()) + bar
+				description = markdown(f"{shiptargets}❔ They [{percentage}%] love themselves❕ " + get_random_smiley()) + bar
 			else:
-				description = markdown(f"{shiptargets} ({uni_str(shipname, 1)})❔ They score a [{percentage}%]❕ " + get_random_emoji()) + bar
+				description = markdown(f"{shiptargets} ({uni_str(shipname, 1)})❔ They score a [{percentage}%]❕ " + get_random_smiley()) + bar
 		author = get_author(message.author)
 		author.name = heart + uni_str(" MATCHMAKING ", 12) + heart
 		colour = await bot.get_colour(message.author)
@@ -2224,46 +2224,57 @@ class UpdateDogpiles(Database):
 class DadJoke(Command):
 	server_only = True
 	min_level = 3
-	description = "Causes ⟨BOT⟩ to automatically nickname a user whenever they say \"I am <something>\" or some variant."
-	usage = "<mode(enable|disable)>? <target(nickname|response|all)>? <chance[100]>?"
-	example = ("dadjoke enable", "dadjoke disable")
-	flags = "aed"
+	description = "Causes ⟨BOT⟩ to automatically call-out or nickname a user whenever they say \"I am <something>\" or some variant."
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("view", "enable", "disable"),
+			),
+			description="Action to perform",
+			example="enable",
+		),
+		action=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("nickname", "response", "all"),
+			),
+			description="Action to perform upon encounter",
+			example="response",
+			default="all",
+		),
+		chance=cdict(
+			type="number",
+			validation="[0, 100]",
+			description="Chance for occurence in %. Shared between all actions that have equal odds",
+			example="69",
+			default=100,
+		)
+	)
 	rate_limit = 0.5
 
-	async def __call__(self, flags, guild, name, args, **void):
-		update = self.data.dadjokes.update
-		bot = self.bot
+	async def __call__(self, bot, _guild, _name, mode, action, chance, **void):
 		following = bot.data.dadjokes
-		curr = following.get(guild.id, {})
-		mode = args[0][:4] if args else "all"
-		if mode == "mess":
-			mode = "resp"
-		if mode not in ("nick", "resp", "all"):
-			raise NotImplementedError(f"Unsupported mode {args[0]}.")
-		chance = args[1] if len(args) > 1 else 100
-		if isinstance(chance, str):
-			chance = await self.bot.eval_math(chance.rstrip("%"), default=100)
-		if chance > 100:
-			chance = 100
-		if "d" in flags or chance <= 0:
-			if mode == "all":
-				if guild.id in following:
-					following.pop(guild.id, None)
+		curr = following.get(_guild.id, {})
+		if mode == "disable" or chance <= 0:
+			if action == "all":
+				if _guild.id in following:
+					following.pop(_guild.id, None)
 			else:
-				curr.pop(mode, None)
+				curr.pop(action, None)
 				if not curr:
-					following.pop(guild.id, None)
-			return css_md(f"Disabled dadjoke ({mode}) for {sqr_md(guild)}.")
-		if "e" in flags or "a" in flags:
-			if mode == "all":
-				following[guild.id] = dict(nick=chance, resp=chance)
+					following.pop(_guild.id, None)
+			return css_md(f"Disabled dadjoke ({action}) for {sqr_md(_guild)}.")
+		if mode == "enable":
+			if action == "all":
+				following[_guild.id] = dict(nickname=chance, response=chance)
 			else:
-				curr[mode] = chance
-			return css_md(f"Set dadjoke ({mode}) for {sqr_md(guild)} to {chance}%.")
+				curr[action] = chance
+			return css_md(f"Set dadjoke ({action}) for {sqr_md(_guild)} to {chance}%.")
 		if curr:
 			key = lambda p: f"{round(p, 1)}%"
-			return ini_md(f"Dadjoke nicknaming settings for {sqr_md(guild)}:{iter2str(curr, key=key)}")
-		return ini_md(f'Dadjoke nicknaming is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
+			return ini_md(f"Dadjoke nicknaming settings for {sqr_md(_guild)}:{iter2str(curr, key=key)}")
+		return ini_md(f'Dadjoke nicknaming is currently disabled in {sqr_md(_guild)}. Use "{bot.get_prefix(_guild)}{_name} enable" to enable.')
 
 
 class UpdateDadjokes(Database):
@@ -2294,9 +2305,9 @@ class UpdateDadjokes(Database):
 		nick = lim_str(nick, 32)
 		if nick and nick != user.display_name:
 			v = random.random() * 100
-			if v < curr.get("resp", 0):
-				csubmit(send_with_reply(message.channel, message, f"Hi, {nick}! {get_random_emoji()}"))
-			if v < curr.get("nick", 0):
+			if v < curr.get("response", curr.get("resp", 0)):
+				csubmit(send_with_reply(message.channel, message, f"Hi, {nick}! {get_random_smiley()}"))
+			if v < curr.get("nickname", curr.get("nick", 0)):
 				await user.edit(nick=nick, reason="Pranked!")
 
 

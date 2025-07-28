@@ -155,7 +155,7 @@ class UpdateAutoEmojis(Database):
 				if message.guild:
 					orig = bot.data.emojilists.setdefault(message.guild.id, {})
 					orig[name] = e_id
-		if not message.guild:
+		if not message.guild or not message.guild.me:
 			return
 		guild = message.guild
 		if not self.get(guild.id, True) or (559426966151757824 in guild._members or not guild.me.guild_permissions.manage_messages or not guild.me.guild_permissions.manage_webhooks):
@@ -237,7 +237,26 @@ class UpdateAutoEmojis(Database):
 					return
 		if message.content.count(":") < 2:
 			return
-		msg, pops, replaceds = await bot.proxy_emojis(msg, guild=guild, user=message.author, is_webhook=message.webhook_id, return_pops=True)
+		cbreg = regexp("`[^`]*`")
+		selected, deselected = [], []
+		while msg:
+			cb = cbreg.search(msg)
+			if not cb:
+				selected.append(msg)
+				break
+			selected.append(msg[:cb.start()])
+			deselected.append(msg[cb.start():cb.end()])
+			msg = msg[cb.end():]
+		pops = set()
+		replaceds = []
+		for i, m in enumerate(selected):
+			m, p, r = await bot.proxy_emojis(m, guild=guild, user=message.author, is_webhook=message.webhook_id, return_pops=True)
+			selected[i] = m
+			pops.update(p)
+			replaceds.extend(r)
+		msg = selected.pop(0)
+		for d, s in zip(deselected, selected):
+			msg += d + s
 		if not msg or msg == message.content or not replaceds:
 			return
 		msg = escape_everyone(msg).strip("\u200b")

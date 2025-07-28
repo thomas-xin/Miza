@@ -2045,7 +2045,7 @@ class EnabledCommands(Command):
 			type="enum",
 			validation=cdict(
 				enum=cats,
-				accepts=dict(owner="owner", misc="misc", nsfw="nsfw", all=None, default=None),
+				accepts=dict(owner="owner", misc="misc", nsfw="nsfw", text="string", music="voice", audio="voice", all=None, default=None),
 			),
 			description="Target category",
 			example="voice",
@@ -3379,8 +3379,6 @@ class UpdateStarboards(Database):
 			return
 		if message.id not in table.get(None, {}):
 			return
-		if verify_id(react) in self.sparkle_ids:
-			react = "SPARKLES"
 		sem = self.sems.setdefault(message.guild.id, Semaphore(1, inf))
 		async with sem:
 			try:
@@ -3388,6 +3386,8 @@ class UpdateStarboards(Database):
 				if not reacts:
 					return
 				react = str(reacts[0].emoji)
+				if verify_id(react) in self.sparkle_ids:
+					react = "SPARKLES"
 				channel = await self.bot.fetch_channel(table[react][1])
 				m = await self.bot.fetch_message(table[None][message.id], channel)
 				embed = await self.bot.as_embed(message, link=True, colour=True)

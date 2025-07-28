@@ -23,6 +23,7 @@ from .util import (
 	is_url, unyt, url2fn, get_duration, rename, uhash, expired, b64,  # noqa: F401
 )
 from .audio_downloader import AudioDownloader
+VC_TIMEOUT = 13
 
 # VERY HACKY removes deprecated audioop dependency for discord.py; this would cause volume transformations to fail but we use FFmpeg for them anyway
 sys.modules["audioop"] = sys.__class__("audioop")
@@ -186,6 +187,7 @@ class AudioPlayer(discord.AudioSource):
 		else:
 			if not self or self.vc and not self.vc.is_connected():
 				await cls.force_disconnect(vcc.guild)
+				await asyncio.sleep(1)
 				if self:
 					self.vc = None
 		if self and self.vc:
@@ -199,13 +201,11 @@ class AudioPlayer(discord.AudioSource):
 			pass
 		else:
 			try:
-				self = await asyncio.wait_for(wrap_future(fut), timeout=7)
+				self = await asyncio.wait_for(wrap_future(fut), timeout=VC_TIMEOUT)
 			except asyncio.TimeoutError:
-				pass
-			if not self or self.vc and not self.vc.is_connected():
-				await cls.force_disconnect(vcc.guild)
 				if self:
 					self.vc = None
+				raise
 		if self and self.vc:
 			await cls.ensure_speak(vcc)
 			self.refresh()
@@ -230,10 +230,10 @@ class AudioPlayer(discord.AudioSource):
 			await self.ensure_speak(vcc)
 			if not self.vc or not self.vc.is_connected():
 				try:
-					self.vc = await vcc.connect(timeout=7, reconnect=True)
+					self.vc = await vcc.connect(timeout=VC_TIMEOUT, reconnect=True)
 				except (discord.ClientException, asyncio.TimeoutError):
 					await self.force_disconnect(vcc.guild)
-					self.vc = await vcc.connect(timeout=7, reconnect=True)
+					self.vc = await vcc.connect(timeout=VC_TIMEOUT, reconnect=True)
 		except Exception as ex:
 			try:
 				cst(self.waiting[gid].set_exception, ex)
@@ -283,7 +283,7 @@ class AudioPlayer(discord.AudioSource):
 					authorise=True,
 					json=True,
 					aio=True,
-					timeout=32,
+					timeout=VC_TIMEOUT,
 				)
 			except ConnectionError:
 				pass
@@ -315,6 +315,12 @@ class AudioPlayer(discord.AudioSource):
 	@classmethod
 	async def force_disconnect(cls, guild):
 		"""Forcibly disconnects the bot from a voice channel, regardless of the current state of discord.py's cache."""
+		AP = cls.players.pop(guild.id, None)
+		if AP:
+			AP.vc = None
+		fut = cls.waiting.pop(guild.id, None)
+		if fut:
+			fut.cancel()
 		resp = await Request(
 			f"https://discord.com/api/{api}/guilds/{guild.id}/members/{client.user.id}",
 			method="PATCH",
@@ -326,7 +332,7 @@ class AudioPlayer(discord.AudioSource):
 		vc = client._connection._voice_clients.pop(guild.id, None)
 		if vc and vc.ws:
 			try:
-				await asyncio.wait_for(vc.ws.close(), timeout=7)
+				await asyncio.wait_for(vc.ws.close(), timeout=VC_TIMEOUT)
 			except Exception:
 				print_exc()
 		if vc and vc.socket:
@@ -347,7 +353,7 @@ class AudioPlayer(discord.AudioSource):
 			pass
 		else:
 			try:
-				self = fut.result(timeout=7)
+				self = fut.result(timeout=VC_TIMEOUT)
 			except concurrent.futures.TimeoutError:
 				self = None
 			if self and self.vc:
@@ -358,7 +364,7 @@ class AudioPlayer(discord.AudioSource):
 		vcc = guild.me.voice.channel
 		self = cls(vcc)
 		cls.waiting[gid] = Future()
-		csubmit(self.join_into(vcc))
+		# csubmit(self.join_into(vcc))
 		return self
 
 	@classmethod
@@ -1031,7 +1037,7 @@ class PipedLoader:
 		self.file = open(self.temp, "wb")
 		try:
 			fut = esubmit(self.fp.read, 1)
-			b = fut.result(timeout=12)
+			b = fut.result(timeout=VC_TIMEOUT)
 			if not b:
 				raise EOFError(path)
 		except Exception:
@@ -1647,6 +1653,8 @@ async def on_ready():
 
 @client.event
 async def on_voice_state_update(member, before, after):
+	if member.id == client.user.id:
+		return
 	guild = member.guild
 	try:
 		a = await asubmit(AP.from_guild, guild.id)
