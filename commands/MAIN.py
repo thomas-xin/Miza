@@ -1391,9 +1391,9 @@ class UpdateUrgentReminders(Database):
 
 	async def update_urgents(self):
 		while self.db is not None:
+			t = utc()
+			listed = self.data["listed"]
 			with tracebacksuppressor:
-				t = utc()
-				listed = self.data["listed"]
 				while listed:
 					p = listed[0]
 					if t < p[0]:
@@ -1438,6 +1438,7 @@ class UpdateUrgentReminders(Database):
 						await message.add_reaction("✅")
 						p[2] = message.id
 						listed.insort(p, key=lambda x: x[:3])
+			self.data["listed"] = listed
 			await asyncio.sleep(1)
 
 

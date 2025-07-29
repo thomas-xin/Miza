@@ -651,6 +651,7 @@ class Fancy(Command):
 					if i == len(UNIFMTS) - 2:
 						s = s[::-1]
 					fields.append((f"Font {i + 1}", s + "\n"))
+				fields.append(("Obfuscated", obfuscate(text)))
 			case "format":
 				for i, f in enumerate(self.formats):
 					s = "".join(c + f for c in text)

@@ -7206,16 +7206,24 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return self
 
 			async def edit(self, *args, **kwargs):
+				if "file" in kwargs:
+					kwargs["attachments"] = [kwargs.pop("file")]
+				if "files" in kwargs:
+					kwargs["attachments"] = kwargs.pop("files")
 				if not self.webhook_id:
 					try:
-						return await discord.Message.edit(self, *args, **kwargs)
+						if args:
+							kwargs["content"] = " ".join(args)
+						return await discord.Message.edit(self, **kwargs)
 					except discord.HTTPException:
 						print(self)
 						print(args)
 						print(kwargs)
 						raise
 				if self.webhook_id == bot.id:
-					return await discord.Message.edit(self, *args, **kwargs)
+					if args:
+						kwargs["content"] = " ".join(args)
+					return await discord.Message.edit(self, **kwargs)
 				try:
 					w = bot.cache.users[self.webhook_id]
 					webhook = getattr(w, "webhook", w)
@@ -7399,7 +7407,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							self.removed.add(m.id)
 							futs.append(fut)
 					if s != m.content or embs or fils or buts:
-						fut = csubmit(bot.edit_message(m, content=s, embeds=embs, files=fils, buttons=buts, attachments=[]))
+						fut = csubmit(bot.edit_message(m, content=s, embeds=embs, attachments=fils, buttons=buts))
 						futs.append(fut)
 						self.messages[i] = fut
 				for fut in futs:
@@ -7655,19 +7663,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		discord.VoiceChannel._get_channel = lambda self: as_fut(self)
 		discord.user.BaseUser.__str__ = lambda self: self.name if self.discriminator in (None, 0, "", "0") else f"{self.name}#{self.discriminator}"
 
-		# recv_message = discord.gateway.DiscordWebSocket.received_message
-		# async def received_message(self, msg, /):
-		# 	if isinstance(msg, byte_like):
-		# 		self._buffer.extend(msg)
-		# 		if len(msg) < 4 or msg[-4:] != b"\x00\x00\xff\xff":
-		# 			return
-		# 		msg = self._zlib.decompress(self._buffer)
-		# 		self._buffer = bytearray()
-		# 	res = orjson.loads(msg)
-		# 	bot.socket_responses.append(res)
-		# 	self._dispatch("socket_response", res)
-		# 	return await recv_message(self, as_str(msg))
-		# discord.gateway.DiscordWebSocket.received_message = received_message
+		recv_message = discord.gateway.DiscordWebSocket.received_message
+		async def received_message(self, msg, /):
+			if isinstance(msg, byte_like):
+				msg = self._decompressor.decompress(msg)
+				if msg is None:
+					return
+			res = orjson.loads(msg)
+			bot.socket_responses.append(res)
+			self._dispatch("socket_response", res)
+			return await recv_message(self, as_str(msg))
+		discord.gateway.DiscordWebSocket.received_message = received_message
 
 		def _get_guild_channel(self, data, guild_id=None):
 			channel_id = int(data["channel_id"])

@@ -894,7 +894,7 @@ def optimise(im, keep_rgb=True, recurse=True, max_frames=60):
 			if type(i0) is type(im):
 				raise StopIteration
 		except StopIteration:
-			return []
+			return im
 		i0 = optimise(i0, keep_rgb=keep_rgb, recurse=False)
 		out = []
 		orig = []
@@ -904,16 +904,16 @@ def optimise(im, keep_rgb=True, recurse=True, max_frames=60):
 			if i >= max_frames and not changed:
 				print("Unchanged:", mode, i0, i2)
 				out.append(i2)
-				return resume(i0, out, it)
+				return ImageSequence.fromiter(resume(i0, out, it))
 			orig.append(i2)
 			if i2.mode != mode:
 				changed = True
 				i2 = optimise(i2, keep_rgb=keep_rgb, recurse=False)
 				if i2.mode != mode:
-					return [im.convert(i2.mode) for im in resume(i0, orig, it)]
+					return ImageSequence.fromiter(im.convert(i2.mode) for im in resume(i0, orig, it))
 			out.append(i2)
 		out.insert(0, i0)
-		return out
+		return ImageSequence(*out)
 	if isinstance(im, dict):
 		raise TypeError(im)
 	original = im.mode

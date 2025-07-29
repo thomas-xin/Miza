@@ -1367,9 +1367,14 @@ obf = {
 }
 obfuscator = "".maketrans(obf)
 deobfuscator = "".maketrans({v: k for k, v in obf.items()})
-def _obfuscate(s):
+def _obfuscate(s, alo=False):
+	if not s:
+		return s
 	a = np.array(tuple(s))
 	m = np.random.randint(0, 2, size=len(a), dtype=bool)
+	if alo:
+		indices = [i for i in range(len(s)) if s[i] in obf]
+		m[random.choice(indices)] = True
 	a[m] = tuple("".join(a[m]).translate(obfuscator))
 	return "".join(a)
 def obfuscate(s):
@@ -1378,7 +1383,7 @@ def obfuscate(s):
 	while s:
 		match = reg.search(s)
 		if not match:
-			out.append(_obfuscate(s))
+			out.append(_obfuscate(s, alo=True))
 			break
 		s1, e1 = match.start(), match.end()
 		out.append(_obfuscate(s[:s1]))

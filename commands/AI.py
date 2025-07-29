@@ -788,7 +788,7 @@ class Instruct(Command):
 
 class Imagine(Command):
 	_timeout_ = 150
-	name = ["AIArt", "Dream", "Envision", "Inspire"]
+	name = ["AIArt", "Dream", "Envision", "Inspire", "Txt2Img"]
 	description = "Runs one of many AI image generators on the input prompt or image. Less censorship is imposed when invoked within NSFW channels. Incurs an adjusted quota cost."
 	schema = cdict(
 		model=cdict(
