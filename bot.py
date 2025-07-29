@@ -7937,7 +7937,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if isinstance(ex, TooManyRequests):
 			fields = (("Running into the rate limit often?", f"Consider donating using one of the subscriptions from my [ko-fi]({self.kofi_url}), which will grant shorter rate limits amongst many feature improvements!"),)
 		elif isinstance(ex, (discord.HTTPException, ConnectionError)):
-			fields = ((str(ex.args[0]), "This error usually indicates that the remote server (possibly Discord) is rejecting the response. Please double check your inputs, or try again later!"),)
+			fields = ((str(ex.args[0]).split(None, 1)[0], "This error usually indicates that the remote server (possibly Discord) is rejecting the response. Please double check your inputs, or try again later!"),)
 		elif isinstance(ex, discord.Forbidden):
 			fields = (("403", "This error usually indicates that I am missing one or more necessary Discord permissions to perform this command!"),)
 		elif isinstance(ex, (CE, CE2)):

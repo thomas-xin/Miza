@@ -2251,12 +2251,12 @@ class CreateSound(Command):
 		if emoji:
 			emoji = await bot.fetch_emoji(emoji, _guild)
 			assert emoji.guild.id == _guild.id, "Emoji must be from the current server."
-		name = name or emoji.name if emoji else url2fn(url).rsplit(".", 1)[0]
+		name = name or (emoji.name if emoji else url2fn(url).rsplit(".", 1)[0])
 		d = await asubmit(get_duration, url)
 		i = ts_us()
 		if d <= 5.1:
 			fn = f"{CACHE_PATH}/{i}.ogg"
-			args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-af", "asetrate=48k", "-ar", "48k", "-c:a", "libopus", "-b:a", "160k", fn]
+			args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-af", "silenceremove=start_periods=0:stop_periods=1:stop_duration=0:stop_threshold=-60dB", "-c:a", "libopus", "-b:a", "160k", fn]
 			print(args)
 			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
 			try:
@@ -2271,8 +2271,8 @@ class CreateSound(Command):
 		else:
 			fn1 = f"{CACHE_PATH}/{i}~1.mp3"
 			fn2 = f"{CACHE_PATH}/{i}~2.mp3"
-			args1 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-to", "1.175", "-vn", "-i", url, "-af", "asetrate=48k", "-ar", "48k", "-c:a", "libmp3lame", "-b:a", "144k", fn1]
-			args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-ss", "1.175", "-to", "11", "-vn", "-i", url, "-af", "asetrate=48k", "-ar", "48k", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
+			args1 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-to", "1.175", "-vn", "-i", url, "-c:a", "libmp3lame", "-b:a", "144k", fn1]
+			args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-ss", "1.175", "-to", "11", "-vn", "-i", url, "-af", "silenceremove=start_periods=0:stop_periods=1:stop_duration=0:stop_threshold=-60dB", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
 			print(args1)
 			print(args2)
 			proc1 = await asyncio.create_subprocess_exec(*args1, stdout=subprocess.DEVNULL)
