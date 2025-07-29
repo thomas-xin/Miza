@@ -7915,6 +7915,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 		discord.Embed.__hash__ = lambda self: len(self)
 
+		def _get_mime_type_for_audio(data: bytes):
+			if data.startswith(b'\x49\x44\x33') or data.startswith(b'\xff\xfb'):
+				return 'audio/mpeg'
+			if data.startswith(b"OggS"):
+				return 'audio/ogg'
+			raise ValueError('Unsupported audio type given')
+		discord.utils._get_mime_type_for_audio = _get_mime_type_for_audio
+
 	def send_exception(self, messageable, ex, reference=None, op=None, comm=None):
 		if self.maintenance and not (reference and self.is_owner(reference.author)):
 			print(reference)

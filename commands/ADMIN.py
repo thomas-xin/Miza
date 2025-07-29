@@ -2187,64 +2187,128 @@ class CreateEmoji(Command):
 	name = ["EmojiCreate", "EmojiCopy", "CopyEmoji", "Emote", "Emoji"]
 	min_level = 0
 	description = "Creates a custom emoji from a URL or attached file."
-	usage = "<1:name>+ <0:url>"
-	example = ("emoji how https://cdn.discordapp.com/emojis/645188934267043840.gif?size=128",)
-	flags = "aed"
+	schema = cdict(
+		name=cdict(
+			type="word",
+			description="The name of the emoji",
+			example="Untitled",
+		),
+		url=cdict(
+			type="visual",
+			description="The image to use (will automatically be resized to <256kb if larger)",
+			required=True,
+		),
+	)
 	rate_limit = (8, 12)
 	_timeout_ = 6
 	typing = True
 	slash = ("Emoji",)
 
-	async def __call__(self, bot, name, perm, user, guild, channel, message, args, argv, _timeout, **void):
-		# Take input from any attachments, or otherwise the message contents
-		if message.attachments:
-			args.extend(best_url(a) for a in message.attachments)
-			argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
-		if not args:
-			prefix = bot.get_prefix(guild)
-			raise ArgumentError("Please enter URL, emoji, or attached file to add. To view list of emojis, use {prefix}emojis!")
-		if perm < 2:
-			ex = self.perm_error(perm, 2, "for command " + name)
-			if args[0].casefold() == "jumbo":
-				p = bot.get_prefix(guild)
-				ex.footer = f"This command is for creating a new emoji. If you meant to copy an existing one, please see {p}jumbo!"
-			raise ex
-		async with discord.context_managers.Typing(channel):
+	async def __call__(self, bot, _guild, _message, _perm, _name, name, url, **void):
+		if _perm < 2:
+			raise self.perm_error(_perm, 2, "for command " + _name)
+		name = name or url2fn(url).rsplit(".", 1)[0]
+		image = await bot.get_request(url, timeout=60)
+		if len(image) > 1073741824:
+			raise OverflowError("Max file size to load is 1GB.")
+		image = await bot.optimise_image(image, fsize=262144, msize=128, fmt="gif")
+		emoji = await _guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
+		# This reaction indicates the emoji was created successfully
+		with suppress(discord.Forbidden):
+			await _message.add_reaction(emoji)
+		return css_md(f"Successfully created emoji {sqr_md(emoji)} for {sqr_md(_guild)}.")
+
+
+class CreateSound(Command):
+	server_only = True
+	name = ["SoundCreate", "SoundBoard", "SFX"]
+	min_level = 0
+	description = "Creates a custom soundboard from a URL or attached file."
+	schema = cdict(
+		name=cdict(
+			type="word",
+			description="The name of the sound",
+			example="Untitled",
+		),
+		emoji=cdict(
+			type="emoji",
+			description="The emoji icon to use",
+		),
+		url=cdict(
+			type="audio",
+			description="The audio to use (will automatically be cut to <10s if longer)",
+			required=True,
+		),
+	)
+	rate_limit = (8, 12)
+	_timeout_ = 6
+	typing = True
+	slash = ("Soundboard",)
+
+	async def __call__(self, bot, _guild, _perm, _name, name, emoji, url, **void):
+		if _perm < 2:
+			raise self.perm_error(_perm, 2, "for command " + _name)
+		if emoji:
+			emoji = await bot.fetch_emoji(emoji, _guild)
+			assert emoji.guild.id == _guild.id, "Emoji must be from the current server."
+		name = name or emoji.name if emoji else url2fn(url).rsplit(".", 1)[0]
+		d = await asubmit(get_duration, url)
+		i = ts_us()
+		if d <= 5.1:
+			fn = f"{CACHE_PATH}/{i}.ogg"
+			args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-af", "asetrate=48k", "-ar", "48k", "-c:a", "libopus", "-b:a", "160k", fn]
+			print(args)
+			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
 			try:
-				if len(args) > 1 and is_url(args[0]):
-					args.append(args.pop(0))
-				url = args.pop(-1)
-				urls = await bot.follow_url(url, best=True, allow=True, limit=1)
-				if not urls:
-					urls = await bot.follow_to_image(argv)
-					if not urls:
-						urls = await bot.follow_to_image(url)
-						if not urls:
-							raise ArgumentError
-				url = urls[0]
-			except ArgumentError:
-				if not argv:
-					url = None
-					try:
-						url = await bot.get_last_image(message.channel)
-					except FileNotFoundError:
-						raise ArgumentError("Please input an image by URL or attachment.")
-				else:
-					raise ArgumentError("Please input an image by URL or attachment.")
-			name = " ".join(args).strip()
-			if not name:
-				name = "emoji_" + str(len(guild.emojis))
-			# print(name, url)
-			image = await bot.get_request(url, timeout=60)
-			if len(image) > 1073741824:
-				raise OverflowError("Max file size to load is 1GB.")
-			image = await bot.optimise_image(image, fsize=262144, msize=128, fmt="gif")
-			emoji = await guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
-			# This reaction indicates the emoji was created successfully
-			with suppress(discord.Forbidden):
-				await message.add_reaction(emoji)
-		s = css_md(f"Successfully created emoji {sqr_md(emoji)} for {sqr_md(guild)}.")
-		await send_with_reply(channel, message, s, ephemeral=True)
+				async with asyncio.timeout(3200):
+					await proc.wait()
+			except (T0, T1, T2):
+				with tracebacksuppressor:
+					force_kill(proc)
+				raise
+			with open(fn, "rb") as f:
+				data = await asubmit(f.read)
+		else:
+			fn1 = f"{CACHE_PATH}/{i}~1.mp3"
+			fn2 = f"{CACHE_PATH}/{i}~2.mp3"
+			args1 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-to", "1.175", "-vn", "-i", url, "-af", "asetrate=48k", "-ar", "48k", "-c:a", "libmp3lame", "-b:a", "144k", fn1]
+			args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-ss", "1.175", "-to", "11", "-vn", "-i", url, "-af", "asetrate=48k", "-ar", "48k", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
+			print(args1)
+			print(args2)
+			proc1 = await asyncio.create_subprocess_exec(*args1, stdout=subprocess.DEVNULL)
+			proc2 = await asyncio.create_subprocess_exec(*args2, stdout=subprocess.DEVNULL)
+			try:
+				async with asyncio.timeout(3200):
+					await proc1.wait()
+					await proc2.wait()
+			except (T0, T1, T2):
+				with tracebacksuppressor:
+					force_kill(proc1)
+				with tracebacksuppressor:
+					force_kill(proc2)
+				raise
+			fn3 = f"{CACHE_PATH}/{i}~3.mp3"
+			args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", fn1, "-c:a", "libmp3lame", "-b:a", "320k", fn3]
+			print(args)
+			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
+			try:
+				async with asyncio.timeout(3200):
+					await proc.wait()
+			except (T0, T1, T2):
+				with tracebacksuppressor:
+					force_kill(proc)
+				raise
+
+			def write_to():
+				with open(fn3, "rb") as f3:
+					data = f3.read()
+				with open(fn2, "rb") as f2:
+					data += f2.read()
+				return data
+
+			data = await asubmit(write_to)
+		await _guild.create_soundboard_sound(name=name, emoji=emoji, sound=data)
+		return css_md(f"Successfully created soundboard {sqr_md(name)} for {sqr_md(_guild)}.")
 
 
 class CreateSticker(Command):
@@ -2521,6 +2585,8 @@ class UpdateUserLogs(Database):
 				ua2 = message.embeds[0].thumbnail and message.embeds[0].thumbnail.url
 				if is_discord_attachment(ua2):
 					a_url = bot.data.exec.uregister(best_url(after), ua2, message.id)
+				if not is_url(a_url) and is_url(ua2):
+					a_url = ua2
 				if requires_edit:
 					emb.fields[-1].value = f"[Before]({b_url}) ➡️ [After]({a_url})"
 					emb.set_author(name=str(after), icon_url=ub, url=b_url)

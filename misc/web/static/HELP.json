@@ -329,13 +329,10 @@
 				"T2I"
 			],
 			"description": "Converts a discord ID to its corresponding UTC time.",
-			"usage": "<string>",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(3, 4)",
-			"example": [
-				"i2t 1052187107600375124",
-				"time2id 13 sep 2018"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Fancy": {
@@ -387,12 +384,21 @@
 				"AltCaps"
 			],
 			"description": "Alternates the capitalization on characters in a string.",
-			"usage": "<string>",
+			"usage": "",
 			"level": "0",
-			"rate_limit": "(4, 5)",
-			"example": [
-				"altcaps that's what she said"
+			"rate_limit": "(1, 2)",
+			"example": [],
+			"timeout": "24"
+		},
+		"Obfuscate": {
+			"aliases": [
+				"Obfuscate"
 			],
+			"description": "Obfuscates English text by substituting identical look-alikes with a unicode table.",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(1, 2)",
+			"example": [],
 			"timeout": "24"
 		},
 		"Char2Emoji": {
@@ -955,12 +961,24 @@
 				"Emoji"
 			],
 			"description": "Creates a custom emoji from a URL or attached file.",
-			"usage": "<1:name>+ <0:url>",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(8, 12)",
-			"example": [
-				"emoji how https://cdn.discordapp.com/emojis/645188934267043840.gif?size=128"
+			"example": [],
+			"timeout": "144"
+		},
+		"CreateSound": {
+			"aliases": [
+				"CreateSound",
+				"SoundCreate",
+				"SoundBoard",
+				"SFX"
 			],
+			"description": "Creates a custom soundboard from a URL or attached file.",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(8, 12)",
+			"example": [],
 			"timeout": "144"
 		},
 		"CreateSticker": {

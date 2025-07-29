@@ -588,21 +588,25 @@ class Unicode(Command):
 class ID2Time(Command):
 	name = ["I2T", "CreateTime", "Timestamp", "Time2ID", "T2I"]
 	description = "Converts a discord ID to its corresponding UTC time."
-	usage = "<string>"
-	example = ("i2t 1052187107600375124", "time2id 13 sep 2018")
+	schema = cdict(
+		id=cdict(
+			type="number",
+			example="201548633244565504",
+		),
+		time=cdict(
+			type="datetime",
+			example="35 minutes and 6.25 seconds before 3am next tuesday, EDT",
+		),
+	)
 	rate_limit = (3, 4)
 	ephemeral = True
 
-	def __call__(self, argv, name, **void):
-		if not argv:
+	def __call__(self, id, time, **void):
+		if not id and not time:
 			raise ArgumentError("Input string is empty.")
-		if name in ("time2id", "t2i"):
-			argv = tzparse(argv)
-			s = time_snowflake(argv)
-		else:
-			argv = int(verify_id("".join(c for c in argv if c.isnumeric() or c == "-")))
-			s = snowflake_time(argv)
-		return fix_md(s)
+		if id:
+			return fix_md(snowflake_time(id))
+		return fix_md(time_snowflake(time))
 
 
 class Fancy(Command):
@@ -651,7 +655,6 @@ class Fancy(Command):
 					if i == len(UNIFMTS) - 2:
 						s = s[::-1]
 					fields.append((f"Font {i + 1}", s + "\n"))
-				fields.append(("Obfuscated", obfuscate(text)))
 			case "format":
 				for i, f in enumerate(self.formats):
 					s = "".join(c + f for c in text)
@@ -744,17 +747,21 @@ class OwOify(Command):
 
 class AltCaps(Command):
 	description = "Alternates the capitalization on characters in a string."
-	usage = "<string>"
-	example = ("altcaps that's what she said",)
-	rate_limit = (4, 5)
+	schema = cdict(
+		text=cdict(
+			type="string",
+			example="that's what she said",
+			required=True,
+		),
+	)
+	rate_limit = (1, 2)
 	ephemeral = True
 
-	def __call__(self, argv, **void):
-		if not argv:
-			raise ArgumentError("Input string is empty.")
-		i = argv[0].isupper()
-		a = argv[i::2].casefold()
-		b = argv[1 - i::2].upper()
+	def __call__(self, text, **void):
+		text = unicode_prune(text)
+		i = text[0].isupper()
+		a = text[i::2].lower()
+		b = text[1 - i::2].upper()
 		if i:
 			a, b = b, a
 		if len(a) > len(b):
@@ -763,6 +770,22 @@ class AltCaps(Command):
 		else:
 			c = ""
 		return fix_md("".join(i[0] + i[1] for i in zip(a, b)) + c)
+
+
+class Obfuscate(Command):
+	description = "Obfuscates English text by substituting identical look-alikes with a unicode table."
+	schema = cdict(
+		text=cdict(
+			type="string",
+			example="that's what she said",
+			required=True,
+		),
+	)
+	rate_limit = (1, 2)
+	ephemeral = True
+
+	def __call__(self, text, **void):
+		return fix_md(obfuscate(unicode_prune(text)))
 
 
 # Char2Emoj, a simple script to convert a string into a block of text
@@ -955,7 +978,7 @@ d(*⌒▽⌒*)b Happy
 			description="Position to insert emoticon",
 			default="end",
 		),
-		string=cdict(
+		text=cdict(
 			type="string",
 			description="Extra message content to send",
 			greedy=False,
@@ -964,10 +987,10 @@ d(*⌒▽⌒*)b Happy
 	rate_limit = (1, 5)
 	slash = True
 
-	async def __call__(self, bot, _user, _slash, _channel, _message, emoticon, position, string, **void):
+	async def __call__(self, bot, _user, _slash, _channel, _message, emoticon, position, text, **void):
 		insertion = self.em_mapper[emoticon]
-		if string:
-			msg = string.strip() + " " + insertion if position == "end" else insertion + " " + string.strip()
+		if text:
+			msg = text.strip() + " " + insertion if position == "end" else insertion + " " + text.strip()
 		else:
 			msg = insertion
 		url = await self.bot.get_proxy_url(_user)

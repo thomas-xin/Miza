@@ -13,6 +13,7 @@ import threading
 from traceback import print_exc
 from urllib.parse import quote_plus, unquote_plus
 import orjson
+import niquests
 import numpy as np
 import psutil
 from .asyncs import csubmit, esubmit, asubmit, wrap_future, cst, eloop, Delay
@@ -20,7 +21,7 @@ from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, TEMP_PATH, FileHashDict, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, maybe_json, select_and_loads,
-	is_url, unyt, url2fn, get_duration, rename, uhash, expired, b64,  # noqa: F401
+	is_url, is_discord_attachment, unyt, url2fn, get_duration, rename, uhash, expired, b64,  # noqa: F401
 )
 from .audio_downloader import AudioDownloader
 VC_TIMEOUT = 13
@@ -1110,6 +1111,7 @@ class AudioFile:
 		Property to check if the FFmpeg process has expired.
 	"""
 
+	duration = None
 	cached = {}
 
 	def __str__(self):
@@ -1168,7 +1170,7 @@ class AudioFile:
 				self.stream = self.path
 				self.duration = entry["duration"] = get_duration(self.stream) or duration
 				return self
-			if duration is None or duration > 960:
+			if duration is None or duration > 1920:
 				self.stream = stream
 				self.duration = entry["duration"] = duration
 				return self
@@ -1262,8 +1264,6 @@ class AudioFile:
 		speed = 1
 		if options or pos or auds.settings.bitrate < auds.defaults["bitrate"] or self.live or not isinstance(self.stream, str):
 			args = ["./ffmpeg", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+nobuffer+discardcorrupt+genpts+igndts+flush_packets"]
-			if is_url(source):
-				args = ["./ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + args[1:]
 			if pos or auds.reverse:
 				arg = "-to" if auds.reverse else "-ss"
 				if auds.reverse and not pos:
@@ -1275,8 +1275,12 @@ class AudioFile:
 			args.append("-i")
 			if isinstance(self.stream, str):
 				buff = False
-				args.insert(1, "-nostdin")
-				args.append(source)
+				if pos > 60 or not self.live or is_discord_attachment(source):
+					args = ["./ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + args[1:]
+					args.insert(1, "-nostdin")
+					args.append(source)
+				else:
+					args.append("-")
 			else:
 				buff = True
 				args.append("-")
@@ -1301,6 +1305,9 @@ class AudioFile:
 			if buff:
 				# Select buffered reader for files not yet fully loaded, convert while downloading
 				player = BufferedAudioReader(self, args, stream=self.stream)
+			elif self.live:
+				# Select live reader for streamed links
+				player = LiveAudioReader(self, args)
 			else:
 				# Select loaded reader for loaded files
 				player = LoadedAudioReader(self, args)
@@ -1318,28 +1325,10 @@ class AudioFile:
 	def proc_expired(self):
 		return not self.proc or not self.proc.is_running()
 
+AF = AudioFile
+
 
 class LoadedAudioReader(discord.AudioSource):
-	"""
-	LoadedAudioReader is a custom audio source class for discord.py that reads audio data from a file using a subprocess.
-	Attributes:
-		speed (int): The speed at which the audio is read. Default is 1.
-		closed (bool): Indicates if the audio reader is closed.
-		args (list): The arguments for the subprocess.
-		proc (psutil.Popen): The subprocess for reading audio data.
-		packet_iter (iterator): An iterator for reading packets from the Ogg stream.
-		af (file): The audio file.
-		file (file): The audio file.
-		pos (int): The current position in the audio stream.
-		new (bool): Indicates if the audio reader is new.
-	Methods:
-		__init__(file, args): Initializes the LoadedAudioReader with the given file and arguments.
-		read(): Reads the next packet of audio data.
-		start(): Starts reading audio data and returns the audio reader.
-		close(*void1, **void2): Closes the audio reader and terminates the subprocess.
-		cleanup(*void1, **void2): Alias for the close method.
-		is_opus(): Returns True indicating the audio is in Opus format.
-	"""
 
 	speed = 1
 
@@ -1399,38 +1388,8 @@ class LoadedAudioReader(discord.AudioSource):
 	def is_opus(self):
 		return True
 
-AF = AudioFile
-
 
 class BufferedAudioReader(discord.AudioSource):
-	"""
-	BufferedAudioReader is a custom audio source for Discord that reads audio data from a file and streams it using FFmpeg.
-	Attributes:
-		speed (int): The speed at which the audio is read. Default is 1.
-		closed (bool): Indicates whether the audio reader is closed.
-		args (list): Arguments for the FFmpeg process.
-		proc (psutil.Popen): The FFmpeg process.
-		packet_iter (iterator): Iterator for Ogg packets.
-		file (str): The file path of the audio file.
-		af (str): Alias for the file path.
-		stream (file object): The audio stream.
-		pos (int): The current position in the audio stream.
-		new (bool): Indicates whether the audio stream is new.
-		buffer (bytes): Buffer for audio data.
-	Methods:
-		__init__(file, args, stream):
-			Initializes the BufferedAudioReader with the given file, arguments, and stream.
-		read():
-			Reads the next packet of audio data.
-		run():
-			Continuously reads data from the stream and writes it to the FFmpeg process.
-		start():
-			Starts the audio reader by running the loading loop in a parallel thread.
-		close():
-			Closes the audio reader and terminates the FFmpeg process.
-		is_opus():
-			Returns True, indicating that the audio is in Opus format.
-	"""
 
 	speed = 1
 
@@ -1491,6 +1450,93 @@ class BufferedAudioReader(discord.AudioSource):
 	def close(self):
 		self.closed = True
 		self.stream.close()
+		force_kill(self.proc)
+		return self
+	cleanup = close
+
+	def is_opus(self):
+		return True
+
+
+class LiveAudioReader(discord.AudioSource):
+
+	speed = 1
+
+	def __init__(self, file, args):
+		self.closed = False
+		self.args = args
+		self.resp = None
+		self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=192000)
+		self.gen = esubmit(self.generate, file.stream, self.proc)
+		self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
+		self.af = file
+		self.file = file
+		self.pos = 0
+		self.new = True
+
+	def generate(self, stream, proc):
+		with tracebacksuppressor:
+			try:
+				self.resp = niquests.get(stream, headers=Request.header(), stream=True, timeout=24)
+				it = self.resp.iter_content(262144)
+				b = next(it)
+				fut = esubmit(next, it)
+				proc.stdin.write(b)
+				proc.stdin.flush()
+				try:
+					while True:
+						b, fut = fut.result(), esubmit(next, it)
+						proc.stdin.write(b)
+						proc.stdin.flush()
+				except StopIteration:
+					pass
+			finally:
+				if self.resp:
+					self.resp.close()
+					self.resp = None
+				proc.stdin.close()
+
+	def read(self):
+		if self.buffer:
+			b, self.buffer = self.buffer, None
+			self.pos += self.speed
+			return b
+		for att in range(16):
+			try:
+				out = next(self.packet_iter, b"")
+			except (OSError, BrokenPipeError):
+				if self.file.seekble:
+					pos = self.pos / 50
+					try:
+						i = self.args.index("-ss")
+					except ValueError:
+						try:
+							i = self.args.index("-to")
+						except ValueError:
+							i = self.args.index("error") + 1
+							self.args.insert(i, "-ss")
+							self.args.insert(i + 1, str(pos))
+						else:
+							self.args[i + 1] = str(float(self.args[i + 1]) - pos)
+					else:
+						self.args[i + 1] = str(float(self.args[i + 1]) + pos)
+				self.proc = psutil.Popen(self.args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, bufsize=192000)
+				self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
+			else:
+				self.pos += self.speed
+				return out
+		return b""
+
+	@tracebacksuppressor
+	def start(self):
+		self.buffer = None
+		self.buffer = self.read()
+		return self
+
+	def close(self, *void1, **void2):
+		self.closed = True
+		if self.resp:
+			self.resp.close()
 		force_kill(self.proc)
 		return self
 	cleanup = close
