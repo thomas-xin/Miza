@@ -794,6 +794,47 @@ class UpdateExec(Database):
 		print("Deleted", deleted)
 		return deleted
 
+	async def get_lfs_channel(self, size=50 * 1048576):
+		bot = self.bot
+		log_channels = set(getattr(c, "parent", c) for c in list(filter(bool, (bot.get_channel(cid) for cid in bot.data.logM.values()))) + list(filter(bool, (bot.get_channel(cid) for cid in bot.data.logU.values()))) if c.guild.filesize_limit >= size and bot.permissions_in(c).manage_threads and bot.permissions_in(c).embed_links)
+		log_channels2 = [c for c in log_channels if bot.owners.intersection(c.guild._members)]
+		log_channels = log_channels2 or log_channels
+		if log_channels:
+			channel = choice(log_channels)
+			for thread in channel.threads:
+				if thread.owner_id == bot.id:
+					return thread
+			async for thread in channel.archived_threads():
+				if thread.owner_id == bot.id:
+					return thread
+			return await channel.create_thread(name="backup")
+		raise NotImplementedError(size)
+
+	async def lproxy(self, url, filename=None, channel=None):
+		bot = self.bot
+		if isinstance(url, byte_like):
+			fn = filetransd(filename or "c.b")
+			b = url
+		elif is_url(url):
+			fn = filetransd(filename or url2fn(url))
+			b = await bot.get_request(url)
+		elif isinstance(url, str):
+			fn = filetransd(filename or url)
+			with open(fn, "rb") as f:
+				b = await asubmit(f.read)
+		else:
+			fn = filetransd(filename or getattr(url, "name", None) or "c.b")
+			with url:
+				b = await asubmit(url.read)
+		if len(b) < attachment_cache.max_size:
+			return await attachment_cache.create(b, filename=fn, channel=channel)
+		channel = await self.get_lfs_channel(len(b))
+		file = CompatFile(b, filename=fn)
+		embed = discord.Embed(colour=rand_colour()).set_thumbnail(url=f"attachment://{fn}")
+		message = await channel.send(file=file, embed=embed)
+		assert message.embeds, message.id
+		return shorten_attachment(message.embeds[0].thumbnail.url, message.id)
+
 	seen = TimedCache(timeout=86400)
 	async def uproxy(self, *urls, collapse=True, mode="upload", filename=None, channel=None, **kwargs):
 		bot = self.bot
@@ -826,22 +867,7 @@ class UpdateExec(Database):
 					pass
 				else:
 					return
-			fn = filename or (url2fn(url) if isinstance(url, str) else "b")
-			if isinstance(url, str) and bot.webserver:
-				url2 = await Request(bot.webserver + "/reupload?url=" + quote_plus(url) + "&filename=" + fn, aio=True, decode=True)
-			else:
-				if not data:
-					resp = await asubmit(
-						reqs.next().get,
-						url,
-						headers=Request.header(),
-						stream=True,
-						verify=False,
-						timeout=60,
-					)
-					data = seq(resp)
-				url2 = await attachment_cache.create(data, filename=fn, channel=channel)
-			assert url2
+			url2 = await self.lproxy(url, filename=filename, channel=channel)
 			if uhu:
 				bot.data.proxies[uhu] = url2
 			return url2
@@ -861,7 +887,7 @@ class UpdateExec(Database):
 			return
 		self.temp[url] = csubmit(self.uproxy(url))
 
-	def _bot_ready_(self, **void):
+	async def _bot_ready_(self, **void):
 		with suppress(AttributeError):
 			PRINT.funcs.append(self._log_)
 		for c_id, flag in self.data.items():
@@ -875,8 +901,7 @@ class UpdateExec(Database):
 				mchannel = channel.parent if hasattr(channel, "thread") or isinstance(channel, discord.Thread) else channel
 			if not mchannel:
 				continue
-			csubmit(self.bot.ensure_webhook(mchannel, force=True))
-		self.bot._globals["miza_player"] = Miza_Player(self.bot)
+			await self.bot.ensure_webhook(mchannel, force=True)
 
 	def _destroy_(self, **void):
 		with suppress(LookupError, AttributeError):
@@ -922,29 +947,6 @@ class SetAvatar(Command):
 			# InvalidURL: raised when given URL is actually not a URL ("brain.exe crashed" )
 			except aiohttp.InvalidURL:
 				raise ArgumentError(f"Please input an image by URL or attachment.")
-
-
-class Miza_Player:
-
-	def __init__(self, bot):
-		self.ip = None
-		self.bot = bot
-
-	def send(self, command):
-		return Request(self.bot.raw_webserver + "/eval2/" + self.bot.token + "/" + command, aio=True, decode=True)
-
-	def submit(self, command):
-		command = command.replace("\n", "$$$")
-		return self.send(f"server.mpresponse.__setitem__({repr(self.ip)},{repr(command)})")
-
-	async def acquire(self, ip):
-		await self.submit("server.mpresponse.clear()")
-		self.ip = ip
-		return await self.submit("status_freq=240")
-	connect = acquire
-
-	def disconnect(self):
-		return self.send("server.__setattr__('mpresponse', {None: 'status_freq=6000'})")
 
 
 class UpdateTrusted(Database):
@@ -1024,7 +1026,7 @@ class UpdateColours(Database):
 	no_file = True
 
 	async def _get(self, url, threshold=True):
-		resp = await asubmit(colour_cache.obtain, url)
+		resp = await asubmit(colour_cache.obtain, url, priority=2)
 		out = [round(i) for i in resp]
 		try:
 			raw = colour2raw(out)

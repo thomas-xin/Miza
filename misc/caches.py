@@ -15,6 +15,7 @@ from misc.util import (
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, uhash,
     snowflake_time_2, shorten_attachment, merge_url, split_url, discord_expired, url2fn
 )
+session = niquests.AsyncSession()
 
 def has_transparency(image):
 	assert image.mode == "P", "Expected a palette image."
@@ -95,10 +96,10 @@ class ColourCache(diskcache.Cache):
 							c = self[k] = (255, 255, 255)
 						else:
 							bc = bc.replace(";", " ").split(None, 1)[0]
-							c = self[k] = parse_colour(bc)
+							c = self[k] = parse_colour(bc)[:3]
 					else:
 						im = Image.open(resp.raw)
-						c = self[k] = get_colour(im)
+						c = self[k] = get_colour(im)[:3]
 			except Exception:
 				print_exc()
 				return (0, 0, 0)

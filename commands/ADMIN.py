@@ -2256,7 +2256,7 @@ class CreateSound(Command):
 		i = ts_us()
 		if d <= 5.1:
 			fn = f"{CACHE_PATH}/{i}.ogg"
-			args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-af", "silenceremove=start_periods=0:stop_periods=1:stop_duration=0:stop_threshold=-60dB", "-c:a", "libopus", "-b:a", "160k", fn]
+			args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-c:a", "libopus", "-b:a", "160k", fn]
 			print(args)
 			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
 			try:
@@ -2271,8 +2271,8 @@ class CreateSound(Command):
 		else:
 			fn1 = f"{CACHE_PATH}/{i}~1.mp3"
 			fn2 = f"{CACHE_PATH}/{i}~2.mp3"
-			args1 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-to", "1.175", "-vn", "-i", url, "-c:a", "libmp3lame", "-b:a", "144k", fn1]
-			args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-ss", "1.175", "-to", "11", "-vn", "-i", url, "-af", "silenceremove=start_periods=0:stop_periods=1:stop_duration=0:stop_threshold=-60dB", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
+			args1 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-to", "1.175", "-c:a", "libmp3lame", "-b:a", "144k", fn1]
+			args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-ss", "1.175", "-to", "11", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
 			print(args1)
 			print(args2)
 			proc1 = await asyncio.create_subprocess_exec(*args1, stdout=subprocess.DEVNULL)
@@ -2304,6 +2304,8 @@ class CreateSound(Command):
 					data = f3.read()
 				with open(fn2, "rb") as f2:
 					data += f2.read()
+				with open(f"{CACHE_PATH}/{i}.mp3", "wb") as f:
+					f.write(data)
 				return data
 
 			data = await asubmit(write_to)
@@ -2588,7 +2590,7 @@ class UpdateUserLogs(Database):
 				if not is_url(a_url) and is_url(ua2):
 					a_url = ua2
 				if requires_edit:
-					emb.fields[-1].value = f"[Before]({b_url}) ➡️ [After]({a_url})"
+					emb._fields[-1]["value"] = f"[Before]({b_url}) ➡️ [After]({a_url})"
 					emb.set_author(name=str(after), icon_url=ub, url=b_url)
 					await message.edit(embed=emb)
 
@@ -3341,9 +3343,9 @@ class UpdateCrossposts(Database):
 				embed.set_footer(**footer)
 			if emb.timestamp:
 				embed.timestamp = emb.timestamp
-			for f in emb.fields:
+			for f in T(emb).get("_fields", ()):
 				if f:
-					embed.add_field(name=f.name, value=f.value, inline=T(f).get("inline", True))
+					embed.add_field(name=f["name"], value=f["value"], inline=f.get("inline", True))
 			embeds.append(embed)
 		files = deque()
 		for a in message.attachments:

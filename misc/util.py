@@ -1321,6 +1321,15 @@ __filetrans = {
 }
 filetrans = "".maketrans(__filetrans)
 
+def filetransd(fn):
+	out = []
+	for c in fn:
+		if c.casefold() not in "abcdefghijklmnopqrstuvwxyz0123456789-_.":
+			out.append("_")
+			continue
+		out.append(c)
+	return "".join(out)
+
 def get_ext(f):
 	mime = mime_from_file(f)
 	return mime_into(mime)

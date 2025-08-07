@@ -110,6 +110,7 @@ class ImageSequence(Image.Image):
 
 	frameprops = None
 	it = None
+	count = 0
 
 	@classmethod
 	def pipe(cls, pipe, mode, size, frameprops, close=None):
@@ -132,13 +133,15 @@ class ImageSequence(Image.Image):
 			yield img
 
 	@classmethod
-	def fromiter(cls, it, frameprops=None, close=None, **kwargs):
+	def fromiter(cls, it, count=None, frameprops=None, close=None, **kwargs):
 		it = iter(it)
 		self = cls(next(it), copy=None, **kwargs)
 		self.it = it
 		self.frameprops = frameprops
 		self.close = close
-		print("FROMITER:", self, it, frameprops)
+		if count:
+			self.count = count
+		print("FROMITER:", self, count, it, frameprops)
 		return self
 
 	@classmethod
@@ -197,15 +200,16 @@ class ImageSequence(Image.Image):
 		else:
 			self._images = images
 			[im.load() for im in images]
+		self.count = len(images)
 		dur2 = images[0].info.get("total_duration", 0) / len(images)
 		for i1, i2 in zip(self._images, images):
-			i1.info["duration"] = i2.info.get("duration", dur2)
+			i1.info["duration"] = i2.info.get("duration", dur2 * 1000)
 		self._position = 0
 
 	def __len__(self):
 		if self.frameprops:
 			return self.frameprops[0]
-		return len(self._images)
+		return self.count or len(self._images)
 
 	def seek(self, position):
 		if position >= len(self):
@@ -287,11 +291,11 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 	if mime in ("application/tar", "application/x-tar"):
 		t = tarfile.open(fileobj=io.BytesIO(data))
 		filenames = t.getmembers()
-		return ImageSequence.fromiter((Image.open(t.extractfile(fn)) for fn in filenames))
+		return ImageSequence.fromiter((Image.open(t.extractfile(fn)) for fn in filenames), count=len(filenames))
 	elif mime == "application/zip":
 		z = zipfile.ZipFile(io.BytesIO(data), strict_timestamps=False)
 		filenames = [f.filename for f in z.filelist if not f.is_dir()]
-		return ImageSequence.fromiter((Image.open(z.open(fn)) for fn in filenames))
+		return ImageSequence.fromiter((Image.open(z.open(fn)) for fn in filenames), count=len(filenames))
 	try:
 		import wand
 		import wand.image
@@ -340,7 +344,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 								except (ValueError, TypeError, SyntaxError, ZeroDivisionError):
 									pass
 							if dur:
-								im.info["total_duration"] = dur * 1000
+								im.info["total_duration"] = dur
 								# print("TD:", im.info["total_duration"])
 							elif r0 != "N/A":
 								try:
@@ -355,7 +359,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 										except EOFError:
 											break
 									im.seek(0)
-									im.info["total_duration"] = i / fps * 1000
+									im.info["total_duration"] = i / fps
 									# print("TD:", im.info["total_duration"])
 				return im
 		if left in ("image", "video") and right != "webp":
@@ -415,7 +419,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 					fps = fcount / dur
 				else:
 					fps = 30
-			framedur = 1000 / fps
+			framedur = 1 / fps
 			bcount = 4 if fmt == "rgba" else 3
 			bcount *= int(np.prod(size))
 			bytecount = bcount * dur * fps
@@ -423,7 +427,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 				proc.terminate()
 				fcount = floor(maxframes / dur / fps * fcount)
 				fps = maxframes / dur
-				framedur = 1000 / fps
+				framedur = 1 / fps
 				cmd3 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps}", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
 				print(cmd3)
 				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
@@ -442,7 +446,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 				fps = max(8, fps * scale)
 				w, h = round(size[0] * scale), round(size[1] * scale)
 				size = (w, h)
-				framedur = 1000 / fps
+				framedur = 1 / fps
 				bcount = 4 if fmt == "rgba" else 3
 				bcount *= int(np.prod(size))
 				cmd3 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps},scale={w}:{h}:flags=bicublin", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
@@ -459,7 +463,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 					if len(b) < bcount:
 						break
 					img = Image.frombuffer(mode, size, b)
-					img.info["duration"] = framedur
+					img.info["duration"] = framedur * 1000
 					images.append(img)
 				if images:
 					proc.wait(timeout=2)
@@ -900,17 +904,26 @@ def optimise(im, keep_rgb=True, recurse=True, max_frames=60):
 		orig = []
 		mode = i0.mode
 		changed = False
+		try:
+			count = len(im)
+		except Exception:
+			try:
+				count = properties(im)[0]
+			except Exception:
+				im = list(resume(i0, out, it))
+				count = len(im)
+				it = iter(im[1:])
 		for i, i2 in enumerate(it):
 			if i >= max_frames and not changed:
 				print("Unchanged:", mode, i0, i2)
 				out.append(i2)
-				return ImageSequence.fromiter(resume(i0, out, it))
+				return ImageSequence.fromiter(resume(i0, out, it), count=count)
 			orig.append(i2)
 			if i2.mode != mode:
 				changed = True
 				i2 = optimise(i2, keep_rgb=keep_rgb, recurse=False)
 				if i2.mode != mode:
-					return ImageSequence.fromiter(im.convert(i2.mode) for im in resume(i0, orig, it))
+					return ImageSequence.fromiter((im.convert(i2.mode) for im in resume(i0, orig, it)), count=count)
 			out.append(i2)
 		out.insert(0, i0)
 		return ImageSequence(*out)
@@ -1260,7 +1273,7 @@ def to_qr(s, repetitions=3, duration=4.8, fps=30):
 				grad = quantise_into(data)
 				yield fromarray(grad, mode="RGB")
 
-		return dict(duration=duration * 1000, count=count, frames=qr_iterator(im))
+		return dict(duration=duration, count=count, frames=qr_iterator(im))
 	return ImageChops.invert(im).convert("RGBA")
 
 
@@ -1278,13 +1291,13 @@ def properties(im, default_duration=None, default_fps=None) -> tuple: # frames, 
 		except EOFError:
 			break
 		if not total_duration:
-			duration += im.info.get("duration") or 1000 / (default_fps or 40)
+			duration += im.info.get("duration", 0) / 1000 or 1 / (default_fps or 40)
 	if f <= 1:
 		fps = default_fps or 40
-		duration = default_duration or 1000 / fps
+		duration = default_duration or 1 / fps
 	else:
-		fps = f / duration * 1000 if duration != 0 else 0
-	props = (max(1, f), duration / 1000, fps)
+		fps = f / duration if duration != 0 else 0
+	props = (max(1, f), duration, fps)
 	print("PROPS:", props)
 	try:
 		im.frameprops = props
@@ -1368,7 +1381,7 @@ def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", r
 				ims.append(im)
 			yield func(ims, *args, props=props, progress=prog * i / count % 1 if count > 1 else 1, count=count, seed=seed, **kwargs)
 
-	return dict(duration=1000 * seconds, count=count, frames=map_iter())
+	return dict(duration=seconds, count=count, frames=map_iter())
 
 def sync_animations(func, keep_size="approx"):
 	def sync_into(image, extras, duration=None, fps=None, *args, **kwargs):
@@ -1454,7 +1467,7 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 	Parameters:
 	image (PIL.Image.Image): The image to be resized.
 	extras (list): Additional images to be processed.
-	duration (int): Duration of the output in milliseconds.
+	duration (int): Duration of the output in seconds.
 	fps (int): Frames per second for the output.
 	operation (str): The type of resizing operation ('rel', 'max', 'mult', 'set').
 	x (int or float): The target width or scaling factor.
@@ -1471,7 +1484,7 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 		image = ImageSequence.cast(image)
 		images = list(image) + list(map(get_image, extras))
 		image, extras = ImageSequence(*images), ()
-	prop = properties(image, default_duration=duration, default_fps=fps)
+	prop = properties(image, default_duration=duration , default_fps=fps)
 	duration, fps, prog = sync_fps([prop], duration, fps)
 	if operation == "rel":
 		x, y = max_size(*image.size, maxsize=x, force=True)
@@ -1542,10 +1555,10 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 		buf = resize_bufferer()
 		if prog < 0:
 			buf = reversed(list(buf))
-		return dict(duration=1000 * duration, count=prop[0], frames=buf)
+		return dict(duration=duration, count=prop[0], frames=buf)
 
 	func = resize_mult if operation == "mult" else resize_to
-	return dict(duration=1000 * duration, count=prop[0], frames=map(func, ImageSequence.cast(image), [x] * prop[0], [y] * prop[0], [mode] * prop[0]))
+	return dict(duration=duration, count=prop[0], frames=map(func, ImageSequence.cast(image), [x] * prop[0], [y] * prop[0], [mode] * prop[0]))
 
 def orbit_map(image, extras, duration, fps, count):
 	symmetry = count or (1 if extras else 5)

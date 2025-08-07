@@ -946,7 +946,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			vf += f"scale={w}:{h}:flags=area"
 			if mode == "RGBA":
 				vf += "format=rgba"
-		bitrate = floor(min(fs / duration * 1000 * 7.5, 99999999)) # use 7.5 bits per byte
+		bitrate = floor(min(fs / duration * 7.5, 99999999)) # use 7.5 bits per byte
 		pix = "rgb24" if lossless else "yuv420p"
 		if mode == "RGBA":
 			cv = ("-c:v:0", "libsvtav1", "-pix_fmt:v:0", "yuv420p") if not h & 1 and not w & 1 else ("-c:v:0", "libaom-av1", "-pix_fmt:v:0", pix, "-usage", "realtime", "-cpu-used", "3")
@@ -1025,7 +1025,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			w = round(first.width / 2) * 2
 			h = round(first.height / 2) * 2
 			command.extend(("-vf", f"scale={w}:{h}:flags=bicubic"))
-		bitrate = floor(min(fs / duration * 1000 * 7.5, 99999999)) # use 7.5 bits per byte
+		bitrate = floor(min(fs / duration * 7.5, 99999999)) # use 7.5 bits per byte
 		command.extend(("-b:v", str(bitrate)))
 		cdc = CODEC_FFMPEG.get(fmt, "libsvtav1")
 		fmt = CODECS.get(fmt, fmt)
@@ -1046,7 +1046,7 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 		b = np.asanyarray(im, dtype=np.uint8).data
 		pix = "rgb24" if im.mode == "RGB" else "rgba"
 		args = ["ffmpeg", "-hide_banner", "-v", "error", "-f", "rawvideo", "-pix_fmt", pix, "-video_size", "x".join(map(str, im.size)), "-i", "-"]
-		opts, fmt = ffmpeg_opts({}, iter([im]), 1, im.mode, im, fmt, fs * (r or 1), *size, 1000, opt)
+		opts, fmt = ffmpeg_opts({}, iter([im]), 1, im.mode, im, fmt, fs * (r or 1), *size, 1, opt)
 		args.extend(opts)
 		print(im, len(b))
 		if fmt in ("png", "jpg", "webp"):
@@ -1139,7 +1139,7 @@ def evalImg(url, operation, args):
 		fs = floor(float(args.pop(-1)))
 		args.pop(-1)
 	if len(args) > 1 and args[-2] == "-d":
-		dur = args.pop(-1) * 1000
+		dur = args.pop(-1)
 		args.pop(-1)
 	if args and args[-1] == "-o":
 		opt = True
@@ -1182,7 +1182,7 @@ def evalImg(url, operation, args):
 		# print("OPER:", new)
 	if Image and isinstance(new, Image.Image):
 		if getattr(new, "audio", None):
-			new = dict(count=1, duration=1000, frames=[new])
+			new = dict(count=1, duration=1, frames=[new])
 		else:
 			prop = properties(new)
 			if prop[0] > 1:
@@ -1193,7 +1193,7 @@ def evalImg(url, operation, args):
 							yield im
 						else:
 							yield im.copy()
-				new = dict(count=prop[0], duration=prop[1] * 1000, frames=iter_img(new))
+				new = dict(count=prop[0], duration=prop[1], frames=iter_img(new))
 				print("Output anim:", new, prop)
 			else:
 				print("Output stat:", new, prop)
@@ -1230,7 +1230,7 @@ def evalImg(url, operation, args):
 				im.paste(frame, (x * first.width, y * first.height))
 			new["frames"] = [im]
 			new["count"] = 1
-			new["duration"] = 1000
+			new["duration"] = 1
 		else:
 			video = True
 		duration = new["duration"]
@@ -1243,7 +1243,7 @@ def evalImg(url, operation, args):
 			if fmt in statics:
 				fmt, cdc = "zip", fmt
 			print("DURATION:", duration, new["count"])
-			fps = 1000 * new["count"] / duration
+			fps = new["count"] / duration
 			if round(fps, 2) == round(fps):
 				fps = round(fps)
 			else:
@@ -1306,6 +1306,7 @@ def evalImg(url, operation, args):
 				env = dict(os.environ)
 				env.pop("CUDA_VISIBLE_DEVICES", None)
 				proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, bufsize=1048576, env=env)
+			i = 0
 			futs = []
 			for i, frame in enumerate(frames):
 				def save_frame(i, frame):

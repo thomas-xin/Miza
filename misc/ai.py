@@ -42,7 +42,7 @@ available = {
 	},
 	"claude-3.7-sonnet-t": {
 		"openrouter": ("anthropic/claude-3.7-sonnet:thinking", ("3", "15")),
-		None: "o4-mini",
+		None: "gpt-oss-120b",
 	},
 	"claude-3.7-sonnet": {
 		"openrouter": ("anthropic/claude-3.7-sonnet", ("3", "15")),
@@ -161,6 +161,16 @@ available = {
 	"grok-3-mini": {
 		"openrouter": ("x-ai/grok-3-mini", ("0.3", "0.5")),
 		None: "gpt-4.1-mini",
+	},
+	"gpt-oss-120b": {
+		"fireworks": ("accounts/fireworks/models/gpt-oss-120b", ("0.1", "0.1")),
+		"openrouter": ("openai/gpt-oss-120b", ("0.15", "0.6")),
+		None: "o4-mini",
+	},
+	"gpt-oss-20b": {
+		"openrouter": ("openai/gpt-oss-20b", ("0.05", "0.2")),
+		"fireworks": ("accounts/fireworks/models/gpt-oss-20b", ("0.1", "0.1")),
+		None: "o4-mini",
 	},
 	"o4-mini": {
 		"openai": ("o4-mini", ("1.1", "4.4")),
@@ -304,7 +314,10 @@ is_chat = {
 	"gemini-2.5-flash-t",
 	"gemini-2.5-flash",
 	"gemini-2.0",
+	"gpt-oss-120b",
+	"gpt-oss-20b",
 	"o4-mini",
+	"o3",
 	"o3-mini",
 	"o1",
 	"o1-preview",
@@ -364,6 +377,8 @@ is_reasoning = {
 	"grok-3-mini",
 	"gemini-2.5-pro",
 	"gemini-2.5-flash-t",
+	"gpt-oss-120b",
+	"gpt-oss-20b",
 	"o4-mini",
 	"o3",
 	"o3-mini",
@@ -390,6 +405,8 @@ is_function = {
 	"gemini-2.5-flash-t",
 	"gemini-2.5-flash",
 	"gemini-2.0",
+	"gpt-oss-120b",
+	"gpt-oss-20b",
 	"o4-mini",
 	"o3",
 	"o3-mini",
@@ -426,6 +443,8 @@ is_vision = {
 	"gemini-2.5-flash-t",
 	"gemini-2.5-flash",
 	"gemini-2.0",
+	"gpt-oss-120b",
+	"gpt-oss-20b",
 	"o1",
 	"o1-preview",
 	"gpt-4.1",
@@ -449,12 +468,10 @@ is_premium = {
 	"llama-3-405b",
 	"grok-4",
 	"gemini-2.5-pro",
-	"o4-mini",
+	"o3",
 	"o1",
 	"o1-preview",
-	"o1-mini",
 	"command-r-plus",
-	"miquliz-120b",
 }
 instruct_formats = {
 	"reflection-llama-3-70b": "llamav3",
@@ -506,7 +523,10 @@ contexts = {
 	"gemini-2.5-flash-t": 1048576,
 	"gemini-2.5-flash": 1048576,
 	"gemini-2.0": 1048576,
+	"gpt-oss-120b": 131072,
+	"gpt-oss-20b": 131072,
 	"o4-mini": 200000,
+	"o3": 200000,
 	"o3-mini": 200000,
 	"o1": 200000,
 	"o1-preview": 200000,
@@ -995,6 +1015,10 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 			continue
 		sem = emptyctx
 		kwa = kwargs.copy()
+		if orig_model in is_reasoning:
+			mt = kwa.pop("max_tokens", 0) or 0
+			if not kwa.get("max_completion_tokens"):
+				kwa["max_completion_tokens"] = mt + 16384
 		kwa["model"] = model
 		rl = 8, 1
 		if sapi == "mizabot":
@@ -1195,7 +1219,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 
 async def instruct(data, best=False, skip=False, prune=True, cache=True, user=None):
 	data["prompt"] = data.get("prompt") or data.pop("inputs", None) or data.pop("input", None)
-	key = shash(str((data["prompt"], data.get("model", "gpt-4.1-mini"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
+	key = shash(str((data["prompt"], data.get("model", "kimi-k2"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
 	if cache:
 		tup = await retrieve_from(CACHE, key, _instruct2, data, best=best, skip=skip, prune=prune, user=user)
 		if tup[1] >= best:
@@ -1219,7 +1243,7 @@ async def _instruct2(data, best=False, skip=False, prune=True, user=None):
 async def _instruct(data, best=False, skip=False, user=None):
 	# c = await tcount(data["prompt"])
 	inputs = dict(
-		model="gpt-4.1" if best >= 2 else "gpt-4.1-mini",
+		model="grok-4" if best >= 2 else "kimi-k2",
 		temperature=0.75,
 		max_tokens=256,
 		top_p=0.999,
@@ -1236,7 +1260,7 @@ async def _instruct(data, best=False, skip=False, user=None):
 		dec = True and not skip
 	if dec:
 		inputs["model"] = "auto" if best else "llama-3-70b"
-	if data.get("model", "gpt-4.1-mini") in is_chat:
+	if data.get("model", "kimi-k2") in is_chat:
 		prompt = inputs.pop("prompt")
 		inputs["messages"] = [cdict(role="user", content=prompt)]
 		async with asyncio.timeout(70):
@@ -1811,7 +1835,10 @@ def unimage(message):
 
 
 CL100K_IM = {
+	"gpt-oss-120b",
+	"gpt-oss-20b",
 	"o4-mini",
+	"o3",
 	"o3-mini",
 	"o1",
 	"o1-preview",

@@ -1143,18 +1143,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			raise LookupError(*ex.args)
 
 	def as_file(self, file, filename=None):
-		if isinstance(file, str):
-			file = open(file, "rb")
-		elif hasattr(file, "fp"):
-			file = file.fp
-		url = Request(
-			f"https://api.mizabot.xyz/upload?filename={filename}&hash={filename}",
-			method="POST",
-			timeout=3600,
-			data=file,
-			ssl=False,
-			json=True,
-		)["url"].replace("/p/", "/f/").split("?", 1)[0]
+		url = await_fut(self.data.exec.lproxy(file, filename=filename))
 		print("AS_FILE:", url)
 		return url
 
@@ -2340,18 +2329,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		1: cdict(
-			reasoning="grok-4",
+			reasoning="gpt-oss-120b",
 			instructive="kimi-k2",
 			casual="kimi-k2",
 			nsfw="grok-3-mini",
 			backup="minimax-m1",
 			retry="gpt-4.1",
-			function="gemini-2.5-flash-t",
+			function="gpt-oss-120b",
 			vision="gemini-2.5-flash",
 			target="auto",
 		),
 		2: cdict(
-			reasoning="gemini-2.5-pro",
+			reasoning="grok-4",
 			instructive="grok-4",
 			casual="grok-4",
 			nsfw="grok-4",
@@ -2375,12 +2364,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if modlvl > 2:
 			maxlim = 196608
 			minlim = 4800
-			snip = 720
+			snip = 960
 			best = 2
 		elif modlvl > 1:
 			maxlim = 98304
 			minlim = 2400
-			snip = 480
+			snip = 600
 			best = 1
 		else:
 			maxlim = 3000
@@ -3060,7 +3049,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					f = filename if filename and not hasattr(file, "fp") else getattr(file, "_fp", None) or data
 				if not isinstance(f, str):
 					f = as_str(f)
-				url = await asubmit(self.as_file, file if getattr(file, "_fp", None) else f, filename=filename)
+				url = await self.data.exec.lproxy(file._fp if getattr(file, "_fp", None) else f, filename=filename)
 				message = await send_with_reply(channel, reference, (msg + ("" if msg.endswith("```") else "\n") + url).strip(), embed=embed, tts=tts)
 			else:
 				message = await send_with_reply(channel, reference, msg, embed=embed, file=file, tts=tts)
@@ -3366,9 +3355,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if not content:
 				if e.description and e.description != EmptyEmbed:
 					content = e.description
-				for f in e.fields:
+				for f in T(e).get("_fields", ()):
 					if f:
-						emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
+						emb.add_field(name=f["name"], value=f["value"], inline=f.get("inline", True))
 			if e.image:
 				if not image:
 					image = await self.data.exec.uproxy(e.image.url)
@@ -3383,7 +3372,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if thumbnail:
 			emb.set_thumbnail(url=thumbnail)
 		for e in message.embeds:
-			if len(emb.fields) >= 25:
+			if len(T(emb).get("_fields", ())) >= 25:
 				break
 			if not emb.description or emb.description == EmptyEmbed:
 				title = e.title or ""
@@ -3396,11 +3385,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				if e.title or e.description:
 					emb.add_field(name=e.title or e.url or "\u200b", value=lim_str(e.description, 1024) or e.url or "\u200b", inline=False)
-			for f in e.fields:
-				if len(emb.fields) >= 25:
+			for f in T(e).get("_fields", ()):
+				if len(T(emb).get("_fields", ())) >= 25:
 					break
 				if f:
-					emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
+					emb.add_field(name=f["name"], value=f["value"], inline=f.get("inline", True))
 			if len(emb) >= 6000:
 				while len(emb) > 6000:
 					emb.remove_field(-1)
@@ -5396,8 +5385,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				enum = set(enum)
 				accepts = set(accepts)
 				if enum and accepts:
-					raise ArgumentError(f'{k} value "{v}" must be one of {enum} or alternatives {accepts}.')
-				raise ArgumentError(f'{k} value "{v}" must be one of {enum.union(accepts)}.')
+					raise EnumError(f'{k} value "{v}" must be one of {enum} or aliases {accepts}.')
+				raise EnumError(f'{k} value "{v}" must be one of {enum.union(accepts)}.')
 			if v not in enum:
 				return validation.accepts[v]
 		return v
@@ -6020,7 +6009,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				else:
 					finished = True
 			if not finished:
-				await asubmit(self.load_guild_http, guild, priority=-1)
+				await asubmit(self.load_guild_http, guild, priority=1)
 		guild._member_count = len(guild._members)
 		if "guilds" in self.data:
 			self.data.guilds.register(guild)
@@ -6486,7 +6475,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				n = lim_str(field[0], 256)
 				v = lim_str(md(field[1]), 1024)
 				i = True if len(field) < 3 else bool(field[2])
-				if len(emb) + len(n) + len(v) > 6000 or len(emb.fields) > 24:
+				if len(emb) + len(n) + len(v) > 6000 or len(T(emb).get("_fields", ())) > 24:
 					embs.append(emb)
 					emb = discord.Embed(colour=fin_col)
 					if col is not None:
@@ -8488,7 +8477,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						after._update(data)
 					else:
 						before.author = after.author
-					if len(after.embeds) == 1 and after.embeds[0].type != "rich" and find_urls(after.content):
+					if len(after.embeds) == 1 and after.embeds[0].type != "rich" and find_urls(after.content) or any((fmt := url2fn(a.url).rsplit(".", 1)[0]) in IMAGE_FORMS or fmt in VIDEO_FORMS for a in message.attachments):
 						print(f"Possible embed-only update on message {after.id}, ignoring...")
 						return
 					raw = True

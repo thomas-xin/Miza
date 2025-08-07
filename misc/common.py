@@ -394,7 +394,7 @@ class CompatFile(discord.File):
 				try:
 					self.filename = fp.name
 				except AttributeError:
-					self.filename = None
+					self.filename = ""
 		else:
 			self.filename = filename
 		self.description = lim_str(description or self.filename or "", 1024) or None
@@ -404,7 +404,7 @@ class CompatFile(discord.File):
 			self.reset()
 		self.filename = lim_str(fn.strip().replace(" ", "_").translate(filetrans), 64)
 		if spoiler:
-			if self.filename is not None:
+			if self.filename:
 				if not self.filename.startswith("SPOILER_"):
 					self.filename = "SPOILER_" + self.filename
 			else:

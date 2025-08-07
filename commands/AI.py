@@ -736,6 +736,7 @@ class Instruct(Command):
 	cache = TimedCache(timeout=720)
 
 	async def __call__(self, bot, _message, _premium, model, prompt, api, temperature, frequency_penalty, presence_penalty, max_tokens, **void):
+		# assert model in ai.available, f"{model} does not exist or is not supported."
 		kwargs = {}
 		if api:
 			key = model = None
@@ -762,7 +763,7 @@ class Instruct(Command):
 			key = key or "x"
 			oai = openai.AsyncOpenAI(api_key=key, base_url=api)
 			kwargs["api"] = oai
-		if model in ("deepseek-r1", "o1", "o1-preview", "o1-mini", "o3", "o3-mini", "o4-mini"):
+		if model in ("deepseek-r1", "o1", "o1-preview", "o1-mini", "o3", "o3-mini", "o4-mini", "gpt-oss-120b", "gpt-oss-20b"):
 			kwargs["max_completion_tokens"] = max_tokens + 16384
 		else:
 			kwargs["max_tokens"] = max_tokens

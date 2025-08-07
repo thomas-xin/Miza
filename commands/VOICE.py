@@ -2231,7 +2231,7 @@ class Download(Command):
 		format=cdict(
 			type="enum",
 			validation=cdict(
-				enum=("mp4_old", "mp4", "mkv", "webm", "avif", "webp", "gif", "ogg", "opus", "mp3", "flac", "wav"),
+				enum=("h264", "h265", "h266", "av1", "mp4", "mkv", "webm", "avif", "webp", "gif", "ogg", "opus", "mp3", "flac", "wav"),
 			),
 			description="Output format of the downloaded file.",
 			default="opus",
@@ -2435,91 +2435,202 @@ class Download(Command):
 				csubmit(bot.silent_delete(message))
 
 
-class Transcribe(Command):
-	time_consuming = True
-	_timeout_ = 75
-	name = ["Whisper", "TranscribeAudio", "Caption"]
-	description = "Downloads a song from a link, automatically transcribing to English, or a provided language if applicable."
-	usage = "<1:language[en]>? <0:search_link>"
-	example = ("transcribe https://www.youtube.com/watch?v=kJQP7kiw5Fk", "transcribe Chinese https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-	rate_limit = (30, 45)
-	typing = True
-	slash = True
-	ephemeral = True
-	maintenance = True
+class Hyperchoron(Command):
+	_timeout_ = 15
+	description = "Runs Hyperchoron on the input URL. See https://github.com/thomas-xin/hyperchoron for more info, or to run it yourself!"
+	schema = cdict(
+		url=cdict(
+			type="audio",
+			description="Audio supplied by URL or attachment",
+			example="https://cocobeanzies.mizabot.xyz/music/rainbow-critter.webm",
+			aliases=["i"],
+			required=True,
+		),
+		format=cdict(
+			type="enum",
+			validation=cdict(
+				enum=(
+					"mid", "csv", "nbs", "mcfunction", "litematic", "org",
+					"als", "amped", "dawproject", "flp", "mmp", "muse",
+					"sequence", "soundbridge", "rrp", "soundation",
+				),
+			),
+			default="nbs",
+		),
+	)
+	macros = cdict(
+		Midi2Org=cdict(
+			format="org",
+		),
+	)
+	rate_limit = (10, 20)
 
-	async def __call__(self, bot, channel, guild, message, argv, flags, user, **void):
-		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
-		if premium < 2:
-			raise PermissionError(f"Sorry, this feature is currently for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
-		for a in message.attachments:
-			argv = a.url + " " + argv
-		dest = None
-		# Attempt to download items in queue if no search query provided
-		if not argv:
-			try:
-				auds = bot.data.audio.players[guild.id]
-				if not auds.queue:
-					raise LookupError
-				url = auds.queue[0].get("url")
-			except:
-				raise IndexError("Queue not found. Please input a search term, URL, or file.")
-		else:
-			# Parse search query, detecting file format selection if possible
-			if " " in argv:
-				spl = smart_split(argv)
-				if len(spl) >= 1:
-					tr = bot.commands.translate[0]
-					arg = spl[0]
-					if (dest := (tr.renamed.get(c := arg.casefold()) or (tr.languages.get(c) and c))):
-						dest = (googletrans.LANGUAGES.get(dest) or dest).capitalize()
-						# curr.languages.append(dest)
-						argv = " ".join(spl[1:])
-			argv = verify_search(argv)
-			# Input must be a URL
-			urls = await bot.follow_url(argv, allow=True, images=False)
-			if not urls:
-				raise TypeError("Input must be a valid URL.")
-			url = urls[0]
-		simulated = getattr(message, "simulated", None)
-		async with discord.context_managers.Typing(channel):
-			entries = await asubmit(ytdl.search, url)
-			if entries:
-				name = entries[0].get("name")
-			else:
-				name = None
-			if not simulated:
-				m = await message.reply(
-					ini_md(f"Downloading and transcribing {sqr_md(ensure_url(url))}..."),
-				)
-			else:
-				m = None
-			await asubmit(ytdl.get_stream, entries[0], force=True, download=False)
-			name, url = entries[0].get("name"), entries[0].get("url")
-			if not name or not url:
-				raise FileNotFoundError(500, argv)
-			url = unyt(url)
-			stream = entries[0].get("stream") or entries[0].url
-			text = await process_image("whisper", "$", [stream], cap="whisper", timeout=3600)
-		if dest:
-			if m:
-				csubmit(bot.edit_message(
-					m,
-					content=css_md(f"Translating {name}..."),
-					embed=None,
-				))
-				csubmit(bot._state.http.send_typing(channel.id))
-			translated = {}
-			comments = {}
-			await bot.commands.translate[0].llm_translate(bot, guild, channel, user, text, "auto", [dest], translated, comments, engine="chatgpt" if premium > 1 else "mixtral")
-			text = "\n".join(translated.values()).strip()
-		emb = discord.Embed(description=text)
-		emb.title = name
-		emb.colour = await bot.get_colour(user)
-		emb.set_author(**get_author(user))
-		if m:
-			csubmit(bot.silent_delete(m))
-		bot.send_as_embeds(channel, text, author=get_author(user), reference=message)
+	async def __call__(self, bot, url, format, **void):
+		fo = os.path.abspath(TEMP_PATH + "/" + replace_ext(url2fn(url), format.casefold()))
+		args = ["hyperchoron", "-i", url, "-o", fo]
+		print(args)
+		proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+		try:
+			async with asyncio.timeout(3200):
+				stdout, stderr = await proc.communicate()
+		except (T0, T1, T2):
+			with tracebacksuppressor:
+				force_kill(proc)
+			raise
+		if proc.returncode != 0:
+			stderr = as_str(stderr)
+			if "```" not in stderr:
+				stderr = py_md(stderr)
+			raise RuntimeError(stderr)
+		assert os.path.exists(fo) and os.path.getsize(fo), "No valid output detected!"
+		return cdict(
+			file=CompatFile(fo, filename=replace_ext(url2fn(url), format)),
+		)
+
+
+class AudioSeparator(Command):
+	name = ["Extract", "Separate"]
+	description = "Runs Audio-Separator on the input URL. See https://github.com/nomadkaraoke/python-audio-separator for more info, or to run it yourself!"
+	schema = cdict(
+		url=cdict(
+			type="audio",
+			description="Audio supplied by URL or attachment",
+			example="https://cocobeanzies.mizabot.xyz/music/rainbow-critter.webm",
+			aliases=["a"],
+			required=True,
+		),
+		format=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("ogg", "opus", "mp3"),
+			),
+			description="The file format or codec of the output",
+			example="mp3",
+			default="opus",
+		),
+	)
+	rate_limit = (20, 40)
+	_timeout_ = 3.5
+
+	async def __call__(self, bot, _channel, _message, url, format, **void):
+		fut = csubmit(send_with_reply(
+			_channel,
+			reference=_message,
+			content=italics(ini_md(f"Downloading and converting {sqr_md(url)}...")),
+		))
+		fn = await bot.get_file(url)
+		args = ["audio-separator", os.path.abspath(fn), "--output_format", format]
+		proc = await asyncio.create_subprocess_exec(*args, cwd=CACHE_PATH)
+		try:
+			async with asyncio.timeout(3200):
+				await proc.wait()
+		except (T0, T1, T2):
+			with tracebacksuppressor:
+				force_kill(proc)
+			raise
+		outputs = []
+		tmpl = fn.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+		# The cache is littered with arbitrary files, but we can rely on bot.get_file's filename to contain a unique identifier which will always carry over to the output files
+		for f2 in os.listdir(CACHE_PATH):
+			if f2.startswith(tmpl) and f2.endswith(format):
+				outputs.append(f2)
+		if not outputs:
+			raise ValueError("No output files found.")
+		files = [CompatFile(f"{CACHE_PATH}/{f2}", filename=f2.removeprefix(tmpl).lstrip(" _")) for f2 in outputs]
+		response = await fut
+		response = await self.bot.edit_message(
+			response,
+			content=italics(ini_md("Uploading output...")),
+		)
+		await send_with_reply(_channel, _message, files=files)
+		await bot.silent_delete(response)
+
+
+# class Transcribe(Command):
+# 	time_consuming = True
+# 	_timeout_ = 75
+# 	name = ["Whisper", "TranscribeAudio", "Caption"]
+# 	description = "Downloads a song from a link, automatically transcribing to English, or a provided language if applicable."
+# 	usage = "<1:language[en]>? <0:search_link>"
+# 	example = ("transcribe https://www.youtube.com/watch?v=kJQP7kiw5Fk", "transcribe Chinese https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+# 	rate_limit = (30, 45)
+# 	typing = True
+# 	slash = True
+# 	ephemeral = True
+# 	maintenance = True
+
+# 	async def __call__(self, bot, channel, guild, message, argv, flags, user, **void):
+# 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
+# 		if premium < 2:
+# 			raise PermissionError(f"Sorry, this feature is currently for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
+# 		for a in message.attachments:
+# 			argv = a.url + " " + argv
+# 		dest = None
+# 		# Attempt to download items in queue if no search query provided
+# 		if not argv:
+# 			try:
+# 				auds = bot.data.audio.players[guild.id]
+# 				if not auds.queue:
+# 					raise LookupError
+# 				url = auds.queue[0].get("url")
+# 			except:
+# 				raise IndexError("Queue not found. Please input a search term, URL, or file.")
+# 		else:
+# 			# Parse search query, detecting file format selection if possible
+# 			if " " in argv:
+# 				spl = smart_split(argv)
+# 				if len(spl) >= 1:
+# 					tr = bot.commands.translate[0]
+# 					arg = spl[0]
+# 					if (dest := (tr.renamed.get(c := arg.casefold()) or (tr.languages.get(c) and c))):
+# 						dest = (googletrans.LANGUAGES.get(dest) or dest).capitalize()
+# 						# curr.languages.append(dest)
+# 						argv = " ".join(spl[1:])
+# 			argv = verify_search(argv)
+# 			# Input must be a URL
+# 			urls = await bot.follow_url(argv, allow=True, images=False)
+# 			if not urls:
+# 				raise TypeError("Input must be a valid URL.")
+# 			url = urls[0]
+# 		simulated = getattr(message, "simulated", None)
+# 		async with discord.context_managers.Typing(channel):
+# 			entries = await asubmit(ytdl.search, url)
+# 			if entries:
+# 				name = entries[0].get("name")
+# 			else:
+# 				name = None
+# 			if not simulated:
+# 				m = await message.reply(
+# 					ini_md(f"Downloading and transcribing {sqr_md(ensure_url(url))}..."),
+# 				)
+# 			else:
+# 				m = None
+# 			await asubmit(ytdl.get_stream, entries[0], force=True, download=False)
+# 			name, url = entries[0].get("name"), entries[0].get("url")
+# 			if not name or not url:
+# 				raise FileNotFoundError(500, argv)
+# 			url = unyt(url)
+# 			stream = entries[0].get("stream") or entries[0].url
+# 			text = await process_image("whisper", "$", [stream], cap="whisper", timeout=3600)
+# 		if dest:
+# 			if m:
+# 				csubmit(bot.edit_message(
+# 					m,
+# 					content=css_md(f"Translating {name}..."),
+# 					embed=None,
+# 				))
+# 				csubmit(bot._state.http.send_typing(channel.id))
+# 			translated = {}
+# 			comments = {}
+# 			await bot.commands.translate[0].llm_translate(bot, guild, channel, user, text, "auto", [dest], translated, comments, engine="chatgpt" if premium > 1 else "mixtral")
+# 			text = "\n".join(translated.values()).strip()
+# 		emb = discord.Embed(description=text)
+# 		emb.title = name
+# 		emb.colour = await bot.get_colour(user)
+# 		emb.set_author(**get_author(user))
+# 		if m:
+# 			csubmit(bot.silent_delete(m))
+# 		bot.send_as_embeds(channel, text, author=get_author(user), reference=message)
 
 
 class UpdateAudio(Database):

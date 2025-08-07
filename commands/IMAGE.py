@@ -941,7 +941,7 @@ class Tesseract(Command):
 			validation="[-3600, 3600]",
 			description="The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
 			example="1:26.3",
-			default=0.25,
+			default=20,
 		),
 		speed=cdict(
 			type="number",

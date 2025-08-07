@@ -138,7 +138,7 @@ athreads = ThreadPoolExecutor(max_workers=lim * 4, initializer=__setloop__)
 
 def get_executor(priority):
 	if priority not in range(0, 2):
-		return
+		raise NotImplementedError(priority)
 	return (athreads, bthreads)[priority]
 
 def initialise_ppe():
@@ -157,7 +157,7 @@ def initialise_ppe():
 
 	def get_executor(priority):
 		if priority not in range(0, 4):
-			return
+			raise NotImplementedError(priority)
 		return (athreads, bthreads, pthreads, mthreads)[priority]
 
 

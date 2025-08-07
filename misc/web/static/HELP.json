@@ -1356,6 +1356,31 @@
 			"example": [],
 			"timeout": "1800"
 		},
+		"Hyperchoron": {
+			"aliases": [
+				"Hyperchoron",
+				"Midi2Org"
+			],
+			"description": "Runs Hyperchoron on the input URL. See https://github.com/thomas-xin/hyperchoron for more info, or to run it yourself!",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(10, 20)",
+			"example": [],
+			"timeout": "360"
+		},
+		"AudioSeparator": {
+			"aliases": [
+				"AudioSeparator",
+				"Extract",
+				"Separate"
+			],
+			"description": "Runs Audio-Separator on the input URL. See https://github.com/nomadkaraoke/python-audio-separator for more info, or to run it yourself!",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(20, 40)",
+			"example": [],
+			"timeout": "84.0"
+		},
 		"Transcribe": {
 			"aliases": [
 				"Transcribe",
@@ -2310,31 +2335,6 @@
 				"png2wav https://cdn.discordapp.com/embed/avatars/0.png"
 			],
 			"timeout": "360"
-		},
-		"Hyperchoron": {
-			"aliases": [
-				"Hyperchoron",
-				"Midi2Org"
-			],
-			"description": "Runs Hyperchoron on the input URL. See https://github.com/thomas-xin/hyperchoron for more info, or to run it yourself!",
-			"usage": "",
-			"level": "0",
-			"rate_limit": "(10, 20)",
-			"example": [],
-			"timeout": "360"
-		},
-		"AudioSeparator": {
-			"aliases": [
-				"AudioSeparator",
-				"Extract",
-				"Separate"
-			],
-			"description": "Runs Audio-Separator on the input URL. See https://github.com/nomadkaraoke/python-audio-separator for more info, or to run it yourself!",
-			"usage": "",
-			"level": "0",
-			"rate_limit": "(20, 40)",
-			"example": [],
-			"timeout": "84.0"
 		},
 		"SpectralPulse": {
 			"aliases": [

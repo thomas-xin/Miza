@@ -889,7 +889,7 @@ DIACRITICS = {
 	"Ϝ": "F",
 	"ĜĞĠĢԌᏀ": "G",
 	"ĤĦΗҢҤԨᎻ": "H",
-	"ÌÍÎÏĨĪĬĮİΙЇӀⅠ": "I",
+	"IÌÍÎÏĨĪĬĮİΙЇӀⅠ": "I",
 	"Ĳ": "IJ",
 	"ĴЈᎫ": "J",
 	"ĶΚҚҜҞҠᏦᛕK": "K",
@@ -901,7 +901,7 @@ DIACRITICS = {
 	"ΡҎᏢ": "P",
 	"ႭႳ": "Q",
 	"ŔŖŘᏒᚱ": "R",
-	"ŚŜŞŠՏႽᏚ𐐠": "S",
+	"SŚŜŞŠՏႽᏚ𐐠": "S",
 	"ŢŤŦΤҬᎢ": "T",
 	"ÙÚÛÜŨŪŬŮŰŲԱՍ⋃": "U",
 	"ѴᏙⅤ": "V",
@@ -917,7 +917,7 @@ DIACRITICS = {
 	"èéêëðēĕėęěѐёҽҿӗ": "e",
 	"ĝğġģɡɢ": "g",
 	"ĥħʜнңҥһԧԩ": "h",
-	"ìíîïĩīĭįıǐɩїاᎥⅰ": "i",
+	"iìíîïĩīĭįıǐɩїاᎥⅰ": "i",
 	"ĳ": "ij",
 	"ĵϳј": "j",
 	"ķĸκқҝҟҡ": "k",
@@ -928,7 +928,7 @@ DIACRITICS = {
 	"œ": "oe",
 	"þρҏṕ": "p",
 	"ŕŗřʀԻ": "r",
-	"śŝşšſ": "s",
+	"sśŝşšſ": "s",
 	"ß": "ss",
 	"ţťŧτтҭ": "t",
 	"ùúûüũūŭůűųǔμυ": "u",
@@ -1373,14 +1373,15 @@ CPE = subprocess.CalledProcessError
 
 class ArgumentError(LookupError):
 	pass
-
+class EnumError(ArgumentError):
+	pass
 class TooManyRequests(PermissionError):
 	pass
-
 class CommandCancelledError(Exception):
 	pass
 
 AE = ArgumentError
+EE = EnumError
 TMR = TooManyRequests
 CCE = CommandCancelledError
 
