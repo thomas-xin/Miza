@@ -1271,7 +1271,7 @@ def evalImg(url, operation, args):
 					fmt = "mp4"
 					cdc = "libsvtav1"
 				else:
-					fmt = "webp"
+					fmt = "avif"
 			out = "cache/" + str(ts) + "." + CODECS.get(fmt, fmt)
 			mode = str(first.mode)
 			if mode == "P":
