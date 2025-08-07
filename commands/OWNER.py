@@ -6,29 +6,34 @@ print = PRINT
 
 
 class Reload(Command):
-	name = ["Unload"]
 	min_level = nan
 	description = "Reloads a specified module."
-	example = ("reload admin", "unload string")
+	schema = cdict(
+		reload=cdict(
+			type="word",
+		),
+		unload=cdict(
+			type="word",
+		),
+	)
 	_timeout_ = inf
 
-	async def __call__(self, bot, message, channel, argv, name, **void):
-		mod = full_prune(argv)
-		_mod = mod.upper()
-		if mod:
-			mod = " " + mod
-		await message.add_reaction("❗")
-		if name == "unload":
-			await send_with_reply(channel, content=f"Unloading{mod}...", reference=message)
-			succ = await asubmit(bot.unload, _mod, priority=True)
+	async def __call__(self, bot, _channel, _message, unload, reload, **void):
+		await _message.add_reaction("❗")
+		if unload:
+			message = await send_with_reply(_channel, content=f"Unloading {unload}...", reference=_message)
+			succ = await asubmit(bot.unload, unload, priority=1)
 			if succ:
-				return f"Successfully unloaded{mod}."
-			return f"Error unloading{mod}. Please see log for more info."
-		await send_with_reply(channel, content=f"Reloading{mod}...", reference=message)
-		succ = await asubmit(bot.reload, _mod, priority=True)
-		if succ:
-			return f"Successfully reloaded{mod}."
-		return f"Error reloading{mod}. Please see log for more info."
+				await message.edit(content=f"Successfully unloaded {unload}.")
+			else:
+				await message.edit(content=f"Error unloading {unload}. Please see log for more info.")
+		if reload:
+			message = await send_with_reply(_channel, content=f"Reloading {reload}...", reference=_message)
+			succ = await asubmit(bot.reload, reload, priority=True)
+			if succ:
+				await message.edit(f"Successfully reloaded {reload}.")
+			else:
+				await message.edit(f"Error reloading {reload}. Please see log for more info.")
 
 
 class Restart(Command):
@@ -839,12 +844,14 @@ class UpdateExec(Database):
 	async def uproxy(self, *urls, collapse=True, mode="upload", filename=None, channel=None, **kwargs):
 		bot = self.bot
 		async def proxy_url(url):
+			nonlocal filename
 			uhu = None
 			data = None
 			if isinstance(url, byte_like):
 				data = url
 			elif isinstance(url, CompatFile):
-				data = url.fp.read()
+				data = await asubmit(url.fp.read)
+				filename = filename or url.filename
 			elif not is_url(url):
 				raise TypeError(url)
 			elif url.startswith(bot.webserver + "/u/") or url.startswith(bot.raw_webserver + "/u/") or url.startswith("https://cdn.discordapp.com/embed/avatars/"):
@@ -867,7 +874,7 @@ class UpdateExec(Database):
 					pass
 				else:
 					return
-			url2 = await self.lproxy(url, filename=filename, channel=channel)
+			url2 = await self.lproxy(data or url, filename=filename, channel=channel)
 			if uhu:
 				bot.data.proxies[uhu] = url2
 			return url2

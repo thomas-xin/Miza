@@ -143,8 +143,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		directory = frozenset(os.listdir())
 		if "saves" not in directory:
 			os.mkdir("saves")
-		if not os.path.exists("saves/filehost"):
-			os.mkdir("saves/filehost")
+		# if not os.path.exists("saves/filehost"):
+		# 	os.mkdir("saves/filehost")
 		for k in ("attachments", "audio", "filehost"):
 			if not os.path.exists(f"{TEMP_PATH}/{k}"):
 				os.mkdir(f"{TEMP_PATH}/{k}")
@@ -1892,7 +1892,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			e = cdict(id=e, animated=animated)
 		return min_emoji(e, full=full)
 
-	async def optimise_image(self, image, fsize=CACHE_FILESIZE, msize=None, fmt="auto", duration=None, anim=True, timeout=3600):
+	async def optimise_image(self, image, fsize=DEFAULT_FILESIZE, msize=None, fmt="auto", duration=None, anim=True, timeout=3600):
 		"Optimises the target image or video file to fit within the \"fsize\" size, or \"msize\" resolution. Optional format and duration parameters."
 		args = [[], None, None, "max", msize, None, "-o"]
 		if not anim:
@@ -4227,7 +4227,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	total_hosted = 0
 	async def get_hosted(self):
 		size = 0
-		for fn in os.listdir("saves/filehost"):
+		try:
+			filehost = os.listdir("saves/filehost")
+		except FileNotFoundError:
+			return size
+		for fn in filehost:
 			with tracebacksuppressor(ValueError):
 				if "$" in fn and fn.split("$", 1)[0].endswith("~.forward"):
 					size += int(fn.split("$", 2)[1])
@@ -6806,71 +6810,76 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if str(reaction) in "🔳🔲" and (not message.attachments and not message.embeds or "exec" not in self.data):
 			return
 		if message.author.id == self.id or getattr(message, "webhook_id", None):
-			with suppress(discord.NotFound):
-				u_perm = self.get_perms(user.id, message.guild)
-				check = False
-				if not u_perm < 3:
-					check = True
-				else:
-					# Handle special case where a message may be part of a set of StreamedMessage instances, where only the first will actually have the reference
-					message2 = message
-					async for temp in self.history(message.channel, before=message, limit=10):
-						if temp.author.id != self.id:
-							break
-						if temp.reference:
-							message2 = temp
-					try:
-						reference = await self.fetch_reference(message2)
-					except (LookupError, discord.NotFound):
-						for react in message.reactions:
-							if str(reaction) == str(react) and react.me:
-								check = True
-								break
-					else:
-						if reference.author.id == user.id:
+			pass
+		else:
+			return
+		print(message, reaction, user)
+		with tracebacksuppressor(discord.NotFound):
+			u_perm = self.get_perms(user.id, message.guild)
+			check = False
+			if not u_perm < 3:
+				check = True
+			else:
+				# Handle special case where a message may be part of a set of StreamedMessage instances, where only the first will actually have the reference
+				message2 = message
+				async for temp in self.history(message.channel, before=message, limit=10):
+					if temp.author.id != self.id:
+						break
+					if temp.reference:
+						message2 = temp
+				try:
+					reference = await self.fetch_reference(message2)
+				except (LookupError, discord.NotFound):
+					for react in message.reactions:
+						if str(reaction) == str(react) and react.me:
 							check = True
-				if check:
-					if str(reaction) in "🔳🔲":
-						if message.content.startswith("||"):
-							content = message.content.replace("||", "")
-						else:
-							def temp_url(url, mid=None):
-								if is_discord_attachment(url):
-									a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-									if a_id in self.data.attachments:
-										return self.preserve_attachment(a_id, fn=url)
-									channel = message.channel
-									return self.preserve_as_long(channel.id, message.id, a_id, fn=url)
-								return url
-							futs = deque()
-							for a in message.attachments:
-								futs.append(csubmit(self.get_request(a.url)))
-							urls = set()
-							for e in message.embeds:
-								if e.image:
-									urls.add(temp_url(e.image.url))
-								if e.thumbnail:
-									urls.add(temp_url(e.thumbnail.url))
-							symrem = "".maketrans({c: "" for c in "<>|*"})
-							spl = [word.translate(symrem) for word in message.content.split() if not word.startswith("<")]
-							content = " ".join(word for word in spl if word and not is_url(word))
-							urls.update(word for word in spl if is_url(word))
-							if futs:
-								datas = await gather(*futs)
-								fut = csubmit(self.edit_message(message, content="`LOADING...`", attachments=(), embeds=()))
-								urli = await self.data.exec.uproxy(*(CompatFile(d) for d, a in zip(datas, message.attachments)), collapse=False, keep=False, filename=a.url.split("?", 1)[0].rsplit("/", 1)[-1])
-								urli.extend(urls)
-								urls = urli
-							if urls:
-								content += "\n" + "\n".join(f"||{url} ||" for url in urls)
-							if futs:
-								await fut
-						# before = copy.copy(message)
-						message = await self.edit_message(message, content=content, attachments=(), embeds=())
-						# await self.send_event("_edit_", before=before, after=message, force=True)
-					else:
-						await self.silent_delete(message, exc=True)
-						await self.send_event("_delete_", message=message)
+							break
+				else:
+					if reference.author.id == user.id:
+						check = True
+			if not check:
+				return
+			if str(reaction) in "🔳🔲":
+				if message.content.startswith("||"):
+					content = message.content.replace("||", "").strip()
+				else:
+					def temp_url(url, mid=None):
+						if is_discord_attachment(url):
+							a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+							if a_id in self.data.attachments:
+								return self.preserve_attachment(a_id, fn=url)
+							channel = message.channel
+							return self.preserve_as_long(channel.id, message.id, a_id, fn=url)
+						return url
+					futs = deque()
+					for a in message.attachments:
+						futs.append(csubmit(self.get_request(a.url)))
+					urls = set()
+					for e in message.embeds:
+						if e.image:
+							urls.add(temp_url(e.image.url))
+						if e.thumbnail:
+							urls.add(temp_url(e.thumbnail.url))
+					symrem = "".maketrans({c: "" for c in "<>|*"})
+					spl = [word.translate(symrem) for word in message.content.split() if not word.startswith("<")]
+					content = " ".join(word for word in spl if word and not is_url(word))
+					urls.update(word for word in spl if is_url(word))
+					if futs:
+						datas = await gather(*futs)
+						fut = csubmit(self.edit_message(message, content="`LOADING...`", attachments=(), embeds=()))
+						urli = await self.data.exec.uproxy(*(CompatFile(d, filename=url2fn(a.url)) for d, a in zip(datas, message.attachments)), collapse=False, keep=False)
+						urli.extend(urls)
+						urls = urli
+					if urls:
+						content += "\n" + "\n".join(f"||{url} ||" for url in urls)
+					if futs:
+						await fut
+				# before = copy.copy(message)
+				message = await self.edit_message(message, content=content, attachments=(), embeds=())
+				# await self.send_event("_edit_", before=before, after=message, force=True)
+			else:
+				await self.silent_delete(message, exc=True)
+				await self.send_event("_delete_", message=message)
 
 	async def handle_message(self, message, before=None):
 		"Handles a new sent message, calls process_message and sends an error if an exception occurs."

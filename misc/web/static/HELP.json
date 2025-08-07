@@ -1380,23 +1380,6 @@
 			"rate_limit": "(20, 40)",
 			"example": [],
 			"timeout": "84.0"
-		},
-		"Transcribe": {
-			"aliases": [
-				"Transcribe",
-				"Whisper",
-				"TranscribeAudio",
-				"Caption"
-			],
-			"description": "Downloads a song from a link, automatically transcribing to English, or a provided language if applicable.",
-			"usage": "<1:language[en]>? <0:search_link>",
-			"level": "0",
-			"rate_limit": "(30, 45)",
-			"example": [
-				"transcribe https://www.youtube.com/watch?v=kJQP7kiw5Fk",
-				"transcribe Chinese https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-			],
-			"timeout": "1800"
 		}
 	},
 	"IMAGE": {
@@ -1485,6 +1468,25 @@
 			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 6)",
+			"example": [],
+			"timeout": "24"
+		},
+		"Colour": {
+			"aliases": [
+				"Colour",
+				"RGB",
+				"HSV",
+				"HSL",
+				"CMY",
+				"LAB",
+				"LUV",
+				"XYZ",
+				"Color"
+			],
+			"description": "Creates a 128x128 image filled with the target colour.",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(3, 5)",
 			"example": [],
 			"timeout": "24"
 		},
@@ -2070,17 +2072,13 @@
 	"OWNER": {
 		"Reload": {
 			"aliases": [
-				"Reload",
-				"Unload"
+				"Reload"
 			],
 			"description": "Reloads a specified module.",
 			"usage": "",
 			"level": "nan",
 			"rate_limit": "(2, 3)",
-			"example": [
-				"reload admin",
-				"unload string"
-			],
+			"example": [],
 			"timeout": "inf"
 		},
 		"Restart": {

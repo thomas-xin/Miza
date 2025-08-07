@@ -959,7 +959,10 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			cv = ("-c:v", "libsvtav1", "-pix_fmt", "yuv420p") if not h & 1 and not w & 1 else ("-c:v", "libaom-av1", "-pix_fmt", pix, "-usage", "realtime", "-cpu-used", "3")
 			command.extend(("-f", "avif", *cv, "-b:v", str(bitrate)))
 		if anim:
-			command.extend(("-loop", "0", "-q:v", "24"))
+			if opt:
+				command.extend(("-loop", "0", "-q:v", "60"))
+			else:
+				command.extend(("-loop", "0", "-q:v", "75"))
 		elif lossless:
 			command.extend(("-lossless", "1"))
 		else:
@@ -980,11 +983,14 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			command.extend(("-c:v", "libwebp_anim" if anim else "libwebp", "-pix_fmt", pix, "-pred", "mixed"))
 		command.extend(("-f", "webp", "-compression_level", "6" if lossless else "5"))
 		if anim:
-			command.extend(("-loop", "0", "-q:v", "75"))
+			if opt:
+				command.extend(("-loop", "0", "-q:v", "75"))
+			else:
+				command.extend(("-loop", "0", "-q:v", "90"))
 		elif lossless:
 			command.extend(("-lossless", "1"))
 		else:
-			command.extend(("-q:v", "90"))
+			command.extend(("-q:v", "95"))
 	elif fmt == "png":
 		command.extend(("-vframes", "1"))
 		if (w, h) != first.size:
@@ -1088,7 +1094,7 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 		im.save(out, format=fmt, optimize=True)
 	return out.getbuffer()
 
-def anim_into(out, new, first, size, fmt, fs, r=0):
+def anim_into(out, new, first, size, fmt, fs, r=0, hq=False):
 	assert size[0] and size[1], f"Expected non-zero size, got {size}"
 	command = ["ffmpeg", "-nostdin", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel]
 	mode = new["mode"]
@@ -1096,7 +1102,7 @@ def anim_into(out, new, first, size, fmt, fs, r=0):
 		"-f", "rawvideo", "-framerate", str(new["fps"]), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
 		"-video_size", "x".join(map(str, first.size)), "-i", "-",
 	))
-	opts, fmt = ffmpeg_opts(new, new["frames"], new["count"], mode, first, fmt, fs, *size, new["duration"], True)
+	opts, fmt = ffmpeg_opts(new, new["frames"], new["count"], mode, first, fmt, fs, *size, new["duration"], not hq)
 	command.extend(opts)
 	if "." in out:
 		out2 = out.rsplit(".", 1)[0] + "~2." + CODECS.get(fmt, fmt)
@@ -1105,12 +1111,15 @@ def anim_into(out, new, first, size, fmt, fs, r=0):
 	command.append(out2)
 	print(command)
 	proc = psutil.Popen(command, stdin=subprocess.PIPE)
+	frames = []
 	for frame in new["frames"]:
+		frames.append(frame)
 		b = np.asanyarray(frame, dtype=np.uint8).data
 		proc.stdin.write(b)
+	new["frames"] = frames
 	proc.stdin.close()
 	proc.wait()
-	assert os.path.exists(out2), f"Expected output file {out2}"
+	assert os.path.exists(out2) and os.path.getsize(out2), f"Expected output file {out2}"
 	print(os.path.getsize(out2), fs, np.prod(size) * new["count"])
 	if fmt == "gif" and (fs >= 1048576 or "A" not in mode) and np.prod(size) * new["count"] <= 67108864 and os.path.getsize(out2) < fs * 3:
 		out = gifsicle(out2, new, heavy=os.path.getsize(out2) > fs * 1.5)
@@ -1249,17 +1258,13 @@ def evalImg(url, operation, args):
 			else:
 				fps = round(fps, 4)
 			new["fps"] = fps
-			real_frames = []
+			real_frames = {}
 			if issubclass(type(frames), collections.abc.Sequence):
 				first = frames[0]
 			else:
 				it = iter(frames)
-				try:
-					first = next(it)
-				except StopIteration:
-					frames = []
-				else:
-					frames = resume(first, it)
+				first = next(it)
+				frames = resume(first, it)
 			size = first.size
 			if fmt == "auto":
 				if getattr(first, "audio", None) or new["count"] * np.prod(size) > 1073741824:
@@ -1299,14 +1304,16 @@ def evalImg(url, operation, args):
 					"-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
 					"-video_size", "x".join(map(str, size)), "-i", "-",
 				])
+				new["frames"] = frames
 				opts, fmt = ffmpeg_opts(new, frames, count, mode, first, fmt, fs, *size, duration, opt)
+				frames = new.get("frames") or frames
 				command.extend(opts)
 				command.append("cache/" + str(ts) + "." + CODECS.get(fmt, fmt))
 				print(command)
 				env = dict(os.environ)
 				env.pop("CUDA_VISIBLE_DEVICES", None)
 				proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, bufsize=1048576, env=env)
-			i = 0
+			i = None
 			futs = []
 			for i, frame in enumerate(frames):
 				def save_frame(i, frame):
@@ -1339,14 +1346,14 @@ def evalImg(url, operation, args):
 						else:
 							b = frame
 					if not real_frames or fmt in ("gif", "webp", "apng", "avif"):
-						real_frames.append(frame)
+						real_frames[i] = frame
 					return b
 				workers = [fut for fut in futs if not fut.done()]
 				if len(workers) >= 12:
 					for fut in workers:
 						fut.result()
 				futs.append(exc.submit(save_frame, i, frame))
-			print(i)
+			print(i, first)
 			for i, fut in enumerate(futs):
 				b = fut.result()
 				if archive:
@@ -1365,7 +1372,7 @@ def evalImg(url, operation, args):
 				if fmt == "gif" and (fs >= 1048576 or "A" not in mode) and first.width * first.height * new["count"] <= 67108864 and os.path.getsize(out) < fs * 3:
 					out = gifsicle(out, new, heavy=os.path.getsize(out) > fs * 1.5)
 				new["mode"] = mode
-				new["frames"] = real_frames
+				new["frames"] = list(map(real_frames.get, sorted(real_frames)))
 				print("LEN:", len(real_frames))
 				orig = out
 				with open(orig, "rb") as f:
@@ -1419,7 +1426,7 @@ def evalImg(url, operation, args):
 							lower_bound = scale
 					print("F:", w, h, scale, len(out), r)
 			if isinstance(out, str):
-				assert os.path.exists(out), f"Expected output file {out}"
+				assert os.path.exists(out) and os.path.getsize(out), f"Expected output file {out}"
 				with open(out, "rb") as f:
 					return f.read()
 			return out

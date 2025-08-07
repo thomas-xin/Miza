@@ -3107,22 +3107,22 @@ class UpdateMessageLogs(Database):
 		if not message.attachments:
 			return
 		msg = deque()
-		fils = []
+		files = []
 		for a in message.attachments:
 			try:
 				b = await self.bot.get_attachment(a.url, full=False, allow_proxy=True)
 				fil = CompatFile(seq(b), filename=a.filename.removeprefix("SPOILER_"))
-				fils.append(fil)
+				files.append(fil)
 			except:
 				msg.append(proxy_url(a))
 		colour = await self.bot.get_colour(message.author)
 		emb = discord.Embed(colour=colour)
-		emb.description = f"File{'s' if len(fils) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"
+		emb.description = f"File{'s' if len(files) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"
 		msg = "\n".join(msg) if msg else None
-		if len(fils) == 1:
-			m2 = await self.bot.send_with_file(channel, msg, embed=emb, file=fils[0])
+		if len(files) == 1:
+			m2 = await self.bot.send_with_file(channel, msg, embed=emb, file=files[0])
 		else:
-			m2 = await channel.send(msg, embed=emb, files=fils)
+			m2 = await channel.send(msg, embed=emb, files=files)
 		message.attachments = [cdict(name=a.filename, id=a.id, url=self.bot.preserve_as_long(channel.id, m2.id, a.id, fn=a.url)) for a in m2.attachments]
 
 	# Delete events must attempt to find the user who deleted the message
@@ -3142,7 +3142,8 @@ class UpdateMessageLogs(Database):
 			self.data.pop(guild.id)
 			return
 		now = utc()
-		await self.reattachments(channel, message)
+		if not message.author.bot:
+			await self.reattachments(channel, message)
 		u = message.author
 		name_id = str(u)
 		url = await self.bot.get_proxy_url(u)
@@ -3205,7 +3206,7 @@ class UpdateMessageLogs(Database):
 			return
 		message = messages[-1]
 		now = utc()
-		futs = [self.reattachments(channel, m) for m in messages]
+		futs = [self.reattachments(channel, m) for m in messages if not m.author.bot]
 		await gather(*futs)
 		action = discord.AuditLogAction.message_bulk_delete
 		try:

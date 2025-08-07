@@ -42,7 +42,7 @@ class ColourDeficiency(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -90,7 +90,7 @@ class EdgeDetect(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -166,7 +166,7 @@ class Blur(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -229,7 +229,7 @@ class ColourSpace(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -303,7 +303,7 @@ class GMagik(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -392,7 +392,7 @@ class Gradient(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -422,6 +422,58 @@ class Gradient(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
+class Colour(Command):
+	name = ["RGB", "HSV", "HSL", "CMY", "LAB", "LUV", "XYZ", "Color"]
+	description = "Creates a 128x128 image filled with the target colour."
+	schema = cdict(
+		colour=cdict(
+			type="colour",
+			description="The colour of the gradient on one side",
+			example="#BF7FFF",
+			default=(255, 255, 255),
+			aliases=["color"],
+		),
+		filesize=cdict(
+			type="filesize",
+			validation="[1024, 1073741824]",
+			description="The maximum filesize in bytes",
+			example="10kb",
+			default=DEFAULT_FILESIZE,
+			aliases=["fs"],
+		),
+		format=cdict(
+			type="enum",
+			validation=cdict(
+				enum=tuple(IMAGE_FORMS),
+				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
+			),
+			description="The file format or codec of the output",
+			example="mp4",
+			default="auto",
+		),
+	)
+	rate_limit = (3, 5)
+	slash = True
+
+	async def __call__(self, bot, colour, filesize, format, **void):
+		adj = [x / 255 for x in colour]
+		# Any exceptions encountered during colour transformations will immediately terminate the command
+		msg = ini_md(
+			"HEX colour code: " + sqr_md(bytes(colour).hex().upper())
+			+ "\nDEC colour code: " + sqr_md(colour2raw(colour))
+			+ "\nRGB values: " + str(list(colour))
+			+ "\nHSV values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_hsv(adj)))
+			+ "\nHSL values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_hsl(adj)))
+			+ "\nCMY values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_cmy(adj)))
+			+ "\nLAB values: " + sqr_md(", ".join(str(round(x)) for x in rgb_to_lab(adj)))
+			+ "\nLUV values: " + sqr_md(", ".join(str(round(x)) for x in rgb_to_luv(adj)))
+			+ "\nXYZ values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_xyz(adj)))
+		)
+		resp = await process_image("from_colour", "$", [colour])
+		name = "Colour." + get_ext(resp)
+		return cdict(content=msg, file=CompatFile(resp, filename=name), reacts="🔳")
+
+
 class Average(Command):
 	name = ["AverageColour"]
 	description = "Computes the average pixel colour in RGB for the supplied image."
@@ -438,7 +490,7 @@ class Average(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -527,7 +579,7 @@ class QR(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -603,7 +655,7 @@ class Rainbow(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -675,7 +727,7 @@ class Scroll(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -749,7 +801,7 @@ class Spin(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -824,7 +876,7 @@ class Orbit(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -893,7 +945,7 @@ class Pet(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -962,7 +1014,7 @@ class Tesseract(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -1071,7 +1123,7 @@ class Resize(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -1173,7 +1225,7 @@ class Crop(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -1247,7 +1299,7 @@ class Adjust(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(
@@ -1344,7 +1396,7 @@ class Blend(Command):
 			validation="[1024, 1073741824]",
 			description="The maximum filesize in bytes",
 			example="10kb",
-			default=CACHE_FILESIZE,
+			default=DEFAULT_FILESIZE,
 			aliases=["fs"],
 		),
 		format=cdict(

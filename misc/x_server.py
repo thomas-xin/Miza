@@ -1334,37 +1334,6 @@ class Server:
 		return ""
 
 	@cp.expose
-	@cp.tools.accept(media="multipart/form-data")
-	def forward(self, **kwargs):
-		ts = time.time_ns() // 1000
-		fn = f"saves/filehost/{IND}{ts}~.forward$"
-		urls = kwargs.get("urls")
-		if not urls:
-			url = kwargs.get("url")
-			if not url:
-				raise IOError("Missing urls field")
-			urls = [url]
-		elif isinstance(urls, str):
-			urls = orjson.loads(urls)
-		code = int(kwargs.get("code", 307))
-		ftype = int(kwargs.get("ftype", 1))
-		url = f"/p/{n2p(ts)}"
-		if len(urls) <= 1:
-			s = f'<!DOCTYPE HTML><!--["{urls[0]}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0;URL={urls[0]}"/></html>'
-		else:
-			with reqs.next().head(urls[0], headers=Request.header(), stream=True, timeout=10) as resp:
-				mime = resp.headers.get("Content-Type") or "text/html"
-			ftype = 3
-			s =  (
-				f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0;URL={url}"/>'
-				+ f'<!--["Multi-redirect",0,"{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--></html>'
-			)
-		with open(fn, "w", encoding="utf-8") as f:
-			f.write(s)
-		update_headers(cp.response.headers, **HEADERS)
-		raise cp.HTTPRedirect(url, status=307)
-
-	@cp.expose
 	def backup(self, token="~"):
 		at = AUTH.get("discord_token")
 		if token != at:

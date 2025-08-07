@@ -4769,6 +4769,7 @@ def new_playwright_page(browser="firefox", viewport=dict(width=480, height=320),
 	return browsers[h].new_page(viewport=viewport)
 
 
-CACHE_FILESIZE = 10485760
+CACHE_FILESIZE = 10 * 1048576
+DEFAULT_FILESIZE = 50 * 1048576
 
 mime_wait.result(timeout=8)

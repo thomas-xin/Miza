@@ -808,6 +808,7 @@ class Imagine(Command):
 			),
 			description='Transform mode; "preprocess" and "raw" affect text prompts, while the others affect image prompts',
 			example="raw",
+			default="caption",
 		),
 		url=cdict(
 			type="image",

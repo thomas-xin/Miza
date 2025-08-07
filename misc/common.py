@@ -1343,10 +1343,12 @@ def get_colour_list():
 	colourlist_cache["map"] = colour_names
 	print(f"Successfully loaded {len(colour_names)} colour names.")
 def load_colour_list():
+	global colour_names
 	try:
-		return colourlist_cache["map"]
+		colour_names = colourlist_cache["map"]
 	except KeyError:
-		return get_colour_list()
+		colour_names = get_colour_list()
+	return colour_names
 
 def parse_colour(s, default=None):
 	ishex = isdec = False

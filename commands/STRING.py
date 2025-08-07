@@ -1127,6 +1127,8 @@ class Time(Command):
 		emb.add_field(name="Time Delta", value=f"`{dt - dt2}`")
 		emb.add_field(name="Live Timestamp", value=f"`{dt.as_discord()}`\n{dt.as_discord()}")
 		emb.add_field(name="Live Delta", value=f"`{dt.as_rel_discord()}`\n{dt.as_rel_discord()}")
+		with tracebacksuppressor:
+			emb.timestamp = datetime.datetime.fromtimestamp(dt.timestamp(), tz=datetime.timezone.utc)
 		return cdict(embed=emb)
 
 
