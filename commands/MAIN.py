@@ -1102,7 +1102,12 @@ class Reminder(Command):
 		time=cdict(
 			type="datetime",
 			description="Time input to parse",
-			example="35 minutes and 6.25 seconds before 3am next tuesday, EDT",
+			example="35 mins and 6.25 secs before 3am next tuesday, EDT",
+		),
+		every=cdict(
+			type="timedelta",
+			description="Turn the reminder into a recurring one that will resend itself after a given amount of time",
+			example="One hundred thousand thirty seconds",
 		),
 		delete=cdict(
 			type="index",
@@ -1115,7 +1120,7 @@ class Reminder(Command):
 	rate_limit = (8, 13)
 	slash = True
 
-	async def __call__(self, bot, _message, _comment, _channel, _user, mode="reminder", message=None, icon=None, time=None, delete=None, **void):
+	async def __call__(self, bot, _message, _comment, _channel, _user, mode="reminder", message=None, icon=None, time=None, every=None, delete=None, **void):
 		sendable = _channel if mode == "announce" else _user
 		rems = bot.data.reminders.get(sendable.id, [])
 		if delete is not None:
@@ -1155,17 +1160,6 @@ class Reminder(Command):
 				message = bold(ini_md(msg))
 		elif len(message) > 4096:
 			raise OverflowError(f"Input message too long ({len(message)} > 4096).")
-			# # Schedule for an event from a user
-			# rem = cdict(
-			# 	user=remind_as.id,
-			# 	msg=msg,
-			# 	u_id=t,
-			# 	t=inf,
-			# )
-			# rems.append(rem)
-			# s = "$" + str(t)
-			# seq = set_dict(bot.data.reminders, s, deque())
-			# seq.append(sendable.id)
 		elif time is None:
 			raise ValueError("Please input a valid time.")
 		dt = time
@@ -1173,6 +1167,7 @@ class Reminder(Command):
 			user=_user.id,
 			msg=message,
 			t=dt.timestamp_exact(),
+			e=max(1, every.total_seconds()) if every else 0,
 			ref=(_message.channel.id, _message.id),
 		)
 		recur = 60 if mode == "urgent" else None
@@ -1528,44 +1523,6 @@ class UpdateReminders(Database):
 				csubmit(ch.send(content, embed=emb, reference=reference))
 			else:
 				csubmit(self.recurrent_message(ch, content, emb, x.get("recur", 60), reference=reference))
-
-	# Seen event: runs when users perform discord actions
-	async def _seen_(self, user, **void):
-		s = "$" + str(user.id)
-		if s in self.data:
-			assigned = self.data[s]
-			# Ignore user events without assigned triggers
-			if not assigned:
-				self.data.pop(s)
-				return
-			with tracebacksuppressor:
-				for u_id in assigned:
-					# Send reminder to all targeted users/channels
-					ch = await self.bot.fetch_messageable(u_id)
-					rems = set_dict(self.data, u_id, [])
-					pops = set()
-					for i, x in enumerate(reversed(rems), 1):
-						if x.get("u_id", None) == user.id:
-							emb = discord.Embed(description=x["msg"])
-							try:
-								u = self.bot.get_user(x["user"], replace=True)
-							except KeyError:
-								u = cdict(x)
-							emb.set_author(**get_author(u))
-							if not x.get("recur"):
-								self.bot.send_embeds(ch, emb)
-							else:
-								csubmit(self.recurrent_message(ch, None, emb, x.get("recur", 60)))
-							pops.add(len(rems) - i)
-						elif isfinite(x["t"]):
-							break
-					it = [rems[i] for i in range(len(rems)) if i not in pops]
-					rems.clear()
-					rems.extend(it)
-					if not rems:
-						self.data.pop(u_id)
-			with suppress(KeyError):
-				self.data.pop(s)
 
 
 class UpdateNotes(Database):

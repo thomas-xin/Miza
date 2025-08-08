@@ -585,7 +585,7 @@ class Personality(Command):
 			return css_md(f"Personality settings for {sqr_md(_channel)} have been reset.")
 		if not description and frequency_penalty is None and temperature is None and top_p is None and stream is None and tts is None and cutoff is None:
 			p = self.retrieve(_channel)
-			return ini_md(f"Current personality settings for {sqr_md(_channel)}:{iter2str(p)}\n(Use {bot.get_prefix(_channel.guild)}personality DEFAULT to reset).")
+			return ini_md(f"Current personality settings for {sqr_md(_channel)}:{iter2str(p)}\n(Use {bot.get_prefix(_channel.guild)}personality DEFAULT to reset; case-sensitive).")
 		if description and (len(description) > 4096 or len(description) > 512 and _premium.value < 2):
 			raise OverflowError("Maximum currently supported personality prompt size is 512 characters, 4096 for premium users.")
 		if description and not _nsfw:
@@ -632,7 +632,7 @@ class Instruct(Command):
 			type="enum",
 			validation=cdict(
 				enum=list(ai.available),
-				accepts={"llama": "llama-3-70b", "haiku": "claude-3-haiku", "r1": "deepseek-r1", "deepseek": "deepseek-v3", "gpt3.5": "gpt-3.5", "sonnet": "claude-3.7-sonnet", "dbrx": "dbrx-instruct", "gpt4": "gpt-4.1", "gpt-4o": "gpt-4", "opus": "claude-3-opus"},
+				accepts={"llama": "llama-3-70b", "haiku": "claude-3-haiku", "r1": "deepseek-r1", "deepseek": "deepseek-v3", "gpt3.5": "gpt-3.5", "sonnet": "claude-3.7-sonnet", "dbrx": "dbrx-instruct", "gpt5": "gpt-5", "gpt4": "gpt-4.1", "gpt-4o": "gpt-4", "opus": "claude-3-opus"},
 			),
 			description="Target LLM to invoke",
 			example="deepseek",
@@ -689,6 +689,12 @@ class Instruct(Command):
 		),
 		O4M=cdict(
 			model="o4-mini",
+		),
+		GPT5=cdict(
+			model="gpt-5",
+		),
+		GPT5M=cdict(
+			model="gpt-5-mini",
 		),
 		GPT4=cdict(
 			model="gpt-4.1",

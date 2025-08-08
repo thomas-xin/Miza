@@ -85,23 +85,23 @@ def get_best_audio(entry):
 	ac = 0
 	replace = True
 	for fmt in fmts:
-		q = (
-			fmt.get("acodec") in ("opus", "vorbis"),
-			fmt.get("vcodec") in (None, "none"),
-			-abs(fmt["audio_channels"] - 2) if isinstance(fmt.get("audio_channels"), (int, float)) else -inf,
-			fmt["abr"] if isinstance(fmt.get("abr"), (int, float)) else -inf,
-			fmt["tbr"] if not isinstance(fmt.get("abr"), (int, float)) and isinstance(fmt.get("tbr"), (int, float)) else -inf,
-			fmt["asr"] if isinstance(fmt.get("asr"), (int, float)) else -inf,
-		)
-		q = fmt.get("abr", 0)
-		if not isinstance(q, (int, float)):
-			q = 0
-		if q <= 0:
-			if fmt.get("asr"):
-				q = fmt["asr"] / 1000
-			elif fmt.get("audio_channels"):
-				q = fmt["audio_channels"]
-		q = (fmt.get("acodec") in ("opus", "vorbis"), fmt.get("vcodec") in (None, "none"), fmt.get("tbr", 0) or q)
+		# q = (
+		# 	fmt.get("acodec") in ("opus", "vorbis"),
+		# 	fmt.get("vcodec") in (None, "none") and fmt.get("acodec") not in (None, "none"),
+		# 	-abs(fmt["audio_channels"] - 2) if isinstance(fmt.get("audio_channels"), (int, float)) else -inf,
+		# 	fmt["abr"] if isinstance(fmt.get("abr"), (int, float)) else -inf,
+		# 	fmt["tbr"] if not isinstance(fmt.get("abr"), (int, float)) and isinstance(fmt.get("tbr"), (int, float)) else -inf,
+		# 	fmt["asr"] if isinstance(fmt.get("asr"), (int, float)) else -inf,
+		# )
+		# q = fmt.get("abr", 0)
+		# if not isinstance(q, (int, float)):
+		# 	q = 0
+		# if q <= 0:
+		# 	if fmt.get("asr"):
+		# 		q = fmt["asr"] / 1000
+		# 	elif fmt.get("audio_channels"):
+		# 		q = fmt["audio_channels"]
+		q = (fmt.get("acodec") in ("opus", "vorbis"), fmt.get("vcodec") in (None, "none") and fmt.get("acodec") not in (None, "none"), fmt.get("abr", 0), fmt.get("tbr", 0))
 		u = as_str(fmt["url"])
 		if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
 			replace = False

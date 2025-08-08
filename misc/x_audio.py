@@ -1276,8 +1276,9 @@ class AudioFile:
 			if isinstance(self.stream, str):
 				buff = False
 				if pos > 60 or not self.live or is_discord_attachment(source):
-					args = ["./ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + args[1:]
-					args.insert(1, "-nostdin")
+					if is_url(source):
+						args = ["./ffmpeg", "-nostdin", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "250"] + args[1:]
+					args.insert(1, )
 					args.append(source)
 				else:
 					args.append("-")

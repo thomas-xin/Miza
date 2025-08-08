@@ -1321,7 +1321,7 @@ def sync_fps(props, duration=None, fps=None):
 	print("SYNC:", props, seconds, fps, prog)
 	return seconds, fps, prog
 
-def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", retrieve=False, **kwargs):
+def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", keep_fps="exact", retrieve=False, **kwargs):
 	"""
 	Synchronizes and maps a function over a sequence of images.
 	The images may be static (repeated if necessary), or animated, in which case a heuristically determined set of frames will be used.
@@ -1344,7 +1344,12 @@ def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", r
 		sources = [get_image(url) for url in images]
 	else:
 		sources = images
-	props = [properties(im, default_duration=duration, default_fps=fps) for im in sources]
+	if keep_fps == "exact":
+		props = [properties(im, default_duration=duration, default_fps=fps) for im in sources]
+	elif keep_fps == "approx":
+		props = [properties(im) for im in sources]
+	else:
+		raise NotImplementedError(keep_fps)
 	seconds, fps, prog = sync_fps(props, duration, fps)
 	count = max(1, round(fps * seconds))
 	if duration == 0:
@@ -1565,7 +1570,7 @@ def orbit_map(image, extras, duration, fps, count):
 	sources = [image, *(get_image(url) for url in extras)]
 	orbitals = sources * symmetry
 	orbital_count = len(orbitals)
-	props = [properties(im, default_duration=duration, default_fps=fps) for im in sources]
+	props = [properties(im) for im in sources]
 	if any(t[0] > 1 for t in props):
 		symmetry = 1
 	duration /= symmetry
@@ -1597,7 +1602,7 @@ def orbit_map(image, extras, duration, fps, count):
 				im2 = Image.alpha_composite(im3, im2)
 			im = Image.alpha_composite(im, im2)
 		return im
-	return map_sync(orbitals, func=orbit_iterator, duration=duration, fps=fps, keep_size=None)
+	return map_sync(orbitals, func=orbit_iterator, duration=duration, fps=fps, keep_size=None, keep_fps="approx")
 
 def quad_as_rect(quad):
 	if quad[0] != quad[2]:

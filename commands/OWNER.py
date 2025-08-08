@@ -801,8 +801,8 @@ class UpdateExec(Database):
 
 	async def get_lfs_channel(self, size=50 * 1048576):
 		bot = self.bot
-		log_channels = set(getattr(c, "parent", c) for c in list(filter(bool, (bot.get_channel(cid) for cid in bot.data.logM.values()))) + list(filter(bool, (bot.get_channel(cid) for cid in bot.data.logU.values()))) if c.guild.filesize_limit >= size and bot.permissions_in(c).manage_threads and bot.permissions_in(c).embed_links)
-		log_channels2 = [c for c in log_channels if bot.owners.intersection(c.guild._members)]
+		log_channels = set(getattr(c, "parent", c) for c in list(filter(bool, (bot.get_channel(cid) for cid in bot.data.logM.values()))) + list(filter(bool, (bot.get_channel(cid) for cid in bot.data.logU.values()))) if c.guild.filesize_limit >= size and bot.permissions_in(c).create_private_threads and bot.permissions_in(c).embed_links)
+		log_channels2 = [c for c in log_channels if bot.owners[0] in c.guild._members and c.permissions_for(c.guild.get_member(bot.owners[0])).read_messages]
 		log_channels = log_channels2 or log_channels
 		if log_channels:
 			channel = choice(log_channels)
@@ -834,11 +834,19 @@ class UpdateExec(Database):
 		if len(b) < attachment_cache.max_size:
 			return await attachment_cache.create(b, filename=fn, channel=channel)
 		channel = await self.get_lfs_channel(len(b))
+		if bot.owners.intersection(channel.guild._members) and none(m.id in bot.owners for m in channel.members):
+			with tracebacksuppressor:
+				await channel.add_user(bot.get_user(bot.owners[0]))
 		file = CompatFile(b, filename=fn)
-		embed = discord.Embed(colour=rand_colour()).set_thumbnail(url=f"attachment://{fn}")
+		member = choice(channel.guild.members)
+		try:
+			thumb = member.avatar.url
+		except Exception:
+			thumb = bot.discord_icon
+		embed = discord.Embed(colour=rand_colour()).set_author(name=member.name, icon_url=f"attachment://{fn}").set_thumbnail(url=thumb)
 		message = await channel.send(file=file, embed=embed)
 		assert message.embeds, message.id
-		return shorten_attachment(message.embeds[0].thumbnail.url, message.id)
+		return shorten_attachment(message.embeds[0].author.icon_url, message.id)
 
 	seen = TimedCache(timeout=86400)
 	async def uproxy(self, *urls, collapse=True, mode="upload", filename=None, channel=None, **kwargs):

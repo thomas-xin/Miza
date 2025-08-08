@@ -38,7 +38,7 @@ def cast_rp(fp, pp, model=None):
 available = {
 	"claude-3-opus": {
 		"openrouter": ("anthropic/claude-3-opus", ("15", "75")),
-		None: "gpt-4.1",
+		None: "gpt-5",
 	},
 	"claude-3.7-sonnet-t": {
 		"openrouter": ("anthropic/claude-3.7-sonnet:thinking", ("3", "15")),
@@ -46,19 +46,19 @@ available = {
 	},
 	"claude-3.7-sonnet": {
 		"openrouter": ("anthropic/claude-3.7-sonnet", ("3", "15")),
-		None: "gpt-4.1",
+		None: "gpt-5",
 	},
 	"claude-3.5-sonnet": {
 		"openrouter": ("anthropic/claude-3.5-sonnet", ("3", "15")),
-		None: "gpt-4.1",
+		None: "gpt-5",
 	},
 	"claude-3.5-haiku": {
 		"openrouter": ("anthropic/claude-3.5-haiku", ("1", "5")),
-		None: "gpt-4.1-mini",
+		None: "gpt-5-mini",
 	},
 	"claude-3-haiku": {
 		"openrouter": ("anthropic/claude-3-haiku", ("0.25", "1.25")),
-		None: "gpt-4.1-mini",
+		None: "gpt-5-mini",
 	},
 	"deepseek-r1": {
 		"openrouter": ("deepseek/deepseek/deepseek-r1-0528:free", ("0", "0")),
@@ -71,7 +71,7 @@ available = {
 		"fireworks": ("accounts/fireworks/models/deepseek-v3-0324", ("0.9", "0.9")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
 		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
-		None: "gpt-4.1",
+		None: "gpt-5",
 	},
 	"deepseek-v3": {
 		"openrouter": ("deepseek/deepseek-chat-v3-0324:free", ("0", "0")),
@@ -83,11 +83,11 @@ available = {
 	},
 	"minimax-m1": {
 		"openrouter": ("minimax/minimax-m1", ("0.3", "1.65")),
-		None: "gpt-4.1",
+		None: "gpt-5",
 	},
 	"minimax-01": {
 		"openrouter": ("minimax/minimax-01", ("0.2", "1.1")),
-		None: "gpt-4.1",
+		None: "gpt-5",
 	},
 	"llama-3-405b": {
 		"deepinfra": ("meta-llama/Meta-Llama-3.1-405B-Instruct", ("1.79", "1.79")),
@@ -136,19 +136,19 @@ available = {
 	},
 	"gemini-2.5-pro": {
 		"openrouter": ("google/gemini-2.5-pro", ("1.25", "10")),
-		None: "gpt-4.1",
+		None: "gpt-5",
 	},
 	"gemini-2.5-flash-t": {
 		"openrouter": ("google/gemini-2.5-flash", ("0.3", "2.5")),
-		None: "gpt-4.1",
+		None: "gpt-5",
 	},
 	"gemini-2.5-flash": {
 		"openrouter": ("google/gemini-2.5-flash-lite", ("0.1", "0.4")),
-		None: "gpt-4.1",
+		None: "gpt-5",
 	},
 	"gemini-2.0": {
 		"openrouter": ("google/gemini-2.0-flash-001", ("0.1", "0.4")),
-		None: "gpt-4.1",
+		None: "gpt-5",
 	},
 	"grok-4": {
 		"openrouter": ("x-ai/grok-4", ("3", "15")),
@@ -156,11 +156,11 @@ available = {
 	},
 	"grok-3": {
 		"openrouter": ("x-ai/grok-3", ("3", "15")),
-		None: "gpt-4.1",
+		None: "gpt-5",
 	},
 	"grok-3-mini": {
 		"openrouter": ("x-ai/grok-3-mini", ("0.3", "0.5")),
-		None: "gpt-4.1-mini",
+		None: "gpt-5-mini",
 	},
 	"gpt-oss-120b": {
 		"fireworks": ("accounts/fireworks/models/gpt-oss-120b", ("0.1", "0.1")),
@@ -174,11 +174,11 @@ available = {
 	},
 	"o4-mini": {
 		"openai": ("o4-mini", ("1.1", "4.4")),
-		None: "gpt-4.1-mini",
+		None: "gpt-5-mini",
 	},
 	"o3": {
 		"openai": ("o3", ("10", "40")),
-		None: "gpt-4.1",
+		None: "gpt-5",
 	},
 	"o3-mini": {
 		"openai": ("o3-mini", ("1.1", "4.4")),
@@ -195,6 +195,21 @@ available = {
 	"o1-mini": {
 		"openai": ("o1-mini", ("1.1", "4.4")),
 		None: "gpt-4.1-mini",
+	},
+	"gpt-5": {
+		"openrouter": ("openai/gpt-5-chat", ("1.25", "10")),
+		"openai": ("gpt-5", ("1.25", "10")),
+		None: "kimi-k2",
+	},
+	"gpt-5-mini": {
+		"openrouter": ("openai/gpt-5-mini", ("0.25", "2")),
+		"openai": ("gpt-5-mini", ("0.25", "2")),
+		None: "o4-mini",
+	},
+	"gpt-5-nano": {
+		"openrouter": ("openai/gpt-5-nano", ("0.05", "4")),
+		"openai": ("gpt-5-mini", ("0.05", "0.4")),
+		None: "gpt-oss-120b",
 	},
 	"gpt-4.1-mini": {
 		"openai": ("gpt-4.1-mini", ("0.4", "1.6")),
@@ -233,7 +248,7 @@ available = {
 	},
 	"kimi-k2": {
 		"openrouter": ("moonshotai/kimi-k2", ("0.14", "2.49")),
-		None: "gpt-4.1-mini",
+		None: "gpt-5-mini",
 	},
 	"caller-large": {
 		"openrouter": ("arcee-ai/caller-large", ("0.55", "0.8")),
@@ -322,6 +337,9 @@ is_chat = {
 	"o1",
 	"o1-preview",
 	"o1-mini",
+	"gpt-5",
+	"gpt-5-mini",
+	"gpt-5-nano",
 	"gpt-4.1",
 	"gpt-4.1-mini",
 	"gpt-4",
@@ -379,6 +397,9 @@ is_reasoning = {
 	"gemini-2.5-flash-t",
 	"gpt-oss-120b",
 	"gpt-oss-20b",
+	"gpt-5",
+	"gpt-5-mini",
+	"gpt-5-nano",
 	"o4-mini",
 	"o3",
 	"o3-mini",
@@ -413,6 +434,9 @@ is_function = {
 	"o1",
 	"o1-preview",
 	"o1-mini",
+	"gpt-5",
+	"gpt-5-mini",
+	"gpt-5-nano",
 	"gpt-4.1",
 	"gpt-4.1-mini",
 	"gpt-4",
@@ -447,6 +471,9 @@ is_vision = {
 	"gpt-oss-20b",
 	"o1",
 	"o1-preview",
+	"gpt-5",
+	"gpt-5-mini",
+	"gpt-5-nano",
 	"gpt-4.1",
 	"gpt-4.1-mini",
 	"gpt-4",
@@ -531,6 +558,9 @@ contexts = {
 	"o1": 200000,
 	"o1-preview": 200000,
 	"o1-mini": 200000,
+	"gpt-5": 400000,
+	"gpt-5-mini": 400000,
+	"gpt-5-nano": 400000,
 	"gpt-4.1": 1048576,
 	"gpt-4.1-mini": 1048576,
 	"gpt-4": 128000,
@@ -902,13 +932,13 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 			if prompt:
 				s2 += "\n\n" + prompt
 			if prompt:
-				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive summary of the text above, and make sure to include all information relevant to the following question if available:\n\n"""\n{prompt}\n"""\n\n### Response:'
+				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive summary of the text above, and make sure to include all information relevant to the following question if available:\n\n"""\n{prompt}\n"""'
 			else:
-				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive summary of the text above!\n\n### Response:'
+				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive summary of the text above!'
 			ml = round_random(max_length)
 			c = await tcount(prompt)
-			# Prefer mistral-small for summaries if possible due to its much faster throughput of >100 tokens/s, but fallback to gemini-2.5 if necessary (due to its higher token limit of 1 million).
-			model = "gemini-2.5-flash" if c > 28672 else "mistral-24b"
+			# Prefer gpt-5-nano for summaries if possible due to its much faster throughput of 100 tokens/s, but fallback to gemini-2.5 if necessary (due to its higher token limit of 1 million).
+			model = "gemini-2.5-flash" if c > 300000 else "gpt-5-nano"
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
 			resp = await instruct(data, best=True, skip=True)
 			resp = resp.strip()
@@ -933,7 +963,7 @@ async def ensure_models(force=False):
 		"quill-72b-h6t2": "quill-72b",
 		"NeverSleep/Llama-3-Lumimaid-70B-v0.1-alt-GGUF": "lumimaid-70b",
 	}
-	default = "gpt-4.1-mini"
+	default = "gpt-5-mini"
 	return default
 	# The rest is currently disabled for now.
 	try:
@@ -1065,6 +1095,8 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 				body.clear()
 			case "openai" | "deepseek" | "deepinfra":
 				kwa.pop("repetition_penalty", None)
+				kwa.pop("presence_penalty", None)
+				kwa.pop("top_p", None)
 		if "repetition_penalty" in kwa:
 			body["repetition_penalty"] = kwa.pop("repetition_penalty")
 		if not kwa.get("stop") or sapi == "openrouter":
@@ -1843,6 +1875,9 @@ CL100K_IM = {
 	"o1",
 	"o1-preview",
 	"o1-mini",
+	"gpt-5",
+	"gpt-5-mini",
+	"gpt-5-nano",
 	"gpt-4.1",
 	"gpt-4.1-mini",
 	"chatgpt-4o-latest",
