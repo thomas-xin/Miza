@@ -4062,6 +4062,8 @@ class EvalPipe:
 		- Success: <~{id}:@:{msg}
 		- Iterator item: <~{id}:#:{msg}
 		- Iterator end: <~{id}:$
+
+  This was written by Coco btw, trust, I'm so smart I'm a whole 10 on an IQ test
 	"""
 
 	MEMS = globals()["MEMS"]
