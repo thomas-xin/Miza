@@ -578,16 +578,20 @@ class UpdateSkyShardReminders(Database):
 		for s in shards:
 			shard_hash = int(s.occurrences[0].start.timestamp())
 			taken = taken_shards.get(shard_hash, 0)
+			ping = True
 			try:
 				for i, o in enumerate(s.occurrences):
 					ts = o.land.timestamp()
 					reminders = [ts - 3600, ts - 300, ts]
 					if not i:
 						reminders.insert(0, ts - 43200)
+					reminders.append(o.end.timestamp() + 1)
 					for r in reminders:
 						if r > taken and t >= r:
 							taken = taken_shards[shard_hash] = r
 							self[0] = taken_shards
+							if r == reminders[-1]:
+								ping = False
 							raise StopIteration
 			except StopIteration:
 				pass
@@ -611,7 +615,7 @@ class UpdateSkyShardReminders(Database):
 			timing = "Active" if any(o.land < ct < o.end for o in s.occurrences) else next((DynamicDT.fromdatetime(o.land).as_rel_discord() for o in s.occurrences if ct < o.land), "Expired")
 			location = " -> ".join(w.capitalize() for w in s.map.split("."))
 			landings = "\n".join(f"  - **{format_landing(o)}**" if o.land < ct < o.end else f"  - {format_landing(o)}" for o in s.occurrences)
-			embed.description = f"""- {timing}
+			embed.description = f"""- Status: **{timing}**
 - Location: {location}
 - Reward: {reward}
 - Landings:
@@ -626,6 +630,7 @@ class UpdateSkyShardReminders(Database):
 				except Exception:
 					print_exc()
 					self.pop(k)
+				message = None
 				try:
 					m_id = v.reminded[shard_hash]
 				except KeyError:
@@ -651,8 +656,12 @@ class UpdateSkyShardReminders(Database):
 						print_exc()
 						continue
 					else:
-						csubmit(bot.silent_delete(message))
-				message = await send_with_react(user, embed=embed, reacts="✅")
+						if ping:
+							csubmit(bot.silent_delete(message))
+				if ping or not message:
+					message = await send_with_react(user, embed=embed, reacts="✅")
+				else:
+					await message.edit(embed=embed)
 				v.reminded[shard_hash] = message.id
 				self[k] = v
 
