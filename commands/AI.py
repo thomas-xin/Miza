@@ -995,7 +995,7 @@ class Imagine(Command):
 		eprompts = alist()
 		dups = max(1, random.randint(amount >> 2, amount))
 		oprompt = prompt
-		if mode == "preprocess" and model != "dalle3" and len(prompt.split()) < 32:
+		if mode in ("caption", "preprocess") and not url and model != "dalle3" and len(prompt.split()) < 32:
 			temp = oprompt.replace('"""', "'''")
 			prompt = f'### Instruction:\n"""\n{temp}\n"""\n\nImprove the above image caption as a description to send to txt2img image generation. Be as creative and detailed as possible in at least 2 sentences, but stay concise!\n\n### Response:'
 			resp = cdict(choices=[])

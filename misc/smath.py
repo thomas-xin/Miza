@@ -83,6 +83,7 @@ sec2time = lambda s: TimeDelta(seconds=s).to_string(precision=4)
 time_repr = lambda s, mode="R": f"<t:{round(s.timestamp() if getattr(s, 'timestamp', None) else s)}:{mode}>"
 time_delta = lambda s: str(TimeDelta(seconds=s))
 time_until = lambda s: str(DynamicDT.utcfromtimestamp(s) - DynamicDT.utcnow())
+time_until_short = lambda s: (DynamicDT.utcfromtimestamp(s) - DynamicDT.utcnow()).to_short()
 time_after = lambda s: str(DynamicDT.utcnow() - DynamicDT.utcfromtimestamp(s))
 utc_ts = lambda s: s.replace(tzinfo=datetime.timezone.utc).timestamp()
 to_utc = lambda dt: dt.replace(tzinfo=datetime.timezone.utc)
@@ -1357,12 +1358,13 @@ obf = {
 	"X": "Х",
 	"Y": "Ү",
 	"a": "а",
-	"c": "с",
+	"c": "ϲ",
 	"e": "е",
 	"i": "і",
 	"o": "о",
 	"p": "р",
 	"s": "ѕ",
+	"u": "ս",
 	"x": "х",
 	"y": "у",
 }

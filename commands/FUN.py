@@ -1774,7 +1774,7 @@ class Matchmaking(Command):
 	usage = "<objects>*"
 	example = ("ship user_a user_b", "ship")
 	rate_limit = (3, 4)
-	slash = ("Ship",)
+	# slash = ("Ship",)
 
 	async def __call__(self, bot, message, channel, guild, args, **void):
 		uids = deque()
@@ -2294,7 +2294,8 @@ class UpdateDadjokes(Database):
 		user = message.author
 		text = m.group().strip()
 		i = text.casefold().index("m")
-		spl = text[i + 1:].lstrip().split()
+		target = text[i + 1:].lstrip()
+		spl = target.split()
 		nick = ""
 		while spl and len(nick) + len(spl[0]) <= 31:
 			if nick:
@@ -2303,11 +2304,11 @@ class UpdateDadjokes(Database):
 		if spl and not nick:
 			nick = spl[0]
 		nick = lim_str(nick, 32)
-		if nick and nick != user.display_name:
+		if target:
 			v = random.random() * 100
 			if v < curr.get("response", curr.get("resp", 0)):
-				csubmit(send_with_reply(message.channel, message, f"Hi, {nick}! {get_random_smiley()}"))
-			if v < curr.get("nickname", curr.get("nick", 0)):
+				csubmit(send_with_reply(message.channel, message, f"Hi, {target}! {get_random_smiley()}"))
+			if v < curr.get("nickname", curr.get("nick", 0)) and nick and nick != user.display_name:
 				await user.edit(nick=nick, reason="Pranked!")
 
 

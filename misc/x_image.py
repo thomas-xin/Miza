@@ -221,12 +221,15 @@ class ImageSequence(Image.Image):
 			return self.__getattribute__(key)
 		except AttributeError:
 			if self.it:
-				while len(self._images) <= self._position:
-					self._images.append(next(self.it))
-					if len(self._images) >= len(self):
-						if self.close:
-							self.close()
-						break
+				try:
+					while len(self._images) <= self._position:
+						self._images.append(next(self.it))
+						if len(self._images) >= len(self):
+							if self.close:
+								self.close()
+							break
+				except StopIteration:
+					raise StopIteration(len(self._images), self._position, len(self))
 			im = self._images[self._position]
 			try:
 				if not im.im:
@@ -885,10 +888,23 @@ def optimise(im, keep_rgb=True, recurse=True, max_frames=60):
 	TypeError: If the input is not an image or a sequence of images, or if the image is a dictionary.
 	"""
 	try:
-		if not recurse:
-			raise TypeError
-		it = iter(im)
-	except TypeError:
+		try:
+			if not recurse:
+				raise EOFError
+			if isinstance(im, Image.Image):
+				raise TypeError
+			it = iter(im)
+		except TypeError:
+			im.seek(1)
+			def iterate(im):
+				try:
+					for i in range(2147483648):
+						im.seek(i)
+						yield im
+				except EOFError:
+					pass
+			it = iterate(im)
+	except EOFError:
 		pass
 	else:
 		if not im:
@@ -980,7 +996,8 @@ def optimise(im, keep_rgb=True, recurse=True, max_frames=60):
 					return (im := im.convert("L"))
 		return im
 	finally:
-		print("OP:", original, im.mode)
+		if original != im.mode:
+			print("OP:", original, im.mode)
 
 # Autodetect max image size, keeping aspect ratio
 def max_size(w, h, maxsize, force=False):
@@ -2188,6 +2205,73 @@ def get_colour(image):
 			return [0, 0, 0]
 		return [np.sum(np.multiply(c.T, a)) / sumA for c in np.asanyarray(rgb, dtype=np.uint8).T]
 	return [np.mean(c) for c in np.asanyarray(rgb, dtype=np.uint8).T]
+
+def get_average_frame(image):
+	arr = np.asanyarray(image).astype(np.float64)
+	i = 0
+	try:
+		for i in range(1, 2147483648):
+			image.seek(i)
+			arr += image
+	except (EOFError, StopIteration):
+		pass
+	if i:
+		arr *= 1 / (i + 1)
+	return np.clip(arr, 0, 255, out=arr).astype(np.uint8)
+
+def psnr(image, extras):
+	assert len(extras) == 1, "Only 2 images are currently accepted."
+	image2 = get_image(extras[0])
+	return cv2.PSNR(get_average_frame(image), get_average_frame(image2))
+
+def cut_to_loop(image):
+	frames, duration, fps = properties(image)
+	# image = ImageSequence.fromiter(optimise(image), frameprops=(frames, duration, fps))
+	first = np.asanyarray(image, dtype=np.uint8)
+	try:
+		image.seek(1)
+	except EOFError:
+		return image
+	else:
+		second = np.asanyarray(image, dtype=np.uint8)
+	closest = frames - 1
+	p = 0
+	for i in range(frames // 2, frames - 1):
+		image.seek(i)
+		curr = np.asanyarray(image, dtype=np.uint8)
+		image.seek(i + 1)
+		curr2 = np.asanyarray(image, dtype=np.uint8)
+		p2 = cv2.PSNR(first, curr) + cv2.PSNR(second, curr2)
+		print(p2)
+		if p2 >= p:
+			p, closest = p2, i
+	image.seek(frames - 1)
+	last = np.asanyarray(image, dtype=np.uint8)
+	image.seek(frames - 2)
+	second_last = np.asanyarray(image, dtype=np.uint8)
+	furthest = 0
+	q = 0
+	for i in range(frames // 2 - 1, 0, -1):
+		image.seek(i)
+		curr = np.asanyarray(image, dtype=np.uint8)
+		image.seek(i - 1)
+		curr2 = np.asanyarray(image, dtype=np.uint8)
+		q2 = cv2.PSNR(last, curr) + cv2.PSNR(second_last, curr2)
+		print(q2)
+		if q2 >= q:
+			q, furthest = q2, i
+	if q >= p + 1:
+		loop = range(furthest + 1, frames)
+	else:
+		loop = range(0, closest)
+	print("C2L:", loop)
+
+	def cut_iterator(im):
+		for i in loop:
+			im.seek(i)
+			yield im.copy()
+
+	return dict(duration=duration, count=loop.stop - loop.start, frames=cut_iterator(image))
 
 
 colour_blind_map = dict(

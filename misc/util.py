@@ -236,6 +236,7 @@ def quit(*args, **kwargs): force_kill(PROC)
 # SHA256 operations: base64 and base16.
 def shash(s): return e64(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).decode("ascii")
 def uhash(s): return sorted([shash(s), quote_plus(s.removeprefix("https://"))], key=len)[0]
+def uuhash(s): return uhash(unyt(s))
 def hhash(s): return hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).hexdigest()
 def ihash(s): return int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little") % 4294967296 - 2147483648
 def nhash(s): return int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little")

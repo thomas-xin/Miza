@@ -12,7 +12,7 @@ from misc.types import utc, as_str
 from misc.asyncs import esubmit, wrap_future, Future
 from misc.util import (
     retrieve_from, CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api,
-    tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, uhash,
+    tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, uuhash,
     snowflake_time_2, shorten_attachment, merge_url, split_url, discord_expired, url2fn
 )
 session = niquests.AsyncSession()
@@ -80,7 +80,7 @@ class ColourCache(diskcache.Cache):
 	def obtain(self, url):
 		if not url:
 			return (0, 0, 0)
-		k = uhash(url)
+		k = uuhash(url)
 		try:
 			return tuple(self[k])
 		except KeyError:

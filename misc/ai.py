@@ -932,9 +932,9 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 			if prompt:
 				s2 += "\n\n" + prompt
 			if prompt:
-				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive summary of the text above, and make sure to include all information relevant to the following question if available:\n\n"""\n{prompt}\n"""'
+				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above, and make sure to include all information relevant to the following question if available:\n\n"""\n{prompt}\n"""\n\nWrite only the summary, not an answer or acknowledgement.'
 			else:
-				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive summary of the text above!'
+				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above!'
 			ml = round_random(max_length)
 			c = await tcount(prompt)
 			# Prefer gpt-5-nano for summaries if possible due to its much faster throughput of 100 tokens/s, but fallback to gemini-2.5 if necessary (due to its higher token limit of 1 million).
@@ -1072,6 +1072,8 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 		body = cdict(kwargs.get("extra_body") or {})
 		if model in is_reasoning:
 			kwa.pop("temperature", None)
+			kwa.pop("presence_penalty", None)
+			kwa.pop("frequency_penalty", None)
 		if "repetition_penalty" not in kwa:
 			kwa["repetition_penalty"] = cast_rp(kwa.pop("frequency_penalty", 0.25), kwa.pop("presence_penalty", 0.25), model=model)
 		match sapi:
@@ -1095,7 +1097,6 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 				body.clear()
 			case "openai" | "deepseek" | "deepinfra":
 				kwa.pop("repetition_penalty", None)
-				kwa.pop("presence_penalty", None)
 				kwa.pop("top_p", None)
 		if "repetition_penalty" in kwa:
 			body["repetition_penalty"] = kwa.pop("repetition_penalty")

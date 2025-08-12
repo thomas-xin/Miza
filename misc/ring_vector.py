@@ -84,6 +84,63 @@ class ReadWriteLock:
 
 
 class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
+	"""
+	A high-performance, thread-safe, mutable sequence implementing a circular buffer.
+	This class is built upon a NumPy array to provide the performance of C-level
+	data structures with the convenience of a Pythonic API. It combines features
+	from Python's `list`, `collections.deque`, and `set`, and supports NumPy-style
+	vectorized operations.
+	The circular buffer (or ring buffer) design allows for efficient appends and pops
+	from both ends (amortized O(1) time complexity) by wrapping data around the
+	edges of the underlying array, avoiding costly memory shifts for most operations.
+	Key Features:
+	- **Performance:** Leverages NumPy arrays for fast, vectorized operations.
+	- **Thread-Safety:** Uses a custom ReadWriteLock to allow for safe concurrent
+		reading and exclusive writing. Decorators `@reading` and `@writing` simplify
+		lock management.
+	- **Versatile API:** Implements the `MutableSequence` ABC, providing a rich set
+		of methods similar to `list`, `deque`, `set`, and NumPy arrays.
+	- **Efficient Memory Management:** Automatically handles resizing of the
+		underlying buffer to accommodate new elements, with methods like `reserve()`
+		for manual capacity control.
+	- **Slicing and Indexing:** Supports integer, float (for interpolation), slice,
+		and iterable-based indexing and assignment.
+	- **Caching:** Caches results of expensive operations like hashing, creating a
+		frozenset, or checking for sortedness, invalidating them upon modification.
+	Parameters
+	----------
+	*args : iterable or elements
+			The initial data for the vector. If a single argument is provided, it is
+			treated as an iterable. If multiple arguments are given, they are used as
+			the elements of the vector.
+	dtype : type, optional
+			The data type for the underlying NumPy array, by default `object`.
+			Using specific types like `np.int32` or `np.float64` can significantly
+			improve performance and reduce memory usage.
+	device : int, optional
+			A placeholder for potential future GPU/device support. Currently unused.
+	Attributes
+	----------
+	length : int
+			The number of elements currently in the vector.
+	capacity : int
+			The total number of elements the underlying buffer can hold before a
+			reallocation is needed.
+	dtype : numpy.dtype
+			The data type of the elements in the vector.
+	view : numpy.ndarray
+			A contiguous NumPy array view of the elements. May trigger a memory
+			reallocation and copy if the internal buffer is wrapped or oversized.
+	views : tuple[numpy.ndarray]
+			A tuple containing one or two NumPy array views that represent the
+			data in the circular buffer. Returns one view if contiguous, two if
+			wrapped around the buffer's edge.
+	lock : ReadWriteLock
+			The lock object used for managing thread-safe access.
+	sorted : bool
+			A cached property that indicates whether the vector is sorted. The check
+			is performed lazily on first access.
+	"""
 
 	__slots__ = ("__weakref__", "_lock", "buffer", "offset", "length", "_view", "_margin", "_hash", "_frozenset", "_queries", "_sorted", "_index")
 

@@ -676,7 +676,7 @@ class UnFancy(Command):
 	schema = cdict(
 		text=cdict(
 			type="string",
-			example=zwremove("T̕​̄​h ֠​̑​̡​ⓘ ͪ​ⷧ​࣮​ⓢ ̱​ࣶ​᷇​  ꙺ​ۭ​ⷼ​ｉ ͑​ⷻ​̍​ｓ ͉​ࣟ​꙯​  ͚​ؖ​ⷠ​𝕒 ׅ​ࣱ​ٕ​  ͯ​ⷡ​͖​𝓬 ࣭​ͤ​̀​𝓸 ࣝ​͂​͡​𝘰 ̘​̪​᷅​𝘭 ֣​̉​֕​  ֞​ⷮ​ࣧ​ᘻ ̩​ⷥ​̴​ᘿ ͟​̎​ꙴ​𝚜 ࣶ​֬​͏​𝚜 ᷃​֘​͉​𝙖 ؒ​֑​ⷲ​𝙜 ⷣ​ͧ​̸​𝐞 ̾​"),
+			example=zwremove("𝔱𝔥𝔦𝔰 𝔦𝔰 𝔞 𝔠𝔬𝔬𝔩 𝔪𝔢𝔰𝔰𝔞𝔤𝔢​"),
 			required=True,
 		)
 	)
@@ -1432,7 +1432,7 @@ class Rate(Command):
 		lego = lego.replace("?", "").replace("!", "")
 		return f"{lego}? I rate {pronoun} a `{rate}/10`!"
 
-	
+
 class WordCount(Command):
 	name = ["Lc", "Wc", "Cc", "Character_Count", "Line_Count"]
 	description = "Simple command that returns the word and character count of a supplied message. message.txt files work too!"

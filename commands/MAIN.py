@@ -1106,7 +1106,7 @@ class Reminder(Command):
 		),
 		every=cdict(
 			type="timedelta",
-			description="Turn the reminder into a recurring one that will resend itself after a given amount of time",
+			description="Turn the reminder into a recurring one that will resend itself after a given amount of time. Note: Must be removed manually!",
 			example="One hundred thousand thirty seconds",
 		),
 		delete=cdict(
@@ -1197,10 +1197,8 @@ class Reminder(Command):
 			out += f"announcement for {sqr_md(sendable)}"
 		else:
 			out += f"reminder for {sqr_md(sendable)}"
-		if mode != "urgent" and recur:
-			out += f" every {sqr_md(sec2time(recur))},"
-			# out += f" upon next event from {sqr_md(user_mention(t))}"
-			# ts = None
+		if every:
+			out += f" every {sqr_md(sec2time(every.total_seconds()))}"
 		out += ":```"
 		if dt:
 			out += dt.as_discord() + " (" + dt.as_rel_discord() + ")"
@@ -1246,10 +1244,16 @@ class Reminder(Command):
 			content += f"Schedule for {str(sendable).replace('`', '')} is currently empty.```*"
 			msg = ""
 		else:
+			def format_reminder(x):
+				s = lim_str(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + no_md(x["msg"]), 96) + "` ➡️ `" + time_until_short(x["t"]) + "`"
+				if x.get("e"):
+					every = TimeDelta(seconds=x["e"])
+					s += f", every `{every.to_short()}`"
+				return s
 			content += f"{len(rems)} message{'s' if len(rems) != 1 else ''} currently scheduled for {str(sendable).replace('`', '')}:```*"
 			msg = iter2str(
 				rems[pos:pos + page],
-				key=lambda x: lim_str(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + no_md(x["msg"]), 96) + "` ➡️ " + (user_mention(x["u_id"]) if "u_id" in x else time_until(x["t"])),
+				key=format_reminder,
 				left="`【",
 				right="】`",
 				offset=pos,
@@ -1489,7 +1493,14 @@ class UpdateReminders(Database):
 				continue
 			# Grab target from database
 			x = cdict(temp.pop(0))
-			if not temp:
+			every = x.get("e", 0)
+			if every:
+				self.listed.insort((min(x["t"] + every, temp[0]["t"] if temp else inf), u_id), key=lambda x: x[0])
+				x["t"] += every
+				temp.insert(0, x)
+				temp.sort(key=lambda x: x["t"])
+				self[u_id] = temp
+			elif not temp:
 				self.data.pop(u_id)
 			else:
 				# Insert next listed item into schedule

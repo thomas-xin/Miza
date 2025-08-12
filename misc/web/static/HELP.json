@@ -770,13 +770,10 @@
 				"StickyRoles"
 			],
 			"description": "Causes Miza to save roles for all users, and re-add them when they leave and rejoin.",
-			"usage": "<mode(enable|disable)>?",
+			"usage": "",
 			"level": "3",
 			"rate_limit": "(9, 12)",
-			"example": [
-				"rolepreserver enable",
-				"stickyroles disable"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"NickPreserver": {
@@ -786,13 +783,10 @@
 				"NicknamePreserver"
 			],
 			"description": "Causes Miza to save nicknames for all users, and re-add them when they leave and rejoin.",
-			"usage": "<mode(enable|disable)>?",
+			"usage": "",
 			"level": "3",
 			"rate_limit": "(9, 12)",
-			"example": [
-				"nickpreserver enable",
-				"stickynicks disable"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"ThreadPreserver": {
@@ -1605,7 +1599,7 @@
 			"description": "Changes size of supplied image, using an optional scaling operation.",
 			"usage": "",
 			"level": "0",
-			"rate_limit": "(8, 13)",
+			"rate_limit": "(7, 13)",
 			"example": [],
 			"timeout": "96"
 		},
@@ -1640,6 +1634,32 @@
 			"rate_limit": "(7, 10)",
 			"example": [],
 			"timeout": "96"
+		},
+		"Cut2Loop": {
+			"aliases": [
+				"Cut2Loop",
+				"C2L",
+				"T2L",
+				"Trim2Loop"
+			],
+			"description": "Autodetects an appropriate loop position for an animation lasting more than one full loop, and performs a trim.",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(8, 15)",
+			"example": [],
+			"timeout": "96"
+		},
+		"ImageCompare": {
+			"aliases": [
+				"ImageCompare",
+				"PSNR"
+			],
+			"description": "Compares the similarity (Peak Signal-Noise Ratio) between two images. A value of 40 or higher means visual match.",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(6, 8)",
+			"example": [],
+			"timeout": "48"
 		},
 		"Blend": {
 			"aliases": [

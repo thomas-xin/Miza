@@ -1154,7 +1154,7 @@ class Resize(Command):
 			format="avif",
 		),
 	)
-	rate_limit = (8, 13)
+	rate_limit = (7, 13)
 	_timeout_ = 4
 	slash = True
 
@@ -1361,6 +1361,68 @@ class Adjust(Command):
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
+
+
+class Cut2Loop(Command):
+	name = ["C2L", "T2L", "Trim2Loop"]
+	description = "Autodetects an appropriate loop position for an animation lasting more than one full loop, and performs a trim."
+	schema = cdict(
+		url=cdict(
+			type="visual",
+			description="Image, animation or video, supplied by URL or attachment",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
+			aliases=["i"],
+			required=True,
+		),
+		filesize=cdict(
+			type="filesize",
+			validation="[1024, 1073741824]",
+			description="The maximum filesize in bytes",
+			example="10kb",
+			default=DEFAULT_FILESIZE,
+			aliases=["fs"],
+		),
+		format=cdict(
+			type="enum",
+			validation=cdict(
+				enum=tuple(VISUAL_FORMS),
+				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
+			),
+			description="The file format or codec of the output",
+			example="mp4",
+			default="auto",
+		),
+	)
+	rate_limit = (8, 15)
+	_timeout_ = 4
+
+	async def __call__(self, _timeout, url, filesize, format, **void):
+		resp = await process_image(url, "cut_to_loop", ["-fs", filesize, "-f", format], timeout=_timeout)
+		fn = url2fn(url)
+		name = replace_ext(fn, get_ext(resp))
+		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
+
+
+class ImageCompare(Command):
+	name = ["PSNR"]
+	description = "Compares the similarity (Peak Signal-Noise Ratio) between two images. A value of 40 or higher means visual match."
+	schema = cdict(
+		urls=cdict(
+			type="visual",
+			description="Image, animation or video, supplied by URL or attachment",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
+			aliases=["i"],
+			required=2,
+			multiple=True,
+		),
+	)
+	rate_limit = (6, 8)
+	_timeout_ = 2
+
+	async def __call__(self, _timeout, urls, **void):
+		url = urls.pop(0)
+		resp = await process_image(url, "psnr", [urls], timeout=_timeout)
+		return py_md(resp)
 
 
 class Blend(Command):

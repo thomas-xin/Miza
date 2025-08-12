@@ -1028,30 +1028,39 @@ class RolePreserver(Command):
 	min_level = 3
 	min_display = "3+"
 	description = "Causes ⟨BOT⟩ to save roles for all users, and re-add them when they leave and rejoin."
-	usage = "<mode(enable|disable)>?"
-	example = ("rolepreserver enable", "stickyroles disable")
-	flags = "aed"
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("view", "enable", "disable"),
+			),
+			description="Action to perform",
+			example="enable",
+			default="view"
+		),
+	)
 	rate_limit = (9, 12)
 	slash = True
 	ephemeral = True
 
-	def __call__(self, flags, guild, name, **void):
+	def __call__(self, _guild, _name, mode, **void):
 		bot = self.bot
 		following = bot.data.rolepreservers
-		update = following.update
 		# Empty dictionary is enough to represent an active role preserver here
-		curr = following.get(guild.id)
-		if "d" in flags:
-			if guild.id in following:
-				following.pop(guild.id)
-			return italics(css_md(f"Disabled role preservation for {sqr_md(guild)}."))
-		elif "e" in flags or "a" in flags:
-			if guild.id not in following:
-				following[guild.id] = {}
-			return italics(css_md(f"Enabled role preservation for {sqr_md(guild)}."))
-		if curr is None:
-			return ini_md(f'Role preservation is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
-		return ini_md(f"Role preservation is currently enabled in {sqr_md(guild)}.")
+		curr = following.get(_guild.id)
+		match mode:
+			case "disable":
+				if _guild.id in following:
+					following.pop(_guild.id)
+				return italics(css_md(f"Disabled role preservation for {sqr_md(_guild)}."))
+			case "enable":
+				if _guild.id not in following:
+					following[_guild.id] = {}
+				return italics(css_md(f"Enabled role preservation for {sqr_md(_guild)}."))
+			case _:
+				if curr is None:
+					return ini_md(f'Role preservation is currently disabled in {sqr_md(_guild)}. Use "{bot.get_prefix(_guild)}{_name} enable" to enable.')
+				return ini_md(f"Role preservation is currently enabled in {sqr_md(_guild)}.")
 
 
 class NickPreserver(Command):
@@ -1060,28 +1069,37 @@ class NickPreserver(Command):
 	min_level = 3
 	min_display = "3+"
 	description = "Causes ⟨BOT⟩ to save nicknames for all users, and re-add them when they leave and rejoin."
-	usage = "<mode(enable|disable)>?"
-	example = ("nickpreserver enable", "stickynicks disable")
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("view", "enable", "disable"),
+			),
+			description="Action to perform",
+			example="enable",
+			default="view"
+		),
+	)
 	rate_limit = (9, 12)
-	flags = "aed"
 
 	def __call__(self, flags, guild, name, **void):
 		bot = self.bot
 		following = bot.data.nickpreservers
-		update = following.update
-		# Empty dictionary is enough to represent an active nick preserver here
-		curr = following.get(guild.id)
-		if "d" in flags:
-			if guild.id in following:
-				following.pop(guild.id)
-			return italics(css_md(f"Disabled nickname preservation for {sqr_md(guild)}."))
-		elif "e" in flags or "a" in flags:
-			if guild.id not in following:
-				following[guild.id] = {}
-			return italics(css_md(f"Enabled nickname preservation for {sqr_md(guild)}."))
-		if curr is None:
-			return ini_md(f'Nickname preservation is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
-		return ini_md(f"Nickname preservation is currently enabled in {sqr_md(guild)}.")
+		# Empty dictionary is enough to represent an active nickname preserver here
+		curr = following.get(_guild.id)
+		match mode:
+			case "disable":
+				if _guild.id in following:
+					following.pop(_guild.id)
+				return italics(css_md(f"Disabled nickname preservation for {sqr_md(_guild)}."))
+			case "enable":
+				if _guild.id not in following:
+					following[_guild.id] = {}
+				return italics(css_md(f"Enabled nickname preservation for {sqr_md(_guild)}."))
+			case _:
+				if curr is None:
+					return ini_md(f'Nickname preservation is currently disabled in {sqr_md(_guild)}. Use "{bot.get_prefix(_guild)}{_name} enable" to enable.')
+				return ini_md(f"Nickname preservation is currently enabled in {sqr_md(_guild)}.")
 
 
 class ThreadPreserver(Command):

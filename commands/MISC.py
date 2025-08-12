@@ -533,6 +533,9 @@ class BTD6Paragon(Command):
 		return "\xad" + paragon_calc.parse(args)
 
 
+
+
+
 def load_douclub():
 	global douclub
 	while True:

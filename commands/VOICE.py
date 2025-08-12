@@ -986,6 +986,8 @@ class Skip(Command):
 					temp.remove(0)
 				await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})) and [a.queue[i].__setitem__('end',{after.total_seconds()}) for i in {temp}]")
 				desc.append((f"Entry {skips[0]} (`{q[skips[0]]['name']}`)" if len(skips) == 1 else f"{len(skips)} entries") + f" will automatically skip after {after}.")
+		if not desc:
+			raise IndexError("No items were skipped (Please verify your query with the current queue).")
 		colour = await bot.get_colour(_user)
 		emb = discord.Embed(colour=colour)
 		emb.description = "\n- ".join(desc)

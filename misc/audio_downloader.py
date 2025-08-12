@@ -101,7 +101,7 @@ def get_best_audio(entry):
 		# 		q = fmt["asr"] / 1000
 		# 	elif fmt.get("audio_channels"):
 		# 		q = fmt["audio_channels"]
-		q = (fmt.get("acodec") in ("opus", "vorbis"), fmt.get("vcodec") in (None, "none") and fmt.get("acodec") not in (None, "none"), fmt.get("abr", 0), fmt.get("tbr", 0))
+		q = (fmt.get("acodec") in ("opus", "vorbis"), fmt.get("vcodec") in (None, "none") and fmt.get("acodec") not in (None, "none"), fmt.get("abr", 0) or 0, fmt.get("tbr", 0) or 0)
 		u = as_str(fmt["url"])
 		if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
 			replace = False
@@ -1156,7 +1156,7 @@ class AudioDownloader:
 				with tracebacksuppressor:
 					return self.get_soundcloud_playlist(url)
 			elif is_spotify_url(url):
-				raise AssertionError(url)
+				raise AssertionError(url, "Currently unsupported!")
 				with tracebacksuppressor:
 					return self.get_spotify_playlist(url)
 		else:

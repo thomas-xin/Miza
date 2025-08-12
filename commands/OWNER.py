@@ -579,7 +579,7 @@ class UpdateExec(Database):
 		if not is_discord_attachment(url):
 			return url
 		bot = self.bot
-		h = uhash(url) + "~"
+		h = uuhash(url) + "~"
 		if self.counter.get(h, 0) >= 3:
 			return url
 		if h in self.seen:
@@ -625,7 +625,7 @@ class UpdateExec(Database):
 
 	def proxy(self, url):
 		if is_url(url) and not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(url) and not url.startswith("https://media.discordapp.net/") and not self.bot.is_webserver_url(url):
-			h = uhash(url)
+			h = uuhash(url)
 			try:
 				return self.bot.data.proxies[h]
 			except KeyError:
@@ -641,7 +641,7 @@ class UpdateExec(Database):
 		for i, url in enumerate(urls):
 			if is_url(url):
 				try:
-					out[i] = self.bot.data.proxies[uhash(url)]
+					out[i] = self.bot.data.proxies[uuhash(url)]
 					if discord_expired(out[i]):
 						raise KeyError(out[i])
 				except KeyError:
@@ -656,7 +656,7 @@ class UpdateExec(Database):
 			for i, f in enumerate(files):
 				if f:
 					try:
-						self.bot.data.proxies[uhash(urls[i])] = out[i] = message.embeds[c].thumbnail.proxy_url
+						self.bot.data.proxies[uuhash(urls[i])] = out[i] = message.embeds[c].thumbnail.proxy_url
 					except IndexError:
 						break
 					c += 1
@@ -846,7 +846,9 @@ class UpdateExec(Database):
 		embed = discord.Embed(colour=rand_colour()).set_author(name=member.name, icon_url=f"attachment://{fn}").set_thumbnail(url=thumb)
 		message = await channel.send(file=file, embed=embed)
 		assert message.embeds, message.id
-		return shorten_attachment(message.embeds[0].author.icon_url, message.id)
+		out = shorten_attachment(message.embeds[0].author.icon_url, message.id)
+		print("LPROXY:", url, out)
+		return out
 
 	seen = TimedCache(timeout=86400)
 	async def uproxy(self, *urls, collapse=True, mode="upload", filename=None, channel=None, **kwargs):
@@ -865,7 +867,7 @@ class UpdateExec(Database):
 			elif url.startswith(bot.webserver + "/u/") or url.startswith(bot.raw_webserver + "/u/") or url.startswith("https://cdn.discordapp.com/embed/avatars/"):
 				return url
 			else:
-				uhu = uhash(url)
+				uhu = uuhash(url)
 				try:
 					url2 = bot.data.proxies[uhu]
 				except KeyError:
@@ -892,7 +894,7 @@ class UpdateExec(Database):
 
 	def uregister(self, k, url, m_id=0):
 		bot = self.bot
-		uhu = uhash(k)
+		uhu = uuhash(k)
 		url = shorten_attachment(url, m_id)
 		bot.data.proxies[uhu] = url
 		return url

@@ -2346,7 +2346,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			nsfw="grok-4",
 			backup="minimax-m1",
 			retry="gemini-2.5-pro",
-			function="gpt-5",
+			function="gpt-5-mini",
 			vision="grok-4",
 			target="auto",
 		),
@@ -2430,36 +2430,37 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					users += 1
 					if users > 1:
 						break
-			toolcheck.append(messages[0])
-			toolcheck.reverse()
-			vision_alt = modelist.vision if modelist.function not in ai.is_vision and modelist.vision in ai.is_function else modelist.function
-			toolcheck, toolmodel = await self.caption_into(toolcheck, model=modelist.function, backup_model=vision_alt, premium_context=premium_context)
-			mode = None
-			label = "instructive"
-			try:
-				resp = await self.function_call(
-					model=toolmodel,
-					messages=toolcheck,
-					temperature=tmp,
-					top_p=tpp,
-					frequency_penalty=fp,
-					presence_penalty=pp,
-					repetition_penalty=rp,
-					tools=list(toolscan) + [f_default],
-					tool_choice="required",
-					require_message=False,
-					max_tokens=min(256, max_tokens),
-					user=ustr,
-					stop=stop,
-					assistant_name=assistant_name,
-					is_nsfw=is_nsfw,
-					premium_context=premium_context,
-				)
-				message = resp.choices[0].message
-			except Exception:
-				print_exc()
-				message = None
-			print("SCAN:", cargs, message)
+			if modelist.instructive != modelist.casual:
+				toolcheck.append(messages[0])
+				toolcheck.reverse()
+				vision_alt = modelist.vision if modelist.function not in ai.is_vision and modelist.vision in ai.is_function else modelist.function
+				toolcheck, toolmodel = await self.caption_into(toolcheck, model=modelist.function, backup_model=vision_alt, premium_context=premium_context)
+				mode = None
+				label = "instructive"
+				try:
+					resp = await self.function_call(
+						model=toolmodel,
+						messages=toolcheck,
+						temperature=tmp,
+						top_p=tpp,
+						frequency_penalty=fp,
+						presence_penalty=pp,
+						repetition_penalty=rp,
+						tools=list(toolscan) + [f_default],
+						tool_choice="required",
+						require_message=False,
+						max_tokens=min(256, max_tokens),
+						user=ustr,
+						stop=stop,
+						assistant_name=assistant_name,
+						is_nsfw=is_nsfw,
+						premium_context=premium_context,
+					)
+					message = resp.choices[0].message
+				except Exception:
+					print_exc()
+					message = None
+				print("SCAN:", cargs, message)
 		if message:
 			directly_answer = True
 			for tc in tuple(message.tool_calls or ()):
@@ -5404,8 +5405,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not self.ready:
 			# If the bot is not currently ready (either loading or in maintenance), send an indicator and wait
 			if message:
-				csubmit(message.add_reaction("🔜"))
-				soon_indicator = True
+				soon_indicator = csubmit(message.add_reaction("🔜"))
 				if slash or getattr(message, "slash", False):
 					await self.defer_interaction(message, ephemeral=getattr(message, "ephemeral", False))
 			await wrap_future(self.connect_ready)
@@ -5437,6 +5437,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				guild = getattr(channel, "guild", None) or guild
 		if soon_indicator:
 			# Remove the "soon" indicator since the bot is now ready
+			await soon_indicator
 			csubmit(message.remove_reaction("🔜", self.user))
 		u_perm = max(min_perm, self.get_perms(user.id, guild)) if min_perm is not None else self.get_perms(user.id, guild)
 		if not isnan(u_perm):
