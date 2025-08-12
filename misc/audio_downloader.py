@@ -22,7 +22,7 @@ from .util import (
 	python, compat_python, shuffle, utc, proxy, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration_2, html_decode,
 	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url,
-	EvalPipe, PipedProcess, TimedCache, Request, Semaphore, CACHE_PATH, magic, rename,
+	EvalPipe, PipedProcess, TimedCache, Request, Semaphore, TEMP_PATH, magic, rename,
 )
 
 # Gets the best icon/thumbnail for a queue entry.
@@ -934,7 +934,7 @@ class AudioDownloader:
 				if stream:
 					entry.update(final)
 					return stream, cdc, dur, ac
-		r_mp3 = f"{CACHE_PATH}/{ts}.mp3"
+		r_mp3 = f"{TEMP_PATH}/{ts}.mp3"
 		fn2 = self.run(f"get_audio_spotify({json_dumpstr(url)},{json_dumpstr(r_mp3)})", priority=True)
 		dur, _bps, cdc, ac = get_duration_2(fn2)
 		entry["duration"] = dur
@@ -968,7 +968,7 @@ class AudioDownloader:
 
 			left, right = ct.split("/", 1)[0], ct.split("/", 1)[-1]
 			if left == "image":
-				r_im = f"{CACHE_PATH}/{ts}.{right}"
+				r_im = f"{TEMP_PATH}/{ts}.{right}"
 				copy_to_file(r_im)
 				args = [python, "png2wav.py", r_im, fn]
 				print(args)
@@ -979,7 +979,7 @@ class AudioDownloader:
 				entry["duration"] = dur
 				return fn, cdc, dur, ac
 			if ct in ("audio/x-ecdc", "audio/ecdc"):
-				r_ecdc = f"{CACHE_PATH}/{ts}.ecdc"
+				r_ecdc = f"{TEMP_PATH}/{ts}.ecdc"
 				copy_to_file(r_ecdc)
 				args1 = [compat_python, "misc/ecdc_stream.py", "-b", "0", "-d", r_ecdc]
 				args2 = ["ffmpeg", "-v", "error", "-hide_banner", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "96k", fn]
@@ -991,8 +991,8 @@ class AudioDownloader:
 				entry["duration"] = dur
 				return fn, cdc, dur, ac
 			if ct in ("audio/x-org", "audio/org"):
-				r_org = f"{CACHE_PATH}/{ts}.org"
-				r_wav = f"{CACHE_PATH}/{ts}.wav"
+				r_org = f"{TEMP_PATH}/{ts}.org"
+				r_wav = f"{TEMP_PATH}/{ts}.wav"
 				copy_to_file(r_org)
 				args = ["orgexport202.exe", r_org, "48000", "0"]
 				print(args)
@@ -1003,8 +1003,8 @@ class AudioDownloader:
 				entry["duration"] = dur
 				return r_wav, cdc, dur, ac
 			if ct in ("audio/x-midi", "audio/midi", "audio/sp-midi"):
-				r_mid = f"{CACHE_PATH}/{ts}.mid"
-				r_wav = f"{CACHE_PATH}/{ts}.wav"
+				r_mid = f"{TEMP_PATH}/{ts}.mid"
+				r_wav = f"{TEMP_PATH}/{ts}.wav"
 				copy_to_file(r_mid)
 				args = [os.path.abspath("misc/fluidsynth/fluidsynth"), "-g", "1", "-F", r_wav, "-r", "48000", "-n", os.path.abspath("misc/fluidsynth/gm64.sf2"), r_mid]
 				print(args)
@@ -1028,7 +1028,7 @@ class AudioDownloader:
 		url = entry.get("orig") or entry["url"]
 		ts = ts_us()
 		ext = fmt or "opus"
-		fn = f"{CACHE_PATH}/{ts}.{ext}"
+		fn = f"{TEMP_PATH}/{ts}.{ext}"
 		d = entry.get("duration")
 		if asap is None:
 			asap = d and d > 72
@@ -1055,7 +1055,7 @@ class AudioDownloader:
 					return result
 				# If format is specified, always produce a file, and allow trimming if necessary
 				url, cdc, dur, ac = result
-				tmpl = f"{CACHE_PATH}/{ts}"
+				tmpl = f"{TEMP_PATH}/{ts}"
 				if start is not None or end is not None:
 					tmpl += f"~{start}-{end}"
 				fn = f"{tmpl}.{fmt}"
@@ -1085,7 +1085,7 @@ class AudioDownloader:
 			default_search="auto",
 			source_address="0.0.0.0",
 			final_ext=ext,
-			cachedir=CACHE_PATH,
+			cachedir=TEMP_PATH,
 			outtmpl=fn,
 			windowsfilenames=True,
 			cookiesfrombrowser=["firefox"],
@@ -1099,7 +1099,7 @@ class AudioDownloader:
 			)]
 		)
 		if start is not None or end is not None:
-			fn = f"{CACHE_PATH}/{ts}~{start}-{end}.{ext}"
+			fn = f"{TEMP_PATH}/{ts}~{start}-{end}.{ext}"
 		if not fmt and (is_discord_attachment(url) or is_miza_url(url)):
 			if discord_expired(url):
 				# Just in case a Discord attachment expires in the short time between checking and downloading

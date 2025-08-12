@@ -155,4 +155,4 @@ for i, img in enumerate(columns):
 if hsv:
 	out = out.convert("RGB")
 
-out.save(fo)
+out.save(fo, lossless=True, compress_level=5)

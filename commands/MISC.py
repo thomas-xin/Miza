@@ -5,6 +5,7 @@ if "common" not in globals():
 print = PRINT
 
 import csv, knackpy
+from misc import shard
 from prettytable import PrettyTable as ptable
 from tsc_utils.flags import address_to_flag, flag_to_address
 from tsc_utils.numbers import tsc_value_to_num, num_to_tsc_value
@@ -384,40 +385,48 @@ class CS_Database(Database):
 
 
 class Wav2Png(Command):
+	name = ["Image2Audio", "Audio2Image", "Webp2Flac", "Flac2Webp", "Png2Wav"]
 	_timeout_ = 15
-	name = ["Png2Wav", "Png2Mp3"]
 	description = "Runs wav2png on the input URL. See https://github.com/thomas-xin/Audio-Image-Converter for more info, or to run it yourself!"
-	usage = "<0:search_links>"
-	example = ("wav2png https://www.youtube.com/watch?v=IgOci6JXPIc", "png2wav https://cdn.discordapp.com/embed/avatars/0.png")
-	rate_limit = (20, 30)
-	typing = True
+	schema = cdict(
+		url=cdict(
+			type="media",
+			description="Image, animation, video or audio, supplied by URL or attachment",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
+			aliases=["i"],
+			required=True,
+		),
+		fmt=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("ogg", "opus", "mp3", "aac", "flac", "wav", "webp", "png"),
+			),
+			description="The file format or codec of the output",
+		),
+	)
+	rate_limit = (15, 25)
 
-	async def __call__(self, bot, channel, message, argv, name, **void):
-		for a in message.attachments:
-			argv = a.url + " " + argv
-		if not argv:
-			raise ArgumentError("Input string is empty.")
-		urls = await bot.follow_url(argv, allow=True, images=False)
-		if not urls or not urls[0]:
-			raise ArgumentError("Please input a valid URL.")
-		url = urls[0]
-		fn = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
+	async def __call__(self, bot, url, fmt, **void):
+		fn = url2fn(url)
+		ext = fn.rsplit(".", 1)[-1]
+		was_image = ext in IMAGE_FORMS
 		ts = ts_us()
-		ext = "png" if name == "wav2png" else "wav"
-		dest = f"{TEMP_PATH}/&{ts}." + ext
-		w2p = "wav2png" if name == "wav2png" else "png2wav"
-		args = [python, w2p + ".py", url, dest]
-		async with discord.context_managers.Typing(channel):
-			print(args)
-			proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL)
-			try:
-				async with asyncio.timeout(3200):
-					await proc.wait()
-			except (T0, T1, T2):
-				with tracebacksuppressor:
-					force_kill(proc)
-				raise
-		await bot.send_with_file(channel, "", dest, filename=fn + "." + ext, reference=message)
+		if not fmt:
+			fmt = "flac" if was_image else "webp"
+		dest = f"{TEMP_PATH}/{ts}.{fmt}"
+		executable = os.path.abspath(".") + "/misc/" + ("png2wav.py" if was_image else "wav2png.py")
+		args = [python, executable, url, dest]
+		print(args)
+		proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
+		try:
+			async with asyncio.timeout(3200):
+				await proc.wait()
+		except (T0, T1, T2):
+			with tracebacksuppressor:
+				force_kill(proc)
+			raise
+		name = replace_ext(fn, fmt)
+		return cdict(file=CompatFile(dest, filename=name))
 
 
 class SpectralPulse(Command):
@@ -504,21 +513,6 @@ class SpectralPulse(Command):
 			await bot.send_with_file(channel, "", fn2, filename=n2, reference=message)
 
 
-class MCEnchant(Command):
-	name = ["Enchant", "GenerateEnchant"]
-	description = "Given an item and custom enchant values, generates a Minecraft /give command. An old misc command brought back."
-	usage = "<item> <enchantment(?:name/level)>*"
-	example = ("enchant diamond_sword sharpness 8, fire_aspect 3, sweeping", "enchant diamond_axe mending unbreaking XI silk_touch", "enchant netherite_shovel efficiency 2000 looting vanishing_curse")
-	rate_limit = (4, 5)
-
-	def __call__(self, args, **void):
-		from misc import enchant_generator
-		if not args:
-			raise ArgumentError("Input string is empty.")
-		item = args.pop(0)
-		return fix_md(enchant_generator.generate_enchant(item, args))
-
-
 class BTD6Paragon(Command):
 	name = ["Paragon", "GenerateParagon"]
 	description = "Given a tower and provided parameters, generates a list of Bloons TD 6 optimised paragon sacrifices. Parameters are \"p\" for pops, \"g\" for cash generated, \"t\" for Geraldo totems, and \"l\" for additional tower limit."
@@ -533,7 +527,134 @@ class BTD6Paragon(Command):
 		return "\xad" + paragon_calc.parse(args)
 
 
+class SkyShardReminder(Command):
+	name = ["SkyShard", "SkyShards"]
+	description = "Tracks and sends DM reminders for Shard Eruptions in the game Sky: Children of the Light. Referenced code from https://github.com/PlutoyDev/sky-shards. When active, reminders will be sent 12 hours prior to the first landing, and additionally 1 hour, 5 minutes, and at the start of all landings. To dismiss remaining reminders for the day, react with ✅ on any reminder message."
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("none", "black", "red", "all"),
+			),
+			description="Whether to disable reminders, or to target a particular type of shard",
+			default="all",
+		),
+	)
 
+	def __call__(self, bot, _user, mode, **void):
+		match mode:
+			case "none":
+				bot.data.skyshardreminders.pop(_user.id, None)
+				return fix_md("Successfully unsubscribed from Sky Shard Reminders.")
+			case "black":
+				bot.data.skyshardreminders[_user.id] = cdict(subscription=1, reminded={})
+				return fix_md("Successfully subscribed to Black Shards.")
+			case "red":
+				bot.data.skyshardreminders[_user.id] = cdict(subscription=2, reminded={})
+				return fix_md("Successfully subscribed to Red Shards.")
+			case "all":
+				bot.data.skyshardreminders[_user.id] = cdict(subscription=3, reminded={})
+				return fix_md("Successfully subscribed to all Shards.")
+
+
+class UpdateSkyShardReminders(Database):
+	name = "skyshardreminders"
+
+	async def __call__(self, **void):
+		bot = self.bot
+		t = utc()
+		taken_shards = self.get(0, {})
+		ct = datetime.datetime.now(tz=datetime.timezone.utc)
+		nt = ct + datetime.timedelta(days=1)
+		s1 = shard.find_next_shard(ct)
+		s2 = shard.find_next_shard(nt)
+		shards = (s1, s2) if s1.occurrences[0].start != s2.occurrences[0].start else [s1]
+
+		def format_landing(o):
+			land = DynamicDT.fromdatetime(o.land)
+			end = DynamicDT.fromdatetime(o.end)
+			return f"{land.as_discord().replace('F', 'd')} {land.as_discord().replace('F', 't')} (*{land.as_rel_discord()}*) ~ {end.as_discord().replace('F', 'd')} {end.as_discord().replace('F', 't')} (*{end.as_rel_discord()}*)"
+
+		for s in shards:
+			shard_hash = int(s.occurrences[0].start.timestamp())
+			taken = taken_shards.get(shard_hash, 0)
+			try:
+				for i, o in enumerate(s.occurrences):
+					ts = o.land.timestamp()
+					reminders = [ts - 3600, ts - 300, ts]
+					if not i:
+						reminders.insert(0, ts - 43200)
+					for r in reminders:
+						if r > taken and t >= r:
+							taken = taken_shards[shard_hash] = r
+							self[0] = taken_shards
+							raise StopIteration
+			except StopIteration:
+				pass
+			else:
+				continue
+			print("SkyShard:", s)
+			embed = discord.Embed().set_image(url=f"https://sky-shards.pages.dev/infographics/data_gale/{s.map}.webp").set_thumbnail(url=f"https://sky-shards.pages.dev/infographics/map_clement/{s.map}.webp")
+			url = f"https://sky-shards.pages.dev/en/{s.date.year}/{'%02d' % s.date.month}/{'%02d' % s.date.day}"
+			if s.is_red:
+				shard_bits = 2
+				embed.colour = discord.Colour(16711680)
+				embed.set_author(name="Red Shard", url=url, icon_url="https://sky-shards.pages.dev/emojis/ShardRed.webp")
+				emoji = await bot.data.emojis.grab("ascended_candle.png")
+				reward = f"{s.reward_ac} ×{emoji}"
+			else:
+				shard_bits = 1
+				embed.colour = discord.Colour(1)
+				embed.set_author(name="Black Shard", url=url, icon_url="https://sky-shards.pages.dev/emojis/ShardBlack.webp")
+				emoji = await bot.data.emojis.grab("piece_of_light.png")
+				reward = f"200 ×{emoji}"
+			timing = "Active" if any(o.land < ct < o.end for o in s.occurrences) else next((DynamicDT.fromdatetime(o.land).as_rel_discord() for o in s.occurrences if ct < o.land), "Expired")
+			location = " -> ".join(w.capitalize() for w in s.map.split("."))
+			landings = "\n".join(f"  - **{format_landing(o)}**" if o.land < ct < o.end else f"  - {format_landing(o)}" for o in s.occurrences)
+			embed.description = f"""- {timing}
+- Location: {location}
+- Reward: {reward}
+- Landings:
+{landings}"""
+			for k, v in tuple(self.items()):
+				if not k:
+					continue
+				if not v.subscription & shard_bits:
+					continue
+				try:
+					user = await bot.fetch_user(k)
+				except Exception:
+					print_exc()
+					self.pop(k)
+				try:
+					m_id = v.reminded[shard_hash]
+				except KeyError:
+					pass
+				else:
+					try:
+						try:
+							message = self.bot.cache.messages[m_id]
+							if not message.reactions:
+								raise KeyError
+						except KeyError:
+							message = await discord.abc.Messageable.fetch_message(user, m_id)
+						for react in message.reactions:
+							if str(react) == "✅":
+								if react.count > 1:
+									raise StopIteration
+								async for u in react.users():
+									if u.id != self.bot.id:
+										raise StopIteration
+					except StopIteration:
+						continue
+					except Exception:
+						print_exc()
+						continue
+					else:
+						csubmit(bot.silent_delete(message))
+				message = await send_with_react(user, embed=embed, reacts="✅")
+				v.reminded[shard_hash] = message.id
+				self[k] = v
 
 
 def load_douclub():

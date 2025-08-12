@@ -1128,7 +1128,7 @@ class Reminder(Command):
 				return ini_md(f"No {mode}s currently set for {sqr_md(sendable)}.")
 			targets = RangeSet.parse([delete], len(rems))
 			assert targets, "No reminders at the specified index."
-			removed = (r := rems[targets[0]]).msg + "; " + DynamicDT.utcfromtimestamp(r.t).as_full()
+			removed = (r := rems[targets[0]]).msg + "; " + r.t.as_full()
 			if len(targets) > 1:
 				removed += f" (+{len(targets) - 1})"
 			rems = astype(rems, alist)
@@ -1138,7 +1138,7 @@ class Reminder(Command):
 				with suppress(ValueError):
 					bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
 				if rems:
-					bot.data.reminders.listed.insort((rems[0]["t"], sendable.id), key=lambda x: x[0])
+					bot.data.reminders.listed.insort((rems[0].t.timestamp_exact(), sendable.id), key=lambda x: x[0])
 			return ini_md(f"Successfully removed {sqr_md(removed)} from {mode} list for {sqr_md(sendable)}.")
 		if message is None and icon is None and time is None:
 			# Set callback message for scrollable list
@@ -1162,12 +1162,11 @@ class Reminder(Command):
 			raise OverflowError(f"Input message too long ({len(message)} > 4096).")
 		elif time is None:
 			raise ValueError("Please input a valid time.")
-		dt = time
 		rem = cdict(
 			user=_user.id,
 			msg=message,
-			t=dt.timestamp_exact(),
-			e=max(1, every.total_seconds()) if every else 0,
+			t=time,
+			e=every,
 			ref=(_message.channel.id, _message.id),
 		)
 		recur = 60 if mode == "urgent" else None
@@ -1177,12 +1176,12 @@ class Reminder(Command):
 			rem.icon = icon
 		rems.append(rem)
 		# Sort list of reminders
-		bot.data.reminders[sendable.id] = sort(rems, key=lambda x: x["t"])
+		bot.data.reminders[sendable.id] = sort(rems, key=lambda x: x.t.timestamp_exact())
 		with suppress(ValueError):
 			# Remove existing schedule
 			bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
 		# Insert back into bot schedule
-		tup = (bot.data.reminders[sendable.id][0]["t"], sendable.id)
+		tup = (bot.data.reminders[sendable.id][0].t.timestamp_exact(), sendable.id)
 		if isfinite(tup[0]):
 			bot.data.reminders.listed.insort(tup, key=lambda x: x[0])
 		emb = discord.Embed(description=message)
@@ -1200,8 +1199,8 @@ class Reminder(Command):
 		if every:
 			out += f" every {sqr_md(sec2time(every.total_seconds()))}"
 		out += ":```"
-		if dt:
-			out += dt.as_discord() + " (" + dt.as_rel_discord() + ")"
+		if time:
+			out += time.as_discord() + " (" + time.as_rel_discord() + ")"
 		return cdict(
 			content=out,
 			embed=emb,
@@ -1244,11 +1243,13 @@ class Reminder(Command):
 			content += f"Schedule for {str(sendable).replace('`', '')} is currently empty.```*"
 			msg = ""
 		else:
+			t = DynamicDT.utcnow()
 			def format_reminder(x):
-				s = lim_str(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + no_md(x["msg"]), 96) + "` ➡️ `" + time_until_short(x["t"]) + "`"
+				remaining = DynamicDT.utcfromtimestamp(x.t) - t if isinstance(x.t, number) else x.t - t
+				s = lim_str(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + no_md(x.msg), 96) + "` ➡️ `" + remaining.to_short() + "`"
 				if x.get("e"):
-					every = TimeDelta(seconds=x["e"])
-					s += f", every `{every.to_short()}`"
+					every = x.e.to_short()
+					s += f", every `{every}`"
 				return s
 			content += f"{len(rems)} message{'s' if len(rems) != 1 else ''} currently scheduled for {str(sendable).replace('`', '')}:```*"
 			msg = iter2str(
@@ -1444,22 +1445,24 @@ class UpdateUrgentReminders(Database):
 # This database is such a hassle to manage, it has to be able to persist between bot restarts, and has to be able to update with O(1) time complexity when idle
 class UpdateReminders(Database):
 	name = "reminders"
+	t = 0
 
 	def __load__(self):
-		d = self.data
-		# This exists so that checking next scheduled item is O(1)
-		for i in tuple(d):
-			try:
-				assert d[i][0]["t"] is not None
-			except Exception:
-				print_exc()
-				d.pop(i, None)
-		gen = ((block[0]["t"], i) for i, block in d.items() if block and isinstance(block[0], dict) and block[0].get("t") is not None)
-		self.listed = alist(sorted(gen, key=lambda x: x[0]))
+		self.listed = alist()
+		with tracebacksuppressor:
+			d = self.data
+			# This exists so that checking next scheduled item is O(1)
+			for i in tuple(d):
+				try:
+					assert d[i][0].t is not None
+				except Exception:
+					print_exc()
+					d.pop(i, None)
+			gen = (((block[0].t if isinstance(block[0].t, number) else block[0].t.timestamp_exact()), i) for i, block in d.items() if block and isinstance(block[0], dict) and block[0].get("t") is not None)
+			self.listed = alist(sorted(gen, key=lambda x: x[0]))
 		self.t = utc()
 
-	async def recurrent_message(self, channel, content, embed, wait=60, reference=None):
-		t = utc()
+	async def recurrent_message(self, channel, content, embed, t=0, wait=60, reference=None):
 		message = await channel.send(content, embed=embed, reference=reference)
 		await message.add_reaction("✅")
 		self.bot.data.urgentreminders.coercedefault("listed", alist, alist()).insort([t + wait, channel.id, message.id, embed, wait, content, reference and reference.id], key=lambda x: x[:3])
@@ -1486,25 +1489,26 @@ class UpdateReminders(Database):
 				continue
 			# Check next item in schedule
 			x = temp[0]
-			if t < x["t"]:
+			xt = x.t if isinstance(x.t, number) else x.t.timestamp_exact()
+			if t < xt:
 				# Insert back into schedule if not expired
-				self.listed.insort((x["t"], u_id), key=lambda x: x[0])
+				self.listed.insort((xt, u_id), key=lambda x: x[0])
 				print(self.listed)
 				continue
 			# Grab target from database
 			x = cdict(temp.pop(0))
-			every = x.get("e", 0)
+			every = x.get("e")
 			if every:
-				self.listed.insort((min(x["t"] + every, temp[0]["t"] if temp else inf), u_id), key=lambda x: x[0])
-				x["t"] += every
+				x.t += every
 				temp.insert(0, x)
-				temp.sort(key=lambda x: x["t"])
+				temp.sort(key=lambda x: x.t)
+				self.listed.insort((temp[0].t.timestamp_exact(), u_id), key=lambda x: x[0])
 				self[u_id] = temp
 			elif not temp:
 				self.data.pop(u_id)
 			else:
 				# Insert next listed item into schedule
-				self.listed.insort((temp[0]["t"], u_id), key=lambda x: x[0])
+				self.listed.insort((temp[0].t if isinstance(temp[0].t, number) else temp[0].t.timestamp_exact(), u_id), key=lambda x: x[0])
 			# print(self.listed)
 			# Send reminder to target user/channel
 			ch = await self.bot.fetch_messageable(u_id)
@@ -1533,7 +1537,7 @@ class UpdateReminders(Database):
 			if not x.get("recur"):
 				csubmit(ch.send(content, embed=emb, reference=reference))
 			else:
-				csubmit(self.recurrent_message(ch, content, emb, x.get("recur", 60), reference=reference))
+				csubmit(self.recurrent_message(ch, content, emb, t, x.get("recur", 60), reference=reference))
 
 
 class UpdateNotes(Database):

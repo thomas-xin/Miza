@@ -1361,7 +1361,7 @@ class UpdateEmojis(Database):
 					timeout=32,
 				)
 			emoji = discord.Emoji(guild=bot.user, state=bot._state, data=edata)
-			emoji.application_id = bot.id
+			# emoji.application_id = bot.id
 			self.data[name] = emoji.id
 			bot.cache.emojis[emoji.id] = emoji
 			return emoji

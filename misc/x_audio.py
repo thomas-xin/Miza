@@ -19,7 +19,7 @@ import psutil
 from .asyncs import csubmit, esubmit, asubmit, wrap_future, cst, eloop, Delay
 from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_str, astype
 from .util import (
-	tracebacksuppressor, force_kill, AUTH, TEMP_PATH, FileHashDict, EvalPipe, Request, api,
+	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, FileHashDict, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, maybe_json, select_and_loads,
 	is_url, is_discord_attachment, unyt, url2fn, get_duration, rename, uhash, expired, b64,  # noqa: F401
 )
@@ -1131,7 +1131,7 @@ class AudioFile:
 				if results:
 					entry.update(results[0])
 			name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
-			self.path = f"{TEMP_PATH}/audio/{name} {uhash(url)}.opus"
+			self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
 			if os.path.exists(self.path) and os.path.getsize(self.path):
 				self.stream = self.path
 				self.duration = get_duration(self.stream)
@@ -1140,7 +1140,7 @@ class AudioFile:
 				return self
 			stream, codec, duration, channels = ytdl.get_audio(entry, asap=asap)
 			name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
-			self.path = f"{TEMP_PATH}/audio/{name} {uhash(url)}.opus"
+			self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
 			if not is_url(stream) and codec == "opus" and channels == 2:
 				rename(stream, self.path)
 				self.stream = self.path
@@ -1171,7 +1171,7 @@ class AudioFile:
 				if asap and "Server returned 403 Forbidden (access denied)" in str(ex):
 					stream, codec, duration, channels = ytdl.get_audio(entry, asap=False)
 					name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
-					self.path = f"{TEMP_PATH}/audio/{name} {uhash(url)}.opus"
+					self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
 					assert not is_url(stream) and codec == "opus" and channels == 2, f"Unexpected stream format: {stream} {codec} {channels}"
 					rename(stream, self.path)
 					self.stream = self.path
@@ -1214,7 +1214,7 @@ class AudioFile:
 			try:
 				out = next(reader.it, b"")
 			except ValueError:
-				f = open(f"{TEMP_PATH}/audio/" + self.file, "rb")
+				f = open(f"{CACHE_PATH}/audio/" + self.file, "rb")
 				f.seek(reader.byte_pos)
 				reader.file = f
 				reader.it = discord.oggparse.OggStream(f).iter_packets()

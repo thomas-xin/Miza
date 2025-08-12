@@ -2522,7 +2522,7 @@ class AudioSeparator(Command):
 		))
 		fn = await bot.get_file(url)
 		args = ["audio-separator", os.path.abspath(fn), "--output_format", format]
-		proc = await asyncio.create_subprocess_exec(*args, cwd=CACHE_PATH)
+		proc = await asyncio.create_subprocess_exec(*args, cwd=TEMP_PATH)
 		try:
 			async with asyncio.timeout(3200):
 				await proc.wait()
@@ -2533,12 +2533,12 @@ class AudioSeparator(Command):
 		outputs = []
 		tmpl = fn.rsplit("/", 1)[-1].rsplit(".", 1)[0]
 		# The cache is littered with arbitrary files, but we can rely on bot.get_file's filename to contain a unique identifier which will always carry over to the output files
-		for f2 in os.listdir(CACHE_PATH):
+		for f2 in os.listdir(TEMP_PATH):
 			if f2.startswith(tmpl) and f2.endswith(format):
 				outputs.append(f2)
 		if not outputs:
 			raise ValueError("No output files found.")
-		files = [CompatFile(f"{CACHE_PATH}/{f2}", filename=f2.removeprefix(tmpl).lstrip(" _")) for f2 in outputs]
+		files = [CompatFile(f"{TEMP_PATH}/{f2}", filename=f2.removeprefix(tmpl).lstrip(" _")) for f2 in outputs]
 		response = await fut
 		response = await self.bot.edit_message(
 			response,

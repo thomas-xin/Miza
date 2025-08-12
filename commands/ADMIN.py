@@ -85,7 +85,6 @@ class Perms(Command):
 
 
 class Purge(Command):
-	server_only = True
 	time_consuming = True
 	_timeout_ = 16
 	name = ["🗑", "Del", "Delete", "Purge_Range"]
@@ -2273,7 +2272,7 @@ class CreateSound(Command):
 		d = await asubmit(get_duration, url)
 		i = ts_us()
 		if d <= 5.1:
-			fn = f"{CACHE_PATH}/{i}.ogg"
+			fn = f"{TEMP_PATH}/{i}.ogg"
 			args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-c:a", "libopus", "-b:a", "160k", fn]
 			print(args)
 			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
@@ -2287,8 +2286,8 @@ class CreateSound(Command):
 			with open(fn, "rb") as f:
 				data = await asubmit(f.read)
 		else:
-			fn1 = f"{CACHE_PATH}/{i}~1.mp3"
-			fn2 = f"{CACHE_PATH}/{i}~2.mp3"
+			fn1 = f"{TEMP_PATH}/{i}~1.mp3"
+			fn2 = f"{TEMP_PATH}/{i}~2.mp3"
 			args1 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-to", "1.175", "-c:a", "libmp3lame", "-b:a", "144k", fn1]
 			args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-ss", "1.175", "-to", "11", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
 			print(args1)
@@ -2305,7 +2304,7 @@ class CreateSound(Command):
 				with tracebacksuppressor:
 					force_kill(proc2)
 				raise
-			fn3 = f"{CACHE_PATH}/{i}~3.mp3"
+			fn3 = f"{TEMP_PATH}/{i}~3.mp3"
 			args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", fn1, "-c:a", "libmp3lame", "-b:a", "320k", fn3]
 			print(args)
 			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
@@ -2322,7 +2321,7 @@ class CreateSound(Command):
 					data = f3.read()
 				with open(fn2, "rb") as f2:
 					data += f2.read()
-				with open(f"{CACHE_PATH}/{i}.mp3", "wb") as f:
+				with open(f"{TEMP_PATH}/{i}.mp3", "wb") as f:
 					f.write(data)
 				return data
 

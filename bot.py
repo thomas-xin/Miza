@@ -146,6 +146,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# if not os.path.exists("saves/filehost"):
 		# 	os.mkdir("saves/filehost")
 		for k in ("attachments", "audio", "filehost"):
+			if not os.path.exists(f"{CACHE_PATH}/{k}"):
+				os.mkdir(f"{CACHE_PATH}/{k}")
 			if not os.path.exists(f"{TEMP_PATH}/{k}"):
 				os.mkdir(f"{TEMP_PATH}/{k}")
 			if not os.path.exists(f"{FAST_PATH}/{k}"):
@@ -3173,7 +3175,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if not name and data:
 				name = "untitled." + get_ext(data)
 			ext = "bin" if "." not in name else name.rsplit(".", 1)[-1]
-			fn = f"{TEMP_PATH}/attachments/{attachment.id}.{ext}"
+			fn = f"{CACHE_PATH}/attachments/{attachment.id}.{ext}"
 			if not os.path.exists(fn):
 				with open(fn, "wb") as f:
 					await asubmit(f.write, data)
@@ -3184,7 +3186,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if "prot" in self.data:
 			name = url2fn(attachment.url) if hasattr(attachment, "url") else ""
 			ext = "bin" if "." not in name else name.rsplit(".", 1)[-1]
-			fn = f"{TEMP_PATH}/attachments/{attachment.id}.{ext}"
+			fn = f"{CACHE_PATH}/attachments/{attachment.id}.{ext}"
 			if fn in self.cache.attachments:
 				if self.cache.attachments[fn]:
 					await self.data.prot.scan(message, fn, known=self.cache.attachments[fn])
@@ -3223,12 +3225,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							self.cache.attachments[a_id] = None
 							try:
 								fh = str(data)
-								for fn in os.listdir(f"{TEMP_PATH}/attachments"):
+								for fn in os.listdir(f"{CACHE_PATH}/attachments"):
 									if fn.startswith(fh):
 										break
 								else:
 									raise FileNotFoundError(fh)
-								with open(f"{TEMP_PATH}/attachments/" + fn, "rb") as f:
+								with open(f"{CACHE_PATH}/attachments/" + fn, "rb") as f:
 									data = await asubmit(f.read)
 							except FileNotFoundError:
 								if allow_proxy and is_image(url):
@@ -4559,42 +4561,25 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.loaded = True
 		return modload
 
+	@tracebacksuppressor
 	def clear_cache(self):
 		if self.cache_semaphore.busy:
 			return 0
 		with self.cache_semaphore:
 			i = 0
-			expendable = list(f for f in os.scandir("cache") if not f.is_dir())
-			stats = psutil.disk_usage(os.getcwd())
-			t = utc()
-			expendable = sorted(expendable, key=lambda f: ((t - max(f.stat().st_atime, f.stat().st_mtime)) // 3600, f.stat().st_size), reverse=True)
-			if not expendable:
-				return 0
-			while stats.free < 81 * 1073741824 or len(expendable) > 8192 or (t - expendable[0].stat().st_atime) > 3600 * 24:
-				with tracebacksuppressor:
-					os.remove(expendable.pop(0).path)
-					i += 1
-				if not expendable:
-					break
-			for k in ("attachments", "audio", "filehost"):
-				atts = os.listdir(f"{TEMP_PATH}/{k}")
-				if len(atts) > 16384:
-					for a in atts[:-16384]:
-						with tracebacksuppressor:
-							os.remove(f"{TEMP_PATH}/{k}/" + a)
-							i += 1
-			for k in ("attachments", "audio", "filehost"):
-				atts = os.listdir(f"{FAST_PATH}/{k}")
-				if len(atts) > 4096:
-					for a in atts[:-4096]:
-						with tracebacksuppressor:
-							os.remove(f"{FAST_PATH}/{k}/" + a)
-							i += 1
-			atts = os.listdir("misc/cache")
-			for a in atts:
-				with tracebacksuppressor:
-					os.remove(f"misc/cache/{a}")
-					i += 1
+			for path, limit in zip((CACHE_PATH, TEMP_PATH, FAST_PATH), (16384, 1024, 4096)):
+				for k in ("", "attachments", "audio", "filehost"):
+					atts = os.listdir(f"{path}/{k}")
+					if len(atts) > limit:
+						atts = sorted((f"{path}/{k}/{a}" for a in atts), key=os.path.getsize)
+						for p in atts[:-limit]:
+							with tracebacksuppressor(PermissionError):
+								os.remove(p)
+								i += 1
+			with tracebacksuppressor(FileNotFoundError):
+				c = len(os.listdir("misc/cache"))
+				shutil.rmtree("misc/cache")
+				i += c + 1
 			if i > 1:
 				print(f"{i} cached files flagged for deletion.")
 			return i

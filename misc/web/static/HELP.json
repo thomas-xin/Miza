@@ -2341,17 +2341,17 @@
 		"Wav2Png": {
 			"aliases": [
 				"Wav2Png",
-				"Png2Wav",
-				"Png2Mp3"
+				"Image2Audio",
+				"Audio2Image",
+				"Webp2Flac",
+				"Flac2Webp",
+				"Png2Wav"
 			],
 			"description": "Runs wav2png on the input URL. See https://github.com/thomas-xin/Audio-Image-Converter for more info, or to run it yourself!",
-			"usage": "<0:search_links>",
+			"usage": "",
 			"level": "0",
-			"rate_limit": "(20, 30)",
-			"example": [
-				"wav2png https://www.youtube.com/watch?v=IgOci6JXPIc",
-				"png2wav https://cdn.discordapp.com/embed/avatars/0.png"
-			],
+			"rate_limit": "(15, 25)",
+			"example": [],
 			"timeout": "360"
 		},
 		"SpectralPulse": {
@@ -2368,23 +2368,6 @@
 			],
 			"timeout": "3600"
 		},
-		"MCEnchant": {
-			"aliases": [
-				"MCEnchant",
-				"Enchant",
-				"GenerateEnchant"
-			],
-			"description": "Given an item and custom enchant values, generates a Minecraft /give command. An old misc command brought back.",
-			"usage": "<item> <enchantment(?:name/level)>*",
-			"level": "0",
-			"rate_limit": "(4, 5)",
-			"example": [
-				"enchant diamond_sword sharpness 8, fire_aspect 3, sweeping",
-				"enchant diamond_axe mending unbreaking XI silk_touch",
-				"enchant netherite_shovel efficiency 2000 looting vanishing_curse"
-			],
-			"timeout": "24"
-		},
 		"BTD6Paragon": {
 			"aliases": [
 				"BTD6Paragon",
@@ -2400,6 +2383,19 @@
 				"paragon boat 400000p 30l",
 				"paragon monkey_ace 2x500 2x050 2x005"
 			],
+			"timeout": "24"
+		},
+		"SkyShardReminder": {
+			"aliases": [
+				"SkyShardReminder",
+				"SkyShard",
+				"SkyShards"
+			],
+			"description": "Tracks and sends DM reminders for Shard Eruptions in the game Sky: Children of the Light. Referenced code from https://github.com/PlutoyDev/sky-shards. When active, reminders will be sent 12 hours prior to the first landing, and additionally 1 hour, 5 minutes, and at the start of all landings. To dismiss remaining reminders for the day, react with \u2705 on any reminder message.",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(2, 3)",
+			"example": [],
 			"timeout": "24"
 		}
 	}

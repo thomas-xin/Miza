@@ -1403,7 +1403,7 @@ class Imagine(Command):
 				continue
 			if isinstance(fn, bytes):
 				ts = ts_us()
-				fn2 = f"{CACHE_PATH}/{ts}.png"
+				fn2 = f"{TEMP_PATH}/{ts}.png"
 				with open(fn2, "wb") as f:
 					f.write(fn)
 				fn = fn2
