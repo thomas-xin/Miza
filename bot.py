@@ -3166,7 +3166,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def add_attachment(self, attachment, data=None, c_id=None, m_id=None):
 		# if c_id and m_id and "attachments" in self.data:
 		# 	self.data.attachments[attachment.id] = (c_id, m_id)
-		if attachment.id not in self.cache.attachments:
+		if attachment.id not in self.cache.attachments and int(attachment.size) <= 64 * 1048576:
 			self.cache.attachments[attachment.id] = None
 			if data is None:
 				data = await attachment.read()
@@ -3236,7 +3236,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 								if allow_proxy and is_image(url):
 									url = to_webp(url)
 								data = await Request(url, timeout=18, aio=True, ssl=False)
-								await self.add_attachment(cdict(id=a_id), data=data)
+								await self.add_attachment(cdict(id=a_id, size=len(data)), data=data)
 								return data
 							else:
 								self.cache.attachments[a_id] = data
@@ -3249,7 +3249,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				url = to_webp(url)
 			if full:
 				data = await Request(url, timeout=18, aio=True, ssl=False)
-				await self.add_attachment(cdict(id=a_id), data=data)
+				await self.add_attachment(cdict(id=a_id, size=len(data)), data=data)
 				return data
 			return await asubmit(reqs.next().get, url, stream=True, _timeout_=30, allow_redirects=True)
 		return
@@ -3852,16 +3852,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if pl2 < 2:
 			return 50
 		if pl2 < 3:
-			return 125
+			return 200
 		if pl2 < 4:
-			return 250
+			return 300
 		if pl2 < 5:
-			return 500
+			return 625
 		if pl2 < 6:
-			return 1000
+			return 1250
 		if pl2 < 7:
-			return 1500
-		return 2000
+			return 2000
+		return 3000
 
 	class PremiumContext(contextlib.AbstractContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 		def __init__(self, user, target=None, value=0, cost=0):
@@ -3872,6 +3872,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.embed = None
 			self.description = None
 			self.costtup = []
+
+		@property
+		def value_approx(self):
+			data = bot.data.users.setdefault(self.user.id, {})
+			freebies = T(data).coercedefault("freebies", list, [])
+			freelim = bot.premium_limit(self.value)
+			rem = max(0, freelim - len(freebies))
+			if rem < 50:
+				return 1
+			return self.value
 
 		def require(self, value=0, cost=None):
 			data = bot.data.users.setdefault(self.user.id, {})
@@ -4570,11 +4580,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return 0
 		with self.cache_semaphore:
 			i = 0
+			t = utc()
 			for path, limit in zip((CACHE_PATH, TEMP_PATH, FAST_PATH), (16384, 1024, 4096)):
 				for k in ("", "attachments", "audio", "filehost"):
 					atts = os.listdir(f"{path}/{k}")
 					if len(atts) > limit:
-						atts = sorted((f"{path}/{k}/{a}" for a in atts), key=os.path.getsize)
+						atts = sorted((f"{path}/{k}/{a}" for a in atts), key=lambda p: (t - os.path.getatime(p)) * os.path.getsize(p), reverse=True)
 						for p in atts[:-limit]:
 							with tracebacksuppressor(PermissionError):
 								os.remove(p)
@@ -4790,7 +4801,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						if isinstance(resp, cdict):
 							if interaction and not resp.get("file"):
 								r, d = await fut
-								print(r, d)
 								if not d:
 									await self.defer_interaction(message, mode="patch")
 								await interaction_patch(
@@ -4850,8 +4860,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					status = discord.Status.dnd
 				else:
 					activity = discord.Game(name=text)
-				if changed:
-					print(repr(activity))
+				# if changed:
+				# 	print(repr(activity))
 				if self.audio:
 					audio_status = "await client.change_presence(status=discord.Status."
 					if status is None:
@@ -4890,7 +4900,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						async def call_into(u):
 							with MemoryTimer(f"{u}-call"):
 								return await asubmit(u, priority=None)
-						# await call_into(u)
 						fut = call_into(u)
 						futs.append(fut)
 				await gather(*futs)
@@ -4899,7 +4908,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		schema = command.schema
 		argv = argv or ""
 		args, ws = smart_split(argv, rws=True)
-		# print("ARGS:", args, ws)
 		append_lws = None
 		if schema is None:
 			flags = {}
@@ -5158,7 +5166,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if r:
 					kwargs[k] = [r] if v.get("multiple") else r
 					continue
-				print(kwargs)
 				raise ArgumentError(f"Argument {k} ({v.description}) is required.")
 		if append_lws:
 			k, j = append_lws
@@ -5508,7 +5515,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					timeout *= 2
 				timeout *= self.premium_multiplier(self.premium_level(user))
 			premium = self.premium_context(user, guild=guild)
-			# print("KWARGS:", kwargs)
 			# Create a future to run the command
 			future = asubmit(
 				command,						# command is a callable object, may be async or not
@@ -5617,7 +5623,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			comm = comm[len(prefix):].strip()
 		elif not from_mention:
 			return
-		# Special case: the ? alias for the ~help command, since ? is an argument flag indicator and will otherwise be parsed as one.
+		# Special case: the ? alias for the ~help command, since ? would not otherwise be an alias
 		if len(comm) and comm[0] == "?":
 			command_check = comm[0]
 			i = 1
@@ -5932,6 +5938,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	@tracebacksuppressor
 	async def process_http_eval(self, t, proc):
+		"""Only called by the webserver worker process when invoked with proper authentication priviledges."""
 		glob = self._globals
 		# url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
 		out = '{"result":null}'

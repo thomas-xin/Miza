@@ -174,7 +174,7 @@ class Ask(Command):
 		)
 		reacts = []
 		if not _model:
-			_model = "large" if premium.value >= 3 else "medium"
+			_model = "large" if premium.value_approx >= 3 else "medium"
 		if _model == "large":
 			premium.require(3)
 		elif _model == "medium":
@@ -387,7 +387,7 @@ class Ask(Command):
 								if pdata.description == DEFPER and bot_name == bot.user.display_name and bot.id == 668999031359537205:
 									res = "- You are `Miza`, a multipurpose, multimodal bot that operates on social platforms such as Discord.\n- Your appearance is based on the witch-girl `Misery` from `Cave Story`.\n- Your creator is <@201548633244565504>, and you have a website at https://mizabot.xyz which a guide on your capabilities!"
 								else:
-									cap = await self.bot.caption(best_url(u2), best=2 if premium.value >= 4 else 0, timeout=24)
+									cap = await self.bot.caption(best_url(u2), best=2 if premium.value_approx >= 4 else 0, timeout=24)
 									s = "\n\n".join(filter(bool, cap)).strip()
 									res = f"- You are `{u2.name}`, a multipurpose, multimodal bot that operates on social platforms such as Discord.\n- Your appearance is based on `{s}`."
 									if bot.owners:
@@ -395,7 +395,7 @@ class Ask(Command):
 										um = user_mention(i)
 										res += f"\n-Your owner is {um}."
 							else:
-								cap = await self.bot.caption(best_url(u2), best=2 if premium.value >= 4 else 0, timeout=24)
+								cap = await self.bot.caption(best_url(u2), best=2 if premium.value_approx >= 4 else 0, timeout=24)
 								s = "\n\n".join(filter(bool, cap)).strip()
 								res = f"- Search results: `{u2.name}` has the appearance of `{s}`."
 							return res
@@ -934,7 +934,7 @@ class Imagine(Command):
 		model = model or "auto"
 		mode = mode or ("raw" if url or mask else "preprocess")
 		aspect_ratio = 0 if not aspect_ratio[0] or not aspect_ratio[1] else aspect_ratio[0] / aspect_ratio[1]
-		count = count or (4 if _premium.value >= 3 else 1)
+		count = count or (4 if _premium.value_approx >= 3 else 1)
 		limit = 18 if _premium.value >= 5 else 9 if _premium.value >= 3 else 4
 		amount = min(count, limit)
 		amount2 = 0
@@ -951,9 +951,9 @@ class Imagine(Command):
 			_premium.require(2)
 		else:
 			_premium.require(2)
-		if _premium.value < 4:
+		if _premium.value_approx < 4:
 			num_inference_steps = min(36, num_inference_steps)
-		elif _premium.value < 2:
+		elif _premium.value_approx < 2:
 			num_inference_steps = min(28, num_inference_steps)
 		if high_quality:
 			num_inference_steps *= 1.25
@@ -963,7 +963,7 @@ class Imagine(Command):
 			raise NotImplementedError("Masks are currently paused due to capacity issues, apologies for any inconvenience!")
 		if not prompt or mode == "caption":
 			if url:
-				pt, *p1 = await bot.caption(url, best=3 if _premium.value >= 4 else 1, premium_context=_premium)
+				pt, *p1 = await bot.caption(url, best=3 if _premium.value_approx >= 4 else 1, premium_context=_premium)
 				caption = "\n".join(filter(bool, p1))
 				if prompt:
 					prompt += f" ({caption})"
@@ -1014,7 +1014,7 @@ class Imagine(Command):
 							premium_context=_premium,
 						),
 						# best=_premium.value >= 3 and not (dups > 2 and not i),
-						cache=_premium.value < 2,
+						cache=_premium.value_approx < 2,
 						skip=True,
 						user=_user,
 					))
