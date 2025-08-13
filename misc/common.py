@@ -726,9 +726,11 @@ async def add_reacts(message, reacts):
 		tempsem = Semaphore(5, inf, rate_limit=5)
 		for react in reacts:
 			async with tempsem:
-				async with Delay(0.25):
-					fut = csubmit(aretry(message.add_reaction, react))
-					futs.append(fut)
+				with tracebacksuppressor:
+					await message.add_reaction(react)
+				# async with Delay(0.25):
+				# 	fut = csubmit(aretry(message.add_reaction, react))
+				# 	futs.append(fut)
 	for fut in futs:
 		await fut
 	return message

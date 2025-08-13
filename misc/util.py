@@ -503,6 +503,8 @@ def html_decode(s) -> str:
 	"Decodes HTML encoded characters in a string."
 	return html.unescape(s)
 
+number_emojis = "0️⃣ 1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ 6️⃣ 7️⃣ 8️⃣ 9️⃣ 🔟".split()
+
 @hashable_args
 @functools.lru_cache(maxsize=256)
 def split_across(s, lim=2000, prefix="", suffix="", mode="len", bypass=((), ()), close_codeboxes=True) -> list:

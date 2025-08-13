@@ -539,59 +539,93 @@ class SkyShardReminder(Command):
 			description="Whether to disable reminders, or to target a particular type of shard",
 			default="all",
 		),
+		ping=cdict(
+			type="bool",
+			description="Whether to ping at all intervals by default",
+			default=True,
+		),
 	)
 
-	def __call__(self, bot, _user, mode, **void):
+	def __call__(self, bot, _user, mode, ping, **void):
 		match mode:
 			case "none":
 				bot.data.skyshardreminders.pop(_user.id, None)
 				return fix_md("Successfully unsubscribed from Sky Shard Reminders.")
 			case "black":
-				bot.data.skyshardreminders[_user.id] = cdict(subscription=1, reminded={})
+				bot.data.skyshardreminders[_user.id] = cdict(subscription=1, ping=ping, reminded={})
 				return fix_md("Successfully subscribed to Black Shards.")
 			case "red":
-				bot.data.skyshardreminders[_user.id] = cdict(subscription=2, reminded={})
+				bot.data.skyshardreminders[_user.id] = cdict(subscription=2, ping=ping, reminded={})
 				return fix_md("Successfully subscribed to Red Shards.")
 			case "all":
-				bot.data.skyshardreminders[_user.id] = cdict(subscription=3, reminded={})
+				bot.data.skyshardreminders[_user.id] = cdict(subscription=3, ping=ping, reminded={})
 				return fix_md("Successfully subscribed to all Shards.")
 
 
 class UpdateSkyShardReminders(Database):
 	name = "skyshardreminders"
 
+	def parse_pings(self, text):
+		return list(map(int, text.split(":", 1)[-1].split(",")))
+
+	async def _reaction_add_(self, message, react, user):
+		if user.id not in self or getattr(message.channel, "recipient", None) != user:
+			return
+		if not message.embeds:
+			return
+		if (r := str(react)) not in number_emojis:
+			print(r)
+			return
+		embed = message.embeds[0]
+		pinged_occurrences = self.parse_pings(embed.footer.text) if embed.footer.text else [1, 2, 3]
+		n = number_emojis.index(r)
+		try:
+			pinged_occurrences.remove(n)
+		except ValueError:
+			pinged_occurrences.append(n)
+			pinged_occurrences.sort()
+		embed.set_footer(text=f"Pings for landings: {', '.join(map(str, pinged_occurrences)) or 'none'}", icon_url="https://cdn.discordapp.com/emojis/695800620682313740.webp")
+		await message.edit(embed=embed)
+
+	_reaction_remove_ = _reaction_add_
+
 	async def __call__(self, **void):
 		bot = self.bot
 		t = utc()
 		taken_shards = self.get(0, {})
 		ct = datetime.datetime.now(tz=datetime.timezone.utc)
-		nt = ct + datetime.timedelta(days=1)
-		s1 = shard.find_next_shard(ct)
+		pt = ct - datetime.timedelta(hours=1)
+		nt = pt + datetime.timedelta(days=1)
+		s1 = shard.find_next_shard(pt)
 		s2 = shard.find_next_shard(nt)
 		shards = (s1, s2) if s1.occurrences[0].start != s2.occurrences[0].start else [s1]
 
 		def format_landing(o):
 			land = DynamicDT.fromdatetime(o.land)
 			end = DynamicDT.fromdatetime(o.end)
-			return f"{land.as_discord().replace('F', 'd')} {land.as_discord().replace('F', 't')} (*{land.as_rel_discord()}*) ~ {end.as_discord().replace('F', 'd')} {end.as_discord().replace('F', 't')} (*{end.as_rel_discord()}*)"
+			# return f"{land.as_discord().replace('F', 'd')} {land.as_discord().replace('F', 't')} (*{land.as_rel_discord()}*) ~ {end.as_discord().replace('F', 'd')} {end.as_discord().replace('F', 't')} (*{end.as_rel_discord()}*)"
+			return f"{land.as_rel_discord()} ~ {end.as_rel_discord()}"
 
 		for s in shards:
 			shard_hash = int(s.occurrences[0].start.timestamp())
 			taken = taken_shards.get(shard_hash, 0)
 			ping = True
+			occurrence_number = 0
+			all_occurrences = list(n + 1 for n in range(len(s.occurrences)))
 			try:
-				for i, o in enumerate(s.occurrences):
+				for i, o in reversed(tuple(enumerate(s.occurrences))):
 					ts = o.land.timestamp()
 					reminders = [ts - 3600, ts - 300, ts]
 					if not i:
 						reminders.insert(0, ts - 43200)
 					reminders.append(o.end.timestamp() + 1)
-					for r in reminders:
+					for r in reversed(reminders):
 						if r > taken and t >= r:
 							taken = taken_shards[shard_hash] = r
 							self[0] = taken_shards
 							if r == reminders[-1]:
 								ping = False
+							occurrence_number = i + 1
 							raise StopIteration
 			except StopIteration:
 				pass
@@ -614,12 +648,11 @@ class UpdateSkyShardReminders(Database):
 				reward = f"200 ×{emoji}"
 			timing = "Active" if any(o.land < ct < o.end for o in s.occurrences) else next((DynamicDT.fromdatetime(o.land).as_rel_discord() for o in s.occurrences if ct < o.land), "Expired")
 			location = " -> ".join(w.capitalize() for w in s.map.split("."))
-			landings = "\n".join(f"  - **{format_landing(o)}**" if o.land < ct < o.end else f"  - {format_landing(o)}" for o in s.occurrences)
-			embed.description = f"""- Status: **{timing}**
-- Location: {location}
-- Reward: {reward}
-- Landings:
-{landings}"""
+			landings = "\n".join(f"- **{format_landing(o)}**" if o.land <= ct < o.end else f"- ~~{format_landing(o)}~~" if o.end <= ct else f"- {format_landing(o)}" for o in s.occurrences)
+			embed.add_field(name="Status", value=f"**{timing}**", inline=True)
+			embed.add_field(name="Location", value=location, inline=True)
+			embed.add_field(name="Reward", value=reward, inline=True)
+			embed.add_field(name="Landings", value=landings, inline=False)
 			for k, v in tuple(self.items()):
 				if not k:
 					continue
@@ -631,6 +664,7 @@ class UpdateSkyShardReminders(Database):
 					print_exc()
 					self.pop(k)
 				message = None
+				pinged_occurrences = all_occurrences.copy() if v.get("ping", True) else []
 				try:
 					m_id = v.reminded[shard_hash]
 				except KeyError:
@@ -656,10 +690,13 @@ class UpdateSkyShardReminders(Database):
 						print_exc()
 						continue
 					else:
+						if message.embeds and message.embeds[0].footer.text and occurrence_number not in (pinged_occurrences := self.parse_pings(message.embeds[0].footer.text)):
+							ping = False
 						if ping:
 							csubmit(bot.silent_delete(message))
+				embed.set_footer(text=f"Pings for landings: {', '.join(map(str, pinged_occurrences)) or 'none'}", icon_url="https://cdn.discordapp.com/emojis/695800620682313740.webp")
 				if ping or not message:
-					message = await send_with_react(user, embed=embed, reacts="✅")
+					message = await send_with_react(user, embed=embed, reacts=["✅"] + [number_emojis[n] for n in all_occurrences])
 				else:
 					await message.edit(embed=embed)
 				v.reminded[shard_hash] = message.id

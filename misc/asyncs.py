@@ -165,7 +165,7 @@ def initialise_ppe():
 def awaitable(obj) -> bool:
 	if isinstance(obj, type):
 		return False
-	return hasattr(obj, "__await__") or isinstance(obj, asyncio.Future) or inspect.isawaitable(obj)
+	return callable(getattr(obj, "__await__", None)) or isinstance(obj, asyncio.Future) or inspect.isawaitable(obj)
 
 # Async function that waits for a given time interval if the result of the input coroutine is None.
 async def wait_on_none(coro, seconds=0.5):

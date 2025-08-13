@@ -3967,7 +3967,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					else:
 						s = " (next refresh " + time_repr(86400 + freebies[0]) + ")" if freebies else ""
 						s = f"Command incurred cost of `{cost}`; `{rem}/{freelim}`{' free' if self.value <= 1 else ''} quota remaining today{s}."
-					desc = f"{s}\nIf you're able to contribute towards [funding](<{bot.kofi_url}>) my hosting costs it would mean the world to us, and ensure that I can continue providing up-to-date tools and entertainment.\nEvery little bit helps due to the size of my audience!\nSee /premium to check usage stats{or_adjust}."
+					if self.value >= 2 or data.get("credit"):
+						desc = f"{s}\nSee /premium to check usage stats{or_adjust}."
+					else:
+						desc = f"{s}\nIf you're able to contribute towards [funding](<{bot.kofi_url}>) my hosting costs it would mean the world to us, and ensure that I can continue providing up-to-date tools and entertainment.\nEvery little bit helps due to the size of my audience!\nSee /premium to check usage stats{or_adjust}."
 				emb = discord.Embed(colour=rand_colour())
 				emb.set_author(**get_author(bot.user))
 				emb.description = desc
@@ -8241,6 +8244,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			await self.seen(user, channel, message.guild, event="reaction", raw="Removing a reaction")
 			if user.id != self.id:
 				reaction = str(emoji)
+				await self.send_event("_reaction_remove_", message=message, react=reaction, user=user)
 				await self.react_callback(message, reaction, user)
 				await self.check_to_delete(message, reaction, user)
 
