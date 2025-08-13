@@ -2391,7 +2391,7 @@
 				"SkyShard",
 				"SkyShards"
 			],
-			"description": "Tracks and sends DM reminders for Shard Eruptions in the game Sky: Children of the Light. Referenced code from https://github.com/PlutoyDev/sky-shards. When active, reminders will be sent 12 hours prior to the first landing, and additionally 1 hour, 5 minutes, and at the start of all landings. To dismiss remaining reminders for the day, react with \u2705 on any reminder message.",
+			"description": "Tracks and sends DM reminders for Shard Eruptions in the game Sky: Children of the Light. Referenced code from https://github.com/PlutoyDev/sky-shards. When active, reminders will be sent 12 hours prior to the first landing, and additionally 1 hour, 5 minutes, and at the start of all landings.",
 			"usage": "",
 			"level": "0",
 			"rate_limit": "(2, 3)",

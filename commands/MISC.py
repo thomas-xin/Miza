@@ -529,7 +529,7 @@ class BTD6Paragon(Command):
 
 class SkyShardReminder(Command):
 	name = ["SkyShard", "SkyShards"]
-	description = "Tracks and sends DM reminders for Shard Eruptions in the game Sky: Children of the Light. Referenced code from https://github.com/PlutoyDev/sky-shards. When active, reminders will be sent 12 hours prior to the first landing, and additionally 1 hour, 5 minutes, and at the start of all landings. To dismiss remaining reminders for the day, react with ✅ on any reminder message."
+	description = "Tracks and sends DM reminders for Shard Eruptions in the game Sky: Children of the Light. Referenced code from https://github.com/PlutoyDev/sky-shards. When active, reminders will be sent 12 hours prior to the first landing, and additionally 1 hour, 5 minutes, and at the start of all landings."
 	schema = cdict(
 		mode=cdict(
 			type="enum",
@@ -566,25 +566,33 @@ class UpdateSkyShardReminders(Database):
 	name = "skyshardreminders"
 
 	def parse_pings(self, text):
-		return list(map(int, text.split(":", 1)[-1].split(",")))
+		nums = text.split(":", 1)[-1].strip()
+		if nums == "none":
+			return []
+		return list(map(int, nums.split(",")))
 
 	async def _reaction_add_(self, message, react, user):
 		if user.id not in self or getattr(message.channel, "recipient", None) != user:
 			return
 		if not message.embeds:
 			return
-		if (r := str(react)) not in number_emojis:
+		if (r := str(react)) != "✅" and r not in number_emojis:
 			print(r)
 			return
+		default = [1, 2, 3]
 		embed = message.embeds[0]
-		pinged_occurrences = self.parse_pings(embed.footer.text) if embed.footer.text else [1, 2, 3]
-		n = number_emojis.index(r)
+		pinged_occurrences = self.parse_pings(embed.footer.text) if embed.footer.text else default
 		try:
-			pinged_occurrences.remove(n)
+			n = number_emojis.index(r)
 		except ValueError:
-			pinged_occurrences.append(n)
-			pinged_occurrences.sort()
-		embed.set_footer(text=f"Pings for landings: {', '.join(map(str, pinged_occurrences)) or 'none'}", icon_url="https://cdn.discordapp.com/emojis/695800620682313740.webp")
+			pinged_occurrences = default if not pinged_occurrences else []
+		else:
+			try:
+				pinged_occurrences.remove(n)
+			except ValueError:
+				pinged_occurrences.append(n)
+				pinged_occurrences.sort()
+		embed.set_footer(text=f"Pings for landings: {', '.join(map(str, pinged_occurrences)) or 'none'}", icon_url="https://cdn.discordapp.com/emojis/695800620682313740.webp" if pinged_occurrences else "https://cdn.discordapp.com/emojis/695800875150475294.webp")
 		await message.edit(embed=embed)
 
 	_reaction_remove_ = _reaction_add_
@@ -603,7 +611,6 @@ class UpdateSkyShardReminders(Database):
 		def format_landing(o):
 			land = DynamicDT.fromdatetime(o.land)
 			end = DynamicDT.fromdatetime(o.end)
-			# return f"{land.as_discord().replace('F', 'd')} {land.as_discord().replace('F', 't')} (*{land.as_rel_discord()}*) ~ {end.as_discord().replace('F', 'd')} {end.as_discord().replace('F', 't')} (*{end.as_rel_discord()}*)"
 			return f"{land.as_rel_discord()} ~ {end.as_rel_discord()}"
 
 		for s in shards:
@@ -632,18 +639,18 @@ class UpdateSkyShardReminders(Database):
 			else:
 				continue
 			print("SkyShard:", s)
-			embed = discord.Embed().set_image(url=f"https://sky-shards.pages.dev/infographics/data_gale/{s.map}.webp").set_thumbnail(url=f"https://sky-shards.pages.dev/infographics/map_clement/{s.map}.webp")
+			embed = discord.Embed().set_image(url=f"https://github.com/PlutoyDev/sky-shards/raw/refs/heads/production/public/infographics/data_gale/{s.map}.webp").set_thumbnail(url=f"https://github.com/PlutoyDev/sky-shards/raw/refs/heads/production/public/infographics/map_clement/{s.map}.webp")
 			url = f"https://sky-shards.pages.dev/en/{s.date.year}/{'%02d' % s.date.month}/{'%02d' % s.date.day}"
 			if s.is_red:
 				shard_bits = 2
 				embed.colour = discord.Colour(16711680)
-				embed.set_author(name="Red Shard", url=url, icon_url="https://sky-shards.pages.dev/emojis/ShardRed.webp")
+				embed.set_author(name="Red Shard", url=url, icon_url="https://raw.githubusercontent.com/PlutoyDev/sky-shards/refs/heads/production/public/emojis/ShardRed.webp")
 				emoji = await bot.data.emojis.grab("ascended_candle.png")
 				reward = f"{s.reward_ac} ×{emoji}"
 			else:
 				shard_bits = 1
 				embed.colour = discord.Colour(1)
-				embed.set_author(name="Black Shard", url=url, icon_url="https://sky-shards.pages.dev/emojis/ShardBlack.webp")
+				embed.set_author(name="Black Shard", url=url, icon_url="https://raw.githubusercontent.com/PlutoyDev/sky-shards/refs/heads/production/public/emojis/ShardBlack.webp")
 				emoji = await bot.data.emojis.grab("piece_of_light.png")
 				reward = f"200 ×{emoji}"
 			timing = "Active" if any(o.land < ct < o.end for o in s.occurrences) else next((DynamicDT.fromdatetime(o.land).as_rel_discord() for o in s.occurrences if ct < o.land), "Expired")
@@ -677,15 +684,6 @@ class UpdateSkyShardReminders(Database):
 								raise KeyError
 						except KeyError:
 							message = await discord.abc.Messageable.fetch_message(user, m_id)
-						for react in message.reactions:
-							if str(react) == "✅":
-								if react.count > 1:
-									raise StopIteration
-								async for u in react.users():
-									if u.id != self.bot.id:
-										raise StopIteration
-					except StopIteration:
-						continue
 					except Exception:
 						print_exc()
 						continue
@@ -694,7 +692,7 @@ class UpdateSkyShardReminders(Database):
 							ping = False
 						if ping:
 							csubmit(bot.silent_delete(message))
-				embed.set_footer(text=f"Pings for landings: {', '.join(map(str, pinged_occurrences)) or 'none'}", icon_url="https://cdn.discordapp.com/emojis/695800620682313740.webp")
+				embed.set_footer(text=f"Pings for landings: {', '.join(map(str, pinged_occurrences)) or 'none'}", icon_url="https://cdn.discordapp.com/emojis/695800620682313740.webp" if pinged_occurrences else "https://cdn.discordapp.com/emojis/695800875150475294.webp")
 				if ping or not message:
 					message = await send_with_react(user, embed=embed, reacts=["✅"] + [number_emojis[n] for n in all_occurrences])
 				else:
