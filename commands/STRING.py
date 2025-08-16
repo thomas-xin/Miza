@@ -1411,9 +1411,6 @@ class Rate(Command):
 	name = ["Rating", "Rank", "Ranking"]
 	description = "Rates a given object with a random value out of 10!"
 	usage = "<string>"
-	example = ("rate cats' cuteness",)
-	slash = True
-	ephemeral = True
 
 	async def __call__(self, bot, guild, argv, **void):
 		rate = random.randint(0, 10)

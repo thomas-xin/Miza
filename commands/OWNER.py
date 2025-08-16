@@ -21,6 +21,7 @@ class Reload(Command):
 	async def __call__(self, bot, _channel, _message, unload, reload, **void):
 		await _message.add_reaction("❗")
 		if unload:
+			unload = unload.upper()
 			message = await send_with_reply(_channel, content=f"Unloading {unload}...", reference=_message)
 			succ = await asubmit(bot.unload, unload, priority=1)
 			if succ:
@@ -28,6 +29,7 @@ class Reload(Command):
 			else:
 				await message.edit(content=f"Error unloading {unload}. Please see log for more info.")
 		if reload:
+			reload = reload.upper()
 			message = await send_with_reply(_channel, content=f"Reloading {reload}...", reference=_message)
 			succ = await asubmit(bot.reload, reload, priority=True)
 			if succ:

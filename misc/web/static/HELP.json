@@ -556,9 +556,7 @@
 			"usage": "<string>",
 			"level": "0",
 			"rate_limit": "(2, 3)",
-			"example": [
-				"rate cats' cuteness"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"WordCount": {

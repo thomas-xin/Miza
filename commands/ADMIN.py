@@ -2265,15 +2265,15 @@ class CreateSound(Command):
 	async def __call__(self, bot, _guild, _perm, _name, name, emoji, url, **void):
 		if _perm < 2:
 			raise self.perm_error(_perm, 2, "for command " + _name)
-		if emoji:
+		if emoji and emoji.isnumeric():
 			emoji = await bot.fetch_emoji(emoji, _guild)
 			assert emoji.guild.id == _guild.id, "Emoji must be from the current server."
-		name = name or (emoji.name if emoji else url2fn(url).rsplit(".", 1)[0])
+		name = name or getattr(emoji, "name", None) or url2fn(url).rsplit(".", 1)[0]
 		d = await asubmit(get_duration, url)
 		i = ts_us()
-		if d <= 5.1:
+		if d <= 5.5:
 			fn = f"{TEMP_PATH}/{i}.ogg"
-			args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-c:a", "libopus", "-b:a", "160k", fn]
+			args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-to", "5.1875", "-c:a", "libopus", "-b:a", "160k", fn]
 			print(args)
 			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
 			try:
@@ -2288,8 +2288,11 @@ class CreateSound(Command):
 		else:
 			fn1 = f"{TEMP_PATH}/{i}~1.mp3"
 			fn2 = f"{TEMP_PATH}/{i}~2.mp3"
-			args1 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-to", "1.175", "-c:a", "libmp3lame", "-b:a", "144k", fn1]
-			args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-ss", "1.175", "-to", "11", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
+			args1 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-ar", "48000", "-to", "1.175", "-c:a", "libmp3lame", "-b:a", "144k", fn1]
+			if d <= 11:
+				args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-i", "misc/10s-soundboard-template.ogg", "-filter_complex", "amix=inputs=2:duration=longest", "-ss", "1.175", "-to", "11", "-ar", "48000", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
+			else:
+				args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-ss", "1.175", "-to", "11", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
 			print(args1)
 			print(args2)
 			proc1 = await asyncio.create_subprocess_exec(*args1, stdout=subprocess.DEVNULL)

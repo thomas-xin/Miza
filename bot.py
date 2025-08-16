@@ -2363,12 +2363,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if system:
 			messages.insert(0, cdict(role="system", content=system))
 		prompt = [m.content for m in messages if m.get("role") == "user"][-1]
-		if modlvl > 2:
+		if modlvl >= 2:
 			maxlim = 196608
 			minlim = 4800
 			snip = 960
 			best = 2
-		elif modlvl > 1:
+		elif modlvl >= 1:
 			maxlim = 98304
 			minlim = 2400
 			snip = 600
@@ -2923,7 +2923,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
-		model = model or ("grok-4" if best else "mistral-24b")
+		model = model or ("gpt-5-mini" if best else "mistral-24b")
 		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
@@ -4477,6 +4477,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		#     mod = self._globals
 		else:
 			mod = cdict(common.__dict__)
+		assert isinstance(mod, dict)
 		fn = f"commands/{module}.py"
 		with open(fn, "rb") as f:
 			b = f.read()
