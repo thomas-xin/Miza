@@ -602,11 +602,15 @@ class UpdateSkyShardReminders(Database):
 		t = utc()
 		taken_shards = self.get(0, {})
 		ct = datetime.datetime.now(tz=datetime.timezone.utc)
-		pt = ct - datetime.timedelta(hours=1)
-		nt = pt + datetime.timedelta(days=1)
+		pt = ct - datetime.timedelta(hours=12)
+		nt = pt + datetime.timedelta(hours=24)
 		s1 = shard.find_next_shard(pt)
 		s2 = shard.find_next_shard(nt)
-		shards = (s1, s2) if s1.occurrences[0].start != s2.occurrences[0].start else [s1]
+		if s1.occurrences[0].start == s2.occurrences[0].start:
+			# s1 = shard.find_next_shard(pt - datetime.timedelta(days=1))
+			# if s1.occurrences[0].start == s2.occurrences[0].start:
+			s1 = None
+		shards = (s1, s2) if s1 is not None else [s2]
 
 		def format_landing(o):
 			land = DynamicDT.fromdatetime(o.land)
@@ -638,7 +642,7 @@ class UpdateSkyShardReminders(Database):
 				pass
 			else:
 				continue
-			print("SkyShard:", s)
+			print("SkyShard:", occurrence_number, s)
 			embed = discord.Embed().set_image(url=f"https://github.com/PlutoyDev/sky-shards/raw/refs/heads/production/public/infographics/data_gale/{s.map}.webp").set_thumbnail(url=f"https://github.com/PlutoyDev/sky-shards/raw/refs/heads/production/public/infographics/map_clement/{s.map}.webp")
 			url = f"https://sky-shards.pages.dev/en/{s.date.year}/{'%02d' % s.date.month}/{'%02d' % s.date.day}"
 			if s.is_red:
@@ -678,12 +682,8 @@ class UpdateSkyShardReminders(Database):
 					pass
 				else:
 					try:
-						try:
-							message = self.bot.cache.messages[m_id]
-							if not message.reactions:
-								raise KeyError
-						except KeyError:
-							message = await discord.abc.Messageable.fetch_message(user, m_id)
+						message = await bot.fetch_message(m_id, user)
+						message = await bot.ensure_reactions(message)
 					except Exception:
 						print_exc()
 						continue

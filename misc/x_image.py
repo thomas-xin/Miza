@@ -68,6 +68,9 @@ def as_str(s):
 		return bytes(s).decode("utf-8", "replace")
 	return str(s)
 
+def register_print_fn(f):
+	globals()["PRINT"] = globals()["print"] = f
+
 mpf = float
 deque = collections.deque
 suppress = contextlib.suppress

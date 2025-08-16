@@ -30,6 +30,9 @@ deque = collections.deque
 
 getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
 
+def register_print_fn(f):
+	globals()["PRINT"] = globals()["print"] = f
+
 
 def as_str(s):
 	if type(s) in (bytes, bytearray, memoryview):
@@ -332,7 +335,6 @@ from sympy.printing.pretty.stringpict import prettyForm  # noqa: E402
 _pow = sympy.Float.__pow__
 
 def pow(a, b):
-	print("_POW:", a, b)
 	if isinstance(a, sympy.Integer) and isinstance(a, sympy.Integer):
 		return _pow(a, b)
 	temp = _pow(r_evalf(a, BF_PREC), b)
@@ -354,6 +356,7 @@ def carmichael(n):
 
 def simplify_recurring(r, prec=100):
 	p, q = r.p, r.q
+	print("SR:", p, q)
 	try:
 		temp = _factorint(q, timeout=2)
 	except subprocess.TimeoutExpired as ex:
@@ -379,6 +382,7 @@ def simplify_recurring(r, prec=100):
 			if f < prec * 16 and divisible(10 ** f - 1, tq):
 				digits = f
 				break
+	print("SR:", digits, prec, cq, pr, tq)
 	start = max(1, l10(p) - l10(q)) + 2
 	if start + digits > prec * 2:
 		return
@@ -817,7 +821,6 @@ def rounder(x):
 	try:
 		if isinstance(x, (int, sympy.Integer)):
 			return x
-		print(x, l10(x), BF_PREC)
 		if l10(x) * 1.25 >= BF_PREC:
 			return x
 		y = int(x)
@@ -1182,7 +1185,7 @@ def l10(n):
 		r = abs(n)
 		m = math.log10(r)
 		if not math.isfinite(m):
-			m = sympy.log(r, 10).p
+			m = sympy.log(sympy.Float(r, 64), 10).p
 	except Exception:
 		return math.nan
 	if math.isnan(m):
@@ -1270,12 +1273,14 @@ def evalSym(f, prec=64, r=False, variables=None):
 		code = compile(a, filename="<math-input>", mode="eval")
 		f = eval(code, env)
 	# Solve any sums and round off floats when possible
-	for i in sympy.preorder_traversal(f):
+	for i in tuple(sympy.preorder_traversal(f)):
 		if isinstance(i, (sympy.Number, float, np.floating)):
-			try:
-				f = f.subs(i, rounder(i))
-			except Exception:
-				pass
+			j = rounder(i)
+			if i != j:
+				try:
+					f = f.subs(i, rounder(i))
+				except Exception:
+					pass
 		elif hasattr(i, "doit"):
 			try:
 				i2 = i.doit()
@@ -1290,17 +1295,15 @@ def evalSym(f, prec=64, r=False, variables=None):
 	# If the requested expression evaluates to a plot, return it
 	if isinstance(f, Plot) or f is plt or type(f) is str:
 		return (f,)
-	# try:
-	# 	f = sympy.simplify(f)
-	# except Exception:
-	# 	pass
 	# Solve any sums and round off floats when possible
-	for i in sympy.preorder_traversal(f):
+	for i in tuple(sympy.preorder_traversal(f)):
 		if isinstance(i, (sympy.Number, float, np.floating)) and l10(i) < BF_PREC:
-			try:
-				f = f.subs(i, rounder(i))
-			except Exception:
-				pass
+			j = rounder(i)
+			if i != j:
+				try:
+					f = f.subs(i, rounder(i))
+				except Exception:
+					pass
 		elif isinstance(f, (sympy.Integer, int, np.integer)) and l10(i) > BF_PREC:
 			try:
 				f = f.subs(i, sympy.N(f, prec))
@@ -1323,19 +1326,22 @@ def evalSym(f, prec=64, r=False, variables=None):
 	if isinstance(f, (sympy.Float, float, np.number)):
 		return [rounder(f)]
 	if prec:
+		print("TEMP:", f)
 		try:
 			f2 = f.evalf(prec + 4, chop=False)
 		except Exception:
 			f2 = f
+		print("TEMP2:", y)
 		try:
 			y = f2.evalf(prec, chop=True)
 		except Exception:
 			y = f2
+		print("TEMP3:", y)
 		try:
 			e = rounder(y)
 		except TypeError:
 			e = y
-			for i in sympy.preorder_traversal(e):
+			for i in tuple(sympy.preorder_traversal(e)):
 				if isinstance(i, (sympy.Float, float, np.floating)) and l10(i) < BF_PREC:
 					e = e.subs(i, rounder(i))
 		if r:

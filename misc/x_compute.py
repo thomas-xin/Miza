@@ -150,7 +150,7 @@ else:
 if CAPS.intersection(("browse", "image", "caption", "video", "sd", "sdxl", "scc")):
 	from math import *
 	import x_image
-	x_image.print = print
+	x_image.register_print_fn(print)
 	from x_image import *
 	from PIL import Image
 else:
@@ -736,7 +736,7 @@ if 0 and "whisper" in CAPS:
 
 if "math" in CAPS:
 	import x_math
-	x_image.print = print
+	x_math.register_print_fn(print)
 
 def max_size(w, h, maxsize, force=False):
 	s = w * h

@@ -1142,6 +1142,7 @@ class AudioFile:
 			name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
 			self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
 			if not is_url(stream) and codec == "opus" and channels == 2:
+				print("DL:", self.path)
 				rename(stream, self.path)
 				self.stream = self.path
 				self.duration = entry["duration"] = get_duration(self.stream) or duration
@@ -1172,12 +1173,14 @@ class AudioFile:
 					stream, codec, duration, channels = ytdl.get_audio(entry, asap=False)
 					name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
 					self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
+					print("DL:", self.path)
 					assert not is_url(stream) and codec == "opus" and channels == 2, f"Unexpected stream format: {stream} {codec} {channels}"
 					rename(stream, self.path)
 					self.stream = self.path
 					self.duration = entry["duration"] = get_duration(self.stream) or duration
 					return self
 				raise
+			print("DL:", self.path)
 			self.duration = entry["duration"] = duration
 			return self
 		except Exception as ex:

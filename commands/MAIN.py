@@ -1123,6 +1123,9 @@ class Reminder(Command):
 	async def __call__(self, bot, _message, _comment, _channel, _user, mode="reminder", message=None, icon=None, time=None, every=None, delete=None, **void):
 		sendable = _channel if mode == "announce" else _user
 		rems = bot.data.reminders.get(sendable.id, [])
+		for r in rems:
+			if isinstance(r.t, number):
+				r.t = DynamicDT.utcfromtimestamp(r.t)
 		if delete is not None:
 			if not len(rems):
 				return ini_md(f"No {mode}s currently set for {sqr_md(sendable)}.")
@@ -1214,6 +1217,9 @@ class Reminder(Command):
 			return
 		user = await bot.fetch_user(u_id)
 		rems = bot.data.reminders.get(s_id, [])
+		for r in rems:
+			if isinstance(r.t, number):
+				r.t = DynamicDT.utcfromtimestamp(r.t)
 		sendable = await bot.fetch_messageable(s_id)
 		page = 16
 		last = max(0, len(rems) - page)
@@ -1245,7 +1251,7 @@ class Reminder(Command):
 		else:
 			t = DynamicDT.utcnow()
 			def format_reminder(x):
-				remaining = DynamicDT.utcfromtimestamp(x.t) - t if isinstance(x.t, number) else x.t - t
+				remaining = x.t - t
 				s = lim_str(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + no_md(x.msg), 96) + "` ➡️ `" + remaining.to_short() + "`"
 				if x.get("e"):
 					every = x.e.to_short()
@@ -1410,15 +1416,9 @@ class UpdateUrgentReminders(Database):
 							p[0] += p[4]
 							i += 1
 						p[0] = max(utc() + 1, p[0])
-						try:
-							message = self.bot.cache.messages[m_id]
-							if not message.reactions:
-								raise KeyError
-						except KeyError:
-							channel = await self.bot.fetch_messageable(c_id)
-							message = await discord.abc.Messageable.fetch_message(channel, m_id)
-						else:
-							channel = message.channel
+						channel = await self.bot.fetch_messageable(c_id)
+						message = await bot.fetch_message(m_id, channel)
+						message = await bot.ensure_reactions(message)
 						for react in message.reactions:
 							if str(react) == "✅":
 								if react.count > 1:
