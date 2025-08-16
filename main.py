@@ -69,10 +69,8 @@ if os.name == "nt":
 		os.system("color")
 	except Exception:
 		traceback.print_exc()
-	# with requests.get("https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip", stream=True) as resp:
 	try:
-		# v = resp.url.rsplit("/", 1)[-1].split("-", 1)[-1].rsplit(".", 1)[0].split("-", 1)[0]
-		v = "6.0"
+		v = "2025-08-14"
 		r = subprocess.run(ffmpeg, stderr=subprocess.PIPE)
 		s = r.stderr[:r.stderr.index(b"\n")].decode("utf-8", "replace").strip().lower()
 		if s.startswith("ffmpeg"):
@@ -80,37 +78,20 @@ if os.name == "nt":
 		if s.startswith("version"):
 			s = s[7:].lstrip()
 		s = s.split("-", 1)[0]
-		# if s != v:
-			# print(f"FFmpeg version outdated ({v} > {s})")
-			# raise FileNotFoundError
+		if v > s:
+			print(f"FFmpeg version outdated ({v} > {s})")
+			raise FileNotFoundError
 		print(f"FFmpeg version {s} found; skipping installation...")
 	except FileNotFoundError:
-		print(f"Downloading FFmpeg version {v}...")
-		subprocess.run([
-			sys.executable, "downloader.py", "-c",
-			"https://cdn.discordapp.com/attachments/886856504135802890/1084164383061585970/c.b",
-			"https://cdn.discordapp.com/attachments/886856504135802890/1084164384059838594/c.b",
-			"https://cdn.discordapp.com/attachments/886856504135802890/1084164384571527218/c.b",
-			"https://cdn.discordapp.com/attachments/886856504135802890/1084164385146155018/c.b",
-			"https://cdn.discordapp.com/attachments/886856504135802890/1084164385754337391/c.b",
-			"https://cdn.discordapp.com/attachments/886856504135802890/1084164386593181736/c.b",
-			"../cache/ffmpeg.zip",
-		], cwd="misc")
-		import zipfile
+		print("Downloading new FFmpeg...")
+		args = [sys.executable, "downloader.py", "-threads", "32", "https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z", "../cache/ffmpeg.7z"]
+		print(args)
+		subprocess.run(args, cwd="misc")
 		print("Download complete; extracting new FFmpeg installation...")
-		f = "cache/ffmpeg.zip"
-		with zipfile.ZipFile(f) as z:
-			names = [name for name in z.namelist() if "bin/" in name and (".exe" in name or ".dll" in name)]
-			for i, name in enumerate(names):
-				print(f"{i}/{len(names)}")
-				fn = name.rsplit("/", 1)[-1]
-				with open(fn, "wb") as y:
-					with z.open(name, "r") as x:
-						while True:
-							b = x.read(1048576)
-							if not b:
-								break
-							y.write(b)
+		f = os.path.abspath("cache/ffmpeg.7z")
+		args = ["7zr", "e", f, "*/bin/*", "-y", "-o" + os.path.abspath(".")]
+		print(args)
+		subprocess.run(args, cwd="misc", shell=True)
 		print("FFmpeg extraction complete.")
 		os.remove(f)
 	if not os.path.exists("misc/poppler/pdftocairo.exe"):
