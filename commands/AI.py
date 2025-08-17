@@ -94,12 +94,13 @@ class Ask(Command):
 			name_repr = bot_name
 		personality = pdata.description.replace("{{user}}", _user.display_name).replace("{{char}}", name_repr)
 		if "nsfw" in personality.casefold():
-			pass
+			ac = ""
 		elif nsfw:
 			ac = "You are currently in a NSFW-enabled channel. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise the needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
 		else:
 			ac = "You are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, please use disclaimers in your response, and mention this to the user if necessary. However, avoid repeating yourself if already clarified."
-		personality += "\n" + ac
+		if ac:
+			personality += "\n" + ac
 		tzinfo = self.bot.data.users.get_timezone(_user.id)
 		if tzinfo is None:
 			tzinfo, _c = self.bot.data.users.estimate_timezone(_user.id)

@@ -2365,13 +2365,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		prompt = [m.content for m in messages if m.get("role") == "user"][-1]
 		if modlvl >= 2:
 			maxlim = 196608
-			minlim = 4800
+			minlim = 3600
 			snip = 960
 			best = 2
 		elif modlvl >= 1:
 			maxlim = 98304
-			minlim = 2400
-			snip = 600
+			minlim = 1200
+			snip = 480
 			best = 1
 		else:
 			maxlim = 3000
@@ -3879,7 +3879,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			freebies = T(data).coercedefault("freebies", list, [])
 			freelim = bot.premium_limit(self.value)
 			rem = max(0, freelim - len(freebies))
-			if rem < 50:
+			if rem < 25:
 				return 1
 			return self.value
 

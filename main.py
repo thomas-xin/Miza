@@ -70,7 +70,7 @@ if os.name == "nt":
 	except Exception:
 		traceback.print_exc()
 	try:
-		v = "2025-08-14"
+		v = "2025"
 		r = subprocess.run(ffmpeg, stderr=subprocess.PIPE)
 		s = r.stderr[:r.stderr.index(b"\n")].decode("utf-8", "replace").strip().lower()
 		if s.startswith("ffmpeg"):
@@ -100,7 +100,7 @@ if os.name == "nt":
 			os.mkdir("misc/poppler")
 		except FileExistsError:
 			pass
-		subprocess.run([sys.executable, "downloader.py", "https://cdn.discordapp.com/attachments/1091275350740320258/1107280656347705404/poppler.zip", "../cache/poppler.zip"], cwd="misc")
+		subprocess.run([sys.executable, "downloader.py", "-threads", "32", "https://cdn.discordapp.com/attachments/1091275350740320258/1107280656347705404/poppler.zip", "../cache/poppler.zip"], cwd="misc")
 		import zipfile
 		f = "cache/poppler.zip"
 		print("Download complete; extracting new Poppler installation...")
