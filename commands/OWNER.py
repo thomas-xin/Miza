@@ -424,7 +424,7 @@ class UpdateExec(Database):
 				glob["_"] = output
 			return output
 		if self.psem.busy:
-			output = await asubmit(aeval, proc, glob, priority=-1)
+			output = await asubmit(aeval, proc, glob, priority=0)
 		else:
 			async with self.psem:
 				output = await asubmit(aeval, proc, glob, priority=3)

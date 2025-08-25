@@ -11,7 +11,7 @@ if __name__ != "__mp_main__":
 from misc import common, asyncs
 from misc.common import * # noqa: F403
 import pdb
-import duckduckgo_search
+import ddgs
 
 # import asyncio
 # import collections
@@ -252,7 +252,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	def command_options(self, command):
 		accepts_attachments = False
-		out = deque()
+		out = []
+		extra = []
 		if command.schema:
 			for k, v in command.schema.items():
 				if not isinstance(v, cdict):
@@ -268,8 +269,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					arg.pop("required", None)
 				elif v.get("required") or v.get("required_slash"):
 					arg.required = True
-				if v.get("multiple"):
-					continue
 				if v.type == "enum":
 					options = sorted(v.validation.get("enum") or v.validation.accepts)
 					if len(options) <= 25:
@@ -302,6 +301,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						arg.min_value = mx
 						arg.max_value = Mx
 				out.append(arg)
+				if v.get("multiple"):
+					for i in range(5):
+						a2 = cdict(arg)
+						a2.name = arg.name + f"-{i + 2}"
+						a2.description = f"Extension of {arg.name}"
+						extra.append(a2)
 		else:
 			for i in command.usage.split():
 				with tracebacksuppressor:
@@ -361,6 +366,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if accepts_attachments:
 			arg = dict(type=11, name="attachment", description="Attachment in place of URL")
 			out.append(arg)
+		out.extend(extra)
 		return sorted(out, key=lambda arg: not arg.get("required"))
 
 	slash_sem = Semaphore(5, 256, rate_limit=5)
@@ -1932,8 +1938,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		11: "au-en",
 		12: "nz-en",	# New Zealand
 	}
-	ddgs = duckduckgo_search.DDGS()
-	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60, screenshot=False, include_hrefs=False, best=False):
+	ddgs = ddgs.DDGS()
+	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60, screenshot=False, include_hrefs=False, best=True):
 		"Browses the internet using DuckDuckGo or Microsoft Edge. Returns an image if screenshot is set to True."
 		if not region:
 			if timezone is None:
@@ -1952,7 +1958,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if best:
 						try:
 							data = await asubmit(self.ddgs.text, argv, safesearch="off", region=region, max_results=20 if best else 10)
-						except duckduckgo_search.exceptions.DuckDuckGoSearchException:
+						except ddgs.exceptions.DuckDuckGoSearchException:
 							print_exc()
 					if not data:
 						headers = Request.header()
@@ -2004,6 +2010,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		exc = None
 		for model in models:
 			kwargs["model"] = model
+			if model in ai.is_reasoning:
+				kwargs["reasoning_effort"] = "low"
+			else:
+				kwargs.pop("reasoning_effort", None)
 			try:
 				resp = await ai.llm("chat.completions.create", *args, stream=False, **kwargs)
 			except Exception as ex:
@@ -2333,20 +2343,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		1: cdict(
 			reasoning="gpt-5-mini",
 			instructive="gpt-5-mini",
-			casual="kimi-k2",
+			casual="grok-3-mini",
 			nsfw="grok-3-mini",
-			backup="minimax-m1",
+			backup="gemini-2.5-flash-t",
 			retry="gpt-5",
-			function="gpt-5-mini",
+			function="gpt-5-nano",
 			vision="gemini-2.5-flash",
 			target="auto",
 		),
 		2: cdict(
 			reasoning="gpt-5",
-			instructive="grok-4",
+			instructive="gpt-5",
 			casual="grok-4",
 			nsfw="grok-4",
-			backup="minimax-m1",
+			backup="gemini-2.5-pro",
 			retry="gemini-2.5-pro",
 			function="gpt-5-mini",
 			vision="grok-4",
@@ -2365,17 +2375,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		prompt = [m.content for m in messages if m.get("role") == "user"][-1]
 		if modlvl >= 2:
 			maxlim = 196608
-			minlim = 3600
-			snip = 960
+			minlim = 2500
+			snip = 800
 			best = 2
 		elif modlvl >= 1:
 			maxlim = 98304
-			minlim = 1200
-			snip = 480
+			minlim = 1000
+			snip = 320
 			best = 1
 		else:
 			maxlim = 3000
-			minlim = 600
+			minlim = 500
 			snip = 240
 			best = 0
 		messages = await ai.cut_to(messages, maxlim, minlim, best=best, prompt=prompt, premium_context=premium_context)
@@ -2424,15 +2434,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						if tc not in temp:
 							temp.append(tc)
 				toolscan = temp
-			users = 0
-			toolcheck = []
-			for m in reversed(messages):
-				toolcheck.append(m)
-				if m.get("role") == "user":
-					users += 1
-					if users > 1:
-						break
 			if modelist.instructive != modelist.casual:
+				users = 0
+				toolcheck = []
+				for m in reversed(snippet):
+					toolcheck.append(m)
+					if m.get("role") == "user":
+						users += 1
+						if users > 1:
+							break
 				toolcheck.append(messages[0])
 				toolcheck.reverse()
 				vision_alt = modelist.vision if modelist.function not in ai.is_vision and modelist.vision in ai.is_function else modelist.function
@@ -3864,6 +3874,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return 3000
 
 	class PremiumContext(contextlib.AbstractContextManager, contextlib.ContextDecorator, collections.abc.Callable):
+
+		quota_expiry = 84600
+
 		def __init__(self, user, target=None, value=0, cost=0):
 			self.user = user
 			self.target = target or user
@@ -3892,14 +3905,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					raise PermissionError(f"Premium level {value // 2} or higher required; please see {bot.kofi_url} for more info!")
 			ts = utc()
 			freebies = T(data).coercedefault("freebies", list, [])
-			while freebies and ts - freebies[0] >= 86400:
+			while freebies and ts - freebies[0] >= self.quota_expiry:
 				freebies.pop(0)
 			if value <= 0:
 				return self
 			freelim = bot.premium_limit(self.value)
 			rem = max(0, freelim - len(freebies))
 			if rem <= 0:
-				s = " (next refresh " + time_repr(86400 + freebies[0]) + ")" if freebies else ""
+				s = " (next refresh " + time_repr(self.quota_expiry + freebies[0]) + ")" if freebies else ""
 				raise PermissionError(f"Apologies, you have exceeded your quota of {freelim} for today{s}. Please see /premium or {bot.kofi_url} for more info!")
 			self.cost = cost or self.cost
 			return self
@@ -3937,7 +3950,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				else:
 					ts = utc()
 					freebies =  T(data).coercedefault("freebies", list, [])
-					while freebies and ts - freebies[0] >= 86400:
+					while freebies and ts - freebies[0] >= self.quota_expiry:
 						freebies.pop(0)
 					if cost:
 						freebies.extend([ts] * cost)
@@ -3975,7 +3988,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						q = round(mpf(c) * 1000)
 						s = f"Command incurred cost of `{cost}` (`${dcost}`); `{q}` premium credits remaining."
 					else:
-						s = " (next refresh " + time_repr(86400 + freebies[0]) + ")" if freebies else ""
+						s = " (next refresh " + time_repr(self.quota_expiry + freebies[0]) + ")" if freebies else ""
 						s = f"Command incurred cost of `{cost}`; `{rem}/{freelim}`{' free' if self.value <= 1 else ''} quota remaining today{s}."
 					if self.value >= 2 or data.get("credit"):
 						desc = f"{s}\nSee /premium to check usage stats{or_adjust}."
@@ -6021,6 +6034,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		x = 0
 		i = 1000
 		while i >= 1000:
+			memberdata = []
 			for r in range(64):
 				try:
 					with self.load_semaphore:
@@ -8328,6 +8342,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							usage = ""
 						arguments = sorted(cdata.get("options", ()), key=lambda arg: ((i := usage.find(arg.get("name") or "")) < 0, i))
 						kwargs = {arg["name"]: arg["value"] for arg in arguments}
+						if kwargs and command.schema:
+							for k in tuple(kwargs):
+								if k not in command.schema:
+									continue
+								if command.schema[k].get("multiple"):
+									argl = [kwargs[k]]
+									for i in range(5):
+										try:
+											argl.append(kwargs.pop(f"{k}-{i + 2}"))
+										except KeyError:
+											pass
 						mdata = d.get("member")
 						if not mdata:
 							mdata = d.get("user")

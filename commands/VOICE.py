@@ -5,6 +5,8 @@ if "common" not in globals():
 print = PRINT
 
 from bs4 import BeautifulSoup
+import hyperchoron
+import hyperchoron.util
 
 # with tracebacksuppressor:
 # 	import openai
@@ -1516,6 +1518,31 @@ class VoiceNuke(Command):
 		return italics(css_md(f"Successfully removed all users from voice channels in {sqr_md(_guild)}.")), 1
 
 
+class RefreshRegion(Command):
+	server_only = True
+	min_level = 1
+	description = "Changes the current voice channel's region, always forcing a refresh."
+	schema = cdict(
+		region=cdict(
+			type="enum",
+			validation=cdict(
+				enum=('brazil', 'hongkong', 'india', 'japan', 'rotterdam', 'singapore', 'south-korea', 'southafrica', 'sydney', 'us-central', 'us-east', 'us-south', 'us-west'),
+			),
+		),
+	)
+	rate_limit = 20
+
+	async def __call__(self, _user, region, **void):
+		if not _user.voice:
+			raise LookupError("This command currently requires that you are in a voice channel!")
+		vc = _user.voice.channel
+		if vc.rtc_region == region:
+			await vc.edit(rtc_region="rotterdam")
+			await asyncio.sleep(1)
+		await vc.edit(rtc_region=region)
+		return italics(css_md(f"Successfully refreshed voice region for {sqr_md(vc)} ({sqr_md(region)}).")), 1
+
+
 class Radio(Command):
 	name = ["FM"]
 	description = "Searches for a radio station livestream on https://worldradiomap.com that can be played on ⟨BOT⟩."
@@ -2451,14 +2478,14 @@ class Hyperchoron(Command):
 		format=cdict(
 			type="enum",
 			validation=cdict(
-				enum=(
-					"mid", "csv", "nbs", "mcfunction", "litematic", "org",
-					"als", "amped", "dawproject", "flp", "mmp", "muse",
-					"sequence", "soundbridge", "rrp", "soundation",
-				),
+				enum=tuple(sorted(set(hyperchoron.encoder_mapping).difference("_"))),
 			),
 			default="nbs",
 		),
+		kwargs=cdict(
+			type="string",
+			greedy=False,
+		)
 	)
 	macros = cdict(
 		Midi2Org=cdict(
@@ -2466,12 +2493,16 @@ class Hyperchoron(Command):
 		),
 	)
 	rate_limit = (10, 20)
+	slash = True
 
-	async def __call__(self, bot, url, format, **void):
-		fo = os.path.abspath(TEMP_PATH + "/" + replace_ext(url2fn(url), format.casefold()))
-		args = ["hyperchoron", "-i", url, "-o", fo]
+	async def __call__(self, bot, url, format, kwargs, **void):
+		default_archive = "zip"
+		fo = os.path.abspath(TEMP_PATH + "/" + replace_ext(url2fn(url), default_archive))
+		args = ["hyperchoron", "-i", url, *unicode_prune(kwargs or "").split(), "-f", format.casefold(), "-o", fo]
 		print(args)
-		proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+		env = os.environ.copy()
+		env["PYTHONUTF8"] = "1"
+		proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=env)
 		try:
 			async with asyncio.timeout(3200):
 				stdout, stderr = await proc.communicate()
@@ -2479,14 +2510,20 @@ class Hyperchoron(Command):
 			with tracebacksuppressor:
 				force_kill(proc)
 			raise
-		if proc.returncode != 0:
-			stderr = as_str(stderr)
-			if "```" not in stderr:
-				stderr = py_md(stderr)
-			raise RuntimeError(stderr)
-		assert os.path.exists(fo) and os.path.getsize(fo), "No valid output detected!"
+		if not os.path.exists(fo) or not (size := os.path.getsize(fo)):
+			if proc.returncode != 0:
+				stderr = as_str(stderr)
+				if "```" not in stderr:
+					stderr = py_md(stderr)
+				raise RuntimeError(stderr)
+			raise FileNotFoundError("No valid output detected!")
+		b = fo
+		if size < 4 * 1048576:
+			z = zipfile.ZipFile(fo, "r")
+			if len(z.filelist) == 1:
+				b = z.open(z.filelist[0])
 		return cdict(
-			file=CompatFile(fo, filename=replace_ext(url2fn(url), format)),
+			file=CompatFile(b, filename=replace_ext(url2fn(url), format if isinstance(b, zipfile.ZipExtFile) else default_archive)),
 		)
 
 

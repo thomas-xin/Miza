@@ -197,8 +197,9 @@ available = {
 		None: "gpt-4.1-mini",
 	},
 	"gpt-5": {
-		"openrouter": ("openai/gpt-5-chat", ("1.25", "10")),
+		"openrouter": ("openai/gpt-5", ("1.25", "10")),
 		"openai": ("gpt-5", ("1.25", "10")),
+		# "openrouter": ("openai/gpt-5-chat", ("1.25", "10")),
 		None: "kimi-k2",
 	},
 	"gpt-5-mini": {
@@ -857,7 +858,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=Fal
 	i = -1
 	for i, m in reversed(tuple(enumerate(messages))):
 		c = await tcount(m_repr(m))
-		if c + count > softlim and not m.get("tool_calls") and m.get("role") != "tool":
+		if c + count > softlim * 0.8 and not m.get("tool_calls") and m.get("role") != "tool":
 			break
 		mes.append(m)
 		count = await count_to(mes)
@@ -885,7 +886,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=Fal
 		if exclude_first:
 			messages.insert(0, sm)
 		return messages
-	ml = max(64, round_random(softlim - count))
+	ml = max(1024, round_random(softlim - count))
 	if best:
 		s2 = await summarise(s, min_length=ml, best=True, prompt=prompt, premium_context=premium_context)
 	else:
@@ -904,6 +905,7 @@ async def summarise(q, min_length=384, max_length=98304, padding=128, best=True,
 	"Produces an AI-generated summary of input text. Model used is controlled by \"best\" parameter."
 	split_length = max_length - padding
 	summ_length = min(min_length, split_length - 1)
+	q = lim_tokens(q, 1048576)
 	c = await tcount(q)
 	if c <= min_length:
 		return q
@@ -1346,12 +1348,12 @@ f_wolfram_alpha = {
 f_sympy = {
 	"type": "function", "function": {
 		"name": "sympy",
-		"description": "Queries the Sympy algebraic library. Faster than Wolfram Alpha, but does NOT handle natural language, or other Python code.",
+		"description": "Queries the Sympy algebraic library. Faster than Wolfram Alpha. Note that this runs `sympy.parsing.sympy_parser`, NOT a Python REPL",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {
 					"type": "string",
-					"description": 'Query, eg. "factorint(57336415063790604359)", "randint(1,100)", "pi*2"',
+					"description": 'Query, eg. "factorint(57336415063790604359)", "randint(1, 100)", "limit(diff(-atan(x)),x,-sqrt(-1.01))"',
 				},
 				"precision": {
 					"type": "integer",

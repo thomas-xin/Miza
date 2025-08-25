@@ -184,7 +184,7 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 				codecs = ["-c:v", "libwebp"]
 			else:
 				codecs = []
-			output_args = ["-f", self.format, *codecs, "-b:v", "2M", "-an", "-loop", "0"]
+			output_args = ["-f", self.format, *codecs, "-b:v", "2M", "-vbr", "on", "-an", "-loop", "0"]
 			lightning = False
 		else:
 			fmt = CODECS.get(self.format, self.format)
@@ -192,7 +192,7 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 				input_args.extend(["-ss", str(self.start)])
 			if self.end is not None:
 				input_args.extend(["-to", str(self.end)])
-			output_args = ["-f", fmt, "-c:v", self.codec, "-b:v", "2M"]
+			output_args = ["-f", fmt, "-c:v", self.codec, "-b:v", "2M", "-vbr", "on"]
 			if self.format == "mp4":
 				# MP4 supports just about any audio codec, but WebM and MKV do not. We assume the audio codec is not WMA, as it is highly unlikely any website would use it for streaming videos.
 				output_args.extend(["-c:a", "copy"])
@@ -257,7 +257,7 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			sample_rate = 44100 if self.codec == "mp3" else 48000
 			if acodec == "wav":
 				acodec = "pcm_s16le"
-			output_args.extend(["-c:a", acodec, "-b:a", f"{bitrate}k", "-ar", f"{sample_rate}"])
+			output_args.extend(["-c:a", acodec, "-b:a", f"{bitrate}k", "-vbr", "on", "-ar", f"{sample_rate}"])
 		self.real_run_ffmpeg(
 			[[filename, input_args]],
 			[[outpath, output_args]],

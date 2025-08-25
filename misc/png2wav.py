@@ -34,7 +34,7 @@ if is_url(fn):
 		pass
 
 if not pcm:
-	cmd = ffmpeg_start + ("-f", "f32le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "192k", fo)
+	cmd = ffmpeg_start + ("-f", "f32le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "192k", "-vbr", "on", fo)
 	p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 else:
 	f = open(fo, "wb")

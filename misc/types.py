@@ -38,6 +38,10 @@ class MemoryBytes:
 	This class wraps byte-like objects (bytes, bytearray, memoryview) and provides
 	a consistent interface similar to bytes while maintaining memory efficiency by
 	using memoryview internally. It lazily converts to bytes only when necessary.
+	The class aims to mirror the immutable bytes API where practical. Operations
+	that inherently require materializing new data (e.g. concatenation, repetition)
+	will allocate new bytes objects, but read-only / predicate style queries avoid
+	unnecessary copies and operate directly on the underlying memoryview.
 	Attributes:
 		view (memoryview): Direct access to the underlying memoryview object.
 	Args:
@@ -103,6 +107,70 @@ class MemoryBytes:
 	def __repr__(self):
 		return f"{self.__class__.__name__}({self.tobytes()!r})"
 
+	# --- core protocol helpers ---
+	def __iter__(self):
+		mv = self._mv
+		for i in range(len(mv)):
+			yield mv[i]
+
+	def __reversed__(self):
+		mv = self._mv
+		for i in range(len(mv) - 1, -1, -1):
+			yield mv[i]
+
+	def __contains__(self, item):
+		if isinstance(item, int):
+			return 0 <= item <= 255 and any(b == item for b in self._mv)
+		if isinstance(item, byte_like):
+			return self.find(item) >= 0
+		return False
+
+	def __hash__(self):
+		# Hash must be stable & match bytes semantics; rely on cached bytes when possible.
+		return hash(self.tobytes())
+
+	def __add__(self, other):
+		if isinstance(other, byte_like):
+			return self.__class__(self.tobytes() + (other.tobytes() if isinstance(other, MemoryBytes) else bytes(other)))
+		return NotImplemented
+
+	def __radd__(self, other):
+		if isinstance(other, byte_like):
+			return self.__class__((other.tobytes() if isinstance(other, MemoryBytes) else bytes(other)) + self.tobytes())
+		return NotImplemented
+
+	def __mul__(self, n):
+		if isinstance(n, int):
+			return self.__class__(self.tobytes() * n)
+		return NotImplemented
+
+	def __rmul__(self, n):
+		return self.__mul__(n)
+
+	def __lt__(self, other):
+		if isinstance(other, byte_like):
+			return self.tobytes() < (other.tobytes() if isinstance(other, MemoryBytes) else bytes(other))
+		return NotImplemented
+
+	def __le__(self, other):
+		if isinstance(other, byte_like):
+			return self.tobytes() <= (other.tobytes() if isinstance(other, MemoryBytes) else bytes(other))
+		return NotImplemented
+
+	def __gt__(self, other):
+		if isinstance(other, byte_like):
+			return self.tobytes() > (other.tobytes() if isinstance(other, MemoryBytes) else bytes(other))
+		return NotImplemented
+
+	def __ge__(self, other):
+		if isinstance(other, byte_like):
+			return self.tobytes() >= (other.tobytes() if isinstance(other, MemoryBytes) else bytes(other))
+		return NotImplemented
+
+	def __reduce__(self):
+		# For pickling
+		return (self.__class__, (self.tobytes(),))
+
 	def __eq__(self, other):
 		if isinstance(other, self.__class__):
 			return self._mv == other._mv
@@ -130,10 +198,49 @@ class MemoryBytes:
 		return self
 
 	def find(self, sub, *args):
-		return self.tobytes().find(sub, *args)
+		# Optimised path avoids full materialisation when possible.
+		mv = self._mv
+		start = args[0] if len(args) >= 1 else 0
+		end = args[1] if len(args) >= 2 else len(mv)
+		if start < 0:
+			start += len(mv)
+		if end < 0:
+			end += len(mv)
+		start = max(0, start)
+		end = min(len(mv), end)
+		if isinstance(sub, int):
+			for i in range(start, end):
+				if mv[i] == sub:
+					return i
+			return -1
+		if self._b is not None:
+			return self._b.find(sub, start, end)
+		try:
+			return sublist_index(mv[start:end], sub) + start
+		except ValueError:
+			return -1
 
 	def rfind(self, sub, *args):
-		return self.tobytes().rfind(sub, *args)
+		mv = self._mv
+		start = args[0] if len(args) >= 1 else 0
+		end = args[1] if len(args) >= 2 else len(mv)
+		if start < 0:
+			start += len(mv)
+		if end < 0:
+			end += len(mv)
+		start = max(0, start)
+		end = min(len(mv), end)
+		if isinstance(sub, int):
+			for i in range(end - 1, start - 1, -1):
+				if mv[i] == sub:
+					return i
+			return -1
+		if self._b is not None:
+			return self._b.rfind(sub, start, end)
+		try:
+			return sublist_rindex(mv[start:end], sub) + start
+		except ValueError:
+			return -1
 
 	def index(self, sub, *args):
 		if self._b is not None:
@@ -235,6 +342,105 @@ class MemoryBytes:
 
 	def lower(self):
 		return self.__class__(self.tobytes().lower())
+
+	# --- predicates (ASCII-focused; fall back to bytes for full semantics) ---
+	def isascii(self):
+		return all(b < 128 for b in self._mv)
+
+	def isalpha(self):
+		mv = self._mv
+		if not mv:
+			return False
+		for b in mv:
+			if not (65 <= b <= 90 or 97 <= b <= 122):
+				return False
+		return True
+
+	def isalnum(self):
+		mv = self._mv
+		if not mv:
+			return False
+		for b in mv:
+			if not (48 <= b <= 57 or 65 <= b <= 90 or 97 <= b <= 122):
+				return False
+		return True
+
+	def isdigit(self):
+		mv = self._mv
+		return bool(mv) and all(48 <= b <= 57 for b in mv)
+
+	def isspace(self):
+		# bytes.isspace considers ASCII whitespace characters
+		mv = self._mv
+		if not mv:
+			return False
+		for b in mv:
+			if b not in (9, 10, 11, 12, 13, 32):
+				return False
+		return True
+
+	def islower(self):
+		mv = self._mv
+		cased = False
+		for b in mv:
+			if 65 <= b <= 90:
+				return False
+			elif 97 <= b <= 122:
+				cased = True
+		return cased
+
+	def isupper(self):
+		mv = self._mv
+		cased = False
+		for b in mv:
+			if 97 <= b <= 122:
+				return False
+			elif 65 <= b <= 90:
+				cased = True
+		return cased
+
+	def istitle(self):
+		# Simplistic ASCII titlecase check
+		mv = self._mv
+		if not mv:
+			return False
+		words = 0
+		in_word = False
+		seen_lower = False
+		for b in mv:
+			if 65 <= b <= 90 or 97 <= b <= 122:
+				if not in_word:
+					# new word, must start upper
+					if not (65 <= b <= 90):
+						return False
+					in_word = True
+					words += 1
+				else:
+					if 65 <= b <= 90:  # subsequent upper -> invalid
+						return False
+					seen_lower = True
+			else:
+				in_word = False
+		return words > 0 and (seen_lower or len(mv) == 1)
+
+	# --- convenience ---
+	@property
+	def nbytes(self):
+		return self._mv.nbytes
+
+	def copy(self):
+		# Shallow copy shares underlying buffer
+		return self.__class__(self._mv)
+
+	def hex(self):
+		if self._b is not None:
+			return self._b.hex()
+		# Avoid caching bytes: hex already produces new str so no need to persist _b
+		return self._mv.tobytes().hex()
+
+	@classmethod
+	def fromhex(cls, s: str):
+		return cls(bytes.fromhex(s))
 
 	def encode(self, encoding=""):
 		return self.tobytes()

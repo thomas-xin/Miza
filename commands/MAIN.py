@@ -792,6 +792,9 @@ class Info(Command):
 						emb.add_field(name="Last seen", value=str(seen), inline=1)
 					if dname:
 						emb.add_field(name="Nickname", value=dname, inline=1)
+					tag = T(T(u).get("primary_guild")).get("tag")
+					if tag:
+						emb.add_field(name="Server Tag", value=tag, inline=1)
 					if role:
 						emb.add_field(name=f"Roles ({len(rolelist)})", value=role, inline=0)
 					embs.add(emb)
@@ -1053,7 +1056,7 @@ class Preserve(Command):
 	msgcmd = ("Preserve Attachment Links",)
 	ephemeral = True
 
-	async def __call__(self, _channel, _message, urls, **void):
+	async def __call__(self, bot, _channel, _message, urls, **void):
 		futs = deque()
 		for url in urls:
 			if is_discord_attachment(url):
@@ -1064,16 +1067,14 @@ class Preserve(Command):
 						found = attachment
 						break
 				if found:
-					url = self.bot.preserve_as_long(_channel.id, _message.id, a_id, fn=url)
-					futs.append(as_fut(url))
+					futs.append(as_fut(shorten_attachment(url, _message.id)))
 					continue
-				url = self.bot.preserve_as_long(_channel.id, 0, a_id, fn=url)
-				futs.append(as_fut(url))
+				futs.append(as_fut(shorten_attachment(url, 0)))
 				continue
-			futs.append(Request(self.bot.webserver + "/reupload?url=" + quote_plus(url), decode=True, aio=True, ssl=False, timeout=1200))
+			futs.append(bot.data.exec.lproxy(url, channel=_channel))
 			await asyncio.sleep(0.1)
 		out = await gather(*futs)
-		return await send_with_reply(_channel, _message, "\n".join("<" + u + ">" for u in out), ephemeral=True)
+		return "\n".join("<" + u + ">" for u in out)
 
 
 class Reminder(Command):

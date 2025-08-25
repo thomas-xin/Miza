@@ -601,9 +601,9 @@ class UpdateSkyShardReminders(Database):
 		bot = self.bot
 		t = utc()
 		taken_shards = self.get(0, {})
-		ct = datetime.datetime.now(tz=datetime.timezone.utc)
-		pt = ct - datetime.timedelta(hours=12)
-		nt = pt + datetime.timedelta(hours=24)
+		ct = DynamicDT.parse("now pacific")
+		pt = DynamicDT.parse("today pacific")
+		nt = pt + TimeDelta(hours=24)
 		s1 = shard.find_next_shard(pt)
 		s2 = shard.find_next_shard(nt)
 		if s1.occurrences[0].start == s2.occurrences[0].start:
@@ -617,7 +617,8 @@ class UpdateSkyShardReminders(Database):
 			end = DynamicDT.fromdatetime(o.end)
 			return f"{land.as_rel_discord()} ~ {end.as_rel_discord()}"
 
-		for s in shards:
+		current_shard = None
+		for n, s in enumerate(shards):
 			shard_hash = int(s.occurrences[0].start.timestamp())
 			taken = taken_shards.get(shard_hash, 0)
 			ping = True
@@ -639,9 +640,18 @@ class UpdateSkyShardReminders(Database):
 							occurrence_number = i + 1
 							raise StopIteration
 			except StopIteration:
-				pass
+				current_shard = s
 			else:
-				continue
+				if n == len(shards) - 1 and current_shard is None and (len(shards) == 1 or shards[0].occurrences[-1].end < ct):
+					r = s.occurrences[0].land.timestamp() - 43200
+					if r > taken:
+						taken = taken_shards[shard_hash] = r
+						self[0] = taken_shards
+						occurrence_number = 1
+					else:
+						continue
+				else:
+					continue
 			print("SkyShard:", occurrence_number, s)
 			embed = discord.Embed().set_image(url=f"https://github.com/PlutoyDev/sky-shards/raw/refs/heads/production/public/infographics/data_gale/{s.map}.webp").set_thumbnail(url=f"https://github.com/PlutoyDev/sky-shards/raw/refs/heads/production/public/infographics/map_clement/{s.map}.webp")
 			url = f"https://sky-shards.pages.dev/en/{s.date.year}/{'%02d' % s.date.month}/{'%02d' % s.date.day}"

@@ -1282,6 +1282,17 @@
 			"example": [],
 			"timeout": "24"
 		},
+		"RefreshRegion": {
+			"aliases": [
+				"RefreshRegion"
+			],
+			"description": "Changes the current voice channel's region, always forcing a refresh.",
+			"usage": "",
+			"level": "1",
+			"rate_limit": "20",
+			"example": [],
+			"timeout": "24"
+		},
 		"Radio": {
 			"aliases": [
 				"Radio",

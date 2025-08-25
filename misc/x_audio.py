@@ -1153,7 +1153,7 @@ class AudioFile:
 				return self
 			ffmpeg = "ffmpeg"
 			sample_rate = SAMPLE_RATE
-			cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(sample_rate), "-ac", "2", "-b:a", "192000", "-"]
+			cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(sample_rate), "-ac", "2", "-b:a", "192000", "-vbr", "on", "-"]
 			if codec == "opus" and channels == 2:
 				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "copy", "-"]
 			if is_url(stream):
@@ -1273,7 +1273,7 @@ class AudioFile:
 					sr >>= 1
 				if sr < 8000:
 					sr = 8000
-				options.extend(("-f", "opus", "-c:a", "libopus", "-ar", str(sr), "-ac", "2", "-b:a", str(round_min(br)), "-bufsize", "8192"))
+				options.extend(("-f", "opus", "-c:a", "libopus", "-ar", str(sr), "-ac", "2", "-b:a", str(round_min(br)), "-vbr", "on", "-bufsize", "8192"))
 				if options:
 					args.extend(options)
 			else:

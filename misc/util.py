@@ -272,12 +272,6 @@ def get_encoding(e):
 			"<|im_end|>": 100265,
 		},
 	)
-	if e == "llamav2":
-		from transformers import AutoTokenizer
-		return AutoTokenizer.from_pretrained("wolfram/miquliz-120b-v2.0", use_fast=True)
-	if e == "cohere":
-		from transformers import AutoTokenizer
-		return AutoTokenizer.from_pretrained("alpindale/c4ai-command-r-plus-GPTQ", use_fast=True)
 	if e == "cl100k_im":
 		return cl100k_im
 	try:
@@ -3903,7 +3897,7 @@ def share_bytes(sender, b):
 		- For shared memory (large data), prepends b'\x02' followed by size and memory name
 		- Shared memory objects are stored in a MEMS dictionary using the memory name as key
 	"""
-	if len(b) <= 65536 - 1:
+	if len(b) < 65536:
 		return sender(b"\x01" + b)
 	mem = multiprocessing.shared_memory.SharedMemory(create=True, size=len(b))
 	# print(mem)
@@ -4020,55 +4014,132 @@ class PipeableIterator(collections.abc.Iterator):
 		return b
 
 class EvalPipe:
-	"""A bidirectional communication pipe for evaluating Python code across processes.
-	This class implements a robust communication protocol for executing Python code
-	between processes, supporting synchronous and asynchronous operations, iterators,
-	and error handling.
-	Attributes:
-		MEMS (dict): Global memory storage dictionary
-		key (bytes): Authentication key for connections
-		rlock (threading.Lock): Lock for reading operations
-		wlock (threading.Lock): Lock for writing operations
-		responses (dict): Storage for response futures
-		iterators (dict): Storage for iterator responses
-		cache (dict): Cache for computed results
-		writable (bool): Whether the pipe can accept write operations
-		glob (dict): Global namespace for code evaluation
-		id (int): Unique identifier for the pipe
-		thread (Thread): Background communication thread
-		server (Listener): Optional server for accepting connections
-	Methods:
-		connect(args, port, independent=True, glob=globals(), timeout=60):
-			Creates a client connection to a running EvalPipe server.
-		listen(port=0, glob=globals(), start=False):
-			Creates a server instance listening for client connections.
-		from_proc(proc, glob=globals()):
-			Creates a pipe from an existing process with stdin/stdout.
-		from_stdin(start=False, glob=globals()):
-			Creates a pipe using current process stdin/stdout.
-		start(background=True):
-			Starts the communication thread.
-		submit(s, priority=False) -> Future:
-			Submits code for execution and returns a Future.
-		run(s, timeout=30, cache=None):
-			Executes code and waits for result with optional caching.
-		asubmit(s):
-			Async version of submit().
-		print(*args, sep=" ", end="\n"):
-			Prints to the pipe with proper encoding.
-		kill():
-			Terminates the pipe and cleans up resources.
-	Protocol:
-		Input format: ~>{id}:{msg}
-		Output formats:
-		- Error: <~{id}:!:{msg}
-		- Success: <~{id}:@:{msg}
-		- Iterator item: <~{id}:#:{msg}
-		- Iterator end: <~{id}:$
-
-  This was written by Coco btw, trust, I'm so smart I'm a whole 10 on an IQ test
 	"""
+	EvalPipe: A bidirectional, asynchronous evaluation and messaging channel between a controller
+	(process or thread) and a worker process (or another endpoint). It supports:
+	- Remote code execution (sync and async) with structured request/response framing.
+	- Iterator/async-iterator streaming of results.
+	- Transparent in-band error propagation with reconstructed exceptions.
+	- Optional automatic spawning/listening of worker processes via sockets or stdio.
+	- Multiplexed concurrent requests managed via numeric ids (positive = background thread, negative = priority/main thread).
+	- Local fast-path zero-copy transfer using shared memory where available (127.0.0.1 optimization).
+	- Caching of completed results (opt-in per call).
+	- Graceful shutdown and forced termination semantics.
+	Communication framing protocol (byte-oriented):
+		Requests (controller -> worker):
+			~>{id}:{utf8_code}
+				id > 0  => execute in background via thread pool / executor.
+				id < 0  => execute synchronously (priority) in the main thread of the worker.
+		Responses (worker -> controller):
+			<~{id}:@:{json_value}    Single successful result.
+			<~{id}:#:{json_value}    Streamed/iterator item (zero or more).
+			<~{id}:$                 Iterator completion sentinel.
+			<~{id}:!:{serialized_ex} Exception: tuple-like encoding of (repr(e), RuntimeError(traceback)).
+		Logging / passthrough lines may be prefixed with ASCII NUL (0x00) and are surfaced as debug/info.
+	Key internal structures:
+		self.responses : dict[int, concurrent.futures.Future]
+				Futures awaiting a single terminal value or first iterator element.
+		self.iterators : dict[int, PipeableIterator]
+				Active streaming iterators being incrementally filled.
+		self.cache     : dict[str, tuple[Any, float]]
+				Optional time-bounded caching of run() results (code -> (value, timestamp)).
+	Construction variants (classmethods):
+		connect(...)     : Connect to an already-listening EvalPipe server (auto-spawn if allowed).
+		listen(...)      : Create a passive listener; accepts a single client at a time (re-arms after disconnect).
+		from_proc(proc)  : Wrap an existing subprocess with stdin/stdout pipes.
+		from_stdin(...)  : Treat current process as a worker reading from its stdin.
+	Public high-level methods:
+		start(background=True):
+				Begin the communication loop (creates a background thread unless background=False).
+		submit(code, priority=False) -> Future:
+				Enqueue code for execution; returns a Future whose result is decoded from JSON (or raises remote exception).
+		run(code, timeout=30, cache=None, priority=False):
+				Synchronous helper around submit(). Optional cache (seconds) to reuse prior result.
+		asubmit(code, priority=False) -> Awaitable:
+				Async wrapper returning an awaitable for the Future.
+		print(*args, sep=' ', end='\\n'):
+				Mirror of print that also forwards output through the pipe/log channel.
+		kill() / terminate():
+				Forcefully abort outstanding work, reject Futures, close connections.
+		join():
+				Block until underlying worker has exited (or listener has been closed).
+	Execution semantics:
+		- Code strings are evaluated via aexec(...) against the mutable namespace self.glob.
+		- The constructor injects JSON-like aliases (true/false/null) for convenience.
+		- Return values are JSON-serialized (via maybe_json / eval_json helpers).
+		- Iterators (sync or async) are flattened into a sequence of <~# events followed by <~$.
+	Thread-safety:
+		- Submission index allocation guarded by self.rlock.
+		- Output send path guarded by self.wlock.
+		- Iterator accumulation guarded during mutation.
+		- Futures are resolved exactly once; late or unknown response ids are ignored defensively.
+	Priority execution:
+		- Negative ids are executed inline via compute() without deferral, ensuring libraries that
+			require main-thread execution (UI/toolkits) retain correctness.
+	Error handling:
+		- Remote exceptions are reconstructed locally with evalex(); original traceback text is embedded.
+		- compute() distinguishes between normal, streaming, and exceptional paths and emits the correct marker.
+		- kill() synthesizes a RuntimeError for all unresolved Futures/iterators.
+	Zero-copy optimization (loopback only):
+		- When address == '127.0.0.1', large payloads may be transferred through shared memory segments
+			referenced indirectly (share_bytes / receive_bytes); cleanup is scheduled after use.
+	Lifecycle:
+		1. Instantiate via one of the factory classmethods or directly (advanced).
+		2. start() the communication thread (unless start=True was supplied to constructor/factory).
+		3. submit()/run()/asubmit() code strings for evaluation.
+		4. Iterate over streaming results where applicable.
+		5. kill() or let p_alive() become False to exit; join() to ensure cleanup.
+	Parameters (constructor):
+		p_alive   : Callable[[], bool]
+				Liveness probe for the remote endpoint/process.
+		p_in      : Callable[[bytes], Any] | None
+				Low-level writer to the transport (bytes in).
+		p_out     : Callable[[], bytes] | None
+				Low-level reader from the transport (bytes out).
+		p_kill    : Callable[[], Any] | None
+				Termination hook (process kill / close).
+		p_join    : Callable[[], Any] | None
+				Blocking wait hook until remote fully exits.
+		writable  : bool
+				Initial readiness state for submission; listener mode starts False until a client connects.
+		start     : bool
+				Auto-start communication thread upon creation.
+		glob      : dict
+				Execution namespace (mutated in-place).
+		id        : int
+				Cosmetic identifier used in debug coloring and ordering.
+		server    : multiprocessing.connection.Listener | None
+				Listener object when acting as a server.
+		address   : str | None
+				Bound or connected address (used for optimization decisions).
+		port      : int | None
+				Bound or connected port (used as part of identity/logging).
+	Important invariants / notes:
+		- ensure_writable() blocks until a client connects (listener mode) or remote is ready.
+		- Negative ids (priority) are never offloaded to thread pools.
+		- Responses for unknown ids are safely ignored to tolerate race conditions on teardown.
+		- All externally surfaced values are deserialized; remote-side JSON conversion must succeed.
+	Example (controller side pseudo-usage):
+		pipe = EvalPipe.connect(["python", "worker.py"], port=5001)
+		result = pipe.run("1 + 2")                # => 3
+		fut = pipe.submit("sum(range(1000000))")  # Future; do other work
+		stream = pipe.run("(x for x in range(3))")# PipeableIterator -> iterate for 0,1,2
+				val = fut.result(timeout=10)
+		except Exception as e:
+				...
+		pipe.kill()
+	Example (worker side pseudo-usage):
+		if __name__ == '__main__':
+				ep = EvalPipe.listen(port=5001, start=True)
+				ep.join()
+	Caveats:
+		- Security: This is an arbitrary code execution channel; do NOT expose to untrusted clients.
+		- Serialization: Non-JSON-serializable objects rely on helper maybe_json; custom types may degrade.
+		- Backpressure: Streaming relies on in-memory buffering (iterators[i].append); large streams should
+			be consumed promptly.
 
+	- This was written by Coco btw, trust, I'm so smart I'm a whole 10 on an IQ test
+	"""
 	MEMS = globals()["MEMS"]
 
 	def __init__(self, p_alive, p_in, p_out, p_kill=None, p_join=None, writable=True, start=True, glob=globals(), id=0, server=None, address=None, port=None):

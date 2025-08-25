@@ -586,6 +586,8 @@ class Server:
 				return False
 			if "Cf-Worker" in cp.request.headers:
 				return True
+			if cp.request.headers.get("X-Real-Ip", "")[:3] in ("34.", "35."):
+				return True
 			if cp.request.headers.get("Sec-Fetch-Dest", "").casefold() == "document" and url.split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[-1] not in ("png", "gif", "webp", "jpg", "jpeg", "heic", "heif", "avif"):
 				return True
 			if (mode := cp.request.headers.get("Sec-Fetch-Mode")):

@@ -947,17 +947,17 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			if mode == "RGBA":
 				vf += "format=rgba"
 		bitrate = floor(min(fs / duration * 7.5, 99999999)) # use 7.5 bits per byte
-		pix = "rgb24" if lossless else "yuv420p"
+		pix = "rgb24" if lossless else "yuv444p"
 		if mode == "RGBA":
 			cv = ("-c:v:0", "libsvtav1", "-pix_fmt:v:0", "yuv420p") if not h & 1 and not w & 1 else ("-c:v:0", "libaom-av1", "-pix_fmt:v:0", pix, "-usage", "realtime", "-cpu-used", "3")
 			b1 = floor(bitrate * 3 / 4)
 			b2 = floor(bitrate / 4)
-			command.extend(("-filter_complex", vf + "[0]split=2[v1][v2];[v2]alphaextract[v2]", "-map", "[v1]", "-map", "[v2]", "-f", "avif", *cv, "-b:v:0", str(b1), "-c:v:1", "libaom-av1", "-pix_fmt:1", "gray", "-b:v:1", str(b2), "-usage", "realtime", "-cpu-used", "3", "-y", "-g", "300"))
+			command.extend(("-filter_complex", vf + "[0]split=2[v1][v2];[v2]alphaextract[v2]", "-map", "[v1]", "-map", "[v2]", "-f", "avif", *cv, "-b:v:0", str(b1), "-vbr", "on", "-c:v:1", "libaom-av1", "-pix_fmt:1", "gray", "-b:v:1", str(b2), "-usage", "realtime", "-cpu-used", "3", "-y", "-g", "300"))
 		else:
 			if vf:
 				command.extend(("-vf", vf))
 			cv = ("-c:v", "libsvtav1", "-pix_fmt", "yuv420p") if not h & 1 and not w & 1 else ("-c:v", "libaom-av1", "-pix_fmt", pix, "-usage", "realtime", "-cpu-used", "3")
-			command.extend(("-f", "avif", *cv, "-b:v", str(bitrate)))
+			command.extend(("-f", "avif", *cv, "-b:v", str(bitrate), "-vbr", "on"))
 		if anim:
 			if opt:
 				command.extend(("-loop", "0", "-q:v", "60"))
@@ -1032,7 +1032,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			h = round(first.height / 2) * 2
 			command.extend(("-vf", f"scale={w}:{h}:flags=bicubic"))
 		bitrate = floor(min(fs / duration * 7.5, 99999999)) # use 7.5 bits per byte
-		command.extend(("-b:v", str(bitrate)))
+		command.extend(("-b:v", str(bitrate), "-vbr", "on"))
 		cdc = CODEC_FFMPEG.get(fmt, "libsvtav1")
 		fmt = CODECS.get(fmt, fmt)
 		if mode == "RGBA":

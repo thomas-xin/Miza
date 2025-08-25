@@ -982,7 +982,7 @@ class AudioDownloader:
 				r_ecdc = f"{TEMP_PATH}/{ts}.ecdc"
 				copy_to_file(r_ecdc)
 				args1 = [compat_python, "misc/ecdc_stream.py", "-b", "0", "-d", r_ecdc]
-				args2 = ["ffmpeg", "-v", "error", "-hide_banner", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "96k", fn]
+				args2 = ["ffmpeg", "-v", "error", "-hide_banner", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "96k", "-vbr", "on", fn]
 				print(args1, args2)
 				res = PipedProcess(args1, args2, stderr=subprocess.PIPE).wait()
 				if not os.path.exists(fn) or not os.path.getsize(fn):
@@ -1069,7 +1069,7 @@ class AudioDownloader:
 					args.extend(["-ss", str(start)])
 				if end:
 					args.extend(["-to", str(end)])
-				args.extend(["-i", url, "-b:a", "96k", fn2])
+				args.extend(["-i", url, "-b:a", "160k", "-vbr", "on", fn2])
 				print(args)
 				res = subprocess.run(args, stderr=subprocess.PIPE)
 				if not os.path.exists(fn2) or not os.path.getsize(fn2):
@@ -1137,6 +1137,8 @@ class AudioDownloader:
 						p_id = p_id.split("&", 1)[0]
 						break
 				if p_id:
+					if p_id in ("LL", "LM", "WL", "RDMM"):
+						raise PermissionError("Sorry, this endpoint is intentionally blocked for privacy and performance.")
 					with tracebacksuppressor:
 						output.extend(self.get_youtube_playlist(p_id))
 						# Scroll to highlighted entry if possible
