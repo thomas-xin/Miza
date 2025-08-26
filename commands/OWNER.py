@@ -167,24 +167,19 @@ class Restart(Command):
 				with suppress(NameError, AttributeError):
 					PRINT.flush()
 					PRINT.close(force=True)
-				with tracebacksuppressor:
-					await asubmit(retry, os.remove, "log.txt", attempts=8, delay=0.1)
 				# await gather(*futs, return_exceptions=True)
+		import pathlib
 		if mode and mode.casefold() == "shutdown":
-			touch(bot.shutdown)
+			pathlib.Path.touch(bot.shutdown)
 		else:
-			touch(bot.restart)
+			pathlib.Path.touch(bot.restart)
+		with suppress():
+			os.remove(self.heartbeat_file)
 		with suppress():
 			await bot.close()
-		# bot.close()
 		del client
 		del bot
-		f = lambda x: mpf("1.8070890240038886796397791962945558584863687305069e-12") * x + mpf("6214315.6770607604120060484376689964637894379472455")
-		code = round(f(_user.id), 16)
-		if type(code) is not int:
-			raise SystemExit
-		nick = as_str(code.to_bytes(3, "little"))
-		raise SystemExit(f"Why you keep throwin' me offline {nick} >:(")
+		raise SystemExit
 
 
 class Execute(Command):

@@ -10,6 +10,7 @@ if __name__ != "__mp_main__":
 	os.environ["IS_BOT"] = "1"
 from misc import common, asyncs
 from misc.common import * # noqa: F403
+import pathlib
 import pdb
 import ddgs
 
@@ -59,8 +60,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	kofi_url = AUTH.get("kofi_url") or "https://ko-fi.com/waveplasma/tiers"
 	rapidapi_url = AUTH.get("rapidapi_url") or "https://rapidapi.com/thomas-xin/api/miza"
 	raw_webserver = AUTH.get("raw_webserver") or "https://api.mizabot.xyz"
-	heartbeat_rec = "heartbeat.tmp"
-	heartbeat_ack = "heartbeat_ack.tmp"
+	heartbeat_file = "heartbeat.tmp"
 	restart = "restart.tmp"
 	shutdown = "shutdown.tmp"
 	activity = 0
@@ -247,7 +247,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if delay:
 			time.sleep(delay)
 		if force:
-			touch(self.shutdown)
+			pathlib.Path.touch(self.shutdown)
+			with suppress():
+				os.remove(self.heartbeat_file)
 		# force_kill(self.proc)
 
 	def command_options(self, command):
@@ -586,7 +588,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		try:
 			self.audio_client_start = asubmit(self.start_audio_client, priority=1)
 			loop = get_event_loop()
-			with closing(loop):
+			with contextlib.closing(loop):
 				with tracebacksuppressor:
 					loop.run_until_complete(self.start(self.token))
 				with tracebacksuppressor:
@@ -6757,10 +6759,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	@tracebacksuppressor
 	async def heartbeat(self):
 		await asyncio.sleep(0.5)
-		d = os.path.exists(self.heartbeat_rec)
-		if d:
-			with tracebacksuppressor(FileNotFoundError, PermissionError):
-				os.rename(self.heartbeat_rec, self.heartbeat_ack)
+		pathlib.Path.touch(self.heartbeat_file)
 
 	def heartbeat_loop(self):
 		"Heartbeat loop: Repeatedly renames a file to inform the watchdog process that the bot's event loop is still running."
@@ -6769,7 +6768,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		lt = utc()
 		seen = set()
 		while not self.closed:
-			with Delay(3):
+			with Delay(8):
 				with tracebacksuppressor:
 					t = utc()
 					# at = asyncio.all_tasks(eloop)

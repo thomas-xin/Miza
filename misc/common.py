@@ -317,13 +317,6 @@ def line_count(fn):
 # Checks if a file is a python code file using its filename extension.
 is_code = lambda fn: str(fn).endswith(".py") or str(fn).endswith(".pyw")
 
-def touch(file):
-	try:
-		with open(file, "ab"):
-			pass
-	except PermissionError:
-		pass
-
 if os.name == "nt":
 	def get_folder_size(path="."):
 		s = subprocess.check_output(f'dir /a /w /s "{path}"', shell=True)
@@ -2417,12 +2410,12 @@ if __name__ != "__mp_main__":
 				if not isinstance(fn, (str, bytes)):
 					f = fn
 				elif isinstance(b, byte_like):
-					f = open(fn, "ab")
+					f = open(fn, "ab+")
 				elif isinstance(b, str):
-					f = open(fn, "a", encoding="utf-8")
+					f = open(fn, "a+", encoding="utf-8")
 				else:
 					f = fn
-				with closing(f):
+				with contextlib.closing(f):
 					try:
 						f.write(b)
 					except TypeError:

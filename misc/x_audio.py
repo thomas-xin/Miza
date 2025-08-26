@@ -2,6 +2,7 @@ import asyncio
 from collections import deque
 import concurrent.futures
 from concurrent.futures import Future
+import diskcache
 import io
 import itertools
 from math import inf, log, tau, isfinite, sqrt, ceil
@@ -19,7 +20,7 @@ import psutil
 from .asyncs import csubmit, esubmit, asubmit, wrap_future, cst, eloop, Delay
 from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_str, astype
 from .util import (
-	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, FileHashDict, EvalPipe, Request, api,
+	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, maybe_json, select_and_loads,
 	is_url, is_discord_attachment, unyt, url2fn, get_duration, rename, uhash, expired, b64,  # noqa: F401
 )
@@ -108,7 +109,8 @@ class AudioPlayer(discord.AudioSource):
 	like alist, cdict, and audio effects processing.
 	"""
 
-	cache = FileHashDict(path="cache/vc.players")
+	# cache = FileHashDict(path="cache/vc.players")
+	cache = diskcache.Cache(directory=f"{CACHE_PATH}/audio", expiry=86400 * 7)
 	defaults = {
 		"volume": 1,
 		"reverb": 0,
@@ -919,7 +921,7 @@ class AudioPlayer(discord.AudioSource):
 
 	def backup(self):
 		if self.queue and self.vcc:
-			AP.cache[self.vcc.guild.id] = (self.vcc.id, self.channel and self.channel.id, self.get_dump(), [m.id for m in self.vcc.members])
+			AP.cache[self.vcc.guild.id] = [self.vcc.id, self.channel and self.channel.id, self.get_dump(), [m.id for m in self.vcc.members]]
 
 	def is_opus(self):
 		return True
@@ -1634,7 +1636,7 @@ async def reload_player(gid):
 		# Annoying quirk of Discord API where list of members in voice is not directly retrievable; we must have a list of member IDs (or fetch every single user in the server, which is not feasible). This of course means members that join while the bot is offline will not be loaded into the audio player. However, this is a rare occurrence and can be mitigated by affected users simply rejoining the voice channel, or using the join or play commands, which notify the bot of their presence.
 		for mid in mis:
 			await a.find_user(gid, mid)
-		AP.cache.pop(gid, None)
+		# AP.cache.pop(gid, None)
 
 async def unload_player(gid):
 	with tracebacksuppressor:
@@ -1645,10 +1647,12 @@ async def unload_player(gid):
 			dump=bool(a.queue),
 		)
 
-async def autosave_loop():
-	while not client.is_closed():
+async def autosave_loop(start=True):
+	while start and not client.is_closed():
+		start = False
 		with tracebacksuppressor:
 			await client.wait_until_ready()
+			print("Autosave loop initialised.")
 			async with Delay(60):
 				for guild in client.guilds:
 					a = AP.players.get(guild.id)
@@ -1660,7 +1664,7 @@ async def autosave_loop():
 						a.update_activity()
 					if a.updating_streaming is None:
 						a.update_streaming()
-				AP.cache.sync()
+		await asyncio.sleep(1)
 
 @client.event
 async def on_connect():
@@ -1668,9 +1672,11 @@ async def on_connect():
 		if not client_fut.done():
 			client_fut.set_result(client)
 			# Restore audio players from our cache on disk
-			print(AP.cache.keys())
-			await asyncio.gather(*(AP.force_disconnect(guild.id) for guild in client.guilds if guild.me and guild.me.voice is not None and guild.id not in AP.cache))
-			await asyncio.gather(*(reload_player(gid) for gid in AP.cache.keys()))
+			keys = set(AP.cache.keys())
+			print("Reloading players:", keys)
+			await asyncio.gather(*(AP.force_disconnect(guild.id) for guild in client.guilds if guild.me and guild.me.voice is not None and guild.id not in keys))
+			await asyncio.gather(*(reload_player(gid) for gid in keys))
+			csubmit(autosave_loop())
 		print("Audio client successfully connected.")
 
 @client.event
@@ -1694,7 +1700,7 @@ async def terminate():
 	# Unload all audio players and preserve their state in our cache on disk
 	await asyncio.gather(*(unload_player(gid) for gid in AP.players.keys()))
 	await asubmit(ytdl.close)
-	AP.cache.sync()
+	# AP.cache.sync()
 	return await client.close()
 
 
@@ -1710,5 +1716,4 @@ if __name__ == "__main__":
 
 	ytdl_fut.add_done_callback(startup)
 	discord.client._loop = eloop
-	csubmit(autosave_loop())
 	eloop.run_until_complete(client.start(AUTH["discord_token"]))

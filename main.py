@@ -60,6 +60,7 @@ from install_update import python, traceback
 
 import time
 import datetime
+import pathlib
 import psutil
 ffmpeg = "./ffmpeg"
 print("Verifying FFmpeg installation...")
@@ -138,7 +139,13 @@ def delete(f):
 sd = "shutdown.tmp"
 rs = "restart.tmp"
 hb = "heartbeat.tmp"
-hb_ack = "heartbeat_ack.tmp"
+
+hbp = pathlib.Path(hb)
+def check_hb(timeout=32):
+    if not hbp.exists():
+        return
+    mtime = hbp.stat().st_mtime
+    return (time.time() - mtime) < timeout
 
 delete(sd)
 delete("log.txt")
@@ -149,7 +156,6 @@ try:
 	att = 0
 	while not os.path.exists(sd):
 		delete(rs)
-		delete(hb)
 		proc = psutil.Popen([python, "bot.py"])
 		start = time.time()
 		print("Bot started with PID \033[1;34;40m" + str(proc.pid) + "\033[1;37;40m.")
@@ -160,12 +166,6 @@ try:
 			if proc.is_running():
 				print("\033[1;32;40mHeartbeat started\033[1;37;40m.")
 				while alive and proc.is_running():
-					if not os.path.exists(hb):
-						if os.path.exists(hb_ack):
-							os.rename(hb_ack, hb)
-						else:
-							with open(hb, "wb"):
-								pass
 					print(
 						"\033[1;36;40m Heartbeat at "
 						+ str(datetime.datetime.now())
@@ -173,12 +173,13 @@ try:
 					)
 					for i in range(64):
 						time.sleep(0.5)
-						ld = os.listdir()
-						if rs in ld or sd in ld:
-							alive = False
-							print("\033[1;31;40mSignal received! Exiting...\033[1;37;40m")
-							break
-					if alive and os.path.exists(hb):
+						if not hbp.exists():
+							ld = os.listdir()
+							if rs in ld or sd in ld:
+								alive = False
+								print("\033[1;31;40mSignal received! Exiting...\033[1;37;40m")
+								break
+					if alive and not check_hb():
 						print("\033[1;31;40mHeartbeat missed! Exiting...\033[1;37;40m")
 						break
 				was_alive = proc.is_running()
@@ -250,7 +251,6 @@ finally:
 delete(sd)
 delete(rs)
 delete(hb)
-delete(hb_ack)
 
 print("Shutdown signal confirmed. Program will now terminate. ")
 raise SystemExit

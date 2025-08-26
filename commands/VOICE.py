@@ -952,24 +952,24 @@ class Skip(Command):
 				q[i] = dict(name="null")
 				skips.append(i)
 				continue
-			if _user.id in entry.get("skips", ()):
-				if len(entry.get("skips", ())) >= required:
+			vote = mode == "vote" or mode == "auto" and entry.get("u_id") not in (_user.id, bot.id)
+			if vote:
+				if _user.id in entry.get("skips", ()):
+					if len(entry.get("skips", ())) >= required:
+						skips.append(i)
+					else:
+						dups.append(i)
+				elif len(entry.get("skips", ())) + 1 >= required:
 					skips.append(i)
 				else:
-					dups.append(i)
-			elif len(entry.get("skips", ())) + 1 >= required:
-				skips.append(i)
-			else:
-				vote = mode == "vote" or mode == "auto" and entry.get("u_id") not in (_user.id, bot.id)
-				if vote:
 					votes.append(i)
-				elif _perm < 1 and entry.get("u_id") not in (_user.id, bot.id):
-					raise self.perm_error(_perm, 1, "to force-skip other users' entries")
-				else:
-					skips.append(i)
+			elif _perm < 1 and entry.get("u_id") not in (_user.id, bot.id):
+				raise self.perm_error(_perm, 1, "to force-skip other users' entries")
+			else:
+				skips.append(i)
 		desc = []
 		if dups:
-			desc.append(f"Entry {dups[0]} (`{q[dups[0]]['name']}`) has already been voted for, `{len(votes)}/{required}`." if len(dups) == 1 else f"{len(dups)} entries have already been voted for.")
+			desc.append(f"Entry {dups[0]} (`{q[dups[0]]['name']}`) has already been voted for, `{len(dups[0]['skips'])}/{required}`." if len(dups) == 1 else f"{len(dups)} entries have already been voted for.")
 		if votes:
 			await bot.audio.asubmit(f"[e.setdefault('skips',set()).add({_user.id}) for e in AP.from_guild({_guild.id}).queue]")
 			desc.append(f"Voted to skip entry {votes[0]} (`{q[votes[0]]['name']}`), `{len(votes)}/{required}`." if len(votes) == 1 else f"Voted to skip {len(votes)} entries.")

@@ -19,17 +19,17 @@ else:
 	pcm = False
 
 if is_url(fn):
-	fi, fn = fn, "temp.tmp"
+	import io
+	fi, fn = fn, io.BytesIO()
 	try:
 		import requests
 		with requests.get(fi, stream=True) as resp:
 			it = resp.iter_content(1048576)
-			with open(fn, "wb") as f:
-				while True:
-					b = next(it)
-					if not b:
-						raise StopIteration
-					f.write(b)
+			while True:
+				b = next(it)
+				if not b:
+					raise StopIteration
+				fn.write(b)
 	except StopIteration:
 		pass
 
