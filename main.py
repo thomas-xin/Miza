@@ -28,6 +28,8 @@ AUTH = {
 	"temp_path": "",
 	"default_personality": "",
 	"ai_features": False,
+	"log_path": "log.txt",
+	"log_store": "log.zip",
 }
 modified = False
 # Makes sure an authentication file exists.
@@ -148,7 +150,6 @@ def check_hb(timeout=32):
     return (time.time() - mtime) < timeout
 
 delete(sd)
-delete("log.txt")
 
 
 try:

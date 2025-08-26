@@ -2389,13 +2389,15 @@ if __name__ != "__mp_main__":
 		# 	"A decoder-only architecture is being used, but right-padding was detected! For correct generation results, please set `padding_side='left'` when initializing the tokenizer.",
 		# }
 
-		def __init__(self, file=None):
+		def __init__(self, file=None, archive=None, archive_size=256 * 1048576):
 			self.buffer = self
 			self.data = {}
 			self.history = {}
 			self.counts = collections.Counter()
 			self.funcs = alist()
 			self.file = file
+			self.archive = archive
+			self.archive_size = archive_size
 			self.closed = True
 			self.strbuff = []
 
@@ -2405,8 +2407,17 @@ if __name__ != "__mp_main__":
 
 		def file_print(self, fn, b):
 			try:
+				trunc = False
 				if isinstance(b, (tuple, list)):
 					b = ("" if isinstance(b, str) else b"").join(b)
+				if self.archive and isinstance(fn, str) and os.path.exists(fn) and os.path.getsize(fn) >= self.archive_size:
+					arcname = str(datetime.datetime.now()).replace(" ", "_", 1).rsplit(".", 1)[0].replace(":", ".", 2)
+					with zipfile.ZipFile(self.archive, "a", compression=zipfile.ZIP_LZMA) as z:
+						if arcname in z.namelist():
+							pass
+						else:
+							z.write(fn, arcname)
+							trunc = True
 				if not isinstance(fn, (str, bytes)):
 					f = fn
 				elif isinstance(b, byte_like):
@@ -2416,6 +2427,8 @@ if __name__ != "__mp_main__":
 				else:
 					f = fn
 				with contextlib.closing(f):
+					if trunc:
+						f.truncate(0)
 					try:
 						f.write(b)
 					except TypeError:
@@ -2452,7 +2465,6 @@ if __name__ != "__mp_main__":
 					s, self.strbuff = self.strbuff, []
 					sys.__stdout__.write("".join(s))
 					time.sleep(0.25)
-				# with Delay(10):
 				self.flush()
 				while not os.path.exists("misc/common.py") or self.closed:
 					time.sleep(1)
@@ -2491,4 +2503,4 @@ if __name__ != "__mp_main__":
 		close = lambda self, force=False: self.__setattr__("closed", force)
 		isatty = lambda self: False
 
-	PRINT = __logPrinter("log.txt")
+	PRINT = __logPrinter(AUTH["log_path"], AUTH["log_store"])
