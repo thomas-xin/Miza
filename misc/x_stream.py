@@ -53,7 +53,7 @@ config = {
 		"server.ssl_module": "builtin",
 		"engine.autoreload_on": True,
 		"tools.gzip.on": True,
-		"tools.gzip.mime_types": ["text/*", "application/json", "application/javascript"],
+		"tools.gzip.mime_types": ["text/plain", "text/html", "text/css", "text/csv", "text/xml", "text/md", "text/markdown", "text/javascript", "application/json", "application/javascript"],
 	},
 	"/": {
 		"request.dispatch": EndpointRedirects(),

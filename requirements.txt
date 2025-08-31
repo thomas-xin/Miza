@@ -20,7 +20,7 @@ googletrans==4.0.0rc1
 httpx>=0.28.1
 h11>=0.16.0
 h2>=4.2.0
-hyperchoron>=1.0.11
+hyperchoron>=1.0.13
 imagesize>=1.4.1
 inspiro>=0.0.3
 knackpy>=1.1.1

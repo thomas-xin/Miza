@@ -619,7 +619,7 @@ class UpdateSkyShardReminders(Database):
 		for n, s in enumerate(shards):
 			shard_hash = int(s.occurrences[0].start.timestamp())
 			taken = taken_shards.get(shard_hash, 0)
-			ping = True
+			ping2 = True
 			occurrence_number = 0
 			all_occurrences = list(n + 1 for n in range(len(s.occurrences)))
 			try:
@@ -634,7 +634,7 @@ class UpdateSkyShardReminders(Database):
 							taken = taken_shards[shard_hash] = r
 							self[0] = taken_shards
 							if r == reminders[-1]:
-								ping = False
+								ping2 = False
 							occurrence_number = i + 1
 							raise StopIteration
 			except StopIteration:
@@ -684,6 +684,7 @@ class UpdateSkyShardReminders(Database):
 					self.pop(k)
 				message = None
 				pinged_occurrences = all_occurrences.copy() if v.get("ping", True) else []
+				ping = ping2
 				try:
 					m_id = v.reminded[shard_hash]
 				except KeyError:

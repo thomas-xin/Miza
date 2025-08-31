@@ -287,7 +287,7 @@ config = {
 		"engine.autoreload_on": False,
 		"environment": "production",
 		"tools.gzip.on": True,
-		"tools.gzip.mime_types": ["text/plain", "application/json", "application/javascript"],
+		"tools.gzip.mime_types": ["text/plain", "text/html", "text/css", "text/csv", "text/xml", "text/md", "text/markdown", "text/javascript", "application/json", "application/javascript"],
 	},
 	"/": {
 		"request.dispatch": EndpointRedirects(),
