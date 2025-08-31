@@ -922,6 +922,7 @@ class AudioPlayer(discord.AudioSource):
 	def backup(self):
 		if self.queue and self.vcc:
 			AP.cache[self.vcc.guild.id] = [self.vcc.id, self.channel and self.channel.id, self.get_dump(), [m.id for m in self.vcc.members]]
+		return len(self.queue)
 
 	def is_opus(self):
 		return True
@@ -1648,11 +1649,11 @@ async def unload_player(gid):
 		)
 
 async def autosave_loop(start=True):
-	while start and not client.is_closed():
+	print("Autosave loop initialised.")
+	while start or not client.is_closed():
 		start = False
 		with tracebacksuppressor:
 			await client.wait_until_ready()
-			print("Autosave loop initialised.")
 			async with Delay(60):
 				for guild in client.guilds:
 					a = AP.players.get(guild.id)
@@ -1665,6 +1666,7 @@ async def autosave_loop(start=True):
 					if a.updating_streaming is None:
 						a.update_streaming()
 		await asyncio.sleep(1)
+	print("Exiting...")
 
 @client.event
 async def on_connect():

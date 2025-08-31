@@ -1036,10 +1036,10 @@ class Tesseract(Command):
 		if isinstance(data, str):
 			fi = data
 		else:
-			fi = f"cache/{ts_us()}.png"
+			fi = temporary_file("png")
 			with open(fi, "wb") as f:
 				f.write(data)
-		fn = f"cache/{ts_us()}.tar"
+		fn = temporary_file("tar")
 		page = new_playwright_page()
 		with page:
 			page.goto(f"https://api.mizabot.xyz/static/tesseract.html?size={size}&texture=:")
@@ -1516,26 +1516,3 @@ class Steganography(Command):
 		fn = url2fn(url)
 		name = replace_ext(fn, "png")
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
-
-
-class OCR(Command):
-	name = ["Read", "Image2Text"]
-	description = "Attempts to read text in an image using Optical Character Recognition AI."
-	schema = cdict(
-		url=cdict(
-			type="image",
-			description="Image supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
-		),
-	)
-	rate_limit = (10, 15)
-	slash = ("Read")
-	ephemeral = True
-
-	async def __call__(self, bot, _user, url, **void):
-		s = await bot.ocr(url)
-		return cdict(
-			embed=discord.Embed(description=s, title="Detected text").set_author(**get_author(_user)),
-		)

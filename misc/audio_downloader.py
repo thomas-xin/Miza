@@ -15,14 +15,14 @@ import zipfile
 import orjson
 import niquests
 import yt_dlp as ytd
-from .types import alist, as_str, cdict, full_prune, json_dumps, round_min, to_alphanumeric, tracebacksuppressor, ts_us
+from .types import alist, as_str, cdict, full_prune, json_dumps, round_min, to_alphanumeric, tracebacksuppressor
 from .smath import time_parse
 from .asyncs import esubmit
 from .util import (
 	python, compat_python, shuffle, utc, proxy, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration_2, html_decode,
 	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url,
-	EvalPipe, PipedProcess, TimedCache, Request, Semaphore, TEMP_PATH, magic, rename,
+	EvalPipe, PipedProcess, TimedCache, Request, Semaphore, TEMP_PATH, magic, rename, temporary_file,
 )
 
 # Gets the best icon/thumbnail for a queue entry.
@@ -994,7 +994,7 @@ class AudioDownloader:
 				r_org = f"{TEMP_PATH}/{ts}.org"
 				r_wav = f"{TEMP_PATH}/{ts}.wav"
 				copy_to_file(r_org)
-				args = ["orgexport202.exe", r_org, "48000", "0"]
+				args = ["orgexport202", r_org, "48000", "0"]
 				print(args)
 				res = subprocess.run(args, cwd="misc", stdin=subprocess.DEVNULL, stderr=subprocess.PIPE, shell=True)
 				if not os.path.exists(r_wav) or not os.path.getsize(r_wav):
@@ -1026,9 +1026,8 @@ class AudioDownloader:
 	def get_audio(self, entry, asap=None, fmt=None, start=None, end=None):
 		"""Gets a valid audio stream (URL or file) from a given entry, with optional trimming. In ASAP (as soon as possible) mode, prefer URLs."""
 		url = entry.get("orig") or entry["url"]
-		ts = ts_us()
 		ext = fmt or "opus"
-		fn = f"{TEMP_PATH}/{ts}.{ext}"
+		fn = temporary_file(ext)
 		d = entry.get("duration")
 		if asap is None:
 			asap = d and d > 72

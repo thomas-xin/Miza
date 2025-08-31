@@ -1249,7 +1249,7 @@ class Archive(Command):
 			raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}!")
 		if "f" not in flags:
 			raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: SERVER DOWNLOAD REQUESTED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
-		fn = f"{TEMP_PATH}/{ts_us()}.zip"
+		fn = temporary_file("zip")
 		args = [
 			sys.executable,
 			"misc/server-dump.py",
@@ -3007,7 +3007,7 @@ class UpdateMessageCache(Database):
 					i += 1
 					if not i % 24:
 						await asyncio.sleep(0.2)
-			if len(saving) >= 12:
+			if len(saving) >= 100:
 				print(f"Message Database: {len(saving)} files updated.")
 			deleted = 0
 			limit = self.get_fn(time_snowflake(dtn() - datetime.timedelta(days=28)))

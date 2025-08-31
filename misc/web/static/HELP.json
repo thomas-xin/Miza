@@ -515,20 +515,6 @@
 			],
 			"timeout": "24"
 		},
-		"Describe": {
-			"aliases": [
-				"Describe",
-				"Description",
-				"Image2Text",
-				"Clip"
-			],
-			"description": "Describes the input image.",
-			"usage": "",
-			"level": "0",
-			"rate_limit": "(4, 5)",
-			"example": [],
-			"timeout": "24"
-		},
 		"Random": {
 			"aliases": [
 				"Random",
@@ -1696,19 +1682,6 @@
 			"rate_limit": "(12, 15)",
 			"example": [],
 			"timeout": "144"
-		},
-		"OCR": {
-			"aliases": [
-				"OCR",
-				"Read",
-				"Image2Text"
-			],
-			"description": "Attempts to read text in an image using Optical Character Recognition AI.",
-			"usage": "",
-			"level": "0",
-			"rate_limit": "(10, 15)",
-			"example": [],
-			"timeout": "24"
 		}
 	},
 	"FUN": {

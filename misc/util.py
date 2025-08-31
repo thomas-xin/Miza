@@ -974,6 +974,9 @@ def maps(funcs, *args, **kwargs):
 	for func in funcs:
 		yield func(*args, **kwargs)
 
+def temporary_file(fmt="bin"):
+	return f"{TEMP_PATH}/{ts_us()}.{fmt}"
+
 def get_image_size(b):
 	if isinstance(b, io.BytesIO):
 		input = b
@@ -1008,8 +1011,7 @@ def get_image_size(b):
 			return im.size
 	except Exception as ex:
 		print("Image size error:", repr(ex))
-		ts = ts_us()
-		temp = TEMP_PATH + f"/{ts}"
+		temp = temporary_file()
 		input.seek(0)
 		with open(temp, "wb") as f:
 			shutil.copyfileobj(input, f, 65536)
@@ -4142,7 +4144,7 @@ class EvalPipe:
 	"""
 	MEMS = globals()["MEMS"]
 
-	def __init__(self, p_alive, p_in, p_out, p_kill=None, p_join=None, writable=True, start=True, glob=globals(), id=0, server=None, address=None, port=None):
+	def __init__(self, p_alive, p_in, p_out, p_kill=None, p_join=None, writable=True, start=True, glob=globals(), id=0, server=None, address=None, port=None, is_main=False):
 		self.rlock = threading.Lock()
 		self.wlock = threading.Lock()
 		self.responses = {}
@@ -4161,6 +4163,7 @@ class EvalPipe:
 		self.server = server
 		self.address = address
 		self.port = port
+		self.is_main = is_main
 		if start:
 			self.start()
 
@@ -4174,10 +4177,9 @@ class EvalPipe:
 		except ConnectionRefusedError:
 			if independent:
 				script = None
-				ts = ts_us()
 				if os.name == "nt":
 					argstr = " ".join(map(json_dumpstr, args)) + "\nexit /b"
-					script = f"cache\\{ts}.bat"
+					script = temporary_file("bat")
 					with open(script, "w") as f:
 						f.write(argstr)
 					args = f"wt -w 0 -d %cd% cmd /s/c {script}"
@@ -4212,6 +4214,7 @@ class EvalPipe:
 			id=port,
 			address=address,
 			port=port,
+			is_main=True,
 		)
 		self.p_out = (lambda: receive_bytes(conn.recv_bytes, unlink=lambda name: self.submit(f"EvalPipe.MEMS.pop({repr(name)}).close()"))) if address == "127.0.0.1" else conn.recv_bytes
 		self.proc = proc
@@ -4249,6 +4252,7 @@ class EvalPipe:
 			start=start,
 			address=address,
 			port=port,
+			is_main=False,
 		)
 
 	@classmethod
@@ -4263,6 +4267,7 @@ class EvalPipe:
 			proc.wait,
 			glob=glob,
 			id=proc.pid,
+			is_main=True,
 		)
 
 	@classmethod
@@ -4277,6 +4282,7 @@ class EvalPipe:
 			start=start,
 			glob=glob,
 			id=os.getpid() + 3,
+			is_main=False,
 		)
 
 	def start(self, background=True):
@@ -4352,6 +4358,8 @@ class EvalPipe:
 			print_exc()
 
 	def debug(self, s):
+		if self.is_main:
+			return print(s, end="")
 		sys.__stderr__.write(s)
 		sys.__stderr__.flush()
 

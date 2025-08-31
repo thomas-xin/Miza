@@ -174,7 +174,7 @@ class Restart(Command):
 		else:
 			pathlib.Path.touch(bot.restart)
 		with suppress():
-			os.remove(self.heartbeat_file)
+			os.remove(bot.heartbeat_file)
 		with suppress():
 			await bot.close()
 		del client

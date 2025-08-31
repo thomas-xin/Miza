@@ -161,7 +161,7 @@ _Note: execute the command `~exec -e log` to enable discord logging on Discord. 
 
 #### Misc:
 
-* Misc has all the different files that the bot needs to pull from, such as the avatar (which gets automatically uploaded to the Discord Developers Portal the first time the code is run), the rainbow bar emojis (which get automatically uploaded to a server Miza is in if it cannot find the emojis already), the code necessary for converting org files, computing math equations, finding time zones and etc. You can change the bots avatar and emojis if you want to; *but if you want the code to use them the same way, the filename must be kept the same.*
+* Misc has all the different files that the bot needs to pull from, such as the avatar (which gets automatically uploaded to the Discord Developers Portal the first time the code is run, or to a server Miza is in if it cannot find the emojis already), the code necessary for converting multimedia files, computing math equations, finding time zones and etc. You can change the bots avatar and emojis if you want to; *but if you want the code to use them the same way, the filename must be kept the same.*
 
 <br>
 

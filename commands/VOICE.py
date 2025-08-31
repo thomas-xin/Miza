@@ -115,15 +115,14 @@ def org2xm(org):
 		if org[:4] != b"Org-":
 			raise ValueError("Invalid file header.")
 		data = org
-	ts = ts_us()
 	# Write org data to file.
-	r_org = f"{TEMP_PATH}/" + str(ts) + ".org"
+	r_org = temporary_file("org")
 	with open(r_org, "wb") as f:
 		f.write(data)
 	args = ["misc/OrgExport", r_org, "48000", "0"]
 	print(args)
 	subprocess.check_output(args, stdin=subprocess.DEVNULL)
-	r_wav = f"{TEMP_PATH}/{ts}.wav"
+	r_wav = temporary_file("wav")
 	if not os.path.exists(r_wav):
 		raise FileNotFoundError("Unable to locate converted file.")
 	if not os.path.getsize(r_wav):
@@ -152,16 +151,14 @@ def mid2mp3(mid):
 			test = Request(f"https://hostfast.onlineconverter.com/file/{fn}")
 			if test == b"d":
 				break
-	ts = ts_us()
-	r_mp3 = f"{TEMP_PATH}/{ts}.mp3"
+	r_mp3 = temporary_file("mp3")
 	with open(r_mp3, "wb") as f:
 		f.write(Request(f"https://hostfast.onlineconverter.com/file/{fn}/download"))
 	return r_mp3
 
 def png2wav(png):
-	ts = ts_us()
-	r_png = f"{TEMP_PATH}/{ts}"
-	r_wav = f"{TEMP_PATH}/{ts}.wav"
+	r_png = temporary_file("png")
+	r_wav = temporary_file("wav")
 	args = [sys.executable, "png2wav.py", r_png, r_wav]
 	with open(r_png, "wb") as f:
 		f.write(png)
@@ -176,8 +173,7 @@ def ecdc_encode(ecdc, bitrate="24k", name=None, source=None, thumbnail=None):
 	if source and thumbnail and unyt(thumbnail) == unyt(source):
 		thumbnail = None
 	b = await_fut(process_image("ecdc_encode", "$", [ecdc, bitrate, name, source, thumbnail], cap="ecdc", timeout=300))
-	ts = ts_us()
-	out = f"{TEMP_PATH}/{ts}.ecdc"
+	out = temporary_file("ecdc")
 	with open(out, "wb") as f:
 		f.write(b)
 	return out
@@ -188,8 +184,7 @@ def ecdc_decode(ecdc, out=None):
 		with open(ecdc, "rb") as f:
 			ecdc = f.read()
 	b = await_fut(process_image("ecdc_decode", "$", [ecdc, fmt], cap="ecdc", timeout=300))
-	ts = ts_us()
-	out = out or f"{TEMP_PATH}/{ts}.{fmt}"
+	out = out or temporary_file(fmt)
 	with open(out, "wb") as f:
 		f.write(b)
 	return out
@@ -201,8 +196,7 @@ async def ecdc_encode_a(ecdc, bitrate="24k", name=None, source=None, thumbnail=N
 	if source and thumbnail and unyt(thumbnail) == unyt(source):
 		thumbnail = None
 	b = await process_image("ecdc_encode", "$", [ecdc, bitrate, name, source, thumbnail], cap="ecdc", timeout=300)
-	ts = ts_us()
-	out = f"{TEMP_PATH}/{ts}.ecdc"
+	out = temporary_file("ecdc")
 	with open(out, "wb") as f:
 		f.write(b)
 	return out
@@ -213,8 +207,7 @@ async def ecdc_decode_a(ecdc, out=None):
 		with open(ecdc, "rb") as f:
 			ecdc = f.read()
 	b = await process_image("ecdc_decode", "$", [ecdc, fmt], cap="ecdc", timeout=300)
-	ts = ts_us()
-	out = out or f"{TEMP_PATH}/{ts}.{fmt}"
+	out = out or temporary_file(fmt)
 	with open(out, "wb") as f:
 		f.write(b)
 	return out

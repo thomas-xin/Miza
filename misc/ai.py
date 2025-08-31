@@ -36,29 +36,37 @@ def cast_rp(fp, pp, model=None):
 	return ((fp + pp) / 8 + 1) ** (0.125 * s)
 # List of language models and their respective providers, as well as pricing per million input/output tokens
 available = {
+	"claude-4.1-opus": {
+		"openrouter": ("anthropic/claude-opus-4.1", ("15", "75")),
+		None: "gpt-5",
+	},
 	"claude-3-opus": {
 		"openrouter": ("anthropic/claude-3-opus", ("15", "75")),
 		None: "gpt-5",
 	},
+	"claude-4-sonnet": {
+		"openrouter": ("anthropic/claude-sonnet-4", ("3", "15")),
+		None: "gemini-2.5-pro",
+	},
 	"claude-3.7-sonnet-t": {
 		"openrouter": ("anthropic/claude-3.7-sonnet:thinking", ("3", "15")),
-		None: "gpt-oss-120b",
+		None: "gpt-5-mini",
 	},
 	"claude-3.7-sonnet": {
 		"openrouter": ("anthropic/claude-3.7-sonnet", ("3", "15")),
-		None: "gpt-5",
+		None: "gpt-5-mini",
 	},
 	"claude-3.5-sonnet": {
 		"openrouter": ("anthropic/claude-3.5-sonnet", ("3", "15")),
-		None: "gpt-5",
+		None: "gpt-5-mini",
 	},
 	"claude-3.5-haiku": {
 		"openrouter": ("anthropic/claude-3.5-haiku", ("1", "5")),
-		None: "gpt-5-mini",
+		None: "gpt-5-nano",
 	},
 	"claude-3-haiku": {
 		"openrouter": ("anthropic/claude-3-haiku", ("0.25", "1.25")),
-		None: "gpt-5-mini",
+		None: "gpt-5-nano",
 	},
 	"deepseek-r1": {
 		"openrouter": ("deepseek/deepseek/deepseek-r1-0528:free", ("0", "0")),
@@ -66,7 +74,8 @@ available = {
 		"deepinfra": ("deepseek-ai/DeepSeek-R1", ("0.85", "2.5")),
 		None: "o1-preview",
 	},
-	"deepseek-v3-t": {
+	"deepseek-v3.1": {
+		"openrouter": ("deepseek/deepseek-chat-v3.1", ("0.2", "0.8")),
 		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
 		"fireworks": ("accounts/fireworks/models/deepseek-v3-0324", ("0.9", "0.9")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
@@ -79,7 +88,7 @@ available = {
 		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
 		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
-		None: "deepseek-v3-t",
+		None: "deepseek-v3.1",
 	},
 	"minimax-m1": {
 		"openrouter": ("minimax/minimax-m1", ("0.3", "1.65")),
@@ -352,7 +361,7 @@ is_chat = {
 	"minimax-m1",
 	"minimax-01",
 	"deepseek-r1",
-	"deepseek-v3-t",
+	"deepseek-v3.1",
 	"deepseek-v3",
 	"skyfall-36b",
 	"mistral-24b",
@@ -447,7 +456,7 @@ is_function = {
 	"gpt-4-0125-preview",
 	"gpt-3.5",
 	"gpt-3.5-turbo",
-	"deepseek-v3-t",
+	"deepseek-v3.1",
 	"mistral-24b",
 	"kimi-k2",
 	"caller-large",
@@ -573,7 +582,7 @@ contexts = {
 	"minimax-m1": 1000000,
 	"minimax-01": 1000000,
 	"deepseek-r1": 64000,
-	"deepseek-v3-t": 64000,
+	"deepseek-v3.1": 64000,
 	"deepseek-v3": 64000,
 	"skyfall-36b": 32768,
 	"mistral-24b": 32768,
@@ -939,9 +948,11 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above!'
 			ml = round_random(max_length)
 			c = await tcount(prompt)
-			# Prefer gpt-5-nano for summaries if possible due to its much faster throughput of 100 tokens/s, but fallback to gemini-2.5 if necessary (due to its higher token limit of 1 million).
+			# Prefer gpt-5-nano for summaries if possible due to its much faster throughput of 100 tokens/s, but fallback to gemini-2.5-flash if necessary (due to its higher token limit of 1 million).
 			model = "gemini-2.5-flash" if c > 300000 else "gpt-5-nano"
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
+			if model in is_reasoning:
+				data["reasoning_effort"] = "low"
 			resp = await instruct(data, best=True, skip=True)
 			resp = resp.strip()
 			print("Summary:", resp)
@@ -949,71 +960,71 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 				return resp
 	return lim_tokens(s, round_random(max_length * 2 / 3))
 
-local_available = False
-last_ensured = None
-last_ensured_time = 0
-async def ensure_models(force=False):
-	global local_available, last_ensured, last_ensured_time
-	if utc() - last_ensured_time < 720 and not force:
-		return last_ensured
-	known = {
-		"command-r-plus-h6t2": "command-r-plus",
-		"command-r-plus-08-2024": "command-r-plus",
-		"alpindale/c4ai-command-r-plus-GPTQ": "command-r-plus",
-		"CohereForAI/c4ai-command-r-plus": "command-r-plus",
-		"CausalLM/35b-beta-long": "35b-beta-long",
-		"quill-72b-h6t2": "quill-72b",
-		"NeverSleep/Llama-3-Lumimaid-70B-v0.1-alt-GGUF": "lumimaid-70b",
-	}
-	default = "gpt-5-mini"
-	return default
-	# The rest is currently disabled for now.
-	try:
-		try:
-			info = await Request(f"{endpoints['mizabot']}/models", aio=True, json=True)
-		except Exception:
-			print_exc()
-			last_ensured = models = (default,)
-			local_available = False
-			return models
-		print(info)
-		models = [m.get("id") for m in sorted(info["data"], key=lambda m: m.get("created"), reverse=True)]
-		for model in models:
-			mname = known.get(model, model)
-			if mname in available:
-				info = available[mname]
-				if "mizabot" in info:
-					mizabot = (model,) + info["mizabot"][1:]
-				else:
-					mizabot = (model, (0.5, 2.5))
-					print(f"Unknown cost, automatically using {mizabot}")
-				info["mizabot"] = mizabot
-			else:
-				mizabot = (model, (0.5, 2.5))
-				print(f"Unknown cost, automatically using {mizabot}")
-				available[mname] = {
-					"mizabot": (model, (0.5, 2.5)),
-					None: default,
-				}
-		last_ensured = models
-		local_available = True
-		return models
-	finally:
-		model = models[0]
-		mname = known.get(model, model)
-		available["auto"] = {None: mname}
-		if mname in contexts:
-			contexts["auto"] = contexts[mname]
-		if mname in instruct_formats:
-			instruct_formats["auto"] = instruct_formats[mname]
-		for k in ("is_chat", "is_completion", "is_function", "is_vision", "is_premium"):
-			if mname in globals()[k]:
-				globals()[k].add("auto")
-		last_ensured_time = utc()
+# local_available = False
+# last_ensured = None
+# last_ensured_time = 0
+# async def ensure_models(force=False):
+# 	global local_available, last_ensured, last_ensured_time
+# 	if utc() - last_ensured_time < 720 and not force:
+# 		return last_ensured
+# 	known = {
+# 		"command-r-plus-h6t2": "command-r-plus",
+# 		"command-r-plus-08-2024": "command-r-plus",
+# 		"alpindale/c4ai-command-r-plus-GPTQ": "command-r-plus",
+# 		"CohereForAI/c4ai-command-r-plus": "command-r-plus",
+# 		"CausalLM/35b-beta-long": "35b-beta-long",
+# 		"quill-72b-h6t2": "quill-72b",
+# 		"NeverSleep/Llama-3-Lumimaid-70B-v0.1-alt-GGUF": "lumimaid-70b",
+# 	}
+# 	default = "gpt-5-mini"
+# 	return default
+# 	# The rest is currently disabled for now.
+# 	try:
+# 		try:
+# 			info = await Request(f"{endpoints['mizabot']}/models", aio=True, json=True)
+# 		except Exception:
+# 			print_exc()
+# 			last_ensured = models = (default,)
+# 			local_available = False
+# 			return models
+# 		print(info)
+# 		models = [m.get("id") for m in sorted(info["data"], key=lambda m: m.get("created"), reverse=True)]
+# 		for model in models:
+# 			mname = known.get(model, model)
+# 			if mname in available:
+# 				info = available[mname]
+# 				if "mizabot" in info:
+# 					mizabot = (model,) + info["mizabot"][1:]
+# 				else:
+# 					mizabot = (model, (0.5, 2.5))
+# 					print(f"Unknown cost, automatically using {mizabot}")
+# 				info["mizabot"] = mizabot
+# 			else:
+# 				mizabot = (model, (0.5, 2.5))
+# 				print(f"Unknown cost, automatically using {mizabot}")
+# 				available[mname] = {
+# 					"mizabot": (model, (0.5, 2.5)),
+# 					None: default,
+# 				}
+# 		last_ensured = models
+# 		local_available = True
+# 		return models
+# 	finally:
+# 		model = models[0]
+# 		mname = known.get(model, model)
+# 		available["auto"] = {None: mname}
+# 		if mname in contexts:
+# 			contexts["auto"] = contexts[mname]
+# 		if mname in instruct_formats:
+# 			instruct_formats["auto"] = instruct_formats[mname]
+# 		for k in ("is_chat", "is_completion", "is_function", "is_vision", "is_premium"):
+# 			if mname in globals()[k]:
+# 				globals()[k].add("auto")
+# 		last_ensured_time = utc()
 
 async def llm(func, *args, api="openai", timeout=120, premium_context=None, require_message=True, allow_alt=True, **kwargs):
 	if isinstance(api, str):
-		await ensure_models()
+		# await ensure_models()
 		if "model" in kwargs:
 			apis = available.get(kwargs["model"]) or {api: None}
 		else:
@@ -1285,7 +1296,7 @@ async def _instruct(data, best=False, skip=False, user=None):
 		frequency_penalty=0,
 		presence_penalty=0,
 		user=user,
-		stop=["### Instruction:", "### Response:", "### Input:"]
+		# stop=["### Instruction:", "### Response:", "### Input:"],
 	)
 	inputs.update(data)
 	if best >= 1:
@@ -1887,7 +1898,7 @@ CL100K_IM = {
 	"gpt-4o",
 	"gpt-4o-mini",
 	"deepseek-r1",
-	"deepseek-v3-t",
+	"deepseek-v3.1",
 	"deepseek-v3",
 	"quill-72b",
 	"databricks/dbrx-instruct",

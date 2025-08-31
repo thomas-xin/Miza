@@ -143,7 +143,7 @@ rs = "restart.tmp"
 hb = "heartbeat.tmp"
 
 hbp = pathlib.Path(hb)
-def check_hb(timeout=32):
+def check_hb(timeout=16):
     if not hbp.exists():
         return
     mtime = hbp.stat().st_mtime

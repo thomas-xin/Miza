@@ -2383,13 +2383,9 @@ def get_current_stats(up_bps, down_bps):
 
 if __name__ != "__mp_main__":
 	class __logPrinter:
-		"Redirects all print operations to target files, limiting the amount of operations that can occur in any given amount of time for efficiency."
+		"Forwards all print operations to target files/callables, limiting the amount of operations that can occur in any given amount of time for efficiency."
 
-		# ignored_messages = {
-		# 	"A decoder-only architecture is being used, but right-padding was detected! For correct generation results, please set `padding_side='left'` when initializing the tokenizer.",
-		# }
-
-		def __init__(self, file=None, archive=None, archive_size=256 * 1048576):
+		def __init__(self, file=None, archive=None, archive_size=8 * 1048576):
 			self.buffer = self
 			self.data = {}
 			self.history = {}
@@ -2411,7 +2407,7 @@ if __name__ != "__mp_main__":
 				if isinstance(b, (tuple, list)):
 					b = ("" if isinstance(b, str) else b"").join(b)
 				if self.archive and isinstance(fn, str) and os.path.exists(fn) and os.path.getsize(fn) >= self.archive_size:
-					arcname = str(datetime.datetime.now()).replace(" ", "_", 1).rsplit(".", 1)[0].replace(":", ".", 2)
+					arcname = str(datetime.datetime.now()).replace(" ", "_", 1).rsplit(".", 1)[0].replace(":", ".", 2) + ".log"
 					with zipfile.ZipFile(self.archive, "a", compression=zipfile.ZIP_LZMA) as z:
 						if arcname in z.namelist():
 							pass

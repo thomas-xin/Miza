@@ -1405,8 +1405,7 @@ class Imagine(Command):
 			if not fn:
 				continue
 			if isinstance(fn, bytes):
-				ts = ts_us()
-				fn2 = f"{TEMP_PATH}/{ts}.png"
+				fn2 = temporary_file("png")
 				with open(fn2, "wb") as f:
 					f.write(fn)
 				fn = fn2
@@ -1460,3 +1459,87 @@ class Imagine(Command):
 			if urls:
 				_comment = ("\n".join(url.split("?", 1)[0] for url in urls) + "\n" + _comment).strip()
 		return cdict(content=_comment, files=files, embeds=embs, prefix=prefix, reacts=reacts)
+
+
+class Describe(Command):
+	name = ["Description", "Image2Text", "Clip"]
+	description = "Describes the input image."
+	schema = cdict(
+		url=cdict(
+			type="visual",
+			description="Image, animation or video, supplied by URL or attachment",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
+			aliases=["i"],
+			required=True,
+		),
+	)
+	rate_limit = (4, 5)
+	slash = True
+	ephemeral = True
+
+	async def __call__(self, bot, _user, _premium, url, **void):
+		fut = asubmit(reqs.next().head, url, headers=Request.header(), stream=True)
+		cap = await self.bot.caption(url, best=1, premium_context=_premium, timeout=24)
+		s = "\n\n".join(filter(bool, cap)).strip()
+		resp = await fut
+		name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
+		return cdict(
+			embed=discord.Embed(description=s, title=name).set_author(**get_author(_user)),
+		)
+
+
+class OCR(Command):
+	name = ["Read", "Image2Text"]
+	description = "Attempts to read text in an image using Optical Character Recognition AI."
+	schema = cdict(
+		url=cdict(
+			type="image",
+			description="Image supplied by URL or attachment",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
+			aliases=["i"],
+			required=True,
+		),
+	)
+	rate_limit = (10, 15)
+	slash = True
+	ephemeral = True
+
+	async def __call__(self, bot, _user, url, **void):
+		s = await bot.ocr(url)
+		return cdict(
+			embed=discord.Embed(description=s, title="Detected text").set_author(**get_author(_user)),
+		)
+
+
+class Vectorise(Command):
+	name = ["SVG", "Vector", "Vectorize"]
+	description = "Attempts to read text in an image using Optical Character Recognition AI."
+	schema = cdict(
+		url=cdict(
+			type="image",
+			description="Image supplied by URL or attachment",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
+			aliases=["i"],
+			required=True,
+		),
+	)
+	rate_limit = (10, 15)
+	slash = True
+	ephemeral = True
+
+	def __call__(self, bot, _premium, url, **void):
+		os.environ["REPLICATE_API_TOKEN"] = AUTH.get("replicate_key")
+		import replicate
+		output = replicate.run(
+			"recraft-ai/recraft-vectorize",
+			input=dict(image=url)
+		)
+		print(output)
+		_premium.append(["replicate", "recraft-vectorize", "0.01"])
+		desc = _premium.apply()
+		fn = temporary_file("svg")
+		with open(fn, "wb") as f:
+			f.write(output.read())
+		if desc:
+			desc = "\n-# " + "\n-# ".join(desc.splitlines())
+		return cdict(content=desc, file=CompatFile(fn, filename=replace_ext(url2fn(url), "svg")))

@@ -410,10 +410,9 @@ class Wav2Png(Command):
 		fn = url2fn(url)
 		ext = fn.rsplit(".", 1)[-1]
 		was_image = ext in IMAGE_FORMS
-		ts = ts_us()
 		if not fmt:
 			fmt = "flac" if was_image else "webp"
-		dest = f"{TEMP_PATH}/{ts}.{fmt}"
+		dest = temporary_file(fmt)
 		executable = os.path.abspath(".") + "/misc/" + ("png2wav.py" if was_image else "wav2png.py")
 		args = [python, executable, url, dest]
 		print(args)
@@ -482,8 +481,7 @@ class SpectralPulse(Command):
 		name = kwargs.get("-dest") or url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
 		n1 = name + ".mp4"
 		n2 = name + ".png"
-		ts = ts_us()
-		dest = f"{TEMP_PATH}/&{ts}"
+		dest = temporary_file()
 		fn1 = dest + ".mp4"
 		fn2 = dest + ".png"
 		args = [
@@ -705,8 +703,10 @@ class UpdateSkyShardReminders(Database):
 				embed.set_footer(text=f"Pings for landings: {', '.join(map(str, pinged_occurrences)) or 'none'}", icon_url="https://cdn.discordapp.com/emojis/695800620682313740.webp" if pinged_occurrences else "https://cdn.discordapp.com/emojis/695800875150475294.webp")
 				if ping or not message:
 					message = await send_with_react(user, embed=embed, reacts=["✅"] + [number_emojis[n] for n in all_occurrences])
+					print(f"SkyShard {occurrence_number}: Pinged @", user)
 				else:
 					await message.edit(embed=embed)
+					print(f"SkyShard {occurrence_number}: Edited @", user)
 				v.reminded[shard_hash] = message.id
 				self[k] = v
 

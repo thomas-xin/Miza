@@ -607,7 +607,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Closes the bot, preventing all events."
 		self.closing = True
 		self.closed = True
-		return csubmit(super().close())
+		return super().close()
 
 	@tracebacksuppressor(SemaphoreOverflowError)
 	async def garbage_collect(self, obj):
@@ -2041,7 +2041,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		raise (exc or RuntimeError("Unknown error occured."))
 
 	async def force_completion(self, model, prompt, stream=True, max_tokens=1024, strip=True, **kwargs):
-		await ai.ensure_models()
 		ctx = ai.contexts.get(model, 4096)
 		is_question = prompt.endswith(".") or prompt.endswith("?")
 		if model in ai.is_completion and (not model in ai.is_chat or not is_question) or model not in ai.is_chat:
@@ -2081,7 +2080,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return CloseableAsyncIterator(_completion(resp, strip), resp.close)
 
 	async def force_chat(self, model, messages, text=None, assistant_name=None, stream=False, max_tokens=1024, vision_model=None, **kwargs):
-		await ai.ensure_models()
 		ctx = ai.contexts.get(model, 4096)
 		messages, vision_model = await self.caption_into(messages, model=model, backup_model=vision_model, premium_context=kwargs.get("premium_context", []))
 		if vision_model in ai.is_chat:
@@ -2345,11 +2343,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		1: cdict(
 			reasoning="gpt-5-mini",
 			instructive="gpt-5-mini",
-			casual="grok-3-mini",
+			casual="gemini-2.5-flash-t",
 			nsfw="grok-3-mini",
 			backup="gemini-2.5-flash-t",
 			retry="gpt-5",
-			function="gpt-5-nano",
+			function="gpt-5-mini",
 			vision="gemini-2.5-flash",
 			target="auto",
 		),
@@ -2360,14 +2358,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			nsfw="grok-4",
 			backup="gemini-2.5-pro",
 			retry="gemini-2.5-pro",
-			function="gpt-5-mini",
+			function="gpt-5",
 			vision="grok-4",
 			target="auto",
 		),
 	}
 	async def chat_completion(self, messages, model="miza-1", system=None, frequency_penalty=None, presence_penalty=None, repetition_penalty=None, max_tokens=256, temperature=0.7, top_p=0.9, tools=None, tool_choice=None, model_router=None, tool_router=None, stop=(), user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
 		"OpenAI-compatible Chat Completion function. Autoselects model using a function call, then routes to tools and target model as required."
-		await ai.ensure_models()
 		await require_predicate(predicate)
 		modlvl = ["miza-1", "miza-2", "miza-3"].index(model.rsplit("/", 1)[-1])
 		modelist = self.model_levels[modlvl]
@@ -2606,7 +2603,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			refusal = False
 			result.model = result.get("model") or assistant
 			ctx = ai.contexts.get(assistant, 4096)
-			passable = not modelist.target or assistant == modelist.target or modelist.target == "auto" and not ai.local_available or attempts >= mA - 1
+			passable = not modelist.target or assistant == modelist.target or modelist.target == "auto" or attempts >= mA - 1
 			if not passable:
 				temp = snippet
 				tlen = sniplen
@@ -2935,7 +2932,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
-		model = model or ("gpt-5-mini" if best else "mistral-24b")
+		model = model or ("gpt-5" if best else "mistral-24b")
 		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
@@ -3294,8 +3291,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		fn = url2fn(url)
 		ext = fn.rsplit(".", 1)[-1] if "." in fn else "bin"
 		content = await self.get_request(url, limit=limit, full=full, timeout=timeout)
-		ts = ts_us()
-		fn = f"{CACHE_PATH}/{ts}.{ext}"
+		fn = temporary_file(ext)
 		with open(fn, "wb") as f:
 			await asubmit(f.write, content)
 		return fn
@@ -4357,7 +4353,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				self.llc = utc()
 		try:
 			audio_players, playing_players = await asyncio.wait_for(self.audio.asubmit("len(AP.players),sum(bool(p.vc) and bool(p.queue) and p.is_playing() for p in AP.players.values())"), timeout=2)
-		except (AttributeError, asyncio.TimeoutError):
+		except (AssertionError, AttributeError, asyncio.TimeoutError):
 			audio_players = playing_players = playing_audio_players = "N/A"
 		files = os.listdir("misc")
 		for f in files:
@@ -6759,6 +6755,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	@tracebacksuppressor
 	async def heartbeat(self):
 		await asyncio.sleep(0.5)
+		if self.closed:
+			return
 		pathlib.Path.touch(self.heartbeat_file)
 
 	def heartbeat_loop(self):

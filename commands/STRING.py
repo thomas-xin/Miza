@@ -46,10 +46,10 @@ class Translate(Command):
 		if spl[0].casefold() in self.LLMs:
 			engine = spl.pop(0).casefold()
 		elif spl[0].casefold() == "auto":
-			engine = "grok-3-mini"
+			engine = "gpt-5-mini"
 			spl.pop(0)
 		else:
-			engine = "grok-3-mini"
+			engine = "gpt-5-mini"
 		if len(spl) > 2 and (spl[1].casefold() in self.renamed or spl[1].casefold() in self.languages) and(src := (self.renamed.get(c := spl[0].casefold()) or (self.languages.get(c) and c))):
 			spl.pop(0)
 			src = lim_str(src, 32)
@@ -194,6 +194,9 @@ class Translate(Command):
 		if len(dests) > 1:
 			prompt += ', each beginning with "•"'
 		prompt += f', keeping formatting as accurate as possible, and do NOT add extra text!{response}'
+		kwargs = {}
+		if engine in ai.is_reasoning:
+			kwargs = dict(reasoning_effort="low")
 		try:
 			out = await ai.instruct(
 				data=dict(
@@ -204,6 +207,7 @@ class Translate(Command):
 					top_p=0.5,
 					user=str(user.id),
 					premium_context=bot.premium_context(user, guild),
+					**kwargs,
 				),
 				skip=True,
 			)
@@ -1019,7 +1023,7 @@ class EmojiCrypt(Command):
 			password = args[i + 1]
 			args = args[:i] + args[i + 2:]
 		msg = " ".join(args)
-		fi = f"{TEMP_PATH}/temp-{ts_us()}"
+		fi = temporary_file()
 		if not msg:
 			msg = message.attachments[0].url
 		if is_url(msg):
@@ -1359,33 +1363,6 @@ class Match(Command):
 				+ sqr_md(round_min(round(string_similarity(full_prune(search), full_prune(s)) * 100, 6))) + "% unicode mapping match."
 			)
 		return ini_md(match)
-
-
-class Describe(Command):
-	name = ["Description", "Image2Text", "Clip"]
-	description = "Describes the input image."
-	schema = cdict(
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
-		),
-	)
-	rate_limit = (4, 5)
-	slash = True
-	ephemeral = True
-
-	async def __call__(self, bot, _user, _premium, url, **void):
-		fut = asubmit(reqs.next().head, url, headers=Request.header(), stream=True)
-		cap = await self.bot.caption(url, best=1, premium_context=_premium, timeout=24)
-		s = "\n\n".join(filter(bool, cap)).strip()
-		resp = await fut
-		name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
-		return cdict(
-			embed=discord.Embed(description=s, title=name).set_author(**get_author(_user)),
-		)
 
 
 class Random(Command):

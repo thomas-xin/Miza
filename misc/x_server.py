@@ -26,7 +26,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut, gather
 from .types import byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, RangeSet, MemoryBytes
-from .util import fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, utc, ts_us, is_url, p2n, n2p, leb128, decode_leb128, ecdc_dir, url_parse, rename, url_unparse, url2fn, is_youtube_url, seq, TimedCache, Request, magic, is_discord_attachment, is_miza_attachment, unyt, ecdc_exists, CACHE_PATH, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment, update_headers, CODEC_FFMPEG
+from .util import fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, utc, is_url, p2n, leb128, decode_leb128, ecdc_dir, url_parse, rename, url_unparse, url2fn, is_youtube_url, seq, TimedCache, Request, magic, is_discord_attachment, is_miza_attachment, unyt, ecdc_exists, CACHE_PATH, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment, update_headers, temporary_file, CODEC_FFMPEG
 from .caches import attachment_cache, upload_cache, download_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -977,8 +977,7 @@ class Server:
 			return b""
 		self.ecdc_running[out] = Future()
 		try:
-			t = ts_us()
-			fn = f"{TEMP_PATH}/{t}"
+			fn = temporary_file()
 			if url.startswith(API):
 				url2 = url
 			elif is_discord_attachment(url):
@@ -1020,8 +1019,7 @@ class Server:
 			return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt}", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".wav")
 		self.ecdc_running[out] = Future()
 		try:
-			t = ts_us()
-			fn = f"{TEMP_PATH}/{t}.ecdc"
+			fn = temporary_file("ecdc")
 			with reqs.next().get(url, timeout=1800, stream=True) as resp:
 				with open(fn, "wb") as f:
 					shutil.copyfileobj(resp.raw, f, 65536)
