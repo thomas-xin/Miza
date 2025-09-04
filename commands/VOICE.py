@@ -2289,7 +2289,7 @@ class Download(Command):
 			reference=message,
 			content=italics(ini_md(f"Downloading and converting {sqr_md(url)}...")),
 		))
-		resp = await asubmit(requests.get, downloader_url, verify=False)
+		resp = await Request.alt_sessions.next().get(downloader_url, timeout=14400)
 		response = await fut
 		print(resp.headers)
 		resp.raise_for_status()

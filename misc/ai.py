@@ -952,7 +952,7 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 			model = "gemini-2.5-flash" if c > 300000 else "gpt-5-nano"
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
 			if model in is_reasoning:
-				data["reasoning_effort"] = "low"
+				data["reasoning_effort"] = "minimal"
 			resp = await instruct(data, best=True, skip=True)
 			resp = resp.strip()
 			print("Summary:", resp)
@@ -1062,6 +1062,11 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 			mt = kwa.pop("max_tokens", 0) or 0
 			if not kwa.get("max_completion_tokens"):
 				kwa["max_completion_tokens"] = mt + 16384
+			kwa.pop("temperature", None)
+			kwa.pop("presence_penalty", None)
+			kwa.pop("frequency_penalty", None)
+		elif "reasoning_effort" in kwa:
+			kwa.pop("reasoning_effort")
 		kwa["model"] = model
 		rl = 8, 1
 		if sapi == "mizabot":
@@ -1083,10 +1088,6 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 		else:
 			caller = oai_method(api, func)
 		body = cdict(kwargs.get("extra_body") or {})
-		if model in is_reasoning:
-			kwa.pop("temperature", None)
-			kwa.pop("presence_penalty", None)
-			kwa.pop("frequency_penalty", None)
 		if "repetition_penalty" not in kwa:
 			kwa["repetition_penalty"] = cast_rp(kwa.pop("frequency_penalty", 0.25), kwa.pop("presence_penalty", 0.25), model=model)
 		match sapi:
@@ -1918,8 +1919,23 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 		self.costs = [utc(), api, model, "0"]
 		self.pricing = pricing or (m_input, m_output)
 		self.tokeniser = "cl100k_im" if model in CL100K_IM else "llamav2"
+		self.terminated = False
+
+	@property
+	def usage(self):
+		return cdict(
+			prompt_tokens=self.tokens[0],
+			completion_tokens=self.tokens[1],
+			total_tokens=self.tokens[0] + self.tokens[1],
+		)
+
+	def update_cost(self):
+		self.costs[-1] = str((mpf(self.pricing[0]) * self.tokens[0] + mpf(self.pricing[1]) * self.tokens[1]) / 1000000)
+		return self.costs
 
 	async def pass_item(self, item):
+		if self.terminated:
+			return item
 		if item and item.choices and item.choices[0]:
 			def dump_calls(tcs):
 				for i, tc in enumerate(tcs):
@@ -1956,7 +1972,7 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 			else:
 				self.tokens[0] = await count_to(self.input)
 		self.tokens[1] = await tcount(self.output)
-		self.costs[-1] = str((mpf(self.pricing[0]) * self.tokens[0] + mpf(self.pricing[1]) * self.tokens[1]) / 1000000)
+		self.update_cost()
 		if not self.applied:
 			self.premium_context.append(self.costs)
 			self.applied = True
@@ -1969,6 +1985,15 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 			except StopAsyncIteration:
 				print("anext pricing:", self.tokens, self.costs)
 				raise
+			if getattr(item, "usage", None):
+				print(item)
+				self.tokens[0] = item.usage.prompt_tokens
+				self.tokens[1] = item.usage.completion_tokens
+				self.update_cost()
+				if not self.applied:
+					self.premium_context.append(self.costs)
+					self.applied = True
+				self.terminated = True
 			if not item.choices:
 				continue
 			choice = item.choices[0]
@@ -1983,6 +2008,15 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 
 	async def __aiter__(self):
 		async for item in self.it:
+			if getattr(item, "usage", None):
+				print(item)
+				self.tokens[0] = item.usage.prompt_tokens
+				self.tokens[1] = item.usage.completion_tokens
+				self.update_cost()
+				if not self.applied:
+					self.premium_context.append(self.costs)
+					self.applied = True
+				self.terminated = True
 			if not item.choices:
 				continue
 			choice = item.choices[0]

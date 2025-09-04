@@ -58,7 +58,7 @@ class Ask(Command):
 		"*Tip: I automatically scan the referenced message, as well as any text and images from within up to 96 messages in the current channel. None of the data is collected/sold, but if you would prefer a response without messages included for the sake of clarity or quota cost, there is always the option of creating a new thread/channel.*",
 		"*Tip: My personality prompt and message streaming are among several parameters that may be modified. Check out ~help personality for more info. Note that an improperly constructed prompt may be detrimental to response quality, and that giving me a nickname may also have an effect.*",
 		"*Tip: I automatically try to correct inaccurate responses when possible. However, this is not foolproof; if you would like this feature more actively applied to counteract censorship, please move to a NSFW channel or use ~verify if in DMs.*",
-		"*Tip: Many of my capabilities are not readily available due to cost reasons. You can gain access by donating through one of the premium subscriptions available, which serves to approximately fund individual usage. A pay-as-you-go subscription priced around the real-world costs of involved commands is in the works!*",
+		"*Tip: Many of my capabilities are not readily available due to cost reasons. You can gain access by donating through one of the premium subscriptions available, which serves to approximately fund individual usage.*",
 		"*Tip: Remember that anything a chatbot says may be fictional or otherwise made-up. Always fact-check from reputable sources before making serious assumptions, and don't take the AI's words too seriously.*",
 		"*Tip: At any point in time, you can delete your command message to stop generation.*",
 	)
@@ -1513,7 +1513,7 @@ class OCR(Command):
 
 class Vectorise(Command):
 	name = ["SVG", "Vector", "Vectorize"]
-	description = "Attempts to read text in an image using Optical Character Recognition AI."
+	description = "Applies https://replicate.com/recraft-ai/recraft-vectorize/api to convert a raster image to SVG format."
 	schema = cdict(
 		url=cdict(
 			type="image",

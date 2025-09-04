@@ -478,14 +478,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 										print(f"{curr['name']}'s slash command does not match, removing...")
 										with self.slash_sem:
 											attempts = 16
-											for i in range(attempts):
+											for j in range(attempts):
 												resp = reqs.next().delete(
 													f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}",
 													headers=dict(Authorization="Bot " + self.token),
 													timeout=30,
 												)
-												if resp.status_code == 429 and i < attempts - 1:
-													time.sleep(2 ** (i + 4))
+												if resp.status_code == 429 and j < attempts - 1:
+													time.sleep(2 ** (j + 4))
 													continue
 												resp.raise_for_status()
 												break
@@ -2105,6 +2105,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if text:
 			prompt += " " + text
 		kwargs["stop"] = list(set(tuple(kwargs.get("stop", ())) + tuple(stopn)))
+		if model in ai.is_reasoning:
+			kwargs["reasoning_effort"] = "low"
 		data = dict(
 			model=model,
 			prompt=prompt,
@@ -2343,7 +2345,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		1: cdict(
 			reasoning="gpt-5-mini",
 			instructive="gpt-5-mini",
-			casual="gemini-2.5-flash-t",
+			casual="gpt-5-mini",
 			nsfw="grok-3-mini",
 			backup="gemini-2.5-flash-t",
 			retry="gpt-5",
@@ -2359,7 +2361,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			backup="gemini-2.5-pro",
 			retry="gemini-2.5-pro",
 			function="gpt-5",
-			vision="grok-4",
+			vision="gpt-5",
 			target="auto",
 		),
 	}
@@ -2789,6 +2791,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if not insufficient and not refusal and passable:
 				text = (text or "").rstrip().removesuffix("### End").removesuffix("### Response").removesuffix("<|im_end|>").rstrip().removesuffix("###").rstrip()
 				ct = await tcount(text)
+				usage = resp.usage if attempts == 0 else cdict(
+					completion_tokens=ct,
+					prompt_tokens=length,
+					total_tokens=ct + length,
+				)
 				result.update(dict(
 					id=cid,
 					choices=[cdict(
@@ -2804,11 +2811,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					created=getattr(result, "created", None) or floor(utc()),
 					source_model=getattr(result, "model", None) or model,
 					model=f"Miza/{model}",
-					usage=cdict(
-						completion_tokens=ct,
-						prompt_tokens=length,
-						total_tokens=ct + length,
-					),
+					usage=usage,
 				))
 				result.choices[0].delta.content = "\r" + text
 				yield result

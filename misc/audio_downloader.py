@@ -22,7 +22,7 @@ from .util import (
 	python, compat_python, shuffle, utc, proxy, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration_2, html_decode,
 	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url,
-	EvalPipe, PipedProcess, TimedCache, Request, Semaphore, TEMP_PATH, magic, rename, temporary_file,
+	EvalPipe, PipedProcess, TimedCache, Request, Semaphore, TEMP_PATH, magic, rename, temporary_file, replace_ext,
 )
 
 # Gets the best icon/thumbnail for a queue entry.
@@ -903,7 +903,7 @@ class AudioDownloader:
 		except (LookupError, ValueError):
 			return []
 
-	def handle_spotify(self, entry, url, ts, fn):
+	def handle_spotify(self, entry, url, fn):
 		assert is_spotify_url(url), "Not a Spotify URL."
 		# If we have the track artist, attempt to find a better match on Bandcamp. The Spotify downloaders are spotty (no pun intended), so those are kept as the fallback instead.
 		artist = entry.get("artist")
@@ -934,16 +934,16 @@ class AudioDownloader:
 				if stream:
 					entry.update(final)
 					return stream, cdc, dur, ac
-		r_mp3 = f"{TEMP_PATH}/{ts}.mp3"
+		r_mp3 = temporary_file("mp3")
 		fn2 = self.run(f"get_audio_spotify({json_dumpstr(url)},{json_dumpstr(r_mp3)})", priority=True)
 		dur, _bps, cdc, ac = get_duration_2(fn2)
 		entry["duration"] = dur
 		return fn2, cdc, dur, ac
 
-	def handle_special_audio(self, entry, url, ts, fn):
+	def handle_special_audio(self, entry, url, fn):
 		"""Handles special audio formats unsupported by FFmpeg, such as spotify URLs, spectrogram images, as well as ecdc, org, and midi files."""
 		if is_spotify_url(url):
-			return self.handle_spotify(entry, url, ts, fn)
+			return self.handle_spotify(entry, url, fn)
 		with niquests.get(url, headers=Request.header(), stream=True) as resp:
 			head = resp.headers
 			ct = head.get("Content-Type", "").split(";", 1)[0]
@@ -968,7 +968,7 @@ class AudioDownloader:
 
 			left, right = ct.split("/", 1)[0], ct.split("/", 1)[-1]
 			if left == "image":
-				r_im = f"{TEMP_PATH}/{ts}.{right}"
+				r_im = temporary_file(right)
 				copy_to_file(r_im)
 				args = [python, "png2wav.py", r_im, fn]
 				print(args)
@@ -979,7 +979,7 @@ class AudioDownloader:
 				entry["duration"] = dur
 				return fn, cdc, dur, ac
 			if ct in ("audio/x-ecdc", "audio/ecdc"):
-				r_ecdc = f"{TEMP_PATH}/{ts}.ecdc"
+				r_ecdc = temporary_file("ecdc")
 				copy_to_file(r_ecdc)
 				args1 = [compat_python, "misc/ecdc_stream.py", "-b", "0", "-d", r_ecdc]
 				args2 = ["ffmpeg", "-v", "error", "-hide_banner", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "96k", "-vbr", "on", fn]
@@ -991,8 +991,8 @@ class AudioDownloader:
 				entry["duration"] = dur
 				return fn, cdc, dur, ac
 			if ct in ("audio/x-org", "audio/org"):
-				r_org = f"{TEMP_PATH}/{ts}.org"
-				r_wav = f"{TEMP_PATH}/{ts}.wav"
+				r_org = temporary_file("org")
+				r_wav = replace_ext(r_org, "wav")
 				copy_to_file(r_org)
 				args = ["orgexport202", r_org, "48000", "0"]
 				print(args)
@@ -1003,8 +1003,8 @@ class AudioDownloader:
 				entry["duration"] = dur
 				return r_wav, cdc, dur, ac
 			if ct in ("audio/x-midi", "audio/midi", "audio/sp-midi"):
-				r_mid = f"{TEMP_PATH}/{ts}.mid"
-				r_wav = f"{TEMP_PATH}/{ts}.wav"
+				r_mid = temporary_file("mid")
+				r_wav = replace_ext(r_mid, "wav")
 				copy_to_file(r_mid)
 				args = [os.path.abspath("misc/fluidsynth/fluidsynth"), "-g", "1", "-F", r_wav, "-r", "48000", "-n", os.path.abspath("misc/fluidsynth/gm64.sf2"), r_mid]
 				print(args)
@@ -1043,18 +1043,18 @@ class AudioDownloader:
 				stream, cdc, ac = get_best_audio(entry2)
 				if entry.get("duration") and cdc and stream and (d is not None or asap):
 					return stream, cdc, entry["duration"], ac
-				result = self.handle_special_audio(entry, url, ts, fn)
+				result = self.handle_special_audio(entry, url, fn)
 				if result:
 					return result
 				special_checked = True
 		if not special_checked:
-			result = self.handle_special_audio(entry, url, ts, fn)
+			result = self.handle_special_audio(entry, url, fn)
 			if result:
 				if not fmt:
 					return result
 				# If format is specified, always produce a file, and allow trimming if necessary
 				url, cdc, dur, ac = result
-				tmpl = f"{TEMP_PATH}/{ts}"
+				tmpl = temporary_file()
 				if start is not None or end is not None:
 					tmpl += f"~{start}-{end}"
 				fn = f"{tmpl}.{fmt}"
@@ -1098,7 +1098,7 @@ class AudioDownloader:
 			)]
 		)
 		if start is not None or end is not None:
-			fn = f"{TEMP_PATH}/{ts}~{start}-{end}.{ext}"
+			fn = temporary_file(ext)
 		if not fmt and (is_discord_attachment(url) or is_miza_url(url)):
 			if discord_expired(url):
 				# Just in case a Discord attachment expires in the short time between checking and downloading
