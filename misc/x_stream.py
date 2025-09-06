@@ -108,7 +108,6 @@ class Server:
 	else:
 		state = {"/": f"https://api.mizabot.xyz:{webserver_port}"}
 	session = requests.Session()
-	session2 = niquests.Session()
 
 	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
 	def index(self, path=None, filename=None, *args, code=None, **kwargs):
@@ -246,7 +245,7 @@ class Server:
 	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
 		for i in range(retries):
 			try:
-				session = self.session2 if url.startswith("https://") and i == 0 else self.session
+				session = niquests if url.startswith("https://") and i == 0 else self.session
 				resp = session.get(url, headers=headers, data=data, verify=i <= 1, timeout=timeout + i ** 2)
 				resp.raise_for_status()
 			except Exception:
@@ -385,7 +384,7 @@ class Server:
 				elif u.startswith("https://cdn.discord"):
 					ns = 8388608
 				else:
-					resp = reqs.next().head(u, headers=headers, timeout=3)
+					resp = niquests.head(u, headers=headers, timeout=3)
 					ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 				if pos + ns <= start:
 					pos += ns

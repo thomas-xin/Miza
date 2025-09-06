@@ -264,7 +264,7 @@ def error_handler(exc=None):
 <meta http-equiv="refresh" content=0;url={video}">
 </head><body></body></html>""".encode("utf-8")
 	else:
-		resp = errdata.get(status) or errdata.setdefault(status, reqs.next().get(f"https://http.cat/{status}", timeout=5))
+		resp = errdata.get(status) or errdata.setdefault(status, niquests.get(f"https://http.cat/{status}", timeout=5))
 		head = resp.headers.copy()
 		body = resp.content
 	update_headers(head, **HEADERS)
@@ -363,7 +363,7 @@ def get_geo(ip):
 	if ip.startswith("192.168."):
 		ip = IP
 		if not ip:
-			ip = IP = reqs.next().get("https://api.ipify.org", verify=False, timeout=5).text
+			ip = IP = niquests.get("https://api.ipify.org", verify=False, timeout=5).text
 	try:
 		resp = TZCACHE[ip]
 	except KeyError:
@@ -373,7 +373,7 @@ def get_geo(ip):
 			url = f"https://demo.ip-api.com/json/{ip}?fields=256&key=test-demo-pro"
 		geo_count += 1
 		with geo_sem:
-			resp = reqs.next().get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}", "Origin": "https://members.ip-api.com"}, timeout=5)
+			resp = niquests.get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}", "Origin": "https://members.ip-api.com"}, timeout=5)
 		resp.raise_for_status()
 		resp = cdict(resp.json())
 		if not resp.get("timezone"):
@@ -396,7 +396,6 @@ def true_ip(request=None):
 class Server:
 
 	session = requests.Session()
-	session2 = niquests.Session()
 
 	@cp.expose(("0",))
 	def rickroll(self, *void1, **void2):
@@ -432,7 +431,7 @@ class Server:
 	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
 		for i in range(retries):
 			try:
-				session = self.session2 if url.startswith("https://") and i == 0 else self.session
+				session = niquests if url.startswith("https://") and i == 0 else self.session
 				resp = session.get(url, headers=headers, data=data, verify=i <= 1, timeout=timeout + i ** 2)
 				resp.raise_for_status()
 			except Exception:
@@ -571,7 +570,7 @@ class Server:
 				elif u.startswith("https://cdn.discord"):
 					ns = 8388608
 				else:
-					resp = reqs.next().head(u, headers=headers, timeout=3)
+					resp = niquests.head(u, headers=headers, timeout=3)
 					ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 				if pos + ns <= start:
 					pos += ns
@@ -984,7 +983,7 @@ class Server:
 				url2 = API + "/u?url=" + url_parse(url)
 			else:
 				url2 = API + "/ytdl?d=" + url_parse(url)
-			with reqs.next().get(url2, timeout=1800, stream=True) as resp:
+			with niquests.get(url2, timeout=1800, stream=True) as resp:
 				resp.raise_for_status()
 				with open(fn, "wb") as f:
 					shutil.copyfileobj(resp.raw, f, 65536)
@@ -1020,7 +1019,7 @@ class Server:
 		self.ecdc_running[out] = Future()
 		try:
 			fn = temporary_file("ecdc")
-			with reqs.next().get(url, timeout=1800, stream=True) as resp:
+			with niquests.get(url, timeout=1800, stream=True) as resp:
 				with open(fn, "wb") as f:
 					shutil.copyfileobj(resp.raw, f, 65536)
 			out = interface.run(f"VOICE.ecdc_decode({repr(fn)},{repr(out)})")

@@ -951,6 +951,7 @@ scraper_blacklist = re.compile("|".join(map(re.escape, (
 	"ko-fi.com",
 	"spotify.com",
 	"artfight.net",
+	"discord.com/invite",
 ))))
 
 def bytes2hex(b, space=True) -> str:
@@ -4710,7 +4711,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 			await self.nossl.close()
 		self.sessions = alist(aiohttp.ClientSession() for i in range(6))
 		self.nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
-		self.alt_sessions = alist(niquests.AsyncSession() for i in range(6))
+		# self.alt_sessions = alist([niquests.AsyncSession()])
 		self.ts = utc()
 		return self
 
@@ -4721,9 +4722,9 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 	async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True, timeout=24) -> bytes | str | json_like:
 		if not self.ts:
 			await self._init_()
-		if not session and not is_discord_url(url):
-			req = self.alt_sessions.next()
-			resp = await req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
+		if not session:
+			async with niquests.AsyncSession() as session:
+				resp = await session.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
 			if resp.status_code >= 400:
 				raise ConnectionError(resp.status_code, (url, as_str(resp.content)))
 			if json:

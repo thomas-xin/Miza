@@ -2356,7 +2356,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		2: cdict(
 			reasoning="gpt-5",
 			instructive="gpt-5",
-			casual="grok-4",
+			casual="kimi-k2",
 			nsfw="grok-4",
 			backup="gemini-2.5-pro",
 			retry="gemini-2.5-pro",
@@ -3281,7 +3281,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					return await asubmit(reqs.next().get, url, headers=Request.header(), stream=True, _timeout_=3, allow_redirects=True)
 				except Exception:
 					print_exc()
-			return await asubmit(reqs.next().get, url, headers=Request.header(), stream=True, _timeout_=timeout, verify=False, allow_redirects=True)
+			with niquests.AsyncSession() as session:
+				return await session.get(url, headers=Request.header(), _timeout_=timeout, verify=False, allow_redirects=True)
 		if is_discord_url(url):
 			try:
 				return await Request(url, timeout=3, aio=True, ssl=True)

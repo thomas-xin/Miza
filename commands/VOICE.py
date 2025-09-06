@@ -2289,7 +2289,8 @@ class Download(Command):
 			reference=message,
 			content=italics(ini_md(f"Downloading and converting {sqr_md(url)}...")),
 		))
-		resp = await Request.alt_sessions.next().get(downloader_url, timeout=14400)
+		async with niquests.AsyncSession() as session:
+			resp = await session.get(downloader_url, verify=False, timeout=14400)
 		response = await fut
 		print(resp.headers)
 		resp.raise_for_status()

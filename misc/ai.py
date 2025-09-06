@@ -257,7 +257,7 @@ available = {
 		None: "gpt-4.1-mini",
 	},
 	"kimi-k2": {
-		"openrouter": ("moonshotai/kimi-k2", ("0.14", "2.49")),
+		"openrouter": ("moonshotai/kimi-k2-0905", ("0.6", "2.5")),
 		None: "gpt-5-mini",
 	},
 	"caller-large": {
@@ -596,7 +596,7 @@ contexts = {
 	"nous-hermes-2-mixtral-8x7b-dpo": 32768,
 	"mixtral-8x7b-instruct": 32768,
 	"mixtral-8x7b": 32768,
-	"kimi-k2": 131072,
+	"kimi-k2": 262144,
 	"caller-large": 32768,
 	"firefunction-v2": 8192,
 	"firefunction-v1": 32768,

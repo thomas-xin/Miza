@@ -219,6 +219,54 @@ def get_best_lyrics(resp):
 					return lyrics
 
 
+synth_dir = os.path.abspath("misc/fluidsynth") + "/"
+fluidsynth = synth_dir + "fluidsynth"
+orgexport = synth_dir + "orgexport"
+
+http_headers = {
+	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+}
+
+def ensure_synths():
+	if not os.path.exists(synth_dir):
+		os.mkdir(synth_dir)
+	if len(os.listdir(synth_dir)) <= 1:
+		if os.name != "nt":
+			raise NotImplementedError("No current synthesizer has been assigned for this platform. Please open an issue on the GitHub repo if you would like this added!")
+		import urllib.request
+		req = urllib.request.Request("https://mizabot.xyz/u/7qLwjt4PGJ_wH-3H4HBBx2Gyt0Cz/fluidsynth.7z", headers=http_headers)
+		f7z = os.path.abspath(TEMP_PATH + "/fluidsynth.7z")
+		import ssl
+		with open(f7z, "wb") as f:
+			f.write(urllib.request.urlopen(req, context=ssl._create_unverified_context()).read())
+		import py7zr
+		with py7zr.SevenZipFile(f7z, mode="r") as z:
+			z.extractall(synth_dir)
+
+def get_sf2():
+	import concurrent.futures
+	with concurrent.futures.ThreadPoolExecutor(max_workers=1) as exc:
+		fut = exc.submit(ensure_synths)
+		sf2 = synth_dir + "soundfont.sf2"
+		if not os.path.exists(sf2) or not os.path.getsize(sf2):
+			s7z = os.path.abspath(TEMP_PATH + "/soundfont.7z")
+			import urllib.request
+			req = urllib.request.Request("https://mizabot.xyz/u/iO-ouosmGJ_wB-xHIHx3H2wypUmn/soundfont.7z", headers=http_headers)
+			import ssl
+			with open(s7z, "wb") as f:
+				f.write(urllib.request.urlopen(req, context=ssl._create_unverified_context()).read())
+			import py7zr
+			with py7zr.SevenZipFile(s7z, mode="r") as z:
+				z.extractall(TEMP_PATH)
+			import subprocess
+			fut.result()
+			sf2convert = os.path.abspath(synth_dir + "sf2convert")
+			sf3 = os.path.abspath(TEMP_PATH + "/soundfont.sf3")
+			subprocess.run([sf2convert, "-x", sf3, sf2])
+		fut.result()
+	return sf2
+
+
 class AudioDownloader:
 
 	def __init__(self, workers=1):
@@ -944,7 +992,7 @@ class AudioDownloader:
 		"""Handles special audio formats unsupported by FFmpeg, such as spotify URLs, spectrogram images, as well as ecdc, org, and midi files."""
 		if is_spotify_url(url):
 			return self.handle_spotify(entry, url, fn)
-		with niquests.get(url, headers=Request.header(), stream=True) as resp:
+		with niquests.get(url, headers=Request.header(), verify=False, stream=True) as resp:
 			head = resp.headers
 			ct = head.get("Content-Type", "").split(";", 1)[0]
 			b = b""
@@ -991,10 +1039,11 @@ class AudioDownloader:
 				entry["duration"] = dur
 				return fn, cdc, dur, ac
 			if ct in ("audio/x-org", "audio/org"):
+				ensure_synths()
 				r_org = temporary_file("org")
 				r_wav = replace_ext(r_org, "wav")
 				copy_to_file(r_org)
-				args = ["orgexport202", r_org, "48000", "0"]
+				args = [orgexport, r_org, "48000", "0"]
 				print(args)
 				res = subprocess.run(args, cwd="misc", stdin=subprocess.DEVNULL, stderr=subprocess.PIPE, shell=True)
 				if not os.path.exists(r_wav) or not os.path.getsize(r_wav):
@@ -1003,10 +1052,11 @@ class AudioDownloader:
 				entry["duration"] = dur
 				return r_wav, cdc, dur, ac
 			if ct in ("audio/x-midi", "audio/midi", "audio/sp-midi"):
+				sf2 = get_sf2()
 				r_mid = temporary_file("mid")
 				r_wav = replace_ext(r_mid, "wav")
 				copy_to_file(r_mid)
-				args = [os.path.abspath("misc/fluidsynth/fluidsynth"), "-g", "1", "-F", r_wav, "-r", "48000", "-n", os.path.abspath("misc/fluidsynth/gm64.sf2"), r_mid]
+				args = [fluidsynth, "-g", "1", "-F", r_wav, "-r", "48000", "-n", sf2, r_mid]
 				print(args)
 				res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 				if not os.path.exists(r_wav) or not os.path.getsize(r_wav):
