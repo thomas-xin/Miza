@@ -768,6 +768,7 @@ class Server:
 			fut = csubmit(attachment_cache.obtains(path))
 			urls, chunksize = await_fut(fut)
 			mimetype, size, lastsize = get_size_mime(urls[0], urls[-1], len(urls), chunksize)
+			update_headers(cp.response.headers, **CHEADERS)
 			cp.response.headers["Content-Type"] = mimetype
 			new_urls = [f"{url}&S={lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
 			return self.dyn_serve(new_urls, size)
