@@ -1946,7 +1946,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not region:
 			if timezone is None:
 				if "users" in self.data:
-					timezone, confidence = self.data.users.estimate_timezone(uid)
+					timezone, confidence = self.data.users.any_timezone(uid)
 					if confidence < 0.5:
 						timezone = None
 			if timezone is not None:
@@ -2349,7 +2349,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			nsfw="grok-3-mini",
 			backup="gemini-2.5-flash-t",
 			retry="gpt-5",
-			function="gpt-5-mini",
+			function="gemini-2.5-flash-t",
 			vision="gemini-2.5-flash",
 			target="auto",
 		),
@@ -4949,6 +4949,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		oargs = tuple(args)
 		if message and message.attachments:
 			args = [best_url(a) for a in message.attachments] + args
+		tz = None
 		parser = getattr(command, "parser", None)
 		if not parser:
 			used = set()
@@ -5012,7 +5013,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if extracted:
 						check = " ".join(extracted)
 						if not check.replace(" ", "").isnumeric():
-							r = DynamicDT.parse(check)
+							if user and "users" in self.data:
+								tz = tz or self.data.users.any_timezone(user.id)
+							r = DynamicDT.parse(check, timezone=tz)
 							args.pops(range(index, index + len(extracted)))
 				elif v.type == "timedelta":
 					def try_parse_timedelta(s):
@@ -5025,6 +5028,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if extracted:
 						check = " ".join(extracted)
 						if not check.replace(" ", "").isnumeric():
+							if user and "users" in self.data:
+								tz = tz or self.data.users.any_timezone(user.id)
 							r = DynamicDT.parse_delta(" ".join(extracted))
 							args.pops(range(index, index + len(extracted)))
 				if r:
@@ -6784,6 +6789,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if t - lt > 30:
 						cf = sys._current_frames()
 						cf = sorted(cf.items())
+						cf += list(asyncio.all_tasks(eloop))
 						out = Flush(sys.__stdout__)
 						out.write(f"STACK TRACE:\n{cf}\n\n\n")
 						out.write(f"CRASHED AT {t}: {t - self.start_time}: {t - lt}\n")
@@ -7035,6 +7041,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			accent_colour = None
 			_accent_colour = None
 			_permissions = discord.Permissions(0)
+			is_timed_out = lambda *args: False
 
 			def __getattr__(self, k):
 				if k == "member":

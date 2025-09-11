@@ -350,8 +350,8 @@ class AudioPlayer(discord.AudioSource):
 	async def disconnect(cls, guild, announce=False, cid=None):
 		gid = cast_id(guild)
 		guild = client.get_guild(gid)
-		if not guild or not guild.me or not guild.me.voice:
-			raise KeyError(gid)
+		# if not guild or not guild.me or not guild.me.voice:
+		# 	raise KeyError(gid)
 		si = StopIteration("Voice disconnected.")
 		wait = cls.waiting.pop(gid, None)
 		if wait and not wait.done():

@@ -127,8 +127,8 @@ def print_class(obj):
 			continue
 		try:
 			v = getattr(obj, k)
-		except AttributeError:
-			continue
+		except Exception as ex:
+			v = repr(ex)
 		if callable(v):
 			continue
 		atts.append(f"{k}={v}")
@@ -235,7 +235,7 @@ def quit(*args, **kwargs): force_kill(PROC)
 
 # SHA256 operations: base64 and base16.
 def shash(s): return e64(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).decode("ascii")
-def uhash(s): return sorted([shash(s), quote_plus(s.removeprefix("https://"))], key=len)[0]
+def uhash(s): return min([shash(s), quote_plus(s.removeprefix("https://"))], key=len)
 def uuhash(s): return uhash(unyt(s))
 def hhash(s): return hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).hexdigest()
 def ihash(s): return int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little") % 4294967296 - 2147483648
@@ -1748,6 +1748,25 @@ def expand_attachment(url):
 	assert len(regs) == 2, "Invalid shortened URL."
 	encoded = regs[-1]
 	return decode_attachment(encoded)
+
+def group_attachments(size_mb, c_id, m_ids):
+	i = c_id
+	b = leb128(size_mb) + leb128(i)
+	for m in m_ids:
+		m, i = m - i, m
+		b += leb128(m)
+	return e64(b).decode("ascii")
+
+def ungroup_attachments(b):
+	b = MemoryBytes(b64(b))
+	size_mb, b = decode_leb128(b)
+	i, b = decode_leb128(b)
+	ids = [i]
+	while b:
+		m, b = decode_leb128(b)
+		i += m
+		ids.append(i)
+	return size_mb, ids.pop(0), ids
 
 def p2n(b):
 	"Converts a urlsafe-base64 string to big-endian integer."
@@ -4711,7 +4730,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 			await self.nossl.close()
 		self.sessions = alist(aiohttp.ClientSession() for i in range(6))
 		self.nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
-		# self.alt_sessions = alist([niquests.AsyncSession()])
+		self.asession = niquests.AsyncSession()
 		self.ts = utc()
 		return self
 
@@ -4723,8 +4742,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		if not self.ts:
 			await self._init_()
 		if not session:
-			async with niquests.AsyncSession() as session:
-				resp = await session.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
+			resp = await self.asession.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
 			if resp.status_code >= 400:
 				raise ConnectionError(resp.status_code, (url, as_str(resp.content)))
 			if json:

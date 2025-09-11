@@ -1,5 +1,6 @@
 import base64
 import datetime
+import functools
 import io
 import itertools
 import json
@@ -26,7 +27,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut, gather
 from .types import byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, RangeSet, MemoryBytes
-from .util import fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, reqs, MIMES, tracebacksuppressor, utc, is_url, p2n, leb128, decode_leb128, ecdc_dir, url_parse, rename, url_unparse, url2fn, is_youtube_url, seq, TimedCache, Request, magic, is_discord_attachment, is_miza_attachment, unyt, ecdc_exists, CACHE_PATH, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment, update_headers, temporary_file, CODEC_FFMPEG
+from .util import fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, leb128, decode_leb128, ecdc_dir, url_parse, rename, url_unparse, url2fn, is_youtube_url, seq, TimedCache, Request, magic, is_discord_attachment, is_miza_attachment, unyt, ecdc_exists, CACHE_PATH, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment, update_headers, temporary_file, CODEC_FFMPEG
 from .caches import attachment_cache, upload_cache, download_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -190,6 +191,16 @@ def remap_url(url):
 		"G$", ".amazonaws.com/www.guilded.gg/ContentMediaGenericFiles/"
 	)
 
+@functools.lru_cache(maxsize=256)
+def get_size_mime(head, tail, count, chunksize):
+	fut = esubmit(requests.head, head)
+	resp = requests.head(tail)
+	lastsize = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
+	size = chunksize * (count - 1) + lastsize
+	resp = fut.result()
+	mimetype = resp.headers.get("Content-Type", "application/octet-stream")
+	return mimetype, size, lastsize
+
 class EndpointRedirects(Dispatcher):
 
 	def __call__(self, path):
@@ -240,7 +251,7 @@ def error_handler(exc=None):
 		status = 418
 	elif isinstance(exc, ConnectionError) or isinstance(exc, type) and issubclass(exc, ConnectionError) and exc.args and isinstance(exc.args[0], int):
 		status = exc.args[0]
-	elif isinstance(exc, requests.exceptions.HTTPError):
+	elif isinstance(exc, niquests.exceptions.HTTPError):
 		status = exc.response.status_code
 	else:
 		status = error_map.get(exc) or error_map.get(exc.__class__) or 500
@@ -395,7 +406,7 @@ def true_ip(request=None):
 
 class Server:
 
-	session = requests.Session()
+	session = niquests.Session()
 
 	@cp.expose(("0",))
 	def rickroll(self, *void1, **void2):
@@ -431,7 +442,7 @@ class Server:
 	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
 		for i in range(retries):
 			try:
-				session = niquests if url.startswith("https://") and i == 0 else self.session
+				session = self.session if url.startswith("https://") and not is_discord_attachment(url) and i == 0 else requests
 				resp = session.get(url, headers=headers, data=data, verify=i <= 1, timeout=timeout + i ** 2)
 				resp.raise_for_status()
 			except Exception:
@@ -501,122 +512,126 @@ class Server:
 		return self.dyn_serve(list(info.chunks), size=info.size, head=cdict(data=data, index=i + length), callback=callback)
 	download._cp_config = {"response.stream": True}
 
-	@tracebacksuppressor
 	def dyn_serve(self, urls, size=0, head=None, callback=None):
-		brange = cp.request.headers.get("Range", "").removeprefix("bytes=")
-		headers = fcdict(cp.request.headers)
-		headers.pop("Remote-Addr", None)
-		headers.pop("Host", None)
-		headers.pop("Range", None)
-		update_headers(headers, **Request.header())
-		ranges = []
-		length = 0
-		if brange:
-			try:
-				branges = brange.split(",")
-				for s in branges:
-					start, end = s.split("-", 1)
-					if not start:
-						if not end:
-							continue
-						start = size - int(end)
-						end = size - 1
-					elif not end:
-						end = size - 1
-					start = int(start)
-					end = int(end) + 1
-					length += end - start
-					ranges.append((start, end))
-			except Exception:
-				pass
-		if ranges:
-			cp.response.status = 206
-		else:
-			cp.response.status = 200
-			ranges.append((0, size))
-			length = size
-		if not size:
-			size = "*"
-		cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size}" for start, end in ranges)
-		cp.response.headers["Content-Range"] = cr
-		cp.response.headers["Content-Length"] = str(length)
-		cp.response.headers["Accept-Ranges"] = "bytes"
-		return self._dyn_serve(urls, ranges, headers, head=head, callback=callback)
+		with tracebacksuppressor:
+			brange = cp.request.headers.get("Range", "").removeprefix("bytes=")
+			headers = fcdict(cp.request.headers)
+			headers.pop("Content-Length", None)
+			headers.pop("Content-Type", None)
+			headers.pop("Remote-Addr", None)
+			headers.pop("Host", None)
+			headers.pop("Range", None)
+			update_headers(headers, **Request.header())
+			ranges = []
+			length = 0
+			if brange:
+				try:
+					branges = brange.split(",")
+					for s in branges:
+						start, end = s.split("-", 1)
+						if not start:
+							if not end:
+								continue
+							start = size - int(end)
+							end = size - 1
+						elif not end:
+							end = size - 1
+						start = int(start)
+						end = int(end) + 1
+						length += end - start
+						ranges.append((start, end))
+				except Exception:
+					pass
+			if ranges:
+				cp.response.status = 206
+			else:
+				cp.response.status = 200
+				ranges.append((0, size))
+				length = size
+			if not size:
+				size = "*"
+			cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size}" for start, end in ranges)
+			cp.response.headers["Content-Range"] = cr
+			if ranges == [(0, size)]:
+				cp.response.headers["Content-Length"] = str(length)
+			cp.response.headers["Accept-Ranges"] = "bytes"
+			print(brange, ranges)
+			return self._dyn_serve(urls, ranges, headers, head=head, callback=callback)
 
-	@tracebacksuppressor(GeneratorExit)
 	def _dyn_serve(self, urls, ranges, headers, head=None, callback=None):
-		if head:
-			data = head.data[head.index:]
-			urls.insert(0, bytes(data))
-			if callback:
-				callback(head.data)
-		for i, (start, end) in enumerate(ranges):
-			pos = 0
-			rems = urls.copy()
-			futs = []
-			big = False
-			while rems:
-				u = rems.pop(0)
-				if isinstance(u, byte_like):
-					ns = len(u)
-				elif "?size=" in u or "&size=" in u:
-					u, ns = u.replace("?size=", "&size=").split("&size=", 1)
-					ns = int(ns)
-				elif "?S=" in u or "&S=" in u:
-					u, ns = u.replace("?S=", "&S=").split("&S=", 1)
-					ns = int(ns)
-				elif u.startswith("https://s3-us-west-2"):
-					ns = 503316480
-				elif u.startswith("https://cdn.discord"):
-					ns = 8388608
-				else:
-					resp = niquests.head(u, headers=headers, timeout=3)
-					ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
-				if pos + ns <= start:
-					pos += ns
-					continue
-				if pos >= end:
-					break
-
-				def get_chunk(u, h, start, end, pos, ns, big):
-					s = start - pos
-					e = end - pos
-					if isinstance(u, byte_like):
-						yield u[s:e]
-						return
-					if is_miza_attachment(u) and (path := u.split("?", 1)[0].split("/u/", 1)[-1]) and len(path.split("/")) == 2 and path.count("~") == 0:
-						c_id, m_id, a_id, fn = decode_attachment(path)
-						u = await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn))
-					print(u)
-					if e >= ns:
-						e = ""
-					else:
-						e -= 1
-					h2 = dict(h.items())
-					h2["range"] = f"bytes={s}-{e}"
-					resp = self.get_with_retries(u, headers=h2, timeout=3)
-					if resp.status_code != 206:
-						ms = min(ns, end - pos - s)
-						if len(resp.content) > ms:
-							yield resp.content[s:(e or len(resp.content))]
-							return
-						yield resp.content
-						return
-					if big:
-						yield from resp.iter_content(1048576)
-						return
-					yield from resp.iter_content(262144)
-
-				if len(futs) > i + 1:
-					yield from futs.pop(0).result()
-				fut = esubmit(get_chunk, u, headers, start, end, pos, ns, big)
-				futs.append(fut)
+		with tracebacksuppressor(GeneratorExit):
+			if head:
+				data = head.data[head.index:]
+				urls.insert(0, bytes(data))
+				if callback:
+					callback(head.data)
+			for i, (start, end) in enumerate(ranges):
 				pos = 0
-				start = 0
-				end -= start + ns
-				big = True
-			for fut in futs:
-				yield from fut.result()
+				rems = urls.copy()
+				futs = []
+				big = False
+				while rems:
+					u = rems.pop(0)
+					if isinstance(u, byte_like):
+						ns = len(u)
+					elif "?size=" in u or "&size=" in u:
+						u, ns = u.replace("?size=", "&size=").split("&size=", 1)
+						ns = int(ns)
+					elif "?S=" in u or "&S=" in u:
+						u, ns = u.replace("?S=", "&S=").split("&S=", 1)
+						ns = int(ns)
+					elif u.startswith("https://s3-us-west-2"):
+						ns = 503316480
+					elif u.startswith("https://cdn.discord"):
+						ns = 8388608
+					else:
+						resp = requests.head(u, timeout=3)
+						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
+					if pos + ns <= start:
+						pos += ns
+						continue
+					if pos >= end:
+						break
+
+					def get_chunk(u, h, start, end, pos, ns, big):
+						s = start - pos
+						e = end - pos
+						if isinstance(u, byte_like):
+							yield u[s:e]
+							return
+						if is_miza_attachment(u) and (path := u.split("?", 1)[0].split("/u/", 1)[-1]) and len(path.split("/")) == 2 and path.count("~") == 0:
+							c_id, m_id, a_id, fn = decode_attachment(path)
+							u = await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn))
+						print(u)
+						if e >= ns:
+							e = ""
+						else:
+							e -= 1
+						h2 = dict(h.items())
+						h2["range"] = f"bytes={s}-{e}"
+						resp = self.get_with_retries(u, headers=h2, timeout=3)
+						if resp.status_code != 206:
+							ms = min(ns, end - pos - s)
+							if len(resp.content) > ms:
+								yield resp.content[s:(e or len(resp.content))]
+								return
+							yield resp.content
+							return
+						if big:
+							yield from resp.iter_content(262144)
+							return
+						yield from resp.iter_content(49152)
+
+					if len(futs) > i + 1:
+						yield from futs.pop(0).result()
+					fut = esubmit(get_chunk, u, headers, start, end, pos, ns, big)
+					futs.append(fut)
+					pos = 0
+					start = 0
+					end -= start + ns
+					big = True
+				for fut in futs:
+					yield from fut.result()
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
@@ -747,6 +762,17 @@ class Server:
 		info = cdict(orjson.loads(encoded))
 		return str(info)
 
+	@cp.expose(("c",))
+	def chunked_proxy(self, path, *void):
+		with tracebacksuppressor:
+			fut = csubmit(attachment_cache.obtains(path))
+			urls, chunksize = await_fut(fut)
+			mimetype, size, lastsize = get_size_mime(urls[0], urls[-1], len(urls), chunksize)
+			cp.response.headers["Content-Type"] = mimetype
+			new_urls = [f"{url}&S={lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
+			return self.dyn_serve(new_urls, size)
+	chunked_proxy._cp_config = {"response.stream": True}
+
 	@cp.expose(("u",))
 	def unproxy(self, *path, url=None, **query):
 		if url:
@@ -800,7 +826,7 @@ class Server:
 				return True
 			if cp.request.headers.get("X-Real-Ip", "")[:3] in ("34.", "35."):
 				return True
-			if cp.request.headers.get("Sec-Fetch-Dest", "").casefold() == "document" and url.split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[-1] not in ("png", "gif", "webp", "jpg", "jpeg", "heic", "heif", "avif"):
+			if cp.request.headers.get("Sec-Fetch-Dest", "").casefold() == "document" and url.split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[-1] not in ("zip", "7z", "tar", "bin", "png", "gif", "webp", "jpg", "jpeg", "heic", "heif", "avif"):
 				return True
 			if (mode := cp.request.headers.get("Sec-Fetch-Mode")):
 				return mode.casefold() not in ("cors", "navigate") or cp.request.headers.get("Sec-Fetch-Site", "").casefold() not in ("none", "cross-site")
@@ -983,7 +1009,7 @@ class Server:
 				url2 = API + "/u?url=" + url_parse(url)
 			else:
 				url2 = API + "/ytdl?d=" + url_parse(url)
-			with niquests.get(url2, timeout=1800, stream=True) as resp:
+			with self.session.get(url2, timeout=1800, stream=True) as resp:
 				resp.raise_for_status()
 				with open(fn, "wb") as f:
 					shutil.copyfileobj(resp.raw, f, 65536)
@@ -1019,7 +1045,7 @@ class Server:
 		self.ecdc_running[out] = Future()
 		try:
 			fn = temporary_file("ecdc")
-			with niquests.get(url, timeout=1800, stream=True) as resp:
+			with self.session.get(url, timeout=1800, stream=True) as resp:
 				with open(fn, "wb") as f:
 					shutil.copyfileobj(resp.raw, f, 65536)
 			out = interface.run(f"VOICE.ecdc_decode({repr(fn)},{repr(out)})")

@@ -1154,7 +1154,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 					for m in kwa["messages"]:
 						m2 = None
 						if m.get("name"):
-							if not oai_name.search(m.name):
+							if 1 or not oai_name.search(m.name):
 								m2 = cdict(m)
 								name = m2.pop("name")
 								name2 = name.replace(" ", "-")
@@ -1402,7 +1402,7 @@ f_recall = {
 f_txt2img = {
 	"type": "function", "function": {
 		"name": "txt2img",
-		"description": "Generates an image of the input caption, only use when asked to draw a picture. Please be descriptive!",
+		"description": "Generates an image of the input description, only use when asked to draw a picture. Please make it elaborate where possible!",
 		"parameters": {
 			"type": "object", "properties": {
 				"prompt": {
@@ -1508,7 +1508,7 @@ f_askip = {
 f_default = {
 	"type": "function", "function": {
 		"name": "directly_answer",
-		"description": "Indicates that you are preparing to draft up a text response. If no other tool is necessary, you MUST use this tool",
+		"description": "Indicates that you are preparing to draft up a text-only response to the user. You should use other tools first as required, but you MUST use this tool if none is necessary.",
 		"parameters": {
 			"type": "object", "properties": {
 				"format": {

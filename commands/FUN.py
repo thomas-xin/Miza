@@ -2894,7 +2894,7 @@ class _8Ball(ImagePool, Command):
 	database = "8ball"
 	rate_limit = (0.5, 3)
 
-	async def __call__(self, channel, embed, **void):
+	async def __call__(self, embed, **void):
 		e_id = choice(
 			"Absolutely",
 			"Ask_Again",
@@ -2922,7 +2922,7 @@ class XKCD(ImagePool, Command):
 	rate_limit = (0.5, 3)
 
 	async def fetch_one(self):
-		s = await asubmit(Request, "https://c.xkcd.com/random/comic")
+		s = await Request("https://c.xkcd.com/random/comic", aio=True)
 		search = b"Image URL (for hotlinking/embedding): "
 		s = s[s.index(search) + len(search):]
 		url = s[:s.index(b"<")].strip()

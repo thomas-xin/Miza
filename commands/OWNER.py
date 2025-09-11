@@ -796,7 +796,8 @@ class UpdateExec(Database):
 		print("Deleted", deleted)
 		return deleted
 
-	async def get_lfs_channel(self, size=50 * 1048576):
+	DEFAULT_LIMIT = 48 * 1048576
+	async def get_lfs_channel(self, size=DEFAULT_LIMIT):
 		bot = self.bot
 		log_channels = set(getattr(c, "parent", c) for c in list(filter(bool, (bot.get_channel(cid) for cid in bot.data.logM.values()))) + list(filter(bool, (bot.get_channel(cid) for cid in bot.data.logU.values()))) if c.guild.filesize_limit >= size and bot.permissions_in(c).create_private_threads and bot.permissions_in(c).embed_links)
 		log_channels2 = [c for c in log_channels if bot.owners[0] in c.guild._members and c.permissions_for(c.guild.get_member(bot.owners[0])).read_messages]
@@ -806,11 +807,44 @@ class UpdateExec(Database):
 			for thread in channel.threads:
 				if thread.owner_id == bot.id:
 					return thread
-			async for thread in channel.archived_threads():
+			async for thread in channel.archived_threads(private=True):
 				if thread.owner_id == bot.id:
 					return thread
 			return await channel.create_thread(name="backup")
 		raise NotImplementedError(size)
+
+	async def mproxy(self, b, fn, channel):
+		bot = self.bot
+		b = MemoryBytes(b)
+		groups = []
+		chunksize = self.DEFAULT_LIMIT
+		for start in range(0, len(b), chunksize):
+			if not groups or len(groups[-1]) >= 10:
+				groups.append([])
+			chunk = b[start:start + chunksize]
+			groups[-1].append(chunk)
+		ofn = fn
+		n = 0
+		m_ids = []
+		for group in groups:
+			files = []
+			embeds = []
+			for chunk in group:
+				file = CompatFile(bytes(chunk), filename=fn)
+				member = choice(channel.guild.members)
+				try:
+					thumb = member.avatar.url
+				except Exception:
+					thumb = bot.discord_icon
+				embed = discord.Embed(colour=rand_colour()).set_author(name=member.name, icon_url=f"attachment://{fn}").set_thumbnail(url=thumb)
+				files.append(file)
+				embeds.append(embed)
+				fn = str(n)
+				n += 1
+			message = await channel.send(files=files, embeds=embeds)
+			assert len(message.embeds) == len(group), message.id
+			m_ids.append(message.id)
+		return f"https://mizabot.xyz/c/{group_attachments(chunksize // 1048576, channel.id, m_ids)}/{ofn}"
 
 	async def lproxy(self, url, filename=None, channel=None):
 		bot = self.bot
@@ -821,8 +855,8 @@ class UpdateExec(Database):
 			fn = filetransd(filename or url2fn(url))
 			b = await bot.get_request(url)
 		elif isinstance(url, str):
-			fn = filetransd(filename or url)
-			with open(fn, "rb") as f:
+			fn = filetransd((filename or url).replace("\\", "/").rsplit("/", 1)[-1])
+			with open(url, "rb") as f:
 				b = await asubmit(f.read)
 		else:
 			fn = filetransd(filename or getattr(url, "name", None) or "c.b")
@@ -830,7 +864,14 @@ class UpdateExec(Database):
 				b = await asubmit(url.read)
 		if len(b) < attachment_cache.max_size:
 			return await attachment_cache.create(b, filename=fn, channel=channel)
-		channel = await self.get_lfs_channel(len(b))
+		try:
+			channel = await self.get_lfs_channel(len(b))
+		except NotImplementedError:
+			channel = await self.get_lfs_channel()
+			if bot.owners.intersection(channel.guild._members) and none(m.id in bot.owners for m in channel.members):
+				with tracebacksuppressor:
+					await channel.add_user(bot.get_user(bot.owners[0]))
+			return await self.mproxy(b, fn, channel)
 		if bot.owners.intersection(channel.guild._members) and none(m.id in bot.owners for m in channel.members):
 			with tracebacksuppressor:
 				await channel.add_user(bot.get_user(bot.owners[0]))
@@ -1596,6 +1637,7 @@ class UpdateGuilds(Database):
 			if guild.id not in cm.get("rids", ()):
 				r = guild._roles.get(guild.id) or discord.Role(guild=guild, state=T(bot).get("_state"), data=dict(id=guild.id, name="@everyone"))
 				m.roles.append(r)
+			m._roles = discord.utils.SnowflakeList([r.id for r in m.roles if r.id != guild.id])
 			m.bot = cm.get("bot", False)
 			m._avatar = T(cm).get("_a")
 			if T(cm).get("tou"):

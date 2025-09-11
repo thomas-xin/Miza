@@ -1200,8 +1200,9 @@ class Reminder(Command):
 			out += f"announcement for {sqr_md(sendable)}"
 		else:
 			out += f"reminder for {sqr_md(sendable)}"
+		out += f" at {sqr_md(time)}"
 		if every:
-			out += f" every {sqr_md(sec2time(every.total_seconds()))}"
+			out += f", every {sqr_md(sec2time(every.total_seconds()))}"
 		out += ":```"
 		if time:
 			out += time.as_discord() + " (" + time.as_rel_discord() + ")"
@@ -1252,8 +1253,10 @@ class Reminder(Command):
 		else:
 			t = DynamicDT.utcnow()
 			def format_reminder(x):
-				remaining = x.t - t
-				s = lim_str(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + no_md(x.msg), 96) + "` ➡️ `" + remaining.to_short() + "`"
+				delta = x.t.as_rel_discord()
+				if delta.startswith("`"):
+					delta = "`" + (x.t - t).to_short() + "`"
+				s = lim_str(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + no_md(x.msg), 96) + f"` ➡️ {delta}"
 				if x.get("e"):
 					every = x.e.to_short()
 					s += f", every `{every}`"
@@ -1394,53 +1397,53 @@ class UpdateUrgentReminders(Database):
 			self.data["listed"]
 		except KeyError:
 			self.data["listed"] = alist()
-		csubmit(self.update_urgents())
+		# csubmit(self.update_urgents())
 
-	async def update_urgents(self):
-		while self.db is not None:
-			t = utc()
-			listed = self.data["listed"]
-			with tracebacksuppressor:
-				while listed:
-					p = listed[0]
-					if t < p[0]:
-						break
-					with suppress(StopIteration):
-						listed.popleft()
-						c_id = p[1]
-						m_id = p[2]
-						emb = p[3]
-						if len(p) < 4:
-							p.append(60)
-						i = 0
-						while p[0] < utc() + 1 and i < 4096:
-							p[0] += p[4]
-							i += 1
-						p[0] = max(utc() + 1, p[0])
-						channel = await self.bot.fetch_messageable(c_id)
-						message = await bot.fetch_message(m_id, channel)
-						message = await bot.ensure_reactions(message)
-						for react in message.reactions:
-							if str(react) == "✅":
-								if react.count > 1:
+	async def __call__(self, **void):
+		if self.db is None:
+			return
+		t = utc()
+		listed = self.data["listed"]
+		with tracebacksuppressor:
+			while listed:
+				p = listed[0]
+				if t < p[0]:
+					break
+				with suppress(StopIteration):
+					listed.popleft()
+					c_id = p[1]
+					m_id = p[2]
+					emb = p[3]
+					if len(p) < 4:
+						p.append(60)
+					i = 0
+					while p[0] < utc() + 1 and i < 4096:
+						p[0] += p[4]
+						i += 1
+					p[0] = max(utc() + 1, p[0])
+					channel = await self.bot.fetch_messageable(c_id)
+					message = await bot.fetch_message(m_id, channel)
+					message = await bot.ensure_reactions(message)
+					for react in message.reactions:
+						if str(react) == "✅":
+							if react.count > 1:
+								raise StopIteration
+							async for u in react.users():
+								if u.id != self.bot.id:
 									raise StopIteration
-								async for u in react.users():
-									if u.id != self.bot.id:
-										raise StopIteration
-						reference = None
-						content = None
-						if len(p) > 5 and p[5]:
-							content = p[5]
-						if len(p) > 6 and p[6]:
-							reference = await self.fetch_message(p[6], channel)
-						fut = csubmit(channel.send(content, embed=emb, reference=reference))
-						await self.bot.silent_delete(message)
-						message = await fut
-						await message.add_reaction("✅")
-						p[2] = message.id
-						listed.insort(p, key=lambda x: x[:3])
-			self.data["listed"] = listed
-			await asyncio.sleep(1)
+					reference = None
+					content = None
+					if len(p) > 5 and p[5]:
+						content = p[5]
+					if len(p) > 6 and p[6]:
+						reference = await self.fetch_message(p[6], channel)
+					fut = csubmit(channel.send(content, embed=emb, reference=reference))
+					await self.bot.silent_delete(message)
+					message = await fut
+					await message.add_reaction("✅")
+					p[2] = message.id
+					listed.insort(p, key=lambda x: x[:3])
+		self.data["listed"] = listed
 
 
 # This database is such a hassle to manage, it has to be able to persist between bot restarts, and has to be able to update with O(1) time complexity when idle
@@ -1510,6 +1513,7 @@ class UpdateReminders(Database):
 			else:
 				# Insert next listed item into schedule
 				self.listed.insort((temp[0].t if isinstance(temp[0].t, number) else temp[0].t.timestamp_exact(), u_id), key=lambda x: x[0])
+				self[u_id] = temp
 			# print(self.listed)
 			# Send reminder to target user/channel
 			ch = await self.bot.fetch_messageable(u_id)
@@ -1752,6 +1756,9 @@ class UpdateUsers(Database):
 			factor = ceil(interval / self.interval)
 			out = [np.sum(out[i:i + factor]) for i in range(0, len(out), factor)]
 		return out
+
+	def any_timezone(self, u_id):
+		return self.get_timezone(u_id) or self.estimate_timezone(u_id)[0]
 
 	def get_timezone(self, u_id):
 		timezone = self.data.get(u_id, EMPTY).get("timezone")

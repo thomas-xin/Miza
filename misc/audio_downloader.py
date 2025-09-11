@@ -920,7 +920,7 @@ class AudioDownloader:
 		# return out
 	def bcsearch(self, query, count=1):
 		query = "https://bandcamp.com/search?q=" + quote_plus(query) + "&item_type=t"
-		content = niquests.get(query, headers=Request.header(), timeout=20).content
+		content = self.session.get(query, headers=Request.header(), timeout=20).content
 		out = alist()
 		try:
 			content = content.split(b'<ul class="result-items">', 1)[1]
@@ -992,7 +992,7 @@ class AudioDownloader:
 		"""Handles special audio formats unsupported by FFmpeg, such as spotify URLs, spectrogram images, as well as ecdc, org, and midi files."""
 		if is_spotify_url(url):
 			return self.handle_spotify(entry, url, fn)
-		with niquests.get(url, headers=Request.header(), verify=False, stream=True) as resp:
+		with self.session.get(url, headers=Request.header(), verify=False, stream=True) as resp:
 			head = resp.headers
 			ct = head.get("Content-Type", "").split(";", 1)[0]
 			b = b""

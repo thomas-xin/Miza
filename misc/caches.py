@@ -13,9 +13,9 @@ from misc.asyncs import esubmit, wrap_future, Future
 from misc.util import (
     retrieve_from, CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, uuhash,
-    snowflake_time_2, shorten_attachment, merge_url, split_url, discord_expired, url2fn
+	group_attachments, ungroup_attachments,
+    snowflake_time_2, shorten_attachment, merge_url, split_url, discord_expired, url2fn,
 )
-session = niquests.AsyncSession()
 
 def has_transparency(image):
 	assert image.mode == "P", "Expected a palette image."
@@ -273,6 +273,32 @@ class AttachmentCache(diskcache.Cache):
 		except AssertionError:
 			resp = await self.get_attachment(c_id, m_id, a_id, fn)
 			self[key] = resp
+		return resp
+
+	async def get_attachments(self, path):
+		size_mb, c_id, m_ids = ungroup_attachments(path)
+		urls = []
+		for m_id in m_ids:
+			data = await Request(
+				f"https://discord.com/api/{api}/channels/{c_id}/messages/{m_id}",
+				headers=self.headers,
+				bypass=False,
+				aio=True,
+				json=True,
+			)
+			for e in data["embeds"]:
+				urls.append(e["author"]["icon_url"])
+		return urls, size_mb * 1048576
+
+	async def obtains(self, path):
+		try:
+			resp = self[path]
+			assert isinstance(resp, tuple) and not discord_expired(resp[0][0], 43200 - 60)
+		except KeyError:
+			resp = await retrieve_from(self, path, self.get_attachments, path)
+		except AssertionError:
+			resp = await self.get_attachments(path)
+			self[path] = resp
 		return resp
 
 	async def delete(self, c_id, m_id, url=None):

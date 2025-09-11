@@ -1,5 +1,6 @@
 import base64
 import datetime
+import functools
 import json
 import logging
 import os
@@ -14,7 +15,7 @@ import orjson
 import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut, gather
 from .types import resume, cdict, fcdict, json_dumps, byte_like, utc, RangeSet, MemoryBytes
-from .util import AUTH, tracebacksuppressor, magic, shash, decrypt, zip2bytes, bytes2zip, enc_box, save_auth, decode_attachment, expand_attachment, shorten_attachment, is_discord_attachment, is_miza_attachment, discord_expired, url2fn, p2n, byte_scale, leb128, decode_leb128, seq, MIMES, Request, reqs, DOMAIN_CERT, PRIVATE_KEY, update_headers
+from .util import AUTH, tracebacksuppressor, magic, shash, decrypt, zip2bytes, bytes2zip, enc_box, save_auth, decode_attachment, expand_attachment, shorten_attachment, is_discord_attachment, is_miza_attachment, discord_expired, url2fn, p2n, byte_scale, leb128, decode_leb128, seq, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY, update_headers
 from .caches import attachment_cache, upload_cache, download_cache
 
 interface = None
@@ -94,6 +95,16 @@ def true_ip(request=None):
 	cp.serving.request.remote.ip = request.remote.ip = ip
 	return ip
 
+@functools.lru_cache(maxsize=256)
+def get_size_mime(head, tail, count, chunksize):
+	fut = esubmit(requests.head, head)
+	resp = requests.head(tail)
+	lastsize = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
+	size = chunksize * (count - 1) + lastsize
+	resp = fut.result()
+	mimetype = resp.headers.get("Content-Type", "application/octet-stream")
+	return mimetype, size, lastsize
+
 
 class Server:
 
@@ -107,7 +118,7 @@ class Server:
 			state = json.load(f)
 	else:
 		state = {"/": f"https://api.mizabot.xyz:{webserver_port}"}
-	session = requests.Session()
+	session = niquests.Session()
 
 	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
 	def index(self, path=None, filename=None, *args, code=None, **kwargs):
@@ -245,7 +256,7 @@ class Server:
 	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
 		for i in range(retries):
 			try:
-				session = niquests if url.startswith("https://") and i == 0 else self.session
+				session = self.session if url.startswith("https://") and i == 0 else requests
 				resp = session.get(url, headers=headers, data=data, verify=i <= 1, timeout=timeout + i ** 2)
 				resp.raise_for_status()
 			except Exception:
@@ -384,7 +395,7 @@ class Server:
 				elif u.startswith("https://cdn.discord"):
 					ns = 8388608
 				else:
-					resp = niquests.head(u, headers=headers, timeout=3)
+					resp = requests.head(u, timeout=3)
 					ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 				if pos + ns <= start:
 					pos += ns
@@ -534,6 +545,17 @@ class Server:
 			futs.append(fut)
 		await_fut(gather(*futs))
 
+	@cp.expose(("c",))
+	def chunked_proxy(self, path, *void):
+		with tracebacksuppressor:
+			fut = csubmit(attachment_cache.obtains(path))
+			urls, chunksize = await_fut(fut)
+			mimetype, size, lastsize = get_size_mime(urls[0], urls[-1], len(urls), chunksize)
+			cp.response.headers["Content-Type"] = mimetype
+			new_urls = [f"{url}&S={lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
+			return self.dyn_serve(new_urls, size)
+	chunked_proxy._cp_config = {"response.stream": True}
+
 	@cp.expose(("u",))
 	def unproxy(self, *path, url=None, **query):
 		if url:
@@ -587,7 +609,7 @@ class Server:
 				return True
 			if cp.request.headers.get("X-Real-Ip", "")[:3] in ("34.", "35."):
 				return True
-			if cp.request.headers.get("Sec-Fetch-Dest", "").casefold() == "document" and url.split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[-1] not in ("png", "gif", "webp", "jpg", "jpeg", "heic", "heif", "avif"):
+			if cp.request.headers.get("Sec-Fetch-Dest", "").casefold() == "document" and url.split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[-1] not in ("zip", "7z", "tar", "bin", "png", "gif", "webp", "jpg", "jpeg", "heic", "heif", "avif"):
 				return True
 			if (mode := cp.request.headers.get("Sec-Fetch-Mode")):
 				return mode.casefold() not in ("cors", "navigate") or cp.request.headers.get("Sec-Fetch-Site", "").casefold() not in ("none", "cross-site")

@@ -672,16 +672,15 @@ class UpdateSkyShardReminders(Database):
 			embed.add_field(name="Location", value=location, inline=True)
 			embed.add_field(name="Reward", value=reward, inline=True)
 			embed.add_field(name="Landings", value=landings, inline=False)
-			for k, v in tuple(self.items()):
-				if not k:
-					continue
-				if not v.subscription & shard_bits:
-					continue
+
+			async def notify_user(k, v):
 				try:
 					user = await bot.fetch_user(k)
-				except Exception:
+				except Exception as ex:
 					print_exc()
-					self.pop(k)
+					if isinstance(ex, (LookupError, discord.NotFound)):
+						self.pop(k)
+					return
 				message = None
 				pinged_occurrences = all_occurrences.copy() if v.get("ping", True) else []
 				ping = ping2
@@ -695,7 +694,7 @@ class UpdateSkyShardReminders(Database):
 						message = await bot.ensure_reactions(message)
 					except Exception:
 						print_exc()
-						continue
+						return
 					else:
 						if message.embeds and message.embeds[0].footer.text and occurrence_number not in (pinged_occurrences := self.parse_pings(message.embeds[0].footer.text)):
 							ping = False
@@ -710,6 +709,16 @@ class UpdateSkyShardReminders(Database):
 					print(f"SkyShard {occurrence_number}: Edited @", user)
 				v.reminded[shard_hash] = message.id
 				self[k] = v
+
+			futs = []
+			for k, v in tuple(self.items()):
+				if not k:
+					continue
+				if not v.subscription & shard_bits:
+					continue
+				fut = csubmit(notify_user(k, v))
+				futs.append(fut)
+			await gather(*futs)
 
 
 def load_douclub():
