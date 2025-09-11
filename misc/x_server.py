@@ -550,10 +550,11 @@ class Server:
 				length = size
 			if not size:
 				size = "*"
-			cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size}" for start, end in ranges)
-			cp.response.headers["Content-Range"] = cr
 			if ranges == [(0, size)]:
 				cp.response.headers["Content-Length"] = str(length)
+			if brange:
+				cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size}" for start, end in ranges)
+				cp.response.headers["Content-Range"] = cr
 			cp.response.headers["Accept-Ranges"] = "bytes"
 			print(brange, ranges)
 			return self._dyn_serve(urls, ranges, headers, head=head, callback=callback)
