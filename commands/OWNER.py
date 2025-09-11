@@ -819,13 +819,14 @@ class UpdateExec(Database):
 		groups = []
 		chunksize = self.DEFAULT_LIMIT
 		for start in range(0, len(b), chunksize):
-			if not groups or len(groups[-1]) >= 10:
+			if not groups or len(groups[-1]) >= min(10, max(1, int(sqrt(len(b) / chunksize)))):
 				groups.append([])
 			chunk = b[start:start + chunksize]
 			groups[-1].append(chunk)
 		ofn = fn
 		n = 0
 		m_ids = []
+		futs = []
 		for group in groups:
 			files = []
 			embeds = []
@@ -841,7 +842,9 @@ class UpdateExec(Database):
 				embeds.append(embed)
 				fn = str(n)
 				n += 1
-			message = await channel.send(files=files, embeds=embeds)
+			futs.append(csubmit(channel.send(files=files, embeds=embeds)))
+		for fut in futs:
+			message = await fut
 			assert len(message.embeds) == len(group), message.id
 			m_ids.append(message.id)
 		return f"https://mizabot.xyz/c/{group_attachments(chunksize // 1048576, channel.id, m_ids)}/{ofn}"

@@ -1563,7 +1563,7 @@ def n2b(n):
 def leb128(n):
 	"Encodes an integer using LEB128."
 	data = bytearray()
-	while n:
+	while n > 0:
 		data.append(n & 127)
 		n >>= 7
 		if n:
@@ -1753,7 +1753,7 @@ def group_attachments(size_mb, c_id, m_ids):
 	i = c_id
 	b = leb128(size_mb) + leb128(i)
 	for m in m_ids:
-		m, i = m - i, m
+		m, i = m ^ i, m
 		b += leb128(m)
 	return e64(b).decode("ascii")
 
@@ -1764,7 +1764,7 @@ def ungroup_attachments(b):
 	ids = [i]
 	while b:
 		m, b = decode_leb128(b)
-		i += m
+		i ^= m
 		ids.append(i)
 	return size_mb, ids.pop(0), ids
 
