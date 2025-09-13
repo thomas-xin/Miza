@@ -63,6 +63,8 @@ config = {
 if os.path.exists(DOMAIN_CERT) and os.path.exists(PRIVATE_KEY):
 	config["global"]["server.ssl_certificate"] = DOMAIN_CERT
 	config["global"]["server.ssl_private_key"] = PRIVATE_KEY
+else:
+	print("WARNING: SSL keys not found!")
 if AUTH:
 	discord_secret = AUTH.get("discord_secret") or ""
 	webserver_port = AUTH.get("webserver_port") or "9801"

@@ -555,7 +555,7 @@ class UpdateExec(Database):
 							b = b[:4194304] + b[-4194304:]
 						csubmit(self.logto(channel, CompatFile(b, filename="message.txt")))
 					else:
-						self.bot.send_as_embeds(channel, msg, md=code_md, bottleneck=True)
+						self.bot.send_as_embeds(channel, msg, md=ansi_md, bottleneck=True)
 			if self.bot.ready:
 				[self.data.pop(i) for i in invalid]
 
