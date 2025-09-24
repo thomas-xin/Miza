@@ -1249,6 +1249,12 @@ class Server:
 		update_headers(cp.response.headers, **HEADERS)
 		raise IsADirectoryError("I'm a teapot.")
 
+	@cp.expose
+	def status(self):
+		cp.response.headers.update(SHEADERS)
+		cp.response.headers["Content-Type"] = "application/json"
+		return orjson.dumps(interface.run("bot.status()"))
+
 	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
 	def index(self, path=None, filename=None, *args, code=None, **kwargs):
 		url = HOST + "/" + cp.url(qs=cp.request.query_string).rstrip("/").split("//", 1)[-1].split("/", 1)[-1]

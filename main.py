@@ -1,7 +1,7 @@
 # ruff: noqa: E402
-import sys
 import subprocess
 import os
+os.environ["PYTHONUTF8"] = "1"
 import json
 
 
@@ -64,7 +64,7 @@ import time
 import datetime
 import pathlib
 import psutil
-ffmpeg = "./ffmpeg"
+ffmpeg = "ffmpeg"
 print("Verifying FFmpeg installation...")
 
 if os.name == "nt":
@@ -87,7 +87,7 @@ if os.name == "nt":
 		print(f"FFmpeg version {s} found; skipping installation...")
 	except FileNotFoundError:
 		print("Downloading new FFmpeg...")
-		args = [sys.executable, "downloader.py", "-threads", "32", "https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z", "../cache/ffmpeg.7z"]
+		args = ["streamshatter", "https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-full.7z", "../cache/ffmpeg.7z"]
 		print(args)
 		subprocess.run(args, cwd="misc")
 		print("Download complete; extracting new FFmpeg installation...")
@@ -103,7 +103,9 @@ if os.name == "nt":
 			os.mkdir("misc/poppler")
 		except FileExistsError:
 			pass
-		subprocess.run([sys.executable, "downloader.py", "-threads", "32", "https://cdn.discordapp.com/attachments/1091275350740320258/1107280656347705404/poppler.zip", "../cache/poppler.zip"], cwd="misc")
+		args = ["streamshatter", "https://mizabot.xyz/u/7NDWx1MC20QyUS02kWSgGyWGQEQ/poppler.zip", "../cache/poppler.zip"]
+		print(args)
+		subprocess.run(args, cwd="misc")
 		import zipfile
 		f = "cache/poppler.zip"
 		print("Download complete; extracting new Poppler installation...")
@@ -117,7 +119,8 @@ else:
 		subprocess.run(ffmpeg)
 	except FileNotFoundError:
 		print("Downloading FFmpeg...")
-		subprocess.run(("wget", "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"))
+		args = ["streamshatter", "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz", "ffmpeg-release-amd64-static.tar.xz"]
+		subprocess.run(args)
 		print("Download complete; extracting new FFmpeg installation...")
 		os.mkdir(".temp")
 		subprocess.run(("tar", "-xf", "ffmpeg-release-amd64-static.tar.xz", "-C", ".temp"))
@@ -143,7 +146,7 @@ rs = "restart.tmp"
 hb = "heartbeat.tmp"
 
 hbp = pathlib.Path(hb)
-def check_hb(timeout=16):
+def check_hb(timeout=20):
     if not hbp.exists():
         return
     mtime = hbp.stat().st_mtime

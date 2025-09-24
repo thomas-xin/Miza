@@ -18,6 +18,7 @@ from math import ceil, comb, inf, isfinite, isqrt, log10
 import multiprocessing.connection
 import multiprocessing.shared_memory
 import os
+os.environ["PYTHONUTF8"] = "1"
 import pickle
 import psutil
 import random
@@ -98,6 +99,15 @@ if PORT:
 IND = "\x7f"
 
 compat_python = AUTH.get("compat_python") or python
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0 AppleWebKit/537.36 Chrome/134.0.0.0 Safari/537.36 Edg/134.0.3124.85"
+
+@tracebacksuppressor
+def save_file(data, fn):
+	if isinstance(data, byte_like):
+		data = io.BytesIO(data)
+	with open(fn, "wb") as f:
+		shutil.copyfileobj(data, f)
+		print("SF:", f.tell())
 
 _globals = globals()
 def save_auth(auth):
@@ -869,7 +879,7 @@ def find_urls_ex(url):
 	no_code = re.sub(r'`[^`]*`', '', no_triple, flags=re.DOTALL)
 	pattern = r'https?://[^\s]+'
 	return re.findall(pattern, no_code)
-def is_url(url): return url and isinstance(url, (str, bytes)) and regexp("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\"'\\])>]+$").fullmatch(url)
+def is_url(url): return url and isinstance(url, (str, bytes)) and regexp("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\\])>]+$").fullmatch(url)
 def is_discord_url(url): return url and regexp("^https?:\\/\\/(?:\\w{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/").findall(url) + regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").findall(url)
 def is_discord_attachment(url): return url and regexp("^https?:\\/\\/(?:\\w{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/attachments\\/").search(str(url))
 def is_discord_emoji(url): return url and regexp("^https?:\\/\\/(?:\\w{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/emojis\\/").search(str(url))
@@ -1014,8 +1024,7 @@ def get_image_size(b):
 		print("Image size error:", repr(ex))
 		temp = temporary_file()
 		input.seek(0)
-		with open(temp, "wb") as f:
-			shutil.copyfileobj(input, f, 65536)
+		save_file(input, temp)
 		cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", temp)
 		print(cmd)
 		try:
@@ -1055,9 +1064,7 @@ def rename(src, dst):
 		return os.rename(src, dst)
 	except OSError as ex:
 		if ex.args and ex.args[0] == 18:
-			with open(dst, "wb") as fdst:
-				with open(src, "rb") as fsrc:
-					shutil.copyfileobj(fsrc, fdst)
+			shutil.copyfile(src, dst)
 
 IMAGE_FORMS = {
 	"auto": None,
@@ -1978,9 +1985,8 @@ def select_and_dumps(data, mode="safe", compress=True):
 def safe_save(fn, s):
 	"Writes data to a file, creating a temporary backup which is then swapped with the destination file. This operation is less susceptible to corruption upon a crash."
 	if os.path.exists(fn):
-		with open(fn + "\x7f", "wb") as f:
-			f.write(s)
-		with open(f + "\x7f", "rb") as f:
+		save_file(s, fn + "\x7f")
+		with open(fn + "\x7f", "rb") as f:
 			if f.read(1) in (b"\x00", b" ", b""):
 				raise ValueError
 		with tracebacksuppressor(FileNotFoundError):
@@ -1989,8 +1995,7 @@ def safe_save(fn, s):
 		os.rename(fn, fn + "\x7f\x7f")
 		os.rename(fn + "\x7f", fn)
 	else:
-		with open(fn, "wb") as f:
-			f.write(s)
+		save_file(s, fn)
 
 
 reqs = alist(requests.Session() for i in range(6))
@@ -4187,7 +4192,7 @@ class EvalPipe:
 		if start:
 			self.start()
 
-	key = b"EvalPipe"
+	key = b64(enc_key)[:32]
 	@classmethod
 	def connect(cls, args, port, address="127.0.0.1", independent=True, glob=globals(), timeout=60):
 		addr = (address, port)
@@ -4345,7 +4350,7 @@ class EvalPipe:
 		if isinstance(s, str):
 			s = s.encode("utf-8")
 		b = f"~>{i}:".encode("ascii") + s
-		self.send(b)
+		esubmit(self.send, b)
 		return fut
 
 	def run(self, s, timeout=30, cache=None, priority=False):
@@ -4704,12 +4709,13 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 	ts = 0
 	semaphore = Semaphore(512, 256)
 	sessions = ()
+	session = niquests.Session()
 
 	@classmethod
 	def header(cls, base=(), **fields) -> cdict:
 		"Creates a custom HTTP request header with randomised properties that spoof anti-scraping sites."
 		head = {
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+			"User-Agent": USER_AGENT,
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in loop(4)),
 			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in loop(4)),
@@ -4734,14 +4740,16 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		self.ts = utc()
 		return self
 
-	@property
-	def session(self) -> aiohttp.ClientSession:
-		return choice(self.sessions)
+	# @property
+	# def session(self) -> aiohttp.ClientSession:
+	# 	return choice(self.sessions)
 
 	async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True, timeout=24) -> bytes | str | json_like:
 		if not self.ts:
 			await self._init_()
-		if not session:
+		if isinstance(data, aiohttp.FormData):
+			session = self.sessions.next()
+		elif not session:
 			resp = await self.asession.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
 			if resp.status_code >= 400:
 				raise ConnectionError(resp.status_code, (url, as_str(resp.content)))
@@ -4794,10 +4802,10 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 			if aio:
 				session = None
 			else:
-				session = requests
+				session = requests if is_discord_url(url) else self.session
 		elif bypass:
 			if "user-agent" not in headers and "User-Agent" not in headers:
-				headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
+				headers["User-Agent"] = USER_AGENT
 				headers["X-Forwarded-For"] = ".".join(str(random.randint(1, 254)) for _ in loop(4))
 			headers["DNT"] = "1"
 		method = method.casefold()
@@ -4818,7 +4826,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				req = reqs.next()
 				resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
 			else:
-				req = requests
+				req = requests if is_discord_url(url) else self.session
 				resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
 			if resp.status_code >= 400:
 				if not resp.content or magic.from_buffer(resp.content).startswith("text/"):
@@ -4861,15 +4869,23 @@ def new_playwright_page(browser="firefox", viewport=dict(width=480, height=320),
 	tid = threading.get_ident()
 	h = f"{browser}~{tid}~{int(headless)}"
 	try:
-		return browsers[h].new_page()
+		browser = browsers[h]
 	except KeyError:
 		try:
 			sp = sps[tid]
 		except KeyError:
 			from playwright.sync_api import sync_playwright
 			sp = sps[tid] = sync_playwright().start()
-		browsers[h] = getattr(sp, browser).launch(headless=headless)
-	return browsers[h].new_page(viewport=viewport)
+		browser = browsers[h] = getattr(sp, browser).launch(headless=headless)
+	context = browser.new_context(
+		device_scale_factor=1,
+		is_mobile=False,
+		has_touch=True,
+		viewport=viewport,
+		default_browser_type="firefox",
+		user_agent=USER_AGENT,
+	)
+	return context.new_page()
 
 
 CACHE_FILESIZE = 10 * 1048576

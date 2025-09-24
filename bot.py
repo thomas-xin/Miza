@@ -661,9 +661,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				with ctx:
 					return await asubmit(events[0](*args, **kwargs))
 				return
-			futs = [asubmit(func(*args, **kwargs)) for func in events]
-			with ctx:
-				return await gather(*futs)
+			for func in filter(bool, events):
+				fut = func(*args, **kwargs)
+				if fut:
+					await fut
+			# futs = [asubmit(func(*args, **kwargs)) for func in events]
+			# with ctx:
+			# 	return await gather(*futs)
 
 	@tracebacksuppressor(default=[])
 	async def get_full_invites(self, guild):
@@ -1704,19 +1708,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, emojis=True, reactions=False, allow=False, limit=None, no_cache=False, ytd=True) -> list:
 		"Finds URLs in a string, following any discord message links found. Traces all the way to raw file stream if \"ytd\" parameter is set."
-		if limit is not None and limit <= 0:
+		if not url or limit is not None and limit <= 0:
 			return []
 		if not isinstance(url, str) and hasattr(url, "channel"):
 			url = message_link(url)
-		if it is None or not is_url(url):
+		if it is None and " " in url or not is_url(url):
 			urls = find_urls(url) if allow else find_urls_ex(url)
 			if not urls:
 				if images or emojis or reactions:
 					return await self.follow_to_image(url, follow=reactions)
 				return []
-			it = {}
 		else:
 			urls = [url]
+		it = it or {}
 		urls = tuple(urls)
 
 		if no_cache:
@@ -1946,9 +1950,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not region:
 			if timezone is None:
 				if "users" in self.data:
-					timezone, confidence = self.data.users.any_timezone(uid)
-					if confidence < 0.5:
-						timezone = None
+					timezone = self.data.users.any_timezone(uid)
 			if timezone is not None:
 				timezone = round(get_offset(timezone) / 3600)
 			region = self.browse_locations.get(timezone, "wt-wt")
@@ -2356,10 +2358,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		2: cdict(
 			reasoning="gpt-5",
 			instructive="gpt-5",
-			casual="kimi-k2",
+			casual="gemini-2.5-pro",
 			nsfw="grok-4",
-			backup="gemini-2.5-pro",
-			retry="gemini-2.5-pro",
+			backup="kimi-k2",
+			retry="kimi-k2",
 			function="gpt-5",
 			vision="gpt-5",
 			target="auto",
@@ -3189,8 +3191,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			ext = "bin" if "." not in name else name.rsplit(".", 1)[-1]
 			fn = f"{CACHE_PATH}/attachments/{attachment.id}.{ext}"
 			if not os.path.exists(fn):
-				with open(fn, "wb") as f:
-					await asubmit(f.write, data)
+				await asubmit(save_file, data, fn)
 		return attachment
 
 	async def add_and_test(self, message, attachment):
@@ -3207,8 +3208,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				data = await self.get_attachment(str(attachment.url))
 				if not data:
 					return
-				with open(fn, "wb") as f:
-					await asubmit(f.write, data)
+				await asubmit(save_file, data, fn)
 			if get_mime(fn).startswith("image/"):
 				res = await self.data.prot.scan(message, fn)
 			else:
@@ -3281,8 +3281,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					return await asubmit(reqs.next().get, url, headers=Request.header(), stream=True, _timeout_=3, allow_redirects=True)
 				except Exception:
 					print_exc()
-			with niquests.AsyncSession() as session:
-				return await session.get(url, headers=Request.header(), _timeout_=timeout, verify=False, allow_redirects=True)
+			return await Request.asession.get(url, headers=Request.header(), _timeout_=timeout, verify=False, allow_redirects=True)
 		if is_discord_url(url):
 			try:
 				return await Request(url, timeout=3, aio=True, ssl=True)
@@ -3296,8 +3295,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		ext = fn.rsplit(".", 1)[-1] if "." in fn else "bin"
 		content = await self.get_request(url, limit=limit, full=full, timeout=timeout)
 		fn = temporary_file(ext)
-		with open(fn, "wb") as f:
-			await asubmit(f.write, content)
+		esubmit(save_file, content, fn)
 		return fn
 
 	def get_colour(self, user) -> int:
@@ -4662,10 +4660,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		fn = f"{backup}/saves.{DynamicDT.utcnow().date()}.tar"
 		day = not os.path.exists(fn)
 		if day:
-			ytd_update = psutil.Popen([python, "-m", "pip", "install", "--upgrade", "--pre", "yt-dlp"])
 			await_fut(self.send_event("_day_"))
 			self.users_updated = True
-			ytd_update.wait()
 		if force or day:
 			fut = self.send_event("_save_")
 			await_fut(fut)
@@ -5187,6 +5183,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if r:
 					kwargs[k] = [r] if v.get("multiple") else r
 					continue
+				print(kwargs)
 				raise ArgumentError(f"Argument {k} ({v.description}) is required.")
 		if append_lws:
 			k, j = append_lws
@@ -6083,7 +6080,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				fut = csubmit(asyncio.wait_for(self.load_guild(guild), timeout=3600))
 				futs.append(fut)
 				fut.guild = guild
-				await asyncio.sleep(0.01)
+				await asyncio.sleep(0.05)
 			for fut in futs:
 				try:
 					await fut
@@ -8976,9 +8973,30 @@ if __name__ == "__main__":
 	_print = print
 	with contextlib.redirect_stdout(PRINT):
 		with contextlib.redirect_stderr(PRINT):
+			orig_warning = asyncio.base_events.logger.warning
+			task_re = re.compile(r"<Task.*name='([^']+)'.*?>")
+
+			def custom_warning(msg, *args, **kwargs):
+				orig_warning(msg, *args, **kwargs)
+
+				m = task_re.search(msg % args)
+				if not m:
+					return
+
+				task_name = m.group(1)
+				loop = asyncio.get_event_loop()
+				for task in asyncio.all_tasks(loop):
+					if task.get_name() == task_name:
+						print(f"\n[Slow task detected] {task}")
+						for line in format_async_stack(task.get_coro()):
+							print(line.strip())
+						print("[End slow task dump]\n")
+
+			# Monkey-patch
+			asyncio.base_events.logger.warning = custom_warning
+			eloop.slow_callback_duration = 0.375
+			eloop.set_debug(True)
 			with tracebacksuppressor:
-				eloop.slow_callback_duration = 0.375
-				eloop.set_debug(True)
 				PRINT.start()
 				sys.stdout = sys.stderr = print = PRINT
 				print("Logging started.")

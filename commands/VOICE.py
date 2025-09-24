@@ -290,7 +290,7 @@ class Queue(Command):
 	exact = False
 
 	async def __call__(self, bot, _user, _perm, _message, _channel, _guild, _name, _comment, mode="all", query=None, index=-1, start=None, end=None, **void):
-		vc_ = select_voice_channel(_user, _channel)
+		vc_ = await select_voice_channel(_user, _channel)
 		if query and _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
 		fut = csubmit(bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id})"))
@@ -451,7 +451,7 @@ class Queue(Command):
 			posstr = "Estimated"
 		final_duration = sum(e_dur_2(e) for e in items) if len(items) != 1 else items[0].get("duration")
 		durstr = "" if not final_duration else f" ({sec2time(final_duration)})"
-		emb.description = f"🎶 {adding} 🎶{durstr}\n*{posstr} time to play: {(DynamicDT.now() + total_duration).as_rel_discord()}.*"
+		emb.description = f"🎶 {adding} 🎶{durstr}\n*{posstr} time to play: {(DynamicDT.now() + total_duration).as_rel_discord() if isfinite(total_duration) else total_duration}.*"
 		if paused:
 			emb.description += f"\nNote: Player is currently paused. Use {bot.get_prefix(_guild)}resume to resume!"
 		print(items)
@@ -823,7 +823,7 @@ class Connect(Command):
 			if vc is not None:
 				vc_ = vc
 			else:
-				vc_ = select_voice_channel(_user, _channel)
+				vc_ = await select_voice_channel(_user, _channel)
 		# target guild may be different from source guild
 		if vc_ is None:
 			guild = _channel.guild
@@ -956,7 +956,7 @@ class Skip(Command):
 					skips.append(i)
 				else:
 					votes.append(i)
-			elif _perm < 1 and entry.get("u_id") not in (_user.id, bot.id):
+			elif _perm < 1 and entry.get("u_id") not in (_user.id, bot.id) and {m.id for m in vc_.members}.difference([_user.id, bot.id]):
 				raise self.perm_error(_perm, 1, "to force-skip other users' entries")
 			else:
 				skips.append(i)
@@ -1327,7 +1327,7 @@ class Dump(Command):
 	slash = True
 
 	async def __call__(self, bot, _guild, _channel, _user, _perm, mode, url, **void):
-		vc_ = select_voice_channel(_user, _channel)
+		vc_ = await select_voice_channel(_user, _channel)
 		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
 		await bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id})")
@@ -2494,9 +2494,7 @@ class Hyperchoron(Command):
 		fo = os.path.abspath(TEMP_PATH + "/" + replace_ext(url2fn(url), default_archive))
 		args = ["hyperchoron", "-i", url, *unicode_prune(kwargs or "").split(), "-f", format.casefold(), "-o", fo]
 		print(args)
-		env = os.environ.copy()
-		env["PYTHONUTF8"] = "1"
-		proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=env)
+		proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 		try:
 			async with asyncio.timeout(3200):
 				stdout, stderr = await proc.communicate()
@@ -2690,13 +2688,19 @@ class UpdateAudio(Database):
 					bot.data.users.add_gold(member, td / 10)
 					bot.data.dailies.progress_quests(member, "music", td)
 
+	async def _day_(self, **void):
+		args = [python, "-m", "pip", "install", "--upgrade", "--pre", "yt-dlp"]
+		print(args)
+		proc = await asyncio.create_subprocess_exec(*args)
+		await proc.wait()
+
 	# Restores all audio players from temporary database when applicable
 	async def _ready_(self, bot, **void):
 		globals()["bot"] = bot
 		try:
-			await asubmit(subprocess.check_output, ("./ffmpeg",))
-		except CPE:
-			pass
+			args = ["ffmpeg"]
+			proc = await asyncio.create_subprocess_exec(*args)
+			await proc.wait()
 		except FileNotFoundError:
 			print("WARNING: FFmpeg not found. Unable to convert and play audio.")
 

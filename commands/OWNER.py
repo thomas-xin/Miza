@@ -1326,49 +1326,90 @@ class UpdateEmojis(Database):
 					if fn.rsplit(".", 1)[0] == name:
 						name = fn
 						break
-				else:
-					continue
 				emoji = discord.Emoji(guild=bot.user, state=bot._state, data=edata)
 				# emoji.application_id = bot.id
 				self.data[name] = emoji.id
 				bot.cache.emojis[emoji.id] = emoji
 		return self.emojidata
 
-	async def grab(self, name):
+	def is_available(self, emoji):
+		bot = self.bot
+		if not emoji:
+			return
+		if bot.ready and getattr(emoji, "guild", None):
+			if not getattr(emoji, "available", True) or emoji.id not in (e.id for e in emoji.guild.emojis):
+				return False
+		return True
+
+	async def get_colour(self, rgb):
 		bot = self.bot
 		while not bot.bot_ready:
 			await asyncio.sleep(2)
 
-		def is_available(emoji):
-			if not emoji:
-				return
-			if bot.ready and getattr(emoji, "guild", None):
-				if not getattr(emoji, "available", True) or emoji.id not in (e.id for e in emoji.guild.emojis):
-					return False
-			return True
-
-		ename = name.rsplit(".", 1)[0]
-		animated = name.endswith(".gif")
+		if isinstance(rgb, int):
+			rgb = raw2colour(rgb)
+		c = 256 / 6
+		rgb = [min(255, round(round(x / c) * c)) for x in rgb[:3]]
+		name = "C_" + "".join(("0" + hex(x)[2:].upper())[-2:] for x in rgb)
+		emojidata = await self.load_own()
 		try:
 			emoji = bot.cache.emojis[self.data[name]]
-			if not is_available(emoji):
+			if not self.is_available(emoji):
 				raise KeyError
 		except KeyError:
 			pass
 		else:
 			return emoji
+		if emojidata is not None and len(emojidata["items"]) < 2000:
+			with open("misc/emojis/heart.svg", "rb") as f:
+				b = await asubmit(f.read)
+			b = await process_image(b, "replace_colour", [rgb, "-f", "webp"], timeout=60)
+			b2 = await bot.to_data_url(b)
+			async with self.sem3:
+				edata = await Request(
+					f"https://discord.com/api/{api}/applications/{bot.id}/emojis",
+					method="POST",
+					data=orjson.dumps(dict(
+						name=name,
+						image=b2,
+					)),
+					headers={
+						"Content-Type": "application/json",
+					},
+					authorise=True,
+					json=True,
+					aio=True,
+					timeout=32,
+				)
+			emoji = discord.Emoji(guild=bot.user, state=bot._state, data=edata)
+			# emoji.application_id = bot.id
+			self.data[name] = emoji.id
+			bot.cache.emojis[emoji.id] = emoji
+			self.emojidata = None
+			return emoji
+		raise LookupError("Unable to find space for the required emoji.")
+
+	async def grab(self, name):
+		bot = self.bot
+		while not bot.bot_ready:
+			await asyncio.sleep(2)
+
+		ename = name.rsplit(".", 1)[0]
+		animated = name.endswith(".gif")
 		emojidata = await self.load_own()
-		if self.data.get(name) and self.data[name] in bot.cache.emojis:
+		try:
 			emoji = bot.cache.emojis[self.data[name]]
-			if not is_available(emoji):
-				pass
-			else:
-				return emoji
+			if not self.is_available(emoji):
+				raise KeyError
+		except KeyError:
+			pass
+		else:
+			return emoji
 		guilds, limits = bot.get_available_guild(animated=animated, return_all=True)
 		for guild in guilds:
 			for emoji in guild.emojis:
 				if emoji.name == ename and emoji.animated == animated:
-					if not is_available(emoji):
+					if not self.is_available(emoji):
 						continue
 					self.data[name] = emoji.id
 					bot.cache.emojis[emoji.id] = emoji
@@ -1405,6 +1446,7 @@ class UpdateEmojis(Database):
 			# emoji.application_id = bot.id
 			self.data[name] = emoji.id
 			bot.cache.emojis[emoji.id] = emoji
+			self.emojidata = None
 			return emoji
 		if not sum(limits):
 			raise LookupError("Unable to find suitable guild for the required emoji.")

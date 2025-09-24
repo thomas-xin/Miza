@@ -680,8 +680,11 @@ class RoleSelect(Command):
 	}
 	hsl_hearts = {k: rgb_to_hsl([c / 255 for c in v]) for k, v in hearts.items()}
 
-	def get_role_emoji(self, role):
+	async def get_role_emoji(self, role):
 		colour = role.colour.to_rgb()
+		if "emojis" in self.bot.data:
+			return await self.bot.data.emojis.get_colour(colour)
+
 		hsl = rgb_to_hsl([c / 255 for c in colour])
 		closest = None
 		dist = inf
@@ -701,7 +704,7 @@ class RoleSelect(Command):
 		rolelist = []
 		if roles:
 			for role in roles:
-				e = self.get_role_emoji(role)
+				e = await self.get_role_emoji(role)
 				rolelist.append((e, role))
 		if custom:
 			role_re = regexp(r"(?:<@&[0-9]+>|[0-9]+)$")
@@ -714,7 +717,7 @@ class RoleSelect(Command):
 					role = await bot.fetch_role(r_id)
 					ems = find_emojis_ex(line[:found.start()], cast_urls=False)
 					if not ems:
-						e = self.get_role_emoji(role)
+						e = await self.get_role_emoji(role)
 					else:
 						e = ems[0]
 					rolelist.append((e, role))
@@ -733,7 +736,7 @@ class RoleSelect(Command):
 					else:
 						ems = ()
 					if not ems:
-						e = self.get_role_emoji(role)
+						e = await self.get_role_emoji(role)
 					else:
 						e = ems[0]
 					rolelist.append((e, role))
@@ -747,7 +750,7 @@ class RoleSelect(Command):
 						ikey=userIter1,
 						fuzzy=2 / 3,
 					)
-					e = self.get_role_emoji(role)
+					e = await self.get_role_emoji(role)
 					rolelist.append((e, role))
 					continue
 				e = ems[0]
@@ -2038,7 +2041,7 @@ class ServerProtector(Database):
 				print_exc()
 				try:
 					await message.reply("-# *This image was generated using AI.*")
-				except:
+				except Exception:
 					await message.channel.send("-# " + user_mention(message.author) + ": " + "*This image was generated using AI.*")
 			return resp
 

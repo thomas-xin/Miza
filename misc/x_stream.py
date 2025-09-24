@@ -15,7 +15,7 @@ import orjson
 import requests
 from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut, gather
 from .types import resume, cdict, fcdict, json_dumps, byte_like, utc, RangeSet, MemoryBytes
-from .util import AUTH, tracebacksuppressor, magic, shash, decrypt, zip2bytes, bytes2zip, enc_box, save_auth, decode_attachment, expand_attachment, shorten_attachment, is_discord_attachment, is_miza_attachment, discord_expired, url2fn, p2n, byte_scale, leb128, decode_leb128, seq, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY, update_headers
+from .util import AUTH, tracebacksuppressor, magic, shash, decrypt, zip2bytes, bytes2zip, enc_box, save_auth, decode_attachment, expand_attachment, shorten_attachment, is_discord_attachment, is_miza_attachment, discord_expired, url2fn, p2n, byte_scale, leb128, decode_leb128, seq, MIMES, Request, DOMAIN_CERT, PRIVATE_KEY, update_headers, USER_AGENT
 from .caches import attachment_cache, upload_cache, download_cache
 
 interface = None
@@ -228,6 +228,7 @@ class Server:
 				f.write(domain_cert)
 			with open(PRIVATE_KEY, "w") as f:
 				f.write(private_key)
+		attachment_cache.init()
 		return "💜"
 
 	@cp.expose
@@ -730,7 +731,7 @@ class Server:
 		headers.pop("Host", None)
 		headers.pop("Range", None)
 		update_headers(headers, **{
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+			"User-Agent": USER_AGENT,
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in range(4)),

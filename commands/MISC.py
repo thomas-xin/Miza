@@ -628,6 +628,7 @@ class UpdateSkyShardReminders(Database):
 					reminders = [ts - 3600, ts - 300, ts]
 					if not i:
 						reminders.insert(0, ts - 43200)
+					reminders.append(o.end.timestamp() - 900)
 					reminders.append(o.end.timestamp() + 1)
 					for r in reversed(reminders):
 						if r > taken and t >= r:
@@ -665,7 +666,12 @@ class UpdateSkyShardReminders(Database):
 				embed.set_author(name="Black Shard", url=url, icon_url="https://raw.githubusercontent.com/PlutoyDev/sky-shards/refs/heads/production/public/emojis/ShardBlack.webp")
 				emoji = await bot.data.emojis.grab("piece_of_light.png")
 				reward = f"200 ×{emoji}"
-			timing = "Active" if any(o.land < ct < o.end for o in s.occurrences) else next((DynamicDT.fromdatetime(o.land).as_rel_discord() for o in s.occurrences if ct < o.land), "Expired")
+			if any(o.land < ct < o.end - datetime.timedelta(seconds=900) for o in s.occurrences):
+				timing = "Active"
+			elif any(o.land < ct < o.end for o in s.occurrences):
+				timing = "Last Call"
+			else:
+				timing = next((DynamicDT.fromdatetime(o.land).as_rel_discord() for o in s.occurrences if ct < o.land), "Expired")
 			location = " -> ".join(w.capitalize() for w in s.map.split("."))
 			landings = "\n".join(f"- **{format_landing(o)}**" if o.land <= ct < o.end else f"- ~~{format_landing(o)}~~" if o.end <= ct else f"- {format_landing(o)}" for o in s.occurrences)
 			embed.add_field(name="Status", value=f"**{timing}**", inline=True)

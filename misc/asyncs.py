@@ -4,14 +4,13 @@ import concurrent.futures
 import contextlib
 import functools
 import inspect
-import random
 import threading
 import time
-import weakref
+import traceback
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, thread
 from time import time as utc
-from traceback import print_exc
+from misc.types import lim_str
 
 print("ASYNCS:", __name__)
 
@@ -74,65 +73,8 @@ def _adjust_thread_count(self):
 
 concurrent.futures.ThreadPoolExecutor._adjust_thread_count = _adjust_thread_count
 
-
-# Thread pool manager for multithreaded operations.
-class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
-
-	def __init__(self, thread_count=8, pool_count=1, initializer=None, executor=ThreadPoolExecutor):
-		self.pools = []
-		self.pool_count = max(1, pool_count)
-		self.thread_count = max(1, thread_count)
-		self.initializer = initializer
-		self.executor = executor
-		self.position = -1
-		self.update()
-		self.tasks = weakref.WeakSet()
-
-	def __len__(self): sum(len(pool._threads) for pool in self.pools)
-
-	# Adjusts pool count if necessary
-	def _update(self):
-		if self.pool_count != len(self.pools):
-			self.pool_count = max(1, self.pool_count)
-			self.thread_count = max(1, self.thread_count)
-			while self.pool_count > len(self.pools):
-				pool = self.executor(
-					max_workers=self.thread_count,
-					initializer=self.initializer,
-				)
-				self.pools.append(pool)
-			while self.pool_count < len(self.pools):
-				func = self.pools.popright().shutdown
-				self.pools[-1].submit(func, wait=True)
-
-	def update(self):
-		if not self.pools:
-			return self._update()
-		self.position = (self.position + 1) % len(self.pools)
-		pool = random.choice(self.pools)
-		if getattr(pool, "_shutdown", False) or getattr(pool, "_broken", False):
-			return
-		pool.submit(self._update)
-
-	def map(self, func, *args, **kwargs):
-		self.update()
-		fut = self.pools[self.position].map(func, *args, **kwargs)
-		self.tasks.add(fut)
-		return fut
-
-	def submit(self, func, *args, **kwargs):
-		self.update()
-		fut = self.pools[self.position].submit(func, *args, **kwargs)
-		self.tasks.add(fut)
-		return fut
-
-	def shutdown(self, wait=True):
-		return [exc.shutdown(wait) for exc in self.pools].append(self.pools.clear())
-
 mthreads = ThreadPoolExecutor(7, initializer=__setloop__)
 lim = 8
-# bthreads = MultiThreadPool(lim, initializer=__setloop__)
-# athreads = concurrent.futures.exc_worker = MultiThreadPool(lim * 2, pool_count=2, initializer=__setloop__)
 bthreads = ThreadPoolExecutor(max_workers=lim, initializer=__setloop__)
 athreads = ThreadPoolExecutor(max_workers=lim * 4, initializer=__setloop__)
 
@@ -146,14 +88,11 @@ def initialise_ppe():
 	athreads.shutdown(wait=False)
 	bthreads.shutdown(wait=False)
 	lim = 32
-	# bthreads = MultiThreadPool(lim, initializer=__setloop__)
-	# athreads = concurrent.futures.exc_worker = MultiThreadPool(lim * 2, pool_count=2, initializer=__setloop__)
 	bthreads = ThreadPoolExecutor(max_workers=lim, initializer=__setloop__)
 	athreads = ThreadPoolExecutor(max_workers=lim * 4, initializer=__setloop__)
 
 	from concurrent.futures import ProcessPoolExecutor
 	pthreads = ProcessPoolExecutor(max_workers=2)
-	# pthreads = MultiThreadPool(6, executor=ProcessPoolExecutor)
 
 	def get_executor(priority):
 		if priority not in range(0, 4):
@@ -284,8 +223,13 @@ def create_future(obj, *args, loop=None, timeout=None, priority=False, thread_sa
 				obj = loop.run_in_executor(executor, obj, *args)
 			else:
 				obj = wrap_future(esubmit(obj, *args, timeout=timeout, priority=priority, **kwargs), loop=loop, thread_safe=thread_safe)
+	if obj is None:
+		return emptyfut
 	if not isinstance(obj, asyncio.Future):
-		obj = csubmit(obj, loop=loop)#, name=f"Task-{utc()}-{obj}-{lim_str(str((args, kwargs)), 256)}")
+		try:
+			return loop.create_task(obj)
+		except RuntimeError:
+			return create_task(obj, name=f"Task-{utc()}-{obj}-{lim_str(str((args, kwargs)), 256)}")
 	return obj
 asubmit = create_future
 
@@ -442,7 +386,26 @@ async def traceback_coro(fut, *args):
 	except args:
 		pass
 	except Exception:
-		print_exc()
+		traceback.print_exc()
+
+def format_async_stack(coro, limit=64):
+	"""Walk coroutine/awaitable chain and return formatted stack trace."""
+	frames = []
+	while coro and limit > 0:
+		if inspect.iscoroutine(coro):
+			frame = coro.cr_frame
+			if frame:
+				frames.extend(traceback.format_stack(frame))
+			coro = coro.cr_await
+		elif inspect.isgenerator(coro):
+			frame = coro.gi_frame
+			if frame:
+				frames.extend(traceback.format_stack(frame))
+			coro = coro.gi_yieldfrom
+		else:
+			break
+		limit -= 1
+	return frames
 
 def trace(fut, *args):
 	return csubmit(traceback_coro(fut, *args))

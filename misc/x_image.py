@@ -703,6 +703,12 @@ def get_request(url, return_headers=False):
 		return resp.content
 
 
+def replace_colour(image, colour):
+	rgb, A = split_rgba(image)
+	a = np.array(rgb, dtype=np.uint8)
+	a.T[:] = np.array(colour, dtype=np.uint8).reshape((3, 1, 1))
+	return join_rgba(fromarray(a, mode="RGB"), A)
+
 def from_colour(colour, size=128, key=None):
 	return Image.new("RGB" + "A" * (len(colour) > 3), (size, size), tuple(colour))
 

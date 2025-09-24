@@ -13,7 +13,7 @@ from misc.asyncs import esubmit, wrap_future, Future
 from misc.util import (
     retrieve_from, CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, uuhash,
-	group_attachments, ungroup_attachments,
+	ungroup_attachments,
     snowflake_time_2, shorten_attachment, merge_url, split_url, discord_expired, url2fn,
 )
 
@@ -240,7 +240,7 @@ class AttachmentCache(diskcache.Cache):
 			for i, a in enumerate(data["attachments"]):
 				if a_id in (i, int(a["id"])):
 					return a["url"]
-			raise KeyError(a_id)
+			raise KeyError(a_id, data["attachments"])
 		fut = Future()
 		url, _ = merge_url(c_id, m_id, a_id, fn)
 		task = [fut, url]

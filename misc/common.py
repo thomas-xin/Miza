@@ -746,27 +746,30 @@ async def send_with_react(channel, *args, reacts=None, reference=None, mention=F
 
 voice_channels = lambda guild: [channel for channel in guild.channels if getattr(channel, "type", None) in (discord.ChannelType.voice, discord.ChannelType.stage_voice)]
 
-def select_voice_channel(user, channel):
+async def select_voice_channel(user, channel):
 	# Attempt to match user's currently connected voice channel
+	if user.voice:
+		return user.voice.channel
+	user = await user.guild.fetch_member(user.id)
+	user.guild._members[user.id] = user
 	voice = user.voice
-	member = user.guild.me
-	if voice is None:
-		# Otherwise attempt to find closest voice channel to current text channel
-		catg = channel.category
-		if catg is not None:
-			channels = voice_channels(catg)
-		else:
-			channels = None
-		if not channels:
-			pos = 0 if channel.category is None else channel.category.position
-			# Sort by distance from text channel
-			channels = sorted(tuple(channel for channel in voice_channels(channel.guild) if channel.permissions_for(member).connect and channel.permissions_for(member).speak and channel.permissions_for(member).use_voice_activation), key=lambda channel: (abs(pos - (channel.position if channel.category is None else channel.category.position)), abs(channel.position)))
-		if channels:
-			vc = channels[0]
-		else:
-			raise LookupError("Unable to find voice channel.")
+	if voice:
+		return voice.channel
+	# Otherwise attempt to find closest voice channel to current text channel
+	catg = channel.category
+	if catg is not None:
+		channels = voice_channels(catg)
 	else:
-		vc = voice.channel
+		channels = None
+	if not channels:
+		member = user.guild.me
+		pos = 0 if channel.category is None else channel.category.position
+		# Sort by distance from text channel
+		channels = sorted(tuple(channel for channel in voice_channels(channel.guild) if channel.permissions_for(member).connect and channel.permissions_for(member).speak and channel.permissions_for(member).use_voice_activation), key=lambda channel: (abs(pos - (channel.position if channel.category is None else channel.category.position)), abs(channel.position)))
+	if channels:
+		vc = channels[0]
+	else:
+		raise LookupError("Unable to find voice channel.")
 	return vc
 
 

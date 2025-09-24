@@ -1028,7 +1028,7 @@ class EmojiCrypt(Command):
 			msg = message.attachments[0].url
 		if is_url(msg):
 			msg = await self.bot.follow_url(msg, allow=True, limit=1)
-			args = (python, "downloader.py", "-threads", "3", msg, "../" + fi)
+			args = ("streamshatter", msg, "../" + fi)
 			proc = await asyncio.create_subprocess_exec(*args, cwd="misc")
 			try:
 				async with asyncio.timeout(48):
@@ -1148,21 +1148,21 @@ class Identify(Command):
 	msgcmd = ("Identify Files",)
 
 	def probe(self, url):
-		command = ["./ffprobe", "-hide_banner", url]
+		command = ["ffprobe", "-hide_banner", url]
 		resp = None
-		for _ in loop(3):
+		for _ in loop(2):
 			try:
 				proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 				fut = esubmit(proc.communicate, timeout=12)
 				res = fut.result(timeout=12)
 				resp = b"\n".join(res)
 				break
-			except:
+			except Exception:
 				with suppress():
 					force_kill(proc)
 				print_exc()
 		if not resp:
-			raise RuntimeError
+			raise RuntimeError(proc)
 		return as_str(resp)
 
 	def identify(self, url):

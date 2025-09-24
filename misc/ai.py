@@ -7,10 +7,10 @@ import openai
 import numpy as np
 from collections import deque
 from math import ceil, inf
-from traceback import format_exc, print_exc
+from traceback import format_exc
 from mpmath import mpf
 from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, CE, tracebacksuppressor, utc, T, string_like
-from misc.util import AUTH, CACHE_PATH, TimedCache, Request, retrieve_from, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across
+from misc.util import AUTH, CACHE_PATH, TimedCache, retrieve_from, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across
 from misc.asyncs import asubmit, csubmit, emptyctx, gather, Semaphore, CloseableAsyncIterator
 
 print("AI:", __name__)
@@ -172,8 +172,7 @@ available = {
 		None: "gpt-5-mini",
 	},
 	"gpt-oss-120b": {
-		"fireworks": ("accounts/fireworks/models/gpt-oss-120b", ("0.1", "0.1")),
-		"openrouter": ("openai/gpt-oss-120b", ("0.15", "0.6")),
+		"openrouter": ("openai/gpt-oss-120b", ("0.072", "0.28")),
 		None: "o4-mini",
 	},
 	"gpt-oss-20b": {
@@ -897,7 +896,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=Fal
 		return messages
 	ml = max(1024, round_random(softlim - count))
 	if best:
-		s2 = await summarise(s, min_length=ml, best=True, prompt=prompt, premium_context=premium_context)
+		s2 = await summarise(s, min_length=ml, best=best, prompt=prompt, premium_context=premium_context)
 	else:
 		s2 = await asubmit(lim_tokens, s, ml, mode="right", priority=2)
 	summ += s2
@@ -948,8 +947,10 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above!'
 			ml = round_random(max_length)
 			c = await tcount(prompt)
-			# Prefer gpt-5-nano for summaries if possible due to its much faster throughput of 100 tokens/s, but fallback to gemini-2.5-flash if necessary (due to its higher token limit of 1 million).
-			model = "gemini-2.5-flash" if c > 300000 else "gpt-5-nano"
+			# Prefer gpt-5-nano and gpt-oss-20b for summaries if possible due to the much faster throughput and lower cost, but fallback to gemini-2.5-flash if necessary (due to its higher token limit of 1 million).
+			model = "gpt-5-nano" if best > 1 else "gpt-oss-20b"
+			if c > contexts.get(model, 65536) * 2 / 3:
+				model = "gemini-2.5-flash"
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
 			if model in is_reasoning:
 				data["reasoning_effort"] = "minimal"
@@ -959,68 +960,6 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 			if resp and not decensor.search(resp):
 				return resp
 	return lim_tokens(s, round_random(max_length * 2 / 3))
-
-# local_available = False
-# last_ensured = None
-# last_ensured_time = 0
-# async def ensure_models(force=False):
-# 	global local_available, last_ensured, last_ensured_time
-# 	if utc() - last_ensured_time < 720 and not force:
-# 		return last_ensured
-# 	known = {
-# 		"command-r-plus-h6t2": "command-r-plus",
-# 		"command-r-plus-08-2024": "command-r-plus",
-# 		"alpindale/c4ai-command-r-plus-GPTQ": "command-r-plus",
-# 		"CohereForAI/c4ai-command-r-plus": "command-r-plus",
-# 		"CausalLM/35b-beta-long": "35b-beta-long",
-# 		"quill-72b-h6t2": "quill-72b",
-# 		"NeverSleep/Llama-3-Lumimaid-70B-v0.1-alt-GGUF": "lumimaid-70b",
-# 	}
-# 	default = "gpt-5-mini"
-# 	return default
-# 	# The rest is currently disabled for now.
-# 	try:
-# 		try:
-# 			info = await Request(f"{endpoints['mizabot']}/models", aio=True, json=True)
-# 		except Exception:
-# 			print_exc()
-# 			last_ensured = models = (default,)
-# 			local_available = False
-# 			return models
-# 		print(info)
-# 		models = [m.get("id") for m in sorted(info["data"], key=lambda m: m.get("created"), reverse=True)]
-# 		for model in models:
-# 			mname = known.get(model, model)
-# 			if mname in available:
-# 				info = available[mname]
-# 				if "mizabot" in info:
-# 					mizabot = (model,) + info["mizabot"][1:]
-# 				else:
-# 					mizabot = (model, (0.5, 2.5))
-# 					print(f"Unknown cost, automatically using {mizabot}")
-# 				info["mizabot"] = mizabot
-# 			else:
-# 				mizabot = (model, (0.5, 2.5))
-# 				print(f"Unknown cost, automatically using {mizabot}")
-# 				available[mname] = {
-# 					"mizabot": (model, (0.5, 2.5)),
-# 					None: default,
-# 				}
-# 		last_ensured = models
-# 		local_available = True
-# 		return models
-# 	finally:
-# 		model = models[0]
-# 		mname = known.get(model, model)
-# 		available["auto"] = {None: mname}
-# 		if mname in contexts:
-# 			contexts["auto"] = contexts[mname]
-# 		if mname in instruct_formats:
-# 			instruct_formats["auto"] = instruct_formats[mname]
-# 		for k in ("is_chat", "is_completion", "is_function", "is_vision", "is_premium"):
-# 			if mname in globals()[k]:
-# 				globals()[k].add("auto")
-# 		last_ensured_time = utc()
 
 async def llm(func, *args, api="openai", timeout=120, premium_context=None, require_message=True, allow_alt=True, **kwargs):
 	if isinstance(api, str):
@@ -1274,6 +1213,7 @@ async def instruct(data, best=False, skip=False, prune=True, cache=True, user=No
 	resp, best = await _instruct2(data, best=best, skip=skip, prune=prune, user=user)
 	if best and decensor.search(resp):
 		resp, best = await _instruct2(data, best=False, skip=False, prune=True, user=user)
+	resp = resp.replace("<think>", "").replace("</think>", "").strip()
 	CACHE[key] = (resp, best)
 	return resp
 

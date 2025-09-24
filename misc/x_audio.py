@@ -164,7 +164,7 @@ class AudioPlayer(discord.AudioSource):
 		except KeyError:
 			pass
 		else:
-			if not self or self.vc and not self.vc.is_connected():
+			if not self or self.vc and (self.vc.channel.id != vcc.id or not self.vc.is_connected()):
 				await cls.force_disconnect(vcc.guild)
 				await asyncio.sleep(1)
 				if self:
@@ -725,7 +725,7 @@ class AudioPlayer(discord.AudioSource):
 			await self.leave("Queue empty")
 
 	def read(self):
-		"""Overrides discord.AudioSource read method to read audio data from the current playing source. Handles EOF, automatically skipping songs that have ended."""
+		"""Overrides discord.AudioSource read method to read audio data from the current playing source. Handles EOF, seamlessly skipping songs that have ended, and removing the need for a new play() call."""
 		if not self.playing or self.settings.pause:
 			if self.silent:
 				try:
@@ -1245,7 +1245,7 @@ class AudioFile:
 		options = auds.construct_options(full=self.live)
 		speed = 1
 		if options or pos or auds.settings.bitrate < auds.defaults["bitrate"] or self.live or not isinstance(self.stream, str):
-			args = ["./ffmpeg", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+nobuffer+discardcorrupt+genpts+igndts+flush_packets"]
+			args = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+nobuffer+discardcorrupt+genpts+igndts+flush_packets"]
 			if pos or auds.reverse:
 				arg = "-to" if auds.reverse else "-ss"
 				if auds.reverse and not pos:
@@ -1259,7 +1259,7 @@ class AudioFile:
 				buff = False
 				if pos > 60 or not self.live or is_discord_attachment(source):
 					if is_url(source):
-						args = ["./ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "250"] + args[1:]
+						args = ["ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "250"] + args[1:]
 					args.insert(1, "-nostdin")
 					args.append(source)
 				else:

@@ -37,15 +37,6 @@ Dario Alpern
 -Integer factorization calculator: {https://github.com/alpertron/calculators}
 -Used by the factorize() function in the math command
 
-https://www.ofoct.com/audio-converter/convert-wav-or-mp3-ogg-aac-wma-to-midi.html
--Used by the mp3 to midi converter
-
-https://www.onlineconverter.com/midi-to-mp3
--Used by the midi to mp3 converter
-
-https://www.svgtopng.me/
--Used by the svg to png converter
-
 https://www.djtech.net/humor/useless_facts.htm
 https://github.com/sameerkumar18/useless-facts-api
 -Used by the fun facts flavour text generator
@@ -53,19 +44,8 @@ https://github.com/sameerkumar18/useless-facts-api
 https://github.com/pocmo/Python-Brainfuck
 -Used for the ~math Brainfuck interpreter
 
-nihui, 20kdc
-https://github.com/nihui/waifu2x-ncnn-vulkan
-https://gitlab.com/20kdc/waifu2x-upconv7-webgl
--Used for the ~waifu2x command
-
-https://stackoverflow.com/a/37350619
--Used for the image transform filter
-
 https://yt-download.org
 -Used for the backup youtube downloader
-
-https://github.com/mailopl/html5-xhr2-chunked-file-upload-slice
--Used by the webserver's upload feature
 
 
 MISC:

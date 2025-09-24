@@ -22,7 +22,7 @@ from .util import (
 	python, compat_python, shuffle, utc, proxy, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration_2, html_decode,
 	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url,
-	EvalPipe, PipedProcess, TimedCache, Request, Semaphore, TEMP_PATH, magic, rename, temporary_file, replace_ext,
+	EvalPipe, PipedProcess, TimedCache, Request, Semaphore, TEMP_PATH, magic, rename, temporary_file, replace_ext, USER_AGENT,
 )
 
 # Gets the best icon/thumbnail for a queue entry.
@@ -224,7 +224,7 @@ fluidsynth = synth_dir + "fluidsynth"
 orgexport = synth_dir + "orgexport"
 
 http_headers = {
-	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+	"User-Agent": USER_AGENT,
 }
 
 def ensure_synths():
@@ -434,21 +434,6 @@ class AudioDownloader:
 	# Returns a full youtube playlist.
 	def get_youtube_playlist(self, p_id):
 		resp = Request(f"https://www.youtube.com/playlist?list={p_id}", headers=self.youtube_header)
-		client = ytd.extractor.youtube.INNERTUBE_CLIENTS["web"]["INNERTUBE_CONTEXT"]["client"].copy()
-		try:
-			ytcfg = resp[resp.index(b"ytcfg.set"):]
-			ytcfg = ytcfg[:ytcfg.index(b";")]
-			ytcfg = eval(ytcfg.split(b"(", 1)[-1].rsplit(b")", 1)[0], {}, {})[-1] + "&"
-			end = "&"
-			start = "client.name="
-			cname = ytcfg[ytcfg.index(start) + len(start):]
-			client["clientName"] = cname[:cname.index(end)]
-			start = "client.version="
-			cversion = ytcfg[ytcfg.index(start) + len(start):]
-			client["clientVersion"] = cversion[:cversion.index(end)]
-		except ValueError:
-			pass
-		context = dict(client=client)
 		try:
 			try:
 				resp = resp[resp.index(b'{"responseContext":{'):]
@@ -465,9 +450,15 @@ class AudioDownloader:
 				resp = resp[:resp.index(b'window["ytInitialPlayerResponse"] = null;')]
 				resp = resp[:resp.rindex(b";")]
 			data = orjson.loads(resp)
+			client = dict(name="WEB", version="2.20250923")
+			for tracker in data["responseContext"]["serviceTrackingParams"]:
+				for param in tracker.get("params", ()):
+					if param["key"].startswith("client."):
+						client[param["key"].removeprefix("client.")] = param["value"]
 		except:
 			print(resp)
 			raise
+		context = dict(client=client)
 		count = int(data["sidebar"]["playlistSidebarRenderer"]["items"][0]["playlistSidebarPrimaryInfoRenderer"]["stats"][0]["runs"][0]["text"].replace(",", ""))
 		items = data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"]
 		entries, token = self.extract_playlist_items(items)
@@ -1186,30 +1177,31 @@ class AudioDownloader:
 						p_id = p_id.split("&", 1)[0]
 						break
 				if p_id:
+					v_id = None
+					for x in ("?v=", "&v="):
+						if x in url:
+							v_id = url[url.index(x) + len(x):]
+							v_id = v_id.split("&", 1)[0]
+							break
 					if p_id in ("LL", "LM", "WL", "RDMM"):
-						raise PermissionError("Sorry, this endpoint is intentionally blocked for privacy and performance.")
+						if v_id:
+							return [], f"https://youtu.be/{v_id}"
+						raise PermissionError("Sorry, this endpoint is intentionally blocked for privacy/performance.")
 					with tracebacksuppressor:
 						output.extend(self.get_youtube_playlist(p_id))
 						# Scroll to highlighted entry if possible
-						v_id = None
-						for x in ("?v=", "&v="):
-							if x in url:
-								v_id = url[url.index(x) + len(x):]
-								v_id = v_id.split("&", 1)[0]
-								break
 						if v_id:
 							for i, e in enumerate(output):
 								if v_id in e.url:
 									output.rotate(-i)
 									break
-						return output
 			elif re.match(r"^https:\/\/soundcloud\.com\/[A-Za-z0-9]+\/sets\/", url) or re.match(r"^https:\/\/soundcloud\.com\/[A-Za-z0-9]+\/likes", url) or re.match(r"^https:\/\/api-v2\.soundcloud\.com\/users\/[0-9]+\/likes", url):
 				with tracebacksuppressor:
-					return self.get_soundcloud_playlist(url)
+					output.extend(self.get_soundcloud_playlist(url))
 			elif is_spotify_url(url):
 				raise AssertionError(url, "Currently unsupported!")
 				with tracebacksuppressor:
-					return self.get_spotify_playlist(url)
+					output.extend(self.get_spotify_playlist(url))
 		else:
 			urls = []
 			if ":" not in url:
@@ -1236,11 +1228,11 @@ class AudioDownloader:
 						futs.append(fut)
 						break
 			output.extend(itertools.chain.from_iterable(f.result() for f in futs))
-		return list(output)
+		return list(output), url
 
 	# Main extract function, able to extract from youtube playlists much faster than youtube-dl using youtube API, as well as ability to follow spotify links.
 	def extract(self, url, mode=None, count=1):
-		output = self.preprocess(url, mode=mode, count=count)
+		output, url = self.preprocess(url, mode=mode, count=count)
 		# Only proceed if no items have already been found (from playlists in this case)
 		if not len(output):
 			resp = None
