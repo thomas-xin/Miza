@@ -4710,6 +4710,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 	semaphore = Semaphore(512, 256)
 	sessions = ()
 	session = niquests.Session()
+	compat_session = requests.Session()
 
 	@classmethod
 	def header(cls, base=(), **fields) -> cdict:
@@ -4802,7 +4803,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 			if aio:
 				session = None
 			else:
-				session = requests if is_discord_url(url) else self.session
+				session = self.compat_session if is_discord_url(url) else self.session
 		elif bypass:
 			if "user-agent" not in headers and "User-Agent" not in headers:
 				headers["User-Agent"] = USER_AGENT
@@ -4826,7 +4827,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				req = reqs.next()
 				resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
 			else:
-				req = requests if is_discord_url(url) else self.session
+				req = self.compat_session if is_discord_url(url) else self.session
 				resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
 			if resp.status_code >= 400:
 				if not resp.content or magic.from_buffer(resp.content).startswith("text/"):

@@ -3319,7 +3319,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				url = (await self.data.exec.uproxy(url, force=force)) or url
 		return url
 
-	async def as_embed(self, message, link=False, colour=False, refresh=True) -> discord.Embed:
+	async def as_embed(self, message, link=False, colour=False, refresh=True, proxy_images=True) -> discord.Embed:
 		if refresh:
 			message = await self.ensure_reactions(message)
 		emb = discord.Embed(description="").set_author(**get_author(message.author))
@@ -3327,7 +3327,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			col = await self.get_colour(message.author)
 			emb.colour = col
 		content = message.content or message.system_content
-		if content:
+		if proxy_images and content:
 			urls = await self.follow_url(content)
 			if urls:
 				with tracebacksuppressor:
@@ -3356,9 +3356,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			url = a.url
 			if is_image(url) is not None:
 				if not image:
-					image = await self.data.exec.uproxy(url)
+					if proxy_images:
+						image = await self.data.exec.uproxy(url)
+					else:
+						image = url
 				else:
-					thumbnail = await self.data.exec.uproxy(url)
+					if proxy_images:
+						thumbnail = await self.data.exec.uproxy(url)
+					else:
+						thumbnail = url
 		for s in T(message).get("stickers", ()):
 			if not image:
 				image = s.url
@@ -3373,12 +3379,24 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						emb.add_field(name=f["name"], value=f["value"], inline=f.get("inline", True))
 			if e.image:
 				if not image:
-					image = await self.data.exec.uproxy(e.image.url)
+					url = e.image.url
+					if proxy_images:
+						image = await self.data.exec.uproxy(url)
+					else:
+						image = url
 				else:
-					thumbnail = await self.data.exec.uproxy(e.image.url)
+					url = e.image.url
+					if proxy_images:
+						thumbnail = await self.data.exec.uproxy(url)
+					else:
+						thumbnail = url
 				break
 			if e.thumbnail:
-				thumbnail = await self.data.exec.uproxy(e.thumbnail.url)
+				url = e.thumbnail.url
+				if proxy_images:
+					thumbnail = await self.data.exec.uproxy(url)
+				else:
+					thumbnail = url
 		if image:
 			emb.url = image
 			emb.set_image(url=image)
@@ -3410,12 +3428,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		urls = [e.url for e in message.embeds if e.url] + [best_url(a) for a in message.attachments]
 		items = []
 		for i in range((len(urls) + 9) // 10):
-			temp = urls[i * 10:i * 10 + 10]
-			try:
-				temp2 = await self.data.exec.uproxy(*temp, collapse=False)
-			except Exception:
-				print_exc()
-				temp2 = temp
+			temp2 = temp = urls[i * 10:i * 10 + 10]
+			if proxy_images:
+				try:
+					temp2 = await self.data.exec.uproxy(*temp, collapse=False)
+				except Exception:
+					print_exc()
 			def as_link(url1, url2):
 				if image in (url1, url2) or thumbnail in (url1, url2):
 					return

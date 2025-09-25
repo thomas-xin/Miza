@@ -3116,8 +3116,8 @@ class UpdateMessageLogs(Database):
 		except (EOFError, discord.NotFound):
 			self.data.pop(guild.id)
 			return
-		emb = await self.bot.as_embed(after)
-		emb2 = await self.bot.as_embed(before, refresh=False)
+		emb = await self.bot.as_embed(after, proxy_images=False)
+		emb2 = await self.bot.as_embed(before, proxy_images=False, refresh=False)
 		emb.colour = discord.Colour(0x0000FF)
 		action = f"**Message edited in** {channel_mention(after.channel.id)}:\n[View Message]({after.jump_url})"
 		emb.add_field(name="Before", value=lim_str(emb2.description, 1024))

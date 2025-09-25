@@ -7,13 +7,12 @@ import time
 from traceback import print_exc
 import numpy as np
 from PIL import Image
-import niquests
 from misc.types import utc, as_str
 from misc.asyncs import esubmit, wrap_future, Future
 from misc.util import (
     retrieve_from, CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, uuhash,
-	ungroup_attachments,
+	ungroup_attachments, is_discord_url,
     snowflake_time_2, shorten_attachment, merge_url, split_url, discord_expired, url2fn,
 )
 
@@ -84,8 +83,9 @@ class ColourCache(diskcache.Cache):
 		try:
 			return tuple(self[k])
 		except KeyError:
+			req = Request.compat_session if is_discord_url(url) else Request.session
 			try:
-				with niquests.get(url, headers=Request.header(), stream=True) as resp:
+				with req.get(url, headers=Request.header(), stream=True) as resp:
 					mime = resp.headers.get("Content-Type", "")
 					if "text/html" in mime:
 						it = resp.iter_content(65536)
@@ -176,7 +176,7 @@ class AttachmentCache(diskcache.Cache):
 					last.discard(tup)
 					cid, mid, n = tup
 					heads = self.alt_headers if n else self.headers
-					resp = niquests.patch(
+					resp = Request.compat_session.patch(
 						f"https://discord.com/api/{api}/channels/{cid}/messages/{mid}",
 						data=json_dumps(dict(embeds=embeds)),
 						headers=heads,
@@ -185,7 +185,7 @@ class AttachmentCache(diskcache.Cache):
 					cid = choice(self.channels)
 					n = random.randint(0, 1)
 					heads = self.alt_headers if n else self.headers
-					resp = niquests.post(
+					resp = Request.compat_session.post(
 						f"https://discord.com/api/{api}/channels/{cid}/messages",
 						data=json_dumps(dict(embeds=embeds)),
 						headers=heads,
@@ -212,8 +212,8 @@ class AttachmentCache(diskcache.Cache):
 			for (c, k, n) in tuple(last):
 				if utc() - snowflake_time_2(int(k)).timestamp() > 86400 * 6:
 					last.remove((c, k, n))
-					heads = self.headers
-					resp = niquests.delete(
+					heads = self.headers if c not in self.channels else self.alt_headers
+					resp = Request.compat_session.delete(
 						f"https://discord.com/api/{api}/channels/{c}/messages{k}",
 						headers=heads,
 					)
