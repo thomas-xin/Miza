@@ -203,26 +203,21 @@ class AttachmentCache(diskcache.Cache):
 			for task, emb in zip(tasks, message["embeds"]):
 				url = emb["image"]["url"]
 				task[0].set_result(url)
-			# futs = []
-			# for emb in message["embeds"]:
-			# 	url = emb["image"]["url"]
-			# 	futs.append(esubmit(requests.head, url, verify=False))
-			# for task, fut in zip(tasks, futs):
-			# 	resp = fut.result()
-			# 	try:
-			# 		resp.raise_for_status()
-			# 	except Exception as ex:
-			# 		task[0].set_exception(ex)
-			# 	else:
-			# 		task[0].set_result(resp.url)
 
 	def set_last(self, tup):
 		time.sleep(1)
-		last = self.last
-		last.add(tup)
-		for (c, k, n) in tuple(last):
-			if utc() - snowflake_time_2(int(k)).timestamp() > 3600 * 12:
-				last.remove((c, k, n))
+		with tracebacksuppressor:
+			last = self.last
+			last.add(tup)
+			for (c, k, n) in tuple(last):
+				if utc() - snowflake_time_2(int(k)).timestamp() > 86400 * 6:
+					last.remove((c, k, n))
+					heads = self.headers
+					resp = niquests.delete(
+						f"https://discord.com/api/{api}/channels/{c}/messages{k}",
+						headers=heads,
+					)
+					resp.raise_for_status()
 
 	async def get_attachment(self, c_id, m_id, a_id, fn):
 		ac = self.attachment_count

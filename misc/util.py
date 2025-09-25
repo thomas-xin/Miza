@@ -1025,7 +1025,7 @@ def get_image_size(b):
 		temp = temporary_file()
 		input.seek(0)
 		save_file(input, temp)
-		cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", temp)
+		cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", temp)
 		print(cmd)
 		try:
 			out = subprocess.check_output(cmd)
@@ -2104,7 +2104,7 @@ class DownloadingFile(io.IOBase):
 
 def get_duration_2(filename, _timeout=12):
 	command = (
-		"./ffprobe",
+		"ffprobe",
 		"-v",
 		"error",
 		"-select_streams",
@@ -2151,7 +2151,7 @@ def get_duration_2(filename, _timeout=12):
 def get_duration_simple(filename, _timeout=12):
 	"Runs FFprobe on a file or url, returning the duration if possible."
 	command = (
-		"./ffprobe",
+		"ffprobe",
 		"-v",
 		"error",
 		"-select_streams",
