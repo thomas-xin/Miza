@@ -2350,6 +2350,17 @@
 			],
 			"timeout": "3600"
 		},
+		"UMP": {
+			"aliases": [
+				"UMP"
+			],
+			"description": "lol",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(0, 1)",
+			"example": [],
+			"timeout": "24"
+		},
 		"BTD6Paragon": {
 			"aliases": [
 				"BTD6Paragon",

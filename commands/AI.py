@@ -80,7 +80,7 @@ class Ask(Command):
 		_premium.require(2)
 		prompt = (prompt or "").strip()
 		if not prompt and not _message.attachments:
-			prompt = "Hi!"
+			prompt = "👋"
 			if xrand(2):
 				emb = discord.Embed(colour=rand_colour())
 				emb.set_author(**get_author(bot.user))
@@ -133,7 +133,7 @@ class Ask(Command):
 			)
 		else:
 			reference = None
-		hislim = 96 if _premium.value >= 4 else 48
+		hislim = 192 if _premium.value >= 4 else 96
 		if not simulated:
 			async for m in bot.history(_channel, limit=hislim):
 				if m.id < pdata.cutoff:

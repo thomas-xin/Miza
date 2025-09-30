@@ -511,6 +511,16 @@ class SpectralPulse(Command):
 			await bot.send_with_file(channel, "", fn2, filename=n2, reference=message)
 
 
+class UMP(Command):
+	description = "lol"
+	schema = cdict()
+	rate_limit = (0, 1)
+	ephemeral = True
+
+	def __call__(self, _channel, _message, **void):
+		self.bot.send_as_embeds(_channel, image="https://mizabot.xyz/u/7KjPmqgCGJ_x2xI5OB__BwAGzRt0/image.png", reference=_message)
+
+
 class BTD6Paragon(Command):
 	name = ["Paragon", "GenerateParagon"]
 	description = "Given a tower and provided parameters, generates a list of Bloons TD 6 optimised paragon sacrifices. Parameters are \"p\" for pops, \"g\" for cash generated, \"t\" for Geraldo totems, and \"l\" for additional tower limit."

@@ -107,7 +107,6 @@ def save_file(data, fn):
 		data = io.BytesIO(data)
 	with open(fn, "wb") as f:
 		shutil.copyfileobj(data, f)
-		print("SF:", f.tell())
 
 _globals = globals()
 def save_auth(auth):
@@ -4803,7 +4802,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 			if aio:
 				session = None
 			else:
-				session = self.compat_session if is_discord_url(url) else self.session
+				session = self.compat_session if is_discord_url(url) or "mizabot.xyz/u/" in url else self.session
 		elif bypass:
 			if "user-agent" not in headers and "User-Agent" not in headers:
 				headers["User-Agent"] = USER_AGENT
@@ -4827,7 +4826,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				req = reqs.next()
 				resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
 			else:
-				req = self.compat_session if is_discord_url(url) else self.session
+				req = self.compat_session if is_discord_url(url) or "mizabot.xyz/u/" in url else self.session
 				resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
 			if resp.status_code >= 400:
 				if not resp.content or magic.from_buffer(resp.content).startswith("text/"):

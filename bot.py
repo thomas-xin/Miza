@@ -1993,7 +1993,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				pass
 		if backup_models:
 			models.extend((
-				"grok-3-mini",
+				"grok-4-fast",
 			))
 		if model:
 			if model in models:
@@ -2348,7 +2348,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			reasoning="gpt-5-mini",
 			instructive="gpt-5-mini",
 			casual="gpt-5-mini",
-			nsfw="grok-3-mini",
+			nsfw="grok-4-fast",
 			backup="gemini-2.5-flash-t",
 			retry="gpt-5",
 			function="gemini-2.5-flash-t",
@@ -2358,7 +2358,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		2: cdict(
 			reasoning="gpt-5",
 			instructive="gpt-5",
-			casual="gemini-2.5-pro",
+			casual="grok-4",
 			nsfw="grok-4",
 			backup="kimi-k2",
 			retry="kimi-k2",
@@ -7968,10 +7968,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		fields = None
 		if isinstance(ex, TooManyRequests):
 			fields = (("Running into the rate limit often?", f"Consider donating using one of the subscriptions from my [ko-fi]({self.kofi_url}), which will grant shorter rate limits amongst many feature improvements!"),)
-		elif isinstance(ex, (discord.HTTPException, ConnectionError)):
-			fields = ((str(ex.args[0]).split(None, 1)[0], "This error usually indicates that the remote server (possibly Discord) is rejecting the response. Please double check your inputs, or try again later!"),)
 		elif isinstance(ex, discord.Forbidden):
 			fields = (("403", "This error usually indicates that I am missing one or more necessary Discord permissions to perform this command!"),)
+		elif isinstance(ex, (discord.HTTPException, ConnectionError)):
+			fields = ((str(ex.args[0]).split(None, 1)[0], "This error usually indicates that the remote server (possibly Discord) is rejecting the response. Please double check your inputs, or try again later!"),)
 		elif isinstance(ex, (CE, CE2)):
 			fields = (("Response disconnected.", "If this error occurs during a command, it is likely due to maintenance!"),)
 		elif hasattr(ex, "footer"):

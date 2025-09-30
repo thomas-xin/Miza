@@ -44,6 +44,10 @@ available = {
 		"openrouter": ("anthropic/claude-3-opus", ("15", "75")),
 		None: "gpt-5",
 	},
+	"claude-4.5-sonnet": {
+		"openrouter": ("anthropic/claude-4.5-sonnet", ("3", "15")),
+		None: "gpt-5",
+	},
 	"claude-4-sonnet": {
 		"openrouter": ("anthropic/claude-sonnet-4", ("3", "15")),
 		None: "gemini-2.5-pro",
@@ -73,6 +77,11 @@ available = {
 		"deepseek": ("deepseek-reasoner", ("0.41167", "1.64333")),
 		"deepinfra": ("deepseek-ai/DeepSeek-R1", ("0.85", "2.5")),
 		None: "o1-preview",
+	},
+	"deepseek-v3.2": {
+		"openrouter": ("deepseek/deepseek-v3.2-exp", ("0.27", "0.41")),
+		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
+		None: "gpt-5",
 	},
 	"deepseek-v3.1": {
 		"openrouter": ("deepseek/deepseek-chat-v3.1", ("0.2", "0.8")),
@@ -148,11 +157,11 @@ available = {
 		None: "gpt-5",
 	},
 	"gemini-2.5-flash-t": {
-		"openrouter": ("google/gemini-2.5-flash", ("0.3", "2.5")),
+		"openrouter": ("google/gemini-2.5-flash-preview-09-2025", ("0.3", "2.5")),
 		None: "gpt-5",
 	},
 	"gemini-2.5-flash": {
-		"openrouter": ("google/gemini-2.5-flash-lite", ("0.1", "0.4")),
+		"openrouter": ("google/gemini-2.5-flash-lite-preview-09-2025", ("0.1", "0.4")),
 		None: "gpt-5",
 	},
 	"gemini-2.0": {
@@ -162,6 +171,10 @@ available = {
 	"grok-4": {
 		"openrouter": ("x-ai/grok-4", ("3", "15")),
 		None: "grok-3",
+	},
+	"grok-4-fast": {
+		"openrouter": ("x-ai/grok-4-fast", ("0.2", "0.5")),
+		None: "grok-3-mini",
 	},
 	"grok-3": {
 		"openrouter": ("x-ai/grok-3", ("3", "15")),
@@ -332,6 +345,7 @@ is_chat = {
 	"magnum-72b",
 	"qwen-72b",
 	"grok-4",
+	"grok-4-fast",
 	"grok-3",
 	"grok-3-mini",
 	"gemini-2.5-pro",
@@ -360,6 +374,7 @@ is_chat = {
 	"minimax-m1",
 	"minimax-01",
 	"deepseek-r1",
+	"deepseek-v3.2",
 	"deepseek-v3.1",
 	"deepseek-v3",
 	"skyfall-36b",
@@ -400,6 +415,7 @@ is_reasoning = {
 	"claude-3.7-sonnet:thinking",
 	"claude-3.7-sonnet-t",
 	"grok-4",
+	"grok-4-fast",
 	"grok-3",
 	"grok-3-mini",
 	"gemini-2.5-pro",
@@ -429,6 +445,7 @@ is_function = {
 	"command-r-plus",
 	"35b-beta-long",
 	"grok-4",
+	"grok-4-fast",
 	"grok-3",
 	"grok-3-mini",
 	"gemini-2.5-pro",
@@ -455,6 +472,7 @@ is_function = {
 	"gpt-4-0125-preview",
 	"gpt-3.5",
 	"gpt-3.5-turbo",
+	"deepseek-v3.2",
 	"deepseek-v3.1",
 	"mistral-24b",
 	"kimi-k2",
@@ -472,6 +490,7 @@ is_vision = {
 	"llama-3-11b",
 	"llama-3-90b",
 	"grok-4",
+	"grok-4-fast",
 	"gemini-2.5-pro",
 	"gemini-2.5-flash-t",
 	"gemini-2.5-flash",
@@ -553,6 +572,7 @@ contexts = {
 	"llama-3-90b": 131072,
 	"llama-3-405b": 131072,
 	"grok-4": 262144,
+	"grok-4-fast": 2097152,
 	"grok-3": 131072,
 	"grok-3-mini": 131072,
 	"gemini-2.5-pro": 1048576,
@@ -581,6 +601,7 @@ contexts = {
 	"minimax-m1": 1000000,
 	"minimax-01": 1000000,
 	"deepseek-r1": 64000,
+	"deepseek-v3.2": 163840,
 	"deepseek-v3.1": 64000,
 	"deepseek-v3": 64000,
 	"skyfall-36b": 32768,
@@ -947,15 +968,14 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above!'
 			ml = round_random(max_length)
 			c = await tcount(prompt)
-			# Prefer gpt-5-nano and gpt-oss-20b for summaries if possible due to the much faster throughput and lower cost, but fallback to gemini-2.5-flash if necessary (due to its higher token limit of 1 million).
+			# Prefer gpt-5-nano and gpt-oss-20b for summaries if possible due to the much faster throughput and lower cost, but fallback to grok-4-fast if necessary (due to its higher token limit of 2 million).
 			model = "gpt-5-nano" if best > 1 else "gpt-oss-20b"
 			if c > contexts.get(model, 65536) * 2 / 3:
-				model = "gemini-2.5-flash"
+				model = "grok-4-fast"
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
 			if model in is_reasoning:
 				data["reasoning_effort"] = "minimal"
 			resp = await instruct(data, best=True, skip=True)
-			resp = resp.strip()
 			print("Summary:", resp)
 			if resp and not decensor.search(resp):
 				return resp
@@ -1213,7 +1233,6 @@ async def instruct(data, best=False, skip=False, prune=True, cache=True, user=No
 	resp, best = await _instruct2(data, best=best, skip=skip, prune=prune, user=user)
 	if best and decensor.search(resp):
 		resp, best = await _instruct2(data, best=False, skip=False, prune=True, user=user)
-	resp = resp.replace("<think>", "").replace("</think>", "").strip()
 	CACHE[key] = (resp, best)
 	return resp
 
@@ -1225,6 +1244,7 @@ async def _instruct2(data, best=False, skip=False, prune=True, user=None):
 		if resp != resp2:
 			print("PRUNED:", resp, resp2, sep="::")
 			resp = resp2
+	resp = resp.replace("<think>", "").replace("</think>", "").strip()
 	return (resp, best)
 
 async def _instruct(data, best=False, skip=False, user=None):
@@ -1839,6 +1859,7 @@ CL100K_IM = {
 	"gpt-4o",
 	"gpt-4o-mini",
 	"deepseek-r1",
+	"deepseek-v3.2",
 	"deepseek-v3.1",
 	"deepseek-v3",
 	"quill-72b",
