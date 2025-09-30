@@ -399,8 +399,8 @@ class Math(Command):
 			type="integer",
 			validation=f"(0, {limit}]",
 			description="Floating point calculation precision. Also affects notation of scientific notation and recurring decimals",
-			example="1000",
-			default=256,
+			example="8000",
+			default=1024,
 		),
 	)
 	usage = "<string> <verbose(-v)|rationalize(-r)>? <show_variables(-l)|clear_variables(-c)>?"

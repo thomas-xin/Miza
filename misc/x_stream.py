@@ -443,8 +443,6 @@ class Server:
 		if rquery:
 			rquery = "?" + rquery
 		url = f"{self.state['/']}{rpath}{rquery}"
-		if cp.request.method.upper() != "GET" or self.state["/"].startswith("https://"):
-			raise cp.HTTPRedirect(url, 307)
 		try:
 			headers, content = self.statics[url]
 		except LookupError:
