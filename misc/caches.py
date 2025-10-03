@@ -282,7 +282,11 @@ class AttachmentCache(diskcache.Cache):
 				json=True,
 			)
 			for e in data["embeds"]:
-				urls.append(e["author"]["icon_url"])
+				try:
+					url = e["author"]["icon_url"]
+				except KeyError:
+					url = e["image"]["url"]
+				urls.append(url)
 		return urls, size_mb * 1048576
 
 	async def obtains(self, path):

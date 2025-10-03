@@ -819,7 +819,7 @@ class UpdateExec(Database):
 		groups = []
 		chunksize = self.DEFAULT_LIMIT
 		for start in range(0, len(b), chunksize):
-			if not groups or len(groups[-1]) >= min(10, max(1, int(sqrt(len(b) / chunksize)))):
+			if not groups or len(groups[-1]) >= min(10, max(2, int(sqrt(len(b) / chunksize)))):
 				groups.append([])
 			chunk = b[start:start + chunksize]
 			groups[-1].append(chunk)
@@ -831,13 +831,18 @@ class UpdateExec(Database):
 			files = []
 			embeds = []
 			for chunk in group:
-				file = CompatFile(bytes(chunk), filename=fn)
+				b = bytes(chunk)
+				file = CompatFile(b, filename=fn)
 				member = choice(channel.guild.members)
 				try:
 					thumb = member.avatar.url
 				except Exception:
 					thumb = bot.discord_icon
-				embed = discord.Embed(colour=rand_colour()).set_author(name=member.name, icon_url=f"attachment://{fn}").set_thumbnail(url=thumb)
+				ext = magic.from_buffer(b)
+				if ext.startswith("image/"):
+					embed = discord.Embed(colour=rand_colour()).set_author(name=member.name, icon_url=f"attachment://{fn}").set_thumbnail(url=thumb)
+				else:
+					embed = discord.Embed(colour=rand_colour()).set_image(url=f"attachment://{fn}")
 				files.append(file)
 				embeds.append(embed)
 				fn = str(n)

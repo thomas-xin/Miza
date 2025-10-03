@@ -392,7 +392,8 @@
 		},
 		"Obfuscate": {
 			"aliases": [
-				"Obfuscate"
+				"Obfuscate",
+				"Obscure"
 			],
 			"description": "Obfuscates English text by substituting identical look-alikes with a unicode table.",
 			"usage": "",

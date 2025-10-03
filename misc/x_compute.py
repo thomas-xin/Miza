@@ -949,10 +949,11 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 		bitrate = floor(min(fs / duration * 7.5, 99999999)) # use 7.5 bits per byte
 		pix = "rgb24" if lossless else "yuv444p"
 		if mode == "RGBA":
-			cv = ("-c:v:0", "libsvtav1", "-pix_fmt:v:0", "yuv420p") if not h & 1 and not w & 1 else ("-c:v:0", "libaom-av1", "-pix_fmt:v:0", pix, "-usage", "realtime", "-cpu-used", "3")
+			cv = ("-c:v:0", "libaom-av1", "-pix_fmt:v:0", pix, "-usage", "realtime", "-cpu-used", "3")
 			b1 = floor(bitrate * 3 / 4)
 			b2 = floor(bitrate / 4)
 			command.extend(("-filter_complex", vf + "[0]split=2[v1][v2];[v2]alphaextract[v2]", "-map", "[v1]", "-map", "[v2]", "-f", "avif", *cv, "-b:v:0", str(b1), "-vbr", "on", "-c:v:1", "libaom-av1", "-pix_fmt:1", "gray", "-b:v:1", str(b2), "-usage", "realtime", "-cpu-used", "3", "-y", "-g", "300"))
+			# command.extend(("-f", "avif", "-c:v", "libaom-av1", "-pix_fmt", "yuva444p", "-usage", "realtime", "-cpu-used", "3", "-y", "-g", "300", "-b:v", str(bitrate), "-vbr", "on"))
 		else:
 			if vf:
 				command.extend(("-vf", vf))

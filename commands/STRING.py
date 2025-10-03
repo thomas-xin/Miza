@@ -777,6 +777,7 @@ class AltCaps(Command):
 
 
 class Obfuscate(Command):
+	name = ["Obscure"]
 	description = "Obfuscates English text by substituting identical look-alikes with a unicode table."
 	schema = cdict(
 		text=cdict(
