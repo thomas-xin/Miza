@@ -623,7 +623,7 @@ if __name__ == "__main__":
 
 	# Configure Hypercorn
 	config = Config()
-	config.bind = [f"0.0.0.0:{PORT}"]
+	config.bind = config.quic_bind = [f"0.0.0.0:{PORT}"]
 	config.worker_class = "asyncio"
 	config.workers = 1  # Single worker, uses async for concurrency
 	config.keep_alive_timeout = 65
@@ -636,7 +636,7 @@ if __name__ == "__main__":
 		logger.info(f"SSL enabled with cert: {DOMAIN_CERT}")
 	else:
 		logger.warning("WARNING: SSL keys not found! Running without HTTPS.")
-		config.bind = ["0.0.0.0:80"]  # Fallback to HTTP
+		config.bind = config.quic_bind = ["0.0.0.0:80"]  # Fallback to HTTP
 
 	# Additional configuration
 	config.accesslog = "-"  # Log to stdout
