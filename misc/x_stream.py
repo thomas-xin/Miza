@@ -623,7 +623,7 @@ if __name__ == "__main__":
 
 	# Configure Hypercorn
 	config = Config()
-	config.bind = ["0.0.0.0:443"]
+	config.bind = [f"0.0.0.0:{PORT}"]
 	config.worker_class = "asyncio"
 	config.workers = 1  # Single worker, uses async for concurrency
 	config.keep_alive_timeout = 65
@@ -642,17 +642,6 @@ if __name__ == "__main__":
 	config.accesslog = "-"  # Log to stdout
 	config.errorlog = "-"   # Log to stdout
 	config.loglevel = "INFO"
-
-	# Optional: Configure from AUTH if available
-	if AUTH:
-		port = AUTH.get("webserver_port")
-		port = 4431
-		if port:
-			if config.certfile:
-				config.bind = [f"0.0.0.0:{port}"]
-			else:
-				config.bind = [f"0.0.0.0:{port}"]
-			logger.info(f"Using port from auth.json: {port}")
 
 	logger.info(f"Starting Miza Proxy Server on {config.bind}")
 	logger.info("Press Ctrl+C to stop")
