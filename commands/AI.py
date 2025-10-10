@@ -299,8 +299,11 @@ class Ask(Command):
 						else:
 							if not succ:
 								res = "[RESPONSE EMPTY OR REDACTED]"
+						if succ:
+							temp = str(res)
+							print(f"{name} result:", len(temp), lim_str(temp, 256))
 						if succ and isinstance(res, bytes):
-							# bytes indicates an image, use GPT-4.1 to describe it
+							# bytes indicates an image, use vision to describe it
 							res = await bot.vision(url=res, premium_context=premium)
 						elif succ and isinstance(res, dict):
 							res = res.get("content", "")
@@ -804,11 +807,12 @@ class Imagine(Command):
 		model=cdict(
 			type="enum",
 			validation=cdict(
-				enum=("dalle3", "sdxl", "dalle2"),
-				accepts=dict(dalle="dalle3", stable_diffusion_xl="sdxl"),
+				enum=("dalle3", "dalle2", "flux", "nano-banana"),
+				accepts=dict(dalle="dalle3"),
 			),
 			description="AI model for generation",
 			example="dalle3",
+			default="nano-banana",
 		),
 		mode=cdict(
 			type="enum",
@@ -817,7 +821,7 @@ class Imagine(Command):
 			),
 			description='Transform mode; "preprocess" and "raw" affect text prompts, while the others affect image prompts',
 			example="raw",
-			default="caption",
+			default="preprocess",
 		),
 		url=cdict(
 			type="image",
@@ -889,20 +893,8 @@ class Imagine(Command):
 		),
 	)
 	macros = cdict(
-		StableDiffusion=cdict(
-			model="sdxl",
-		),
-		SDXL=cdict(
-			model="sdxl",
-		),
-		DALLE=cdict(
-			model="dalle3",
-		),
 		DALLE3=cdict(
 			model="dalle3",
-		),
-		DALLE2=cdict(
-			model="dalle2",
 		),
 	)
 	rate_limit = (12, 16)
@@ -912,8 +904,8 @@ class Imagine(Command):
 		"*Tip: Use --ar or --aspect-ratio to control the proportions of the image.*",
 		"*Tip: Use -c or --count to control the amount of images generated; maximum 4 for regular users, 9 for premium.*",
 		# "*Tip: Use --np or --negative-prompt to specify what an image should not contain.*",
-		"*Tip: Use --steps or --hq to control quality vs speed.*",
-		"*Tip: Use --gs or --guidance-scale to control adherance vs diversity.*",
+		# "*Tip: Use --steps or --hq to control quality vs speed.*",
+		# "*Tip: Use --gs or --guidance-scale to control adherance vs diversity.*",
 		# "*Tip: Use --mode (or simply type one of the keywords) to control how separate inputs should be treated.*",
 		# "*Tip: You can upload more than one image as prompt, in which case the second image will be used as inpaint/controlnet mask, if applicable.*",
 	)
@@ -943,15 +935,8 @@ class Imagine(Command):
 		amount2 = 0
 		if model == "dalle3":
 			_premium.require(4)
-		elif model == "scc":
-			_premium.require(2)
-			await bot.lambdassert("scc")
-		elif model == "sdxl":
-			_premium.require(2)
-			assert self.comfyui_data
-			await Request(self.comfyui_api[0] + "/queue")
 		elif model == "dalle2":
-			_premium.require(2)
+			_premium.require(3)
 		else:
 			_premium.require(2)
 		if _premium.value_approx < 4:
@@ -964,7 +949,7 @@ class Imagine(Command):
 		nsfw_prompt = False
 		if mask:
 			raise NotImplementedError("Masks are currently paused due to capacity issues, apologies for any inconvenience!")
-		if not prompt or mode == "caption":
+		if mode == "caption":
 			if url:
 				pt, *p1 = await bot.caption(url, best=3 if _premium.value_approx >= 4 else 1, premium_context=_premium)
 				caption = "\n".join(filter(bool, p1))
@@ -972,10 +957,9 @@ class Imagine(Command):
 					prompt += f" ({caption})"
 				else:
 					prompt = caption
-			elif not prompt:
-				prompt = "imagine art " + str(ts_us())[::-1] if mode == "preprocess" else "art"
-		if mode == "caption":
-			url = mask = None
+				url = None
+		if not prompt:
+			prompt = "imagine art " + str(ts_us())[::-1] if mode == "preprocess" else ""
 		mod_resp = await ai.moderate("Create an image of: " + prompt, premium_context=_premium)
 		if prompt and not nsfw:
 			flagged = nsfw_flagged(mod_resp)
@@ -989,8 +973,6 @@ class Imagine(Command):
 				if mod_resp.categories.sexual:
 					nsfw_prompt = True
 			negative_prompt = negative_prompt or ", ".join(set(("watermark", "blurry", "distorted", "disfigured", "bad anatomy", "poorly drawn")).difference(smart_split(prompt)))
-		if not prompt:
-			prompt = f"Art {random.random()}"
 		await bot.require_integrity(_message)
 
 		pnames = []
@@ -998,8 +980,8 @@ class Imagine(Command):
 		eprompts = alist()
 		dups = max(1, random.randint(amount >> 2, amount))
 		oprompt = prompt
-		if mode in ("caption", "preprocess") and not url and model != "dalle3" and len(prompt.split()) < 32:
-			temp = oprompt.replace('"""', "'''")
+		if mode in ("caption", "preprocess") and not url and len(prompt.split()) < 32:
+			temp = oprompt.replace('"""', "'''") or "[Art]"
 			prompt = f'### Instruction:\n"""\n{temp}\n"""\n\nImprove the above image caption as a description to send to txt2img image generation. Be as creative and detailed as possible in at least 2 sentences, but stay concise!\n\n### Response:'
 			resp = cdict(choices=[])
 			if len(resp.choices) < dups:
@@ -1072,6 +1054,65 @@ class Imagine(Command):
 			eprompts.append(oprompt)
 		# print("PROMPT:", eprompts or prompt)
 		await bot.require_integrity(_message)
+
+		if amount2 < amount and model == "nano-banana":
+			ars = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]
+			selected_ar = ars[0]
+			if aspect_ratio:
+				diff = inf
+				for i, ar in enumerate(ars):
+					p, q = map(int, ar.split(":", 1))
+					d2 = abs(p / q - aspect_ratio)
+					if d2 < diff:
+						diff = d2
+						selected_ar = ar
+
+			def nano_banana(text, image):
+				p = text if text and image else f'Please create an image, to the best of your ability, according to the given user caption:\n\n"""\n{text}"""' if text else "Please make a more interesting version of the provided picture!"
+				content = [dict(type="text", text=p)]
+				if image:
+					content.append(dict(type="image_url", image_url=dict(url=image)))
+				url = "https://openrouter.ai/api/v1/chat/completions"
+				headers = {
+					"Authorization": f"Bearer {AUTH['openrouter_key']}",
+					"Content-Type": "application/json",
+				}
+				payload = {
+					"model": "google/gemini-2.5-flash-image",
+					"messages": [
+						{
+							"role": "user",
+							"content": content,
+						},
+					],
+					"modalities": ["image", "text"],
+					"image_config": {
+						"aspect_ratio": selected_ar,
+					}
+				}
+				response = requests.post(url, headers=headers, json=payload)
+				response.raise_for_status()
+				result = response.json()
+				usage = result["usage"]
+				cost = mpf(1.238 + 0.03 if image else 0.03) / 1000 + mpf(0.3 * usage["prompt_tokens"] + 2.5 * usage["completion_tokens"]) / 1000000
+				_premium.append(["mizabot", resp_model, cost])
+				if result.get("choices"):
+					message = result["choices"][0]["message"]
+					if message.get("images"):
+						for image in message["images"]:
+							image_url = image["image_url"]["url"]
+							return base64.b64decode(image_url.split("base64,", 1)[-1].encode("ascii"))
+				raise RuntimeError(result)
+
+			resp_model = "gemini-2.5-flash-image-preview"
+			pps = [eprompts.next().replace(" BREAK ", "\n") for i in range(amount - amount2)]
+			pnames.extend(pps)
+			if url:
+				image = await bot.to_data_url(url)
+			else:
+				image = None
+			futs.extend(asubmit(nano_banana, p, image) for p in pps)
+			amount2 = amount
 
 		if amount2 < amount and model in ("dalle3", "dalle2"):
 			dalle = "2" if model == "dalle2" else "3"

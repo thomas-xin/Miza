@@ -1,3 +1,4 @@
+import asyncio
 import io
 import os
 import subprocess
@@ -6,6 +7,7 @@ from traceback import print_exc
 import zipfile
 import niquests
 from PIL import Image
+import streamshatter
 # Allow fallback (although not recommended as generally the up-to-date version is necessary for most sites)
 try:
 	import yt_dlp as ytd
@@ -205,6 +207,30 @@ else:
 			'url': video_url,
 		}
 	ytd.extractor.reddit.RedditIE._real_extract = _real_extract
+
+	real_download = ytd.downloader.http.HttpFD.real_download
+	def trial_download(self, filename, info_dict):
+		try:
+			asyncio.run(streamshatter.shatter_request(
+				info_dict["url"],
+				headers=info_dict.get("http_headers", {}),
+				filename=filename,
+			))
+		except Exception:
+			pass
+		else:
+			byte_counter = os.path.getsize(filename)
+			self._hook_progress({
+				'downloaded_bytes': byte_counter,
+				'total_bytes': byte_counter,
+				'filename': filename,
+				'status': 'finished',
+				'elapsed': -1,
+				'ctx_id': info_dict.get('ctx_id'),
+			}, info_dict)
+			return True
+		return real_download(filename, info_dict)
+	ytd.downloader.http.HttpFD.real_download = trial_download
 from .types import list_like, utc
 from .util import Request, EvalPipe, esubmit, python, new_playwright_page, CODECS
 

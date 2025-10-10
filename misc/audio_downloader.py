@@ -352,8 +352,12 @@ class AudioDownloader:
 				video = data["playlistVideoRenderer"]
 			except KeyError:
 				try:
-					token = data["continuationItemRenderer"]["continuationEndpoint"]["continuationCommand"]["token"]
-				except KeyError:
+					continuation_endpoint = data["continuationItemRenderer"]["continuationEndpoint"]
+					try:
+						token = continuation_endpoint["commandExecutorCommand"]["commands"][-1]["continuationCommand"]["token"]
+					except LookupError:
+						token = continuation_endpoint["continuationCommand"]["token"]
+				except LookupError:
 					print(data)
 				continue
 			v_id = video['videoId']
@@ -377,21 +381,16 @@ class AudioDownloader:
 		return out, token
 	# Returns a subsequent page of a youtube playlist from a page token.
 	def get_youtube_continuation(self, token, ctx):
-		for i in range(3):
-			try:
-				data = Request(
-					"https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
-					headers=self.youtube_header,
-					method="POST",
-					data=json_dumps(dict(
-						context=ctx,
-						continuation=token,
-					)),
-					json=True,
-				)
-			except Exception:
-				print_exc()
-				time.sleep(i)
+		data = Request(
+			"https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
+			headers=self.youtube_header,
+			method="POST",
+			data=json_dumps(dict(
+				context=ctx,
+				continuation=token,
+			)),
+			json=True,
+		)
 		items = data["onResponseReceivedActions"][0]["appendContinuationItemsAction"]["continuationItems"]
 		return self.extract_playlist_items(items)
 	# Async version of the previous function, used when possible to minimise thread pool wastage.
@@ -1073,7 +1072,7 @@ class AudioDownloader:
 		if asap is None:
 			asap = d and d > 72
 		special_checked = False
-		if not fmt and (asap or d is None or d > 960):
+		if not fmt:# and (asap or d is None or d > 960):
 			# If format is not specified, try to stream the audio from URL if possible
 			with tracebacksuppressor:
 				stream, cdc, ac = get_best_audio(entry)
@@ -1118,6 +1117,8 @@ class AudioDownloader:
 				dur, _bps, cdc, ac = get_duration_2(fn)
 				return fn, cdc, dur, ac
 		codec = "opus" if ext == "ogg" else ext
+		if start is not None or end is not None:
+			fn = temporary_file(ext)
 		# print("OUTTMPL:", fn)
 		ydl_opts = dict(
 			# Prefer selected codec, but fallback to best audio if not available
@@ -1138,8 +1139,6 @@ class AudioDownloader:
 				end=end,
 			)]
 		)
-		if start is not None or end is not None:
-			fn = temporary_file(ext)
 		if not fmt and (is_discord_attachment(url) or is_miza_url(url)):
 			if discord_expired(url):
 				# Just in case a Discord attachment expires in the short time between checking and downloading
@@ -1148,7 +1147,11 @@ class AudioDownloader:
 			if dur:
 				entry["duration"] = dur
 			return url, cdc, dur, ac
-		entry2 = self.run(f"entry_from_ytdl(ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True))")
+		if url.startswith("https://youtu.be/"):
+			url2 = url.replace("https://youtu.be/", "https://www.youtube.com/watch?v=")
+		else:
+			url2 = url
+		entry2 = self.run(f"entry_from_ytdl(ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url2)},download=True))")
 		entry.update(dict(
 			name=entry2.get("name"),
 			icon=get_best_icon(entry2),
@@ -1253,7 +1256,11 @@ class AudioDownloader:
 					return [cdict(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
 			# Otherwise call automatic extract_info function
 			if not resp:
-				resp = self.extract_info(url, process=False)
+				if url.startswith("https://youtu.be/"):
+					url2 = url.replace("https://youtu.be/", "https://www.youtube.com/watch?v=")
+				else:
+					url2 = url
+				resp = self.extract_info(url2, process=False)
 			if not resp:
 				return []
 			if resp.get("_type") == "url":

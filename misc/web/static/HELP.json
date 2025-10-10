@@ -2330,7 +2330,7 @@
 				"Flac2Webp",
 				"Png2Wav"
 			],
-			"description": "Runs wav2png on the input URL. See https://github.com/thomas-xin/Audio-Image-Converter for more info, or to run it yourself!",
+			"description": "Runs wav2png on the input URL. See https://github.com/thomas-xin/audioptic for more info, or to run it yourself!",
 			"usage": "",
 			"level": "0",
 			"rate_limit": "(15, 25)",

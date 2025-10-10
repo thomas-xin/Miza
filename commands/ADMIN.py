@@ -2765,7 +2765,7 @@ class UpdateUserLogs(Database):
 						print_exc()
 						stored.pop(c_id, None)
 						continue
-					print("Remaining author:", m.author, m.author.id)
+					print("Remaining author:", m.author, m.author.id, guild)
 					if m.author.id == bot.deleted_user:
 						print(user, user.id, "deleted!!")
 						bot.data.users[user.id]["deleted"] = True
@@ -3133,8 +3133,8 @@ class UpdateMessageLogs(Database):
 		files = []
 		for a in message.attachments:
 			try:
-				b = await self.bot.get_attachment(a.url, full=False, allow_proxy=True)
-				fil = CompatFile(seq(b), filename=a.filename.removeprefix("SPOILER_"))
+				fn = await self.bot.get_attachment(a.url)
+				fil = CompatFile(fn, filename=a.filename.removeprefix("SPOILER_"))
 				files.append(fil)
 			except:
 				msg.append(proxy_url(a))
@@ -3373,8 +3373,8 @@ class UpdateCrossposts(Database):
 			embeds.append(embed)
 		files = deque()
 		for a in message.attachments:
-			b = await self.bot.get_attachment(a.url, full=False)
-			files.append(CompatFile(seq(b), filename=T(a).get("filename", "untitled")))
+			fn = await self.bot.get_attachment(a.url)
+			files.append(CompatFile(fn, filename=a.filename.removeprefix("SPOILER_")))
 		for c_id in tuple(self.data[message.channel.id]):
 			try:
 				channel = await self.bot.fetch_channel(c_id)

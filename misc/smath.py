@@ -70,7 +70,10 @@ from misc.types import Dummy, astype, as_str, nested_tuple, alist, arange, afull
 
 import math
 from itertools import repeat
-from colormath import color_objects, color_conversions
+try:
+	from colormath import color_objects, color_conversions
+except ImportError:
+	color_objects = color_conversions = None
 from dynamic_dt import DynamicDT, TimeDelta, time_parse, time_disp, get_timezone, get_offset, get_name
 
 dtn = lambda: datetime.datetime.now()

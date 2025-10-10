@@ -7,7 +7,7 @@ import openai
 import numpy as np
 from collections import deque
 from math import ceil, inf
-from traceback import format_exc
+from traceback import format_exc, print_exc
 from mpmath import mpf
 from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, CE, tracebacksuppressor, utc, T, string_like
 from misc.util import AUTH, CACHE_PATH, TimedCache, retrieve_from, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across
@@ -930,7 +930,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=Fal
 		messages.insert(0, sm)
 	return messages
 
-async def summarise(q, min_length=384, max_length=98304, padding=128, best=True, prompt=None, premium_context=[]):
+async def summarise(q, min_length=384, max_length=65536, padding=128, best=True, prompt=None, premium_context=[]):
 	"Produces an AI-generated summary of input text. Model used is controlled by \"best\" parameter."
 	split_length = max_length - padding
 	summ_length = min(min_length, split_length - 1)
@@ -2126,8 +2126,47 @@ async def moderate(text="", image="", input="", premium_context=[]):
 				input.append(dict(type="text", text=text))
 			if image:
 				input.append(dict(type="image_url", image_url=dict(url=image)))
-		resp = await get_oai("moderations.create")(model="omni-moderation-latest", input=input)
-		premium_context.append(["openai", resp.model, "0.00001"])
+		try:
+			resp = await get_oai("moderations.create")(model="omni-moderation-latest", input=input)
+		except Exception:
+			print_exc()
+			resp = cdict(
+				id="ERROR",
+				model="ERROR",
+				results=[
+					cdict(
+						flagged=False,
+						categories={
+							"sexual": False,
+							"hate": False,
+							"harassment": False,
+							"self-harm": False,
+							"sexual/minors": False,
+							"hate/threatening": False,
+							"violence/graphic": False,
+							"self-harm/intent": False,
+							"self-harm/instructions": False,
+							"harassment/threatening": False,
+							"violence": False,
+						},
+						category_scores={
+							"sexual": 0,
+							"hate": 0,
+							"harassment": 0,
+							"self-harm": 0,
+							"sexual/minors": 0,
+							"hate/threatening": 0,
+							"violence/graphic": 0,
+							"self-harm/intent": 0,
+							"self-harm/instructions": 0,
+							"harassment/threatening": 0,
+							"violence": 0,
+						},
+					)
+				]
+			)
+		else:
+			premium_context.append(["openai", resp.model, "0.00001"])
 		return resp
 	resp = await retrieve_from(CACHE, "moderate-" + shash(text) + "-" + shash(image), moderate_into, text, image)
 	return resp.results[0]

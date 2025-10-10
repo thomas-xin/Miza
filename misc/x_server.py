@@ -826,6 +826,8 @@ class Server:
 				return False
 			if "Cf-Worker" in cp.request.headers:
 				return True
+			if "bot" in cp.request.headers.get("User-Agent", ""):
+				return False
 			if cp.request.headers.get("X-Real-Ip", "")[:3] in ("34.", "35."):
 				return True
 			if cp.request.headers.get("Sec-Fetch-Dest", "").casefold() == "document" and url.split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[-1] not in ("zip", "7z", "tar", "bin", "png", "gif", "webp", "jpg", "jpeg", "heic", "heif", "avif"):
@@ -858,6 +860,10 @@ class Server:
 		update_headers(cp.response.headers, **resp.headers)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
+		if cp.response.headers.pop("Content-Encoding", None):
+			cp.response.headers.pop("Content-Length", None)
+		cp.response.headers.pop("Server", None)
+		cp.response.headers.pop("Alt-Svc", None)
 		if is_discord_attachment(url):
 			cp.response.headers.pop("Content-Disposition", None)
 			update_headers(cp.response.headers, **CHEADERS)

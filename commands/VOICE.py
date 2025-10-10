@@ -2705,10 +2705,6 @@ class UpdateAudio(Database):
 			print("WARNING: FFmpeg not found. Unable to convert and play audio.")
 
 
-class UpdateYTD(Database):
-	name = "ytd"
-
-
 class UpdatePlaylists(Database):
 	name = "playlists"
 

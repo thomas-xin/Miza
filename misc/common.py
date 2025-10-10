@@ -14,7 +14,7 @@ if __name__ != "__mp_main__":
 	from misc.smath import *
 	from misc.caches import *
 
-import psutil, subprocess, weakref, zipfile, urllib, asyncio, json, pickle, functools, orjson, aiohttp, threading, shutil, filetype, inspect, sqlite3, argparse, bisect, httpx
+import psutil, subprocess, weakref, zipfile, urllib, asyncio, json, pickle, functools, orjson, aiohttp, threading, shutil, filetype, inspect, sqlite3, argparse, bisect, httpx, streamshatter
 
 # VERY HACKY removes deprecated audioop dependency for discord.py; this would cause volume transformations to fail but Miza uses FFmpeg for them anyway
 sys.modules["audioop"] = sys
@@ -1691,17 +1691,17 @@ def device_cap(i, resolve=False):
 	return di
 
 
-async def proc_eval(s, caps, priority=False, timeout=12):
+async def proc_eval(s, caps=["image"], priority=False, timeout=12):
 	procs = PROCS_BY_CAPS[caps[0]]
 	for p in procs:
 		if not set(caps).difference(p.caps):
 			break
 	else:
 		raise RuntimeError("No suitable worker process for task.")
-	fut = p.pipe.submit(s, priority=priority)
 	try:
-		return await asyncio.wait_for(wrap_future(fut), timeout=timeout)
-	except Exception:
+		fut = csubmit(p.pipe.asubmit(s, priority=priority))
+		return await asyncio.wait_for(fut, timeout=timeout)
+	except (T0, T1, T2):
 		if not fut.done():
 			print(f"Process {p} timed out, restarting!")
 			csubmit(start_proc(p))
@@ -2074,39 +2074,42 @@ class Database(Importable, collections.abc.MutableMapping):
 	encode = None
 	decode = None
 	automut = True
+	no_file = False
+	use_diskcache = False
 
 	def __init__(self, bot, catg):
 		self.name
 		name = self.name
 		self.__name__ = self.__class__.__name__
 		fhp = "saves/" + name
-		if not getattr(self, "no_file", False):
-			if os.path.exists(fhp):
-				data = self.data = FileHashDict(path=fhp, encode=self.encode, decode=self.decode, automut=self.automut)
-			else:
-				self.file = fhp + ".json"
-				self.updated = False
-				try:
-					with open(self.file, "rb") as f:
-						s = f.read()
-					if not s:
-						raise FileNotFoundError
-					try:
-						data = select_and_loads(s)
-					except Exception:
-						print(self.file)
-						print_exc()
-						raise FileNotFoundError
-					data = FileHashDict(data, path=fhp, encode=self.encode, decode=self.decode, automut=self.automut)
-					data.modified.update(data.data.keys())
-					self.iter = None
-					self.data = data
-				except FileNotFoundError:
-					data = None
-		else:
+		if self.no_file:
 			data = self.data = {}
-		if data is None:
-			self.data = FileHashDict(path=fhp, encode=self.encode, decode=self.decode, automut=self.automut)
+		elif self.use_diskcache:
+			data = self.data = diskcache.Index(fhp)
+		elif os.path.exists(fhp):
+			data = self.data = FileHashDict(path=fhp, encode=self.encode, decode=self.decode, automut=self.automut)
+		else:
+			self.file = fhp + ".json"
+			self.updated = False
+			try:
+				with open(self.file, "rb") as f:
+					s = f.read()
+				if not s:
+					raise FileNotFoundError
+				try:
+					data = select_and_loads(s)
+				except Exception:
+					print(self.file)
+					print_exc()
+					raise FileNotFoundError
+				data = FileHashDict(data, path=fhp, encode=self.encode, decode=self.decode, automut=self.automut)
+				data.modified.update(data.data.keys())
+				self.iter = None
+				self.data = data
+			except FileNotFoundError:
+				data = None
+			if data is None:
+				self.data = FileHashDict(path=fhp, encode=self.encode, decode=self.decode, automut=self.automut)
 		if not issubclass(type(self.data), collections.abc.MutableMapping):
 			self.data = FileHashDict(dict.fromkeys(self.data), path=fhp, encode=self.encode, decode=self.decode, automut=self.automut)
 		self.fixup()
@@ -2158,14 +2161,14 @@ class Database(Importable, collections.abc.MutableMapping):
 	fill = lambda self, other: self.data.fill(other)
 	clear = lambda self: self.data.clear()
 	setdefault = lambda self, k, v: self.data.setdefault(k, v)
-	coercedefault = lambda self, *args, **kwargs: self.data.coercedefault(*args, **kwargs)
-	updatedefault = lambda self, *args, **kwargs: self.data.updatedefault(*args, **kwargs)
+	coercedefault = lambda self, *args, **kwargs: coercedefault(self.data, *args, **kwargs)
+	updatedefault = lambda self, *args, **kwargs: updatedefault(self.data, *args, **kwargs)
 	keys = lambda self: self.data.keys()
 	discard = lambda self, k: self.data.pop(k, None)
 	vacuum = lambda self: self.data.vacuum() if hasattr(self.data, "vacuum") else None
 
 	def sync(self, modified=None, force=False):
-		if hasattr(self, "no_file"):
+		if self.no_file or self.use_diskcache:
 			return
 		if force:
 			try:

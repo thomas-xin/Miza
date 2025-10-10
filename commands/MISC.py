@@ -387,7 +387,7 @@ class CS_Database(Database):
 class Wav2Png(Command):
 	name = ["Image2Audio", "Audio2Image", "Webp2Flac", "Flac2Webp", "Png2Wav"]
 	_timeout_ = 15
-	description = "Runs wav2png on the input URL. See https://github.com/thomas-xin/Audio-Image-Converter for more info, or to run it yourself!"
+	description = "Runs wav2png on the input URL. See https://github.com/thomas-xin/audioptic for more info, or to run it yourself!"
 	schema = cdict(
 		url=cdict(
 			type="media",
@@ -411,10 +411,9 @@ class Wav2Png(Command):
 		ext = fn.rsplit(".", 1)[-1]
 		was_image = ext in IMAGE_FORMS
 		if not fmt:
-			fmt = "flac" if was_image else "webp"
+			fmt = "opus" if was_image else "webp"
 		dest = temporary_file(fmt)
-		executable = os.path.abspath(".") + "/misc/" + ("png2wav.py" if was_image else "wav2png.py")
-		args = [python, executable, url, dest]
+		args = ["audioptic", url, dest]
 		print(args)
 		proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
 		try:
@@ -580,7 +579,7 @@ class UpdateSkyShardReminders(Database):
 		return list(map(int, nums.split(",")))
 
 	async def _reaction_add_(self, message, react, user):
-		if user.id not in self or getattr(message.channel, "recipient", None) != user:
+		if user.id not in self or message.channel.id != (await self.bot.get_dm(user)).id:
 			return
 		if not message.embeds:
 			return

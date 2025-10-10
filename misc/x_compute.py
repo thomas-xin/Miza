@@ -31,11 +31,13 @@ import psutil
 import collections
 import traceback
 import re
+import requests
 import niquests
 import ast
 import base64
 import hashlib
 import random
+import streamshatter
 import urllib
 import numpy as np
 from contextlib import suppress
@@ -48,7 +50,6 @@ if __name__ == "__main__":
 	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
 	print = interface.print
 
-requests = niquests.Session()
 cdict = dict
 utc = time.time
 
@@ -747,6 +748,11 @@ def max_size(w, h, maxsize, force=False):
 		h = round(h * r)
 	return w, h
 
+def download_file(url, fn, timeout=12):
+	resp = requests.get(url, headers=streamshatter.header(), timeout=timeout)
+	with open(fn, "wb") as f:
+		f.write(resp.content)
+
 if "browse" in CAPS:
 	import playwright  # noqa: F401
 
@@ -1272,7 +1278,7 @@ def evalImg(url, operation, args):
 					fmt = "mp4"
 					cdc = "libsvtav1"
 				else:
-					fmt = "avif"
+					fmt = "webp"
 			out = "cache/" + str(ts) + "." + CODECS.get(fmt, fmt)
 			mode = str(first.mode)
 			if mode == "P":

@@ -2351,7 +2351,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			nsfw="grok-4-fast",
 			backup="gemini-2.5-flash-t",
 			retry="gpt-5",
-			function="gemini-2.5-flash-t",
+			function="grok-4-fast",
 			vision="gemini-2.5-flash",
 			target="auto",
 		),
@@ -2949,6 +2949,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			presence_penalty=0.8,
 			user=str(hash(self.name)),
 		)
+		print("Vision Input:", data)
 		async with asyncio.timeout(30):
 			response = await ai.llm("chat.completions.create", premium_context=premium_context, **data, timeout=45)
 		out = response.choices[0].message.content.strip()
@@ -3084,7 +3085,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print(filename, os.path.getsize(filename))
 			raise
 		if not getattr(reference, "slash", None) and message.attachments:
-			await self.add_attachment(message.attachments[0], data, c_id=message.channel.id, m_id=message.id)
 			def temp_url(url):
 				if is_discord_attachment(url):
 					a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
@@ -3123,7 +3123,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					uid = url.rsplit("/", 2)[-2]
 				else:
 					uid = url.split("?", 1)[0].rsplit("/", 1)[-1]
-				attachment = cdict(id=uid, name=url2fn(url), url=url, size=resp.headers.get("Content-Length", 1), read=lambda: self.get_request(url))
+				attachment = cdict(id=uid, name=url2fn(url), url=url, size=int(resp.headers.get("Content-Length", 1)), read=lambda: self.get_request(url))
 				resp.close()
 				csubmit(self.add_and_test(message, attachment))
 
@@ -3177,104 +3177,55 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			ch = f"deleted/{message.channel.id}.txt"
 			print(s, file=ch)
 
-	async def add_attachment(self, attachment, data=None, c_id=None, m_id=None):
-		# if c_id and m_id and "attachments" in self.data:
-		# 	self.data.attachments[attachment.id] = (c_id, m_id)
-		if attachment.id not in self.cache.attachments and int(attachment.size) <= 64 * 1048576:
-			self.cache.attachments[attachment.id] = None
-			if data is None:
-				data = await attachment.read()
-			self.cache.attachments[attachment.id] = data
-			name = url2fn(attachment.url) if hasattr(attachment, "url") else ""
-			if not name and data:
-				name = "untitled." + get_ext(data)
-			ext = "bin" if "." not in name else name.rsplit(".", 1)[-1]
-			fn = f"{CACHE_PATH}/attachments/{attachment.id}.{ext}"
-			if not os.path.exists(fn):
-				await asubmit(save_file, data, fn)
-		return attachment
+	async def add_attachment(self, attachment):
+		if int(attachment.size) <= 64 * 1048576:
+			return await self.get_attachment(attachment.url, size=attachment.size)
 
 	async def add_and_test(self, message, attachment):
-		attachment = await self.add_attachment(attachment, c_id=message.channel.id, m_id=message.id)
-		if "prot" in self.data:
-			name = url2fn(attachment.url) if hasattr(attachment, "url") else ""
-			ext = "bin" if "." not in name else name.rsplit(".", 1)[-1]
-			fn = f"{CACHE_PATH}/attachments/{attachment.id}.{ext}"
-			if fn in self.cache.attachments:
-				if self.cache.attachments[fn]:
-					await self.data.prot.scan(message, fn, known=self.cache.attachments[fn])
-				return
-			if not os.path.exists(fn):
-				data = await self.get_attachment(str(attachment.url))
-				if not data:
-					return
-				await asubmit(save_file, data, fn)
+		fn = await self.add_attachment(attachment)
+		if fn and "prot" in self.data:
+			known = self.cache.attachments.get(attachment.id, None)
 			if get_mime(fn).startswith("image/"):
-				res = await self.data.prot.scan(message, fn)
+				res = await self.data.prot.scan(message, fn, known=known)
 			else:
 				res = ""
-			self.cache.attachments[fn] = res
+			self.cache.attachments[attachment.id] = res
 
-	def attachment_from_file(self, file):
-		a_id = file.split(".", 1)[0][11:]
-		if not a_id.isnumeric():
-			return
-		a_id = int(a_id)
-		self.cache.attachments[a_id] = a_id
-
-	async def get_attachment(self, url, full=True, allow_proxy=False):
-		if not is_discord_attachment(url):
-			return
-		with suppress(ValueError):
-			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-			with suppress(LookupError):
-				for i in range(30):
-					data = self.cache.attachments[a_id]
-					if data is not None:
-						if isinstance(data, memoryview):
-							self.cache.attachments[a_id] = data = bytes(data)
-						if not isinstance(data, bytes):
-							self.cache.attachments[a_id] = None
-							try:
-								fh = str(data)
-								for fn in os.listdir(f"{CACHE_PATH}/attachments"):
-									if fn.startswith(fh):
-										break
-								else:
-									raise FileNotFoundError(fh)
-								with open(f"{CACHE_PATH}/attachments/" + fn, "rb") as f:
-									data = await asubmit(f.read)
-							except FileNotFoundError:
-								if allow_proxy and is_image(url):
-									url = to_webp(url)
-								data = await Request(url, timeout=18, aio=True, ssl=False)
-								await self.add_attachment(cdict(id=a_id, size=len(data)), data=data)
-								return data
-							else:
-								self.cache.attachments[a_id] = data
-						print(f"Successfully loaded attachment {a_id} from cache.")
-						return data
-					if i:
-						await asyncio.sleep(0.25 * i)
+	async def get_attachment(self, url, data=False, size=0):
+		a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+		name = url2fn(url)
+		ext = "bin" if "." not in name else name.rsplit(".", 1)[-1]
+		fn = f"{CACHE_PATH}/attachments/{a_id}.{ext}"
+		if not os.path.exists(fn):
 			url = await self.renew_attachment(url)
-			if allow_proxy and is_image(url):
-				url = to_webp(url)
-			if full:
-				data = await Request(url, timeout=18, aio=True, ssl=False)
-				await self.add_attachment(cdict(id=a_id, size=len(data)), data=data)
-				return data
-			return await asubmit(reqs.next().get, url, stream=True, _timeout_=30, allow_redirects=True)
-		return
+			if size <= 10485760:
+				try:
+					await proc_eval(f"download_file({repr(url)},{repr(fn)},timeout=12)", timeout=16)
+				except Exception:
+					pass
+			args = ["streamshatter", url, fn]
+			print(args)
+			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
+			try:
+				async with asyncio.timeout(24):
+					await proc.wait()
+			except (T0, T1, T2):
+				with tracebacksuppressor:
+					force_kill(proc)
+				raise
+		if not data:
+			return fn
+		with open(fn, "rb") as f:
+			return f.read()
 
-	async def get_request(self, url, limit=None, full=True, timeout=12):
+	async def get_request(self, url, limit=None, full=True, size=0, timeout=12):
 		if is_miza_attachment(url):
 			ids = expand_attachment(url)
 			url = await attachment_cache.obtain(*ids)
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
-		data = await self.get_attachment(url, full=full)
-		if data is not None:
-			return data
+		if is_discord_attachment(url):
+			return await self.get_attachment(url, size=size, data=True)
 		if not full:
 			if is_discord_url(url):
 				try:
@@ -3282,20 +3233,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				except Exception:
 					print_exc()
 			return await Request.asession.get(url, headers=Request.header(), _timeout_=timeout, verify=False, allow_redirects=True)
-		if is_discord_url(url):
-			try:
-				return await Request(url, timeout=3, aio=True, ssl=True)
-			except Exception:
-				print_exc()
-		return await Request(url, timeout=timeout, aio=True, ssl=False)
+		fn = await self.get_file(url)
+		with open(fn, "rb") as f:
+			return f.read()
 
-	async def get_file(self, url, limit=None, full=True, timeout=12):
-		# Helper function to get a file from a URL. We use the ts_us() function to generate a unique filename starting with the current timestamp.
+	async def get_file(self, url, limit=None, timeout=24):
 		fn = url2fn(url)
 		ext = fn.rsplit(".", 1)[-1] if "." in fn else "bin"
-		content = await self.get_request(url, limit=limit, full=full, timeout=timeout)
 		fn = temporary_file(ext)
-		esubmit(save_file, content, fn)
+		await proc_eval(f"asyncio.run(streamshatter.shatter_request({repr(url)},filename={repr(fn)})) and 0", timeout=timeout)
 		return fn
 
 	def get_colour(self, user) -> int:
@@ -6668,30 +6614,23 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			async with self.slsem:
 				with tracebacksuppressor:
 					csubmit(self.update_status())
-					with MemoryTimer("uptimes"):
-						if "uptimes" in self.data:
-							data = await self.status()
-							# await self.update_uptime(data)
-							net = await asubmit(psutil.net_io_counters)
-							if not hasattr(self, "up_bytes"):
-								self.up_bytes = deque(maxlen=ninter)
-								self.down_bytes = deque(maxlen=ninter)
-								self.start_up = max(0, self.data.insights.get("up_bytes", 0) - net.bytes_sent)
-								self.start_down = max(0, self.data.insights.get("down_bytes", 0) - net.bytes_recv)
-							self.up_bytes.append(net.bytes_sent)
-							self.down_bytes.append(net.bytes_recv)
-							self.up_bps = (self.up_bytes[-1] - self.up_bytes[0]) * 8 / len(self.up_bytes) / ninter
-							self.down_bps = (self.down_bytes[-1] - self.down_bytes[0]) * 8 / len(self.down_bytes) / ninter
-							self.bitrate = self.up_bps + self.down_bps
-							self.data.insights["up_bytes"] = up_bytes = self.up_bytes[-1] + self.start_up
-							self.data.insights["down_bytes"] = down_bytes = self.down_bytes[-1] + self.start_down
-							self.total_bytes = up_bytes + down_bytes
-						else:
-							self.uptime = 0
-							self.up_bps = 0
-							self.down_bps = 0
-							self.bitrate = 0
-							self.total_bytes = 0
+					with MemoryTimer("network_usage"):
+						data = await self.status()
+						await self.update_uptime(data)
+						net = await asubmit(psutil.net_io_counters)
+						if not hasattr(self, "up_bytes"):
+							self.up_bytes = deque(maxlen=ninter)
+							self.down_bytes = deque(maxlen=ninter)
+							self.start_up = max(0, self.data.insights.get("up_bytes", 0) - net.bytes_sent)
+							self.start_down = max(0, self.data.insights.get("down_bytes", 0) - net.bytes_recv)
+						self.up_bytes.append(net.bytes_sent)
+						self.down_bytes.append(net.bytes_recv)
+						self.up_bps = (self.up_bytes[-1] - self.up_bytes[0]) * 8 / len(self.up_bytes) / ninter
+						self.down_bps = (self.down_bytes[-1] - self.down_bytes[0]) * 8 / len(self.down_bytes) / ninter
+						self.bitrate = self.up_bps + self.down_bps
+						self.data.insights["up_bytes"] = up_bytes = self.up_bytes[-1] + self.start_up
+						self.data.insights["down_bytes"] = down_bytes = self.down_bytes[-1] + self.start_down
+						self.total_bytes = up_bytes + down_bytes
 
 	async def lazy_loop(self):
 		"The lazy update loop that runs once every 3~11 seconds."
@@ -8073,10 +8012,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	@tracebacksuppressor
 	async def init_ready(self):
 		await asubmit(self.start_webserver)
-		attachments = (file for file in sorted(set(file for file in os.listdir(f"{TEMP_PATH}/attachments"))))
-		for file in attachments:
-			with tracebacksuppressor:
-				self.attachment_from_file(file)
 		await self.modload
 		print(f"Mapped command count: {len(self.commands)}")
 		commands = set()

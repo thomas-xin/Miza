@@ -4,59 +4,29 @@ import functools
 import json
 import logging
 import os
-import random
 from traceback import print_exc
-import cherrypy as cp
-from cherrypy._cpdispatch import Dispatcher
+from typing import Optional, AsyncIterator
 import niquests
 import orjson
 import requests
-from .asyncs import eloop, tsubmit, esubmit, csubmit, await_fut
-from .types import resume, fcdict, byte_like, MemoryBytes
-from .util import AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment, is_discord_attachment, is_miza_attachment, discord_expired, url2fn, p2n, seq, Request, DOMAIN_CERT, PRIVATE_KEY, update_headers, USER_AGENT, CACHE_PATH
+from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File, Form
+from fastapi.responses import StreamingResponse, RedirectResponse, JSONResponse
+from .asyncs import asubmit, esubmit, csubmit
+from .types import fcdict, byte_like, MemoryBytes
+from .util import (
+	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment,
+	is_discord_attachment, is_miza_attachment, discord_expired, url2fn, p2n, seq,
+	Request as MizaRequest, DOMAIN_CERT, PRIVATE_KEY, update_headers,
+	CACHE_PATH,
+)
 from .caches import attachment_cache
 
 interface = None
-csubmit(Request._init_())
-tsubmit(eloop.run_forever)
+csubmit(MizaRequest._init_())
+
 ADDRESS = "0.0.0.0"
 PORT = 443
 
-class EndpointRedirects(Dispatcher):
-
-	def __call__(self, path):
-		p = path.strip("/")
-		first = p.split("/", 1)[0]
-		if not p or p == "dummy.html":
-			p = "static_backend/index"
-		elif first in ("home", "index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "static"):
-			p = "static_backend/" + p
-		elif first not in ("proxy", "upload", "delete", "edit", "c", "u", "unproxy", "reupload", "stream", "heartbeat", "backend", "debug"):
-			p = "backend/" + p
-		p = "/" + p
-		return super().__call__(p)
-
-config = {
-	"global": {
-		"server.socket_host": ADDRESS,
-		"server.socket_port": PORT,
-		"server.thread_pool": 128,
-		"server.max_request_body_size": 0,
-		"server.socket_timeout": 65,
-		"server.ssl_module": "builtin",
-		"engine.autoreload_on": True,
-		"tools.gzip.on": True,
-		"tools.gzip.mime_types": ["text/plain", "text/html", "text/css", "text/csv", "text/xml", "text/md", "text/markdown", "text/javascript", "application/json", "application/javascript"],
-	},
-	"/": {
-		"request.dispatch": EndpointRedirects(),
-	},
-}
-if os.path.exists(DOMAIN_CERT) and os.path.exists(PRIVATE_KEY):
-	config["global"]["server.ssl_certificate"] = DOMAIN_CERT
-	config["global"]["server.ssl_private_key"] = PRIVATE_KEY
-else:
-	print("WARNING: SSL keys not found!")
 if AUTH:
 	discord_secret = AUTH.get("discord_secret") or ""
 	webserver_port = AUTH.get("webserver_port") or "9801"
@@ -79,15 +49,14 @@ SHEADERS = {"Cache-Control": "public, max-age=5, stale-while-revalidate=10737418
 CHEADERS.update(HEADERS)
 SHEADERS.update(HEADERS)
 
-def true_ip(request=None):
-	request = request or cp.request
-	ip = request.headers["Remote-Addr"]
-	if ip == "127.0.0.1":
-		ip = request.headers.get("X-Real-Ip") or ip
-	if ip == "127.0.0.1":
-		ip = request.remote.ip
-	cp.serving.request.remote.ip = request.remote.ip = ip
+
+def true_ip(request: Request) -> str:
+	"""Extract the true client IP from request headers."""
+	ip = request.headers.get("X-Real-Ip") or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+	if not ip or ip == "127.0.0.1":
+		ip = request.client.host if request.client else "127.0.0.1"
 	return ip
+
 
 @functools.lru_cache(maxsize=256)
 def get_size_mime(head, tail, count, chunksize):
@@ -101,55 +70,25 @@ def get_size_mime(head, tail, count, chunksize):
 
 
 class Server:
+	"""Main server class containing all endpoint handlers."""
 
 	token = ""
 	alt_token = ""
 	channels = []
-	cache = {}
 	ucache = {}
+
 	if os.path.exists("temp.json") and os.path.getsize("temp.json"):
 		with open("temp.json", "rb") as f:
 			state = json.load(f)
 	else:
 		state = {"/": f"https://api.mizabot.xyz:{webserver_port}"}
-	session = niquests.Session()
 
-	@cp.expose
-	@cp.tools.json_in()
-	def heartbeat(self, key, uri="", **kwargs):
-		assert key == discord_secret
-		uri = uri or f"https://IP:{webserver_port}"
-		uri = uri.replace("IP", cp.request.remote.ip)
-		if self.state["/"] != uri:
-			self.state["/"] = uri
-			with open("temp.json", "w") as f:
-				json.dump(self.state, f)
-		if len(self.ucache) > 1048576:
-			for k, v in tuple(self.ucache.items()):
-				if isinstance(v, list) and discord_expired(v[1]):
-					self.ucache.pop(k, None)
-		data = cp.request.json or {}
-		data = orjson.loads(decrypt(base64.b64decode(data["data"].encode("ascii") + b"==")))
-		if data:
-			print("Authorised:", data)
-		self.token = data.get("token") or self.token
-		self.alt_token = data.get("alt_token") or self.alt_token
-		domain_cert = data.get("domain_cert")
-		private_key = data.get("private_key")
-		self.channels = data.get("channels") or self.channels
-		AUTH["discord_token"] = self.token
-		AUTH["alt_token"] = self.alt_token
-		AUTH["proxy_channels"] = self.channels
-		save_auth(AUTH)
-		if domain_cert and private_key:
-			with open(DOMAIN_CERT, "w") as f:
-				f.write(domain_cert)
-			with open(PRIVATE_KEY, "w") as f:
-				f.write(private_key)
-		attachment_cache.init()
-		return "💜"
+	session = niquests.Session()
+	asession = niquests.AsyncSession()
+	statics = diskcache.Cache(directory=f"{CACHE_PATH}/statics", expiry=86400 * 30)
 
 	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
+		"""HTTP GET with automatic retries."""
 		for i in range(retries):
 			try:
 				session = self.session if url.startswith("https://") and not is_discord_attachment(url) and i == 0 else requests
@@ -163,18 +102,29 @@ class Server:
 				return resp
 		return resp
 
-	def dyn_serve(self, urls, size=0, head=None, callback=None):
+	async def dyn_serve(
+		self,
+		urls: list,
+		size: int = 0,
+		head=None,
+		callback=None,
+		request: Request = None,
+		mimetype: str = "application/octet-stream"
+	) -> StreamingResponse:
+		"""Dynamically serve content from multiple URLs with range support."""
 		with tracebacksuppressor:
-			brange = cp.request.headers.get("Range", "").removeprefix("bytes=")
-			headers = fcdict(cp.request.headers)
+			brange = request.headers.get("Range", "").removeprefix("bytes=") if request else ""
+			headers = fcdict(request.headers) if request else fcdict()
 			headers.pop("Content-Length", None)
 			headers.pop("Content-Type", None)
 			headers.pop("Remote-Addr", None)
 			headers.pop("Host", None)
 			headers.pop("Range", None)
-			update_headers(headers, **Request.header())
+			update_headers(headers, **MizaRequest.header())
+
 			ranges = []
 			length = 0
+
 			if brange:
 				try:
 					branges = brange.split(",")
@@ -193,35 +143,46 @@ class Server:
 						ranges.append((start, end))
 				except Exception:
 					pass
-			if ranges:
-				cp.response.status = 206
-			else:
-				cp.response.status = 200
+
+			status_code = 206 if ranges else 200
+			if not ranges:
 				ranges.append((0, size))
 				length = size
-			if not size:
-				size = "*"
-			if ranges == [(0, size)]:
-				cp.response.headers["Content-Length"] = str(length)
-			if brange:
-				cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size}" for start, end in ranges)
-				cp.response.headers["Content-Range"] = cr
-			cp.response.headers["Accept-Ranges"] = "bytes"
-			print(brange, ranges)
-			return self._dyn_serve(urls, ranges, headers, head=head, callback=callback)
 
-	def _dyn_serve(self, urls, ranges, headers, head=None, callback=None):
+			response_headers = dict(HEADERS)
+			response_headers["Content-Type"] = mimetype
+
+			if ranges == [(0, size)]:
+				response_headers["Content-Length"] = str(length)
+
+			if brange:
+				cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size or '*'}" for start, end in ranges)
+				response_headers["Content-Range"] = cr
+
+			print(brange, ranges)
+
+			return StreamingResponse(
+				self._dyn_serve(urls, ranges, headers, head=head, callback=callback),
+				status_code=status_code,
+				headers=response_headers,
+				media_type=mimetype
+			)
+
+	async def _dyn_serve(self, urls, ranges, headers, head=None, callback=None) -> AsyncIterator[bytes]:
+		"""Internal generator for dynamic serving."""
 		with tracebacksuppressor(GeneratorExit):
 			if head:
 				data = head.data[head.index:]
 				urls.insert(0, bytes(data))
 				if callback:
 					callback(head.data)
+
 			for i, (start, end) in enumerate(ranges):
 				pos = 0
 				rems = urls.copy()
 				futs = []
 				big = False
+
 				while rems:
 					u = rems.pop(0)
 					if isinstance(u, byte_like):
@@ -239,13 +200,14 @@ class Server:
 					else:
 						resp = requests.head(u, timeout=3)
 						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
+
 					if pos + ns <= start:
 						pos += ns
 						continue
 					if pos >= end:
 						break
 
-					def get_chunk(u, h, start, end, pos, ns, big):
+					async def get_chunk(u, h, start, end, pos, ns, big):
 						s = start - pos
 						e = end - pos
 						if isinstance(u, byte_like):
@@ -253,7 +215,7 @@ class Server:
 							return
 						if is_miza_attachment(u) and (path := u.split("?", 1)[0].split("/u/", 1)[-1]) and len(path.split("/")) == 2 and path.count("~") == 0:
 							c_id, m_id, a_id, fn = decode_attachment(path)
-							u = await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn))
+							u = await attachment_cache.obtain(c_id, m_id, a_id, fn)
 						print(u)
 						if e >= ns:
 							e = ""
@@ -261,7 +223,7 @@ class Server:
 							e -= 1
 						h2 = dict(h.items())
 						h2["range"] = f"bytes={s}-{e}"
-						resp = self.get_with_retries(u, headers=h2, timeout=3)
+						resp = await asubmit(self.get_with_retries, u, headers=h2, timeout=3)
 						if resp.status_code != 206:
 							ms = min(ns, end - pos - s)
 							if len(resp.content) > ms:
@@ -269,275 +231,438 @@ class Server:
 								return
 							yield resp.content
 							return
-						if big:
-							yield from resp.iter_content(262144)
-							return
-						yield from resp.iter_content(49152)
+						it = resp.iter_content(262144 if big else 49152)
+						try:
+							while True:
+								yield await asubmit(next, it)
+						except (StopIteration, RuntimeError):
+							pass
 
 					if len(futs) > i + 1:
-						yield from futs.pop(0).result()
-					fut = esubmit(get_chunk, u, headers, start, end, pos, ns, big)
+						resp = await futs.pop(0)
+						async for content in resp:
+							yield content
+					fut = asubmit(get_chunk, u, headers, start, end, pos, ns, big)
 					futs.append(fut)
 					pos = 0
 					start = 0
 					end -= start + ns
 					big = True
+
 				for fut in futs:
-					yield from fut.result()
+					resp = await fut
+					async for content in resp:
+						yield content
 
-	@cp.expose(("c",))
-	def chunked_proxy(self, path, *void):
-		with tracebacksuppressor:
-			fut = csubmit(attachment_cache.obtains(path))
-			urls, chunksize = await_fut(fut)
-			mimetype, size, lastsize = get_size_mime(urls[0], urls[-1], len(urls), chunksize)
-			update_headers(cp.response.headers, **CHEADERS)
-			cp.response.headers["Content-Type"] = mimetype
-			new_urls = [f"{url}&S={lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
-			return self.dyn_serve(new_urls, size)
-	chunked_proxy._cp_config = {"response.stream": True}
 
-	@cp.expose(("u",))
-	def unproxy(self, *path, url=None, **query):
-		if url:
-			return self.proxy_if(url)
-		rpath = "/".join(path)
-		if rpath:
-			rpath = "/" + rpath
-		rquery = cp.request.query_string and "?" + cp.request.query_string
-		if len(path) == 1 and path[0].count("~") == 2:
-			fut = csubmit(attachment_cache.obtain(*path[0].split(".", 1)[0].split("~", 2)))
-			return self.proxy_if(await_fut(fut))
-		if len(path) == 2 and path[0].count("~") == 0:
-			c_id, m_id, a_id, fn = decode_attachment("/".join(path))
-			fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
-			return self.proxy_if(await_fut(fut))
-		if hasattr(self, "state"):
-			url = f"{self.state['/']}/u{rpath}{rquery}"
-			raise cp.HTTPRedirect(url, 307)
-		assert len(path) == 1
-		aid = p2n(path[0])
-		resp = interface.run(f"bot.renew_attachment({aid})")
-		return self.proxy_if(resp)
-	unproxy._cp_config = {"response.stream": True}
+# Create FastAPI app
+app = FastAPI(title="Miza Proxy Server", version="2.0")
+server = Server()
 
-	@cp.expose
-	@cp.tools.accept(media="multipart/form-data")
-	def reupload(self, url=None, filename=None, **void):
-		try:
-			resp = cp.request.body.fp
-		except Exception:
-			print_exc()
+
+@app.middleware("http")
+async def add_headers_middleware(request: Request, call_next):
+	"""Add standard headers to all responses."""
+	response = await call_next(request)
+	for key, value in HEADERS.items():
+		response.headers[key] = value
+	return response
+
+
+@app.post("/heartbeat")
+async def heartbeat(request: Request, key: str = Form(...), uri: str = Form("")):
+	"""Receive configuration updates from Discord bot."""
+	if key != discord_secret:
+		raise HTTPException(status_code=403, detail="Invalid key")
+
+	uri = uri or f"https://{true_ip(request)}:{webserver_port}"
+
+	if server.state["/"] != uri:
+		server.state["/"] = uri
+		with open("temp.json", "w") as f:
+			json.dump(server.state, f)
+
+	if len(server.ucache) > 1048576:
+		for k, v in tuple(server.ucache.items()):
+			if isinstance(v, list) and discord_expired(v[1]):
+				server.ucache.pop(k, None)
+
+	body = await request.json()
+	data = orjson.loads(decrypt(base64.b64decode(body["data"].encode("ascii") + b"==")))
+
+	if data:
+		print("Authorised:", data)
+
+	server.token = data.get("token") or server.token
+	server.alt_token = data.get("alt_token") or server.alt_token
+	domain_cert = data.get("domain_cert")
+	private_key = data.get("private_key")
+	server.channels = data.get("channels") or server.channels
+
+	AUTH["discord_token"] = server.token
+	AUTH["alt_token"] = server.alt_token
+	AUTH["proxy_channels"] = server.channels
+	save_auth(AUTH)
+
+	if domain_cert and private_key:
+		with open(DOMAIN_CERT, "w") as f:
+			f.write(domain_cert)
+		with open(PRIVATE_KEY, "w") as f:
+			f.write(private_key)
+
+	attachment_cache.init()
+	return "💜"
+
+
+@app.get("/c/{path:path}")
+async def chunked_proxy(path: str, request: Request):
+	"""Serve chunked/split files with range support."""
+	with tracebacksuppressor:
+		urls, chunksize = await attachment_cache.obtains(path.split("/", 1)[0])
+		mimetype, size, lastsize = get_size_mime(urls[0], urls[-1], len(urls), chunksize)
+
+		new_urls = [f"{url}&S={lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
+
+		response = await server.dyn_serve(new_urls, size, request=request, mimetype=mimetype)
+		update_headers(response.headers, **CHEADERS)
+		return response
+
+
+@app.get("/u/{path:path}")
+async def unproxy(path: str, request: Request, url: Optional[str] = None):
+	"""Unproxy Discord attachments or redirect to direct URLs."""
+	if url:
+		return await proxy_if(url, request)
+
+	path_parts = path.split("/")
+
+	if len(path_parts) == 1 and path_parts[0].count("~") == 2:
+		resp = await attachment_cache.obtain(*path_parts[0].split(".", 1)[0].split("~", 2))
+		return await proxy_if(resp, request)
+
+	if len(path_parts) == 2 and path_parts[0].count("~") == 0:
+		c_id, m_id, a_id, fn = decode_attachment(path)
+		resp = await attachment_cache.obtain(c_id, m_id, a_id, fn)
+		return await proxy_if(resp, request)
+
+	if hasattr(server, "state"):
+		query_string = str(request.url.query) if request.url.query else ""
+		redirect_url = f"{server.state['/']}/u/{path}"
+		if query_string:
+			redirect_url += f"?{query_string}"
+		return RedirectResponse(url=redirect_url, status_code=307)
+
+	assert len(path_parts) == 1
+	aid = p2n(path_parts[0])
+	resp = interface.run(f"bot.renew_attachment({aid})")
+	return await proxy_if(resp, request)
+
+
+@app.post("/reupload")
+async def reupload(
+	request: Request,
+	url: Optional[str] = Form(None),
+	filename: Optional[str] = Form(None),
+	file: Optional[UploadFile] = File(None)
+):
+	"""Re-upload files to Discord storage."""
+	try:
+		if file:
+			resp = file.file
+		else:
 			resp = None
-		if not resp or int(cp.request.headers.get("Content-Length", 0)) < 1:
-			if not url:
-				return "Expected input URL or data."
-			headers = Request.header()
-			if cp.request.headers.get("Range"):
-				headers["Range"] = cp.request.headers["Range"]
-			resp = self.get_with_retries(url, headers=headers, timeout=3)
-		fn = filename or (url2fn(url) if url else None)
-		fut = attachment_cache.create(seq(resp), filename=fn)
-		return await_fut(fut)
+	except Exception:
+		print_exc()
+		resp = None
 
-	def proxy_if(self, url):
-		assert isinstance(url, str), url
+	content_length = int(request.headers.get("Content-Length", 0))
 
-		def requires_proxy():
-			if not is_discord_attachment(url):
-				return False
-			if "Cf-Worker" in cp.request.headers:
-				return True
-			if cp.request.headers.get("X-Real-Ip", "")[:3] in ("34.", "35."):
-				return True
-			if cp.request.headers.get("Sec-Fetch-Dest", "").casefold() == "document" and url.split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[-1] not in ("zip", "7z", "tar", "bin", "png", "gif", "webp", "jpg", "jpeg", "heic", "heif", "avif"):
-				return True
-			if (mode := cp.request.headers.get("Sec-Fetch-Mode")):
-				return mode.casefold() not in ("cors", "navigate") or cp.request.headers.get("Sec-Fetch-Site", "").casefold() not in ("none", "cross-site")
-			if cp.request.headers.get("Referer"):
-				return True
-			return False
-
-		if requires_proxy():
-			return self.proxy(url=url)
-		raise cp.HTTPRedirect(url, 307)
-
-	@cp.expose
-	@cp.tools.accept(media="multipart/form-data")
-	def proxy(self, url=None, **void):
+	if not resp or content_length < 1:
 		if not url:
-			return "Expected proxy URL."
-		try:
-			body = cp.request.body.fp.read()
-		except Exception:
-			print_exc()
-			body = None
-		headers = Request.header()
-		if cp.request.headers.get("Range"):
-			headers["Range"] = cp.request.headers["Range"]
-		resp = self.get_with_retries(url, data=body, headers=headers, timeout=2)
-		cp.response.status = resp.status_code
-		update_headers(cp.response.headers, **resp.headers)
-		cp.response.headers.pop("Connection", None)
-		cp.response.headers.pop("Transfer-Encoding", None)
-		if is_discord_attachment(url):
-			cp.response.headers.pop("Content-Disposition", None)
-			update_headers(cp.response.headers, **CHEADERS)
-		ctype = resp.headers.get("Content-Type", "application/octet-stream")
-		if ctype in ("text/html", "text/html; charset=utf-8", "application/octet-stream"):
-			it = resp.iter_content(262144)
-			b = next(it)
-			mime = magic.from_buffer(b)
-			if mime == "application/octet-stream":
-				a = MemoryBytes(b)[:128]
-				if sum(32 <= c < 128 for c in a) >= len(a) * 7 / 8:
-					mime = "text/plain"
-			cp.response.headers.pop("Content-Type", None)
-			cp.response.headers["Content-Type"] = mime
-			return resume(b, it)
-		return resp.iter_content(262144)
-	proxy._cp_config = {"response.stream": True}
+			return "Expected input URL or data."
+		headers = MizaRequest.header()
+		if request.headers.get("Range"):
+			headers["Range"] = request.headers["Range"]
+		resp = server.get_with_retries(url, headers=headers, timeout=3)
 
-	@cp.expose
-	# @cp.tools.accept(media="multipart/form-data")
-	def backend(self, *path, **query):
-		rpath = "/".join(path)
-		if rpath:
-			rpath = "/" + rpath
-		rquery = cp.request.query_string
-		if rquery:
-			rquery = "?" + rquery
-		url = f"{self.state['/']}{rpath}{rquery}"
-		if cp.request.method.upper() != "GET" or self.state["/"].startswith("https://"):
-			raise cp.HTTPRedirect(url, 307)
-		headers = dict(cp.request.headers)
-		headers.pop("Connection", None)
-		headers.pop("Transfer-Encoding", None)
-		headers["X-Real-Ip"] = cp.request.remote.ip
-		print("BACKEND:", url)
-		resp = self.session.get(
-			url,
-			headers=headers,
-			stream=True,
-			verify=False,
-			allow_redirects=False,
-			timeout=60,
+	fn = filename or (url2fn(url) if url else None)
+	return await attachment_cache.create(seq(resp), filename=fn)
+
+
+async def proxy_if(url: str, request: Request):
+	"""Proxy if needed, otherwise redirect."""
+	assert isinstance(url, str), url
+
+	def requires_proxy():
+		if not is_discord_attachment(url):
+			return False
+		if "Cf-Worker" in request.headers:
+			return True
+		if "bot" in request.headers.get("User-Agent", ""):
+			return False
+		if request.headers.get("X-Real-Ip", "")[:3] in ("34.", "35."):
+			return True
+		sec_fetch_dest = request.headers.get("Sec-Fetch-Dest", "").casefold()
+		if sec_fetch_dest == "document":
+			ext = url.split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[-1]
+			if ext not in ("zip", "7z", "tar", "bin", "png", "gif", "webp", "jpg", "jpeg", "heic", "heif", "avif"):
+				return True
+		mode = request.headers.get("Sec-Fetch-Mode")
+		if mode:
+			if mode.casefold() not in ("cors", "navigate"):
+				return True
+			if request.headers.get("Sec-Fetch-Site", "").casefold() not in ("none", "cross-site"):
+				return True
+		if request.headers.get("Referer"):
+			return True
+		return False
+
+	if requires_proxy():
+		return await proxy(url=url, request=request)
+	return RedirectResponse(url=url, status_code=307)
+
+
+@app.api_route("/proxy", methods=["GET", "POST"])
+async def proxy(request: Request, url: Optional[str] = None):
+	"""Proxy any URL with optional body forwarding."""
+	if not url:
+		return "Expected proxy URL."
+
+	try:
+		body = await request.body()
+	except Exception:
+		print_exc()
+		body = None
+
+	headers = MizaRequest.header()
+	if request.headers.get("Range"):
+		headers["Range"] = request.headers["Range"]
+
+	resp = server.get_with_retries(url, data=body, headers=headers, timeout=2)
+
+	response_headers = fcdict(resp.headers)
+	response_headers.pop("Connection", None)
+	response_headers.pop("Transfer-Encoding", None)
+	if response_headers.pop("Content-Encoding", None):
+		response_headers.pop("Content-Length", None)
+	response_headers.pop("Date", None)
+	response_headers.pop("Server", None)
+
+	if is_discord_attachment(url):
+		response_headers.pop("Content-Disposition", None)
+		update_headers(response_headers, **CHEADERS)
+
+	ctype = resp.headers.get("Content-Type", "application/octet-stream")
+
+	if ctype in ("text/html", "text/html; charset=utf-8", "application/octet-stream"):
+		it = resp.iter_content(262144)
+		b = next(it)
+		mime = magic.from_buffer(b)
+		if mime == "application/octet-stream":
+			a = MemoryBytes(b)[:128]
+			if sum(32 <= c < 128 for c in a) >= len(a) * 7 / 8:
+				mime = "text/plain"
+		response_headers["Content-Type"] = mime
+
+		async def content_generator():
+			yield b
+			for chunk in it:
+				yield chunk
+
+		return StreamingResponse(
+			content_generator(),
+			status_code=resp.status_code,
+			headers=response_headers,
+			media_type=mime
 		)
-		if resp.status_code in range(300, 400):
-			raise cp.HTTPRedirect(resp.headers.get("Location") or url, resp.status_code)
-		update_headers(cp.response.headers, **resp.headers)
-		cp.response.headers.pop("Connection", None)
-		cp.response.headers.pop("Transfer-Encoding", None)
-		if int(resp.headers.get("Content-Length") or 262145) <= 262144:
-			return resp.content
-		return resp.iter_content(65536)
-	backend._cp_config = {"response.stream": True}
 
-	statics = diskcache.Cache(directory=f"{CACHE_PATH}/upload", expiry=86400 * 30)
-	@cp.expose
-	def static_backend(self, *path, **query):
-		rpath = "/".join(path)
-		if rpath:
-			rpath = "/" + rpath
-		rquery = cp.request.query_string
-		if rquery:
-			rquery = "?" + rquery
-		url = f"{self.state['/']}{rpath}{rquery}"
-		try:
-			headers, content = self.statics[url]
-		except LookupError:
-			pass
-		else:
-			update_headers(cp.response.headers, **headers)
-			return content
-		headers = dict(cp.request.headers)
-		headers.pop("Connection", None)
-		headers.pop("Transfer-Encoding", None)
-		headers["X-Real-Ip"] = cp.request.remote.ip
-		resp = self.session.get(
-			url,
-			headers=headers,
-			verify=False,
-			timeout=60,
+	return StreamingResponse(
+		resp.iter_content(262144),
+		status_code=resp.status_code,
+		headers=response_headers,
+		media_type=ctype
+	)
+
+
+@app.get("/backend/{path:path}")
+async def backend(path: str, request: Request):
+	"""Proxy requests to backend API server."""
+	query_string = str(request.url.query) if request.url.query else ""
+	url = f"{server.state['/']}/{path}"
+	if query_string:
+		url += f"?{query_string}"
+
+	if request.method != "GET" or server.state["/"].startswith("https://"):
+		return RedirectResponse(url=url, status_code=307)
+
+	headers = fcdict(request.headers)
+	headers.pop("Connection", None)
+	headers.pop("Transfer-Encoding", None)
+	headers.pop("Cache-Control", None)
+	headers.pop("If-Modified-Since", None)
+	headers.pop("If-None-Match", None)
+	headers["X-Real-Ip"] = true_ip(request)
+
+	print("BACKEND:", url)
+
+	resp = await asubmit(
+		server.session.get,
+		url,
+		headers=headers,
+		stream=True,
+		verify=False,
+		allow_redirects=False,
+		timeout=60,
+	)
+
+	if resp.status_code in range(300, 400):
+		return RedirectResponse(url=resp.headers.get("Location") or url, status_code=resp.status_code)
+
+	response_headers = fcdict(resp.headers)
+	response_headers.pop("Connection", None)
+	response_headers.pop("Transfer-Encoding", None)
+	if response_headers.pop("Content-Encoding", None):
+		response_headers.pop("Content-Length", None)
+	response_headers.pop("Date", None)
+	response_headers.pop("Server", None)
+
+	if int(resp.headers.get("Content-Length") or 0) <= 262144:
+		return Response(
+			content=resp.content,
+			status_code=resp.status_code,
+			headers=response_headers
 		)
-		headers = dict(resp.headers)
-		headers.pop("Connection", None)
-		headers.pop("Transfer-Encoding", None)
-		self.statics[url] = [headers, resp.content]
-		update_headers(cp.response.headers, **headers)
-		return resp.content
 
-	@cp.expose
-	def debug(self):
-		cp.response.headers["Content-Type"] = "application/json"
-		return json.dumps(self.ucache).encode("utf-8")
+	return StreamingResponse(
+		resp.iter_content(65536),
+		status_code=resp.status_code,
+		headers=response_headers
+	)
 
-	@cp.expose
-	def stream(self, info=None):
-		if not info:
-			return "Expected info URL."
-		try:
-			data = self.cache[info]
-		except KeyError:
-			if len(self.cache) > 128:
-				self.cache.pop(next(iter(self.cache)))
-			data = self.cache[info] = self.get_with_retries(info, timeout=5, retries=3).json()
-		info = [data["filename"], data["size"], data["mimetype"]]
-		urls = data.get("chunks") or [data["dl"]]
-		size = info[1]
-		disp = "filename=" + info[0]
-		cp.response.headers["Content-Disposition"] = disp
-		cp.response.headers["Content-Type"] = info[2]
-		cp.response.headers["Attachment-Filename"] = info[0]
-		brange = cp.request.headers.get("Range", "").removeprefix("bytes=")
-		headers = cp.request.headers.copy()
-		headers.pop("Remote-Addr", None)
-		headers.pop("Host", None)
-		headers.pop("Range", None)
-		update_headers(headers, **{
-			"User-Agent": USER_AGENT,
-			"DNT": "1",
-			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
-			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in range(4)),
-		})
-		ranges = []
-		length = 0
-		if brange:
-			try:
-				branges = brange.split(",")
-				for s in branges:
-					start, end = s.split("-", 1)
-					if not start:
-						if not end:
-							continue
-						start = size - int(end)
-						end = size - 1
-					elif not end:
-						end = size - 1
-					start = int(start)
-					end = int(end) + 1
-					length += end - start
-					ranges.append((start, end))
-			except Exception:
-				pass
-		if ranges:
-			cp.response.status = 206
-		else:
-			cp.response.status = 200
-			ranges.append((0, size))
-			length = size
-		if not size:
-			size = "*"
-		cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size}" for start, end in ranges)
-		cp.response.headers["Content-Range"] = cr
-		cp.response.headers["Content-Length"] = str(length)
-		cp.response.headers["Accept-Ranges"] = "bytes"
-		return self._dyn_serve(urls, ranges, headers)
-	stream._cp_config = {"response.stream": True}
+
+@app.get("/static_backend/{path:path}")
+async def static_backend(path: str, request: Request):
+	"""Serve cached static content from backend."""
+	query_string = str(request.url.query) if request.url.query else ""
+	url = f"{server.state['/']}/{path}"
+	if query_string:
+		url += f"?{query_string}"
+
+	# try:
+	# 	headers, content = server.statics[url]
+	# except LookupError:
+	# 	pass
+	# else:
+	# 	return Response(content=content, headers=headers)
+
+	headers = fcdict(request.headers)
+	headers.pop("Connection", None)
+	headers.pop("Transfer-Encoding", None)
+	headers.pop("Cache-Control", None)
+	headers.pop("If-Modified-Since", None)
+	headers.pop("If-None-Match", None)
+	headers["X-Real-Ip"] = true_ip(request)
+
+	print(url, headers)
+	resp = await asubmit(server.session.get, url, headers=dict(headers), verify=False, timeout=60)
+
+	response_headers = fcdict(resp.headers)
+	response_headers.pop("Connection", None)
+	response_headers.pop("Transfer-Encoding", None)
+	if response_headers.pop("Content-Encoding", None):
+		response_headers.pop("Content-Length", None)
+	response_headers.pop("Date", None)
+	response_headers.pop("Server", None)
+	print(resp, resp.headers, len(resp.content))
+
+	server.statics[url] = [response_headers, resp.content]
+
+	return Response(content=resp.content, headers=response_headers)
+
+
+@app.get("/debug")
+async def debug():
+	"""Debug endpoint showing ucache contents."""
+	return JSONResponse(content=server.ucache)
+
+
+# Catch-all route for custom routing logic
+@app.get("/{path:path}")
+async def catch_all(path: str, request: Request):
+	"""Handle custom routing for static files and redirects."""
+	p = path.strip("/")
+	first = p.split("/", 1)[0] if p else ""
+
+	if not p or p == "dummy.html" or p == "index":
+		return await static_backend("index.html", request=request)
+	elif first in ("favicon.ico", "logo256.png", "logo512.png", "home", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "static"):
+		return await static_backend(p, request=request)
+	elif first not in ("static_backend", "proxy", "c", "u", "unproxy", "reupload", "heartbeat", "backend", "debug"):
+		return await backend(p, request=request)
+	return await globals()[first](request=request)
+
+	# Redirect to appropriate handler
+	query_string = str(request.url.query) if request.url.query else ""
+	redirect_url = f"/{p}"
+	if query_string:
+		redirect_url += f"?{query_string}"
+
+	return RedirectResponse(url=redirect_url, status_code=307)
+
 
 if __name__ == "__main__":
-	logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(message)s')
-	app = Server()
-	self = server = cp.Application(app, "/", config)
-	cp.quickstart(server, "/", config)
-	# waitress.serve(server, threads=128, host=ADDRESS, port=PORT, url_scheme="https")
+	# Configure logging
+	logging.basicConfig(
+		level=logging.INFO,
+		format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+	)
+	logger = logging.getLogger(__name__)
+
+	from hypercorn.config import Config
+	from hypercorn.asyncio import serve
+
+	# Configure Hypercorn
+	config = Config()
+	config.bind = ["0.0.0.0:443"]
+	config.worker_class = "asyncio"
+	config.workers = 1  # Single worker, uses async for concurrency
+	config.keep_alive_timeout = 65
+	config.graceful_timeout = 30
+
+	# SSL Configuration
+	if os.path.exists(DOMAIN_CERT) and os.path.exists(PRIVATE_KEY):
+		config.certfile = DOMAIN_CERT
+		config.keyfile = PRIVATE_KEY
+		logger.info(f"SSL enabled with cert: {DOMAIN_CERT}")
+	else:
+		logger.warning("WARNING: SSL keys not found! Running without HTTPS.")
+		config.bind = ["0.0.0.0:80"]  # Fallback to HTTP
+
+	# Additional configuration
+	config.accesslog = "-"  # Log to stdout
+	config.errorlog = "-"   # Log to stdout
+	config.loglevel = "INFO"
+
+	# Optional: Configure from AUTH if available
+	if AUTH:
+		port = AUTH.get("webserver_port")
+		port = 4431
+		if port:
+			if config.certfile:
+				config.bind = [f"0.0.0.0:{port}"]
+			else:
+				config.bind = [f"0.0.0.0:{port}"]
+			logger.info(f"Using port from auth.json: {port}")
+
+	logger.info(f"Starting Miza Proxy Server on {config.bind}")
+	logger.info("Press Ctrl+C to stop")
+
+	from .asyncs import eloop
+	# Run the server
+	try:
+		eloop.run_until_complete(serve(app, config))
+	except KeyboardInterrupt:
+		logger.info("Server stopped by user")
+	except Exception as e:
+		logger.error(f"Server error: {e}", exc_info=True)
+		raise SystemExit

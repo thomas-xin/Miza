@@ -1,5 +1,6 @@
 akipy>=0.2.3
 antlr4-python3-runtime>=4.13.2
+audioptic>=1.0.0
 asyncio>=3.4.3
 async-timeout>=5.0.1
 beautifulsoup4>=4.13.5
@@ -46,7 +47,7 @@ python-dateutil>=2.9.0
 pytz>=2025.2
 requests>=2.32.5
 rule34>=1.8.1
-streamshatter>=1.0.10
+streamshatter>=1.0.14
 sympy>=1.13.3
 tiktoken>=0.11.0
 tsc_utils>=0.2.5

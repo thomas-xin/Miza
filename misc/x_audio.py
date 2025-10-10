@@ -17,12 +17,14 @@ import orjson
 import niquests
 import numpy as np
 import psutil
-from .asyncs import csubmit, esubmit, asubmit, wrap_future, cst, eloop, Delay
+import streamshatter
+from .asyncs import await_fut, csubmit, esubmit, asubmit, wrap_future, cst, eloop, Delay
 from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_str, astype
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, maybe_json, select_and_loads,
 	is_url, is_discord_attachment, unyt, url2fn, get_duration, rename, uhash, expired, b64,  # noqa: F401
+	temporary_file,
 )
 from .audio_downloader import AudioDownloader
 VC_TIMEOUT = 13
@@ -39,7 +41,7 @@ if ADDRESS == "0.0.0.0":
 
 # Audio sample rate for both converting and playing
 SAMPLE_RATE = 48000
-MAX_BITRATE = 192000
+MAX_BITRATE = 160000
 MAX_QUEUE = 262144
 
 
@@ -371,6 +373,7 @@ class AudioPlayer(discord.AudioSource):
 			if not cid or not client.get_channel(cid):
 				return
 		else:
+			print("Clearing queue to disconnect...")
 			self.settings.update(self.defaults)
 			self.clear()
 		if announce:
@@ -928,7 +931,9 @@ class AudioPlayer(discord.AudioSource):
 		return True
 
 	def cleanup(self):
-		return self.clear()
+		return
+		# print("Clearing queue for cleanup...")
+		# return self.clear()
 
 AP = AudioPlayer
 
@@ -1090,6 +1095,7 @@ class AudioFile:
 		Property to check if the FFmpeg process has expired.
 	"""
 
+	temporary = None
 	duration = None
 	cached = {}
 
@@ -1150,14 +1156,25 @@ class AudioFile:
 				self.stream = self.path
 				self.duration = entry["duration"] = get_duration(self.stream) or duration
 				return self
-			if duration is None or duration > 1920:
+			if duration is None or duration > 36960:
 				self.stream = stream
 				self.duration = entry["duration"] = duration
 				return self
+			if duration < 3840 or not asap:
+				try:
+					fn = url2fn(stream)
+					ext = fn.rsplit(".", 1)[-1]
+					self.temporary = temporary_file(ext)
+					await_fut(streamshatter.shatter_request(stream, filename=self.temporary))
+				except Exception:
+					print_exc()
+				else:
+					stream = self.temporary
 			ffmpeg = "ffmpeg"
 			sample_rate = SAMPLE_RATE
-			cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(sample_rate), "-ac", "2", "-b:a", "192000", "-vbr", "on", "-"]
-			if codec == "opus" and channels == 2:
+			ba = "160k" if is_url(stream) or os.path.getsize(stream) <= 10485760 else "108k"
+			cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(sample_rate), "-ac", "2", "-b:a", ba, "-vbr", "on", "-"]
+			if ba == "160k" and codec == "opus" and channels == 2:
 				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "copy", "-"]
 			if is_url(stream):
 				cmd = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + cmd[1:]
@@ -1168,6 +1185,8 @@ class AudioFile:
 			def callback(file):
 				self.stream = file
 				self.duration = entry["duration"] = get_duration(self.stream) or self.duration
+				if self.temporary:
+					os.remove(self.temporary)
 
 			try:
 				self.stream = PipedLoader(proc.stdout, self.path, efp=proc.stderr, callback=callback)

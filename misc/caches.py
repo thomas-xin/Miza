@@ -200,9 +200,14 @@ class AttachmentCache(diskcache.Cache):
 					task[0].set_exception(ex)
 				continue
 			esubmit(self.set_last, (cid, mid, n))
-			for task, emb in zip(tasks, message["embeds"]):
+			for emb in message["embeds"]:
 				url = emb["image"]["url"]
-				task[0].set_result(url)
+				tasks.pop(0)[0].set_result(url)
+				if not tasks:
+					break
+			for task in tasks:
+				task[0].set_exception(RuntimeError("Missing attachment embed!"))
+		self.fut = None
 
 	def set_last(self, tup):
 		time.sleep(1)
