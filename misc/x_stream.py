@@ -75,7 +75,6 @@ class Server:
 	token = ""
 	alt_token = ""
 	channels = []
-	ucache = {}
 
 	if os.path.exists("temp.json") and os.path.getsize("temp.json"):
 		with open("temp.json", "rb") as f:
@@ -281,11 +280,6 @@ async def heartbeat(request: Request, key: str = Form(...), uri: str = Form(""))
 		server.state["/"] = uri
 		with open("temp.json", "w") as f:
 			json.dump(server.state, f)
-
-	if len(server.ucache) > 1048576:
-		for k, v in tuple(server.ucache.items()):
-			if isinstance(v, list) and discord_expired(v[1]):
-				server.ucache.pop(k, None)
 
 	body = await request.json()
 	data = orjson.loads(decrypt(base64.b64decode(body["data"].encode("ascii") + b"==")))
@@ -578,12 +572,6 @@ async def static_backend(path: str, request: Request):
 	server.statics[url] = [response_headers, resp.content]
 
 	return Response(content=resp.content, headers=response_headers)
-
-
-@app.get("/debug")
-async def debug():
-	"""Debug endpoint showing ucache contents."""
-	return JSONResponse(content=server.ucache)
 
 
 # Catch-all route for custom routing logic

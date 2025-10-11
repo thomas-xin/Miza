@@ -2553,8 +2553,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					with tracebacksuppressor:
 						label = await model_router_fut
 			if is_nsfw:
-				print(mod)
-			if is_nsfw:
+				print(mod, allow_nsfw)
 				label = "nsfw" if allow_nsfw else "casual"
 			cargs["mode"] = label
 		decensor = not is_nsfw or allow_nsfw

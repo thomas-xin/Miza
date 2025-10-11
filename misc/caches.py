@@ -1,4 +1,5 @@
 import aiohttp
+import asyncio
 import concurrent.futures
 import diskcache
 import random
@@ -180,6 +181,7 @@ class AttachmentCache(diskcache.Cache):
 						f"https://discord.com/api/{api}/channels/{cid}/messages/{mid}",
 						data=json_dumps(dict(embeds=embeds)),
 						headers=heads,
+						timeout=5,
 					)
 				else:
 					cid = choice(self.channels)
@@ -189,6 +191,7 @@ class AttachmentCache(diskcache.Cache):
 						f"https://discord.com/api/{api}/channels/{cid}/messages",
 						data=json_dumps(dict(embeds=embeds)),
 						headers=heads,
+						timeout=5,
 					)
 				resp.raise_for_status()
 				message = resp.json()
@@ -221,6 +224,7 @@ class AttachmentCache(diskcache.Cache):
 					resp = Request.compat_session.delete(
 						f"https://discord.com/api/{api}/channels/{c}/messages{k}",
 						headers=heads,
+						timeout=5,
 					)
 					resp.raise_for_status()
 
@@ -247,7 +251,7 @@ class AttachmentCache(diskcache.Cache):
 		self.queue.append(task)
 		if self.fut is None or self.fut.done() or len(self.queue) > ac:
 			self.fut = self.exc.submit(self.update_queue)
-		return await wrap_future(fut)
+		return await asyncio.wait_for(wrap_future(fut), timeout=5)
 
 	async def obtain(self, c_id=None, m_id=None, a_id=None, fn=None, url=None):
 		if url:
