@@ -229,7 +229,7 @@ else:
 				'ctx_id': info_dict.get('ctx_id'),
 			}, info_dict)
 			return True
-		return real_download(filename, info_dict)
+		return real_download(self, filename, info_dict)
 	ytd.downloader.http.HttpFD.real_download = trial_download
 from .types import list_like, utc
 from .util import Request, EvalPipe, esubmit, python, new_playwright_page, CODECS
