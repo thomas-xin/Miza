@@ -3133,7 +3133,7 @@ class UpdateMessageLogs(Database):
 		files = []
 		for a in message.attachments:
 			try:
-				fn = await self.bot.get_attachment(a.url)
+				fn = await self.bot.get_attachment(a.url, size=a.size)
 				fil = CompatFile(fn, filename=a.filename.removeprefix("SPOILER_"))
 				files.append(fil)
 			except:
@@ -3373,7 +3373,7 @@ class UpdateCrossposts(Database):
 			embeds.append(embed)
 		files = deque()
 		for a in message.attachments:
-			fn = await self.bot.get_attachment(a.url)
+			fn = await self.bot.get_attachment(a.url, size=a.size)
 			files.append(CompatFile(fn, filename=a.filename.removeprefix("SPOILER_")))
 		for c_id in tuple(self.data[message.channel.id]):
 			try:

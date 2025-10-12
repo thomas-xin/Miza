@@ -3111,11 +3111,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return message
 
 	async def tag_message(self, message):
+		always_log = "logM" in self.data and message.guild.id in self.data.logM
 		for attachment in message.attachments:
-			csubmit(self.add_and_test(message, attachment))
+			if always_log or url2ext(attachment.url) in IMAGE_FORMS:
+				csubmit(self.add_and_test(message, attachment))
 		urls = await self.renew_attachments(find_urls_ex(message.content))
 		for url in urls:
-			if is_discord_attachment(url) and not discord_expired(url) or self.is_webserver_url(url):
+			if is_discord_attachment(url) and not discord_expired(url) or self.is_webserver_url(url) and (always_log or url2ext(url) in IMAGE_FORMS):
 				resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True, timeout=30, allow_redirects=True)
 				url = resp.headers.get("Location") or resp.url
 				if is_discord_attachment(url):
@@ -3194,13 +3196,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 		ext = url2ext(url)
 		fn = f"{CACHE_PATH}/attachments/{a_id}.{ext}"
-		if not os.path.exists(fn):
+		if not os.path.exists(fn) or not os.path.getsize(fn):
 			url = await self.renew_attachment(url)
-			if size <= 10485760:
+			if size and size <= 10485760:
 				try:
-					await proc_eval(f"download_file({repr(url)},{repr(fn)},timeout=12)", timeout=16)
-				except Exception:
-					pass
+					await proc_eval(f"download_file({repr(url)},{repr(fn)},timeout=12)", caps=["browse"], timeout=16)
+				except Exception as ex:
+					print(repr(ex))
+		if not os.path.exists(fn) or not os.path.getsize(fn):
 			args = ["streamshatter", url, "-l", "3", fn]
 			print(args)
 			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
@@ -3238,7 +3241,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def get_file(self, url, limit=None, timeout=24):
 		ext = url2ext(url)
 		fn = temporary_file(ext)
-		await proc_eval(f"asyncio.run(streamshatter.shatter_request({repr(url)},filename={repr(fn)},limit=8)) and 0", timeout=timeout)
+		args = ["streamshatter", url, "-l", "8", fn]
+		print(args)
+		proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
+		try:
+			async with asyncio.timeout(24):
+				await proc.wait()
+		except (T0, T1, T2):
+			with tracebacksuppressor:
+				force_kill(proc)
+			raise
 		return fn
 
 	def get_colour(self, user) -> int:
@@ -7303,7 +7315,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if hasattr(message, "files"):
 						self.files = message.files
 					else:
-						futs = [csubmit(bot.get_attachment(a.url)) for a in message.attachments]
+						futs = [csubmit(bot.get_attachment(a.url, size=a.size)) for a in message.attachments]
 						files = await gather(*futs)
 						self.files = [CompatFile(b, filename=a.filename) for a, b in zip(message.attachments, files)]
 				return self

@@ -1691,7 +1691,7 @@ def device_cap(i, resolve=False):
 	return di
 
 
-async def proc_eval(s, caps=["image"], priority=False, timeout=12):
+async def proc_eval(s, caps=["math"], priority=False, timeout=12):
 	procs = PROCS_BY_CAPS[caps[0]]
 	for p in procs:
 		if not set(caps).difference(p.caps):
