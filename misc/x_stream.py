@@ -585,7 +585,7 @@ async def catch_all(path: str, request: Request):
 		return await static_backend("index.html", request=request)
 	elif first in ("favicon.ico", "logo256.png", "logo512.png", "home", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "static"):
 		return await static_backend(p, request=request)
-	elif first not in ("static_backend", "proxy", "c", "u", "unproxy", "reupload", "heartbeat", "backend", "debug"):
+	elif first not in ("static_backend", "proxy", "c", "u", "unproxy", "reupload", "authorised-heartbeat", "backend", "debug"):
 		return await backend(p, request=request)
 	return await globals()[first](request=request)
 
