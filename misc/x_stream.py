@@ -9,13 +9,13 @@ from typing import Optional, AsyncIterator
 import niquests
 import orjson
 import requests
-from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File, Form
-from fastapi.responses import StreamingResponse, RedirectResponse, JSONResponse
+from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File, Query
+from fastapi.responses import StreamingResponse, RedirectResponse
 from .asyncs import asubmit, esubmit, csubmit
 from .types import fcdict, byte_like, MemoryBytes
 from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment,
-	is_discord_attachment, is_miza_attachment, discord_expired, url2fn, p2n, seq,
+	is_discord_attachment, is_miza_attachment, url2fn, p2n, seq,
 	Request as MizaRequest, DOMAIN_CERT, PRIVATE_KEY, update_headers,
 	CACHE_PATH,
 )
@@ -268,8 +268,8 @@ async def add_headers_middleware(request: Request, call_next):
 	return response
 
 
-@app.post("/heartbeat")
-async def heartbeat(request: Request, key: str = Form(...), uri: str = Form("")):
+@app.post("/authorised-heartbeat")
+async def authorised_heartbeat(request: Request, key: str = Query(...), uri: str = Query("")):
 	"""Receive configuration updates from Discord bot."""
 	if key != discord_secret:
 		raise HTTPException(status_code=403, detail="Invalid key")
@@ -285,7 +285,7 @@ async def heartbeat(request: Request, key: str = Form(...), uri: str = Form(""))
 	data = orjson.loads(decrypt(base64.b64decode(body["data"].encode("ascii") + b"==")))
 
 	if data:
-		print("Authorised:", data)
+		print("Authorised update:", data)
 
 	server.token = data.get("token") or server.token
 	server.alt_token = data.get("alt_token") or server.alt_token
@@ -355,8 +355,8 @@ async def unproxy(path: str, request: Request, url: Optional[str] = None):
 @app.post("/reupload")
 async def reupload(
 	request: Request,
-	url: Optional[str] = Form(None),
-	filename: Optional[str] = Form(None),
+	url: Optional[str] = Query(None),
+	filename: Optional[str] = Query(None),
 	file: Optional[UploadFile] = File(None)
 ):
 	"""Re-upload files to Discord storage."""

@@ -950,6 +950,9 @@ def expired(stream):
 
 def url2fn(url) -> str:
 	return url.split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1]
+def url2ext(url) -> str:
+	fn = url2fn(url)
+	return fn.rsplit(".", 1)[-1] if "." in fn else "bin"
 
 def replace_ext(fn, ext="") -> str:
 	if "." not in fn:
@@ -1086,9 +1089,7 @@ IMAGE_FORMS = {
 def is_image(url):
 	"Checks whether a url or filename ends with an image file extension. Returns a ternary True/False/None value where True indicates a positive match, False indicates a possible match, and None indicates no match."
 	if url:
-		fn = url2fn(url)
-		if "." in fn:
-			return IMAGE_FORMS.get(fn.rsplit(".", 1)[-1])
+		return IMAGE_FORMS.get(url2ext(url))
 
 VIDEO_FORMS = {
 	"auto": None,
@@ -1118,9 +1119,7 @@ VIDEO_FORMS = {
 def is_video(url):
 	"Checks whether a url or filename ends with a video file extension. Returns a ternary True/False/None value where True indicates a positive match, False indicates a possible match, and None indicates no match."
 	if url:
-		fn = url2fn(url)
-		if "." in fn:
-			return VIDEO_FORMS.get(fn.rsplit(".", 1)[-1])
+		return VIDEO_FORMS.get(url2ext(url))
 
 AUDIO_FORMS = {
 	"auto": None,
@@ -1143,9 +1142,7 @@ AUDIO_FORMS = {
 def is_audio(url):
 	"Checks whether a url or filename ends with an audio file extension. Returns a ternary True/False/None value where True indicates a positive match, False indicates a possible match, and None indicates no match."
 	if url:
-		fn = url2fn(url)
-		if "." in fn:
-			return AUDIO_FORMS.get(fn.rsplit(".", 1)[-1])
+		return AUDIO_FORMS.get(url2ext(url))
 
 VISUAL_FORMS = {
 	"auto": None,
@@ -4751,12 +4748,18 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 	# 	return choice(self.sessions)
 
 	async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True, timeout=24) -> bytes | str | json_like:
+		verify = True if ssl is not False else False
 		if not self.ts:
 			await self._init_()
 		if isinstance(data, aiohttp.FormData):
 			session = self.sessions.next()
 		elif not session:
-			resp = await self.asession.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
+			try:
+				resp = await self.asession.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=verify)
+			except niquests.exceptions.SSLError:
+				if ssl is not None:
+					raise
+				resp = await self.asession.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=False)
 			if resp.status_code >= 400:
 				raise ConnectionError(resp.status_code, (url, as_str(resp.content)))
 			if json:
@@ -4792,7 +4795,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				return as_str(data)
 			return data
 
-	def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, proxy=False, aio=False, session=None, ssl=True, authorise=False) -> bytes | str | json_like:
+	def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, proxy=False, aio=False, session=None, ssl=None, authorise=False) -> bytes | str | json_like:
 		"Creates and executes a HTTP request, returning the body in bytes, string or JSON format. Raises an exception if status code is below 200 or above 399"
 		if headers is None:
 			headers = {}
@@ -4825,15 +4828,14 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				if decode:
 					return as_str(data)
 				return data
-			if session:
-				req = session
-				resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
-			elif bypass:
-				req = reqs.next()
-				resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
-			else:
-				req = self.compat_session if is_discord_url(url) or "mizabot.xyz/u/" in url else self.session
-				resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
+			req = self.compat_session if is_discord_url(url) or "mizabot.xyz/u/" in url else self.session
+			verify = True if ssl is not False else False
+			try:
+				resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout, verify=verify)
+			except (niquests.exceptions.SSLError, requests.exceptions.SSLError):
+				if ssl is not None:
+					raise
+				resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout, verify=False)
 			if resp.status_code >= 400:
 				if not resp.content or magic.from_buffer(resp.content).startswith("text/"):
 					raise ConnectionError(resp.status_code, (url, resp.text))

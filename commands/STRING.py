@@ -1499,7 +1499,7 @@ class Urban(Command):
 	}
 
 	async def __call__(self, channel, user, argv, message, **void):
-		url = f"https://mashape-community-urban-dictionary.p.rapidapi.com/define?term={url_parse(argv)}"
+		url = f"https://mashape-community-urban-dictionary.p.rapidapi.com/define?term={quote_plus(argv)}"
 		d = await Request(url, headers=self.header, timeout=12, json=True, aio=True)
 		resp = d["list"]
 		if not resp:

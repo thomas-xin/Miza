@@ -23,7 +23,7 @@ from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, maybe_json, select_and_loads,
-	is_url, is_discord_attachment, unyt, url2fn, get_duration, rename, uhash, expired, b64,  # noqa: F401
+	is_url, is_discord_attachment, unyt, url2fn, url2ext, get_duration, rename, uhash, expired, b64,  # noqa: F401
 	temporary_file,
 )
 from .audio_downloader import AudioDownloader
@@ -1162,10 +1162,9 @@ class AudioFile:
 				return self
 			if duration < 3840 or not asap:
 				try:
-					fn = url2fn(stream)
-					ext = fn.rsplit(".", 1)[-1]
+					ext = url2ext(stream)
 					self.temporary = temporary_file(ext)
-					await_fut(streamshatter.shatter_request(stream, filename=self.temporary))
+					await_fut(streamshatter.shatter_request(stream, filename=self.temporary, limit=32 if asap else 4))
 				except Exception:
 					print_exc()
 				else:
@@ -1186,7 +1185,10 @@ class AudioFile:
 				self.stream = file
 				self.duration = entry["duration"] = get_duration(self.stream) or self.duration
 				if self.temporary:
-					os.remove(self.temporary)
+					try:
+						os.remove(self.temporary)
+					except Exception:
+						pass
 
 			try:
 				self.stream = PipedLoader(proc.stdout, self.path, efp=proc.stderr, callback=callback)

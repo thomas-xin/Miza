@@ -605,8 +605,8 @@ class UpdateExec(Database):
 		sendable = list(c_id for c_id, flag in self.data.items() if flag & 16)
 		if not sendable:
 			return url
-		name = url2fn(url)
-		if not IMAGE_FORMS.get(name.rsplit(".", 1)[-1]):
+		ext = url2ext(url)
+		if not IMAGE_FORMS.get(ext):
 			return await self.uproxy(url)
 		c_id = choice(sendable)
 		channel = await bot.fetch_channel(c_id)

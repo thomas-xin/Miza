@@ -56,7 +56,7 @@ douclub = None
 
 
 async def searchForums(query):
-	url = f"https://forum.cavestory.org/search/320966/?q={url_parse(query)}"
+	url = f"https://forum.cavestory.org/search/320966/?q={quote_plus(query)}"
 	s = await Request(url, aio=True, timeout=16, ssl=False, decode=True)
 	output = []
 	i = 0
@@ -408,7 +408,7 @@ class Wav2Png(Command):
 
 	async def __call__(self, bot, url, fmt, **void):
 		fn = url2fn(url)
-		ext = fn.rsplit(".", 1)[-1]
+		ext = url2ext(url)
 		was_image = ext in IMAGE_FORMS
 		if not fmt:
 			fmt = "opus" if was_image else "webp"

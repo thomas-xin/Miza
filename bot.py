@@ -1203,7 +1203,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	def preserve_as_long(self, c_id, m_id, a_id, fn=None):
 		if fn and is_url(fn) and ("exec" not in self.data or not is_discord_attachment(fn)):
-			return self.webserver + "/u?url=" + url_parse(fn.split("?", 1)[0])
+			return self.webserver + "/u?url=" + quote_plus(fn.split("?", 1)[0])
 		if fn and "://" in fn:
 			fn = fn.split("?", 1)[0].rsplit("/", 1)[-1]
 		else:
@@ -3192,8 +3192,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def get_attachment(self, url, data=False, size=0):
 		a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-		name = url2fn(url)
-		ext = "bin" if "." not in name else name.rsplit(".", 1)[-1]
+		ext = url2ext(url)
 		fn = f"{CACHE_PATH}/attachments/{a_id}.{ext}"
 		if not os.path.exists(fn):
 			url = await self.renew_attachment(url)
@@ -3202,7 +3201,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					await proc_eval(f"download_file({repr(url)},{repr(fn)},timeout=12)", timeout=16)
 				except Exception:
 					pass
-			args = ["streamshatter", url, fn]
+			args = ["streamshatter", url, "-l", "3", fn]
 			print(args)
 			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
 			try:
@@ -3237,10 +3236,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return f.read()
 
 	async def get_file(self, url, limit=None, timeout=24):
-		fn = url2fn(url)
-		ext = fn.rsplit(".", 1)[-1] if "." in fn else "bin"
+		ext = url2ext(url)
 		fn = temporary_file(ext)
-		await proc_eval(f"asyncio.run(streamshatter.shatter_request({repr(url)},filename={repr(fn)})) and 0", timeout=timeout)
+		await proc_eval(f"asyncio.run(streamshatter.shatter_request({repr(url)},filename={repr(fn)},limit=8)) and 0", timeout=timeout)
 		return fn
 
 	def get_colour(self, user) -> int:
@@ -4213,7 +4211,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Gets the external IP address from api.ipify.org"
 		if not self.ip_sem.busy:
 			async with self.ip_sem:
-				self.ip = await Request("https://api.ipify.org", bypass=False, ssl=False, decode=True, timeout=3, aio=True)
+				self.ip = await Request("https://api.ipify.org", bypass=False, decode=True, timeout=3, aio=True)
 		return self.ip
 
 	total_hosted = 0
@@ -6666,26 +6664,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			))
 			encoded = base64.b64encode(encrypt(data)).rstrip(b"=").decode("ascii")
 			async def external_heartbeat():
-				try:
-					return await Request(
-						f"https://{addr}/heartbeat?key={url_parse(key)}&uri={url_parse(uri)}",
-						method="POST",
-						headers={"content-type": "application/json"},
-						data=orjson.dumps(dict(data=encoded)),
-						aio=True,
-						timeout=5,
-					)
-				except Exception:
-					print_exc()
-					return await Request(
-						f"https://{addr}/heartbeat?key={url_parse(key)}&uri={url_parse(uri)}",
-						method="POST",
-						headers={"content-type": "application/json"},
-						data=orjson.dumps(dict(data=encoded)),
-						aio=True,
-						ssl=False,
-						timeout=10,
-					)
+				return await Request(
+					f"https://{addr}/authorised-heartbeat?key={quote_plus(key)}&uri={quote_plus(uri)}",
+					method="POST",
+					headers={"content-type": "application/json"},
+					data=orjson.dumps(dict(data=encoded)),
+					aio=True,
+					timeout=5,
+				)
 			fut = csubmit(external_heartbeat())
 			futs.append(fut)
 		await gather(*futs)
@@ -8466,7 +8452,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						after._update(data)
 					else:
 						before.author = after.author
-					if len(after.embeds) == 1 and after.embeds[0].type != "rich" and find_urls(after.content) or any((fmt := url2fn(a.url).rsplit(".", 1)[0]) in IMAGE_FORMS or fmt in VIDEO_FORMS for a in message.attachments):
+					if len(after.embeds) == 1 and after.embeds[0].type != "rich" and find_urls(after.content) or any((fmt := url2ext(url)) in IMAGE_FORMS or fmt in VIDEO_FORMS for a in message.attachments):
 						print(f"Possible embed-only update on message {after.id}, ignoring...")
 						return
 					raw = True
