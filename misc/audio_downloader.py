@@ -15,7 +15,7 @@ import zipfile
 import orjson
 import niquests
 import yt_dlp as ytd
-from .types import alist, as_str, cdict, full_prune, json_dumps, round_min, to_alphanumeric, tracebacksuppressor
+from .types import alist, as_str, cdict, fcdict, full_prune, json_dumps, round_min, to_alphanumeric, tracebacksuppressor
 from .smath import time_parse
 from .asyncs import esubmit
 from .util import (
@@ -986,6 +986,20 @@ class AudioDownloader:
 			return
 		with self.session.get(url, headers=Request.header(), verify=False, stream=True) as resp:
 			head = resp.headers
+			if not entry.get("icon", None):
+				head = fcdict(head)
+				try:
+					for keyword in ("thumbnail", "icon", "logo"):
+						for k, v in head.items():
+							if keyword in k:
+								entry["icon"] = v
+								raise StopIteration
+				except StopIteration:
+					for keyword in ("name", "title"):
+						for k, v in head.items():
+							if keyword in k:
+								entry["name"] = v
+					print(entry)
 			ct = head.get("Content-Type", "").split(";", 1)[0]
 			b = b""
 			it = resp.iter_content(65536)
