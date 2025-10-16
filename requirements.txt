@@ -1,3 +1,4 @@
+aiofiles>=25.1.0
 akipy>=0.2.3
 antlr4-python3-runtime>=4.13.2
 audioptic>=1.0.0
@@ -47,7 +48,7 @@ python-dateutil>=2.9.0
 pytz>=2025.2
 requests>=2.32.5
 rule34>=1.8.1
-streamshatter>=1.0.16
+streamshatter>=1.0.17
 sympy>=1.13.3
 tiktoken>=0.11.0
 tsc_utils>=0.2.5

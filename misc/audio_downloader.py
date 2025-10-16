@@ -982,6 +982,8 @@ class AudioDownloader:
 		"""Handles special audio formats unsupported by FFmpeg, such as spotify URLs, spectrogram images, as well as ecdc, org, and midi files."""
 		if is_spotify_url(url):
 			return self.handle_spotify(entry, url, fn)
+		if is_youtube_url(url):
+			return
 		with self.session.get(url, headers=Request.header(), verify=False, stream=True) as resp:
 			head = resp.headers
 			ct = head.get("Content-Type", "").split(";", 1)[0]
@@ -1070,9 +1072,9 @@ class AudioDownloader:
 		fn = temporary_file(ext)
 		d = entry.get("duration")
 		if asap is None:
-			asap = d and d > 72
+			asap = d and d > 3840
 		special_checked = False
-		if not fmt:# and (asap or d is None or d > 960):
+		if not fmt and asap:
 			# If format is not specified, try to stream the audio from URL if possible
 			with tracebacksuppressor:
 				stream, cdc, ac = get_best_audio(entry)

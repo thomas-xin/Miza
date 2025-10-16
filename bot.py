@@ -3111,7 +3111,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return message
 
 	async def tag_message(self, message):
-		always_log = "logM" in self.data and message.guild.id in self.data.logM
+		always_log = "logM" in self.data and message.guild is not None and message.guild.id in self.data.logM
 		for attachment in message.attachments:
 			if always_log or url2ext(attachment.url) in IMAGE_FORMS:
 				csubmit(self.add_and_test(message, attachment))
@@ -3193,12 +3193,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.cache.attachments[attachment.id] = res
 
 	async def get_attachment(self, url, data=False, size=0):
-		a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-		ext = url2ext(url)
-		fn = f"{CACHE_PATH}/attachments/{a_id}.{ext}"
+		if is_discord_attachment(url):
+			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+			ext = url2ext(url)
+			fn = f"{CACHE_PATH}/attachments/{a_id}.{ext}"
+		else:
+			fn = f"{CACHE_PATH}/attachments/{uhash(url.split('//', 1)[-1])}"
 		if not os.path.exists(fn) or not os.path.getsize(fn):
-			url = await self.renew_attachment(url)
-			if size and size <= 10485760:
+			if is_discord_attachment(url):
+				url = await self.renew_attachment(url)
+			if not size or size <= 25 * 1048576:
 				try:
 					await proc_eval(f"download_file({repr(url)},{repr(fn)},timeout=12)", caps=["browse"], timeout=16)
 				except Exception as ex:
@@ -3216,8 +3220,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				raise
 		if not data:
 			return fn
-		with open(fn, "rb") as f:
-			return f.read()
+		async with aiofiles.open(fn, "rb") as f:
+			return await f.read()
 
 	async def get_request(self, url, limit=None, full=True, size=0, timeout=12):
 		if is_miza_attachment(url):
@@ -3225,7 +3229,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			url = await attachment_cache.obtain(*ids)
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
-		if is_discord_attachment(url):
+		if is_discord_url(url):
 			return await self.get_attachment(url, size=size, data=True)
 		if not full:
 			if is_discord_url(url):
@@ -3235,8 +3239,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					print_exc()
 			return await Request.asession.get(url, headers=Request.header(), _timeout_=timeout, verify=False, allow_redirects=True)
 		fn = await self.get_file(url)
-		with open(fn, "rb") as f:
-			return f.read()
+		async with aiofiles.open(fn, "rb") as f:
+			return await f.read()
 
 	async def get_file(self, url, limit=None, timeout=24):
 		ext = url2ext(url)
@@ -6659,10 +6663,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		uri = "https://api.mizabot.xyz"
 		dc = pk = ""
 		if DOMAIN_CERT and PRIVATE_KEY:
-			with open(DOMAIN_CERT, "r", encoding="utf-8") as f:
-				dc = f.read()
-			with open(PRIVATE_KEY, "r", encoding="utf-8") as f:
-				pk = f.read()
+			async with aiofiles.open(DOMAIN_CERT, "r") as f:
+				dc = await f.read()
+			async with aiofiles.open(PRIVATE_KEY, "r") as f:
+				pk = await f.read()
 		for addr in AUTH.get("remote_servers", ()):
 			token = AUTH.get("alt_token") or self.token
 			channels = [k for k, v in self.data.exec.items() if v & 16]

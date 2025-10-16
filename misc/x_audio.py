@@ -146,7 +146,7 @@ class AudioPlayer(discord.AudioSource):
 	last_activity = inf
 
 	@classmethod
-	async def join(cls, vcc, channel=None, user=None, announce=0):
+	async def join(cls, vcc, channel=None, user=None, announce=0, force=False):
 		globals()["client"] = await wrap_future(client_fut)
 		cid = cast_id(vcc)
 		vcc = client.get_channel(cid)
@@ -166,7 +166,7 @@ class AudioPlayer(discord.AudioSource):
 		except KeyError:
 			pass
 		else:
-			if not self or self.vc and (self.vc.channel.id != vcc.id or not self.vc.is_connected()):
+			if not self or self.vc and (self.vc.channel.id != vcc.id and (force or getattr(user, "voice", None)) or not self.vc.is_connected()):
 				await cls.force_disconnect(vcc.guild)
 				await asyncio.sleep(1)
 				if self:
@@ -413,6 +413,7 @@ class AudioPlayer(discord.AudioSource):
 		self.playing = deque(maxlen=2)
 		self.fut = Future()
 		self.ensure_lock = threading.RLock()
+		self.after_lock = threading.RLock()
 		self.vcc = vcc
 		if vcc:
 			self.vc = client.get_guild(cast_id(vcc.guild)).voice_client
@@ -626,7 +627,7 @@ class AudioPlayer(discord.AudioSource):
 			assert self, "No accessible queue to save!"
 			b = self.get_dump()
 			dump = discord.File(io.BytesIO(b), filename="dump.json")
-		message = await channel.send(s, file=dump or None)
+		message = await channel.send(lim_str(s, 2000), file=dump or None)
 		if channel.permissions_for(channel.guild.me).add_reactions:
 			csubmit(message.add_reaction("❎"))
 		return message
@@ -887,23 +888,29 @@ class AudioPlayer(discord.AudioSource):
 				self.resume()
 			elif self.settings.pause and self.vc.is_playing():
 				self.vc.pause()
-			if len(self.playing) == 1 and len(self.queue) > 1:
-				try:
-					source = AF.load(self.queue[1], asap=False).create_reader(self, pos=self.queue[1].get("start", 0))
-				except Exception as ex:
-					print_exc()
-					s = italics(ansi_md(
-						f"{colourise('❗', fg='blue')}{colourise()} An error occured while loading {colourise_brackets(self.queue[1].name, 'red', 'green', 'magenta')}{colourise()}, and it has been removed automatically. {colourise('❗', fg='blue')}{colourise()}\n"
-						+ f"Exception: {colourise_brackets(repr(ex), 'red', 'magenta', 'yellow')}"
-					))
-					csubmit(self.announce(s))
-					return self.skip(1)
-				if len(self.playing) == 1 and len(self.queue) > 1 and self.queue[1].url == source.af.url:
-					self.playing.append(source)
+			esubmit(self.ensure_next)
 		if not self.queue:
 			self.update_streaming()
 		else:
 			self.update_activity()
+
+	def ensure_next(self):
+		with tracebacksuppressor:
+			with self.after_lock:
+				if len(self.playing) == 1 and len(self.queue) > 1:
+					entry = self.queue[1]
+					try:
+						source = AF.load(entry, asap=False).create_reader(self, pos=entry.get("start", 0))
+					except Exception as ex:
+						print_exc()
+						s = italics(ansi_md(
+							f"{colourise('❗', fg='blue')}{colourise()} An error occured while loading {colourise_brackets(entry.name, 'red', 'green', 'magenta')}{colourise()}, and it has been removed automatically. {colourise('❗', fg='blue')}{colourise()}\n"
+							+ f"Exception: {colourise_brackets(repr(ex), 'red', 'magenta', 'yellow')}"
+						))
+						csubmit(self.announce(s))
+						return self.skip(1)
+					if len(self.playing) == 1 and len(self.queue) > 1 and self.queue[1].url == source.af.url:
+						self.playing.append(source)
 
 	def clear(self):
 		"""Clears the queue and stops all audio."""
@@ -1151,7 +1158,7 @@ class AudioFile:
 			name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
 			self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
 			if not is_url(stream) and codec == "opus" and channels == 2:
-				print("DL:", self.path)
+				print("DL:", stream, self.path)
 				rename(stream, self.path)
 				self.stream = self.path
 				self.duration = entry["duration"] = get_duration(self.stream) or duration
@@ -1160,15 +1167,15 @@ class AudioFile:
 				self.stream = stream
 				self.duration = entry["duration"] = duration
 				return self
-			if duration < 3840 or not asap:
-				try:
-					ext = url2ext(stream)
-					self.temporary = temporary_file(ext)
-					await_fut(streamshatter.shatter_request(stream, filename=self.temporary, limit=32 if asap else 4))
-				except Exception:
-					print_exc()
-				else:
-					stream = self.temporary
+			# if duration < 3840:
+			# 	try:
+			# 		ext = url2ext(stream)
+			# 		self.temporary = temporary_file(ext)
+			# 		await_fut(streamshatter.shatter_request(stream, filename=self.temporary, limit=4 if asap else 2))
+			# 	except Exception:
+			# 		print_exc()
+			# 	else:
+			# 		stream = self.temporary
 			ffmpeg = "ffmpeg"
 			sample_rate = SAMPLE_RATE
 			ba = "160k" if is_url(stream) or os.path.getsize(stream) <= 10485760 else "108k"
@@ -1263,6 +1270,8 @@ class AudioFile:
 	def create_reader(self, auds, pos=0):
 		source = self.stream
 		# Construct FFmpeg options
+		if self.live and not self.duration:
+			pos = 0
 		options = auds.construct_options(full=self.live)
 		speed = 1
 		if options or pos or auds.settings.bitrate < auds.defaults["bitrate"] or self.live or not isinstance(self.stream, str):
@@ -1678,7 +1687,7 @@ async def autosave_loop(start=True):
 			async with Delay(60):
 				for guild in client.guilds:
 					a = AP.players.get(guild.id)
-					if not a:
+					if not a or not len(a.queue):
 						AP.cache.pop(guild.id, None)
 						continue
 					a.backup()

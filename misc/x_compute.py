@@ -37,8 +37,8 @@ import ast
 import base64
 import hashlib
 import random
-import streamshatter
-import urllib
+import urllib.parse
+import urllib.request
 import numpy as np
 from contextlib import suppress
 from math import inf, floor, ceil, log2, log10
@@ -748,17 +748,20 @@ def max_size(w, h, maxsize, force=False):
 		h = round(h * r)
 	return w, h
 
-def download_file(url, fn, timeout=12):
-	resp = requests.get(url, headers=streamshatter.header(), timeout=timeout)
-	with open(fn, "wb") as f:
-		f.write(resp.content)
 
 if "browse" in CAPS:
+	import shutil
 	import playwright  # noqa: F401
+	import streamshatter
 
 	url_match = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
 	def is_url(url):
 		return url_match.search(url)
+
+	def download_file(url, filename="untitled.bin", timeout=12):
+		req = urllib.request.Request(url, method="GET", headers=streamshatter.header())
+		with open(filename, "wb") as f:
+			shutil.copyfileobj(urllib.request.urlopen(req, timeout=timeout), f)
 
 	def browse(q, text=True):
 		if not is_url(q):

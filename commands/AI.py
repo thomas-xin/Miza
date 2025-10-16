@@ -1102,17 +1102,25 @@ class Imagine(Command):
 						for image in message["images"]:
 							image_url = image["image_url"]["url"]
 							return base64.b64decode(image_url.split("base64,", 1)[-1].encode("ascii"))
-				raise RuntimeError(result)
+				if image:
+					raise RuntimeError(result)
 
 			resp_model = "gemini-2.5-flash-image-preview"
-			pps = [eprompts.next().replace(" BREAK ", "\n") for i in range(amount - amount2)]
+			n = amount - amount2
+			if n > 1:
+				n -= 1
+			pps = [eprompts.next().replace(" BREAK ", "\n") for i in range(n)]
 			pnames.extend(pps)
 			if url:
 				image = await bot.to_data_url(url)
 			else:
 				image = None
-			futs.extend(asubmit(nano_banana, p, image) for p in pps)
-			amount2 = amount
+			cfuts = [asubmit(nano_banana, p, image) for p in pps]
+			await gather(*cfuts)
+			for fut in cfuts:
+				if fut.result():
+					futs.append(fut)
+					amount2 += 1
 
 		if amount2 < amount and model in ("dalle3", "dalle2"):
 			dalle = "2" if model == "dalle2" else "3"
@@ -1373,8 +1381,8 @@ class Imagine(Command):
 					fn = target + "/" + fin
 					if not isinstance(inim, byte_like):
 						inim = await process_image(inim, "resize_to", ["-nogif", w, h, "auto", "-bg", "-oz"], timeout=20, retries=1)
-					with open(fn, "wb") as f:
-						await asubmit(f.write, inim)
+					async with aiofiles.open(fn, "wb") as f:
+						await f.write(inim)
 					data["prompt"]["35"]["inputs"]["image"] = fin
 					data["prompt"]["38"]["inputs"]["amount"] = n
 				else:
@@ -1447,16 +1455,14 @@ class Imagine(Command):
 				continue
 			if isinstance(fn, bytes):
 				fn2 = temporary_file("png")
-				with open(fn2, "wb") as f:
-					f.write(fn)
+				async with aiofiles.open(fn2, "wb") as f:
+					await f.write(fn)
 				fn = fn2
 			if isinstance(fn, str):
 				if is_url(fn):
 					fn = await Request(fn, timeout=24, aio=True)
 				else:
 					assert os.path.exists(fn)
-					# with open(fn, "rb") as f:
-					# 	fn = f.read()
 			meta = cdict(
 				issuer=bot.name,
 				issuer_id=bot.id,

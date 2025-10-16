@@ -428,21 +428,6 @@
 			"example": [],
 			"timeout": "24"
 		},
-		"EmojiCrypt": {
-			"aliases": [
-				"EmojiCrypt",
-				"EncryptEmoji",
-				"DecryptEmoji",
-				"EmojiEncrypt",
-				"EmojiDecrypt"
-			],
-			"description": "Encrypts the input text or file into smileys.",
-			"usage": "<string> <mode(encrypt|decrypt)> <encrypted(-p)>? <-1:password>",
-			"level": "0",
-			"rate_limit": "(9, 12)",
-			"example": [],
-			"timeout": "24"
-		},
 		"Time": {
 			"aliases": [
 				"Time",

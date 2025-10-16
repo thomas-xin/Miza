@@ -1005,64 +1005,6 @@ d(*⌒▽⌒*)b Happy
 		await bot.send_as_webhook(_channel, msg, username=_user.display_name, avatar_url=url)
 
 
-class EmojiCrypt(Command):
-	name = ["EncryptEmoji", "DecryptEmoji", "EmojiEncrypt", "EmojiDecrypt"]
-	description = "Encrypts the input text or file into smileys."
-	usage = "<string> <mode(encrypt|decrypt)> <encrypted(-p)>? <-1:password>"
-	rate_limit = (9, 12)
-	# slash = True
-	ephemeral = True
-	flags = "ed"
-
-	async def __call__(self, args, name, flags, message, **void):
-		password = None
-		for flag in ("+p", "-p", "?p"):
-			try:
-				i = args.index(flag)
-			except ValueError:
-				continue
-			password = args[i + 1]
-			args = args[:i] + args[i + 2:]
-		msg = " ".join(args)
-		fi = temporary_file()
-		if not msg:
-			msg = message.attachments[0].url
-		if is_url(msg):
-			msg = await self.bot.follow_url(msg, allow=True, limit=1)
-			args = ("streamshatter", msg, "../" + fi)
-			proc = await asyncio.create_subprocess_exec(*args, cwd="misc")
-			try:
-				async with asyncio.timeout(48):
-					await proc.wait()
-			except (T0, T1, T2):
-				with tracebacksuppressor:
-					force_kill(proc)
-				raise
-		else:
-			with open(fi, "w", encoding="utf-8") as f:
-				await asubmit(f.write, msg)
-		fs = os.path.getsize(fi)
-		args = [python, "neutrino.py", "-y", "../" + fi, "../" + fi + "-"]
-		if "d" in flags or "decrypt" in name:
-			args.append("--decrypt")
-		else:
-			c = round_random(27 - math.log(fs, 2))
-			c = max(min(c, 9), 0)
-			args.extend((f"-c{c}", "--encrypt"))
-		args.append(password or "\x7f")
-		proc = await asyncio.create_subprocess_exec(*args, cwd="misc")
-		try:
-			async with asyncio.timeout(60):
-				await proc.wait()
-		except (T0, T1, T2):
-			with tracebacksuppressor:
-				force_kill(proc)
-			raise
-		fn = "message.txt"
-		f = CompatFile(fi + "-", filename=fn)
-		return dict(file=f, filename=fn)
-
-
 class Time(Command):
 	name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T"]
 	description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user."

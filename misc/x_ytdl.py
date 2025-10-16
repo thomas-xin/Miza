@@ -8,6 +8,7 @@ import zipfile
 import niquests
 from PIL import Image
 import streamshatter
+from .util import is_url, is_discord_attachment, TEMP_PATH
 # Allow fallback (although not recommended as generally the up-to-date version is necessary for most sites)
 try:
 	import yt_dlp as ytd
@@ -211,10 +212,14 @@ else:
 	real_download = ytd.downloader.http.HttpFD.real_download
 	def trial_download(self, filename, info_dict):
 		try:
+			if is_url(info_dict["url"]) and is_discord_attachment(info_dict["url"]):
+				raise ValueError
 			asyncio.run(streamshatter.shatter_request(
 				info_dict["url"],
+				cache_folder=TEMP_PATH,
 				headers=info_dict.get("http_headers", {}),
 				filename=filename,
+				limit=12,
 			))
 		except Exception:
 			pass

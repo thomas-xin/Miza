@@ -1,3 +1,4 @@
+import aiofiles
 import aiohttp
 import ast
 import asyncio
@@ -107,6 +108,12 @@ def save_file(data, fn):
 		data = io.BytesIO(data)
 	with open(fn, "wb") as f:
 		shutil.copyfileobj(data, f)
+
+async def save_file_a(data, fn):
+	async with aiofiles.open(fn, "wb") as f:
+		if hasattr(data, "read"):
+			data = await asubmit(data.read)
+		await f.write(data)
 
 _globals = globals()
 def save_auth(auth):

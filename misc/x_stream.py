@@ -21,7 +21,6 @@ from .util import (
 )
 from .caches import attachment_cache
 
-interface = None
 csubmit(MizaRequest._init_())
 
 ADDRESS = "0.0.0.0"
@@ -85,6 +84,7 @@ class Server:
 	session = niquests.Session()
 	asession = niquests.AsyncSession()
 	statics = diskcache.Cache(directory=f"{CACHE_PATH}/statics", expiry=86400 * 30)
+	dynamics = diskcache.Cache(directory=f"{CACHE_PATH}/dynamics", expiry=86400 * 30)
 
 	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
 		"""HTTP GET with automatic retries."""
@@ -346,10 +346,7 @@ async def unproxy(path: str, request: Request, url: Optional[str] = None):
 			redirect_url += f"?{query_string}"
 		return RedirectResponse(url=redirect_url, status_code=307)
 
-	assert len(path_parts) == 1
-	aid = p2n(path_parts[0])
-	resp = interface.run(f"bot.renew_attachment({aid})")
-	return await proxy_if(resp, request)
+	raise HTTPException(status_code=404, detail="Invalid path")
 
 
 @app.post("/reupload")
@@ -542,12 +539,12 @@ async def static_backend(path: str, request: Request):
 	if query_string:
 		url += f"?{query_string}"
 
-	# try:
-	# 	headers, content = server.statics[url]
-	# except LookupError:
-	# 	pass
-	# else:
-	# 	return Response(content=content, headers=headers)
+	try:
+		headers, content = server.statics[url]
+	except LookupError:
+		pass
+	else:
+		return Response(content=content, headers=headers)
 
 	headers = fcdict(request.headers)
 	headers.pop("Connection", None)

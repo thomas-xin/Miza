@@ -814,6 +814,7 @@ class Connect(Command):
 	slash = ("Connect", "Leave")
 
 	async def __call__(self, bot, _user, _channel, _message=None, _perm=0, channel=None, mode="connect", vc=None, **void):
+		force = bool(channel)
 		if mode == "disconnect":
 			vc_ = None
 		elif channel:
@@ -846,7 +847,7 @@ class Connect(Command):
 		if not vc_.permissions_for(guild.me).connect:
 			raise ConnectionError("Insufficient permissions to connect to voice channel.")
 		# Create audio source if none already exists
-		await bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id},announce=1)")
+		await bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id},announce=1,force={force})")
 
 
 class Skip(Command):
