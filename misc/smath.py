@@ -81,12 +81,12 @@ utc_ft = lambda s: datetime.datetime.fromtimestamp(s, tz=datetime.timezone.utc).
 utc_dt = lambda: datetime.datetime.now(tz=datetime.timezone.utc).replace(tzinfo=None)
 utc_ddt = lambda: DynamicDT.utcnow()
 zerot = lambda: utc_dt().replace(hour=0, minute=0, second=0)
-sec2time = lambda s: TimeDelta(seconds=s).to_string(precision=4)
+sec2time = lambda s: TimeDelta(seconds=s).to_string(precision=4) if isfinite(s) else str(s)
 time_repr = lambda s, mode="R": f"<t:{round(s.timestamp() if getattr(s, 'timestamp', None) else s)}:{mode}>"
-time_delta = lambda s: str(TimeDelta(seconds=s))
-time_until = lambda s: str(DynamicDT.utcfromtimestamp(s) - DynamicDT.utcnow())
-time_until_short = lambda s: (DynamicDT.utcfromtimestamp(s) - DynamicDT.utcnow()).to_short()
-time_after = lambda s: str(DynamicDT.utcnow() - DynamicDT.utcfromtimestamp(s))
+time_delta = lambda s: str(TimeDelta(seconds=s)) if isfinite(s) else str(s)
+time_until = lambda s: str(DynamicDT.utcfromtimestamp(s) - DynamicDT.utcnow()) if isfinite(s) else str(s)
+time_until_short = lambda s: (DynamicDT.utcfromtimestamp(s) - DynamicDT.utcnow()).to_short() if isfinite(s) else str(s)
+time_after = lambda s: str(DynamicDT.utcnow() - DynamicDT.utcfromtimestamp(s)) if isfinite(s) else str(s)
 utc_ts = lambda s: s.replace(tzinfo=datetime.timezone.utc).timestamp()
 to_utc = lambda dt: dt.replace(tzinfo=datetime.timezone.utc)
 

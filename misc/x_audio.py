@@ -1313,6 +1313,15 @@ class AudioFile:
 				args.extend(("-f", "opus"))
 				if not self.live:
 					args.extend(("-c:a", "copy"))
+				else:
+					br = auds.settings.bitrate
+					sr = SAMPLE_RATE
+					while br < 512:
+						br *= 2
+						sr >>= 1
+					if sr < 8000:
+						sr = 8000
+					args.extend(("-c:a", "libopus", "-ar", str(sr), "-ac", "2", "-b:a", str(round_min(br)), "-vbr", "on", "-bufsize", "8192"))
 			args.append("-")
 			print(args)
 			if buff:
