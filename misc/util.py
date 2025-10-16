@@ -2114,6 +2114,7 @@ class DownloadingFile(io.IOBase):
 		self.fp = None
 
 
+@functools.lru_cache(maxsize=64)
 def get_duration_2(filename, _timeout=12):
 	command = (
 		"ffprobe",
@@ -2160,6 +2161,7 @@ def get_duration_2(filename, _timeout=12):
 			bps = float(resp[4])
 	return dur, bps, cdc, ac
 
+@functools.lru_cache(maxsize=64)
 def get_duration_simple(filename, _timeout=12):
 	"Runs FFprobe on a file or url, returning the duration if possible."
 	command = (
@@ -2201,6 +2203,7 @@ def get_duration_simple(filename, _timeout=12):
 			bps = float(resp[2])
 	return dur, bps
 
+@functools.lru_cache(maxsize=64)
 def get_duration(filename):
 	"Gets the duration of an audio/video file using metadata, bitrate, filesize etc. Falls back to FFmpeg if necessary."
 	if not filename:

@@ -23,8 +23,8 @@ from .smath import log2lin
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, maybe_json, select_and_loads,
-	is_url, is_discord_attachment, unyt, url2fn, url2ext, get_duration, rename, uhash, expired, b64,  # noqa: F401
-	is_youtube_stream,
+	is_url, unyt, url2fn, get_duration, get_duration_2,
+	rename, uhash, expired, is_youtube_stream,
 )
 from .audio_downloader import AudioDownloader
 VC_TIMEOUT = 13
@@ -1306,9 +1306,13 @@ class AudioFile:
 				buff = True
 				args.append("-")
 			auds.settings.bitrate = min(auds.settings.bitrate, MAX_BITRATE)
+			same_codec = False
 			if not options and not auds.settings.bitrate < auds.defaults["bitrate"]:
-				args.extend(("-f", "opus", "-c:a", "copy"))
-			else:
+				_dur, _bps, cdc, ac = get_duration_2(source)
+				if ac and cdc in ("opus", "libopus"):
+					args.extend(("-f", "opus", "-c:a", "copy"))
+					same_codec = True
+			if not same_codec:
 				br = auds.settings.bitrate
 				if self.live:
 					br = min(96000, br)
