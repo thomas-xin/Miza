@@ -1298,7 +1298,9 @@ class AudioFile:
 				buff = True
 				args.append("-")
 			auds.settings.bitrate = min(auds.settings.bitrate, MAX_BITRATE)
-			if options or auds.settings.bitrate < auds.defaults["bitrate"]:
+			if not self.live and not options and not auds.settings.bitrate < auds.defaults["bitrate"]:
+				args.extend(("-c:a", "copy"))
+			else:
 				br = auds.settings.bitrate
 				sr = SAMPLE_RATE
 				while br < 512:
@@ -1307,21 +1309,7 @@ class AudioFile:
 				if sr < 8000:
 					sr = 8000
 				options.extend(("-f", "opus", "-c:a", "libopus", "-ar", str(sr), "-ac", "2", "-b:a", str(round_min(br)), "-vbr", "on", "-bufsize", "8192"))
-				if options:
-					args.extend(options)
-			else:
-				args.extend(("-f", "opus"))
-				if not self.live:
-					args.extend(("-c:a", "copy"))
-				else:
-					br = auds.settings.bitrate
-					sr = SAMPLE_RATE
-					while br < 512:
-						br *= 2
-						sr >>= 1
-					if sr < 8000:
-						sr = 8000
-					args.extend(("-c:a", "libopus", "-ar", str(sr), "-ac", "2", "-b:a", str(round_min(br)), "-vbr", "on", "-bufsize", "8192"))
+				args.extend(options)
 			args.append("-")
 			print(args)
 			if buff:
