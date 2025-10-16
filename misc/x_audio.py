@@ -17,14 +17,13 @@ import orjson
 import niquests
 import numpy as np
 import psutil
-import streamshatter
-from .asyncs import await_fut, csubmit, esubmit, asubmit, wrap_future, cst, eloop, Delay
+from .asyncs import csubmit, esubmit, asubmit, wrap_future, cst, eloop, Delay
 from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_str, astype
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, maybe_json, select_and_loads,
 	is_url, is_discord_attachment, unyt, url2fn, url2ext, get_duration, rename, uhash, expired, b64,  # noqa: F401
-	temporary_file,
+	is_youtube_stream,
 )
 from .audio_downloader import AudioDownloader
 VC_TIMEOUT = 13
@@ -142,6 +141,7 @@ class AudioPlayer(discord.AudioSource):
 	# Empty opus packet data
 	emptyopus = b"\xfc\xff\xfe"
 	silent = False
+	last_read = None
 	last_played = 0
 	last_activity = inf
 
@@ -743,12 +743,16 @@ class AudioPlayer(discord.AudioSource):
 		try:
 			if not self.queue or not self.playing:
 				raise IndexError
-			new, out = self.playing[0].new, self.playing[0].read()
-		except (StopIteration, IndexError, discord.oggparse.OggError):
+			new = self.playing[0].new
+			self.last_read = self.last_read or esubmit(self.playing[0].read)
+			out = self.last_read.result(timeout=0.05)
+		except (StopIteration, IndexError, discord.oggparse.OggError, concurrent.futures.TimeoutError):
 			pass
 		except Exception:
 			print_exc()
+			self.last_read = None
 		else:
+			self.last_read = None
 			if out and new:
 				self.playing[0].new = False
 				csubmit(self.announce_play(self.queue[0]))
@@ -1167,21 +1171,12 @@ class AudioFile:
 				self.stream = stream
 				self.duration = entry["duration"] = duration
 				return self
-			# if duration < 3840:
-			# 	try:
-			# 		ext = url2ext(stream)
-			# 		self.temporary = temporary_file(ext)
-			# 		await_fut(streamshatter.shatter_request(stream, filename=self.temporary, limit=4 if asap else 2))
-			# 	except Exception:
-			# 		print_exc()
-			# 	else:
-			# 		stream = self.temporary
 			ffmpeg = "ffmpeg"
 			sample_rate = SAMPLE_RATE
 			ba = "160k" if is_url(stream) or os.path.getsize(stream) <= 10485760 else "108k"
-			cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(sample_rate), "-ac", "2", "-b:a", ba, "-vbr", "on", "-"]
+			cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(sample_rate), "-ac", "2", "-b:a", ba, "-vbr", "on", "-frame_duration", "20", "-"]
 			if ba == "160k" and codec == "opus" and channels == 2:
-				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "copy", "-"]
+				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "copy", "-"]
 			if is_url(stream):
 				cmd = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + cmd[1:]
 			print(cmd)
@@ -1275,7 +1270,7 @@ class AudioFile:
 		options = auds.construct_options(full=self.live)
 		speed = 1
 		if options or pos or auds.settings.bitrate < auds.defaults["bitrate"] or self.live or not isinstance(self.stream, str):
-			args = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+nobuffer+discardcorrupt+genpts+igndts+flush_packets"]
+			args = ["ffmpeg", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets"]
 			if pos or auds.reverse:
 				arg = "-to" if auds.reverse else "-ss"
 				if auds.reverse and not pos:
@@ -1285,14 +1280,16 @@ class AudioFile:
 			if auds.reverse:
 				speed = -speed
 			args.append("-i")
+			buff = False
+			live = False
 			if isinstance(self.stream, str):
-				buff = False
-				if pos > 60 or not self.live or is_discord_attachment(source):
+				if pos > 60 or not self.live or not is_youtube_stream(source):
 					if is_url(source):
 						args = ["ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "250"] + args[1:]
 					args.insert(1, "-nostdin")
 					args.append(source)
 				else:
+					live = True
 					args.append("-")
 			else:
 				buff = True
@@ -1302,20 +1299,25 @@ class AudioFile:
 				args.extend(("-c:a", "copy"))
 			else:
 				br = auds.settings.bitrate
+				if self.live:
+					br = min(96000, br)
+					options.extend(("-rtbufsize", "1M"))
 				sr = SAMPLE_RATE
 				while br < 512:
 					br *= 2
 					sr >>= 1
 				if sr < 8000:
 					sr = 8000
-				options.extend(("-f", "opus", "-c:a", "libopus", "-ar", str(sr), "-ac", "2", "-b:a", str(round_min(br)), "-vbr", "on", "-bufsize", "8192"))
+				options.extend(("-f", "opus", "-c:a", "libopus", "-ar", str(sr), "-ac", "2", "-b:a", str(round_min(br)), "-vbr", "on", "-bufsize", "16k", "-frame_duration", "20"))
 				args.extend(options)
+			if self.live:
+				args.extend(("-thread_queue_size", "512", "-application", "lowdelay"))
 			args.append("-")
 			print(args)
 			if buff:
 				# Select buffered reader for files not yet fully loaded, convert while downloading
 				player = BufferedAudioReader(self, args, stream=self.stream)
-			elif self.live:
+			elif live:
 				# Select live reader for streamed links
 				player = LiveAudioReader(self, args)
 			else:
@@ -1488,7 +1490,7 @@ class LiveAudioReader(discord.AudioSource):
 		with tracebacksuppressor:
 			try:
 				self.resp = niquests.get(stream, headers=Request.header(), stream=True, timeout=24)
-				it = self.resp.iter_content(262144)
+				it = self.resp.iter_content(65536)
 				b = next(it)
 				fut = esubmit(next, it)
 				proc.stdin.write(b)
