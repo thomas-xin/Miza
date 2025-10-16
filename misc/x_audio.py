@@ -19,6 +19,7 @@ import numpy as np
 import psutil
 from .asyncs import csubmit, esubmit, asubmit, wrap_future, cst, eloop, Delay
 from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_str, astype
+from .smath import log2lin
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, maybe_json, select_and_loads,
@@ -545,10 +546,10 @@ class AudioPlayer(discord.AudioSource):
 			small = 0
 			for i in range(bars):
 				freq = low * (high / low) ** (i / bars)
-				bb = -(i / (bars - 1) - 0.5) * settings.bassboost * 64
-				dB = log(abs(bb) + 1, 2)
-				if bb < 0:
-					dB = -dB
+				dB = -(i / (bars - 1) - 0.5) * settings.bassboost * 64
+				# dB = log(abs(bb) + 1, 2)
+				# if bb < 0:
+				# 	dB = -dB
 				if dB < small:
 					small = dB
 				entries.append(f"entry({round(freq, 5)},{round(dB, 5)})")
@@ -592,7 +593,10 @@ class AudioPlayer(discord.AudioSource):
 				options.append("extrastereo=m=" + str(p) + ":c=0")
 				volume *= 1 / max(1, round(sqrt(abs(p)), 4))
 		if volume != 1:
-			options.append("volume=" + str(round(volume, 7)))
+			v = round(log2lin(volume), 7)
+			if not isfinite(v):
+				v = 1e308
+			options.append("volume=" + str(v))
 		# Soft clip audio using atan, reverb filter requires -filter_complex rather than -af option
 		# Clipping is bypassed if compressor is enabled; instead we use a limiter such that if the volume is also set higher than 100%, the limiter will take effect instead.
 		if options:
@@ -739,15 +743,17 @@ class AudioPlayer(discord.AudioSource):
 			self.silent = True
 			return self.emptyopus * 3
 		new = False
-		out = b""
+		out = self.emptyopus
 		try:
 			if not self.queue or not self.playing:
 				raise IndexError
 			new = self.playing[0].new
 			self.last_read = self.last_read or esubmit(self.playing[0].read)
 			out = self.last_read.result(timeout=0.05)
-		except (StopIteration, IndexError, discord.oggparse.OggError, concurrent.futures.TimeoutError):
+		except concurrent.futures.TimeoutError:
 			pass
+		except (StopIteration, IndexError, discord.oggparse.OggError):
+			self.last_read = None
 		except Exception:
 			print_exc()
 			self.last_read = None
@@ -757,7 +763,7 @@ class AudioPlayer(discord.AudioSource):
 				self.playing[0].new = False
 				csubmit(self.announce_play(self.queue[0]))
 			self.last_played = utc()
-		if (self.playing and self.queue) and (not out or self.playing[0].pos / 50 >= self.queue[0].get("end", inf)):
+		if (self.playing and self.queue) and (not out or self.playing[0].pos / 50 >= (self.queue[0].get("end") or inf)):
 			self.skip(0, loop=self.settings.loop, repeat=self.settings.repeat, shuffle=self.settings.shuffle)
 			if not out and self.playing:
 				return self.read()
@@ -1167,7 +1173,7 @@ class AudioFile:
 				self.stream = self.path
 				self.duration = entry["duration"] = get_duration(self.stream) or duration
 				return self
-			if duration is None or duration > 36960:
+			if not duration or duration > 36960:
 				self.stream = stream
 				self.duration = entry["duration"] = duration
 				return self
@@ -1270,7 +1276,10 @@ class AudioFile:
 		options = auds.construct_options(full=self.live)
 		speed = 1
 		if options or pos or auds.settings.bitrate < auds.defaults["bitrate"] or self.live or not isinstance(self.stream, str):
-			args = ["ffmpeg", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets"]
+			fflags = "+discardcorrupt+genpts+igndts+flush_packets"
+			if self.live:
+				fflags += "+bitexact"
+			args = ["ffmpeg", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", fflags]
 			if pos or auds.reverse:
 				arg = "-to" if auds.reverse else "-ss"
 				if auds.reverse and not pos:
@@ -1279,6 +1288,8 @@ class AudioFile:
 			speed = round_min(auds.settings.speed * 2 ** (auds.settings.resample / 12))
 			if auds.reverse:
 				speed = -speed
+			if not is_url(self.stream) and self.stream.endswith(".concat"):
+				args.extend(("-f", "concat"))
 			args.append("-i")
 			buff = False
 			live = False
@@ -1295,8 +1306,8 @@ class AudioFile:
 				buff = True
 				args.append("-")
 			auds.settings.bitrate = min(auds.settings.bitrate, MAX_BITRATE)
-			if not self.live and not options and not auds.settings.bitrate < auds.defaults["bitrate"]:
-				args.extend(("-c:a", "copy"))
+			if not options and not auds.settings.bitrate < auds.defaults["bitrate"]:
+				args.extend(("-f", "opus", "-c:a", "copy"))
 			else:
 				br = auds.settings.bitrate
 				if self.live:
@@ -1308,10 +1319,10 @@ class AudioFile:
 					sr >>= 1
 				if sr < 8000:
 					sr = 8000
-				options.extend(("-f", "opus", "-c:a", "libopus", "-ar", str(sr), "-ac", "2", "-b:a", str(round_min(br)), "-vbr", "on", "-bufsize", "16k", "-frame_duration", "20"))
+				options.extend(("-f", "opus", "-c:a", "libopus", "-ar", str(sr), "-ac", "2", "-b:a", str(round(br)), "-vbr", "on", "-bufsize", "16k", "-frame_duration", "20"))
 				args.extend(options)
 			if self.live:
-				args.extend(("-thread_queue_size", "512", "-application", "lowdelay"))
+				args.extend(("-map_metadata", "-1", "-thread_queue_size", "512", "-application", "lowdelay"))
 			args.append("-")
 			print(args)
 			if buff:
@@ -1323,6 +1334,7 @@ class AudioFile:
 			else:
 				# Select loaded reader for loaded files
 				player = LoadedAudioReader(self, args)
+			print(player)
 			player.speed = speed
 			auds.args = args
 			reader = player.start()
@@ -1359,11 +1371,12 @@ class LoadedAudioReader(discord.AudioSource):
 			b, self.buffer = self.buffer, None
 			self.pos += self.speed
 			return b
+		out = b""
 		for att in range(16):
 			try:
 				out = next(self.packet_iter, b"")
 			except (OSError, BrokenPipeError):
-				if self.file.seekble:
+				if getattr(self.file, "seekable", False):
 					pos = self.pos / 50
 					try:
 						i = self.args.index("-ss")
@@ -1383,7 +1396,7 @@ class LoadedAudioReader(discord.AudioSource):
 			else:
 				self.pos += self.speed
 				return out
-		return b""
+		return out
 
 	@tracebacksuppressor
 	def start(self):
@@ -1517,7 +1530,7 @@ class LiveAudioReader(discord.AudioSource):
 			try:
 				out = next(self.packet_iter, b"")
 			except (OSError, BrokenPipeError):
-				if self.file.seekble:
+				if getattr(self.file, "seekable", False):
 					pos = self.pos / 50
 					try:
 						i = self.args.index("-ss")
@@ -1704,9 +1717,10 @@ async def on_connect():
 			client_fut.set_result(client)
 			# Restore audio players from our cache on disk
 			keys = set(AP.cache.keys())
-			print("Reloading players:", keys)
+			if keys:
+				print("Reloading players:", keys)
+				await asyncio.gather(*(reload_player(gid) for gid in keys))
 			await asyncio.gather(*(AP.force_disconnect(guild.id) for guild in client.guilds if guild.me and guild.me.voice is not None and guild.id not in keys))
-			await asyncio.gather(*(reload_player(gid) for gid in keys))
 			csubmit(autosave_loop())
 		print("Audio client successfully connected.")
 

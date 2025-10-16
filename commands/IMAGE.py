@@ -1070,7 +1070,7 @@ class Resize(Command):
 			type="enum",
 			validation=cdict(
 				enum=("auto", "crop", "nearest", "linear", "area", "scale2x", "hamming", "gauss", "cubic", "spline", "sinc", "lanczos"),
-				accepts=dict(bilinear="linear", bicubic="cubic")
+				accepts=dict(bilinear="linear", bicubic="cubic", bicublin="cubic", cublin="cubic")
 			),
 			description="Mode used to resize image",
 			example="scale2x",

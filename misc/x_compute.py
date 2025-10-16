@@ -1101,6 +1101,8 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 				out = io.BytesIO()
 				im.save(out, format="png", optimize=True, compress_level=9)
 	else:
+		if fmt in ("jpeg", "bmp"):
+			im, A = split_rgba(im)
 		im.save(out, format=fmt, optimize=True)
 	return out.getbuffer()
 

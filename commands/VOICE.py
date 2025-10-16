@@ -265,7 +265,7 @@ class Queue(Command):
 		),
 		end=cdict(
 			type="timedelta",
-			description="end position; subsequent audio skipped autonatically",
+			description="end position; subsequent audio skipped automatically",
 			greedy=False,
 		),
 	)

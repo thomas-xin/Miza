@@ -120,6 +120,21 @@ Infinity = math.inf
 from cmath import phase, polar, infj, isfinite, isnan # noqa: F403
 from math import inf, nan, pi, e, tau, sin, cos, tan, sinh, cosh, tanh, asin, acos, atan, asinh, acosh, atanh, atan2, hypot, erf, erfc, exp, log, log10, log2, modf, sqrt # noqa: F403
 
+def log2lin(x, min_db=-40):
+	if x <= 0:
+		return 0
+	try:
+		return 10.0 ** ((x - 1) * -min_db / 20)
+	except OverflowError:
+		return inf
+
+def lin2log(y, min_db=-40):
+	if y <= 0:
+		return 0
+	if not isfinite(y):
+		return 156
+	return 1 + 20 * log10(y) / (-min_db)
+
 null = None
 i = I = j = J = 1j # noqa: E741
 π = pi

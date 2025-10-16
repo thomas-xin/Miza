@@ -1204,6 +1204,7 @@ CODEC_FFMPEG = {
 	"x265": "hevc_nvenc",
 	"h265": "hevc_nvenc",
 	"hevc": "hevc_nvenc",
+	"mkv": "hevc_nvenc",
 	"x266": "libvvenc",
 	"h266": "libvvenc",
 	"vvc": "libvvenc",
@@ -1229,6 +1230,7 @@ CODECS = {
 	"matroska": "mkv",
 	"s16le": "pcm",
 }
+CODECS_INV = {v: k for k, v in CODECS.items()}
 MIMES = cdict(
 	bin="application/octet-stream",
 	css="text/css",
@@ -1244,7 +1246,7 @@ MIMES = cdict(
 	webp="image/webp",
 	avif="image/avif",
 	ts="video/ts",
-	webm="video/mp2t",
+	webm="video/webm",
 	weba="audio/weba",
 	qt="video/quicktime",
 	mp3="audio/mpeg",
@@ -1253,6 +1255,7 @@ MIMES = cdict(
 	flac="audio/flac",
 	wav="audio/x-wav",
 	mp4="video/mp4",
+	mkv="video/x-matroska",
 	tar="application/tar",
 	zip="application/zip",
 )

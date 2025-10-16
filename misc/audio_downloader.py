@@ -21,7 +21,7 @@ from .asyncs import esubmit
 from .util import (
 	python, compat_python, shuffle, utc, proxy, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration_2, html_decode,
-	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url,
+	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url, AUDIO_FORMS,
 	EvalPipe, PipedProcess, TimedCache, Request, Semaphore, TEMP_PATH, magic, rename, temporary_file, replace_ext, USER_AGENT,
 )
 
@@ -986,6 +986,7 @@ class AudioDownloader:
 			return
 		with self.session.get(url, headers=Request.header(), verify=False, stream=True) as resp:
 			head = resp.headers
+			changed = False
 			if not entry.get("icon", None):
 				head = fcdict(head)
 				try:
@@ -993,13 +994,17 @@ class AudioDownloader:
 						for k, v in head.items():
 							if keyword in k:
 								entry["icon"] = v
+								changed = True
 								raise StopIteration
 				except StopIteration:
-					for keyword in ("name", "title"):
-						for k, v in head.items():
-							if keyword in k:
-								entry["name"] = v
-					print(entry)
+					pass
+			for keyword in ("title", "name"):
+				for k, v in head.items():
+					if keyword in k:
+						entry["name"] = v
+						changed = True
+			if changed:
+				print(entry)
 			ct = head.get("Content-Type", "").split(";", 1)[0]
 			b = b""
 			it = resp.iter_content(65536)
@@ -1070,7 +1075,26 @@ class AudioDownloader:
 				dur, _bps, cdc, ac = get_duration_2(r_wav)
 				entry["duration"] = dur
 				return r_wav, cdc, dur, ac
-			if left == "audio":
+			if ct in ("audio/x-scpls", "audio/pls", "audio/scpls"):
+				entries = []
+				lines = as_str(b).splitlines()
+				for line in lines:
+					k, v = line.split("=", 1)
+					if k.lower().startswith("file") and k[-1].isnumeric():
+						entries.append(v)
+					if k.lower() == "title1":
+						entry["name"] = v
+					if k.lower() == "length1":
+						dur = float(v)
+						if dur > 0:
+							entry["duration"] = dur
+				if entries:
+					dur, _bps, cdc, ac = get_duration_2(r_wav)
+					fn = temporary_file("concat")
+					with open(fn, "w", encoding="utf-8") as f:
+						f.write("\n".join(f"file '{url}'" for url in entries))
+					return fn, cdc, entry.get("duration") or dur, ac
+			if left == "audio" or right in AUDIO_FORMS:
 				try:
 					dur, _bps, cdc, ac = get_duration_2(url)
 				except Exception:
@@ -1102,6 +1126,8 @@ class AudioDownloader:
 				result = self.handle_special_audio(entry, url, fn)
 				if result:
 					return result
+				if not entry.get("duration") and cdc and stream and ac:
+					return stream, cdc, entry.get("duration") or None, ac
 				special_checked = True
 		if not special_checked:
 			result = self.handle_special_audio(entry, url, fn)

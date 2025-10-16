@@ -889,10 +889,14 @@ class UpdateExec(Database):
 			thumb = member.avatar.url
 		except Exception:
 			thumb = bot.discord_icon
-		embed = discord.Embed(colour=rand_colour()).set_author(name=member.name, icon_url=f"attachment://{fn}").set_thumbnail(url=thumb)
+		ext = magic.from_buffer(b)
+		if ext.startswith("image/"):
+			embed = discord.Embed(colour=rand_colour()).set_author(name=member.name, icon_url=f"attachment://{fn}").set_thumbnail(url=thumb)
+		else:
+			embed = discord.Embed(colour=rand_colour()).set_image(url=f"attachment://{fn}")
 		message = await channel.send(file=file, embed=embed)
 		assert message.embeds, message.id
-		out = shorten_attachment(message.embeds[0].author.icon_url, message.id)
+		out = shorten_attachment(message.embeds[0].author.icon_url if ext.startswith("image/") else message.embeds[0].image.url, message.id)
 		print("LPROXY:", url, out)
 		return out
 

@@ -2948,7 +2948,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			presence_penalty=0.8,
 			user=str(hash(self.name)),
 		)
-		print("Vision Input:", data)
+		print("Vision Input:", lim_str(data, 1024))
 		async with asyncio.timeout(30):
 			response = await ai.llm("chat.completions.create", premium_context=premium_context, **data, timeout=45)
 		out = response.choices[0].message.content.strip()

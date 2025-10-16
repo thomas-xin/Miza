@@ -8,7 +8,7 @@ import zipfile
 import niquests
 from PIL import Image
 import streamshatter
-from .util import is_url, is_discord_attachment, TEMP_PATH
+from .util import is_url, is_discord_attachment, TEMP_PATH, CODECS_INV
 # Allow fallback (although not recommended as generally the up-to-date version is necessary for most sites)
 try:
 	import yt_dlp as ytd
@@ -409,7 +409,7 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			output_args = ["-f", self.format, *codecs, "-b:v", "2M", "-vbr", "on", "-an", "-loop", "0"]
 			lightning = False
 		else:
-			fmt = CODECS.get(self.format, self.format)
+			fmt = CODECS_INV.get(self.format, self.format)
 			if self.start is not None:
 				input_args.extend(["-ss", str(self.start)])
 			if self.end is not None:
