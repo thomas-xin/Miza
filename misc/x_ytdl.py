@@ -3,6 +3,7 @@ import io
 import os
 import subprocess
 import sys
+import time
 from traceback import print_exc
 import zipfile
 import niquests
@@ -212,8 +213,9 @@ else:
 	real_download = ytd.downloader.http.HttpFD.real_download
 	def trial_download(self, filename, info_dict):
 		try:
-			if is_url(info_dict["url"]) and is_discord_attachment(info_dict["url"]):
+			if not is_url(info_dict["url"]) or is_discord_attachment(info_dict["url"]):
 				raise ValueError
+			t = time.time()
 			asyncio.run(streamshatter.shatter_request(
 				info_dict["url"],
 				cache_folder=TEMP_PATH,
@@ -222,8 +224,11 @@ else:
 				limit=12,
 				timeout=30,
 			))
-		except Exception:
+			elapsed = time.time() - t
+		except ValueError:
 			pass
+		except Exception as ex:
+			print(repr(ex))
 		else:
 			byte_counter = os.path.getsize(filename)
 			self._hook_progress({
@@ -231,7 +236,7 @@ else:
 				'total_bytes': byte_counter,
 				'filename': filename,
 				'status': 'finished',
-				'elapsed': -1,
+				'elapsed': elapsed,
 				'ctx_id': info_dict.get('ctx_id'),
 			}, info_dict)
 			return True

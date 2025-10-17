@@ -303,8 +303,10 @@ class Ask(Command):
 							temp = str(res)
 							print(f"{name} result:", len(temp), lim_str(temp, 256))
 						if succ and isinstance(res, bytes):
-							# bytes indicates an image, use vision to describe it
-							res = await bot.vision(url=res, premium_context=premium)
+							data_url = await bot.to_data_url(res)
+							res = [cdict(type="image_url", image_url=cdict(url=data_url, detail="auto"))]
+							# # bytes indicates an image, use vision to describe it
+							# res = await bot.vision(url=res, premium_context=premium)
 						elif succ and isinstance(res, dict):
 							res = res.get("content", "")
 						elif succ:

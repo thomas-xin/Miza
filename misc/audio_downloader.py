@@ -292,6 +292,15 @@ class AudioDownloader:
 			)
 			self.workers.append(worker)
 
+	def restart(self):
+		self.futs = [
+			esubmit(self.set_cookie),
+		]
+		for worker in self.workers:
+			worker.kill()
+		self.workers.clear()
+		return self.start_workers()
+
 	def submit(self, s):
 		if not self.workers:
 			self.start_workers()
