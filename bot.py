@@ -3208,11 +3208,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				except Exception as ex:
 					print(repr(ex))
 		if not os.path.exists(fn) or not os.path.getsize(fn):
-			args = ["streamshatter", url, "-l", "3", fn]
+			args = ["streamshatter", url, "-l", "3", "-t", "20", fn]
 			print(args)
 			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
 			try:
-				async with asyncio.timeout(24):
+				async with asyncio.timeout(32):
 					await proc.wait()
 			except (T0, T1, T2):
 				with tracebacksuppressor:
@@ -3245,11 +3245,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def get_file(self, url, limit=None, timeout=24):
 		ext = url2ext(url)
 		fn = temporary_file(ext)
-		args = ["streamshatter", url, "-l", "8", fn]
+		args = ["streamshatter", url, "-l", "8", "-t", "20", fn]
 		print(args)
 		proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
 		try:
-			async with asyncio.timeout(24):
+			async with asyncio.timeout(32):
 				await proc.wait()
 		except (T0, T1, T2):
 			with tracebacksuppressor:

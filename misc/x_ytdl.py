@@ -220,6 +220,7 @@ else:
 				headers=info_dict.get("http_headers", {}),
 				filename=filename,
 				limit=12,
+				timeout=30,
 			))
 		except Exception:
 			pass
@@ -237,7 +238,7 @@ else:
 		return real_download(self, filename, info_dict)
 	ytd.downloader.http.HttpFD.real_download = trial_download
 from .types import list_like, utc
-from .util import Request, EvalPipe, esubmit, python, new_playwright_page, CODECS
+from .util import Request, EvalPipe, esubmit, python, new_playwright_page
 
 ts = 0
 ytdl = None

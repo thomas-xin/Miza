@@ -19,7 +19,7 @@ from .types import alist, as_str, cdict, fcdict, full_prune, json_dumps, round_m
 from .smath import time_parse
 from .asyncs import esubmit
 from .util import (
-	python, compat_python, shuffle, utc, proxy, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
+	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration_2, html_decode,
 	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url, AUDIO_FORMS,
 	EvalPipe, PipedProcess, TimedCache, Request, Semaphore, TEMP_PATH, magic, rename, temporary_file, replace_ext, USER_AGENT,
@@ -492,12 +492,8 @@ class AudioDownloader:
 				with head.sem:
 					headers.Authorization = "Bearer " + head.accessToken
 				return headers
-		if self.spothead_sem.active:
-			with self.spothead_sem:
-				resp = proxy.content_or("https://open.spotify.com/get_access_token", headers=Request.header(), timeout=10)
-		else:
-			with self.spothead_sem:
-				resp = self.session.get("https://open.spotify.com/get_access_token", headers=Request.header(), timeout=20)
+		with self.spothead_sem:
+			resp = self.session.get("https://open.spotify.com/get_access_token", headers=Request.header(), timeout=20)
 		resp.raise_for_status()
 		head = cdict(orjson.loads(resp.content))
 		head.sem = Semaphore(20, 1, rate_limit=5)
@@ -624,7 +620,7 @@ class AudioDownloader:
 	def get_spotify_part(self, url):
 		resp = self.session.get(url, headers=self.spotify_header, timeout=20)
 		if resp.status_code not in range(200, 400):
-			resp = proxy.content_or(url, headers=self.spotify_header, timeout=25)
+			# resp = proxy.content_or(url, headers=self.spotify_header, timeout=25)
 			resp.raise_for_status()
 		return self.export_spotify_part(resp.json())
 	def export_spotify_part(self, d):
