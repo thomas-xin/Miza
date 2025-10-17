@@ -5,7 +5,7 @@ from concurrent.futures import Future
 import diskcache
 import io
 import itertools
-from math import inf, log, tau, isfinite, sqrt, ceil
+from math import inf, tau, isfinite, sqrt, ceil
 import os
 import shutil
 import subprocess
@@ -23,8 +23,8 @@ from .smath import log2lin
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, maybe_json, select_and_loads,
-	is_url, unyt, url2fn, get_duration, get_duration_2,
-	rename, uhash, expired, is_youtube_stream,
+	is_url, unyt, url2fn, get_duration, get_duration_2, CachingTeeFile,
+	rename, uhash, expired, is_youtube_stream, b64,  # noqa: F401
 )
 from .audio_downloader import AudioDownloader
 VC_TIMEOUT = 13
@@ -955,140 +955,6 @@ class AudioPlayer(discord.AudioSource):
 AP = AudioPlayer
 
 
-class PipedReader(io.IOBase):
-	"""
-	A custom IOBase class that reads data from a piped source.
-	Attributes:
-		pl: An object containing the piped data and synchronization primitives.
-		pos: The current position in the piped data.
-	Methods:
-		__init__(pl):
-			Initializes the PipedReader with the given piped data object.
-		read(nbytes=None):
-			Reads data from the piped source. If nbytes is None, reads until the end of the piped data.
-			If nbytes is specified, reads up to nbytes bytes from the current position.
-		close():
-			Closes the PipedReader. This method is a no-op and returns the PipedReader instance.
-	"""
-
-	def __init__(self, pl):
-		self.pl = pl
-		self.pos = 0
-
-	@tracebacksuppressor
-	def read(self, nbytes=None):
-		if nbytes is None:
-			while not isfinite(self.pl.end):
-				with self.pl.cv:
-					self.pl.cv.wait()
-			with open(self.pl.temp, "rb") as f:
-				if self.pos:
-					f.seek(self.pos)
-				try:
-					b = f.read()
-					return b
-				finally:
-					self.pos = f.tell()
-		b = b""
-		while self.pos < self.pl.end:
-			while self.pl.buffer < self.pos + nbytes and not isfinite(self.pl.end):
-				with self.pl.cv:
-					self.pl.cv.wait()
-			with self.pl.lock:
-				with open(self.pl.temp, "rb") as f:
-					if self.pos:
-						f.seek(self.pos)
-					try:
-						b += f.read(nbytes)
-						if len(b) >= nbytes:
-							return b
-					finally:
-						self.pos = f.tell()
-
-	def close(self):
-		return self
-
-class PipedLoader:
-	"""
-	A class to handle loading data from a file-like object and writing it to a temporary file, 
-	which is then renamed to the target path upon completion.
-	Attributes:
-		buffer (int): The current size of the buffer.
-		end (float): The end position of the buffer.
-		fp (file-like object): The file-like object to read from.
-		path (str): The target path to write the data to.
-		temp (str): The temporary file path.
-		file (file object): The file object for the temporary file.
-		cv (threading.Condition): A condition variable for synchronization.
-		lock (threading.Lock): A lock for thread-safe operations.
-		callback (callable): A callback function to be called upon completion.
-	Methods:
-		loading():
-			Reads data from the file-like object in chunks and writes it to the temporary file.
-			Renames the temporary file to the target path upon completion.
-		open():
-			Returns a PipedReader instance for reading the loaded data.
-	"""
-
-	def __init__(self, fp, path, efp=None, callback=None):
-		self.buffer = 0
-		self.end = inf
-		self.fp = fp
-		self.path = path
-		self.temp = path + "~"
-		self.file = open(self.temp, "wb")
-		try:
-			fut = esubmit(self.fp.read, 1)
-			b = fut.result(timeout=VC_TIMEOUT)
-			if not b:
-				raise EOFError(path)
-		except Exception:
-			if efp:
-				e = efp.read().strip()
-				if e:
-					raise RuntimeError(as_str(e))
-			raise
-		else:
-			self.file.write(b)
-			self.file.flush()
-			self.buffer += 1
-			assert os.path.getsize(self.temp) == 1, "Expected non-empty file"
-		if efp:
-			esubmit(shutil.copyfileobj, efp, sys.stderr)
-		esubmit(self.loading)
-		self.cv = threading.Condition()
-		self.lock = threading.Lock()
-		self.callback = callback
-
-	def loading(self):
-		try:
-			for i in itertools.count(1):
-				b = self.fp.read(i * 1024)
-				if not b:
-					break
-				self.file.write(b)
-				self.file.flush()
-				with self.cv:
-					self.buffer += len(b)
-					self.cv.notify_all()
-			with self.cv:
-				with self.lock:
-					if os.path.exists(self.temp) and os.path.getsize(self.temp):
-						self.file.close()
-						rename(self.temp, self.path)
-					self.temp = self.path
-					assert self.buffer == os.path.getsize(self.path), f"{self.buffer} != {os.path.getsize(self.path)}"
-					self.end = self.buffer
-					if self.callback:
-						self.callback(self.path)
-				self.cv.notify_all()
-		except Exception:
-			print_exc()
-
-	def open(self):
-		return PipedReader(self)
-
-
 class AudioFile:
 	"""
 	A class to represent an audio file with caching and streaming capabilities.
@@ -1160,10 +1026,13 @@ class AudioFile:
 			self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
 			if os.path.exists(self.path) and os.path.getsize(self.path):
 				self.stream = self.path
-				self.duration = get_duration(self.stream)
 				if not entry.get("duration"):
+					entry["duration"] = self.duration = get_duration(self.stream)
+					return self
+				self.duration = get_duration(self.stream)
+				if abs(entry["duration"] - self.duration) < 1:
 					entry["duration"] = self.duration
-				return self
+					return self
 			stream, codec, duration, channels = ytdl.get_audio(entry, asap=asap)
 			name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
 			self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
@@ -1186,11 +1055,11 @@ class AudioFile:
 			if is_url(stream):
 				cmd = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + cmd[1:]
 			print(cmd)
-			proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=None)
+			proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
 			assert proc.is_running(), "FFmpeg process failed to start"
 
-			def callback(file):
-				self.stream = file
+			def callback():
+				self.stream = self.path
 				self.duration = entry["duration"] = get_duration(self.stream) or self.duration
 				if self.temporary:
 					try:
@@ -1198,9 +1067,9 @@ class AudioFile:
 					except Exception:
 						pass
 
-			try:
-				self.stream = PipedLoader(proc.stdout, self.path, efp=proc.stderr, callback=callback)
-			except RuntimeError as ex:
+			self.stream = CachingTeeFile(proc.stdout, self.path, callback=callback)
+			if not self.stream.open().read(1024):
+				ex = as_str(proc.stderr.read())
 				if asap and "Server returned 403 Forbidden (access denied)" in str(ex):
 					stream, codec, duration, channels = ytdl.get_audio(entry, asap=False)
 					name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
@@ -1211,7 +1080,7 @@ class AudioFile:
 					self.stream = self.path
 					self.duration = entry["duration"] = get_duration(self.stream) or duration
 					return self
-				raise
+				raise RuntimeError("File was empty!")
 			print("DL:", self.path)
 			self.duration = entry["duration"] = duration
 			return self
@@ -1288,7 +1157,7 @@ class AudioFile:
 			speed = round_min(auds.settings.speed * 2 ** (auds.settings.resample / 12))
 			if auds.reverse:
 				speed = -speed
-			if not is_url(self.stream) and self.stream.endswith(".concat"):
+			if isinstance(source, str) and not is_url(source) and source.endswith(".concat"):
 				args.extend(("-f", "concat"))
 			args.append("-i")
 			buff = False
@@ -1307,11 +1176,15 @@ class AudioFile:
 				args.append("-")
 			auds.settings.bitrate = min(auds.settings.bitrate, MAX_BITRATE)
 			same_codec = False
-			if not options and not auds.settings.bitrate < auds.defaults["bitrate"]:
-				_dur, _bps, cdc, ac = get_duration_2(source)
-				if ac and cdc in ("opus", "libopus"):
+			if not options:
+				if not isinstance(source, str):
 					args.extend(("-f", "opus", "-c:a", "copy"))
 					same_codec = True
+				if isinstance(source, str) and not auds.settings.bitrate < auds.defaults["bitrate"]:
+					_dur, _bps, cdc, ac = get_duration_2(source)
+					if ac and cdc in ("opus", "libopus"):
+						args.extend(("-f", "opus", "-c:a", "copy"))
+						same_codec = True
 			if not same_codec:
 				br = auds.settings.bitrate
 				if self.live:

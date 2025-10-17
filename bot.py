@@ -2918,7 +2918,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		mime = magic.from_buffer(d)
 		return "data:" + mime + ";base64," + base64.b64encode(d).decode("ascii")
 
-	async def vision(self, url, name=None, best=True, model=None, question=None, premium_context=[], timeout=8):
+	async def vision(self, url, name=None, best=True, model=None, question=None, premium_context=[], timeout=12):
 		"Requests an image description from a vision-supporting LLM."
 		if name:
 			iname = f'image "{name}"'
@@ -2949,8 +2949,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			user=str(hash(self.name)),
 		)
 		print("Vision Input:", lim_str(data, 1024))
-		async with asyncio.timeout(30):
-			response = await ai.llm("chat.completions.create", premium_context=premium_context, **data, timeout=45)
+		async with asyncio.timeout(timeout):
+			response = await ai.llm("chat.completions.create", premium_context=premium_context, **data, timeout=timeout)
 		out = response.choices[0].message.content.strip()
 		if ai.decensor.search(out):
 			raise ValueError(f"Failed or censored response: {repr(out)}.")

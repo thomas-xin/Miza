@@ -325,7 +325,7 @@ class Ask(Command):
 						s = f'\n> Browsing "{argv}"...'
 						text += s
 						yield s
-						fut = bot.browse(argv, uid=_user.id)
+						fut = bot.browse(argv, uid=_user.id, screenshot=False)
 						succ = await rag(name, tid, fut)
 					elif name == "sympy":
 						argv = kwargs.get("query") or " ".join(kwargs.values())
@@ -1526,7 +1526,7 @@ class Describe(Command):
 
 	async def __call__(self, bot, _user, _premium, url, **void):
 		fut = asubmit(reqs.next().head, url, headers=Request.header(), stream=True)
-		cap = await self.bot.caption(url, best=1, premium_context=_premium, timeout=24)
+		cap = await self.bot.caption(url, best=1, premium_context=_premium, timeout=90)
 		s = "\n\n".join(filter(bool, cap)).strip()
 		resp = await fut
 		name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]

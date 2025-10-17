@@ -956,7 +956,7 @@ def expired(stream):
 			return True
 
 def url2fn(url) -> str:
-	return url.split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1]
+	return url.split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1].translate(filetrans)
 def url2ext(url) -> str:
 	fn = url2fn(url)
 	return fn.rsplit(".", 1)[-1] if "." in fn else "bin"
@@ -2039,79 +2039,138 @@ class open2(io.IOBase):
 			self.fp.close()
 		self.fp = None
 
-class DownloadingFile(io.IOBase):
-	"A buffer indicating a file that is currently being written. Calls to read() when there is no more data but the write is not yet complete will block until either condition is met."
 
-	__slots__ = ("fp", "fn", "mode", "filename", "af")
-	min_buffer = 4096
+class TeeBuffer:
+	def __init__(self, src, chunk_size=8192):
+		self.src = src
+		self.chunk_size = chunk_size
+		self.buffer = bytearray()
+		self.eof = False
+		self.lock = threading.Lock()
+		self.data_ready = threading.Condition(self.lock)
 
-	def __init__(self, fn, af, mode="rb", filename=None, min_buffer=4096):
-		self.fp = None
-		self.fn = fn
-		self.mode = mode
-		self.filename = filename or T(fn).get("name") or fn
-		self.af = af
-		self.last_size = 0
-		self.min_buffer = min_buffer
-		for _ in loop(720):
-			if os.path.exists(fn) and os.path.getsize(fn) > 3:
-				break
-			if af():
-				raise FileNotFoundError
-			time.sleep(0.1)
+	def _fill_to(self, size):
+		"""Ensure buffer has at least `size` bytes (if possible)."""
+		with self.lock:
+			while len(self.buffer) < size and not self.eof:
+				chunk = self.src.read(self.chunk_size)
+				if not chunk:
+					self.eof = True
+					self.data_ready.notify_all()
+					break
+				self.buffer.extend(chunk)
+				self.data_ready.notify_all()
 
-	def __getattribute__(self, k):
-		if k in object.__getattribute__(self, "__slots__") or k in ("seek", "read", "clear", "min_buffer", "scan_size", "last_size"):
-			return object.__getattribute__(self, k)
-		if k == "name":
-			return object.__getattribute__(self, "filename")
-		if self.fp is None:
-			self.fp = open(self.fn, self.mode)
-		if k[0] == "_" and (len(k) < 2 or k[1] != "_"):
-			k = k[1:]
-		return getattr(self.fp, k)
+	def open(self):
+		"""Return a new independent file-like reader."""
+		return _TeeReader(self)
 
-	def scan_size(self, req=0):
-		while req > self.last_size:
-			time.sleep(0.1)
-			if self.af():
-				break
-			self.last_size = os.path.exists(self.fn) and os.path.getsize(self.fn)
-			print(self.last_size, req)
+class _TeeReader(io.RawIOBase):
+	def __init__(self, tee):
+		self.tee = tee
+		self.pos = 0
 
-	def seek(self, pos):
-		self.scan_size(pos)
-		self._seek(pos)
+	def read(self, n=-1):
+		if n == -1:
+			out = bytearray()
+			while True:
+				chunk = self.read(8192)
+				if not chunk:
+					break
+				out.extend(chunk)
+			return out
 
-	def read(self, size):
-		pos = self.tell()
-		self.scan_size(pos + size + self.min_buffer)
-		b = self._read(size)
-		s = len(b)
-		if s < size:
-			buf = deque([b])
-			n = 1
-			while s < size:
-				time.sleep(n / 3)
-				n += 1
-				b = self._read(size - s)
-				if not b:
-					if self.af():
-						print("AF Complete.")
-						b = self._read(size - s)
-						if not b:
-							break
-					else:
-						continue
-				s += len(b)
-				buf.append(b)
-			b = b"".join(buf)
-		return b
+		target = self.pos + n
+		self.tee._fill_to(target)
+		with self.tee.lock:
+			while len(self.tee.buffer) < target and not self.tee.eof:
+				self.tee.data_ready.wait()
+			data = memoryview(self.tee.buffer)[self.pos:min(target, len(self.tee.buffer))]
+			self.pos += len(data)
+			return data
 
-	def clear(self):
-		with suppress(Exception):
-			self.fp.close()
-		self.fp = None
+
+class CachingTeeFile:
+	def __init__(self, src, cache_path=None, chunk_size=8192, callback=None):
+		self.src = src
+		self.chunk_size = chunk_size
+		self.cache_path = cache_path or temporary_file("bin")
+		self._cache_file = open(self.cache_path, "wb")
+		self._pos = 0
+		self._written = 0
+		self._eof = False
+		self._callback = callback
+		self._lock = threading.Lock()
+		self._data_ready = threading.Condition(self._lock)
+		self._writer_thread = threading.Thread(target=self._writer_loop, daemon=True)
+		self._writer_thread.start()
+
+	def _writer_loop(self):
+		"""Background thread: read from src and write to cache file."""
+		with self._cache_file:
+			while True:
+				chunk = self.src.read(self.chunk_size)
+				if not chunk:
+					with self._lock:
+						self._eof = True
+						self._data_ready.notify_all()
+					break
+				with self._lock:
+					pos = self._written
+					self._written += len(chunk)
+					self._cache_file.seek(pos)
+					self._cache_file.write(chunk)
+					self._cache_file.flush()
+					self._data_ready.notify_all()
+		if self._callback:
+			self._callback()
+
+	def open(self):
+		"""Return a new independent reader for the cached file."""
+		return _CachingReader(self)
+
+	def wait_until_complete(self):
+		"""Block until the background writer finishes reading from src."""
+		self._writer_thread.join()
+
+	def close(self):
+		"""Stop reading (won't delete the cache file)."""
+		# Wait for the background writer to finish
+		self.wait_until_complete()
+		self.src.close()
+
+class _CachingReader(io.RawIOBase):
+	def __init__(self, parent):
+		self.parent = parent
+		self.file = open(parent.cache_path, "rb")
+		self.pos = 0
+
+	def read(self, n=-1):
+		parent = self.parent
+		with parent._lock:
+			while True:
+				available = parent._written - self.pos
+				if n == -1:
+					need = float("inf")
+				else:
+					need = n - available
+
+				if available >= need or parent._eof:
+					break
+				parent._data_ready.wait()
+
+		if n == -1:
+			read_len = parent._written - self.pos
+		else:
+			read_len = min(n, parent._written - self.pos)
+
+		self.file.seek(self.pos)
+		data = self.file.read(read_len)
+		self.pos += len(data)
+		return data
+
+	def close(self):
+		self.file.close()
 
 
 @functools.lru_cache(maxsize=64)
