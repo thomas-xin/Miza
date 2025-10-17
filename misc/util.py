@@ -2099,45 +2099,69 @@ class CachingTeeFile:
 		self._pos = 0
 		self._written = 0
 		self._eof = False
+		self._error = None
 		self._callback = callback
+
 		self._lock = threading.Lock()
 		self._data_ready = threading.Condition(self._lock)
+		self._stop_event = threading.Event()
+
 		self._writer_thread = threading.Thread(target=self._writer_loop, daemon=True)
 		self._writer_thread.start()
 
 	def _writer_loop(self):
-		"""Background thread: read from src and write to cache file."""
-		with self._cache_file:
-			while True:
-				chunk = self.src.read(self.chunk_size)
-				if not chunk:
+		try:
+			with self._cache_file:
+				while not self._stop_event.is_set():
+					# Read a chunk; may block
+					chunk = self.src.read(self.chunk_size)
+					if not chunk:
+						break
+
+					# Snapshot current written position under lock
 					with self._lock:
-						self._eof = True
-						self._data_ready.notify_all()
-					break
-				with self._lock:
-					pos = self._written
-					self._written += len(chunk)
+						pos = self._written
+
+					# Do I/O outside the lock
 					self._cache_file.seek(pos)
 					self._cache_file.write(chunk)
 					self._cache_file.flush()
-					self._data_ready.notify_all()
-		if self._callback:
-			self._callback()
+
+					# Publish the new bytes and notify
+					with self._lock:
+						self._written += len(chunk)
+						self._data_ready.notify_all()
+		except Exception as e:
+			# If we were asked to stop, treat exceptions as normal shutdown
+			if not self._stop_event.is_set():
+				with self._lock:
+					self._error = e
+		finally:
+			# Always mark terminal state and wake readers
+			with self._lock:
+				self._eof = True
+				self._data_ready.notify_all()
+			if self._callback:
+				try:
+					self._callback()
+				except Exception:
+					pass
 
 	def open(self):
-		"""Return a new independent reader for the cached file."""
 		return _CachingReader(self)
 
-	def wait_until_complete(self):
-		"""Block until the background writer finishes reading from src."""
-		self._writer_thread.join()
+	def wait_until_complete(self, timeout=None):
+		self._writer_thread.join(timeout=timeout)
 
 	def close(self):
-		"""Stop reading (won't delete the cache file)."""
-		# Wait for the background writer to finish
-		self.wait_until_complete()
-		self.src.close()
+		# Signal stop and forcibly close the source to unblock read()
+		self._stop_event.set()
+		try:
+			self.src.close()
+		except Exception:
+			pass
+		# Wait for the background writer to exit
+		self._writer_thread.join()
 
 class _CachingReader(io.RawIOBase):
 	def __init__(self, parent):
@@ -2145,24 +2169,41 @@ class _CachingReader(io.RawIOBase):
 		self.file = open(parent.cache_path, "rb")
 		self.pos = 0
 
+	def readable(self):
+		return True
+
 	def read(self, n=-1):
+		if n == 0:
+			return b""
+
 		parent = self.parent
 		with parent._lock:
 			while True:
 				available = parent._written - self.pos
-				if n == -1:
-					need = float("inf")
-				else:
-					need = n - available
 
-				if available >= need or parent._eof:
-					break
+				if n is None or n < 0:
+					# read-all: wait until EOF or error (or any available if already eof)
+					if parent._eof or parent._error:
+						break
+				else:
+					# Wait until we have at least n bytes, or EOF, or error
+					if available >= n or parent._eof or parent._error:
+						break
+
 				parent._data_ready.wait()
 
-		if n == -1:
-			read_len = parent._written - self.pos
-		else:
-			read_len = min(n, parent._written - self.pos)
+			# Propagate writer error to readers
+			if parent._error is not None:
+				raise parent._error
+
+			# Determine how much to read
+			if n is None or n < 0:
+				read_len = parent._written - self.pos
+			else:
+				read_len = min(n, parent._written - self.pos)
+
+		if read_len <= 0:
+			return b""
 
 		self.file.seek(self.pos)
 		data = self.file.read(read_len)

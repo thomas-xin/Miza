@@ -414,7 +414,6 @@ class AudioPlayer(discord.AudioSource):
 		self.playing = deque(maxlen=2)
 		self.fut = Future()
 		self.ensure_lock = threading.RLock()
-		self.after_lock = threading.RLock()
 		self.vcc = vcc
 		if vcc:
 			self.vc = client.get_guild(cast_id(vcc.guild)).voice_client
@@ -898,29 +897,30 @@ class AudioPlayer(discord.AudioSource):
 				self.resume()
 			elif self.settings.pause and self.vc.is_playing():
 				self.vc.pause()
-			esubmit(self.ensure_next)
+			if not self.ensuring or self.ensuring.done():
+				self.ensuring = esubmit(self.ensure_next)
 		if not self.queue:
 			self.update_streaming()
 		else:
 			self.update_activity()
 
+	ensuring = None
 	def ensure_next(self):
 		with tracebacksuppressor:
-			with self.after_lock:
-				if len(self.playing) == 1 and len(self.queue) > 1:
-					entry = self.queue[1]
-					try:
-						source = AF.load(entry, asap=False).create_reader(self, pos=entry.get("start", 0))
-					except Exception as ex:
-						print_exc()
-						s = italics(ansi_md(
-							f"{colourise('❗', fg='blue')}{colourise()} An error occured while loading {colourise_brackets(entry.name, 'red', 'green', 'magenta')}{colourise()}, and it has been removed automatically. {colourise('❗', fg='blue')}{colourise()}\n"
-							+ f"Exception: {colourise_brackets(repr(ex), 'red', 'magenta', 'yellow')}"
-						))
-						csubmit(self.announce(s))
-						return self.skip(1)
-					if len(self.playing) == 1 and len(self.queue) > 1 and self.queue[1].url == source.af.url:
-						self.playing.append(source)
+			if len(self.playing) == 1 and len(self.queue) > 1:
+				entry = self.queue[1]
+				try:
+					source = AF.load(entry, asap=False).create_reader(self, pos=entry.get("start", 0))
+				except Exception as ex:
+					print_exc()
+					s = italics(ansi_md(
+						f"{colourise('❗', fg='blue')}{colourise()} An error occured while loading {colourise_brackets(entry.name, 'red', 'green', 'magenta')}{colourise()}, and it has been removed automatically. {colourise('❗', fg='blue')}{colourise()}\n"
+						+ f"Exception: {colourise_brackets(repr(ex), 'red', 'magenta', 'yellow')}"
+					))
+					csubmit(self.announce(s))
+					return self.skip(1)
+				if len(self.playing) == 1 and len(self.queue) > 1 and self.queue[1].url == source.af.url:
+					self.playing.append(source)
 
 	def clear(self):
 		"""Clears the queue and stops all audio."""
@@ -1055,7 +1055,7 @@ class AudioFile:
 			if is_url(stream):
 				cmd = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + cmd[1:]
 			print(cmd)
-			proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
+			proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			assert proc.is_running(), "FFmpeg process failed to start"
 
 			def callback():
@@ -1068,8 +1068,11 @@ class AudioFile:
 						pass
 
 			self.stream = CachingTeeFile(proc.stdout, self.path, callback=callback)
+			err = CachingTeeFile(proc.stderr).open()
 			if not self.stream.open().read(1024):
-				ex = as_str(proc.stderr.read())
+				proc.stdin.close()
+				proc.terminate()
+				ex = as_str(err.read())
 				if asap and "Server returned 403 Forbidden (access denied)" in str(ex):
 					stream, codec, duration, channels = ytdl.get_audio(entry, asap=False)
 					name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
