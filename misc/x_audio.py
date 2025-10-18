@@ -843,7 +843,7 @@ class AudioPlayer(discord.AudioSource):
 			return
 		with self.ensure_lock:
 			self.pause()
-			source = AF.load(self.queue[0]).create_reader(self, pos=pos)
+			source = AF.load(self.queue[0], asap=pos <= 8).create_reader(self, pos=pos)
 			source.new = False
 			if self.playing:
 				self.playing[0], _ = source, self.playing[0].close()
