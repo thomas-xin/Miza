@@ -1024,7 +1024,7 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 		steps %= s
 		if steps > s >> 1:
 			steps -= s
-		if abs(steps) <= sqrt(s):
+		if abs(steps) <= max(8, sqrt(s)):
 			while steps > 0:
 				self.appendleft(self.popright())
 				steps -= 1
@@ -1032,14 +1032,15 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 				self.appendright(self.popleft())
 				steps += 1
 			return self
-		if self.capacity - self.length < abs(steps):
-			self.reserve()
+		temp = self.view.copy()
 		if steps > 0:
-			self._move_range(self.offset + self.length - steps, steps, self.offset - steps)
-			self.offset = (self.offset - steps) % self.capacity
+			self.buffer[steps:s] = temp[:s - steps]
+			self.buffer[:steps] = temp[s - steps:]
 		else:
-			self._move_range(self.offset, steps, self.offset + self.length)
-			self.offset = (self.offset + steps) % self.capacity
+			steps = -steps
+			self.buffer[:s - steps] = temp[steps:]
+			self.buffer[s - steps:] = temp[:steps]
+		self.offset = 0
 		return self
 	rotateright = rotate
 

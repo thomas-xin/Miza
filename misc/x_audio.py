@@ -682,7 +682,7 @@ class AudioPlayer(discord.AudioSource):
 
 	updating_activity = None
 	def update_activity(self):
-		"""Updates whether there are people listening; timeout after 5 minutes of inactivity."""
+		"""Updates whether there are people listening; timeout after 6 minutes of inactivity."""
 		if self.updating_activity:
 			self.updating_activity.cancel()
 			self.updating_activity = None
@@ -698,10 +698,9 @@ class AudioPlayer(discord.AudioSource):
 				self.updating_activity = csubmit(self._updating_activity())
 			elif not self.settings.pause:
 				self.resume()
-
 	async def _updating_activity(self):
 		self.pause()
-		await asyncio.sleep(300)
+		await asyncio.sleep(360)
 		if self is not self.players.get(self.vcc.guild.id):
 			return
 		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
@@ -712,7 +711,7 @@ class AudioPlayer(discord.AudioSource):
 
 	updating_streaming = None
 	def update_streaming(self):
-		"""Updates whether we're streaming audio; timeout after 5 minutes of inactivity."""
+		"""Updates whether we're streaming audio; timeout after 16 minutes of inactivity."""
 		if self.updating_streaming:
 			self.updating_streaming.cancel()
 			self.updating_streaming = None
@@ -724,7 +723,7 @@ class AudioPlayer(discord.AudioSource):
 		if len(self.queue) == 0 and connected:
 			self.updating_streaming = csubmit(self._updating_streaming())
 	async def _updating_streaming(self):
-		await asyncio.sleep(300)
+		await asyncio.sleep(960)
 		if self is not self.players.get(self.vcc.guild.id):
 			return
 		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
@@ -909,8 +908,9 @@ class AudioPlayer(discord.AudioSource):
 		with tracebacksuppressor:
 			if len(self.playing) == 1 and len(self.queue) > 1:
 				entry = self.queue[1]
+				asap = not entry.get("duration") or not entry.duration <= min(3960, (self.epos[1] - self.epos[0]) * 8)
 				try:
-					source = AF.load(entry, asap=False).create_reader(self, pos=entry.get("start", 0))
+					source = AF.load(entry, asap=asap).create_reader(self, pos=entry.get("start", 0))
 				except Exception as ex:
 					print_exc()
 					s = italics(ansi_md(
@@ -1057,6 +1057,7 @@ class AudioFile:
 			print(cmd)
 			proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			assert proc.is_running(), "FFmpeg process failed to start"
+			err = CachingTeeFile(proc.stderr).open()
 
 			def callback():
 				self.stream = self.path
@@ -1067,10 +1068,8 @@ class AudioFile:
 					except Exception:
 						pass
 
-			self.stream = CachingTeeFile(proc.stdout, self.path, callback=callback)
-			err = CachingTeeFile(proc.stderr).open()
-			if not self.stream.open().read(1024):
-				proc.stdin.close()
+			stream = self.stream = CachingTeeFile(proc.stdout, self.path, callback=callback)
+			if not stream.open().read(1024):
 				proc.terminate()
 				ex = as_str(err.read())
 				if asap and "Server returned 403 Forbidden (access denied)" in str(ex):
@@ -1100,8 +1099,13 @@ class AudioFile:
 
 	# Creates a reader object that either reads bytes or opus packets from the file.
 	def open(self):
-		assert isinstance(self.stream, str) and not is_url(self.stream) and os.path.exists(self.stream) and os.path.getsize(self.stream), "File not found or empty"
-		f = open(self.stream, "rb")
+		if isinstance(self.stream, str):
+			assert not is_url(self.stream) and os.path.exists(self.stream) and os.path.getsize(self.stream), "File not found or empty"
+			f = open(self.stream, "rb")
+		elif hasattr(self.stream, "open"):
+			f = self.stream.open()
+		else:
+			f = self.stream
 		it = discord.oggparse.OggStream(f).iter_packets()
 
 		reader = cdict(
@@ -1147,7 +1151,7 @@ class AudioFile:
 			pos = 0
 		options = auds.construct_options(full=self.live)
 		speed = 1
-		if options or pos or auds.settings.bitrate < auds.defaults["bitrate"] or self.live or not isinstance(self.stream, str):
+		if options or pos or auds.settings.bitrate < auds.defaults["bitrate"] or self.live or not isinstance(self.stream, (str, CachingTeeFile)):
 			fflags = "+discardcorrupt+genpts+igndts+flush_packets"
 			if self.live:
 				fflags += "+bitexact"

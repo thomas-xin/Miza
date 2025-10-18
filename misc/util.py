@@ -14,6 +14,7 @@ import functools
 import hashlib
 import html
 import io
+import itertools
 import json
 from math import ceil, comb, inf, isfinite, isqrt, log10
 import multiprocessing.connection
@@ -2073,8 +2074,8 @@ class _TeeReader(io.RawIOBase):
 	def read(self, n=-1):
 		if n == -1:
 			out = bytearray()
-			while True:
-				chunk = self.read(8192)
+			for i in itertools.count(1):
+				chunk = self.read(i * 1024)
 				if not chunk:
 					break
 				out.extend(chunk)
@@ -2091,7 +2092,7 @@ class _TeeReader(io.RawIOBase):
 
 
 class CachingTeeFile:
-	def __init__(self, src, cache_path=None, chunk_size=8192, callback=None):
+	def __init__(self, src, cache_path=None, chunk_size=1024, callback=None):
 		self.src = src
 		self.chunk_size = chunk_size
 		self.cache_path = cache_path or temporary_file("bin")
@@ -2110,11 +2111,12 @@ class CachingTeeFile:
 		self._writer_thread.start()
 
 	def _writer_loop(self):
+		i = 1
 		try:
 			with self._cache_file:
 				while not self._stop_event.is_set():
 					# Read a chunk; may block
-					chunk = self.src.read(self.chunk_size)
+					chunk = self.src.read(self.chunk_size * i)
 					if not chunk:
 						break
 
@@ -2131,6 +2133,8 @@ class CachingTeeFile:
 					with self._lock:
 						self._written += len(chunk)
 						self._data_ready.notify_all()
+
+					i += 1
 		except Exception as e:
 			# If we were asked to stop, treat exceptions as normal shutdown
 			if not self._stop_event.is_set():

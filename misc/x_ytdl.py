@@ -221,7 +221,7 @@ else:
 				cache_folder=TEMP_PATH,
 				headers=info_dict.get("http_headers", {}),
 				filename=filename,
-				limit=12,
+				limit=48,
 				timeout=30,
 			))
 			elapsed = time.time() - t
@@ -230,6 +230,7 @@ else:
 		except Exception as ex:
 			print(repr(ex))
 		else:
+			print()
 			byte_counter = os.path.getsize(filename)
 			self._hook_progress({
 				'downloaded_bytes': byte_counter,

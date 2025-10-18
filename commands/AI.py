@@ -290,15 +290,13 @@ class Ask(Command):
 							for c in m.tool_calls:
 								if c.id not in cids:
 									function_message.tool_calls.append(c)
+						res = "[RESPONSE EMPTY OR REDACTED]"
 						try:
 							res = await fut
 							succ = res and (isinstance(res, (str, bytes)) or res.get("content"))
 						except Exception as ex:
 							print_exc()
 							res = repr(ex)
-						else:
-							if not succ:
-								res = "[RESPONSE EMPTY OR REDACTED]"
 						if succ:
 							temp = str(res)
 							print(f"{name} result:", len(temp), lim_str(temp, 256))
@@ -443,7 +441,7 @@ class Ask(Command):
 						else:
 							call = {"func": kwargs.mode, "argv": int(kwargs.value)}
 					if succ:
-						print("New prompt:", tool_responses)
+						print("New prompt:", lim_str(tool_responses, 65536))
 					if not call:
 						continue
 					print("Function Call:", call)
@@ -1106,6 +1104,7 @@ class Imagine(Command):
 							return base64.b64decode(image_url.split("base64,", 1)[-1].encode("ascii"))
 				if image:
 					raise RuntimeError(result)
+				print(result)
 
 			resp_model = "gemini-2.5-flash-image-preview"
 			n = amount - amount2
