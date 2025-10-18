@@ -908,7 +908,7 @@ class AudioPlayer(discord.AudioSource):
 		with tracebacksuppressor:
 			if len(self.playing) == 1 and len(self.queue) > 1:
 				entry = self.queue[1]
-				if not entry.get("duration") or not entry.duration <= 3960:
+				if not entry.get("duration") or not entry.duration < 3840:
 					return
 				asap = entry["duration"] > (self.epos[1] - self.epos[0]) * 8
 				try:
@@ -1038,19 +1038,26 @@ class AudioFile:
 			stream, codec, duration, channels = ytdl.get_audio(entry, asap=asap)
 			name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
 			self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
+			if duration:
+				self.duration = entry["duration"] = duration
 			if not is_url(stream) and codec == "opus" and channels == 2:
 				print("DL:", stream, self.path)
 				rename(stream, self.path)
 				self.stream = self.path
-				self.duration = entry["duration"] = get_duration(self.stream) or duration
 				return self
 			if not duration or duration > 36960:
 				self.stream = stream
-				self.duration = entry["duration"] = duration
 				return self
 			ffmpeg = "ffmpeg"
 			sample_rate = SAMPLE_RATE
-			ba = "160k" if is_url(stream) or os.path.getsize(stream) <= 10485760 else "108k"
+			if not self.duration or self.duration < 1920:
+				ba = "160k"
+			elif self.duration < 3840:
+				ba = "128k"
+			elif self.duration < 7680:
+				ba = "108k"
+			else:
+				ba = "96k"
 			cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(sample_rate), "-ac", "2", "-b:a", ba, "-vbr", "on", "-frame_duration", "20", "-"]
 			if ba == "160k" and codec == "opus" and channels == 2:
 				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "copy", "-"]

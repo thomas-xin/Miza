@@ -388,34 +388,42 @@ class AudioDownloader:
 			)
 			out.append(temp)
 		return out, token
+	yt_client = dict(name="WEB", version="2.20251017", clientName="WEB", clientVersion="2.20251017.01.00")
+	yt_session = niquests.Session()
+	yt_asession = niquests.AsyncSession()
 	# Returns a subsequent page of a youtube playlist from a page token.
-	def get_youtube_continuation(self, token, ctx):
-		data = Request(
-			"https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
+	def get_youtube_continuation(self, token, ctx=None):
+		resp = self.yt_session.post(
+			"https://www.youtube.com/youtubei/v1/browse?prettyPrint=false",
 			headers=self.youtube_header,
-			method="POST",
 			data=json_dumps(dict(
-				context=ctx,
+				context=ctx or dict(client=self.yt_client),
 				continuation=token,
 			)),
-			json=True,
 		)
-		items = data["onResponseReceivedActions"][0]["appendContinuationItemsAction"]["continuationItems"]
+		resp.raise_for_status()
+		data = resp.json()
+		try:
+			items = data["onResponseReceivedActions"][0]["appendContinuationItemsAction"]["continuationItems"]
+		except LookupError:
+			return [], None
 		return self.extract_playlist_items(items)
 	# Async version of the previous function, used when possible to minimise thread pool wastage.
-	async def get_youtube_continuation_async(self, token, ctx):
-		data = await Request(
-			"https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
+	async def get_youtube_continuation_async(self, token, ctx=None):
+		resp = await self.yt_asession.post(
+			"https://www.youtube.com/youtubei/v1/browse?prettyPrint=false",
 			headers=self.youtube_header,
-			method="POST",
 			data=json_dumps(dict(
-				context=ctx,
+				context=ctx or dict(client=self.yt_client),
 				continuation=token,
 			)),
-			json=True,
-			aio=True,
 		)
-		items = data["onResponseReceivedActions"][0]["appendContinuationItemsAction"]["continuationItems"]
+		resp.raise_for_status()
+		data = resp.json()
+		try:
+			items = data["onResponseReceivedActions"][0]["appendContinuationItemsAction"]["continuationItems"]
+		except LookupError:
+			return [], None
 		return self.extract_playlist_items(items)
 	# Generates a playlist continuation token purely from ID and page number.
 	def produce_continuation(self, p, i):
@@ -423,25 +431,27 @@ class AudioDownloader:
 			p = str(p).encode("ascii")
 		parts = []
 		if i == 1:
-			parts.append(b"\xe2\xa9\x85\xb2\x02a\x12$VL")
+			parts.append(b"\xe2\xa9\x85\xb2\x02\x81\x01\x12$VL")
 		else:
-			parts.append(b"\xe2\xa9\x85\xb2\x02_\x12$VL")
+			parts.append(b"\xe2\xa9\x85\xb2\x02\x7f\x12$VL")
 		parts.append(p)
 		if i == 1:
-			parts.append(b"\x1a\x14")
+			parts.append(b"\x1a4")
 		else:
-			parts.append(b"\x1a\x12")
+			parts.append(b"\x1a2")
 		import base64
-		key = bytes((8, i, 0x7a, (i != 1) + 6)) + b"PT:" + base64.b64encode(b"\x08" + leb128(i * 100)).rstrip(b"=")
+		key = bytes((8, i, 0x7a, 0x1e if i == 1 else 0x1f)) + b"PT:" + base64.b64encode(b"\x08" + leb128(i * 100) + b'"\x10780605BC69C6C250').rstrip(b"=")
 		obj = base64.b64encode(key).replace(b"=", b"%3D")
 		parts.append(obj)
 		parts.append(b"\x9a\x02\x22")
 		parts.append(p)
 		code = b"".join(parts)
-		return base64.b64encode(code).replace(b"=", b"%3D").decode("ascii")
+		return base64.urlsafe_b64encode(code).replace(b"=", b"%3D").decode("ascii")
 	# Returns a full youtube playlist.
 	def get_youtube_playlist(self, p_id):
-		resp = Request(f"https://www.youtube.com/playlist?list={p_id}", headers=self.youtube_header)
+		resp = self.yt_session.get(f"https://www.youtube.com/playlist?list={p_id}", headers=self.youtube_header)
+		resp.raise_for_status()
+		resp = resp.content
 		try:
 			try:
 				resp = resp[resp.index(b'{"responseContext":{'):]
@@ -458,7 +468,7 @@ class AudioDownloader:
 				resp = resp[:resp.index(b'window["ytInitialPlayerResponse"] = null;')]
 				resp = resp[:resp.rindex(b";")]
 			data = orjson.loads(resp)
-			client = dict(name="WEB", version="2.20250923")
+			client = self.yt_client
 			for tracker in data["responseContext"]["serviceTrackingParams"]:
 				for param in tracker.get("params", ()):
 					if param["key"].startswith("client."):
@@ -478,8 +488,12 @@ class AudioDownloader:
 				fut = esubmit(self.get_youtube_continuation, token, context)
 				futs.append(fut)
 				token = self.produce_continuation(p_id, page + 1)
-			for fut in futs:
-				entries.extend(fut.result()[0])
+			for i, fut in enumerate(futs):
+				try:
+					entries.extend(fut.result()[0])
+				except Exception as ex:
+					print(i, repr(ex))
+					raise
 		out = []
 		urls = set()
 		for entry in entries:
