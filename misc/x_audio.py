@@ -908,7 +908,9 @@ class AudioPlayer(discord.AudioSource):
 		with tracebacksuppressor:
 			if len(self.playing) == 1 and len(self.queue) > 1:
 				entry = self.queue[1]
-				asap = not entry.get("duration") or not entry.duration <= min(3960, (self.epos[1] - self.epos[0]) * 8)
+				if not entry.get("duration") or not entry.duration <= 3960:
+					return
+				asap = entry["duration"] > (self.epos[1] - self.epos[0]) * 8
 				try:
 					source = AF.load(entry, asap=asap).create_reader(self, pos=entry.get("start", 0))
 				except Exception as ex:
