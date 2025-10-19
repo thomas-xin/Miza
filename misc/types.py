@@ -1,5 +1,6 @@
 import ast
 import asyncio
+import bisect
 import collections.abc
 from collections import deque
 import concurrent.futures
@@ -920,8 +921,6 @@ class RangeSet(collections.abc.Iterable):
 	def __getitem__(self, k):
 		if isinstance(k, slice):
 			k = range(*k.indices(len(self)))
-			# if k.step < 0:
-			# 	k = k[::-1]
 			out = self.__class__()
 			for i, x in enumerate(self):
 				if i in k:
@@ -936,23 +935,23 @@ class RangeSet(collections.abc.Iterable):
 			i += r[1] - r[0]
 		raise IndexError(k)
 
-	def add(self, start, stop=None):
+	def add(self, start, stop=None, fixup=True):
 		if stop is None:
 			stop = start + 1
 		assert start <= stop, "Start must be less than or equal to stop."
 		if start == stop or range(start, stop) in self:
 			return self
-		self.ranges.append((start, stop))
-		self.ranges.sort()
-		i = 0
-		while i < len(self.ranges) - 1:
-			l1, r1 = self.ranges[i]
-			l2, r2 = self.ranges[i + 1]
-			if r1 >= l2:
-				self.ranges[i] = (l1, max(r1, r2))
-				self.ranges.pop(i + 1)
-			else:
-				i += 1
+		bisect.insort_right((start, stop), self.ranges)
+		if fixup:
+			i = 0
+			while i < len(self.ranges) - 1:
+				l1, r1 = self.ranges[i]
+				l2, r2 = self.ranges[i + 1]
+				if r1 >= l2:
+					self.ranges[i] = (l1, max(r1, r2))
+					self.ranges.pop(i + 1)
+				else:
+					i += 1
 		return self
 
 	def remove(self, start, stop=None):
@@ -1031,9 +1030,12 @@ class RangeSet(collections.abc.Iterable):
 				elif target.step == -1:
 					target = target[::-1]
 					self.add(target.start, target.stop)
+				elif not self.ranges:
+					self.ranges = [(n, n + 1) for n in target]
 				else:
-					for n in target:
-						self.add(n)
+					for n in target[:-1]:
+						self.add(n, fixup=False)
+					self.add(target[-1])
 			else:
 				spl = [x if x >= 0 else x + size for x in spl]
 				self.add(*slice(*sorted(spl)).indices(size)[:2])

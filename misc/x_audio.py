@@ -7,12 +7,12 @@ import io
 import itertools
 from math import inf, tau, isfinite, sqrt, ceil
 import os
-import shutil
 import subprocess
 import sys
 import threading
 from traceback import print_exc
 from urllib.parse import quote_plus, unquote_plus
+import zipfile
 import orjson
 import niquests
 import numpy as np
@@ -24,7 +24,7 @@ from .util import (
 	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, maybe_json, select_and_loads,
 	is_url, unyt, url2fn, get_duration, get_duration_2, CachingTeeFile,
-	rename, uhash, expired, is_youtube_stream, b64,  # noqa: F401
+	get_ext, rename, uhash, expired, is_youtube_stream, b64,  # noqa: F401
 )
 from .audio_downloader import AudioDownloader
 VC_TIMEOUT = 13
@@ -629,7 +629,8 @@ class AudioPlayer(discord.AudioSource):
 		if dump:
 			assert self, "No accessible queue to save!"
 			b = self.get_dump()
-			dump = discord.File(io.BytesIO(b), filename="dump.json")
+			ext = "json" if get_ext(b) != "zip" else "zip"
+			dump = discord.File(io.BytesIO(b), filename=f"dump.{ext}")
 		message = await channel.send(lim_str(s, 2000), file=dump or None)
 		if channel.permissions_for(channel.guild.me).add_reactions:
 			csubmit(message.add_reaction("❎"))
@@ -646,11 +647,18 @@ class AudioPlayer(discord.AudioSource):
 		elapsed, _length = self.epos
 		if elapsed:
 			data.setdefault("settings", {})["pos"] = elapsed
-		return maybe_json(data)
+		b = maybe_json(data)
+		if len(b) > 262144:
+			f = io.BytesIO()
+			with zipfile.ZipFile(f, "w", compression=zipfile.ZIP_LZMA) as z:
+				z.writestr("dump.json", b)
+			f.seek(0)
+			return f.getbuffer()
+		return b
 
-	def load_dump(self, b, uid=None, universal=False):
+	def load_dump(self, b, uid=None, universal=False, append=False):
 		try:
-			d = select_and_loads(b, size=268435456)
+			d = select_and_loads(b, size=268435456, safe=True)
 		except orjson.JSONDecodeError:
 			d = [url for url in as_str(b).splitlines() if is_url(url)]
 			if not d:
@@ -673,7 +681,10 @@ class AudioPlayer(discord.AudioSource):
 			settings.pop("pos", None)
 		pos = settings.pop("pos", None)
 		self.settings.update({k: v for k, v in settings.items() if k in self.defaults})
-		self.queue.fill(map(cdict, d["queue"]))
+		if append:
+			self.queue.extend(map(cdict, d["queue"]))
+		else:
+			self.queue.fill(map(cdict, d["queue"]))
 		if pos is not None:
 			esubmit(self.seek, pos)
 		else:
@@ -780,35 +791,37 @@ class AudioPlayer(discord.AudioSource):
 
 	def enqueue(self, items, start=-1, stride=1):
 		"""Inserts items into the queue, respecting the start and stride parameters where applicable."""
+		count = len(self.queue)
 		if len(items) > MAX_QUEUE:
-			items = astype(items, (list, alist))[:MAX_QUEUE]
-		items = list(astype(e, cdict) for e in items)
-		if stride == 1 and (start == -1 or start > len(self.queue) or not self.queue):
-			self.queue.extend(items)
-		else:
-			self.queue.rotate(-start)
-			rotpos = start
-			if stride == 1:
+			items = astype(items, (list, alist))[:MAX_QUEUE - len(items)]
+		if items:
+			items = list(astype(e, cdict) for e in items)
+			if stride == 1 and (start == -1 or start > len(self.queue) or not self.queue):
 				self.queue.extend(items)
-				rotpos += len(items)
 			else:
-				temp = alist([None] * (len(items) * abs(stride)))
-				temp[::stride] = items
-				sli = temp.view == None  # noqa: E711
-				inserts = self[:len(items) * (abs(stride) - 1)]
-				i = -1
-				while not sli[i] or np.sum(sli) > len(inserts):
-					sli[i] = False
-					i -= 1
-				print(len(temp), len(sli), len(inserts))
-				temp.view[sli] = inserts
-				temp = temp.view[temp.view != None]  # noqa: E711
-				temp = np.concatenate([temp, self[len(items) * (abs(stride) - 1):]])
-				self.queue.fill(temp)
-			self.queue.rotate(rotpos)
+				self.queue.rotate(-start)
+				rotpos = start
+				if stride == 1:
+					self.queue.extend(items)
+					rotpos += len(items)
+				else:
+					temp = alist([None] * (len(items) * abs(stride)))
+					temp[::stride] = items
+					sli = temp.view == None  # noqa: E711
+					inserts = self[:len(items) * (abs(stride) - 1)]
+					i = -1
+					while not sli[i] or np.sum(sli) > len(inserts):
+						sli[i] = False
+						i -= 1
+					print(len(temp), len(sli), len(inserts))
+					temp.view[sli] = inserts
+					temp = temp.view[temp.view != None]  # noqa: E711
+					temp = np.concatenate([temp, self[len(items) * (abs(stride) - 1):]])
+					self.queue.fill(temp)
+				self.queue.rotate(rotpos)
 		self.last_played = utc()
 		esubmit(self.ensure_play)
-		return self
+		return len(self.queue) - count
 
 	shuffler = 0
 	def skip(self, indices=0, loop=False, repeat=False, shuffle=False):
@@ -860,13 +873,8 @@ class AudioPlayer(discord.AudioSource):
 		"""Ensures that the player is playing audio when it should be. Called when the queue is modified, reloaded, or resumed."""
 		with self.ensure_lock:
 			pos = None
-			if len(self.queue) > MAX_QUEUE + 2048:
-				self.queue.fill(self.queue[1 - MAX_QUEUE:].appendleft(self.queue[0]))
-			elif len(self.queue) > MAX_QUEUE:
-				self.queue.rotate(-1)
-				while len(self.queue) > MAX_QUEUE:
-					self.queue.pop()
-				self.queue.rotate(1)
+			if len(self.queue) > MAX_QUEUE:
+				self.queue = self.queue[:MAX_QUEUE]
 			if len(self.playing) > 1 and (force or (len(self.queue) > 1 and self.playing[1].af.url != self.queue[1].url)):
 				self.playing.pop().close()
 			if self.playing and (force or self.queue and self.playing[0].af.url != self.queue[0].url):

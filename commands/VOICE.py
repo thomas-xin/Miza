@@ -441,7 +441,6 @@ class Queue(Command):
 			title += f" (+{len(items) - 1})"
 		emb.title = title
 		emb.url = resp[0]["url"]
-		adding = "Added to the queue!" if len(items) == 1 else f"{len(items)} items added!"
 		if qstride != 1:
 			positions = ":".join(str(i) if i is not None else "" for i in index)
 			posstr = f"Positions {positions};"
@@ -451,11 +450,12 @@ class Queue(Command):
 			posstr = "Estimated"
 		final_duration = sum(e_dur_2(e) for e in items) if len(items) != 1 else items[0].get("duration")
 		durstr = "" if not final_duration else f" ({sec2time(final_duration)})"
+		print(items)
+		count = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).enqueue({json_dumpstr(items)},start={qstart},stride={qstride})")
+		adding = f"{count}/{len(items)} items added!" if len(items) != count else f"{len(items)} items added!" if len(items) > 1 else "Added to the queue!"
 		emb.description = f"🎶 {adding} 🎶{durstr}\n*{posstr} time to play: {(DynamicDT.now() + total_duration).as_rel_discord() if isfinite(total_duration) else total_duration}.*"
 		if paused:
 			emb.description += f"\nNote: Player is currently paused. Use {bot.get_prefix(_guild)}resume to resume!"
-		print(items)
-		await bot.audio.asubmit(f"AP.from_guild({_guild.id}).enqueue({json_dumpstr(items)},start={qstart},stride={qstride})")
 		return cdict(
 			content=_comment,
 			embed=emb,
@@ -1296,9 +1296,9 @@ class Dump(Command):
 		mode=cdict(
 			type="enum",
 			validation=cdict(
-				enum=("save", "load"),
+				enum=("save", "load", "append"),
 			),
-			description="Whether to save or load queue",
+			description="Whether to save or load queue, or append loaded data to current queue",
 			example="load",
 		),
 		url=cdict(
@@ -1315,7 +1315,7 @@ class Dump(Command):
 			mode="save",
 		),
 		Import=cdict(
-			mode="load",
+			mode="append",
 		),
 		Load=cdict(
 			mode="load",
@@ -1345,14 +1345,15 @@ class Dump(Command):
 				if not url:
 					raise LookupError("No valid dump file provided or found.")
 			b = await self.bot.get_request(url)
-			queue = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).load_dump({maybe_json(b).decode('ascii')},{_user.id})")
+			queue = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).load_dump({maybe_json(b).decode('ascii')},{_user.id},append={mode == 'append'})")
 			count = len(queue)
 			return cdict(
 				content=(link + "\n" if link else "") + italics(css_md(f"Successfully loaded audio data ({count} item{'s' if count != 1 else ''}) for {sqr_md(_guild)}.")),
 				reacts="❎",
 			)
-		data = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).get_dump()")
-		return cdict(file=CompatFile(data, filename="dump.json"), reacts="❎")
+		b = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).get_dump()")
+		ext = "json" if get_ext(b) != "zip" else "zip"
+		return cdict(file=CompatFile(b, filename=f"dump.{ext}"), reacts="❎")
 
 
 class Seek(Command):

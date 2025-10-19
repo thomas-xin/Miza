@@ -1928,7 +1928,7 @@ def json_if(s):
 
 @always_copy
 @functools.lru_cache(maxsize=256)
-def select_and_loads(s, encrypted=False, size=None):
+def select_and_loads(s, encrypted=False, size=None, safe=False):
 	"Automatically decodes data from JSON or Pickle, decompressing if necessary."
 	if not s:
 		raise ValueError("Data must not be empty.")
@@ -1943,14 +1943,14 @@ def select_and_loads(s, encrypted=False, size=None):
 			pass
 		except:
 			raise
-	if s[0] == 128:
+	if s[0] == 128 and not safe:
 		return pickle.loads(s)
 	if s[:1] in (b"~", b"!") or zipfile.is_zipfile(io.BytesIO(s)):
 		s = zip2bytes(s)
 	data = None
 	if not s:
 		return data
-	if s[0] == 128:
+	if s[0] == 128 and not safe:
 		return pickle.loads(s)
 	if data is None:
 		tcls = None
@@ -1964,20 +1964,11 @@ def select_and_loads(s, encrypted=False, size=None):
 			data = tcls(data)
 	return data
 
-def select_and_dumps(data, mode="safe", compress=True):
+def select_and_dumps(data, safe=True, compress=True):
 	"Automatically serialises data as JSON or Pickle, compressing if beneficial."
 	if isinstance(data, Future):
 		data = data.result(timeout=2)
-	if mode == "unsafe":
-		# try:
-		# 	if len(data) and isinstance(data, dict) and not isinstance(next(iter(data)), str):
-		# 		raise TypeError
-		# 	if isinstance(data, (set, frozenset)):
-		# 		s = b"$" + json_dumps(list(data))
-		# 	else:
-		# 		s = json_dumps(data)
-		# except TypeError:
-		# 	s = pickle.dumps(data)
+	if not safe:
 		s = pickle.dumps(data)
 		if len(s) > 32768 and compress:
 			t = bytes2zip(s, lzma=len(s) > 16777216)
@@ -3117,7 +3108,7 @@ class FileHashDict(collections.abc.MutableMapping):
 				except KeyError:
 					self.deleted.add(k)
 					continue
-				futs.append((k, self.parallel(select_and_dumps, d, mode="safe" if self.safe else "unsafe", compress=True)))
+				futs.append((k, self.parallel(select_and_dumps, d, safe=self.safe, compress=True)))
 			fut2 = []
 			for k, fut in futs:
 				b = fut.result()
