@@ -20,7 +20,7 @@ from .smath import time_parse
 from .asyncs import esubmit
 from .util import (
 	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
-	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration_2, html_decode,
+	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration, get_duration_2, html_decode,
 	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url, AUDIO_FORMS,
 	EvalPipe, PipedProcess, TimedCache, Request, Semaphore, TEMP_PATH, magic, rename, temporary_file, replace_ext, USER_AGENT,
 )
@@ -389,8 +389,8 @@ class AudioDownloader:
 			out.append(temp)
 		return out, token
 	yt_client = dict(name="WEB", version="2.20251017", clientName="WEB", clientVersion="2.20251017.01.00")
-	yt_session = niquests.Session()
-	yt_asession = niquests.AsyncSession()
+	yt_session = niquests.Session(multiplexed=True)
+	yt_asession = niquests.AsyncSession(multiplexed=True)
 	# Returns a subsequent page of a youtube playlist from a page token.
 	def get_youtube_continuation(self, token, ctx=None):
 		resp = self.yt_session.post(
@@ -1212,13 +1212,9 @@ class AudioDownloader:
 			url2 = url.replace("https://youtu.be/", "https://www.youtube.com/watch?v=")
 		else:
 			url2 = url
-		entry2 = self.run(f"entry_from_ytdl(ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url2)},download=True))")
-		entry.update(dict(
-			name=entry2.get("name"),
-			icon=get_best_icon(entry2),
-			duration=entry2.get("duration"),
-		))
+		self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).download({repr(url2)})")
 		assert os.path.exists(fn) and os.path.getsize(fn), fn
+		entry["duration"] = get_duration(fn)
 		return fn, "opus", entry["duration"], 2
 
 	def preprocess(self, url, mode, count):

@@ -6630,7 +6630,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					with MemoryTimer("network_usage"):
 						data = await self.status()
 						await self.update_uptime(data)
-						net = await asubmit(psutil.net_io_counters)
+						net = await asubmit(psutil.net_io_counters, priority=2)
 						if not hasattr(self, "up_bytes"):
 							self.up_bytes = deque(maxlen=ninter)
 							self.down_bytes = deque(maxlen=ninter)

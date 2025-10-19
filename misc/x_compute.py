@@ -760,8 +760,18 @@ if "browse" in CAPS:
 
 	def download_file(url, filename="untitled.bin", timeout=12):
 		req = urllib.request.Request(url, method="GET", headers=streamshatter.header())
+		try:
+			resp = urllib.request.urlopen(req, timeout=timeout)
+		except urllib.error.HTTPError as ex:
+			if ex.code in range(400, 500):
+				print(repr(ex))
+				return
+			raise
+		except Exception as ex:
+			print(repr(ex))
+			return
 		with open(filename, "wb") as f:
-			shutil.copyfileobj(urllib.request.urlopen(req, timeout=timeout), f)
+			shutil.copyfileobj(resp, f)
 
 	def browse(q, text=True):
 		if not is_url(q):

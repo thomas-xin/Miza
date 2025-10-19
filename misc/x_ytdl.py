@@ -228,9 +228,9 @@ else:
 		except ValueError:
 			pass
 		except Exception as ex:
-			print(repr(ex))
+			sys.stderr.write(f"{repr(ex)}\n")
 		else:
-			print()
+			sys.stdout.write("\n")
 			byte_counter = os.path.getsize(filename)
 			self._hook_progress({
 				'downloaded_bytes': byte_counter,
