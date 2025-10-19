@@ -1976,7 +1976,7 @@ def select_and_dumps(data, safe=True, compress=True):
 				s = t
 		return s
 	try:
-		s = json_dumps(data)
+		s = maybe_json(data)
 	except (TypeError, orjson.JSONEncodeError):
 		s = None
 	if len(s) > 262144:

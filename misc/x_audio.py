@@ -951,7 +951,7 @@ class AudioPlayer(discord.AudioSource):
 
 	def backup(self):
 		if self.queue and self.vcc:
-			AP.cache[self.vcc.guild.id] = [self.vcc.id, self.channel and self.channel.id, self.get_dump(), [m.id for m in self.vcc.members]]
+			AP.cache[self.vcc.guild.id] = [self.vcc.id, self.channel and self.channel.id, astype(self.get_dump(), bytes), [m.id for m in self.vcc.members]]
 		return len(self.queue)
 
 	def is_opus(self):

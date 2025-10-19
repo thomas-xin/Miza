@@ -507,8 +507,8 @@ class Queue(Command):
 				total_time += e_dur_2(e)
 				if i < pos:
 					start_time += e_dur_2(e)
-				if not 1 + i & 32767:
-					await asyncio.sleep(0.1)
+				if not 1 + i & 262143:
+					await asyncio.sleep(0.25)
 				i += 1
 			stime = sec2time(total_time / abs(settings.speed))
 		cnt = len(q)

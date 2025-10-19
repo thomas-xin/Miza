@@ -857,27 +857,80 @@ def obj2range(r):
 	return tuple(r)
 
 class RangeSet(collections.abc.Iterable):
-	"""A class representing a set of continuous ranges of integers.
-	RangeSet manages ordered collections of non-overlapping integer ranges. It supports basic set operations
-	and provides efficient range-based manipulation.
-	Attributes:
-		ranges (list): A sorted list of tuples, where each tuple contains (start, stop) values representing ranges.
-	Examples:
-		>>> rs = RangeSet(1, 5)  # Creates range [1,5)
-		>>> rs.add(7, 9)         # Adds range [7,9)
-		>>> 3 in rs              # True
-		>>> 6 in rs              # False
-		>>> len(rs)              # 6 (total count of integers in ranges)
-		>>> list(rs)             # [1, 2, 3, 4, 7, 8]
-	Args:
-		start: If int, the start of initial range. If iterable, treated as collection of ranges.
-		stop (int, optional): The end of initial range if start is int. Defaults to start + 1.
-	Methods:
-		add(start, stop=None): Adds a range to the set, merging overlapping ranges.
-		remove(start, stop=None): Removes a range from the set, splitting existing ranges if needed.
-		update(others): Updates set with ranges from multiple iterables.
-		difference_update(others): Removes ranges specified in multiple iterables.
-		parse(slices, size): Class method to create RangeSet from slice notations.
+
+	"""
+	RangeSet is an ordered, normalized, and mutable collection of non-negative and/or negative integer
+	indices represented internally as a union of half-open ranges [start, stop). It behaves like a
+	set of integers while also supporting sequence-like operations such as iteration, indexing, and
+	slicing across the flattened elements.
+	Construction
+	- RangeSet(): create an empty set.
+	- RangeSet(start, stop): initialize with a single half-open interval [start, stop).
+	- RangeSet(seq): if the first argument is list-like, initialize from an iterable of range-like
+		objects (each element is converted to a (start, stop) pair via obj2range).
+	Core semantics
+	- Intervals are half-open: [start, stop), so stop is excluded.
+	- Ranges are kept sorted and normalized (no overlaps or adjacency) by merging overlapping or
+		touching intervals. Normalization happens via fixup() and is invoked by most mutating methods.
+	- Membership:
+		- int in rs: True if the integer is contained in any internal range.
+		- range/slice in rs: True if the entire target interval is covered by a single internal range.
+			Note: non-contiguous coverage across multiple disjoint ranges returns False.
+	- Iteration yields contained integers in ascending order.
+	- len(rs) returns the count of distinct integers represented by all ranges.
+	- bool(rs) is True if the set is non-empty.
+	Indexing and slicing
+	- rs[i]: return the i-th smallest element (0-based) across the flattened set; raises IndexError
+		if out of bounds.
+	- rs[i:j:k]: return a new RangeSet consisting of elements selected by positional slicing across
+		the flattened sequence of integers (not by numeric value range). The result is normalized.
+	Mutating methods (all mutate in place and return self for chaining)
+	- add(start, stop=None, fixup=True): add [start, stop). If stop is None, add the single element
+		start (i.e., [start, start + 1)). No-op if the added interval is empty or already fully covered.
+	- remove(start, stop=None): remove [start, stop) from the set. If stop is None, remove a single
+		element at start. Supports splitting ranges when the removal cuts through the middle.
+	- update(iterable): bulk-add. Each element can be a singleton (int) or a 2-item range-like
+		(start, stop) if list-like.
+	- difference_update(iterable): bulk-remove. Each element can be a singleton (int) or a 2-item
+		range-like (start, stop) if list-like.
+	- fixup(): normalize by merging overlapping or adjacent intervals; typically not needed to be
+		called directly unless add(..., fixup=False) was used.
+	Class methods
+	- RangeSet.parse(slices, size): Build a RangeSet from an iterable of slice-like specifications
+		relative to a bounded domain [0, size). Each element in 'slices' can be:
+		- [n] or (n,): a single index; supports negative indices like Python.
+		- [start, stop]: a half-open interval; None is allowed and interpreted like normal slice bounds;
+			negative indices are allowed.
+		- [start, stop, step]: a full slice; step of +1 or -1 becomes a contiguous range (after
+			normalization of direction). For |step| > 1, the result is a union of singletons (potentially
+			merged if they become adjacent due to other operations).
+		Out-of-bounds and empty selections are safely ignored/clamped via slice.indices(size).
+	Complexity notes
+	- Membership check for ints is O(log m + t), where m is the number of stored ranges and t is
+		the number of candidate ranges to examine (typically small).
+	- add/remove are O(m) in the number of ranges due to insertion and potential merging/splitting.
+	- Indexing by position is O(m) in the worst case; slicing by positions is O(N) where N is the
+		number of returned elements (plus merging cost).
+	Examples
+	- Build and mutate:
+			rs = RangeSet()
+			rs.add(2, 5).add(7).add(5, 7)   # becomes [2, 8)
+			assert 3 in rs                   # True
+			assert range(2, 8) in rs         # True (covered by a single internal range)
+			assert range(2, 9) in rs is False
+	- Sequence-like behavior:
+			list(rs)                         # [2, 3, 4, 5, 6, 7]
+			rs[0]                            # 2
+			rs[1:4]                          # RangeSet representing {3, 4, 5}, i.e., [3, 6)
+	- Removal and splitting:
+			rs.remove(4, 10)                 # leaves [2, 4)
+	- Parsing:
+			rs = RangeSet.parse([[None, 5], [7, None], [9, 1, -2]], size=10)
+			# Interprets slice-like specs relative to [0, 10). Negative indices and None are supported.
+	Notes
+	- All mutating methods return self for fluent chaining.
+	- The containment check for range/slice requires the interval to be fully covered by a single
+		internal range, not a union of disjoint ranges.
 	"""
 
 	__slots__ = ("ranges",)
@@ -895,17 +948,22 @@ class RangeSet(collections.abc.Iterable):
 	def __contains__(self, key):
 		if isinstance(key, slice | range):
 			start, stop = (key.start, key.stop) if key.step >= 0 else ((k2 := range(key.start, key.stop, key.step)[::-1]).start, k2.stop)
-			for left, right in self.ranges:
+			i = bisect.bisect_left(self.ranges, start, key=lambda x: x[1])
+			while i < len(self.ranges):
+				left, right = self.ranges[i]
 				if left > start:
 					break
 				if right > stop:
 					return True
 			return False
-		for left, right in self.ranges:
+		i = bisect.bisect_left(self.ranges, key, key=lambda x: x[1])
+		while i < len(self.ranges):
+			left, right = self.ranges[i]
 			if left > key:
 				break
 			if right > key:
 				return True
+			i += 1
 		return False
 
 	def __len__(self):
@@ -916,7 +974,10 @@ class RangeSet(collections.abc.Iterable):
 
 	def __iter__(self):
 		for left, right in self.ranges:
-			yield from range(left, right)
+			if right == left + 1:
+				yield left
+			else:
+				yield from range(left, right)
 
 	def __getitem__(self, k):
 		if isinstance(k, slice):
@@ -924,8 +985,8 @@ class RangeSet(collections.abc.Iterable):
 			out = self.__class__()
 			for i, x in enumerate(self):
 				if i in k:
-					out.add(x)
-			return out
+					out.add(x, fixup=False)
+			return out.fixup()
 		if not isinstance(k, int):
 			raise TypeError(k)
 		i = 0
@@ -935,23 +996,27 @@ class RangeSet(collections.abc.Iterable):
 			i += r[1] - r[0]
 		raise IndexError(k)
 
+	def fixup(self):
+		i = 0
+		while i < len(self.ranges) - 1:
+			l1, r1 = self.ranges[i]
+			l2, r2 = self.ranges[i + 1]
+			if r1 >= l2:
+				self.ranges[i] = (l1, max(r1, r2))
+				self.ranges.pop(i + 1)
+			else:
+				i += 1
+		return self
+
 	def add(self, start, stop=None, fixup=True):
 		if stop is None:
 			stop = start + 1
 		assert start <= stop, "Start must be less than or equal to stop."
 		if start == stop or range(start, stop) in self:
 			return self
-		bisect.insort_right((start, stop), self.ranges)
+		bisect.insort_right(self.ranges, (start, stop))
 		if fixup:
-			i = 0
-			while i < len(self.ranges) - 1:
-				l1, r1 = self.ranges[i]
-				l2, r2 = self.ranges[i + 1]
-				if r1 >= l2:
-					self.ranges[i] = (l1, max(r1, r2))
-					self.ranges.pop(i + 1)
-				else:
-					i += 1
+			self.fixup()
 		return self
 
 	def remove(self, start, stop=None):
@@ -1033,9 +1098,9 @@ class RangeSet(collections.abc.Iterable):
 				elif not self.ranges:
 					self.ranges = [(n, n + 1) for n in target]
 				else:
-					for n in target[:-1]:
+					for n in target:
 						self.add(n, fixup=False)
-					self.add(target[-1])
+					self.fixup()
 			else:
 				spl = [x if x >= 0 else x + size for x in spl]
 				self.add(*slice(*sorted(spl)).indices(size)[:2])
