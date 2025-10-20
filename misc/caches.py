@@ -1,20 +1,25 @@
+import aiofiles
 import aiohttp
 import asyncio
 import concurrent.futures
 import diskcache
+import os
 import random
 import re
+import shutil
+import subprocess
 import time
 from traceback import print_exc
+import zipfile
 import numpy as np
 from PIL import Image
 from misc.types import utc, as_str
-from misc.asyncs import esubmit, wrap_future, Future
+from misc.asyncs import esubmit, wrap_future, await_fut, Future
 from misc.util import (
     retrieve_from, CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, uuhash,
-	ungroup_attachments, is_discord_url,
-    snowflake_time_2, shorten_attachment, merge_url, split_url, discord_expired, url2fn,
+	ungroup_attachments, is_discord_url, temporary_file, url2ext, is_discord_attachment, is_miza_attachment,
+    snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, url2fn,
 )
 
 def has_transparency(image):
@@ -309,6 +314,37 @@ class AttachmentCache(diskcache.Cache):
 			self[path] = resp
 		return resp
 
+	async def download(self, url, filename):
+		if is_discord_attachment(url):
+			target = await self.obtain(url=url)
+			data = await Request(target, headers=Request.header(), aio=True)
+			async with aiofiles.open(filename, "wb") as f:
+				await f.write(data)
+			return filename
+		if not is_miza_attachment(url):
+			args = ["streamshatter", url, filename]
+			print(args)
+			proc = await asyncio.create_subprocess_exec(*args, stdin=subprocess.DEVNULL)
+			await proc.wait()
+			return filename
+		if "/u/" in url:
+			c_id, m_id, a_id, fn = expand_attachment(url)
+			target = await self.obtain(c_id, m_id, a_id, fn)
+			data = await Request(target, headers=Request.header(), aio=True)
+			async with aiofiles.open(filename, "wb") as f:
+				await f.write(data)
+			return filename
+		elif "/c/" in url:
+			path = url.split("/c/", 1)[-1].split("/", 1)[0]
+			urls = await self.obtains(path)
+			async with aiofiles.open(filename, "wb") as f:
+				for url in urls:
+					data = await Request(target, headers=Request.header(), aio=True)
+					await f.write(data)
+			return filename
+		else:
+			raise NotImplementedError(url)
+
 	async def delete(self, c_id, m_id, url=None):
 		if url:
 			c_id, m_id, *_ = split_url(url, m_id)
@@ -404,6 +440,60 @@ class AttachmentCache(diskcache.Cache):
 		if len(out) == 1 and collapse:
 			return out[0]
 		return out
+
+
+def acquire_from_archive(url, arcnames, filenames):
+	with tracebacksuppressor:
+		try:
+			for fn in filenames:
+				args = [fn, "--version"]
+				subprocess.run(args)
+		except FileNotFoundError:
+			temp = temporary_file(url2ext(url))
+			await_fut(attachment_cache.download(url, temp))
+			assert os.path.exists(temp) and os.path.getsize(temp), "Download unsuccessful!"
+			if not zipfile.is_zipfile(temp):
+				assert len(filenames) == 1
+				fn = filenames[0]
+				path = fn.replace("\\", "/").rsplit("/", 1)[0]
+				os.makedirs(path, exist_ok=True)
+				shutil.copyfile(temp, fn)
+				if os.name != "nt":
+					subprocess.run(("chmod", "777", fn))
+				return
+			with zipfile.ZipFile(temp) as z:
+				for an, fn in zip(arcnames, filenames):
+					path = fn.replace("\\", "/").rsplit("/", 1)[0]
+					os.makedirs(path, exist_ok=True)
+					with z.open(an, "r") as fi:
+						with open(fn, "wb") as fo:
+							shutil.copyfileobj(fi, fo)
+					if os.name != "nt":
+						subprocess.run(("chmod", "777", fn))
+
+
+def download_binary_dependencies():
+	if os.name == "nt":
+		acquire_from_archive("https://eternallybored.org/misc/gifsicle/releases/gifsicle-1.95-win64.zip", ["gifsicle.exe"], ["binaries/gifsicle.exe"])
+	else:
+		print("gifsicle binary not implemented in loader! Feature will not be available.")
+
+	if os.name == "nt":
+		acquire_from_archive("https://github.com/AOMediaCodec/libavif/releases/download/v1.3.0/windows-artifacts.zip", ["avifenc.exe"], ["binaries/avifenc.exe"])
+	else:
+		acquire_from_archive("https://github.com/AOMediaCodec/libavif/releases/download/v1.3.0/linux-artifacts.zip", ["avifenc"], ["binaries/avifenc"])
+
+	# if os.name == "nt":
+	# 	acquire_from_archive("https://pngquant.org/pngquant-windows.zip", ["pngquant/pngquant.exe"], ["binaries/pngquant.exe"])
+	# else:
+	# 	print("pngquant binary not implemented in loader! Feature will not be available.")
+	# 	acquire_from_archive("https://pngquant.org/pngquant-linux.tar.bz2", ["pngquant"], ["binaries/pngquant"])
+
+	if os.name == "nt":
+		acquire_from_archive("https://mizabot.xyz/u/_bjH2NMEAslNEANIlNsAJhJJoNFl/ecm.exe", [], ["binaries/ecm.exe"])
+	else:
+		acquire_from_archive("https://mizabot.xyz/u/vaWqov8EAslNEANIlpskJhpJMplF/ecm", [], ["binaries/ecm"])
+
 
 colour_cache = ColourCache(directory=f"{CACHE_PATH}/colour", expiry=86400 * 7)
 attachment_cache = AttachmentCache(directory=f"{CACHE_PATH}/attachment", expiry=3600 * 18)

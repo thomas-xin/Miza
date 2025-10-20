@@ -47,6 +47,7 @@ if ADDRESS == "0.0.0.0":
 if __name__ != "__mp_main__":
 	esubmit(load_colour_list)
 	esubmit(load_emojis)
+	esubmit(download_binary_dependencies)
 
 
 class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collections.abc.Callable):
@@ -3208,7 +3209,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				except Exception as ex:
 					print(repr(ex))
 		if not os.path.exists(fn) or not os.path.getsize(fn):
-			args = ["streamshatter", url, "-l", "3", "-t", "20", fn]
+			args = ["streamshatter", url, "-c", TEMP_PATH, "-l", "3", "-t", "20", fn]
 			print(args)
 			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
 			try:
@@ -3245,7 +3246,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def get_file(self, url, limit=None, timeout=24):
 		ext = url2ext(url)
 		fn = temporary_file(ext)
-		args = ["streamshatter", url, "-l", "8", "-t", "20", fn]
+		args = ["streamshatter", url, "-c", TEMP_PATH, "-l", "8", "-t", "20", fn]
 		print(args)
 		proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
 		try:
@@ -3275,7 +3276,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return self.discord_icon
 		if "proxies" in self.data:
 			with tracebacksuppressor:
-				url = (await self.data.exec.uproxy(url, force=force)) or url
+				url = (await self.data.exec.uproxy(url, force=force, optimise=True)) or url
 		return url
 
 	async def as_embed(self, message, link=False, colour=False, refresh=True, proxy_images=True) -> discord.Embed:
@@ -4610,9 +4611,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			break
 		args = ["tar", "-cvf", fn, "saves"]
 		subprocess.run(args)
-		# lines = as_str(subprocess.run([python, "neutrino.py", "-c0", "../saves", fn], stdout=subprocess.PIPE, cwd="misc").stdout).split("\n")
-		# s = "\n".join(line.strip() for line in lines if not line.startswith("\r"))
-		# print(s)
 		if os.path.exists(fn):
 			print("Backup database created in", fn)
 		else:
@@ -6630,14 +6628,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					with MemoryTimer("network_usage"):
 						data = await self.status()
 						await self.update_uptime(data)
-						net = await asubmit(psutil.net_io_counters, priority=2)
+						sent, recv = await proc_eval("(net:=psutil.net_io_counters()).bytes_sent,net.bytes_recv", caps=["math"])
 						if not hasattr(self, "up_bytes"):
 							self.up_bytes = deque(maxlen=ninter)
 							self.down_bytes = deque(maxlen=ninter)
-							self.start_up = max(0, self.data.insights.get("up_bytes", 0) - net.bytes_sent)
-							self.start_down = max(0, self.data.insights.get("down_bytes", 0) - net.bytes_recv)
-						self.up_bytes.append(net.bytes_sent)
-						self.down_bytes.append(net.bytes_recv)
+							self.start_up = max(0, self.data.insights.get("up_bytes", 0) - sent)
+							self.start_down = max(0, self.data.insights.get("down_bytes", 0) - recv)
+						self.up_bytes.append(sent)
+						self.down_bytes.append(recv)
 						self.up_bps = (self.up_bytes[-1] - self.up_bytes[0]) * 8 / len(self.up_bytes) / ninter
 						self.down_bps = (self.down_bytes[-1] - self.down_bytes[0]) * 8 / len(self.down_bytes) / ninter
 						self.bitrate = self.up_bps + self.down_bps

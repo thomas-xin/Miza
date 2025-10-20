@@ -514,51 +514,29 @@ def array(*args, **kwargs):
 		return np.asanyarray(arr, **kwargs)
 	return np.array(args, **kwargs)
 
-if os.name != "nt":
-	accel = None
-else:
-	sys.path.append("misc")
-	try:
-		import accel
-	except ImportError:
-		accel = None
+def _predict_next(seq):
+	if len(seq) < 2:
+		return
+	if np.min(seq) == np.max(seq):
+		return seq[0]
+	if len(seq) < 3:
+		return
+	if len(seq) > 4 and all(seq[2:] - seq[1:-1] == seq[:-2]):
+		return seq[-1] + seq[-2]
+	a = _predict_next(seq[1:] - seq[:-1])
+	if a is not None and isfinite(a):
+		return seq[-1] + a
+	if len(seq) < 4 or 0 in seq[:-1]:
+		return
+	b = _predict_next(seq[1:] / seq[:-1])
+	if b is not None and isfinite(b):
+		return seq[-1] * b
 
-if accel is None:
-	def _predict_next(seq):
-		if len(seq) < 2:
-			return
-		if np.min(seq) == np.max(seq):
-			return seq[0]
-		if len(seq) < 3:
-			return
-		if len(seq) > 4 and all(seq[2:] - seq[1:-1] == seq[:-2]):
-			return seq[-1] + seq[-2]
-		a = _predict_next(seq[1:] - seq[:-1])
-		if a is not None and isfinite(a):
-			return seq[-1] + a
-		if len(seq) < 4 or 0 in seq[:-1]:
-			return
-		b = _predict_next(seq[1:] / seq[:-1])
-		if b is not None and isfinite(b):
-			return seq[-1] * b
-
-	def predict_next(seq, limit=12):
-		"Predicts the next number in a sequence. Works on most combinations of linear, polynomial, exponential and fibonacci equations."
-		seq = np.array(seq, dtype=np.float64)
-		for i in range(min(8, limit), 1 + max(8, min(len(seq), limit))):
-			temp = _predict_next(seq[-i:])
-			if temp is not None and isfinite(temp):
-				return round_min(temp)
-else:
-	def predict_next(seq, limit=12):
-		"Predicts the next number in a sequence. Works on most combinations of linear, polynomial, exponential and fibonacci equations."
-		seq = list(map(float, seq))
-		if len(seq) > limit:
-			seq = seq[-limit:]
-		try:
-			temp = accel.predict_next(seq)
-		except ValueError:
-			return
+def predict_next(seq, limit=12):
+	"Predicts the next number in a sequence. Works on most combinations of linear, polynomial, exponential and fibonacci equations."
+	seq = np.array(seq, dtype=np.float64)
+	for i in range(min(8, limit), 1 + max(8, min(len(seq), limit))):
+		temp = _predict_next(seq[-i:])
 		if temp is not None and isfinite(temp):
 			return round_min(temp)
 
@@ -715,21 +693,6 @@ def gcd(*nums):
 			nums.append(x)
 	return nums[0]
 
-if os.name == "nt":
-	if not os.path.exists("misc/ecm.exe") or os.path.getsize("misc/ecm.exe") < 4096:
-		import requests
-		with requests.get("https://cdn.discordapp.com/attachments/703579929840844891/1103723891815362600/ecm.exe") as resp:
-			b = resp.content
-		with open("misc/ecm.exe", "wb") as f:
-			f.write(b)
-else:
-	if not os.path.exists("misc/ecm") or os.path.getsize("misc/ecm") < 4096:
-		import requests
-		with requests.get("https://cdn.discordapp.com/attachments/703579929840844891/1103729122909376562/ecm") as resp:
-			b = resp.content
-		with open("misc/ecm", "wb") as f:
-			f.write(b)
-		subprocess.run(("chmod", "777", "misc/ecm"))
 o_factorint = sympy.factorint
 _fcache = {}
 def _factorint(n, **kwargs):
@@ -746,14 +709,8 @@ def _factorint(n, **kwargs):
 		return _fcache[s]
 	except KeyError:
 		pass
-	args = ["misc/ecm", s, "2"]
-	try:
-		proc = subprocess.run(args, stdout=subprocess.PIPE, timeout=timeout)
-	except PermissionError:
-		if os.name == "nt":
-			raise
-		subprocess.run(("chmod", "777", "misc/ecm"))
-		proc = subprocess.run(args, stdout=subprocess.PIPE, timeout=timeout)
+	args = ["binaries/ecm", s, "2"]
+	proc = subprocess.run(args, stdout=subprocess.PIPE, timeout=timeout)
 	data = proc.stdout.decode("utf-8", "replace").replace(" ", "")
 	if "<li>" not in data:
 		if not data:

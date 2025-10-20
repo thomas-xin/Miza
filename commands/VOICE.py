@@ -296,10 +296,10 @@ class Queue(Command):
 		fut = csubmit(bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id})"))
 		if not query:
 			await fut
-			q, paused = await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).queue,a.settings.pause")
+			q, paused = await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).queue,a.settings.pause")
 			if len(q) and paused and ("▶️" in _name or _name.startswith("p")):
 				# With no item specified, the "play" alias is used for resuming rather than listing the queue
-				await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).settings.__setitem__('pause',False)\nreturn a.ensure_play()")
+				await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).settings.__setitem__('pause',False)\nreturn a.ensure_play()")
 				return cdict(
 					content=css_md(f"Successfully resumed audio playback in {sqr_md(_guild)}."),
 					reacts="❎",
@@ -347,7 +347,7 @@ class Queue(Command):
 			# Wait for audio player to finish loading if necessary
 			await fut
 		try:
-			q, settings, paused, reverse, (elapsed, length) = await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).queue,a.settings,a.settings.pause,a.reverse,a.epos")
+			q, settings, paused, reverse, (elapsed, length) = await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).queue,a.settings,a.settings.pause,a.reverse,a.epos")
 		except KeyError:
 			raise KeyError("Unable to communicate with voice client! (Please verify that I have permission to join the voice channel?)")
 		settings = astype(settings, cdict)
@@ -471,7 +471,7 @@ class Queue(Command):
 		if reaction not in self.directions and reaction is not None:
 			return
 		user = await bot.fetch_user(u_id)
-		q, settings, paused, reverse, (elapsed, length) = await bot.audio.asubmit(f"(a := AP.from_guild({guild.id})).queue,a.settings,a.settings.pause,a.reverse,a.epos")
+		q, settings, paused, reverse, (elapsed, length) = await bot.audio.asubmit(f"(a:=AP.from_guild({guild.id})).queue,a.settings,a.settings.pause,a.reverse,a.epos")
 		settings = astype(settings, cdict)
 		last = max(0, len(q) - 10)
 		if reaction is not None:
@@ -922,7 +922,7 @@ class Skip(Command):
 
 	async def __call__(self, bot, _guild, _channel, _user, _perm, mode, slices, after, **void):
 		try:
-			q, cid, settings, (elapsed, _length) = await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).queue, a.vcc.id, a.settings, a.epos")
+			q, cid, settings, (elapsed, _length) = await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).queue, a.vcc.id, a.settings, a.epos")
 		except KeyError:
 			raise LookupError("Currently not playing in a voice channel.")
 		settings = cdict(settings)
@@ -980,7 +980,7 @@ class Skip(Command):
 				if 0 in temp:
 					await bot.audio.asubmit(f"AP.from_guild({_guild.id}).queue[0].__setitem__('end',{elapsed + after.total_seconds()})")
 					temp.remove(0)
-				await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})) and [a.queue[i].__setitem__('end',{after.total_seconds()}) for i in {temp}]")
+				await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})) and [a.queue[i].__setitem__('end',{after.total_seconds()}) for i in {temp}]")
 				desc.append((f"Entry {skips[0]} (`{q[skips[0]]['name']}`)" if len(skips) == 1 else f"{len(skips)} entries") + f" will automatically skip after {after}.")
 		if not desc:
 			raise IndexError("No items were skipped (Please verify your query with the current queue).")
@@ -1084,7 +1084,7 @@ class AudioState(Command):
 
 	async def __call__(self, bot, _comment, _guild, _user, _perm, mode, value, **void):
 		try:
-			cid, settings = await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).vcc.id,a.settings")
+			cid, settings = await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).vcc.id,a.settings")
 		except KeyError:
 			raise LookupError("Currently not playing in a voice channel.")
 		vc_ = await bot.fetch_channel(cid)
@@ -1092,7 +1092,7 @@ class AudioState(Command):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
 		if not mode:
 			if value:
-				await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).settings.update(AP.defaults)\nreturn a.ensure_play(1)")
+				await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).settings.update(AP.defaults)\nreturn a.ensure_play(1)")
 				return italics(css_md(f"Successfully reset all audio settings for {sqr_md(_guild)}."))
 			d = audio_key(settings) # {k: v for k, v in settings.items() if k in audio_states}
 			return f"Current audio states for **{escape_markdown(_guild.name)}**:\n{ini_md(iter2str(d))}"
@@ -1253,7 +1253,7 @@ class AudioSettings(Command):
 
 	async def __call__(self, bot, _comment, _guild, _user, _perm, mode, value, **void):
 		try:
-			cid, settings = await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).vcc.id,a.settings")
+			cid, settings = await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).vcc.id,a.settings")
 		except KeyError:
 			raise LookupError("Currently not playing in a voice channel.")
 		vc_ = await bot.fetch_channel(cid)
@@ -1261,7 +1261,7 @@ class AudioSettings(Command):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
 		if not mode or value is None:
 			if value:
-				await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).settings.update(AP.defaults)\nreturn a.ensure_play(1)")
+				await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).settings.update(AP.defaults);return a.ensure_play(1)")
 				return italics(css_md(f"Successfully reset all audio settings for {sqr_md(_guild)}."))
 			d = audio_key(settings) # {k: v for k, v in settings.items() if k in audio_settings}
 			return f"Current audio settings for **{escape_markdown(_guild.name)}**:\n{ini_md(iter2str(d))}"
@@ -1277,7 +1277,7 @@ class AudioSettings(Command):
 		else:
 			value = await bot.eval_math(full_prune(value))
 			valstr = str(value)
-		await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).settings.{mode} = {value}\nreturn a.ensure_play(1)")
+		await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).settings.{mode}={value};return a.ensure_play(1)")
 		content = css_md(f"{sqr_md(mode.capitalize())} setting for audio playback in {sqr_md(_guild)} has been updated to {sqr_md(valstr)}.")
 		if _comment:
 			content = _comment + "\n" + content
@@ -1381,7 +1381,7 @@ class Seek(Command):
 		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
 		try:
-			await bot.audio.asubmit(f"(e := AP.from_guild({_guild.id}).queue[0]).pop('start',0),e.pop('end',0)")
+			await bot.audio.asubmit(f"(e:=AP.from_guild({_guild.id}).queue[0]).pop('start',0),e.pop('end',0)")
 		except LookupError:
 			raise LookupError("Unable to perform seek (Am I currently playing a song?)")
 		await bot.audio.asubmit(f"AP.from_guild({_guild.id}).seek({position.total_seconds()})")
@@ -1415,7 +1415,7 @@ class Jump(Command):
 		vc_ = await bot.fetch_channel(cid)
 		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
-		await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).queue.rotate({-position}),a.ensure_play(2)")
+		await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).queue.rotate({-position}),a.ensure_play(2)")
 		return cdict(
 			content=italics(css_md(f"Successfully rotated queue {sqr_md(position)} step{'s' if abs(position) != 1 else ''}.")),
 			reacts="❎",
@@ -1439,7 +1439,7 @@ class Shuffle(Command):
 		vc_ = await bot.fetch_channel(cid)
 		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
-		await bot.audio.asubmit(f"(a := AP.from_guild({_guild.id})).queue.shuffle(),a.ensure_play(2)")
+		await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).queue.shuffle(),a.ensure_play(2)")
 		return cdict(
 			content=italics(css_md(f"Successfully shuffled queue for {sqr_md(_guild)}.")),
 			reacts="❎",
@@ -1463,7 +1463,7 @@ class Dedup(Command):
 		vc_ = await bot.fetch_channel(cid)
 		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
-		lx, ly, *_ = await bot.audio.asubmit(f"len((a := AP.from_guild({_guild.id})).queue),len(a.queue.dedup(key=lambda e: e.url)),a.ensure_play()")
+		lx, ly, *_ = await bot.audio.asubmit(f"len((a:=AP.from_guild({_guild.id})).queue),len(a.queue.dedup(key=lambda e: e.url)),a.ensure_play()")
 		if lx <= ly:
 			raise LookupError("No duplicate elements in queue.")
 		n = lx - ly
@@ -2676,7 +2676,7 @@ class UpdateAudio(Database):
 		td, self.timestamp = t - self.timestamp, t
 		bot = self.bot
 		try:
-			player_states = await bot.audio.asubmit("[(k,v.vc and v.vc.is_playing(),{m.id for m in v.vcc.members if (mv := m.voice) and not m.voice.deaf and not m.voice.self_deaf}) for k,v in AP.players.items()]")
+			player_states = await bot.audio.asubmit("[(k,v.vc and v.vc.is_playing(),{m.id for m in v.vcc.members if (mv:=m.voice) and not m.voice.deaf and not m.voice.self_deaf}) for k,v in AP.players.items()]")
 		except AttributeError:
 			player_states = ()
 		for state in player_states:

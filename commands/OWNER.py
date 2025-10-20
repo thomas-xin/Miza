@@ -864,8 +864,8 @@ class UpdateExec(Database):
 			b = await bot.get_request(url)
 		elif isinstance(url, str):
 			fn = filetransd((filename or url).replace("\\", "/").rsplit("/", 1)[-1])
-			with open(url, "rb") as f:
-				b = await asubmit(f.read)
+			async with aiofiles.open(url, "rb") as f:
+				b = await f.read()
 		else:
 			fn = filetransd(filename or getattr(url, "name", None) or "c.b")
 			with url:
@@ -901,7 +901,7 @@ class UpdateExec(Database):
 		return out
 
 	seen = TimedCache(timeout=86400)
-	async def uproxy(self, *urls, collapse=True, mode="upload", filename=None, channel=None, **kwargs):
+	async def uproxy(self, *urls, collapse=True, mode="upload", filename=None, channel=None, optimise=False, **kwargs):
 		bot = self.bot
 		async def proxy_url(url):
 			nonlocal filename
@@ -934,6 +934,11 @@ class UpdateExec(Database):
 					pass
 				else:
 					return
+			if optimise:
+				if not data and is_url(url):
+					data = await bot.get_request(url)
+				if data and len(data) > 1048576:
+					data = await bot.optimise_image(data, fsize=1048576, fmt="webp")
 			url2 = await self.lproxy(data or url, filename=filename, channel=channel)
 			if uhu:
 				bot.data.proxies[uhu] = url2

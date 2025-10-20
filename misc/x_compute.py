@@ -32,7 +32,6 @@ import collections
 import traceback
 import re
 import requests
-import niquests
 import ast
 import base64
 import hashlib
@@ -195,7 +194,7 @@ def is_strict_running(proc):
 			proc = psutil.Process(proc.pid)
 		except (ProcessLookupError, psutil.NoSuchProcess):
 			return
-		except:
+		except Exception:
 			print_exc()
 			return
 	if not proc.is_running():
@@ -215,6 +214,7 @@ if "video" in CAPS:
 
 if "math" in CAPS:
 	import matplotlib.pyplot as plt
+	import psutil
 	plt.style.use("dark_background")
 	plt.rcParams["figure.dpi"] = 96
 	plt.rcParams["figure.figsize"] = (16, 16)
@@ -337,7 +337,7 @@ if "ecdc" in CAPS:
 					si += 1
 				if proc2.is_running():
 					proc2.stdin.close()
-			except:
+			except Exception:
 				import traceback
 				traceback.print_exc()
 				if not proc.is_running() or not proc2.is_running():
@@ -493,7 +493,7 @@ def ensure_gc(t):
 			with torch.no_grad():
 				torch.cuda.empty_cache()
 			ot = 0
-	except:
+	except Exception:
 		traceback.print_exc()
 
 
@@ -872,24 +872,11 @@ def write_video(proc, data):
 		print(traceback.format_exc(), end="")
 
 def gifsicle(out, info=None, heavy=False):
-	if os.name == "nt":
-		if not os.path.exists("misc/gifsicle.exe") or os.path.getsize("misc/gifsicle.exe") < 4096:
-			with requests.get("https://mizabot.xyz/u/EN8_fQ2CAKs.exe") as resp:
-				b = resp.content
-			with open("misc/gifsicle.exe", "wb") as f:
-				f.write(b)
-	else:
-		if not os.path.exists("misc/gifsicle") or os.path.getsize("misc/gifsicle") < 4096:
-			with requests.get("https://cdn.discordapp.com/attachments/1093723058386256022/1152254899694870599/gifsicle-static") as resp:
-				b = resp.content
-			with open("misc/gifsicle", "wb") as f:
-				f.write(b)
-			subprocess.run(("chmod", "777", "misc/gifsicle"))
 	if "." in out:
 		out2 = out.rsplit(".", 1)[0] + "~2." + out.rsplit(".", 1)[-1]
 	else:
 		out2 = out + "~2"
-	args = ["misc/gifsicle"]
+	args = ["binaries/gifsicle"]
 	if heavy:
 		args.extend(("-O3", "--lossy=100", "--colors=64"))
 	else:

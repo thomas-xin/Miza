@@ -1,4 +1,3 @@
-import asyncio
 import io
 import os
 import subprocess
@@ -8,7 +7,7 @@ from traceback import print_exc
 import zipfile
 import niquests
 from PIL import Image
-import streamshatter
+import psutil
 from .util import is_url, is_discord_attachment, TEMP_PATH, CODECS_INV
 # Allow fallback (although not recommended as generally the up-to-date version is necessary for most sites)
 try:
@@ -212,23 +211,22 @@ else:
 
 	real_download = ytd.downloader.http.HttpFD.real_download
 	def trial_download(self, filename, info_dict):
+		proc = None
 		try:
 			if not is_url(info_dict["url"]) or is_discord_attachment(info_dict["url"]):
 				raise ValueError
 			t = time.time()
-			asyncio.run(streamshatter.shatter_request(
-				info_dict["url"],
-				cache_folder=TEMP_PATH,
-				headers=info_dict.get("http_headers", {}),
-				filename=filename,
-				limit=48,
-				timeout=30,
-			))
+			args = ["streamshatter", info_dict["url"], "-c", TEMP_PATH, "-H", json.dumps(info_dict.get("http_headers", {})), "-l", "48", "-t", "30", filename]
+			proc = psutil.Popen(args, stdin=subprocess.DEVNULL)
+			proc.wait(timeout=32)
 			elapsed = time.time() - t
+			assert os.path.exists(filename) and os.path.getsize(filename)
 		except ValueError:
 			pass
 		except Exception as ex:
 			sys.stderr.write(f"{repr(ex)}\n")
+			if proc and proc.is_running():
+				proc.terminate()
 		else:
 			sys.stdout.write("\n")
 			byte_counter = os.path.getsize(filename)
