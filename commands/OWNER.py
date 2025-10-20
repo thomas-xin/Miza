@@ -938,7 +938,7 @@ class UpdateExec(Database):
 				if not data and is_url(url):
 					data = await bot.get_request(url)
 				if data and len(data) > 1048576:
-					data = await bot.optimise_image(data, fsize=1048576, fmt="webp")
+					data = await bot.optimise_image(data, fsize=1048576, fmt="avif")
 			url2 = await self.lproxy(data or url, filename=filename, channel=channel)
 			if uhu:
 				bot.data.proxies[uhu] = url2
