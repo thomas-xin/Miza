@@ -144,8 +144,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		directory = frozenset(os.listdir())
 		if "saves" not in directory:
 			os.mkdir("saves")
-		# if not os.path.exists("saves/filehost"):
-		# 	os.mkdir("saves/filehost")
 		for k in ("attachments", "audio", "filehost"):
 			if not os.path.exists(f"{CACHE_PATH}/{k}"):
 				os.mkdir(f"{CACHE_PATH}/{k}")
@@ -3186,11 +3184,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return await self.get_attachment(attachment.url, size=attachment.size)
 
 	async def add_and_test(self, message, attachment):
+		n = 0
 		fn = await self.add_attachment(attachment)
 		if fn and "prot" in self.data:
 			known = self.cache.attachments.get(attachment.id, None)
 			if get_mime(fn).startswith("image/"):
-				res = await self.data.prot.scan(message, fn, known=known)
+				res, n = await self.data.prot.scan(message, fn, known=known)
 			else:
 				res = ""
 			self.cache.attachments[attachment.id] = res
@@ -8490,6 +8489,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					after = self.ExtendedMessage(after)
 					after.sem = Semaphore(3, 1, rate_limit=20.09)
 					after.sem.delay_for(20)
+			with tracebacksuppressor:
+				inits = T(before).get("inits")
+				if inits:
+					print("Cancel:", inits)
+					for fut in inits:
+						with tracebacksuppressor:
+							try:
+								fut.cancel()
+							except AttributeError:
+								try:
+									fut.close()
+								except AttributeError:
+									force_kill(fut)
 			self.add_message(after, files=False, force=2)
 			if before.author.id == self.deleted_user or after.author.id == self.deleted_user:
 				print("Deleted User RAW_MESSAGE_EDIT", after.channel, before.author, after.author, before, after, after.channel.id, after.id)
@@ -8552,7 +8564,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			except (AttributeError, LookupError):
 				channel = await self.fetch_channel(payload.channel_id)
 				try:
-					message = await self.fetch_message(payload.message_id, channel)
+					message = await self.fetch_message(payload.message_id, channel, old=True)
 					if message is None:
 						raise LookupError
 				except (AttributeError, LookupError, discord.NotFound):

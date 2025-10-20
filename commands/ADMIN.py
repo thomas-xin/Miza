@@ -1994,11 +1994,11 @@ class ServerProtector(Database):
 		self.data["scans"] = self.data.get("scans", 0) + 1
 		resp = known or await process_image("ectoplasm", "$", [url, b"", "-f", "png"], cap="caption", priority=True, timeout=60)
 		if not resp:
-			return
+			return "", 0
 
 		def analyse(resp):
 			if not isinstance(resp, bytes):
-				return False
+				return 0
 			if re.search(r'^{\s*"', as_str(resp[:64])):
 				try:
 					data = orjson.loads(resp)
@@ -2010,8 +2010,11 @@ class ServerProtector(Database):
 					except KeyError:
 						pass
 					else:
+						action = 1
 						try:
 							software_agent = data["manifests"][data["active_manifest"]]["assertions"][0]
+							if all(action["action"] == "c2pa.edited" for action in software_agent["data"].get("actions", ())):
+								action = 2
 							while "softwareAgent" not in software_agent:
 								curr = software_agent["data"]
 								if isinstance(curr, list):
@@ -2024,16 +2027,16 @@ class ServerProtector(Database):
 						except LookupError:
 							software_agent = None
 						if issuer in ("Miza", "OpenAI", "StabilityAI") or software_agent in ("Adobe Firefly", "DALL·E", "Bing Image Creator"):
-							return True
-					if str(data.get("issuer_id") or data.get("copyright")) == str(self.bot.id) or data.get("type") == "AI_GENERATED":
-						return True
+							return action
+					if str(data.get("issuer_id") or data.get("copyright")) == str(self.bot.id):
+						return 1 if data.get("type") != "AI_EDITED" else 2
 			elif resp.startswith(b"{'prompt':"):
-				return True
-			return False
+				return 1
+			return 0
 
 		is_ai = analyse(resp)
 		print("META:", type(resp), is_ai, resp)
-		if is_ai:
+		if is_ai == 1:
 			self.data["pos"] = self.data.get("pos", 0) + 1
 			try:
 				await self.bot.react_with(message, "ai_generated.gif")
@@ -2043,7 +2046,11 @@ class ServerProtector(Database):
 					await message.reply("-# *This image was generated using AI.*")
 				except Exception:
 					await message.channel.send("-# " + user_mention(message.author) + ": " + "*This image was generated using AI.*")
-			return resp
+			return resp, is_ai
+		elif is_ai == 2:
+			self.data["pos"] = self.data.get("pos", 0) + 1
+			await self.bot.react_with(message, "ai_edited.png")
+		return "", is_ai
 
 
 class EnabledCommands(Command):

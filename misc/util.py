@@ -1023,7 +1023,18 @@ def get_image_size(b):
 	except Exception as ex:
 		if not isinstance(ex, IndexError):
 			print_exc()
-	if isinstance(input, str):
+	if isinstance(b, io.BytesIO):
+		input = b
+		input.seek(0)
+	elif isinstance(b, (bytes, bytearray, memoryview)):
+		input = io.BytesIO(b)
+	elif isinstance(b, (io.IOBase)):
+		try:
+			b.seek(0)
+		except Exception:
+			print_exc()
+		input = io.BytesIO(b.read(256))
+	elif isinstance(b, str):
 		input = open(input, "rb")
 	from PIL import Image
 	input.seek(0)

@@ -929,7 +929,7 @@ class Imagine(Command):
 		model = model or "auto"
 		mode = mode or ("raw" if url or mask else "preprocess")
 		aspect_ratio = 0 if not aspect_ratio[0] or not aspect_ratio[1] else aspect_ratio[0] / aspect_ratio[1]
-		count = count or (4 if _premium.value_approx >= 3 else 1)
+		count = count or (4 if _premium.value_approx >= 3 and not url else 1)
 		limit = 18 if _premium.value >= 5 else 9 if _premium.value >= 3 else 4
 		amount = min(count, limit)
 		amount2 = 0
@@ -974,6 +974,19 @@ class Imagine(Command):
 					nsfw_prompt = True
 			negative_prompt = negative_prompt or ", ".join(set(("watermark", "blurry", "distorted", "disfigured", "bad anatomy", "poorly drawn")).difference(smart_split(prompt)))
 		await bot.require_integrity(_message)
+		image = None
+		was_ai = 1
+		if url:
+			fut = csubmit(bot.data.prot.scan(_message, url))
+			fut2 = csubmit(bot.to_data_url(url))
+			b = await bot.get_request(url)
+			if not aspect_ratio:
+				p = 2 if len(b) > 1048576 else 0
+				w, h = await asubmit(get_image_size, b, priority=2)
+				aspect_ratio = w / h
+			res, n = await fut
+			was_ai = 1 if n == 1 else 0
+			image = await fut2
 
 		pnames = []
 		futs = []
@@ -1085,13 +1098,18 @@ class Imagine(Command):
 							"content": content,
 						},
 					],
+					"reasoning_effort": "low",
 					"modalities": ["image", "text"],
 					"image_config": {
 						"aspect_ratio": selected_ar,
 					}
 				}
 				response = requests.post(url, headers=headers, json=payload)
-				response.raise_for_status()
+				try:
+					response.raise_for_status()
+				except Exception:
+					print(response.content)
+					raise
 				result = response.json()
 				usage = result["usage"]
 				cost = mpf(1.238 + 0.03 if image else 0.03) / 1000 + mpf(0.3 * usage["prompt_tokens"] + 2.5 * usage["completion_tokens"]) / 1000000
@@ -1103,25 +1121,25 @@ class Imagine(Command):
 							image_url = image["image_url"]["url"]
 							return base64.b64decode(image_url.split("base64,", 1)[-1].encode("ascii"))
 				if image:
-					raise RuntimeError(result)
+					raise RuntimeError("No image was produced!", f"LLM response: {repr(result)}")
 				print(result)
 
 			resp_model = "gemini-2.5-flash-image-preview"
 			n = amount - amount2
-			if n > 1:
+			if n > 1 and not url:
 				n -= 1
 			pps = [eprompts.next().replace(" BREAK ", "\n") for i in range(n)]
 			pnames.extend(pps)
-			if url:
-				image = await bot.to_data_url(url)
-			else:
-				image = None
 			cfuts = [asubmit(nano_banana, p, image) for p in pps]
 			await gather(*cfuts)
+			temp_futs = []
 			for fut in cfuts:
 				if fut.result():
-					futs.append(fut)
+					temp_futs.append(fut)
 					amount2 += 1
+			for fut in temp_futs:
+				fut.model = resp_model
+			futs.extend(temp_futs)
 
 		if amount2 < amount and model in ("dalle3", "dalle2"):
 			dalle = "2" if model == "dalle2" else "3"
@@ -1213,12 +1231,16 @@ class Imagine(Command):
 					else:
 						cost = "0.12" if q == "hd" else "0.08"
 					_premium.append(["openai", resp_model, cost])
+			temp_futs = []
 			futs.extend(csubmit(Request(im.url, timeout=48, aio=True)) for im in images)
+			for fut in temp_futs:
+				fut.model = resp_model
+			futs.extend(temp_futs)
 			amount2 += len(images)
 		if amount2 < amount and not url and (AUTH.get("deepinfra_key") or AUTH.get("together_key")):
 			use_together = False #bool(AUTH.get("together_key")) and not mod_resp.flagged
 			if url:
-				url = await bot.to_data_url(url)
+				url = image
 			resp_model = "black-forest-labs/FLUX.1-redux" if url else "black-forest-labs/FLUX.1-schnell-Free" if use_together else "black-forest-labs/FLUX-1-schnell"
 			c = amount - amount2
 			ms = 1024 if high_quality else 768
@@ -1297,13 +1319,17 @@ class Imagine(Command):
 					b += b"=="
 				return base64.b64decode(b)
 
+			temp_futs = []
 			for fut in queue:
 				data = await fut
 				images = data["data"] if use_together else data["images"]
 				for imd in images:
 					imd = b64_data(imd)
-					futs.append(as_fut(imd))
+					temp_futs.append(as_fut(imd))
 					amount2 += 1
+			for fut in temp_futs:
+				fut.model = resp_model
+			futs.extend(temp_futs)
 		if amount2 < amount:
 			c = amount - amount2
 			counts = []
@@ -1438,7 +1464,10 @@ class Imagine(Command):
 				else:
 					raise FileNotFoundError("Unexpected error retrieving image.")
 				pnames.extend([prompt] * n)
-				futs.extend(as_fut(target + f"/{seed}_{'%05d' % i}_.png") for i in range(1, n + 1))
+				temp_futs = [as_fut(target + f"/{seed}_{'%05d' % i}_.png") for i in range(1, n + 1)]
+				for fut in temp_futs:
+					fut.model = resp_model
+				futs.extend(temp_futs)
 				_premium.append(["mizabot", resp_model, cost])
 		ffuts = []
 		exc = RuntimeError("Unknown error occured.")
@@ -1447,6 +1476,7 @@ class Imagine(Command):
 				break
 			if not tup:
 				continue
+			model = getattr(tup, "model", resp_model)
 			if not isinstance(tup, tuple):
 				if awaitable(tup):
 					tup = await tup
@@ -1467,11 +1497,11 @@ class Imagine(Command):
 			meta = cdict(
 				issuer=bot.name,
 				issuer_id=bot.id,
-				type="AI_GENERATED",
-				engine=resp_model,
+				type="AI_GENERATED" if was_ai else "AI_EDITED",
+				engine=model,
 				prompt=oprompt,
 			)
-			ffut = csubmit(process_image(fn, "ectoplasm", ["-nogif", orjson.dumps(meta), 1, "-f", "png"], cap="caption", timeout=60))
+			ffut = csubmit(process_image(fn, "ectoplasm", ["-nogif", orjson.dumps(meta), 1, "-f", "webp"], cap="caption", timeout=60))
 			ffut.prompt = prompt
 			ffut.back = fn
 			ffuts.append(ffut)
@@ -1483,7 +1513,7 @@ class Imagine(Command):
 			fn = ffut.back
 			fn = await ffut
 			assert fn
-			files.append(CompatFile(fn, filename=prompt + ".png", description=prompt))
+			files.append(CompatFile(fn, filename=prompt + ".webp", description=prompt))
 		embs = []
 		emb = discord.Embed(colour=rand_colour())
 		emb.description = ""
