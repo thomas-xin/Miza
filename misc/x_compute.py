@@ -43,7 +43,7 @@ from contextlib import suppress
 from math import inf, floor, ceil, log2, log10
 from traceback import print_exc
 sys.path.append("misc")
-from misc.util import EvalPipe, new_playwright_page, CODECS, CODEC_FFMPEG
+from misc.util import EvalPipe, new_playwright_page, CODECS, CODEC_FFMPEG, temporary_file
 
 if __name__ == "__main__":
 	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
@@ -245,8 +245,7 @@ if "math" in CAPS:
 		plt.xlabel("Time (Hours)")
 		plt.ylabel("Action Count")
 		plt.legend(loc="upper left")
-		ts = time.time_ns() // 1000
-		out = f"cache/{ts}.png"
+		out = temporary_file("png")
 		plt.savefig(out)
 		plt.clf()
 		plt.rcParams["figure.figsize"] = (16, 16)
@@ -368,11 +367,10 @@ if "ecdc" in CAPS:
 
 	def ecdc_encode(b, bitrate="24", name="", source="", thumbnail=""):
 		assert len(b)
-		ts = time.time_ns() // 10000 * 10 + int(DEV)
-		fn = "cache/" + str(ts)
+		fn = temporary_file()
 		with open(fn, "wb") as f:
 			f.write(b)
-		fo = "cache/" + str(ts) + ".ecdc"
+		fo = temporary_file("ecdc")
 		if name:
 			name = " " + base64.b64encode(name.strip().encode("utf-8")).rstrip(b"=").decode("utf-8")
 		args1 = ["ffmpeg", "-v", "error", "-hide_banner", "-vn", "-nostdin", "-i", fn, "-f", "s16le", "-ac", "2", "-ar", "48k", "-"]
@@ -385,11 +383,10 @@ if "ecdc" in CAPS:
 
 	def ecdc_decode(b, fmt="opus"):
 		assert len(b)
-		ts = time.time_ns() // 10000 * 10 + int(DEV)
-		fn = "cache/" + str(ts)
+		fn = temporary_file("ecdc")
 		with open(fn, "wb") as f:
 			f.write(b)
-		fo = "cache/" + str(ts) + "." + fmt
+		fo = temporary_file(fmt)
 		args1 = [sys.executable, "misc/ecdc_stream.py", "-b", "0", "-g", str(DEV), "-d", fn]
 		args2 = ["ffmpeg", "-v", "error", "-hide_banner", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "96k", fo]
 		print(args1)
@@ -884,13 +881,20 @@ def gifsicle(out, info=None, heavy=False):
 	args.extend(("--dither", "--careful", "--loopcount=forever", "-o", out2, out))
 	print(args)
 	try:
-		subprocess.run(args, timeout=90)
+		subprocess.run(args, stdin=subprocess.DEVNULL, timeout=90)
 	except subprocess.TimeoutExpired:
 		pass
 	else:
 		if os.path.getsize(out2) < os.path.getsize(out):
 			return out2
 	return out
+
+def avifsicle(out, q=100, s=6):
+	out2 = temporary_file("avif")
+	args = ["binaries/avifenc", out, "-q", str(q), "--qalpha", str(q if q == 100 else q - 10), "-s", str(s), out2]
+	print(args)
+	subprocess.run(args, stdin=subprocess.DEVNULL)
+	return out2
 
 def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, vf=""):
 	anim = count > 1
@@ -944,36 +948,20 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			else:
 				command.extend(("-loop", "0"))
 		command.extend(("-f", fmt))
-	elif fmt == "avif":
+	elif fmt == "y4m":
 		lossless = not anim and not opt
 		if not anim:
 			command.extend(("-vframes", "1", "-r", "1"))
 		if (w, h) != first.size:
-			vf += f"scale={w}:{h}:flags=area"
-			if mode == "RGBA":
+			vf += f"scale={w}:{h}:flags=area,"
+			if mode == "rgba":
 				vf += "format=rgba"
-		bitrate = floor(min(fs / duration * 7.5, 99999999)) # use 7.5 bits per byte
-		pix = "rgb24" if lossless else "yuv444p"
+			command.extend(("-vf", vf))
+		command.extend(("-strict", "-1", "-f", "yuv4mpegpipe"))
 		if mode == "RGBA":
-			cv = ("-c:v:0", "libaom-av1", "-pix_fmt:v:0", pix, "-usage", "realtime", "-cpu-used", "3")
-			b1 = floor(bitrate * 3 / 4)
-			b2 = floor(bitrate / 4)
-			command.extend(("-filter_complex", vf + "[0]split=2[v1][v2];[v2]alphaextract[v2]", "-map", "[v1]", "-map", "[v2]", "-f", "avif", *cv, "-b:v:0", str(b1), "-vbr", "on", "-c:v:1", "libaom-av1", "-pix_fmt:1", "gray", "-b:v:1", str(b2), "-usage", "realtime", "-cpu-used", "3", "-y", "-g", "300"))
-			# command.extend(("-f", "avif", "-c:v", "libaom-av1", "-pix_fmt", "yuva444p", "-usage", "realtime", "-cpu-used", "3", "-y", "-g", "300", "-b:v", str(bitrate), "-vbr", "on"))
+			command.extend(("-pix_fmt", "yuva444p"))
 		else:
-			if vf:
-				command.extend(("-vf", vf))
-			cv = ("-c:v", "libsvtav1", "-pix_fmt", "yuv420p") if not h & 1 and not w & 1 else ("-c:v", "libaom-av1", "-pix_fmt", pix, "-usage", "realtime", "-cpu-used", "3")
-			command.extend(("-f", "avif", *cv, "-b:v", str(bitrate), "-vbr", "on"))
-		if anim:
-			if opt:
-				command.extend(("-loop", "0", "-q:v", "60"))
-			else:
-				command.extend(("-loop", "0", "-q:v", "75"))
-		elif lossless:
-			command.extend(("-lossless", "1"))
-		else:
-			command.extend(("-q:v", "90"))
+			command.extend(("-pix_fmt", "yuv444p"))
 	elif fmt == "webp":
 		lossless = not anim and not opt
 		if not anim:
@@ -1042,12 +1030,8 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 		command.extend(("-b:v", str(bitrate), "-vbr", "on"))
 		cdc = CODEC_FFMPEG.get(fmt, "libsvtav1")
 		fmt = CODECS.get(fmt, fmt)
-		if mode == "RGBA":
-			pix_fmt = "yuva444p" if cdc == "libsvtav1" else "yuva420p"
-			command.extend(("-pix_fmt", pix_fmt, "-c:v", cdc))
-		else:
-			pix_fmt = "yuv444p" if cdc == "libsvtav1" else "yuv420p"
-			command.extend(("-pix_fmt", pix_fmt, "-c:v", cdc))
+		pix_fmt = "yuv444p" if cdc == "libsvtav1" else "yuv420p"
+		command.extend(("-pix_fmt", pix_fmt, "-c:v", cdc))
 		command.extend(("-f", fmt))
 	return command, fmt
 
@@ -1059,6 +1043,9 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 		b = np.asanyarray(im, dtype=np.uint8).data
 		pix = "rgb24" if im.mode == "RGB" else "rgba"
 		args = ["ffmpeg", "-hide_banner", "-v", "error", "-f", "rawvideo", "-pix_fmt", pix, "-video_size", "x".join(map(str, im.size)), "-i", "-"]
+		is_avif = fmt == "avif" and im.mode == "RGBA"
+		if is_avif:
+			fmt = "y4m"
 		opts, fmt = ffmpeg_opts({}, iter([im]), 1, im.mode, im, fmt, fs * (r or 1), *size, 1, opt)
 		args.extend(opts)
 		print(im, len(b))
@@ -1067,11 +1054,12 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 			print(args)
 			return subprocess.run(args, stdout=subprocess.PIPE, input=b).stdout
 		else:
-			ts = time.time_ns() // 1000
-			out = "cache/" + str(ts) + "." + fmt
+			out = temporary_file(fmt)
 			args.append(out)
 			print(args)
 			subprocess.run(args, input=b)
+			if is_avif:
+				out = avifsicle(out, q=60 if opt else 100, s=1)
 			assert os.path.exists(out) and os.path.getsize(out), f"Expected output file {out}"
 			with open(out, "rb") as f:
 				return f.read()
@@ -1111,6 +1099,9 @@ def anim_into(out, new, first, size, fmt, fs, r=0, hq=False):
 		"-f", "rawvideo", "-framerate", str(new["fps"]), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
 		"-video_size", "x".join(map(str, first.size)), "-i", "-",
 	))
+	is_avif = fmt == "avif" and first.mode == "RGBA"
+	if is_avif:
+		fmt = "y4m"
 	opts, fmt = ffmpeg_opts(new, new["frames"], new["count"], mode, first, fmt, fs, *size, new["duration"], not hq)
 	command.extend(opts)
 	if "." in out:
@@ -1130,7 +1121,9 @@ def anim_into(out, new, first, size, fmt, fs, r=0, hq=False):
 	proc.wait()
 	assert os.path.exists(out2) and os.path.getsize(out2), f"Expected output file {out2}"
 	print(os.path.getsize(out2), fs, np.prod(size) * new["count"])
-	if fmt == "gif" and (fs >= 1048576 or "A" not in mode) and np.prod(size) * new["count"] <= 67108864 and os.path.getsize(out2) < fs * 3:
+	if is_avif:
+		out = avifsicle(out2, q=75, s=min(10, 1 + round(log2(new["count"]))))
+	elif fmt == "gif" and (fs >= 1048576 or "A" not in mode) and np.prod(size) * new["count"] <= 67108864 and os.path.getsize(out2) < fs * 3:
 		out = gifsicle(out2, new, heavy=os.path.getsize(out2) > fs * 1.5)
 	else:
 		out = out2
@@ -1142,9 +1135,9 @@ statics = ("png", "bmp", "jpg", "heic", "ico", "icns", "j2k", "tga", "tiff", "pd
 # Main image operation function
 def evalImg(url, operation, args):
 	ts = time.time_ns() // 1000
-	out = "cache/" + str(ts) + ".webp"
+	out = "cache/" + str(ts) + ".avif"
 	fmt = "auto"
-	cdc = "webp"
+	cdc = "avif"
 	fs = inf
 	dur = None
 	maxframes = inf
@@ -1280,12 +1273,13 @@ def evalImg(url, operation, args):
 					fmt = "mp4"
 					cdc = "libsvtav1"
 				else:
-					fmt = "webp"
+					fmt = "avif"
 			out = "cache/" + str(ts) + "." + CODECS.get(fmt, fmt)
 			mode = str(first.mode)
 			if mode == "P":
 				raise RuntimeError("Unexpected P mode image")
 			archive = False
+			is_avif = False
 			if fmt == "zip":
 				import zipfile
 				resp = zipfile.ZipFile(out, "w", compression=zipfile.ZIP_STORED, allowZip64=True)
@@ -1314,10 +1308,14 @@ def evalImg(url, operation, args):
 					"-video_size", "x".join(map(str, size)), "-i", "-",
 				])
 				new["frames"] = frames
+				is_avif = fmt == "avif" and mode == "RGBA"
+				if is_avif:
+					fmt = "y4m"
 				opts, fmt = ffmpeg_opts(new, frames, count, mode, first, fmt, fs, *size, duration, opt)
+				out = "cache/" + str(ts) + "." + CODECS.get(fmt, fmt)
 				frames = new.get("frames") or frames
 				command.extend(opts)
-				command.append("cache/" + str(ts) + "." + CODECS.get(fmt, fmt))
+				command.append(out)
 				print(command)
 				env = dict(os.environ)
 				env.pop("CUDA_VISIBLE_DEVICES", None)
@@ -1376,6 +1374,8 @@ def evalImg(url, operation, args):
 			else:
 				proc.stdin.close()
 				proc.wait()
+			if is_avif:
+				out = avifsicle(out, q=60 if opt else 80 if new["count"] > 1 else 100, s=min(10, round(log2(new["count"]))))
 			if not archive:
 				print(os.path.getsize(out), fs, np.prod(size) * new["count"])
 				if fmt == "gif" and (fs >= 1048576 or "A" not in mode) and first.width * first.height * new["count"] <= 67108864 and os.path.getsize(out) < fs * 3:
@@ -1443,7 +1443,7 @@ def evalImg(url, operation, args):
 			new = next(iter(new["frames"]))
 	if Image and isinstance(new, Image.Image):
 		if fmt == "auto":
-			fmt = "webp"
+			fmt = "avif"
 		new = optimise(new, keep_rgb=False)
 		if bg and "A" in new.mode:
 			if new.mode != "RGBA":
@@ -1517,7 +1517,7 @@ def evaluate_image(args):
 				out[i] = bytes(out[i])
 		elif isinstance(out[0], Image.Image):
 			for i in range(len(out)):
-				out[i] = save_into(out[i], out[i].size, "webp", inf)
+				out[i] = save_into(out[i], out[i].size, "avif", inf)
 	elif isinstance(out, io.BytesIO):
 		out.seek(0)
 		out = out.read()

@@ -1664,6 +1664,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							# 	lost.append(u)
 			elif is_discord_attachment(url):
 				out.append(url)
+			elif is_miza_attachment(url):
+				out.append(url)
 			else:
 				if (match := scraper_blacklist.search(url)):
 					print("Interrupted:", match)
