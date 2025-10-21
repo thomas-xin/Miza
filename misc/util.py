@@ -3386,7 +3386,9 @@ class TimedCache(dict):
 		if db:
 			db.clear()
 			db.setdefault("__tmap", {})
-		object.__setattr__(self, "tmap", db["__tmap"])
+			object.__setattr__(self, "tmap", db["__tmap"])
+		else:
+			object.__setattr__(self, "tmap", None)
 
 
 def keys(d):

@@ -281,6 +281,7 @@ def extract_info(url, download=False, process=True):
 		for entry in resp["entries"]:
 			if "entries" not in entry:
 				entries.append(entry)
+				continue
 			elif not isinstance(entry["entries"], list_like):
 				entry["entries"] = list(entry["entries"])
 			entries.extend(entry["entries"])
