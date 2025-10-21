@@ -2534,25 +2534,22 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				cargs["mode"] = label
 			else:
 				if model_router:
-					model_router_fut = csubmit(self.classify(content, examples=model_router, premium_context=premium_context))
-				if tool_router:
-					if not isinstance(tools, dict):
-						tools = {f["function"]["name"]: [f] for f in tools if "function" in f}
-					try:
-						label = await self.classify(content, examples=tool_router, premium_context=premium_context)
-					except Exception:
-						print_exc()
-						tools = toolscan
-					else:
-						tools = tools[label]
-				elif isinstance(tools, dict):
+					label = await self.classify(content, examples=model_router, premium_context=premium_context)
+			if tool_router:
+				if not isinstance(tools, dict):
+					tools = {f["function"]["name"]: [f] for f in tools if "function" in f}
+				try:
+					label = await self.classify(content, examples=tool_router, premium_context=premium_context)
+				except Exception:
+					print_exc()
 					tools = toolscan
 				else:
-					tools = tools or None
-				cargs["tools"] = tools
-				if model_router:
-					with tracebacksuppressor:
-						label = await model_router_fut
+					tools = tools[label]
+			elif isinstance(tools, dict):
+				tools = toolscan
+			else:
+				tools = tools or None
+			cargs["tools"] = tools
 			if is_nsfw:
 				print(mod, allow_nsfw)
 				label = "nsfw" if allow_nsfw else "casual"
@@ -2937,7 +2934,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
-		model = model or ("gpt-5" if best else "mistral-24b")
+		model = model or ("gpt-5" if best else "gemini-2.5-flash")
 		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,

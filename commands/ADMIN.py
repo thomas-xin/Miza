@@ -1992,7 +1992,7 @@ class ServerProtector(Database):
 
 	async def scan(self, message, url, known=None, **void):
 		self.data["scans"] = self.data.get("scans", 0) + 1
-		resp = known or await process_image("ectoplasm", "$", [url, b"", "-f", "png"], cap="caption", priority=True, timeout=60)
+		resp = known or await process_image("ectoplasm", "$", [url, b"", "-f", "webp"], cap="caption", priority=True, timeout=60)
 		if not resp:
 			return "", 0
 

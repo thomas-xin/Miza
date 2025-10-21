@@ -1338,7 +1338,7 @@ class Dump(Command):
 			link = None
 			if not url:
 				async for message in bot.history(_channel, limit=300):
-					if message.author.id == bot.id and message.attachments and message.attachments[0].url.split("?", 1)[0].endswith("/dump.json"):
+					if message.author.id == bot.id and message.attachments and message.attachments[0].url.split("?", 1)[0].rsplit("/", 1)[-1] in ("dump.json", "dump.zip"):
 						url = message.attachments[0].url
 						link = message.jump_url
 						break

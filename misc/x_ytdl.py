@@ -276,8 +276,15 @@ def extract_info(url, download=False, process=True):
 		}
 		ytdl = ytd.YoutubeDL(ydl_opts)
 	resp = ytdl.extract_info(url, download=download, process=process)
-	if "entries" in resp and not isinstance(resp["entries"], list_like):
-		resp["entries"] = list(resp["entries"])
+	if "entries" in resp:
+		entries = []
+		for entry in resp["entries"]:
+			if "entries" not in entry:
+				entries.append(entry)
+			elif not isinstance(entry["entries"], list_like):
+				entry["entries"] = list(entry["entries"])
+			entries.extend(entry["entries"])
+		resp["entries"] = entries
 	return resp
 
 def get_audio_spotify(url, fn):

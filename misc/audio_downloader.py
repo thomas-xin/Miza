@@ -22,7 +22,7 @@ from .util import (
 	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration, get_duration_2, html_decode,
 	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url, AUDIO_FORMS,
-	EvalPipe, PipedProcess, TimedCache, Request, Semaphore, TEMP_PATH, magic, rename, temporary_file, replace_ext, USER_AGENT,
+	EvalPipe, PipedProcess, TimedCache, Request, Semaphore, TEMP_PATH, magic, rename, temporary_file, replace_ext, select_and_loads,
 )
 
 # Gets the best icon/thumbnail for a queue entry.
@@ -1252,7 +1252,7 @@ class AudioDownloader:
 				if utest[-5:] == ".json" or utest[-4:] in (".txt", ".zip"):
 					b = Request(url)
 					try:
-						d = orjson.loads(b)
+						d = select_and_loads(b, safe=True)
 					except orjson.JSONDecodeError:
 						d = [url for url in as_str(b).splitlines() if is_url(url)]
 						if not d:
@@ -1270,6 +1270,9 @@ class AudioDownloader:
 				resp = self.extract_info(url2, process=False)
 			if not resp:
 				return []
+			if isinstance(resp, str):
+				assert is_url(resp), resp
+				resp = dict(_type="url", url=resp)
 			if resp.get("_type") == "url":
 				resp = self.extract_info(resp["url"], process=True)
 			if resp is None or not len(resp):

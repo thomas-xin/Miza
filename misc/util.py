@@ -1392,8 +1392,6 @@ def mime_from_file(path, filename=None, mime=True):
 			return "image/avif"
 	if out == "text/plain" and data.startswith(b"#EXTM3U"):
 		return "video/m3u8"
-	# if out == "image/jpeg":
-	# 	return "image/jpg"
 	return out
 
 magic = cdict(
