@@ -502,7 +502,7 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			input_args.extend(["-ss", str(self.start)])
 		if self.end is not None:
 			input_args.extend(["-to", str(self.end)])
-		if source_codec == self.codec and cbr <= mbr or isinstance(source_codec, str) and source_codec.startswith("pcm_") and self.codec == "wav":
+		if source_codec == self.codec and bps / 1000 <= mbr or isinstance(source_codec, str) and source_codec.startswith("pcm_") and self.codec == "wav":
 			output_args.extend(["-c", "copy"])
 		else:
 			# Default to 192k for AAC, 160k for Opus, and 224k for MP3
