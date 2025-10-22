@@ -8,7 +8,7 @@ import zipfile
 import niquests
 from PIL import Image
 import psutil
-from .util import is_url, is_discord_attachment, TEMP_PATH, CODECS_INV
+from .util import is_url, is_discord_attachment, get_duration_2, TEMP_PATH, CODECS_INV
 # Allow fallback (although not recommended as generally the up-to-date version is necessary for most sites)
 try:
 	import yt_dlp as ytd
@@ -476,13 +476,24 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 	@ytd.postprocessor.PostProcessor._restrict_to(images=False)
 	def run(self, info):
 		filename, source_ext = info['filepath'], info['ext'].lower()
+		dur, bps, cdc, ac = get_duration_2(filename)
+		cbr = max(60, min(bps / 1000 / (0.875 if cdc == "mp3" else 0.75 if cdc == "aac" else 0.625), 256))
+		if not dur or dur < 1920:
+			mbr = 160
+		elif dur < 3840:
+			mbr = 128
+		elif dur < 7680:
+			mbr = 108
+		else:
+			mbr = 96
+		print(dur, bps, cbr, mbr)
 		if source_ext == self.format and self.start == self.end == None:  # noqa: E711
 			return [], info
 		name = filename.rsplit(".", 1)[0]
 		if self.start is not None or self.end is not None:
 			name += f"~{self.start}-{self.end}"
 		outpath = name + "." + self.format
-		source_codec = self.get_audio_codec(filename)
+		source_codec = cdc
 		A = ytd.postprocessor.ffmpeg.ACODECS
 		acodec = A[self.codec][1] or A[self.codec][0]
 		input_args = []
@@ -491,11 +502,11 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			input_args.extend(["-ss", str(self.start)])
 		if self.end is not None:
 			input_args.extend(["-to", str(self.end)])
-		if source_codec == self.codec or isinstance(source_codec, str) and source_codec.startswith("pcm_") and self.codec == "wav":
+		if source_codec == self.codec and cbr <= mbr or isinstance(source_codec, str) and source_codec.startswith("pcm_") and self.codec == "wav":
 			output_args.extend(["-c", "copy"])
 		else:
 			# Default to 192k for AAC, 160k for Opus, and 224k for MP3
-			bitrate = 224 if self.codec == "mp3" else 192 if self.codec == "aac" else 160
+			bitrate = min(mbr, cbr * (0.875 if self.codec == "mp3" else 0.75 if self.codec == "aac" else 0.625))
 			# Default to 44100 Hz for MP3, 48000 Hz for everything else
 			sample_rate = 44100 if self.codec == "mp3" else 48000
 			if acodec == "wav":

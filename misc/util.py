@@ -2227,9 +2227,9 @@ def get_duration_2(filename, _timeout=12):
 		"-select_streams",
 		"a:0",
 		"-show_entries",
-		"stream=codec_name,channels,duration",
+		"stream=codec_name,channels,duration,bit_rate",
 		"-show_entries",
-		"format=duration,bit_rate",
+		"format=duration",
 		"-of",
 		"default=nokey=1:noprint_wrappers=1",
 		filename,
@@ -2256,13 +2256,13 @@ def get_duration_2(filename, _timeout=12):
 		dur = float(resp[2])
 	except (IndexError, ValueError, TypeError):
 		try:
-			dur = float(resp[3])
+			dur = float(resp[4])
 		except (IndexError, ValueError, TypeError):
 			dur = None
-	bps = None
-	if resp and len(resp) > 4:
-		with suppress(ValueError):
-			bps = float(resp[4])
+	try:
+		bps = float(resp[3])
+	except (IndexError, ValueError, TypeError):
+		bps = None
 	return dur, bps, cdc, ac
 
 @functools.lru_cache(maxsize=64)
