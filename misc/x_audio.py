@@ -1142,7 +1142,7 @@ class AudioFile:
 			try:
 				out = next(reader.it, b"")
 			except ValueError:
-				f = open(f"{CACHE_PATH}/audio/" + self.file, "rb")
+				f = open(f"{CACHE_PATH}/audio/" + self.path, "rb")
 				f.seek(reader.byte_pos)
 				reader.file = f
 				reader.it = discord.oggparse.OggStream(f).iter_packets()

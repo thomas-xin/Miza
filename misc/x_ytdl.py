@@ -213,10 +213,12 @@ else:
 	def trial_download(self, filename, info_dict):
 		proc = None
 		try:
-			if not is_url(info_dict["url"]) or is_discord_attachment(info_dict["url"]):
+			url = info_dict["url"]
+			if not is_url(url) or is_discord_attachment(url) or url.endswith(".ts"):
 				raise ValueError
+			print(url)
 			t = time.time()
-			args = ["streamshatter", info_dict["url"], "-c", TEMP_PATH, "-H", json.dumps(info_dict.get("http_headers", {})), "-l", "48", "-t", "30", filename]
+			args = ["streamshatter", url, "-c", TEMP_PATH, "-H", json.dumps(info_dict.get("http_headers", {})), "-l", "48", "-t", "30", filename]
 			proc = psutil.Popen(args, stdin=subprocess.DEVNULL)
 			proc.wait(timeout=32)
 			elapsed = time.time() - t
@@ -273,6 +275,12 @@ def extract_info(url, download=False, process=True):
 			"default_search": "auto",
 			"source_address": "0.0.0.0",
 			"cookiesfrombrowser": ["firefox"],
+			"extractor_args": {
+				"youtube": {
+					"player_client": ["default", "web_safari"],
+					"player_js_version": ["actual"]
+				}
+			}
 		}
 		ytdl = ytd.YoutubeDL(ydl_opts)
 	resp = ytdl.extract_info(url, download=download, process=process)

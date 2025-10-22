@@ -2363,7 +2363,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			nsfw="grok-4",
 			backup="kimi-k2",
 			retry="kimi-k2",
-			function="gpt-5",
+			function="grok-4-fast",
 			vision="gpt-5",
 			target="auto",
 		),
@@ -4001,8 +4001,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def is_nsfw(self, channel):
 		if is_nsfw(channel):
 			return True
-		if "nsfw" in self.data and getattr(channel, "recipient", None):
-			return self.data.nsfw.get(channel.recipient.id, False)
+		if "nsfw" in self.data:
+			if getattr(channel, "recipient", None):
+				return self.data.nsfw.get(channel.recipient.id, False)
+			return self.data.nsfw.get(channel.id, False)
 
 	async def donate(self, name, uid, amount, msg):
 		channel = self.get_channel(320915703102177293)
@@ -4400,7 +4402,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			it = int(utc() // ninter) * ninter
 			out = []
 			for i in range(ninter, interval + ninter, ninter):
-				out.append(self.data.uptimes.get(i - interval + it, {}))
+				out.append(self.uptime_db.get(i - interval + it, {}))
 			return out
 		status = self.status_data
 		if simplified:
@@ -5631,7 +5633,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if command_check in self.commands:
 			# Multiple commands may have the same alias, run all of them
 			for command in self.commands[command_check]:
-				if getattr(command, "exact", True) and full_prune(comm) != command_check and from_mention:
+				if from_mention and getattr(command, "exact", True) and full_prune(comm) != command_check:
 					continue
 				# argv is the raw parsed argument data
 				argv = comm[i:].strip()
@@ -6579,15 +6581,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						await_fut(self.send_event("_call_"))
 				self.update_users()
 
-	async def update_uptime(self, data):
-		uptimes = self.data.uptimes
+	uptime_db = diskcache.Cache(directory=f"{CACHE_PATH}/uptime", expiry=86400 * 7)
+	def update_uptime(self, data):
+		uptimes = self.uptime_db
 		ninter = self.ninter
 		it = int(utc() // ninter) * ninter
 		interval = 86400 * 7
 		if it not in uptimes:
 			uptimes[it] = copy.deepcopy(data)
 			if min(uptimes) <= it - interval - 3600:
-				sl = alist(uptimes).sort()
+				sl = sorted(uptimes)
 				while sl[0] <= it - interval:
 					uptimes.pop(sl.pop(0), None)
 				while sl[-1] > it:
@@ -6608,7 +6611,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		j = np.searchsorted(uptimea, it + ninter)
 		ut = j - i
 		self.uptime = ut / interval * ninter
-		return self.data.uptimes
+		return self.uptime_db
 
 	uptime = 0
 	up_bps = down_bps = 0
@@ -6624,9 +6627,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				with tracebacksuppressor:
 					csubmit(self.update_status())
 					with MemoryTimer("network_usage"):
+						fut = asubmit(psutil.net_io_counters)
 						data = await self.status()
-						await self.update_uptime(data)
-						sent, recv = await proc_eval("(net:=psutil.net_io_counters()).bytes_sent,net.bytes_recv", caps=["math"])
+						await asubmit(self.update_uptime, data)
+						resp = await fut
+						sent, recv = resp.bytes_sent, resp.bytes_recv
 						if not hasattr(self, "up_bytes"):
 							self.up_bytes = deque(maxlen=ninter)
 							self.down_bytes = deque(maxlen=ninter)

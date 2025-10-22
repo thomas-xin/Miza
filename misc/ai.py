@@ -64,6 +64,10 @@ available = {
 		"openrouter": ("anthropic/claude-3.5-sonnet", ("3", "15")),
 		None: "gpt-5-mini",
 	},
+	"claude-4.5-haiku": {
+		"openrouter": ("anthropic/claude-haiku-4.5", ("1", "5")),
+		None: "gpt-5-nano",
+	},
 	"claude-3.5-haiku": {
 		"openrouter": ("anthropic/claude-3.5-haiku", ("1", "5")),
 		None: "gpt-5-nano",

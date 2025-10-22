@@ -1141,6 +1141,12 @@ class AudioDownloader:
 			outtmpl=fn,
 			windowsfilenames=True,
 			cookiesfrombrowser=["firefox"],
+			extractor_args=dict(
+				youtube=dict(
+					player_client=["default", "web_safari"],
+					player_js_version=["actual"],
+				),
+			),
 			postprocessors=[dict(
 				# Use our custom FFmpeg audio convertor to ensure consistent audio codec, and allow trimming if necessary
 				key="FFmpegCustomAudioConvertor",

@@ -230,6 +230,27 @@ def select_and_convert(stream):
 	return convert(b)
 
 
+async def search_one(bot, query):
+	# Perform search concurrently, may contain multiple URLs
+	out = None
+	urls = await bot.follow_url(query, allow=True, images=False, ytd=False)
+	if urls:
+		if len(urls) == 1:
+			query = urls[0]
+		else:
+			out = [csubmit(bot.audio.asubmit(f"ytdl.search({repr(url)})")) for url in urls]
+	if out is None:
+		resp = await bot.audio.asubmit(f"ytdl.search({repr(query)})")
+	else:
+		resp = deque()
+		for fut in out:
+			temp = await fut
+			# Ignore errors when searching with multiple URLs
+			if type(temp) not in (str, bytes):
+				resp.extend(temp)
+	return resp
+
+
 class Queue(Command):
 	server_only = True
 	name = ["▶️", "P", "Q", "Play", "PlayNow", "PlayNext", "Enqueue", "Search&Play"]
@@ -293,63 +314,47 @@ class Queue(Command):
 		vc_ = await select_voice_channel(_user, _channel)
 		if query and _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
-		fut = csubmit(bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id})"))
-		if not query:
-			await fut
-			q, paused = await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).queue,a.settings.pause")
-			if len(q) and paused and ("▶️" in _name or _name.startswith("p")):
-				# With no item specified, the "play" alias is used for resuming rather than listing the queue
-				await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).settings.__setitem__('pause',False)\nreturn a.ensure_play()")
-				return cdict(
-					content=css_md(f"Successfully resumed audio playback in {sqr_md(_guild)}."),
-					reacts="❎",
-				)
-			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-			resp = await self._callback_(
-				bot=bot,
-				message=None,
-				guild=_guild,
-				reaction=None,
-				user=_user,
-				perm=_perm,
-				vals=f"{_user.id}_0_0",
-			)
-			return cdict(
-				**resp,
-				buttons=buttons,
-			)
-		if mode == "now":
-			index = [0]
-		elif mode == "next":
-			index = [1]
-		if index[0] != -1:
-			if _perm < 1 and {m.id for m in vc_.members}.difference([_user.id, bot.id]):
-				raise self.perm_error(_perm, 1, "to force insert while other users are in voice")
 		# Start typing event asynchronously to avoid delays
 		async with discord.context_managers.Typing(_channel):
-			# Perform search concurrently, may contain multiple URLs
-			out = None
-			urls = await bot.follow_url(query, allow=True, images=False, ytd=False)
-			if urls:
-				if len(urls) == 1:
-					query = urls[0]
-				else:
-					out = [csubmit(bot.audio.asubmit(f"ytdl.search({repr(url)})")) for url in urls]
-			if out is None:
-				resp = await bot.audio.asubmit(f"ytdl.search({repr(query)})")
-			else:
-				resp = deque()
-				for fut in out:
-					temp = await fut
-					# Ignore errors when searching with multiple URLs
-					if type(temp) not in (str, bytes):
-						resp.extend(temp)
+			fut = csubmit(bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id})"))
+			if not query:
+				await fut
+				q, paused = await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).queue,a.settings.pause")
+				if len(q) and paused and ("▶️" in _name or _name.startswith("p")):
+					# With no item specified, the "play" alias is used for resuming rather than listing the queue
+					await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).settings.__setitem__('pause',False)\nreturn a.ensure_play()")
+					return cdict(
+						content=css_md(f"Successfully resumed audio playback in {sqr_md(_guild)}."),
+						reacts="❎",
+					)
+				buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+				resp = await self._callback_(
+					bot=bot,
+					message=None,
+					guild=_guild,
+					reaction=None,
+					user=_user,
+					perm=_perm,
+					vals=f"{_user.id}_0_0",
+				)
+				return cdict(
+					**resp,
+					buttons=buttons,
+				)
+			if mode == "now":
+				index = [0]
+			elif mode == "next":
+				index = [1]
+			if index[0] != -1:
+				if _perm < 1 and {m.id for m in vc_.members}.difference([_user.id, bot.id]):
+					raise self.perm_error(_perm, 1, "to force insert while other users are in voice")
+			resp = await search_one(bot, query)
 			# Wait for audio player to finish loading if necessary
 			await fut
-		try:
-			q, settings, paused, reverse, (elapsed, length) = await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).queue,a.settings,a.settings.pause,a.reverse,a.epos")
-		except KeyError:
-			raise KeyError("Unable to communicate with voice client! (Please verify that I have permission to join the voice channel?)")
+			try:
+				q, settings, paused, reverse, (elapsed, length) = await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).queue,a.settings,a.settings.pause,a.reverse,a.epos")
+			except KeyError:
+				raise KeyError("Unable to communicate with voice client! (Please verify that I have permission to join the voice channel?)")
 		settings = astype(settings, cdict)
 		# Raise exceptions returned by searches
 		if type(resp) is str:
@@ -1250,6 +1255,7 @@ class AudioSettings(Command):
 	}
 	rate_limit = (4, 8)
 	slash = True
+	exact = False
 
 	async def __call__(self, bot, _comment, _guild, _user, _perm, mode, value, **void):
 		try:
@@ -2092,7 +2098,7 @@ async def get_lyrics(item, url=None):
 	name = None
 	description = None
 	if is_url(url):
-		resp = ytdl.extract_from(url)
+		resp = await bot.audio.asubmit(f"ytdl.extract_info({repr(url)})")
 		name = resp.get("title") or resp["webpage_url"].rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
 		if "description" in resp:
 			description = resp["description"]
@@ -2163,7 +2169,7 @@ async def get_lyrics(item, url=None):
 				lyrics = extract_lyrics(text).strip()
 				print("lyrics_json", s)
 				return name, lyrics
-			except:
+			except Exception:
 				if i:
 					raise
 				print_exc()
@@ -2179,51 +2185,49 @@ class Lyrics(Command):
 	time_consuming = True
 	name = ["SongLyrics"]
 	description = "Searches genius.com for lyrics of a song."
-	usage = "<search_link>* <verbose(-v)>?"
-	example = ("lyrics", "lyrics despacito", "lyrics -v viva la vida")
-	flags = "v"
+	schema = cdict(
+		query=cdict(
+			type="string",
+			description="Song by name or URL",
+			example="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+			default=None,
+		),
+	)
 	rate_limit = (7, 12)
 	typing = True
 	slash = True
 
-	async def __call__(self, bot, guild, channel, message, argv, flags, user, **void):
-		for a in message.attachments:
-			argv = a.url + " " + argv
-		if not argv:
+	async def __call__(self, bot, _guild, _channel, _message, query, **void):
+		if not query:
 			try:
-				auds = bot.data.audio.players[guild.id]
-				if not auds.queue:
-					raise LookupError
-				argv = auds.queue[0].url
+				entry = await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).queue[0]")
+				query = entry["url"]
 			except LookupError:
 				raise IndexError("Queue not found. Please input a search term, URL, or file.")
-		# Extract song name if input is a URL, otherwise search song name directly
-		url = None
-		urls = await bot.follow_url(argv, allow=True, images=False, ytd=False)
-		if urls:
-			url = urls[0]
-			resp = await asubmit(ytdl.search, url, timeout=18)
-			if type(resp) is str:
-				raise evalEX(resp)
-			search = resp[0].name
-		else:
-			search = argv
-		search = search.translate(self.bot.mtrans)
-		# Attempt to find best query based on the song name
-		item = verify_search(to_alphanumeric(lyric_trans.sub("", search)))
-		ic = item.casefold()
-		if ic.endswith(" with lyrics"):
-			item = item[:-len(" with lyrics")]
-		elif ic.endswith(" lyrics"):
-			item = item[:-len(" lyrics")]
-		elif ic.endswith(" acoustic"):
-			item = item[:-len(" acoustic")]
-		item = item.rsplit(" ft ", 1)[0].strip()
-		if not item:
-			item = verify_search(to_alphanumeric(search))
+		async with discord.context_managers.Typing(_channel):
+			# Extract song name if input is a URL, otherwise search song name directly
+			url = None
+			urls = await bot.follow_url(query, allow=True, images=False, ytd=False)
+			if urls:
+				resp = await search_one(bot, query)
+				search = resp[0]["name"]
+			else:
+				search = query
+			search = search.translate(self.bot.mtrans)
+			# Attempt to find best query based on the song name
+			item = verify_search(to_alphanumeric(lyric_trans.sub("", search)))
+			ic = item.casefold()
+			if ic.endswith(" with lyrics"):
+				item = item[:-len(" with lyrics")]
+			elif ic.endswith(" lyrics"):
+				item = item[:-len(" lyrics")]
+			elif ic.endswith(" acoustic"):
+				item = item[:-len(" acoustic")]
+			item = item.rsplit(" ft ", 1)[0].strip()
 			if not item:
-				item = search
-		async with discord.context_managers.Typing(channel):
+				item = verify_search(to_alphanumeric(search))
+				if not item:
+					item = search
 			try:
 				name, lyrics = await get_lyrics(item, url=url)
 			except KeyError:
@@ -2231,15 +2235,10 @@ class Lyrics(Command):
 				raise KeyError(f"Invalid response from genius.com for {item}")
 		# Escape colour markdown because that will interfere with the colours we want
 		text = clr_md(lyrics.strip()).replace("#", "♯")
-		msg = f"Lyrics for **{escape_markdown(name)}**:"
-		s = msg + ini_md(text)
-		# Directly return lyrics in a code box if it fits
-		if "v" not in flags and len(s) <= 2000:
-			return s
 		title = f"Lyrics for {name}:"
 		if len(text) > 54000:
 			return (title + "\n\n" + text).strip()
-		bot.send_as_embeds(channel, text, author=dict(name=title), colour=(1024, 128), md=ini_md, reference=message)
+		bot.send_as_embeds(_channel, text, author=dict(name=title), colour=(1024, 128), md=ini_md, reference=_message)
 
 
 class Download(Command):
@@ -2291,11 +2290,15 @@ class Download(Command):
 			reference=message,
 			content=italics(ini_md(f"Downloading and converting {sqr_md(url)}...")),
 		))
+		headers = dict(Accept="application/json")
 		async with niquests.AsyncSession() as session:
-			resp = await session.get(downloader_url, verify=False, timeout=14400)
+			resp = await session.get(downloader_url, headers=headers, verify=False, timeout=14400)
 		response = await fut
 		print(resp.headers)
-		resp.raise_for_status()
+		try:
+			resp.raise_for_status()
+		except Exception as ex:
+			raise RuntimeError([repr(ex), resp.content])
 		file = CompatFile(resp.content, resp.headers["Content-Disposition"].split("=", 1)[-1].strip('"'))
 		response = await self.bot.edit_message(
 			response,

@@ -1304,14 +1304,10 @@
 				"SongLyrics"
 			],
 			"description": "Searches genius.com for lyrics of a song.",
-			"usage": "<search_link>* <verbose(-v)>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(7, 12)",
-			"example": [
-				"lyrics",
-				"lyrics despacito",
-				"lyrics -v viva la vida"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Download": {

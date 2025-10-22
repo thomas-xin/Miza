@@ -1901,26 +1901,6 @@ class UpdateUsers(Database):
 		if "dailies" in bot.data:
 			csubmit(bot.data.dailies.valid_message(message))
 
-	async def _mention_(self, user, message, **void):
-		bot = self.bot
-		mentions = self.mentionspam.findall(message.content)
-		t = utc()
-		out = None
-		if len(mentions) >= xrand(8, 12) and self.data.get(user.id, EMPTY).get("last_mention", 0) > 3:
-			out = f"{choice('🥴😣😪😢')} Please calm down a second, I'm only here to help..."
-		elif len(mentions) >= 3 and (self.data.get(user.id, EMPTY).get("last_mention", 0) > 2 or random.random() >= 2 / 3):
-			out = f"{choice('😟😦😓')} Oh, that's a lot of mentions, is everything okay?"
-		elif len(mentions) >= 2 and self.data.get(user.id, EMPTY).get("last_mention", 0) > 0 and random.random() >= 0.75:
-			out = "One mention is enough, but I appreciate your enthusiasm 🙂"
-		if out:
-			csubmit(send_with_react(message.channel, out, reacts="❎", reference=message))
-			await bot.seen(user, event="misc", raw="Being naughty")
-			add_dict(self.data, {user.id: {"last_mention": 1}})
-			self.data[user.id]["last_used"] = t
-			with suppress():
-				message.noresponse = True
-			raise CommandCancelledError
-
 	def get_xp(self, user):
 		if self.bot.is_blacklisted(user.id):
 			return -inf

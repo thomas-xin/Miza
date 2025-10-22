@@ -93,7 +93,7 @@ class Ask(Command):
 		else:
 			name_repr = bot_name
 		personality = pdata.description.replace("{{user}}", _user.display_name).replace("{{char}}", name_repr)
-		if "nsfw" in personality.casefold():
+		if "nsfw" in personality.casefold() or bot.is_nsfw(_user):
 			ac = ""
 		elif nsfw:
 			ac = "You are currently in a NSFW-enabled channel. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise the needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
@@ -101,6 +101,7 @@ class Ask(Command):
 			ac = "You are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, please use disclaimers in your response, and mention this to the user if necessary. However, avoid repeating yourself if already clarified."
 		if ac:
 			personality += "\n" + ac
+		nsfw = bot.is_nsfw(_user)
 		tzinfo = self.bot.data.users.get_timezone(_user.id)
 		if tzinfo is None:
 			tzinfo, _c = self.bot.data.users.estimate_timezone(_user.id)
@@ -925,7 +926,7 @@ class Imagine(Command):
 	else:
 		comfyui_data = None
 
-	async def __call__(self, bot, _user, _channel, _message, _perm, _premium, _prefix, _comment, model, mode, url, prompt, mask, num_inference_steps, high_quality, strength, guidance_scale, aspect_ratio, negative_prompt, count, **void):
+	async def __call__(self, bot, _user, _channel, _message, _perm, _premium, _prefix, _comment, _nsfw, model, mode, url, prompt, mask, num_inference_steps, high_quality, strength, guidance_scale, aspect_ratio, negative_prompt, count, **void):
 		model = model or "auto"
 		mode = mode or ("raw" if url or mask else "preprocess")
 		aspect_ratio = 0 if not aspect_ratio[0] or not aspect_ratio[1] else aspect_ratio[0] / aspect_ratio[1]
@@ -945,7 +946,7 @@ class Imagine(Command):
 			num_inference_steps = min(28, num_inference_steps)
 		if high_quality:
 			num_inference_steps *= 1.25
-		nsfw = bot.is_nsfw(_channel)
+		nsfw = _nsfw or bot.is_nsfw(_user)
 		nsfw_prompt = False
 		if mask:
 			raise NotImplementedError("Masks are currently paused due to capacity issues, apologies for any inconvenience!")

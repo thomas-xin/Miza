@@ -1586,10 +1586,6 @@ class UpdateInfo(Database):
 	name = "info"
 
 
-class UpdateUptimes(Database):
-	name = "uptimes"
-
-
 class UpdateOnceoffs(Database):
 	name = "onceoffs"
 

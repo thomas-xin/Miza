@@ -243,6 +243,8 @@ error_map = {
 }
 errdata = {}
 def error_handler(exc=None):
+	head = {}
+	update_headers(head, **HEADERS)
 	if not exc:
 		exc = sys.exc_info()[1]
 		if not exc:
@@ -255,6 +257,14 @@ def error_handler(exc=None):
 		status = exc.response.status_code
 	else:
 		status = error_map.get(exc) or error_map.get(exc.__class__) or 500
+	cp.response.status = status
+	if "application/json" in cp.request.headers.get("Accept", ""):
+		head["Content-Type"] = "application/json"
+		update_headers(cp.response.headers, **head)
+		return orjson.dumps(dict(
+			exception=str(exc.__class__),
+			message=str(exc),
+		))
 	if status == 418:
 		head = {}
 		vid = "dQw4w9WgXcQ"
@@ -278,9 +288,7 @@ def error_handler(exc=None):
 		resp = errdata.get(status) or errdata.setdefault(status, niquests.get(f"https://http.cat/{status}", timeout=5))
 		head = resp.headers.copy()
 		body = resp.content
-	update_headers(head, **HEADERS)
 	head["Content-Length"] = len(body)
-	cp.response.status = status
 	update_headers(cp.response.headers, **head)
 	cp.response.headers.pop("Connection", None)
 	print_exc()
@@ -1159,6 +1167,12 @@ class Server:
 							outtmpl=tmpl,
 							windowsfilenames=True,
 							cookiesfrombrowser=["firefox"],
+							extractor_args=dict(
+								youtube=dict(
+									player_client=["default", "web_safari"],
+									player_js_version=["actual"],
+								),
+							),
 							postprocessors=postprocessors,
 						)
 						title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True)['title']", timeout=3600)

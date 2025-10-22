@@ -748,8 +748,10 @@ voice_channels = lambda guild: [channel for channel in guild.channels if getattr
 
 async def select_voice_channel(user, channel):
 	# Attempt to match user's currently connected voice channel
-	if user.voice:
+	if getattr(user, "voice", None):
 		return user.voice.channel
+	if not user.guild:
+		raise LookupError("Unable to find voice channel.")
 	user = await user.guild.fetch_member(user.id)
 	user.guild._members[user.id] = user
 	voice = user.voice

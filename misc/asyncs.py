@@ -669,7 +669,10 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 			self.traces[ts] = inspect.stack()
 		try:
 			while self.is_busy():
-				self.mutex.release()
+				try:
+					self.mutex.release()
+				except RuntimeError:
+					pass
 				try:
 					if self.paused:
 						time.sleep(1)
