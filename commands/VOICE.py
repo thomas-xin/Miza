@@ -2554,7 +2554,7 @@ class AudioSeparator(Command):
 			reference=_message,
 			content=italics(ini_md(f"Downloading and converting {sqr_md(url)}...")),
 		))
-		fn = await bot.get_file(url)
+		fn = await bot.get_request(url, data=False)
 		args = ["audio-separator", os.path.abspath(fn), "--output_format", format]
 		proc = await asyncio.create_subprocess_exec(*args, cwd=TEMP_PATH)
 		try:

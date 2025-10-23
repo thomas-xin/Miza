@@ -22,7 +22,7 @@ from .util import (
 	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration, get_duration_2, html_decode,
 	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url, AUDIO_FORMS,
-	EvalPipe, PipedProcess, AutoCache, Request, Semaphore, TEMP_PATH, magic, rename, temporary_file, replace_ext, select_and_loads,
+	EvalPipe, PipedProcess, AutoCache, Request, Semaphore, TEMP_PATH, CACHE_PATH, magic, rename, temporary_file, replace_ext, select_and_loads,
 )
 
 # Gets the best icon/thumbnail for a queue entry.
@@ -223,9 +223,9 @@ class AudioDownloader:
 
 	def __init__(self, workers=1):
 		self.session = niquests.Session()
-		self.search_cache = AutoCache("ytdl.search.cache", stale=300, timeout=86400)
-		self.thumbnail_cache = AutoCache("ytdl.thumbnail.cache", stale=300, timeout=86400 * 7)
-		self.extract_cache = AutoCache("ytdl.extract.cache", stale=60, timeout=120)
+		self.search_cache = AutoCache(f"{CACHE_PATH}/ytdl.search", stale=300, timeout=86400)
+		self.thumbnail_cache = AutoCache(f"{CACHE_PATH}/ytdl.thumbnail", stale=300, timeout=86400 * 7)
+		self.extract_cache = AutoCache(f"{CACHE_PATH}/ytdl.extract", stale=60, timeout=120)
 		self.futs = [
 			esubmit(self.set_cookie),
 		]

@@ -13,9 +13,9 @@ import zipfile
 import numpy as np
 from PIL import Image
 from misc.types import utc, as_str
-from misc.asyncs import esubmit, wrap_future, await_fut, Future
+from misc.asyncs import asubmit, esubmit, wrap_future, await_fut, Future
 from misc.util import (
-    CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache,
+    CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, download_file,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, uuhash,
 	ungroup_attachments, is_discord_url, temporary_file, url2ext, is_discord_attachment, is_miza_attachment,
     snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt,
@@ -285,7 +285,7 @@ class AttachmentCache(AutoCache):
 		if is_discord_attachment(url):
 			target = await self.obtain(url=url)
 			print(target)
-			data = await Request(target, headers=Request.header(), aio=True)
+			data = await asubmit(download_file, target)
 			return data
 		if not is_miza_attachment(url):
 			fn = temporary_file(url2ext(url))
@@ -303,7 +303,7 @@ class AttachmentCache(AutoCache):
 			print(url)
 			c_id, m_id, a_id, fn = expand_attachment(url)
 			target = await self.obtain(c_id, m_id, a_id, fn)
-			data = await Request(target, headers=Request.header(), aio=True)
+			data = await asubmit(download_file, url)
 			return data
 		elif "/c/" in url:
 			print(url)
@@ -311,7 +311,7 @@ class AttachmentCache(AutoCache):
 			urls = await self.obtains(path)
 			data = bytearray()
 			for url in urls:
-				b = await Request(target, headers=Request.header(), aio=True)
+				b = await asubmit(download_file, url)
 				data.extend(b)
 			return data
 		raise NotImplementedError(url)
@@ -476,4 +476,4 @@ def download_binary_dependencies():
 
 
 colour_cache = ColourCache(f"{CACHE_PATH}/colour", stale=86400, timeout=86400 * 7)
-attachment_cache = AttachmentCache(f"{CACHE_PATH}/attachment", secondary=f"{CACHE_PATH}/attachments", expiry=3600 * 18)
+attachment_cache = AttachmentCache(f"{CACHE_PATH}/attachment", secondary=f"{CACHE_PATH}/attachments", timeout=3600 * 16, expiry=3600 * 18)

@@ -267,8 +267,8 @@ class UpdateAutoEmojis(Database):
 		replacemap = {e.name: e for e in replaceds}
 		files = deque()
 		for a in message.attachments:
-			b = await bot.get_request(a.url, full=False)
-			files.append(CompatFile(seq(b), filename=a.filename))
+			b = await bot.get_request(a.url, data=False)
+			files.append(discord.File(b, filename=a.filename))
 		csubmit(bot.silent_delete(message))
 		url = await bot.get_proxy_url(message.author)
 		m = await bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url, reference=ref)

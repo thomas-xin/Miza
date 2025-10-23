@@ -2208,7 +2208,7 @@ class UpdateDogpiles(Database):
 				break
 		if random.random() >= 3 / (count + 0.5) and prediction:
 			if random.random() < 1 / 4096:
-				content = "https://cdn.discordapp.com/attachments/321524006316539904/843707932989587476/secretsmall.gif"
+				content = "https://mizabot.xyz/u/iJKEhAECGSG0UwWQiSWgQUEWEkE/secretsmall.gif"
 				csubmit(message.add_reaction("💎"))
 				self.bot.data.users.add_diamonds(message.author, 1000)
 			else:
@@ -3126,9 +3126,9 @@ class Rickroll(Command):
 						ext = "jpg"
 				else:
 					ext = "png"
-		b = await bot.get_request(url)
+		fn = await bot.get_request(url, data=False)
 		from PIL import Image
-		with Image.open(io.BytesIO(b)) as im:
+		with Image.open(fn) as im:
 			w, h = im.size
 		vid = None
 		mime = "text/html"

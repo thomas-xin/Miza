@@ -975,7 +975,7 @@ class SetAvatar(Command):
 		async with discord.context_managers.Typing(channel):
 			# Initiating an aiohttp session
 			try:
-				data = await bot.get_request(url, aio=True)
+				data = await bot.get_request(url)
 				await bot.edit(avatar=data)
 				return css_md(f"✅ Succesfully Changed {bot.user.name}'s avatar!")
 			# ClientResponseError: raised if server replied with forbidden status, or the link had too many redirects.
@@ -1069,7 +1069,7 @@ class UpdateColours(Database):
 	no_file = True
 
 	async def _get(self, url, threshold=True):
-		resp = await asubmit(colour_cache.obtain, url, priority=2)
+		resp = await asubmit(colour_cache.obtain, url)
 		out = [round(i) for i in resp]
 		try:
 			raw = colour2raw(out)

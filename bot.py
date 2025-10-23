@@ -3206,7 +3206,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return filename
 		return await attachment_cache.download(url)
 
-	async def get_request(self, url, limit=None, full=True, size=0, timeout=12):
+	async def get_request(self, url, limit=None, full=True, data=True, size=0, timeout=12):
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
 		if not full:
@@ -3219,22 +3219,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				ids = expand_attachment(url)
 				url = await attachment_cache.obtain(*ids)
 			return await Request.asession.get(url, headers=Request.header(), _timeout_=timeout, verify=False, allow_redirects=True)
-		return await self.get_attachment(url)
-
-	async def get_file(self, url, limit=None, timeout=24):
-		ext = url2ext(url)
-		fn = temporary_file(ext)
-		args = ["streamshatter", url, "-c", TEMP_PATH, "-l", "8", "-t", "20", fn]
-		print(args)
-		proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
-		try:
-			async with asyncio.timeout(32):
-				await proc.wait()
-		except (T0, T1, T2):
-			with tracebacksuppressor:
-				force_kill(proc)
-			raise
-		return fn
+		return await self.get_attachment(url, data=data)
 
 	def get_colour(self, user) -> int:
 		if user is None:
@@ -4554,7 +4539,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			i = 0
 			t = utc()
 			for path, limit in zip((CACHE_PATH, TEMP_PATH, FAST_PATH), (16384, 1024, 4096)):
-				for k in ("", "attachments", "audio", "filehost"):
+				for k in ("", "audio"):
 					atts = os.listdir(f"{path}/{k}")
 					if len(atts) > limit:
 						atts = sorted((f"{path}/{k}/{a}" for a in atts), key=lambda p: (t - os.path.getatime(p)) * os.path.getsize(p), reverse=True)

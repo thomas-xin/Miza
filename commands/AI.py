@@ -978,8 +978,8 @@ class Imagine(Command):
 		if url:
 			fut = csubmit(bot.data.prot.scan(_message, url))
 			fut2 = csubmit(bot.to_data_url(url))
-			b = await bot.get_request(url)
 			if not aspect_ratio:
+				b = await bot.get_request(url)
 				p = 2 if len(b) > 1048576 else 0
 				w, h = await asubmit(get_image_size, b, priority=2)
 				aspect_ratio = w / h

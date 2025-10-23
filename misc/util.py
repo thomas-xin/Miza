@@ -35,6 +35,7 @@ import threading
 import time
 from traceback import format_exc, print_exc
 from urllib.parse import quote_plus, unquote_plus
+import urllib.request
 import zipfile
 from dynamic_dt import DynamicDT
 import filetype
@@ -3195,19 +3196,30 @@ class FileHashDict(collections.abc.MutableMapping):
 			self.db_sem.resume()
 
 
-class AutoCache(diskcache.Cache, collections.abc.MutableMapping):
+cachecls = diskcache.FanoutCache
+class AutoCache(cachecls, collections.abc.MutableMapping):
+
+	__slots__ = ("_path", "_stale", "_stimeout", "_retrieving")
+
 	"A dictionary-compatible object where the key-value pairs expire after a specified delay. Implements stale-while-revaluate + stale-if-error protocols."
-	def __init__(self, directory=None, stale=60, timeout=86400, **kwargs):
+	def __init__(self, directory=None, shards=6, stale=60, timeout=86400, **kwargs):
+		print("Loading Cache:", directory, stale, timeout, kwargs)
 		self._path = directory or None
 		self._stale = stale or inf
 		self._stimeout = timeout or inf
 		self._retrieving = {}
-		super().__init__(self._path, **kwargs)
+		super().__init__(self._path, shards=shards, **kwargs)
 		self.validate_or_clear()
+
+	def __getattr__(self, k):
+		try:
+			return object.__getattribute__(self, k)
+		except AttributeError:
+			return super().__getattribute__(k)
 
 	def validate_or_clear(self):
 		if bool(self):
-			t = next(diskcache.Cache.__getitem__(self, k) for k in diskcache.Cache.iterkeys(self))
+			t = next(cachecls.__getitem__(self, k) for k in cachecls.__iter__(self))
 			if not isinstance(t, (tuple, list)) or len(t) != 2 or not isinstance(t[-1], float):
 				self.clear()
 
@@ -3314,13 +3326,13 @@ class AutoCache(diskcache.Cache, collections.abc.MutableMapping):
 		return v
 
 	def keys(self):
-		return super().iterkeys()
+		return super().__iter__()
 
 	def values(self):
-		return (diskcache.Cache.__getitem__(self, k) for k in diskcache.Cache.iterkeys(self))
+		return (cachecls.__getitem__(self, k) for k in super().__iter__())
 
 	def items(self):
-		return ((k, diskcache.Cache.__getitem__(self, k)) for k in diskcache.Cache.iterkeys(self))
+		return ((k, cachecls.__getitem__(self, k)) for k in super().__iter__())
 
 	def clear(self):
 		self._retrieving.clear()
@@ -4602,10 +4614,6 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		self.ts = utc()
 		return self
 
-	# @property
-	# def session(self) -> aiohttp.ClientSession:
-	# 	return choice(self.sessions)
-
 	async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True, timeout=24) -> bytes | str | json_like:
 		verify = True if ssl is not False else False
 		if not self.ts:
@@ -4712,6 +4720,20 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 
 Request = RequestManager()
 get_request = Request.__call__
+
+def download_file(url, filename=None, timeout=12):
+	req = urllib.request.Request(url, method="GET", headers=Request.header())
+	try:
+		resp = urllib.request.urlopen(req, timeout=timeout)
+	except urllib.error.HTTPError as ex:
+		if ex.code in range(400, 500):
+			print(repr(ex))
+			return
+		raise
+	if not filename:
+		return resp.read()
+	with open(filename, "wb") as f:
+		shutil.copyfileobj(resp, f)
 
 def update_headers(headers, **fields):
 	"Updates a dictionary of HTTP headers with new fields. Case-insensitive."

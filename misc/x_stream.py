@@ -294,10 +294,10 @@ async def chunked_proxy(path: str, request: Request):
 
 
 @app.get("/u/{path:path}")
-async def unproxy(path: str, request: Request, url: Optional[str] = None):
+async def unproxy(path: str, request: Request, url: Optional[str] = None, force: bool = False):
 	"""Unproxy Discord attachments or redirect to direct URLs."""
 	if url:
-		return await proxy_if(url, request)
+		return await proxy_if(url, request, force=force)
 
 	path_parts = path.split("/")
 
@@ -310,7 +310,7 @@ async def unproxy(path: str, request: Request, url: Optional[str] = None):
 			resp = await attachment_cache.obtain(*segments)
 		except ConnectionError as ex:
 			raise HTTPException(status_code=ex.errno, detail=str(ex))
-		return await proxy_if(resp, request)
+		return await proxy_if(resp, request, force=force)
 
 	if len(path_parts) == 2 and path_parts[0].count("~") == 0:
 		try:
@@ -321,7 +321,7 @@ async def unproxy(path: str, request: Request, url: Optional[str] = None):
 			resp = await attachment_cache.obtain(c_id, m_id, a_id, fn)
 		except ConnectionError as ex:
 			raise HTTPException(status_code=ex.errno, detail=str(ex))
-		return await proxy_if(resp, request)
+		return await proxy_if(resp, request, force=force)
 
 	if hasattr(server, "state"):
 		query_string = str(request.url.query) if request.url.query else ""
@@ -364,7 +364,7 @@ async def reupload(
 	return await attachment_cache.create(seq(resp), filename=fn)
 
 
-async def proxy_if(url: str, request: Request):
+async def proxy_if(url: str, request: Request, force=False):
 	"""Proxy if needed, otherwise redirect."""
 	assert isinstance(url, str), url
 
@@ -392,7 +392,7 @@ async def proxy_if(url: str, request: Request):
 			return True
 		return False
 
-	if requires_proxy():
+	if force or requires_proxy():
 		return await proxy(url=url, request=request)
 	return RedirectResponse(url=url, status_code=307)
 
