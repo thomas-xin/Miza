@@ -281,7 +281,10 @@ async def authorised_heartbeat(request: Request, key: str = Query(...), uri: str
 @app.get("/c/{path:path}")
 async def chunked_proxy(path: str, request: Request):
 	"""Serve chunked/split files with range support."""
-	urls, chunksize = await attachment_cache.obtains(path.split("/", 1)[0])
+	try:
+		urls, chunksize = await attachment_cache.obtains(path.split("/", 1)[0])
+	except ConnectionError as ex:
+		raise HTTPException(status_code=ex.errno, detail=str(ex))
 	mimetype, size, lastsize = get_size_mime(urls[0], urls[-1], len(urls), chunksize)
 
 	new_urls = [f"{url}&S={lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
@@ -299,12 +302,25 @@ async def unproxy(path: str, request: Request, url: Optional[str] = None):
 	path_parts = path.split("/")
 
 	if len(path_parts) == 1 and path_parts[0].count("~") == 2:
-		resp = await attachment_cache.obtain(*path_parts[0].split(".", 1)[0].split("~", 2))
+		try:
+			segments = path_parts[0].split(".", 1)[0].split("~", 2)
+		except Exception as ex:
+			raise HTTPException(status_code=400, detail=str(ex))
+		try:
+			resp = await attachment_cache.obtain(*segments)
+		except ConnectionError as ex:
+			raise HTTPException(status_code=ex.errno, detail=str(ex))
 		return await proxy_if(resp, request)
 
 	if len(path_parts) == 2 and path_parts[0].count("~") == 0:
-		c_id, m_id, a_id, fn = decode_attachment(path)
-		resp = await attachment_cache.obtain(c_id, m_id, a_id, fn)
+		try:
+			c_id, m_id, a_id, fn = decode_attachment(path)
+		except Exception as ex:
+			raise HTTPException(status_code=400, detail=str(ex))
+		try:
+			resp = await attachment_cache.obtain(c_id, m_id, a_id, fn)
+		except ConnectionError as ex:
+			raise HTTPException(status_code=ex.errno, detail=str(ex))
 		return await proxy_if(resp, request)
 
 	if hasattr(server, "state"):
