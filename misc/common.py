@@ -1311,7 +1311,7 @@ colour_types = (
 	tertiary_colours,
 )
 
-colourlist_cache = AutoCache(f"{CACHE_PATH}/colourlist", stale=86400 * 7, expiry=86400 * 30)
+colourlist_cache = AutoCache(f"{CACHE_PATH}/colourlist", stale=86400 * 7, timeout=86400 * 30)
 @tracebacksuppressor
 def get_colour_list():
 	global colour_names
@@ -1741,7 +1741,7 @@ emoji_replace = {}
 em_trans = {}
 discord_stripped = RangeSet([range(0x2000, 0x2070), range(0xfe00, 0xffff)])
 discord_stripmap = "".maketrans({k: "" for k in discord_stripped})
-emoji_cache = AutoCache(f"{CACHE_PATH}/follow", stale=86400 * 7, expiry=86400 * 30)
+emoji_cache = AutoCache(f"{CACHE_PATH}/follow", stale=86400 * 7, timeout=86400 * 30)
 _eop = "\n    query vendorHistoricEmojiV1(\n      $slug: Slug!\n      $version: Slug = null\n      $status: VendorHistoricEmojiStatus = null\n      $lang: Language\n    ) {\n      vendorHistoricEmoji_v1(slug: $slug, version: $version, status: $status, lang: $lang) {\n        ...vendorHistoricEmojiResource\n      }\n    }\n    \n  fragment vendorHistoricEmojiImageFragment on VendorHistoricEmojiImage {\n    slug\n    image {\n      source\n      description\n      useOriginalImage\n    }\n    status\n  }\n\n    \n  fragment vendorHistoricEmojiResource on VendorHistoricEmoji {\n    items {\n      category {\n        slug\n        title\n\n        representingEmoji {\n          code\n        }\n      }\n      images {\n        ...vendorHistoricEmojiImageFragment\n      }\n    }\n    statuses\n  }\n\n  "
 def request_emojis():
 	emojimap = {}

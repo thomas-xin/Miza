@@ -397,7 +397,10 @@ async def proxy(request: Request, url: Optional[str] = None):
 
 	if request.method.lower() == "get" and not body:
 		print("get_download:", url)
-		data = await attachment_cache.download(url)
+		try:
+			data = await attachment_cache.download(url)
+		except ConnectionError as ex:
+			raise HTTPException(status_code=ex.errno, detail=str(ex))
 		brange = request.headers.get("Range", "").removeprefix("bytes=") if request else ""
 		size = len(data)
 		ranges = []
