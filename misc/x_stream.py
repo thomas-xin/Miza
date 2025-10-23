@@ -436,7 +436,7 @@ async def proxy(request: Request, url: Optional[str] = None):
 			cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size or '*'}" for start, end in ranges)
 			response_headers["Content-Range"] = cr
 		return Response(
-			b"".join(data[r[0]:r[1] + 1] for r in ranges) if direct else data,
+			b"".join(data[r[0]:r[1]] for r in ranges) if not direct else data,
 			status_code=status_code,
 			headers=response_headers,
 			media_type=filetype.guess_mime(data),
