@@ -281,15 +281,13 @@ async def authorised_heartbeat(request: Request, key: str = Query(...), uri: str
 @app.get("/c/{path:path}")
 async def chunked_proxy(path: str, request: Request):
 	"""Serve chunked/split files with range support."""
-	with tracebacksuppressor:
-		urls, chunksize = await attachment_cache.obtains(path.split("/", 1)[0])
-		mimetype, size, lastsize = get_size_mime(urls[0], urls[-1], len(urls), chunksize)
+	urls, chunksize = await attachment_cache.obtains(path.split("/", 1)[0])
+	mimetype, size, lastsize = get_size_mime(urls[0], urls[-1], len(urls), chunksize)
 
-		new_urls = [f"{url}&S={lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
+	new_urls = [f"{url}&S={lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
 
-		response = await server.dyn_serve(new_urls, size, request=request, mimetype=mimetype)
-		update_headers(response.headers, **CHEADERS)
-		return response
+	response = await server.dyn_serve(new_urls, size, request=request, mimetype=mimetype)
+	return response
 
 
 @app.get("/u/{path:path}")
