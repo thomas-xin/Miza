@@ -40,23 +40,15 @@ if os.name == "nt":
 	modlist.append("wmi>=1.5.1")
 if os.environ.get("AI_FEATURES", True):
 	modlist.extend((
-		# "accelerate>=0.22.0",
-		# "clip-interrogator>=0.6.0",
-		# "diffusers>=0.19.0",
-		# "fasttext-langdetect>=1.0.5",
+		"addict>=2.4.0",
+		"easydict>=1.13",
+		"hf_xet>=1.1.10",
 		"openai>=1.107.2",
 		"opencv-python>=4.12.0.88",
-		# "protobuf==3.20.3",
-		"pytesseract>=0.3.10",
 		"replicate>=1.0.7",
 		"safetensors>=0.4.5",
-		# "sentencepiece>=0.1.99",
-		# "sentence-transformers>=2.2.2",
-		# "soundfile>=0.12.1",
 		"tokenizers>=0.13.3",
-		# "torch>=2.1.1",
-		"transformers>=4.56.0",
-		# "tomesd>=0.1.3",
+		"transformers==4.47.1",
 	))
 
 # Parsed requirements.txt

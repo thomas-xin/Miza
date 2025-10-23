@@ -495,95 +495,40 @@ def ensure_gc(t):
 
 
 if "caption" in CAPS:
-	import tiktoken
-	try:
-		import pytesseract
-	except ImportError:
-		pytesseract = None
-
-	VIT = True
-	dfut = None
-	def download_model():
-		from clip_interrogator import Config, Interrogator
-		Vconfig = Config(
-			clip_model_name="ViT-H-14/laion2b_s32b_b79k",
-			clip_model_path="misc/Clip",
-			caption_model_name="blip-base",
-			cache_path="misc/Clip",
-			device="cpu",
-			caption_max_length=48,
-		)
-		globals()["VIT"] = Interrogator(Vconfig)
-		VIT.dtype = torch.float32
-		VIT.device = "cpu"
-
-		from PIL import Image
+	from misc.asyncs import esubmit
+	def load_caption_model():
+		from transformers import AutoModel, AutoTokenizer
 		import torch
-		def image_to_features(self, image: Image.Image) -> torch.Tensor:
-			self._prepare_clip()
-			images = self.clip_preprocess(image).unsqueeze(0).to(self.device).to(torch.float32)
-			with torch.no_grad():
-				image_features = self.clip_model.encode_image(images)
-				image_features /= image_features.norm(dim=-1, keepdim=True)
-			return image_features
-		Interrogator.image_to_features = lambda self, image=None: image_to_features(self, image) if image else image_to_features(VIT, self)
+		model_name = "deepseek-ai/DeepSeek-OCR"
+		tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+		model = AutoModel.from_pretrained(model_name, _attn_implementation="flash_attention_2", trust_remote_code=True, use_safetensors=True)
+		model = model.eval().to(torch.bfloat16).cuda()
+		return model, tokenizer
 
-		print("Interrogator:", VIT)
-		im = Image.new("RGB", (4, 4), (0, 0, 255))
-		VIT.caption_model = VIT.caption_model.to(torch.float32).to("cpu")
-		VIT.clip_model = VIT.clip_model.to(torch.float32).to("cpu")
-		description = VIT.interrogate_fast(im, max_flavors=12)#, caption=caption)
-		print("VIT:", description)
-		return pytesseract.image_to_string(im, config="--psm 1")
-	# dfut = exc.submit(download_model)
+	caption_model_loading = None
+	def caption(im):
+		global caption_model_loading
+		if not caption_model_loading:
+			caption_model_loading = esubmit(load_caption_model)
+		model, tokenizer = caption_model_loading.result()
+		prompt = '<image>\n<|grounding|>Please transcribe all text in the image as accurately as possible. If there is no text present, respond with "N/A". '
+		image_file = temporary_file("webp")
+		im.save(image_file)
+		output_path = temporary_file().rsplit(".", 1)[0]
+		res = model.infer(
+			tokenizer,
+			prompt=prompt,
+			image_file=image_file,
+			output_path=output_path,
+			base_size=1024,
+			image_size=1024,
+			crop_mode=False,
+			save_results=True,
+			test_compress=True,
+		)
+		print(res)
+		raise RuntimeError(res)
 
-	def caption(im, best=False):
-		global dfut
-		if not best:
-			if not dfut:
-				dfut = exc.submit(download_model)
-			try:
-				dfut.result(timeout=1)
-			except concurrent.futures.TimeoutError:
-				raise RuntimeError("Model is loading, please wait...")
-		im = resize_max(im, 1024, resample="auto")
-		if im.mode != "RGB":
-			image = im.convert("RGB")
-		else:
-			image = im
-		if pytesseract:
-			fut = exc.submit(pytesseract.image_to_string, image, config="--psm 1", timeout=8)
-		else:
-			fut = None
-		if not best:
-			# cfut = exc.submit(VIT.generate_caption, image)
-			desc = VIT.interrogate_fast(image, max_flavors=24)#, caption=" ")
-			exc.submit(ensure_gc, 20)
-			p1 = desc.lstrip()
-			enc = tiktoken.get_encoding("cl100k_base")
-			out = []
-			otok = list(enc.encode(p1.strip()))
-			if len(otok) >= 8:
-				last = None
-				count = 0
-				while otok:
-					c = otok.pop(0)
-					if c == last:
-						if count > 3:
-							continue
-						count += 1
-					else:
-						last = c
-						count = 0
-					out.append(c)
-				p1 = enc.decode(out) if len(out) >= 8 else p1
-		else:
-			p1 = None
-		if fut:
-			p2 = fut.result().strip()
-		else:
-			p2 = None
-		return (p1, p2)
 
 	def canny(im):
 		if "RGB" not in im.mode:
@@ -593,144 +538,6 @@ if "caption" in CAPS:
 		a2 = Canny(a, 100, 200)
 		return fromarray(a2)
 
-# if "summ" in CAPS:
-# 	if 0:
-# 		from transformers import pipeline
-# 		smp = pipeline("summarization", model="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", device=0, torch_dtype=torch.float16)
-# 		print(smp)
-
-# 		def summarise(s1, min_length=128, max_length=192, rm=True, do_sample=True):
-# 			s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
-# 			# exc.submit(ensure_gc, 20)
-# 			if rm:
-# 				return re.sub(r"(?:in )?(?:the|this|some)? *(?:article|essay|page|study|text|report|topic)[s, ]*(?:also mentions|we discuss|we look at|is about|includes|is based on)? *", "", s2, flags=re.I)
-# 			return s2
-
-# 	device, dtype = determine_cuda(1073741824, priority=None)
-# 	device = f"cuda:{device}" if device >= 0 else "cpu"
-# 	from sentence_transformers import SentenceTransformer
-# 	Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device=device)
-# 	if torch and dtype == torch.float16 and torch.cuda.get_device_properties(device).major >= 7:
-# 		try:
-# 			Embedder = Embedder.half()
-# 		except (RuntimeError, NotImplementedError):
-# 			pass
-# 	def embedding(s):
-# 		a = Embedder.encode(s).astype(np.float16)
-# 		exc.submit(ensure_gc, 20)
-# 		return a.data
-
-if 0 and "whisper" in CAPS:
-	special_languages = {
-		"mandarin chinese": "chinese",
-		"cantonese chinese": "chinese",
-	}
-	special_unmap = {
-		"chinese": "mandarin chinese",
-	}
-	usable_languages = {'english', 'chinese', 'german', 'spanish', 'russian', 'korean', 'french', 'japanese', 'portuguese', 'turkish', 'polish', 'catalan', 'dutch', 'arabic', 'swedish', 'italian', 'indonesian', 'hindi', 'finnish', 'vietnamese', 'hebrew', 'ukrainian', 'greek', 'malay', 'czech', 'romanian', 'danish', 'hungarian', 'tamil', 'norwegian', 'thai', 'urdu', 'croatian', 'bulgarian', 'lithuanian', 'latin', 'maori', 'malayalam', 'welsh', 'slovak', 'telugu', 'persian', 'latvian', 'bengali', 'serbian', 'azerbaijani', 'slovenian', 'kannada', 'estonian', 'macedonian', 'breton', 'basque', 'icelandic', 'armenian', 'nepali', 'mongolian', 'bosnian', 'kazakh', 'albanian', 'swahili', 'galician', 'marathi', 'punjabi', 'sinhala', 'khmer', 'shona', 'yoruba', 'somali', 'afrikaans', 'occitan', 'georgian', 'belarusian', 'tajik', 'sindhi', 'gujarati', 'amharic', 'yiddish', 'lao', 'uzbek', 'faroese', 'haitian creole', 'pashto', 'turkmen', 'nynorsk', 'maltese', 'sanskrit', 'luxembourgish', 'myanmar', 'tibetan', 'tagalog', 'malagasy', 'assamese', 'tatar', 'hawaiian', 'lingala', 'hausa', 'bashkir', 'javanese', 'sundanese', 'burmese', 'valencian', 'flemish', 'haitian', 'letzeburgesch', 'pushto', 'panjabi', 'moldavian', 'moldovan', 'sinhalese', 'castilian'}
-	common_languages = {"english", "mandarin chinese", "hindi", "spanish", "french", "arabic", "bengali", "portuguese", "russian", "urdu", "indonesian", "german", "japanese", "telugu", "turkish", "tamil", "vietnamese", "korean", "persian", "javanese", "italian", "thai"}
-
-	import torch
-	from transformers import AutoFeatureExtractor, WhisperProcessor, WhisperForConditionalGeneration, AutoModelForAudioClassification
-	w_extractor = AutoFeatureExtractor.from_pretrained("sanchit-gandhi/whisper-medium-fleurs-lang-id", return_attention_mask=True)
-	w_classifier = AutoModelForAudioClassification.from_pretrained("sanchit-gandhi/whisper-medium-fleurs-lang-id", torch_dtype=torch.float16).to(0)
-	print("CLASSIFIER:", w_classifier)
-	w_processor = WhisperProcessor.from_pretrained("openai/whisper-large-v2", torch_dtype=torch.float16)
-	w_model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-large-v2", torch_dtype=torch.float16).to(0)
-	print("MODEL:", w_model)
-
-	def pipe_to(p, f):
-		while True:
-			b = f.read(1048576)
-			if not b or not p.is_running():
-				p.stdin.close()
-				break
-			p.stdin.write(b)
-			p.stdin.flush()
-
-	def split_audio(f):
-		args = ["ffmpeg", "-hide_banner", "-v", "error", "-i", "-", "-vn", "-f", "s16le", "-ar", "16k", "-ac", "1", "-"]
-		print(args)
-		proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=1048576)
-		exc.submit(pipe_to, proc, f)
-		buf = []
-		emptied = 0
-		n = 0
-		while True:
-			b = proc.stdout.read(16000 // 2)
-			if not b:
-				break
-			a = np.frombuffer(b, dtype=np.int16)
-			x = a.astype(np.float32)
-			x *= 1 / 32768
-			rms = np.sqrt(x.dot(x) / x.size)
-			if rms < len(buf) / 256:
-				if buf:
-					if emptied > 3:
-						buf.append(a)
-						temp = np.concatenate(buf)
-						buf.clear()
-						yield temp
-						emptied = 0
-						n += 1
-						continue
-					emptied += 1
-			if rms > 1 / 1024:
-				buf.append(a)
-		if buf:
-			yield np.concatenate(buf)
-
-	def lang_id(audio, favoured=None):
-		floats = torch.from_numpy(audio).to(torch.float16)
-		floats *= 1 / 32768
-		extracted_features = w_extractor(floats, sampling_rate=16000, return_tensors="pt").input_features
-		classes = w_classifier(extracted_features.to(w_classifier.dtype).to(w_classifier.device))
-		logits = classes.logits
-		for lang in common_languages:
-			lid = int(w_classifier.config.label2id[" ".join(s.capitalize() for s in lang.split())])
-			logits[:, lid] *= 2
-		if favoured:
-			lang = special_unmap.get(favoured, favoured)
-			lid = int(w_classifier.config.label2id[" ".join(s.capitalize() for s in lang.split())])
-			logits[:, lid] += 0.5
-		predicted_class_ids = torch.argmax(logits, dim=-1).item()
-		language = w_classifier.config.id2label[predicted_class_ids].lower()
-		language = special_languages.get(language, language)
-		if language not in usable_languages:
-			language = "english"
-		return language
-
-	def whisper(url, prompt=""):
-		if isinstance(url, str):
-			f = requests.get(url, headers=header(), stream=True, verify=False, timeout=12).raw
-		else:
-			f = io.BytesIO(url)
-		prompt_ids = w_processor.get_prompt_ids(prompt)
-		language = None
-		out = []
-		with torch.no_grad():
-			for audio in split_audio(f):
-				language = lang_id(audio, favoured=language)
-				input_features = w_processor(audio, sampling_rate=16000, return_tensors="pt").input_features
-				forced_decoder_ids = w_processor.get_decoder_prompt_ids(task="transcribe", language=language)
-				predicted_ids = w_model.generate(input_features.to(w_model.dtype).to(w_model.device), forced_decoder_ids=forced_decoder_ids, prompt_ids=prompt_ids)
-				resp = w_processor.batch_decode(predicted_ids, skip_special_tokens=True)
-				out.extend(resp)
-			if not out:
-				return ""
-		s = "".join(out)
-		while True:
-			m = re.search(r"(.+?)\1{4,}?", s)
-			if not m:
-				break
-			sub = m.group(1)
-			r2 = r"(" + re.escape(sub) + r"){4,}"
-			s2 = re.sub(r2, lambda s: s.group(1) * 3, s)
-			if s2 == s:
-				break
-			s = s2
-		return s.strip()
 
 if "math" in CAPS:
 	import x_math

@@ -1584,7 +1584,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return await self.id_from_message(self.cache.messages[m_id].content)
 		return verify_id(m_id)
 
-	followed = diskcache.Cache(directory=f"{CACHE_PATH}/follow", expiry=86400 * 7)
+	followed = AutoCache(f"{CACHE_PATH}/follow", stale=3600, timeout=86400 * 7)
 	async def _follow_url(self, urls, it=None, best=False, preserve=True, images=True, emojis=True, reactions=False, allow=False, limit=None, no_cache=False, ytd=True):
 		if images:
 			medias = ("video", "image", "thumbnail")
@@ -1728,12 +1728,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return await self._follow_url(urls, it=it, best=best, preserve=preserve, images=images, emojis=emojis, reactions=reactions, allow=allow, limit=limit, no_cache=no_cache, ytd=ytd)
 
 		tup = shash((urls, best, preserve, images, emojis, reactions, allow, ytd))
-		out = await retrieve_from(self.followed, tup, self._follow_url, urls, it=it, best=best, preserve=preserve, images=images, emojis=emojis, reactions=reactions, allow=allow, limit=limit, no_cache=no_cache, ytd=ytd)
+		out = await self.followed.aretrieve(
+			tup, self._follow_url,
+			urls, it=it, best=best, preserve=preserve, images=images,
+			emojis=emojis, reactions=reactions, allow=allow, limit=limit,
+			no_cache=no_cache, ytd=ytd,
+		)
 		for i, url in enumerate(out):
 			if discord_expired(url):
-				if isinstance(out, tuple):
-					out = self.followed[tup] = list(out)
+				out = list(out)
 				out[i] = await self.renew_attachment(url)
+				self.followed[tup] = out
 		return out[:limit]
 
 	@functools.lru_cache(maxsize=64)
@@ -1981,7 +1986,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		urls = find_urls(argv)
 		if not urls:
 			urls.append(argv)
-		futs = [retrieve_from(ai.cache, shash((argv, screenshot, best)), retrieval, argv, region, screenshot, best) for argv in urls]
+		futs = [csubmit(ai.cache.aretrieve(shash((argv, screenshot, best)), retrieval, argv, region, screenshot, best)) for argv in urls]
 		resp = await gather(*futs)
 		return "\n\n\n".join(resp) if isinstance(resp[0], str) else b"\n\n\n".join(resp)
 
@@ -2348,7 +2353,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		1: cdict(
 			reasoning="gpt-5-mini",
 			instructive="gpt-5-mini",
-			casual="gpt-5-mini",
+			casual="grok-4-fast",
 			nsfw="grok-4-fast",
 			backup="gemini-2.5-flash-t",
 			retry="gpt-5",
@@ -2876,11 +2881,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			mime = magic.from_buffer(d)
 		return resp, mime, name, d
 
-	analysed = diskcache.Cache(directory=f"{CACHE_PATH}/caption", expiry=86400 * 7)
+	analysed = AutoCache(f"{CACHE_PATH}/caption", stale=86400, timeout=86400 * 7)
 	async def caption(self, url, best=False, screenshot=False, timeout=24, premium_context=[]):
 		"Produces an AI-generated caption for an image. Model used is determined by \"best\" argument."
 		h = shash((url, best))
-		s = await retrieve_from(self.analysed, h, self.vision, url, None, best, None, None, [], timeout)
+		s = await self.analysed.aretrieve(h, self.vision, url, best=best, timeout=timeout)
 		return ("Image", s)
 
 	caption_prompt = "Please describe this image in detail; be descriptive but concise!"
@@ -2956,6 +2961,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return out
 
 	async def ocr(self, url):
+		resp = await process_image(url, "caption", ["-nogif"], cap="caption", timeout=3600)
 		data = await self.to_data_url(url)
 		mistral_key = AUTH.get("mistral_key")
 		s = None
@@ -3113,7 +3119,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		for attachment in message.attachments:
 			if always_log or url2ext(attachment.url) in IMAGE_FORMS:
 				csubmit(self.add_and_test(message, attachment))
-		urls = await self.renew_attachments(find_urls_ex(message.content))
+		urls = [url for url in find_urls_ex(message.content) if message.content[message.content.index(url) - 1] != "<"]
+		urls = await self.renew_attachments(urls)
 		for url in urls:
 			if is_discord_attachment(url) and not discord_expired(url) or self.is_webserver_url(url) and (always_log or url2ext(url) in IMAGE_FORMS):
 				resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True, timeout=30, allow_redirects=True)
@@ -3192,54 +3199,27 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.cache.attachments[attachment.id] = res
 
 	async def get_attachment(self, url, data=False, size=0):
-		if is_discord_attachment(url):
-			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-			ext = url2ext(url)
-			fn = f"{CACHE_PATH}/attachments/{a_id}.{ext}"
-		else:
-			fn = f"{CACHE_PATH}/attachments/{uhash(url.split('//', 1)[-1])}"
-		if not os.path.exists(fn) or not os.path.getsize(fn):
-			if is_discord_attachment(url):
-				url = await self.renew_attachment(url)
-			if not size or size <= 25 * 1048576:
-				try:
-					await proc_eval(f"download_file({repr(url)},{repr(fn)},timeout=12)", caps=["browse"], timeout=16)
-				except Exception as ex:
-					print(repr(ex))
-		if not os.path.exists(fn) or not os.path.getsize(fn):
-			args = ["streamshatter", url, "-c", TEMP_PATH, "-l", "3", "-t", "20", fn]
-			print(args)
-			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
-			try:
-				async with asyncio.timeout(32):
-					await proc.wait()
-			except (T0, T1, T2):
-				with tracebacksuppressor:
-					force_kill(proc)
-				raise
 		if not data:
-			return fn
-		async with aiofiles.open(fn, "rb") as f:
-			return await f.read()
+			filename = f"{CACHE_PATH}/attachments/{uhash(url.split('//', 1)[-1])}"
+			if not os.path.exists(filename):
+				await attachment_cache.download(url, filename=filename)
+			return filename
+		return await attachment_cache.download(url)
 
 	async def get_request(self, url, limit=None, full=True, size=0, timeout=12):
-		if is_miza_attachment(url):
-			ids = expand_attachment(url)
-			url = await attachment_cache.obtain(*ids)
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
-		if is_discord_url(url):
-			return await self.get_attachment(url, size=size, data=True)
 		if not full:
 			if is_discord_url(url):
 				try:
 					return await asubmit(reqs.next().get, url, headers=Request.header(), stream=True, _timeout_=3, allow_redirects=True)
 				except Exception:
 					print_exc()
+			if is_miza_attachment(url):
+				ids = expand_attachment(url)
+				url = await attachment_cache.obtain(*ids)
 			return await Request.asession.get(url, headers=Request.header(), _timeout_=timeout, verify=False, allow_redirects=True)
-		fn = await self.get_file(url)
-		async with aiofiles.open(fn, "rb") as f:
-			return await f.read()
+		return await self.get_attachment(url)
 
 	async def get_file(self, url, limit=None, timeout=24):
 		ext = url2ext(url)
@@ -4249,7 +4229,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return size
 
 	caps = set()
-	capfrom = TimedCache(timeout=60, trash=0)
+	capfrom = AutoCache(stale=0, timeout=60)
 	last_pings = {}
 	compute_queue = {}
 	compute_wait = {}
@@ -6070,7 +6050,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.users_updated = True
 		print(len(guilds), "guilds loaded.")
 
-	inter_cache = TimedCache(timeout=900, trash=0)
+	inter_cache = AutoCache(stale=0, timeout=900)
 	async def defer_interaction(self, message, ephemeral=False, mode="post"):
 		with tracebacksuppressor:
 			if hasattr(message, "int_id"):
@@ -6581,7 +6561,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						await_fut(self.send_event("_call_"))
 				self.update_users()
 
-	uptime_db = diskcache.Cache(directory=f"{CACHE_PATH}/uptime", expiry=86400 * 7)
+	uptime_db = diskcache.Cache(f"{CACHE_PATH}/uptime", expiry=86400 * 7)
 	def update_uptime(self, data):
 		uptimes = self.uptime_db
 		ninter = self.ninter
@@ -6605,8 +6585,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						skipto = i * ninter + 3600 - ninter * 2
 					if uptimes[i]:
 						uptimes[i] = {}
-		uptimea = np.array(uptimes.keys())
-		uptimea.sort(kind="stable")
+		uptimea = np.array(list(uptimes.iterkeys()))
+		if len(uptimea):
+			uptimea.sort(kind="stable")
 		i = np.searchsorted(uptimea, it - interval + ninter)
 		j = np.searchsorted(uptimea, it + ninter)
 		ut = j - i

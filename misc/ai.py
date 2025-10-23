@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import diskcache
 import orjson
 import re
 import openai
@@ -10,7 +9,7 @@ from math import ceil, inf
 from traceback import format_exc, print_exc
 from mpmath import mpf
 from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, CE, tracebacksuppressor, utc, T, string_like
-from misc.util import AUTH, CACHE_PATH, TimedCache, retrieve_from, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across
+from misc.util import AUTH, CACHE_PATH, AutoCache, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across
 from misc.asyncs import asubmit, csubmit, emptyctx, gather, Semaphore, CloseableAsyncIterator
 
 print("AI:", __name__)
@@ -632,7 +631,7 @@ contexts = {
 oai_name = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 api_map = cdict()
 api_sems = cdict()
-api_blocked = TimedCache(timeout=30, trash=0)
+api_blocked = AutoCache(stale=0, timeout=30)
 
 def oai_method(oai, func):
 	lookup = func.split(".")
@@ -1231,13 +1230,10 @@ async def instruct(data, best=False, skip=False, prune=True, cache=True, user=No
 	data["prompt"] = data.get("prompt") or data.pop("inputs", None) or data.pop("input", None)
 	key = shash(str((data["prompt"], data.get("model", "kimi-k2"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
 	if cache:
-		tup = await retrieve_from(CACHE, key, _instruct2, data, best=best, skip=skip, prune=prune, user=user)
+		tup = await CACHE.aretrieve(key, _instruct2, data, best=best, skip=skip, prune=prune, user=user)
 		if tup[1] >= best:
 			return tup[0]
-	resp, best = await _instruct2(data, best=best, skip=skip, prune=prune, user=user)
-	if best and decensor.search(resp):
-		resp, best = await _instruct2(data, best=False, skip=False, prune=True, user=user)
-	CACHE[key] = (resp, best)
+	resp, _best = await CACHE._aretrieve(key, _instruct2, data, best=best, skip=skip, prune=prune, user=user)
 	return resp
 
 async def _instruct2(data, best=False, skip=False, prune=True, user=None):
@@ -2115,7 +2111,7 @@ async def collect_stream(resp):
 	return result
 
 
-cache = CACHE = diskcache.Cache(directory=f"{CACHE_PATH}/ai", expiry=86400 * 14)
+cache = CACHE = AutoCache(f"{CACHE_PATH}/ai", stale=86400, timeout=86400 * 14)
 
 async def moderate(text="", image="", input="", premium_context=[]):
 	if isinstance(text, (tuple, list)):
@@ -2172,5 +2168,5 @@ async def moderate(text="", image="", input="", premium_context=[]):
 		else:
 			premium_context.append(["openai", resp.model, "0.00001"])
 		return resp
-	resp = await retrieve_from(CACHE, "moderate-" + shash(text) + "-" + shash(image), moderate_into, text, image)
+	resp = await CACHE.aretrieve("moderate-" + shash(text) + "-" + shash(image), moderate_into, text, image)
 	return resp.results[0]

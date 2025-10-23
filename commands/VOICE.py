@@ -968,7 +968,7 @@ class Skip(Command):
 				skips.append(i)
 		desc = []
 		if dups:
-			desc.append(f"Entry {dups[0]} (`{q[dups[0]]['name']}`) has already been voted for, `{len(dups[0]['skips'])}/{required}`." if len(dups) == 1 else f"{len(dups)} entries have already been voted for.")
+			desc.append(f"Entry {dups[0]} (`{q[dups[0]]['name']}`) has already been voted for, `{len(q[dups[0]]['skips'])}/{required}`." if len(dups) == 1 else f"{len(dups)} entries have already been voted for.")
 		if votes:
 			await bot.audio.asubmit(f"[e.setdefault('skips',set()).add({_user.id}) for e in AP.from_guild({_guild.id}).queue]")
 			desc.append(f"Voted to skip entry {votes[0]} (`{q[votes[0]]['name']}`), `{len(votes)}/{required}`." if len(votes) == 1 else f"Voted to skip {len(votes)} entries.")

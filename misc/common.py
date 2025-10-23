@@ -1311,7 +1311,7 @@ colour_types = (
 	tertiary_colours,
 )
 
-colourlist_cache = diskcache.Cache(directory=f"{CACHE_PATH}/colourlist", expiry=86400 * 7)
+colourlist_cache = AutoCache(f"{CACHE_PATH}/colourlist", stale=86400 * 7, expiry=86400 * 30)
 @tracebacksuppressor
 def get_colour_list():
 	global colour_names
@@ -1340,14 +1340,10 @@ def get_colour_list():
 				colour_names = cdict(colour_group)
 			else:
 				colour_names.update(colour_group)
-	colourlist_cache["map"] = colour_names
 	print(f"Successfully loaded {len(colour_names)} colour names.")
 def load_colour_list():
 	global colour_names
-	try:
-		colour_names = colourlist_cache["map"]
-	except KeyError:
-		colour_names = get_colour_list()
+	colour_names = colourlist_cache.retrieve("map", get_colour_list)
 	return colour_names
 
 def parse_colour(s, default=None):
@@ -1745,7 +1741,7 @@ emoji_replace = {}
 em_trans = {}
 discord_stripped = RangeSet([range(0x2000, 0x2070), range(0xfe00, 0xffff)])
 discord_stripmap = "".maketrans({k: "" for k in discord_stripped})
-emoji_cache = diskcache.Cache(directory=f"{CACHE_PATH}/follow", expiry=86400 * 7)
+emoji_cache = AutoCache(f"{CACHE_PATH}/follow", stale=86400 * 7, expiry=86400 * 30)
 _eop = "\n    query vendorHistoricEmojiV1(\n      $slug: Slug!\n      $version: Slug = null\n      $status: VendorHistoricEmojiStatus = null\n      $lang: Language\n    ) {\n      vendorHistoricEmoji_v1(slug: $slug, version: $version, status: $status, lang: $lang) {\n        ...vendorHistoricEmojiResource\n      }\n    }\n    \n  fragment vendorHistoricEmojiImageFragment on VendorHistoricEmojiImage {\n    slug\n    image {\n      source\n      description\n      useOriginalImage\n    }\n    status\n  }\n\n    \n  fragment vendorHistoricEmojiResource on VendorHistoricEmoji {\n    items {\n      category {\n        slug\n        title\n\n        representingEmoji {\n          code\n        }\n      }\n      images {\n        ...vendorHistoricEmojiImageFragment\n      }\n    }\n    statuses\n  }\n\n  "
 def request_emojis():
 	emojimap = {}
@@ -1777,13 +1773,9 @@ def request_emojis():
 				e2 = e.translate(discord_stripmap)
 				if e2 and not e2.isascii():
 					emojimap[e2] = (name, url)
-	emoji_cache["map"] = emojimap
 	return emojimap
 def load_emojilist():
-	try:
-		return emoji_cache["map"]
-	except KeyError:
-		return request_emojis()
+	return emoji_cache.retrieve("map", request_emojis)
 @tracebacksuppressor
 def load_emojis():
 	global emoji_translate, emoji_replace, em_trans

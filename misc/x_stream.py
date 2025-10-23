@@ -6,6 +6,7 @@ import logging
 import os
 from traceback import print_exc
 from typing import Optional, AsyncIterator
+import filetype
 import niquests
 import orjson
 import requests
@@ -15,7 +16,7 @@ from .asyncs import asubmit, esubmit, csubmit
 from .types import fcdict, byte_like, MemoryBytes
 from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment,
-	is_discord_attachment, is_miza_attachment, url2fn, p2n, seq,
+	is_discord_attachment, url2fn, seq,
 	Request as MizaRequest, DOMAIN_CERT, PRIVATE_KEY, update_headers,
 	CACHE_PATH,
 )
@@ -120,7 +121,6 @@ class Server:
 			headers.pop("Host", None)
 			headers.pop("Range", None)
 			update_headers(headers, **MizaRequest.header())
-
 			ranges = []
 			length = 0
 
@@ -147,24 +147,19 @@ class Server:
 			if not ranges:
 				ranges.append((0, size))
 				length = size
-
 			response_headers = dict(HEADERS)
-			response_headers["Content-Type"] = mimetype
-
 			if ranges == [(0, size)]:
 				response_headers["Content-Length"] = str(length)
-
 			if brange:
 				cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size or '*'}" for start, end in ranges)
 				response_headers["Content-Range"] = cr
-
 			print(brange, ranges)
 
 			return StreamingResponse(
 				self._dyn_serve(urls, ranges, headers, head=head, callback=callback),
 				status_code=status_code,
 				headers=response_headers,
-				media_type=mimetype
+				media_type=mimetype,
 			)
 
 	async def _dyn_serve(self, urls, ranges, headers, head=None, callback=None) -> AsyncIterator[bytes]:
@@ -212,35 +207,12 @@ class Server:
 						if isinstance(u, byte_like):
 							yield u[s:e]
 							return
-						if is_miza_attachment(u) and (path := u.split("?", 1)[0].split("/u/", 1)[-1]) and len(path.split("/")) == 2 and path.count("~") == 0:
-							c_id, m_id, a_id, fn = decode_attachment(path)
-							u = await attachment_cache.obtain(c_id, m_id, a_id, fn)
-						print(u)
-						if e >= ns:
-							e = ""
-						else:
-							e -= 1
-						h2 = dict(h.items())
-						h2["range"] = f"bytes={s}-{e}"
-						resp = await asubmit(self.get_with_retries, u, headers=h2, timeout=3)
-						if resp.status_code != 206:
-							ms = min(ns, end - pos - s)
-							if len(resp.content) > ms:
-								yield resp.content[s:(e or len(resp.content))]
-								return
-							yield resp.content
-							return
-						it = resp.iter_content(262144 if big else 49152)
-						try:
-							while True:
-								yield await asubmit(next, it)
-						except (StopIteration, RuntimeError):
-							pass
+						print("get_chunk:", u)
+						b = await attachment_cache.download(u)
+						yield memoryview(b)[s:e]
 
 					if len(futs) > i + 1:
-						resp = await futs.pop(0)
-						async for content in resp:
-							yield content
+						yield await futs.pop(0)
 					fut = asubmit(get_chunk, u, headers, start, end, pos, ns, big)
 					futs.append(fut)
 					pos = 0
@@ -249,9 +221,7 @@ class Server:
 					big = True
 
 				for fut in futs:
-					resp = await fut
-					async for content in resp:
-						yield content
+					yield await fut
 
 
 # Create FastAPI app
@@ -425,6 +395,50 @@ async def proxy(request: Request, url: Optional[str] = None):
 		print_exc()
 		body = None
 
+	if request.method.lower() == "get" and not body:
+		print("get_download:", url)
+		data = await attachment_cache.download(url)
+		brange = request.headers.get("Range", "").removeprefix("bytes=") if request else ""
+		size = len(data)
+		ranges = []
+		length = 0
+
+		if brange:
+			try:
+				branges = brange.split(",")
+				for s in branges:
+					start, end = s.split("-", 1)
+					if not start:
+						if not end:
+							continue
+						start = size - int(end)
+						end = size - 1
+					elif not end:
+						end = size - 1
+					start = int(start)
+					end = int(end) + 1
+					length += end - start
+					ranges.append((start, end))
+			except Exception:
+				pass
+
+		status_code = 206 if ranges else 200
+		if not ranges:
+			ranges.append((0, size))
+			length = size
+		response_headers = dict(HEADERS)
+		if ranges == [(0, size)]:
+			response_headers["Content-Length"] = str(length)
+		if brange:
+			cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size or '*'}" for start, end in ranges)
+			response_headers["Content-Range"] = cr
+		return Response(
+			b"".join(data[r[0]:r[1]] for r in ranges),
+			status_code=status_code,
+			headers=response_headers,
+			media_type=filetype.guess_mime(data),
+		)
+
 	headers = MizaRequest.header()
 	if request.headers.get("Range"):
 		headers["Range"] = request.headers["Range"]
@@ -464,14 +478,14 @@ async def proxy(request: Request, url: Optional[str] = None):
 			content_generator(),
 			status_code=resp.status_code,
 			headers=response_headers,
-			media_type=mime
+			media_type=mime,
 		)
 
 	return StreamingResponse(
 		resp.iter_content(262144),
 		status_code=resp.status_code,
 		headers=response_headers,
-		media_type=ctype
+		media_type=ctype,
 	)
 
 

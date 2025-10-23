@@ -571,35 +571,6 @@ class UpdateExec(Database):
 			self.backoff = 0
 			self.skip_until = 0
 
-	counter = {}
-	async def renew(self, url):
-		if not is_discord_attachment(url):
-			return url
-		bot = self.bot
-		h = uuhash(url) + "~"
-		if self.counter.get(h, 0) >= 3:
-			return url
-		if h in self.seen:
-			url = self.seen[h]
-			if not discord_expired(url):
-				return url
-		sendable = list(c_id for c_id, flag in self.data.items() if flag & 16)
-		if not sendable:
-			return url
-		c_id = choice(sendable)
-		channel = await bot.fetch_channel(c_id)
-		embed = discord.Embed(colour=rand_colour())
-		embed.set_thumbnail(url=url)
-		message = await bot.send_as_webhook(channel, url, embed=embed)
-		self.seen[h] = url = message.embeds[0].thumbnail.url
-		if discord_expired(url):
-			try:
-				self.counter[h] += 1
-			except KeyError:
-				self.counter[h] = 1
-		csubmit(bot.silent_delete(message))
-		return url
-
 	async def _proxy(self, url, whole=False):
 		bot = self.bot
 		sendable = list(c_id for c_id, flag in self.data.items() if flag & 16)
@@ -900,7 +871,6 @@ class UpdateExec(Database):
 		print("LPROXY:", url, out)
 		return out
 
-	seen = TimedCache(timeout=86400)
 	async def uproxy(self, *urls, collapse=True, mode="upload", filename=None, channel=None, optimise=False, **kwargs):
 		bot = self.bot
 		async def proxy_url(url):
@@ -1198,13 +1168,8 @@ class UpdateChannelCache(Database):
 
 class UpdateDeleted(Database):
 	name = "deleted"
-	cache = {}
-
-	def __load__(self, **void):
-		cache = self.cache
-		self.cache = TimedCache(timeout=86400 * 7, trash=1)
-		self.cache.update(cache)
-		self.cache.attach(self.data)
+	cache = AutoCache(stale=0, timeout=86400 * 7)
+	no_file = True
 
 
 class UpdateChannelHistories(Database):

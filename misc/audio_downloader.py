@@ -22,7 +22,7 @@ from .util import (
 	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration, get_duration_2, html_decode,
 	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url, AUDIO_FORMS,
-	EvalPipe, PipedProcess, TimedCache, Request, Semaphore, TEMP_PATH, magic, rename, temporary_file, replace_ext, select_and_loads,
+	EvalPipe, PipedProcess, AutoCache, Request, Semaphore, TEMP_PATH, magic, rename, temporary_file, replace_ext, select_and_loads,
 )
 
 # Gets the best icon/thumbnail for a queue entry.
@@ -223,9 +223,9 @@ class AudioDownloader:
 
 	def __init__(self, workers=1):
 		self.session = niquests.Session()
-		self.search_cache = TimedCache(timeout=inf, timeout2=60, persist="ytdl.search.cache", autosave=60)
-		self.thumbnail_cache = TimedCache(timeout=inf, timeout2=60, persist="ytdl.thumbnail.cache", autosave=60)
-		self.extract_cache = TimedCache(timeout=120, timeout2=8)
+		self.search_cache = AutoCache("ytdl.search.cache", stale=300, timeout=86400)
+		self.thumbnail_cache = AutoCache("ytdl.thumbnail.cache", stale=300, timeout=86400 * 7)
+		self.extract_cache = AutoCache("ytdl.extract.cache", stale=60, timeout=120)
 		self.futs = [
 			esubmit(self.set_cookie),
 		]
@@ -264,11 +264,7 @@ class AudioDownloader:
 		return self.workers.next().run(s, timeout=timeout, priority=priority)
 
 	def extract_info(self, url, download=False, process=True):
-		try:
-			return self.extract_cache[url]
-		except KeyError:
-			pass
-		resp = self.extract_cache[url] = self.run(f"extract_info({json_dumpstr(url)},download={download},process={process})")
+		resp = self.extract_cache.retrieve(url, self.run, f"extract_info({json_dumpstr(url)},download={download},process={process})")
 		return resp
 
 	def get_thumbnail(self, entry, pos=0):
@@ -276,10 +272,7 @@ class AudioDownloader:
 		if not is_youtube_url(url):
 			return get_best_icon(entry)
 		info = self.extract_info(url)
-		try:
-			b = self.thumbnail_cache[url]
-		except KeyError:
-			b = self.thumbnail_cache[url] = self.run(f"get_full_storyboard({repr(info)})")
+		b = self.thumbnail_cache.retrieve(url, self.run, f"get_full_storyboard({repr(info)})")
 		if isinstance(b, str):
 			return b
 		with io.BytesIO(b) as b:
@@ -1351,13 +1344,12 @@ class AudioDownloader:
 				output.append(temp)
 		return output
 
-	def search_into(self, retrieval, item, mode, count):
+	def search_into(self, item, mode, count):
 		temp = self.extract(item, mode=mode, count=count)
 		for e in temp:
 			url = unyt(e["url"])
 			if url != e["url"]:
 				e["url"], e["orig"] = url, e["url"]
-		self.search_cache[retrieval] = temp
 		return temp
 
 	# Performs a search, storing and using cached search results for efficiency.
@@ -1365,23 +1357,7 @@ class AudioDownloader:
 		key = verify_search(item)
 		# Force key to be a string, eliminating shenanigans where tuples are serialised as lists within the cache and then fail to retrieve due to hashability
 		retrieval = json_dumpstr([key, mode, count])
-		temp = None
-		age = inf
-		try:
-			temp = self.search_cache[retrieval]
-		except KeyError:
-			try:
-				temp = self.search_cache.retrieve(retrieval)
-			except KeyError:
-				pass
-		else:
-			age = self.search_cache.age(retrieval)
-		if age > 86400 or not temp or force:
-			# For entries older than 1 day, prioritise searching first, fallback to cached results if necessary
-			temp = self.search_into(retrieval, item, mode, count) or temp
-		elif age > 720:
-			# For entries older than 12 minutes, search in the background (stale-while-revalidate)
-			esubmit(self.search_into, retrieval, item, mode, count)
+		temp = self.search_cache.retrieve(retrieval, self.search_into, item, mode, count)
 		if not temp:
 			raise FileNotFoundError(f'No results for {item}.')
 		return temp
@@ -1392,18 +1368,11 @@ class AudioDownloader:
 		try:
 			temp = self.search_cache[retrieval][0]
 		except KeyError:
-			try:
-				temp = self.search_cache.retrieve(retrieval)[0]
-			except KeyError:
-				pass
-			else:
-				return 1 + (not expired(get_best_audio(temp)[0]))
+			return 0
 		else:
 			return 1 + (not expired(get_best_audio(temp)[0]))
-		return 0
 
 	def close(self):
 		for worker in self.workers:
 			worker.terminate()
 		self.workers.clear()
-		self.search_cache.db.sync()

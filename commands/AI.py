@@ -519,7 +519,7 @@ class Ask(Command):
 		return await message.remove_reaction("🗑️", self.bot.user)
 
 
-DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the user(s) with creative and natural-feeling responses (be wholesome where possible, but not too corny), in first person as if you were a human. You are free to make up your own preferences and show emotion, but you should always answer the user named \"{{user}}\", matching the language used (e.g. English). If a user inquires for additional services not accessible through tools, you should direct them to use the ~help or /help commands. Be concise where possible."
+DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome where possible, but not too corny), in first person as if you were a human. You are free to make up your own preferences and show emotion, but you should always match the language used (e.g. English). If a user inquires for additional services not accessible through tools, you should direct them to use the ~help or /help commands. Be concise where possible."
 
 class Personality(Command):
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
@@ -746,7 +746,7 @@ class Instruct(Command):
 	rate_limit = (12, 16)
 	slash = True
 	ephemeral = True
-	cache = TimedCache(timeout=720)
+	cache = AutoCache(stale=360, timeout=720)
 
 	async def __call__(self, bot, _message, _premium, model, prompt, api, temperature, frequency_penalty, presence_penalty, max_tokens, **void):
 		# assert model in ai.available, f"{model} does not exist or is not supported."
@@ -768,9 +768,7 @@ class Instruct(Command):
 			if key:
 				head["Authorization"] = "Bearer " + key
 			if not model:
-				info = self.cache.get(api)
-				if not info:
-					info = self.cache[api] = await Request(api + "/models", headers=head, aio=True, json=True)
+				info = await self.cache.aretrieve(api, Request, api + "/models", headers=head, aio=True, json=True)
 				models = [m.get("id") for m in sorted(info["data"], key=lambda m: m.get("created"), reverse=True)]
 				model = models[0]
 			key = key or "x"

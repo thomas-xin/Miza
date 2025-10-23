@@ -2,7 +2,6 @@ import aiofiles
 import aiohttp
 import asyncio
 import concurrent.futures
-import diskcache
 import os
 import random
 import re
@@ -16,10 +15,10 @@ from PIL import Image
 from misc.types import utc, as_str
 from misc.asyncs import esubmit, wrap_future, await_fut, Future
 from misc.util import (
-    retrieve_from, CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api,
+    CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, uuhash,
 	ungroup_attachments, is_discord_url, temporary_file, url2ext, is_discord_attachment, is_miza_attachment,
-    snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, url2fn,
+    snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt,
 )
 
 def has_transparency(image):
@@ -80,68 +79,40 @@ def parse_colour(s):
 		return (r, g, b)
 	raise ValueError(s)
 
-class ColourCache(diskcache.Cache):
+class ColourCache(AutoCache):
+
+	def _obtain(self, url):
+		req = Request.compat_session if is_discord_url(url) else Request.session
+		with req.get(url, headers=Request.header(), stream=True) as resp:
+			mime = resp.headers.get("Content-Type", "")
+			if "text/html" in mime:
+				it = resp.iter_content(65536)
+				s = as_str(next(it))
+				try:
+					bc = s.split("background-color:", 1)[1]
+				except IndexError:
+					c = (255, 255, 255)
+				else:
+					bc = bc.replace(";", " ").split(None, 1)[0]
+					c = parse_colour(bc)[:3]
+			else:
+				im = Image.open(resp.raw)
+				c = get_colour(im)[:3]
+		print("GC:", url, c)
+		return c
 
 	def obtain(self, url):
 		if not url:
 			return (0, 0, 0)
 		k = uuhash(url)
 		try:
-			return tuple(self[k])
-		except KeyError:
-			req = Request.compat_session if is_discord_url(url) else Request.session
-			try:
-				with req.get(url, headers=Request.header(), stream=True) as resp:
-					mime = resp.headers.get("Content-Type", "")
-					if "text/html" in mime:
-						it = resp.iter_content(65536)
-						s = as_str(next(it))
-						try:
-							bc = s.split("background-color:", 1)[1]
-						except IndexError:
-							c = self[k] = (255, 255, 255)
-						else:
-							bc = bc.replace(";", " ").split(None, 1)[0]
-							c = self[k] = parse_colour(bc)[:3]
-					else:
-						im = Image.open(resp.raw)
-						c = self[k] = get_colour(im)[:3]
-			except Exception:
-				print_exc()
-				return (0, 0, 0)
-			print("GC:", url, c)
-			return c
+			return self.retrieve(k, self._obtain, url)
+		except Exception:
+			print_exc()
+			return (0, 0, 0)
 
 
-class AttachmentCache(diskcache.Cache):
-	"""
-	A class to manage caching of attachments and embeds for a Discord bot.
-	Attributes:
-		min_size (int): Minimum size of the cache.
-		max_size (int): Maximum size of the cache.
-		attachment_count (int): Number of attachments to handle.
-		embed_count (int): Number of embeds to handle.
-		discord_token (str): Discord bot token.
-		alt_token (str): Alternative Discord bot token.
-		headers (dict): HTTP headers for requests using the main token.
-		alt_headers (dict): HTTP headers for requests using the alternative token.
-		exc (concurrent.futures.ThreadPoolExecutor): Thread pool executor for handling tasks.
-		sess (aiohttp.ClientSession): HTTP session for making asynchronous requests.
-		fut (concurrent.futures.Future): Future object for managing asynchronous tasks.
-		queue (list): Queue of tasks to be processed.
-		channels (set): Set of channels to be used for posting messages.
-		last (set): Set of last used messages for updating embeds.
-	Methods:
-		__init__(*args, **kwargs): Initializes the cache and calls the init method.
-		init(): Initializes the channels set with proxy channels from the AUTH configuration.
-		update_queue(): Updates the queue by processing tasks and sending requests to Discord API.
-		set_last(tup): Adds a tuple to the last set and removes old entries.
-		get_attachment(c_id, m_id, a_id, fn): Retrieves an attachment URL asynchronously.
-		obtain(c_id=None, m_id=None, a_id=None, fn=None, url=None): Obtains an attachment URL, either from cache or by retrieving it.
-		delete(c_id, m_id, url=None): Deletes a message from a channel asynchronously.
-		create(*data, filename=None, channel=None, content="", collapse=True, editable=False): Creates a new message with attachments in a channel asynchronously.
-		edit(c_id, m_id, *data, url=None, filename=None, content="", collapse=True): Edits an existing message with new attachments in a channel asynchronously.
-	"""
+class AttachmentCache(AutoCache):
 	min_size = 262144
 	max_size = CACHE_FILESIZE
 	attachment_count = 10
@@ -157,13 +128,15 @@ class AttachmentCache(diskcache.Cache):
 	channels = set()
 	last = set()
 
-	def __init__(self, *args, **kwargs):
+	def __init__(self, *args, secondary=None, **kwargs):
 		super().__init__(*args, **kwargs)
-		self.init()
+		self.init(secondary)
 
-	def init(self):
+	def init(self, secondary=None):
 		self.channels.clear()
 		self.channels.update(AUTH.get("proxy_channels", ()))
+		if secondary:
+			self.secondary = AutoCache(secondary, size_limit=128 * 1073741824, stale=86400 * 7, timeout=86400 * 30)
 		return self.channels
 
 	@tracebacksuppressor
@@ -274,14 +247,11 @@ class AttachmentCache(diskcache.Cache):
 		else:
 			key = m_id * ac + a_id
 			early = 86400 - 60
+		resp = await self.aretrieve(key, self.get_attachment, c_id, m_id, a_id, fn)
 		try:
-			resp = self[key]
-			assert isinstance(resp, str) and not discord_expired(resp, early) and url2fn(resp) == fn
-		except KeyError:
-			resp = await retrieve_from(self, key, self.get_attachment, c_id, m_id, a_id, fn)
+			assert isinstance(resp, str) and not discord_expired(resp, early)
 		except AssertionError:
-			resp = await self.get_attachment(c_id, m_id, a_id, fn)
-			self[key] = resp
+			resp = await self._aretrieve(key, self.get_attachment, c_id, m_id, a_id, fn)
 		return resp
 
 	async def get_attachments(self, path):
@@ -304,46 +274,56 @@ class AttachmentCache(diskcache.Cache):
 		return urls, size_mb * 1048576
 
 	async def obtains(self, path):
+		resp = await self.aretrieve(path, self.get_attachments, path)
 		try:
-			resp = self[path]
-			assert isinstance(resp, tuple) and not discord_expired(resp[0][0], 43200 - 60)
-		except KeyError:
-			resp = await retrieve_from(self, path, self.get_attachments, path)
+			assert isinstance(resp, tuple) and not discord_expired(resp[0][0], 43200 - 120)
 		except AssertionError:
-			resp = await self.get_attachments(path)
-			self[path] = resp
+			resp = await self._aretrieve(path, self.get_attachments, path)
 		return resp
 
-	async def download(self, url, filename):
+	async def _download(self, url):
 		if is_discord_attachment(url):
 			target = await self.obtain(url=url)
+			print(target)
 			data = await Request(target, headers=Request.header(), aio=True)
-			async with aiofiles.open(filename, "wb") as f:
-				await f.write(data)
-			return filename
+			return data
 		if not is_miza_attachment(url):
-			args = ["streamshatter", url, filename]
+			fn = temporary_file(url2ext(url))
+			args = ["streamshatter", url, fn]
 			print(args)
 			proc = await asyncio.create_subprocess_exec(*args, stdin=subprocess.DEVNULL)
 			await proc.wait()
-			return filename
+			async with aiofiles.open(fn, "rb") as f:
+				return await f.read()
+			try:
+				os.remove(fn)
+			except (OSError, PermissionError, FileNotFoundError):
+				pass
 		if "/u/" in url:
+			print(url)
 			c_id, m_id, a_id, fn = expand_attachment(url)
 			target = await self.obtain(c_id, m_id, a_id, fn)
 			data = await Request(target, headers=Request.header(), aio=True)
+			return data
+		elif "/c/" in url:
+			print(url)
+			path = url.split("/c/", 1)[-1].split("/", 1)[0]
+			urls = await self.obtains(path)
+			data = bytearray()
+			for url in urls:
+				b = await Request(target, headers=Request.header(), aio=True)
+				data.extend(b)
+			return data
+		raise NotImplementedError(url)
+
+	async def download(self, url, filename=None):
+		url = unyt(url)
+		data = await self.secondary.aretrieve(url, self._download, url)
+		if filename:
 			async with aiofiles.open(filename, "wb") as f:
 				await f.write(data)
 			return filename
-		elif "/c/" in url:
-			path = url.split("/c/", 1)[-1].split("/", 1)[0]
-			urls = await self.obtains(path)
-			async with aiofiles.open(filename, "wb") as f:
-				for url in urls:
-					data = await Request(target, headers=Request.header(), aio=True)
-					await f.write(data)
-			return filename
-		else:
-			raise NotImplementedError(url)
+		return data
 
 	async def delete(self, c_id, m_id, url=None):
 		if url:
@@ -495,7 +475,5 @@ def download_binary_dependencies():
 		acquire_from_archive("https://mizabot.xyz/u/vaWqov8EAslNEANIlpskJhpJMplF/ecm", [], ["binaries/ecm"])
 
 
-colour_cache = ColourCache(directory=f"{CACHE_PATH}/colour", expiry=86400 * 7)
-attachment_cache = AttachmentCache(directory=f"{CACHE_PATH}/attachment", expiry=3600 * 18)
-upload_cache = diskcache.Cache(directory=f"{CACHE_PATH}/upload", expiry=86400 * 30)
-download_cache = diskcache.Cache(directory=f"{CACHE_PATH}/colour", expiry=60)
+colour_cache = ColourCache(f"{CACHE_PATH}/colour", stale=86400, timeout=86400 * 7)
+attachment_cache = AttachmentCache(f"{CACHE_PATH}/attachment", secondary=f"{CACHE_PATH}/attachments", expiry=3600 * 18)

@@ -35,7 +35,6 @@ import threading
 import time
 from traceback import format_exc, print_exc
 from urllib.parse import quote_plus, unquote_plus
-import weakref
 import zipfile
 from dynamic_dt import DynamicDT
 import filetype
@@ -50,7 +49,7 @@ import niquests
 import requests
 from misc.smath import predict_next, display_to_precision, unicode_prune, full_prune
 from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, fcdict, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, T2, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, MultiEncoder, sublist_index # noqa: F401
-from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, asubmit, csubmit, esubmit, tsubmit, waited_sync, Future, Semaphore
+from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, asubmit, csubmit, esubmit, tsubmit, Future, Semaphore
 
 try:
 	from random import randbytes
@@ -981,13 +980,31 @@ def bytes2hex(b, space=True) -> str:
 	if space:
 		return b.hex(" ").upper()
 	return b.hex().upper()
-
 def hex2bytes(b) -> bytes:
 	"Converts a hex string to a bytes object."
 	s = as_str(b).replace(" ", "")
 	if len(s) & 1:
 		s = s[:-1] + "0" + s[-1]
 	return bytes.fromhex(s)
+
+def lev_utf_encode(b):
+	out = []
+	b = memoryview(b)
+	while b:
+		c, b = b[:5], b[5:]
+		n = int.from_bytes(c, "big")
+		x, y = divmod(n, 1048576)
+		out.append(chr(x + 65536))
+		out.append(chr(y + 65536))
+	return "".join(out)
+def lev_utf_decode(s):
+	b = bytearray()
+	buf = list(map(ord, s))
+	for x, y in zip(buf[::2], buf[1::2]):
+		n = (x - 65536) * 1048576 + y - 65536
+		c = n.to_bytes(5, "big")
+		b.extend(c)
+	return b
 
 
 def maps(funcs, *args, **kwargs):
@@ -996,7 +1013,7 @@ def maps(funcs, *args, **kwargs):
 		yield func(*args, **kwargs)
 
 def temporary_file(fmt="bin"):
-	return f"{TEMP_PATH}/{ts_us()}.{fmt}"
+	return f"{TEMP_PATH}/{ts_us()}.{fmt}" if fmt else f"{TEMP_PATH}/{ts_us()}"
 
 def get_image_size(b):
 	if isinstance(b, io.BytesIO):
@@ -3178,259 +3195,136 @@ class FileHashDict(collections.abc.MutableMapping):
 			self.db_sem.resume()
 
 
-class CacheItem:
-	__slots__ = ("value")
+class AutoCache(diskcache.Cache, collections.abc.MutableMapping):
+	"A dictionary-compatible object where the key-value pairs expire after a specified delay. Implements stale-while-revaluate + stale-if-error protocols."
+	def __init__(self, directory=None, stale=60, timeout=86400, **kwargs):
+		self._path = directory or None
+		self._stale = stale or inf
+		self._stimeout = timeout or inf
+		self._retrieving = {}
+		super().__init__(self._path, **kwargs)
+		self.validate_or_clear()
 
-	def __init__(self, value):
-		self.value = value
-
-class TimedCache(dict):
-	"A dictionary-compatible object where the key-value pairs expire after a specified delay. Implements stale-while-revaluate protocol."
-	# __slots__ = ("timeout", "timeout2", "tmap", "soonest", "waiting", "lost", "trash", "db")
-
-	def __init__(self, *args, timeout=60, timeout2=8, trash=4096, persist=None, autosave=3600, **kwargs):
-		super().__init__(*args, **kwargs)
-		object.__setattr__(self, "timeout", timeout)
-		object.__setattr__(self, "timeout2", timeout2)
-		object.__setattr__(self, "lost", {})
-		object.__setattr__(self, "trash", trash)
-		object.__setattr__(self, "db", None)
-		if self:
-			ts = time.time()
-			tmap = {k: ts for k in self}
-			object.__setattr__(self, "soonest", ts)
-		else:
-			tmap = {}
-			object.__setattr__(self, "soonest", inf)
-		object.__setattr__(self, "tmap", tmap)
-		if self:
-			fut = esubmit(waited_sync, self._update, timeout)
-		else:
-			fut = None
-		object.__setattr__(self, "waiting", fut)
-		if persist is not None:
-			path = f"{persistdir}/{persist}"
-			db = FileHashDict(path=path, automut=False, autosave=autosave)
-			self.attach(db)
-
-	def attach(self, db):
-		db.setdefault("__lost", {}).update(self.lost)
-		object.__setattr__(self, "lost", db["__lost"])
-		db.setdefault("__tmap", {}).update(self.tmap)
-		db.pop("tmap", None)
-		object.__setattr__(self, "db", db)
-		object.__setattr__(self, "tmap", db["__tmap"])
-		super().clear()
-		if self.waiting:
-			self.waiting.cancel()
-		fut = esubmit(waited_sync, self._update, self.timeout)
-		object.__setattr__(self, "waiting", fut)
-		t = time.time()
-		for k in self.db:
-			if k not in self.tmap:
-				self.tmap[k] = t
-
-	def _update(self):
-		tmap = self.tmap
-		timeout = self.timeout
-		lost = self.lost
-		popcount = 0
-		t = time.time()
-		for k in sorted(tmap, key=tmap.__getitem__):
-			if not isfinite(timeout):
-				continue
-			if t < tmap.get(k, inf) + timeout:
-				ts = tmap.get(k, inf) + timeout
-				object.__setattr__(self, "soonest", ts)
-				if self.waiting:
-					self.waiting.cancel()
-				if isfinite(ts):
-					fut = esubmit(waited_sync, self._update, ts - t)
-					object.__setattr__(self, "waiting", fut)
-				break
-			popcount += 1
-			tmap.pop(k)
-			v = self.db.pop(k) if self.db else super().pop(k)
-			if self.trash >= popcount:
-				while len(lost) > self.trash:
-					with suppress(KeyError, RuntimeError):
-						lost.pop(next(iter(lost)))
-				lost[k] = v
-		else:
-			object.__setattr__(self, "soonest", inf)
-		if self.db:
-			self.db.sync()
-		return self
+	def validate_or_clear(self):
+		if bool(self):
+			t = next(diskcache.Cache.__getitem__(self, k) for k in diskcache.Cache.iterkeys(self))
+			if not isinstance(t, (tuple, list)) or len(t) != 2 or not isinstance(t[-1], float):
+				self.clear()
 
 	def __iter__(self):
-		if self.db is not None:
-			return iter(self.db)
 		return super().__iter__()
 
 	def __len__(self):
-		if self.db is not None:
-			return len(self.db)
 		return super().__len__()
 
 	def __getitem__(self, k):
-		if self.db is not None:
-			try:
-				return self.db.__getitem__(k)
-			except KeyError:
-				pass
-		return super().__getitem__(k)
+		if (fut := self._retrieving.get(k)):
+			return fut.result()
+		return super().__getitem__(k)[0]
 
 	def __setitem__(self, k, v):
-		if self.db is None:
-			super().__setitem__(k, v)
-		else:
-			self.db.__setitem__(k, v)
-		self.lost.pop(k, None)
-		timeout = self.timeout2 if is_exception(v) else self.timeout
-		ts = time.time()
-		if isfinite(timeout) and ts < self.soonest:
-			object.__setattr__(self, "soonest", ts)
-			if self.waiting:
-				self.waiting.cancel()
-			fut = esubmit(waited_sync, self._update, timeout)
-			if self.waiting:
-				self.waiting.cancel()
-			object.__setattr__(self, "waiting", fut)
-		self.tmap[k] = ts
+		item = (v, utc())
+		if isinstance(v, memoryview):
+			v = bytes(v)
+		super().set(k, item, expire=2. ** 52 if isfinite(self._stale) else self._stimeout)
 
 	def update(self, other):
-		super().update(other)
-		t = time.time()
-		for k, v in other.items():
-			self.tmap[k] = t
+		t = utc()
+		if hasattr(other, "items"):
+			other = other.items()
+		for k, v in other:
+			if isinstance(v, memoryview):
+				v = bytes(v)
+			super().set(k, (v, t), expire=2. ** 52 if isfinite(self._stale) else self._stimeout)
 		return self
 
 	def pop(self, k, v=Dummy):
-		try:
-			v = self[k]
-		except KeyError:
-			if v is Dummy:
-				raise KeyError(k)
-			return v
-		super().pop(k, None)
-		if self.db is not None:
-			self.db.pop(k, None)
-		self.lost.pop(k, None)
-		self.tmap.pop(k, None)
+		self._retrieving.pop(k, None)
+		v = super().pop(k, default=(v,))[0]
+		if v is Dummy:
+			raise KeyError(k)
 		return v
 
 	def age(self, k):
-		try:
-			self[k]
-		except KeyError:
-			self.tmap.pop(k, None)
-			return inf
-		return utc() - self.tmap.get(k, -inf)
+		return utc() - super().get(k, (-inf,))[-1]
 
 	def setdefault(self, k, v, timeout=None):
+		if (fut := self._retrieving.get(k)):
+			return fut.result()
 		try:
-			resp = self[k]
+			return super().__getitem__(k)[0]
 		except KeyError:
 			self[k] = v
-			return v
-		if timeout is not None and self.age(k) > timeout:
-			self[k] = v
-			return v
-		return resp
+		return v
 
-	def retrieve(self, k):
-		return self.lost.pop(k)
-
-	async def retrieve_into(self, k, func, *args, **kwargs):
-		resp = await asubmit(func, *args, **kwargs)
-		self[k] = resp
-		return resp
-
-	async def retrieve_from(self, k, func, *args, **kwargs):
+	def _retrieve(self, k, func, *args, **kwargs):
 		try:
-			resp = self[k]
-		except KeyError:
-			pass
+			self._retrieving[k] = fut = concurrent.futures.Future()
+			self[k] = v = func(*args, **kwargs)
+		except Exception as ex:
+			fut.set_exception(ex)
 		else:
-			if isinstance(resp, CacheItem):
-				try:
-					resp = await resp.value
-				except BaseException as ex:
-					resp = ex
-				if is_exception(resp):
-					ti = self.tmap.get(k)
-					if not ti or utc() - ti > self.timeout2:
-						resp = Dummy
-			if resp is not Dummy:
-				if is_exception(resp):
-					raise resp
-				return resp
-		fut = csubmit(self.retrieve_into(k, func, *args, **kwargs))
-		super().__setitem__(k, CacheItem(fut))
-		resp = Dummy
+			fut.set_result(v)
+		finally:
+			self._retrieving.pop(k, None)
+		return v
+	def retrieve(self, k, func, *args, **kwargs):
 		try:
-			resp = await fut
-		except Exception:
-			try:
-				resp = self.retrieve(k)
-			except KeyError:
-				pass
-			if is_exception(resp):
-				raise
-		super().__delitem__(k)
-		return resp
+			v, t = super().__getitem__(k)
+		except KeyError:
+			v = self._retrieve(k, func, *args, **kwargs)
+		else:
+			delay = utc() - t
+			if delay > self._stimeout:
+				try:
+					v = self._retrieve(k, func, *args, **kwargs)
+				except Exception:
+					pass
+			elif delay > self._stale:
+				esubmit(self._retrieve, k, func, *args, **kwargs)
+		return v
+
+	async def _aretrieve(self, k, func, *args, **kwargs):
+		try:
+			self._retrieving[k] = fut = concurrent.futures.Future()
+			v = await asubmit(func, *args, **kwargs)
+			await asubmit(self.__setitem__, k, v)
+		except Exception as ex:
+			fut.set_exception(ex)
+			raise
+		else:
+			fut.set_result(v)
+		finally:
+			self._retrieving.pop(k, None)
+		return v
+	async def aretrieve(self, k, func, *args, **kwargs):
+		try:
+			v, t = super().__getitem__(k)
+		except KeyError:
+			v = await self._aretrieve(k, func, *args, **kwargs)
+		else:
+			delay = utc() - t
+			if delay > self._stimeout:
+				try:
+					v = await self._aretrieve(k, func, *args, **kwargs)
+				except Exception:
+					pass
+			if delay > self._stale:
+				csubmit(self._aretrieve(k, func, *args, **kwargs))
+		return v
+
+	def keys(self):
+		return super().iterkeys()
+
+	def values(self):
+		return (diskcache.Cache.__getitem__(self, k) for k in diskcache.Cache.iterkeys(self))
+
+	def items(self):
+		return ((k, diskcache.Cache.__getitem__(self, k)) for k in diskcache.Cache.iterkeys(self))
 
 	def clear(self):
-		db = self.db
+		self._retrieving.clear()
 		super().clear()
-		if db:
-			db.clear()
-			db.setdefault("__tmap", {})
-			object.__setattr__(self, "tmap", db["__tmap"])
-		else:
-			object.__setattr__(self, "tmap", None)
-
-
-def keys(d):
-	return tuple(d)
-diskcache.Cache.keys = keys
-
-def values(d):
-	return tuple(map(d.__getitem__, keys(d)))
-diskcache.Cache.values = values
-
-def items(d):
-	return tuple((k, d.__getitem__(k)) for k in keys(d))
-diskcache.Cache.items = items
-
-weak_retrieval = weakref.WeakValueDictionary()
-
-async def retrieve_into(d, k, func, *args, **kwargs):
-	resp = await asubmit(func, *args, **kwargs)
-	if hasattr(d, "expiry"):
-		d.set(k, resp, expire=d.expiry)
-	else:
-		d[k] = resp
-	return resp
-
-async def retrieve_from(d, k, func, *args, **kwargs):
-	try:
-		return d[k]
-	except KeyError:
-		pass
-	h = (id(d), k)
-	try:
-		fut = weak_retrieval[h]
-	except KeyError:
-		pass
-	else:
-		return await fut
-	fut = csubmit(retrieve_into(d, k, func, *args, **kwargs))
-	weak_retrieval[h] = fut
-	try:
-		return await fut
-	finally:
-		weak_retrieval.pop(h, None)
 
 
 DISCORD_EPOCH = 1420070400000 # 1 Jan 2015

@@ -985,6 +985,8 @@ class RingVector(collections.abc.MutableSequence, collections.abc.Callable):
 
 	@writing_with(order=True, elements=True)
 	def sort(self, *args, key=None, reverse=False, **kwargs):
+		if len(self) < 2:
+			return True
 		try:
 			if key is not None:
 				view = sorted(self.view, *args, key=key, reverse=reverse, **kwargs)

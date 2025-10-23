@@ -158,7 +158,7 @@ class Purge(Command):
 						raise StopIteration
 					await _channel.delete_messages(dels)
 					for m in dels:
-						bot.data.deleted[m.id] = 2
+						bot.data.deleted.cache[m.id] = 2
 					deleting = deleting[len(dels):]
 					delcount += len(dels)
 				else:

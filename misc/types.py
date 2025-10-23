@@ -948,16 +948,17 @@ class RangeSet(collections.abc.Iterable):
 	def __contains__(self, key):
 		if isinstance(key, slice | range):
 			start, stop = (key.start, key.stop) if key.step >= 0 else ((k2 := range(key.start, key.stop, key.step)[::-1]).start, k2.stop)
-			i = bisect.bisect_left(self.ranges, start, key=lambda x: x[1])
-			while i < len(self.ranges):
+			idx = bisect.bisect_left(self.ranges, start, key=lambda x: x[1])
+			for i in range(idx, len(self.ranges)):
 				left, right = self.ranges[i]
 				if left > start:
 					break
 				if right > stop:
 					return True
+				i += 1
 			return False
-		i = bisect.bisect_left(self.ranges, key, key=lambda x: x[1])
-		while i < len(self.ranges):
+		idx = bisect.bisect_left(self.ranges, key, key=lambda x: x[1])
+		for i in range(idx, len(self.ranges)):
 			left, right = self.ranges[i]
 			if left > key:
 				break

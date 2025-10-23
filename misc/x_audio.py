@@ -55,63 +55,7 @@ client_fut = Future()
 ytdl_fut = esubmit(AudioDownloader, workers=1)
 
 class AudioPlayer(discord.AudioSource):
-	"""
-	Custom audio player for Discord voice channels, extending discord.AudioSource.
-	This class manages audio playback, queueing, voice connections, and various audio effects/settings
-	for a Discord bot. It handles joining/leaving voice channels, audio streaming, queue manipulation,
-	and application of effects like pitch, speed, reverb, etc.
-	Attributes:
-		cache (FileHashDict): Cache for voice channel players.
-		defaults (dict): Default audio settings (volume, reverb, pitch, etc.).
-		players (dict): Mapping of guild IDs to AudioPlayer instances.
-		waiting (dict): Futures for pending voice connections.
-		futs (dict): Additional futures for operations.
-		sources (dict): Audio sources.
-		users (dict): Cached users.
-		fetched (dict): Fetched user voice states per guild.
-		vc (discord.VoiceClient): The voice client connection.
-		args: Additional arguments (not explicitly used).
-		emptyopus (bytes): Empty Opus packet for silence.
-		silent (bool): Indicates if currently silent.
-		last_played (float): Timestamp of last audio playback.
-		last_activity (float): Timestamp of last activity (set to infinity).
-	Class Methods:
-		join(cls, vcc, channel=None, user=None, announce=0): Joins or reconnects to a voice channel.
-		join_into(self, vcc, announce=0): Internal method to connect to voice.
-		find_user(cls, guild, user): Finds and fetches user voice state.
-		ensure_speak(cls, vcc): Ensures the bot can speak in stage channels.
-		speak(cls, vcc): Requests to speak in stage channels.
-		force_disconnect(cls, guild): Forcefully disconnects from voice.
-		from_guild(cls, guild): Retrieves or creates player from guild.
-		disconnect(cls, guild, announce=False, cid=None): Disconnects from voice.
-		fetch_user(cls, u_id): Fetches and caches a user.
-	Instance Methods:
-		__init__(self, vcc=None, channel=None, queue=[], settings={}): Initializes the player.
-		__getattr__(self, k): Attribute getter with fallback to voice client or playing source.
-		epos (property): Current position and duration of playing audio.
-		reverse (property): Whether audio is playing in reverse.
-		construct_options(self, full=True): Builds FFmpeg options from settings.
-		announce_play(self, entry): Announces the currently playing entry.
-		announce(self, s, dump=False, channel=None): Sends announcement message.
-		get_dump(self): Dumps queue and settings to JSON.
-		load_dump(self, b, uid=None, universal=False): Loads queue from dump.
-		update_activity(self): Updates activity and handles timeouts for empty channels.
-		update_streaming(self): Updates streaming status and handles empty queue timeouts.
-		read(self): Reads audio data, handles skipping and silence.
-		enqueue(self, items, start=-1, stride=1): Adds items to the queue.
-		skip(self, indices=0, loop=False, repeat=False, shuffle=False): Skips queue items.
-		seek(self, pos=0): Seeks to position in current audio.
-		ensure_play(self, force=0): Ensures playback is active.
-		clear(self): Clears queue and stops audio.
-		refresh(self): Resets update tasks.
-		backup(self): Backs up player state.
-		is_opus(self): Returns True (Opus audio).
-		cleanup(self): Cleans up resources (calls clear).
-	Note: This class integrates with Discord.py for voice functionality and uses custom utilities
-	like alist, cdict, and audio effects processing.
-	"""
 
-	# cache = FileHashDict(path="cache/vc.players")
 	cache = diskcache.Cache(directory=f"{CACHE_PATH}/audio", expiry=86400 * 7)
 	defaults = {
 		"volume": 1,
@@ -1646,7 +1590,6 @@ async def terminate():
 	# Unload all audio players and preserve their state in our cache on disk
 	await asyncio.gather(*(unload_player(gid) for gid in AP.players.keys()))
 	await asubmit(ytdl.close)
-	# AP.cache.sync()
 	return await client.close()
 
 

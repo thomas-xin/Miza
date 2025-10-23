@@ -1,4 +1,3 @@
-import base64
 import datetime
 import functools
 import io
@@ -25,10 +24,10 @@ from concurrent.futures import Future
 from traceback import print_exc
 from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
-from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut, gather
-from .types import byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, RangeSet, MemoryBytes
-from .util import fcdict, nhash, shash, uhash, bytes2zip, zip2bytes, enc_box, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, leb128, decode_leb128, ecdc_dir, quote_plus, rename, url_unparse, url2fn, is_youtube_url, seq, TimedCache, Request, magic, is_discord_attachment, is_miza_attachment, unyt, ecdc_exists, CACHE_PATH, T, byte_scale, decode_attachment, expand_attachment, shorten_attachment, update_headers, temporary_file, CODEC_FFMPEG
-from .caches import attachment_cache, upload_cache, download_cache, colour_cache
+from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut
+from .types import byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, MemoryBytes
+from .util import fcdict, nhash, shash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, ecdc_dir, quote_plus, rename, url_unparse, url2fn, is_youtube_url, seq, AutoCache, Request, magic, is_discord_attachment, is_miza_attachment, unyt, ecdc_exists, CACHE_PATH, T, byte_scale, decode_attachment, update_headers, temporary_file, CODEC_FFMPEG
+from .caches import attachment_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
 try:
@@ -461,65 +460,6 @@ class Server:
 				return resp
 		return resp
 
-	@cp.expose(("fi",))
-	def fileinfo(self, *path, **void):
-		update_headers(cp.response.headers, **SHEADERS)
-		assert len(path) in (1, 2) and path[0].count("~") == 0
-		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
-		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
-		url = await_fut(fut)
-		try:
-			info = download_cache[url]
-		except KeyError:
-			resp = self.get_with_retries(url, timeout=3)
-			data = seq(resp)
-		else:
-			data = MemoryBytes(info)
-		length, i = decode_leb128(data, mode="index")
-		content = data[i:i + length]
-		try:
-			encoded = zip2bytes(content)
-		except Exception:
-			encoded = bytes(content)
-		cp.response.headers["Content-Type"] = "application/json"
-		return bytes(encoded)
-
-	@cp.expose
-	def download(self, *path, download="1", **void):
-		update_headers(cp.response.headers, **CHEADERS)
-		assert len(path) in (1, 2) and path[0].count("~") == 0
-		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
-		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
-		url = await_fut(fut)
-		callback = None
-		try:
-			info = download_cache[url]
-		except KeyError:
-			resp = self.get_with_retries(url, timeout=3)
-			data = seq(resp)
-
-			def callback(data):
-				data.seek(0)
-				download_cache[url] = bytes(data.read())
-		else:
-			data = MemoryBytes(info)
-		length, i = decode_leb128(data, mode="index")
-		content = data[i:i + length]
-		try:
-			encoded = zip2bytes(content)
-		except Exception:
-			encoded = bytes(content)
-		info = cdict(orjson.loads(encoded))
-		endpoint = cp.url(qs=cp.request.query_string, base="")[1:].split("/", 1)[0]
-		download = (download and download[0] not in "0fFnN") and endpoint.startswith("d")
-		if download:
-			cp.response.headers["Content-Disposition"] = "attachment; " * bool(download) + "filename=" + json.dumps(info.filename)
-		cp.response.headers["Attachment-Filename"] = info.filename
-		cp.response.headers["Content-Type"] = info.mimetype
-		cp.response.headers["ETag"] = json_dumps(f"{info.get('timestamp', 0)};{info.get('hash', info.filename)}")
-		return self.dyn_serve(list(info.chunks), size=info.size, head=cdict(data=data, index=i + length), callback=callback)
-	download._cp_config = {"response.stream": True}
-
 	def dyn_serve(self, urls, size=0, head=None, callback=None):
 		with tracebacksuppressor:
 			brange = cp.request.headers.get("Range", "").removeprefix("bytes=")
@@ -641,135 +581,6 @@ class Server:
 					big = True
 				for fut in futs:
 					yield from fut.result()
-
-	@cp.expose
-	@cp.tools.accept(media="multipart/form-data")
-	def upload(self, filename="b", hash="", position=0, size=0):
-		position = int(position)
-		size2 = int(cp.request.headers.get("Content-Length", 0))
-		size = int(size) or size2
-		h = true_ip() + hash
-		try:
-			fp = cp.request.body.fp
-		except Exception:
-			print_exc()
-			fp = None
-		update_headers(cp.response.headers, **HEADERS)
-		cp.response.headers["Content-Type"] = "application/json"
-		if not size or not fp:
-			if h in upload_cache:
-				return json_dumps(list(upload_cache[h].keys()))
-			return b"Expected input data."
-		if size > 1 << 40:
-			return b"Maximum filesize is 1TB."
-		assert position == 0 or h in upload_cache
-		assert not position % attachment_cache.max_size
-		if h not in upload_cache:
-			private_key = os.urandom(8)
-			hashable = private_key + b"~" + enc_box._key
-			public_key = shash(hashable)
-			upload_cache[h] = cdict(info=cdict(filename=filename, mimetype=cp.request.headers.get("mimetype", "application/octet-stream"), hash="", timestamp=utc(), size=size, key=public_key, chunks=[]), chunkinfo={}, required=RangeSet(0, size), key=private_key)
-
-		def start_upload(position):
-			if position == 0:
-				head = fp.read(attachment_cache.max_size // 2)
-				upload_cache[h].info.mimetype = magic.from_buffer(head)
-				upload_cache[h].info.hash = shash(head)
-				upload_cache[h].head = head
-				upload_cache[h].required.remove(0, len(head))
-				position += len(head)
-			yield b"{"
-			while upload_cache[h].required:
-				fn = "c"
-				b = fp.read(attachment_cache.max_size)
-				if not b:
-					break
-				fut = attachment_cache.create(b, filename=fn)
-				url = await_fut(fut)
-				cid, mid, aid, fn = expand_attachment(url)
-				uchunk = shorten_attachment(cid, mid, aid, fn, size=len(b))
-				upload_cache[h].chunkinfo[position] = uchunk
-				upload_cache[h].required.remove(position, position + len(b))
-				position += len(b)
-			if not upload_cache[h].required:
-				upload_cache[h].info["chunks"] = [v for k, v in sorted(upload_cache[h].chunkinfo.items())]
-				debug_info = upload_cache[h].info.copy()
-				debug_info.pop("head", None)
-				print("INFO:", debug_info)
-				data = json_dumps(upload_cache[h].info)
-				if len(data) > 262144:
-					data2 = bytes2zip(data)
-					if len(data2) <= len(data) / 2 or len(data) >= attachment_cache.max_size // 4:
-						data = data2
-				encoded = leb128(len(data)) + data
-				head = upload_cache[h].head
-				assert len(encoded) + len(head) <= attachment_cache.max_size, f"Unable to encode file header: {len(encoded) + len(head)} > {attachment_cache.max_size}"
-				fut = attachment_cache.create(encoded + head, filename=filename, editable=True)
-				url = await_fut(fut)
-				cid, mid, aid, fn = expand_attachment(url)
-				uhead = shorten_attachment(cid, mid, aid, fn, mode="p") + "?key=" + base64.urlsafe_b64encode(upload_cache[h].key).rstrip(b"=").decode("ascii")
-				yield b'"url":"' + uhead.encode("utf-8") + b'"'
-			yield b"}"
-		return start_upload(position)
-
-	@cp.expose
-	def delete(self, *path, key=None, **void):
-		assert len(path) in (1, 2) and path[0].count("~") == 0
-		assert key, "File Key Required."
-		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
-		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
-		url = await_fut(fut)
-		resp = self.get_with_retries(url, timeout=3)
-		data = seq(resp)
-		length, i = decode_leb128(data, mode="index")
-		content = data[i:i + length]
-		try:
-			data = zip2bytes(content)
-		except Exception:
-			data = content
-		info = orjson.loads(data)
-		hashable = base64.urlsafe_b64decode(key + "=") + b"~" + enc_box._key
-		public_key = shash(hashable)
-		assert public_key == info["key"], "File Key Mismatch."
-		deletes = set()
-		deletes.add((c_id, m_id))
-		for url in info["chunks"]:
-			c_id, m_id, a_id, fn = expand_attachment(url)
-			deletes.add((c_id, m_id))
-		print("DELETES:", deletes)
-		futs = []
-		for c_id, m_id in deletes:
-			fut = csubmit(attachment_cache.delete(c_id, m_id))
-			futs.append(fut)
-		await_fut(gather(*futs))
-
-	@cp.expose
-	def edit(self, *path, key=None, **void):
-		update_headers(cp.response.headers, **CHEADERS)
-		assert len(path) in (1, 2) and path[0].count("~") == 0
-		c_id, m_id, a_id, fn = decode_attachment("/".join(path))
-		fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
-		url = await_fut(fut)
-		callback = None
-		try:
-			info = download_cache[url]
-		except KeyError:
-			resp = self.get_with_retries(url, timeout=3)
-			data = seq(resp)
-
-			def callback(data):
-				data.seek(0)
-				download_cache[url] = bytes(data.read())
-		else:
-			data = MemoryBytes(info)
-		length, i = decode_leb128(data, mode="index")
-		content = data[i:i + length]
-		try:
-			encoded = zip2bytes(content)
-		except Exception:
-			encoded = bytes(content)
-		info = cdict(orjson.loads(encoded))
-		return str(info)
 
 	@cp.expose(("c",))
 	def chunked_proxy(self, path, *void):
@@ -1072,7 +883,7 @@ class Server:
 			fut = self.ecdc_running.pop(out, None)
 			fut.set_result(None)
 
-	ydl_sems = TimedCache(timeout=8)
+	ydl_sems = AutoCache(stale=0, timeout=60)
 	ydl = None
 	@cp.expose
 	def ytdl(self, **kwargs):
