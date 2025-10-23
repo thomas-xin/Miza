@@ -13,7 +13,7 @@ import requests
 from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse, RedirectResponse
 from .asyncs import asubmit, esubmit, csubmit
-from .types import fcdict, byte_like, astype, MemoryBytes
+from .types import fcdict, byte_like, MemoryBytes
 from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment,
 	is_discord_attachment, url2fn, seq,
@@ -208,8 +208,8 @@ class Server:
 							print("get_chunk:", u)
 							b = await attachment_cache.download(u)
 						if s <= 0 and e >= len(b):
-							yield b
-						yield astype(b, bytes)[s:e]
+							return b
+						return memoryview(b)[s:e]
 
 					if len(futs) > i + 1:
 						yield await futs.pop(0)
