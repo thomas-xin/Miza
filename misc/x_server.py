@@ -232,10 +232,10 @@ def error_handler(exc=None):
 	else:
 		status = error_map.get(exc) or error_map.get(exc.__class__) or 500
 	cp.response.status = status
+	print_exc()
 	if "application/json" in cp.request.headers.get("Accept", ""):
 		head["Content-Type"] = "application/json"
-		update_headers(cp.response.headers, **head)
-		return orjson.dumps(dict(
+		body = orjson.dumps(dict(
 			exception=str(exc.__class__),
 			message=str(exc),
 		))
@@ -265,7 +265,6 @@ def error_handler(exc=None):
 	head["Content-Length"] = len(body)
 	update_headers(cp.response.headers, **head)
 	cp.response.headers.pop("Connection", None)
-	print_exc()
 	print(cp.response.headers)
 	cp.response.body = body
 
@@ -858,7 +857,7 @@ class Server:
 			fut = self.ecdc_running.pop(out, None)
 			fut.set_result(None)
 
-	ydl_sems = AutoCache(stale=0, timeout=60)
+	ydl_sems = {}
 	ydl = None
 	@cp.expose
 	def ytdl(self, **kwargs):
@@ -1261,22 +1260,9 @@ class Server:
 	@cp.expose(("commands",))
 	def command(self, content="", input="", timeout=420, redirect=""):
 		ip = true_ip()
-		if "\x7f" in content and ip in ("127.0.0.1", ADDRESS, T(self).get("ip", None)):
-			cp.request.no_log = True
-			cl = int(cp.request.headers["Content-Length"])
-			d = cp.request.body.read(cl)
-			try:
-				j = orjson.loads(d)
-			except Exception:
-				try:
-					j = eval(d, {}, {})
-				except Exception:
-					j = dict(error=d)
-			if isinstance(j, dict) or not j:
-				return
-			else:
-				return b"\xf0\x9f\x92\x9c"
 		content = input or urllib.parse.unquote(cp.url(base="", qs=cp.request.query_string).rstrip("?").split("/", 1)[-1].removeprefix("api/").split("/", 1)[-1])
+		if not content.startswith("~"):
+			content = "~" + content
 		print("/command", ip, content)
 		try:
 			secret = cp.request.headers["X-RapidAPI-Proxy-Secret"]
@@ -1289,12 +1275,14 @@ class Server:
 			self.rapidapi += 1
 		if " " not in content:
 			content += " "
-		j, after = interface.run(f"bot.run_simulate({repr(content)})")
-		a = after - utc()
-		if a > 0:
-			cp.response.headers["Retry-After"] = a
 		update_headers(cp.response.headers, **HEADERS)
-		return json_dumps(j)
+		cp.response.headers["content-type"] = "application/json"
+		try:
+			resp = interface.run(f"await bot.run_simulate({repr(ip)},{repr(content)})")
+		except Exception as ex:
+			cp.response.status = 500
+			return json_dumps(dict(exception=ex.__class__.__name__, message=str(ex)))
+		return json_dumps(resp)
 
 	@cp.expose(("cat", "cats", "dog", "dogs", "neko", "nekos"))
 	def imagepool(self, tag="", refresh=60):

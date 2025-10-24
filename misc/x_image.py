@@ -35,7 +35,7 @@ Transpose = getattr(Image, "Transpose", Image)
 Transform = getattr(Image, "Transform", Image)
 Image.MAX_IMAGE_PIXELS = 4294967296
 GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_DIFFERENT_PALETTE_ONLY
-from misc.util import get_image_size  # noqa: E402
+from misc.util import get_image_size, temporary_file  # noqa: E402, F401
 
 DC = 0
 torch = None
@@ -2560,8 +2560,7 @@ def ectoplasm(url, message, force=False):
 		i.seek(0)
 		b = i.read()
 	if not fn:
-		ts = time.time_ns() // 1000
-		fn = "cache/" + str(ts) + ".png"
+		fn = temporary_file("webp")
 	if not force or not message:
 		with open(fn, "wb") as f:
 			f.write(b)

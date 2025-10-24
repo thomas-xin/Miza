@@ -458,7 +458,7 @@ class Colour(Command):
 	async def __call__(self, bot, colour, filesize, format, **void):
 		adj = [x / 255 for x in colour]
 		# Any exceptions encountered during colour transformations will immediately terminate the command
-		msg = ini_md(
+		msg = (
 			"HEX colour code: " + sqr_md(bytes(colour).hex().upper())
 			+ "\nDEC colour code: " + sqr_md(colour2raw(colour))
 			+ "\nRGB values: " + str(list(colour))
@@ -471,7 +471,7 @@ class Colour(Command):
 		)
 		resp = await process_image("from_colour", "$", [colour])
 		name = "Colour." + get_ext(resp)
-		return cdict(content=msg, file=CompatFile(resp, filename=name), reacts="🔳")
+		return cdict(content=msg, prefix="```ini\n", suffix="```", file=CompatFile(resp, filename=name), reacts="🔳")
 
 
 class Average(Command):
@@ -512,7 +512,7 @@ class Average(Command):
 		channels = raw2colour(colour)
 		adj = [x / 255 for x in channels]
 		# Any exceptions encountered during colour transformations will immediately terminate the command
-		msg = ini_md(
+		msg = (
 			"HEX colour code: " + sqr_md(bytes(channels).hex().upper())
 			+ "\nDEC colour code: " + sqr_md(colour2raw(channels))
 			+ "\nRGB values: " + str(channels)
@@ -525,7 +525,7 @@ class Average(Command):
 		)
 		resp = await process_image("from_colour", "$", [channels, "-fs", filesize, "-f", format])
 		name = "Average." + get_ext(resp)
-		return cdict(content=msg, file=CompatFile(resp, filename=name), reacts="🔳")
+		return cdict(content=msg, prefix="```ini\n", suffix="```", file=CompatFile(resp, filename=name), reacts="🔳")
 
 
 class QR(Command):

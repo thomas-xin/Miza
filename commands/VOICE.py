@@ -595,182 +595,6 @@ class Queue(Command):
 		)
 
 
-class Playlist(Command):
-	server_only = True
-	name = ["DefaultPlaylist", "PL"]
-	min_display = "0~2"
-	description = "Shows, appends, or removes from the default playlist."
-	schema = cdict(
-		mode=cdict(
-			type="enum",
-			validation=cdict(
-				enum=("show", "add", "sort", "remove", "clear"),
-				aliases=dict(insert="add", delete="remove", display="show"),
-			),
-			description="Indicates whether to add or remove item(s)",
-			example="remove",
-		),
-		urls=cdict(
-			type="url",
-			description="Song or playlist by URL",
-			example="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-			multiple=True,
-		),
-		index=cdict(
-			type="index",
-			description="Position to insert or remove song(s)",
-			example="4",
-		),
-	)
-	usage = "<mode(add|remove)>? <search_links>*"
-	example = ("playlist add https://www.youtube.com/watch?v=wDgQdr8ZkTw", "playlist remove 6")
-	flags = "aedzf"
-	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
-	rate_limit = (7, 11)
-	slash = True
-	ephemeral = True
-
-	async def __call__(self, bot, _message, _user, _guild, _perm, mode, urls, index, **void):
-		playlists = bot.data.playlists
-		if urls or mode in ("add", "remove", "clear"):
-			req = 2
-			if _perm < req:
-				reason = f"to modify default playlist for {_guild.name}"
-				raise self.perm_error(_perm, req, reason)
-		pl = playlists.setdefault(_guild.id, [])
-		if mode in (None, "show") and not urls and not index:
-			# Set callback message for scrollable list
-			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-			await send_with_reply(
-				None,
-				_message,
-				"*```" + "callback-voice-playlist-"
-				+ str(_user.id) + "_0"
-				+ "-\nLoading Playlist database...```*",
-				buttons=buttons,
-			)
-			return
-		if mode == "sort":
-			playlists[_guild.id] = sorted(pl)
-			return italics(css_md(f"Successfully sorted default playlist for {sqr_md(_guild)}."))
-		if mode == "clear":
-			playlists.pop(_guild.id)
-			return italics(css_md(f"Successfully removed all {sqr_md(len(pl))} entries from the default playlist for {sqr_md(_guild)}."))
-		index = index and list(index)
-		if not index:
-			index = [len(pl) + 1]
-		elif index[0] is None:
-			index[0] = 0
-		elif index[0] < 0:
-			index[0] += len(pl) + 1
-		if mode == "remove":
-			targets = RangeSet.parse([index], len(pl))
-			assert targets, "Please input valid indices."
-			removed = pl[targets[0]].get("name", "Unknown")
-			if len(targets) > 1:
-				removed += f" (+{len(targets) - 1})"
-			pl = astype(pl, alist)
-			pl.pops(removed)
-			playlists[_guild.id] = list(pl)
-			return italics(css_md(f"Successfully removed {sqr_md(removed)} from the default playlist for {sqr_md(_guild)}."))
-		lim = 4096 << self.bot.is_trusted(_guild.id) * 2 + 1
-		if len(pl) >= lim:
-			raise OverflowError(f"Playlist for {_guild} has reached the maximum of {lim} items. Please remove an item to add another.")
-		futs = [csubmit(bot.audio.asubmit(f"ytdl.search({repr(url)})")) for url in urls]
-		resps = await gather(*futs)
-		resp = list(itertools.chain.from_iterable(resps))
-		if not resp:
-			raise LookupError(f"No results for {urls}.")
-		start = index[0]
-		stride = 1 if len(index) < 3 or index[2] is None else index[2]
-		end = index[1] if len(index) > 1 else None
-		resp = resp[:(end - start) // stride] if end is not None else resp
-		items = [cdict(name=e.name, url=e.url, duration=e.duration) for e in resp]
-		pl = alist(pl)
-		pl.rotate(-start)
-		temp = alist([None] * (len(items) * abs(stride)))
-		temp[::stride] = items
-		sli = temp.view == None
-		inserts = pl[:len(items) * (abs(stride) - 1)]
-		i = -1
-		while not sli[i] or np.sum(sli) > len(inserts):
-			sli[i] = False
-			i -= 1
-			if i <= -len(sli):
-				break
-		print(len(temp), len(sli), len(inserts))
-		temp.view[sli] = inserts
-		temp = temp.view[temp.view != None]
-		temp = np.concatenate([temp, pl[len(items) * (abs(stride) - 1):]])
-		pl.fill(temp)
-		pl.rotate(start)
-		playlists[_guild.id] = list(pl)
-		stuff = str(len(items)) + " items" if len(items) > 1 else items[0].name
-		if stride != 1:
-			positions = ":".join(str(i) if i is not None else "" for i in index)
-			ins = f", at positions {positions}"
-		elif start < len(pl):
-			ins = f", at position {start}"
-		else:
-			ins = ""
-		return css_md(f"Added {sqr_md(stuff)} to the default playlist for {sqr_md(_guild)}{ins}.")
-
-	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-		u_id, pos = list(map(int, vals.split("_", 1)))
-		if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
-			return
-		if reaction not in self.directions and reaction is not None:
-			return
-		guild = message.guild
-		user = await bot.fetch_user(u_id)
-		pl = bot.data.playlists.get(guild.id, [])
-		page = 12
-		last = max(0, len(pl) - page)
-		if reaction is not None:
-			i = self.directions.index(reaction)
-			if i == 0:
-				new = 0
-			elif i == 1:
-				new = max(0, pos - page)
-			elif i == 2:
-				new = min(last, pos + page)
-			elif i == 3:
-				new = last
-			else:
-				new = pos
-			pos = new
-		content = message.content
-		if not content:
-			content = message.embeds[0].description
-		i = content.index("callback")
-		content = "*```" + "\n" * ("\n" in content[:i]) + (
-			"callback-voice-playlist-"
-			+ str(u_id) + "_" + str(pos)
-			+ "-\n"
-		)
-		if not pl:
-			content += f"No currently enabled default playlist for {str(guild).replace('`', '')}.```*"
-			msg = ""
-		else:
-			# pl.sort(key=lambda x: x["name"].casefold())
-			content += f"{len(pl)} item(s) in default playlist for {str(guild).replace('`', '')}:```*"
-			key = lambda x: lim_str(sqr_md(x["name"]) + "(" + x["url"] + ")", 1900 / page)
-			msg = iter2str(pl[pos:pos + page], key=key, offset=pos, left="`【", right="】`")
-		colour = await bot.get_colour(guild)
-		emb = discord.Embed(
-			description=content + msg,
-			colour=colour,
-		)
-		emb.set_author(**get_author(user))
-		more = len(pl) - pos - page
-		if more > 0:
-			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-		if hasattr(message, "int_token"):
-			await bot.ignore_interaction(message)
-
-
 class Connect(Command):
 	server_only = True
 	name = ["📲", "🎤", "🎵", "🎶", "Summon", "J", "Join", "Move", "Reconnect"]
@@ -845,7 +669,7 @@ class Connect(Command):
 			# if not auds.is_alone(_user) and auds.queue and _perm < 1:
 			# 	raise self.perm_error(_perm, 1, "to disconnect while other users are in voice")
 			try:
-				await bot.audio.asubmit(f"AP.disconnect({guild.id},announce=True,cid={_channel.id})")
+				await bot.audio.asubmit(f"AP.disconnect({guild.id},announce=1,cid={_channel.id},clear=1)")
 			except KeyError:
 				raise LookupError("Not currently in a voice channel.")
 			return
@@ -2711,13 +2535,5 @@ class UpdateAudio(Database):
 			print("WARNING: FFmpeg not found. Unable to convert and play audio.")
 
 
-class UpdatePlaylists(Database):
-	name = "playlists"
-
-
 class UpdateAudioSettings(Database):
 	name = "audiosettings"
-
-
-class UpdateInaccessible(Database):
-	name = "inaccessible"

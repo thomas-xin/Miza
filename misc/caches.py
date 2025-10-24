@@ -15,9 +15,9 @@ from PIL import Image
 from misc.types import utc, as_str
 from misc.asyncs import asubmit, esubmit, wrap_future, await_fut, Future
 from misc.util import (
-    CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, download_file,
+    CACHE_FILESIZE, CACHE_PATH, TEMP_PATH, AUTH, Request, api, AutoCache, download_file,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, uuhash,
-	ungroup_attachments, is_discord_url, temporary_file, url2ext, is_discord_attachment, is_miza_attachment,
+	ungroup_attachments, is_discord_url, temporary_file, url2ext, is_discord_attachment, is_miza_attachment, is_miza_url,
     snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt,
 )
 
@@ -288,17 +288,30 @@ class AttachmentCache(AutoCache):
 			data = await asubmit(download_file, target)
 			return data
 		if not is_miza_attachment(url):
+			if is_miza_url(url):
+				data = await asubmit(download_file, url)
+				return data
 			fn = temporary_file(url2ext(url))
-			args = ["streamshatter", url, fn]
+			args = ["streamshatter", "--no-log-progress", "-c", TEMP_PATH, url, fn]
 			print(args)
-			proc = await asyncio.create_subprocess_exec(*args, stdin=subprocess.DEVNULL)
+			proc = await asyncio.create_subprocess_exec(*args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 			await proc.wait()
-			async with aiofiles.open(fn, "rb") as f:
-				return await f.read()
+			if proc.returncode:
+				err = await proc.stderr.read()
+				line = as_str(err.strip().rsplit(b"\n", 1)[-1])
+				if line.startswith("niquests.exceptions.HTTPError:"):
+					line = line[len("niquests.exceptions.HTTPError:"):].strip()
+					code, msg = line.split(None, 1)
+					raise ConnectionError(code, msg)
+				raise ConnectionError(501, line)
 			try:
-				os.remove(fn)
-			except (OSError, PermissionError, FileNotFoundError):
-				pass
+				async with aiofiles.open(fn, "rb") as f:
+					return await f.read()
+			finally:
+				try:
+					os.remove(fn)
+				except (OSError, PermissionError, FileNotFoundError):
+					pass
 		if "/u/" in url:
 			c_id, m_id, a_id, fn = expand_attachment(url)
 			target = await self.obtain(c_id, m_id, a_id, fn)

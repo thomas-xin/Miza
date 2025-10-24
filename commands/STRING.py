@@ -393,34 +393,39 @@ class Math(Command):
 			description="Input expression or formula, in Sympy syntax",
 			example="lim(diff(-atan(x)), x=-sqrt(-1.02))",
 			required=True,
-			aliases=["expression"]
+			aliases=["expression"],
 		),
 		precision=cdict(
 			type="integer",
 			validation=f"(0, {limit}]",
-			description="Floating point calculation precision. Also affects notation of scientific notation and recurring decimals",
+			description="Floating point calculation precision. Also affects accuracy of scientific notation and recurring decimals",
 			example="8000",
 			default=1024,
 		),
+		rationalise=cdict(
+			type="bool",
+			description="Whether to simplify/rationalise results where possible.",
+			default=True,
+		)
 	)
-	usage = "<string> <verbose(-v)|rationalize(-r)>? <show_variables(-l)|clear_variables(-c)>?"
-	example = ("m factorial 32", "plot 3x^2-2x+1", "math integral tan(x)", "m solve(x^3-1)", "calc std([6.26,6.23,6.34,6.28])", "🔢 predict_next([2, 10, 30, 68, 130])")
-	flags = "rvlcd"
 	rate_limit = (4.5, 6)
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, bot, _user, _premium, mode, query, precision, **void):
+	async def __call__(self, bot, _user, _premium, mode, query, precision, rationalise, **void):
 		if query == "69":
 			return py_md("69 = nice")
 		if mode == "list_vars":
 			var = bot.data.variables.get(_user.id, {})
 			if not var:
-				return ini_md(f"No currently assigned variables for {sqr_md(_user)}.")
-			return ini_md(f"Currently assigned variables for {_user}:{iter2str(var)}")
+				output = f"No currently assigned variables for {sqr_md(_user)}."
+				return cdict(content=output, prefix="```ini\n", suffix="```")
+			output = f"Currently assigned variables for {_user}:{iter2str(var)}"
+			return cdict(content=output, prefix="```ini\n", suffix="```")
 		if mode == "clear_vars":
 			bot.data.variables.pop(_user.id, None)
-			return italics(css_md(f"Successfully cleared all variables for {sqr_md(_user)}."))
+			output = f"Successfully cleared all variables for {sqr_md(_user)}."
+			return cdict(content=output, prefix="*```css\n", suffix="```*")
 		var = None
 		if mode == "plot":
 			query = f"{mode}({query})"
@@ -444,7 +449,7 @@ class Math(Command):
 					if var is not None:
 						break
 		timeout = 240 if _premium.value >= 3 else 30
-		resp = await bot.solve_math(query, precision, False, timeout=timeout, variables=bot.data.variables.get(_user.id))
+		resp = await bot.solve_math(query, precision, rationalise, timeout=timeout, variables=bot.data.variables.get(_user.id))
 		# Determine whether output is a direct answer or a file
 		if type(resp) is dict and "file" in resp:
 			fn = resp["file"]
@@ -996,6 +1001,7 @@ d(*⌒▽⌒*)b Happy
 			greedy=False,
 		),
 	)
+	no_cancel = True
 	rate_limit = (1, 5)
 	slash = True
 
@@ -1008,8 +1014,9 @@ d(*⌒▽⌒*)b Happy
 		url = await self.bot.get_proxy_url(_user)
 		if _slash:
 			return cdict(content=msg)
+		fut = csubmit(bot.silent_delete(_message))
 		await bot.send_as_webhook(_channel, msg, username=_user.display_name, avatar_url=url)
-		await bot.silent_delete(_message)
+		await fut
 
 
 class Time(Command):
@@ -1302,7 +1309,7 @@ class Match(Command):
 		else:
 			regex = args.pop(0)
 		if regex:
-			temp = await asubmit(re.findall, regex, " ".join(args))
+			temp = await asubmit(re.findall, regex, " ".join(args), priority=2)
 			match = "\n".join(sqr_md(i) for i in temp)
 		else:
 			search = args.pop(0)
@@ -1312,7 +1319,7 @@ class Match(Command):
 				+ sqr_md(round_min(round(string_similarity(search.casefold(), s.casefold()) * 100, 6))) + "% case-insensitive match,\n"
 				+ sqr_md(round_min(round(string_similarity(full_prune(search), full_prune(s)) * 100, 6))) + "% unicode mapping match."
 			)
-		return ini_md(match)
+		return cdict(content=match, prefix="```ini\n", suffix="```")
 
 
 class Random(Command):

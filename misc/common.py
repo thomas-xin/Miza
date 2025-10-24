@@ -1704,10 +1704,9 @@ async def proc_eval(s, caps=["math"], priority=False, timeout=12):
 		csubmit(start_proc(p))
 		raise
 
-def process_math(expr, prec=64, rat=False, timeout=12, variables=None, retries=0):
+def process_math(expr, prec=64, rational=False, timeout=12, variables=None, retries=0):
 	"Sends an operation to the math subprocess pool."
-	cmd = [expr, prec, rat, variables]
-	return proc_eval(f"x_math.evaluate({repr(cmd)})", caps=["math"], timeout=timeout)
+	return proc_eval(f"x_math.procResp(x_math.evalSym({repr(expr)},{repr(prec)},{repr(rational)},{repr(variables)}))", caps=["math"], timeout=timeout)
 
 def process_image(image, operation="$", args=[], cap="image", priority=False, timeout=60, retries=1):
 	"Sends an operation to the image subprocess pool."

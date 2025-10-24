@@ -43,7 +43,7 @@ from contextlib import suppress
 from math import inf, floor, ceil, log2, log10
 from traceback import print_exc
 sys.path.append("misc")
-from misc.util import EvalPipe, new_playwright_page, CODECS, CODEC_FFMPEG, temporary_file
+from .util import EvalPipe, new_playwright_page, CODECS, CODEC_FFMPEG, temporary_file
 
 if __name__ == "__main__":
 	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
@@ -942,7 +942,7 @@ statics = ("png", "bmp", "jpg", "heic", "ico", "icns", "j2k", "tga", "tiff", "pd
 # Main image operation function
 def evalImg(url, operation, args):
 	ts = time.time_ns() // 1000
-	out = "cache/" + str(ts) + ".avif"
+	out = temporary_file("avif", name=ts)
 	fmt = "auto"
 	cdc = "avif"
 	fs = inf
@@ -1081,7 +1081,7 @@ def evalImg(url, operation, args):
 					cdc = "libsvtav1"
 				else:
 					fmt = "avif"
-			out = "cache/" + str(ts) + "." + CODECS.get(fmt, fmt)
+			out = temporary_file(CODECS.get(fmt, fmt), name=ts)
 			mode = str(first.mode)
 			if mode == "P":
 				raise RuntimeError("Unexpected P mode image")
@@ -1119,7 +1119,7 @@ def evalImg(url, operation, args):
 				if is_avif:
 					fmt = "y4m"
 				opts, fmt = ffmpeg_opts(new, frames, count, mode, first, fmt, fs, *size, duration, opt)
-				out = "cache/" + str(ts) + "." + CODECS.get(fmt, fmt)
+				out = temporary_file(CODECS.get(fmt, fmt), name=ts)
 				frames = new.get("frames") or frames
 				command.extend(opts)
 				command.append(out)

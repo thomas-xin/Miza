@@ -456,7 +456,19 @@ bgmap = cdict(
 	cyan=46,
 	white=47,
 )
+autocolours = dict(
+	r="red",
+	g="green",
+	b="blue",
+	c="cyan",
+	m="magenta",
+	y="yellow",
+	k="black",
+	w="white",
+)
 def colourise(s=None, fg=None, bg=None):
+	fg = autocolours.get(fg, fg)
+	bg = autocolours.get(bg, bg)
 	s = as_str(s) if s is not None else ""
 	if not bg:
 		if not fg:
@@ -488,6 +500,22 @@ def colourise_brackets(s=None, a=None, b=None, c=None):
 		out += colourise(closing, fg=b if closing in colourised_quotes else (c or b))
 		s = s[match.end():]
 	return out + colourise(s, fg=a)
+def colourise_auto(s):
+	while s:
+		match = re.search(r"\$[rgbcmykwRGBCMYKW]*<[^\$]*>", s)
+		if not match:
+			break
+		left, mid, right = s[:match.start()], match.group(), s[match.end():]
+		code, mid = mid[1:-1].split("<", 1)
+		kwargs = dict(
+			fg=None,
+			bg=None,
+		)
+		for c in code:
+			target = "fg" if c.islower() else "bg"
+			kwargs[target] = c.lower()
+		s = left + colourise(mid, **kwargs) + colourise() + right
+	return s
 
 # Discord object mention formatting
 def user_mention(u_id):
@@ -1013,8 +1041,8 @@ def maps(funcs, *args, **kwargs):
 	for func in funcs:
 		yield func(*args, **kwargs)
 
-def temporary_file(fmt="bin"):
-	return f"{TEMP_PATH}/{ts_us()}.{fmt}" if fmt else f"{TEMP_PATH}/{ts_us()}"
+def temporary_file(fmt="bin", name=""):
+	return f"{TEMP_PATH}/{name or ts_us()}.{fmt}" if fmt else f"{TEMP_PATH}/{ts_us()}"
 
 def get_image_size(b):
 	if isinstance(b, io.BytesIO):
@@ -4751,10 +4779,7 @@ def download_file(url, filename=None, timeout=12):
 	try:
 		resp = urllib.request.urlopen(req, timeout=timeout)
 	except urllib.error.HTTPError as ex:
-		if ex.code in range(400, 500):
-			print(repr(ex))
-			return
-		raise
+		raise ConnectionError(ex.getcode(), ex.msg)
 	if not filename:
 		return resp.read()
 	with open(filename, "wb") as f:

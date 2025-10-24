@@ -5879,82 +5879,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						await guild.me.edit(nick=original_nickname)
 			return response
 
-	@tracebacksuppressor
-	async def process_http_command(self, t, ip, tz, command):
-		# url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
-		res = []
-		out = b"[]"
-		message = SimulatedMessage(self, command, t, ip, "user")
+	async def run_simulate(self, ip, command):
+		message = SimulatedMessage(self, command, utc(), ip, "user")
 		self.cache.users[message.author.id] = message.author
-		after = await self.process_message(message)
-		if after != -1:
-			if after is not None:
-				after += utc()
-			else:
-				after = 0
-			for i in range(3600):
-				if message.response:
-					break
-				await asyncio.sleep(0.1)
-			await self.react_callback(message, None, message.author)
-			res = list(message.response)
-			out = json_dumps(res)
-		resp = esafe(out)
-		self.print(t, resp)
-		return Flush(self.server.stdin).write(f"{t}\x7f{after}\x7f{resp}\n".encode("utf-8"))
-
-	@tracebacksuppressor
-	async def process_http_eval(self, t, proc):
-		"""Only called by the webserver worker process when invoked with proper authentication priviledges."""
-		glob = self._globals
-		# url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
-		out = '{"result":null}'
-		try:
-			code = None
-			with suppress(SyntaxError):
-				code = compile(proc, "<webserver>", "eval", optimize=2)
-			if code is None:
-				with suppress(SyntaxError):
-					code = compile(proc, "<webserver>", "exec", optimize=2)
-				if code is None:
-					_ = glob.get("_")
-					defs = False
-					lines = proc.splitlines()
-					for line in lines:
-						if line.startswith("def") or line.startswith("async def"):
-							defs = True
-					func = "async def _():\n\tlocals().update(globals())\n"
-					func += "\n".join(("\tglobals().update(locals())\n" if not defs and line.strip().startswith("return") else "") + "\t" + line for line in lines)
-					func += "\n\tglobals().update(locals())"
-					code2 = compile(func, "<webserver>", "exec", optimize=2)
-					await asubmit(eval, code2, glob)
-					output = await glob["_"]()
-					glob["_"] = _
-			if code is not None:
-				try:
-					output = await asubmit(eval, code, glob, priority=True)
-				except:
-					print(proc)
-					raise
-			if type(output) in (deque, alist):
-				output = list(output)
-			if output is not None:
-				glob["_"] = output
-			res = dict(result=output)
-			try:
-				out = json_dumps(res)
-			except TypeError:
-				try:
-					out = json.dumps(res, cls=MultiEncoder)
-				except TypeError:
-					out = json_dumps(res)
-		except Exception as ex:
-			print(repr(ex))
-			res = dict(error=repr(ex))
-			out = json_dumps(res)
-		resp = esafe(out)
-		# self.print(t, resp)
-		return Flush(self.server.stdin).write(f"{t}\x7f0\x7f{resp}\n".encode("utf-8"))
+		resp = {}
+		async for command, command_check, argv, from_mention in self.parse_command(message):
+			resp = await self.run_command(command, message=message, argv=argv, slash=True, respond=False)
+			break
+		return resp
 
 	chunk_guild_sems = None
 	load_guild_sem = Semaphore(48, inf, rate_limit=1)
@@ -8771,7 +8703,7 @@ class SimulatedMessage:
 
 	def __init__(self, bot, content, t, name, nick=None, recursive=True):
 		self._state = bot._state
-		self.created_at = datetime.datetime.utcfromtimestamp(int(t) / 1e6)
+		self.created_at = DynamicDT.utcfromtimestamp(t)
 		self.ip = name
 		self.id = time_snowflake(self.created_at, high=True) - 1
 		self.content = content
@@ -8814,6 +8746,7 @@ class SimulatedMessage:
 	bot = False
 	ghost = True
 	simulated = True
+	deleted = False
 	reference = None
 	__str__ = lambda self: self.name
 
@@ -8863,6 +8796,7 @@ class SimulatedMessage:
 	get_member = lambda self, *args: None
 	delete = async_nop
 	add_reaction = async_nop
+	remove_reaction = async_nop
 	delete_messages = async_nop
 	trigger_typing = async_nop
 	webhooks = lambda self: []

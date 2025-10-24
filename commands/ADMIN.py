@@ -84,6 +84,50 @@ class Perms(Command):
 			return "".join(msgs)
 
 
+class Timeout(Command):
+	name = ["Mute", "Silence"]
+	min_level = 3
+	description = "Times out one or more users for a certain amount of time."
+	schema = cdict(
+		users=cdict(
+			type="user",
+			description="User(s) to time out",
+			example="668999031359537205",
+			multiple=True,
+			required=True,
+		),
+		duration=cdict(
+			type="datetime",
+			description="Time input to parse",
+			example="35 mins and 6.25 secs before 3am next tuesday, EDT",
+			default="now",
+		),
+		reason=cdict(
+			type="string",
+			description="Timeout reason (will show up in Audit Log)",
+			example="Being naughty >:(",
+			greedy=False,
+		),
+	)
+	rate_limit = (5, 10)
+	slash = True
+	ephemeral = True
+
+	async def __call__(self, bot, users, duration, reason, **void):
+		if duration < DynamicDT.now():
+			duration = None
+		futs = [csubmit(user.timeout(duration, reason=reason)) for user in users]
+		for fut in futs:
+			await fut
+		userstr = ", ".join(map(str, users))
+		resp = f"Successfully timed out [{userstr}] until {sqr_md(duration)}" if duration else f"Successfully removed all timeouts from [{userstr}]"
+		if reason:
+			resp += f", with reason {sqr_md(reason)}"
+		else:
+			resp += "."
+		return css_md(resp)
+
+
 class Purge(Command):
 	time_consuming = True
 	_timeout_ = 16
@@ -190,213 +234,6 @@ class Purge(Command):
 				await use_delete()
 		s = italics(css_md(f"Deleted {sqr_md(delcount)} message{'s' if delcount != 1 else ''}!", force=True))
 		return cdict(content=s, reacts="❎")
-
-
-class Mute(Command):
-	server_only = True
-	_timeout_ = 16
-	name = ["🔇", "Revoke", "Silence", "UnMute", "Timeout", "Mutes"]
-	min_level = 3
-	min_display = "3+"
-	description = "Mutes a user for a certain amount of time, with an optional reason."
-	schema = cdict(
-		user=cdict(
-			type="user",
-			description="User to mute",
-			example="668999031359537205",
-		),
-		duration=cdict(
-			type="datetime",
-			description="Mute duration (immediately unmutes if set to 0)",
-			example="3 months 6d 15h 9:59.3",
-		),
-		range=cdict(
-			type="index",
-			description="Mute reason",
-			example="being naughty",
-		),
-	)
-	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
-	rate_limit = (9, 16)
-	multi = True
-	slash = True
-	maintenance = True
-
-	async def __call__(self, bot, _name, user, duration, range, **void):
-		if not args and not argl:
-			# Set callback message for scrollable list
-			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-			await send_with_reply(
-				None,
-				message,
-				"*```" + "\n" * ("z" in flags) + "callback-admin-mute-"
-				+ str(user.id) + "_0"
-				+ "-\nLoading mute list...```*",
-				buttons=buttons,
-			)
-			return
-		ts = utc()
-		dt = discord.utils.utcnow()
-		omutes = bot.data.mutes.setdefault(guild.id, {})
-		if not isinstance(omutes, dict):
-			omutes = bot.data.mutes[guild.id] = {m["u"]: m["t"] for m in omutes}
-		async with discord.context_managers.Typing(channel):
-			mutes, glob = await self.getMutes(guild)
-			users = await bot.find_users(argl, args, user, guild)
-		if not users:
-			raise LookupError(f"No results found for {argv}.")
-		if len(users) > 1 and "f" not in flags:
-			raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
-		if not args or name == "unmute":
-			out = deque()
-			for user in users:
-				try:
-					mute = mutes[user.id]
-				except LookupError:
-					out.append(f"{sqr_md(user)} is currently not muted in {sqr_md(guild)}. Specify a duration for temporary mutes, or `inf` for permanent mutes.")
-					continue
-				if name == "unmute":
-					omutes.pop(user.id, None)
-					await user.timeout(datetime.timedelta(0))
-					with suppress(AttributeError):
-						user.timed_out_until = None
-					out.append(f"Successfully unmuted {sqr_md(user)} in {sqr_md(guild)}.")
-					continue
-				out.append(f"Current mute for {sqr_md(user)} in {sqr_md(guild)}: {sqr_md(time_until(mute))}.")
-			if out:
-				return italics(ini_md("\n".join(out)))
-			return
-		# This parser is a mess too
-		mutetype = " ".join(args)
-		if mutetype.startswith("for "):
-			mutetype = mutetype[4:]
-		if "for " in mutetype:
-			i = mutetype.index("for ")
-			expr = mutetype[:i].strip()
-			msg = mutetype[i + 4:].strip()
-		if "with reason " in mutetype:
-			i = mutetype.index("with reason ")
-			expr = mutetype[:i].strip()
-			msg = mutetype[i + 12:].strip()
-		elif "reason " in mutetype:
-			i = mutetype.index("reason ")
-			expr = mutetype[:i].strip()
-			msg = mutetype[i + 7:].strip()
-		elif '"' in argv and len(args) == 2:
-			expr, msg = args
-		else:
-			expr = mutetype
-			msg = None
-		msg = msg or None
-		_op = None
-		for op, at in bot.op.items():
-			if expr.startswith(op):
-				expr = expr[len(op):].strip()
-				_op = at
-		num = await bot.eval_time(expr, op=False)
-		csubmit(message.add_reaction("❗"))
-		out = deque()
-		for user in users:
-			p = bot.get_perms(user, guild)
-			if not p < 0 and not isfinite(p):
-				ex = PermissionError(f"{user} has administrator permission level, and cannot be muted in this server.")
-				bot.send_exception(channel, ex)
-				continue
-			elif not p + 1 <= perm and not isnan(perm):
-				reason = "to mute " + str(user) + " in " + guild.name
-				ex = self.perm_error(perm, p + 1, reason)
-				bot.send_exception(channel, ex)
-				continue
-			orig = 0
-			try:
-				mute = mutes[user.id]
-				orig = mute - ts
-			except LookupError:
-				try:
-					mute = user.timed_out_until.timestamp()
-					orig = mute - ts
-				except AttributeError:
-					mute = 0
-			orig = max(0, orig)
-			if _op is not None:
-				new = getattr(float(orig), _op)(num)
-			else:
-				new = num
-			new_ts = ts + new
-			if new <= 21 * 86400:
-				omutes.pop(user.id, None)
-				await user.timeout(datetime.timedelta(seconds=new), reason=msg)
-			else:
-				omutes[user.id] = new_ts
-				await user.timeout(datetime.timedelta(days=21), reason=msg)
-			if orig:
-				orig_ts = ts + orig
-				out.append(f"Updated mute for {sqr_md(user)} in {sqr_md(guild)} from {sqr_md(time_until(orig_ts))} to {sqr_md(time_until(new_ts))}.")
-			else:
-				out.append(f"{sqr_md(user)} has been muted in {sqr_md(guild)} for {sqr_md(time_until(new_ts))}. Reason: {sqr_md(msg)}")
-		if out:
-			return italics(ini_md("\n".join(out)))
-
-	async def getMutes(self, guild):
-		ts = utc()
-		mutes = {user.id: user.timed_out_until.timestamp() for user in guild._members.values() if T(user).get("timed_out_until")}
-		mutes.update(self.bot.data.mutes.get(guild.id, {}))
-		for k, v in tuple(mutes.items()):
-			if v <= ts:
-				mutes.pop(k, None)
-		return mutes, list(mutes.keys())
-
-	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-		u_id, pos = list(map(int, vals.split("_", 1)))
-		if reaction not in (None, self.directions[-1]) and perm < 3:
-			return
-		if reaction not in self.directions and reaction is not None:
-			return
-		guild = message.guild
-		user = await bot.fetch_user(u_id)
-		update = self.bot.data.mutes.update
-		ts = utc()
-		mutes, glob = await self.getMutes(guild)
-		page = 25
-		last = max(0, len(mutes) - page)
-		if reaction is not None:
-			i = self.directions.index(reaction)
-			if i == 0:
-				new = 0
-			elif i == 1:
-				new = max(0, pos - page)
-			elif i == 2:
-				new = min(last, pos + page)
-			elif i == 3:
-				new = last
-			else:
-				new = pos
-			pos = new
-		content = message.content
-		if not content:
-			content = message.embeds[0].description
-		i = content.index("callback")
-		content = "*```" + "\n" * ("\n" in content[:i]) + (
-			"callback-admin-mute-"
-			+ str(u_id) + "_" + str(pos)
-			+ "-\n"
-		)
-		if not mutes:
-			content += f"Mute list for {str(guild).replace('`', '')} is currently empty.```*"
-			msg = ""
-		else:
-			content += f"{len(mutes)} mute(s) currently assigned for {str(guild).replace('`', '')}:```*"
-			msg = iter2str({user_mention(k): time_until(mutes[k]) for k in tuple(mutes)[pos:pos + page]}, left="", right="")
-		emb = discord.Embed(colour=discord.Colour(1))
-		emb.description = content + "\n" + msg
-		emb.set_author(**get_author(guild))
-		more = len(mutes) - pos - page
-		if more > 0:
-			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-		if hasattr(message, "int_token"):
-			await bot.ignore_interaction(message)
 
 
 class Ban(Command):

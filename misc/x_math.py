@@ -12,7 +12,6 @@ import traceback
 import random
 import collections
 import itertools
-import base64
 import ast
 import re
 import sympy.stats
@@ -22,6 +21,7 @@ import sympy.parsing.latex as latex
 import matplotlib.pyplot as plt
 import sympy.plotting as plotter
 from sympy.plotting.plot import Plot
+from misc.util import temporary_file
 
 if not hasattr(time, "time_ns"):
 	time.time_ns = lambda: int(time.time() * 1e9)
@@ -356,7 +356,7 @@ def carmichael(n):
 
 def simplify_recurring(r, prec=100):
 	p, q = r.p, r.q
-	print("SR:", p, q)
+	# print("SR:", p, q)
 	try:
 		temp = _factorint(q, timeout=2)
 	except subprocess.TimeoutExpired as ex:
@@ -382,7 +382,7 @@ def simplify_recurring(r, prec=100):
 			if f < prec * 16 and divisible(10 ** f - 1, tq):
 				digits = f
 				break
-	print("SR:", digits, prec, cq, pr, tq)
+	# print("SR:", digits, prec, cq, pr, tq)
 	start = max(1, l10(p) - l10(q)) + 2
 	if start + digits > prec * 2:
 		return
@@ -1283,17 +1283,17 @@ def evalSym(f, prec=64, r=False, variables=None):
 	if isinstance(f, (sympy.Float, float, np.number)):
 		return [rounder(f)]
 	if prec:
-		print("TEMP:", f)
+		# print("TEMP:", f)
 		try:
 			f2 = f.evalf(prec + 4, chop=False)
 		except Exception:
 			f2 = f
-		print("TEMP2:", y)
+		# print("TEMP2:", y)
 		try:
 			y = f2.evalf(prec, chop=True)
 		except Exception:
 			y = f2
-		print("TEMP3:", y)
+		# print("TEMP3:", y)
 		try:
 			e = rounder(y)
 		except TypeError:
@@ -1325,25 +1325,13 @@ def evalSym(f, prec=64, r=False, variables=None):
 def procResp(resp):
 	# Return file path if necessary
 	if isinstance(resp[0], Plot):
-		ts = time.time_ns() // 1000
-		name = f"{ts}.png"
-		fn = "cache/" + name
-		try:
-			resp[0].save(fn)
-		except FileNotFoundError:
-			fn = name
-			resp[0].save(fn)
+		fn = temporary_file("png")
+		resp[0].save(fn)
 		plt.clf()
 		s = dict(file=fn)
 	elif resp[0] == plt:
-		ts = time.time_ns() // 1000
-		name = f"{ts}.png"
-		fn = "cache/" + name
-		try:
-			plt.savefig(fn)
-		except FileNotFoundError:
-			fn = name
-			plt.savefig(fn)
+		fn = temporary_file("png")
+		plt.savefig(fn)
 		plt.clf()
 		s = dict(file=fn)
 	elif type(resp) is tuple:
@@ -1351,10 +1339,3 @@ def procResp(resp):
 	else:
 		s = [repr(i) if type(i) is not str else i for i in resp]
 	return s
-
-def evaluate(args):
-	if isinstance(args, (str, bytes, memoryview)):
-		args = literal_eval(base64.b64decode(args))
-	resp = evalSym(*args)
-	out = procResp(resp)
-	return out

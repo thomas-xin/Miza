@@ -1078,14 +1078,9 @@ class Preserve(Command):
 
 
 class Reminder(Command):
-	name = ["Announcement", "Announcements", "Announce", "RemindMe", "Reminders", "Remind"]
+	name = ["RemindMe", "Reminders", "Remind"]
 	description = "Sets a reminder for a certain date and time in the future."
 	schema = cdict(
-		message=cdict(
-			type="string",
-			description="Message to receive. Will show up as an embed",
-			example="Doctor's appointment",
-		),
 		mode=cdict(
 			type="enum",
 			validation=cdict(
@@ -1094,6 +1089,11 @@ class Reminder(Command):
 			),
 			description="Reminders are sent as direct messages, announcements are sent to the origin channel, urgent reminders will continuously update a direct message until the acknowledged by a reaction",
 			default="reminder",
+		),
+		message=cdict(
+			type="string",
+			description="Message to receive. Will show up as an embed",
+			example="Doctor's appointment",
 		),
 		icon=cdict(
 			type="visual",
@@ -1114,6 +1114,17 @@ class Reminder(Command):
 			type="index",
 			description="Index of reminder(s) to delete",
 			example="3..7",
+		),
+	)
+	macros = cdict(
+		Announce=cdict(
+			mode="announcement",
+		),
+		Announcement=cdict(
+			mode="announcement",
+		),
+		Announcements=cdict(
+			mode="announcements",
 		),
 	)
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']

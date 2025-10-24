@@ -22,7 +22,7 @@ from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_
 from .smath import log2lin
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, EvalPipe, Request, api,
-	italics, ansi_md, colourise, colourise_brackets, maybe_json, select_and_loads,
+	italics, ansi_md, colourise, colourise_brackets, colourise_auto, maybe_json, select_and_loads,
 	is_url, unyt, url2fn, get_duration, get_duration_2, CachingTeeFile,
 	get_ext, rename, uhash, expired, is_youtube_stream, b64,  # noqa: F401
 )
@@ -182,9 +182,7 @@ class AudioPlayer(discord.AudioSource):
 					csubmit(member.edit(mute=False))
 			if announce:
 				connected = "connected" if announce == 1 else "reconnected"
-				s = ansi_md(
-					f"{colourise('🎵', fg='blue')}{colourise()} Successfully {connected} to {colourise(self.channel.guild, fg='magenta')}{colourise()}. {colourise('🎵', fg='blue')}{colourise()}"
-				)
+				s = ansi_md(colourise_auto(f"$b<🎵> Successfully {connected} to $m<{self.channel.guild}>. $b<🎵>"))
 				csubmit(self.announce(s))
 			return self
 		finally:
@@ -290,11 +288,10 @@ class AudioPlayer(discord.AudioSource):
 		vcc = guild.me.voice.channel
 		self = cls(vcc)
 		cls.waiting[gid] = Future()
-		# csubmit(self.join_into(vcc))
 		return self
 
 	@classmethod
-	async def disconnect(cls, guild, announce=False, cid=None):
+	async def disconnect(cls, guild, announce=False, cid=None, clear=False):
 		gid = cast_id(guild)
 		guild = client.get_guild(gid)
 		si = StopIteration("Voice disconnected.")
@@ -312,7 +309,6 @@ class AudioPlayer(discord.AudioSource):
 			if self.vc:
 				self.vc.stop()
 				await self.vc.disconnect()
-		cls.cache.pop(guild.id, None)
 		if not self:
 			if not cid or not client.get_channel(cid):
 				return
@@ -320,23 +316,21 @@ class AudioPlayer(discord.AudioSource):
 			print("Clearing queue to disconnect...")
 			self.settings.update(self.defaults)
 			self.clear()
+		if clear:
+			cls.cache.pop(guild.id, None)
 		if announce:
 			channel = self.channel if self else client.get_channel(cid)
-			s = ansi_md(
-				f"{colourise('🎵', fg='blue')}{colourise()} Successfully disconnected from {colourise(channel.guild, fg='magenta')}{colourise()}. {colourise('🎵', fg='blue')}{colourise()}"
-			)
+			s = ansi_md(colourise_auto(f"$b<🎵> Successfully disconnected from $m<{self.channel.guild}>. $b<🎵>"))
 			return await cls.announce(self, s, channel=channel)
 
 	async def leave(self, reason=None, dump=False):
 		csubmit(self.disconnect(self.vcc.guild))
 		if not self.channel:
 			return
-		r = f": {colourise(reason, fg='yellow')}{colourise()}" if reason else ""
+		r = f": $y<{reason}>" if reason else ""
 		if dump:
 			r += " (use ~load to restore)"
-		s = ansi_md(
-			f"{colourise('🎵', fg='blue')}{colourise()} Automatically disconnected from {colourise(self.channel.guild, fg='magenta')}{colourise()}{r}. {colourise('🎵', fg='blue')}{colourise()}"
-		)
+		s = ansi_md(colourise_auto(f"$b<🎵> Successfully disconnected from $m<{self.channel.guild}>{r}. $b<🎵>"))
 		return await self.announce(s, dump=dump)
 
 	@classmethod
@@ -560,9 +554,11 @@ class AudioPlayer(discord.AudioSource):
 			name = u.display_name
 		except (KeyError, AttributeError, discord.NotFound):
 			name = "Unknown User"
-		s = italics(ansi_md(
-			f"{colourise('🎵', fg='blue')}{colourise()} Now playing {colourise_brackets(entry.name, 'red', 'green', 'magenta')}{colourise()}, added by {colourise(name, fg='blue')}{colourise()}! {colourise('🎵', fg='blue')}{colourise()}"
-		))
+		s = italics(ansi_md(colourise_auto("$b<🎶> Now playing {ENTRY}, added by {NAME}! $b<🎶>")))
+		s = s.format(
+			ENTRY=colourise_brackets(entry.name, 'red', 'green', 'magenta') + colourise(),
+			NAME=name,
+		)
 		return await self.announce(s)
 
 	async def announce(self, s, dump=False, channel=None):
@@ -830,10 +826,11 @@ class AudioPlayer(discord.AudioSource):
 					source = AF.load(entry).create_reader(self, pos=pos if pos is not None else entry.get("start", 0))
 				except Exception as ex:
 					print_exc()
-					s = italics(ansi_md(
-						f"{colourise('❗', fg='blue')}{colourise()} An error occured while loading {colourise_brackets(entry.name, 'red', 'green', 'magenta')}{colourise()}, and it has been removed automatically. {colourise('❗', fg='blue')}{colourise()}\n"
-						+ f"Exception: {colourise_brackets(lim_str(repr(ex), 1024), 'red', 'magenta', 'yellow')}"
-					))
+					s = italics(ansi_md(colourise_auto("$r<❗> An error occured while loading {ENTRY}, and it has been removed automatically. $r<❗>\nException: {EXCEPTION}")))
+					s = s.format(
+						ENTRY=colourise_brackets(entry.name, 'red', 'green', 'magenta') + colourise(),
+						EXCEPTION=colourise_brackets(lim_str(repr(ex), 1024), 'red', 'magenta', 'yellow'),
+					)
 					csubmit(self.announce(s))
 					return self.skip()
 				if pos is not None:
@@ -866,10 +863,11 @@ class AudioPlayer(discord.AudioSource):
 					source = AF.load(entry, asap=asap).create_reader(self, pos=entry.get("start", 0))
 				except Exception as ex:
 					print_exc()
-					s = italics(ansi_md(
-						f"{colourise('❗', fg='blue')}{colourise()} An error occured while loading {colourise_brackets(entry.name, 'red', 'green', 'magenta')}{colourise()}, and it has been removed automatically. {colourise('❗', fg='blue')}{colourise()}\n"
-						+ f"Exception: {colourise_brackets(repr(ex), 'red', 'magenta', 'yellow')}"
-					))
+					s = italics(ansi_md(colourise_auto("$r<❗> An error occured while loading {ENTRY}, and it has been removed automatically. $r<❗>\nException: {EXCEPTION}")))
+					s = s.format(
+						ENTRY=colourise_brackets(entry.name, 'red', 'green', 'magenta') + colourise(),
+						EXCEPTION=colourise_brackets(lim_str(repr(ex), 1024), 'red', 'magenta', 'yellow'),
+					)
 					csubmit(self.announce(s))
 					return self.skip(1)
 				if len(self.playing) == 1 and len(self.queue) > 1 and self.queue[1].url == source.af.url:
@@ -977,11 +975,8 @@ class AudioFile:
 					entry.update(results[0])
 			name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
 			self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
-			if os.path.exists(self.path) and os.path.getsize(self.path):
+			if entry.get("duration") and os.path.exists(self.path) and os.path.getsize(self.path):
 				self.stream = self.path
-				if not entry.get("duration"):
-					entry["duration"] = self.duration = get_duration(self.stream)
-					return self
 				self.duration = get_duration(self.stream)
 				if abs(entry["duration"] - self.duration) < 1:
 					entry["duration"] = self.duration

@@ -1195,7 +1195,7 @@ class AudioDownloader:
 					if p_id in ("LL", "LM", "WL", "RDMM"):
 						if v_id:
 							return [], f"https://youtu.be/{v_id}"
-						raise PermissionError("Sorry, this endpoint is intentionally blocked for privacy/performance.")
+						raise PermissionError(url, "Sorry, this endpoint is intentionally blocked for privacy/performance.")
 					with tracebacksuppressor:
 						output.extend(self.get_youtube_playlist(p_id))
 						# Scroll to highlighted entry if possible
@@ -1208,9 +1208,9 @@ class AudioDownloader:
 				with tracebacksuppressor:
 					output.extend(self.get_soundcloud_playlist(url))
 			elif is_spotify_url(url):
-				raise AssertionError(url, "Currently unsupported!")
-				with tracebacksuppressor:
-					output.extend(self.get_spotify_playlist(url))
+				raise NotImplementedError(url, "Spotify is currently unsupported!")
+				# with tracebacksuppressor:
+				# 	output.extend(self.get_spotify_playlist(url))
 		else:
 			urls = []
 			if ":" not in url:

@@ -170,12 +170,12 @@
 		"Reminder": {
 			"aliases": [
 				"Reminder",
-				"Announcement",
-				"Announcements",
-				"Announce",
 				"RemindMe",
 				"Reminders",
-				"Remind"
+				"Remind",
+				"Announce",
+				"Announcement",
+				"Announcements"
 			],
 			"description": "Sets a reminder for a certain date and time in the future.",
 			"usage": "",
@@ -249,17 +249,10 @@
 				"Factorize"
 			],
 			"description": "Evaluates a math formula.",
-			"usage": "<string> <verbose(-v)|rationalize(-r)>? <show_variables(-l)|clear_variables(-c)>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(4.5, 6)",
-			"example": [
-				"m factorial 32",
-				"plot 3x^2-2x+1",
-				"math integral tan(x)",
-				"m solve(x^3-1)",
-				"calc std([6.26,6.23,6.34,6.28])",
-				"\ud83d\udd22 predict_next([2, 10, 30, 68, 130])"
-			],
+			"example": [],
 			"timeout": "96"
 		},
 		"Unicode": {
@@ -641,6 +634,19 @@
 			],
 			"timeout": "24"
 		},
+		"Timeout": {
+			"aliases": [
+				"Timeout",
+				"Mute",
+				"Silence"
+			],
+			"description": "Times out one or more users for a certain amount of time.",
+			"usage": "",
+			"level": "3",
+			"rate_limit": "(5, 10)",
+			"example": [],
+			"timeout": "24"
+		},
 		"Purge": {
 			"aliases": [
 				"Purge",
@@ -653,23 +659,6 @@
 			"usage": "",
 			"level": "3",
 			"rate_limit": "(7, 12)",
-			"example": [],
-			"timeout": "384"
-		},
-		"Mute": {
-			"aliases": [
-				"Mute",
-				"\ud83d\udd07",
-				"Revoke",
-				"Silence",
-				"UnMute",
-				"Timeout",
-				"Mutes"
-			],
-			"description": "Mutes a user for a certain amount of time, with an optional reason.",
-			"usage": "",
-			"level": "3",
-			"rate_limit": "(9, 16)",
 			"example": [],
 			"timeout": "384"
 		},
@@ -1011,22 +1000,6 @@
 			"rate_limit": "(3.5, 5)",
 			"example": [],
 			"timeout": "48"
-		},
-		"Playlist": {
-			"aliases": [
-				"Playlist",
-				"DefaultPlaylist",
-				"PL"
-			],
-			"description": "Shows, appends, or removes from the default playlist.",
-			"usage": "<mode(add|remove)>? <search_links>*",
-			"level": "0",
-			"rate_limit": "(7, 11)",
-			"example": [
-				"playlist add https://www.youtube.com/watch?v=wDgQdr8ZkTw",
-				"playlist remove 6"
-			],
-			"timeout": "24"
 		},
 		"Connect": {
 			"aliases": [

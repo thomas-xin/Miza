@@ -300,7 +300,7 @@ class Exec(Command):
 			default="null",
 		),
 		code=cdict(
-			type="text",
+			type="string",
 			description="Code to evaluate directly",
 			example="1 + 1",
 		),
@@ -1583,6 +1583,7 @@ class UpdateGuilds(Database):
 		mdata = []
 		ts = utc()
 		for m in guild._members.values():
+			m.guild = guild
 			cm = cdict(
 				name=m.name,
 				nick=m.nick,
