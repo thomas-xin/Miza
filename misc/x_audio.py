@@ -297,8 +297,6 @@ class AudioPlayer(discord.AudioSource):
 	async def disconnect(cls, guild, announce=False, cid=None):
 		gid = cast_id(guild)
 		guild = client.get_guild(gid)
-		# if not guild or not guild.me or not guild.me.voice:
-		# 	raise KeyError(gid)
 		si = StopIteration("Voice disconnected.")
 		wait = cls.waiting.pop(gid, None)
 		if wait and not wait.done():
@@ -314,6 +312,7 @@ class AudioPlayer(discord.AudioSource):
 			if self.vc:
 				self.vc.stop()
 				await self.vc.disconnect()
+		cls.cache.pop(guild.id, None)
 		if not self:
 			if not cid or not client.get_channel(cid):
 				return
@@ -895,7 +894,7 @@ class AudioPlayer(discord.AudioSource):
 
 	def backup(self):
 		if self.queue and self.vcc:
-			AP.cache[self.vcc.guild.id] = [self.vcc.id, self.channel and self.channel.id, astype(self.get_dump(), bytes), [m.id for m in self.vcc.members]]
+			self.cache[self.vcc.guild.id] = [self.vcc.id, self.channel and self.channel.id, astype(self.get_dump(), bytes), [m.id for m in self.vcc.members]]
 		return len(self.queue)
 
 	def is_opus(self):
@@ -1561,7 +1560,7 @@ async def on_connect():
 		if not client_fut.done():
 			client_fut.set_result(client)
 			# Restore audio players from our cache on disk
-			keys = set(AP.cache.keys())
+			keys = set(iter(AP.cache))
 			if keys:
 				print("Reloading players:", keys)
 				await asyncio.gather(*(reload_player(gid) for gid in keys))

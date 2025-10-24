@@ -1806,42 +1806,10 @@ class Matchmaking(Command):
 		heart = choice(HEARTS)
 		bar = await bot.create_progress_bar(21, percentage / 100)
 
-		markdown = choice(ini_md, lambda s: css_md(s, force=True))
-		suspicious_function = lambda x: x / ((x ** 2 * 6254793562032913) // (7632048114126314 * 10 ** 24) - (x * 5638138161912547) // 2939758 + 1000000155240420236976462021787648)
-		suspicious_function_2 = lambda x: int.from_bytes(bytes.fromhex(x.encode("utf-8").hex()), "little")
-		s = "".join(a.capitalize() for a in sorted(users))
-		if round(suspicious_function(suspicious_function_2(s))) in (13264547, 47787122) or fold(int.__and__, uids) == 38283079340654592:
-			inwards_heart = [
-				"00111011100",
-				"01122122110",
-				"01223232210",
-				"01234543210",
-				"00123432100",
-				"00012321000",
-				"00001210000",
-				"00000100000"
-			]
-			emoji = {
-				"0": "▪",
-				"1": "<a:_" + ":797359273914138625>",
-				"2": "<a:_" + ":797359354314620939>",
-				"3": "<a:_" + ":797359351509549056>",
-				"4": "<a:_" + ":797359341157482496>",
-				"5": "<:_" + ":722354192995450912>",
-			}
-			e_calc = lambda x: (x * 15062629995394936) // 7155909327645687 - (x ** 2 * 3014475045596449) // (2062550437214859 * 10 ** 18) + 123795804094758818
-			e2 = bot.get_emoji(e_calc(guild.id))
-			if e2:
-				emoji["5"] = f"<:_:{e2.id}>"
-
-			trans = "".maketrans(emoji)
-			rainbow_heart = "\n".join(inwards_heart).translate(trans)
-			description = markdown(f"{shiptargets}❔ They score an [{uni_str('infinite%', 1)}]❕ 💜") + rainbow_heart
+		if all(a == users[0] for a in users[1:]):
+			description = css_md(f"{shiptargets}❔ They [{percentage}%] love themselves❕ " + get_random_smiley()) + bar
 		else:
-			if all(a == users[0] for a in users[1:]):
-				description = markdown(f"{shiptargets}❔ They [{percentage}%] love themselves❕ " + get_random_smiley()) + bar
-			else:
-				description = markdown(f"{shiptargets} ({uni_str(shipname, 1)})❔ They score a [{percentage}%]❕ " + get_random_smiley()) + bar
+			description = css_md(f"{shiptargets} ({uni_str(shipname, 1)})❔ They score a [{percentage}%]❕ " + get_random_smiley()) + bar
 		author = get_author(message.author)
 		author.name = heart + uni_str(" MATCHMAKING ", 12) + heart
 		colour = await bot.get_colour(message.author)

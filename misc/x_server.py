@@ -165,31 +165,6 @@ cp._cprequest.Request.process_headers = process_headers
 actually_static = set(os.listdir("misc/web"))
 mapped_static = {k[:-5]: k for k in actually_static if k.endswith(".html")}
 
-def map_url(url):
-	if not isinstance(url, str):
-		return url
-	if url.startswith(HOST + "/u"):
-		return url.replace(HOST + "/u", "M$")
-	if url.startswith(API + "/u"):
-		return url.replace(API + "/u", "M$")
-	return url.removeprefix(
-		"https://"
-	).replace(
-		"cdn.discordapp.com/attachments/", "D$"
-	).replace(
-		".amazonaws.com/www.guilded.gg/ContentMediaGenericFiles/", "G$"
-	)
-def remap_url(url):
-	if not isinstance(url, str) or url.startswith("https://"):
-		return url
-	if url.startswith("M$"):
-		return HOST + "/u" + url[2:]
-	return "https://" + url.replace(
-		"D$", "cdn.discordapp.com/attachments/"
-	).replace(
-		"G$", ".amazonaws.com/www.guilded.gg/ContentMediaGenericFiles/"
-	)
-
 @functools.lru_cache(maxsize=256)
 def get_size_mime(head, tail, count, chunksize):
 	fut = esubmit(requests.head, head)

@@ -3199,7 +3199,7 @@ class FileHashDict(collections.abc.MutableMapping):
 cachecls = diskcache.FanoutCache
 class AutoCache(cachecls, collections.abc.MutableMapping):
 
-	__slots__ = ("_path", "_stale", "_stimeout", "_retrieving")
+	__slots__ = ("_path", "_stale", "_stimeout", "_retrieving", "_kwargs")
 
 	"A dictionary-compatible object where the key-value pairs expire after a specified delay. Implements stale-while-revaluate + stale-if-error protocols."
 	def __init__(self, directory=None, shards=6, stale=60, timeout=86400, **kwargs):
@@ -3208,6 +3208,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		self._stale = stale or inf
 		self._stimeout = timeout or inf
 		self._retrieving = {}
+		self._kwargs = kwargs
 		super().__init__(self._path, shards=shards, **kwargs)
 		self.validate_or_clear()
 
@@ -3229,10 +3230,23 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 	def __len__(self):
 		return super().__len__()
 
+	def __contains__(self, k):
+		try:
+			return super().__contains__(k)
+		except (diskcache.core.Timeout, sqlite3.OperationalError):
+			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
+			self.validate_or_clear()
+			return super().__contains__(k)
+
 	def __getitem__(self, k):
 		if (fut := self._retrieving.get(k)):
 			return fut.result()
-		return super().__getitem__(k)[0]
+		try:
+			return super().__getitem__(k)[0]
+		except (diskcache.core.Timeout, sqlite3.OperationalError):
+			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
+			self.validate_or_clear()
+			return super().__getitem__(k)[0]
 
 	def __setitem__(self, k, v):
 		item = (v, utc())
@@ -3275,6 +3289,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			self[k] = v = func(*args, **kwargs)
 		except Exception as ex:
 			fut.set_exception(ex)
+			raise
 		else:
 			fut.set_result(v)
 		finally:
@@ -3282,7 +3297,12 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		return v
 	def retrieve(self, k, func, *args, **kwargs):
 		try:
-			v, t = super().__getitem__(k)
+			try:
+				v, t = super().__getitem__(k)
+			except (diskcache.core.Timeout, sqlite3.OperationalError):
+				super().__init__(self._path, shards=len(self._shards), **self._kwargs)
+				self.validate_or_clear()
+				v, t = super().__getitem__(k)
 		except KeyError:
 			v = self._retrieve(k, func, *args, **kwargs)
 		else:
@@ -3311,7 +3331,12 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		return v
 	async def aretrieve(self, k, func, *args, **kwargs):
 		try:
-			v, t = super().__getitem__(k)
+			try:
+				v, t = super().__getitem__(k)
+			except (diskcache.core.Timeout, sqlite3.OperationalError):
+				super().__init__(self._path, shards=len(self._shards), **self._kwargs)
+				self.validate_or_clear()
+				v, t = super().__getitem__(k)
 		except KeyError:
 			v = await self._aretrieve(k, func, *args, **kwargs)
 		else:
@@ -4734,6 +4759,7 @@ def download_file(url, filename=None, timeout=12):
 		return resp.read()
 	with open(filename, "wb") as f:
 		shutil.copyfileobj(resp, f)
+	return filename
 
 def update_headers(headers, **fields):
 	"Updates a dictionary of HTTP headers with new fields. Case-insensitive."

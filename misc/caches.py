@@ -282,9 +282,9 @@ class AttachmentCache(AutoCache):
 		return resp
 
 	async def _download(self, url):
+		print(url)
 		if is_discord_attachment(url):
 			target = await self.obtain(url=url)
-			print(target)
 			data = await asubmit(download_file, target)
 			return data
 		if not is_miza_attachment(url):
@@ -300,18 +300,20 @@ class AttachmentCache(AutoCache):
 			except (OSError, PermissionError, FileNotFoundError):
 				pass
 		if "/u/" in url:
-			print(url)
 			c_id, m_id, a_id, fn = expand_attachment(url)
 			target = await self.obtain(c_id, m_id, a_id, fn)
 			data = await asubmit(download_file, url)
 			return data
 		elif "/c/" in url:
-			print(url)
 			path = url.split("/c/", 1)[-1].split("/", 1)[0]
 			urls = await self.obtains(path)
-			data = bytearray()
+			futs = []
 			for url in urls:
-				b = await asubmit(download_file, url)
+				fut = asubmit(download_file, url)
+				futs.append(fut)
+			data = bytearray()
+			for fut in futs:
+				b = await fut
 				data.extend(b)
 			return data
 		raise NotImplementedError(url)

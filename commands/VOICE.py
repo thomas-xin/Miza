@@ -2196,6 +2196,7 @@ class Lyrics(Command):
 	rate_limit = (7, 12)
 	typing = True
 	slash = True
+	maintenance = True
 
 	async def __call__(self, bot, _guild, _channel, _message, query, **void):
 		if not query:

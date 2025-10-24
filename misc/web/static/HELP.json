@@ -409,12 +409,10 @@
 				"Char2Emoj"
 			],
 			"description": "Makes emoji blocks using a string.",
-			"usage": "<0:string> <1:emoji_1> <2:emoji_2>?",
+			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 14)",
-			"example": [
-				"c2e POOP \ud83d\udca9 \ud83e\udeb0"
-			],
+			"example": [],
 			"timeout": "24"
 		},
 		"Emoticon": {

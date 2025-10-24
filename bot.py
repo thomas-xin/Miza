@@ -1912,6 +1912,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			e = cdict(id=e, animated=animated)
 		return min_emoji(e, full=full)
 
+	async def emoji_i2s(self, id, full=False):
+		if hasattr(id, "id"):
+			id = id.id
+		if isinstance(id, int) or id.isnumeric():
+			return await self.min_emoji(id, full=full)
+		return id
+
 	async def optimise_image(self, image, fsize=DEFAULT_FILESIZE, msize=None, fmt="auto", duration=None, anim=True, timeout=3600):
 		"Optimises the target image or video file to fit within the \"fsize\" size, or \"msize\" resolution. Optional format and duration parameters."
 		args = [[], None, None, "max", msize, None, "-o"]
@@ -5124,7 +5131,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					kwargs[k] = [r] if v.get("multiple") else r
 					continue
 				print(kwargs)
-				raise ArgumentError(f"Argument {k} ({v.description}) is required.")
+				if v:
+					raise ArgumentError(f"Argument {k} ({v.description}) is required.")
+				raise ArgumentError(f"Argument {k} ({v.type}) is required.")
 		if append_lws:
 			k, j = append_lws
 			if j < len(ws):
@@ -6181,9 +6190,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							kwargs.pop("username", None)
 							message = await channel.send(*args, **kwargs)
 						else:
+							username = kwargs.get("username")
+							if not username and getattr(channel, "guild", None):
+								username = guild.me.display_name
 							data = dict(
 								content=content,
-								username=kwargs.get("username"),
+								username=username,
 								avatar_url=kwargs.get("avatar_url"),
 								tts=kwargs.get("tts"),
 								embeds=[emb.to_dict() for emb in kwargs.get("embeds", ())] or ([kwargs["embed"].to_dict()] if kwargs.get("embed") is not None else None),

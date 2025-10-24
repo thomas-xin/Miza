@@ -1074,7 +1074,7 @@ class AudioDownloader:
 		if asap is None:
 			asap = d and d > 3840
 		special_checked = False
-		if not fmt and asap:
+		if not fmt and asap or not d:
 			# If format is not specified, try to stream the audio from URL if possible
 			with tracebacksuppressor:
 				stream, cdc, ac = get_best_audio(entry)
@@ -1088,8 +1088,8 @@ class AudioDownloader:
 				result = self.handle_special_audio(entry, url, fn)
 				if result:
 					return result
-				if not entry.get("duration") and cdc and stream and ac:
-					return stream, cdc, entry.get("duration") or None, ac
+				if not entry.get("duration"):
+					return stream, cdc or "auto", entry.get("duration") or None, ac or 1
 				special_checked = True
 		if not special_checked:
 			result = self.handle_special_audio(entry, url, fn)

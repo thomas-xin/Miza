@@ -860,21 +860,18 @@ def _c2e(string, em1, em2):
 		"Y": [5, 5, 2, 2, 2],
 		"Z": [7, 1, 2, 4, 7],
 	}
-	# I don't quite remember how this algorithm worked lol
-	printed = ["\u200b"] * 7
+	printed = [em2] * 7
 	string = string.upper()
-	for i in range(len(string)):
-		curr = string[i]
-		data = chars.get(curr, [15] * 5)
+	for i, c in enumerate(string):
+		data = chars.get(c, [15] * 5)
 		size = max(1, max(data))
-		lim = max(2, int(log(size, 2))) + 1
-		printed[0] += em2 * (lim + 1)
-		printed[6] += em2 * (lim + 1)
+		lim = max(2, int(log2(size))) + 1
+		printed[0] += em2 * lim
+		printed[6] += em2 * lim
 		if len(data) == 5:
 			for y in range(5):
-				printed[y + 1] += em2
 				for p in range(lim):
-					if data[y] & (1 << (lim - 1 - p)):
+					if (data[y] >> (lim - 1 - p)) & 1:
 						printed[y + 1] += em1
 					else:
 						printed[y + 1] += em2
@@ -882,58 +879,68 @@ def _c2e(string, em1, em2):
 			printed[x] += em2
 	return printed
 
-
 class Char2Emoji(Command):
 	name = ["C2E", "Char2Emoj"]
 	description = "Makes emoji blocks using a string."
-	usage = "<0:string> <1:emoji_1> <2:emoji_2>?"
-	example = ("c2e POOP 💩 🪰",)
+	schema = cdict(
+		text=cdict(
+			type="string",
+			example="POOP",
+			required=True,
+			greedy=False,
+		),
+		emoji1=cdict(
+			type="emoji",
+			example="💩",
+			default="⬜",
+		),
+		emoji2=cdict(
+			type="emoji",
+			example="🪰",
+			default="⬛",
+		),
+	)
 	rate_limit = (10, 14)
 	slash = True
 
-	def __call__(self, args, guild, message, **void):
-		if len(args) < 2:
-			raise ArgumentError(
-				"At least 2 arguments are required for this command.\n"
-				+ "Place quotes around arguments containing spaces as required."
-			)
-		webhook = not getattr(guild, "ghost", None)
-		for i, a in enumerate(args):
-			e_id = None
-			if find_emojis(a):
-				e_id = a.rsplit(":", 1)[-1].rstrip(">")
-				ani = a.startswith("<a:")
-			elif a.isnumeric():
-				e_id = a = int(a)
-				try:
-					a = self.bot.cache.emojis[a]
-				except KeyError:
-					ani = False
+	def fits(self, text, ratio=1):
+		lim = 200 * ratio
+		if sum(not c.isalnum() for c in text) > lim:
+			return False
+		lim = 2000 * ratio
+		if len(text) > lim:
+			return False
+		return True
+
+	async def __call__(self, bot, _guild, _channel, _message, text, emoji1, emoji2, **void):
+		use_webhook = not getattr(_guild, "ghost", None)
+		e1 = await bot.emoji_i2s(emoji1)
+		e2 = await bot.emoji_i2s(emoji2)
+		resp = _c2e(text, e1, e2)
+		temp = "\xad" + "\n".join(resp)
+		if hasattr(_message, "simulated") or self.fits(temp):
+			return temp
+		out = ["\xad" + "\n".join(i) for i in (resp[:2], resp[2:5], resp[5:])]
+		if not all(self.fits(line) for line in out):
+			out = []
+			for line in resp:
+				if not out or not self.fits(out[-1] + "\n" + line):
+					out.append("\xad" + line)
 				else:
-					ani = a.animated
-			if e_id:
-				# if int(e_id) not in (e.id for e in guild.emojis):
-				#     webhook = False
-				if ani:
-					args[i] = f"<a:_:{e_id}>"
-				else:
-					args[i] = f"<:_:{e_id}>"
-		if len(args) < 3:
-			args.append("⬛")
-		resp = _c2e(*args[:3])
-		if hasattr(message, "simulated") or len(args[0]) <= 25:
-			return resp
-		out = []
-		for line in resp:
-			if not out or len(out[-1]) + len(line) + 1 > 2000:
-				out.append(line)
-			else:
-				out[-1] += "\n" + line
-		if len(out) <= 3:
-			out = ["\n".join(i) for i in (resp[:2], resp[2:5], resp[5:])]
-		if webhook:
-			out = alist(out)
-		return out
+					out[-1] += "\n" + line
+		if use_webhook:
+			for line in out:
+				await bot.send_as_webhook(_channel, line)
+			return
+
+		async def c2e_iterator():
+			yield out[0]
+			for line in out[1:]:
+				yield "\n" + line
+
+		return cdict(
+			content=c2e_iterator(),
+		)
 
 
 class Emoticon(Command):
@@ -1001,8 +1008,8 @@ d(*⌒▽⌒*)b Happy
 		url = await self.bot.get_proxy_url(_user)
 		if _slash:
 			return cdict(content=msg)
-		csubmit(bot.silent_delete(_message))
 		await bot.send_as_webhook(_channel, msg, username=_user.display_name, avatar_url=url)
+		await bot.silent_delete(_message)
 
 
 class Time(Command):
