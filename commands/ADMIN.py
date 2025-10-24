@@ -1613,64 +1613,6 @@ class UpdateRelays(Database):
 		print(msent)
 
 
-class UpdateMutes(Database):
-	name = "mutes"
-	sem = Semaphore(1, 1, rate_limit=3600)
-
-	async def _call_(self):
-		if self.sem.active or self.sem.busy:
-			return
-		ts = utc()
-		async with self.sem:
-			for g_id, data in tuple(self.items()):
-				try:
-					guild = self.bot.cache.guilds[g_id]
-				except LookupError:
-					self.pop(g_id, None)
-					continue
-				for u_id, t in tuple(data.items()):
-					user = guild._members.get(u_id)
-					if not u_id:
-						data.pop(u_id)
-						continue
-					tou = T(user).get("timed_out_until")
-					if not tou and not T(user).get("ghost"):
-						data.pop(u_id)
-						continue
-					if tou and abs(tou.timestamp() - t) < 1:
-						continue
-					rem = ts - t
-					reason = "Mute refreshed"
-					if rem < 21 * 86400:
-						if rem < 0:
-							rem = 0
-							reason = "Mute expired"
-							if not tou:
-								continue
-						data.pop(u_id)
-						await user.timeout(datetime.timedelta(seconds=rem), reason=reason)
-						continue
-					await user.timeout(datetime.timedelta(days=21), reason=reason)
-
-	async def _join_(self, user, guild, **void):
-		ts = utc()
-		data = self.get(guild.id)
-		if not data:
-			return
-		t = data.get(user.id)
-		if not t:
-			return
-		rem = ts - t
-		if rem <= 0:
-			data.pop(t, None)
-			return
-		if rem <= 21 * 86400:
-			data.pop(t, None)
-		else:
-			rem = 21 * 86400
-		await user.timeout(datetime.timedelta(seconds=rem), reason="Mute restored")
-
-
 class UpdateBans(Database):
 	name = "bans"
 
