@@ -58,7 +58,6 @@ def true_ip(request: Request) -> str:
 	return ip
 
 
-@functools.lru_cache(maxsize=256)
 async def get_size_mime(head, tail, count, chunksize):
 	fut = csubmit(attachment_cache.download, head)
 	resp = await attachment_cache.download(tail)
