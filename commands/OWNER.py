@@ -811,7 +811,9 @@ class UpdateExec(Database):
 			if not groups or len(groups[-1]) >= groupsize:
 				groups.append([])
 			if start == 0:
-				semi = ((total_size % chunksize) or chunksize) + 1 >> 1
+				semi = ((total_size % chunksize) or chunksize)
+				if semi >= 2097152:
+					semi = semi + 1 >> 1
 				chunk = b[start:start + semi]
 				start += semi
 			else:

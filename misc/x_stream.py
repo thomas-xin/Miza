@@ -179,7 +179,7 @@ class Server:
 				if callback:
 					callback(head.data)
 
-			counter = -1
+			counter = 0
 			for i, (start, end) in enumerate(ranges):
 				pos = 0
 				rems = urls.copy()
@@ -188,7 +188,6 @@ class Server:
 
 				while rems:
 					u = rems.pop(0)
-					counter += 1
 					if isinstance(u, byte_like):
 						ns = len(u)
 					elif "?size=" in u or "&size=" in u:
@@ -221,6 +220,7 @@ class Server:
 						b = await futs.pop(0)
 						for chunk in content_generator(b, chunksize=262144 if counter else 65536):
 							yield chunk
+						counter += 1
 
 					fut = asubmit(get_chunk, u, headers, start, end, pos, ns, big)
 					futs.append(fut)
@@ -233,6 +233,7 @@ class Server:
 					b = await fut
 					for chunk in content_generator(b, chunksize=262144 if counter else 65536):
 						yield chunk
+					counter += 1
 
 
 # Create FastAPI app
