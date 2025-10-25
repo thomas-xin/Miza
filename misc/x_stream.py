@@ -59,12 +59,12 @@ def true_ip(request: Request) -> str:
 
 
 @functools.lru_cache(maxsize=256)
-def get_size_mime(head, tail, count, chunksize):
-	fut = esubmit(attachment_cache.download, head)
-	resp = attachment_cache.download(tail)
+async def get_size_mime(head, tail, count, chunksize):
+	fut = csubmit(attachment_cache.download, head)
+	resp = await attachment_cache.download(tail)
 	lastsize = len(resp)
 	size = chunksize * (count - 1) + lastsize
-	resp = fut.result()
+	resp = await fut
 	mimetype = filetype.guess_mime(resp)
 	return mimetype, size, lastsize
 
@@ -281,7 +281,7 @@ async def chunked_proxy(path: str, request: Request):
 		urls, chunksize = await attachment_cache.obtains(path.split("/", 1)[0])
 	except ConnectionError as ex:
 		raise HTTPException(status_code=ex.errno, detail=str(ex))
-	mimetype, size, lastsize = get_size_mime(urls[0], urls[-1], len(urls), chunksize)
+	mimetype, size, lastsize = await get_size_mime(urls[0], urls[-1], len(urls), chunksize)
 
 	new_urls = [f"{url}&S={lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
 
