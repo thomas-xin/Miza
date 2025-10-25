@@ -59,13 +59,14 @@ def true_ip(request: Request) -> str:
 
 
 async def get_size_mime(head, tail, count, chunksize):
-	fut = csubmit(attachment_cache.download, head)
-	resp = await attachment_cache.download(tail)
-	lastsize = len(resp)
+	fut = csubmit(attachment_cache.download, tail)
+	HEAD = await attachment_cache.download(head)
+	TAIL = await fut
+	firstsize = len(HEAD)
+	mimetype = filetype.guess_mime(HEAD)
+	lastsize = len(TAIL)
 	size = chunksize * (count - 1) + lastsize
-	resp = await fut
-	mimetype = filetype.guess_mime(resp)
-	return mimetype, size, lastsize
+	return mimetype, size, firstsize, lastsize
 
 
 class Server:
@@ -292,9 +293,9 @@ async def chunked_proxy(path: str, request: Request):
 		urls, chunksize = await attachment_cache.obtains(path.split("/", 1)[0])
 	except ConnectionError as ex:
 		raise HTTPException(status_code=ex.errno, detail=str(ex))
-	mimetype, size, lastsize = await get_size_mime(urls[0], urls[-1], len(urls), chunksize)
+	mimetype, size, firstsize, lastsize = await get_size_mime(urls[0], urls[-1], len(urls), chunksize)
 
-	new_urls = [f"{url}&S={lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
+	new_urls = [f"{url}&S={firstsize if not i else lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
 
 	response = await server.dyn_serve(new_urls, size, request=request, mimetype=mimetype)
 	return response

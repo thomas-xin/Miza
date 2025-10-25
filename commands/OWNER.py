@@ -806,10 +806,17 @@ class UpdateExec(Database):
 					await channel.add_user(bot.get_user(bot.owners[0]))
 			private = False
 		groupsize = min(10, 1 + int(total_size / chunksize))
-		for start in range(0, total_size, chunksize):
+		start = 0
+		while start < total_size:
 			if not groups or len(groups[-1]) >= groupsize:
 				groups.append([])
-			chunk = b[start:start + chunksize]
+			if start == 0:
+				semi = ((total_size % chunksize) or chunksize) + 1 >> 1
+				chunk = b[start:start + semi]
+				start += semi
+			else:
+				chunk = b[start:start + chunksize]
+				start += chunksize
 			groups[-1].append(chunk)
 		ofn = fn
 		n = 0
