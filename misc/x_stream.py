@@ -60,12 +60,12 @@ def true_ip(request: Request) -> str:
 
 @functools.lru_cache(maxsize=256)
 def get_size_mime(head, tail, count, chunksize):
-	fut = esubmit(requests.head, head)
-	resp = requests.head(tail)
-	lastsize = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
+	fut = esubmit(attachment_cache.download, head)
+	resp = attachment_cache.download(tail)
+	lastsize = len(resp)
 	size = chunksize * (count - 1) + lastsize
 	resp = fut.result()
-	mimetype = resp.headers.get("Content-Type", "application/octet-stream")
+	mimetype = filetype.guess_mime(resp)
 	return mimetype, size, lastsize
 
 
@@ -187,10 +187,6 @@ class Server:
 					elif "?S=" in u or "&S=" in u:
 						u, ns = u.replace("?S=", "&S=").split("&S=", 1)
 						ns = int(ns)
-					elif u.startswith("https://s3-us-west-2"):
-						ns = 503316480
-					elif u.startswith("https://cdn.discord"):
-						ns = 8388608
 					else:
 						resp = requests.head(u, timeout=3)
 						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))

@@ -789,7 +789,7 @@ class UpdateExec(Database):
 		b = MemoryBytes(b)
 		groups = []
 		total_size = len(b)
-		if total_size > attachment_cache.max_size * attachment_cache.attachment_count:
+		if total_size > attachment_cache.max_size * 100:
 			chunksize = self.DEFAULT_LIMIT
 		elif attachment_cache.max_size < total_size <= self.DEFAULT_LIMIT:
 			chunksize = self.DEFAULT_LIMIT

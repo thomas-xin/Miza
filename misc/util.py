@@ -4731,7 +4731,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 			if aio:
 				session = None
 			else:
-				session = self.compat_session if is_discord_url(url) or "mizabot.xyz/u/" in url else self.session
+				session = self.compat_session if is_discord_url(url) or is_miza_url(url) else self.session
 		elif bypass:
 			if "user-agent" not in headers and "User-Agent" not in headers:
 				headers["User-Agent"] = USER_AGENT
@@ -4741,7 +4741,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		if aio:
 			return csubmit(asyncio.wait_for(self.aio_call(url, headers, files, data, method, decode, json, session, ssl, timeout=timeout), timeout=timeout))
 		with self.semaphore:
-			req = self.compat_session if is_discord_url(url) or "mizabot.xyz/u/" in url else self.session
+			req = self.compat_session if is_discord_url(url) or is_miza_url(url) else self.session
 			verify = True if ssl is not False else False
 			try:
 				resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout, verify=verify)
