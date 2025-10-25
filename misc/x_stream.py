@@ -65,7 +65,10 @@ async def get_size_mime(head, tail, count, chunksize):
 	firstsize = len(HEAD)
 	mimetype = filetype.guess_mime(HEAD)
 	lastsize = len(TAIL)
-	size = chunksize * (count - 1) + lastsize
+	if count >= 2:
+		size = firstsize + chunksize * (count - 2) + lastsize
+	else:
+		size = firstsize
 	return mimetype, size, firstsize, lastsize
 
 
