@@ -175,6 +175,7 @@ class Server:
 				if callback:
 					callback(head.data)
 
+			counter = -1
 			for i, (start, end) in enumerate(ranges):
 				pos = 0
 				rems = urls.copy()
@@ -183,6 +184,7 @@ class Server:
 
 				while rems:
 					u = rems.pop(0)
+					counter += 1
 					if isinstance(u, byte_like):
 						ns = len(u)
 					elif "?size=" in u or "&size=" in u:
@@ -192,7 +194,7 @@ class Server:
 						u, ns = u.replace("?S=", "&S=").split("&S=", 1)
 						ns = int(ns)
 					else:
-						resp = requests.head(u, timeout=3)
+						resp = await asubmit(requests.head, u, timeout=3)
 						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 
 					if pos + ns <= start:
@@ -213,7 +215,7 @@ class Server:
 
 					if len(futs) > i + 1:
 						b = await futs.pop(0)
-						for chunk in content_generator(b):
+						for chunk in content_generator(b, chunksize=262144 if counter else 65536):
 							yield chunk
 
 					fut = asubmit(get_chunk, u, headers, start, end, pos, ns, big)
@@ -225,7 +227,7 @@ class Server:
 
 				for fut in futs:
 					b = await fut
-					for chunk in content_generator(b):
+					for chunk in content_generator(b, chunksize=262144 if counter else 65536):
 						yield chunk
 
 
@@ -441,7 +443,7 @@ async def proxy(request: Request, url: Optional[str] = None):
 			cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size or '*'}" for start, end in ranges)
 			response_headers["Content-Range"] = cr
 
-		async def content_generator(b, chunksize=262144):
+		async def content_generator(b, chunksize=65536):
 			for i in range(0, len(b), chunksize):
 				yield b[i:i + chunksize]
 
@@ -471,9 +473,9 @@ async def proxy(request: Request, url: Optional[str] = None):
 		update_headers(response_headers, **CHEADERS)
 
 	ctype = resp.headers.get("Content-Type", "application/octet-stream")
+	it = await asubmit(resp.iter_content, 65536)
 
 	if ctype in ("text/html", "text/html; charset=utf-8", "application/octet-stream"):
-		it = resp.iter_content(262144)
 		b = await asubmit(next, it)
 		mime = magic.from_buffer(b)
 		if mime == "application/octet-stream":
@@ -497,8 +499,15 @@ async def proxy(request: Request, url: Optional[str] = None):
 			media_type=mime,
 		)
 
+	async def content_generator():
+		try:
+			while True:
+				yield await asubmit(next, it)
+		except StopIteration:
+			pass
+
 	return StreamingResponse(
-		resp.iter_content(262144),
+		content_generator(),
 		status_code=resp.status_code,
 		headers=response_headers,
 		media_type=ctype,
