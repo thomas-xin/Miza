@@ -1,5 +1,6 @@
 import io
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -8,7 +9,7 @@ import zipfile
 import niquests
 from PIL import Image
 import psutil
-from .util import is_url, is_discord_attachment, get_duration_2, TEMP_PATH, CODECS_INV
+from .util import is_url, is_discord_attachment, get_duration_2, temporary_file, TEMP_PATH, CODEC_FFMPEG
 # Allow fallback (although not recommended as generally the up-to-date version is necessary for most sites)
 try:
 	import yt_dlp as ytd
@@ -388,26 +389,23 @@ def get_full_storyboard(info):
 class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 	"Replace the default FFmpegPostProcessor with one that supports seeking as well as custom video formats and codecs. Additionally supports adding a thumbnail to purely audio files as the cover image."
 
-	def __init__(self, downloader=None, codec=None, format=None, start=None, end=None, thumbnail=None):
+	def __init__(self, downloader=None, codec=None, format=None, start=None, end=None, final=None, thumbnail=None):
 		super().__init__(downloader)
 		self.codec = codec
 		self.format = format
 		self.start = start
 		self.end = end
+		self.final = final
 		self.thumbnail = thumbnail
 
 	@ytd.postprocessor.PostProcessor._restrict_to(images=False)
 	def run(self, info):
 		filename, source_ext = info['filepath'], info['ext'].lower()
-		if source_ext == self.format and self.start == self.end == None:  # noqa: E711
+		if self.codec == CODEC_FFMPEG.get(self.format) and source_ext == self.format and self.start == self.end == None:  # noqa: E711
+			if self.final and filename != self.final:
+				shutil.copyfile(filename, self.final)
 			return [], info
-		name = filename.rsplit(".", 1)[0]
-		if self.start is not None or self.end is not None:
-			name += f"~{self.start}-{self.end}"
-		if self.thumbnail:
-			name += "~i"
-		outpath = name + "." + self.format
-		temp_path = filename.rsplit(".", 1)[0] + "~." + self.format
+		temp_path = temporary_file(self.format)
 		before = []
 		input_args = []
 		if not self.codec and self.format == "mp4" and info.get("vcodec", "none") not in ("none", "png", "jpeg", "gif"):
@@ -415,7 +413,6 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			lightning = self.start is not None or self.end is not None
 			if self.end is not None:
 				input_args.extend(["-to", str(self.end)])
-				temp_path = filename.rsplit(".", 1)[0] + f"~None~{self.end}~." + self.format
 		elif self.format in ("avif", "webp", "gif", "apng"):
 			if self.start is not None:
 				input_args.extend(["-ss", str(self.start)])
@@ -430,17 +427,18 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			output_args = ["-f", self.format, *codecs, "-b:v", "2M", "-vbr", "on", "-an", "-loop", "0"]
 			lightning = False
 		else:
-			fmt = CODECS_INV.get(self.format, self.format)
 			if self.start is not None:
 				input_args.extend(["-ss", str(self.start)])
 			if self.end is not None:
 				input_args.extend(["-to", str(self.end)])
-			output_args = ["-f", fmt, "-c:v", self.codec, "-b:v", "2M", "-vbr", "on"]
+			if not self.codec:
+				self.codec = "libsvtav1"
+			output_args = ["-f", self.format, "-c:v", self.codec, "-b:v", "2M", "-vbr", "on"]
 			if self.format == "mp4":
 				# MP4 supports just about any audio codec, but WebM and MKV do not. We assume the audio codec is not WMA, as it is highly unlikely any website would use it for streaming videos.
 				output_args.extend(["-c:a", "copy"])
 			else:
-				output_args.extend(["-c:a", "libopus", "-b:a", "160k", "-ar", "48k"])
+				output_args.extend(["-c:a", "libopus", "-b:a", "144k", "-ar", "48k"])
 			lightning = False
 		if self.thumbnail:
 			before_filename = self.thumbnail
@@ -448,7 +446,8 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			output_args.extend("-shortest")
 			before.append([before_filename, before_args])
 		if not lightning:
-			temp_path = outpath
+			temp_path = self.final
+		print(before, [filename, input_args], [temp_path, output_args])
 		self.real_run_ffmpeg(
 			[*before, [filename, input_args]],
 			[[temp_path, output_args]],
@@ -458,7 +457,8 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			# Lightning-trim computes the nearest keyframe after the start time, and forces a reencode for any cut-off frames occuring before said keyframe.
 			start = str(self.start) if self.start is not None else "0"
 			end = str(self.end) if self.end is not None else "86400"
-			args = [python, "misc/lightning.py", temp_path, start, end, outpath]
+			args = [python, "misc/lightning.py", temp_path, start, end, self.final]
+			print(args)
 			subprocess.run(args)
 			return [temp_path], info
 		return [], info
@@ -466,12 +466,13 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 	"Replace the default FFmpegPostProcessor with one that supports seeking as well as custom audio codecs and formats."
 
-	def __init__(self, downloader=None, codec=None, format=None, start=None, end=None):
+	def __init__(self, downloader=None, codec=None, format=None, start=None, end=None, final=None):
 		super().__init__(downloader)
 		self.codec = codec
 		self.format = format
 		self.start = start
 		self.end = end
+		self.final = final
 
 	@ytd.postprocessor.PostProcessor._restrict_to(images=False)
 	def run(self, info):
@@ -488,11 +489,9 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			mbr = 96
 		print(dur, bps, cbr, mbr)
 		if source_ext == self.format and self.start == self.end == None:  # noqa: E711
+			if self.final and filename != self.final:
+				shutil.copyfile(filename, self.final)
 			return [], info
-		name = filename.rsplit(".", 1)[0]
-		if self.start is not None or self.end is not None:
-			name += f"~{self.start}-{self.end}"
-		outpath = name + "." + self.format
 		source_codec = cdc
 		A = ytd.postprocessor.ffmpeg.ACODECS
 		acodec = A[self.codec][1] or A[self.codec][0]
@@ -514,7 +513,7 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			output_args.extend(["-c:a", acodec, "-b:a", f"{bitrate}k", "-vbr", "on", "-ar", f"{sample_rate}"])
 		self.real_run_ffmpeg(
 			[[filename, input_args]],
-			[[outpath, output_args]],
+			[[self.final, output_args]],
 		)
 		return [], info
 

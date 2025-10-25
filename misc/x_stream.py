@@ -163,6 +163,11 @@ class Server:
 
 	async def _dyn_serve(self, urls, ranges, headers, head=None, callback=None) -> AsyncIterator[bytes]:
 		"""Internal generator for dynamic serving."""
+
+		def content_generator(b, chunksize=262144):
+			for i in range(0, len(b), chunksize):
+				yield b[i:i + chunksize]
+
 		with tracebacksuppressor(GeneratorExit):
 			if head:
 				data = head.data[head.index:]
@@ -207,7 +212,10 @@ class Server:
 						return memoryview(b)[s:e]
 
 					if len(futs) > i + 1:
-						yield await futs.pop(0)
+						b = await futs.pop(0)
+						for chunk in content_generator(b):
+							yield chunk
+
 					fut = asubmit(get_chunk, u, headers, start, end, pos, ns, big)
 					futs.append(fut)
 					pos = 0
@@ -216,7 +224,9 @@ class Server:
 					big = True
 
 				for fut in futs:
-					yield await fut
+					b = await fut
+					for chunk in content_generator(b):
+						yield chunk
 
 
 # Create FastAPI app
@@ -364,28 +374,11 @@ async def proxy_if(url: str, request: Request, force=False):
 	assert isinstance(url, str), url
 
 	def requires_proxy():
-		if not is_discord_attachment(url):
-			return False
 		if "Cf-Worker" in request.headers:
 			return True
 		if "bot" in request.headers.get("User-Agent", ""):
 			return False
-		if request.headers.get("X-Real-Ip", "")[:3] in ("34.", "35."):
-			return True
-		sec_fetch_dest = request.headers.get("Sec-Fetch-Dest", "").casefold()
-		if sec_fetch_dest == "document":
-			ext = url.split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[-1]
-			if ext not in ("zip", "7z", "tar", "bin", "png", "gif", "webp", "jpg", "jpeg", "heic", "heif", "avif"):
-				return True
-		mode = request.headers.get("Sec-Fetch-Mode")
-		if mode:
-			if mode.casefold() not in ("cors", "navigate"):
-				return True
-			if request.headers.get("Sec-Fetch-Site", "").casefold() not in ("none", "cross-site"):
-				return True
-		if request.headers.get("Referer"):
-			return True
-		return False
+		return True
 
 	if force or requires_proxy():
 		return await proxy(url=url, request=request)
@@ -447,8 +440,13 @@ async def proxy(request: Request, url: Optional[str] = None):
 		if brange:
 			cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size or '*'}" for start, end in ranges)
 			response_headers["Content-Range"] = cr
-		return Response(
-			b"".join(data[r[0]:r[1]] for r in ranges) if not direct else data,
+
+		async def content_generator(b, chunksize=262144):
+			for i in range(0, len(b), chunksize):
+				yield b[i:i + chunksize]
+
+		return StreamingResponse(
+			content_generator(b"".join(data[r[0]:r[1]] for r in ranges) if not direct else data),
 			status_code=status_code,
 			headers=response_headers,
 			media_type=filetype.guess_mime(data),
@@ -476,7 +474,7 @@ async def proxy(request: Request, url: Optional[str] = None):
 
 	if ctype in ("text/html", "text/html; charset=utf-8", "application/octet-stream"):
 		it = resp.iter_content(262144)
-		b = next(it)
+		b = await asubmit(next, it)
 		mime = magic.from_buffer(b)
 		if mime == "application/octet-stream":
 			a = MemoryBytes(b)[:128]
@@ -486,8 +484,11 @@ async def proxy(request: Request, url: Optional[str] = None):
 
 		async def content_generator():
 			yield b
-			for chunk in it:
-				yield chunk
+			try:
+				while True:
+					yield await asubmit(next, it)
+			except StopIteration:
+				pass
 
 		return StreamingResponse(
 			content_generator(),

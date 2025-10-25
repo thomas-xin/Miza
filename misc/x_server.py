@@ -26,7 +26,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut
 from .types import byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, MemoryBytes
-from .util import fcdict, nhash, shash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, ecdc_dir, quote_plus, rename, url_unparse, url2fn, is_youtube_url, seq, AutoCache, Request, magic, is_discord_attachment, is_miza_attachment, unyt, ecdc_exists, CACHE_PATH, T, byte_scale, decode_attachment, update_headers, temporary_file, CODEC_FFMPEG
+from .util import fcdict, nhash, shash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, ecdc_dir, quote_plus, rename, url_unparse, url2fn, is_youtube_url, seq, Request, magic, is_discord_attachment, is_miza_attachment, unyt, ecdc_exists, CACHE_PATH, T, byte_scale, decode_attachment, update_headers, temporary_file, CODEC_FFMPEG
 from .caches import attachment_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -895,7 +895,6 @@ class Server:
 			entry = self.ydl.search(v)[0]
 			url = entry["url"]
 			v2 = unyt(url)
-			tmpl = f"{CACHE_PATH}/{uhash(v2)}.{fmt}"
 			start = kwargs.get("start")
 			end = kwargs.get("end")
 			if start == "-":
@@ -906,32 +905,34 @@ class Server:
 				start = round_min(round(float(start), 3))
 			if end is not None:
 				end = round_min(round(float(end), 3))
+			is_audio = fmt in ("ogg", "opus", "mp3", "flac", "wav")
+			if not is_audio:
+				codec = CODEC_FFMPEG.get(fmt)
+				if codec:
+					cdc = fmt
+				if fmt in ("h264", "h265", "h266", "av1"):
+					fmt = "mp4"
+			else:
+				codec = None
+			tmpl = f"{CACHE_PATH}/{uhash(v2)}.{fmt}"
 			name = tmpl.rsplit(".", 1)[0]
 			if start is not None or end is not None:
 				name += f"~{start}-{end}"
-			fn = name + "." + fmt
+			if codec:
+				fn = name + "~" + cdc + "." + fmt
+			else:
+				fn = name + "." + fmt
 			print(tmpl, fn)
 			if not os.path.exists(fn) or not os.path.getsize(fn):
 				sem = self.ydl_sems.setdefault(ip, Semaphore(64, 256, rate_limit=8))
 				with sem:
 					# Separate video and audio formats
-					if fmt in ("ogg", "opus", "mp3", "flac", "wav"):
+					if is_audio:
 						fn2, _cdc, _dur, _ac = self.ydl.get_audio(entry, fmt=fmt, start=start, end=end)
 						if fn != fn2:
 							rename(fn2, fn)
 						title = entry["name"]
 					else:
-						codec = CODEC_FFMPEG.get(fmt)
-						if codec:
-							cdc = fmt
-						if fmt in ("h264", "h265", "h266"):
-							fmt = "mp4"
-						if codec:
-							tmpl = f"{CACHE_PATH}/{uhash(v2)}~{cdc}.{fmt}"
-							fn = name + "~" + cdc + "." + fmt
-						else:
-							tmpl = f"{CACHE_PATH}/{uhash(v2)}.{fmt}"
-							fn = name + "." + fmt
 						if fmt in ("avif", "webp", "gif"):
 							fstr = f"bestvideo[ext={fmt}]/bestvideo[acssodec=none]/bestvideo"
 						else:
@@ -942,6 +943,7 @@ class Server:
 							codec=codec,
 							start=start,
 							end=end,
+							final=fn,
 						)]
 						ydl_opts = dict(
 							format=fstr,

@@ -1120,8 +1120,17 @@ class AudioDownloader:
 				rename(fn2, fn)
 				dur, _bps, cdc, ac = get_duration_2(fn)
 				return fn, cdc, dur, ac
+		if not fmt and (is_discord_attachment(url) or is_miza_url(url)):
+			if discord_expired(url):
+				# Just in case a Discord attachment expires in the short time between checking and downloading
+				url = shorten_attachment(url, 0)
+			dur, _bps, cdc, ac = get_duration_2(url)
+			if dur:
+				entry["duration"] = dur
+			return url, cdc, dur, ac
 		codec = "opus" if ext == "ogg" else ext
-		if start is not None or end is not None:
+		target = fn
+		if start or end is not None:
 			fn = temporary_file(ext)
 		# print("OUTTMPL:", fn)
 		ydl_opts = dict(
@@ -1131,7 +1140,7 @@ class AudioDownloader:
 			source_address="0.0.0.0",
 			final_ext=ext,
 			cachedir=TEMP_PATH,
-			outtmpl=fn,
+			outtmpl=target,
 			windowsfilenames=True,
 			cookiesfrombrowser=["firefox"],
 			extractor_args=dict(
@@ -1147,16 +1156,9 @@ class AudioDownloader:
 				codec=codec,
 				start=start,
 				end=end,
+				final=fn,
 			)]
 		)
-		if not fmt and (is_discord_attachment(url) or is_miza_url(url)):
-			if discord_expired(url):
-				# Just in case a Discord attachment expires in the short time between checking and downloading
-				url = shorten_attachment(url, 0)
-			dur, _bps, cdc, ac = get_duration_2(url)
-			if dur:
-				entry["duration"] = dur
-			return url, cdc, dur, ac
 		if url.startswith("https://youtu.be/"):
 			url2 = url.replace("https://youtu.be/", "https://www.youtube.com/watch?v=")
 		else:

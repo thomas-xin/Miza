@@ -7825,7 +7825,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		elif isinstance(ex, discord.Forbidden):
 			fields = (("403", "This error usually indicates that I am missing one or more necessary Discord permissions to perform this command!"),)
 		elif isinstance(ex, (discord.HTTPException, ConnectionError)):
-			fields = ((str(ex.args[0]).split(None, 1)[0], "This error usually indicates that the remote server (possibly Discord) is rejecting the response. Please double check your inputs, or try again later!"),)
+			fields = ((lim_str(str(ex.args[0]).split(None, 1)[0], 1024), "This error usually indicates that the remote server (possibly Discord) is rejecting the response. Please double check your inputs, or try again later!"),)
 		elif isinstance(ex, (CE, CE2)):
 			fields = (("Response disconnected.", "If this error occurs during a command, it is likely due to maintenance!"),)
 		elif hasattr(ex, "footer"):
@@ -7846,14 +7846,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				content += "\n> " + "\n> ".join((t := ((f["name"], f["value"]) if isinstance(f, dict) else f)) and ("### " + t[0] + "\n" + t[1]) for f in fields if f)
 			return csubmit(send_with_react(
 				messageable,
-				content,
+				lim_str(content, 2000),
 				reacts=reacts,
 				reference=reference,
 			))
 		print(reference)
 		return self.send_as_embeds(
 			messageable,
-			description=description,
+			description=lim_str(description, 3000),
 			title=title,
 			fields=fields,
 			reacts=reacts,

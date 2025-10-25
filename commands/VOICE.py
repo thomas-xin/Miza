@@ -2123,7 +2123,7 @@ class Download(Command):
 		try:
 			resp.raise_for_status()
 		except Exception as ex:
-			raise RuntimeError([repr(ex), resp.content])
+			raise RuntimeError([repr(ex), as_str(resp.content)])
 		file = CompatFile(resp.content, resp.headers["Content-Disposition"].split("=", 1)[-1].strip('"'))
 		response = await self.bot.edit_message(
 			response,

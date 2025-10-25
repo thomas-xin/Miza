@@ -3332,7 +3332,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 				self.validate_or_clear()
 				v, t = super().__getitem__(k)
 		except KeyError:
-			v = self._retrieve(k, func, *args, **kwargs)
+			v = Dummy
 		else:
 			delay = utc() - t
 			if delay > self._stimeout:
@@ -3342,6 +3342,8 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 					pass
 			elif delay > self._stale:
 				esubmit(self._retrieve, k, func, *args, **kwargs)
+		if v is Dummy:
+			return self._retrieve(k, func, *args, **kwargs)
 		return v
 
 	async def _aretrieve(self, k, func, *args, **kwargs):
@@ -3366,7 +3368,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 				self.validate_or_clear()
 				v, t = super().__getitem__(k)
 		except KeyError:
-			v = await self._aretrieve(k, func, *args, **kwargs)
+			v = Dummy
 		else:
 			delay = utc() - t
 			if delay > self._stimeout:
@@ -3376,6 +3378,8 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 					pass
 			if delay > self._stale:
 				csubmit(self._aretrieve(k, func, *args, **kwargs))
+		if v is Dummy:
+			return await self._aretrieve(k, func, *args, **kwargs)
 		return v
 
 	def keys(self):

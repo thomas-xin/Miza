@@ -805,8 +805,9 @@ class UpdateExec(Database):
 				with tracebacksuppressor:
 					await channel.add_user(bot.get_user(bot.owners[0]))
 			private = False
+		groupsize = min(10, 1 + int(total_size / chunksize))
 		for start in range(0, total_size, chunksize):
-			if not groups or len(groups[-1]) >= min(10, max(2, int(sqrt(total_size / chunksize)))):
+			if not groups or len(groups[-1]) >= groupsize:
 				groups.append([])
 			chunk = b[start:start + chunksize]
 			groups[-1].append(chunk)
