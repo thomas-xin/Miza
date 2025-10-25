@@ -182,7 +182,7 @@ class AttachmentCache(AutoCache):
 				continue
 			esubmit(self.set_last, (cid, mid, n))
 			for emb in message["embeds"]:
-				url = emb["image"]["url"]
+				url = emb["image"]["url"].rstrip("&")
 				tasks.pop(0)[0].set_result(url)
 				if not tasks:
 					break
@@ -221,7 +221,7 @@ class AttachmentCache(AutoCache):
 			)
 			for i, a in enumerate(data["attachments"]):
 				if a_id in (i, int(a["id"])):
-					return a["url"]
+					return a["url"].rstrip("&")
 			raise KeyError(a_id, data["attachments"])
 		fut = Future()
 		url, _ = merge_url(c_id, m_id, a_id, fn)
@@ -267,14 +267,14 @@ class AttachmentCache(AutoCache):
 			)
 			if data.get("attachments"):
 				for a in data["attachments"]:
-					urls.append(a["url"])
+					urls.append(a["url"].rstrip("&"))
 			else:
 				for e in data["embeds"]:
 					try:
 						url = e["author"]["icon_url"]
 					except KeyError:
 						url = e["image"]["url"]
-					urls.append(url)
+					urls.append(url.rstrip("&"))
 		return urls, size_mb * 1048576
 
 	async def obtains(self, path):
