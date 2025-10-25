@@ -2024,99 +2024,120 @@
 			"timeout": "24"
 		}
 	},
-	"OWNER": {
-		"Reload": {
+	"AI": {
+		"Ask": {
 			"aliases": [
-				"Reload"
+				"Ask"
 			],
-			"description": "Reloads a specified module.",
+			"description": "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. The chatbot will automatically choose one of multiple language models to conjure a response based on premium level. Less censorship is imposed when invoked within NSFW channels.",
 			"usage": "",
-			"level": "nan",
-			"rate_limit": "(2, 3)",
+			"level": "0",
+			"rate_limit": "(12, 16)",
 			"example": [],
-			"timeout": "inf"
+			"timeout": "576"
 		},
-		"Restart": {
+		"Personality": {
 			"aliases": [
-				"Restart",
-				"Reboot",
-				"Shutdown",
-				"Maintain",
-				"Update"
+				"Personality",
+				"ResetChat",
+				"ClearChat",
+				"ChangePersonality"
 			],
-			"description": "Restarts, reloads, or shuts down Miza, with an optional delay.",
+			"description": "Customises my personality for ~ask and @mentions in the current channel. Note that with the increased complexity of the chatbot, a clear description of who the bot is should be provided.",
 			"usage": "",
-			"level": "nan",
-			"rate_limit": "(2, 3)",
-			"example": [],
-			"timeout": "inf"
-		},
-		"Execute": {
-			"aliases": [
-				"Execute"
-			],
-			"description": "Executes a command as other user(s), similar to the command's function in Minecraft.",
-			"usage": "as <0:user>* run <1:command>+ <inherit_perms(-i)>?",
-			"level": "nan",
-			"rate_limit": "(2, 3)",
-			"example": [
-				"execute as @Miza run ~info"
-			],
-			"timeout": "24"
-		},
-		"Exec": {
-			"aliases": [
-				"Exec",
-				"Aexec",
-				"Aeval",
-				"Eval"
-			],
-			"description": "Causes all messages by the bot owner(s) in the current channel to be executed as python code on Miza.",
-			"usage": "",
-			"level": "nan",
-			"rate_limit": "(2, 3)",
+			"level": "2",
+			"rate_limit": "(18, 24)",
 			"example": [],
 			"timeout": "24"
 		},
-		"SetAvatar": {
+		"Instruct": {
 			"aliases": [
-				"SetAvatar",
-				"ChangeAvatar",
-				"UpdateAvatar"
+				"Instruct",
+				"Complete",
+				"Completion",
+				"O1",
+				"O1M",
+				"O3M",
+				"O4M",
+				"GPT5",
+				"GPT5M",
+				"GPT4",
+				"GPT4M",
+				"GPT3",
+				"R1",
+				"Grok",
+				"Gemini",
+				"Deepseek",
+				"Claude",
+				"Opus",
+				"Sonnet",
+				"Haiku",
+				"Llama",
+				"Qwen"
 			],
-			"description": "Changes Miza's current avatar.",
-			"usage": "<avatar_url>?",
-			"level": "nan",
-			"rate_limit": "(2, 3)",
-			"example": [
-				"setavatar https://cdn.discordapp.com/embed/avatars/0.png"
-			],
-			"timeout": "24"
-		},
-		"Maintenance": {
-			"aliases": [
-				"Maintenance"
-			],
-			"description": "Toggles Maintenance mode, which will block all use of commands for all servers except the current one while active.",
+			"description": "Similar to ~ask, but functions as instruct rather than chat.",
 			"usage": "",
-			"level": "nan",
-			"rate_limit": "(2, 3)",
+			"level": "0",
+			"rate_limit": "(12, 16)",
 			"example": [],
 			"timeout": "24"
 		},
-		"Suspend": {
+		"Imagine": {
 			"aliases": [
-				"Suspend",
-				"Block",
-				"Blacklist"
+				"Imagine",
+				"AIArt",
+				"Dream",
+				"Envision",
+				"Inspire",
+				"Txt2Img",
+				"DALLE3"
 			],
-			"description": "Prevents a user from accessing Miza's commands. Overrides <perms>.",
-			"usage": "<0:user> <disable(-d)>",
-			"level": "nan",
-			"rate_limit": "(2, 3)",
-			"example": [
-				"block 201548633244565504"
+			"description": "Runs one of many AI image generators on the input prompt or image. Less censorship is imposed when invoked within NSFW channels. Incurs an adjusted quota cost.",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(12, 16)",
+			"example": [],
+			"timeout": "3600"
+		},
+		"Describe": {
+			"aliases": [
+				"Describe",
+				"Description",
+				"Image2Text",
+				"Clip"
 			],
+			"description": "Describes the input image.",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(4, 5)",
+			"example": [],
+			"timeout": "24"
+		},
+		"OCR": {
+			"aliases": [
+				"OCR",
+				"Read",
+				"Image2Text"
+			],
+			"description": "Attempts to read text in an image using Optical Character Recognition AI.",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(10, 15)",
+			"example": [],
+			"timeout": "24"
+		},
+		"Vectorise": {
+			"aliases": [
+				"Vectorise",
+				"SVG",
+				"Vector",
+				"Vectorize"
+			],
+			"description": "Applies https://replicate.com/recraft-ai/recraft-vectorize/api to convert a raster image to SVG format.",
+			"usage": "",
+			"level": "0",
+			"rate_limit": "(10, 15)",
+			"example": [],
 			"timeout": "24"
 		}
 	},
@@ -2342,6 +2363,102 @@
 			"level": "0",
 			"rate_limit": "(2, 3)",
 			"example": [],
+			"timeout": "24"
+		}
+	},
+	"OWNER": {
+		"Reload": {
+			"aliases": [
+				"Reload"
+			],
+			"description": "Reloads a specified module.",
+			"usage": "",
+			"level": "nan",
+			"rate_limit": "(2, 3)",
+			"example": [],
+			"timeout": "inf"
+		},
+		"Restart": {
+			"aliases": [
+				"Restart",
+				"Reboot",
+				"Shutdown",
+				"Maintain",
+				"Update"
+			],
+			"description": "Restarts, reloads, or shuts down Miza, with an optional delay.",
+			"usage": "",
+			"level": "nan",
+			"rate_limit": "(2, 3)",
+			"example": [],
+			"timeout": "inf"
+		},
+		"Execute": {
+			"aliases": [
+				"Execute"
+			],
+			"description": "Executes a command as other user(s), similar to the command's function in Minecraft.",
+			"usage": "as <0:user>* run <1:command>+ <inherit_perms(-i)>?",
+			"level": "nan",
+			"rate_limit": "(2, 3)",
+			"example": [
+				"execute as @Miza run ~info"
+			],
+			"timeout": "24"
+		},
+		"Exec": {
+			"aliases": [
+				"Exec",
+				"Aexec",
+				"Aeval",
+				"Eval"
+			],
+			"description": "Causes all messages by the bot owner(s) in the current channel to be executed as python code on Miza.",
+			"usage": "",
+			"level": "nan",
+			"rate_limit": "(2, 3)",
+			"example": [],
+			"timeout": "24"
+		},
+		"SetAvatar": {
+			"aliases": [
+				"SetAvatar",
+				"ChangeAvatar",
+				"UpdateAvatar"
+			],
+			"description": "Changes Miza's current avatar.",
+			"usage": "<avatar_url>?",
+			"level": "nan",
+			"rate_limit": "(2, 3)",
+			"example": [
+				"setavatar https://cdn.discordapp.com/embed/avatars/0.png"
+			],
+			"timeout": "24"
+		},
+		"Maintenance": {
+			"aliases": [
+				"Maintenance"
+			],
+			"description": "Toggles Maintenance mode, which will block all use of commands for all servers except the current one while active.",
+			"usage": "",
+			"level": "nan",
+			"rate_limit": "(2, 3)",
+			"example": [],
+			"timeout": "24"
+		},
+		"Suspend": {
+			"aliases": [
+				"Suspend",
+				"Block",
+				"Blacklist"
+			],
+			"description": "Prevents a user from accessing Miza's commands. Overrides <perms>.",
+			"usage": "<0:user> <disable(-d)>",
+			"level": "nan",
+			"rate_limit": "(2, 3)",
+			"example": [
+				"block 201548633244565504"
+			],
 			"timeout": "24"
 		}
 	}

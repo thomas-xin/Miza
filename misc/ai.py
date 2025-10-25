@@ -39,10 +39,6 @@ available = {
 		"openrouter": ("anthropic/claude-opus-4.1", ("15", "75")),
 		None: "gpt-5",
 	},
-	"claude-3-opus": {
-		"openrouter": ("anthropic/claude-3-opus", ("15", "75")),
-		None: "gpt-5",
-	},
 	"claude-4.5-sonnet": {
 		"openrouter": ("anthropic/claude-4.5-sonnet", ("3", "15")),
 		None: "gpt-5",
@@ -51,28 +47,8 @@ available = {
 		"openrouter": ("anthropic/claude-sonnet-4", ("3", "15")),
 		None: "gemini-2.5-pro",
 	},
-	"claude-3.7-sonnet-t": {
-		"openrouter": ("anthropic/claude-3.7-sonnet:thinking", ("3", "15")),
-		None: "gpt-5-mini",
-	},
-	"claude-3.7-sonnet": {
-		"openrouter": ("anthropic/claude-3.7-sonnet", ("3", "15")),
-		None: "gpt-5-mini",
-	},
-	"claude-3.5-sonnet": {
-		"openrouter": ("anthropic/claude-3.5-sonnet", ("3", "15")),
-		None: "gpt-5-mini",
-	},
 	"claude-4.5-haiku": {
 		"openrouter": ("anthropic/claude-haiku-4.5", ("1", "5")),
-		None: "gpt-5-nano",
-	},
-	"claude-3.5-haiku": {
-		"openrouter": ("anthropic/claude-3.5-haiku", ("1", "5")),
-		None: "gpt-5-nano",
-	},
-	"claude-3-haiku": {
-		"openrouter": ("anthropic/claude-3-haiku", ("0.25", "1.25")),
 		None: "gpt-5-nano",
 	},
 	"deepseek-r1": {
@@ -167,10 +143,6 @@ available = {
 		"openrouter": ("google/gemini-2.5-flash-lite-preview-09-2025", ("0.1", "0.4")),
 		None: "gpt-5",
 	},
-	"gemini-2.0": {
-		"openrouter": ("google/gemini-2.0-flash-001", ("0.1", "0.4")),
-		None: "gpt-5",
-	},
 	"grok-4": {
 		"openrouter": ("x-ai/grok-4", ("3", "15")),
 		None: "grok-3",
@@ -178,14 +150,6 @@ available = {
 	"grok-4-fast": {
 		"openrouter": ("x-ai/grok-4-fast", ("0.2", "0.5")),
 		None: "grok-3-mini",
-	},
-	"grok-3": {
-		"openrouter": ("x-ai/grok-3", ("3", "15")),
-		None: "gpt-5",
-	},
-	"grok-3-mini": {
-		"openrouter": ("x-ai/grok-3-mini", ("0.3", "0.5")),
-		None: "gpt-5-mini",
 	},
 	"gpt-oss-120b": {
 		"openrouter": ("openai/gpt-oss-120b", ("0.072", "0.28")),
@@ -206,18 +170,6 @@ available = {
 	},
 	"o3-mini": {
 		"openai": ("o3-mini", ("1.1", "4.4")),
-		None: "gpt-4.1-mini",
-	},
-	"o1": {
-		"openai": ("o1", ("15", "60")),
-		None: "gpt-4.1",
-	},
-	"o1-preview": {
-		"openai": ("o1-preview", ("15", "60")),
-		None: "gpt-4.1",
-	},
-	"o1-mini": {
-		"openai": ("o1-mini", ("1.1", "4.4")),
 		None: "gpt-4.1-mini",
 	},
 	"gpt-5": {
@@ -253,18 +205,6 @@ available = {
 		"openrouter": ("openai/gpt-4o", ("2.5", "10")),
 		None: "claude-3.5-sonnet",
 	},
-	"gpt-3.5-turbo-instruct": {
-		"openai": ("gpt-3.5-turbo-instruct", ("1.5", "2")),
-		None: "command-r-plus",
-	},
-	"gpt-3.5": {
-		"openai": ("gpt-3.5-turbo-0125", ("0.5", "1.5")),
-		None: "command-r-plus",
-	},
-	"skyfall-36b": {
-		"openrouter": ("thedrummer/skyfall-36b-v2", ("0.5", "0.5")),
-		None: "magnum-72b",
-	},
 	"mistral-24b": {
 		"mistral": ("mistral-small-latest", ("0", "0")),
 		"openrouter": ("mistralai/mistral-small-3.1-24b-instruct-2503", ("0.1", "0.3")),
@@ -274,54 +214,6 @@ available = {
 	"kimi-k2": {
 		"openrouter": ("moonshotai/kimi-k2-0905", ("0.6", "2.5")),
 		None: "gpt-5-mini",
-	},
-	"caller-large": {
-		"openrouter": ("arcee-ai/caller-large", ("0.55", "0.8")),
-		None: "gpt-4.1-mini",
-	},
-	"firefunction-v1": {
-		"fireworks": ("accounts/fireworks/models/firefunction-v1", ("0.5", "0.5")),
-		None: "gpt-4.1-mini",
-	},
-	"firefunction-v2": {
-		"fireworks": ("accounts/fireworks/models/firefunction-v2", ("0.9", "0.9")),
-		None: "gpt-4.1-mini",
-	},
-	"firellava-13b": {
-		"fireworks": ("accounts/fireworks/models/firellava-13b", ("0.2", "0.2")),
-		None: "claude-3-haiku",
-	},
-	"phi-4b": {
-		"fireworks": ("accounts/fireworks/models/phi-3-vision-128k-instruct", ("0.2", "0.2")),
-		None: "gpt-4.1-mini",
-	},
-	"wizard-8x22b": {
-		"deepinfra": ("microsoft/WizardLM-2-8x22B", ("0.65", "0.65")),
-		None: "mixtral-8x22b-instruct",
-	},
-	"mixtral-8x22b-instruct": {
-		"deepinfra": ("mistralai/Mixtral-8x22B-Instruct-v0.1", ("0.65", "0.65")),
-		"together": ("mistralai/Mixtral-8x22B-Instruct-v0.1", ("1.2", "1.2")),
-		"fireworks": ("accounts/fireworks/models/mixtral-8x22b-instruct", ("0.9", "0.9")),
-		None: "dbrx-instruct",
-	},
-	"reflection-llama-3-70b": {
-		"deepinfra": ("mattshumer/Reflection-Llama-3.1-70B", ("0.35", "0.4")),
-		None: "llama-3-70b",
-	},
-	"euryale-70b": {
-		"openrouter": ("euryale-70b", ("0.7", "0.8")),
-		"deepinfra": ("Sao10K/L3-70B-Euryale-v2.1", ("0.7", "0.8")),
-		None: "lzlv-70b",
-	},
-	"lzlv-70b": {
-		"deepinfra": ("lizpreciatior/lzlv_70b_fp16_hf", ("0.59", "0.79")),
-	},
-	"mixtral-8x7b-instruct": {
-		"deepinfra": ("mistralai/Mixtral-8x7B-Instruct-v0.1", ("0.27", "0.27")),
-		"fireworks": ("accounts/fireworks/models/mixtral-8x7b-instruct", ("0.5", "0.5")),
-		"together": ("mistralai/Mixtral-8x7B-Instruct-v0.1", ("0.6", "0.6")),
-		None: "llama-3-8b",
 	},
 }
 

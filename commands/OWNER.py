@@ -784,13 +784,29 @@ class UpdateExec(Database):
 			return await channel.create_thread(name="backup")
 		raise NotImplementedError(size)
 
-	async def mproxy(self, b, fn, channel):
+	async def mproxy(self, b, fn=None, channel=None):
 		bot = self.bot
 		b = MemoryBytes(b)
 		groups = []
-		chunksize = self.DEFAULT_LIMIT
-		for start in range(0, len(b), chunksize):
-			if not groups or len(groups[-1]) >= min(10, max(2, int(sqrt(len(b) / chunksize)))):
+		total_size = len(b)
+		if total_size > attachment_cache.max_size * attachment_cache.attachment_count:
+			chunksize = self.DEFAULT_LIMIT
+		elif attachment_cache.max_size < total_size <= self.DEFAULT_LIMIT:
+			chunksize = self.DEFAULT_LIMIT
+		else:
+			chunksize = attachment_cache.max_size
+		if chunksize <= attachment_cache.max_size:
+			if not channel:
+				channel = await bot.fetch_channel(choice(attachment_cache.channels))
+			private = True
+		else:
+			channel = await self.get_lfs_channel(self.DEFAULT_LIMIT)
+			if bot.owners.intersection(channel.guild._members) and none(m.id in bot.owners for m in channel.members):
+				with tracebacksuppressor:
+					await channel.add_user(bot.get_user(bot.owners[0]))
+			private = False
+		for start in range(0, total_size, chunksize):
+			if not groups or len(groups[-1]) >= min(10, max(2, int(sqrt(total_size / chunksize)))):
 				groups.append([])
 			chunk = b[start:start + chunksize]
 			groups[-1].append(chunk)
@@ -803,25 +819,29 @@ class UpdateExec(Database):
 			embeds = []
 			for chunk in group:
 				b = bytes(chunk)
-				file = CompatFile(b, filename=fn)
-				member = choice(channel.guild.members)
-				try:
-					thumb = member.avatar.url
-				except Exception:
-					thumb = bot.discord_icon
-				ext = magic.from_buffer(b)
-				if ext.startswith("image/"):
+				file = CompatFile(b, filename=fn or "c.b")
+				if not private:
+					member = choice(channel.guild.members)
+					try:
+						thumb = member.avatar.url
+					except Exception:
+						thumb = bot.discord_icon
+				ext = magic.from_buffer(b) if not n else ""
+				if private:
+					embed = None
+				elif ext.startswith("image/"):
 					embed = discord.Embed(colour=rand_colour()).set_author(name=member.name, icon_url=f"attachment://{fn}").set_thumbnail(url=thumb)
 				else:
 					embed = discord.Embed(colour=rand_colour()).set_image(url=f"attachment://{fn}")
 				files.append(file)
-				embeds.append(embed)
+				if embed:
+					embeds.append(embed)
 				fn = str(n)
 				n += 1
 			futs.append(csubmit(channel.send(files=files, embeds=embeds)))
 		for fut in futs:
 			message = await fut
-			assert len(message.embeds) == len(group), message.id
+			assert not len(message.embeds) or len(message.embeds) == len(group), message.id
 			m_ids.append(message.id)
 		return f"https://mizabot.xyz/c/{group_attachments(chunksize // 1048576, channel.id, m_ids)}/{ofn}"
 
@@ -841,16 +861,12 @@ class UpdateExec(Database):
 			fn = filetransd(filename or getattr(url, "name", None) or "c.b")
 			with url:
 				b = await asubmit(url.read)
-		if len(b) < attachment_cache.max_size:
+		if len(b) <= attachment_cache.max_size:
 			return await attachment_cache.create(b, filename=fn, channel=channel)
 		try:
 			channel = await self.get_lfs_channel(len(b))
 		except NotImplementedError:
-			channel = await self.get_lfs_channel()
-			if bot.owners.intersection(channel.guild._members) and none(m.id in bot.owners for m in channel.members):
-				with tracebacksuppressor:
-					await channel.add_user(bot.get_user(bot.owners[0]))
-			return await self.mproxy(b, fn, channel)
+			return await self.mproxy(b, fn, channel=channel)
 		if bot.owners.intersection(channel.guild._members) and none(m.id in bot.owners for m in channel.members):
 			with tracebacksuppressor:
 				await channel.add_user(bot.get_user(bot.owners[0]))
@@ -907,7 +923,7 @@ class UpdateExec(Database):
 			if optimise:
 				if not data and is_url(url):
 					data = await bot.get_request(url)
-				if data and len(data) > 1048576:
+				if data and len(data) > 1048576 and magic.from_buffer(data).split("/", 1)[0] in ("image", "video"):
 					data = await bot.optimise_image(data, fsize=1048576, fmt="avif")
 					filename = replace_ext(filename, "avif")
 			url2 = await self.lproxy(data or url, filename=filename, channel=channel)

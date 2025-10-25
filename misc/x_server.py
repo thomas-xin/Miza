@@ -1278,7 +1278,7 @@ class Server:
 		update_headers(cp.response.headers, **HEADERS)
 		cp.response.headers["content-type"] = "application/json"
 		try:
-			resp = interface.run(f"await bot.run_simulate({repr(ip)},{repr(content)})")
+			resp = interface.run(f"await bot.run_simulate({repr(ip)},{repr(content)})", timeout=3600)
 		except Exception as ex:
 			cp.response.status = 500
 			return json_dumps(dict(exception=ex.__class__.__name__, message=str(ex)))

@@ -151,8 +151,8 @@ class Ask(Command):
 		await bot.require_integrity(_message)
 		print("ASK:", _channel.id, input_message)
 		bp = ["> ", "# ", "## ", "### "]
-		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, _prefix, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, model, nsfw, bp)
-		if pdata.stream and not pdata.tts:
+		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, _prefix, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, model, nsfw, bp, simulated)
+		if pdata.stream and not pdata.tts and not simulated:
 			return cdict(
 				content=fut,
 				prefix="\xad",
@@ -168,7 +168,7 @@ class Ask(Command):
 			return resp
 		raise RuntimeError(temp)
 
-	async def ask_iterator(self, bot, _message, _channel, _guild, _user, _prefix, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, premium, _model, nsfw, bp):
+	async def ask_iterator(self, bot, _message, _channel, _guild, _user, _prefix, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, premium, _model, nsfw, bp, simulated):
 		function_message = None
 		tool_responses = []
 		props = cdict(name=bot_name)
@@ -178,7 +178,7 @@ class Ask(Command):
 		)
 		reacts = []
 		if not _model:
-			_model = "large" if premium.value_approx >= 3 else "medium"
+			_model = "large" if premium.value_approx >= 3 else "medium" if not simulated else "small"
 		if _model == "large":
 			premium.require(3)
 		elif _model == "medium":

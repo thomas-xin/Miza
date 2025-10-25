@@ -513,7 +513,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if first:
 			print("Generating command json...")
 			j = {}
-			for category in ("MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "FUN", "OWNER", "NSFW", "MISC"):
+			for category in ("MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "FUN", "AI", "NSFW", "MISC", "OWNER"):
 				k = j[category] = {}
 				if category not in self.categories:
 					continue
@@ -2349,8 +2349,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		0: cdict(
 			reasoning="gpt-5-mini",
 			instructive="gpt-oss-120b",
-			casual="minimax-m1",
-			nsfw="mythomax-13b",
+			casual="gemini-2.5-flash",
+			nsfw="grok-4-fast",
 			backup="deepseek-v3",
 			retry="gpt-5-mini",
 			function="gpt-5-nano",
@@ -2360,12 +2360,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		1: cdict(
 			reasoning="gpt-5-mini",
 			instructive="gpt-5-mini",
-			casual="grok-4-fast",
+			casual="gemini-2.5-flash-t",
 			nsfw="grok-4-fast",
-			backup="gemini-2.5-flash-t",
-			retry="gpt-5",
+			backup="kimi-k2",
+			retry="claude-4.5-haiku",
 			function="grok-4-fast",
-			vision="gemini-2.5-flash",
+			vision="gemini-2.5-flash-t",
 			target="auto",
 		),
 		2: cdict(
@@ -2374,7 +2374,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			casual="grok-4",
 			nsfw="grok-4",
 			backup="kimi-k2",
-			retry="kimi-k2",
+			retry="claude-4.5-sonnet",
 			function="grok-4-fast",
 			vision="gpt-5",
 			target="auto",
@@ -5517,6 +5517,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		async with csem:
 			response = await future
 			await self.send_event("_command_", user=user, command=command, loop=loop, message=message)
+			if isinstance(response, str):
+				response = cdict(content=response)
 			if not respond:
 				return response
 			fut = csubmit(self.respond_with(response, message=message, command=command))
@@ -5691,8 +5693,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			msglen = 2000
 			# Maximum length we'll allow for a set of messages, beyond which the text will instead be uploaded as a file
 			maxlen = 12000
-			if response and isinstance(response, str):
-				response = cdict(content=response)
 			force = bool(manager)
 			channel = manager.channel if manager else message.channel if hasattr(message, "channel") else response.get("channel")
 			guild = (manager.guild if manager else message.guild if hasattr(message, "guild") else response.get("guild")) or getattr(channel, "guild", None)
@@ -6591,6 +6591,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			))
 			encoded = base64.b64encode(encrypt(data)).rstrip(b"=").decode("ascii")
 			async def external_heartbeat():
+				if not Request.sessions:
+					return
 				return await Request(
 					f"https://{addr}/authorised-heartbeat?key={quote_plus(key)}&uri={quote_plus(uri)}",
 					method="POST",
@@ -6598,6 +6600,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					data=orjson.dumps(dict(data=encoded)),
 					aio=True,
 					timeout=5,
+					session=Request.sessions.next(),
 				)
 			fut = csubmit(external_heartbeat())
 			futs.append(fut)
@@ -8745,6 +8748,7 @@ class SimulatedMessage:
 	voice = None
 	bot = False
 	ghost = True
+	slash = True
 	simulated = True
 	deleted = False
 	reference = None

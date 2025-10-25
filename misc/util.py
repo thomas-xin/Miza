@@ -4661,7 +4661,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 			for session in self.sessions:
 				await session.close()
 			await self.nossl.close()
-		self.sessions = alist(aiohttp.ClientSession() for i in range(6))
+		self.sessions = alist(aiohttp.ClientSession() for i in range(3))
 		self.nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
 		self.asession = niquests.AsyncSession()
 		self.ts = utc()
@@ -4673,7 +4673,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 			await self._init_()
 		if isinstance(data, aiohttp.FormData):
 			session = self.sessions.next()
-		elif not session:
+		elif not session and not is_discord_url(url):
 			try:
 				resp = await self.asession.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=verify)
 			except niquests.exceptions.SSLError:
