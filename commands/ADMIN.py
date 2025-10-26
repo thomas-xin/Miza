@@ -479,7 +479,6 @@ class RoleSelect(Command):
 			type="integer",
 			description="Amount of roles each user can assign",
 			example="2",
-			default=inf,
 		),
 		title=cdict(
 			type="text",
@@ -614,7 +613,7 @@ class RoleSelect(Command):
 		emb.set_author(**get_author(_guild))
 		emb.title = title
 		rolestr = "_".join(str(role.id) for e, role in rolelist)
-		if isfinite(limit) and limit < len(buttons):
+		if limit and limit < len(buttons):
 			rolestr = f"{limit}__{rolestr}"
 			available = f"{limit}/{len(buttons)}"
 		else:

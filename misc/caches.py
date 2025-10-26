@@ -107,8 +107,8 @@ class ColourCache(AutoCache):
 		k = uuhash(url)
 		try:
 			return self.retrieve(k, self._obtain, url)
-		except Exception:
-			print_exc()
+		except Exception as ex:
+			print(repr(ex))
 			return (0, 0, 0)
 
 
@@ -286,32 +286,25 @@ class AttachmentCache(AutoCache):
 		return resp
 
 	async def _download(self, url):
-		print(url)
+		fn = temporary_file(url2ext(url))
+		print(url, fn)
 		if is_discord_attachment(url):
 			target = await self.obtain(url=url)
-			data = await asubmit(download_file, target)
-			return data
+			fn = await asubmit(download_file, target, filename=fn)
+			return open(fn, "rb")
 		if is_miza_url(url):
 			if "/u/" in url:
 				c_id, m_id, a_id, fn = expand_attachment(url)
 				target = await self.obtain(c_id, m_id, a_id, fn)
-				data = await asubmit(download_file, url)
-				return data
+				fn = await asubmit(download_file, target, filename=fn)
+				return open(fn, "rb")
 			elif "/c/" in url:
 				path = url.split("/c/", 1)[-1].split("/", 1)[0]
 				urls = await self.obtains(path)
-				futs = []
-				for url in urls:
-					fut = asubmit(download_file, url)
-					futs.append(fut)
-				data = bytearray()
-				for fut in futs:
-					b = await fut
-					data.extend(b)
-				return data
-			data = await asubmit(download_file, url)
-			return data
-		fn = temporary_file(url2ext(url))
+				fn = await asubmit(download_file, *urls, filename=fn)
+				return open(fn, "rb")
+			fn = await asubmit(download_file, url, filename=fn)
+			return open(fn, "rb")
 		args = ["streamshatter", "--no-log-progress", "-c", TEMP_PATH, url, fn]
 		proc = await asyncio.create_subprocess_exec(*args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 		await proc.wait()
@@ -323,24 +316,24 @@ class AttachmentCache(AutoCache):
 				code, msg = line.split(None, 1)
 				raise ConnectionError(code, msg)
 			raise ConnectionError(501, line)
-		try:
-			async with aiofiles.open(fn, "rb") as f:
-				return await f.read()
-		finally:
-			try:
-				os.remove(fn)
-			except (OSError, PermissionError, FileNotFoundError):
-				pass
-		raise NotImplementedError(url)
+		assert os.path.exists(fn)
+		return open(fn, "rb")
 
-	async def download(self, url, filename=None):
+	async def download(self, url, filename=None, read=False):
 		url = unyt(url)
-		data = await self.secondary.aretrieve(url, self._download, url)
+		fp = await self.secondary.aretrieve(url, self._download, url, _read=True)
 		if filename:
-			async with aiofiles.open(filename, "wb") as f:
-				await f.write(data)
+			f2 = open(filename, "wb")
+			await asubmit(shutil.copyfileobj, fp, f2, 262144)
+			fp.close()
+			f2.close()
 			return filename
-		return data
+		if read:
+			return fp
+		try:
+			return await asubmit(fp.read)
+		finally:
+			fp.close()
 
 	async def delete(self, c_id, m_id, url=None):
 		if url:

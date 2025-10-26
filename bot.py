@@ -521,12 +521,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					c = k[command.parse_name()] = dict(
 						aliases=[n.strip("_") for n in command.alias],
 						description=command.parse_description(),
-						usage=command.usage,
 						level=str(command.min_level),
 						rate_limit=str(command.rate_limit),
 						example=T(command).get("example", []),
 						timeout=str(T(command).get("_timeout_", 1) * self.timeout),
 					)
+					if command.schema:
+						c["schema"] = command.schema
+					else:
+						c["usage"] = command.usage
 					for attr in ("flags", "server_only", "slash"):
 						with suppress(AttributeError):
 							c[attr] = command.attr
@@ -3192,7 +3195,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def add_attachment(self, attachment):
 		if int(attachment.size) <= 64 * 1048576:
-			return await self.get_attachment(attachment.url, size=attachment.size)
+			return await self.get_attachment(attachment.url, size=attachment.size, read=True)
 
 	async def add_and_test(self, message, attachment):
 		n = 0
@@ -3205,13 +3208,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				res = ""
 			self.cache.attachments[attachment.id] = res
 
-	async def get_attachment(self, url, data=False, size=0):
+	async def get_attachment(self, url, data=False, read=False, size=0):
 		if not data:
 			filename = f"{CACHE_PATH}/attachments/{uhash(url.split('//', 1)[-1])}"
 			if not os.path.exists(filename):
 				await attachment_cache.download(url, filename=filename)
 			return filename
-		return await attachment_cache.download(url)
+		return await attachment_cache.download(url, read=read)
 
 	async def get_request(self, url, limit=None, full=True, data=True, size=0, timeout=12):
 		if (match := scraper_blacklist.search(url)):
@@ -5546,10 +5549,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				ks = kwargs[k]
 				if len(ks) == 1 and not v.get("required") and ks[0] is None:
 					kwargs[k] = None
-		if len(kwargs) == 1:
-			k = next(iter(kwargs))
-			if argv and schema[k].type in ("string",) and not schema[k].get("multiple"):
-				kwargs[k] = argv
+		# if len(kwargs) == 1:
+		# 	k = next(iter(kwargs))
+		# 	if argv and schema[k].type in ("string",) and not schema[k].get("multiple"):
+		# 		kwargs[k] = argv
 		for k, v in schema.items():
 			if v.get("required", 0) > 1 and len(kwargs[k]) < v.required:
 				raise ArgumentError(f'{k} requires a minimum amount of {v.required} inputs.')
@@ -7233,7 +7236,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if hasattr(message, "files"):
 						self.files = message.files
 					else:
-						futs = [csubmit(bot.get_attachment(a.url, size=a.size)) for a in message.attachments]
+						futs = [csubmit(bot.get_attachment(a.url, size=a.size, read=True)) for a in message.attachments]
 						files = await gather(*futs)
 						self.files = [CompatFile(b, filename=a.filename) for a, b in zip(message.attachments, files)]
 				return self

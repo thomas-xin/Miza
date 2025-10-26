@@ -495,7 +495,7 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 		source_codec = cdc
 		A = ytd.postprocessor.ffmpeg.ACODECS
 		acodec = A[self.codec][1] or A[self.codec][0]
-		input_args = []
+		input_args = ["-vn"]
 		output_args = []
 		if self.start is not None:
 			input_args.extend(["-ss", str(self.start)])

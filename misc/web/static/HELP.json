@@ -9,11 +9,40 @@
 				"Halp"
 			],
 			"description": "Shows a list of usable commands, or gives a detailed description of a command.",
-			"usage": "<category(['admin', 'ai', 'fun', 'image', 'main', 'string', 'voice', 'webhook'])>? <command>?",
 			"level": "0",
 			"rate_limit": "(0.25, 1)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"category": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"admin",
+							"ai",
+							"fun",
+							"image",
+							"main",
+							"string",
+							"voice",
+							"webhook"
+						],
+						"accepts": {
+							"owner": "owner",
+							"misc": "misc",
+							"nsfw": "nsfw"
+						}
+					},
+					"description": "Command category to search",
+					"example": "image"
+				},
+				"command": {
+					"type": "string",
+					"description": "Help on a specific command",
+					"example": "download",
+					"greedy": false
+				}
+			}
 		},
 		"Hello": {
 			"aliases": [
@@ -23,44 +52,73 @@
 				"Bye"
 			],
 			"description": "\ud83d\udc4b",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(0, 0)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": ""
 		},
 		"Loop": {
 			"aliases": [
 				"Loop"
 			],
 			"description": "Loops a command. Delete the original message to terminate the loop if necessary. Subject to regular command restrictions and rate limits.",
-			"usage": "",
 			"level": "1",
 			"rate_limit": "(10, 15)",
 			"example": [],
-			"timeout": "288"
+			"timeout": "288",
+			"schema": {
+				"iterations": {
+					"type": "integer",
+					"validation": "[1, 256]",
+					"description": "Amount of times to perform target command",
+					"example": "4"
+				},
+				"command": {
+					"type": "string",
+					"description": "Command and arguments to run",
+					"example": "~cat"
+				}
+			}
 		},
 		"Edit": {
 			"aliases": [
 				"Edit"
 			],
 			"description": "Edits an existing bot message using new output from a command. Subject to regular command restrictions and rate limits.",
-			"usage": "",
 			"level": "1",
 			"rate_limit": "(10, 15)",
 			"example": [],
-			"timeout": "288"
+			"timeout": "288",
+			"schema": {
+				"target": {
+					"type": "message",
+					"description": "Target message; must be visible to the bot, and must use full message links if older than 2 weeks.",
+					"example": "https://discord.com/channels/247184721262411776/247184721262411776/803501099633737758"
+				},
+				"command": {
+					"type": "string",
+					"description": "Command and arguments to run",
+					"example": "~cat"
+				}
+			}
 		},
 		"Pipe": {
 			"aliases": [
 				"Pipe"
 			],
 			"description": "Redirects the output of one command into another. Subject to regular command restrictions and rate limits.",
-			"usage": "",
 			"level": "1",
 			"rate_limit": "(10, 15)",
 			"example": [],
-			"timeout": "288"
+			"timeout": "288",
+			"schema": {
+				"pipeline": {
+					"type": "string",
+					"description": "Pipeline syntax, specified as `first` | `second` | `third` etc",
+					"example": "~gradient spiral (0,255,255) (255,255,255) --repetitions 5 --space hsv | ~rainbow"
+				}
+			}
 		},
 		"Avatar": {
 			"aliases": [
@@ -69,7 +127,6 @@
 				"Icon"
 			],
 			"description": "Sends a link to the avatar of a user or server.",
-			"usage": "<objects>*",
 			"level": "0",
 			"rate_limit": "(5, 7)",
 			"example": [
@@ -77,7 +134,8 @@
 				"avatar bob",
 				"pfp"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<objects>*"
 		},
 		"Info": {
 			"aliases": [
@@ -89,14 +147,14 @@
 				"WhoIs"
 			],
 			"description": "Shows information about the target user or server.",
-			"usage": "<user>* <verbose(-v)>?",
 			"level": "0",
 			"rate_limit": "(6, 9)",
 			"example": [
 				"info 201548633244565504",
 				"info"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<user>* <verbose(-v)>?"
 		},
 		"Profile": {
 			"aliases": [
@@ -105,11 +163,47 @@
 				"UserProfile"
 			],
 			"description": "Shows or edits a user profile on Miza.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 6)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"user": {
+					"type": "user",
+					"description": "Target user to retrieve profile from",
+					"example": "201548633244565504"
+				},
+				"description": {
+					"type": "text",
+					"description": "Profile description. Will show up in embeds",
+					"example": "You should play Cave Story, it's a good game"
+				},
+				"pronouns": {
+					"type": "text",
+					"description": "Optional field containing any text; will show above description when set",
+					"example": "he/she/they"
+				},
+				"website": {
+					"type": "url",
+					"description": "Optional field denoting a redirect when the profile is clicked on",
+					"example": "https://mizabot.xyz"
+				},
+				"icon": {
+					"type": "visual",
+					"description": "Thumbnail to display on corner of embeds",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png"
+				},
+				"timezone": {
+					"type": "text",
+					"description": "Timezone. Used in datetime calculations where applicable; supports both city/state names (e.g. \"London\") and abbreviations (e.g. \"AET\"). Daylight savings is automatically calculated for non-fixed timezones",
+					"example": "US/Eastern"
+				},
+				"birthday": {
+					"type": "datetime",
+					"description": "Birthday date; affected by the timezone parameter",
+					"example": "february 29th"
+				}
+			}
 		},
 		"Activity": {
 			"aliases": [
@@ -118,11 +212,11 @@
 				"Log"
 			],
 			"description": "Shows your recent Discord activity",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(8, 11)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": ""
 		},
 		"Status": {
 			"aliases": [
@@ -130,14 +224,14 @@
 				"Ping"
 			],
 			"description": "Shows the bot's current internal program state.",
-			"usage": "<mode(enable|disable)>?",
 			"level": "0",
 			"rate_limit": "(9, 13)",
 			"example": [
 				"status",
 				"status enable"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<mode(enable|disable)>?"
 		},
 		"Invite": {
 			"aliases": [
@@ -147,13 +241,13 @@
 				"InviteLink"
 			],
 			"description": "Sends a link to Miza's homepage, github and invite code, as well as an invite link to the current server if applicable.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(9, 13)",
 			"example": [
 				"invite"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": ""
 		},
 		"Preserve": {
 			"aliases": [
@@ -161,11 +255,22 @@
 				"PreserveAttachmentLinks"
 			],
 			"description": "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to Miza's webserver's upload page: https://mizabot.xyz/files",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(12, 17)",
 			"example": [],
-			"timeout": "1200"
+			"timeout": "1200",
+			"schema": {
+				"urls": {
+					"type": "url",
+					"description": "URL or attachment to preserve",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"multiple": true,
+					"required": true
+				}
+			}
 		},
 		"Reminder": {
 			"aliases": [
@@ -178,11 +283,54 @@
 				"Announcements"
 			],
 			"description": "Sets a reminder for a certain date and time in the future.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(8, 13)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"reminder",
+							"announcement",
+							"urgent"
+						],
+						"accepts": {
+							"remind": "reminder",
+							"announce": "announcement",
+							"urgently": "urgent"
+						}
+					},
+					"description": "Reminders are sent as direct messages, announcements are sent to the origin channel, urgent reminders will continuously update a direct message until the acknowledged by a reaction",
+					"default": "reminder"
+				},
+				"message": {
+					"type": "string",
+					"description": "Message to receive. Will show up as an embed",
+					"example": "Doctor's appointment"
+				},
+				"icon": {
+					"type": "visual",
+					"description": "Thumbnail to display on corner of embed",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png"
+				},
+				"time": {
+					"type": "datetime",
+					"description": "Time input to parse",
+					"example": "35 mins and 6.25 secs before 3am next tuesday, EDT"
+				},
+				"every": {
+					"type": "timedelta",
+					"description": "Turn the reminder into a recurring one that will resend itself after a given amount of time. Note: Must be removed manually!",
+					"example": "One hundred thousand thirty seconds"
+				},
+				"delete": {
+					"type": "index",
+					"description": "Index of reminder(s) to delete",
+					"example": "3..7"
+				}
+			}
 		},
 		"Note": {
 			"aliases": [
@@ -191,7 +339,6 @@
 				"Notes"
 			],
 			"description": "Takes note of a given string and allows you to view and edit a to-do list!",
-			"usage": "<mode(edit|delete)>? <target(id|note)>?",
 			"level": "0",
 			"rate_limit": "(6, 10)",
 			"example": [
@@ -199,7 +346,8 @@
 				"trash 1",
 				"note edit 0 do the laundry"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<mode(edit|delete)>? <target(id|note)>?"
 		}
 	},
 	"STRING": {
@@ -209,7 +357,6 @@
 				"TR"
 			],
 			"description": "Translates a string into another language.",
-			"usage": "<0:engine(google|command-r-plus|gpt-3.5-turbo-instruct)>? <2:src_language>? <1:dest_languages>* <-1:string>",
 			"level": "0",
 			"rate_limit": "(6, 9)",
 			"example": [
@@ -217,7 +364,8 @@
 				"tr gpt-4.1-mini chinese bonjour, comment-t'appelles-tu?",
 				"translate gpt-3.5-turbo-instruct auto spanish french italian thank you!"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<0:engine(google|command-r-plus|gpt-3.5-turbo-instruct)>? <2:src_language>? <1:dest_languages>* <-1:string>"
 		},
 		"Translator": {
 			"aliases": [
@@ -225,14 +373,14 @@
 				"AutoTranslate"
 			],
 			"description": "Adds an automated translator to the current channel. Specify a list of languages to translate between, and optionally a translation engine. All non-command messages that do not begin with \"#\" will be passed through the translator.",
-			"usage": "<0:engine(google|command-r-plus|gpt-3.5-turbo-instruct)>? <1:languages>* <disable(-d)>?",
 			"level": "2",
 			"rate_limit": "(9, 12)",
 			"example": [
 				"translator chatgpt english german russian",
 				"autotranslate korean polish"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<0:engine(google|command-r-plus|gpt-3.5-turbo-instruct)>? <1:languages>* <disable(-d)>?"
 		},
 		"Math": {
 			"aliases": [
@@ -249,11 +397,47 @@
 				"Factorize"
 			],
 			"description": "Evaluates a math formula.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(4.5, 6)",
 			"example": [],
-			"timeout": "96"
+			"timeout": "96",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"default",
+							"list_vars",
+							"clear_vars",
+							"plot"
+						]
+					},
+					"description": "Alternative actions to perform",
+					"example": "list_vars",
+					"default": "default"
+				},
+				"query": {
+					"type": "string",
+					"description": "Input expression or formula, in Sympy syntax",
+					"example": "lim(diff(-atan(x)), x=-sqrt(-1.02))",
+					"required": true,
+					"aliases": [
+						"expression"
+					]
+				},
+				"precision": {
+					"type": "integer",
+					"validation": "(0, 1073741824]",
+					"description": "Floating point calculation precision. Also affects accuracy of scientific notation and recurring decimals",
+					"example": "8000",
+					"default": 1024
+				},
+				"rationalise": {
+					"type": "bool",
+					"description": "Whether to simplify/rationalise results where possible.",
+					"default": true
+				}
+			}
 		},
 		"Unicode": {
 			"aliases": [
@@ -302,7 +486,6 @@
 				"B85Decode"
 			],
 			"description": "Converts unicode text to hexadecimal or binary numbers.",
-			"usage": "<string>",
 			"level": "0",
 			"rate_limit": "(3.5, 5)",
 			"example": [
@@ -310,7 +493,8 @@
 				"uni2bin this is a secret message",
 				"32u NRXWY"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<string>"
 		},
 		"ID2Time": {
 			"aliases": [
@@ -322,11 +506,20 @@
 				"T2I"
 			],
 			"description": "Converts a discord ID to its corresponding UTC time.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(3, 4)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"id": {
+					"type": "number",
+					"example": "201548633244565504"
+				},
+				"time": {
+					"type": "datetime",
+					"example": "35 minutes and 6.25 seconds before 3am next tuesday, EDT"
+				}
+			}
 		},
 		"Fancy": {
 			"aliases": [
@@ -336,11 +529,28 @@
 				"Format"
 			],
 			"description": "Creates fun string translations using unicode fonts.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 5)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"fancy",
+							"zalgo",
+							"format"
+						]
+					},
+					"default": "fancy"
+				},
+				"text": {
+					"type": "string",
+					"example": "This is a cool message",
+					"required": true
+				}
+			}
 		},
 		"UnFancy": {
 			"aliases": [
@@ -349,11 +559,17 @@
 				"UnZalgo"
 			],
 			"description": "Removes unicode formatting and diacritic characters from inputted text.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 5)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"text": {
+					"type": "string",
+					"example": "\ud835\udd31\ud835\udd25\ud835\udd26\ud835\udd30 \ud835\udd26\ud835\udd30 \ud835\udd1e \ud835\udd20\ud835\udd2c\ud835\udd2c\ud835\udd29 \ud835\udd2a\ud835\udd22\ud835\udd30\ud835\udd30\ud835\udd1e\ud835\udd24\ud835\udd22",
+					"required": true
+				}
+			}
 		},
 		"OwOify": {
 			"aliases": [
@@ -363,25 +579,31 @@
 				"UwUify"
 			],
 			"description": "Applies the owo/uwu text filter to a string.",
-			"usage": "<string> <aggressive(-a)>? <basic(-b)>?",
 			"level": "0",
 			"rate_limit": "(4, 5)",
 			"example": [
 				"owoify hello, what's your name?",
 				"owoify -a Greetings, this is your cat god speaking"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<string> <aggressive(-a)>? <basic(-b)>?"
 		},
 		"AltCaps": {
 			"aliases": [
 				"AltCaps"
 			],
 			"description": "Alternates the capitalization on characters in a string.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(1, 2)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"text": {
+					"type": "string",
+					"example": "that's what she said",
+					"required": true
+				}
+			}
 		},
 		"Obfuscate": {
 			"aliases": [
@@ -389,11 +611,17 @@
 				"Obscure"
 			],
 			"description": "Obfuscates English text by substituting identical look-alikes with a unicode table.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(1, 2)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"text": {
+					"type": "string",
+					"example": "that's what she said",
+					"required": true
+				}
+			}
 		},
 		"Char2Emoji": {
 			"aliases": [
@@ -402,22 +630,90 @@
 				"Char2Emoj"
 			],
 			"description": "Makes emoji blocks using a string.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 14)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"text": {
+					"type": "string",
+					"example": "POOP",
+					"required": true,
+					"greedy": false
+				},
+				"emoji1": {
+					"type": "emoji",
+					"example": "\ud83d\udca9",
+					"default": "\u2b1c"
+				},
+				"emoji2": {
+					"type": "emoji",
+					"example": "\ud83e\udeb0",
+					"default": "\u2b1b"
+				}
+			}
 		},
 		"Emoticon": {
 			"aliases": [
 				"Emoticon"
 			],
 			"description": "Sends an ASCII emoticon from a selection.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(1, 5)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"emoticon": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"bear",
+							"cat",
+							"cheers",
+							"com'ere",
+							"cry",
+							"disapprove",
+							"embarrassed",
+							"flipoff",
+							"flower",
+							"friends",
+							"hai",
+							"happy",
+							"happygary",
+							"infatuated",
+							"joy",
+							"lenny",
+							"mellow",
+							"money",
+							"sad",
+							"salute",
+							"shout",
+							"smooch",
+							"star",
+							"studying",
+							"uwu"
+						]
+					},
+					"description": "Emoticon to insert",
+					"required": true
+				},
+				"position": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"start",
+							"end"
+						]
+					},
+					"description": "Position to insert emoticon",
+					"default": "end"
+				},
+				"text": {
+					"type": "string",
+					"description": "Extra message content to send",
+					"greedy": false
+				}
+			}
 		},
 		"Time": {
 			"aliases": [
@@ -432,11 +728,33 @@
 				"EstimateTimezone"
 			],
 			"description": "Shows the current time at a certain GMT/UTC offset, or the current time for a user.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(3, 5)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"input": {
+					"type": "string",
+					"description": "Time input to parse",
+					"example": "last sunday 3pm hawaii",
+					"default": ""
+				},
+				"user": {
+					"type": "user",
+					"description": "Target user to retrieve timezone from. Will use automatically estimated timezone if not provided",
+					"example": "201548633244565504"
+				},
+				"estimate": {
+					"type": "bool",
+					"description": "Force a timezone estimate, even if a timezone is assigned",
+					"default": false
+				},
+				"timezone": {
+					"type": "word",
+					"description": "Target timezone to display input after conversion",
+					"example": "Europe/Stockholm"
+				}
+			}
 		},
 		"Identify": {
 			"aliases": [
@@ -450,13 +768,13 @@
 				"IdentifyFiles"
 			],
 			"description": "Detects the type, mime, and optionally details of an input file.",
-			"usage": "<url>*",
 			"level": "0",
 			"rate_limit": "(12, 16)",
 			"example": [
 				"identify https://raw.githubusercontent.com/thomas-xin/Image-Test/master/title-rainbow.webp"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<url>*"
 		},
 		"Follow": {
 			"aliases": [
@@ -466,13 +784,13 @@
 				"Redirect"
 			],
 			"description": "Follows a discord message link and/or finds URLs in a string.",
-			"usage": "<url>*",
 			"level": "0",
 			"rate_limit": "(7, 10)",
 			"example": [
 				"follow https://canary.discord.com/channels/247184721262411776/669066569170550797/1052190693390565406"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<url>*"
 		},
 		"Match": {
 			"aliases": [
@@ -483,14 +801,14 @@
 				"GREP"
 			],
 			"description": "matches two strings using Linux-style RegExp, or computes the match ratio of two strings.",
-			"usage": "<0:string1> <1:string2>?",
 			"level": "0",
 			"rate_limit": "(4, 6)",
 			"example": [
 				"match test test2",
 				"regex t*e+s?t test"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<0:string1> <1:string2>?"
 		},
 		"Random": {
 			"aliases": [
@@ -499,14 +817,14 @@
 				"choose"
 			],
 			"description": "Randomizes a set of arguments.",
-			"usage": "<string>+",
 			"level": "0",
 			"rate_limit": "(2, 3)",
 			"example": [
 				"random 1 2 3",
 				"choose \"this one\" \"that one\""
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<string>+"
 		},
 		"Rate": {
 			"aliases": [
@@ -516,11 +834,11 @@
 				"Ranking"
 			],
 			"description": "Rates a given object with a random value out of 10!",
-			"usage": "<string>",
 			"level": "0",
 			"rate_limit": "(2, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<string>"
 		},
 		"WordCount": {
 			"aliases": [
@@ -532,14 +850,14 @@
 				"Line_Count"
 			],
 			"description": "Simple command that returns the word and character count of a supplied message. message.txt files work too!",
-			"usage": "<string>",
 			"level": "0",
 			"rate_limit": "(2, 3)",
 			"example": [
 				"wordcount two words",
 				"wc Lorem ipsum dolor sit amet."
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<string>"
 		},
 		"Topic": {
 			"aliases": [
@@ -547,14 +865,14 @@
 				"Question"
 			],
 			"description": "Asks a random question.",
-			"usage": "<relationship(-r)>? <pickup-line(-p)>? <nsfw-pickup-line(-n)>?",
 			"level": "0",
 			"rate_limit": "(2, 3)",
 			"example": [
 				"topic",
 				"question -r"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<relationship(-r)>? <pickup-line(-p)>? <nsfw-pickup-line(-n)>?"
 		},
 		"Fact": {
 			"aliases": [
@@ -563,11 +881,11 @@
 				"UselessFact"
 			],
 			"description": "Provides a random fact.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(2, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": ""
 		},
 		"BubbleWrap": {
 			"aliases": [
@@ -577,11 +895,19 @@
 				"Bubbles"
 			],
 			"description": "Creates a sheet of bubble wrap using spoilers.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(3, 5)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"size": {
+					"type": "integer",
+					"validation": "(0, 1250]",
+					"description": "Amount of bubbles to generate",
+					"example": "1000",
+					"default": 250
+				}
+			}
 		},
 		"Urban": {
 			"aliases": [
@@ -590,13 +916,13 @@
 				"UrbanDictionary"
 			],
 			"description": "Searches Urban Dictionary for an item.",
-			"usage": "<string>",
 			"level": "0",
 			"rate_limit": "(5, 8)",
 			"example": [
 				"urban ur mom"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<string>"
 		},
 		"Browse": {
 			"aliases": [
@@ -607,11 +933,30 @@
 				"Browser"
 			],
 			"description": "Searches the web, and displays as text or image.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 16)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"text"
+						]
+					},
+					"description": "Controls how direct URLs are visited; produces an image by default",
+					"example": "text",
+					"default": "auto"
+				},
+				"query": {
+					"type": "string",
+					"description": "Search query; may be a string or URL",
+					"example": "https://youtu.be/dQw4w9WgXcQ",
+					"required": true
+				}
+			}
 		}
 	},
 	"ADMIN": {
@@ -625,14 +970,14 @@
 				"Permissions"
 			],
 			"description": "Shows or changes a user's permission level. Server Administrators bypass this.",
-			"usage": "<0:user>* <1:new_level|default(-d)>?",
 			"level": "0",
 			"rate_limit": "(5, 8)",
 			"example": [
 				"perms steven 2",
 				"perms 201548633244565504 ?d"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<0:user>* <1:new_level|default(-d)>?"
 		},
 		"Timeout": {
 			"aliases": [
@@ -641,11 +986,31 @@
 				"Silence"
 			],
 			"description": "Times out one or more users for a certain amount of time.",
-			"usage": "",
 			"level": "3",
 			"rate_limit": "(5, 10)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"users": {
+					"type": "user",
+					"description": "User(s) to time out",
+					"example": "668999031359537205",
+					"multiple": true,
+					"required": true
+				},
+				"duration": {
+					"type": "datetime",
+					"description": "Time input to parse",
+					"example": "35 mins and 6.25 secs before 3am next tuesday, EDT",
+					"default": "now"
+				},
+				"reason": {
+					"type": "string",
+					"description": "Timeout reason (will show up in Audit Log)",
+					"example": "Being naughty >:(",
+					"greedy": false
+				}
+			}
 		},
 		"Purge": {
 			"aliases": [
@@ -656,11 +1021,27 @@
 				"Purge_Range"
 			],
 			"description": "Deletes a number or range of messages from a certain user in current channel.",
-			"usage": "",
 			"level": "3",
 			"rate_limit": "(7, 12)",
 			"example": [],
-			"timeout": "384"
+			"timeout": "384",
+			"schema": {
+				"user": {
+					"type": "user",
+					"description": "User to delete messages from",
+					"example": "668999031359537205"
+				},
+				"count": {
+					"type": "integer",
+					"description": "Maximum amount of messages to delete. Defaults to infinite if range is specified, else 1. Does NOT include the message invoking the command.",
+					"example": "123"
+				},
+				"range": {
+					"type": "index",
+					"description": "Range of message IDs to delete",
+					"example": "1162630678890950746:1215499763089408030"
+				}
+			}
 		},
 		"Ban": {
 			"aliases": [
@@ -670,13 +1051,13 @@
 				"Unban"
 			],
 			"description": "Bans a user for a certain amount of time, with an optional reason.",
-			"usage": "<0:user>* <1:time>? <2:reason>?",
 			"level": "3",
 			"rate_limit": "(9, 16)",
 			"example": [
 				"ban @Miza 30m for being naughty"
 			],
-			"timeout": "384"
+			"timeout": "384",
+			"usage": "<0:user>* <1:time>? <2:reason>?"
 		},
 		"RoleSelect": {
 			"aliases": [
@@ -687,11 +1068,40 @@
 				"RoleSelector"
 			],
 			"description": "Creates a message that allows users to self-assign roles from a specified list.",
-			"usage": "",
 			"level": "3",
 			"rate_limit": "(9, 12)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"roles": {
+					"type": "role",
+					"description": "Role choices",
+					"example": "@Members",
+					"multiple": true
+				},
+				"limit": {
+					"type": "integer",
+					"description": "Amount of roles each user can assign",
+					"example": "2"
+				},
+				"title": {
+					"type": "text",
+					"description": "Title to display in embed",
+					"example": "\ud83c\udf1f Pronoun Roles \ud83c\udf1f",
+					"default": "\ud83d\uddc2 Role Selection \ud83d\uddc2"
+				},
+				"description": {
+					"type": "text",
+					"description": "Description to display in embed",
+					"example": "*The buttons are self-explanatory!*",
+					"default": "Click a button to add or remove a role from yourself!"
+				},
+				"custom": {
+					"type": "text",
+					"description": "Newline-separated emoji-role pairs",
+					"example": "- \ud83d\udc31 @Cat Lovers"
+				}
+			}
 		},
 		"RoleGiver": {
 			"aliases": [
@@ -699,11 +1109,11 @@
 				"Verifier"
 			],
 			"description": "Adds an automated role giver to the current channel. Triggered by a keyword in messages, only applicable to users with permission level >= 0 and account age >= 7d. Searches for word if only word characters, any substring if non-word characters are included, or regex if trigger begins and ends with a slash (/).",
-			"usage": "<0:react_to>? <1:role>? <delete_messages(-x)>?",
 			"level": "3",
 			"rate_limit": "(9, 12)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<0:react_to>? <1:role>? <delete_messages(-x)>?"
 		},
 		"AutoRole": {
 			"aliases": [
@@ -711,14 +1121,14 @@
 				"InstaRole"
 			],
 			"description": "Causes any new user joining the server to automatically gain the targeted role. Input multiple roles to create a randomized role giver.",
-			"usage": "<role>? <update_all(-x)>? <disable(-d)>?",
 			"level": "3",
 			"rate_limit": "(9, 12)",
 			"example": [
 				"autorole welcome",
 				"autorole -x \"lovely people\""
 			],
-			"timeout": "288"
+			"timeout": "288",
+			"usage": "<role>? <update_all(-x)>? <disable(-d)>?"
 		},
 		"RolePreserver": {
 			"aliases": [
@@ -727,11 +1137,25 @@
 				"StickyRoles"
 			],
 			"description": "Causes Miza to save roles for all users, and re-add them when they leave and rejoin.",
-			"usage": "",
 			"level": "3",
 			"rate_limit": "(9, 12)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"view",
+							"enable",
+							"disable"
+						]
+					},
+					"description": "Action to perform",
+					"example": "enable",
+					"default": "view"
+				}
+			}
 		},
 		"NickPreserver": {
 			"aliases": [
@@ -740,11 +1164,25 @@
 				"NicknamePreserver"
 			],
 			"description": "Causes Miza to save nicknames for all users, and re-add them when they leave and rejoin.",
-			"usage": "",
 			"level": "3",
 			"rate_limit": "(9, 12)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"view",
+							"enable",
+							"disable"
+						]
+					},
+					"description": "Action to perform",
+					"example": "enable",
+					"default": "view"
+				}
+			}
 		},
 		"ThreadPreserver": {
 			"aliases": [
@@ -755,14 +1193,14 @@
 				"UnArchive"
 			],
 			"description": "Causes Miza to \"bump\" (revive) the current thread when auto-archived.",
-			"usage": "<mode(enable|disable)>?",
 			"level": "3",
 			"rate_limit": "(9, 12)",
 			"example": [
 				"keepalive enable",
 				"threadpreserver disable"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<mode(enable|disable)>?"
 		},
 		"Lockdown": {
 			"aliases": [
@@ -771,11 +1209,11 @@
 				"\u2623\ufe0f"
 			],
 			"description": "Completely locks down the server by removing send message permissions for all users, revoking all invites, and archiving all threads.",
-			"usage": "",
 			"level": "inf",
 			"rate_limit": "(30, 40)",
 			"example": [],
-			"timeout": "384"
+			"timeout": "384",
+			"usage": ""
 		},
 		"Archive": {
 			"aliases": [
@@ -784,11 +1222,11 @@
 				"DownloadServer"
 			],
 			"description": "Archives all messages, attachments and users into a .zip folder. Defaults to entire server if no channel specified, requires server permission level 3 as well as a Lv2 or above Miza subscription to perform, and may take a significant amount of time.",
-			"usage": "<server|channel>? <start-id>? <end-id>? <token>?",
 			"level": "3",
 			"rate_limit": "172800",
 			"example": [],
-			"timeout": "86400"
+			"timeout": "86400",
+			"usage": "<server|channel>? <start-id>? <end-id>? <token>?"
 		},
 		"UserLog": {
 			"aliases": [
@@ -796,11 +1234,25 @@
 				"MemberLog"
 			],
 			"description": "Causes Miza to log user and member events from the server, in the current channel.",
-			"usage": "",
 			"level": "3",
 			"rate_limit": "1",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"view",
+							"enable",
+							"disable"
+						]
+					},
+					"description": "Action to perform",
+					"example": "enable",
+					"default": "view"
+				}
+			}
 		},
 		"MessageLog": {
 			"aliases": [
@@ -808,22 +1260,82 @@
 				"MemberLog"
 			],
 			"description": "Causes Miza to log message and file events from the server, in the current channel.",
-			"usage": "",
 			"level": "3",
 			"rate_limit": "1",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"view",
+							"enable",
+							"disable"
+						]
+					},
+					"description": "Action to perform",
+					"example": "enable",
+					"default": "view"
+				}
+			}
 		},
 		"StarBoard": {
 			"aliases": [
 				"StarBoard"
 			],
 			"description": "Causes Miza to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel.",
-			"usage": "",
 			"level": "2",
 			"rate_limit": "1",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"view",
+							"add",
+							"remove"
+						],
+						"accepts": {
+							"enable": "add",
+							"disable": "remove",
+							"create": "add",
+							"delete": "remove"
+						}
+					},
+					"description": "Action to perform",
+					"example": "enable"
+				},
+				"emoji": {
+					"type": "emoji",
+					"description": "Emoji to treat as starboard trigger.",
+					"example": "\ud83d\udc31"
+				},
+				"special": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"SPARKLES"
+						],
+						"strict_case": true
+					},
+					"description": "Overrides emoji; special categories of reactions",
+					"example": "SPARKLES"
+				},
+				"count": {
+					"type": "integer",
+					"description": "Amount of reactions required to trigger. Counts both regular and super reactions",
+					"default": 1,
+					"example": "3"
+				},
+				"channel": {
+					"type": "channel",
+					"description": "Channel to add or remove from ignore list; will not forward messages from channels within this list",
+					"example": "#Starboard"
+				}
+			}
 		},
 		"Crosspost": {
 			"aliases": [
@@ -832,14 +1344,14 @@
 				"Subscribe"
 			],
 			"description": "Causes Miza to automatically crosspost all messages from the target channel, into the current channel.",
-			"usage": "<channel> <disable(-d)>?",
 			"level": "3",
 			"rate_limit": "(7, 11)",
 			"example": [
 				"crosspost 683634093464092672",
 				"crosspost -d #general"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<channel> <disable(-d)>?"
 		},
 		"Publish": {
 			"aliases": [
@@ -848,14 +1360,14 @@
 				"AutoPublish"
 			],
 			"description": "Causes Miza to automatically publish all posted messages in the current channel.",
-			"usage": "<mode(enable|disable)>? <force(-x)>?",
 			"level": "3",
 			"rate_limit": "(16, 24)",
 			"example": [
 				"publish enable",
 				"news disable"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<mode(enable|disable)>? <force(-x)>?"
 		},
 		"Relay": {
 			"aliases": [
@@ -863,14 +1375,14 @@
 				"Forward"
 			],
 			"description": "Causes Miza to send the target user(s) a DM that enables them to communicate through the current channel.",
-			"usage": "<user>* <disable(-d)>?",
 			"level": "4",
 			"rate_limit": "(16, 24)",
 			"example": [
 				"relay @Miza Sorry, you have been banned from this server. Reply to this message to appeal!",
 				"relay -d 201548633244565504"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<user>* <disable(-d)>?"
 		},
 		"EnabledCommands": {
 			"aliases": [
@@ -880,11 +1392,66 @@
 				"Disable"
 			],
 			"description": "Shows, enables, or disables a command category in the current channel.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(5, 8)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"view",
+							"enable",
+							"disable",
+							"enable-all",
+							"disable-all",
+							"reset"
+						]
+					},
+					"description": "Action to perform",
+					"example": "enable"
+				},
+				"category": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"admin",
+							"ai",
+							"fun",
+							"image",
+							"main",
+							"string",
+							"voice",
+							"webhook"
+						],
+						"accepts": {
+							"owner": "owner",
+							"misc": "misc",
+							"nsfw": "nsfw",
+							"text": "string",
+							"music": "voice",
+							"audio": "voice",
+							"all": null,
+							"default": null
+						}
+					},
+					"description": "Target category",
+					"example": "voice",
+					"multiple": true
+				},
+				"apply_all": {
+					"type": "bool",
+					"description": "Whether to apply to server (will affect all non-assigned channels)",
+					"example": "true",
+					"default": false
+				},
+				"target": {
+					"type": "mentionable",
+					"description": "Target channel (specifying the server's ID will act the same way as --enable-all/--disable-all)",
+					"example": "247184721262411776"
+				}
+			}
 		},
 		"Prefix": {
 			"aliases": [
@@ -892,7 +1459,6 @@
 				"ChangePrefix"
 			],
 			"description": "Shows or changes the prefix for Miza's commands for this server.",
-			"usage": "<new_prefix>? <default(-d)>?",
 			"level": "0",
 			"rate_limit": "(5, 8)",
 			"example": [
@@ -900,7 +1466,8 @@
 				"change_prefix >",
 				"prefix -d"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<new_prefix>? <default(-d)>?"
 		},
 		"CreateEmoji": {
 			"aliases": [
@@ -912,11 +1479,22 @@
 				"Emoji"
 			],
 			"description": "Creates a custom emoji from a URL or attached file.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(8, 12)",
 			"example": [],
-			"timeout": "144"
+			"timeout": "144",
+			"schema": {
+				"name": {
+					"type": "word",
+					"description": "The name of the emoji",
+					"example": "Untitled"
+				},
+				"url": {
+					"type": "visual",
+					"description": "The image to use (will automatically be resized to <256kb if larger)",
+					"required": true
+				}
+			}
 		},
 		"CreateSound": {
 			"aliases": [
@@ -926,11 +1504,26 @@
 				"SFX"
 			],
 			"description": "Creates a custom soundboard from a URL or attached file.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(8, 12)",
 			"example": [],
-			"timeout": "144"
+			"timeout": "144",
+			"schema": {
+				"name": {
+					"type": "word",
+					"description": "The name of the sound",
+					"example": "Untitled"
+				},
+				"emoji": {
+					"type": "emoji",
+					"description": "The emoji icon to use"
+				},
+				"url": {
+					"type": "audio",
+					"description": "The audio to use (will automatically be cut to <10s if longer)",
+					"required": true
+				}
+			}
 		},
 		"CreateSticker": {
 			"aliases": [
@@ -941,13 +1534,13 @@
 				"Sticker"
 			],
 			"description": "Creates a custom sticker from a URL or attached file.",
-			"usage": "<1:name>+ <0:url>",
 			"level": "2",
 			"rate_limit": "(8, 12)",
 			"example": [
 				"sticker HOW https://cdn.discordapp.com/stickers/974228511357284372.png"
 			],
-			"timeout": "192"
+			"timeout": "192",
+			"usage": "<1:name>+ <0:url>"
 		},
 		"ScanEmoji": {
 			"aliases": [
@@ -956,13 +1549,13 @@
 				"ScanEmojis"
 			],
 			"description": "Scans all the emojis in the current server for potential issues.",
-			"usage": "<count>?",
 			"level": "1",
 			"rate_limit": "(24, 32)",
 			"example": [
 				"scanemoji"
 			],
-			"timeout": "96"
+			"timeout": "96",
+			"usage": "<count>?"
 		},
 		"ThreadList": {
 			"aliases": [
@@ -973,11 +1566,11 @@
 				"ReviveAll"
 			],
 			"description": "Shows or revives all threads in the current server.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(8, 30)",
 			"example": [],
-			"timeout": "192"
+			"timeout": "192",
+			"usage": ""
 		}
 	},
 	"VOICE": {
@@ -995,11 +1588,56 @@
 				"LS"
 			],
 			"description": "Shows the music queue, or plays a song in voice.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(3.5, 5)",
 			"example": [],
-			"timeout": "48"
+			"timeout": "48",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"all",
+							"first",
+							"random",
+							"last",
+							"now",
+							"next"
+						],
+						"accepts": {
+							"force": "now",
+							"budge": "next"
+						}
+					},
+					"description": "Determines which song(s) to add if the link resolves to a playlist",
+					"example": "next",
+					"default": "all"
+				},
+				"query": {
+					"type": "string",
+					"description": "Song by name or URL",
+					"example": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+					"default": null
+				},
+				"index": {
+					"type": "index",
+					"description": "Position to insert song(s)",
+					"example": "4",
+					"default": [
+						-1
+					]
+				},
+				"start": {
+					"type": "timedelta",
+					"description": "start position; automatically seeks when played",
+					"greedy": false
+				},
+				"end": {
+					"type": "timedelta",
+					"description": "end position; subsequent audio skipped automatically",
+					"greedy": false
+				}
+			}
 		},
 		"Connect": {
 			"aliases": [
@@ -1022,11 +1660,35 @@
 				"Deafen"
 			],
 			"description": "Summons the bot into a voice channel, or advises it to leave.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(3, 4)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"connect",
+							"disconnect",
+							"listen",
+							"deafen"
+						],
+						"aliases": {
+							"join": "connect",
+							"leave": "disconnect"
+						}
+					},
+					"description": "Action to perform",
+					"example": "remove",
+					"default": "connect"
+				},
+				"channel": {
+					"type": "channel",
+					"description": "Target channel to join (defaults to voice channel of closest proximity)",
+					"example": "#Voice"
+				}
+			}
 		},
 		"Skip": {
 			"aliases": [
@@ -1048,11 +1710,41 @@
 				"\u23f9\ufe0f"
 			],
 			"description": "Removes an entry or range of entries from the voice channel queue.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(3.5, 5)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"vote",
+							"force"
+						]
+					},
+					"description": "Skip mode; force skips voting and bypasses repeats, but requires trusted priviledge level for other users' songs",
+					"example": "force",
+					"default": "auto"
+				},
+				"slices": {
+					"type": "index",
+					"description": "Entry or sequence of entries to remove; accepts one or more slice indicators such as 1..100 or 6:73:4",
+					"example": "0 1 2..4 5:8:1",
+					"default": [
+						[
+							0
+						]
+					],
+					"multiple": true
+				},
+				"after": {
+					"type": "timedelta",
+					"description": "Skips the song(s) after the provided timestamp rather than immediately; requires trusted priviledge level for other users' songs",
+					"greedy": false
+				}
+			}
 		},
 		"AudioState": {
 			"aliases": [
@@ -1078,11 +1770,35 @@
 				"Reset"
 			],
 			"description": "Adjusts boolean states of the audio player",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(2, 4)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"pause",
+							"loop",
+							"repeat",
+							"shuffle",
+							"quiet",
+							"stay"
+						],
+						"accepts": {
+							"reset": null
+						}
+					},
+					"description": "Setting to modify",
+					"example": "shuffle"
+				},
+				"value": {
+					"type": "bool",
+					"description": "Specify a state (toggles by default)",
+					"example": "false"
+				}
+			}
 		},
 		"AudioSettings": {
 			"aliases": [
@@ -1124,11 +1840,41 @@
 				"BR"
 			],
 			"description": "Adjusts variable settings of the audio player",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 8)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"volume",
+							"speed",
+							"pitch",
+							"pan",
+							"bassboost",
+							"reverb",
+							"compressor",
+							"chorus",
+							"resample",
+							"bitrate"
+						],
+						"accepts": {
+							"nightcore": "resample",
+							"reset": null
+						}
+					},
+					"description": "Setting to modify",
+					"example": "bassboost"
+				},
+				"value": {
+					"type": "string",
+					"description": "Specify a value; all settings except bitrate are represented using percentages; enter \"DEFAULT\" to reset",
+					"example": "200",
+					"greedy": false
+				}
+			}
 		},
 		"Dump": {
 			"aliases": [
@@ -1141,11 +1887,29 @@
 				"Restore"
 			],
 			"description": "Saves or loads the currently playing audio, including queue and settings, as a re-usable checkpoint file.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(1, 2)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"save",
+							"load",
+							"append"
+						]
+					},
+					"description": "Whether to save or load queue, or append loaded data to current queue",
+					"example": "load"
+				},
+				"url": {
+					"type": "url",
+					"description": "Queue data to load",
+					"example": "https://cdn.discordapp.com/attachments/731709481863479436/1052210287303999528/dump.json"
+				}
+			}
 		},
 		"Seek": {
 			"aliases": [
@@ -1154,11 +1918,18 @@
 				"Replay"
 			],
 			"description": "Seeks to a position in the current audio file.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"position": {
+					"type": "timedelta",
+					"description": "Seek position",
+					"example": "3m59.2s",
+					"default": "0"
+				}
+			}
 		},
 		"Jump": {
 			"aliases": [
@@ -1169,11 +1940,18 @@
 				"RotateQueue"
 			],
 			"description": "Rotates the queue to the left by a certain amount of steps.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"position": {
+					"type": "integer",
+					"description": "Jump position",
+					"example": "-3",
+					"default": "0"
+				}
+			}
 		},
 		"Shuffle": {
 			"aliases": [
@@ -1182,11 +1960,11 @@
 				"Scramble"
 			],
 			"description": "Immediately shuffles the queue. See ~autoshuffle for an automatic, non-disruptive version",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": ""
 		},
 		"Dedup": {
 			"aliases": [
@@ -1196,22 +1974,22 @@
 				"RemoveDuplicates"
 			],
 			"description": "Removes all duplicate elements from the queue.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": ""
 		},
 		"UnmuteAll": {
 			"aliases": [
 				"UnmuteAll"
 			],
 			"description": "Disables server mute/deafen for all members.",
-			"usage": "",
 			"level": "3",
 			"rate_limit": "10",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": ""
 		},
 		"VoiceNuke": {
 			"aliases": [
@@ -1219,22 +1997,43 @@
 				"\u2622\ufe0f"
 			],
 			"description": "Removes all users from voice channels in the current server.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "10",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": ""
 		},
 		"RefreshRegion": {
 			"aliases": [
 				"RefreshRegion"
 			],
 			"description": "Changes the current voice channel's region, always forcing a refresh.",
-			"usage": "",
 			"level": "1",
 			"rate_limit": "20",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"region": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"brazil",
+							"hongkong",
+							"india",
+							"japan",
+							"rotterdam",
+							"singapore",
+							"south-korea",
+							"southafrica",
+							"sydney",
+							"us-central",
+							"us-east",
+							"us-south",
+							"us-west"
+						]
+					}
+				}
+			}
 		},
 		"Radio": {
 			"aliases": [
@@ -1242,7 +2041,6 @@
 				"FM"
 			],
 			"description": "Searches for a radio station livestream on https://worldradiomap.com that can be played on Miza.",
-			"usage": "<0:country>? <2:state>? <1:city>?",
 			"level": "0",
 			"rate_limit": "(6, 8)",
 			"example": [
@@ -1250,7 +2048,8 @@
 				"radio australia",
 				"radio Canada Ottawa,_on"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<0:country>? <2:state>? <1:city>?"
 		},
 		"Player": {
 			"aliases": [
@@ -1260,14 +2059,14 @@
 				"Playing"
 			],
 			"description": "Creates an auto-updating virtual audio player for the current server.",
-			"usage": "<mode(enable|disable)>?",
 			"level": "0",
 			"rate_limit": "(6, 9)",
 			"example": [
 				"player",
 				"np -d"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<mode(enable|disable)>?"
 		},
 		"Lyrics": {
 			"aliases": [
@@ -1275,11 +2074,18 @@
 				"SongLyrics"
 			],
 			"description": "Searches genius.com for lyrics of a song.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(7, 12)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"query": {
+					"type": "string",
+					"description": "Song by name or URL",
+					"example": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+					"default": null
+				}
+			}
 		},
 		"Download": {
 			"aliases": [
@@ -1292,11 +2098,52 @@
 				"ConvertOrg"
 			],
 			"description": "Searches and/or downloads a song from a YouTube/SoundCloud query or stream link.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(30, 45)",
 			"example": [],
-			"timeout": "1800"
+			"timeout": "1800",
+			"schema": {
+				"url": {
+					"type": "url",
+					"description": "The URL of a song or playlist to download."
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"h264",
+							"h265",
+							"h266",
+							"av1",
+							"mp4",
+							"mkv",
+							"webm",
+							"avif",
+							"webp",
+							"gif",
+							"ogg",
+							"opus",
+							"mp3",
+							"flac",
+							"wav"
+						]
+					},
+					"description": "Output format of the downloaded file.",
+					"default": "opus"
+				},
+				"query": {
+					"type": "text",
+					"description": "A search query to look for a song or video."
+				},
+				"start": {
+					"type": "timedelta",
+					"description": "The start time to trim the file at."
+				},
+				"end": {
+					"type": "timedelta",
+					"description": "The end time to trim the file at."
+				}
+			}
 		},
 		"Hyperchoron": {
 			"aliases": [
@@ -1304,11 +2151,58 @@
 				"Midi2Org"
 			],
 			"description": "Runs Hyperchoron on the input URL. See https://github.com/thomas-xin/hyperchoron for more info, or to run it yourself!",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 20)",
 			"example": [],
-			"timeout": "360"
+			"timeout": "360",
+			"schema": {
+				"url": {
+					"type": "audio",
+					"description": "Audio supplied by URL or attachment",
+					"example": "https://cocobeanzies.mizabot.xyz/music/rainbow-critter.webm",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"aac",
+							"csv",
+							"deltarune",
+							"flac",
+							"genshinsheet",
+							"hpc",
+							"litematic",
+							"m4a",
+							"mcfunction",
+							"mid",
+							"midi",
+							"moai",
+							"mp3",
+							"nbs",
+							"nbt",
+							"ogg",
+							"opus",
+							"org",
+							"schem",
+							"schematic",
+							"skysheet",
+							"wav",
+							"weba",
+							"webm",
+							"\ud83d\uddff"
+						]
+					},
+					"default": "nbs"
+				},
+				"kwargs": {
+					"type": "string",
+					"greedy": false
+				}
+			}
 		},
 		"AudioSeparator": {
 			"aliases": [
@@ -1317,11 +2211,34 @@
 				"Separate"
 			],
 			"description": "Runs Audio-Separator on the input URL. See https://github.com/nomadkaraoke/python-audio-separator for more info, or to run it yourself!",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(20, 40)",
 			"example": [],
-			"timeout": "84.0"
+			"timeout": "84.0",
+			"schema": {
+				"url": {
+					"type": "audio",
+					"description": "Audio supplied by URL or attachment",
+					"example": "https://cocobeanzies.mizabot.xyz/music/rainbow-critter.webm",
+					"aliases": [
+						"a"
+					],
+					"required": true
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"ogg",
+							"opus",
+							"mp3"
+						]
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp3",
+					"default": "opus"
+				}
+			}
 		}
 	},
 	"IMAGE": {
@@ -1343,11 +2260,128 @@
 				"Achromatonomaly"
 			],
 			"description": "Applies a colourblindness filter to the target image.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(6, 10)",
 			"example": [],
-			"timeout": "84.0"
+			"timeout": "84.0",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"protanopia",
+							"protanomaly",
+							"deuteranopia",
+							"deuteranomaly",
+							"tritanopia",
+							"tritanomaly",
+							"achromatopsia",
+							"achromatonomaly"
+						],
+						"accepts": {
+							"protan": "protanomaly",
+							"deutan": "deuteranomaly",
+							"tritan": "tritanomaly",
+							"achro": "achromatonomaly"
+						}
+					},
+					"description": "The colourblindness filter to apply",
+					"example": "tritanopia",
+					"default": "deuteranomaly"
+				},
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"strength": {
+					"type": "number",
+					"validation": "[0, 2]",
+					"description": "The filter strength",
+					"example": "0.9"
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"EdgeDetect": {
 			"aliases": [
@@ -1358,11 +2392,111 @@
 				"DepthMap"
 			],
 			"description": "Applies an edge or depth detection algorithm to the image.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(5, 7)",
 			"example": [],
-			"timeout": "72"
+			"timeout": "72",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"canny",
+							"laplacian",
+							"depth"
+						]
+					},
+					"description": "The algorithm to apply",
+					"example": "depth",
+					"default": "canny"
+				},
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"Blur": {
 			"aliases": [
@@ -1370,11 +2504,115 @@
 				"Gaussian"
 			],
 			"description": "Applies a blur algorithm to the image.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(5, 7)",
 			"example": [],
-			"timeout": "72"
+			"timeout": "72",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"gaussian"
+						]
+					},
+					"description": "The algorithm to apply",
+					"example": "depth",
+					"default": "gaussian"
+				},
+				"strength": {
+					"type": "number",
+					"validation": "[0, 1048576]",
+					"example": "8",
+					"default": 6
+				},
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"ColourSpace": {
 			"aliases": [
@@ -1382,11 +2620,142 @@
 				"ColorSpace"
 			],
 			"description": "Changes the colour space of the supplied image.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(7, 11)",
 			"example": [],
-			"timeout": "96"
+			"timeout": "96",
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"source": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"rgb",
+							"bgr",
+							"cmy",
+							"xyz",
+							"hsv",
+							"hsl",
+							"hsi",
+							"hcl",
+							"hcy",
+							"lab",
+							"luv",
+							"yuv"
+						]
+					},
+					"description": "The colourspace which should be treated as the image's original space",
+					"example": "hsv",
+					"default": "rgb"
+				},
+				"dest": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"rgb",
+							"bgr",
+							"cmy",
+							"xyz",
+							"hsv",
+							"hsl",
+							"hsi",
+							"hcl",
+							"hcy",
+							"lab",
+							"luv",
+							"yuv"
+						]
+					},
+					"description": "The colourspace which should be treated as the image's new space",
+					"example": "rgb",
+					"default": "hsv"
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"GMagik": {
 			"aliases": [
@@ -1395,11 +2764,130 @@
 				"Liquefy"
 			],
 			"description": "Applies the Magik image filter to supplied image.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(8, 12)",
 			"example": [],
-			"timeout": "168"
+			"timeout": "168",
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"required": true
+				},
+				"intensity": {
+					"type": "number",
+					"validation": "[0, 256]",
+					"description": "Distortion distance, relative to cell size",
+					"example": "0.75",
+					"default": 7
+				},
+				"cells": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "How many transform cells should tile each edge of the image",
+					"example": "13.75",
+					"default": 7
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"default": 2
+				},
+				"speed": {
+					"type": "number",
+					"validation": "[-60, 60]",
+					"description": "Inverse of duration; higher values reduce the duration",
+					"example": "3.[3]",
+					"default": 1
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7",
+					"default": 30
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"Gradient": {
 			"aliases": [
@@ -1407,11 +2895,146 @@
 				"RainbowGradient"
 			],
 			"description": "Generates a gradient with a specific shape.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 6)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"linear",
+							"radial",
+							"conical",
+							"spiral",
+							"polygon"
+						]
+					},
+					"description": "Indicates the type of spiral to generate",
+					"example": "radial",
+					"default": "linear"
+				},
+				"colour": {
+					"type": "colour",
+					"description": "The colour of the gradient on one side",
+					"example": "#BF7FFF",
+					"default": [
+						255,
+						255,
+						255
+					],
+					"aliases": [
+						"color"
+					]
+				},
+				"background": {
+					"type": "colour",
+					"description": "The colour of the gradient on the other side",
+					"example": "#000000",
+					"default": [
+						0,
+						0,
+						0
+					],
+					"aliases": [
+						"bg"
+					]
+				},
+				"repetitions": {
+					"type": "number",
+					"validation": "[-256, 256]",
+					"description": "How many times the gradient repeats across the image",
+					"example": "4",
+					"default": 1
+				},
+				"size": {
+					"type": "number",
+					"validation": "[1, 65536]",
+					"description": "Width of the output image",
+					"example": "1536",
+					"default": 1024
+				},
+				"colourspace": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"rgb",
+							"bgr",
+							"cmy",
+							"xyz",
+							"hsv",
+							"hsl",
+							"hsi",
+							"hcl",
+							"hcy",
+							"lab",
+							"luv",
+							"yuv"
+						]
+					},
+					"description": "The colourspace used to produce the image",
+					"example": "hsv",
+					"default": "rgb",
+					"aliases": [
+						"space"
+					]
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"heif",
+							"avif",
+							"ico"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"Colour": {
 			"aliases": [
@@ -1426,11 +3049,79 @@
 				"Color"
 			],
 			"description": "Creates a 128x128 image filled with the target colour.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(3, 5)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"colour": {
+					"type": "colour",
+					"description": "The colour of the gradient on one side",
+					"example": "#BF7FFF",
+					"default": [
+						255,
+						255,
+						255
+					],
+					"aliases": [
+						"color"
+					]
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"heif",
+							"avif",
+							"ico"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"Average": {
 			"aliases": [
@@ -1438,11 +3129,75 @@
 				"AverageColour"
 			],
 			"description": "Computes the average pixel colour in RGB for the supplied image.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(5, 7)",
 			"example": [],
-			"timeout": "48"
+			"timeout": "48",
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"heif",
+							"avif",
+							"ico"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"QR": {
 			"aliases": [
@@ -1450,11 +3205,137 @@
 				"RainbowQR"
 			],
 			"description": "Creates a QR code image from an input string, optionally adding a rainbow swirl effect.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(8, 11)",
 			"example": [],
-			"timeout": "96"
+			"timeout": "96",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"normal",
+							"rainbow"
+						]
+					},
+					"description": "Indicates whether to apply an animated rainbow filter to the output",
+					"example": "rainbow",
+					"default": "normal"
+				},
+				"text": {
+					"type": "string",
+					"description": "Text to encode",
+					"example": "You found the funny!",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"arms": {
+					"type": "integer",
+					"description": "Number of spiral arms, for rainbow mode",
+					"example": "5",
+					"default": 2
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"default": 2
+				},
+				"speed": {
+					"type": "number",
+					"validation": "[-60, 60]",
+					"description": "Inverse of duration; higher values reduce the duration",
+					"example": "3.[3]",
+					"default": 1
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7",
+					"default": 30
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"Rainbow": {
 			"aliases": [
@@ -1462,11 +3343,134 @@
 				"Gay"
 			],
 			"description": "Creates an animation from repeatedly hueshifting supplied image.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 13)",
 			"example": [],
-			"timeout": "96"
+			"timeout": "96",
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"rgb",
+							"hsv",
+							"hsi",
+							"hcl",
+							"hcy"
+						]
+					},
+					"description": "The colour space to perform hueshifts in. Changes the way chroma/saturation is treated",
+					"example": "hcl",
+					"default": "hsv"
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"default": 2
+				},
+				"speed": {
+					"type": "number",
+					"validation": "[-60, 60]",
+					"description": "Inverse of duration; higher values reduce the duration",
+					"example": "3.[3]",
+					"default": 1
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7",
+					"default": 30
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"Scroll": {
 			"aliases": [
@@ -1474,11 +3478,143 @@
 				"Parallax"
 			],
 			"description": "Creates an animation from repeatedly shifting supplied image in a specified direction.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 13)",
 			"example": [],
-			"timeout": "96"
+			"timeout": "96",
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"direction": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"left",
+							"up",
+							"right",
+							"down"
+						],
+						"accepts": {
+							"l": "left",
+							"u": "up",
+							"r": "right",
+							"d": "down",
+							"v": "up",
+							"h": "left",
+							"vertical": "up",
+							"horizontal": "left"
+						}
+					},
+					"description": "The direction of motion",
+					"example": "down",
+					"default": "left"
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"default": 2
+				},
+				"speed": {
+					"type": "number",
+					"validation": "[-60, 60]",
+					"description": "Inverse of duration; higher values reduce the duration",
+					"example": "3.[3]",
+					"default": 1
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7",
+					"default": 30
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"Spin": {
 			"aliases": [
@@ -1486,11 +3622,132 @@
 				"Rotate"
 			],
 			"description": "Creates an animation from repeatedly rotating supplied image.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 13)",
 			"example": [],
-			"timeout": "96"
+			"timeout": "96",
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"angle": {
+					"type": "number",
+					"validation": "[0, 360)",
+					"description": "Initial orientation of the image, in counterclockwise degrees",
+					"example": "90",
+					"default": 0
+				},
+				"circle": {
+					"type": "bool",
+					"description": "Indicates whether to crop the image to a circle",
+					"example": "False",
+					"default": true
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"default": 2
+				},
+				"speed": {
+					"type": "number",
+					"validation": "[-60, 60]",
+					"description": "Inverse of duration; higher values reduce the duration",
+					"example": "3.[3]",
+					"default": 1
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7",
+					"default": 30
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"Orbit": {
 			"aliases": [
@@ -1499,11 +3756,126 @@
 				"Orbitals"
 			],
 			"description": "Renders a ring of orbiting sprites of the supplied image.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(16, 22)",
 			"example": [],
-			"timeout": "312"
+			"timeout": "312",
+			"schema": {
+				"urls": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true,
+					"multiple": true
+				},
+				"count": {
+					"type": "integer",
+					"validation": "[1, 256]",
+					"description": "The amount of each image to include in the ring",
+					"example": "5"
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"default": 2
+				},
+				"speed": {
+					"type": "number",
+					"validation": "[-60, 60]",
+					"description": "Inverse of duration; higher values reduce the duration",
+					"example": "3.[3]",
+					"default": 1
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7",
+					"default": 30
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"Pet": {
 			"aliases": [
@@ -1513,11 +3885,126 @@
 				"Pat"
 			],
 			"description": "Creates an animation from applying the Petpet generator to the supplied image.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 13)",
 			"example": [],
-			"timeout": "120"
+			"timeout": "120",
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"squish": {
+					"type": "number",
+					"validation": "[-0.5, 0.5]",
+					"description": "Maximum and minimum stretch factor",
+					"example": "1/7",
+					"default": 0.1
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"default": 0.25
+				},
+				"speed": {
+					"type": "number",
+					"validation": "[-60, 60]",
+					"description": "Inverse of duration; higher values reduce the duration",
+					"example": "3.[3]",
+					"default": 1
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7",
+					"default": 30
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"Tesseract": {
 			"aliases": [
@@ -1527,11 +4014,126 @@
 				"Hypercube"
 			],
 			"description": "Creates an animation from applying the image as a tesseract texture and rotating.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 13)",
 			"example": [],
-			"timeout": "120"
+			"timeout": "120",
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"size": {
+					"type": "integer",
+					"validation": "[64, 1024]",
+					"description": "Maximum and minimum stretch factor",
+					"example": "256",
+					"default": 512
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"default": 20
+				},
+				"speed": {
+					"type": "number",
+					"validation": "[-60, 60]",
+					"description": "Inverse of duration; higher values reduce the duration",
+					"example": "3.[3]",
+					"default": 1
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7",
+					"default": 30
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"Resize": {
 			"aliases": [
@@ -1545,11 +4147,163 @@
 				"AVIF"
 			],
 			"description": "Changes size of supplied image, using an optional scaling operation.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(7, 13)",
 			"example": [],
-			"timeout": "96"
+			"timeout": "96",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"crop",
+							"nearest",
+							"linear",
+							"area",
+							"scale2x",
+							"hamming",
+							"gauss",
+							"cubic",
+							"spline",
+							"sinc",
+							"lanczos"
+						],
+						"accepts": {
+							"bilinear": "linear",
+							"bicubic": "cubic",
+							"bicublin": "cubic",
+							"cublin": "cubic"
+						}
+					},
+					"description": "Mode used to resize image",
+					"example": "scale2x",
+					"default": "auto"
+				},
+				"urls": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true,
+					"multiple": true
+				},
+				"resolution": {
+					"type": "resolution",
+					"validation": "[1, 65536]",
+					"description": "Width and height of output, in pixels",
+					"example": "1920x1080",
+					"aliases": [
+						"size"
+					]
+				},
+				"multiplier": {
+					"type": "number",
+					"validation": "(0, 1920]",
+					"description": "Multiplies width and height by a constant factor",
+					"example": "3",
+					"default": 1
+				},
+				"area": {
+					"type": "number",
+					"validation": "(0, 4294967296]",
+					"description": "Desired area in square pixels; will automatically scale current aspect ratio",
+					"example": "2073600"
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"default": null
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7",
+					"default": null
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"Crop": {
 			"aliases": [
@@ -1557,11 +4311,126 @@
 				"Cut"
 			],
 			"description": "Crops the supplied image to a given size, expanding if necessary. Use \"-\" to omit measurements.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 9)",
 			"example": [],
-			"timeout": "96"
+			"timeout": "96",
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"left": {
+					"type": "integer",
+					"validation": "[-16384, 16384]",
+					"description": "Left edge of crop in pixels, absolute",
+					"example": "10",
+					"default": "-"
+				},
+				"top": {
+					"type": "integer",
+					"validation": "[-16384, 16384]",
+					"description": "Top edge of crop in pixels, absolute",
+					"example": "-",
+					"default": "-"
+				},
+				"right": {
+					"type": "integer",
+					"validation": "[0, 32768]",
+					"description": "Right edge of crop in pixels, absolute",
+					"example": "20",
+					"default": "-"
+				},
+				"bottom": {
+					"type": "integer",
+					"validation": "[0, 32768]",
+					"description": "Bottom edge of crop in pixels, absolute",
+					"example": "15",
+					"default": "-"
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"Adjust": {
 			"aliases": [
@@ -1577,11 +4446,188 @@
 				"Brighten"
 			],
 			"description": "Adjusts an optional amount of channels in the target image with a given operation and optional value.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(7, 10)",
 			"example": [],
-			"timeout": "96"
+			"timeout": "96",
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"channels": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"r",
+							"g",
+							"b",
+							"h",
+							"s",
+							"c",
+							"v",
+							"l",
+							"i",
+							"y",
+							"a"
+						],
+						"accepts": {
+							"red": "r",
+							"green": "g",
+							"blue": "b",
+							"hue": "h",
+							"saturation": "s",
+							"chroma": "c",
+							"value": "s",
+							"lightness": "l",
+							"intensity": "i",
+							"luma": "y",
+							"alpha": "a"
+						}
+					},
+					"description": "Target colour channel(s)",
+					"example": "gb",
+					"default": "rgb",
+					"multiple": true
+				},
+				"operation": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"=",
+							"+",
+							"-",
+							"*",
+							"/",
+							"**",
+							"%",
+							"&",
+							"|",
+							"^"
+						],
+						"accepts": {
+							"set": "=",
+							"replace": "=",
+							"add": "+",
+							"additive": "+",
+							"sub": "-",
+							"subtract": "-",
+							"subtractive": "-",
+							"mul": "*",
+							"multiply": "*",
+							"multiplicative": "*",
+							"div": "/",
+							"divide": "/",
+							"divisive": "/",
+							"pow": "**",
+							"power": "**",
+							"mod": "%",
+							"modulo": "%",
+							"and": "&",
+							"or": "|",
+							"xor": "^"
+						}
+					},
+					"description": "Operation to perform",
+					"example": "multiply",
+					"default": "="
+				},
+				"value": {
+					"type": "number",
+					"validation": "[0, 1]",
+					"description": "Value to set, 32-bit float",
+					"example": "0.75",
+					"default": "0.5"
+				},
+				"clip": {
+					"type": "bool",
+					"description": "Clips out-of-bound values. Wraps values if not set",
+					"example": "False",
+					"default": true
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"Cut2Loop": {
 			"aliases": [
@@ -1591,11 +4637,98 @@
 				"Trim2Loop"
 			],
 			"description": "Autodetects an appropriate loop position for an animation lasting more than one full loop, and performs a trim.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(8, 15)",
 			"example": [],
-			"timeout": "96"
+			"timeout": "96",
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"ImageCompare": {
 			"aliases": [
@@ -1603,22 +4736,221 @@
 				"PSNR"
 			],
 			"description": "Compares the similarity (Peak Signal-Noise Ratio) between two images. A value of 40 or higher means visual match.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(6, 8)",
 			"example": [],
-			"timeout": "48"
+			"timeout": "48",
+			"schema": {
+				"urls": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": 2,
+					"multiple": true
+				}
+			}
 		},
 		"Blend": {
 			"aliases": [
 				"Blend"
 			],
 			"description": "Combines the two supplied images, using an optional blend operation.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(13, 17)",
 			"example": [],
-			"timeout": "168"
+			"timeout": "168",
+			"schema": {
+				"urls": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": 2,
+					"multiple": true
+				},
+				"operation": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"blend",
+							"replace",
+							"add",
+							"sub",
+							"mul",
+							"div",
+							"mod",
+							"and",
+							"or",
+							"xor",
+							"nand",
+							"nor",
+							"xnor",
+							"difference",
+							"overlay",
+							"screen",
+							"soft",
+							"hard",
+							"lighten",
+							"darken",
+							"plusdarken",
+							"overflow",
+							"lighting",
+							"burn",
+							"linearburn",
+							"dodge",
+							"hue",
+							"saturation",
+							"lightness",
+							"lum",
+							"value",
+							"colour",
+							"extract",
+							"merge",
+							"alpha"
+						],
+						"accepts": {
+							"normal": "blend",
+							"blt": "blend",
+							"blit": "blend",
+							"+": "add",
+							"addition": "add",
+							"additive": "add",
+							"-": "sub",
+							"subtract": "sub",
+							"subtraction": "sub",
+							"subtractive": "sub",
+							"*": "mul",
+							"multiply": "mul",
+							"mult": "mul",
+							"multiplication": "mul",
+							"multiplicative": "mul",
+							"/": "div",
+							"divide": "div",
+							"division": "div",
+							"divisive": "div",
+							"modulo": "mod",
+							"%": "mod",
+							"&": "and",
+							"|": "or",
+							"^": "xor",
+							"~&": "nand",
+							"~|": "nor",
+							"~^": "xnor",
+							"diff": "difference",
+							"softlight": "soft",
+							"hardlight": "hard",
+							"lighter": "lighten",
+							"darker": "darken",
+							"plusdarker": "plusdarken",
+							"grainextract": "extract",
+							"grainmerge": "merge",
+							"colorburn": "burn",
+							"colourburn": "burn",
+							"colordodge": "dodge",
+							"colourdodge": "dodge",
+							"lineardodge": "add",
+							"sat": "saturation",
+							"brightness": "lightness",
+							"luminosity": "lum",
+							"luminance": "lum",
+							"val": "value",
+							"color": "colour"
+						}
+					},
+					"description": "Blend operation to perform",
+					"example": "multiply",
+					"default": "blend"
+				},
+				"opacity": {
+					"type": "number",
+					"validation": "[0, 1]",
+					"description": "Opacity of the second image",
+					"example": "0.75",
+					"default": 0.5
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": [
+						"fs"
+					]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"gif",
+							"png",
+							"apng",
+							"bmp",
+							"jpg",
+							"jpeg",
+							"jp2",
+							"jpx",
+							"jxl",
+							"tiff",
+							"webp",
+							"heic",
+							"ico",
+							"ts",
+							"webm",
+							"mkv",
+							"f4v",
+							"flv",
+							"ogv",
+							"ogg",
+							"gifv",
+							"avi",
+							"avif",
+							"mov",
+							"qt",
+							"wmv",
+							"mp4",
+							"m4v",
+							"av1",
+							"h266",
+							"h265",
+							"h264",
+							"mpg",
+							"mpeg",
+							"mpv",
+							"m3u8",
+							"zip",
+							"tar"
+						],
+						"accepts": {
+							"auto": "auto",
+							"x264": "mp4",
+							"h264": "mp4",
+							"avc": "mp4",
+							"x265": "mp4",
+							"h265": "mp4",
+							"hevc": "mp4",
+							"x266": "mp4",
+							"h266": "mp4",
+							"vvc": "mp4",
+							"vp8": "webm",
+							"vp9": "webm",
+							"av1": "mp4",
+							"quicktime": "qt",
+							"mpegts": "ts",
+							"matroska": "mkv"
+						}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			}
 		},
 		"Steganography": {
 			"aliases": [
@@ -1630,11 +4962,26 @@
 				"\u00a9"
 			],
 			"description": "Reads an image's tagged information, or embeds a message into an image (input a user ID to tag as a Discord user). Aborts if image already has a known tag.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(12, 15)",
 			"example": [],
-			"timeout": "144"
+			"timeout": "144",
+			"schema": {
+				"url": {
+					"type": "image",
+					"description": "Image supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"data": {
+					"type": "string",
+					"description": "Message to encode",
+					"example": "This image was produced by X in collaboration with Y"
+				}
+			}
 		}
 	},
 	"FUN": {
@@ -1645,7 +4992,6 @@
 				"\ud83c\udfae"
 			],
 			"description": "Plays a game of 2048 using buttons. Gained points are rewarded as gold.",
-			"usage": "<0:dimension_sizes[4x4]|dimension_count[2]>* <public(-p)|special_tiles(-s)|insanity_mode(-i)|easy_mode(-e)>*",
 			"level": "0",
 			"rate_limit": "(8, 14)",
 			"example": [
@@ -1654,7 +5000,8 @@
 				"2048 3x3x3 -e -s",
 				"2048 4x4x4x4 -i"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<0:dimension_sizes[4x4]|dimension_count[2]>* <public(-p)|special_tiles(-s)|insanity_mode(-i)|easy_mode(-e)>*"
 		},
 		"Snake": {
 			"aliases": [
@@ -1663,7 +5010,6 @@
 				"\ud83d\udc0d"
 			],
 			"description": "Plays a game of Snake using buttons!",
-			"usage": "<dimensions[8x8]>* <public(-p)|insanity_mode(-i)>*",
 			"level": "0",
 			"rate_limit": "(8, 14)",
 			"example": [
@@ -1671,7 +5017,8 @@
 				"snake 4x12",
 				"snake 6x6 -i"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<dimensions[8x8]>* <public(-p)|insanity_mode(-i)>*"
 		},
 		"SlotMachine": {
 			"aliases": [
@@ -1679,49 +5026,49 @@
 				"Slots"
 			],
 			"description": "Plays a slot machine game. Costs gold to play, can yield gold and diamonds.",
-			"usage": "<bet[50]>? <skip_animation(-s)>?",
 			"level": "0",
 			"rate_limit": "(7, 12)",
 			"example": [
 				"slots 60",
 				"slots -s 1000"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<bet[50]>? <skip_animation(-s)>?"
 		},
 		"Barter": {
 			"aliases": [
 				"Barter"
 			],
 			"description": "Simulates a Minecraft Piglin barter. Uses gold ingots; see ~shop and ~bal for more!",
-			"usage": "<amount>",
 			"level": "0",
 			"rate_limit": "(1, 2)",
 			"example": [
 				"barter 10"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<amount>"
 		},
 		"UpdateOutbreaks": {
 			"aliases": [
 				"UpdateOutbreaks"
 			],
 			"description": "",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(2, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": ""
 		},
 		"Uno": {
 			"aliases": [
 				"Uno"
 			],
 			"description": "Play a game of UNO with me, or with friends!",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(8, 14)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": ""
 		},
 		"Matchmaking": {
 			"aliases": [
@@ -1743,14 +5090,14 @@
 				"\ud83d\udc96"
 			],
 			"description": "Ships two provided objects with a randomised percent.",
-			"usage": "<objects>*",
 			"level": "0",
 			"rate_limit": "(3, 4)",
 			"example": [
 				"ship user_a user_b",
 				"ship"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<objects>*"
 		},
 		"Pay": {
 			"aliases": [
@@ -1763,13 +5110,13 @@
 				"\ud83d\udc8e"
 			],
 			"description": "Pays a specified amount of coins or diamonds to the target user.",
-			"usage": "<0:user> <1:amount[1]>? <-1:diamonds(\ud83d\udc8e)>?",
 			"level": "0",
 			"rate_limit": "(6, 8)",
 			"example": [
 				"pay @Miza 100"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<0:user> <1:amount[1]>? <-1:diamonds(\ud83d\udc8e)>?"
 		},
 		"React": {
 			"aliases": [
@@ -1777,35 +5124,107 @@
 				"AutoReact"
 			],
 			"description": "Causes Miza to automatically assign a reaction to messages containing the trigger. Triggered by a keyword in messages, only applicable to non-command messages.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 6)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"view",
+							"add",
+							"remove"
+						],
+						"accepts": {
+							"enable": "add",
+							"disable": "remove",
+							"create": "add",
+							"delete": "remove"
+						}
+					},
+					"description": "Action to perform",
+					"example": "enable"
+				},
+				"keyword": {
+					"type": "word",
+					"description": "Keyword(s) to search. Uses words if only word characters, any substring if non-word characters are included, or regex if trigger begins and ends with a slash (/)",
+					"example": "cat",
+					"aliases": [
+						"t",
+						"trigger"
+					]
+				},
+				"emoji": {
+					"type": "emoji",
+					"description": "Emoji to add as reaction. Use `-d --emoji` to remove by emoji rather than keyword",
+					"example": "\ud83d\udc31"
+				},
+				"preprocess": {
+					"type": "word",
+					"description": "Preprocess the message, allowing customisation of rules based on USERNAME, NICKNAME, CONTENT and ID; for example, to replicate the conditions for sparkle react, use `--preprocess \"{ID}\"` and `--keyword \"/0{3}$/\"`",
+					"example": "{NICKNAME} {ID}",
+					"default": "{CONTENT}"
+				}
+			}
 		},
 		"Dogpile": {
 			"aliases": [
 				"Dogpile"
 			],
 			"description": "Causes Miza to automatically imitate users when 3+ of the same messages are posted in a row. Grants XP and gold when triggered. Enabled by default.",
-			"usage": "<mode(enable|disable)>?",
 			"level": "2",
 			"rate_limit": "0.5",
 			"example": [
 				"dogpile enable"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<mode(enable|disable)>?"
 		},
 		"DadJoke": {
 			"aliases": [
 				"DadJoke"
 			],
 			"description": "Causes Miza to automatically call-out or nickname a user whenever they say \"I am <something>\" or some variant.",
-			"usage": "",
 			"level": "3",
 			"rate_limit": "0.5",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"view",
+							"enable",
+							"disable"
+						]
+					},
+					"description": "Action to perform",
+					"example": "enable"
+				},
+				"action": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"nickname",
+							"response",
+							"all"
+						]
+					},
+					"description": "Action to perform upon encounter",
+					"example": "response",
+					"default": "all"
+				},
+				"chance": {
+					"type": "number",
+					"validation": "[0, 100]",
+					"description": "Chance for occurence in %. Shared between all actions that have equal odds",
+					"example": "69",
+					"default": 100
+				}
+			}
 		},
 		"Daily": {
 			"aliases": [
@@ -1817,11 +5236,11 @@
 				"Dailies"
 			],
 			"description": "Shows your list of daily quests.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(6, 8)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": ""
 		},
 		"Stats": {
 			"aliases": [
@@ -1833,11 +5252,39 @@
 				"premium"
 			],
 			"description": "Shows the target users' stats, and their wallet and premium subscription status (if applicable).",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(3, 4)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"wallet",
+							"premium"
+						]
+					},
+					"default": "wallet"
+				},
+				"user": {
+					"type": "user",
+					"description": "User to view",
+					"example": "668999031359537205"
+				},
+				"logging": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"none",
+							"auto",
+							"all"
+						]
+					},
+					"description": "Controls how frequently premium quota usage is logged after commands; \"none\" disables all logging, \"auto\" will log at powers of 3 or increments of $1, and \"all\" will log all usage and associated costs",
+					"example": "all"
+				}
+			}
 		},
 		"Shop": {
 			"aliases": [
@@ -1846,7 +5293,6 @@
 				"UpgradeServer"
 			],
 			"description": "Displays the shop system, or purchases an item.",
-			"usage": "<item>?",
 			"level": "0",
 			"rate_limit": "(6, 10)",
 			"example": [
@@ -1854,7 +5300,8 @@
 				"shop upgrade_server",
 				"upgrade_server"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<item>?"
 		},
 		"Cat": {
 			"aliases": [
@@ -1866,11 +5313,22 @@
 				"Kitten"
 			],
 			"description": "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it. Be sure to check out https://mizabot.xyz/cats!",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"embed": {
+					"type": "bool",
+					"description": "Whether to send the message as an embed",
+					"default": true
+				},
+				"code": {
+					"type": "integer",
+					"description": "HTTP status code to display an image from https://http.cat",
+					"example": "404"
+				}
+			}
 		},
 		"Dog": {
 			"aliases": [
@@ -1883,11 +5341,17 @@
 				"Puppo"
 			],
 			"description": "Pulls a random image from images.dog.ceo, api.alexflipnote.dev/dogs, or cdn.nekos.life/woof, and embeds it. Be sure to check out https://mizabot.xyz/dogs!",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"embed": {
+					"type": "bool",
+					"description": "Whether to send the message as an embed",
+					"default": true
+				}
+			}
 		},
 		"8Ball": {
 			"aliases": [
@@ -1895,33 +5359,51 @@
 				"\ud83c\udfb1"
 			],
 			"description": "Pulls a random image from cdn.nekos.life/8ball, and embeds it.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"embed": {
+					"type": "bool",
+					"description": "Whether to send the message as an embed",
+					"default": true
+				}
+			}
 		},
 		"XKCD": {
 			"aliases": [
 				"XKCD"
 			],
 			"description": "Pulls a random image from xkcd.com and embeds it.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"embed": {
+					"type": "bool",
+					"description": "Whether to send the message as an embed",
+					"default": true
+				}
+			}
 		},
 		"Turnoff": {
 			"aliases": [
 				"Turnoff"
 			],
 			"description": "Pulls a random image from turnoff.us and embeds it.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"embed": {
+					"type": "bool",
+					"description": "Whether to send the message as an embed",
+					"default": true
+				}
+			}
 		},
 		"Inspiro": {
 			"aliases": [
@@ -1929,11 +5411,17 @@
 				"InspiroBot"
 			],
 			"description": "Pulls a random image from inspirobot.me and embeds it.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"embed": {
+					"type": "bool",
+					"description": "Whether to send the message as an embed",
+					"default": true
+				}
+			}
 		},
 		"ImageSearch": {
 			"aliases": [
@@ -1945,14 +5433,20 @@
 				"Muffins"
 			],
 			"description": "Pulls a random image from a search on gettyimages.co.uk and unsplash.com, using tags.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(2, 4)",
 			"example": [
 				"imgsearch cat",
 				"muffin"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"embed": {
+					"type": "bool",
+					"description": "Whether to send the message as an embed",
+					"default": true
+				}
+			}
 		},
 		"Giphy": {
 			"aliases": [
@@ -1960,13 +5454,19 @@
 				"GIFSearch"
 			],
 			"description": "Pulls a random image from a search on giphy.com using tags.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(2, 4)",
 			"example": [
 				"giphy cat"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"embed": {
+					"type": "bool",
+					"description": "Whether to send the message as an embed",
+					"default": true
+				}
+			}
 		},
 		"Rickroll": {
 			"aliases": [
@@ -1976,14 +5476,14 @@
 				"FakeVideo"
 			],
 			"description": "Generates a link that embeds a thumbnail, but redirects to a separate YouTube video once played.",
-			"usage": "<thumbnail>? <video>?",
 			"level": "0",
 			"rate_limit": "(6, 9)",
 			"example": [
 				"rickroll https://i.ytimg.com/kJQP7kiw5Fk/maxresdefault.jpg",
 				"rickroll https://i.ytimg.com/kJQP7kiw5Fk/maxresdefault.jpg https://www.youtube.com/watch?v=wDgQdr8ZkTw"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<thumbnail>? <video>?"
 		},
 		"RPS": {
 			"aliases": [
@@ -1991,25 +5491,25 @@
 				"Rockpaperscissors"
 			],
 			"description": "A randomised game of Rock-Paper-Scissors!",
-			"usage": "<move(rock|paper|scissors)>?",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [
 				"rockpaperscissors",
 				"rps rock"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<move(rock|paper|scissors)>?"
 		},
 		"HOW": {
 			"aliases": [
 				"HOW"
 			],
 			"description": ":3",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(0, 1)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": ""
 		},
 		"Akinator": {
 			"aliases": [
@@ -2017,11 +5517,43 @@
 				"Aki"
 			],
 			"description": "Think about a real or fictional character. I will try to guess who it is!",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(12, 16)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"language": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"en",
+							"ar",
+							"cn",
+							"de",
+							"es",
+							"fr",
+							"il",
+							"it",
+							"jp",
+							"kr",
+							"nl",
+							"pl",
+							"pt",
+							"ru",
+							"tr",
+							"id",
+							"vi"
+						]
+					},
+					"description": "Language used by Akinator",
+					"default": "en"
+				},
+				"child_friendly": {
+					"type": "bool",
+					"description": "Whether to enable child-friendly mode. Defaults to the current channel's age restriction state.",
+					"example": "true"
+				}
+			}
 		}
 	},
 	"AI": {
@@ -2030,11 +5562,30 @@
 				"Ask"
 			],
 			"description": "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. The chatbot will automatically choose one of multiple language models to conjure a response based on premium level. Less censorship is imposed when invoked within NSFW channels.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(12, 16)",
 			"example": [],
-			"timeout": "576"
+			"timeout": "576",
+			"schema": {
+				"prompt": {
+					"type": "string",
+					"description": "Input message/question to ask",
+					"example": "Can I please have a hug?",
+					"required_slash": true
+				},
+				"model": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"small",
+							"medium",
+							"large"
+						]
+					},
+					"description": "Determines which model tier to choose from; e.g. large includes top models such as GPT-4.1, Claude3.7-Sonnet and Magnum-v4, but incurs much higher costs",
+					"example": "small"
+				}
+			}
 		},
 		"Personality": {
 			"aliases": [
@@ -2044,11 +5595,51 @@
 				"ChangePersonality"
 			],
 			"description": "Customises my personality for ~ask and @mentions in the current channel. Note that with the increased complexity of the chatbot, a clear description of who the bot is should be provided.",
-			"usage": "",
 			"level": "2",
 			"rate_limit": "(18, 24)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"description": {
+					"type": "string",
+					"description": "Personality description; enter \"DEFAULT\" to reset",
+					"example": "Your name is Miza, you are dry, sarcastic and snarky. Be creative with your responses and attempt to annoy the user."
+				},
+				"frequency_penalty": {
+					"type": "number",
+					"validation": "[-1, 2]",
+					"description": "Amount to discourage repeating words, default 0",
+					"example": "0.7"
+				},
+				"temperature": {
+					"type": "number",
+					"validation": "[0, 3]",
+					"description": "Alignment vs diversity; lower values give more correct but boring answers, default 1",
+					"example": "0.8"
+				},
+				"top_p": {
+					"type": "number",
+					"validation": "[0, 1]",
+					"description": "Percentage of weighted choices considered, default 1",
+					"example": "0.9"
+				},
+				"stream": {
+					"type": "bool",
+					"description": "Determines whether the response should be edited, or delayed until complete",
+					"example": "false"
+				},
+				"tts": {
+					"type": "bool",
+					"description": "Whether the output should trigger Discord TTS. Incompatible with streamed editing",
+					"example": "true"
+				},
+				"cutoff": {
+					"type": "integer",
+					"description": "Message ID cutoff (bot will not read messages before this point; enter -1 to cut off at current time)",
+					"validation": "[-1, 18446744073709551616)",
+					"example": "201548633244565504"
+				}
+			}
 		},
 		"Instruct": {
 			"aliases": [
@@ -2076,11 +5667,111 @@
 				"Qwen"
 			],
 			"description": "Similar to ~ask, but functions as instruct rather than chat.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(12, 16)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"model": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"claude-4.1-opus",
+							"claude-4.5-sonnet",
+							"claude-4-sonnet",
+							"claude-4.5-haiku",
+							"deepseek-r1",
+							"deepseek-v3.2",
+							"deepseek-v3.1",
+							"deepseek-v3",
+							"minimax-m1",
+							"minimax-01",
+							"llama-3-405b",
+							"llama-3-90b",
+							"llama-3-70b",
+							"llama-3-11b",
+							"llama-3-8b",
+							"command-r-plus",
+							"command-r",
+							"magnum-72b",
+							"qwen-72b",
+							"gemini-2.5-pro",
+							"gemini-2.5-flash-t",
+							"gemini-2.5-flash",
+							"grok-4",
+							"grok-4-fast",
+							"gpt-oss-120b",
+							"gpt-oss-20b",
+							"o4-mini",
+							"o3",
+							"o3-mini",
+							"gpt-5",
+							"gpt-5-mini",
+							"gpt-5-nano",
+							"gpt-4.1-mini",
+							"gpt-4.1",
+							"gpt-4-mini",
+							"gpt-4",
+							"mistral-24b",
+							"kimi-k2"
+						],
+						"accepts": {
+							"llama": "llama-3-70b",
+							"haiku": "claude-3-haiku",
+							"r1": "deepseek-r1",
+							"deepseek": "deepseek-v3",
+							"gpt3.5": "gpt-3.5",
+							"sonnet": "claude-3.7-sonnet",
+							"dbrx": "dbrx-instruct",
+							"gpt5": "gpt-5",
+							"gpt4": "gpt-4.1",
+							"gpt-4o": "gpt-4",
+							"opus": "claude-3-opus"
+						}
+					},
+					"description": "Target LLM to invoke",
+					"example": "deepseek",
+					"default": "kimi-k2"
+				},
+				"prompt": {
+					"type": "string",
+					"description": "Input text for completion",
+					"example": "Once upon a time, there was"
+				},
+				"api": {
+					"type": "string",
+					"description": "Custom OpenAI-compatible API url, optionally followed by API key and then model, all separated with \"#\"",
+					"example": "https://api.deepinfra.com/v1/openai#your-api-key-here#lzlv-70b"
+				},
+				"temperature": {
+					"type": "number",
+					"validation": "[0, 3]",
+					"description": "Temperature to influence alignment",
+					"example": "1.2",
+					"default": 0.8
+				},
+				"frequency_penalty": {
+					"type": "number",
+					"validation": "[-1, 2]",
+					"description": "Amount to penalise tokens based on frequency",
+					"example": "1.1",
+					"default": 0.7
+				},
+				"presence_penalty": {
+					"type": "number",
+					"validation": "[-1, 2]",
+					"description": "Amount to penalise tokens based on presence",
+					"example": "1.1",
+					"default": 0.5
+				},
+				"max_tokens": {
+					"type": "integer",
+					"validation": "[1, 65536]",
+					"description": "Maximum tokens to generate",
+					"example": "16384",
+					"default": 3072
+				}
+			}
 		},
 		"Imagine": {
 			"aliases": [
@@ -2093,11 +5784,128 @@
 				"DALLE3"
 			],
 			"description": "Runs one of many AI image generators on the input prompt or image. Less censorship is imposed when invoked within NSFW channels. Incurs an adjusted quota cost.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(12, 16)",
 			"example": [],
-			"timeout": "3600"
+			"timeout": "3600",
+			"schema": {
+				"model": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"dalle3",
+							"dalle2",
+							"flux",
+							"nano-banana"
+						],
+						"accepts": {
+							"dalle": "dalle3"
+						}
+					},
+					"description": "AI model for generation",
+					"example": "dalle3",
+					"default": "nano-banana"
+				},
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"preprocess",
+							"raw",
+							"caption",
+							"inpaint",
+							"controlnet",
+							"canny"
+						]
+					},
+					"description": "Transform mode; \"preprocess\" and \"raw\" affect text prompts, while the others affect image prompts",
+					"example": "raw",
+					"default": "preprocess"
+				},
+				"url": {
+					"type": "image",
+					"description": "Image supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					]
+				},
+				"prompt": {
+					"type": "string",
+					"description": "Description to create image with",
+					"example": "A cat finding a treasure chest full of rainbows",
+					"default": "",
+					"required_slash": true
+				},
+				"mask": {
+					"type": "image",
+					"description": "Mask supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png"
+				},
+				"num_inference_steps": {
+					"type": "number",
+					"validation": "[1, 96]",
+					"description": "How many times data is passed through model. Automatically divided by 8 for SDXL-Lightning and Flux-Schnell",
+					"example": "64",
+					"default": 32,
+					"aliases": [
+						"steps"
+					]
+				},
+				"high_quality": {
+					"type": "bool",
+					"description": "Requests a high quality image; may increase quota cost. Increases resolution for relevant models, and increases inference steps by 25%",
+					"example": "True",
+					"default": true,
+					"aliases": [
+						"hq"
+					]
+				},
+				"strength": {
+					"type": "number",
+					"validation": "[0, 1]",
+					"description": "Denoising strength",
+					"example": "0.6",
+					"default": 0.85
+				},
+				"guidance_scale": {
+					"type": "number",
+					"validation": "[-100, 100]",
+					"description": "Prompt guidance scale. Automatically divided by 5 for SDXL Lightning",
+					"example": "12",
+					"default": 6,
+					"aliases": [
+						"gs"
+					]
+				},
+				"aspect_ratio": {
+					"type": "resolution",
+					"validation": "[0.0009765625, 8192]",
+					"description": "Output aspect ratio (total amount of pixels remains roughly the same)",
+					"example": "16:9",
+					"default": [
+						0,
+						0
+					],
+					"aliases": [
+						"ar"
+					]
+				},
+				"negative_prompt": {
+					"type": "text",
+					"description": "Unwanted elements",
+					"example": "blurry",
+					"aliases": [
+						"np"
+					]
+				},
+				"count": {
+					"type": "integer",
+					"validation": "[1, 9]",
+					"description": "Number of output images to produce",
+					"example": "6"
+				}
+			}
 		},
 		"Describe": {
 			"aliases": [
@@ -2107,11 +5915,21 @@
 				"Clip"
 			],
 			"description": "Describes the input image.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(4, 5)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				}
+			}
 		},
 		"OCR": {
 			"aliases": [
@@ -2120,11 +5938,21 @@
 				"Image2Text"
 			],
 			"description": "Attempts to read text in an image using Optical Character Recognition AI.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 15)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"url": {
+					"type": "image",
+					"description": "Image supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				}
+			}
 		},
 		"Vectorise": {
 			"aliases": [
@@ -2134,11 +5962,21 @@
 				"Vectorize"
 			],
 			"description": "Applies https://replicate.com/recraft-ai/recraft-vectorize/api to convert a raster image to SVG format.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(10, 15)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"url": {
+					"type": "image",
+					"description": "Image supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				}
+			}
 		}
 	},
 	"NSFW": {
@@ -2148,14 +5986,14 @@
 				"Nya"
 			],
 			"description": "Pulls a random image from nekos.life and embeds it.",
-			"usage": "<tags[neko]>? <verbose(-v)|random(-r)|list(-l)>?",
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [
 				"neko poke",
 				"neko lizard"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<tags[neko]>? <verbose(-v)|random(-r)|list(-l)>?"
 		},
 		"Lewd": {
 			"aliases": [
@@ -2163,13 +6001,13 @@
 				"NSFW"
 			],
 			"description": "Pulls a random image from a search on Rule34 and e621, and embeds it.",
-			"usage": "<query> <verbose(-v)>?",
 			"level": "1",
 			"rate_limit": "(1, 6)",
 			"example": [
 				"lewd pokemon"
 			],
-			"timeout": "48"
+			"timeout": "48",
+			"usage": "<query> <verbose(-v)>?"
 		},
 		"Verify": {
 			"aliases": [
@@ -2177,11 +6015,25 @@
 				"AgeVerify"
 			],
 			"description": "Verifies your account age as 18+, allowing you to access NSFW-restricted commands within DM channels.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(1, 6)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"enable",
+							"disable",
+							"view"
+						]
+					},
+					"description": "Determines whether to enable, disable, or view verification status",
+					"example": "enable",
+					"default": "view"
+				}
+			}
 		}
 	},
 	"MISC": {
@@ -2193,13 +6045,13 @@
 				"CS_m2f"
 			],
 			"description": "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value.",
-			"usage": "<0:address> <1:value[1]>?",
 			"level": "0",
 			"rate_limit": "1",
 			"example": [
 				"cs_m2f 49e6e8 123"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<0:address> <1:value[1]>?"
 		},
 		"CS_flag2mem": {
 			"aliases": [
@@ -2209,13 +6061,13 @@
 				"CS_f2m"
 			],
 			"description": "Returns the memory offset and specific bit pointed to by a given flag number.",
-			"usage": "<flag>",
 			"level": "0",
 			"rate_limit": "1",
 			"example": [
 				"cs_f2m A036"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<flag>"
 		},
 		"CS_num2val": {
 			"aliases": [
@@ -2225,11 +6077,25 @@
 				"CS_n2v"
 			],
 			"description": "Returns a TSC value representing the desired number, within a certain number of characters.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "1",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"number": {
+					"type": "integer",
+					"validation": "[-17776, 86658]",
+					"description": "The number to convert",
+					"example": "12345",
+					"required": true
+				},
+				"length": {
+					"type": "integer",
+					"validation": "[0, 1000)",
+					"description": "Number of available ASCII characters",
+					"default": 4
+				}
+			}
 		},
 		"CS_val2num": {
 			"aliases": [
@@ -2239,13 +6105,13 @@
 				"CS_v2n"
 			],
 			"description": "Returns the number encoded by a given TSC value.",
-			"usage": "<tsc_value>",
 			"level": "0",
 			"rate_limit": "1",
 			"example": [
 				"cs_v2n CCCC"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<tsc_value>"
 		},
 		"CS_hex2xml": {
 			"aliases": [
@@ -2255,13 +6121,13 @@
 				"CS_h2x"
 			],
 			"description": "Converts a given Cave Story hex patch to an xml file readable by Booster's Lab.",
-			"usage": "<hex_data>",
 			"level": "0",
 			"rate_limit": "(3, 5)",
 			"example": [
 				"cs_h2x 0x481D27 C3"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<hex_data>"
 		},
 		"CS_npc": {
 			"aliases": [
@@ -2272,13 +6138,13 @@
 				"cs_mus"
 			],
 			"description": "Searches the Cave Story NPC list for an NPC/bullet/effect/music by name or ID.",
-			"usage": "<query> <condensed(-c)>?",
 			"level": "0",
 			"rate_limit": "2",
 			"example": [
 				"cs_npc misery"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<query> <condensed(-c)>?"
 		},
 		"CS_mod": {
 			"aliases": [
@@ -2286,13 +6152,13 @@
 				"CS_search"
 			],
 			"description": "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item.",
-			"usage": "<query>",
 			"level": "0",
 			"rate_limit": "(3, 7)",
 			"example": [
 				"cs_mod critter"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<query>"
 		},
 		"Wav2Png": {
 			"aliases": [
@@ -2304,36 +6170,62 @@
 				"Png2Wav"
 			],
 			"description": "Runs wav2png on the input URL. See https://github.com/thomas-xin/audioptic for more info, or to run it yourself!",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(15, 25)",
 			"example": [],
-			"timeout": "360"
+			"timeout": "360",
+			"schema": {
+				"url": {
+					"type": "media",
+					"description": "Image, animation, video or audio, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": [
+						"i"
+					],
+					"required": true
+				},
+				"fmt": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"ogg",
+							"opus",
+							"mp3",
+							"aac",
+							"flac",
+							"wav",
+							"webp",
+							"png"
+						]
+					},
+					"description": "The file format or codec of the output"
+				}
+			}
 		},
 		"SpectralPulse": {
 			"aliases": [
 				"SpectralPulse"
 			],
 			"description": "Runs SpectralPulse on the input URL. Operates on a global queue system. See https://github.com/thomas-xin/SpectralPulse for more info, or to run it yourself!",
-			"usage": "<0:search_links>",
 			"level": "0",
 			"rate_limit": "(120, 180)",
 			"example": [
 				"spectralpulse https://www.youtube.com/watch?v=IgOci6JXPIc",
 				"spectralpulse -fps 60 https://www.youtube.com/watch?v=kJQP7kiw5Fk"
 			],
-			"timeout": "3600"
+			"timeout": "3600",
+			"usage": "<0:search_links>"
 		},
 		"UMP": {
 			"aliases": [
 				"UMP"
 			],
 			"description": "lol",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(0, 1)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": ""
 		},
 		"BTD6Paragon": {
 			"aliases": [
@@ -2342,7 +6234,6 @@
 				"GenerateParagon"
 			],
 			"description": "Given a tower and provided parameters, generates a list of Bloons TD 6 optimised paragon sacrifices. Parameters are \"p\" for pops, \"g\" for cash generated, \"t\" for Geraldo totems, and \"l\" for additional tower limit.",
-			"usage": "<tower> <sacrifices>* <parameters>*",
 			"level": "0",
 			"rate_limit": "(4, 5)",
 			"example": [
@@ -2350,7 +6241,8 @@
 				"paragon boat 400000p 30l",
 				"paragon monkey_ace 2x500 2x050 2x005"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<tower> <sacrifices>* <parameters>*"
 		},
 		"SkyShardReminder": {
 			"aliases": [
@@ -2359,11 +6251,30 @@
 				"SkyShards"
 			],
 			"description": "Tracks and sends DM reminders for Shard Eruptions in the game Sky: Children of the Light. Referenced code from https://github.com/PlutoyDev/sky-shards. When active, reminders will be sent 12 hours prior to the first landing, and additionally 1 hour, 5 minutes, and at the start of all landings.",
-			"usage": "",
 			"level": "0",
 			"rate_limit": "(2, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"none",
+							"black",
+							"red",
+							"all"
+						]
+					},
+					"description": "Whether to disable reminders, or to target a particular type of shard",
+					"default": "all"
+				},
+				"ping": {
+					"type": "bool",
+					"description": "Whether to ping at all intervals by default",
+					"default": true
+				}
+			}
 		}
 	},
 	"OWNER": {
@@ -2372,11 +6283,18 @@
 				"Reload"
 			],
 			"description": "Reloads a specified module.",
-			"usage": "",
 			"level": "nan",
 			"rate_limit": "(2, 3)",
 			"example": [],
-			"timeout": "inf"
+			"timeout": "inf",
+			"schema": {
+				"reload": {
+					"type": "word"
+				},
+				"unload": {
+					"type": "word"
+				}
+			}
 		},
 		"Restart": {
 			"aliases": [
@@ -2387,24 +6305,54 @@
 				"Update"
 			],
 			"description": "Restarts, reloads, or shuts down Miza, with an optional delay.",
-			"usage": "",
 			"level": "nan",
 			"rate_limit": "(2, 3)",
 			"example": [],
-			"timeout": "inf"
+			"timeout": "inf",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"workers",
+							"audio",
+							"server",
+							"maintain",
+							"reboot",
+							"shutdown",
+							"update"
+						],
+						"accepts": {
+							"restart": "reboot",
+							"wait": "maintain"
+						}
+					},
+					"description": "Image supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"default": "maintain"
+				},
+				"delay": {
+					"type": "timedelta",
+					"description": "Time to wait",
+					"aliases": [
+						"d"
+					],
+					"default": 0
+				}
+			}
 		},
 		"Execute": {
 			"aliases": [
 				"Execute"
 			],
 			"description": "Executes a command as other user(s), similar to the command's function in Minecraft.",
-			"usage": "as <0:user>* run <1:command>+ <inherit_perms(-i)>?",
 			"level": "nan",
 			"rate_limit": "(2, 3)",
 			"example": [
 				"execute as @Miza run ~info"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "as <0:user>* run <1:command>+ <inherit_perms(-i)>?"
 		},
 		"Exec": {
 			"aliases": [
@@ -2414,11 +6362,49 @@
 				"Eval"
 			],
 			"description": "Causes all messages by the bot owner(s) in the current channel to be executed as python code on Miza.",
-			"usage": "",
 			"level": "nan",
 			"rate_limit": "(2, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"view",
+							"enable",
+							"disable"
+						]
+					},
+					"description": "Action to perform",
+					"example": "enable",
+					"default": "view"
+				},
+				"type": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"null",
+							"main",
+							"relay",
+							"virtual",
+							"log",
+							"proxy",
+							"shell",
+							"chat",
+							"lfproxy"
+						]
+					},
+					"description": "Terminal mode",
+					"example": "virtual",
+					"default": "null"
+				},
+				"code": {
+					"type": "string",
+					"description": "Code to evaluate directly",
+					"example": "1 + 1"
+				}
+			}
 		},
 		"SetAvatar": {
 			"aliases": [
@@ -2427,24 +6413,36 @@
 				"UpdateAvatar"
 			],
 			"description": "Changes Miza's current avatar.",
-			"usage": "<avatar_url>?",
 			"level": "nan",
 			"rate_limit": "(2, 3)",
 			"example": [
 				"setavatar https://cdn.discordapp.com/embed/avatars/0.png"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<avatar_url>?"
 		},
 		"Maintenance": {
 			"aliases": [
 				"Maintenance"
 			],
 			"description": "Toggles Maintenance mode, which will block all use of commands for all servers except the current one while active.",
-			"usage": "",
 			"level": "nan",
 			"rate_limit": "(2, 3)",
 			"example": [],
-			"timeout": "24"
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"enable",
+							"disable"
+						]
+					},
+					"description": "New state to apply",
+					"example": "disable"
+				}
+			}
 		},
 		"Suspend": {
 			"aliases": [
@@ -2453,13 +6451,13 @@
 				"Blacklist"
 			],
 			"description": "Prevents a user from accessing Miza's commands. Overrides <perms>.",
-			"usage": "<0:user> <disable(-d)>",
 			"level": "nan",
 			"rate_limit": "(2, 3)",
 			"example": [
 				"block 201548633244565504"
 			],
-			"timeout": "24"
+			"timeout": "24",
+			"usage": "<0:user> <disable(-d)>"
 		}
 	}
 }

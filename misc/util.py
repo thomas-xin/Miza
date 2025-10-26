@@ -3246,11 +3246,16 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		except AttributeError:
 			return super().__getattribute__(k)
 
+	version = "1.0.0"
 	def validate_or_clear(self):
-		if bool(self):
-			t = next(cachecls.__getitem__(self, k) for k in cachecls.__iter__(self))
-			if not isinstance(t, (tuple, list)) or len(t) != 2 or not isinstance(t[-1], float):
+		if len(self):
+			if self.get("version") != self.version:
 				self.clear()
+		self.set("version", self.version)
+
+	@property
+	def expire_offset(self):
+		return 2. ** 52 if isfinite(self._stale) else self._stimeout
 
 	def __iter__(self):
 		return super().__iter__()
@@ -3270,17 +3275,16 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		if (fut := self._retrieving.get(k)):
 			return fut.result()
 		try:
-			return super().__getitem__(k)[0]
+			return super().__getitem__(k)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
 			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
 			self.validate_or_clear()
-			return super().__getitem__(k)[0]
+			return super().__getitem__(k)
 
-	def __setitem__(self, k, v):
-		item = (v, utc())
+	def __setitem__(self, k, v, read=False):
 		if isinstance(v, memoryview):
 			v = bytes(v)
-		super().set(k, item, expire=2. ** 52 if isfinite(self._stale) else self._stimeout)
+		super().set(k, v, expire=self.expire_offset, tag=utc(), read=read)
 
 	def update(self, other):
 		t = utc()
@@ -3289,12 +3293,12 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		for k, v in other:
 			if isinstance(v, memoryview):
 				v = bytes(v)
-			super().set(k, (v, t), expire=2. ** 52 if isfinite(self._stale) else self._stimeout)
+			super().set(k, v, expire=self.expire_offset, tag=t)
 		return self
 
 	def pop(self, k, v=Dummy):
 		self._retrieving.pop(k, None)
-		v = super().pop(k, default=(v,))[0]
+		v = super().pop(k, default=(v,))
 		if v is Dummy:
 			raise KeyError(k)
 		return v
@@ -3306,15 +3310,16 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		if (fut := self._retrieving.get(k)):
 			return fut.result()
 		try:
-			return super().__getitem__(k)[0]
+			return super().__getitem__(k)
 		except KeyError:
 			self[k] = v
 		return v
 
-	def _retrieve(self, k, func, *args, **kwargs):
+	def _retrieve(self, k, func, *args, read=False, **kwargs):
 		try:
 			self._retrieving[k] = fut = concurrent.futures.Future()
-			self[k] = v = func(*args, **kwargs)
+			v = func(*args, **kwargs)
+			self.__setitem__(k, v, read=read)
 		except Exception as ex:
 			fut.set_exception(ex)
 			raise
@@ -3323,34 +3328,31 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		finally:
 			self._retrieving.pop(k, None)
 		return v
-	def retrieve(self, k, func, *args, **kwargs):
+	def retrieve(self, k, func, *args, _read=False, **kwargs):
 		try:
-			try:
-				v, t = super().__getitem__(k)
-			except (diskcache.core.Timeout, sqlite3.OperationalError):
-				super().__init__(self._path, shards=len(self._shards), **self._kwargs)
-				self.validate_or_clear()
-				v, t = super().__getitem__(k)
-		except KeyError:
-			v = Dummy
-		else:
+			v, t = super().get(k, read=_read, tag=True)
+		except (diskcache.core.Timeout, sqlite3.OperationalError):
+			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
+			self.validate_or_clear()
+			v, t = super().get(k, read=_read, tag=True)
+		if t is not None and v is not Dummy:
 			delay = utc() - t
 			if delay > self._stimeout:
 				try:
-					v = self._retrieve(k, func, *args, **kwargs)
+					v = self._retrieve(k, func, *args, read=_read, **kwargs)
 				except Exception:
 					pass
 			elif delay > self._stale:
-				esubmit(self._retrieve, k, func, *args, **kwargs)
-		if v is Dummy:
-			return self._retrieve(k, func, *args, **kwargs)
+				esubmit(self._retrieve, k, func, *args, read=_read, **kwargs)
+		else:
+			return self._retrieve(k, func, *args, read=_read, **kwargs)
 		return v
 
-	async def _aretrieve(self, k, func, *args, **kwargs):
+	async def _aretrieve(self, k, func, *args, read=False, **kwargs):
 		try:
 			self._retrieving[k] = fut = concurrent.futures.Future()
 			v = await asubmit(func, *args, **kwargs)
-			await asubmit(self.__setitem__, k, v)
+			await asubmit(self.__setitem__, k, v, read=read)
 		except Exception as ex:
 			fut.set_exception(ex)
 			raise
@@ -3359,27 +3361,24 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		finally:
 			self._retrieving.pop(k, None)
 		return v
-	async def aretrieve(self, k, func, *args, **kwargs):
+	async def aretrieve(self, k, func, *args, _read=False, **kwargs):
 		try:
-			try:
-				v, t = super().__getitem__(k)
-			except (diskcache.core.Timeout, sqlite3.OperationalError):
-				super().__init__(self._path, shards=len(self._shards), **self._kwargs)
-				self.validate_or_clear()
-				v, t = super().__getitem__(k)
-		except KeyError:
-			v = Dummy
-		else:
+			v, t = super().get(k, read=_read, tag=True)
+		except (diskcache.core.Timeout, sqlite3.OperationalError):
+			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
+			self.validate_or_clear()
+			v, t = super().get(k, read=_read, tag=True)
+		if t is not None and v is not Dummy:
 			delay = utc() - t
 			if delay > self._stimeout:
 				try:
-					v = await self._aretrieve(k, func, *args, **kwargs)
+					v = await self._aretrieve(k, func, *args, read=_read, **kwargs)
 				except Exception:
 					pass
 			if delay > self._stale:
-				csubmit(self._aretrieve(k, func, *args, **kwargs))
-		if v is Dummy:
-			return await self._aretrieve(k, func, *args, **kwargs)
+				csubmit(self._aretrieve(k, func, *args, read=_read, **kwargs))
+		else:
+			return await self._aretrieve(k, func, *args, read=_read, **kwargs)
 		return v
 
 	def keys(self):
@@ -4778,17 +4777,35 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 Request = RequestManager()
 get_request = Request.__call__
 
-def download_file(url, filename=None, timeout=12):
-	req = urllib.request.Request(url, method="GET", headers=Request.header())
-	try:
-		resp = urllib.request.urlopen(req, timeout=timeout)
-	except urllib.error.HTTPError as ex:
-		raise ConnectionError(ex.getcode(), ex.msg)
-	if not filename:
-		return resp.read()
-	with open(filename, "wb") as f:
-		shutil.copyfileobj(resp, f)
+def download_file(*urls, filename=None, timeout=12):
+	if filename is None:
+		file = io.BytesIO()
+	else:
+		file = open(filename, "wb")
+	for url in urls:
+		req = urllib.request.Request(url, method="GET", headers=Request.header())
+		try:
+			resp = urllib.request.urlopen(req, timeout=timeout)
+		except urllib.error.HTTPError as ex:
+			raise ConnectionError(ex.getcode(), ex.msg)
+		shutil.copyfileobj(resp, file, 65536)
+	if filename is None:
+		return file.getbuffer()
+	file.close()
 	return filename
+
+def getsize(fp):
+	if isinstance(fp, byte_like):
+		return len(fp)
+	if isinstance(fp, str):
+		return os.path.getsize(fp)
+	if hasattr(fp, "seek"):
+		p = fp.tell()
+		try:
+			return fp.seek(0, os.SEEK_END)
+		finally:
+			fp.seek(p)
+	raise NotImplementedError(fp)
 
 def update_headers(headers, **fields):
 	"Updates a dictionary of HTTP headers with new fields. Case-insensitive."

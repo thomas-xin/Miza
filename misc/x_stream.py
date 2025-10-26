@@ -1,6 +1,5 @@
 import base64
 import diskcache
-import functools
 import json
 import logging
 import os
@@ -12,11 +11,11 @@ import orjson
 import requests
 from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse, RedirectResponse
-from .asyncs import asubmit, esubmit, csubmit
+from .asyncs import asubmit, csubmit
 from .types import fcdict, byte_like, MemoryBytes
 from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment,
-	is_discord_attachment, url2fn, seq,
+	is_discord_attachment, url2fn, seq, getsize,
 	Request as MizaRequest, DOMAIN_CERT, PRIVATE_KEY, update_headers,
 	CACHE_PATH,
 )
@@ -59,12 +58,12 @@ def true_ip(request: Request) -> str:
 
 
 async def get_size_mime(head, tail, count, chunksize):
-	fut = csubmit(attachment_cache.download, tail)
-	HEAD = await attachment_cache.download(head)
+	fut = csubmit(attachment_cache.download(tail, read=True))
+	HEAD = await attachment_cache.download(head, read=True)
 	TAIL = await fut
-	firstsize = len(HEAD)
+	firstsize = getsize(HEAD)
 	mimetype = filetype.guess_mime(HEAD)
-	lastsize = len(TAIL)
+	lastsize = getsize(TAIL)
 	if count >= 2:
 		size = firstsize + chunksize * (count - 2) + lastsize
 	else:
@@ -167,11 +166,6 @@ class Server:
 
 	async def _dyn_serve(self, urls, ranges, headers, head=None, callback=None) -> AsyncIterator[bytes]:
 		"""Internal generator for dynamic serving."""
-
-		def content_generator(b, chunksize=262144):
-			for i in range(0, len(b), chunksize):
-				yield b[i:i + chunksize]
-
 		with tracebacksuppressor(GeneratorExit):
 			if head:
 				data = head.data[head.index:]
@@ -184,7 +178,6 @@ class Server:
 				pos = 0
 				rems = urls.copy()
 				futs = []
-				big = False
 
 				while rems:
 					u = rems.pop(0)
@@ -206,32 +199,35 @@ class Server:
 					if pos >= end:
 						break
 
-					async def get_chunk(u, h, start, end, pos, ns, big):
+					async def get_chunk(u, h, start, end, pos, ns):
 						s = start - pos
 						e = end - pos
-						if not isinstance(u, byte_like):
-							print("get_chunk:", u)
-							b = await attachment_cache.download(u)
-						if s <= 0 and e >= len(b):
-							return b
-						return memoryview(b)[s:e]
+						print("get_chunk:", u)
+						fp = await attachment_cache.download(u, read=True)
+
+						async def content_generator():
+							chunksize = 262144 if counter else 65536
+							fp.seek(s)
+							for i in range(s, e, chunksize):
+								yield fp.read(min(chunksize, e - i))
+
+						return content_generator()
 
 					if len(futs) > i + 1:
-						b = await futs.pop(0)
-						for chunk in content_generator(b, chunksize=262144 if counter else 65536):
+						gen = await futs.pop(0)
+						async for chunk in gen:
 							yield chunk
 						counter += 1
 
-					fut = asubmit(get_chunk, u, headers, start, end, pos, ns, big)
+					fut = asubmit(get_chunk, u, headers, start, end, pos, ns)
 					futs.append(fut)
 					pos = 0
 					start = 0
 					end -= start + ns
-					big = True
 
 				for fut in futs:
-					b = await fut
-					for chunk in content_generator(b, chunksize=262144 if counter else 65536):
+					gen = await fut
+					async for chunk in gen:
 						yield chunk
 					counter += 1
 
@@ -407,11 +403,11 @@ async def proxy(request: Request, url: Optional[str] = None):
 	if request.method.lower() == "get" and not body:
 		print("get_download:", url)
 		try:
-			data = await attachment_cache.download(url)
+			fp = await attachment_cache.download(url, read=True)
 		except ConnectionError as ex:
 			raise HTTPException(status_code=ex.errno, detail=str(ex))
 		brange = request.headers.get("Range", "").removeprefix("bytes=") if request else ""
-		size = len(data)
+		size = getsize(fp)
 		ranges = []
 		length = 0
 
@@ -441,22 +437,21 @@ async def proxy(request: Request, url: Optional[str] = None):
 		response_headers = dict(HEADERS)
 		if ranges == [(0, size)]:
 			response_headers["Content-Length"] = str(length)
-			direct = True
-		else:
-			direct = False
 		if brange:
 			cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size or '*'}" for start, end in ranges)
 			response_headers["Content-Range"] = cr
 
-		async def content_generator(b, chunksize=65536):
-			for i in range(0, len(b), chunksize):
-				yield b[i:i + chunksize]
+		async def content_generator(chunksize=65536):
+			for r in ranges:
+				fp.seek(r[0])
+				for i in range(r[0], r[1], chunksize):
+					yield fp.read(min(chunksize, r[1] - i))
 
 		return StreamingResponse(
-			content_generator(b"".join(data[r[0]:r[1]] for r in ranges) if not direct else data),
+			content_generator(),
 			status_code=status_code,
 			headers=response_headers,
-			media_type=filetype.guess_mime(data),
+			media_type=filetype.guess_mime(fp),
 		)
 
 	headers = MizaRequest.header()
