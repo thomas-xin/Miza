@@ -213,7 +213,7 @@ class Server:
 
 						return content_generator()
 
-					if len(futs) > i + 1:
+					if len(futs) > 1:
 						gen = await futs.pop(0)
 						async for chunk in gen:
 							yield chunk
