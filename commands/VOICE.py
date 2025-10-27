@@ -2519,10 +2519,18 @@ class UpdateAudio(Database):
 					bot.data.dailies.progress_quests(member, "music", td)
 
 	async def _day_(self, **void):
+		import importlib
+		old_version = importlib.metadata.version("yt-dlp")
 		args = [python, "-m", "pip", "install", "--upgrade", "--pre", "yt-dlp"]
 		print(args)
 		proc = await asyncio.create_subprocess_exec(*args)
 		await proc.wait()
+		new_version = importlib.metadata.version("yt-dlp")
+		if old_version != new_version:
+			print("yt-dlp updated! Reloading dependencies...")
+			bot = self.bot
+			await bot.audio.asubmit("ytdl and ytdl.restart()")
+			await bot.server.asubmit("ytdl and ytdl.restart()")
 
 	# Restores all audio players from temporary database when applicable
 	async def _ready_(self, bot, **void):

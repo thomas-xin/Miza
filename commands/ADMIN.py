@@ -1770,6 +1770,10 @@ class ServerProtector(Database):
 
 	async def scan(self, message, url, known=None, **void):
 		self.data["scans"] = self.data.get("scans", 0) + 1
+		if hasattr(url, "name") and os.path.exists(url.name):
+			url = url.name
+		elif hasattr(url, "read"):
+			url = url.read()
 		resp = known or await process_image("ectoplasm", "$", [url, b"", "-f", "webp"], cap="caption", priority=True, timeout=60)
 		if not resp:
 			return "", 0

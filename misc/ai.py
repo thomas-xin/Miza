@@ -1687,9 +1687,12 @@ def to_claude(messages, tools=None):
 def untool(message):
 	content = message.content or ""
 	if message.get("role") == "tool":
-		message.role = "user"
-		name = message.get("name") or "tool"
-		content = name + ":\n" + "```\n" + content + "\n```"
+		if isinstance(content, list):
+			message.role = "user"
+		else:
+			message.role = "user"
+			name = message.get("name") or "tool"
+			content = name + ":\n" + "```\n" + content + "\n```"
 	if message.get("tool_calls") is not None:
 		tcs = message.pop("tool_calls")
 		content += "\n"

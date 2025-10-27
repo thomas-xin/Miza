@@ -1045,6 +1045,8 @@ def temporary_file(fmt="bin", name=""):
 	return f"{TEMP_PATH}/{name or ts_us()}.{fmt}" if fmt else f"{TEMP_PATH}/{ts_us()}"
 
 def get_image_size(b):
+	if not b:
+		raise FileNotFoundError("Input data empty or not received!")
 	if isinstance(b, io.BytesIO):
 		input = b
 		input.seek(0)
@@ -1055,7 +1057,7 @@ def get_image_size(b):
 			b.seek(0)
 		except Exception:
 			print_exc()
-		input = io.BytesIO(b.read(256))
+		input = io.BytesIO(b.read(4096))
 	elif isinstance(b, str):
 		input = b
 	else:
@@ -1069,6 +1071,8 @@ def get_image_size(b):
 	except Exception as ex:
 		if not isinstance(ex, IndexError):
 			print_exc()
+		if not getsize(input):
+			raise FileNotFoundError("Input data empty or not received!")
 	if isinstance(b, io.BytesIO):
 		input = b
 		input.seek(0)
@@ -1079,7 +1083,7 @@ def get_image_size(b):
 			b.seek(0)
 		except Exception:
 			print_exc()
-		input = io.BytesIO(b.read(256))
+		input = b
 	elif isinstance(b, str):
 		input = open(input, "rb")
 	from PIL import Image
@@ -1450,7 +1454,7 @@ magic = cdict(
 )
 
 def get_mime(path):
-	if os.path.getsize(path) < 1048576:
+	if not isinstance(path, str) or os.path.getsize(path) < 1048576:
 		try:
 			mime = magic.from_file(path, mime=True)
 		except Exception:
@@ -3329,6 +3333,11 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			self._retrieving.pop(k, None)
 		return v
 	def retrieve(self, k, func, *args, _read=False, **kwargs):
+		if (fut := self._retrieving.get(k)):
+			resp = fut.result()
+			if _read and hasattr(resp, "name") and os.path.exists(resp.name):
+				return open(resp.name, "rb")
+			return resp
 		try:
 			v, t = super().get(k, read=_read, tag=True)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
@@ -3362,6 +3371,11 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			self._retrieving.pop(k, None)
 		return v
 	async def aretrieve(self, k, func, *args, _read=False, **kwargs):
+		if (fut := self._retrieving.get(k)):
+			resp = await wrap_future(fut)
+			if _read and hasattr(resp, "name") and os.path.exists(resp.name):
+				return open(resp.name, "rb")
+			return resp
 		try:
 			v, t = super().get(k, read=_read, tag=True)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):

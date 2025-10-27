@@ -954,12 +954,12 @@ class Server:
 							outtmpl=tmpl,
 							windowsfilenames=True,
 							cookiesfrombrowser=["firefox"],
-							extractor_args=dict(
-								youtube=dict(
-									player_client=["default", "web_safari"],
-									player_js_version=["actual"],
-								),
-							),
+							# extractor_args=dict(
+							# 	youtube=dict(
+							# 		player_client=["default", "web_safari"],
+							# 		player_js_version=["actual"],
+							# 	),
+							# ),
 							postprocessors=postprocessors,
 						)
 						title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True)['title']", timeout=3600)

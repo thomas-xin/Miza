@@ -554,7 +554,7 @@ class AudioPlayer(discord.AudioSource):
 			name = u.display_name
 		except (KeyError, AttributeError, discord.NotFound):
 			name = "Unknown User"
-		s = italics(ansi_md(colourise_auto("$b<🎶> Now playing {ENTRY}, added by {NAME}! $b<🎶>")))
+		s = italics(ansi_md(colourise_auto("$b<🎶> Now playing {ENTRY}, added by $b<{NAME}>! $b<🎶>")))
 		s = s.format(
 			ENTRY=colourise_brackets(entry.name, 'red', 'green', 'magenta') + colourise(),
 			NAME=name,

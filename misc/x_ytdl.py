@@ -276,12 +276,12 @@ def extract_info(url, download=False, process=True):
 			"default_search": "auto",
 			"source_address": "0.0.0.0",
 			"cookiesfrombrowser": ["firefox"],
-			"extractor_args": {
-				"youtube": {
-					"player_client": ["default", "web_safari"],
-					"player_js_version": ["actual"]
-				}
-			}
+			# "extractor_args": {
+			# 	"youtube": {
+			# 		"player_client": ["default", "web_safari"],
+			# 		"player_js_version": ["actual"]
+			# 	}
+			# }
 		}
 		ytdl = ytd.YoutubeDL(ydl_opts)
 	resp = ytdl.extract_info(url, download=download, process=process)

@@ -206,30 +206,40 @@ class AttachmentCache(AutoCache):
 					)
 					resp.raise_for_status()
 
+	async def get_direct(self, c_id, m_id, a_id=None):
+		if not m_id:
+			raise LookupError("Insufficient information to retrieve attachment.")
+		heads = self.headers if c_id not in self.channels else self.alt_headers
+		data = await Request(
+			f"https://discord.com/api/{api}/channels/{c_id}/messages/{m_id}",
+			headers=heads,
+			bypass=False,
+			aio=True,
+			json=True,
+		)
+		for i, a in enumerate(data["attachments"]):
+			if not a_id or a_id in (i, int(a["id"])):
+				return a["url"].rstrip("&")
+		raise KeyError(a_id, data["attachments"])
+
 	async def get_attachment(self, c_id, m_id, a_id, fn):
 		ac = self.attachment_count
-		heads = self.headers if c_id not in self.channels else self.alt_headers
 		if not self.channels or not fn or a_id < ac:
 			if not m_id:
 				raise LookupError("Insufficient information to retrieve attachment.")
-			data = await Request(
-				f"https://discord.com/api/{api}/channels/{c_id}/messages/{m_id}",
-				headers=heads,
-				bypass=False,
-				aio=True,
-				json=True,
-			)
-			for i, a in enumerate(data["attachments"]):
-				if a_id in (i, int(a["id"])):
-					return a["url"].rstrip("&")
-			raise KeyError(a_id, data["attachments"])
+			return await self.get_direct(c_id, m_id, a_id)
 		fut = Future()
 		url, _ = merge_url(c_id, m_id, a_id, fn)
 		task = [fut, url]
 		self.queue.append(task)
 		if self.fut is None or self.fut.done() or len(self.queue) > ac:
 			self.fut = self.exc.submit(self.update_queue)
-		return await asyncio.wait_for(wrap_future(fut), timeout=5)
+		try:
+			return await asyncio.wait_for(wrap_future(fut), timeout=5)
+		except asyncio.TimeoutError:
+			if not m_id:
+				raise
+		return await self.get_direct(c_id, m_id, a_id)
 
 	async def obtain(self, c_id=None, m_id=None, a_id=None, fn=None, url=None):
 		if url:
@@ -323,10 +333,9 @@ class AttachmentCache(AutoCache):
 		url = unyt(url)
 		fp = await self.secondary.aretrieve(url, self._download, url, _read=True)
 		if filename:
-			f2 = open(filename, "wb")
-			await asubmit(shutil.copyfileobj, fp, f2, 262144)
+			with open(filename, "wb") as f2:
+				await asubmit(shutil.copyfileobj, fp, f2, 262144)
 			fp.close()
-			f2.close()
 			return filename
 		if read:
 			return fp

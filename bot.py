@@ -2912,23 +2912,24 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					return url
 				with open(url, "rb") as f:
 					d = await asubmit(f.read)
-				mime = magic.from_buffer(d)
-				name = url.replace("\\", "/").rsplit("/", 1)
 			else:
 				_resp, mime, name, d = await self.req_data(url, timeout=timeout, screenshot=True)
-			lim = 5 * 1048576 * 3 / 4
-			p = 2 if len(d) > 1048576 else 0
-			if mime not in ("image/jpg", "image/jpeg", "image/png") or len(d) > lim or np.prod(await asubmit(get_image_size, d, priority=p)) > sizelim:
-				if mime.split("/", 1)[0] not in ("image", "video"):
-					if len(d) > 288 and mime not in ("text/plain", "text/html"):
-						d = d[:128] + b".." + d[-128:]
-					s = as_str(d)
-					return f'<file name="{name}">' + s + "</file>"
-				assert isinstance(d, (str, bytes)), d
-				d = await process_image(d, "resize_map", [[], None, None, "rel", dimlim, "-", "auto", "-bg", "-oz", "-fs", lim, "-f", "jpg"], timeout=24)
 		else:
 			d = url
 		mime = magic.from_buffer(d)
+
+		lim = 5 * 1048576 * 3 / 4
+		p = 2 if len(d) > 1048576 else 0
+		if mime not in ("image/jpg", "image/jpeg", "image/png") or len(d) > lim or np.prod(await asubmit(get_image_size, d, priority=p)) > sizelim:
+			name = url.replace("\\", "/").rsplit("/", 1)
+			if mime.split("/", 1)[0] not in ("image", "video"):
+				if len(d) > 288 and mime not in ("text/plain", "text/html"):
+					d = d[:128] + b".." + d[-128:]
+				s = as_str(d)
+				return f'<file name="{name}">' + s + "</file>"
+			assert isinstance(d, (str, bytes)), d
+			d = await process_image(d, "resize_map", [[], None, None, "rel", dimlim, "-", "auto", "-bg", "-oz", "-fs", lim, "-f", "jpg"], timeout=24)
+			mime = magic.from_buffer(d)
 		return "data:" + mime + ";base64," + base64.b64encode(d).decode("ascii")
 
 	async def vision(self, url, name=None, best=True, model=None, question=None, premium_context=[], timeout=12):
@@ -3212,11 +3213,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not data:
 			filename = f"{CACHE_PATH}/attachments/{uhash(url.split('//', 1)[-1])}"
 			if not os.path.exists(filename):
-				await attachment_cache.download(url, filename=filename)
+				await attachment_cache.download(url, filename=filename, read=True)
 			return filename
 		return await attachment_cache.download(url, read=read)
 
-	async def get_request(self, url, limit=None, full=True, data=True, size=0, timeout=12):
+	async def get_request(self, url, limit=None, full=True, data=True, read=False, size=0, timeout=12):
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
 		if not full:
@@ -3229,7 +3230,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				ids = expand_attachment(url)
 				url = await attachment_cache.obtain(*ids)
 			return await Request.asession.get(url, headers=Request.header(), _timeout_=timeout, verify=False, allow_redirects=True)
-		return await self.get_attachment(url, data=data)
+		return await self.get_attachment(url, data=data, read=read)
 
 	def get_colour(self, user) -> int:
 		if user is None:
