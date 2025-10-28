@@ -113,7 +113,7 @@ class Timeout(Command):
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, bot, users, duration, reason, **void):
+	async def __call__(self, bot, _guild, users, duration, reason, **void):
 		if duration < DynamicDT.now():
 			duration = None
 		futs = [csubmit(user.timeout(duration, reason=reason)) for user in users]
@@ -125,7 +125,11 @@ class Timeout(Command):
 			resp += f", with reason {sqr_md(reason)}"
 		else:
 			resp += "."
-		return css_md(resp)
+		return cdict(
+			content=resp,
+			prefix="```css\n",
+			suffix="```",
+		)
 
 
 class Purge(Command):
@@ -500,41 +504,11 @@ class RoleSelect(Command):
 	)
 	rate_limit = (9, 12)
 
-	hearts = {
-		"❤️": (221, 46, 68),
-		"🧡": (244, 144, 12),
-		"💛": (253, 203, 88),
-		"💚": (120, 177, 89),
-		"💙": (93, 173, 236),
-		"💜": (170, 142, 214),
-		"🖤": (49, 55, 61),
-		"🤍": (230, 231, 232),
-		"🤎": (193, 105, 79),
-		"🩶": (153, 170, 181),
-		"🩵": (136, 201, 249),
-		"🩷": (244, 171, 186),
-	}
-	hsl_hearts = {k: rgb_to_hsl([c / 255 for c in v]) for k, v in hearts.items()}
-
 	async def get_role_emoji(self, role):
 		colour = role.colour.to_rgb()
 		if "emojis" in self.bot.data:
 			return await self.bot.data.emojis.get_colour(colour)
-
-		hsl = rgb_to_hsl([c / 255 for c in colour])
-		closest = None
-		dist = inf
-
-		def wd(a, b):
-			return min(abs(a - b), 1 - abs(a - b))
-
-		for k, v in self.hsl_hearts.items():
-			d = wd(hsl[0], v[0]) ** 2 + (hsl[1] - v[1]) ** 2 / 16 + (hsl[2] - v[2]) ** 2 / 4
-			print(k, v, hsl, d)
-			if d < dist:
-				dist = d
-				closest = k
-		return closest
+		return get_closest_heart(colour)
 
 	async def __call__(self, bot, _guild, _channel, _user, _perm, roles, limit, title, description, custom, **void):
 		rolelist = []
@@ -1310,7 +1284,11 @@ class StarBoard(Command):
 		emoji = special if special else str(await bot.fetch_emoji(emoji, _guild))
 		boards = data.setdefault(_guild.id, {})
 		boards[emoji] = (count, channel.id, set([channel.id]))
-		return ini_md(f"Successfully added starboard to {sqr_md(channel)}, with trigger {sqr_md(emoji)}: {sqr_md(count)}.")
+		return cdict(
+			content=f"Successfully added starboard to {sqr_md(channel)}, with trigger {sqr_md(emoji)}: {sqr_md(count)}.",
+			prefix="```css\n",
+			suffix="```",
+		)
 
 	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
 		u_id, pos = list(map(int, vals.split("_", 1)))
@@ -2017,15 +1995,16 @@ class CreateEmoji(Command):
 		if _perm < 2:
 			raise self.perm_error(_perm, 2, "for command " + _name)
 		name = name or url2fn(url).rsplit(".", 1)[0]
-		image = await bot.get_request(url, timeout=60)
-		if len(image) > 1073741824:
-			raise OverflowError("Max file size to load is 1GB.")
-		image = await bot.optimise_image(image, fsize=262144, msize=128, fmt="gif")
+		image = await bot.optimise_image(url, fsize=262144, csize=128, fmt="gif")
 		emoji = await _guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
 		# This reaction indicates the emoji was created successfully
 		with suppress(discord.Forbidden):
 			await _message.add_reaction(emoji)
-		return css_md(f"Successfully created emoji {sqr_md(emoji)} for {sqr_md(_guild)}.")
+		return cdict(
+			content=f"Successfully created emoji {sqr_md(emoji)} for {sqr_md(_guild)}.",
+			prefix="```css\n",
+			suffix="```",
+		)
 
 
 class CreateSound(Command):
@@ -2122,7 +2101,11 @@ class CreateSound(Command):
 
 			data = await asubmit(write_to)
 		await _guild.create_soundboard_sound(name=name, emoji=emoji, sound=data)
-		return css_md(f"Successfully created soundboard {sqr_md(name)} for {sqr_md(_guild)}.")
+		return cdict(
+			content=f"Successfully created soundboard {sqr_md(name)} for {sqr_md(_guild)}.",
+			prefix="```css\n",
+			suffix="```",
+		)
 
 
 class CreateSticker(Command):
@@ -2130,82 +2113,46 @@ class CreateSticker(Command):
 	name = ["StickerCreate", "StickerCopy", "CopySticker", "Sticker"]
 	min_level = 2
 	description = "Creates a custom sticker from a URL or attached file."
-	usage = "<1:name>+ <0:url>"
-	example = ("sticker HOW https://cdn.discordapp.com/stickers/974228511357284372.png",)
-	flags = "aed"
+	schema = cdict(
+		name=cdict(
+			type="word",
+			description="The name of the sticker",
+			example="Untitled",
+		),
+		emoji=cdict(
+			type="emoji",
+			description="The emoji icon to use",
+		),
+		url=cdict(
+			type="visual",
+			description="The image to use (will automatically be resized to <256kb if larger)",
+			required=True,
+		),
+	)
 	rate_limit = (8, 12)
 	_timeout_ = 8
 	typing = True
 	slash = ("Sticker",)
 
-	async def __call__(self, bot, user, guild, channel, message, args, argv, _timeout, **void):
-		# Take input from any attachments, or otherwise the message contents
-		if message.attachments:
-			args.extend(best_url(a) for a in message.attachments)
-			argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
-		if not args:
-			raise ArgumentError("Please enter URL, emoji, or attached file to add.")
-		async with discord.context_managers.Typing(channel):
-			try:
-				if len(args) > 1 and is_url(args[0]):
-					args.append(args.pop(0))
-				url = args.pop(-1)
-				urls = await bot.follow_url(url, best=True, allow=True, limit=1)
-				if not urls:
-					urls = await bot.follow_to_image(argv)
-					if not urls:
-						urls = await bot.follow_to_image(url)
-						if not urls:
-							raise ArgumentError
-				url = urls[0]
-			except ArgumentError:
-				if not argv:
-					url = None
-					try:
-						url = await bot.get_last_image(message.channel)
-					except FileNotFoundError:
-						raise ArgumentError("Please input an image by URL or attachment.")
-				else:
-					raise ArgumentError("Please input an image by URL or attachment.")
-			name = " ".join(args).strip()
-			if not name:
-				name = "emoji_" + str(len(guild.emojis))
-			# print(name, url)
-			image = resp = await bot.get_request(url, timeout=60)
-			if len(image) > 1073741824:
-				raise OverflowError("Max file size to load is 1GB.")
-			image = await bot.optimise_image(image, fsize=512000, msize=320, fmt="apng", duration=5)
-			try:
-				data = await asubmit(
-					Request,
-					f"https://discord.com/api/{api}/guilds/{guild.id}/stickers",
-					method="POST",
-					files=dict(
-						name=(None, name),
-						tags=(None, "upside_down"),
-						file=image,
-					),
-					authorise=True,
-					json=True,
-				)
-			except Exception as ex:
-				if isinstance(ex, ConnectionError):
-					msg = f"Unable to create sticker (Error {ex.errno}). Please download and add manually."
-				else:
-					msg = "Unable to create sticker (Unknown error). Please download and add manually."
-				print_exc()
-				await bot.send_with_file(
-					channel,
-					msg,
-					file=CompatFile(image, filename=name + ".png"),
-				)
-				return
-			sticker = f"https://media.discordapp.net/stickers/{data['id']}"
-			colour = await bot.get_colour(sticker)
-			embed = discord.Embed(colour=colour)
-			embed.set_image(url=sticker)
-			content = css_md(f"Successfully created sticker {sqr_md(name)} for {sqr_md(guild)}.")
-		await send_with_reply(channel, message, content, embed=embed)
+	async def __call__(self, bot, _guild, name, emoji, url, **void):
+		if not name:
+			name = "sticker_" + str(len(guild.stickers))
+		image = await bot.optimise_image(url, fsize=512000, csize=320, fmt="apng", duration=5, opt=False)
+		if emoji and emoji.isnumeric():
+			emoji = await bot.fetch_emoji(emoji, _guild)
+			assert emoji.guild.id == _guild.id, "Emoji must be from the current server."
+		if not emoji:
+			emoji = await asubmit(colour_cache.obtain_heart, url)
+		sticker = await _guild.create_sticker(name=name, emoji=emoji, description="", file=CompatFile(image))
+		colour = await bot.get_colour(sticker.url)
+		embed = discord.Embed(colour=colour)
+		embed.set_image(url=sticker.url)
+		return cdict(
+			content=f"Successfully created sticker {sqr_md(sticker.name)} for {sqr_md(_guild)}.",
+			embed=embed,
+			prefix="```css\n",
+			suffix="```",
+		)
 
 
 class ScanEmoji(Command):
@@ -2389,7 +2336,6 @@ class UpdateUserLogs(Database):
 		ua, ub = a_url, b_url
 		emb.set_author(name=str(after), icon_url=b_url, url=b_url if is_url(b_url) else None)
 		emb.colour = colour2raw(colour)
-		print("MU:", emb, a_url, b_url, files)
 		message = await channel.send(embed=emb, files=files)
 		if "exec" in bot.data:
 			with tracebacksuppressor:
@@ -2922,7 +2868,7 @@ class UpdateMessageLogs(Database):
 		files = []
 		for a in message.attachments:
 			try:
-				fn = await self.bot.get_attachment(a.url, size=a.size)
+				fn = await attachment_cache.download(a.url, read=True)
 				fil = CompatFile(fn, filename=a.filename.removeprefix("SPOILER_"))
 				files.append(fil)
 			except:
@@ -3162,7 +3108,7 @@ class UpdateCrossposts(Database):
 			embeds.append(embed)
 		files = deque()
 		for a in message.attachments:
-			fn = await self.bot.get_attachment(a.url, size=a.size)
+			fn = await attachment_cache.download(a.url, read=True)
 			files.append(CompatFile(fn, filename=a.filename.removeprefix("SPOILER_")))
 		for c_id in tuple(self.data[message.channel.id]):
 			try:

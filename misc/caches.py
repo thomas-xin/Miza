@@ -1,5 +1,3 @@
-import aiofiles
-import aiohttp
 import asyncio
 import concurrent.futures
 import os
@@ -8,15 +6,17 @@ import re
 import shutil
 import subprocess
 import time
-from traceback import print_exc
 import zipfile
+import aiofiles
+import aiohttp
 import numpy as np
 from PIL import Image
 from misc.types import utc, as_str
 from misc.asyncs import asubmit, esubmit, wrap_future, await_fut, Future
+from misc.smath import get_closest_heart
 from misc.util import (
     CACHE_FILESIZE, CACHE_PATH, TEMP_PATH, AUTH, Request, api, AutoCache, download_file,
-    tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, uuhash,
+    tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist,
 	ungroup_attachments, is_discord_url, temporary_file, url2ext, is_discord_attachment, is_miza_url,
     snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt,
 )
@@ -104,12 +104,15 @@ class ColourCache(AutoCache):
 	def obtain(self, url):
 		if not url:
 			return (0, 0, 0)
-		k = uuhash(url)
 		try:
-			return self.retrieve(k, self._obtain, url)
+			return self.retrieve(url, self._obtain, url)
 		except Exception as ex:
 			print(repr(ex))
 			return (0, 0, 0)
+
+	def obtain_heart(self, url):
+		rgb = self.obtain(url)
+		return get_closest_heart(rgb)
 
 
 class AttachmentCache(AutoCache):
@@ -128,15 +131,17 @@ class AttachmentCache(AutoCache):
 	channels = set()
 	last = set()
 
-	def __init__(self, *args, secondary=None, **kwargs):
+	def __init__(self, *args, secondary=None, tertiary=None, **kwargs):
 		super().__init__(*args, **kwargs)
-		self.init(secondary)
+		self.init(secondary, tertiary)
 
-	def init(self, secondary=None):
+	def init(self, secondary=None, tertiary=None):
 		self.channels.clear()
 		self.channels.update(AUTH.get("proxy_channels", ()))
 		if secondary:
 			self.secondary = AutoCache(secondary, size_limit=128 * 1073741824, stale=86400 * 7, timeout=86400 * 30)
+		if tertiary:
+			self.tertiary = AutoCache(tertiary, size_limit=1073741824, stale=86400 * 7, timeout=86400 * 30)
 		return self.channels
 
 	@tracebacksuppressor
@@ -295,54 +300,91 @@ class AttachmentCache(AutoCache):
 			resp = await self._aretrieve(path, self.get_attachments, path)
 		return resp
 
-	async def _download(self, url):
+	async def _download(self, url, m_id=None):
 		fn = temporary_file(url2ext(url))
-		print(url, fn)
 		if is_discord_attachment(url):
-			target = await self.obtain(url=url)
-			fn = await asubmit(download_file, target, filename=fn)
+			target = await self.obtain(url=url, m_id=m_id)
+			fn, head = await asubmit(download_file, target, filename=fn, return_headers=True)
+			self.tertiary[url] = head
 			return open(fn, "rb")
 		if is_miza_url(url):
 			if "/u/" in url:
 				c_id, m_id, a_id, fn = expand_attachment(url)
 				target = await self.obtain(c_id, m_id, a_id, fn)
-				fn = await asubmit(download_file, target, filename=fn)
+				fn, head = await asubmit(download_file, target, filename=fn, return_headers=True)
+				self.tertiary[url] = head
 				return open(fn, "rb")
 			elif "/c/" in url:
 				path = url.split("/c/", 1)[-1].split("/", 1)[0]
 				urls = await self.obtains(path)
-				fn = await asubmit(download_file, *urls, filename=fn)
+				fn, head = await asubmit(download_file, *urls, filename=fn, return_headers=True)
+				self.tertiary[url] = head
 				return open(fn, "rb")
-			fn = await asubmit(download_file, url, filename=fn)
+			fn, head = await asubmit(download_file, url, filename=fn, return_headers=True)
+			self.tertiary[url] = head
 			return open(fn, "rb")
 		args = ["streamshatter", "--no-log-progress", "-c", TEMP_PATH, url, fn]
 		proc = await asyncio.create_subprocess_exec(*args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
+		resp = await Request.asession.get(url, headers=Request.header(), stream=True)
+		self.tertiary[url] = dict(resp.headers)
+		await resp.close()
 		await proc.wait()
 		if proc.returncode:
 			err = await proc.stderr.read()
 			line = as_str(err.strip().rsplit(b"\n", 1)[-1])
 			if line.startswith("niquests.exceptions.HTTPError:"):
-				line = line.split(":", 1)[0].strip()
-				code, msg = line.split(None, 1)
-				raise ConnectionError(code, msg)
+				try:
+					curr = line.split(":", 1)[0].strip()
+					code, msg = curr.split(None, 1)
+				except ValueError:
+					raise ConnectionError(502, line)
+				else:
+					raise ConnectionError(code, msg)
 			raise ConnectionError(501, line)
 		assert os.path.exists(fn)
 		return open(fn, "rb")
-
-	async def download(self, url, filename=None, read=False):
+	async def download(self, url, m_id=None, filename=None, read=False):
 		url = unyt(url)
-		fp = await self.secondary.aretrieve(url, self._download, url, _read=True)
+		if (match := scraper_blacklist.search(url)):
+			raise InterruptedError(match)
+		fp = await self.secondary.aretrieve(url, self._download, url, m_id=m_id, _read=True)
 		if filename:
-			with open(filename, "wb") as f2:
-				await asubmit(shutil.copyfileobj, fp, f2, 262144)
-			fp.close()
-			return filename
+			try:
+				if isinstance(filename, bool):
+					if hasattr(fp, "name") and os.path.exists(fp.name):
+						return fp.name
+					filename = temporary_file(url2ext(url))
+				with open(filename, "wb") as f2:
+					await asubmit(shutil.copyfileobj, fp, f2, 262144)
+				return filename
+			finally:
+				fp.close()
 		if read:
 			return fp
 		try:
+			if hasattr(fp, "name") and os.path.exists(fp.name):
+				async with aiofiles.open(fp.name, "rb") as f:
+					return await f.read()
 			return await asubmit(fp.read)
 		finally:
 			fp.close()
+
+	async def _scan_headers(self, url, m_id=None):
+		if is_discord_attachment(url):
+			url = await self.obtain(url=url, m_id=m_id)
+		resp = await Request.asession.get(url, headers=Request.header(), stream=True)
+		try:
+			return dict(resp.headers)
+		finally:
+			await resp.close()
+	async def scan_headers(self, url, m_id=None):
+		url = unyt(url)
+		if (match := scraper_blacklist.search(url)):
+			raise InterruptedError(match)
+		try:
+			return self.tertiary[url]
+		except KeyError:
+			return await self.tertiary.aretrieve(url, self._scan_headers, url, m_id=m_id)
 
 	async def delete(self, c_id, m_id, url=None):
 		if url:
@@ -361,6 +403,10 @@ class AttachmentCache(AutoCache):
 		form_data = aiohttp.FormData(quote_fields=False)
 		filename = filename or "b"
 		out = []
+		if hasattr(data, "read"):
+			if hasattr(data, "seek"):
+				data = data.seek(0)
+			data = await asubmit(data.read)
 		while data:
 			temp, data = data[:ac], data[ac:]
 			payload = dict(
@@ -448,19 +494,18 @@ def acquire_from_archive(url, arcnames, filenames):
 				args = [fn, "--version"]
 				subprocess.run(args)
 		except FileNotFoundError:
-			temp = temporary_file(url2ext(url))
-			await_fut(attachment_cache.download(url, temp))
-			assert os.path.exists(temp) and os.path.getsize(temp), "Download unsuccessful!"
-			if not zipfile.is_zipfile(temp):
+			fn = await_fut(attachment_cache.download(url, filename=True))
+			assert os.path.exists(fn) and os.path.getsize(fn), "Download unsuccessful!"
+			if not zipfile.is_zipfile(fn):
 				assert len(filenames) == 1
 				fn = filenames[0]
 				path = fn.replace("\\", "/").rsplit("/", 1)[0]
 				os.makedirs(path, exist_ok=True)
-				shutil.copyfile(temp, fn)
+				shutil.copyfile(fn, fn)
 				if os.name != "nt":
 					subprocess.run(("chmod", "777", fn))
 				return
-			with zipfile.ZipFile(temp) as z:
+			with zipfile.ZipFile(fn) as z:
 				for an, fn in zip(arcnames, filenames):
 					path = fn.replace("\\", "/").rsplit("/", 1)[0]
 					os.makedirs(path, exist_ok=True)
@@ -495,4 +540,10 @@ def download_binary_dependencies():
 
 
 colour_cache = ColourCache(f"{CACHE_PATH}/colour", stale=86400, timeout=86400 * 7)
-attachment_cache = AttachmentCache(f"{CACHE_PATH}/attachment", secondary=f"{CACHE_PATH}/attachments", timeout=3600 * 16, expiry=3600 * 18)
+attachment_cache = AttachmentCache(
+	f"{CACHE_PATH}/attachment",
+	secondary=f"{CACHE_PATH}/attachment_contents",
+	tertiary=f"{CACHE_PATH}/attachment_headers",
+	stale=0,
+	timeout=3600 * 18,
+)

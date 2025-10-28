@@ -1151,7 +1151,7 @@ class UpdateOutbreaks(Command):
 						await self.single_sem.acquire()
 					else:
 						async with self.single_sem:
-							b = await self.bot.get_request("https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_by_National_Pok%C3%A9dex_number")
+							b = await attachment_cache.download("https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_by_National_Pok%C3%A9dex_number")
 							count = 0
 							while not count:
 								b, last = b.rsplit(b'<td rowspan="1" style="font-family:monospace,monospace">#', 1)
@@ -3094,7 +3094,7 @@ class Rickroll(Command):
 						ext = "jpg"
 				else:
 					ext = "png"
-		fn = await bot.get_request(url, data=False)
+		fn = await attachment_cache.download(url, read=True)
 		from PIL import Image
 		with Image.open(fn) as im:
 			w, h = im.size

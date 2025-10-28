@@ -862,16 +862,14 @@ class UpdateExec(Database):
 			b = url
 		elif is_url(url):
 			fn = filetransd(filename or url2fn(url))
-			b = await bot.get_request(url)
+			b = await attachment_cache.download(url, read=True)
 		elif isinstance(url, str):
 			fn = filetransd((filename or url).replace("\\", "/").rsplit("/", 1)[-1])
-			async with aiofiles.open(url, "rb") as f:
-				b = await f.read()
+			b = open(url, "rb")
 		else:
 			fn = filetransd(filename or getattr(url, "name", None) or "c.b")
-			with url:
-				b = await asubmit(url.read)
-		if len(b) <= attachment_cache.max_size:
+			b = url
+		if getsize(b) <= attachment_cache.max_size:
 			return await attachment_cache.create(b, filename=fn, channel=channel)
 		try:
 			channel = await self.get_lfs_channel(len(b))
@@ -925,15 +923,15 @@ class UpdateExec(Database):
 				if mode == "raise":
 					raise FileNotFoundError(url)
 				elif mode == "download":
-					return await bot.get_request(url)
+					return await attachment_cache.download(url)
 				elif mode == "upload":
 					pass
 				else:
 					return
 			if optimise:
 				if not data and is_url(url):
-					data = await bot.get_request(url)
-				if data and len(data) > 1048576 and magic.from_buffer(data).split("/", 1)[0] in ("image", "video"):
+					data = await attachment_cache.download(url, filename=True)
+				if data and getsize(data) > 1048576 and magic.from_file(data).split("/", 1)[0] in ("image", "video"):
 					data = await bot.optimise_image(data, fsize=1048576, fmt="avif")
 					filename = replace_ext(filename, "avif")
 			url2 = await self.lproxy(data or url, filename=filename, channel=channel)
@@ -986,36 +984,22 @@ class SetAvatar(Command):
 	name = ["ChangeAvatar", "UpdateAvatar"]
 	min_level = nan
 	description = "Changes ⟨BOT⟩'s current avatar."
-	usage = "<avatar_url>?"
-	example = ("setavatar https://cdn.discordapp.com/embed/avatars/0.png",)
+	schema = cdict(
+		url=cdict(
+			type="visual",
+			description="The new image to use as avatar",
+			required=True,
+		),
+	)
 
-	async def __call__(self, bot, user, message, channel, args, **void):
-		# Checking if message has an attachment
-		if message.attachments:
-			url = str(message.attachments[0].url)
-		# Checking if a url is provided
-		elif args:
-			url = args[0]
-		else:
-			raise ArgumentError(f"Please input an image by URL or attachment.")
-		async with discord.context_managers.Typing(channel):
-			# Initiating an aiohttp session
-			try:
-				data = await bot.get_request(url)
-				await bot.edit(avatar=data)
-				return css_md(f"✅ Succesfully Changed {bot.user.name}'s avatar!")
-			# ClientResponseError: raised if server replied with forbidden status, or the link had too many redirects.
-			except aiohttp.ClientResponseError:
-				raise ArgumentError(f"Failed to fetch image from provided URL, Please try again.")
-			# ClientConnectorError: raised if client failed to connect to URL/Server.
-			except aiohttp.ClientConnectorError:
-				raise ArgumentError(f"Failed to connnect to provided URL, Are you sure it's valid?")
-			# ClientPayloadError: raised if failed to compress image, or detected malformed data.
-			except aiohttp.ClientPayloadError:
-				raise ArgumentError(f"Failed to compress image, Please try again.")
-			# InvalidURL: raised when given URL is actually not a URL ("brain.exe crashed" )
-			except aiohttp.InvalidURL:
-				raise ArgumentError(f"Please input an image by URL or attachment.")
+	async def __call__(self, bot, url, **void):
+		data = await bot.optimise_image(url, msize=10485760, fmt="gif")
+		await bot.edit(avatar=data)
+		return cdict(
+			content=f"✅ Succesfully Changed {bot.user.name}'s avatar!",
+			prefix="```css\n",
+			suffix="```",
+		)
 
 
 class UpdateTrusted(Database):

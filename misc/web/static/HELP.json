@@ -1536,11 +1536,24 @@
 			"description": "Creates a custom sticker from a URL or attached file.",
 			"level": "2",
 			"rate_limit": "(8, 12)",
-			"example": [
-				"sticker HOW https://cdn.discordapp.com/stickers/974228511357284372.png"
-			],
+			"example": [],
 			"timeout": "192",
-			"usage": "<1:name>+ <0:url>"
+			"schema": {
+				"name": {
+					"type": "word",
+					"description": "The name of the sticker",
+					"example": "Untitled"
+				},
+				"emoji": {
+					"type": "emoji",
+					"description": "The emoji icon to use"
+				},
+				"url": {
+					"type": "visual",
+					"description": "The image to use (will automatically be resized to <256kb if larger)",
+					"required": true
+				}
+			}
 		},
 		"ScanEmoji": {
 			"aliases": [
@@ -6415,11 +6428,15 @@
 			"description": "Changes Miza's current avatar.",
 			"level": "nan",
 			"rate_limit": "(2, 3)",
-			"example": [
-				"setavatar https://cdn.discordapp.com/embed/avatars/0.png"
-			],
+			"example": [],
 			"timeout": "24",
-			"usage": "<avatar_url>?"
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "The new image to use as avatar",
+					"required": true
+				}
+			}
 		},
 		"Maintenance": {
 			"aliases": [

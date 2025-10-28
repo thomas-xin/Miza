@@ -1174,7 +1174,7 @@ class Dump(Command):
 						break
 				if not url:
 					raise LookupError("No valid dump file provided or found.")
-			b = await self.bot.get_request(url)
+			b = await attachment_cache.download(url)
 			queue = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).load_dump({maybe_json(b).decode('ascii')},{_user.id},append={mode == 'append'})")
 			count = len(queue)
 			return cdict(
@@ -2123,7 +2123,7 @@ class Download(Command):
 		try:
 			resp.raise_for_status()
 		except Exception as ex:
-			raise RuntimeError([repr(ex), as_str(resp.content)])
+			raise RuntimeError([repr(ex), lim_str(as_str(resp.content), 1024)])
 		file = CompatFile(resp.content, resp.headers["Content-Disposition"].split("=", 1)[-1].strip('"'))
 		response = await self.bot.edit_message(
 			response,
@@ -2163,129 +2163,6 @@ class Download(Command):
 		# Add reaction numbers corresponding to search results for selection
 		for i in range(len(res)):
 			await sent.add_reaction(str(i) + as_str(b"\xef\xb8\x8f\xe2\x83\xa3"))
-
-	async def _callback_(self, message, guild, channel, reaction, bot, perm, vals, argv, user, **void):
-		if reaction is None or user.id == bot.id:
-			return
-		spl = vals.split("_")
-		u_id = int(spl[0])
-		if user.id != u_id and perm < 3:
-			return
-		# Make sure reaction is a valid number
-		if b"\xef\xb8\x8f\xe2\x83\xa3" not in reaction:
-			return
-		simulated = getattr(message, "simulated", None)
-		with bot.ExceptionSender(channel):
-			# Make sure selected index is valid
-			num = int(as_str(reaction)[0])
-			if num >= int(spl[1]):
-				return
-			# Reconstruct list of URLs from hidden encoded data
-			data = orjson.loads(b642bytes(argv, True))
-			url = data[num]
-			# Perform all these tasks asynchronously to save time
-			async with discord.context_managers.Typing(channel):
-				f = out = None
-				fmt = spl[2]
-				try:
-					if int(spl[3]):
-						auds = bot.data.audio.players[guild.id]
-					else:
-						auds = None
-				except LookupError:
-					auds = None
-				silenceremove = False
-				try:
-					if int(spl[6]):
-						silenceremove = True
-				except IndexError:
-					pass
-				start = end = None
-				if len(spl) >= 6:
-					start, end = spl[4:6]
-				if not simulated:
-					download = None
-					if tuple(map(str, (start, end))) == ("None", "None") and not silenceremove and not auds and fmt in ("mp3", "opus", "ogg", "wav", "weba"):
-						# view = bot.raw_webserver + "/ytdl?fmt=" + fmt + "&view=" + url
-						download =  f"http://127.0.0.1:{PORT}/ytdl?fmt={fmt}&download={quote_plus(url)}"
-						entries = await asubmit(ytdl.search, url)
-						if entries:
-							name = entries[0].get("name")
-						else:
-							name = None
-						name = name or url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-						# name = f"【{num}】{name}"
-						# sem = getattr(message, "sem", None)
-						# if not sem:
-						#     try:
-						#         sem = EDIT_SEM[message.channel.id]
-						#     except KeyError:
-						#         sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
-						# async with sem:
-						#     return await Request(
-						#         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-						#         data=dict(
-						#             components=restructure_buttons([[
-						#                 cdict(emoji="🔊", name=name, url=view),
-						#                 cdict(emoji="📥", name=name, url=download),
-						#             ]]),
-						#         ),
-						#         method="PATCH",
-						#         authorise=True,
-						#         aio=True,
-						#     )
-					if len(data) <= 1:
-						csubmit(bot.edit_message(
-							message,
-							content=ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
-							embed=None,
-						))
-					else:
-						message = await message.channel.send(
-							ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
-						)
-					if download:
-						f = await bot.get_request(download, timeout=3600)
-						out = name + "." + (fmt if fmt != "weba" else "webm")
-				if not f:
-					try:
-						reference = await bot.fetch_reference(message)
-					except (LookupError, discord.NotFound):
-						reference = None
-					f, out = await asubmit(
-						ytdl.download_file,
-						url,
-						fmt=fmt,
-						start=start,
-						end=end,
-						auds=auds,
-						silenceremove=silenceremove,
-						message=reference,
-					)
-				if not simulated:
-					csubmit(bot.edit_message(
-						message,
-						content=css_md(f"Uploading {sqr_md(out)}..."),
-						embed=None,
-					))
-					csubmit(bot._state.http.send_typing(channel.id))
-			reference = getattr(message, "reference", None)
-			if reference:
-				r_id = getattr(reference, "message_id", None) or getattr(reference, "id", None)
-				reference = bot.cache.messages.get(r_id)
-			resp = await bot.send_with_file(
-				channel=channel,
-				msg="",
-				file=f,
-				filename=out,
-				rename=True,
-				reference=reference,
-			)
-			if resp.attachments and type(f) is str and "~" not in f and "!" not in f and os.path.exists(f):
-				with suppress():
-					os.remove(f)
-			if not simulated:
-				csubmit(bot.silent_delete(message))
 
 
 class Hyperchoron(Command):
@@ -2379,7 +2256,7 @@ class AudioSeparator(Command):
 			reference=_message,
 			content=italics(ini_md(f"Downloading and converting {sqr_md(url)}...")),
 		))
-		fn = await bot.get_request(url, data=False)
+		fn = await attachment_cache.download(url, filename=True)
 		args = ["audio-separator", os.path.abspath(fn), "--output_format", format]
 		proc = await asyncio.create_subprocess_exec(*args, cwd=TEMP_PATH)
 		try:

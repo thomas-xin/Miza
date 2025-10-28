@@ -960,9 +960,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					with suppress(LookupError):
 						member = await self.fetch_user(u_id)
 			try:
-				return self.usernames[u_id]
+				user = self.usernames[u_id]
 			except KeyError:
 				pass
+			else:
+				return guild.get_member(user.id) or user
 			if member is None:
 				if not guild:
 					raise LookupError("No guild or unique identifier provided.")
@@ -1671,21 +1673,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if (match := scraper_blacklist.search(url)):
 					print("Interrupted:", match)
 					return [url]
-				try:
-					resp = await create_future(
-						reqs.next().head,
-						unyt(url),
-						headers=Request.header(),
-						verify=False,
-						allow_redirects=True,
-						_timeout_=5,
-					)
-				except Exception:
-					print_exc()
-					out.append(url)
-					continue
-				if resp.headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html", "application/json"):
-					url = resp.url
+				headers = await attachment_cache.scan_headers(url)
+				headers = fcdict(headers)
+				if headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html",):
+					pass
 				elif ytd and self.audio:
 					try:
 						resp = await self.audio.asubmit(f"ytdl.search({repr(url)})")
@@ -1922,15 +1913,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return await self.min_emoji(id, full=full)
 		return id
 
-	async def optimise_image(self, image, fsize=DEFAULT_FILESIZE, msize=None, fmt="auto", duration=None, anim=True, timeout=3600):
+	async def optimise_image(self, image, fsize=DEFAULT_FILESIZE, msize=None, csize=None, fmt="auto", duration=None, anim=True, opt=True, timeout=3600):
 		"Optimises the target image or video file to fit within the \"fsize\" size, or \"msize\" resolution. Optional format and duration parameters."
-		args = [[], None, None, "max", msize, None, "-o"]
+		if csize:
+			args = [[], None, None, "clamp", csize, None]
+		else:
+			args = [[], None, None, "max", msize, None]
+		if opt:
+			args.append("-o")
 		if not anim:
 			args.insert(0, "-nogif")
 		elif duration is not None:
 			args += ["-d", duration]
 		args += ["-fs", fsize, "-f", fmt]
-		# print(args)
+		if isinstance(image, str) and is_url(image):
+			image = await attachment_cache.download(image, filename=True)
 		return await process_image(image, "resize_map", args, timeout=timeout, retries=2)
 
 	# Map of search engine locations for browsing the internet. As we do not have access to the user's IP address, we estimate their timezone and use that to approximate their location.
@@ -2880,7 +2877,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				durl = url.split("base64,", 1)[-1].encode("ascii")
 				d = base64.b64decode(durl + b"==")
 			else:
-				d = await self.get_request(url)
+				d = await attachment_cache.download(url)
 			name = url.rsplit("/", 1)[-1].split("?", 1)[0]
 		else:
 			d = url
@@ -3000,12 +2997,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				question="Please transcribe all text within this <IMAGE>, as accurately as possible. Leave all text in their original language, using unicode if necessary, and do NOT attempt to describe any other elements within the picture.",
 				model="mistral-24b",
 			)
-		if not s:
-			fut = asubmit(__import__, "pytesseract")
-			resp = await process_image(url, "resize_max", ["-nogif", 4096, 0, "auto", "-bg", "-oz", "-f", "jpg"], timeout=60)
-			im = await asubmit(Image.open, io.BytesIO(resp))
-			pytesseract = await fut
-			s = await asubmit(pytesseract.image_to_string, im, config="--psm 1", timeout=8)
 		return s
 
 	async def follow_to_image(self, url, follow=True):
@@ -3134,14 +3125,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		urls = await self.renew_attachments(urls)
 		for url in urls:
 			if is_discord_attachment(url) and not discord_expired(url) or self.is_webserver_url(url) and (always_log or url2ext(url) in IMAGE_FORMS):
-				resp = await asubmit(reqs.next().get, url, headers=Request.header(), verify=False, stream=True, timeout=30, allow_redirects=True)
-				url = resp.headers.get("Location") or resp.url
-				if is_discord_attachment(url):
-					uid = url.rsplit("/", 2)[-2]
-				else:
-					uid = url.split("?", 1)[0].rsplit("/", 1)[-1]
-				attachment = cdict(id=uid, name=url2fn(url), url=url, size=int(resp.headers.get("Content-Length", 1)), read=lambda: self.get_request(url))
-				resp.close()
+				_c_id, _m_id, a_id, *_ = split_url(url, 0)
+				headers = await attachment_cache.scan_headers(url)
+				attachment = cdict(id=a_id, name=url2fn(url), url=url, size=int(fcdict(headers).get("Content-Length", 1)), read=lambda: attachment_cache.download(url))
 				csubmit(self.add_and_test(message, attachment))
 
 	def add_message(self, message, files=True, cache=True, force=False):
@@ -3194,13 +3180,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			ch = f"deleted/{message.channel.id}.txt"
 			print(s, file=ch)
 
-	async def add_attachment(self, attachment):
+	async def add_attachment(self, attachment, message=None):
 		if int(attachment.size) <= 64 * 1048576:
-			return await self.get_attachment(attachment.url, size=attachment.size, read=True)
+			return await attachment_cache.download(attachment.url, m_id=message.id, read=True)
 
 	async def add_and_test(self, message, attachment):
 		n = 0
-		fn = await self.add_attachment(attachment)
+		fn = await self.add_attachment(attachment, message=message)
 		if fn and "prot" in self.data:
 			known = self.cache.attachments.get(attachment.id, None)
 			if get_mime(fn).startswith("image/"):
@@ -3208,29 +3194,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				res = ""
 			self.cache.attachments[attachment.id] = res
-
-	async def get_attachment(self, url, data=False, read=False, size=0):
-		if not data:
-			filename = f"{CACHE_PATH}/attachments/{uhash(url.split('//', 1)[-1])}"
-			if not os.path.exists(filename):
-				await attachment_cache.download(url, filename=filename, read=True)
-			return filename
-		return await attachment_cache.download(url, read=read)
-
-	async def get_request(self, url, limit=None, full=True, data=True, read=False, size=0, timeout=12):
-		if (match := scraper_blacklist.search(url)):
-			raise InterruptedError(match)
-		if not full:
-			if is_discord_url(url):
-				try:
-					return await asubmit(reqs.next().get, url, headers=Request.header(), stream=True, _timeout_=3, allow_redirects=True)
-				except Exception:
-					print_exc()
-			if is_miza_attachment(url):
-				ids = expand_attachment(url)
-				url = await attachment_cache.obtain(*ids)
-			return await Request.asession.get(url, headers=Request.header(), _timeout_=timeout, verify=False, allow_redirects=True)
-		return await self.get_attachment(url, data=data, read=read)
 
 	def get_colour(self, user) -> int:
 		if user is None:
@@ -4294,7 +4257,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.llc = t
 		elif t - self.llc < 5:
 			pass
-		else:
+		elif Request.sessions:
 			try:
 				await Request.sessions.next().head(f"https://discord.com/api/{api}/users/@me", timeout=5)
 				if self.api_latency >= 300:
@@ -6618,9 +6581,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				with tracebacksuppressor:
 					await self.worker_heartbeat()
 					await asyncio.sleep(1)
-					with MemoryTimer("update_file_cache"):
-						await asubmit(update_file_cache)
-					await asyncio.sleep(1)
 					# with MemoryTimer("get_disk"):
 					#     await self.get_disk()
 					with MemoryTimer("get_hosted"):
@@ -6744,7 +6704,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						return url
 					futs = deque()
 					for a in message.attachments:
-						futs.append(csubmit(self.get_request(a.url)))
+						futs.append(csubmit(attachment_cache.download(url)))
 					urls = set()
 					for e in message.embeds:
 						if e.image:
@@ -6777,7 +6737,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if message.author.id != self.user.id:
 			for i, a in enumerate(message.attachments):
 				if a.filename == "message.txt":
-					b = await self.get_request(message.attachments.pop(i).url)
+					b = await attachment_cache.download(a.url, m_id=message.id)
 					if message.content:
 						message.content += " "
 					message.content += as_str(b)
@@ -7237,7 +7197,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if hasattr(message, "files"):
 						self.files = message.files
 					else:
-						futs = [csubmit(bot.get_attachment(a.url, size=a.size, read=True)) for a in message.attachments]
+						futs = [csubmit(attachment_cache.download(a.url, read=True)) for a in message.attachments]
 						files = await gather(*futs)
 						self.files = [CompatFile(b, filename=a.filename) for a, b in zip(message.attachments, files)]
 				return self
@@ -8694,15 +8654,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		@self.event
 		async def on_member_ban(guild, user):
 			await self.send_event("_ban_", user=user, guild=guild)
-
-
-@tracebacksuppressor
-def update_file_cache():
-	attachments = {t for t in bot.cache.attachments.items() if isinstance(t[-1], bytes)}
-	while len(attachments) > 512:
-		a_id = next(iter(attachments))
-		self.cache.attachments[a_id] = a_id
-		attachments.discard(a_id)
 
 
 class SimulatedMessage:

@@ -85,22 +85,6 @@ def get_best_audio(entry):
 	ac = 0
 	replace = True
 	for fmt in fmts:
-		# q = (
-		# 	fmt.get("acodec") in ("opus", "vorbis"),
-		# 	fmt.get("vcodec") in (None, "none") and fmt.get("acodec") not in (None, "none"),
-		# 	-abs(fmt["audio_channels"] - 2) if isinstance(fmt.get("audio_channels"), (int, float)) else -inf,
-		# 	fmt["abr"] if isinstance(fmt.get("abr"), (int, float)) else -inf,
-		# 	fmt["tbr"] if not isinstance(fmt.get("abr"), (int, float)) and isinstance(fmt.get("tbr"), (int, float)) else -inf,
-		# 	fmt["asr"] if isinstance(fmt.get("asr"), (int, float)) else -inf,
-		# )
-		# q = fmt.get("abr", 0)
-		# if not isinstance(q, (int, float)):
-		# 	q = 0
-		# if q <= 0:
-		# 	if fmt.get("asr"):
-		# 		q = fmt["asr"] / 1000
-		# 	elif fmt.get("audio_channels"):
-		# 		q = fmt["audio_channels"]
 		q = (fmt.get("acodec") in ("opus", "vorbis"), fmt.get("vcodec") in (None, "none") and fmt.get("acodec") not in (None, "none"), fmt.get("abr", 0) or 0, fmt.get("tbr", 0) or 0)
 		u = as_str(fmt["url"])
 		if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
@@ -1017,7 +1001,7 @@ class AudioDownloader:
 				r_org = temporary_file("org")
 				r_opus = replace_ext(r_org, "opus")
 				copy_to_file(r_org)
-				args = ["hyperchoron", "-i", r_org, "-f", "opus", r_opus]
+				args = ["hyperchoron", "-i", r_org, "-f", "opus", "-o", r_opus]
 				print(args)
 				res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 				if not os.path.exists(r_opus) or not os.path.getsize(r_opus):
@@ -1029,7 +1013,7 @@ class AudioDownloader:
 				r_mid = temporary_file("mid")
 				r_opus = replace_ext(r_mid, "opus")
 				copy_to_file(r_mid)
-				args = ["hyperchoron", "-i", r_mid, "-f", "opus", r_opus]
+				args = ["hyperchoron", "-i", r_mid, "-f", "opus", "-o", r_opus]
 				print(args)
 				res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 				if not os.path.exists(r_opus) or not os.path.getsize(r_opus):
@@ -1135,7 +1119,7 @@ class AudioDownloader:
 		# print("OUTTMPL:", fn)
 		ydl_opts = dict(
 			# Prefer selected codec, but fallback to best audio if not available
-			format=f"bestaudio[vcodec=none][acodec={codec}][audio_channels=2]/bestaudio[audio_channels=2]/bestaudio/worstvideo[acodec!=none]/best",
+			format=f"bestaudio[vcodec=none][acodec={codec}][audio_channels=2]/worst[abr>=96][audio_channels=2]/bestaudio[audio_channels=2]/bestaudio/worst[abr>=64]/worst[acodec!=none][tbr>=480]/best",
 			default_search="auto",
 			source_address="0.0.0.0",
 			final_ext=ext,

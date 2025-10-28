@@ -979,7 +979,7 @@ class Imagine(Command):
 			fut = csubmit(bot.data.prot.scan(_message, url))
 			fut2 = csubmit(bot.to_data_url(url))
 			if not aspect_ratio:
-				b = await bot.get_request(url, read=True)
+				b = await attachment_cache.download(url, read=True)
 				p = 2 if getsize(b) > 1048576 else 0
 				w, h = await asubmit(get_image_size, b, priority=p)
 				aspect_ratio = w / h
@@ -1555,11 +1555,11 @@ class Describe(Command):
 	ephemeral = True
 
 	async def __call__(self, bot, _user, _premium, url, **void):
-		fut = asubmit(reqs.next().head, url, headers=Request.header(), stream=True)
+		fut = csubmit(attachment_cache.scan_headers(url))
 		cap = await self.bot.caption(url, best=1, premium_context=_premium, timeout=90)
 		s = "\n\n".join(filter(bool, cap)).strip()
-		resp = await fut
-		name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
+		headers = await fut
+		name = fcdict(headers).get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
 		return cdict(
 			embed=discord.Embed(description=s, title=name).set_author(**get_author(_user)),
 		)

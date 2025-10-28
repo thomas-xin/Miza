@@ -9,6 +9,7 @@ import copy
 import datetime
 import fractions
 import functools
+import io
 from itertools import chain, repeat # noqa: F401
 from math import ceil, floor, inf, nan
 import json
@@ -63,7 +64,10 @@ class MemoryBytes:
 
 	def __init__(self, data):
 		if not isinstance(data, byte_like):
-			raise TypeError(f"Expected byte_like, got {type(data).__name__}")
+			if isinstance(data, io.IOBase):
+				data = data.read()
+			else:
+				raise TypeError(f"Expected byte_like, got {type(data).__name__}")
 		if isinstance(data, MemoryBytes):
 			data = data._mv
 		if isinstance(data, bytes):

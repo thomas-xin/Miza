@@ -1018,6 +1018,15 @@ def max_size(w, h, maxsize, force=False):
 		h = round(h * r)
 	return w, h
 
+def clamp_size(w, h, maxsize, force=False):
+	if not force and w <= maxsize and h <= maxsize:
+		return w, h
+	if w == h:
+		return maxsize, maxsize
+	if w > h:
+		return maxsize, round(h / w * maxsize)
+	return round(w / h * maxsize), maxsize
+
 def resize_max(image, maxsize, force=False, resample=Resampling.LANCZOS, box=None, reducing_gap=None):
 	# print("RM:", image, maxsize, force, resample, box, reducing_gap)
 	w, h = max_size(image.width, image.height, maxsize, force=force)
@@ -1519,6 +1528,12 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 	duration, fps, prog = sync_fps([prop], duration, fps)
 	if operation == "rel":
 		x, y = max_size(*image.size, maxsize=x, force=True)
+		operation = "set"
+	elif operation == "clamp":
+		if x is None:
+			x, y = image.size
+		else:
+			x, y = clamp_size(*image.size, maxsize=x)
 		operation = "set"
 	elif operation == "max":
 		if x is None:

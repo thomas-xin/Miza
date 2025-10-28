@@ -1274,7 +1274,7 @@ class Follow(Command):
 			if is_discord_message_link(url):
 				temp = await self.bot.follow_url(url, allow=True)
 			else:
-				data = await self.bot.get_request(url)
+				data = await attachment_cache.download(url)
 				temp = find_urls(as_str(data))
 			out.update(temp)
 		if not out:

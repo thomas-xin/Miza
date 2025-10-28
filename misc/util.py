@@ -1,5 +1,3 @@
-import aiofiles
-import aiohttp
 import ast
 import asyncio
 import base64
@@ -22,7 +20,6 @@ import multiprocessing.shared_memory
 import os
 os.environ["PYTHONUTF8"] = "1"
 import pickle
-import psutil
 import random
 import re
 import shlex
@@ -37,11 +34,14 @@ from traceback import format_exc, print_exc
 from urllib.parse import quote_plus, unquote_plus
 import urllib.request
 import zipfile
+import aiofiles
+import aiohttp
 from dynamic_dt import DynamicDT
 import filetype
 import nacl.secret
 import numpy as np
 import orjson
+import psutil
 try:
 	import pynvml
 except Exception:
@@ -4791,21 +4791,29 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 Request = RequestManager()
 get_request = Request.__call__
 
-def download_file(*urls, filename=None, timeout=12):
+def download_file(*urls, filename=None, timeout=12, return_headers=False):
 	if filename is None:
 		file = io.BytesIO()
 	else:
 		file = open(filename, "wb")
+	headers = {}
 	for url in urls:
 		req = urllib.request.Request(url, method="GET", headers=Request.header())
 		try:
 			resp = urllib.request.urlopen(req, timeout=timeout)
 		except urllib.error.HTTPError as ex:
 			raise ConnectionError(ex.getcode(), ex.msg)
+		else:
+			if not headers:
+				headers = dict(resp.headers)
 		shutil.copyfileobj(resp, file, 65536)
 	if filename is None:
+		if return_headers:
+			return file.getbuffer(), resp.headers
 		return file.getbuffer()
 	file.close()
+	if return_headers:
+		return filename, resp.headers
 	return filename
 
 def getsize(fp):

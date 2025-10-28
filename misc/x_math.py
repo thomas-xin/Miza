@@ -1283,17 +1283,14 @@ def evalSym(f, prec=64, r=False, variables=None):
 	if isinstance(f, (sympy.Float, float, np.number)):
 		return [rounder(f)]
 	if prec:
-		# print("TEMP:", f)
 		try:
 			f2 = f.evalf(prec + 4, chop=False)
 		except Exception:
 			f2 = f
-		# print("TEMP2:", y)
 		try:
 			y = f2.evalf(prec, chop=True)
 		except Exception:
 			y = f2
-		# print("TEMP3:", y)
 		try:
 			e = rounder(y)
 		except TypeError:

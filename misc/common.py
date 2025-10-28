@@ -1523,19 +1523,6 @@ async def restart_workers():
 
 IS_MAIN = True
 FIRST_LOAD = True
-# Spec requirements:
-# math			CPU >1							multithreading support
-# image			FFMPEG, CPU >3, RAM >6GB		multiprocessing support
-# browse		Windows, CPU >1, RAM >3GB		webdriver support
-# caption		Tesseract, CPU >5, RAM >14GB	cpu inference
-# video			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
-# ecdc			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
-# summ			GPU >200k, VRAM >4GB			GTX970, M60, GTX1050ti, P4, GTX1630
-# sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
-# whisper		GPU >200k, VRAM >6GB			RTX2070, T4, RTX3060, A16, RTX4060
-# sdxl			GPU >400k, VRAM >11GB			P40, RTX3060, A2000, RTX4070
-# scc			GPU >400k, VRAM >15GB			V100, RTX3090, A4000, RTX4080, L4
-# exl2			GPU >700k, VRAM >44GB			2xV100, 5xRTX3080, 2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
 def spec2cap(skip=False):
 	"Automatically calculates list of capabilities from device specs. Uses benchmark results if available."
 	global FIRST_LOAD
@@ -1559,12 +1546,6 @@ def spec2cap(skip=False):
 		ffmpeg = False
 	else:
 		ffmpeg = True
-	try:
-		subprocess.run("tesseract")
-	except FileNotFoundError:
-		tesseract = False
-	else:
-		tesseract = True
 	done = []
 	try:
 		import pynvml
@@ -1591,7 +1572,7 @@ def spec2cap(skip=False):
 		caps = [[], "math"]
 		if cc > 3 and ram > (rm * 8 - 2) * g and ffmpeg:
 			caps.append("image")
-		if cc > 5 and ram > (rm * 14 - 2) * g and tesseract:
+		if cc > 5 and ram > (rm * 14 - 2) * g:
 			caps.append("caption")
 		mc -= 1
 		rm += 1
@@ -2024,6 +2005,79 @@ class Command(Importable):
 			+ "-\n"
 			+ (f"Loading {self.__name__} database...```*" if load else "")
 		)
+
+	callback_restrictions = cdict(
+		users="admins",
+	)
+	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+		u_id, pos, s_id = list(map(int, vals.split("_", 2)))
+		if reaction not in (None, self.directions[-1]) and u_id != user.id:
+			return
+		if reaction not in self.directions and reaction is not None:
+			return
+		user = await bot.fetch_user(u_id)
+		rems = bot.data.reminders.get(s_id, [])
+		for r in rems:
+			if isinstance(r.t, number):
+				r.t = DynamicDT.utcfromtimestamp(r.t)
+		sendable = await bot.fetch_messageable(s_id)
+		page = 16
+		last = max(0, len(rems) - page)
+		if reaction is not None:
+			i = self.directions.index(reaction)
+			if i == 0:
+				new = 0
+			elif i == 1:
+				new = max(0, pos - page)
+			elif i == 2:
+				new = min(last, pos + page)
+			elif i == 3:
+				new = last
+			else:
+				new = pos
+			pos = new
+		content = message.content
+		if not content:
+			content = message.embeds[0].description
+		i = content.index("callback")
+		content = "*```" + "\n" * ("\n" in content[:i]) + (
+			"callback-main-reminder-"
+			+ str(u_id) + "_" + str(pos) + "_" + str(s_id)
+			+ "-\n"
+		)
+		if not rems:
+			content += f"Schedule for {str(sendable).replace('`', '')} is currently empty.```*"
+			msg = ""
+		else:
+			t = DynamicDT.utcnow()
+			def format_reminder(x):
+				delta = x.t.as_rel_discord()
+				if delta.startswith("`"):
+					delta = "`" + (x.t - t).to_short() + "`"
+				s = lim_str(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + no_md(x.msg), 96) + f"` ➡️ {delta}"
+				if x.get("e"):
+					every = x.e.to_short()
+					s += f", every `{every}`"
+				return s
+			content += f"{len(rems)} message{'s' if len(rems) != 1 else ''} currently scheduled for {str(sendable).replace('`', '')}:```*"
+			msg = iter2str(
+				rems[pos:pos + page],
+				key=format_reminder,
+				left="`【",
+				right="】`",
+				offset=pos,
+			)
+		colour = await self.bot.get_colour(user)
+		emb = discord.Embed(
+			description=content + msg,
+			colour=colour,
+		).set_author(**get_author(user))
+		more = len(rems) - pos - page
+		if more > 0:
+			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
+		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		if hasattr(message, "int_token"):
+			await bot.ignore_interaction(message)
 
 	def paginate(self, curr, *args, name="data", pos=0, page=0, direction=None, key=lambda curr, pos, page: iter2str(dict(tuple(curr)[pos:pos + page])), colour=None, author=None, **kwargs):
 		last = max(0, len(curr) - page)

@@ -926,6 +926,38 @@ def adj_colour(colour, brightness=0, intensity=1, hue=0, bits=0, scale=False):
 	return verify_colour(c)
 
 
+heart_emojis = {
+	"❤️": (221, 46, 68),
+	"🧡": (244, 144, 12),
+	"💛": (253, 203, 88),
+	"💚": (120, 177, 89),
+	"💙": (93, 173, 236),
+	"💜": (170, 142, 214),
+	"🖤": (49, 55, 61),
+	"🤍": (230, 231, 232),
+	"🤎": (193, 105, 79),
+	"🩶": (153, 170, 181),
+	"🩵": (136, 201, 249),
+	"🩷": (244, 171, 186),
+}
+hsl_hearts = {k: rgb_to_hsl([c / 255 for c in v]) for k, v in heart_emojis.items()}
+
+def get_closest_heart(rgb):
+	hsl = rgb_to_hsl([c / 255 for c in rgb])
+	closest = None
+	dist = inf
+
+	def wd(a, b):
+		return min(abs(a - b), 1 - abs(a - b))
+
+	for k, v in hsl_hearts.items():
+		d = wd(hsl[0], v[0]) ** 2 + (hsl[1] - v[1]) ** 2 / 16 + (hsl[2] - v[2]) ** 2 / 4
+		if d < dist:
+			dist = d
+			closest = k
+	return closest
+
+
 # Reduces a number's bit precision.
 def bit_crush(dest, b=0, f=round):
 	try:
