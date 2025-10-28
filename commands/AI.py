@@ -979,11 +979,14 @@ class Imagine(Command):
 			fut = csubmit(bot.data.prot.scan(_message, url))
 			fut2 = csubmit(bot.to_data_url(url))
 			if not aspect_ratio:
-				b = await attachment_cache.download(url, read=True)
+				b = await attachment_cache.download(url, filename=True)
 				p = 2 if getsize(b) > 1048576 else 0
 				w, h = await asubmit(get_image_size, b, priority=p)
 				aspect_ratio = w / h
-			res, n = await fut
+			try:
+				res, n = await fut
+			except Exception:
+				n = 1
 			was_ai = 1 if n == 1 else 0
 			image = await fut2
 

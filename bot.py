@@ -6434,7 +6434,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					self.update_embeds(utc() % 1 < 0.5)
 					await_fut(self.send_event("_call_"))
 
-	uptime_db = diskcache.Cache(f"{CACHE_PATH}/uptime", expiry=86400 * 7)
+	uptime_db = AutoCache(f"{CACHE_PATH}/uptime", stale=0, timeout=86400 * 7)
 	def update_uptime(self, data):
 		uptimes = self.uptime_db
 		ninter = self.ninter

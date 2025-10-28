@@ -1016,23 +1016,66 @@ def hex2bytes(b) -> bytes:
 		s = s[:-1] + "0" + s[-1]
 	return bytes.fromhex(s)
 
+# Experimental base1048576 encoding
+# Relies on there not being any special characters past codepoint 65536 (0x10000) that would be removed by text processing
+# Encoding format:
+#   - Each 5 bytes of input converts to 2 bytes of output
+#   - All standard output characters have indices above 65536 (0x10000), enabling full range from 0x10000 to 0x110000 to be utilised to encode 2.5 bytes
+#   - Leftover bytes are encoded with the final output range determining the length
+#   - Ranges used for last byte are 1024~1280 (0x400~0x400) for 1 byte, 65536~131062 (0x10000~0x20000) for 2 bytes, 65~81 (0x41~0x51) for 0.5 bytes, and 16384~20480 (0x4000~0x4000) for 1.5 bytes
 def lev_utf_encode(b):
 	out = []
 	b = memoryview(b)
-	while b:
+	while len(b) >= 5:
 		c, b = b[:5], b[5:]
-		n = int.from_bytes(c, "big")
-		x, y = divmod(n, 1048576)
+		n = int.from_bytes(c, "little")
+		y, x = divmod(n, 1048576)
 		out.append(chr(x + 65536))
 		out.append(chr(y + 65536))
+	c = b
+	match len(c):
+		case 4:
+			n = int.from_bytes(c, "little")
+			y, x = divmod(n, 1048576)
+			out.append(chr(x + 65536))
+			out.append(chr(y + 16384))
+		case 3:
+			n = int.from_bytes(c, "little")
+			y, x = divmod(n, 1048576)
+			out.append(chr(x + 65536))
+			out.append(chr(y + 65))
+		case 2:
+			x = int.from_bytes(c, "little")
+			out.append(chr(x + 65536))
+		case 1:
+			x = int.from_bytes(c, "little")
+			out.append(chr(x + 1024))
 	return "".join(out)
 def lev_utf_decode(s):
 	b = bytearray()
 	buf = list(map(ord, s))
+	suffix = b""
+	if len(buf) & 1:
+		n = buf.pop(-1)
+		if n >= 65536:
+			n -= 65536
+			suffix = n.to_bytes(2, "little")
+		else:
+			n -= 1024
+			suffix = n.to_bytes(1, "little")
+	elif buf[-1] < 65536:
+		y, x = buf.pop(-1), buf.pop(-1)
+		if y >= 16384:
+			n = (y - 16384) * 1048576 | x - 65536
+			suffix = n.to_bytes(4, "little")
+		else:
+			n = (y - 65) * 1048576 | x - 65536
+			suffix = n.to_bytes(3, "little")
 	for x, y in zip(buf[::2], buf[1::2]):
-		n = (x - 65536) * 1048576 + y - 65536
-		c = n.to_bytes(5, "big")
+		n = (y - 65536) * 1048576 | x - 65536
+		c = n.to_bytes(5, "little")
 		b.extend(c)
+	b.extend(suffix)
 	return b
 
 
@@ -3197,17 +3240,21 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		- Handles database timeout and operational errors by reinitializing.
 		- Supports concurrent retrievals with Future-based deduplication.
 	"""
-	__slots__ = ("_path", "_stale", "_stimeout", "_retrieving", "_kwargs")
+	__slots__ = ("_path", "_shardcount", "_stale", "_stimeout", "_retrieving", "_kwargs")
 
 	def __init__(self, directory=None, shards=6, stale=60, timeout=86400, **kwargs):
 		print("Loading Cache:", directory, stale, timeout, kwargs)
 		self._path = directory or None
+		self._shardcount = shards
 		self._stale = stale or inf
 		self._stimeout = timeout or inf
 		self._retrieving = {}
 		self._kwargs = kwargs
-		super().__init__(self._path, shards=shards, **kwargs)
+		self.base_init()
 		self.validate_or_clear()
+
+	def base_init(self):
+		super().__init__(self._path, shards=self._shardcount, **self._kwargs)
 
 	def __getattr__(self, k):
 		try:
@@ -3215,19 +3262,18 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		except AttributeError:
 			return super().__getattribute__(k)
 
-	version = "1.0.0"
+	version = "1.0.1"
 	def validate_or_clear(self):
-		if len(self):
-			if self.get("version") != self.version:
-				self.clear()
-		self.set("version", self.version)
+		if self.get("__version__") != self.version:
+			self.clear()
+		self.set("__version__", self.version)
 
 	@property
 	def expire_offset(self):
 		return 2. ** 52 if isfinite(self._stale) else self._stimeout
 
 	def __iter__(self):
-		return super().__iter__()
+		return (i for i in super().__iter__() if i != "__version__")
 
 	def __len__(self):
 		return super().__len__()
@@ -3236,7 +3282,6 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		try:
 			return super().__contains__(k)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
-			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
 			self.validate_or_clear()
 			return super().__contains__(k)
 
@@ -3246,7 +3291,6 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		try:
 			return super().__getitem__(k)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
-			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
 			self.validate_or_clear()
 			return super().__getitem__(k)
 
@@ -3361,17 +3405,30 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		return v
 
 	def keys(self):
-		return super().__iter__()
+		return iter(self)
+	iterkeys = keys
 
 	def values(self):
-		return (cachecls.__getitem__(self, k) for k in super().__iter__())
+		return (cachecls.__getitem__(self, k) for k in iter(self))
+	itervalues = values
 
 	def items(self):
-		return ((k, cachecls.__getitem__(self, k)) for k in super().__iter__())
+		return ((k, cachecls.__getitem__(self, k)) for k in iter(self))
+	iteritems = items
 
 	def clear(self):
 		self._retrieving.clear()
-		super().clear()
+		if self._path and os.path.exists(self._path):
+			self.clear()
+			self.close()
+			try:
+				shutil.rmtree(self._path)
+				os.mkdir(self._path)
+			except PermissionError:
+				self.base_init()
+				self.clear()
+			else:
+				self.base_init()
 
 
 DISCORD_EPOCH = 1420070400000 # 1 Jan 2015

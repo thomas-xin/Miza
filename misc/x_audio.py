@@ -56,7 +56,7 @@ ytdl_fut = esubmit(AudioDownloader, workers=1)
 
 class AudioPlayer(discord.AudioSource):
 
-	cache = diskcache.Cache(directory=f"{CACHE_PATH}/audio", expiry=86400 * 7)
+	cache = diskcache.Cache(directory=f"{CACHE_PATH}/audio")
 	defaults = {
 		"volume": 1,
 		"reverb": 0,
