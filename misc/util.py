@@ -3418,17 +3418,15 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 
 	def clear(self):
 		self._retrieving.clear()
-		if self._path and os.path.exists(self._path):
-			self.clear()
+		super().clear()
+		if self._path and os.path.exists(self._path) and os.path.isdir(self._path) and os.listdir(self._path):
 			self.close()
 			try:
 				shutil.rmtree(self._path)
 				os.mkdir(self._path)
 			except PermissionError:
-				self.base_init()
-				self.clear()
-			else:
-				self.base_init()
+				pass
+			self.base_init()
 
 
 DISCORD_EPOCH = 1420070400000 # 1 Jan 2015
