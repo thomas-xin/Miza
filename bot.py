@@ -128,7 +128,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.events = mdict()
 		self.react_sem = cdict()
 		self.mention = ()
-		self.user_loader = set()
 		self.users_updated = True
 		self.guilds_updated = True
 		self.update_semaphore = Semaphore(2, 1)
@@ -798,14 +797,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							s = data["username"]
 					self.usernames[s] = users[u_id] = self._state.store_user(data)
 					return
-			self.user_loader.add(u_id)
-
-	def update_users(self):
-		if self.user_loader:
-			if not self.user_semaphore.busy:
-				u_id = self.user_loader.pop()
-				if u_id not in self.cache.users:
-					csubmit(self.auser2cache(u_id))
+			csubmit(self.auser2cache(u_id))
 
 	def get_user(self, u_id, replace=False):
 		"Gets a user from ID, using the bot cache."
@@ -6433,29 +6425,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return sent
 
 	def fast_loop(self):
-		"The fast update loop that runs almost 24 times per second. Used for events where timing is important."
-		fps = 24
-		delay = 0.51
-		freq = fps * delay
-
-		def event_call():
-			f = round_random(freq)
-			for i in range(f):
-				with Delay(delay / f):
-					await_fut(self.send_event("_call_"))
-
-		sent = 0
+		"The fast update loop that runs twice per second. Used for events where timing is important."
 		while not self.closed:
-			while self.api_latency > 6:
+			while not self.api_latency < 6:
 				time.sleep(1)
 			with tracebacksuppressor:
-				sent = self.update_embeds(utc() % 1 < 0.5)
-				if sent:
-					event_call()
-				else:
-					with Delay(delay / freq):
-						await_fut(self.send_event("_call_"))
-				self.update_users()
+				with Delay(0.5):
+					self.update_embeds(utc() % 1 < 0.5)
+					await_fut(self.send_event("_call_"))
 
 	uptime_db = diskcache.Cache(f"{CACHE_PATH}/uptime", expiry=86400 * 7)
 	def update_uptime(self, data):

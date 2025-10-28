@@ -1460,10 +1460,9 @@ class UpdateUrgentReminders(Database):
 # This database is such a hassle to manage, it has to be able to persist between bot restarts, and has to be able to update with O(1) time complexity when idle
 class UpdateReminders(Database):
 	name = "reminders"
-	t = 0
+	listed = alist()
 
-	def __load__(self):
-		self.listed = alist()
+	def __load__(self, **void):
 		with tracebacksuppressor:
 			d = self.data
 			# This exists so that checking next scheduled item is O(1)
@@ -1474,20 +1473,13 @@ class UpdateReminders(Database):
 					print_exc()
 					d.pop(i, None)
 			gen = (((block[0].t if isinstance(block[0].t, number) else block[0].t.timestamp_exact()), i) for i, block in d.items() if block and isinstance(block[0], dict) and block[0].get("t") is not None)
-			self.listed = alist(sorted(gen, key=lambda x: x[0]))
-		self.t = utc()
+			self.listed.extend(sorted(gen, key=lambda x: x[0]))
 
 	async def recurrent_message(self, channel, content, embed, t=0, wait=60, reference=None):
 		message = await channel.send(content, embed=embed, reference=reference)
 		await message.add_reaction("✅")
 		self.bot.data.urgentreminders.coercedefault("listed", alist, alist()).insort([t + wait, channel.id, message.id, embed, wait, content, reference and reference.id], key=lambda x: x[:3])
 
-	async def __call__(self):
-		if utc() - self.t >= 4800:
-			esubmit(self.__load__)
-			self.t = utc()
-
-	# Fast call: runs many times per second
 	async def _call_(self):
 		t = utc()
 		while self.listed:

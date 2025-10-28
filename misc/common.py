@@ -14,7 +14,7 @@ if __name__ != "__mp_main__":
 	from misc.smath import *
 	from misc.caches import *
 
-import psutil, subprocess, weakref, zipfile, urllib, asyncio, json, pickle, functools, orjson, aiohttp, threading, shutil, filetype, inspect, sqlite3, argparse, bisect, httpx, streamshatter
+import psutil, subprocess, weakref, zipfile, urllib, asyncio, json, pickle, functools, orjson, aiohttp, threading, shutil, filetype, inspect, sqlite3, argparse, bisect, httpx
 
 # VERY HACKY removes deprecated audioop dependency for discord.py; this would cause volume transformations to fail but Miza uses FFmpeg for them anyway
 sys.modules["audioop"] = sys
@@ -2121,7 +2121,6 @@ class Database(Importable, collections.abc.MutableMapping):
 	decode = None
 	automut = True
 	no_file = False
-	use_diskcache = False
 
 	def __init__(self, bot, catg):
 		self.name
@@ -2129,35 +2128,9 @@ class Database(Importable, collections.abc.MutableMapping):
 		self.__name__ = self.__class__.__name__
 		fhp = "saves/" + name
 		if self.no_file:
-			data = self.data = {}
-		elif self.use_diskcache:
-			data = self.data = diskcache.Index(fhp)
-		elif os.path.exists(fhp):
-			data = self.data = FileHashDict(path=fhp, encode=self.encode, decode=self.decode, automut=self.automut)
+			self.data = {}
 		else:
-			self.file = fhp + ".json"
-			self.updated = False
-			try:
-				with open(self.file, "rb") as f:
-					s = f.read()
-				if not s:
-					raise FileNotFoundError
-				try:
-					data = select_and_loads(s)
-				except Exception:
-					print(self.file)
-					print_exc()
-					raise FileNotFoundError
-				data = FileHashDict(data, path=fhp, encode=self.encode, decode=self.decode, automut=self.automut)
-				data.modified.update(data.data.keys())
-				self.iter = None
-				self.data = data
-			except FileNotFoundError:
-				data = None
-			if data is None:
-				self.data = FileHashDict(path=fhp, encode=self.encode, decode=self.decode, automut=self.automut)
-		if not issubclass(type(self.data), collections.abc.MutableMapping):
-			self.data = FileHashDict(dict.fromkeys(self.data), path=fhp, encode=self.encode, decode=self.decode, automut=self.automut)
+			self.data = FileHashDict(path=fhp, encode=self.encode, decode=self.decode, automut=self.automut)
 		self.fixup()
 		bot.database[name] = bot.data[name] = self
 		self.catg = self.category = catg
@@ -2171,8 +2144,6 @@ class Database(Importable, collections.abc.MutableMapping):
 				f()
 			except Exception:
 				print_exc()
-				# self.data.clear()
-				# f()
 
 	def fixup(self):
 		pass
@@ -2214,7 +2185,7 @@ class Database(Importable, collections.abc.MutableMapping):
 	vacuum = lambda self: self.data.vacuum() if hasattr(self.data, "vacuum") else None
 
 	def sync(self, modified=None, force=False):
-		if self.no_file or self.use_diskcache:
+		if self.no_file:
 			return
 		if force:
 			try:

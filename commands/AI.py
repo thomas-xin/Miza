@@ -1490,7 +1490,7 @@ class Imagine(Command):
 				fn = fn2
 			if isinstance(fn, str):
 				if is_url(fn):
-					fn = await Request(fn, timeout=24, aio=True)
+					fn = await attachment_cache.download(fn, filename=True)
 				else:
 					assert os.path.exists(fn)
 			meta = cdict(

@@ -15,7 +15,7 @@ from misc.types import utc, as_str
 from misc.asyncs import asubmit, esubmit, wrap_future, await_fut, Future
 from misc.smath import get_closest_heart
 from misc.util import (
-    CACHE_FILESIZE, CACHE_PATH, TEMP_PATH, AUTH, Request, api, AutoCache, download_file,
+    CACHE_FILESIZE, CACHE_PATH, TEMP_PATH, AUTH, Request, api, AutoCache, download_file, header_test,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist,
 	ungroup_attachments, is_discord_url, temporary_file, url2ext, is_discord_attachment, is_miza_url,
     snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt,
@@ -105,7 +105,7 @@ class ColourCache(AutoCache):
 		if not url:
 			return (0, 0, 0)
 		try:
-			return self.retrieve(url, self._obtain, url)
+			return self.retrieve(unyt(url), self._obtain, url)
 		except Exception as ex:
 			print(repr(ex))
 			return (0, 0, 0)
@@ -192,7 +192,7 @@ class AttachmentCache(AutoCache):
 				if not tasks:
 					break
 			for task in tasks:
-				task[0].set_exception(RuntimeError("Missing attachment embed!"))
+				task[0].set_exception(ConnectionError(404, "Missing attachment embed!"))
 		self.fut = None
 
 	def set_last(self, tup):
@@ -225,7 +225,7 @@ class AttachmentCache(AutoCache):
 		for i, a in enumerate(data["attachments"]):
 			if not a_id or a_id in (i, int(a["id"])):
 				return a["url"].rstrip("&")
-		raise KeyError(a_id, data["attachments"])
+		raise ConnectionError(404, a_id)
 
 	async def get_attachment(self, c_id, m_id, a_id, fn):
 		ac = self.attachment_count
@@ -240,10 +240,12 @@ class AttachmentCache(AutoCache):
 		if self.fut is None or self.fut.done() or len(self.queue) > ac:
 			self.fut = self.exc.submit(self.update_queue)
 		try:
-			return await asyncio.wait_for(wrap_future(fut), timeout=5)
+			return await asyncio.wait_for(wrap_future(fut), timeout=6)
 		except asyncio.TimeoutError:
-			if not m_id:
-				raise
+			if task in self.queue:
+				if self.fut is None or self.fut.done() or len(self.queue) > ac:
+					self.fut = self.exc.submit(self.update_queue)
+				return await asyncio.wait_for(wrap_future(fut), timeout=6)
 		return await self.get_direct(c_id, m_id, a_id)
 
 	async def obtain(self, c_id=None, m_id=None, a_id=None, fn=None, url=None):
@@ -302,9 +304,10 @@ class AttachmentCache(AutoCache):
 
 	async def _download(self, url, m_id=None):
 		fn = temporary_file(url2ext(url))
-		if is_discord_attachment(url):
-			target = await self.obtain(url=url, m_id=m_id)
-			fn, head = await asubmit(download_file, target, filename=fn, return_headers=True)
+		if is_discord_url(url):
+			if is_discord_attachment(url):
+				url = await self.obtain(url=url, m_id=m_id)
+			fn, head = await asubmit(download_file, url, filename=fn, return_headers=True)
 			self.tertiary[url] = head
 			return open(fn, "rb")
 		if is_miza_url(url):
@@ -325,16 +328,13 @@ class AttachmentCache(AutoCache):
 			return open(fn, "rb")
 		args = ["streamshatter", "--no-log-progress", "-c", TEMP_PATH, url, fn]
 		proc = await asyncio.create_subprocess_exec(*args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
-		resp = await Request.asession.get(url, headers=Request.header(), stream=True)
-		self.tertiary[url] = dict(resp.headers)
-		await resp.close()
 		await proc.wait()
 		if proc.returncode:
 			err = await proc.stderr.read()
 			line = as_str(err.strip().rsplit(b"\n", 1)[-1])
 			if line.startswith("niquests.exceptions.HTTPError:"):
 				try:
-					curr = line.split(":", 1)[0].strip()
+					curr = line.split(":", 1)[1].strip()
 					code, msg = curr.split(None, 1)
 				except ValueError:
 					raise ConnectionError(502, line)
@@ -372,11 +372,8 @@ class AttachmentCache(AutoCache):
 	async def _scan_headers(self, url, m_id=None):
 		if is_discord_attachment(url):
 			url = await self.obtain(url=url, m_id=m_id)
-		resp = await Request.asession.get(url, headers=Request.header(), stream=True)
-		try:
-			return dict(resp.headers)
-		finally:
-			await resp.close()
+		headers = await asubmit(header_test, url)
+		return dict(headers)
 	async def scan_headers(self, url, m_id=None):
 		url = unyt(url)
 		if (match := scraper_blacklist.search(url)):

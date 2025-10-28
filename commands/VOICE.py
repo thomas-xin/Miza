@@ -2217,10 +2217,9 @@ class Hyperchoron(Command):
 				raise RuntimeError(stderr)
 			raise FileNotFoundError("No valid output detected!")
 		b = fo
-		if size < 4 * 1048576:
-			z = zipfile.ZipFile(fo, "r")
-			if len(z.filelist) == 1:
-				b = z.open(z.filelist[0])
+		z = zipfile.ZipFile(fo, "r")
+		if len(z.filelist) == 1:
+			b = z.open(z.filelist[0])
 		return cdict(
 			file=CompatFile(b, filename=replace_ext(url2fn(url), format if isinstance(b, zipfile.ZipExtFile) else default_archive)),
 		)

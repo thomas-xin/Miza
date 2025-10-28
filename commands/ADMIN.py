@@ -3046,7 +3046,7 @@ class UpdateCrossposts(Database):
 	sem = Semaphore(1, 0, rate_limit=1)
 
 	@tracebacksuppressor
-	async def _call_(self):
+	async def __call__(self):
 		if self.sem.is_busy():
 			return
 		if not self.stack:

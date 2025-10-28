@@ -932,7 +932,7 @@ class AudioDownloader:
 			return self.handle_spotify(entry, url, fn)
 		if is_youtube_url(url):
 			return
-		with self.session.get(url, headers=Request.header(), verify=False, stream=True) as resp:
+		with self.session.get(url, headers=Request.header(), stream=True) as resp:
 			head = resp.headers
 			changed = False
 			if not entry.get("icon", None):

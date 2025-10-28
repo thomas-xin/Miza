@@ -2396,70 +2396,6 @@ def get_duration(filename):
 	return dur
 
 
-class ForwardedRequest(io.IOBase):
-	"A requests-compatible buffer that caches read data to enable seeking."
-
-	__slots__ = ("fp", "resp", "size", "pos", "it")
-
-	def __init__(self, resp, buffer=65536):
-		self.resp = resp
-		self.it = resp.iter_content(buffer)
-		self.fp = io.BytesIO()
-		self.size = 0
-		self.pos = 0
-
-	def __getattribute__(self, k):
-		if k in object.__getattribute__(self, "__slots__") or k in ("seek", "read", "clear"):
-			return object.__getattribute__(self, k)
-		if k == "name":
-			return object.__getattribute__(self, "filename")
-		if self.fp is None:
-			self.fp = open(self.fn, self.mode)
-		if k[0] == "_" and (len(k) < 2 or k[1] != "_"):
-			k = k[1:]
-		return getattr(self.fp, k)
-
-	def seek(self, pos):
-		while self.size < pos:
-			try:
-				n = next(self.it)
-			except StopIteration:
-				n = b""
-			if not n:
-				self.resp.close()
-				break
-			self.fp.seek(self.size)
-			self.size += len(n)
-			self.fp.write(n)
-		self.fp.seek(pos)
-		self.pos = pos
-
-	def read(self, size):
-		b = self.fp.read(size)
-		s = len(b)
-		self.pos += s
-		while s < size:
-			try:
-				n = next(self.it)
-			except StopIteration:
-				n = b""
-			if not n:
-				self.resp.close()
-				break
-			self.fp.seek(self.size)
-			self.size += len(n)
-			self.fp.write(n)
-			self.fp.seek(self.pos)
-			b += self.fp.read(size - s)
-			s += len(b)
-			self.pos += len(b)
-		return b
-
-	def clear(self):
-		with suppress(Exception):
-			self.fp.close()
-		self.fp = None
-
 class FileStreamer(io.BufferedRandom, contextlib.AbstractContextManager):
 	"A buffer-compatible file object that treats multiple files or buffers as a single concatenated one."
 
@@ -2876,7 +2812,6 @@ class FileHashDict(collections.abc.MutableMapping):
 
 	db = None
 	def load_cursor(self):
-		# print("Loading cursor", self)
 		if self.db:
 			self.db.close()
 			self.db = None
@@ -2889,7 +2824,6 @@ class FileHashDict(collections.abc.MutableMapping):
 			raise
 		self.cur[-1].execute(f"CREATE UNIQUE INDEX IF NOT EXISTS idx_key ON '{self.internal}' (key)")
 		self.codb = set(try_int(r[0]) for r in self.cur[-1].execute(f"SELECT key FROM '{self.internal}'") if r)
-		# print("Loaded cursor", self)
 		return self.codb
 
 	def __hash__(self):
@@ -3230,10 +3164,41 @@ class FileHashDict(collections.abc.MutableMapping):
 
 cachecls = diskcache.FanoutCache
 class AutoCache(cachecls, collections.abc.MutableMapping):
-
+	"""
+	A disk-based cache with automatic staleness detection and background refresh capabilities.
+	AutoCache extends a disk cache implementation with automatic expiration, staleness checking,
+	and concurrent retrieval handling. It supports both synchronous and asynchronous operations
+	for retrieving and caching values.
+	Attributes:
+		_path (str or None): Directory path for the disk cache storage.
+		_stale (float): Time in seconds after which cached items are considered stale and
+			should be refreshed in the background. Defaults to 60 seconds.
+		_stimeout (float): Time in seconds after which cached items are expired and must be
+			refreshed before returning. Defaults to 86400 seconds (1 day).
+		_retrieving (dict): Dictionary tracking ongoing retrieval operations using Futures
+			to prevent duplicate concurrent retrievals of the same key.
+		_kwargs (dict): Additional keyword arguments passed to the parent cache class.
+		version (str): Cache version identifier used to invalidate incompatible cache formats.
+	Args:
+		directory (str, optional): Path to the cache directory. Defaults to None.
+		shards (int, optional): Number of database shards for the cache. Defaults to 6.
+		stale (float, optional): Staleness threshold in seconds. Defaults to 60.
+		timeout (float, optional): Expiration timeout in seconds. Defaults to 86400.
+		**kwargs: Additional arguments passed to the parent cache implementation.
+	Methods:
+		retrieve: Synchronously retrieve or compute a cached value with staleness/expiration handling.
+		aretrieve: Asynchronously retrieve or compute a cached value with staleness/expiration handling.
+		age: Get the age of a cached item in seconds.
+		validate_or_clear: Check cache version compatibility and clear if mismatched.
+	Notes:
+		- Items are tagged with timestamps for staleness detection.
+		- Stale items trigger background refresh while returning cached value.
+		- Expired items block until refresh completes.
+		- Handles database timeout and operational errors by reinitializing.
+		- Supports concurrent retrievals with Future-based deduplication.
+	"""
 	__slots__ = ("_path", "_stale", "_stimeout", "_retrieving", "_kwargs")
 
-	"A dictionary-compatible object where the key-value pairs expire after a specified delay. Implements stale-while-revaluate + stale-if-error protocols."
 	def __init__(self, directory=None, shards=6, stale=60, timeout=86400, **kwargs):
 		print("Loading Cache:", directory, stale, timeout, kwargs)
 		self._path = directory or None
@@ -4791,6 +4756,25 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 Request = RequestManager()
 get_request = Request.__call__
 
+def header_test(url, timeout=12):
+	req = urllib.request.Request(url, method="HEAD", headers=Request.header())
+	try:
+		resp = urllib.request.urlopen(req, timeout=timeout / 2)
+	except urllib.error.HTTPError as ex:
+		if ex.getcode() not in (400, 405):
+			raise ConnectionError(ex.getcode(), ex.msg)
+	except urllib.error.URLError:
+		pass
+	else:
+		resp.close()
+		return resp.headers
+	with requests.get(url, headers=Request.header(), stream=True, verify=False, timeout=timeout) as resp:
+		try:
+			resp.raise_for_status()
+		except requests.exceptions.HTTPError as ex:
+			raise ConnectionError(ex.response.status_code, ex.response.reason)
+		return resp.headers
+
 def download_file(*urls, filename=None, timeout=12, return_headers=False):
 	if filename is None:
 		file = io.BytesIO()
@@ -4807,6 +4791,7 @@ def download_file(*urls, filename=None, timeout=12, return_headers=False):
 			if not headers:
 				headers = dict(resp.headers)
 		shutil.copyfileobj(resp, file, 65536)
+		resp.close()
 	if filename is None:
 		if return_headers:
 			return file.getbuffer(), resp.headers
