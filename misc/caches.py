@@ -162,6 +162,7 @@ class AttachmentCache(AutoCache):
 				if last:
 					tup = choice(last)
 					cid, mid, n = tup
+					last.discard(tup)
 					heads = self.alt_headers if n else self.headers
 					try:
 						resp = Request.compat_session.patch(
@@ -172,8 +173,7 @@ class AttachmentCache(AutoCache):
 						)
 					except Exception as ex:
 						print(repr(ex))
-					else:
-						last.discard(tup)
+						last.add(tup)
 				if not resp:
 					cid = choice(self.channels)
 					n = random.randint(0, 2)
@@ -205,8 +205,8 @@ class AttachmentCache(AutoCache):
 
 	def set_last(self, tup):
 		time.sleep(1)
+		last = self.last
 		with tracebacksuppressor:
-			last = self.last
 			last.add(tup)
 			for (c, k, n) in tuple(last):
 				if utc() - snowflake_time_2(int(k)).timestamp() > 86400 * 6:
@@ -218,6 +218,7 @@ class AttachmentCache(AutoCache):
 						timeout=5,
 					)
 					resp.raise_for_status()
+		self["__last__"] = last
 
 	async def get_direct(self, c_id, m_id, a_id=None):
 		if not m_id:
