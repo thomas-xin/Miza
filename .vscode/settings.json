@@ -1,4 +1,12 @@
 {
+    "python.defaultInterpreterPath": "C:\\Program Files\\Python313\\python.exe",
     "python.analysis.typeCheckingMode": "off",
-    "python.analysis.autoImportCompletions": false
+    "python.analysis.autoImportCompletions": false,
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportMatchNotExhaustive": "none"
+    },
+    "python.languageServer": "Pylance",
+    "python.analysis.extraPaths": [],
+    "python.analysis.stubPath": "",
+    "python.analysis.diagnosticMode": "openFilesOnly"
 }

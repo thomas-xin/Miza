@@ -11,6 +11,7 @@ import aiofiles
 import aiohttp
 import numpy as np
 from PIL import Image
+import requests
 from misc.types import utc, as_str
 from misc.asyncs import asubmit, esubmit, wrap_future, await_fut, Future
 from misc.smath import get_closest_heart
@@ -160,7 +161,6 @@ class AttachmentCache(AutoCache):
 			try:
 				if last:
 					tup = choice(last)
-					last.discard(tup)
 					cid, mid, n = tup
 					heads = self.alt_headers if n else self.headers
 					try:
@@ -172,11 +172,13 @@ class AttachmentCache(AutoCache):
 						)
 					except Exception as ex:
 						print(repr(ex))
+					else:
+						last.discard(tup)
 				if not resp:
 					cid = choice(self.channels)
 					n = random.randint(0, 2)
 					heads = self.alt_headers if n else self.headers
-					resp = Request.compat_session.post(
+					resp = requests.post(
 						f"https://discord.com/api/{api}/channels/{cid}/messages",
 						data=json_dumps(dict(embeds=embeds)),
 						headers=heads,

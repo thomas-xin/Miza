@@ -2178,6 +2178,8 @@ class _TeeReader(io.RawIOBase):
 						break
 					self.tee._fill_to(len(self.tee.buffer) + i * 1024)
 				self.pos = len(self.tee.buffer) + offset
+			case _:
+				raise NotImplementedError(whence)
 
 	def read(self, n=-1):
 		if n == -1:
