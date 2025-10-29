@@ -309,30 +309,30 @@ class AttachmentCache(AutoCache):
 		return resp
 
 	async def _download(self, url, m_id=None):
-		fn = temporary_file(url2ext(url))
+		raw_fn = temporary_file(url2ext(url))
 		if is_discord_url(url):
 			if is_discord_attachment(url):
 				url = await self.obtain(url=url, m_id=m_id)
-			fn, head = await asubmit(download_file, url, filename=fn, return_headers=True)
+			fn, head = await asubmit(download_file, url, filename=raw_fn, return_headers=True)
 			self.tertiary[url] = head
 			return open(fn, "rb")
 		if is_miza_url(url):
 			if "/u/" in url:
 				c_id, m_id, a_id, fn = expand_attachment(url)
 				target = await self.obtain(c_id, m_id, a_id, fn)
-				fn, head = await asubmit(download_file, target, filename=fn, return_headers=True)
+				fn, head = await asubmit(download_file, target, filename=raw_fn, return_headers=True)
 				self.tertiary[url] = head
 				return open(fn, "rb")
 			elif "/c/" in url:
 				path = url.split("/c/", 1)[-1].split("/", 1)[0]
 				urls = await self.obtains(path)
-				fn, head = await asubmit(download_file, *urls, filename=fn, return_headers=True)
+				fn, head = await asubmit(download_file, *urls, filename=raw_fn, return_headers=True)
 				self.tertiary[url] = head
 				return open(fn, "rb")
-			fn, head = await asubmit(download_file, url, filename=fn, return_headers=True)
+			fn, head = await asubmit(download_file, url, filename=raw_fn, return_headers=True)
 			self.tertiary[url] = head
 			return open(fn, "rb")
-		args = ["streamshatter", "--no-log-progress", "-c", TEMP_PATH, url, fn]
+		args = ["streamshatter", "--no-log-progress", "-c", TEMP_PATH, url, raw_fn]
 		proc = await asyncio.create_subprocess_exec(*args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 		await proc.wait()
 		if proc.returncode:
@@ -347,6 +347,7 @@ class AttachmentCache(AutoCache):
 				else:
 					raise ConnectionError(code, msg)
 			raise ConnectionError(501, line)
+		fn = raw_fn
 		assert os.path.exists(fn)
 		return open(fn, "rb")
 	async def download(self, url, m_id=None, filename=None, read=False):

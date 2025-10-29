@@ -3620,17 +3620,23 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			await asyncio.sleep(float(delay))
 		v = 2 if keep_log else 3
 		if isinstance(message, list_like) and len(message) > 1:
-			channel = None
-			messages = message
-			for m in messages:
-				if channel is None:
-					channel = m.channel
-				elif channel.id != m.channel.id:
-					futs = [self.silent_delete(m, keep_log=keep_log, exc=exc) for m in messages]
-					return await gather(*futs)
-			for m in messages:
-				self.log_delete(m, v)
-			return await channel.delete_messages(messages)
+			try:
+				if not message.guild or message.guild.me.guild_permissions.manage_messages:
+					raise PermissionError
+				channel = None
+				messages = message
+				for m in messages:
+					if channel is None:
+						channel = m.channel
+					elif channel.id != m.channel.id:
+						raise PermissionError
+			except (PermissionError, AttributeError):
+				futs = [self.silent_delete(m, keep_log=keep_log, exc=exc) for m in messages]
+				return await gather(*futs)
+			else:
+				for m in messages:
+					self.log_delete(m, v)
+				return await channel.delete_messages(messages)
 		elif isinstance(message, list_like):
 			message = message[0]
 		if isinstance(message, int):
