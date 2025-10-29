@@ -537,7 +537,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	server = None
 	server_start_sem = Semaphore(1, 0, rate_limit=5)
-	def start_webserver(self):
+	def start_webserver(self, shutdown=False):
 		with self.server_start_sem:
 			if self.server:
 				try:
@@ -545,7 +545,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				except Exception:
 					print_exc()
 				self.server.terminate()
-			if os.path.exists("misc/x_server.py") and PORT:
+			if not shutdown and os.path.exists("misc/x_server.py") and PORT:
 				print("Starting webserver...")
 				self.server = EvalPipe.connect(
 					[python, "-m", "misc.x_server", "6562"],
@@ -555,14 +555,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				self.server = None
 
-	def start_audio_client(self):
+	def start_audio_client(self, shutdown=False):
 		if self.audio:
 			try:
 				self.audio.run("terminate()", timeout=8)
 			except Exception:
 				print_exc()
 			self.audio.terminate()
-		if os.path.exists("misc/x_audio.py"):
+		if not shutdown and os.path.exists("misc/x_audio.py"):
 			print("Starting audio client...")
 			self.audio = EvalPipe.connect(
 				[python, "-m", "misc.x_audio", "6561"],
@@ -4254,6 +4254,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				await Request.sessions.next().head(f"https://discord.com/api/{api}/users/@me", timeout=5)
 				if self.api_latency >= 300:
 					print(f"API latency {self.api_latency} exceeded 300s, restarting...")
+					await self.start_audio_client(shutdown=True)
 					return await self.commands.shutdown[0].confirm_shutdown()
 				self.api_latency = self.api_latency * 2 / 3 + (utc() - t) / 3
 			except Exception as ex:

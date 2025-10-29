@@ -2145,6 +2145,8 @@ class TeeBuffer:
 
 	def _fill_to(self, size):
 		"""Ensure buffer has at least `size` bytes (if possible)."""
+		if self.eof:
+			return
 		with self.lock:
 			while len(self.buffer) < size and not self.eof:
 				chunk = self.src.read(self.chunk_size)
@@ -2164,6 +2166,19 @@ class _TeeReader(io.RawIOBase):
 		self.tee = tee
 		self.pos = 0
 
+	def seek(self, offset=0, whence=0):
+		match whence:
+			case 0:
+				self.pos = offset
+			case 1:
+				self.pos += offset
+			case 2:
+				for i in itertools.count(1):
+					if self.tee.eof:
+						break
+					self.tee._fill_to(len(self.tee.buffer) + i * 1024)
+				self.pos = len(self.tee.buffer) + offset
+
 	def read(self, n=-1):
 		if n == -1:
 			out = bytearray()
@@ -2179,7 +2194,7 @@ class _TeeReader(io.RawIOBase):
 		with self.tee.lock:
 			while len(self.tee.buffer) < target and not self.tee.eof:
 				self.tee.data_ready.wait()
-			data = memoryview(self.tee.buffer)[self.pos:min(target, len(self.tee.buffer))]
+			data = memoryview(self.tee.buffer).toreadonly()[self.pos:min(target, len(self.tee.buffer))]
 			self.pos += len(data)
 			return data
 
@@ -2268,6 +2283,9 @@ class _CachingReader(io.RawIOBase):
 
 	def readable(self):
 		return True
+
+	def seek(self, offset=0, whence=0):
+		return self.file.seek(offset, whence)
 
 	def read(self, n=-1):
 		if n == 0:

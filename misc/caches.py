@@ -129,7 +129,6 @@ class AttachmentCache(AutoCache):
 	fut = None
 	queue = []
 	channels = set()
-	last = set()
 
 	def __init__(self, *args, secondary=None, tertiary=None, **kwargs):
 		super().__init__(*args, **kwargs)
@@ -143,6 +142,10 @@ class AttachmentCache(AutoCache):
 		if tertiary:
 			self.tertiary = AutoCache(tertiary, size_limit=1073741824, stale=86400 * 7, timeout=86400 * 30)
 		return self.channels
+
+	@property
+	def last(self):
+		return self.setdefault("__last__", set())
 
 	@tracebacksuppressor
 	def update_queue(self):
@@ -160,21 +163,24 @@ class AttachmentCache(AutoCache):
 					last.discard(tup)
 					cid, mid, n = tup
 					heads = self.alt_headers if n else self.headers
-					resp = Request.compat_session.patch(
-						f"https://discord.com/api/{api}/channels/{cid}/messages/{mid}",
-						data=json_dumps(dict(embeds=embeds)),
-						headers=heads,
-						timeout=5,
-					)
-				else:
+					try:
+						resp = Request.compat_session.patch(
+							f"https://discord.com/api/{api}/channels/{cid}/messages/{mid}",
+							data=json_dumps(dict(embeds=embeds)),
+							headers=heads,
+							timeout=3,
+						)
+					except Exception as ex:
+						print(repr(ex))
+				if not resp:
 					cid = choice(self.channels)
-					n = random.randint(0, 1)
+					n = random.randint(0, 2)
 					heads = self.alt_headers if n else self.headers
 					resp = Request.compat_session.post(
 						f"https://discord.com/api/{api}/channels/{cid}/messages",
 						data=json_dumps(dict(embeds=embeds)),
 						headers=heads,
-						timeout=5,
+						timeout=4.5,
 					)
 				resp.raise_for_status()
 				message = resp.json()
@@ -240,12 +246,12 @@ class AttachmentCache(AutoCache):
 		if self.fut is None or self.fut.done() or len(self.queue) > ac:
 			self.fut = self.exc.submit(self.update_queue)
 		try:
-			return await asyncio.wait_for(wrap_future(fut), timeout=6)
+			return await asyncio.wait_for(wrap_future(fut), timeout=8)
 		except asyncio.TimeoutError:
 			if task in self.queue:
 				if self.fut is None or self.fut.done() or len(self.queue) > ac:
 					self.fut = self.exc.submit(self.update_queue)
-				return await asyncio.wait_for(wrap_future(fut), timeout=6)
+				return await asyncio.wait_for(wrap_future(fut), timeout=8)
 		return await self.get_direct(c_id, m_id, a_id)
 
 	async def obtain(self, c_id=None, m_id=None, a_id=None, fn=None, url=None):
