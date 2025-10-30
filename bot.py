@@ -1981,6 +1981,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if include_hrefs:
 						return "\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).strip()
 					return "\n\n".join((e.get("title", "") + "\n" + e.get("body", "")).strip() for e in data).strip()
+			if url2ext(argv) in IMAGE_FORMS:
+				return await attachment_cache.download(argv)
+			headers = await attachment_cache.scan_headers(argv)
+			headers = fcdict(headers)
+			if headers.get("Content-Type").split("/", 1)[0] in ("image", "video"):
+				return await attachment_cache.download(argv)
 			return await process_image("browse", "$", [argv, not screenshot], cap="browse", timeout=timeout, retries=2)
 		urls = find_urls(argv)
 		if not urls:
@@ -2352,12 +2358,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		1: cdict(
 			reasoning="gpt-5-mini",
 			instructive="gpt-5-mini",
-			casual="gemini-2.5-flash-t",
+			casual="kimi-k2",
 			nsfw="grok-4-fast",
-			backup="kimi-k2",
+			backup="gemini-2.5-flash-t",
 			retry="claude-4.5-haiku",
 			function="grok-4-fast",
-			vision="gemini-2.5-flash-t",
+			vision="qwen3-235b",
 			target="auto",
 		),
 		2: cdict(
@@ -2863,7 +2869,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		raise ex or RuntimeError("Maximum inference attempts exceeded (model likely encountered an infinite loop).")
 
 	async def req_data(self, url, screenshot=False, timeout=20):
-		resp = None
 		if isinstance(url, str):
 			if url.startswith("data:") and "base64," in url:
 				durl = url.split("base64,", 1)[-1].encode("ascii")
@@ -2874,11 +2879,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		else:
 			d = url
 			name = None
-		mime = resp.headers.get("Content-Type", "") if resp else magic.from_buffer(d)
+		mime = magic.from_buffer(d)
 		if mime == "text/html" and screenshot:
 			d = await self.browse(url, best=True, timeout=timeout + 8, screenshot=True)
 			mime = magic.from_buffer(d)
-		return resp, mime, name, d
+		return mime, name, d
 
 	analysed = AutoCache(f"{CACHE_PATH}/caption", stale=86400, timeout=86400 * 7)
 	async def caption(self, url, best=False, screenshot=False, timeout=24, premium_context=[]):
@@ -2902,7 +2907,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				with open(url, "rb") as f:
 					d = await asubmit(f.read)
 			else:
-				_resp, mime, name, d = await self.req_data(url, timeout=timeout, screenshot=True)
+				mime, name, d = await self.req_data(url, timeout=timeout, screenshot=True)
 		else:
 			d = url
 		mime = magic.from_buffer(d)

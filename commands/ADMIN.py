@@ -255,6 +255,7 @@ class Ban(Command):
 	rate_limit = (9, 16)
 	multi = True
 	slash = True
+	maintenance = True
 
 	async def __call__(self, bot, argv, args, argl, message, channel, guild, flags, perm, user, name, **void):
 		if not args and not argl:

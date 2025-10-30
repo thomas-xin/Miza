@@ -78,6 +78,10 @@ available = {
 		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
 		None: "deepseek-v3.1",
 	},
+	"minimax-m2": {
+		"openrouter": ("minimax/minimax-m2", ("0.15", "0.45")),
+		None: "gpt-5",
+	},
 	"minimax-m1": {
 		"openrouter": ("minimax/minimax-m1", ("0.3", "1.65")),
 		None: "gpt-5",
@@ -90,7 +94,7 @@ available = {
 		"deepinfra": ("meta-llama/Meta-Llama-3.1-405B-Instruct", ("1.79", "1.79")),
 		"fireworks": ("accounts/fireworks/models/llama-v3p1-405b-instruct", ("3", "3")),
 		"together": ("meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo", ("5", "5")),
-		None: "qwen-72b",
+		None: "qwen3-235b",
 	},
 	"llama-3-90b": {
 		"deepinfra": ("meta-llama/Llama-3.2-11B-Vision-Instruct", ("0.35", "0.4")),
@@ -124,6 +128,10 @@ available = {
 	},
 	"magnum-72b": {
 		"openrouter": ("anthracite-org/magnum-v4-72b", ("1.875", "2.25")),
+	},
+	"qwen3-235b": {
+		"openrouter": ("qwen/qwen3-vl-235b-a22b-thinking", ("0.3", "1.2")),
+		None: "kimi-k2",
 	},
 	"qwen-72b": {
 		"fireworks": ("accounts/fireworks/models/qwen2p5-72b-instruct", ("0.9", "0.9")),
@@ -212,8 +220,8 @@ available = {
 		None: "gpt-4.1-mini",
 	},
 	"kimi-k2": {
-		"openrouter": ("moonshotai/kimi-k2-0905", ("0.6", "2.5")),
-		None: "gpt-5-mini",
+		"openrouter": ("moonshotai/kimi-k2-0905:exacto", ("0.6", "2.5")),
+		None: "gpt-5",
 	},
 }
 
@@ -238,6 +246,7 @@ is_chat = {
 	"euryale-70b",
 	"lzlv-70b",
 	"magnum-72b",
+	"qwen3-235b",
 	"qwen-72b",
 	"grok-4",
 	"grok-4-fast",
@@ -266,6 +275,7 @@ is_chat = {
 	"gpt-4o-mini",
 	"gpt-3.5",
 	"gpt-3.5-turbo",
+	"minimax-m2",
 	"minimax-m1",
 	"minimax-01",
 	"deepseek-r1",
@@ -403,6 +413,8 @@ is_vision = {
 	"chatgpt-4o-latest",
 	"gpt-4-mini",
 	"gpt-4o-mini",
+	"qwen3-235b",
+	"minimax-m2",
 	"minimax-m1",
 	"minimax-01",
 	"mistral-24b",
@@ -460,6 +472,7 @@ contexts = {
 	"command-r-plus": 112000,
 	"35b-beta-long": 14336,
 	"magnum-72b": 16384,
+	"qwen3-235b": 262144,
 	"qwen-72b": 32768,
 	"llama-3-8b": 131072,
 	"llama-3-11b": 131072,
@@ -493,6 +506,7 @@ contexts = {
 	"gpt-4o-mini": 128000,
 	"gpt-3.5": 16384,
 	"gpt-3.5-turbo-instruct": 4096,
+	"minimax-m2": 1000000,
 	"minimax-m1": 1000000,
 	"minimax-01": 1000000,
 	"deepseek-r1": 64000,
@@ -1173,7 +1187,7 @@ async def _instruct(data, best=False, skip=False, user=None):
 f_browse = {
 	"type": "function", "function": {
 		"name": "browse",
-		"description": "Searches internet browser, or visits given URL. Avoid using on URLs for images that are already visible. Use for knowledge or advice to validate facts and up-to-date information!",
+		"description": "Searches internet browser, or visits given URL. Avoid using on redundant file URLs from images sent by user(s). Use for knowledge or advice to validate facts and up-to-date information!",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {
@@ -1366,7 +1380,7 @@ f_default = {
 				"format": {
 					"type": "string",
 					"enum": ["instructive", "casual"],
-					"description": 'The conversation format. Enter "instructive" for academic, knowledge or advice responses, "casual" for banter, roleplay, or simpler questions.',
+					"description": 'The conversation format. Enter "instructive" for academic, knowledge or advice responses, "casual" for banter, roleplay, or very simple questions.',
 				},
 			},
 			"required": ["format"],

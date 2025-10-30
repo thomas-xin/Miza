@@ -792,7 +792,7 @@ class Info(Command):
 						emb.add_field(name="Last seen", value=str(seen), inline=1)
 					if dname:
 						emb.add_field(name="Nickname", value=dname, inline=1)
-					tag = T(T(u).get("primary_guild")).get("tag")
+					tag = getattr_chain(u, "primary_guild.tag", None)
 					if tag:
 						emb.add_field(name="Server Tag", value=tag, inline=1)
 					if role:
@@ -975,7 +975,8 @@ class Status(Command):
 					return f"{n}\n[`{x2}`]({x})"
 				return f"{n}\n`{x}`"
 			s = await bot.status(simplified=True)
-			s["Discord info"]["Current shard"] = bot.guild_shard(T(T(channel).get("guild")).get("id", 0))
+			g_id = getattr_chain(channel, "guild.id")
+			s["Discord info"]["Current shard"] = bot.guild_shard(g_id)
 			for k, v in s.items():
 				emb.add_field(
 					name=k,

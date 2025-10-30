@@ -1663,6 +1663,13 @@ EE = EnumError
 TMR = TooManyRequests
 CCE = CommandCancelledError
 
+def getattr_chain(obj, attrs, default=Dummy):
+	for attr in attrs.split("."):
+		obj = getattr(obj, attr, default)
+	if obj is Dummy:
+		raise AttributeError(attrs)
+	return obj
+
 class T(object):
 	"""
 	A wrapper class that provides various utility methods for an object.

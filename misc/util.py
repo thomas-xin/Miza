@@ -1466,7 +1466,7 @@ def mime_from_file(path, filename=None, mime=True):
 	else:
 		out = filetype.guess_extension(data)
 	filename = filename or (path if isinstance(path, str) else "")
-	if out and out.split("/", 1)[-1] == "zip" and filename.endswith(".jar"):
+	if out and out.split("/", 1)[-1] == "zip" and isinstance(filename, str) and filename.endswith(".jar"):
 		return "application/java-archive"
 	if not out:
 		if not isinstance(data, bytes):
@@ -1519,7 +1519,10 @@ def get_mime(path):
 			else:
 				return "text/plain"
 	if mime.startswith("text/plain"):
-		mime2 = MIMES.get(path.rsplit("/", 1)[-1].rsplit(".", 1)[-1], "")
+		if not isinstance(path, str):
+			path = path.name if hasattr(path, "name") else ".txt"
+		ext = path.rsplit("/", 1)[-1].rsplit(".", 1)[-1]
+		mime2 = MIMES.get(ext, "")
 		if mime2:
 			return mime2
 	elif mime.split("/", 1)[-1] == "zip" and path.endswith(".jar"):
@@ -2134,6 +2137,38 @@ class open2(io.IOBase):
 		self.fp = None
 
 
+class RNGFile(io.IOBase):
+
+	def __init__(self, count=1073741824):
+		self.pos = 0
+		self.count = count
+		assert isinstance(self.count, int)
+
+	def seek(self, offset=0, whence=0):
+		match whence:
+			case 0:
+				self.pos = offset
+			case 1:
+				self.pos += offset
+			case 2:
+				self.pos = self.count + offset
+			case _:
+				raise NotImplementedError(whence)
+		return self.pos
+
+	def read(self, count=-1):
+		if count < 0:
+			b = random.randbytes(self.count - self.pos)
+			self.pos = self.count
+			return b
+		n = min(count, self.count - self.pos)
+		self.pos += n
+		return random.randbytes(n)
+
+	def tell(self):
+		return self.pos
+
+
 class TeeBuffer:
 	def __init__(self, src, chunk_size=8192):
 		self.src = src
@@ -2180,6 +2215,7 @@ class _TeeReader(io.RawIOBase):
 				self.pos = len(self.tee.buffer) + offset
 			case _:
 				raise NotImplementedError(whence)
+		return self.pos
 
 	def read(self, n=-1):
 		if n == -1:
@@ -2287,7 +2323,14 @@ class _CachingReader(io.RawIOBase):
 		return True
 
 	def seek(self, offset=0, whence=0):
-		return self.file.seek(offset, whence)
+		match whence:
+			case 0:
+				self.pos = offset
+			case 1:
+				self.pos += offset
+			case _:
+				raise NotImplementedError(whence)
+		return self.pos
 
 	def read(self, n=-1):
 		if n == 0:
@@ -2485,6 +2528,7 @@ class FileStreamer(io.BufferedRandom, contextlib.AbstractContextManager):
 
 	def seek(self, pos=0):
 		self.pos = pos
+		return self.pos
 
 	def read(self, size=None):
 		out = []
@@ -2653,6 +2697,7 @@ class seq(io.BufferedRandom, collections.abc.Sequence, contextlib.AbstractContex
 
 	def seek(self, pos=0):
 		self.pos = pos
+		return self.pos
 
 	def read(self, size=None):
 		out = self.peek(size)

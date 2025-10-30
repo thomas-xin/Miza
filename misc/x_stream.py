@@ -3,6 +3,7 @@ import diskcache
 import json
 import logging
 import os
+import time
 from traceback import print_exc
 from typing import Optional, AsyncIterator
 import filetype
@@ -17,7 +18,7 @@ from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment,
 	is_discord_attachment, url2fn, seq, getsize,
 	Request as MizaRequest, DOMAIN_CERT, PRIVATE_KEY, update_headers,
-	CACHE_PATH,
+	CACHE_PATH, RNGFile,
 )
 from .caches import attachment_cache
 
@@ -232,6 +233,56 @@ class Server:
 					counter += 1
 
 
+def stream_fp(request, fp):
+	brange = request.headers.get("Range", "").removeprefix("bytes=") if request else ""
+	size = getsize(fp)
+	ranges = []
+	length = 0
+
+	if brange:
+		try:
+			branges = brange.split(",")
+			for s in branges:
+				start, end = s.split("-", 1)
+				if not start:
+					if not end:
+						continue
+					start = size - int(end)
+					end = size - 1
+				elif not end:
+					end = size - 1
+				start = int(start)
+				end = int(end) + 1
+				length += end - start
+				ranges.append((start, end))
+		except Exception:
+			pass
+
+	status_code = 206 if ranges else 200
+	if not ranges:
+		ranges.append((0, size))
+		length = size
+	response_headers = dict(HEADERS)
+	if ranges == [(0, size)]:
+		response_headers["Content-Length"] = str(length)
+	if brange:
+		cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size or '*'}" for start, end in ranges)
+		response_headers["Content-Range"] = cr
+
+	async def content_generator(chunksize=65536):
+		for r in ranges:
+			fp.seek(r[0])
+			for i in range(r[0], r[1], chunksize):
+				yield fp.read(min(chunksize, r[1] - i))
+
+	return StreamingResponse(
+		content_generator(),
+		status_code=status_code,
+		headers=response_headers,
+		media_type=filetype.guess_mime(fp),
+	)
+
+
 # Create FastAPI app
 app = FastAPI(title="Miza Proxy Server", version="2.0")
 server = Server()
@@ -244,6 +295,23 @@ async def add_headers_middleware(request: Request, call_next):
 	for key, value in HEADERS.items():
 		response.headers[key] = value
 	return response
+
+
+global_ip = "127.0.0.1"
+last_ip_check = 0
+@app.get("/ip")
+async def get_ip(request: Request):
+	global global_ip, last_ip_check
+	if time.time() - last_ip_check > 3600:
+		resp = await server.asession.get("https://api.ipify.org")
+		global_ip = resp.text
+		last_ip_check = time.time()
+	return dict(host=global_ip, remote=request.client.host)
+
+
+@app.get("/random")
+async def prandom(request: Request, count: int = 1048576):
+	return stream_fp(request, RNGFile(count))
 
 
 @app.post("/authorised-heartbeat")
@@ -406,53 +474,7 @@ async def proxy(request: Request, url: Optional[str] = None):
 			fp = await attachment_cache.download(url, read=True)
 		except ConnectionError as ex:
 			raise HTTPException(status_code=ex.errno, detail=str(ex))
-		brange = request.headers.get("Range", "").removeprefix("bytes=") if request else ""
-		size = getsize(fp)
-		ranges = []
-		length = 0
-
-		if brange:
-			try:
-				branges = brange.split(",")
-				for s in branges:
-					start, end = s.split("-", 1)
-					if not start:
-						if not end:
-							continue
-						start = size - int(end)
-						end = size - 1
-					elif not end:
-						end = size - 1
-					start = int(start)
-					end = int(end) + 1
-					length += end - start
-					ranges.append((start, end))
-			except Exception:
-				pass
-
-		status_code = 206 if ranges else 200
-		if not ranges:
-			ranges.append((0, size))
-			length = size
-		response_headers = dict(HEADERS)
-		if ranges == [(0, size)]:
-			response_headers["Content-Length"] = str(length)
-		if brange:
-			cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size or '*'}" for start, end in ranges)
-			response_headers["Content-Range"] = cr
-
-		async def content_generator(chunksize=65536):
-			for r in ranges:
-				fp.seek(r[0])
-				for i in range(r[0], r[1], chunksize):
-					yield fp.read(min(chunksize, r[1] - i))
-
-		return StreamingResponse(
-			content_generator(),
-			status_code=status_code,
-			headers=response_headers,
-			media_type=filetype.guess_mime(fp),
-		)
+		return stream_fp(request, fp)
 
 	headers = MizaRequest.header()
 	if request.headers.get("Range"):
@@ -621,7 +643,7 @@ async def catch_all(path: str, request: Request):
 		return await static_backend("index.html", request=request)
 	elif first in ("favicon.ico", "logo256.png", "logo512.png", "home", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "static"):
 		return await static_backend(p, request=request)
-	elif first not in ("static_backend", "proxy", "c", "u", "unproxy", "reupload", "authorised-heartbeat", "backend", "debug"):
+	elif first not in ("static_backend", "proxy", "c", "u", "unproxy", "reupload", "ip", "random", "authorised-heartbeat", "backend", "debug"):
 		return await backend(p, request=request)
 	return await globals()[first](request=request)
 

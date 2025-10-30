@@ -712,7 +712,7 @@ async def manual_edit(message, **fields):
 	return message
 
 async def add_reacts(message, reacts):
-	if not reacts:
+	if not reacts or not getattr_chain(message, "guild.me.guild_permissions.add_reactions", True):
 		return message
 	futs = []
 	if reacts and not getattr(message, "ephemeral", False):

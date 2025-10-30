@@ -1524,7 +1524,7 @@ class Browse(Command):
 		urls = await bot.follow_url(argv, ytd=False)
 		argv = urls[0] if urls else argv
 		s = await bot.browse(argv, uid=user.id, screenshot=ss, best=True, include_hrefs=True)
-		ref = getattr(getattr(message, "reference", None), "cached_message", None)
+		ref = getattr_chain(message, "reference.cached_message", None)
 		if isinstance(s, bytes):
 			csubmit(bot.silent_delete(message))
 			return await bot.respond_with(cdict(file=CompatFile(s)), message=ref)

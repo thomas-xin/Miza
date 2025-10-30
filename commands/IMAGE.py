@@ -1056,7 +1056,7 @@ class Tesseract(Command):
 	async def __call__(self, _timeout, url, size, duration, speed, fps, filesize, format, **void):
 		data = await process_image(url, "resize_max", ["-nogif", size, 0, "auto", "-f", "png"], timeout=60)
 		resp = await asubmit(self.tesseract, data, size, timeout=_timeout)
-		resp = await process_image(resp, "resize_map", [[], duration, fps, "mult", 1, 1, "nearest", None, "-fs", filesize, "-f", format], cap="image", timeout=_timeout)
+		resp = await process_image(resp, "resize_map", [[], float(duration) if duration is not None else None, fps, "mult", 1, 1, "nearest", None, "-fs", filesize, "-f", format], cap="image", timeout=_timeout)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -1173,7 +1173,7 @@ class Resize(Command):
 			func = "mult"
 		resp = urls[0]
 		if len(urls) > 1 or func != "mult" or not x == y == 1 or area or duration is not None or fps is not None:
-			resp = await process_image(resp, "resize_map", [urls[1:], duration, fps, func, x, y, mode, area, "-fs", filesize, "-f", format], cap="image", timeout=_timeout)
+			resp = await process_image(resp, "resize_map", [urls[1:], float(duration) if duration is not None else None, fps, func, x, y, mode, area, "-fs", filesize, "-f", format], cap="image", timeout=_timeout)
 		else:
 			resp = await bot.optimise_image(resp, fsize=filesize, fmt=format)
 		fn = url2fn(urls[0])
