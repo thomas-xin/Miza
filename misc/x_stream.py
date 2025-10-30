@@ -269,7 +269,7 @@ def stream_fp(request, fp):
 		cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size or '*'}" for start, end in ranges)
 		response_headers["Content-Range"] = cr
 
-	async def content_generator(chunksize=65536):
+	async def content_generator(chunksize=262144 if length > 64 * 1048576 else 65536):
 		for r in ranges:
 			fp.seek(r[0])
 			for i in range(r[0], r[1], chunksize):
