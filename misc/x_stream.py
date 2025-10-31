@@ -292,8 +292,7 @@ server = Server()
 async def add_headers_middleware(request: Request, call_next):
 	"""Add standard headers to all responses."""
 	response = await call_next(request)
-	response.headers.pop("Server", None)
-	response.headers.pop("server", None)
+	del response.headers["Server"]
 	for key, value in HEADERS.items():
 		response.headers[key] = value
 	return response
