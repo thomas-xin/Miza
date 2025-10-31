@@ -292,6 +292,8 @@ server = Server()
 async def add_headers_middleware(request: Request, call_next):
 	"""Add standard headers to all responses."""
 	response = await call_next(request)
+	response.headers.pop("Server", None)
+	response.headers.pop("server", None)
 	for key, value in HEADERS.items():
 		response.headers[key] = value
 	return response
@@ -300,13 +302,13 @@ async def add_headers_middleware(request: Request, call_next):
 global_ip = "127.0.0.1"
 last_ip_check = 0
 @app.get("/ip")
-async def get_ip(request: Request):
+async def ip(request: Request):
 	global global_ip, last_ip_check
 	if time.time() - last_ip_check > 3600:
 		resp = await server.asession.get("https://api.ipify.org")
 		global_ip = resp.text
 		last_ip_check = time.time()
-	return dict(host=global_ip, remote=request.client.host)
+	return dict(host=global_ip, remote=true_ip(request))
 
 
 @app.get("/random")
