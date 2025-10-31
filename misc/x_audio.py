@@ -330,7 +330,7 @@ class AudioPlayer(discord.AudioSource):
 		r = f": $y<{reason}>" if reason else ""
 		if dump:
 			r += " (use ~load to restore)"
-		s = ansi_md(colourise_auto(f"$b<🎵> Successfully disconnected from $m<{self.channel.guild}>{r}. $b<🎵>"))
+		s = ansi_md(colourise_auto(f"$b<🎵> Automatically disconnected from $m<{self.channel.guild}>{r}. $b<🎵>"))
 		return await self.announce(s, dump=dump)
 
 	@classmethod

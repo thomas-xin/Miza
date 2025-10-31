@@ -9,6 +9,7 @@ import zipfile
 import niquests
 from PIL import Image
 import psutil
+import streamshatter
 from .util import is_url, is_discord_attachment, get_duration_2, temporary_file, TEMP_PATH, CODEC_FFMPEG
 # Allow fallback (although not recommended as generally the up-to-date version is necessary for most sites)
 try:
@@ -219,9 +220,10 @@ else:
 				raise ValueError
 			print(url)
 			t = time.time()
-			args = ["streamshatter", url, "-c", TEMP_PATH, "-H", json.dumps(info_dict.get("http_headers", {})), "-l", "48", "-t", "30", filename]
-			proc = psutil.Popen(args, stdin=subprocess.DEVNULL)
-			proc.wait(timeout=32)
+			streamshatter.ChunkManager(url, headers=info_dict.get("http_headers", {}), concurrent_limit=48, timeout=30, filename=filename).run()
+			# args = ["streamshatter", url, "-c", TEMP_PATH, "-H", json.dumps(info_dict.get("http_headers", {})), "-l", "48", "-t", "30", filename]
+			# proc = psutil.Popen(args, stdin=subprocess.DEVNULL)
+			# proc.wait(timeout=32)
 			elapsed = time.time() - t
 			assert os.path.exists(filename) and os.path.getsize(filename)
 		except ValueError:

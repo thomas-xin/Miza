@@ -24,22 +24,18 @@ os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 import io
 import time
 import concurrent.futures
-import asyncio
 import itertools
 import subprocess
 import psutil
 import collections
 import traceback
 import re
-import requests
 import ast
 import base64
-import hashlib
 import random
 import urllib.parse
 import urllib.request
 import numpy as np
-from contextlib import suppress
 from math import inf, floor, ceil, log2, log10
 from traceback import print_exc
 sys.path.append("misc")
@@ -74,50 +70,6 @@ def lim_str(s, maxlen=10, mode="centre"):
 			s = s[:maxlen - 3] + "..."
 	return s
 
-CACHE = {}
-
-def wrap_future(fut, loop=None):
-	if loop is None:
-		loop = asyncio.main_new_loop
-	wrapper = loop.create_future()
-
-	def set_suppress(res, is_exception=False):
-		try:
-			if is_exception:
-				wrapper.set_exception(res)
-			else:
-				wrapper.set_result(res)
-		except (RuntimeError, asyncio.InvalidStateError):
-			pass
-
-	def on_done(*void):
-		try:
-			res = fut.result()
-		except Exception as ex:
-			loop.call_soon_threadsafe(set_suppress, ex, True)
-		else:
-			loop.call_soon_threadsafe(set_suppress, res)
-
-	fut.add_done_callback(on_done)
-	return wrapper
-
-async def _await_fut(fut, ret):
-	out = await fut
-	ret.set_result(out)
-	return ret
-
-def await_fut(fut, timeout=None):
-	return convert_fut(fut).result(timeout=timeout)
-
-def convert_fut(fut):
-	loop = asyncio.main_new_loop
-	try:
-		ret = asyncio.run_coroutine_threadsafe(fut, loop=loop)
-	except Exception:
-		ret = concurrent.futures.Future()
-		loop.create_task(_await_fut(fut, ret))
-	return ret
-
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 if len(sys.argv) > 2 and sys.argv[2]:
 	os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[2]
@@ -146,6 +98,7 @@ if len(sys.argv) > 7:
 	IT = int(sys.argv[7])
 else:
 	IT = 0
+
 
 if CAPS.intersection(("browse", "image", "caption", "video", "sd", "sdxl", "scc")):
 	from math import *

@@ -9,6 +9,8 @@ import time
 import zipfile
 import aiofiles
 import aiohttp
+import niquests
+import streamshatter
 import numpy as np
 from PIL import Image
 import requests
@@ -16,7 +18,7 @@ from misc.types import utc, as_str
 from misc.asyncs import asubmit, esubmit, wrap_future, await_fut, Future
 from misc.smath import get_closest_heart
 from misc.util import (
-    CACHE_FILESIZE, CACHE_PATH, TEMP_PATH, AUTH, Request, api, AutoCache, download_file, header_test,
+    CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, download_file, header_test,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist,
 	ungroup_attachments, is_discord_url, temporary_file, url2ext, is_discord_attachment, is_miza_url,
     snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt,
@@ -312,14 +314,12 @@ class AttachmentCache(AutoCache):
 		return resp
 
 	async def _download(self, url, m_id=None):
+		target = url
 		raw_fn = temporary_file(url2ext(url))
 		if is_discord_url(url):
 			if is_discord_attachment(url):
-				url = await self.obtain(url=url, m_id=m_id)
-			fn, head = await asubmit(download_file, url, filename=raw_fn, return_headers=True)
-			self.tertiary[url] = head
-			return open(fn, "rb")
-		if is_miza_url(url):
+				target = await self.obtain(url=url, m_id=m_id)
+		elif is_miza_url(url):
 			if "/u/" in url:
 				c_id, m_id, a_id, fn = expand_attachment(url)
 				target = await self.obtain(c_id, m_id, a_id, fn)
@@ -332,50 +332,40 @@ class AttachmentCache(AutoCache):
 				fn, head = await asubmit(download_file, *urls, filename=raw_fn, return_headers=True)
 				self.tertiary[url] = head
 				return open(fn, "rb")
-			fn, head = await asubmit(download_file, url, filename=raw_fn, return_headers=True)
-			self.tertiary[url] = head
-			return open(fn, "rb")
-		args = ["streamshatter", "--no-log-progress", "-c", TEMP_PATH, url, raw_fn]
-		proc = await asyncio.create_subprocess_exec(*args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
-		await proc.wait()
-		if proc.returncode:
-			err = await proc.stderr.read()
-			line = as_str(err.strip().rsplit(b"\n", 1)[-1])
-			if line.startswith("niquests.exceptions.HTTPError:"):
-				try:
-					curr = line.split(":", 1)[1].strip()
-					code, msg = curr.split(None, 1)
-				except ValueError:
-					raise ConnectionError(502, line)
-				else:
-					raise ConnectionError(code, msg)
-			raise ConnectionError(501, line)
-		fn = raw_fn
-		assert os.path.exists(fn)
-		return open(fn, "rb")
-	async def download(self, url, m_id=None, filename=None, read=False):
+		try:
+			f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, return_headers=True)
+		except niquests.exceptions.HTTPError as ex:
+			code, msg = ex.response.status_code, ex.response.reason
+			raise ConnectionError(code, msg)
+		self.tertiary[url] = head
+		return f
+	async def download(self, url, m_id=None, filename=None, read=False, return_headers=False):
 		url = unyt(url)
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
 		fp = await self.secondary.aretrieve(url, self._download, url, m_id=m_id, _read=True)
+		if return_headers:
+			headers = await self.scan_headers(url, m_id=m_id)
 		if filename:
 			try:
 				if isinstance(filename, bool):
 					if hasattr(fp, "name") and os.path.exists(fp.name):
-						return fp.name
+						return (fp.name, headers) if return_headers else fp.name
 					filename = temporary_file(url2ext(url))
 				with open(filename, "wb") as f2:
 					await asubmit(shutil.copyfileobj, fp, f2, 262144)
-				return filename
+				return (filename, headers) if return_headers else filename
 			finally:
 				fp.close()
 		if read:
-			return fp
+			return (fp, headers) if return_headers else fp
 		try:
 			if hasattr(fp, "name") and os.path.exists(fp.name):
 				async with aiofiles.open(fp.name, "rb") as f:
-					return await f.read()
-			return await asubmit(fp.read)
+					data = await f.read()
+				return (data, headers) if return_headers else data
+			data = await asubmit(fp.read)
+			return (data, headers) if return_headers else data
 		finally:
 			fp.close()
 

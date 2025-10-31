@@ -4746,8 +4746,8 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		head = {
 			"User-Agent": USER_AGENT,
 			"DNT": "1",
-			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in loop(4)),
-			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in loop(4)),
+			"X-Forwarded-For": "34." + ".".join(str(random.randint(1, 254)) for _ in range(3)),
+			"X-Real-Ip": "34." + ".".join(str(random.randint(1, 254)) for _ in range(3)),
 		}
 		if base:
 			head.update(base)

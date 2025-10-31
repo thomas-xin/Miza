@@ -1,3 +1,4 @@
+import asyncio
 import collections
 import concurrent.futures
 import contextlib
@@ -35,6 +36,7 @@ Transpose = getattr(Image, "Transpose", Image)
 Transform = getattr(Image, "Transform", Image)
 Image.MAX_IMAGE_PIXELS = 4294967296
 GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_DIFFERENT_PALETTE_ONLY
+from misc.asyncs import esubmit  # noqa: E402
 from misc.util import get_image_size, temporary_file  # noqa: E402, F401
 
 DC = 0
@@ -76,6 +78,23 @@ deque = collections.deque
 suppress = contextlib.suppress
 
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=24)
+
+
+def get_request(url, return_headers=False):
+	headers = {}
+	if isinstance(url, (bytes, memoryview)):
+		data = url
+	elif isinstance(url, io.IOBase):
+		with url:
+			url.seek(0)
+			data = url.read()
+	elif not is_url(url):
+		with open(url, "rb") as f:
+			data = f.read()
+	else:
+		from misc.caches import attachment_cache
+		return asyncio.run(attachment_cache.download(url, return_headers=return_headers))
+	return (data, headers) if return_headers else data
 
 
 def ImageOpIterator(image, step=1, operation=None, ts=0, args=()):
@@ -542,7 +561,6 @@ discord_emoji = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/
 def is_discord_emoji(url):
 	return discord_emoji.search(url)
 
-CACHE = {}
 def get_image(url, out=None, nodel=False, nogif=False, maxframes=inf, msize=None, cache=False):
 	if isinstance(url, Image.Image):
 		return url
@@ -550,25 +568,10 @@ def get_image(url, out=None, nodel=False, nogif=False, maxframes=inf, msize=None
 	if type(url) not in (bytes, bytearray, io.BytesIO):
 		save = None
 		if is_url(url):
-			if cache and url in CACHE:
-				return CACHE[url]
-			data = None
-			if is_discord_emoji(url):
-				save = f"cache/emoji_{url.rsplit('/', 1)[-1].split('.', 1)[0]}"
-				if os.path.exists(save):
-					with open(save, "rb") as f:
-						data = f.read()
-					print(f"Emoji {save} successfully loaded from cache.")
-			if data is None:
-				data = get_request(url)
-				if is_discord_emoji(url) and not os.path.exists(save):
-					with open(save, "wb") as f:
-						f.write(data)
+			data = get_request(url)
 			if len(data) > 8589934592:
 				raise OverflowError("Max file size to load is 8GB.")
 			image = from_bytes(data, save, nogif=nogif, maxframes=maxframes, orig=url, msize=msize)
-			if cache:
-				CACHE[url] = image
 		else:
 			if os.path.getsize(url) > 8589934592:
 				raise OverflowError("Max file size to load is 8GB.")
@@ -600,7 +603,7 @@ def load_mimes():
 				mimesplitter[len(data)] = {}
 				mimesplitter[len(data)][data] = (ext, mime)
 
-exc.submit(load_mimes)
+esubmit(load_mimes)
 
 def simple_mimes(b, mime=True):
 	mimesplitter = globals()["mimesplitter"]
@@ -666,41 +669,6 @@ def is_discord_url(url):
 	return discord_match.findall(url)
 
 fcache = "cache" if os.path.exists("cache") else "../cache"
-
-def header():
-	return {
-		"DNT": "1",
-		"user-agent": f"Mozilla/5.{(time.time_ns() // 1000) % 10}",
-	}
-
-def get_request(url, return_headers=False):
-	if isinstance(url, (bytes, memoryview)):
-		return url
-	if isinstance(url, io.BytesIO):
-		url.seek(0)
-		return url.read()
-	if is_discord_url(url) and "attachments/" in url[:64]:
-		try:
-			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-		except ValueError:
-			pass
-		else:
-			for fn in os.listdir(f"{fcache}/attachments"):
-				if fn.split("_", 1)[-1].split(".", 1)[0] == str(a_id):
-					with open(f"{fcache}/attachments/{fn}", "rb") as f:
-						print(f"Attachment {a_id} loaded from cache.")
-						return f.read()
-	try:
-		with requests.get(url, headers=header(), stream=True, timeout=3, allow_redirects=True) as resp:
-			if return_headers:
-				return resp.content, resp.headers
-			return resp.content
-	except Exception:
-		print_exc()
-	with requests.get(url, headers=header(), stream=True, verify=False, timeout=12, allow_redirects=True) as resp:
-		if return_headers:
-			return resp.content, resp.headers
-		return resp.content
 
 
 def replace_colour(image, colour):
@@ -1597,7 +1565,7 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 				yield Image.frombuffer("RGB" if fmt == "rgb24" else "RGBA", (w, h), b)
 			if b is None:
 				raise RuntimeError(as_str(proc.stderr.read()))
-		exc.submit(writer)
+		esubmit(writer)
 		buf = resize_bufferer()
 		if prog < 0:
 			buf = reversed(list(buf))

@@ -14,6 +14,11 @@ from misc.types import lim_str
 
 print("ASYNCS:", __name__)
 
+def is_main_thread() -> bool:
+	return threading.current_thread() is threading.main_thread()
+def get_event_loop():
+	return asyncio.get_event_loop() if is_main_thread() else eloop
+
 # Main event loop for all asyncio operations.
 try:
 	eloop = asyncio.get_event_loop()
@@ -112,9 +117,6 @@ async def wait_on_none(coro, seconds=0.5):
 	if resp is None:
 		await asyncio.sleep(seconds)
 	return resp
-
-def get_event_loop():
-	return eloop
 
 def wrap_future(fut, loop=None, shield=False, thread_safe=True) -> asyncio.Future:
 	"Creates an asyncio Future that waits on a multithreaded one."
@@ -334,9 +336,6 @@ def reflatten(ait):
 			yield await_fut(anext(ait))  # noqa: F821
 	except StopAsyncIteration:
 		pass
-
-def is_main_thread() -> bool:
-	return threading.current_thread() is threading.main_thread()
 
 # A dummy coroutine that returns None.
 async def async_nop(*args, **kwargs):
