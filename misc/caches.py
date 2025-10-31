@@ -323,17 +323,17 @@ class AttachmentCache(AutoCache):
 			if "/u/" in url:
 				c_id, m_id, a_id, fn = expand_attachment(url)
 				target = await self.obtain(c_id, m_id, a_id, fn)
-				fn, head = await asubmit(download_file, target, filename=raw_fn, return_headers=True)
+				fn, head = await asubmit(download_file, target, filename=raw_fn, timeout=12, return_headers=True)
 				self.tertiary[url] = head
 				return open(fn, "rb")
 			elif "/c/" in url:
 				path = url.split("/c/", 1)[-1].split("/", 1)[0]
 				urls = await self.obtains(path)
-				fn, head = await asubmit(download_file, *urls, filename=raw_fn, return_headers=True)
+				fn, head = await asubmit(download_file, *urls, filename=raw_fn, timeout=12, return_headers=True)
 				self.tertiary[url] = head
 				return open(fn, "rb")
 		try:
-			f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, return_headers=True)
+			f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, timeout=12, return_headers=True)
 		except niquests.exceptions.HTTPError as ex:
 			code, msg = ex.response.status_code, ex.response.reason
 			raise ConnectionError(code, msg)
@@ -378,10 +378,7 @@ class AttachmentCache(AutoCache):
 		url = unyt(url)
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
-		try:
-			return self.tertiary[url]
-		except KeyError:
-			return await self.tertiary.aretrieve(url, self._scan_headers, url, m_id=m_id)
+		return await self.tertiary.aretrieve(url, self._scan_headers, url, m_id=m_id)
 
 	async def delete(self, c_id, m_id, url=None):
 		if url:

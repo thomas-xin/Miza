@@ -3061,6 +3061,7 @@ class Rickroll(Command):
 	example = ("rickroll https://i.ytimg.com/kJQP7kiw5Fk/maxresdefault.jpg", "rickroll https://i.ytimg.com/kJQP7kiw5Fk/maxresdefault.jpg https://www.youtube.com/watch?v=wDgQdr8ZkTw")
 	rate_limit = (6, 9)
 	ephemeral = True
+	maintenance = True
 
 	async def __call__(self, bot, args, message, channel, **void):
 		if message.attachments:
@@ -3305,6 +3306,7 @@ class Akinator(Command):
 	)
 	slash = True
 	rate_limit = (12, 16)
+	maintenance = True
 
 	async def compatible_akinator(self, language, child_mode=False):
 		aki = AsyncAkinator()

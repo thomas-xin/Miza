@@ -65,7 +65,8 @@ STATIC = {}
 TZCACHE = {}
 
 PREVIEW = {}
-utc_dt = datetime.datetime.utcnow
+def utc_dt():
+	return datetime.datetime.now(tz=datetime.timezone.utc).replace(tzinfo=None)
 prev_date = utc_dt().date()
 zfailed = set()
 

@@ -404,7 +404,7 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 	def run(self, info):
 		filename, source_ext = info['filepath'], info['ext'].lower()
 		if self.codec == CODEC_FFMPEG.get(self.format) and source_ext == self.format and self.start == self.end == None:  # noqa: E711
-			if self.final and filename != self.final:
+			if self.final and not os.path.samefile(filename, self.final):
 				shutil.copyfile(filename, self.final)
 			return [], info
 		temp_path = temporary_file(self.format)
@@ -491,7 +491,7 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			mbr = 96
 		print(dur, bps, cbr, mbr)
 		if source_ext == self.format and self.start == self.end == None:  # noqa: E711
-			if self.final and filename != self.final:
+			if self.final and os.path.samefile(filename, self.final):
 				shutil.copyfile(filename, self.final)
 			return [], info
 		source_codec = cdc
