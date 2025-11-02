@@ -5,7 +5,6 @@
 #!/usr/bin/python3
 
 import os
-print("BOT:", __name__)
 if __name__ != "__mp_main__":
 	os.environ["IS_BOT"] = "1"
 from misc import common, asyncs
@@ -14,31 +13,44 @@ import pathlib
 import pdb
 import ddgs
 
-# import asyncio
-# import collections
-# import contextlib
-# import datetime
-# import json
-# import pdb
-# import subprocess
-# import sys
-# import time
-# import discord
-# import orjson
-# import psutil
-# import misc.common as common
-# from collections import deque
-# from concurrent.futures import Future
-# from math import inf, ceil, log10
-# from misc.asyncs import asubmit, csubmit, esubmit, tsubmit, gather, eloop, get_event_loop, Semaphore, SemaphoreOverflowError
-# from misc.smath import xrand
-# from misc.types import cdict, fdict, fcdict, mdict, alist, azero, round_min, full_prune, suppress, tracebacksuppressor
-# from misc.util import AUTH, TEMP_PATH, FAST_PATH, PORT, PROC, EvalPipe, python, utc, T, lim_str, regexp, Request, reqs, is_strict_running, force_kill
-# from misc.common import api, load_colour_list, load_emojis, touch, BASE_LOGO, closing, MemoryTimer
+# Make linter shut up lol
+if "common" not in globals():
+	import asyncio
+	import base64
+	import collections
+	from collections import deque
+	from concurrent.futures import Future
+	import contextlib
+	import datetime
+	import functools
+	import itertools
+	import json
+	from math import inf, floor, ceil, log10, isfinite, isnan
+	import pdb
+	import re
+	import subprocess
+	import sys
+	import time
+	from traceback import print_exc
+	from urllib.parse import quote_plus
+	import discord
+	from dynamic_dt import get_offset, DynamicDT
+	import httpx
+	import niquests
+	import numpy as np
+	import openai
+	import orjson
+	import psutil
+	import requests
+	from misc import ai
+	from misc.ai import nsfw_flagged, count_to, instruct_structure, m_str, f_default
+	from misc.asyncs import asubmit, csubmit, esubmit, tsubmit, gather, flatten, eloop, get_event_loop, emptyctx, as_fut, await_fut, Semaphore, SemaphoreOverflowError, CloseableAsyncIterator, Delay
+	from misc.smath import xrand, sec2time, dtn, utc_dt
+	from misc.types import astype, as_str, cdict, fdict, fcdict, mdict, alist, azero, round_min, full_prune, suppress, tracebacksuppressor, ts_us, CE
+	from misc.util import AUTH, CACHE_PATH, TEMP_PATH, FAST_PATH, CACHE_FILESIZE, DEFAULT_FILESIZE, IMAGE_FORMS, PORT, PROC, EvalPipe, python, AutoCache, utc, T, lim_str, lim_tokens, regexp, Request, reqs, force_kill, json_dumps, discord_expired, is_miza_attachment, is_discord_attachment, is_discord_message_link, print_class, is_url, encode_attachment, choice, time_snowflake, magic, url2fn, url2ext, find_urls, find_urls_ex, shash, tcount, require_predicate, eval_json, get_image_size, split_url
+	from misc.caches import download_binary_dependencies, attachment_cache
+	from misc.common import api, load_colour_list, load_emojis, str_lookup, verify_id, manual_edit, BASE_LOGO, MemoryTimer, userQuery1, userIter1, userQuery2, userIter2, is_channel, get_last_image, best_url, worst_url, translate_emojis, message_repr, message_link, min_emoji, process_image, find_emojis, find_emojis_ex, find_users, replace_emojis, send_with_react, send_with_reply, CompatFile
 
-
-# import tracemalloc
-# tracemalloc.start()
 
 ADDRESS = AUTH.get("webserver_address") or "0.0.0.0"
 if ADDRESS == "0.0.0.0":
@@ -206,10 +218,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			csubmit(super()._async_setup_hook())
 		globals()["messages"] = self.messages = self.MessageCache()
 
-	__str__ = lambda self: str(self.user) if T(self).get("user") else object.__str__(self)
-	__repr__ = lambda self: repr(self.user) if T(self).get("user") else object.__repr__(self)
-	__call__ = lambda self: self
-	__exit__ = lambda self, *args, **kwargs: self.close()
+	def __str__(self):
+		return str(self.user) if T(self).get("user") else object.__str__(self)
+	def __repr__(self):
+		return repr(self.user) if T(self).get("user") else object.__repr__(self)
+	def __call__(self):
+		return self
+	def __exit__(self, *args, **kwargs):
+		return self.close()
 
 	def __getattr__(self, key):
 		try:
@@ -1352,13 +1368,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if len(guild.roles) <= 1:
 				roles = await guild.fetch_roles()
 				guild.roles = sorted(roles)
-				role = utils.get(roles, id=r_id)
+				role = next((r for r in roles if r.id == r_id), None)
 			if role is None:
 				raise LookupError("Role not found.")
 		self.cache.roles[r_id] = role
 		return role
 
-	async def fetch_emoji(self, e_id, guild=None):
+	async def fetch_emoji(self, e_id, guild=None, allow_external=True):
 		"Fetches an emoji from ID and guild, using the bot cache when possible."
 		if not isinstance(e_id, int):
 			try:
@@ -1367,16 +1383,36 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				raise TypeError(f"Invalid emoji identifier: {e_id}")
 		with suppress(KeyError):
 			return self.cache.emojis[e_id]
-		try:
-			emoji = super().get_emoji(e_id)
-			if emoji is None:
-				raise LookupError
-		except LookupError:
-			if guild is not None:
+		emoji = super().get_emoji(e_id)
+		if emoji is not None:
+			self.cache.emojis[emoji.id] = emoji
+			return emoji
+		if guild is not None:
+			try:
 				emoji = await guild.fetch_emoji(e_id)
+			except discord.NotFound:
+				pass
 			else:
-				raise LookupError("Emoji not found or not usable.")
-		self.cache.emojis[e_id] = emoji
+				self.cache.emojis[emoji.id] = emoji
+				return emoji
+		if allow_external:
+			animated = await asubmit(self.is_animated, e_id, verify=True)
+			if animated is not None:
+				emoji = SimulatedEmoji(id=e_id, animated=animated, name=self.data.emojinames.get(e_id))
+				self.cache.emojis[emoji.id] = emoji
+				return emoji
+		raise LookupError("Emoji not found or not usable.")
+
+	async def resolve_emoji(self, e_id, guild=None, allow_external=True):
+		if not isinstance(e_id, (int, str)):
+			return e_id
+		if isinstance(e_id, string_like):
+			e_id = await self.id_from_message(e_id)
+		if isinstance(e_id, int):
+			return await self.fetch_emoji(e_id, guild=guild, allow_external=allow_external)
+		assert not e_id.isacii()
+		emoji = SimulatedEmoji(id=int.from_bytes(e_id.encode("utf-8"), "big"), animated=False, name=e_id, unicode=e_id)
+		self.cache.emojis[emoji.id] = emoji
 		return emoji
 
 	# Searches the bot database for a webhook proxy from ID.
@@ -1662,31 +1698,31 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			elif is_miza_attachment(url):
 				out.append(url)
 			else:
-				if (match := scraper_blacklist.search(url)):
-					print("Interrupted:", match)
-					return [url]
-				headers = await attachment_cache.scan_headers(url)
-				headers = fcdict(headers)
-				if headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html",):
-					pass
-				elif ytd and self.audio:
-					try:
-						resp = await self.audio.asubmit(f"ytdl.search({repr(url)})")
-						if not resp:
-							raise FileNotFoundError(url)
-					except Exception as ex:
-						print(repr(ex))
-					else:
-						resp = resp[0]
-						if resp.get("video") and resp["video"][0]:
-							url = resp["video"][0]
-						elif images and resp.get("icon"):
-							url = resp["icon"]
-						elif resp["url"] != url:
-							url = resp["url"]
+				try:
+					headers = await attachment_cache.scan_headers(url)
+					headers = fcdict(headers)
+					if headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html",):
+						pass
+					elif ytd and self.audio:
+						try:
+							resp = await self.audio.asubmit(f"ytdl.search({repr(url)})")
+							if not resp:
+								raise FileNotFoundError(url)
+						except Exception as ex:
+							print(repr(ex))
 						else:
-							url = resp.get("stream") or resp.get("icon") or resp.get("url") or url
-				out.append(url)
+							resp = resp[0]
+							if resp.get("video") and resp["video"][0]:
+								url = resp["video"][0]
+							elif images and resp.get("icon"):
+								url = resp["icon"]
+							elif resp["url"] != url:
+								url = resp["url"]
+							else:
+								url = resp.get("stream") or resp.get("icon") or resp.get("url") or url
+					out.append(url)
+				except Exception:
+					return [url]
 		# if lost:
 		# 	out.extend(lost)
 		if not out:
@@ -1816,16 +1852,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 								i -= 1
 								name = t[0] + "-" + str(i)
 								emoji = emojis.get(name)
-			if isinstance(emoji, int):
-				e_id = await self.id_from_message(emoji)
-				emoji = self.cache.emojis.get(e_id)
-				if not emoji:
-					animated = await asubmit(self.is_animated, e_id, verify=True)
-					if animated is not None:
-						emoji = cdict(id=e_id, animated=animated, name=self.data.emojinames.get(e_id))
-				if not emoji and not is_webhook and user:
-					self.data.emojilists.get(user.id, {}).pop(name, None)
-			if emoji:
+			emoji = await self.resolve_emoji(emoji, guild=guild)
+			if not emoji and not is_webhook and user:
+				self.data.emojilists.get(user.id, {}).pop(name, None)
+			elif emoji:
 				pops.add((str(name), emoji.id))
 				if len(msg) < lim:
 					sub = "<"
@@ -1973,10 +2003,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						headers = Request.header()
 						headers.Referer = "https://duckduckgo.com"
 						headers.Accept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-						resp = await asubmit(niquests.post, "https://lite.duckduckgo.com/lite/", data=dict(q=argv), headers=headers)
-						from bs4 import BeautifulSoup
-						data = BeautifulSoup(resp.content)
-						text = re.sub("\n{2,}", "\n\n", data.get_text().split("Any Time\n", 1)[-1].split("Past Year\n", 1)[-1].strip())
+						async with niquests.AsyncSession() as session:
+							async with session.post("https://lite.duckduckgo.com/lite/", data=dict(q=argv), headers=headers) as resp:
+								from bs4 import BeautifulSoup
+								data = BeautifulSoup(resp.content)
+								text = data.get_text()
+						text = re.sub("\n{2,}", "\n\n", text.split("Any Time\n", 1)[-1].split("Past Year\n", 1)[-1].strip())
 						return text
 					if include_hrefs:
 						return "\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).strip()
@@ -2056,7 +2088,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def force_completion(self, model, prompt, stream=True, max_tokens=1024, strip=True, **kwargs):
 		ctx = ai.contexts.get(model, 4096)
 		is_question = prompt.endswith(".") or prompt.endswith("?")
-		if model in ai.is_completion and (not model in ai.is_chat or not is_question) or model not in ai.is_chat:
+		if model in ai.is_completion and (model not in ai.is_chat or not is_question) or model not in ai.is_chat:
 			count = await tcount(prompt, model="llamav2")
 			max_tokens = min(max_tokens, ctx - count - 64)
 			if "max_completion_tokens" not in kwargs:
@@ -2205,8 +2237,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				# text=text,
 				message=cdict(role="assistant", content=text, tool_calls=None),
 			)],
-			created=T(chunk).get("created") or floor(utc()),
-			model=T(chunk).get("model") or model,
+			created=T(resp).get("created") or floor(utc()),
+			model=T(resp).get("model") or model,
 			object="chat.completion",
 			usage=resp.usage,
 		)
@@ -2389,17 +2421,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		prompt = [m.content for m in messages if m.get("role") == "user"][-1]
 		if modlvl >= 2:
 			maxlim = 196608
-			minlim = 2500
+			minlim = 3200
 			snip = 800
 			best = 2
 		elif modlvl >= 1:
 			maxlim = 98304
-			minlim = 1000
+			minlim = 1600
 			snip = 320
 			best = 1
 		else:
 			maxlim = 3000
-			minlim = 500
+			minlim = 600
 			snip = 240
 			best = 0
 		messages = await ai.cut_to(messages, maxlim, minlim, best=best, prompt=prompt, premium_context=premium_context)
@@ -2436,6 +2468,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		cargs = props.get("cargs") or {}
 		is_nsfw = cargs.get("nsfw")
 		message = None
+		label = cargs.get("mode")
 		if not cargs:
 			content = messages[-1].content
 			mod = await ai.moderate(messages[-3:], premium_context=premium_context)
@@ -2560,32 +2593,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				tools = tools or None
 			cargs["tools"] = tools
-			if is_nsfw:
-				print(mod, allow_nsfw)
-				label = "nsfw" if allow_nsfw else "casual"
-			cargs["mode"] = label
+		if is_nsfw:
+			print(mod, allow_nsfw)
+			label = "nsfw" if allow_nsfw else "casual"
+		cargs["mode"] = label
 		decensor = not is_nsfw or allow_nsfw
 		tools = cargs.get("tools")
 		mode = cargs.get("mode", "casual")
 		if mode not in ("instructive", "casual", "nsfw"):
 			mode = "instructive"
-		# if mode != "nsfw":
-		# 	ps = [m for m in messages if m.get("new")]
-		# 	for m in ps:
-		# 		url = m.get("url")
-		# 		if url:
-		# 			urls = await self.follow_url(url)
-		# 			if urls:
-		# 				url = urls[0]
-		# 				if is_discord_message_link(url):
-		# 					url = None
-		# 					m.pop("url")
-		# 			else:
-		# 				url = None
-		# 				m.pop("url")
-		# 		if url:
-		# 			mode = "vision"
-		# 			break
 		mA = 4 if not allow_nsfw else 6 if model == "miza-3" else 5
 		draft = monologue = None
 		last_successful = None
@@ -2604,6 +2620,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		ex = None
 		print("Chat completions:", model, ai.overview(messages), cargs, sep="\n")
 		tmpcut = None
+		tmplen = 0
 		for attempts in range(mA):
 			await require_predicate(predicate)
 			assistant = modelist[mode]
@@ -2761,32 +2778,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							cargs=cargs,
 						)
 						return
-			eval1 = None
 			eval2 = None
 			if not text:
 				insufficient = True
 			if decensor and attempts < mA - 1:
 				if ai.decensor.search(text):
 					refusal = True
-				# if not passable and not insufficient and not refusal and modlvl >= 1:
-				# 	eval1 = await ai.moderate(text, premium_context=premium_context)
-				# 	if not nsfw_flagged(eval1):
-				# 		for m in reversed(messages):
-				# 			if m.get("role") == "user":
-				# 				break
-				# 		else:
-				# 			m = messages[-1]
-				# 		m = cdict(m)
-				# 		if m.content and isinstance(m.content, str):
-				# 			m.content = lim_tokens(m.content, 512)
-				# 		ms = [m, cdict(role="assistant", content=text)]
-				# 		# ms = await ai.cut_to(ms, 400, 400, simple=True)
-				# 		# ms.append(cdict(role="assistant", content=text))
-				# 		arg = await self.evaluate(ms, premium_context=premium_context)
-				# 		if arg == "refusal":
-				# 			refusal = True
-				# 		if arg == "insufficient":
-				# 			insufficient = True
 				if not last_successful:
 					last_successful = text
 				elif not refusal or not insufficient:
@@ -3105,12 +3102,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			print("No message detected.")
 		elif reacts:
 			for react in reacts:
-				try:
-					await message.add_reaction(react)
-				except CE:
-					await asyncio.sleep(1)
-					with tracebacksuppressor:
-						await message.add_reaction(react)
+				await message.add_reaction(react)
 		return message
 
 	async def tag_message(self, message):
@@ -3197,7 +3189,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return as_fut(16777214)
 		if hasattr(user, "icon_url"):
 			user = astype(user.icon_url, str)
-		url = worst_url(user)
+		if isinstance(user, (str, byte_like)):
+			url = user
+		else:
+			url = worst_url(user)
 		return self.data.colours.get(url)
 
 	async def get_proxy_url(self, user, force=False) -> str:
@@ -3626,10 +3621,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		v = 2 if keep_log else 3
 		if isinstance(message, list_like) and len(message) > 1:
 			try:
-				if not message.guild or message.guild.me.guild_permissions.manage_messages:
+				messages = message
+				if not messages[0].guild or messages[0].guild.me.guild_permissions.manage_messages:
 					raise PermissionError
 				channel = None
-				messages = message
 				for m in messages:
 					if channel is None:
 						channel = m.channel
@@ -4400,15 +4395,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			print(f"Reloading module {module}...")
 			if module in self.categories:
 				self.unload(module)
-			# mod = importlib.reload(self._globals[module])
 		else:
 			print(f"Loading module {module}...")
 			new = True
-			# mod = __import__(module)
 		if not new:
 			mod = self._globals.pop(module, {})
-		# else:
-		#     mod = self._globals
 		else:
 			mod = cdict(common.__dict__)
 		assert isinstance(mod, dict)
@@ -4611,142 +4602,96 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return " ".join(out)
 		return
 
-	zw_callback = zwencode("callback")
-
 	async def react_callback(self, message, reaction, user):
 		"Operates on reactions on special messages, calling the _callback_ methods of commands when necessary."
-		if message.author.id == self.id:
-			if self.closed:
+		if self.closed:
+			return
+		if message.author.id != self.id:
+			return
+		u_perm = self.get_perms(user.id, message.guild)
+		if u_perm <= -inf:
+			return
+		reacode = as_str(reaction).encode("utf-8")
+		interaction = hasattr(message, "int_token")
+		while utc() - self.react_sem.get(message.id, 0) < 30:
+			# Ignore if more than 2 reactions already queued for target message
+			if self.react_sem.get(message.id, 0) - utc() > 1:
 				return
-			u_perm = self.get_perms(user.id, message.guild)
-			if u_perm <= -inf:
-				return
-			if reaction is not None:
-				reacode = str(reaction).encode("utf-8")
-			else:
-				reacode = None
-			interaction = hasattr(message, "int_token")
-			# m = self.cache.messages.get(message.id)
-			if getattr(message, "_react_callback_", None):
-				resp = await message._react_callback_(
-					message=message,
-					channel=message.channel,
-					guild=message.guild,
-					reaction=reacode,
-					user=user,
-					perm=u_perm,
-					vals="",
-					argv="",
-					bot=self,
-				)
+			await asyncio.sleep(0.2)
+		content = message.content
+		if not content:
+			if message.embeds:
+				content = str(message.embeds[0].description)
+		try:
+			name, u_id, data = PaginationCommand.decode(content)
+		except ValueError:
+			return
+		# Force a rate limit on the reaction processing for the message
+		self.react_sem[message.id] = max(utc(), self.react_sem.get(message.id, 0) + 1)
+		for f in self.commands[name]:
+			if not isinstance(f, PaginationCommand):
+				continue
+			if not isnan(u_perm):
+				match f.react_perms(u_perm):
+					case True:
+						pass
+					case False:
+						continue
+					case _:
+						if u_id != user.id:
+							continue
+			with self.ExceptionSender(message.channel, reference=message):
+				timeout = getattr(f, "_timeout_", 1) * self.timeout
+				if timeout >= inf:
+					timeout = None
+				elif self.is_trusted(message.guild):
+					timeout *= 3
+				self.data.usage.add(f)
+				try:
+					index = f.directions.index(reacode)
+				except (ValueError, AttributeError):
+					index = -1
+				async with asyncio.timeout(timeout):
+					future = csubmit(f._callback_(
+						bot=self,
+						_message=message,
+						_channel=message.channel,
+						_guild=message.guild,
+						_user=user,
+						_perm=u_perm,
+						reaction=reaction,
+						reacode=reacode,
+						index=index,
+						data=data,
+					))
+					if interaction:
+						fut = csubmit(delayed_callback(future, 1, self.defer_interaction, message, mode="patch", ephemeral=getattr(message, "ephemeral", False), exc=False))
+					resp = await future
+				await self.send_event("_command_", user=user, command=f, loop=False, message=message)
+				if isinstance(resp, str):
+					resp = cdict(content=resp, embeds=[], attachments=[])
 				if isinstance(resp, cdict):
+					if interaction and not resp.get("file") and not resp.get("files"):
+						r, d = await fut
+						if not d:
+							await self.defer_interaction(message, mode="patch")
+						await interaction_patch(
+							bot=self,
+							message=message,
+							**resp,
+						)
+						break
+					if resp.get("embed") or resp.get("embeds"):
+						resp.pop("buttons", None)
+						resp.pop("components", None)
 					csubmit(self.ignore_interaction(message))
 					await self.edit_message(
 						message,
 						**resp,
 						allowed_mentions=discord.AllowedMentions.none(),
 					)
-				return
-			msg = message.content.strip("*")
-			if not msg and message.embeds:
-				msg = str(message.embeds[0].description).strip("*")
-			if msg[:3] != "```" or len(msg) <= 3:
-				msg = None
-				if message.embeds and message.embeds[0].footer:
-					s = message.embeds[0].footer.text
-					if is_zero_enc(s):
-						msg = s
-				if not msg:
-					return
-			else:
-				msg = msg[3:].lstrip("\n")
-				check = "callback-"
-				with suppress(ValueError):
-					msg = msg[:msg.index("\n")]
-				if not msg.startswith(check):
-					return
-			while len(self.react_sem) > 65536:
-				with suppress(RuntimeError):
-					self.react_sem.pop(next(iter(self.react_sem)))
-			while utc() - self.react_sem.get(message.id, 0) < 30:
-				# Ignore if more than 2 reactions already queued for target message
-				if self.react_sem.get(message.id, 0) - utc() > 1:
-					return
-				await asyncio.sleep(0.2)
-			msg = message.content.strip("*")
-			if not msg and message.embeds:
-				msg = str(message.embeds[0].description).strip("*")
-			if msg[:3] != "```" or len(msg) <= 3:
-				msg = None
-				if message.embeds and message.embeds[0].footer:
-					s = message.embeds[0].footer.text
-					if is_zero_enc(s):
-						msg = s
-				if not msg:
-					return
-				# Experimental zero-width invisible character encoded message (unused)
-				try:
-					msg = msg[msg.index(self.zw_callback) + len(self.zw_callback):]
-				except ValueError:
-					return
-				msg = zwdecode(msg)
-				args = msg.split("q")
-			else:
-				msg = msg[3:].lstrip("\n")
-				check = "callback-"
-				msg = msg.splitlines()[0]
-				msg = msg[len(check):]
-				args = msg.split("-")
-			catn, func, vals = args[:3]
-			func = func.casefold()
-			argv = "-".join(args[3:])
-			catg = self.categories[catn]
-			# Force a rate limit on the reaction processing for the message
-			self.react_sem[message.id] = max(utc(), self.react_sem.get(message.id, 0) + 1)
-			for f in catg:
-				if f.parse_name().casefold() == func:
-					with self.ExceptionSender(message.channel, reference=message):
-						timeout = getattr(f, "_timeout_", 1) * self.timeout
-						if timeout >= inf:
-							timeout = None
-						elif self.is_trusted(message.guild):
-							timeout *= 3
-						self.data.usage.add(f)
-						async with asyncio.timeout(timeout):
-							future = csubmit(f._callback_(
-								message=message,
-								channel=message.channel,
-								guild=message.guild,
-								reaction=reacode,
-								user=user,
-								perm=u_perm,
-								vals=vals,
-								argv=argv,
-								bot=self,
-							))
-							if interaction:
-								fut = csubmit(delayed_callback(future, 1, self.defer_interaction, message, mode="patch", ephemeral=getattr(message, "ephemeral", False), exc=False))
-							resp = await future
-						await self.send_event("_command_", user=user, command=f, loop=False, message=message)
-						if isinstance(resp, cdict):
-							if interaction and not resp.get("file"):
-								r, d = await fut
-								if not d:
-									await self.defer_interaction(message, mode="patch")
-								await interaction_patch(
-									bot=self,
-									message=message,
-									**resp,
-								)
-								break
-							csubmit(self.ignore_interaction(message))
-							await self.edit_message(
-								message,
-								**resp,
-								allowed_mentions=discord.AllowedMentions.none(),
-							)
-						break
-			self.react_sem.pop(message.id, None)
+				break
+		self.react_sem.pop(message.id, None)
 
 	status_cycle = Semaphore(1, 1, rate_limit=60, sync=True)
 	@tracebacksuppressor
@@ -5189,8 +5134,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							fuzzy=1 / 3,
 						)
 		elif info.type == "emoji":
-			if isinstance(v, string_like):
-				v = await self.id_from_message(v)
+			v = await self.resolve_emoji(v, guild=guild)
 		elif info.type in ("url", "image", "visual", "video", "audio", "media"):
 			ytd = info.type in ("image", "visual", "video", "audio")
 			urls = await self.follow_url(v, ytd=ytd, reactions=True, allow=True)
@@ -5618,11 +5562,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			out_fut = None
 			try:
 				await self.run_command(command, kwargs, message=message, argv=argv, command_check=command_check, min_perm=min_perm, respond=True)
-			# Represents any timeout error that occurs
-			except CE:
-				print(command, argv)
-				raise
 			except (T0, T1, T2, ArgumentError, TooManyRequests) as ex:
+				# Represents any timeout error that occurs
 				out_fut = self.send_exception(channel, ex, reference=message, comm=command)
 				return
 			# Represents all other errors
@@ -5727,7 +5668,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 										task = csubmit(anext(it))
 									wait = asyncio.shield(task) if utc() < start + timeout else task
 									resp = await asyncio.wait_for(wait, timeout=d)
-								except (T0, T1, CE):
+								except (T0, T1):
 									if not blocked and edit and (not fut or fut.done()):
 										if fut:
 											try:
@@ -5879,13 +5820,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				else:
 					finished = True
 			if not finished:
-				await asubmit(self.load_guild_http, guild, priority=1)
+				await self.load_guild_http(guild)
 		guild._member_count = len(guild._members)
 		if "guilds" in self.data:
 			self.data.guilds.register(guild)
 		return guild.members
 
-	def load_guild_http(self, guild):
+	async def load_guild_http(self, guild):
 		_members = {}
 		x = 0
 		i = 1000
@@ -5893,9 +5834,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			memberdata = []
 			for r in range(64):
 				try:
-					with self.load_semaphore:
-						memberdata = Request(
+					async with self.load_semaphore:
+						memberdata = await Request(
 							f"https://discord.com/api/{api}/guilds/{guild.id}/members?limit=1000&after={x}",
+							aio=True,
 							authorise=True,
 							json=True,
 							timeout=32,
@@ -5904,7 +5846,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if isinstance(ex, ConnectionError) and T(ex).get("errno") in (401, 403, 404):
 						break
 					print_exc()
-					time.sleep(r + 2)
+					await asyncio.sleep(r ** 2 + random.random())
 				else:
 					break
 			else:
@@ -5936,7 +5878,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			for fut in futs:
 				try:
 					await fut
-				except (T0, T1, T2, CE):
+				except (T0, T1, T2):
 					print("Error loading", fut.guild)
 					print_exc()
 					await self.load_guild(fut.guild)
@@ -6764,10 +6706,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					return bot.user
 				name = "DM"
 				topic = None
-				is_nsfw = lambda self: bot.is_nsfw(self.channel)
-				is_news = lambda *self: False
+				def is_nsfw(self):
+					return bot.is_nsfw(self.channel)
+				def is_news(*self):
+					return False
 				is_channel = True
-				__str__ = lambda self: self.channel.recipient.display_name if self.channel.recipient else "channel"
+				def __str__(self):
+					return self.channel.recipient.display_name if self.channel.recipient else "channel"
 
 			def __init__(self, user=None, channel=None, **void):
 				self.channel = self.system_channel = self.rules_channel = self.UserChannel(channel) if channel else None
@@ -6806,7 +6751,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			def me(self, value):
 				return
 			
-			get_role = lambda *args: None
+			def get_role(*args):
+				return None
 			filesize_limit = CACHE_FILESIZE
 			bitrate_limit = 98304
 			emoji_limit = 0
@@ -6816,22 +6762,30 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			unavailable = False
 			ghost = True
 			is_channel = True
-			is_nsfw = lambda self: bot.is_nsfw(self.channel)
-			__str__ = lambda self: self.channel.recipient.display_name if self.channel.recipient else "channel"
+			def is_nsfw(self):
+				return bot.is_nsfw(self.channel)
+			def __str__(self):
+				return self.channel.recipient.display_name if self.channel.recipient else "channel"
 
 		class GhostUser(discord.abc.Snowflake):
 			"Represents a deleted/not found user."
 
-			__repr__ = lambda self: f"<Ghost User id={self.id} name='{self.name}' discriminator='{self.discriminator}' bot=False>"
+			def __repr__(self):
+				return f"<Ghost User id={self.id} name='{self.name}' discriminator='{self.discriminator}' bot=False>"
 			__str__ = discord.user.BaseUser.__str__
 			system = False
-			history = lambda *void1, **void2: fut_nop
+			def history(*void1, **void2):
+				return fut_nop
 			dm_channel = None
-			create_dm = lambda self: fut_nop
+			def create_dm(self):
+				return fut_nop
 			relationship = None
-			is_friend = lambda self: None
-			is_blocked = lambda self: None
-			is_migrated = lambda self: None
+			def is_friend(self):
+				return None
+			def is_blocked(self):
+				return None
+			def is_migrated(self):
+				return None
 			colour = color = discord.Colour(16777215)
 			_avatar = _avatar_decoration = None
 			name = "[USER DATA NOT FOUND]"
@@ -6863,7 +6817,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			accent_colour = None
 			_accent_colour = None
 			_permissions = discord.Permissions(0)
-			is_timed_out = lambda *args: False
+			def is_timed_out(*args):
+				return False
 
 			def __getattr__(self, k):
 				if k == "member":
@@ -8045,9 +8000,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					"I noticed you haven't given me administrator permissions here.\n"
 					+ "That's completely understandable if intentional, but please note that some features may not function well, or not at all, without the required permissions."
 				))
-			message = await channel.send(embed=emb)
-			await message.add_reaction("✅")
+			fut = csubmit(send_with_react(channel, embed=emb, reacts=["✅"]))
 			await self.load_guild(guild)
+			await fut
 			for member in guild.members:
 				name = str(member)
 				self.usernames[name] = self.cache.users[member.id]
@@ -8143,7 +8098,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if user.id == self.deleted_user:
 				print("Deleted user MESSAGE", channel, user, message, channel.id, message.id)
 			fut = csubmit(self.seen(user, channel, guild, event="message", raw="Sending a message"))
-			await self.react_callback(message, None, user)
+			# await self.react_callback(message, None, user)
 			await fut
 			await self.handle_message(message)
 
@@ -8159,7 +8114,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					message.slash = d["token"]
 					cdata = d.get("data")
 					if d["type"] == 2:
-						# print("SLASH:", cdata)
+						# Slash commands
 						name = cdata["name"].replace(" ", "")
 						command = self.commands[name][0]
 						try:
@@ -8228,6 +8183,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						finally:
 							message.deleted = True
 					elif d["type"] == 3:
+						# Interaction buttons
 						custom_id = cdata.get("custom_id", "")
 						if "?" in custom_id:
 							custom_id = custom_id.rsplit("?", 1)[0]
@@ -8269,9 +8225,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							del m.method
 						add = False
 						if type(m) is not self.ExtendedMessage:
-							m = self.ExtendedMessage(m)
-							add = True
-						if "```callback" not in m.content and not m.embeds:
 							m = await channel.fetch_message(m_id)
 							add = True
 						if add:
@@ -8413,7 +8366,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			with tracebacksuppressor:
 				fut = self.delete_waits.setdefault(payload.guild_id, Future())
 				fut2 = csubmit(_on_raw_message_delete(payload))
-				with suppress(T1, CE):
+				with suppress(T1, T2):
 					await asyncio.wait_for(wrap_future(fut), timeout=1)
 				message = await fut2
 				guild = message.guild
@@ -8476,7 +8429,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			with tracebacksuppressor:
 				fut = self.delete_waits.setdefault(payload.guild_id, Future())
 				fut2 = csubmit(_on_raw_bulk_message_delete(payload))
-				with suppress(T1, CE):
+				with suppress(T1, T2):
 					await asyncio.wait_for(wrap_future(fut), timeout=1)
 				messages = await fut2
 				await self.send_event("_bulk_delete_", messages=messages)

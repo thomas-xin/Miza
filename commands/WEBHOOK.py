@@ -5,94 +5,56 @@ if "common" not in globals():
 print = PRINT
 
 
-class AutoEmoji(Command):
+class AutoEmoji(PaginationCommand):
 	server_only = True
 	name = ["NQN", "Emojis"]
 	min_level = 0
 	description = "Causes all failed emojis starting and ending with : to be deleted and reposted with a webhook, when possible. See ~emojilist for assigned emojis. Enabled by default, unless NQN (<@559426966151757824>) is in the server."
-	usage = "<mode(enable|disable)>?"
-	example = ("emojis", "autoemoji enable", "nqn disable")
-	flags = "aed"
-	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("view", "enable", "disable"),
+			),
+			description="Action to perform",
+			example="enable",
+			default="view"
+		),
+	)
 	rate_limit = (4, 6)
 	slash = True
 
-	async def __call__(self, bot, flags, guild, message, user, name, perm, **void):
+	async def __call__(self, bot, _user, _guild, mode, **void):
 		data = bot.data.autoemojis
-		if flags and perm < 3:
-			reason = "to modify autoemoji for " + guild.name
-			raise self.perm_error(perm, 3, reason)
-		if "e" in flags or "a" in flags:
-			data[guild.id] = True
-			return italics(css_md(f"Enabled automatic emoji substitution for {sqr_md(guild)}."))
-		elif "d" in flags:
-			data[guild.id] = False
-			return italics(css_md(f"Disabled automatic emoji substitution for {sqr_md(guild)}."))
-		buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-		await send_with_reply(
-			None,
-			message,
-			"*```" + "\n" * ("z" in flags) + "callback-webhook-autoemoji-"
-			+ str(user.id) + "_0"
-			+ "-\nLoading AutoEmoji database...```*",
-			buttons=buttons,
+		if mode == "enable":
+			data[_guild.id] = True
+			return italics(css_md(f"Enabled automatic emoji substitution for {sqr_md(_guild)}."))
+		elif mode == "disable":
+			data[_guild.id] = False
+			return italics(css_md(f"Disabled automatic emoji substitution for {sqr_md(_guild)}."))
+		# Set callback message for scrollable list
+		return await self.display(_user.id, 0, _guild.id)
+
+	def react_perms(self, perm: int):
+		return False if perm < 2 else True
+
+	async def display(self, uid, pos, gid, diridx=-1):
+		bot = self.bot
+
+		def key(curr, pos, page):
+			return iter2str({(k := f":{e.name}:") + " " * (32 - len(k)): f"({e.id})` {min_emoji(e)}" for e in tuple(curr)[pos:pos + page]}, left="`", right="")
+
+		guild = await bot.fetch_guild(gid)
+		return await self.default_display(
+			"custom emoji", uid, pos,
+			sorted((e for e in guild.emojis if e.is_usable()), key=lambda e: full_prune(e.name)),
+			diridx, extra=leb128(gid), key=key,
 		)
-	
-	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-		u_id, pos = list(map(int, vals.split("_", 1)))
-		if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
-			return
-		if reaction not in self.directions and reaction is not None:
-			return
-		guild = message.guild
-		user = await bot.fetch_user(u_id)
-		data = bot.data.autoemojis
-		curr = {f":{e.name}:": f"({e.id})` {min_emoji(e)}" for e in sorted(guild.emojis, key=lambda e: full_prune(e.name)) if e.is_usable()}
-		page = 16
-		last = max(0, len(curr) - page)
-		if reaction is not None:
-			i = self.directions.index(reaction)
-			if i == 0:
-				new = 0
-			elif i == 1:
-				new = max(0, pos - page)
-			elif i == 2:
-				new = min(last, pos + page)
-			elif i == 3:
-				new = last
-			else:
-				new = pos
-			pos = new
-		content = message.content
-		if not content:
-			content = message.embeds[0].description
-		i = content.index("callback")
-		content = "```" + "\n" * ("\n" in content[:i]) + (
-			"callback-webhook-autoemoji-"
-			+ str(u_id) + "_" + str(pos)
-			+ "-\n"
-		)
-		if data.get(guild.id) or guild.id not in data and not (559426966151757824 in guild._members or not guild.me.guild_permissions.manage_messages or not guild.me.guild_permissions.manage_webhooks):
-			content += f"Automatic emoji substitution is currently enabled in {sqr_md(guild)}.```"
-		else:
-			content += f'Automatic emoji substitution is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}autoemoji enable" to enable.```'
-		if not curr:
-			msg = italics(code_md(f"No custom emojis found for {str(message.guild).replace('`', '')}."))
-		else:
-			msg = italics(code_md(f"{len(curr)} custom emoji(s) currently assigned for {str(message.guild).replace('`', '')}:")) + "\n" + iter2str({k + " " * (32 - len(k)): curr[k] for k in tuple(curr)[pos:pos + page]}, left="`", right="")
-		colour = await self.bot.get_colour(guild)
-		emb = discord.Embed(
-			description=msg,
-			colour=colour,
-		)
-		emb.set_author(**get_author(user))
-		more = len(curr) - pos - page
-		if more > 0:
-			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(bot.edit_message(message, content=content, embed=emb))
-		if hasattr(message, "int_token"):
-			await bot.ignore_interaction(message)
+
+	async def _callback_(self, _user, index, data, **void):
+		pos, more = decode_leb128(data)
+		gid, _ = decode_leb128(more)
+		return await self.display(_user.id, pos, gid, index)
 
 
 class UpdateAutoEmojis(Database):
@@ -133,6 +95,11 @@ class UpdateAutoEmojis(Database):
 				emojis[n] = e
 		return emojis
 
+	def is_enabled_in(self, guild):
+		if not self.get(guild.id, True) or (559426966151757824 in guild._members or not guild.me.guild_permissions.manage_messages or not guild.me.guild_permissions.manage_webhooks):
+			return False
+		return True
+
 	async def _nocommand_(self, message, recursive=True, edit=False, **void):
 		if getattr(message, "simulated", None) or (utc_ddt() - message.created_at).total_seconds() > 3600:
 			return
@@ -158,7 +125,7 @@ class UpdateAutoEmojis(Database):
 		if not message.guild or not message.guild.me:
 			return
 		guild = message.guild
-		if not self.get(guild.id, True) or (559426966151757824 in guild._members or not guild.me.guild_permissions.manage_messages or not guild.me.guild_permissions.manage_webhooks):
+		if not self.is_enabled_in(guild):
 			return
 		if "emojis" in bot.data:
 			await bot.data.emojis.load_own()
@@ -312,132 +279,116 @@ class UpdateAutoEmojis(Database):
 					bot.data.webhooks.temp.pop(m.channel.id, None)
 
 
-class EmojiList(Command):
+class EmojiList(PaginationCommand):
+	name = ["CustomEmoji", "ProxyEmoji"]
 	description = "Sets a custom alias for an emoji, usable by ~autoemoji. Accepts emojis, emoji IDs, emoji URLs, and message links containing emojis or reactions."
-	usage = "<action(add|delete)>? <name>? <id>?"
-	example = ("emojilist add how https://cdn.discordapp.com/emojis/645188934267043840.gif", "emojilist remove why")
-	flags = "aed"
-	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("view", "add", "remove"),
+				accepts=dict(enable="add", disable="remove", create="add", delete="remove"),
+			),
+			description="Action to perform",
+			example="enable",
+		),
+		name=cdict(
+			type="word",
+			description="Emoji name",
+			example="cat3",
+		),
+		emoji=cdict(
+			type="emoji",
+			description="Emoji to select",
+			example="988721351969865729",
+		),
+	)
 	rate_limit = (4, 6)
 
-	async def __call__(self, bot, flags, message, user, name, argv, args, **void):
-		data = bot.data.emojilists
-		if "d" in flags:
-			try:
-				e_id = bot.data.emojilists[user.id].pop(args[0])
-			except KeyError:
-				raise KeyError(f'Emoji name "{args[0]}" not found.')
-			return italics(css_md(f"Successfully removed emoji alias {sqr_md(args[0])}: {sqr_md(e_id)} for {sqr_md(user)}."))
-		elif argv:
-			try:
-				name, e_id = argv.rsplit(None, 1)
-			except ValueError:
-				raise ArgumentError("Please input alias followed by emoji, separated by a space.")
-			name = name.strip(":")
-			if not regexp("[A-Za-z0-9\\-~_]{1,32}").fullmatch(name):
-				raise ArgumentError("Emoji aliases may only contain 1~32 alphanumeric characters, dashes, tildes and underscores.")
-			e_id = await bot.id_from_message(e_id)
-			e_id = as_str(e_id).strip("<>").rsplit(":", 1)[-1].strip(":")
-			if not e_id.isnumeric():
-				raise ArgumentError("Only custom emojis are supported.")
-			e_id = int(e_id)
-			animated = await asubmit(bot.is_animated, e_id, verify=True)
-			if animated is None:
-				raise LookupError(f"Emoji {e_id} does not exist.")
-			bot.data.emojilists.setdefault(user.id, {})[name] = e_id
-			return ini_md(f"Successfully added emoji alias {sqr_md(name)}: {sqr_md(e_id)} for {sqr_md(user)}.")
-		buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-		await send_with_reply(
-			None,
-			message,
-			"*```" + "\n" * ("z" in flags) + "callback-webhook-emojilist-"
-			+ str(user.id) + "_0"
-			+ "-\nLoading EmojiList database...```*",
-			buttons=buttons,
-			ephemeral=True,
-		)
-	
-	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-		u_id, pos = list(map(int, vals.split("_", 1)))
-		if reaction not in (None, self.directions[-1]) and u_id != user.id and perm <= inf:
-			return
-		if reaction not in self.directions and reaction is not None:
-			return
-		guild = message.guild
-		user = await bot.fetch_user(u_id)
-		following = bot.data.emojilists
-		items = following.get(user.id, {}).items()
-		page = 16
-		last = max(0, len(items) - page)
-		if reaction is not None:
-			i = self.directions.index(reaction)
-			if i == 0:
-				new = 0
-			elif i == 1:
-				new = max(0, pos - page)
-			elif i == 2:
-				new = min(last, pos + page)
-			elif i == 3:
-				new = last
-			else:
-				new = pos
-			pos = new
-		curr = {}
-		futs = []
-		for k, v in sorted(items, key=lambda n: full_prune(n[0]))[pos:pos + page]:
-
-			async def check_emoji(k, v):
-				try:
+	async def __call__(self, bot, _user, mode, name, emoji, **void):
+		curr = bot.data.emojilists.get(_user.id, {})
+		emote = getattr(emoji, "id", emoji)
+		match mode:
+			case "view":
+				# Set callback message for scrollable list
+				return await self.display(_user.id, 0)
+			case "remove":
+				removed = []
+				if emote:
+					for k, v in tuple(curr.items()):
+						if v == emote:
+							removed.append(curr.pop(k))
+							name = name or k
+					if not removed:
+						raise KeyError(f'Emoji "{emoji}" not assigned.')
+				if name:
 					try:
-						e = bot.cache.emojis[v]
-						if not e.is_usable():
-							raise LookupError
-						me = " " + str(e)
+						removed.append(bot.data.emojilists[_user.id].pop(name))
 					except KeyError:
-						await bot.min_emoji(v)
-						me = ""
-				except LookupError:
-					following[user.id].pop(k)
-					return
-				return f"({v})` {me}"
+						raise KeyError(f'Emoji "{emoji}" not assigned.')
+				if len(removed) > 1:
+					content = f"Successfully removed {sqr_md(len(removed))} emoji aliases for {sqr_md(_user)}."
+				else:
+					content = f"Successfully removed emoji alias {sqr_md(name)}: {sqr_md(removed[0])} for {sqr_md(_user)}."
+				bot.data.emojilists[_user.id] = curr
+				return cdict(
+					content=content,
+					prefix="```css\n",
+					suffix="```",
+				)
+			case "add":
+				assert emoji, "Emoji required to add."
+				assert isinstance(emote, int), "Emoji should be a valid Discord emoji."
+				if not name:
+					name = emoji.get("name", emote)
+				name = name.strip(":")
+				if not regexp("[A-Za-z0-9\\-~_]{1,32}").fullmatch(name):
+					raise ArgumentError("Emoji aliases may only contain 1~32 alphanumeric characters, dashes, tildes and underscores.")
+				curr[name] = emote
+				bot.data.emojilists[_user.id] = curr
+				return ini_md(f"Successfully added emoji alias {sqr_md(name)}: {sqr_md(emote)} for {sqr_md(_user)}.")
+		raise NotImplementedError(mode)
 
-			fut = csubmit(check_emoji(k, v))
-			fut.k = k
-			futs.append(fut)
-		for fut in futs:
-			info = await fut
-			if not info:
-				continue
-			curr[f":{fut.k}:"] = info
-		content = message.content
-		if not content:
-			content = message.embeds[0].description
-		i = content.index("callback")
-		content = "*```" + "\n" * ("\n" in content[:i]) + (
-			"callback-webhook-emojilist-"
-			+ str(u_id) + "_" + str(pos)
-			+ "-\n"
-		)
-		if not items:
-			content += f"No currently assigned emoji aliases for {str(user).replace('`', '')}.```*"
-			msg = ""
-		else:
-			content += f"{len(items)} emoji alias(es) currently assigned for {str(user).replace('`', '')}:```*"
-			key = lambda x: "\n" + ", ".join(x)
-			msg = iter2str({k + " " * (32 - len(k)): curr[k] for k in curr}, left="`", right="")
-		colour = await self.bot.get_colour(user)
-		emb = discord.Embed(
-			description=content + msg,
-			colour=colour,
-		)
-		emb.set_author(**get_author(user))
-		more = len(curr) - pos - page
-		if more > 0:
-			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-		if hasattr(message, "int_token"):
-			await bot.ignore_interaction(message)
+	async def display(self, uid, pos, diridx=-1):
+		bot = self.bot
+
+		async def akey(curr, pos, page):
+			mapping = {}
+			futs = []
+			for k, v in sorted(curr, key=lambda n: full_prune(n[0]))[pos:pos + page]:
+
+				async def check_emoji(k, v):
+					try:
+						try:
+							e = bot.cache.emojis[v]
+							if not e.is_usable():
+								raise LookupError
+							me = " " + str(e)
+						except KeyError:
+							await bot.min_emoji(v)
+							me = ""
+					except LookupError:
+						curr = bot.data.emojilists.get(uid, {})
+						curr.pop(k)
+						bot.data.emojilists[uid] = curr
+						return
+					return f"({v})` {me}"
+
+				fut = csubmit(check_emoji(k, v))
+				fut.k = k
+				futs.append(fut)
+			for fut in futs:
+				info = await fut
+				if not info:
+					continue
+				mapping[f":{fut.k}:"] = info
+			return iter2str({k + " " * (32 - len(k)): v for k, v in mapping.items()}, left="`", right="").strip()
+
+		return await self.default_display("proxy emoji", uid, pos, bot.data.emojilists.get(uid, {}).items(), diridx, akey=akey)
+
+	async def _callback_(self, _user, index, data, **void):
+		pos, _ = decode_leb128(data)
+		return await self.display(_user.id, pos, index)
 
 
 class UpdateEmojiLists(Database):

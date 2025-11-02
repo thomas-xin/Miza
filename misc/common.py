@@ -493,7 +493,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 							file.reset()
 					return await channel.send(content, **fields)
 				raise
-			except (aiohttp.client_exceptions.ClientOSError, CE):
+			except (aiohttp.client_exceptions.ClientOSError):
 				await asyncio.sleep(random.random() * 2 + 1)
 				if fields.get("files"):
 					for file in fields["files"]:
@@ -657,12 +657,33 @@ async def manual_edit(message, **fields):
 		return await message.edit(**fields)
 	if fields.get("embeds"):
 		fields["embeds"] = [embed.to_dict() for embed in fields["embeds"]]
+		if fields.get("embed"):
+			fields["embeds"].insert(0, fields["embed"].to_dict())
+	elif fields.get("embed"):
+		fields["embed"] = fields["embed"].to_dict()
 	if fields.get("buttons"):
 		fields["components"] = restructure_buttons(fields.pop("buttons"))
 	if fields.get("files"):
 		files = fields.pop("files")
+		if fields.get("file"):
+			files.insert(0, fields.pop("file"))
+	elif fields.get("file"):
+		files = [fields.pop("file")]
 	else:
 		files = None
+	if fields.get("allowed_mentions"):
+		mentions = fields["allowed_mentions"]
+		parse = []
+		if mentions.users:
+			parse.append("users")
+		if mentions.roles:
+			parse.append("roles")
+		if mentions.everyone:
+			parse.append("everyone")
+		fields["allowed_mentions"] = dict(
+			parse=parse,
+			replied_user=mentions.replied_user,
+		)
 	channel = message.channel
 	try:
 		sem = EDIT_SEM[channel.id]
@@ -831,7 +852,7 @@ worst_url = lambda obj: get_url(obj, to_webp_ex) or getattr(obj, "url", None) or
 
 allow_gif = lambda url: url + ".gif" if "." not in url.rsplit("/", 1)[-1] and "?" not in url else url
 
-def get_author(user, u_id=None):
+def get_author(user, uid=None):
 	url = best_url(user)
 	bot = BOT[0]
 	if bot and "proxies" in bot.data:
@@ -841,7 +862,7 @@ def get_author(user, u_id=None):
 		else:
 			bot.data.exec.cproxy(url)
 	name = getattr(user, "display_name", None) or user.name
-	if u_id:
+	if uid:
 		name = f"{name} ({user.id})"
 	return cdict(name=name, icon_url=url, url=url)
 
@@ -850,7 +871,7 @@ find_emojis = lambda s: regexp(r"<a?:[A-Za-z0-9\-~_]+:[0-9]+>").findall(s)
 find_users = lambda s: regexp(r"<@!?[0-9]+>").findall(s)
 
 
-def min_emoji(emoji, full=False):
+def min_emoji(emoji, full=False) -> str:
 	if not getattr(emoji, "id", None):
 		if getattr(emoji, "name", None):
 			return emoji.name
@@ -1818,6 +1839,12 @@ def find_emojis_ex(s, cast_urls=True):
 
 HEARTS = ["❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
 
+class SimulatedEmoji(cdict):
+	def __str__(self):
+		if self.get("unicode"):
+			return self.unicode
+		return min_emoji(self, full=True)
+
 
 readstring = lambda s: deobfuscate(zwremove(s))
 
@@ -1996,120 +2023,108 @@ class Command(Importable):
 			if not coms:
 				bot.commands.pop(alias, None)
 
-	def pageinit(self, *args, index=0, load=True):
-		catg = self.catg.casefold()
-		name = self.__name__.casefold()
-		return (
-			f"*```callback-{catg}-{name}-"
-			+ "_".join(map(str, args)) + f"_{index}"
-			+ "-\n"
-			+ (f"Loading {self.__name__} database...```*" if load else "")
+	def encode(self, *args):
+		raise NotImplementedError
+
+	def decode(self, *args):
+		raise NotImplementedError
+
+
+def default_pagination_key(curr, pos=0, page=16):
+	return iter2str(
+		tuple(curr)[pos:pos + page],
+		left="`【",
+		right="】`",
+		offset=pos,
+	).strip()
+
+class PaginationCommand(Command):
+
+	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
+
+	def encode(self, uid: int, data: bytes, s: str) -> str:
+		s = s.strip()
+		code = invisicode.encode(self.__name__.encode("utf-8") + b" " + leb128(uid) + as_bytes(data))
+		if (s.startswith("```") or s.startswith("*```")) and "\n" in s:
+			x, y = s.split("\n", 1)
+			if not y or not y[0].isascii():
+				code += "\u200b"
+			return x + "\n" + code + y
+		if not s or not s[0].isascii():
+			code += "\u200b"
+		return code + s
+
+	@staticmethod
+	def decode(s: str) -> tuple:
+		if s.startswith("```") or s.startswith("*```"):
+			s = s.split("\n", 2)[1]
+		if not s:
+			raise ValueError(s)
+		for i, c in enumerate(s):
+			if not invisicode.BASE <= ord(c) < invisicode.BASE + invisicode.RANGE:
+				break
+		code = invisicode.decode(s[:i])
+		name, code = code.split(b" ", 1)
+		return (as_str(name), *decode_leb128(code))
+
+	def react_perms(self, perm: int):
+		return None
+
+	def construct(self, uid, data, content="", **kwargs):
+		if not content:
+			embed = kwargs.get("embed")
+			if embed:
+				embed.description = self.encode(uid, data, embed.description)
+			else:
+				content = self.encode(uid, data, content)
+		else:
+			content = self.encode(uid, data, content)
+		if "buttons" not in kwargs:
+			kwargs["buttons"] = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+		return cdict(
+			content=content or None,
+			**kwargs,
 		)
 
-	callback_restrictions = cdict(
-		users="admins",
-	)
-	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-		u_id, pos, s_id = list(map(int, vals.split("_", 2)))
-		if reaction not in (None, self.directions[-1]) and u_id != user.id:
-			return
-		if reaction not in self.directions and reaction is not None:
-			return
-		user = await bot.fetch_user(u_id)
-		rems = bot.data.reminders.get(s_id, [])
-		for r in rems:
-			if isinstance(r.t, number):
-				r.t = DynamicDT.utcfromtimestamp(r.t)
-		sendable = await bot.fetch_messageable(s_id)
-		page = 16
-		last = max(0, len(rems) - page)
-		if reaction is not None:
-			i = self.directions.index(reaction)
-			if i == 0:
-				new = 0
-			elif i == 1:
-				new = max(0, pos - page)
-			elif i == 2:
-				new = min(last, pos + page)
-			elif i == 3:
-				new = last
-			else:
-				new = pos
-			pos = new
-		content = message.content
-		if not content:
-			content = message.embeds[0].description
-		i = content.index("callback")
-		content = "*```" + "\n" * ("\n" in content[:i]) + (
-			"callback-main-reminder-"
-			+ str(u_id) + "_" + str(pos) + "_" + str(s_id)
-			+ "-\n"
-		)
-		if not rems:
-			content += f"Schedule for {str(sendable).replace('`', '')} is currently empty.```*"
-			msg = ""
-		else:
-			t = DynamicDT.utcnow()
-			def format_reminder(x):
-				delta = x.t.as_rel_discord()
-				if delta.startswith("`"):
-					delta = "`" + (x.t - t).to_short() + "`"
-				s = lim_str(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + no_md(x.msg), 96) + f"` ➡️ {delta}"
-				if x.get("e"):
-					every = x.e.to_short()
-					s += f", every `{every}`"
-				return s
-			content += f"{len(rems)} message{'s' if len(rems) != 1 else ''} currently scheduled for {str(sendable).replace('`', '')}:```*"
-			msg = iter2str(
-				rems[pos:pos + page],
-				key=format_reminder,
-				left="`【",
-				right="】`",
-				offset=pos,
-			)
+	async def _callback_(self, _user, **void):
+		return self.construct(_user.id, b"", "`PLACEHOLDER`")
+
+	async def default_display(self, name, uid, pos, curr, diridx=-1, extra=b"", key=default_pagination_key, akey=None, page_size=16):
+		bot = self.bot
+		user = await bot.fetch_user(uid)
+		page = page_size
+		pos = self.paginate(pos, len(curr), page, diridx)
 		colour = await self.bot.get_colour(user)
 		emb = discord.Embed(
-			description=content + msg,
 			colour=colour,
 		).set_author(**get_author(user))
-		more = len(rems) - pos - page
-		if more > 0:
-			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-		if hasattr(message, "int_token"):
-			await bot.ignore_interaction(message)
-
-	def paginate(self, curr, *args, name="data", pos=0, page=0, direction=None, key=lambda curr, pos, page: iter2str(dict(tuple(curr)[pos:pos + page])), colour=None, author=None, **kwargs):
-		last = max(0, len(curr) - page)
-		if direction is not None:
-			i = direction
-			if i == 0:
-				new = 0
-			elif i == 1:
-				new = max(0, pos - page)
-			elif i == 2:
-				new = min(last, pos + page)
-			elif i == 3:
-				new = last
-			else:
-				new = pos
-			pos = new
-		content = self.pageinit(*args, index=pos, load=False)
-		if not len(curr):
-			content += f"No {name}.```*"
-			msg = ""
+		s = "s" if len(curr) != 1 else ""
+		if not curr:
+			emb.title = f"No {name}{s}."
 		else:
-			content += f"{len(curr)} {name}:```*"
-			msg = key(curr, pos, page)
-		emb = discord.Embed(description=content + msg)
-		if colour:
-			emb.colour = colour
-		if author:
-			emb.set_author(**author)
+			emb.title = f"{len(curr)} {name}{s}:"
+			if akey:
+				emb.description = await akey(curr, pos, page)
+			else:
+				emb.description = key(curr, pos, page)
 		more = len(curr) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		return emb
+		return self.construct(uid, leb128(pos) + extra, embed=emb)
+
+	def paginate(self, pos, size, page, diridx=-1):
+		last = max(0, size - page)
+		match diridx:
+			case 0:
+				pos = 0
+			case 1:
+				pos = max(0, pos - page)
+			case 2:
+				pos = min(last, pos + page)
+			case 3:
+				pos = last
+		return pos
 
 
 class Database(Importable, collections.abc.MutableMapping):

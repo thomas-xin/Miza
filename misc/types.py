@@ -508,6 +508,12 @@ def as_str(s, encoding="utf-8"):
 	if isinstance(s, (bytes, bytearray)):
 		return s.decode(encoding, "replace")
 	return str(s)
+def as_bytes(b):
+	if isinstance(b, str):
+		b = b.encode("utf-8")
+	elif not isinstance(b, bytes):
+		b = bytes(b)
+	return b
 
 # Creates a nested tuple from a nested list.
 def _nested_tuple(a):
@@ -1286,6 +1292,8 @@ __qmap = {
 	"⸥": "'",
 }
 __qtrans = "".maketrans(__qmap)
+for i in range(0xe0000, 0xe1000):
+	__qtrans[i] = ""
 
 def full_prune(s):
 	return unicode_prune(s).translate(__qtrans).casefold()
@@ -1669,6 +1677,16 @@ def getattr_chain(obj, attrs, default=Dummy):
 	if obj is Dummy:
 		raise AttributeError(attrs)
 	return obj
+def all_none(*args):
+	for obj in args:
+		if obj is not None:
+			return False
+	return True
+def no_none(*args):
+	for obj in args:
+		if obj is None:
+			return False
+	return True
 
 class T(object):
 	"""

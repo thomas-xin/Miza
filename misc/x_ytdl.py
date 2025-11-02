@@ -8,15 +8,14 @@ from traceback import print_exc
 import zipfile
 import niquests
 from PIL import Image
-import psutil
 import streamshatter
-from .util import is_url, is_discord_attachment, get_duration_2, temporary_file, TEMP_PATH, CODEC_FFMPEG
+from .util import is_url, is_discord_attachment, get_duration_2, temporary_file, CODEC_FFMPEG
 # Allow fallback (although not recommended as generally the up-to-date version is necessary for most sites)
 try:
 	import yt_dlp as ytd
 except ImportError as ex:
 	try:
-		import youtube_dl as ytd
+		import youtube_dl as ytd # type: ignore
 	except ImportError:
 		raise ex
 else:
@@ -216,14 +215,11 @@ else:
 		proc = None
 		try:
 			url = info_dict["url"]
-			if not is_url(url) or is_discord_attachment(url) or url.endswith(".ts"):
+			if not is_url(url) or url.endswith(".ts") or url.endswith(".m4s"):
 				raise ValueError
 			print(url)
 			t = time.time()
-			streamshatter.ChunkManager(url, headers=info_dict.get("http_headers", {}), concurrent_limit=48, timeout=30, filename=filename).run()
-			# args = ["streamshatter", url, "-c", TEMP_PATH, "-H", json.dumps(info_dict.get("http_headers", {})), "-l", "48", "-t", "30", filename]
-			# proc = psutil.Popen(args, stdin=subprocess.DEVNULL)
-			# proc.wait(timeout=32)
+			streamshatter.ChunkManager(url, headers=info_dict.get("http_headers", {}), concurrent_limit=48, timeout=30, filename=filename).run(close=True)
 			elapsed = time.time() - t
 			assert os.path.exists(filename) and os.path.getsize(filename)
 		except ValueError:
@@ -277,13 +273,8 @@ def extract_info(url, download=False, process=True):
 			"ignoreerrors": 0,
 			"default_search": "auto",
 			"source_address": "0.0.0.0",
+			"remote_components": ["ejs:github"],
 			"cookiesfrombrowser": ["firefox"],
-			"extractor_args": {
-				"youtube": {
-					"player_client": ["default", "web_safari"],
-					"player_js_version": ["actual"]
-				}
-			}
 		}
 		ytdl = ytd.YoutubeDL(ydl_opts)
 	resp = ytdl.extract_info(url, download=download, process=process)
@@ -480,7 +471,7 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 	def run(self, info):
 		filename, source_ext = info['filepath'], info['ext'].lower()
 		dur, bps, cdc, ac = get_duration_2(filename)
-		cbr = max(60, min(bps / 1000 / (0.875 if cdc == "mp3" else 0.75 if cdc == "aac" else 0.625), 256))
+		cbr = max(60, min(bps / 1000 / (0.875 if cdc == "mp3" else 0.75 if cdc == "aac" else 0.625), 256)) if bps else 256
 		if not dur or dur < 1920:
 			mbr = 160
 		elif dur < 3840:
@@ -503,7 +494,7 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			input_args.extend(["-ss", str(self.start)])
 		if self.end is not None:
 			input_args.extend(["-to", str(self.end)])
-		if source_codec == self.codec and bps / 1000 <= mbr or isinstance(source_codec, str) and source_codec.startswith("pcm_") and self.codec == "wav":
+		if source_codec == self.codec and bps and bps / 1000 <= mbr or isinstance(source_codec, str) and source_codec.startswith("pcm_") and self.codec == "wav":
 			output_args.extend(["-c", "copy"])
 		else:
 			# Default to 192k for AAC, 160k for Opus, and 224k for MP3

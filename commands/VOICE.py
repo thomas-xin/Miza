@@ -251,7 +251,7 @@ async def search_one(bot, query):
 	return resp
 
 
-class Queue(Command):
+class Queue(PaginationCommand):
 	server_only = True
 	name = ["▶️", "P", "Q", "Play", "PlayNow", "PlayNext", "Enqueue", "Search&Play"]
 	alias = name + ["LS"]
@@ -301,8 +301,6 @@ class Queue(Command):
 			mode="next",
 		),
 	)
-	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	_timeout_ = 2
 	rate_limit = (3.5, 5)
 	typing = True
@@ -327,20 +325,8 @@ class Queue(Command):
 						content=css_md(f"Successfully resumed audio playback in {sqr_md(_guild)}."),
 						reacts="❎",
 					)
-				buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-				resp = await self._callback_(
-					bot=bot,
-					message=None,
-					guild=_guild,
-					reaction=None,
-					user=_user,
-					perm=_perm,
-					vals=f"{_user.id}_0_0",
-				)
-				return cdict(
-					**resp,
-					buttons=buttons,
-				)
+				# Set callback message for scrollable list
+				return await self.display(_user.id, 0, _guild.id)
 			if mode == "now":
 				index = [0]
 			elif mode == "next":
@@ -467,132 +453,104 @@ class Queue(Command):
 			reacts="❎",
 		)
 
-	async def _callback_(self, bot, message, guild, reaction, user, perm, vals, **void):
-		u_id, pos, v = list(map(int, vals.split("_", 2)))
-		if message and not reaction:
-			return
-		if reaction and u_id != user.id and perm < 1:
-			return
-		if reaction not in self.directions and reaction is not None:
-			return
-		user = await bot.fetch_user(u_id)
-		q, settings, paused, reverse, (elapsed, length) = await bot.audio.asubmit(f"(a:=AP.from_guild({guild.id})).queue,a.settings,a.settings.pause,a.reverse,a.epos")
+	def react_perms(self, perm: int):
+		return None if perm < 2 else True
+
+	async def display(self, uid, pos, gid, diridx=-1):
+		bot = self.bot
+		user = await bot.fetch_user(uid)
+		curr, settings, paused, reverse, (elapsed, length) = await bot.audio.asubmit(f"(a:=AP.from_guild({gid})).queue,a.settings,a.settings.pause,a.reverse,a.epos")
 		settings = astype(settings, cdict)
-		last = max(0, len(q) - 10)
-		if reaction is not None:
-			i = self.directions.index(reaction)
-			if i == 0:
-				new = 0
-			elif i == 1:
-				new = max(0, pos - 10)
-			elif i == 2:
-				new = min(last, pos + 10)
-			elif i == 3:
-				new = last
-			else:
-				new = pos
-			pos = new
-		content = (
-			f"```callback-voice-queue-{u_id}_{pos}_{int(v)}-\n"
-			+ "Queue for " + guild.name.replace("`", "") + ": "
-		)
+		page = 10
+		pos = self.paginate(pos, len(curr), page, diridx)
 		start_time = 0
-		if not q:
-			stime = "0"
+		if not curr:
+			stime = "`0`"
 		elif settings.loop:
-			stime = "undefined (loop)"
+			stime = "`indefinite (loop)`"
 		elif settings.repeat:
-			stime = "undefined (repeat)"
+			stime = "`indefinite (repeat)`"
 		elif paused:
-			stime = "undefined (paused)"
+			stime = "`indefinite (paused)`"
 		else:
-			total_time = e_remainder(elapsed, length, q[0], reverse)
+			total_time = e_remainder(elapsed, length, curr[0], reverse)
 			i = 0
-			for e in q[1:]:
+			for e in curr[1:]:
 				total_time += e_dur_2(e)
 				if i < pos:
 					start_time += e_dur_2(e)
 				if not 1 + i & 262143:
 					await asyncio.sleep(0.25)
 				i += 1
-			stime = sec2time(total_time / abs(settings.speed))
-		cnt = len(q)
-		info = (
-			str(cnt) + " item" + "s" * (cnt != 1) + "\nEstimated total duration: "
-			+ stime + "```"
-		)
-		bar = await bot.create_progress_bar(18, elapsed / max(0.0001, length if q else 0))
-		if not q:
-			countstr = "Queue is currently empty.\n"
-		else:
-			countstr = f'{"[`" + no_md(q[0]["name"]) + "`]"}({q[0]["url"]})'
-		countstr += f"` ({uni_str(time_disp(elapsed))}/{uni_str(time_disp(length))})`\n{bar}\n"
+			stime = (DynamicDT.now() + total_time / abs(settings.speed)).as_rel_discord()
+		s = "s" if len(curr) != 1 else ""
 		emb = discord.Embed(
-			description=content + info + countstr,
-			colour=rand_colour(),
-		)
-		emb.set_author(**get_author(user))
+			title=f"Queue: {len(curr)} item{s}" if len(curr) else "Queue: Currently empty",
+		).set_author(**get_author(user))
+		bar = await bot.create_progress_bar(18, elapsed / max(0.0001, length if curr else 0))
+		if not curr:
+			emb.description = f"*Use {bot.get_prefix(gid)}play to add a song!* `"
+		else:
+			emb.description = (
+				f"**Estimated finish time: {stime}**"
+				+ f'\n{"[`" + no_md(curr[0]["name"]) + "`]"}({curr[0]["url"]})` '
+			)
+		emb.description += f"({uni_str(time_disp(elapsed))}/{uni_str(time_disp(length))})`\n{bar}\n"
 		icon = ""
-		if q:
-			if q[0].get("has_storyboard") or reaction is not None:# and self.directions.index(reaction) == 4:
+		if curr:
+			if curr[0].get("has_storyboard") or diridx != -1:
 				try:
-					fut = csubmit(bot.audio.asubmit(f"ytdl.get_thumbnail({json_dumpstr(q[0])},pos={elapsed})"))
+					fut = csubmit(bot.audio.asubmit(f"ytdl.get_thumbnail({json_dumpstr(curr[0])},pos={elapsed})"))
 					icon = await asyncio.wait_for(asyncio.shield(fut), timeout=0.5)
 				except asyncio.TimeoutError:
 					pass
 				except Exception:
 					print_exc()
 				else:
-					q[0]["has_storyboard"] = True
+					curr[0]["has_storyboard"] = True
 			if not icon:
-				icon = get_best_icon(q[0])
+				icon = get_best_icon(curr[0])
 		if icon:
 			if isinstance(icon, str):
 				emb.set_thumbnail(url=icon)
 			else:
 				emb.set_thumbnail(url="attachment://thumb.jpg")
+			emb.colour = await bot.get_colour(icon)
 		embstr = ""
 		curr_time = start_time
 		i = pos
-		maxlen = 40 if icon else 48
-		highest = min(pos + 10, len(q))
+		maxlen = 36 if icon else 48
+		highest = min(pos + page, len(curr))
 		l10 = int(math.log10(max(highest - 1, 1)))
-		maxlen = maxlen - l10 if q else maxlen
+		maxlen = maxlen - l10 if curr else maxlen
 		while i < highest:
-			e = cdict(q[i])
+			try:
+				e = cdict(curr[i])
+			except ValueError:
+				print(i, curr[i])
+				i += 1
+				continue
 			space = l10 - int(math.log10(max(1, i)))
-			curr = "`" + " " * space
+			temp = "`" + " " * space
 			ename = no_md(e.name)
-			curr += f'【{i}】`{"[`" + no_md(lim_str(ename + " " * (maxlen - len(ename)), maxlen)) + "`]"}({e.url})` ({e_dur_n(e)})`'
-			if v:
-				try:
-					u = bot.cache.users[e.u_id]
-					name = u.display_name
-				except KeyError:
-					name = "Deleted User"
-					with suppress():
-						u = await bot.fetch_user(e.u_id)
-						name = u.display_name
-				curr += "\n" + css_md(sqr_md(name))
-			curr += "\n"
-			if len(embstr) + len(curr) > 4096 - len(emb.description):
+			temp += f'【{i}】`{"[`" + no_md(lim_str(ename + " " * (maxlen - len(ename)), maxlen)) + "`]"}({e.url})` ({e_dur_n(e)})`\n'
+			if len(embstr) + len(temp) > 4096 - len(emb.description):
 				break
-			embstr += curr
+			embstr += temp
 			if i <= 1 or not settings.shuffle:
 				curr_time += e_dur_2(e)
 			i += 1
-		emb.description += embstr
-		more = len(q) - i
+		emb.description += embstr.strip()
+		more = len(curr) - i
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
 		file = CompatFile(icon, filename="thumb.jpg") if isinstance(icon, byte_like) else None
 		filed = {"file": file} if file else {}
-		return cdict(
-			**filed,
-			attachments=[],
-			content=None,
-			embed=emb,
-		)
+		return self.construct(uid, leb128(pos), embed=emb, **filed, attachments=[])
+
+	async def _callback_(self, _user, _guild, index, data, **void):
+		pos, _ = decode_leb128(data)
+		return await self.display(_user.id, pos, _guild.id, index)
 
 
 class Connect(Command):

@@ -8,7 +8,7 @@ from collections import deque
 from math import ceil, inf
 from traceback import format_exc, print_exc
 from mpmath import mpf
-from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, CE, tracebacksuppressor, utc, T, string_like
+from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, tracebacksuppressor, utc, T, string_like
 from misc.util import AUTH, CACHE_PATH, AutoCache, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across
 from misc.asyncs import asubmit, csubmit, emptyctx, gather, Semaphore, CloseableAsyncIterator
 
@@ -71,7 +71,7 @@ available = {
 		None: "gpt-5",
 	},
 	"deepseek-v3": {
-		"openrouter": ("deepseek/deepseek-chat-v3-0324:free", ("0", "0")),
+		"openrouter": ("deepseek/deepseek-v3.2-exp", ("0.27", "0.41")),
 		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
 		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
@@ -561,7 +561,7 @@ def get_oai(func, api="openai"):
 		api_map[endpoint] = oai
 	return oai_method(oai, func)
 
-decensor = regexp(r"(?:i am unable to|i'm unable to|i cannot|i can't|i am not able to|i'm not able to|i will not) (?:fulfil|assist|help with|provide|do|respond|comply|engage|perform|encourage|endorse|continue) |refrain from|disengage from", re.I)
+decensor = regexp(r"(?:i am unable to|i.?m unable to|i cannot|i can.?t|i am not able to|i.?m not able to|i will not) (?:fulfil|assist|help with|provide|do|respond|comply|engage|perform|encourage|endorse|continue) |refrain from|disengage from", re.I)
 
 def nsfw_flagged(resp):
 	cat = resp.categories
@@ -573,6 +573,9 @@ def nsfw_flagged(resp):
 			if score >= 0.75:
 				found.append((score, flag + f"({round(score * 100)}%)"))
 	if not found:
+		if resp.flagged:
+			flag, score = max(dict(resp.category_scores).items(), key=lambda t: t[1])
+			return flag + f"({round(score * 100)}%)"
 		return
 	return max(found)[-1]
 
@@ -778,8 +781,8 @@ def _count_to(messages, model):
 								num_tokens += np.prod(get_image_size(b)) / 768 + 128
 							continue
 						raise RuntimeError(f"Unexpected object {json_dumpstr(part)} in message.")
-				else:
-					num_tokens += len(encoding.encode(json_dumpstr(value), allowed_special=encoding.special_tokens_set))
+				# else:
+				# 	num_tokens += len(encoding.encode(json_dumpstr(value), allowed_special=encoding.special_tokens_set))
 	return num_tokens + 3
 async def count_to(messages, model="cl100k_im"):
 	"""Return the number of tokens used by a list of messages."""
@@ -1120,8 +1123,6 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 			if hasattr(response, "choices"):
 				return await stream.pass_item(response)
 			return stream
-		except CE:
-			raise
 		except Exception as ex:
 			if isinstance(ex, ConnectionError) and ex.errno in (401, 403, 404, 429, 502, 503, 504):
 				api_blocked[(sapi, model)] = ex

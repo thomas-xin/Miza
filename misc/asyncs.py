@@ -17,7 +17,10 @@ print("ASYNCS:", __name__)
 def is_main_thread() -> bool:
 	return threading.current_thread() is threading.main_thread()
 def get_event_loop():
-	return asyncio.get_event_loop() if is_main_thread() else eloop
+	try:
+		return asyncio.get_event_loop()
+	except RuntimeError:
+		return eloop
 
 # Main event loop for all asyncio operations.
 try:
@@ -303,13 +306,19 @@ async def _await_fut(fut, ret) -> Future:
 	return ret
 
 def await_fut(fut, timeout=None):
-	"Blocking call that waits for a single asyncio future to complete, do *not* call from main asyncio loop."
+	"Blocking call that waits for a single asyncio future to complete."
+	if is_main_thread():
+		if timeout:
+			fut = asyncio.wait_for(fut, timeout=timeout)
+		return asyncio.run(fut)
 	return convert_fut(fut).result(timeout=timeout)
 
-def convert_fut(fut) -> Future:
-	loop = get_event_loop()
+def convert_fut(fut):
 	if is_main_thread():
-		raise RuntimeError("This function must not be called from the main thread's asyncio loop.")
+		fut = concurrent.futures.Future()
+		fut.set_result(asyncio.run(fut))
+		return fut
+	loop = get_event_loop()
 	try:
 		ret = asyncio.run_coroutine_threadsafe(fut, loop=loop)
 	except Exception:

@@ -795,7 +795,7 @@ class AudioPlayer(discord.AudioSource):
 			return
 		with self.ensure_lock:
 			self.pause()
-			source = AF.load(self.queue[0], asap=pos <= 8).create_reader(self, pos=pos)
+			source = AF.load(self.queue[0], asap=None if pos <= 8 else False).create_reader(self, pos=pos)
 			source.new = False
 			if self.playing:
 				self.playing[0], _ = source, self.playing[0].close()
@@ -858,9 +858,9 @@ class AudioPlayer(discord.AudioSource):
 				entry = self.queue[1]
 				if not entry.get("duration") or not entry.duration < 3840:
 					return
-				asap = entry["duration"] > (self.epos[1] - self.epos[0]) * 8
+				# asap = entry["duration"] > (self.epos[1] - self.epos[0]) * 8
 				try:
-					source = AF.load(entry, asap=asap).create_reader(self, pos=entry.get("start", 0))
+					source = AF.load(entry, asap=False).create_reader(self, pos=entry.get("start", 0))
 				except Exception as ex:
 					print_exc()
 					s = italics(ansi_md(colourise_auto("$r<❗> An error occured while loading {ENTRY}, and it has been removed automatically. $r<❗>\nException: {EXCEPTION}")))
@@ -939,7 +939,7 @@ class AudioFile:
 		return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}, linked to {self.path}>"
 
 	@classmethod
-	def load(cls, entry, asap=True):
+	def load(cls, entry, asap=None):
 		url = unyt(entry["url"])
 		self = None
 		try:
@@ -970,7 +970,7 @@ class AudioFile:
 			self.url = url
 			# Sometimes entries may have a corrupted name, so we need to fetch a new search using the URL
 			if not entry.get("duration") and (not entry.get("name") or entry["name"] == entry["url"].rsplit("/", 1)[-1].split("?", 1)[0]):
-				results = ytdl.search(entry["url"])
+				results = ytdl_fut.result().search(entry["url"])
 				if results:
 					entry.update(results[0])
 			name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
@@ -981,7 +981,7 @@ class AudioFile:
 				if abs(entry["duration"] - self.duration) < 1:
 					entry["duration"] = self.duration
 					return self
-			stream, codec, duration, channels = ytdl.get_audio(entry, asap=asap)
+			stream, codec, duration, channels = ytdl_fut.result().get_audio(entry, asap=asap)
 			name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
 			self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
 			if duration:
@@ -1028,7 +1028,7 @@ class AudioFile:
 				proc.terminate()
 				ex = as_str(err.read())
 				if asap and "Server returned 403 Forbidden (access denied)" in str(ex):
-					stream, codec, duration, channels = ytdl.get_audio(entry, asap=False)
+					stream, codec, duration, channels = ytdl_fut.result().get_audio(entry, asap=False)
 					name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
 					self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
 					print("DL:", self.path)
@@ -1583,7 +1583,7 @@ async def on_voice_state_update(member, before, after):
 async def terminate():
 	# Unload all audio players and preserve their state in our cache on disk
 	await asyncio.gather(*(unload_player(gid) for gid in AP.players.keys()))
-	await asubmit(ytdl.close)
+	await asubmit(ytdl_fut.result().close)
 	return await client.close()
 
 

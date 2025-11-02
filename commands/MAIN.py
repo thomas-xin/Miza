@@ -48,7 +48,6 @@ help_descriptions = fcdict((
 	("misc", "Miscellaneous, mostly not relevant to Discord and restricted to trusted servers"),
 ))
 
-
 class Help(Command):
 	name = ["❓", "❔", "?", "Halp"]
 	description = "Shows a list of usable commands, or gives a detailed description of a command."
@@ -79,8 +78,8 @@ class Help(Command):
 		prefix = "/" if getattr(_message, "slash", None) else bot.get_prefix(_guild)
 		if " " in prefix:
 			prefix += " "
-		embed = discord.Embed()
-		embed.set_author(name="❓ Help ❓", icon_url=best_url(_user), url=bot.webserver)
+		colour = await self.bot.get_colour(_user)
+		embed = discord.Embed(colour=colour).set_author(name="❓ Help ❓", icon_url=best_url(_user), url=bot.webserver)
 		if command and command not in bot.commands:
 			raise KeyError(f'Command "{command}" does not exist.')
 		content = None
@@ -241,7 +240,7 @@ class Loop(Command):
 			try:
 				response = await fut
 			# Represents any timeout error that occurs
-			except (T0, T1, T2, CE):
+			except (T0, T1, T2):
 				print(command, argv)
 				raise TimeoutError("Request timed out.")
 			if fut:
@@ -300,7 +299,7 @@ class Edit(Command):
 			try:
 				response = await bot.run_command(command, message=fake_message, argv=argv, command_check=command_check, respond=False, allow_recursion=True)
 			# Represents any timeout error that occurs
-			except (T0, T1, T2, CE):
+			except (T0, T1, T2):
 				print(command, argv)
 				raise TimeoutError("Request timed out.")
 			await bot.respond_with(response, message=fake_message, command=command, manager=manager)
@@ -340,7 +339,7 @@ class Pipe(Command):
 			try:
 				response = await bot.run_command(command, message=fake_message, argv=argv, command_check=command_check, respond=False, allow_recursion=True)
 			# Represents any timeout error that occurs
-			except (T0, T1, T2, CE):
+			except (T0, T1, T2):
 				print(command, argv)
 				raise TimeoutError("Request timed out.")
 		while pipe:
@@ -362,7 +361,7 @@ class Pipe(Command):
 					try:
 						response = await bot.run_command(command, message=fake_message, argv=argv, command_check=command_check, respond=False, allow_recursion=True)
 					# Represents any timeout error that occurs
-					except (T0, T1, T2, CE):
+					except (T0, T1, T2):
 						print(command, argv)
 						raise TimeoutError("Request timed out.")
 				if response:
@@ -388,11 +387,10 @@ class Avatar(Command):
 		url = best_url(g)
 		name = g.name
 		colour = await self.bot.get_colour(g)
-		emb = discord.Embed(colour=colour)
-		emb.set_thumbnail(url=url)
-		emb.set_image(url=url)
-		emb.set_author(name=name, icon_url=url, url=url)
-		emb.description = f"{sqr_md(name)}({url})"
+		emb = discord.Embed(
+			description=f"{sqr_md(name)}({url})",
+			colour=colour,
+		).set_thumbnail(url=url).set_image(url=url).set_author(name=name, icon_url=url, url=url)
 		return emb
 
 	async def getMimicData(self, p):
@@ -400,11 +398,10 @@ class Avatar(Command):
 		url = best_url(p)
 		name = p.name
 		colour = await self.bot.get_colour(p)
-		emb = discord.Embed(colour=colour)
-		emb.set_thumbnail(url=url)
-		emb.set_image(url=url)
-		emb.set_author(name=name, icon_url=url, url=url)
-		emb.description = f"{sqr_md(name)}({url})"
+		emb = discord.Embed(
+			description=f"{sqr_md(name)}({url})",
+			colour=colour,
+		).set_thumbnail(url=url).set_image(url=url).set_author(name=name, icon_url=url, url=url)
 		return emb
 
 	async def __call__(self, argv, argl, channel, guild, bot, user, message, **void):
@@ -501,9 +498,7 @@ class Info(Command):
 		except (AttributeError, KeyError):
 			u = None
 		colour = await self.bot.get_colour(g)
-		emb = discord.Embed(colour=colour)
-		emb.set_thumbnail(url=url)
-		emb.set_author(name=name, icon_url=url, url=url)
+		emb = discord.Embed(colour=colour).set_thumbnail(url=url).set_author(name=name, icon_url=url, url=url)
 		if u is not None:
 			d = user_mention(u.id)
 		else:
@@ -1020,8 +1015,7 @@ class Invite(Command):
 	ephemeral = True
 
 	async def __call__(self, channel, message, **void):
-		emb = discord.Embed(colour=rand_colour())
-		emb.set_author(**get_author(self.bot.user))
+		emb = discord.Embed(colour=rand_colour()).set_author(**get_author(self.bot.user))
 		emb.description = f"[**`My Github`**]({self.bot.github}) [**`My Website`**]({self.bot.webserver}) [**`My Invite`**]({self.bot.invite})"
 		if message.guild:
 			with tracebacksuppressor:
@@ -1078,7 +1072,7 @@ class Preserve(Command):
 		return "\n".join("<" + u + ">" for u in out)
 
 
-class Reminder(Command):
+class Reminder(PaginationCommand):
 	name = ["RemindMe", "Reminders", "Remind"]
 	description = "Sets a reminder for a certain date and time in the future."
 	schema = cdict(
@@ -1095,6 +1089,7 @@ class Reminder(Command):
 			type="string",
 			description="Message to receive. Will show up as an embed",
 			example="Doctor's appointment",
+			validation="[0, 4096]",
 		),
 		icon=cdict(
 			type="visual",
@@ -1110,6 +1105,11 @@ class Reminder(Command):
 			type="timedelta",
 			description="Turn the reminder into a recurring one that will resend itself after a given amount of time. Note: Must be removed manually!",
 			example="One hundred thousand thirty seconds",
+		),
+		edit=cdict(
+			type="index",
+			description="Index of reminder(s) to edit",
+			example="3..7",
 		),
 		delete=cdict(
 			type="index",
@@ -1128,17 +1128,61 @@ class Reminder(Command):
 			mode="announcements",
 		),
 	)
-	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	rate_limit = (8, 13)
 	slash = True
 
-	async def __call__(self, bot, _message, _comment, _channel, _user, mode="reminder", message=None, icon=None, time=None, every=None, delete=None, **void):
+	async def __call__(self, bot, _message, _comment, _channel, _user, mode, message, icon, time, every, edit, delete, **void):
 		sendable = _channel if mode == "announce" else _user
 		rems = bot.data.reminders.get(sendable.id, [])
 		for r in rems:
 			if isinstance(r.t, number):
 				r.t = DynamicDT.utcfromtimestamp(r.t)
+		if all_none(message, icon, time, edit, delete):
+			# Set callback message for scrollable list
+			return await self.display(_user.id, 0, sendable.id)
+
+		if edit is not None:
+			if not len(rems):
+				return ini_md(f"No {mode}s currently set for {sqr_md(sendable)}.")
+			if all_none(message, icon, time, every):
+				raise ValueError("Please input at least one valid field to edit")
+			targets = RangeSet.parse([edit], len(rems))
+			assert targets, "No reminders at the specified index."
+			for i in targets:
+				if message is not None:
+					rems[i].msg = message
+				if icon is not None:
+					rems[i].icon = icon
+				if time is not None:
+					rems[i].t = time
+				if every is not None:
+					rems[i].e = every
+			rems = astype(rems, alist)
+			if time is not None:
+				rems.sort(rems, key=lambda x: x.t.timestamp_exact())
+			bot.data.reminders[sendable.id] = rems
+			if 0 in targets:
+				with suppress(ValueError):
+					bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
+				if rems:
+					bot.data.reminders.listed.insort((rems[0].t.timestamp_exact(), sendable.id), key=lambda x: x[0])
+			out = _comment + f"\n```css\nSuccessfully edited {sqr_md(len(targets))} "
+			s = "s" if len(targets) != 1 else ""
+			if mode == "announcement":
+				out += f"announcement{s} for {sqr_md(sendable)}"
+			else:
+				out += f"reminder{s} for {sqr_md(sendable)}"
+			if time is not None:
+				out += f" at {sqr_md(time)}"
+			if every:
+				out += f", every {sqr_md(sec2time(every.total_seconds()))}"
+			out += ".```"
+			if time is not None:
+				out += time.as_discord() + " (" + time.as_rel_discord() + ")"
+			return cdict(
+				content=out,
+			)
+
 		if delete is not None:
 			if not len(rems):
 				return ini_md(f"No {mode}s currently set for {sqr_md(sendable)}.")
@@ -1156,28 +1200,15 @@ class Reminder(Command):
 				if rems:
 					bot.data.reminders.listed.insort((rems[0].t.timestamp_exact(), sendable.id), key=lambda x: x[0])
 			return ini_md(f"Successfully removed {sqr_md(removed)} from {mode} list for {sqr_md(sendable)}.")
-		if message is None and icon is None and time is None:
-			# Set callback message for scrollable list
-			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-			await send_with_reply(
-				None,
-				_message,
-				"*```callback-main-reminder-"
-				+ str(_user.id) + "_0_" + str(sendable.id)
-				+ "-\nLoading Reminder database...```*",
-				buttons=buttons,
-			)
-			return
+
+		if time is None:
+			raise ValueError("Please input a valid time.")
 		if not message:
 			msg = "[SAMPLE ANNOUNCEMENT]" if mode == "announcement" else "[SAMPLE REMINDER]"
 			if mode == "urgent":
 				message = bold(css_md(msg, force=True))
 			else:
 				message = bold(ini_md(msg))
-		elif len(message) > 4096:
-			raise OverflowError(f"Input message too long ({len(message)} > 4096).")
-		elif time is None:
-			raise ValueError("Please input a valid time.")
 		rem = cdict(
 			user=_user.id,
 			msg=message,
@@ -1216,54 +1247,33 @@ class Reminder(Command):
 		if every:
 			out += f", every {sqr_md(sec2time(every.total_seconds()))}"
 		out += ":```"
-		if time:
-			out += time.as_discord() + " (" + time.as_rel_discord() + ")"
+		out += time.as_discord() + " (" + time.as_rel_discord() + ")"
 		return cdict(
 			content=out,
 			embed=emb,
 		)
 
-	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-		u_id, pos, s_id = list(map(int, vals.split("_", 2)))
-		if reaction not in (None, self.directions[-1]) and u_id != user.id:
-			return
-		if reaction not in self.directions and reaction is not None:
-			return
-		user = await bot.fetch_user(u_id)
-		rems = bot.data.reminders.get(s_id, [])
-		for r in rems:
+	async def display(self, uid, pos, sid, diridx=-1):
+		bot = self.bot
+		user = await bot.fetch_user(uid)
+		curr = bot.data.reminders.get(sid, [])
+		for r in curr:
 			if isinstance(r.t, number):
 				r.t = DynamicDT.utcfromtimestamp(r.t)
-		sendable = await bot.fetch_messageable(s_id)
+		sendable = await bot.fetch_messageable(sid)
 		page = 16
-		last = max(0, len(rems) - page)
-		if reaction is not None:
-			i = self.directions.index(reaction)
-			if i == 0:
-				new = 0
-			elif i == 1:
-				new = max(0, pos - page)
-			elif i == 2:
-				new = min(last, pos + page)
-			elif i == 3:
-				new = last
-			else:
-				new = pos
-			pos = new
-		content = message.content
-		if not content:
-			content = message.embeds[0].description
-		i = content.index("callback")
-		content = "*```" + "\n" * ("\n" in content[:i]) + (
-			"callback-main-reminder-"
-			+ str(u_id) + "_" + str(pos) + "_" + str(s_id)
-			+ "-\n"
-		)
-		if not rems:
-			content += f"Schedule for {str(sendable).replace('`', '')} is currently empty.```*"
-			msg = ""
+		pos = self.paginate(pos, len(curr), page, diridx)
+		colour = await self.bot.get_colour(user)
+		emb = discord.Embed(
+			colour=colour,
+		).set_author(**get_author(user))
+		if not curr:
+			emb.title = f"Schedule for {sendable} is currently empty."
 		else:
+			s = "s" if len(curr) != 1 else ""
+			emb.title = f"{len(curr)} message{s} currently scheduled for {sendable}:"
 			t = DynamicDT.utcnow()
+
 			def format_reminder(x):
 				delta = x.t.as_rel_discord()
 				if delta.startswith("`"):
@@ -1273,132 +1283,91 @@ class Reminder(Command):
 					every = x.e.to_short()
 					s += f", every `{every}`"
 				return s
-			content += f"{len(rems)} message{'s' if len(rems) != 1 else ''} currently scheduled for {str(sendable).replace('`', '')}:```*"
-			msg = iter2str(
-				rems[pos:pos + page],
+
+			emb.description = iter2str(
+				curr[pos:pos + page],
 				key=format_reminder,
 				left="`【",
 				right="】`",
 				offset=pos,
-			)
-		colour = await self.bot.get_colour(user)
-		emb = discord.Embed(
-			description=content + msg,
-			colour=colour,
-		).set_author(**get_author(user))
-		more = len(rems) - pos - page
-		if more > 0:
-			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-		if hasattr(message, "int_token"):
-			await bot.ignore_interaction(message)
-
-
-class Note(Command):
-	name = ["Trash", "Notes"]
-	description = "Takes note of a given string and allows you to view and edit a to-do list!"
-	usage = "<mode(edit|delete)>? <target(id|note)>?"
-	example = ("note test", "trash 1", "note edit 0 do the laundry")
-	rate_limit = (6, 10)
-	flags = "aed"
-	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
-
-	async def __call__(self, name, message, channel, flags, bot, user, argv, **void):
-		note_userbase = bot.data.notes
-		if argv.startswith("edit "):
-			if argv:
-				argv = argv.split(None, 1)[-1]
-			add_dict(flags, dict(e=1))
-		elif argv.startswith("delete ") or argv.startswith("remove ") or name == "trash":
-			if argv:
-				argv = argv.split(None, 1)[-1]
-			add_dict(flags, dict(d=1))
-		if "d" in flags:
-			if not argv:
-				argv = 0
-			try:
-				n = note_userbase[user.id].pop(int(argv))
-			except (KeyError, IndexError):
-				argv = rank_format(int(argv))
-				raise LookupError(f"You don't have a {argv} note!")
-			argv = rank_format(int(argv))
-			if not note_userbase.get(user.id):
-				note_userbase.discard(user.id)
-			return ini_md(f"Successfully removed {argv} note: {sqr_md(n)}")
-		elif not argv:
-			# Set callback message for scrollable list
-			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-			await send_with_reply(
-				None,
-				message,
-				"*```" + "\n" * ("z" in flags) + "callback-main-note-"
-				+ str(user.id) + "_0"
-				+ "-\nLoading Notes database...```*",
-				buttons=buttons,
-			)
-			return
-		elif "e" in flags:
-			pass
-			# Kind of want to implement buttons for this one, so Miza will ask if the user wants to append below or to the side of an existing note in a less clunky way. Leaving this one to Txin. XD
-		try:
-			note_userbase[user.id].append(argv)
-		except KeyError:
-			note_userbase[user.id] = [argv]
-		notecount = rank_format(len(note_userbase[user.id]) - 1)
-		return ini_md(f"Successfully added {notecount} note for [{user}]!")
-
-	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-		u_id, pos = list(map(int, vals.split("_", 1)))
-		if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
-			return
-		if reaction not in self.directions and reaction is not None:
-			return
-		user = await bot.fetch_user(u_id)
-		data = bot.data.notes
-		curr = data.get(user.id, ())
-		page = 16
-		last = max(0, len(curr) - page)
-		if reaction is not None:
-			i = self.directions.index(reaction)
-			if i == 0:
-				new = 0
-			elif i == 1:
-				new = max(0, pos - page)
-			elif i == 2:
-				new = min(last, pos + page)
-			elif i == 3:
-				new = last
-			else:
-				new = pos
-			pos = new
-		content = message.content
-		if not content:
-			content = message.embeds[0].description
-		i = content.index("callback")
-		content = "*```" + "\n" * ("\n" in content[:i]) + (
-			"callback-main-note-"
-			+ str(u_id) + "_" + str(pos)
-			+ "-\n"
-		)
-		if not curr:
-			content += f"No currently assigned notes for {str(user).replace('`', '')}.```*"
-			msg = ""
-		else:
-			content += f"{len(curr)} note(s) currently assigned for {str(user).replace('`', '')}:```*"
-			msg = iter2str(tuple(curr)[pos:pos + page], left="`【", right="】`", offset=pos)
-		colour = await self.bot.get_colour(user)
-		emb = discord.Embed(
-			description=content + msg,
-			colour=colour,
-		)
-		emb.set_author(**get_author(user))
+			).strip()
 		more = len(curr) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-		if hasattr(message, "int_token"):
-			await bot.ignore_interaction(message)
+		return self.construct(uid, leb128(pos) + leb128(sendable.id), embed=emb)
+
+	async def _callback_(self, _user, index, data, **void):
+		pos, more = decode_leb128(data)
+		sid, _ = decode_leb128(more)
+		return await self.display(_user.id, pos, sid, index)
+
+
+class Note(PaginationCommand):
+	name = ["Notes"]
+	description = "Takes note of a given string and allows you to view and edit a to-do list!"
+	schema = cdict(
+		message=cdict(
+			type="string",
+			description="Message to receive. Will show up as an embed",
+			example="Doctor's appointment",
+		),
+		edit=cdict(
+			type="index",
+			description="Index of reminder(s) to edit",
+			example="3..7",
+		),
+		delete=cdict(
+			type="index",
+			description="Index of reminder(s) to delete",
+			example="3..7",
+		),
+	)
+	rate_limit = (6, 10)
+
+	async def __call__(self, bot, _user, message, edit, delete, **void):
+		notes = bot.data.notes.get(_user.id, [])
+		if all_none(message, edit, delete):
+			# Set callback message for scrollable list
+			return await self.display(_user.id, 0)
+
+		if edit:
+			targets = RangeSet.parse([edit], len(notes))
+			assert targets, "No reminders at the specified index."
+			for i in targets:
+				notes[i] = message
+			bot.data.notes[_user.id] = notes
+			return cdict(
+				f"Successfully updated {sqr_md(len(targets))} notes for {sqr_md(_user)}.",
+				prefix="```css\n",
+				suffix="```",
+			)
+		if delete:
+			targets = RangeSet.parse([delete], len(notes))
+			assert targets, "No reminders at the specified index."
+			notes = [note for i, note in enumerate(notes) if i not in targets]
+			bot.data.notes[_user.id] = notes
+			return cdict(
+				f"Successfully removed {sqr_md(len(targets))} notes for {sqr_md(_user)}.",
+				prefix="```css\n",
+				suffix="```",
+			)
+
+		nth = rank_format(len(notes))
+		notes.append(message)
+		bot.data.notes[_user.id] = notes
+		return cdict(
+			f"Successfully added {sqr(nth)} note for {sqr_md(_user)}!",
+			prefix="```css\n",
+			suffix="```",
+		)
+
+	async def display(self, uid, pos, diridx=-1):
+		bot = self.bot
+		return await self.default_display("note", uid, pos, bot.data.notes.get(uid, ()), diridx)
+
+	async def _callback_(self, _user, index, data, **void):
+		pos, _ = decode_leb128(data)
+		return await self.display(_user.id, pos, index)
 
 
 class UpdateUrgentReminders(Database):
@@ -1523,12 +1492,11 @@ class UpdateReminders(Database):
 			ch = await self.bot.fetch_messageable(u_id)
 			if not self.bot.permissions_in(ch).send_messages:
 				continue
-			emb = discord.Embed(description=x.msg)
 			try:
 				u = self.bot.get_user(x["user"], replace=True)
 			except KeyError:
 				u = x
-			emb.set_author(**get_author(u))
+			emb = discord.Embed(description=x.msg).set_author(**get_author(u))
 			if x.get("icon"):
 				emb.set_thumbnail(url=x["icon"])
 			reference = None
@@ -1585,15 +1553,6 @@ class UpdateMessages(Database):
 
 	async def _destroy_(self, **void):
 		self.closed = True
-		# self.hue += 128
-		# col = colour2raw(hue2colour(self.hue))
-		# msg = "Offline 😔"
-		# for c_id, data in self.data.items():
-			# with tracebacksuppressor(SemaphoreOverflowError):
-				# channel = await self.bot.fetch_channel(c_id)
-				# for m_id, v in data.items():
-					# async with self.semaphore:
-						# await eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id, msg=msg, colour=col)
 
 
 

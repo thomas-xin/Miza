@@ -76,7 +76,7 @@ class Ask(Command):
 			bot_name = _guild.me.display_name
 		except (AttributeError, LookupError):
 			bot_name = bot.name
-		nsfw = _nsfw
+		nsfw = _nsfw or bot.is_nsfw(_user)
 		_premium.require(2)
 		prompt = (prompt or "").strip()
 		if not prompt and not _message.attachments:
@@ -93,7 +93,7 @@ class Ask(Command):
 		else:
 			name_repr = bot_name
 		personality = pdata.description.replace("{{user}}", _user.display_name).replace("{{char}}", name_repr)
-		if "nsfw" in personality.casefold() or bot.is_nsfw(_user):
+		if "nsfw" in personality.casefold() or not _nsfw and bot.is_nsfw(_user):
 			ac = ""
 		elif nsfw:
 			ac = "You are currently in a NSFW-enabled channel. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise the needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
@@ -101,7 +101,6 @@ class Ask(Command):
 			ac = "You are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, please use disclaimers in your response, and mention this to the user if necessary. However, avoid repeating yourself if already clarified."
 		if ac:
 			personality += "\n" + ac
-		nsfw = bot.is_nsfw(_user)
 		tzinfo = self.bot.data.users.get_timezone(_user.id)
 		if tzinfo is None:
 			tzinfo, _c = self.bot.data.users.estimate_timezone(_user.id)
@@ -902,11 +901,7 @@ class Imagine(Command):
 		"*Tip: By using generative AI, you are assumed to comply with the [ToS](<https://github.com/thomas-xin/Miza/wiki/Terms-of-Service>).*",
 		"*Tip: Use --ar or --aspect-ratio to control the proportions of the image.*",
 		"*Tip: Use -c or --count to control the amount of images generated; maximum 4 for regular users, 9 for premium.*",
-		# "*Tip: Use --np or --negative-prompt to specify what an image should not contain.*",
-		# "*Tip: Use --steps or --hq to control quality vs speed.*",
-		# "*Tip: Use --gs or --guidance-scale to control adherance vs diversity.*",
-		# "*Tip: Use --mode (or simply type one of the keywords) to control how separate inputs should be treated.*",
-		# "*Tip: You can upload more than one image as prompt, in which case the second image will be used as inpaint/controlnet mask, if applicable.*",
+		'*Tip: Standalone text prompts that are short may be reinterpreted by the language model automatically. Use the ALT button on image outputs to see what was added (requires "With image descriptions" enabled in Discord chat settings)',
 	)
 	comfyui_json = "misc/comfyui-api.json"
 	comfyui_api = None
@@ -1106,7 +1101,7 @@ class Imagine(Command):
 						"aspect_ratio": selected_ar,
 					}
 				}
-				response = requests.post(url, headers=headers, json=payload)
+				response = requests.post(url, headers=headers, json=payload, timeout=48)
 				try:
 					response.raise_for_status()
 				except Exception:

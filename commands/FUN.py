@@ -1856,7 +1856,7 @@ class Pay(Command):
 		return css_md(f"{sqr_md(user)} has paid {sqr_md(amount)} {currency} to {sqr_md(target)}.")
 
 
-class React(Command):
+class React(PaginationCommand):
 	server_only = True
 	name = ["AutoReact"]
 	min_level = 0
@@ -1889,27 +1889,9 @@ class React(Command):
 			default="{CONTENT}",
 		),
 	)
-	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	rate_limit = (4, 6)
 	slash = True
 	default_preprocess = "{CONTENT}"
-
-	def react_repr(self, func, preprocess, keyword, emoji):
-		s = ""
-		if preprocess and preprocess != self.default_preprocess:
-			s += as_str(func(preprocess))
-		if keyword:
-			if s:
-				s += " 🔀 "
-			s += as_str(func(keyword))
-		if emoji:
-			if s:
-				s += " ➡️ "
-			s += as_str(func(emoji))
-		if not s:
-			s = "all auto reacts"
-		return s
 
 	def as_list(self, main):
 		out = []
@@ -1923,11 +1905,8 @@ class React(Command):
 		main = reacts.coercedefault(_guild.id, alist, alist())
 		if not keyword and not emoji and mode != "remove":
 			# Set callback message for scrollable list
-			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-			return cdict(
-				content=self.pageinit(_user.id),
-				buttons=buttons,
-			)
+			return await self.display(_user.id, 0, _guild.id)
+
 		if keyword:
 			if len(keyword) > 2 and keyword[0] == keyword[-1] == "/":
 				re.compile(keyword[1:-1])
@@ -1935,14 +1914,12 @@ class React(Command):
 				keyword = full_prune(keyword)
 		if _perm < 2:
 			raise self.perm_error(_perm, 2, "for command " + _name)
-		if emoji:
-			if isinstance(emoji, int):
-				emoji = await bot.fetch_emoji(emoji)
-				emoji = str(emoji)
-				# This reaction indicates that the emoji was valid
-				await _message.add_reaction(emoji)
-		json_repr = self.react_repr(maybe_json, preprocess, keyword, emoji)
-		sqr_repr = self.react_repr(sqr_md, preprocess, keyword, emoji)
+		emote = str(emoji)
+		if emote:
+			# This reaction indicates that the emoji was valid
+			await _message.add_reaction(emote)
+			json_repr = self.react_repr(maybe_json, preprocess, keyword, emote)
+			sqr_repr = self.react_repr(sqr_md, preprocess, keyword, emote)
 		if mode == "remove":
 			pops = deque()
 			for i, tup in enumerate(main):
@@ -1950,7 +1927,7 @@ class React(Command):
 					continue
 				if keyword and keyword != tup[1]:
 					continue
-				if emoji and emoji != tup[2]:
+				if emote != tup[2]:
 					continue
 				pops.append(i)
 			if not pops:
@@ -1959,7 +1936,7 @@ class React(Command):
 			reacts[_guild.id] = main
 			instances = sqr_repr if len(pops) == 1 else f"[{len(pops)}] instances of {sqr_repr}"
 			return italics(css_md(f"Removed {instances} from the auto react list for {sqr_md(_guild)}."))
-		if not emoji:
+		if not emote:
 			raise ArgumentError("Please input emoji by ID, indicator or URL.")
 		lim = 128 << bot.is_trusted(_guild.id) * 2 + 1
 		if len(main) >= lim:
@@ -1969,7 +1946,7 @@ class React(Command):
 		# Limit substring length to 512
 		if len(keyword) > 512 or preprocess and len(preprocess) > 512:
 			raise OverflowError(f"Search substring too long ({len(keyword)} > 512).")
-		tup = (preprocess, keyword, emoji)
+		tup = (preprocess, keyword, emote)
 		if tup in main:
 			raise FileExistsError(f"{json_repr} is already in the auto react list.")
 		main.append(tup)
@@ -1977,26 +1954,37 @@ class React(Command):
 		reacts[_guild.id] = main
 		return css_md(f"Added {sqr_repr} to the auto react list for {sqr_md(_guild)}.")
 
-	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-		u_id, pos = list(map(int, vals.split("_", 1)))
-		if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
-			return
-		if reaction not in self.directions and reaction is not None:
-			return
-		guild = message.guild
-		main = bot.data.reacts.get(guild.id, [])
-		colour = await bot.get_colour(guild)
-		if reaction is not None:
-			direction = self.directions.index(reaction)
-		else:
-			direction = None
-		name = f"auto reactions currently assigned for {str(guild).replace('`', '')}"
+	def react_repr(self, func, preprocess, keyword, emote):
+		s = ""
+		if preprocess and preprocess != self.default_preprocess:
+			s += as_str(func(preprocess))
+		if keyword:
+			if s:
+				s += " 🔀 "
+			s += as_str(func(keyword))
+		if emote:
+			if s:
+				s += " ➡️ "
+			s += as_str(func(emote))
+		if not s:
+			s = "all auto reacts"
+		return s
+
+	def react_perms(self, perm: int):
+		return False if perm < 2 else True
+
+	async def display(self, uid, pos, gid, diridx=-1):
+		bot = self.bot
+
 		def key(curr, pos, page):
-			return ini_md("\n".join(sqr_md(i) + ": " + self.react_repr(lambda x: x, p, k, e) for i, (p, k, e) in enumerate(tuple(main)[pos:pos + page], pos)))
-		emb = self.paginate(main, u_id, name=name, pos=pos, page=16, direction=direction, key=key, colour=colour, author=get_author(user))
-		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-		if hasattr(message, "int_token"):
-			await bot.ignore_interaction(message)
+			return "\n".join(sqr_md(i) + ": " + self.react_repr(lambda x: x, p, k, e) for i, (p, k, e) in enumerate(tuple(curr)[pos:pos + page], pos))
+
+		return await self.default_display("auto reaction", uid, pos, bot.data.reacts.get(gid, ()), diridx, extra=leb128(gid), key=key)
+
+	async def _callback_(self, _user, index, data, **void):
+		pos, more = decode_leb128(data)
+		gid, _ = decode_leb128(more)
+		return await self.display(_user.id, pos, gid, index)
 
 
 class UpdateReacts(Database):
@@ -2085,16 +2073,9 @@ class UpdateReacts(Database):
 		# Reactions sorted by their order of appearance in the message
 		for r in sorted(reacting):
 			for react in reacting[r]:
-				if isinstance(react, str) and not react.isnumeric():
-					react = await self.bot.id_from_message(react)
-				if isinstance(react, int):
-					try:
-						react = await self.bot.fetch_emoji(react, guild=guild)
-					except (LookupError, discord.NotFound):
-						self.remove_by_emoji(guild, react)
-						continue
+				react = await self.bot.resolve_emoji(react, guild=guild, allow_external=False)
 				try:
-					await message.add_reaction(react)
+					await message.add_reaction(str(react))
 				except discord.HTTPException as ex:
 					if "10014" in repr(ex):
 						self.remove_by_emoji(guild, react)
@@ -2633,134 +2614,6 @@ class Stats(Command):
 			return
 		cache.add(user.id)
 		bot.data.dailies.progress_quests(user, "invite")
-
-
-class Shop(Command):
-	name = ["Upgrade", "UpgradeServer"]
-	description = "Displays the shop system, or purchases an item."
-	usage = "<item>?"
-	example = ("shop", "shop upgrade_server", "upgrade_server")
-	rate_limit = (6, 10)
-
-	products = cdict(
-		upgradeserver=cdict(
-			name="Upgrade Server",
-			cost=[480, 61440],
-			description="Upgrades the server's privilege level, granting access to all command categories and reducing command cooldown.",
-		),
-		goldingots=cdict(
-			name="Gold Ingots",
-			cost=[0, 100],
-			description="Gold ingots for the ~barter command.",
-		),
-	)
-
-	async def __call__(self, bot, guild, channel, user, message, argv, name, **void):
-		if name.startswith("premium"):
-			premium = bot.premium_level(user)
-			if premium < 1:
-				return f"You have no assigned subscription! Please visit {bot.kofi_url} to purchase one, or join the support server at {bot.rcc_invite} if you've already purchased one!"
-		if name != "shop":
-			argv = "upgradeserver"
-		if not argv:
-			desc = deque()
-			for product in self.products.values():
-				cost = await bot.as_rewards(*product.cost)
-				desc.append(f"**{product.name}** {cost}\n{product.description}")
-			bot.send_as_embeds(channel, "\n\n".join(desc), title="Shop", author=get_author(user), reference=message)
-			return
-		item = argv.replace("-", "").replace("_", "").replace(" ", "").casefold()
-		try:
-			product = self.products[item]
-		except KeyError:
-			raise LookupError(f"Sorry, we don't sell {argv} here...")
-		data = bot.data.users.get(user.id, {})
-		gold = data.get("gold", 0)
-		diamonds = data.get("diamonds", 0)
-		if len(product.cost) < 2 or diamonds >= product.cost[0]:
-			if gold >= product.cost[-1]:
-				if product.name == "Upgrade Server":
-					if hasattr(guild, "ghost"):
-						return "```\nThis item can only be purchased in a server.```"
-					t = bot.is_trusted(guild)
-					pl = bot.premium_level(user)
-					if name.startswith("premium"):
-						st = f"Your current subscription is {pl}! Please visit {bot.kofi_url} if you'd like to upgrade or cancel!\n"
-					else:
-						st = ""
-					if t >= 2 and user.id not in bot.data.trusted[guild.id]:
-						return f"```\n{st}The current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.```"
-					if t == 1 and pl < 2:
-						return f"```\n{st}A premium subscription level of 2 or higher is required to promote this server further. Visit {bot.rapidapi_url} to purchase a subscription.```"
-					target = 1 if pl < 2 or t == 2 else 2
-					await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}_{target}-\n{st}You are about to {'up' if target >= t else 'down'}grade the server's privilege level from {t} to {target}.```", reacts="✅", reference=message)
-					return
-				if product.name == "Gold Ingots":
-					reacts = deque()
-					for i in range(5):
-						reacts.append(str(i) + as_str(b"\xef\xb8\x8f\xe2\x83\xa3"))
-					await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}-\nPlease choose how many ingots are desired;\n0: 100\n1: 1,000\n2: 10,000\n3: 100,000\n4: 1,000,000```", reacts=reacts, reference=message)
-					return
-				raise NotImplementedError(f"Target item {product.name} has not yet been implemented.")
-		raise ValueError(f"Insufficient funds. Use {bot.get_prefix(guild)}shop for product list and cost.")
-
-	async def _callback_(self, bot, message, reaction, user, vals, **void):
-		if reaction is None or as_str(reaction) != "✅" and b"\xef\xb8\x8f\xe2\x83\xa3" not in reaction:
-			return
-		u_id, item = vals.split("_", 1)
-		if "_" in item:
-			item, count = item.split("_", 1)
-			count = int(count)
-		else:
-			count = 0
-		u_id = int(u_id)
-		if u_id != user.id:
-			return
-		guild = message.guild
-		try:
-			product = self.products[item]
-		except KeyError:
-			raise LookupError(f"Sorry, we don't sell {item} here...")
-		data = bot.data.users.get(user.id, {})
-		gold = data.get("gold", 0)
-		diamonds = data.get("diamonds", 0)
-		if count != 0 or len(product.cost) < 2 or diamonds >= product.cost[0]:
-			if count != 0 or gold >= product.cost[-1]:
-				if product.name == "Upgrade Server":
-					t = bot.is_trusted(guild)
-					if t >= 2 and user.id not in bot.data.trusted.get(guild.id, ()):
-						await message.channel.send("```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.```", reference=message)
-					pl = bot.premium_level(user)
-					if t == 1 and pl < 2:
-						await message.channel.send(f"```\nA premium subscription level of 2 or higher is required to promote this server further. Visit {bot.rapidapi_url} to purchase a subscription.```", reference=message)
-					ext = ""
-					if pl < 2:
-						bot.data.users.add_diamonds(user, -product.cost[0])
-						bot.data.users.add_gold(user, -product.cost[-1])
-						bot.data.trusted[guild.id] = {None}
-					elif count < 2:
-						bot.data.premiums[user.id]["gl"].discard(guild.id)
-						bot.data.trusted[guild.id].discard(user.id)
-						await message.channel.send(f"```{sqr_md(guild)} has been removed from your promoted server list.```", reference=message)
-						return
-					else:
-						rm = bot.data.premiums.register(user, guild)
-						if rm:
-							ext = f"\n{len(rm)} server{'s' if len(rm) != 1 else ''} ha{'ve' if len(rm) != 1 else 's'} been removed from your promoted list to make room."
-					await message.channel.send(f"```{sqr_md(guild)} has been successfully elevated from {t} to {count} privilege level.{ext}```", reference=message)
-					return
-				if product.name == "Gold Ingots":
-					magnitude = int(as_str(reaction)[0])
-					ingots = 10 ** (magnitude + 2)
-					if gold < ingots:
-						raise ValueError(f"Insufficient funds. Use {bot.get_prefix(guild)}shop for product list and cost.")
-					else:
-						bot.data.users.add_gold(user, -ingots)
-						bot.data.users[user.id].setdefault("ingots", 0)
-						bot.data.users[user.id]["ingots"] += ingots
-					return
-				raise NotImplementedError(f"Target item {product.name} has not yet been implemented.")
-		raise ValueError(f"Insufficient funds. Use {bot.get_prefix(guild)}shop for product list and cost.")
 
 
 class Cat(ImagePool, Command):

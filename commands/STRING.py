@@ -1475,7 +1475,7 @@ class Urban(Command):
 		self.bot.send_as_embeds(channel, title=title, fields=fields, author=get_author(user), reference=message)
 
 
-class Browse(Command):
+class Browse(PaginationCommand):
 	name = ["🦆", "🌐", "Google", "Browser"]
 	description = "Searches the web, and displays as text or image."
 	schema = cdict(
@@ -1495,85 +1495,35 @@ class Browse(Command):
 			required=True,
 		),
 	)
-	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	rate_limit = (10, 16)
-	typing = True
 	slash = True
 	ephemeral = True
-	no_parse = True
 
 	async def __call__(self, _user, mode, query, **void):
 		m = 0 if mode == "auto" else 1
-		data = bytes2b64(query.encode("utf-8"), alt_char_set=True).decode("ascii")
-		out = f'*```callback-string-browse-{_user.id}_0_{m}_{data}-\nBrowsing "{query}"...```*'
-		buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-		return cdict(content=out, buttons=buttons)
+		# Set callback message for scrollable list
+		return await self.display(_user.id, 0, m, query)
 
-	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-		u_id, pos, m, data = vals.split("_", 3)
-		print("Browse CB:", vals)
-		if reaction and u_id != user.id and perm < 1:
-			return
-		if reaction not in self.directions and reaction is not None:
-			return
-		user = await bot.fetch_user(u_id)
-		pos = int(pos)
-		argv = b642bytes(data.encode("ascii"), alt_char_set=True).decode("utf-8")
-		ss = True if int(m) == 0 else False
-		urls = await bot.follow_url(argv, ytd=False)
-		argv = urls[0] if urls else argv
-		s = await bot.browse(argv, uid=user.id, screenshot=ss, best=True, include_hrefs=True)
-		ref = getattr_chain(message, "reference.cached_message", None)
+	async def display(self, uid, pos, mode, query, diridx=-1):
+		bot = self.bot
+
+		ss = True if int(mode) == 0 else False
+		urls = await bot.follow_url(query, ytd=False)
+		argv = urls[0] if urls else query
+		s = await bot.browse(argv, uid=uid, screenshot=ss, best=True, include_hrefs=True)
 		if isinstance(s, bytes):
-			csubmit(bot.silent_delete(message))
-			return await bot.respond_with(cdict(file=CompatFile(s)), message=ref)
-		elif is_url(argv):
-			csubmit(bot.silent_delete(message))
-			return await bot.respond_with(cdict(content=s, prefix="\xad"), message=ref)
-		rems = s.split("\n\n")
-		page = 8
-		last = max(0, len(rems) - page)
-		if reaction is not None:
-			i = self.directions.index(reaction)
-			if i == 0:
-				new = 0
-			elif i == 1:
-				new = max(0, pos - page)
-			elif i == 2:
-				new = min(last, pos + page)
-			elif i == 3:
-				new = last
-			else:
-				new = pos
-			pos = new
-		content = message.content
-		if not content:
-			content = message.embeds[0].description
-		i = content.index("callback")
-		content = "*```" + "\n" * ("\n" in content[:i]) + (
-			"callback-string-search-"
-			+ str(u_id) + "_" + str(pos) + "_" + str(data)
-			+ f'-\nSearch results for "{argv}":```*'
-		)
-		if not rems:
-			msg = ""
-		else:
-			t = utc()
-			msg = iter2str(
-				rems[pos:pos + page],
-				left="`【",
-				right="】`",
-				offset=pos,
+			return cdict(
+				file=CompatFile(s),
 			)
-		colour = await self.bot.get_colour(user)
-		emb = discord.Embed(
-			description=content + msg,
-			colour=colour,
-		).set_author(**get_author(user))
-		more = len(rems) - pos - page
-		if more > 0:
-			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-		if hasattr(message, "int_token"):
-			await bot.ignore_interaction(message)
+		elif is_url(argv):
+			return cdict(
+				content=s,
+				prefix="\xad",
+			)
+		return await self.default_display("search result", uid, pos, s.split("\n\n"), diridx, extra=leb128(mode) + as_bytes(query), page_size=7)
+
+	async def _callback_(self, _user, index, data, **void):
+		pos, more = decode_leb128(data)
+		mode, more = decode_leb128(data)
+		query = as_str(more)
+		return await self.display(_user.id, pos, mode, query, index)

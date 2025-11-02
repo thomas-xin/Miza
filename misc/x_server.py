@@ -589,7 +589,7 @@ class Server:
 			raise cp.HTTPRedirect(url, 307)
 		assert len(path) == 1
 		aid = p2n(path[0])
-		resp = interface.run(f"bot.renew_attachment({aid})")
+		resp = interface.run(f"await bot.renew_attachment({aid})")
 		return self.proxy_if(resp)
 	unproxy._cp_config = {"response.stream": True}
 
@@ -950,17 +950,12 @@ class Server:
 							format=fstr,
 							default_search="auto",
 							source_address="0.0.0.0",
+							remote_components=["ejs:github"],
 							final_ext=fmt,
 							cachedir=CACHE_PATH,
 							outtmpl=tmpl,
 							windowsfilenames=True,
 							cookiesfrombrowser=["firefox"],
-							# extractor_args=dict(
-							# 	youtube=dict(
-							# 		player_client=["default", "web_safari"],
-							# 		player_js_version=["actual"],
-							# 	),
-							# ),
 							postprocessors=postprocessors,
 						)
 						title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True)['title']", timeout=3600)

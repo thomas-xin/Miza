@@ -1,4 +1,3 @@
-import asyncio
 import collections
 import concurrent.futures
 import contextlib
@@ -36,7 +35,7 @@ Transpose = getattr(Image, "Transpose", Image)
 Transform = getattr(Image, "Transform", Image)
 Image.MAX_IMAGE_PIXELS = 4294967296
 GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_DIFFERENT_PALETTE_ONLY
-from misc.asyncs import esubmit  # noqa: E402
+from misc.asyncs import esubmit, await_fut  # noqa: E402
 from misc.util import get_image_size, temporary_file  # noqa: E402, F401
 
 DC = 0
@@ -92,6 +91,7 @@ def get_request(url, return_headers=False):
 		with open(url, "rb") as f:
 			data = f.read()
 	else:
+		import asyncio
 		from misc.caches import attachment_cache
 		return asyncio.run(attachment_cache.download(url, return_headers=return_headers))
 	return (data, headers) if return_headers else data

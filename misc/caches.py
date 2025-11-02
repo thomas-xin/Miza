@@ -1,5 +1,6 @@
 import asyncio
 import concurrent.futures
+import io
 import os
 import random
 import re
@@ -14,7 +15,7 @@ import streamshatter
 import numpy as np
 from PIL import Image
 import requests
-from misc.types import utc, as_str
+from misc.types import utc, as_str, byte_like
 from misc.asyncs import asubmit, esubmit, wrap_future, await_fut, Future
 from misc.smath import get_closest_heart
 from misc.util import (
@@ -85,8 +86,7 @@ def parse_colour(s):
 class ColourCache(AutoCache):
 
 	def _obtain(self, url):
-		req = Request.compat_session if is_discord_url(url) else Request.session
-		with req.get(url, headers=Request.header(), stream=True) as resp:
+		with niquests.get(url, headers=Request.header(), stream=True) as resp:
 			mime = resp.headers.get("Content-Type", "")
 			if "text/html" in mime:
 				it = resp.iter_content(65536)
@@ -107,6 +107,9 @@ class ColourCache(AutoCache):
 	def obtain(self, url):
 		if not url:
 			return (0, 0, 0)
+		if isinstance(url, byte_like):
+			im = Image.open(io.BytesIO(url))
+			return get_colour(im)[:3]
 		try:
 			return self.retrieve(unyt(url), self._obtain, url)
 		except Exception as ex:
@@ -167,7 +170,7 @@ class AttachmentCache(AutoCache):
 					last.discard(tup)
 					heads = self.alt_headers if n else self.headers
 					try:
-						resp = Request.compat_session.patch(
+						resp = requests.patch(
 							f"https://discord.com/api/{api}/channels/{cid}/messages/{mid}",
 							data=json_dumps(dict(embeds=embeds)),
 							headers=heads,
@@ -214,7 +217,7 @@ class AttachmentCache(AutoCache):
 				if utc() - snowflake_time_2(int(k)).timestamp() > 86400 * 6:
 					last.remove((c, k, n))
 					heads = self.headers if c not in self.channels else self.alt_headers
-					resp = Request.compat_session.delete(
+					resp = requests.delete(
 						f"https://discord.com/api/{api}/channels/{c}/messages{k}",
 						headers=heads,
 						timeout=5,

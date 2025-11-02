@@ -1253,9 +1253,11 @@ class Maintenance(Command):
 	async def __call__(self, bot, _guild, mode, **void):
 		if mode == "disable":
 			bot.data.blacklist.pop(0)
+			await bot.update_status(force=True)
 			return css_md(f"Maintenance mode deactivated.")
 		if mode == "enable":
 			bot.data.blacklist[0] = _guild.id
+			await bot.update_status(force=True)
 			return css_md(f"Maintenance mode activated. No longer serving commands outside of {sqr_md(_guild)}.")
 		maintenance = bot.data.blacklist.get(0)
 		return css_md(f"Maintenance mode: {sqr_md(maintenance)}")

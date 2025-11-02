@@ -1056,7 +1056,7 @@ class AudioDownloader:
 		fn = temporary_file(ext)
 		d = entry.get("duration")
 		if asap is None:
-			asap = d and d > 3840
+			asap = not d or d > 3840
 		special_checked = False
 		if not fmt and asap or not d:
 			# If format is not specified, try to stream the audio from URL if possible
@@ -1122,17 +1122,12 @@ class AudioDownloader:
 			format=f"bestaudio[vcodec=none][acodec={codec}][audio_channels=2]/worst[abr>=96][audio_channels=2]/bestaudio[audio_channels=2]/bestaudio/worst[abr>=64]/worst[acodec!=none][tbr>=480]/best",
 			default_search="auto",
 			source_address="0.0.0.0",
+			remote_components=["ejs:github"],
 			final_ext=ext,
 			cachedir=TEMP_PATH,
 			outtmpl=target,
 			windowsfilenames=True,
 			cookiesfrombrowser=["firefox"],
-			# extractor_args=dict(
-			# 	youtube=dict(
-			# 		player_client=["default", "web_safari"],
-			# 		player_js_version=["actual"],
-			# 	),
-			# ),
 			postprocessors=[dict(
 				# Use our custom FFmpeg audio convertor to ensure consistent audio codec, and allow trimming if necessary
 				key="FFmpegCustomAudioConvertor",

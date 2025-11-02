@@ -511,7 +511,7 @@ class RoleSelect(Command):
 			return await self.bot.data.emojis.get_colour(colour)
 		return get_closest_heart(colour)
 
-	async def __call__(self, bot, _guild, _channel, _user, _perm, roles, limit, title, description, custom, **void):
+	async def __call__(self, bot, _guild, _user, _perm, roles, limit, title, description, custom, **void):
 		rolelist = []
 		if roles:
 			for role in roles:
@@ -587,14 +587,15 @@ class RoleSelect(Command):
 		emb = discord.Embed(colour=colour)
 		emb.set_author(**get_author(_guild))
 		emb.title = title
-		rolestr = "_".join(str(role.id) for e, role in rolelist)
 		if limit and limit < len(buttons):
-			rolestr = f"{limit}__{rolestr}"
 			available = f"{limit}/{len(buttons)}"
 		else:
 			available = f"{len(buttons)}"
-		emb.description = f"```callback-admin-roleselect-{rolestr}-\n{available} roles assignable```{description}"
-		return cdict(embed=emb, buttons=buttons, reference=None)
+		emb.description = italics(f"{available} roles assignable") + "\n" + description
+		return self.construct(_user.id, leb128(limit) + serialise_nums([role.id for _, role in rolelist]), embed=emb, buttons=buttons)
+
+	def react_perms(self, perm):
+		return True
 
 	async def _callback_(self, bot, message, reaction, user, vals, **void):
 		if not reaction:
@@ -1171,7 +1172,7 @@ class MessageLog(Command):
 		return ini_md(f'Message event logging is currently disabled in {sqr_md(_guild)}. Use "{bot.get_prefix(_guild)}{_name} enable" to enable.')
 
 
-class StarBoard(Command):
+class StarBoard(PaginationCommand):
 	server_only = True
 	min_level = 2
 	description = "Causes ⟨BOT⟩ to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel."
@@ -1211,8 +1212,6 @@ class StarBoard(Command):
 			example="#Starboard",
 		)
 	)
-	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	rate_limit = 1
 
 	async def __call__(self, bot, _message, _channel, _guild, _user, mode, emoji, special, count, channel, **void):
@@ -1231,12 +1230,7 @@ class StarBoard(Command):
 				return ini_md(f"Starboard reposting is currently disabled in {sqr_md(channel or _channel)}.")
 			emojis = []
 			for e_data, (count, c_id, *extra) in zip(selected, map(data[_guild.id].get, selected)):
-				try:
-					e_id = int(e_data)
-				except ValueError:
-					emoji = e_data
-				else:
-					emoji = await bot.fetch_emoji(e_id)
+				emoji = await bot.resolve_emoji(e_data, guild=_guild)
 				emojis.append(str(emoji))
 			if len(selected) > 1:
 				triggers = "triggers "
@@ -1271,87 +1265,37 @@ class StarBoard(Command):
 			now = "Now" if mode == "remove" else "No longer"
 			return italics(css_md(f"{now} excluding {sqr_md(channel)} from starboard {triggers}."))
 		if not emoji and not special:
-			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-			await send_with_reply(
-				None,
-				_message,
-				"*```" + "\n" + "callback-admin-starboard-"
-				+ str(_user.id) + "_0"
-				+ "-\nLoading Starboard database...```*",
-				buttons=buttons,
-			)
-			return
+			# Set callback message for scrollable list
+			return await self.display(_user.id, 0, _guild.id)
 		channel = channel or _channel
-		emoji = special if special else str(await bot.fetch_emoji(emoji, _guild))
+		emote = special if special else str(emoji)
 		boards = data.setdefault(_guild.id, {})
-		boards[emoji] = (count, channel.id, set([channel.id]))
+		boards[emote] = (count, channel.id, set([channel.id]))
 		return cdict(
-			content=f"Successfully added starboard to {sqr_md(channel)}, with trigger {sqr_md(emoji)}: {sqr_md(count)}.",
+			content=f"Successfully added starboard to {sqr_md(channel)}, with trigger {sqr_md(emote)}: {sqr_md(count)}.",
 			prefix="```css\n",
 			suffix="```",
 		)
 
-	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-		u_id, pos = list(map(int, vals.split("_", 1)))
-		if reaction not in (None, self.directions[-1]) and perm < 3:
-			return
-		if reaction not in self.directions and reaction is not None:
-			return
-		guild = message.guild
-		# user = await bot.fetch_user(u_id)
-		data = bot.data.starboards
-		curr = data.setdefault(guild.id, {}).copy()
-		curr.pop(None, None)
-		page = 16
-		last = max(0, len(curr) - page)
-		if reaction is not None:
-			i = self.directions.index(reaction)
-			if i == 0:
-				new = 0
-			elif i == 1:
-				new = max(0, pos - page)
-			elif i == 2:
-				new = min(last, pos + page)
-			elif i == 3:
-				new = last
-			else:
-				new = pos
-			pos = new
-		content = message.content
-		if not content:
-			content = message.embeds[0].description
-		i = content.index("callback")
-		content = "*```" + "\n" * ("\n" in content[:i]) + (
-			"callback-admin-starboard-"
-			+ str(u_id) + "_" + str(pos)
-			+ "-\n"
-		)
-		if not curr:
-			content += f"No currently assigned starboard triggers for {str(guild).replace('`', '')}.```*"
-			msg = ""
-		else:
-			content += f"{len(curr)} starboard triggers currently assigned for {str(guild).replace('`', '')}:```*"
+	def react_perms(self, perm: int):
+		return False if perm < 2 else True
 
+	async def display(self, uid, pos, gid, diridx=-1):
+		bot = self.bot
+
+		def key(curr, pos, page):
 			def disp(t):
 				disabled = ",".join(map(str, sorted(t[2])))
 				s = f"×{t[0]} -> {sqr_md(bot.get_channel(t[1]))} ![{disabled}]"
-				# if len(t) > 2:
-				# 	s += ", excludes " + ", ".join(sqr_md(bot.get_channel(i)) for i in t[2])
 				return s
+			return iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=disp)
 
-			msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=disp))
-		colour = await self.bot.get_colour(guild)
-		emb = discord.Embed(
-			description=content + msg,
-			colour=colour,
-		)
-		emb.set_author(**get_author(guild))
-		more = len(curr) - pos - page
-		if more > 0:
-			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-		if hasattr(message, "int_token"):
-			await bot.ignore_interaction(message)
+		return await self.default_display("starboard trigger", uid, pos, bot.data.reacts.get(gid, ()), diridx, extra=leb128(gid), key=key)
+
+	async def _callback_(self, _user, index, data, **void):
+		pos, more = decode_leb128(data)
+		gid, _ = decode_leb128(more)
+		return await self.display(_user.id, pos, gid, index)
 
 
 class Crosspost(Command):

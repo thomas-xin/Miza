@@ -38,6 +38,7 @@ import aiofiles
 import aiohttp
 from dynamic_dt import DynamicDT
 import filetype
+import invisicode
 import nacl.secret
 import numpy as np
 import orjson
@@ -49,7 +50,7 @@ except Exception:
 import niquests
 import requests
 from misc.smath import predict_next, display_to_precision, unicode_prune, full_prune
-from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, fcdict, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, T2, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, MultiEncoder, sublist_index # noqa: F401
+from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, fcdict, as_bytes, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, MultiEncoder # noqa: F401
 from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, asubmit, csubmit, esubmit, tsubmit, Future, Semaphore
 
 try:
@@ -1016,68 +1017,6 @@ def hex2bytes(b) -> bytes:
 		s = s[:-1] + "0" + s[-1]
 	return bytes.fromhex(s)
 
-# Experimental base1048576 encoding
-# Relies on there not being any special characters past codepoint 65536 (0x10000) that would be removed by text processing
-# Encoding format:
-#   - Each 5 bytes of input converts to 2 bytes of output
-#   - All standard output characters have indices above 65536 (0x10000), enabling full range from 0x10000 to 0x110000 to be utilised to encode 2.5 bytes
-#   - Leftover bytes are encoded with the final output range determining the length
-#   - Ranges used for last byte are 1024~1280 (0x400~0x400) for 1 byte, 65536~131062 (0x10000~0x20000) for 2 bytes, 65~81 (0x41~0x51) for 0.5 bytes, and 16384~20480 (0x4000~0x4000) for 1.5 bytes
-def lev_utf_encode(b):
-	out = []
-	b = memoryview(b)
-	while len(b) >= 5:
-		c, b = b[:5], b[5:]
-		n = int.from_bytes(c, "little")
-		y, x = divmod(n, 1048576)
-		out.append(chr(x + 65536))
-		out.append(chr(y + 65536))
-	c = b
-	match len(c):
-		case 4:
-			n = int.from_bytes(c, "little")
-			y, x = divmod(n, 1048576)
-			out.append(chr(x + 65536))
-			out.append(chr(y + 16384))
-		case 3:
-			n = int.from_bytes(c, "little")
-			y, x = divmod(n, 1048576)
-			out.append(chr(x + 65536))
-			out.append(chr(y + 65))
-		case 2:
-			x = int.from_bytes(c, "little")
-			out.append(chr(x + 65536))
-		case 1:
-			x = int.from_bytes(c, "little")
-			out.append(chr(x + 1024))
-	return "".join(out)
-def lev_utf_decode(s):
-	b = bytearray()
-	buf = list(map(ord, s))
-	suffix = b""
-	if len(buf) & 1:
-		n = buf.pop(-1)
-		if n >= 65536:
-			n -= 65536
-			suffix = n.to_bytes(2, "little")
-		else:
-			n -= 1024
-			suffix = n.to_bytes(1, "little")
-	elif buf[-1] < 65536:
-		y, x = buf.pop(-1), buf.pop(-1)
-		if y >= 16384:
-			n = (y - 16384) * 1048576 | x - 65536
-			suffix = n.to_bytes(4, "little")
-		else:
-			n = (y - 65) * 1048576 | x - 65536
-			suffix = n.to_bytes(3, "little")
-	for x, y in zip(buf[::2], buf[1::2]):
-		n = (y - 65536) * 1048576 | x - 65536
-		c = n.to_bytes(5, "little")
-		b.extend(c)
-	b.extend(suffix)
-	return b
-
 
 def maps(funcs, *args, **kwargs):
 	"A map-compatible function that takes and iterates through multiple functions in a list as the first argument."
@@ -1640,18 +1579,14 @@ def byte_unscale(s, ratio=1024):
 		n = round_min(n)
 	return round_min(n * ratio ** __uscales.index(s.lower()))
 
-def e64(b):
-	if isinstance(b, str):
-		b = b.encode("utf-8")
-	elif isinstance(b, MemoryBytes):
-		b = bytes(b)
-	return base64.urlsafe_b64encode(b).rstrip(b"=")
-
+def e64(b, out=bytes):
+	b = as_bytes(b)
+	e = base64.urlsafe_b64encode(b).rstrip(b"=")
+	if out is str:
+		e = e.decode("ascii")
+	return e
 def b64(b):
-	if isinstance(b, str):
-		b = b.encode("ascii")
-	elif isinstance(b, MemoryBytes):
-		b = bytes(b)
+	b = as_bytes(b)
 	if len(b) & 3:
 		b += b"=="
 	return base64.urlsafe_b64decode(b)
@@ -1845,6 +1780,23 @@ def split_attachment(func) -> collections.abc.Callable:
 			args = split_url(*args)
 		return func(*args, **kwargs)
 	return wrapper
+
+def serialise_nums(nums: list) -> bytearray:
+	data = bytearray()
+	m = 0
+	for n in nums:
+		data.extend(leb128(n ^ m))
+		m = n
+	return data
+def deserialise_nums(b: bytearray) -> list:
+	nums = []
+	b = memoryview(b)
+	m = 0
+	while b:
+		n, b = decode_leb128(b)
+		m ^= n
+		nums.append(m)
+	return nums
 
 @split_attachment
 def encode_attachment(c_id, m_id, a_id, fn):
@@ -2385,7 +2337,7 @@ def get_duration_2(filename, _timeout=12):
 		"-show_entries",
 		"stream=codec_name,channels,duration,bit_rate",
 		"-show_entries",
-		"format=duration",
+		"format=duration,bit_rate",
 		"-of",
 		"default=nokey=1:noprint_wrappers=1",
 		filename,
@@ -2418,7 +2370,10 @@ def get_duration_2(filename, _timeout=12):
 	try:
 		bps = float(resp[3])
 	except (IndexError, ValueError, TypeError):
-		bps = None
+		try:
+			bps = float(resp[5])
+		except (IndexError, ValueError, TypeError):
+			bps = None
 	return dur, bps, cdc, ac
 
 @functools.lru_cache(maxsize=64)
@@ -4558,11 +4513,8 @@ class EvalPipe:
 	def print(self, *args, sep=" ", end="\n"):
 		b = ("\x00" + sep.join(map(str, args)) + end).encode("utf-8")
 		Flush(sys.__stderr__.buffer, flush=sys.__stderr__.flush).write(b)
-		try:
-			self.ensure_writable()
+		if self.p_alive() and self.writable:
 			return self.send(b)
-		except Exception:
-			print_exc()
 
 	def debug(self, s):
 		if self.is_main:
