@@ -324,8 +324,8 @@ class AttachmentCache(AutoCache):
 				target = await self.obtain(url=url, m_id=m_id)
 		elif is_miza_url(url):
 			if "/u/" in url:
-				c_id, m_id, a_id, fn = expand_attachment(url)
-				target = await self.obtain(c_id, m_id, a_id, fn)
+				c_id, m_id2, a_id, fn = expand_attachment(url)
+				target = await self.obtain(c_id, m_id2 or m_id, a_id, fn)
 				fn, head = await asubmit(download_file, target, filename=raw_fn, timeout=12, return_headers=True)
 				self.tertiary[url] = head
 				return open(fn, "rb")
@@ -392,7 +392,7 @@ class AttachmentCache(AutoCache):
 		resp = await self.sess.request("DELETE", url, headers=heads, timeout=120)
 		resp.raise_for_status()
 
-	async def create(self, *data, filename=None, channel=None, content="", collapse=True, editable=False):
+	async def create(self, *data, filename=None, channel=None, content="", collapse=True, editable=False, minimise=False):
 		if not self.channels:
 			raise RuntimeError("Proxy channel list required.")
 		ac = self.attachment_count
@@ -436,13 +436,13 @@ class AttachmentCache(AutoCache):
 			for i, a in enumerate(message["attachments"]):
 				aid = i if editable else int(a["id"])
 				fn = a["filename"]
-				out.append(shorten_attachment(cid, mid, aid, fn))
+				out.append(shorten_attachment(cid, mid, aid, fn, minimise=minimise))
 			filename = "b"
 		if len(out) == 1 and collapse:
 			return out[0]
 		return out
 
-	async def edit(self, c_id, m_id, *data, url=None, filename=None, content="", collapse=True):
+	async def edit(self, c_id, m_id, *data, url=None, filename=None, content="", collapse=True, minimise=False):
 		if url:
 			c_id, m_id, *_ = split_url(url, m_id)
 		ac = self.attachment_count
@@ -478,7 +478,7 @@ class AttachmentCache(AutoCache):
 		for i, a in enumerate(message["attachments"]):
 			aid = i
 			fn = a["filename"]
-			out.append(shorten_attachment(cid, mid, aid, fn))
+			out.append(shorten_attachment(cid, mid, aid, fn, minimise=minimise))
 		if len(out) == 1 and collapse:
 			return out[0]
 		return out

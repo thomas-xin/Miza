@@ -1640,11 +1640,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					print_exc()
 				else:
 					if preserve:
-						for a in m.attachments:
-							self.preserve_into(c.id, m.id, a.id, fn=a.url)
-					# All attachments should be valid URLs
-					if best:
-						found.extend(best_url(a) for a in m.attachments)
+						found.extend(shorten_attachment(a.url, m.id) for a in m.attachments)
 					else:
 						found.extend(a.url for a in m.attachments)
 					found.extend(find_urls(m.content) if allow else find_urls_ex(m.content))
@@ -4531,11 +4527,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	@tracebacksuppressor
 	def backup(self):
-		backup = AUTH.get("backup_path") or os.getcwd() + "/backup"
 		self.clear_cache()
 		date = utc_dt().date()
-		if not os.path.exists(backup):
-			os.mkdir(backup)
+		backup = AUTH.get("backup_path") or os.getcwd() + "/backup"
+		os.makedirs(backup, exist_ok=True)
 		fn = f"{backup}/saves.{date}.tar"
 		if os.path.exists(fn):
 			if utc() - os.path.getmtime(fn) < 60:
@@ -4569,8 +4564,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							saved.append(i)
 							# time.sleep(0.05)
 		backup = AUTH.get("backup_path") or "backup"
-		if not os.path.exists(backup):
-			os.mkdir(backup)
+		os.makedirs(backup, exist_ok=True)
 		fn = f"{backup}/saves.{DynamicDT.utcnow().date()}.tar"
 		day = not os.path.exists(fn)
 		if day:

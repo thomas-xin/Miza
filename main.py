@@ -99,10 +99,7 @@ if os.name == "nt":
 		os.remove(f)
 	if not os.path.exists("misc/poppler/pdftocairo.exe"):
 		print("Downloading Poppler version 21.10.0...")
-		try:
-			os.mkdir("misc/poppler")
-		except FileExistsError:
-			pass
+		os.makedirs("misc/poppler", exist_ok=True)
 		args = ["streamshatter", "https://mizabot.xyz/u/7NDWx1MC20QyUS02kWSgGyWGQEQ/poppler.zip", "../cache/poppler.zip"]
 		print(args)
 		subprocess.run(args, cwd="misc")

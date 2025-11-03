@@ -1045,6 +1045,11 @@ class Preserve(Command):
 	name = ["PreserveAttachmentLinks"]
 	description = "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to ⟨BOT⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
 	schema = cdict(
+		minimise=cdict(
+			type="bool",
+			description="Whether to produce the shortest possible alias",
+			default=False,
+		),
 		urls=cdict(
 			type="url",
 			description="URL or attachment to preserve",
@@ -1054,15 +1059,30 @@ class Preserve(Command):
 			required=True,
 		),
 	)
+	macros = cdict(
+		Shorten=cdict(
+			minimise=True,
+		),
+		Minimise=cdict(
+			minimise=True,
+		),
+		Minimize=cdict(
+			minimise=True,
+		),
+	)
 	rate_limit = (12, 17)
 	_timeout_ = 50
 	slash = ("Preserve",)
 	msgcmd = ("Preserve Attachment Links",)
 	ephemeral = True
 
-	async def __call__(self, bot, _channel, _message, urls, **void):
+	async def __call__(self, bot, _channel, _message, minimise, urls, **void):
 		futs = deque()
 		for url in urls:
+			if is_miza_attachment(url):
+				args = expand_attachment(url)
+				futs.append(as_fut(shorten_attachment(*args, minimise=minimise)))
+				continue
 			if is_discord_attachment(url):
 				a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 				found = None
@@ -1071,11 +1091,11 @@ class Preserve(Command):
 						found = attachment
 						break
 				if found:
-					futs.append(as_fut(shorten_attachment(url, _message.id)))
+					futs.append(as_fut(shorten_attachment(url, _message.id, minimise=minimise)))
 					continue
-				futs.append(as_fut(shorten_attachment(url, 0)))
+				futs.append(as_fut(shorten_attachment(url, 0, minimise=minimise)))
 				continue
-			futs.append(bot.data.exec.lproxy(url, channel=_channel))
+			futs.append(bot.data.exec.lproxy(url, channel=_channel, minimise=minimise))
 			await asyncio.sleep(0.1)
 		out = await gather(*futs)
 		return "\n".join("<" + u + ">" for u in out)

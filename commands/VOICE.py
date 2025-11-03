@@ -696,9 +696,6 @@ class Skip(Command):
 		SkipAll=cdict(
 			slices=[[None, None]],
 		),
-		Shorten=cdict(
-			after=300,
-		),
 	)
 	macros["⏹️"] = cdict(
 		mode="force",
@@ -1326,14 +1323,22 @@ class RefreshRegion(Command):
 		return italics(css_md(f"Successfully refreshed voice region for {sqr_md(vc)} ({sqr_md(region)}).")), 1
 
 
-class Radio(Command):
+class Radio(PaginationCommand):
 	name = ["FM"]
 	description = "Searches for a radio station livestream on https://worldradiomap.com that can be played on ⟨BOT⟩."
-	usage = "<0:country>? <2:state>? <1:city>?"
-	example = ("radio", "radio australia", "radio Canada Ottawa,_on")
+	schema = cdict(
+		country=cdict(
+			type="word",
+		),
+		state=cdict(
+			type="word",
+		),
+		city=cdict(
+			type="word",
+		),
+	)
 	rate_limit = (6, 8)
 	slash = True
-	countries = fcdict()
 	ephemeral = True
 
 	def country_repr(self, c):

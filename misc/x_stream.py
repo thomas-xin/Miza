@@ -110,6 +110,7 @@ class Server:
 		urls: list,
 		size: int = 0,
 		head=None,
+		response_headers={},
 		callback=None,
 		request: Request = None,
 		mimetype: str = "application/octet-stream"
@@ -150,7 +151,7 @@ class Server:
 			if not ranges:
 				ranges.append((0, size))
 				length = size
-			response_headers = dict(HEADERS)
+			response_headers.update(HEADERS)
 			if ranges == [(0, size)]:
 				response_headers["Content-Length"] = str(length)
 			if brange:
@@ -233,7 +234,7 @@ class Server:
 					counter += 1
 
 
-def stream_fp(request, fp):
+def stream_fp(request, fp, response_headers={}):
 	brange = request.headers.get("Range", "").removeprefix("bytes=") if request else ""
 	size = getsize(fp)
 	ranges = []
@@ -262,7 +263,7 @@ def stream_fp(request, fp):
 	if not ranges:
 		ranges.append((0, size))
 		length = size
-	response_headers = dict(HEADERS)
+	response_headers.update(HEADERS)
 	if ranges == [(0, size)]:
 		response_headers["Content-Length"] = str(length)
 	if brange:
@@ -312,7 +313,7 @@ async def ip(request: Request):
 
 @app.get("/random")
 async def prandom(request: Request, count: int = 1048576):
-	return stream_fp(request, RNGFile(count))
+	return stream_fp(request, RNGFile(count), {"Content-Disposition": "attachment; filename=random.bin"})
 
 
 @app.post("/authorised-heartbeat")
@@ -364,10 +365,13 @@ async def chunked_proxy(path: str, request: Request):
 	except ConnectionError as ex:
 		raise HTTPException(status_code=ex.errno, detail=str(ex))
 	mimetype, size, firstsize, lastsize = await get_size_mime(urls[0], urls[-1], len(urls), chunksize)
-
 	new_urls = [f"{url}&S={firstsize if not i else lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
-
-	response = await server.dyn_serve(new_urls, size, request=request, mimetype=mimetype)
+	heads = fcdict(await attachment_cache.scan_headers(urls[0]))
+	response_headers = {}
+	filename = heads.get("attachment-filename") or heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or urls[0].rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0]
+	if filename:
+		response_headers["Content-Disposition"] = f"inline; filename={filename}"
+	response = await server.dyn_serve(new_urls, size, request=request, mimetype=mimetype, response_headers=response_headers)
 	return response
 
 
@@ -453,7 +457,12 @@ async def proxy(request: Request, url: Optional[str] = None):
 			fp = await attachment_cache.download(url, read=True)
 		except ConnectionError as ex:
 			raise HTTPException(status_code=ex.errno, detail=str(ex))
-		return stream_fp(request, fp)
+		heads = fcdict(await attachment_cache.scan_headers(url))
+		response_headers = {}
+		filename = heads.get("attachment-filename") or heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0]
+		if filename:
+			response_headers["Content-Disposition"] = f"inline; filename={filename}"
+		return stream_fp(request, fp, response_headers)
 
 	headers = MizaRequest.header()
 	if request.headers.get("Range"):

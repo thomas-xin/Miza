@@ -4,6 +4,7 @@ antlr4-python3-runtime>=4.13.2
 audioptic>=1.0.0
 asyncio>=4.0.0
 async-timeout>=5.0.1
+base65536>=0.1.1
 beautifulsoup4>=4.14.2
 bs4>=0.0.2
 c2pa-python>=0.9.0

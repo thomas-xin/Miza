@@ -1,6 +1,7 @@
 import ast
 import asyncio
 import base64
+import base65536
 import collections
 from collections import deque, defaultdict
 import concurrent.futures
@@ -76,20 +77,16 @@ if cachedir:
 	os.environ["HF_DATASETS_CACHE"] = f"{cachedir}/huggingface/datasets"
 else:
 	cachedir = os.path.expanduser("~") + "/.cache"
-	if not os.path.exists(cachedir):
-		os.mkdir(cachedir)
+	os.makedirs(cachedir, exist_ok=True)
 
 CACHE_PATH = cachedir + "/cache"
-if not os.path.exists(CACHE_PATH):
-	os.mkdir(CACHE_PATH)
+os.makedirs(CACHE_PATH, exist_ok=True)
 TEMP_PATH = AUTH.get("temp_path")
 if not TEMP_PATH or not os.path.exists(TEMP_PATH):
-	TEMP_PATH = "cache"
-	if not os.path.exists(TEMP_PATH):
-		os.mkdir(TEMP_PATH)
-FAST_PATH = "cache"
-if not os.path.exists(FAST_PATH):
-	os.mkdir(FAST_PATH)
+	TEMP_PATH = os.path.abspath("cache")
+	os.makedirs(TEMP_PATH, exist_ok=True)
+FAST_PATH = os.path.abspath("cache")
+os.makedirs(FAST_PATH, exist_ok=True)
 
 persistdir = AUTH.get("persist_path") or cachedir
 ecdc_dir = persistdir + "/ecdc/"
@@ -252,7 +249,7 @@ def quit(*args, **kwargs): force_kill(PROC)
 
 
 # SHA256 operations: base64 and base16.
-def shash(s): return e64(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).decode("ascii")
+def shash(s): return e64(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), out=str)
 def uhash(s): return min([shash(s), quote_plus(s.removeprefix("https://"))], key=len)
 def uuhash(s): return uhash(unyt(s))
 def hhash(s): return hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).hexdigest()
@@ -1591,6 +1588,15 @@ def b64(b):
 		b += b"=="
 	return base64.urlsafe_b64decode(b)
 
+def b64_or_uni(b):
+	b = b.strip()
+	if b.isascii():
+		try:
+			return b64(b)
+		except Exception:
+			pass
+	return base65536.decode(as_str(b))
+
 def cantor(*x):
 	n = len(x)
 	p = 0
@@ -1677,7 +1683,7 @@ def deinterleave(z, n=1):
 			X[i % n] |= 1 << i // n
 	return X
 
-def encode_snowflake(*args, store_count=False):
+def encode_snowflake(*args, store_count=False, minimise=False):
 	"""
 	Encodes a list of snowflake IDs into a compact string representation.
 
@@ -1723,7 +1729,9 @@ def encode_snowflake(*args, store_count=False):
 		encoded = bytes([len(args)]) + encoded
 	elif encoded[0] < 128:
 		encoded = b"\x7f" + encoded
-	return e64(encoded).decode("ascii")
+	if minimise:
+		return base65536.encode(encoded)
+	return e64(encoded, out=str)
 def decode_snowflake(data, n=1):
 	"""
 	Decodes a snowflake ID into its constituent parts.
@@ -1743,7 +1751,7 @@ def decode_snowflake(data, n=1):
 		It decodes the string, extracts the timestamp, worker ID, process ID,
 		and increment values, and then reconstructs the original snowflake IDs.
 	"""
-	decoded = b64(data)
+	decoded = b64_or_uni(data)
 	if 1 < decoded[0] < 127:
 		n, decoded = decoded[0], decoded[1:]
 	elif decoded[0] == 127:
@@ -1799,10 +1807,16 @@ def deserialise_nums(b: bytearray) -> list:
 	return nums
 
 @split_attachment
-def encode_attachment(c_id, m_id, a_id, fn):
+def encode_attachment(c_id, m_id, a_id, fn, minimise=False):
 	if a_id == 0:
-		return encode_snowflake(*map(int, (c_id, m_id)), store_count=True) + "/" + fn
-	return encode_snowflake(*map(int, (c_id, m_id, a_id))) + "/" + fn
+		url = encode_snowflake(*map(int, (c_id, m_id)), store_count=True, minimise=minimise)
+		if not minimise:
+			url += "/" + fn
+		return url
+	url = encode_snowflake(*map(int, (c_id, m_id, a_id)), minimise=minimise)
+	if not minimise:
+		url += "/" + fn
+	return url
 def decode_attachment(encoded):
 	data, *fn = encoded.split("/", 1)
 	ids = list(decode_snowflake(data, 3))
@@ -1814,8 +1828,8 @@ def decode_attachment(encoded):
 	return ids
 
 @split_attachment
-def shorten_attachment(c_id, m_id, a_id, fn, mode="u", size=0, base="https://mizabot.xyz"):
-	url = f"{base}/{mode}/" + encode_attachment(c_id, m_id, a_id, fn)
+def shorten_attachment(c_id, m_id, a_id, fn, mode="u", size=0, base="https://mizabot.xyz", minimise=False):
+	url = f"{base}/{mode}/" + encode_attachment(c_id, m_id, a_id, fn, minimise=minimise)
 	if size:
 		url += f"?size={size}"
 	return url
@@ -1826,16 +1840,15 @@ def expand_attachment(url):
 	encoded = regs[-1]
 	return decode_attachment(encoded)
 
-def group_attachments(size_mb, c_id, m_ids):
+def group_attachments(size_mb, c_id, m_ids, minimise=False):
 	i = c_id
 	b = leb128(size_mb) + leb128(i)
 	for m in m_ids:
 		m, i = m ^ i, m
 		b += leb128(m)
-	return e64(b).decode("ascii")
-
+	return base65536.encode(b) if minimise else e64(b, out=str)
 def ungroup_attachments(b):
-	b = MemoryBytes(b64(b))
+	b = MemoryBytes(b64_or_uni(b))
 	size_mb, b = decode_leb128(b)
 	i, b = decode_leb128(b)
 	ids = [i]
@@ -1858,7 +1871,7 @@ with tracebacksuppressor:
 	enc_key = AUTH["encryption_key"]
 
 if not enc_key:
-	enc_key = (AUTH.get("discord_secret") or AUTH.get("discord_token") or e64(randbytes(32)).decode("ascii")).replace(".", "A").replace("_", "a").replace("-", "a")[:43]
+	enc_key = (AUTH.get("discord_secret") or AUTH.get("discord_token") or e64(randbytes(32), out=str)).replace(".", "A").replace("_", "a").replace("-", "a")[:43]
 	while len(enc_key) < 43:
 		enc_key += "A"
 	AUTH["encryption_key"] = enc_key 

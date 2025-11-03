@@ -784,7 +784,7 @@ class UpdateExec(Database):
 			return await channel.create_thread(name="backup")
 		raise NotImplementedError(size)
 
-	async def mproxy(self, b, fn=None, channel=None):
+	async def mproxy(self, b, fn=None, channel=None, minimise=False):
 		bot = self.bot
 		b = MemoryBytes(b)
 		groups = []
@@ -853,9 +853,9 @@ class UpdateExec(Database):
 			message = await fut
 			assert not len(message.embeds) or len(message.embeds) == len(group), message.id
 			m_ids.append(message.id)
-		return f"https://mizabot.xyz/c/{group_attachments(chunksize // 1048576, channel.id, m_ids)}/{ofn}"
+		return f"https://mizabot.xyz/c/{group_attachments(chunksize // 1048576, channel.id, m_ids, minimise=minimise)}/{ofn}"
 
-	async def lproxy(self, url, filename=None, channel=None):
+	async def lproxy(self, url, filename=None, channel=None, minimise=False):
 		bot = self.bot
 		if isinstance(url, byte_like):
 			fn = filetransd(filename or "c.b")
@@ -870,11 +870,11 @@ class UpdateExec(Database):
 			fn = filetransd(filename or getattr(url, "name", None) or "c.b")
 			b = url
 		if getsize(b) <= attachment_cache.max_size:
-			return await attachment_cache.create(b, filename=fn, channel=channel)
+			return await attachment_cache.create(b, filename=fn, channel=channel, minimise=minimise)
 		try:
 			channel = await self.get_lfs_channel(len(b))
 		except NotImplementedError:
-			return await self.mproxy(b, fn, channel=channel)
+			return await self.mproxy(b, fn, channel=channel, minimise=minimise)
 		if bot.owners.intersection(channel.guild._members) and none(m.id in bot.owners for m in channel.members):
 			with tracebacksuppressor:
 				await channel.add_user(bot.get_user(bot.owners[0]))
@@ -891,7 +891,7 @@ class UpdateExec(Database):
 			embed = discord.Embed(colour=rand_colour()).set_image(url=f"attachment://{fn}")
 		message = await channel.send(file=file, embed=embed)
 		assert message.embeds, message.id
-		out = shorten_attachment(message.embeds[0].author.icon_url if ext.startswith("image/") else message.embeds[0].image.url, message.id)
+		out = shorten_attachment(message.embeds[0].author.icon_url if ext.startswith("image/") else message.embeds[0].image.url, message.id, minimise=minimise)
 		print("LPROXY:", url, out)
 		return out
 
