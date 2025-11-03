@@ -508,9 +508,9 @@ def as_str(s, encoding="utf-8"):
 	if isinstance(s, (bytes, bytearray)):
 		return s.decode(encoding, "replace")
 	return str(s)
-def as_bytes(b):
+def as_bytes(b, encoding="utf-8"):
 	if isinstance(b, str):
-		b = b.encode("utf-8")
+		b = b.encode(encoding)
 	elif not isinstance(b, bytes):
 		b = bytes(b)
 	return b

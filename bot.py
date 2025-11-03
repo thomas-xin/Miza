@@ -1410,7 +1410,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			e_id = await self.id_from_message(e_id)
 		if isinstance(e_id, int):
 			return await self.fetch_emoji(e_id, guild=guild, allow_external=allow_external)
-		assert not e_id.isacii()
+		assert not e_id.isascii()
 		emoji = SimulatedEmoji(id=int.from_bytes(e_id.encode("utf-8"), "big"), animated=False, name=e_id, unicode=e_id)
 		self.cache.emojis[emoji.id] = emoji
 		return emoji
@@ -2468,6 +2468,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		cargs = props.get("cargs") or {}
 		is_nsfw = cargs.get("nsfw")
 		message = None
+		mod = None
 		label = cargs.get("mode")
 		if not cargs:
 			content = messages[-1].content
@@ -3935,13 +3936,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 		return self.PremiumContext(user, value=premium)
 
-	def is_nsfw(self, channel):
-		if is_nsfw(channel):
-			return True
-		if "nsfw" in self.data:
-			if getattr(channel, "recipient", None):
-				return self.data.nsfw.get(channel.recipient.id, False)
-			return self.data.nsfw.get(channel.id, False)
+	def is_nsfw(self, *args):
+		for mentionable in args:
+			if is_nsfw(mentionable):
+				return True
+			if "nsfw" in self.data:
+				if getattr(mentionable, "recipient", None):
+					if self.data.nsfw.get(mentionable.recipient.id, False):
+						return True
+				elif self.data.nsfw.get(mentionable.id, False):
+					return True
+		return False
 
 	async def donate(self, name, uid, amount, msg):
 		channel = self.get_channel(320915703102177293)
@@ -5215,6 +5220,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				verifs = [n for n in v if n != "-"]
 			elif info.type == "colour":
 				verifs = list(v)
+			elif info.type in ("string", "word", "text"):
+				verifs = [len(v)]
 			else:
 				verifs = [v]
 			for x in verifs:

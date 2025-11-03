@@ -48,7 +48,7 @@ help_descriptions = fcdict((
 	("misc", "Miscellaneous, mostly not relevant to Discord and restricted to trusted servers"),
 ))
 
-class Help(Command):
+class Help(PaginationCommand):
 	name = ["❓", "❔", "?", "Halp"]
 	description = "Shows a list of usable commands, or gives a detailed description of a command."
 	cats = [c for c in sorted(standard_commands)]
@@ -74,19 +74,31 @@ class Help(Command):
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, bot, _guild, _channel, _message, _user, _nsfw, category, command, original=None, **void):
-		prefix = "/" if getattr(_message, "slash", None) else bot.get_prefix(_guild)
-		if " " in prefix:
-			prefix += " "
-		colour = await self.bot.get_colour(_user)
-		embed = discord.Embed(colour=colour).set_author(name="❓ Help ❓", icon_url=best_url(_user), url=bot.webserver)
+	async def __call__(self, bot, _message, _channel, _user, category, command, **void):
 		if command and command not in bot.commands:
 			raise KeyError(f'Command "{command}" does not exist.')
+		# Set callback message for scrollable list
+		return await self.display(_user.id, bool(getattr(_message, "slash", None)), _channel.id, category, command)
+
+	async def display(self, uid, is_slash, cid, category, command):
+		bot = self.bot
+		user = await bot.fetch_user(uid)
+		channel = await bot.fetch_channel(cid)
+		guild = channel.guild
+
+		prefix = "/" if is_slash else bot.get_prefix(guild)
+		if " " in prefix:
+			prefix += " "
+		embed = discord.Embed(
+			title=f"{user} has asked for help!",
+		).set_author(name="❓ Help ❓", icon_url=best_url(user), url=bot.webserver)
+
 		content = None
-		enabled = bot.get_enabled(_channel)
+		enabled = bot.get_enabled(channel)
+		nsfw = bot.is_nsfw(channel, user)
 
 		def category_repr(catg):
-			return (catg.capitalize() if len(catg) > 2 else catg.upper()) + (" [[DISABLED]]" if catg.lower() not in enabled else "")
+			return (catg.capitalize() if len(catg) > 2 else catg.upper()) + (" [DISABLED]" if catg.lower() not in enabled else "")
 
 		if command:
 			com = bot.commands[command][0]
@@ -94,14 +106,14 @@ class Help(Command):
 			content = (
 				f"[[Category]] {colourise(category_repr(com.category), fg='white')}\n"
 				+ f"[[Aliases]] {a}\n"
-				+ f"[[Effect]] {colourise(com.parse_description(), fg='white')}\n"
+				+ f"[[Description]] {colourise(com.parse_description(), fg='white')}\n"
 				+ f"[[Usage]] {colourise(prefix, fg='white')}{com.parse_usage()}\n"
 				+ f"[[Level]] {colourise(com.min_display)}"
 			)
 			rl = com.rate_limit
 			if rl:
-				rl = rl[bool(bot.is_trusted(_guild))] if isinstance(rl, (tuple, list)) else rl
-				pm = bot.premium_multiplier(bot.premium_level(_user))
+				rl = rl[bool(bot.is_trusted(guild))] if isinstance(rl, (tuple, list)) else rl
+				pm = bot.premium_multiplier(bot.premium_level(user))
 				rl /= pm
 				content += f"\n[[Rate Limit]] {colourise(sec2time(rl), fg='yellow')}"
 			content += f"\n[[Example]] {colourise(prefix, fg='white')}{com.parse_example()}"
@@ -116,8 +128,9 @@ class Help(Command):
 				+ f"Want to try the premium features, unsure about anything, or have a bug to report? check out the [`support server`]({bot.rcc_invite})!\n"
 				+ f"Finally, donate to me or purchase a subscription [`here`]({bot.kofi_url})! Any support is greatly appreciated!"
 			)
+		embed.description = content
 		embed.colour = discord.Colour(help_colours[category])
-		categories = visible_commands if _nsfw else standard_commands
+		categories = visible_commands if nsfw else standard_commands
 		if not category:
 			coms = chain.from_iterable(v for k, v in bot.categories.items() if k in categories)
 		else:
@@ -152,28 +165,24 @@ class Help(Command):
 			placeholder=com.parse_name() if command else "Choose a command...",
 		)
 		buttons = [[catmenu], [commenu]]
-		if content:
-			embed.description = f"```callback-main-help-{_user.id}-\n{_user.display_name} has asked for help!```" + content
-		return cdict(
-			embed=embed,
-			buttons=buttons,
-		)
+		return self.construct(user.id, bytes([is_slash]) + leb128(cid) + (category or "").encode("utf-8") + b"\x00" + (command or "").encode("utf-8"), embed=embed, buttons=buttons)
 
-	async def _callback_(self, message, reaction, user, vals, perm, **void):
-		u_id = int(vals)
-		if reaction is None or u_id != user.id and perm < 3:
-			return
+	async def _callback_(self, _message, _user, data, reaction, **void):
+		is_slash, more = data[0], data[1:]
+		cid, more = decode_leb128(more)
 		bot = self.bot
 		category = as_str(reaction)
+		if not category:
+			category, command = map(as_str, more.split(b"\x00", 1))
 		if category in bot.commands:
 			command = category
 			category = bot.commands[command][0].category
 		elif category in bot.categories:
 			command = None
 		else:
-			return await bot.ignore_interaction(message)
-		channel = message.channel
-		return await self.__call__(bot, _guild=message.guild, _channel=channel, _message=message, _user=user, _nsfw=bot.is_nsfw(channel), category=category, command=command, original=message)
+			return await bot.ignore_interaction(_message)
+
+		return await self.display(_user.id, is_slash, cid, category, command)
 
 
 class Hello(Command):

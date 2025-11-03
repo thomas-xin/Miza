@@ -1285,12 +1285,11 @@ class StarBoard(PaginationCommand):
 
 		def key(curr, pos, page):
 			def disp(t):
-				disabled = ",".join(map(str, sorted(t[2])))
-				s = f"×{t[0]} -> {sqr_md(bot.get_channel(t[1]))} ![{disabled}]"
-				return s
-			return iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=disp)
+				disabled = ",".join(map(channel_mention, sorted(t[2])))
+				return f"×{t[0]} -> {channel_mention(t[1])}, *excludes {disabled}*"
+			return iter2str({k: curr[k] for k in tuple(filter(bool, curr))[pos:pos + page]}, key=disp)
 
-		return await self.default_display("starboard trigger", uid, pos, bot.data.reacts.get(gid, ()), diridx, extra=leb128(gid), key=key)
+		return await self.default_display("starboard trigger", uid, pos, bot.data.starboards.get(gid, {}), diridx, extra=leb128(gid), key=key)
 
 	async def _callback_(self, _user, index, data, **void):
 		pos, more = decode_leb128(data)
@@ -1871,39 +1870,59 @@ class Prefix(Command):
 	name = ["ChangePrefix"]
 	min_display = "0~3"
 	description = "Shows or changes the prefix for ⟨BOT⟩'s commands for this server."
-	usage = "<new_prefix>? <default(-d)>?"
-	example = ("prefix !", "change_prefix >", "prefix -d")
-	flags = "hd"
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("auto", "reset"),
+				accepts=dict(default="reset"),
+			),
+			description="Action to perform",
+		),
+		prefix=cdict(
+			type="word",
+			validation="[0, 1024]",
+			description="New prefix to assign"
+		)
+	)
 	rate_limit = (5, 8)
-	umap = {c: "" for c in ZeroEnc}
-	umap["\u200a"] = ""
-	utrans = "".maketrans(umap)
 	slash = True
 	ephemeral = True
 	exact = False
 
-	def __call__(self, argv, guild, perm, bot, flags, **void):
+	def __call__(self, bot, _guild, _perm, mode, prefix, **void):
 		pref = bot.data.prefixes
-		update = self.data.prefixes.update
-		if "d" in flags:
-			if guild.id in pref:
-				pref.pop(guild.id)
-			return css_md(f"Successfully reset command prefix for {sqr_md(guild)}.")
-		if not argv:
-			return css_md(f"Current command prefix for {sqr_md(guild)}: {sqr_md(bot.get_prefix(guild))}.")
 		req = 3
-		if perm < req:
-			reason = f"to change command prefix for {guild}"
-			raise self.perm_error(perm, req, reason)
-		prefix = argv
-		if not prefix.isalnum():
-			prefix = prefix.translate(self.utrans)
-		# Backslash is not allowed, it is used to escape commands normally
-		if prefix.startswith("\\"):
-			raise TypeError("Prefix must not begin with backslash.")
-		pref[guild.id] = prefix
-		if "h" not in flags:
-			return css_md(f"Successfully changed command prefix for {sqr_md(guild)} to {sqr_md(argv)}.")
+		match mode:
+			case "reset":
+				if _perm < req:
+					reason = f"to change command prefix for {_guild}"
+					raise self.perm_error(_perm, req, reason)
+				if _guild.id in pref:
+					pref.pop(_guild.id)
+				return cdict(
+					content=f"Successfully reset command prefix for {sqr_md(_guild)}.",
+					prefix="```css\n",
+					suffix="```",
+				)
+			case _ if prefix:
+				if _perm < req:
+					reason = f"to change command prefix for {_guild}"
+					raise self.perm_error(_perm, req, reason)
+				# Backslash is not allowed, it is used to escape commands normally
+				if prefix.startswith("\\"):
+					raise TypeError("Prefix must not begin with backslash.")
+				pref[_guild.id] = prefix
+				return cdict(
+					content=f"Successfully changed command prefix for {sqr_md(_guild)} to {sqr_md(prefix)}.",
+					prefix="```css\n",
+					suffix="```",
+				)
+		return cdict(
+			content=f"Current command prefix for {sqr_md(_guild)}: {sqr_md(bot.get_prefix(_guild))}.",
+			prefix="```ini\n",
+			suffix="```",
+		)
 
 
 class UpdateEnabled(Database):

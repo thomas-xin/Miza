@@ -872,6 +872,8 @@ find_users = lambda s: regexp(r"<@!?[0-9]+>").findall(s)
 
 
 def min_emoji(emoji, full=False) -> str:
+	if getattr(emoji, "unicode", None):
+		return emoji.unicode
 	if not getattr(emoji, "id", None):
 		if getattr(emoji, "name", None):
 			return emoji.name
@@ -2045,7 +2047,7 @@ class PaginationCommand(Command):
 
 	def encode(self, uid: int, data: bytes, s: str) -> str:
 		s = s.strip()
-		code = invisicode.encode(self.__name__.encode("utf-8") + b" " + leb128(uid) + as_bytes(data))
+		code = invisicode.encode(self.__name__.encode("utf-8") + b"\x00" + leb128(uid) + as_bytes(data))
 		if (s.startswith("```") or s.startswith("*```")) and "\n" in s:
 			x, y = s.split("\n", 1)
 			if not y or not y[0].isascii():
@@ -2065,7 +2067,7 @@ class PaginationCommand(Command):
 			if not invisicode.BASE <= ord(c) < invisicode.BASE + invisicode.RANGE:
 				break
 		code = invisicode.decode(s[:i])
-		name, code = code.split(b" ", 1)
+		name, code = code.split(b"\x00", 1)
 		return (as_str(name), *decode_leb128(code))
 
 	def react_perms(self, perm: int):

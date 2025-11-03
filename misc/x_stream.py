@@ -375,39 +375,15 @@ async def unproxy(path: str, request: Request, url: Optional[str] = None, force:
 	"""Unproxy Discord attachments or redirect to direct URLs."""
 	if url:
 		return await proxy_if(url, request, force=force)
-
-	path_parts = path.split("/")
-
-	if len(path_parts) == 1 and path_parts[0].count("~") == 2:
-		try:
-			segments = path_parts[0].split(".", 1)[0].split("~", 2)
-		except Exception as ex:
-			raise HTTPException(status_code=400, detail=str(ex))
-		try:
-			resp = await attachment_cache.obtain(*segments)
-		except ConnectionError as ex:
-			raise HTTPException(status_code=ex.errno, detail=str(ex))
-		return await proxy_if(resp, request, force=force)
-
-	if len(path_parts) == 2 and path_parts[0].count("~") == 0:
-		try:
-			c_id, m_id, a_id, fn = decode_attachment(path)
-		except Exception as ex:
-			raise HTTPException(status_code=400, detail=str(ex))
-		try:
-			resp = await attachment_cache.obtain(c_id, m_id, a_id, fn)
-		except ConnectionError as ex:
-			raise HTTPException(status_code=ex.errno, detail=str(ex))
-		return await proxy_if(resp, request, force=force)
-
-	if hasattr(server, "state"):
-		query_string = str(request.url.query) if request.url.query else ""
-		redirect_url = f"{server.state['/']}/u/{path}"
-		if query_string:
-			redirect_url += f"?{query_string}"
-		return RedirectResponse(url=redirect_url, status_code=307)
-
-	raise HTTPException(status_code=404, detail="Invalid path")
+	try:
+		c_id, m_id, a_id, fn = decode_attachment(path)
+	except Exception as ex:
+		raise HTTPException(status_code=400, detail=str(ex))
+	try:
+		resp = await attachment_cache.obtain(c_id, m_id, a_id, fn)
+	except ConnectionError as ex:
+		raise HTTPException(status_code=ex.errno, detail=str(ex))
+	return await proxy_if(resp, request, force=force)
 
 
 @app.post("/reupload")

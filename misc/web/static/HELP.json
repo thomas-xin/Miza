@@ -11,6 +11,50 @@
 			"timeout": "24",
 			"usage": ""
 		},
+		"Help": {
+			"aliases": [
+				"Help",
+				"\u2753",
+				"\u2754",
+				"?",
+				"Halp"
+			],
+			"description": "Shows a list of usable commands, or gives a detailed description of a command.",
+			"level": "0",
+			"rate_limit": "(0.25, 1)",
+			"example": [],
+			"timeout": "24",
+			"schema": {
+				"category": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"admin",
+							"ai",
+							"fun",
+							"image",
+							"main",
+							"string",
+							"voice",
+							"webhook"
+						],
+						"accepts": {
+							"owner": "owner",
+							"misc": "misc",
+							"nsfw": "nsfw"
+						}
+					},
+					"description": "Command category to search",
+					"example": "image"
+				},
+				"command": {
+					"type": "string",
+					"description": "Help on a specific command",
+					"example": "download",
+					"greedy": false
+				}
+			}
+		},
 		"Reminder": {
 			"aliases": [
 				"Reminder",
@@ -102,50 +146,6 @@
 					"type": "index",
 					"description": "Index of reminder(s) to delete",
 					"example": "3..7"
-				}
-			}
-		},
-		"Help": {
-			"aliases": [
-				"Help",
-				"\u2753",
-				"\u2754",
-				"?",
-				"Halp"
-			],
-			"description": "Shows a list of usable commands, or gives a detailed description of a command.",
-			"level": "0",
-			"rate_limit": "(0.25, 1)",
-			"example": [],
-			"timeout": "24",
-			"schema": {
-				"category": {
-					"type": "enum",
-					"validation": {
-						"enum": [
-							"admin",
-							"ai",
-							"fun",
-							"image",
-							"main",
-							"string",
-							"voice",
-							"webhook"
-						],
-						"accepts": {
-							"owner": "owner",
-							"misc": "misc",
-							"nsfw": "nsfw"
-						}
-					},
-					"description": "Command category to search",
-					"example": "image"
-				},
-				"command": {
-					"type": "string",
-					"description": "Help on a specific command",
-					"example": "download",
-					"greedy": false
 				}
 			}
 		},
@@ -1511,13 +1511,28 @@
 			"description": "Shows or changes the prefix for Miza's commands for this server.",
 			"level": "0",
 			"rate_limit": "(5, 8)",
-			"example": [
-				"prefix !",
-				"change_prefix >",
-				"prefix -d"
-			],
+			"example": [],
 			"timeout": "24",
-			"usage": "<new_prefix>? <default(-d)>?"
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"auto",
+							"reset"
+						],
+						"accepts": {
+							"default": "reset"
+						}
+					},
+					"description": "Action to perform"
+				},
+				"prefix": {
+					"type": "word",
+					"validation": "[0, 1024]",
+					"description": "New prefix to assign"
+				}
+			}
 		},
 		"CreateEmoji": {
 			"aliases": [

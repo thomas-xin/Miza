@@ -1524,6 +1524,6 @@ class Browse(PaginationCommand):
 
 	async def _callback_(self, _user, index, data, **void):
 		pos, more = decode_leb128(data)
-		mode, more = decode_leb128(data)
+		mode, more = decode_leb128(more)
 		query = as_str(more)
 		return await self.display(_user.id, pos, mode, query, index)
