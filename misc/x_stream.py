@@ -356,6 +356,7 @@ async def authorised_heartbeat(request: Request, key: str = Query(...), uri: str
 
 
 @app.get("/c/{path:path}")
+@app.get("/chunked-proxy/{path:path}")
 async def chunked_proxy(path: str, request: Request):
 	"""Serve chunked/split files with range support."""
 	try:
@@ -371,6 +372,7 @@ async def chunked_proxy(path: str, request: Request):
 
 
 @app.get("/u/{path:path}")
+@app.get("/unproxy/{path:path}")
 async def unproxy(path: str, request: Request, url: Optional[str] = None, force: bool = False):
 	"""Unproxy Discord attachments or redirect to direct URLs."""
 	if url:
@@ -620,7 +622,7 @@ async def catch_all(path: str, request: Request):
 		return await static_backend("index.html", request=request)
 	elif first in ("favicon.ico", "logo256.png", "logo512.png", "home", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "static"):
 		return await static_backend(p, request=request)
-	elif first not in ("static_backend", "proxy", "c", "u", "unproxy", "reupload", "ip", "random", "authorised-heartbeat", "backend", "debug"):
+	elif first not in ("static_backend", "proxy", "c", "chunked-proxy", "u", "unproxy", "reupload", "ip", "random", "authorised-heartbeat", "backend", "debug"):
 		return await backend(p, request=request)
 	return await globals()[first](request=request)
 
