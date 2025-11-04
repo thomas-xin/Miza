@@ -1811,11 +1811,11 @@ def encode_attachment(c_id, m_id, a_id, fn, minimise=False):
 	if a_id == 0:
 		url = encode_snowflake(*map(int, (c_id, m_id)), store_count=True, minimise=minimise)
 		if not minimise:
-			url += "/" + fn
+			url += f"/{fn}"
 		return url
 	url = encode_snowflake(*map(int, (c_id, m_id, a_id)), minimise=minimise)
 	if not minimise:
-		url += "/" + fn
+		url += f"/{fn}"
 	return url
 def decode_attachment(encoded):
 	data, *fn = encoded.split("/", 1)
@@ -1857,6 +1857,20 @@ def ungroup_attachments(b):
 		i ^= m
 		ids.append(i)
 	return size_mb, ids.pop(0), ids
+
+def shorten_chunks(size_mb, c_id, m_ids, fn, mode="c", base="https://mizabot.xyz", minimise=False):
+	encoded = group_attachments(size_mb, c_id, m_ids, minimise=minimise)
+	url = f"{base}/{mode}/{encoded}"
+	if not minimise:
+		url += f"/{fn}"
+	return url
+def expand_chunks(url):
+	path = url.split("?", 1)[0].split("/c/", 1)[-1]
+	if "/" not in path:
+		path += "/"
+	path, fn = path.split("/", 1)
+	size_mb, c_id, m_ids = ungroup_attachments(path)
+	return size_mb, c_id, m_ids, fn
 
 def p2n(b):
 	"Converts a urlsafe-base64 string to big-endian integer."

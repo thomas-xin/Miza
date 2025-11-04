@@ -219,7 +219,7 @@ else:
 				raise ValueError
 			print(url)
 			t = time.time()
-			streamshatter.ChunkManager(url, headers=info_dict.get("http_headers", {}), concurrent_limit=48, timeout=30, filename=filename).run(close=True)
+			streamshatter.ChunkManager(url, headers=info_dict.get("http_headers", {}), concurrent_limit=48, timeout=12, filename=filename).run(close=True)
 			elapsed = time.time() - t
 			assert os.path.exists(filename) and os.path.getsize(filename)
 		except ValueError:

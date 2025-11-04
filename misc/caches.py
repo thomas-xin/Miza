@@ -152,6 +152,9 @@ class AttachmentCache(AutoCache):
 	@property
 	def last(self):
 		return self.setdefault("__last__", set())
+	@last.setter
+	def set_last(self, value):
+		self["__last__"] = value
 
 	@tracebacksuppressor
 	def update_queue(self):
@@ -218,12 +221,12 @@ class AttachmentCache(AutoCache):
 					last.remove((c, k, n))
 					heads = self.headers if c not in self.channels else self.alt_headers
 					resp = requests.delete(
-						f"https://discord.com/api/{api}/channels/{c}/messages{k}",
+						f"https://discord.com/api/{api}/channels/{c}/messages/{k}",
 						headers=heads,
 						timeout=5,
 					)
 					resp.raise_for_status()
-		self["__last__"] = last
+		self.last = last
 
 	async def get_direct(self, c_id, m_id, a_id=None):
 		if not m_id:
@@ -316,7 +319,7 @@ class AttachmentCache(AutoCache):
 			resp = await self._aretrieve(path, self.get_attachments, path)
 		return resp
 
-	async def _download(self, url, m_id=None):
+	async def _download(self, url, m_id=None, timeout=12):
 		target = url
 		raw_fn = temporary_file(url2ext(url))
 		if is_discord_url(url):
@@ -326,17 +329,17 @@ class AttachmentCache(AutoCache):
 			if "/u/" in url:
 				c_id, m_id2, a_id, fn = expand_attachment(url)
 				target = await self.obtain(c_id, m_id2 or m_id, a_id, fn)
-				fn, head = await asubmit(download_file, target, filename=raw_fn, timeout=12, return_headers=True)
+				fn, head = await asubmit(download_file, target, filename=raw_fn, timeout=timeout, return_headers=True)
 				self.tertiary[url] = head
 				return open(fn, "rb")
 			elif "/c/" in url:
 				path = url.split("/c/", 1)[-1].split("/", 1)[0]
 				urls = await self.obtains(path)
-				fn, head = await asubmit(download_file, *urls, filename=raw_fn, timeout=12, return_headers=True)
+				fn, head = await asubmit(download_file, *urls, filename=raw_fn, timeout=timeout, return_headers=True)
 				self.tertiary[url] = head
 				return open(fn, "rb")
 		try:
-			f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, timeout=12, return_headers=True)
+			f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, timeout=timeout, return_headers=True)
 		except niquests.exceptions.HTTPError as ex:
 			code, msg = ex.response.status_code, ex.response.reason
 			raise ConnectionError(code, msg)
@@ -346,7 +349,7 @@ class AttachmentCache(AutoCache):
 		url = unyt(url)
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
-		fp = await self.secondary.aretrieve(url, self._download, url, m_id=m_id, _read=True)
+		fp = await self.secondary.aretrieve(url, self._download, url, m_id=m_id, timeout=16, _read=True)
 		if return_headers:
 			headers = await self.scan_headers(url, m_id=m_id)
 		if filename:

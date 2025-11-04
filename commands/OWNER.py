@@ -853,7 +853,7 @@ class UpdateExec(Database):
 			message = await fut
 			assert not len(message.embeds) or len(message.embeds) == len(group), message.id
 			m_ids.append(message.id)
-		return f"https://mizabot.xyz/c/{group_attachments(chunksize // 1048576, channel.id, m_ids, minimise=minimise)}/{ofn}"
+		return shorten_chunks(chunksize // 1048576, channel.id, m_ids, ofn, mode="c", base="https://mizabot.xyz", minimise=minimise)
 
 	async def lproxy(self, url, filename=None, channel=None, minimise=False):
 		bot = self.bot
@@ -872,7 +872,7 @@ class UpdateExec(Database):
 		if getsize(b) <= attachment_cache.max_size:
 			return await attachment_cache.create(b, filename=fn, channel=channel, minimise=minimise)
 		try:
-			channel = await self.get_lfs_channel(len(b))
+			channel = await self.get_lfs_channel(getsize(b))
 		except NotImplementedError:
 			return await self.mproxy(b, fn, channel=channel, minimise=minimise)
 		if bot.owners.intersection(channel.guild._members) and none(m.id in bot.owners for m in channel.members):

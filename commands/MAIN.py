@@ -96,6 +96,7 @@ class Help(PaginationCommand):
 		content = None
 		enabled = bot.get_enabled(channel)
 		nsfw = bot.is_nsfw(channel, user)
+		perm = bot.get_perms(user, guild)
 
 		def category_repr(catg):
 			return (catg.capitalize() if len(catg) > 2 else catg.upper()) + (" [DISABLED]" if catg.lower() not in enabled else "")
@@ -121,13 +122,21 @@ class Help(PaginationCommand):
 				content += colourise("\nNote: This command may currently be under maintenance. Full functionality is not guaranteed!", fg='red')
 			content = ansi_md(content)
 		else:
-			content = (
-				"Yo! Use the menu below to select from my command list!\n"
-				+ f"Alternatively, visit [`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\n\n"
-				+ f"If you're an admin and wish to disable me in a particular channel, check out `{prefix}ec`!\n"
-				+ f"Want to try the premium features, unsure about anything, or have a bug to report? check out the [`support server`]({bot.rcc_invite})!\n"
-				+ f"Finally, donate to me or purchase a subscription [`here`]({bot.kofi_url})! Any support is greatly appreciated!"
-			)
+			content = "\n".join((
+				"Yo! Use the menu below to select from my command list!",
+				f"Alternatively, visit [`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\n",
+				"**Command help information**:",
+				f"- All commands may be run via prefix, such as `{prefix}help`. Most are also accessible through slash commands; i.e. `/help.`",
+				f"- Inputs are documented as `<name:type>`, where *name* represents the argument's name, and *type* represents expected [data type](<https://wikipedia.org/wiki/Data_type>). Where possible, commands are interpreted case-insensitive.",
+				f"- Commands automatically infer by *type* where possible, with *name* keywords for disambiguation if necessary; input order only matters if two or more match the same data type. For example,",
+				f"  - `{prefix}resize webp 512kb lanczos 320x180` *is identical to*:",
+				f"  - `{prefix}RESIZE Lanczos 320*180 WEBP .5mb`",
+				f"  - `{prefix}ReSize -r 320:180 -f webp --filesize 0.5MiB --lanczos`",
+				f"""  - `{prefix}Resize --filesize="512kB" --mode='LANCZOS' --format="WebP" --resolution='320×180'`\n""",
+				(f"If you're an admin and wish to enable/disable me in a particular channel, check out `{prefix}ec`!\n" if not perm < 3 else "")
+				+ f"Unsure about any of my features, or have a bug to report? check out the [`support server`]({bot.rcc_invite})!",
+				f"-# Finally, donate to me or purchase a subscription [`here`]({bot.kofi_url})! Any support is greatly appreciated!"
+			))
 		embed.description = content
 		embed.colour = discord.Colour(help_colours[category])
 		categories = visible_commands if nsfw else standard_commands
@@ -1045,7 +1054,7 @@ class Preserve(Command):
 	name = ["PreserveAttachmentLinks"]
 	description = "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to ⟨BOT⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
 	schema = cdict(
-		minimise=cdict(
+		mode=cdict(
 			type="bool",
 			description="Whether to produce the shortest possible alias",
 			default=False,
@@ -1080,8 +1089,12 @@ class Preserve(Command):
 		futs = deque()
 		for url in urls:
 			if is_miza_attachment(url):
-				args = expand_attachment(url)
-				futs.append(as_fut(shorten_attachment(*args, minimise=minimise)))
+				if "/c/" in url:
+					args = expand_chunks(url)
+					futs.append(as_fut(shorten_chunks(*args, minimise=minimise)))
+				else:
+					args = expand_attachment(url)
+					futs.append(as_fut(shorten_attachment(*args, minimise=minimise)))
 				continue
 			if is_discord_attachment(url):
 				a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])

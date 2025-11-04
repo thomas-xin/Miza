@@ -368,7 +368,7 @@
 			"example": [],
 			"timeout": "1200",
 			"schema": {
-				"minimise": {
+				"mode": {
 					"type": "bool",
 					"description": "Whether to produce the shortest possible alias",
 					"default": false

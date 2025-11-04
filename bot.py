@@ -9,9 +9,10 @@ if __name__ != "__mp_main__":
 	os.environ["IS_BOT"] = "1"
 from misc import common, asyncs
 from misc.common import * # noqa: F403
+import ddgs
 import pathlib
 import pdb
-import ddgs
+from traceback_with_variables import activate_by_import
 
 # Make linter shut up lol
 if "common" not in globals():
@@ -3110,8 +3111,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		urls = [url for url in find_urls_ex(message.content) if message.content[message.content.index(url) - 1] != "<"]
 		urls = await self.renew_attachments(urls)
 		for url in urls:
-			if is_discord_attachment(url) and not discord_expired(url) or self.is_webserver_url(url) and (always_log or url2ext(url) in IMAGE_FORMS):
-				_c_id, _m_id, a_id, *_ = split_url(url, 0)
+			if is_discord_attachment(url) and not discord_expired(url) or is_miza_attachment(url) and (always_log or url2ext(url) in IMAGE_FORMS):
+				if is_miza_attachment(url):
+					if "/c/" in url:
+						return
+					else:
+						_c_id, _m_id, a_id, *_ = expand_attachment(url)
+				else:
+					_c_id, _m_id, a_id, *_ = split_url(url, 0)
 				headers = await attachment_cache.scan_headers(url)
 				attachment = cdict(id=a_id, name=url2fn(url), url=url, size=int(fcdict(headers).get("Content-Length", 1)), read=lambda: attachment_cache.download(url))
 				csubmit(self.add_and_test(message, attachment))
@@ -4734,22 +4741,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					status = discord.Status.dnd
 				else:
 					activity = discord.Game(name=text)
-				# if changed:
-				# 	print(repr(activity))
 				if self.audio:
 					audio_status = "await client.change_presence(status=discord.Status."
 					if status is None:
 						status = discord.Status.offline
 						csubmit(self.audio.asubmit(audio_status + "offline)"))
-						await self.seen(self.user, event="misc", raw="Changing their status")
 					elif status == discord.Status.invisible:
 						status = discord.Status.idle
 						esubmit(self.audio.submit(audio_status + "online)"))
-						await self.seen(self.user, event="misc", raw="Changing their status")
 					else:
-						# if status == discord.Status.online:
 						esubmit(self.audio.submit(audio_status + "dnd)"))
-						csubmit(self.seen(self.user, event="misc", raw="Changing their status"))
 				elif status is None:
 					status = discord.Status.offline
 				elif status == discord.Status.invisible:
@@ -4922,9 +4923,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					taken = True
 				elif v.type == "message" and is_discord_message_link(a):
 					taken = True
-				elif not hs and v.type == "filesize" and re.fullmatch(r"[\.0-9]+[A-Za-z]?[Bb]", a):
+				elif not hs and v.type == "filesize" and re.fullmatch(r"[\.0-9]+[A-Za-z]?i?[Bb]", a):
 					taken = True
-				elif not hs and v.type == "resolution" and re.fullmatch(r"-?[0-9]+[:x*]-?[0-9]+", a):
+				elif not hs and v.type == "resolution" and re.fullmatch(r"-?[0-9]+[:x*×]-?[0-9]+", a):
 					taken = True
 				elif not hs and v.type == "index" and (a.casefold() == "all" or re.fullmatch(r"(?:[\-0-9]+|[:\-]|\.{2,}){1,5}", a)):
 					taken = True
@@ -5151,7 +5152,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		elif info.type == "filesize":
 			if not isinstance(v, (int, float, np.number)):
 				try:
-					v = byte_unscale(full_prune(v).removesuffix("b"))
+					v = byte_unscale(full_prune(v).removesuffix("b").removesuffix("i"))
 				except (IndexError, OverflowError, ValueError) as ex:
 					raise err(ex.__class__, k, v)
 		elif info.type == "bool":
@@ -5187,7 +5188,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if s == "-":
 						return s
 					return round_min(s)
-				v = tuple(map(round_or_omit, regexp(r"[*x:]").split(v, 1)))
+				v = tuple(map(round_or_omit, regexp(r"[:x*×]").split(v, 1)))
 			except Exception as ex:
 				raise err(ex.__class__, k, v)
 		elif info.type == "index":
