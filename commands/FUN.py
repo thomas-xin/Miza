@@ -2582,7 +2582,7 @@ class Stats(Command):
 		sparkles = data.get("sparkles", 0)
 		if sparkles:
 			items = deque()
-			for i, c in sorted(sparkles.items()):
+			for i, c in sorted(sparkles.items(), key=lambda t: -len(t[0])):
 				s = await bot.data.emojis.emoji_as(sparkle_values[i] + ".gif", full=True)
 				s += f" {c}"
 				items.append(s)

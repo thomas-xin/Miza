@@ -516,14 +516,14 @@ def colourise_auto(s):
 	return s
 
 # Discord object mention formatting
-def user_mention(u_id):
-	return f"<@{u_id}>"
-def user_pc_mention(u_id):
-	return f"<@!{u_id}>"
-def channel_mention(c_id):
-	return f"<#{c_id}>"
-def role_mention(r_id):
-	return f"<@&{r_id}>"
+def user_mention(uid):
+	return f"<@{uid}>"
+def user_pc_mention(uid):
+	return f"<@!{uid}>"
+def channel_mention(cid):
+	return f"<#{cid}>"
+def role_mention(rid):
+	return f"<@&{rid}>"
 def auto_mention(obj):
 	if getattr(obj, "mention", None):
 		return obj.mention
@@ -1769,11 +1769,11 @@ def decode_snowflake(data, n=1):
 		args.append(n)
 	return args
 
-def split_url(url, m_id):
-	_, c_id, a_id, fn = url.split("?", 1)[0].rsplit("/", 3)
-	return (int(c_id), int(m_id) if m_id is not None else None, int(a_id), fn)
-def merge_url(c_id, m_id, a_id, fn):
-	return f"https://cdn.discordapp.com/attachments/{c_id}/{a_id}/{fn}", m_id
+def split_url(url, mid):
+	_, cid, aid, fn = url.split("?", 1)[0].rsplit("/", 3)
+	return (int(cid), int(mid) if mid is not None else None, int(aid), fn)
+def merge_url(cid, mid, aid, fn):
+	return f"https://cdn.discordapp.com/attachments/{cid}/{aid}/{fn}", mid
 def merge_attachment(func) -> collections.abc.Callable:
 	@functools.wraps(func)
 	def wrapper(*args, **kwargs):
@@ -1807,13 +1807,13 @@ def deserialise_nums(b: bytearray) -> list:
 	return nums
 
 @split_attachment
-def encode_attachment(c_id, m_id, a_id, fn, minimise=False):
-	if a_id == 0:
-		url = encode_snowflake(*map(int, (c_id, m_id)), store_count=True, minimise=minimise)
+def encode_attachment(cid, mid, aid, fn, minimise=False):
+	if aid == 0:
+		url = encode_snowflake(*map(int, (cid, mid)), store_count=True, minimise=minimise)
 		if not minimise:
 			url += f"/{fn}"
 		return url
-	url = encode_snowflake(*map(int, (c_id, m_id, a_id)), minimise=minimise)
+	url = encode_snowflake(*map(int, (cid, mid, aid)), minimise=minimise)
 	if not minimise:
 		url += f"/{fn}"
 	return url
@@ -1828,8 +1828,8 @@ def decode_attachment(encoded):
 	return ids
 
 @split_attachment
-def shorten_attachment(c_id, m_id, a_id, fn, mode="u", size=0, base="https://mizabot.xyz", minimise=False):
-	url = f"{base}/{mode}/" + encode_attachment(c_id, m_id, a_id, fn, minimise=minimise)
+def shorten_attachment(cid, mid, aid, fn, mode="u", size=0, base="https://mizabot.xyz", minimise=False):
+	url = f"{base}/{mode}/" + encode_attachment(cid, mid, aid, fn, minimise=minimise)
 	if size:
 		url += f"?size={size}"
 	return url
@@ -1840,10 +1840,10 @@ def expand_attachment(url):
 	encoded = regs[-1]
 	return decode_attachment(encoded)
 
-def group_attachments(size_mb, c_id, m_ids, minimise=False):
-	i = c_id
+def group_attachments(size_mb, cid, mids, minimise=False):
+	i = cid
 	b = leb128(size_mb) + leb128(i)
-	for m in m_ids:
+	for m in mids:
 		m, i = m ^ i, m
 		b += leb128(m)
 	return base65536.encode(b) if minimise else e64(b, out=str)
@@ -1858,8 +1858,8 @@ def ungroup_attachments(b):
 		ids.append(i)
 	return size_mb, ids.pop(0), ids
 
-def shorten_chunks(size_mb, c_id, m_ids, fn, mode="c", base="https://mizabot.xyz", minimise=False):
-	encoded = group_attachments(size_mb, c_id, m_ids, minimise=minimise)
+def shorten_chunks(size_mb, cid, mids, fn, mode="c", base="https://mizabot.xyz", minimise=False):
+	encoded = group_attachments(size_mb, cid, mids, minimise=minimise)
 	url = f"{base}/{mode}/{encoded}"
 	if not minimise:
 		url += f"/{fn}"
@@ -1869,8 +1869,8 @@ def expand_chunks(url):
 	if "/" not in path:
 		path += "/"
 	path, fn = path.split("/", 1)
-	size_mb, c_id, m_ids = ungroup_attachments(path)
-	return size_mb, c_id, m_ids, fn
+	size_mb, cid, mids = ungroup_attachments(path)
+	return size_mb, cid, mids, fn
 
 def p2n(b):
 	"Converts a urlsafe-base64 string to big-endian integer."

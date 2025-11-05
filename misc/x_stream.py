@@ -35,7 +35,6 @@ else:
 	webserver_port = "9801"
 
 HEADERS = {
-	"X-Content-Type-Options": "nosniff",
 	"Server": "Miza",
 	"Vary": "Accept-Encoding",
 	"Accept-Ranges": "bytes",
@@ -276,11 +275,22 @@ def stream_fp(request, fp, response_headers={}):
 			for i in range(r[0], r[1], chunksize):
 				yield fp.read(min(chunksize, r[1] - i))
 
+	mime = filetype.guess_mime(fp)
+	if not mime:
+		fp.seek(0)
+		b = fp.read(65536)
+		try:
+			s = b.decode("utf-8")
+		except Exception:
+			mime = "application/octet-stream"
+		else:
+			mime = "text/html" if s.lower().startswith("<!doctype html>") else "text/plain"
+
 	return StreamingResponse(
 		content_generator(),
 		status_code=status_code,
 		headers=response_headers,
-		media_type=filetype.guess_mime(fp),
+		media_type=mime,
 	)
 
 

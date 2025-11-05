@@ -2469,7 +2469,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		label = cargs.get("mode")
 		if not cargs:
 			content = messages[-1].content
-			mod = await ai.moderate(messages[-3:], premium_context=premium_context)
+			mod = await ai.moderate(messages[max(1, len(messages) - 3):], premium_context=premium_context)
 			cargs["nsfw"] = is_nsfw = nsfw_flagged(mod)
 			toolscan = tools
 			if isinstance(toolscan, dict):
@@ -2593,8 +2593,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			cargs["tools"] = tools
 		if is_nsfw:
 			print(mod, allow_nsfw)
-			label = "nsfw" if allow_nsfw else "casual"
-		cargs["mode"] = label
+			if allow_nsfw:
+				label = "nsfw"
+		if label:
+			cargs["mode"] = label
 		decensor = not is_nsfw or allow_nsfw
 		tools = cargs.get("tools")
 		mode = cargs.get("mode", "casual")
@@ -2910,7 +2912,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		lim = 5 * 1048576 * 3 / 4
 		p = 2 if len(d) > 1048576 else 0
 		if mime not in ("image/jpg", "image/jpeg", "image/png") or len(d) > lim or np.prod(await asubmit(get_image_size, d, priority=p)) > sizelim:
-			name = url.replace("\\", "/").rsplit("/", 1)
+			name = url.replace("\\", "/").rsplit("/", 1) if isinstance(url, str) else "data"
 			if mime.split("/", 1)[0] not in ("image", "video"):
 				if len(d) > 288 and mime not in ("text/plain", "text/html"):
 					d = d[:128] + b".." + d[-128:]
@@ -7701,7 +7703,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			typing = channel._state.http.send_typing
 
 			while True:
-				async with Delay(7):
+				async with Delay(9):
 					await typing(channel.id)
 		async def __aenter__(self):
 			self.task = csubmit(self.do_typing())

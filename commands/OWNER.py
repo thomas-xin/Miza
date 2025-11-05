@@ -822,7 +822,7 @@ class UpdateExec(Database):
 			groups[-1].append(chunk)
 		ofn = fn
 		n = 0
-		m_ids = []
+		mids = []
 		futs = []
 		for group in groups:
 			files = []
@@ -852,8 +852,8 @@ class UpdateExec(Database):
 		for fut in futs:
 			message = await fut
 			assert not len(message.embeds) or len(message.embeds) == len(group), message.id
-			m_ids.append(message.id)
-		return shorten_chunks(chunksize // 1048576, channel.id, m_ids, ofn, mode="c", base="https://mizabot.xyz", minimise=minimise)
+			mids.append(message.id)
+		return shorten_chunks(chunksize // 1048576, channel.id, mids, ofn, mode="c", base="https://mizabot.xyz", minimise=minimise)
 
 	async def lproxy(self, url, filename=None, channel=None, minimise=False):
 		bot = self.bot

@@ -1054,7 +1054,7 @@ class Preserve(Command):
 	name = ["PreserveAttachmentLinks"]
 	description = "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to ⟨BOT⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
 	schema = cdict(
-		mode=cdict(
+		minimise=cdict(
 			type="bool",
 			description="Whether to produce the shortest possible alias",
 			default=False,

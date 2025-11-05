@@ -882,7 +882,7 @@ def evalImg(url, operation, args):
 	ts = time.time_ns() // 1000
 	out = temporary_file("avif", name=ts)
 	fmt = "auto"
-	cdc = "avif"
+	cdc = "webp"
 	fs = inf
 	dur = None
 	maxframes = inf
@@ -1188,7 +1188,7 @@ def evalImg(url, operation, args):
 			new = next(iter(new["frames"]))
 	if Image and isinstance(new, Image.Image):
 		if fmt == "auto":
-			fmt = "avif"
+			fmt = "webp"
 		new = optimise(new, keep_rgb=False)
 		if bg and "A" in new.mode:
 			if new.mode != "RGBA":
@@ -1262,7 +1262,7 @@ def evaluate_image(args):
 				out[i] = bytes(out[i])
 		elif isinstance(out[0], Image.Image):
 			for i in range(len(out)):
-				out[i] = save_into(out[i], out[i].size, "avif", inf)
+				out[i] = save_into(out[i], out[i].size, "webp", inf)
 	elif isinstance(out, io.BytesIO):
 		out.seek(0)
 		out = out.read()
