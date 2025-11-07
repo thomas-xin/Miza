@@ -1620,34 +1620,43 @@ def decode_filename(b):
 	fn = fn.replace(b"-_", b".").replace(b"--", b"-")
 	return fn.rstrip(b"_").decode("ascii")
 
-def b2n(b):
-	return int.from_bytes(b, "big")
-def n2b(n):
+def b2n(b, mode="big"):
+	return int.from_bytes(b, mode)
+def n2b(n, mode="big"):
 	c = n.bit_length() + 7 >> 3
-	return n.to_bytes(c, "big")
+	return n.to_bytes(c, mode)
 
-def leb128(n):
-	"Encodes an integer using LEB128."
+def leb128(n: int) -> bytearray:
+	"Encodes an integer using a custom LEB128 algorithm. Supports a sign for negative integers via an additional 00 byte, maintaining compatibility with standard LEB128 (unlike SLEB128)."
+	if n <= 0:
+		was_negative = True
+		n = -n
+	else:
+		was_negative = False
 	data = bytearray()
 	while n > 0:
-		data.append(n & 127)
+		data.append(n & 0x7F)
 		n >>= 7
 		if n:
-			data[-1] |= 128
-	return data or b"\x00"
-def decode_leb128(data, mode="cut"): # mode: cut | index
-	"Decodes an integer from LEB128 encoded data; optionally returns the remaining data."
+			data[-1] |= 0x80
+	if was_negative:
+		if len(data):
+			data[-1] |= 0x80
+		data.append(0)
+	return data
+def decode_leb128(data: bytes) -> tuple[int, bytes]:
+	"Decodes an integer from LEB128 encoded data; returns a tuple of decoded and remaining data."
 	i = n = 0
 	shift = 0
 	for i, byte in enumerate(data):
 		n |= (byte & 0x7F) << shift
 		if byte & 0x80 == 0:
+			if byte == 0:
+				n = -n
 			break
 		else:
 			shift += 7
-	if mode == "cut":
-		return n, data[i + 1:]
-	return n, i + 1
+	return n, data[i + 1:]
 
 def szudzik(x, y):
 	"Szudzik's pairing function."
@@ -1684,27 +1693,6 @@ def deinterleave(z, n=1):
 	return X
 
 def encode_snowflake(*args, store_count=False, minimise=False):
-	"""
-	Encodes a list of snowflake IDs into a compact string representation.
-
-	Args:
-		*args: Variable length argument list of snowflake IDs to encode.
-		store_count (bool): If True, stores the count of snowflake IDs in the encoded string.
-							If False, uses a padding byte or predetermined count.
-
-	Returns:
-		str: The encoded string representation of the snowflake IDs.
-
-	Raises:
-		AssertionError: If store_count is True and the number of snowflake IDs is not between 2 and 126 inclusive.
-
-	Notes:
-		- The function extracts the timestamp, worker ID, process ID, and increment from each snowflake ID.
-		- It interleaves these components and encodes them using LEB128 and Szudzik's pairing function.
-		- The encoded string is then base64 encoded and returned.
-		- If store_count is True, the count of snowflake IDs is stored in the encoded string.
-		- If store_count is False and the first byte of the encoded string is less than 128, a padding byte (0x7f) is added.
-	"""
 	timestamps = []
 	ids = []
 	increments = []
@@ -1733,24 +1721,6 @@ def encode_snowflake(*args, store_count=False, minimise=False):
 		return base65536.encode(encoded)
 	return e64(encoded, out=str)
 def decode_snowflake(data, n=1):
-	"""
-	Decodes a snowflake ID into its constituent parts.
-
-	Args:
-		data (str): The base64 encoded snowflake ID.
-		n (int, optional): The number of IDs to decode. Defaults to 1.
-
-	Returns:
-		list: A list of decoded snowflake IDs, each represented as an integer.
-
-	Raises:
-		ValueError: If the input data is not valid base64 or if decoding fails.
-
-	Note:
-		The function assumes the input data is a valid base64 encoded string.
-		It decodes the string, extracts the timestamp, worker ID, process ID,
-		and increment values, and then reconstructs the original snowflake IDs.
-	"""
 	decoded = b64_or_uni(data)
 	if 1 < decoded[0] < 127:
 		n, decoded = decoded[0], decoded[1:]
@@ -1808,15 +1778,14 @@ def deserialise_nums(b: bytearray) -> list:
 
 @split_attachment
 def encode_attachment(cid, mid, aid, fn, minimise=False):
+	if minimise:
+		aid = 0
 	if aid == 0:
 		url = encode_snowflake(*map(int, (cid, mid)), store_count=True, minimise=minimise)
 		if not minimise:
 			url += f"/{fn}"
 		return url
-	url = encode_snowflake(*map(int, (cid, mid, aid)), minimise=minimise)
-	if not minimise:
-		url += f"/{fn}"
-	return url
+	return encode_snowflake(*map(int, (cid, mid, aid))) + f"/{fn}"
 def decode_attachment(encoded):
 	data, *fn = encoded.split("/", 1)
 	ids = list(decode_snowflake(data, 3))
@@ -1835,7 +1804,7 @@ def shorten_attachment(cid, mid, aid, fn, mode="u", size=0, base="https://mizabo
 	return url
 def expand_attachment(url):
 	assert "//" in url, "Expected shortened URL."
-	regs = regexp(r"\/\w\/").split(url.split("?", 1)[0], 1)
+	regs = regexp(r"\/\w\/").split(unquote_plus(url.split("?", 1)[0]), 1)
 	assert len(regs) == 2, "Invalid shortened URL."
 	encoded = regs[-1]
 	return decode_attachment(encoded)

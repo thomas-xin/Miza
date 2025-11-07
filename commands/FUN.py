@@ -2486,6 +2486,7 @@ class Stats(Command):
 			type="enum",
 			validation=cdict(
 				enum=("wallet", "premium"),
+				accepts=dict(quota="premium"),
 			),
 			default="wallet",
 		),
@@ -2505,6 +2506,9 @@ class Stats(Command):
 	)
 	macros = cdict(
 		premium=cdict(
+			mode="premium",
+		),
+		quota=cdict(
 			mode="premium",
 		),
 	)
@@ -2571,7 +2575,7 @@ class Stats(Command):
 				premium.require(0)
 				freebies = T(data).coerce("freebies", list, [])
 				freelim = bot.premium_limit(premium.value)
-				q = max(0, freelim - len(freebies))
+				q = freelim - len(freebies)
 				c = round_min(mpf(q) / 1000)
 				if freebies:
 					s = f", next refresh {time_repr(86400 + freebies[0])}"
@@ -2582,7 +2586,10 @@ class Stats(Command):
 		sparkles = data.get("sparkles", 0)
 		if sparkles:
 			items = deque()
-			for i, c in sorted(sparkles.items(), key=lambda t: -len(t[0])):
+			for i in ("secret", "legendary", "rare", "normal"):
+				c = sparkles.get(i)
+				if not c:
+					continue
 				s = await bot.data.emojis.emoji_as(sparkle_values[i] + ".gif", full=True)
 				s += f" {c}"
 				items.append(s)

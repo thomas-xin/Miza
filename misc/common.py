@@ -141,7 +141,7 @@ def restructure_buttons(buttons):
 			if "name" in button:
 				button["label"] = button.pop("name")
 			if "label" in button:
-				button["label"] = lim_str(button["label"], 80)
+				button["label"] = lim_str(button["label"], 34)
 			try:
 				if isinstance(button["emoji"], str):
 					s = button["emoji"]
@@ -1024,8 +1024,10 @@ def fake_reply(message):
 		content = content[:100] + "…"
 	content = content.translate(breaks).strip()
 	if not content:
-		content = "…" if not message.attachments and not message.embeds else "[attachment]"
-	return f"-# ⮣ [**{message.author.display_name}** {content}]({message_link(message)})"
+		content = "…" if not message.attachments and not message.embeds else "*Click to see attachment*"
+	encoded = f"**{message.author.display_name}** {content}"
+	encoded = regexp("https?:\\/\\/").sub("", encoded) # Disallow HTTP string prefixes as Discord blacklists them
+	return f"-# ⮣ [{encoded}]({message_link(message)})"
 
 
 def apply_stickers(message, data=None):
@@ -1842,10 +1844,18 @@ def find_emojis_ex(s, cast_urls=True):
 HEARTS = ["❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
 
 class SimulatedEmoji(cdict):
+
 	def __str__(self):
 		if self.get("unicode"):
 			return self.unicode
 		return min_emoji(self, full=True)
+
+	@property
+	def url(self):
+		if self.get("unicode"):
+			urls = find_emojis_ex(self.unicode)
+			return urls[0] if urls else "https://mizabot.xyz/notfound.png"
+		return f"https://cdn.discordapp.com/emojis/{self.id}.{'gif' if self.animated else 'png'}"
 
 
 readstring = lambda s: deobfuscate(zwremove(s))
@@ -2042,8 +2052,9 @@ def default_pagination_key(curr, pos=0, page=16):
 
 class PaginationCommand(Command):
 
-	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+	directions = [b'\xe2\x8f\xaa', b'\xe2\x97\x80', b'\xe2\x96\xb6', b'\xe2\x8f\xa9', b'\xf0\x9f\x94\x84']
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
+	dirmap = dict(zip(dirnames, map(as_str, directions)))
 
 	def encode(self, uid: int, data: bytes, s: str) -> str:
 		s = s.strip()
@@ -2064,7 +2075,8 @@ class PaginationCommand(Command):
 		if not s:
 			raise ValueError(s)
 		for i, c in enumerate(s):
-			if not invisicode.BASE <= ord(c) < invisicode.BASE + invisicode.RANGE:
+			n = ord(c)
+			if not invisicode.BASE <= n < invisicode.BASE + invisicode.RANGE and n != invisicode.STRINGPREFIX:
 				break
 		code = invisicode.decode(s[:i])
 		name, code = code.split(b"\x00", 1)
@@ -2077,13 +2089,14 @@ class PaginationCommand(Command):
 		if not content:
 			embed = kwargs.get("embed")
 			if embed:
-				embed.description = self.encode(uid, data, embed.description)
+				embed.description = self.encode(uid, data, embed.description or "")
 			else:
 				content = self.encode(uid, data, content)
 		else:
 			content = self.encode(uid, data, content)
 		if "buttons" not in kwargs:
-			kwargs["buttons"] = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+			kwargs["buttons"] = [[cdict(emoji=self.dirmap[k], name=k, custom_id=self.dirmap[k]) for k in tup] for tup in [("First", "Prev", "Refresh", "Next", "Last")]]
+			#[cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
 		return cdict(
 			content=content or None,
 			**kwargs,
@@ -2110,9 +2123,10 @@ class PaginationCommand(Command):
 				emb.description = await akey(curr, pos, page)
 			else:
 				emb.description = key(curr, pos, page)
-		more = len(curr) - pos - page
-		if more > 0:
-			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
+		max_page = len(curr) // page + 1
+		if max_page > 1:
+			curr_page = min(max_page, ceil(pos / page)) + 1
+			emb.set_footer(text=f"Page {curr_page}/{max_page}")
 		return self.construct(uid, leb128(pos) + extra, embed=emb)
 
 	def paginate(self, pos, size, page, diridx=-1):

@@ -578,7 +578,7 @@ class UpdateSkyShardReminders(Database):
 			return []
 		return list(map(int, nums.split(",")))
 
-	async def _reaction_add_(self, message, react, user):
+	async def _reaction_add_(self, message, react, user, **void):
 		if user.id not in self or message.channel.id != (await self.bot.get_dm(user)).id:
 			return
 		if not message.embeds:

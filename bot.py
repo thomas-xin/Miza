@@ -74,6 +74,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	kofi_url = AUTH.get("kofi_url") or "https://ko-fi.com/waveplasma/tiers"
 	rapidapi_url = AUTH.get("rapidapi_url") or "https://rapidapi.com/thomas-xin/api/miza"
 	raw_webserver = AUTH.get("raw_webserver") or "https://api.mizabot.xyz"
+	notfound = "https://mizabot.xyz/notfound.png"
 	heartbeat_file = "heartbeat.tmp"
 	restart = "restart.tmp"
 	shutdown = "shutdown.tmp"
@@ -1236,7 +1237,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if discord_expired(url):
 						return await self.renew_attachment(url, m_id)
 					return url
-		return "https://mizabot.xyz/notfound.png"
+		return self.notfound
 
 	def try_attachment(self, url, m_id=None) -> str:
 		if not isinstance(url, int):
@@ -1283,7 +1284,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if is_url(tup):
 				return await self.backup_url(tup)
 			if not tup:
-				return "https://mizabot.xyz/notfound.png"
+				return self.notfound
 			c_id, m_id = tup
 		else:
 			try:
@@ -1397,9 +1398,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				self.cache.emojis[emoji.id] = emoji
 				return emoji
 		if allow_external:
-			animated = await asubmit(self.is_animated, e_id, verify=True)
+			animated = await asubmit(self.is_animated, e_id)
 			if animated is not None:
-				emoji = SimulatedEmoji(id=e_id, animated=animated, name=self.data.emojinames.get(e_id))
+				emoji = SimulatedEmoji(
+					id=e_id,
+					animated=animated,
+					name=self.data.emojinames.get(e_id),
+				)
 				self.cache.emojis[emoji.id] = emoji
 				return emoji
 		raise LookupError("Emoji not found or not usable.")
@@ -1412,7 +1417,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if isinstance(e_id, int):
 			return await self.fetch_emoji(e_id, guild=guild, allow_external=allow_external)
 		assert not e_id.isascii()
-		emoji = SimulatedEmoji(id=int.from_bytes(e_id.encode("utf-8"), "big"), animated=False, name=e_id, unicode=e_id)
+		emoji = SimulatedEmoji(
+			id=int.from_bytes(e_id.encode("utf-8"), "big"),
+			animated=False,
+			name=e_id,
+			unicode=e_id,
+		)
 		self.cache.emojis[emoji.id] = emoji
 		return emoji
 
@@ -1771,37 +1781,30 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			data = next(it)
 			return tuple(t.strip() for t in self.mime.from_buffer(data).split(";"))
 
-	emoji_stuff = {}
-	def is_animated(self, e, verify=False):
+	emoji_animated = AutoCache(f"{CACHE_PATH}/emoji_animated", stale=86400 * 365, timeout=None)
+	def _is_animated(self, e):
+		try:
+			emoji = self.cache.emojis[e]
+		except KeyError:
+			if e <= 0 or e > time_snowflake(dtn(), high=True):
+				return
+			base = f"https://cdn.discordapp.com/emojis/{e}."
+			fut = esubmit(Request, base + "png", method="HEAD")
+			url = base + "gif"
+			with reqs.next().head(url, headers=Request.header(), timeout=30) as resp:
+				if resp.status_code in range(400, 500):
+					try:
+						fut.result()
+					except ConnectionError:
+						return None
+					return False
+			return True
+		return emoji.animated
+	def is_animated(self, e):
 		"Detects whether an emoji is usable, and if so, animated. Returns a ternary True/False/None value where True represents an emoji that is both usable and animated, False for a usable non-animated emoji, and None for unusable emojis."
 		if type(e) in (int, str):
-			try:
-				emoji = self.cache.emojis[e]
-			except KeyError:
-				e = int(e)
-				if e <= 0 or e > time_snowflake(dtn(), high=True):
-					return
-				try:
-					return self.emoji_stuff[e]
-				except KeyError:
-					pass
-				base = f"https://cdn.discordapp.com/emojis/{e}."
-				if verify:
-					fut = esubmit(Request, base + "png", method="HEAD")
-				url = base + "gif"
-				with reqs.next().head(url, headers=Request.header(), timeout=30) as resp:
-					if resp.status_code in range(400, 500):
-						if not verify:
-							return False
-						try:
-							fut.result()
-						except ConnectionError:
-							self.emoji_stuff[e] = None
-							return
-						self.emoji_stuff[e] = False
-						return False
-				self.emoji_stuff[e] = True
-				return True
+			e = int(e)
+			return self.emoji_animated.aretrieve(e, self._is_animated, e)
 		else:
 			emoji = e
 		return emoji.animated
@@ -1910,7 +1913,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			url = f"https://cdn.discordapp.com/emojis/{e}.png"
 			with reqs.next().head(url, headers=Request.header(), timeout=30) as resp:
 				if resp.status_code in range(400, 500):
-					self.emoji_stuff.pop(int(e), None)
+					self.emoji_animated.pop(int(e), None)
 					return
 		else:
 			if e.id not in self.cache.emojis:
@@ -1918,7 +1921,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return True
 
 	async def min_emoji(self, e, full=False):
-		animated = await asubmit(self.is_animated, e, verify=True)
+		animated = await asubmit(self.is_animated, e)
 		if animated is None:
 			raise LookupError(f"Emoji {e} does not exist.")
 		if type(e) in (int, str):
@@ -2386,8 +2389,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		),
 		1: cdict(
 			reasoning="gpt-5-mini",
-			instructive="gpt-5-mini",
-			casual="kimi-k2",
+			instructive="kimi-k2-t",
+			casual="kimi-k2-t",
 			nsfw="grok-4-fast",
 			backup="gemini-2.5-flash-t",
 			retry="claude-4.5-haiku",
@@ -2398,9 +2401,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		2: cdict(
 			reasoning="gpt-5",
 			instructive="gpt-5",
-			casual="grok-4",
+			casual="kimi-k2-t",
 			nsfw="grok-4",
-			backup="kimi-k2",
+			backup="gemini-2.5-pro",
 			retry="claude-4.5-sonnet",
 			function="grok-4-fast",
 			vision="gpt-5",
@@ -8036,7 +8039,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					self.data.users.add_xp(user, xrand(4, 7))
 					self.data.users.add_gold(user, xrand(1, 5))
 				reaction = str(emoji)
-				await self.send_event("_reaction_add_", message=message, react=reaction, user=user)
+				await self.send_event("_reaction_add_", message=message, react=reaction, user=user, emoji=emoji)
 				await self.react_callback(message, reaction, user)
 				await self.check_to_delete(message, reaction, user)
 
@@ -8051,7 +8054,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			await self.seen(user, channel, message.guild, event="reaction", raw="Removing a reaction")
 			if user.id != self.id:
 				reaction = str(emoji)
-				await self.send_event("_reaction_remove_", message=message, react=reaction, user=user)
+				await self.send_event("_reaction_remove_", message=message, react=reaction, user=user, emoji=emoji)
 				await self.react_callback(message, reaction, user)
 				await self.check_to_delete(message, reaction, user)
 
@@ -8186,12 +8189,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							print("SC:", resp)
 						finally:
 							message.deleted = True
-					elif d["type"] == 3:
+					elif d["type"] in (3, 5):
 						# Interaction buttons
 						custom_id = cdata.get("custom_id", "")
 						if "?" in custom_id:
 							custom_id = custom_id.rsplit("?", 1)[0]
-						if custom_id.startswith("▪️"):
+						if not custom_id or custom_id.startswith("▪️"):
 							return await self.ignore_interaction(message)
 						mdata = d.get("member")
 						if not mdata:
@@ -8235,7 +8238,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							self.add_message(m, force=True)
 						m.int_id = message.id
 						m.int_token = message.slash
-						# print(custom_id, user)
 						await self.react_callback(m, custom_id, user)
 					else:
 						print("Unknown interaction:\n" + str(data))

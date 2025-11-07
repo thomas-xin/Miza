@@ -52,6 +52,7 @@ class AutoEmoji(PaginationCommand):
 		)
 
 	async def _callback_(self, _user, index, data, **void):
+		print(data)
 		pos, more = decode_leb128(data)
 		gid, _ = decode_leb128(more)
 		return await self.display(_user.id, pos, gid, index)
@@ -100,6 +101,26 @@ class UpdateAutoEmojis(Database):
 			return False
 		return True
 
+	async def _reaction_add_(self, message, emoji, **void):
+		if not emoji or isinstance(emoji, str):
+			return
+		e = str(emoji)
+		bot = self.bot
+		name, e_id = e.split(":")[1:]
+		e_id = int("".join(regexp("[0-9]+").findall(e_id)))
+		anim = e.startswith("<a:")
+		bot.emoji_animated[e_id] = anim
+		emoji = bot.cache.emojis.get(e_id)
+		if emoji:
+			name = emoji.name
+		if not message.webhook_id:
+			bot.data.emojinames[e_id] = name
+			orig = bot.data.emojilists.setdefault(message.author.id, {})
+			orig[name] = e_id
+			if message.guild:
+				orig = bot.data.emojilists.setdefault(message.guild.id, {})
+				orig[name] = e_id
+
 	async def _nocommand_(self, message, recursive=True, edit=False, **void):
 		if getattr(message, "simulated", None) or (utc_ddt() - message.created_at).total_seconds() > 3600:
 			return
@@ -111,7 +132,7 @@ class UpdateAutoEmojis(Database):
 			name, e_id = e.split(":")[1:]
 			e_id = int("".join(regexp("[0-9]+").findall(e_id)))
 			anim = e.startswith("<a:")
-			bot.emoji_stuff[e_id] = anim
+			bot.emoji_animated[e_id] = anim
 			emoji = bot.cache.emojis.get(e_id)
 			if emoji:
 				name = emoji.name
@@ -291,6 +312,7 @@ class EmojiList(PaginationCommand):
 			),
 			description="Action to perform",
 			example="enable",
+			default="view",
 		),
 		name=cdict(
 			type="word",

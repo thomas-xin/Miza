@@ -2540,11 +2540,6 @@ class UpdateMessageCache(Database):
 	def __load__(self, **void):
 		self.data.encoder = [encrypt, decrypt]
 
-	# def __init__(self, *args):
-	#     super().__init__(*args)
-	#     if not os.path.exists(self.files):
-	#         os.mkdir(self.files)
-
 	def get_fn(self, m_id):
 		return  m_id // 10 ** 12
 

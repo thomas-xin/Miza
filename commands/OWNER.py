@@ -1574,13 +1574,6 @@ class UpdateOnceoffs(Database):
 		return False
 
 
-class UpdateEmojiStats(Database):
-	name = "emojistats"
-
-	def __load__(self, **void):
-		self.bot.emoji_stuff = self
-
-
 class UpdateGuildSettings(Database):
 	name = "guildsettings"
 

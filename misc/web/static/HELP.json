@@ -5373,7 +5373,8 @@
 				"Bal",
 				"Balance",
 				"Wallet",
-				"premium"
+				"premium",
+				"quota"
 			],
 			"description": "Shows the target users' stats, and their wallet and premium subscription status (if applicable).",
 			"level": "0",
@@ -5387,7 +5388,10 @@
 						"enum": [
 							"wallet",
 							"premium"
-						]
+						],
+						"accepts": {
+							"quota": "premium"
+						}
 					},
 					"default": "wallet"
 				},
@@ -5833,6 +5837,7 @@
 							"gpt-4-mini",
 							"gpt-4",
 							"mistral-24b",
+							"kimi-k2-t",
 							"kimi-k2"
 						],
 						"accepts": {

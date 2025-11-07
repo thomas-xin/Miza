@@ -240,7 +240,7 @@ class AttachmentCache(AutoCache):
 			json=True,
 		)
 		for i, a in enumerate(data["attachments"]):
-			if not a_id or a_id in (i, int(a["id"])):
+			if a_id in (None, m_id, i, int(a["id"])):
 				return a["url"].rstrip("&")
 		raise ConnectionError(404, a_id)
 
@@ -273,7 +273,7 @@ class AttachmentCache(AutoCache):
 			c_id = int.from_bytes(b64(c_id), "big")
 			m_id = int.from_bytes(b64(m_id), "big")
 			a_id = int.from_bytes(b64(a_id), "big")
-		if not a_id:
+		if not a_id or a_id == m_id:
 			a_id = 0
 		if a_id >= ac:
 			key = a_id
@@ -339,7 +339,7 @@ class AttachmentCache(AutoCache):
 				self.tertiary[url] = head
 				return open(fn, "rb")
 		try:
-			f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, timeout=timeout, return_headers=True)
+			f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, timeout=timeout, max_attempts=3, return_headers=True)
 		except niquests.exceptions.HTTPError as ex:
 			code, msg = ex.response.status_code, ex.response.reason
 			raise ConnectionError(code, msg)

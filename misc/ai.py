@@ -219,9 +219,13 @@ available = {
 		"openrouter_": ("cognitivecomputations/dolphin3.0-mistral-24b:free", ("0", "0")),
 		None: "gpt-4.1-mini",
 	},
+	"kimi-k2-t": {
+		"openrouter": ("moonshotai/kimi-k2-thinking", ("0.6", "2.5")),
+		None: "gpt-5",
+	},
 	"kimi-k2": {
 		"openrouter": ("moonshotai/kimi-k2-0905:exacto", ("0.6", "2.5")),
-		None: "gpt-5",
+		None: "gpt-5-mini",
 	},
 }
 
@@ -284,6 +288,7 @@ is_chat = {
 	"deepseek-v3",
 	"skyfall-36b",
 	"mistral-24b",
+	"kimi-k2-t",
 	"kimi-k2",
 	"caller-large",
 	"firefunction-v2",
@@ -317,6 +322,9 @@ is_completion = {
 	"mixtral-8x7b",
 }
 is_reasoning = {
+	"claude-4.1-opus",
+	"claude-4.5-sonnet",
+	"claude-4.5-haiku",
 	"claude-3.7-sonnet:thinking",
 	"claude-3.7-sonnet-t",
 	"grok-4",
@@ -337,6 +345,8 @@ is_reasoning = {
 	"o1-preview",
 	"o1-mini",
 	"deepseek-r1",
+	"kimi-k2-t",
+	"qwen3-235b",
 }
 is_function = {
 	"claude-3.7-sonnet-t",
@@ -380,6 +390,7 @@ is_function = {
 	"deepseek-v3.2",
 	"deepseek-v3.1",
 	"mistral-24b",
+	"kimi-k2-t",
 	"kimi-k2",
 	"caller-large",
 	"firefunction-v2",
@@ -525,6 +536,7 @@ contexts = {
 	"nous-hermes-2-mixtral-8x7b-dpo": 32768,
 	"mixtral-8x7b-instruct": 32768,
 	"mixtral-8x7b": 32768,
+	"kimi-k2-t": 262144,
 	"kimi-k2": 262144,
 	"caller-large": 32768,
 	"firefunction-v2": 8192,
@@ -570,12 +582,12 @@ def nsfw_flagged(resp):
 	for flag in flagged:
 		if getattr(cat, flag):
 			score = getattr(resp.category_scores, flag)
-			if score >= 0.75:
+			if score >= 0.5:
 				found.append((score, flag + f"({round(score * 100)}%)"))
 	if not found:
-		if resp.flagged:
-			flag, score = max(dict(resp.category_scores).items(), key=lambda t: t[1])
-			return flag + f"({round(score * 100)}%)"
+		# if resp.flagged:
+		# 	flag, score = max(dict(resp.category_scores).items(), key=lambda t: t[1])
+		# 	return flag + f"({round(score * 100)}%)"
 		return
 	return max(found)[-1]
 
@@ -752,7 +764,7 @@ def m_name(m):
 	return m.name
 
 def overview(messages):
-	return "\n\n".join(map(m_str, (m for m in messages if m.content)))
+	return "\n\n".join(lim_str(m_str(m), 4096) for m in messages if m.content)
 
 def _count_to(messages, model):
 	encoding = get_encoding(model)
@@ -996,14 +1008,21 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 		try:
 			if "messages" in kwa:
 				if model not in is_function:
-					kwa["messages"] = [untool(m.copy()) for m in kwa["messages"]]
+					messages = []
+					for m in kwa["messages"]:
+						m = cdict(m)
+						m = untool(m)
+						if not m.get("content"):
+							m.content = "."
+						messages.append(m)
+					kwa["messages"] = messages
 				else:
 					messages = []
 					for m in kwa["messages"]:
 						m = cdict(m)
-						if m.get("content") is None:
-							m.content = ""
 						m = fix_tool(m)
+						if not m.get("content"):
+							m.content = "."
 						messages.append(m)
 					kwa["messages"] = messages
 				if sapi in ("fireworks", "together", "deepinfra", "mistral"):
@@ -1135,7 +1154,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 
 async def instruct(data, best=False, skip=False, prune=True, cache=True, user=None):
 	data["prompt"] = data.get("prompt") or data.pop("inputs", None) or data.pop("input", None)
-	key = shash(str((data["prompt"], data.get("model", "kimi-k2"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
+	key = shash(str((data["prompt"], data.get("model", "kimi-k2-t"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
 	if cache:
 		tup = await CACHE.aretrieve(key, _instruct2, data, best=best, skip=skip, prune=prune, user=user)
 		if tup[1] >= best:
@@ -1157,7 +1176,7 @@ async def _instruct2(data, best=False, skip=False, prune=True, user=None):
 async def _instruct(data, best=False, skip=False, user=None):
 	# c = await tcount(data["prompt"])
 	inputs = dict(
-		model="grok-4" if best >= 2 else "kimi-k2",
+		model="kimi-k2-t",
 		temperature=0.75,
 		max_tokens=256,
 		top_p=0.999,
@@ -1174,7 +1193,7 @@ async def _instruct(data, best=False, skip=False, user=None):
 		dec = True and not skip
 	if dec:
 		inputs["model"] = "auto" if best else "llama-3-70b"
-	if data.get("model", "kimi-k2") in is_chat:
+	if data["model"] in is_chat:
 		prompt = inputs.pop("prompt")
 		inputs["messages"] = [cdict(role="user", content=prompt)]
 		async with asyncio.timeout(70):
