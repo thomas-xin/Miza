@@ -637,7 +637,9 @@
 			"aliases": [
 				"UnFancy",
 				"UnFormat",
-				"UnZalgo"
+				"UnZalgo",
+				"Deobfuscate",
+				"Unobscure"
 			],
 			"description": "Removes unicode formatting and diacritic characters from inputted text.",
 			"level": "0",
@@ -701,6 +703,41 @@
 					"type": "string",
 					"example": "that's what she said",
 					"required": true
+				}
+			}
+		},
+		"Invisicode": {
+			"aliases": [
+				"Invisicode",
+				"Invisencode",
+				"Invisiencode",
+				"Invisdecode",
+				"Invisidecode"
+			],
+			"description": "Encodes arbitrary text or data in the invisicode format. See https://github.com/thomas-xin/invisicode for more info, or to run it yourself!",
+			"level": "0",
+			"rate_limit": "(1, 2)",
+			"example": [],
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"encode",
+							"decode"
+						]
+					},
+					"default": "encode"
+				},
+				"url": {
+					"type": "url",
+					"description": "File to encode or decode"
+				},
+				"text": {
+					"type": "string",
+					"description": "Text to encode or decode",
+					"example": "Hello World! \u2764\ufe0f"
 				}
 			}
 		},

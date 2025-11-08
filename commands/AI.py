@@ -66,8 +66,10 @@ class Ask(Command):
 	async def __call__(self, bot, _message, _guild, _channel, _user, _nsfw, _prefix, _premium, prompt, model, **void):
 		await bot.require_integrity(_message)
 		self.description = f"Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. See {bot.kofi_url} for premium tier chatbot specifications; check using ~serverinfo, or apply it with ~premium!"
-		add_dict(bot.data.users, {_user.id: {"last_talk": 1, "last_mention": 1}})
-		bot.data.users[_user.id]["last_used"] = utc()
+		data = bot.get_userbase(_user.id)
+		add_dict(data, {"last_talk": 1, "last_mention": 1})
+		data["last_used"] = utc()
+		bot.set_userbase(_user.id, "", data)
 		await bot.seen(_user, event="misc", raw="Talking to me")
 		embs = []
 		if "dailies" in bot.data:
@@ -491,11 +493,6 @@ class Ask(Command):
 			desc = "-# " + "\n-# ".join(desc.splitlines())
 			response.content += "\n" + desc
 			print(">", desc)
-		# if not ai.local_available:
-		# 	if bot.data.onceoffs.use(_channel.id, 86400):
-		# 		note = "-# *Note: My main AI appears to currently be down; using alternative models (this may affect the way I talk).*"
-		# 		response.content += "\n" + note
-		# 		print(">", note)
 		if not xrand(30):
 			note = "-# " + choice(self.tips)
 			response.content += "\n" + note
@@ -1514,10 +1511,10 @@ class Imagine(Command):
 		embs = []
 		emb = discord.Embed(colour=rand_colour())
 		emb.description = ""
-		data = bot.data.users.setdefault(_user.id, {})
-		if not data.get("tos"):
+		tos = bot.get_userbase(_user.id, "tos")
+		if not tos:
 			emb.description += "\n-# " + self.tips[0]
-			data["tos"] = True
+			bot.set_userbase(_user.id, "tos", True)
 		elif not xrand(30):
 			emb.description += "\n-# " + choice(self.tips)
 		reacts = ["🔳"]

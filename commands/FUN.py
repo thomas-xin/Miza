@@ -904,7 +904,7 @@ class SlotMachine(Command):
 				raise ValueError(f"Minimum bet is {b1} coins.")
 		else:
 			bet = b1
-		if not bet <= self.bot.data.users.get(user.id, {}).get("gold", 0):
+		if not bet <= self.bot.get_userbase(user.id, "gold", 0):
 			raise OverflowError("Bet cannot be greater than your balance.")
 		self.bot.data.users.add_gold(user, -bet)
 		skip = int("s" in flags)
@@ -920,7 +920,7 @@ class SlotMachine(Command):
 				csubmit(message.add_reaction("⤵️"))
 				user = await bot.fetch_user(u_id)
 			else:
-				if bet > bot.data.users.get(user.id, {}).get("gold", 0):
+				if bet > self.bot.get_userbase(user.id, "gold", 0):
 					raise OverflowError("Bet cannot be greater than your balance.")
 				bot.data.users.add_gold(user, -bet)
 			rate = 0.5 - max(0, min(1, ((bet - 64) / 4032))) / 14
@@ -932,7 +932,7 @@ class SlotMachine(Command):
 			if not skip:
 				async with Delay(2):
 					emoj = await self.as_emojis(wheel_display)
-					gold = bot.data.users.get(user.id, {}).get("gold", 0)
+					gold = self.bot.get_userbase(user.id, "gold", 0)
 					bets = await bot.as_rewards(bet)
 					bals = await bot.as_rewards(gold)
 					emb.description = f"```css\n[Slot Machine]```{emoj}\nBet: {bets}\nBalance: {bals}"
@@ -959,7 +959,7 @@ class SlotMachine(Command):
 						start = "```ini\n"
 						end = ""
 					emoj = await self.as_emojis(wheel_display)
-					gold = bot.data.users.get(user.id, {}).get("gold", 0)
+					gold = self.bot.get_userbase(user.id, "gold", 0)
 					bets = await bot.as_rewards(bet)
 					bals = await bot.as_rewards(gold)
 					emb.description = f"{start}[Slot Machine]```{emoj}\nBet: {bets}\nBalance: {bals}{end}"
@@ -1037,13 +1037,13 @@ class Barter(Command):
 			amount = 1
 		else:
 			amount = await bot.eval_math(argv)
-		ingots = bot.data.users.get(user.id, {}).get("ingots", 0)
-		if amount > ingots:
+		cost = amount * 100
+		ingots = bot.get_userbase(user.id, "gold", 0)
+		if cost > ingots:
 			raise OverflowError(f"Barter amount cannot be greater than your balance ({amount} > {ingots}). See ~shop for more information.")
 		elif not amount >= 1:
 			raise ValueError("Please input a valid amount of ingots.")
-		data = bot.data.users[user.id]
-		data["ingots"] -= amount
+		bot.data.users.add_gold(user.id, -cost)
 		if amount >= 18446744073709551616:
 			dtype = np.float80
 		elif amount >= 4294967296:
@@ -1077,19 +1077,20 @@ class Barter(Command):
 			counts = counts.astype(dtype)
 			await asubmit(np.add.at, totals, ids, counts)
 		rewards = deque()
-		data.setdefault("minecraft", {})
+		minecraft = bot.get_userbase(user.id, "minecraft", cdict())
 		for i, c in enumerate(totals):
 			if c:
 				with suppress(TypeError, OverflowError, ValueError):
 					c = round_random(c)
 				try:
-					data["minecraft"][i] += c
+					minecraft[i] += c
 				except KeyError:
-					data["minecraft"][i] = c
+					minecraft[i] = c
 				s = await bot.data.emojis.emoji_as(barter_values[i] + ".gif")
 				if c != 1:
 					s += f" {c}"
 				rewards.append(s)
+		bot.set_userbase(user.id, "minecraft", minecraft)
 		out = "\n".join(rewards)
 		footer = thumbnail = None
 		if amount == 1:
@@ -1847,7 +1848,7 @@ class Pay(Command):
 			amount = 1
 		if amount <= 0:
 			raise ValueError(f"Please input a valid amount of {currency}.")
-		if not amount <= bot.data.users.get(user.id, {}).get(currency, 0):
+		if not amount <= bot.get_userbase(user.id, currency, 0):
 			raise OverflowError("Payment cannot be greater than your balance.")
 		getattr(bot.data.users, f"add_{currency}")(user, -amount, multiplier=False)
 		getattr(bot.data.users, f"add_{currency}")(target, amount, multiplier=False)
@@ -2519,7 +2520,7 @@ class Stats(Command):
 
 	async def __call__(self, bot, _guild, _channel, _message, _perm, _user, mode, user, logging, **void):
 		user = user or _user
-		data = bot.data.users.get(user.id, {})
+		data = bot.get_userbase(_user.id)
 		if logging:
 			if user.id != _user.id and not isnan(_perm):
 				raise PermissionError("Modifying settings of other users is not permitted.")
@@ -2573,12 +2574,12 @@ class Stats(Command):
 			else:
 				premium = bot.premium_context(user, _guild)
 				premium.require(0)
-				freebies = T(data).coerce("freebies", list, [])
+				quota_uses = T(data).coerce("quota_uses", list, [])
 				freelim = bot.premium_limit(premium.value)
-				q = freelim - len(freebies)
+				q = freelim - len(quota_uses)
 				c = round_min(mpf(q) / 1000)
-				if freebies:
-					s = f", next refresh {time_repr(86400 + freebies[0])}"
+				if quota_uses:
+					s = f", next refresh {time_repr(86400 + quota_uses[0])}"
 				else:
 					s = ""
 				description += f"\nPremium credit remaining: `{q}` (`${c}`){s}"

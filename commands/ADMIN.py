@@ -583,6 +583,7 @@ class RoleSelect(Command):
 				if memb.top_role <= role:
 					raise PermissionError("Target role is higher than your highest role.")
 		buttons = [cdict(name=role.name, emoji=e, id="%04d" % (ihash(role.name) % 10000) + str(role.id)) for e, role in rolelist]
+		emb = await self.bot.coloured_embed(_guild)
 		colour = await self.bot.get_colour(_guild)
 		emb = discord.Embed(colour=colour)
 		emb.set_author(**get_author(_guild))
@@ -2446,35 +2447,34 @@ class UpdateUserLogs(Database):
 		kick = None
 		ban = None
 		bot = self.bot
-		if "users" in bot.data:
-			try:
-				stored = bot.data.users[user.id]["stored"]
-			except LookupError:
-				pass
-			else:
-				for c_id, m_id in tuple(stored.items()):
-					try:
-						c = bot.cache.channels[c_id]
-					except KeyError:
-						stored.pop(c_id)
-						continue
-					try:
-						m = await c.fetch_message(m_id)
-					except:
-						print_exc()
-						stored.pop(c_id, None)
-						continue
-					print("Remaining author:", m.author, m.author.id, guild)
-					if m.author.id == bot.deleted_user:
-						print(user, user.id, "deleted!!")
-						bot.data.users[user.id]["deleted"] = True
-					break
+		try:
+			stored = bot.get_userbase(user.id, "stored")
+		except LookupError:
+			pass
+		else:
+			for c_id, m_id in tuple(stored.items()):
+				try:
+					c = bot.cache.channels[c_id]
+				except KeyError:
+					stored.pop(c_id)
+					continue
+				try:
+					m = await c.fetch_message(m_id)
+				except:
+					print_exc()
+					stored.pop(c_id, None)
+					continue
+				print("Remaining author:", m.author, m.author.id, guild)
+				if m.author.id == bot.deleted_user:
+					print(user, user.id, "deleted!!")
+					bot.set_userbase(user.id, "deleted", True)
+				break
 		# Colour: Black
 		emb = discord.Embed(colour=1)
 		emb.set_author(**get_author(user))
 		if not bot.permissions_in(guild).view_audit_log:
 			pass
-		elif not bot.data.users.get(user.id, {}).get("deleted"):
+		elif not bot.get_userbase(user.id, "deleted", False):
 			# Check audit log to find whether user left or was kicked/banned
 			with tracebacksuppressor(StopIteration):
 				ts = utc()
@@ -2840,7 +2840,7 @@ class UpdateMessageLogs(Database):
 			m2 = await self.bot.send_with_file(channel, msg, embed=emb, file=files[0])
 		else:
 			m2 = await channel.send(msg, embed=emb, files=files)
-		message.attachments = [cdict(name=a.filename, id=a.id, url=self.bot.preserve_as_long(channel.id, m2.id, a.id, fn=a.url)) for a in m2.attachments]
+		message.attachments = [cdict(name=a.filename, id=a.id, url=shorten_attachment(channel.id, m2.id, a.id, fn=a.url)) for a in m2.attachments]
 
 	# Delete events must attempt to find the user who deleted the message
 	async def _raw_delete_(self, message, bulk=False, **void):

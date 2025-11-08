@@ -434,29 +434,29 @@ class Avatar(Command):
 							emb = await self.getGuildData(g)
 							embs.add(emb)
 							raise StopIteration
-						u_id = argv
+						uid = argv
 						with suppress():
-							u_id = verify_id(u_id)
-						u = guild.get_member(u_id)
+							uid = verify_id(uid)
+						u = guild.get_member(uid)
 						g = None
 						while u is None and g is None:
 							with suppress():
-								u = bot.get_member(u_id, guild)
+								u = bot.get_member(uid, guild)
 								break
 							with suppress():
 								try:
-									u = bot.get_user(u_id)
+									u = bot.get_user(uid)
 								except:
-									if not bot.in_cache(u_id):
-										u = await bot.fetch_user(u_id)
+									if not bot.in_cache(uid):
+										u = await bot.fetch_user(uid)
 									else:
 										raise
 								break
-							if type(u_id) is str and "@" in u_id and ("everyone" in u_id or "here" in u_id):
+							if type(uid) is str and "@" in uid and ("everyone" in uid or "here" in uid):
 								g = guild
 								break
 							try:
-								p = bot.get_mimic(u_id, user)
+								p = bot.get_mimic(uid, user)
 								emb = await self.getMimicData(p)
 								embs.add(emb)
 							except:
@@ -464,15 +464,15 @@ class Avatar(Command):
 							else:
 								raise StopIteration
 							with suppress():
-								g = bot.cache.guilds[u_id]
+								g = bot.cache.guilds[uid]
 								break
 							with suppress():
-								g = bot.cache.roles[u_id].guild
+								g = bot.cache.roles[uid].guild
 								break
 							with suppress():
-								g = bot.cache.channels[u_id].guild
+								g = bot.cache.channels[uid].guild
 							with suppress():
-								u = await bot.fetch_member_ex(u_id, guild)
+								u = await bot.fetch_member_ex(uid, guild)
 								break
 							raise LookupError(f"No results for {argv}.")     
 						if g:
@@ -580,7 +580,7 @@ class Info(Command):
 		emb = discord.Embed(colour=colour)
 		emb.set_thumbnail(url=url)
 		emb.set_author(name=name, icon_url=url, url=url)
-		d = f"{user_mention(p.u_id)}{fix_md(p.id)}"
+		d = f"{user_mention(p.uid)}{fix_md(p.id)}"
 		if p.description:
 			d += code_md(p.description)
 		emb.description = d
@@ -610,41 +610,41 @@ class Info(Command):
 							emb = await self.getGuildData(g, flags, is_current=guild.id == g.id)
 							embs.add(emb)
 							raise StopIteration
-						u_id = argv
+						uid = argv
 						with suppress():
-							u_id = verify_id(u_id)
-						u = guild.get_member(u_id) if type(u_id) is int else None
+							uid = verify_id(uid)
+						u = guild.get_member(uid) if type(uid) is int else None
 						g = None
 						while u is None and g is None:
 							with suppress():
-								u = bot.get_member(u_id, guild)
+								u = bot.get_member(uid, guild)
 								break
 							with suppress():
 								try:
-									u = bot.get_user(u_id)
+									u = bot.get_user(uid)
 								except:
-									if not bot.in_cache(u_id):
-										u = await bot.fetch_user(u_id)
+									if not bot.in_cache(uid):
+										u = await bot.fetch_user(uid)
 									else:
 										raise
 								break
-							if type(u_id) is str and "@" in u_id and ("everyone" in u_id or "here" in u_id):
+							if type(uid) is str and "@" in uid and ("everyone" in uid or "here" in uid):
 								g = guild
 								break
 							if "server" in name:
 								with suppress():
-									g = await bot.fetch_guild(u_id)
+									g = await bot.fetch_guild(uid)
 									break
 								with suppress():
-									role = await bot.fetch_role(u_id, g)
+									role = await bot.fetch_role(uid, g)
 									g = role.guild
 									break
 								with suppress():
-									channel = await bot.fetch_channel(u_id)
+									channel = await bot.fetch_channel(uid)
 									g = channel.guild
 									break
 							try:
-								p = bot.get_mimic(u_id, user)
+								p = bot.get_mimic(uid, user)
 								emb = await self.getMimicData(p, flags)
 								embs.add(emb)
 							except:
@@ -652,15 +652,15 @@ class Info(Command):
 							else:
 								raise StopIteration
 							with suppress():
-								g = bot.cache.guilds[u_id]
+								g = bot.cache.guilds[uid]
 								break
 							with suppress():
-								g = bot.cache.roles[u_id].guild
+								g = bot.cache.roles[uid].guild
 								break
 							with suppress():
-								g = bot.cache.channels[u_id].guild
+								g = bot.cache.channels[uid].guild
 							with suppress():
-								u = await bot.fetch_member_ex(u_id, guild)
+								u = await bot.fetch_member_ex(uid, guild)
 								break
 							raise LookupError(f"No results for {argv}.")
 						if g:
@@ -688,9 +688,7 @@ class Info(Command):
 						is_self = False
 					if bot.is_owner(u.id):
 						st.append("My owner ❤️")
-					deleted = False
-					with suppress(LookupError):
-						deleted = bot.data.users[u.id]["deleted"]
+					deleted = bot.get_userbase(u.id, "deleted")
 					if deleted:
 						st.append("Deleted User ⚠️")
 					is_sys = False
@@ -758,25 +756,14 @@ class Info(Command):
 					seen = None
 					zone = None
 					with suppress(LookupError):
-						ls = bot.data.users[u.id]["last_seen"]
-						la = bot.data.users[u.id].get("last_action")
+						ls = bot.get_userbase(u.id, "last_seen", Dummy)
+						la = bot.get_userbase(u.id, "last_action", Dummy)
 						if type(ls) is str:
 							seen = ls
 						else:
 							seen = time_repr(ls, mode="R")
 						if la:
 							seen = f"{la}, {seen}"
-						if "v" in flags:
-							tz = self.bot.data.users.get_timezone(u.id)
-							if tz is None:
-								tz, c = self.bot.data.users.estimate_timezone(u.id)
-								estimated = True
-							else:
-								estimated = False
-							if tz >= 0:
-								zone = f"GMT+{tz}"
-							else:
-								zone = f"GMT{tz}"
 					if is_self and bot.webserver:
 						url2 = bot.webserver
 					else:
@@ -1367,7 +1354,7 @@ class Note(PaginationCommand):
 	rate_limit = (6, 10)
 
 	async def __call__(self, bot, _user, message, edit, delete, **void):
-		notes = bot.data.notes.get(_user.id, [])
+		notes = bot.get_userbase(_user.id, "notes", [])
 		if all_none(message, edit, delete):
 			# Set callback message for scrollable list
 			return await self.display(_user.id, 0)
@@ -1377,7 +1364,7 @@ class Note(PaginationCommand):
 			assert targets, "No reminders at the specified index."
 			for i in targets:
 				notes[i] = message
-			bot.data.notes[_user.id] = notes
+			bot.set_userbase(_user.id, "notes", notes)
 			return cdict(
 				f"Successfully updated {sqr_md(len(targets))} notes for {sqr_md(_user)}.",
 				prefix="```css\n",
@@ -1387,7 +1374,7 @@ class Note(PaginationCommand):
 			targets = RangeSet.parse([delete], len(notes))
 			assert targets, "No reminders at the specified index."
 			notes = [note for i, note in enumerate(notes) if i not in targets]
-			bot.data.notes[_user.id] = notes
+			bot.set_userbase(_user.id, "notes", notes)
 			return cdict(
 				f"Successfully removed {sqr_md(len(targets))} notes for {sqr_md(_user)}.",
 				prefix="```css\n",
@@ -1396,7 +1383,7 @@ class Note(PaginationCommand):
 
 		nth = rank_format(len(notes))
 		notes.append(message)
-		bot.data.notes[_user.id] = notes
+		bot.set_userbase(_user.id, "notes", notes)
 		return cdict(
 			f"Successfully added {sqr(nth)} note for {sqr_md(_user)}!",
 			prefix="```css\n",
@@ -1405,7 +1392,7 @@ class Note(PaginationCommand):
 
 	async def display(self, uid, pos, diridx=-1):
 		bot = self.bot
-		return await self.default_display("note", uid, pos, bot.data.notes.get(uid, ()), diridx)
+		return await self.default_display("note", uid, pos, bot.get_userbase(uid, "notes"), diridx)
 
 	async def _callback_(self, _user, index, data, **void):
 		pos, _ = decode_leb128(data)
@@ -1501,17 +1488,17 @@ class UpdateReminders(Database):
 				break
 			# Grab expired item
 			self.listed.popleft()
-			u_id = p[1]
-			temp = self.data[u_id]
+			uid = p[1]
+			temp = self.data[uid]
 			if not temp:
-				self.data.pop(u_id)
+				self.data.pop(uid)
 				continue
 			# Check next item in schedule
 			x = temp[0]
 			xt = x.t if isinstance(x.t, number) else x.t.timestamp_exact()
 			if t < xt:
 				# Insert back into schedule if not expired
-				self.listed.insort((xt, u_id), key=lambda x: x[0])
+				self.listed.insort((xt, uid), key=lambda x: x[0])
 				print(self.listed)
 				continue
 			# Grab target from database
@@ -1521,17 +1508,17 @@ class UpdateReminders(Database):
 				x.t += every
 				temp.insert(0, x)
 				temp.sort(key=lambda x: x.t)
-				self.listed.insort((temp[0].t.timestamp_exact(), u_id), key=lambda x: x[0])
-				self[u_id] = temp
+				self.listed.insort((temp[0].t.timestamp_exact(), uid), key=lambda x: x[0])
+				self[uid] = temp
 			elif not temp:
-				self.data.pop(u_id)
+				self.data.pop(uid)
 			else:
 				# Insert next listed item into schedule
-				self.listed.insort((temp[0].t if isinstance(temp[0].t, number) else temp[0].t.timestamp_exact(), u_id), key=lambda x: x[0])
-				self[u_id] = temp
+				self.listed.insort((temp[0].t if isinstance(temp[0].t, number) else temp[0].t.timestamp_exact(), uid), key=lambda x: x[0])
+				self[uid] = temp
 			# print(self.listed)
 			# Send reminder to target user/channel
-			ch = await self.bot.fetch_messageable(u_id)
+			ch = await self.bot.fetch_messageable(uid)
 			if not self.bot.permissions_in(ch).send_messages:
 				continue
 			try:
@@ -1557,10 +1544,6 @@ class UpdateReminders(Database):
 				csubmit(ch.send(content, embed=emb, reference=reference))
 			else:
 				csubmit(self.recurrent_message(ch, content, emb, t, x.get("recur", 60), reference=reference))
-
-
-class UpdateNotes(Database):
-	name = "notes"
 
 
 class UpdateMessages(Database):
@@ -1648,36 +1631,11 @@ EMPTY = {}
 # This database takes up a lot of space, storing so many events from users
 class UpdateUsers(Database):
 	name = "users"
+	no_file = True
 	hours = 336
 	interval = 900
 	scale = 3600 // interval
 	mentionspam = re.compile("<@[!&]?[0-9]+>")
-
-	async def garbage_collect(self):
-		bot = self.bot
-		data = self.data
-		for key in tuple(data):
-			if type(key) is str:
-				if key.startswith("#"):
-					c_id = int(key[1:].rstrip("\x7f"))
-					if c_id not in bot.cache.channels and c_id not in bot.cache.guilds:
-						print(f"Deleting {key} from {self}...")
-						data.pop(key, None)
-						await asyncio.sleep(0.1)
-				continue
-			try:
-				if not data[key]:
-					raise LookupError
-				d = await bot.fetch_user(key)
-				if d is not None:
-					continue
-			except (LookupError, discord.NotFound):
-				pass
-			except:
-				print_exc()
-				continue
-			print(f"Deleting {key} from {self}...")
-			data.pop(key, None)
 
 	def __load__(self):
 		self.semaphore = Semaphore(1, 0, rate_limit=120)
@@ -1697,30 +1655,6 @@ class UpdateUsers(Database):
 		with open("misc/nsfw_pickup_lines.txt", "r", encoding="utf-8") as f:
 			self.nsfw_pickup_lines = f.read().splitlines()
 
-	async def _bot_ready_(self, **void):
-		data = {"Command": Command}
-		name = "".join(regexp("[A-Za-z_]+").findall(self.bot.name.translate("".maketrans({
-			" ": "_",
-			"-": "_",
-			".": "_",
-		}))))
-		exec(
-			f"class {name}(Command):"
-			+ "\n\tdescription = 'Serves as an alias for mentioning the bot.'"
-			+ "\n\tno_parse = True"
-			+ "\n\tasync def __call__(self, message, argv, flags, **void):"
-			+ "\n\t\tawait self.bot.data.users._nocommand_(message, self.bot.user.mention + ' ' + argv, flags=flags, force=True)",
-			data,
-		)
-		mod = "MAIN"
-		for v in data.values():
-			with suppress(TypeError):
-				if issubclass(v, Command) and v != Command:
-					obj = v(self.bot, mod)
-					self.bot.categories[mod].append(obj)
-					# print(f"Successfully loaded command {repr(obj)}.")
-		return await self()
-
 	def clear_events(self, data, minimum):
 		curr = round_min(int(utc() // self.interval) / self.scale)
 		for hour in tuple(data):
@@ -1728,56 +1662,56 @@ class UpdateUsers(Database):
 				continue
 			data.pop(hour, None)
 
-	def send_event(self, u_id, event, count=1):
-		# print(self.bot.cache.users.get(u_id), event, count)
-		data = set_dict(set_dict(self.data, u_id, {}), "recent", {})
+	def send_event(self, uid, event, count=1):
+		recent = self.bot.get_userbase(uid, "recent", cdict())
 		hour = round_min(int(utc() // self.interval) / self.scale)
-		if data and not xrand(12):
-			self.clear_events(data, hour - self.hours)
+		if recent and not xrand(12):
+			self.clear_events(recent, hour - self.hours)
 		try:
-			data[hour][event] += count
+			recent[hour][event] += count
 		except KeyError:
 			try:
-				data[hour][event] = count
+				recent[hour][event] = count
 			except KeyError:
-				data[hour] = {event: count}
+				recent[hour] = {event: count}
+		self.bot.set_userbase(uid, "recent", recent)
 
-	def fetch_events(self, u_id, interval=3600):
-		return {i: self.get_events(u_id, interval=interval, event=i) for i in ("message", "typing", "command", "reaction", "misc")}
+	def fetch_events(self, uid, interval=3600):
+		return {i: self.get_events(uid, interval=interval, event=i) for i in ("message", "typing", "command", "reaction", "misc")}
 
 	# Get all events of a certain type from a certain user, with specified intervals.
-	def get_events(self, u_id, interval=3600, event=None):
-		data = self.data.get(u_id, EMPTY).get("recent")
-		if not data:
+	def get_events(self, uid, interval=3600, event=None):
+		recent = self.bot.get_userbase(uid, "recent")
+		if not recent:
 			return list(repeat(0, int(self.hours / self.interval * interval)))
 		hour = round_min(int(utc() // self.interval) / self.scale)
-		self.clear_events(data, hour - self.hours)
+		self.clear_events(recent, hour - self.hours)
 		start = hour - self.hours
 		if event is None:
-			out = [np.sum(data.get(i / self.scale + start, EMPTY).values()) for i in range(self.hours * self.scale)]
+			out = [np.sum(recent.get(i / self.scale + start, EMPTY).values()) for i in range(self.hours * self.scale)]
 		else:
-			out = [data.get(i / self.scale + start, EMPTY).get(event, 0) for i in range(self.hours * self.scale)]
+			out = [recent.get(i / self.scale + start, EMPTY).get(event, 0) for i in range(self.hours * self.scale)]
 		if interval != self.interval:
 			factor = ceil(interval / self.interval)
 			out = [np.sum(out[i:i + factor]) for i in range(0, len(out), factor)]
 		return out
 
-	def any_timezone(self, u_id):
-		return self.get_timezone(u_id) or self.estimate_timezone(u_id)[0]
+	def any_timezone(self, uid):
+		return self.get_timezone(uid) or self.estimate_timezone(uid)[0]
 
-	def get_timezone(self, u_id):
-		timezone = self.data.get(u_id, EMPTY).get("timezone")
+	def get_timezone(self, uid):
+		timezone = self.bot.get_userbase(uid, "timezone")
 		if timezone is not None:
 			return get_timezone(timezone)
 
-	def estimate_timezone(self, u_id):
-		data = self.data.get(u_id, EMPTY).get("recent")
-		if not data:
+	def estimate_timezone(self, uid):
+		recent = self.bot.get_userbase(uid, "recent")
+		if not recent:
 			return datetime.timezone.utc, 0
 		hour = round_min(int(utc() // self.interval) / self.scale)
-		self.clear_events(data, hour - self.hours)
+		self.clear_events(recent, hour - self.hours)
 		start = hour - self.hours
-		out = [sum(data.get(i / self.scale + start, EMPTY).values()) for i in range(self.hours * self.scale)]
+		out = [sum(recent.get(i / self.scale + start, EMPTY).values()) for i in range(self.hours * self.scale)]
 		factor = ceil(3600 / self.interval)
 		activity = [sum(out[i:i + factor]) for i in range(0, len(out), factor)]
 		inactive = alist()
@@ -1827,7 +1761,7 @@ class UpdateUsers(Database):
 				estimated -= 24
 		else:
 			estimated = 0
-		return get_timezone(estimated), min(1, len(data) / self.hours)
+		return get_timezone(estimated), min(1, len(recent) / self.hours)
 
 	async def __call__(self):
 		changed = False
@@ -1846,26 +1780,25 @@ class UpdateUsers(Database):
 			self.flavour = tuple(self.flavour_set)
 
 	def _offline_(self, user, **void):
-		set_dict(self.data, user.id, {})["last_offline"] = utc()
+		self.bot.set_userbase(user.id, "last_offline", utc())
 
 	# User seen, add event to activity database
 	def _seen_(self, user, delay, event, count=1, raw=None, **void):
 		if is_channel(user):
-			u_id = "#" + str(user.id)
+			uid = "#" + str(user.id)
 		else:
-			u_id = user.id
-		self.send_event(u_id, event, count=count)
+			uid = user.id
+		self.send_event(uid, event, count=count)
 		if type(user) in (discord.User, discord.Member):
-			add_dict(self.data, {u_id: {"last_seen": 0}})
-			self.data[u_id]["last_seen"] = utc() + delay
-			self.data[u_id]["last_action"] = raw
+			self.bot.set_userbase(uid, "last_seen", utc() + delay)
+			self.bot.set_userbase(uid, "last_action", raw)
 
 	# User executed command, add to activity database
 	def _command_(self, user, loop, command, **void):
 		self.send_event(user.id, "command")
-		add_dict(self.data, {user.id: {"commands": {command.parse_name(): 1}}})
-		self.data[user.id]["last_used"] = utc()
-		self.data.get(user.id, EMPTY).pop("last_mention", None)
+		self.bot.add_userbase(user.id, f"commands.{command.parse_name()}", 1)
+		self.bot.set_userbase(user.id, "last_seen", utc())
+		self.bot.pop_userbase(user.id, "last_mention")
 		if not loop:
 			self.add_xp(user, getattr(command, "xp", xrand(6, 14)))
 
@@ -1879,22 +1812,22 @@ class UpdateUsers(Database):
 		size = get_message_length(message)
 		points = sqrt(size) + sum(1 for w in message.content.split() if len(w) > 1)
 		if points >= 32 and not message.attachments:
-			typing = self.data.get(user.id, EMPTY).get("last_typing", None)
+			typing = self.bot.get_userbase(user.id, "last_typing")
 			if typing is None:
-				set_dict(self.data, user.id, {})["last_typing"] = inf
+				self.bot.set_userbase(user.id, "last_typing", inf)
 			elif typing >= inf:
 				return
 			else:
-				self.data.get(user.id, EMPTY).pop("last_typing", None)
+				self.bot.pop_userbase(user.id, "last_typing")
 		else:
-			self.data.get(user.id, EMPTY).pop("last_typing", None)
+			self.bot.pop_userbase(user.id, "last_typing")
 		mid = message.id
 		if mid % 1000 == 0:
 			if bot.data.enabled.get(message.channel.id, True) and (fun := bot._globals.get("FUN")) is not None:
 				for k, v in fun.sparkle_odds.items():
 					if mid % k == 0:
 						self.add_diamonds(user, points * k / 1000)
-						add_dict(self.data.setdefault(user.id, {}).setdefault("sparkles", {}), {v: 1})
+						bot.add_userbase(user.id, f"sparkles.{v}", 1)
 						sparkle_name = fun.sparkle_values[v]
 						csubmit(self.bot.react_with(message, sparkle_name + ".gif"))
 						print(f"{user} has obtained {sparkle_name} in {message.guild}!")
@@ -1910,12 +1843,8 @@ class UpdateUsers(Database):
 		if self.bot.is_blacklisted(user.id):
 			return -inf
 		if user.id == self.bot.id:
-			if self.data.get(self.bot.id, EMPTY).get("xp", 0) != inf:
-				set_dict(self.data, self.bot.id, {})["xp"] = inf
-				self.data[self.bot.id]["gold"] = inf
-				self.data[self.bot.id]["diamonds"] = inf
 			return inf
-		return self.data.get(user.id, EMPTY).get("xp", 0)
+		return self.bot.get_userbase(user.id, "xp", 0)
 
 	def xp_to_level(self, xp):
 		if isfinite(xp):
@@ -1933,14 +1862,14 @@ class UpdateUsers(Database):
 		return level
 
 	async def get_balance(self, user):
-		data = self.data.get(user.id, EMPTY)
+		data = self.bot.get_userbase(user.id)
 		return await self.bot.as_rewards(data.get("diamonds"), data.get("gold"))
 
 	def add_xp(self, user, amount, multiplier=True):
 		if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
 			pl = self.bot.premium_level(user)
 			amount *= min(5, self.bot.premium_multiplier(pl))
-			add_dict(set_dict(self.data, user.id, {}), {"xp": amount})
+			self.bot.add_userbase(user.id, "xp", amount)
 			if "dailies" in self.bot.data:
 				self.bot.data.dailies.progress_quests(user, "xp", amount)
 
@@ -1948,22 +1877,22 @@ class UpdateUsers(Database):
 		if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
 			pl = self.bot.premium_level(user, absolute=True)
 			amount *= min(5, self.bot.premium_multiplier(pl))
-			add_dict(set_dict(self.data, user.id, {}), {"gold": amount})
-			if amount < 0 and self[user.id]["gold"] < 0:
-				self[user.id]["gold"] = 0
+			total = self.bot.add_userbase(user.id, "gold", amount)
+			if amount <= 0 and total <= 0:
+				self.bot.pop_userbase(user.id, "gold")
 
 	def add_diamonds(self, user, amount, multiplier=True):
 		if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
 			pl = self.bot.premium_level(user, absolute=True)
 			amount *= min(5, self.bot.premium_multiplier(pl))
-			add_dict(set_dict(self.data, user.id, {}), {"diamonds": amount})
+			total = self.bot.add_userbase(user.id, "diamonds", amount)
 			if amount > 0 and "dailies" in self.bot.data:
 				self.bot.data.dailies.progress_quests(user, "diamond", amount)
-			if amount < 0 and self[user.id]["diamonds"] < 0:
+			if amount <= 0 and total <= 0:
 				self[user.id]["diamonds"] = 0
 
 	async def _typing_(self, user, **void):
-		self.data.setdefault(user.id, {})["last_typing"] = utc()
+		self.bot.set_userbase(user.id, "last_typing", utc())
 
 	async def _nocommand_(self, message, msg, force=False, flags=(), before=None, truemention=True, perm=0, **void):
 		if getattr(message, "noresponse", False):
@@ -1975,8 +1904,8 @@ class UpdateUsers(Database):
 		channel = message.channel
 		guild = message.guild
 		if not getattr(message, "simulated", None):
-			self.data.setdefault(user.id, {})["last_channel"] = channel.id
-			stored = self.data[user.id].setdefault("stored", {})
+			bot.set_userbase(user.id, "last_channel", channel.id)
+			stored = bot.get_userbase(user.id, "stored", {})
 			if channel.id in stored and len(stored) < 5:
 				m_id = stored[channel.id]
 				try:
@@ -2000,6 +1929,7 @@ class UpdateUsers(Database):
 						stored.pop(c_id, None)
 			if channel.id in bot.cache.channels:
 				stored[channel.id] = message.id
+			bot.set_userbase(user.id, "stored", stored)
 		if force or bot.is_mentioned(message, bot, guild):
 			if user.bot:
 				with suppress(AttributeError):
@@ -2017,7 +1947,7 @@ class UpdateUsers(Database):
 				if reference.author.id == bot.id and reference.content.startswith("*```callback-admin-relay-"):
 					return
 			out = None
-			count = self.data.get(user.id, EMPTY).get("last_talk", 0)
+			count = bot.get_userbase(user.id, "last_talk", 0)
 			if count < 5:
 				csubmit(message.add_reaction("👀"))
 			argv = message.clean_content.strip()
@@ -2050,14 +1980,14 @@ class UpdateUsers(Database):
 			if argv:
 				out += f"\n-# If your intention was to chat with me, my AI is not currently enabled in this channel! If you are a moderator and wish to enable it, use `{prefix}ec --enable AI`."
 			send = lambda *args, **kwargs: send_with_react(channel, *args, reacts="❎", reference=not flags and message, **kwargs)
-			add_dict(self.data, {user.id: {"last_talk": 1, "last_mention": 1}})
-			self.data[user.id]["last_used"] = utc()
+			bot.add_userbase(user.id, "", dict(last_talk=1, last_mention=1))
+			bot.set_userbase(user.id, "last_used", utc())
 			await send(out)
 			await bot.seen(user, event="misc", raw="Talking to me")
 			self.add_xp(user, xrand(12, 20))
 			if "dailies" in bot.data:
 				bot.data.dailies.progress_quests(user, "talk")
 		else:
-			if not self.data.get(user.id, EMPTY).get("last_mention") and random.random() > 0.6:
-				self.data.get(user.id, EMPTY).pop("last_talk", None)
-			self.data.get(user.id, EMPTY).pop("last_mention", None)
+			if not bot.get_userbase(user.id, "last_mention") and random.random() > 0.6:
+				self.bot.pop_userbase(user.id, "last_talk")
+			self.bot.pop_userbase(user.id, "last_mention")

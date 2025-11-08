@@ -680,7 +680,7 @@ class Fancy(Command):
 
 
 class UnFancy(Command):
-	name = ["UnFormat", "UnZalgo"]
+	name = ["UnFormat", "UnZalgo", "Deobfuscate", "Unobscure"]
 	description = "Removes unicode formatting and diacritic characters from inputted text."
 	schema = cdict(
 		text=cdict(
@@ -796,6 +796,76 @@ class Obfuscate(Command):
 
 	def __call__(self, text, **void):
 		return fix_md(obfuscate(unicode_prune(text)))
+
+
+class Invisicode(Command):
+	description = "Encodes arbitrary text or data in the invisicode format. See https://github.com/thomas-xin/invisicode for more info, or to run it yourself!"
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("encode", "decode"),
+			),
+			default="encode",
+		),
+		url=cdict(
+			type="url",
+			description="File to encode or decode",
+		),
+		text=cdict(
+			type="string",
+			description="Text to encode or decode",
+			example="Hello World! ❤️",
+		),
+	)
+	macros = cdict(
+		Invisencode=cdict(
+			mode="encode",
+		),
+		Invisiencode=cdict(
+			mode="encode",
+		),
+		Invisdecode=cdict(
+			mode="decode",
+		),
+		Invisidecode=cdict(
+			mode="decode",
+		),
+	)
+	rate_limit = (1, 2)
+	ephemeral = True
+
+	async def __call__(self, mode, text, url, **void):
+		if not text and not url:
+			raise ArgumentError("Please input text or a URL to encode/decode.")
+		if url:
+			data = await attachment_cache.download(url)
+		else:
+			data = text
+
+		def _invisicode(mode, data):
+			match mode:
+				case "encode":
+					return [invisicode.encode(data)]
+				case "decode":
+					return invisicode.detect_and_decode(as_str(data))
+			return []
+
+		blocks = await asubmit(_invisicode, mode, data)
+		blocks = list(filter(bool, (block.strip() for block in blocks)))
+		if not blocks:
+			raise EOFError("Output was empty.")
+		texts = []
+		files = []
+		for block in blocks:
+			if isinstance(block, byte_like):
+				files.append(CompatFile(block))
+			else:
+				texts.append(block)
+		return cdict(
+			content="\n\n".join(texts),
+			files=files,
+		)
 
 
 # Char2Emoj, a simple script to convert a string into a block of text

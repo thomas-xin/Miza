@@ -212,7 +212,7 @@ class Execute(Command):
 					raise LookupError("No results found.")
 				channels = []
 				for u in users:
-					cid = bot.data.users.get(u.id, {}).get("last_channel")
+					cid = bot.get_userbase(u.id, "last_channel")
 					try:
 						if not cid:
 							raise
@@ -434,21 +434,6 @@ class UpdateExec(Database):
 		message = await channel.send(**kwargs)
 		if isfinite(delete_after):
 			csubmit(self.bot.silent_delete(message, no_log=True, delay=delete_after))
-
-	# async def _typing_(self, user, channel, **void):
-	#     # Typing indicator for DM channels
-	#     bot = self.bot
-	#     if user.id == bot.client.user.id or bot.is_blacklisted(user.id):
-	#         return
-	#     if not hasattr(channel, "guild") or channel.guild is None:
-	#         colour = await bot.get_colour(user)
-	#         emb = discord.Embed(colour=colour)
-	#         url = await bot.get_proxy_url(user)
-	#         emb.set_author(name=f"{user} ({user.id})", icon_url=url)
-	#         emb.description = italics(ini_md("typing..."))
-	#         for c_id, flag in self.data.items():
-	#             if flag & 2:
-	#                 csubmit(self.sendDeleteID(c_id, embed=emb))
 
 	def prepare_string(self, s, lim=2000, fmt="py"):
 		if type(s) is not str:
@@ -676,7 +661,7 @@ class UpdateExec(Database):
 						if raw:
 							u = url
 						else:
-							u = self.bot.preserve_attachment(url) + "?S=" + str(len(b))
+							u = shorten_attachment(url, 0) + "?S=" + str(len(b))
 						urls.append(u)
 						i = f.tell()
 						continue
@@ -725,10 +710,7 @@ class UpdateExec(Database):
 							continue
 					# message = await bot.send_as_webhook(channel, fstr, files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
 					for a, bs in zip(message.attachments, sizes):
-						if raw:
-							u = self.bot.preserve_as_long(channel.id, message.id, a.id, fn=a.url) + "?S=" + str(bs)
-						else:
-							u = self.bot.preserve_into(channel.id, message.id, a.id, fn=a.url) + "?S=" + str(bs)
+						u = shorten_attachment(channel.id, message.id, a.id, fn=a.url) + "?S=" + str(bs)
 						urls.append(u)
 						# u = str(a.url).rstrip("&")
 						# u += "?" if "?" not in u else "&"
@@ -778,9 +760,12 @@ class UpdateExec(Database):
 			for thread in channel.threads:
 				if thread.owner_id == bot.id:
 					return thread
-			async for thread in channel.archived_threads(private=True):
-				if thread.owner_id == bot.id:
-					return thread
+			try:
+				async for thread in channel.archived_threads(private=True):
+					if thread.owner_id == bot.id:
+						return thread
+			except discord.Forbidden:
+				pass
 			return await channel.create_thread(name="backup")
 		raise NotImplementedError(size)
 
@@ -1557,21 +1542,6 @@ class UpdateAnalysed(Database):
 
 class UpdateInsights(Database):
 	name = "insights"
-
-
-class UpdateInfo(Database):
-	name = "info"
-
-
-class UpdateOnceoffs(Database):
-	name = "onceoffs"
-
-	def use(self, key, timeout=60):
-		t = utc()
-		if t - self.get(key, 0) > timeout:
-			self[key] = t
-			return True
-		return False
 
 
 class UpdateGuildSettings(Database):

@@ -427,7 +427,7 @@ class Queue(PaginationCommand):
 		emb = discord.Embed(colour=colour)
 		if icon:
 			emb.set_thumbnail(url=icon)
-		title = no_md(resp[0]["name"])
+		title = no_links(resp[0]["name"])
 		if len(items) > 1:
 			title += f" (+{len(items) - 1})"
 		emb.title = title
@@ -493,7 +493,7 @@ class Queue(PaginationCommand):
 		else:
 			emb.description = (
 				f"**Estimated finish time: {stime}**"
-				+ f'\n{"[`" + no_md(curr[0]["name"]) + "`]"}({curr[0]["url"]})` '
+				+ f'\n{"[`" + no_links(curr[0]["name"]) + "`]"}({curr[0]["url"]})` '
 			)
 		emb.description += f"({uni_str(time_disp(elapsed))}/{uni_str(time_disp(length))})`\n{bar}\n"
 		icon = ""
@@ -532,8 +532,8 @@ class Queue(PaginationCommand):
 				continue
 			space = l10 - int(math.log10(max(1, i)))
 			temp = "`" + " " * space
-			ename = no_md(e.name)
-			temp += f'【{i}】`{"[`" + no_md(lim_str(ename + " " * (maxlen - len(ename)), maxlen)) + "`]"}({e.url})` ({e_dur_n(e)})`\n'
+			ename = no_links(e.name)
+			temp += f'【{i}】`{"[`" + lim_str(ename + " " * (maxlen - len(ename)), maxlen) + "`]"}({e.url})` ({e_dur_n(e)})`\n'
 			if len(embstr) + len(temp) > 4096 - len(emb.description):
 				break
 			embstr += temp
@@ -541,9 +541,10 @@ class Queue(PaginationCommand):
 				curr_time += e_dur_2(e)
 			i += 1
 		emb.description += embstr.strip()
-		more = len(curr) - i
-		if more > 0:
-			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
+		max_page = len(curr) // page + 1
+		if max_page > 1:
+			curr_page = min(max_page, ceil(pos / page)) + 1
+			emb.set_footer(text=f"Page {curr_page}/{max_page}")
 		file = CompatFile(icon, filename="thumb.jpg") if isinstance(icon, byte_like) else None
 		filed = {"file": file} if file else {}
 		return self.construct(uid, leb128(pos), embed=emb, **filed, attachments=[])
@@ -1619,7 +1620,7 @@ class Player(Command):
 		output += "```"
 		output += await self.bot.create_progress_bar(18, p[0] / p[1])
 		if q:
-			output += "\n[`" + no_md(q[0].name) + "`](" + ensure_url(q[0].url) + ")"
+			output += "\n[`" + no_links(q[0].name) + "`](" + ensure_url(q[0].url) + ")"
 		output += "\n`"
 		if auds.paused or not auds.settings.speed:
 			output += "⏸️"
@@ -2335,6 +2336,7 @@ class AudioSeparator(Command):
 
 class UpdateAudio(Database):
 	name = "audio"
+	no_file = True
 	timestamp = utc()
 
 	# Updates all voice clients

@@ -1072,7 +1072,7 @@ class AudioDownloader:
 				result = self.handle_special_audio(entry, url, fn)
 				if result:
 					return result
-				if not entry.get("duration"):
+				if stream and not entry.get("duration"):
 					return stream, cdc or "auto", entry.get("duration") or None, ac or 1
 				special_checked = True
 		if not special_checked:

@@ -390,6 +390,14 @@ ESCAPE_T2 = {
 }
 __emap2 = "".maketrans(ESCAPE_T2)
 
+breaks = "".maketrans({
+	"\n": " ",
+	"\r": " ",
+	"\t": " ",
+	"\v": " ",
+	"\f": " ",
+})
+
 # Discord markdown format helper functions
 def no_md(s):
 	return str(s).translate(__emap)
@@ -397,6 +405,8 @@ def clr_md(s):
 	return str(s).translate(__emap2)
 def sqr_md(s):
 	return f"[#{no_md(s)}]" if hasattr(s, "send") and not hasattr(s, "bot") else f"[{no_md(s)}]"
+def no_links(s):
+	return re.sub(r"`|https?:\/\/", "", s.translate(breaks)).strip()
 
 def italics(s):
 	if not isinstance(s, str):
@@ -1417,8 +1427,13 @@ def mime_from_file(path, filename=None, mime=True):
 			return "audio/midi"
 		if data.startswith(b"Org-"):
 			return "audio/x-org"
-		if data.startswith(b'\x00\x00\x00,ftypavis'):
-			return "image/avif"
+		if data[4:8] == b"ftyp":
+			if data[8:12] in (b"avis", b"avif"):
+				return "image/avif"
+			if data[8:12] in (b"heic", "heix", "hevc", "hevx"):
+				return "image/heic"
+			if data[8:12] in (b"mif1", "msf1"):
+				return "image/heif"
 	if out == "text/plain" and data.startswith(b"#EXTM3U"):
 		return "video/m3u8"
 	return out
@@ -1778,6 +1793,8 @@ def deserialise_nums(b: bytearray) -> list:
 
 @split_attachment
 def encode_attachment(cid, mid, aid, fn, minimise=False):
+	if is_url(fn):
+		fn = url2fn(fn)
 	if minimise:
 		aid = 0
 	if aid == 0:
@@ -3267,7 +3284,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		self._retrieving = {}
 		self._kwargs = kwargs
 		self.base_init()
-		self.validate_or_clear()
+		# self.validate_or_clear()
 
 	def base_init(self):
 		super().__init__(self._path, shards=self._shardcount, **self._kwargs)
@@ -3281,6 +3298,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 	version = "1.0.1"
 	def validate_or_clear(self):
 		if self.get("__version__") != self.version:
+			print(tuple(self.keys()))
 			self.clear()
 		self.set("__version__", self.version)
 
@@ -3298,7 +3316,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		try:
 			return super().__contains__(k)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
-			self.validate_or_clear()
+			self.base_init()
 			return super().__contains__(k)
 
 	def __getitem__(self, k):
@@ -3307,7 +3325,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		try:
 			return super().__getitem__(k)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
-			self.validate_or_clear()
+			self.base_init()
 			return super().__getitem__(k)
 
 	def __setitem__(self, k, v, read=False):
@@ -3335,7 +3353,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 	def age(self, k):
 		return utc() - super().get(k, (-inf,))[-1]
 
-	def setdefault(self, k, v, timeout=None):
+	def setdefault(self, k, v):
 		if (fut := self._retrieving.get(k)):
 			return fut.result()
 		try:
@@ -3367,7 +3385,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			v, t = super().get(k, read=_read, tag=True)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
 			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
-			self.validate_or_clear()
+			self.base_init()
 			v, t = super().get(k, read=_read, tag=True)
 		if t is not None and v is not Dummy:
 			delay = utc() - t
@@ -3405,7 +3423,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			v, t = super().get(k, read=_read, tag=True)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
 			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
-			self.validate_or_clear()
+			self.base_init()
 			v, t = super().get(k, read=_read, tag=True)
 		if t is not None and v is not Dummy:
 			delay = utc() - t
@@ -3417,6 +3435,171 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			if delay > self._stale:
 				csubmit(self._aretrieve(k, func, *args, read=_read, **kwargs))
 		else:
+			return await self._aretrieve(k, func, *args, read=_read, **kwargs)
+		return v
+
+	def keys(self):
+		return iter(self)
+	iterkeys = keys
+
+	def values(self):
+		return (cachecls.__getitem__(self, k) for k in iter(self))
+	itervalues = values
+
+	def items(self):
+		return ((k, cachecls.__getitem__(self, k)) for k in iter(self))
+	iteritems = items
+
+	def clear(self):
+		self._retrieving.clear()
+		super().clear()
+		if self._path and os.path.exists(self._path) and os.path.isdir(self._path) and os.listdir(self._path):
+			self.close()
+			try:
+				shutil.rmtree(self._path)
+				os.mkdir(self._path)
+			except PermissionError:
+				pass
+			self.base_init()
+
+
+class AutoDatabase(cachecls, collections.abc.MutableMapping):
+	__slots__ = ("_path", "_shardcount", "_retrieving", "_kwargs")
+
+	def __init__(self, directory=None, shards=6, **kwargs):
+		print("Loading Database:", directory, kwargs)
+		self._path = directory or None
+		self._shardcount = shards
+		self._retrieving = {}
+		self._kwargs = kwargs
+		self.base_init()
+		# self.validate_or_clear()
+
+	def base_init(self):
+		super().__init__(self._path, shards=self._shardcount, **self._kwargs)
+
+	def __getattr__(self, k):
+		try:
+			return object.__getattribute__(self, k)
+		except AttributeError:
+			return super().__getattribute__(k)
+
+	version = "1.0.0"
+	def validate_or_clear(self):
+		if self.get("__version__") != self.version:
+			if len(self):
+				print(tuple(self.keys()))
+				raise NotImplementedError("Database must be updated.")
+		self.set("__version__", self.version)
+
+	def __iter__(self):
+		return (i for i in super().__iter__() if i != "__version__")
+
+	def __len__(self):
+		return super().__len__()
+
+	def __contains__(self, k):
+		try:
+			return super().__contains__(k)
+		except (diskcache.core.Timeout, sqlite3.OperationalError):
+			self.base_init()
+			return super().__contains__(k)
+
+	def __getitem__(self, k):
+		if (fut := self._retrieving.get(k)):
+			return fut.result()
+		try:
+			return super().__getitem__(k)
+		except (diskcache.core.Timeout, sqlite3.OperationalError):
+			self.base_init()
+			return super().__getitem__(k)
+
+	def __setitem__(self, k, v, read=False):
+		if isinstance(v, memoryview):
+			v = bytes(v)
+		super().set(k, v, read=read)
+
+	def update(self, other):
+		t = utc()
+		if hasattr(other, "items"):
+			other = other.items()
+		for k, v in other:
+			if isinstance(v, memoryview):
+				v = bytes(v)
+			super().set(k, v)
+		return self
+
+	def pop(self, k, v=Dummy):
+		self._retrieving.pop(k, None)
+		v = super().pop(k, default=(v,))
+		if v is Dummy:
+			raise KeyError(k)
+		return v
+
+	def setdefault(self, k, v):
+		if (fut := self._retrieving.get(k)):
+			return fut.result()
+		try:
+			return super().__getitem__(k)
+		except KeyError:
+			self[k] = v
+		return v
+
+	def _retrieve(self, k, func, *args, read=False, **kwargs):
+		try:
+			self._retrieving[k] = fut = concurrent.futures.Future()
+			v = func(*args, **kwargs)
+			self.__setitem__(k, v, read=read)
+		except Exception as ex:
+			fut.set_exception(ex)
+			raise
+		else:
+			fut.set_result(v)
+		finally:
+			self._retrieving.pop(k, None)
+		return v
+	def retrieve(self, k, func, *args, _read=False, **kwargs):
+		if (fut := self._retrieving.get(k)):
+			resp = fut.result()
+			if _read and hasattr(resp, "name") and os.path.exists(resp.name):
+				return open(resp.name, "rb")
+			return resp
+		try:
+			v = super().get(k, read=_read)
+		except (diskcache.core.Timeout, sqlite3.OperationalError):
+			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
+			self.base_init()
+			v = super().get(k, read=_read)
+		if v is Dummy:
+			return self._retrieve(k, func, *args, read=_read, **kwargs)
+		return v
+
+	async def _aretrieve(self, k, func, *args, read=False, **kwargs):
+		try:
+			self._retrieving[k] = fut = concurrent.futures.Future()
+			v = await asubmit(func, *args, **kwargs)
+			await asubmit(self.__setitem__, k, v, read=read)
+		except Exception as ex:
+			fut.set_exception(ex)
+			raise
+		else:
+			fut.set_result(v)
+		finally:
+			self._retrieving.pop(k, None)
+		return v
+	async def aretrieve(self, k, func, *args, _read=False, **kwargs):
+		if (fut := self._retrieving.get(k)):
+			resp = await wrap_future(fut)
+			if _read and hasattr(resp, "name") and os.path.exists(resp.name):
+				return open(resp.name, "rb")
+			return resp
+		try:
+			v = super().get(k, read=_read)
+		except (diskcache.core.Timeout, sqlite3.OperationalError):
+			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
+			self.base_init()
+			v = super().get(k, read=_read)
+		if v is Dummy:
 			return await self._aretrieve(k, func, *args, read=_read, **kwargs)
 		return v
 

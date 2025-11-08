@@ -1008,13 +1008,6 @@ def message_link(message):
 	g_id = getattr(guild, "id", -1)
 	return f"https://discord.com/channels/{g_id}/{message.channel.id}/{message.id}"
 
-breaks = "".maketrans({
-	"\n": " ",
-	"\r": " ",
-	"\t": " ",
-	"\v": " ",
-	"\f": " ",
-})
 def fake_reply(message):
 	"Simulates the appearance of a reply to a message. Required as Discord does not support replies for webhook messages, or messages from different channels."
 	content = message.content
@@ -1022,11 +1015,11 @@ def fake_reply(message):
 		content = content.split("\n", 1)[-1]
 	if len(content) >= 100:
 		content = content[:100] + "…"
-	content = content.translate(breaks).strip()
+	content = content.strip()
 	if not content:
 		content = "…" if not message.attachments and not message.embeds else "*Click to see attachment*"
 	encoded = f"**{message.author.display_name}** {content}"
-	encoded = regexp("https?:\\/\\/").sub("", encoded) # Disallow HTTP string prefixes as Discord blacklists them
+	encoded = no_links(encoded) # Disallow HTTP string prefixes as Discord blacklists them
 	return f"-# ⮣ [{encoded}]({message_link(message)})"
 
 

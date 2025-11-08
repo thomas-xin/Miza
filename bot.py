@@ -195,6 +195,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		modload = self.get_modules()
 		self.modload = csubmit(gather(*modload))
 		tsubmit(self.heartbeat_loop)
+		self.init_main_databases()
 		data = shard_fut.result()
 		self.wss = data["url"]
 		x = AUTH.get("guild_count", 1)
@@ -266,7 +267,72 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			pathlib.Path.touch(self.shutdown)
 			with suppress():
 				os.remove(self.heartbeat_file)
-		# force_kill(self.proc)
+
+	def init_main_databases(self):
+		self.userbase = AutoDatabase("saves/userbase", shards=64)
+		self.guildbase = AutoDatabase("saves/guildbase", shards=16)
+
+	def get_userbase(self, uid, path="", default=None):
+		try:
+			temp = self.userbase[uid]
+			if path:
+				for k in path.split("."):
+					temp = temp[k]
+			if default is not None and default is not Dummy and not isinstance(temp, type(default)):
+				return type(default)(temp)
+			return temp
+		except KeyError:
+			if default is Dummy:
+				raise
+		if not path and default is None:
+			return cdict()
+		return default
+
+	def set_userbase(self, uid, path, value):
+		if path:
+			orig = temp = self.userbase.setdefault(uid, cdict())
+			attrs = path.split(".")
+			last = attrs.pop(-1)
+			for k in attrs:
+				temp = temp.setdefault(k, cdict())
+			temp[last] = value
+			self.userbase[uid] = orig
+		else:
+			self.userbase[uid] = value
+
+	def add_userbase(self, uid, path, value):
+		if path:
+			orig = temp = self.userbase.setdefault(uid, cdict())
+			attrs = path.split(".")
+			last = attrs.pop(-1)
+			for k in attrs:
+				temp = temp.setdefault(k, cdict())
+			try:
+				temp[last] += value
+			except LookupError:
+				temp[last] = value
+			self.userbase[uid] = orig
+			return temp[last]
+		else:
+			data = self.get_userbase(uid)
+			add_dict(data, uid, value)
+			self.set_userbase(uid, data)
+			return data
+
+	def pop_userbase(self, uid, path):
+		if path:
+			orig = temp = self.userbase.get(uid, cdict())
+			attrs = path.split(".")
+			last = attrs.pop(-1)
+			for k in attrs:
+				temp = temp.setdefault(k, cdict())
+			value = temp.pop(last, None)
+			if not orig:
+				self.userbase.pop(uid, None)
+			else:
+				self.userbase[uid] = orig
+			return value
+		return self.userbase.pop(uid)
 
 	def command_options(self, command):
 		accepts_attachments = False
@@ -1174,55 +1240,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		url = await_fut(self.data.exec.lproxy(file, filename=filename))
 		print("AS_FILE:", url)
 		return url
-
-	@functools.lru_cache(maxsize=64)
-	def preserve_attachment(self, a_id, fn=None):
-		if fn and "://" in fn:
-			u = fn.split("?", 1)[0].rsplit("/", 1)[-1]
-			if "." in u:
-				fn = "." + u.rsplit(".", 1)[-1]
-			else:
-				fn = ""
-		elif not fn:
-			fn = ""
-		elif "." not in fn:
-			fn = "." + fn
-		if is_url(a_id):
-			url = a_id
-			if is_discord_attachment(url):
-				_c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
-				a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-				if a_id in self.data.attachments:
-					return self.webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii") + fn
-			a_id = ts_us()
-			while a_id in self.data.attachments:
-				a_id += 1
-			self.data.attachments[a_id] = url
-		return self.webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii") + fn
-
-	def preserve_into(self, c, m, a, fn=None):
-		if fn and "://" in fn:
-			u = fn.split("?", 1)[0].rsplit("/", 1)[-1]
-			if "." in u:
-				fn = "." + u.rsplit(".", 1)[-1]
-			else:
-				fn = ""
-		elif not fn:
-			fn = ""
-		elif "." not in fn:
-			fn = "." + fn
-		a_id = verify_id(a)
-		self.data.attachments[a_id] = (verify_id(c), verify_id(m))
-		return self.webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii") + fn
-
-	def preserve_as_long(self, c_id, m_id, a_id, fn=None):
-		if fn and is_url(fn) and ("exec" not in self.data or not is_discord_attachment(fn)):
-			return self.webserver + "/u?url=" + quote_plus(fn.split("?", 1)[0])
-		if fn and "://" in fn:
-			fn = fn.split("?", 1)[0].rsplit("/", 1)[-1]
-		else:
-			fn = ""
-		return self.webserver + "/u/" + encode_attachment(c_id, m_id, a_id, fn)
 
 	async def renew_from_long(cself, c, m, a):
 		c_id = int.from_bytes(base64.urlsafe_b64decode(c + "=="), "big")
@@ -2421,12 +2438,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		prompt = [m.content for m in messages if m.get("role") == "user"][-1]
 		if modlvl >= 2:
 			maxlim = 196608
-			minlim = 3200
+			minlim = 2800
 			snip = 800
 			best = 2
 		elif modlvl >= 1:
 			maxlim = 98304
-			minlim = 1600
+			minlim = 1200
 			snip = 320
 			best = 1
 		else:
@@ -3089,15 +3106,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not getattr(reference, "slash", None) and message.attachments:
 			def temp_url(url):
 				if is_discord_attachment(url):
-					a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-					if a_id in self.data.attachments:
-						u = self.preserve_attachment(a_id, fn=url)
-						if filename and not isinstance(filename, str) or filename.endswith(".gif"):
-							u += ".gif"
-						return u
-					if best:
-						return self.preserve_into(channel.id, message.id, a_id, fn=url)
-					return self.preserve_as_long(channel.id, message.id, a_id, fn=url)
+					aid = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+					return shorten_attachment(channel.id, message.id, aid, url)
 				return url
 			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join("<" + temp_url(a.url) + ">" for a in message.attachments)
 			message = await bot.edit_message(message, content=content.strip())
@@ -3165,9 +3175,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.cache.messages[message.id] = message
 			if (utc_dt() - created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
 				self.data.message_cache.save_message(message)
-		# if "attachments" in self.data:
-		# 	for a in message.attachments:
-		# 		self.data.attachments[a.id] = (message.channel.id, message.id)
 		return message
 
 	def remove_message(self, message):
@@ -3375,7 +3382,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def cache_reduce(self):
 		self.limit_cache("messages")
 		self.limit_cache("attachments", 256)
-		# self.limit_cache("guilds")
 		self.limit_cache("channels")
 		self.limit_cache("users")
 		self.limit_cache("members")
@@ -3568,7 +3574,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		for attr in ("status", "desktop_status", "web_status", "mobile_status"):
 			b, a = getattr(before, attr), getattr(after, attr)
 			if b == discord.Status.online and a == discord.Status.idle:
-				if utc() - self.data.users.get(after.id, {}).get("last_seen", 0) < 900:
+				if utc() - self.get_userbase(after.id, "last_seen", 0) < 900:
 					return False
 			elif a == discord.Status.offline:
 				return False
@@ -3751,9 +3757,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		else:
 			return 3
 		if not absolute:
-			if not self.data.users:
-				return lv
-			data = self.data.users.get(uid)
+			data = self.get_userbase(uid)
 			if data and data.get("payg"):
 				return 3
 			if data and data.get("credit"):
@@ -3810,31 +3814,31 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 		@property
 		def value_approx(self):
-			data = bot.data.users.setdefault(self.user.id, {})
-			freebies = T(data).coercedefault("freebies", list, [])
+			quota_uses = bot.get_userbase(self.user.id, "quota_uses", [])
 			freelim = bot.premium_limit(self.value)
-			rem = max(0, freelim - len(freebies))
+			rem = max(0, freelim - len(quota_uses))
 			if rem < 25:
 				return 1
 			return self.value
 
 		def require(self, value=0, cost=None):
-			data = bot.data.users.setdefault(self.user.id, {})
+			data = self.get_userbase(self.user.id)
 			if data.get("payg") or data.get("credit"):
 				return self
 			if self.value < value:
 				if value > 2:
 					raise PermissionError(f"Premium level {value // 2} or higher required; please see {bot.kofi_url} for more info!")
 			ts = utc()
-			freebies = T(data).coercedefault("freebies", list, [])
-			while freebies and ts - freebies[0] >= self.quota_expiry:
-				freebies.pop(0)
+			quota_uses = data.get("quota_uses", [])
+			while quota_uses and ts - quota_uses[0] >= self.quota_expiry:
+				quota_uses.pop(0)
+			bot.set_userbase(self.user.id, "quota_uses", quota_uses)
 			if value <= 0:
 				return self
 			freelim = bot.premium_limit(self.value)
-			rem = max(0, freelim - len(freebies))
+			rem = max(0, freelim - len(quota_uses))
 			if rem <= 0:
-				s = " (next refresh " + time_repr(self.quota_expiry + freebies[0]) + ")" if freebies else ""
+				s = " (next refresh " + time_repr(self.quota_expiry + quota_uses[0]) + ")" if quota_uses else ""
 				raise PermissionError(f"Apologies, you have exceeded your quota of {freelim} for today{s}. Please see /premium or {bot.kofi_url} for more info!")
 			self.cost = cost or self.cost
 			return self
@@ -3856,7 +3860,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					self.add(mpf(tup[-1]) * 1000)
 				if exc_type and exc_value:
 					return
-				data = bot.data.users.setdefault(target.id, {})
+				data = self.get_userbase(target.id)
 				cost = round_random(self.cost)
 				dcost = self.cost / 1000
 				print("QCost:", target, self.cost, cost)
@@ -3871,13 +3875,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						data["credit"] = str(c)
 				else:
 					ts = utc()
-					freebies =  T(data).coercedefault("freebies", list, [])
-					while freebies and ts - freebies[0] >= self.quota_expiry:
-						freebies.pop(0)
+					quota_uses = data.get("quota_uses", [])
+					while quota_uses and ts - quota_uses[0] >= self.quota_expiry:
+						quota_uses.pop(0)
 					if cost:
-						freebies.extend([ts] * cost)
+						quota_uses.extend([ts] * cost)
+					bot.set_userbase(target.id, "quota_uses", quota_uses)
 					freelim = bot.premium_limit(self.value)
-					rem = max(0, freelim - len(freebies))
+					rem = max(0, freelim - len(quota_uses))
 					print("Remaining:", target, f"{rem}/{freelim}")
 				if data.get("payg") and data.get("usages"):
 					tcost = sum(mpf(t[-1]) for t in data["usages"])
@@ -3910,7 +3915,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						q = round(mpf(c) * 1000)
 						s = f"Command incurred cost of `{cost}` (`${dcost}`); `{q}` premium credits remaining."
 					else:
-						s = " (next refresh " + time_repr(self.quota_expiry + freebies[0]) + ")" if freebies else ""
+						s = " (next refresh " + time_repr(self.quota_expiry + quota_uses[0]) + ")" if quota_uses else ""
 						s = f"Command incurred cost of `{cost}`; `{rem}/{freelim}`{' free' if self.value <= 1 else ''} quota remaining today{s}."
 					if self.value >= 2 or data.get("credit"):
 						desc = f"{s}\nSee /premium to check usage stats{or_adjust}."
@@ -3934,9 +3939,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return self.description
 
 		def append(self, tup):
-			data = bot.data.users.setdefault(self.target.id, {})
+			
+			data = bot.get_userbase(self.target.id)
 			if data.get("payg"):
 				data.setdefault("usages", []).append(tup)
+				bot.set_userbase(self.user.id, "", data)
 			self.costtup.append(tup)
 			return tup
 
@@ -3950,11 +3957,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return True
 			if "nsfw" in self.data:
 				if getattr(mentionable, "recipient", None):
-					if self.data.nsfw.get(mentionable.recipient.id, False):
-						return True
-				elif self.data.nsfw.get(mentionable.id, False):
-					return True
-		return False
+					return self.get_userbase(mentionable.recipient.id, "nsfw")
+				return self.get_userbase(mentionable.id, "nsfw")
+		return None
 
 	async def donate(self, name, uid, amount, msg):
 		channel = self.get_channel(320915703102177293)
@@ -4624,15 +4629,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return
 		reacode = as_str(reaction).encode("utf-8")
 		interaction = hasattr(message, "int_token")
+		if interaction:
+			fut = csubmit(delayed_callback(future, 1, self.defer_interaction, message, mode="patch", ephemeral=getattr(message, "ephemeral", False), exc=False))
 		while utc() - self.react_sem.get(message.id, 0) < 30:
 			# Ignore if more than 2 reactions already queued for target message
 			if self.react_sem.get(message.id, 0) - utc() > 1:
+				if interaction:
+					fut.cancel()
+					return await self.ignore_interaction(message)
 				return
 			await asyncio.sleep(0.2)
 		content = message.content
 		if not content:
 			if message.embeds:
-				content = str(message.embeds[0].description)
+				content = str(message.embeds[0].description or message.embeds[0].footer.text)
 		try:
 			name, u_id, data = PaginationCommand.decode(content)
 		except ValueError:
@@ -4675,8 +4685,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						index=index,
 						data=data,
 					))
-					if interaction:
-						fut = csubmit(delayed_callback(future, 1, self.defer_interaction, message, mode="patch", ephemeral=getattr(message, "ephemeral", False), exc=False))
 					resp = await future
 				await self.send_event("_command_", user=user, command=f, loop=False, message=message)
 				if isinstance(resp, str):
@@ -4695,7 +4703,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if resp.get("embed") or resp.get("embeds"):
 						resp.pop("buttons", None)
 						resp.pop("components", None)
-					csubmit(self.ignore_interaction(message))
+					if interaction:
+						fut.cancel()
+						csubmit(self.ignore_interaction(message))
 					await self.edit_message(
 						message,
 						**resp,
@@ -6632,17 +6642,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if message.content.startswith("||"):
 					content = message.content.replace("||", "").strip()
 				else:
-					def temp_url(url, mid=None):
+					def temp_url(url):
 						if is_discord_attachment(url):
-							a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-							if a_id in self.data.attachments:
-								return self.preserve_attachment(a_id, fn=url)
-							channel = message.channel
-							return self.preserve_as_long(channel.id, message.id, a_id, fn=url)
+							aid = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+							return shorten_attachment(message.channel.id, message.id, aid, url)
 						return url
 					futs = deque()
 					for a in message.attachments:
-						futs.append(csubmit(attachment_cache.download(url)))
+						futs.append(csubmit(attachment_cache.download(a.url)))
 					urls = set()
 					for e in message.embeds:
 						if e.image:
