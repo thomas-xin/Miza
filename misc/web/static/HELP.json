@@ -737,7 +737,8 @@
 				"text": {
 					"type": "string",
 					"description": "Text to encode or decode",
-					"example": "Hello World! \u2764\ufe0f"
+					"example": "Hello World! \u2764\ufe0f",
+					"autoresolve": true
 				}
 			}
 		},

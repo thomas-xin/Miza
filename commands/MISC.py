@@ -435,6 +435,7 @@ class SpectralPulse(Command):
 	rate_limit = (120, 180)
 	typing = True
 	spec_sem = Semaphore(1, 256, rate_limit=1)
+	maintenance = True
 
 	async def __call__(self, bot, channel, message, args, **void):
 		for a in message.attachments:

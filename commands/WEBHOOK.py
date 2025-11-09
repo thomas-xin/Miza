@@ -211,9 +211,8 @@ class UpdateAutoEmojis(Database):
 											name = t[0] + "-" + str(i)
 											emoji = emojis.get(name)
 					if emoji:
-						if type(emoji) is int:
-							e_id = await bot.id_from_message(emoji)
-							emoji = bot.cache.emojis.get(e_id)
+						if isinstance(emoji, int):
+							emoji = await bot.fetch_emoji(emoji, guild=message.guild)
 						futs.append(m2.add_reaction(emoji))
 						orig = bot.data.emojilists.setdefault(message.author.id, {})
 						if getattr(emoji, "id", None):
@@ -387,7 +386,7 @@ class EmojiList(PaginationCommand):
 								raise LookupError
 							me = " " + str(e)
 						except KeyError:
-							await bot.min_emoji(v)
+							await bot.is_animated(v)
 							me = ""
 					except LookupError:
 						curr = bot.data.emojilists.get(uid, {})

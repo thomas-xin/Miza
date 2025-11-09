@@ -816,6 +816,7 @@ class Invisicode(Command):
 			type="string",
 			description="Text to encode or decode",
 			example="Hello World! ❤️",
+			autoresolve=True,
 		),
 	)
 	macros = cdict(
@@ -989,8 +990,8 @@ class Char2Emoji(Command):
 
 	async def __call__(self, bot, _guild, _channel, _message, text, emoji1, emoji2, **void):
 		use_webhook = not getattr(_guild, "ghost", None)
-		e1 = await bot.emoji_i2s(emoji1)
-		e2 = await bot.emoji_i2s(emoji2)
+		e1 = min_emoji(emoji1)
+		e2 = min_emoji(emoji2)
 		resp = _c2e(text, e1, e2)
 		temp = "\xad" + "\n".join(resp)
 		if hasattr(_message, "simulated") or self.fits(temp):

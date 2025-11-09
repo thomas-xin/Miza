@@ -920,7 +920,7 @@ def find_urls(url): return url and regexp("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|
 def find_urls_ex(url):
 	no_triple = re.sub(r'```.*?```', '', url, flags=re.DOTALL)
 	no_code = re.sub(r'`[^`]*`', '', no_triple, flags=re.DOTALL)
-	pattern = r'https?://[^\s]+'
+	pattern = r'''https?://[^\s`|"'\])>]+'''
 	return re.findall(pattern, no_code)
 def is_url(url): return url and isinstance(url, (str, bytes)) and regexp("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\\])>]+$").fullmatch(url)
 def is_discord_url(url): return url and regexp("^https?:\\/\\/(?:\\w{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/").findall(url) + regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").findall(url)

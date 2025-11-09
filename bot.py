@@ -694,47 +694,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.closed = True
 		return super().close()
 
-	@tracebacksuppressor(SemaphoreOverflowError)
-	async def garbage_collect(self, obj):
-		"A garbage collector for empty and unassigned objects in the database."
-		if not self.ready or hasattr(obj, "no_delete") or not any(hasattr(obj, i) for i in ("guild", "user", "channel", "garbage")) and not getattr(obj, "garbage_collect", None):
-			return
-		with MemoryTimer(f"{obj.name}-gc"):
-			async with obj._garbage_semaphore:
-				data = obj.data
-				if getattr(obj, "garbage_collect", None):
-					return await obj.garbage_collect()
-				if len(data) <= 1024:
-					keys = data.keys()
-				else:
-					low = xrand(ceil(len(data) / 1024)) << 10
-					keys = astype(data, alist).view[low:low + 1024]
-				for key in keys:
-					if getattr(obj, "unloaded", False):
-						return
-					if not key or isinstance(key, str):
-						continue
-					try:
-						# Database keys may be user, guild, or channel IDs
-						if getattr(obj, "channel", False):
-							d = self.get_channel(key)
-						elif getattr(obj, "user", False):
-							d = await self.fetch_user(key)
-						else:
-							if not data[key]:
-								raise LookupError
-							with suppress(KeyError):
-								d = self.cache.guilds[key]
-								continue
-							d = await self.fetch_messageable(key)
-						if d is not None:
-							continue
-					except Exception:
-						print_exc()
-					print(f"Deleting {key} from {obj}...")
-					data.pop(key, None)
-
-	@tracebacksuppressor
 	async def send_event(self, ev, *args, exc=False, **kwargs):
 		"Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async."
 		if self.closed:
@@ -746,15 +705,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				with ctx:
 					return await asubmit(events[0](*args, **kwargs))
 				return
-			for func in filter(bool, events):
-				fut = func(*args, **kwargs)
-				if fut:
-					await fut
-			# futs = [asubmit(func(*args, **kwargs)) for func in events]
-			# with ctx:
-			# 	return await gather(*futs)
+			futs = []
+			async with asyncio.TaskGroup() as group:
+				for func in filter(bool, events):
+					fut = func(*args, **kwargs)
+					if not fut:
+						continue
+					futs.append(group.create_task(fut))
+			return await gather(*futs)
 
-	@tracebacksuppressor(default=[])
 	async def get_full_invites(self, guild):
 		"Gets the full list of invites from a guild, if applicable."
 		member = guild.get_member(self.id)
@@ -1195,6 +1154,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return data[m_id]
 	async def fetch_message(self, m_id, channel=None, old=False):
 		if not isinstance(m_id, int):
+			if is_discord_url(m_id) and "/channels/" in m_id:
+				url = m_id
+				spl = url[url.index("/channels/") + 10:].replace("?", "/").split("/", 2)
+				channel = await self.fetch_channel(spl[1])
+				m_id = spl[2]
 			try:
 				m_id = int(m_id)
 			except (ValueError, TypeError):
@@ -1239,31 +1203,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def as_file(self, file, filename=None):
 		url = await_fut(self.data.exec.lproxy(file, filename=filename))
 		print("AS_FILE:", url)
-		return url
-
-	async def renew_from_long(cself, c, m, a):
-		c_id = int.from_bytes(base64.urlsafe_b64decode(c + "=="), "big")
-		m_id = int.from_bytes(base64.urlsafe_b64decode(m + "=="), "big")
-		a_id = int.from_bytes(base64.urlsafe_b64decode(a + "=="), "big")
-		with tracebacksuppressor:
-			channel = await self.fetch_channel(c_id)
-			message = await self.fetch_message(m_id, channel)
-			for attachment in message.attachments:
-				if attachment.id == a_id:
-					url = str(attachment.url).rstrip("&")
-					if discord_expired(url):
-						return await self.renew_attachment(url, m_id)
-					return url
-		return self.notfound
-
-	def try_attachment(self, url, m_id=None) -> str:
-		if not isinstance(url, int):
-			_c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
-			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-		else:
-			a_id = url
-		if a_id in self.data.attachments:
-			return self.webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
 		return url
 
 	async def delete_attachment(self, url, m_id=None):
@@ -1429,11 +1368,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def resolve_emoji(self, e_id, guild=None, allow_external=True):
 		if not isinstance(e_id, (int, str)):
 			return e_id
-		if isinstance(e_id, string_like):
-			e_id = await self.id_from_message(e_id)
 		if isinstance(e_id, int):
 			return await self.fetch_emoji(e_id, guild=guild, allow_external=allow_external)
-		assert not e_id.isascii()
+		assert not e_id.isascii(), e_id
 		emoji = SimulatedEmoji(
 			id=int.from_bytes(e_id.encode("utf-8"), "big"),
 			animated=False,
@@ -1506,7 +1443,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return f[max(f.keys())]
 		raise LookupError("Unable to find suitable guild.")
 
-	@tracebacksuppressor
 	async def create_progress_bar(self, length, ratio=0.5):
 		if "emojis" in self.data:
 			return await self.data.emojis.create_progress_bar(length, ratio)
@@ -1627,165 +1563,115 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	mime = magic.Magic(mime=True, mime_encoding=True)
 	mimes = {}
 
-	async def id_from_message(self, m_id):
-		if not m_id:
-			return m_id
-		m_id = as_str(m_id)
-		links = await self.follow_url(m_id)
-		m_id = links[0] if links else m_id
-		if is_url(m_id.strip("<>")) and "/emojis/" in m_id:
-			return int(m_id.strip("<>").split("/emojis/", 1)[-1].split(".", 1)[0])
-		if m_id[0] == "<" and m_id[-1] == ">" and ":" in m_id:
-			n = m_id.rsplit(":", 1)[-1][:-1]
-			if n.isnumeric():
-				return int(n)
-		if m_id.isnumeric():
-			m_id = int(m_id)
-			if m_id in self.cache.messages:
-				return await self.id_from_message(self.cache.messages[m_id].content)
-		return verify_id(m_id)
-
 	followed = AutoCache(f"{CACHE_PATH}/follow", stale=3600, timeout=86400 * 7)
-	async def _follow_url(self, urls, it=None, best=False, preserve=True, images=True, emojis=True, reactions=False, allow=False, limit=None, no_cache=False, ytd=True):
-		if images:
-			medias = ("video", "image", "thumbnail")
-		else:
-			medias = "video"
+	async def _follow_url(self, urls, priority_order, allow_text, seen=None):
+		seen = seen or {}
 		out = deque()
 		for url in urls:
-			if discord_expired(url):
-				url = await self.renew_attachment(url)
-			u = T(url).get("url")
-			if u:
-				url = u
+			url = T(url).get("url", url)
+			if is_miza_url(url):
+				out.append(url)
+				continue
+			if is_discord_attachment(url):
+				out.append(shorten_attachment(url, 0))
+				continue
 			if is_discord_message_link(url):
-				found = deque()
-				try:
-					spl = url[url.index("channels/") + 9:].replace("?", "/").split("/", 2)
-					c = await self.fetch_channel(spl[1])
-					m = await self.fetch_message(spl[2], c)
-				except Exception:
-					print_exc()
-				else:
-					if preserve:
-						found.extend(shorten_attachment(a.url, m.id) for a in m.attachments)
+				m = await self.fetch_message(url)
+				found = alist(shorten_attachment(a.url, m.id) for a in m.attachments)
+				for p in priority_order:
+					match p:
+						case "video":
+							found.extend(url for url in find_urls_ex(m.content) if url2ext(url) in VIDEO_FORMS)
+						case "audio":
+							found.extend(url for url in find_urls_ex(m.content) if url2ext(url) in AUDIO_FORMS)
+						case "image":
+							found.extend(url for url in find_urls_ex(m.content) if url2ext(url) in IMAGE_FORMS)
+							found.extend(s.url for s in m.stickers)
+						case "text":
+							if allow_text:
+								found.append(m.content)
+							found.extend(find_urls_ex(m.content))
+				for e in m.embeds:
+					for attr in ("video", "image", "thumbnail"):
+						url = getattr(e, attr, None)
+						if url:
+							found.append(url)
+				found.extend(find_emojis_ex(m.content))
+				m = await self.ensure_reactions(m)
+				for r in m.reactions:
+					u = await self.emoji_to_url(r.emoji, guild=m.guild)
+					found.append(u)
+				found.uniq()
+				for url in found:
+					if is_discord_attachment(url):
+						out.append(shorten_attachment(url, 0))
+					elif is_discord_message_link(url) and url not in seen:
+						urls = await self._follow_url(url, priority_order=priority_order, allow_text=allow_text, seen=seen)
+						out.extend(urls)
 					else:
-						found.extend(a.url for a in m.attachments)
-					found.extend(find_urls(m.content) if allow else find_urls_ex(m.content))
-					for s in T(m).get("stickers", ()):
-						found.append(s.url)
-					# Attempt to find URLs in embed contents
-					for e in m.embeds:
-						for a in medias:
-							obj = T(e).get(a)
-							if obj:
-								if best:
-									url = best_url(obj)
-								else:
-									url = obj.url
-								if url:
-									found.append(url)
-									break
-					# Attempt to find URLs in embed descriptions
-					[found.extend(find_urls(e.description) if allow else find_urls_ex(e.description)) for e in m.embeds if e.description]
-					if emojis:
-						temp = await self.follow_to_image(m.content, follow=reactions)
-						found.extend(filter(is_url, temp))
-					if images:
-						if reactions:
-							m = await self.ensure_reactions(m)
-							for r in m.reactions:
-								e = r.emoji
-								if hasattr(e, "url"):
-									found.append(as_str(e.url))
-								else:
-									u = translate_emojis(e)
-									if is_url(u):
-										found.append(u)
-					if found:
-						for u in filter(bool, found):
-							# Do not attempt to find the same URL twice
-							if u in it:
-								continue
-							it[u] = True
-							if not len(it) & 255:
-								await asyncio.sleep(0.2)
-							found2 = await self.follow_url(u, it, best=best, preserve=preserve, images=images, emojis=emojis, reactions=reactions, allow=allow, limit=limit, ytd=ytd)
-							if len(found2):
-								out.extend(found2)
-							# elif allow and m.content:
-							# 	lost.append(m.content)
-							# elif preserve:
-							# 	lost.append(u)
-			elif is_discord_attachment(url):
+						out.append(url)
+				continue
+			if priority_order[0] == "text":
 				out.append(url)
-			elif is_miza_attachment(url):
-				out.append(url)
-			else:
-				try:
-					headers = await attachment_cache.scan_headers(url)
-					headers = fcdict(headers)
-					if headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html",):
-						pass
-					elif ytd and self.audio:
-						try:
-							resp = await self.audio.asubmit(f"ytdl.search({repr(url)})")
-							if not resp:
-								raise FileNotFoundError(url)
-						except Exception as ex:
-							print(repr(ex))
-						else:
-							resp = resp[0]
-							if resp.get("video") and resp["video"][0]:
-								url = resp["video"][0]
-							elif images and resp.get("icon"):
-								url = resp["icon"]
-							elif resp["url"] != url:
-								url = resp["url"]
-							else:
-								url = resp.get("stream") or resp.get("icon") or resp.get("url") or url
-					out.append(url)
-				except Exception:
-					return [url]
-		# if lost:
-		# 	out.extend(lost)
+				continue
+			try:
+				headers = await attachment_cache.scan_headers(url)
+				headers = fcdict(headers)
+				if headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html",):
+					pass
+				elif self.audio:
+					resp = await self.audio.asubmit(f"ytdl.search({repr(url)})")
+					if not resp:
+						raise EOFError(url)
+					found = deque()
+					for p in priority_order:
+						for entry in resp:
+							try:
+								match p:
+									case "video":
+										found.append(entry["video"][0])
+									case "audio":
+										found.append(entry["stream"])
+									case "image":
+										found.append(entry["icon"])
+									case _:
+										found.append(entry["url"])
+							except LookupError:
+								pass
+					out.extend(found)
+					continue
+			except Exception as ex:
+				print(repr(ex))
+			out.append(url)
 		if not out:
 			out = urls
 		return tuple(out)
-
-	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, emojis=True, reactions=False, allow=False, limit=None, no_cache=False, ytd=True) -> list:
-		"Finds URLs in a string, following any discord message links found. Traces all the way to raw file stream if \"ytd\" parameter is set."
-		if not url or limit is not None and limit <= 0:
+	async def follow_url(self, url, priority_order=("video", "audio", "image", "text"), allow_text=False, limit=None) -> list:
+		"Finds URLs in a string, following any discord message links found."
+		if not url:
 			return []
 		if not isinstance(url, str) and hasattr(url, "channel"):
 			url = message_link(url)
-		if it is None and " " in url or not is_url(url):
-			urls = find_urls(url) if allow else find_urls_ex(url)
-			if not urls:
-				if images or emojis or reactions:
-					return await self.follow_to_image(url, follow=reactions)
-				return []
-		else:
+		if is_url(url):
 			urls = [url]
-		it = it or {}
+		else:
+			urls = find_urls_ex(url)
+			urls.extend(find_emojis_ex(url))
+			if limit is not None:
+				urls = urls[:limit]
+
 		urls = tuple(urls)
+		priority_order = tuple(priority_order)
+		allow_text = bool(allow_text)
+		tup = (urls, priority_order, allow_text)
 
-		if no_cache:
-			return await self._follow_url(urls, it=it, best=best, preserve=preserve, images=images, emojis=emojis, reactions=reactions, allow=allow, limit=limit, no_cache=no_cache, ytd=ytd)
-
-		tup = shash((urls, best, preserve, images, emojis, reactions, allow, ytd))
 		out = await self.followed.aretrieve(
 			tup, self._follow_url,
-			urls, it=it, best=best, preserve=preserve, images=images,
-			emojis=emojis, reactions=reactions, allow=allow, limit=limit,
-			no_cache=no_cache, ytd=ytd,
+			urls, priority_order=priority_order, allow_text=allow_text,
 		)
-		for i, url in enumerate(out):
-			if discord_expired(url):
-				out = list(out)
-				out[i] = await self.renew_attachment(url)
-				self.followed[tup] = out
-		return out[:limit]
+		if limit is not None:
+			out = out[:limit]
+		return out
 
 	@functools.lru_cache(maxsize=64)
 	def detect_mime(self, url) -> tuple:
@@ -1806,22 +1692,22 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if e <= 0 or e > time_snowflake(dtn(), high=True):
 				return
 			base = f"https://cdn.discordapp.com/emojis/{e}."
-			fut = esubmit(Request, base + "png", method="HEAD")
-			url = base + "gif"
-			with reqs.next().head(url, headers=Request.header(), timeout=30) as resp:
-				if resp.status_code in range(400, 500):
-					try:
-						fut.result()
-					except ConnectionError:
-						return None
-					return False
+			fut = convert_fut(attachment_cache.scan_headers, base + "webp")
+			try:
+				await_fut(attachment_cache.scan_headers(base + "gif"))
+			except ConnectionError:
+				try:
+					fut.result()
+				except ConnectionError:
+					return None
+				return False
 			return True
 		return emoji.animated
 	def is_animated(self, e):
 		"Detects whether an emoji is usable, and if so, animated. Returns a ternary True/False/None value where True represents an emoji that is both usable and animated, False for a usable non-animated emoji, and None for unusable emojis."
 		if type(e) in (int, str):
 			e = int(e)
-			return self.emoji_animated.aretrieve(e, self._is_animated, e)
+			return self.emoji_animated.retrieve(e, self._is_animated, e)
 		else:
 			emoji = e
 		return emoji.animated
@@ -1895,62 +1781,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return msg, pops, replaceds
 		return msg
 
-	async def emoji_to_url(self, e):
+	async def emoji_to_url(self, e, guild=None):
 		if isinstance(e, str) and not e.isnumeric():
-			e = e[3:]
-			i = e.index(":")
-			e_id = int(e[i + 1:e.rindex(">")])
-			try:
-				url = str(self.cache.emojis[e_id].url)
-			except KeyError:
-				anim = await asubmit(self.is_animated, e_id)
-				if anim is None:
-					return
-				if anim:
-					fmt = "gif"
-				else:
-					fmt = "png"
-				url = f"https://cdn.discordapp.com/emojis/{e_id}.{fmt}"
-		elif type(e) in (int, str):
-			anim = self.is_animated(e)
-			if anim is None:
-				return
-			fmt = "gif" if anim else "png"
-			url = f"https://cdn.discordapp.com/emojis/{e}.{fmt}"
-		else:
-			anim = self.is_animated(e)
-			if anim is None:
-				return
-			fmt = "gif" if anim else "png"
-			url = f"https://cdn.discordapp.com/emojis/{e.id}.{fmt}"
-		return url
-
-	def emoji_exists(self, e):
-		if type(e) in (int, str):
-			url = f"https://cdn.discordapp.com/emojis/{e}.png"
-			with reqs.next().head(url, headers=Request.header(), timeout=30) as resp:
-				if resp.status_code in range(400, 500):
-					self.emoji_animated.pop(int(e), None)
-					return
-		else:
-			if e.id not in self.cache.emojis:
-				return
-		return True
-
-	async def min_emoji(self, e, full=False):
-		animated = await asubmit(self.is_animated, e)
-		if animated is None:
-			raise LookupError(f"Emoji {e} does not exist.")
-		if type(e) in (int, str):
-			e = cdict(id=e, animated=animated)
-		return min_emoji(e, full=full)
-
-	async def emoji_i2s(self, id, full=False):
-		if hasattr(id, "id"):
-			id = id.id
-		if isinstance(id, int) or id.isnumeric():
-			return await self.min_emoji(id, full=full)
-		return id
+			return find_emojis_ex(e)[0]
+		emoji = await self.resolve_emoji(e, guild=guild)
+		return emoji.url
 
 	async def optimise_image(self, image, fsize=DEFAULT_FILESIZE, msize=None, csize=None, fmt="auto", duration=None, anim=True, opt=True, timeout=3600):
 		"Optimises the target image or video file to fit within the \"fsize\" size, or \"msize\" resolution. Optional format and duration parameters."
@@ -2288,7 +2123,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				follows[i] = as_fut(urls)
 			elif sum(f is not None for f in follows) < 4 and m.get("url") and j < 8:
 				extract = not is_discord_message_link(m.url) and not is_discord_attachment(m.url) and m.get("new")
-				follows[i] = csubmit(self.follow_url(m.url, ytd=extract))
+				follows[i] = csubmit(self.follow_url(m.url))
 			m.pop("url", None)
 		for i, fut in enumerate(follows):
 			if not fut:
@@ -3822,7 +3657,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return self.value
 
 		def require(self, value=0, cost=None):
-			data = self.get_userbase(self.user.id)
+			data = bot.get_userbase(self.user.id)
 			if data.get("payg") or data.get("credit"):
 				return self
 			if self.value < value:
@@ -3860,7 +3695,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					self.add(mpf(tup[-1]) * 1000)
 				if exc_type and exc_value:
 					return
-				data = self.get_userbase(target.id)
+				data = bot.get_userbase(target.id)
 				cost = round_random(self.cost)
 				dcost = self.cost / 1000
 				print("QCost:", target, self.cost, cost)
@@ -3948,7 +3783,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return tup
 
 	def premium_context(self, user, guild=None):
-		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
+		premium = max(self.is_trusted(guild), self.premium_level(user) * 2 + 1)
 		return self.PremiumContext(user, value=premium)
 
 	def is_nsfw(self, *args):
@@ -4590,13 +4425,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if force or day:
 			fut = self.send_event("_save_")
 			await_fut(fut)
-		if day and (not self.collecting or self.collecting.done()):
+		if day:
 			self.backup()
-			futs = deque()
-			for u in self.data.values():
-				if not xrand(5) and not u._garbage_semaphore.busy:
-					futs.append(self.garbage_collect(u))
-			self.collecting = csubmit(gather(*futs))
 
 	async def as_rewards(self, diamonds, gold=Dummy):
 		if diamonds and not isinstance(diamonds, int):
@@ -4715,7 +4545,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.react_sem.pop(message.id, None)
 
 	status_cycle = Semaphore(1, 1, rate_limit=60, sync=True)
-	@tracebacksuppressor
 	async def update_status(self, force=False):
 		guild_count = len(self.guilds)
 		changed = force or guild_count != self.guild_count
@@ -5023,13 +4852,23 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					break
 		if not args:
 			for k, v in schema.items():
-				if k in kwargs or not v.get("required"):
+				if k in kwargs or not v.get("required") and not v.get("autoresolve"):
 					continue
 				r = None
-				if v.type in ("url", "image", "visual", "video"):
+				if v.type in ("url", "image", "visual", "video", "audio", "media"):
 					url = None
 					if getattr(message, "reference", None):
-						urls = await self.follow_url(message, ytd=False)
+						if v.type in ("visual", "video"):
+							priority_order = ("video", "image", "audio", "text")
+						elif v.type in ("media",):
+							priority_order = ("video", "audio", "image", "text")
+						elif v.type in ("audio",):
+							priority_order = ("audio", "video", "image", "text")
+						elif v.type in ("image",):
+							priority_order = ("image", "video", "audio", "text")
+						else:
+							priority_order = ("text", "video", "audio", "image")
+						urls = await self.follow_url(message, priority_order=priority_order, limit=1)
 						if urls and not is_discord_message_link(urls[0]):
 							url = urls[0]
 					if not url:
@@ -5039,6 +4878,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							pass
 					if url:
 						r = url
+				elif v.type in ("string", "text", "word"):
+					if getattr(message, "reference", None):
+						urls = await self.follow_url(message, priority_order=("text",), allow_text=True, limit=1)
+						if urls and not is_discord_message_link(urls[0]):
+							r = urls[0]
 				elif v.type == "message":
 					reference = getattr(message, "reference", None)
 					if reference:
@@ -5151,19 +4995,22 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		elif info.type == "emoji":
 			v = await self.resolve_emoji(v, guild=guild)
 		elif info.type in ("url", "image", "visual", "video", "audio", "media"):
-			ytd = info.type in ("image", "visual", "video", "audio")
-			urls = await self.follow_url(v, ytd=ytd, reactions=True, allow=True)
+			if info.type in ("visual", "video"):
+				priority_order = ("video", "image", "audio", "text")
+			elif info.type in ("media",):
+				priority_order = ("video", "audio", "image", "text")
+			elif info.type in ("audio",):
+				priority_order = ("audio", "video", "image", "text")
+			elif info.type in ("image",):
+				priority_order = ("image", "video", "audio", "text")
+			else:
+				priority_order = ("text", "video", "audio", "image")
+			urls = await self.follow_url(v, priority_order=priority_order, limit=1)
 			if not urls or is_discord_message_link(urls[0]):
 				raise err(TypeError, k, v)
 			v = urls[0]
 		elif info.type == "message":
-			if isinstance(v, str):
-				assert is_discord_message_link(v), f"{k}: Expected valid message link."
-				p1, p2, p3, p4, gid, cid, mid, *_ = v.split("/", 7)
-				channel = await self.fetch_channel(cid)
-				v = await self.fetch_message(mid, channel)
-			elif isinstance(v, int):
-				v = await self.fetch_message(v)
+			v = await self.fetch_message(v)
 		elif info.type == "filesize":
 			if not isinstance(v, (int, float, np.number)):
 				try:
@@ -5876,7 +5723,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		guild._members = _members
 		return guild
 
-	@tracebacksuppressor
 	async def load_guilds(self, guilds=None):
 		guilds = guilds or self.client.guilds
 		if "guilds" in self.data:
@@ -6481,7 +6327,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					with MemoryTimer("handle_update"):
 						await self.handle_update()
 
-	@tracebacksuppressor
 	async def worker_heartbeat(self):
 		futs = []
 		key = AUTH.get("discord_secret") or ""
@@ -6542,7 +6387,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					with MemoryTimer("update"):
 						await asubmit(self.update, priority=True)
 
-	@tracebacksuppressor
 	async def heartbeat(self):
 		await asyncio.sleep(0.5)
 		if self.closed:
@@ -7846,7 +7690,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.dispatch("reaction_clear", message, old_reactions)
 		self.add_message(message, files=False, force=True)
 
-	@tracebacksuppressor
 	async def init_ready(self):
 		await asubmit(self.start_webserver)
 		await self.modload

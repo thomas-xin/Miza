@@ -827,8 +827,6 @@ BASE_LOGO = "https://cdn.discordapp.com/embed/avatars/0.png"
 def get_url(obj, f=to_webp) -> str:
 	if isinstance(obj, str):
 		return obj
-	if BOT[0] and isinstance(obj, discord.Attachment):
-		return BOT[0].try_attachment(obj.url)
 	found = False
 	for attr in ("display_avatar", "avatar_url", "icon_url", "icon", "avatar"):
 		try:
@@ -1802,7 +1800,7 @@ def replace_emojis(s):
 			s = s.replace(emoji, url)
 	return s
 
-@functools.lru_cache(maxsize=4)
+@functools.lru_cache(maxsize=64)
 def find_emojis_ex(s, cast_urls=True):
 	"Finds all emojis in a string, both unicode and discord-exclusive representations. Prioritises multi-character emojis if possible."
 	out = {}
@@ -1831,6 +1829,13 @@ def find_emojis_ex(s, cast_urls=True):
 	found = find_emojis(s)
 	for e in found:
 		i = s.index(e)
+		if cast_urls:
+			eid = verify_id(e)
+			url = f"https://cdn.discordapp.com/emojis/{eid}.webp"
+			if e.startswith("<:a:"):
+				url += "?animated=true"
+			out[i] = url
+			continue
 		out.setdefault(i, e)
 	return [t[1] for t in sorted(out.items()) if t[1]]
 
