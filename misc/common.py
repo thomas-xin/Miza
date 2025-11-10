@@ -2318,22 +2318,18 @@ def get_current_stats(up_bps, down_bps):
 	global WMI, _cpuinfo, _ctime, _diskinfo, _dtime
 	import psutil
 	t = utc()
-	# print("GCS:", t, 0)
 	cinfo = _cpuinfo
 	if t - _ctime > 3600:
 		_ctime = t
 		import cpuinfo
 		cinfo = _cpuinfo = cpuinfo.get_cpu_info()
-	# print("GCS:", t, 1)
 	f1 = psutil.cpu_percent()
 	f2 = psutil.virtual_memory()
 	f3 = psutil.swap_memory()
-	# print("GCS:", t, 2)
 	try:
 		gname, gcore, gmems, gutil, gpowa, gpowb, gtempa, gtempb = get_nvml()
 	except Exception:
 		gname = []
-	# print("GCS:", t, 3)
 	dinfo = _diskinfo
 	if t - _dtime > 60:
 		_dtime = t
@@ -2343,7 +2339,6 @@ def get_current_stats(up_bps, down_bps):
 				dinfo[p.mountpoint] = psutil.disk_usage(p.mountpoint)
 			except OSError:
 				pass
-	# print("GCS:", t, 4)
 	cpercent, minfo, sinfo = f1, f2, f3
 	ip = "127.0.0.1"
 	if os.name == "nt":
@@ -2353,7 +2348,6 @@ def get_current_stats(up_bps, down_bps):
 				def __init__(self, used, total):
 					self.used, self.total = used, total
 			sinfo = mtemp(used=cswap, total=sinfo.total)
-	# print("GCS:", t, 5)
 	ram_name = globals().get("RAM_NAME") or "RAM"
 	if os.name == "nt" and not globals().get("WMI"):
 		try:
@@ -2386,7 +2380,6 @@ def get_current_stats(up_bps, down_bps):
 			except KeyError:
 				ram_class = "DDR" + str(max(1, ceil(log2(ram_speed / 250))))
 			ram_name = globals()["RAM_NAME"] = f"{ram_class}-{ram_speed}"
-	# print("GCS:", t, 6)
 	return dict(
 		cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
 		gpu={f"{ip}-{i}": dict(

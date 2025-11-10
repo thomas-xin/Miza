@@ -182,6 +182,7 @@ class AttachmentCache(AutoCache):
 					except Exception as ex:
 						print(repr(ex))
 						last.add(tup)
+						self.last = last
 				if not resp:
 					cid = choice(self.channels)
 					n = random.randint(0, 2)
@@ -201,7 +202,7 @@ class AttachmentCache(AutoCache):
 				for task in tasks:
 					task[0].set_exception(ex)
 				continue
-			esubmit(self.set_last, (cid, mid, n))
+			esubmit(self.clear_last, (cid, mid, n))
 			for emb in message["embeds"]:
 				url = emb["image"]["url"].rstrip("&")
 				tasks.pop(0)[0].set_result(url)
@@ -211,11 +212,12 @@ class AttachmentCache(AutoCache):
 				task[0].set_exception(ConnectionError(404, "Missing attachment embed!"))
 		self.fut = None
 
-	def set_last(self, tup):
+	def clear_last(self, tup=None):
 		time.sleep(1)
 		last = self.last
-		with tracebacksuppressor:
+		if tup:
 			last.add(tup)
+		with tracebacksuppressor:
 			for (c, k, n) in tuple(last):
 				if utc() - snowflake_time_2(int(k)).timestamp() > 86400 * 6:
 					last.remove((c, k, n))

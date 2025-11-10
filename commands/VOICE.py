@@ -233,7 +233,7 @@ def select_and_convert(stream):
 async def search_one(bot, query):
 	# Perform search concurrently, may contain multiple URLs
 	out = None
-	urls = await bot.follow_url(query, priority_order=("text", "video", "audio", "image"))
+	urls = await bot.follow_url(query, priority_order=("text", "video", "audio"))
 	if urls:
 		if len(urls) == 1:
 			query = urls[0]
@@ -1996,7 +1996,7 @@ class Lyrics(Command):
 		async with discord.context_managers.Typing(_channel):
 			# Extract song name if input is a URL, otherwise search song name directly
 			url = None
-			urls = await bot.follow_url(query, priority_order=("text", "video", "audio", "image"))
+			urls = await bot.follow_url(query, priority_order=("text", "video", "audio"))
 			if urls:
 				resp = await search_one(bot, query)
 				search = resp[0]["name"]

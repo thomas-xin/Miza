@@ -712,7 +712,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if not fut:
 						continue
 					futs.append(group.create_task(fut))
-			return await gather(*futs)
+				return await gather(*futs)
 
 	async def get_full_invites(self, guild):
 		"Gets the full list of invites from a guild, if applicable."
@@ -1591,16 +1591,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							if allow_text:
 								found.append(m.content)
 							found.extend(find_urls_ex(m.content))
-				for e in m.embeds:
-					for attr in ("video", "image", "thumbnail"):
-						url = getattr(e, attr, None)
-						if url:
-							found.append(url)
-				found.extend(find_emojis_ex(m.content))
-				m = await self.ensure_reactions(m)
-				for r in m.reactions:
-					u = await self.emoji_to_url(r.emoji, guild=m.guild)
-					found.append(u)
+						case "emoji":
+							for e in m.embeds:
+								for attr in ("video", "image", "thumbnail"):
+									url = getattr(e, attr, None)
+									if url:
+										found.append(url)
+							found.extend(find_emojis_ex(m.content))
+							m = await self.ensure_reactions(m)
+							for r in m.reactions:
+								u = await self.emoji_to_url(r.emoji, guild=m.guild)
+								found.append(u)
 				found.uniq()
 				for url in found:
 					if is_discord_attachment(url):
@@ -2122,8 +2123,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						raise TypeError(c["type"])
 				follows[i] = as_fut(urls)
 			elif sum(f is not None for f in follows) < 4 and m.get("url") and j < 8:
-				extract = not is_discord_message_link(m.url) and not is_discord_attachment(m.url) and m.get("new")
-				follows[i] = csubmit(self.follow_url(m.url))
+				follows[i] = csubmit(self.follow_url(m.url, priority_order=("video", "image", "text")))
 			m.pop("url", None)
 		for i, fut in enumerate(follows):
 			if not fut:
@@ -2166,12 +2166,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			try:
 				captions = await fut
 			except Exception as ex:
-				print("Caption Error:", repr(ex))
+				print("Caption Error:", m.get("url"), repr(ex))
 				continue
 			images = []
 			for caption in captions:
 				if isinstance(caption, BaseException):
-					print("Caption Error:", repr(caption))
+					print("Caption Error:", m.get("url"), repr(caption))
 					continue
 				if isinstance(caption, tuple):
 					caption = "<" + ":".join(caption) + ">"
@@ -2930,7 +2930,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						filename = filename.filename
 					# with suppress():
 					# 	os.remove(filename)
-		except:
+		except Exception:
 			if filename is not None:
 				if not isinstance(filename, str):
 					filename = getattr(filename, "filename", None) or filename.name
@@ -3503,7 +3503,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.cache.banned[(guild.id, user.id)] = utc()
 		try:
 			await guild.ban(user, delete_message_days=0, reason=reason)
-		except:
+		except Exception:
 			self.cache.banned.pop((guild.id, user.id), None)
 			raise
 		self.cache.banned[(guild.id, user.id)] = utc()
@@ -4193,7 +4193,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			it = int(utc() // ninter) * ninter
 			out = []
 			for i in range(ninter, interval + ninter, ninter):
-				out.append(self.uptime_db.get(i - interval + it, {}))
+				out.append(self.uptime_db.get(i - interval + it, None) or {})
 			return out
 		status = self.status_data
 		if simplified:
@@ -4458,15 +4458,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if u_perm <= -inf:
 			return
 		reacode = as_str(reaction).encode("utf-8")
-		interaction = hasattr(message, "int_token")
-		if interaction:
-			fut = csubmit(delayed_callback(future, 1, self.defer_interaction, message, mode="patch", ephemeral=getattr(message, "ephemeral", False), exc=False))
 		while utc() - self.react_sem.get(message.id, 0) < 30:
 			# Ignore if more than 2 reactions already queued for target message
 			if self.react_sem.get(message.id, 0) - utc() > 1:
-				if interaction:
-					fut.cancel()
-					return await self.ignore_interaction(message)
 				return
 			await asyncio.sleep(0.2)
 		content = message.content
@@ -4515,6 +4509,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						index=index,
 						data=data,
 					))
+					interaction = hasattr(message, "int_token")
+					if interaction:
+						fut = csubmit(delayed_callback(future, 1, self.defer_interaction, message, mode="patch", ephemeral=getattr(message, "ephemeral", False), exc=False))
 					resp = await future
 				await self.send_event("_command_", user=user, command=f, loop=False, message=message)
 				if isinstance(resp, str):
@@ -4769,9 +4766,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					taken = True
 				elif not hs and v.type == "filesize" and re.fullmatch(r"[\.0-9]+[A-Za-z]?i?[Bb]", a):
 					taken = True
-				elif not hs and v.type == "resolution" and re.fullmatch(r"-?[0-9]+[:x*×]-?[0-9]+", a):
+				elif not hs and v.type == "resolution" and re.fullmatch(r"-?[0-9]+[:x*×,]-?[0-9]+", a):
 					taken = True
-				elif not hs and v.type == "index" and (a.casefold() == "all" or re.fullmatch(r"(?:[\-0-9]+|[:\-]|\.{2,}){1,5}", a)):
+				elif not hs and v.type == "index" and (a.casefold() == "all" or re.fullmatch(r"(?:[\-0-9]+|[:\-]|\.{2,}){1,5}", a.strip("([])"))):
 					taken = True
 				elif not hs and v.type in ("number", "integer") and re.fullmatch(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?(?:\/\d*\.?\d+)?", a):
 					taken = True
@@ -4859,15 +4856,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					url = None
 					if getattr(message, "reference", None):
 						if v.type in ("visual", "video"):
-							priority_order = ("video", "image", "audio", "text")
+							priority_order = ("video", "image", "emoji", "audio", "text")
 						elif v.type in ("media",):
-							priority_order = ("video", "audio", "image", "text")
+							priority_order = ("video", "audio", "image", "emoji", "text")
 						elif v.type in ("audio",):
-							priority_order = ("audio", "video", "image", "text")
+							priority_order = ("audio", "video", "image", "emoji", "text")
 						elif v.type in ("image",):
-							priority_order = ("image", "video", "audio", "text")
+							priority_order = ("image", "video", "emoji", "audio", "text")
 						else:
-							priority_order = ("text", "video", "audio", "image")
+							priority_order = ("text", "video", "audio", "image", "emoji")
 						urls = await self.follow_url(message, priority_order=priority_order, limit=1)
 						if urls and not is_discord_message_link(urls[0]):
 							url = urls[0]
@@ -4995,16 +4992,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		elif info.type == "emoji":
 			v = await self.resolve_emoji(v, guild=guild)
 		elif info.type in ("url", "image", "visual", "video", "audio", "media"):
-			if info.type in ("visual", "video"):
-				priority_order = ("video", "image", "audio", "text")
-			elif info.type in ("media",):
-				priority_order = ("video", "audio", "image", "text")
-			elif info.type in ("audio",):
-				priority_order = ("audio", "video", "image", "text")
-			elif info.type in ("image",):
-				priority_order = ("image", "video", "audio", "text")
+			v = info
+			if v.type in ("visual", "video"):
+				priority_order = ("video", "image", "emoji", "audio", "text")
+			elif v.type in ("media",):
+				priority_order = ("video", "audio", "image", "emoji", "text")
+			elif v.type in ("audio",):
+				priority_order = ("audio", "video", "image", "emoji", "text")
+			elif v.type in ("image",):
+				priority_order = ("image", "video", "emoji", "audio", "text")
 			else:
-				priority_order = ("text", "video", "audio", "image")
+				priority_order = ("text", "video", "audio", "image", "emoji")
 			urls = await self.follow_url(v, priority_order=priority_order, limit=1)
 			if not urls or is_discord_message_link(urls[0]):
 				raise err(TypeError, k, v)
@@ -5050,13 +5048,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if s == "-":
 						return s
 					return round_min(s)
-				v = tuple(map(round_or_omit, regexp(r"[:x*×]").split(v, 1)))
+				v = tuple(map(round_or_omit, regexp(r"[:x*×,]").split(v, 1)))
 			except Exception as ex:
 				raise err(ex.__class__, k, v)
 		elif info.type == "index":
 			if v.casefold == "all":
 				v = [None, None]
 			else:
+				v = v.strip("([])")
 				try:
 					if re.fullmatch(r"[0-9]+-[0-9]+", v):
 						v = tuple(map(int, v.split("-", 1)))
@@ -5917,7 +5916,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 									aio=True,
 									json=True,
 								)
-							except:
+							except Exception:
 								print("Errored:", kwargs, data)
 								raise
 							message = self.ExtendedMessage.new(resp)
@@ -6265,24 +6264,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					uptimes.pop(sl.pop(0), None)
 				while sl[-1] > it:
 					uptimes.pop(sl.pop(-1), None)
-				skipto = 0
-				for i in sl[:-3600 // ninter]:
+				for i in sl[:-3600 // ninter][::-1]:
 					if i * ninter % 3600 == 0:
 						continue
-					if skipto >= i:
-						continue
-					if i * ninter % 3600 == ninter and uptimes.get(i * ninter + 3600 - ninter * 2) == {}:
-						skipto = i * ninter + 3600 - ninter * 2
-					if uptimes[i]:
-						uptimes[i] = {}
-		uptimea = np.array(list(uptimes.iterkeys()))
+					if uptimes[i] is None:
+						break
+					uptimes[i] = None
+		uptimea = np.array(list(uptimes.iterkeys()), dtype=np.uint32)
 		if len(uptimea):
 			uptimea.sort(kind="stable")
 		i = np.searchsorted(uptimea, it - interval + ninter)
 		j = np.searchsorted(uptimea, it + ninter)
-		ut = j - i
-		self.uptime = ut / interval * ninter
-		return self.uptime_db
+		diffs = np.diff(uptimea[i:j])
+		self.uptime = 1 - np.sum(diffs[diffs > 60]) / (j - i)
 
 	uptime = 0
 	up_bps = down_bps = 0
@@ -6316,14 +6310,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						self.data.insights["up_bytes"] = up_bytes = self.up_bytes[-1] + self.start_up
 						self.data.insights["down_bytes"] = down_bytes = self.down_bytes[-1] + self.start_down
 						self.total_bytes = up_bytes + down_bytes
-
-	async def lazy_loop(self):
-		"The lazy update loop that runs once every 3~11 seconds."
-		await asyncio.sleep(5)
-		while not self.closed:
-			async with Delay(random.random() * 8 + 3):
-				async with tracebacksuppressor:
-					# self.var_count = await asubmit(var_count)
 					with MemoryTimer("handle_update"):
 						await self.handle_update()
 
@@ -6374,8 +6360,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				with tracebacksuppressor:
 					await self.worker_heartbeat()
 					await asyncio.sleep(1)
-					# with MemoryTimer("get_disk"):
-					#     await self.get_disk()
 					with MemoryTimer("get_hosted"):
 						await self.get_hosted()
 					await asyncio.sleep(1)
@@ -7165,7 +7149,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						r.setdefault("me", False)
 				try:
 					message = bot.LoadedMessage(state=bot._state, channel=channel, data=d)
-				except:
+				except Exception:
 					print(d)
 					raise
 				if not getattr(message, "author", None):
@@ -7537,7 +7521,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		def create_message(self, *, channel, data=None):
 			try:
 				data["channel_id"] = channel.id
-			except:
+			except Exception:
 				print("CREATE_MESSAGE:", data)
 				raise
 			return bot.ExtendedMessage.new(data)
@@ -7709,7 +7693,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		await self.fetch_user(self.deleted_user)
 		self.gl = csubmit(self.global_loop())
 		self.sl = csubmit(self.slow_loop())
-		self.ll = csubmit(self.lazy_loop())
 		print("Update loops initiated.")
 		futs = alist()
 		if commands:
