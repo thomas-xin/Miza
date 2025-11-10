@@ -85,7 +85,6 @@ class Server:
 		state = {"/": f"https://api.mizabot.xyz:{webserver_port}"}
 
 	session = niquests.Session()
-	asession = niquests.AsyncSession()
 	statics = diskcache.Cache(directory=f"{CACHE_PATH}/statics", expiry=86400 * 30)
 	dynamics = diskcache.Cache(directory=f"{CACHE_PATH}/dynamics", expiry=86400 * 30)
 
@@ -315,8 +314,9 @@ last_ip_check = 0
 async def ip(request: Request):
 	global global_ip, last_ip_check
 	if time.time() - last_ip_check > 3600:
-		resp = await server.asession.get("https://api.ipify.org")
-		global_ip = resp.text
+		async with niquests.AsyncSession() as asession:
+			resp = await asession.get("https://api.ipify.org")
+			global_ip = resp.text
 		last_ip_check = time.time()
 	return dict(host=global_ip, remote=true_ip(request))
 

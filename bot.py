@@ -287,7 +287,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not path and default is None:
 			return cdict()
 		return default
-
 	def set_userbase(self, uid, path, value):
 		if path:
 			orig = temp = self.userbase.setdefault(uid, cdict())
@@ -299,7 +298,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.userbase[uid] = orig
 		else:
 			self.userbase[uid] = value
-
 	def add_userbase(self, uid, path, value):
 		if path:
 			orig = temp = self.userbase.setdefault(uid, cdict())
@@ -318,7 +316,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			add_dict(data, uid, value)
 			self.set_userbase(uid, data)
 			return data
-
 	def pop_userbase(self, uid, path):
 		if path:
 			orig = temp = self.userbase.get(uid, cdict())
@@ -333,6 +330,65 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				self.userbase[uid] = orig
 			return value
 		return self.userbase.pop(uid)
+
+	def get_guildbase(self, gid, path="", default=None):
+		try:
+			temp = self.guildbase[gid]
+			if path:
+				for k in path.split("."):
+					temp = temp[k]
+			if default is not None and default is not Dummy and not isinstance(temp, type(default)):
+				return type(default)(temp)
+			return temp
+		except KeyError:
+			if default is Dummy:
+				raise
+		if not path and default is None:
+			return cdict()
+		return default
+	def set_guildbase(self, gid, path, value):
+		if path:
+			orig = temp = self.guildbase.setdefault(gid, cdict())
+			attrs = path.split(".")
+			last = attrs.pop(-1)
+			for k in attrs:
+				temp = temp.setdefault(k, cdict())
+			temp[last] = value
+			self.guildbase[gid] = orig
+		else:
+			self.guildbase[gid] = value
+	def add_guildbase(self, gid, path, value):
+		if path:
+			orig = temp = self.guildbase.setdefault(gid, cdict())
+			attrs = path.split(".")
+			last = attrs.pop(-1)
+			for k in attrs:
+				temp = temp.setdefault(k, cdict())
+			try:
+				temp[last] += value
+			except LookupError:
+				temp[last] = value
+			self.guildbase[gid] = orig
+			return temp[last]
+		else:
+			data = self.get_guildbase(gid)
+			add_dict(data, gid, value)
+			self.set_guildbase(gid, data)
+			return data
+	def pop_guildbase(self, gid, path):
+		if path:
+			orig = temp = self.guildbase.get(gid, cdict())
+			attrs = path.split(".")
+			last = attrs.pop(-1)
+			for k in attrs:
+				temp = temp.setdefault(k, cdict())
+			value = temp.pop(last, None)
+			if not orig:
+				self.guildbase.pop(gid, None)
+			else:
+				self.guildbase[gid] = orig
+			return value
+		return self.guildbase.pop(gid)
 
 	def command_options(self, command):
 		accepts_attachments = False
@@ -1354,7 +1410,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				self.cache.emojis[emoji.id] = emoji
 				return emoji
 		if allow_external:
-			animated = await asubmit(self.is_animated, e_id)
+			animated = await self.is_animated(e_id)
 			if animated is not None:
 				emoji = SimulatedEmoji(
 					id=e_id,
@@ -1368,9 +1424,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def resolve_emoji(self, e_id, guild=None, allow_external=True):
 		if not isinstance(e_id, (int, str)):
 			return e_id
-		if isinstance(e_id, int):
-			return await self.fetch_emoji(e_id, guild=guild, allow_external=allow_external)
-		assert not e_id.isascii(), e_id
+		if isinstance(e_id, int) or e_id.isascii():
+			return await self.fetch_emoji(verify_id(e_id), guild=guild, allow_external=allow_external)
 		emoji = SimulatedEmoji(
 			id=int.from_bytes(e_id.encode("utf-8"), "big"),
 			animated=False,
@@ -1573,11 +1628,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				out.append(url)
 				continue
 			if is_discord_attachment(url):
-				out.append(shorten_attachment(url, 0))
+				out.append(attachment_cache.preserve(url, 0))
 				continue
 			if is_discord_message_link(url):
 				m = await self.fetch_message(url)
-				found = alist(shorten_attachment(a.url, m.id) for a in m.attachments)
+				found = alist(attachment_cache.preserve(a.url, m.id) for a in m.attachments)
 				for p in priority_order:
 					match p:
 						case "video":
@@ -1605,7 +1660,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				found.uniq()
 				for url in found:
 					if is_discord_attachment(url):
-						out.append(shorten_attachment(url, 0))
+						out.append(attachment_cache.preserve(url))
 					elif is_discord_message_link(url) and url not in seen:
 						urls = await self._follow_url(url, priority_order=priority_order, allow_text=allow_text, seen=seen)
 						out.extend(urls)
@@ -1686,29 +1741,29 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return tuple(t.strip() for t in self.mime.from_buffer(data).split(";"))
 
 	emoji_animated = AutoCache(f"{CACHE_PATH}/emoji_animated", stale=86400 * 365, timeout=None)
-	def _is_animated(self, e):
+	async def _is_animated(self, e):
 		try:
 			emoji = self.cache.emojis[e]
 		except KeyError:
 			if e <= 0 or e > time_snowflake(dtn(), high=True):
 				return
 			base = f"https://cdn.discordapp.com/emojis/{e}."
-			fut = convert_fut(attachment_cache.scan_headers, base + "webp")
+			fut = csubmit(attachment_cache.scan_headers(base + "webp"))
 			try:
-				await_fut(attachment_cache.scan_headers(base + "gif"))
+				await attachment_cache.scan_headers(base + "gif")
 			except ConnectionError:
 				try:
-					fut.result()
+					await fut
 				except ConnectionError:
 					return None
 				return False
 			return True
 		return emoji.animated
-	def is_animated(self, e):
+	async def is_animated(self, e):
 		"Detects whether an emoji is usable, and if so, animated. Returns a ternary True/False/None value where True represents an emoji that is both usable and animated, False for a usable non-animated emoji, and None for unusable emojis."
 		if type(e) in (int, str):
 			e = int(e)
-			return self.emoji_animated.retrieve(e, self._is_animated, e)
+			return await self.emoji_animated.aretrieve(e, self._is_animated, e)
 		else:
 			emoji = e
 		return emoji.animated
@@ -2939,12 +2994,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print(filename, os.path.getsize(filename))
 			raise
 		if not getattr(reference, "slash", None) and message.attachments:
-			def temp_url(url):
-				if is_discord_attachment(url):
-					aid = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-					return shorten_attachment(channel.id, message.id, aid, url)
-				return url
-			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join("<" + temp_url(a.url) + ">" for a in message.attachments)
+			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join("<" + attachment_cache.preserve(a.url, message.id) + ">" for a in message.attachments)
 			message = await bot.edit_message(message, content=content.strip())
 		if not message:
 			print("No message detected.")
@@ -4855,13 +4905,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if v.type in ("url", "image", "visual", "video", "audio", "media"):
 					url = None
 					if getattr(message, "reference", None):
-						if v.type in ("visual", "video"):
+						info = v
+						if info.type in ("visual", "video"):
 							priority_order = ("video", "image", "emoji", "audio", "text")
-						elif v.type in ("media",):
+						elif info.type in ("media",):
 							priority_order = ("video", "audio", "image", "emoji", "text")
-						elif v.type in ("audio",):
+						elif info.type in ("audio",):
 							priority_order = ("audio", "video", "image", "emoji", "text")
-						elif v.type in ("image",):
+						elif info.type in ("image",):
 							priority_order = ("image", "video", "emoji", "audio", "text")
 						else:
 							priority_order = ("text", "video", "audio", "image", "emoji")
@@ -4992,14 +5043,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		elif info.type == "emoji":
 			v = await self.resolve_emoji(v, guild=guild)
 		elif info.type in ("url", "image", "visual", "video", "audio", "media"):
-			v = info
-			if v.type in ("visual", "video"):
+			if info.type in ("visual", "video"):
 				priority_order = ("video", "image", "emoji", "audio", "text")
-			elif v.type in ("media",):
+			elif info.type in ("media",):
 				priority_order = ("video", "audio", "image", "emoji", "text")
-			elif v.type in ("audio",):
+			elif info.type in ("audio",):
 				priority_order = ("audio", "video", "image", "emoji", "text")
-			elif v.type in ("image",):
+			elif info.type in ("image",):
 				priority_order = ("image", "video", "emoji", "audio", "text")
 			else:
 				priority_order = ("text", "video", "audio", "image", "emoji")
@@ -5573,7 +5623,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						with tracebacksuppressor:
 							await fut
 					try:
-						new_content = add_content(old_content, content)
+						new_content = await self.proxy_emojis(add_content(old_content, content), guild=guild)
 						await manager.update(new_content, embeds=embeds, files=files, buttons=buttons, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), reacts=reacts, done=done, force=force)
 					except (OverflowError, InterruptedError):
 						# If the StreamedMessage was interrupted or exceeded the maximum length, we wipe the original and force a new message. This ensures the list of messages stays contiguous, which improves readability.
@@ -6470,20 +6520,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if message.content.startswith("||"):
 					content = message.content.replace("||", "").strip()
 				else:
-					def temp_url(url):
-						if is_discord_attachment(url):
-							aid = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-							return shorten_attachment(message.channel.id, message.id, aid, url)
-						return url
 					futs = deque()
 					for a in message.attachments:
 						futs.append(csubmit(attachment_cache.download(a.url)))
 					urls = set()
 					for e in message.embeds:
 						if e.image:
-							urls.add(temp_url(e.image.url))
+							urls.add(attachment_cache.preserve(e.image.url))
 						if e.thumbnail:
-							urls.add(temp_url(e.thumbnail.url))
+							urls.add(attachment_cache.preserve(e.thumbnail.url))
 					symrem = "".maketrans({c: "" for c in "<>|*"})
 					spl = [word.translate(symrem) for word in message.content.split() if not word.startswith("<")]
 					content = " ".join(word for word in spl if word and not is_url(word))

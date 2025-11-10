@@ -661,7 +661,7 @@ class UpdateExec(Database):
 						if raw:
 							u = url
 						else:
-							u = shorten_attachment(url, 0) + "?S=" + str(len(b))
+							u = attachment_cache.preserve(url, 0) + "?S=" + str(len(b))
 						urls.append(u)
 						i = f.tell()
 						continue
@@ -710,7 +710,7 @@ class UpdateExec(Database):
 							continue
 					# message = await bot.send_as_webhook(channel, fstr, files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
 					for a, bs in zip(message.attachments, sizes):
-						u = shorten_attachment(channel.id, message.id, a.id, fn=a.url) + "?S=" + str(bs)
+						u = attachment_cache.preserve(a.url, message.id) + "?S=" + str(bs)
 						urls.append(u)
 						# u = str(a.url).rstrip("&")
 						# u += "?" if "?" not in u else "&"
@@ -876,7 +876,7 @@ class UpdateExec(Database):
 			embed = discord.Embed(colour=rand_colour()).set_image(url=f"attachment://{fn}")
 		message = await channel.send(file=file, embed=embed)
 		assert message.embeds, message.id
-		out = shorten_attachment(message.embeds[0].author.icon_url if ext.startswith("image/") else message.embeds[0].image.url, message.id, minimise=minimise)
+		out = attachment_cache.preserve(message.embeds[0].author.icon_url if ext.startswith("image/") else message.embeds[0].image.url, message.id, minimise=minimise)
 		print("LPROXY:", url, out)
 		return out
 
@@ -903,7 +903,7 @@ class UpdateExec(Database):
 					pass
 				else:
 					if is_discord_attachment(url2):
-						url2 = bot.data.proxies[uhu] = shorten_attachment(url2, 0)
+						url2 = bot.data.proxies[uhu] = attachment_cache.preserve(url2, 0)
 					return url2
 				if mode == "raise":
 					raise FileNotFoundError(url)
@@ -930,7 +930,7 @@ class UpdateExec(Database):
 	def uregister(self, k, url, m_id=0):
 		bot = self.bot
 		uhu = uuhash(k)
-		url = shorten_attachment(url, m_id)
+		url = attachment_cache.preserve(url, m_id)
 		bot.data.proxies[uhu] = url
 		return url
 	

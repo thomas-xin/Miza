@@ -95,6 +95,11 @@ class Ask(Command):
 		else:
 			name_repr = bot_name
 		personality = pdata.description.replace("{{user}}", _user.display_name).replace("{{char}}", name_repr)
+		emojis = not simulated and _guild and [emoji for emoji in _guild.emojis if emoji.is_usable()]
+		if emojis:
+			emojis = shuffle(emojis)[:25]
+			emojitexts = " ".join(sorted(f":{e.name}:" for e in emojis))
+			personality += f"\n\nThe current conversation takes place on Discord, where you have access to the following additional emojis:\n{emojitexts}"
 		if "nsfw" in personality.casefold() or not _nsfw and bot.is_nsfw(_user):
 			ac = ""
 		elif nsfw:
@@ -102,7 +107,7 @@ class Ask(Command):
 		else:
 			ac = "You are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, please use disclaimers in your response, and mention this to the user if necessary. However, avoid repeating yourself if already clarified."
 		if ac:
-			personality += "\n" + ac
+			personality += "\n\n" + ac
 		tzinfo = self.bot.data.users.get_timezone(_user.id)
 		if tzinfo is None:
 			tzinfo, _c = self.bot.data.users.estimate_timezone(_user.id)
@@ -151,13 +156,10 @@ class Ask(Command):
 				messages[m.id] = message
 		await bot.require_integrity(_message)
 		print("ASK:", _channel.id, input_message)
-		bp = ["> ", "# ", "## ", "### "]
-		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, _prefix, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, model, nsfw, bp, simulated)
+		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, model, nsfw, simulated)
 		if pdata.stream and not pdata.tts and not simulated:
 			return cdict(
 				content=fut,
-				prefix="\xad",
-				bypass_prefix=bp,
 			)
 		temp = await flatten(fut)
 		if not temp:
@@ -169,14 +171,11 @@ class Ask(Command):
 			return resp
 		raise RuntimeError(temp)
 
-	async def ask_iterator(self, bot, _message, _channel, _guild, _user, _prefix, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, premium, _model, nsfw, bp, simulated):
+	async def ask_iterator(self, bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, premium, _model, nsfw, simulated):
 		function_message = None
 		tool_responses = []
 		props = cdict(name=bot_name)
-		response = cdict(
-			prefix="\xad",
-			bypass_prefix=bp,
-		)
+		response = cdict()
 		reacts = []
 		if not _model:
 			_model = "large" if premium.value_approx >= 3 else "medium" if not simulated else "small"

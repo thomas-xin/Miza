@@ -920,8 +920,7 @@ def find_urls(url): return url and regexp("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|
 def find_urls_ex(url):
 	no_triple = re.sub(r'```.*?```', '', url, flags=re.DOTALL)
 	no_code = re.sub(r'`[^`]*`', '', no_triple, flags=re.DOTALL)
-	pattern = r'''https?://[^\s`|"'\])>]+'''
-	return re.findall(pattern, no_code)
+	return re.findall(r'''https?://[^\s`|"'\])>]+''', no_code)
 def is_url(url): return url and isinstance(url, (str, bytes)) and regexp("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\\])>]+$").fullmatch(url)
 def is_discord_url(url): return url and regexp("^https?:\\/\\/(?:\\w{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/").findall(url) + regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").findall(url)
 def is_discord_attachment(url): return url and regexp("^https?:\\/\\/(?:\\w{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/attachments\\/").search(str(url))
@@ -4896,7 +4895,6 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 			await self.nossl.close()
 		self.sessions = alist(aiohttp.ClientSession() for i in range(3))
 		self.nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
-		self.asession = niquests.AsyncSession()
 		self.ts = utc()
 		return self
 
@@ -4907,19 +4905,20 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		if isinstance(data, aiohttp.FormData):
 			session = self.sessions.next()
 		elif not session:
-			try:
-				resp = await self.asession.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=verify)
-			except niquests.exceptions.SSLError:
-				if ssl is not None:
-					raise
-				resp = await self.asession.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=False)
-			if resp.status_code >= 400:
-				raise ConnectionError(resp.status_code, (url, as_str(resp.content)))
-			if json:
-				return resp.json()
-			if decode:
-				return resp.text
-			return resp.content
+			async with niquests.AsyncSession() as asession:
+				try:
+					resp = await asession.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=verify)
+				except niquests.exceptions.SSLError:
+					if ssl is not None:
+						raise
+					resp = await asession.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=False)
+				if resp.status_code >= 400:
+					raise ConnectionError(resp.status_code, (url, as_str(resp.content)))
+				if json:
+					return resp.json()
+				if decode:
+					return resp.text
+				return resp.content
 		async with self.semaphore:
 			req = session or (self.sessions.next() if ssl else self.nossl)
 			resp = await req.request(method.upper(), url, headers=headers, data=data, timeout=timeout)

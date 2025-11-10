@@ -1091,9 +1091,9 @@ class Preserve(Command):
 						found = attachment
 						break
 				if found:
-					futs.append(as_fut(shorten_attachment(url, _message.id, minimise=minimise)))
+					futs.append(as_fut(attachment_cache.preserve(url, _message.id, minimise=minimise)))
 					continue
-				futs.append(as_fut(shorten_attachment(url, 0, minimise=minimise)))
+				futs.append(as_fut(attachment_cache.preserve(url, 0, minimise=minimise)))
 				continue
 			futs.append(bot.data.exec.lproxy(url, channel=_channel, minimise=minimise))
 			await asyncio.sleep(0.1)

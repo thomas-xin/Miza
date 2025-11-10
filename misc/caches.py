@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import time
+import traceback
 import zipfile
 import aiofiles
 import aiohttp
@@ -230,6 +231,16 @@ class AttachmentCache(AutoCache):
 					resp.raise_for_status()
 		self.last = last
 
+	def preserve(self, url, mid=0, minimise=False):
+		if not is_discord_attachment(url):
+			return url
+		early = 43200 + 60
+		if not discord_expired(url, early):
+			cid, mid, aid, fn = split_url(url, mid)
+			key = aid
+			self[key] = url
+		return shorten_attachment(url, mid, minimise=minimise)
+
 	async def get_direct(self, c_id, m_id, a_id=None):
 		if not m_id:
 			raise LookupError("Insufficient information to retrieve attachment.")
@@ -322,30 +333,37 @@ class AttachmentCache(AutoCache):
 		return resp
 
 	async def _download(self, url, m_id=None, timeout=12):
-		target = url
-		raw_fn = temporary_file(url2ext(url))
-		if is_discord_url(url):
-			if is_discord_attachment(url):
-				target = await self.obtain(url=url, m_id=m_id)
-		elif is_miza_url(url):
-			if "/u/" in url:
-				c_id, m_id2, a_id, fn = expand_attachment(url)
-				target = await self.obtain(c_id, m_id2 or m_id, a_id, fn)
-				fn, head = await asubmit(download_file, target, filename=raw_fn, timeout=timeout, return_headers=True)
-				self.tertiary[url] = head
-				return open(fn, "rb")
-			elif "/c/" in url:
-				path = url.split("/c/", 1)[-1].split("/", 1)[0]
-				urls = await self.obtains(path)
-				fn, head = await asubmit(download_file, *urls, filename=raw_fn, timeout=timeout, return_headers=True)
-				self.tertiary[url] = head
-				return open(fn, "rb")
 		try:
-			f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, timeout=timeout, max_attempts=3, return_headers=True)
-		except niquests.exceptions.HTTPError as ex:
-			code, msg = ex.response.status_code, ex.response.reason
-			raise ConnectionError(code, msg)
-		self.tertiary[url] = head
+			target = url
+			raw_fn = temporary_file(url2ext(url))
+			if is_discord_url(url):
+				if is_discord_attachment(url):
+					target = await self.obtain(url=url, m_id=m_id)
+			elif is_miza_url(url):
+				if "/u/" in url:
+					c_id, m_id2, a_id, fn = expand_attachment(url)
+					target = await self.obtain(c_id, m_id2 or m_id, a_id, fn)
+					fn, head = await asubmit(download_file, target, filename=raw_fn, timeout=timeout, return_headers=True)
+					self.tertiary[url] = head
+					return open(fn, "rb")
+				elif "/c/" in url:
+					path = url.split("/c/", 1)[-1].split("/", 1)[0]
+					urls = await self.obtains(path)
+					fn, head = await asubmit(download_file, *urls, filename=raw_fn, timeout=timeout, return_headers=True)
+					self.tertiary[url] = head
+					return open(fn, "rb")
+			ctx = streamshatter.ChunkManager(target, filename=raw_fn, log_progress=False, timeout=timeout, max_attempts=3)
+			try:
+				f, head = await asubmit(ctx.run, close=False, return_headers=True)
+			except niquests.exceptions.HTTPError as ex:
+				code, msg = ex.response.status_code, ex.response.reason
+				raise ConnectionError(code, msg)
+			self.tertiary[url] = head
+		except ConnectionError:
+			raise
+		except:
+			traceback.print_exc()
+			raise
 		return f
 	async def download(self, url, m_id=None, filename=None, read=False, return_headers=False):
 		url = unyt(url)

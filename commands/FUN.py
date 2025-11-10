@@ -1978,7 +1978,7 @@ class React(PaginationCommand):
 		bot = self.bot
 
 		def key(curr, pos, page):
-			return "\n".join(sqr_md(i) + ": " + self.react_repr(lambda x: x, p, k, e) for i, (p, k, e) in enumerate(tuple(curr)[pos:pos + page], pos))
+			return "\n".join(self.react_repr(lambda x: x, p, k, e) for (p, k, e) in tuple(curr)[pos:pos + page])
 
 		return await self.default_display("auto reaction", uid, pos, bot.data.reacts.get(gid, ()), diridx, extra=leb128(gid), key=key)
 
@@ -2029,7 +2029,7 @@ class UpdateReacts(Database):
 		main.pops(pops)
 
 	@tracebacksuppressor(ZeroDivisionError)
-	async def _nocommand_(self, text, text2, edit, message, **void):
+	async def _nocommand_(self, message, **void):
 		if message.guild is None:
 			return
 		g_id = message.guild.id

@@ -9,7 +9,7 @@ import zipfile
 import niquests
 from PIL import Image
 import streamshatter
-from .util import is_url, is_discord_attachment, get_duration_2, temporary_file, CODEC_FFMPEG
+from .util import is_url, get_duration_2, temporary_file, CODEC_FFMPEG
 # Allow fallback (although not recommended as generally the up-to-date version is necessary for most sites)
 try:
 	import yt_dlp as ytd
