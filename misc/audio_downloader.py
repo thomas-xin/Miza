@@ -21,7 +21,7 @@ from .asyncs import esubmit
 from .util import (
 	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration, get_duration_2, html_decode,
-	is_url, is_discord_attachment, is_image, is_miza_url, is_youtube_url, is_spotify_url, AUDIO_FORMS,
+	is_image, is_url, is_discord_attachment, is_miza_url, is_miza_attachment, is_youtube_url, is_spotify_url, AUDIO_FORMS,
 	EvalPipe, PipedProcess, AutoCache, Request, Semaphore, TEMP_PATH, CACHE_PATH, magic, rename, temporary_file, replace_ext, select_and_loads,
 )
 
@@ -1225,6 +1225,13 @@ class AudioDownloader:
 		output, url = self.preprocess(url, mode=mode, count=count)
 		# Only proceed if no items have already been found (from playlists in this case)
 		if not len(output):
+			if is_miza_attachment(url):
+				return [cdict(
+					name=url2fn(url),
+					url=url,
+					audio=url,
+					video=url,
+				)]
 			resp = None
 			# Allow loading of files output by ~dump
 			if is_url(url):

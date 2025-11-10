@@ -1902,8 +1902,7 @@ class React(PaginationCommand):
 		return out
 
 	async def __call__(self, bot, _guild, _user, _message, _name, _perm, mode, keyword, emoji, preprocess, **void):
-		reacts = bot.data.reacts
-		main = reacts.coercedefault(_guild.id, alist, alist())
+		reacts = bot.get_guildbase(_guild.id, "reacts", [])
 		if not keyword and not emoji and mode != "remove":
 			# Set callback message for scrollable list
 			return await self.display(_user.id, 0, _guild.id)
@@ -1912,35 +1911,44 @@ class React(PaginationCommand):
 			if len(keyword) > 2 and keyword[0] == keyword[-1] == "/":
 				re.compile(keyword[1:-1])
 			else:
+				keys = keyword.split()
+				for i, k in enumerate(keys):
+					if re.fullmatch(r"<a?:[A-Za-z0-9\-~_]{1,32}:[0-9]+>", k):
+						keys[i] = ":" + k.split(":", 2)[1] + ":"
+				keyword = " ".join(keys)
 				keyword = full_prune(keyword)
 		if _perm < 2:
 			raise self.perm_error(_perm, 2, "for command " + _name)
-		emote = str(emoji)
+		emote = str(emoji) if emoji else None
 		if emote:
 			# This reaction indicates that the emoji was valid
-			await _message.add_reaction(emote)
-			json_repr = self.react_repr(maybe_json, preprocess, keyword, emote)
-			sqr_repr = self.react_repr(sqr_md, preprocess, keyword, emote)
+			try:
+				await _message.add_reaction(emote)
+			except Exception:
+				if mode != "remove":
+					raise
+		json_repr = self.react_repr(maybe_json, preprocess, keyword, emote)
+		sqr_repr = self.react_repr(sqr_md, preprocess, keyword, emote)
 		if mode == "remove":
-			pops = deque()
-			for i, tup in enumerate(main):
+			pops = set()
+			for i, tup in enumerate(reacts):
 				if preprocess and preprocess != self.default_preprocess and preprocess != tup[0]:
 					continue
 				if keyword and keyword != tup[1]:
 					continue
-				if emote != tup[2]:
+				if emote and emote != tup[2]:
 					continue
-				pops.append(i)
+				pops.add(i)
 			if not pops:
 				raise LookupError(f"{json_repr} is not in the auto react list.")
-			main.pops(pops)
-			reacts[_guild.id] = main
+			reacts = [react for i, react in enumerate(reacts) if i not in pops]
+			bot.set_guildbase(_guild.id, "reacts", reacts)
 			instances = sqr_repr if len(pops) == 1 else f"[{len(pops)}] instances of {sqr_repr}"
 			return italics(css_md(f"Removed {instances} from the auto react list for {sqr_md(_guild)}."))
 		if not emote:
 			raise ArgumentError("Please input emoji by ID, indicator or URL.")
 		lim = 128 << bot.is_trusted(_guild.id) * 2 + 1
-		if len(main) >= lim:
+		if len(reacts) >= lim:
 			raise OverflowError(f"React list for {_guild} has reached the maximum of {lim} items. Please remove an item to add another.")
 		if not keyword:
 			raise ValueError("Keyword string must not be empty.")
@@ -1948,11 +1956,11 @@ class React(PaginationCommand):
 		if len(keyword) > 512 or preprocess and len(preprocess) > 512:
 			raise OverflowError(f"Search substring too long ({len(keyword)} > 512).")
 		tup = (preprocess, keyword, emote)
-		if tup in main:
+		if tup in reacts:
 			raise FileExistsError(f"{json_repr} is already in the auto react list.")
-		main.append(tup)
-		main.sort()
-		reacts[_guild.id] = main
+		reacts.append(tup)
+		reacts.sort()
+		bot.set_guildbase(_guild.id, "reacts", reacts)
 		return css_md(f"Added {sqr_repr} to the auto react list for {sqr_md(_guild)}.")
 
 	def react_repr(self, func, preprocess, keyword, emote):
@@ -1962,7 +1970,7 @@ class React(PaginationCommand):
 		if keyword:
 			if s:
 				s += " 🔀 "
-			s += as_str(func(keyword))
+			s += "`" + "`:`".join(as_str(func(keyword)).split(":")) + "`"
 		if emote:
 			if s:
 				s += " ➡️ "
@@ -1980,7 +1988,7 @@ class React(PaginationCommand):
 		def key(curr, pos, page):
 			return "\n".join(self.react_repr(lambda x: x, p, k, e) for (p, k, e) in tuple(curr)[pos:pos + page])
 
-		return await self.default_display("auto reaction", uid, pos, bot.data.reacts.get(gid, ()), diridx, extra=leb128(gid), key=key)
+		return await self.default_display("auto reaction", uid, pos, bot.get_guildbase(gid, "reacts", ()), diridx, extra=leb128(gid), key=key)
 
 	async def _callback_(self, _user, index, data, **void):
 		pos, more = decode_leb128(data)
@@ -1990,19 +1998,8 @@ class React(PaginationCommand):
 
 class UpdateReacts(Database):
 	name = "reacts"
+	no_file = True
 	default_preprocess = "{CONTENT}"
-
-	def fixup(self):
-		for g, main in self.items():
-			if isinstance(main, dict):
-				temp = alist()
-				for k, v in main.items():
-					if isinstance(v, list_like):
-						for e in v:
-							temp.append([self.default_preprocess, k, e])
-					else:
-						temp.append([self.default_preprocess, k, v])
-				self[g] = temp
 
 	def preprocess(self, p, message):
 		full = message.content
@@ -2018,29 +2015,28 @@ class UpdateReacts(Database):
 		)
 
 	def remove_by_emoji(self, guild, emoji):
-		try:
-			main = self.data[guild.id]
-		except LookupError:
+		main = self.bot.get_guildbase(guild.id, "reacts")
+		if not main:
 			return
-		pops = deque()
-		for i, (p, k, e) in enumerate(main):
-			if e == emoji:
-				pops.append(i)
-		main.pops(pops)
+		emoji = str(emoji)
+		mains = []
+		for p, k, e in main:
+			if e != emoji:
+				mains.append((p, k, e))
+		self.bot.set_guildbase(guild.id, "reacts", mains)
 
 	@tracebacksuppressor(ZeroDivisionError)
 	async def _nocommand_(self, message, **void):
-		if message.guild is None:
+		guild = message.guild
+		if guild is None:
 			return
-		g_id = message.guild.id
-		data = self.data
-		if g_id not in data:
+		data = self.bot.get_guildbase(guild.id, "reacts")
+		if not data:
 			return
-		main = self.data.coerce(g_id, alist, alist())
 		reacting = mdict()
 		cp = None
 		full = clean_full = alnum = lower = None
-		for p, k, e in main:
+		for p, k, e in data:
 			x = y = ()
 			if p != cp:
 				cp = p
@@ -2069,18 +2065,17 @@ class UpdateReacts(Database):
 			else:
 				continue
 			if p != self.default_preprocess:
-				print(g_id, message.author, (p, k, e))
-		guild = message.guild
+				print(guild.id, message.author, (p, k, e))
 		# Reactions sorted by their order of appearance in the message
 		for r in sorted(reacting):
 			for react in reacting[r]:
-				react = await self.bot.resolve_emoji(react, guild=guild, allow_external=False)
 				try:
+					react = await self.bot.resolve_emoji(react, guild=guild, allow_external=False)
 					await message.add_reaction(str(react))
 				except discord.HTTPException as ex:
 					if "10014" in repr(ex):
 						self.remove_by_emoji(guild, react)
-				except LookupError:
+				except Exception:
 					self.remove_by_emoji(guild, react)
 
 
@@ -2089,35 +2084,41 @@ class Dogpile(Command):
 	min_level = 2
 	description = "Causes ⟨BOT⟩ to automatically imitate users when 3+ of the same messages are posted in a row. Grants XP and gold when triggered. Enabled by default."
 	usage = "<mode(enable|disable)>?"
-	example = ("dogpile enable",)
-	flags = "aed"
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("enable", "disable", "view"),
+			),
+			description="Action to perform",
+			default="view",
+		),
+	)
 	rate_limit = 0.5
 
-	async def __call__(self, flags, guild, name, **void):
-		update = self.data.dogpiles.update
-		bot = self.bot
-		following = bot.data.dogpiles
-		curr = following.get(guild.id, True)
-		if "d" in flags:
-			following[guild.id] = False
-			return css_md(f"Disabled dogpile imitating for {sqr_md(guild)}.")
-		if "e" in flags or "a" in flags:
-			following.pop(guild.id, None)
-			return css_md(f"Enabled dogpile imitating for {sqr_md(guild)}.")
+	async def __call__(self, bot, _guild, _prefix, _name, mode, **void):
+		match mode:
+			case "disable":
+				bot.set_guildbase(_guild.id, "dogpile", False)
+				return css_md(f"Disabled dogpile imitating for {sqr_md(_guild)}.")
+			case "enable":
+				bot.set_guildbase(_guild.id, "dogpile", True)
+				return css_md(f"Enabled dogpile imitating for {sqr_md(_guild)}.")
+		curr = bot.get_guildbase(_guild.id, "dogpile", True)
 		if curr:
-			return ini_md(f"Dogpile imitating is currently enabled in {sqr_md(guild)}.")
-		return ini_md(f'Dogpile imitating is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
+			return ini_md(f"Dogpile imitating is currently enabled in {sqr_md(_guild)}.")
+		return ini_md(f'Dogpile imitating is currently disabled in {sqr_md(_guild)}. Use "{_prefix}{_name} enable" to enable.')
 
 
 class UpdateDogpiles(Database):
 	name = "dogpiles"
+	no_file = True
 
 	async def _nocommand_(self, edit, message, **void):
 		if edit or message.guild is None or not message.content:
 			return
 		g_id = message.guild.id
-		following = self.data
-		dogpile = following.get(g_id, True)
+		dogpile = self.bot.get_guildbase(g_id, "dogpile", True)
 		if not dogpile:
 			return
 		if not message.guild.me or not self.bot.permissions_in(message.channel).send_messages:

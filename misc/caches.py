@@ -352,9 +352,8 @@ class AttachmentCache(AutoCache):
 					fn, head = await asubmit(download_file, *urls, filename=raw_fn, timeout=timeout, return_headers=True)
 					self.tertiary[url] = head
 					return open(fn, "rb")
-			ctx = streamshatter.ChunkManager(target, filename=raw_fn, log_progress=False, timeout=timeout, max_attempts=3)
 			try:
-				f, head = await asubmit(ctx.run, close=False, return_headers=True)
+				f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, timeout=timeout, max_attempts=3, return_headers=True)
 			except niquests.exceptions.HTTPError as ex:
 				code, msg = ex.response.status_code, ex.response.reason
 				raise ConnectionError(code, msg)

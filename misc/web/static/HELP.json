@@ -5338,11 +5338,22 @@
 			"description": "Causes Miza to automatically imitate users when 3+ of the same messages are posted in a row. Grants XP and gold when triggered. Enabled by default.",
 			"level": "2",
 			"rate_limit": "0.5",
-			"example": [
-				"dogpile enable"
-			],
+			"example": [],
 			"timeout": "24",
-			"usage": "<mode(enable|disable)>?"
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": [
+							"enable",
+							"disable",
+							"view"
+						]
+					},
+					"description": "Action to perform",
+					"default": "view"
+				}
+			}
 		},
 		"DadJoke": {
 			"aliases": [

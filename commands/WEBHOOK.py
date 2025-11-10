@@ -363,7 +363,7 @@ class EmojiList(PaginationCommand):
 				if not name:
 					name = emoji.get("name", emote)
 				name = name.strip(":")
-				if not regexp("[A-Za-z0-9\\-~_]{1,32}").fullmatch(name):
+				if not regexp(r"[A-Za-z0-9\-~_]{1,32}").fullmatch(name):
 					raise ArgumentError("Emoji aliases may only contain 1~32 alphanumeric characters, dashes, tildes and underscores.")
 				curr[name] = emote
 				bot.data.emojilists[_user.id] = curr
