@@ -1374,7 +1374,7 @@ class RadioCache:
 					key=lambda radio: radio["name"],
 					fuzzy=0,
 				)]
-			results = cls.filter_results(rf.result)
+			results = cls.filter_results(results)
 			return results
 		if not query:
 			facets = await cls.search()
@@ -1388,7 +1388,7 @@ class RadioCache:
 				key=lambda radio: radio["name"],
 				fuzzy=0,
 			)]
-		results = cls.filter_results(rf.result)
+		results = cls.filter_results(results)
 		return results
 
 class Radio(Pagination, Command):
