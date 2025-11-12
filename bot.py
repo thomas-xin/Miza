@@ -4127,12 +4127,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def worker_count(self, cap="image"):
 		return sum(c == cap for c, i in self.capfrom)
 
-	async def lambdassert(self, cap="image", timeout=2):
-		if cap not in self.caps:
-			raise NotImplementedError(f"Capability {cap} required.")
-		await process_image(lambdassert, "$", (), cap=cap, timeout=timeout)
-		return sum(c == cap for c, i in self.capfrom)
-
 	_cpuinfo = None
 	api_latency = inf
 	lll = inf
@@ -4206,6 +4200,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			},
 		})
 		return self.status_data
+	def eff_latency(self):
+		return min(1, max(self.api_latency / 2, 0.05))
 
 	status_sem = Semaphore(1, inf, rate_limit=1, sync=True)
 	status_data = cdict(
@@ -4549,16 +4545,22 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					))
 					interaction = hasattr(message, "int_token")
 					if interaction:
-						fut = csubmit(delayed_callback(future, 1, self.defer_interaction, message, mode="patch", ephemeral=getattr(message, "ephemeral", False), exc=False))
+						fut = csubmit(delayed_callback(future, 2, self.defer_interaction, message, mode="patch", ephemeral=getattr(message, "ephemeral", False), exc=False))
 					resp = await future
 				await self.send_event("_command_", user=user, command=f, loop=False, message=message)
 				if isinstance(resp, str):
 					resp = cdict(content=resp, embeds=[], attachments=[])
 				if isinstance(resp, cdict):
 					if interaction and not resp.get("file") and not resp.get("files"):
-						r, d = await fut
-						if not d:
-							await self.defer_interaction(message, mode="patch")
+						if not fut.done():
+							fut.cancel()
+							csubmit(self.defer_interaction(message, mode="patch"))
+							await asyncio.sleep(self.eff_latency())
+						else:
+							r, d = await fut
+							if not d:
+								csubmit(self.defer_interaction(message, mode="patch"))
+								await asyncio.sleep(self.eff_latency())
 						await interaction_patch(
 							bot=self,
 							message=message,
@@ -4569,7 +4571,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						resp.pop("buttons", None)
 						resp.pop("components", None)
 					if interaction:
-						fut.cancel()
+						if not fut.done():
+							fut.cancel()
 						csubmit(self.ignore_interaction(message))
 					await self.edit_message(
 						message,
