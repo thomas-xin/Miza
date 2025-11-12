@@ -86,6 +86,17 @@
 					"description": "Index of reminder(s) to delete",
 					"example": "3..7"
 				}
+			},
+			"macros": {
+				"Announce": {
+					"mode": "announcement"
+				},
+				"Announcement": {
+					"mode": "announcement"
+				},
+				"Announcements": {
+					"mode": "announcements"
+				}
 			}
 		},
 		"Note": {
@@ -289,6 +300,17 @@
 					"multiple": true,
 					"required": true
 				}
+			},
+			"macros": {
+				"Shorten": {
+					"minimise": true
+				},
+				"Minimise": {
+					"minimise": true
+				},
+				"Minimize": {
+					"minimise": true
+				}
 			}
 		}
 	},
@@ -430,6 +452,10 @@
 					"example": "This is a cool message",
 					"required": true
 				}
+			},
+			"macros": {
+				"Zalgo": {"mode": "zalgo"},
+				"Format": {"mode": "format"}
 			}
 		},
 		"UnFancy": {
@@ -511,6 +537,12 @@
 					"example": "Hello World! \u2764\ufe0f",
 					"autoresolve": true
 				}
+			},
+			"macros": {
+				"Invisencode": {"mode": "encode"},
+				"Invisiencode": {"mode": "encode"},
+				"Invisdecode": {"mode": "decode"},
+				"Invisidecode": {"mode": "decode"}
 			}
 		},
 		"Char2Emoji": {
@@ -597,6 +629,16 @@
 					"type": "word",
 					"description": "Target timezone to display input after conversion",
 					"example": "Europe/Stockholm"
+				}
+			},
+			"macros": {
+				"TS": {"mode": "relative"},
+				"Timestamp": {"mode": "relative"},
+				"EstimateTime": {
+					"estimate": true
+				},
+				"EstimateTimezone": {
+					"estimate": true
 				}
 			}
 		},
@@ -1220,6 +1262,11 @@
 					"description": "end position; subsequent audio skipped automatically",
 					"greedy": false
 				}
+			},
+			"macros": {
+				"PlayNow": {"mode": "now"},
+				"PlayNext": {"mode": "next"},
+				"PN": {"mode": "next"}
 			}
 		},
 		"Radio": {
@@ -1269,6 +1316,15 @@
 					"description": "Target channel to join (defaults to voice channel of closest proximity)",
 					"example": "#Voice"
 				}
+			},
+			"macros": {
+				"Leave": {"mode": "disconnect"},
+				"Disconnect": {"mode": "disconnect"},
+				"DC": {"mode": "disconnect"},
+				"Yeet": {"mode": "disconnect"},
+				"FuckOff": {"mode": "disconnect"},
+				"Listen": {"mode": "listen"},
+				"Deafen": {"mode": "deafen"}
 			}
 		},
 		"Skip": {
@@ -1302,6 +1358,44 @@
 					"description": "Skips the song(s) after the provided timestamp rather than immediately; requires trusted priviledge level for other users' songs",
 					"greedy": false
 				}
+			},
+			"macros": {
+				"VoteSkip": {"mode": "vote"},
+				"ForceSkip": {"mode": "force"},
+				"FS": {"mode": "force"},
+				"Remove": {"mode": "force"},
+				"Rem": {"mode": "force"},
+				"ClearQueue": {
+					"mode": "force",
+					"slices": [
+						[null, null]
+					]
+				},
+				"Clear": {
+					"mode": "force",
+					"slices": [
+						[null, null]
+					]
+				},
+				"Stop": {
+					"mode": "force",
+					"slices": [
+						[null, null]
+					]
+				},
+				"SkipAll": {
+					"slices": [
+						[null, null]
+					]
+				},
+				"⏹️": [
+					{
+						"mode": "force",
+						"slices": [
+							[null, null]
+						]
+					}
+				]
 			}
 		},
 		"AudioState": {
@@ -1327,6 +1421,41 @@
 					"type": "bool",
 					"description": "Specify a state (toggles by default)",
 					"example": "false"
+				}
+			},
+			"macros": {
+				"⏯️": {"mode": "pause"},
+				"⏸️": {
+					"mode": "pause",
+					"value": true
+				},
+				"Toggle": {"mode": "pause"},
+				"Pause": {
+					"mode": "pause",
+					"value": true
+				},
+				"Resume": {
+					"mode": "pause",
+					"value": false
+				},
+				"Unpause": {
+					"mode": "pause",
+					"value": false
+				},
+				"LoopQueue": {"mode": "loop"},
+				"LQ": {"mode": "loop"},
+				"RepeatAll": {"mode": "loop"},
+				"Repeat": {"mode": "repeat"},
+				"RepeatOne": {"mode": "repeat"},
+				"Shuffler": {"mode": "shuffle"},
+				"AutoShuffle": {"mode": "shuffle"},
+				"Quiet": {"mode": "quiet"},
+				"Stay": {"mode": "stay"},
+				"24/7": {"mode": "stay"},
+				"A": {},
+				"Reset": {
+					"mode": null,
+					"value": true
 				}
 			}
 		},
@@ -1356,6 +1485,63 @@
 					"example": "200",
 					"greedy": false
 				}
+			},
+			"macros": {
+				"Volume": {"mode": "volume"},
+				"Vol": {"mode": "volume"},
+				"V": {"mode": "volume"},
+				"🔉": {
+					"mode": "volume",
+					"value": 25
+				},
+				"🔊": {
+					"mode": "volume",
+					"value": 100
+				},
+				"📢": {
+					"mode": "volume",
+					"value": 400
+				},
+				"Speed": {"mode": "speed"},
+				"SP": {"mode": "speed"},
+				"⏩": {
+					"mode": "speed",
+					"value": 200
+				},
+				"Rewind": {
+					"mode": "speed",
+					"value": -100
+				},
+				"Rew": {
+					"mode": "speed",
+					"value": -100
+				},
+				"⏪": {
+					"mode": "speed",
+					"value": -100
+				},
+				"Pitch": {"mode": "pitch"},
+				"Transpose": {"mode": "pitch"},
+				"↕️": {"mode": "pitch"},
+				"Pan": {"mode": "pan"},
+				"Bassboost": {"mode": "bassboost"},
+				"BB": {"mode": "bassboost"},
+				"🥁": {"mode": "bassboost"},
+				"Reverb": {"mode": "reverb"},
+				"RV": {"mode": "reverb"},
+				"📉": {"mode": "reverb"},
+				"Compressor": {"mode": "compressor"},
+				"CO": {"mode": "compressor"},
+				"🗜": {"mode": "compressor"},
+				"Chorus": {"mode": "chorus"},
+				"CH": {"mode": "chorus"},
+				"📊": {"mode": "chorus"},
+				"Resample": {"mode": "resample"},
+				"Nightcore": {"mode": "resample"},
+				"NC": {"mode": "resample"},
+				"Bitrate": {"mode": "bitrate"},
+				"BPS": {"mode": "bitrate"},
+				"BR": {"mode": "bitrate"}
 			}
 		},
 		"Dump": {
@@ -1379,6 +1565,13 @@
 					"description": "Queue data to load",
 					"example": "https://cdn.discordapp.com/attachments/731709481863479436/1052210287303999528/dump.json"
 				}
+			},
+			"macros": {
+				"Export": {"mode": "save"},
+				"Save": {"mode": "save"},
+				"Import": {"mode": "append"},
+				"Load": {"mode": "load"},
+				"Restore": {"mode": "load"}
 			}
 		},
 		"Seek": {
@@ -1549,6 +1742,9 @@
 					"type": "string",
 					"greedy": false
 				}
+			},
+			"macros": {
+				"Midi2Org": {"format": "org"}
 			}
 		},
 		"AudioSeparator": {
@@ -1686,6 +1882,12 @@
 					"example": "mp4",
 					"default": "auto"
 				}
+			},
+			"macros": {
+				"Laplacian": {"mode": "laplacian"},
+				"Canny": {"mode": "canny"},
+				"Depth": {"mode": "depth"},
+				"DepthMap": {"mode": "depth"}
 			}
 		},
 		"Blur": {
@@ -1736,6 +1938,9 @@
 					"example": "mp4",
 					"default": "auto"
 				}
+			},
+			"macros": {
+				"Gaussian": {"mode": "gaussian"}
 			}
 		},
 		"ColourSpace": {
@@ -1858,6 +2063,16 @@
 					"example": "mp4",
 					"default": "auto"
 				}
+			},
+			"macros": {
+				"Magik": {
+					"intensity": 1,
+					"duration": 0
+				},
+				"Liquefy": {
+					"intensity": 0.125,
+					"cells": 256
+				}
 			}
 		},
 		"Gradient": {
@@ -1932,6 +2147,13 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
+				}
+			},
+			"macros": {
+				"RainbowGradient": {
+					"colour": [0, 255, 255],
+					"background": [255, 255, 255],
+					"colourspace": "hsv"
 				}
 			}
 		},
@@ -2074,6 +2296,9 @@
 					"example": "mp4",
 					"default": "auto"
 				}
+			},
+			"macros": {
+				"RainbowQR": {"mode": "rainbow"}
 			}
 		},
 		"Rainbow": {
@@ -2273,6 +2498,12 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
+				}
+			},
+			"macros": {
+				"Rotate": {
+					"duration": 0,
+					"circle": false
 				}
 			}
 		},
@@ -2541,6 +2772,13 @@
 					"example": "mp4",
 					"default": "auto"
 				}
+			},
+			"macros": {
+				"Scale2x": {"mode": "scale2x"},
+				"Jumbo": {"mode": "nearest"},
+				"GIF": {"format": "gif"},
+				"WebP": {"format": "webp"},
+				"AVIF": {"format": "avif"}
 			}
 		},
 		"Crop": {
@@ -2673,6 +2911,25 @@
 					"example": "mp4",
 					"default": "auto"
 				}
+			},
+			"macros": {
+				"Fill": {"operation": "="},
+				"HueShift": {
+					"operation": "+",
+					"channels": "h",
+					"clip": false
+				},
+				"Invert": {"operation": "^", "channels": "rgb", "value": "1"},
+				"GreyScale": {
+					"operation": "=",
+					"channels": "c",
+					"value": 0
+				},
+				"Lightness": {"operation": "+", "channels": "l"},
+				"Lighten": {"operation": "+", "channels": "l"},
+				"Luma": {"operation": "+", "channels": "y"},
+				"Brightness": {"operation": "+", "channels": "y"},
+				"Brighten": {"operation": "+", "channels": "y"}
 			}
 		},
 		"Cut2Loop": {
@@ -3012,6 +3269,10 @@
 					"description": "Controls how frequently premium quota usage is logged after commands; \"none\" disables all logging, \"auto\" will log at powers of 3 or increments of $1, and \"all\" will log all usage and associated costs",
 					"example": "all"
 				}
+			},
+			"macros": {
+				"premium": {"mode": "premium"},
+				"quota": {"mode": "premium"}
 			}
 		},
 		"Cat": {
@@ -3341,6 +3602,45 @@
 					"example": "16384",
 					"default": 3072
 				}
+			},
+			"macros": {
+				"O1": {"model": "o1-preview"},
+				"O1M": {"model": "o1-mini"},
+				"O3M": {"model": "o3-mini"},
+				"O4M": {"model": "o4-mini"},
+				"GPT5": {"model": "gpt-5"},
+				"GPT5M": {"model": "gpt-5-mini"},
+				"GPT4": {"model": "gpt-4.1"},
+				"GPT4M": {
+					"model": "gpt-4.1-mini"
+				},
+				"GPT3": {"model": "gpt-3.5"},
+				"R1": {
+					"model": "deepseek-r1"
+				},
+				"Grok": {"model": "grok-4"},
+				"Gemini": {
+					"model": "gemini-2.5-flash-t"
+				},
+				"Deepseek": {
+					"model": "deepseek-v3"
+				},
+				"Claude": {
+					"model": "claude-3.7-sonnet-t"
+				},
+				"Opus": {
+					"model": "claude-3-opus"
+				},
+				"Sonnet": {
+					"model": "claude-3.7-sonnet-t"
+				},
+				"Haiku": {
+					"model": "claude-3-haiku"
+				},
+				"Llama": {
+					"model": "llama-3-70b"
+				},
+				"Qwen": {"model": "qwen-72b"}
 			}
 		},
 		"Imagine": {
@@ -3438,6 +3738,9 @@
 					"description": "Number of output images to produce",
 					"example": "6"
 				}
+			},
+			"macros": {
+				"DALLE3": {"model": "dalle3"}
 			}
 		},
 		"Describe": {
@@ -3748,6 +4051,11 @@
 					"aliases": ["d"],
 					"default": 0
 				}
+			},
+			"macros": {
+				"Shutdown": {"mode": "shutdown"},
+				"Maintain": {"mode": "maintain"},
+				"Update": {"mode": "update"}
 			}
 		},
 		"Execute": {

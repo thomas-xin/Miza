@@ -670,6 +670,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					c["schema"] = command.schema
 				else:
 					c["usage"] = command.usage
+				if getattr(command, "macros", None):
+					c["macros"] = command.macros
 				for attr in ("flags", "server_only", "slash"):
 					with suppress(AttributeError):
 						c[attr] = command.attr
