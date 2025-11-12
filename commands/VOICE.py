@@ -1326,7 +1326,12 @@ class RadioCache:
 	cache = AutoCache(f"{CACHE_PATH}/radio_facets", shards=1, stale=86400, timeout=86400 * 30)
 	def load_countries():
 		countries = fcdict()
-		for info in RB.countries():
+		try:
+			rb_countries = RB.countries()
+		except Exception:
+			globals()["RB"] = pyradios.RadioBrowser()
+			rb_countries = RB.countries()
+		for info in rb_countries:
 			if not info.get("iso_3166_1"):
 				continue
 			code = info["iso_3166_1"].upper()
@@ -1341,8 +1346,8 @@ class RadioCache:
 		for radio in results:
 			radio["name"] = radio["name"].strip()
 			radio["countrycode"] = radio["countrycode"].upper()
-			k = radio["url"]
-			if k in unique:
+			k = no_links(radio["url"].split("#", 1)[0])
+			if k in unique and len(unique[k]["url"]) >= len(radio["url"]):
 				continue
 			unique[k] = radio
 		return list(unique.values())
