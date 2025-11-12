@@ -1857,7 +1857,7 @@ class Pay(Command):
 		return css_md(f"{sqr_md(user)} has paid {sqr_md(amount)} {currency} to {sqr_md(target)}.")
 
 
-class React(PaginationCommand):
+class React(Pagination, Command):
 	server_only = True
 	name = ["AutoReact"]
 	min_level = 0

@@ -248,7 +248,7 @@ async def search_one(bot, query):
 	return resp
 
 
-class Queue(PaginationCommand):
+class Queue(Pagination, Command):
 	server_only = True
 	name = ["▶️", "P", "Q", "Play", "PlayNow", "PlayNext", "Enqueue", "Search&Play"]
 	alias = name + ["LS"]
@@ -1391,7 +1391,7 @@ class RadioCache:
 		results = cls.filter_results(rf.result)
 		return results
 
-class Radio(PaginationCommand):
+class Radio(Pagination, Command):
 	name = ["Radios", "RadioBrowser"]
 	description = "Searches for a radio station livestream on https://api.radio-browser.info that can be played in voice."
 	schema = cdict(

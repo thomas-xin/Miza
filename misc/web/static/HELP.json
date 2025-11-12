@@ -1,14 +1,5 @@
 {
 	"MAIN": {
-		"PaginationCommand": {
-			"aliases": ["PaginationCommand"],
-			"description": "",
-			"level": "0",
-			"rate_limit": "(2, 3)",
-			"example": [],
-			"timeout": "24",
-			"usage": ""
-		},
 		"Help": {
 			"aliases": ["Help", "❓", "❔", "?", "Halp"],
 			"description": "Shows a list of usable commands, or gives a detailed description of a command.",
@@ -31,96 +22,6 @@
 					"description": "Help on a specific command",
 					"example": "download",
 					"greedy": false
-				}
-			}
-		},
-		"Reminder": {
-			"aliases": ["Reminder", "RemindMe", "Reminders", "Remind", "Announce", "Announcement", "Announcements"],
-			"description": "Sets a reminder for a certain date and time in the future.",
-			"level": "0",
-			"rate_limit": "(8, 13)",
-			"example": [],
-			"timeout": "24",
-			"schema": {
-				"mode": {
-					"type": "enum",
-					"validation": {
-						"enum": ["reminder", "announcement", "urgent"],
-						"accepts": {
-							"remind": "reminder",
-							"announce": "announcement",
-							"urgently": "urgent"
-						}
-					},
-					"description": "Reminders are sent as direct messages, announcements are sent to the origin channel, urgent reminders will continuously update a direct message until the acknowledged by a reaction",
-					"default": "reminder"
-				},
-				"message": {
-					"type": "string",
-					"description": "Message to receive. Will show up as an embed",
-					"example": "Doctor's appointment",
-					"validation": "[0, 4096]"
-				},
-				"icon": {
-					"type": "visual",
-					"description": "Thumbnail to display on corner of embed",
-					"example": "https://cdn.discordapp.com/embed/avatars/0.png"
-				},
-				"time": {
-					"type": "datetime",
-					"description": "Time input to parse",
-					"example": "35 mins and 6.25 secs before 3am next tuesday, EDT"
-				},
-				"every": {
-					"type": "timedelta",
-					"description": "Turn the reminder into a recurring one that will resend itself after a given amount of time. Note: Must be removed manually!",
-					"example": "One hundred thousand thirty seconds"
-				},
-				"edit": {
-					"type": "index",
-					"description": "Index of reminder(s) to edit",
-					"example": "3..7"
-				},
-				"delete": {
-					"type": "index",
-					"description": "Index of reminder(s) to delete",
-					"example": "3..7"
-				}
-			},
-			"macros": {
-				"Announce": {
-					"mode": "announcement"
-				},
-				"Announcement": {
-					"mode": "announcement"
-				},
-				"Announcements": {
-					"mode": "announcements"
-				}
-			}
-		},
-		"Note": {
-			"aliases": ["Note", "Notes"],
-			"description": "Takes note of a given string and allows you to view and edit a to-do list!",
-			"level": "0",
-			"rate_limit": "(6, 10)",
-			"example": [],
-			"timeout": "24",
-			"schema": {
-				"message": {
-					"type": "string",
-					"description": "Message to receive. Will show up as an embed",
-					"example": "Doctor's appointment"
-				},
-				"edit": {
-					"type": "index",
-					"description": "Index of reminder(s) to edit",
-					"example": "3..7"
-				},
-				"delete": {
-					"type": "index",
-					"description": "Index of reminder(s) to delete",
-					"example": "3..7"
 				}
 			}
 		},
@@ -312,43 +213,99 @@
 					"minimise": true
 				}
 			}
-		}
-	},
-	"STRING": {
-		"PaginationCommand": {
-			"aliases": ["PaginationCommand"],
-			"description": "",
-			"level": "0",
-			"rate_limit": "(2, 3)",
-			"example": [],
-			"timeout": "24",
-			"usage": ""
 		},
-		"Browse": {
-			"aliases": ["Browse", "🦆", "🌐", "Google", "Browser"],
-			"description": "Searches the web, and displays as text or image.",
+		"Reminder": {
+			"aliases": ["Reminder", "RemindMe", "Reminders", "Remind", "Announce", "Announcement", "Announcements"],
+			"description": "Sets a reminder for a certain date and time in the future.",
 			"level": "0",
-			"rate_limit": "(10, 16)",
+			"rate_limit": "(8, 13)",
 			"example": [],
 			"timeout": "24",
 			"schema": {
 				"mode": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "text"]
+						"enum": ["reminder", "announcement", "urgent"],
+						"accepts": {
+							"remind": "reminder",
+							"announce": "announcement",
+							"urgently": "urgent"
+						}
 					},
-					"description": "Controls how direct URLs are visited; produces an image by default",
-					"example": "text",
-					"default": "auto"
+					"description": "Reminders are sent as direct messages, announcements are sent to the origin channel, urgent reminders will continuously update a direct message until the acknowledged by a reaction",
+					"default": "reminder"
 				},
-				"query": {
+				"message": {
 					"type": "string",
-					"description": "Search query; may be a string or URL",
-					"example": "https://youtu.be/dQw4w9WgXcQ",
-					"required": true
+					"description": "Message to receive. Will show up as an embed",
+					"example": "Doctor's appointment",
+					"validation": "[0, 4096]"
+				},
+				"icon": {
+					"type": "visual",
+					"description": "Thumbnail to display on corner of embed",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png"
+				},
+				"time": {
+					"type": "datetime",
+					"description": "Time input to parse",
+					"example": "35 mins and 6.25 secs before 3am next tuesday, EDT"
+				},
+				"every": {
+					"type": "timedelta",
+					"description": "Turn the reminder into a recurring one that will resend itself after a given amount of time. Note: Must be removed manually!",
+					"example": "One hundred thousand thirty seconds"
+				},
+				"edit": {
+					"type": "index",
+					"description": "Index of reminder(s) to edit",
+					"example": "3..7"
+				},
+				"delete": {
+					"type": "index",
+					"description": "Index of reminder(s) to delete",
+					"example": "3..7"
+				}
+			},
+			"macros": {
+				"Announce": {
+					"mode": "announcement"
+				},
+				"Announcement": {
+					"mode": "announcement"
+				},
+				"Announcements": {
+					"mode": "announcements"
 				}
 			}
 		},
+		"Note": {
+			"aliases": ["Note", "Notes"],
+			"description": "Takes note of a given string and allows you to view and edit a to-do list!",
+			"level": "0",
+			"rate_limit": "(6, 10)",
+			"example": [],
+			"timeout": "24",
+			"schema": {
+				"message": {
+					"type": "string",
+					"description": "Message to receive. Will show up as an embed",
+					"example": "Doctor's appointment"
+				},
+				"edit": {
+					"type": "index",
+					"description": "Index of reminder(s) to edit",
+					"example": "3..7"
+				},
+				"delete": {
+					"type": "index",
+					"description": "Index of reminder(s) to delete",
+					"example": "3..7"
+				}
+			}
+		}
+	},
+	"STRING": {
 		"Translate": {
 			"aliases": ["Translate", "TR"],
 			"description": "Translates a string into another language.",
@@ -739,62 +696,34 @@
 			"example": ["urban ur mom"],
 			"timeout": "24",
 			"usage": "<string>"
-		}
-	},
-	"ADMIN": {
-		"PaginationCommand": {
-			"aliases": ["PaginationCommand"],
-			"description": "",
-			"level": "0",
-			"rate_limit": "(2, 3)",
-			"example": [],
-			"timeout": "24",
-			"usage": ""
 		},
-		"StarBoard": {
-			"aliases": ["StarBoard"],
-			"description": "Causes Miza to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel.",
-			"level": "2",
-			"rate_limit": "1",
+		"Browse": {
+			"aliases": ["Browse", "🦆", "🌐", "Google", "Browser"],
+			"description": "Searches the web, and displays as text or image.",
+			"level": "0",
+			"rate_limit": "(10, 16)",
 			"example": [],
 			"timeout": "24",
 			"schema": {
 				"mode": {
 					"type": "enum",
 					"validation": {
-						"enum": ["view", "add", "remove"],
-						"accepts": {"enable": "add", "disable": "remove", "create": "add", "delete": "remove"}
+						"enum": ["auto", "text"]
 					},
-					"description": "Action to perform",
-					"example": "enable"
+					"description": "Controls how direct URLs are visited; produces an image by default",
+					"example": "text",
+					"default": "auto"
 				},
-				"emoji": {
-					"type": "emoji",
-					"description": "Emoji to treat as starboard trigger.",
-					"example": "🐱"
-				},
-				"special": {
-					"type": "enum",
-					"validation": {
-						"enum": ["SPARKLES"],
-						"strict_case": true
-					},
-					"description": "Overrides emoji; special categories of reactions",
-					"example": "SPARKLES"
-				},
-				"count": {
-					"type": "integer",
-					"description": "Amount of reactions required to trigger. Counts both regular and super reactions",
-					"default": 1,
-					"example": "3"
-				},
-				"channel": {
-					"type": "channel",
-					"description": "Channel to add or remove from ignore list; will not forward messages from channels within this list",
-					"example": "#Starboard"
+				"query": {
+					"type": "string",
+					"description": "Search query; may be a string or URL",
+					"example": "https://youtu.be/dQw4w9WgXcQ",
+					"required": true
 				}
 			}
-		},
+		}
+	},
+	"ADMIN": {
 		"Perms": {
 			"aliases": ["Perms", "DefaultPerms", "ChangePerms", "Perm", "ChangePerm", "Permissions"],
 			"description": "Shows or changes a user's permission level. Server Administrators bypass this.",
@@ -1028,6 +957,50 @@
 				}
 			}
 		},
+		"StarBoard": {
+			"aliases": ["StarBoard"],
+			"description": "Causes Miza to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel.",
+			"level": "2",
+			"rate_limit": "1",
+			"example": [],
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": ["view", "add", "remove"],
+						"accepts": {"enable": "add", "disable": "remove", "create": "add", "delete": "remove"}
+					},
+					"description": "Action to perform",
+					"example": "enable"
+				},
+				"emoji": {
+					"type": "emoji",
+					"description": "Emoji to treat as starboard trigger.",
+					"example": "🐱"
+				},
+				"special": {
+					"type": "enum",
+					"validation": {
+						"enum": ["SPARKLES"],
+						"strict_case": true
+					},
+					"description": "Overrides emoji; special categories of reactions",
+					"example": "SPARKLES"
+				},
+				"count": {
+					"type": "integer",
+					"description": "Amount of reactions required to trigger. Counts both regular and super reactions",
+					"default": 1,
+					"example": "3"
+				},
+				"channel": {
+					"type": "channel",
+					"description": "Channel to add or remove from ignore list; will not forward messages from channels within this list",
+					"example": "#Starboard"
+				}
+			}
+		},
 		"Crosspost": {
 			"aliases": ["Crosspost", "Repost", "Subscribe"],
 			"description": "Causes Miza to automatically crosspost all messages from the target channel, into the current channel.",
@@ -1214,15 +1187,6 @@
 		}
 	},
 	"VOICE": {
-		"PaginationCommand": {
-			"aliases": ["PaginationCommand"],
-			"description": "",
-			"level": "0",
-			"rate_limit": "(2, 3)",
-			"example": [],
-			"timeout": "24",
-			"usage": ""
-		},
 		"Queue": {
 			"aliases": ["Queue", "▶️", "P", "Q", "Play", "PlayNow", "PlayNext", "Enqueue", "Search&Play", "LS"],
 			"description": "Shows the music queue, or plays a song in voice.",
@@ -1267,30 +1231,6 @@
 				"PlayNow": {"mode": "now"},
 				"PlayNext": {"mode": "next"},
 				"PN": {"mode": "next"}
-			}
-		},
-		"Radio": {
-			"aliases": ["Radio", "Radios", "RadioBrowser"],
-			"description": "Searches for a radio station livestream on https://api.radio-browser.info that can be played in voice.",
-			"level": "0",
-			"rate_limit": "(6, 8)",
-			"example": [],
-			"timeout": "24",
-			"schema": {
-				"country": {
-					"type": "enum",
-					"validation": {
-						"enum": ["AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ", "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BM", "BN", "BO", "BQ", "BR", "BS", "BT", "BW", "BY", "BZ", "CA", "CC", "CD", "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN", "CO", "CR", "CU", "CV", "CW", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM", "DO", "DZ", "EC", "EE", "EG", "ER", "ES", "ET", "FI", "FJ", "FK", "FM", "FO", "FR", "GA", "GB", "GD", "GE", "GF", "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ", "GR", "GT", "GU", "GW", "GY", "HK", "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT", "JM", "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC", "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MG", "MH", "MK", "ML", "MM", "MN", "MO", "MQ", "MR", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA", "NC", "NE", "NG", "NI", "NL", "NO", "NP", "NR", "NU", "NZ", "OM", "PA", "PE", "PF", "PG", "PH", "PK", "PL", "PM", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS", "RU", "RW", "SA", "SB", "SC", "SD", "SE", "SG", "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS", "ST", "SV", "SY", "SZ", "TC", "TD", "TF", "TG", "TH", "TJ", "TL", "TM", "TN", "TO", "TR", "TT", "TV", "TW", "TZ", "UA", "UG", "UM", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI", "VN", "VU", "WF", "XK", "YE", "YT", "ZA", "ZM", "ZW"],
-						"accepts": {"andorra": "AD", "ad": "AD", "the united arab emirates": "AE", "ae": "AE", "afghanistan": "AF", "af": "AF", "antigua and barbuda": "AG", "ag": "AG", "anguilla": "AI", "ai": "AI", "albania": "AL", "al": "AL", "armenia": "AM", "am": "AM", "angola": "AO", "ao": "AO", "antarctica": "AQ", "aq": "AQ", "argentina": "AR", "ar": "AR", "american samoa": "AS", "as": "AS", "austria": "AT", "at": "AT", "australia": "AU", "au": "AU", "aruba": "AW", "aw": "AW", "aland islands": "AX", "ax": "AX", "azerbaijan": "AZ", "az": "AZ", "bosnia and herzegovina": "BA", "ba": "BA", "barbados": "BB", "bb": "BB", "bangladesh": "BD", "bd": "BD", "belgium": "BE", "be": "BE", "burkina faso": "BF", "bf": "BF", "bulgaria": "BG", "bg": "BG", "bahrain": "BH", "bh": "BH", "burundi": "BI", "bi": "BI", "benin": "BJ", "bj": "BJ", "bermuda": "BM", "bm": "BM", "brunei darussalam": "BN", "bn": "BN", "bolivia": "BO", "bo": "BO", "bonaire": "BQ", "bq": "BQ", "brazil": "BR", "br": "BR", "the bahamas": "BS", "bs": "BS", "bhutan": "BT", "bt": "BT", "botswana": "BW", "bw": "BW", "belarus": "BY", "by": "BY", "belize": "BZ", "bz": "BZ", "canada": "CA", "ca": "CA", "the cocos keeling islands": "CC", "cc": "CC", "the democratic republic of the congo": "CD", "cd": "CD", "the central african republic": "CF", "cf": "CF", "the congo": "CG", "cg": "CG", "switzerland": "CH", "ch": "CH", "coted ivoire": "CI", "ci": "CI", "the cook islands": "CK", "ck": "CK", "chile": "CL", "cl": "CL", "cameroon": "CM", "cm": "CM", "china": "CN", "cn": "CN", "colombia": "CO", "co": "CO", "costa rica": "CR", "cr": "CR", "cuba": "CU", "cu": "CU", "cabo verde": "CV", "cv": "CV", "curacao": "CW", "cw": "CW", "christmas island": "CX", "cx": "CX", "cyprus": "CY", "cy": "CY", "czechia": "CZ", "cz": "CZ", "germany": "DE", "de": "DE", "djibouti": "DJ", "dj": "DJ", "denmark": "DK", "dk": "DK", "dominica": "DM", "dm": "DM", "the dominican republic": "DO", "do": "DO", "algeria": "DZ", "dz": "DZ", "ecuador": "EC", "ec": "EC", "estonia": "EE", "ee": "EE", "egypt": "EG", "eg": "EG", "eritrea": "ER", "er": "ER", "spain": "ES", "es": "ES", "ethiopia": "ET", "et": "ET", "finland": "FI", "fi": "FI", "fiji": "FJ", "fj": "FJ", "the falkland islands malvinas": "FK", "fk": "FK", "federated states of micronesia": "FM", "fm": "FM", "the faroe islands": "FO", "fo": "FO", "france": "FR", "fr": "FR", "gabon": "GA", "ga": "GA", "the united kingdom of great britain and northern ireland": "GB", "gb": "GB", "grenada": "GD", "gd": "GD", "georgia": "GE", "ge": "GE", "french guiana": "GF", "gf": "GF", "guernsey": "GG", "gg": "GG", "ghana": "GH", "gh": "GH", "gibraltar": "GI", "gi": "GI", "greenland": "GL", "gl": "GL", "the gambia": "GM", "gm": "GM", "guinea": "GN", "gn": "GN", "guadeloupe": "GP", "gp": "GP", "equatorial guinea": "GQ", "gq": "GQ", "greece": "GR", "gr": "GR", "guatemala": "GT", "gt": "GT", "guam": "GU", "gu": "GU", "guinea bissau": "GW", "gw": "GW", "guyana": "GY", "gy": "GY", "hong kong": "HK", "hk": "HK", "honduras": "HN", "hn": "HN", "croatia": "HR", "hr": "HR", "haiti": "HT", "ht": "HT", "hungary": "HU", "hu": "HU", "indonesia": "ID", "id": "ID", "ireland": "IE", "ie": "IE", "israel": "IL", "il": "IL", "isle of man": "IM", "im": "IM", "india": "IN", "in": "IN", "british indian ocean territory": "IO", "io": "IO", "iraq": "IQ", "iq": "IQ", "islamic republic of iran": "IR", "ir": "IR", "iceland": "IS", "is": "IS", "italy": "IT", "it": "IT", "jamaica": "JM", "jm": "JM", "jordan": "JO", "jo": "JO", "japan": "JP", "jp": "JP", "kenya": "KE", "ke": "KE", "kyrgyzstan": "KG", "kg": "KG", "cambodia": "KH", "kh": "KH", "kiribati": "KI", "ki": "KI", "the comoros": "KM", "km": "KM", "saint kitts and nevis": "KN", "kn": "KN", "the democratic peoples republic of korea": "KP", "kp": "KP", "the republic of korea": "KR", "kr": "KR", "kuwait": "KW", "kw": "KW", "the cayman islands": "KY", "ky": "KY", "kazakhstan": "KZ", "kz": "KZ", "the lao peoples democratic republic": "LA", "la": "LA", "lebanon": "LB", "lb": "LB", "saint lucia": "LC", "lc": "LC", "liechtenstein": "LI", "li": "LI", "sri lanka": "LK", "lk": "LK", "liberia": "LR", "lr": "LR", "lesotho": "LS", "ls": "LS", "lithuania": "LT", "lt": "LT", "luxembourg": "LU", "lu": "LU", "latvia": "LV", "lv": "LV", "libya": "LY", "ly": "LY", "morocco": "MA", "ma": "MA", "monaco": "MC", "mc": "MC", "the republic of moldova": "MD", "md": "MD", "montenegro": "ME", "me": "ME", "madagascar": "MG", "mg": "MG", "the marshall islands": "MH", "mh": "MH", "republic of north macedonia": "MK", "mk": "MK", "mali": "ML", "ml": "ML", "myanmar": "MM", "mm": "MM", "mongolia": "MN", "mn": "MN", "macao": "MO", "mo": "MO", "martinique": "MQ", "mq": "MQ", "mauritania": "MR", "mr": "MR", "montserrat": "MS", "ms": "MS", "malta": "MT", "mt": "MT", "mauritius": "MU", "mu": "MU", "maldives": "MV", "mv": "MV", "malawi": "MW", "mw": "MW", "mexico": "MX", "mx": "MX", "malaysia": "MY", "my": "MY", "mozambique": "MZ", "mz": "MZ", "namibia": "NA", "na": "NA", "new caledonia": "NC", "nc": "NC", "the niger": "NE", "ne": "NE", "nigeria": "NG", "ng": "NG", "nicaragua": "NI", "ni": "NI", "the netherlands": "NL", "nl": "NL", "norway": "NO", "no": "NO", "nepal": "NP", "np": "NP", "nauru": "NR", "nr": "NR", "niue": "NU", "nu": "NU", "new zealand": "NZ", "nz": "NZ", "oman": "OM", "om": "OM", "panama": "PA", "pa": "PA", "peru": "PE", "pe": "PE", "french polynesia": "PF", "pf": "PF", "papua new guinea": "PG", "pg": "PG", "the philippines": "PH", "ph": "PH", "pakistan": "PK", "pk": "PK", "poland": "PL", "pl": "PL", "saint pierre and miquelon": "PM", "pm": "PM", "puerto rico": "PR", "pr": "PR", "state of palestine": "PS", "ps": "PS", "portugal": "PT", "pt": "PT", "palau": "PW", "pw": "PW", "paraguay": "PY", "py": "PY", "qatar": "QA", "qa": "QA", "reunion": "RE", "re": "RE", "romania": "RO", "ro": "RO", "serbia": "RS", "rs": "RS", "the russian federation": "RU", "ru": "RU", "rwanda": "RW", "rw": "RW", "saudi arabia": "SA", "sa": "SA", "solomon islands": "SB", "sb": "SB", "seychelles": "SC", "sc": "SC", "the sudan": "SD", "sd": "SD", "sweden": "SE", "se": "SE", "singapore": "SG", "sg": "SG", "ascension and tristan da cunha saint helena": "SH", "sh": "SH", "slovenia": "SI", "si": "SI", "svalbard and jan mayen": "SJ", "sj": "SJ", "slovakia": "SK", "sk": "SK", "sierra leone": "SL", "sl": "SL", "san marino": "SM", "sm": "SM", "senegal": "SN", "sn": "SN", "somalia": "SO", "so": "SO", "suriname": "SR", "sr": "SR", "south sudan": "SS", "ss": "SS", "sao tome and principe": "ST", "st": "ST", "el salvador": "SV", "sv": "SV", "syrian arab republic": "SY", "sy": "SY", "eswatini": "SZ", "sz": "SZ", "the turks and caicos islands": "TC", "tc": "TC", "chad": "TD", "td": "TD", "the french southern territories": "TF", "tf": "TF", "togo": "TG", "tg": "TG", "thailand": "TH", "th": "TH", "tajikistan": "TJ", "tj": "TJ", "timor leste": "TL", "tl": "TL", "turkmenistan": "TM", "tm": "TM", "tunisia": "TN", "tn": "TN", "tonga": "TO", "to": "TO", "turkiye": "TR", "tr": "TR", "trinidad and tobago": "TT", "tt": "TT", "tuvalu": "TV", "tv": "TV", "taiwan, republic of china": "TW", "tw": "TW", "united republic of tanzania": "TZ", "tz": "TZ", "ukraine": "UA", "ua": "UA", "uganda": "UG", "ug": "UG", "the united states minor outlying islands": "UM", "um": "UM", "the united states of america": "US", "us": "US", "uruguay": "UY", "uy": "UY", "uzbekistan": "UZ", "uz": "UZ", "the holy see": "VA", "va": "VA", "saint vincent and the grenadines": "VC", "vc": "VC", "bolivarian republic of venezuela": "VE", "ve": "VE", "british virgin islands": "VG", "vg": "VG", "us virgin islands": "VI", "vi": "VI", "vietnam": "VN", "vn": "VN", "vanuatu": "VU", "vu": "VU", "wallis and futuna": "WF", "wf": "WF", "kosovo": "XK", "xk": "XK", "yemen": "YE", "ye": "YE", "mayotte": "YT", "yt": "YT", "south africa": "ZA", "za": "ZA", "zambia": "ZM", "zm": "ZM", "zimbabwe": "ZW", "zw": "ZW"}
-					},
-					"description": "Radio station by country"
-				},
-				"query": {
-					"type": "string",
-					"description": "Radio station by name",
-					"example": "BBC Radio",
-					"greedy": false
-				}
 			}
 		},
 		"Connect": {
@@ -1658,6 +1598,30 @@
 				}
 			}
 		},
+		"Radio": {
+			"aliases": ["Radio", "Radios", "RadioBrowser"],
+			"description": "Searches for a radio station livestream on https://api.radio-browser.info that can be played in voice.",
+			"level": "0",
+			"rate_limit": "(6, 8)",
+			"example": [],
+			"timeout": "24",
+			"schema": {
+				"country": {
+					"type": "enum",
+					"validation": {
+						"enum": ["AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ", "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BM", "BN", "BO", "BQ", "BR", "BS", "BT", "BW", "BY", "BZ", "CA", "CC", "CD", "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN", "CO", "CR", "CU", "CV", "CW", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM", "DO", "DZ", "EC", "EE", "EG", "ER", "ES", "ET", "FI", "FJ", "FK", "FM", "FO", "FR", "GA", "GB", "GD", "GE", "GF", "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ", "GR", "GT", "GU", "GW", "GY", "HK", "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT", "JM", "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC", "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MG", "MH", "MK", "ML", "MM", "MN", "MO", "MQ", "MR", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA", "NC", "NE", "NG", "NI", "NL", "NO", "NP", "NR", "NU", "NZ", "OM", "PA", "PE", "PF", "PG", "PH", "PK", "PL", "PM", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS", "RU", "RW", "SA", "SB", "SC", "SD", "SE", "SG", "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS", "ST", "SV", "SY", "SZ", "TC", "TD", "TF", "TG", "TH", "TJ", "TL", "TM", "TN", "TO", "TR", "TT", "TV", "TW", "TZ", "UA", "UG", "UM", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI", "VN", "VU", "WF", "XK", "YE", "YT", "ZA", "ZM", "ZW"],
+						"accepts": {"andorra": "AD", "ad": "AD", "the united arab emirates": "AE", "ae": "AE", "afghanistan": "AF", "af": "AF", "antigua and barbuda": "AG", "ag": "AG", "anguilla": "AI", "ai": "AI", "albania": "AL", "al": "AL", "armenia": "AM", "am": "AM", "angola": "AO", "ao": "AO", "antarctica": "AQ", "aq": "AQ", "argentina": "AR", "ar": "AR", "american samoa": "AS", "as": "AS", "austria": "AT", "at": "AT", "australia": "AU", "au": "AU", "aruba": "AW", "aw": "AW", "aland islands": "AX", "ax": "AX", "azerbaijan": "AZ", "az": "AZ", "bosnia and herzegovina": "BA", "ba": "BA", "barbados": "BB", "bb": "BB", "bangladesh": "BD", "bd": "BD", "belgium": "BE", "be": "BE", "burkina faso": "BF", "bf": "BF", "bulgaria": "BG", "bg": "BG", "bahrain": "BH", "bh": "BH", "burundi": "BI", "bi": "BI", "benin": "BJ", "bj": "BJ", "bermuda": "BM", "bm": "BM", "brunei darussalam": "BN", "bn": "BN", "bolivia": "BO", "bo": "BO", "bonaire": "BQ", "bq": "BQ", "brazil": "BR", "br": "BR", "the bahamas": "BS", "bs": "BS", "bhutan": "BT", "bt": "BT", "botswana": "BW", "bw": "BW", "belarus": "BY", "by": "BY", "belize": "BZ", "bz": "BZ", "canada": "CA", "ca": "CA", "the cocos keeling islands": "CC", "cc": "CC", "the democratic republic of the congo": "CD", "cd": "CD", "the central african republic": "CF", "cf": "CF", "the congo": "CG", "cg": "CG", "switzerland": "CH", "ch": "CH", "coted ivoire": "CI", "ci": "CI", "the cook islands": "CK", "ck": "CK", "chile": "CL", "cl": "CL", "cameroon": "CM", "cm": "CM", "china": "CN", "cn": "CN", "colombia": "CO", "co": "CO", "costa rica": "CR", "cr": "CR", "cuba": "CU", "cu": "CU", "cabo verde": "CV", "cv": "CV", "curacao": "CW", "cw": "CW", "christmas island": "CX", "cx": "CX", "cyprus": "CY", "cy": "CY", "czechia": "CZ", "cz": "CZ", "germany": "DE", "de": "DE", "djibouti": "DJ", "dj": "DJ", "denmark": "DK", "dk": "DK", "dominica": "DM", "dm": "DM", "the dominican republic": "DO", "do": "DO", "algeria": "DZ", "dz": "DZ", "ecuador": "EC", "ec": "EC", "estonia": "EE", "ee": "EE", "egypt": "EG", "eg": "EG", "eritrea": "ER", "er": "ER", "spain": "ES", "es": "ES", "ethiopia": "ET", "et": "ET", "finland": "FI", "fi": "FI", "fiji": "FJ", "fj": "FJ", "the falkland islands malvinas": "FK", "fk": "FK", "federated states of micronesia": "FM", "fm": "FM", "the faroe islands": "FO", "fo": "FO", "france": "FR", "fr": "FR", "gabon": "GA", "ga": "GA", "the united kingdom of great britain and northern ireland": "GB", "gb": "GB", "grenada": "GD", "gd": "GD", "georgia": "GE", "ge": "GE", "french guiana": "GF", "gf": "GF", "guernsey": "GG", "gg": "GG", "ghana": "GH", "gh": "GH", "gibraltar": "GI", "gi": "GI", "greenland": "GL", "gl": "GL", "the gambia": "GM", "gm": "GM", "guinea": "GN", "gn": "GN", "guadeloupe": "GP", "gp": "GP", "equatorial guinea": "GQ", "gq": "GQ", "greece": "GR", "gr": "GR", "guatemala": "GT", "gt": "GT", "guam": "GU", "gu": "GU", "guinea bissau": "GW", "gw": "GW", "guyana": "GY", "gy": "GY", "hong kong": "HK", "hk": "HK", "honduras": "HN", "hn": "HN", "croatia": "HR", "hr": "HR", "haiti": "HT", "ht": "HT", "hungary": "HU", "hu": "HU", "indonesia": "ID", "id": "ID", "ireland": "IE", "ie": "IE", "israel": "IL", "il": "IL", "isle of man": "IM", "im": "IM", "india": "IN", "in": "IN", "british indian ocean territory": "IO", "io": "IO", "iraq": "IQ", "iq": "IQ", "islamic republic of iran": "IR", "ir": "IR", "iceland": "IS", "is": "IS", "italy": "IT", "it": "IT", "jamaica": "JM", "jm": "JM", "jordan": "JO", "jo": "JO", "japan": "JP", "jp": "JP", "kenya": "KE", "ke": "KE", "kyrgyzstan": "KG", "kg": "KG", "cambodia": "KH", "kh": "KH", "kiribati": "KI", "ki": "KI", "the comoros": "KM", "km": "KM", "saint kitts and nevis": "KN", "kn": "KN", "the democratic peoples republic of korea": "KP", "kp": "KP", "the republic of korea": "KR", "kr": "KR", "kuwait": "KW", "kw": "KW", "the cayman islands": "KY", "ky": "KY", "kazakhstan": "KZ", "kz": "KZ", "the lao peoples democratic republic": "LA", "la": "LA", "lebanon": "LB", "lb": "LB", "saint lucia": "LC", "lc": "LC", "liechtenstein": "LI", "li": "LI", "sri lanka": "LK", "lk": "LK", "liberia": "LR", "lr": "LR", "lesotho": "LS", "ls": "LS", "lithuania": "LT", "lt": "LT", "luxembourg": "LU", "lu": "LU", "latvia": "LV", "lv": "LV", "libya": "LY", "ly": "LY", "morocco": "MA", "ma": "MA", "monaco": "MC", "mc": "MC", "the republic of moldova": "MD", "md": "MD", "montenegro": "ME", "me": "ME", "madagascar": "MG", "mg": "MG", "the marshall islands": "MH", "mh": "MH", "republic of north macedonia": "MK", "mk": "MK", "mali": "ML", "ml": "ML", "myanmar": "MM", "mm": "MM", "mongolia": "MN", "mn": "MN", "macao": "MO", "mo": "MO", "martinique": "MQ", "mq": "MQ", "mauritania": "MR", "mr": "MR", "montserrat": "MS", "ms": "MS", "malta": "MT", "mt": "MT", "mauritius": "MU", "mu": "MU", "maldives": "MV", "mv": "MV", "malawi": "MW", "mw": "MW", "mexico": "MX", "mx": "MX", "malaysia": "MY", "my": "MY", "mozambique": "MZ", "mz": "MZ", "namibia": "NA", "na": "NA", "new caledonia": "NC", "nc": "NC", "the niger": "NE", "ne": "NE", "nigeria": "NG", "ng": "NG", "nicaragua": "NI", "ni": "NI", "the netherlands": "NL", "nl": "NL", "norway": "NO", "no": "NO", "nepal": "NP", "np": "NP", "nauru": "NR", "nr": "NR", "niue": "NU", "nu": "NU", "new zealand": "NZ", "nz": "NZ", "oman": "OM", "om": "OM", "panama": "PA", "pa": "PA", "peru": "PE", "pe": "PE", "french polynesia": "PF", "pf": "PF", "papua new guinea": "PG", "pg": "PG", "the philippines": "PH", "ph": "PH", "pakistan": "PK", "pk": "PK", "poland": "PL", "pl": "PL", "saint pierre and miquelon": "PM", "pm": "PM", "puerto rico": "PR", "pr": "PR", "state of palestine": "PS", "ps": "PS", "portugal": "PT", "pt": "PT", "palau": "PW", "pw": "PW", "paraguay": "PY", "py": "PY", "qatar": "QA", "qa": "QA", "reunion": "RE", "re": "RE", "romania": "RO", "ro": "RO", "serbia": "RS", "rs": "RS", "the russian federation": "RU", "ru": "RU", "rwanda": "RW", "rw": "RW", "saudi arabia": "SA", "sa": "SA", "solomon islands": "SB", "sb": "SB", "seychelles": "SC", "sc": "SC", "the sudan": "SD", "sd": "SD", "sweden": "SE", "se": "SE", "singapore": "SG", "sg": "SG", "ascension and tristan da cunha saint helena": "SH", "sh": "SH", "slovenia": "SI", "si": "SI", "svalbard and jan mayen": "SJ", "sj": "SJ", "slovakia": "SK", "sk": "SK", "sierra leone": "SL", "sl": "SL", "san marino": "SM", "sm": "SM", "senegal": "SN", "sn": "SN", "somalia": "SO", "so": "SO", "suriname": "SR", "sr": "SR", "south sudan": "SS", "ss": "SS", "sao tome and principe": "ST", "st": "ST", "el salvador": "SV", "sv": "SV", "syrian arab republic": "SY", "sy": "SY", "eswatini": "SZ", "sz": "SZ", "the turks and caicos islands": "TC", "tc": "TC", "chad": "TD", "td": "TD", "the french southern territories": "TF", "tf": "TF", "togo": "TG", "tg": "TG", "thailand": "TH", "th": "TH", "tajikistan": "TJ", "tj": "TJ", "timor leste": "TL", "tl": "TL", "turkmenistan": "TM", "tm": "TM", "tunisia": "TN", "tn": "TN", "tonga": "TO", "to": "TO", "turkiye": "TR", "tr": "TR", "trinidad and tobago": "TT", "tt": "TT", "tuvalu": "TV", "tv": "TV", "taiwan, republic of china": "TW", "tw": "TW", "united republic of tanzania": "TZ", "tz": "TZ", "ukraine": "UA", "ua": "UA", "uganda": "UG", "ug": "UG", "the united states minor outlying islands": "UM", "um": "UM", "the united states of america": "US", "us": "US", "uruguay": "UY", "uy": "UY", "uzbekistan": "UZ", "uz": "UZ", "the holy see": "VA", "va": "VA", "saint vincent and the grenadines": "VC", "vc": "VC", "bolivarian republic of venezuela": "VE", "ve": "VE", "british virgin islands": "VG", "vg": "VG", "us virgin islands": "VI", "vi": "VI", "vietnam": "VN", "vn": "VN", "vanuatu": "VU", "vu": "VU", "wallis and futuna": "WF", "wf": "WF", "kosovo": "XK", "xk": "XK", "yemen": "YE", "ye": "YE", "mayotte": "YT", "yt": "YT", "south africa": "ZA", "za": "ZA", "zambia": "ZM", "zm": "ZM", "zimbabwe": "ZW", "zw": "ZW"}
+					},
+					"description": "Radio station by country"
+				},
+				"query": {
+					"type": "string",
+					"description": "Radio station by name",
+					"example": "BBC Radio",
+					"greedy": false
+				}
+			}
+		},
 		"Player": {
 			"aliases": ["Player", "NP", "NowPlaying", "Playing"],
 			"description": "Creates an auto-updating virtual audio player for the current server.",
@@ -1775,15 +1739,6 @@
 		}
 	},
 	"IMAGE": {
-		"PaginationCommand": {
-			"aliases": ["PaginationCommand"],
-			"description": "",
-			"level": "0",
-			"rate_limit": "(2, 3)",
-			"example": [],
-			"timeout": "24",
-			"usage": ""
-		},
 		"ColourDeficiency": {
 			"aliases": ["ColourDeficiency", "ColorBlind", "ColourBlind", "ColorBlindness", "ColourBlindness", "ColorDeficiency", "Protanopia", "Protanomaly", "Deuteranopia", "Deuteranomaly", "Tritanopia", "Tritanomaly", "Achromatopsia", "Achromatonomaly"],
 			"description": "Applies a colourblindness filter to the target image.",
@@ -3062,51 +3017,6 @@
 		}
 	},
 	"FUN": {
-		"PaginationCommand": {
-			"aliases": ["PaginationCommand"],
-			"description": "",
-			"level": "0",
-			"rate_limit": "(2, 3)",
-			"example": [],
-			"timeout": "24",
-			"usage": ""
-		},
-		"React": {
-			"aliases": ["React", "AutoReact"],
-			"description": "Causes Miza to automatically assign a reaction to messages containing the trigger. Triggered by a keyword in messages, only applicable to non-command messages.",
-			"level": "0",
-			"rate_limit": "(4, 6)",
-			"example": [],
-			"timeout": "24",
-			"schema": {
-				"mode": {
-					"type": "enum",
-					"validation": {
-						"enum": ["view", "add", "remove"],
-						"accepts": {"enable": "add", "disable": "remove", "create": "add", "delete": "remove"}
-					},
-					"description": "Action to perform",
-					"example": "enable"
-				},
-				"keyword": {
-					"type": "word",
-					"description": "Keyword(s) to search. Uses words if only word characters, any substring if non-word characters are included, or regex if trigger begins and ends with a slash (/)",
-					"example": "cat",
-					"aliases": ["t", "trigger"]
-				},
-				"emoji": {
-					"type": "emoji",
-					"description": "Emoji to add as reaction. Use `-d --emoji` to remove by emoji rather than keyword",
-					"example": "🐱"
-				},
-				"preprocess": {
-					"type": "word",
-					"description": "Preprocess the message, allowing customisation of rules based on USERNAME, NICKNAME, CONTENT and ID; for example, to replicate the conditions for sparkle react, use `--preprocess \"{ID}\"` and `--keyword \"/0{3}$/\"`",
-					"example": "{NICKNAME} {ID}",
-					"default": "{CONTENT}"
-				}
-			}
-		},
 		"Text2048": {
 			"aliases": ["Text2048", "2048", "🎮"],
 			"description": "Plays a game of 2048 using buttons. Gained points are rewarded as gold.",
@@ -3178,6 +3088,42 @@
 			"example": ["pay @Miza 100"],
 			"timeout": "24",
 			"usage": "<0:user> <1:amount[1]>? <-1:diamonds(💎)>?"
+		},
+		"React": {
+			"aliases": ["React", "AutoReact"],
+			"description": "Causes Miza to automatically assign a reaction to messages containing the trigger. Triggered by a keyword in messages, only applicable to non-command messages.",
+			"level": "0",
+			"rate_limit": "(4, 6)",
+			"example": [],
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": ["view", "add", "remove"],
+						"accepts": {"enable": "add", "disable": "remove", "create": "add", "delete": "remove"}
+					},
+					"description": "Action to perform",
+					"example": "enable"
+				},
+				"keyword": {
+					"type": "word",
+					"description": "Keyword(s) to search. Uses words if only word characters, any substring if non-word characters are included, or regex if trigger begins and ends with a slash (/)",
+					"example": "cat",
+					"aliases": ["t", "trigger"]
+				},
+				"emoji": {
+					"type": "emoji",
+					"description": "Emoji to add as reaction. Use `-d --emoji` to remove by emoji rather than keyword",
+					"example": "🐱"
+				},
+				"preprocess": {
+					"type": "word",
+					"description": "Preprocess the message, allowing customisation of rules based on USERNAME, NICKNAME, CONTENT and ID; for example, to replicate the conditions for sparkle react, use `--preprocess \"{ID}\"` and `--keyword \"/0{3}$/\"`",
+					"example": "{NICKNAME} {ID}",
+					"default": "{CONTENT}"
+				}
+			}
 		},
 		"Dogpile": {
 			"aliases": ["Dogpile"],
@@ -3452,15 +3398,6 @@
 		}
 	},
 	"AI": {
-		"PaginationCommand": {
-			"aliases": ["PaginationCommand"],
-			"description": "",
-			"level": "0",
-			"rate_limit": "(2, 3)",
-			"example": [],
-			"timeout": "24",
-			"usage": ""
-		},
 		"Ask": {
 			"aliases": ["Ask"],
 			"description": "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. The chatbot will automatically choose one of multiple language models to conjure a response based on premium level. Less censorship is imposed when invoked within NSFW channels.",
@@ -3796,15 +3733,6 @@
 		}
 	},
 	"NSFW": {
-		"PaginationCommand": {
-			"aliases": ["PaginationCommand"],
-			"description": "",
-			"level": "0",
-			"rate_limit": "(2, 3)",
-			"example": [],
-			"timeout": "24",
-			"usage": ""
-		},
 		"Neko": {
 			"aliases": ["Neko", "Nya"],
 			"description": "Pulls a random image from nekos.life and embeds it.",
@@ -3844,15 +3772,6 @@
 		}
 	},
 	"MISC": {
-		"PaginationCommand": {
-			"aliases": ["PaginationCommand"],
-			"description": "",
-			"level": "0",
-			"rate_limit": "(2, 3)",
-			"example": [],
-			"timeout": "24",
-			"usage": ""
-		},
 		"CS_mem2flag": {
 			"aliases": ["CS_mem2flag", "mem2flag", "m2f", "CS_m2f"],
 			"description": "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value.",
@@ -4006,15 +3925,6 @@
 		}
 	},
 	"OWNER": {
-		"PaginationCommand": {
-			"aliases": ["PaginationCommand"],
-			"description": "",
-			"level": "0",
-			"rate_limit": "(2, 3)",
-			"example": [],
-			"timeout": "24",
-			"usage": ""
-		},
 		"Reload": {
 			"aliases": ["Reload"],
 			"description": "Reloads a specified module.",

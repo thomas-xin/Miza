@@ -4506,13 +4506,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if message.embeds:
 				content = str(message.embeds[0].description or message.embeds[0].footer.text)
 		try:
-			name, u_id, data = PaginationCommand.decode(content)
+			name, u_id, data = Pagination.decode(content)
 		except ValueError:
 			return
 		# Force a rate limit on the reaction processing for the message
 		self.react_sem[message.id] = max(utc(), self.react_sem.get(message.id, 0) + 1)
 		for f in self.commands[name]:
-			if not isinstance(f, PaginationCommand):
+			if not isinstance(f, Pagination):
 				continue
 			if not isnan(u_perm):
 				match f.react_perms(u_perm):

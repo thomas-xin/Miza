@@ -1564,7 +1564,7 @@ class Urban(Command):
 		self.bot.send_as_embeds(channel, title=title, fields=fields, author=get_author(user), reference=message)
 
 
-class Browse(PaginationCommand):
+class Browse(Pagination, Command):
 	name = ["🦆", "🌐", "Google", "Browser"]
 	description = "Searches the web, and displays as text or image."
 	schema = cdict(

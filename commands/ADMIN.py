@@ -1172,7 +1172,7 @@ class MessageLog(Command):
 		return ini_md(f'Message event logging is currently disabled in {sqr_md(_guild)}. Use "{bot.get_prefix(_guild)}{_name} enable" to enable.')
 
 
-class StarBoard(PaginationCommand):
+class StarBoard(Pagination, Command):
 	server_only = True
 	min_level = 2
 	description = "Causes ⟨BOT⟩ to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel."

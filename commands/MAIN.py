@@ -48,7 +48,7 @@ help_descriptions = fcdict((
 	("misc", "Miscellaneous, mostly not relevant to Discord and restricted to trusted servers"),
 ))
 
-class Help(PaginationCommand):
+class Help(Pagination, Command):
 	name = ["❓", "❔", "?", "Halp"]
 	description = "Shows a list of usable commands, or gives a detailed description of a command."
 	cats = [c for c in sorted(standard_commands)]
@@ -1101,7 +1101,7 @@ class Preserve(Command):
 		return "\n".join("<" + u + ">" for u in out)
 
 
-class Reminder(PaginationCommand):
+class Reminder(Pagination, Command):
 	name = ["RemindMe", "Reminders", "Remind"]
 	description = "Sets a reminder for a certain date and time in the future."
 	schema = cdict(
@@ -1331,7 +1331,7 @@ class Reminder(PaginationCommand):
 		return await self.display(_user.id, pos, sid, index)
 
 
-class Note(PaginationCommand):
+class Note(Pagination, Command):
 	name = ["Notes"]
 	description = "Takes note of a given string and allows you to view and edit a to-do list!"
 	schema = cdict(

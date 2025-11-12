@@ -1995,8 +1995,7 @@ def default_pagination_key(curr, pos=0, page=16):
 		offset=pos,
 	).strip()
 
-class PaginationCommand(Command):
-
+class Pagination:
 	directions = [b'\xe2\x8f\xaa', b'\xe2\x97\x80', b'\xe2\x96\xb6', b'\xe2\x8f\xa9', b'\xf0\x9f\x94\x84']
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	dirmap = dict(zip(dirnames, map(as_str, directions)))
@@ -2086,6 +2085,27 @@ class PaginationCommand(Command):
 			case 3:
 				pos = last
 		return pos
+
+class ImagePool:
+	schema = cdict(
+		embed=cdict(
+			type="bool",
+			description="Whether to send the message as an embed",
+			default=True,
+		),
+	)
+	rate_limit = (0.05, 0.25)
+	threshold = 1024
+
+	async def __call__(self, bot, embed=True, **void):
+		url = await bot.data.imagepools.get(self.database, self.fetch_one, self.threshold)
+		return await self.send(url, embed=embed)
+
+	async def send(self, url, embed=True):
+		if embed:
+			emb = await self.bot.random_embed(url)
+			return cdict(embed=emb)
+		return cdict(url=url)
 
 
 class Database(Importable, collections.abc.MutableMapping):
@@ -2202,28 +2222,6 @@ class Database(Importable, collections.abc.MutableMapping):
 		bot.database.pop(self, None)
 		if isinstance(self.data, FileHashDict):
 			self.data.unload()
-
-
-class ImagePool:
-	schema = cdict(
-		embed=cdict(
-			type="bool",
-			description="Whether to send the message as an embed",
-			default=True,
-		),
-	)
-	rate_limit = (0.05, 0.25)
-	threshold = 1024
-
-	async def __call__(self, bot, embed=True, **void):
-		url = await bot.data.imagepools.get(self.database, self.fetch_one, self.threshold)
-		return await self.send(url, embed=embed)
-
-	async def send(self, url, embed=True):
-		if embed:
-			emb = await self.bot.random_embed(url)
-			return cdict(embed=emb)
-		return cdict(url=url)
 
 
 def get_nvml():

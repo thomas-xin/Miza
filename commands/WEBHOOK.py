@@ -5,7 +5,7 @@ if "common" not in globals():
 print = PRINT
 
 
-class AutoEmoji(PaginationCommand):
+class AutoEmoji(Pagination, Command):
 	server_only = True
 	name = ["NQN", "Emojis"]
 	min_level = 0
@@ -302,7 +302,7 @@ class UpdateAutoEmojis(Database):
 					bot.data.webhooks.temp.pop(m.channel.id, None)
 
 
-class EmojiList(PaginationCommand):
+class EmojiList(Pagination, Command):
 	name = ["CustomEmoji", "ProxyEmoji"]
 	description = "Sets a custom alias for an emoji, usable by ~autoemoji. Accepts emojis, emoji IDs, emoji URLs, and message links containing emojis or reactions."
 	schema = cdict(
