@@ -1462,6 +1462,31 @@ def json_dumps(obj, *args, **kwargs):
 def json_dumpstr(obj, *args, **kwargs):
 	return orjson.dumps(obj, *args, default=json_default, **kwargs).decode("utf-8", "replace")
 
+class PrettyJSONEncoder(json.JSONEncoder):
+
+	def __init__(self, *args, **kwargs):
+		self.indent = kwargs.get("indent") or "\t"
+		super().__init__(*args, **kwargs)
+
+	def encode(self, obj, level=0):
+		indent = " " * self.indent if type(self.indent) is int else self.indent
+		curr_indent = indent * level
+		next_indent = indent * (level + 1)
+		if isinstance(obj, (list, tuple)):
+			if all(type(x) not in (tuple, list, dict) for x in obj):
+				return "[" + ", ".join(json_dumpstr(x) for x in obj) + "]"
+			items = [self.encode(x, level=level + 1) for x in obj]
+			return "[\n" + next_indent + f",\n{next_indent}".join(item for item in items) + f"\n{curr_indent}" + "]"
+		elif isinstance(obj, dict):
+			if all(type(x) is str and len(x) <= max(10, len(obj)) for x in obj.values()) and all(type(x) is str and len(x) <= max(10, len(obj)) for x in obj.keys()):
+				return json.dumps(obj)
+			items = [f"{json_dumpstr(k)}: {self.encode(v, level=level + 1)}" for k, v in obj.items()]
+			return "{\n" + next_indent + f",\n{next_indent}".join(item for item in items) + f"\n{curr_indent}" + "}"
+		return json.dumps(obj)
+
+prettyjsonencoder = PrettyJSONEncoder(indent="\t")
+json_pretty = lambda obj: prettyjsonencoder.encode(obj)
+
 def require_hashable(k) -> collections.abc.Hashable:
 	if isinstance(k, list_like):
 		return tuple(map(require_hashable, k))

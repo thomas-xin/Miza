@@ -649,31 +649,33 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				resp.raise_for_status()
 
 	async def create_main_website(self, first=False):
-		if first:
-			print("Generating command json...")
-			j = {}
-			for category in ("MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "FUN", "AI", "NSFW", "MISC", "OWNER"):
-				k = j[category] = {}
-				if category not in self.categories:
-					continue
-				for command in self.categories[category]:
-					c = k[command.parse_name()] = dict(
-						aliases=[n.strip("_") for n in command.alias],
-						description=command.parse_description(),
-						level=str(command.min_level),
-						rate_limit=str(command.rate_limit),
-						example=T(command).get("example", []),
-						timeout=str(T(command).get("_timeout_", 1) * self.timeout),
-					)
-					if command.schema:
-						c["schema"] = command.schema
-					else:
-						c["usage"] = command.usage
-					for attr in ("flags", "server_only", "slash"):
-						with suppress(AttributeError):
-							c[attr] = command.attr
-			with open("misc/web/static/HELP.json", "w", encoding="utf-8") as f:
-				json.dump(j, f, indent="\t")
+		if not first:
+			return
+		print("Generating command json...")
+		j = {}
+		for category in ("MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "FUN", "AI", "NSFW", "MISC", "OWNER"):
+			k = j[category] = {}
+			if category not in self.categories:
+				continue
+			for command in self.categories[category]:
+				c = k[command.parse_name()] = dict(
+					aliases=[n.strip("_") for n in command.alias],
+					description=command.parse_description(),
+					level=str(command.min_level),
+					rate_limit=str(command.rate_limit),
+					example=T(command).get("example", []),
+					timeout=str(T(command).get("_timeout_", 1) * self.timeout),
+				)
+				if command.schema:
+					c["schema"] = command.schema
+				else:
+					c["usage"] = command.usage
+				for attr in ("flags", "server_only", "slash"):
+					with suppress(AttributeError):
+						c[attr] = command.attr
+		s = await asubmit(json_pretty, j)
+		with open("misc/web/static/HELP.json", "w", encoding="utf-8") as f:
+			f.write(s)
 
 	server = None
 	server_start_sem = Semaphore(1, 0, rate_limit=5)
