@@ -61,13 +61,16 @@ class AutoEmoji(PaginationCommand):
 class UpdateAutoEmojis(Database):
 	name = "autoemojis"
 
-	def guild_emoji_map(self, guild, user, emojis={}):
-		guilds = sorted(getattr(user, "mutual_guilds", None) or [g for g in self.bot.guilds if user.id in g._members], key=lambda g: g.id)
-		try:
-			guilds.remove(guild)
-		except ValueError:
-			pass
-		guilds.insert(0, guild)
+	def guild_emoji_map(self, guild, user=None, emojis={}):
+		if user:
+			guilds = sorted(getattr(user, "mutual_guilds", None) or [g for g in self.bot.guilds if user.id in g._members], key=lambda g: g.id)
+			try:
+				guilds.remove(guild)
+			except ValueError:
+				pass
+			guilds.insert(0, guild)
+		else:
+			guilds = [guild]
 		elist = self.bot.data.emojilists.get(guild.id)
 		if elist:
 			for n, e_id in sorted(elist.items(), key=lambda t: t[1]):

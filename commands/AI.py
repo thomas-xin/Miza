@@ -385,7 +385,7 @@ class Ask(Command):
 							u2 = None
 							if argv.strip("-"):
 								if not _guild and getattr(_channel, "recipient", None):
-									u2 = await bot.query_members([_channel.recipient, bot.user], argv)
+									u2 = bot.query_members([_channel.recipient, bot.user], argv)
 								else:
 									u2 = await bot.fetch_user_member(argv, _guild)
 							if not u2:
@@ -1506,7 +1506,7 @@ class Imagine(Command):
 			fn = ffut.back
 			fn = await ffut
 			assert fn
-			files.append(CompatFile(fn, filename=prompt + ".webp", description=prompt))
+			files.append(CompatFile(fn, filename=(prompt or "_") + ".webp", description=prompt))
 		embs = []
 		emb = discord.Embed(colour=rand_colour())
 		emb.description = ""

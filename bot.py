@@ -50,7 +50,7 @@ if "common" not in globals():
 	from misc.types import astype, as_str, cdict, fdict, fcdict, mdict, alist, azero, round_min, full_prune, suppress, tracebacksuppressor, ts_us, CE
 	from misc.util import AUTH, CACHE_PATH, TEMP_PATH, FAST_PATH, CACHE_FILESIZE, DEFAULT_FILESIZE, IMAGE_FORMS, PORT, PROC, EvalPipe, python, AutoCache, utc, T, lim_str, lim_tokens, regexp, Request, reqs, force_kill, json_dumps, discord_expired, is_miza_attachment, is_discord_attachment, is_discord_message_link, print_class, is_url, encode_attachment, choice, time_snowflake, magic, url2fn, url2ext, find_urls, find_urls_ex, shash, tcount, require_predicate, eval_json, get_image_size, split_url
 	from misc.caches import download_binary_dependencies, attachment_cache
-	from misc.common import api, load_colour_list, load_emojis, str_lookup, verify_id, manual_edit, BASE_LOGO, MemoryTimer, userQuery1, userIter1, userQuery2, userIter2, is_channel, get_last_image, best_url, worst_url, translate_emojis, message_repr, message_link, min_emoji, process_image, find_emojis, find_emojis_ex, find_users, replace_emojis, send_with_react, send_with_reply, CompatFile
+	from misc.common import api, load_colour_list, load_emojis, str_lookup, verify_id, manual_edit, BASE_LOGO, MemoryTimer, is_channel, get_last_image, best_url, worst_url, translate_emojis, message_repr, message_link, min_emoji, process_image, find_emojis, find_emojis_ex, find_users, replace_emojis, send_with_react, send_with_reply, CompatFile
 
 
 ADDRESS = AUTH.get("webserver_address") or "0.0.0.0"
@@ -1012,29 +1012,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				members.add(user)
 		return members
 
-	async def query_members(self, members, query, fuzzy=0.5):
-		query = str(query)
-		fuz_base = 0
-		with suppress(LookupError):
-			return await str_lookup(
-				members,
-				query,
-				qkey=userQuery1,
-				ikey=userIter1,
-				loose=False,
-				fuzzy=fuz_base,
-			)
-		with suppress(LookupError):
-			return await str_lookup(
-				members,
-				query,
-				qkey=userQuery2,
-				ikey=userIter2,
-				fuzzy=fuzzy,
-			)
-		raise LookupError(f"No results for {query}.")
+	def query_members(self, members, query, fuzzy=0.25):
+		looks = set((member.name, member) for member in members)
+		looks.update((member.global_name, member) for member in members if member.global_name)
+		looks.update((member.nick, member) for member in members if getattr(member, "nick", None))
+		return str_lookup(looks, query, key=lambda t: t[0], fuzzy=fuzzy)
 
-	async def fetch_member_ex(self, u_id, guild=None, allow_banned=True, fuzzy=0.5):
+	async def fetch_member_ex(self, u_id, guild=None, allow_banned=True, fuzzy=0.25):
 		"Fetches a member in the target server by ID or name lookup."
 		if not isinstance(u_id, int) and u_id.isnumeric():
 			with suppress(TypeError, ValueError):
@@ -1066,7 +1050,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if not members:
 					members = guild.members = await guild.fetch_members(limit=None)
 					guild._members.update({m.id: m for m in members})
-				return await self.query_members(members, u_id, fuzzy=fuzzy)
+				return self.query_members(members, u_id, fuzzy=fuzzy)
 		return member
 
 	def fetch_member(self, u_id, guild=None, find_others=False):
@@ -1676,7 +1660,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html",):
 					pass
 				elif self.audio:
-					resp = await self.audio.asubmit(f"ytdl.search({repr(url)})")
+					resp = await self.server.asubmit(f"ytdl.search({repr(url)})")
 					if not resp:
 						raise EOFError(url)
 					found = deque()
@@ -3118,7 +3102,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			emb.colour = col
 		content = message.content or message.system_content
 		if proxy_images and content:
-			urls = await self.follow_url(content)
+			urls = await self.follow_url(content, priority_order=("image",))
 			if urls:
 				with tracebacksuppressor:
 					url = urls[0]
@@ -4969,6 +4953,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		err = lambda e, k, v: e(f'Unable to parse input {json.dumps(v)} for {k}.')
 		if info.type in ("mentionable", "user", "channel", "guild", "role"):
 			m = verify_id(v)
+			fuzzy = 0 if info.get("strict", False) else 0.25
 			if info.type == "mentionable":
 				if isinstance(m, int):
 					v = self.in_cache(m)
@@ -4983,7 +4968,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						except Exception:
 							pass
 					if v is None:
-						v = await self.fetch_member_ex(m, guild)
+						v = await self.fetch_member_ex(m, guild, fuzzy=fuzzy)
 			elif info.type == "user":
 				v2 = verify_id(m)
 				v = None
@@ -4995,7 +4980,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						except Exception:
 							pass
 				if v is None:
-					v = await self.fetch_member_ex(m, guild)
+					v = await self.fetch_member_ex(m, guild, fuzzy=fuzzy)
 			elif info.type == "channel":
 				if isinstance(m, int):
 					v = await self.fetch_channel(m)
@@ -5010,12 +4995,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						except Exception:
 							pass
 					if v is None:
-						v = await str_lookup(
+						v = str_lookup(
 							guild.channels,
 							m,
-							qkey=userQuery1,
-							ikey=userIter1,
-							fuzzy=1 / 3,
+							key=lambda channel: channel.name,
+							fuzzy=fuzzy,
 						)
 			elif info.type == "guild":
 				v = await self.fetch_guild(m)
@@ -5033,12 +5017,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						except Exception:
 							pass
 					if v is None:
-						v = await str_lookup(
+						v = str_lookup(
 							guild.roles,
 							m,
-							qkey=userQuery1,
-							ikey=userIter1,
-							fuzzy=1 / 3,
+							key=lambda role: role.name,
+							fuzzy=fuzzy,
 						)
 		elif info.type == "emoji":
 			v = await self.resolve_emoji(v, guild=guild)

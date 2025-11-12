@@ -1109,14 +1109,12 @@ class Resize(Command):
 			validation="[-3600, 3600]",
 			description="The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
 			example="1:26.3",
-			default=None,
 		),
 		fps=cdict(
 			type="number",
 			validation="(0, 256]",
 			description="The framerate of the animation (does not affect duration)",
 			example="120/7",
-			default=None,
 		),
 		filesize=cdict(
 			type="filesize",

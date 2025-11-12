@@ -1197,59 +1197,6 @@ def strip_code_box(s):
 	return s
 
 
-# A string lookup operation with an iterable, multiple attempts, and sorts by priority.
-async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)], loose=True, fuzzy=0.5):
-	queries = qkey(query)
-	qlist = [q for q in queries if q]
-	if not qlist:
-		qlist = list(queries)
-	cache = [[[nan, None], [nan, None]] for _ in qlist]
-	for x, i in enumerate(shuffle(it), 1):
-		for c in ikey(i):
-			if not c and i:
-				continue
-			if fuzzy:
-				for a, b in enumerate(qkey(c)):
-					match = string_similarity(qlist[a], b)
-					if match >= 1:
-						return i
-					elif match >= fuzzy and not match <= cache[a][0][0]:
-						cache[a][0] = [match, i]
-			else:
-				for a, b in enumerate(qkey(c)):
-					if b == qlist[a]:
-						return i
-		if not x & 2047:
-			await asyncio.sleep(0.1)
-	for c in cache:
-		if c[0][0] < inf:
-			return c[0][1]
-	if loose and not fuzzy:
-		for c in cache:
-			if c[1][0] < inf:
-				return c[1][1]
-	raise LookupError(f"No results for {query}.")
-
-
-# Queries for searching members
-
-def userQuery1(x):
-	yield str(x)
-
-def userIter1(x):
-	yield str(x)
-
-def userQuery2(x):
-	yield str(x)
-
-def userIter2(x):
-	yield str(x.name)
-	if T(x).get("global_name"):
-		yield str(x.global_name)
-	if T(x).get("nick"):
-		yield str(x.nick)
-
-
 # Generates a random colour across the spectrum, in intervals of 128.
 rand_colour = lambda: colour2raw(hue2colour(xrand(12) * 128))
 
@@ -2103,7 +2050,7 @@ class PaginationCommand(Command):
 	async def _callback_(self, _user, **void):
 		return self.construct(_user.id, b"", "`PLACEHOLDER`")
 
-	async def default_display(self, name, uid, pos, curr, diridx=-1, extra=b"", key=default_pagination_key, akey=None, page_size=16):
+	async def default_display(self, name, uid, pos, curr, diridx=-1, extra=b"", key=default_pagination_key, akey=None, page_size=16, plural=True):
 		bot = self.bot
 		user = await bot.fetch_user(uid)
 		page = page_size
@@ -2112,7 +2059,7 @@ class PaginationCommand(Command):
 		emb = discord.Embed(
 			colour=colour,
 		).set_author(**get_author(user))
-		s = "s" if len(curr) != 1 else ""
+		s = "s" if plural and len(curr) != 1 else ""
 		if not curr:
 			emb.title = f"No {name}{s}."
 		else:

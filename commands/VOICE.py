@@ -6,11 +6,8 @@ print = PRINT
 
 from bs4 import BeautifulSoup
 import hyperchoron
-import hyperchoron.util
+import pyradios
 
-# with tracebacksuppressor:
-# 	import openai
-# 	import googletrans
 if BOT[0]:
 	bot = BOT[0]
 
@@ -271,7 +268,6 @@ class Queue(PaginationCommand):
 			type="string",
 			description="Song by name or URL",
 			example="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-			default=None,
 		),
 		index=cdict(
 			type="index",
@@ -482,7 +478,7 @@ class Queue(PaginationCommand):
 				if not 1 + i & 262143:
 					await asyncio.sleep(0.25)
 				i += 1
-			stime = (DynamicDT.now() + total_time / abs(settings.speed)).as_rel_discord()
+			stime = (DynamicDT.now() + total_time / abs(settings.speed)).as_rel_discord() if isfinite(total_time) else "`indefinite (stream)`"
 		s = "s" if len(curr) != 1 else ""
 		emb = discord.Embed(
 			title=f"Queue: {len(curr)} item{s}" if len(curr) else "Queue: Currently empty",
@@ -1324,242 +1320,131 @@ class RefreshRegion(Command):
 		return italics(css_md(f"Successfully refreshed voice region for {sqr_md(vc)} ({sqr_md(region)}).")), 1
 
 
+RB = pyradios.RadioBrowser()
+
+class RadioCache:
+	cache = AutoCache(f"{CACHE_PATH}/radio_facets", shards=1, stale=86400, timeout=86400 * 30)
+	def load_countries():
+		countries = fcdict()
+		for info in RB.countries():
+			if not info.get("iso_3166_1"):
+				continue
+			code = info["iso_3166_1"].upper()
+			countries[info["name"]] = code
+			countries[code] = code
+		return countries
+	countries = cache.retrieve("countries", load_countries)
+
+	@staticmethod
+	def filter_results(results):
+		unique = {}
+		for radio in results:
+			radio["name"] = radio["name"].strip()
+			radio["countrycode"] = radio["countrycode"].upper()
+			k = radio["url"]
+			if k in unique:
+				continue
+			unique[k] = radio
+		return list(unique.values())
+
+	@classmethod
+	async def search(cls, countrycode="", query=""):
+		key = (countrycode, query)
+		return await cls.cache.aretrieve(key, cls._search, countrycode, query)
+
+	@classmethod
+	async def _search(cls, countrycode, query):
+		if not countrycode:
+			if not query:
+				rf = await asubmit(pyradios.RadioFacets, RB)
+				results = cls.filter_results(rf.result)
+				results.sort(key=lambda radio: radio["name"])
+				return results
+			results = await asubmit(RB.search, name=query, name_exact=False)
+			if not results:
+				facets = await cls.search()
+				results = [str_lookup(
+					facets,
+					query,
+					key=lambda radio: radio["name"],
+					fuzzy=0,
+				)]
+			results = cls.filter_results(rf.result)
+			return results
+		if not query:
+			facets = await cls.search()
+			return [r for r in facets if r["countrycode"] == countrycode]
+		results = await asubmit(RB.search, name=query, name_exact=False, countrycode=countrycode)
+		if not results:
+			country_results = await cls.search(countrycode=countrycode)
+			results = [str_lookup(
+				country_results,
+				query,
+				key=lambda radio: radio["name"],
+				fuzzy=0,
+			)]
+		results = cls.filter_results(rf.result)
+		return results
+
 class Radio(PaginationCommand):
-	name = ["FM"]
-	description = "Searches for a radio station livestream on https://worldradiomap.com that can be played on ⟨BOT⟩."
+	name = ["Radios", "RadioBrowser"]
+	description = "Searches for a radio station livestream on https://api.radio-browser.info that can be played in voice."
 	schema = cdict(
 		country=cdict(
-			type="word",
+			type="enum",
+			validation=cdict(
+				enum=sorted(set(RadioCache.countries.values())),
+				accepts=RadioCache.countries,
+			),
+			description="Radio station by country",
 		),
-		state=cdict(
-			type="word",
-		),
-		city=cdict(
-			type="word",
+		query=cdict(
+			type="string",
+			description="Radio station by name",
+			example="BBC Radio",
+			greedy=False,
 		),
 	)
 	rate_limit = (6, 8)
 	slash = True
 	ephemeral = True
 
-	def country_repr(self, c):
-		out = io.StringIO()
-		start = None
-		for w in c.split("_"):
-			if len(w) > 1:
-				if start:
-					out.write("_")
-				if len(w) > 3 or not start:
-					if len(w) < 3:
-						out.write(w.upper())
-					else:
-						out.write(w.capitalize())
-				else:
-					out.write(w.lower())
-			else:
-				out.write(w.upper())
-			start = True
-		out.seek(0)
-		return out.read().strip("_")
-
-	def get_countries(self):
-		with tracebacksuppressor:
-			resp = Request("https://worldradiomap.com", timeout=24)
-			search = b'<option value="selector/_blank.htm">- Select a country -</option>'
-			resp = resp[resp.index(search) + len(search):]
-			resp = resp[:resp.index(b"</select>")]
-			with suppress(ValueError):
-				while True:
-					search = b'<option value="'
-					resp = resp[resp.index(search) + len(search):]
-					search = b'">'
-					href = as_str(resp[:resp.index(search)])
-					if not href.startswith("http"):
-						href = "https://worldradiomap.com/" + href.lstrip("/")
-					if href.endswith(".htm"):
-						href = href[:-4]
-					resp = resp[resp.index(search) + len(search):]
-					country = single_space(as_str(resp[:resp.index(b"</option>")]).replace(".", " ")).replace(" ", "_")
-					try:
-						self.countries[country].url = href
-					except KeyError:
-						self.countries[country] = cdict(name=country, url=href, cities=fcdict(), states=False)
-					data = self.countries[country]
-					alias = href.rsplit("/", 1)[-1].split("_", 1)[-1]
-					self.countries[alias] = data
-
-					def get_cities(country):
-						resp = Request(country.url, decode=True)
-						search = '<img src="'
-						resp = resp[resp.index(search) + len(search):]
-						icon, resp = resp.split('"', 1)
-						icon = icon.replace("../", "https://worldradiomap.com/")
-						country.icon = icon
-						search = '<option selected value="_blank.htm">- Select a city -</option>'
-						try:
-							resp = resp[resp.index(search) + len(search):]
-						except ValueError:
-							search = '<option selected value="_blank.htm">- State -</option>'
-							resp = resp[resp.index(search) + len(search):]
-							country.states = True
-							with suppress(ValueError):
-								while True:
-									search = '<option value="'
-									resp = resp[resp.index(search) + len(search):]
-									search = '">'
-									href = as_str(resp[:resp.index(search)])
-									if not href.startswith("http"):
-										href = "https://worldradiomap.com/selector/" + href
-									if href.endswith(".htm"):
-										href = href[:-4]
-									search = "<!--"
-									resp = resp[resp.index(search) + len(search):]
-									city = single_space(resp[:resp.index("-->")].replace(".", " ")).replace(" ", "_")
-									country.cities[city] = cdict(url=href, cities=fcdict(), icon=icon, states=False, get_cities=get_cities)
-									country.cities[city.rsplit(",", 1)[0]] = cdict(url=href, cities=fcdict(), icon=icon, states=False, get_cities=get_cities)
-									self.bot.data.radiomaps[full_prune(city)] = country.name
-									self.bot.data.radiomaps[full_prune(city.rsplit(",", 1)[0])] = country.name
-						else:
-							resp = resp[:resp.index("</select>")]
-							with suppress(ValueError):
-								while True:
-									search = '<option value="'
-									resp = resp[resp.index(search) + len(search):]
-									search = '">'
-									href = as_str(resp[:resp.index(search)])
-									if href.startswith("../"):
-										href = "https://worldradiomap.com/" + href[3:]
-									if href.endswith(".htm"):
-										href = href[:-4]
-									resp = resp[resp.index(search) + len(search):]
-									city = single_space(resp[:resp.index("</option>")].replace(".", " ")).replace(" ", "_")
-									country.cities[city] = href
-									country.cities[city.rsplit(",", 1)[0]] = href
-									self.bot.data.radiomaps[full_prune(city)] = country.name
-									self.bot.data.radiomaps[full_prune(city.rsplit(",", 1)[0])] = country.name
-						return country
-
-					data.get_cities = get_cities
-		return self.countries
-
-	async def __call__(self, bot, channel, message, args, **void):
-		if not self.countries:
-			await asubmit(self.get_countries)
-		path = deque()
-		if not args:
-			fields = msdict()
-			for country in self.countries:
-				if len(country) > 2:
-					fields.add(country[0].upper(), self.country_repr(country))
-			bot.send_as_embeds(channel, title="Available countries", fields={k: "\n".join(v) for k, v in fields.items()}, author=get_author(bot.user), reference=message)
-			return
-		c = args.pop(0)
-		if c not in self.countries:
-			await asubmit(self.get_countries)
-			if c not in self.countries:
-				d = full_prune(c)
-				if d in bot.data.radiomaps:
-					args.insert(0, c)
-					c = bot.data.radiomaps[d]
-				else:
-					raise LookupError(f"Country {c} not found.")
-		path.append(c)
-		country = self.countries[c]
-		if not country.cities:
-			await asubmit(country.get_cities, country)
-		if not args:
-			fields = msdict()
-			desc = deque()
-			for city in country.cities:
-				desc.append(self.country_repr(city))
-			t = "states" if country.states else "cities"
-			bot.send_as_embeds(channel, title=f"Available {t} in {self.country_repr(c)}", thumbnail=country.icon, description="\n".join(desc), author=get_author(bot.user), reference=message)
-			return
-		c = args.pop(0)
-		if c not in country.cities:
-			await asubmit(country.get_cities, country)
-			if c not in country.cities:
-				d = full_prune(c)
-				if d in bot.data.radiomaps:
-					args.insert(0, c)
-					c = bot.data.radiomaps[d]
-				else:
-					raise LookupError(f"Country {c} not found.")
-		path.append(c)
-		city = country.cities[c]
-		if type(city) is not str:
-			state = city
-			if not state.cities:
-				await asubmit(state.get_cities, state)
-			if not args:
-				fields = msdict()
-				desc = deque()
-				for city in state.cities:
-					desc.append(self.country_repr(city))
-				bot.send_as_embeds(channel, title=f"Available cities in {self.country_repr(c)}", thumbnail=country.icon, description="\n".join(desc), author=get_author(bot.user), reference=message)
-				return
-			c = args.pop(0)
-			if c not in state.cities:
-				await asubmit(state.get_cities, state)
-				if c not in state.cities:
-					raise LookupError(f"City {c} not found.")
-			path.append(c)
-			city = state.cities[c]
-		resp = await Request(city, aio=True)
-		title = "Radio stations in " + ", ".join(self.country_repr(c) for c in reversed(path)) + ", by frequency (MHz)"
-		fields = deque()
-		search = b'<table class=fix cellpadding="0" cellspacing="0">'
-		resp = as_str(resp[resp.index(search) + len(search):resp.index(b"</p></div><!--end rightcontent-->")])
-		for section in resp.split("<td class=tr31><b>")[1:]:
+	async def __call__(self, _user, country, query, **void):
+		query = query or ""
+		if country:
 			try:
-				i = regexp(r"(?:Hz|赫|هرتز|Гц)</td>").search(section).start()
-				scale = section[section.index("</b>,") + 5:i].upper()
-			except:
-				print(section)
-				print_exc()
-				scale = ""
-			coeff = 0.000001
-			if any(n in scale for n in ("M", "兆", "مگا", "М")):
-				coeff = 1
-			elif any(n in scale for n in ("K", "千", "کیلو", "к")):
-				coeff = 0.001
-			# else:
-				# coeff = 1
-			with tracebacksuppressor:
-				while True:
-					search = "<td class=freq>"
-					search2 = "<td class=dxfreq>"
-					i = j = inf
-					with suppress(ValueError):
-						i = section.index(search) + len(search)
-					with suppress(ValueError):
-						j = section.index(search2) + len(search2)
-					if i > j:
-						i = j
-					if type(i) is not int:
-						break
-					section = section[i:]
-					freq = round_min(round(float(section[:section.index("<")].replace("&nbsp;", "").strip()) * coeff, 6))
-					field = [freq, ""]
-					curr, section = section.split("</tr>", 1)
-					for station in regexp(r'(?:<td class=(?:dx)?fsta2?>|\s{2,})<a href="').split(curr)[1:]:
-						if field[1]:
-							field[1] += "\n"
-						href, station = station.split('"', 1)
-						if not href.startswith("http"):
-							href = "https://worldradiomap.com/" + href.lstrip("/")
-							if href.endswith(".htm"):
-								href = href[:-4]
-						search = "class=station>"
-						station = station[station.index(search) + len(search):]
-						name = station[:station.index("<")]
-						field[1] += f"[{name.strip()}]({href.strip()})"
-					fields.append(field)
-		bot.send_as_embeds(channel, title=title, thumbnail=country.icon, fields=sorted(fields), author=get_author(bot.user), reference=message)
+				countrycode = RadioCache.countries[country]
+			except KeyError:
+				country = str_lookup(
+					RadioCache.countries,
+					query,
+					fuzzy=0.05,
+				)
+				countrycode = RadioCache.countries[country]
+			# Set callback message for scrollable list
+			return await self.display(_user.id, 0, countrycode, query)
+		# Set callback message for scrollable list
+		return await self.display(_user.id, 0, "", query)
 
+	async def display(self, uid, pos, countrycode, query, diridx=-1):
+		curr = await RadioCache.search(countrycode, query)
 
-class UpdateRadioMaps(Database):
-	name = "radiomaps"
+		def key(curr, pos, page):
+
+			def radio_repr(radio):
+				name = lim_str(no_links(radio["name"].strip() or radio["tags"].strip() or url2fn(radio["homepage"].strip())), 80)
+				return f"[{name}]({radio['url']})"
+
+			return "\n".join(radio_repr(radio) for radio in tuple(curr)[pos:pos + page])
+
+		search = f" for ({countrycode.upper()}, {query})" if countrycode and query else f" for ({countrycode.upper() or query})" if countrycode or query else ""
+		s = "s" if len(curr) != 1 else ""
+		return await self.default_display(f"result{s}{search}", uid, pos, curr, diridx, extra=as_bytes(countrycode) + b"\xad" + as_bytes(query), key=key, page_size=32, plural=False)
+
+	async def _callback_(self, _user, index, data, **void):
+		pos, more = decode_leb128(data)
+		countrycode, query = map(as_str, more.split(b"\xad"))
+		return await self.display(_user.id, pos, countrycode, query, index)
 
 
 class Player(Command):
@@ -1978,7 +1863,6 @@ class Lyrics(Command):
 			type="string",
 			description="Song by name or URL",
 			example="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-			default=None,
 		),
 	)
 	rate_limit = (7, 12)
@@ -2160,7 +2044,7 @@ class Hyperchoron(Command):
 	rate_limit = (10, 20)
 	slash = True
 
-	async def __call__(self, bot, url, format, kwargs, **void):
+	async def __call__(self, url, format, kwargs, **void):
 		default_archive = "zip"
 		fo = os.path.abspath(TEMP_PATH + "/" + replace_ext(url2fn(url), default_archive))
 		args = ["hyperchoron", "-i", url, *unicode_prune(kwargs or "").split(), "-f", format.casefold(), "-o", fo]
@@ -2173,7 +2057,7 @@ class Hyperchoron(Command):
 			with tracebacksuppressor:
 				force_kill(proc)
 			raise
-		if not os.path.exists(fo) or not (size := os.path.getsize(fo)):
+		if not os.path.exists(fo) or not os.path.getsize(fo):
 			if proc.returncode != 0:
 				stderr = as_str(stderr)
 				if "```" not in stderr:

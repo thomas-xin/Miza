@@ -4006,9 +4006,9 @@ def string_similarity(s1, s2):
 
 	# Initialize the first row and column
 	for i in range(len1 + 1):
-		dp[i][0] = -i  # Penalize erasures in s1
+		dp[i][0] = -i / 2  # Penalize erasures in s1
 	for j in range(len2 + 1):
-		dp[0][j] = -j  # Penalize erasures in s2
+		dp[0][j] = -j / 2  # Penalize erasures in s2
 
 	# Fill the DP table
 	for i in range(1, len1 + 1):
@@ -4056,6 +4056,27 @@ def string_similarity(s1, s2):
 	similarity = (dp[len1][len2] - min_possible_score) / (max_possible_score - min_possible_score)
 
 	return similarity
+
+# A string lookup operation with an iterable, multiple attempts, and sorts by priority.
+def str_lookup(objs, query, key=lambda obj: obj, fuzzy=0):
+	objs = astype(objs, (tuple, list))
+	query = query.strip()
+	keys = [key(obj).strip() for obj in objs]
+	try:
+		return objs[keys.index(query)]
+	except ValueError:
+		pass
+	closest = (-inf, None, "")
+	for s, obj in zip(keys, objs):
+		match = string_similarity(query, s)
+		if match > closest[0]:
+			closest = (match, obj, s)
+	if closest[0] >= 1 - fuzzy:
+		return closest[1]
+	err = f'No results for "{query}".'
+	if closest[0] > -inf:
+		err += f' Did you mean: "{closest[2]}"?'
+	raise LookupError(err)
 
 def longest_sublist(lst, predicate):
 	"Returns the longest contiguous sublist of a list that satisfies a predicate. For example, if the predicate is `lambda a: all(a[i] < a[i + 1] for i in range(len(a) - 1))`, the function will return the longest sorted sublist. Note that for our implementation, we may sometimes need to perform backtracking with the sliding window, as a contiguous sublist may not fulfil the predicate if cut off; for example, if our predicate is instead a function which parses a string and returns a time delta, it may consider the strings `2 hours` and `3 minutes` as valid, but not `2 hours 3`, so we would need to backtrack at `3 minutes` to the previous predicate-satisfying sublist to be able to correctly identify the string `2 hours 3 minutes`."

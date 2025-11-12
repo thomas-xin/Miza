@@ -95,6 +95,7 @@ class Timeout(Command):
 			example="668999031359537205",
 			multiple=True,
 			required=True,
+			strict=True,
 		),
 		duration=cdict(
 			type="datetime",
@@ -143,6 +144,7 @@ class Purge(Command):
 			type="user",
 			description="User to delete messages from",
 			example="668999031359537205",
+			strict=True,
 		),
 		count=cdict(
 			type="integer",
@@ -535,12 +537,11 @@ class RoleSelect(Command):
 					continue
 				if "@" in line:
 					em, r = line.split("@", 1)
-					role = await str_lookup(
+					role = str_lookup(
 						_guild.roles,
-						r.strip(),
-						qkey=userQuery1,
-						ikey=userIter1,
-						fuzzy=2 / 3,
+						r,
+						key=lambda role: role.name,
+						fuzzy=0.5,
 					)
 					if em:
 						ems = find_emojis_ex(em, cast_urls=False)
@@ -554,23 +555,21 @@ class RoleSelect(Command):
 					continue
 				ems = find_emojis_ex(line, cast_urls=False)
 				if not ems:
-					role = await str_lookup(
+					role = str_lookup(
 						_guild.roles,
-						line.strip(),
-						qkey=userQuery1,
-						ikey=userIter1,
-						fuzzy=2 / 3,
+						line,
+						key=lambda role: role.name,
+						fuzzy=0.5,
 					)
 					e = await self.get_role_emoji(role)
 					rolelist.append((e, role))
 					continue
 				e = ems[0]
-				role = await str_lookup(
+				role = str_lookup(
 					_guild.roles,
 					line.split(e, 1)[-1],
-					qkey=userQuery1,
-					ikey=userIter1,
-					fuzzy=2 / 3,
+					key=lambda role: role.name,
+					fuzzy=0.5,
 				)
 				rolelist.append((e, role))
 		if not rolelist:
@@ -708,10 +707,10 @@ class RoleGiver(Command):
 		if type(r) is int:
 			role = guild.get_role(i)
 		else:
-			role = await str_lookup(
+			role = str_lookup(
 				standard_roles(guild),
 				r,
-				qkey=lambda x: [str(x), full_prune(x.replace(" ", ""))],
+				key=lambda role: role.name,
 				fuzzy=0.125,
 			)
 		# Must ensure that the user does not assign roles higher than their own
@@ -804,10 +803,10 @@ class AutoRole(Command):
 						role = i
 						break
 			else:
-				role = await str_lookup(
+				role = str_lookup(
 					rolelist,
 					r,
-					qkey=lambda x: [str(x), full_prune(x.replace(" ", ""))],
+					key=lambda role: role.name,
 					fuzzy=0.125,
 				)
 			# Must ensure that the user does not assign roles higher than their own
