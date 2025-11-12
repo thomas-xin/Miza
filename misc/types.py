@@ -1454,6 +1454,7 @@ def json_default(obj):
 	raise TypeError(obj)
 
 class MultiEncoder(json.JSONEncoder):
+
 	def default(self, obj):
 		return json_default(obj)
 
@@ -1473,7 +1474,7 @@ class PrettyJSONEncoder(json.JSONEncoder):
 		curr_indent = indent * level
 		next_indent = indent * (level + 1)
 		if isinstance(obj, (list, tuple)):
-			if all(type(x) not in (tuple, list, dict) for x in obj):
+			if all(not isinstance(x, (tuple, list, dict)) for x in obj):
 				return "[" + ", ".join(json_dumpstr(x) for x in obj) + "]"
 			items = [self.encode(x, level=level + 1) for x in obj]
 			return "[\n" + next_indent + f",\n{next_indent}".join(item for item in items) + f"\n{curr_indent}" + "]"
@@ -1484,8 +1485,11 @@ class PrettyJSONEncoder(json.JSONEncoder):
 			return "{\n" + next_indent + f",\n{next_indent}".join(item for item in items) + f"\n{curr_indent}" + "}"
 		return json.dumps(obj)
 
+	def default(self, obj):
+		return json_default(obj)
+
 prettyjsonencoder = PrettyJSONEncoder(indent="\t")
-json_pretty = lambda obj: prettyjsonencoder.encode(obj)
+pretty_json = lambda obj: prettyjsonencoder.encode(obj)
 
 def require_hashable(k) -> collections.abc.Hashable:
 	if isinstance(k, list_like):

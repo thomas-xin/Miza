@@ -18,7 +18,7 @@ import niquests
 import numpy as np
 import psutil
 from .asyncs import csubmit, esubmit, asubmit, wrap_future, cst, eloop, Delay
-from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_str, astype
+from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_str, astype, pretty_json
 from .smath import log2lin
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, EvalPipe, Request, api,
@@ -576,7 +576,7 @@ class AudioPlayer(discord.AudioSource):
 		return message
 
 	def get_dump(self):
-		data = dict(queue=self.queue)
+		data = dict(queue=list(self.queue))
 		setts = dict(self.settings)
 		for k, v in tuple(setts.items()):
 			if k not in self.defaults or v == self.defaults[k]:
@@ -586,7 +586,7 @@ class AudioPlayer(discord.AudioSource):
 		elapsed, _length = self.epos
 		if elapsed:
 			data.setdefault("settings", {})["pos"] = elapsed
-		b = maybe_json(data)
+		b = maybe_json(data) if len(data["queue"]) > 256 else pretty_json(data).encode("utf-8")
 		if len(b) > 262144:
 			f = io.BytesIO()
 			with zipfile.ZipFile(f, "w", compression=zipfile.ZIP_LZMA) as z:

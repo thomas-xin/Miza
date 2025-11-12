@@ -673,7 +673,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				for attr in ("flags", "server_only", "slash"):
 					with suppress(AttributeError):
 						c[attr] = command.attr
-		s = await asubmit(json_pretty, j)
+		s = await asubmit(pretty_json, j)
 		with open("misc/web/static/HELP.json", "w", encoding="utf-8") as f:
 			f.write(s)
 
