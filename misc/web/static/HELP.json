@@ -393,7 +393,7 @@
 			"usage": "<string>"
 		},
 		"ID2Time": {
-			"aliases": ["ID2Time", "I2T", "CreateTime", "Timestamp", "Time2ID", "T2I"],
+			"aliases": ["ID2Time", "I2T", "CreateTime", "Time2ID", "T2I"],
 			"description": "Converts a discord ID to its corresponding UTC time.",
 			"level": "0",
 			"rate_limit": "(3, 4)",
@@ -563,13 +563,20 @@
 			}
 		},
 		"Time": {
-			"aliases": ["Time", "🕰️", "⏰", "⏲️", "UTC", "GMT", "T", "EstimateTime", "EstimateTimezone"],
+			"aliases": ["Time", "🕰️", "⏰", "⏲️", "UTC", "GMT", "T", "TS", "Timestamp", "EstimateTime", "EstimateTimezone"],
 			"description": "Shows the current time at a certain GMT/UTC offset, or the current time for a user.",
 			"level": "0",
 			"rate_limit": "(3, 5)",
 			"example": [],
 			"timeout": "24",
 			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": ["full", "relative", "absolute"]
+					},
+					"default": "full"
+				},
 				"input": {
 					"type": "string",
 					"description": "Time input to parse",

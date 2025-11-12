@@ -1758,7 +1758,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Retrieves and maps user's emoji list on target string. Used for ~AutoEmoji and compatibility with other commands."
 		orig = self.bot.data.emojilists.get(user.id, {}) if user else {}
 		emojis = emoji = None
-		regex = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
+		regex = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^at\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
 		pops = set()
 		offs = 0
 		replaceds = []

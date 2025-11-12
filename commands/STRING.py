@@ -595,7 +595,7 @@ class Unicode(Command):
 
 
 class ID2Time(Command):
-	name = ["I2T", "CreateTime", "Timestamp", "Time2ID", "T2I"]
+	name = ["I2T", "CreateTime", "Time2ID", "T2I"]
 	description = "Converts a discord ID to its corresponding UTC time."
 	schema = cdict(
 		id=cdict(
@@ -1094,6 +1094,13 @@ class Time(Command):
 	name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T"]
 	description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user."
 	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("full", "relative", "absolute"),
+			),
+			default="full",
+		),
 		input=cdict(
 			type="string",
 			description="Time input to parse",
@@ -1117,6 +1124,12 @@ class Time(Command):
 		),
 	)
 	macros = cdict(
+		TS=cdict(
+			mode="relative",
+		),
+		Timestamp=cdict(
+			mode="relative",
+		),
 		EstimateTime=cdict(
 			estimate=True,
 		),
@@ -1128,7 +1141,7 @@ class Time(Command):
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, _user, input, user, estimate, timezone, **void):
+	async def __call__(self, _user, mode, input, user, estimate, timezone, **void):
 		target = user or _user
 		c = 1
 		tzinfo = self.bot.data.users.get_timezone(target.id) if not estimate else None
@@ -1139,6 +1152,11 @@ class Time(Command):
 			estimated = False
 		dt2 = DynamicDT.now(tz=tzinfo)
 		dt = DynamicDT.parse(input, timestamp=dt2.timestamp_exact(), timezone=get_name(tzinfo))
+		match mode:
+			case "relative":
+				return dt.as_rel_discord()
+			case "absolute":
+				return dt.as_discord()
 		colour = await self.bot.get_colour(target)
 		emb = discord.Embed(colour=colour)
 		emb.add_field(name="Parsed As", value="`" + ", ".join(dt.parsed_as) + "`")
