@@ -126,7 +126,7 @@
 		},
 		"Hello": {
 			"aliases": ["Hello", "Hi", "👋", "Bye"],
-			"description": "\ud83d\udc4b",
+			"description": "👋",
 			"level": "0",
 			"rate_limit": "(0, 0)",
 			"example": [],
@@ -468,7 +468,7 @@
 			"schema": {
 				"text": {
 					"type": "string",
-					"example": "\ud835\udd31\ud835\udd25\ud835\udd26\ud835\udd30 \ud835\udd26\ud835\udd30 \ud835\udd1e \ud835\udd20\ud835\udd2c\ud835\udd2c\ud835\udd29 \ud835\udd2a\ud835\udd22\ud835\udd30\ud835\udd30\ud835\udd1e\ud835\udd24\ud835\udd22",
+					"example": "𝔱𝔥𝔦𝔰 𝔦𝔰 𝔞 𝔠𝔬𝔬𝔩 𝔪𝔢𝔰𝔰𝔞𝔤𝔢",
 					"required": true
 				}
 			}
@@ -534,7 +534,7 @@
 				"text": {
 					"type": "string",
 					"description": "Text to encode or decode",
-					"example": "Hello World! \u2764\ufe0f",
+					"example": "Hello World! ❤️",
 					"autoresolve": true
 				}
 			},
@@ -771,7 +771,7 @@
 				"emoji": {
 					"type": "emoji",
 					"description": "Emoji to treat as starboard trigger.",
-					"example": "\ud83d\udc31"
+					"example": "🐱"
 				},
 				"special": {
 					"type": "enum",
@@ -891,8 +891,8 @@
 				"title": {
 					"type": "text",
 					"description": "Title to display in embed",
-					"example": "\ud83c\udf1f Pronoun Roles \ud83c\udf1f",
-					"default": "\ud83d\uddc2 Role Selection \ud83d\uddc2"
+					"example": "🌟 Pronoun Roles 🌟",
+					"default": "🗂 Role Selection 🗂"
 				},
 				"description": {
 					"type": "text",
@@ -903,7 +903,7 @@
 				"custom": {
 					"type": "text",
 					"description": "Newline-separated emoji-role pairs",
-					"example": "- \ud83d\udc31 @Cat Lovers"
+					"example": "- 🐱 @Cat Lovers"
 				}
 			}
 		},
@@ -3097,7 +3097,7 @@
 				"emoji": {
 					"type": "emoji",
 					"description": "Emoji to add as reaction. Use `-d --emoji` to remove by emoji rather than keyword",
-					"example": "\ud83d\udc31"
+					"example": "🐱"
 				},
 				"preprocess": {
 					"type": "word",
@@ -3177,7 +3177,7 @@
 			"rate_limit": "(6, 8)",
 			"example": ["pay @Miza 100"],
 			"timeout": "24",
-			"usage": "<0:user> <1:amount[1]>? <-1:diamonds(\ud83d\udc8e)>?"
+			"usage": "<0:user> <1:amount[1]>? <-1:diamonds(💎)>?"
 		},
 		"Dogpile": {
 			"aliases": ["Dogpile"],

@@ -1483,7 +1483,7 @@ class PrettyJSONEncoder(json.JSONEncoder):
 				return json.dumps(obj)
 			items = [f"{json_dumpstr(k)}: {self.encode(v, level=level + 1)}" for k, v in obj.items()]
 			return "{\n" + next_indent + f",\n{next_indent}".join(item for item in items) + f"\n{curr_indent}" + "}"
-		return json.dumps(obj)
+		return json_dumpstr(obj)
 
 	def default(self, obj):
 		return json_default(obj)
