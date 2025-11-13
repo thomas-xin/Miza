@@ -1398,7 +1398,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				self.cache.emojis[emoji.id] = emoji
 				return emoji
 		if allow_external:
-			animated = await self.is_animated(e_id)
+			try:
+				animated = await self.is_animated(e_id)
+			except BaseException as ex:
+				raise LookupError from ex
 			if animated is not None:
 				emoji = SimulatedEmoji(
 					id=e_id,
@@ -1645,7 +1648,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							for r in m.reactions:
 								u = await self.emoji_to_url(r.emoji, guild=m.guild)
 								found.append(u)
-				found.uniq()
+				found.uniq(sort=False)
 				for url in found:
 					if is_discord_attachment(url):
 						out.append(attachment_cache.preserve(url))
@@ -4157,7 +4160,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		try:
 			audio_players, playing_players = await asyncio.wait_for(self.audio.asubmit("len(AP.players),sum(bool(p.vc) and bool(p.queue) and p.is_playing() for p in AP.players.values())"), timeout=2)
 		except (AssertionError, AttributeError, asyncio.TimeoutError):
-			audio_players = playing_players = playing_audio_players = "N/A"
+			audio_players = playing_players = "N/A"
 		files = os.listdir("misc")
 		for f in files:
 			path = "misc/" + f
@@ -6290,7 +6293,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					self.update_embeds(utc() % 1 < 0.5)
 					await_fut(self.send_event("_call_"))
 
-	uptime_db = AutoCache(f"{CACHE_PATH}/uptime", stale=0, timeout=86400 * 7)
+	uptime_db = AutoCache(f"{CACHE_PATH}/uptime", shards=5, stale=0, timeout=86400 * 7)
 	def update_uptime(self, data):
 		uptimes = self.uptime_db
 		ninter = self.ninter

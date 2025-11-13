@@ -949,7 +949,7 @@ def unyt(s):
 		else:
 			s = re.sub(r"https?:\/\/(?:\w{1,5}\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)|https?:\/\/(?:api\.)?mizabot\.xyz\/ytdl\?[vd]=(?:https:\/\/youtu\.be\/|https%3A%2F%2Fyoutu\.be%2F)", "https://youtu.be/", re.sub(r"[\?&]si=[\w\-]+", "", s))
 		s = s.split("&", 1)[0]
-	if is_discord_attachment(s) or is_spotify_url(s):
+	if is_discord_attachment(s) or is_spotify_url(s) or s.startswith("https://i.ytimg.com"):
 		s = s.split("?", 1)[0]
 	return re.sub(r"https?:\/\/(?:\w{1,5}\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)", "https://youtu.be/", re.sub(r"[\?&]si=[\w\-]+", "", s))
 def is_discord_message_link(url) -> bool:
@@ -1453,11 +1453,13 @@ def get_mime(path):
 		except Exception:
 			print_exc()
 			mime = "cannot open `"
+		if not isinstance(path, str):
+			path = path.name if hasattr(path, "name") else ".txt"
 	else:
 		mime = "cannot open `"
 	if mime.startswith("cannot open `"):
 		with open(path, "rb") as f:
-			b = f.read(1048576)
+			b = f.read(262144)
 		mime = magic.from_buffer(b, mime=True)
 		if mime == "application/octet-stream":
 			if path.endswith(".txt"):
@@ -1469,8 +1471,6 @@ def get_mime(path):
 			else:
 				return "text/plain"
 	if mime.startswith("text/plain"):
-		if not isinstance(path, str):
-			path = path.name if hasattr(path, "name") else ".txt"
 		ext = path.rsplit("/", 1)[-1].rsplit(".", 1)[-1]
 		mime2 = MIMES.get(ext, "")
 		if mime2:
