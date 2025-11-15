@@ -425,7 +425,7 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			if self.end is not None:
 				input_args.extend(["-to", str(self.end)])
 			if not self.codec:
-				self.codec = "libsvtav1"
+				self.codec = "av1_nvenc"
 			output_args = ["-f", self.format, "-c:v", self.codec, "-b:v", "2M", "-vbr", "on"]
 			if self.format == "mp4":
 				# MP4 supports just about any audio codec, but WebM and MKV do not. We assume the audio codec is not WMA, as it is highly unlikely any website would use it for streaming videos.

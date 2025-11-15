@@ -1397,6 +1397,20 @@ def sync_animations(func, keep_size="approx"):
 	return sync_into
 
 
+def clamp_transparency(frames):
+	for im in frames:
+		arr = np.array(im, dtype=np.uint8)
+		R, G, B, A = arr.T
+		am = np.float32(A) * (1 / 255)
+		np.multiply(R, am, out=R, casting="unsafe")
+		np.multiply(G, am, out=G, casting="unsafe")
+		np.multiply(B, am, out=B, casting="unsafe")
+		mask = A < 128
+		A[mask] = 0
+		A[np.logical_not(mask)] = 255
+		yield fromarray(arr, mode=im.mode)
+
+
 @sync_animations
 def spin_map(images, angle, circle, progress=0, **kwargs):
 	image = images[0]

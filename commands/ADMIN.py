@@ -1959,7 +1959,7 @@ class CreateEmoji(Command):
 		if _perm < 2:
 			raise self.perm_error(_perm, 2, "for command " + _name)
 		name = name or url2fn(url).rsplit(".", 1)[0]
-		image = await bot.optimise_image(url, fsize=262144, csize=128, fmt="gif")
+		image = await bot.optimise_image(url, fsize=262144, csize=128, fmt="webp")
 		emoji = await _guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
 		# This reaction indicates the emoji was created successfully
 		with suppress(discord.Forbidden):

@@ -620,9 +620,9 @@ def gifsicle(out, info=None, heavy=False):
 		out2 = out + "~2"
 	args = ["binaries/gifsicle"]
 	if heavy:
-		args.extend(("-O3", "--lossy=100", "--colors=64"))
+		args.extend(("-O3", "--lossy=90", "--colors=64"))
 	else:
-		args.extend(("-O3", "--lossy=90"))
+		args.extend(("-O", "--lossy=50"))
 	args.extend(("--dither", "--careful", "--loopcount=forever", "-o", out2, out))
 	print(args)
 	try:
@@ -773,9 +773,9 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			command.extend(("-vf", f"scale={w}:{h}:flags=bicubic"))
 		bitrate = floor(min(fs / duration * 7.5, 99999999)) # use 7.5 bits per byte
 		command.extend(("-b:v", str(bitrate), "-vbr", "on"))
-		cdc = CODEC_FFMPEG.get(fmt, "libsvtav1")
+		cdc = CODEC_FFMPEG.get(fmt, "av1_nvenc")
 		fmt = CODECS.get(fmt, fmt)
-		pix_fmt = "yuv444p" if cdc == "libsvtav1" else "yuv420p"
+		pix_fmt = "yuv444p" if cdc == "av1_nvenc" else "yuv420p"
 		command.extend(("-pix_fmt", pix_fmt, "-c:v", cdc))
 		command.extend(("-f", fmt))
 	return command, fmt
@@ -1016,13 +1016,15 @@ def evalImg(url, operation, args):
 			if fmt == "auto":
 				if getattr(first, "audio", None) or new["count"] * np.prod(size) > 1073741824:
 					fmt = "mp4"
-					cdc = "libsvtav1"
+					cdc = "av1_nvenc"
 				else:
 					fmt = "avif"
 			out = temporary_file(CODECS.get(fmt, fmt), name=ts)
 			mode = str(first.mode)
 			if mode == "P":
 				raise RuntimeError("Unexpected P mode image")
+			if fmt == "gif" and "A" in mode:
+				frames = clamp_transparency(frames)
 			archive = False
 			is_avif = False
 			if fmt == "zip":
@@ -1121,6 +1123,7 @@ def evalImg(url, operation, args):
 				proc.wait()
 			if is_avif:
 				out = avifsicle(out, q=60 if opt else 80 if new["count"] > 1 else 100, s=min(10, round(log2(new["count"]))))
+				fmt = "avif"
 			if not archive:
 				print(os.path.getsize(out), fs, np.prod(size) * new["count"])
 				if fmt == "gif" and (fs >= 1048576 or "A" not in mode) and first.width * first.height * new["count"] <= 67108864 and os.path.getsize(out) < fs * 3:

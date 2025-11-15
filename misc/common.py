@@ -1778,9 +1778,8 @@ def find_emojis_ex(s, cast_urls=True):
 		i = s.index(e)
 		if cast_urls:
 			eid = verify_id(e)
-			url = f"https://cdn.discordapp.com/emojis/{eid}.webp"
-			if e.startswith("<:a:"):
-				url += "?animated=true"
+			fmt = "gif" if e.startswith("<a:") else "webp"
+			url = f"https://cdn.discordapp.com/emojis/{eid}.{fmt}"
 			out[i] = url
 			continue
 		out.setdefault(i, e)

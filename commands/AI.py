@@ -112,7 +112,7 @@ class Ask(Command):
 		if tzinfo is None:
 			tzinfo, _c = self.bot.data.users.estimate_timezone(_user.id)
 		dt = DynamicDT.now(tz=tzinfo)
-		personality += f"\nCurrent Time/Knowledge Cutoff: {dt.as_full()}"
+		personality += f"\nCurrent Time: {dt.as_full()}"
 		system_message = cdict(
 			role="system",
 			content=personality,
@@ -693,7 +693,7 @@ class Instruct(Command):
 			model="o4-mini",
 		),
 		GPT5=cdict(
-			model="gpt-5",
+			model="gpt-5.1",
 		),
 		GPT5M=cdict(
 			model="gpt-5-mini",

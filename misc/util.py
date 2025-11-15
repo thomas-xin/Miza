@@ -1247,7 +1247,7 @@ MEDIA_FORMS.update(VIDEO_FORMS)
 MEDIA_FORMS.update(AUDIO_FORMS)
 
 CODEC_FFMPEG = {
-	"auto": "libsvtav1",
+	"auto": "av1_nvenc",
 	"x264": "h264_nvenc",
 	"h264": "h264_nvenc",
 	"avc": "h264_nvenc",
@@ -1258,7 +1258,7 @@ CODEC_FFMPEG = {
 	"x266": "libvvenc",
 	"h266": "libvvenc",
 	"vvc": "libvvenc",
-	"av1": "libsvtav1",
+	"av1": "av1_nvenc",
 }
 CODECS = {
 	"auto": "auto",

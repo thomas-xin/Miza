@@ -37,11 +37,11 @@ def cast_rp(fp, pp, model=None):
 available = {
 	"claude-4.1-opus": {
 		"openrouter": ("anthropic/claude-opus-4.1", ("15", "75")),
-		None: "gpt-5",
+		None: "gpt-5.1",
 	},
 	"claude-4.5-sonnet": {
 		"openrouter": ("anthropic/claude-4.5-sonnet", ("3", "15")),
-		None: "gpt-5",
+		None: "gpt-5.1",
 	},
 	"claude-4-sonnet": {
 		"openrouter": ("anthropic/claude-sonnet-4", ("3", "15")),
@@ -180,11 +180,15 @@ available = {
 		"openai": ("o3-mini", ("1.1", "4.4")),
 		None: "gpt-4.1-mini",
 	},
+	"gpt-5.1": {
+		"openrouter": ("openai/gpt-5.1", ("1.25", "10")),
+		None: "kimi-k2-t",
+	},
 	"gpt-5": {
 		"openrouter": ("openai/gpt-5", ("1.25", "10")),
 		"openai": ("gpt-5", ("1.25", "10")),
 		# "openrouter": ("openai/gpt-5-chat", ("1.25", "10")),
-		None: "kimi-k2",
+		None: "kimi-k2-t",
 	},
 	"gpt-5-mini": {
 		"openrouter": ("openai/gpt-5-mini", ("0.25", "2")),
@@ -221,7 +225,7 @@ available = {
 	},
 	"kimi-k2-t": {
 		"openrouter": ("moonshotai/kimi-k2-thinking", ("0.6", "2.5")),
-		None: "gpt-5",
+		None: "gpt-5.1",
 	},
 	"kimi-k2": {
 		"openrouter": ("moonshotai/kimi-k2-0905:exacto", ("0.6", "2.5")),
@@ -268,6 +272,7 @@ is_chat = {
 	"o1",
 	"o1-preview",
 	"o1-mini",
+	"gpt-5.1",
 	"gpt-5",
 	"gpt-5-mini",
 	"gpt-5-nano",
@@ -335,6 +340,7 @@ is_reasoning = {
 	"gemini-2.5-flash-t",
 	"gpt-oss-120b",
 	"gpt-oss-20b",
+	"gpt-5.1",
 	"gpt-5",
 	"gpt-5-mini",
 	"gpt-5-nano",
@@ -375,6 +381,7 @@ is_function = {
 	"o1",
 	"o1-preview",
 	"o1-mini",
+	"gpt-5.1",
 	"gpt-5",
 	"gpt-5-mini",
 	"gpt-5-nano",
@@ -415,6 +422,7 @@ is_vision = {
 	"gpt-oss-20b",
 	"o1",
 	"o1-preview",
+	"gpt-5.1",
 	"gpt-5",
 	"gpt-5-mini",
 	"gpt-5-nano",
@@ -506,6 +514,7 @@ contexts = {
 	"o1": 200000,
 	"o1-preview": 200000,
 	"o1-mini": 200000,
+	"gpt-5.1": 400000,
 	"gpt-5": 400000,
 	"gpt-5-mini": 400000,
 	"gpt-5-nano": 400000,
@@ -1779,6 +1788,7 @@ CL100K_IM = {
 	"o1",
 	"o1-preview",
 	"o1-mini",
+	"gpt-5.1",
 	"gpt-5",
 	"gpt-5-mini",
 	"gpt-5-nano",

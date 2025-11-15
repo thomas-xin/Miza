@@ -3482,7 +3482,7 @@
 				"model": {
 					"type": "enum",
 					"validation": {
-						"enum": ["claude-4.1-opus", "claude-4.5-sonnet", "claude-4-sonnet", "claude-4.5-haiku", "deepseek-r1", "deepseek-v3.2", "deepseek-v3.1", "deepseek-v3", "minimax-m2", "minimax-m1", "minimax-01", "llama-3-405b", "llama-3-90b", "llama-3-70b", "llama-3-11b", "llama-3-8b", "command-r-plus", "command-r", "magnum-72b", "qwen3-235b", "qwen-72b", "gemini-2.5-pro", "gemini-2.5-flash-t", "gemini-2.5-flash", "grok-4", "grok-4-fast", "gpt-oss-120b", "gpt-oss-20b", "o4-mini", "o3", "o3-mini", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4.1-mini", "gpt-4.1", "gpt-4-mini", "gpt-4", "mistral-24b", "kimi-k2-t", "kimi-k2"],
+						"enum": ["claude-4.1-opus", "claude-4.5-sonnet", "claude-4-sonnet", "claude-4.5-haiku", "deepseek-r1", "deepseek-v3.2", "deepseek-v3.1", "deepseek-v3", "minimax-m2", "minimax-m1", "minimax-01", "llama-3-405b", "llama-3-90b", "llama-3-70b", "llama-3-11b", "llama-3-8b", "command-r-plus", "command-r", "magnum-72b", "qwen3-235b", "qwen-72b", "gemini-2.5-pro", "gemini-2.5-flash-t", "gemini-2.5-flash", "grok-4", "grok-4-fast", "gpt-oss-120b", "gpt-oss-20b", "o4-mini", "o3", "o3-mini", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4.1-mini", "gpt-4.1", "gpt-4-mini", "gpt-4", "mistral-24b", "kimi-k2-t", "kimi-k2"],
 						"accepts": {
 							"llama": "llama-3-70b",
 							"haiku": "claude-3-haiku",
@@ -3545,7 +3545,7 @@
 				"O1M": {"model": "o1-mini"},
 				"O3M": {"model": "o3-mini"},
 				"O4M": {"model": "o4-mini"},
-				"GPT5": {"model": "gpt-5"},
+				"GPT5": {"model": "gpt-5.1"},
 				"GPT5M": {"model": "gpt-5-mini"},
 				"GPT4": {"model": "gpt-4.1"},
 				"GPT4M": {
