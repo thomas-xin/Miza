@@ -460,7 +460,7 @@ class Text2048(Command):
 					except KeyError:
 						sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
 				async with sem:
-					return await Request(
+					return await Request.aio(
 						f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
 						data=dict(
 							content="**```\n2048: GAME OVER```**",
@@ -469,7 +469,6 @@ class Text2048(Command):
 						),
 						method="PATCH",
 						authorise=True,
-						aio=True,
 					)
 		if data is not None:
 			# Update message if gamestate has been changed
@@ -557,7 +556,7 @@ class Text2048(Command):
 				except KeyError:
 					sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
 			async with sem:
-				return await Request(
+				return await Request.aio(
 					f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
 					data=dict(
 						content=content,
@@ -566,7 +565,6 @@ class Text2048(Command):
 					),
 					method="PATCH",
 					authorise=True,
-					aio=True,
 				)
 		await bot.ignore_interaction(message)
 
@@ -1351,7 +1349,7 @@ class Uno(Command):
 					except KeyError:
 						sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
 				async with sem:
-					return await Request(
+					return await Request.aio(
 						f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
 						data=dict(
 							content=content,
@@ -1363,7 +1361,6 @@ class Uno(Command):
 						),
 						method="PATCH",
 						authorise=True,
-						aio=True,
 					)
 			# Does not have permission to start game
 			s = ""
@@ -2664,9 +2661,9 @@ class Cat(ImagePool, Command):
 			x = 2
 		if x:
 			if x == 1 and alexflipnote_key:
-				d = await Request("https://api.alexflipnote.dev/cats", headers={"Authorization": alexflipnote_key}, json=True, aio=True)
+				d = await Request.aio("https://api.alexflipnote.dev/cats", headers={"Authorization": alexflipnote_key}, json=True)
 			else:
-				d = await Request("https://api.thecatapi.com/v1/images/search", json=True, aio=True)
+				d = await Request.aio("https://api.thecatapi.com/v1/images/search", json=True)
 			if type(d) is list:
 				d = choice(d)
 			url = d["file" if x == 1 and alexflipnote_key else "url"]
@@ -2698,9 +2695,9 @@ class Dog(ImagePool, Command):
 			x = 2
 		if x:
 			if x == 1 and alexflipnote_key:
-				d = await Request("https://api.alexflipnote.dev/dogs", headers={"Authorization": alexflipnote_key}, json=True, aio=True)
+				d = await Request.aio("https://api.alexflipnote.dev/dogs", headers={"Authorization": alexflipnote_key}, json=True)
 			else:
-				d = await Request("https://dog.ceo/api/breeds/image/random", json=True, aio=True)
+				d = await Request.aio("https://dog.ceo/api/breeds/image/random", json=True)
 			if type(d) is list:
 				d = choice(d)
 			url = d["file" if x == 1 and alexflipnote_key else "message"]
@@ -2752,7 +2749,7 @@ class XKCD(ImagePool, Command):
 	rate_limit = (0.5, 3)
 
 	async def fetch_one(self):
-		s = await Request("https://c.xkcd.com/random/comic", aio=True)
+		s = await Request.aio("https://c.xkcd.com/random/comic")
 		search = b"Image URL (for hotlinking/embedding): "
 		s = s[s.index(search) + len(search):]
 		url = s[:s.index(b"<")].strip()
@@ -2768,7 +2765,7 @@ class Turnoff(ImagePool, Command):
 	async def fetch_one(self):
 		if self.bot.data.imagepools.data.get(self.database) and xrand(64):
 			return choice(self.bot.data.imagepools[self.database])
-		s = await Request("https://turnoff.us", aio=True)
+		s = await Request.aio("https://turnoff.us")
 		search = b"$(function() {"
 		s = s[s.rindex(search) + len(search):]
 		search = b"var pages = "
@@ -2778,13 +2775,13 @@ class Turnoff(ImagePool, Command):
 		urls = alist("https://turnoff.us" + href.rstrip("/") + "/" for href in hrefs if href)
 		data = self.bot.data.imagepools.setdefault(self.database, alist())
 		for url in urls[:-1]:
-			s = await Request(url, aio=True)
+			s = await Request.aio(url)
 			search = b'<meta property="og:image" content="'
 			s = s[s.index(search) + len(search):]
 			url = as_str(s[:s.index(b'"')])
 			data.add(url)
 		url = url[-1]
-		s = await Request(url, aio=True)
+		s = await Request.aio(url)
 		search = b'<meta property="og:image" content="'
 		s = s[s.index(search) + len(search):]
 		url = as_str(s[:s.index(b'"')])
@@ -2798,7 +2795,7 @@ class Inspiro(ImagePool, Command):
 	rate_limit = (0.5, 3)
 
 	async def fetch_one(self):
-		return await Request("https://inspirobot.me/api?generate=true", decode=True, aio=True)
+		return await Request.aio("https://inspirobot.me/api?generate=true", decode=True)
 
 
 class ImageSearch(ImagePool, Command):
@@ -2814,12 +2811,12 @@ class ImageSearch(ImagePool, Command):
 
 		async def fetch(tag, search_tag):
 			if xrand(3):
-				s = await Request(f"https://www.gettyimages.co.uk/photos/{tag}?page={random.randint(1, 100)}", decode=True, aio=True)
+				s = await Request.aio(f"https://www.gettyimages.co.uk/photos/{tag}?page={random.randint(1, 100)}", decode=True)
 				url = "https://media.gettyimages.com/photos/"
 				spl = s.split(url)[1:]
 				imageset = {url + i.split('"', 1)[0].split("?", 1)[0] for i in spl}
 			else:
-				d = await Request(f"https://unsplash.com/napi/search/photos?query={tag}&per_page=30&page={random.randint(1, 19)}", json=True, aio=True)
+				d = await Request.aio(f"https://unsplash.com/napi/search/photos?query={tag}&per_page=30&page={random.randint(1, 19)}", json=True)
 				imageset = {result["urls"]["raw"] for result in d["results"]}
 			return imageset
 
@@ -2829,12 +2826,12 @@ class ImageSearch(ImagePool, Command):
 			for i in range(1, 100):
 				async with self.sem:
 					if xrand(3):
-						s = await Request(f"https://www.gettyimages.co.uk/photos/{tag}?page={i}", decode=True, aio=True)
+						s = await Request.aio(f"https://www.gettyimages.co.uk/photos/{tag}?page={i}", decode=True)
 						url = "https://media.gettyimages.com/photos/"
 						spl = s.split(url)[1:]
 						imageset = [url + i.split('"', 1)[0].split("?", 1)[0] for i in spl]
 					else:
-						d = await Request(f"https://unsplash.com/napi/search/photos?query={tag}&per_page=30&page={i}", json=True, aio=True)
+						d = await Request.aio(f"https://unsplash.com/napi/search/photos?query={tag}&per_page=30&page={i}", json=True)
 						imageset = [result["urls"]["raw"] for result in d["results"]]
 				images.update(imageset)
 				if len(imageset) < 25:
@@ -2876,7 +2873,7 @@ class Giphy(ImagePool, Command):
 		file = f"giphy~{tag}"
 
 		async def fetch(tag, search_tag):
-			resp = await Request(f"https://api.giphy.com/v1/gifs/search?offset=0&type=gifs&sort=&explore=true&api_key={giphy_key}&q={search_tag}", aio=True, json=True)
+			resp = await Request.aio(f"https://api.giphy.com/v1/gifs/search?offset=0&type=gifs&sort=&explore=true&api_key={giphy_key}&q={search_tag}", json=True)
 			images = {entry["images"]["source"]["url"].split("?", 1)[0] for entry in resp["data"]}
 			return images
 
@@ -2885,7 +2882,7 @@ class Giphy(ImagePool, Command):
 			images = set()
 			for i in range(1, 100):
 				async with self.sem:
-					resp = await Request(f"https://api.giphy.com/v1/gifs/search?offset={i * 25}&type=gifs&sort=&explore=true&api_key={giphy_key}&q={search_tag}", aio=True, json=True)
+					resp = await Request.aio(f"https://api.giphy.com/v1/gifs/search?offset={i * 25}&type=gifs&sort=&explore=true&api_key={giphy_key}&q={search_tag}", json=True)
 				data = resp["data"]
 				if not data:
 					break

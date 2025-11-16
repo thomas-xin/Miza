@@ -57,7 +57,7 @@ douclub = None
 
 async def searchForums(query):
 	url = f"https://forum.cavestory.org/search/320966/?q={quote_plus(query)}"
-	s = await Request(url, aio=True, timeout=16, ssl=False, decode=True)
+	s = await Request.aio(url, timeout=16, ssl=False, decode=True)
 	output = []
 	i = 0
 	while i < len(s):
@@ -99,7 +99,7 @@ class SheetPull:
 	async def pull(self):
 		data = {}
 		for url in self.urls:
-			s = await Request(url, aio=True, timeout=16, decode=True)
+			s = await Request.aio(url, timeout=16, decode=True)
 			reader = csv.reader(s.splitlines(), delimiter="\t" if self.mode == "tsv" else ",")
 			data[url] = list(reader)[1:] # Skip header
 		return data

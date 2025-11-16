@@ -1545,7 +1545,7 @@ class Urban(Command):
 
 	async def __call__(self, channel, user, argv, message, **void):
 		url = f"https://mashape-community-urban-dictionary.p.rapidapi.com/define?term={quote_plus(argv)}"
-		d = await Request(url, headers=self.header, timeout=12, json=True, aio=True)
+		d = await Request.aio(url, headers=self.header, timeout=12, json=True)
 		resp = d["list"]
 		if not resp:
 			raise LookupError(f"No results for {argv}.")

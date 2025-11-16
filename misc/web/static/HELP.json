@@ -3472,7 +3472,7 @@
 			}
 		},
 		"Instruct": {
-			"aliases": ["Instruct", "Complete", "Completion", "O1", "O1M", "O3M", "O4M", "GPT5", "GPT5M", "GPT4", "GPT4M", "GPT3", "R1", "Grok", "Gemini", "Deepseek", "Claude", "Opus", "Sonnet", "Haiku", "Llama", "Qwen"],
+			"aliases": ["Instruct", "Complete", "Completion", "GPT5", "GPT4", "R1", "Grok", "Gemini", "Deepseek", "Claude"],
 			"description": "Similar to ~ask, but functions as instruct rather than chat.",
 			"level": "0",
 			"rate_limit": "(12, 16)",
@@ -3509,7 +3509,7 @@
 				"api": {
 					"type": "string",
 					"description": "Custom OpenAI-compatible API url, optionally followed by API key and then model, all separated with \"#\"",
-					"example": "https://api.deepinfra.com/v1/openai#your-api-key-here#lzlv-70b"
+					"example": "https://api.deepinfra.com/v1/openai#your-api-key-here#gpt-3.5-turbo"
 				},
 				"temperature": {
 					"type": "number",
@@ -3541,43 +3541,21 @@
 				}
 			},
 			"macros": {
-				"O1": {"model": "o1-preview"},
-				"O1M": {"model": "o1-mini"},
-				"O3M": {"model": "o3-mini"},
-				"O4M": {"model": "o4-mini"},
 				"GPT5": {"model": "gpt-5.1"},
-				"GPT5M": {"model": "gpt-5-mini"},
 				"GPT4": {"model": "gpt-4.1"},
-				"GPT4M": {
-					"model": "gpt-4.1-mini"
-				},
-				"GPT3": {"model": "gpt-3.5"},
 				"R1": {
 					"model": "deepseek-r1"
 				},
 				"Grok": {"model": "grok-4"},
 				"Gemini": {
-					"model": "gemini-2.5-flash-t"
+					"model": "gemini-2.5-pro"
 				},
 				"Deepseek": {
-					"model": "deepseek-v3"
+					"model": "deepseek-v3.2"
 				},
 				"Claude": {
-					"model": "claude-3.7-sonnet-t"
-				},
-				"Opus": {
-					"model": "claude-3-opus"
-				},
-				"Sonnet": {
-					"model": "claude-3.7-sonnet-t"
-				},
-				"Haiku": {
-					"model": "claude-3-haiku"
-				},
-				"Llama": {
-					"model": "llama-3-70b"
-				},
-				"Qwen": {"model": "qwen-72b"}
+					"model": "claude-4.5-sonnet"
+				}
 			}
 		},
 		"Imagine": {

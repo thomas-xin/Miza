@@ -245,11 +245,10 @@ class AttachmentCache(AutoCache):
 		if not m_id:
 			raise LookupError("Insufficient information to retrieve attachment.")
 		heads = self.headers if c_id not in self.channels else self.alt_headers
-		data = await Request(
+		data = await Request.aio(
 			f"https://discord.com/api/{api}/channels/{c_id}/messages/{m_id}",
 			headers=heads,
 			bypass=False,
-			aio=True,
 			json=True,
 		)
 		for i, a in enumerate(data["attachments"]):
@@ -305,11 +304,10 @@ class AttachmentCache(AutoCache):
 		size_mb, c_id, m_ids = ungroup_attachments(path)
 		urls = []
 		for m_id in m_ids:
-			data = await Request(
+			data = await Request.aio(
 				f"https://discord.com/api/{api}/channels/{c_id}/messages/{m_id}",
 				headers=self.headers,
 				bypass=False,
-				aio=True,
 				json=True,
 			)
 			if data.get("attachments"):

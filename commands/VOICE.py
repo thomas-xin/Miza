@@ -1813,7 +1813,7 @@ async def get_lyrics(item, url=None):
 					if "json" in cap["ext"]:
 						break
 				with tracebacksuppressor:
-					data = await Request(cap["url"], aio=True, json=True, timeout=18)
+					data = await Request.aio(cap["url"], json=True, timeout=18)
 					lyr = []
 					for event in data["events"]:
 						para = "".join(seg.get("utf8", "") for seg in event.get("segs", ()))
@@ -1825,7 +1825,7 @@ async def get_lyrics(item, url=None):
 	url = f"https://genius.com/api/search/multi?q={item}"
 	for i in range(2):
 		data = {"q": item}
-		rdata = await Request(url, data=data, aio=True, json=True, timeout=18)
+		rdata = await Request.aio(url, data=data, json=True, timeout=18)
 		hits = chain.from_iterable(sect["hits"] for sect in rdata["response"]["sections"])
 		path = None
 		for h in hits:
@@ -1835,7 +1835,7 @@ async def get_lyrics(item, url=None):
 				break
 		if path:
 			s = "https://genius.com" + path
-			page = await Request(s, decode=True, aio=True)
+			page = await Request.aio(s, decode=True)
 			text = page
 			html = await asubmit(BeautifulSoup, text, "html.parser", timeout=18)
 			lyricobj = html.find('div', class_='lyrics')
@@ -1990,10 +1990,9 @@ class Download(Command):
 			raise IndexError("Please input a search term or URL.")
 		if query and not url:
 			query = verify_search(query)
-			res = await Request(
+			res = await Request.aio(
 				f"https://api.mizabot.xyz/ytdl?q={quote_plus(query)}",
 				json=True,
-				aio=True,
 			)
 			if not res:
 				raise LookupError(f"No results found for {query}.")

@@ -1,8 +1,8 @@
-# ruff: noqa: E402
-import subprocess
+import json
 import os
 os.environ["PYTHONUTF8"] = "1"
-import json
+import subprocess
+from misc.types import pretty_json
 
 
 AUTH = {
@@ -43,8 +43,9 @@ else:
 		AUTH["default_personality"] = ""
 	AUTH.update(orig)
 if set(AUTH).difference(orig):
+	data = pretty_json(AUTH)
 	with open("auth.json", "w", encoding="utf-8") as f:
-		json.dump(AUTH, f, indent="\t")
+		f.write(data)
 	if "discord_token" not in orig:
 		token = input("auth.json generated. Please fill in discord_token and restart bot when done. ")
 		if not token:

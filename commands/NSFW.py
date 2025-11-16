@@ -303,13 +303,12 @@ class Neko(Command):
 				tag = "neko"
 				if not xrand(50) and not self.moe_sem.is_busy():
 					async with self.moe_sem:
-						resp = await Request(
+						resp = await Request.aio(
 							"https://nekos.moe/api/v1/images/search",
 							data=json_dumps(dict(nsfw=False, limit=50, skip=xrand(10) * 50, sort="newest", artist="", uploader="")),
 							headers={"Content-Type": "application/json"},
 							method="POST",
 							json=True,
-							aio=True,
 						)
 					out = set("https://nekos.moe/image/" + e["id"] for e in resp["images"])
 					if out:
@@ -320,7 +319,7 @@ class Neko(Command):
 				if xrand(2) and not self.nekobot_sem.neko.is_busy():
 					nekobot_sem = self.nekobot_sem.neko
 					async with nekobot_sem:
-						data = await Request("https://nekobot.xyz/api/image?type=neko", aio=True, json=True)
+						data = await Request.aio("https://nekobot.xyz/api/image?type=neko", json=True)
 					return data["message"]
 			if (tag in nekobot_exclusive or tag in nekobot_shared and xrand(2)):
 				if tag not in self.nekobot_sem:
@@ -331,12 +330,11 @@ class Neko(Command):
 				with suppress(SemaphoreOverflowError):
 					async with nekobot_sem:
 						url = f"https://nekobot.xyz/api/image?type={tag}"
-						# print(url, len(self.nekobot_sem.rate_bin))
-						data = await Request(url, aio=True, json=True)
+						data = await Request.aio(url, json=True)
 					return data["message"]
 				return
 			if tag in nekoslife_deprecated:
-				data = await Request(f"https://nekos.life/api/v2/img/{tag}", aio=True, json=True)
+				data = await Request.aio(f"https://nekos.life/api/v2/img/{tag}", json=True)
 				return data["url"]
 			return await asubmit(nekos.img, tag)
 

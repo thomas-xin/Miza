@@ -778,10 +778,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Gets the full list of invites from a guild, if applicable."
 		member = guild.get_member(self.id)
 		if member.guild_permissions.create_instant_invite:
-			invitedata = await Request(
+			invitedata = await Request.aio(
 				f"https://discord.com/api/{api}/guilds/{guild.id}/invites",
 				authorise=True,
-				aio=True,
 				json=True,
 			)
 			invites = [cdict(invite) for invite in invitedata]
@@ -1987,7 +1986,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def force_completion(self, model, prompt, stream=True, max_tokens=1024, strip=True, **kwargs):
 		ctx = ai.contexts.get(model, 4096)
 		is_question = prompt.endswith(".") or prompt.endswith("?")
-		if model in ai.is_completion and (model not in ai.is_chat or not is_question) or model not in ai.is_chat:
+		if model in ai.is_completion:
 			count = await tcount(prompt, model="llamav2")
 			max_tokens = min(max_tokens, ctx - count - 64)
 			if "max_completion_tokens" not in kwargs:
@@ -2026,7 +2025,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def force_chat(self, model, messages, text=None, assistant_name=None, stream=False, max_tokens=1024, vision_model=None, **kwargs):
 		ctx = ai.contexts.get(model, 4096)
 		messages, vision_model = await self.caption_into(messages, model=model, backup_model=vision_model, premium_context=kwargs.get("premium_context", []))
-		if vision_model in ai.is_chat:
+		if vision_model not in is_completion:
 			count = await count_to(messages)
 			max_tokens = min(max_tokens, ctx - count - 64)
 			if "max_completion_tokens" not in kwargs:
@@ -2248,7 +2247,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			examples=examples,
 			model=model,
 		)
-		data = await Request(
+		data = await Request.aio(
 			"https://api.cohere.ai/v1/classify",
 			method="POST",
 			headers={
@@ -2256,7 +2255,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				"Content-Type": "application/json",
 			},
 			data=json_dumps(inputs),
-			aio=True,
 			json=True,
 			timeout=24,
 		)
@@ -2567,7 +2565,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if text:
 					yield "\r"
 					text = ""
-			elif assistant in ai.is_chat:
+			elif assistant not in is_completion:
 				if text:
 					yield "\r"
 					text = ""
@@ -2870,7 +2868,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		s = None
 		if mistral_key:
 			mistral_headers = {"Content-Type": "application/json", "Authorization": f"Bearer {mistral_key}"}
-			resp = await Request(
+			resp = await Request.aio(
 				"https://api.mistral.ai/v1/ocr",
 				method="POST",
 				headers=mistral_headers,
@@ -2879,7 +2877,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					document=dict(type="image_url", image_url=data)
 				)),
 				json=True,
-				aio=True,
 			)
 			print(resp)
 			s = "\n\n".join(page["markdown"] for page in resp["pages"]).strip()
@@ -4059,7 +4056,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Gets the external IP address from api.ipify.org"
 		if not self.ip_sem.busy:
 			async with self.ip_sem:
-				self.ip = await Request("https://api.ipify.org", bypass=False, decode=True, timeout=3, aio=True)
+				self.ip = await Request.aio("https://api.ipify.org", bypass=False, decode=True, timeout=3)
 		return self.ip
 
 	total_hosted = 0
@@ -5741,9 +5738,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			for r in range(64):
 				try:
 					async with self.load_semaphore:
-						memberdata = await Request(
+						memberdata = await Request.aio(
 							f"https://discord.com/api/{api}/guilds/{guild.id}/members?limit=1000&after={x}",
-							aio=True,
 							authorise=True,
 							json=True,
 							timeout=32,
@@ -5803,12 +5799,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				int_id, int_token = message.id, message.slash
 			else:
 				return
-			data = await Request(
+			data = await Request.aio(
 				f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
 				method="POST",
 				authorise=True,
 				data='{"type":5,"data":{"flags":64}}' if ephemeral else '{"type":5}' if mode == "post" else '{"type":6}',
-				aio=True,
 			)
 			print("Deferred:", message.id, data)
 			self.inter_cache[int_id] = int_token
@@ -5839,12 +5834,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			try:
 				if skip:
 					raise ConnectionError(400)
-				m = await Request(
+				m = await Request.aio(
 					f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
 					method="POST",
 					authorise=True,
 					data='{"type":6}',
-					aio=True,
 				)
 			except ConnectionError:
 				m = await interaction_response(self, message, "\xad")
@@ -5951,12 +5945,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 								embeds=[emb.to_dict() for emb in kwargs.get("embeds", ())] or ([kwargs["embed"].to_dict()] if kwargs.get("embed") is not None else None),
 							)
 							try:
-								resp = await Request(
+								resp = await Request.aio(
 									f"https://discord.com/api/{api}/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
 									method="POST",
 									authorise=True,
 									data=data,
-									aio=True,
 									json=True,
 								)
 							except Exception:
@@ -5970,12 +5963,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				async with getattr(w, "semaphore", emptyctx):
 					w = getattr(w, "webhook", w)
 					if hasattr(channel, "thread"):
-						resp = await Request(
+						resp = await Request.aio(
 							f"https://discord.com/api/{api}/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
 							method="POST",
 							authorise=True,
 							data=data,
-							aio=True,
 							json=True,
 						)
 						message = self.ExtendedMessage.new(resp)
@@ -6382,12 +6374,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			async def external_heartbeat():
 				if not Request.sessions:
 					return
-				return await Request(
+				return await Request.aio(
 					f"https://{addr}/authorised-heartbeat?key={quote_plus(key)}&uri={quote_plus(uri)}",
 					method="POST",
 					headers={"content-type": "application/json"},
 					data=orjson.dumps(dict(data=encoded)),
-					aio=True,
 					timeout=5,
 					session=Request.sessions.next(),
 				)
@@ -6913,12 +6904,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					data["embeds"] = [data.pop("embed").to_dict()]
 				elif "embeds" in data:
 					data["embeds"] = [emb.to_dict() for emb in data["embeds"]]
-				resp = await Request(
+				resp = await Request.aio(
 					f"https://discord.com/api/{api}/webhooks/{webhook.id}/{webhook.token}/messages/{self.id}",
 					data=data,
 					authorise=True,
 					method="PATCH",
-					aio=True,
 					json=True,
 				)
 				return self.__class__.new(channel=self.channel, data=resp)

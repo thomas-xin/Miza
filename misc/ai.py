@@ -233,98 +233,10 @@ available = {
 	},
 }
 
-# tags: is_chat, is_completion, is_function, is_vision, is_premium
-is_chat = {
-	"claude-3.7-sonnet-t",
-	"claude-3.7-sonnet",
-	"claude-3.5-sonnet",
-	"claude-3.5-haiku",
-	"claude-3-opus",
-	"claude-3-sonnet",
-	"claude-3-haiku",
-	"command-r",
-	"command-r-plus",
-	"35b-beta-long",
-	"llama-3-8b",
-	"llama-3-11b",
-	"llama-3-70b",
-	"llama-3-90b",
-	"llama-3-405b",
-	"reflection-llama-3-70b",
-	"euryale-70b",
-	"lzlv-70b",
-	"magnum-72b",
-	"qwen3-235b",
-	"qwen-72b",
-	"grok-4",
-	"grok-4-fast",
-	"grok-3",
-	"grok-3-mini",
-	"gemini-2.5-pro",
-	"gemini-2.5-flash-t",
-	"gemini-2.5-flash",
-	"gemini-2.0",
-	"gpt-oss-120b",
-	"gpt-oss-20b",
-	"o4-mini",
-	"o3",
-	"o3-mini",
-	"o1",
-	"o1-preview",
-	"o1-mini",
-	"gpt-5.1",
-	"gpt-5",
-	"gpt-5-mini",
-	"gpt-5-nano",
-	"gpt-4.1",
-	"gpt-4.1-mini",
-	"gpt-4",
-	"chatgpt-4o-latest",
-	"gpt-4-mini",
-	"gpt-4o-mini",
-	"gpt-3.5",
-	"gpt-3.5-turbo",
-	"minimax-m2",
-	"minimax-m1",
-	"minimax-01",
-	"deepseek-r1",
-	"deepseek-v3.2",
-	"deepseek-v3.1",
-	"deepseek-v3",
-	"skyfall-36b",
-	"mistral-24b",
-	"kimi-k2-t",
-	"kimi-k2",
-	"caller-large",
-	"firefunction-v2",
-	"firefunction-v1",
-	"firellava-13b",
-	"phi-4b",
-	"wizard-8x22b",
-	"mixtral-8x22b-instruct",
-	"mixtral-8x7b-instruct",
-}
+# tags: is_completion, is_function, is_vision, is_premium
 is_completion = {
-	"command-r-plus",
-	"35b-beta-long",
-	"magnum-72b",
-	"qwen-72b",
 	"dbrx-instruct",
-	"miquliz-120b",
 	"gpt-3.5-turbo-instruct",
-	"llama-3-8b",
-	"llama-3-11b",
-	"llama-3-70b",
-	"llama-3-90b",
-	"llama-3-405b",
-	"reflection-llama-3-70b",
-	"euryale-70b",
-	"lzlv-70b",
-	"phi-4b",
-	"wizard-8x22b",
-	"mixtral-8x22b-instruct",
-	"mixtral-8x7b-instruct",
-	"mixtral-8x7b",
 }
 is_reasoning = {
 	"claude-4.1-opus",
@@ -441,12 +353,14 @@ is_vision = {
 	"phi-4b",
 }
 is_premium = {
-	"claude-3.7-sonnet-t",
-	"claude-3.7-sonnet",
-	"claude-3.5-sonnet",
-	"claude-3-opus",
-	"claude-3-sonnet",
+	"claude-4.5-opus",
+	"claude-4.1-opus",
+	"claude-4-opus",
+	"claude-4.5-sonnet",
+	"claude-4-sonnet",
 	"llama-3-405b",
+	"gpt-5.1",
+	"gpt-5",
 	"grok-4",
 	"gemini-2.5-pro",
 	"o3",
@@ -886,7 +800,16 @@ async def summarise(q, min_length=384, max_length=65536, padding=128, best=True,
 		return q
 	return await _summarise(q, summ_length, best=best, prompt=prompt, premium_context=premium_context)
 
-async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium_context=[]):
+info = AUTH.get("summarisation_model")
+if info:
+	model = info.get("model", "x")
+	api_key = info.get("api_key", "x")
+	base_url = info.get("base_url", "x")
+	summarisation_model = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
+	summarisation_model.model = model
+else:
+	summarisation_model = None
+async def _summarise(s, max_length, best=False, prompt=None, premium_context=[]):
 	if len(s) <= max_length:
 		return s
 	s = lim_tokens(s, 98304, mode="right")
@@ -902,10 +825,15 @@ async def _summarise(s, max_length, prune=True, best=False, prompt=None, premium
 			ml = round_random(max_length)
 			c = await tcount(prompt)
 			# Prefer gpt-5-nano and gpt-oss-20b for summaries if possible due to the much faster throughput and lower cost, but fallback to grok-4-fast if necessary (due to its higher token limit of 2 million).
-			model = "gpt-5-nano" if best > 1 else "gpt-oss-20b"
+			if summarisation_model:
+				api = summarisation_model
+				model = api.model
+			else:
+				api = None
+				model = "gpt-5-nano" if best > 1 else "gpt-oss-20b"
 			if c > contexts.get(model, 65536) * 2 / 3:
 				model = "grok-4-fast"
-			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
+			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context, api=api)
 			if model in is_reasoning:
 				data["reasoning_effort"] = "minimal"
 			resp = await instruct(data, best=True, skip=True)
@@ -1179,7 +1107,10 @@ async def _instruct2(data, best=False, skip=False, prune=True, user=None):
 		if resp != resp2:
 			print("PRUNED:", resp, resp2, sep="::")
 			resp = resp2
-	resp = resp.replace("<think>", "").replace("</think>", "").strip()
+	resp = resp.strip()
+	resp2 = resp.split("</think>", 1)[-1]
+	if resp2:
+		resp = resp2.replace("<think>", "").replace("</think>", "").strip()
 	return (resp, best)
 
 async def _instruct(data, best=False, skip=False, user=None):
@@ -1202,7 +1133,7 @@ async def _instruct(data, best=False, skip=False, user=None):
 		dec = True and not skip
 	if dec:
 		inputs["model"] = "auto" if best else "llama-3-70b"
-	if data["model"] in is_chat:
+	if data["model"] not in is_completion:
 		prompt = inputs.pop("prompt")
 		inputs["messages"] = [cdict(role="user", content=prompt)]
 		async with asyncio.timeout(70):

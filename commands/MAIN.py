@@ -1610,7 +1610,7 @@ class UpdateFlavour(Database):
 					raise KeyError
 			except KeyError:
 				s = str(datetime.datetime.fromtimestamp(xrand(1462456800, utc())).date())
-				data = await Request("https://www.uselessfacts.net/api/posts?d=" + s, timeout=24, json=True, aio=True)
+				data = await Request.aio("https://www.uselessfacts.net/api/posts?d=" + s, timeout=24, json=True)
 				factlist = [fact["title"].replace("`", "") for fact in data if "title" in fact]
 				useless.extend(factlist)
 				useless.uniq()

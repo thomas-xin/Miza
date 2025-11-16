@@ -1289,11 +1289,10 @@ class UpdateEmojis(Database):
 			return self.emojidata
 		bot = self.bot
 		async with self.sem2:
-			emojidata = self.emojidata = await Request(
+			emojidata = self.emojidata = await Request.aio(
 				f"https://discord.com/api/{api}/applications/{bot.id}/emojis",
 				authorise=True,
 				json=True,
-				aio=True,
 				timeout=32,
 			)
 			fns = set(chain.from_iterable(t[2] for t in os.walk("misc/emojis")))
@@ -1343,7 +1342,7 @@ class UpdateEmojis(Database):
 			b = await process_image(b, "replace_colour", [rgb, "-f", "webp"], timeout=60)
 			b2 = await bot.to_data_url(b)
 			async with self.sem3:
-				edata = await Request(
+				edata = await Request.aio(
 					f"https://discord.com/api/{api}/applications/{bot.id}/emojis",
 					method="POST",
 					data=orjson.dumps(dict(
@@ -1355,7 +1354,6 @@ class UpdateEmojis(Database):
 					},
 					authorise=True,
 					json=True,
-					aio=True,
 					timeout=32,
 				)
 			emoji = discord.Emoji(guild=bot.user, state=bot._state, data=edata)
@@ -1404,7 +1402,7 @@ class UpdateEmojis(Database):
 				b = await asubmit(f.read)
 			b2 = await bot.to_data_url(b)
 			async with self.sem3:
-				edata = await Request(
+				edata = await Request.aio(
 					f"https://discord.com/api/{api}/applications/{bot.id}/emojis",
 					method="POST",
 					data=orjson.dumps(dict(
@@ -1416,7 +1414,6 @@ class UpdateEmojis(Database):
 					},
 					authorise=True,
 					json=True,
-					aio=True,
 					timeout=32,
 				)
 			emoji = discord.Emoji(guild=bot.user, state=bot._state, data=edata)

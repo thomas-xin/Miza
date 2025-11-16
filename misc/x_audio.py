@@ -202,11 +202,10 @@ class AudioPlayer(discord.AudioSource):
 			cls.fetched.setdefault(gid, set()).add(uid)
 			# Manually fetch voice state, as discord.py does not do this automatically
 			try:
-				data = await Request(
+				data = await Request.aio(
 					f"https://discord.com/api/{api}/guilds/{gid}/voice-states/{uid}",
 					authorise=True,
 					json=True,
-					aio=True,
 					timeout=VC_TIMEOUT,
 				)
 			except ConnectionError:
@@ -228,12 +227,11 @@ class AudioPlayer(discord.AudioSource):
 	@classmethod
 	async def speak(cls, vcc):
 		"""Overrides speaking permissions in a stage voice channel."""
-		return await Request(
+		return await Request.aio(
 			f"https://discord.com/api/{api}/guilds/{vcc.guild.id}/voice-states/@me",
 			method="PATCH",
 			authorise=True,
 			data={"suppress": False, "request_to_speak_timestamp": None, "channel_id": vcc.id},
-			aio=True,
 		)
 
 	@classmethod
@@ -245,12 +243,11 @@ class AudioPlayer(discord.AudioSource):
 		fut = cls.waiting.pop(guild.id, None)
 		if fut:
 			fut.cancel()
-		resp = await Request(
+		resp = await Request.aio(
 			f"https://discord.com/api/{api}/guilds/{guild.id}/members/{client.user.id}",
 			method="PATCH",
 			authorise=True,
 			data={"channel_id": None},
-			aio=True,
 		)
 		# This removes the cached voice state, which is necessary for reconnecting to a voice channel after a disconnect
 		vc = client._connection._voice_clients.pop(guild.id, None)
@@ -1342,7 +1339,7 @@ class LiveAudioReader(discord.AudioSource):
 		with tracebacksuppressor:
 			try:
 				self.resp = niquests.get(stream, headers=Request.header(), stream=True, timeout=24)
-				it = self.resp.iter_content(65536)
+				it = self.resp.iter_content(8192)
 				b = next(it)
 				fut = esubmit(next, it)
 				proc.stdin.write(b)

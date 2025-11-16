@@ -51,7 +51,7 @@ except Exception:
 import niquests
 import requests
 from misc.smath import predict_next, display_to_precision, unicode_prune, full_prune
-from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, fcdict, as_bytes, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, MultiEncoder # noqa: F401
+from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, fcdict, as_bytes, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, pretty_json, MultiEncoder # noqa: F401
 from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, asubmit, csubmit, esubmit, tsubmit, Future, Semaphore
 
 try:
@@ -118,8 +118,9 @@ _globals = globals()
 def save_auth(auth):
 	globals()["AUTH"].update(auth)
 	_globals["AUTH"].update(auth)
+	data = pretty_json(AUTH)
 	with open("auth.json", "w", encoding="utf-8") as f:
-		json.dump(AUTH, f, indent="\t")
+		f.write(data)
 
 
 DC = 0
@@ -4919,7 +4920,25 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		self.ts = utc()
 		return self
 
-	async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True, timeout=24) -> bytes | str | json_like:
+	async def aio(self, url, headers=None, files=None, data=None, method="GET", decode=False, json=False, bypass=True, session=None, ssl=None, timeout=24, authorise=False) -> bytes | str | json_like:
+		if headers is None:
+			headers = {}
+		if authorise:
+			token = AUTH["discord_token"]
+			headers["Authorization"] = f"Bot {token}"
+			if data:
+				if not isinstance(data, aiohttp.FormData):
+					if not isinstance(data, (str, bytes, memoryview)):
+						data = json_dumps(data)
+			if data and (isinstance(data, (list, dict)) or (data[:1] in '[{"') if isinstance(data, str) else (data[:1] in b'[{"' if isinstance(data, (bytes, memoryview)) else False)):
+				headers["Content-Type"] = "application/json"
+			session = None
+		elif bypass:
+			if "user-agent" not in headers and "User-Agent" not in headers:
+				headers["User-Agent"] = USER_AGENT
+				headers["X-Forwarded-For"] = ".".join(str(random.randint(1, 254)) for _ in loop(4))
+			headers["DNT"] = "1"
+		method = method.upper()
 		verify = True if ssl is not False else False
 		if not self.ts:
 			await self._init_()
@@ -4928,11 +4947,11 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		elif not session:
 			async with niquests.AsyncSession() as asession:
 				try:
-					resp = await asession.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=verify)
+					resp = await asession.request(method, url, headers=headers, files=files, data=data, timeout=timeout, verify=verify)
 				except niquests.exceptions.SSLError:
 					if ssl is not None:
 						raise
-					resp = await asession.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=False)
+					resp = await asession.request(method, url, headers=headers, files=files, data=data, timeout=timeout, verify=False)
 				if resp.status_code >= 400:
 					raise ConnectionError(resp.status_code, (url, as_str(resp.content)))
 				if json:
@@ -4942,7 +4961,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				return resp.content
 		async with self.semaphore:
 			req = session or (self.sessions.next() if ssl else self.nossl)
-			resp = await req.request(method.upper(), url, headers=headers, data=data, timeout=timeout)
+			resp = await req.request(method, url, headers=headers, data=data, timeout=timeout)
 			status = T(resp).get("status_code") or getattr(resp, "status", 400)
 			if status >= 400:
 				try:
@@ -4968,7 +4987,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				return as_str(data)
 			return data
 
-	def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, proxy=False, aio=False, session=None, ssl=None, authorise=False) -> bytes | str | json_like:
+	def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, session=None, ssl=None, authorise=False) -> bytes | str | json_like:
 		"Creates and executes a HTTP request, returning the body in bytes, string or JSON format. Raises an exception if status code is below 200 or above 399"
 		if headers is None:
 			headers = {}
@@ -4981,18 +5000,13 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 						data = json_dumps(data)
 			if data and (isinstance(data, (list, dict)) or (data[:1] in '[{"') if isinstance(data, str) else (data[:1] in b'[{"' if isinstance(data, (bytes, memoryview)) else False)):
 				headers["Content-Type"] = "application/json"
-			if aio:
-				session = None
-			else:
-				session = self.session
+			session = self.session
 		elif bypass:
 			if "user-agent" not in headers and "User-Agent" not in headers:
 				headers["User-Agent"] = USER_AGENT
 				headers["X-Forwarded-For"] = ".".join(str(random.randint(1, 254)) for _ in loop(4))
 			headers["DNT"] = "1"
 		method = method.casefold()
-		if aio:
-			return csubmit(asyncio.wait_for(self.aio_call(url, headers, files, data, method, decode, json, session, ssl, timeout=timeout), timeout=timeout))
 		with self.semaphore:
 			req = self.session
 			verify = True if ssl is not False else False

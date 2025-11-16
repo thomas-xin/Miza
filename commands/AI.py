@@ -648,7 +648,7 @@ class Instruct(Command):
 		api=cdict(
 			type="string",
 			description="Custom OpenAI-compatible API url, optionally followed by API key and then model, all separated with \"#\"",
-			example="https://api.deepinfra.com/v1/openai#your-api-key-here#lzlv-70b",
+			example="https://api.deepinfra.com/v1/openai#your-api-key-here#gpt-3.5-turbo",
 		),
 		temperature=cdict(
 			type="number",
@@ -680,32 +680,11 @@ class Instruct(Command):
 		),
 	)
 	macros = cdict(
-		O1=cdict(
-			model="o1-preview",
-		),
-		O1M=cdict(
-			model="o1-mini",
-		),
-		O3M=cdict(
-			model="o3-mini",
-		),
-		O4M=cdict(
-			model="o4-mini",
-		),
 		GPT5=cdict(
 			model="gpt-5.1",
 		),
-		GPT5M=cdict(
-			model="gpt-5-mini",
-		),
 		GPT4=cdict(
 			model="gpt-4.1",
-		),
-		GPT4M=cdict(
-			model="gpt-4.1-mini",
-		),
-		GPT3=cdict(
-			model="gpt-3.5",
 		),
 		R1=cdict(
 			model="deepseek-r1",
@@ -714,28 +693,13 @@ class Instruct(Command):
 			model="grok-4",
 		),
 		Gemini=cdict(
-			model="gemini-2.5-flash-t",
+			model="gemini-2.5-pro",
 		),
 		Deepseek=cdict(
-			model="deepseek-v3",
+			model="deepseek-v3.2",
 		),
 		Claude=cdict(
-			model="claude-3.7-sonnet-t",
-		),
-		Opus=cdict(
-			model="claude-3-opus",
-		),
-		Sonnet=cdict(
-			model="claude-3.7-sonnet-t",
-		),
-		Haiku=cdict(
-			model="claude-3-haiku",
-		),
-		Llama=cdict(
-			model="llama-3-70b",
-		),
-		Qwen=cdict(
-			model="qwen-72b",
+			model="claude-4.5-sonnet",
 		),
 	)
 	rate_limit = (12, 16)
@@ -763,7 +727,7 @@ class Instruct(Command):
 			if key:
 				head["Authorization"] = "Bearer " + key
 			if not model:
-				info = await self.cache.aretrieve(api, Request, api + "/models", headers=head, aio=True, json=True)
+				info = await self.cache.aretrieve(api, Request.aio, api + "/models", headers=head, json=True)
 				models = [m.get("id") for m in sorted(info["data"], key=lambda m: m.get("created"), reverse=True)]
 				model = models[0]
 			key = key or "x"
@@ -775,7 +739,7 @@ class Instruct(Command):
 			kwargs["max_tokens"] = max_tokens
 		if not model:
 			raise ValueError("No model specified")
-		resp = await bot.force_completion(model=model, prompt=prompt, stream=True, timeout=120, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, premium_context=_premium, allow_alt=False, **kwargs)
+		resp = await bot.force_completion(model=model, prompt=prompt, stream=True, timeout=120, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, premium_context=_premium, allow_alt=True, **kwargs)
 		try:
 			_message.__dict__.setdefault("inits", []).append(resp)
 		except Exception:
@@ -1225,7 +1189,7 @@ class Imagine(Command):
 						cost = "0.12" if q == "hd" else "0.08"
 					_premium.append(["openai", resp_model, cost])
 			temp_futs = []
-			futs.extend(csubmit(Request(im.url, timeout=48, aio=True)) for im in images)
+			futs.extend(csubmit(Request.aio(im.url, timeout=48)) for im in images)
 			for fut in temp_futs:
 				fut.model = resp_model
 			futs.extend(temp_futs)
@@ -1260,7 +1224,7 @@ class Imagine(Command):
 				prompt = p.replace(" BREAK ", "\n")
 				steps = max(1, round_random(num_inference_steps / 8))
 				if use_together:
-					fut = csubmit(Request(
+					fut = csubmit(Request.aio(
 						"https://api.together.xyz/v1/images/generations",
 						method="POST",
 						headers={"Content-Type": "application/json", "Authorization": "Bearer " + AUTH["together_key"]},
@@ -1275,11 +1239,10 @@ class Imagine(Command):
 							image_base64=[url] if url else [],
 						)),
 						json=True,
-						aio=True,
 						timeout=60,
 					))
 				else:
-					fut = csubmit(Request(
+					fut = csubmit(Request.aio(
 						f"https://api.deepinfra.com/v1/inference/{resp_model}",
 						method="POST",
 						headers={"Content-Type": "application/json", "Authorization": "Bearer " + AUTH["deepinfra_key"]},
@@ -1291,7 +1254,6 @@ class Imagine(Command):
 							height=h,
 						)),
 						json=True,
-						aio=True,
 						timeout=60,
 					))
 				pnames.extend([prompt] * n)
@@ -1424,22 +1386,20 @@ class Imagine(Command):
 				updatedefault(data["prompt"], entry["prompt"])
 				self.comfyui_i = (self.comfyui_i + 1) % self.comfyui_n
 				cost = mpf("0.00024") * (steps * w * h / 1048576)
-				resp = await Request(
+				resp = await Request.aio(
 					api + "/prompt",
 					data=json_dumps(data),
 					headers={"Content-Type": "application/json"},
 					method="POST",
 					json=True,
-					aio=True,
 				)
 				number = resp["number"]
 				queue.append((api, seed, number, n, prompt))
 			for api, seed, number, n, prompt in queue:
 				for att in range(1, 20):
-					resp = await Request(
+					resp = await Request.aio(
 						api + "/queue",
 						json=True,
-						aio=True,
 					)
 					waiting = False
 					for q in itertools.chain(resp["queue_running"], resp["queue_pending"]):

@@ -1,5 +1,3 @@
-# ruff: noqa: E401 E402 E731 F401 F403 F405
-
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 
@@ -19,6 +17,8 @@ import psutil, subprocess, weakref, zipfile, urllib, asyncio, json, pickle, func
 # VERY HACKY removes deprecated audioop dependency for discord.py; this would cause volume transformations to fail but Miza uses FFmpeg for them anyway
 sys.modules["audioop"] = sys
 import discord, discord.utils, discord.file  # noqa: E402
+
+import invisicode
 
 from misc.asyncs import *
 
@@ -200,7 +200,7 @@ async def interaction_response(bot, message, content=None, embed=None, embeds=()
 	if not getattr(message, "int_token", None):
 		message.int_token = message.slash
 	ephemeral = ephemeral and 64
-	resp = await Request(
+	resp = await Request.aio(
 		f"https://discord.com/api/{api}/interactions/{message.int_id}/{message.int_token}/callback",
 		data=json_dumps(dict(
 			type=4,
@@ -213,7 +213,6 @@ async def interaction_response(bot, message, content=None, embed=None, embeds=()
 		)),
 		method="POST",
 		authorise=True,
-		aio=True,
 	)
 	# print("INTERACTION_RESPONSE", resp)
 	bot = BOT[0]
@@ -238,7 +237,7 @@ async def interaction_post(bot, message, content=None, embed=None, embeds=(), co
 	if not getattr(message, "int_token", None):
 		message.int_token = message.slash
 	ephemeral = ephemeral and 64
-	resp = await Request(
+	resp = await Request.aio(
 		f"https://discord.com/api/{api}/webhooks/{bot.id}/{message.int_token}",
 		data=json_dumps(dict(
 			flags=ephemeral,
@@ -248,7 +247,6 @@ async def interaction_post(bot, message, content=None, embed=None, embeds=(), co
 		)),
 		method="POST",
 		authorise=True,
-		aio=True,
 	)
 	# print("INTERACTION_POST", resp)
 	bot = BOT[0]
@@ -279,7 +277,7 @@ async def interaction_patch(bot, message, content=None, embed=None, embeds=(), a
 	extra = {} if attachments is None else dict(attachments=attachments)
 	if components or buttons:
 		extra["components"] = components or restructure_buttons(buttons)
-	resp = await Request(
+	resp = await Request.aio(
 		f"https://discord.com/api/{api}/webhooks/{bot.id}/{message.int_token}/messages/{mid}",
 		data=json_dumps(dict(
 			content=content,
@@ -288,7 +286,6 @@ async def interaction_patch(bot, message, content=None, embed=None, embeds=(), a
 		)),
 		method="PATCH",
 		authorise=True,
-		aio=True,
 	)
 	# print("INTERACTION_PATCH", resp)
 	bot = BOT[0]
@@ -575,12 +572,11 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 				)
 				body = form
 			async with sem:
-				resp = await Request(
+				resp = await Request.aio(
 					url,
 					method=method,
 					data=body,
 					authorise=True,
-					aio=True,
 				)
 		except Exception as ex:
 			exc = ex
@@ -595,12 +591,11 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 					method = "patch"
 					body = json_dumps(data["data"])
 					print("Retrying interaction:", url, method, body)
-					resp = await Request(
+					resp = await Request.aio(
 						url,
 						method=method,
 						data=body,
 						authorise=True,
-						aio=True,
 					)
 					message = M(state=bot._state, channel=channel, data=eval_json(resp))
 					if ephemeral:
@@ -631,11 +626,10 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 			if not resp:
 				if url.endswith("/callback") and hasattr(reference, "slash"):
 					url = f"https://discord.com/api/{api}/webhooks/{bot.id}/{reference.slash}/messages/@original"
-					resp = await Request(
+					resp = await Request.aio(
 						url,
 						method="GET",
 						authorise=True,
-						aio=True,
 					)
 				if not resp:
 					return
@@ -722,12 +716,11 @@ async def manual_edit(message, **fields):
 		)
 		body = form
 	async with sem:
-		resp = await Request(
+		resp = await Request.aio(
 			url,
 			method=method,
 			data=body,
 			authorise=True,
-			aio=True,
 		)
 	message._update(eval_json(resp))
 	return message

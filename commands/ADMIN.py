@@ -1036,10 +1036,9 @@ class Archive(Command):
 				headers = {"Authorization": token, "Content-Type": "application/json"}
 				try:
 					data = await create_future(
-						Request,
+						Request.aio,
 						f"https://discord.com/api/v10/channels/{oid}",
 						headers=headers,
-						aio=True,
 						json=True,
 						bypass=False,
 					)
@@ -1048,10 +1047,9 @@ class Archive(Command):
 					target = str(c.id) + ","
 				except ConnectionError:
 					data = await create_future(
-						Request,
+						Request.aio,
 						f"https://discord.com/api/v10/guilds/{oid}",
 						headers=headers,
-						aio=True,
 						json=True,
 						bypass=False,
 					)
@@ -3373,11 +3371,10 @@ class ThreadList(Command):
 			for mode in ("public", "private"):
 				async with sem:
 					url = f"https://discord.com/api/{api}/channels/{c.id}/threads/archived/{mode}"
-					futs.append(Request(
+					futs.append(Request.aio(
 						url,
 						method="GET",
 						authorise=True,
-						aio=True,
 						json=True,
 					))
 		for fut in futs:
