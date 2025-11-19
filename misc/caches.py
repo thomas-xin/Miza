@@ -1,5 +1,6 @@
 import asyncio
 import concurrent.futures
+import fractions
 import io
 import os
 import random
@@ -12,11 +13,12 @@ import zipfile
 import aiofiles
 import aiohttp
 import niquests
-import streamshatter
 import numpy as np
 from PIL import Image
+import psutil
 import requests
-from misc.types import utc, as_str, byte_like
+import streamshatter
+from misc.types import utc, as_str, byte_like, cdict
 from misc.asyncs import asubmit, esubmit, wrap_future, await_fut, Future
 from misc.smath import get_closest_heart
 from misc.util import (
@@ -504,6 +506,55 @@ class AttachmentCache(AutoCache):
 		return out
 
 
+audio_meta_cache = AutoCache(f"{CACHE_PATH}/audio_meta", stale=0, timeout=300)
+def _audio_meta(path, _timeout=12) -> dict:
+	command = (
+		"ffprobe",
+		"-v",
+		"error",
+		"-select_streams",
+		"a:0",
+		"-show_streams",
+		"-show_format",
+		path,
+	)
+	lines = ()
+	try:
+		proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+		fut = esubmit(proc.wait, timeout=_timeout)
+		_res = fut.result(timeout=_timeout)
+		lines = [line for line in reversed(proc.stdout.read().decode("utf-8").splitlines()) if "=" in line]
+	except Exception:
+		try:
+			proc.terminate()
+		except Exception:
+			pass
+		traceback.print_exc()
+	info = {(t := line.split("=", 1))[0]: t[1] for line in lines if "=" in line and line.rsplit("=", 1)[-1] not in ("N/A", "0/0")}
+	name = info.get("TAG:album") or info.get("TAG:icy-name")
+	title = info.get("TAG:title") or info.get("TAG:StreamTitle")
+	return dict(
+		name=f"{name}: {title}" if name and title else None,
+		duration=(dur := float(info.get("duration") or int(info.get("duration_ts") or 0) * fractions.Fraction(info.get("time_base") or 0))) or None,
+		format=info.get("format_name") or url2ext(info["filename"]),
+		codec=info.get("codec_name", "auto"),
+		channels=int(info.get("channels") or 1),
+		bitrate=float(info.get("bit_rate") or float(info.get("size", 0)) * 8 / (dur or 1) or 0),
+		sample_rate=int(info.get("sample_rate") or info.get("TAG:icy-samplerate") or 0),
+	)
+def audio_meta(path, _timeout=12) -> cdict:
+	return cdict(audio_meta_cache.retrieve(path, _audio_meta, path, _timeout=_timeout))
+
+colour_cache = ColourCache(f"{CACHE_PATH}/colour", stale=86400, timeout=86400 * 7)
+attachment_cache = AttachmentCache(
+	f"{CACHE_PATH}/attachment",
+	secondary=f"{CACHE_PATH}/attachment_contents",
+	tertiary=f"{CACHE_PATH}/attachment_headers",
+	stale=0,
+	timeout=3600 * 18,
+)
+
+
 def acquire_from_archive(url, arcnames, filenames):
 	with tracebacksuppressor:
 		try:
@@ -532,7 +583,6 @@ def acquire_from_archive(url, arcnames, filenames):
 					if os.name != "nt":
 						subprocess.run(("chmod", "777", fn))
 
-
 def download_binary_dependencies():
 	if os.name == "nt":
 		acquire_from_archive("https://eternallybored.org/misc/gifsicle/releases/gifsicle-1.95-win64.zip", ["gifsicle.exe"], ["binaries/gifsicle.exe"])
@@ -554,13 +604,3 @@ def download_binary_dependencies():
 		acquire_from_archive("https://mizabot.xyz/u/_bjH2NMEAslNEANIlNsAJhJJoNFl/ecm.exe", [], ["binaries/ecm.exe"])
 	else:
 		acquire_from_archive("https://mizabot.xyz/u/vaWqov8EAslNEANIlpskJhpJMplF/ecm", [], ["binaries/ecm"])
-
-
-colour_cache = ColourCache(f"{CACHE_PATH}/colour", stale=86400, timeout=86400 * 7)
-attachment_cache = AttachmentCache(
-	f"{CACHE_PATH}/attachment",
-	secondary=f"{CACHE_PATH}/attachment_contents",
-	tertiary=f"{CACHE_PATH}/attachment_headers",
-	stale=0,
-	timeout=3600 * 18,
-)

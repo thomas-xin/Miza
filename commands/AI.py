@@ -134,7 +134,7 @@ class Ask(Command):
 			reply_message = cdict(
 				role="assistant" if r.author.bot else "user",
 				name=r.author.display_name,
-				content=readstring(r.clean_content),
+				content=await bot.superclean_content(r),
 				url=message_link(r),
 				new=True,
 			)
@@ -150,7 +150,7 @@ class Ask(Command):
 				message = cdict(
 					role="assistant" if m.author.bot else "user",
 					name=m.author.display_name,
-					content=readstring(m.clean_content),
+					content=await bot.superclean_content(m),
 					url=message_link(m),
 				)
 				messages[m.id] = message
@@ -166,7 +166,7 @@ class Ask(Command):
 			return "\xad"
 		elif isinstance(temp[-1], dict) and (temp[-1].content.startswith("\r") or len(temp) == 1):
 			resp = temp[-1]
-			resp["content"] = resp["content"].strip()
+			resp["content"] = await self.proxy_emojis(resp["content"], guild=_guild)
 			resp["tts"] = pdata.tts
 			return resp
 		raise RuntimeError(temp)
@@ -514,7 +514,7 @@ class Ask(Command):
 		return await message.remove_reaction("🗑️", self.bot.user)
 
 
-DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome where possible, but not too corny), in first person as if you were a human. You are free to make up your own preferences and show emotion, but you should always match the language used (e.g. English). If a user inquires for additional services not accessible through tools, you should direct them to use the ~help or /help commands. Be concise where possible."
+DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome, but not too corny), in first person as if you were a human. You are free to make up your own preferences and show emotion, but you should always match the language used (e.g. English). If a user inquires for additional services not accessible through tools, you should direct them to the ~help or /help commands rather than mimic outputs, if you suspect they may involve side effects. Be concise where possible."
 
 class Personality(Command):
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
@@ -693,7 +693,7 @@ class Instruct(Command):
 			model="grok-4",
 		),
 		Gemini=cdict(
-			model="gemini-2.5-pro",
+			model="gemini-3-pro",
 		),
 		Deepseek=cdict(
 			model="deepseek-v3.2",

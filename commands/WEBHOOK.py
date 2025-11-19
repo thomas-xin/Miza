@@ -69,8 +69,11 @@ class UpdateAutoEmojis(Database):
 			except ValueError:
 				pass
 			guilds.insert(0, guild)
-		else:
+		elif guild:
 			guilds = [guild]
+		else:
+			guilds = self.bot.guilds
+			guild = guilds[0]
 		elist = self.bot.data.emojilists.get(guild.id)
 		if elist:
 			for n, e_id in sorted(elist.items(), key=lambda t: t[1]):

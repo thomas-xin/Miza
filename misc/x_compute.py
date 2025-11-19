@@ -39,7 +39,7 @@ import numpy as np
 from math import inf, floor, ceil, log2, log10
 from traceback import print_exc
 sys.path.append("misc")
-from .util import EvalPipe, new_playwright_page, CODECS, CODEC_FFMPEG, temporary_file
+from .util import EvalPipe, new_playwright_page, CODECS, CODEC_FFMPEG, CODEC_PIX, temporary_file
 
 if __name__ == "__main__":
 	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
@@ -642,8 +642,9 @@ def avifsicle(out, q=100, s=6):
 	return out2
 
 def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, vf=""):
+	env = os.environ.copy()
 	anim = count > 1
-	command = []
+	command = ["-i", "-"]
 	if fmt in ("gif", "apng"):
 		command.extend(("-gifflags", "-offsetting"))
 		if (w, h) != first.size:
@@ -775,10 +776,22 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 		command.extend(("-b:v", str(bitrate), "-vbr", "on"))
 		cdc = CODEC_FFMPEG.get(fmt, "av1_nvenc")
 		fmt = CODECS.get(fmt, fmt)
-		pix_fmt = "yuv444p" if cdc == "av1_nvenc" else "yuv420p"
+		pix_fmt = CODEC_PIX.get(cdc, "yuv420p")
+		if cdc == "av1_nvenc":
+			if w < 144 or h < 144:
+				cdc = "libaom-av1"
+				pix_fmt = "yuv444p"
+				command.extend(("-cpu-used", "6"))
+			else:
+				import pynvml
+				env["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+				av1_devices = [str(i) for i, info in enumerate(map(lambda n: pynvml.nvmlDeviceGetCudaComputeCapability(pynvml.nvmlDeviceGetHandleByIndex(n)), range(pynvml.nvmlDeviceGetCount()))) if info[0] > 8 or info[0] == 8 and info[1] >= 9]
+				env["CUDA_VISIBLE_DEVICES"] = ",".join(av1_devices)
+				command.insert(0, "-hwaccel_device")
+				command.insert(1, av1_devices[0])
 		command.extend(("-pix_fmt", pix_fmt, "-c:v", cdc))
 		command.extend(("-f", fmt))
-	return command, fmt
+	return command, env, fmt
 
 def save_into(im, size, fmt, fs, r=0, opt=False):
 	assert size[0] and size[1], f"Expected non-zero size, got {size}"
@@ -787,22 +800,22 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 	if "RGB" in im.mode and np.prod(size) > 65536 or fmt not in ("png", "jpg", "webp", "gif"):
 		b = np.asanyarray(im, dtype=np.uint8).data
 		pix = "rgb24" if im.mode == "RGB" else "rgba"
-		args = ["ffmpeg", "-hide_banner", "-v", "error", "-f", "rawvideo", "-pix_fmt", pix, "-video_size", "x".join(map(str, im.size)), "-i", "-"]
+		args = ["ffmpeg", "-hide_banner", "-v", "error", "-f", "rawvideo", "-pix_fmt", pix, "-video_size", "x".join(map(str, im.size))]
 		is_avif = fmt == "avif" and im.mode == "RGBA"
 		if is_avif:
 			fmt = "y4m"
-		opts, fmt = ffmpeg_opts({}, iter([im]), 1, im.mode, im, fmt, fs * (r or 1), *size, 1, opt)
+		opts, env, fmt = ffmpeg_opts({}, iter([im]), 1, im.mode, im, fmt, fs * (r or 1), *size, 1, opt)
 		args.extend(opts)
 		print(im, len(b))
 		if fmt in ("png", "jpg", "webp"):
 			args.append("-")
 			print(args)
-			return subprocess.run(args, stdout=subprocess.PIPE, input=b).stdout
+			return subprocess.run(args, stdout=subprocess.PIPE, input=b, env=env).stdout
 		else:
 			out = temporary_file(fmt)
 			args.append(out)
 			print(args)
-			subprocess.run(args, input=b)
+			subprocess.run(args, input=b, env=env)
 			if is_avif:
 				out = avifsicle(out, q=60 if opt else 100, s=1)
 			assert os.path.exists(out) and os.path.getsize(out), f"Expected output file {out}"
@@ -842,12 +855,12 @@ def anim_into(out, new, first, size, fmt, fs, r=0, hq=False):
 	mode = new["mode"]
 	command.extend((
 		"-f", "rawvideo", "-framerate", str(new["fps"]), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
-		"-video_size", "x".join(map(str, first.size)), "-i", "-",
+		"-video_size", "x".join(map(str, first.size)),
 	))
 	is_avif = fmt == "avif" and first.mode == "RGBA"
 	if is_avif:
 		fmt = "y4m"
-	opts, fmt = ffmpeg_opts(new, new["frames"], new["count"], mode, first, fmt, fs, *size, new["duration"], not hq)
+	opts, env, fmt = ffmpeg_opts(new, new["frames"], new["count"], mode, first, fmt, fs, *size, new["duration"], not hq)
 	command.extend(opts)
 	if "." in out:
 		out2 = out.rsplit(".", 1)[0] + "~2." + CODECS.get(fmt, fmt)
@@ -855,7 +868,7 @@ def anim_into(out, new, first, size, fmt, fs, r=0, hq=False):
 		out2 = out + "~2"
 	command.append(out2)
 	print(command)
-	proc = psutil.Popen(command, stdin=subprocess.PIPE)
+	proc = psutil.Popen(command, stdin=subprocess.PIPE, env=env)
 	frames = []
 	for frame in new["frames"]:
 		frames.append(frame)
@@ -1052,20 +1065,18 @@ def evalImg(url, operation, args):
 				# 	command.extend(("-hwaccel_device", str(devid)))
 				command.extend([
 					"-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
-					"-video_size", "x".join(map(str, size)), "-i", "-",
+					"-video_size", "x".join(map(str, size)),
 				])
 				new["frames"] = frames
 				is_avif = fmt == "avif" and mode == "RGBA"
 				if is_avif:
 					fmt = "y4m"
-				opts, fmt = ffmpeg_opts(new, frames, count, mode, first, fmt, fs, *size, duration, opt)
+				opts, env, fmt = ffmpeg_opts(new, frames, count, mode, first, fmt, fs, *size, duration, opt)
 				out = temporary_file(CODECS.get(fmt, fmt), name=ts)
 				frames = new.get("frames") or frames
 				command.extend(opts)
 				command.append(out)
 				print(command)
-				env = dict(os.environ)
-				env.pop("CUDA_VISIBLE_DEVICES", None)
 				proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, bufsize=1048576, env=env)
 			i = None
 			futs = []

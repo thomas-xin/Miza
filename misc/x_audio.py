@@ -23,9 +23,10 @@ from .smath import log2lin
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, colourise_auto, maybe_json, select_and_loads,
-	is_url, unyt, url2fn, get_duration, get_duration_2, CachingTeeFile,
+	is_url, unyt, url2fn, CachingTeeFile,
 	get_ext, rename, uhash, expired, is_youtube_stream, b64,  # noqa: F401
 )
+from .caches import audio_meta
 from .audio_downloader import AudioDownloader
 VC_TIMEOUT = 13
 
@@ -957,7 +958,7 @@ class AudioFile:
 				if self:
 					if isinstance(self.stream, str) and not is_url(self.stream) and os.path.exists(self.stream):
 						if not entry.get("duration"):
-							entry["duration"] = get_duration(self.stream) or self.duration
+							entry["duration"] = audio_meta(self.stream).duration
 							name, _url = map(unquote_plus, self.stream.rsplit("/", 1)[-1].rsplit(" ", 1))
 							entry["name"] = name
 					return self
@@ -974,7 +975,7 @@ class AudioFile:
 			self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
 			if entry.get("duration") and os.path.exists(self.path) and os.path.getsize(self.path):
 				self.stream = self.path
-				self.duration = get_duration(self.stream)
+				self.duration = audio_meta(self.stream).duration
 				if abs(entry["duration"] - self.duration) < 1:
 					entry["duration"] = self.duration
 					return self
@@ -1013,7 +1014,7 @@ class AudioFile:
 
 			def callback():
 				self.stream = self.path
-				self.duration = entry["duration"] = get_duration(self.stream) or self.duration
+				self.duration = entry["duration"] = audio_meta(self.stream).duration
 				if self.temporary:
 					try:
 						os.remove(self.temporary)
@@ -1032,7 +1033,7 @@ class AudioFile:
 					assert not is_url(stream) and codec == "opus" and channels == 2, f"Unexpected stream format: {stream} {codec} {channels}"
 					rename(stream, self.path)
 					self.stream = self.path
-					self.duration = entry["duration"] = get_duration(self.stream) or duration
+					self.duration = entry["duration"] = audio_meta(self.stream).duration
 					return self
 				raise RuntimeError("File was empty!")
 			print("DL:", self.path)
@@ -1140,8 +1141,8 @@ class AudioFile:
 					args.extend(("-f", "opus", "-c:a", "copy"))
 					same_codec = True
 				if isinstance(source, str) and not auds.settings.bitrate < auds.defaults["bitrate"]:
-					_dur, _bps, cdc, ac = get_duration_2(source)
-					if ac and cdc in ("opus", "libopus"):
+					info = audio_meta(source)
+					if info.channels and info.codec in ("opus", "libopus"):
 						args.extend(("-f", "opus", "-c:a", "copy"))
 						same_codec = True
 			if not same_codec:
@@ -1556,7 +1557,7 @@ async def on_connect():
 			if keys:
 				print("Reloading players:", keys)
 				await asyncio.gather(*(reload_player(gid) for gid in keys))
-			await asyncio.gather(*(AP.force_disconnect(guild.id) for guild in client.guilds if guild.me and guild.me.voice is not None and guild.id not in keys))
+			await asyncio.gather(*(AP.force_disconnect(guild) for guild in client.guilds if guild.me and guild.me.voice is not None and guild.id not in keys))
 			csubmit(autosave_loop())
 		print("Audio client successfully connected.")
 

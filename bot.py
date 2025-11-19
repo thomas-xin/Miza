@@ -147,7 +147,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.update_semaphore = Semaphore(2, 1)
 		self.ready_semaphore = Semaphore(1, inf)
 		self.guild_semaphore = Semaphore(5, inf, rate_limit=5)
-		self.load_semaphore = Semaphore(5, inf, rate_limit=1)
+		self.load_semaphore = Semaphore(8, inf, rate_limit=1)
 		self.user_semaphore = Semaphore(64, inf, rate_limit=8)
 		self.cache_semaphore = Semaphore(1, 1, rate_limit=30)
 		self.command_semaphore = Semaphore(262144, 16384, rate_limit=30)
@@ -744,6 +744,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		finally:
 			self.setshutdown()
 
+	discord_cache = AutoCache(f"{CACHE_PATH}/discord_api", stale=0, timeout=300)
+	async def _retrieve_api(self, path):
+		return await Request.aio(f"https://discord.com/api/{api}/{path}", authorise=True, json=True)
+	async def retrieve_api(self, path):
+		return await self.discord_cache.aretrieve(path, self._retrieve_api, path)
+
+	discord_data_cache = AutoCache(f"{CACHE_PATH}/discord_data", stale=86400, timeout=86400 * 7)
+
 	def print(self, *args, sep=" ", end="\n"):
 		"A reimplementation of the print builtin function."
 		sys.__stdout__.write(str(sep).join(str(i) for i in args) + end)
@@ -778,11 +786,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Gets the full list of invites from a guild, if applicable."
 		member = guild.get_member(self.id)
 		if member.guild_permissions.create_instant_invite:
-			invitedata = await Request.aio(
-				f"https://discord.com/api/{api}/guilds/{guild.id}/invites",
-				authorise=True,
-				json=True,
-			)
+			invitedata = await self.retrieve_api(f"guilds/{guild.id}/invites")
 			invites = [cdict(invite) for invite in invitedata]
 			return sorted(invites, key=lambda invite: (invite.max_age == 0, -abs(invite.max_uses - invite.uses), len(invite.url)))
 		return []
@@ -851,12 +855,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		with suppress(KeyError):
 			return self.cache.channels[s_id]
 		try:
-			user = await super().fetch_user(s_id)
+			user = await self._fetch_user(s_id)
 		except (LookupError, discord.NotFound):
-			channel = await super().fetch_channel(s_id)
-			self.cache.channels[s_id] = channel
+			channel = await self._fetch_channel(s_id)
 			return channel
-		self.cache.users[s_id] = user
 		return user
 
 	async def _fetch_user(self, u_id):
@@ -918,11 +920,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		with suppress(KeyError):
 			return self.cache.users[u_id]
 		if u_id == self.deleted_user:
-			user = self.GhostUser()
-			user.system = True
-			user.name = "Deleted User"
-			user.nick = "Deleted User"
-			user.id = u_id
+			data = dict(username="Deleted User", discriminator=0, id=u_id, system=True, bot=True)
+			user = discord.User(data=data, state=self._state)
 		else:
 			try:
 				user = super().get_user(u_id)
@@ -1019,7 +1018,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		looks = set((member.name, member) for member in members)
 		looks.update((member.global_name, member) for member in members if member.global_name)
 		looks.update((member.nick, member) for member in members if getattr(member, "nick", None))
-		return str_lookup(looks, query, key=lambda t: t[0], fuzzy=fuzzy)
+		return str_lookup(looks, query, key=lambda t: t[0], fuzzy=fuzzy)[1]
 
 	async def fetch_member_ex(self, u_id, guild=None, allow_banned=True, fuzzy=0.25):
 		"Fetches a member in the target server by ID or name lookup."
@@ -1095,55 +1094,98 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.cache.members[u_id] = member
 		return member
 
-	async def fetch_guild(self, g_id, follow_invites=True):
+	async def fetch_guild(self, gid, follow_invites=True, force=False):
 		"Fetches a guild from ID, using the bot cache when possible."
-		if not isinstance(g_id, int):
-			try:
-				g_id = int(g_id)
-			except (ValueError, TypeError):
-				if follow_invites:
-					try:
-						# Parse and follow invites to get partial guild info
-						invite = await super().fetch_invite(g_id.strip("< >"))
-						g = invite.guild
-						with suppress(KeyError):
-							return self.cache.guilds[g.id]
-						if not hasattr(g, "member_count"):
-							guild = cdict(ghost=True, member_count=invite.approximate_member_count)
-							for at in ('banner', 'created_at', 'description', 'features', 'icon', 'id', 'name', 'splash', 'verification_level'):
-								setattr(guild, at, getattr(g, at))
-							guild.member_count = getattr(invite, "approximate_member_count", None)
-							guild.icon_url = str(guild.icon)
-						else:
-							guild = g
-						return guild
-					except (discord.NotFound, discord.HTTPException) as ex:
-						raise LookupError(str(ex))
-				raise TypeError(f"Invalid server identifier: {g_id}")
-		with suppress(KeyError):
-			return self.cache.guilds[g_id]
 		try:
-			guild = super().get_guild(g_id)
-			if guild is None:
-				raise LookupError
-		except LookupError:
-			guild = await super().fetch_guild(g_id)
-		# self.cache.guilds[g_id] = guild
+			gid = int(gid)
+		except ValueError:
+			if follow_invites:
+				try:
+					code = gid.split("?", 1)[0].rsplit("/", 1)[-1]
+					data = await self.retrieve_api(f"invites/{code}")
+					return discord.Guild(data=data["guild"], state=self._state)
+				except (discord.NotFound, discord.HTTPException) as ex:
+					raise LookupError(str(ex))
+			raise TypeError(f"Invalid server identifier: {gid}")
+		if not force:
+			try:
+				guild = self.cache.guilds[gid]
+			except LookupError:
+				pass
+			else:
+				if len(guild._members) == guild.member_count:
+					return guild
+			data = await self.discord_data_cache.aretrieve(gid, self.retrieve_guild, gid)
+		else:
+			data = await self.discord_data_cache._aretrieve(gid, self.retrieve_guild, gid)
+		fut = self.temp_guilds.get(gid)
+		if fut:
+			return await wrap_future(fut)
+		self.temp_guilds[gid] = concurrent.futures.Future()
+		try:
+			data["members"] = list(data.get("_members", {}).values()) or data.get("members", [])
+			guild = discord.Guild(data=data, state=self._state)
+			if data.get("members"):
+				guild._member_count = len(data["members"])
+				self._state._guilds[gid] = guild
+		except Exception as ex:
+			self.temp_guilds.pop(gid).set_exception(ex)
+		else:
+			self.temp_guilds.pop(gid).set_result(guild)
 		return guild
+	temp_guilds = {}
+	async def retrieve_guild(self, gid):
+		async with self.load_semaphore:
+			print("Retrieving guild:", gid)
+			try:
+				data = await self.retrieve_api(f"guilds/{gid}")
+			except ConnectionError:
+				data = await self.retrieve_api(f"guilds/{gid}/preview")
+			else:
+				members = []
+				x = 0
+				while True:
+					memberdata = await self.retrieve_api(f"guilds/{gid}/members?limit=1000&after={x}")
+					members.extend(memberdata)
+					if len(memberdata) < 1000:
+						break
+					x = max(int(member["user"]["id"]) for member in memberdata)
+				data["_members"] = {int(member["user"]["id"]): member for member in members}
+		return data
+
+	async def dm_as_guild(self, user, channel=None):
+		channel = channel or await self.get_dm(user)
+		guild = discord.Guild._create_unavailable(state=self._state, guild_id=user.id, data=dict(name=f"DM: {self.name} - {user.name}"))
+		guild._members[user.id] = user
+		guild._members[self.id] = self
+		guild._channels[channel.id] = channel
+	# Gets the DM channel for the target user, creating a new one if none exists.
+	async def get_dm(self, user):
+		if isinstance(user, discord.abc.PrivateChannel):
+			return user
+		with suppress(TypeError):
+			int(user)
+			user = await self.fetch_user(user)
+		channel = user.dm_channel
+		if channel is None:
+			channel = await user.create_dm()
+		return channel
 
 	async def _fetch_channel(self, c_id):
 		"Fetches a channel from ID, using the bot cache when possible."
 		channel = await super().fetch_channel(c_id)
-		self.cache.channels[c_id] = channel
+		if getattr(channel, "guild", None):
+			channel.guild._channels[channel.id] = channel
 		return channel
-	def fetch_channel(self, c_id):
+	def fetch_channel(self, c_id, force=False):
 		if not isinstance(c_id, int):
 			try:
 				c_id = int(c_id)
 			except (ValueError, TypeError):
 				raise TypeError(f"Invalid channel identifier: {c_id}")
-		with suppress(KeyError):
-			return as_fut(self.cache.channels[c_id])
+		if not force:
+			with suppress(KeyError):
+				return as_fut(self.cache.channels[c_id])
 		return self._fetch_channel(c_id)
 
 	def force_channel(self, data):
@@ -1441,53 +1483,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return mimic
 		raise LookupError("Unable to find target proxy.")
 
-	# Gets the DM channel for the target user, creating a new one if none exists.
-	async def get_dm(self, user):
-		if isinstance(user, discord.abc.PrivateChannel):
-			return user
-		with suppress(TypeError):
-			int(user)
-			user = await self.fetch_user(user)
-		channel = user.dm_channel
-		if channel is None:
-			channel = await user.create_dm()
-		return channel
-
-	def get_available_guild(self, animated=True, return_all=False):
-		gids = AUTH.get("emoji_servers", ())
-		found = [{} for i in range(6)]
-		if gids:
-			guilds = [self.cache.guilds[gid] for gid in gids]
-		else:
-			guilds = self.guilds
-		for guild in guilds:
-			m = guild.me
-			if m is not None and m.guild_permissions.manage_emojis:
-				owners_in = self.owners.intersection(guild._members)
-				if guild.owner_id == self.id:
-					x = 0
-				elif len(owners_in) == len(self.owners):
-					x = 1
-				elif guild.id == self.premium_server:
-					x = 2
-				elif owners_in:
-					x = 3
-				elif m.guild_permissions.administrator and len(deque(member for member in guild.members if not member.bot)) <= 5:
-					x = 4
-				else:
-					x = 5
-				rem = guild.emoji_limit - len(deque(e for e in guild.emojis if e.animated == animated))
-				rem /= len(guild.members)
-				if rem > 0:
-					found[x][rem] = guild
-		if return_all:
-			valids = list(itertools.chain.from_iterable(v.values() for v in found))
-			return valids, [guild.emoji_limit - len(deque(e for e in guild.emojis if e.animated == animated)) for guild in valids]
-		for i, f in enumerate(found):
-			if f:
-				return f[max(f.keys())]
-		raise LookupError("Unable to find suitable guild.")
-
 	async def create_progress_bar(self, length, ratio=0.5):
 		if "emojis" in self.data:
 			return await self.data.emojis.create_progress_bar(length, ratio)
@@ -1608,12 +1603,23 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	mime = magic.Magic(mime=True, mime_encoding=True)
 	mimes = {}
 
+	async def superclean_content(self, message):
+		content = readstring(message.clean_content or message.content)
+		for e in find_emojis_ex(content, cast_urls=False):
+			emoji = await self.resolve_emoji(e)
+			if not getattr(e, "unicode", None):
+				content = content.replace(e, f":{emoji.name}:")
+		return content
+
 	followed = AutoCache(f"{CACHE_PATH}/follow", stale=3600, timeout=86400 * 7)
 	async def _follow_url(self, urls, priority_order, allow_text, seen=None):
 		seen = seen or {}
 		out = deque()
 		for url in urls:
 			url = T(url).get("url", url)
+			if not is_url(url):
+				print("_follow_url:", url)
+				continue
 			if is_miza_url(url):
 				out.append(url)
 				continue
@@ -1652,7 +1658,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if is_discord_attachment(url):
 						out.append(attachment_cache.preserve(url))
 					elif is_discord_message_link(url) and url not in seen:
-						urls = await self._follow_url(url, priority_order=priority_order, allow_text=allow_text, seen=seen)
+						urls = await self._follow_url([url], priority_order=priority_order, allow_text=allow_text, seen=seen)
 						out.extend(urls)
 					else:
 						out.append(url)
@@ -1687,7 +1693,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					out.extend(found)
 					continue
 			except Exception as ex:
-				print(repr(ex))
+				print("_follow_url:", repr(ex))
 			out.append(url)
 		if not out:
 			out = urls
@@ -1766,6 +1772,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		pops = set()
 		offs = 0
 		replaceds = []
+		msg = msg.strip()
 		while offs < len(msg):
 			matched = regex.search(msg[offs:])
 			if not matched:
@@ -2187,7 +2194,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if not urls:
 				continue
 			if m.get("url"):
-				for url in list(urls) + [m.get("url")]:
+				for url in list(urls) + [m["url"]]:
 					if not url:
 						continue
 					m.content = m.content.replace(url, "", 1).strip()
@@ -2262,29 +2269,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		premium_context.append(["cohere", model, "0.00005"])
 		return data["classifications"][0]["prediction"]
 
-	async def evaluate(self, messages, premium_context=[]):
-		contents = "\n\n".join(map(m_str, messages))
-		try:
-			label = await self.classify(contents, model="c31ba1d3-2e68-4f70-954b-43cc93846b2d-ft", premium_context=premium_context)
-		except Exception:
-			print_exc()
-			return "ok"
-		return "refusal" if label == "Assistant Refused" else "insufficient" if label == "Assistant Misunderstood" else "ok"
-
 	model_levels = {
 		0: cdict(
-			reasoning="gpt-5-mini",
-			instructive="gpt-oss-120b",
+			instructive="gpt-5-mini",
 			casual="gemini-2.5-flash",
 			nsfw="grok-4-fast",
 			backup="deepseek-v3",
-			retry="gpt-5-mini",
+			retry="gpt-oss-120b",
 			function="gpt-5-nano",
 			vision="mistral-24b",
 			target="auto",
 		),
 		1: cdict(
-			reasoning="gpt-5-mini",
 			instructive="kimi-k2-t",
 			casual="kimi-k2-t",
 			nsfw="grok-4-fast",
@@ -2295,11 +2291,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		2: cdict(
-			reasoning="gpt-5.1",
-			instructive="gpt-5.1",
-			casual="kimi-k2-t",
+			instructive="gemini-3-pro",
+			casual="gemini-3-pro",
 			nsfw="grok-4",
-			backup="gemini-2.5-pro",
+			backup="gpt-5.1",
 			retry="claude-4.5-sonnet",
 			function="grok-4-fast",
 			vision="gpt-5.1",
@@ -3038,8 +3033,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					try:
 						if guild._members[author.id] != author:
 							guild._members[author.id] = author
-							if "guilds" in self.data:
-								self.data.guilds.register(guild, force=False)
 					except KeyError:
 						pass
 			if files and (not message.author.bot or message.webhook_id):
@@ -3278,30 +3271,25 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		)
 		self.cache.roles._feed = lambda: (guild._roles for guild in g)
 
-	def update_usernames(self):
-		if self.users_updated:
-			self.usernames = {str(user): user for user in self.cache.users.values()}
-			self.users_updated = False
-		if self.guilds_updated:
-			has_guilds = getattr(self, "_guilds", None) or self.cache.guilds
-			nf = [k for k in self.data.guilds if k not in has_guilds]
-			for k in nf:
-				self.cache.guilds.pop(k, None)
-				self.data.guilds.pop(k, None)
-			self.guilds_updated = False
-
 	sub_channels = {}
-	def update_subs(self):
+	async def update_subs(self):
 		self.sub_guilds = dict(self._guilds) or self.sub_guilds
 		sc = self.sub_channels
 		self.sub_channels = dict(chain.from_iterable(guild._channels.items() for guild in self.sub_guilds.values())) or sc
 		self.sub_channels.update(sc)
 		if not hasattr(self, "guilds_ready") or not self.guilds_ready.done():
 			return
+		futs = []
 		for guild in self.guilds:
-			if len(guild._members) != guild.member_count:
-				print("Incorrect member count:", guild, len(guild._members), guild.member_count)
-				csubmit(self.load_guild(guild))
+			if len(guild._members) == guild.member_count:
+				continue
+			guild = await self.fetch_guild(guild.id)
+			if len(guild._members) == guild.member_count:
+				continue
+			print("Incorrect member count:", guild, len(guild._members), guild.member_count)
+			fut = self.fetch_guild(guild.id, force=True)
+			futs.append(fut)
+		await gather(*futs, max_concurrency=8)
 
 	def get_prefix(self, guild):
 		"Gets the target bot prefix for the target guild, return the default one if none exists."
@@ -3847,7 +3835,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not uid:
 			await channel.send(f"Failed to locate donation of ${amount} from user {name}!", embed=emb)
 			return
-		await asubmit(self.update_usernames)
 		try:
 			user = await self.fetch_user(uid)
 		except Exception:
@@ -4149,7 +4136,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					return await self.commands.shutdown[0].confirm_shutdown()
 				self.api_latency = self.api_latency * 2 / 3 + (utc() - t) / 3
 			except Exception as ex:
-				print(repr(ex))
+				print("get_system_stats:", repr(ex))
 				self.api_exc = ex
 				self.api_latency += 5
 			else:
@@ -5178,7 +5165,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def run_command(self, command, kwargs=None, message=None, argv=None, comment=None, slash=False, command_check=None, user=None, channel=None, guild=None, min_perm=None, respond=False, allow_recursion=True):
 		command_check = command_check or command.name[0].casefold()
-		user = user or (message.author if message else self.GhostUser())
+		user = user or (message.author if message else None)
 		if message and user:
 			print(f"{message.channel.id}: {user} ({user.id}) issued command {command_check} {kwargs or argv}")
 		soon_indicator = False
@@ -5267,11 +5254,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					raise TooManyRequests(f"Command has a rate limit of {sec2time(rl)} with a burst+queue of {burst}; please wait {sec2time(sem.reset_after)}.")
 		# Assign "guild" as an object that mimics the discord.py guild if there is none
 		if guild is None:
-			guild = self.UserGuild(
+			guild = await self.dm_as_guild(
 				user=user,
 				channel=channel,
 			)
-			channel = guild.channel
 		elif channel and guild.me and hasattr(guild.me, "timed_out") and (guild.me.timed_out or not channel.permissions_for(guild.me).send_messages):
 			raise PermissionError("Unable to send message.")
 		if getattr(sem, "busy", None):
@@ -5613,7 +5599,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						with tracebacksuppressor:
 							await fut
 					try:
-						new_content = await self.proxy_emojis(add_content(old_content, content), guild=guild)
+						new_content = await self.proxy_emojis(add_content(old_content, content))
 						await manager.update(new_content, embeds=embeds, files=files, buttons=buttons, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), reacts=reacts, done=done, force=force)
 					except (OverflowError, InterruptedError):
 						# If the StreamedMessage was interrupted or exceeded the maximum length, we wipe the original and force a new message. This ensures the list of messages stays contiguous, which improves readability.
@@ -5703,90 +5689,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			break
 		return resp
 
-	chunk_guild_sems = None
-	load_guild_sem = Semaphore(48, inf, rate_limit=1)
-	async def load_guild(self, guild):
-		if not self.chunk_guild_sems:
-			self.chunk_guild_sems = [Semaphore(3, inf, rate_limit=0.5) for i in range(self.shard_count)]
-		if "guilds" in self.data:
-			self.data.guilds.update_guild(guild)
-		finished = False
-		async with self.load_guild_sem:
-			member_count = getattr(guild, "_member_count", None) or len(guild._members)
-			sid = self.guild_shard(guild.id)
-			if member_count in range(3, 250) and not self.shards[sid].is_ws_ratelimited() and not self.chunk_guild_sems[sid].busy:
-				try:
-					async with self.chunk_guild_sems[sid]:
-						await asyncio.wait_for(self._connection.chunk_guild(guild), timeout=30)
-				except Exception:
-					print_exc()
-				else:
-					finished = True
-			if not finished:
-				await self.load_guild_http(guild)
-		guild._member_count = len(guild._members)
-		if "guilds" in self.data:
-			self.data.guilds.register(guild)
-		return guild.members
-
-	async def load_guild_http(self, guild):
-		_members = {}
-		x = 0
-		i = 1000
-		while i >= 1000:
-			memberdata = []
-			for r in range(64):
-				try:
-					async with self.load_semaphore:
-						memberdata = await Request.aio(
-							f"https://discord.com/api/{api}/guilds/{guild.id}/members?limit=1000&after={x}",
-							authorise=True,
-							json=True,
-							timeout=32,
-						)
-				except Exception as ex:
-					if isinstance(ex, ConnectionError) and T(ex).get("errno") in (401, 403, 404):
-						break
-					print_exc()
-					await asyncio.sleep(r ** 2 + random.random())
-				else:
-					break
-			else:
-				raise RuntimeError("Max retries exceeded in loading guild members via http.")
-			members = {int(m["user"]["id"]): discord.Member(guild=guild, data=m, state=self._connection) for m in memberdata}
-			guild._members.update(members)
-			_members.update(members)
-			i = len(memberdata)
-			x = max(members) if members else 0
-		guild._members = _members
-		return guild
-
 	async def load_guilds(self, guilds=None):
+		return
+		print("Loading guilds...")
 		guilds = guilds or self.client.guilds
-		if "guilds" in self.data:
-			for guild in guilds:
-				with tracebacksuppressor:
-					self.data.guilds.load_guild(guild)
-		async def load_guilds_into():
-			while self.maintenance:
-				await asyncio.sleep(5)
-			futs = deque()
-			for guild in sorted(guilds, key=lambda guild: getattr(guild, "_member_count", None) or len(guild._members), reverse=True):
-				fut = csubmit(asyncio.wait_for(self.load_guild(guild), timeout=3600))
-				futs.append(fut)
-				fut.guild = guild
-				await asyncio.sleep(0.05)
-			for fut in futs:
-				try:
-					await fut
-				except (T0, T1, T2):
-					print("Error loading", fut.guild)
-					print_exc()
-					await self.load_guild(fut.guild)
-		if not self.maintenance:
-			await load_guilds_into()
-		else:
-			csubmit(load_guilds_into())
+		for guild in guilds:
+			await self.fetch_guild(guild.id)
 		self.users_updated = True
 		print(len(guilds), "guilds loaded.")
 
@@ -5936,7 +5844,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						else:
 							username = kwargs.get("username")
 							if not username and getattr(channel, "guild", None):
-								username = guild.me.display_name
+								username = channel.guild.me.display_name
 							data = dict(
 								content=content,
 								username=username,
@@ -6398,7 +6306,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						await self.get_hosted()
 					await asyncio.sleep(1)
 					with MemoryTimer("update_subs"):
-						await asubmit(self.update_subs, priority=True)
+						await self.update_subs()
 					await asyncio.sleep(1)
 					await self.send_event("_minute_loop_")
 					esubmit(self.cache_reduce, priority=True)
@@ -6446,7 +6354,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				await self.send_event("_seen_", user=arg, delay=delay, event=event, **kwargs)
 
 	async def ensure_reactions(self, message):
-		if not message.reactions or isinstance(message, self.CachedMessage | self.LoadedMessage) or isinstance(message.author, cdict | self.GhostUser):
+		if not message.reactions or isinstance(message, self.CachedMessage | self.LoadedMessage) or isinstance(message.author, cdict):
 			if self.permissions_in(message.channel).read_message_history:
 				try:
 					message = await discord.abc.Messageable.fetch_message(message.channel, message.id)
@@ -6547,246 +6455,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	def set_classes(self):
 		bot = self
-
-		class UserGuild(discord.Object):
-			"For compatibility with guild objects, takes a user and DM channel."
-
-			class UserChannel(discord.abc.PrivateChannel):
-
-				def __init__(self, channel, **void):
-					self.channel = channel
-					self.id = channel.id if channel else 0
-
-				def __dir__(self):
-					data = set(object.__dir__(self))
-					data.update(dir(self.channel))
-					return data
-
-				def __getattr__(self, key):
-					try:
-						return self.__getattribute__(key)
-					except AttributeError:
-						pass
-					return getattr(self.__getattribute__("channel"), key)
-
-				def fetch_message(self, id):
-					return bot.fetch_message(id, self.channel)
-
-				@property
-				def me(self):
-					return bot.user
-				name = "DM"
-				topic = None
-				def is_nsfw(self):
-					return bot.is_nsfw(self.channel)
-				def is_news(*self):
-					return False
-				is_channel = True
-				def __str__(self):
-					return self.channel.recipient.display_name if self.channel.recipient else "channel"
-
-			def __init__(self, user=None, channel=None, **void):
-				self.channel = self.system_channel = self.rules_channel = self.UserChannel(channel) if channel else None
-				self.members = [bot.user]
-				if user:
-					self.members.append(user)
-				self._members = {m.id: m for m in self.members if m}
-				self.channels = self.text_channels = [self.channel] if channel else []
-				self.voice_channels = []
-				self.roles = []
-				self.emojis = []
-				self.get_channel = lambda _id: self.channel
-				self.owner_id = bot.user.id
-				self.owner = bot.user
-				self.fetch_member = bot.fetch_user
-				self.get_member = self._members.get
-				self.voice_client = None
-				self.id = channel.id if channel else user.id if user else 0
-
-			def __dir__(self):
-				data = set(object.__dir__(self))
-				data.update(dir(self.channel))
-				return data
-
-			def __getattr__(self, key):
-				try:
-					return self.__getattribute__(key)
-				except AttributeError:
-					pass
-				return getattr(self.__getattribute__("channel"), key)
-
-			@property
-			def me(self):
-				return bot.user
-			@me.setter
-			def me(self, value):
-				return
-			
-			def get_role(*args):
-				return None
-			filesize_limit = CACHE_FILESIZE
-			bitrate_limit = 98304
-			emoji_limit = 0
-			large = False
-			description = ""
-			max_members = 2
-			unavailable = False
-			ghost = True
-			is_channel = True
-			def is_nsfw(self):
-				return bot.is_nsfw(self.channel)
-			def __str__(self):
-				return self.channel.recipient.display_name if self.channel.recipient else "channel"
-
-		class GhostUser(discord.abc.Snowflake):
-			"Represents a deleted/not found user."
-
-			def __repr__(self):
-				return f"<Ghost User id={self.id} name='{self.name}' discriminator='{self.discriminator}' bot=False>"
-			__str__ = discord.user.BaseUser.__str__
-			system = False
-			def history(*void1, **void2):
-				return fut_nop
-			dm_channel = None
-			def create_dm(self):
-				return fut_nop
-			relationship = None
-			def is_friend(self):
-				return None
-			def is_blocked(self):
-				return None
-			def is_migrated(self):
-				return None
-			colour = color = discord.Colour(16777215)
-			_avatar = _avatar_decoration = None
-			name = "[USER DATA NOT FOUND]"
-			nick = None
-			global_name = None
-			discriminator = "0"
-			id = 0
-			guild = None
-			mutual_guilds = []
-			status = None
-			voice = None
-			display_avatar = avatar = "0"
-			avatar_url = icon_url = url = bot.discord_icon
-			joined_at = premium_since = None
-			timed_out_until = None
-			communication_disabled_until = None
-			_primary_guild = None
-			_avatar_decoration_data = None
-			_client_status = client_status = _status = cdict({None: "offline", "_status": "offline", "desktop": "false", "mobile": "false", "web": "false"})
-			pending = False
-			ghost = True
-			roles = ()
-			_roles = ()
-			activities = ()
-			_activities = ()
-			flags = _flags = public_flags = _public_flags = discord.flags.PublicUserFlags()
-			banner = None
-			_banner = None
-			accent_colour = None
-			_accent_colour = None
-			_permissions = discord.Permissions(0)
-			def is_timed_out(*args):
-				return False
-
-			def __getattr__(self, k):
-				if k == "member":
-					return self.__getattribute__(k)
-				elif hasattr(self, "member"):
-					try:
-						return getattr(self.member, k)
-					except AttributeError:
-						pass
-				return self.__getattribute__(k)
-
-			def send(self, *args, **kwargs):
-				if not getattr(self, "guild", None):
-					raise AttributeError("Member is not in a guild.")
-				return discord.Member.send(self, *args, **kwargs)
-
-			def edit(self, *args, **kwargs):
-				if not getattr(self, "guild", None):
-					raise AttributeError("Member is not in a guild.")
-				return discord.Member.edit(self, *args, **kwargs)
-
-			def add_roles(self, *args, **kwargs):
-				if not getattr(self, "guild", None):
-					raise AttributeError("Member is not in a guild.")
-				return discord.Member.add_roles(self, *args, **kwargs)
-
-			def remove_roles(self, *args, **kwargs):
-				if not getattr(self, "guild", None):
-					raise AttributeError("Member is not in a guild.")
-				return discord.Member.remove_roles(self, *args, **kwargs)
-
-			def kick(self, reason=None):
-				if not getattr(self, "guild", None):
-					raise AttributeError("Member is not in a guild.")
-				return discord.Member.kick(self, reason=reason)
-
-			def ban(self, reason=None):
-				if not getattr(self, "guild", None):
-					raise AttributeError("Member is not in a guild.")
-				return discord.Member.ban(self, reason=reason)
-
-			def timeout(self, duration, reason=None):
-				if not getattr(self, "guild", None):
-					raise AttributeError("Member is not in a guild.")
-				return discord.Member.timeout(self, duration, reason=reason)
-
-			def move_to(self, duration, reason=None):
-				if not getattr(self, "guild", None):
-					raise AttributeError("Member is not in a guild.")
-				return discord.Member.move_to(self, duration, reason=reason)
-
-			@property
-			def display_name(self):
-				return self.nick or self.name
-
-			@property
-			def mention(self):
-				return f"<@{self.id}>"
-
-			@property
-			def created_at(self):
-				return snowflake_time_3(self.id)
-
-			@property
-			def _state(self):
-				return bot._state
-
-			@property
-			def _user(self):
-				return bot.cache.users.get(self.id) or self
-			@_user.setter
-			def _user(self, user):
-				bot.cache.users[user.id] = user
-
-			def _to_minimal_user_json(self):
-				return cdict(
-					username=self.name,
-					id=self.id,
-					avatar=self.avatar,
-					discriminator=self.discriminator,
-					bot=self.bot,
-				)
-
-			def _update(self, data):
-				m = discord.Member._copy(self)
-				m._update(data)
-				self.member = m
-				return m
-
-		GhostUser.bot = False
-		user = GhostUser()
-		user.bot = True
-		name = AUTH.get("name") or "Unknown User"
-		user.name = name
-		user.nick = name
-		user.id = AUTH.get("discord_id", 0)
-		bot._user = user
 
 		class GhostMessage(discord.abc.Snowflake):
 			"Represents a deleted/not found message."
@@ -7307,9 +6975,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			__aexit__ = lambda self, *args: as_fut(self.__exit__(*args))
 			__call__ = lambda self, *args, **kwargs: self.__class__(*args, **kwargs)
 
-
-		bot.UserGuild = UserGuild
-		bot.GhostUser = GhostUser
 		bot.GhostMessage = GhostMessage
 		bot.ExtendedMessage = ExtendedMessage
 		bot.StreamedMessage = StreamedMessage
@@ -7321,6 +6986,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def monkey_patch(self):
 		"Extends discord.py's features using our bot class, allowing access to caches/databases on disk and fixing several issues."
 		bot = self
+
+		def attach_middleware(original_method, interceptor):
+			@functools.wraps(original_method)
+			def wrapper(*args, **kwargs):
+				interceptor(*args, **kwargs)
+				return original_method(*args, **kwargs)
+			return wrapper
 
 		discord.http.Route.BASE = f"https://discord.com/api/{api}"
 		discord.Member.permissions_in = lambda self, channel: discord.Permissions.none() if not getattr(self, "roles", None) else discord.Permissions(fold(int.__or__, (role.permissions.value for role in self.roles))) if not getattr(channel, "permissions_for", None) else channel.permissions_for(self)
@@ -7335,7 +7007,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					return
 			res = orjson.loads(msg)
 			bot.socket_responses.append(res)
-			self._dispatch("socket_response", res)
+			try:
+				if await bot.socket_response(res):
+					return
+			except Exception:
+				print_exc()
 			return await recv_message(self, as_str(msg))
 		discord.gateway.DiscordWebSocket.received_message = received_message
 
@@ -7356,17 +7032,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				channel = guild and guild._resolve_channel(channel_id)
 			return channel or discord.PartialMessageable(state=self, id=channel_id), guild
 		discord.state.ConnectionState._get_guild_channel = _get_guild_channel
-
-		# async def get_gateway(self, *, encoding="json", zlib=True):
-		# 	try:
-		# 		data = await self.request(discord.http.Route("GET", "/gateway"))
-		# 	except discord.HTTPException as exc:
-		# 		raise discord.GatewayNotFound() from exc
-		# 	value = "{0}?encoding={1}&v=" + api[1:]
-		# 	if zlib:
-		# 		value += "&compress=zlib-stream"
-		# 	return value.format(data["url"], encoding)
-		# discord.http.HTTPClient.get_gateway = get_gateway
 
 		async def history(self, limit=100, before=None, after=None, around=None, oldest_first=None):
 			if not getattr(self, "channel", None):
@@ -7741,7 +7406,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.start_time = utc()
 		print("Connect ready.")
 		self.ready = True
-		await asubmit(self.update_usernames)
 		# Send ready event to all databases.
 		await self.send_event("_ready_", bot=self)
 		await self.update_status(force=True)
@@ -7749,7 +7413,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		print("Database ready.")
 		await wrap_future(self.full_ready)
 		await self.guilds_ready
-		await asubmit(self.update_usernames)
 		print("Guilds ready.")
 		self.initialisation_complete = True
 		print("Initialisation complete.")
@@ -7764,6 +7427,221 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def set_guilds(self):
 		AUTH["guild_count"] = len(self._guilds)
 		save_auth(AUTH)
+
+	# Socket response event: if the event was an interaction, create a virtual message with the arguments as the content, then process as if it were a regular command.
+	async def socket_response(self, data):
+		if data.get("op") or "d" not in data:
+			return
+		try:
+			ptype = data.get("t") or ""
+			sub = data["d"]
+			if "_" in ptype:
+				*base, target, action = ptype.casefold().split("_")
+			else:
+				target = action = None
+			match ptype:
+				case "INTERACTION_CREATE":
+					await self.interaction_create(sub)
+					return True
+				case _ if action in ("add", "create", "edit", "update") and target in ("channel", "thread", "role"):
+					gid = int(sub["guild_id"])
+					try:
+						guild_data = self.discord_data_cache[gid]
+					except KeyError:
+						return
+					kv = target + "s"
+					for obj in guild_data.get(kv, ()):
+						if obj.get("id") == sub["id"]:
+							obj.update(sub)
+							break
+					else:
+						guild_data.setdefault(kv, []).append(sub)
+					self.discord_data_cache[gid] = guild_data
+				case _ if action in ("remove", "delete") and target in ("channel", "thread", "role"):
+					gid = int(sub["guild_id"])
+					try:
+						guild_data = self.discord_data_cache[gid]
+					except KeyError:
+						return
+					kv = target + "s"
+					for obj in tuple(guild_data.get(kv, ())):
+						if obj.get("id") in (None, sub["id"]):
+							guild_data[kv].remove(obj)
+							break
+					self.discord_data_cache[gid] = guild_data
+				case _ if action in ("add", "create", "edit", "update") and target in ("member", "user"):
+					if target == "member":
+						gids = [int(sub["guild_id"])]
+					else:
+						gids = self.cache.guilds
+					uid = int(sub["user"]["id"])
+					for gid in gids:
+						try:
+							guild_data = self.discord_data_cache[gid]
+						except KeyError:
+							continue
+						if uid not in guild_data.get("_members", ()):
+							continue
+						if target == "member":
+							guild_data["_members"][uid] = sub
+						else:
+							guild_data["_members"][uid]["user"] = sub
+						self.discord_data_cache[gid] = guild_data
+				case _ if action in ("remove", "delete") and target == "member":
+					gid = int(sub["guild_id"])
+					uid = int(sub["user"]["id"])
+					try:
+						guild_data = self.discord_data_cache[gid]
+					except KeyError:
+						return
+					guild_data.get("_members", {}).pop(uid, None)
+					self.discord_data_cache[gid] = guild_data
+				case "GUILD_CREATE" | "GUILD_UPDATE":
+					gid = int(sub["id"])
+					await self.fetch_guild(gid)
+					orig = self.discord_data_cache.get(gid, {})
+					orig.update(sub)
+					sub.update(orig)
+					self.discord_data_cache[gid] = orig
+				case "GUILD_DELETE":
+					gid = int(sub["id"])
+					self.discord_data_cache.pop(gid, None)
+		except Exception:
+			print(data)
+			print_exc()
+
+	async def interaction_create(self, data):
+		message = self.GhostMessage()
+		message.id = int(data["id"])
+		message.slash = data["token"]
+		cdata = data.get("data")
+		match data["type"]:
+			case 2:
+				# Slash commands
+				name = cdata["name"].replace(" ", "")
+				command = self.commands[name][0]
+				try:
+					usage = command.usage
+				except LookupError:
+					usage = ""
+				arguments = sorted(cdata.get("options", ()), key=lambda arg: ((i := usage.find(arg.get("name") or "")) < 0, i))
+				kwargs = {arg["name"]: arg["value"] for arg in arguments}
+				if kwargs and command.schema:
+					for k in tuple(kwargs):
+						if k not in command.schema:
+							continue
+						if command.schema[k].get("multiple"):
+							argl = [kwargs[k]]
+							for i in range(5):
+								try:
+									argl.append(kwargs.pop(f"{k}-{i + 2}"))
+								except KeyError:
+									pass
+				mdata = data.get("member")
+				if not mdata:
+					mdata = data.get("user")
+				else:
+					mdata = mdata.get("user")
+				author = self._state.store_user(mdata)
+				message.author = author
+				channel = None
+				if cdata.get("type") == 3 and "resolved" in cdata:
+					res = cdata.get("resolved", {})
+					for mdata in res.get("users", {}).values():
+						self._state.store_user(mdata)
+					for mdata in res.get("messages", {}).values():
+						msg = self.ExtendedMessage.new(mdata)
+						self.add_message(msg, force=True)
+						message.channel = channel = msg.channel or message.channel
+				try:
+					channel = self.force_channel(data["channel_id"])
+					try:
+						guild = await self.fetch_guild(data["guild_id"])
+					except (LookupError, discord.NotFound):
+						raise KeyError
+					message.guild = guild
+					author = guild.get_member(author.id)
+					if author:
+						message.author = author
+				except KeyError:
+					if author is None:
+						raise
+					if channel is None:
+						channel = await self.get_dm(author)
+					guild = T(channel).get("guild")
+				if not T(message).get("guild"):
+					message.guild = guild
+				message.content = f"/{name} " + " ".join(map(json.dumps, kwargs.values()))
+				message.channel = channel
+				message.noref = True
+				message.deleted = False
+				message.ephemeral = kwargs.pop("ephemeral", False) and getattr(command, "ephemeral", False)
+				try:
+					await self.run_command(command, kwargs, message=message, slash=True, respond=True)
+				except Exception as ex:
+					if not getattr(message, "deferred", False):
+						await self.defer_interaction(message)
+					resp = await self.send_exception(channel, ex, reference=message, comm=command)
+					print("SC:", resp)
+				finally:
+					message.deleted = True
+			case 3 | 5:
+				# Interaction buttons
+				custom_id = cdata.get("custom_id", "")
+				if "?" in custom_id:
+					custom_id = custom_id.rsplit("?", 1)[0]
+				if not custom_id or custom_id.startswith("▪️"):
+					return await self.ignore_interaction(message)
+				mdata = data.get("member")
+				if not mdata:
+					mdata = data.get("user")
+				else:
+					mdata = mdata.get("user")
+				user = self._state.store_user(mdata)
+				if not user:
+					user = self.GhostUser()
+				channel = None
+				try:
+					channel = self.force_channel(data["channel_id"])
+					try:
+						guild = await self.fetch_guild(data["guild_id"])
+					except (LookupError, discord.NotFound):
+						raise KeyError
+					user = (guild.get_member(user.id) if guild else None) or user
+				except KeyError:
+					if user is None:
+						raise
+					if channel is None:
+						channel = await self.get_dm(user)
+				message.channel = channel
+				if custom_id.startswith("\x7f"):
+					custom_id = cdata.get("values") or custom_id
+					if isinstance(custom_id, list_like):
+						custom_id = " ".join(custom_id)
+				if isinstance(custom_id, str) and custom_id.startswith("~"):
+					m_id, custom_id = custom_id[1:].split("~", 1)
+					custom_id = "~" + custom_id
+				else:
+					m_id = data["message"]["id"]
+				m = await self.fetch_message(m_id, channel)
+				if getattr(m, "method", None):
+					del m.method
+				add = False
+				if type(m) is not self.ExtendedMessage:
+					m = await channel.fetch_message(m_id)
+					add = True
+				if add:
+					self.add_message(m, force=True)
+				m.int_id = message.id
+				m.int_token = message.slash
+				await self.react_callback(m, custom_id, user)
+			case _:
+				print("Unknown interaction:\n" + str(data))
+		for attr in ("slash", "int_id", "int_token"):
+			try:
+				delattr(message, attr)
+			except AttributeError:
+				pass
 
 	def set_client_events(self):
 
@@ -7821,7 +7699,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			await self.modload
 			fut = csubmit(self.load_guilds(guilds))
 			self.guilds_loading.append(fut)
-			await asubmit(self.update_subs, priority=True)
+			with MemoryTimer("update_subs"):
+				await self.update_subs()
 			self.update_cache_feed()
 			with tracebacksuppressor:
 				await self.handle_update(force=True)
@@ -7869,7 +7748,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					+ "That's completely understandable if intentional, but please note that some features may not function well, or not at all, without the required permissions."
 				))
 			fut = csubmit(send_with_react(channel, embed=emb, reacts=["✅"]))
-			await self.load_guild(guild)
+			await self.fetch_guild(guild.id)
 			await fut
 			for member in guild.members:
 				name = str(member)
@@ -7953,7 +7832,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			channel = message.channel
 			if T(channel).get("guild") is None and T(channel).get("recipient") is None:
 				try:
-					channel = await self._fetch_channel(channel.id)
+					channel = await self.fetch_channel(channel.id, force=True)
 				except discord.NotFound:
 					print(f"Channel {channel.id} not found.")
 				else:
@@ -7969,148 +7848,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			# await self.react_callback(message, None, user)
 			await fut
 			await self.handle_message(message)
-
-		# Socket response event: if the event was an interaction, create a virtual message with the arguments as the content, then process as if it were a regular command.
-		@self.event
-		async def on_socket_response(data):
-			if not data.get("op") and data.get("t") == "INTERACTION_CREATE" and "d" in data:
-				try:
-					# dt = utc_dt()
-					message = self.GhostMessage()
-					d = data["d"]
-					message.id = int(d["id"])
-					message.slash = d["token"]
-					cdata = d.get("data")
-					if d["type"] == 2:
-						# Slash commands
-						name = cdata["name"].replace(" ", "")
-						command = self.commands[name][0]
-						try:
-							usage = command.usage
-						except LookupError:
-							usage = ""
-						arguments = sorted(cdata.get("options", ()), key=lambda arg: ((i := usage.find(arg.get("name") or "")) < 0, i))
-						kwargs = {arg["name"]: arg["value"] for arg in arguments}
-						if kwargs and command.schema:
-							for k in tuple(kwargs):
-								if k not in command.schema:
-									continue
-								if command.schema[k].get("multiple"):
-									argl = [kwargs[k]]
-									for i in range(5):
-										try:
-											argl.append(kwargs.pop(f"{k}-{i + 2}"))
-										except KeyError:
-											pass
-						mdata = d.get("member")
-						if not mdata:
-							mdata = d.get("user")
-						else:
-							mdata = mdata.get("user")
-						author = self._state.store_user(mdata)
-						message.author = author
-						channel = None
-						if cdata.get("type") == 3 and "resolved" in cdata:
-							res = cdata.get("resolved", {})
-							for mdata in res.get("users", {}).values():
-								self._state.store_user(mdata)
-							for mdata in res.get("messages", {}).values():
-								msg = self.ExtendedMessage.new(mdata)
-								self.add_message(msg, force=True)
-								message.channel = channel = msg.channel or message.channel
-						try:
-							channel = self.force_channel(d["channel_id"])
-							try:
-								guild = await self.fetch_guild(d["guild_id"])
-							except (LookupError, discord.NotFound):
-								raise KeyError
-							message.guild = guild
-							author = guild.get_member(author.id)
-							if author:
-								message.author = author
-						except KeyError:
-							if author is None:
-								raise
-							if channel is None:
-								channel = await self.get_dm(author)
-							guild = T(channel).get("guild")
-						if not T(message).get("guild"):
-							message.guild = guild
-						message.content = f"/{name} " + " ".join(map(json.dumps, kwargs.values()))
-						message.channel = channel
-						message.noref = True
-						message.deleted = False
-						message.ephemeral = kwargs.pop("ephemeral", False) and getattr(command, "ephemeral", False)
-						try:
-							await self.run_command(command, kwargs, message=message, slash=True, respond=True)
-						except Exception as ex:
-							if not getattr(message, "deferred", False):
-								await self.defer_interaction(message)
-							resp = await self.send_exception(channel, ex, reference=message, comm=command)
-							print("SC:", resp)
-						finally:
-							message.deleted = True
-					elif d["type"] in (3, 5):
-						# Interaction buttons
-						custom_id = cdata.get("custom_id", "")
-						if "?" in custom_id:
-							custom_id = custom_id.rsplit("?", 1)[0]
-						if not custom_id or custom_id.startswith("▪️"):
-							return await self.ignore_interaction(message)
-						mdata = d.get("member")
-						if not mdata:
-							mdata = d.get("user")
-						else:
-							mdata = mdata.get("user")
-						user = self._state.store_user(mdata)
-						if not user:
-							user = self.GhostUser()
-						channel = None
-						try:
-							channel = self.force_channel(d["channel_id"])
-							try:
-								guild = await self.fetch_guild(d["guild_id"])
-							except (LookupError, discord.NotFound):
-								raise KeyError
-							user = (guild.get_member(user.id) if guild else None) or user
-						except KeyError:
-							if user is None:
-								raise
-							if channel is None:
-								channel = await self.get_dm(user)
-						message.channel = channel
-						if custom_id.startswith("\x7f"):
-							custom_id = cdata.get("values") or custom_id
-							if isinstance(custom_id, list_like):
-								custom_id = " ".join(custom_id)
-						if isinstance(custom_id, str) and custom_id.startswith("~"):
-							m_id, custom_id = custom_id[1:].split("~", 1)
-							custom_id = "~" + custom_id
-						else:
-							m_id = d["message"]["id"]
-						m = await self.fetch_message(m_id, channel)
-						if getattr(m, "method", None):
-							del m.method
-						add = False
-						if type(m) is not self.ExtendedMessage:
-							m = await channel.fetch_message(m_id)
-							add = True
-						if add:
-							self.add_message(m, force=True)
-						m.int_id = message.id
-						m.int_token = message.slash
-						await self.react_callback(m, custom_id, user)
-					else:
-						print("Unknown interaction:\n" + str(data))
-					print("Deleting interaction:", message)
-					for attr in ("slash", "int_id", "int_token"):
-						try:
-							delattr(message, attr)
-						except AttributeError:
-							pass
-				except Exception:
-					print_exc()
-					print("Failed interaction:\n" + str(data))
 
 		# Message edit event: processes edited message, uses raw payloads rather than discord.py message cache. calls _edit_ and _seen_ bot database events.
 		@self.event
@@ -8388,8 +8125,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.usernames[name] = self.cache.users[member.id]
 			if member.guild.id in self._guilds:
 				member.guild._member_count = len(member.guild._members)
-				if "guilds" in self.data:
-					self.data.guilds.register(member.guild, force=False)
 			await self.send_event("_join_", user=member, guild=member.guild)
 			await self.seen(member, member.guild, event="misc", raw="Joining a server")
 
@@ -8411,8 +8146,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if before.guild.id in self._guilds:
 				before.guild._members.pop(after.id, None)
 				before.guild._member_count = len(before.guild._members)
-				if "guilds" in self.data:
-					self.data.guilds.register(before.guild, force=False)
 			await self.send_event("_leave_", user=before, guild=before.guild)
 
 		# Channel create event: calls _channel_create_ bot database event.

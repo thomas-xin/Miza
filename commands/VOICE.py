@@ -487,6 +487,8 @@ class Queue(Pagination, Command):
 		if not curr:
 			emb.description = f"*Use {bot.get_prefix(gid)}play to add a song!* `"
 		else:
+			resp = await bot.audio.asubmit(f"ytdl.search(AP.from_guild({gid}).queue[0].url)")
+			curr[0] = resp[0]
 			emb.description = (
 				f"**Estimated finish time: {stime}**"
 				+ f'\n{"[`" + no_links(curr[0]["name"]) + "`]"}({curr[0]["url"]})` '
@@ -1438,7 +1440,7 @@ class Radio(Pagination, Command):
 
 			def radio_repr(radio):
 				name = lim_str(no_links(radio["name"].strip() or radio["tags"].strip() or url2fn(radio["homepage"].strip())), 80)
-				return f"[{name}]({radio['url']})"
+				return f"[{name}]({radio['url_resolved']})"
 
 			return "\n".join(radio_repr(radio) for radio in tuple(curr)[pos:pos + page])
 

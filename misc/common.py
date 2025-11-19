@@ -2439,7 +2439,7 @@ if __name__ != "__mp_main__":
 			if self.file is None:
 				return
 			while True:
-				for i in range(40):
+				for i in range(100):
 					s, self.strbuff = self.strbuff, []
 					sys.__stdout__.write("".join(s))
 					time.sleep(0.25)

@@ -275,24 +275,31 @@ def pipe_fut(src, dest):
 		dest.set_exception(e)
 	return res
 
-async def gather(*futs, return_exceptions=False):
+async def gather(*futs, return_exceptions=False, max_concurrency=None):
 	"Same functionality as asyncio.gather, but with fallback to main thread if called from a non-asyncio loop."
-	if not is_main_thread() and any(map(asyncio.iscoroutine, futs)):
-		futs = [asyncio.run_coroutine_threadsafe(fut, loop=get_event_loop()) for fut in futs]
-		out = []
-		if return_exceptions:
-			for fut in futs:
-				try:
-					res = await wrap_future(fut)
-				except Exception as ex:
-					res = ex
-				out.append(res)
+	out_futs = deque()
+	outs = []
+	for fut in futs:
+		while max_concurrency and len(out_futs) >= max_concurrency:
+			try:
+				res = await out_futs.popleft()
+			except Exception as ex:
+				if not return_exceptions:
+					raise
+				outs.append(ex)
+			else:
+				outs.append(res)
+		if not max_concurrency or isinstance(fut, asyncio.Task):
+			pass
+		elif not is_main_thread() and asyncio.iscoroutine(fut):
+			temp = asyncio.run_coroutine_threadsafe(fut, loop=get_event_loop())
+			fut = csubmit(wrap_future(fut))
 		else:
-			for fut in futs:
-				res = await wrap_future(fut)
-				out.append(res)
-		return out
-	return await asyncio.gather(*futs, return_exceptions=return_exceptions)
+			fut = csubmit(fut)
+		out_futs.append(fut)
+	remainder = await asyncio.gather(*out_futs, return_exceptions=return_exceptions)
+	outs.extend(remainder)
+	return outs
 
 async def _await_fut(fut, ret) -> Future:
 	try:

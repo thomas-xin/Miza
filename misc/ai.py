@@ -37,30 +37,24 @@ def cast_rp(fp, pp, model=None):
 available = {
 	"claude-4.1-opus": {
 		"openrouter": ("anthropic/claude-opus-4.1", ("15", "75")),
-		None: "gpt-5.1",
 	},
 	"claude-4.5-sonnet": {
 		"openrouter": ("anthropic/claude-4.5-sonnet", ("3", "15")),
-		None: "gpt-5.1",
 	},
 	"claude-4-sonnet": {
 		"openrouter": ("anthropic/claude-sonnet-4", ("3", "15")),
-		None: "gemini-2.5-pro",
 	},
 	"claude-4.5-haiku": {
 		"openrouter": ("anthropic/claude-haiku-4.5", ("1", "5")),
-		None: "gpt-5-nano",
 	},
 	"deepseek-r1": {
 		"openrouter": ("deepseek/deepseek/deepseek-r1-0528:free", ("0", "0")),
 		"deepseek": ("deepseek-reasoner", ("0.41167", "1.64333")),
 		"deepinfra": ("deepseek-ai/DeepSeek-R1", ("0.85", "2.5")),
-		None: "o1-preview",
 	},
 	"deepseek-v3.2": {
 		"openrouter": ("deepseek/deepseek-v3.2-exp", ("0.27", "0.41")),
 		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
-		None: "gpt-5",
 	},
 	"deepseek-v3.1": {
 		"openrouter": ("deepseek/deepseek-chat-v3.1", ("0.2", "0.8")),
@@ -68,7 +62,6 @@ available = {
 		"fireworks": ("accounts/fireworks/models/deepseek-v3-0324", ("0.9", "0.9")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
 		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
-		None: "gpt-5",
 	},
 	"deepseek-v3": {
 		"openrouter": ("deepseek/deepseek-v3.2-exp", ("0.27", "0.41")),
@@ -76,160 +69,128 @@ available = {
 		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
 		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
-		None: "deepseek-v3.1",
 	},
 	"minimax-m2": {
 		"openrouter": ("minimax/minimax-m2", ("0.15", "0.45")),
-		None: "gpt-5",
 	},
 	"minimax-m1": {
 		"openrouter": ("minimax/minimax-m1", ("0.3", "1.65")),
-		None: "gpt-5",
 	},
 	"minimax-01": {
 		"openrouter": ("minimax/minimax-01", ("0.2", "1.1")),
-		None: "gpt-5",
 	},
 	"llama-3-405b": {
 		"deepinfra": ("meta-llama/Meta-Llama-3.1-405B-Instruct", ("1.79", "1.79")),
 		"fireworks": ("accounts/fireworks/models/llama-v3p1-405b-instruct", ("3", "3")),
 		"together": ("meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo", ("5", "5")),
-		None: "qwen3-235b",
 	},
 	"llama-3-90b": {
 		"deepinfra": ("meta-llama/Llama-3.2-11B-Vision-Instruct", ("0.35", "0.4")),
 		"together": ("meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo", ("1.2", "1.2")),
-		None: "llama-3-70b",
 	},
 	"llama-3-70b": {
 		"fireworks": ("accounts/fireworks/models/llama-v3p3-70b-instruct", ("0.9", "0.9")),
 		"deepinfra": ("meta-llama/Llama-3.3-70B-Instruct", ("0.23", "0.4")),
 		"together": ("meta-llama/Llama-3.3-70B-Instruct-Turbo", ("0.88", "0.88")),
-		None: "lzlv-70b",
 	},
 	"llama-3-11b": {
 		"deepinfra": ("meta-llama/Llama-3.2-11B-Vision-Instruct", ("0.055", "0.055")),
 		"together": ("meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo", ("0.18", "0.18")),
-		None: "llama-3-8b",
 	},
 	"llama-3-8b": {
 		"deepinfra": ("meta-llama/Meta-Llama-3.1-8B-Instruct", ("0.03", "0.05")),
 		"fireworks": ("accounts/fireworks/models/llama-v3p1-8b-instruct", ("0.2", "0.2")),
 		"together": ("meta-llama/Meta-Llama-3.1-8B-Instruct", ("0.2", "0.2")),
-		None: "command-r",
 	},
 	"command-r-plus": {
 		"openrouter": ("cohere/command-r-plus-08-2024", ("2.375", "9.5")),
-		None: "deepseek-v3",
 	},
 	"command-r": {
 		"openrouter": ("cohere/command-r-08-2024", ("0.1425", "0.57")),
-		None: "deepseek-v3",
 	},
 	"magnum-72b": {
 		"openrouter": ("anthracite-org/magnum-v4-72b", ("1.875", "2.25")),
 	},
 	"qwen3-235b": {
 		"openrouter": ("qwen/qwen3-vl-235b-a22b-thinking", ("0.3", "1.2")),
-		None: "kimi-k2",
 	},
 	"qwen-72b": {
 		"fireworks": ("accounts/fireworks/models/qwen2p5-72b-instruct", ("0.9", "0.9")),
 		"deepinfra": ("Qwen/Qwen2.5-72B-Instruct", ("0.35", "0.4")),
 		"together": ("Qwen/Qwen2.5-72B-Instruct-Turbo", ("1.2", "1.2")),
-		None: "llama-3-70b",
+	},
+	"gemini-3-pro": {
+		"openrouter": ("google/gemini-3-pro-preview", ("2", "12")),
 	},
 	"gemini-2.5-pro": {
 		"openrouter": ("google/gemini-2.5-pro", ("1.25", "10")),
-		None: "gpt-5",
 	},
 	"gemini-2.5-flash-t": {
 		"openrouter": ("google/gemini-2.5-flash-preview-09-2025", ("0.3", "2.5")),
-		None: "gpt-5",
 	},
 	"gemini-2.5-flash": {
 		"openrouter": ("google/gemini-2.5-flash-lite-preview-09-2025", ("0.1", "0.4")),
-		None: "gpt-5",
 	},
 	"grok-4": {
 		"openrouter": ("x-ai/grok-4", ("3", "15")),
-		None: "grok-3",
 	},
 	"grok-4-fast": {
 		"openrouter": ("x-ai/grok-4-fast", ("0.2", "0.5")),
-		None: "grok-3-mini",
 	},
 	"gpt-oss-120b": {
 		"openrouter": ("openai/gpt-oss-120b", ("0.072", "0.28")),
-		None: "o4-mini",
 	},
 	"gpt-oss-20b": {
 		"openrouter": ("openai/gpt-oss-20b", ("0.05", "0.2")),
 		"fireworks": ("accounts/fireworks/models/gpt-oss-20b", ("0.1", "0.1")),
-		None: "o4-mini",
 	},
 	"o4-mini": {
 		"openai": ("o4-mini", ("1.1", "4.4")),
-		None: "gpt-5-mini",
 	},
 	"o3": {
 		"openai": ("o3", ("10", "40")),
-		None: "gpt-5",
 	},
 	"o3-mini": {
 		"openai": ("o3-mini", ("1.1", "4.4")),
-		None: "gpt-4.1-mini",
 	},
 	"gpt-5.1": {
 		"openrouter": ("openai/gpt-5.1", ("1.25", "10")),
-		None: "kimi-k2-t",
 	},
 	"gpt-5": {
 		"openrouter": ("openai/gpt-5", ("1.25", "10")),
 		"openai": ("gpt-5", ("1.25", "10")),
-		# "openrouter": ("openai/gpt-5-chat", ("1.25", "10")),
-		None: "kimi-k2-t",
 	},
 	"gpt-5-mini": {
 		"openrouter": ("openai/gpt-5-mini", ("0.25", "2")),
 		"openai": ("gpt-5-mini", ("0.25", "2")),
-		None: "o4-mini",
 	},
 	"gpt-5-nano": {
 		"openrouter": ("openai/gpt-5-nano", ("0.05", "4")),
 		"openai": ("gpt-5-mini", ("0.05", "0.4")),
-		None: "gpt-oss-120b",
 	},
 	"gpt-4.1-mini": {
 		"openai": ("gpt-4.1-mini", ("0.4", "1.6")),
-		None: "claude-3-haiku",
 	},
 	"gpt-4.1": {
 		"openai": ("gpt-4.1", ("2", "8")),
-		None: "claude-3.5-sonnet",
 	},
 	"gpt-4-mini": {
 		"openai": ("gpt-4o-mini", ("0.15", "0.6")),
-		None: "claude-3-haiku",
 	},
 	"gpt-4": {
 		"openai": ("gpt-4o", ("2.5", "10")),
 		"openrouter": ("openai/gpt-4o", ("2.5", "10")),
-		None: "claude-3.5-sonnet",
 	},
 	"mistral-24b": {
 		"mistral": ("mistral-small-latest", ("0", "0")),
 		"openrouter": ("mistralai/mistral-small-3.1-24b-instruct-2503", ("0.1", "0.3")),
 		"openrouter_": ("cognitivecomputations/dolphin3.0-mistral-24b:free", ("0", "0")),
-		None: "gpt-4.1-mini",
 	},
 	"kimi-k2-t": {
 		"openrouter": ("moonshotai/kimi-k2-thinking", ("0.6", "2.5")),
-		None: "gpt-5.1",
 	},
 	"kimi-k2": {
 		"openrouter": ("moonshotai/kimi-k2-0905:exacto", ("0.6", "2.5")),
-		None: "gpt-5-mini",
 	},
 }
 
@@ -248,6 +209,7 @@ is_reasoning = {
 	"grok-4-fast",
 	"grok-3",
 	"grok-3-mini",
+	"gemini-3-pro",
 	"gemini-2.5-pro",
 	"gemini-2.5-flash-t",
 	"gpt-oss-120b",
@@ -281,6 +243,7 @@ is_function = {
 	"grok-4-fast",
 	"grok-3",
 	"grok-3-mini",
+	"gemini-3-pro",
 	"gemini-2.5-pro",
 	"gemini-2.5-flash-t",
 	"gemini-2.5-flash",
@@ -326,6 +289,7 @@ is_vision = {
 	"llama-3-90b",
 	"grok-4",
 	"grok-4-fast",
+	"gemini-3-pro",
 	"gemini-2.5-pro",
 	"gemini-2.5-flash-t",
 	"gemini-2.5-flash",
@@ -362,6 +326,7 @@ is_premium = {
 	"gpt-5.1",
 	"gpt-5",
 	"grok-4",
+	"gemini-3-pro",
 	"gemini-2.5-pro",
 	"o3",
 	"o1",
@@ -416,6 +381,7 @@ contexts = {
 	"grok-4-fast": 2097152,
 	"grok-3": 131072,
 	"grok-3-mini": 131072,
+	"gemini-3-pro": 1048576,
 	"gemini-2.5-pro": 1048576,
 	"gemini-2.5-flash-t": 1048576,
 	"gemini-2.5-flash": 1048576,
@@ -832,9 +798,10 @@ async def _summarise(s, max_length, best=False, prompt=None, premium_context=[])
 				api = None
 				model = "gpt-5-nano" if best > 1 else "gpt-oss-20b"
 			if c > contexts.get(model, 65536) * 2 / 3:
+				api = None
 				model = "grok-4-fast"
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context, api=api)
-			if model in is_reasoning:
+			if api or model in is_reasoning:
 				data["reasoning_effort"] = "minimal"
 			resp = await instruct(data, best=True, skip=True)
 			print("Summary:", resp)
@@ -843,7 +810,7 @@ async def _summarise(s, max_length, best=False, prompt=None, premium_context=[])
 	return lim_tokens(s, round_random(max_length * 2 / 3))
 
 async def llm(func, *args, api="openai", timeout=120, premium_context=None, require_message=True, allow_alt=True, **kwargs):
-	if isinstance(api, str):
+	if isinstance(api, str) or not api:
 		# await ensure_models()
 		if "model" in kwargs:
 			apis = available.get(kwargs["model"]) or {api: None}
@@ -859,7 +826,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 		if api is None:
 			if not allow_alt:
 				break
-			assert isinstance(minfo, str)
+			assert isinstance(minfo, str), minfo
 			kwargs["model"] = minfo
 			return await llm(func, *args, timeout=timeout, premium_context=premium_context, require_message=require_message, allow_alt=False, **kwargs)
 		if not isinstance(api, str):

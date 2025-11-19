@@ -929,7 +929,7 @@ class ThreadPreserver(Command):
 
 	async def __call__(self, bot, guild, channel, name, args, flags, **void):
 		if args:
-			thr = await bot.fetch_channel(verify_id(args[0]))
+			thr = await bot._fetch_channel(verify_id(args[0]))
 		else:
 			thr = channel
 		if not isinstance(thr, discord.Thread) and not hasattr(thr, "archived"):
@@ -1957,7 +1957,7 @@ class CreateEmoji(Command):
 		if _perm < 2:
 			raise self.perm_error(_perm, 2, "for command " + _name)
 		name = name or url2fn(url).rsplit(".", 1)[0]
-		image = await bot.optimise_image(url, fsize=262144, csize=128, fmt="webp")
+		image = await bot.optimise_image(url, fsize=262144, csize=256, fmt="webp")
 		emoji = await _guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
 		# This reaction indicates the emoji was created successfully
 		with suppress(discord.Forbidden):
@@ -2002,9 +2002,9 @@ class CreateSound(Command):
 			emoji = await bot.fetch_emoji(emoji, _guild)
 			assert emoji.guild.id == _guild.id, "Emoji must be from the current server."
 		name = name or getattr(emoji, "name", None) or url2fn(url).rsplit(".", 1)[0]
-		d = await asubmit(get_duration, url)
+		info = await asubmit(audio_meta, url)
 		i = ts_us()
-		if d <= 5.5:
+		if info.duration <= 5.5:
 			fn = f"{TEMP_PATH}/{i}.ogg"
 			args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-to", "5.1875", "-c:a", "libopus", "-b:a", "160k", fn]
 			print(args)
@@ -2022,7 +2022,7 @@ class CreateSound(Command):
 			fn1 = f"{TEMP_PATH}/{i}~1.mp3"
 			fn2 = f"{TEMP_PATH}/{i}~2.mp3"
 			args1 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-ar", "48000", "-to", "1.175", "-c:a", "libmp3lame", "-b:a", "144k", fn1]
-			if d <= 11:
+			if info.duration <= 11:
 				args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-i", "misc/10s-soundboard-template.ogg", "-filter_complex", "amix=inputs=2:duration=longest", "-ss", "1.175", "-to", "11", "-ar", "48000", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
 			else:
 				args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-ss", "1.175", "-to", "11", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
@@ -2153,10 +2153,10 @@ class ScanEmoji(Command):
 				url = str(emoji.url)
 				resp = await asubmit(subprocess.run, self.ffprobe_start + (url,), stdout=subprocess.PIPE)
 				width, height = map(int, resp.stdout.splitlines())
-				if width < 128 or height < 128:
+				if width < 256 or height < 256:
 					found += 1
 					w, h = width, height
-					while w < 128 or h < 128:
+					while w < 256 or h < 256:
 						w, h = w << 1, h << 1
 					colour = await asubmit(bot.get_colour, url)
 					bot.send_as_embeds(
@@ -2319,7 +2319,7 @@ class UpdateUserLogs(Database):
 			return
 		c_id = self.data[guild.id]
 		try:
-			channel = await self.bot.fetch_channel(c_id)
+			channel = await self.bot._fetch_channel(c_id)
 		except (EOFError, discord.NotFound):
 			self.data.pop(guild.id)
 			return
@@ -2344,18 +2344,19 @@ class UpdateUserLogs(Database):
 			return
 		c_id = self.data[guild.id]
 		try:
-			channel = await self.bot.fetch_channel(c_id)
+			channel = await self.bot._fetch_channel(c_id)
 		except (EOFError, discord.NotFound):
 			self.data.pop(guild.id)
 			return
 		emb = discord.Embed(colour=8323072)
 		mlist = self.bot.data.channel_cache.get(ch.id)
-		count = f" ({len(mlist)}+)" if mlist else ""
+		count = max(len(mlist) if mlist else 0, getattr(ch, "message_count", 0))
+		mcount = f" ({count}+)" if count else ""
 		if user:
 			emb.set_author(**get_author(user))
-			emb.description = f"#{ch.name}{count}: {ch.id} was deleted by {user_mention(user.id)}."
+			emb.description = f"#{ch.name}{mcount}: {ch.id} was deleted by {user_mention(user.id)}."
 		else:
-			emb.description = f"#{ch.name}{count}: {ch.id} has been deleted."	
+			emb.description = f"#{ch.name}{mcount}: {ch.id} has been deleted."	
 		self.bot.send_embeds(channel, emb)
 
 	async def _guild_update_(self, before, after, **void):
@@ -2783,13 +2784,8 @@ class UpdateMessageLogs(Database):
 						print_exc()
 						perm = True
 					if perm:
-						futs.append(csubmit(self.save_channel(channel, t)))
-					if len(futs) >= 4:
-						with tracebacksuppressor:
-							await futs.popleft()
-		for fut in futs:
-			with tracebacksuppressor:
-				await fut
+						futs.append(self.save_channel(channel, t))
+		await gather(*futs, max_concurrency=4)
 		self.bot.data.message_cache.finished = True
 		self.bot.data.message_cache.setmtime()
 		print("Loading new messages completed.")
@@ -3423,7 +3419,7 @@ class UpdateThreadPreservers(Database):
 			if after not in self.data:
 				return
 			try:
-				after = await self.bot.fetch_channel(after)
+				after = await self.bot._fetch_channel(after)
 			except:
 				print_exc()
 				self.pop(after)

@@ -9,7 +9,8 @@ import zipfile
 import niquests
 from PIL import Image
 import streamshatter
-from .util import is_url, get_duration_2, temporary_file, CODEC_FFMPEG
+from .util import is_url, temporary_file, CODEC_FFMPEG, CODEC_PIX
+from .caches import audio_meta
 # Allow fallback (although not recommended as generally the up-to-date version is necessary for most sites)
 try:
 	import yt_dlp as ytd
@@ -426,7 +427,8 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 				input_args.extend(["-to", str(self.end)])
 			if not self.codec:
 				self.codec = "av1_nvenc"
-			output_args = ["-f", self.format, "-c:v", self.codec, "-b:v", "2M", "-vbr", "on"]
+			pix_fmt = CODEC_PIX.get(self.codec, "yuv420p")
+			output_args = ["-f", self.format, "-c:v", self.codec, "-b:v", "2M", "-vbr", "on", "-pix_fmt", pix_fmt]
 			if self.format == "mp4":
 				# MP4 supports just about any audio codec, but WebM and MKV do not. We assume the audio codec is not WMA, as it is highly unlikely any website would use it for streaming videos.
 				output_args.extend(["-c:a", "copy"])
@@ -470,22 +472,22 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 	@ytd.postprocessor.PostProcessor._restrict_to(images=False)
 	def run(self, info):
 		filename, source_ext = info['filepath'], info['ext'].lower()
-		dur, bps, cdc, ac = get_duration_2(filename)
-		cbr = max(60, min(bps / 1000 / (0.875 if cdc == "mp3" else 0.75 if cdc == "aac" else 0.625), 256)) if bps else 256
-		if not dur or dur < 1920:
+		meta = audio_meta(filename)
+		cbr = max(60, min(meta.bitrate / 1000 / (0.875 if meta.codec == "mp3" else 0.75 if meta.codec == "aac" else 0.625), 256)) if meta.bitrate else 256
+		if meta.duration < 1920:
 			mbr = 160
-		elif dur < 3840:
+		elif meta.duration < 3840:
 			mbr = 128
-		elif dur < 7680:
+		elif meta.duration < 7680:
 			mbr = 108
 		else:
 			mbr = 96
-		print(dur, bps, cbr, mbr)
+		print(meta.duration, meta.bitrate, cbr, mbr)
 		if source_ext == self.format and self.start == self.end == None:  # noqa: E711
 			if self.final and os.path.samefile(filename, self.final):
 				shutil.copyfile(filename, self.final)
 			return [], info
-		source_codec = cdc
+		source_codec = meta.codec
 		A = ytd.postprocessor.ffmpeg.ACODECS
 		acodec = A[self.codec][1] or A[self.codec][0]
 		input_args = ["-vn"]
@@ -494,7 +496,7 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			input_args.extend(["-ss", str(self.start)])
 		if self.end is not None:
 			input_args.extend(["-to", str(self.end)])
-		if source_codec == self.codec and bps and bps / 1000 <= mbr or isinstance(source_codec, str) and source_codec.startswith("pcm_") and self.codec == "wav":
+		if source_codec == self.codec and meta.bitrate and meta.bitrate / 1000 <= mbr or isinstance(source_codec, str) and source_codec.startswith("pcm_") and self.codec == "wav":
 			output_args.extend(["-c", "copy"])
 		else:
 			# Default to 192k for AAC, 160k for Opus, and 224k for MP3

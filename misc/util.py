@@ -1261,6 +1261,12 @@ CODEC_FFMPEG = {
 	"vvc": "libvvenc",
 	"av1": "av1_nvenc",
 }
+CODEC_PIX = {
+	"h264_nvenc": "nv12",
+	"h265_nvenc": "nv12",
+	"av1_nvenc": "nv12",
+	"libvvcenc": "yuv444p",
+}
 CODECS = {
 	"auto": "auto",
 	"x264": "mp4",
@@ -1504,69 +1510,6 @@ def stream_exists(url, fmt="opus"):
 	h = shash(url)
 	fn = f"{TEMP_PATH}/audio/~" + h + "." + fmt
 	return os.path.exists(fn) and os.path.getsize(fn)
-
-def ecdc_exists(url, exc=False, force=None):
-	url = unyt(url)
-	h = shash(url)
-	elist = {}
-	for fn in os.listdir(ecdc_dir):
-		if not os.path.getsize(ecdc_dir + fn):
-			os.remove(ecdc_dir + fn)
-			continue
-		if fn.startswith("!" + h + "~"):
-			if force and fn.rsplit("/", 1)[-1] != force.rsplit("/", 1)[-1]:
-				os.remove(ecdc_dir + fn)
-				continue
-			brs = fn.rsplit("~", 1)[-1].rsplit(".", 1)[0]
-			if brs.endswith(".0"):
-				fn2 = fn.rsplit("~", 1)[0] + "~" + brs[:-2] + "." + fn.rsplit(".", 1)[-1]
-				if os.path.exists(ecdc_dir + fn2):
-					os.remove(ecdc_dir + fn)
-					continue
-				else:
-					os.rename(ecdc_dir + fn, ecdc_dir + fn2)
-					fn = fn2
-			br = float(brs)
-			elist[br] = fn
-	if not elist:
-		if not exc:
-			return
-		raise FileNotFoundError(h)
-	n = max(elist)
-	fn = elist.pop(n)
-	if elist:
-		for f2 in elist.values():
-			os.remove(ecdc_dir + f2)
-	return ecdc_dir + fn
-
-@functools.lru_cache(maxsize=None)
-def ecdc_info(fn):
-	if is_url(fn):
-		fn = ecdc_exists(fn, exc=True)
-	from misc import ecdc_stream
-	return cdict(ecdc_stream.get_info(fn))
-
-def ecdc_br(fn):
-	bps = None
-	try:
-		_dur, bps, cdc, *_ = get_duration_2(fn)
-	except Exception:
-		print_exc()
-	else:
-		if bps:
-			if cdc in ("wav", "flac"):
-				bps //= 4
-			if cdc not in ("opus", "vorbis"):
-				bps //= 2
-	bps = bps or 192000
-	br = min(32, round(bps / 6000))
-	if 18 < br < 24:
-		br = 24
-	elif 9 < br < 12:
-		br = 12
-	elif 4.5 < br < 6:
-		br = 6
-	return br
 
 def verify_url(url):
 	return url if is_url(url) else quote_plus(url)
@@ -2337,137 +2280,6 @@ class _CachingReader(io.RawIOBase):
 
 	def close(self):
 		self.file.close()
-
-
-@functools.lru_cache(maxsize=64)
-def get_duration_2(filename, _timeout=12):
-	command = (
-		"ffprobe",
-		"-v",
-		"error",
-		"-select_streams",
-		"a:0",
-		"-show_entries",
-		"stream=codec_name,channels,duration,bit_rate",
-		"-show_entries",
-		"format=duration,bit_rate",
-		"-of",
-		"default=nokey=1:noprint_wrappers=1",
-		filename,
-	)
-	resp = None
-	try:
-		proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
-		fut = esubmit(proc.wait, timeout=_timeout)
-		_res = fut.result(timeout=_timeout)
-		resp = proc.stdout.read().splitlines()
-	except Exception:
-		with suppress():
-			proc.kill()
-		print_exc()
-	try:
-		cdc = as_str(resp[0].rstrip())
-	except (IndexError, ValueError, TypeError):
-		cdc = "auto"
-	try:
-		ac = int(resp[1].rstrip())
-	except (IndexError, ValueError, TypeError):
-		ac = 0
-	try:
-		dur = float(resp[2])
-	except (IndexError, ValueError, TypeError):
-		try:
-			dur = float(resp[4])
-		except (IndexError, ValueError, TypeError):
-			dur = None
-	try:
-		bps = float(resp[3])
-	except (IndexError, ValueError, TypeError):
-		try:
-			bps = float(resp[5])
-		except (IndexError, ValueError, TypeError):
-			bps = None
-	return dur, bps, cdc, ac
-
-@functools.lru_cache(maxsize=64)
-def get_duration_simple(filename, _timeout=12):
-	"Runs FFprobe on a file or url, returning the duration if possible."
-	command = (
-		"ffprobe",
-		"-v",
-		"error",
-		"-select_streams",
-		"a:0",
-		"-show_entries",
-		"stream=duration",
-		"-show_entries",
-		"format=duration,bit_rate",
-		"-of",
-		"default=nokey=1:noprint_wrappers=1",
-		filename,
-	)
-	resp = None
-	try:
-		proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
-		fut = esubmit(proc.wait, timeout=_timeout)
-		fut.result(timeout=_timeout)
-		resp = proc.stdout.read().split()
-	except Exception:
-		with suppress():
-			force_kill(proc)
-		with suppress():
-			resp = proc.stdout.read().split()
-		print_exc()
-	try:
-		dur = float(resp[0])
-	except (IndexError, ValueError, TypeError):
-		try:
-			dur = float(resp[1])
-		except (IndexError, ValueError, TypeError):
-			dur = None
-	bps = None
-	if resp and len(resp) > 2:
-		with suppress(ValueError):
-			bps = float(resp[2])
-	return dur, bps
-
-@functools.lru_cache(maxsize=64)
-def get_duration(filename):
-	"Gets the duration of an audio/video file using metadata, bitrate, filesize etc. Falls back to FFmpeg if necessary."
-	if not filename:
-		return
-	dur, bps = get_duration_simple(filename, 4)
-	if not dur and is_url(filename):
-		with reqs.next().get(filename, headers=Request.header(), stream=True) as resp:
-			head = fcdict(resp.headers)
-			if "Content-Length" not in head:
-				dur = get_duration_simple(filename, 20)[0]
-				return dur
-			if bps:
-				print(head, bps, sep="\n")
-				return (int(head["Content-Length"]) << 3) / bps
-			ctype = [e.strip() for e in head.get("Content-Type", "").split(";") if "/" in e][0]
-			if ctype.split("/", 1)[0] not in ("audio", "video") or ctype == "audio/midi":
-				return
-			it = resp.iter_content(65536)
-			data = next(it)
-		ident = str(magic.from_buffer(data))
-		print(head, ident, sep="\n")
-		try:
-			bitrate = regexp("[0-9.]+\\s.?bps").findall(ident)[0].casefold()
-		except IndexError:
-			dur = get_duration_simple(filename, 16)[0]
-			return dur
-		bps, key = bitrate.split(None, 1)
-		bps = float(bps)
-		if key.startswith("k"):
-			bps *= 1e3
-		elif key.startswith("m"):
-			bps *= 1e6
-		elif key.startswith("g"):
-			bps *= 1e9
-		dur = (int(head["Content-Length"]) << 3) / bps
-	return dur
 
 
 class FileStreamer(io.BufferedRandom, contextlib.AbstractContextManager):
@@ -3273,23 +3085,27 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		- Handles database timeout and operational errors by reinitializing.
 		- Supports concurrent retrievals with Future-based deduplication.
 	"""
-	__slots__ = ("_path", "_shardcount", "_stale", "_stimeout", "_retrieving", "_kwargs")
+	__slots__ = ("_initialised", "_path", "_shardcount", "_stale", "_stimeout", "_retrieving", "_kwargs")
 
 	def __init__(self, directory=None, shards=6, stale=60, timeout=86400, **kwargs):
-		print("Loading Cache:", directory, stale, timeout, kwargs)
 		self._path = directory or None
 		self._shardcount = shards
 		self._stale = stale or inf
 		self._stimeout = timeout or inf
 		self._retrieving = {}
 		self._kwargs = kwargs
-		self.base_init()
-		# self.validate_or_clear()
+		self._initialised = None
 
-	def base_init(self):
-		super().__init__(self._path, shards=self._shardcount, **self._kwargs)
+	def base_init(self, force=False):
+		if not force and self._initialised:
+			return self._initialised.result()
+		self._initialised = fut = concurrent.futures.Future()
+		fut.set_result(super().__init__(self._path, shards=self._shardcount, **self._kwargs))
+		print("Loaded Cache:", self._path, len(self), self._stale, self._stimeout, self._kwargs)
 
 	def __getattr__(self, k):
+		if k not in ("base_init", "__class__", "__slots__", *self.__slots__):
+			self.base_init()
 		try:
 			return object.__getattribute__(self, k)
 		except AttributeError:
@@ -3316,7 +3132,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		try:
 			return super().__contains__(k)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
-			self.base_init()
+			self.base_init(force=True)
 			return super().__contains__(k)
 
 	def __getitem__(self, k):
@@ -3325,7 +3141,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		try:
 			return super().__getitem__(k)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
-			self.base_init()
+			self.base_init(force=True)
 			return super().__getitem__(k)
 
 	def __setitem__(self, k, v, read=False):
@@ -3385,7 +3201,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			v, t = super().get(k, read=_read, tag=True)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
 			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
-			self.base_init()
+			self.base_init(force=True)
 			v, t = super().get(k, read=_read, tag=True)
 		if t is not None and v is not Dummy:
 			delay = utc() - t
@@ -3423,7 +3239,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			v, t = super().get(k, read=_read, tag=True)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
 			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
-			self.base_init()
+			self.base_init(force=True)
 			v, t = super().get(k, read=_read, tag=True)
 		if t is not None and v is not Dummy:
 			delay = utc() - t
@@ -3460,7 +3276,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 				os.mkdir(self._path)
 			except PermissionError:
 				pass
-			self.base_init()
+			self.base_init(force=True)
 
 
 class AutoDatabase(cachecls, collections.abc.MutableMapping):
@@ -3473,7 +3289,6 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 		self._retrieving = {}
 		self._kwargs = kwargs
 		self.base_init()
-		# self.validate_or_clear()
 
 	def base_init(self):
 		super().__init__(self._path, shards=self._shardcount, **self._kwargs)

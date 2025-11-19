@@ -301,12 +301,22 @@ class Exec(Command):
 		),
 		code=cdict(
 			type="string",
-			description="Code to evaluate directly",
+			description="Code to evaluate directly in the main process",
 			example="1 + 1",
+		),
+		audio=cdict(
+			type="string",
+			description="Code to evaluate directly in the audio process",
+			example="1 + 2",
+		),
+		server=cdict(
+			type="string",
+			description="Code to evaluate directly in the server process",
+			example="2 + 2",
 		),
 	)
 
-	async def __call__(self, bot, _channel, _message, mode, type, code, **void):
+	async def __call__(self, bot, _channel, _message, mode, type, code, audio, server, **void):
 		num = self.terminal_types[type]
 		execd = bot.data.exec
 		if mode == "enable":
@@ -332,6 +342,10 @@ class Exec(Command):
 						execd.pop(_channel.id)
 			attachment_cache["@channels"] = [k for k, v in execd.items() if v & 16]
 			return css_md(f"Successfully removed {sqr_md(out)} terminal.")
+		if server:
+			code = f"await bot.server.asubmit({repr(server)})"
+		elif audio:
+			code = f"await bot.audio.asubmit({repr(audio)})"
 		if code:
 			proc = code.translate(execd.qtrans)
 			try:
@@ -351,7 +365,7 @@ class Exec(Command):
 
 class UpdateExec(Database):
 	name = "exec"
-	virtuals = cdict()
+	virtuals = None
 	listeners = cdict()
 	qmap = {
 		"“": '"',
@@ -389,20 +403,17 @@ class UpdateExec(Database):
 		if term & 1:
 			glob = bot._globals
 		else:
-			try:
-				glob = self.virtuals[channel.id]
-			except KeyError:
-				glob = self.virtuals[channel.id] = dict(bot._globals)
-				glob.update(dict(
-					print=lambda *args, **kwargs: self._print(*args, channel=channel, **kwargs),
-					input=lambda *args, **kwargs: self._input(*args, channel=channel, **kwargs),
-					channel=channel,
-					guild=message.guild,
-				))
+			glob = self.virtuals
+			if glob is None:
+				glob = self.virtuals = dict(bot._globals)
 			glob.update(dict(
 				user=message.author,
 				member=message.author,
 				message=message,
+				channel=channel,
+				guild=message.guild,
+				print=lambda *args, **kwargs: self._print(*args, channel=channel, **kwargs),
+				input=lambda *args, **kwargs: self._input(*args, channel=channel, **kwargs),
 			))
 			try:
 				glob["auds"] = bot.data.audio.players[message.guild.id]
@@ -1543,119 +1554,6 @@ class UpdateInsights(Database):
 
 class UpdateGuildSettings(Database):
 	name = "guildsettings"
-
-
-class UpdateGuilds(Database):
-	name = "guilds"
-	forced = set()
-
-	def cache_guild(self, guild):
-		if T(guild).get("unavailable", False) or T(guild).get("ghost") or T(guild).get("simulated"):
-			return guild._members.values()
-		mdata = []
-		ts = utc()
-		for m in guild._members.values():
-			m.guild = guild
-			cm = cdict(
-				name=m.name,
-				nick=m.nick,
-				global_name=T(m).get("global_name"),
-				id=m.id,
-				gp=m.guild_permissions.value,
-				rids=list(m._roles),
-			)
-			if m.bot:
-				cm.bot = True
-			if m._avatar:
-				cm._a = m._avatar
-			tou = T(m).get("timed_out_until")
-			if tou and ts - tou.timestamp() > 0:
-				cm.tou = tou.timestamp()
-			mdata.append(cm)
-		gdata = cdict(
-			id=guild.id,
-			name=guild.name,
-			icon=guild.icon and str(guild.icon),
-			description=guild.description,
-			_member_count=len(mdata),
-			features=guild.features,
-			banner=guild.banner and str(guild.banner),
-			owner_id=guild.owner_id,
-			filesize_limit=guild.filesize_limit,
-			members=mdata,
-		)
-		self[guild.id] = gdata
-		self.bot.cache.guilds[guild.id] = guild
-		return mdata
-
-	def __bot_ready__(self, **void):
-		bot = self.bot
-		for k, v in self.items():
-			with tracebacksuppressor:
-				g = self.get(k)
-				if not isinstance(g, dict):
-					continue
-				if k not in bot.cache.guilds:
-					guild = bot.UserGuild()
-					guild.channel = bot.user
-					guild._members = {}
-					guild._roles = {}
-					guild._channels = {}
-					guild._threads = {}
-					guild.channels = []
-					guild.text_channels = []
-					guild.voice_channels = []
-					guild.categories = []
-					guild.me = bot.user
-					guild.__dict__.update(g)
-				self.load_guild(guild)
-				bot.cache.guilds[guild.id] = guild
-
-	def load_guild(self, guild):
-		bot = self.bot
-		gdata = self.get(guild.id, {})
-		if not isinstance(gdata, dict):
-			gdata = dict(members=gdata)
-		mdata = gdata["members"]
-		for cm in map(cdict, mdata):
-			if cm.id in guild._members and isinstance(guild._members[cm.id], discord.Member):
-				continue
-			m = bot.GhostUser()
-			m.id = cm.id
-			m.name = cm.name
-			m.nick = cm.get("nick")
-			m.global_name = cm.get("global_name")
-			m.guild_permissions = discord.Permissions(cm.gp)
-			m.guild = guild
-			m.roles = list(filter(bool, map(guild._roles.get, cm.get("rids", ()))))
-			if guild.id not in cm.get("rids", ()):
-				r = guild._roles.get(guild.id) or discord.Role(guild=guild, state=T(bot).get("_state"), data=dict(id=guild.id, name="@everyone"))
-				m.roles.append(r)
-			m._roles = discord.utils.SnowflakeList([r.id for r in m.roles if r.id != guild.id])
-			m.bot = cm.get("bot", False)
-			m._avatar = T(cm).get("_a")
-			if T(cm).get("tou"):
-				m.timed_out_until = datetime.datetime.utcfromtimestamp(cm.tou).replace(tzinfo=datetime.timezone.utc)
-			guild._members[m.id] = m
-		if isinstance(guild, dict):
-			guild["owner"] = guild._members.get(guild.owner_id)
-		return guild._members
-
-	def update_guild(self, guild):
-		bot = self.bot
-		if guild.id in bot.cache.guilds:
-			members = bot.cache.guilds[guild.id]._members
-			guild._members.update(members)
-			guild._member_count = len(guild._members)
-		bot.cache.guilds[guild.id] = guild
-		return guild
-
-	def register(self, guild, force=True):
-		if force:
-			self.forced.add(guild.id)
-		elif guild.id not in self.forced:
-			return
-		return self.cache_guild(guild)
 
 
 class UpdateDrives(Database):

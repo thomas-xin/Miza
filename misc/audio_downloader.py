@@ -3,7 +3,7 @@ from concurrent.futures import Future
 from contextlib import suppress
 import io
 import itertools
-from math import ceil, inf
+from math import ceil, inf, isfinite
 import os
 import random
 import re
@@ -20,10 +20,11 @@ from .smath import time_parse
 from .asyncs import esubmit
 from .util import (
 	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
-	find_urls, url2fn, discord_expired, expired, shorten_attachment, unyt, get_duration, get_duration_2, html_decode,
+	find_urls, url2fn, url2ext, discord_expired, expired, shorten_attachment, unyt, html_decode,
 	is_image, is_url, is_discord_attachment, is_miza_url, is_miza_attachment, is_youtube_url, is_spotify_url, AUDIO_FORMS,
 	EvalPipe, PipedProcess, AutoCache, Request, Semaphore, TEMP_PATH, CACHE_PATH, magic, rename, temporary_file, replace_ext, select_and_loads,
 )
+from .caches import audio_meta
 
 # Gets the best icon/thumbnail for a queue entry.
 def get_best_icon(entry):
@@ -70,11 +71,13 @@ def get_best_audio(entry):
 	except KeyError:
 		pass
 	else:
+		if isinstance(a, str):
+			a = [a]
 		if len(a) < 2:
 			return a[0], None, 0
 		if len(a) < 3:
 			return a[0], a[1], 0
-		return a
+		return a[:3]
 	best = (-inf,)
 	try:
 		fmts = entry["formats"]
@@ -889,6 +892,14 @@ class AudioDownloader:
 		except (LookupError, ValueError):
 			return []
 
+	def handle_path(self, path, entry=None):
+		info = audio_meta(path)
+		if entry is not None:
+			entry["duration"] = info.duration
+			if info.name:
+				entry["name"] = info.name
+		return path, info.codec, info.duration, info.channels
+
 	def handle_spotify(self, entry, url, fn):
 		assert is_spotify_url(url), "Not a Spotify URL."
 		# If we have the track artist, attempt to find a better match on Bandcamp. The Spotify downloaders are spotty (no pun intended), so those are kept as the fallback instead.
@@ -922,9 +933,7 @@ class AudioDownloader:
 					return stream, cdc, dur, ac
 		r_mp3 = temporary_file("mp3")
 		fn2 = self.run(f"get_audio_spotify({json_dumpstr(url)},{json_dumpstr(r_mp3)})", priority=True)
-		dur, _bps, cdc, ac = get_duration_2(fn2)
-		entry["duration"] = dur
-		return fn2, cdc, dur, ac
+		return self.handle_path(fn2, entry)
 
 	def handle_special_audio(self, entry, url, fn):
 		"""Handles special audio formats unsupported by FFmpeg, such as spotify URLs, spectrogram images, as well as ecdc, org, and midi files."""
@@ -932,7 +941,18 @@ class AudioDownloader:
 			return self.handle_spotify(entry, url, fn)
 		if is_youtube_url(url):
 			return
-		with self.session.get(url, headers=Request.header(), stream=True) as resp:
+		header = Request.header()
+		header["User-Agent"] = "Lavf/100.0.0"
+		header["Accept"] = "audio/*, */*"
+		header["Icy-Metadata"] = "1"
+		try:
+			resp = self.session.get(url, headers=header, stream=True)
+		except niquests.exceptions.ConnectionError:
+			try:
+				return self.handle_path(url, entry)
+			except Exception:
+				return
+		with resp:
 			head = resp.headers
 			changed = False
 			if not entry.get("icon", None):
@@ -982,9 +1002,7 @@ class AudioDownloader:
 				res = subprocess.run(args, cwd="misc", stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 				if not os.path.exists(fn) or not os.path.getsize(fn):
 					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
-				dur, _bps, cdc, ac = get_duration_2(fn)
-				entry["duration"] = dur
-				return fn, cdc, dur, ac
+				return self.handle_path(fn, entry)
 			if ct in ("audio/x-ecdc", "audio/ecdc"):
 				r_ecdc = temporary_file("ecdc")
 				copy_to_file(r_ecdc)
@@ -994,9 +1012,7 @@ class AudioDownloader:
 				res = PipedProcess(args1, args2, stderr=subprocess.PIPE).wait()
 				if not os.path.exists(fn) or not os.path.getsize(fn):
 					raise RuntimeError(as_str(res.stderr.read()) or "Unable to locate converted file.")
-				dur, _bps, cdc, ac = get_duration_2(fn)
-				entry["duration"] = dur
-				return fn, cdc, dur, ac
+				return self.handle_path(fn, entry)
 			if ct in ("audio/x-org", "audio/org"):
 				r_org = temporary_file("org")
 				r_opus = replace_ext(r_org, "opus")
@@ -1006,9 +1022,7 @@ class AudioDownloader:
 				res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 				if not os.path.exists(r_opus) or not os.path.getsize(r_opus):
 					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
-				dur, _bps, cdc, ac = get_duration_2(r_opus)
-				entry["duration"] = dur
-				return r_opus, cdc, dur, ac
+				return self.handle_path(fn, entry)
 			if ct in ("audio/x-midi", "audio/midi", "audio/sp-midi"):
 				r_mid = temporary_file("mid")
 				r_opus = replace_ext(r_mid, "opus")
@@ -1018,9 +1032,7 @@ class AudioDownloader:
 				res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 				if not os.path.exists(r_opus) or not os.path.getsize(r_opus):
 					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
-				dur, _bps, cdc, ac = get_duration_2(r_opus)
-				entry["duration"] = dur
-				return r_opus, cdc, dur, ac
+				return self.handle_path(fn, entry)
 			if ct in ("audio/x-scpls", "audio/pls", "audio/scpls"):
 				entries = []
 				lines = as_str(b).splitlines()
@@ -1035,21 +1047,17 @@ class AudioDownloader:
 						if dur > 0:
 							entry["duration"] = dur
 				if entries:
-					dur, _bps, cdc, ac = get_duration_2(entries[0])
 					fn = temporary_file("concat")
 					with open(fn, "w", encoding="utf-8") as f:
 						f.write("\n".join(f"file '{url}'" for url in entries))
-					return fn, cdc, entry.get("duration") or dur, ac
+					return self.handle_path(entries[0], entry)
 			if left == "audio" or right in AUDIO_FORMS:
 				try:
-					dur, _bps, cdc, ac = get_duration_2(url)
+					return self.handle_path(url, entry)
 				except Exception:
-					pass
-				else:
-					entry["duration"] = dur
-					return url, cdc, dur, ac
+					return
 
-	def get_audio(self, entry, asap=None, fmt=None, start=None, end=None):
+	def get_audio(self, entry, asap=None, fmt=None, start=None, end=None, research=True):
 		"""Gets a valid audio stream (URL or file) from a given entry, with optional trimming. In ASAP (as soon as possible) mode, prefer URLs."""
 		url = entry.get("orig") or entry["url"]
 		ext = fmt or "opus"
@@ -1057,18 +1065,20 @@ class AudioDownloader:
 		d = entry.get("duration")
 		if asap is None:
 			asap = not d or d > 3840
+		is_trim = start or end is not None
 		special_checked = False
-		if not fmt and asap or not d:
+		if not fmt and asap or (not d or not isfinite(d)):
 			# If format is not specified, try to stream the audio from URL if possible
 			with tracebacksuppressor:
 				stream, cdc, ac = get_best_audio(entry)
-				if entry.get("duration") and cdc and not expired(stream):
+				if entry.get("duration") and cdc and not expired(stream) and (d is not None or asap):
 					return stream, cdc, entry["duration"], ac
-				entry2 = self.search(url, force=True)[0]
-				entry.update(entry2)
-				stream, cdc, ac = get_best_audio(entry2)
-				if entry.get("duration") and cdc and stream and (d is not None or asap):
-					return stream, cdc, entry["duration"], ac
+				if research:
+					entry2 = self.search(url, force=True)[0]
+					entry.update(entry2)
+					stream, cdc, ac = get_best_audio(entry2)
+					if entry.get("duration") and cdc and stream:
+						return stream, cdc, entry["duration"], ac
 				result = self.handle_special_audio(entry, url, fn)
 				if result:
 					return result
@@ -1083,13 +1093,11 @@ class AudioDownloader:
 				# If format is specified, always produce a file, and allow trimming if necessary
 				url, cdc, dur, ac = result
 				tmpl = temporary_file()
-				if start is not None or end is not None:
+				if is_trim:
 					tmpl += f"~{start}-{end}"
 				fn = f"{tmpl}.{fmt}"
 				if os.path.exists(fn) and os.path.getsize(fn):
-					dur, _bps, cdc, ac = get_duration_2(fn)
-					print(f"Trimmed audio file already exists: {fn}")
-					return fn, cdc, dur, ac
+					return self.handle_path(fn, entry=None if is_trim else entry)
 				fn2 = f"{tmpl}~.{fmt}"
 				args = ["ffmpeg", "-v", "error", "-hide_banner", "-vn"]
 				if start:
@@ -1102,19 +1110,15 @@ class AudioDownloader:
 				if not os.path.exists(fn2) or not os.path.getsize(fn2):
 					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
 				rename(fn2, fn)
-				dur, _bps, cdc, ac = get_duration_2(fn)
-				return fn, cdc, dur, ac
+				return self.handle_path(fn, entry=None if is_trim else entry)
 		if not fmt and (is_discord_attachment(url) or is_miza_url(url)):
 			if discord_expired(url):
 				# Just in case a Discord attachment expires in the short time between checking and downloading
 				url = shorten_attachment(url, 0)
-			dur, _bps, cdc, ac = get_duration_2(url)
-			if dur:
-				entry["duration"] = dur
-			return url, cdc, dur, ac
+			return self.handle_path(url, entry)
 		codec = "opus" if ext == "ogg" else ext
 		target = fn
-		if start or end is not None:
+		if is_trim:
 			fn = temporary_file(ext)
 		# print("OUTTMPL:", fn)
 		ydl_opts = dict(
@@ -1144,8 +1148,7 @@ class AudioDownloader:
 			url2 = url
 		self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).download({repr(url2)})")
 		assert os.path.exists(fn) and os.path.getsize(fn), fn
-		entry["duration"] = get_duration(fn)
-		return fn, "opus", entry["duration"], 2
+		return self.handle_path(fn, entry=None if is_trim else entry)
 
 	def preprocess(self, url, mode, count):
 		output = deque()
@@ -1249,19 +1252,31 @@ class AudioDownloader:
 						q = d["queue"][:262144]
 					return [cdict(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
 			# Otherwise call automatic extract_info function
-			if not resp:
-				if url.startswith("https://youtu.be/"):
-					url2 = url.replace("https://youtu.be/", "https://www.youtube.com/watch?v=")
-				else:
-					url2 = url
-				resp = self.extract_info(url2, process=False)
-			if not resp:
-				return []
-			if isinstance(resp, str):
-				assert is_url(resp), resp
-				resp = dict(_type="url", url=resp)
-			if resp.get("_type") == "url":
-				resp = self.extract_info(resp["url"], process=True)
+			try:
+				if not resp:
+					if url.startswith("https://youtu.be/"):
+						url2 = url.replace("https://youtu.be/", "https://www.youtube.com/watch?v=")
+					else:
+						url2 = url
+					resp = self.extract_info(url2, process=False)
+				if not resp:
+					return []
+				if isinstance(resp, str):
+					assert is_url(resp), resp
+					resp = dict(_type="url", url=resp)
+				if resp.get("_type") == "url":
+					resp = self.extract_info(resp["url"], process=True)
+			except (RuntimeError, ytd.utils.DownloadError):
+				entry = cdict(
+					name=url2fn(url),
+					url=url,
+				)
+				ext = url2ext(url)
+				fn = temporary_file(ext)
+				result = self.handle_special_audio(entry, url, fn)
+				if not result:
+					raise
+				return [entry]
 			if resp is None or not len(resp):
 				raise LookupError(f"No results for {url}")
 			# Check if result is a playlist
@@ -1278,7 +1293,7 @@ class AudioDownloader:
 								temp = cdict({
 									"name": resp["title"],
 									"url": resp.get("webpage_url", url),
-									"duration": inf,
+									"duration": None,
 									"audio": get_best_audio(entry),
 									"icon": get_best_icon(entry),
 									"video": get_best_video(entry),
@@ -1348,6 +1363,8 @@ class AudioDownloader:
 		temp = self.search_cache.retrieve(retrieval, self.search_into, item, mode, count)
 		if not temp:
 			raise FileNotFoundError(f'No results for {item}.')
+		if not temp[0].get("duration"):
+			self.get_audio(temp[0], asap=True, research=False)
 		return temp
 
 	def in_cache(self, item):

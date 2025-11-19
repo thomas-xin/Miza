@@ -1943,7 +1943,7 @@ class React(Pagination, Command):
 			instances = sqr_repr if len(pops) == 1 else f"[{len(pops)}] instances of {sqr_repr}"
 			return italics(css_md(f"Removed {instances} from the auto react list for {sqr_md(_guild)}."))
 		if not emote:
-			raise ArgumentError("Please input emoji by ID, indicator or URL.")
+			raise ArgumentError("Please input emoji by ID, canonical form or URL.")
 		lim = 128 << bot.is_trusted(_guild.id) * 2 + 1
 		if len(reacts) >= lim:
 			raise OverflowError(f"React list for {_guild} has reached the maximum of {lim} items. Please remove an item to add another.")

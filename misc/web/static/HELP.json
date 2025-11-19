@@ -3482,7 +3482,7 @@
 				"model": {
 					"type": "enum",
 					"validation": {
-						"enum": ["claude-4.1-opus", "claude-4.5-sonnet", "claude-4-sonnet", "claude-4.5-haiku", "deepseek-r1", "deepseek-v3.2", "deepseek-v3.1", "deepseek-v3", "minimax-m2", "minimax-m1", "minimax-01", "llama-3-405b", "llama-3-90b", "llama-3-70b", "llama-3-11b", "llama-3-8b", "command-r-plus", "command-r", "magnum-72b", "qwen3-235b", "qwen-72b", "gemini-2.5-pro", "gemini-2.5-flash-t", "gemini-2.5-flash", "grok-4", "grok-4-fast", "gpt-oss-120b", "gpt-oss-20b", "o4-mini", "o3", "o3-mini", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4.1-mini", "gpt-4.1", "gpt-4-mini", "gpt-4", "mistral-24b", "kimi-k2-t", "kimi-k2"],
+						"enum": ["claude-4.1-opus", "claude-4.5-sonnet", "claude-4-sonnet", "claude-4.5-haiku", "deepseek-r1", "deepseek-v3.2", "deepseek-v3.1", "deepseek-v3", "minimax-m2", "minimax-m1", "minimax-01", "llama-3-405b", "llama-3-90b", "llama-3-70b", "llama-3-11b", "llama-3-8b", "command-r-plus", "command-r", "magnum-72b", "qwen3-235b", "qwen-72b", "gemini-3-pro", "gemini-2.5-pro", "gemini-2.5-flash-t", "gemini-2.5-flash", "grok-4", "grok-4-fast", "gpt-oss-120b", "gpt-oss-20b", "o4-mini", "o3", "o3-mini", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4.1-mini", "gpt-4.1", "gpt-4-mini", "gpt-4", "mistral-24b", "kimi-k2-t", "kimi-k2"],
 						"accepts": {
 							"llama": "llama-3-70b",
 							"haiku": "claude-3-haiku",
@@ -3548,7 +3548,7 @@
 				},
 				"Grok": {"model": "grok-4"},
 				"Gemini": {
-					"model": "gemini-2.5-pro"
+					"model": "gemini-3-pro"
 				},
 				"Deepseek": {
 					"model": "deepseek-v3.2"
@@ -3983,8 +3983,18 @@
 				},
 				"code": {
 					"type": "string",
-					"description": "Code to evaluate directly",
+					"description": "Code to evaluate directly in the main process",
 					"example": "1 + 1"
+				},
+				"audio": {
+					"type": "string",
+					"description": "Code to evaluate directly in the audio process",
+					"example": "1 + 2"
+				},
+				"server": {
+					"type": "string",
+					"description": "Code to evaluate directly in the server process",
+					"example": "2 + 2"
 				}
 			}
 		},

@@ -260,7 +260,7 @@ class ImageSequence(Image.Image):
 				im.load()
 			return getattr(im, key)
 
-def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
+def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 	"""
 	Convert a byte stream into an image or image sequence.
 
@@ -331,7 +331,7 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 	proc = None
 	try:
 		left, right = mime.split("/", 1)[0], mime.split("/", 1)[-1]
-		if not wand or left == "image" and right in "apng avif blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal wmf xbm".split():
+		if not wand or left == "image" and right in "avif blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal wmf xbm".split():
 			try:
 				im = Image.open(out)
 			except PIL.UnidentifiedImageError:
@@ -396,8 +396,8 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 				fn = "cache/" + str(ts)
 				with open(fn, "wb") as f:
 					f.write(data)
-			cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate,duration,nb_frames", "-show_entries", "format=duration", "-of", "csv=s=x:p=0", fn)
-			print(cmd)
+			cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-count_frames", "-show_streams", fn)
+			# print(cmd)
 			p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			cmd2 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y"]
 			if nogif:
@@ -410,40 +410,18 @@ def from_bytes(b, save=None, nogif=False, maxframes=inf, orig=None, msize=None):
 			proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
 			mode = "RGBA" if fmt == "rgba" else "RGB"
 			try:
-				res = as_str(p.stdout.read()).strip()
-				if not res:
+				lines = as_str(p.stdout.read()).splitlines()
+				if not lines:
 					raise TypeError(f'Filetype "{mime}" is not supported.')
-				r1, r2, *_ = res.splitlines()
-				info = r1.split("x", 4)
+				info = {(t := line.split("=", 1))[0]: t[1] for line in lines if "=" in line and line.split("=", 1)[-1] not in ("N/A", "0/0")}
 			except:
 				print(as_str(p.stderr.read()), end="")
 				raise
-			print("Image info:", info)
-			size = tuple(map(int, info[:2]))
-			if info[3] == "N/A":
-				info[3] = r2
-			try:
-				dur = float(info[3])
-			except (ValueError, TypeError, SyntaxError, ZeroDivisionError):
-				dur = 0
-			if not size[0] or not size[1] or not dur:
-				raise InterruptedError(info)
-			if info[2] == "N/A":
-				fps = 0
-			else:
-				try:
-					fps = float(fractions.Fraction(info[2]))
-				except (ZeroDivisionError, OverflowError):
-					fps = 0
-			try:
-				fcount = int(info[4].removesuffix("x"))
-			except ValueError:
-				fcount = inf
-			if not fps:
-				if isfinite(fcount):
-					fps = fcount / dur
-				else:
-					fps = 30
+			# print("Image info:", info)
+			size = (int(info.get("coded_width") or info.get("width")), int(info.get("coded_height") or info.get("height")))
+			fps = float(fractions.Fraction(info.get("avg_frame_rate") or info.get("r_frame_rate") or 30))
+			fcount = int(info.get("nb_frames") or info.get("nb_read_frames") or 1)
+			dur = float(info.get("duration") or fcount / fps)
 			framedur = 1 / fps
 			bcount = 4 if fmt == "rgba" else 3
 			bcount *= int(np.prod(size))
@@ -561,27 +539,26 @@ discord_emoji = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/
 def is_discord_emoji(url):
 	return discord_emoji.search(url)
 
-def get_image(url, out=None, nodel=False, nogif=False, maxframes=inf, msize=None, cache=False):
+def get_image(url, out=None, nodel=False, nogif=False, maxframes=inf, msize=None):
 	if isinstance(url, Image.Image):
 		return url
 	out = out or url
 	if type(url) not in (bytes, bytearray, io.BytesIO):
-		save = None
 		if is_url(url):
 			data = get_request(url)
 			if len(data) > 8589934592:
 				raise OverflowError("Max file size to load is 8GB.")
-			image = from_bytes(data, save, nogif=nogif, maxframes=maxframes, orig=url, msize=msize)
+			image = image_from_bytes(data, nogif=nogif, maxframes=maxframes, orig=url, msize=msize)
 		else:
 			if os.path.getsize(url) > 8589934592:
 				raise OverflowError("Max file size to load is 8GB.")
 			with open(url, "rb") as f:
 				data = f.read()
-			image = from_bytes(data, save, nogif=nogif, maxframes=maxframes, msize=msize)
+			image = image_from_bytes(data, nogif=nogif, maxframes=maxframes, msize=msize)
 	else:
 		if len(url) > 8589934592:
 			raise OverflowError("Max file size to load is 8GB.")
-		image = from_bytes(url, maxframes=maxframes, msize=msize)
+		image = image_from_bytes(url, maxframes=maxframes, msize=msize)
 	return image
 
 
@@ -2549,7 +2526,7 @@ def ectoplasm(url, message, force=False):
 	else:
 		b = url
 	if isinstance(b, bytes):
-		image = from_bytes(b)
+		image = image_from_bytes(b)
 	else:
 		image = b
 		i = io.BytesIO()
