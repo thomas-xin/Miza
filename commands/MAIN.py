@@ -392,106 +392,34 @@ class Pipe(Command):
 class Avatar(Command):
 	name = ["PFP", "Icon"]
 	description = "Sends a link to the avatar of a user or server."
-	usage = "<objects>*"
-	example = ("icon 247184721262411776", "avatar bob", "pfp")
+	schema = cdict(
+		objects=cdict(
+			type="mentionable",
+			description="user or server",
+			example=247184721262411776,
+			required=True,
+			multiple=True,
+		),
+	)
 	rate_limit = (5, 7)
-	multi = True
 	slash = True
 	ephemeral = True
 	exact = False
 
-	async def getGuildData(self, g):
-		# Gets icon display of a server and returns as an embed.
-		url = best_url(g)
-		name = g.name
-		colour = await self.bot.get_colour(g)
-		emb = discord.Embed(
-			description=f"{sqr_md(name)}({url})",
-			colour=colour,
-		).set_thumbnail(url=url).set_image(url=url).set_author(name=name, icon_url=url, url=url)
-		return emb
-
-	async def getMimicData(self, p):
-		# Gets icon display of a mimic and returns as an embed.
-		url = best_url(p)
-		name = p.name
-		colour = await self.bot.get_colour(p)
-		emb = discord.Embed(
-			description=f"{sqr_md(name)}({url})",
-			colour=colour,
-		).set_thumbnail(url=url).set_image(url=url).set_author(name=name, icon_url=url, url=url)
-		return emb
-
-	async def __call__(self, argv, argl, channel, guild, bot, user, message, **void):
-		iterator = argl if argl else (argv,)
-		embs = set()
-		for argv in iterator:
-			with self.bot.ExceptionSender(channel):
-				with suppress(StopIteration):
-					if argv:
-						if is_url(argv) or argv.startswith("discord.gg/"):
-							g = await bot.fetch_guild(argv)
-							emb = await self.getGuildData(g)
-							embs.add(emb)
-							raise StopIteration
-						uid = argv
-						with suppress():
-							uid = verify_id(uid)
-						u = guild.get_member(uid)
-						g = None
-						while u is None and g is None:
-							with suppress():
-								u = bot.get_member(uid, guild)
-								break
-							with suppress():
-								try:
-									u = bot.get_user(uid)
-								except:
-									if not bot.in_cache(uid):
-										u = await bot.fetch_user(uid)
-									else:
-										raise
-								break
-							if type(uid) is str and "@" in uid and ("everyone" in uid or "here" in uid):
-								g = guild
-								break
-							try:
-								p = bot.get_mimic(uid, user)
-								emb = await self.getMimicData(p)
-								embs.add(emb)
-							except:
-								pass
-							else:
-								raise StopIteration
-							with suppress():
-								g = bot.cache.guilds[uid]
-								break
-							with suppress():
-								g = bot.cache.roles[uid].guild
-								break
-							with suppress():
-								g = bot.cache.channels[uid].guild
-							with suppress():
-								u = await bot.fetch_member_ex(uid, guild)
-								break
-							raise LookupError(f"No results for {argv}.")     
-						if g:
-							emb = await self.getGuildData(g)    
-							embs.add(emb)   
-							raise StopIteration         
-					else:
-						u = user
-					name = getattr(u, "name", None) or str(u)
-					url = await self.bot.get_proxy_url(u, force=True)
-					colour = await self.bot.get_colour(u)
-					url2 = await self.bot.get_proxy_url(str(u.avatar), force=True)
-					emb = discord.Embed(colour=colour)
-					emb.set_thumbnail(url=url2)
-					emb.set_image(url=url)
-					emb.set_author(name=name, icon_url=url, url=url)
-					emb.description = f"{sqr_md(getattr(u, 'display_name', None) or name)}({url})"
-					embs.add(emb)
-		bot.send_embeds(channel, embeds=embs, reference=message)
+	async def __call__(self, objects, **void):
+		embs = []
+		for obj in objects:
+			name = getattr(obj, "name", None) or str(obj)
+			url = await self.bot.get_proxy_url(obj, force=True)
+			colour = await self.bot.get_colour(obj)
+			url2 = await self.bot.get_proxy_url(str(obj.avatar), force=True)
+			emb = discord.Embed(colour=colour)
+			emb.set_thumbnail(url=url2)
+			emb.set_image(url=url)
+			emb.set_author(name=name, icon_url=url, url=url)
+			emb.description = f"{sqr_md(getattr(obj, 'display_name', None) or name)}({url})"
+			embs.append(emb)
+		return cdict(embeds=embs)
 
 
 class Info(Command):

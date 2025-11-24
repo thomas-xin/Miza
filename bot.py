@@ -744,6 +744,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		finally:
 			self.setshutdown()
 
+	# rate_limits = AutoCache(f"{CACHE_PATH}/discord_rates", stale=0, timeout=300)
 	discord_cache = AutoCache(f"{CACHE_PATH}/discord_api", stale=0, timeout=300)
 	async def _retrieve_api(self, path):
 		return await Request.aio(f"https://discord.com/api/{api}/{path}", authorise=True, json=True)
@@ -1607,7 +1608,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		content = readstring(message.clean_content or message.content)
 		for e in find_emojis_ex(content, cast_urls=False):
 			emoji = await self.resolve_emoji(e)
-			if not getattr(e, "unicode", None):
+			if not getattr(emoji, "unicode", None):
 				content = content.replace(e, f":{emoji.name}:")
 		return content
 
@@ -1941,7 +1942,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				pass
 		if backup_models:
 			models.extend((
-				"grok-4-fast",
+				"grok-4.1-fast",
 			))
 		if model:
 			if model in models:
@@ -2273,7 +2274,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		0: cdict(
 			instructive="gpt-5-mini",
 			casual="gemini-2.5-flash",
-			nsfw="grok-4-fast",
+			nsfw="grok-4.1-fast",
 			backup="deepseek-v3",
 			retry="gpt-oss-120b",
 			function="gpt-5-nano",
@@ -2281,12 +2282,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		1: cdict(
-			instructive="kimi-k2-t",
+			instructive="gpt-5-mini",
 			casual="kimi-k2-t",
-			nsfw="grok-4-fast",
+			nsfw="grok-4.1-fast",
 			backup="gemini-2.5-flash-t",
 			retry="claude-4.5-haiku",
-			function="grok-4-fast",
+			function="grok-4.1-fast",
 			vision="qwen3-235b",
 			target="auto",
 		),
@@ -2296,7 +2297,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			nsfw="grok-4",
 			backup="gpt-5.1",
 			retry="claude-4.5-sonnet",
-			function="grok-4-fast",
+			function="grok-4.1-fast",
 			vision="gpt-5.1",
 			target="auto",
 		),
@@ -6354,7 +6355,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				await self.send_event("_seen_", user=arg, delay=delay, event=event, **kwargs)
 
 	async def ensure_reactions(self, message):
-		if not message.reactions or isinstance(message, self.CachedMessage | self.LoadedMessage) or isinstance(message.author, cdict):
+		if not message.reactions or isinstance(message, self.CachedMessage) or isinstance(message.author, cdict):
 			if self.permissions_in(message.channel).read_message_history:
 				try:
 					message = await discord.abc.Messageable.fetch_message(message.channel, message.id)
@@ -6783,17 +6784,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					messages.append(m)
 				return messages
 
-		class LoadedMessage(discord.Message):
-			"discord.py-compatible message object that enables dynamic creation."
-
-			def __getattr__(self, k):
-				if k not in ("mentions", "role_mentions"):
-					return super().__getattribute__(k)
-				try:
-					return super().__getattribute__(k)
-				except AttributeError:
-					return []
-
 		class CachedMessage(discord.abc.Snowflake):
 			"discord.py-compatible message object that enables fast loading."
 
@@ -6844,7 +6834,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					for r in d["reactions"]:
 						r.setdefault("me", False)
 				try:
-					message = bot.LoadedMessage(state=bot._state, channel=channel, data=d)
+					message = bot.ExtendedMessage.new(d)
 				except Exception:
 					print(d)
 					raise
@@ -6903,7 +6893,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					m = self.__getattribute__("cached")
 				except AttributeError:
 					m = bot.cache.messages.get(d["id"])
-				if m is None or m is self or not isinstance(m, bot.LoadedMessage):
+				if m is None or m is self or type(m) not in (discord.Message, bot.ExtendedMessage):
 					message = self.cached = self.__copy__()
 					if type(m) not in (discord.Message, bot.ExtendedMessage):
 						bot.add_message(message, files=False, force=True)
@@ -6978,7 +6968,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		bot.GhostMessage = GhostMessage
 		bot.ExtendedMessage = ExtendedMessage
 		bot.StreamedMessage = StreamedMessage
-		bot.LoadedMessage = LoadedMessage
 		bot.CachedMessage = CachedMessage
 		bot.MessageCache = MessageCache
 		bot.ExceptionSender = ExceptionSender
@@ -7443,7 +7432,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				case "INTERACTION_CREATE":
 					await self.interaction_create(sub)
 					return True
-				case _ if action in ("add", "create", "edit", "update") and target in ("channel", "thread", "role"):
+				case _ if action in ("add", "create", "edit", "update") and target in ("channel", "thread"):
 					gid = int(sub["guild_id"])
 					try:
 						guild_data = self.discord_data_cache[gid]
@@ -7457,7 +7446,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					else:
 						guild_data.setdefault(kv, []).append(sub)
 					self.discord_data_cache[gid] = guild_data
-				case _ if action in ("remove", "delete") and target in ("channel", "thread", "role"):
+				case _ if action in ("remove", "delete") and target in ("channel", "thread"):
 					gid = int(sub["guild_id"])
 					try:
 						guild_data = self.discord_data_cache[gid]
@@ -7466,6 +7455,32 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					kv = target + "s"
 					for obj in tuple(guild_data.get(kv, ())):
 						if obj.get("id") in (None, sub["id"]):
+							guild_data[kv].remove(obj)
+							break
+					self.discord_data_cache[gid] = guild_data
+				case _ if action in ("add", "create", "edit", "update") and target in ("role",):
+					gid = int(sub["guild_id"])
+					try:
+						guild_data = self.discord_data_cache[gid]
+					except KeyError:
+						return
+					kv = target + "s"
+					for obj in guild_data.get(kv, ()):
+						if obj.get("id") == sub["role"]["id"]:
+							obj.update(sub["role"])
+							break
+					else:
+						guild_data.setdefault(kv, []).append(sub["role"])
+					self.discord_data_cache[gid] = guild_data
+				case _ if action in ("remove", "delete") and target in ("role",):
+					gid = int(sub["guild_id"])
+					try:
+						guild_data = self.discord_data_cache[gid]
+					except KeyError:
+						return
+					kv = target + "s"
+					for obj in tuple(guild_data.get(kv, ())):
+						if obj.get("id") in (None, sub["role_id"]):
 							guild_data[kv].remove(obj)
 							break
 					self.discord_data_cache[gid] = guild_data
@@ -7480,11 +7495,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							guild_data = self.discord_data_cache[gid]
 						except KeyError:
 							continue
-						if uid not in guild_data.get("_members", ()):
-							continue
 						if target == "member":
 							guild_data["_members"][uid] = sub
 						else:
+							if uid not in guild_data.get("_members", ()):
+								continue
 							guild_data["_members"][uid]["user"] = sub
 						self.discord_data_cache[gid] = guild_data
 				case _ if action in ("remove", "delete") and target == "member":

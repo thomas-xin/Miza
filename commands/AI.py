@@ -99,7 +99,7 @@ class Ask(Command):
 		if emojis:
 			emojis = shuffle(emojis)[:25]
 			emojitexts = " ".join(sorted(f":{e.name}:" for e in emojis))
-			personality += f"\n\nThe current conversation takes place on Discord, where you have access to the following additional emojis:\n{emojitexts}"
+			personality += f"\n\nThe current conversation takes place on Discord, where you have access to the following additional emojis. You may use these as desired, as an alternative to Unicode ones:\n{emojitexts}"
 		if "nsfw" in personality.casefold() or not _nsfw and bot.is_nsfw(_user):
 			ac = ""
 		elif nsfw:

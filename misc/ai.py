@@ -8,7 +8,7 @@ from collections import deque
 from math import ceil, inf
 from traceback import format_exc, print_exc
 from mpmath import mpf
-from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, tracebacksuppressor, utc, T, string_like
+from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, tracebacksuppressor, utc, T, string_like, getattr_chain
 from misc.util import AUTH, CACHE_PATH, AutoCache, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across
 from misc.asyncs import asubmit, csubmit, emptyctx, gather, Semaphore, CloseableAsyncIterator
 
@@ -28,10 +28,7 @@ endpoints = cdict(
 )
 
 def cast_rp(fp, pp, model=None):
-	if model in ("miquliz-120b", "miquliz-120b-v2.0"):
-		s = 3
-	else:
-		s = 1
+	s = 1
 	return ((fp + pp) / 8 + 1) ** (0.125 * s)
 # List of language models and their respective providers, as well as pricing per million input/output tokens
 available = {
@@ -131,6 +128,9 @@ available = {
 	"gemini-2.5-flash": {
 		"openrouter": ("google/gemini-2.5-flash-lite-preview-09-2025", ("0.1", "0.4")),
 	},
+	"grok-4.1-fast": {
+		"openrouter": ("x-ai/grok-4.1-fast", ("0.2", "0.5")),
+	},
 	"grok-4": {
 		"openrouter": ("x-ai/grok-4", ("3", "15")),
 	},
@@ -205,6 +205,7 @@ is_reasoning = {
 	"claude-4.5-haiku",
 	"claude-3.7-sonnet:thinking",
 	"claude-3.7-sonnet-t",
+	"grok-4.1-fast",
 	"grok-4",
 	"grok-4-fast",
 	"grok-3",
@@ -239,6 +240,7 @@ is_function = {
 	"command-r",
 	"command-r-plus",
 	"35b-beta-long",
+	"grok-4.1-fast",
 	"grok-4",
 	"grok-4-fast",
 	"grok-3",
@@ -287,6 +289,7 @@ is_vision = {
 	"claude-3-haiku",
 	"llama-3-11b",
 	"llama-3-90b",
+	"grok-4.1-fast",
 	"grok-4",
 	"grok-4-fast",
 	"gemini-3-pro",
@@ -377,6 +380,7 @@ contexts = {
 	"llama-3-70b": 131072,
 	"llama-3-90b": 131072,
 	"llama-3-405b": 131072,
+	"grok-4.1-fast": 2000000,
 	"grok-4": 262144,
 	"grok-4-fast": 2097152,
 	"grok-3": 131072,
@@ -790,7 +794,7 @@ async def _summarise(s, max_length, best=False, prompt=None, premium_context=[])
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above!'
 			ml = round_random(max_length)
 			c = await tcount(prompt)
-			# Prefer gpt-5-nano and gpt-oss-20b for summaries if possible due to the much faster throughput and lower cost, but fallback to grok-4-fast if necessary (due to its higher token limit of 2 million).
+			# Prefer gpt-5-nano and gpt-oss-20b for summaries if possible due to the much faster throughput and lower cost, but fallback to grok-4.1-fast if necessary (due to its higher token limit of 2 million).
 			if summarisation_model:
 				api = summarisation_model
 				model = api.model
@@ -799,7 +803,7 @@ async def _summarise(s, max_length, best=False, prompt=None, premium_context=[])
 				model = "gpt-5-nano" if best > 1 else "gpt-oss-20b"
 			if c > contexts.get(model, 65536) * 2 / 3:
 				api = None
-				model = "grok-4-fast"
+				model = "grok-4.1-fast"
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context, api=api)
 			if api or model in is_reasoning:
 				data["reasoning_effort"] = "minimal"
@@ -848,7 +852,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 		if orig_model in is_reasoning:
 			mt = kwa.pop("max_tokens", 0) or 0
 			if not kwa.get("max_completion_tokens"):
-				kwa["max_completion_tokens"] = mt + 16384
+				kwa["max_completion_tokens"] = mt * 3 // 2
 			kwa.pop("temperature", None)
 			kwa.pop("presence_penalty", None)
 			kwa.pop("frequency_penalty", None)
@@ -878,14 +882,8 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 		if "repetition_penalty" not in kwa:
 			kwa["repetition_penalty"] = cast_rp(kwa.pop("frequency_penalty", 0.25), kwa.pop("presence_penalty", 0.25), model=model)
 		match sapi:
-			case "mizabot":
-				tpp = kwa.get("top_p", 0.9)
-				mpp = max(0, 1 - tpp)
-				body["min_p"] = mpp
-				kwa["top_p"] = 0.999
-				kwa["temperature"] = kwa.get("temperature", 1) * (1 + mpp)
-				kwa.pop("frequency_penalty", None)
-				kwa.pop("presence_penalty", None)
+			case "openrouter":
+				body["usage"] = dict(include=True)
 			case "fireworks":
 				kwa.pop("repetition_penalty", None)
 				if kwa.get("tool_choice") == "required":
@@ -1715,6 +1713,7 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 		self.tokens = [0, 0]
 		self.model = model
 		self.costs = [utc(), api, model, "0"]
+		self.true_cost = None
 		self.pricing = pricing or (m_input, m_output)
 		self.tokeniser = "cl100k_im" if model in CL100K_IM else "llamav2"
 		self.terminated = False
@@ -1728,7 +1727,10 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 		)
 
 	def update_cost(self):
-		self.costs[-1] = str((mpf(self.pricing[0]) * self.tokens[0] + mpf(self.pricing[1]) * self.tokens[1]) / 1000000)
+		if self.true_cost is not None:
+			self.costs[-1] = self.true_cost
+		else:
+			self.costs[-1] = str((mpf(self.pricing[0]) * self.tokens[0] + mpf(self.pricing[1]) * self.tokens[1]) / 1000000)
 		return self.costs
 
 	async def pass_item(self, item):
@@ -1787,6 +1789,10 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 				print(item)
 				self.tokens[0] = item.usage.prompt_tokens
 				self.tokens[1] = item.usage.completion_tokens
+				if getattr(item.usage, "is_byok", False):
+					self.true_cost = getattr_chain(item.usage, "cost_details.upstream_inference_cost", None)
+				else:
+					self.true_cost = getattr(item.usage, "cost", None)
 				self.update_cost()
 				if not self.applied:
 					self.premium_context.append(self.costs)
@@ -1810,6 +1816,10 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 				print(item)
 				self.tokens[0] = item.usage.prompt_tokens
 				self.tokens[1] = item.usage.completion_tokens
+				if getattr(item.usage, "is_byok", False):
+					self.true_cost = getattr_chain(item.usage, "cost_details.upstream_inference_cost", None)
+				else:
+					self.true_cost = getattr(item.usage, "cost", None)
 				self.update_cost()
 				if not self.applied:
 					self.premium_context.append(self.costs)
