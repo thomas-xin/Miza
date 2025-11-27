@@ -1117,6 +1117,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if len(guild._members) == guild.member_count:
 					return guild
 			data = await self.discord_data_cache.aretrieve(gid, self.retrieve_guild, gid)
+			self.discord_data_cache[gid] = data
 		else:
 			data = await self.discord_data_cache._aretrieve(gid, self.retrieve_guild, gid)
 		fut = self.temp_guilds.get(gid)
@@ -1127,7 +1128,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			data["members"] = list(data.get("_members", {}).values()) or data.get("members", [])
 			guild = discord.Guild(data=data, state=self._state)
 			if data.get("members"):
-				guild._member_count = len(data["members"])
+				if gid in self._state._guilds:
+					mc = self._state._guilds[gid].member_count
+				else:
+					mc = len(data["members"])
+				guild._member_count = mc
 				self._state._guilds[gid] = guild
 		except Exception as ex:
 			self.temp_guilds.pop(gid).set_exception(ex)
@@ -1993,7 +1998,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def force_completion(self, model, prompt, stream=True, max_tokens=1024, strip=True, **kwargs):
 		ctx = ai.contexts.get(model, 4096)
-		is_question = prompt.endswith(".") or prompt.endswith("?")
 		if model in ai.is_completion:
 			count = await tcount(prompt, model="llamav2")
 			max_tokens = min(max_tokens, ctx - count - 64)
@@ -2019,11 +2023,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			kwargs["max_tokens"] = max_tokens
 		resp = await ai.llm("chat.completions.create", model=model, messages=messages, stream=True, **kwargs)
 		async def _completion(resp, strip):
+			stopped_reasoning = None
 			async for r in resp:
-				if not r.choices:
+				if not r.choices or not (delta := r.choices[0].delta):
 					continue
-				s = r.choices[0].delta.content or ""
-				if s and strip:
+				if getattr(delta, "reasoning_content", None):
+					yield delta.reasoning_content
+					if not stopped_reasoning:
+						stopped_reasoning = False
+				s = delta.content
+				if not s:
+					continue
+				if stopped_reasoning is False:
+					stopped_reasoning = True
+					s = "</think>\n" + s.lstrip()
+				if strip:
 					yield s.lstrip()
 					strip = False
 					continue
@@ -5600,7 +5614,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						with tracebacksuppressor:
 							await fut
 					try:
-						new_content = await self.proxy_emojis(add_content(old_content, content))
+						new_content = await self.proxy_emojis(add_content(old_content, content), guild=message.guild)
 						await manager.update(new_content, embeds=embeds, files=files, buttons=buttons, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), reacts=reacts, done=done, force=force)
 					except (OverflowError, InterruptedError):
 						# If the StreamedMessage was interrupted or exceeded the maximum length, we wipe the original and force a new message. This ensures the list of messages stays contiguous, which improves readability.

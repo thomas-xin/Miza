@@ -187,6 +187,7 @@ available = {
 		"openrouter_": ("cognitivecomputations/dolphin3.0-mistral-24b:free", ("0", "0")),
 	},
 	"kimi-k2-t": {
+		"deepinfra": ("moonshotai/Kimi-K2-Thinking", ("0.55", "2.5")),
 		"openrouter": ("moonshotai/kimi-k2-thinking", ("0.6", "2.5")),
 	},
 	"kimi-k2": {
@@ -494,10 +495,10 @@ def m_repr(m):
 			temp.append(fc.function.name + " " + as_str(fc.function.arguments))
 		content = "\n".join(temp)
 	if "name" in m:
-		if "role" in m:
+		if m.get("role"):
 			return m.role + "\n" + m.name + "\n" + content
 		return m.name + "\n" + content
-	if "role" in m:
+	if m.get("role"):
 		m.role + "\n" + content
 	return content
 
@@ -723,7 +724,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=Fal
 		if exclude_first:
 			messages.insert(0, sm)
 		return messages
-	summ = "Summary of prior conversation:\n"
+	summ = "Summary of chat history:\n"
 	s = overview(messages[:i + 1] if i > 0 else messages)
 	s = s.removeprefix(summ).removeprefix("system:").strip()
 	c = await tcount(summ + s)
@@ -805,8 +806,10 @@ async def _summarise(s, max_length, best=False, prompt=None, premium_context=[])
 				api = None
 				model = "grok-4.1-fast"
 			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context, api=api)
-			if api or model in is_reasoning:
+			if model in is_reasoning:
 				data["reasoning_effort"] = "minimal"
+			elif api:
+				data["reasoning_effort"] = "low"
 			resp = await instruct(data, best=True, skip=True)
 			print("Summary:", resp)
 			if resp and not decensor.search(resp):
@@ -849,7 +852,8 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 			continue
 		sem = emptyctx
 		kwa = kwargs.copy()
-		if orig_model in is_reasoning:
+		body = cdict(kwargs.get("extra_body") or {})
+		if orig_model in is_reasoning or minfo is None:
 			mt = kwa.pop("max_tokens", 0) or 0
 			if not kwa.get("max_completion_tokens"):
 				kwa["max_completion_tokens"] = mt * 3 // 2
@@ -878,7 +882,6 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 			caller = get_oai(func, api=api)
 		else:
 			caller = oai_method(api, func)
-		body = cdict(kwargs.get("extra_body") or {})
 		if "repetition_penalty" not in kwa:
 			kwa["repetition_penalty"] = cast_rp(kwa.pop("frequency_penalty", 0.25), kwa.pop("presence_penalty", 0.25), model=model)
 		match sapi:
@@ -1804,10 +1807,11 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 			if getattr(choice, "text", None):
 				break
 			delta = getattr(choice, "delta", None)
-			if delta and getattr(delta, "tool_calls", None):
-				break
-			if delta and getattr(delta, "content", None):
-				break
+			if not delta:
+				continue
+			for k in ("tool_calls", "content", "reasoning_content"):
+				if getattr(delta, k, None):
+					break
 		return await self.pass_item(item)
 
 	async def __aiter__(self):
@@ -1832,10 +1836,11 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 				yield await self.pass_item(item)
 			else:
 				delta = getattr(choice, "delta", None)
-				if delta and getattr(delta, "tool_calls", None):
-					yield await self.pass_item(item)
-				elif delta and getattr(delta, "content", None):
-					yield await self.pass_item(item)
+				if not delta:
+					continue
+				for k in ("tool_calls", "content", "reasoning_content"):
+					if getattr(delta, k, None):
+						yield await self.pass_item(item)
 		print("aiter pricing:", self.tokens, self.costs)
 
 def instruct_structure(messages, exclude_first=True, fmt="alpaca", assistant=None):

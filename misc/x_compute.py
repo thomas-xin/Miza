@@ -1071,7 +1071,7 @@ def evalImg(url, operation, args):
 				is_avif = fmt == "avif" and mode == "RGBA"
 				if is_avif:
 					fmt = "y4m"
-				opts, env, fmt = ffmpeg_opts(new, frames, count, mode, first, fmt, fs, *size, duration, opt)
+				opts, env, fmt = ffmpeg_opts(new, frames, count, mode, first, fmt, fs, *size, duration, False)
 				out = temporary_file(CODECS.get(fmt, fmt), name=ts)
 				frames = new.get("frames") or frames
 				command.extend(opts)
@@ -1166,7 +1166,7 @@ def evalImg(url, operation, args):
 						if (w, h) in seen:
 							out, r = seen[(w, h)]
 						else:
-							out = anim_into(orig, new, first, (w, h), fmt, fs, r=r)
+							out = anim_into(orig, new, first, (w, h), fmt, fs, r=r, hq=not opt)
 							r = fs / len(out)
 							print("RA:", w, h, scale, len(out), r)
 							seen[(w, h)] = out, r
@@ -1184,7 +1184,7 @@ def evalImg(url, operation, args):
 						if (w, h) in seen:
 							out, r = seen[(w, h)]
 						else:
-							out = anim_into(orig, new, first, (w, h), fmt, fs, r=r)
+							out = anim_into(orig, new, first, (w, h), fmt, fs, r=r, hq=not opt)
 							r = fs / len(out)
 							print("RB:", w, h, scale, len(out), r)
 							seen[(w, h)] = out, r

@@ -1021,6 +1021,7 @@ class Preserve(Command):
 				if found:
 					futs.append(as_fut(attachment_cache.preserve(url, _message.id, minimise=minimise)))
 					continue
+				minimise = False
 				futs.append(as_fut(attachment_cache.preserve(url, 0, minimise=minimise)))
 				continue
 			futs.append(bot.data.exec.lproxy(url, channel=_channel, minimise=minimise))

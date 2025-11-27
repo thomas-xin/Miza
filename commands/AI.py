@@ -166,7 +166,7 @@ class Ask(Command):
 			return "\xad"
 		elif isinstance(temp[-1], dict) and (temp[-1].content.startswith("\r") or len(temp) == 1):
 			resp = temp[-1]
-			resp["content"] = await self.proxy_emojis(resp["content"], guild=_guild)
+			resp["content"] = await bot.proxy_emojis(resp["content"], guild=_guild)
 			resp["tts"] = pdata.tts
 			return resp
 		raise RuntimeError(temp)
@@ -360,7 +360,7 @@ class Ask(Command):
 								],
 								**mt,
 								premium_context=premium,
-								reasoning_effort="high" if "o3" in model else "medium",
+								reasoning_effort="medium",
 								timeout=3600,
 							)
 							message = resp.choices[0].message
@@ -733,13 +733,10 @@ class Instruct(Command):
 			key = key or "x"
 			oai = openai.AsyncOpenAI(api_key=key, base_url=api)
 			kwargs["api"] = oai
-		if model in ai.is_reasoning:
-			kwargs["max_completion_tokens"] = max_tokens + 16384
-		else:
-			kwargs["max_tokens"] = max_tokens
+		kwargs["max_tokens"] = max_tokens
 		if not model:
 			raise ValueError("No model specified")
-		resp = await bot.force_completion(model=model, prompt=prompt, stream=True, timeout=120, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, premium_context=_premium, allow_alt=True, **kwargs)
+		resp = await bot.force_completion(model=model, prompt=prompt, stream=True, timeout=1800, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, premium_context=_premium, allow_alt=True, **kwargs)
 		try:
 			_message.__dict__.setdefault("inits", []).append(resp)
 		except Exception:

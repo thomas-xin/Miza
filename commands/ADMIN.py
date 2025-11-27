@@ -1957,7 +1957,7 @@ class CreateEmoji(Command):
 		if _perm < 2:
 			raise self.perm_error(_perm, 2, "for command " + _name)
 		name = name or url2fn(url).rsplit(".", 1)[0]
-		image = await bot.optimise_image(url, fsize=262144, csize=256, fmt="webp")
+		image = await bot.optimise_image(url, fsize=262144, csize=160, fmt="webp", opt=False)
 		emoji = await _guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
 		# This reaction indicates the emoji was created successfully
 		with suppress(discord.Forbidden):
@@ -3216,6 +3216,7 @@ class UpdateRolegivers(Database):
 				except LookupError:
 					al[0].remove(r)
 					continue
+				print(f"RoleGiver: Granting {role} to {user} in {guild}...")
 				if role in user.roles:
 					continue
 				with bot.ExceptionSender(message.channel):
@@ -3224,8 +3225,7 @@ class UpdateRolegivers(Database):
 						reason=f'Keyword "{k}" found in message "{message.content}".',
 						atomic=True,
 					)
-					print(f"RoleGiver: Granted {role} to {user} in {guild}.")
-			if alist[1]:
+			if al[1]:
 				await bot.silent_delete(message)
 
 

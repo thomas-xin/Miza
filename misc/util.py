@@ -3217,6 +3217,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		return v
 
 	async def _aretrieve(self, k, func, *args, read=False, **kwargs):
+		await asubmit(self.base_init)
 		try:
 			self._retrieving[k] = fut = concurrent.futures.Future()
 			v = await asubmit(func, *args, **kwargs)
@@ -3230,6 +3231,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			self._retrieving.pop(k, None)
 		return v
 	async def aretrieve(self, k, func, *args, _read=False, **kwargs):
+		await asubmit(self.base_init)
 		if (fut := self._retrieving.get(k)):
 			resp = await wrap_future(fut)
 			if _read and hasattr(resp, "name") and os.path.exists(resp.name):
@@ -3239,7 +3241,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			v, t = super().get(k, read=_read, tag=True)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
 			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
-			self.base_init(force=True)
+			await asubmit(self.base_init, force=True)
 			v, t = super().get(k, read=_read, tag=True)
 		if t is not None and v is not Dummy:
 			delay = utc() - t
@@ -3283,7 +3285,6 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 	__slots__ = ("_path", "_shardcount", "_retrieving", "_kwargs")
 
 	def __init__(self, directory=None, shards=6, **kwargs):
-		print("Loading Database:", directory, kwargs)
 		self._path = directory or None
 		self._shardcount = shards
 		self._retrieving = {}
@@ -3292,6 +3293,7 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 
 	def base_init(self):
 		super().__init__(self._path, shards=self._shardcount, **self._kwargs)
+		print("Loaded Database:", self._path, len(self), self._kwargs)
 
 	def __getattr__(self, k):
 		try:

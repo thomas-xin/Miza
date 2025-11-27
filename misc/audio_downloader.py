@@ -1022,7 +1022,7 @@ class AudioDownloader:
 				res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 				if not os.path.exists(r_opus) or not os.path.getsize(r_opus):
 					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
-				return self.handle_path(fn, entry)
+				return self.handle_path(r_opus, entry)
 			if ct in ("audio/x-midi", "audio/midi", "audio/sp-midi"):
 				r_mid = temporary_file("mid")
 				r_opus = replace_ext(r_mid, "opus")
@@ -1032,7 +1032,7 @@ class AudioDownloader:
 				res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 				if not os.path.exists(r_opus) or not os.path.getsize(r_opus):
 					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
-				return self.handle_path(fn, entry)
+				return self.handle_path(r_opus, entry)
 			if ct in ("audio/x-scpls", "audio/pls", "audio/scpls"):
 				entries = []
 				lines = as_str(b).splitlines()

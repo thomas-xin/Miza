@@ -43,7 +43,7 @@ if os.environ.get("AI_FEATURES", True):
 		"addict>=2.4.0",
 		"easydict>=1.13",
 		"hf_xet>=1.1.10",
-		"openai>=1.107.2",
+		"openai>=2.8.1",
 		"opencv-python>=4.12.0.88",
 		"replicate>=1.0.7",
 		"safetensors>=0.4.5",

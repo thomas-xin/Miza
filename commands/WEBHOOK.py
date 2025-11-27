@@ -69,23 +69,26 @@ class UpdateAutoEmojis(Database):
 			except ValueError:
 				pass
 			guilds.insert(0, guild)
-		elif guild:
-			guilds = [guild]
 		else:
-			guilds = self.bot.guilds
-			guild = guilds[0]
-		elist = self.bot.data.emojilists.get(guild.id)
-		if elist:
-			for n, e_id in sorted(elist.items(), key=lambda t: t[1]):
-				while n in emojis:
-					if emojis[n] == e_id:
-						break
-					t = n.rsplit("-", 1)
-					if t[-1].isnumeric():
-						n = t[0] + "-" + str(int(t[-1]) + 1)
-					else:
-						n = t[0] + "-1"
-				emojis[n] = e_id
+			guilds = list(self.bot.guilds)
+			if guild:
+				guilds.remove(guild)
+				guilds.insert(0, guild)
+			else:
+				guild = guilds[0]
+		if user:
+			elist = self.bot.data.emojilists.get(guild.id)
+			if elist:
+				for n, e_id in sorted(elist.items(), key=lambda t: t[1]):
+					while n in emojis:
+						if emojis[n] == e_id:
+							break
+						t = n.rsplit("-", 1)
+						if t[-1].isnumeric():
+							n = t[0] + "-" + str(int(t[-1]) + 1)
+						else:
+							n = t[0] + "-1"
+					emojis[n] = e_id
 		for g in guilds:
 			for e in sorted(g.emojis, key=lambda e: e.id):
 				if not e.is_usable():
@@ -100,9 +103,23 @@ class UpdateAutoEmojis(Database):
 					else:
 						n = t[0] + "-1"
 				emojis[n] = e
+		if not user:
+			elist = self.bot.data.emojilists.get(guild.id)
+			if elist:
+				for n, e_id in sorted(elist.items(), key=lambda t: t[1]):
+					while n in emojis:
+						if emojis[n] == e_id:
+							break
+						t = n.rsplit("-", 1)
+						if t[-1].isnumeric():
+							n = t[0] + "-" + str(int(t[-1]) + 1)
+						else:
+							n = t[0] + "-1"
+					emojis[n] = e_id
 		return emojis
 
 	def is_enabled_in(self, guild):
+		# Special case: Auto-disable if NQN bot is detected (as we do not want a delete-proxy conflict/race condition!)
 		if not self.get(guild.id, True) or (559426966151757824 in guild._members or not guild.me.guild_permissions.manage_messages or not guild.me.guild_permissions.manage_webhooks):
 			return False
 		return True
