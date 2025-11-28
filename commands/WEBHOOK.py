@@ -77,18 +77,17 @@ class UpdateAutoEmojis(Database):
 			else:
 				guild = guilds[0]
 		if user:
-			elist = self.bot.data.emojilists.get(guild.id)
-			if elist:
-				for n, e_id in sorted(elist.items(), key=lambda t: t[1]):
-					while n in emojis:
-						if emojis[n] == e_id:
-							break
-						t = n.rsplit("-", 1)
-						if t[-1].isnumeric():
-							n = t[0] + "-" + str(int(t[-1]) + 1)
-						else:
-							n = t[0] + "-1"
-					emojis[n] = e_id
+			elist = self.bot.get_userbase(user.id, "emojilist", {})
+			for n, e_id in sorted(elist.items(), key=lambda t: t[1]):
+				while n in emojis:
+					if emojis[n] == e_id:
+						break
+					t = n.rsplit("-", 1)
+					if t[-1].isnumeric():
+						n = t[0] + "-" + str(int(t[-1]) + 1)
+					else:
+						n = t[0] + "-1"
+				emojis[n] = e_id
 		for g in guilds:
 			for e in sorted(g.emojis, key=lambda e: e.id):
 				if not e.is_usable():
@@ -103,19 +102,18 @@ class UpdateAutoEmojis(Database):
 					else:
 						n = t[0] + "-1"
 				emojis[n] = e
-		if not user:
-			elist = self.bot.data.emojilists.get(guild.id)
-			if elist:
-				for n, e_id in sorted(elist.items(), key=lambda t: t[1]):
-					while n in emojis:
-						if emojis[n] == e_id:
-							break
-						t = n.rsplit("-", 1)
-						if t[-1].isnumeric():
-							n = t[0] + "-" + str(int(t[-1]) + 1)
-						else:
-							n = t[0] + "-1"
-					emojis[n] = e_id
+		if not user and guild:
+			elist = self.bot.get_guildbase(guild.id, "emojilist", {})
+			for n, e_id in sorted(elist.items(), key=lambda t: t[1]):
+				while n in emojis:
+					if emojis[n] == e_id:
+						break
+					t = n.rsplit("-", 1)
+					if t[-1].isnumeric():
+						n = t[0] + "-" + str(int(t[-1]) + 1)
+					else:
+						n = t[0] + "-1"
+				emojis[n] = e_id
 		return emojis
 
 	def is_enabled_in(self, guild):
@@ -124,7 +122,7 @@ class UpdateAutoEmojis(Database):
 			return False
 		return True
 
-	async def _reaction_add_(self, message, emoji, **void):
+	async def _reaction_add_(self, message, emoji, user, **void):
 		if not emoji or isinstance(emoji, str):
 			return
 		e = str(emoji)
@@ -137,18 +135,23 @@ class UpdateAutoEmojis(Database):
 		if emoji:
 			name = emoji.name
 		if not message.webhook_id:
-			bot.data.emojinames[e_id] = name
-			orig = bot.data.emojilists.setdefault(message.author.id, {})
-			orig[name] = e_id
-			if message.guild:
-				orig = bot.data.emojilists.setdefault(message.guild.id, {})
-				orig[name] = e_id
+			bot.emojinames[e_id] = name
+			if user:
+				elist = self.bot.get_userbase(user.id, "emojilist", {})
+				elist[name] = e_id
+				self.bot.set_userbase(user.id, "emojilist", elist)
+			guild = message.guild
+			if guild:
+				elist = self.bot.get_guildbase(guild.id, "emojilist", {})
+				elist[name] = e_id
+				self.bot.set_guildbase(guild.id, "emojilist", elist)
 
 	async def _nocommand_(self, message, recursive=True, edit=False, **void):
 		if getattr(message, "simulated", None) or (utc_ddt() - message.created_at).total_seconds() > 3600:
 			return
 		if message.guild and not message.guild.get_member(message.author.id) or not message.content or getattr(message, "webhook_id", None) or message.content.count("```") > 1:
 			return
+		user = message.author
 		bot = self.bot
 		emojis = find_emojis(message.content)
 		for e in emojis:
@@ -160,12 +163,16 @@ class UpdateAutoEmojis(Database):
 			if emoji:
 				name = emoji.name
 			if not message.webhook_id:
-				bot.data.emojinames[e_id] = name
-				orig = bot.data.emojilists.setdefault(message.author.id, {})
-				orig[name] = e_id
-				if message.guild:
-					orig = bot.data.emojilists.setdefault(message.guild.id, {})
-					orig[name] = e_id
+				bot.emojinames[e_id] = name
+				if user:
+					elist = self.bot.get_userbase(user.id, "emojilist", {})
+					elist[name] = e_id
+					self.bot.set_userbase(user.id, "emojilist", elist)
+				guild = message.guild
+				if guild:
+					elist = self.bot.get_guildbase(guild.id, "emojilist", {})
+					elist[name] = e_id
+					self.bot.set_guildbase(guild.id, "emojilist", elist)
 		if not message.guild or not message.guild.me:
 			return
 		guild = message.guild
@@ -176,7 +183,7 @@ class UpdateAutoEmojis(Database):
 		m_id = None
 		msg = message.content
 		ref = message.reference and await bot.fetch_reference(message)
-		orig = bot.data.emojilists.get(message.author.id, {})
+		orig = self.bot.get_userbase(user.id, "emojilist", {})
 		emojis = None
 		# long = len(msg) > 32
 		if msg.startswith("+"):
@@ -237,10 +244,10 @@ class UpdateAutoEmojis(Database):
 						if isinstance(emoji, int):
 							emoji = await bot.fetch_emoji(emoji, guild=message.guild)
 						futs.append(m2.add_reaction(emoji))
-						orig = bot.data.emojilists.setdefault(message.author.id, {})
+						orig = self.bot.get_userbase(user.id, "emojilist", {})
 						if getattr(emoji, "id", None):
 							orig[name] = emoji.id
-							bot.data.emojinames[emoji.id] = name
+							bot.emojinames[emoji.id] = name
 				if futs:
 					futs.append(bot.autodelete(message))
 					await gather(*futs)
@@ -350,7 +357,7 @@ class EmojiList(Pagination, Command):
 	rate_limit = (4, 6)
 
 	async def __call__(self, bot, _user, mode, name, emoji, **void):
-		curr = bot.data.emojilists.get(_user.id, {})
+		curr = bot.get_userbase(_user.id, "emojilist", {})
 		emote = getattr(emoji, "id", emoji)
 		match mode:
 			case "view":
@@ -365,16 +372,19 @@ class EmojiList(Pagination, Command):
 							name = name or k
 					if not removed:
 						raise KeyError(f'Emoji "{emoji}" not assigned.')
-				if name:
+				elif name:
 					try:
-						removed.append(bot.data.emojilists[_user.id].pop(name))
+						removed.append(curr.pop(name))
 					except KeyError:
 						raise KeyError(f'Emoji "{emoji}" not assigned.')
+				else:
+					removed.extend(curr.values())
+					curr.clear()
 				if len(removed) > 1:
 					content = f"Successfully removed {sqr_md(len(removed))} emoji aliases for {sqr_md(_user)}."
 				else:
 					content = f"Successfully removed emoji alias {sqr_md(name)}: {sqr_md(removed[0])} for {sqr_md(_user)}."
-				bot.data.emojilists[_user.id] = curr
+				bot.set_userbase(_user.id, "emojlilist", curr)
 				return cdict(
 					content=content,
 					prefix="```css\n",
@@ -389,7 +399,7 @@ class EmojiList(Pagination, Command):
 				if not regexp(r"[A-Za-z0-9\-~_]{1,32}").fullmatch(name):
 					raise ArgumentError("Emoji aliases may only contain 1~32 alphanumeric characters, dashes, tildes and underscores.")
 				curr[name] = emote
-				bot.data.emojilists[_user.id] = curr
+				bot.set_userbase(_user.id, "emojlilist", curr)
 				return ini_md(f"Successfully added emoji alias {sqr_md(name)}: {sqr_md(emote)} for {sqr_md(_user)}.")
 		raise NotImplementedError(mode)
 
@@ -412,9 +422,9 @@ class EmojiList(Pagination, Command):
 							await bot.is_animated(v)
 							me = ""
 					except LookupError:
-						curr = bot.data.emojilists.get(uid, {})
+						curr = bot.get_userbase(uid, "emojilist", {})
 						curr.pop(k)
-						bot.data.emojilists[uid] = curr
+						bot.set_userbase(uid, "emojlilist", curr)
 						return
 					return f"({v})` {me}"
 
@@ -428,20 +438,11 @@ class EmojiList(Pagination, Command):
 				mapping[f":{fut.k}:"] = info
 			return iter2str({k + " " * (32 - len(k)): v for k, v in mapping.items()}, left="`", right="").strip()
 
-		return await self.default_display("proxy emoji", uid, pos, bot.data.emojilists.get(uid, {}).items(), diridx, akey=akey)
+		return await self.default_display("proxy emoji", uid, pos, bot.get_userbase(uid, "emojlisit", {}).items(), diridx, akey=akey)
 
 	async def _callback_(self, _user, index, data, **void):
 		pos, _ = decode_leb128(data)
 		return await self.display(_user.id, pos, index)
-
-
-class UpdateEmojiLists(Database):
-	name = "emojilists"
-	user = True
-
-
-class UpdateEmojiNames(Database):
-	name = "emojinames"
 
 
 class Proxy(Command):

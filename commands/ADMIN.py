@@ -433,7 +433,7 @@ class Ban(Command):
 			await bot.ignore_interaction(message)
 
 
-class RoleSelect(Command):
+class RoleSelect(Pagination, Command):
 	server_only = True
 	name = ["ReactionRoles", "RoleButtons", "RoleSelection", "RoleSelector"]
 	min_level = 3
@@ -556,24 +556,18 @@ class RoleSelect(Command):
 		else:
 			available = f"{len(buttons)}"
 		emb.description = italics(f"{available} roles assignable") + "\n" + description
-		return self.construct(_user.id, leb128(limit) + serialise_nums([role.id for _, role in rolelist]), embed=emb, buttons=buttons)
+		return self.construct(_user.id, leb128(limit or 0) + serialise_nums([role.id for _, role in rolelist]), embed=emb, buttons=buttons, reference=None)
 
 	def react_perms(self, perm):
 		return True
 
-	async def _callback_(self, bot, message, reaction, user, vals, **void):
-		if not reaction:
-			return
-		reaction = as_str(reaction)
-		if not reaction.isnumeric():
-			return
-		if "__" in vals:
-			limit, vals = vals.split("__", 1)
-			limit = int(limit)
-		else:
-			limit = inf
-		role_ids = vals.split("_")
+	async def _callback_(self, bot, _message, _user, reaction, data, **void):
+		limit, more = decode_leb128(data)
+		limit = limit or inf
+		role_ids = deserialise_nums(more)
+		assert reaction.isnumeric(), "Invalid role ID specified."
 		h1, r_id = reaction[:4], reaction[4:]
+		r_id = int(r_id)
 		if r_id not in role_ids:
 			raise LookupError(f"Role <@&{r_id}> is not self-assignable.")
 		try:
@@ -584,10 +578,10 @@ class RoleSelect(Command):
 		if h1 != h2:
 			raise NameError(f"Role hash mismatch ({h1} != {h2}). Please check if the role name was modified!")
 		role_ids = set(map(int, role_ids))
-		if role in user.roles:
+		if role in _user.roles:
 			removals = [role]
 			if isfinite(limit):
-				rids = {r.id for r in standard_roles(user)}
+				rids = {r.id for r in standard_roles(_user)}
 				rids.remove(role.id)
 				has_after = rids.intersection(role_ids)
 				while len(has_after) > limit:
@@ -595,15 +589,15 @@ class RoleSelect(Command):
 					has_after.remove(rid)
 					r = await bot.fetch_role(rid)
 					removals.append(r)
-			await user.remove_roles(*removals, reason="Role Select", atomic=False)
-			text = user.mention + ": Successfully removed " + ", ".join(role.mention for role in removals)
-			await interaction_response(bot, message, text, ephemeral=True)
+			await _user.remove_roles(*removals, reason="Role Select", atomic=False)
+			text = _user.mention + ": Successfully removed " + ", ".join(role.mention for role in removals)
+			await interaction_response(bot, _message, text, ephemeral=True)
 		else:
-			rolelist = set(standard_roles(user))
+			rolelist = set(standard_roles(_user))
 			rolelist.add(role)
 			removals = []
 			if isfinite(limit):
-				rids = {r.id for r in standard_roles(user)}
+				rids = {r.id for r in standard_roles(_user)}
 				has_after = rids.intersection(role_ids)
 				while len(has_after) + 1 > limit:
 					rid = choice(has_after)
@@ -613,12 +607,12 @@ class RoleSelect(Command):
 			text = ""
 			if removals:
 				rolelist.difference_update(removals)
-				await user.edit(roles=rolelist, reason="Role Select")
-				text = user.mention + ": Successfully removed " + ", ".join(role.mention for role in removals) + "\n"
+				await _user.edit(roles=rolelist, reason="Role Select")
+				text = _user.mention + ": Successfully removed " + ", ".join(role.mention for role in removals) + "\n"
 			else:
-				await user.add_roles(role, reason="Role Select")
-			text += user.mention + ": Successfully added " + role.mention
-			await interaction_response(bot, message, text, ephemeral=True)
+				await _user.add_roles(role, reason="Role Select")
+			text += _user.mention + ": Successfully added " + role.mention
+			await interaction_response(bot, _message, text, ephemeral=True)
 
 
 class RoleGiver(Command):

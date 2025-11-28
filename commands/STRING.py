@@ -373,7 +373,6 @@ class UpdateTranslators(Database):
 class Math(Command):
 	_timeout_ = 4
 	name = ["🔢", "M", "PY", "Sympy", "Plot", "Calc"]
-	alias = name + ["Plot3D", "Factor", "Factorise", "Factorize"]
 	description = "Evaluates a math formula."
 	limit = 1073741824
 	schema = cdict(
@@ -413,15 +412,15 @@ class Math(Command):
 	async def __call__(self, bot, _user, _premium, mode, query, precision, rationalise, **void):
 		if query == "69":
 			return py_md("69 = nice")
+		env = bot.get_userbase(_user.id, "variables", {})
 		if mode == "list_vars":
-			var = bot.data.variables.get(_user.id, {})
-			if not var:
+			if not env:
 				output = f"No currently assigned variables for {sqr_md(_user)}."
 				return cdict(content=output, prefix="```ini\n", suffix="```")
-			output = f"Currently assigned variables for {_user}:{iter2str(var)}"
+			output = f"Currently assigned variables for {_user}:{iter2str(env)}"
 			return cdict(content=output, prefix="```ini\n", suffix="```")
 		if mode == "clear_vars":
-			bot.data.variables.pop(_user.id, None)
+			bot.pop_userbase(_user.id, "variables")
 			output = f"Successfully cleared all variables for {sqr_md(_user)}."
 			return cdict(content=output, prefix="*```css\n", suffix="```*")
 		var = None
@@ -447,7 +446,7 @@ class Math(Command):
 					if var is not None:
 						break
 		timeout = 240 if _premium.value >= 3 else 30
-		resp = await bot.solve_math(query, precision, rationalise, timeout=timeout, variables=bot.data.variables.get(_user.id))
+		resp = await bot.solve_math(query, precision, rationalise, timeout=timeout, variables=env)
 		# Determine whether output is a direct answer or a file
 		if type(resp) is dict and "file" in resp:
 			fn = resp["file"]
@@ -456,18 +455,14 @@ class Math(Command):
 		assert resp, "Response empty."
 		answer = "\n".join(a for a in map(str, resp) if a != query.strip()) or str(resp[0])
 		if var is not None:
-			env = bot.data.variables.setdefault(_user.id, {})
 			env[var] = resp[0]
 			while len(env) > 64:
 				env.pop(next(iter(env)))
+			bot.set_userbase(_user.id, "variables", env)
 			s = lim_str(f"Variable {sqr_md(var)} set to {sqr_md(resp[0])}.", self.limit, mode="left")
 			return cdict(content=s, prefix="```css\n", suffix="```")
 		s = lim_str(f"{query} = {answer}", self.limit, mode="left")
 		return cdict(content=s, prefix="```py\n", suffix="```")
-
-
-class UpdateVariables(Database):
-	name = "variables"
 
 
 class Unicode(Command):

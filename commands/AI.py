@@ -519,10 +519,10 @@ class Ask(Command):
 
 DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome, but not too corny), in first person as if you were a human. You are free to make up your own preferences and show emotion, but you should always match the language used (e.g. English). If a user inquires for additional services not accessible through tools, you should direct them to the ~help or /help commands rather than mimic outputs, if you suspect they may involve side effects. Be concise where possible."
 
-class Personality(Command):
-	name = ["ChangePersonality"]
+class ChatConfig(Command):
+	name = ["Personality", "ChangePersonality"]
 	min_level = 2
-	description = "Customises my personality for ~ask and @mentions in the current channel. Note that with the increased complexity of the chatbot, a clear description of who the bot is should be provided."
+	description = "Customises my personality and behaviours for ~ask and @mentions in the current channel. Note that with the increased complexity of the chatbot, a clear description of who the bot is should be provided."
 	schema = cdict(
 		description=cdict(
 			type="string",
@@ -564,9 +564,14 @@ class Personality(Command):
 		),
 		cutoff=cdict(
 			type="integer",
-			description='Message ID cutoff (bot will not read messages before this point; enter -1 to disable conversation history), default 0',
+			description="Message ID cutoff (bot will not read messages before this point; enter -1 to disable conversation history), default 0",
 			validation="[-1, 18446744073709551616)",
 			example="201548633244565504",
+		),
+		apply_all=cdict(
+			type="bool",
+			description="Whether to apply to all channels within the current server",
+			default=False,
 		),
 	)
 	rate_limit = (18, 24)
@@ -583,56 +588,58 @@ class Personality(Command):
 			shared=False,
 			cutoff=0,
 		) if update else cdict()
-		p = self.bot.data.personalities.get(channel.id)
-		if isinstance(p, str):
-			p = cdict(description=p)
+		p = self.bot.get_guildbase(get_guild_id(channel), "personalities", {}).get(channel.id)
 		if p:
 			per.update(p)
 		return per
 
-	async def __call__(self, bot, _nsfw, _channel, _premium, description, frequency_penalty, temperature, top_p, stream, tts, shared, cutoff, **void):
-		if description == "DEFAULT":
-			bot.data.personalities.pop(_channel.id, None)
-			return css_md(f"Personality settings for {sqr_md(_channel)} have been reset.")
-		if not description and frequency_penalty is None and temperature is None and top_p is None and stream is None and tts is None and shared is None and cutoff is None:
-			p = self.retrieve(_channel)
-			return ini_md(f"Current personality settings for {sqr_md(_channel)}:{iter2str(p)}\n(Use {bot.get_prefix(_channel.guild)}personality DEFAULT to reset; case-sensitive).")
-		if description:
-			description = await bot.superclean_content(description)
-		if description and (len(description) > 4096 or len(description) > 512 and _premium.value < 2):
-			raise OverflowError("Maximum currently supported personality prompt size is 512 characters, 4096 for premium users.")
-		if description and not _nsfw:
-			resp = await ai.moderate(description)
-			if nsfw_flagged(resp):
-				print(resp)
-				raise PermissionError(
-					"Apologies, my AI has detected that your input may be inappropriate.\n"
-					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
-				)
-		p = self.retrieve(_channel, update=False)
-		if description:
-			p.description = description
-		if frequency_penalty is not None:
-			p.frequency_penalty = frequency_penalty
-		if temperature is not None:
-			p.temperature = temperature
-		if top_p is not None:
-			p.top_p = top_p
-		if stream is not None:
-			p.stream = stream
-		if tts is not None:
-			p.tts = tts
-		if shared is not None:
-			p.shared = shared
-		if cutoff is not None:
-			p.cutoff = cutoff
-		bot.data.personalities[_channel.id] = p
-		return css_md(f"Personality settings for {sqr_md(_channel)} have been changed to {iter2str(p)}\n(Use {bot.get_prefix(_channel.guild)}personality DEFAULT to reset).")
-
-
-class UpdatePersonalities(Database):
-	name = "personalities"
-	channel = True
+	async def __call__(self, bot, _nsfw, _guild, _channel, _premium, description, frequency_penalty, temperature, top_p, stream, tts, shared, cutoff, apply_all, **void):
+		targets = _guild.text_channels if apply_all else [_channel]
+		gid = get_guild_id(_channel)
+		pers = bot.get_guildbase(gid, "personalities", {})
+		s = ""
+		for channel in targets:
+			if description == "DEFAULT":
+				pers.pop(channel.id, None)
+				s += css_md(f"Personality settings for {sqr_md(_channel)} have been reset.")
+				continue
+			if not description and frequency_penalty is None and temperature is None and top_p is None and stream is None and tts is None and shared is None and cutoff is None:
+				p = self.retrieve(_channel)
+				s += ini_md(f"Current personality settings for {sqr_md(_channel)}:{iter2str(p)}\n(Use {bot.get_prefix(_channel.guild)}personality DEFAULT to reset; case-sensitive).")
+				continue
+			if description:
+				description = await bot.superclean_content(description)
+			if description and (len(description) > 4096 or len(description) > 512 and _premium.value < 2):
+				raise OverflowError("Maximum currently supported personality prompt size is 512 characters, 4096 for premium users.")
+			if description and not _nsfw:
+				resp = await ai.moderate(description)
+				if nsfw_flagged(resp):
+					print(resp)
+					raise PermissionError(
+						"Apologies, my AI has detected that your input may be inappropriate.\n"
+						+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
+					)
+			p = pers.get(_channel.id) or cdict()
+			if description:
+				p.description = description
+			if frequency_penalty is not None:
+				p.frequency_penalty = frequency_penalty
+			if temperature is not None:
+				p.temperature = temperature
+			if top_p is not None:
+				p.top_p = top_p
+			if stream is not None:
+				p.stream = stream
+			if tts is not None:
+				p.tts = tts
+			if shared is not None:
+				p.shared = shared
+			if cutoff is not None:
+				p.cutoff = cutoff
+			pers[channel.id] = p
+			s += css_md(f"Personality settings for {sqr_md(_channel)} have been changed to {iter2str(p)}\n(Use {bot.get_prefix(_channel.guild)}personality DEFAULT to reset).")
+		bot.set_guildbase(gid, "personalities", pers)
+		return s
 
 
 class Instruct(Command):
@@ -1057,7 +1064,7 @@ class Imagine(Command):
 							"content": content,
 						},
 					],
-					"reasoning_effort": "low",
+					"reasoning_effort": "minimal",
 					"modalities": ["image", "text"],
 					"image_config": {
 						"aspect_ratio": selected_ar,

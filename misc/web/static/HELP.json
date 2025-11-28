@@ -487,6 +487,65 @@
 			},
 			"timeout": "576"
 		},
+		"ChatConfig": {
+			"aliases": ["ChatConfig", "Personality", "ChangePersonality"],
+			"description": "Customises my personality and behaviours for ~ask and @mentions in the current channel. Note that with the increased complexity of the chatbot, a clear description of who the bot is should be provided.",
+			"example": [],
+			"level": "2",
+			"rate_limit": "(18, 24)",
+			"schema": {
+				"apply_all": {
+					"default": false,
+					"description": "Whether to apply to all channels within the current server",
+					"type": "bool"
+				},
+				"cutoff": {
+					"description": "Message ID cutoff (bot will not read messages before this point; enter -1 to disable conversation history), default 0",
+					"example": "201548633244565504",
+					"type": "integer",
+					"validation": "[-1, 18446744073709551616)"
+				},
+				"description": {
+					"description": "Personality description; enter \"DEFAULT\" to reset",
+					"example": "Your name is Miza, you are dry, sarcastic and snarky. Be creative with your responses and attempt to annoy the user.",
+					"type": "string"
+				},
+				"frequency_penalty": {
+					"description": "Amount to discourage repeating words, default 0",
+					"example": "0.7",
+					"type": "number",
+					"validation": "[-1, 2]"
+				},
+				"shared": {
+					"description": "Whether conversation histories should include other users, default false",
+					"example": "true",
+					"type": "bool"
+				},
+				"stream": {
+					"description": "Determines whether the response should be edited, or delayed until complete, default true",
+					"example": "false",
+					"type": "bool"
+				},
+				"temperature": {
+					"description": "Alignment vs diversity; lower values give more correct but boring answers, default 1",
+					"example": "0.8",
+					"type": "number",
+					"validation": "[0, 3]"
+				},
+				"top_p": {
+					"description": "Percentage of weighted choices considered, default 1",
+					"example": "0.9",
+					"type": "number",
+					"validation": "[0, 1]"
+				},
+				"tts": {
+					"description": "Whether the output should trigger Discord TTS. Incompatible with streamed editing, default false",
+					"example": "true",
+					"type": "bool"
+				}
+			},
+			"timeout": "24"
+		},
 		"Describe": {
 			"aliases": ["Describe", "Description", "Image2Text", "Clip"],
 			"description": "Describes the input image.",
@@ -703,60 +762,6 @@
 					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
 					"required": true,
 					"type": "image"
-				}
-			},
-			"timeout": "24"
-		},
-		"Personality": {
-			"aliases": ["Personality", "ChangePersonality"],
-			"description": "Customises my personality for ~ask and @mentions in the current channel. Note that with the increased complexity of the chatbot, a clear description of who the bot is should be provided.",
-			"example": [],
-			"level": "2",
-			"rate_limit": "(18, 24)",
-			"schema": {
-				"cutoff": {
-					"description": "Message ID cutoff (bot will not read messages before this point; enter -1 to disable conversation history), default 0",
-					"example": "201548633244565504",
-					"type": "integer",
-					"validation": "[-1, 18446744073709551616)"
-				},
-				"description": {
-					"description": "Personality description; enter \"DEFAULT\" to reset",
-					"example": "Your name is Miza, you are dry, sarcastic and snarky. Be creative with your responses and attempt to annoy the user.",
-					"type": "string"
-				},
-				"frequency_penalty": {
-					"description": "Amount to discourage repeating words, default 0",
-					"example": "0.7",
-					"type": "number",
-					"validation": "[-1, 2]"
-				},
-				"shared": {
-					"description": "Whether conversation histories should include other users, default false",
-					"example": "true",
-					"type": "bool"
-				},
-				"stream": {
-					"description": "Determines whether the response should be edited, or delayed until complete, default true",
-					"example": "false",
-					"type": "bool"
-				},
-				"temperature": {
-					"description": "Alignment vs diversity; lower values give more correct but boring answers, default 1",
-					"example": "0.8",
-					"type": "number",
-					"validation": "[0, 3]"
-				},
-				"top_p": {
-					"description": "Percentage of weighted choices considered, default 1",
-					"example": "0.9",
-					"type": "number",
-					"validation": "[0, 1]"
-				},
-				"tts": {
-					"description": "Whether the output should trigger Discord TTS. Incompatible with streamed editing, default false",
-					"example": "true",
-					"type": "bool"
 				}
 			},
 			"timeout": "24"
@@ -1105,11 +1110,38 @@
 		"Text2048": {
 			"aliases": ["Text2048", "2048", "🎮"],
 			"description": "Plays a game of 2048 using buttons. Gained points are rewarded as gold.",
-			"example": ["2048", "text2048 3x4 -p", "2048 3x3x3 -e -s", "2048 4x4x4x4 -i"],
+			"example": [],
 			"level": "0",
 			"rate_limit": "(8, 14)",
-			"timeout": "24",
-			"usage": "<0:dimension_sizes[4x4]|dimension_count[2]>* <public(-p)|special_tiles(-s)|insanity_mode(-i)|easy_mode(-e)>*"
+			"schema": {
+				"dimensions": {
+					"default": "4x4",
+					"description": "Sequence of board dimension widths",
+					"example": "3x3x3x3",
+					"type": "word"
+				},
+				"easy": {
+					"default": false,
+					"description": "Whether to enable undo",
+					"type": "bool"
+				},
+				"insanity": {
+					"default": false,
+					"description": "Whether to scale spawns based on current progress",
+					"type": "bool"
+				},
+				"public": {
+					"default": false,
+					"description": "Whether the game is playable by other users",
+					"type": "bool"
+				},
+				"special_tiles": {
+					"default": false,
+					"description": "Whether to include multiplier tiles",
+					"type": "bool"
+				}
+			},
+			"timeout": "24"
 		},
 		"Turnoff": {
 			"aliases": ["Turnoff"],
@@ -3304,7 +3336,7 @@
 			"usage": "<0:string1> <1:string2>?"
 		},
 		"Math": {
-			"aliases": ["Math", "🔢", "M", "PY", "Sympy", "Plot", "Calc", "Plot3D", "Factor", "Factorise", "Factorize"],
+			"aliases": ["Math", "🔢", "M", "PY", "Sympy", "Plot", "Calc"],
 			"description": "Evaluates a math formula.",
 			"example": [],
 			"level": "0",

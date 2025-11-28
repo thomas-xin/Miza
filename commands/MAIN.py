@@ -268,7 +268,7 @@ class Loop(Command):
 			done = i >= iterations - 1
 			t2 = utc()
 			if done or t2 - t > 1:
-				fut = csubmit(bot.respond_with(response, message=fake_message, command=command, manager=manager, done=done))
+				fut = csubmit(bot.respond_with(response, message=fake_message, manager=manager, done=done))
 			continue
 		assert response, "No response was captured. (Make sure you inputted the command correctly!)"
 		if fut:
@@ -320,7 +320,7 @@ class Edit(Command):
 			except (T0, T1, T2):
 				print(command, argv)
 				raise TimeoutError("Request timed out.")
-			await bot.respond_with(response, message=fake_message, command=command, manager=manager)
+			await bot.respond_with(response, message=fake_message, manager=manager)
 		assert response, "No response was captured. (Make sure you inputted the command correctly!)"
 		await bot.edit_message(message, content=message.content + " (done!)")
 
@@ -363,7 +363,7 @@ class Pipe(Command):
 		while pipe:
 			second = pipe.pop(0)
 			if response:
-				inter = await bot.respond_with(response, message=fake_message, command=command)
+				inter = await bot.respond_with(response, message=fake_message)
 				print("RW:", inter)
 				original = inter.content
 				fake_message = copy.copy(inter)
@@ -384,7 +384,7 @@ class Pipe(Command):
 						raise TimeoutError("Request timed out.")
 				if response:
 					fake_message.content = original
-					await bot.respond_with(response, message=fake_message, command=command, manager=manager)
+					await bot.respond_with(response, message=fake_message, manager=manager)
 		assert response, "No response was captured. (Make sure you inputted the command correctly!)"
 		await bot.edit_message(message, content=message.content + " (done!)")
 

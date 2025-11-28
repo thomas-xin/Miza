@@ -52,34 +52,45 @@ class GameOverError(OverflowError):
 class ND2048(collections.abc.MutableSequence):
 
 	digit_ratio = 1 / math.log2(10)
-	spl = b"_"
-	__slots__ = ("data", "history", "shape", "flags")
+	__slots__ = ("data", "history", "flags")
 
 	# Loads a new instance from serialised data
 	@classmethod
 	@functools.lru_cache(maxsize=12)
 	def load(cls, data):
-		spl = data.split(cls.spl)
-		i = spl.index(b"")
-		shape = [int(x) for x in spl[:i - 1]]
-		flags = int(spl[i - 1])
-		spl = spl[i + 1:]
-		self = cls(flags=flags)
-		self.data = np.frombuffer(b642bytes(spl.pop(0), 1), dtype=np.int8).reshape(shape)
+		data = memoryview(data)
+		flags, more = decode_leb128(data)
+		size, more = decode_leb128(more)
+		shape, more = more[:size], more[size:]
+		shape = np.frombuffer(shape, dtype=np.uint8)
+		self = cls(*shape, flags=flags)
+		instances = []
+		while more:
+			size, more = decode_leb128(more)
+			data, more = more[:size], more[size:]
+			data = np.frombuffer(data, dtype=np.int8).reshape(shape)
+			instances.append(data)
+		self.data = instances.pop(0)
 		if not self.data.flags.writeable:
 			self.data = self.data.copy()
-		if self.flags & 1:
-			self.history = deque(maxlen=max(1, int(800 / np.prod(self.data.size) - 1)))
-			while spl:
-				self.history.append(np.frombuffer(b642bytes(spl.pop(0), 1), dtype=np.int8).reshape(shape))
+		self.history.extend(instances)
 		return self
+
+	@property
+	def shape(self):
+		return self.data.shape
 
 	# serialises gamestate data to base64
 	def serialise(self):
-		s = (self.spl.join(str(i).encode("utf-8") for i in self.data.shape)) + self.spl + str(self.flags).encode("utf-8") + self.spl * 2 + bytes2b64(self.data.tobytes(), 1)
-		if self.flags & 1 and self.history:
-			s += self.spl + self.spl.join(bytes2b64(b.tobytes(), 1) for b in self.history)
-		return s
+		segments = []
+		segments.append(leb128(self.flags))
+		shape = np.uint8(self.shape).data
+		segments.extend((leb128(len(shape)), shape))
+		instances = [self.data, *self.history]
+		for instance in instances:
+			b = instance.tobytes()
+			segments.extend((leb128(len(b)), b))
+		return b"".join(segments)
 
 	# Initializes new game
 	def __init__(self, *size, flags=0):
@@ -94,10 +105,9 @@ class ND2048(collections.abc.MutableSequence):
 				size = list(reversed(size))
 			else:
 				size = [size, size]
-		self.data = np.tile(np.int8(0), size)
-		if flags & 1:
-			# Maximum undo steps based on the size of the game board
-			self.history = deque(maxlen=max(1, int(800 / np.prod(size) - 1)))
+		self.data = np.zeros(size, dtype=np.int8)
+		# Maximum undo steps based on the size of the game board
+		self.history = deque(maxlen=max(1, int(2048 / np.prod(size) - 1)))
 		self.flags = flags
 		self.spawn(max(2, self.data.size // 6), flag_override=0)
 
@@ -127,7 +137,6 @@ class ND2048(collections.abc.MutableSequence):
 				horiz += 1
 			curr += 2
 		if a.ndim <= 4:
-			dim = len(a)
 			if a.ndim == 3:
 				a = np.expand_dims(np.rollaxis(a, 0, 3), 0)
 				shape.insert(3, 1)
@@ -281,13 +290,38 @@ class ND2048(collections.abc.MutableSequence):
 	render = lambda self: self.__str__()
 
 
-class Text2048(Command):
+class Text2048(Pagination, Command):
 	time_consuming = True
 	name = ["2048", "🎮"]
 	description = "Plays a game of 2048 using buttons. Gained points are rewarded as gold."
-	usage = "<0:dimension_sizes[4x4]|dimension_count[2]>* <public(-p)|special_tiles(-s)|insanity_mode(-i)|easy_mode(-e)>*"
-	example = ("2048", "text2048 3x4 -p", "2048 3x3x3 -e -s", "2048 4x4x4x4 -i")
-	flags = "pies"
+	schema = cdict(
+		dimensions=cdict(
+			type="word",
+			description="Sequence of board dimension widths",
+			example="3x3x3x3",
+			default="4x4",
+		),
+		public=cdict(
+			type="bool",
+			description="Whether the game is playable by other users",
+			default=False,
+		),
+		special_tiles=cdict(
+			type="bool",
+			description="Whether to include multiplier tiles",
+			default=False,
+		),
+		insanity=cdict(
+			type="bool",
+			description="Whether to scale spawns based on current progress",
+			default=False,
+		),
+		easy=cdict(
+			type="bool",
+			description="Whether to enable undo",
+			default=False,
+		),
+	)
 	rate_limit = (8, 14)
 	reacts = ("⬅️", "➡️", "⬆️", "⬇️", "⏪", "⏩", "⏫", "⏬", "◀️", "▶️", "🔼", "🔽", "👈", "👉", "👆", "👇")
 	directions = demap((r.encode("utf-8"), i) for i, r in enumerate(reacts))
@@ -375,216 +409,148 @@ class Text2048(Command):
 		],
 	}
 
-	async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
-		u_id, mode = list(map(int, vals.split("_", 1)))
-		if reaction is not None and u_id != user.id and u_id != 0 and perm < 3:
-			return
-		spl = argv.split("-")
-		size = [int(x) for x in spl.pop(0).split("_")]
-		data = None
-		if reaction is None:
-			return
-			# If game has not been started, add reactions and create new game
-			# for react in self.directions.a:
-			#     r = self.directions.a[react]
-			#     if r == -2 or (r == -1 and mode & 1) or r >= 0 and r >> 1 < len(size):
-			#         await message.add_reaction(as_str(react))
-			g = ND2048(*size, flags=mode)
-			data = g.serialise()
-			r = -1
-			score = 0
-		else:
-			# Get direction of movement
-			data = "-".join(spl).encode("utf-8")
-			reac = reaction
-			if reac not in self.directions:
-				return
-			r = self.directions[reac]
-			score = 0
-			try:
-				# Undo action only works in easy mode
-				if r == -1:
-					if not mode & 1:
-						return
+	async def _callback_(self, bot, _message, _user, _uid, index, data, **void):
+		serialised = None
+		r = index
+		try:
+			match r:
+				case -1:
 					g = ND2048.load(data)
+					if not g.flags & 1:
+						return
 					if not g.undo():
 						return
-					data = g.serialise()
-				# Random moves
-				elif r == -2:
+					serialised = g.serialise()
+				case -2:
 					g = ND2048.load(data)
 					if not g.move(-1, count=16):
 						return
-					data = g.serialise()
-				# Regular moves; each dimension has 2 possible moves
-				elif r >> 1 < len(size):
+					serialised = g.serialise()
+				case _:
 					g = ND2048.load(data)
+					assert r >> 1 < len(g.shape), "Invalid move operation!"
 					score = g.score()
 					if not g.move(r >> 1, r & 1):
 						return
-					data = g.serialise()
-			except GameOverError:
-				if u_id == 0:
-					u = None
-				elif user.id == u_id:
-					u = user
-				else:
-					u = bot.get_user(u_id, replace=True)
-				emb = discord.Embed(colour=discord.Colour(1))
-				if u is None:
-					emb.set_author(name="@everyone", icon_url=bot.discord_icon)
-				else:
-					emb.set_author(**get_author(u))
-				emb.description = ("**```fix\n" if mode & 6 else "**```\n") + g.render() + "```**"
-				fscore = g.score()
-				if r < 0:
-					score = None
-				if score is not None:
-					xp = max(0, fscore - score) * 16 / np.prod(g.data.shape)
-					if mode & 1:
-						xp /= math.sqrt(2)
-					elif mode & 2:
-						xp /= 2
-					elif mode & 4:
-						xp /= 3
-					bot.data.users.add_gold(user, xp)
-					rew = await bot.as_rewards(xp)
-					if rew:
-						emb.description += "+" + rew
-				emb.set_footer(text=f"Score: {fscore}")
-				# Clear buttons and announce game over message
-				sem = T(message).get("sem")
-				if not sem:
-					try:
-						sem = EDIT_SEM[message.channel.id]
-					except KeyError:
-						sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
-				async with sem:
-					return await Request.aio(
-						f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-						data=dict(
-							content="**```\n2048: GAME OVER```**",
-							embeds=[emb.to_dict()],
-							components=None,
-						),
-						method="PATCH",
-						authorise=True,
-					)
-		if data is not None:
-			# Update message if gamestate has been changed
-			if u_id == 0:
-				u = None
-			elif user.id == u_id:
-				u = user
-			else:
-				u = bot.get_user(u_id, replace=True)
-			colour = await bot.get_colour(u)
-			emb = discord.Embed(colour=colour)
-			if u is None:
+					serialised = g.serialise()
+		except GameOverError:
+			emb = discord.Embed(colour=discord.Colour(1))
+			if not _uid:
 				emb.set_author(name="@everyone", icon_url=bot.discord_icon)
 			else:
-				emb.set_author(**get_author(u))
-			content = "*```callback-fun-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "-" + as_str(data) + "\nPlaying 2048...```*"
-			emb.description = ("**```fix\n" if mode & 6 else "**```\n") + g.render() + "```**"
+				emb.set_author(**get_author(_user))
+			emb.description = ("**```fix\n" if g.flags & 6 else "**```\n") + g.render() + "```**"
 			fscore = g.score()
 			if r < 0:
 				score = None
 			if score is not None:
-				xp = max(0, fscore - score) * 16 / np.prod(g.data.shape)
-				if mode & 1:
+				xp = max(0, fscore - score) * 16 / np.prod(g.shape)
+				if g.flags & 1:
 					xp /= math.sqrt(2)
-				elif mode & 2:
+				elif g.flags & 2:
 					xp /= 2
-				elif mode & 4:
+				elif g.flags & 4:
 					xp /= 3
-				bot.data.users.add_gold(user, xp)
+				bot.data.users.add_gold(_user, xp)
 				rew = await bot.as_rewards(xp)
 				if rew:
 					emb.description += "+" + rew
 			emb.set_footer(text=f"Score: {fscore}")
-			csubmit(bot.ignore_interaction(message))
-			dims = max(2, len(g.data.shape))
-			buttons = copy.deepcopy(self.buttons[dims])
-			vm = g.valid_moves()
-			# print(vm)
-			dis = set()
-			if dims == 2:
-				if not vm & 1:
-					dis.add((0, 1))
-				if not vm & 2:
-					dis.add((-1, 1))
-				if not vm & 4:
-					dis.add((1, 0))
-				if not vm & 8:
-					dis.add((1, -1))
-			elif dims == 3:
-				if not vm & 1:
-					dis.add((1, 1))
-				if not vm & 2:
-					dis.add((-2, 1))
-				if not vm & 4:
-					dis.add((2, 0))
-				if not vm & 8:
-					dis.add((2, -1))
-				if not vm & 16:
-					dis.add((0, 1))
-				if not vm & 32:
-					dis.add((-1, 1))
-			elif dims == 4:
-				if not vm & 1:
-					dis.add((1, 2))
-				if not vm & 2:
-					dis.add((-2, 2))
-				if not vm & 4:
-					dis.add((2, 1))
-				if not vm & 8:
-					dis.add((2, -2))
-				if not vm & 16:
-					dis.add((0, 2))
-				if not vm & 32:
-					dis.add((-1, 2))
-				if not vm & 64:
-					dis.add((2, 0))
-				if not vm & 128:
-					dis.add((2, -1))
-			for x, y in dis:
-				buttons[y][x].disabled = True
-			sem = T(message).get("sem")
-			if not sem:
-				try:
-					sem = EDIT_SEM[message.channel.id]
-				except KeyError:
-					sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
-			async with sem:
-				return await Request.aio(
-					f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-					data=dict(
-						content=content,
-						embeds=[emb.to_dict()],
-						components=restructure_buttons(buttons),
-					),
-					method="PATCH",
-					authorise=True,
-				)
-		await bot.ignore_interaction(message)
+			# Clear buttons and announce game over message
+			return await Request.aio(
+				f"https://discord.com/api/{api}/channels/{_message.channel.id}/messages/{_message.id}",
+				data=dict(
+					content="**```\n2048: GAME OVER```**",
+					embeds=[emb.to_dict()],
+					components=None,
+				),
+				method="PATCH",
+				authorise=True,
+			)
+		if serialised is not None:
+			# Update message if gamestate has been changed
+			return await self.display(_user, _uid, g, score=score, serialised=serialised)
+		await bot.ignore_interaction(_message)
 
-	async def __call__(self, bot, argv, args, user, flags, message, guild, **void):
-		# Input may be nothing, a single value representing board size, a size and dimension count input, or a sequence of numbers representing size along an arbitrary amount of dimensions
-		if not len(argv.replace(" ", "")):
-			size = [4, 4]
+	async def display(self, user, uid, g, score=0, serialised=None):
+		bot = self.bot
+		if not serialised:
+			serialised = g.serialise()
+			score = None
+		emb = discord.Embed(colour=discord.Colour(0))
+		if not uid:
+			emb.set_author(name="@everyone", icon_url=bot.discord_icon)
 		else:
-			if "x" in argv:
-				size = await recursive_coro([bot.eval_math(i) for i in argv.split("x")])
-			else:
-				if len(args) > 1:
-					dims = args.pop(-1)
-					dims = await bot.eval_math(dims)
-				else:
-					dims = 2
-				if dims <= 0:
-					raise ValueError("Invalid amount of dimensions specified.")
-				width = await bot.eval_math(" ".join(args))
-				size = list(repeat(width, dims))
+			emb.set_author(**get_author(user))
+			emb.colour = await bot.get_colour(user)
+		emb.description = ("**```fix\n" if g.flags & 6 else "**```\n") + g.render() + "```**"
+		fscore = g.score()
+		if score is not None:
+			xp = max(0, fscore - score) * 16 / np.prod(g.shape)
+			if g.flags & 1:
+				xp /= math.sqrt(2)
+			elif g.flags & 2:
+				xp /= 2
+			elif g.flags & 4:
+				xp /= 3
+			bot.data.users.add_gold(user, xp)
+			rew = await bot.as_rewards(xp)
+			if rew:
+				emb.description += "+" + rew
+		emb.set_footer(text=self.encode(user.id, g.serialise(), f"Score: {fscore}"))
+		dims = max(2, len(g.shape))
+		buttons = copy.deepcopy(self.buttons[dims])
+		vm = g.valid_moves()
+		dis = set()
+		if dims == 2:
+			if not vm & 1:
+				dis.add((0, 1))
+			if not vm & 2:
+				dis.add((-1, 1))
+			if not vm & 4:
+				dis.add((1, 0))
+			if not vm & 8:
+				dis.add((1, -1))
+		elif dims == 3:
+			if not vm & 1:
+				dis.add((1, 1))
+			if not vm & 2:
+				dis.add((-2, 1))
+			if not vm & 4:
+				dis.add((2, 0))
+			if not vm & 8:
+				dis.add((2, -1))
+			if not vm & 16:
+				dis.add((0, 1))
+			if not vm & 32:
+				dis.add((-1, 1))
+		elif dims == 4:
+			if not vm & 1:
+				dis.add((1, 2))
+			if not vm & 2:
+				dis.add((-2, 2))
+			if not vm & 4:
+				dis.add((2, 1))
+			if not vm & 8:
+				dis.add((2, -2))
+			if not vm & 16:
+				dis.add((0, 2))
+			if not vm & 32:
+				dis.add((-1, 2))
+			if not vm & 64:
+				dis.add((2, 0))
+			if not vm & 128:
+				dis.add((2, -1))
+		for x, y in dis:
+			buttons[y][x].disabled = True
+		return cdict(
+			embed=emb,
+			buttons=buttons,
+		)
+
+	async def __call__(self, _user, dimensions, public, special_tiles, insanity, easy, **void):
+		# Input may be nothing, a single value representing board size, a size and dimension count input, or a sequence of numbers representing size along an arbitrary amount of dimensions
+		size = list(map(int, dimensions.split("x")))
 		if len(size) > 8:
 			raise OverflowError("Board size too large.")
 		items = 1
@@ -594,41 +560,22 @@ class Text2048(Command):
 				raise OverflowError("Board size too large.")
 		# Prepare game settings, send callback message to schedule game start
 		mode = 0
-		if "p" in flags:
-			u_id = 0
+		if public:
+			uid = 0
 			mode |= 8
 		else:
-			u_id = user.id
-		if "i" in flags:
+			uid = _user.id
+		if insanity:
 			mode |= 4
-		if "s" in flags:
+		if special_tiles:
 			mode |= 2
-		if "e" in flags:
+		if easy:
 			mode |= 1
-		if len(size) <= 2:
-			buttons = self.buttons[2]
-		elif len(size) == 3:
-			buttons = self.buttons[3]
-		elif len(size) == 4:
-			buttons = self.buttons[4]
-		else:
-			raise ValueError("Button and board configuration for issued size is not yet implemented.")
 		reacts = []
 		if mode & 1:
 			reacts.append("↩️")
 		g = ND2048(*size, flags=mode)
-		data = g.serialise()
-		u = user
-		colour = await bot.get_colour(u)
-		emb = discord.Embed(colour=colour)
-		if u is None:
-			emb.set_author(name="@everyone", icon_url=bot.discord_icon)
-		else:
-			emb.set_author(**get_author(u))
-		content = "*```callback-fun-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "-" + as_str(data) + "\nPlaying 2048...```*"
-		emb.description = ("**```fix\n" if mode & 6 else "**```\n") + g.render() + "```**"
-		emb.set_footer(text="Score: 0")
-		await send_with_react(message.channel, content, embed=emb, reacts=reacts, buttons=buttons, reference=message)
+		return await self.display(_user, uid, g)
 
 
 class Snake(Command):
@@ -2202,22 +2149,20 @@ class DadJoke(Command):
 	rate_limit = 0.5
 
 	async def __call__(self, bot, _guild, _name, mode, action, chance, **void):
-		following = bot.data.dadjokes
-		curr = following.get(_guild.id, {})
+		curr = bot.get_guildbase(_guild.id, "dadjoke")
 		if mode == "disable" or chance <= 0:
 			if action == "all":
-				if _guild.id in following:
-					following.pop(_guild.id, None)
+				bot.pop_guildbase(_guild.id, "dadjoke")
 			else:
 				curr.pop(action, None)
-				if not curr:
-					following.pop(_guild.id, None)
+				bot.set_guildbase(_guild.id, "dadjoke", curr)
 			return css_md(f"Disabled dadjoke ({action}) for {sqr_md(_guild)}.")
 		if mode == "enable":
 			if action == "all":
-				following[_guild.id] = dict(nickname=chance, response=chance)
+				curr = dict(nickname=chance, response=chance)
 			else:
 				curr[action] = chance
+			bot.set_guildbase(_guild.id, "dadjoke", curr)
 			return css_md(f"Set dadjoke ({action}) for {sqr_md(_guild)} to {chance}%.")
 		if curr:
 			key = lambda p: f"{round(p, 1)}%"
@@ -2227,12 +2172,13 @@ class DadJoke(Command):
 
 class UpdateDadjokes(Database):
 	name = "dadjokes"
+	no_file = True
 	reg = re.compile(r"(?:(?:(?<=^)|(?<=[.,;:?!\(]\s))i(?:m| am)\s|(?:(?<=^)|(?<=\s))i'm\s){1}[^.,;:?!\)]+(?:[.,;:?!]{2,}|(?=[.,;:?!\)]|$))", re.I | re.M)
 
 	async def _nocommand_(self, message, **void):
 		if message.guild is None or not message.content:
 			return
-		curr = self.data.get(message.guild.id)
+		curr = self.bot.get_guildbase(message.guild.id, "dadjoke")
 		if not curr:
 			return
 		s = message.clean_content

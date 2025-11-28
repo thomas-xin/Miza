@@ -287,7 +287,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not path and default is None:
 			return cdict()
 		return default
-	def set_userbase(self, uid, path, value):
+	def set_userbase(self, uid, path, value, delete_empty=True):
+		if delete_empty and not value:
+			self.pop_userbase(uid, path)
+			return
 		if path:
 			orig = temp = self.userbase.setdefault(uid, cdict())
 			attrs = path.split(".")
@@ -346,7 +349,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not path and default is None:
 			return cdict()
 		return default
-	def set_guildbase(self, gid, path, value):
+	def set_guildbase(self, gid, path, value, delete_empty=True):
+		if delete_empty and not value:
+			self.pop_guildbase(gid, path)
+			return
 		if path:
 			orig = temp = self.guildbase.setdefault(gid, cdict())
 			attrs = path.split(".")
@@ -1427,6 +1433,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.cache.roles[r_id] = role
 		return role
 
+	emojinames = AutoCache(f"{CACHE_PATH}/emojinames", stale=3600, timeout=86400)
 	async def fetch_emoji(self, e_id, guild=None, allow_external=True):
 		"Fetches an emoji from ID and guild, using the bot cache when possible."
 		if not isinstance(e_id, int):
@@ -1457,7 +1464,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				emoji = SimulatedEmoji(
 					id=e_id,
 					animated=animated,
-					name=self.data.emojinames.get(e_id),
+					name=self.emojinames.get(e_id),
 				)
 				self.cache.emojis[emoji.id] = emoji
 				return emoji
@@ -1776,7 +1783,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def proxy_emojis(self, msg, guild=None, user=None, is_webhook=False, return_pops=False, lim=400):
 		"Retrieves and maps user's emoji list on target string. Used for ~AutoEmoji and compatibility with other commands."
-		orig = self.bot.data.emojilists.get(user.id, {}) if user else {}
+		orig = self.get_userbase(user.id, "emojilist", {}) if user else {}
 		emojis = emoji = None
 		regex = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^at\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
 		pops = set()
@@ -1820,7 +1827,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 								emoji = emojis.get(name)
 			emoji = await self.resolve_emoji(emoji, guild=guild)
 			if not emoji and not is_webhook and user:
-				self.data.emojilists.get(user.id, {}).pop(name, None)
+				orig.pop(name, None)
+				self.set_userbase(user.id, "emojilist", orig)
 			elif emoji:
 				pops.add((str(name), emoji.id))
 				if len(msg) < lim:
@@ -1834,9 +1842,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				substitutes = (start, sub, start + len(s))
 				if T(emoji).get("name"):
 					if not is_webhook and user:
-						orig = self.data.emojilists.setdefault(user.id, {})
 						orig.setdefault(name, emoji.id)
-						self.data.emojinames[emoji.id] = name
+						self.set_userbase(user.id, "emojilist", orig)
+						self.emojinames[emoji.id] = name
 				replaceds.append(emoji)
 			if substitutes:
 				msg = msg[:substitutes[0]] + substitutes[1] + msg[substitutes[2]:]
@@ -4497,11 +4505,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return
 			await asyncio.sleep(0.2)
 		content = message.content
-		if not content:
-			if message.embeds:
-				content = str(message.embeds[0].description or message.embeds[0].footer.text)
+		if not content and message.embeds:
+			content = str(message.embeds[0].footer.text or message.embeds[0].description)
 		try:
-			name, u_id, data = Pagination.decode(content)
+			name, uid, data = Pagination.decode(content)
 		except ValueError:
 			return
 		# Force a rate limit on the reaction processing for the message
@@ -4516,7 +4523,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					case False:
 						continue
 					case _:
-						if u_id != user.id:
+						if uid and uid != user.id:
 							continue
 			with self.ExceptionSender(message.channel, reference=message):
 				timeout = getattr(f, "_timeout_", 1) * self.timeout
@@ -4526,7 +4533,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					timeout *= 3
 				self.data.usage.add(f)
 				try:
-					index = f.directions.index(reacode)
+					index = f.directions.index(reacode) if hasattr(f.directions, "index") else f.directions[reacode]
 				except (ValueError, AttributeError):
 					index = -1
 				async with asyncio.timeout(timeout):
@@ -4537,6 +4544,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						_guild=message.guild,
 						_user=user,
 						_perm=u_perm,
+						_uid=uid,
 						reaction=reaction,
 						reacode=reacode,
 						index=index,
@@ -4550,6 +4558,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if isinstance(resp, str):
 					resp = cdict(content=resp, embeds=[], attachments=[])
 				if isinstance(resp, cdict):
+					if resp.get("embed") or resp.get("embeds"):
+						if resp.get("buttons") or resp.get("components"):
+							csubmit(self.edit_message(
+								message,
+								buttons=resp.pop("buttons", None),
+								components=resp.pop("components", None),
+							))
 					if interaction and not resp.get("file") and not resp.get("files"):
 						if not fut.done():
 							fut.cancel()
@@ -4566,9 +4581,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							**resp,
 						)
 						break
-					if resp.get("embed") or resp.get("embeds"):
-						resp.pop("buttons", None)
-						resp.pop("components", None)
 					if interaction:
 						if not fut.done():
 							fut.cancel()
@@ -5337,7 +5349,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				response = cdict(content=response)
 			if not respond:
 				return response
-			fut = csubmit(self.respond_with(response, message=message, command=command))
+			fut = csubmit(self.respond_with(response, message=message))
 			try:
 				message.__dict__.setdefault("inits", []).append(fut)
 			except Exception:
@@ -5500,7 +5512,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Return the delay before the message can be called again. This is calculated by the rate limit of the command.
 		return 0
 	
-	async def respond_with(self, response, message=None, command=None, manager=None, done=True, timeout=3600):
+	async def respond_with(self, response, message=None, manager=None, done=True, timeout=3600):
 		with self.command_semaphore:
 			# Limit for regular Discord messages, beyond which we'll need to split the text into multiple messages
 			msglen = 2000

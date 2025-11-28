@@ -1172,60 +1172,6 @@ class UpdateDeleted(Database):
 	no_file = True
 
 
-class UpdateChannelHistories(Database):
-	name = "channel_histories"
-	channel = True
-
-	async def get(self, channel, as_message=True, force=False):
-		if hasattr(channel, "simulated"):
-			yield channel.message
-			return
-		c_id = verify_id(channel)
-		min_time = time_snowflake(dtn() - datetime.timedelta(days=14))
-		deletable = False
-		s = self.get(c_id, ())
-		if isinstance(s, set):
-			s = self[c_id] = sorted(s, reverse=True)
-		for m_id in s:
-			if as_message:
-				try:
-					if m_id < min_time:
-						raise OverflowError
-					message = await self.bot.fetch_message(m_id, channel=channel if force else None)
-					if T(message).get("deleted"):
-						continue
-				except (discord.NotFound, discord.Forbidden, OverflowError):
-					if deletable:
-						self.data[c_id].remove(m_id)
-				except (TypeError, ValueError, LookupError, discord.HTTPException):
-					if not force:
-						break
-					print_exc()
-				else:
-					yield message
-				deletable = True
-			else:
-				yield m_id
-
-	def add(self, c_id, m_id):
-		s = self.data.setdefault(c_id, set())
-		if not isinstance(s, set):
-			s = set(s)
-		s.add(m_id)
-		while len(s) > 32768:
-			try:
-				s.discard(next(iter(s)))
-			except RuntimeError:
-				pass
-		self[c_id] = s
-	
-	def _delete_(self, message, **void):
-		try:
-			self.data[message.channel.id].remove(message.id)
-		except (AttributeError, KeyError, ValueError):
-			pass
-
-
 class Maintenance(Command):
 	min_level = nan
 	description = "Toggles Maintenance mode, which will block all use of commands for all servers except the current one while active."
