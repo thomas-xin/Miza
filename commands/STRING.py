@@ -1083,7 +1083,7 @@ d(*⌒▽⌒*)b Happy
 		url = await self.bot.get_proxy_url(_user)
 		if _slash:
 			return cdict(content=msg)
-		fut = csubmit(bot.silent_delete(_message))
+		fut = csubmit(bot.autodelete(_message))
 		await bot.send_as_webhook(_channel, msg, username=_user.display_name, avatar_url=url)
 		await fut
 

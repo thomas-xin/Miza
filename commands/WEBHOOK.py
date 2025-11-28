@@ -242,7 +242,7 @@ class UpdateAutoEmojis(Database):
 							orig[name] = emoji.id
 							bot.data.emojinames[emoji.id] = name
 				if futs:
-					futs.append(bot.silent_delete(message))
+					futs.append(bot.autodelete(message))
 					await gather(*futs)
 					return
 		if message.content.count(":") < 2:
@@ -279,7 +279,7 @@ class UpdateAutoEmojis(Database):
 		for a in message.attachments:
 			fn = await attachment_cache.download(a.url, m_id=message.id, filename=True)
 			files.append(discord.File(fn, filename=a.filename))
-		csubmit(bot.silent_delete(message))
+		csubmit(bot.autodelete(message))
 		url = await bot.get_proxy_url(message.author)
 		m = await bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url, reference=ref)
 		regex = regexp(r"(?:^|^[^<\\`]|[^<][^\\`]|.[^a\\`\[])(:[A-Za-z0-9\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>\]`])")
@@ -821,7 +821,7 @@ class UpdateMimics(Database):
 				mimic = self.data[info.m_id]
 				invoke = info.get("invoke")
 				if not invoke:
-					csubmit(bot.silent_delete(message))
+					csubmit(bot.autodelete(message))
 				elif not mimic.get("personality"):
 					raise ValueError(f"Character must have a personality assigned to chat! Please see {bot.get_prefix(guild)}ProxyConfig for more info.")
 				await self.invoke_mimic(message, mimic, channel, info["msg"], invoke=invoke)

@@ -439,13 +439,6 @@ class UpdateExec(Database):
 			glob["_"] = output
 		return output
 
-	async def sendDeleteID(self, c_id, delete_after=20, **kwargs):
-		# Autodeletes after a delay
-		channel = await self.bot.fetch_channel(c_id)
-		message = await channel.send(**kwargs)
-		if isfinite(delete_after):
-			csubmit(self.bot.silent_delete(message, no_log=True, delay=delete_after))
-
 	def prepare_string(self, s, lim=2000, fmt="py"):
 		if type(s) is not str:
 			s = str(s)
@@ -754,11 +747,12 @@ class UpdateExec(Database):
 					m = await bot.fetch_message(mid, c)
 				except:
 					continue
-				await bot.silent_delete(m)
-				deleted.append(m.id)
+				deleted.append(m)
 				break
-		print("Deleted", deleted)
-		return deleted
+		await bot.autodelete(*deleted)
+		deli = [m.id for m in deleted]
+		print("Deleted:", deli)
+		return deli
 
 	DEFAULT_LIMIT = 48 * 1048576
 	async def get_lfs_channel(self, size=DEFAULT_LIMIT):

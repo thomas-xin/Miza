@@ -715,7 +715,7 @@ class UpdateSkyShardReminders(Database):
 						if message.embeds and message.embeds[0].footer.text and occurrence_number not in (pinged_occurrences := self.parse_pings(message.embeds[0].footer.text)):
 							ping = False
 						if ping:
-							csubmit(bot.silent_delete(message))
+							csubmit(bot.autodelete(message))
 				embed.set_footer(text=f"Pings for landings: {', '.join(map(str, pinged_occurrences)) or 'none'}", icon_url="https://cdn.discordapp.com/emojis/695800620682313740.webp" if pinged_occurrences else "https://cdn.discordapp.com/emojis/695800875150475294.webp")
 				if ping or not message:
 					message = await send_with_react(user, embed=embed, reacts=["✅"] + [number_emojis[n] for n in all_occurrences])

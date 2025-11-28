@@ -1682,11 +1682,11 @@ class Player(Command):
 					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
 				elif i == 14:
 					await asubmit(auds.kill)
-					await bot.silent_delete(message)
+					await bot.autodelete(message)
 					return
 				else:
 					auds.player = None
-					await bot.silent_delete(message)
+					await bot.autodelete(message)
 					return
 		other = await self.show(auds)
 		text = lim_str(orig + other, 4096)
@@ -1721,7 +1721,7 @@ class Player(Command):
 				buttons=buttons,
 			)
 			auds.player.message = message
-			await bot.silent_delete(temp)
+			await bot.autodelete(temp)
 		if auds.queue and not auds.paused & 1:
 			p = auds.epos
 			maxdel = p[1] - p[0] + 2
@@ -1985,7 +1985,7 @@ class Download(Command):
 			content=italics(ini_md(f"Uploading {file.filename}...")),
 		)
 		await self.bot.send_with_file(channel, file=file, reference=message)
-		await self.bot.silent_delete(response)
+		await self.bot.autodelete(response)
 
 	async def __call__(self, bot, _channel, _message, url, format, query, start, end, **void):
 		if not query and not url:
@@ -2134,94 +2134,7 @@ class AudioSeparator(Command):
 			content=italics(ini_md("Uploading output...")),
 		)
 		await send_with_reply(_channel, _message, files=files)
-		await bot.silent_delete(response)
-
-
-# class Transcribe(Command):
-# 	time_consuming = True
-# 	_timeout_ = 75
-# 	name = ["Whisper", "TranscribeAudio", "Caption"]
-# 	description = "Downloads a song from a link, automatically transcribing to English, or a provided language if applicable."
-# 	usage = "<1:language[en]>? <0:search_link>"
-# 	example = ("transcribe https://www.youtube.com/watch?v=kJQP7kiw5Fk", "transcribe Chinese https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-# 	rate_limit = (30, 45)
-# 	typing = True
-# 	slash = True
-# 	ephemeral = True
-# 	maintenance = True
-
-# 	async def __call__(self, bot, channel, guild, message, argv, flags, user, **void):
-# 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
-# 		if premium < 2:
-# 			raise PermissionError(f"Sorry, this feature is currently for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
-# 		for a in message.attachments:
-# 			argv = a.url + " " + argv
-# 		dest = None
-# 		# Attempt to download items in queue if no search query provided
-# 		if not argv:
-# 			try:
-# 				auds = bot.data.audio.players[guild.id]
-# 				if not auds.queue:
-# 					raise LookupError
-# 				url = auds.queue[0].get("url")
-# 			except:
-# 				raise IndexError("Queue not found. Please input a search term, URL, or file.")
-# 		else:
-# 			# Parse search query, detecting file format selection if possible
-# 			if " " in argv:
-# 				spl = smart_split(argv)
-# 				if len(spl) >= 1:
-# 					tr = bot.commands.translate[0]
-# 					arg = spl[0]
-# 					if (dest := (tr.renamed.get(c := arg.casefold()) or (tr.languages.get(c) and c))):
-# 						dest = (googletrans.LANGUAGES.get(dest) or dest).capitalize()
-# 						# curr.languages.append(dest)
-# 						argv = " ".join(spl[1:])
-# 			argv = verify_search(argv)
-# 			# Input must be a URL
-# 			urls = await bot.follow_url(argv, allow=True, images=False)
-# 			if not urls:
-# 				raise TypeError("Input must be a valid URL.")
-# 			url = urls[0]
-# 		simulated = getattr(message, "simulated", None)
-# 		async with discord.context_managers.Typing(channel):
-# 			entries = await asubmit(ytdl.search, url)
-# 			if entries:
-# 				name = entries[0].get("name")
-# 			else:
-# 				name = None
-# 			if not simulated:
-# 				m = await message.reply(
-# 					ini_md(f"Downloading and transcribing {sqr_md(ensure_url(url))}..."),
-# 				)
-# 			else:
-# 				m = None
-# 			await asubmit(ytdl.get_stream, entries[0], force=True, download=False)
-# 			name, url = entries[0].get("name"), entries[0].get("url")
-# 			if not name or not url:
-# 				raise FileNotFoundError(500, argv)
-# 			url = unyt(url)
-# 			stream = entries[0].get("stream") or entries[0].url
-# 			text = await process_image("whisper", "$", [stream], cap="whisper", timeout=3600)
-# 		if dest:
-# 			if m:
-# 				csubmit(bot.edit_message(
-# 					m,
-# 					content=css_md(f"Translating {name}..."),
-# 					embed=None,
-# 				))
-# 				csubmit(bot._state.http.send_typing(channel.id))
-# 			translated = {}
-# 			comments = {}
-# 			await bot.commands.translate[0].llm_translate(bot, guild, channel, user, text, "auto", [dest], translated, comments, engine="chatgpt" if premium > 1 else "mixtral")
-# 			text = "\n".join(translated.values()).strip()
-# 		emb = discord.Embed(description=text)
-# 		emb.title = name
-# 		emb.colour = await bot.get_colour(user)
-# 		emb.set_author(**get_author(user))
-# 		if m:
-# 			csubmit(bot.silent_delete(m))
-# 		bot.send_as_embeds(channel, text, author=get_author(user), reference=message)
+		await bot.autodelete(response)
 
 
 class UpdateAudio(Database):

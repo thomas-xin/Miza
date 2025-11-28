@@ -920,12 +920,12 @@ class Status(Command):
 				if message is None:
 					message = await aretry(channel.fetch_message, m_id, attempts=6, delay=2, exc=(discord.NotFound, discord.Forbidden))
 					if utc() - snowflake_time_2(message.id).timestamp() > 86400 * 14 - 60:
-						csubmit(bot.silent_delete(message))
+						csubmit(bot.autodelete(message, keep_log=False))
 						raise StopIteration
 				if message.id != channel.last_message_id or getattr(message, "rated", False):
 					async for m in bot.data.channel_cache.grab(channel):
 						if message.id != m.id or utc() - snowflake_time_2(m.id).timestamp() > 86400 * 14 - 60 or getattr(m, "rated", False):
-							csubmit(bot.silent_delete(m))
+							csubmit(bot.autodelete(m, keep_log=False))
 							raise StopIteration
 						break
 				func = lambda *args, **kwargs: bot.edit_message(message, *args, content=None, **kwargs)
@@ -1377,7 +1377,7 @@ class UpdateUrgentReminders(Database):
 					if len(p) > 6 and p[6]:
 						reference = await self.fetch_message(p[6], channel)
 					fut = csubmit(channel.send(content, embed=emb, reference=reference))
-					await self.bot.silent_delete(message)
+					await self.bot.autodelete(message)
 					message = await fut
 					await message.add_reaction("✅")
 					p[2] = message.id

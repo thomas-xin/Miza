@@ -636,11 +636,10 @@ class Instruct(Command):
 			type="enum",
 			validation=cdict(
 				enum=list(ai.available),
-				accepts={"llama": "llama-3-70b", "haiku": "claude-3-haiku", "r1": "deepseek-r1", "deepseek": "deepseek-v3", "gpt3.5": "gpt-3.5", "sonnet": "claude-3.7-sonnet", "dbrx": "dbrx-instruct", "gpt5": "gpt-5", "gpt4": "gpt-4.1", "gpt-4o": "gpt-4", "opus": "claude-3-opus"},
+				accepts={"llama": "llama-3-70b", "haiku": "claude-3-haiku", "r1": "deepseek-r1", "deepseek": "deepseek-v3", "gpt3.5": "gpt-3.5", "sonnet": "claude-4.5-sonnet", "dbrx": "dbrx-instruct", "gpt5": "gpt-5.1", "gpt4": "gpt-4.1", "gpt-4o": "gpt-4", "opus": "claude-4.1-opus"},
 			),
 			description="Target LLM to invoke",
 			example="deepseek",
-			default="kimi-k2",
 		),
 		prompt=cdict(
 			type="string",
@@ -737,7 +736,8 @@ class Instruct(Command):
 			kwargs["api"] = oai
 		kwargs["max_tokens"] = max_tokens
 		if not model:
-			raise ValueError("No model specified")
+			kwargs["api"] = summarisation_model
+			model = summarisation_model.model
 		resp = await bot.force_completion(model=model, prompt=prompt, stream=True, timeout=1800, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, premium_context=_premium, allow_alt=True, **kwargs)
 		try:
 			_message.__dict__.setdefault("inits", []).append(resp)

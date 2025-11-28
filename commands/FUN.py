@@ -2070,7 +2070,7 @@ class UpdateReacts(Database):
 					react = await self.bot.resolve_emoji(react, guild=guild, allow_external=False)
 					await message.add_reaction(str(react))
 				except discord.HTTPException as ex:
-					if "10014" in repr(ex):
+					if ex.code == 10014:
 						self.remove_by_emoji(guild, react)
 				except Exception:
 					self.remove_by_emoji(guild, react)

@@ -648,7 +648,6 @@
 					"validation": "[1, 65536]"
 				},
 				"model": {
-					"default": "kimi-k2",
 					"description": "Target LLM to invoke",
 					"example": "deepseek",
 					"type": "enum",
@@ -659,12 +658,12 @@
 							"gpt-4o": "gpt-4",
 							"gpt3.5": "gpt-3.5",
 							"gpt4": "gpt-4.1",
-							"gpt5": "gpt-5",
+							"gpt5": "gpt-5.1",
 							"haiku": "claude-3-haiku",
 							"llama": "llama-3-70b",
-							"opus": "claude-3-opus",
+							"opus": "claude-4.1-opus",
 							"r1": "deepseek-r1",
-							"sonnet": "claude-3.7-sonnet"
+							"sonnet": "claude-4.5-sonnet"
 						},
 						"enum": ["claude-4.1-opus", "claude-4.5-sonnet", "claude-4-sonnet", "claude-4.5-haiku", "deepseek-r1", "deepseek-v3.2", "deepseek-v3.1", "deepseek-v3", "minimax-m2", "minimax-m1", "minimax-01", "llama-3-405b", "llama-3-90b", "llama-3-70b", "llama-3-11b", "llama-3-8b", "command-r-plus", "command-r", "magnum-72b", "qwen3-235b", "qwen-72b", "gemini-3-pro", "gemini-2.5-pro", "gemini-2.5-flash-t", "gemini-2.5-flash", "grok-4.1-fast", "grok-4", "grok-4-fast", "gpt-oss-120b", "gpt-oss-20b", "o4-mini", "o3", "o3-mini", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4.1-mini", "gpt-4.1", "gpt-4-mini", "gpt-4", "mistral-24b", "kimi-k2-t", "kimi-k2"]
 					}

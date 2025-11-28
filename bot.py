@@ -1324,7 +1324,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		channel = await self.fetch_channel(c_id)
 		message = await self.fetch_message(channel, m_id)
 		if message.author.id == self.user.id:
-			await self.silent_delete(message)
+			await self.autodelete(message)
 		return True
 
 	async def renew_attachment(self, url, m_id=None):
@@ -1567,7 +1567,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if "channel_cache" in self.data:
 				async for message in self.data.channel_cache.grab(c_id, as_message=full, force=False):
 					if isinstance(message, int):
-						message = cdict(id=message)
+						message = cdict(id=message, channel=channel, _state=self._connection)
 					if before:
 						if message.id > time_snowflake(before):
 							continue
@@ -3497,51 +3497,44 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			raise CommandCancelledError("Reference message was deleted.")
 		return message
 
-	def log_delete(self, message, value=1):
-		"Logs if a message has been deleted."
-		if not message:
+	recently_deleted = AutoCache(stale=0, timeout=60)
+	async def autodelete(self, *messages, keep_log=True):
+		if not messages:
 			return
-		try:
-			m_id = int(message.id)
-		except AttributeError:
-			m_id = int(message)
-		self.data.deleted.cache[m_id] = value
-
-	async def silent_delete(self, message, keep_log=False, exc=False, delay=None):
-		"Silently deletes a message, bypassing logs whilst enabling connected commands to continue executing."
-		if not message:
-			return
-		if delay:
-			await asyncio.sleep(float(delay))
-		v = 2 if keep_log else 3
-		if isinstance(message, list_like) and len(message) > 1:
+		collections = {}
+		futs = []
+		dt = DynamicDT.now()
+		for m in messages:
+			if isinstance(m, int):
+				m = await self.fetch_message(m)
+			if not keep_log:
+				self.recently_deleted[m.id] = True
 			try:
-				messages = message
-				if not messages[0].guild or messages[0].guild.me.guild_permissions.manage_messages:
+				if dt - snowflake_time_2(m.id) >= 14 * 86400 - 60:
 					raise PermissionError
-				channel = None
-				for m in messages:
-					if channel is None:
-						channel = m.channel
-					elif channel.id != m.channel.id:
-						raise PermissionError
+				if not m.channel or not getattr(m.channel, "delete_messages") or not m.guild or not m.guild.me.guild_permissions.manage_messages:
+					raise PermissionError
 			except (PermissionError, AttributeError):
-				futs = [self.silent_delete(m, keep_log=keep_log, exc=exc) for m in messages]
-				return await gather(*futs)
+				futs.append(self.with_retries(discord.Message.delete, m))
 			else:
-				for m in messages:
-					self.log_delete(m, v)
-				return await channel.delete_messages(messages)
-		elif isinstance(message, list_like):
-			message = message[0]
-		if isinstance(message, int):
-			message = await self.fetch_message(message)
-		try:
-			self.log_delete(message, v)
-			await discord.Message.delete(message)
-		except Exception:
-			self.data.deleted.cache.pop(message.id, None)
-			if exc:
+				c = collections.setdefault(m.channel.id, [])
+				if not c or len(c[-1]) >= 100:
+					c.append([])
+				c[-1].append(m)
+		for k, v in collections.items():
+			c = await self.fetch_channel(k)
+			for l100 in v:
+				futs.append(self.with_retries(c.delete_messages, l100))
+		return await gather(*futs, max_concurrency=3)
+
+	async def with_retries(self, func, *args, **kwargs):
+		for i in itertools.count(1):
+			try:
+				return await func(*args, **kwargs)
+			except discord.HTTPException as ex:
+				if ex.status in (408, 420, 425, 429, 460, 502, 503, 504, 508, 509, 522, 524, 529, 599):
+					await asyncio.sleep(1.5 ** i)
+					continue
 				raise
 
 	async def verified_ban(self, user, guild, reason=None):
@@ -5772,7 +5765,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				# m = await send_with_reply(getattr(message, "channel", None), message, "\xad", ephemeral=False)
 				print("Ignored:", m)
 				if m and not getattr(m, "ephemeral", False):
-					await self.silent_delete(m)
+					await self.autodelete(m, keep_log=False)
 			else:
 				message.method = "patch"
 
@@ -6458,7 +6451,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				message = await self.edit_message(message, content=content, attachments=(), embeds=())
 				# await self.send_event("_edit_", before=before, after=message, force=True)
 			else:
-				await self.silent_delete(message, exc=True)
+				await self.autodelete(message)
 				await self.send_event("_delete_", message=message)
 
 	async def handle_message(self, message, before=None):
@@ -6728,10 +6721,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 			async def _update(self, content, embeds, files, buttons, prefix, suffix, bypass, reacts, force, done):
 				ms = split_text(content, max_length=self.msglen, prefix=prefix, suffix=suffix)
+				n = len(ms)
 				futs = []
-				while len(ms) < len(self.messages):
-					fut = csubmit(bot.silent_delete(self.messages.pop(-1)))
-					futs.append(fut)
+				if len(self.messages) > n:
+					futs.append(csubmit(bot.autodelete(*self.messages[n:], keep_log=False)))
+					self.messages = self.messages[:n]
 				for i, s in enumerate(ms):
 					left = (i - len(ms)) * 10
 					right = (i + 1 - len(ms)) * 10 or None
@@ -6791,7 +6785,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 			async def delete(self):
 				messages = await self.collect()
-				csubmit(bot.silent_delete(messages))
+				await bot.autodelete(*messages, keep_log=False)
 				self.messages.clear()
 				self.removed.clear()
 

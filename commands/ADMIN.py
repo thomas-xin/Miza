@@ -191,39 +191,6 @@ class Purge(Command):
 			deleting.append(_message)
 			found.add(_message.id)
 			count += 1
-		delcount = 0
-		async def use_delete():
-			nonlocal delcount, deleting
-			try:
-				if hasattr(_channel, "delete_messages") and _channel.permissions_for(_guild.me).manage_messages:
-					dels = deleting[:100]
-					dels = []
-					t = utc()
-					for i, m in enumerate(deleting):
-						if t - discord.utils.snowflake_time(m.id).timestamp() > 14 * 86400 - 60:
-							break
-						m._state = bot._connection
-						dels.append(m)
-					if not dels:
-						raise StopIteration
-					await _channel.delete_messages(dels)
-					for m in dels:
-						bot.data.deleted.cache[m.id] = 2
-					deleting = deleting[len(dels):]
-					delcount += len(dels)
-				else:
-					m = deleting[0]
-					m.channel = _channel
-					await bot.silent_delete(m, keep_log=True, exc=True)
-					deleting.popleft()
-					delcount += 1
-			except Exception:
-				for _ in loop(min(5, len(deleting))):
-					m = deleting.popleft()
-					m.channel = _channel
-					with tracebacksuppressor:
-						await bot.silent_delete(m, keep_log=True, exc=True)
-					delcount += 1
 		async with bot.guild_semaphore:
 			async for m in bot.history(_channel, limit=count, after=left, before=right, full=False):
 				if len(found) >= count:
@@ -234,11 +201,8 @@ class Purge(Command):
 					continue
 				deleting.append(m)
 				found.add(m.id)
-				if len(deleting) >= 100:
-					await use_delete()
-			while deleting:
-				await use_delete()
-		s = italics(css_md(f"Deleted {sqr_md(delcount)} message{'s' if delcount != 1 else ''}!", force=True))
+			await bot.autodelete(*deleting)
+		s = italics(css_md(f"Deleted {sqr_md(len(deleting))} message{'s' if len(deleting) != 1 else ''}!", force=True))
 		return cdict(content=s, reacts="❎")
 
 
@@ -2861,6 +2825,8 @@ class UpdateMessageLogs(Database):
 		try:
 			t = u
 			init = user_mention(t.id)
+			if self.bot.recently_deleted.get(message.id):
+				return
 			d_level = self.bot.is_deleted(message)
 			if d_level > 1:
 				if d_level > 2:
@@ -2921,6 +2887,8 @@ class UpdateMessageLogs(Database):
 		action = discord.AuditLogAction.message_bulk_delete
 		try:
 			init = "[UNKNOWN USER]"
+			if self.bot.recently_deleted.get(message.id):
+				return
 			if self.bot.is_deleted(message):
 				t = self.bot.user
 				init = user_mention(t.id)
@@ -3226,7 +3194,7 @@ class UpdateRolegivers(Database):
 						atomic=True,
 					)
 			if al[1]:
-				await bot.silent_delete(message)
+				await bot.autodelete(message)
 
 
 class UpdateAutoRoles(Database):
@@ -3404,7 +3372,7 @@ class ThreadList(Command):
 					await thread.edit(archived=False, locked=False)
 				else:
 					m = await thread.send("\xad")
-					csubmit(bot.silent_delete(m))
+					csubmit(bot.autodelete(m, keep_log=False))
 
 
 class UpdateThreadPreservers(Database):
@@ -3431,7 +3399,7 @@ class UpdateThreadPreservers(Database):
 				await after.edit(archived=False, locked=False)
 			else:
 				m = await after.send("\xad")
-				await self.bot.silent_delete(m)
+				await self.bot.autodelete(m, keep_log=False)
 
 	async def _channel_delete_(self, channel, **void):
 		if not isinstance(channel, discord.Thread):
