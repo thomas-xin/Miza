@@ -55,7 +55,8 @@ class Ask(Command):
 	tips = (
 		"*Tip: By using generative AI, you are assumed to comply with the [ToS](<https://github.com/thomas-xin/Miza/wiki/Terms-of-Service>).*",
 		"*Tip: The chatbot feature is designed to incorporate multiple SOTA models in addition to internet-based interactions. For direct interaction with the raw LLMs, check out ~instruct.*",
-		"*Tip: I automatically scan the referenced message, as well as any text and images from within up to 192 messages in the current channel. None of the data is collected/sold, but if you would prefer a response without messages included for the sake of clarity or quota cost, there is always the option of creating a new thread/channel.*",
+		"*Tip: I automatically scan the referenced message, as well as any text and images from me and the requesting user within up to 192 messages in the current channel. None of the data is collected/sold, but if you would prefer a response without messages included for any reason, there is always the option of creating a new thread/channel.*",
+		"*Tip: For privacy reasons, shared conversation histories (allowing referencing of other users' messages in the same channel) is disabled by default. If you would like to enable this, use ~personality --shared.*",
 		"*Tip: My personality prompt and message streaming are among several parameters that may be modified. Check out ~help personality for more info. Note that an improperly constructed prompt may be detrimental to response quality, and that giving me a nickname may also have an effect.*",
 		"*Tip: I automatically try to correct inaccurate responses when possible. However, this is not foolproof; if you would like this feature more actively applied to counteract censorship, please move to a NSFW channel or use ~verify if in DMs.*",
 		"*Tip: Many of my capabilities are not readily available due to cost reasons. You can gain access by donating through one of the premium subscriptions available, which serves to approximately fund individual usage.*",
@@ -86,7 +87,7 @@ class Ask(Command):
 			if xrand(2):
 				emb = discord.Embed(colour=rand_colour())
 				emb.set_author(**get_author(bot.user))
-				emb.description = f"Did you instead intend to ask about my main bot? use {bot.get_prefix(_guild)}help for help!"
+				emb.description = f"Did you instead intend to ask about my main bot? use {_prefix}help for help!"
 				embs.append(emb)
 		simulated = getattr(_message, "simulated", False)
 		pdata = bot.commands.personality[0].retrieve(_channel or _guild)
@@ -141,11 +142,13 @@ class Ask(Command):
 		else:
 			reference = None
 		hislim = 384 if _premium.value >= 4 else 192
-		if not simulated:
+		if not simulated and pdata.cutoff >= 0:
 			async for m in bot.history(_channel, limit=hislim):
 				if m.id < pdata.cutoff:
 					break
 				if m.id in messages or m.id == _message.id:
+					continue
+				if not pdata.shared and m.author.id not in (bot.id, _message.author.id):
 					continue
 				message = cdict(
 					role="assistant" if m.author.bot else "user",
@@ -517,7 +520,7 @@ class Ask(Command):
 DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome, but not too corny), in first person as if you were a human. You are free to make up your own preferences and show emotion, but you should always match the language used (e.g. English). If a user inquires for additional services not accessible through tools, you should direct them to the ~help or /help commands rather than mimic outputs, if you suspect they may involve side effects. Be concise where possible."
 
 class Personality(Command):
-	name = ["ResetChat", "ClearChat", "ChangePersonality"]
+	name = ["ChangePersonality"]
 	min_level = 2
 	description = "Customises my personality for ~ask and @mentions in the current channel. Note that with the increased complexity of the chatbot, a clear description of who the bot is should be provided."
 	schema = cdict(
@@ -546,17 +549,22 @@ class Personality(Command):
 		),
 		stream=cdict(
 			type="bool",
-			description="Determines whether the response should be edited, or delayed until complete",
+			description="Determines whether the response should be edited, or delayed until complete, default true",
 			example="false",
 		),
 		tts=cdict(
 			type="bool",
-			description="Whether the output should trigger Discord TTS. Incompatible with streamed editing",
+			description="Whether the output should trigger Discord TTS. Incompatible with streamed editing, default false",
+			example="true",
+		),
+		shared=cdict(
+			type="bool",
+			description="Whether conversation histories should include other users, default false",
 			example="true",
 		),
 		cutoff=cdict(
 			type="integer",
-			description='Message ID cutoff (bot will not read messages before this point; enter -1 to cut off at current time)',
+			description='Message ID cutoff (bot will not read messages before this point; enter -1 to disable conversation history), default 0',
 			validation="[-1, 18446744073709551616)",
 			example="201548633244565504",
 		),
@@ -564,7 +572,7 @@ class Personality(Command):
 	rate_limit = (18, 24)
 	ephemeral = True
 
-	def retrieve(self, channel):
+	def retrieve(self, channel, update=True):
 		per = cdict(
 			description=DEFPER,
 			frequency_penalty=0.3,
@@ -572,8 +580,9 @@ class Personality(Command):
 			top_p=0.9,
 			stream=True,
 			tts=False,
+			shared=False,
 			cutoff=0,
-		)
+		) if update else cdict()
 		p = self.bot.data.personalities.get(channel.id)
 		if isinstance(p, str):
 			p = cdict(description=p)
@@ -581,11 +590,11 @@ class Personality(Command):
 			per.update(p)
 		return per
 
-	async def __call__(self, bot, _nsfw, _channel, _premium, _name, description, frequency_penalty, temperature, top_p, stream, tts, cutoff, **void):
+	async def __call__(self, bot, _nsfw, _channel, _premium, description, frequency_penalty, temperature, top_p, stream, tts, shared, cutoff, **void):
 		if description == "DEFAULT":
 			bot.data.personalities.pop(_channel.id, None)
 			return css_md(f"Personality settings for {sqr_md(_channel)} have been reset.")
-		if not description and frequency_penalty is None and temperature is None and top_p is None and stream is None and tts is None and cutoff is None:
+		if not description and frequency_penalty is None and temperature is None and top_p is None and stream is None and tts is None and shared is None and cutoff is None:
 			p = self.retrieve(_channel)
 			return ini_md(f"Current personality settings for {sqr_md(_channel)}:{iter2str(p)}\n(Use {bot.get_prefix(_channel.guild)}personality DEFAULT to reset; case-sensitive).")
 		if description:
@@ -600,7 +609,7 @@ class Personality(Command):
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
-		p = self.retrieve(_channel)
+		p = self.retrieve(_channel, update=False)
 		if description:
 			p.description = description
 		if frequency_penalty is not None:
@@ -613,11 +622,9 @@ class Personality(Command):
 			p.stream = stream
 		if tts is not None:
 			p.tts = tts
-		if cutoff is None and "reset" in _name:
-			cutoff = -1
+		if shared is not None:
+			p.shared = shared
 		if cutoff is not None:
-			if cutoff < 0:
-				cutoff = time_snowflake(cdict(timestamp=lambda: utc() + 1))
 			p.cutoff = cutoff
 		bot.data.personalities[_channel.id] = p
 		return css_md(f"Personality settings for {sqr_md(_channel)} have been changed to {iter2str(p)}\n(Use {bot.get_prefix(_channel.guild)}personality DEFAULT to reset).")

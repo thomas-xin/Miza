@@ -708,14 +708,14 @@
 			"timeout": "24"
 		},
 		"Personality": {
-			"aliases": ["Personality", "ResetChat", "ClearChat", "ChangePersonality"],
+			"aliases": ["Personality", "ChangePersonality"],
 			"description": "Customises my personality for ~ask and @mentions in the current channel. Note that with the increased complexity of the chatbot, a clear description of who the bot is should be provided.",
 			"example": [],
 			"level": "2",
 			"rate_limit": "(18, 24)",
 			"schema": {
 				"cutoff": {
-					"description": "Message ID cutoff (bot will not read messages before this point; enter -1 to cut off at current time)",
+					"description": "Message ID cutoff (bot will not read messages before this point; enter -1 to disable conversation history), default 0",
 					"example": "201548633244565504",
 					"type": "integer",
 					"validation": "[-1, 18446744073709551616)"
@@ -731,8 +731,13 @@
 					"type": "number",
 					"validation": "[-1, 2]"
 				},
+				"shared": {
+					"description": "Whether conversation histories should include other users, default false",
+					"example": "true",
+					"type": "bool"
+				},
 				"stream": {
-					"description": "Determines whether the response should be edited, or delayed until complete",
+					"description": "Determines whether the response should be edited, or delayed until complete, default true",
 					"example": "false",
 					"type": "bool"
 				},
@@ -749,7 +754,7 @@
 					"validation": "[0, 1]"
 				},
 				"tts": {
-					"description": "Whether the output should trigger Discord TTS. Incompatible with streamed editing",
+					"description": "Whether the output should trigger Discord TTS. Incompatible with streamed editing, default false",
 					"example": "true",
 					"type": "bool"
 				}

@@ -7437,6 +7437,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		try:
 			ptype = data.get("t") or ""
 			sub = data["d"]
+			base = ()
 			if "_" in ptype:
 				*base, target, action = ptype.casefold().split("_")
 			else:
@@ -7498,6 +7499,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							break
 					self.discord_data_cache[gid] = guild_data
 				case _ if action in ("add", "create", "edit", "update") and target in ("member", "user"):
+					if base == ("thread,"):
+						return
 					if target == "member":
 						gids = [int(sub["guild_id"])]
 					else:
@@ -7516,6 +7519,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							guild_data["_members"][uid]["user"] = sub
 						self.discord_data_cache[gid] = guild_data
 				case _ if action in ("remove", "delete") and target == "member":
+					if base == ("thread,"):
+						return
 					gid = int(sub["guild_id"])
 					uid = int(sub["user"]["id"])
 					try:
