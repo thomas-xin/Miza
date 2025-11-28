@@ -1008,7 +1008,7 @@
 			"rate_limit": "(4, 6)",
 			"schema": {
 				"emoji": {
-					"description": "Emoji to add as reaction. Use `-d --emoji` to remove by emoji rather than keyword",
+					"description": "Emoji to add as reaction. Use `--remove --emoji` to remove by emoji rather than keyword",
 					"example": "🐱",
 					"type": "emoji"
 				},

@@ -156,7 +156,7 @@ class AttachmentCache(AutoCache):
 	def last(self):
 		return self.setdefault("__last__", set())
 	@last.setter
-	def set_last(self, value):
+	def last(self, value):
 		self["__last__"] = value
 
 	@tracebacksuppressor
@@ -217,10 +217,10 @@ class AttachmentCache(AutoCache):
 
 	def clear_last(self, tup=None):
 		time.sleep(1)
-		last = self.last
-		if tup:
-			last.add(tup)
 		with tracebacksuppressor:
+			last = self.last
+			if tup:
+				last.add(tup)
 			for (c, k, n) in tuple(last):
 				if utc() - snowflake_time_2(int(k)).timestamp() > 86400 * 6:
 					last.remove((c, k, n))
@@ -231,7 +231,7 @@ class AttachmentCache(AutoCache):
 						timeout=5,
 					)
 					resp.raise_for_status()
-		self.last = last
+			self.last = last
 
 	def preserve(self, url, mid=0, minimise=False):
 		if not is_discord_attachment(url):

@@ -55,7 +55,7 @@ class Ask(Command):
 	tips = (
 		"*Tip: By using generative AI, you are assumed to comply with the [ToS](<https://github.com/thomas-xin/Miza/wiki/Terms-of-Service>).*",
 		"*Tip: The chatbot feature is designed to incorporate multiple SOTA models in addition to internet-based interactions. For direct interaction with the raw LLMs, check out ~instruct.*",
-		"*Tip: I automatically scan the referenced message, as well as any text and images from within up to 96 messages in the current channel. None of the data is collected/sold, but if you would prefer a response without messages included for the sake of clarity or quota cost, there is always the option of creating a new thread/channel.*",
+		"*Tip: I automatically scan the referenced message, as well as any text and images from within up to 192 messages in the current channel. None of the data is collected/sold, but if you would prefer a response without messages included for the sake of clarity or quota cost, there is always the option of creating a new thread/channel.*",
 		"*Tip: My personality prompt and message streaming are among several parameters that may be modified. Check out ~help personality for more info. Note that an improperly constructed prompt may be detrimental to response quality, and that giving me a nickname may also have an effect.*",
 		"*Tip: I automatically try to correct inaccurate responses when possible. However, this is not foolproof; if you would like this feature more actively applied to counteract censorship, please move to a NSFW channel or use ~verify if in DMs.*",
 		"*Tip: Many of my capabilities are not readily available due to cost reasons. You can gain access by donating through one of the premium subscriptions available, which serves to approximately fund individual usage.*",
@@ -140,7 +140,7 @@ class Ask(Command):
 			)
 		else:
 			reference = None
-		hislim = 192 if _premium.value >= 4 else 96
+		hislim = 384 if _premium.value >= 4 else 192
 		if not simulated:
 			async for m in bot.history(_channel, limit=hislim):
 				if m.id < pdata.cutoff:
@@ -588,6 +588,8 @@ class Personality(Command):
 		if not description and frequency_penalty is None and temperature is None and top_p is None and stream is None and tts is None and cutoff is None:
 			p = self.retrieve(_channel)
 			return ini_md(f"Current personality settings for {sqr_md(_channel)}:{iter2str(p)}\n(Use {bot.get_prefix(_channel.guild)}personality DEFAULT to reset; case-sensitive).")
+		if description:
+			description = await bot.superclean_content(description)
 		if description and (len(description) > 4096 or len(description) > 512 and _premium.value < 2):
 			raise OverflowError("Maximum currently supported personality prompt size is 512 characters, 4096 for premium users.")
 		if description and not _nsfw:
@@ -957,7 +959,6 @@ class Imagine(Command):
 					fut = csubmit(ai.instruct(
 						dict(
 							prompt=prompt,
-							model="gemini-2.5-flash",
 							temperature=1,
 							max_tokens=200,
 							top_p=0.9,
@@ -965,9 +966,6 @@ class Imagine(Command):
 							presence_penalty=0,
 							premium_context=_premium,
 						),
-						# best=_premium.value >= 3 and not (dups > 2 and not i),
-						cache=_premium.value_approx < 2,
-						skip=True,
 						user=_user,
 					))
 					futi.append(fut)

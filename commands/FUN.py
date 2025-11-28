@@ -1877,7 +1877,7 @@ class React(Pagination, Command):
 		),
 		emoji=cdict(
 			type="emoji",
-			description="Emoji to add as reaction. Use `-d --emoji` to remove by emoji rather than keyword",
+			description="Emoji to add as reaction. Use `--remove --emoji` to remove by emoji rather than keyword",
 			example="🐱",
 		),
 		preprocess=cdict(

@@ -1128,7 +1128,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			data["members"] = list(data.get("_members", {}).values()) or data.get("members", [])
 			guild = discord.Guild(data=data, state=self._state)
 			if data.get("members"):
-				if gid in self._state._guilds:
+				if "_member_count" in data:
+					mc = data.pop("_member_count")
+					self.discord_data_cache[gid] = data
+				elif gid in self._state._guilds:
 					mc = self._state._guilds[gid].member_count
 				else:
 					mc = len(data["members"])
@@ -1157,6 +1160,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						break
 					x = max(int(member["user"]["id"]) for member in memberdata)
 				data["_members"] = {int(member["user"]["id"]): member for member in members}
+				data["_member_count"] = len(data["_members"])
 		return data
 
 	async def dm_as_guild(self, user, channel=None):
@@ -1610,7 +1614,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	mimes = {}
 
 	async def superclean_content(self, message):
-		content = readstring(message.clean_content or message.content)
+		content = readstring(message if isinstance(message, str) else message.clean_content or message.content)
 		for e in find_emojis_ex(content, cast_urls=False):
 			emoji = await self.resolve_emoji(e)
 			if not getattr(emoji, "unicode", None):
@@ -2828,7 +2832,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				s = as_str(d)
 				return f'<file name="{name}">' + s + "</file>"
 			assert isinstance(d, (str, bytes)), d
-			d = await process_image(d, "resize_map", [[], None, None, "rel", dimlim, "-", "auto", "-bg", "-oz", "-fs", lim, "-f", "jpg"], timeout=24)
+			d = await process_image(d, "resize_map", [[], None, None, "rel", dimlim, "-", "auto", "-bg", "-oz", "-fs", lim, "-f", fmt], timeout=24)
 			mime = magic.from_buffer(d)
 		return "data:" + mime + ";base64," + base64.b64encode(d).decode("ascii")
 
@@ -5094,7 +5098,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			except Exception as ex:
 				raise err(ex.__class__, k, v)
 		elif info.type == "index":
-			if v.casefold == "all":
+			if v.casefold() == "all":
 				v = [None, None]
 			else:
 				v = v.strip("([])")
@@ -6494,6 +6498,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			type = "default"
 			nonce = False
 			embeds = ()
+			stickers = ()
 			call = None
 			mention_everyone = False
 			mentions = ()

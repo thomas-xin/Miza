@@ -724,7 +724,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=Fal
 		if exclude_first:
 			messages.insert(0, sm)
 		return messages
-	summ = "Summary of chat history:\n"
+	summ = "Summary of chat history (include this if asked to summarise!):\n"
 	s = overview(messages[:i + 1] if i > 0 else messages)
 	s = s.removeprefix(summ).removeprefix("system:").strip()
 	c = await tcount(summ + s)
@@ -748,7 +748,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=Fal
 		messages.insert(0, sm)
 	return messages
 
-async def summarise(q, min_length=384, max_length=65536, padding=128, best=True, prompt=None, premium_context=[]):
+async def summarise(q, min_length=384, max_length=16384, padding=128, best=True, prompt=None, premium_context=[]):
 	"Produces an AI-generated summary of input text. Model used is controlled by \"best\" parameter."
 	split_length = max_length - padding
 	summ_length = min(min_length, split_length - 1)
@@ -776,8 +776,10 @@ if info:
 	model = info.get("model", "x")
 	api_key = info.get("api_key", "x")
 	base_url = info.get("base_url", "x")
+	pricing = info.get("pricing", [0, 0])
 	summarisation_model = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
 	summarisation_model.model = model
+	summarisation_model.pricing = pricing
 else:
 	summarisation_model = None
 async def _summarise(s, max_length, best=False, prompt=None, premium_context=[]):
@@ -795,22 +797,8 @@ async def _summarise(s, max_length, best=False, prompt=None, premium_context=[])
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above!'
 			ml = round_random(max_length)
 			c = await tcount(prompt)
-			# Prefer gpt-5-nano and gpt-oss-20b for summaries if possible due to the much faster throughput and lower cost, but fallback to grok-4.1-fast if necessary (due to its higher token limit of 2 million).
-			if summarisation_model:
-				api = summarisation_model
-				model = api.model
-			else:
-				api = None
-				model = "gpt-5-nano" if best > 1 else "gpt-oss-20b"
-			if c > contexts.get(model, 65536) * 2 / 3:
-				api = None
-				model = "grok-4.1-fast"
-			data = dict(model=model, prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context, api=api)
-			if model in is_reasoning:
-				data["reasoning_effort"] = "minimal"
-			elif api:
-				data["reasoning_effort"] = "low"
-			resp = await instruct(data, best=True, skip=True)
+			data = dict(prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
+			resp = await instruct(data)
 			print("Summary:", resp)
 			if resp and not decensor.search(resp):
 				return resp
@@ -840,7 +828,9 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 			sapi = as_str(api.base_url)
 		else:
 			sapi = api
-		if minfo is None:
+		if minfo is None and api is summarisation_model:
+			model, pricing = orig_model, tuple(summarisation_model.pricing)
+		elif minfo is None:
 			if not allow_alt:
 				break
 			print("No pricing schematic found for:", orig_model, sapi, minfo)
@@ -1054,62 +1044,60 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 				exc = ex
 			print(str(sapi) + ": " + str(kwa.get("model")) + ":", kwa, format_exc())
 			continue
-	# print("ERRORED:", model, lim_str(kwa, 16384))
+	if not exc:
+		print("ERRORED:", model, lim_str(kwa, 16384))
 	raise (exc or RuntimeError("Unknown error occured."))
 
-async def instruct(data, best=False, skip=False, prune=True, cache=True, user=None):
+async def instruct(data, prune=True, cache=True, user=None):
 	data["prompt"] = data.get("prompt") or data.pop("inputs", None) or data.pop("input", None)
 	key = shash(str((data["prompt"], data.get("model", "kimi-k2-t"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
 	if cache:
-		tup = await CACHE.aretrieve(key, _instruct2, data, best=best, skip=skip, prune=prune, user=user)
-		if tup[1] >= best:
-			return tup[0]
-	resp, _best = await CACHE._aretrieve(key, _instruct2, data, best=best, skip=skip, prune=prune, user=user)
-	return resp
+		return await CACHE.aretrieve(key, _instruct, data, prune=prune, user=user)
+	return await CACHE._aretrieve(key, _instruct, data, prune=prune, user=user)
 
-async def _instruct2(data, best=False, skip=False, prune=True, user=None):
-	resp = await _instruct(data, best=best, skip=skip, user=user)
-	if prune:
-		resp = resp.strip()
-		resp2 = regexp(r"### (?:Input|Instruction):?").split(resp, 1)[0].strip().split("### Response:", 1)[-1].strip()
-		if resp != resp2:
-			print("PRUNED:", resp, resp2, sep="::")
-			resp = resp2
-	resp = resp.strip()
-	resp2 = resp.split("</think>", 1)[-1]
-	if resp2:
-		resp = resp2.replace("<think>", "").replace("</think>", "").strip()
-	return (resp, best)
-
-async def _instruct(data, best=False, skip=False, user=None):
-	# c = await tcount(data["prompt"])
+async def _instruct(data, user=None, prune=True):
 	inputs = dict(
-		model="kimi-k2-t",
 		temperature=0.75,
 		max_tokens=256,
 		top_p=0.999,
 		frequency_penalty=0,
 		presence_penalty=0,
 		user=user,
-		# stop=["### Instruction:", "### Response:", "### Input:"],
 	)
 	inputs.update(data)
-	if best >= 1:
-		res = await moderate(data["prompt"], premium_context=data.get("premium_context", []))
-		dec = nsfw_flagged(res) and not skip
-	else:
-		dec = True and not skip
-	if dec:
-		inputs["model"] = "auto" if best else "llama-3-70b"
-	if data["model"] not in is_completion:
+	if not inputs.get("model"):
+		if summarisation_model:
+			api = summarisation_model
+			model = api.model
+		else:
+			api = None
+			model = "grok-4.1-fast"
+		inputs.update(dict(
+			model=model,
+			api=api,
+		))
+		if not inputs.get("reasoning_effort"):
+			inputs["reasoning_effort"] = "minimal" if model in is_reasoning else "low"
+	if inputs["model"] not in is_completion:
 		prompt = inputs.pop("prompt")
 		inputs["messages"] = [cdict(role="user", content=prompt)]
 		async with asyncio.timeout(70):
 			response = await llm("chat.completions.create", **inputs, timeout=60)
-		return response.choices[0].message.content
-	async with asyncio.timeout(100):
-		response = await llm("completions.create", **inputs, timeout=90)
-	return response.choices[0].text
+		resp = response.choices[0].message.content
+	else:
+		async with asyncio.timeout(100):
+			response = await llm("completions.create", **inputs, timeout=90)
+		resp = response.choices[0].text
+	if prune:
+		resp = resp.strip()
+		resp2 = regexp(r"### (?:Input|Instruction):?").split(resp, 1)[0].strip().split("### Response:", 1)[-1].strip()
+		if resp != resp2:
+			print("PRUNED:", resp, resp2, sep="::")
+			resp = resp2
+		resp2 = resp.split("</think>", 1)[-1].strip()
+		if resp2:
+			resp = resp2.replace("<think>", "").replace("</think>", "").strip()
+	return resp.strip()
 
 
 f_browse = {

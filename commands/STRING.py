@@ -209,7 +209,6 @@ class Translate(Command):
 					premium_context=bot.premium_context(user, guild),
 					**kwargs,
 				),
-				skip=True,
 			)
 		except:
 			print_exc()
@@ -228,7 +227,6 @@ class Translate(Command):
 					user=str(user.id),
 					premium_context=bot.premium_context(user, guild),
 				),
-				skip=True,
 			)
 			# resp = await ai.llm(
 			# 	"completions.create",
