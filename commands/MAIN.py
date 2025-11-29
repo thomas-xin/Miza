@@ -743,11 +743,6 @@ class Profile(Command):
 			description="Profile description. Will show up in embeds",
 			example="You should play Cave Story, it's a good game",
 		),
-		pronouns=cdict(
-			type="text",
-			description="Optional field containing any text; will show above description when set",
-			example="he/she/they",
-		),
 		website=cdict(
 			type="url",
 			description="Optional field denoting a redirect when the profile is clicked on",
@@ -768,17 +763,29 @@ class Profile(Command):
 			description="Birthday date; affected by the timezone parameter",
 			example="february 29th",
 		),
+		optout=cdict(
+			type="bool",
+			description="Whether to opt-out of automated services, excluding moderation features",
+		),
+	)
+	macros=cdict(
+		OptOut=cdict(
+			optout=True,
+		),
+		OptIn=cdict(
+			optout=False,
+		),
 	)
 	rate_limit = (4, 6)
 	slash = True
 	ephemeral = True
 	usercmd = True
 
-	async def __call__(self, bot, _user, user, description, pronouns, website, icon, timezone, birthday, **void):
+	async def __call__(self, bot, _user, user, description, website, icon, timezone, birthday, optout, **void):
 		target = user or _user
 		is_owner = target.id == _user.id
 		updated = False
-		profile = T(bot.data.users).coercedefault(target.id, cdict, cdict())
+		profile = bot.get_userbase(target.id, "profile", cdict())
 
 		def raise_unless_owner():
 			nonlocal updated
@@ -789,9 +796,6 @@ class Profile(Command):
 		if description is not None:
 			raise_unless_owner()
 			profile.description = description
-		if pronouns is not None:
-			raise_unless_owner()
-			profile.pronouns = pronouns
 		if website is not None:
 			raise_unless_owner()
 			profile.website = website
@@ -805,6 +809,9 @@ class Profile(Command):
 		if birthday is not None:
 			raise_unless_owner()
 			profile.birthday = birthday
+		if optout is not None:
+			raise_unless_owner()
+			profile.optout = optout
 
 		colour = await bot.get_colour(target)
 		emb = discord.Embed(colour=colour)
@@ -843,6 +850,10 @@ class Profile(Command):
 			ts = temp.as_rel_discord()
 			bi = birthday.as_discord()
 			emb.add_field(name="Birthday", value=bi + "\n" + ts)
+		if profile.get("optout"):
+			emb.add_field(name="Opt-out status", value="*true*")
+
+		bot.set_userbase(target.id, "profile", profile)
 		return cdict(embed=emb)
 
 
@@ -1724,10 +1735,13 @@ class UpdateUsers(Database):
 
 	# User executed command, add to activity database
 	def _command_(self, user, loop, command, **void):
+		bot = self.bot
+		if bot.is_optout(user):
+			return
 		self.send_event(user.id, "command")
-		self.bot.add_userbase(user.id, f"commands.{command.parse_name()}", 1)
-		self.bot.set_userbase(user.id, "last_seen", utc())
-		self.bot.pop_userbase(user.id, "last_mention")
+		bot.add_userbase(user.id, f"commands.{command.parse_name()}", 1)
+		bot.set_userbase(user.id, "last_seen", utc())
+		bot.pop_userbase(user.id, "last_mention")
 		if not loop:
 			self.add_xp(user, getattr(command, "xp", xrand(6, 14)))
 
@@ -1735,6 +1749,8 @@ class UpdateUsers(Database):
 		user = message.author
 		bot = self.bot
 		if user.id == bot.id or bot.get_perms(user, message.guild) <= -inf:
+			return
+		if bot.is_optout(user):
 			return
 		if not bot.get_enabled(message.channel):
 			return
@@ -1823,13 +1839,15 @@ class UpdateUsers(Database):
 	async def _typing_(self, user, **void):
 		self.bot.set_userbase(user.id, "last_typing", utc())
 
-	async def _nocommand_(self, message, msg, force=False, flags=(), before=None, truemention=True, perm=0, **void):
+	async def _nocommand_(self, message, force=False, flags=(), before=None, perm=0, **void):
 		if getattr(message, "noresponse", False):
 			return
 		bot = self.bot
 		if isinstance(before, bot.GhostMessage):
 			return
 		user = message.author
+		if bot.is_optout(user):
+			return
 		channel = message.channel
 		guild = message.guild
 		if not getattr(message, "simulated", None):

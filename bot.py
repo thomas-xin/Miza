@@ -3426,6 +3426,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not g_perm:
 			self.data.perms.pop(guild.id, None)
 
+	def is_optout(self, uid):
+		return self.get_userbase(verify_id(uid), "profile.optout")
+
 	def get_enabled(self, channel):
 		"Retrieves the list of enabled command categories for a channel."
 		guild = getattr(channel, "guild", None)

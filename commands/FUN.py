@@ -1974,8 +1974,12 @@ class UpdateReacts(Database):
 		guild = message.guild
 		if guild is None:
 			return
-		data = self.bot.get_guildbase(guild.id, "reacts")
+		bot = self.bot
+		data = bot.get_guildbase(guild.id, "reacts")
 		if not data:
+			return
+		user = message.author
+		if bot.is_optout(user):
 			return
 		reacting = mdict()
 		cp = None
@@ -2014,7 +2018,7 @@ class UpdateReacts(Database):
 		for r in sorted(reacting):
 			for react in reacting[r]:
 				try:
-					react = await self.bot.resolve_emoji(react, guild=guild, allow_external=False)
+					react = await bot.resolve_emoji(react, guild=guild, allow_external=False)
 					await message.add_reaction(str(react))
 				except discord.HTTPException as ex:
 					if ex.code == 10014:
@@ -2062,20 +2066,23 @@ class UpdateDogpiles(Database):
 		if edit or message.guild is None or not message.content:
 			return
 		g_id = message.guild.id
-		dogpile = self.bot.get_guildbase(g_id, "dogpile", True)
+		bot = self.bot
+		dogpile = bot.get_guildbase(g_id, "dogpile", True)
 		if not dogpile:
 			return
-		if not message.guild.me or not self.bot.permissions_in(message.channel).send_messages:
+		if not message.guild.me or not bot.permissions_in(message.channel).send_messages:
 			return
 		u_id = message.author.id
-		if u_id == self.bot.id:
+		if u_id == bot.id:
+			return
+		if bot.is_optout(message.author):
 			return
 		content = readstring(message.content)
 		if not content:
 			return
 		last_author_id = u_id
 		hist = []
-		async for m in self.bot.history(message.channel, use_cache=True, limit=100):
+		async for m in bot.history(message.channel, use_cache=True, limit=100):
 			if m.id == message.id:
 				continue
 			c = readstring(m.content)
@@ -2087,7 +2094,7 @@ class UpdateDogpiles(Database):
 			hist.append((m, c))
 		hist2 = []
 		for m, c in reversed(hist):
-			if m.author.id == self.bot.id:
+			if m.author.id == bot.id:
 				hist2.clear()
 			hist2.append(c)
 		hist = hist2
@@ -2105,15 +2112,15 @@ class UpdateDogpiles(Database):
 			if random.random() < 1 / 4096:
 				content = "https://mizabot.xyz/u/iJKEhAECGSG0UwWQiSWgQUEWEkE/secretsmall.gif"
 				csubmit(message.add_reaction("💎"))
-				self.bot.data.users.add_diamonds(message.author, 1000)
+				bot.data.users.add_diamonds(message.author, 1000)
 			else:
 				content = prediction
 			print("DOGPILE:", message.guild, message.channel, hist, content)
 			if content[0].isascii() and content[:2] != "<:" and not is_url(content):
 				content = lim_str("\u200b" + content, 2000)
 			csubmit(discord.abc.Messageable.send(message.channel, content, tts=message.tts))
-			self.bot.data.users.add_xp(message.author, len(content) / 2 + 16)
-			self.bot.data.users.add_gold(message.author, len(content) / 4 + 32)
+			bot.data.users.add_xp(message.author, len(content) / 2 + 16)
+			bot.data.users.add_gold(message.author, len(content) / 4 + 32)
 
 
 class DadJoke(Command):
@@ -2178,7 +2185,8 @@ class UpdateDadjokes(Database):
 	async def _nocommand_(self, message, **void):
 		if message.guild is None or not message.content:
 			return
-		curr = self.bot.get_guildbase(message.guild.id, "dadjoke")
+		bot = self.bot
+		curr = bot.get_guildbase(message.guild.id, "dadjoke")
 		if not curr:
 			return
 		s = message.clean_content
@@ -2186,6 +2194,8 @@ class UpdateDadjokes(Database):
 		if not m:
 			return
 		user = message.author
+		if bot.is_optout(user):
+			return
 		text = m.group().strip()
 		i = text.casefold().index("m")
 		target = text[i + 1:].lstrip()
@@ -2419,7 +2429,10 @@ class UpdateDailies(Database):
 
 	def _reaction_add_(self, message, user, **void):
 		self.progress_quests(user, "react")
-		if message.author.id != user.id and user.id != self.bot.id:
+		bot = self.bot
+		if bot.is_optout(user):
+			return
+		if message.author.id != user.id and user.id != bot.id:
 			self.progress_quests(message.author, "reacted")
 
 

@@ -323,6 +323,8 @@ class UpdateTranslators(Database):
 			return
 		bot = self.bot
 		user = message.author
+		if bot.is_optout(user):
+			return
 		channel = message.channel
 		guild = message.guild
 		tr = bot.commands.translate[0]

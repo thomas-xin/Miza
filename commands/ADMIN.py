@@ -2943,15 +2943,17 @@ class UpdatePublishers(Database):
 			return
 		if "\u2009\u2009" in message.author.name:
 			return
+		bot = self.bot
+		user = message.author
+		if bot.is_optout(user):
+			return
 		try:
-			# if not message.channel.permissions_for(message.guild.me).manage_messages:
-			#     raise PermissionError("Manage messages permission missing from channel.")
 			await message.publish()
 		except Exception as ex:
 			if "invalid message type" in repr(ex).lower():
 				return
 			print_exc()
-			self.bot.send_exception(message.channel, ex)
+			bot.send_exception(message.channel, ex)
 
 
 class UpdateCrossposts(Database):
@@ -2985,8 +2987,6 @@ class UpdateCrossposts(Database):
 	async def _send_(self, message, **void):
 		if message.channel.id not in self.data:
 			return
-		# if message.flags.is_crossposted:
-			# return
 		if "\u2009\u2009" in message.author.name:
 			return
 		content = message.content or message.system_content

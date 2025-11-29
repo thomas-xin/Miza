@@ -150,6 +150,8 @@ class Ask(Command):
 					continue
 				if not pdata.shared and m.author.id not in (bot.id, _message.author.id):
 					continue
+				if bot.is_optout(m.author.id):
+					continue
 				message = cdict(
 					role="assistant" if m.author.bot else "user",
 					name=m.author.display_name,

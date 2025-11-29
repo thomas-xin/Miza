@@ -127,6 +127,8 @@ class UpdateAutoEmojis(Database):
 			return
 		e = str(emoji)
 		bot = self.bot
+		if bot.is_optout(user):
+			return
 		name, e_id = e.split(":")[1:]
 		e_id = int("".join(regexp("[0-9]+").findall(e_id)))
 		anim = e.startswith("<a:")
@@ -146,13 +148,15 @@ class UpdateAutoEmojis(Database):
 				elist[name] = e_id
 				self.bot.set_guildbase(guild.id, "emojilist", elist)
 
-	async def _nocommand_(self, message, recursive=True, edit=False, **void):
+	async def _nocommand_(self, message, recursive=True, **void):
 		if getattr(message, "simulated", None) or (utc_ddt() - message.created_at).total_seconds() > 3600:
 			return
-		if message.guild and not message.guild.get_member(message.author.id) or not message.content or getattr(message, "webhook_id", None) or message.content.count("```") > 1:
-			return
 		user = message.author
+		if message.guild and not message.guild.get_member(user.id) or not message.content or getattr(message, "webhook_id", None) or message.content.count("```") > 1:
+			return
 		bot = self.bot
+		if bot.is_optout(user):
+			return
 		emojis = find_emojis(message.content)
 		for e in emojis:
 			name, e_id = e.split(":")[1:]
@@ -165,14 +169,14 @@ class UpdateAutoEmojis(Database):
 			if not message.webhook_id:
 				bot.emojinames[e_id] = name
 				if user:
-					elist = self.bot.get_userbase(user.id, "emojilist", {})
+					elist = bot.get_userbase(user.id, "emojilist", {})
 					elist[name] = e_id
-					self.bot.set_userbase(user.id, "emojilist", elist)
+					bot.set_userbase(user.id, "emojilist", elist)
 				guild = message.guild
 				if guild:
-					elist = self.bot.get_guildbase(guild.id, "emojilist", {})
+					elist = bot.get_guildbase(guild.id, "emojilist", {})
 					elist[name] = e_id
-					self.bot.set_guildbase(guild.id, "emojilist", elist)
+					bot.set_guildbase(guild.id, "emojilist", elist)
 		if not message.guild or not message.guild.me:
 			return
 		guild = message.guild
@@ -183,7 +187,7 @@ class UpdateAutoEmojis(Database):
 		m_id = None
 		msg = message.content
 		ref = message.reference and await bot.fetch_reference(message)
-		orig = self.bot.get_userbase(user.id, "emojilist", {})
+		orig = bot.get_userbase(user.id, "emojilist", {})
 		emojis = None
 		# long = len(msg) > 32
 		if msg.startswith("+"):
@@ -244,7 +248,7 @@ class UpdateAutoEmojis(Database):
 						if isinstance(emoji, int):
 							emoji = await bot.fetch_emoji(emoji, guild=message.guild)
 						futs.append(m2.add_reaction(emoji))
-						orig = self.bot.get_userbase(user.id, "emojilist", {})
+						orig = bot.get_userbase(user.id, "emojilist", {})
 						if getattr(emoji, "id", None):
 							orig[name] = emoji.id
 							bot.emojinames[emoji.id] = name
@@ -267,7 +271,7 @@ class UpdateAutoEmojis(Database):
 		pops = set()
 		replaceds = []
 		for i, m in enumerate(selected):
-			m, p, r = await bot.proxy_emojis(m, guild=guild, user=message.author, is_webhook=message.webhook_id, return_pops=True)
+			m, p, r = await bot.proxy_emojis(m, guild=guild, user=user, is_webhook=message.webhook_id, return_pops=True)
 			selected[i] = m
 			pops.update(p)
 			replaceds.extend(r)
@@ -287,8 +291,8 @@ class UpdateAutoEmojis(Database):
 			fn = await attachment_cache.download(a.url, m_id=message.id, filename=True)
 			files.append(discord.File(fn, filename=a.filename))
 		csubmit(bot.autodelete(message))
-		url = await bot.get_proxy_url(message.author)
-		m = await bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url, reference=ref)
+		url = await bot.get_proxy_url(user)
+		m = await bot.send_as_webhook(message.channel, msg, files=files, username=user.display_name, avatar_url=url, reference=ref)
 		regex = regexp(r"(?:^|^[^<\\`]|[^<][^\\`]|.[^a\\`\[])(:[A-Za-z0-9\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>\]`])")
 		if recursive and regex.search(m.content):
 			m = await m.edit(content=msg)
@@ -773,6 +777,8 @@ class UpdateMimics(Database):
 		if user.id not in self.data:
 			return
 		bot = self.bot
+		if bot.is_optout(user):
+			return
 		perm = bot.get_perms(user.id, guild)
 		if perm < 1:
 			return

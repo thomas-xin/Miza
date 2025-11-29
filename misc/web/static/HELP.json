@@ -2665,10 +2665,18 @@
 			"timeout": "1200"
 		},
 		"Profile": {
-			"aliases": ["Profile", "User", "UserProfile"],
+			"aliases": ["Profile", "User", "UserProfile", "OptOut", "OptIn"],
 			"description": "Shows or edits a user profile on Miza.",
 			"example": [],
 			"level": "0",
+			"macros": {
+				"OptIn": {
+					"optout": false
+				},
+				"OptOut": {
+					"optout": true
+				}
+			},
 			"rate_limit": "(4, 6)",
 			"schema": {
 				"birthday": {
@@ -2686,10 +2694,9 @@
 					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
 					"type": "visual"
 				},
-				"pronouns": {
-					"description": "Optional field containing any text; will show above description when set",
-					"example": "he/she/they",
-					"type": "text"
+				"optout": {
+					"description": "Whether to opt-out of automated services, excluding moderation features",
+					"type": "bool"
 				},
 				"timezone": {
 					"description": "Timezone. Used in datetime calculations where applicable; supports both city/state names (e.g. \"London\") and abbreviations (e.g. \"AET\"). Daylight savings is automatically calculated for non-fixed timezones",
