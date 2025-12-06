@@ -5,7 +5,7 @@ if "common" not in globals():
 print = PRINT
 
 from bs4 import BeautifulSoup
-import hyperchoron
+from hyperchoron import encoder_mapping as hyperchoron_encoder_mapping
 import pyradios
 
 if BOT[0]:
@@ -2033,7 +2033,7 @@ class Hyperchoron(Command):
 		format=cdict(
 			type="enum",
 			validation=cdict(
-				enum=tuple(sorted(set(hyperchoron.encoder_mapping).difference("_"))),
+				enum=tuple(sorted(set(hyperchoron_encoder_mapping).difference("_"))),
 			),
 			default="nbs",
 		),

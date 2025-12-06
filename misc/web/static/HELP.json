@@ -470,12 +470,16 @@
 			"level": "0",
 			"rate_limit": "(12, 16)",
 			"schema": {
+				"history": {
+					"description": "Whether chat history is enabled",
+					"type": "bool"
+				},
 				"model": {
-					"description": "Determines which model tier to choose from; e.g. large includes top models such as GPT-4.1, Claude3.7-Sonnet and Magnum-v4, but incurs much higher costs",
+					"description": "Model size hint. Larger size increases intelligence, at the cost of higher quota usage",
 					"example": "small",
 					"type": "enum",
 					"validation": {
-						"enum": ["small", "medium", "large"]
+						"enum": ["auto", "small", "medium", "large"]
 					}
 				},
 				"prompt": {
@@ -489,54 +493,40 @@
 		},
 		"ChatConfig": {
 			"aliases": ["ChatConfig", "Personality", "ChangePersonality"],
-			"description": "Customises my personality and behaviours for ~ask and @mentions in the current channel. Note that with the increased complexity of the chatbot, a clear description of who the bot is should be provided.",
+			"description": "Customises my personality and behaviours for ~ask and @mentions in the current channel. Note that with the increased complexity of the chatbot, a clear description of who the bot is should be provided. If used in DMs, applies per-user settings that will override settings in servers, except tts and history.",
 			"example": [],
-			"level": "2",
+			"level": "0",
 			"rate_limit": "(18, 24)",
 			"schema": {
 				"apply_all": {
 					"default": false,
-					"description": "Whether to apply to all channels within the current server",
+					"description": "Whether to apply to all channels (only applicable in servers)",
 					"type": "bool"
-				},
-				"cutoff": {
-					"description": "Message ID cutoff (bot will not read messages before this point; enter -1 to disable conversation history), default 0",
-					"example": "201548633244565504",
-					"type": "integer",
-					"validation": "[-1, 18446744073709551616)"
 				},
 				"description": {
 					"description": "Personality description; enter \"DEFAULT\" to reset",
 					"example": "Your name is Miza, you are dry, sarcastic and snarky. Be creative with your responses and attempt to annoy the user.",
 					"type": "string"
 				},
-				"frequency_penalty": {
-					"description": "Amount to discourage repeating words, default 0",
-					"example": "0.7",
-					"type": "number",
-					"validation": "[-1, 2]"
+				"history": {
+					"description": "Whether chat history is enabled, and if so, whether the conversation is shared (including messages from different users)",
+					"type": "enum",
+					"validation": {
+						"enum": ["none", "private", "shared"]
+					}
 				},
-				"shared": {
-					"description": "Whether conversation histories should include other users, default false",
-					"example": "true",
-					"type": "bool"
+				"model": {
+					"description": "Model size hint. Larger size increases intelligence, at the cost of higher quota usage",
+					"example": "small",
+					"type": "enum",
+					"validation": {
+						"enum": ["auto", "small", "medium", "large"]
+					}
 				},
 				"stream": {
 					"description": "Determines whether the response should be edited, or delayed until complete, default true",
 					"example": "false",
 					"type": "bool"
-				},
-				"temperature": {
-					"description": "Alignment vs diversity; lower values give more correct but boring answers, default 1",
-					"example": "0.8",
-					"type": "number",
-					"validation": "[0, 3]"
-				},
-				"top_p": {
-					"description": "Percentage of weighted choices considered, default 1",
-					"example": "0.9",
-					"type": "number",
-					"validation": "[0, 1]"
 				},
 				"tts": {
 					"description": "Whether the output should trigger Discord TTS. Incompatible with streamed editing, default false",

@@ -304,11 +304,13 @@ async def interaction_patch(bot, message, content=None, embed=None, embeds=(), a
 
 channel_repr = lambda s: as_str(s) if not isinstance(s, discord.abc.GuildChannel) else str(s)
 def get_guild_id(channel):
+	if hasattr(channel, "mutual_guilds"):
+		return channel.id
 	guild = getattr(channel, "guild", None)
 	if not guild:
 		guild = getattr(channel, "recipient", None)
 		if not guild:
-			raise RuntimeError("Channel guild or recipient not loaded.")
+			raise RuntimeError(f"Channel guild or recipient not loaded: {channel}")
 	return guild.id
 
 

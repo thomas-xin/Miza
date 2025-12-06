@@ -1526,10 +1526,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if hasattr(user, "permissions_in"):
 			try:
 				return user.permissions_in(obj)
-			except Exception:
+			except (AttributeError, discord.errors.ClientException):
 				try:
 					return obj.permissions_in(guild)
-				except discord.errors.ClientException:
+				except (AttributeError, discord.errors.ClientException):
 					pass
 		if hasattr(obj, "recipient") or hasattr(obj, "dm_channel"):
 			return discord.Permissions(2147483647)
@@ -1662,7 +1662,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						case "emoji":
 							for e in m.embeds:
 								for attr in ("video", "image", "thumbnail"):
-									url = getattr(e, attr, None)
+									url = getattr_chain(e, f"{attr}.url", None)
 									if url:
 										found.append(url)
 							found.extend(find_emojis_ex(m.content))
@@ -1961,21 +1961,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			models.extend((
 				"grok-4.1-fast",
 			))
-		if model:
-			if model in models:
-				models.remove(model)
-			models.insert(0, model)
+		if model in models:
+			models.remove(model)
+		models.insert(0, model)
 		model = models[0]
 		fut = csubmit(self.caption_into(kwargs["messages"], model=model, premium_context=kwargs.get("premium_context", [])))
-		if is_nsfw is None:
-			mod1 = json_dumps(kwargs.get("tools"))
-			mod2 = kwargs.get("messages")
-			pc = kwargs.get("premium_context", [])
-			futs = [ai.moderate(mod1, premium_context=pc), ai.moderate(mod2, premium_context=pc)]
-			r1, r2 = await gather(*futs)
-			is_nsfw = nsfw_flagged(r1) or nsfw_flagged(r2)
-		if is_nsfw:
-			models = reversed(models)
+		# if is_nsfw is None:
+		# 	mod1 = json_dumps(kwargs.get("tools"))
+		# 	mod2 = kwargs.get("messages")
+		# 	pc = kwargs.get("premium_context", [])
+		# 	futs = [ai.moderate(mod1, premium_context=pc), ai.moderate(mod2, premium_context=pc)]
+		# 	r1, r2 = await gather(*futs)
+		# 	is_nsfw = nsfw_flagged(r1) or nsfw_flagged(r2)
+		# if is_nsfw:
+		# 	models = reversed(models)
 		kwargs["messages"], _model = await fut
 		exc = None
 		for model in models:
@@ -2008,9 +2007,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return resp
 		raise (exc or RuntimeError("Unknown error occured."))
 
-	async def force_completion(self, model, prompt, stream=True, max_tokens=1024, strip=True, **kwargs):
+	async def force_completion(self, model, prompt=None, stream=True, max_tokens=1024, strip=True, **kwargs):
 		ctx = ai.contexts.get(model, 4096)
-		if model in ai.is_completion:
+		if prompt and model in ai.is_completion:
 			count = await tcount(prompt, model="llamav2")
 			max_tokens = min(max_tokens, ctx - count - 64)
 			if "max_completion_tokens" not in kwargs:
@@ -2028,7 +2027,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					yield s
 				return
 			return CloseableAsyncIterator(_completion(resp, strip), resp.close)
-		messages = [cdict(role="user", content=prompt)]
+		messages = kwargs.pop("messages", None) or [cdict(role="user", content=prompt)]
 		count = await count_to(messages)
 		max_tokens = min(max_tokens, ctx - count - 64)
 		if "max_completion_tokens" not in kwargs:
@@ -2056,7 +2055,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				yield s
 		return CloseableAsyncIterator(_completion(resp, strip), resp.close)
 
-	async def force_chat(self, model, messages, text=None, assistant_name=None, stream=False, max_tokens=1024, vision_model=None, **kwargs):
+	async def force_chat(self, model, messages, text=None, assistant_name=None, stream=False, max_tokens=1024, vision_model=None, allow_preliminary_thinking=True, **kwargs):
 		ctx = ai.contexts.get(model, 4096)
 		messages, vision_model = await self.caption_into(messages, model=model, backup_model=vision_model, premium_context=kwargs.get("premium_context", []))
 		if vision_model not in is_completion:
@@ -2064,6 +2063,46 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			max_tokens = min(max_tokens, ctx - count - 64)
 			if "max_completion_tokens" not in kwargs:
 				kwargs["max_tokens"] = max_tokens
+			# if allow_preliminary_thinking and isinstance(messages[-1].content, str):
+			# 	premium_context = kwargs.get("premium_context")
+			# 	try:
+			# 		resp = await self.force_completion(
+			# 			model=None,
+			# 			prompt=None,
+			# 			messages=[ai.unimage(m) for m in messages],
+			# 			temperature=1,
+			# 			reasoning_effort="medium",
+			# 			max_tokens=4096,
+			# 			timeout=360,
+			# 			premium_context=premium_context,
+			# 			user=kwargs.get("user"),
+			# 			allow_alt=True,
+			# 		)
+			# 		content = ""
+			# 		async for m in resp:
+			# 			content += m
+			# 	except Exception:
+			# 		print_exc()
+			# 	else:
+			# 		reasoning, *content = content.split("</think>", 1)
+			# 		reasoning = reasoning.strip()
+			# 		if reasoning and content:
+			# 			print("REASONING:", reasoning)
+			# 			messages = await ai.cut_to(
+			# 				messages,
+			# 				1024,
+			# 				384,
+			# 				best=True,
+			# 				premium_context=premium_context,
+			# 			)
+			# 			messages.append(cdict(
+			# 				role="assistant",
+			# 				name=assistant_name,
+			# 				content=f"<think>\n{reasoning}\n</think>",
+			# 			))
+			# 			kwargs["messages"] = messages
+			if vision_model in ai.is_reasoning:
+				kwargs["reasoning_effort"] = "low"
 			return await ai.llm("chat.completions.create", model=vision_model, messages=messages, stream=stream, **kwargs)
 		fmt = ai.instruct_formats.get(model, "chatml")
 		assistant_messages = [m for m in messages if m.get("content") and m.get("role") == "assistant"]
@@ -2082,8 +2121,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if text:
 			prompt += " " + text
 		kwargs["stop"] = list(set(tuple(kwargs.get("stop", ())) + tuple(stopn)))
-		if model in ai.is_reasoning:
-			kwargs["reasoning_effort"] = "low"
 		data = dict(
 			model=model,
 			prompt=prompt,
@@ -2298,12 +2335,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	model_levels = {
 		0: cdict(
-			instructive="gpt-5-mini",
-			casual="gemini-2.5-flash",
-			nsfw="grok-4.1-fast",
+			instructive=None,
+			casual=None,
+			nsfw=None,
 			backup="deepseek-v3",
-			retry="gpt-oss-120b",
-			function="gpt-5-nano",
+			retry="gpt-5-mini",
+			function=None,
 			vision="mistral-24b",
 			target="auto",
 		),
@@ -2313,7 +2350,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			nsfw="grok-4.1-fast",
 			backup="gemini-2.5-flash-t",
 			retry="claude-4.5-haiku",
-			function="grok-4.1-fast",
+			function=None,
 			vision="qwen3-235b",
 			target="auto",
 		),
@@ -2323,7 +2360,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			nsfw="grok-4",
 			backup="gpt-5.1",
 			retry="claude-4.5-sonnet",
-			function="grok-4.1-fast",
+			function=None,
 			vision="gpt-5.1",
 			target="auto",
 		),
@@ -2339,17 +2376,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		prompt = [m.content for m in messages if m.get("role") == "user"][-1]
 		if modlvl >= 2:
 			maxlim = 196608
-			minlim = 2800
+			minlim = 1600
 			snip = 800
 			best = 2
 		elif modlvl >= 1:
 			maxlim = 98304
-			minlim = 1200
+			minlim = 800
 			snip = 320
 			best = 1
 		else:
 			maxlim = 3000
-			minlim = 600
+			minlim = 500
 			snip = 240
 			best = 0
 		messages = await ai.cut_to(messages, maxlim, minlim, best=best, prompt=prompt, premium_context=premium_context)
@@ -2373,7 +2410,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return r
 			return "user"
 		raws = [cdict(role=force_ua(m.get("role")), content=m.content) for m in messages]
-		snippet = await ai.cut_to(raws, snip, snip, best=False, simple=True)
+		snippet = await ai.cut_to(raws, snip, snip, best=False)
 		sniplen = await count_to(snippet)
 		text = ""
 		ustr = str(hash(str(user) or self.user.name))
@@ -2400,7 +2437,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						if tc not in temp:
 							temp.append(tc)
 				toolscan = temp
-			if modelist.instructive != modelist.casual:
+			if toolscan or modelist.instructive != modelist.casual:
 				users = 0
 				toolcheck = []
 				for m in reversed(snippet):
@@ -2411,7 +2448,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							break
 				toolcheck.append(messages[0])
 				toolcheck.reverse()
-				vision_alt = modelist.vision if modelist.function not in ai.is_vision and modelist.vision in ai.is_function else modelist.function
+				vision_alt = "grok-4.1-fast" if modelist.function not in ai.is_vision and modelist.vision in ai.is_function else modelist.function
 				toolcheck, toolmodel = await self.caption_into(toolcheck, model=modelist.function, backup_model=vision_alt, premium_context=premium_context)
 				mode = None
 				label = "instructive"
@@ -2438,7 +2475,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				except Exception:
 					print_exc()
 					message = None
-				print("SCAN:", cargs, message)
+				print("SCAN:", cargs, toolmodel, message)
 		if message:
 			directly_answer = True
 			for tc in tuple(message.tool_calls or ()):
@@ -2511,7 +2548,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				tools = toolscan
 			else:
 				tools = tools or None
-			cargs["tools"] = tools
+			cargs["tools"] = tools if len(messages) > 2 else None
 		if is_nsfw:
 			print(mod, allow_nsfw)
 			if allow_nsfw:
@@ -7784,7 +7821,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					self.data.dailies.progress_quests(user, "invite")
 			emb.description += (
 				f"!\n-My default prefix is `{self.prefix}`, which can be changed as desired on a per-server basis. Mentioning me also serves as an alias for all prefixes.\n"
-				+ (f"- As this appears to be a large server, all except the most basic commands will automatically be disabled for non-bot channels. Please view the `{self.prefix}enabled` command for specifics.\n" if len(guild._members) > 100 else "")
+				+ (f"- As this appears to be a large server, all except the most basic commands will automatically be disabled for non-bot channels. Please view the `{self.prefix}ec` command for specifics.\n" if guild.member_count > 100 else "")
 				+ f"- For more information, use the `{self.prefix}help` command, "
 				+ (f"I have a website at {self.webserver}, " if self.webserver else "")
 				+ f"and my source code is available at {self.github} for those who are interested.\n"

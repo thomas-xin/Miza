@@ -694,7 +694,7 @@ async def count_to(messages, model="cl100k_im"):
 	"""Return the number of tokens used by a list of messages."""
 	return await asubmit(_count_to, messages, model, priority=2)
 
-async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=False, simple=False, prompt=None, premium_context=[]):
+async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=False, prompt=None, premium_context=[]):
 	if not messages:
 		return messages
 	messages = list(messages)
@@ -804,7 +804,7 @@ async def _summarise(s, max_length, best=False, prompt=None, premium_context=[])
 				return resp
 	return lim_tokens(s, round_random(max_length * 2 / 3))
 
-async def llm(func, *args, api="openai", timeout=120, premium_context=None, require_message=True, allow_alt=True, **kwargs):
+async def llm(func, *args, api=None, timeout=120, premium_context=None, require_message=True, allow_alt=True, **kwargs):
 	if isinstance(api, str) or not api:
 		# await ensure_models()
 		if "model" in kwargs:
@@ -818,6 +818,8 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 	tries = tuple(apis.items())
 	kwa = kwargs
 	for i, (api, minfo) in enumerate(tries + tries):
+		if api is None and minfo is None:
+			api = summarisation_model
 		if api is None:
 			if not allow_alt:
 				break
@@ -1049,8 +1051,7 @@ async def llm(func, *args, api="openai", timeout=120, premium_context=None, requ
 	raise (exc or RuntimeError("Unknown error occured."))
 
 async def instruct(data, prune=True, cache=True, user=None):
-	data["prompt"] = data.get("prompt") or data.pop("inputs", None) or data.pop("input", None)
-	key = shash(str((data["prompt"], data.get("model", "kimi-k2-t"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
+	key = shash(str((data.get("prompt") or data.get("messages"), data.get("model", "kimi-k2-t"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
 	if cache:
 		return await CACHE.aretrieve(key, _instruct, data, prune=prune, user=user)
 	return await CACHE._aretrieve(key, _instruct, data, prune=prune, user=user)
@@ -1058,7 +1059,7 @@ async def instruct(data, prune=True, cache=True, user=None):
 async def _instruct(data, user=None, prune=True):
 	inputs = dict(
 		temperature=0.75,
-		max_tokens=256,
+		max_tokens=4096,
 		top_p=0.999,
 		frequency_penalty=0,
 		presence_penalty=0,
@@ -1079,8 +1080,9 @@ async def _instruct(data, user=None, prune=True):
 		if not inputs.get("reasoning_effort"):
 			inputs["reasoning_effort"] = "minimal" if model in is_reasoning else "low"
 	if inputs["model"] not in is_completion:
-		prompt = inputs.pop("prompt")
-		inputs["messages"] = [cdict(role="user", content=prompt)]
+		if "messages" not in inputs:
+			prompt = inputs.pop("prompt")
+			inputs["messages"] = [cdict(role="user", content=prompt)]
 		async with asyncio.timeout(70):
 			response = await llm("chat.completions.create", **inputs, timeout=60)
 		resp = response.choices[0].message.content
@@ -1613,6 +1615,14 @@ def to_claude(messages, tools=None):
 	if outs and isinstance(outs[-1].content, list) and any(c.get("type") == "image" for c in outs[-1].content):
 		print("IM:", lim_str(outs[-1], 1024))
 	return system, outs
+
+def unimage(message):
+	if isinstance(message.content, str):
+		return message
+	content = "\n\n".join(line["text"] for line in message.content if line["type"] == "text")
+	m = cdict(message)
+	m.content = content
+	return m
 
 def untool(message):
 	content = message.content or ""
