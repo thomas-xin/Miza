@@ -2079,64 +2079,6 @@ class Hyperchoron(Command):
 		)
 
 
-class AudioSeparator(Command):
-	name = ["Extract", "Separate"]
-	description = "Runs Audio-Separator on the input URL. See https://github.com/nomadkaraoke/python-audio-separator for more info, or to run it yourself!"
-	schema = cdict(
-		url=cdict(
-			type="audio",
-			description="Audio supplied by URL or attachment",
-			example="https://cocobeanzies.mizabot.xyz/music/rainbow-critter.webm",
-			aliases=["a"],
-			required=True,
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=("ogg", "opus", "mp3"),
-			),
-			description="The file format or codec of the output",
-			example="mp3",
-			default="opus",
-		),
-	)
-	rate_limit = (20, 40)
-	_timeout_ = 3.5
-
-	async def __call__(self, bot, _channel, _message, url, format, **void):
-		fut = csubmit(send_with_reply(
-			_channel,
-			reference=_message,
-			content=italics(ini_md(f"Downloading and converting {sqr_md(url)}...")),
-		))
-		fn = await attachment_cache.download(url, filename=True)
-		args = ["audio-separator", os.path.abspath(fn), "--output_format", format]
-		proc = await asyncio.create_subprocess_exec(*args, cwd=TEMP_PATH)
-		try:
-			async with asyncio.timeout(3200):
-				await proc.wait()
-		except (T0, T1, T2):
-			with tracebacksuppressor:
-				force_kill(proc)
-			raise
-		outputs = []
-		tmpl = fn.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-		# The cache is littered with arbitrary files, but we can rely on bot.get_file's filename to contain a unique identifier which will always carry over to the output files
-		for f2 in os.listdir(TEMP_PATH):
-			if f2.startswith(tmpl) and f2.endswith(format):
-				outputs.append(f2)
-		if not outputs:
-			raise ValueError("No output files found.")
-		files = [CompatFile(f"{TEMP_PATH}/{f2}", filename=f2.removeprefix(tmpl).lstrip(" _")) for f2 in outputs]
-		response = await fut
-		response = await self.bot.edit_message(
-			response,
-			content=italics(ini_md("Uploading output...")),
-		)
-		await send_with_reply(_channel, _message, files=files)
-		await bot.autodelete(response)
-
-
 class UpdateAudio(Database):
 	name = "audio"
 	no_file = True

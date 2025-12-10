@@ -1,13 +1,13 @@
 import asyncio
 import base64
-import orjson
-import re
-import openai
-import numpy as np
 from collections import deque
 from math import ceil, inf
+import orjson
+import re
 from traceback import format_exc, print_exc
 from mpmath import mpf
+import numpy as np
+import openai
 from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, tracebacksuppressor, utc, T, string_like, getattr_chain
 from misc.util import AUTH, CACHE_PATH, AutoCache, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across
 from misc.asyncs import asubmit, csubmit, emptyctx, gather, Semaphore, CloseableAsyncIterator
@@ -340,15 +340,10 @@ is_premium = {
 instruct_formats = {
 	"reflection-llama-3-70b": "llamav3",
 	"euryale-70b": "llamav3",
-	"lzlv-70b": "vicuna",
 	"skyfall-36b": "mistral",
 	"mistral-24b": "mistral",
 	"miquliz-120b": "mistral",
 	"goliath-120b": "alpaca",
-	"command-r": "cohere",
-	"command-r-plus": "cohere",
-	"command-r-plus-08-2024": "cohere",
-	"command-r-plus-h6t2": "cohere",
 	"magnum-72b": "chatml",
 	"qwen-72b": "chatml",
 	"dbrx-instruct": "chatml",
@@ -523,17 +518,8 @@ def m_str(m, include_role=True):
 		return "user: " + content
 	return m.name + ": " + content
 
-def im_sep(mode="im"):
-	if mode == "im":
-		start = "<|im_start|>"
-		end = "<|im_end|>"
-	else:
-		start = "▀"
-		end = "▄"
-	return start, end
-
-def chatml(m, mode="im"):
-	s, e = im_sep(mode)
+def chatml(m):
+	s, e = "<|im_start|>", "<|im_end|>"
 	if not isinstance(m, cdict):
 		m = cdict(m)
 	content = str(getattr(m, "content", ""))
@@ -572,32 +558,6 @@ def llamav3(m):
 			return f"{s}{role}<|end_header_id|>\n" + content + e
 	return f"{s}{role} name={name}<|end_header_id|>\n" + content + e
 
-def cohere(m):
-	if not isinstance(m, cdict):
-		m = cdict(m)
-	content = str(getattr(m, "content", ""))
-	if not content or not content.strip():
-		temp = deque()
-		for fc in m.get("tool_calls", ()):
-			temp.append(fc.function.name + " " + as_str(fc.function.arguments))
-		content = "\n".join(temp)
-	name, role = getattr(m, "name", None), (getattr(m, "role", None) or "user")
-	if role == "tool":
-		return "<results>\n" + f"Document: 1\ntitle: {m.get('name', 'tool')}\ntext: {m['content']}" + "\n</results>"
-	if role == "system":
-		return f"<|START_OF_TURN_TOKEN|><|SYSTEM_TOKEN|>\n{content}<|END_OF_TURN_TOKEN|>"
-	if role == "user":
-		s, e = "<|START_OF_TURN_TOKEN|><|USER_TOKEN|>", "<|END_OF_TURN_TOKEN|>"
-	else:
-		s, e = "<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>", "<|END_OF_TURN_TOKEN|>"
-	if not name or role != "user":
-		if content.startswith("name=") and "\n" in content:
-			name, content = content.split("\n", 1)
-			name = name.removeprefix("name=").strip()
-		else:
-			return f"{s}\n" + content + e
-	return f"{s}name={name}\n\n" + content + e
-
 def mistral(m):
 	if not isinstance(m, cdict):
 		m = cdict(m)
@@ -621,30 +581,6 @@ def mistral(m):
 		else:
 			return f"{s}{role}\n" + content + e
 	return f"{s}{role} name={name}\n\n" + content + e
-
-def vicuna(m):
-	if not isinstance(m, cdict):
-		m = cdict(m)
-	content = str(getattr(m, "content", ""))
-	if not content or not content.strip():
-		temp = deque()
-		for fc in m.get("tool_calls", ()):
-			temp.append(fc.function.name + " " + as_str(fc.function.arguments))
-		content = "\n".join(temp)
-	name, role = getattr(m, "name", None), (getattr(m, "role", None) or "user")
-	if role == "system":
-		return content.strip() + "\n"
-	elif role == "assistant":
-		s, e = "### ", "</s>"
-	else:
-		s, e = "### ", ""
-	if not name or role != "user":
-		if content.startswith("name=") and "\n" in content:
-			name, content = content.split("\n", 1)
-			name = name.removeprefix("name=").strip()
-		else:
-			return f"{s}{role}: " + content + e
-	return f"{s}{role} name={name}: " + content + e
 
 def m_name(m):
 	if not m.get("name"):
@@ -792,7 +728,7 @@ async def _summarise(s, max_length, best=False, prompt=None, premium_context=[])
 			if prompt:
 				s2 += "\n\n" + prompt
 			if prompt:
-				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above, and make sure to include all information relevant to the following question if available:\n\n"""\n{prompt}\n"""\n\nWrite only the summary, not an answer or acknowledgement.'
+				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above, and make sure to include all information relevant to the following question if available:\n\n"""\n{prompt}\n"""\n\nWrite only the summary, and do not produce an answer if there is none.'
 			else:
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above!'
 			ml = round_random(max_length)
@@ -1337,285 +1273,6 @@ TINFO = {
 	"calculator": "Use plain text when writing mathematical equations or formulas.",
 }
 
-
-def construct_format_parameters_prompt(parameters):
-	constructed_prompt = "\n".join(f"<parameter>\n<name>{parameter['name']}</name>\n<type>{parameter['type']}</type>\n<description>{parameter['description']}</description>\n</parameter>" for parameter in parameters)
-	return constructed_prompt
-
-def construct_format_tool_for_claude_prompt(name, description, parameters):
-	constructed_prompt = (
-		"<tool_description>\n"
-		f"<tool_name>{name}</tool_name>\n"
-		+ ("<description>\n"
-		f"{description}\n"
-		"</description>\n" if description else "")
-		+ "<parameters>\n"
-		f"{construct_format_parameters_prompt(parameters)}\n"
-		"</parameters>\n"
-		"</tool_description>"
-	)
-	return constructed_prompt
-
-def to_claude_function(tool):
-	function = tool["function"]
-	params = [dict(name=k, type=p["type"], description=p.get("description", "")) for k, p in function["parameters"]["properties"].items()]
-	return construct_format_tool_for_claude_prompt(function["name"], function["description"], params)
-
-def construct_tool_use_system_prompt(tools):
-	return (
-		"You have access to a set of tools you can use to answer the user's question. If relevant, please use them before answering, to ensure correcness of your responses!\n"
-		"\n"
-		"Please call them like this:\n"
-		"<function_calls>\n"
-		"<invoke>\n"
-		"<tool_name>$TOOL_NAME</tool_name>\n"
-		"<parameters>\n"
-		"<$PARAMETER_NAME>$PARAMETER_VALUE</$PARAMETER_NAME>\n"
-		"...\n"
-		"</parameters>\n"
-		"</invoke>\n"
-		"</function_calls>\n"
-		"\n"
-		"Example:\n"
-		"<invoke>\n"
-		"<tool_name>browse</tool_name>\n"
-		"<parameters>\n"
-		"<query>Who is Elon Musk?</query>\n"
-		"</parameters>\n"
-		"</invoke>\n"
-		"\n"
-		"Currently available tools:\n"
-		"<tools>\n"
-		+ '\n'.join([to_claude_function(tool) for tool in tools]) +
-		"\n</tools>"
-	)
-
-def to_claude_tool(tool):
-	function = tool["function"]
-	return cdict(
-		name=function["name"],
-		description=function["description"],
-		input_schema=cdict(function["parameters"]),
-	)
-
-def extract_between_tags(tag: str, string: str, strip: bool = True, capture: bool = True) -> list[str]:
-	reg = f"<{tag}>(.+?)</{tag}>" if capture else f"<{tag}>.+?</{tag}>"
-	ext_list = re.findall(reg, string, re.DOTALL)
-	if strip:
-		ext_list = [e.strip() for e in ext_list]
-	return ext_list
-
-def from_claude(message, messages=None, allowed_tools=None):
-	content = message.content
-	if isinstance(content, list):
-		message.content = "\n".join(c["text"] for c in content if c and c.get("type") == "text").strip().replace("</thinking>", "*").replace("<thinking>", "*")
-		message.tool_calls = tc = []
-		for c in content:
-			if c and c.get("type") == "tool_use":
-				tc.append(cdict(
-					index=len(tc),
-					id=c.get("id", 0),
-					type="function",
-					function=cdict(
-						name=c.get("name"),
-						arguments=json_dumpstr(c.get("input")),
-					),
-				))
-		return message
-	if isinstance(content, dict):
-		content = content.get("text") or ""
-	if not message.get("name") and content.startswith("name=") and "\n" in content:
-		name, content = content.split("\n", 1)
-		message.name = name.removeprefix("name=").strip()
-	if "<function_calls>" not in content and "<invoke>" not in content:
-		if "### Response:" in content:
-			content = content.rsplit("### Response:", 1)[-1]
-		for kw in ("final", "rewrite", "revision", "draft_revision", "draft-revision", "result", "draft"):
-			if f"<{kw}>" in content and f"</{kw}>" in content:
-				content = "\n\n".join(extract_between_tags(kw, content)) + "\n\n" + content.rsplit(f"</{kw}>", 1)[-1].lstrip()
-				break
-		if messages and "<search_quality_reflection>" in content and "</search_quality_reflection>" in content:
-			reflection = "\n\n".join(extract_between_tags("search_quality_reflection", content))
-			content = content.split("</search_quality_reflection>", 1)[-1]
-			if "</search_quality_score>" in content:
-				content = content.split("</search_quality_score>", 1)[-1]
-			for m in reversed(messages):
-				if m.role == "tool":
-					content += m.content
-					break
-			content += "\n\n" + reflection
-		message.content = content.strip()
-		return message
-	if "<function_calls>" in content:
-		content, calls = content.rsplit("<function_calls>", 1)
-	else:
-		content, calls = content.rsplit("<invoke>", 1)
-		calls = "<invoke>" + calls
-		if "</invoke>" in calls:
-			calls, cont2 = calls.rsplit("</invoke>", 1)
-			if cont2.strip():
-				content = content.strip() + "\n\n" + cont2.strip()
-			calls += "</invoke>"
-	if "### Response:" in content:
-		content = content.rsplit("### Response:", 1)[-1]
-	for kw in ("final", "rewrite", "revision", "draft_revision", "draft-revision", "result"):
-		if f"<{kw}>" in content and f"</{kw}>" in content:
-			content = "\n\n".join(extract_between_tags(kw, content))
-			break
-	message.content = content.strip()
-	invokes = extract_between_tags("invoke", calls)
-	if not invokes:
-		return message
-	message.tool_calls = tc = []
-	for i, call in enumerate(invokes):
-		name = extract_between_tags("tool_name", call)[0]
-		function = None
-		if allowed_tools:
-			matches = [f for f in allowed_tools if f["function"]["name"] == name]
-			if matches:
-				function = matches[0]["function"]
-		params = ()
-		if "<parameters>" in call:
-			params = extract_between_tags("parameters", call)[0]
-		elif "<parameter>" in call:
-			params = "".join(extract_between_tags("parameter", call))
-		if params:
-			args = extract_between_tags(r"\w+", params, capture=False)
-			kwargs = {}
-			for a in args:
-				k = a.split(">", 1)[0].removeprefix("<").strip()
-				v = a.split(">", 1)[-1].rsplit("</", 1)[0].strip()
-				kwargs[k] = v
-		if ("description" in kwargs or "parameter" in kwargs or "value" in kwargs) and function:
-			properties = function["parameters"]["properties"]
-			props = set(properties).difference(kwargs)
-			if props:
-				kwargs[next(iter(props))] = kwargs.pop("description", "") or kwargs.pop("parameter", "") or kwargs.pop("value", "")
-		tc.append(cdict(
-			index=len(tc),
-			id=str(i),
-			type="function",
-			function=cdict(
-				name=name,
-				arguments=json_dumpstr(kwargs),
-			),
-		))
-	return message
-
-def to_claude(messages, tools=None):
-	system = ""
-	has_user = False
-	last_role = None
-	outs = []
-	ims = {}
-	for i, m in enumerate(messages):
-		m = cdict(m)
-		if i == len(messages) - 1 and m.role == "assistant":
-			m.role = "user"
-		if m.role == "system":
-			if system:
-				system += "\n\n"
-			system += m.content
-			continue
-		if m.role == "assistant" and not has_user:
-			continue
-		has_user = True
-		if m.role == "tool":
-			resp = f"""<function_results>
-<result>
-<tool_name>{m.name}</tool_name>
-<stdout>
-{m.content}
-</stdout>
-</result>
-</function_results>"""
-			if not outs:
-				outs.append(cdict(role="user", content=resp))
-			else:
-				outs[-1].content += "\n\n" + resp
-			continue
-		elif getattr(m, "tool_calls", None):
-			content = m.content or ""
-			if content and content[-1] != "\n":
-				content += "\n"
-			content += "<function_calls>\n"
-			for fc in m.pop("tool_calls"):
-				content += "<invoke>\n"
-				content += "<tool_name>" + fc.function.name + "</tool_name>\n"
-				if fc.function.arguments:
-					kwargs = orjson.loads(fc.function.arguments)
-					if kwargs:
-						content += "<parameters>\n"
-						content += "\n".join(f"<{k}>{v}</{k}>" for k, v in kwargs.items()) + "\n"
-						content += "</parameters>\n"
-				content += "</invoke>\n"
-			content += "</function_calls>"
-			m.content = content
-		m.pop("tool_call_id", None)
-		images = []
-		content = ""
-		if isinstance(m.content, list):
-			for c in m.content:
-				if c.get("type") == "text":
-					content += "\n" + c["text"]
-					continue
-				mime, data = c["image_url"]["url"].split(";base64,", 1)
-				image = cdict(
-					type="image",
-					source=cdict(
-						type="base64",
-						media_type=mime.removeprefix("data:"),
-						data=data,
-					),
-				)
-				images.append(image)
-		else:
-			content = m.content
-		content = (content or "").strip()
-		if m.get("name"):
-			if m.get("role") == "user":
-				content = "name=" + m.pop("name") + "\n\n" + content
-			else:
-				m.pop("name", None)
-		if images and m.get("role") == "user":
-			while len(ims) + len(images) > 20:
-				k = next(iter(ims))
-				im2 = ims.pop(k)
-				for im in im2:
-					messages[k].content.remove(im)
-			ims[i] = images
-			images.append(cdict(type="text", text=content))
-			content = images
-		if not outs or m.role != last_role:
-			if not content:
-				continue
-			m.content = content
-			outs.append(m)
-			last_role = m.role
-			continue
-		if isinstance(outs[-1].content, list):
-			if isinstance(content, list):
-				outs[-1].content.extend(content)
-			else:
-				for c in outs[-1].content:
-					if c.get("type") == "text":
-						c["text"] += "\n\n" + content
-						break
-		elif isinstance(content, list):
-			for c in content:
-				if c.get("type") == "text":
-					c["text"] = outs[-1].content + "\n\n" + c["text"]
-					break
-		else:
-			outs[-1].content += "\n\n" + content
-	if tools:
-		if system:
-			system += "\n\n"
-		system += construct_tool_use_system_prompt(tools)
-	if outs and isinstance(outs[-1].content, list) and any(c.get("type") == "image" for c in outs[-1].content):
-		print("IM:", lim_str(outs[-1], 1024))
-	return system, outs
-
 def unimage(message):
 	if isinstance(message.content, str):
 		return message
@@ -1766,7 +1423,7 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 			elif isinstance(self.input, tuple):
 				ii = await count_to(self.input[0])
 				if self.input[1]:
-					ti = await tcount(construct_tool_use_system_prompt(self.input[1]))
+					ti = await tcount(str(self.input[1]))
 				else:
 					ti = 0
 				self.tokens[0] = ii + ti
@@ -1858,21 +1515,6 @@ def instruct_structure(messages, exclude_first=True, fmt="alpaca", assistant=Non
 		stops = ["<|im_start|>", "<|im_end|>"]
 		prompt = "\n".join(ins) + "\n<|im_start|>assistant"
 		prompt += "\n"
-	elif fmt == "cohere":
-		ins = tuple(map(cohere, messages))
-		stops = ["<|START_OF_TURN_TOKEN|>", "<|END_OF_TURN_TOKEN|>", "<EOS_TOKEN>"]
-		prompt = "<BOS_TOKEN>" + "\n".join(ins) + "\n<|START_OF_TURN_TOKEN|><|CHATBOT_TOKEN|>"
-		prompt += "\n"
-	elif fmt == "blockml":
-		ins = [chatml(m, "cc") for m in messages]
-		stops = im_sep("cc")
-		prompt = "\n".join(ins) + "\n" + stops[0] + "assistant"
-		prompt += "\n"
-	elif fmt == "vicuna":
-		ins = tuple(map(vicuna, messages))
-		stops = ["</s>", "### user", "### assistant"]
-		prompt = "<s>" + "\n".join(ins) + "\n### assistant"
-		prompt += ":"
 	elif fmt == "alpaca":
 		ins = tuple(map(m_str, messages))
 		stops = ["### Input:", "### Instruction:", "### Response:"]

@@ -800,86 +800,73 @@ def split_text(text, max_length=2000, priority=("\n\n", "\n", "\t", "? ", "! ", 
 		text = remaining_text
 	return chunks
 
-def apply_translator(s, t, reverse=False):
-	if reverse:
-		for k, v in t.items():
-			s = s.replace(v, k)
-		return s
-	for k, v in t.items():
-		s = s.replace(k, v)
-	return s
-
-smart_map = {
-	"'''": "\ufffd",
-	"```": "\ufffe",
-	'"""': "\uffff",
-}
-def smart_shlex(s):
-	t = shlex.shlex(s, posix=True)
-	t.whitespace_split = True
-	t.escape = "\\"
-	t.quotes = t.escapedquotes = "'\"`" + "".join(smart_map.values())
-	return t
+smart_re = r"""(?:^|\s)(["'`])(?:[^"'`]+)\1(?:$|\s)"""
+leftspace_re = r"^\s+"
+rightspace_re = r"\s+$"
 def smart_split(s, rws=False):
-	"""Splits a string using a smart tokenizer that respects quotes and escapes.
+	words, whites = [], []
 
-	This function implements a more sophisticated string splitting algorithm that handles:
-	- Quoted strings (both single and double quotes)
-	- Escaped characters
-	- Special characters and spaces
+	def process_token(token):
+		if not token:
+			return words.append(token)
+		if token[0] == token[-1]:
+			return words.append(token[1:-1])
+		spl = token.split()
+		for i, w in enumerate(spl):
+			words.append(w)
+			token = token[len(w):]
+			if i < len(spl) - 1:
+				wss = token.index(spl[i + 1])
+				whites.append(token[:wss])
+				token = token[wss:]
 
-	Args:
-		s (str): The input string to split
-		rws (bool, optional): If True, returns both tokens and whitespace. Defaults to False.
-
-	Returns:
-		Union[alist, Tuple[list, list]]: 
-			If rws=False: Returns an alist (array-list) of tokens
-			If rws=True: Returns a tuple of (tokens, whitespace), where whitespace contains
-			the separating whitespace between tokens including leading/trailing spaces
-
-	Examples:
-		>>> smart_split('hello "world with spaces"')
-		['hello', 'world with spaces']
-		>>> smart_split('cmd "quoted \\"nested\\" arg"') 
-		['cmd', 'quoted "nested" arg']
-		>>> smart_split('a b c', rws=True)
-		(['a', 'b', 'c'], [' ', ' ', ' ', ''])
-	"""
-	si = apply_translator(s, smart_map)
-	try:
-		t = smart_shlex(si)
-		out = deque()
-		while True:
-			try:
-				w = t.get_token()
-			except ValueError:
-				remainder = si[len(si) - len(t.token) - len(t.state):]
-				tup = remainder.split(None, 1)
-				out.append(tup[0])
-				if len(tup) == 1:
-					break
-				t = smart_shlex(tup[-1])
-				continue
-			if w is None or w == t.eof:
-				break
-			out.append(w)
-	except ValueError:
-		out = si.split()
-	out = [apply_translator(w, smart_map, reverse=True) for w in out]
-	if rws:
-		whites = []
-		for w in out:
-			if not w:
-				continue
-			if w not in s:
+	while s:
+		match = re.search(smart_re, s)
+		if not match:
+			match = re.search(leftspace_re, s)
+			if not match:
 				whites.append("")
-				continue
-			left, s = s.split(w, 1)
-			whites.append(left)
-		whites.append(s)
-		return out, whites
-	return alist(out)
+				process_token(s)
+				break
+			whites.append(match.group())
+			process_token(s[match.end():])
+			break
+		token = s[:match.start()]
+		sub = token.lstrip()
+		if len(sub) < len(token):
+			whites.append(token[:len(token) - len(sub)])
+			if sub:
+				process_token(sub)
+			else:
+				words.append("")
+		elif sub:
+			whites.append("")
+			process_token(sub)
+		grouped = match.group()
+		match2 = re.search(leftspace_re, grouped)
+		match3 = re.search(rightspace_re, grouped)
+		end = match.end()
+		if not match2:
+			whites.append("")
+			if not match3:
+				process_token(grouped)
+			else:
+				process_token(grouped[:match3.start()])
+				end -= len(match3.group())
+		else:
+			whites.append(match2.group())
+			if not match3:
+				process_token(grouped[match2.end():])
+			else:
+				process_token(grouped[match2.end():match3.start()])
+				end -= len(match3.group())
+		s = s[end:]
+		if s and not s.lstrip():
+			whites.append(s)
+			break
+	if rws:
+		return words, whites
+	return words
 
 @hashable_args
 @functools.lru_cache(maxsize=256)
@@ -3212,6 +3199,8 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 					pass
 			elif delay > self._stale:
 				esubmit(self._retrieve, k, func, *args, read=_read, **kwargs)
+			elif isinstance(v, Exception):
+				raise v
 		else:
 			return self._retrieve(k, func, *args, read=_read, **kwargs)
 		return v
@@ -3250,8 +3239,10 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 					v = await self._aretrieve(k, func, *args, read=_read, **kwargs)
 				except Exception:
 					pass
-			if delay > self._stale:
+			elif delay > self._stale:
 				csubmit(self._aretrieve(k, func, *args, read=_read, **kwargs))
+			elif isinstance(v, Exception):
+				raise v
 		else:
 			return await self._aretrieve(k, func, *args, read=_read, **kwargs)
 		return v

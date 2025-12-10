@@ -1589,7 +1589,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			async for message in discord.abc.Messageable.history(channel, limit=limit, before=before, after=after, oldest_first=False):
 				if message.id in found:
 					continue
-				self.data.deleted.cache.pop(message.id, None)
+				self.recently_deleted.pop(message.id, None)
 				self.hiscache.pop(c_id, None)
 				self.add_message(message, files=False, force=True)
 				found.add(message.id)
@@ -1665,7 +1665,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 									url = getattr_chain(e, f"{attr}.url", None)
 									if url:
 										found.append(url)
-							found.extend(find_emojis_ex(m.content))
+							emoji_tests = find_emojis_ex(m.content)
+							for i, u in enumerate(emoji_tests):
+								emoji_tests[i] = await fix_emoji_url(u)
+							found.extend(emoji_tests)
 							m = await self.ensure_reactions(m)
 							for r in m.reactions:
 								u = await self.emoji_to_url(r.emoji, guild=m.guild)
@@ -1725,7 +1728,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			urls = [url]
 		else:
 			urls = find_urls_ex(url)
-			urls.extend(find_emojis_ex(url))
+			emoji_tests = find_emojis_ex(url)
+			for i, u in enumerate(emoji_tests):
+				emoji_tests[i] = await fix_emoji_url(u)
+			urls.extend(emoji_tests)
 			if limit is not None:
 				urls = urls[:limit]
 
@@ -1854,7 +1860,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def emoji_to_url(self, e, guild=None):
 		if isinstance(e, str) and not e.isnumeric():
-			return find_emojis_ex(e)[0]
+			return await fix_emoji_url(find_emojis_ex(e)[0])
 		emoji = await self.resolve_emoji(e, guild=guild)
 		return emoji.url
 
@@ -2350,7 +2356,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			nsfw="grok-4.1-fast",
 			backup="gemini-2.5-flash-t",
 			retry="claude-4.5-haiku",
-			function=None,
+			function="grok-4.1-fast",
 			vision="qwen3-235b",
 			target="auto",
 		),
@@ -2360,7 +2366,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			nsfw="grok-4",
 			backup="gpt-5.1",
 			retry="claude-4.5-sonnet",
-			function=None,
+			function="grok-4.1-fast",
 			vision="gpt-5.1",
 			target="auto",
 		),
@@ -2958,6 +2964,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		users = find_users(url)
 		if follow:
 			emojis = find_emojis_ex(url)
+			for i, u in enumerate(emojis):
+				emojis[i] = await fix_emoji_url(u)
 		else:
 			emojis = find_emojis(url)
 		out = deque()
@@ -3518,10 +3526,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			m_id = int(message)
 		if "deleted" not in self.data:
 			return False
-		try:
-			return self.data.deleted.cache[m_id]
-		except KeyError:
-			return False
+		return m_id in self.recently_deleted
 
 	async def verify_integrity(self, message):
 		v = self.is_deleted(message)
@@ -3556,6 +3561,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if isinstance(m, int):
 				m = await self.fetch_message(m)
 			if not keep_log:
+				self.recently_deleted[m.id] = False
+			else:
 				self.recently_deleted[m.id] = True
 			try:
 				if dt - snowflake_time_2(m.id) >= 14 * 86400 - 60:
@@ -3579,6 +3586,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		for i in itertools.count(1):
 			try:
 				return await func(*args, **kwargs)
+			except discord.DiscordServerError:
+				await asyncio.sleep(1.5 ** i)
+				continue
 			except discord.HTTPException as ex:
 				if ex.status in (408, 420, 425, 429, 460, 502, 503, 504, 508, 509, 522, 524, 529, 599):
 					await asyncio.sleep(1.5 ** i)
@@ -5626,7 +5636,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 										if fut:
 											try:
 												await fut
-											except InterruptedError:
+											except (InterruptedError, discord.DiscordServerError, discord.HTTPException):
 												# If the StreamedMessage is interrupted, it is most likely from another user sending a new message. We block the current stream and buffer all other content until we have the full message.
 												blocked = True
 										try:
@@ -7321,7 +7331,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			fields = (("Running into the rate limit often?", f"Consider donating using one of the subscriptions from my [ko-fi]({self.kofi_url}), which will grant shorter rate limits amongst many feature improvements!"),)
 		elif isinstance(ex, discord.Forbidden):
 			fields = (("403", "This error usually indicates that I am missing one or more necessary Discord permissions to perform this command!"),)
-		elif isinstance(ex, (discord.HTTPException, ConnectionError)):
+		elif isinstance(ex, (discord.DiscordServerError, discord.HTTPException, ConnectionError)):
 			fields = ((lim_str(str(ex.args[0]).split(None, 1)[0], 1024), "This error usually indicates that the remote server (possibly Discord) is rejecting the response. Please double check your inputs, or try again later!"),)
 		elif isinstance(ex, (CE, CE2)):
 			fields = (("Response disconnected.", "If this error occurs during a command, it is likely due to maintenance!"),)
@@ -8065,8 +8075,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					await fut
 
 		async def _on_raw_message_delete(payload):
-			if "deleted" in self.data:
-				self.data.deleted.cache[payload.message_id] = max(1, self.is_deleted(payload.message_id))
 			try:
 				message = payload.cached_message
 				if not message:
@@ -8179,6 +8187,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				await self.send_event("_user_update_", before=before, after=after)
 			if before.id == self.deleted_user or after.id == self.deleted_user:
 				print("Deleted user USER_UPDATE", before, after, before.id, after.id)
+			self.cache.users[after.id] = after
 			await self.seen(after, event="misc", raw="Editing their profile")
 
 		# Member update event: calls _member_update_ and _seen_ bot database events.

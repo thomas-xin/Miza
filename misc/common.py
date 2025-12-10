@@ -1787,6 +1787,17 @@ def find_emojis_ex(s, cast_urls=True):
 		out.setdefault(i, e)
 	return [t[1] for t in sorted(out.items()) if t[1]]
 
+async def fix_emoji_url(url):
+	if url.endswith(".gif"):
+		try:
+			await attachment_cache.scan_headers(url)
+		except ConnectionError as ex:
+			if ex.errno != 415:
+				raise
+			attachment_cache.tertiary[unyt(url)] = ex
+			return url.replace(".gif", ".webp?animated=true")
+	return url
+
 HEARTS = ["❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
 
 class SimulatedEmoji(cdict):

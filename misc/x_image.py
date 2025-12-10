@@ -1418,7 +1418,7 @@ def rainbow_map(images, mode, progress=0, **kwargs):
 @sync_animations
 def pet_map(images, squeeze, progress=0, **kwargs):
 	image = images[0]
-	pet = get_image("https://api.mizabot.xyz/u/2omMy8VUGJ5GOH3AIJxw3wJ5yQrU/EBjYrqCEUDw.zip", cache=True)
+	pet = get_image("https://api.mizabot.xyz/u/2omMy8VUGJ5GOH3AIJxw3wJ5yQrU/EBjYrqCEUDw.zip")
 	w, h = image.width * 2.5, image.height * 2.5
 	if w < 256 and h < 256:
 		w, h = max_size(w, h, 256, force=True)

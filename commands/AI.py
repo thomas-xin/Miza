@@ -505,7 +505,7 @@ class Ask(Command):
 			if not nsfw:
 				tips.append("*Tip: I automatically try to correct inaccurate responses when possible. However, this is not foolproof; if you would like this feature more actively applied to counteract censorship, please move to a NSFW channel or use ~verify if in DMs.*")
 			if pdata.history != "shared":
-				tips.append("*Tip: For privacy reasons, conversation histories (allowing referencing previous messages in the same channel) is disabled by default. If you would like to enable this, use `~chatconfig --cutoff 0`, followed by `~personality --shared` if you would also like the bot to be able to read multi-user conversations. This enables me to read up to 192 previous messages from the current channel. No messages from other channels are included.*")
+				tips.append("*Tip: For privacy reasons, conversation histories (allowing referencing previous messages in the same channel) is disabled by default. If you would like to enable this, use `~chatconfig --history private`, or `~chatconfig --history shared` if you would also like the bot to be able to read multi-user conversations. This enables me to read up to 192 previous messages from the current channel. No messages from other channels are included.*")
 			note = "-# " + choice(tips)
 			response.content += "\n" + note
 			print(">", note)
@@ -527,7 +527,7 @@ class Ask(Command):
 		return await message.remove_reaction("🗑️", self.bot.user)
 
 
-DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome, but not too corny), in first person as if you were a human. You are free to make up your own preferences and show emotion, but you should always match the language used (e.g. English). If a user inquires for additional services not accessible through tools, you should direct them to the ~help or /help commands rather than mimic outputs, if you suspect they may involve side effects. Be concise where possible."
+DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the last question from the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome, but not too corny), in first person as if you were a human. You are free to make up your own preferences and show emotion, but you should always match the language used (e.g. English). If a user inquires for additional services not accessible through tools, you should direct them to the ~help or /help commands rather than mimic outputs, if you suspect they may involve side effects. Be concise where possible."
 
 class ChatConfig(Command):
 	name = ["Personality", "ChangePersonality"]
@@ -577,7 +577,7 @@ class ChatConfig(Command):
 
 	def retrieve(self, channel, user=None, update=True):
 		per = cdict(
-			model="large",
+			model="auto",
 			description=DEFPER,
 			stream=True,
 			tts=False,
@@ -1559,6 +1559,63 @@ class OCR(Command):
 		)
 
 
+class AudioSeparator(Command):
+	name = ["Extract", "Separate"]
+	description = "Runs Audio-Separator on the input URL. See https://github.com/nomadkaraoke/python-audio-separator for more info, or to run it yourself!"
+	schema = cdict(
+		url=cdict(
+			type="audio",
+			description="Audio supplied by URL or attachment",
+			example="https://cocobeanzies.mizabot.xyz/music/rainbow-critter.webm",
+			aliases=["a"],
+			required=True,
+		),
+		format=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("ogg", "opus", "mp3", "flac", "wav"),
+			),
+			description="The file format or codec of the output",
+			default="opus",
+		),
+	)
+	rate_limit = (20, 40)
+	_timeout_ = 3.5
+
+	async def __call__(self, bot, _channel, _message, url, format, **void):
+		fut = csubmit(send_with_reply(
+			_channel,
+			reference=_message,
+			content=italics(ini_md(f"Downloading and converting {sqr_md(url)}...")),
+		))
+		fn = await attachment_cache.download(url, filename=True)
+		args = ["audio-separator", os.path.abspath(fn), "--output_format", format]
+		proc = await asyncio.create_subprocess_exec(*args, cwd=TEMP_PATH)
+		try:
+			async with asyncio.timeout(3200):
+				await proc.wait()
+		except (T0, T1, T2):
+			with tracebacksuppressor:
+				force_kill(proc)
+			raise
+		outputs = []
+		tmpl = fn.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+		# The cache is littered with arbitrary files, but we can rely on bot.get_file's filename to contain a unique identifier which will always carry over to the output files
+		for f2 in os.listdir(TEMP_PATH):
+			if f2.startswith(tmpl) and f2.endswith(format):
+				outputs.append(f2)
+		if not outputs:
+			raise ValueError("No output files found.")
+		files = [CompatFile(f"{TEMP_PATH}/{f2}", filename=f2.removeprefix(tmpl).lstrip(" _")) for f2 in outputs]
+		response = await fut
+		response = await self.bot.edit_message(
+			response,
+			content=italics(ini_md("Uploading output...")),
+		)
+		await send_with_reply(_channel, _message, files=files)
+		await bot.autodelete(response)
+
+
 class Vectorise(Command):
 	name = ["SVG", "Vector", "Vectorize"]
 	description = "Applies https://replicate.com/recraft-ai/recraft-vectorize/api to convert a raster image to SVG format."
@@ -1590,4 +1647,108 @@ class Vectorise(Command):
 			f.write(output.read())
 		if desc:
 			desc = "\n-# " + "\n-# ".join(desc.splitlines())
-		return cdict(content=desc, file=CompatFile(fn, filename=replace_ext(url2fn(url), "svg")))
+		return cdict(
+			content=desc,
+			file=CompatFile(fn, filename=replace_ext(url2fn(url), "svg")),
+		)
+
+
+voices = []
+openai_voices = """alloy
+ash
+ballad
+coral
+echo
+fable
+nova
+onyx
+sage
+shimmer""".splitlines()
+voices.extend(f"openai-{v}" for v in openai_voices)
+dectalk_voices = """paul
+betty
+harry
+frank
+kit
+rita
+ursula
+dennis
+wendy""".splitlines()
+voices.extend(f"dectalk-{v}" for v in dectalk_voices)
+
+class TTS(Command):
+	description = "Produces synthesised speech from a text input."
+	schema = cdict(
+		voice=cdict(
+			type="enum",
+			validation=cdict(
+				enum=tuple(voices),
+			),
+			description="The engine and voice to apply",
+			default="dectalk-paul",
+			example="openai-coral",
+		),
+		text=cdict(
+			type="string",
+			description="The text to render",
+			required=True,
+		),
+		format=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("opus", "aac", "mp3", "flac", "wav"),
+			),
+			description="The file format or codec of the output",
+			default="opus",
+		),
+	)
+	rate_limit = (10, 15)
+	slash = True
+	ephemeral = True
+
+	async def __call__(self, _premium, voice, text, format, **void):
+		engine, mode = voice.split("-", 1)
+		fi = temporary_file()
+		desc = None
+		match engine:
+			case "openai":
+				_premium.require(2)
+				oai = openai.AsyncOpenAI(api_key=AUTH["openai_key"])
+				model = "gpt-4o-mini-tts"
+				resp = await oai.audio.speech.create(
+					model=model,
+					voice=mode,
+					input=text,
+					response_format="opus",
+				)
+				c = await tcount(text)
+				_premium.append(["openai", model, mpf("12.6") / 1000000 * c])
+				desc = _premium.apply()
+				resp.write_to_file(fi)
+				fmt = "opus"
+			case "dectalk":
+				args = ["say", "-w", fi, "-pre", f"[:name {mode}]", text]
+				print(args)
+				await asubmit(subprocess.run, args, cwd="misc/dectalk", stdout=subprocess.DEVNULL, shell=True)
+				assert os.path.exists(fi), "No output was captured!"
+				fmt = "wav"
+			case _:
+				raise NotImplementedError(engine)
+		if fmt == format:
+			fo = fi
+		else:
+			fo = temporary_file(format)
+			args = ["ffmpeg", "-v", "error", "-hide_banner", "-vn", "-i", fi, "-b:a", "128k", "-vbr", "on", fo]
+			print(args)
+			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
+			try:
+				async with asyncio.timeout(3200):
+					await proc.wait()
+			except (T0, T1, T2):
+				with tracebacksuppressor:
+					force_kill(proc)
+				raise
+		return cdict(
+			content=desc,
+			file=CompatFile(fo, filename=text[:48] + "." + format),
+		)

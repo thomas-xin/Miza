@@ -546,10 +546,7 @@ class AudioPlayer(discord.AudioSource):
 		if not self.channel or not self.channel.permissions_for(self.channel.guild.me).send_messages:
 			return
 		try:
-			u = await self.fetch_user(entry.u_id)
-			if not u:
-				raise KeyError(entry.u_id)
-			name = u.display_name
+			name = await interface.asubmit(f"u = await bot.fetch_user({entry.u_id}); u.display_name")
 		except (KeyError, AttributeError, discord.NotFound):
 			name = "Unknown User"
 		s = italics(ansi_md(colourise_auto("$b<🎶> Now playing {ENTRY}, added by $b<{NAME}>! $b<🎶>")))

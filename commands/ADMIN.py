@@ -1599,8 +1599,6 @@ class ServerProtector(Database):
 			await self.kickWarn(u_id, guild, owner, msg)
 
 	async def _channel_delete_(self, channel, guild, **void):
-		if channel.id in self.bot.data.deleted.cache:
-			return
 		user = None
 		if not isinstance(channel, discord.Thread) and channel.permissions_for(guild.me).view_audit_log:
 			ts = utc()
@@ -2819,12 +2817,10 @@ class UpdateMessageLogs(Database):
 		try:
 			t = u
 			init = user_mention(t.id)
-			if self.bot.recently_deleted.get(message.id):
+			d_level = self.bot.recently_deleted.get(message.id)
+			if d_level is False:
 				return
-			d_level = self.bot.is_deleted(message)
-			if d_level > 1:
-				if d_level > 2:
-					return
+			if d_level:
 				t = self.bot.user
 				init = user_mention(t.id)
 			else:
@@ -2881,9 +2877,10 @@ class UpdateMessageLogs(Database):
 		action = discord.AuditLogAction.message_bulk_delete
 		try:
 			init = "[UNKNOWN USER]"
-			if self.bot.recently_deleted.get(message.id):
+			d_level = self.bot.recently_deleted.get(message.id)
+			if d_level is False:
 				return
-			if self.bot.is_deleted(message):
+			if d_level:
 				t = self.bot.user
 				init = user_mention(t.id)
 			else:

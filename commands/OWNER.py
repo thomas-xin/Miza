@@ -845,7 +845,7 @@ class UpdateExec(Database):
 			mids.append(message.id)
 		return shorten_chunks(chunksize // 1048576, channel.id, mids, ofn, mode="c", base="https://mizabot.xyz", minimise=minimise)
 
-	async def lproxy(self, url, filename=None, channel=None, minimise=False):
+	async def lproxy(self, url, filename=None, channel=None, minimise=False, allow_empty=True):
 		bot = self.bot
 		if isinstance(url, byte_like):
 			fn = filetransd(filename or "c.b")
@@ -859,6 +859,8 @@ class UpdateExec(Database):
 		else:
 			fn = filetransd(filename or getattr(url, "name", None) or "c.b")
 			b = url
+		if not allow_empty and not getsize(b):
+			raise EOFError(b)
 		if getsize(b) <= attachment_cache.max_size:
 			return await attachment_cache.create(b, filename=fn, channel=channel, minimise=minimise)
 		try:
@@ -924,7 +926,7 @@ class UpdateExec(Database):
 				if data and getsize(data) > 1048576 and magic.from_file(data).split("/", 1)[0] in ("image", "video"):
 					data = await bot.optimise_image(data, fsize=1048576, fmt="avif")
 					filename = replace_ext(filename, "avif")
-			url2 = await self.lproxy(data or url, filename=filename, channel=channel)
+			url2 = await self.lproxy(data or url, filename=filename, channel=channel, allow_empty=False)
 			if uhu:
 				bot.data.proxies[uhu] = url2
 			return url2
@@ -1107,8 +1109,6 @@ class UpdateChannelCache(Database):
 		if isinstance(s, set):
 			s = self[c_id] = sorted(s, reverse=True)
 		for m_id in s:
-			if m_id in self.bot.data.deleted.cache:
-				continue
 			if as_message:
 				try:
 					if m_id < min_time:
@@ -1164,12 +1164,6 @@ class UpdateChannelCache(Database):
 			self.data[message.channel.id].remove(message.id)
 		except (AttributeError, KeyError, ValueError):
 			pass
-
-
-class UpdateDeleted(Database):
-	name = "deleted"
-	cache = AutoCache(stale=0, timeout=86400 * 7)
-	no_file = True
 
 
 class Maintenance(Command):

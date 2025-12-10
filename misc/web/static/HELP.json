@@ -491,6 +491,31 @@
 			},
 			"timeout": "576"
 		},
+		"AudioSeparator": {
+			"aliases": ["AudioSeparator", "Extract", "Separate"],
+			"description": "Runs Audio-Separator on the input URL. See https://github.com/nomadkaraoke/python-audio-separator for more info, or to run it yourself!",
+			"example": [],
+			"level": "0",
+			"rate_limit": "(20, 40)",
+			"schema": {
+				"format": {
+					"default": "opus",
+					"description": "The file format or codec of the output",
+					"type": "enum",
+					"validation": {
+						"enum": ["ogg", "opus", "mp3", "flac", "wav"]
+					}
+				},
+				"url": {
+					"aliases": ["a"],
+					"description": "Audio supplied by URL or attachment",
+					"example": "https://cocobeanzies.mizabot.xyz/music/rainbow-critter.webm",
+					"required": true,
+					"type": "audio"
+				}
+			},
+			"timeout": "84.0"
+		},
 		"ChatConfig": {
 			"aliases": ["ChatConfig", "Personality", "ChangePersonality"],
 			"description": "Customises my personality and behaviours for ~ask and @mentions in the current channel. Note that with the increased complexity of the chatbot, a clear description of who the bot is should be provided. If used in DMs, applies per-user settings that will override settings in servers, except tts and history.",
@@ -752,6 +777,38 @@
 					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
 					"required": true,
 					"type": "image"
+				}
+			},
+			"timeout": "24"
+		},
+		"TTS": {
+			"aliases": ["TTS"],
+			"description": "Produces synthesised speech from a text input.",
+			"example": [],
+			"level": "0",
+			"rate_limit": "(10, 15)",
+			"schema": {
+				"format": {
+					"default": "opus",
+					"description": "The file format or codec of the output",
+					"type": "enum",
+					"validation": {
+						"enum": ["opus", "aac", "mp3", "flac", "wav"]
+					}
+				},
+				"text": {
+					"description": "The text to render",
+					"required": true,
+					"type": "string"
+				},
+				"voice": {
+					"default": "dectalk-paul",
+					"description": "The engine and voice to apply",
+					"example": "openai-coral",
+					"type": "enum",
+					"validation": {
+						"enum": ["openai-alloy", "openai-ash", "openai-ballad", "openai-coral", "openai-echo", "openai-fable", "openai-nova", "openai-onyx", "openai-sage", "openai-shimmer", "dectalk-paul", "dectalk-betty", "dectalk-harry", "dectalk-frank", "dectalk-kit", "dectalk-rita", "dectalk-ursula", "dectalk-dennis", "dectalk-wendy"]
+					}
 				}
 			},
 			"timeout": "24"
@@ -3531,32 +3588,6 @@
 		}
 	},
 	"VOICE": {
-		"AudioSeparator": {
-			"aliases": ["AudioSeparator", "Extract", "Separate"],
-			"description": "Runs Audio-Separator on the input URL. See https://github.com/nomadkaraoke/python-audio-separator for more info, or to run it yourself!",
-			"example": [],
-			"level": "0",
-			"rate_limit": "(20, 40)",
-			"schema": {
-				"format": {
-					"default": "opus",
-					"description": "The file format or codec of the output",
-					"example": "mp3",
-					"type": "enum",
-					"validation": {
-						"enum": ["ogg", "opus", "mp3"]
-					}
-				},
-				"url": {
-					"aliases": ["a"],
-					"description": "Audio supplied by URL or attachment",
-					"example": "https://cocobeanzies.mizabot.xyz/music/rainbow-critter.webm",
-					"required": true,
-					"type": "audio"
-				}
-			},
-			"timeout": "84.0"
-		},
 		"AudioSettings": {
 			"aliases": ["AudioSettings", "Settings", "Volume", "Vol", "V", "🔉", "🔊", "📢", "Speed", "SP", "⏩", "Rewind", "Rew", "⏪", "Pitch", "Transpose", "↕️", "Pan", "Bassboost", "BB", "🥁", "Reverb", "RV", "📉", "Compressor", "CO", "🗜", "Chorus", "CH", "📊", "Resample", "Nightcore", "NC", "Bitrate", "BPS", "BR"],
 			"description": "Adjusts variable settings of the audio player",
