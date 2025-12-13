@@ -60,10 +60,6 @@ class Ask(Command):
 	async def __call__(self, bot, _message, _guild, _channel, _user, _nsfw, _prefix, _premium, prompt, model, history, **void):
 		await bot.require_integrity(_message)
 		self.description = f"Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. See {bot.kofi_url} for premium tier chatbot specifications; check using ~serverinfo, or apply it with ~premium!"
-		data = bot.get_userbase(_user.id)
-		add_dict(data, {"last_talk": 1, "last_mention": 1})
-		data["last_used"] = utc()
-		bot.set_userbase(_user.id, "", data)
 		await bot.seen(_user, event="misc", raw="Talking to me")
 		embs = []
 		if "dailies" in bot.data:
@@ -480,7 +476,7 @@ class Ask(Command):
 				raise ex
 		except StopIteration:
 			pass
-		print("COST:", usage)
+		print("Usage:", usage)
 		response.content = "\r" + content
 		embs = []
 		if response.get("embed"):
@@ -882,7 +878,7 @@ class Imagine(Command):
 		"*Tip: By using generative AI, you are assumed to comply with the [ToS](<https://github.com/thomas-xin/Miza/wiki/Terms-of-Service>).*",
 		"*Tip: Use --ar or --aspect-ratio to control the proportions of the image.*",
 		"*Tip: Use -c or --count to control the amount of images generated; maximum 4 for regular users, 9 for premium.*",
-		'*Tip: Standalone text prompts that are short may be reinterpreted by the language model automatically. Use the ALT button on image outputs to see what was added (requires "With image descriptions" enabled in Discord chat settings)',
+		'*Tip: Standalone text prompts that are short may be reinterpreted by the language model automatically. Use the ALT button on image outputs to see what was added (requires "With image descriptions" enabled in Discord chat settings)*',
 	)
 	comfyui_json = "misc/comfyui-api.json"
 	comfyui_api = None
@@ -1719,13 +1715,13 @@ class TTS(Command):
 					model=model,
 					voice=mode,
 					input=text,
-					response_format="opus",
+					response_format=format,
 				)
 				c = await tcount(text)
 				_premium.append(["openai", model, mpf("12.6") / 1000000 * c])
 				desc = _premium.apply()
 				resp.write_to_file(fi)
-				fmt = "opus"
+				fmt = format
 			case "dectalk":
 				args = ["say", "-w", fi, "-pre", f"[:name {mode}]", text]
 				print(args)

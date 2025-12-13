@@ -271,6 +271,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def init_main_databases(self):
 		self.userbase = AutoDatabase("saves/userbase", shards=64)
 		self.guildbase = AutoDatabase("saves/guildbase", shards=16)
+		self.weekly_users = AutoCache(f"{CACHE_PATH}/weekly_users", shards=1, stale=0, timeout=86400 * 7)
 
 	def get_userbase(self, uid, path="", default=None):
 		try:
@@ -2361,13 +2362,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		2: cdict(
-			instructive="gemini-3-pro",
+			instructive="gpt-5.2",
 			casual="gemini-3-pro",
 			nsfw="grok-4",
-			backup="gpt-5.1",
+			backup="gpt-5.2",
 			retry="claude-4.5-sonnet",
 			function="grok-4.1-fast",
-			vision="gpt-5.1",
+			vision="gpt-5.2",
 			target="auto",
 		),
 	}
@@ -2554,7 +2555,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				tools = toolscan
 			else:
 				tools = tools or None
-			cargs["tools"] = tools if len(messages) > 2 else None
+			if len(messages) <= 4:
+				used_tools = {m["name"] for m in messages if m.get("role") == "tool"}
+				tools = [t for t in tools if t["function"]["name"] in used_tools]
+			cargs["tools"] = tools
 		if is_nsfw:
 			print(mod, allow_nsfw)
 			if allow_nsfw:
@@ -4116,23 +4120,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				self.ip = await Request.aio("https://api.ipify.org", bypass=False, decode=True, timeout=3)
 		return self.ip
 
-	total_hosted = 0
-	async def get_hosted(self):
-		size = 0
-		try:
-			filehost = os.listdir("saves/filehost")
-		except FileNotFoundError:
-			return size
-		for fn in filehost:
-			with tracebacksuppressor(ValueError):
-				if "$" in fn and fn.split("$", 1)[0].endswith("~.forward"):
-					size += int(fn.split("$", 2)[1])
-				else:
-					p = "saves/filehost/" + fn
-					size += os.path.getsize(p)
-		self.total_hosted = size
-		return size
-
 	caps = set()
 	capfrom = AutoCache(stale=0, timeout=60)
 	last_pings = {}
@@ -4248,8 +4235,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				"Active commands": self.command_semaphore.active,
 				"Voice (connected, playing)": f"{audio_players}|{playing_players}",
 				"Total data transmitted": self.total_bytes,
-				"Hosted storage": self.total_hosted,
 				"System time": datetime.datetime.now(),
+				"Active users (past week)": len(self.weekly_users),
 				"Uptime (past week)": self.uptime,
 				"Uptime (current)": time_disp(utc() - self.start_time),
 				"Command count": len(set(itertools.chain.from_iterable(self.commands.values()))),
@@ -4309,7 +4296,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		discord_stats["API latency"] = sec2time(discord_stats["API latency"])
 		misc_stats = dict(status.misc)
 		misc_stats["Total data transmitted"] = byte_scale(misc_stats["Total data transmitted"]) + "B"
-		misc_stats["Hosted storage"] = byte_scale(misc_stats["Hosted storage"]) + "B"
 		misc_stats["Uptime (past week)"] = f'{round(misc_stats["Uptime (past week)"] * 100, 3)}%'
 		return {
 			"System info": {
@@ -6375,9 +6361,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			async with Delay(300):
 				with tracebacksuppressor:
 					await self.worker_heartbeat()
-					await asyncio.sleep(1)
-					with MemoryTimer("get_hosted"):
-						await self.get_hosted()
 					await asyncio.sleep(1)
 					with MemoryTimer("update_subs"):
 						await self.update_subs()

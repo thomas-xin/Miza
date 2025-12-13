@@ -804,6 +804,27 @@ smart_re = r"""(?:^|\s)(["'`])(?:[^"'`]+)\1(?:$|\s)"""
 leftspace_re = r"^\s+"
 rightspace_re = r"\s+$"
 def smart_split(s, rws=False):
+	"""
+	Split a string into words while preserving whitespace information.
+	This function intelligently splits a string into words, handling quoted strings
+	and various whitespace patterns. It can optionally return both the words and
+	the whitespace that separates them.
+	Args:
+		s (str): The input string to split.
+		rws (bool, optional): If True, return both words and whitespace. 
+			If False, return only words. Defaults to False.
+	Returns:
+		list or tuple: If rws is False, returns a list of words (strings).
+			If rws is True, returns a tuple of (words, whites) where:
+			- words (list): List of extracted words/tokens
+			- whites (list): List of whitespace strings separating the words
+	Note:
+		This function uses regex patterns (smart_re, leftspace_re, rightspace_re)
+		that should be defined in the module scope. It handles:
+		- Quoted strings (preserving content between matching quotes)
+		- Leading and trailing whitespace
+		- Multiple consecutive whitespace characters
+	"""
 	words, whites = [], []
 
 	def process_token(token):

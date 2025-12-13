@@ -1738,6 +1738,7 @@ class UpdateUsers(Database):
 		bot = self.bot
 		if bot.is_optout(user):
 			return
+		bot.weekly_users[user.id] = True
 		self.send_event(user.id, "command")
 		bot.add_userbase(user.id, f"commands.{command.parse_name()}", 1)
 		bot.set_userbase(user.id, "last_seen", utc())
@@ -1839,7 +1840,7 @@ class UpdateUsers(Database):
 	async def _typing_(self, user, **void):
 		self.bot.set_userbase(user.id, "last_typing", utc())
 
-	async def _nocommand_(self, message, force=False, flags=(), before=None, perm=0, **void):
+	async def _nocommand_(self, message, force=False, before=None, perm=0, **void):
 		if getattr(message, "noresponse", False):
 			return
 		bot = self.bot
@@ -1877,15 +1878,17 @@ class UpdateUsers(Database):
 			if channel.id in bot.cache.channels:
 				stored[channel.id] = message.id
 			bot.set_userbase(user.id, "stored", stored)
-		if force or bot.is_mentioned(message, bot, guild):
-			if user.bot:
-				with suppress(AttributeError):
-					async for m in bot.data.channel_cache.grab(channel):
-						user = m.author
-						if bot.get_perms(user.id, guild) <= -inf:
-							return
-						if not user.bot:
-							break
+		if not force and not bot.is_mentioned(message, bot, guild):
+			return
+		if user.bot:
+			with suppress(AttributeError):
+				async for m in bot.data.channel_cache.grab(channel):
+					user = m.author
+					if bot.get_perms(user.id, guild) <= -inf:
+						return
+					if not user.bot:
+						break
+		with tracebacksuppressor:
 			try:
 				reference = await bot.fetch_reference(message)
 			except (LookupError, discord.NotFound):
@@ -1893,48 +1896,44 @@ class UpdateUsers(Database):
 			else:
 				if reference.author.id == bot.id and reference.content.startswith("*```callback-admin-relay-"):
 					return
-			out = None
-			count = bot.get_userbase(user.id, "last_talk", 0)
-			if count < 5:
-				csubmit(message.add_reaction("👀"))
-			argv = message.clean_content.strip()
+			csubmit(message.add_reaction("👀"))
 			me = getattr(guild, "me", bot.user)
-			argv = argv.removeprefix(f"@{me.display_name}")
-			argv = argv.removesuffix(f"@{me.display_name}")
-			argv = argv.strip()
-			if "ask" in bot.commands and ("ai" in bot.get_enabled(channel) or not perm < inf):
+			argv = message.clean_content.strip().removeprefix(f"@{me.display_name}").lstrip()
+			if "ask" in bot.commands and "ai" in bot.get_enabled(channel):
 				with bot.ExceptionSender(message.channel, reference=message):
 					await bot.run_command(bot.commands.ask[0], dict(prompt=argv), message=message, respond=True)
 				return
-			# Help message greetings
-			i = xrand(7)
-			if i == 0:
-				out = "I have been summoned!"
-			elif i == 1:
-				out = f"Hey there! Name's {bot.name}!"
-			elif i == 2:
-				out = f"Hello {user.name}, nice to see you! Can I help you?"
-			elif i == 3:
-				out = f"Howdy, {user.display_name}!"
-			elif i == 4:
-				out = f"Greetings, {user.name}! May I be of service?"
-			elif i == 5:
-				out = f"Hi, {user.name}! What can I do for you today?"
-			else:
-				out = f"Yo, what's good, {user.display_name}? Need me for anything?"
-			prefix = bot.get_prefix(message.guild)
+			out = self.random_basic_response(bot, guild, user, message)
+			prefix = bot.get_prefix(guild)
 			out += f"\n> Use `{prefix}help` or `/help` for help!"
 			if argv:
-				out += f"\n-# If your intention was to chat with me, my AI is not currently enabled in this channel! If you are a moderator and wish to enable it, use `{prefix}ec --enable AI`."
-			send = lambda *args, **kwargs: send_with_react(channel, *args, reacts="❎", reference=not flags and message, **kwargs)
-			bot.add_userbase(user.id, "", dict(last_talk=1, last_mention=1))
-			bot.set_userbase(user.id, "last_used", utc())
-			await send(out)
+				out += "\n-# If your intention was to chat with me, my AI is not currently enabled in this channel!"
+				perm = bot.get_perms(user, guild)
+				if not perm < 2:
+					out += f" If you are a moderator and wish to enable it, use `{prefix}ec --enable AI`."
+			await send_with_react(channel, out, reacts="❎", reference=message)
 			await bot.seen(user, event="misc", raw="Talking to me")
 			self.add_xp(user, xrand(12, 20))
 			if "dailies" in bot.data:
 				bot.data.dailies.progress_quests(user, "talk")
-		else:
-			if not bot.get_userbase(user.id, "last_mention") and random.random() > 0.6:
-				self.bot.pop_userbase(user.id, "last_talk")
-			self.bot.pop_userbase(user.id, "last_mention")
+
+	def random_basic_response(self, bot, guild, user, message):
+		# Help message greetings
+		i = random.randint(0, 6)
+		match i:
+			case 0:
+				return "I have been summoned!"
+			case 1:
+				return f"Hey there! Name's {bot.name}!"
+			case 2:
+				return f"Hello {user.global_name}, nice to see you! Can I help you?"
+			case 3:
+				return f"Howdy, {user.display_name}!"
+			case 4:
+				return f"Greetings, {user.name}! May I be of service?"
+			case 5:
+				return f"Hi, {user.global_name}! What can I do for you today?"
+			case 6:
+				return f"Yo, what's good, {user.display_name}? Need me for anything?"
+			case _:
+				raise NotImplementedError("Invalid response!")

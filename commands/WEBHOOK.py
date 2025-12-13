@@ -293,6 +293,7 @@ class UpdateAutoEmojis(Database):
 		csubmit(bot.autodelete(message))
 		url = await bot.get_proxy_url(user)
 		m = await bot.send_as_webhook(message.channel, msg, files=files, username=user.display_name, avatar_url=url, reference=ref)
+		await bot.send_event("_command_", user=user, command=bot.commands.autoemoji[0], loop=False, message=message)
 		regex = regexp(r"(?:^|^[^<\\`]|[^<][^\\`]|.[^a\\`\[])(:[A-Za-z0-9\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>\]`])")
 		if recursive and regex.search(m.content):
 			m = await m.edit(content=msg)

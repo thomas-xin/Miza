@@ -12,14 +12,6 @@ except Exception:
 	print_exc()
 	googletrans = None
 
-try:
-	rapidapi_key = AUTH["rapidapi_key"]
-	if not rapidapi_key:
-		raise
-except:
-	rapidapi_key = None
-	print("WARNING: rapidapi_key not found. Unable to search Urban Dictionary.")
-
 
 class Translate(Command):
 	name = ["TR"]
@@ -1525,9 +1517,14 @@ class BubbleWrap(Command):
 class Urban(Command):
 	name = ["📖", "UrbanDictionary"]
 	description = "Searches Urban Dictionary for an item."
-	usage = "<string>"
-	example = ("urban ur mom",)
-	flags = "v"
+	schema = cdict(
+		query=cdict(
+			type="string",
+			description="Search query",
+			example="ur mom",
+			required=True,
+		),
+	)
 	rate_limit = (5, 8)
 	typing = True
 	slash = True
@@ -1535,28 +1532,28 @@ class Urban(Command):
 	header = {
 		"accept-encoding": "application/gzip",
 		"x-rapidapi-host": "mashape-community-urban-dictionary.p.rapidapi.com",
-		"x-rapidapi-key": rapidapi_key,
+		"x-rapidapi-key": AUTH.get("rapidapi_key", ""),
 	}
 
-	async def __call__(self, channel, user, argv, message, **void):
-		url = f"https://mashape-community-urban-dictionary.p.rapidapi.com/define?term={quote_plus(argv)}"
+	async def __call__(self, _channel, _message, _user, query, **void):
+		url = f"https://mashape-community-urban-dictionary.p.rapidapi.com/define?term={quote_plus(query)}"
 		d = await Request.aio(url, headers=self.header, timeout=12, json=True)
 		resp = d["list"]
 		if not resp:
-			raise LookupError(f"No results for {argv}.")
+			raise LookupError(f"No results for {query}.")
 		resp.sort(
 			key=lambda e: scale_ratio(e.get("thumbs_up", 0), e.get("thumbs_down", 0)),
 			reverse=True,
 		)
-		title = argv
+		title = query
 		fields = deque()
 		for e in resp:
 			fields.append(dict(
-				name=e.get("word", argv),
+				name=e.get("word", query),
 				value=ini_md(e.get("definition", "")),
 				inline=False,
 			))
-		self.bot.send_as_embeds(channel, title=title, fields=fields, author=get_author(user), reference=message)
+		self.bot.send_as_embeds(_channel, title=title, fields=fields, author=get_author(_user), reference=_message)
 
 
 class Browse(Pagination, Command):
