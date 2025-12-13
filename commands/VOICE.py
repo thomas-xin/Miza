@@ -487,8 +487,9 @@ class Queue(Pagination, Command):
 		if not curr:
 			emb.description = f"*Use {bot.get_prefix(gid)}play to add a song!* `"
 		else:
-			resp = await bot.audio.asubmit(f"ytdl.search(AP.from_guild({gid}).queue[0].url)")
-			curr[0] = resp[0]
+			if not curr[0].get("duration"):
+				resp = await bot.audio.asubmit(f"ytdl.search(AP.from_guild({gid}).queue[0].url)")
+				curr[0] = resp[0]
 			emb.description = (
 				f"**Estimated finish time: {stime}**"
 				+ f'\n{"[`" + no_links(curr[0]["name"]) + "`]"}({curr[0]["url"]})` '

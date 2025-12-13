@@ -3571,11 +3571,18 @@
 		"Urban": {
 			"aliases": ["Urban", "📖", "UrbanDictionary"],
 			"description": "Searches Urban Dictionary for an item.",
-			"example": ["urban ur mom"],
+			"example": [],
 			"level": "0",
 			"rate_limit": "(5, 8)",
-			"timeout": "24",
-			"usage": "<string>"
+			"schema": {
+				"query": {
+					"description": "Search query",
+					"example": "ur mom",
+					"required": true,
+					"type": "string"
+				}
+			},
+			"timeout": "24"
 		},
 		"WordCount": {
 			"aliases": ["WordCount", "Lc", "Wc", "Cc", "Character_Count", "Line_Count"],

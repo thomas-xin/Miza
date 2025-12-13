@@ -946,6 +946,9 @@ def is_deviantart_url(url): return url and regexp("^https?:\\/\\/(?:www\\.)?devi
 def is_reddit_url(url): return url and regexp("^https?:\\/\\/(?:\\w{2,3}\\.)?reddit.com\\/r\\/[^/\\W]+\\/").findall(url)
 def is_emoji_url(url): return url and url.startswith("https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/")
 def is_spotify_url(url): return url and regexp("^https?:\\/\\/(?:play|open|api)\\.spotify\\.com\\/").findall(url)
+def _unyt(s):
+	s = re.sub(r"[\?&]pp=[\w\-]+", "", re.sub(r"[\?&]si=[\w\-]+", "", s))
+	return re.sub(r"https?:\/\/(?:\w{1,5}\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)", "https://youtu.be/", s)
 def unyt(s):
 	"Produces a unique URL, such as converting all instances of https://www.youtube.com/watch?v=video to https://youtu.be/video. This is useful for caching and deduplication."
 	if not is_url(s):
@@ -956,11 +959,11 @@ def unyt(s):
 		if "?d=" in s or "?v=" in s:
 			s = unquote_plus(s.replace("?v=", "?d=", 1).split("?d=", 1)[-1])
 		else:
-			s = re.sub(r"https?:\/\/(?:\w{1,5}\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)|https?:\/\/(?:api\.)?mizabot\.xyz\/ytdl\?[vd]=(?:https:\/\/youtu\.be\/|https%3A%2F%2Fyoutu\.be%2F)", "https://youtu.be/", re.sub(r"[\?&]si=[\w\-]+", "", s))
+			s = re.sub(r"https?:\/\/(?:api\.)?mizabot\.xyz\/ytdl\?[vd]=(?:https:\/\/youtu\.be\/|https%3A%2F%2Fyoutu\.be%2F)", "https://youtu.be/", s)
 		s = s.split("&", 1)[0]
 	if is_discord_attachment(s) or is_spotify_url(s) or s.startswith("https://i.ytimg.com"):
 		s = s.split("?", 1)[0]
-	return re.sub(r"https?:\/\/(?:\w{1,5}\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)", "https://youtu.be/", re.sub(r"[\?&]si=[\w\-]+", "", s))
+	return _unyt(s)
 def is_discord_message_link(url) -> bool:
 	"Detects whether a Discord link represents a channel or message link."
 	check = url[:64]
