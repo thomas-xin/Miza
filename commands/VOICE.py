@@ -1960,35 +1960,7 @@ class Download(Command):
 	ephemeral = True
 	exact = False
 
-	async def download_single(self, channel, message, url, fmt, start, end, **void):
-		downloader_url = f"https://api.mizabot.xyz/ytdl?d={quote_plus(url)}&fmt={fmt}"
-		if start:
-			downloader_url += f"&start={float(start)}"
-		if end:
-			downloader_url += f"&end={float(end)}"
-		fut = csubmit(send_with_reply(
-			channel,
-			reference=message,
-			content=italics(ini_md(f"Downloading and converting {sqr_md(url)}...")),
-		))
-		headers = dict(Accept="application/json")
-		async with niquests.AsyncSession() as session:
-			resp = await session.get(downloader_url, headers=headers, verify=False, timeout=14400)
-		response = await fut
-		print(resp.headers)
-		try:
-			resp.raise_for_status()
-		except Exception as ex:
-			raise RuntimeError([repr(ex), lim_str(as_str(resp.content), 1024)])
-		file = CompatFile(resp.content, resp.headers["Content-Disposition"].split("=", 1)[-1].strip('"'))
-		response = await self.bot.edit_message(
-			response,
-			content=italics(ini_md(f"Uploading {file.filename}...")),
-		)
-		await self.bot.send_with_file(channel, file=file, reference=message)
-		await self.bot.autodelete(response)
-
-	async def __call__(self, bot, _channel, _message, url, format, query, start, end, **void):
+	async def __call__(self, url, format, query, start, end, **void):
 		if not query and not url:
 			raise IndexError("Please input a search term or URL.")
 		if query and not url:
@@ -2003,14 +1975,22 @@ class Download(Command):
 				url = res[0].url
 		if url:
 			# If only one result is found and the input is a URL, directly download it
-			# TODO: Implement direct download
-			return await self.download_single(
-				channel=_channel,
-				message=_message,
-				url=url,
-				fmt=format or "opus",
-				start=start,
-				end=end,
+			fmt = format or "opus"
+			downloader_url = f"https://api.mizabot.xyz/ytdl?d={quote_plus(url)}&fmt={fmt}"
+			if start:
+				downloader_url += f"&start={float(start)}"
+			if end:
+				downloader_url += f"&end={float(end)}"
+			headers = dict(Accept="application/json")
+			async with niquests.AsyncSession() as session:
+				resp = await session.get(downloader_url, headers=headers, verify=False, timeout=14400)
+			print(resp.headers)
+			try:
+				resp.raise_for_status()
+			except Exception as ex:
+				raise RuntimeError([repr(ex), lim_str(as_str(resp.content), 1024)])
+			return cdict(
+				file = CompatFile(resp.content, resp.headers["Content-Disposition"].split("=", 1)[-1].strip('"')),
 			)
 		# If multiple results are found, display them for selection
 		# TODO: Implement selection
