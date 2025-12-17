@@ -3389,6 +3389,8 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 			fut.set_result(v)
 		finally:
 			self._retrieving.pop(k, None)
+		if read:
+			v.seek(0)
 		return v
 	def retrieve(self, k, func, *args, _read=False, **kwargs):
 		if (fut := self._retrieving.get(k)):
@@ -3404,6 +3406,8 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 			v = super().get(k, read=_read)
 		if v is Dummy:
 			return self._retrieve(k, func, *args, read=_read, **kwargs)
+		if _read:
+			v.seek(0)
 		return v
 
 	async def _aretrieve(self, k, func, *args, read=False, **kwargs):
@@ -3418,6 +3422,8 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 			fut.set_result(v)
 		finally:
 			self._retrieving.pop(k, None)
+		if read:
+			v.seek(0)
 		return v
 	async def aretrieve(self, k, func, *args, _read=False, **kwargs):
 		if (fut := self._retrieving.get(k)):
@@ -3433,6 +3439,8 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 			v = super().get(k, read=_read)
 		if v is Dummy:
 			return await self._aretrieve(k, func, *args, read=_read, **kwargs)
+		if _read:
+			v.seek(0)
 		return v
 
 	def keys(self):

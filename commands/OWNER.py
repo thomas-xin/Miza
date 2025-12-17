@@ -619,114 +619,6 @@ class UpdateExec(Database):
 					c += 1
 		return out if len(out) > 1 else out[0]
 
-	hmac_sem = Semaphore(5, 1, rate_limit=5)
-	async def stash(self, fn, start=0, end=inf, filename=None, dont=False, raw=True):
-		bot = self.bot
-		fns = [fn] if isinstance(fn, (str, bytes, memoryview, io.BytesIO, discord.File)) else fn
-		print("Stash", lim_str(str(fns), 256), start, end, filename)
-		urls = []
-		with FileStreamer(*fns) as f:
-			fn = f.filename or "untitled"
-			i = start
-			f.seek(i)
-			while i < end:
-				b = None
-				if 0 and end - i > 83886080 and "hmac_signed_session" in AUTH and not self.hmac_sem.full:
-					try:
-						async with self.hmac_sem:
-							b = await asubmit(f.read, 503316480)
-							if not b:
-								break
-							if len(b) <= 100663296 or dont:
-								raise StopIteration(f"Skipping small chunk {len(b)}")
-							fn2 = filename or "c.7z"
-							resp = await asubmit(
-								reqs.next().post,
-								AUTH.hmac_signed_url,
-								files=dict(
-									file=(fn2, io.BytesIO(b), "application/octet-stream"),
-								),
-								cookies=dict(
-									authenticated="true",
-									hmac_signed_session=AUTH.hmac_signed_session,
-								),
-							)
-							resp.raise_for_status()
-							url = resp.json()["url"].split("?", 1)[0]
-					except StopIteration as ex:
-						print("Stash error:", repr(ex))
-						if not b:
-							print_exc()
-							f.seek(i)
-					except Exception:
-						print_exc()
-						f.seek(i)
-					else:
-						if raw:
-							u = url
-						else:
-							u = attachment_cache.preserve(url, 0) + "?S=" + str(len(b))
-						urls.append(u)
-						i = f.tell()
-						continue
-				with tracebacksuppressor:
-					chunkf = []
-					fs = []
-					sizes = []
-					fn2 = filename or "c.b"
-					if b:
-						bm = memoryview(b)
-						if len(bm) > CACHE_FILESIZE * 8:
-							bm = bm[:CACHE_FILESIZE * 8]
-						for n in range(0, len(bm), CACHE_FILESIZE):
-							bi = bm[n:n + CACHE_FILESIZE]
-							chunkf.append(bi)
-							fi = CompatFile(bi, filename=fn2)
-							fs.append(fi)
-							sizes.append(len(bi))
-						f.seek(i + len(bm))
-					while len(fs) < 8:
-						b = await asubmit(f.read, CACHE_FILESIZE)
-						if not b:
-							break
-						chunkf.append(b)
-						fi = CompatFile(b, filename=fn2)
-						fs.append(fi)
-						sizes.append(len(b))
-					if not fs:
-						break
-					c_id = choice([c_id for c_id, flag in self.data.items() if flag & 16])
-					channel = await bot.fetch_channel(c_id)
-					fstr = f"{fn.rsplit('/', 1)[-1]} ({i})"
-					try:
-						message = await channel.send(fstr, files=fs)
-					except Exception:
-						print(channel, c_id)
-						print(sizes)
-						print_exc()
-						await asyncio.sleep(10)
-						try:
-							message = await channel.send(fstr, files=[CompatFile(b, filename=fn2) for b in chunkf])
-						except:
-							print_exc()
-							f.seek(i)
-							await asyncio.sleep(20)
-							continue
-					# message = await bot.send_as_webhook(channel, fstr, files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
-					for a, bs in zip(message.attachments, sizes):
-						u = attachment_cache.preserve(a.url, message.id) + "?S=" + str(bs)
-						urls.append(u)
-						# u = str(a.url).rstrip("&")
-						# u += "?" if "?" not in u else "&"
-						# u += "size=" + str(bs) + "&mid=" + str(message.id)
-						# urls.append(u)
-					# mids.append(message.id)
-					i = f.tell()
-				await asyncio.sleep(0.25)
-		print(urls)
-		esubmit(bot.clear_cache, priority=True)
-		return urls
-
 	async def delete(self, mids):
 		bot = self.bot
 		print("Delete:", mids)
@@ -780,8 +672,6 @@ class UpdateExec(Database):
 		groups = []
 		total_size = len(b)
 		if total_size > attachment_cache.max_size * 100:
-			chunksize = self.DEFAULT_LIMIT
-		elif attachment_cache.max_size < total_size <= self.DEFAULT_LIMIT:
 			chunksize = self.DEFAULT_LIMIT
 		else:
 			chunksize = attachment_cache.max_size
@@ -846,7 +736,6 @@ class UpdateExec(Database):
 		return shorten_chunks(chunksize // 1048576, channel.id, mids, ofn, mode="c", base="https://mizabot.xyz", minimise=minimise)
 
 	async def lproxy(self, url, filename=None, channel=None, minimise=False, allow_empty=True):
-		bot = self.bot
 		if isinstance(url, byte_like):
 			fn = filetransd(filename or "c.b")
 			b = url
@@ -863,29 +752,7 @@ class UpdateExec(Database):
 			raise EOFError(b)
 		if getsize(b) <= attachment_cache.max_size:
 			return await attachment_cache.create(b, filename=fn, channel=channel, minimise=minimise)
-		try:
-			channel = await self.get_lfs_channel(getsize(b))
-		except NotImplementedError:
-			return await self.mproxy(b, fn, channel=channel, minimise=minimise)
-		if bot.owners.intersection(channel.guild._members) and none(m.id in bot.owners for m in channel.members):
-			with tracebacksuppressor:
-				await channel.add_user(bot.get_user(bot.owners[0]))
-		file = CompatFile(b, filename=fn)
-		member = choice(channel.guild.members)
-		try:
-			thumb = member.avatar.url
-		except Exception:
-			thumb = bot.discord_icon
-		ext = magic.from_buffer(b)
-		if ext.startswith("image/"):
-			embed = discord.Embed(colour=rand_colour()).set_author(name=member.name, icon_url=f"attachment://{fn}").set_thumbnail(url=thumb)
-		else:
-			embed = discord.Embed(colour=rand_colour()).set_image(url=f"attachment://{fn}")
-		message = await channel.send(file=file, embed=embed)
-		assert message.embeds, message.id
-		out = attachment_cache.preserve(message.embeds[0].author.icon_url if ext.startswith("image/") else message.embeds[0].image.url, message.id, minimise=minimise)
-		print("LPROXY:", url, out)
-		return out
+		return await self.mproxy(b, fn, channel=channel, minimise=minimise)
 
 	async def uproxy(self, *urls, collapse=True, mode="upload", filename=None, channel=None, optimise=False, **kwargs):
 		bot = self.bot
@@ -925,7 +792,7 @@ class UpdateExec(Database):
 					data = await attachment_cache.download(url, filename=True)
 				if data and getsize(data) > 1048576 and magic.from_file(data).split("/", 1)[0] in ("image", "video"):
 					data = await bot.optimise_image(data, fsize=1048576, fmt="avif")
-					filename = replace_ext(filename, "avif")
+					filename = replace_ext(filename or "Untitled", "avif")
 			url2 = await self.lproxy(data or url, filename=filename, channel=channel, allow_empty=False)
 			if uhu:
 				bot.data.proxies[uhu] = url2

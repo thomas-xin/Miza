@@ -374,7 +374,7 @@ class Ask(Command):
 						s = f'\n> Solving "{argv}"...'
 						text += s
 						yield s
-						fut = process_image("wolframalpha", "$", [argv], cap="browse", timeout=60, retries=2)
+						fut = process_image("wolframalpha", "$", [argv], cap="browse", timeout=60)
 						succ = await rag(name, tid, fut)
 					elif name == "myinfo":
 						async def myinfo(argv):
@@ -1298,143 +1298,6 @@ class Imagine(Command):
 			for fut in temp_futs:
 				fut.model = resp_model
 			futs.extend(temp_futs)
-		if amount2 < amount:
-			c = amount - amount2
-			counts = []
-			c2 = c
-			while c2 > 0:
-				prompt = eprompts.next()
-				n = round_random(min(4 if len(self.comfyui_api) <= 1 else 2, c2, amount / dups))
-				if not n:
-					n = c2
-				if counts and counts[-1][0] == prompt and n + counts[-1][1] <= 4:
-					counts[-1][1] += n
-				else:
-					counts.append([prompt, n])
-				c2 -= n
-			ms = 1024 if high_quality else 768
-			if url:
-				init_image = await process_image(url, "downsample", ["-nogif", 5, ms, "-bg", "-f", "png"], timeout=60)
-				# x, y = await asubmit(get_image_size, init_image, priority=2)
-				# print("Downsample:", x, y)
-			else:
-				init_image = None
-			queue = []
-			for prompt, n in sort(counts):
-				inim = init_image
-				if aspect_ratio != 0:
-					x, y = max_size(aspect_ratio, 1, ms, force=True)
-				elif inim:
-					# print("RM:", inim, ms)
-					inim = await process_image(inim, "resize_max", ["-nogif", ms, True, "hamming", "-bg", "-oz"], timeout=20, retries=1)
-					x, y = await asubmit(get_image_size, inim, priority=2)
-				else:
-					x = y = ms
-				if x > 16384:
-					y *= 16384 / x
-					x = 16384
-				if y > 16384:
-					x *= 16384 / y
-					y = 16384
-				d = 2
-				w, h = (round(x / d) * d, round(y / d) * d)
-				if inim:
-					wi, hi = x, y #await asubmit(get_image_size, inim, priority=2)
-					if (wi, hi) != (w, h):
-						if wi / w >= hi / h:
-							r = wi / w
-							tx = w
-							ty = round(hi / r)
-						else:
-							r = hi / h
-							tx = round(wi / r)
-							ty = h
-						if (wi, hi) != (tx, ty):
-							inim = await process_image(inim, "resize_to", ["-nogif", tx, ty, "hamming", "-bg", "-oz"], timeout=20, retries=1)
-						if (tx, ty) != (w, h):
-							inim = await process_image(inim, "resize_to", ["-nogif", w, h, "crop", "-bg", "-oz"], timeout=20, retries=1)
-				data = copy.deepcopy(self.comfyui_data)
-				seed = ts_us()
-				steps = max(1, round_random(num_inference_steps / 8))
-				resp_model = data["prompt"]["40"]["inputs"]["ckpt_name"].removesuffix(".safetensors")
-				data["prompt"]["5"]["inputs"].update(dict(
-					seed=seed,
-					steps=steps,
-					cfg=guidance_scale / 5,
-					denoise=strength if inim else 1,
-					latent_image=["36", 0] if inim else ["20", 0],
-				))
-				data["prompt"]["28"]["inputs"]["filename_prefix"] = str(seed)
-				data["prompt"]["4"]["inputs"]["text"] = negative_prompt
-				prompt = prompt.replace(" BREAK ", "\n")
-				data["prompt"]["44"]["inputs"]["clip_l"] = prompt
-				data["prompt"]["44"]["inputs"]["t5xxl"] = prompt
-				data["prompt"]["44"]["inputs"]["guidance"] = guidance_scale
-				if inim:
-					target = AUTH["comfyui_path"] + "/input"
-					fin = f"{seed}.png"
-					fn = target + "/" + fin
-					if not isinstance(inim, byte_like):
-						inim = await process_image(inim, "resize_to", ["-nogif", w, h, "auto", "-bg", "-oz"], timeout=20, retries=1)
-					async with aiofiles.open(fn, "wb") as f:
-						await f.write(inim)
-					data["prompt"]["35"]["inputs"]["image"] = fin
-					data["prompt"]["38"]["inputs"]["amount"] = n
-				else:
-					data["prompt"]["20"]["inputs"]["batch_size"] = n
-					data["prompt"]["20"]["inputs"]["width"] = w
-					data["prompt"]["20"]["inputs"]["height"] = h
-				# ts = 1024
-				# if aspect_ratio != 0:
-				# 	x, y = max_size(aspect_ratio, 1, ts, force=True)
-				# else:
-				# 	x = y = ts
-				# d = 32
-				# w2, h2 = (round(x / d) * d, round(y / d) * d)
-				# data["prompt"]["11"]["inputs"]["width"] = max(1, min(16384, w2 * 2))
-				# data["prompt"]["11"]["inputs"]["height"] = max(1, min(16384, h2 * 2))
-				# data["prompt"]["11"]["inputs"]["target_width"] = w
-				# data["prompt"]["11"]["inputs"]["target_height"] = h
-				api, entry = tuple(self.comfyui_api.items())[self.comfyui_i]
-				updatedefault(data["prompt"], entry["prompt"])
-				self.comfyui_i = (self.comfyui_i + 1) % self.comfyui_n
-				cost = mpf("0.00024") * (steps * w * h / 1048576)
-				resp = await Request.aio(
-					api + "/prompt",
-					data=json_dumps(data),
-					headers={"Content-Type": "application/json"},
-					method="POST",
-					json=True,
-				)
-				number = resp["number"]
-				queue.append((api, seed, number, n, prompt))
-			for api, seed, number, n, prompt in queue:
-				for att in range(1, 20):
-					resp = await Request.aio(
-						api + "/queue",
-						json=True,
-					)
-					waiting = False
-					for q in itertools.chain(resp["queue_running"], resp["queue_pending"]):
-						if q[0] == number:
-							waiting = True
-							break
-					if not waiting:
-						break
-					await asyncio.sleep(att ** 2 / 10)
-				target = AUTH["comfyui_path"] + "/output"
-				fn = target + f"/{seed}_{'%05d' % n}_.png"
-				print("Target:", fn)
-				if os.path.exists(fn) and os.path.getsize(fn):
-					pass
-				else:
-					raise FileNotFoundError("Unexpected error retrieving image.")
-				pnames.extend([prompt] * n)
-				temp_futs = [as_fut(target + f"/{seed}_{'%05d' % i}_.png") for i in range(1, n + 1)]
-				for fut in temp_futs:
-					fut.model = resp_model
-				futs.extend(temp_futs)
-				_premium.append(["mizabot", resp_model, cost])
 		ffuts = []
 		exc = RuntimeError("Unknown error occured.")
 		for tup, prompt in zip(futs, pnames):
@@ -1499,7 +1362,7 @@ class Imagine(Command):
 			embs.append(emb)
 		if len(files) == 2:
 			fe = files.pop(1)
-			urls = await bot.data.exec.stash(fe, filename=fe.filename)
+			urls = await bot.data.exec.lproxy(fe, filename=fe.filename)
 			if urls:
 				_comment = ("\n".join(url.split("?", 1)[0] for url in urls) + "\n" + _comment).strip()
 		return cdict(content=_comment, files=files, embeds=embs, prefix=prefix, reacts=reacts)

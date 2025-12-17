@@ -224,13 +224,14 @@ class AttachmentCache(AutoCache):
 			for (c, k, n) in tuple(last):
 				if utc() - snowflake_time_2(int(k)).timestamp() > 86400 * 6:
 					last.remove((c, k, n))
-					heads = self.headers if c not in self.channels else self.alt_headers
-					resp = requests.delete(
-						f"https://discord.com/api/{api}/channels/{c}/messages/{k}",
-						headers=heads,
-						timeout=5,
-					)
-					resp.raise_for_status()
+					with tracebacksuppressor:
+						heads = self.headers if c not in self.channels else self.alt_headers
+						resp = requests.delete(
+							f"https://discord.com/api/{api}/channels/{c}/messages/{k}",
+							headers=heads,
+							timeout=5,
+						)
+						resp.raise_for_status()
 			self.last = last
 
 	def preserve(self, url, mid=0, minimise=False):

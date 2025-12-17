@@ -1643,18 +1643,18 @@ async def proc_eval(s, caps=["math"], priority=False, timeout=12):
 	else:
 		raise RuntimeError("No suitable worker process for task.")
 	try:
-		fut = csubmit(p.pipe.asubmit(s, priority=priority))
+		fut = p.pipe.asubmit(s, priority=priority)
 		return await asyncio.wait_for(fut, timeout=timeout)
 	except (T0, T1, T2):
 		print(f"Process {p} timed out, restarting!")
 		csubmit(start_proc(p))
 		raise
 
-def process_math(expr, prec=64, rational=False, timeout=12, variables=None, retries=0):
+def process_math(expr, prec=64, rational=False, timeout=12, variables=None):
 	"Sends an operation to the math subprocess pool."
 	return proc_eval(f"x_math.procResp(x_math.evalSym({repr(expr)},{repr(prec)},{repr(rational)},{repr(variables)}))", caps=["math"], timeout=timeout)
 
-def process_image(image, operation="$", args=[], cap="image", priority=False, timeout=60, retries=1):
+def process_image(image, operation="$", args=[], cap="image", priority=False, timeout=60):
 	"Sends an operation to the image subprocess pool."
 	args = astype(args, list)
 	for i, a in enumerate(args):

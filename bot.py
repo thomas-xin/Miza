@@ -1880,7 +1880,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		args += ["-fs", fsize, "-f", fmt]
 		if isinstance(image, str) and is_url(image):
 			image = await attachment_cache.download(image, filename=True)
-		return await process_image(image, "resize_map", args, timeout=timeout, retries=2)
+		return await process_image(image, "resize_map", args, timeout=timeout)
 
 	# Map of search engine locations for browsing the internet. As we do not have access to the user's IP address, we estimate their timezone and use that to approximate their location.
 	browse_locations = {
@@ -1949,7 +1949,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			headers = fcdict(headers)
 			if headers.get("Content-Type").split("/", 1)[0] in ("image", "video"):
 				return await attachment_cache.download(argv)
-			return await process_image("browse", "$", [argv, not screenshot], cap="browse", timeout=timeout, retries=2)
+			return await process_image("browse", "$", [argv, not screenshot], cap="browse", timeout=timeout)
 		urls = find_urls(argv)
 		if not urls:
 			urls.append(argv)
@@ -2362,7 +2362,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		2: cdict(
-			instructive="gpt-5.2",
+			instructive="gemini-3-pro",
 			casual="gemini-3-pro",
 			nsfw="grok-4",
 			backup="gpt-5.2",
@@ -7961,7 +7961,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							user = None
 						if not user:
 							user = self._state.store_user(data["author"])
-							# user = await self.fetch_user(u_id)
 						before.author = user
 					try:
 						after = await discord.abc.Messageable.fetch_message(channel, before.id)
@@ -7970,8 +7969,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						after._update(data)
 					else:
 						before.author = after.author
-					if len(after.embeds) == 1 and after.embeds[0].type != "rich" and find_urls(after.content) or any((fmt := url2ext(url)) in IMAGE_FORMS or fmt in VIDEO_FORMS for a in message.attachments):
-						print(f"Possible embed-only update on message {after.id}, ignoring...")
+					if any(embed.image or embed.thumbnail or embed.video for embed in after.embeds) or any((fmt := url2ext(a.url)) in IMAGE_FORMS or fmt in VIDEO_FORMS for a in after.attachments):
+						# print(f"Possible embed-only update on message {after.id}, ignoring...")
 						return
 					raw = True
 				else:

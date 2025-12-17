@@ -65,6 +65,8 @@ class MemoryBytes:
 	def __init__(self, data):
 		if not isinstance(data, byte_like):
 			if isinstance(data, io.IOBase):
+				if hasattr(data, "seek"):
+					data.seek(0)
 				data = data.read()
 			else:
 				raise TypeError(f"Expected byte_like, got {type(data).__name__}")
