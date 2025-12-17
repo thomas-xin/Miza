@@ -1906,7 +1906,6 @@ class CreateEmoji(Command):
 	)
 	rate_limit = (8, 12)
 	_timeout_ = 6
-	typing = True
 	slash = ("Emoji",)
 
 	async def __call__(self, bot, _guild, _message, _perm, _name, name, url, **void):
@@ -1948,7 +1947,6 @@ class CreateSound(Command):
 	)
 	rate_limit = (8, 12)
 	_timeout_ = 6
-	typing = True
 	slash = ("Soundboard",)
 
 	async def __call__(self, bot, _guild, _perm, _name, name, emoji, url, **void):
@@ -2049,7 +2047,6 @@ class CreateSticker(Command):
 	)
 	rate_limit = (8, 12)
 	_timeout_ = 8
-	typing = True
 	slash = ("Sticker",)
 
 	async def __call__(self, bot, _guild, name, emoji, url, **void):

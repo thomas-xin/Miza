@@ -1526,7 +1526,6 @@ class Urban(Command):
 		),
 	)
 	rate_limit = (5, 8)
-	typing = True
 	slash = True
 	ephemeral = True
 	header = {

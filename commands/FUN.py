@@ -2956,7 +2956,6 @@ class RPS(Command):
 	usage = "<move(rock|paper|scissors)>?"
 	example = ("rockpaperscissors", "rps rock")
 	slash = True
-	typing = False
 	rate_limit = (0.5, 3)
 
 	buttons = [

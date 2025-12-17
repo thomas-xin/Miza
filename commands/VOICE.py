@@ -1954,7 +1954,6 @@ class Download(Command):
 		),
 	)
 	rate_limit = (30, 45)
-	typing = True
 	slash = True
 	msgcmd = ("Download as mp3",)
 	ephemeral = True

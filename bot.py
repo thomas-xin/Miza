@@ -5373,10 +5373,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					pass
 			self.data.usage.add(command)
 			# Add a callback to typing in the channel if the command takes too long
-			if fut is None and not hasattr(command, "typing") and channel and not getattr(message, "simulated", False):
-				csubmit(delayed_callback(future, sqrt(3), self._state.http.send_typing, channel.id, repeat=9, exc=True))
 			if slash or getattr(message, "slash", None):
 				csubmit(delayed_callback(future, 1, self.defer_interaction, message, ephemeral=getattr(message, "ephemeral", False), exc=False))
+			elif fut is None and not hasattr(command, "typing") and channel and not getattr(message, "simulated", False):
+				csubmit(delayed_callback(future, 1, self._state.http.send_typing, channel.id, repeat=9, exc=True))
 			csem = emptyctx if isnan(command.min_level) else self.command_semaphore
 		async with csem:
 			response = await future
