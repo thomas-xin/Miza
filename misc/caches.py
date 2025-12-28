@@ -10,7 +10,6 @@ import subprocess
 import time
 import traceback
 import zipfile
-import aiofiles
 import aiohttp
 import niquests
 import numpy as np
@@ -22,7 +21,7 @@ from misc.types import utc, as_str, byte_like, cdict
 from misc.asyncs import asubmit, esubmit, wrap_future, await_fut, Future
 from misc.smath import get_closest_heart
 from misc.util import (
-    CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, download_file, header_test,
+    CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, read_file_a, download_file, header_test,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist,
 	ungroup_attachments, is_discord_url, temporary_file, url2ext, is_discord_attachment, is_miza_url,
     snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt,
@@ -387,8 +386,7 @@ class AttachmentCache(AutoCache):
 			return (fp, headers) if return_headers else fp
 		try:
 			if hasattr(fp, "name") and os.path.exists(fp.name):
-				async with aiofiles.open(fp.name, "rb") as f:
-					data = await f.read()
+				data = await read_file_a(fp.name)
 				return (data, headers) if return_headers else data
 			data = await asubmit(fp.read)
 			return (data, headers) if return_headers else data

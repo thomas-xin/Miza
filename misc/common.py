@@ -769,17 +769,19 @@ async def send_with_react(channel, *args, reacts=None, reference=None, mention=F
 
 voice_channels = lambda guild: [channel for channel in guild.channels if getattr(channel, "type", None) in (discord.ChannelType.voice, discord.ChannelType.stage_voice)]
 
-async def select_voice_channel(user, channel):
+async def select_voice_channel(user, channel, find=True):
 	# Attempt to match user's currently connected voice channel
-	if getattr(user, "voice", None):
+	if find and getattr(user, "voice", None):
 		return user.voice.channel
 	if not user.guild:
-		raise LookupError("Unable to find voice channel.")
+		raise DisconnectedChannelError("Unable to find voice channel.")
 	user = await user.guild.fetch_member(user.id)
 	user.guild._members[user.id] = user
 	voice = user.voice
 	if voice:
 		return voice.channel
+	if not find:
+		raise DisconnectedChannelError("Unable to find voice channel.")
 	# Otherwise attempt to find closest voice channel to current text channel
 	catg = channel.category
 	if catg is not None:
@@ -794,7 +796,7 @@ async def select_voice_channel(user, channel):
 	if channels:
 		vc = channels[0]
 	else:
-		raise LookupError("Unable to find voice channel.")
+		raise DisconnectedChannelError("Unable to find voice channel.")
 	return vc
 
 

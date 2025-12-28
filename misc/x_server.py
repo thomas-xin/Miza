@@ -1,3 +1,4 @@
+from urllib.parse import quote_plus
 import datetime
 import functools
 import io
@@ -16,6 +17,7 @@ import urllib
 import zipfile
 import cheroot
 import cherrypy
+import diskcache
 import niquests
 import orjson
 import psutil
@@ -25,8 +27,8 @@ from traceback import print_exc
 from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut
-from .types import byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, MemoryBytes
-from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, rename, url_unparse, url2fn, is_youtube_url, seq, Request, magic, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG
+from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, MemoryBytes
+from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url_unparse, url2fn, is_youtube_url, seq, Request, get_mime, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG
 from .caches import attachment_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -599,20 +601,51 @@ class Server:
 	@cp.tools.accept(media="multipart/form-data")
 	def reupload(self, url=None, filename=None, **void):
 		try:
-			resp = cp.request.body.fp
+			fp = cp.request.body.fp
 		except Exception:
 			print_exc()
-			resp = None
-		if not resp or int(cp.request.headers.get("Content-Length", 0)) < 1:
+			fp = None
+		if not fp or int(cp.request.headers.get("Content-Length", 0)) < 1:
 			if not url:
 				return "Expected input URL or data."
-			headers = Request.header()
-			if cp.request.headers.get("Range"):
-				headers["Range"] = cp.request.headers["Range"]
-			resp = self.get_with_retries(url, headers=headers, timeout=3)
+			fp = await_fut(attachment_cache.download(url, read=True))
 		fn = filename or (url2fn(url) if url else None)
-		fut = attachment_cache.create(seq(resp), filename=fn)
+		fut = attachment_cache.create(fp, filename=fn)
 		return await_fut(fut)
+
+	upload_cache = diskcache.Cache(f"{CACHE_PATH}/uploads", size_limit=128 * 1073741824)
+
+	@cp.expose
+	@cp.tools.accept(media="multipart/form-data")
+	def upload(self, url=None, filename=None, **void):
+		try:
+			fp = cp.request.body.fp
+		except Exception:
+			print_exc()
+			fp = None
+		if not fp or int(cp.request.headers.get("Content-Length", 0)) < 1:
+			if not url:
+				return "Expected input URL or data."
+			fp = await_fut(attachment_cache.download(url, read=True))
+		fn = filename or (url2fn(url) if url else None)
+		ts = n2p(ts_us()).decode("ascii")
+		self.upload_cache.set(ts, fp, tag=fn, read=True)
+		fp, fn = self.upload_cache.get(ts, tag=True, read=True)
+		mimetype = get_mime(fp)
+		ext = mime_into(mimetype)
+		url = API + f"/f/{ts}.{ext}"
+		return url
+
+	@cp.expose
+	def download(self, path):
+		ts = path.rsplit("/", 1)[-1].split(".", 1)[0]
+		fp, fn = self.upload_cache.get(ts, tag=True, read=True)
+		if not fp:
+			raise FileNotFoundError(404, path)
+		mimetype = get_mime(fp)
+		fp.seek(0)
+		return cp.lib.static.serve_fileobj(fp, name=fn, content_type=mimetype, disposition="inline")
+	download._cp_config = {"response.stream": True}
 
 	def proxy_if(self, url):
 		assert isinstance(url, str), url
@@ -667,7 +700,7 @@ class Server:
 		if ctype in ("text/html", "text/html; charset=utf-8", "application/octet-stream"):
 			it = resp.iter_content(262144)
 			b = next(it)
-			mime = magic.from_buffer(b)
+			mime = get_mime(b)
 			if mime == "application/octet-stream":
 				a = MemoryBytes(b)[:128]
 				if sum(32 <= c < 128 for c in a) >= len(a) * 7 / 8:
@@ -858,15 +891,6 @@ class Server:
 		return json_dumps(dict(colour=resp))
 
 	@cp.expose
-	def specexec(self, url, **kwargs):
-		update_headers(cp.response.headers, **HEADERS)
-		argv = " ".join(itertools.chain.from_iterable(kwargs.items()))
-		b = self.command(input=f"spectralpulse {url} {argv}")
-		data = orjson.loads(b)
-		url = data[0]["content"].replace("/d/", "/f/")
-		raise cp.HTTPRedirect(url, status="307")
-
-	@cp.expose
 	def filelist(self, path=None):
 		update_headers(cp.response.headers, **HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
@@ -922,8 +946,6 @@ class Server:
 			raise cp.HTTPRedirect(url.replace("/p/", "/file/"), status=307)
 		if "/preview/" in url:
 			raise cp.HTTPRedirect(url.replace("/preview/", "/file/"), status=307)
-		if "/upload" in url:
-			raise cp.HTTPRedirect(url.replace("/upload", "/files"), status=307)
 		data, mime = fetch_static("index.html")
 		if url.split("//", 1)[-1].count("/") > 1:
 			meta = '<meta property="og:title" content="Miza"><meta property="og:description" content="A multipurpose Discord bot.">'
@@ -1008,23 +1030,6 @@ class Server:
 	@cp.expose
 	def error(self, code=400):
 		raise ConnectionError(int(code))
-
-	def hash_file(self, fn):
-		if os.name != "nt":
-			return ""
-		args = ["certutil", "-hashfile", fn, "sha384"]
-		print(args)
-		s = ""
-		try:
-			s = subprocess.check_output(args)
-			s = s.splitlines()[1].decode("ascii")
-			print(s)
-			return s
-		except Exception:
-			if s:
-				print(s)
-			print_exc()
-		return ""
 
 	@cp.expose
 	def backup(self, token="~"):

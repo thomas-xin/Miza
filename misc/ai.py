@@ -8,6 +8,7 @@ from traceback import format_exc, print_exc
 from mpmath import mpf
 import numpy as np
 import openai
+assert hasattr(openai, "AsyncOpenAI"), "OpenAI library has incorrect version installed!"
 from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, tracebacksuppressor, utc, T, string_like, getattr_chain
 from misc.util import AUTH, CACHE_PATH, AutoCache, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across
 from misc.asyncs import asubmit, csubmit, emptyctx, gather, Semaphore, CloseableAsyncIterator

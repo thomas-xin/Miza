@@ -319,10 +319,11 @@ class AudioPlayer(discord.AudioSource):
 		if announce:
 			channel = self.channel if self else client.get_channel(cid)
 			s = ansi_md(colourise_auto(f"$b<🎵> Successfully disconnected from $m<{self.channel.guild}>. $b<🎵>"))
-			return await cls.announce(self, s, channel=channel)
+			return await cls.announce(self, s, channel=channel, dump=True)
 
 	async def leave(self, reason=None, dump=False):
-		csubmit(self.disconnect(self.vcc.guild))
+		if self.vcc and self.vcc.guild:
+			csubmit(self.disconnect(self.vcc.guild))
 		if not self.channel:
 			return
 		r = f": $y<{reason}>" if reason else ""
@@ -543,6 +544,8 @@ class AudioPlayer(discord.AudioSource):
 		return args
 
 	async def announce_play(self, entry):
+		if entry.get("hidden", False):
+			return
 		if not self.channel or not self.channel.permissions_for(self.channel.guild.me).send_messages:
 			return
 		try:
@@ -560,12 +563,14 @@ class AudioPlayer(discord.AudioSource):
 		channel = channel or self.channel
 		if not dump and self and (not channel or self.settings.get("quiet") or not channel.permissions_for(channel.guild.me).send_messages):
 			return
-		if dump:
+		if dump and bool(self.queue):
 			assert self, "No accessible queue to save!"
 			b = self.get_dump()
 			ext = "json" if get_ext(b) != "zip" else "zip"
 			dump = discord.File(io.BytesIO(b), filename=f"dump.{ext}")
-		message = await channel.send(lim_str(s, 2000), file=dump or None)
+		else:
+			dump = None
+		message = await channel.send(lim_str(s, 2000), file=dump)
 		if channel.permissions_for(channel.guild.me).add_reactions:
 			csubmit(message.add_reaction("❎"))
 		return message
@@ -652,7 +657,7 @@ class AudioPlayer(discord.AudioSource):
 		if connected:
 			listeners = sum(not m.bot and bool(m.voice) for m in self.vcc.members)
 			if listeners == 0:
-				await self.leave("Channel empty", dump=len(self.queue) > 0)
+				await self.leave("Channel empty", dump=True)
 
 	updating_streaming = None
 	def update_streaming(self):
@@ -733,7 +738,10 @@ class AudioPlayer(discord.AudioSource):
 			if stride == 1 and (start == -1 or start > len(self.queue) or not self.queue):
 				self.queue.extend(items)
 			else:
-				self.queue.rotate(-start)
+				if start == 0:
+					self.queue[0].start = self.epos[0]
+				else:
+					self.queue.rotate(-start)
 				rotpos = start
 				if stride == 1:
 					self.queue.extend(items)
@@ -780,6 +788,9 @@ class AudioPlayer(discord.AudioSource):
 					if shuffler >= len(self.queue):
 						shuffler = 0
 					self.shuffler = shuffler
+				for e in resp:
+					e.pop("start", None)
+					e.pop("end", None)
 				self.queue.extend(resp)
 		esubmit(self.ensure_play)
 		return resp
@@ -1521,7 +1532,7 @@ async def unload_player(gid):
 		a.backup()
 		await a.leave(
 			reason="Temporary maintenance",
-			dump=bool(a.queue),
+			dump=True,
 		)
 
 async def autosave_loop(start=True):

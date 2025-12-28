@@ -470,10 +470,6 @@
 			"level": "0",
 			"rate_limit": "(12, 16)",
 			"schema": {
-				"history": {
-					"description": "Whether chat history is enabled",
-					"type": "bool"
-				},
 				"model": {
 					"description": "Model size hint. Larger size increases intelligence, at the cost of higher quota usage",
 					"example": "small",
@@ -554,9 +550,11 @@
 					"type": "bool"
 				},
 				"tts": {
-					"description": "Whether the output should trigger Discord TTS. Incompatible with streamed editing, default false",
-					"example": "true",
-					"type": "bool"
+					"description": "Whether the output should include automatic text-to-speech audio. \"discord\" mode uses Discord's builtin TTS feature, while \"builtin\" mode will play the output in the voice channel when available",
+					"type": "enum",
+					"validation": {
+						"enum": ["none", "discord", "builtin"]
+					}
 				}
 			},
 			"timeout": "24"
@@ -788,6 +786,10 @@
 			"level": "0",
 			"rate_limit": "(10, 15)",
 			"schema": {
+				"autoplay": {
+					"description": "Automatically plays in the current voice channel once generated",
+					"type": "bool"
+				},
 				"format": {
 					"default": "opus",
 					"description": "The file format or codec of the output",

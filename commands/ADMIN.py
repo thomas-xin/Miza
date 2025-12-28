@@ -1971,8 +1971,7 @@ class CreateSound(Command):
 				with tracebacksuppressor:
 					force_kill(proc)
 				raise
-			with open(fn, "rb") as f:
-				data = await asubmit(f.read)
+			data = await read_file_a(fn)
 		else:
 			fn1 = f"{TEMP_PATH}/{i}~1.mp3"
 			fn2 = f"{TEMP_PATH}/{i}~2.mp3"

@@ -1641,7 +1641,7 @@ class UpdateUsers(Database):
 		return self.get_timezone(uid) or self.estimate_timezone(uid)[0]
 
 	def get_timezone(self, uid):
-		timezone = self.bot.get_userbase(uid, "timezone")
+		timezone = self.bot.get_userbase(uid, "profile", {}).get("timezone")
 		if timezone is not None:
 			return get_timezone(timezone)
 
@@ -1858,7 +1858,7 @@ class UpdateUsers(Database):
 			if channel.id in stored and len(stored) < 5:
 				m_id = stored[channel.id]
 				try:
-					await bot.fetch_message(m_id, channel)
+					await bot.fetch_message(m_id, channel, fast=True)
 				except (discord.NotFound, LookupError):
 					stored[channel.id] = message.id
 				except:
@@ -1870,7 +1870,7 @@ class UpdateUsers(Database):
 					stored.pop(c_id, None)
 				else:
 					try:
-						m = await bot.fetch_message(m_id, c)
+						m = await bot.fetch_message(m_id, c, fast=True)
 					except (discord.NotFound, LookupError):
 						stored.pop(c_id, None)
 					except:

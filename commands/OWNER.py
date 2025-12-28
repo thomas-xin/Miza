@@ -1149,8 +1149,7 @@ class UpdateEmojis(Database):
 		else:
 			return emoji
 		if emojidata is not None and len(emojidata["items"]) < 2000:
-			with open("misc/emojis/heart.svg", "rb") as f:
-				b = await asubmit(f.read)
+			b = await read_file_a("misc/emojis/heart.svg")
 			b = await process_image(b, "replace_colour", [rgb, "-f", "webp"], timeout=60)
 			b2 = await bot.to_data_url(b)
 			async with self.sem3:
@@ -1210,8 +1209,7 @@ class UpdateEmojis(Database):
 					bot.cache.emojis[emoji.id] = emoji
 					return emoji
 		if emojidata is not None and len(emojidata["items"]) < 2000:
-			with open(f"misc/emojis/{name}", "rb") as f:
-				b = await asubmit(f.read)
+			b = await read_file_a(f"misc/emojis/{name}")
 			b2 = await bot.to_data_url(b)
 			async with self.sem3:
 				edata = await Request.aio(
@@ -1236,8 +1234,7 @@ class UpdateEmojis(Database):
 			return emoji
 		if not sum(limits):
 			raise LookupError("Unable to find suitable guild for the required emoji.")
-		with open(f"misc/emojis/{name}", "rb") as f:
-			b = await asubmit(f.read)
+		b = await read_file_a(f"misc/emojis/{name}")
 		emoji = await guilds[0].create_custom_emoji(name=ename, image=b)
 		self.data[name] = emoji.id
 		bot.cache.emojis[emoji.id] = emoji

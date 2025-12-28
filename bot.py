@@ -1256,7 +1256,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			data.update({m.id: m for m in right})
 		self.cache.messages.update(data)
 		return data[m_id]
-	async def fetch_message(self, m_id, channel=None, old=False):
+	async def fetch_message(self, m_id, channel=None, old=False, fast=False):
 		if not isinstance(m_id, int):
 			if is_discord_url(m_id) and "/channels/" in m_id:
 				url = m_id
@@ -1284,6 +1284,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					m = None
 		if m:
 			return m
+		if fast:
+			return await channel.fetch_message(m_id)
 		return await self._fetch_message(m_id, channel)
 
 	async def fetch_reference(self, message):
@@ -1623,9 +1625,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	mime = magic.Magic(mime=True, mime_encoding=True)
 	mimes = {}
 
-	async def superclean_content(self, message):
+	async def superclean_content(self, message, keep_emojis=True):
 		content = readstring(message if isinstance(message, str) else message.clean_content or message.content)
 		for e in find_emojis_ex(content, cast_urls=False):
+			if not keep_emojis:
+				content = content.replace(e, "")
+				continue
 			emoji = await self.resolve_emoji(e)
 			if not getattr(emoji, "unicode", None):
 				content = content.replace(e, f":{emoji.name}:")
@@ -2513,7 +2518,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				tools = toolscan
 			else:
 				tools = tools or None
-			if len(messages) <= 4:
+			if True:#len(messages) <= 4:
 				used_tools = {m["name"] for m in messages if m.get("role") == "tool"}
 				tools = [t for t in tools if t["function"]["name"] in used_tools]
 			cargs["tools"] = tools
@@ -2827,8 +2832,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if not is_url(url):
 				if not os.path.exists(url):
 					return url
-				with open(url, "rb") as f:
-					d = await asubmit(f.read)
+				d = await read_file_a(url)
 			else:
 				mime, name, d = await self.req_data(url, timeout=timeout, screenshot=True)
 		else:
@@ -5516,7 +5520,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return 0
 		# Return the delay before the message can be called again. This is calculated by the rate limit of the command.
 		return 0
-	
+
+	async def auto_tts(self, content, message):
+		if "tts" not in self.commands:
+			return
+		try:
+			return await self.run_command(self.commands.tts[0], dict(voice="openai-coral", text=content, autoplay=True), message=message, respond=False)
+		except DisconnectedChannelError as ex:
+			print(repr(ex))
+		except Exception:
+			print_exc()
+
 	async def respond_with(self, response, message=None, manager=None, done=True, timeout=3600):
 		with self.command_semaphore:
 			# Limit for regular Discord messages, beyond which we'll need to split the text into multiple messages
@@ -5534,6 +5548,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				suffix = response.pop("suffix", None) or ""
 				content = response.pop("content", None) or ""
 				tts = response.pop("tts", False) or False
+				b_tts = response.pop("b_tts", False) or False
 				def get_prefix():
 					return prefix if not bypass_prefix or none(content.startswith(b) for b in bypass_prefix) else ""
 				def get_suffix():
@@ -5627,16 +5642,26 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if fut:
 						with tracebacksuppressor:
 							await fut
+					content = add_content(old_content, content)
+					if b_tts and message:
+						clean = await self.superclean_content(content)
+						tfut = csubmit(self.auto_tts(clean, message))
+					else:
+						tfut = None
 					try:
-						new_content = await self.proxy_emojis(add_content(old_content, content), guild=message.guild)
+						new_content = await self.proxy_emojis(content, guild=message.guild)
 						await manager.update(new_content, embeds=embeds, files=files, buttons=buttons, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), reacts=reacts, done=done, force=force)
 					except (OverflowError, InterruptedError):
 						# If the StreamedMessage was interrupted or exceeded the maximum length, we wipe the original and force a new message. This ensures the list of messages stays contiguous, which improves readability.
 						csubmit(manager.delete())
+						if tfut:
+							await tfut
 					else:
 						messages = await manager.collect()
 						for m in messages:
 							self.add_message(m, force=2)
+						if tfut:
+							await tfut
 						return manager
 				if isinstance(content, collections.abc.AsyncIterator):
 					async for cc in content:
@@ -7672,7 +7697,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					custom_id = "~" + custom_id
 				else:
 					m_id = data["message"]["id"]
-				m = await self.fetch_message(m_id, channel)
+				m = await self.fetch_message(m_id, channel, fast=True)
 				if getattr(m, "method", None):
 					del m.method
 				add = False

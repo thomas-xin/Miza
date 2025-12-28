@@ -26,7 +26,7 @@ if not hasattr(time, "time_ns"):
 	time.time_ns = lambda: int(time.time() * 1e9)
 
 UNIQUE_TS = 0
-def ts_us():
+def ts_us() -> int:
 	global UNIQUE_TS
 	ts = max(UNIQUE_TS + 1, time.time_ns())
 	UNIQUE_TS = ts
@@ -1697,11 +1697,14 @@ class TooManyRequests(PermissionError):
 	pass
 class CommandCancelledError(Exception):
 	pass
+class DisconnectedChannelError(LookupError):
+	pass
 
 AE = ArgumentError
 EE = EnumError
 TMR = TooManyRequests
 CCE = CommandCancelledError
+DCE = DisconnectedChannelError
 
 def getattr_chain(obj, attrs, default=Dummy):
 	for attr in attrs.split("."):

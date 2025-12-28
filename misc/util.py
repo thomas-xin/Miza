@@ -111,6 +111,10 @@ async def save_file_a(data, fn):
 			data = await asubmit(data.read)
 		await f.write(data)
 
+async def read_file_a(fn):
+	async with aiofiles.open(fn, "rb") as f:
+		return await f.read()
+
 _globals = globals()
 def save_auth(auth):
 	globals()["AUTH"].update(auth)
@@ -770,7 +774,7 @@ def close_markdown(text):
 			text += closed[-1]
 	return text, "".join(reversed(closed))
 
-def split_text(text, max_length=2000, priority=("\n\n", "\n", "\t", "? ", "! ", ". ", ", ", " "), prefix="", suffix=""):
+def split_text(text, max_length=2000, priority=("\n\n", "\n", "\t", "? ", "! ", "။", "。", ". ", ", ", " "), prefix="", suffix=""):
 	chunks = []
 	opening = ""
 	while text:
@@ -1373,7 +1377,7 @@ special_mimes = {
 }
 inv_mimes = {v: k for k, v in special_mimes.items()}
 
-def mime_into(mime):
+def mime_into(mime: str) -> str:
 	ext = mime.split("/", 1)[-1]
 	return inv_mimes.get(ext) or ext.rsplit("/", 1)[-1]
 

@@ -250,10 +250,6 @@ class Ask(Command):
 			description="Model size hint. Larger size increases intelligence, at the cost of higher quota usage",
 			example="small",
 		),
-		history=cdict(
-			type="bool",
-			description="Whether chat history is enabled",
-		),
 	)
 	rate_limit = (12, 16)
 	slash = True
@@ -262,7 +258,7 @@ class Ask(Command):
 	reset = {}
 	visited = {}
 
-	async def __call__(self, bot, _message, _guild, _channel, _user, _nsfw, _prefix, _premium, prompt, model, history, **void):
+	async def __call__(self, bot, _message, _guild, _channel, _user, _nsfw, _prefix, _premium, prompt, model, **void):
 		await bot.require_integrity(_message)
 		self.description = f"Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. See {bot.kofi_url} for premium tier chatbot specifications; check using ~serverinfo, or apply it with ~premium!"
 		await bot.seen(_user, event="misc", raw="Talking to me")
@@ -356,9 +352,10 @@ class Ask(Command):
 		await bot.require_integrity(_message)
 		print("ASK:", _channel.id, input_message)
 		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, model, nsfw, simulated)
-		if pdata.stream and not pdata.tts and not simulated:
+		if pdata.stream and pdata.tts != "discord" and not simulated:
 			return cdict(
 				content=fut,
+				b_tts=pdata.tts == "builtin",
 			)
 		temp = await flatten(fut)
 		if not temp:
@@ -366,7 +363,7 @@ class Ask(Command):
 		elif isinstance(temp[-1], dict) and (temp[-1].content.startswith("\r") or len(temp) == 1):
 			resp = temp[-1]
 			resp["content"] = await bot.proxy_emojis(resp["content"], guild=_guild)
-			resp["tts"] = pdata.tts
+			resp["tts"] = pdata.tts == "discord"
 			return resp
 		raise RuntimeError(temp)
 
@@ -709,7 +706,10 @@ class Ask(Command):
 			if pdata.history != "shared":
 				tips.append("*Tip: For privacy reasons, conversation histories (allowing referencing previous messages in the same channel) is disabled by default. If you would like to enable this, use `~chatconfig --history private`, or `~chatconfig --history shared` if you would also like the bot to be able to read multi-user conversations. This enables me to read up to 192 previous messages from the current channel. No messages from other channels are included.*")
 			note = "-# " + choice(tips)
-			response.content += "\n" + note
+			embs.append(discord.Embed(
+				colour=rand_colour(),
+				description=note
+			))
 			print(">", note)
 		response.embeds = embs
 		response.reacts = tuple(response.get("reacts", ())) + tuple(reacts)
@@ -756,9 +756,11 @@ class ChatConfig(Command):
 			example="false",
 		),
 		tts=cdict(
-			type="bool",
-			description="Whether the output should trigger Discord TTS. Incompatible with streamed editing, default false",
-			example="true",
+			type="enum",
+			validation=cdict(
+				enum=("none", "discord", "builtin"),
+			),
+			description="""Whether the output should include automatic text-to-speech audio. "discord" mode uses Discord's builtin TTS feature, while "builtin" mode will play the output in the voice channel when available""",
 		),
 		history=cdict(
 			type="enum",
@@ -782,7 +784,7 @@ class ChatConfig(Command):
 			model="auto",
 			description=DEFPER,
 			stream=True,
-			tts=False,
+			tts="none",
 			history="none",
 		) if update else cdict()
 		p = self.bot.get_guildbase(get_guild_id(channel), "chatconfig", {}).get(channel.id)
@@ -1768,12 +1770,24 @@ class TTS(Command):
 			description="The file format or codec of the output",
 			default="opus",
 		),
+		autoplay=cdict(
+			type="bool",
+			description="Automatically plays in the current voice channel once generated",
+		),
 	)
 	rate_limit = (10, 15)
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, _premium, voice, text, format, **void):
+	async def __call__(self, bot, _guild, _channel, _user, _perm, _premium, voice, text, format, autoplay, **void):
+		if autoplay:
+			assert format == "opus", "Only opus format can be played in voice."
+			assert bot.audio and "voice" in bot.get_enabled(_channel), "Voice commands must be enabled for autoplay."
+			vc_ = await select_voice_channel(_user, _channel, find=False)
+			if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
+				raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
+			vc_fut = csubmit(bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id})"))
+		text = await bot.superclean_content(text)
 		engine, mode = voice.split("-", 1)
 		fi = temporary_file()
 		desc = None
@@ -1786,7 +1800,9 @@ class TTS(Command):
 					model=model,
 					voice=mode,
 					input=text,
+					instructions="Gentle and soothing, but steady voice",
 					response_format=format,
+					speed=1,
 				)
 				c = await tcount(text)
 				_premium.append(["openai", model, mpf("12.6") / 1000000 * c])
@@ -1801,11 +1817,11 @@ class TTS(Command):
 				fmt = "wav"
 			case _:
 				raise NotImplementedError(engine)
-		if fmt == format:
+		if False:#fmt == format:
 			fo = fi
 		else:
 			fo = temporary_file(format)
-			args = ["ffmpeg", "-v", "error", "-hide_banner", "-vn", "-i", fi, "-b:a", "128k", "-vbr", "on", fo]
+			args = ["ffmpeg", "-v", "error", "-hide_banner", "-vn", "-i", fi, "-af", "volume=2", "-b:a", "128k", "-vbr", "on", fo]
 			print(args)
 			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
 			try:
@@ -1815,6 +1831,22 @@ class TTS(Command):
 				with tracebacksuppressor:
 					force_kill(proc)
 				raise
+		if autoplay:
+			await vc_fut
+			b = await read_file_a(fo)
+			async with niquests.AsyncSession() as asession:
+				resp = await asession.post(
+					"https://api.mizabot.xyz/upload",
+					data=b,
+				)
+				url = resp.text
+			items = [cdict(
+				name=text[:48],
+				url=url,
+				hidden=True,
+			)]
+			await bot.audio.asubmit(f"AP.from_guild({_guild.id}).enqueue({json_dumpstr(items)},start={0})")
+			return
 		return cdict(
 			content=desc,
 			file=CompatFile(fo, filename=text[:48] + "." + format),
