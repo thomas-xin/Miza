@@ -7,45 +7,6 @@ import contextlib
 import concurrent.futures
 from concurrent.futures import thread
 
-def _adjust_thread_count(self):
-	# if idle threads are available, don't spin new threads
-	try:
-		if self._idle_semaphore.acquire(timeout=0):
-			return
-	except AttributeError:
-		pass
-
-	# When the executor gets lost, the weakref callback will wake up
-	# the worker threads.
-	def weakref_cb(_, q=self._work_queue):
-		q.put(None)
-
-	num_threads = len(self._threads)
-	if num_threads < self._max_workers:
-		thread_name = '%s_%d' % (self._thread_name_prefix or self, num_threads)
-		args = [
-			thread.weakref.ref(self, weakref_cb),
-			self._work_queue,
-		]
-		try:
-			args.extend((
-				self._initializer,
-				self._initargs,
-			))
-		except AttributeError:
-			pass
-		t = thread.threading.Thread(
-			name=thread_name,
-			target=thread._worker,
-			args=args,
-			daemon=True
-		)
-		t.start()
-		self._threads.add(t)
-		thread._threads_queues[t] = self._work_queue
-
-concurrent.futures.ThreadPoolExecutor._adjust_thread_count = lambda self: _adjust_thread_count(self)
-
 import sys
 import collections
 import time

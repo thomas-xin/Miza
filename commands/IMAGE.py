@@ -1437,7 +1437,7 @@ class Blend(Command):
 		operation=cdict(
 			type="enum",
 			validation=cdict(
-				enum=("blend", "replace", "add", "sub", "mul", "div", "mod", "and", "or", "xor", "nand", "nor", "xnor", "difference", "overlay", "screen", "soft", "hard", "lighten", "darken", "plusdarken", "overflow", "lighting", "burn", "linearburn", "dodge", "hue", "saturation", "lightness", "lum", "value", "colour", "extract", "merge", "alpha"),
+				enum=("blit", "blend", "replace", "add", "sub", "mul", "div", "mod", "and", "or", "xor", "nand", "nor", "xnor", "difference", "overlay", "screen", "soft", "hard", "lighten", "darken", "plusdarken", "overflow", "lighting", "burn", "linearburn", "dodge", "hue", "saturation", "lightness", "lum", "value", "colour", "extract", "merge", "alpha"),
 				accepts={"normal": "blend", "blt": "blend", "blit": "blend", "+": "add", "addition": "add", "additive": "add", "-": "sub", "subtract": "sub", "subtraction": "sub", "subtractive": "sub", "*": "mul", "multiply": "mul", "mult": "mul", "multiplication": "mul", "multiplicative": "mul", "/": "div", "divide": "div", "division": "div", "divisive": "div", "modulo": "mod", "%": "mod", "&": "and", "|": "or", "^": "xor", "~&": "nand", "~|": "nor", "~^": "xnor", "diff": "difference", "softlight": "soft", "hardlight": "hard","lighter": "lighten", "darker": "darken", "plusdarker": "plusdarken", "grainextract": "extract", "grainmerge": "merge", "colorburn": "burn", "colourburn": "burn", "colordodge": "dodge", "colourdodge": "dodge", "lineardodge": "add", "sat": "saturation", "brightness": "lightness", "luminosity": "lum", "luminance": "lum", "val": "value", "color": "colour"},
 			),
 			description="Blend operation to perform",

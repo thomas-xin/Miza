@@ -537,7 +537,7 @@ def _audio_meta(path, _timeout=12) -> dict:
 	return dict(
 		name=f"{name}: {title}" if name and title else None,
 		duration=(dur := float(info.get("duration") or int(info.get("duration_ts") or 0) * fractions.Fraction(info.get("time_base") or 0))) or None,
-		format=info.get("format_name") or url2ext(info["filename"]),
+		format=info.get("format_name") or url2ext(info.get("filename") or path),
 		codec=info.get("codec_name", "auto"),
 		channels=int(info.get("channels") or 1),
 		bitrate=float(info.get("bit_rate") or float(info.get("size", 0)) * 8 / (dur or 1) or 0),

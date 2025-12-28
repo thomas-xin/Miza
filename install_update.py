@@ -24,7 +24,7 @@ if sys.version_info.major == 3 and sys.version_info.minor >= 10:
 
 installing = []
 def install(m):
-	installing.append(subprocess.Popen([python, "-m", "pip", "install", m, "--upgrade"]))
+	installing.append(subprocess.Popen([python, "-m", "pip", "install", m, "--upgrade", "--upgrade-strategy", "eager"]))
 	if len(installing) > 8:
 		installing.pop(0).wait()
 
@@ -76,14 +76,14 @@ for mod in modlist:
 				print(s)
 			print_exc()
 			inst = name
-			if op in ("==", "<="):
+			if version and op in ("==", "<="):
 				inst += "==" + version
 			install(inst)
 
 # Run pip on any modules that need installing
 if installing:
 	print("Installing missing or outdated modules, please wait...")
-	subprocess.run([python, "-m", "pip", "install", "pip", "--upgrade"])
+	subprocess.run([python, "-m", "pip", "install", "pip", "--upgrade", "--upgrade-strategy", "eager"])
 	for i in installing:
 		i.wait()
 try:
@@ -96,13 +96,13 @@ try:
 	assert v >= "4.0.0rc1"
 except Exception:
 	print_exc()
-	subprocess.run([python, "-m", "pip", "install", "googletrans==4.0.0rc1", "--upgrade"])
+	subprocess.run([python, "-m", "pip", "install", "googletrans==4.0.0rc1", "--upgrade", "--upgrade-strategy", "eager"])
 
 # if os.environ.get("AI_FEATURES", True):
 # 	try:
 # 		assert importlib.metadata.version("encodec") >= "0.1.2a3"
 # 	except (importlib.metadata.PackageNotFoundError, AssertionError):
-# 		subprocess.run([python, "-m", "pip", "install", "git+https://github.com/facebookresearch/encodec", "--upgrade"])
+# 		subprocess.run([python, "-m", "pip", "install", "git+https://github.com/facebookresearch/encodec", "--upgrade", "--upgrade-strategy", "eager"])
 # 	try:
 # 		if sys.version_info.major == 3 and sys.version_info.minor >= 12:
 # 			pass

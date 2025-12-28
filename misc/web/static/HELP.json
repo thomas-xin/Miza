@@ -739,7 +739,7 @@
 							"r1": "deepseek-r1",
 							"sonnet": "claude-4.5-sonnet"
 						},
-						"enum": ["claude-4.1-opus", "claude-4.5-sonnet", "claude-4-sonnet", "claude-4.5-haiku", "deepseek-r1", "deepseek-v3.2", "deepseek-v3.1", "deepseek-v3", "minimax-m2", "minimax-m1", "minimax-01", "llama-3-405b", "llama-3-90b", "llama-3-70b", "llama-3-11b", "llama-3-8b", "command-r-plus", "command-r", "magnum-72b", "qwen3-235b", "qwen-72b", "gemini-3-pro", "gemini-2.5-pro", "gemini-2.5-flash-t", "gemini-2.5-flash", "grok-4.1-fast", "grok-4", "grok-4-fast", "gpt-oss-120b", "gpt-oss-20b", "o4-mini", "o3", "o3-mini", "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4.1-mini", "gpt-4.1", "gpt-4-mini", "gpt-4", "mistral-24b", "kimi-k2-t", "kimi-k2"]
+						"enum": ["claude-4.1-opus", "claude-4.5-sonnet", "claude-4-sonnet", "claude-4.5-haiku", "deepseek-r1", "deepseek-v3.2", "deepseek-v3.1", "deepseek-v3", "minimax-m2", "minimax-m1", "minimax-01", "llama-3-405b", "llama-3-90b", "llama-3-70b", "llama-3-11b", "llama-3-8b", "command-r-plus", "command-r", "magnum-72b", "qwen3-235b", "qwen-72b", "gemini-3-pro", "gemini-3-flash", "gemini-2.5-pro", "gemini-2.5-flash-t", "gemini-2.5-flash", "grok-4.1-fast", "grok-4", "grok-4-fast", "seed-1.6", "seed-1.6-flash", "gpt-oss-120b", "gpt-oss-20b", "o4-mini", "o3", "o3-mini", "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4.1-mini", "gpt-4.1", "gpt-4-mini", "gpt-4", "mistral-24b", "kimi-k2-t", "kimi-k2"]
 					}
 				},
 				"presence_penalty": {
@@ -808,6 +808,71 @@
 					"type": "enum",
 					"validation": {
 						"enum": ["openai-alloy", "openai-ash", "openai-ballad", "openai-coral", "openai-echo", "openai-fable", "openai-nova", "openai-onyx", "openai-sage", "openai-shimmer", "dectalk-paul", "dectalk-betty", "dectalk-harry", "dectalk-frank", "dectalk-kit", "dectalk-rita", "dectalk-ursula", "dectalk-dennis", "dectalk-wendy"]
+					}
+				}
+			},
+			"timeout": "24"
+		},
+		"Translate": {
+			"aliases": ["Translate", "TR"],
+			"description": "Translates text from one language to another.",
+			"example": [],
+			"level": "0",
+			"rate_limit": "(6, 9)",
+			"schema": {
+				"dst_languages": {
+					"default": ["en"],
+					"description": "Target language(s) to translate to",
+					"example": "korean polish german",
+					"multiple": true,
+					"type": "enum",
+					"validation": {
+						"accepts": {"abkhaz": "abk", "acehnese": "ace", "acholi": "ach", "afar": "aar", "afrikaans": "af", "albanian": "sq", "alur": "alz", "amharic": "am", "arabic": "ar", "armenian": "hy", "assamese": "as", "avar": "ava", "awadhi": "awa", "aymara": "ay", "azerbaijani": "az", "balinese": "ban", "baluchi": "bal", "bambara": "bm", "baoul\u00e9": "bci", "bashkir": "bak", "basque": "eu", "batak karo": "btx", "batak simalungun": "bts", "batak toba": "bbc", "belarusian": "be", "bemba": "bem", "bengali": "bn", "betawi": "bew", "bhojpuri": "bho", "bikol": "bik", "bosnian": "bs", "breton": "bre", "bulgarian": "bg", "buryat": "bua", "cantonese": "yue", "catalan": "ca", "cebuano": "ceb", "chamorro": "cha", "chechen": "che", "chinese": "zh", "chinese (simplified)": "zh-cn", "chinese (traditional)": "zh-tw", "chuukese": "chk", "chuvash": "chv", "corsican": "co", "crimean tatar": "crh", "croatian": "hr", "czech": "cs", "danish": "da", "dari": "fa-af", "dhivehi": "dv", "dinka": "din", "dogri": "doi", "dombe": "dom", "dutch": "nl", "dyula": "dyu", "dzongkha": "dzo", "english": "en", "esperanto": "eo", "estonian": "et", "faroese": "fao", "fijian": "fij", "filipino (tagalog)": "fil", "finnish": "fi", "fon": "fon", "french": "fr", "frisian": "fy", "friulian": "fur", "fulani": "ful", "ga": "gaa", "galician": "gl", "georgian": "ka", "german": "de", "greek": "el", "guarani": "gn", "gujarati": "gu", "haitian creole": "ht", "hakha chin": "cnh", "hausa": "ha", "hawaiian": "haw", "hebrew": "iw", "hiligaynon": "hil", "hindi": "hi", "hmong": "hmn", "hungarian": "hu", "hunsrik": "hrx", "iban": "iba", "icelandic": "is", "igbo": "ig", "ilocano": "ilo", "indonesian": "id", "irish": "ga", "italian": "it", "jamaican patois": "jam", "japanese": "ja", "javanese": "jw", "jingpo": "kac", "kalaallisut": "kal", "kannada": "kn", "kanuri": "kau", "kapampangan": "pam", "kazakh": "kk", "khasi": "kha", "khmer": "km", "kiga": "cgg", "kikongo": "kik", "kinyarwanda": "rw", "kituba": "ktu", "kokborok": "trp", "komi": "kom", "konkani": "gom", "korean": "ko", "krio": "kri", "kurdish": "ku", "kurdish (sorani)": "ckb", "kyrgyz": "ky", "lao": "lo", "latgalian": "ltg", "latin": "la", "latvian": "lv", "ligurian": "lij", "limburgish": "lim", "lingala": "ln", "lithuanian": "lt", "lombard": "lmo", "luganda": "lg", "luo": "luo", "luxembourgish": "lb", "macedonian": "mk", "madurese": "mad", "maithili": "mai", "makassar": "mak", "malagasy": "mg", "malay": "ms", "malay (jawi)": "ms-arab", "malayalam": "ml", "maltese": "mt", "mam": "mam", "manx": "glv", "maori": "mi", "marathi": "mr", "marshallese": "mah", "marwadi": "mwr", "mauritian creole": "mfe", "meadow mari": "mhr", "meiteilon (manipuri)": "mni-mtei", "minang": "min", "mizo": "lus", "mongolian": "mn", "myanmar (burmese)": "my", "nahuatl (eastern huasteca)": "nhe", "ndau": "ndc-zw", "ndebele (south)": "nde", "nepalbhasa (newari)": "new", "nepali": "ne", "norwegian": "no", "nuer": "nus", "nyanja (chichewa)": "ny", "occitan": "oci", "odia (oriya)": "or", "oromo": "om", "ossetian": "oss", "pangasinan": "pag", "papiamento": "pap", "pashto": "ps", "persian": "fa", "polish": "pl", "portuguese (portugal)": "por", "portuguese (portugal, brazil)": "pt", "punjabi": "pa", "punjabi (shahmukhi)": "pa-arab", "q'eqchi'": "kek", "quechua": "qu", "romani": "rom", "romanian": "ro", "rundi": "run", "russian": "ru", "sami (north)": "sme", "samoan": "sm", "sango": "sag", "sanskrit": "sa", "santali": "sat", "scots gaelic": "gd", "sepedi": "nso", "serbian": "sr", "sesotho": "st", "seychellois creole": "crs", "shan": "shn", "shona": "sn", "sicilian": "scn", "silesian": "szl", "sindhi": "sd", "sinhala (sinhalese)": "si", "slovak": "sk", "slovenian": "sl", "somali": "so", "spanish": "es", "sundanese": "su", "susu": "sus", "swahili": "sw", "swati": "ssw", "swedish": "sv", "tagalog (filipino)": "tl", "tahitian": "tah", "tajik": "tg", "tamazight": "ber-atn", "tamazight (tifinagh)": "ber", "tamil": "ta", "tatar": "tt", "telugu": "te", "tetum": "tet", "thai": "th", "tibetan": "bod", "tigrinya": "ti", "tiv": "tiv", "tok pisin": "tpi", "tongan": "ton", "tsonga": "ts", "tswana": "tsn", "tulu": "tcy", "tumbuka": "tum", "turkish": "tr", "turkmen": "tk", "tuvan": "tuk", "twi (akan)": "ak", "udmurt": "udm", "ukrainian": "uk", "urdu": "ur", "uyghur": "ug", "uzbek": "uz", "venda": "ven", "venetian": "vec", "vietnamese": "vi", "waray": "war", "welsh": "cy", "wolof": "wol", "xhosa": "xh", "yakut": "sah", "yiddish": "yi", "yoruba": "yo", "yucatec maya": "yua", "zapotec": "zap", "zulu": "zu"},
+						"enum": ["auto", "abk", "ace", "ach", "aar", "af", "sq", "alz", "am", "ar", "hy", "as", "ava", "awa", "ay", "az", "ban", "bal", "bm", "bci", "bak", "eu", "btx", "bts", "bbc", "be", "bem", "bn", "bew", "bho", "bik", "bs", "bre", "bg", "bua", "yue", "ca", "ceb", "cha", "che", "zh", "zh-cn", "zh-tw", "chk", "chv", "co", "crh", "hr", "cs", "da", "fa-af", "dv", "din", "doi", "dom", "nl", "dyu", "dzo", "en", "eo", "et", "fao", "fij", "fil", "fi", "fon", "fr", "fy", "fur", "ful", "gaa", "gl", "ka", "de", "el", "gn", "gu", "ht", "cnh", "ha", "haw", "he", "iw", "hil", "hi", "hmn", "hu", "hrx", "iba", "is", "ig", "ilo", "id", "ga", "it", "jam", "ja", "jv", "jw", "kac", "kal", "kn", "kau", "pam", "kk", "kha", "km", "cgg", "kik", "rw", "ktu", "trp", "kom", "gom", "ko", "kri", "ku", "ckb", "ky", "lo", "ltg", "la", "lv", "lij", "lim", "ln", "lt", "lmo", "lg", "luo", "lb", "mk", "mad", "mai", "mak", "mg", "ms", "ms-arab", "ml", "mt", "mam", "glv", "mi", "mr", "mah", "mwr", "mfe", "mhr", "mni-mtei", "min", "lus", "mn", "my", "nhe", "ndc-zw", "nde", "new", "ne", "no", "nus", "ny", "oci", "or", "om", "oss", "pag", "pap", "ps", "fa", "pl", "por", "pt", "pa", "pa-arab", "kek", "qu", "rom", "ro", "run", "ru", "sme", "sm", "sag", "sa", "sat", "gd", "nso", "sr", "st", "crs", "shn", "sn", "scn", "szl", "sd", "si", "sk", "sl", "so", "es", "su", "sus", "sw", "ssw", "sv", "tl", "tah", "tg", "ber-atn", "ber", "ta", "tt", "te", "tet", "th", "bod", "ti", "tiv", "tpi", "ton", "ts", "tsn", "tcy", "tum", "tr", "tk", "tuk", "ak", "udm", "uk", "ur", "ug", "uz", "ven", "vec", "vi", "war", "cy", "wol", "xh", "sah", "yi", "yo", "yua", "zap", "zu"]
+					}
+				},
+				"engine": {
+					"default": "auto",
+					"type": "enum",
+					"validation": {
+						"enum": ["auto", "google", "llm"]
+					}
+				},
+				"input": {
+					"description": "Text to translate",
+					"example": "bonjour, comment-t'appelles-tu?",
+					"type": "string"
+				}
+			},
+			"timeout": "24"
+		},
+		"Translator": {
+			"aliases": ["Translator", "AutoTranslate"],
+			"description": "Adds an automated translator to the current channel. Specify a list of languages to translate between, and optionally a translation engine. All non-command messages that do not begin with \"#\", \"%\" or \"//\" will be passed through the translator.",
+			"example": [],
+			"level": "2",
+			"rate_limit": "(9, 12)",
+			"schema": {
+				"disable": {
+					"description": "Turns off translator for the current channel",
+					"type": "bool"
+				},
+				"dst_languages": {
+					"default": ["en"],
+					"description": "Target language(s) to translate to",
+					"example": "korean polish german",
+					"multiple": true,
+					"type": "enum",
+					"validation": {
+						"accepts": {"abkhaz": "abk", "acehnese": "ace", "acholi": "ach", "afar": "aar", "afrikaans": "af", "albanian": "sq", "alur": "alz", "amharic": "am", "arabic": "ar", "armenian": "hy", "assamese": "as", "avar": "ava", "awadhi": "awa", "aymara": "ay", "azerbaijani": "az", "balinese": "ban", "baluchi": "bal", "bambara": "bm", "baoul\u00e9": "bci", "bashkir": "bak", "basque": "eu", "batak karo": "btx", "batak simalungun": "bts", "batak toba": "bbc", "belarusian": "be", "bemba": "bem", "bengali": "bn", "betawi": "bew", "bhojpuri": "bho", "bikol": "bik", "bosnian": "bs", "breton": "bre", "bulgarian": "bg", "buryat": "bua", "cantonese": "yue", "catalan": "ca", "cebuano": "ceb", "chamorro": "cha", "chechen": "che", "chinese": "zh", "chinese (simplified)": "zh-cn", "chinese (traditional)": "zh-tw", "chuukese": "chk", "chuvash": "chv", "corsican": "co", "crimean tatar": "crh", "croatian": "hr", "czech": "cs", "danish": "da", "dari": "fa-af", "dhivehi": "dv", "dinka": "din", "dogri": "doi", "dombe": "dom", "dutch": "nl", "dyula": "dyu", "dzongkha": "dzo", "english": "en", "esperanto": "eo", "estonian": "et", "faroese": "fao", "fijian": "fij", "filipino (tagalog)": "fil", "finnish": "fi", "fon": "fon", "french": "fr", "frisian": "fy", "friulian": "fur", "fulani": "ful", "ga": "gaa", "galician": "gl", "georgian": "ka", "german": "de", "greek": "el", "guarani": "gn", "gujarati": "gu", "haitian creole": "ht", "hakha chin": "cnh", "hausa": "ha", "hawaiian": "haw", "hebrew": "iw", "hiligaynon": "hil", "hindi": "hi", "hmong": "hmn", "hungarian": "hu", "hunsrik": "hrx", "iban": "iba", "icelandic": "is", "igbo": "ig", "ilocano": "ilo", "indonesian": "id", "irish": "ga", "italian": "it", "jamaican patois": "jam", "japanese": "ja", "javanese": "jw", "jingpo": "kac", "kalaallisut": "kal", "kannada": "kn", "kanuri": "kau", "kapampangan": "pam", "kazakh": "kk", "khasi": "kha", "khmer": "km", "kiga": "cgg", "kikongo": "kik", "kinyarwanda": "rw", "kituba": "ktu", "kokborok": "trp", "komi": "kom", "konkani": "gom", "korean": "ko", "krio": "kri", "kurdish": "ku", "kurdish (sorani)": "ckb", "kyrgyz": "ky", "lao": "lo", "latgalian": "ltg", "latin": "la", "latvian": "lv", "ligurian": "lij", "limburgish": "lim", "lingala": "ln", "lithuanian": "lt", "lombard": "lmo", "luganda": "lg", "luo": "luo", "luxembourgish": "lb", "macedonian": "mk", "madurese": "mad", "maithili": "mai", "makassar": "mak", "malagasy": "mg", "malay": "ms", "malay (jawi)": "ms-arab", "malayalam": "ml", "maltese": "mt", "mam": "mam", "manx": "glv", "maori": "mi", "marathi": "mr", "marshallese": "mah", "marwadi": "mwr", "mauritian creole": "mfe", "meadow mari": "mhr", "meiteilon (manipuri)": "mni-mtei", "minang": "min", "mizo": "lus", "mongolian": "mn", "myanmar (burmese)": "my", "nahuatl (eastern huasteca)": "nhe", "ndau": "ndc-zw", "ndebele (south)": "nde", "nepalbhasa (newari)": "new", "nepali": "ne", "norwegian": "no", "nuer": "nus", "nyanja (chichewa)": "ny", "occitan": "oci", "odia (oriya)": "or", "oromo": "om", "ossetian": "oss", "pangasinan": "pag", "papiamento": "pap", "pashto": "ps", "persian": "fa", "polish": "pl", "portuguese (portugal)": "por", "portuguese (portugal, brazil)": "pt", "punjabi": "pa", "punjabi (shahmukhi)": "pa-arab", "q'eqchi'": "kek", "quechua": "qu", "romani": "rom", "romanian": "ro", "rundi": "run", "russian": "ru", "sami (north)": "sme", "samoan": "sm", "sango": "sag", "sanskrit": "sa", "santali": "sat", "scots gaelic": "gd", "sepedi": "nso", "serbian": "sr", "sesotho": "st", "seychellois creole": "crs", "shan": "shn", "shona": "sn", "sicilian": "scn", "silesian": "szl", "sindhi": "sd", "sinhala (sinhalese)": "si", "slovak": "sk", "slovenian": "sl", "somali": "so", "spanish": "es", "sundanese": "su", "susu": "sus", "swahili": "sw", "swati": "ssw", "swedish": "sv", "tagalog (filipino)": "tl", "tahitian": "tah", "tajik": "tg", "tamazight": "ber-atn", "tamazight (tifinagh)": "ber", "tamil": "ta", "tatar": "tt", "telugu": "te", "tetum": "tet", "thai": "th", "tibetan": "bod", "tigrinya": "ti", "tiv": "tiv", "tok pisin": "tpi", "tongan": "ton", "tsonga": "ts", "tswana": "tsn", "tulu": "tcy", "tumbuka": "tum", "turkish": "tr", "turkmen": "tk", "tuvan": "tuk", "twi (akan)": "ak", "udmurt": "udm", "ukrainian": "uk", "urdu": "ur", "uyghur": "ug", "uzbek": "uz", "venda": "ven", "venetian": "vec", "vietnamese": "vi", "waray": "war", "welsh": "cy", "wolof": "wol", "xhosa": "xh", "yakut": "sah", "yiddish": "yi", "yoruba": "yo", "yucatec maya": "yua", "zapotec": "zap", "zulu": "zu"},
+						"enum": ["auto", "abk", "ace", "ach", "aar", "af", "sq", "alz", "am", "ar", "hy", "as", "ava", "awa", "ay", "az", "ban", "bal", "bm", "bci", "bak", "eu", "btx", "bts", "bbc", "be", "bem", "bn", "bew", "bho", "bik", "bs", "bre", "bg", "bua", "yue", "ca", "ceb", "cha", "che", "zh", "zh-cn", "zh-tw", "chk", "chv", "co", "crh", "hr", "cs", "da", "fa-af", "dv", "din", "doi", "dom", "nl", "dyu", "dzo", "en", "eo", "et", "fao", "fij", "fil", "fi", "fon", "fr", "fy", "fur", "ful", "gaa", "gl", "ka", "de", "el", "gn", "gu", "ht", "cnh", "ha", "haw", "he", "iw", "hil", "hi", "hmn", "hu", "hrx", "iba", "is", "ig", "ilo", "id", "ga", "it", "jam", "ja", "jv", "jw", "kac", "kal", "kn", "kau", "pam", "kk", "kha", "km", "cgg", "kik", "rw", "ktu", "trp", "kom", "gom", "ko", "kri", "ku", "ckb", "ky", "lo", "ltg", "la", "lv", "lij", "lim", "ln", "lt", "lmo", "lg", "luo", "lb", "mk", "mad", "mai", "mak", "mg", "ms", "ms-arab", "ml", "mt", "mam", "glv", "mi", "mr", "mah", "mwr", "mfe", "mhr", "mni-mtei", "min", "lus", "mn", "my", "nhe", "ndc-zw", "nde", "new", "ne", "no", "nus", "ny", "oci", "or", "om", "oss", "pag", "pap", "ps", "fa", "pl", "por", "pt", "pa", "pa-arab", "kek", "qu", "rom", "ro", "run", "ru", "sme", "sm", "sag", "sa", "sat", "gd", "nso", "sr", "st", "crs", "shn", "sn", "scn", "szl", "sd", "si", "sk", "sl", "so", "es", "su", "sus", "sw", "ssw", "sv", "tl", "tah", "tg", "ber-atn", "ber", "ta", "tt", "te", "tet", "th", "bod", "ti", "tiv", "tpi", "ton", "ts", "tsn", "tcy", "tum", "tr", "tk", "tuk", "ak", "udm", "uk", "ur", "ug", "uz", "ven", "vec", "vi", "war", "cy", "wol", "xh", "sah", "yi", "yo", "yua", "zap", "zu"]
+					}
+				},
+				"engine": {
+					"default": "auto",
+					"type": "enum",
+					"validation": {
+						"enum": ["auto", "google", "llm"]
 					}
 				}
 			},
@@ -1402,7 +1467,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"normal": "blend", "blt": "blend", "blit": "blend", "+": "add", "addition": "add", "additive": "add", "-": "sub", "subtract": "sub", "subtraction": "sub", "subtractive": "sub", "*": "mul", "multiply": "mul", "mult": "mul", "multiplication": "mul", "multiplicative": "mul", "/": "div", "divide": "div", "division": "div", "divisive": "div", "modulo": "mod", "%": "mod", "&": "and", "|": "or", "^": "xor", "~&": "nand", "~|": "nor", "~^": "xnor", "diff": "difference", "softlight": "soft", "hardlight": "hard", "lighter": "lighten", "darker": "darken", "plusdarker": "plusdarken", "grainextract": "extract", "grainmerge": "merge", "colorburn": "burn", "colourburn": "burn", "colordodge": "dodge", "colourdodge": "dodge", "lineardodge": "add", "sat": "saturation", "brightness": "lightness", "luminosity": "lum", "luminance": "lum", "val": "value", "color": "colour"},
-						"enum": ["blend", "replace", "add", "sub", "mul", "div", "mod", "and", "or", "xor", "nand", "nor", "xnor", "difference", "overlay", "screen", "soft", "hard", "lighten", "darken", "plusdarken", "overflow", "lighting", "burn", "linearburn", "dodge", "hue", "saturation", "lightness", "lum", "value", "colour", "extract", "merge", "alpha"]
+						"enum": ["blit", "blend", "replace", "add", "sub", "mul", "div", "mod", "and", "or", "xor", "nand", "nor", "xnor", "difference", "overlay", "screen", "soft", "hard", "lighten", "darken", "plusdarken", "overflow", "lighting", "burn", "linearburn", "dodge", "hue", "saturation", "lightness", "lum", "value", "colour", "extract", "merge", "alpha"]
 					}
 				},
 				"urls": {
@@ -2527,23 +2592,6 @@
 			"timeout": "24",
 			"usage": ""
 		},
-		"Avatar": {
-			"aliases": ["Avatar", "PFP", "Icon"],
-			"description": "Sends a link to the avatar of a user or server.",
-			"example": [],
-			"level": "0",
-			"rate_limit": "(5, 7)",
-			"schema": {
-				"objects": {
-					"description": "user or server",
-					"example": 247184721262411776,
-					"multiple": true,
-					"required": true,
-					"type": "mentionable"
-				}
-			},
-			"timeout": "24"
-		},
 		"Edit": {
 			"aliases": ["Edit"],
 			"description": "Edits an existing bot message using new output from a command. Subject to regular command restrictions and rate limits.",
@@ -2594,6 +2642,23 @@
 					"example": "download",
 					"greedy": false,
 					"type": "string"
+				}
+			},
+			"timeout": "24"
+		},
+		"Icon": {
+			"aliases": ["Icon", "PFP", "Avatar"],
+			"description": "Sends a link to the avatar of a user or server.",
+			"example": [],
+			"level": "0",
+			"rate_limit": "(5, 7)",
+			"schema": {
+				"objects": {
+					"description": "user or server",
+					"example": 247184721262411776,
+					"multiple": true,
+					"required": true,
+					"type": "mentionable"
 				}
 			},
 			"timeout": "24"
@@ -3420,7 +3485,7 @@
 					"type": "string"
 				},
 				"rationalise": {
-					"default": true,
+					"default": false,
 					"description": "Whether to simplify/rationalise results where possible.",
 					"type": "bool"
 				}
@@ -3525,24 +3590,6 @@
 			"rate_limit": "(2, 3)",
 			"timeout": "24",
 			"usage": "<relationship(-r)>? <pickup-line(-p)>? <nsfw-pickup-line(-n)>?"
-		},
-		"Translate": {
-			"aliases": ["Translate", "TR"],
-			"description": "Translates a string into another language.",
-			"example": ["translate english 你好", "tr gpt-4.1-mini chinese bonjour, comment-t'appelles-tu?", "translate gpt-3.5-turbo-instruct auto spanish french italian thank you!"],
-			"level": "0",
-			"rate_limit": "(6, 9)",
-			"timeout": "24",
-			"usage": "<0:engine(google|command-r-plus|gpt-3.5-turbo-instruct)>? <2:src_language>? <1:dest_languages>* <-1:string>"
-		},
-		"Translator": {
-			"aliases": ["Translator", "AutoTranslate"],
-			"description": "Adds an automated translator to the current channel. Specify a list of languages to translate between, and optionally a translation engine. All non-command messages that do not begin with \"#\" will be passed through the translator.",
-			"example": ["translator chatgpt english german russian", "autotranslate korean polish"],
-			"level": "2",
-			"rate_limit": "(9, 12)",
-			"timeout": "24",
-			"usage": "<0:engine(google|command-r-plus|gpt-3.5-turbo-instruct)>? <1:languages>* <disable(-d)>?"
 		},
 		"UnFancy": {
 			"aliases": ["UnFancy", "UnFormat", "UnZalgo", "Deobfuscate", "Unobscure"],

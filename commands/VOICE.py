@@ -2045,10 +2045,9 @@ class Hyperchoron(Command):
 			raise
 		if not os.path.exists(fo) or not os.path.getsize(fo):
 			if proc.returncode != 0:
-				stderr = as_str(stderr)
-				if "```" not in stderr:
-					stderr = py_md(stderr)
-				raise RuntimeError(stderr)
+				stderr = as_str(stderr).strip()
+				print(stderr)
+				raise RuntimeError(stderr.rsplit("\n", 1)[-1].strip())
 			raise FileNotFoundError("No valid output detected!")
 		b = fo
 		z = zipfile.ZipFile(fo, "r")

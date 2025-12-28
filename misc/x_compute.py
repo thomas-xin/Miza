@@ -717,7 +717,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			if mode == "rgba":
 				vf += "format=rgba"
 			command.extend(("-vf", vf))
-		pix = ("rgba" if lossless else "yuva420p") if mode == "RGBA" else ("rgb24" if lossless else "yuv420p")
+		pix = ("rgba" if lossless else "yuva444p") if mode == "RGBA" else ("rgb24" if lossless else "yuv444p")
 		if mode == "RGBA":
 			command.extend(("-c:v", "libwebp_anim" if anim else "libwebp", "-pix_fmt", pix, "-pred", "mixed"))
 		else:
@@ -727,7 +727,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			if opt:
 				command.extend(("-loop", "0", "-q:v", "75"))
 			else:
-				command.extend(("-loop", "0", "-q:v", "90"))
+				command.extend(("-loop", "0", "-q:v", "95"))
 		elif lossless:
 			command.extend(("-lossless", "1"))
 		else:

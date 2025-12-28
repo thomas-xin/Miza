@@ -803,32 +803,26 @@ typing = lambda self: csubmit(self.trigger_typing())
 
 
 # Gets the string representation of a url object with the maximum allowed image size for discord, replacing png with webp format when possible.
-def to_webp(url):
+def auto_url(url):
 	if not isinstance(url, str):
 		url = str(url)
-	if url.startswith("https://cdn.discordapp.com/embed/avatars/"):
+	if url.startswith("https://media.discordapp.net/embed/avatars/"):
 		return url.replace("/media.discordapp.net/", "/cdn.discordapp.com/").replace(".webp", ".png")
-	if url.endswith("?size=1024"):
-		url = url[:-10] + "?size=4096"
-	if "/embed/" not in url[:48]:
-		url = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
-	return url.replace(".png", ".webp")
+	return url
 
-def to_webp_ex(url):
+def auto_url_ex(url):
 	if not isinstance(url, str):
 		url = str(url)
 	if url.startswith("https://cdn.discordapp.com/embed/avatars/"):
-		return url.replace("/media.discordapp.net/", "/cdn.discordapp.com/").replace(".webp", ".png")
-	if url.endswith("?size=1024"):
+		return url.replace("/cdn.discordapp.com/", "/media.discordapp.net/").replace(".webp", ".png")
+	if url.endswith("?size=1024") or url.endswith("?size=4096"):
 		url = url[:-10] + "?size=256"
-	if "/embed/" not in url[:48]:
-		url = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
-	return url.replace(".png", ".webp")
+	return url
 
 BASE_LOGO = "https://cdn.discordapp.com/embed/avatars/0.png"
-def get_url(obj, f=to_webp) -> str:
+def get_url(obj: str, f=auto_url) -> str:
 	if isinstance(obj, str):
-		return obj
+		return obj and f(obj)
 	found = False
 	for attr in ("display_avatar", "avatar_url", "icon_url", "icon", "avatar"):
 		try:
@@ -846,9 +840,9 @@ def get_url(obj, f=to_webp) -> str:
 # Finds the best URL for a Discord object's icon, prioritizing proxy_url for images if applicable.
 proxy_url = lambda obj: get_url(obj) or (obj.proxy_url if is_image(obj.proxy_url) else obj.url)
 # Finds the best URL for a Discord object's icon.
-best_url = lambda obj: get_url(obj) or getattr(obj, "url", None) or BASE_LOGO
+best_url = lambda obj: get_url(obj) or auto_url(getattr(obj, "url", None)) or BASE_LOGO
 # Finds the worst URL for a Discord object's icon.
-worst_url = lambda obj: get_url(obj, to_webp_ex) or getattr(obj, "url", None) or BASE_LOGO
+worst_url = lambda obj: get_url(obj, auto_url_ex) or getattr(obj, "url", None) or BASE_LOGO
 
 allow_gif = lambda url: url + ".gif" if "." not in url.rsplit("/", 1)[-1] and "?" not in url else url
 
@@ -1306,6 +1300,7 @@ def get_colour_list():
 			else:
 				colour_names.update(colour_group)
 	print(f"Successfully loaded {len(colour_names)} colour names.")
+	return colour_names
 def load_colour_list():
 	global colour_names
 	colour_names = colourlist_cache.retrieve("map", get_colour_list)
@@ -1718,6 +1713,7 @@ def request_emojis():
 				e2 = e.translate(discord_stripmap)
 				if e2 and not e2.isascii():
 					emojimap[e2] = (name, url)
+	print(f"Successfully loaded {len(emojimap)} unicode emojis.")
 	return emojimap
 def load_emojilist():
 	return emoji_cache.retrieve("map", request_emojis)
@@ -1731,7 +1727,6 @@ def load_emojis():
 		else:
 			emoji_replace[k] = v[1] + " "
 	em_trans = "".maketrans(emoji_translate)
-	print(f"Successfully loaded {len(emap)} unicode emojis.")
 
 
 @functools.lru_cache(maxsize=4)

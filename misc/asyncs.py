@@ -27,7 +27,7 @@ try:
 	eloop = asyncio.get_event_loop()
 except Exception:
 	eloop = asyncio.new_event_loop()
-def __setloop__(): return asyncio.set_event_loop(eloop)
+def __setloop__(*args): return asyncio.set_event_loop(eloop)
 __setloop__()
 
 def at():
@@ -48,43 +48,11 @@ def as_fut(obj):
 	cst(fut.set_result, obj)
 	return fut
 
-def _adjust_thread_count(self):
-	# if idle threads are available, don't spin new threads
-	try:
-		if self._idle_semaphore.acquire(timeout=0):
-			return
-	except AttributeError:
-		pass
-
-	# When the executor gets lost, the weakref callback will wake up
-	# the worker threads.
-	def weakref_cb(_, q=self._work_queue):
-		q.put(None)
-
-	num_threads = len(self._threads)
-	if num_threads < self._max_workers:
-		thread_name = '%s_%d' % (self._thread_name_prefix or self, num_threads)
-		t = thread.threading.Thread(
-			name=thread_name,
-			target=thread._worker,
-			args=(
-				thread.weakref.ref(self, weakref_cb),
-				self._work_queue,
-				self._initializer,
-				self._initargs,
-			),
-			daemon=True,
-		)
-		t.start()
-		self._threads.add(t)
-		thread._threads_queues[t] = self._work_queue
-
-concurrent.futures.ThreadPoolExecutor._adjust_thread_count = _adjust_thread_count
-
 mthreads = ThreadPoolExecutor(7, initializer=__setloop__)
 lim = 8
 bthreads = ThreadPoolExecutor(max_workers=lim, initializer=__setloop__)
 athreads = ThreadPoolExecutor(max_workers=lim * 4, initializer=__setloop__)
+pthreads = bthreads
 
 def get_executor(priority):
 	if priority not in range(0, 2):
@@ -112,7 +80,7 @@ def initialise_ppe():
 def awaitable(obj) -> bool:
 	if isinstance(obj, type):
 		return False
-	return callable(getattr(obj, "__await__", None)) or isinstance(obj, asyncio.Future) or inspect.isawaitable(obj)
+	return isinstance(obj, collections.abc.Awaitable) or inspect.isawaitable(obj)
 
 # Async function that waits for a given time interval if the result of the input coroutine is None.
 async def wait_on_none(coro, seconds=0.5):
@@ -277,8 +245,10 @@ def pipe_fut(src, dest):
 
 async def gather(*futs, return_exceptions=False, max_concurrency=None):
 	"Same functionality as asyncio.gather, but with fallback to main thread if called from a non-asyncio loop."
-	out_futs = deque()
 	outs = []
+	if not futs:
+		return outs
+	out_futs = deque()
 	for fut in futs:
 		while max_concurrency and len(out_futs) >= max_concurrency:
 			try:
@@ -322,9 +292,9 @@ def await_fut(fut, timeout=None):
 
 def convert_fut(fut):
 	if is_main_thread():
-		fut = concurrent.futures.Future()
-		fut.set_result(asyncio.run(fut))
-		return fut
+		fut2 = concurrent.futures.Future()
+		fut2.set_result(asyncio.run(fut))
+		return fut2
 	loop = get_event_loop()
 	try:
 		ret = asyncio.run_coroutine_threadsafe(fut, loop=loop)
@@ -366,11 +336,13 @@ def delayed_sync(fut, duration=None):
 		return fut.result()
 
 async def waited_coro(fut, duration=None):
-	await asyncio.sleep(duration)
+	if duration:
+		await asyncio.sleep(duration)
 	return await fut
 
 def waited_sync(fut, duration=None):
-	time.sleep(duration)
+	if duration:
+		time.sleep(duration)
 	return fut.result()
 
 async def delayed_callback(fut, delay, func, *args, repeat=False, exc=False, **kwargs):
@@ -455,7 +427,7 @@ class CloseableAsyncIterator:
 	async def __exit__(self):
 		out = self.fclose
 		out = out() if callable(out) else out
-		if awaitable(out):
+		if isinstance(out, collections.abc.Awaitable):
 			return await out
 		return out
 
@@ -786,7 +758,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 		self.__enter__()
 		self.__exit__()
 
-	async def __call__(self):
+	async def __call__(self):  # ty:ignore[invalid-method-override]
 		await self.__aenter__()
 		await self.__aexit__()
 	
@@ -887,7 +859,7 @@ class Delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextMa
 		self.duration = duration
 		self.start = utc()
 
-	def __call__(self):
+	def __call__(self):  # ty:ignore[invalid-method-override]
 		return self.exit()
 
 	def __exit__(self, *args):

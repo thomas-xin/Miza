@@ -23,10 +23,7 @@ import nekos
 # from misc.common import api, PRINT, Command, get_author, EDIT_SEM, restructure_buttons, recursive_coro, send_with_react
 # print = PRINT
 
-try:
-	from akipy.async_akipy import Akinator as AsyncAkinator
-except (AttributeError, ModuleNotFoundError):
-	from akinator.async_aki import Akinator as AsyncAkinator
+from akipy.async_akinator import Akinator as AsyncAkinator
 
 try:
 	alexflipnote_key = AUTH["alexflipnote_key"]

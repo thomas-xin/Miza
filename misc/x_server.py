@@ -30,6 +30,8 @@ from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, traceb
 from .caches import attachment_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
+ytdl_fut = esubmit(AudioDownloader, workers=1)
+
 try:
 	RAPIDAPI_SECRET = AUTH["rapidapi_secret"]
 except KeyError:
@@ -733,7 +735,7 @@ class Server:
 		ip = true_ip()
 		print("/ytdl", ip, q)
 		if not self.ydl:
-			self.ydl = globals()["ytdl"] = AudioDownloader()
+			self.ydl = globals()["ytdl"]
 		if v:
 			fmt = kwargs.get("fmt")
 			if not fmt:
@@ -1171,5 +1173,6 @@ if __name__ == "__main__":
 	self = server = cp.Application(app, "/", config)
 	esubmit(app.get_ip_ex)
 	interface.start()
+	ytdl = ytdl_fut.result()
 	cp.quickstart(server, "/", config)
 	# waitress.serve(server, threads=128, host=ADDRESS, port=PORT, url_scheme="https")

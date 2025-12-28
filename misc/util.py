@@ -44,10 +44,7 @@ import nacl.secret
 import numpy as np
 import orjson
 import psutil
-try:
-	import pynvml
-except Exception:
-	pynvml = None
+import pynvml
 import niquests
 import requests
 from misc.smath import predict_next, display_to_precision, unicode_prune, full_prune
@@ -1613,7 +1610,7 @@ def leb128(n: int) -> bytearray:
 			data[-1] |= 0x80
 		data.append(0)
 	return data
-def decode_leb128(data: bytes) -> tuple[int, bytes]:
+def decode_leb128(data: byte_like) -> tuple[int, byte_like]:
 	"Decodes an integer from LEB128 encoded data; returns a tuple of decoded and remaining data."
 	i = n = 0
 	shift = 0
@@ -2713,7 +2710,6 @@ class FileHashDict(collections.abc.MutableMapping):
 	def load_cursor(self):
 		if self.db:
 			self.db.close()
-			self.db = None
 		self.db = sqlite3.connect(self.path, check_same_thread=False)
 		self.cur = alist([self.db.cursor() for i in range(self.max_concurrency)])
 		try:
@@ -3044,7 +3040,6 @@ class FileHashDict(collections.abc.MutableMapping):
 		try:
 			self.db.commit()
 			self.db.close()
-			self.db = None
 		finally:
 			self.db_sem.resume()
 
@@ -3214,6 +3209,8 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
 			self.base_init(force=True)
 			v, t = super().get(k, read=_read, tag=True)
+		except TypeError:
+			t = None
 		if t is not None and v is not Dummy:
 			delay = utc() - t
 			if delay > self._stimeout:
@@ -3256,6 +3253,8 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
 			await asubmit(self.base_init, force=True)
 			v, t = super().get(k, read=_read, tag=True)
+		except TypeError:
+			t = None
 		if t is not None and v is not Dummy:
 			delay = utc() - t
 			if delay > self._stimeout:

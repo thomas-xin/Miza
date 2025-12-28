@@ -58,9 +58,11 @@ if ADDRESS == "0.0.0.0":
 	ADDRESS = "127.0.0.1"
 
 if __name__ != "__mp_main__":
-	esubmit(load_colour_list)
-	esubmit(load_emojis)
-	esubmit(download_binary_dependencies)
+	futs = []
+	for f in (load_colour_list, load_emojis, download_binary_dependencies):
+		futs.append(esubmit(f))
+	for fut in futs:
+		fut.result()
 
 
 class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collections.abc.Callable):
@@ -1986,10 +1988,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		exc = None
 		for model in models:
 			kwargs["model"] = model
-			if model in ai.is_reasoning:
-				kwargs["reasoning_effort"] = "low"
-			else:
-				kwargs.pop("reasoning_effort", None)
 			try:
 				resp = await ai.llm("chat.completions.create", *args, stream=False, **kwargs)
 			except Exception as ex:
@@ -2070,46 +2068,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			max_tokens = min(max_tokens, ctx - count - 64)
 			if "max_completion_tokens" not in kwargs:
 				kwargs["max_tokens"] = max_tokens
-			# if allow_preliminary_thinking and isinstance(messages[-1].content, str):
-			# 	premium_context = kwargs.get("premium_context")
-			# 	try:
-			# 		resp = await self.force_completion(
-			# 			model=None,
-			# 			prompt=None,
-			# 			messages=[ai.unimage(m) for m in messages],
-			# 			temperature=1,
-			# 			reasoning_effort="medium",
-			# 			max_tokens=4096,
-			# 			timeout=360,
-			# 			premium_context=premium_context,
-			# 			user=kwargs.get("user"),
-			# 			allow_alt=True,
-			# 		)
-			# 		content = ""
-			# 		async for m in resp:
-			# 			content += m
-			# 	except Exception:
-			# 		print_exc()
-			# 	else:
-			# 		reasoning, *content = content.split("</think>", 1)
-			# 		reasoning = reasoning.strip()
-			# 		if reasoning and content:
-			# 			print("REASONING:", reasoning)
-			# 			messages = await ai.cut_to(
-			# 				messages,
-			# 				1024,
-			# 				384,
-			# 				best=True,
-			# 				premium_context=premium_context,
-			# 			)
-			# 			messages.append(cdict(
-			# 				role="assistant",
-			# 				name=assistant_name,
-			# 				content=f"<think>\n{reasoning}\n</think>",
-			# 			))
-			# 			kwargs["messages"] = messages
-			if vision_model in ai.is_reasoning:
-				kwargs["reasoning_effort"] = "low"
 			return await ai.llm("chat.completions.create", model=vision_model, messages=messages, stream=stream, **kwargs)
 		fmt = ai.instruct_formats.get(model, "chatml")
 		assistant_messages = [m for m in messages if m.get("content") and m.get("role") == "assistant"]
@@ -2352,10 +2310,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		1: cdict(
-			instructive="gpt-5-mini",
-			casual="kimi-k2-t",
+			instructive="seed-1.6",
+			casual="seed-1.6",
 			nsfw="grok-4.1-fast",
-			backup="gemini-2.5-flash-t",
+			backup="kimi-k2-t",
 			retry="claude-4.5-haiku",
 			function="grok-4.1-fast",
 			vision="qwen3-235b",
@@ -5216,9 +5174,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if v not in enum and v not in accepts:
 				enum = set(enum)
 				accepts = set(accepts)
+				union = enum.union(accepts)
+				try:
+					alt = str_lookup(
+						union,
+						v,
+						fuzzy=0.5,
+					)
+				except LookupError:
+					dym = ""
+				else:
+					dym = f' Did you mean: "{alt}"?'
 				if enum and accepts:
-					raise EnumError(f'{k} value "{v}" must be one of {enum} or aliases {accepts}.')
-				raise EnumError(f'{k} value "{v}" must be one of {enum.union(accepts)}.')
+					raise EnumError(f'{k} value "{v}" must be one of {enum} or aliases {accepts}.{dym}')
+				raise EnumError(f'{k} value "{v}" must be one of {enum.union(accepts)}.{dym}')
 			if v not in enum:
 				return validation.accepts[v]
 		return v
@@ -6766,6 +6735,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 			async def _update(self, content, embeds, files, buttons, prefix, suffix, bypass, reacts, force, done):
 				ms = split_text(content, max_length=self.msglen, prefix=prefix, suffix=suffix)
+				while ceil(len(embeds) / 10) > len(ms) or ceil(len(files) / 10) > len(ms):
+					ms.append("")
 				n = len(ms)
 				futs = []
 				if len(self.messages) > n:

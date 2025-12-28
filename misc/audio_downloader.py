@@ -15,6 +15,7 @@ import zipfile
 import orjson
 import niquests
 import yt_dlp as ytd
+assert hasattr(ytd.extractor, "youtube")
 from .types import alist, as_str, cdict, fcdict, full_prune, json_dumps, round_min, to_alphanumeric, tracebacksuppressor
 from .smath import time_parse
 from .asyncs import esubmit
@@ -99,6 +100,7 @@ def get_best_audio(entry):
 			url = fmt["url"]
 	if url and url.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
 		resp = Request(url)
+		assert isinstance(resp, bytes)
 		fmts = alist()
 		with suppress(ValueError, KeyError):
 			while True:
@@ -145,6 +147,7 @@ def get_best_video(entry, hq=True):
 			url = fmt["url"]
 	if url and url.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
 		resp = Request(url)
+		assert isinstance(resp, bytes)
 		fmts = alist()
 		with suppress(ValueError, KeyError):
 			while True:
@@ -196,6 +199,7 @@ def get_best_lyrics(resp):
 					break
 			with tracebacksuppressor:
 				data = Request(cap["url"], json=True, timeout=18)
+				assert isinstance(data, dict)
 				lyr = []
 				for event in data["events"]:
 					para = "".join(seg.get("utf8", "") for seg in event.get("segs", ()))
@@ -272,6 +276,7 @@ class AudioDownloader:
 	def set_cookie(self):
 		self.youtube_base = "CONSENT=YES+cb.20210328-17-p0.en+FX"
 		s = self.session.get("https://www.youtube.com").text
+		assert isinstance(s, str)
 		if "<title>Before you continue to YouTube</title>" in s:
 			s = s.split('<input type="hidden" name="v" value="', 1)[-1]
 			s = s[:s.index('">')].rsplit("+", 1)[0]
@@ -384,6 +389,7 @@ class AudioDownloader:
 		resp = self.yt_session.get(f"https://www.youtube.com/playlist?list={p_id}", headers=self.youtube_header)
 		resp.raise_for_status()
 		resp = resp.content
+		assert isinstance(resp, bytes)
 		try:
 			try:
 				resp = resp[resp.index(b'{"responseContext":{'):]
@@ -450,6 +456,7 @@ class AudioDownloader:
 		with self.spothead_sem:
 			resp = self.session.get("https://open.spotify.com/get_access_token", headers=Request.header(), timeout=20)
 		resp.raise_for_status()
+		assert isinstance(resp.content, bytes)
 		head = cdict(orjson.loads(resp.content))
 		head.sem = Semaphore(20, 1, rate_limit=5)
 		self.spot_backs.append(head)
@@ -468,6 +475,7 @@ class AudioDownloader:
 		resp = self.session.get(url, headers=Request.header(), timeout=10)
 		resp.raise_for_status()
 		s = resp.text
+		assert isinstance(s, str)
 		if s[0] == "{" and s[-1] == "}":
 			t = resp.json()
 			return [cdict(
@@ -527,6 +535,7 @@ class AudioDownloader:
 			resp = self.session.get(url, headers=Request.header(), timeout=20)
 			resp.raise_for_status()
 			s = resp.text
+			assert isinstance(s, str)
 			search = 'content="soundcloud://users:'
 			s = s[s.index(search) + len(search):]
 			uid = s[:s.index('"')]
@@ -680,7 +689,7 @@ class AudioDownloader:
 		return entries
 
 	def ydl_errors(self, s):
-		return "this video has been removed" not in s and "private video" not in s and "has been terminated" not in s and ("Video unavailable" not in s or not self.backup_sem.active)
+		return "this video has been removed" not in s and "private video" not in s and "has been terminated" not in s and "Video unavailable" not in s
 
 	def item_yt(self, item):
 		video = next(iter(item.values()))
@@ -770,6 +779,7 @@ class AudioDownloader:
 			resp = Request(url, headers=self.youtube_header, timeout=12)
 			result = None
 			s = resp
+			assert isinstance(s, bytes)
 			with suppress(ValueError):
 				with suppress(ValueError):
 					s = s[s.index(b"// scraper_data_begin") + 21:s.rindex(b"// scraper_data_end")]
@@ -862,6 +872,7 @@ class AudioDownloader:
 	def bcsearch(self, query, count=1):
 		query = "https://bandcamp.com/search?q=" + quote_plus(query) + "&item_type=t"
 		content = self.session.get(query, headers=Request.header(), timeout=20).content
+		assert isinstance(content, bytes)
 		out = alist()
 		try:
 			content = content.split(b'<ul class="result-items">', 1)[1]

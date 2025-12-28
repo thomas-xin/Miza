@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -208,11 +209,12 @@ def trial_download(self, filename, info_dict):
 	proc = None
 	try:
 		url = info_dict["url"]
-		if not is_url(url) or url.endswith(".ts") or url.endswith(".m4s"):
+		name = url.split("?", 1)[0]
+		if not is_url(url) or name.endswith(".ts") or name.endswith(".m4s") or "hls" in re.split(r"[^A-Za-z0-9]", name):
 			raise ValueError
 		print(url)
 		t = time.time()
-		streamshatter.ChunkManager(url, headers=info_dict.get("http_headers", {}), concurrent_limit=48, timeout=12, max_attempts=5, filename=filename).run(close=True)
+		streamshatter.ChunkManager(url, headers=info_dict.get("http_headers", {}), concurrent_limit=16, timeout=12, max_attempts=7, filename=filename).run(close=True)
 		elapsed = time.time() - t
 		assert os.path.exists(filename) and os.path.getsize(filename)
 	except ValueError:
@@ -476,7 +478,7 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			mbr = 96
 		print(meta.duration, meta.bitrate, cbr, mbr)
 		if source_ext == self.format and self.start == self.end == None:  # noqa: E711
-			if self.final and os.path.samefile(filename, self.final):
+			if self.final and not os.path.samefile(filename, self.final):
 				shutil.copyfile(filename, self.final)
 			return [], info
 		source_codec = meta.codec

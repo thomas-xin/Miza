@@ -80,8 +80,9 @@ class Perms(Command):
 					reason = f"to change permissions for {name} in {guild} from {self.perm_display(t_perm)} to {self.perm_display(c_perm)}"
 					raise self.perm_error(perm, m_perm, reason)
 				msgs.append(css_md(f"Current permissions for {sqr_md(t_user)} in {sqr_md(guild)}: {sqr_md(self.perm_display(t_perm))}."))
-		finally:
-			return "".join(msgs)
+		except Exception:
+			print_exc()
+		return "".join(msgs)
 
 
 class Timeout(Command):
@@ -2725,9 +2726,9 @@ class UpdateMessageLogs(Database):
 		while "channel_cache" not in self.bot.data:
 			await asyncio.sleep(0.5)
 		print(f"Probing new messages from {len(self.bot.guilds)} guild{'s' if len(self.bot.guilds) != 1 else ''}...")
+		futs = deque()
 		for guild in self.bot.guilds:
 			with tracebacksuppressor:
-				futs = deque()
 				for channel in itertools.chain(guild.text_channels, guild.threads):
 					try:
 						perm = channel.permissions_for(guild.me).read_message_history

@@ -1818,7 +1818,9 @@ def adjust_map(images, operation, value, channels, clip, **kwargs):
 def blend_single(i1, a1, i2, a2, opacity, operation):
 	if opacity == 0:
 		return i1, a1
-	if operation == "blend":
+	if operation == "blit":
+		return i1 * (1 - a2) + i2 * a2, np.maximum(a1, a2)
+	elif operation == "blend":
 		o1, o2 = min(1, opacity * 2), min(1, (1 - opacity) * 2)
 		return (i1 * a1 * o1 + i2 * a2 * o2) / (a1 + a2), np.maximum(a1, a2)
 	elif operation == "replace":

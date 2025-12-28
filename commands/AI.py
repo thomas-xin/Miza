@@ -4,6 +4,211 @@ if "common" not in globals():
 	from misc.common import *
 print = PRINT
 
+from fast_langdetect import LangDetectConfig, LangDetector
+flcache = CACHE_PATH + "/fast-langdetect"
+os.makedirs(flcache, exist_ok=True)
+config = LangDetectConfig(cache_dir=flcache, model="full")
+detector = LangDetector(config)
+import googletrans
+translator = googletrans.Translator(user_agent=USER_AGENT)
+
+
+class Translate(Command):
+	name = ["TR"]
+	description = "Translates text from one language to another."
+	schema = cdict(
+		engine=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("auto", "google", "llm"),
+			),
+			default="auto",
+		),
+		dst_languages=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("auto",) + tuple(googletrans.LANGUAGES),
+				accepts=googletrans.LANGCODES,
+			),
+			description="Target language(s) to translate to",
+			default=["en"],
+			example="korean polish german",
+			multiple=True,
+		),
+		input=cdict(
+			type="string",
+			description="Text to translate",
+			example="bonjour, comment-t'appelles-tu?",
+		),
+	)
+	rate_limit = (6, 9)
+	slash = True
+	ephemeral = True
+
+	async def __call__(self, bot, _premium, engine, dst_languages, input, **void):
+		input = await bot.superclean_content(input)
+		if not input:
+			raise ArgumentError("Input string is empty.")
+		embeds = []
+		assert isinstance(dst_languages, list_like)
+		src_language = await self.det(input)
+		for dest in dst_languages:
+			if dest.split("-", 1)[0] == src_language:
+				continue
+			match engine:
+				case "auto" | "llm":
+					out = await self.llm_translate(input, dest, premium=_premium)
+				case _:
+					raise NotImplementedError(engine)
+			dst_language = googletrans.LANGUAGES.get(dest, dest).capitalize()
+			emb = discord.Embed(
+				colour=rand_colour(),
+				title=dst_language,
+				description=lim_str(out.translated, 4096),
+			)
+			pronunciation = getattr(out, "pronunciation", None)
+			if pronunciation:
+				emb.set_footer(text=lim_str(pronunciation, 1024))
+			embeds.append(emb)
+		desc = _premium.apply()
+		if desc:
+			embeds.append(discord.Embed(description=desc))
+			print(">", desc)
+		return cdict(embeds=embeds)
+
+	async def det(self, input):
+		resp = await asubmit(detector.detect, input, model="auto")
+		return str_lookup(googletrans.LANGUAGES, resp[0]["lang"], fuzzy=0.25).split("-", 1)[0]
+
+	async def llm_translate(self, input, dest, premium):
+		dst_language = googletrans.LANGUAGES.get(dest, dest).capitalize()
+		try:
+			tr = await translator.translate(input, dest=dest)
+		except Exception:
+			print_exc()
+			messages = [
+				dict(
+					role="system",
+					content=f'Please translate the following text into {dst_language}, keeping formatting as accurate as possible. Avoid being overly formal, and do not add extra information to the text itself!',
+				),
+				dict(
+					role="user",
+					content=input,
+				),
+			]
+		else:
+			messages = [
+				dict(
+					role="system",
+					content=f'Below will be some text, followed by its translation into {dst_language}. Please rewrite the translation, making improvements where applicable, and keeping formatting as accurate as possible. Avoid being overly formal, and do not add extra information to the text itself!',
+				),
+				dict(
+					role="user",
+					content=input,
+				),
+				dict(
+					role="user",
+					content=tr.text,
+				)
+			]
+		print(messages)
+		translated = await ai._instruct(
+			data=dict(
+				model="grok-4.1-fast",
+				messages=messages,
+				temperature=0.01,
+				premium_context=premium,
+				reasoning_effort="low",
+			),
+		)
+		assert translated, "No output was captured!"
+		print(translated)
+		tr = None
+		pronunciation = None
+		if dest != "en":
+			tr = await translator.translate(translated, dest="en")
+			print(tr.extra_data)
+		if tr:
+			try:
+				pronunciation = tr.extra_data["translation"][-1][3]
+			except (AttributeError, LookupError):
+				pass
+		return cdict(
+			translated=translated,
+			pronunciation=pronunciation,
+		)
+
+
+class Translator(Command):
+	name = ["AutoTranslate"]
+	min_level = 2
+	description = 'Adds an automated translator to the current channel. Specify a list of languages to translate between, and optionally a translation engine. All non-command messages that do not begin with "#", "%" or "//" will be passed through the translator.'
+	schema = cdict(
+		engine=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("auto", "google", "llm"),
+			),
+			default="auto",
+		),
+		dst_languages=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("auto",) + tuple(googletrans.LANGUAGES),
+				accepts=googletrans.LANGCODES,
+			),
+			description="Target language(s) to translate to",
+			default=["en"],
+			example="korean polish german",
+			multiple=True,
+		),
+		disable=cdict(
+			type="bool",
+			description="Turns off translator for the current channel",
+		),
+	)
+	rate_limit = (9, 12)
+
+	async def __call__(self, bot, _guild, _channel, engine, dst_languages, disable, **void):
+		curr = bot.get_guildbase(_guild.id, "translators", {})
+		if disable:
+			curr.pop(_channel.id, None)
+			bot.set_guildbase(_guild.id, "translators", curr)
+			return italics(css_md(f"Disabled translator service for {sqr_md(_channel)}."))
+		if dst_languages:
+			curr[_channel.id] = cdict(engine=engine, dst_languages=dst_languages)
+			bot.set_guildbase(_guild.id, "translators", curr)
+			return italics(ini_md(f"Successfully set translation languages for {sqr_md(_channel)} {sqr_md(engine)}:{iter2str(dst_languages)}"))
+		chan = curr.get(_channel.id)
+		if not chan:
+			return ini_md(f'No auto translator currently set for {sqr_md(_channel)}.')
+		return ini_md(f"Current translation languages set for {sqr_md(_channel)} {sqr_md(curr.engine)}:{iter2str(chan.dst_languages)}")
+
+
+class UpdateTranslators(Database):
+	name = "translators"
+	no_file = True
+
+	async def _nocommand_(self, message, msg, **void):
+		bot = self.bot
+		if "tr" not in bot.commands or getattr(message, "noresponse", False):
+			return
+		curr = bot.get_guildbase(message.guild.id, "translators", {}).get(message.channel.id)
+		if not curr or not msg.strip():
+			return
+		c = msg
+		if c[0] in COMM or c[:2] in ("//", "/*"):
+			return
+		user = message.author
+		if bot.is_optout(user):
+			return
+		channel = message.channel
+		guild = message.guild
+		tr = bot.commands.translate[0]
+		content = message.clean_content.strip()
+		with bot.ExceptionSender(channel, reference=message):
+			await bot.run_command(bot.commands.tr[0], dict(**curr, input=message.clean_content.strip()), message=message, respond=True)
+
 
 _ntrans = "".maketrans({"-": "", " ": "", "_": ""})
 def to_msg(k, v, n=None, t=None):
@@ -420,7 +625,8 @@ class Ask(Command):
 						s = f'\n> Generating "{argv}"...'
 						text += s
 						yield s
-						call = {"func": "imagine", "prompt": argv, "count": kwargs.get("count") or 1, "comment": text}
+						url = _message.jump_url if _message.attachments else reference.jump_url if reference else None
+						call = {"func": "imagine", "prompt": argv, "url": url, "count": kwargs.get("count") or 1, "comment": text}
 					elif name == "reminder":
 						argv = str(kwargs.message) + " -t " + str(kwargs.time)
 						call = {"func": "remind", "message": kwargs.message, "time": kwargs.time, "comment": text}
@@ -608,13 +814,13 @@ class ChatConfig(Command):
 					reason = f"to modify chat config for {channel_repr(target)}"
 					raise self.perm_error(_perm, req, reason)
 				pers.pop(target.id, None)
-				s += css_md(f"Personality settings for {sqr_md(target)} have been reset.")
+				s += css_md(f"Chat settings for {sqr_md(target)} have been reset.")
 				continue
 			if not description and model is None and stream is None and tts is None and history is None:
 				p = self.retrieve(target)
-				s += ini_md(f"Current personality settings for {sqr_md(target)}:{iter2str(p)}")
+				s += ini_md(f"Current chat settings for {sqr_md(target)}:{iter2str(p)}")
 				if _perm < req:
-					s += f"\n(Use {bot.get_prefix(_guild)}personality DEFAULT to reset; case-sensitive)."
+					s += f"\n(Use {bot.get_prefix(_guild)}chatconfig DEFAULT to reset; case-sensitive)."
 				continue
 			if _perm < req:
 				reason = f"to modify chat config for {channel_repr(target)}"
@@ -641,7 +847,9 @@ class ChatConfig(Command):
 			if history is not None:
 				p.history = history
 			pers[target.id] = p
-			s += css_md(f"Personality settings for {sqr_md(target)} have been changed to {iter2str(p)}\n(Use {bot.get_prefix(_guild)}personality DEFAULT to reset).")
+			bot.set_guildbase(gid, "chatconfig", pers)
+			p = self.retrieve(target, _user)
+			s += css_md(f"Chat settings for {sqr_md(target)} have been changed to {iter2str(p)}\n(Use {bot.get_prefix(_guild)}chatconfig DEFAULT to reset).")
 		bot.set_guildbase(gid, "chatconfig", pers)
 		return s
 
@@ -1068,7 +1276,7 @@ class Imagine(Command):
 							"content": content,
 						},
 					],
-					"reasoning_effort": "minimal",
+					"reasoning": {"effort": "minimal"},
 					"modalities": ["image", "text"],
 					"image_config": {
 						"aspect_ratio": selected_ar,

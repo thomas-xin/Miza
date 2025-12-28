@@ -119,6 +119,9 @@ available = {
 	"gemini-3-pro": {
 		"openrouter": ("google/gemini-3-pro-preview", ("2", "12")),
 	},
+	"gemini-3-flash": {
+		"openrouter": ("google/gemini-3-flash-preview", ("0.5", "3")),
+	},
 	"gemini-2.5-pro": {
 		"openrouter": ("google/gemini-2.5-pro", ("1.25", "10")),
 	},
@@ -136,6 +139,12 @@ available = {
 	},
 	"grok-4-fast": {
 		"openrouter": ("x-ai/grok-4-fast", ("0.2", "0.5")),
+	},
+	"seed-1.6": {
+		"openrouter": ("bytedance-seed/seed-1.6", ("0.25", "2")),
+	},
+	"seed-1.6-flash": {
+		"openrouter": ("bytedance-seed/seed-1.6-flash", ("0.075", "0.3")),
 	},
 	"gpt-oss-120b": {
 		"openrouter": ("openai/gpt-oss-120b", ("0.072", "0.28")),
@@ -215,8 +224,11 @@ is_reasoning = {
 	"grok-3",
 	"grok-3-mini",
 	"gemini-3-pro",
+	"gemini-3-flash",
 	"gemini-2.5-pro",
 	"gemini-2.5-flash-t",
+	"seed-1.6",
+	"seed-1.6-flash",
 	"gpt-oss-120b",
 	"gpt-oss-20b",
 	"gpt-5.2",
@@ -251,10 +263,13 @@ is_function = {
 	"grok-3",
 	"grok-3-mini",
 	"gemini-3-pro",
+	"gemini-3-flash",
 	"gemini-2.5-pro",
 	"gemini-2.5-flash-t",
 	"gemini-2.5-flash",
 	"gemini-2.0",
+	"seed-1.6",
+	"seed-1.6-flash",
 	"gpt-oss-120b",
 	"gpt-oss-20b",
 	"o4-mini",
@@ -299,10 +314,13 @@ is_vision = {
 	"grok-4",
 	"grok-4-fast",
 	"gemini-3-pro",
+	"gemini-3-flash",
 	"gemini-2.5-pro",
 	"gemini-2.5-flash-t",
 	"gemini-2.5-flash",
 	"gemini-2.0",
+	"seed-1.6",
+	"seed-1.6-flash",
 	"gpt-oss-120b",
 	"gpt-oss-20b",
 	"o1",
@@ -389,10 +407,13 @@ contexts = {
 	"grok-3": 131072,
 	"grok-3-mini": 131072,
 	"gemini-3-pro": 1048576,
+	"gemini-3-flash": 1048576,
 	"gemini-2.5-pro": 1048576,
 	"gemini-2.5-flash-t": 1048576,
 	"gemini-2.5-flash": 1048576,
 	"gemini-2.0": 1048576,
+	"seed-1.6": 262144,
+	"seed-1.6-flash": 262144,
 	"gpt-oss-120b": 131072,
 	"gpt-oss-20b": 131072,
 	"o4-mini": 200000,
@@ -448,16 +469,9 @@ api_map = cdict()
 api_sems = cdict()
 api_blocked = AutoCache(stale=0, timeout=30)
 
-def oai_method(oai, func):
-	lookup = func.split(".")
-	caller = oai
-	for k in lookup:
-		caller = getattr(caller, k)
-	return caller
-
 def get_oai(func, api="openai"):
 	if not isinstance(api, str):
-		return oai_method(api, func)
+		return getattr_chain(api, func)
 	base_url = endpoint = endpoints.get(api, api)
 	oai = api_map.get(endpoint)
 	if not oai:
@@ -468,7 +482,7 @@ def get_oai(func, api="openai"):
 			key = AUTH.get(kkey) or "."
 		oai = openai.AsyncOpenAI(api_key=key, base_url=base_url)
 		api_map[endpoint] = oai
-	return oai_method(oai, func)
+	return getattr_chain(oai, func)
 
 decensor = regexp(r"(?:i am unable to|i.?m unable to|i cannot|i can.?t|i am not able to|i.?m not able to|i will not) (?:fulfil|assist|help with|provide|do|respond|comply|engage|perform|encourage|endorse|continue) |refrain from|disengage from", re.I)
 
@@ -717,9 +731,10 @@ async def summarise(q, min_length=384, max_length=16384, padding=128, best=True,
 
 info = AUTH.get("summarisation_model")
 if info:
-	model = info.get("model", "x")
 	api_key = info.get("api_key", "x")
 	base_url = info.get("base_url", "x")
+	oai = openai.OpenAI(api_key=api_key, base_url=base_url)
+	model = oai.models.list().data[0].id
 	pricing = info.get("pricing", [0, 0])
 	summarisation_model = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
 	summarisation_model.model = model
@@ -796,6 +811,15 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 			kwa.pop("temperature", None)
 			kwa.pop("presence_penalty", None)
 			kwa.pop("frequency_penalty", None)
+			# if "reasoning" in kwa or "reasoning" in body:
+			# 	kwa.pop("reasoning_effort", None)
+			# else:
+			# 	body["reasoning"] = dict(
+			# 		effort=kwa.pop("reasoning_effort", "low"),
+			# 		summary="auto",
+			# 	)
+			if not kwa.get("reasoning_effort"):
+				kwa["reasoning_effort"] = "low"
 		elif "reasoning_effort" in kwa:
 			kwa.pop("reasoning_effort")
 		kwa["model"] = model
@@ -817,7 +841,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 		if isinstance(api, str):
 			caller = get_oai(func, api=api)
 		else:
-			caller = oai_method(api, func)
+			caller = getattr_chain(api, func)
 		if "repetition_penalty" not in kwa:
 			kwa["repetition_penalty"] = cast_rp(kwa.pop("frequency_penalty", 0.25), kwa.pop("presence_penalty", 0.25), model=model)
 		match sapi:
@@ -1010,7 +1034,8 @@ async def _instruct(data, user=None, prune=True):
 		user=user,
 	)
 	inputs.update(data)
-	if not inputs.get("model"):
+	model = inputs.get("model")
+	if not model:
 		if summarisation_model:
 			api = summarisation_model
 			model = api.model
@@ -1021,8 +1046,8 @@ async def _instruct(data, user=None, prune=True):
 			model=model,
 			api=api,
 		))
-		if not inputs.get("reasoning_effort"):
-			inputs["reasoning_effort"] = "minimal" if model in is_reasoning else "low"
+	if not inputs.get("reasoning_effort"):
+		inputs["reasoning_effort"] = "minimal" if model in is_reasoning else "low"
 	if inputs["model"] not in is_completion:
 		if "messages" not in inputs:
 			prompt = inputs.pop("prompt")

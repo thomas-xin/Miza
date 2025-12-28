@@ -389,8 +389,8 @@ class Pipe(Command):
 		await bot.edit_message(message, content=message.content + " (done!)")
 
 
-class Avatar(Command):
-	name = ["PFP", "Icon"]
+class Icon(Command):
+	name = ["PFP", "Avatar"]
 	description = "Sends a link to the avatar of a user or server."
 	schema = cdict(
 		objects=cdict(
@@ -410,13 +410,14 @@ class Avatar(Command):
 		embs = []
 		for obj in objects:
 			name = getattr(obj, "name", None) or str(obj)
-			url = await self.bot.get_proxy_url(obj, force=True)
+			url = best_url(obj)
+			url2 = await self.bot.get_proxy_url(obj, force=True)
+			url3 = await self.bot.get_proxy_url(str(obj.avatar), force=True)
 			colour = await self.bot.get_colour(obj)
-			url2 = await self.bot.get_proxy_url(str(obj.avatar), force=True)
 			emb = discord.Embed(colour=colour)
-			emb.set_thumbnail(url=url2)
-			emb.set_image(url=url)
-			emb.set_author(name=name, icon_url=url, url=url)
+			emb.set_thumbnail(url=url3)
+			emb.set_image(url=url2 if url2 != url3 else url)
+			emb.set_author(name=name, icon_url=url2, url=url2)
 			emb.description = f"{sqr_md(getattr(obj, 'display_name', None) or name)}({url})"
 			embs.append(emb)
 		return cdict(embeds=embs)
@@ -502,7 +503,7 @@ class Info(Command):
 		return emb
 
 	async def getMimicData(self, p, flags={}):
-		url = to_webp(p.url)
+		url = best_url(p.url)
 		name = p.name
 		colour = await self.bot.get_colour(p)
 		emb = discord.Embed(colour=colour)
