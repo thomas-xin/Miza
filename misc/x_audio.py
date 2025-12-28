@@ -307,6 +307,10 @@ class AudioPlayer(discord.AudioSource):
 			if self.vc:
 				self.vc.stop()
 				await self.vc.disconnect()
+		if announce:
+			channel = self.channel if self else client.get_channel(cid)
+			s = ansi_md(colourise_auto(f"$b<🎵> Successfully disconnected from $m<{self.channel.guild}>. $b<🎵>"))
+			await cls.announce(self, s, channel=channel, dump=True)
 		if not self:
 			if not cid or not client.get_channel(cid):
 				return
@@ -316,10 +320,6 @@ class AudioPlayer(discord.AudioSource):
 			self.clear()
 		if clear:
 			cls.cache.pop(guild.id, None)
-		if announce:
-			channel = self.channel if self else client.get_channel(cid)
-			s = ansi_md(colourise_auto(f"$b<🎵> Successfully disconnected from $m<{self.channel.guild}>. $b<🎵>"))
-			return await cls.announce(self, s, channel=channel, dump=True)
 
 	async def leave(self, reason=None, dump=False):
 		if self.vcc and self.vcc.guild:
