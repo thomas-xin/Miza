@@ -1084,7 +1084,7 @@ class Dump(Command):
 				enum=("save", "load", "append"),
 			),
 			description="Whether to save or load queue, or append loaded data to current queue",
-			example="load",
+			default="load",
 		),
 		url=cdict(
 			type="url",
@@ -1130,7 +1130,7 @@ class Dump(Command):
 				if not url:
 					raise LookupError("No valid dump file provided or found.")
 			b = await attachment_cache.download(url)
-			queue = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).load_dump({maybe_json(b).decode('ascii')},{_user.id},append={mode == 'append'})")
+			queue = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).load_dump({maybe_json(b).decode('ascii')},{_user.id},universal={mode == 'load'},append={mode == 'append'})")
 			count = len(queue)
 			return cdict(
 				content=(link + "\n" if link else "") + italics(css_md(f"Successfully loaded audio data ({count} item{'s' if count != 1 else ''}) for {sqr_md(_guild)}.")),
