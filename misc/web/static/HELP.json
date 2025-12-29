@@ -3882,8 +3882,8 @@
 			"rate_limit": "(1, 2)",
 			"schema": {
 				"mode": {
+					"default": "load",
 					"description": "Whether to save or load queue, or append loaded data to current queue",
-					"example": "load",
 					"type": "enum",
 					"validation": {
 						"enum": ["save", "load", "append"]

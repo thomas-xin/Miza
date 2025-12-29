@@ -1237,12 +1237,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return resp
 
 	# Fetches a message from ID and channel, using the bot cache when possible.
-	async def _fetch_message(self, m_id, channel=None):
+	async def _fetch_message(self, m_id, channel=None, fast=False):
 		if channel is None:
 			raise LookupError("Message data not found.")
 		with suppress(TypeError):
 			int(channel)
 			channel = await self.fetch_channel(channel)
+		if fast:
+			message = await channel.fetch_message(m_id)
+			self.cache.messages[message.id] = message
+			return message
 		# This method is only called when a message is not found in the cache. This means that it is likely either out of range of cache or was produced during downtime, meaning surrounding messages may not be cached either. We preemtively fetch the surrounding messages to prepare for future requests, or requests that may involve the surrounding messages.
 		messages = await flatten(discord.abc.Messageable.history(channel, limit=101, around=cdict(id=m_id)))
 		data = {m.id: m for m in messages}
@@ -1284,9 +1288,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					m = None
 		if m:
 			return m
-		if fast:
-			return await channel.fetch_message(m_id)
-		return await self._fetch_message(m_id, channel)
+		return await self._fetch_message(m_id, channel, fast=fast)
 
 	async def fetch_reference(self, message):
 		if not getattr(message, "reference", None):
