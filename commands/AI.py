@@ -864,7 +864,6 @@ class Instruct(Command):
 			type="enum",
 			validation=cdict(
 				enum=list(ai.available),
-				accepts={"llama": "llama-3-70b", "haiku": "claude-3-haiku", "r1": "deepseek-r1", "deepseek": "deepseek-v3", "gpt3.5": "gpt-3.5", "sonnet": "claude-4.5-sonnet", "dbrx": "dbrx-instruct", "gpt5": "gpt-5.1", "gpt4": "gpt-4.1", "gpt-4o": "gpt-4", "opus": "claude-4.1-opus"},
 			),
 			description="Target LLM to invoke",
 			example="deepseek",
@@ -899,6 +898,13 @@ class Instruct(Command):
 			description="Amount to penalise tokens based on presence",
 			example="1.1",
 			default=0.5,
+		),
+		reasoning_effort=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("minimal", "low", "medium", "high"),
+			),
+			default="low",
 		),
 		max_tokens=cdict(
 			type="integer",
@@ -936,7 +942,7 @@ class Instruct(Command):
 	ephemeral = True
 	cache = AutoCache(stale=360, timeout=720)
 
-	async def __call__(self, bot, _message, _premium, model, prompt, api, temperature, frequency_penalty, presence_penalty, max_tokens, **void):
+	async def __call__(self, bot, _message, _premium, model, prompt, api, temperature, frequency_penalty, presence_penalty, reasoning_effort, max_tokens, **void):
 		# assert model in ai.available, f"{model} does not exist or is not supported."
 		kwargs = {}
 		if api:
@@ -963,9 +969,10 @@ class Instruct(Command):
 			oai = openai.AsyncOpenAI(api_key=key, base_url=api)
 			kwargs["api"] = oai
 		kwargs["max_tokens"] = max_tokens
+		kwargs["reasoning_effort"] = reasoning_effort
 		if not model:
-			kwargs["api"] = summarisation_model
-			model = summarisation_model.model
+			kwargs["api"] = ai.load_summarisation_model()
+			model = ai.summarisation_model.model
 		resp = await bot.force_completion(model=model, prompt=prompt, stream=True, timeout=1800, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, premium_context=_premium, allow_alt=True, **kwargs)
 		try:
 			_message.__dict__.setdefault("inits", []).append(resp)

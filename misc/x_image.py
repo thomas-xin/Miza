@@ -282,7 +282,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 	"""
 	if b[:4] == b"<svg" or b[:5] == b"<?xml":
 		import wand
-		import wand.image
+		import wand.api, wand.color, wand.image
 		with wand.image.Image() as im:
 			with wand.color.Color("transparent") as background_color:
 				wand.api.library.MagickSetBackgroundColor(
@@ -323,7 +323,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 		return ImageSequence.fromiter((Image.open(z.open(fn)) for fn in filenames), count=len(filenames))
 	try:
 		import wand
-		import wand.image
+		import wand.api, wand.color, wand.image, wand.sequence
 	except ImportError:
 		wand = None
 	dur = None
@@ -331,7 +331,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 	proc = None
 	try:
 		left, right = mime.split("/", 1)[0], mime.split("/", 1)[-1]
-		if not wand or left == "image" and right in "avif blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal wmf xbm".split():
+		if left == "image" and right in "avif blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal wmf xbm".split():
 			try:
 				im = Image.open(out)
 			except PIL.UnidentifiedImageError:
@@ -418,7 +418,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 				print(as_str(p.stderr.read()), end="")
 				raise
 			# print("Image info:", info)
-			size = (int(info.get("coded_width") or info.get("width")), int(info.get("coded_height") or info.get("height")))
+			size = (int(info.get("width") or info.get("coded_width")), int(info.get("height") or info.get("coded_height")))
 			fps = float(fractions.Fraction(info.get("avg_frame_rate") or info.get("r_frame_rate") or 30))
 			fcount = int(info.get("nb_frames") or info.get("nb_read_frames") or 1)
 			dur = float(info.get("duration") or fcount / fps)

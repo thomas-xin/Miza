@@ -87,34 +87,14 @@ def get_best_audio(entry):
 	url = None
 	cdc = None
 	ac = 0
-	replace = True
 	for fmt in fmts:
-		q = (fmt.get("acodec") in ("opus", "vorbis"), fmt.get("vcodec") in (None, "none") and fmt.get("acodec") not in (None, "none"), fmt.get("abr", 0) or 0, fmt.get("tbr", 0) or 0)
+		q = (fmt.get("protocol", "m3u8_native") != "m3u8_native", fmt.get("acodec") in ("opus", "vorbis"), fmt.get("vcodec") in (None, "none") and fmt.get("acodec") not in (None, "none"), fmt.get("abr", 0) or 0, fmt.get("tbr", 0) or 0)
 		u = as_str(fmt["url"])
-		if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
-			replace = False
-		if q > best or replace:
+		if q > best:
 			ac = fmt.get("audio_channels", 0)
 			cdc = fmt.get("acodec")
 			best = q
 			url = fmt["url"]
-	if url and url.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
-		resp = Request(url)
-		assert isinstance(resp, bytes)
-		fmts = alist()
-		with suppress(ValueError, KeyError):
-			while True:
-				search = b'<Representation id="'
-				resp = resp[resp.index(search) + len(search):]
-				f_id = as_str(resp[:resp.index(b'"')])
-				search = b"><BaseURL>"
-				resp = resp[resp.index(search) + len(search):]
-				stream = as_str(resp[:resp.index(b'</BaseURL>')])
-				fmt = cdict(ytd.extractor.youtube.YoutubeIE._formats[f_id])
-				fmt.url = stream
-				fmts.append(fmt)
-		entry["formats"] = fmts
-		return get_best_audio(entry)
 	return url, cdc, ac
 # Gets the best video file download link for a queue entry.
 def get_best_video(entry, hq=True):
@@ -129,39 +109,19 @@ def get_best_video(entry, hq=True):
 		fmts = ()
 	url = None
 	cdc = None
-	replace = True
 	for fmt in fmts:
 		q = (
+			fmt.get("protocol", "m3u8_native") != "m3u8_native",
 			fmt.get("vcodec") not in (None, "none"),
-			fmt.get("protocol") != "m3u8_native" if not hq else False,
 			-abs(fmt["fps"] - (90 if hq else 42)) if isinstance(fmt.get("fps"), (int, float)) else -inf,
 			-abs(fmt["height"] - (1600 if hq else 720)) if isinstance(fmt.get("height"), (int, float)) else -inf,
 			fmt["tbr"] if isinstance(fmt.get("tbr"), (int, float)) else -inf,
 		)
 		u = as_str(fmt["url"])
-		if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
-			replace = False
-		if q > best or replace:
+		if q > best:
 			cdc = fmt.get("vcodec")
 			best = q
 			url = fmt["url"]
-	if url and url.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
-		resp = Request(url)
-		assert isinstance(resp, bytes)
-		fmts = alist()
-		with suppress(ValueError, KeyError):
-			while True:
-				search = b'<Representation id="'
-				resp = resp[resp.index(search) + len(search):]
-				f_id = as_str(resp[:resp.index(b'"')])
-				search = b"><BaseURL>"
-				resp = resp[resp.index(search) + len(search):]
-				stream = as_str(resp[:resp.index(b'</BaseURL>')])
-				fmt = cdict(ytd.extractor.youtube.YoutubeIE._formats[f_id])
-				fmt.url = stream
-				fmts.append(fmt)
-		entry["formats"] = fmts
-		return get_best_video(entry)
 	return url, cdc
 def get_best_lyrics(resp):
 	if "description" in resp:
@@ -1371,7 +1331,8 @@ class AudioDownloader:
 		key = verify_search(item)
 		# Force key to be a string, eliminating shenanigans where tuples are serialised as lists within the cache and then fail to retrieve due to hashability
 		retrieval = json_dumpstr([key, mode, count])
-		temp = self.search_cache.retrieve(retrieval, self.search_into, item, mode, count)
+		retrieve = self.search_cache._retrieve if force else self.search_cache.retrieve
+		temp = retrieve(retrieval, self.search_into, item, mode, count)
 		if not temp:
 			raise FileNotFoundError(f'No results for {item}.')
 		if not temp[0].get("duration"):

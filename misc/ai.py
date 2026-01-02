@@ -1,6 +1,7 @@
 import asyncio
 import base64
 from collections import deque
+import decimal
 from math import ceil, inf
 import orjson
 import re
@@ -11,7 +12,7 @@ import openai
 assert hasattr(openai, "AsyncOpenAI"), "OpenAI library has incorrect version installed!"
 from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, tracebacksuppressor, utc, T, string_like, getattr_chain
 from misc.util import AUTH, CACHE_PATH, AutoCache, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across
-from misc.asyncs import asubmit, csubmit, emptyctx, gather, Semaphore, CloseableAsyncIterator
+from misc.asyncs import flatten, asubmit, esubmit, csubmit, emptyctx, gather, Semaphore, CloseableAsyncIterator
 
 print("AI:", __name__)
 
@@ -33,49 +34,24 @@ def cast_rp(fp, pp, model=None):
 	return ((fp + pp) / 8 + 1) ** (0.125 * s)
 # List of language models and their respective providers, as well as pricing per million input/output tokens
 available = {
-	"claude-4.1-opus": {
-		"openrouter": ("anthropic/claude-opus-4.1", ("15", "75")),
-	},
-	"claude-4.5-sonnet": {
-		"openrouter": ("anthropic/claude-4.5-sonnet", ("3", "15")),
-	},
-	"claude-4-sonnet": {
-		"openrouter": ("anthropic/claude-sonnet-4", ("3", "15")),
-	},
-	"claude-4.5-haiku": {
-		"openrouter": ("anthropic/claude-haiku-4.5", ("1", "5")),
-	},
 	"deepseek-r1": {
-		"openrouter": ("deepseek/deepseek/deepseek-r1-0528:free", ("0", "0")),
 		"deepseek": ("deepseek-reasoner", ("0.41167", "1.64333")),
 		"deepinfra": ("deepseek-ai/DeepSeek-R1", ("0.85", "2.5")),
 	},
 	"deepseek-v3.2": {
-		"openrouter": ("deepseek/deepseek-v3.2-exp", ("0.27", "0.41")),
 		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
 	},
 	"deepseek-v3.1": {
-		"openrouter": ("deepseek/deepseek-chat-v3.1", ("0.2", "0.8")),
 		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
 		"fireworks": ("accounts/fireworks/models/deepseek-v3-0324", ("0.9", "0.9")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
 		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
 	},
 	"deepseek-v3": {
-		"openrouter": ("deepseek/deepseek-v3.2-exp", ("0.27", "0.41")),
 		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
 		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
 		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
 		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
-	},
-	"minimax-m2": {
-		"openrouter": ("minimax/minimax-m2", ("0.15", "0.45")),
-	},
-	"minimax-m1": {
-		"openrouter": ("minimax/minimax-m1", ("0.3", "1.65")),
-	},
-	"minimax-01": {
-		"openrouter": ("minimax/minimax-01", ("0.2", "1.1")),
 	},
 	"llama-3-405b": {
 		"deepinfra": ("meta-llama/Meta-Llama-3.1-405B-Instruct", ("1.79", "1.79")),
@@ -100,59 +76,16 @@ available = {
 		"fireworks": ("accounts/fireworks/models/llama-v3p1-8b-instruct", ("0.2", "0.2")),
 		"together": ("meta-llama/Meta-Llama-3.1-8B-Instruct", ("0.2", "0.2")),
 	},
-	"command-r-plus": {
-		"openrouter": ("cohere/command-r-plus-08-2024", ("2.375", "9.5")),
-	},
-	"command-r": {
-		"openrouter": ("cohere/command-r-08-2024", ("0.1425", "0.57")),
-	},
-	"magnum-72b": {
-		"openrouter": ("anthracite-org/magnum-v4-72b", ("1.875", "2.25")),
-	},
-	"qwen3-235b": {
-		"openrouter": ("qwen/qwen3-vl-235b-a22b-thinking", ("0.3", "1.2")),
-	},
 	"qwen-72b": {
 		"fireworks": ("accounts/fireworks/models/qwen2p5-72b-instruct", ("0.9", "0.9")),
 		"deepinfra": ("Qwen/Qwen2.5-72B-Instruct", ("0.35", "0.4")),
 		"together": ("Qwen/Qwen2.5-72B-Instruct-Turbo", ("1.2", "1.2")),
 	},
-	"gemini-3-pro": {
-		"openrouter": ("google/gemini-3-pro-preview", ("2", "12")),
-	},
-	"gemini-3-flash": {
-		"openrouter": ("google/gemini-3-flash-preview", ("0.5", "3")),
-	},
-	"gemini-2.5-pro": {
-		"openrouter": ("google/gemini-2.5-pro", ("1.25", "10")),
-	},
-	"gemini-2.5-flash-t": {
-		"openrouter": ("google/gemini-2.5-flash-preview-09-2025", ("0.3", "2.5")),
-	},
-	"gemini-2.5-flash": {
-		"openrouter": ("google/gemini-2.5-flash-lite-preview-09-2025", ("0.1", "0.4")),
-	},
-	"grok-4.1-fast": {
-		"openrouter": ("x-ai/grok-4.1-fast", ("0.2", "0.5")),
-	},
-	"grok-4": {
-		"openrouter": ("x-ai/grok-4", ("3", "15")),
-	},
-	"grok-4-fast": {
-		"openrouter": ("x-ai/grok-4-fast", ("0.2", "0.5")),
-	},
-	"seed-1.6": {
-		"openrouter": ("bytedance-seed/seed-1.6", ("0.25", "2")),
-	},
-	"seed-1.6-flash": {
-		"openrouter": ("bytedance-seed/seed-1.6-flash", ("0.075", "0.3")),
-	},
 	"gpt-oss-120b": {
-		"openrouter": ("openai/gpt-oss-120b", ("0.072", "0.28")),
+		"deepinfra": ("openai/gpt-oss-120b", ("0.039", "0.19")),
 	},
 	"gpt-oss-20b": {
-		"openrouter": ("openai/gpt-oss-20b", ("0.05", "0.2")),
-		"fireworks": ("accounts/fireworks/models/gpt-oss-20b", ("0.1", "0.1")),
+		"deepinfra": ("openai/gpt-oss-20b", ("0.03", "0.14")),
 	},
 	"o4-mini": {
 		"openai": ("o4-mini", ("1.1", "4.4")),
@@ -163,22 +96,13 @@ available = {
 	"o3-mini": {
 		"openai": ("o3-mini", ("1.1", "4.4")),
 	},
-	"gpt-5.2": {
-		"openrouter": ("openai/gpt-5.2", ("1.75", "14")),
-	},
-	"gpt-5.1": {
-		"openrouter": ("openai/gpt-5.1", ("1.25", "10")),
-	},
 	"gpt-5": {
-		"openrouter": ("openai/gpt-5", ("1.25", "10")),
 		"openai": ("gpt-5", ("1.25", "10")),
 	},
 	"gpt-5-mini": {
-		"openrouter": ("openai/gpt-5-mini", ("0.25", "2")),
 		"openai": ("gpt-5-mini", ("0.25", "2")),
 	},
 	"gpt-5-nano": {
-		"openrouter": ("openai/gpt-5-nano", ("0.05", "4")),
 		"openai": ("gpt-5-mini", ("0.05", "0.4")),
 	},
 	"gpt-4.1-mini": {
@@ -192,278 +116,28 @@ available = {
 	},
 	"gpt-4": {
 		"openai": ("gpt-4o", ("2.5", "10")),
-		"openrouter": ("openai/gpt-4o", ("2.5", "10")),
 	},
 	"mistral-24b": {
 		"mistral": ("mistral-small-latest", ("0", "0")),
-		"openrouter": ("mistralai/mistral-small-3.1-24b-instruct-2503", ("0.1", "0.3")),
-		"openrouter_": ("cognitivecomputations/dolphin3.0-mistral-24b:free", ("0", "0")),
 	},
 	"kimi-k2-t": {
 		"deepinfra": ("moonshotai/Kimi-K2-Thinking", ("0.55", "2.5")),
-		"openrouter": ("moonshotai/kimi-k2-thinking", ("0.6", "2.5")),
-	},
-	"kimi-k2": {
-		"openrouter": ("moonshotai/kimi-k2-0905:exacto", ("0.6", "2.5")),
 	},
 }
 
 # tags: is_completion, is_function, is_vision, is_premium
-is_completion = {
-	"dbrx-instruct",
-	"gpt-3.5-turbo-instruct",
-}
+is_completion = set()
 is_reasoning = {
-	"claude-4.1-opus",
-	"claude-4.5-sonnet",
-	"claude-4.5-haiku",
-	"claude-3.7-sonnet:thinking",
-	"claude-3.7-sonnet-t",
 	"grok-4.1-fast",
-	"grok-4",
-	"grok-4-fast",
-	"grok-3",
-	"grok-3-mini",
-	"gemini-3-pro",
-	"gemini-3-flash",
-	"gemini-2.5-pro",
-	"gemini-2.5-flash-t",
-	"seed-1.6",
-	"seed-1.6-flash",
-	"gpt-oss-120b",
-	"gpt-oss-20b",
-	"gpt-5.2",
-	"gpt-5.1",
-	"gpt-5",
-	"gpt-5-mini",
-	"gpt-5-nano",
-	"o4-mini",
-	"o3",
-	"o3-mini",
-	"o1",
-	"o1-preview",
-	"o1-mini",
-	"deepseek-r1",
-	"kimi-k2-t",
-	"qwen3-235b",
 }
 is_function = {
-	"claude-3.7-sonnet-t",
-	"claude-3.7-sonnet",
-	"claude-3.5-sonnet",
-	"claude-3.5-haiku",
-	"claude-3-opus",
-	"claude-3-sonnet",
-	"claude-3-haiku",
-	"command-r",
-	"command-r-plus",
-	"35b-beta-long",
 	"grok-4.1-fast",
-	"grok-4",
-	"grok-4-fast",
-	"grok-3",
-	"grok-3-mini",
-	"gemini-3-pro",
-	"gemini-3-flash",
-	"gemini-2.5-pro",
-	"gemini-2.5-flash-t",
-	"gemini-2.5-flash",
-	"gemini-2.0",
-	"seed-1.6",
-	"seed-1.6-flash",
-	"gpt-oss-120b",
-	"gpt-oss-20b",
-	"o4-mini",
-	"o3",
-	"o3-mini",
-	"o1",
-	"o1-preview",
-	"o1-mini",
-	"gpt-5.2",
-	"gpt-5.1",
-	"gpt-5",
-	"gpt-5-mini",
-	"gpt-5-nano",
-	"gpt-4.1",
-	"gpt-4.1-mini",
-	"gpt-4",
-	"chatgpt-4o-latest",
-	"gpt-4-mini",
-	"gpt-4o-mini",
-	"gpt-4-0125-preview",
-	"gpt-3.5",
-	"gpt-3.5-turbo",
-	"deepseek-v3.2",
-	"deepseek-v3.1",
-	"mistral-24b",
-	"kimi-k2-t",
-	"kimi-k2",
-	"caller-large",
-	"firefunction-v2",
-	"firefunction-v1",
 }
 is_vision = {
-	"claude-3.7-sonnet-t",
-	"claude-3.7-sonnet",
-	"claude-3.5-sonnet",
-	"claude-3-opus",
-	"claude-3-sonnet",
-	"claude-3-haiku",
-	"llama-3-11b",
-	"llama-3-90b",
 	"grok-4.1-fast",
-	"grok-4",
-	"grok-4-fast",
-	"gemini-3-pro",
-	"gemini-3-flash",
-	"gemini-2.5-pro",
-	"gemini-2.5-flash-t",
-	"gemini-2.5-flash",
-	"gemini-2.0",
-	"seed-1.6",
-	"seed-1.6-flash",
-	"gpt-oss-120b",
-	"gpt-oss-20b",
-	"o1",
-	"o1-preview",
-	"gpt-5.2",
-	"gpt-5.1",
-	"gpt-5",
-	"gpt-5-mini",
-	"gpt-5-nano",
-	"gpt-4.1",
-	"gpt-4.1-mini",
-	"gpt-4",
-	"chatgpt-4o-latest",
-	"gpt-4-mini",
-	"gpt-4o-mini",
-	"qwen3-235b",
-	"minimax-m2",
-	"minimax-m1",
-	"minimax-01",
-	"mistral-24b",
-	"firellava-13b",
-	"phi-4b",
 }
-is_premium = {
-	"claude-4.5-opus",
-	"claude-4.1-opus",
-	"claude-4-opus",
-	"claude-4.5-sonnet",
-	"claude-4-sonnet",
-	"llama-3-405b",
-	"gpt-5.2",
-	"gpt-5.1",
-	"gpt-5",
-	"grok-4",
-	"gemini-3-pro",
-	"gemini-2.5-pro",
-	"o3",
-	"o1",
-	"o1-preview",
-	"command-r-plus",
-}
-instruct_formats = {
-	"reflection-llama-3-70b": "llamav3",
-	"euryale-70b": "llamav3",
-	"skyfall-36b": "mistral",
-	"mistral-24b": "mistral",
-	"miquliz-120b": "mistral",
-	"goliath-120b": "alpaca",
-	"magnum-72b": "chatml",
-	"qwen-72b": "chatml",
-	"dbrx-instruct": "chatml",
-	"mixtral-8x22b-instruct": "mistral",
-	"wizard-8x22b": "mistral",
-	"llama-3-405b": "llamav3",
-	"llama-3-90b": "llamav3",
-	"llama-3-70b": "llamav3",
-	"llama-3-11b": "llamav3",
-	"llama-3-8b": "llamav3",
-	"phi-4b": "llamav3",
-}
-# Default context: 4096
-contexts = {
-	"claude-3.7-sonnet-t": 200000,
-	"claude-3.7-sonnet": 200000,
-	"claude-3.5-sonnet": 200000,
-	"claude-3.5-haiku": 200000,
-	"claude-3-opus": 200000,
-	"claude-3-sonnet": 200000,
-	"claude-3-haiku": 200000,
-	"command-r": 112000,
-	"command-r-plus": 112000,
-	"35b-beta-long": 14336,
-	"magnum-72b": 16384,
-	"qwen3-235b": 262144,
-	"qwen-72b": 32768,
-	"llama-3-8b": 131072,
-	"llama-3-11b": 131072,
-	"llama-3-70b": 131072,
-	"llama-3-90b": 131072,
-	"llama-3-405b": 131072,
-	"grok-4.1-fast": 2000000,
-	"grok-4": 262144,
-	"grok-4-fast": 2097152,
-	"grok-3": 131072,
-	"grok-3-mini": 131072,
-	"gemini-3-pro": 1048576,
-	"gemini-3-flash": 1048576,
-	"gemini-2.5-pro": 1048576,
-	"gemini-2.5-flash-t": 1048576,
-	"gemini-2.5-flash": 1048576,
-	"gemini-2.0": 1048576,
-	"seed-1.6": 262144,
-	"seed-1.6-flash": 262144,
-	"gpt-oss-120b": 131072,
-	"gpt-oss-20b": 131072,
-	"o4-mini": 200000,
-	"o3": 200000,
-	"o3-mini": 200000,
-	"o1": 200000,
-	"o1-preview": 200000,
-	"o1-mini": 200000,
-	"gpt-5.2": 400000,
-	"gpt-5.1": 400000,
-	"gpt-5": 400000,
-	"gpt-5-mini": 400000,
-	"gpt-5-nano": 400000,
-	"gpt-4.1": 1048576,
-	"gpt-4.1-mini": 1048576,
-	"gpt-4": 128000,
-	"chatgpt-4o-latest": 128000,
-	"gpt-4-mini": 128000,
-	"gpt-4o-mini": 128000,
-	"gpt-3.5": 16384,
-	"gpt-3.5-turbo-instruct": 4096,
-	"minimax-m2": 1000000,
-	"minimax-m1": 1000000,
-	"minimax-01": 1000000,
-	"deepseek-r1": 64000,
-	"deepseek-v3.2": 163840,
-	"deepseek-v3.1": 64000,
-	"deepseek-v3": 64000,
-	"skyfall-36b": 32768,
-	"mistral-24b": 32768,
-	"dbrx-instruct": 32768,
-	"miquliz-120b": 32768,
-	"reflection-llama-3-70b": 8192,
-	"euryale-70b": 8192,
-	"lzlv-70b": 4096,
-	"wizard-8x22b": 65536,
-	"mixtral-8x22b-instruct": 65536,
-	"nous-hermes-2-mixtral-8x7b-dpo": 32768,
-	"mixtral-8x7b-instruct": 32768,
-	"mixtral-8x7b": 32768,
-	"kimi-k2-t": 262144,
-	"kimi-k2": 262144,
-	"caller-large": 32768,
-	"firefunction-v2": 8192,
-	"firefunction-v1": 32768,
-	"firellava-13b": 4096,
-	"phi-4b": 131072,
-	"mythomax-13b": 4096,
-}
+is_premium = set()
+contexts = {}
 
 oai_name = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 api_map = cdict()
@@ -730,18 +404,85 @@ async def summarise(q, min_length=384, max_length=16384, padding=128, best=True,
 		return q
 	return await _summarise(q, summ_length, best=best, prompt=prompt, premium_context=premium_context)
 
-info = AUTH.get("summarisation_model")
-if info:
+cache = CACHE = AutoCache(f"{CACHE_PATH}/ai", stale=86400, timeout=86400 * 14)
+
+class ExtendedOpenAI(openai.AsyncOpenAI):
+	__slots__ = ("model", "pricing", "refresh")
+
+	def __init__(self, *args, **kwargs):
+		self.model = ""
+		self.pricing = (0, 0)
+		self.refresh = 0
+		super().__init__(*args, **kwargs)
+
+summarisation_model = None
+def load_summarisation_model():
+	global summarisation_model
+	info = AUTH.get("summarisation_model")
+	if not info or getattr(summarisation_model, "refresh", 0) > utc():
+		return
 	api_key = info.get("api_key", "x")
 	base_url = info.get("base_url", "x")
-	oai = openai.OpenAI(api_key=api_key, base_url=base_url)
-	model = oai.models.list().data[0].id
-	pricing = info.get("pricing", [0, 0])
-	summarisation_model = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
+	try:
+		oai = openai.OpenAI(api_key=api_key, base_url=base_url)
+		model = oai.models.list().data[0].id
+		pricing = info.get("pricing", [0, 0])
+	except Exception:
+		return
+	summarisation_model = ExtendedOpenAI(api_key=api_key, base_url=base_url)
+	print(f"Loaded summarisation model API {base_url} with model {model}.")
 	summarisation_model.model = model
-	summarisation_model.pricing = pricing
-else:
-	summarisation_model = None
+	summarisation_model.pricing = tuple(pricing)
+	summarisation_model.refresh = utc() + 720
+	return summarisation_model
+
+openai_refresh = 0
+async def load_openrouter():
+	if openai_refresh > utc():
+		return
+
+	async def get_openrouter_models():
+		oai = get_oai("", "openrouter")
+		models = await flatten(oai.models.list())
+		models.sort(key=lambda model: "-preview" not in model.id)
+		return models
+
+	models = await CACHE.aretrieve("openrouter-models", get_openrouter_models, _force=True)
+	count = 0
+	for model in models:
+		name = model.id.rsplit("/", 1)[-1].rsplit("-preview", 1)[0]
+		prompt, completion = str(decimal.Decimal(model.pricing["prompt"]) * 1000000), str(decimal.Decimal(model.pricing["completion"]) * 1000000)
+		entry = (model.id, (prompt, completion))
+		try:
+			available[name]["openrouter"] = entry
+		except KeyError:
+			available[name] = dict(openrouter=entry)
+		contexts[name] = model.context_length
+		if float(completion) >= 5:
+			is_premium.add(name)
+		else:
+			is_premium.discard(name)
+		if "image" in model.architecture.get("input_modalities", ()):
+			is_vision.add(name)
+		else:
+			is_vision.discard(name)
+		if "tools" in model.supported_parameters:
+			is_function.add(name)
+		else:
+			is_function.discard(name)
+		if "reasoning" in model.supported_parameters:
+			is_reasoning.add(name)
+		else:
+			is_reasoning.discard(name)
+		count += 1
+	print(f"Openrouter: Loaded {count} models")
+	globals()["openai_refresh"] = utc() + 86400
+
+with tracebacksuppressor:
+	fut = esubmit(load_summarisation_model)
+	asyncio.run(load_openrouter())
+	fut.result()
+
 async def _summarise(s, max_length, best=False, prompt=None, premium_context=[]):
 	if len(s) <= max_length:
 		return s
@@ -766,7 +507,7 @@ async def _summarise(s, max_length, best=False, prompt=None, premium_context=[])
 
 async def llm(func, *args, api=None, timeout=120, premium_context=None, require_message=True, allow_alt=True, **kwargs):
 	if isinstance(api, str) or not api:
-		# await ensure_models()
+		await load_openrouter()
 		if "model" in kwargs:
 			apis = available.get(kwargs["model"]) or {api: None}
 		else:
@@ -779,7 +520,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 	kwa = kwargs
 	for i, (api, minfo) in enumerate(tries + tries):
 		if api is None and minfo is None:
-			api = summarisation_model
+			api = load_summarisation_model()
 		if api is None:
 			if not allow_alt:
 				break
@@ -1037,7 +778,7 @@ async def _instruct(data, user=None, prune=True):
 	inputs.update(data)
 	model = inputs.get("model")
 	if not model:
-		if summarisation_model:
+		if load_summarisation_model():
 			api = summarisation_model
 			model = api.model
 		else:
@@ -1061,7 +802,7 @@ async def _instruct(data, user=None, prune=True):
 			response = await llm("completions.create", **inputs, timeout=90)
 		resp = response.choices[0].text
 	if prune:
-		resp = resp.strip()
+		resp = (resp or "").strip()
 		resp2 = regexp(r"### (?:Input|Instruction):?").split(resp, 1)[0].strip().split("### Response:", 1)[-1].strip()
 		if resp != resp2:
 			print("PRUNED:", resp, resp2, sep="::")
@@ -1636,9 +1377,6 @@ async def collect_stream(resp):
 		choice.message.tool_calls = []
 	result.choices[0] = choice
 	return result
-
-
-cache = CACHE = AutoCache(f"{CACHE_PATH}/ai", stale=86400, timeout=86400 * 14)
 
 async def moderate(text="", image="", input="", premium_context=[]):
 	if isinstance(text, (tuple, list)):

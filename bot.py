@@ -1841,7 +1841,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 								i -= 1
 								name = t[0] + "-" + str(i)
 								emoji = emojis.get(name)
-			emoji = await self.resolve_emoji(emoji, guild=guild)
+			try:
+				emoji = await self.resolve_emoji(emoji, guild=guild)
+			except LookupError:
+				continue
+			except Exception:
+				print_exc()
+				continue
 			if not emoji and not is_webhook and user:
 				orig.pop(name, None)
 				self.set_userbase(user.id, "emojilist", orig)
@@ -2076,7 +2082,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if "max_completion_tokens" not in kwargs:
 				kwargs["max_tokens"] = max_tokens
 			return await ai.llm("chat.completions.create", model=vision_model, messages=messages, stream=stream, **kwargs)
-		fmt = ai.instruct_formats.get(model, "chatml")
+		fmt = "chatml"
 		assistant_messages = [m for m in messages if m.get("content") and m.get("role") == "assistant"]
 		if assistant_name:
 			bot_name = assistant_name
@@ -2279,45 +2285,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			m.pop("new", None)
 		return messages, model
 
-	async def classify(self, content, examples=[], model="embed-multilingual-v3.0", premium_context=[]):
-		if model == "embed-multilingual-v3.0" and len(content) > 1024:
-			if content.isascii():
-				model = "embed-english-light-v3.0"
-			else:
-				model = "embed-multilingual-light-v3.0"
-		inputs = dict(
-			inputs=[content],
-			examples=examples,
-			model=model,
-		)
-		data = await Request.aio(
-			"https://api.cohere.ai/v1/classify",
-			method="POST",
-			headers={
-				"Authorization": "Bearer " + AUTH["cohere_key"],
-				"Content-Type": "application/json",
-			},
-			data=json_dumps(inputs),
-			json=True,
-			timeout=24,
-		)
-		print("EVALUATION:", data)
-		premium_context.append(["cohere", model, "0.00005"])
-		return data["classifications"][0]["prediction"]
-
 	model_levels = {
 		0: cdict(
 			instructive=None,
 			casual=None,
 			nsfw=None,
-			backup="deepseek-v3",
+			backup="deepseek-v3.2",
 			retry="gpt-5-mini",
 			function=None,
 			vision="mistral-24b",
 			target="auto",
 		),
 		1: cdict(
-			instructive="seed-1.6",
+			instructive="gemini-3-flash",
 			casual="seed-1.6",
 			nsfw="grok-4.1-fast",
 			backup="kimi-k2-t",
@@ -2503,19 +2483,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				model_router = None
 				label = mode
 				cargs["mode"] = label
-			else:
-				if model_router:
-					label = await self.classify(content, examples=model_router, premium_context=premium_context)
 			if tool_router:
-				if not isinstance(tools, dict):
-					tools = {f["function"]["name"]: [f] for f in tools if "function" in f}
-				try:
-					label = await self.classify(content, examples=tool_router, premium_context=premium_context)
-				except Exception:
-					print_exc()
-					tools = toolscan
-				else:
-					tools = tools[label]
+				tools = toolscan
 			elif isinstance(tools, dict):
 				tools = toolscan
 			else:

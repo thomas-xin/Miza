@@ -1707,6 +1707,8 @@ CCE = CommandCancelledError
 DCE = DisconnectedChannelError
 
 def getattr_chain(obj, attrs, default=Dummy):
+	if not attrs:
+		return obj
 	for attr in attrs.split("."):
 		obj = getattr(obj, attr, default)
 	if obj is Dummy:

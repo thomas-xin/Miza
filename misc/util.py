@@ -3201,7 +3201,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		finally:
 			self._retrieving.pop(k, None)
 		return v
-	def retrieve(self, k, func, *args, _read=False, **kwargs):
+	def retrieve(self, k, func, *args, _read=False, _force=False, **kwargs):
 		if (fut := self._retrieving.get(k)):
 			resp = fut.result()
 			if _read and hasattr(resp, "name") and os.path.exists(resp.name):
@@ -3217,7 +3217,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			t = None
 		if t is not None and v is not Dummy:
 			delay = utc() - t
-			if delay > self._stimeout:
+			if delay > self._stimeout or _force and delay > self._stale:
 				try:
 					v = self._retrieve(k, func, *args, read=_read, **kwargs)
 				except Exception:
@@ -3244,7 +3244,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		finally:
 			self._retrieving.pop(k, None)
 		return v
-	async def aretrieve(self, k, func, *args, _read=False, **kwargs):
+	async def aretrieve(self, k, func, *args, _read=False, _force=False, **kwargs):
 		await asubmit(self.base_init)
 		if (fut := self._retrieving.get(k)):
 			resp = await wrap_future(fut)
@@ -3261,7 +3261,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			t = None
 		if t is not None and v is not Dummy:
 			delay = utc() - t
-			if delay > self._stimeout:
+			if delay > self._stimeout or _force and delay > self._stale:
 				try:
 					v = await self._aretrieve(k, func, *args, read=_read, **kwargs)
 				except Exception:

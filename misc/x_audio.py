@@ -1010,9 +1010,9 @@ class AudioFile:
 				ba = "108k"
 			else:
 				ba = "96k"
-			cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(sample_rate), "-ac", "2", "-b:a", ba, "-vbr", "on", "-frame_duration", "20", "-"]
+			cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-allowed_segment_extensions", "3gp,aac,avi,ac3,eac3,flac,mkv,m3u8,m4a,m4s,m4v,mpg,mov,mp2,mp3,mp4,mpeg,mpegts,ogg,ogv,oga,opus,ts,vob,vtt,wav,webvtt,cmfv", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(sample_rate), "-ac", "2", "-b:a", ba, "-vbr", "on", "-frame_duration", "20", "-"]
 			if ba == "160k" and codec == "opus" and channels == 2:
-				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "copy", "-"]
+				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-allowed_segment_extensions", "3gp,aac,avi,ac3,eac3,flac,mkv,m3u8,m4a,m4s,m4v,mpg,mov,mp2,mp3,mp4,mpeg,mpegts,ogg,ogv,oga,opus,ts,vob,vtt,wav,webvtt,cmfv", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "copy", "-"]
 			if is_url(stream):
 				cmd = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + cmd[1:]
 			print(cmd)
@@ -1032,8 +1032,9 @@ class AudioFile:
 			stream = self.stream = CachingTeeFile(proc.stdout, self.path, callback=callback)
 			if not stream.open().read(1024):
 				proc.terminate()
-				ex = as_str(err.read())
-				if asap and "Server returned 403 Forbidden (access denied)" in str(ex):
+				ex = RuntimeError(as_str(err.read()))
+				strex = str(ex)
+				if asap and "Server returned 403 Forbidden (access denied)" in strex or "HTTP error 403 Forbidden" in strex:
 					stream, codec, duration, channels = ytdl_fut.result().get_audio(entry, asap=False)
 					name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
 					self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
@@ -1043,6 +1044,9 @@ class AudioFile:
 					self.stream = self.path
 					self.duration = entry["duration"] = audio_meta(self.stream).duration
 					return self
+				if strex:
+					# print(strex)
+					raise ex
 				raise RuntimeError("File was empty!")
 			print("DL:", self.path)
 			self.duration = entry["duration"] = duration
