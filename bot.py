@@ -1110,6 +1110,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			gid = int(gid)
 		except ValueError:
 			if follow_invites:
+				assert isinstance(gid, str)
 				try:
 					code = gid.split("?", 1)[0].rsplit("/", 1)[-1]
 					data = await self.retrieve_api(f"invites/{code}")
@@ -1667,16 +1668,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						case "image":
 							found.extend(url for url in find_urls_ex(m.content) if url2ext(url) in IMAGE_FORMS)
 							found.extend(s.url for s in m.stickers)
-						case "text":
-							if allow_text:
-								found.append(m.content)
-							found.extend(find_urls_ex(m.content))
-						case "emoji":
 							for e in m.embeds:
 								for attr in ("video", "image", "thumbnail"):
 									url = getattr_chain(e, f"{attr}.url", None)
 									if url:
 										found.append(url)
+						case "text":
+							if allow_text:
+								found.append(m.content)
+							found.extend(find_urls_ex(m.content))
+						case "emoji":
 							emoji_tests = find_emojis_ex(m.content)
 							for i, u in enumerate(emoji_tests):
 								emoji_tests[i] = await fix_emoji_url(u)
@@ -5131,7 +5132,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				e = validation.get("error")
 				if not e:
 					raise
-				if "{}" in E:
+				if "{}" in e:
 					raise ValueError(e.format(v))
 				raise ValueError(e)
 		elif validation.get("function"):
@@ -5141,7 +5142,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				e = validation.get("error")
 				if not e:
 					raise
-				if "{}" in E:
+				if "{}" in e:
 					raise ValueError(e.format(v))
 				raise ValueError(e)
 		elif validation.get("enum") or validation.get("accepts"):
@@ -5174,7 +5175,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		user = user or (message.author if message else None)
 		if message and user:
 			print(f"{message.channel.id}: {user} ({user.id}) issued command {command_check} {kwargs or argv}")
-		soon_indicator = False
+		soon_indicator = None
 		if not self.ready:
 			# If the bot is not currently ready (either loading or in maintenance), send an indicator and wait
 			if message:
@@ -5184,7 +5185,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			await wrap_future(self.connect_ready)
 		channel = channel or (message.channel if message else None)
 		guild = guild or getattr(channel, "guild", None)
-		if user.id == self.id:
+		if user and user.id == self.id:
 			prefix = self.prefix
 		else:
 			prefix = self.get_prefix(guild)
@@ -5211,6 +5212,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if soon_indicator:
 			# Remove the "soon" indicator since the bot is now ready
 			await soon_indicator
+			assert message
 			csubmit(message.remove_reaction("🔜", self.user))
 		u_perm = max(min_perm, self.get_perms(user.id, guild)) if min_perm is not None else self.get_perms(user.id, guild)
 		if not isnan(u_perm):

@@ -1732,7 +1732,6 @@ class Matchmaking(Command):
 		while len(users) < 2:
 			users.append(choice(guild.members).display_name)
 
-		x = random.random()
 		users = sorted(map(unicode_prune, users))
 		seed = nhash("\x7f".join(users))
 		seed, percentage = divmod(seed, 100)
@@ -1744,7 +1743,7 @@ class Matchmaking(Command):
 		shipname += users[-1][len(users[-1]) >> 1:]
 		shipname = shipname.strip().capitalize()
 
-		random.seed(utc() * x)
+		random.seed(time.time_ns())
 		heart = choice(HEARTS)
 		bar = await bot.create_progress_bar(21, percentage / 100)
 

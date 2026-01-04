@@ -3373,13 +3373,18 @@
 			"timeout": "24"
 		},
 		"Follow": {
-			"aliases": ["Follow", "🚶", "Follow_URL", "Redirect"],
+			"aliases": ["Follow", "🚶"],
 			"description": "Follows a discord message link and/or finds URLs in a string.",
-			"example": ["follow https://canary.discord.com/channels/247184721262411776/669066569170550797/1052190693390565406"],
+			"example": [],
 			"level": "0",
 			"rate_limit": "(7, 10)",
-			"timeout": "24",
-			"usage": "<url>*"
+			"schema": {
+				"urls": {
+					"description": "Text containing one or more URLs to search",
+					"type": "string"
+				}
+			},
+			"timeout": "24"
 		},
 		"ID2Time": {
 			"aliases": ["ID2Time", "I2T", "CreateTime", "Time2ID", "T2I"],
@@ -3514,12 +3519,17 @@
 		},
 		"Random": {
 			"aliases": ["Random", "choice", "choose"],
-			"description": "Randomizes a set of arguments.",
-			"example": ["random 1 2 3", "choose \"this one\" \"that one\""],
+			"description": "Randomly chooses from a list of words.",
+			"example": [],
 			"level": "0",
 			"rate_limit": "(2, 3)",
-			"timeout": "24",
-			"usage": "<string>+"
+			"schema": {
+				"args": {
+					"description": "List of possible choices, separated by newline or space.",
+					"type": "string"
+				}
+			},
+			"timeout": "24"
 		},
 		"Rate": {
 			"aliases": ["Rate", "Rating", "Rank", "Ranking"],

@@ -51,12 +51,6 @@ from misc.smath import predict_next, display_to_precision, unicode_prune, full_p
 from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, fcdict, as_bytes, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, pretty_json, MultiEncoder # noqa: F401
 from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, asubmit, csubmit, esubmit, tsubmit, Future, Semaphore
 
-try:
-	from random import randbytes
-except ImportError:
-	def randbytes(size):
-		return np.random.randint(0, 256, size=size, dtype=np.uint8).data
-
 print("UTIL:", __name__)
 
 
@@ -255,7 +249,7 @@ def shash(s): return e64(hashlib.sha256(s if type(s) is bytes else as_str(s).enc
 def uhash(s): return min([shash(s), quote_plus(s.removeprefix("https://"))], key=len)
 def uuhash(s): return uhash(unyt(s))
 def hhash(s): return hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).hexdigest()
-def ihash(s): return int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little") % 4294967296 - 2147483648
+def ihash(s): return int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()[:8], "little")
 def nhash(s): return int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little")
 
 
@@ -801,7 +795,19 @@ def split_text(text, max_length=2000, priority=("\n\n", "\n", "\t", "? ", "! ", 
 		text = remaining_text
 	return chunks
 
-smart_re = r"""(?:^|\s)(["'`])(?:[^"'`]+)\1(?:$|\s)"""
+smart_re = re.compile(r"""
+	(?:^|\s)
+	(['"`])
+	(?:
+		\\[\s\S]
+	| (?!\1)"[^"]*"
+	| (?!\1)'[^']*'
+	| (?!\1)`[^`]*`
+	| [^"'`]
+	)*
+	\1
+	(?:$|\s)
+""", re.VERBOSE)
 leftspace_re = r"^\s+"
 rightspace_re = r"\s+$"
 def smart_split(s, rws=False):
@@ -3132,7 +3138,9 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 
 	@property
 	def expire_offset(self):
-		return 2. ** 52 if isfinite(self._stale) else self._stimeout * ((random.random() - 0.5) * self._desync + 1)
+		if isfinite(self._stale):
+			return 2. ** 52
+		return self._stimeout * ((random.random() - 0.5) * self._desync + 1)
 
 	def __iter__(self):
 		return (i for i in super().__iter__() if i != "__version__")

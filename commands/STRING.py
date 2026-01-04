@@ -970,37 +970,24 @@ class Identify(Command):
 
 
 class Follow(Command):
-	name = ["🚶", "Follow_URL", "Redirect"]
+	name = ["🚶"]
 	description = "Follows a discord message link and/or finds URLs in a string."
-	usage = "<url>*"
-	example = ("follow https://canary.discord.com/channels/247184721262411776/669066569170550797/1052190693390565406",)
+	schema = cdict(
+		urls=cdict(
+			type="string",
+			description="Text containing one or more URLs to search",
+		),
+	)
 	rate_limit = (7, 10)
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, bot, channel, argv, message, **void):
-		urls = find_urls(argv)
-		if len(urls) == 1 and is_discord_message_link(urls[0]):
-			spl = argv.rsplit("/", 2)
-			channel = await bot.fetch_channel(spl[-2])
-			msg = await bot.fetch_message(spl[-1], channel)
-			argv = msg.content
-			urls = find_urls(argv)
-		out = set()
-		for url in urls:
-			if is_discord_message_link(url):
-				temp = await self.bot.follow_url(url, allow=True)
-			else:
-				data = await attachment_cache.download(url)
-				temp = find_urls(as_str(data))
-			out.update(temp)
+	async def __call__(self, bot, urls, **void):
+		out = await bot.follow_url(urls)
 		if not out:
 			raise FileNotFoundError("No valid URLs detected.")
 		output = f"`Detected {len(out)} url{'s' if len(out) != 1 else ''}:`\n" + "\n".join(out)
-		if len(output) > 2000 and len(output) < 54000:
-			self.bot.send_as_embeds(channel, output, reference=message)
-		else:
-			return escape_roles(output)
+		return output
 
 
 class Match(Command):
@@ -1041,21 +1028,24 @@ class Match(Command):
 
 class Random(Command):
 	name = ["choice", "choose"]
-	description = "Randomizes a set of arguments."
-	usage = "<string>+"
-	example = ("random 1 2 3", 'choose "this one" "that one"')
+	description = "Randomly chooses from a list of words."
+	schema = cdict(
+		args=cdict(
+			type="string",
+			description="List of possible choices, separated by newline or space.",
+		),
+	)
 	slash = True
 	ephemeral = True
 
-	def __call__(self, argv, args, **void):
+	def __call__(self, args, **void):
 		if not args:
 			raise ArgumentError("Input string is empty.")
-		random.seed(time.time_ns())
-		if "\n" in argv:
-			x = choice(argv.splitlines())
+		if "\n" in args:
+			x = choice(args.splitlines())
 		else:
 			x = choice(args)
-		return f"\xadI choose `{x}`!"
+		return f"I choose `{x}`!"
 
 
 class Rate(Command):
