@@ -1150,6 +1150,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.temp_guilds.pop(gid).set_exception(ex)
 		else:
 			self.temp_guilds.pop(gid).set_result(guild)
+		for member in guild.members:
+			self.usernames[member.name] = member._user
 		return guild
 	temp_guilds = {}
 	async def retrieve_guild(self, gid):
@@ -5714,15 +5716,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			break
 		return resp
 
-	async def load_guilds(self, guilds=None):
-		return
-		print("Loading guilds...")
-		guilds = guilds or self.client.guilds
-		for guild in guilds:
-			await self.fetch_guild(guild.id)
-		self.users_updated = True
-		print(len(guilds), "guilds loaded.")
-
 	inter_cache = AutoCache(stale=0, timeout=900)
 	async def defer_interaction(self, message, ephemeral=False, mode="post"):
 		with tracebacksuppressor:
@@ -7741,7 +7734,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				self.cache.guilds.pop(g.id, None)
 				self._guilds[g.id] = g
 			await self.modload
-			fut = csubmit(self.load_guilds(guilds))
+			fut = fut_nop
 			self.guilds_loading.append(fut)
 			with MemoryTimer("update_subs"):
 				await self.update_subs()
@@ -7796,7 +7789,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			await fut
 			for member in guild.members:
 				name = str(member)
-				self.usernames[name] = self.cache.users[member.id]
+				self.usernames[name] = member._user
 			await asubmit(self.set_guilds)
 
 		# Guild destroy event: Remove guild from bot cache.
@@ -8164,7 +8157,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		@self.event
 		async def on_member_join(member):
 			name = str(member)
-			self.usernames[name] = self.cache.users[member.id]
+			self.usernames[name] = member._user
 			if member.guild.id in self._guilds:
 				member.guild._member_count = len(member.guild._members)
 			await self.send_event("_join_", user=member, guild=member.guild)
