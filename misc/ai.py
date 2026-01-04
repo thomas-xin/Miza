@@ -142,7 +142,7 @@ contexts = {}
 oai_name = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 api_map = cdict()
 api_sems = cdict()
-api_blocked = AutoCache(stale=0, timeout=30)
+api_blocked = AutoCache(stale=0, timeout=30, desync=0.25)
 
 def get_oai(func, api="openai"):
 	if not isinstance(api, str):

@@ -174,9 +174,9 @@ class AudioDownloader:
 
 	def __init__(self, workers=1):
 		self.session = niquests.Session()
-		self.search_cache = AutoCache(f"{CACHE_PATH}/ytdl.search", stale=300, timeout=86400)
-		self.thumbnail_cache = AutoCache(f"{CACHE_PATH}/ytdl.thumbnail", stale=300, timeout=86400 * 7)
-		self.extract_cache = AutoCache(f"{CACHE_PATH}/ytdl.extract", stale=60, timeout=120)
+		self.search_cache = AutoCache(f"{CACHE_PATH}/ytdl.search", stale=300, timeout=86400, desync=0.05)
+		self.thumbnail_cache = AutoCache(f"{CACHE_PATH}/ytdl.thumbnail", stale=300, timeout=86400 * 7, desync=0.05)
+		self.extract_cache = AutoCache(f"{CACHE_PATH}/ytdl.extract", stale=60, timeout=120, desync=0.05)
 		self.futs = [
 			esubmit(self.set_cookie),
 		]
@@ -866,7 +866,7 @@ class AudioDownloader:
 	def handle_path(self, path, entry=None):
 		info = audio_meta(path)
 		if entry is not None:
-			entry["duration"] = info.duration
+			entry["duration"] = info.get("duration")
 			if info.name:
 				entry["name"] = info.name
 		return path, info.codec, info.duration, info.channels

@@ -862,9 +862,17 @@ class AudioPlayer(discord.AudioSource):
 		with tracebacksuppressor:
 			if len(self.playing) == 1 and len(self.queue) > 1:
 				entry = self.queue[1]
-				if not entry.get("duration") or not entry.duration < 3840:
+				if not entry.get("duration"):
+					if "duration" not in entry:
+						return
+					results = ytdl_fut.result().search(entry["url"])
+					if results:
+						entry.update(results[0])
+					if not entry.get("duration"):
+						entry.pop("duration", None)
+						return
+				if not (entry.get("duration") or 3840) < 3840:
 					return
-				# asap = entry["duration"] > (self.epos[1] - self.epos[0]) * 8
 				try:
 					source = AF.load(entry, asap=False).create_reader(self, pos=entry.get("start", 0))
 				except Exception as ex:
@@ -1010,11 +1018,11 @@ class AudioFile:
 				ba = "108k"
 			else:
 				ba = "96k"
-			cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-allowed_segment_extensions", "3gp,aac,avi,ac3,eac3,flac,mkv,m3u8,m4a,m4s,m4v,mpg,mov,mp2,mp3,mp4,mpeg,mpegts,ogg,ogv,oga,opus,ts,vob,vtt,wav,webvtt,cmfv", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(sample_rate), "-ac", "2", "-b:a", ba, "-vbr", "on", "-frame_duration", "20", "-"]
+			cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(sample_rate), "-ac", "2", "-b:a", ba, "-vbr", "on", "-frame_duration", "20", "-"]
 			if ba == "160k" and codec == "opus" and channels == 2:
-				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-allowed_segment_extensions", "3gp,aac,avi,ac3,eac3,flac,mkv,m3u8,m4a,m4s,m4v,mpg,mov,mp2,mp3,mp4,mpeg,mpegts,ogg,ogv,oga,opus,ts,vob,vtt,wav,webvtt,cmfv", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "copy", "-"]
+				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "copy", "-"]
 			if is_url(stream):
-				cmd = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + cmd[1:]
+				cmd = [ffmpeg, "-allowed_segment_extensions", "3gp,aac,avi,ac3,eac3,flac,mkv,m3u8,m4a,m4s,m4v,mpg,mov,mp2,mp3,mp4,mpeg,mpegts,ogg,ogv,oga,opus,ts,vob,vtt,wav,webvtt,cmfv", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + cmd[1:]
 			print(cmd)
 			proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			assert proc.is_running(), "FFmpeg process failed to start"

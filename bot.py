@@ -754,13 +754,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.setshutdown()
 
 	# rate_limits = AutoCache(f"{CACHE_PATH}/discord_rates", stale=0, timeout=300)
-	discord_cache = AutoCache(f"{CACHE_PATH}/discord_api", stale=0, timeout=300)
+	discord_cache = AutoCache(f"{CACHE_PATH}/discord_api", stale=0, timeout=300, desync=0.05)
 	async def _retrieve_api(self, path):
 		return await Request.aio(f"https://discord.com/api/{api}/{path}", authorise=True, json=True)
 	async def retrieve_api(self, path):
 		return await self.discord_cache.aretrieve(path, self._retrieve_api, path)
 
-	discord_data_cache = AutoCache(f"{CACHE_PATH}/discord_data", stale=86400, timeout=86400 * 7)
+	discord_data_cache = AutoCache(f"{CACHE_PATH}/discord_data", stale=86400, timeout=86400 * 7, desync=0.25)
 
 	def print(self, *args, sep=" ", end="\n"):
 		"A reimplementation of the print builtin function."
@@ -1440,7 +1440,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.cache.roles[r_id] = role
 		return role
 
-	emojinames = AutoCache(f"{CACHE_PATH}/emojinames", stale=3600, timeout=86400)
+	emojinames = AutoCache(f"{CACHE_PATH}/emojinames", stale=3600, timeout=86400, desync=0.05)
 	async def fetch_emoji(self, e_id, guild=None, allow_external=True):
 		"Fetches an emoji from ID and guild, using the bot cache when possible."
 		if not isinstance(e_id, int):
@@ -1638,7 +1638,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				content = content.replace(e, f":{emoji.name}:")
 		return content
 
-	followed = AutoCache(f"{CACHE_PATH}/follow", stale=3600, timeout=86400 * 7)
+	followed = AutoCache(f"{CACHE_PATH}/follow", stale=3600, timeout=86400 * 7, desync=0.05)
 	async def _follow_url(self, urls, priority_order, allow_text, seen=None):
 		seen = seen or {}
 		out = deque()
@@ -1769,7 +1769,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			data = next(it)
 			return tuple(t.strip() for t in self.mime.from_buffer(data).split(";"))
 
-	emoji_animated = AutoCache(f"{CACHE_PATH}/emoji_animated", stale=86400 * 365, timeout=None)
+	emoji_animated = AutoCache(f"{CACHE_PATH}/emoji_animated", stale=86400 * 365, timeout=None, desync=0.05)
 	async def _is_animated(self, e):
 		try:
 			emoji = self.cache.emojis[e]
@@ -7511,7 +7511,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							break
 					self.discord_data_cache[gid] = guild_data
 				case _ if action in ("add", "create", "edit", "update") and target in ("member", "user"):
-					if base == ("thread,"):
+					if base == ("thread,") or "user" not in sub:
 						return
 					if target == "member":
 						gids = [int(sub["guild_id"])]
@@ -7531,7 +7531,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							guild_data["_members"][uid]["user"] = sub
 						self.discord_data_cache[gid] = guild_data
 				case _ if action in ("remove", "delete") and target == "member":
-					if base == ("thread,"):
+					if base == ("thread,") or "user" not in sub:
 						return
 					gid = int(sub["guild_id"])
 					uid = int(sub["user"]["id"])
@@ -7643,8 +7643,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				else:
 					mdata = mdata.get("user")
 				user = self._state.store_user(mdata)
-				if not user:
-					user = self.GhostUser()
+				assert user, data
 				channel = None
 				try:
 					channel = self.force_channel(data["channel_id"])
@@ -8132,7 +8131,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if b != a:
 				self.usernames.pop(b, None)
 				self.usernames[a] = after
-			if not isinstance(before, self.GhostUser):
+			if not getattr(before, "simulated", None):
 				await self.send_event("_user_update_", before=before, after=after)
 			if before.id == self.deleted_user or after.id == self.deleted_user:
 				print("Deleted user USER_UPDATE", before, after, before.id, after.id)
@@ -8142,7 +8141,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Member update event: calls _member_update_ and _seen_ bot database events.
 		@self.event
 		async def on_member_update(before, after):
-			if not isinstance(before, self.GhostUser):
+			if not getattr(before, "simulated", None):
 				await self.send_event("_member_update_", before=before, after=after)
 			if self.status_changed(before, after):
 				# A little bit of a trick to make sure this part is only called once per user event.

@@ -988,8 +988,6 @@ def expired(stream):
 		return True
 	if is_youtube_url(stream):
 		return True
-	if is_soundcloud_stream(stream):
-		return True
 	if stream.startswith("ytsearch:"):
 		return True
 	if stream.startswith("https://open.spotify.com/track/"):
@@ -1002,6 +1000,9 @@ def expired(stream):
 			return True
 	elif is_youtube_stream(stream):
 		if int(stream.replace("/", "=").split("expire=", 1)[-1].split("=", 1)[0].split("&", 1)[0]) < utc() + 60:
+			return True
+	elif is_soundcloud_stream(stream):
+		if int(stream.replace("/", "=").split("expires=", 1)[-1].split("=", 1)[0].split("&", 1)[0]) < utc() + 30:
 			return True
 
 def url2fn(url) -> str:
@@ -3095,13 +3096,14 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		- Handles database timeout and operational errors by reinitializing.
 		- Supports concurrent retrievals with Future-based deduplication.
 	"""
-	__slots__ = ("_initialised", "_path", "_shardcount", "_stale", "_stimeout", "_retrieving", "_kwargs")
+	__slots__ = ("_initialised", "_path", "_shardcount", "_stale", "_stimeout", "_desync", "_retrieving", "_kwargs")
 
-	def __init__(self, directory=None, shards=6, stale=60, timeout=86400, **kwargs):
+	def __init__(self, directory=None, shards=6, stale=60, timeout=86400, desync=0, **kwargs):
 		self._path = directory or None
 		self._shardcount = shards
 		self._stale = stale or inf
 		self._stimeout = timeout or inf
+		self._desync = desync
 		self._retrieving = {}
 		self._kwargs = kwargs
 		self._initialised = None
@@ -3130,7 +3132,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 
 	@property
 	def expire_offset(self):
-		return 2. ** 52 if isfinite(self._stale) else self._stimeout
+		return 2. ** 52 if isfinite(self._stale) else self._stimeout * ((random.random() - 0.5) * self._desync + 1)
 
 	def __iter__(self):
 		return (i for i in super().__iter__() if i != "__version__")
