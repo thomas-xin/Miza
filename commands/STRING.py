@@ -1033,6 +1033,7 @@ class Random(Command):
 		args=cdict(
 			type="string",
 			description="List of possible choices, separated by newline or space.",
+			example="one two three",
 		),
 	)
 	slash = True
