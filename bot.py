@@ -2300,21 +2300,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		1: cdict(
-			instructive="gemini-3-flash",
-			casual="seed-1.6",
+			instructive="claude-haiku-4.5",
+			casual="gemini-3-flash",
 			nsfw="grok-4.1-fast",
-			backup="kimi-k2-t",
-			retry="claude-4.5-haiku",
+			backup="kimi-k2-thinking",
+			retry="gpt-5-mini",
 			function="grok-4.1-fast",
-			vision="qwen3-235b",
+			vision="qwen3-235b-a22b",
 			target="auto",
 		),
 		2: cdict(
-			instructive="gemini-3-pro",
+			instructive="claude-sonnet-4.5",
 			casual="gemini-3-pro",
 			nsfw="grok-4",
 			backup="gpt-5.2",
-			retry="claude-4.5-sonnet",
+			retry="claude-opus-4.5",
 			function="grok-4.1-fast",
 			vision="gpt-5.2",
 			target="auto",
@@ -2323,6 +2323,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def chat_completion(self, messages, model="miza-1", system=None, frequency_penalty=None, presence_penalty=None, repetition_penalty=None, max_tokens=256, temperature=0.7, top_p=0.9, tools=None, tool_choice=None, model_router=None, tool_router=None, stop=(), user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
 		"OpenAI-compatible Chat Completion function. Autoselects model using a function call, then routes to tools and target model as required."
 		await require_predicate(predicate)
+		reasoning = []
 		modlvl = ["miza-1", "miza-2", "miza-3"].index(model.rsplit("/", 1)[-1])
 		modelist = self.model_levels[modlvl]
 		messages = [cdict(m) for m in messages]
@@ -2417,7 +2418,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						presence_penalty=pp,
 						repetition_penalty=rp,
 						tools=list(toolscan) + [f_default],
-						tool_choice="required",
+						tool_choice="required" if toolmodel else "auto",
 						require_message=False,
 						max_tokens=min(256, max_tokens),
 						user=ustr,
@@ -2431,6 +2432,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					print_exc()
 					message = None
 				print("SCAN:", cargs, toolmodel, message)
+				reason = getattr(message, "reasoning", None)
+				if not reason and getattr(message, "reasoning_details", None):
+					reason = [r["summary"] for r in message.reasoning_details if r["type"] in ("reasoning.summary", "reasoning.text")]
+					if reason:
+						reason = str(reason[0])
+					else:
+						reason = ""
+				if reason and (reason := reason.strip()):
+					reasoning.append(reason)
 		if message:
 			directly_answer = True
 			for tc in tuple(message.tool_calls or ()):
@@ -2589,6 +2599,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print_exc()
 				refusal = True
 			else:
+				reason = ""
 				print("Response chosen:", T(resp).get("model", assistant), tlen, resp)
 				message = None
 				written = False
@@ -2602,6 +2613,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							continue
 						finish_reason = chunk.choices[0].finish_reason or finish_reason
 						delta = chunk.choices[0].delta
+						print(delta)
+						if getattr(delta, "reasoning", None):
+							reason += delta.reasoning
+						elif not reason and getattr(delta, "reasoning_details", None):
+							reason = [r["summary"] for r in delta.reasoning_details if r["type"] in ("reasoning.summary", "reasoning.text")]
+							if reason:
+								reason = str(reason[0])
+							else:
+								reason = ""
 						if not message:
 							message = cdict(delta)
 							text += message.content or ""
@@ -2657,6 +2677,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				finally:
 					if getattr(resp, "close", None):
 						await resp.close()
+				if reason and (reason := reason.strip()):
+					reasoning.append(reason)
 				if message:
 					if getattr(message, "tool_calls", None):
 						print("Output call:", message)
@@ -2681,6 +2703,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							object="chat.completion.chunk",
 							usage=result.get("usage"),
 							cargs=cargs,
+							reasoning=reasoning,
 						)
 						return
 			eval2 = None
@@ -2723,6 +2746,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					source_model=getattr(result, "model", None) or model,
 					model=f"Miza/{model}",
 					usage=usage,
+					reasoning=reasoning,
 				))
 				result.choices[0].delta.content = "\r" + text
 				yield result
@@ -5134,7 +5158,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				elif rx[-1] == "]" and not x <= Mx:
 					valid = False
 				if not valid:
-					raise OverflowError(f'{k} value "{x}" must be in range {validation}.')
+					raise DomainError(f'{k} value "{x}" must be in range `{validation}`.')
 		elif validation.get("mapping"):
 			try:
 				return validation.mapping(v)
@@ -5174,8 +5198,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				else:
 					dym = f' Did you mean: "{alt}"?'
 				if enum and accepts:
-					raise EnumError(f'{k} value "{v}" must be one of {enum} or aliases {accepts}.{dym}')
-				raise EnumError(f'{k} value "{v}" must be one of {enum.union(accepts)}.{dym}')
+					raise EnumError(f'{k} value "{v}" must be one of `{"`, `".join(sorted(enum))}` or aliases `{"`, `".join(sorted(accepts))}`.{dym}')
+				raise EnumError(f'{k} value "{v}" must be one of `{"`, `".join(sorted(enum.union(accepts)))}`.{dym}')
 			if v not in enum:
 				return validation.accepts[v]
 		return v
@@ -7940,7 +7964,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						after._update(data)
 					else:
 						before.author = after.author
-					if any(embed.image or embed.thumbnail or embed.video for embed in after.embeds) or any((fmt := url2ext(a.url)) in IMAGE_FORMS or fmt in VIDEO_FORMS for a in after.attachments):
+					if find_urls(after.content) and after.embeds or any(embed.image or embed.thumbnail or embed.video for embed in after.embeds) or any((fmt := url2ext(a.url)) in IMAGE_FORMS or fmt in VIDEO_FORMS for a in after.attachments):
 						# print(f"Possible embed-only update on message {after.id}, ignoring...")
 						return
 					raw = True

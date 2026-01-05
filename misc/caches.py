@@ -421,12 +421,11 @@ class AttachmentCache(AutoCache):
 		form_data = aiohttp.FormData(quote_fields=False)
 		filename = filename or "b"
 		out = []
-		if hasattr(data, "read"):
-			if hasattr(data, "seek"):
-				data = data.seek(0)
-			data = await asubmit(data.read)
 		while data:
 			temp, data = data[:ac], data[ac:]
+			for fp in temp:
+				if hasattr(fp, "seek"):
+					fp.seek(0)
 			payload = dict(
 				content=content,
 				attachments=[dict(

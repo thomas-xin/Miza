@@ -580,43 +580,9 @@ class UpdateExec(Database):
 			return message
 		return message.embeds[0].thumbnail.proxy_url
 
-	def proxy(self, url):
-		if is_url(url) and not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(url) and not url.startswith("https://media.discordapp.net/") and not self.bot.is_webserver_url(url):
-			h = uuhash(url)
-			try:
-				return self.bot.data.proxies[h]
-			except KeyError:
-				new = await_fut(self._proxy(url))
-				self.bot.data.proxies[h] = new
-				return new
-		return url
-	
 	async def aproxy(self, *urls):
-		out = [None] * len(urls)
-		files = [None] * len(urls)
-		sendable = list(c_id for c_id, flag in self.data.items() if flag & 16)
-		for i, url in enumerate(urls):
-			if is_url(url):
-				try:
-					out[i] = self.bot.data.proxies[uuhash(url)]
-					if discord_expired(out[i]):
-						raise KeyError(out[i])
-				except KeyError:
-					if not sendable:
-						out[i] = url
-						continue
-					files[i] = url
-		fs = [i for i in files if i]
-		if fs:
-			message = await self._proxy("\n".join(fs), whole=True)
-			c = 0
-			for i, f in enumerate(files):
-				if f:
-					try:
-						self.bot.data.proxies[uuhash(urls[i])] = out[i] = message.embeds[c].thumbnail.proxy_url
-					except IndexError:
-						break
-					c += 1
+		out = [self.bot.data.proxies.get(uuhash(url)) or url for url in urls]
+		out = [attachment_cache.preserve(url, 0) for url in out]
 		return out if len(out) > 1 else out[0]
 
 	async def delete(self, mids):
@@ -794,6 +760,7 @@ class UpdateExec(Database):
 					data = await bot.optimise_image(data, fsize=1048576, fmt="avif")
 					filename = replace_ext(filename or "Untitled", "avif")
 			url2 = await self.lproxy(data or url, filename=filename, channel=channel, allow_empty=False)
+			# print("UPROXY:", urls, filename, url2)
 			if uhu:
 				bot.data.proxies[uhu] = url2
 			return url2

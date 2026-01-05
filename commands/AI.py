@@ -372,6 +372,7 @@ class Ask(Command):
 		tool_responses = []
 		props = cdict(name=bot_name)
 		response = cdict()
+		reasonings = []
 		reacts = []
 		if not _model or _model == "auto":
 			_model = pdata.model
@@ -404,6 +405,8 @@ class Ask(Command):
 				modelist = None
 				async for resp in bot.chat_completion(messagelist, model=model, max_tokens=16384, tool_choice=None, tools=TOOLS, stop=(), user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
 					if isinstance(resp, dict):
+						if resp.get("reasoning"):
+							reasonings.extend(resp["reasoning"])
 						if resp.get("cargs"):
 							props.cargs = resp["cargs"]
 						if resp.get("usage"):
@@ -536,41 +539,6 @@ class Ask(Command):
 						succ = await rag(name, tid, fut)
 						if not succ:
 							name = "wolfram_alpha"
-					elif name == "reasoning":
-						async def reasoning(q):
-							model = modelist.reasoning if modelist else "o4-mini"
-							if model in ai.is_reasoning:
-								mt = dict(
-									max_completion_tokens=16384,
-								)
-							else:
-								mt = dict(
-									max_tokens=2048,
-								)
-							resp = await ai.llm(
-								"chat.completions.create",
-								model=model,
-								messages=[
-									cdict(
-										role="user",
-										content=q,
-									),
-								],
-								**mt,
-								premium_context=premium,
-								reasoning_effort="medium",
-								timeout=3600,
-							)
-							message = resp.choices[0].message
-							s = T(message).get("reasoning_content") or message.content
-							print("Reasoning:", s)
-							return s
-						argv = kwargs.get("query") or " ".join(kwargs.values())
-						s = f'\n> Thinking "{argv}"...'
-						text += s
-						yield s
-						fut = reasoning(argv)
-						succ = await rag(name, tid, fut)
 					if name == "wolfram_alpha":
 						argv = kwargs.get("query") or " ".join(kwargs.values())
 						s = f'\n> Solving "{argv}"...'
@@ -680,6 +648,15 @@ class Ask(Command):
 		except StopIteration:
 			pass
 		print("Usage:", usage)
+		if reasonings:
+			reasoning = "\n\n".join(reasonings).encode("utf-8")
+			async with niquests.AsyncSession() as asession:
+				resp2 = await asession.post(
+					"https://api.mizabot.xyz/upload?filename=reasoning.txt",
+					data=reasoning,
+				)
+				url = resp2.text
+			content = (f"> [Reasoning (click to view)]({url})\n" + content).strip()
 		response.content = "\r" + content
 		embs = []
 		if response.get("embed"):

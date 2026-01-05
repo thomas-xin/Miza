@@ -120,9 +120,6 @@ available = {
 	"mistral-24b": {
 		"mistral": ("mistral-small-latest", ("0", "0")),
 	},
-	"kimi-k2-t": {
-		"deepinfra": ("moonshotai/Kimi-K2-Thinking", ("0.55", "2.5")),
-	},
 }
 
 # tags: is_completion, is_function, is_vision, is_premium
@@ -420,7 +417,7 @@ def load_summarisation_model():
 	global summarisation_model
 	info = AUTH.get("summarisation_model")
 	if not info or getattr(summarisation_model, "refresh", 0) > utc():
-		return
+		return summarisation_model
 	api_key = info.get("api_key", "x")
 	base_url = info.get("base_url", "x")
 	try:
@@ -428,7 +425,7 @@ def load_summarisation_model():
 		model = oai.models.list().data[0].id
 		pricing = info.get("pricing", [0, 0])
 	except Exception:
-		return
+		return summarisation_model
 	summarisation_model = ExtendedOpenAI(api_key=api_key, base_url=base_url)
 	print(f"Loaded summarisation model API {base_url} with model {model}.")
 	summarisation_model.model = model
@@ -553,14 +550,16 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 			kwa.pop("temperature", None)
 			kwa.pop("presence_penalty", None)
 			kwa.pop("frequency_penalty", None)
-			# if "reasoning" in kwa or "reasoning" in body:
-			# 	kwa.pop("reasoning_effort", None)
-			# else:
-			# 	body["reasoning"] = dict(
-			# 		effort=kwa.pop("reasoning_effort", "low"),
-			# 		summary="auto",
-			# 	)
-			if not kwa.get("reasoning_effort"):
+			if sapi == "openrouter":
+				reasoning = dict(
+					effort=kwa.pop("reasoning_effort", "low"),
+					summary="detailed",
+				)
+				reasoning_2 = body.pop("reasoning", None) or kwa.pop("reasoning", None)
+				if reasoning_2:
+					reasoning.update(reasoning_2)
+				body["reasoning"] = reasoning
+			elif not kwa.get("reasoning_effort"):
 				kwa["reasoning_effort"] = "low"
 		elif "reasoning_effort" in kwa:
 			kwa.pop("reasoning_effort")
@@ -1009,7 +1008,7 @@ f_default = {
 				"format": {
 					"type": "string",
 					"enum": ["instructive", "casual"],
-					"description": 'The conversation format. Enter "instructive" for academic, knowledge or advice responses, "casual" for banter, roleplay, or very simple questions.',
+					"description": 'The conversation format/tone. Enter "instructive" for academic, knowledge or advice responses, "casual" for banter, roleplay, or very simple questions.',
 				},
 			},
 			"required": ["format"],
@@ -1212,39 +1211,6 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 			self.applied = True
 		return item
 
-	async def __anext__(self):
-		while True:
-			try:
-				item = await self.it.__anext__()
-			except StopAsyncIteration:
-				print("anext pricing:", self.tokens, self.costs)
-				raise
-			if getattr(item, "usage", None):
-				print(item)
-				self.tokens[0] = item.usage.prompt_tokens
-				self.tokens[1] = item.usage.completion_tokens
-				if getattr(item.usage, "is_byok", False):
-					self.true_cost = getattr_chain(item.usage, "cost_details.upstream_inference_cost", None)
-				else:
-					self.true_cost = getattr(item.usage, "cost", None)
-				self.update_cost()
-				if not self.applied:
-					self.premium_context.append(self.costs)
-					self.applied = True
-				self.terminated = True
-			if not item.choices:
-				continue
-			choice = item.choices[0]
-			if getattr(choice, "text", None):
-				break
-			delta = getattr(choice, "delta", None)
-			if not delta:
-				continue
-			for k in ("tool_calls", "content", "reasoning_content"):
-				if getattr(delta, k, None):
-					break
-		return await self.pass_item(item)
-
 	async def __aiter__(self):
 		async for item in self.it:
 			if getattr(item, "usage", None):
@@ -1265,13 +1231,14 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 			choice = item.choices[0]
 			if getattr(choice, "text", None):
 				yield await self.pass_item(item)
-			else:
-				delta = getattr(choice, "delta", None)
-				if not delta:
-					continue
-				for k in ("tool_calls", "content", "reasoning_content"):
-					if getattr(delta, k, None):
-						yield await self.pass_item(item)
+				continue
+			delta = getattr(choice, "delta", None)
+			if not delta:
+				continue
+			for k in ("tool_calls", "content", "reasoning", "reasoning_details"):
+				if getattr(delta, k, None):
+					yield await self.pass_item(item)
+					break
 		print("aiter pricing:", self.tokens, self.costs)
 
 def instruct_structure(messages, exclude_first=True, fmt="alpaca", assistant=None):

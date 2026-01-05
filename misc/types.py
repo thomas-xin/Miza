@@ -1691,6 +1691,8 @@ CPE = subprocess.CalledProcessError
 
 class ArgumentError(LookupError):
 	pass
+class DomainError(ArgumentError, OverflowError):
+	pass
 class EnumError(ArgumentError):
 	pass
 class TooManyRequests(PermissionError):
@@ -1701,6 +1703,7 @@ class DisconnectedChannelError(LookupError):
 	pass
 
 AE = ArgumentError
+DE = DomainError
 EE = EnumError
 TMR = TooManyRequests
 CCE = CommandCancelledError
