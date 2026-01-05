@@ -4930,7 +4930,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print(kwargs)
 				if v:
 					raise ArgumentError(f"Argument {k} ({v.description}) is required.")
-				raise ArgumentError(f"Argument {k} ({v.type}) is required.")
+				raise ArgumentError(f"Argument {k} (`{v.type}`) is required.")
 		if append_lws:
 			k, j = append_lws
 			if j < len(ws):
@@ -4940,7 +4940,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def validate_into(self, k, v, info, guild):
 		if not isinstance(v, str):
 			return v
-		err = lambda e, k, v: e(f'Unable to parse input {json.dumps(v)} for {k}.')
+
+		def err(e, k, v):
+			s = f"Unable to parse input {json.dumps(v)} for {k}"
+			if info.get("type"):
+				s += f"; expected type `{info['type']}`"
+			s += "."
+			try:
+				return e(s)
+			except TypeError:
+				return ArgumentError(s)
+
 		if info.type in ("mentionable", "user", "channel", "guild", "role"):
 			m = verify_id(v)
 			fuzzy = 0 if info.get("strict", False) else 0.25

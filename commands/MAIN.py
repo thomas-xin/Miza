@@ -127,12 +127,9 @@ class Help(Pagination, Command):
 				f"Alternatively, visit [`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\n",
 				"**Command help information**:",
 				f"- All commands may be run via prefix, such as `{prefix}help`. Most are also accessible through slash commands; i.e. `/help.`",
-				f"- Inputs are documented as `<name:type>`, where *name* represents the argument's name, and *type* represents expected [data type](<https://wikipedia.org/wiki/Data_type>). Where possible, commands are interpreted case-insensitive.",
-				f"- Commands automatically infer by *type* where possible, with *name* keywords for disambiguation if necessary; input order only matters if two or more match the same data type. For example,",
-				f"  - `{prefix}resize webp 512kb lanczos 320x180` *is identical to*:",
-				f"  - `{prefix}RESIZE Lanczos 320*180 WEBP .5mb`",
-				f"  - `{prefix}ReSize -r 320:180 -f webp --filesize 0.5MiB --lanczos`",
-				f"""  - `{prefix}Resize --filesize="512kB" --mode='LANCZOS' --format="WebP" --resolution='320×180'`\n""",
+				"- Inputs are documented as `<name:type>`, where *name* represents the argument's name, and *type* represents expected [data type](<https://wikipedia.org/wiki/Data_type>). Where possible, commands are interpreted case-insensitive.",
+				"- Commands automatically infer by *type* where possible, with *name* keywords for disambiguation if necessary; input order only matters if two or more match the same data type.",
+				"- See the [wiki page](https://github.com/thomas-xin/Miza/wiki/Command-Inputs) for more information on how the input systems work!",
 				(f"If you're an admin and wish to enable/disable me in a particular channel, check out `{prefix}ec`!\n" if not perm < 3 else "")
 				+ f"Unsure about any of my features, or have a bug to report? check out the [`support server`]({bot.rcc_invite})!",
 				f"-# Finally, donate to me or purchase a subscription [`here`]({bot.kofi_url})! Any support is greatly appreciated!"
