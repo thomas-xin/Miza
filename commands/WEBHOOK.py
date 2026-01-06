@@ -986,13 +986,8 @@ class UpdateMimics(Database):
 				messages=messages,
 				assistant_name=mimic.name,
 				temperature=1,
-				top_p=1,
-				frequency_penalty=0,
-				presence_penalty=0,
-				repetition_penalty=1,
 				max_tokens=2000,
 				user=str(hash(str(user) or bot.user.name)),
-				stop=(),
 			)
 			try:
 				resp = await bot.force_chat(**data, premium_context=premium, stream=False, timeout=90)

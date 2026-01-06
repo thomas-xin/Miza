@@ -495,7 +495,7 @@ async def _summarise(s, max_length, best=False, prompt=None, premium_context=[])
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above!'
 			ml = round_random(max_length)
 			c = await tcount(prompt)
-			data = dict(prompt=prompt, temperature=0.8, top_p=0.9, max_tokens=ml, premium_context=premium_context)
+			data = dict(prompt=prompt, temperature=0.6, max_tokens=ml, premium_context=premium_context)
 			resp = await instruct(data)
 			print("Summary:", resp)
 			if resp and not decensor.search(resp):
@@ -511,7 +511,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 			apis = {api: None}
 	else:
 		apis = {api: None}
-	orig_model = kwargs.get("model")
+	orig_model = model = kwargs.get("model")
 	exc = None
 	tries = tuple(apis.items())
 	kwa = kwargs
@@ -564,175 +564,90 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 		elif "reasoning_effort" in kwa:
 			kwa.pop("reasoning_effort")
 		kwa["model"] = model
-		rl = 8, 1
-		if sapi == "mizabot":
-			rl = 16, 0.25
-		elif sapi == "together":
-			rl = 64, 4
-		elif sapi == "fireworks":
-			rl = 48, 6
-		elif sapi == "deepinfra":
-			rl = 32, 8
-		elif sapi == "openai":
-			rl = 5000, 60
-		if rl[0]:
-			sem = api_sems.get((sapi, model)) or api_sems.setdefault((sapi, model), Semaphore(rl[0], inf, rate_limit=rl[1], sync=rl[1] > 900))
-			if (sem.busy or sem.active >= sem.limit / 2 + 1) and i < len(apis) - 1:
-				continue
 		if isinstance(api, str):
 			caller = get_oai(func, api=api)
 		else:
 			caller = getattr_chain(api, func)
-		if "repetition_penalty" not in kwa:
-			kwa["repetition_penalty"] = cast_rp(kwa.pop("frequency_penalty", 0.25), kwa.pop("presence_penalty", 0.25), model=model)
-		match sapi:
-			case "openrouter":
-				body["usage"] = dict(include=True)
-			case "fireworks":
-				kwa.pop("repetition_penalty", None)
-				if kwa.get("tool_choice") == "required":
-					kwa["tool_choice"] = "any"
-			case "together":
-				kwa.pop("frequency_penalty", None)
-				kwa.pop("presence_penalty", None)
-			case "mistral":
-				kwa.pop("repetition_penalty", None)
-				body.clear()
-			case "openai" | "deepseek" | "deepinfra":
-				kwa.pop("repetition_penalty", None)
-				kwa.pop("top_p", None)
-		if "repetition_penalty" in kwa:
-			body["repetition_penalty"] = kwa.pop("repetition_penalty")
-		if not kwa.get("stop") or sapi == "openrouter":
-			kwa.pop("stop", None)
-		if sapi not in ("openai",):
-			kwa.pop("user", None)
-		elif "user" in kwa:
-			kwa["user"] = str(hash(str(kwa["user"])))
 		if body:
 			kwa["extra_body"] = body
 		try:
+			was_input = "input" in kwa
+			if was_input:
+				messages = kwa.pop("input")
+				if isinstance(messages, str):
+					messages = [cdict(role="user", content=messages)]
+				kwa["messages"] = messages
 			if "messages" in kwa:
-				if model not in is_function:
-					messages = []
-					for m in kwa["messages"]:
-						m = cdict(m)
-						m = untool(m)
-						if not m.get("content"):
-							m.content = "."
-						messages.append(m)
-					kwa["messages"] = messages
-				else:
-					messages = []
-					for m in kwa["messages"]:
-						m = cdict(m)
-						m = fix_tool(m)
-						if not m.get("content"):
-							m.content = "."
-						messages.append(m)
-					kwa["messages"] = messages
-				if sapi in ("fireworks", "together", "deepinfra", "mistral"):
-					messages = []
-					for m in kwa["messages"]:
-						m2 = None
-						if m.get("name"):
-							m2 = cdict(m)
-							name = m2.pop("name")
-							if isinstance(m2.content, list):
-								m2.content = [cdict(type="text", text=f"name={name}\n\n{c.text}") if c.get("type") == "text" else c for c in m2.content]
-							else:
-								m2.content = f"name={name}\n\n{m2.content}"
-							m = m2
-						messages.append(m)
-					kwa["messages"] = messages
-				if sapi in ("openai", "deepseek", "openrouter"):
-					messages = []
-					for m in kwa["messages"]:
-						m2 = None
-						if m.get("name"):
-							if 1 or not oai_name.search(m.name):
-								m2 = cdict(m)
-								name = m2.pop("name")
-								name2 = name.replace(" ", "-")
-								if oai_name.search(name2):
-									m2.name = name2
-								elif isinstance(m2.content, list):
-									m2.content = [cdict(type="text", text=f"name={name}\n\n{c.text}") if c.get("type") == "text" else c for c in m2.content]
-								else:
-									m2.content = f"name={name}\n\n{m2.content}"
-								m = m2
-						messages.append(m)
-					tcid = set()
-					i = 0
-					while i < len(messages):
-						try:
-							m = cdict(messages[i])
-							if m.get("role") == "tool":
-								tci = m.get("tool_call_id") or "x" + str(len(tcid))
-								if tci in tcid:
-									m["tool_call_id"] = tci
-									continue
-								if not i:
-									m.role = "assistant"
-									m.name = "tool-" + T(m).get("name", "").rstrip("-")
-									m.content = m.content or ""
-									continue
-								tool_call = cdict(
-									id=tci,
-									type="function",
-									function=cdict(
-										name=T(m).get("name") or "tool",
-										arguments="{}",
-									),
+				messages = []
+				for m in kwa["messages"]:
+					m2 = cdict(m)
+					if m.get("name"):
+						name = m2.pop("name")
+						name2 = name.replace(" ", "-")
+						if oai_name.search(name2):
+							m2.name = name2
+						elif isinstance(m2.content, list):
+							m2.content = [cdict(type="text", text=f"name={name}\n\n{c.text}") if c.get("type") == "text" else c for c in m2.content]
+						else:
+							m2.content = f"name={name}\n\n{m2.content}"
+					if model in is_function:
+						m = fix_tool(m2)
+					else:
+						m = untool(m2)
+					if not m.get("content"):
+						m.content = "."
+					messages.append(m)
+				tcid = set()
+				i = 0
+				while i < len(messages):
+					try:
+						m = cdict(messages[i])
+						if m.get("role") == "tool":
+							tci = m.get("tool_call_id") or "x" + str(len(tcid))
+							if tci in tcid:
+								m["tool_call_id"] = tci
+								continue
+							if not i:
+								m.role = "assistant"
+								m.name = "tool-" + T(m).get("name", "").rstrip("-")
+								m.content = m.content or ""
+								continue
+							tool_call = cdict(
+								id=tci,
+								type="function",
+								function=cdict(
+									name=T(m).get("name") or "tool",
+									arguments="{}",
+								),
+							)
+							if not i or messages[i - 1].get("role") != "assistant":
+								m2 = cdict(
+									role="assistant",
+									name=None,
+									content="",
+									tool_calls=[tool_call],
 								)
-								if not i or messages[i - 1].get("role") != "assistant":
-									m2 = cdict(
-										role="assistant",
-										name=None,
-										content="",
-										tool_calls=[tool_call],
-									)
-									messages.insert(i, m2)
-									tcid.add(tci)
-									continue
-								tc = T(messages[i - 1]).get("tool_calls", [])
-								tc.append(tool_call)
-								messages[i - 1].tool_calls = tc
+								messages.insert(i, m2)
 								tcid.add(tci)
 								continue
-							if m.get("tool_calls"):
-								for tc in m.tool_calls:
-									tcid.add(tc.id)
-						finally:
-							i += 1
+							tc = T(messages[i - 1]).get("tool_calls", [])
+							tc.append(tool_call)
+							messages[i - 1].tool_calls = tc
+							tcid.add(tci)
+							continue
+						if m.get("tool_calls"):
+							for tc in m.tool_calls:
+								tcid.add(tc.id)
+					finally:
+						i += 1
+				if was_input:
+					kwa["input"] = messages if len(messages) > 1 else messages[0].content
+				else:
 					kwa["messages"] = messages
-				if sapi == "fireworks":
-					messages = []
-					system = []
-					for m in kwa["messages"]:
-						if m.get("role") == "system":
-							system.append(m.content)
-						elif isinstance(m.content, (tuple, list)):
-							m = cdict(m)
-							content = list(m.content)
-							for i, c in enumerate(content):
-								if c.get("type") == "image_url":
-									content[i] = dict(type="image_url", image_url=dict(url=c["image_url"]["url"]))
-							m.content = content
-							messages.append(m)
-						else:
-							messages.append(m)
-					for i, m in enumerate(tuple(messages)):
-						if m.role == "assistant":
-							messages.insert(i, cdict(role="user", content=""))
-							break
-						if m.role == "user":
-							break
-					if system:
-						messages.insert(0, cdict(role="system", content="\n\n".join(system)))
-					if messages[-1].get("role") != "user":
-						messages[-1]["role"] = "user"
-					kwa["messages"] = messages
+			if kwa.get("user"):
+				kwa["user"] = str(hash(kwa["user"]))
+			else:
+				kwa.pop("user", None)
 			async with sem:
 				response = await asyncio.wait_for(caller(*args, timeout=timeout, **kwa), timeout=timeout)
 			inputs = (kwa["messages"], kwa.get("tools")) if "messages" in kwa else kwa.get("prompt")
@@ -745,7 +660,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 				input=inputs,
 				pricing=pricing,
 			)
-			if hasattr(response, "choices"):
+			if response.object == "response" or hasattr(response, "choices"):
 				return await stream.pass_item(response)
 			return stream
 		except Exception as ex:
@@ -760,7 +675,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 	raise (exc or RuntimeError("Unknown error occured."))
 
 async def instruct(data, prune=True, cache=True, user=None):
-	key = shash(str((data.get("prompt") or data.get("messages"), data.get("model", "kimi-k2-t"), data.get("temperature", 0.75), data.get("max_tokens", 256), data.get("top_p", 0.999), data.get("frequency_penalty", 0), data.get("presence_penalty", 0))))
+	key = shash(str((data.get("prompt") or data.get("messages"), data.get("model", "kimi-k2-t"), data.get("temperature", 0.75), data.get("max_tokens", 256))))
 	if cache:
 		return await CACHE.aretrieve(key, _instruct, data, prune=prune, user=user)
 	return await CACHE._aretrieve(key, _instruct, data, prune=prune, user=user)
@@ -769,9 +684,6 @@ async def _instruct(data, user=None, prune=True):
 	inputs = dict(
 		temperature=0.75,
 		max_tokens=4096,
-		top_p=0.999,
-		frequency_penalty=0,
-		presence_penalty=0,
 		user=user,
 	)
 	inputs.update(data)
@@ -1002,13 +914,13 @@ f_askip = {
 f_default = {
 	"type": "function", "function": {
 		"name": "directly_answer",
-		"description": "Indicates that you are preparing to draft up a text-only response to the user. You should use other tools first as required, but you MUST use this tool if none is necessary.",
+		"description": "Indicates that you are preparing to draft up a text-only response to the user. Use when no other tools are necessary.",
 		"parameters": {
 			"type": "object", "properties": {
 				"format": {
 					"type": "string",
 					"enum": ["instructive", "casual"],
-					"description": 'The conversation format/tone. Enter "instructive" for academic, knowledge or advice responses, "casual" for banter, roleplay, or very simple questions.',
+					"description": 'The conversation format/tone; "instructive" for academic, knowledge or advice responses, "casual" for banter, roleplay, or very simple questions.',
 				},
 			},
 			"required": ["format"],

@@ -352,6 +352,10 @@ class AttachmentCache(AutoCache):
 					fn, head = await asubmit(download_file, *urls, filename=raw_fn, timeout=timeout, return_headers=True)
 					self.tertiary[url] = head
 					return open(fn, "rb")
+			if is_discord_url(target):
+				fn, head = await asubmit(download_file, target, filename=raw_fn, timeout=timeout, return_headers=True)
+				self.tertiary[url] = head
+				return open(fn, "rb")
 			try:
 				f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, timeout=timeout, max_attempts=3, return_headers=True)
 			except niquests.exceptions.HTTPError as ex:
@@ -456,6 +460,7 @@ class AttachmentCache(AutoCache):
 			for i, a in enumerate(message["attachments"]):
 				aid = i if editable else int(a["id"])
 				fn = a["filename"]
+				self[aid] = a["url"]
 				out.append(shorten_attachment(cid, mid, aid, fn, minimise=minimise))
 			filename = "b"
 		if len(out) == 1 and collapse:

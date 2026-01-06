@@ -16,6 +16,11 @@ import json
 import random
 import re
 import subprocess
+import sys
+try:
+	sys.stdout.reconfigure(encoding="utf-8")
+except AttributeError:
+	pass
 import time
 from traceback import print_exc
 import numpy as np

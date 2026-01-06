@@ -1991,15 +1991,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		models.insert(0, model)
 		model = models[0]
 		fut = csubmit(self.caption_into(kwargs["messages"], model=model, premium_context=kwargs.get("premium_context", [])))
-		# if is_nsfw is None:
-		# 	mod1 = json_dumps(kwargs.get("tools"))
-		# 	mod2 = kwargs.get("messages")
-		# 	pc = kwargs.get("premium_context", [])
-		# 	futs = [ai.moderate(mod1, premium_context=pc), ai.moderate(mod2, premium_context=pc)]
-		# 	r1, r2 = await gather(*futs)
-		# 	is_nsfw = nsfw_flagged(r1) or nsfw_flagged(r2)
-		# if is_nsfw:
-		# 	models = reversed(models)
 		kwargs["messages"], _model = await fut
 		exc = None
 		for model in models:
@@ -2320,7 +2311,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 	}
-	async def chat_completion(self, messages, model="miza-1", system=None, frequency_penalty=None, presence_penalty=None, repetition_penalty=None, max_tokens=256, temperature=0.7, top_p=0.9, tools=None, tool_choice=None, model_router=None, tool_router=None, stop=(), user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
+	async def chat_completion(self, messages, model="miza-1", system=None, max_tokens=256, temperature=0.8, tools=None, tool_choice=None, model_router=None, tool_router=None, user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
 		"OpenAI-compatible Chat Completion function. Autoselects model using a function call, then routes to tools and target model as required."
 		await require_predicate(predicate)
 		reasoning = []
@@ -2349,18 +2340,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		length = await count_to(messages)
 		length = ceil(length * 1.1) + 4 * len(messages)
 		tmp = temperature
-		tpp = top_p
-		fp = frequency_penalty
-		pp = presence_penalty
-		rp = repetition_penalty
-		if not rp:
-			if not fp and not pp:
-				fp = 0.6
-				pp = 0.4
-			rp = ai.cast_rp(fp, pp, model=model)
-		elif not fp and not pp:
-			fp = rp - 1
-			pp = 0
 		def force_ua(r):
 			if r == "assistant":
 				return r
@@ -2413,16 +2392,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						model=toolmodel,
 						messages=toolcheck,
 						temperature=tmp,
-						top_p=tpp,
-						frequency_penalty=fp,
-						presence_penalty=pp,
-						repetition_penalty=rp,
 						tools=list(toolscan) + [f_default],
 						tool_choice="required" if toolmodel else "auto",
 						require_message=False,
 						max_tokens=min(256, max_tokens),
 						user=ustr,
-						stop=stop,
 						assistant_name=assistant_name,
 						is_nsfw=is_nsfw,
 						premium_context=premium_context,
@@ -2434,11 +2408,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print("SCAN:", cargs, toolmodel, message)
 				reason = getattr(message, "reasoning", None)
 				if not reason and getattr(message, "reasoning_details", None):
-					reason = [r["summary"] for r in message.reasoning_details if r["type"] in ("reasoning.summary", "reasoning.text")]
-					if reason:
-						reason = str(reason[0])
+					rdetails = [r["text"] for r in message.reasoning_details if r["type"] == "reasoning.text"]
+					if rdetails:
+						reason = str(rdetails[0])
 					else:
-						reason = ""
+						rdetails = [r["summary"] for r in message.reasoning_details if r["type"] == "reasoning.summary"]
+						if rdetails:
+							reason = str(rdetails[0])
 				if reason and (reason := reason.strip()):
 					reasoning.append(reason)
 		if message:
@@ -2490,6 +2466,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					),
 					cargs=cargs,
 					modelist=modelist,
+					reasoning=reasoning,
 				)
 				return
 			if mode:
@@ -2568,13 +2545,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				messages=temp,
 				assistant_name=assistant_name,
 				temperature=tmp,
-				top_p=tpp,
-				frequency_penalty=fp,
-				presence_penalty=pp,
-				repetition_penalty=rp,
 				max_tokens=ml,
 				user=ustr,
-				stop=stop,
 			)
 			if tools and assistant in ai.is_function:
 				data["tools"] = tools
@@ -2613,15 +2585,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							continue
 						finish_reason = chunk.choices[0].finish_reason or finish_reason
 						delta = chunk.choices[0].delta
-						print(delta)
+						# print(delta)
 						if getattr(delta, "reasoning", None):
 							reason += delta.reasoning
 						elif not reason and getattr(delta, "reasoning_details", None):
-							reason = [r["summary"] for r in delta.reasoning_details if r["type"] in ("reasoning.summary", "reasoning.text")]
-							if reason:
-								reason = str(reason[0])
+							rdetails = [r["text"] for r in delta.reasoning_details if r["type"] == "reasoning.text"]
+							if rdetails:
+								reason += str(rdetails[0])
 							else:
-								reason = ""
+								rdetails = [r["summary"] for r in delta.reasoning_details if r["type"] == "reasoning.summary"]
+								if rdetails:
+									reason += str(rdetails[0])
 						if not message:
 							message = cdict(delta)
 							text += message.content or ""
@@ -2876,9 +2850,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			messages=messages,
 			temperature=0.5,
 			max_tokens=2048,
-			top_p=0.9,
-			frequency_penalty=0.6,
-			presence_penalty=0.8,
 			user=str(hash(self.name)),
 		)
 		print("Vision Input:", lim_str(data, 1024))

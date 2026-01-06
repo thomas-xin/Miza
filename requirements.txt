@@ -22,7 +22,6 @@ googletrans==4.0.2
 httpx>=0.28.1
 h11>=0.16.0
 h2>=4.3.0
-hyperchoron>=1.1.10
 imagesize>=1.4.1
 inspiro>=0.0.3
 invisicode>=1.1.0

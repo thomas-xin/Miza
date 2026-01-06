@@ -82,34 +82,57 @@ class Translate(Command):
 
 	async def llm_translate(self, input, dest, premium):
 		dst_language = googletrans.LANGUAGES.get(dest, dest).capitalize()
-		try:
-			tr = await translator.translate(input, dest=dest)
-		except Exception:
-			print_exc()
+		messages = [
+			dict(
+				role="system",
+				content=f'Please translate the following text into {dst_language}, keeping formatting as accurate as possible. Avoid being overly formal, and do not add extra information to the text itself!',
+			),
+			dict(
+				role="user",
+				content=input,
+			),
+		]
+		c = await tcount(input)
+		translations = []
+		if c >= 16:
+
+			async def google_translate():
+				try:
+					tr = await translator.translate(input, dest=dest)
+				except Exception:
+					print_exc()
+					return
+				return tr.text
+			async def llm_translate():
+				try:
+					return await ai._instruct(
+						data=dict(
+							model=None,
+							messages=messages,
+							temperature=0.01,
+							premium_context=premium,
+							reasoning_effort="low",
+						),
+					)
+				except Exception:
+					print_exc()
+
+			translations = await gather(google_translate(), llm_translate())
+			translations = list(filter(bool, translations))
+		if translations:
 			messages = [
 				dict(
 					role="system",
-					content=f'Please translate the following text into {dst_language}, keeping formatting as accurate as possible. Avoid being overly formal, and do not add extra information to the text itself!',
+					content=f'Below will be some text, followed by its translation(s) into {dst_language}. Please rewrite the translation, making improvements where applicable, and keeping formatting accurate to the original. Avoid being overly formal, and do not add extra information to the text itself!',
 				),
 				dict(
 					role="user",
 					content=input,
 				),
-			]
-		else:
-			messages = [
-				dict(
-					role="system",
-					content=f'Below will be some text, followed by its translation into {dst_language}. Please rewrite the translation, making improvements where applicable, and keeping formatting as accurate as possible. Avoid being overly formal, and do not add extra information to the text itself!',
-				),
-				dict(
+				*(dict(
 					role="user",
-					content=input,
-				),
-				dict(
-					role="user",
-					content=tr.text,
-				)
+					content=text,
+				) for text in translations),
 			]
 		print(messages)
 		translated = await ai._instruct(
@@ -403,7 +426,7 @@ class Ask(Command):
 					messagelist.extend(tool_responses)
 				m = None
 				modelist = None
-				async for resp in bot.chat_completion(messagelist, model=model, max_tokens=16384, tool_choice=None, tools=TOOLS, stop=(), user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
+				async for resp in bot.chat_completion(messagelist, model=model, max_tokens=16384, tool_choice=None, tools=TOOLS, user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
 					if isinstance(resp, dict):
 						if resp.get("reasoning"):
 							reasonings.extend(resp["reasoning"])
@@ -649,7 +672,7 @@ class Ask(Command):
 			pass
 		print("Usage:", usage)
 		if reasonings:
-			reasoning = "\n\n".join(reasonings).encode("utf-8")
+			reasoning = "\n\n\n".join(reasonings).encode("utf-8")
 			async with niquests.AsyncSession() as asession:
 				resp2 = await asession.post(
 					"https://api.mizabot.xyz/upload?filename=reasoning.txt",
@@ -1173,9 +1196,6 @@ class Imagine(Command):
 							prompt=prompt,
 							temperature=1,
 							max_tokens=200,
-							top_p=0.9,
-							frequency_penalty=0.25,
-							presence_penalty=0,
 							premium_context=_premium,
 						),
 						user=_user,
@@ -1196,9 +1216,6 @@ class Imagine(Command):
 					messages=[dict(role="user", content=prompt)],
 					temperature=1,
 					max_tokens=120,
-					top_p=0.9,
-					frequency_penalty=0.25,
-					presence_penalty=0,
 					user=_user,
 					n=max(1, dups - len(resp.choices) - 1),
 					premium_context=_premium,

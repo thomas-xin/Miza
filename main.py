@@ -1,7 +1,11 @@
 import json
 import os
-os.environ["PYTHONUTF8"] = "1"
 import subprocess
+import sys
+try:
+	sys.stdout.reconfigure(encoding="utf-8")
+except AttributeError:
+	pass
 from misc.types import pretty_json
 
 

@@ -5,7 +5,17 @@ if "common" not in globals():
 print = PRINT
 
 from bs4 import BeautifulSoup
-from hyperchoron import encoder_mapping as hyperchoron_encoder_mapping
+hyperchoron_encoders = set()
+hyperchoron_decoders = set()
+try:
+	s = subprocess.check_output(["hyperchoron", "-lf"], encoding="utf-8")
+except Exception:
+	print_exc()
+else:
+	_, encoders = s.split("# Encoders:\n", 1)
+	encoders, decoders = encoders.split("\n# Decoders:\n", 1)
+	hyperchoron_encoders.update(encoders.splitlines())
+	hyperchoron_decoders.update(decoders.splitlines())
 import pyradios
 
 if BOT[0]:
@@ -1084,7 +1094,6 @@ class Dump(Command):
 				enum=("save", "load", "append"),
 			),
 			description="Whether to save or load queue, or append loaded data to current queue",
-			default="load",
 		),
 		url=cdict(
 			type="url",
@@ -2013,7 +2022,7 @@ class Hyperchoron(Command):
 		format=cdict(
 			type="enum",
 			validation=cdict(
-				enum=tuple(sorted(set(hyperchoron_encoder_mapping).difference("_"))),
+				enum=tuple(sorted(set(hyperchoron_encoders).difference("_"))),
 			),
 			default="nbs",
 		),

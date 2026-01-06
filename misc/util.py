@@ -4586,7 +4586,7 @@ class EvalPipe:
 			resp = aexec(s, self.glob)
 		except BaseException as ex:
 			s = maybe_json(ex)
-			b = f"<~{i}:!:".encode("ascii") + b"(" + s + f",RuntimeError({repr(format_exc())}))".encode("utf-8")
+			b = f"<~{i}:!:".encode("ascii") + b"(" + s + f",RuntimeError({repr(ex)}))".encode("utf-8")
 			self.send(b)
 			return
 		if isinstance(resp, collections.abc.AsyncIterator):
