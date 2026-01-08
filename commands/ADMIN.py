@@ -434,6 +434,14 @@ class Ban(Command):
 			await bot.ignore_interaction(message)
 
 
+class Captcha(Command):
+
+	async def __call__(self, _timeout, **void):
+		resp = await process_image("gen_captcha", "$", ["-f", "avif"], timeout=_timeout)
+		name = "Captcha." + get_ext(resp)
+		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
+
+
 class RoleSelect(Pagination, Command):
 	server_only = True
 	name = ["ReactionRoles", "RoleButtons", "RoleSelection", "RoleSelector"]
@@ -1929,7 +1937,7 @@ class CreateSound(Command):
 	server_only = True
 	name = ["SoundCreate", "SoundBoard", "SFX"]
 	min_level = 0
-	description = "Creates a custom soundboard from a URL or attached file."
+	description = "Creates a custom soundboard from a URL or attached file. Can handle up to 10 seconds of sound, as opposed to the default 5.2s limit"
 	schema = cdict(
 		name=cdict(
 			type="word",
@@ -2219,13 +2227,19 @@ class UpdateUserLogs(Database):
 		b_url = best_url(before)
 		if "exec" in bot.data:
 			with tracebacksuppressor:
-				bf = await bot.data.exec.uproxy(b_url, collapse=True, mode="download")
-				if isinstance(bf, byte_like):
-					fn = b_url.split("?", 1)[0].rsplit("/", 1)[-1]
-					files.append(CompatFile(bf, filename=fn))
-					b_url = "attachment://" + fn
+				try:
+					bf = await bot.data.exec.uproxy(b_url, collapse=True, mode="download")
+				except ConnectionError as ex:
+					if ex.errno != 404:
+						raise
+					print(repr(ex))
 				else:
-					b_url = bf
+					if isinstance(bf, byte_like):
+						fn = b_url.split("?", 1)[0].rsplit("/", 1)[-1]
+						files.append(CompatFile(bf, filename=fn))
+						b_url = "attachment://" + fn
+					else:
+						b_url = bf
 		requires_edit = False
 		if bk != ak:
 			a_url = best_url(after)

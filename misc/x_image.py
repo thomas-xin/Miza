@@ -764,6 +764,50 @@ def quantise_into(a, clip=None, in_place=False, checkerboard=True, dtype=np.uint
 		np.floor(a, out=a)
 	return np.asanyarray(a, dtype=dtype)
 
+def random_square(size, mult=1) -> Image.Image:
+	arr = np.random.randint(0, 2, size=(size, size, 3), dtype=np.uint8)
+	arr *= 255
+	im = Image.fromarray(arr, "RGB")
+	if mult != 1:
+		return im.resize((size * mult, size * mult), Resampling.NEAREST)
+	return im
+
+def gen_captcha(cells: int = 25, n: int = 5, cell_size: int = 30):
+	mult = 2
+	border = random.randint(4, 12)
+	padding = random.randint(3, 7)
+	cell_size += random.randint(-3, 3)
+	side_count = ceil(sqrt(cells))
+	im_width = cell_size * side_count + border * 2 + padding * (side_count - 1)
+	segments = [random_square(cell_size, mult) for i in range(cells)]
+	base_dir = (random.randint(-3, 3), random.randint(-3, 3))
+	while base_dir == (0, 0):
+		base_dir = (random.randint(-3, 3), random.randint(-3, 3))
+	offsets = [base_dir] * cells
+	diffs = list(range(cells))
+	random.shuffle(diffs)
+	for i in diffs[:n]:
+		new_dir = (random.randint(-4, 4), random.randint(-4, 4))
+		while new_dir != (0, 0) and abs(new_dir[0] - base_dir[0]) + abs(new_dir[1] - base_dir[1]) < 3:
+			new_dir = (random.randint(-4, 4), random.randint(-4, 4))
+		offsets[i] = new_dir
+
+	def captcha_iter():
+		for i in range(cell_size * mult):
+			base = random_square(im_width, mult)
+			for j, seg in enumerate(segments):
+				px, py = j % side_count, j // side_count
+				x, y = px * cell_size * mult, py * cell_size * mult
+				x += mult * (border + padding * px); y += mult * (border + padding * py)
+				dx, dy = offsets[j]
+				dx *= i; dy *= i
+				cell = ImageChops.offset(seg, dx, dy)
+				print(x, y, dx, dy)
+				base.paste(cell, (x, y))
+			yield base
+
+	return dict(duration=3, count=cell_size, frames=captcha_iter())
+
 def detect_c2pa(url):
 	if is_url(url):
 		b, h = get_request(url, return_headers=True)

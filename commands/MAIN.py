@@ -1444,6 +1444,9 @@ class UpdateReminders(Database):
 			every = x.get("e")
 			if every:
 				x.t += every
+				now = DynamicDT.utcnow()
+				if x.t < now - every:
+					x.t = now - every
 				temp.insert(0, x)
 				temp.sort(key=lambda x: x.t)
 				self.listed.insort((temp[0].t.timestamp_exact(), uid), key=lambda x: x[0])

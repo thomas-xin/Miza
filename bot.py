@@ -295,7 +295,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.pop_userbase(uid, path)
 			return
 		if path:
-			orig = temp = self.userbase.setdefault(uid, cdict())
+			orig = temp = self.userbase.get(uid, cdict())
 			attrs = path.split(".")
 			last = attrs.pop(-1)
 			for k in attrs:
@@ -306,7 +306,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.userbase[uid] = value
 	def add_userbase(self, uid, path, value):
 		if path:
-			orig = temp = self.userbase.setdefault(uid, cdict())
+			orig = temp = self.userbase.get(uid, cdict())
 			attrs = path.split(".")
 			last = attrs.pop(-1)
 			for k in attrs:
@@ -320,7 +320,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		else:
 			data = self.get_userbase(uid)
 			add_dict(data, uid, value)
-			self.set_userbase(uid, data)
+			self.userbase[uid] = data
 			return data
 	def pop_userbase(self, uid, path):
 		if path:
@@ -357,7 +357,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.pop_guildbase(gid, path)
 			return
 		if path:
-			orig = temp = self.guildbase.setdefault(gid, cdict())
+			orig = temp = self.guildbase.get(gid, cdict())
 			attrs = path.split(".")
 			last = attrs.pop(-1)
 			for k in attrs:
@@ -368,7 +368,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.guildbase[gid] = value
 	def add_guildbase(self, gid, path, value):
 		if path:
-			orig = temp = self.guildbase.setdefault(gid, cdict())
+			orig = temp = self.guildbase.get(gid, cdict())
 			attrs = path.split(".")
 			last = attrs.pop(-1)
 			for k in attrs:
@@ -382,7 +382,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		else:
 			data = self.get_guildbase(gid)
 			add_dict(data, gid, value)
-			self.set_guildbase(gid, data)
+			self.guildbase[gid] = data
 			return data
 	def pop_guildbase(self, gid, path):
 		if path:
@@ -2862,7 +2862,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return out
 
 	async def ocr(self, url):
-		resp = await process_image(url, "caption", ["-nogif"], cap="caption", timeout=3600)
+		# resp = await process_image(url, "caption", ["-nogif"], cap="caption", timeout=3600)
 		data = await self.to_data_url(url)
 		mistral_key = AUTH.get("mistral_key")
 		s = None

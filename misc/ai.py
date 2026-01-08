@@ -660,7 +660,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 				input=inputs,
 				pricing=pricing,
 			)
-			if response.object == "response" or hasattr(response, "choices"):
+			if getattr(response, "object", None) == "response" or hasattr(response, "choices"):
 				return await stream.pass_item(response)
 			return stream
 		except Exception as ex:

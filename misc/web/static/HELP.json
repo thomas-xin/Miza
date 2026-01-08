@@ -27,6 +27,15 @@
 			"timeout": "384",
 			"usage": "<0:user>* <1:time>? <2:reason>?"
 		},
+		"Captcha": {
+			"aliases": ["Captcha"],
+			"description": "",
+			"example": [],
+			"level": "0",
+			"rate_limit": "(2, 3)",
+			"timeout": "24",
+			"usage": ""
+		},
 		"CreateEmoji": {
 			"aliases": ["CreateEmoji", "EmojiCreate", "EmojiCopy", "CopyEmoji", "Emote", "Emoji"],
 			"description": "Creates a custom emoji from a URL or attached file.",
@@ -49,7 +58,7 @@
 		},
 		"CreateSound": {
 			"aliases": ["CreateSound", "SoundCreate", "SoundBoard", "SFX"],
-			"description": "Creates a custom soundboard from a URL or attached file.",
+			"description": "Creates a custom soundboard from a URL or attached file. Can handle up to 10 seconds of sound, as opposed to the default 5.2s limit",
 			"example": [],
 			"level": "0",
 			"rate_limit": "(8, 12)",
