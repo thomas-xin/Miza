@@ -241,12 +241,13 @@ class AttachmentCache(AutoCache):
 		if not is_discord_attachment(url):
 			return url
 		early = 43200 + 60
-		if not discord_expired(url, early):
-			cid, mid, aid, fn = split_url(url, 0)
-			key = aid
-			curr = self.get(key)
-			if not curr or discord_expired(curr):
-				self[key] = url
+		cid, mid, aid, fn = split_url(url, 0)
+		key = aid
+		curr = self.get(key)
+		if (not curr or discord_expired(curr, early)) and not discord_expired(url, early):
+			self[key] = url
+		elif curr and discord_expired(url, early):
+			url = curr
 		return url
 
 	def preserve(self, url, mid=0, minimise=False):
@@ -290,7 +291,7 @@ class AttachmentCache(AutoCache):
 
 	async def obtain(self, c_id=None, m_id=None, a_id=None, fn=None, url=None):
 		if url:
-			self.store(url)
+			url = self.store(url)
 			c_id, m_id, a_id, fn = split_url(url, m_id)
 		ac = self.attachment_count
 		if isinstance(c_id, str) and not c_id.isnumeric():

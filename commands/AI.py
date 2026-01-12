@@ -92,38 +92,39 @@ class Translate(Command):
 				content=input,
 			),
 		]
+
+		async def google_translate():
+			try:
+				tr = await translator.translate(input, dest=dest)
+			except Exception:
+				print_exc()
+				return
+			return tr.text
+		async def llm_translate():
+			try:
+				translation_model = await asubmit(ai.load_translation_model)
+				cmpl = await ai.llm(
+					"chat.completions.create",
+					messages=messages,
+					model=translation_model.model,
+					api=translation_model,
+					premium_context=premium,
+				)
+				return cmpl.choices[0].message.content
+			except Exception:
+				print_exc()
+
 		c = await tcount(input)
-		translations = []
 		if c >= 16:
-
-			async def google_translate():
-				try:
-					tr = await translator.translate(input, dest=dest)
-				except Exception:
-					print_exc()
-					return
-				return tr.text
-			async def llm_translate():
-				try:
-					return await ai._instruct(
-						data=dict(
-							model=None,
-							messages=messages,
-							temperature=0.01,
-							premium_context=premium,
-							reasoning_effort="low",
-						),
-					)
-				except Exception:
-					print_exc()
-
 			translations = await gather(google_translate(), llm_translate())
-			translations = list(filter(bool, translations))
+		else:
+			translations = [await llm_translate()]
+		translations = list(filter(bool, translations))
 		if translations:
 			messages = [
 				dict(
 					role="system",
-					content=f'Below will be some text, followed by its translation(s) into {dst_language}. Please rewrite the translation, making improvements where applicable, and keeping formatting accurate to the original. Avoid being overly formal, and do not add extra information to the text itself!',
+					content=f'Below will be some text, followed by translation(s) into {dst_language}. Please rewrite ONLY the translation, making improvements where applicable, and keeping formatting accurate to the original. Avoid being overly formal, and do not add extra information to the text itself!',
 				),
 				dict(
 					role="user",
@@ -491,10 +492,6 @@ class Ask(Command):
 							tc.remove(fc)
 						continue
 					tid = fc.id
-					# tid = tid[:6] + str(n)
-					# while tid in ucid:
-					# 	tid += "0"
-					# ucid.add(tid)
 					fc.id = tid
 					try:
 						kwargs = cdict(eval_json(fc.function.arguments))
@@ -977,7 +974,7 @@ class Instruct(Command):
 		kwargs["max_tokens"] = max_tokens
 		kwargs["reasoning_effort"] = reasoning_effort
 		if not model:
-			kwargs["api"] = ai.load_summarisation_model()
+			kwargs["api"] = await asubmit(ai.load_summarisation_model)
 			model = ai.summarisation_model.model
 		resp = await bot.force_completion(model=model, prompt=prompt, stream=True, timeout=1800, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, premium_context=_premium, allow_alt=True, **kwargs)
 		try:
@@ -1801,7 +1798,7 @@ class TTS(Command):
 		match engine:
 			case "openai":
 				_premium.require(2)
-				oai = openai.AsyncOpenAI(api_key=AUTH["openai_key"])
+				oai = get_oai(None, "openai")
 				model = "gpt-4o-mini-tts"
 				resp = await oai.audio.speech.create(
 					model=model,

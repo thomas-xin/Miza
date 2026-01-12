@@ -455,6 +455,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						a2 = cdict(arg)
 						a2.name = arg.name + f"-{i + 2}"
 						a2.description = f"Extension of {arg.name}"
+						a2.pop("required", None)
 						extra.append(a2)
 		else:
 			for i in command.usage.split():
@@ -6314,6 +6315,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			futs.append(fut)
 		resps: Unknown = await gather(*futs)
 		for data in resps:
+			if not data:
+				continue
 			ac = data.get("attachment_cache")
 			if ac:
 				for k, v in ac.items():
@@ -6339,7 +6342,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		await asyncio.sleep(0.5)
 		if self.closed:
 			return
-		pathlib.Path.touch(self.heartbeat_file)
+		await asubmit(pathlib.Path.touch, self.heartbeat_file)
 
 	def heartbeat_loop(self):
 		"Heartbeat loop: Repeatedly renames a file to inform the watchdog process that the bot's event loop is still running."

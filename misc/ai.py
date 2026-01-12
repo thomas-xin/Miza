@@ -332,6 +332,11 @@ class ExtendedOpenAI(openai.AsyncOpenAI):
 		self.refresh = 0
 		super().__init__(*args, **kwargs)
 
+def find_model(oai):
+	oai = openai.OpenAI(api_key=oai.api_key, base_url=oai.base_url)
+	model = oai.models.list().data[0].id
+	return model
+
 summarisation_model = None
 def load_summarisation_model():
 	global summarisation_model
@@ -340,18 +345,38 @@ def load_summarisation_model():
 		return summarisation_model
 	api_key = info.get("api_key", "x")
 	base_url = info.get("base_url", "x")
+	pricing = info.get("pricing", [0, 0])
+	summarisation_model = ExtendedOpenAI(api_key=api_key, base_url=base_url)
 	try:
-		oai = openai.OpenAI(api_key=api_key, base_url=base_url)
-		model = oai.models.list().data[0].id
-		pricing = info.get("pricing", [0, 0])
+		model = find_model(summarisation_model)
 	except Exception:
 		return summarisation_model
-	summarisation_model = ExtendedOpenAI(api_key=api_key, base_url=base_url)
 	print(f"Loaded summarisation model API {base_url} with model {model}.")
 	summarisation_model.model = model
 	summarisation_model.pricing = tuple(pricing)
 	summarisation_model.refresh = utc() + 720
 	return summarisation_model
+
+translation_model = None
+def load_translation_model():
+	global translation_model
+	info = AUTH.get("translation_model")
+	if not info or getattr(translation_model, "refresh", 0) > utc():
+		return translation_model
+	api_key = info.get("api_key", "x")
+	base_url = info.get("base_url", "x")
+	try:
+		oai = openai.OpenAI(api_key=api_key, base_url=base_url)
+		model = oai.models.list().data[0].id
+		pricing = info.get("pricing", [0, 0])
+	except Exception:
+		return translation_model
+	translation_model = ExtendedOpenAI(api_key=api_key, base_url=base_url)
+	print(f"Loaded translation model API {base_url} with model {model}.")
+	translation_model.model = model
+	translation_model.pricing = tuple(pricing)
+	translation_model.refresh = utc() + 720
+	return translation_model
 
 openai_refresh = 0
 async def load_openrouter():
@@ -359,7 +384,7 @@ async def load_openrouter():
 		return
 
 	async def get_openrouter_models():
-		oai = get_oai("", "openrouter")
+		oai = get_oai(None, "openrouter")
 		models = await flatten(oai.models.list())
 		models.sort(key=lambda model: "-preview" not in model.id)
 		return models
@@ -437,7 +462,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 	kwa = kwargs
 	for i, (api, minfo) in enumerate(tries + tries):
 		if api is None and minfo is None:
-			api = load_summarisation_model()
+			api = await asubmit(load_summarisation_model)
 		if api is None:
 			if not allow_alt:
 				break
@@ -609,7 +634,7 @@ async def _instruct(data, user=None, prune=True):
 	inputs.update(data)
 	model = inputs.get("model")
 	if not model:
-		if load_summarisation_model():
+		if await asubmit(load_summarisation_model):
 			api = summarisation_model
 			model = api.model
 		else:
