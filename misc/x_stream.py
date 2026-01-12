@@ -371,7 +371,7 @@ async def authorised_heartbeat(request: Request, key: str = Query(...), uri: str
 
 	ac = data.get("attachment_cache")
 	if ac:
-		for k, v in ac:
+		for k, v in ac.items():
 			attachment_cache.store(v)
 	attachment_cache.init()
 	return {str(k): v for k, v in attachment_cache.items() if isinstance(k, int) and v and not discord_expired(v)}

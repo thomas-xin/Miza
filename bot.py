@@ -6316,7 +6316,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		for data in resps:
 			ac = data.get("attachment_cache")
 			if ac:
-				for k, v in ac:
+				for k, v in ac.items():
 					attachment_cache.store(v)
 		return resps
 
