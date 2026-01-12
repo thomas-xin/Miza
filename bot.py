@@ -6284,7 +6284,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				dc = await f.read()
 			async with aiofiles.open(PRIVATE_KEY, "r") as f:
 				pk = await f.read()
-		ac = {k: v for k, v in attachment_cache.items() if v and not discord_expired(v)}
+		ac = {str(k): v for k, v in attachment_cache.items() if isinstance(k, int) and v and not discord_expired(v)}
 		for addr in AUTH.get("remote_servers", ()):
 			token = AUTH.get("alt_token") or self.token
 			channels = [k for k, v in self.data.exec.items() if v & 16]
