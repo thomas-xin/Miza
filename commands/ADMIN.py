@@ -2065,7 +2065,7 @@ class CreateSticker(Command):
 			emoji = await bot.fetch_emoji(emoji, _guild)
 			assert emoji.guild.id == _guild.id, "Emoji must be from the current server."
 		if not emoji:
-			emoji = await asubmit(colour_cache.obtain_heart, url)
+			emoji = await colour_cache.obtain_heart(url)
 		sticker = await _guild.create_sticker(name=name, emoji=emoji, description="", file=CompatFile(image))
 		colour = await bot.get_colour(sticker.url)
 		embed = discord.Embed(colour=colour)

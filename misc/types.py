@@ -1481,7 +1481,7 @@ class PrettyJSONEncoder(json.JSONEncoder):
 		curr_indent = indent * level
 		next_indent = indent * (level + 1)
 		if isinstance(obj, (list, tuple)):
-			if all(not isinstance(x, (tuple, list, dict)) for x in obj):
+			if all(not isinstance(x, (tuple, list, dict)) or len(json_dumps(x)) < 10 for x in obj):
 				return "[" + ", ".join(json_dumpstr(x) for x in obj) + "]"
 			items = [self.encode(x, level=level + 1) for x in obj]
 			return "[\n" + next_indent + f",\n{next_indent}".join(item for item in items) + f"\n{curr_indent}" + "]"

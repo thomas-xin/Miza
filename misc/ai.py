@@ -34,91 +34,11 @@ def cast_rp(fp, pp, model=None):
 	return ((fp + pp) / 8 + 1) ** (0.125 * s)
 # List of language models and their respective providers, as well as pricing per million input/output tokens
 available = {
-	"deepseek-r1": {
-		"deepseek": ("deepseek-reasoner", ("0.41167", "1.64333")),
-		"deepinfra": ("deepseek-ai/DeepSeek-R1", ("0.85", "2.5")),
-	},
-	"deepseek-v3.2": {
-		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
-	},
-	"deepseek-v3.1": {
-		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
-		"fireworks": ("accounts/fireworks/models/deepseek-v3-0324", ("0.9", "0.9")),
-		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
-		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
-	},
-	"deepseek-v3": {
-		"deepseek": ("deepseek-chat", ("0.2025", "0.825")),
-		"fireworks": ("accounts/fireworks/models/deepseek-v3", ("0.9", "0.9")),
-		"together": ("deepseek-ai/DeepSeek-V3", ("1.25", "1.25")),
-		"deepinfra": ("deepseek-ai/DeepSeek-V3", ("0.85", "0.9")),
-	},
-	"llama-3-405b": {
-		"deepinfra": ("meta-llama/Meta-Llama-3.1-405B-Instruct", ("1.79", "1.79")),
-		"fireworks": ("accounts/fireworks/models/llama-v3p1-405b-instruct", ("3", "3")),
-		"together": ("meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo", ("5", "5")),
-	},
-	"llama-3-90b": {
-		"deepinfra": ("meta-llama/Llama-3.2-11B-Vision-Instruct", ("0.35", "0.4")),
-		"together": ("meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo", ("1.2", "1.2")),
-	},
-	"llama-3-70b": {
-		"fireworks": ("accounts/fireworks/models/llama-v3p3-70b-instruct", ("0.9", "0.9")),
-		"deepinfra": ("meta-llama/Llama-3.3-70B-Instruct", ("0.23", "0.4")),
-		"together": ("meta-llama/Llama-3.3-70B-Instruct-Turbo", ("0.88", "0.88")),
-	},
-	"llama-3-11b": {
-		"deepinfra": ("meta-llama/Llama-3.2-11B-Vision-Instruct", ("0.055", "0.055")),
-		"together": ("meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo", ("0.18", "0.18")),
-	},
-	"llama-3-8b": {
-		"deepinfra": ("meta-llama/Meta-Llama-3.1-8B-Instruct", ("0.03", "0.05")),
-		"fireworks": ("accounts/fireworks/models/llama-v3p1-8b-instruct", ("0.2", "0.2")),
-		"together": ("meta-llama/Meta-Llama-3.1-8B-Instruct", ("0.2", "0.2")),
-	},
-	"qwen-72b": {
-		"fireworks": ("accounts/fireworks/models/qwen2p5-72b-instruct", ("0.9", "0.9")),
-		"deepinfra": ("Qwen/Qwen2.5-72B-Instruct", ("0.35", "0.4")),
-		"together": ("Qwen/Qwen2.5-72B-Instruct-Turbo", ("1.2", "1.2")),
-	},
-	"gpt-oss-120b": {
-		"deepinfra": ("openai/gpt-oss-120b", ("0.039", "0.19")),
-	},
-	"gpt-oss-20b": {
-		"deepinfra": ("openai/gpt-oss-20b", ("0.03", "0.14")),
-	},
-	"o4-mini": {
-		"openai": ("o4-mini", ("1.1", "4.4")),
-	},
-	"o3": {
-		"openai": ("o3", ("10", "40")),
-	},
-	"o3-mini": {
-		"openai": ("o3-mini", ("1.1", "4.4")),
-	},
-	"gpt-5": {
-		"openai": ("gpt-5", ("1.25", "10")),
-	},
-	"gpt-5-mini": {
-		"openai": ("gpt-5-mini", ("0.25", "2")),
-	},
-	"gpt-5-nano": {
-		"openai": ("gpt-5-mini", ("0.05", "0.4")),
-	},
-	"gpt-4.1-mini": {
-		"openai": ("gpt-4.1-mini", ("0.4", "1.6")),
-	},
-	"gpt-4.1": {
-		"openai": ("gpt-4.1", ("2", "8")),
-	},
-	"gpt-4-mini": {
-		"openai": ("gpt-4o-mini", ("0.15", "0.6")),
-	},
-	"gpt-4": {
-		"openai": ("gpt-4o", ("2.5", "10")),
-	},
 	"mistral-24b": {
 		"mistral": ("mistral-small-latest", ("0", "0")),
+	},
+	"deepseek-v3.2-speciale": {
+		"deepseek": ("deepseek-reasoner", ("0.2", "0.42")),
 	},
 }
 
@@ -727,7 +647,7 @@ async def _instruct(data, user=None, prune=True):
 f_browse = {
 	"type": "function", "function": {
 		"name": "browse",
-		"description": "Searches internet browser, or visits given URL. Avoid using on redundant file URLs from images sent by user(s). Use for knowledge or advice to validate facts and up-to-date information!",
+		"description": "Searches internet browser, or visits given URL. Use for knowledge or advice to validate facts and up-to-date information. Note: Does NOT support pictures!",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {

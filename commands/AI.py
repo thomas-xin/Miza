@@ -293,7 +293,6 @@ class Ask(Command):
 		except (AttributeError, LookupError):
 			bot_name = bot.name
 		nsfw = _nsfw or bot.is_nsfw(_user)
-		_premium.require(2)
 		prompt = (prompt or "").strip()
 		if not prompt and not _message.attachments:
 			prompt = "👋"
@@ -354,7 +353,7 @@ class Ask(Command):
 			)
 		else:
 			reference = None
-		hislim = 384 if _premium.value >= 4 else 192
+		hislim = 384 if _premium.value >= 4 else 192 if _premium.value >= 2 else 64
 		if not simulated and pdata.history != "none":
 			async for m in bot.history(_channel, limit=hislim):
 				if m.id in messages or m.id == _message.id:
@@ -400,7 +399,14 @@ class Ask(Command):
 		if not _model or _model == "auto":
 			_model = pdata.model
 			if not _model or _model == "auto":
-				_model = "large" if premium.value_approx >= 3 else "medium" if not simulated else "small"
+				try:
+					if simulated:
+						raise PermissionError
+					premium.require(2)
+				except PermissionError:
+					_model = "small"
+				else:
+					_model = "large" if premium.value_approx >= 3 else "medium"
 		if _model == "large":
 			premium.require(3)
 		elif _model == "medium":

@@ -230,7 +230,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def __call__(self):
 		return self
 	def __exit__(self, *args, **kwargs):
-		return self.close()
+		return self
 
 	def __getattr__(self, key):
 		try:
@@ -2284,7 +2284,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			instructive=None,
 			casual=None,
 			nsfw=None,
-			backup="deepseek-v3.2",
+			backup="deepseek-v3.2-speciale",
 			retry="gpt-5-mini",
 			function=None,
 			vision="mistral-24b",
@@ -2292,7 +2292,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		),
 		1: cdict(
 			instructive="claude-haiku-4.5",
-			casual="gemini-3-flash",
+			casual="deepseek-v3.2-speciale",
 			nsfw="grok-4.1-fast",
 			backup="kimi-k2-thinking",
 			retry="gpt-5-mini",
@@ -2301,11 +2301,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		2: cdict(
-			instructive="claude-sonnet-4.5",
+			instructive="claude-opus-4.5",
 			casual="gemini-3-pro",
 			nsfw="grok-4",
 			backup="gpt-5.2",
-			retry="claude-opus-4.5",
+			retry="gpt-5.2-pro",
 			function="grok-4.1-fast",
 			vision="gpt-5.2",
 			target="auto",
@@ -3049,14 +3049,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if (utc_dt() - created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
 				self.data.message_cache.save_message(message)
 		return message
-
-	def remove_message(self, message):
-		"Deletes a message from the bot cache."
-		self.cache.messages.pop(message.id, None)
-		if not message.author.bot:
-			s = message_repr(message, username=True)
-			ch = f"deleted/{message.channel.id}.txt"
-			print(s, file=ch)
 
 	async def add_attachment(self, attachment, message=None):
 		if int(attachment.size) <= 64 * 1048576:
@@ -6292,6 +6284,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				dc = await f.read()
 			async with aiofiles.open(PRIVATE_KEY, "r") as f:
 				pk = await f.read()
+		ac = {k: v for k, v in attachment_cache.items() if v and not discord_expired(v)}
 		for addr in AUTH.get("remote_servers", ()):
 			token = AUTH.get("alt_token") or self.token
 			channels = [k for k, v in self.data.exec.items() if v & 16]
@@ -6302,6 +6295,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				encryption_key=AUTH["encryption_key"],
 				token=self.token,
 				alt_token=AUTH.get("alt_token") or self.token,
+				attachment_cache=ac,
 			))
 			encoded = base64.b64encode(encrypt(data)).rstrip(b"=").decode("ascii")
 			async def external_heartbeat():
@@ -6314,16 +6308,22 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					data=orjson.dumps(dict(data=encoded)),
 					timeout=5,
 					session=Request.sessions.next(),
+					json=True,
 				)
 			fut = csubmit(external_heartbeat())
 			futs.append(fut)
-		await gather(*futs)
-		return futs
+		resps: Unknown = await gather(*futs)
+		for data in resps:
+			ac = data.get("attachment_cache")
+			if ac:
+				for k, v in ac:
+					attachment_cache.store(v)
+		return resps
 
 	async def global_loop(self):
-		"The slowest update loop that runs once every 5 minutes. Used for slow operations, such as the bot database autosave event."
+		"The slowest update loop that runs once every 12 minutes. Used for slow operations, such as the bot database autosave event."
 		while not self.closed:
-			async with Delay(300):
+			async with Delay(720):
 				with tracebacksuppressor:
 					await self.worker_heartbeat()
 					await asyncio.sleep(1)

@@ -905,7 +905,7 @@ class UpdateColours(Database):
 	no_file = True
 
 	async def _get(self, url, threshold=True):
-		resp = await asubmit(colour_cache.obtain, url)
+		resp = await colour_cache.obtain(url)
 		out = [round(i) for i in resp]
 		try:
 			raw = colour2raw(out)

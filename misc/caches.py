@@ -17,7 +17,7 @@ from PIL import Image
 import psutil
 import requests
 import streamshatter
-from misc.types import utc, as_str, byte_like, cdict
+from misc.types import utc, as_str, byte_like, cdict, fcdict
 from misc.asyncs import asubmit, esubmit, wrap_future, await_fut, Future
 from misc.smath import get_closest_heart
 from misc.util import (
@@ -57,7 +57,7 @@ def split_rgba(image):
 		A = None
 	return image, A
 def get_colour(image):
-	rgb, A = split_rgba(image)
+	rgb, A = split_rgba(remove_p(image))
 	if A:
 		a = np.array(A, dtype=np.float32)
 		a *= 1 / 255
@@ -65,6 +65,8 @@ def get_colour(image):
 		if sumA == 0:
 			return [0, 0, 0]
 		return [(np.sum(np.multiply(c.T, a)) / sumA).item() for c in np.asanyarray(rgb, dtype=np.uint8).T]
+	if rgb.mode == "L":
+		rgb = rgb.convert("RGB")
 	return [np.mean(c).item() for c in np.asanyarray(rgb, dtype=np.uint8).T]
 def parse_colour(s):
 	if s == "black":
@@ -87,39 +89,41 @@ def parse_colour(s):
 
 class ColourCache(AutoCache):
 
-	def _obtain(self, url):
-		with niquests.get(url, headers=Request.header(), stream=True) as resp:
-			mime = resp.headers.get("Content-Type", "")
-			if "text/html" in mime:
-				it = resp.iter_content(65536)
-				s = as_str(next(it))
+	async def _obtain(self, url):
+		headers = await attachment_cache.scan_headers(url)
+		c = (0, 0, 0)
+		match (mime := fcdict(headers).get("content-type")):
+			case "text/html":
+				data = await attachment_cache.download(url)
+				s = as_str(data[:65536])
 				try:
 					bc = s.split("background-color:", 1)[1]
 				except IndexError:
 					c = (255, 255, 255)
 				else:
 					bc = bc.replace(";", " ").split(None, 1)[0]
-					c = parse_colour(bc)[:3]
-			else:
-				im = Image.open(resp.raw)
-				c = get_colour(im)[:3]
+					c = parse_colour(bc)
+			case _ if mime.startswith("image"):
+				fp = await attachment_cache.download(url, read=True)
+				im = await asubmit(Image.open, fp)
+				c = await asubmit(get_colour, im)
 		print("GC:", url, c)
-		return c
+		return c[:3]
 
-	def obtain(self, url):
+	async def obtain(self, url):
 		if not url:
 			return (0, 0, 0)
 		if isinstance(url, byte_like):
 			im = Image.open(io.BytesIO(url))
 			return get_colour(im)[:3]
 		try:
-			return self.retrieve(unyt(url), self._obtain, url)
+			return await self.aretrieve(unyt(url), self._obtain, url)
 		except Exception as ex:
 			print(repr(ex))
 			return (0, 0, 0)
 
-	def obtain_heart(self, url):
-		rgb = self.obtain(url)
+	async def obtain_heart(self, url):
+		rgb = await self.obtain(url)
 		return get_closest_heart(rgb)
 
 
@@ -233,15 +237,20 @@ class AttachmentCache(AutoCache):
 						resp.raise_for_status()
 			self.last = last
 
-	def preserve(self, url, mid=0, minimise=False):
+	def store(self, url):
 		if not is_discord_attachment(url):
 			return url
 		early = 43200 + 60
 		if not discord_expired(url, early):
-			cid, mid, aid, fn = split_url(url, mid)
+			cid, mid, aid, fn = split_url(url, 0)
 			key = aid
-			self[key] = url
-		return shorten_attachment(url, mid, minimise=minimise)
+			curr = self.get(key)
+			if not curr or discord_expired(curr):
+				self[key] = url
+		return url
+
+	def preserve(self, url, mid=0, minimise=False):
+		return shorten_attachment(self.store(url), mid, minimise=minimise)
 
 	async def get_direct(self, c_id, m_id, a_id=None):
 		if not m_id:
@@ -281,6 +290,7 @@ class AttachmentCache(AutoCache):
 
 	async def obtain(self, c_id=None, m_id=None, a_id=None, fn=None, url=None):
 		if url:
+			self.store(url)
 			c_id, m_id, a_id, fn = split_url(url, m_id)
 		ac = self.attachment_count
 		if isinstance(c_id, str) and not c_id.isnumeric():

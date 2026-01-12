@@ -149,10 +149,10 @@ hb = "heartbeat.tmp"
 
 hbp = pathlib.Path(hb)
 def check_hb(timeout=20):
-    if not hbp.exists():
-        return
-    mtime = hbp.stat().st_mtime
-    return (time.time() - mtime) < timeout
+	if not hbp.exists():
+		return
+	mtime = hbp.stat().st_mtime
+	return (time.time() - mtime) < timeout
 
 delete(sd)
 

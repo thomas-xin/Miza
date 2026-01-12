@@ -808,8 +808,8 @@ smart_re = re.compile(r"""
 	\1
 	(?:$|\s)
 """, re.VERBOSE)
-leftspace_re = r"^\s+"
-rightspace_re = r"\s+$"
+leftspace_re = re.compile(r"^\s+")
+rightspace_re = re.compile(r"\s+$")
 def smart_split(s, rws=False):
 	"""
 	Split a string into words while preserving whitespace information.
@@ -837,7 +837,7 @@ def smart_split(s, rws=False):
 	def process_token(token):
 		if not token:
 			return words.append(token)
-		if token[0] == token[-1]:
+		if len(token) > 1 and token[0] == token[-1] and token[0] in (r"""`"`"""):
 			return words.append(token[1:-1])
 		spl = token.split()
 		for i, w in enumerate(spl):
@@ -849,9 +849,9 @@ def smart_split(s, rws=False):
 				token = token[wss:]
 
 	while s:
-		match = re.search(smart_re, s)
+		match = smart_re.search(s)
 		if not match:
-			match = re.search(leftspace_re, s)
+			match = leftspace_re.search(s)
 			if not match:
 				whites.append("")
 				process_token(s)
@@ -871,8 +871,8 @@ def smart_split(s, rws=False):
 			whites.append("")
 			process_token(sub)
 		grouped = match.group()
-		match2 = re.search(leftspace_re, grouped)
-		match3 = re.search(rightspace_re, grouped)
+		match2 = leftspace_re.search(grouped)
+		match3 = rightspace_re.search(grouped)
 		end = match.end()
 		if not match2:
 			whites.append("")
@@ -3289,11 +3289,19 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 	iterkeys = keys
 
 	def values(self):
-		return (cachecls.__getitem__(self, k) for k in iter(self))
+		for k in iter(self):
+			try:
+				yield cachecls.__getitem__(self, k)
+			except KeyError:
+				pass
 	itervalues = values
 
 	def items(self):
-		return ((k, cachecls.__getitem__(self, k)) for k in iter(self))
+		for k in iter(self):
+			try:
+				yield k, cachecls.__getitem__(self, k)
+			except KeyError:
+				pass
 	iteritems = items
 
 	def clear(self):

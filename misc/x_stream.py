@@ -15,12 +15,12 @@ from fastapi.responses import StreamingResponse, RedirectResponse
 from .asyncs import asubmit, csubmit
 from .types import fcdict, byte_like, MemoryBytes
 from .util import (
-	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment,
+	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment, discord_expired,
 	is_discord_attachment, url2fn, seq, getsize,
 	Request as MizaRequest, DOMAIN_CERT, PRIVATE_KEY, update_headers,
 	CACHE_PATH, RNGFile,
 )
-from .caches import attachment_cache
+from .caches import attachment_cache, colour_cache
 
 csubmit(MizaRequest._init_())
 
@@ -326,6 +326,13 @@ async def prandom(request: Request, count: int = 1048576):
 	return stream_fp(request, RNGFile(count), {"Content-Disposition": "attachment; filename=random.bin"})
 
 
+@app.get("/mean-color")
+@app.get("/mean-colour")
+async def mean_colour(request: Request, url: str = Query(...)):
+	resp = await colour_cache.obtain(url)
+	return list(resp)
+
+
 @app.post("/authorised-heartbeat")
 async def authorised_heartbeat(request: Request, key: str = Query(...), uri: str = Query("")):
 	"""Receive configuration updates from Discord bot."""
@@ -362,8 +369,12 @@ async def authorised_heartbeat(request: Request, key: str = Query(...), uri: str
 		with open(PRIVATE_KEY, "w") as f:
 			f.write(private_key)
 
+	ac = data.get("attachment_cache")
+	if ac:
+		for k, v in ac:
+			attachment_cache.store(v)
 	attachment_cache.init()
-	return "💜"
+	return {k: v for k, v in attachment_cache.items() if v and not discord_expired(v)}
 
 
 @app.get("/c/{path:path}")

@@ -564,8 +564,7 @@ class Server:
 	@cp.expose(("c",))
 	def chunked_proxy(self, path, *void):
 		with tracebacksuppressor:
-			fut = csubmit(attachment_cache.obtains(path))
-			urls, chunksize = await_fut(fut)
+			urls, chunksize = await_fut(attachment_cache.obtains(path))
 			mimetype, size, lastsize = get_size_mime(urls[0], urls[-1], len(urls), chunksize)
 			update_headers(cp.response.headers, **CHEADERS)
 			cp.response.headers["Content-Type"] = mimetype
@@ -582,12 +581,10 @@ class Server:
 			rpath = "/" + rpath
 		rquery = cp.request.query_string and "?" + cp.request.query_string
 		if len(path) == 1 and path[0].count("~") == 2:
-			fut = csubmit(attachment_cache.obtain(*path[0].split(".", 1)[0].split("~", 2)))
-			return self.proxy_if(await_fut(fut))
+			return self.proxy_if(await_fut(attachment_cache.obtain(*path[0].split(".", 1)[0].split("~", 2))))
 		if len(path) == 2 and path[0].count("~") == 0:
 			c_id, m_id, a_id, fn = decode_attachment("/".join(path))
-			fut = csubmit(attachment_cache.obtain(c_id, m_id, a_id, fn))
-			return self.proxy_if(await_fut(fut))
+			return self.proxy_if(await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn)))
 		if hasattr(self, "state"):
 			url = f"{self.state['/']}/u{rpath}{rquery}"
 			raise cp.HTTPRedirect(url, 307)
@@ -610,8 +607,7 @@ class Server:
 				return "Expected input URL or data."
 			fp = await_fut(attachment_cache.download(url, read=True))
 		fn = filename or (url2fn(url) if url else None)
-		fut = attachment_cache.create(fp, filename=fn)
-		return await_fut(fut)
+		return await_fut(attachment_cache.create(fp, filename=fn))
 
 	upload_cache = diskcache.Cache(f"{CACHE_PATH}/uploads", size_limit=128 * 1073741824)
 
@@ -885,7 +881,7 @@ class Server:
 
 	@cp.expose
 	def mean_colour(self, url=""):
-		resp = colour_cache.obtain(url)
+		resp = await_fut(colour_cache.obtain(url))
 		cp.response.headers["Content-Type"] = "application/json"
 		update_headers(cp.response.headers, **SHEADERS)
 		return json_dumps(dict(colour=resp))
