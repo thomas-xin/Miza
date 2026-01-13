@@ -1237,9 +1237,9 @@ class AudioDownloader:
 		# Only proceed if no items have already been found (from playlists in this case)
 		if not len(output):
 			if is_miza_attachment(url):
-				output = self.handle_special_multiple(url)
-				if output:
-					return output
+				resp2 = self.handle_special_multiple(url)
+				if resp2:
+					return resp2
 				return [cdict(
 					name=url2fn(url),
 					url=url,
@@ -1263,9 +1263,9 @@ class AudioDownloader:
 				if resp.get("_type") == "url":
 					resp = self.extract_info(resp["url"], process=True)
 			except (RuntimeError, ytd.utils.DownloadError):
-				output = self.handle_special_multiple(url)
-				if output:
-					return output
+				resp2 = self.handle_special_multiple(url)
+				if resp2:
+					return resp2
 				entry = cdict(
 					name=url2fn(url),
 					url=url,
@@ -1327,9 +1327,9 @@ class AudioDownloader:
 						output.append(cdict(temp))
 			else:
 				if resp.get("ext", "unknown_video") == "unknown_video":
-					output = self.handle_special_multiple(url)
-					if output:
-						return output
+					resp2 = self.handle_special_multiple(url)
+					if resp2:
+						return resp2
 				# Single item results must contain full data, we take advantage of that here
 				name = resp.get("title") or resp["webpage_url"].rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
 				url = resp.get("webpage_url") or resp["url"]

@@ -913,10 +913,10 @@ class Instruct(Command):
 		),
 		max_tokens=cdict(
 			type="integer",
-			validation="[1, 65536]",
+			validation="[1, 1048576]",
 			description="Maximum tokens to generate",
-			example="16384",
-			default=3072,
+			example="262144",
+			default=65536,
 		),
 	)
 	macros = cdict(
