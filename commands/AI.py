@@ -108,6 +108,7 @@ class Translate(Command):
 					messages=messages,
 					model=translation_model.model,
 					api=translation_model,
+					max_completion_tokens=16384,
 					premium_context=premium,
 				)
 				return cmpl.choices[0].message.content
@@ -138,11 +139,12 @@ class Translate(Command):
 		print(messages)
 		translated = await ai._instruct(
 			data=dict(
-				model="grok-4.1-fast",
+				model=None,
 				messages=messages,
 				temperature=0.01,
 				premium_context=premium,
-				reasoning_effort="low",
+				max_completion_tokens=65536,
+				reasoning_effort="medium",
 			),
 		)
 		assert translated, "No output was captured!"

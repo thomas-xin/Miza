@@ -435,7 +435,24 @@ async def _summarise(s, max_length, best=False, prompt=None, premium_context=[])
 			if prompt:
 				s2 += "\n\n" + prompt
 			if prompt:
-				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above, and make sure to include all information relevant to the following question if available:\n\n"""\n{prompt}\n"""\n\nWrite only the summary, and do not produce an answer if there is none.'
+				prompt = f'''### Input:
+"""
+{s}
+"""
+
+### Instruction:
+Please provide a comprehensive but concise summary of the text above. Make sure to include all information relevant to the following question if available:
+"""
+{prompt}
+"""
+
+e.g If the user asks about:
+- the next number in a sequence: include all previously occurring numbers
+- a user's gender: include any mentions of gender or pronouns of each user
+- a chess game: include all chess moves
+- nonspecific: provide a general summary
+
+Answer ONLY with the summary, do not answer the question itself!'''
 			else:
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above!'
 			ml = round_random(max_length)

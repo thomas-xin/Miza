@@ -2288,7 +2288,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			backup="deepseek-v3.2-speciale",
 			retry="gpt-5-mini",
 			function=None,
-			vision="mistral-24b",
+			vision="grok-4.1-fast",
 			target="auto",
 		),
 		1: cdict(
@@ -2298,7 +2298,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			backup="kimi-k2-thinking",
 			retry="gpt-5-mini",
 			function="grok-4.1-fast",
-			vision="qwen3-235b-a22b",
+			vision="grok-4.1-fast",
 			target="auto",
 		),
 		2: cdict(

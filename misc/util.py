@@ -78,6 +78,9 @@ if not TEMP_PATH or not os.path.exists(TEMP_PATH):
 	os.makedirs(TEMP_PATH, exist_ok=True)
 FAST_PATH = os.path.abspath("cache")
 os.makedirs(FAST_PATH, exist_ok=True)
+assert isinstance(CACHE_PATH, str)
+assert isinstance(TEMP_PATH, str)
+assert isinstance(FAST_PATH, str)
 
 persistdir = AUTH.get("persist_path") or cachedir
 ecdc_dir = persistdir + "/ecdc/"
@@ -2032,6 +2035,34 @@ def safe_save(fn, s):
 		os.rename(fn + "\x7f", fn)
 	else:
 		save_file(s, fn)
+
+
+archive_formats = ("7z", "zip", "tar", "gz", "bz", "xz")
+
+def unpack_gz(archive_name, extract_dir):
+	import gzip
+	with gzip.open(archive_name, "rb") as f_in:
+		with open(os.path.join(extract_dir, os.path.basename(archive_name).replace(".gz", "")), "wb") as f_out:
+			f_out.write(f_in.read())
+shutil.register_unpack_format("gz", [".gz"], unpack_gz)
+def unpack_xz(filename, extract_dir):
+	import tarfile
+	with tarfile.open(filename, "r:xz") as tar:
+		tar.extractall(path=extract_dir)
+shutil.register_unpack_format("xz", [".xz"], unpack_xz)
+
+def extract_archive(archive_path, format=None, excludes=()):
+	path = f"{TEMP_PATH}/{ts_us()}"
+	os.mkdir(path)
+	with open(archive_path, "rb") as f:
+		b = f.read(6)
+	if b == b'7z\xbc\xaf\x27\x1c':
+		import py7zr
+		with py7zr.SevenZipFile(archive_path, mode="r") as z:
+			z.extractall(path=path)
+	else:
+		shutil.unpack_archive(archive_path, extract_dir=path, format=format or get_ext(archive_path))
+	return [f"{path}/{fn}" for fn in os.listdir(path) if fn.rsplit(".", 1)[-1] not in excludes]
 
 
 reqs = alist(requests.Session() for i in range(6))

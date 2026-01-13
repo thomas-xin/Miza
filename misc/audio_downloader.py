@@ -1,3 +1,4 @@
+import asyncio
 from collections import deque
 from concurrent.futures import Future
 from contextlib import suppress
@@ -23,9 +24,9 @@ from .util import (
 	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, url2ext, discord_expired, expired, shorten_attachment, unyt, html_decode,
 	is_image, is_url, is_discord_attachment, is_miza_url, is_miza_attachment, is_youtube_url, is_spotify_url, AUDIO_FORMS,
-	EvalPipe, PipedProcess, AutoCache, Request, Semaphore, TEMP_PATH, CACHE_PATH, magic, rename, temporary_file, replace_ext, select_and_loads,
+	EvalPipe, PipedProcess, AutoCache, Request, Semaphore, TEMP_PATH, CACHE_PATH, magic, rename, temporary_file, replace_ext, select_and_loads, extract_archive,
 )
-from .caches import audio_meta
+from .caches import audio_meta, attachment_cache
 
 # Gets the best icon/thumbnail for a queue entry.
 def get_best_icon(entry):
@@ -906,6 +907,42 @@ class AudioDownloader:
 		fn2 = self.run(f"get_audio_spotify({json_dumpstr(url)},{json_dumpstr(r_mp3)})", priority=True)
 		return self.handle_path(fn2, entry)
 
+	def handle_special_multiple(self, url):
+		headers = fcdict(asyncio.run(attachment_cache.scan_headers(url)))
+		match headers.get("content-type"):
+			case "application/json":
+				b = asyncio.run(attachment_cache.download(url))
+				try:
+					d = select_and_loads(b, safe=True)
+				except orjson.JSONDecodeError:
+					d = [url for url in as_str(b).splitlines() if is_url(url)]
+					if not d:
+						raise
+					q = [dict(name=url.split("?", 1)[0].rsplit("/", 1)[-1], url=url) for url in d]
+				else:
+					q = d["queue"][:262144]
+				return [cdict(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
+			case "application/zip" | "application/gzip" | "application/x-gzip" | "application/zstd" | "application/vnd.rar" | "application/x-tar" | "application/x-tar+xz" | "application/x-7z-compressed":
+				fp = asyncio.run(attachment_cache.download(url, read=True))
+				path = fp.name
+				assert os.path.exists(path), path
+				files = extract_archive(path)
+				output = []
+				with niquests.Session() as session:
+					for fi in files:
+						with open(fi, "rb") as f:
+							b = f.read()
+						data = audio_meta(fi)
+						if data.get("bitrate"):
+							name = data.get("name") or url2fn(fi)
+							resp2 = session.post(
+								f"https://api.mizabot.xyz/upload?filename={name}",
+								data=b,
+							)
+							url = resp2.text
+							output.append(cdict(name=name, url=url, duration=data.get("duration")))
+				return output
+
 	def handle_special_audio(self, entry, url, fn):
 		"""Handles special audio formats unsupported by FFmpeg, such as spotify URLs, spectrogram images, as well as ecdc, org, and midi files."""
 		if is_spotify_url(url):
@@ -1200,6 +1237,9 @@ class AudioDownloader:
 		# Only proceed if no items have already been found (from playlists in this case)
 		if not len(output):
 			if is_miza_attachment(url):
+				output = self.handle_special_multiple(url)
+				if output:
+					return output
 				return [cdict(
 					name=url2fn(url),
 					url=url,
@@ -1207,21 +1247,6 @@ class AudioDownloader:
 					video=url,
 				)]
 			resp = None
-			# Allow loading of files output by ~dump
-			if is_url(url):
-				utest = url.split("?", 1)[0]
-				if utest[-5:] == ".json" or utest[-4:] in (".txt", ".zip"):
-					b = Request(url)
-					try:
-						d = select_and_loads(b, safe=True)
-					except orjson.JSONDecodeError:
-						d = [url for url in as_str(b).splitlines() if is_url(url)]
-						if not d:
-							raise
-						q = [dict(name=url.split("?", 1)[0].rsplit("/", 1)[-1], url=url) for url in d]
-					else:
-						q = d["queue"][:262144]
-					return [cdict(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
 			# Otherwise call automatic extract_info function
 			try:
 				if not resp:
@@ -1238,6 +1263,9 @@ class AudioDownloader:
 				if resp.get("_type") == "url":
 					resp = self.extract_info(resp["url"], process=True)
 			except (RuntimeError, ytd.utils.DownloadError):
+				output = self.handle_special_multiple(url)
+				if output:
+					return output
 				entry = cdict(
 					name=url2fn(url),
 					url=url,
@@ -1298,6 +1326,10 @@ class AudioDownloader:
 					if temp:
 						output.append(cdict(temp))
 			else:
+				if resp.get("ext", "unknown_video") == "unknown_video":
+					output = self.handle_special_multiple(url)
+					if output:
+						return output
 				# Single item results must contain full data, we take advantage of that here
 				name = resp.get("title") or resp["webpage_url"].rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
 				url = resp.get("webpage_url") or resp["url"]
