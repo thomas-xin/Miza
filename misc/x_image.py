@@ -36,7 +36,7 @@ Transform = getattr(Image, "Transform", Image)
 Image.MAX_IMAGE_PIXELS = 4294967296
 GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_DIFFERENT_PALETTE_ONLY
 from misc.asyncs import esubmit, await_fut  # noqa: E402
-from misc.util import get_image_size, temporary_file  # noqa: E402, F401
+from misc.util import get_image_size, temporary_file, archive_mimes, extract_archive
 
 DC = 0
 torch = None
@@ -308,19 +308,13 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 		pass
 	else:
 		pillow_heif.register_heif_opener()
-	try:
-		import pillow_avif  # noqa: F401
-	except ImportError:
-		pass
 	mime = magic.from_buffer(data)
-	if mime in ("application/tar", "application/x-tar"):
-		t = tarfile.open(fileobj=io.BytesIO(data))
-		filenames = t.getmembers()
-		return ImageSequence.fromiter((Image.open(t.extractfile(fn)) for fn in filenames), count=len(filenames))
-	elif mime == "application/zip":
-		z = zipfile.ZipFile(io.BytesIO(data), strict_timestamps=False)
-		filenames = [f.filename for f in z.filelist if not f.is_dir()]
-		return ImageSequence.fromiter((Image.open(z.open(fn)) for fn in filenames), count=len(filenames))
+	if mime in archive_mimes:
+		fn = temporary_file()
+		with open(fn, "wb") as f:
+			f.write(b)
+		filenames = extract_archive(fn)
+		return ImageSequence.fromiter((Image.open(fn) for fn in filenames), count=len(filenames))
 	try:
 		import wand
 		import wand.api, wand.color, wand.image, wand.sequence

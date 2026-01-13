@@ -24,7 +24,7 @@ from .util import (
 	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, url2ext, discord_expired, expired, shorten_attachment, unyt, html_decode,
 	is_image, is_url, is_discord_attachment, is_miza_url, is_miza_attachment, is_youtube_url, is_spotify_url, AUDIO_FORMS,
-	EvalPipe, PipedProcess, AutoCache, Request, Semaphore, TEMP_PATH, CACHE_PATH, magic, rename, temporary_file, replace_ext, select_and_loads, extract_archive,
+	EvalPipe, PipedProcess, AutoCache, Request, Semaphore, TEMP_PATH, CACHE_PATH, magic, rename, temporary_file, replace_ext, select_and_loads, extract_archive, archive_mimes,
 )
 from .caches import audio_meta, attachment_cache
 
@@ -909,7 +909,7 @@ class AudioDownloader:
 
 	def handle_special_multiple(self, url):
 		headers = fcdict(asyncio.run(attachment_cache.scan_headers(url)))
-		match headers.get("content-type"):
+		match (ctype := headers.get("content-type")):
 			case "application/json":
 				b = asyncio.run(attachment_cache.download(url))
 				try:
@@ -922,7 +922,7 @@ class AudioDownloader:
 				else:
 					q = d["queue"][:262144]
 				return [cdict(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
-			case "application/zip" | "application/gzip" | "application/x-gzip" | "application/zstd" | "application/vnd.rar" | "application/x-tar" | "application/x-tar+xz" | "application/x-7z-compressed":
+			case _ if ctype in archive_mimes:
 				fp = asyncio.run(attachment_cache.download(url, read=True))
 				path = fp.name
 				assert os.path.exists(path), path

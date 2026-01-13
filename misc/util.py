@@ -2038,6 +2038,7 @@ def safe_save(fn, s):
 
 
 archive_formats = ("7z", "zip", "tar", "gz", "bz", "xz")
+archive_mimes = ("application/zip", "application/gzip", "application/x-gzip", "application/zstd", "application/vnd.rar", "application/tar", "application/x-tar", "application/x-tar+xz", "application/x-7z-compressed", "application/x-bzip2")
 
 def unpack_gz(archive_name, extract_dir):
 	import gzip
