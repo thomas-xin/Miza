@@ -1059,7 +1059,7 @@ class Rate(Command):
 		pronoun = "that"
 		lego = f"`{grammarly_2_point_1(argv)}`"
 		try:
-			user = await bot.fetch_member_ex(verify_id(argv), guild, allow_banned=False, fuzzy=None)
+			user = await bot.fetch_member_ex(verify_id(argv), guild, allow_banned=False, fuzzy=0)
 		except:
 			if re.match("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>", argv):
 				lego = argv

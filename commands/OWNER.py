@@ -742,9 +742,14 @@ class UpdateExec(Database):
 				except KeyError:
 					pass
 				else:
-					if is_discord_attachment(url2):
-						url2 = bot.data.proxies[uhu] = attachment_cache.preserve(url2, 0)
-					return url2
+					try:
+						await attachment_cache.scan_headers(url2)
+					except ConnectionError as ex:
+						print(repr(ex))
+					else:
+						if is_discord_attachment(url2):
+							url2 = bot.data.proxies[uhu] = attachment_cache.preserve(url2, 0)
+						return url2
 				if mode == "raise":
 					raise FileNotFoundError(url)
 				elif mode == "download":

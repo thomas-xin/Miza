@@ -1025,13 +1025,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				members.add(user)
 		return members
 
-	def query_members(self, members, query, fuzzy=0.25):
+	def query_members(self, members, query, fuzzy=0.75):
 		looks = set((member.name, member) for member in members)
 		looks.update((member.global_name, member) for member in members if member.global_name)
 		looks.update((member.nick, member) for member in members if getattr(member, "nick", None))
 		return str_lookup(looks, query, key=lambda t: t[0], fuzzy=fuzzy)[1]
 
-	async def fetch_member_ex(self, u_id, guild=None, allow_banned=True, fuzzy=0.25):
+	async def fetch_member_ex(self, u_id, guild=None, allow_banned=True, fuzzy=0.75):
 		"Fetches a member in the target server by ID or name lookup."
 		if not isinstance(u_id, int) and u_id.isnumeric():
 			with suppress(TypeError, ValueError):
@@ -5155,7 +5155,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					alt = str_lookup(
 						union,
 						v,
-						fuzzy=0.5,
+						fuzzy=0.875,
 					)
 				except LookupError:
 					dym = ""

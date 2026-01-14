@@ -1435,7 +1435,7 @@ class Radio(Pagination, Command):
 				country = str_lookup(
 					RadioCache.countries,
 					query,
-					fuzzy=0.05,
+					fuzzy=0.1,
 				)
 				countrycode = RadioCache.countries[country]
 			# Set callback message for scrollable list

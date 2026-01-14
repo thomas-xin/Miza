@@ -585,10 +585,8 @@ class Info(Command):
 								break
 							with suppress():
 								g = bot.cache.channels[uid].guild
-							with suppress():
-								u = await bot.fetch_member_ex(uid, guild)
-								break
-							raise LookupError(f"No results for {argv}.")
+							u = await bot.fetch_member_ex(uid, guild)
+							break
 						if g:
 							emb = await self.getGuildData(g, flags)
 							embs.add(emb)

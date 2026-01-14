@@ -2073,11 +2073,14 @@ def greyscale(image):
 	image = join_rgba(image, A)
 	return image
 
+laplacian_kernel = [
+	-1, -1, -1,
+	-1,  8, -1,
+	-1, -1, -1
+]
 def laplacian(image):
 	image = remove_p(image)
-	surf = pil2pyg(image)
-	surf = pygame.transform.laplacian(surf)
-	return pyg2pil(surf)
+	return image.filter(ImageFilter.Kernel((3, 3), laplacian_kernel, 1, 0))
 
 cv2_swaps = {k: v for k, v in cv2.__dict__.items() if k.startswith("COLOR_")}
 # supported formats: RGB, BGR, CMY, XYZ, HSV, HSI, HSL, HCL, HCY, LAB, LUV, YUV

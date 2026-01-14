@@ -514,7 +514,7 @@ class RoleSelect(Pagination, Command):
 						_guild.roles,
 						r,
 						key=lambda role: role.name,
-						fuzzy=0.5,
+						fuzzy=0.75,
 					)
 					if em:
 						ems = find_emojis_ex(em, cast_urls=False)
@@ -532,7 +532,7 @@ class RoleSelect(Pagination, Command):
 						_guild.roles,
 						line,
 						key=lambda role: role.name,
-						fuzzy=0.5,
+						fuzzy=0.75,
 					)
 					e = await self.get_role_emoji(role)
 					rolelist.append((e, role))
@@ -542,7 +542,7 @@ class RoleSelect(Pagination, Command):
 					_guild.roles,
 					line.split(e, 1)[-1],
 					key=lambda role: role.name,
-					fuzzy=0.5,
+					fuzzy=0.75,
 				)
 				rolelist.append((e, role))
 		if not rolelist:
@@ -678,7 +678,7 @@ class RoleGiver(Command):
 				standard_roles(guild),
 				r,
 				key=lambda role: role.name,
-				fuzzy=0.125,
+				fuzzy=0.25,
 			)
 		# Must ensure that the user does not assign roles higher than their own
 		if inf > perm:
@@ -774,7 +774,7 @@ class AutoRole(Command):
 					rolelist,
 					r,
 					key=lambda role: role.name,
-					fuzzy=0.125,
+					fuzzy=0.25,
 				)
 			# Must ensure that the user does not assign roles higher than their own
 			if not inf > perm:

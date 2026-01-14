@@ -689,7 +689,7 @@ async def _instruct(data, user=None, prune=True):
 f_browse = {
 	"type": "function", "function": {
 		"name": "browse",
-		"description": "Searches internet browser, or visits given URL. Use for knowledge or advice to validate facts and up-to-date information. Note: Does NOT support pictures!",
+		"description": "Searches internet browser, or visits given website URL. Use for knowledge or advice to validate facts and up-to-date information. Note: Avoid using this for media links in chat, as they will be resolved automatically by `directly_answer`",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {

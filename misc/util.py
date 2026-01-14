@@ -3878,79 +3878,89 @@ def time_parse(ts):
 	mults = (1, 60, 3600, 86400)
 	return round_min(sum(float(count) * mult for count, mult in zip(data, reversed(mults[:len(data)]))))
 
-# Thank you to deepseek-r1 for improving on the old algorithm.
-@functools.lru_cache(maxsize=256)
-def string_similarity(s1, s2):
-	"""
-	Compare two strings by their similarity, with the following rules:
-	- Contiguous matching substrings yield a higher score.
-	- Mismatched characters and characters out of order are penalized.
-	- Erasures (deletions) are penalized less than substitutions.
-	"""
-	len1, len2 = len(s1), len(s2)
-	if len1 == 0 or len2 == 0:
-		# Avoid possible index or zero division errors later
-		return 1 if s1 == s2 else 0
-	max_len = max(len1, len2)
+def _normalize(s: str) -> str:
+	s = re.sub(r"\s+", " ", s).strip()
+	return s
 
-	# Initialize a DP table to store the similarity scores
-	dp = [[0] * (len2 + 1) for _ in range(len1 + 1)]
+def _tokens(s: str):
+	return re.findall(r"\b\w+\b", s.lower())
 
-	# Initialize the first row and column
-	for i in range(len1 + 1):
-		dp[i][0] = -i / 2  # Penalize erasures in s1
-	for j in range(len2 + 1):
-		dp[0][j] = -j / 2  # Penalize erasures in s2
+def _common_prefix_len(a: str, b: str) -> int:
+	n = min(len(a), len(b))
+	i = 0
+	while i < n and a[i] == b[i]:
+		i += 1
+	return i
 
-	# Fill the DP table
-	for i in range(1, len1 + 1):
-		for j in range(1, len2 + 1):
-			a, b = s1[i - 1], s2[j - 1]
-			if a == b:
-				# Characters match perfectly; highest reward
-				dp[i][j] = dp[i - 1][j - 1] + 2
-			elif not a.strip() and not b.strip():
-				# Both characters are whitespace
-				dp[i][j] = dp[i - 1][j - 1] + 1.75
-			elif a.isascii() and b.isascii() and a.lower() == b.lower():
-				# Characters match case-insensitively
-				dp[i][j] = dp[i - 1][j - 1] + 1.5
-			elif unicode_prune(a) == unicode_prune(b):
-				# Characters are similar in unicode (such as "o" vs "ö" or "𝓸")
-				dp[i][j] = dp[i - 1][j - 1] + 1
-			elif full_prune(a) == full_prune(b):
-				# Characters are similar in unicode but only match case-insensitively
-				dp[i][j] = dp[i - 1][j - 1] + 0.5
+def _weighted_edit_distance(a: str, b: str) -> float:
+	# Costs
+	ins_cost = 1.0
+	del_cost = 1.0
+	sub_cost_alnum = 1.2
+	sub_cost_other = 1.4
+	case_cost = 0.2  # cheap substitution when only case differs
+
+	@functools.lru_cache(maxsize=4096)
+	def dp(i: int, j: int) -> float:
+		if i == 0:
+			return j * ins_cost
+		if j == 0:
+			return i * del_cost
+
+		ca, cb = a[i - 1], b[j - 1]
+
+		if ca == cb:
+			sub_cost = 0.0
+		elif ca.lower() == cb.lower():
+			sub_cost = case_cost
+		else:
+			if ca.isalnum() and cb.isalnum():
+				sub_cost = sub_cost_alnum
 			else:
-				if a.isdigit() and b.isdigit():
-					# No penalty but also no reward for mismatched digits
-					p = 0
-				elif not a.strip() or not b.strip():
-					# Less penalty for mismatched whitespace
-					p = 0.5
-				elif not a.isascii() or not b.isascii():
-					# Slightly less penalty for mismatched non-ASCII characters
-					p = 0.75
-				else:
-					# Normal penalty for other mismatched characters
-					p = 1
-				# Characters don't match: penalize substitutions and erasures
-				substitution = dp[i - 1][j - 1] - p      # Penalize substitution
-				deletion = dp[i - 1][j] - 0.5 * p        # Penalize erasure less
-				insertion = dp[i][j - 1] - 0.5 * p       # Penalize erasure less
-				dp[i][j] = max(substitution, deletion, insertion)
+				sub_cost = sub_cost_other
 
-	# Normalize the score to a range of [0, 1]
-	# The maximum possible score is 2 * min(len1, len2) (if all characters match)
-	# The minimum possible score is -max_len (if all characters are mismatched or erased)
-	max_possible_score = 2 * min(len1, len2)
-	min_possible_score = -max_len
-	similarity = (dp[len1][len2] - min_possible_score) / (max_possible_score - min_possible_score)
+		return min(
+			dp(i - 1, j) + del_cost,
+			dp(i, j - 1) + ins_cost,
+			dp(i - 1, j - 1) + sub_cost
+		)
 
-	return similarity
+	return dp(len(a), len(b))
+
+# Thank you to gpt-5.2-codex for improving on the old algorithm.
+@functools.lru_cache(maxsize=4096)
+def string_similarity(a: str, b: str) -> float:
+	a_norm = _normalize(a)
+	b_norm = _normalize(b)
+
+	# --- Component 1: weighted edit similarity ---
+	dist = _weighted_edit_distance(a_norm, b_norm)
+	max_len = max(len(a_norm), len(b_norm), 1)
+	max_sub_cost = 1.4
+	avg_len = max((len(a_norm) + len(b_norm)) / 2, 1)
+	edit_sim = 1.0 - (dist / (avg_len * max_sub_cost))
+
+	# --- Component 2: token overlap (Jaccard) ---
+	ta = set(_tokens(a_norm))
+	tb = set(_tokens(b_norm))
+	if ta or tb:
+		token_sim = len(ta & tb) / len(ta | tb)
+	else:
+		token_sim = 1.0
+
+	# --- Component 3: prefix similarity ---
+	prefix_len = _common_prefix_len(full_prune(a_norm), full_prune(b_norm))
+	prefix_sim = prefix_len / max_len
+
+	# Weighted blend
+	w_edit, w_token, w_prefix = 0.55, 0.25, 0.20
+	score = (w_edit * edit_sim) + (w_token * token_sim) + (w_prefix * prefix_sim)
+
+	# Clamp to $[0, 1]$
+	return max(0.0, min(1.0, score))
 
 # A string lookup operation with an iterable, multiple attempts, and sorts by priority.
-def str_lookup(objs, query, key=lambda obj: obj, fuzzy=0):
+def str_lookup(objs, query, key=lambda obj: obj, fuzzy=0, compare=string_similarity):
 	objs = astype(objs, (tuple, list))
 	query = query.strip()
 	keys = [key(obj).strip() for obj in objs]
@@ -3960,7 +3970,7 @@ def str_lookup(objs, query, key=lambda obj: obj, fuzzy=0):
 		pass
 	closest = (-inf, None, "")
 	for s, obj in zip(keys, objs):
-		match = string_similarity(query, s)
+		match = compare(query, s)
 		if match > closest[0]:
 			closest = (match, obj, s)
 	if closest[0] >= 1 - fuzzy:

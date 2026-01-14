@@ -78,7 +78,7 @@ class Translate(Command):
 
 	async def det(self, input):
 		resp = await asubmit(detector.detect, input, model="auto")
-		return str_lookup(googletrans.LANGUAGES, resp[0]["lang"], fuzzy=0.25).split("-", 1)[0]
+		return str_lookup(googletrans.LANGUAGES, resp[0]["lang"], fuzzy=0.5).split("-", 1)[0]
 
 	async def llm_translate(self, input, dest, premium):
 		dst_language = googletrans.LANGUAGES.get(dest, dest).capitalize()
