@@ -1168,7 +1168,7 @@ class AudioFile:
 			if not same_codec:
 				br = auds.settings.bitrate
 				if self.live:
-					br = min(96000, br)
+					br = max(1, min(96000, br))
 					options.extend(("-rtbufsize", "1M"))
 				sr = SAMPLE_RATE
 				while br < 512:

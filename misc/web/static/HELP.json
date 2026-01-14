@@ -722,11 +722,11 @@
 					"validation": "[-1, 2]"
 				},
 				"max_tokens": {
-					"default": 3072,
+					"default": 65536,
 					"description": "Maximum tokens to generate",
-					"example": "16384",
+					"example": "262144",
 					"type": "integer",
-					"validation": "[1, 65536]"
+					"validation": "[1, 1048576]"
 				},
 				"model": {
 					"description": "Target LLM to invoke",
@@ -1368,7 +1368,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"operation": {
@@ -1455,7 +1455,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"opacity": {
@@ -1511,7 +1511,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"mode": {
@@ -1596,7 +1596,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"mode": {
@@ -1661,7 +1661,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"source": {
@@ -1712,7 +1712,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"left": {
@@ -1768,7 +1768,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"url": {
@@ -1809,7 +1809,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"mode": {
@@ -1877,7 +1877,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"fps": {
@@ -2045,7 +2045,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"fps": {
@@ -2102,7 +2102,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"fps": {
@@ -2174,7 +2174,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"fps": {
@@ -2239,7 +2239,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"fps": {
@@ -2316,7 +2316,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"fps": {
@@ -2399,7 +2399,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"fps": {
@@ -2474,7 +2474,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"fps": {
@@ -2552,7 +2552,7 @@
 					"type": "enum",
 					"validation": {
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "zip", "tar"]
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"]
 					}
 				},
 				"fps": {

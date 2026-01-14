@@ -1724,7 +1724,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 										found.append(entry["url"])
 							except LookupError:
 								pass
-					out.extend(found)
+					out.extend(filter(bool, found))
 					continue
 			except Exception as ex:
 				print("_follow_url:", repr(ex))
@@ -2292,7 +2292,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		1: cdict(
-			instructive="claude-haiku-4.5",
+			instructive="deepseek-v3.2-speciale",
 			casual="deepseek-v3.2-speciale",
 			nsfw="grok-4.1-fast",
 			backup="kimi-k2-thinking",

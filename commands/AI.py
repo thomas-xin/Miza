@@ -116,7 +116,7 @@ class Translate(Command):
 				print_exc()
 
 		c = await tcount(input)
-		if c >= 16:
+		if c > 1:
 			translations = await gather(google_translate(), llm_translate())
 		else:
 			translations = [await llm_translate()]
@@ -125,7 +125,7 @@ class Translate(Command):
 			messages = [
 				dict(
 					role="system",
-					content=f'Below will be some text, followed by translation(s) into {dst_language}. Please rewrite ONLY the translation, making improvements where applicable, and keeping formatting accurate to the original. Avoid being overly formal, and do not add extra information to the text itself!',
+					content=f'Below will be some text, followed by translation(s) into {dst_language}. Please rewrite into ONE translation, making improvements where applicable, and keeping formatting accurate to the original. Avoid being overly formal, and do not add extra information to the text itself!',
 				),
 				dict(
 					role="user",
@@ -143,7 +143,7 @@ class Translate(Command):
 				messages=messages,
 				temperature=0.01,
 				premium_context=premium,
-				max_completion_tokens=65536,
+				max_completion_tokens=98304,
 				reasoning_effort="medium",
 			),
 		)

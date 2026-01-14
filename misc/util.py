@@ -1148,6 +1148,34 @@ def rename(src, dst):
 		if ex.args and ex.args[0] == 18:
 			shutil.copyfile(src, dst)
 
+archive_formats = ("7z", "zip", "tar", "gz", "bz", "xz")
+archive_mimes = ("application/zip", "application/gzip", "application/x-gzip", "application/zstd", "application/vnd.rar", "application/tar", "application/x-tar", "application/x-tar+xz", "application/x-7z-compressed", "application/x-bzip2")
+
+def unpack_gz(archive_name, extract_dir):
+	import gzip
+	with gzip.open(archive_name, "rb") as f_in:
+		with open(os.path.join(extract_dir, os.path.basename(archive_name).replace(".gz", "")), "wb") as f_out:
+			f_out.write(f_in.read())
+shutil.register_unpack_format("gz", [".gz"], unpack_gz)
+def unpack_xz(filename, extract_dir):
+	import tarfile
+	with tarfile.open(filename, "r:xz") as tar:
+		tar.extractall(path=extract_dir)
+shutil.register_unpack_format("xz", [".xz"], unpack_xz)
+
+def extract_archive(archive_path, format=None, excludes=()):
+	path = f"{TEMP_PATH}/{ts_us()}"
+	os.mkdir(path)
+	with open(archive_path, "rb") as f:
+		b = f.read(6)
+	if b == b'7z\xbc\xaf\x27\x1c':
+		import py7zr
+		with py7zr.SevenZipFile(archive_path, mode="r") as z:
+			z.extractall(path=path)
+	else:
+		shutil.unpack_archive(archive_path, extract_dir=path, format=format or get_ext(archive_path))
+	return [f"{path}/{fn}" for fn in os.listdir(path) if fn.rsplit(".", 1)[-1] not in excludes]
+
 IMAGE_FORMS = {
 	"auto": None,
 	"gif": True,
@@ -1262,8 +1290,7 @@ VISUAL_FORMS = {
 	"mpeg": True,
 	"mpv": True,
 	"m3u8": True,
-	"zip": False,
-	"tar": False,
+	**{k: False for k in archive_formats},
 }
 MEDIA_FORMS = IMAGE_FORMS.copy()
 MEDIA_FORMS.update(VIDEO_FORMS)
@@ -2035,35 +2062,6 @@ def safe_save(fn, s):
 		os.rename(fn + "\x7f", fn)
 	else:
 		save_file(s, fn)
-
-
-archive_formats = ("7z", "zip", "tar", "gz", "bz", "xz")
-archive_mimes = ("application/zip", "application/gzip", "application/x-gzip", "application/zstd", "application/vnd.rar", "application/tar", "application/x-tar", "application/x-tar+xz", "application/x-7z-compressed", "application/x-bzip2")
-
-def unpack_gz(archive_name, extract_dir):
-	import gzip
-	with gzip.open(archive_name, "rb") as f_in:
-		with open(os.path.join(extract_dir, os.path.basename(archive_name).replace(".gz", "")), "wb") as f_out:
-			f_out.write(f_in.read())
-shutil.register_unpack_format("gz", [".gz"], unpack_gz)
-def unpack_xz(filename, extract_dir):
-	import tarfile
-	with tarfile.open(filename, "r:xz") as tar:
-		tar.extractall(path=extract_dir)
-shutil.register_unpack_format("xz", [".xz"], unpack_xz)
-
-def extract_archive(archive_path, format=None, excludes=()):
-	path = f"{TEMP_PATH}/{ts_us()}"
-	os.mkdir(path)
-	with open(archive_path, "rb") as f:
-		b = f.read(6)
-	if b == b'7z\xbc\xaf\x27\x1c':
-		import py7zr
-		with py7zr.SevenZipFile(archive_path, mode="r") as z:
-			z.extractall(path=path)
-	else:
-		shutil.unpack_archive(archive_path, extract_dir=path, format=format or get_ext(archive_path))
-	return [f"{path}/{fn}" for fn in os.listdir(path) if fn.rsplit(".", 1)[-1] not in excludes]
 
 
 reqs = alist(requests.Session() for i in range(6))

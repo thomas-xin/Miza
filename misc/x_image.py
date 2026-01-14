@@ -1105,21 +1105,6 @@ def image_to(im, mode="RGB", size=None):
 		im = im.resize(size, resample=Image.Resampling.LANCZOS)
 	return im
 
-def pil2pyg(image):
-	global pygame
-	try:
-		import pygame
-	except ImportError:
-		pygame = None
-		raise
-	b = np.asanyarray(image, dtype=np.uint8).data
-	return pygame.image.frombuffer(b, image.size, image.mode)
-
-def pyg2pil(surf):
-	mode = "RGBA" if surf.get_flags() & pygame.SRCALPHA else "RGB"
-	b = surf.get_buffer()
-	return Image.frombuffer(mode, surf.get_size(), b)
-
 resizers = dict(
 	sinc="lanczos",
 	lanczos="lanczos",
@@ -1177,10 +1162,16 @@ def resize_to(image, w, h, mode="auto"):
 		image = remove_p(image)
 	if filt == "scale2x":
 		if w > image.width or h > image.height:
-			surf = pil2pyg(image)
-			while w > surf.get_width() or h > surf.get_height():
-				surf = pygame.transform.scale2x(surf)
-			image = pyg2pil(surf)
+			fi = temporary_file("png")
+			image.save(fi)
+			while w > image.width or h > image.height:
+				N = min(4, ceil(max(w / image.width, h / image.height)))
+				if N <= 1:
+					break
+				fo = temporary_file("png")
+				subprocess.run(["misc/scalex", "-k", str(N), fi, fo])
+				image = Image.open(fo)
+				fi = fo
 		filt = Resampling.NEAREST
 	elif filt == "crop":
 		out = Image.new(image.mode, (w, h), (0,) * len(image.mode))

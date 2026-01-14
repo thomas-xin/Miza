@@ -18,8 +18,6 @@ if os.path.exists("auth.json"):
 		cachedir = os.path.expanduser("~") + "/.cache"
 		if not os.path.exists(cachedir):
 			os.mkdir(cachedir)
-os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
-# os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 import io
 import time
