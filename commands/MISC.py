@@ -361,9 +361,9 @@ async def sheet_search(sheet_id, query, n=25):
 	result_ids.extend(sheet.fcids.get(query, ()))
 	result_ids.dedup(sort=False)
 	if len(result_ids) < n:
-		other_results = {string_similarity(query, k): v for k, v in sheet.searchables}
-		other_ids = [k for k in sorted(other_results, reverse=True) if k >= 0.15]
-		result_ids.extend(map(other_results.__getitem__, other_ids))
+		other_results = [(string_similarity(query, k), i, v) for i, (k, v) in enumerate(sheet.searchables)]
+		other_ids = [k for k in sorted(other_results, reverse=True) if k[0] >= 0.15]
+		result_ids.extend(t[-1] for t in other_ids)
 	if not result_ids:
 		result_ids = alist([str_lookup(sheet.searchables, query, key=lambda t: t[0], fuzzy=0)[1]])
 	result_ids.dedup(sort=False)
