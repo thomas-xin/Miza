@@ -89,7 +89,7 @@ def get_best_audio(entry):
 	cdc = None
 	ac = 0
 	for fmt in fmts:
-		q = (fmt.get("protocol", "m3u8_native") != "m3u8_native", fmt.get("acodec") in ("opus", "vorbis"), fmt.get("vcodec") in (None, "none") and fmt.get("acodec") not in (None, "none"), fmt.get("abr", 0) or 0, fmt.get("tbr", 0) or 0)
+		q = (fmt.get("protocol") not in ("m3u8_native", "mhtml"), fmt.get("acodec") in ("opus", "vorbis"), fmt.get("vcodec") in (None, "none") and fmt.get("acodec") not in (None, "none"), fmt.get("abr", 0) or 0, fmt.get("tbr", 0) or 0)
 		u = as_str(fmt["url"])
 		if q > best:
 			ac = fmt.get("audio_channels", 0)
@@ -112,7 +112,7 @@ def get_best_video(entry, hq=True):
 	cdc = None
 	for fmt in fmts:
 		q = (
-			fmt.get("protocol", "m3u8_native") != "m3u8_native",
+			fmt.get("protocol") not in ("m3u8_native", "mhtml"),
 			fmt.get("vcodec") not in (None, "none"),
 			-abs(fmt["fps"] - (90 if hq else 42)) if isinstance(fmt.get("fps"), (int, float)) else -inf,
 			-abs(fmt["height"] - (1600 if hq else 720)) if isinstance(fmt.get("height"), (int, float)) else -inf,

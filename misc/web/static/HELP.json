@@ -2946,7 +2946,7 @@
 			"usage": "<0:address> <1:value[1]>?"
 		},
 		"CS_mod": {
-			"aliases": ["CS_mod", "CS_search"],
+			"aliases": ["CS_mod"],
 			"description": "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item.",
 			"example": ["cs_mod critter"],
 			"level": "0",

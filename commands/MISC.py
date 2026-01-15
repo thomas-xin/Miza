@@ -441,7 +441,6 @@ class CSsearch(Command):
 
 class CS_mod(Command):
 	time_consuming = True
-	name = ["CS_search"]
 	description = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
 	usage = "<query>"
 	example = ("cs_mod critter",)
