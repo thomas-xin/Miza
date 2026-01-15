@@ -392,6 +392,9 @@ async def sheet_search(sheet_id, query, n=25):
 		name = " ".join(name) or "N/A"
 		value = ini_md(iter2str(entry).strip())
 		embed.add_field(name=name, value=value, inline=len(result_ids) > 5)
+		if len(embed) > 6000:
+			embed.remove_field(index=-1)
+			break
 	return embed
 
 
