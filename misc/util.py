@@ -3893,39 +3893,48 @@ def _common_prefix_len(a: str, b: str) -> int:
 	return i
 
 def _weighted_edit_distance(a: str, b: str) -> float:
-	# Costs
-	ins_cost = 1.0
-	del_cost = 1.0
-	sub_cost_alnum = 1.2
-	sub_cost_other = 1.4
-	case_cost = 0.2  # cheap substitution when only case differs
+    # Costs
+    ins_cost = 1.0
+    del_cost = 1.0
+    sub_cost_alnum = 1.2
+    sub_cost_other = 1.4
+    case_cost = 0.2  # cheap substitution when only case differs
 
-	@functools.lru_cache(maxsize=4096)
-	def dp(i: int, j: int) -> float:
-		if i == 0:
-			return j * ins_cost
-		if j == 0:
-			return i * del_cost
+    n, m = len(a), len(b)
+    if n == 0:
+        return m * ins_cost
+    if m == 0:
+        return n * del_cost
 
-		ca, cb = a[i - 1], b[j - 1]
+    # dp rows
+    prev = [j * ins_cost for j in range(m + 1)]
+    curr = [0.0] * (m + 1)
 
-		if ca == cb:
-			sub_cost = 0.0
-		elif ca.lower() == cb.lower():
-			sub_cost = case_cost
-		else:
-			if ca.isalnum() and cb.isalnum():
-				sub_cost = sub_cost_alnum
-			else:
-				sub_cost = sub_cost_other
+    for i in range(1, n + 1):
+        curr[0] = i * del_cost
+        ca = a[i - 1]
+        for j in range(1, m + 1):
+            cb = b[j - 1]
 
-		return min(
-			dp(i - 1, j) + del_cost,
-			dp(i, j - 1) + ins_cost,
-			dp(i - 1, j - 1) + sub_cost
-		)
+            if ca == cb:
+                sub_cost = 0.0
+            elif ca.lower() == cb.lower():
+                sub_cost = case_cost
+            else:
+                if ca.isalnum() and cb.isalnum():
+                    sub_cost = sub_cost_alnum
+                else:
+                    sub_cost = sub_cost_other
 
-	return dp(len(a), len(b))
+            curr[j] = min(
+                prev[j] + del_cost,      # deletion
+                curr[j - 1] + ins_cost,  # insertion
+                prev[j - 1] + sub_cost   # substitution
+            )
+
+        prev, curr = curr, prev
+
+    return prev[m]
 
 # Thank you to gpt-5.2-codex for improving on the old algorithm.
 @functools.lru_cache(maxsize=4096)
@@ -3953,7 +3962,7 @@ def string_similarity(a: str, b: str) -> float:
 	prefix_sim = prefix_len / max_len
 
 	# Weighted blend
-	w_edit, w_token, w_prefix = 0.55, 0.25, 0.20
+	w_edit, w_token, w_prefix = 0.3, 0.3, 0.4
 	score = (w_edit * edit_sim) + (w_token * token_sim) + (w_prefix * prefix_sim)
 
 	# Clamp to $[0, 1]$

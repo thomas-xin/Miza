@@ -509,13 +509,13 @@ class Dummy(BaseException):
 	def __bool__(self):
 		return False
 
-def as_str(s, encoding="utf-8"):
+def as_str(s, encoding="utf-8") -> str:
 	if callable(getattr(s, "tobytes", None)):
 		s = s.tobytes()
 	if isinstance(s, (bytes, bytearray)):
 		return s.decode(encoding, "replace")
 	return str(s)
-def as_bytes(b, encoding="utf-8"):
+def as_bytes(b, encoding="utf-8") -> bytes:
 	if isinstance(b, str):
 		b = b.encode(encoding)
 	elif not isinstance(b, bytes):
@@ -525,7 +525,7 @@ def as_bytes(b, encoding="utf-8"):
 # Creates a nested tuple from a nested list.
 def _nested_tuple(a):
 	return tuple(_nested_tuple(i) if isinstance(i, collections.abc.MutableSequence) else i for i in a)
-def nested_tuple(a):
+def nested_tuple(a) -> tuple:
 	return _nested_tuple(a) if isinstance(a, collections.abc.Sequence) and type(a) not in (str, bytes) and a[0] != a else a
 int_like = int | np.integer
 object_like = (object, np.object_)

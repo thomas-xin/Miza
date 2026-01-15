@@ -379,11 +379,14 @@ class AttachmentCache(AutoCache):
 			traceback.print_exc()
 			raise
 		return f
-	async def download(self, url, m_id=None, filename=None, read=False, return_headers=False):
+	async def download(self, url, m_id=None, filename=None, read=False, return_headers=False, force=False):
 		url = unyt(url)
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
-		fp = await self.secondary.aretrieve(url, self._download, url, m_id=m_id, timeout=16, _read=True)
+		if force:
+			fp = await self.secondary._aretrieve(url, self._download, url, m_id=m_id, timeout=16, read=True)
+		else:
+			fp = await self.secondary.aretrieve(url, self._download, url, m_id=m_id, timeout=16, _read=True)
 		if return_headers:
 			headers = await self.scan_headers(url, m_id=m_id)
 		if filename:

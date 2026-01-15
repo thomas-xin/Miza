@@ -125,7 +125,7 @@ class Translate(Command):
 			messages = [
 				dict(
 					role="system",
-					content=f'Below will be some text, followed by translation(s) into {dst_language}. Please rewrite into ONE translation, making improvements where applicable, and keeping formatting accurate to the original. Avoid being overly formal, and do not add extra information to the text itself!',
+					content=f'Below will be some text, followed by sample translation(s). Please rewrite into ONE {dst_language} translation, making improvements where applicable, and keeping formatting accurate to the original. Avoid being overly formal, and do not add extra information to the text itself!',
 				),
 				dict(
 					role="user",

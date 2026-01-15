@@ -89,54 +89,6 @@ async def searchForums(query):
 	return output
 
 
-class SheetPull:
-
-	def __init__(self, *urls, mode="csv"):
-		self.mode = mode
-		self.urls = urls
-		self.data = AutoCache(f"{CACHE_PATH}/cs", stale=720, timeout=86400 * 7)
-
-	async def pull(self):
-		data = {}
-		for url in self.urls:
-			s = await Request.aio(url, timeout=16, decode=True)
-			reader = csv.reader(s.splitlines(), delimiter="\t" if self.mode == "tsv" else ",")
-			data[url] = list(reader)[1:] # Skip header
-		return data
-
-	async def search(self, query, max_results=20):
-		output = []
-		data = await self.data.aretrieve(None, self.pull)
-		for file in data.values():
-			for line in file:
-				if not line:
-					continue
-				if query in line:
-					output.append([inf, line])
-				elif query.casefold() in " ".join(line).casefold():
-					output.append([100, line])
-				else:
-					try:
-						score = max(string_similarity(query, x) for x in line if x and not x.isnumeric())
-					except ValueError:
-						score = 0
-					output.append([score, line])
-		output.sort(reverse=True)
-		return [x[1] for x in output[:max_results]]
-
-
-# URLs of Google Sheets .csv download links
-entity_list = SheetPull(
-	"https://github.com/CaveStoryModdingCommunity/CaveStoryLists/raw/main/CaveStoryEntities.tsv",
-	"https://github.com/CaveStoryModdingCommunity/CaveStoryLists/raw/main/FreewareOutOfBoundsEntities.tsv",
-	"https://github.com/CaveStoryModdingCommunity/CaveStoryLists/raw/main/FreewareMisc.tsv",
-	"https://github.com/CaveStoryModdingCommunity/CaveStoryLists/raw/main/CaveStoryBullets.tsv",
-	"https://github.com/CaveStoryModdingCommunity/CaveStoryLists/raw/main/CaveStoryCaretsEffects.tsv",
-	"https://github.com/CaveStoryModdingCommunity/CaveStoryLists/raw/main/CaveStoryMusicOrganya.tsv",
-	mode="tsv",
-)
-
-
 class CS_mem2flag(Command):
 	name = ["mem2flag", "m2f", "CS_m2f"]
 	description = "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value."
@@ -271,81 +223,217 @@ class CS_hex2xml(Command):
 		csubmit(bot.send_with_file(channel, "Patch successfully converted!", f, reference=message))
 
 
-class CS_npc(Command):
-	time_consuming = True
-	name = ["npc", "cs_bul", "cs_sfx", "cs_mus"]
-	description = "Searches the Cave Story NPC list for an NPC/bullet/effect/music by name or ID."
-	usage = "<query> <condensed(-c)>?"
-	example = ("cs_npc misery",)
-	flags = "c"
+async def periwinkle_variables_txt():
+	url = "https://github.com/periwinkle9/CSMemoryMap/raw/refs/heads/main/cs%20global%20and%20static%20variables.txt"
+	b = await attachment_cache.download(url, force=True)
+	s = as_str(b.strip())
+	lines = [line.rstrip() for line in s.splitlines()]
+	assert lines[7] == "Address (bytes)  Data Type               Description", "Header not found!"
+	entries = []
+	entry = cdict()
+	for line in lines[9:]:
+		addr = line[:6].strip()
+		size = line[6:13].strip()
+		dtype = line[13:41].strip()
+		desc = line[41:].strip()
+		if size.startswith("(TODO") or size.startswith("-") or dtype == ".":
+			continue
+		if addr:
+			if entry:
+				entries.append(entry)
+			entry = cdict(addr=int(addr, 16))
+		elif size:
+			if entry:
+				entries.append(entry.copy())
+				if entry.get("size"):
+					entry.addr += entry.size
+		if size:
+			entry.size = int(size)
+		if dtype:
+			entry.dtype = dtype
+			if dtype == "(struct padding)":
+				entry.desc = ""
+		if desc:
+			if addr or size or not entry.desc:
+				entry.desc = desc
+			elif desc[0].islower():
+				entry.desc += " " + desc
+			else:
+				entry.desc += "\n" + desc
+	if entry:
+		entries.append(entry)
+	results = []
+	for entry in entries:
+		res = {
+			"Address": hex(entry.addr)[2:].upper(),
+		}
+		if entry.get("size"):
+			res["Size (bytes)"] = entry.size
+		if entry.get("dtype"):
+			res["Data Type"] = entry.dtype
+		if entry.get("desc"):
+			res["Description"] = entry.desc
+		results.append(res)
+	return results
+
+cs_sheets = cdict(
+	entity=["https://github.com/CaveStoryModdingCommunity/CaveStoryLists/raw/main/CaveStoryEntities.tsv", "https://github.com/CaveStoryModdingCommunity/CaveStoryLists/raw/main/FreewareOutOfBoundsEntities.tsv", "https://github.com/CaveStoryModdingCommunity/CaveStoryLists/raw/main/FreewareMisc.tsv"],
+	bullet=["https://github.com/CaveStoryModdingCommunity/CaveStoryLists/raw/main/CaveStoryBullets.tsv"],
+	caret=["https://github.com/CaveStoryModdingCommunity/CaveStoryLists/raw/main/CaveStoryCaretsEffects.tsv"],
+	music=["https://github.com/CaveStoryModdingCommunity/CaveStoryLists/raw/main/CaveStoryMusicOrganya.tsv"],
+	variable=[periwinkle_variables_txt],
+)
+cs_sheets.all = list(itertools.chain(*cs_sheets.values()))
+sheet_searchables = {
+	"Id (dec)": False,
+	"Id (hex)": False,
+	"Id (dec) (CMU)": False,
+	"Entity Name": True,
+	"Function Address": False,
+	"Type": False,
+	"PXE/TSC Compatibility": False,
+	"Other notes": True,
+	"Function Pointer": False,
+	"Default Sprite Sheet": False,
+	"Bullet Name": True,
+	"Effect Name": True,
+	"Official Music Name": True,
+	"Internal Name": True,
+	"Memory Offset": False,
+	"Description": True,
+	"Address": False,
+	"Size (bytes)": False,
+	"Data Type": False,
+}
+sheet_keys = {
+	"Entity Name",
+	"Bullet Name",
+	"Effect Name",
+	"Official Music Name",
+	"Address",
+}
+cs_cache = AutoCache(f"{CACHE_PATH}/cs", stale=43200, timeout=86400 * 7)
+
+async def sheet_pull(*urls, delimiter="\t"):
+	data = []
+	for url in urls:
+		if callable(url):
+			sheet = await url()
+			data.extend(sheet)
+			continue
+		assert isinstance(url, str) and is_url(url)
+		b = await attachment_cache.download(url, force=True)
+		reader = csv.reader(as_str(b).splitlines(), delimiter=delimiter)
+		sheet = list(reader)
+		header = [h.removeprefix("Default ") for h in sheet.pop(0)]
+		for row in sheet:
+			entry = cdict()
+			for col, val in zip(header, row):
+				if not val:
+					continue
+				entry[col] = val
+			data.append(entry)
+	return data
+
+async def sheet_structure(sheet_id):
+	data = await sheet_pull(*cs_sheets[sheet_id])
+	sheet = cdict(
+		data=data,
+		ids={},
+		fcids={},
+		searchables=[],
+	)
+	for i, entry in enumerate(data):
+		for k, v in entry.items():
+			if not v or v == "-":
+				continue
+			if sheet_searchables.get(k):
+				sheet.searchables.append((v, i))
+			else:
+				sheet.ids.setdefault(v, []).append(i)
+				sheet.fcids.setdefault(full_prune(v), []).append(i)
+	return sheet
+
+async def sheet_search(sheet_id, query, n=25):
+	result_ids = alist()
+	sheet = await cs_cache.aretrieve(sheet_id, sheet_structure, sheet_id)
+	result_ids.extend(sheet.ids.get(query, ()))
+	result_ids.extend(sheet.fcids.get(query, ()))
+	result_ids.dedup(sort=False)
+	if len(result_ids) < n:
+		other_results = {string_similarity(query, k): v for k, v in sheet.searchables}
+		other_ids = [k for k in sorted(other_results, reverse=True) if k >= 0.15]
+		result_ids.extend(map(other_results.__getitem__, other_ids))
+	if not result_ids:
+		result_ids = alist([str_lookup(sheet.searchables, query, key=lambda t: t[0], fuzzy=0)[1]])
+	result_ids.dedup(sort=False)
+	embed = discord.Embed(colour=colour2raw(0, 127, 255), title=f'Search results for {json.dumps(query)}:')
+	for entry in map(sheet.data.__getitem__, result_ids[:n]):
+		name = []
+		for k in sheet_keys:
+			v = entry.pop(k, None)
+			if v:
+				name.append(v)
+		if "Id (dec)" in entry or "Id (dec) (CMU)" in entry:
+			try:
+				dec = int(entry.pop("Id (dec)", 0) or entry.pop("Id (dec) (CMU)", 0))
+			except ValueError:
+				dec = 0
+			entry.pop("Id (hex)", None)
+			entry = cdict(
+				ID=f"{dec} (0x{hex(dec)[2:].upper()})",
+				**entry,
+			)
+		for k in ("Function Address", "Function Pointer", "Memory Offset", "Description"):
+			if k in entry:
+				entry[k] = entry.pop(k)
+		if "Other notes" in entry:
+			entry["Other Notes"] = entry.pop("Other notes")
+		name = " ".join(name) or "N/A"
+		value = ini_md(iter2str(entry).strip())
+		embed.add_field(name=name, value=value, inline=len(result_ids) > 5)
+	return embed
+
+
+class CSsearch(Command):
+	description = "Searches the Cave Story NPC list for an NPC/bullet/effect/music/variable by ID, name or description."
+	schema = cdict(
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("entity", "bullet", "effect", "music", "variable", "all"),
+			),
+			default="all",
+		),
+		query=cdict(
+			type="string",
+			description="Search query",
+			required=True,
+		),
+	)
+	macros = cdict(
+		CSnpc=cdict(
+			mode="entity",
+		),
+		CSbul=cdict(
+			mode="bullet",
+		),
+		CSeff=cdict(
+			mode="effect",
+		),
+		CSmus=cdict(
+			mode="music",
+		),
+		CSvar=cdict(
+			mode="variable",
+		),
+	)
 	rate_limit = 2
 
-	async def __call__(self, bot, args, flags, **void):
-		lim = ("c" not in flags) * 40 + 20
-		argv = " ".join(args)
-		data = await asubmit(entity_list.search, argv, lim, timeout=8)
-		# Sends multiple messages up to 20000 characters total
-		if len(data):
-			head = entity_list.data[0][1]
-			for i in range(len(head)):
-				if head[i] == "":
-					head[i] = i * " "
-			table = ptable(head)
-			for line in data:
-				table.add_row(line)
-			output = str(table)
-			if len(output) < 20000 and len(output) > 1900:
-				response = [f"Search results for `{argv}`:"]
-				lines = output.splitlines()
-				curr = "```\n"
-				for line in lines:
-					if len(curr) + len(line) > 1900:
-						response.append(curr + "```")
-						curr = "```\n"
-					if len(line):
-						curr += line + "\n"
-				response.append(curr + "```")
-				return response
-			return f"Search results for `{argv}`:\n{code_md(output)}"
-		raise LookupError(f"No results for {argv}.")
-
-
-# class CS_flag(Command):
-	# name = ["OOB", "CS_OOB", "CS_flags"]
-	# description = "Searches the Cave Story OOB flags list for a memory variable."
-	# usage = "<query> <condensed(-c)>?"
-	# example = ("cs_oob key",)
-	# flags = "c"
-	# # rate_limit = 2
-
-	# async def __call__(self, args, flags, **void):
-		# lim = ("c" not in flags) * 40 + 20
-		# argv = " ".join(args)
-		# data = await asubmit(tsc_list.search, argv, lim, timeout=8)
-		# Sends multiple messages up to 20000 characters total
-		# if len(data):
-			# head = tsc_list.data[0][0]
-			# for i in range(len(head)):
-				# if head[i] == "":
-					# head[i] = i * " "
-			# table = ptable(head)
-			# for line in data:
-				# table.add_row(line)
-			# output = str(table)
-			# if len(output) < 20000 and len(output) > 1900:
-				# response = [f"Search results for `{argv}`:"]
-				# lines = output.splitlines()
-				# curr = "```\n"
-				# for line in lines:
-					# if len(curr) + len(line) > 1900:
-						# response.append(curr + "```")
-						# curr = "```\n"
-					# if len(line):
-						# curr += line + "\n"
-				# response.append(curr + "```")
-				# return response
-			# return f"Search results for `{argv}`:\n{code_md(output)}"
-		# raise LookupError(f"No results for {argv}.")
+	async def __call__(self, bot, mode, query, **void):
+		return cdict(
+			embed=await sheet_search(mode, query, n=25),
+		)
 
 
 class CS_mod(Command):
