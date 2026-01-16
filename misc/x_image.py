@@ -36,7 +36,7 @@ Transform = getattr(Image, "Transform", Image)
 Image.MAX_IMAGE_PIXELS = 4294967296
 GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_DIFFERENT_PALETTE_ONLY
 from misc.asyncs import esubmit, await_fut  # noqa: E402
-from misc.util import get_image_size, temporary_file, archive_mimes, extract_archive
+from misc.util import get_image_size, temporary_file, archive_mimes, extract_archive, is_url
 
 DC = 0
 torch = None
@@ -630,14 +630,6 @@ def time_parse(ts):
 		elif len(data):
 			raise TypeError("Too many time arguments.")
 	return t
-
-# URL string detector
-url_match = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
-def is_url(url):
-	return url_match.search(url)
-discord_match = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/")
-def is_discord_url(url):
-	return discord_match.findall(url)
 
 fcache = "cache" if os.path.exists("cache") else "../cache"
 

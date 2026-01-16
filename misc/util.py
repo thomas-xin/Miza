@@ -935,12 +935,59 @@ def capwords(s, spl=None):
 	return (" " if spl is None else spl).join(w.capitalize() for w in s.split(spl))
 
 # This reminds me of Perl - Smudge
-def find_urls(url): return url and regexp("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\"'\\])>]+").findall(url)
+url_re = re.compile(r"""(?:
+  (?<=<)(?:https?|hxxps?|ftps?|fxps?):\/\/[^>]*
+| (?<=\()(?:(?:https?|hxxps?|ftps?|fxps?):\/\/[^)]*)
+| (?<=\[)(?:https?|hxxps?|ftps?|fxps?):\/\/[^\]]*
+| (?<=\{)(?:https?|hxxps?|ftps?|fxps?):\/\/[^}]*
+| (?<=')(?:(?:https?|hxxps?|ftps?|fxps?):\/\/[^']*)
+| (?<=")(?:(?:https?|hxxps?|ftps?|fxps?):\/\/[^"]*)
+| (?:https?|hxxps?|ftps?|fxps?):\/\/\S+
+)""", re.VERBOSE)
+def find_urls(url):
+	if not url:
+		return ()
+	return url_re.findall(url)
 def find_urls_ex(url):
+	if not url:
+		return ()
 	no_triple = re.sub(r'```.*?```', '', url, flags=re.DOTALL)
 	no_code = re.sub(r'`[^`]*`', '', no_triple, flags=re.DOTALL)
-	return re.findall(r'''https?://[^\s`|"'\])>]+''', no_code)
-def is_url(url): return url and isinstance(url, (str, bytes)) and regexp("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\\])>]+$").fullmatch(url)
+	if not no_code:
+		return ()
+	return url_re.findall(no_code)
+def is_url(url):
+	if not url or not isinstance(url, str | bytes):
+		return
+	match = url_re.search(url)
+	if not match:
+		return False
+	return match.start() <= 1 and match.end() >= len(url) - 1
+def verify_url(url):
+	if not url or not len(url) >= 2:
+		return url
+	match url[0]:
+		case " " | "\n" | "'" | "`" | '"':
+			if url[0] == url[-1]:
+				return url[1:-1]
+			return url
+		case "<":
+			if url[-1] == ">":
+				return url[1:-1]
+			return url
+		case "(":
+			if url[-1] == ")":
+				return url[1:-1]
+			return url
+		case "[":
+			if url[-1] == "]":
+				return url[1:-1]
+			return url
+		case "{":
+			if url[-1] == "}":
+				return url[1:-1]
+			return url
+	return url
 def is_discord_url(url): return url and regexp("^https?:\\/\\/(?:\\w{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/").findall(url) + regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").findall(url)
 def is_discord_attachment(url): return url and regexp("^https?:\\/\\/(?:\\w{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/attachments\\/").search(str(url))
 def is_discord_emoji(url): return url and regexp("^https?:\\/\\/(?:\\w{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/emojis\\/").search(str(url))
@@ -1559,9 +1606,6 @@ def stream_exists(url, fmt="opus"):
 	h = shash(url)
 	fn = f"{TEMP_PATH}/audio/~" + h + "." + fmt
 	return os.path.exists(fn) and os.path.getsize(fn)
-
-def verify_url(url):
-	return url if is_url(url) else quote_plus(url)
 
 __scales = ("", "k", "M", "G", "T", "P", "E", "Z", "Y")
 __uscales = [s.lower() for s in __scales]

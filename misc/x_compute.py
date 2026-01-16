@@ -37,7 +37,7 @@ import numpy as np
 from math import inf, floor, ceil, log2, log10
 from traceback import print_exc
 sys.path.append("misc")
-from .util import EvalPipe, new_playwright_page, CODECS, CODEC_FFMPEG, CODEC_PIX, temporary_file
+from .util import EvalPipe, new_playwright_page, CODECS, CODEC_FFMPEG, CODEC_PIX, temporary_file, is_url
 
 if __name__ == "__main__":
 	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
@@ -508,10 +508,6 @@ if "browse" in CAPS:
 	import shutil
 	import playwright  # noqa: F401
 	import streamshatter
-
-	url_match = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
-	def is_url(url):
-		return url_match.search(url)
 
 	def browse(q, text=True):
 		if not is_url(q):

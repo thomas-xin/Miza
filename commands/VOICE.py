@@ -109,60 +109,6 @@ def e_remainder(elapsed, length, e, reverse):
 	return min(e.get("end", inf), length) - elapsed
 
 
-# runs org2xm on a file, with an optional custom sample bank.
-def org2xm(org):
-	if not org or not isinstance(org, (bytes, memoryview)):
-		if not is_url(org):
-			raise TypeError("Invalid input URL.")
-		org = verify_url(org)
-		data = Request(org)
-		if not data:
-			raise FileNotFoundError("Error downloading file content.")
-	else:
-		if org[:4] != b"Org-":
-			raise ValueError("Invalid file header.")
-		data = org
-	# Write org data to file.
-	r_org = temporary_file("org")
-	with open(r_org, "wb") as f:
-		f.write(data)
-	args = ["misc/OrgExport", r_org, "48000", "0"]
-	print(args)
-	subprocess.check_output(args, stdin=subprocess.DEVNULL)
-	r_wav = temporary_file("wav")
-	if not os.path.exists(r_wav):
-		raise FileNotFoundError("Unable to locate converted file.")
-	if not os.path.getsize(r_wav):
-		raise RuntimeError("Converted file is empty.")
-	with suppress():
-		os.remove(r_org)
-	return r_wav
-
-def mid2mp3(mid):
-	url = Request(
-		"https://hostfast.onlineconverter.com/file/send",
-		files={
-			"class": (None, "audio"),
-			"from": (None, "midi"),
-			"to": (None, "mp3"),
-			"source": (None, "file"),
-			"file": mid,
-			"audio_quality": (None, "192"),
-		},
-		method="post",
-		decode=True,
-	)
-	fn = url.rsplit("/", 1)[-1].strip("\x00")
-	for i in range(360):
-		with Delay(1):
-			test = Request(f"https://hostfast.onlineconverter.com/file/{fn}")
-			if test == b"d":
-				break
-	r_mp3 = temporary_file("mp3")
-	with open(r_mp3, "wb") as f:
-		f.write(Request(f"https://hostfast.onlineconverter.com/file/{fn}/download"))
-	return r_mp3
-
 def png2wav(png):
 	r_png = temporary_file("png")
 	r_wav = temporary_file("wav")
@@ -218,23 +164,6 @@ async def ecdc_decode_a(ecdc, out=None):
 	with open(out, "wb") as f:
 		f.write(b)
 	return out
-
-CONVERTERS = {
-	b"MThd": mid2mp3,
-	b"Org-": org2xm,
-	b"ECDC": ecdc_decode,
-}
-
-def select_and_convert(stream):
-	print("Selecting and converting", stream)
-	resp = reqs.next().get(stream, headers=Request.header(), timeout=8, stream=True)
-	b = seq(resp)
-	try:
-		convert = CONVERTERS[b[:4]]
-	except KeyError:
-		convert = png2wav
-	b = b.read()
-	return convert(b)
 
 
 async def search_one(bot, query):

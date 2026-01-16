@@ -1739,7 +1739,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not isinstance(url, str) and hasattr(url, "channel"):
 			url = message_link(url)
 		if is_url(url):
-			urls = [url]
+			urls = [verify_url(url)]
 		else:
 			urls = find_urls_ex(url)
 			emoji_tests = find_emojis_ex(url)
@@ -1940,6 +1940,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			region = self.browse_locations.get(timezone, "wt-wt")
 		async def retrieval(argv, region="wt-wt", screenshot=False, best=False):
 			if not is_url(argv):
+				argv = verify_url(argv)
 				print("Browse query:", repr(argv))
 				with tracebacksuppressor:
 					data = None
@@ -4772,7 +4773,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					taken = True
 				elif v.type == "emoji" and (find_emojis_ex(a) or is_discord_emoji(a)):
 					taken = True
-				elif v.type in ("url", "image", "visual", "video", "audio", "media") and (is_url(a) or find_emojis_ex(a) or a[0] == "<" and a[-1] == ">"):
+				elif v.type in ("url", "image", "visual", "video", "audio", "media") and (is_url(a) or find_emojis_ex(a)):
 					taken = True
 				elif v.type == "message" and is_discord_message_link(a):
 					taken = True
