@@ -1016,6 +1016,8 @@ class Preserve(Command):
 					futs.append(as_fut(shorten_chunks(*args, minimise=minimise)))
 				else:
 					args = expand_attachment(url)
+					if len(args) < 2 or not args[1]:
+						minimise = False
 					futs.append(as_fut(shorten_attachment(*args, minimise=minimise)))
 				continue
 			if is_discord_attachment(url):
@@ -1034,6 +1036,8 @@ class Preserve(Command):
 			futs.append(bot.data.exec.lproxy(url, channel=_channel, minimise=minimise))
 			await asyncio.sleep(0.1)
 		out = await gather(*futs)
+		print(urls)
+		print(out)
 		return "\n".join("<" + u + ">" for u in out)
 
 

@@ -4661,7 +4661,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			)
 		oargs = tuple(args)
 		if message and message.attachments:
-			args = [best_url(a) for a in message.attachments] + args
+			args = [attachment_cache.preserve(a.url, mid=message.id) for a in message.attachments] + args
 		tz = None
 		parser = getattr(command, "parser", None)
 		if not parser:
