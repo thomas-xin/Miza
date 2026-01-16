@@ -359,7 +359,7 @@ class AttachmentCache(AutoCache):
 					return open(fn, "rb")
 				elif "/c/" in url:
 					path = url.split("/c/", 1)[-1].split("/", 1)[0]
-					urls = await self.obtains(path)
+					urls, csize = await self.obtains(path)
 					fn, head = await asubmit(download_file, *urls, filename=raw_fn, timeout=timeout, return_headers=True)
 					self.tertiary[url] = head
 					return open(fn, "rb")
