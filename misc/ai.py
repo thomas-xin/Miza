@@ -37,9 +37,6 @@ available = {
 	"mistral-24b": {
 		"mistral": ("mistral-small-latest", ("0", "0")),
 	},
-	"deepseek-v3.2-speciale": {
-		"deepseek": ("deepseek-reasoner", ("0.2", "0.42")),
-	},
 }
 
 # tags: is_completion, is_function, is_vision, is_premium

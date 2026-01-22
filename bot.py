@@ -1644,7 +1644,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	followed = AutoCache(f"{CACHE_PATH}/follow", stale=3600, timeout=86400 * 7, desync=0.05)
 	async def _follow_url(self, urls, priority_order, allow_text, seen=None):
-		seen = seen or {}
+		seen = seen or set()
 		out = deque()
 		for url in urls:
 			url = T(url).get("url", url)
@@ -1692,6 +1692,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if is_discord_attachment(url):
 						out.append(attachment_cache.preserve(url))
 					elif is_discord_message_link(url) and url not in seen:
+						seen.add(url)
 						urls = await self._follow_url([url], priority_order=priority_order, allow_text=allow_text, seen=seen)
 						out.extend(urls)
 					else:
@@ -4292,6 +4293,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			print(f"Resending _ready_ event to module {module}...")
 			futs = []
 			for db in dataitems:
+				print(f"- {db}")
 				for f in dir(db):
 					if f.startswith("_") and f[-1] == "_" and f[1] != "_":
 						func = getattr(db, f, None)
@@ -4302,6 +4304,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if callable(func):
 						fut = asubmit(func, bot=self)
 						futs.append(fut)
+			print("...")
 			await_fut(gather(*futs))
 		print(f"Successfully loaded module {module}.")
 		return True
@@ -4785,6 +4788,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					taken = True
 				elif not hs and v.type in ("number", "integer") and re.fullmatch(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?(?:\/\d*\.?\d+)?", a):
 					taken = True
+				elif not hs and v.type == "colour" and a in common.colour_names:
+					taken = True
 				elif hs and v.type == "string":
 					taken = True
 				if not taken:
@@ -5172,8 +5177,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def run_command(self, command, kwargs=None, message=None, argv=None, comment=None, slash=False, command_check=None, user=None, channel=None, guild=None, min_perm=None, respond=False, allow_recursion=True):
 		command_check = command_check or command.name[0].casefold()
 		user = user or (message.author if message else None)
-		if message and user:
-			print(f"{message.channel.id}: {user} ({user.id}) issued command {command_check} {kwargs or argv}")
 		soon_indicator = None
 		if not self.ready:
 			# If the bot is not currently ready (either loading or in maintenance), send an indicator and wait
@@ -5275,6 +5278,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				kv.update(kwargs)
 			kwargs = kv
 		kwargs = await self.extract_kwargs(argv, command, u_perm, user, message, channel, guild, command_check, kwargs)
+		if message and user:
+			print(f"{message.channel.id}: {user} ({user.id}) issued command {command_check} {kwargs or argv}")
 		comment = comment or ""
 		fut = None
 		async with sem:

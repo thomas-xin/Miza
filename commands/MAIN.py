@@ -69,7 +69,6 @@ class Help(Pagination, Command):
 			greedy=False,
 		),
 	)
-	usage = f"<category({cats})>? <command>?"
 	rate_limit = (0.25, 1)
 	slash = True
 	ephemeral = True
@@ -103,6 +102,8 @@ class Help(Pagination, Command):
 
 		if command:
 			com = bot.commands[command][0]
+			if not category:
+				category = com.catg
 			a = ", ".join(n.strip("_") for n in com.name) or "[none]"
 			content = (
 				f"[[Category]] {colourise(category_repr(com.category), fg='white')}\n"

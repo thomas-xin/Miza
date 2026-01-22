@@ -7,6 +7,7 @@ import random
 import re
 import shutil
 import subprocess
+import sys
 import time
 import traceback
 import zipfile
@@ -570,6 +571,58 @@ attachment_cache = AttachmentCache(
 	stale=0,
 	timeout=3600 * 18,
 )
+
+font_cache = AutoCache("fonts", stale=86400 * 7, timeout=86400 * 90)
+def _enumerate_os_fonts():
+	from PIL import ImageFont
+	dirs = []
+	if sys.platform == "win32":
+		# check the windows font repository
+		# NOTE: must use uppercase WINDIR, to work around bugs in
+		# 1.5.2's os.environ.get()
+		windir = os.environ.get("WINDIR")
+		if windir:
+			dirs.append(os.path.join(windir, "fonts"))
+	elif sys.platform in ("linux", "linux2"):
+		data_home = os.environ.get("XDG_DATA_HOME")
+		if not data_home:
+			# The freedesktop spec defines the following default directory for
+			# when XDG_DATA_HOME is unset or empty. This user-level directory
+			# takes precedence over system-level directories.
+			data_home = os.path.expanduser("~/.local/share")
+		xdg_dirs = [data_home]
+
+		data_dirs = os.environ.get("XDG_DATA_DIRS")
+		if not data_dirs:
+			# Similarly, defaults are defined for the system-level directories
+			data_dirs = "/usr/local/share:/usr/share"
+		xdg_dirs += data_dirs.split(":")
+
+		dirs += [os.path.join(xdg_dir, "fonts") for xdg_dir in xdg_dirs]
+	elif sys.platform == "darwin":
+		dirs += [
+			"/Library/Fonts",
+			"/System/Library/Fonts",
+			os.path.expanduser("~/Library/Fonts"),
+		]
+	fonts = {}
+	for directory in dirs:
+		for walkroot, walkdir, walkfilenames in os.walk(directory):
+			for walkfilename in walkfilenames:
+				path = os.path.join(walkroot, walkfilename)
+				try:
+					font = ImageFont.FreeTypeFont(path, 1)
+				except OSError:
+					continue
+				# fonts[walkfilename.rsplit(".", 1)[0]] = path
+				name, fmt = font.getname()
+				if name == "Regular":
+					fonts[name] = path
+				else:
+					fonts.setdefault(name, path)
+	return fonts
+def enumerate_os_fonts():
+	return font_cache.retrieve("map", _enumerate_os_fonts)
 
 
 def acquire_from_archive(url, arcnames, filenames):

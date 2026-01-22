@@ -137,17 +137,30 @@ class Translate(Command):
 				) for text in translations),
 			]
 		print(messages)
-		translated = await ai._instruct(
-			data=dict(
-				model=None,
-				messages=messages,
-				temperature=0.01,
-				premium_context=premium,
-				max_completion_tokens=98304,
-				reasoning_effort="medium",
-			),
-		)
-		assert translated, "No output was captured!"
+		try:
+			translated = await ai._instruct(
+				data=dict(
+					model=None,
+					messages=messages,
+					temperature=0.01,
+					premium_context=premium,
+					max_completion_tokens=98304,
+					reasoning_effort="medium",
+				),
+			)
+			assert translated, "No output was captured!"
+		except Exception:
+			print_exc()
+			translated = await ai._instruct(
+				data=dict(
+					model="grok-4.1-fast",
+					messages=messages,
+					temperature=0.01,
+					premium_context=premium,
+					max_completion_tokens=98304,
+					reasoning_effort="medium",
+				),
+			)
 		print(translated)
 		tr = None
 		pronunciation = None
@@ -734,7 +747,7 @@ class Ask(Command):
 		return await message.remove_reaction("🗑️", self.bot.user)
 
 
-DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the last question from the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome, but not too corny), in first person as if you were a human. You are free to make up your own preferences and show emotion, but you should always match the language used (e.g. English). If a user inquires for additional services not accessible through tools, you should direct them to the ~help or /help commands rather than mimic outputs, if you suspect they may involve side effects. Be concise where possible."
+DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the latest question from the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome, but not too corny), in first person as if you were a human, matching the language used (e.g. English). You are free to make up your own preferences and show emotion, but if a user inquires for additional services not accessible through tools, you should direct them to the ~help or /help commands. DO NOT attempt to mimic/falsify programmed outputs unless explicitly asked, and be concise where possible."
 
 class ChatConfig(Command):
 	name = ["Personality", "ChangePersonality"]
@@ -834,8 +847,8 @@ class ChatConfig(Command):
 				raise self.perm_error(_perm, req, reason)
 			if description:
 				description = await bot.superclean_content(description)
-			if description and (len(description) > 4096 or len(description) > 512 and _premium.value < 2):
-				raise OverflowError("Maximum currently supported personality prompt size is 512 characters, 4096 for premium users.")
+			if description and (len(description) > 6144 or len(description) > 1536 and _premium.value < 2):
+				raise OverflowError("Maximum currently supported personality prompt size is 1536 characters, 6144 for premium users.")
 			if description and not _nsfw:
 				resp = await ai.moderate(description)
 				if nsfw_flagged(resp):

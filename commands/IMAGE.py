@@ -469,9 +469,80 @@ class Colour(Command):
 			+ "\nLUV values: " + sqr_md(", ".join(str(round(x)) for x in rgb_to_luv(adj)))
 			+ "\nXYZ values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_xyz(adj)))
 		)
-		resp = await process_image("from_colour", "$", [colour])
+		resp = await process_image("from_colour", "$", [colour, "-fs", filesize, "-f", format])
 		name = "Colour." + get_ext(resp)
 		return cdict(content=msg, prefix="```ini\n", suffix="```", file=CompatFile(resp, filename=name), reacts="🔳")
+
+
+class Text(Command):
+	name = ["Font"]
+	description = "Renders text using an optional font."
+	schema = cdict(
+		text=cdict(
+			type="string",
+			description="The text to draw",
+			example="Hello World!",
+			required=True,
+		),
+		font=cdict(
+			type="enum",
+			validation=cdict(
+				enum=(),
+				accepts={full_prune(k): k for k in enumerate_os_fonts()},
+			),
+			description="The font to use",
+			default="Calibri",
+		),
+		size=cdict(
+			type="number",
+			validation="(0, 1024]",
+			description="The size of the font (usually in pixels width/height)",
+			default=48,
+		),
+		colour=cdict(
+			type="colour",
+			description="The colour of the gradient on one side",
+			example="#BF7FFF",
+			default=(255, 255, 255),
+			aliases=["color"],
+		),
+		width=cdict(
+			type="number",
+			validation="(0, 256]",
+			description="The stroke width",
+		),
+		outline=cdict(
+			type="colour",
+			description="The colour of the outline",
+			example="#FF7FBF",
+			default=(0, 0, 0),
+		),
+		filesize=cdict(
+			type="filesize",
+			validation="[1024, 1073741824]",
+			description="The maximum filesize in bytes",
+			example="10kb",
+			default=DEFAULT_FILESIZE,
+			aliases=["fs"],
+		),
+		format=cdict(
+			type="enum",
+			validation=cdict(
+				enum=tuple(IMAGE_FORMS),
+				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
+			),
+			description="The file format or codec of the output",
+			example="mp4",
+			default="auto",
+		),
+	)
+	rate_limit = (3, 5)
+	slash = True
+
+	async def __call__(self, bot, text, font, size, colour, width, outline, filesize, format, **void):
+		resp = await process_image("render_text", "$", [text, font, size, width, colour, outline, "-fs", filesize, "-f", format])
+		name = "Text." + get_ext(resp)
+		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
 class Average(Command):
@@ -1421,6 +1492,91 @@ class ImageCompare(Command):
 		url = urls.pop(0)
 		resp = await process_image(url, "psnr", [urls], timeout=_timeout)
 		return py_md(resp)
+
+
+class Caption(Command):
+	name = ["Title"]
+	description = "Renders text onto an image or animation, using an optional font."
+	schema = cdict(
+		url=cdict(
+			type="visual",
+			description="Image, animation or video, supplied by URL or attachment",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
+			aliases=["i"],
+			required=True,
+		),
+		top_text=cdict(
+			type="word",
+			description="The text to draw",
+			example="Hello World!",
+		),
+		bottom_text=cdict(
+			type="word",
+			description="Bottom text to draw",
+			example="World!",
+		),
+		font=cdict(
+			type="enum",
+			validation=cdict(
+				enum=(),
+				accepts={full_prune(k): k for k in enumerate_os_fonts()},
+			),
+			description="The font to use",
+			default="Impact",
+		),
+		size=cdict(
+			type="number",
+			validation="(0, 1024]",
+			description="The size of the font (usually in pixels width/height)",
+			default=64,
+		),
+		colour=cdict(
+			type="colour",
+			description="The colour of the gradient on one side",
+			example="#BF7FFF",
+			default=(255, 255, 255),
+			aliases=["color"],
+		),
+		width=cdict(
+			type="number",
+			validation="(0, 256]",
+			description="The stroke width",
+		),
+		outline=cdict(
+			type="colour",
+			description="The colour of the outline",
+			example="#FF7FBF",
+			default=(0, 0, 0),
+		),
+		filesize=cdict(
+			type="filesize",
+			validation="[1024, 1073741824]",
+			description="The maximum filesize in bytes",
+			example="10kb",
+			default=DEFAULT_FILESIZE,
+			aliases=["fs"],
+		),
+		format=cdict(
+			type="enum",
+			validation=cdict(
+				enum=tuple(IMAGE_FORMS),
+				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
+			),
+			description="The file format or codec of the output",
+			example="mp4",
+			default="auto",
+		),
+	)
+	rate_limit = (7, 13)
+	slash = True
+
+	async def __call__(self, bot, url, top_text, bottom_text, font, size, colour, width, outline, filesize, format, **void):
+		if not top_text and not bottom_text:
+			raise ArgumentError("At least one of top_text or bottom_text is required.")
+		resp = await process_image(url, "caption_image", [top_text, bottom_text, font, size, width, colour, outline, "-fs", filesize, "-f", format])
+		fn = url2fn(url)
+		name = replace_ext(fn, get_ext(resp))
+		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
 class Blend(Command):

@@ -712,13 +712,22 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 				vf += "format=rgba"
 			command.extend(("-vf", vf))
 		pix = ("rgba" if lossless else "yuva444p") if mode == "RGBA" else ("rgb24" if lossless else "yuv444p")
+		if opt:
+			if pix == "yuva444p":
+				pix = "yuva420p"
+			else:
+				pix = "yuv420p"
 		if mode == "RGBA":
 			command.extend(("-c:v", "libwebp_anim" if anim else "libwebp", "-pix_fmt", pix, "-pred", "mixed"))
 		else:
 			command.extend(("-c:v", "libwebp_anim" if anim else "libwebp", "-pix_fmt", pix, "-pred", "mixed"))
 		command.extend(("-f", "webp", "-compression_level", "6" if lossless else "5"))
 		if anim:
-			if opt:
+			if opt > 1:
+				command.extend(("-loop", "0", "-q:v", "0"))
+			elif opt > 1:
+				command.extend(("-loop", "0", "-q:v", "33"))
+			elif opt:
 				command.extend(("-loop", "0", "-q:v", "75"))
 			else:
 				command.extend(("-loop", "0", "-q:v", "95"))
@@ -767,6 +776,10 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			h = round(first.height / 2) * 2
 			command.extend(("-vf", f"scale={w}:{h}:flags=bicubic"))
 		bitrate = floor(min(fs / duration * 7.5, 99999999)) # use 7.5 bits per byte
+		if opt > 1:
+			bitrate *= 0.8
+		if opt:
+			bitrate *= 0.9
 		command.extend(("-b:v", str(bitrate), "-vbr", "on"))
 		cdc = CODEC_FFMPEG.get(fmt, "av1_nvenc")
 		fmt = CODECS.get(fmt, fmt)
@@ -843,7 +856,7 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 		im.save(out, format=fmt, optimize=True)
 	return out.getbuffer()
 
-def anim_into(out, new, first, size, fmt, fs, r=0, hq=False):
+def anim_into(out, new, first, size, fmt, fs, r=0, opt=False):
 	assert size[0] and size[1], f"Expected non-zero size, got {size}"
 	command = ["ffmpeg", "-nostdin", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel]
 	mode = new["mode"]
@@ -854,7 +867,7 @@ def anim_into(out, new, first, size, fmt, fs, r=0, hq=False):
 	is_avif = fmt == "avif" and first.mode == "RGBA"
 	if is_avif:
 		fmt = "y4m"
-	opts, env, fmt = ffmpeg_opts(new, new["frames"], new["count"], mode, first, fmt, fs, *size, new["duration"], not hq)
+	opts, env, fmt = ffmpeg_opts(new, new["frames"], new["count"], mode, first, fmt, fs, *size, new["duration"], opt)
 	command.extend(opts)
 	if "." in out:
 		out2 = out.rsplit(".", 1)[0] + "~2." + CODECS.get(fmt, fmt)
@@ -1160,7 +1173,14 @@ def evalImg(url, operation, args):
 						if (w, h) in seen:
 							out, r = seen[(w, h)]
 						else:
-							out = anim_into(orig, new, first, (w, h), fmt, fs, r=r, hq=not opt)
+							rat = np.prod((w, h)) / np.prod(size)
+							if rat < 1 / 16:
+								opt = 3
+							elif rat < 1 / 8:
+								opt = 2
+							elif rat < 1 / 4:
+								opt = 1
+							out = anim_into(orig, new, first, (w, h), fmt, fs, r=r, opt=opt)
 							r = fs / len(out)
 							print("RA:", w, h, scale, len(out), r)
 							seen[(w, h)] = out, r
@@ -1178,7 +1198,14 @@ def evalImg(url, operation, args):
 						if (w, h) in seen:
 							out, r = seen[(w, h)]
 						else:
-							out = anim_into(orig, new, first, (w, h), fmt, fs, r=r, hq=not opt)
+							rat = np.prod((w, h)) / np.prod(size)
+							if rat < 1 / 16:
+								opt = 3
+							elif rat < 1 / 8:
+								opt = 2
+							elif rat < 1 / 4:
+								opt = 1
+							out = anim_into(orig, new, first, (w, h), fmt, fs, r=r, opt=opt)
 							r = fs / len(out)
 							print("RB:", w, h, scale, len(out), r)
 							seen[(w, h)] = out, r

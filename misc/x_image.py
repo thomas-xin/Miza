@@ -27,7 +27,7 @@ except Exception:
 	print_exc()
 	colorspace = None
 import PIL
-from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat, ImageFile # noqa: F401
+from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat, ImageFile, ImageFont # noqa: F401
 from PIL import GifImagePlugin
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 Resampling = getattr(Image, "Resampling", Image)
@@ -1276,6 +1276,97 @@ def to_qr(s, repetitions=3, duration=4.8, fps=30):
 
 		return dict(duration=duration, count=count, frames=qr_iterator(im))
 	return ImageChops.invert(im).convert("RGBA")
+
+
+dummy_im = Image.new("LA", (1, 1))
+dummy_draw = ImageDraw.Draw(dummy_im)
+
+def render_text(text, font="Calibri", size=48, width=None, colour=(0, 0, 0), outline=(255, 255, 255)) -> Image.Image:
+	if isinstance(font, str):
+		from misc.caches import enumerate_os_fonts
+		font = ImageFont.truetype(enumerate_os_fonts()[font], size=size)
+	if width is None:
+		width = size / 16
+
+	left, top, right, bottom = dummy_draw.textbbox(
+		(0, 0),
+		text,
+		font=font,
+		stroke_width=width,
+	)
+
+	w, h = ceil(right - left), ceil(bottom - top)
+	im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+	draw = ImageDraw.Draw(im)
+
+	# Offset by -left/-top so the text fits exactly
+	draw.text(
+		(-left, -top),
+		text,
+		fill=colour,
+		font=font,
+		stroke_width=width,
+		stroke_fill=outline,
+	)
+	return im
+
+def caption_image(im: Image.Image, top_text, bottom_text, font="Impact", size=64, width=None, colour=(0, 0, 0), outline=(255, 255, 255)) -> Image.Image:
+	if isinstance(font, str):
+		from misc.caches import enumerate_os_fonts
+		font = ImageFont.truetype(enumerate_os_fonts()[font], size=size)
+	if width is None:
+		width = size / 16
+
+	if top_text:
+		left, top, right, bottom = dummy_draw.textbbox(
+			(0, 0),
+			top_text,
+			font=font,
+			stroke_width=width,
+		)
+		if right - left > im.width * 0.75:
+			im2 = render_text(top_text, font, min(size, im.width * 2 / len(top_text)), width, colour, outline)
+			ims = (round(im.width * 0.75), round(im2.height * im.width * 0.75 / im2.width))
+			im2 = im2.resize(ims, Resampling.LANCZOS)
+			if im.mode != im2.mode:
+				im = im.convert(im2.mode)
+			im.alpha_composite(im2, (round(im.width / 2 - im2.width / 2), round(im2.height / 4)))
+		else:
+			draw = ImageDraw.Draw(im)
+			draw.text(
+				(im.width / 2 - (right - left) / 2, bottom / 4 - top),
+				top_text,
+				fill=colour,
+				font=font,
+				stroke_width=width,
+				stroke_fill=outline,
+			)
+
+	if bottom_text:
+		left, top, right, bottom = dummy_draw.textbbox(
+			(0, 0),
+			bottom_text,
+			font=font,
+			stroke_width=width,
+		)
+		if right - left > im.width * 0.75:
+			im2 = render_text(bottom_text, font, min(size, im.width * 2 / len(bottom_text)), width, colour, outline)
+			ims = (round(im.width * 0.75), round(im2.height * im.width * 0.75 / im2.width))
+			im2 = im2.resize(ims, Resampling.LANCZOS)
+			if im.mode != im2.mode:
+				im = im.convert(im2.mode)
+			im.alpha_composite(im2, (round(im.width / 2 - im2.width / 2), round(im.height - im2.height * 5 / 4)))
+		else:
+			draw = ImageDraw.Draw(im)
+			draw.text(
+				(im.width / 2 - (right - left) / 2, im.height - bottom * 5 / 4),
+				bottom_text,
+				fill=colour,
+				font=font,
+				stroke_width=width,
+				stroke_fill=outline,
+			)
+	return im
 
 
 def properties(im, default_duration=None, default_fps=None) -> tuple: # frames, duration, fps

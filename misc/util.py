@@ -798,19 +798,7 @@ def split_text(text, max_length=2000, priority=("\n\n", "\n", "\t", "? ", "! ", 
 		text = remaining_text
 	return chunks
 
-smart_re = re.compile(r"""
-	(?:^|\s)
-	(['"`])
-	(?:
-		\\[\s\S]
-	| (?!\1)"[^"]*"
-	| (?!\1)'[^']*'
-	| (?!\1)`[^`]*`
-	| [^"'`]
-	)*
-	\1
-	(?:$|\s)
-""", re.VERBOSE)
+smart_re = re.compile(r"""(?:^|\s)(?:"[^"]*"|'[^']*'|`[^`]*`|[\S]+)(?:$|\s)""")
 leftspace_re = re.compile(r"^\s+")
 rightspace_re = re.compile(r"\s+$")
 def smart_split(s, rws=False):
@@ -4686,6 +4674,7 @@ class EvalPipe:
 		try:
 			resp = aexec(s, self.glob)
 		except BaseException as ex:
+			self.debug(format_exc())
 			s = maybe_json(ex)
 			b = f"<~{i}:!:".encode("ascii") + b"(" + s + f",RuntimeError({repr(ex)}))".encode("utf-8")
 			self.send(b)

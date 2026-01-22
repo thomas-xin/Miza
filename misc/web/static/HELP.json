@@ -733,7 +733,7 @@
 					"example": "deepseek",
 					"type": "enum",
 					"validation": {
-						"enum": ["mistral-24b", "deepseek-v3.2-speciale", "gemini-3-flash", "gemini-3-pro-image", "gemini-3-pro", "cogito-v2", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gpt-4o-audio", "gemini-2.5-pro", "deephermes-3-mistral-24b", "gpt-4o-mini-search", "gpt-4o-search", "gpt-4-turbo", "gpt-4-1106", "gpt-5.2-codex", "molmo-2-8b:free", "olmo-3.1-32b-instruct", "seed-1.6-flash", "seed-1.6", "minimax-m2.1", "glm-4.7", "mistral-small-creative", "olmo-3.1-32b-think", "mimo-v2-flash:free", "mimo-v2-flash", "nemotron-3-nano-30b-a3b:free", "nemotron-3-nano-30b-a3b", "gpt-5.2-chat", "gpt-5.2-pro", "gpt-5.2", "devstral-2512:free", "devstral-2512", "relace-search", "glm-4.6v", "deepseek-v3.1-nex-n1", "rnj-1-instruct", "bodybuilder", "gpt-5.1-codex-max", "nova-2-lite-v1", "ministral-14b-2512", "ministral-8b-2512", "ministral-3b-2512", "mistral-large-2512", "trinity-mini:free", "trinity-mini", "deepseek-v3.2", "intellect-3", "tng-r1t-chimera:free", "tng-r1t-chimera", "claude-opus-4.5", "olmo-3-32b-think", "olmo-3-7b-instruct", "olmo-3-7b-think", "grok-4.1-fast", "cogito-v2.1-671b", "gpt-5.1", "gpt-5.1-chat", "gpt-5.1-codex", "gpt-5.1-codex-mini", "kat-coder-pro", "kimi-k2-thinking", "nova-premier-v1", "sonar-pro-search", "voxtral-small-24b-2507", "gpt-oss-safeguard-20b", "nemotron-nano-12b-v2-vl:free", "nemotron-nano-12b-v2-vl", "minimax-m2", "qwen3-vl-32b-instruct", "lfm2-8b-a1b", "lfm-2.2-6b", "granite-4.0-h-micro", "gpt-5-image-mini", "claude-haiku-4.5", "qwen3-vl-8b-instruct", "gpt-5-image", "o3-deep-research", "o4-mini-deep-research", "llama-3.3-nemotron-super-49b-v1.5", "ernie-4.5-21b-a3b-thinking", "gemini-2.5-flash-image", "qwen3-vl-30b-a3b-thinking", "qwen3-vl-30b-a3b-instruct", "gpt-5-pro", "glm-4.6", "glm-4.6:exacto", "claude-sonnet-4.5", "deepseek-v3.2-exp", "cydonia-24b-v4.1", "relace-apply-3", "qwen3-vl-235b-a22b-thinking", "qwen3-vl-235b-a22b-instruct", "gpt-5-codex", "deepseek-v3.1-terminus:exacto", "deepseek-v3.1-terminus", "grok-4-fast", "tongyi-deepresearch-30b-a3b", "internvl3-78b", "qwen3-next-80b-a3b-thinking", "qwen3-next-80b-a3b-instruct:free", "qwen3-next-80b-a3b-instruct", "longcat-flash-chat", "nemotron-nano-9b-v2:free", "nemotron-nano-9b-v2", "kimi-k2-0905", "kimi-k2-0905:exacto", "step3", "qwen3-30b-a3b-thinking-2507", "grok-code-fast-1", "hermes-4-70b", "hermes-4-405b", "deepseek-chat-v3.1", "mistral-medium-3.1", "ernie-4.5-21b-a3b", "ernie-4.5-vl-28b-a3b", "glm-4.5v", "jamba-mini-1.7", "jamba-large-1.7", "gpt-5-chat", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-oss-120b:free", "gpt-oss-120b", "gpt-oss-120b:exacto", "gpt-oss-20b:free", "gpt-oss-20b", "claude-opus-4.1", "codestral-2508", "qwen3-coder-30b-a3b-instruct", "qwen3-30b-a3b-instruct-2507", "glm-4.5", "glm-4.5-air:free", "glm-4.5-air", "qwen3-235b-a22b-thinking-2507", "glm-4-32b", "qwen3-coder:free", "qwen3-coder", "qwen3-coder:exacto", "ui-tars-1.5-7b", "qwen3-235b-a22b-2507", "router", "kimi-k2:free", "kimi-k2", "devstral-medium", "devstral-small", "dolphin-mistral-24b-venice-edition:free", "grok-4", "gemma-3n-e2b-it:free", "hunyuan-a13b-instruct", "deepseek-r1t2-chimera:free", "deepseek-r1t2-chimera", "morph-v3-large", "morph-v3-fast", "ernie-4.5-vl-424b-a47b", "ernie-4.5-300b-a47b", "mercury", "mistral-small-3.2-24b-instruct", "minimax-m1", "kimi-dev-72b", "o3-pro", "grok-3-mini", "grok-3", "deepseek-r1-0528:free", "deepseek-r1-0528", "claude-opus-4", "claude-sonnet-4", "gemma-3n-e4b-it:free", "gemma-3n-e4b-it", "mistral-medium-3", "spotlight", "maestro-reasoning", "virtuoso-large", "coder-large", "mercury-coder", "qwen3-4b:free", "llama-guard-4-12b", "qwen3-30b-a3b", "qwen3-8b", "qwen3-14b", "qwen3-32b", "qwen3-235b-a22b", "deepseek-r1t-chimera:free", "deepseek-r1t-chimera", "o4-mini-high", "o3", "o4-mini", "qwen2.5-coder-7b-instruct", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "llemma_7b", "codellama-7b-instruct-solidity", "grok-3-mini-beta", "grok-3-beta", "llama-3.1-nemotron-ultra-253b-v1", "llama-4-maverick", "llama-4-scout", "qwen2.5-vl-32b-instruct", "deepseek-chat-v3-0324", "o1-pro", "mistral-small-3.1-24b-instruct:free", "mistral-small-3.1-24b-instruct", "olmo-2-0325-32b-instruct", "gemma-3-4b-it:free", "gemma-3-4b-it", "gemma-3-12b-it:free", "gemma-3-12b-it", "command-a", "gemma-3-27b-it:free", "gemma-3-27b-it", "skyfall-36b-v2", "sonar-reasoning-pro", "sonar-pro", "sonar-deep-research", "qwq-32b", "gemini-2.0-flash-lite-001", "claude-3.7-sonnet:thinking", "claude-3.7-sonnet", "mistral-saba", "llama-guard-3-8b", "o3-mini-high", "gemini-2.0-flash-001", "aion-1.0", "aion-1.0-mini", "aion-rp-llama-3.1-8b", "qwen2.5-vl-72b-instruct", "o3-mini", "mistral-small-24b-instruct-2501", "deepseek-r1-distill-qwen-32b", "sonar", "deepseek-r1-distill-llama-70b", "deepseek-r1", "minimax-01", "phi-4", "l3.1-70b-hanami-x1", "deepseek-chat", "l3.3-euryale-70b", "o1", "command-r7b-12-2024", "gemini-2.0-flash-exp:free", "llama-3.3-70b-instruct:free", "llama-3.3-70b-instruct", "nova-lite-v1", "nova-micro-v1", "nova-pro-v1", "gpt-4o-2024-11-20", "mistral-large-2411", "mistral-large-2407", "pixtral-large-2411", "qwen-2.5-coder-32b-instruct", "sorcererlm-8x22b", "unslopnemo-12b", "claude-3.5-haiku", "claude-3.5-sonnet", "magnum-v4-72b", "ministral-3b", "ministral-8b", "qwen-2.5-7b-instruct", "llama-3.1-nemotron-70b-instruct", "inflection-3-productivity", "inflection-3-pi", "rocinante-12b", "llama-3.2-1b-instruct", "llama-3.2-3b-instruct:free", "llama-3.2-3b-instruct", "llama-3.2-11b-vision-instruct", "qwen-2.5-72b-instruct", "llama-3.1-lumimaid-8b", "pixtral-12b", "command-r-08-2024", "command-r-plus-08-2024", "qwen-2.5-vl-7b-instruct:free", "qwen-2.5-vl-7b-instruct", "l3.1-euryale-70b", "hermes-3-llama-3.1-70b", "hermes-3-llama-3.1-405b:free", "hermes-3-llama-3.1-405b", "chatgpt-4o-latest", "l3-lunaris-8b", "gpt-4o-2024-08-06", "llama-3.1-405b", "llama-3.1-70b-instruct", "llama-3.1-8b-instruct", "llama-3.1-405b-instruct:free", "llama-3.1-405b-instruct", "mistral-nemo", "gpt-4o-mini", "gpt-4o-mini-2024-07-18", "gemma-2-27b-it", "gemma-2-9b-it", "l3-euryale-70b", "mistral-7b-instruct-v0.3", "mistral-7b-instruct", "hermes-2-pro-llama-3-8b", "gpt-4o-2024-05-13", "llama-guard-2-8b", "gpt-4o", "gpt-4o:extended", "llama-3-70b-instruct", "llama-3-8b-instruct", "mixtral-8x22b-instruct", "wizardlm-2-8x22b", "claude-3-haiku", "mistral-large", "gpt-3.5-turbo-0613", "mistral-tiny", "mistral-7b-instruct-v0.2", "mixtral-8x7b-instruct", "noromaid-20b", "goliath-120b", "auto", "gpt-3.5-turbo-instruct", "mistral-7b-instruct-v0.1", "gpt-3.5-turbo-16k", "weaver", "remm-slerp-l2-13b", "mythomax-l2-13b", "gpt-3.5-turbo", "gpt-4-0314", "gpt-4"]
+						"enum": ["mistral-24b", "gemini-3-flash", "gemini-3-pro-image", "gemini-3-pro", "cogito-v2", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gpt-4o-audio", "gemini-2.5-pro", "deephermes-3-mistral-24b", "gpt-4o-mini-search", "gpt-4o-search", "gpt-4-turbo", "gpt-4-1106", "palmyra-x5", "lfm-2.5-1.2b-thinking:free", "lfm-2.5-1.2b-instruct:free", "gpt-audio", "gpt-audio-mini", "glm-4.7-flash", "gpt-5.2-codex", "molmo-2-8b:free", "olmo-3.1-32b-instruct", "seed-1.6-flash", "seed-1.6", "minimax-m2.1", "glm-4.7", "mistral-small-creative", "olmo-3.1-32b-think", "mimo-v2-flash:free", "mimo-v2-flash", "nemotron-3-nano-30b-a3b:free", "nemotron-3-nano-30b-a3b", "gpt-5.2-chat", "gpt-5.2-pro", "gpt-5.2", "devstral-2512:free", "devstral-2512", "relace-search", "glm-4.6v", "deepseek-v3.1-nex-n1", "rnj-1-instruct", "bodybuilder", "gpt-5.1-codex-max", "nova-2-lite-v1", "ministral-14b-2512", "ministral-8b-2512", "ministral-3b-2512", "mistral-large-2512", "trinity-mini:free", "trinity-mini", "deepseek-v3.2-speciale", "deepseek-v3.2", "intellect-3", "tng-r1t-chimera:free", "tng-r1t-chimera", "claude-opus-4.5", "olmo-3-32b-think", "olmo-3-7b-instruct", "olmo-3-7b-think", "grok-4.1-fast", "cogito-v2.1-671b", "gpt-5.1", "gpt-5.1-chat", "gpt-5.1-codex", "gpt-5.1-codex-mini", "kat-coder-pro", "kimi-k2-thinking", "nova-premier-v1", "sonar-pro-search", "voxtral-small-24b-2507", "gpt-oss-safeguard-20b", "nemotron-nano-12b-v2-vl:free", "nemotron-nano-12b-v2-vl", "minimax-m2", "qwen3-vl-32b-instruct", "lfm2-8b-a1b", "lfm-2.2-6b", "granite-4.0-h-micro", "gpt-5-image-mini", "claude-haiku-4.5", "qwen3-vl-8b-thinking", "qwen3-vl-8b-instruct", "gpt-5-image", "o3-deep-research", "o4-mini-deep-research", "llama-3.3-nemotron-super-49b-v1.5", "ernie-4.5-21b-a3b-thinking", "gemini-2.5-flash-image", "qwen3-vl-30b-a3b-thinking", "qwen3-vl-30b-a3b-instruct", "gpt-5-pro", "glm-4.6", "glm-4.6:exacto", "claude-sonnet-4.5", "deepseek-v3.2-exp", "cydonia-24b-v4.1", "relace-apply-3", "qwen3-vl-235b-a22b-thinking", "qwen3-vl-235b-a22b-instruct", "qwen3-max", "qwen3-coder-plus", "gpt-5-codex", "deepseek-v3.1-terminus:exacto", "deepseek-v3.1-terminus", "grok-4-fast", "tongyi-deepresearch-30b-a3b", "qwen3-coder-flash", "internvl3-78b", "qwen3-next-80b-a3b-thinking", "qwen3-next-80b-a3b-instruct:free", "qwen3-next-80b-a3b-instruct", "longcat-flash-chat", "qwen-plus-2025-07-28", "qwen-plus-2025-07-28:thinking", "nemotron-nano-9b-v2:free", "nemotron-nano-9b-v2", "kimi-k2-0905", "kimi-k2-0905:exacto", "step3", "qwen3-30b-a3b-thinking-2507", "grok-code-fast-1", "hermes-4-70b", "hermes-4-405b", "deepseek-chat-v3.1", "mistral-medium-3.1", "ernie-4.5-21b-a3b", "ernie-4.5-vl-28b-a3b", "glm-4.5v", "jamba-mini-1.7", "jamba-large-1.7", "gpt-5-chat", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-oss-120b:free", "gpt-oss-120b", "gpt-oss-120b:exacto", "gpt-oss-20b:free", "gpt-oss-20b", "claude-opus-4.1", "codestral-2508", "qwen3-coder-30b-a3b-instruct", "qwen3-30b-a3b-instruct-2507", "glm-4.5", "glm-4.5-air:free", "glm-4.5-air", "qwen3-235b-a22b-thinking-2507", "glm-4-32b", "qwen3-coder:free", "qwen3-coder", "qwen3-coder:exacto", "ui-tars-1.5-7b", "qwen3-235b-a22b-2507", "router", "kimi-k2:free", "kimi-k2", "devstral-medium", "devstral-small", "dolphin-mistral-24b-venice-edition:free", "grok-4", "gemma-3n-e2b-it:free", "hunyuan-a13b-instruct", "deepseek-r1t2-chimera:free", "deepseek-r1t2-chimera", "morph-v3-large", "morph-v3-fast", "ernie-4.5-vl-424b-a47b", "ernie-4.5-300b-a47b", "mercury", "mistral-small-3.2-24b-instruct", "minimax-m1", "kimi-dev-72b", "o3-pro", "grok-3-mini", "grok-3", "deepseek-r1-0528:free", "deepseek-r1-0528", "claude-opus-4", "claude-sonnet-4", "gemma-3n-e4b-it:free", "gemma-3n-e4b-it", "mistral-medium-3", "spotlight", "maestro-reasoning", "virtuoso-large", "coder-large", "mercury-coder", "qwen3-4b:free", "llama-guard-4-12b", "qwen3-30b-a3b", "qwen3-8b", "qwen3-14b", "qwen3-32b", "qwen3-235b-a22b", "deepseek-r1t-chimera:free", "deepseek-r1t-chimera", "o4-mini-high", "o3", "o4-mini", "qwen2.5-coder-7b-instruct", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "llemma_7b", "codellama-7b-instruct-solidity", "grok-3-mini-beta", "grok-3-beta", "llama-3.1-nemotron-ultra-253b-v1", "llama-4-maverick", "llama-4-scout", "qwen2.5-vl-32b-instruct", "deepseek-chat-v3-0324", "o1-pro", "mistral-small-3.1-24b-instruct:free", "mistral-small-3.1-24b-instruct", "olmo-2-0325-32b-instruct", "gemma-3-4b-it:free", "gemma-3-4b-it", "gemma-3-12b-it:free", "gemma-3-12b-it", "command-a", "gemma-3-27b-it:free", "gemma-3-27b-it", "skyfall-36b-v2", "sonar-reasoning-pro", "sonar-pro", "sonar-deep-research", "qwq-32b", "gemini-2.0-flash-lite-001", "claude-3.7-sonnet:thinking", "claude-3.7-sonnet", "mistral-saba", "llama-guard-3-8b", "o3-mini-high", "gemini-2.0-flash-001", "qwen-vl-plus", "aion-1.0", "aion-1.0-mini", "aion-rp-llama-3.1-8b", "qwen-vl-max", "qwen-turbo", "qwen2.5-vl-72b-instruct", "qwen-plus", "qwen-max", "o3-mini", "mistral-small-24b-instruct-2501", "deepseek-r1-distill-qwen-32b", "sonar", "deepseek-r1-distill-llama-70b", "deepseek-r1", "minimax-01", "phi-4", "l3.1-70b-hanami-x1", "deepseek-chat", "l3.3-euryale-70b", "o1", "command-r7b-12-2024", "gemini-2.0-flash-exp:free", "llama-3.3-70b-instruct:free", "llama-3.3-70b-instruct", "nova-lite-v1", "nova-micro-v1", "nova-pro-v1", "gpt-4o-2024-11-20", "mistral-large-2411", "mistral-large-2407", "pixtral-large-2411", "qwen-2.5-coder-32b-instruct", "sorcererlm-8x22b", "unslopnemo-12b", "claude-3.5-haiku", "claude-3.5-sonnet", "magnum-v4-72b", "ministral-3b", "ministral-8b", "qwen-2.5-7b-instruct", "llama-3.1-nemotron-70b-instruct", "inflection-3-pi", "inflection-3-productivity", "rocinante-12b", "llama-3.2-1b-instruct", "llama-3.2-3b-instruct:free", "llama-3.2-3b-instruct", "llama-3.2-11b-vision-instruct", "qwen-2.5-72b-instruct", "llama-3.1-lumimaid-8b", "pixtral-12b", "command-r-plus-08-2024", "command-r-08-2024", "qwen-2.5-vl-7b-instruct:free", "qwen-2.5-vl-7b-instruct", "l3.1-euryale-70b", "hermes-3-llama-3.1-70b", "hermes-3-llama-3.1-405b:free", "hermes-3-llama-3.1-405b", "chatgpt-4o-latest", "l3-lunaris-8b", "gpt-4o-2024-08-06", "llama-3.1-405b", "llama-3.1-70b-instruct", "llama-3.1-405b-instruct:free", "llama-3.1-405b-instruct", "llama-3.1-8b-instruct", "mistral-nemo", "gpt-4o-mini", "gpt-4o-mini-2024-07-18", "gemma-2-27b-it", "gemma-2-9b-it", "l3-euryale-70b", "mistral-7b-instruct", "hermes-2-pro-llama-3-8b", "mistral-7b-instruct-v0.3", "llama-guard-2-8b", "gpt-4o", "gpt-4o:extended", "gpt-4o-2024-05-13", "llama-3-8b-instruct", "llama-3-70b-instruct", "mixtral-8x22b-instruct", "wizardlm-2-8x22b", "claude-3-haiku", "mistral-large", "gpt-3.5-turbo-0613", "mistral-tiny", "mistral-7b-instruct-v0.2", "mixtral-8x7b-instruct", "noromaid-20b", "goliath-120b", "auto", "gpt-3.5-turbo-instruct", "mistral-7b-instruct-v0.1", "gpt-3.5-turbo-16k", "weaver", "remm-slerp-l2-13b", "mythomax-l2-13b", "gpt-4-0314", "gpt-4", "gpt-3.5-turbo"]
 					}
 				},
 				"presence_penalty": {
@@ -1538,6 +1538,84 @@
 				}
 			},
 			"timeout": "72"
+		},
+		"Caption": {
+			"aliases": ["Caption", "Title"],
+			"description": "Renders text onto an image or animation, using an optional font.",
+			"example": [],
+			"level": "0",
+			"rate_limit": "(7, 13)",
+			"schema": {
+				"bottom_text": {
+					"description": "Bottom text to draw",
+					"example": "World!",
+					"type": "word"
+				},
+				"colour": {
+					"aliases": ["color"],
+					"default": [255, 255, 255],
+					"description": "The colour of the gradient on one side",
+					"example": "#BF7FFF",
+					"type": "colour"
+				},
+				"filesize": {
+					"aliases": ["fs"],
+					"default": 52428800,
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"type": "filesize",
+					"validation": "[1024, 1073741824]"
+				},
+				"font": {
+					"default": "Impact",
+					"description": "The font to use",
+					"type": "enum",
+					"validation": {
+						"accepts": {"agency fb": "Agency FB", "algerian": "Algerian", "book antiqua": "Book Antiqua", "arial": "Arial", "arial rounded mt bold": "Arial Rounded MT Bold", "bahnschrift": "Bahnschrift", "baskerville old face": "Baskerville Old Face", "bauhaus 93": "Bauhaus 93", "bell mt": "Bell MT", "bernard mt condensed": "Bernard MT Condensed", "bodoni mt": "Bodoni MT", "bookman old style": "Bookman Old Style", "bradley hand itc": "Bradley Hand ITC", "britannic bold": "Britannic Bold", "berlin sans fb": "Berlin Sans FB", "berlin sans fb demi": "Berlin Sans FB Demi", "broadway": "Broadway", "brush script mt": "Brush Script MT", "bookshelf symbol 7": "Bookshelf Symbol 7", "calibri": "Calibri", "californian fb": "Californian FB", "calisto mt": "Calisto MT", "cambria": "Cambria", "candara": "Candara", "cascadia code": "Cascadia Code", "cascadia mono": "Cascadia Mono", "castellar": "Castellar", "century schoolbook": "Century Schoolbook", "centaur": "Centaur", "century": "Century", "chiller": "Chiller", "colonna mt": "Colonna MT", "comic sans ms": "Comic Sans MS", "consolas": "Consolas", "constantia": "Constantia", "cooper black": "Cooper Black", "copperplate gothic bold": "Copperplate Gothic Bold", "copperplate gothic light": "Copperplate Gothic Light", "corbel": "Corbel", "courier new": "Courier New", "curlz mt": "Curlz MT", "dubai": "Dubai", "ebrima": "Ebrima", "elephant": "Elephant", "engravers mt": "Engravers MT", "eras bold itc": "Eras Bold ITC", "eras demi itc": "Eras Demi ITC", "eras light itc": "Eras Light ITC", "eras medium itc": "Eras Medium ITC", "felix titling": "Felix Titling", "forte": "Forte", "franklin gothic book": "Franklin Gothic Book", "franklin gothic demi": "Franklin Gothic Demi", "franklin gothic demi cond": "Franklin Gothic Demi Cond", "franklin gothic heavy": "Franklin Gothic Heavy", "franklin gothic medium": "Franklin Gothic Medium", "franklin gothic medium cond": "Franklin Gothic Medium Cond", "freestyle script": "Freestyle Script", "french script mt": "French Script MT", "footlight mt light": "Footlight MT Light", "gabriola": "Gabriola", "gadugi": "Gadugi", "garamond": "Garamond", "georgia": "Georgia", "gigi": "Gigi", "gill sans mt": "Gill Sans MT", "gill sans mt condensed": "Gill Sans MT Condensed", "gill sans ultra bold condensed": "Gill Sans Ultra Bold Condensed", "gill sans ultra bold": "Gill Sans Ultra Bold", "gloucester mt extra condensed": "Gloucester MT Extra Condensed", "gill sans mt ext condensed bold": "Gill Sans MT Ext Condensed Bold", "century gothic": "Century Gothic", "goudy old style": "Goudy Old Style", "goudy stout": "Goudy Stout", "harlow solid italic": "Harlow Solid Italic", "harrington": "Harrington", "haettenschweiler": "Haettenschweiler", "microsoft himalaya": "Microsoft Himalaya", "high tower text": "High Tower Text", "impact": "Impact", "imprint mt shadow": "Imprint MT Shadow", "informal roman": "Informal Roman", "ink free": "Ink Free", "blackadder itc": "Blackadder ITC", "edwardian script itc": "Edwardian Script ITC", "kristen itc": "Kristen ITC", "javanese text": "Javanese Text", "jokerman": "Jokerman", "juice itc": "Juice ITC", "kunstler script": "Kunstler Script", "wide latin": "Wide Latin", "lucida bright": "Lucida Bright", "lucida calligraphy": "Lucida Calligraphy", "leelawadee ui": "Leelawadee UI", "leelawadee": "Leelawadee", "lucida fax": "Lucida Fax", "lucida handwriting": "Lucida Handwriting", "lucida sans": "Lucida Sans", "lucida sans typewriter": "Lucida Sans Typewriter", "lucida console": "Lucida Console", "lucida sans unicode": "Lucida Sans Unicode", "magneto": "Magneto", "maiandra gd": "Maiandra GD", "malgun gothic": "Malgun Gothic", "marlett": "Marlett", "matura mt script capitals": "Matura MT Script Capitals", "microsoft sans serif": "Microsoft Sans Serif", "mingliu-extb": "MingLiU-ExtB", "mistral": "Mistral", "myanmar text": "Myanmar Text", "modern no. 20": "Modern No. 20", "mongolian baiti": "Mongolian Baiti", "ms gothic": "MS Gothic", "microsoft jhenghei": "Microsoft JhengHei", "microsoft uighur": "Microsoft Uighur", "microsoft yahei": "Microsoft YaHei", "microsoft yi baiti": "Microsoft Yi Baiti", "monotype corsiva": "Monotype Corsiva", "mt extra": "MT Extra", "mv boli": "MV Boli", "niagara engraved": "Niagara Engraved", "niagara solid": "Niagara Solid", "nirmala ui": "Nirmala UI", "microsoft new tai lue": "Microsoft New Tai Lue", "ocr a extended": "OCR A Extended", "old english text mt": "Old English Text MT", "onyx": "Onyx", "ms outlook": "MS Outlook", "palatino linotype": "Palatino Linotype", "palace script mt": "Palace Script MT", "papyrus": "Papyrus", "parchment": "Parchment", "perpetua": "Perpetua", "perpetua titling mt": "Perpetua Titling MT", "microsoft phagspa": "Microsoft PhagsPa", "playbill": "Playbill", "poor richard": "Poor Richard", "pristina": "Pristina", "rage italic": "Rage Italic", "ravie": "Ravie", "ms reference sans serif": "MS Reference Sans Serif", "ms reference specialty": "MS Reference Specialty", "rockwell condensed": "Rockwell Condensed", "rockwell": "Rockwell", "rockwell extra bold": "Rockwell Extra Bold", "sans serif collection": "Sans Serif Collection", "script mt bold": "Script MT Bold", "segoe mdl2 assets": "Segoe MDL2 Assets", "segoe fluent icons": "Segoe Fluent Icons", "segoe print": "Segoe Print", "segoe script": "Segoe Script", "segoe ui": "Segoe UI", "segoe ui emoji": "Segoe UI Emoji", "segoe ui historic": "Segoe UI Historic", "segoe ui symbol": "Segoe UI Symbol", "segoe ui variable": "Segoe UI Variable", "showcard gothic": "Showcard Gothic", "simsun": "SimSun", "simsun-extb": "SimSun-ExtB", "simsun-extg": "SimSun-ExtG", "sitka": "Sitka", "snap itc": "Snap ITC", "stencil": "Stencil", "sylfaen": "Sylfaen", "symbol": "Symbol", "tahoma": "Tahoma", "microsoft tai le": "Microsoft Tai Le", "tw cen mt": "Tw Cen MT", "tw cen mt condensed": "Tw Cen MT Condensed", "tw cen mt condensed extra bold": "Tw Cen MT Condensed Extra Bold", "tempus sans itc": "Tempus Sans ITC", "times new roman": "Times New Roman", "trebuchet ms": "Trebuchet MS", "verdana": "Verdana", "viner hand itc": "Viner Hand ITC", "vivaldi": "Vivaldi", "vladimir script": "Vladimir Script", "webdings": "Webdings", "wingdings": "Wingdings", "wingdings 2": "Wingdings 2", "wingdings 3": "Wingdings 3", "yu gothic": "Yu Gothic"},
+						"enum": []
+					}
+				},
+				"format": {
+					"default": "auto",
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"type": "enum",
+					"validation": {
+						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "heif", "avif", "ico"]
+					}
+				},
+				"outline": {
+					"default": [0, 0, 0],
+					"description": "The colour of the outline",
+					"example": "#FF7FBF",
+					"type": "colour"
+				},
+				"size": {
+					"default": 64,
+					"description": "The size of the font (usually in pixels width/height)",
+					"type": "number",
+					"validation": "(0, 1024]"
+				},
+				"top_text": {
+					"description": "The text to draw",
+					"example": "Hello World!",
+					"type": "word"
+				},
+				"url": {
+					"aliases": ["i"],
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"required": true,
+					"type": "visual"
+				},
+				"width": {
+					"description": "The stroke width",
+					"type": "number",
+					"validation": "(0, 256]"
+				}
+			},
+			"timeout": "24"
 		},
 		"Colour": {
 			"aliases": ["Colour", "RGB", "HSV", "HSL", "CMY", "LAB", "LUV", "XYZ", "Color"],
@@ -2585,6 +2663,73 @@
 				}
 			},
 			"timeout": "120"
+		},
+		"Text": {
+			"aliases": ["Text", "Font"],
+			"description": "Renders text using an optional font.",
+			"example": [],
+			"level": "0",
+			"rate_limit": "(3, 5)",
+			"schema": {
+				"colour": {
+					"aliases": ["color"],
+					"default": [255, 255, 255],
+					"description": "The colour of the gradient on one side",
+					"example": "#BF7FFF",
+					"type": "colour"
+				},
+				"filesize": {
+					"aliases": ["fs"],
+					"default": 52428800,
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"type": "filesize",
+					"validation": "[1024, 1073741824]"
+				},
+				"font": {
+					"default": "Calibri",
+					"description": "The font to use",
+					"type": "enum",
+					"validation": {
+						"accepts": {"agency fb": "Agency FB", "algerian": "Algerian", "book antiqua": "Book Antiqua", "arial": "Arial", "arial rounded mt bold": "Arial Rounded MT Bold", "bahnschrift": "Bahnschrift", "baskerville old face": "Baskerville Old Face", "bauhaus 93": "Bauhaus 93", "bell mt": "Bell MT", "bernard mt condensed": "Bernard MT Condensed", "bodoni mt": "Bodoni MT", "bookman old style": "Bookman Old Style", "bradley hand itc": "Bradley Hand ITC", "britannic bold": "Britannic Bold", "berlin sans fb": "Berlin Sans FB", "berlin sans fb demi": "Berlin Sans FB Demi", "broadway": "Broadway", "brush script mt": "Brush Script MT", "bookshelf symbol 7": "Bookshelf Symbol 7", "calibri": "Calibri", "californian fb": "Californian FB", "calisto mt": "Calisto MT", "cambria": "Cambria", "candara": "Candara", "cascadia code": "Cascadia Code", "cascadia mono": "Cascadia Mono", "castellar": "Castellar", "century schoolbook": "Century Schoolbook", "centaur": "Centaur", "century": "Century", "chiller": "Chiller", "colonna mt": "Colonna MT", "comic sans ms": "Comic Sans MS", "consolas": "Consolas", "constantia": "Constantia", "cooper black": "Cooper Black", "copperplate gothic bold": "Copperplate Gothic Bold", "copperplate gothic light": "Copperplate Gothic Light", "corbel": "Corbel", "courier new": "Courier New", "curlz mt": "Curlz MT", "dubai": "Dubai", "ebrima": "Ebrima", "elephant": "Elephant", "engravers mt": "Engravers MT", "eras bold itc": "Eras Bold ITC", "eras demi itc": "Eras Demi ITC", "eras light itc": "Eras Light ITC", "eras medium itc": "Eras Medium ITC", "felix titling": "Felix Titling", "forte": "Forte", "franklin gothic book": "Franklin Gothic Book", "franklin gothic demi": "Franklin Gothic Demi", "franklin gothic demi cond": "Franklin Gothic Demi Cond", "franklin gothic heavy": "Franklin Gothic Heavy", "franklin gothic medium": "Franklin Gothic Medium", "franklin gothic medium cond": "Franklin Gothic Medium Cond", "freestyle script": "Freestyle Script", "french script mt": "French Script MT", "footlight mt light": "Footlight MT Light", "gabriola": "Gabriola", "gadugi": "Gadugi", "garamond": "Garamond", "georgia": "Georgia", "gigi": "Gigi", "gill sans mt": "Gill Sans MT", "gill sans mt condensed": "Gill Sans MT Condensed", "gill sans ultra bold condensed": "Gill Sans Ultra Bold Condensed", "gill sans ultra bold": "Gill Sans Ultra Bold", "gloucester mt extra condensed": "Gloucester MT Extra Condensed", "gill sans mt ext condensed bold": "Gill Sans MT Ext Condensed Bold", "century gothic": "Century Gothic", "goudy old style": "Goudy Old Style", "goudy stout": "Goudy Stout", "harlow solid italic": "Harlow Solid Italic", "harrington": "Harrington", "haettenschweiler": "Haettenschweiler", "microsoft himalaya": "Microsoft Himalaya", "high tower text": "High Tower Text", "impact": "Impact", "imprint mt shadow": "Imprint MT Shadow", "informal roman": "Informal Roman", "ink free": "Ink Free", "blackadder itc": "Blackadder ITC", "edwardian script itc": "Edwardian Script ITC", "kristen itc": "Kristen ITC", "javanese text": "Javanese Text", "jokerman": "Jokerman", "juice itc": "Juice ITC", "kunstler script": "Kunstler Script", "wide latin": "Wide Latin", "lucida bright": "Lucida Bright", "lucida calligraphy": "Lucida Calligraphy", "leelawadee ui": "Leelawadee UI", "leelawadee": "Leelawadee", "lucida fax": "Lucida Fax", "lucida handwriting": "Lucida Handwriting", "lucida sans": "Lucida Sans", "lucida sans typewriter": "Lucida Sans Typewriter", "lucida console": "Lucida Console", "lucida sans unicode": "Lucida Sans Unicode", "magneto": "Magneto", "maiandra gd": "Maiandra GD", "malgun gothic": "Malgun Gothic", "marlett": "Marlett", "matura mt script capitals": "Matura MT Script Capitals", "microsoft sans serif": "Microsoft Sans Serif", "mingliu-extb": "MingLiU-ExtB", "mistral": "Mistral", "myanmar text": "Myanmar Text", "modern no. 20": "Modern No. 20", "mongolian baiti": "Mongolian Baiti", "ms gothic": "MS Gothic", "microsoft jhenghei": "Microsoft JhengHei", "microsoft uighur": "Microsoft Uighur", "microsoft yahei": "Microsoft YaHei", "microsoft yi baiti": "Microsoft Yi Baiti", "monotype corsiva": "Monotype Corsiva", "mt extra": "MT Extra", "mv boli": "MV Boli", "niagara engraved": "Niagara Engraved", "niagara solid": "Niagara Solid", "nirmala ui": "Nirmala UI", "microsoft new tai lue": "Microsoft New Tai Lue", "ocr a extended": "OCR A Extended", "old english text mt": "Old English Text MT", "onyx": "Onyx", "ms outlook": "MS Outlook", "palatino linotype": "Palatino Linotype", "palace script mt": "Palace Script MT", "papyrus": "Papyrus", "parchment": "Parchment", "perpetua": "Perpetua", "perpetua titling mt": "Perpetua Titling MT", "microsoft phagspa": "Microsoft PhagsPa", "playbill": "Playbill", "poor richard": "Poor Richard", "pristina": "Pristina", "rage italic": "Rage Italic", "ravie": "Ravie", "ms reference sans serif": "MS Reference Sans Serif", "ms reference specialty": "MS Reference Specialty", "rockwell condensed": "Rockwell Condensed", "rockwell": "Rockwell", "rockwell extra bold": "Rockwell Extra Bold", "sans serif collection": "Sans Serif Collection", "script mt bold": "Script MT Bold", "segoe mdl2 assets": "Segoe MDL2 Assets", "segoe fluent icons": "Segoe Fluent Icons", "segoe print": "Segoe Print", "segoe script": "Segoe Script", "segoe ui": "Segoe UI", "segoe ui emoji": "Segoe UI Emoji", "segoe ui historic": "Segoe UI Historic", "segoe ui symbol": "Segoe UI Symbol", "segoe ui variable": "Segoe UI Variable", "showcard gothic": "Showcard Gothic", "simsun": "SimSun", "simsun-extb": "SimSun-ExtB", "simsun-extg": "SimSun-ExtG", "sitka": "Sitka", "snap itc": "Snap ITC", "stencil": "Stencil", "sylfaen": "Sylfaen", "symbol": "Symbol", "tahoma": "Tahoma", "microsoft tai le": "Microsoft Tai Le", "tw cen mt": "Tw Cen MT", "tw cen mt condensed": "Tw Cen MT Condensed", "tw cen mt condensed extra bold": "Tw Cen MT Condensed Extra Bold", "tempus sans itc": "Tempus Sans ITC", "times new roman": "Times New Roman", "trebuchet ms": "Trebuchet MS", "verdana": "Verdana", "viner hand itc": "Viner Hand ITC", "vivaldi": "Vivaldi", "vladimir script": "Vladimir Script", "webdings": "Webdings", "wingdings": "Wingdings", "wingdings 2": "Wingdings 2", "wingdings 3": "Wingdings 3", "yu gothic": "Yu Gothic"},
+						"enum": []
+					}
+				},
+				"format": {
+					"default": "auto",
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"type": "enum",
+					"validation": {
+						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "vp8": "webm", "vp9": "webm", "av1": "mp4", "quicktime": "qt", "mpegts": "ts", "matroska": "mkv"},
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "heif", "avif", "ico"]
+					}
+				},
+				"outline": {
+					"default": [0, 0, 0],
+					"description": "The colour of the outline",
+					"example": "#FF7FBF",
+					"type": "colour"
+				},
+				"size": {
+					"default": 48,
+					"description": "The size of the font (usually in pixels width/height)",
+					"type": "number",
+					"validation": "(0, 1024]"
+				},
+				"text": {
+					"description": "The text to draw",
+					"example": "Hello World!",
+					"required": true,
+					"type": "string"
+				},
+				"width": {
+					"description": "The stroke width",
+					"type": "number",
+					"validation": "(0, 256]"
+				}
+			},
+			"timeout": "24"
 		}
 	},
 	"MAIN": {
@@ -3944,7 +4089,7 @@
 					"default": "nbs",
 					"type": "enum",
 					"validation": {
-						"enum": ["aac", "csv", "deltarune", "flac", "genshinsheet", "hpc", "litematic", "m4a", "mcfunction", "mid", "midi", "moai", "mp3", "nbs", "nbt", "ogg", "opus", "org", "schem", "schematic", "skysheet", "wav", "weba", "webm", "🗿"]
+						"enum": ["aac", "csv", "deltarune", "flac", "genshinsheet", "hpc", "litematic", "m4a", "mcfunction", "mid", "midi", "moai", "mp3", "nbs", "nbt", "ogg", "opus", "org", "raw", "schem", "schematic", "skysheet", "wav", "weba", "webm", "🗿"]
 					}
 				},
 				"kwargs": {

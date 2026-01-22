@@ -1919,7 +1919,14 @@ class Command(Importable):
 			if v.get("description"):
 				desc.append(colourise(v.description))
 				if v.get("validation"):
-					valid = v.validation if isinstance(v.validation, str) else (colourise(",") + colourise(" ", fg="cyan")).join(v.validation.enum)
+					if isinstance(v.validation, str):
+						valid = v.validation
+					else:
+						seqs = v.validation.enum or v.validation.accepts
+						if len(seqs) > 64 or sum(map(len, seqs)) > 512:
+							valid = ", ".join(seqs)
+						else:
+							valid = (colourise(",") + colourise(" ", fg="cyan")).join(seqs)
 					desc.append(f"{colourise('Allowed', fg='red')}{colourise(':', fg='white')} {colourise(valid, fg='cyan')}")
 				elif v.get("default"):
 					desc.append(f"{colourise('Default', fg='red')}{colourise(':', fg='white')} {colourise(json_if(v.default), fg='cyan')}")
