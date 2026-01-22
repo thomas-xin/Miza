@@ -555,6 +555,122 @@ def get_image(url, out=None, nodel=False, nogif=False, maxframes=inf, msize=None
 		image = image_from_bytes(url, maxframes=maxframes, msize=msize)
 	return image
 
+def properties(im, default_duration=None, default_fps=None) -> tuple: # frames, duration, fps
+	try:
+		if im.frameprops and not default_duration and not default_fps:
+			return im.frameprops
+	except AttributeError:
+		pass
+	total_duration = im.info.get("total_duration", default_duration or 0)
+	duration = total_duration
+	for f in range(2147483648):
+		try:
+			im.seek(f)
+		except EOFError:
+			break
+		if not total_duration:
+			duration += im.info.get("duration", 0) / 1000 or 1 / (default_fps or 40)
+	if f <= 1:
+		fps = default_fps or 40
+		duration = default_duration or 1 / fps
+	else:
+		fps = f / duration if duration != 0 else 0
+	props = (max(1, f), duration, fps)
+	print("PROPS:", props)
+	try:
+		im.frameprops = props
+	except AttributeError:
+		pass
+	return props
+
+def sync_fps(props, duration=None, fps=None):
+	d = max(t[1] for t in props)
+	prog = 1
+	if duration == 0:
+		return 1, 1, 0
+	if duration and duration < 0:
+		duration = -duration
+		prog = -prog
+	if fps and fps < 0:
+		fps = -fps
+		prog = -prog
+	seconds = d * ceil(duration / d) if duration is not None else d
+	fps = fps if fps is not None else max(t[2] for t in props)
+	print("SYNC:", props, seconds, fps, prog)
+	return seconds, fps, prog
+
+def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", keep_fps="exact", retrieve=False, **kwargs):
+	"""
+	Synchronizes and maps a function over a sequence of images.
+	The images may be static (repeated if necessary), or animated, in which case a heuristically determined set of frames will be used.
+	Args:
+		images (list): List of image URLs or image objects.
+		*args: Additional positional arguments to pass to the mapping function.
+		func (callable): Function to apply to the synchronized images.
+		duration (float, optional): Duration in seconds for the synchronization. Defaults to None.
+		fps (int, optional): Frames per second for the synchronization. Defaults to None.
+		keep_size (str, optional): Determines how to handle image sizes. Options are "exact", "approx", or None. Defaults to "approx".
+		retrieve (bool, optional): If True, retrieves images from URLs. Defaults to False.
+		**kwargs: Additional keyword arguments to pass to the mapping function.
+	Returns:
+		dict: A dictionary containing:
+			- 'duration' (int): Duration in milliseconds.
+			- 'count' (int): Number of frames.
+			- 'frames' (generator): Generator yielding the mapped frames.
+	"""
+	if retrieve:
+		sources = [get_image(url) for url in images]
+	else:
+		sources = images
+	if keep_fps == "exact":
+		props = [properties(im, default_duration=duration, default_fps=fps) for im in sources]
+	elif keep_fps == "approx":
+		props = [properties(im) for im in sources]
+	else:
+		raise NotImplementedError(keep_fps)
+	seconds, fps, prog = sync_fps(props, duration, fps)
+	count = max(1, round(fps * seconds))
+	if duration == 0:
+		count = 1
+	elif duration:
+		prog *= max(1, round(seconds / duration))
+	seed = time.time_ns() // 1000
+
+	if keep_size == "exact":
+		others = [ImageSequence.cast(resize_map(im, (), duration, fps, "set", sources[0].width, sources[0].height, mode="auto")) for im in sources[1:]]
+	elif keep_size == "approx":
+		width = max(source.width for source in sources)
+		height = max(source.height for source in sources)
+		diameter = sqrt(width * height)
+		others = [ImageSequence.cast(resize_map(im, (), duration, fps, "set", *max_size(im.width, im.height, maxsize=diameter, force=True), mode="auto")) for im in sources[1:]]
+	elif keep_size:
+		raise NotImplementedError(keep_size)
+	else:
+		others = sources[1:]
+	mapped_sources = (sources[0], *others)
+	def map_iter():
+		for i in range(count):
+			ims = []
+			for im, prop in zip(mapped_sources, props):
+				maxframes = prop[0]
+				mult = round(seconds / prop[1])
+				n = floor(i / count * mult * maxframes)
+				try:
+					im.seek(n % maxframes)
+				except Exception:
+					print(f"Seek error: {n}, {n % maxframes}, {maxframes}")
+					print(f"Current frame: {i}, {props}, {mapped_sources}")
+					raise
+				ims.append(im)
+			yield func(ims, *args, props=props, progress=prog * i / count % 1 if count > 1 else 1, count=count, seed=seed, **kwargs)
+
+	return dict(duration=seconds, count=count, frames=map_iter())
+
+def sync_animations(func, keep_size="approx"):
+	def sync_into(image, extras, duration=None, fps=None, *args, **kwargs):
+		return map_sync([image, *extras], *args, func=func, duration=duration, fps=fps, retrieve=True, keep_size=keep_size, **kwargs)
+	return sync_into
+
 
 def load_mimes():
 	with open("misc/mimes.txt") as f:
@@ -1310,7 +1426,10 @@ def render_text(text, font="Calibri", size=48, width=None, colour=(0, 0, 0), out
 	)
 	return im
 
-def caption_image(im: Image.Image, top_text, bottom_text, font="Impact", size=64, width=None, colour=(0, 0, 0), outline=(255, 255, 255)) -> Image.Image:
+
+@sync_animations
+def caption_map(images, top_text, bottom_text, font="Impact", size=64, width=None, colour=(0, 0, 0), outline=(255, 255, 255), progress=0, **kwargs):
+	im = images[0].convert("RGBA")
 	if isinstance(font, str):
 		from misc.caches import enumerate_os_fonts
 		font = ImageFont.truetype(enumerate_os_fonts()[font], size=size)
@@ -1328,8 +1447,6 @@ def caption_image(im: Image.Image, top_text, bottom_text, font="Impact", size=64
 			im2 = render_text(top_text, font, min(size, im.width * 2 / len(top_text)), width, colour, outline)
 			ims = (round(im.width * 0.75), round(im2.height * im.width * 0.75 / im2.width))
 			im2 = im2.resize(ims, Resampling.LANCZOS)
-			if im.mode != im2.mode:
-				im = im.convert(im2.mode)
 			im.alpha_composite(im2, (round(im.width / 2 - im2.width / 2), round(im2.height / 4)))
 		else:
 			draw = ImageDraw.Draw(im)
@@ -1353,8 +1470,6 @@ def caption_image(im: Image.Image, top_text, bottom_text, font="Impact", size=64
 			im2 = render_text(bottom_text, font, min(size, im.width * 2 / len(bottom_text)), width, colour, outline)
 			ims = (round(im.width * 0.75), round(im2.height * im.width * 0.75 / im2.width))
 			im2 = im2.resize(ims, Resampling.LANCZOS)
-			if im.mode != im2.mode:
-				im = im.convert(im2.mode)
 			im.alpha_composite(im2, (round(im.width / 2 - im2.width / 2), round(im.height - im2.height * 5 / 4)))
 		else:
 			draw = ImageDraw.Draw(im)
@@ -1367,123 +1482,6 @@ def caption_image(im: Image.Image, top_text, bottom_text, font="Impact", size=64
 				stroke_fill=outline,
 			)
 	return im
-
-
-def properties(im, default_duration=None, default_fps=None) -> tuple: # frames, duration, fps
-	try:
-		if im.frameprops and not default_duration and not default_fps:
-			return im.frameprops
-	except AttributeError:
-		pass
-	total_duration = im.info.get("total_duration", default_duration or 0)
-	duration = total_duration
-	for f in range(2147483648):
-		try:
-			im.seek(f)
-		except EOFError:
-			break
-		if not total_duration:
-			duration += im.info.get("duration", 0) / 1000 or 1 / (default_fps or 40)
-	if f <= 1:
-		fps = default_fps or 40
-		duration = default_duration or 1 / fps
-	else:
-		fps = f / duration if duration != 0 else 0
-	props = (max(1, f), duration, fps)
-	print("PROPS:", props)
-	try:
-		im.frameprops = props
-	except AttributeError:
-		pass
-	return props
-
-def sync_fps(props, duration=None, fps=None):
-	d = max(t[1] for t in props)
-	prog = 1
-	if duration == 0:
-		return 1, 1, 0
-	if duration and duration < 0:
-		duration = -duration
-		prog = -prog
-	if fps and fps < 0:
-		fps = -fps
-		prog = -prog
-	seconds = d * ceil(duration / d) if duration is not None else d
-	fps = fps if fps is not None else max(t[2] for t in props)
-	print("SYNC:", props, seconds, fps, prog)
-	return seconds, fps, prog
-
-def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", keep_fps="exact", retrieve=False, **kwargs):
-	"""
-	Synchronizes and maps a function over a sequence of images.
-	The images may be static (repeated if necessary), or animated, in which case a heuristically determined set of frames will be used.
-	Args:
-		images (list): List of image URLs or image objects.
-		*args: Additional positional arguments to pass to the mapping function.
-		func (callable): Function to apply to the synchronized images.
-		duration (float, optional): Duration in seconds for the synchronization. Defaults to None.
-		fps (int, optional): Frames per second for the synchronization. Defaults to None.
-		keep_size (str, optional): Determines how to handle image sizes. Options are "exact", "approx", or None. Defaults to "approx".
-		retrieve (bool, optional): If True, retrieves images from URLs. Defaults to False.
-		**kwargs: Additional keyword arguments to pass to the mapping function.
-	Returns:
-		dict: A dictionary containing:
-			- 'duration' (int): Duration in milliseconds.
-			- 'count' (int): Number of frames.
-			- 'frames' (generator): Generator yielding the mapped frames.
-	"""
-	if retrieve:
-		sources = [get_image(url) for url in images]
-	else:
-		sources = images
-	if keep_fps == "exact":
-		props = [properties(im, default_duration=duration, default_fps=fps) for im in sources]
-	elif keep_fps == "approx":
-		props = [properties(im) for im in sources]
-	else:
-		raise NotImplementedError(keep_fps)
-	seconds, fps, prog = sync_fps(props, duration, fps)
-	count = max(1, round(fps * seconds))
-	if duration == 0:
-		count = 1
-	elif duration:
-		prog *= max(1, round(seconds / duration))
-	seed = time.time_ns() // 1000
-
-	if keep_size == "exact":
-		others = [ImageSequence.cast(resize_map(im, (), duration, fps, "set", sources[0].width, sources[0].height, mode="auto")) for im in sources[1:]]
-	elif keep_size == "approx":
-		width = max(source.width for source in sources)
-		height = max(source.height for source in sources)
-		diameter = sqrt(width * height)
-		others = [ImageSequence.cast(resize_map(im, (), duration, fps, "set", *max_size(im.width, im.height, maxsize=diameter, force=True), mode="auto")) for im in sources[1:]]
-	elif keep_size:
-		raise NotImplementedError(keep_size)
-	else:
-		others = sources[1:]
-	mapped_sources = (sources[0], *others)
-	def map_iter():
-		for i in range(count):
-			ims = []
-			for im, prop in zip(mapped_sources, props):
-				maxframes = prop[0]
-				mult = round(seconds / prop[1])
-				n = floor(i / count * mult * maxframes)
-				try:
-					im.seek(n % maxframes)
-				except Exception:
-					print(f"Seek error: {n}, {n % maxframes}, {maxframes}")
-					print(f"Current frame: {i}, {props}, {mapped_sources}")
-					raise
-				ims.append(im)
-			yield func(ims, *args, props=props, progress=prog * i / count % 1 if count > 1 else 1, count=count, seed=seed, **kwargs)
-
-	return dict(duration=seconds, count=count, frames=map_iter())
-
-def sync_animations(func, keep_size="approx"):
-	def sync_into(image, extras, duration=None, fps=None, *args, **kwargs):
-		return map_sync([image, *extras], *args, func=func, duration=duration, fps=fps, retrieve=True, keep_size=keep_size, **kwargs)
-	return sync_into
 
 
 def clamp_transparency(frames):

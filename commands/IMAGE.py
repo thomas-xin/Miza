@@ -1573,7 +1573,7 @@ class Caption(Command):
 	async def __call__(self, bot, url, top_text, bottom_text, font, size, colour, width, outline, filesize, format, **void):
 		if not top_text and not bottom_text:
 			raise ArgumentError("At least one of top_text or bottom_text is required.")
-		resp = await process_image(url, "caption_image", [top_text, bottom_text, font, size, width, colour, outline, "-fs", filesize, "-f", format])
+		resp = await process_image(url, "caption_map", [[], None, 30, top_text, bottom_text, font, size, width, colour, outline, "-fs", filesize, "-f", format])
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
