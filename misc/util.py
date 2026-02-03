@@ -48,7 +48,7 @@ import pynvml
 import niquests
 import requests
 from misc.smath import predict_next, display_to_precision, unicode_prune, full_prune
-from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, fcdict, as_bytes, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, pretty_json, MultiEncoder # noqa: F401
+from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, mdict, fcdict, as_bytes, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, pretty_json, MultiEncoder # noqa: F401
 from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, asubmit, csubmit, esubmit, tsubmit, Future, Semaphore
 
 print("UTIL:", __name__)
@@ -1040,13 +1040,13 @@ def expired(stream):
 		if int(stream.split("/download/", 1)[1].split("/", 4)[3]) < utc() + 60:
 			return True
 	elif re.match(r"https?:\/\/cdn[0-9]*\.tik\.live\/api\/stream", stream):
-		if float(stream.replace("/", "=").replace("&e=", "?e=").split("?e=", 1)[-1].split("=", 1)[0].split("&", 1)[0]) / 1000 < utc() + 60:
+		if "e=" not in stream or float(stream.replace("/", "=").replace("&e=", "?e=").split("?e=", 1)[-1].split("=", 1)[0].split("&", 1)[0]) / 1000 < utc() + 60:
 			return True
 	elif is_youtube_stream(stream):
-		if int(stream.replace("/", "=").split("expire=", 1)[-1].split("=", 1)[0].split("&", 1)[0]) < utc() + 60:
+		if "expire=" not in stream or int(stream.replace("/", "=").split("expire=", 1)[-1].split("=", 1)[0].split("&", 1)[0]) < utc() + 60:
 			return True
 	elif is_soundcloud_stream(stream):
-		if int(stream.replace("/", "=").split("expires=", 1)[-1].split("=", 1)[0].split("&", 1)[0]) < utc() + 30:
+		if "expires=" not in stream or int(stream.replace("/", "=").split("expires=", 1)[-1].split("=", 1)[0].split("&", 1)[0]) < utc() + 30:
 			return True
 
 def url2fn(url) -> str:
@@ -4021,6 +4021,64 @@ def str_lookup(objs, query, key=lambda obj: obj, fuzzy=0, compare=string_similar
 		err += f' Did you mean: "{closest[2]}"?'
 	raise LookupError(err)
 
+confusable_pairs = (
+	("a", "o"),
+	("b", "6"),
+	("c", "e"),
+	("f", "t"),
+	("g", "9"),
+	("g", "q"),
+	("i", "j"),
+	("l", "1"),
+	("l", "I"),
+	("o", "0"),
+	("q", "4"),
+	("q", "9"),
+	("s", "5"),
+	("u", "v"),
+	("y", "4"),
+	("z", "2"),
+	("A", "4"),
+	("B", "8"),
+	("C", "G"),
+	("D", "0"),
+	("D", "O"),
+	("G", "6"),
+	("G", "Q"),
+	("I", "1"),
+	("K", "X"),
+	("O", "Q"),
+	("S", "5"),
+	("T", "7"),
+	("U", "V"),
+	("Z", "2"),
+	("0", "8"),
+	("3", "8"),
+	("4", "9"),
+)
+confusable_groups = list(map(set, confusable_pairs))
+while True:
+	new_groups = []
+	for g1 in confusable_groups:
+		for g2 in new_groups:
+			if g1.isdisjoint(g2):
+				pass
+			else:
+				g2.update(g1)
+				break
+		else:
+			new_groups.append(g1)
+	confusable_groups, new_groups = new_groups, confusable_groups
+	if len(new_groups) == len(confusable_groups):
+		break
+confusable_tr = "".maketrans({k: chr(i + 0x1800) for i, group in enumerate(confusable_groups) for k in group})
+def confusable_hash(s: str) -> str:
+	return unicode_prune(s).translate(confusable_tr).casefold()
+def confusable(s1: str, s2: str) -> bool:
+	if len(s1) != len(s2):
+		return False
+	return confusable_hash(s1) == confusable_hash(s2)
+
 def longest_sublist(lst, predicate):
 	"Returns the longest contiguous sublist of a list that satisfies a predicate. For example, if the predicate is `lambda a: all(a[i] < a[i + 1] for i in range(len(a) - 1))`, the function will return the longest sorted sublist. Note that for our implementation, we may sometimes need to perform backtracking with the sliding window, as a contiguous sublist may not fulfil the predicate if cut off; for example, if our predicate is instead a function which parses a string and returns a time delta, it may consider the strings `2 hours` and `3 minutes` as valid, but not `2 hours 3`, so we would need to backtrack at `3 minutes` to the previous predicate-satisfying sublist to be able to correctly identify the string `2 hours 3 minutes`."
 	if not lst:
@@ -4885,7 +4943,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		verify = True if ssl is not False else False
 		if not self.ts:
 			await self._init_()
-		if isinstance(data, aiohttp.FormData):
+		if 1 or isinstance(data, aiohttp.FormData):
 			session = self.sessions.next()
 		elif not session:
 			async with niquests.AsyncSession() as asession:

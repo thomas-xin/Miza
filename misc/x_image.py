@@ -35,6 +35,7 @@ Transpose = getattr(Image, "Transpose", Image)
 Transform = getattr(Image, "Transform", Image)
 Image.MAX_IMAGE_PIXELS = 4294967296
 GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_DIFFERENT_PALETTE_ONLY
+from misc.types import ts_us
 from misc.asyncs import esubmit, await_fut  # noqa: E402
 from misc.util import get_image_size, temporary_file, archive_mimes, extract_archive, is_url
 
@@ -866,49 +867,62 @@ def quantise_into(a, clip=None, in_place=False, checkerboard=True, dtype=np.uint
 		np.floor(a, out=a)
 	return np.asanyarray(a, dtype=dtype)
 
-def random_square(size, mult=1) -> Image.Image:
-	arr = np.random.randint(0, 2, size=(size, size, 3), dtype=np.uint8)
+def gen_noise(size, mult=1, mode="L") -> Image.Image:
+	ims = (*size[::-1], len(mode)) if len(mode) > 1 else size[::-1]
+	arr = np.random.randint(0, 2, size=ims, dtype=np.uint8)
 	arr *= 255
-	im = Image.fromarray(arr, "RGB")
+	im = Image.fromarray(arr, mode)
 	if mult != 1:
-		return im.resize((size * mult, size * mult), Resampling.NEAREST)
+		return im.resize((size[0] * mult, size[1] * mult), Resampling.NEAREST)
 	return im
 
-def gen_captcha(cells: int = 25, n: int = 5, cell_size: int = 30):
-	mult = 2
-	border = random.randint(4, 12)
-	padding = random.randint(3, 7)
-	cell_size += random.randint(-3, 3)
-	side_count = ceil(sqrt(cells))
-	im_width = cell_size * side_count + border * 2 + padding * (side_count - 1)
-	segments = [random_square(cell_size, mult) for i in range(cells)]
-	base_dir = (random.randint(-3, 3), random.randint(-3, 3))
-	while base_dir == (0, 0):
-		base_dir = (random.randint(-3, 3), random.randint(-3, 3))
-	offsets = [base_dir] * cells
-	diffs = list(range(cells))
-	random.shuffle(diffs)
-	for i in diffs[:n]:
-		new_dir = (random.randint(-4, 4), random.randint(-4, 4))
-		while new_dir != (0, 0) and abs(new_dir[0] - base_dir[0]) + abs(new_dir[1] - base_dir[1]) < 3:
-			new_dir = (random.randint(-4, 4), random.randint(-4, 4))
-		offsets[i] = new_dir
+def gen_captcha(seed, width=640, font="Segoe Script", mult=2, mode="RGB"):
+	size = (width, round(width / 3 * 1))
+	fg = gen_noise(size, mult, mode)
+	bg = gen_noise(size, mult, mode)
+
+	im = Image.new("LA", fg.size, color=(0, 0))
+	im2 = render_text(seed, font, im.width * 2 / len(seed), im.width * 2 / len(seed) / 24, 255, outline=128)
+	ims = (round(im.width * 0.9), round(im2.height * im.width * 0.9 / im2.width))
+	im2 = im2.convert("LA").resize(ims, Resampling.LANCZOS)
+	im.alpha_composite(im2, (round(im.width / 2 - im2.width / 2), round(im.height / 2 - im2.height / 2)))
+	image = im.convert("L")
+
+	np.random.seed(ts_us() & 4294967295)
+	dst_grid = griddify(shape_to_rect(image.size), 7, 6)
+	src_grid = distort_grid(dst_grid, width // 48)
+	mesh = grid_to_mesh(src_grid, dst_grid)
+	mask = np.asanyarray(image.transform(image.size, Transform.MESH, mesh, resample=Resampling.BILINEAR), dtype=np.float32)
+	mask *= 1 / 127
+	bgmask = mask < 1
+	fgmask = mask >= 2
+	maxframes = 60 * 8
 
 	def captcha_iter():
-		for i in range(cell_size * mult):
-			base = random_square(im_width, mult)
-			for j, seg in enumerate(segments):
-				px, py = j % side_count, j // side_count
-				x, y = px * cell_size * mult, py * cell_size * mult
-				x += mult * (border + padding * px); y += mult * (border + padding * py)
-				dx, dy = offsets[j]
-				dx *= i; dy *= i
-				cell = ImageChops.offset(seg, dx, dy)
-				print(x, y, dx, dy)
-				base.paste(cell, (x, y))
-			yield base
+		nonlocal fg, bg
+		v = 2
+		vx = random.randint(-v, v)
+		vy = (v - abs(vx)) * (1 if random.randint(0, 1) else -1)
+		vx2 = random.randint(-v, v)
+		vy2 = (v - abs(vx2)) * (1 if random.randint(0, 1) else -1)
+		while abs(vx - vx2) < v:
+			vx2 = random.randint(-v, v)
+			vy2 = (v - abs(vx2)) * (1 if random.randint(0, 1) else -1)
+		vx = round(vx / 2)
+		for i in range(maxframes):
+			progress = i / maxframes
+			dx, dy = progress * vx * fg.width, progress * vy * fg.height
+			dx2, dy2 = progress * vx2 * bg.width, progress * vy2 * bg.height
+			fga = np.asanyarray(ImageChops.offset(fg, round(dx), round(dy)), dtype=np.uint8)
+			bga = np.asanyarray(ImageChops.offset(bg, round(dx2), round(dy2)), dtype=np.uint8)
+			ol = gen_noise(size, mult, mode)
+			ola = np.array(ol, dtype=np.uint8)
+			ola[bgmask] = bga[bgmask]
+			ola[fgmask] = fga[fgmask]
+			yield Image.fromarray(ola, mode)
 
-	return dict(duration=3, count=cell_size, frames=captcha_iter())
+	return dict(duration=8, count=maxframes, frames=captcha_iter())
+
 
 def detect_c2pa(url):
 	if is_url(url):
@@ -1412,7 +1426,7 @@ def render_text(text, font="Calibri", size=48, width=None, colour=(0, 0, 0), out
 	)
 
 	w, h = ceil(right - left), ceil(bottom - top)
-	im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+	im = Image.new("RGBA" if isinstance(colour, tuple) else "L", (w, h))
 	draw = ImageDraw.Draw(im)
 
 	# Offset by -left/-top so the text fits exactly

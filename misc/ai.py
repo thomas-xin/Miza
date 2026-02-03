@@ -634,7 +634,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 	raise (exc or RuntimeError("Unknown error occured."))
 
 async def instruct(data, prune=True, cache=True, user=None):
-	key = shash(str((data.get("prompt") or data.get("messages"), data.get("model", "kimi-k2-t"), data.get("temperature", 0.75), data.get("max_tokens", 256))))
+	key = shash(str((data.get("prompt") or data.get("messages"), data.get("model", "grok-4.1-fast"), data.get("temperature", 0.75), data.get("max_tokens", 256))))
 	if cache:
 		return await CACHE.aretrieve(key, _instruct, data, prune=prune, user=user)
 	return await CACHE._aretrieve(key, _instruct, data, prune=prune, user=user)
@@ -659,7 +659,7 @@ async def _instruct(data, user=None, prune=True):
 			api=api,
 		))
 	if not inputs.get("reasoning_effort"):
-		inputs["reasoning_effort"] = "minimal" if model in is_reasoning else "low"
+		inputs["reasoning_effort"] = "low"
 	if inputs["model"] not in is_completion:
 		if "messages" not in inputs:
 			prompt = inputs.pop("prompt")

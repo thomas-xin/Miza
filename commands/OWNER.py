@@ -4,6 +4,11 @@ if "common" not in globals():
 	from misc.common import *
 print = PRINT
 
+try:
+	import compression.zstd
+except ImportError:
+	compression = None
+
 
 class Reload(Command):
 	min_level = nan
@@ -935,45 +940,54 @@ class UpdateColours(Database):
 
 class UpdateChannelCache(Database):
 	name = "channel_cache"
-	channel = True
+	no_file = True
+
+	def remove(self, c_id, removed: list):
+		if not removed:
+			return
+		bot = self.bot
+		bot.channel_cache[c_id] = set(bot.channel_cache[c_id]).difference(removed)
 
 	async def grab(self, channel, as_message=True, force=False):
 		if hasattr(channel, "simulated"):
 			yield channel.message
 			return
+		bot = self.bot
 		c_id = verify_id(channel)
 		min_time = time_snowflake(dtn() - datetime.timedelta(days=14))
 		deletable = False
-		s = self.get(c_id, ())
+		s = bot.channel_cache.get(c_id, ())
 		if isinstance(s, set):
-			s = self[c_id] = sorted(s, reverse=True)
+			s = bot.channel_cache[c_id] = sorted(s, reverse=True)
+		removed = []
 		for m_id in s:
 			if as_message:
 				try:
 					if m_id < min_time:
+						self.remove(c_id, removed)
 						raise OverflowError
-					message = await self.bot.fetch_message(m_id, channel=channel if force else None)
+					message = await bot.fetch_message(m_id, channel=channel if force else None)
 					if T(message).get("deleted"):
 						continue
 				except (discord.NotFound, discord.Forbidden, OverflowError):
-					if deletable:
-						self.data[c_id].remove(m_id)
+					removed.append(m_id)
 				except (TypeError, ValueError, LookupError, discord.HTTPException):
 					if not force:
 						break
 					print_exc()
 				else:
 					yield message
-				deletable = True
 			else:
 				yield m_id
+		self.remove(c_id, removed)
 
 	async def splice(self, channel, messages):
 		if not messages or hasattr(channel, "simulated"):
 			return []
+		bot = self.bot
 		c_id = verify_id(channel)
 		iids = sorted(m.id for m in messages)
-		mids = sorted(self.get(c_id, ()))
+		mids = sorted(bot.channel_cache.get(c_id, ()))
 		i = bisect.bisect_left(mids, iids[0])
 		j = bisect.bisect_right(mids, iids[-1])
 		min_id = time_snowflake(cdict(timestamp=lambda: utc() - 14 * 86400))
@@ -983,26 +997,150 @@ class UpdateChannelCache(Database):
 			midl = midl[k:]
 		mids = list(chain(midl, iids, mids[j:]))
 		mids.reverse()
-		self[c_id] = mids
+		bot.channel_cache[c_id] = mids
 		return mids
 
 	def add(self, c_id, m_id):
-		s = self.data.get(c_id, ())
-		if not isinstance(s, set):
-			s = set(s)
-		s.add(m_id)
-		while len(s) > 32768:
-			try:
-				s.discard(next(iter(s)))
-			except RuntimeError:
-				pass
-		self[c_id] = s
-	
+		bot = self.bot
+		s = bot.channel_cache.get(c_id, ())
+		if isinstance(s, tuple):
+			s = [m_id]
+		elif isinstance(s, list):
+			if m_id > s[0]:
+				s.insert(0, m_id)
+			elif m_id == s[0]:
+				return
+			else:
+				s = set(s)
+		if isinstance(s, set):
+			if m_id in s:
+				return
+			s.add(m_id)
+		bot.channel_cache[c_id] = s
+
 	def _delete_(self, message, **void):
+		bot = self.bot
 		try:
-			self.data[message.channel.id].remove(message.id)
+			bot.channel_cache[message.channel.id].remove(message.id)
 		except (AttributeError, KeyError, ValueError):
 			pass
+
+
+class UpdateMessageCache(Database):
+	name = "message_cache"
+	no_file = True
+	checked = set()
+	loader = diskcache.Cache(f"{CACHE_PATH}/message_cache_loader")
+
+	async def load_messages(self, channel):
+		if channel.id in self.checked:
+			return
+		self.checked.add(channel.id)
+		bot = self.bot
+		m_id = self.loader.get(channel.id, 0)
+		last = max(
+			time_snowflake(datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=14)),
+			m_id,
+		)
+		async with bot.guild_semaphore:
+			message = None
+			async for message in channel.history(after=last, limit=None, oldest_first=True):
+				esubmit(self.store_message, message)
+			if message:
+				self.loader[channel.id] = message.id
+
+	async def _send_(self, message, **void):
+		return await self.load_messages(message.channel)
+
+	def store_message(self, message):
+		bot = self.bot
+		m = T(message).get("_data")
+		if m:
+			if "author" not in m:
+				author = message.author
+				m["author"] = dict(id=author.id, username=author.name, avatar=author.avatar if not author.avatar or isinstance(author.avatar, str) else author.avatar.key)
+			elif not message.webhook_id:
+				m["author"] = dict(id=m["author"]["id"], username=m["author"]["username"], avatar=m["author"]["avatar"])
+			if "channel_id" not in m:
+				try:
+					m["channel_id"] = message.channel.id
+				except AttributeError:
+					return
+		else:
+			if message.channel is None:
+				return
+			author = message.author
+			m = dict(
+				author=dict(id=author.id, username=author.name, avatar=author.avatar if not author.avatar or isinstance(author.avatar, str) else author.avatar.key),
+				channel_id=message.channel.id,
+			)
+			if message.content:
+				m["content"] = readstring(message.content)
+			mtype = T(message.type).get("value", message.type)
+			if mtype:
+				m["type"] = mtype
+			flags = message.flags.value if message.flags else 0
+			if flags:
+				m["flags"] = flags
+			for k in ("tts", "pinned", "mention_everyone", "webhook_id"):
+				v = T(message).get(k)
+				if v:
+					m[k] = v
+			edited_timestamp = as_str(T(message).get("_edited_timestamp") or "")
+			if edited_timestamp:
+				m["edited_timestamp"] = edited_timestamp
+			reactions = []
+			for reaction in message.reactions:
+				if not reaction.is_custom_emoji():
+					r = dict(emoji=dict(id=None, name=str(reaction.emoji)))
+				else:
+					ename, eid = str(reaction.emoji).rsplit(":", 1)
+					eid = int(eid.removesuffix(">"))
+					ename = ename.split(":", 1)[-1]
+					r = dict(emoji=dict(id=eid, name=ename))
+				if reaction.count != 1:
+					r["count"] = reaction.count
+				if reaction.me:
+					r["me"] = reaction.me
+				reactions.append(r)
+			if reactions:
+				m["reactions"] = reactions
+			try:
+				attachments = [dict(id=a.id, size=a.size, filename=a.filename, url=a.url, proxy_url=a.proxy_url) for a in message.attachments if T(a).get("size")]
+			except AttributeError:
+				print(message.id)
+				raise
+			if attachments:
+				m["attachments"] = attachments
+			embeds = [e.to_dict() for e in message.embeds]
+			if embeds:
+				m["embeds"] = embeds
+		try:
+			m["id"] = int(m["id"])
+		except (KeyError, ValueError):
+			m["id"] = message.id
+		if not message.webhook_id:
+			m.pop("member", None)
+		m.pop("nonce", None)
+		m.pop("timestamp", None)
+		for k in ("type", "attachments", "embeds", "components", "channel_type", "edited_timestamp", "flags", "pinned", "mentions", "mention_roles", "mention_everyone", "tts", "deaf"):
+			if not m.get(k):
+				m.pop(k, None)
+		data = orjson.dumps(m)
+		if compression and len(data) > 1024:
+			data2 = compression.zstd.compress(data, 10)
+			if len(data2) < len(data) - 1:
+				data = b"\x80" + data2
+		bot.message_cache[m["id"]] = encrypt(data)
+		bot.data.channel_cache.add(message.channel.id, message.id)
+		return m
+
+	def load_message(self, m_id):
+		bot = self.bot
+		data = decrypt(bot.message_cache[m_id])
+		if data.startswith(b"\x80"):
+			data = compression.zstd.decompress(data[1:])
+		return bot.CachedMessage(orjson.loads(data))
 
 
 class Maintenance(Command):

@@ -9,6 +9,7 @@ hyperchoron_encoders = set()
 hyperchoron_decoders = set()
 try:
 	s = subprocess.check_output(["hyperchoron", "-lf"], encoding="utf-8")
+	assert "# Encoders:" in s, s[:256]
 except Exception:
 	print_exc()
 else:

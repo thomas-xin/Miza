@@ -434,14 +434,6 @@ class Ban(Command):
 			await bot.ignore_interaction(message)
 
 
-class Captcha(Command):
-
-	async def __call__(self, _timeout, **void):
-		resp = await process_image("gen_captcha", "$", ["-f", "avif"], timeout=_timeout)
-		name = "Captcha." + get_ext(resp)
-		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
-
-
 class RoleSelect(Pagination, Command):
 	server_only = True
 	name = ["ReactionRoles", "RoleButtons", "RoleSelection", "RoleSelector"]
@@ -624,9 +616,55 @@ class RoleSelect(Pagination, Command):
 			await interaction_response(bot, _message, text, ephemeral=True)
 
 
+class Verifier(Pagination, Command):
+	server_only = True
+	name = ["Captcha", "Verification"]
+	description = "Sends a verification trigger in the current channel, intended to filter out bots."
+	schema = cdict(
+		role=cdict(
+			type="role",
+			description="Role to assign",
+			example="@Members",
+			required=True,
+		),
+		difficulty=cdict(
+			type="integer",
+			validation="(1, 10]",
+			description="Number of characters required to transcribe",
+			default=5,
+		),
+	)
+	min_level = 3
+	rate_limit = (9, 12)
+
+	async def __call__(self, bot, _guild, _user, role, difficulty, **void):
+		colour = await bot.get_colour(_guild)
+		return self.construct(
+			_user.id,
+			b"\x00" + leb128(difficulty) + leb128(role.id),
+			embed=discord.Embed(
+				colour=colour,
+				description=f"Please verify that you are a human using the button below, in order to obtain the {role.mention} role.",
+			).set_author(**get_author(_guild)),
+			buttons=[cdict(emoji="🛡️", name="Verify", custom_id="🛡️")],
+			reference=None,
+		)
+
+	def react_perms(self, perm):
+		return True
+
+	async def _callback_(self, bot, _user, _guild, index, data, **void):
+		mode, more, _ = decode_leb128(data)
+		difficulty, more, _ = decode_leb128(more)
+		r_id, more = decode_leb128(more)
+		verification_string = as_str(more)
+		role = await bot.fetch_role(r_id)
+		print(mode, difficulty, role, verification_string)
+		raise
+
+
 class RoleGiver(Command):
 	server_only = True
-	name = ["Verifier"]
 	min_level = 3
 	min_display = "3+"
 	description = "Adds an automated role giver to the current channel. Triggered by a keyword in messages, only applicable to users with permission level >= 0 and account age >= 7d. Searches for word if only word characters, any substring if non-word characters are included, or regex if trigger begins and ends with a slash (/)."
@@ -2291,7 +2329,7 @@ class UpdateUserLogs(Database):
 			self.data.pop(guild.id)
 			return
 		emb = discord.Embed(colour=8323072)
-		mlist = self.bot.data.channel_cache.get(after.id)
+		mlist = self.bot.channel_cache.get(after.id)
 		count = f" ({len(mlist)}+)" if mlist else ""
 		if before.name != after.name:
 			emb.add_field(
@@ -2316,7 +2354,7 @@ class UpdateUserLogs(Database):
 			self.data.pop(guild.id)
 			return
 		emb = discord.Embed(colour=8323072)
-		mlist = self.bot.data.channel_cache.get(ch.id)
+		mlist = self.bot.channel_cache.get(ch.id)
 		count = max(len(mlist) if mlist else 0, getattr(ch, "message_count", 0))
 		mcount = f" ({count}+)" if count else ""
 		if user:
@@ -2491,271 +2529,8 @@ class UpdateUserLogs(Database):
 		self.bot.send_embeds(channel, emb)
 
 
-class UpdateMessageCache(Database):
-	name = "message_cache"
-	# no_file = True
-	files = "saves/message_cache"
-	raws = {}
-	loaded = {}
-	saving = {}
-	save_sem = Semaphore(1, 512, 5, 30)
-	search_sem = Semaphore(16, 4096, rate_limit=5)
-	locks = {}
-
-	def __load__(self, **void):
-		self.data.encoder = [encrypt, decrypt]
-
-	def get_fn(self, m_id):
-		return  m_id // 10 ** 12
-
-	def load_file(self, fn, raw=False):
-		if not raw:
-			with suppress(KeyError):
-				return self.loaded[fn]
-		try:
-			data = self.raws[fn]
-		except KeyError:
-			data = self.get(fn, {})
-			if type(data) is not dict:
-				data = {as_str(m["id"]): m for m in data}
-			self.raws[fn] = data
-		if raw:
-			return
-		found = self.loaded.setdefault(fn, {})
-		bot = self.bot
-		i = 0
-		for k, m in deque(data.items()):
-			if "channel" in m:
-				m["channel_id"] = m.pop("channel")
-			try:
-				message = bot.CachedMessage(m)
-			except:
-				print(m)
-				print_exc()
-			k = int(k)
-			bot.cache.messages[k] = found[k] = message
-			i += 1
-			if not i & 2047:
-				time.sleep(0.1)
-		return found
-
-	def load_message(self, m_id):
-		m_id = int(m_id)
-		fn = self.get_fn(m_id)
-		if fn in self.saving:
-			return self.saving[fn][m_id]
-		if fn in self.loaded:
-			return self.loaded[fn][m_id]
-		lock = self.locks.get(fn)
-		if lock is None:
-			lock = self.locks[fn] = Semaphore(1, inf)
-		with lock:
-			found = self.load_file(fn)
-		if not found:
-			fn = self.get_fn(m_id // 10)
-			if fn in self.saving:
-				return self.saving[fn][m_id]
-			if fn in self.loaded:
-				return self.loaded[fn][m_id]
-			with lock:
-				found = self.load_file(fn)
-			if not found:
-				raise KeyError(m_id)
-		return found[m_id]
-
-	def save_message(self, message):
-		fn = self.get_fn(message.id)
-		saving = self.saving.setdefault(fn, {})
-		saving[message.id] = message
-		return message
-
-	def saves(self, fn, messages):
-		lock = self.locks.get(fn)
-		if lock is None:
-			lock = self.locks[fn] = Semaphore(1, inf)
-		with lock:
-			self.load_file(fn, raw=True)
-		if fn in self.loaded:
-			self.loaded[fn].update(messages)
-		saved = self.raws.setdefault(fn, {})
-		for m_id, message in messages.items():
-			m = T(message).get("_data")
-			if m:
-				if "author" not in m:
-					author = message.author
-					m["author"] = dict(id=author.id, s=str(author), avatar=author.avatar if not author.avatar or isinstance(author.avatar, str) else author.avatar.key)
-				if "channel_id" not in m:
-					try:
-						m["channel_id"] = message.channel.id
-					except AttributeError:
-						continue
-			else:
-				if message.channel is None:
-					continue
-				author = message.author
-				m = dict(
-					author=dict(id=author.id, s=str(author), avatar=author.avatar if not author.avatar or isinstance(author.avatar, str) else author.avatar.key),
-					channel_id=message.channel.id,
-				)
-				if message.content:
-					m["content"] = readstring(message.content)
-				mtype = T(message.type).get("value", message.type)
-				if mtype:
-					m["type"] = mtype
-				flags = message.flags.value if message.flags else 0
-				if flags:
-					m["flags"] = flags
-				for k in ("tts", "pinned", "mention_everyone", "webhook_id"):
-					v = T(message).get(k)
-					if v:
-						m[k] = v
-				edited_timestamp = as_str(T(message).get("_edited_timestamp") or "")
-				if edited_timestamp:
-					m["edited_timestamp"] = edited_timestamp
-				reactions = []
-				for reaction in message.reactions:
-					if not reaction.is_custom_emoji():
-						r = dict(emoji=dict(id=None, name=str(reaction.emoji)))
-					else:
-						ename, eid = str(reaction.emoji).rsplit(":", 1)
-						eid = int(eid.removesuffix(">"))
-						ename = ename.split(":", 1)[-1]
-						r = dict(emoji=dict(id=eid, name=ename))
-					if reaction.count != 1:
-						r["count"] = reaction.count
-					if reaction.me:
-						r["me"] = reaction.me
-					reactions.append(r)
-				if reactions:
-					m["reactions"] = reactions
-				try:
-					attachments = [dict(id=a.id, size=a.size, filename=a.filename, url=a.url, proxy_url=a.proxy_url) for a in message.attachments if T(a).get("size")]
-				except AttributeError:
-					print(message.id)
-					raise
-				if attachments:
-					m["attachments"] = attachments
-				embeds = [e.to_dict() for e in message.embeds]
-				if embeds:
-					m["embeds"] = embeds
-			m["id"] = str(m_id)
-			saved[m["id"]] = m
-		self[fn] = saved
-		return len(saved)
-
-	async def _save_(self, **void):
-		if self.save_sem.is_busy():
-			return
-		# print("MESSAGE DATABASE UPDATING...")
-		async with self.save_sem:
-			saving = deque(self.saving.items())
-			self.saving.clear()
-			i = 0
-			for fn, messages in saving:
-				await asubmit(self.saves, fn, messages)
-				i += 1
-				if not i & 15 or len(messages) > 65536:
-					await asyncio.sleep(0.3)
-			while len(self.loaded) > 64:
-				with suppress(RuntimeError):
-					self.loaded.pop(next(iter(self.loaded)))
-				i += 1
-				if not i % 24:
-					await asyncio.sleep(0.2)
-			if not self.save_sem.is_busy():
-				while len(self.raws) > 64:
-					with suppress(RuntimeError):
-						self.raws.pop(next(iter(self.raws)))
-					i += 1
-					if not i % 24:
-						await asyncio.sleep(0.2)
-			if len(saving) >= 100:
-				print(f"Message Database: {len(saving)} files updated.")
-			deleted = 0
-			limit = self.get_fn(time_snowflake(dtn() - datetime.timedelta(days=28)))
-			for f in sorted(k for k in self.keys() if isinstance(k, int)):
-				if f == -1:
-					continue
-				if f < limit:
-					self.pop(f, None)
-					deleted += 1
-				else:
-					break
-			if deleted >= 3:
-				print(f"Message Database: {deleted} files deleted.")
-			if len(self) > 1:
-				self.setmtime()
-		# print("MESSAGE DATABASE COMPLETE.")
-
-	def getmtime(self):
-		try:
-			return self["~~"]
-		except FileNotFoundError:
-			return utc() - 28 * 86400
-	setmtime = lambda self: self.__setitem__("~~", utc())
-
-	async def _minute_loop_(self):
-		await self._save_()
-
-
 class UpdateMessageLogs(Database):
 	name = "logM"
-	searched = False
-	dc = {}
-
-	async def __call__(self):
-		for h in tuple(self.dc):
-			if isinstance(h, datetime.datetime):
-				x = h.timestamp()
-			else:
-				x = h
-			if utc() - x > 3600:
-				self.dc.pop(h)
-
-	async def _bot_ready_(self, **void):
-		if not self.bot.ready and not self.bot.maintenance and not self.searched and len(self.bot.cache.messages) <= 65536:
-			self.searched = True
-			t = None
-			with tracebacksuppressor(FileNotFoundError):
-				t = utc_ft(self.bot.data.message_cache.getmtime())
-			if not t:
-				t = utc_dt() - datetime.timedelta(days=7)
-			csubmit(self.load_new_messages(t))
-
-	async def save_channel(self, channel, t=None):
-		i = T(channel).get("last_message_id")
-		if i:
-			if id2ts(i) < self.bot.data.message_cache.getmtime():
-				return
-			# async for m in self.bot.data.channel_cache.grab(channel, as_message=False):
-			#     if m == i:
-			#         return
-			#     break
-		async with self.bot.data.message_cache.search_sem:
-			async for message in channel.history(limit=32768, after=t, oldest_first=False):
-				self.bot.add_message(message, files=False, force=True)
-
-	async def load_new_messages(self, t):
-		while "channel_cache" not in self.bot.data:
-			await asyncio.sleep(0.5)
-		print(f"Probing new messages from {len(self.bot.guilds)} guild{'s' if len(self.bot.guilds) != 1 else ''}...")
-		futs = deque()
-		for guild in self.bot.guilds:
-			with tracebacksuppressor:
-				for channel in itertools.chain(guild.text_channels, guild.threads):
-					try:
-						perm = channel.permissions_for(guild.me).read_message_history
-					except discord.errors.ClientException:
-						pass
-					except:
-						print_exc()
-						perm = True
-					if perm:
-						futs.append(self.save_channel(channel, t))
-		await gather(*futs, max_concurrency=4)
-		self.bot.data.message_cache.finished = True
-		self.bot.data.message_cache.setmtime()
-		print("Loading new messages completed.")
 
 	# Edit events are rather straightforward to log
 	async def _edit_(self, before, after, force=False, **void):

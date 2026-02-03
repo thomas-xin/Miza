@@ -37,7 +37,6 @@ if "common" not in globals():
 	import discord
 	from dynamic_dt import get_offset, DynamicDT
 	import httpx
-	import niquests
 	import numpy as np
 	import openai
 	import orjson
@@ -271,9 +270,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				os.remove(self.heartbeat_file)
 
 	def init_main_databases(self):
+		t = DynamicDT.now()
 		self.userbase = AutoDatabase("saves/userbase", shards=64)
 		self.guildbase = AutoDatabase("saves/guildbase", shards=16)
 		self.weekly_users = AutoCache(f"{CACHE_PATH}/weekly_users", shards=1, stale=0, timeout=86400 * 7)
+		self.channel_cache = AutoCache(f"{CACHE_PATH}/channel_cache", shards=32, stale=86400 * 7, timeout=86400 * 365, desync=0.25)
+		self.message_cache = AutoCache(f"{CACHE_PATH}/message_cache", shards=64, stale=86400 * 7, timeout=86400 * 14, desync=0.3)
+		self.discord_cache = AutoCache(f"{CACHE_PATH}/discord_api", stale=0, timeout=300, desync=0.05)
+		self.discord_data_cache = AutoCache(f"{CACHE_PATH}/discord_data", shards=7, stale=86400 * 3, timeout=86400 * 14, desync=0.5)
+		self.uptime_db = AutoCache(f"{CACHE_PATH}/uptime", shards=5, stale=0, timeout=86400 * 7)
+		print(f"Loading main databases took {DynamicDT.now() - t}.")
 
 	def get_userbase(self, uid, path="", default=None):
 		try:
@@ -754,14 +760,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		finally:
 			self.setshutdown()
 
-	# rate_limits = AutoCache(f"{CACHE_PATH}/discord_rates", stale=0, timeout=300)
-	discord_cache = AutoCache(f"{CACHE_PATH}/discord_api", stale=0, timeout=300, desync=0.05)
 	async def _retrieve_api(self, path):
 		return await Request.aio(f"https://discord.com/api/{api}/{path}", authorise=True, json=True)
 	async def retrieve_api(self, path):
 		return await self.discord_cache.aretrieve(path, self._retrieve_api, path)
-
-	discord_data_cache = AutoCache(f"{CACHE_PATH}/discord_data", stale=86400, timeout=86400 * 7, desync=0.25)
 
 	def print(self, *args, sep=" ", end="\n"):
 		"A reimplementation of the print builtin function."
@@ -1954,11 +1956,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						headers = Request.header()
 						headers.Referer = "https://duckduckgo.com"
 						headers.Accept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-						async with niquests.AsyncSession() as session:
-							async with session.post("https://lite.duckduckgo.com/lite/", data=dict(q=argv), headers=headers) as resp:
-								from bs4 import BeautifulSoup
-								data = BeautifulSoup(resp.content)
-								text = data.get_text()
+						content = await Request.aio(
+							"https://lite.duckduckgo.com/lite/",
+							headers=headers,
+							data=dict(q=argv),
+							method="POST",
+						)
+						from bs4 import BeautifulSoup
+						data = BeautifulSoup(resp.content)
+						text = data.get_text()
 						text = re.sub("\n{2,}", "\n\n", text.split("Any Time\n", 1)[-1].split("Past Year\n", 1)[-1].strip())
 						return text
 					if include_hrefs:
@@ -2025,7 +2031,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def force_completion(self, model, prompt=None, stream=True, max_tokens=1024, strip=True, **kwargs):
 		ctx = ai.contexts.get(model, 4096)
 		if prompt and model in ai.is_completion:
-			count = await tcount(prompt, model="llamav2")
+			count = await tcount(prompt)
 			max_tokens = min(max_tokens, ctx - count - 64)
 			if "max_completion_tokens" not in kwargs:
 				kwargs["max_tokens"] = max_tokens
@@ -2053,8 +2059,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			async for r in resp:
 				if not r.choices or not (delta := r.choices[0].delta):
 					continue
-				if getattr(delta, "reasoning_content", None):
-					yield delta.reasoning_content
+
+				reason = getattr(delta, "reasoning", None)
+				if not reason and getattr(delta, "reasoning_details", None):
+					rdetails = [r["text"] for r in delta.reasoning_details if r["type"] == "reasoning.text"]
+					if rdetails:
+						reason = str(rdetails[0])
+					else:
+						rdetails = [r["summary"] for r in delta.reasoning_details if r["type"] == "reasoning.summary"]
+						if rdetails:
+							reason = str(rdetails[0])
+				if reason:
+					yield reason
 					if not stopped_reasoning:
 						stopped_reasoning = False
 				s = delta.content
@@ -2102,7 +2118,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			**kwargs,
 		)
 		print("CC:", data)
-		count = await tcount(prompt, model="llamav2")
+		count = await tcount(prompt)
 		max_tokens = min(max_tokens, ctx - count - 64)
 		if "max_completion_tokens" not in kwargs:
 			kwargs["max_tokens"] = max_tokens
@@ -2111,7 +2127,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			async def stream_iter(resp):
 				name = None
 				found = deque()
-				nt = await tcount(assistant_name, model="llamav2")
+				nt = await tcount(assistant_name)
 				async for chunk in resp:
 					if not chunk.choices:
 						if getattr(chunk, "error_message"):
@@ -2294,13 +2310,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		1: cdict(
-			instructive="deepseek-v3.2-speciale",
+			instructive="kimi-k2.5",
 			casual="deepseek-v3.2-speciale",
 			nsfw="grok-4.1-fast",
-			backup="kimi-k2-thinking",
-			retry="gpt-5-mini",
+			backup="gpt-5-mini",
+			retry="claude-haiku-4.5",
 			function="grok-4.1-fast",
-			vision="grok-4.1-fast",
+			vision="kimi-k2.5",
 			target="auto",
 		),
 		2: cdict(
@@ -2310,7 +2326,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			backup="gpt-5.2",
 			retry="gpt-5.2-pro",
 			function="grok-4.1-fast",
-			vision="gpt-5.2",
+			vision="claude-sonnet-4.5",
 			target="auto",
 		),
 	}
@@ -3050,7 +3066,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					csubmit(self.tag_message(message))
 			self.cache.messages[message.id] = message
 			if (utc_dt() - created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
-				self.data.message_cache.save_message(message)
+				self.data.message_cache.store_message(message)
 		return message
 
 	async def add_attachment(self, attachment, message=None):
@@ -4153,7 +4169,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				"Channel count": len(self.cache.channels),
 				"Role count": len(self.cache.roles),
 				"Emoji count": len(self.cache.emojis),
-				"Cached messages": len(self.cache.messages),
+				"Cached messages": len(self.message_cache),
 				"API latency": self.api_latency,
 				**({"Website URL": self.webserver} if self.webserver else {}),
 			},
@@ -5181,6 +5197,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not self.ready:
 			# If the bot is not currently ready (either loading or in maintenance), send an indicator and wait
 			if message:
+				if user:
+					print(f"{message.channel.id}: {user} ({user.id}) queued command {command_check} {kwargs or argv}")
 				soon_indicator = csubmit(message.add_reaction("🔜"))
 				if slash or getattr(message, "slash", False):
 					await self.defer_interaction(message, ephemeral=getattr(message, "ephemeral", False))
@@ -5277,9 +5295,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if kwargs:
 				kv.update(kwargs)
 			kwargs = kv
-		kwargs = await self.extract_kwargs(argv, command, u_perm, user, message, channel, guild, command_check, kwargs)
+		try:
+			kwargs = await self.extract_kwargs(argv, command, u_perm, user, message, channel, guild, command_check, kwargs)
+		except Exception:
+			if not soon_indicator and message and user:
+				print(f"{message.channel.id}: {user} ({user.id}) queued command {command_check} {kwargs or argv}")
+			raise
 		if message and user:
-			print(f"{message.channel.id}: {user} ({user.id}) issued command {command_check} {kwargs or argv}")
+			print(f"{message.channel.id}: {user} ({user.id}) executing command {command_check} {kwargs or argv}")
 		comment = comment or ""
 		fut = None
 		async with sem:
@@ -5773,6 +5796,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					data='{"type":6}',
 				)
 			except ConnectionError:
+				raise
 				m = await interaction_response(self, message, "\xad")
 				# m = await send_with_reply(getattr(message, "channel", None), message, "\xad", ephemeral=False)
 				print("Ignored:", m)
@@ -6217,7 +6241,23 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					self.update_embeds(utc() % 1 < 0.5)
 					await_fut(self.send_event("_call_"))
 
-	uptime_db = AutoCache(f"{CACHE_PATH}/uptime", shards=5, stale=0, timeout=86400 * 7)
+	async def upload_temp(self, b, filename=None):
+		if isinstance(b, str):
+			b = await read_file_a(b)
+		elif isinstance(b, byte_like):
+			pass
+		else:
+			b = await asubmit(b.read)
+		url = f"{self.raw_webserver}/upload"
+		if filename:
+			url += f"?filename={filename}"
+		return await Request.aio(
+			url,
+			data=b,
+			method="POST",
+			decode=True,
+		)
+
 	def update_uptime(self, data):
 		uptimes = self.uptime_db
 		ninter = self.ninter
@@ -6284,7 +6324,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		futs = []
 		key = AUTH.get("discord_secret") or ""
 		# uri = f"http://IP:{PORT}"
-		uri = "https://api.mizabot.xyz"
+		uri = self.raw_webserver
 		dc = pk = ""
 		if DOMAIN_CERT and PRIVATE_KEY:
 			async with aiofiles.open(DOMAIN_CERT, "r") as f:
@@ -6314,8 +6354,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					headers={"content-type": "application/json"},
 					data=orjson.dumps(dict(data=encoded)),
 					timeout=5,
-					session=Request.sessions.next(),
 					json=True,
+					ssl=None,
 				)
 			fut = csubmit(external_heartbeat())
 			futs.append(fut)
@@ -6613,6 +6653,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				)
 				return self.__class__.new(channel=self.channel, data=resp)
 
+			def _update(self, data):
+				self._data.update(data)
+				self.message._update(data)
+
 			def __init__(self, message):
 				self.message = message
 			
@@ -6660,7 +6704,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				self.id = 0
 				self.channel = channel
 				self.guild = getattr(channel, "guild", None)
-				self.me = self.author = channel.guild.me if getattr(channel, "guild", None) else bot.user
+				self.me = self.author = getattr_chain(channel, "guild.me", None) or bot.user
 				self.created_at = to_utc(utc_dt())
 				self.edited_at = None
 				self.reference = reference
@@ -7284,7 +7328,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			reacts = ""
 		else:
 			reacts="❎"
-		footer = None
 		fields = None
 		if isinstance(ex, TooManyRequests):
 			fields = (("Running into the rate limit often?", f"Consider donating using one of the subscriptions from my [ko-fi]({self.kofi_url}), which will grant shorter rate limits amongst many feature improvements!"),)
@@ -7317,6 +7360,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				reference=reference,
 			))
 		print(reference)
+		if getattr(reference, "slash", None):
+			embed = discord.Embed(
+				title=title,
+				description=lim_str(description, 3000),
+			)
+			for field in fields:
+				embed.add_field(name=fields[0], value=fields[1])
+			return csubmit(self.send_with_react(
+				messageable,
+				embed=embed,
+				reacts=reacts,
+				reference=reference,
+			))
 		return self.send_as_embeds(
 			messageable,
 			description=lim_str(description, 3000),
@@ -7324,7 +7380,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			fields=fields,
 			reacts=reacts,
 			reference=reference,
-			footer=footer,
 			exc=False,
 		)
 

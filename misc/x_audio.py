@@ -640,7 +640,11 @@ class AudioPlayer(discord.AudioSource):
 			return
 		if not self.vc and not self.fut.done():
 			return
-		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+		try:
+			connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+		except Exception:
+			print_exc()
+			connected = False
 		if connected:
 			# Handle special case of only deafened users; they are not counted as listeners but will still keep the bot in the channel, paused instead
 			listeners = sum(not m.bot and bool(m.voice) and not (m.voice.deaf or m.voice.self_deaf) for m in self.vcc.members)
@@ -669,14 +673,22 @@ class AudioPlayer(discord.AudioSource):
 			return
 		if not self.vc and not self.fut.done():
 			return
-		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+		try:
+			connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+		except Exception:
+			print_exc()
+			connected = False
 		if len(self.queue) == 0 and connected:
 			self.updating_streaming = csubmit(self._updating_streaming())
 	async def _updating_streaming(self):
 		await asyncio.sleep(960)
 		if self is not self.players.get(self.vcc.guild.id):
 			return
-		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+		try:
+			connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+		except Exception:
+			print_exc()
+			connected = False
 		if len(self.queue) == 0 and connected:
 			await self.leave("Queue empty")
 

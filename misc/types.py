@@ -1268,14 +1268,14 @@ def uni_str(s, fmt=0):
 	return s.translate(__unitrans[fmt])
 
 # Translates all alphanumeric characters in unicode fonts to their respective ascii counterparts.
-def unicode_prune(s):
+def unicode_prune(s: str) -> str:
 	if type(s) is not str:
 		s = str(s)
 	if s.isascii():
 		return s
 	return s.translate(__trans)
 
-def word_count(s):
+def word_count(s: str) -> int:
 	return 1 + sum(1 for _ in regexp("\\W+").finditer(s))
 def single_space(s):
 	return regexp("\\s\\s+").sub(" ", s)
@@ -1302,7 +1302,7 @@ __qtrans = "".maketrans(__qmap)
 for i in range(0xe0000, 0xe1000):
 	__qtrans[i] = ""
 
-def full_prune(s):
+def full_prune(s: str) -> str:
 	return unicode_prune(s).translate(__qtrans).casefold()
 
 

@@ -691,13 +691,11 @@ class Ask(Command):
 		print("Usage:", usage)
 		if reasonings:
 			reasoning = "\n\n\n".join(reasonings).encode("utf-8")
-			async with niquests.AsyncSession() as asession:
-				resp2 = await asession.post(
-					"https://api.mizabot.xyz/upload?filename=reasoning.txt",
-					data=reasoning,
-				)
-				url = resp2.text
-			content = (f"> [Reasoning (click to view)]({url})\n" + content).strip()
+			try:
+				url = await bot.upload_temp(reasoning, filename="reasoning.txt")
+				content = (f"> [Reasoning (click to view)]({url})\n" + content).strip()
+			except Exception:
+				print_exc()
 		response.content = "\r" + content
 		embs = []
 		if response.get("embed"):
@@ -1852,13 +1850,7 @@ class TTS(Command):
 				raise
 		if autoplay:
 			await vc_fut
-			b = await read_file_a(fo)
-			async with niquests.AsyncSession() as asession:
-				resp = await asession.post(
-					"https://api.mizabot.xyz/upload",
-					data=b,
-				)
-				url = resp.text
+			url = await bot.upload_temp(fo)
 			items = [cdict(
 				name=text[:48],
 				url=url,
