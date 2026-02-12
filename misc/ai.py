@@ -712,7 +712,7 @@ f_reasoning = {
 f_wolfram_alpha = {
 	"type": "function", "function": {
 		"name": "wolfram_alpha",
-		"description": "Queries the Wolfram Alpha engine. Only use for mathematics equations to ensure correctness of answers.",
+		"description": "Queries the Wolfram Alpha engine.",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {
@@ -722,19 +722,15 @@ f_wolfram_alpha = {
 			},
 			"required": ["query"],
 }}}
-f_sympy = {
+f_deno = {
 	"type": "function", "function": {
-		"name": "sympy",
-		"description": "Queries the Sympy algebraic library. Faster than Wolfram Alpha. Note that this runs `sympy.parsing.sympy_parser`, NOT a Python REPL",
+		"name": "deno",
+		"description": "Queries the Deno JavaScript interpreter. Must finish with `console.log` to retrive output.",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {
 					"type": "string",
-					"description": 'Query, eg. "factorint(57336415063790604359)", "randint(1, 100)", "limit(diff(-atan(x)),x,-sqrt(-1.01))"',
-				},
-				"precision": {
-					"type": "integer",
-					"description": "Float precision, eg. 128"
+					"description": 'Query, eg. "let x = 0.1; let y = 0.2; console.log(x+y);"',
 				},
 			},
 			"required": ["query"],
@@ -889,7 +885,7 @@ TOOLS = {
 	"knowledge_internet": [
 		f_browse,
 		f_wolfram_alpha,
-		f_sympy,
+		f_deno,
 		f_myinfo,
 		f_txt2img,
 	],
@@ -901,7 +897,7 @@ TOOLS = {
 	"calculator": [
 		f_browse,
 		f_wolfram_alpha,
-		f_sympy,
+		f_deno,
 	],
 	"calendar": [
 		f_reminder,

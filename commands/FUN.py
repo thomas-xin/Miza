@@ -2057,6 +2057,7 @@ class Dogpile(Command):
 class UpdateDogpiles(Database):
 	name = "dogpiles"
 	no_file = True
+	times = {}
 
 	async def _nocommand_(self, edit, message, **void):
 		if edit or message.guild is None or not message.content:
@@ -2066,15 +2067,19 @@ class UpdateDogpiles(Database):
 		dogpile = bot.get_guildbase(g_id, "dogpile", True)
 		if not dogpile:
 			return
-		if not message.guild.me or not bot.permissions_in(message.channel).send_messages:
-			return
 		u_id = message.author.id
 		if u_id == bot.id:
+			return
+		if random.randint(0, 2):
+			return
+		if not message.guild.me or not bot.permissions_in(message.channel).send_messages:
 			return
 		if bot.is_optout(message.author):
 			return
 		content = readstring(message.content)
 		if not content:
+			return
+		if self.times.get(message.guild.id, 0) + 30 >= utc():
 			return
 		last_author_id = u_id
 		hist = []
@@ -2104,7 +2109,11 @@ class UpdateDogpiles(Database):
 				prediction = pred
 			else:
 				break
-		if random.random() >= 3 / (count + 0.5) and prediction:
+		if not prediction:
+			return
+		bot.data.dailies.progress_quests(message.author, "dogpile")
+		if random.random() >= 1 / (count + 0.5):
+			self.times[message.guild.id] = utc()
 			if random.random() < 1 / 4096:
 				content = "https://mizabot.xyz/u/iJKEhAECGSG0UwWQiSWgQUEWEkE/secretsmall.gif"
 				csubmit(message.add_reaction("💎"))
@@ -2345,6 +2354,8 @@ class UpdateDailies(Database):
 		add_quest(20, "pay", "Pay {x} to other users", gold=lambda x: x >> 1, diamonds=lambda x: xrand(0, 2),
 			x=scale(400, 900, 70, 100))
 		add_quest(18, "diamond", "Earn 1 diamond", required=1, gold=lambda x: x * 50, diamonds=1,
+			x=nofunc)
+		add_quest(50, "dogpile", "Participate in a number chain", required=1, gold=lambda x: x * 50, diamonds=1,
 			x=nofunc)
 		add_quest(15, "invite", "Invite me to a server and/or react to the join message", required=1, diamonds=lambda x: 50 + x * 2 / 3,
 			x=nofunc)

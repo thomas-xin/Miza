@@ -588,10 +588,7 @@ class Server:
 		if hasattr(self, "state"):
 			url = f"{self.state['/']}/u{rpath}{rquery}"
 			raise cp.HTTPRedirect(url, 307)
-		assert len(path) == 1
-		aid = p2n(path[0])
-		resp = interface.run(f"await bot.renew_attachment({aid})")
-		return self.proxy_if(resp)
+		raise FileNotFoundError(*path)
 	unproxy._cp_config = {"response.stream": True}
 
 	@cp.expose

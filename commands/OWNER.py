@@ -154,10 +154,11 @@ class Restart(Command):
 				print("Destroying database memory...")
 				with tracebacksuppressor:
 					await bot.send_event("_destroy_", shutdown=mode == "shutdown")
+				with tracebacksuppressor:
+					await asubmit(bot.handle_update, force=True, priority=True)
 				# Save any database that has not already been autosaved
 				print("Saving all databases...")
 				with tracebacksuppressor:
-					await asubmit(bot.handle_update, force=True, priority=True)
 					await asubmit(bot.update, force=True, priority=True)
 				# Send the bot "offline"
 				bot.closed = True
@@ -172,7 +173,6 @@ class Restart(Command):
 				with suppress(NameError, AttributeError):
 					PRINT.flush()
 					PRINT.close(force=True)
-				# await gather(*futs, return_exceptions=True)
 		import pathlib
 		if mode and mode.casefold() == "shutdown":
 			pathlib.Path.touch(bot.shutdown)
@@ -1035,26 +1035,35 @@ class UpdateMessageCache(Database):
 	async def load_messages(self, channel):
 		if channel.id in self.checked:
 			return
-		self.checked.add(channel.id)
 		bot = self.bot
+		perms = bot.permissions_in(channel)
+		if perms.read_messages and perms.read_message_history:
+			pass
+		else:
+			return
+		self.checked.add(channel.id)
 		m_id = self.loader.get(channel.id, 0)
 		last = max(
 			time_snowflake(datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=14)),
 			m_id,
 		)
 		async with bot.guild_semaphore:
-			message = None
+			messages = []
 			async for message in channel.history(after=last, limit=None, oldest_first=True):
-				esubmit(self.store_message, message)
-			if message:
-				self.loader[channel.id] = message.id
+				messages.append(message)
+		if messages:
+			await asubmit(self.store_messages, messages)
+			self.loader[channel.id] = message.id
+
+	def store_messages(self, messages):
+		return [self.store_message(message) for message in messages]
 
 	async def _send_(self, message, **void):
 		return await self.load_messages(message.channel)
 
 	def store_message(self, message):
 		bot = self.bot
-		m = T(message).get("_data")
+		m = getattr(message, "_data", None)
 		if m:
 			if "author" not in m:
 				author = message.author
@@ -1123,7 +1132,8 @@ class UpdateMessageCache(Database):
 			m.pop("member", None)
 		m.pop("nonce", None)
 		m.pop("timestamp", None)
-		for k in ("type", "attachments", "embeds", "components", "channel_type", "edited_timestamp", "flags", "pinned", "mentions", "mention_roles", "mention_everyone", "tts", "deaf"):
+		m.pop("referenced_message", None)
+		for k in ("type", "attachments", "embeds", "components", "reactions", "channel_type", "edited_timestamp", "flags", "pinned", "mentions", "mention_roles", "mention_everyone", "tts", "deaf"):
 			if not m.get(k):
 				m.pop(k, None)
 		data = orjson.dumps(m)
@@ -1448,16 +1458,8 @@ class UpdateImagePools(Database):
 		return choice(data)
 
 
-class UpdateAttachments(Database):
-	name = "attachments"
-
-
 class UpdateAnalysed(Database):
 	name = "analysed"
-
-
-class UpdateInsights(Database):
-	name = "insights"
 
 
 class UpdateGuildSettings(Database):

@@ -283,7 +283,11 @@ def stream_fp(request, fp, response_headers={}):
 		except Exception:
 			mime = "application/octet-stream"
 		else:
-			mime = "text/html" if s.lower().startswith("<!doctype html>") else "text/plain"
+			mime = (
+				"text/html" if s.lower().startswith("<!doctype html>")
+				else "image/svg+xml" if s.lower().startswith("<svg ")
+				else "text/plain"
+			)
 
 	return StreamingResponse(
 		content_generator(),

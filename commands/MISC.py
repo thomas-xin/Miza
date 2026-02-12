@@ -6,7 +6,6 @@ print = PRINT
 
 import csv, knackpy
 from misc import shard
-from prettytable import PrettyTable as ptable
 from tsc_utils.flags import address_to_flag, flag_to_address
 from tsc_utils.numbers import tsc_value_to_num, num_to_tsc_value
 

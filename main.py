@@ -165,7 +165,7 @@ try:
 		proc = psutil.Popen([python, "bot.py"])
 		start = time.time()
 		print("Bot started with PID \033[1;34;40m" + str(proc.pid) + "\033[1;37;40m.")
-		time.sleep(12)
+		time.sleep(32)
 		try:
 			alive = True
 			was_alive = True

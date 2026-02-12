@@ -517,10 +517,6 @@ class Ask(Command):
 					kwargs.pop("description", None)
 					kwargs.pop("required", None)
 					call = None
-					if name == "wolfram_alpha":
-						argv = kwargs.get("query") or " ".join(kwargs.values())
-						if regexp(r"[1-9]*[0-9]?\.?[0-9]+[+\-*/^][1-9]*[0-9]?\.?[0-9]+").fullmatch(argv.strip().replace(" ", "")):
-							name = "sympy"
 
 					async def rag(name, tid, fut):
 						nonlocal function_message
@@ -570,13 +566,15 @@ class Ask(Command):
 						yield s
 						fut = bot.browse(argv, uid=_user.id, screenshot=False)
 						succ = await rag(name, tid, fut)
-					elif name == "sympy":
+					elif name == "deno":
 						argv = kwargs.get("query") or " ".join(kwargs.values())
 						prec = float(kwargs.get("precision") or 128)
-						s = f'\n> Calculating "{argv}"...'
+						s = f'\n> Evaluating "{argv}"...'
 						text += s
 						yield s
-						fut = bot.solve_math(argv, prec=prec, timeout=24, nlp=True)
+						args = ["deno", "eval", argv]
+						print(args)
+						fut = check_output_async(args)
 						succ = await rag(name, tid, fut)
 						if not succ:
 							name = "wolfram_alpha"

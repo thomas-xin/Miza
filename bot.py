@@ -1319,97 +1319,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		print("AS_FILE:", url)
 		return url
 
-	async def delete_attachment(self, url, m_id=None):
-		"Deletes a cached attachment by URL or ID."
-		if isinstance(url, int):
-			a_id = url
-			tup = self.data.attachments.get(a_id)
-			if is_url(tup):
-				return tup
-			if not tup:
-				return False
-			c_id, m_id = tup
-		else:
-			c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
-			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-		if not m_id:
-			m_id = self.data.attachments.get(a_id)
-			if is_url(m_id):
-				return m_id
-			if isinstance(m_id, (tuple, list)):
-				c_id, m_id = m_id
-		if not m_id:
-			return False
-		channel = await self.fetch_channel(c_id)
-		message = await self.fetch_message(channel, m_id)
-		if message.author.id == self.user.id:
-			await self.autodelete(message)
-		return True
-
 	async def renew_attachment(self, url, m_id=None):
 		"Renews a cached attachment URL by either re-fetching the message, or failing that, proxying its embed preview."
 		if isinstance(url, int):
-			a_id = url
-			tup = self.data.attachments.get(a_id)
-			if is_url(tup):
-				return await self.backup_url(tup)
-			if not tup:
-				return self.notfound
-			c_id, m_id = tup
-		else:
 			try:
-				c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
-			except ValueError:
-				return url # Either not a discord attachment, or an attachment in DMs which cannot be renewed.
-			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-		if not m_id:
-			m_id = self.data.attachments.get(a_id)
-			if is_url(m_id):
-				return await self.backup_url(m_id)
-			if isinstance(m_id, (tuple, list)):
-				c_id, m_id = m_id
-		if not m_id:
-			return await self.backup_url(url)
-		channel = await self.fetch_channel(c_id)
-		try:
-			message = self.data.message_cache.load_message(m_id)
-			for attachment in message.attachments:
-				if attachment.id == a_id:
-					url = str(attachment.url)
-					if not discord_expired(url):
-						return url.rstrip("&")
-		except (AttributeError, LookupError):
-			pass
-		try:
-			message = await channel.fetch_message(m_id)
-		except discord.NotFound:
-			print_exc()
-			return await self.backup_url(url)
-		self.add_message(message, force=True)
-		for attachment in message.attachments:
-			if attachment.id == a_id:
-				return str(attachment.url).rstrip("&")
-		return await self.backup_url(url)
-
-	async def backup_url(self, url):
-		a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-		u = url.rstrip("&")
-		if discord_expired(u):
-			u2 = None
-			with tracebacksuppressor:
-				u2 = await attachment_cache.obtain(url=u.split("?", 1)[0], m_id=0)
-			if u2:
-				self.data.attachments[a_id] = url
-				return u2
-		return u
-
-	async def delete_attachments(self, aids=()):
-		"Deletes a list of cached attachments asynchronously."
-		futs = []
-		for a_id in aids:
-			fut = self.delete_attachment(a_id)
-			futs.append(fut)
-		return await gather(*futs)
+				return attachment_cache[url]
+			except KeyError:
+				return self.notfound
+		url = await attachment_cache.obtain(url, m_id)
+		return url.rstrip("&")
 
 	async def renew_attachments(self, aids=()):
 		"Renews a list of cached attachments asynchronously."
@@ -2311,7 +2229,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		),
 		1: cdict(
 			instructive="kimi-k2.5",
-			casual="deepseek-v3.2-speciale",
+			casual="gemini-3-flash",
 			nsfw="grok-4.1-fast",
 			backup="gpt-5-mini",
 			retry="claude-haiku-4.5",
@@ -2320,7 +2238,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		2: cdict(
-			instructive="claude-opus-4.5",
+			instructive="claude-opus-4.6",
 			casual="gemini-3-pro",
 			nsfw="grok-4",
 			backup="gpt-5.2",
@@ -2862,7 +2780,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
-		model = model or ("gpt-5" if best else "gemini-2.5-flash")
+		model = model or ("gemini-3-pro" if best else "gemini-3-flash")
 		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
@@ -3048,6 +2966,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if getattr(m, "slash", False):
 				message.slash = m.slash
 		if cache and not m or force:
+			for a in message.attachments:
+				attachment_cache.store(a.url)
 			created_at = message.created_at
 			if created_at.tzinfo:
 				created_at = created_at.replace(tzinfo=None)
@@ -4118,7 +4038,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	lll = inf
 	llc = 0
 	async def get_system_stats(self):
-		fut = asubmit(get_current_stats, self.up_bps, self.down_bps, priority=2)
+		fut = asubmit(get_current_stats, self.up_bps, self.down_bps, priority=2, timeout=8)
 		t = utc()
 		latency = self.latency
 		if latency != self.lll and isfinite(latency):
@@ -4428,16 +4348,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down."
 		if force:
 			self.update_embeds(True)
-		saved = alist()
+		saved = []
 		with tracebacksuppressor:
 			for i, u in self.data.items():
 				if getattr(u, "sync", None):
 					with MemoryTimer(f"{u}-sync"):
 						if u.sync(force=True):
 							saved.append(i)
-							# time.sleep(0.05)
 		backup = AUTH.get("backup_path") or "backup"
-		os.makedirs(backup, exist_ok=True)
 		fn = f"{backup}/saves.{DynamicDT.utcnow().date()}.tar"
 		day = not os.path.exists(fn)
 		if day:
@@ -6307,20 +6225,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						if not hasattr(self, "up_bytes"):
 							self.up_bytes = deque(maxlen=ninter)
 							self.down_bytes = deque(maxlen=ninter)
-							self.start_up = max(0, self.data.insights.get("up_bytes", 0) - sent)
-							self.start_down = max(0, self.data.insights.get("down_bytes", 0) - recv)
+							self.start_up = max(0, self.discord_cache.get("up_bytes", 0) - sent)
+							self.start_down = max(0, self.discord_cache.get("down_bytes", 0) - recv)
 						self.up_bytes.append(sent)
 						self.down_bytes.append(recv)
 						self.up_bps = (self.up_bytes[-1] - self.up_bytes[0]) * 8 / len(self.up_bytes) / ninter
 						self.down_bps = (self.down_bytes[-1] - self.down_bytes[0]) * 8 / len(self.down_bytes) / ninter
 						self.bitrate = self.up_bps + self.down_bps
-						self.data.insights["up_bytes"] = up_bytes = self.up_bytes[-1] + self.start_up
-						self.data.insights["down_bytes"] = down_bytes = self.down_bytes[-1] + self.start_down
+						self.discord_cache["up_bytes"] = up_bytes = self.up_bytes[-1] + self.start_up
+						self.discord_cache["down_bytes"] = down_bytes = self.down_bytes[-1] + self.start_down
 						self.total_bytes = up_bytes + down_bytes
 					with MemoryTimer("handle_update"):
 						await self.handle_update()
 
 	async def worker_heartbeat(self):
+		return
 		futs = []
 		key = AUTH.get("discord_secret") or ""
 		# uri = f"http://IP:{PORT}"
@@ -6334,7 +6253,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		ac = {str(k): v for k, v in attachment_cache.items() if isinstance(k, int) and v and not discord_expired(v)}
 		for addr in AUTH.get("remote_servers", ()):
 			token = AUTH.get("alt_token") or self.token
-			channels = [k for k, v in self.data.exec.items() if v & 16]
+			channels = [k for k, v in self.data.exec.items() if v & 16] if "exec" in self.data else None
 			data = orjson.dumps(dict(
 				domain_cert=dc,
 				private_key=pk,
@@ -7507,9 +7426,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		save_auth(AUTH)
 
 	# Socket response event: if the event was an interaction, create a virtual message with the arguments as the content, then process as if it were a regular command.
+	sockets_count = 0
 	async def socket_response(self, data):
 		if data.get("op") or "d" not in data:
 			return
+		sys.__stdout__.write(f"Total socket inputs: {self.sockets_count}\r")
+		self.sockets_count += 1
 		try:
 			ptype = data.get("t") or ""
 			sub = data["d"]
