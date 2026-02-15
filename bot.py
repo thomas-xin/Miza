@@ -11,7 +11,7 @@ from misc import common, asyncs
 from misc.common import * # noqa: F403
 import ddgs
 import pathlib
-import pdb
+# import pdb
 from traceback_with_variables import activate_by_import
 
 # Make linter shut up lol
@@ -278,7 +278,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.message_cache = AutoCache(f"{CACHE_PATH}/message_cache", shards=64, stale=86400 * 7, timeout=86400 * 14, desync=0.3)
 		self.discord_cache = AutoCache(f"{CACHE_PATH}/discord_api", stale=0, timeout=300, desync=0.05)
 		self.discord_data_cache = AutoCache(f"{CACHE_PATH}/discord_data", shards=7, stale=86400 * 3, timeout=86400 * 14, desync=0.5)
-		self.uptime_db = AutoCache(f"{CACHE_PATH}/uptime", shards=5, stale=0, timeout=86400 * 7)
+		self.uptime_db = AutoCache(f"{CACHE_PATH}/uptime", shards=1, stale=0, timeout=86400 * 7)
 		print(f"Loading main databases took {DynamicDT.now() - t}.")
 
 	def get_userbase(self, uid, path="", default=None):
@@ -1253,13 +1253,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			message = await channel.fetch_message(m_id)
 			self.cache.messages[message.id] = message
 			return message
-		# This method is only called when a message is not found in the cache. This means that it is likely either out of range of cache or was produced during downtime, meaning surrounding messages may not be cached either. We preemtively fetch the surrounding messages to prepare for future requests, or requests that may involve the surrounding messages.
-		messages = await flatten(discord.abc.Messageable.history(channel, limit=101, around=cdict(id=m_id)))
-		data = {m.id: m for m in messages}
-		min_id = min(data, default=m_id)
-		if min_id != m_id:
-			left = await flatten(discord.abc.Messageable.history(channel, limit=100, before=cdict(id=min_id)))
-			data.update({m.id: m for m in left})
+		try:
+			# This method is only called when a message is not found in the cache. This means that it is likely either out of range of cache or was produced during downtime, meaning surrounding messages may not be cached either. We preemtively fetch the surrounding messages to prepare for future requests, or requests that may involve the surrounding messages.
+			messages = await flatten(discord.abc.Messageable.history(channel, limit=101, around=cdict(id=m_id)))
+			data = {m.id: m for m in messages}
+			min_id = min(data, default=m_id)
+			if min_id != m_id:
+				left = await flatten(discord.abc.Messageable.history(channel, limit=100, before=cdict(id=min_id)))
+				data.update({m.id: m for m in left})
+		except discord.HTTPException:
+			return await self._fetch_message(m_id, channel, fast=True)
 		max_id = max(data, default=m_id)
 		if max_id != m_id:
 			right = await flatten(discord.abc.Messageable.history(channel, limit=100, after=cdict(id=max_id)))
@@ -1440,10 +1443,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def permissions_in(self, obj):
 		user = self.user
 		guild = obj
-		if hasattr(guild, "members"):
-			user = ([m for m in guild.members if m.id == user.id] or [user])[0]
 		if hasattr(guild, "guild"):
 			guild = guild.guild
+		if hasattr(guild, "me"):
+			user = guild.me
+		elif hasattr(guild, "_members"):
+			user = guild._members.get(user.id, user)
+		elif hasattr(guild, "members"):
+			user = ([m for m in guild.members if m.id == user.id] or [user])[0]
 		if hasattr(guild, "get_member"):
 			try:
 				user = guild.get_member(user.id) or user
@@ -4133,7 +4140,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			it = int(utc() // ninter) * ninter
 			out = []
 			for i in range(ninter, interval + ninter, ninter):
-				out.append(self.uptime_db.get(i - interval + it, None) or {})
+				v = it - interval + i
+				cur = self.uptime_db.get(v // 86400, {}).get(v, None) or {}
+				out.append(cur)
 			return out
 		status = self.status_data
 		if simplified:
@@ -5613,7 +5622,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							content = ms[-1] if ms else "\xad"
 							futs = []
 							for i, t in enumerate(ms[:-1]):
-								if tts and i == 1 and channel and guild and guild.me.permissions_in(channel).change_nickname:
+								if tts and i == 1 and channel and guild and guild.me.guild_permissions.change_nickname:
 									# If we've got more than one message in TTS mode, we automatically backup the bot's nickname and replace it with a backtick (silent character) to avoid it being read out alongside every message.
 									original_nickname = guild.me.nick or "" # The "" is crucial to differentiate between None and an empty string.
 									await guild.me.edit(nick="`")
@@ -6181,21 +6190,22 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		ninter = self.ninter
 		it = int(utc() // ninter) * ninter
 		interval = 86400 * 7
-		if it not in uptimes:
-			uptimes[it] = copy.deepcopy(data)
-			if min(uptimes) <= it - interval - 3600:
-				sl = sorted(uptimes)
-				while sl[0] <= it - interval:
-					uptimes.pop(sl.pop(0), None)
-				while sl[-1] > it:
-					uptimes.pop(sl.pop(-1), None)
-				for i in sl[:-3600 // ninter][::-1]:
-					if i * ninter % 3600 == 0:
-						continue
-					if uptimes[i] is None:
-						break
-					uptimes[i] = None
-		uptimea = np.array(list(uptimes.iterkeys()), dtype=np.uint32)
+		itd = it // 86400
+		cur = uptimes.get(itd, {})
+		if it not in cur:
+			cur[it] = copy.deepcopy(data)
+			uptimes[itd] = cur
+		for i in tuple(uptimes):
+			if it // 86400 >= i + 7:
+				uptimes.pop(i)
+				continue
+			if it // 86400 > i:
+				temp = uptimes[i]
+				for k, v in temp.items():
+					temp[k] = None
+				uptimes[i] = temp
+		uptimea = list(itertools.chain(*(v.keys() for v in uptimes.values())))
+		uptimea = np.array(uptimea, dtype=np.uint32)
 		if len(uptimea):
 			uptimea.sort(kind="stable")
 		i = np.searchsorted(uptimea, it - interval + ninter)
@@ -6334,7 +6344,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						out = Flush(sys.__stdout__)
 						out.write(f"STACK TRACE:\n{cf}\n\n\n")
 						out.write(f"CRASHED AT {t}: {t - self.start_time}: {t - lt}\n")
-						pdb.set_trace()
+						# pdb.set_trace()
 						break
 
 	async def seen(self, *args, delay=0, event=None, **kwargs):
@@ -6981,7 +6991,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return wrapper
 
 		discord.http.Route.BASE = f"https://discord.com/api/{api}"
-		discord.Member.permissions_in = lambda self, channel: discord.Permissions.none() if not getattr(self, "roles", None) else discord.Permissions(fold(int.__or__, (role.permissions.value for role in self.roles))) if not getattr(channel, "permissions_for", None) else channel.permissions_for(self)
+		discord.Member.permissions_in = lambda self, channel: (
+			discord.Permissions.none() if not getattr(self, "roles", None)
+			else discord.Permissions(fold(
+				int.__or__,
+				(role.permissions.value for role in self.roles)
+			)) if not getattr(channel, "permissions_for", None)
+			else channel.permissions_for(self)
+		)
 		discord.VoiceChannel._get_channel = lambda self: as_fut(self)
 		discord.user.BaseUser.__str__ = lambda self: self.name if self.discriminator in (None, 0, "", "0") else f"{self.name}#{self.discriminator}"
 
@@ -8405,7 +8422,12 @@ if __name__ == "__main__":
 			asyncio.base_events.logger.warning = custom_warning
 			eloop.slow_callback_duration = 0.375
 			eloop.set_debug(True)
-			with tracebacksuppressor:
+
+			profiling = 0
+			if profiling:
+				import yappi
+				yappi.start()
+			try:
 				PRINT.start()
 				sys.stdout = sys.stderr = print = PRINT
 				print("Logging started.")
@@ -8417,6 +8439,14 @@ if __name__ == "__main__":
 				miza.miza = miza
 				with miza:
 					miza.run()
+			except:
+				print_exc()
+			finally:
+				if profiling:
+					yappi.stop()
+					func_stats = yappi.get_func_stats()
+					func_stats.save("profile.prof", type="pstat")
+
 			sys.__stdout__.write("MAIN PROCESS EXITING...")
 			common.MEM_LOCK.close()
 			asyncs.athreads.shutdown(wait=False)

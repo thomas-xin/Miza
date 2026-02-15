@@ -936,7 +936,7 @@ def untool(message):
 		content += "\n"
 		for tc in tcs:
 			fn = tc.function
-			content += f"\n> Used {fn.name} {fn.arguments}"
+			content += f"\n> Executed {fn.name} {fn.arguments}"
 	message.content = content.strip() if isinstance(content, string_like) else content
 	return message
 

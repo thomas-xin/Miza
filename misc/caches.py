@@ -151,7 +151,7 @@ class AttachmentCache(AutoCache):
 		self.channels.clear()
 		self.channels.update(AUTH.get("proxy_channels", ()))
 		if secondary:
-			self.secondary = AutoCache(secondary, size_limit=128 * 1073741824, stale=86400 * 7, timeout=86400 * 30)
+			self.secondary = AutoCache(secondary, size_limit=128 * 1073741824, stale=86400 * 7, timeout=86400 * 30, safe=True)
 		if tertiary:
 			self.tertiary = AutoCache(tertiary, size_limit=1073741824, stale=86400 * 7, timeout=86400 * 30)
 		return self.channels
@@ -563,13 +563,18 @@ def _audio_meta(path, _timeout=12) -> dict:
 def audio_meta(path, _timeout=12) -> cdict:
 	return cdict(audio_meta_cache.retrieve(path, _audio_meta, path, _timeout=_timeout))
 
-colour_cache = ColourCache(f"{CACHE_PATH}/colour", stale=86400, timeout=86400 * 7)
+colour_cache = ColourCache(
+	f"{CACHE_PATH}/colour",
+	stale=86400,
+	timeout=86400 * 7,
+)
 attachment_cache = AttachmentCache(
 	f"{CACHE_PATH}/attachment",
 	secondary=f"{CACHE_PATH}/attachment_contents",
 	tertiary=f"{CACHE_PATH}/attachment_headers",
 	stale=0,
 	timeout=3600 * 18,
+	safe=True,
 )
 
 font_cache = AutoCache("fonts", stale=86400 * 7, timeout=86400 * 90)

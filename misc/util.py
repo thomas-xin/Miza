@@ -3164,9 +3164,9 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		- Handles database timeout and operational errors by reinitializing.
 		- Supports concurrent retrievals with Future-based deduplication.
 	"""
-	__slots__ = ("_initialised", "_path", "_shardcount", "_stale", "_stimeout", "_desync", "_retrieving", "_kwargs")
+	__slots__ = ("_initialised", "_path", "_shardcount", "_stale", "_stimeout", "_desync", "_retrieving", "_unsafe", "_unsafe_mut", "_kwargs")
 
-	def __init__(self, directory=None, shards=6, stale=60, timeout=86400, desync=0, **kwargs):
+	def __init__(self, directory=None, shards=6, stale=60, timeout=86400, desync=0, safe=False, **kwargs):
 		self._path = directory or None
 		self._shardcount = shards
 		self._stale = stale or inf
@@ -3174,6 +3174,10 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		self._desync = desync
 		self._retrieving = {}
 		self._kwargs = kwargs
+		self._unsafe = None if safe else {}
+		self._unsafe_mut = None if safe else {}
+		self._autosave_thread = None if safe else concurrent.futures.ThreadPoolExecutor(max_workers=1)
+		self._autosave = None
 		self._initialised = None
 
 	def base_init(self, force=False):
@@ -3211,6 +3215,8 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		return super().__len__()
 
 	def __contains__(self, k):
+		if self._unsafe and k in self._unsafe:
+			return True
 		try:
 			return super().__contains__(k)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
@@ -3220,6 +3226,11 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 	def __getitem__(self, k):
 		if (fut := self._retrieving.get(k)):
 			return fut.result()
+		if self._unsafe:
+			try:
+				return self._unsafe[k]
+			except KeyError:
+				pass
 		try:
 			return super().__getitem__(k)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
@@ -3229,20 +3240,46 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 	def __setitem__(self, k, v, read=False):
 		if isinstance(v, memoryview):
 			v = bytes(v)
+		if self._unsafe is not None:
+			self._unsafe[k] = v
+			self._unsafe_mut[k] = v
+			if len(self._unsafe) > 65536:
+				try:
+					k2 = next(iter(self._unsafe))
+					self._unsafe.pop(k2)
+				except (KeyError, RuntimeError, StopIteration):
+					pass
+			if not self._autosave or self._autosave.done():
+				self._autosave = self._autosave_thread.submit(self.autosave)
+			return
 		super().set(k, v, expire=self.expire_offset, tag=utc(), read=read)
+
+	def autosave(self):
+		with tracebacksuppressor:
+			time.sleep(5)
+			self.update(self._unsafe_mut)
+			self._unsafe_mut.clear()
 
 	def update(self, other):
 		t = utc()
 		if hasattr(other, "items"):
 			other = other.items()
-		for k, v in other:
+		for k, v in tuple(other):
 			if isinstance(v, memoryview):
 				v = bytes(v)
 			super().set(k, v, expire=self.expire_offset, tag=t)
+			if self._unsafe:
+				self._unsafe.pop(k, None)
+			if self._unsafe_mut:
+				self._unsafe_mut.pop(k, None)
 		return self
 
 	def pop(self, k, v=Dummy):
 		self._retrieving.pop(k, None)
+		if self._unsafe:
+			self._unsafe.pop(k, None)
+		if self._unsafe_mut:
+			self._unsafe_mut.pop(k, None)
 		v = super().pop(k, default=(v,))
 		if v is Dummy:
 			raise KeyError(k)

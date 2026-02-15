@@ -7,6 +7,7 @@ import io
 import itertools
 from math import inf, tau, isfinite, sqrt, ceil
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -17,7 +18,7 @@ import orjson
 import niquests
 import numpy as np
 import psutil
-from .asyncs import csubmit, esubmit, asubmit, wrap_future, cst, eloop, Delay
+from .asyncs import csubmit, esubmit, asubmit, wrap_future, cst, eloop, Delay, format_async_stack, gather
 from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_str, astype, pretty_json
 from .smath import log2lin
 from .util import (
@@ -641,7 +642,7 @@ class AudioPlayer(discord.AudioSource):
 		if not self.vc and not self.fut.done():
 			return
 		try:
-			connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+			connected = self.vcc.guild.me.voice or interface.run(f"bool((guild := client.get_channel({self.vcc.id}).guild) and guild.me.voice)")
 		except Exception:
 			print_exc()
 			connected = False
@@ -657,7 +658,7 @@ class AudioPlayer(discord.AudioSource):
 		await asyncio.sleep(360)
 		if self is not self.players.get(self.vcc.guild.id):
 			return
-		connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+		connected = self.vcc.guild.me.voice or interface.run(f"bool((guild := client.get_channel({self.vcc.id}).guild) and guild.me.voice)")
 		if connected:
 			listeners = sum(not m.bot and bool(m.voice) for m in self.vcc.members)
 			if listeners == 0:
@@ -674,7 +675,7 @@ class AudioPlayer(discord.AudioSource):
 		if not self.vc and not self.fut.done():
 			return
 		try:
-			connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+			connected = self.vcc.guild.me.voice or interface.run(f"bool((guild := client.get_channel({self.vcc.id}).guild) and guild.me.voice)")
 		except Exception:
 			print_exc()
 			connected = False
@@ -685,7 +686,7 @@ class AudioPlayer(discord.AudioSource):
 		if self is not self.players.get(self.vcc.guild.id):
 			return
 		try:
-			connected = self.vcc.guild.me.voice or interface.run(f"bool(client.get_channel({self.vcc.id}).guild.me.voice)")
+			connected = self.vcc.guild.me.voice or interface.run(f"bool((guild := client.get_channel({self.vcc.id}).guild) and guild.me.voice)")
 		except Exception:
 			print_exc()
 			connected = False
@@ -1526,11 +1527,10 @@ discord.gateway.DiscordWebSocket.identify = lambda self: mobile_identify(self)
 async def kill():
 	futs = deque()
 	with suppress(ConnectionResetError):
-		futs.append(csubmit(client.change_presence(status=discord.Status.offline)))
+		futs.append(client.change_presence(status=discord.Status.offline))
 	for vc in client.voice_clients:
-		futs.append(csubmit(vc.disconnect(force=True)))
-	for fut in futs:
-		await fut
+		futs.append(vc.disconnect(force=True))
+	await gather(*futs)
 	sys.stdin.close()
 	return await client.close()
 
@@ -1626,6 +1626,30 @@ if __name__ == "__main__":
 		interface.start()
 		interface2.start()
 		globals()["ytdl"] = fut.result()
+
+	orig_warning = asyncio.base_events.logger.warning
+	task_re = re.compile(r"<Task.*name='([^']+)'.*?>")
+
+	def custom_warning(msg, *args, **kwargs):
+		orig_warning(msg, *args, **kwargs)
+
+		m = task_re.search(msg % args)
+		if not m:
+			return
+
+		task_name = m.group(1)
+		loop = asyncio.get_event_loop()
+		for task in asyncio.all_tasks(loop):
+			if task.get_name() == task_name:
+				print(f"\n[Slow task detected] {task}")
+				for line in format_async_stack(task.get_coro()):
+					print(line.strip())
+				print("[End slow task dump]\n")
+
+	# Monkey-patch
+	asyncio.base_events.logger.warning = custom_warning
+	eloop.slow_callback_duration = 0.375
+	eloop.set_debug(True)
 
 	ytdl_fut.add_done_callback(startup)
 	discord.client._loop = eloop

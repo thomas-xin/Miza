@@ -55,4 +55,5 @@ traceback_with_variables>=2.2.1
 tsc_utils>=0.2.5
 typing_extensions>=4.15.0
 wand>=0.6.13
+yappi>=1.7.3
 yt-dlp>=2025.11.18.232918

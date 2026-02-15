@@ -177,7 +177,7 @@ class AudioDownloader:
 		self.session = niquests.Session()
 		self.search_cache = AutoCache(f"{CACHE_PATH}/ytdl.search", stale=300, timeout=86400, desync=0.05)
 		self.thumbnail_cache = AutoCache(f"{CACHE_PATH}/ytdl.thumbnail", stale=300, timeout=86400 * 7, desync=0.05)
-		self.extract_cache = AutoCache(f"{CACHE_PATH}/ytdl.extract", stale=60, timeout=120, desync=0.05)
+		self.extract_cache = AutoCache(f"{CACHE_PATH}/ytdl.extract", stale=60, timeout=120, desync=0.05, safe=True)
 		self.futs = [
 			esubmit(self.set_cookie),
 		]

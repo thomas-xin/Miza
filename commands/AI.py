@@ -576,9 +576,7 @@ class Ask(Command):
 						print(args)
 						fut = check_output_async(args)
 						succ = await rag(name, tid, fut)
-						if not succ:
-							name = "wolfram_alpha"
-					if name == "wolfram_alpha":
+					elif name == "wolfram_alpha":
 						argv = kwargs.get("query") or " ".join(kwargs.values())
 						s = f'\n> Solving "{argv}"...'
 						text += s
