@@ -80,7 +80,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	restart = "restart.tmp"
 	shutdown = "shutdown.tmp"
 	activity = 0
-	caches = ("guilds", "channels", "users", "roles", "emojis", "messages", "members", "attachments", "banned", "colours")
+	caches = ("guilds", "channels", "users", "usernames", "roles", "emojis", "messages", "members", "attachments", "banned", "colours")
 	statuses = (discord.Status.online, discord.Status.idle, discord.Status.dnd, discord.Streaming, discord.Status.invisible)
 	# Default command prefix
 	prefix = AUTH.get("prefix", "~")
@@ -139,7 +139,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.loaded = False
 		# Channel-Webhook cache: for accessing all webhooks for a channel.
 		self.cw_cache = cdict()
-		self.usernames = {}
 		self.events = mdict()
 		self.react_sem = cdict()
 		self.mention = ()
@@ -912,7 +911,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							s = data["username"] + "#" + data["discriminator"]
 						else:
 							s = data["username"]
-					self.usernames[s] = users[u_id] = self._state.store_user(data)
+					self.cache.usernames[s] = users[u_id] = self._state.store_user(data)
 					return
 			csubmit(self.auser2cache(u_id))
 
@@ -976,7 +975,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		for i in range(len(spl)):
 			uid = " ".join(spl[i:])
 			try:
-				return self.usernames[uid]
+				return self.cache.usernames[uid]
 			except KeyError:
 				pass
 
@@ -1050,7 +1049,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					with suppress(LookupError):
 						member = await self.fetch_user(u_id)
 			try:
-				user = self.usernames[u_id]
+				user = self.cache.usernames[u_id]
 			except KeyError:
 				pass
 			else:
@@ -1155,7 +1154,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		else:
 			self.temp_guilds.pop(gid).set_result(guild)
 		for member in guild.members:
-			self.usernames[member.name] = member._user
+			self.cache.usernames[member.name] = member._user
+		self.cache.channels.update(guild._threads)
+		self.cache.channels.update(guild._channels)
 		return guild
 	temp_guilds = {}
 	async def retrieve_guild(self, gid):
@@ -3193,10 +3194,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def cache_reduce(self):
 		self.limit_cache("messages")
 		self.limit_cache("attachments", 256)
-		self.limit_cache("channels")
-		self.limit_cache("users")
-		self.limit_cache("members")
-		self.limit_cache("roles")
 		self.limit_cache("emojis")
 		self.limit_cache("deleted", limit=16384)
 		self.limit_cache("banned", 4096)
@@ -3208,20 +3205,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.cache.users._feed = (self._users,)
 		g = self._guilds.values()
 		self.cache.members._feed = lambda: (guild._members for guild in g)
-		self.cache.channels._feed = lambda: chain(
-			(guild._channels for guild in g),
-			(guild._threads for guild in g),
-			(self._private_channels,),
-			(getattr(self, "sub_channels", {}),),
-		)
+		self.cache.channels._feed = (self._private_channels,)
 		self.cache.roles._feed = lambda: (guild._roles for guild in g)
 
-	sub_channels = {}
 	async def update_subs(self):
-		self.sub_guilds = dict(self._guilds) or self.sub_guilds
-		sc = self.sub_channels
-		self.sub_channels = dict(chain.from_iterable(guild._channels.items() for guild in self.sub_guilds.values())) or sc
-		self.sub_channels.update(sc)
 		if not hasattr(self, "guilds_ready") or not self.guilds_ready.done():
 			return
 		futs = []
@@ -7799,7 +7786,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			await fut
 			for member in guild.members:
 				name = str(member)
-				self.usernames[name] = member._user
+				self.cache.usernames[name] = member._user
 			await asubmit(self.set_guilds)
 
 		# Guild destroy event: Remove guild from bot cache.
@@ -8132,8 +8119,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			b = str(before)
 			a = str(after)
 			if b != a:
-				self.usernames.pop(b, None)
-				self.usernames[a] = after
+				self.cache.usernames.pop(b, None)
+				self.cache.usernames[a] = after
 			if not getattr(before, "simulated", None):
 				await self.send_event("_user_update_", before=before, after=after)
 			if before.id == self.deleted_user or after.id == self.deleted_user:
@@ -8167,7 +8154,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		@self.event
 		async def on_member_join(member):
 			name = str(member)
-			self.usernames[name] = member._user
+			self.cache.usernames[name] = member._user
 			if member.guild.id in self._guilds:
 				member.guild._member_count = len(member.guild._members)
 			await self.send_event("_join_", user=member, guild=member.guild)
@@ -8180,14 +8167,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			b = str(before)
 			a = str(after)
 			if b != a:
-				self.usernames.pop(b, None)
-				self.usernames[a] = after
+				self.cache.usernames.pop(b, None)
+				self.cache.usernames[a] = after
 				await self.send_event("_user_update_", before=before, after=after)
 			if hasattr(before, "_user"):
 				before._user = after
 			if after.id not in self.cache.members:
 				name = str(after)
-				self.usernames.pop(name, None)
+				self.cache.usernames.pop(name, None)
 			if before.guild.id in self._guilds:
 				before.guild._members.pop(after.id, None)
 				before.guild._member_count = len(before.guild._members)
@@ -8196,7 +8183,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Channel create event: calls _channel_create_ bot database event.
 		@self.event
 		async def on_guild_channel_create(channel):
-			self.sub_channels[channel.id] = channel
+			self.cache.channels[channel.id] = channel
 			guild = channel.guild
 			if guild:
 				await self.send_event("_channel_create_", channel=channel, guild=guild)
@@ -8204,7 +8191,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Channel update event: calls _channel_update_ bot database event.
 		@self.event
 		async def on_guild_channel_update(before, after):
-			self.sub_channels[after.id] = after
+			self.cache.channels[after.id] = after
 			guild = after.guild
 			if guild and (before.name != after.name or before.position != after.position):
 				await self.send_event("_channel_update_", before=before, after=after, guild=guild)
@@ -8212,7 +8199,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Channel delete event: calls _channel_delete_ bot database event.
 		@self.event
 		async def on_guild_channel_delete(channel):
-			self.sub_channels.pop(channel.id, None)
 			self.cache.channels.pop(channel.id, None)
 			guild = channel.guild
 			if guild:
@@ -8221,7 +8207,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Thread delete event: calls _channel_delete_ bot database event.
 		@self.event
 		async def on_thread_delete(channel):
-			self.sub_channels.pop(channel.id, None)
 			self.cache.channels.pop(channel.id, None)
 			guild = channel.guild
 			if guild:
@@ -8423,7 +8408,7 @@ if __name__ == "__main__":
 			eloop.slow_callback_duration = 0.375
 			eloop.set_debug(True)
 
-			profiling = 0
+			profiling = 1
 			if profiling:
 				import yappi
 				yappi.start()

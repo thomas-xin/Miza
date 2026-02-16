@@ -3256,7 +3256,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 
 	def autosave(self):
 		with tracebacksuppressor:
-			time.sleep(5)
+			time.sleep(30)
 			self.update(self._unsafe_mut)
 			self._unsafe_mut.clear()
 

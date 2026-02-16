@@ -577,7 +577,7 @@ attachment_cache = AttachmentCache(
 	safe=True,
 )
 
-font_cache = AutoCache("fonts", stale=86400 * 7, timeout=86400 * 90)
+font_cache = AutoCache(f"{CACHE_PATH}/fonts", stale=86400 * 7, timeout=86400 * 90)
 def _enumerate_os_fonts():
 	from PIL import ImageFont
 	dirs = []
