@@ -47,7 +47,7 @@ if "common" not in globals():
 	from misc.asyncs import asubmit, csubmit, esubmit, tsubmit, gather, flatten, eloop, get_event_loop, emptyctx, as_fut, await_fut, Semaphore, SemaphoreOverflowError, CloseableAsyncIterator, Delay
 	from misc.smath import xrand, sec2time, dtn, utc_dt
 	from misc.types import astype, as_str, cdict, fdict, fcdict, mdict, alist, azero, round_min, full_prune, suppress, tracebacksuppressor, ts_us, CE
-	from misc.util import AUTH, CACHE_PATH, TEMP_PATH, FAST_PATH, CACHE_FILESIZE, DEFAULT_FILESIZE, IMAGE_FORMS, PORT, PROC, EvalPipe, python, AutoCache, utc, T, lim_str, lim_tokens, regexp, Request, reqs, force_kill, json_dumps, discord_expired, is_miza_attachment, is_discord_attachment, is_discord_message_link, print_class, is_url, encode_attachment, choice, time_snowflake, magic, url2fn, url2ext, find_urls, find_urls_ex, shash, tcount, require_predicate, eval_json, get_image_size, split_url
+	from misc.util import AUTH, CACHE_PATH, TEMP_PATH, CACHE_FILESIZE, DEFAULT_FILESIZE, IMAGE_FORMS, PORT, PROC, EvalPipe, python, AutoCache, utc, T, lim_str, lim_tokens, regexp, Request, reqs, force_kill, json_dumps, discord_expired, is_miza_attachment, is_discord_attachment, is_discord_message_link, print_class, is_url, encode_attachment, choice, time_snowflake, magic, url2fn, url2ext, find_urls, find_urls_ex, shash, tcount, require_predicate, eval_json, get_image_size, split_url
 	from misc.caches import download_binary_dependencies, attachment_cache
 	from misc.common import api, load_colour_list, load_emojis, str_lookup, verify_id, manual_edit, BASE_LOGO, MemoryTimer, is_channel, get_last_image, best_url, worst_url, translate_emojis, message_repr, message_link, min_emoji, process_image, find_emojis, find_emojis_ex, find_users, replace_emojis, send_with_react, send_with_reply, CompatFile
 
@@ -162,8 +162,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				os.mkdir(f"{CACHE_PATH}/{k}")
 			if not os.path.exists(f"{TEMP_PATH}/{k}"):
 				os.mkdir(f"{TEMP_PATH}/{k}")
-			if not os.path.exists(f"{FAST_PATH}/{k}"):
-				os.mkdir(f"{FAST_PATH}/{k}")
 		try:
 			self.token = AUTH["discord_token"]
 		except KeyError:
@@ -277,7 +275,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.message_cache = AutoCache(f"{CACHE_PATH}/message_cache", shards=64, stale=86400 * 7, timeout=86400 * 14, desync=0.3)
 		self.discord_cache = AutoCache(f"{CACHE_PATH}/discord_api", stale=0, timeout=300, desync=0.05)
 		self.discord_data_cache = AutoCache(f"{CACHE_PATH}/discord_data", shards=7, stale=86400 * 3, timeout=86400 * 14, desync=0.5)
-		self.uptime_db = AutoCache(f"{CACHE_PATH}/uptime", shards=1, stale=0, timeout=86400 * 7)
+		self.uptime_db = FileHashDict(path=f"{CACHE_PATH}/uptime")
 		print(f"Loading main databases took {DynamicDT.now() - t}.")
 
 	def get_userbase(self, uid, path="", default=None):
@@ -1046,7 +1044,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if guild:
 						member = await self.fetch_member(u_id, guild)
 				if member is None:
-					with suppress(LookupError):
+					with suppress(LookupError, discord.NotFound):
 						member = await self.fetch_user(u_id)
 			try:
 				user = self.cache.usernames[u_id]
@@ -1157,6 +1155,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.cache.usernames[member.name] = member._user
 		self.cache.channels.update(guild._threads)
 		self.cache.channels.update(guild._channels)
+		self.cache.users.update({k: getattr(v, "_user", v) for k, v in guild._members.items()})
+		self.cache.members.update(guild._members)
+		self.cache.roles.update(guild._roles)
+		self.cache.guilds[guild.id] = guild
 		return guild
 	temp_guilds = {}
 	async def retrieve_guild(self, gid):
@@ -1330,7 +1332,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return attachment_cache[url]
 			except KeyError:
 				return self.notfound
-		url = await attachment_cache.obtain(url, m_id)
+		url = await attachment_cache.obtain(url=url, m_id=m_id)
 		return url.rstrip("&")
 
 	async def renew_attachments(self, aids=()):
@@ -2232,7 +2234,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			backup="deepseek-v3.2-speciale",
 			retry="gpt-5-mini",
 			function=None,
-			vision="grok-4.1-fast",
+			vision="qwen3.5-27b",
 			target="auto",
 		),
 		1: cdict(
@@ -2246,13 +2248,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		2: cdict(
-			instructive="claude-opus-4.6",
-			casual="gemini-3-pro",
+			instructive="gemini-3.1-pro",
+			casual="gemini-3.1-pro",
 			nsfw="grok-4",
 			backup="gpt-5.2",
 			retry="gpt-5.2-pro",
 			function="grok-4.1-fast",
-			vision="claude-sonnet-4.5",
+			vision="gemini-3.1-pro",
 			target="auto",
 		),
 	}
@@ -2328,7 +2330,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							break
 				toolcheck.append(messages[0])
 				toolcheck.reverse()
-				vision_alt = "grok-4.1-fast" if modelist.function not in ai.is_vision and modelist.vision in ai.is_function else modelist.function
+				vision_alt = modelist.vision if modelist.function not in ai.is_vision else modelist.function
 				toolcheck, toolmodel = await self.caption_into(toolcheck, model=modelist.function, backup_model=vision_alt, premium_context=premium_context)
 				mode = None
 				label = "instructive"
@@ -2340,7 +2342,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						tools=list(toolscan) + [f_default],
 						tool_choice="required" if toolmodel else "auto",
 						require_message=False,
-						max_tokens=min(256, max_tokens),
+						max_tokens=min(2048, max_tokens),
 						user=ustr,
 						assistant_name=assistant_name,
 						is_nsfw=is_nsfw,
@@ -2362,8 +2364,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							reason = str(rdetails[0])
 				if reason and (reason := reason.strip()):
 					reasoning.append(reason)
+		reasoning_effort = "low"
 		if message:
-			directly_answer = True
+			directly_answer = None
 			for tc in tuple(message.tool_calls or ()):
 				if tc.function.name == "directly_answer":
 					try:
@@ -2375,10 +2378,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					print(args)
 					if args.get("format"):
 						mode = args["format"]
+					if args.get("reasoning_effort"):
+						reasoning_effort = args["reasoning_effort"]
+						if reasoning_effort not in ("minimal", "low", "medium", "high"):
+							reasoning_effort = "low"
 					message.tool_calls.remove(tc)
 					break
 				else:
 					directly_answer = False
+			if directly_answer is None:
+				directly_answer = True
+				reasoning_effort = "medium"
 			if not directly_answer and message.tool_calls:
 				print("Immediate call:", message)
 				choice = resp.choices[0]
@@ -2507,6 +2517,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					yield "\r"
 				text = text.strip()
 				data["text"] = text
+			data["reasoning_effort"] = reasoning_effort
 			try:
 				resp = await self.force_chat(**data, premium_context=premium_context, stream=True, timeout=90)
 			except openai.BadRequestError:
@@ -2788,7 +2799,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
-		model = model or ("gemini-3-pro" if best else "gemini-3-flash")
+		model = model or ("gemini-3.1-pro" if best else "gemini-3-flash")
 		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
@@ -3200,13 +3211,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	def update_cache_feed(self):
 		"Updates bot cache from the discord.py client cache, using automatic feeding to mitigate the need for slow dict.update() operations."
-		self.cache.guilds._feed = (self._guilds, getattr(self, "sub_guilds", {}))
 		self.cache.emojis._feed = (self._emojis,)
-		self.cache.users._feed = (self._users,)
 		g = self._guilds.values()
-		self.cache.members._feed = lambda: (guild._members for guild in g)
 		self.cache.channels._feed = (self._private_channels,)
-		self.cache.roles._feed = lambda: (guild._roles for guild in g)
 
 	async def update_subs(self):
 		if not hasattr(self, "guilds_ready") or not self.guilds_ready.done():
@@ -3543,9 +3550,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				for role in u.roles:
 					if role.id in self.premium_roles:
 						lv = max(lv, self.premium_roles[role.id])
-		elif not self.ready:
-			return 0
 		else:
+			print("WARNING: Premium server not set, using default!")
+			if not self.ready:
+				return 0
 			return 3
 		if not absolute:
 			data = self.get_userbase(uid)
@@ -4297,7 +4305,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		with self.cache_semaphore:
 			i = 0
 			t = utc()
-			for path, limit in zip((CACHE_PATH, TEMP_PATH, FAST_PATH), (16384, 1024, 4096)):
+			for path, limit in zip((CACHE_PATH, TEMP_PATH), (16384, 1024)):
 				for k in ("", "audio"):
 					atts = os.listdir(f"{path}/{k}")
 					if len(atts) > limit:
@@ -4344,13 +4352,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down."
 		if force:
 			self.update_embeds(True)
-		saved = []
-		with tracebacksuppressor:
-			for i, u in self.data.items():
-				if getattr(u, "sync", None):
-					with MemoryTimer(f"{u}-sync"):
-						if u.sync(force=True):
-							saved.append(i)
 		backup = AUTH.get("backup_path") or "backup"
 		fn = f"{backup}/saves.{DynamicDT.utcnow().date()}.tar"
 		day = not os.path.exists(fn)
@@ -4358,8 +4359,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			await_fut(self.send_event("_day_"))
 			self.users_updated = True
 		if force or day:
-			fut = self.send_event("_save_")
-			await_fut(fut)
+			print("Forcing save event...")
+			# fut = self.send_event("_save_")
+			# await_fut(fut)
 		if day:
 			self.backup()
 
@@ -4641,9 +4643,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		for k, v in tuple(kwargs.items()):
 			if "-" in k:
 				kwargs[k.replace("-", "_")] = kwargs.pop(k)
+		any_unavailable = any(v.get("excludes") for v in schema.values())
+		if any_unavailable:
+			not_available = set(itertools.chain(*(schema[k].get("excludes", ()) for k in kwargs)))
+			available = [k for k in schema if k not in not_available]
+		else:
+			available = schema
 		args = alist(spl[0]._get_args() + spl[1])
 		if args:
-			for k, v in schema.items():
+			for k in available:
+				v = schema[k]
 				if k in kwargs or not v.get("greedy", True):
 					continue
 				r = None
@@ -4680,11 +4689,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							args.pops(range(index, index + len(extracted)))
 				if r:
 					kwargs[k] = [r] if v.get("multiple") else r
+					if any_unavailable:
+						not_available = set(itertools.chain(*(schema[k].get("excludes", ()) for k in kwargs)))
+						available = [k for k in schema if k not in not_available]
 					continue
 		oj = 0
 		pops = []
 		for i, a in enumerate(args):
-			for k, v in schema.items():
+			for k in available:
+				v = schema[k]
 				if k in kwargs and not v.get("multiple"):
 					if v.type in ("text", "string"):
 						if a in oargs:
@@ -4728,13 +4741,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					kwargs[k].append(a)
 				else:
 					kwargs[k] = [a] if v.get("multiple") else a
+				if any_unavailable:
+					not_available = set(itertools.chain(*(schema[k].get("excludes", ()) for k in kwargs)))
+					available = [k for k in schema if k not in not_available]
 				pops.append(i)
 				break
 		args.pops(pops)
 		oj = 0
 		pops = []
 		for i, a in enumerate(args):
-			for k, v in schema.items():
+			for k in available:
+				v = schema[k]
 				if k in kwargs and not v.get("multiple"):
 					if v.type in ("text", "string"):
 						if a in oargs:
@@ -4767,6 +4784,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					kwargs[k].append(a)
 				else:
 					kwargs[k] = [a] if v.get("multiple") else a
+				if any_unavailable:
+					not_available = set(itertools.chain(*(schema[k].get("excludes", ()) for k in kwargs)))
+					available = [k for k in schema if k not in not_available]
 				pops.append(i)
 				break
 		args.pops(pops)
@@ -4853,12 +4873,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					continue
 				print(kwargs)
 				if v:
-					raise ArgumentError(f"Argument {k} ({v.description}) is required.")
-				raise ArgumentError(f"Argument {k} (`{v.type}`) is required.")
+					raise ArgumentError(f"Argument `{k}` ({italics(v.description)}) is required.")
+				raise ArgumentError(f"Argument `{k}` (`{italics(v.type)}`) is required.")
 		if append_lws:
 			k, j = append_lws
 			if j < len(ws):
 				kwargs[k] = (kwargs[k] + ws[j]).strip()
+		if any_unavailable:
+			for k in kwargs:
+				for k2 in schema[k].get("excludes", ()):
+					if kwargs.get(k2) and kwargs.get(k2) != schema[k2].get("default"):
+						v = schema[k]
+						v2 = schema[k2]
+						raise ArgumentError(f"Argument `{k}` ({italics(v.description)}) is incompatible with `{k2}` ({italics(v2.description)}).")
 		return await self.validate_schema(kwargs, schema, command_check=command_check, argv=argv, args=args, guild=guild)
 
 	async def validate_into(self, k, v, info, guild):
@@ -4884,23 +4911,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				elif isinstance(m, int):
 					v = await self.fetch_messageable(m)
 				else:
-					v2 = verify_id(m)
 					v = None
-					if isinstance(v2, int):
+					if isinstance(m, int):
 						try:
-							v = await self.fetch_messageable(v2)
+							v = await self.fetch_messageable(m)
 						except Exception:
 							pass
 					if v is None:
 						v = await self.fetch_member_ex(m, guild, fuzzy=fuzzy)
 			elif info.type == "user":
-				v2 = verify_id(m)
 				v = None
-				if isinstance(v2, int):
-					v = guild.get_member(v2)
+				if isinstance(m, int):
+					v = guild.get_member(m)
 					if v is None:
 						try:
-							v = await self.fetch_user(v2)
+							v = await self.fetch_user(m)
 						except Exception:
 							pass
 				if v is None:
@@ -4911,11 +4936,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				elif not guild:
 					raise TypeError("Channels must be specified by ID outside of servers.")
 				else:
-					v2 = verify_id(m)
 					v = None
-					if isinstance(v2, int):
+					if isinstance(m, int):
 						try:
-							v = await self.fetch_channel(v2)
+							v = await self.fetch_channel(m)
 						except Exception:
 							pass
 					if v is None:
@@ -4933,11 +4957,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				elif not guild:
 					raise TypeError("Roles must be specified by ID outside of servers.")
 				else:
-					v2 = verify_id(m)
 					v = None
-					if isinstance(v2, int):
+					if isinstance(m, int):
 						try:
-							v = await self.fetch_role(v2, guild)
+							v = await self.fetch_role(m, guild)
 						except Exception:
 							pass
 					if v is None:
@@ -5465,6 +5488,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				content = response.pop("content", None) or ""
 				tts = response.pop("tts", False) or False
 				b_tts = response.pop("b_tts", False) or False
+				callback = response.pop("callback", None)
 				def get_prefix():
 					return prefix if not bypass_prefix or none(content.startswith(b) for b in bypass_prefix) else ""
 				def get_suffix():
@@ -5553,7 +5577,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					files = manager.files + (response.get("files") or ([response["file"]] if response.get("file") else None) or [])
 					reacts = response.get("reacts")
 					buttons = manager.buttons + (response.get("buttons") or [])
-					print("STOP:", content, embeds, files, reacts, buttons)
+					if callback:
+						callback(cdict(
+							content=content,
+							embeds=embeds,
+							files=files,
+							reacts=reacts,
+							buttons=buttons,
+						))
 					total_length = len(get_prefix()) + len(content) + len(get_suffix())
 					if fut:
 						with tracebacksuppressor:
@@ -6579,25 +6610,37 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			def __copy__(self):
 				return self.__class__(copy.copy(self.message))
 
+			@property
+			def channel(self):
+				m = object.__getattribute__(self, "message")
+				c = getattr(m, "channel")
+				if isinstance(c, discord.abc.PrivateChannel):
+					try:
+						c = bot.cache.channels[c.id]
+					except KeyError:
+						pass
+					else:
+						m.channel = c
+				return c
+			@channel.setter
+			def channel(self, c):
+				m = object.__getattribute__(self, "message")
+				m.channel = c
+
+			@property
+			def guild(self):
+				m = object.__getattribute__(self, "message")
+				g = getattr(m, "guild")
+				if not g:
+					c = self.channel
+					m.guild = getattr(c, "guild", None)
+				return m.guild
+			@guild.setter
+			def guild(self, g):
+				m = object.__getattribute__(self, "message")
+				m.guild = g
+
 			def __getattr__(self, k):
-				if k == "channel":
-					m = object.__getattribute__(self, "message")
-					c = getattr(m, "channel")
-					if isinstance(c, discord.abc.PrivateChannel):
-						try:
-							c = bot.cache.channels[c.id]
-						except KeyError:
-							pass
-						else:
-							m.channel = c
-					return c
-				elif k == "guild":
-					m = object.__getattribute__(self, "message")
-					g = getattr(m, "guild")
-					if not g:
-						c = self.channel
-						m.guild = getattr(c, "guild", None)
-					return m.guild
 				try:
 					return self.__getattribute__(k)
 				except AttributeError:
@@ -6607,8 +6650,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					v = getattr(m, k)
 				else:
 					v = object.__getattribute__(m, k)
-				if v and k in ("content", "system_content", "clean_content"):
-					return readstring(v)
+				# if v and k in ("content", "system_content", "clean_content"):
+				# 	return readstring(v)
 				return v
 
 		class StreamedMessage:
@@ -6781,7 +6824,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		class CachedMessage(discord.abc.Snowflake):
 			"discord.py-compatible message object that enables fast loading."
 
-			__slots__ = ("_data", "id", "created_at", "author", "channel", "guild", "channel_id", "deleted", "attachments", "sem", "cached")
+			__slots__ = ("_data", "id", "created_at", "_author", "_channel", "_attachments", "_embeds", "channel_id", "deleted", "sem", "cached")
 
 			def __init__(self, data):
 				self._data = data
@@ -6790,6 +6833,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				author = data["author"]
 				if author["id"] not in bot.cache.users:
 					bot.user2cache(author)
+				self._author = None
+				self._channel = None
+				self._guild = None
+				self._attachments = None
 
 			def __copy__(self):
 				d = dict(self.__getattribute__("_data"))
@@ -6836,6 +6883,89 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					message.author = author
 				return message
 
+			@property
+			def content(self):
+				d = self.__getattribute__("_data")
+				return d.get("content", "")
+
+			@property
+			def system_content(self):
+				d = self.__getattribute__("_data")
+				return d.get("system_content") or d.get("content", "")
+
+			@property
+			def clean_content(self):
+				d = self.__getattribute__("_data")
+				return readstring(d.get("clean_content") or d.get("content", ""))
+
+			@property
+			def channel(self):
+				if self._channel:
+					return self._channel
+				d = self.__getattribute__("_data")
+				try:
+					channel, _ = bot._get_guild_channel(d)
+					if channel is None:
+						raise LookupError
+				except LookupError:
+					pass
+				else:
+					return channel
+				cid = int(d["channel_id"])
+				channel = bot.cache.channels.get(cid)
+				if channel:
+					self._channel = channel
+					return channel
+				else:
+					return cdict(id=cid)
+			@channel.setter
+			def channel(self, c):
+				self._channel = c
+
+			@property
+			def guild(self):
+				return getattr(self.channel, "guild", None)
+			@guild.setter
+			def guild(self, g):
+				self.channel.guild = g
+
+			@property
+			def author(self):
+				if self._author:
+					return self._author
+				d = self.__getattribute__("_data")
+				self._author = bot.get_user(d["author"]["id"], replace=True)
+				guild = getattr(self.channel, "guild", None)
+				if guild is not None:
+					member = guild.get_member(self._author.id)
+					if member is not None:
+						self._author = member
+				return self._author
+
+			@property
+			def type(self):
+				d = self.__getattribute__("_data")
+				return discord.enums.try_enum(discord.MessageType, d.get("type", 0))
+
+			@property
+			def attachments(self):
+				if self._attachments is not None:
+					return self._attachments
+				d = self.__getattribute__("_data")
+				self._attachments = attachments = [discord.Attachment(data=a, state=bot._state) for a in d.get("attachments", ())]
+				return attachments
+			@attachments.setter
+			def attachments(self, a):
+				self._attachments = a
+
+			@property
+			def embeds(self):
+				if self._embeds is not None:
+					return self._embeds
+				d = self.__getattribute__("_data")
+				self._embeds = embeds = [discord.Embed.from_dict(a) for a in d.get("embeds", ())]
+				return embeds
+
 			def __getattr__(self, k):
 				if k in self.__slots__:
 					try:
@@ -6846,43 +6976,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if k in ("simulated", "slash"):
 					raise AttributeError(k)
 				d = self.__getattribute__("_data")
-				if k in ("content", "system_content", "clean_content"):
-					return readstring(d.get(k) or d.get("content", ""))
-				if k == "channel":
-					try:
-						channel, _ = bot._get_guild_channel(d)
-						if channel is None:
-							raise LookupError
-					except LookupError:
-						pass
-					else:
-						return channel
-					cid = int(d["channel_id"])
-					channel = bot.cache.channels.get(cid)
-					if channel:
-						self.channel = channel
-						return channel
-					else:
-						return cdict(id=cid)
-				if k == "guild":
-					return getattr(self.channel, "guild", None)
-				if k == "author":
-					self.author = bot.get_user(d["author"]["id"], replace=True)
-					guild = getattr(self.channel, "guild", None)
-					if guild is not None:
-						member = guild.get_member(self.author.id)
-						if member is not None:
-							self.author = member
-					return self.author
-				if k == "type":
-					return discord.enums.try_enum(discord.MessageType, d.get("type", 0))
-				if k == "attachments":
-					self.attachments = attachments = [discord.Attachment(data=a, state=bot._state) for a in d.get("attachments", ())]
-					return attachments
-				if k == "embeds":
-					return [discord.Embed.from_dict(a) for a in d.get("embeds", ())]
-				if k == "system_content" and not d.get("type"):
-					return self.content
 				try:
 					m = self.__getattribute__("cached")
 				except AttributeError:
@@ -7728,7 +7821,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.states[shard_id] = self.states[shard_id] or True
 			guilds = [g for g in self.client.guilds if self.guild_shard(g.id) == shard_id]
 			for g in guilds:
-				self.cache.guilds.pop(g.id, None)
+				self.cache.guilds[g.id] = g
 				self._guilds[g.id] = g
 			await self.modload
 			fut = fut_nop
@@ -7749,7 +7842,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.users_updated = True
 			print(f"New server: {guild}")
 			guild = await self.fetch_guild(guild.id)
-			self.sub_guilds[guild.id] = guild
+			self.cache.guilds[guild.id] = guild
 			m = guild.me
 			await self.send_event("_join_", user=m, guild=guild)
 			channel = self.get_first_sendable(guild, m)
@@ -7795,7 +7888,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.guilds_updated = True
 			self.users_updated = True
 			self.cache.guilds.pop(guild.id, None)
-			self.sub_guilds.pop(guild.id, None)
 			await asubmit(self.set_guilds)
 			print("Server lost:", guild, "removed.")
 
@@ -8408,14 +8500,16 @@ if __name__ == "__main__":
 			eloop.slow_callback_duration = 0.375
 			eloop.set_debug(True)
 
-			profiling = 1
+			PRINT.start()
+			sys.stdout = sys.stderr = print = PRINT
+			print("Logging started.")
+
+			profiling = 1 if len(sys.argv) > 1 and sys.argv[1] == "1" else 0
 			if profiling:
+				print("Profiling is ON.")
 				import yappi
 				yappi.start()
 			try:
-				PRINT.start()
-				sys.stdout = sys.stderr = print = PRINT
-				print("Logging started.")
 				initialise_ppe()
 				esubmit(proc_start)
 				discord.client._loop = eloop

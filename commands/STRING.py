@@ -229,10 +229,12 @@ class ID2Time(Command):
 		id=cdict(
 			type="number",
 			example="201548633244565504",
+			excludes=("time",),
 		),
 		time=cdict(
 			type="datetime",
 			example="35 minutes and 6.25 seconds before 3am next tuesday, EDT",
+			excludes=("id",),
 		),
 	)
 	rate_limit = (3, 4)

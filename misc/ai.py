@@ -41,15 +41,9 @@ available = {
 
 # tags: is_completion, is_function, is_vision, is_premium
 is_completion = set()
-is_reasoning = {
-	"grok-4.1-fast",
-}
-is_function = {
-	"grok-4.1-fast",
-}
-is_vision = {
-	"grok-4.1-fast",
-}
+is_reasoning = set()
+is_function = set()
+is_vision = set()
 is_premium = set()
 contexts = {}
 
@@ -375,6 +369,9 @@ def load_translation_model():
 	translation_model.refresh = utc() + 720
 	return translation_model
 
+def model_name(model_id):
+	return model_id and model_id.rsplit("/", 1)[-1].replace("-preview", "")
+
 openai_refresh = 0
 async def load_openrouter():
 	if openai_refresh > utc():
@@ -389,7 +386,7 @@ async def load_openrouter():
 	models = await CACHE.aretrieve("openrouter-models", get_openrouter_models, _force=True)
 	count = 0
 	for model in models:
-		name = model.id.rsplit("/", 1)[-1].rsplit("-preview", 1)[0]
+		name = model_name(model.id)
 		prompt, completion = str(decimal.Decimal(model.pricing["prompt"]) * 1000000), str(decimal.Decimal(model.pricing["completion"]) * 1000000)
 		entry = (model.id, (prompt, completion))
 		try:
@@ -502,11 +499,10 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 		sem = emptyctx
 		kwa = kwargs.copy()
 		body = cdict(kwargs.get("extra_body") or {})
-		if orig_model in is_reasoning or minfo is None:
+		if model_name(orig_model) in is_reasoning or minfo is None:
 			mt = kwa.pop("max_tokens", 0) or 0
 			if not kwa.get("max_completion_tokens"):
 				kwa["max_completion_tokens"] = mt * 3 // 2
-			kwa.pop("temperature", None)
 			kwa.pop("presence_penalty", None)
 			kwa.pop("frequency_penalty", None)
 			if sapi == "openrouter":
@@ -549,9 +545,11 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 							m2.content = [cdict(type="text", text=f"name={name}\n\n{c.text}") if c.get("type") == "text" else c for c in m2.content]
 						else:
 							m2.content = f"name={name}\n\n{m2.content}"
-					if model in is_function:
+					mname = model_name(model)
+					if mname in is_function:
 						m = fix_tool(m2)
 					else:
+						print("Untool:", mname)
 						m = untool(m2)
 					if not m.get("content"):
 						m.content = "."
@@ -664,11 +662,11 @@ async def _instruct(data, user=None, prune=True):
 		if "messages" not in inputs:
 			prompt = inputs.pop("prompt")
 			inputs["messages"] = [cdict(role="user", content=prompt)]
-		async with asyncio.timeout(70):
+		async with asyncio.timeout(120):
 			response = await llm("chat.completions.create", **inputs, timeout=60)
 		resp = response.choices[0].message.content
 	else:
-		async with asyncio.timeout(100):
+		async with asyncio.timeout(180):
 			response = await llm("completions.create", **inputs, timeout=90)
 		resp = response.choices[0].text
 	if prune:
@@ -696,19 +694,6 @@ f_browse = {
 			},
 			"required": ["query"],
 }}}
-f_reasoning = {
-	"type": "function", "function": {
-		"name": "reasoning",
-		"description": "Requests for a slower, more powerful language model to provide reasoning. Use if you are unsure about, or if a user is pointing out a flaw in your logic. Includes complex programming tasks. Make sure to pass all relevant information!",
-		"parameters": {
-			"type": "object", "properties": {
-				"query": {
-					"type": "string",
-					"description": 'Query, eg. "oyfjdnisdr rtqwainr acxz mynzbhhx -> Think step by step. Use the example above to decode: oyekaijzdf aaptcg suaokybhai ouow aqht mynznvaatzacdfoulxxz"',
-				},
-			},
-			"required": ["query"],
-}}}
 f_wolfram_alpha = {
 	"type": "function", "function": {
 		"name": "wolfram_alpha",
@@ -725,12 +710,12 @@ f_wolfram_alpha = {
 f_deno = {
 	"type": "function", "function": {
 		"name": "deno",
-		"description": "Queries the Deno JavaScript interpreter. Must finish with `console.log` to retrive output.",
+		"description": "Queries the Deno JavaScript interpreter.",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {
 					"type": "string",
-					"description": 'Query, eg. "let x = 0.1; let y = 0.2; console.log(x+y);"',
+					"description": 'Query, eg. "1+1", "let x = 0.1; let y = 0.2; console.log(x+y);"',
 				},
 			},
 			"required": ["query"],
@@ -746,19 +731,6 @@ f_myinfo = {
 					"description": "Username or ID, eg. Miza",
 				},
 			},
-}}}
-f_recall = {
-	"type": "function", "function": {
-		"name": "recall",
-		"description": "Recalls previous messages from conversation history.",
-		"parameters": {
-			"type": "object", "properties": {
-				"query": {
-					"type": "string",
-					"description": '''Query, eg. "Jack's birthday, age, gender"''',
-				},
-			},
-			"required": ["query"],
 }}}
 f_txt2img = {
 	"type": "function", "function": {
@@ -875,7 +847,12 @@ f_default = {
 				"format": {
 					"type": "string",
 					"enum": ["instructive", "casual"],
-					"description": 'The conversation format/tone; "instructive" for academic, knowledge or advice responses, "casual" for banter, roleplay, or very simple questions.',
+					"description": """The conversation format/tone; "instructive" for academic, knowledge or advice responses, "casual" for banter, roleplay, or very simple questions.""",
+				},
+				"reasoning_effort": {
+					"type": "string",
+					"enum": ["low", "medium", "high"],
+					"description": """The reasoning effort to apply further reasoning before answering. Adjust based on complexity of the user's questions; defaults to "low".""",
 				},
 			},
 			"required": ["format"],
@@ -936,7 +913,7 @@ def untool(message):
 		content += "\n"
 		for tc in tcs:
 			fn = tc.function
-			content += f"\n> Executed {fn.name} {fn.arguments}"
+			content += f"\n> Used {fn.name} {fn.arguments}"
 	message.content = content.strip() if isinstance(content, string_like) else content
 	return message
 
@@ -959,7 +936,6 @@ def fix_tool(message):
 		seen.add(tc.id)
 	return message
 
-
 def unimage(message):
 	if not message.content or isinstance(message.content, string_like):
 		return message
@@ -974,34 +950,6 @@ def unimage(message):
 	return message
 
 
-CL100K_IM = {
-	"gpt-oss-120b",
-	"gpt-oss-20b",
-	"o4-mini",
-	"o3",
-	"o3-mini",
-	"o1",
-	"o1-preview",
-	"o1-mini",
-	"gpt-5.2",
-	"gpt-5.1",
-	"gpt-5",
-	"gpt-5-mini",
-	"gpt-5-nano",
-	"gpt-4.1",
-	"gpt-4.1-mini",
-	"chatgpt-4o-latest",
-	"gpt-4o",
-	"gpt-4o-mini",
-	"deepseek-r1",
-	"deepseek-v3.2",
-	"deepseek-v3.1",
-	"deepseek-v3",
-	"quill-72b",
-	"databricks/dbrx-instruct",
-	"meta-llama/Meta-Llama-3-70B-Instruct",
-}
-
 class OpenAIPricingIterator(CloseableAsyncIterator):
 
 	def __init__(self, it, close, premium_context, api, model, input="", m_input=0, m_output=0, pricing=None):
@@ -1015,7 +963,7 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 		self.costs = [utc(), api, model, "0"]
 		self.true_cost = None
 		self.pricing = pricing or (m_input, m_output)
-		self.tokeniser = "cl100k_im" if model in CL100K_IM else "llamav2"
+		self.tokeniser = "cl100k_im"
 		self.terminated = False
 
 	@property

@@ -464,16 +464,19 @@ class Proxy(Command):
 			description="Name of the proxy. Must be 80 or fewer in length",
 			example="Test Webhook",
 			greedy=False,
+			excludes=("user",),
 		),
 		icon=cdict(
 			type="visual",
 			description="Icon of the proxy, supplied by URL or attachment",
 			example="https://cdn.discordapp.com/embed/avatars/0.png",
+			excludes=("user",),
 		),
 		user=cdict(
 			type="user",
-			description="User account to clone, for mimic mode. Overrides both name and icon when applied",
+			description="User account to clone, for mimic mode.",
 			example="668999031359537205",
+			excludes=("name", "icon"),
 		),
 		delete=cdict(
 			type="word",

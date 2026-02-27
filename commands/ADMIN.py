@@ -149,13 +149,16 @@ class Purge(Command):
 		),
 		count=cdict(
 			type="integer",
-			description="Maximum amount of messages to delete. Defaults to infinite if range is specified, else 1. Does NOT include the message invoking the command.",
+			validation="[0, 1048576]",
+			description="Maximum amount of messages to delete. Does NOT include the message invoking the command.",
 			example="123",
+			excludes=("range",),
 		),
 		range=cdict(
 			type="index",
 			description="Range of message IDs to delete",
 			example="1162630678890950746:1215499763089408030",
+			excludes=("count",),
 		),
 	)
 	no_cancel = True
@@ -446,6 +449,7 @@ class RoleSelect(Pagination, Command):
 			description="Role choices",
 			example="@Members",
 			multiple=True,
+			excludes=("custom",),
 		),
 		limit=cdict(
 			type="integer",
@@ -468,6 +472,7 @@ class RoleSelect(Pagination, Command):
 			type="text",
 			description="Newline-separated emoji-role pairs",
 			example="- 🐱 @Cat Lovers",
+			excludes=("roles",),
 		),
 	)
 	rate_limit = (9, 12)
@@ -1193,6 +1198,7 @@ class StarBoard(Pagination, Command):
 			type="emoji",
 			description="Emoji to treat as starboard trigger.",
 			example="🐱",
+			excludes=("special",),
 		),
 		special=cdict(
 			type="enum",
@@ -1200,8 +1206,9 @@ class StarBoard(Pagination, Command):
 				enum=("SPARKLES",),
 				strict_case=True,
 			),
-			description="Overrides emoji; special categories of reactions",
+			description="Special categories of reactions",
 			example="SPARKLES",
+			excludes=("emoji",),
 		),
 		count=cdict(
 			type="integer",
@@ -1788,11 +1795,13 @@ class EnabledCommands(Command):
 			description="Whether to apply to server (will affect all non-assigned channels)",
 			example="true",
 			default=False,
+			excludes=("target",),
 		),
 		target=cdict(
 			type="mentionable",
 			description="Target channel (specifying the server's ID will act the same way as --enable-all/--disable-all)",
 			example="247184721262411776",
+			excludes=("apply_all",),
 		),
 	)
 	rate_limit = (5, 8)

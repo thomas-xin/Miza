@@ -8,6 +8,7 @@ import subprocess
 import threading
 import time
 import traceback
+import types
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, thread
 from time import time as utc
@@ -179,9 +180,9 @@ def create_future(obj, *args, loop=None, timeout=None, priority=False, thread_sa
 		loop = get_event_loop()
 	if loop.is_closed():
 		return emptyfut
-	if asyncio.iscoroutinefunction(obj):
+	if callable(obj) and asyncio.iscoroutinefunction(obj):
 		obj = obj(*args, **kwargs)
-	if callable(obj):
+	if hasattr(obj, "__call__"):
 		if asyncio.iscoroutinefunction(obj.__call__) or priority is None:
 			obj = obj.__call__(*args, **kwargs)
 		else:
@@ -612,7 +613,6 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 
 	def update_bin(self):
 		if self.rate_limit:
-			# was_full = len(self.rate_bin) >= self.limit
 			try:
 				if self.lifo:
 					if self.rate_bin and time.time() - self.rate_bin[-1] >= self.rate_limit:
@@ -624,8 +624,6 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 						self.signal()
 			except IndexError:
 				pass
-			# if was_full and len(self.rate_bin) < self.limit:
-			# 	self.signal()
 		return self.rate_bin
 
 	def delay_for(self, seconds=0):

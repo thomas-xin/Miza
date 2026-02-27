@@ -593,16 +593,16 @@ class cdict(dict):
 	__call__ = lambda self, k: self.__getitem__(k) # noqa: E731
 
 	def __getattr__(self, k):
+		if k.startswith("__") and k.endswith("__"):
+			return self.__getattribute__(k)
 		try:
 			return self.__getattribute__(k)
 		except AttributeError:
 			pass
-		if not k.startswith("__") or not k.endswith("__"):
-			try:
-				return self.__getitem__(k)
-			except KeyError as ex:
-				raise AttributeError(*ex.args)
-		raise AttributeError(k)
+		try:
+			return self.__getitem__(k)
+		except KeyError as ex:
+			raise AttributeError(*ex.args)
 
 	def __setattr__(self, k, v):
 		if k.startswith("__") and k.endswith("__"):
@@ -652,8 +652,15 @@ class fdict(cdict):
 		return feed
 
 	def _keys(self):
+		feed = self.get_feed()
+		if isinstance(feed, tuple) and len(feed) <= 1:
+			if not feed:
+				return super().keys()
+			found = set(super().keys())
+			if not found:
+				return feed[0]
 		found = set(super().keys())
-		for f in self.get_feed():
+		for f in feed:
 			found.update(f)
 		return found
 

@@ -76,11 +76,8 @@ TEMP_PATH = AUTH.get("temp_path")
 if not TEMP_PATH or not os.path.exists(TEMP_PATH):
 	TEMP_PATH = os.path.abspath("cache")
 	os.makedirs(TEMP_PATH, exist_ok=True)
-FAST_PATH = os.path.abspath("cache")
-os.makedirs(FAST_PATH, exist_ok=True)
 assert isinstance(CACHE_PATH, str)
 assert isinstance(TEMP_PATH, str)
-assert isinstance(FAST_PATH, str)
 
 persistdir = AUTH.get("persist_path") or cachedir
 ecdc_dir = persistdir + "/ecdc/"
@@ -998,17 +995,21 @@ def unyt(s):
 	"Produces a unique URL, such as converting all instances of https://www.youtube.com/watch?v=video to https://youtu.be/video. This is useful for caching and deduplication."
 	if not is_url(s):
 		return s
-	if (s.startswith("https://mizabot.xyz/u") or s.startswith("https://api.mizabot.xyz/u")) and ("?url=" in s or "&url=" in s):
-		s = unquote_plus(s.replace("&url=", "?url=", 1).split("?url=", 1)[-1])
-	if s.startswith("https://mizabot.xyz/ytdl") or s.startswith("https://api.mizabot.xyz/ytdl"):
-		if "?d=" in s or "?v=" in s:
-			s = unquote_plus(s.replace("?v=", "?d=", 1).split("?d=", 1)[-1])
-		else:
-			s = re.sub(r"https?:\/\/(?:api\.)?mizabot\.xyz\/ytdl\?[vd]=(?:https:\/\/youtu\.be\/|https%3A%2F%2Fyoutu\.be%2F)", "https://youtu.be/", s)
-		s = s.split("&", 1)[0]
+	if is_miza_url(s):
+		if (s.startswith("https://mizabot.xyz/u") or s.startswith("https://api.mizabot.xyz/u")) and ("?url=" in s or "&url=" in s):
+			s = unquote_plus(s.replace("&url=", "?url=", 1).split("?url=", 1)[-1])
+		if s.startswith("https://mizabot.xyz/ytdl") or s.startswith("https://api.mizabot.xyz/ytdl"):
+			if "?d=" in s or "?v=" in s:
+				s = unquote_plus(s.replace("?v=", "?d=", 1).split("?d=", 1)[-1])
+			else:
+				s = re.sub(r"https?:\/\/(?:api\.)?mizabot\.xyz\/ytdl\?[vd]=(?:https:\/\/youtu\.be\/|https%3A%2F%2Fyoutu\.be%2F)", "https://youtu.be/", s)
+			s = s.split("&", 1)[0]
+		return s
 	if is_discord_attachment(s) or is_spotify_url(s) or s.startswith("https://i.ytimg.com"):
-		s = s.split("?", 1)[0]
-	return _unyt(s)
+		return s.split("?", 1)[0]
+	if is_youtube_url(s):
+		return _unyt(s)
+	return s
 def is_discord_message_link(url) -> bool:
 	"Detects whether a Discord link represents a channel or message link."
 	check = url[:64]
@@ -2739,11 +2740,11 @@ class FileHashDict(collections.abc.MutableMapping):
 
 	sem = Semaphore(64, 128, 0.3, 1)
 	db_sems = {}
-	cache_size = 4096
+	cache_size = 65536
 	encoder = [None, None]
 	max_concurrency = 8
 
-	def __init__(self, *args, path="", encode=None, decode=None, automut=True, autosave=60, safe=False, **kwargs):
+	def __init__(self, *args, path="", encode=None, decode=None, automut=True, autosave=60, safe=True, **kwargs):
 		if not kwargs and len(args) == 1:
 			self.data = args[0]
 		else:
@@ -2770,6 +2771,8 @@ class FileHashDict(collections.abc.MutableMapping):
 		self.autosave = autosave
 		self.safe = safe
 		self.tp = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+		import atexit
+		atexit.register(self.sync)
 
 	@property
 	def encode(self):
@@ -3185,6 +3188,8 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			return self._initialised.result()
 		self._initialised = fut = concurrent.futures.Future()
 		fut.set_result(super().__init__(self._path, shards=self._shardcount, **self._kwargs))
+		import atexit
+		atexit.register(self.sync)
 		print("Loaded Cache:", self._path, len(self), self._stale, self._stimeout, self._kwargs)
 
 	def __getattr__(self, k):
@@ -3215,27 +3220,49 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		return super().__len__()
 
 	def __contains__(self, k):
-		if self._unsafe and k in self._unsafe:
-			return True
+		if self._unsafe:
+			try:
+				v = self._unsafe[k]
+			except KeyError:
+				pass
+			else:
+				return v is not Dummy
 		try:
-			return super().__contains__(k)
+			contains = super().__contains__(k)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
 			self.base_init(force=True)
-			return super().__contains__(k)
+			contains = super().__contains__(k)
+		if self._unsafe is not None and not contains:
+			self._unsafe[k] = Dummy
+			self.autoclear()
+		return contains
 
 	def __getitem__(self, k):
 		if (fut := self._retrieving.get(k)):
 			return fut.result()
 		if self._unsafe:
 			try:
-				return self._unsafe[k]
+				v = self._unsafe[k]
 			except KeyError:
 				pass
+			else:
+				if v is Dummy:
+					raise KeyError(k)
+				return v
 		try:
-			return super().__getitem__(k)
+			v = super().__getitem__(k)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
 			self.base_init(force=True)
-			return super().__getitem__(k)
+			v = super().__getitem__(k)
+		except KeyError:
+			if self._unsafe is not None:
+				self._unsafe[k] = Dummy
+				self.autoclear()
+			raise
+		if self._unsafe is not None:
+			self._unsafe[k] = v
+			self.autoclear()
+		return v
 
 	def __setitem__(self, k, v, read=False):
 		if isinstance(v, memoryview):
@@ -3243,22 +3270,28 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		if self._unsafe is not None:
 			self._unsafe[k] = v
 			self._unsafe_mut[k] = v
-			if len(self._unsafe) > 65536:
-				try:
-					k2 = next(iter(self._unsafe))
-					self._unsafe.pop(k2)
-				except (KeyError, RuntimeError, StopIteration):
-					pass
+			self.autoclear()
 			if not self._autosave or self._autosave.done():
 				self._autosave = self._autosave_thread.submit(self.autosave)
 			return
 		super().set(k, v, expire=self.expire_offset, tag=utc(), read=read)
 
+	def autoclear(self, n=65536):
+		if len(self._unsafe) > n:
+			try:
+				k2 = next(iter(self._unsafe))
+				self._unsafe.pop(k2)
+			except (KeyError, RuntimeError, StopIteration):
+				pass
+
 	def autosave(self):
 		with tracebacksuppressor:
 			time.sleep(30)
-			self.update(self._unsafe_mut)
-			self._unsafe_mut.clear()
+			self.sync()
+
+	def sync(self):
+		self.update(self._unsafe_mut)
+		self._unsafe_mut.clear()
 
 	def update(self, other):
 		t = utc()
@@ -3276,10 +3309,11 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 
 	def pop(self, k, v=Dummy):
 		self._retrieving.pop(k, None)
-		if self._unsafe:
-			self._unsafe.pop(k, None)
+		if self._unsafe is not None:
+			self._unsafe[k] = Dummy
 		if self._unsafe_mut:
 			self._unsafe_mut.pop(k, None)
+			self.autoclear()
 		v = super().pop(k, default=(v,))
 		if v is Dummy:
 			raise KeyError(k)
@@ -3291,6 +3325,15 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 	def setdefault(self, k, v):
 		if (fut := self._retrieving.get(k)):
 			return fut.result()
+		if self._unsafe:
+			try:
+				v = self._unsafe[k]
+			except KeyError:
+				pass
+			else:
+				if v is Dummy:
+					self[k] = v
+				return v
 		try:
 			return super().__getitem__(k)
 		except KeyError:
@@ -3417,17 +3460,23 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 
 
 class AutoDatabase(cachecls, collections.abc.MutableMapping):
-	__slots__ = ("_path", "_shardcount", "_retrieving", "_kwargs")
+	__slots__ = ("_path", "_shardcount", "_retrieving", "_unsafe", "_unsafe_mut", "_kwargs")
 
 	def __init__(self, directory=None, shards=6, **kwargs):
 		self._path = directory or None
 		self._shardcount = shards
 		self._retrieving = {}
 		self._kwargs = kwargs
+		self._unsafe = {}
+		self._unsafe_mut = {}
+		self._autosave_thread = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+		self._autosave = None
 		self.base_init()
 
 	def base_init(self):
 		super().__init__(self._path, shards=self._shardcount, **self._kwargs)
+		import atexit
+		atexit.register(self.sync)
 		print("Loaded Database:", self._path, len(self), self._kwargs)
 
 	def __getattr__(self, k):
@@ -3451,6 +3500,8 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 		return super().__len__()
 
 	def __contains__(self, k):
+		if self._unsafe and k in self._unsafe:
+			return True
 		try:
 			return super().__contains__(k)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
@@ -3460,6 +3511,11 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 	def __getitem__(self, k):
 		if (fut := self._retrieving.get(k)):
 			return fut.result()
+		if self._unsafe:
+			try:
+				return self._unsafe[k]
+			except KeyError:
+				pass
 		try:
 			return super().__getitem__(k)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
@@ -3467,22 +3523,44 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 			return super().__getitem__(k)
 
 	def __setitem__(self, k, v, read=False):
-		if isinstance(v, memoryview):
-			v = bytes(v)
-		super().set(k, v, read=read)
+		self._unsafe[k] = v
+		self._unsafe_mut[k] = v
+		if len(self._unsafe) > 65536:
+			try:
+				k2 = next(iter(self._unsafe))
+				self._unsafe.pop(k2)
+			except (KeyError, RuntimeError, StopIteration):
+				pass
+		if not self._autosave or self._autosave.done():
+			self._autosave = self._autosave_thread.submit(self.autosave)
+
+	def autosave(self):
+		with tracebacksuppressor:
+			time.sleep(30)
+			self.sync()
+
+	def sync(self):
+		self.update(self._unsafe_mut)
+		self._unsafe_mut.clear()
 
 	def update(self, other):
 		t = utc()
 		if hasattr(other, "items"):
 			other = other.items()
-		for k, v in other:
+		for k, v in tuple(other):
 			if isinstance(v, memoryview):
 				v = bytes(v)
 			super().set(k, v)
+			if self._unsafe:
+				self._unsafe.pop(k, None)
+			if self._unsafe_mut:
+				self._unsafe_mut.pop(k, None)
 		return self
 
 	def pop(self, k, v=Dummy):
 		self._retrieving.pop(k, None)
+		self._unsafe.pop(k, None)
+		self._unsafe_mut.pop(k, None)
 		v = super().pop(k, default=(v,))
 		if v is Dummy:
 			raise KeyError(k)
@@ -3491,6 +3569,11 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 	def setdefault(self, k, v):
 		if (fut := self._retrieving.get(k)):
 			return fut.result()
+		if self._unsafe:
+			try:
+				return self._unsafe[k]
+			except KeyError:
+				pass
 		try:
 			return super().__getitem__(k)
 		except KeyError:
@@ -4038,10 +4121,10 @@ def string_similarity(a: str, b: str) -> float:
 	return max(0.0, min(1.0, score))
 
 # A string lookup operation with an iterable, multiple attempts, and sorts by priority.
-def str_lookup(objs, query, key=lambda obj: obj, fuzzy=0, compare=string_similarity):
+def str_lookup(objs, query, key=None, fuzzy=0, compare=string_similarity):
 	objs = astype(objs, (tuple, list))
-	query = query.strip()
-	keys = [key(obj).strip() for obj in objs]
+	query = as_str(query).strip()
+	keys = [as_str(key(obj)).strip() for obj in objs] if key else [as_str(obj) for obj in objs]
 	try:
 		return objs[keys.index(query)]
 	except ValueError:

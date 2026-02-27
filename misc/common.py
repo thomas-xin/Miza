@@ -2142,7 +2142,7 @@ class Database(Importable, collections.abc.MutableMapping):
 		if self.no_file:
 			self.data = {}
 		else:
-			self.data = FileHashDict(path=fhp, encode=self.encode, decode=self.decode, automut=self.automut)
+			self.data = FileHashDict(path=fhp, encode=self.encode, decode=self.decode, automut=self.automut, safe=False)
 		self.fixup()
 		bot.database[name] = bot.data[name] = self
 		self.catg = self.category = catg

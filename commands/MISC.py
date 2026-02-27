@@ -4,88 +4,10 @@ if "common" not in globals():
 	from misc.common import *
 print = PRINT
 
-import csv, knackpy
+import csv
 from misc import shard
 from tsc_utils.flags import address_to_flag, flag_to_address
 from tsc_utils.numbers import tsc_value_to_num, num_to_tsc_value
-
-
-class DouClub:
-
-	def __init__(self, c_id, c_sec):
-		self.id = c_id
-		self.secret = c_sec
-		self.time = utc()
-		self.knack = knackpy.App(app_id=self.id, api_key=self.secret)
-		esubmit(self.pull)
-
-	@tracebacksuppressor
-	def pull(self):
-		# print("Pulling Doukutsu Club...")
-		self.data = self.knack.get("object_1")
-		self.time = utc()
-
-	def update(self):
-		if utc() - self.time > 720:
-			esubmit(self.pull, timeout=60)
-			self.time = utc()
-
-	def search(self, query):
-		# This string search algorithm could be better
-		output = []
-		query = query.casefold()
-		qlist = set(query.split())
-		for res in self.data:
-			author = res["Author"][0]["identifier"]
-			name = res["Title"]
-			description = res["Description"]
-			s = (name, description, author)
-			if not all(any(q in v for v in s) for q in qlist):
-				continue
-			url = f"https://doukutsuclub.knack.com/database#search-database/mod-details/{res['id']}"
-			output.append({
-				"author": author,
-				"name": name,
-				"description": description,
-				"url": url,
-			})
-		return output
-
-douclub = None
-
-
-async def searchForums(query):
-	url = f"https://forum.cavestory.org/search/320966/?q={quote_plus(query)}"
-	s = await Request.aio(url, timeout=16, ssl=False, decode=True)
-	output = []
-	i = 0
-	while i < len(s):
-		# HTML is a mess
-		try:
-			search = '<li class="block-row block-row--separated  js-inlineModContainer" data-author="'
-			s = s[s.index(search) + len(search):]
-		except ValueError:
-			break
-		j = s.index('">')
-		curr = {"author": s[:j]}
-		s = s[s.index('<h3 class="contentRow-title">'):]
-		search = '<a href="/'
-		s = s[s.index(search) + len(search):]
-		j = s.index('">')
-		curr["url"] = 'https://www.cavestory.org/forums/' + s[:j].lstrip("/")
-		s = s[j + 2:]
-		j = s.index('</a>')
-		curr["name"] = s[:j]
-		search = '<div class="contentRow-snippet">'
-		s = s[s.index(search) + len(search):]
-		j = s.index('</div>')
-		curr["description"] = s[:j]
-		for elem in curr:
-			temp = curr[elem].replace('<em class="textHighlight">', "**").replace("</em>", "**")
-			temp = html_decode(temp)
-			curr[elem] = temp
-		output.append(curr)
-	return output
 
 
 class CS_mem2flag(Command):
@@ -436,41 +358,6 @@ class CSsearch(Command):
 		return cdict(
 			embed=await sheet_search(mode, query, n=25),
 		)
-
-
-class CS_mod(Command):
-	time_consuming = True
-	description = "Searches the Doukutsu Club and Cave Story Tribute Site Forums for an item."
-	usage = "<query>"
-	example = ("cs_mod critter",)
-	rate_limit = (3, 7)
-
-	async def __call__(self, channel, user, args, **void):
-		argv = " ".join(args)
-		fut = asubmit(douclub.search, argv, timeout=8)
-		try:
-			data = await searchForums(argv)
-		except ConnectionError as ex:
-			if ex.errno != 404:
-				raise
-			data = []
-		data += await fut
-		if not data:
-			raise LookupError(f"No results for {argv}.")
-		description = f"Search results for `{argv}`:\n"
-		fields = deque()
-		for res in data:
-			fields.append(dict(
-				name=res["name"],
-				value=res["url"] + "\n" + lim_str(res["description"], 128).replace("\n", " ") + f"\n> {res['author']}",
-				inline=False,
-			))
-		self.bot.send_as_embeds(channel, description=description, fields=fields, author=get_author(user))
-
-
-class CS_Database(Database):
-	name = "cs_database"
-	no_file = True
 
 
 class Wav2Png(Command):
@@ -824,24 +711,3 @@ class UpdateSkyShardReminders(Database):
 				fut = csubmit(notify_user(k, v))
 				futs.append(fut)
 			await gather(*futs)
-
-
-def load_douclub():
-	global douclub
-	while True:
-		try:
-			douclub = DouClub(AUTH["knack_id"], AUTH["knack_secret"])
-		except KeyError:
-			break
-		except:
-			print_exc()
-			time.sleep(30)
-			continue
-		break
-
-douclub = cdict(
-	search=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to search Doukutsu Club.")'),
-	update=lambda: None,
-	pull=lambda: None,
-)
-esubmit(load_douclub, priority=True)

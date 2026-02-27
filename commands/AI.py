@@ -334,7 +334,12 @@ class Ask(Command):
 		elif nsfw:
 			ac = "You are currently in a NSFW-enabled channel. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise the needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
 		else:
-			ac = "You are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, please use disclaimers in your response, and mention this to the user if necessary. However, avoid repeating yourself if already clarified."
+			ac = "You are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, please use disclaimers in your response, and clarify if necessary. However, avoid repeating yourself."
+		match pdata.history:
+			case "none":
+				personality += "\nNo permission to view past messages. Please clarify this to users if necessary."
+			case "private":
+				personality += "\nNo permission to view messages from users besides the one presently talking. Please clarify this to users if necessary."
 		if ac:
 			personality += "\n\n" + ac
 		tzinfo = self.bot.data.users.get_timezone(_user.id)
@@ -394,14 +399,16 @@ class Ask(Command):
 			return cdict(
 				content=fut,
 				b_tts=pdata.tts == "builtin",
+				callback=lambda s: print("Ask:", s),
 			)
 		temp = await flatten(fut)
 		if not temp:
 			return "\xad"
 		elif isinstance(temp[-1], dict) and (temp[-1].content.startswith("\r") or len(temp) == 1):
 			resp = temp[-1]
-			resp["content"] = await bot.proxy_emojis(resp["content"], guild=_guild)
+			resp["content"] = content = await bot.proxy_emojis(resp["content"], guild=_guild)
 			resp["tts"] = pdata.tts == "discord"
+			print("Ask:", content)
 			return resp
 		raise RuntimeError(temp)
 
@@ -432,7 +439,7 @@ class Ask(Command):
 		try:
 			ex = RuntimeError("Maximum inference attempts exceeded (model likely encountered an infinite loop).")
 			content = ""
-			for att in range(4):
+			for att in range(6):
 				await bot.require_integrity(_message)
 				if content:
 					yield "\n\n"
@@ -572,7 +579,16 @@ class Ask(Command):
 						s = f'\n> Evaluating "{argv}"...'
 						text += s
 						yield s
-						args = ["deno", "eval", argv]
+						args = ["deno", "eval"]
+						argv = argv.strip()
+						if ";" in argv.rstrip(";"):
+							start, end = argv.rstrip(";").rsplit(";", 1)
+							end = end.strip()
+							if not end.startswith("console.log"):
+								argv = start + f"; console.log({end});"
+						else:
+							args.append("-p")
+						args.append(argv)
 						print(args)
 						fut = check_output_async(args)
 						succ = await rag(name, tid, fut)
@@ -892,7 +908,7 @@ class Instruct(Command):
 		),
 		temperature=cdict(
 			type="number",
-			validation="[0, 3]",
+			validation="[0, 10]",
 			description="Temperature to influence alignment",
 			example="1.2",
 			default=0.8,
@@ -1000,7 +1016,7 @@ class Instruct(Command):
 			desc = _premium.apply()
 			if desc:
 				yield "\n-# " + "\n-# ".join(desc.splitlines())
-		return cdict(content=respond(), prefix=prefix, bypass_prefix=["> ", "# ", "## ", "### "], message=_message)
+		return cdict(content=respond(), callback=lambda s: print("Instruct:", s), prefix=prefix, bypass_prefix=["> ", "# ", "## ", "### "], message=_message)
 
 
 class Imagine(Command):
@@ -1284,7 +1300,7 @@ class Imagine(Command):
 					"Content-Type": "application/json",
 				}
 				payload = {
-					"model": "google/gemini-2.5-flash-image",
+					"model": "google/gemini-3.1-flash-image-preview",
 					"messages": [
 						{
 							"role": "user",
@@ -1305,7 +1321,7 @@ class Imagine(Command):
 					raise
 				result = response.json()
 				usage = result["usage"]
-				cost = mpf(1.238 + 0.03 if image else 0.03) / 1000 + mpf(0.3 * usage["prompt_tokens"] + 2.5 * usage["completion_tokens"]) / 1000000
+				cost = mpf(1.238 + 0.06 if image else 0.06) / 1000 + mpf(0.25 * usage["prompt_tokens"] + 1.5 * usage["completion_tokens"]) / 1000000
 				_premium.append(["mizabot", resp_model, cost])
 				if result.get("choices"):
 					message = result["choices"][0]["message"]
@@ -1782,10 +1798,12 @@ class TTS(Command):
 			),
 			description="The file format or codec of the output",
 			default="opus",
+			excludes=("autoplay",),
 		),
 		autoplay=cdict(
 			type="bool",
-			description="Automatically plays in the current voice channel once generated",
+			description="Automatically plays in the current voice channel",
+			excludes=("format",),
 		),
 	)
 	rate_limit = (10, 15)

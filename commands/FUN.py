@@ -2454,11 +2454,13 @@ class Stats(Command):
 				accepts=dict(quota="premium"),
 			),
 			default="wallet",
+			excludes=("logging",),
 		),
 		user=cdict(
 			type="user",
 			description="User to view",
 			example="668999031359537205",
+			excludes=("logging",),
 		),
 		logging=cdict(
 			type="enum",
@@ -2467,6 +2469,7 @@ class Stats(Command):
 			),
 			description='Controls how frequently premium quota usage is logged after commands; "none" disables all logging, "auto" will log at powers of 3 or increments of $1, and "all" will log all usage and associated costs',
 			example="all",
+			excludes=("mode", "user"),
 		),
 	)
 	macros = cdict(

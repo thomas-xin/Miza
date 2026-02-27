@@ -61,12 +61,14 @@ class Help(Pagination, Command):
 			),
 			description="Command category to search",
 			example="image",
+			excludes=("command",),
 		),
 		command=cdict(
 			type="string",
 			description="Help on a specific command",
 			example="download",
 			greedy=False,
+			excludes=("category",),
 		),
 	)
 	rate_limit = (0.25, 1)
@@ -734,35 +736,42 @@ class Profile(Command):
 			type="user",
 			description="Target user to retrieve profile from",
 			example="201548633244565504",
+			excludes=("description", "website", "icon", "timezone", "birthday", "optout"),
 		),
 		description=cdict(
 			type="text",
 			description="Profile description. Will show up in embeds",
 			example="You should play Cave Story, it's a good game",
+			excludes=("user",),
 		),
 		website=cdict(
 			type="url",
 			description="Optional field denoting a redirect when the profile is clicked on",
 			example="https://mizabot.xyz",
+			excludes=("user",),
 		),
 		icon=cdict(
 			type="visual",
 			description="Thumbnail to display on corner of embeds",
 			example="https://cdn.discordapp.com/embed/avatars/0.png",
+			excludes=("user",),
 		),
 		timezone=cdict(
 			type="text",
 			description='Timezone. Used in datetime calculations where applicable; supports both city/state names (e.g. "London") and abbreviations (e.g. "AET"). Daylight savings is automatically calculated for non-fixed timezones',
 			example="US/Eastern",
+			excludes=("user",),
 		),
 		birthday=cdict(
 			type="datetime",
 			description="Birthday date; affected by the timezone parameter",
 			example="february 29th",
+			excludes=("user",),
 		),
 		optout=cdict(
 			type="bool",
 			description="Whether to opt-out of automated services, excluding moderation features",
+			excludes=("user",),
 		),
 	)
 	macros=cdict(
@@ -1060,6 +1069,7 @@ class Reminder(Pagination, Command):
 			description="Message to receive. Will show up as an embed",
 			example="Doctor's appointment",
 			validation="[0, 4096]",
+			excludes=("delete",),
 		),
 		icon=cdict(
 			type="visual",
@@ -1080,11 +1090,13 @@ class Reminder(Pagination, Command):
 			type="index",
 			description="Index of reminder(s) to edit",
 			example="3..7",
+			excludes=("delete",),
 		),
 		delete=cdict(
 			type="index",
 			description="Index of reminder(s) to delete",
 			example="3..7",
+			excludes=("edit", "message"),
 		),
 	)
 	macros = cdict(
@@ -1280,16 +1292,19 @@ class Note(Pagination, Command):
 			type="string",
 			description="Message to receive. Will show up as an embed",
 			example="Doctor's appointment",
+			excludes=("delete",),
 		),
 		edit=cdict(
 			type="index",
 			description="Index of reminder(s) to edit",
 			example="3..7",
+			excludes=("delete",),
 		),
 		delete=cdict(
 			type="index",
 			description="Index of reminder(s) to delete",
 			example="3..7",
+			excludes=("edit", "message"),
 		),
 	)
 	rate_limit = (6, 10)

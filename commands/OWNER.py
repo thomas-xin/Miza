@@ -16,9 +16,11 @@ class Reload(Command):
 	schema = cdict(
 		reload=cdict(
 			type="word",
+			excludes=("unload",),
 		),
 		unload=cdict(
 			type="word",
+			excludes=("reload",),
 		),
 	)
 	_timeout_ = inf
@@ -132,7 +134,7 @@ class Restart(Command):
 						emb.set_author(name=str(bot.user), url=bot.github, icon_url=url)
 						emb.description = f"I will be {'shutting down' if mode == 'shutdown' else 'restarting'} in {sec2time(delay)}, apologies for any inconvenience..."
 						await bot.send_event("_announce_", embed=emb)
-						save = csubmit(bot.send_event("_save_"))
+						# save = csubmit(bot.send_event("_save_"))
 		with tracebacksuppressor:
 			if mode == "shutdown":
 				await send_with_reply(_channel, content="Shutting down... :wave:", reference=_message)
@@ -144,9 +146,9 @@ class Restart(Command):
 		bot = self.bot
 		client = bot.client
 		bot.closing = True
-		if save is None:
-			print("Saving message cache...")
-			save = csubmit(bot.send_event("_save_"))
+		# if save is None:
+		# 	print("Saving message cache...")
+		# 	save = csubmit(bot.send_event("_save_"))
 		ctx = discord.context_managers.Typing(_channel) if _channel else emptyctx
 		async with Delay(1):
 			async with ctx:
@@ -293,7 +295,8 @@ class Exec(Command):
 			),
 			description="Action to perform",
 			example="enable",
-			default="view"
+			default="view",
+			excludes=("code", "audio", "server"),
 		),
 		type=cdict(
 			type="enum",
@@ -303,21 +306,25 @@ class Exec(Command):
 			description="Terminal mode",
 			example="virtual",
 			default="null",
+			excludes=("code", "audio", "server"),
 		),
 		code=cdict(
 			type="string",
 			description="Code to evaluate directly in the main process",
 			example="1 + 1",
+			excludes=("mode", "type", "audio", "server"),
 		),
 		audio=cdict(
 			type="string",
 			description="Code to evaluate directly in the audio process",
 			example="1 + 2",
+			excludes=("mode", "type", "code", "server"),
 		),
 		server=cdict(
 			type="string",
 			description="Code to evaluate directly in the server process",
 			example="2 + 2",
+			excludes=("mode", "type", "audio", "code"),
 		),
 	)
 
@@ -1030,7 +1037,7 @@ class UpdateMessageCache(Database):
 	name = "message_cache"
 	no_file = True
 	checked = set()
-	loader = diskcache.Cache(f"{CACHE_PATH}/message_cache_loader")
+	loader = FileHashDict(path=f"{CACHE_PATH}/message_cache_loader")
 
 	async def load_messages(self, channel):
 		if channel.id in self.checked:
