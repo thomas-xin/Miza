@@ -2079,25 +2079,22 @@ class UpdateDogpiles(Database):
 			return
 		last_author_id = u_id
 		hist = []
+		doglim = 12
 		async for m in bot.history(message.channel, use_cache=True, limit=100):
 			if m.id == message.id:
 				continue
 			c = readstring(m.content)
 			if not c:
 				break
-			if m.author.id == last_author_id:
+			if m.author.id == last_author_id or m.author.id == bot.id:
 				break
 			last_author_id = m.author.id
-			hist.append((m, c))
-		hist2 = []
-		for m, c in reversed(hist):
-			if m.author.id == bot.id:
-				hist2.clear()
-			hist2.append(c)
-		hist = hist2
+			hist.append(c)
+			if len(hist) >= doglim:
+				break
 		hist.append(content)
 		prediction = None
-		for count in range(3, 12):
+		for count in range(3, doglim):
 			if count > len(hist):
 				break
 			pred = predict_continuation(hist[-count:], min_score=1 / (count - 2))
