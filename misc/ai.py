@@ -852,7 +852,7 @@ f_default = {
 				"reasoning_effort": {
 					"type": "string",
 					"enum": ["low", "medium", "high"],
-					"description": """The reasoning effort to apply further reasoning before answering. Adjust based on complexity of the user's questions; defaults to "low".""",
+					"description": """Amount of further reasoning applied. Adjust based on complexity of the user's questions; defaults to "low".""",
 				},
 			},
 			"required": ["format"],
