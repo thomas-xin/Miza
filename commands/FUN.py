@@ -2065,16 +2065,12 @@ class UpdateDogpiles(Database):
 		g_id = message.guild.id
 		bot = self.bot
 		dogpile = bot.get_guildbase(g_id, "dogpile", True)
-		if not dogpile:
+		if not dogpile or random.randint(0, 2):
 			return
 		u_id = message.author.id
-		if u_id == bot.id:
-			return
-		if random.randint(0, 2):
+		if u_id == bot.id or bot.is_optout(message.author):
 			return
 		if not message.guild.me or not bot.permissions_in(message.channel).send_messages:
-			return
-		if bot.is_optout(message.author):
 			return
 		content = readstring(message.content)
 		if not content:
@@ -2107,7 +2103,7 @@ class UpdateDogpiles(Database):
 			pred = predict_continuation(hist[-count:], min_score=1 / (count - 2))
 			if pred:
 				prediction = pred
-			else:
+			elif count > 5:
 				break
 		if not prediction:
 			return

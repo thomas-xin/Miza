@@ -526,7 +526,7 @@ class Proxy(Command):
 				buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
 				return cdict(
 					"*```callback-webhook-mimic-"
-					+ str(user.id) + "_0"
+					+ str(_user.id) + "_0"
 					+ "-\nLoading Proxy database...```*",
 					buttons=buttons,
 				)
@@ -1045,7 +1045,7 @@ class UpdateWebhooks(Database):
 		)
 
 	def add(self, w):
-		user = self.bot.GhostUser()
+		user = cdict()
 		with suppress(AttributeError):
 			user.channel = w.channel
 		user.id = w.id
@@ -1067,17 +1067,17 @@ class UpdateWebhooks(Database):
 			w.owner_id = w.user.id
 		except AttributeError:
 			pass
-		try:
-			sem = self.bot.cache.users[w.id].semaphore
-		except (AttributeError, KeyError):
-			sem = None
-		self.bot.cache.users[w.id] = user
+		# try:
+		# 	sem = self.bot.cache.users[w.id].semaphore
+		# except (AttributeError, KeyError):
+		# 	sem = None
+		# self.bot.cache.users[w.id] = user
 		if w.token:
 			webhooks = self.data.setdefault(w.channel.id, cdict())
 			webhooks[w.id] = self.to_dict(w)
-			if sem is None:
-				sem = Semaphore(5, 256, rate_limit=5)
-			user.semaphore = sem
+			# if sem is None:
+			# 	sem = Semaphore(5, 256, rate_limit=5)
+			# user.semaphore = sem
 		return user
 
 	async def get(self, channel, force=False, bypass=False):

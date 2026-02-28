@@ -46,7 +46,7 @@ if "common" not in globals():
 	from misc.ai import nsfw_flagged, count_to, instruct_structure, m_str, f_default
 	from misc.asyncs import asubmit, csubmit, esubmit, tsubmit, gather, flatten, eloop, get_event_loop, emptyctx, as_fut, await_fut, Semaphore, SemaphoreOverflowError, CloseableAsyncIterator, Delay
 	from misc.smath import xrand, sec2time, dtn, utc_dt
-	from misc.types import astype, as_str, cdict, fdict, fcdict, mdict, alist, azero, round_min, full_prune, suppress, tracebacksuppressor, ts_us, CE
+	from misc.types import astype, as_str, cdict, fcdict, mdict, alist, azero, round_min, full_prune, suppress, tracebacksuppressor, ts_us, CE
 	from misc.util import AUTH, CACHE_PATH, TEMP_PATH, CACHE_FILESIZE, DEFAULT_FILESIZE, IMAGE_FORMS, PORT, PROC, EvalPipe, python, AutoCache, utc, T, lim_str, lim_tokens, regexp, Request, reqs, force_kill, json_dumps, discord_expired, is_miza_attachment, is_discord_attachment, is_discord_message_link, print_class, is_url, encode_attachment, choice, time_snowflake, magic, url2fn, url2ext, find_urls, find_urls_ex, shash, tcount, require_predicate, eval_json, get_image_size, split_url
 	from misc.caches import download_binary_dependencies, attachment_cache
 	from misc.common import api, load_colour_list, load_emojis, str_lookup, verify_id, manual_edit, BASE_LOGO, MemoryTimer, is_channel, get_last_image, best_url, worst_url, translate_emojis, message_repr, message_link, min_emoji, process_image, find_emojis, find_emojis_ex, find_users, replace_emojis, send_with_react, send_with_reply, CompatFile
@@ -129,7 +129,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		)
 		self.cache_size = cache_size
 		# Base cache: contains all other caches
-		self.cache = fcdict((c, fdict()) for c in self.caches)
+		self.cache = fcdict((c, {}) for c in self.caches)
 		self.timeout = timeout
 		self.set_classes()
 		self.bot = self
@@ -3211,9 +3211,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	def update_cache_feed(self):
 		"Updates bot cache from the discord.py client cache, using automatic feeding to mitigate the need for slow dict.update() operations."
-		self.cache.emojis._feed = (self._emojis,)
-		g = self._guilds.values()
-		self.cache.channels._feed = (self._private_channels,)
+		self.cache.emojis = collections.ChainMap({}, self._emojis)
+		self.cache.channels = collections.ChainMap({}, self._private_channels)
 
 	async def update_subs(self):
 		if not hasattr(self, "guilds_ready") or not self.guilds_ready.done():

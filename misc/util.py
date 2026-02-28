@@ -2923,8 +2923,10 @@ class FileHashDict(collections.abc.MutableMapping):
 		self.modify()
 
 	def get(self, k, default=None):
-		with suppress(KeyError):
+		try:
 			return self[k]
+		except KeyError:
+			pass
 		return default
 
 	def coerce(self, k, cls=None, default=Dummy):
@@ -3263,6 +3265,13 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			self._unsafe[k] = v
 			self.autoclear()
 		return v
+
+	def get(self, k, default=None):
+		try:
+			return self[k]
+		except KeyError:
+			pass
+		return default
 
 	def __setitem__(self, k, v, read=False):
 		if isinstance(v, memoryview):
@@ -4245,20 +4254,20 @@ def predict_continuation(posts, min_score=0.5):
 	Predict the next post in a sequence of posts based on:
 	- The most common and closest matching non-numeric string.
 	- The continuation of the numeric sequence.
-	
+
 	Args:
 		posts (list): A list of strings representing the sequence of posts.
 		min_score (float): The minimum similarity score for a string to be considered a match.
-	
+
 	Returns:
 		str: The predicted next post, or None if no valid continuation is found.
 	"""
 	if not posts:
 		return None
-	
+
 	# Regular expression to match numeric substrings as individual words
 	numeric_pattern = re.compile(r'\b\d+(?:\.\d+)?\b')
-	
+
 	# Split each post into tokens (numeric and non-numeric parts)
 	split_posts = []
 	for post in posts:
@@ -4275,26 +4284,26 @@ def predict_continuation(posts, min_score=0.5):
 		if last_end < len(post):
 			tokens.append(post[last_end:])
 		split_posts.append(tokens)
-	
+
 	# Extract non-numeric and numeric parts separately
 	non_numeric_parts = [' '.join(str(token) for token in tokens if not isinstance(token, number)) for tokens in split_posts]
 	numeric_parts = [[token for token in tokens if isinstance(token, number)] for tokens in split_posts]
-	
+
 	# Find the most common and closest matching non-numeric string
 	counts = defaultdict(int)
 	for part in non_numeric_parts:
 		counts[part] += 1
-	
+
 	# Ensure the most common string appears at least twice
 	most_common = max(counts.keys(), key=lambda x: counts[x])
 	if counts[most_common] < 2:
 		return None  # Require at least two occurrences for a valid prediction
-	
+
 	# Check if the most common string is sufficiently similar to all non-numeric parts
 	for part in non_numeric_parts:
 		if string_similarity(most_common, part) < min_score:
 			return None  # A non-numeric part doesn't match sufficiently
-	
+
 	# Predict the next numeric values for each sequence
 	next_numerics = []
 	for i in range(len(numeric_parts[0])):
@@ -4303,7 +4312,7 @@ def predict_continuation(posts, min_score=0.5):
 		if next_numeric is None:
 			return None  # No valid numeric continuation for this sequence
 		next_numerics.append(next_numeric)
-	
+
 	# Find the structure of the most common non-numeric string
 	most_common_tokens = None
 	for tokens in split_posts:
@@ -4311,7 +4320,7 @@ def predict_continuation(posts, min_score=0.5):
 		if non_numeric_part == most_common:
 			most_common_tokens = tokens
 			break
-	
+
 	# Reconstruct the predicted post by replacing numeric tokens with predicted values
 	predicted_tokens = []
 	numeric_index = 0

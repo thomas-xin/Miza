@@ -99,7 +99,6 @@ class Restart(Command):
 			await asubmit(bot.start_webserver)
 			await m.edit("Webserver restarted successfully.")
 			return
-		save = None
 		if mode == "update":
 			resp = await asubmit(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			print(resp.stdout)
@@ -134,21 +133,17 @@ class Restart(Command):
 						emb.set_author(name=str(bot.user), url=bot.github, icon_url=url)
 						emb.description = f"I will be {'shutting down' if mode == 'shutdown' else 'restarting'} in {sec2time(delay)}, apologies for any inconvenience..."
 						await bot.send_event("_announce_", embed=emb)
-						# save = csubmit(bot.send_event("_save_"))
 		with tracebacksuppressor:
 			if mode == "shutdown":
 				await send_with_reply(_channel, content="Shutting down... :wave:", reference=_message)
 			else:
 				await send_with_reply(_channel, content="Restarting... :wave:", reference=_message)
-		return await self.confirm_shutdown(_channel, _user, save=save, mode=mode)
+		return await self.confirm_shutdown(_channel, _user, mode=mode)
 
-	async def confirm_shutdown(self, _channel=None, _user=None, save=None, mode="restart"):
+	async def confirm_shutdown(self, _channel=None, _user=None, mode="restart"):
 		bot = self.bot
 		client = bot.client
 		bot.closing = True
-		# if save is None:
-		# 	print("Saving message cache...")
-		# 	save = csubmit(bot.send_event("_save_"))
 		ctx = discord.context_managers.Typing(_channel) if _channel else emptyctx
 		async with Delay(1):
 			async with ctx:
@@ -168,9 +163,6 @@ class Restart(Command):
 				with tracebacksuppressor:
 					async with asyncio.timeout(3):
 						await bot.change_presence(status=discord.Status.invisible)
-				print("Waiting on save...")
-				with tracebacksuppressor:
-					await save
 				print("Goodbye.")
 				with suppress(NameError, AttributeError):
 					PRINT.flush()
@@ -949,12 +941,6 @@ class UpdateChannelCache(Database):
 	name = "channel_cache"
 	no_file = True
 
-	def remove(self, c_id, removed: list):
-		if not removed:
-			return
-		bot = self.bot
-		bot.channel_cache[c_id] = set(bot.channel_cache[c_id]).difference(removed)
-
 	async def grab(self, channel, as_message=True, force=False):
 		if hasattr(channel, "simulated"):
 			yield channel.message
@@ -962,27 +948,28 @@ class UpdateChannelCache(Database):
 		bot = self.bot
 		c_id = verify_id(channel)
 		min_time = time_snowflake(dtn() - datetime.timedelta(days=14))
-		deletable = False
 		s = bot.channel_cache.get(c_id, ())
 		if isinstance(s, set):
 			s = bot.channel_cache[c_id] = sorted(s, reverse=True)
+		i = bisect.bisect_right(s, min_time)
+		if i < len(s):
+			s = s[:i]
+			bot.channel_cache[c_id] = s
 		removed = []
 		for m_id in s:
 			if as_message:
 				try:
-					if m_id < min_time:
-						self.remove(c_id, removed)
-						raise OverflowError
 					message = await bot.fetch_message(m_id, channel=channel if force else None)
 					if T(message).get("deleted"):
 						continue
-				except (discord.NotFound, discord.Forbidden, OverflowError):
+				except (discord.NotFound, discord.Forbidden):
 					removed.append(m_id)
 				except (TypeError, ValueError, LookupError, discord.HTTPException):
 					if not force:
 						break
 					print_exc()
 				else:
+					self.remove(c_id, removed)
 					yield message
 			else:
 				yield m_id
@@ -1009,11 +996,12 @@ class UpdateChannelCache(Database):
 
 	def add(self, c_id, m_id):
 		bot = self.bot
-		s = bot.channel_cache.get(c_id, ())
-		if isinstance(s, tuple):
-			s = [m_id]
-		elif isinstance(s, list):
-			if m_id > s[0]:
+		try:
+			s = bot.channel_cache[c_id]
+		except KeyError:
+			s = []
+		if isinstance(s, list):
+			if not s or m_id > s[0]:
 				s.insert(0, m_id)
 			elif m_id == s[0]:
 				return
@@ -1024,6 +1012,12 @@ class UpdateChannelCache(Database):
 				return
 			s.add(m_id)
 		bot.channel_cache[c_id] = s
+
+	def remove(self, c_id, removed):
+		if not removed:
+			return
+		bot = self.bot
+		bot.channel_cache[c_id] = set(bot.channel_cache[c_id]).difference(removed)
 
 	def _delete_(self, message, **void):
 		bot = self.bot
@@ -1304,7 +1298,7 @@ class UpdateEmojis(Database):
 
 	async def grab(self, name):
 		bot = self.bot
-		while not bot.bot_ready:
+		while not bot.ready:
 			await asyncio.sleep(2)
 
 		ename = name.rsplit(".", 1)[0]
@@ -1318,20 +1312,10 @@ class UpdateEmojis(Database):
 			pass
 		else:
 			return emoji
-		guilds, limits = bot.get_available_guild(animated=animated, return_all=True)
-		for guild in guilds:
-			for emoji in guild.emojis:
-				if emoji.name == ename and emoji.animated == animated:
-					if not self.is_available(emoji):
-						continue
-					self.data[name] = emoji.id
-					bot.cache.emojis[emoji.id] = emoji
-					return emoji
 		if emojidata is not None:
 			for edata in emojidata["items"]:
 				if edata["name"] == ename and edata["animated"] == animated:
 					emoji = discord.Emoji(guild=bot.user, state=bot._state, data=edata)
-					# emoji.application_id = bot.id
 					self.data[name] = emoji.id
 					bot.cache.emojis[emoji.id] = emoji
 					return emoji
@@ -1354,18 +1338,11 @@ class UpdateEmojis(Database):
 					timeout=32,
 				)
 			emoji = discord.Emoji(guild=bot.user, state=bot._state, data=edata)
-			# emoji.application_id = bot.id
 			self.data[name] = emoji.id
 			bot.cache.emojis[emoji.id] = emoji
 			self.emojidata = None
 			return emoji
-		if not sum(limits):
-			raise LookupError("Unable to find suitable guild for the required emoji.")
-		b = await read_file_a(f"misc/emojis/{name}")
-		emoji = await guilds[0].create_custom_emoji(name=ename, image=b)
-		self.data[name] = emoji.id
-		bot.cache.emojis[emoji.id] = emoji
-		return emoji
+		raise LookupError("Unable to find suitable guild for the required emoji:", name)
 
 	async def emoji_as(self, s, full=False):
 		e = await self.grab(s)
