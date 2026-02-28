@@ -1134,6 +1134,7 @@ class UpdateMessageCache(Database):
 		m.pop("nonce", None)
 		m.pop("timestamp", None)
 		m.pop("referenced_message", None)
+		m.pop("guild_id", None)
 		for k in ("type", "attachments", "embeds", "components", "reactions", "channel_type", "edited_timestamp", "flags", "pinned", "mentions", "mention_roles", "mention_everyone", "tts", "deaf"):
 			if not m.get(k):
 				m.pop(k, None)
@@ -1236,7 +1237,6 @@ class UpdateEmojis(Database):
 						name = fn
 						break
 				emoji = discord.Emoji(guild=bot.user, state=bot._state, data=edata)
-				# emoji.application_id = bot.id
 				self.data[name] = emoji.id
 				bot.cache.emojis[emoji.id] = emoji
 		return self.emojidata
@@ -1249,6 +1249,12 @@ class UpdateEmojis(Database):
 			if not getattr(emoji, "available", True) or emoji.id not in (e.id for e in emoji.guild.emojis):
 				return False
 		return True
+
+	async def create_heart(self, rgb):
+		bot = self.bot
+		b = await read_file_a("misc/emojis/heart.svg")
+		b = await process_image(b, "replace_colour", [rgb, "-f", "png"], timeout=60)
+		return await bot.to_data_url(b)
 
 	async def get_colour(self, rgb):
 		bot = self.bot
@@ -1270,16 +1276,14 @@ class UpdateEmojis(Database):
 		else:
 			return emoji
 		if emojidata is not None and len(emojidata["items"]) < 2000:
-			b = await read_file_a("misc/emojis/heart.svg")
-			b = await process_image(b, "replace_colour", [rgb, "-f", "webp"], timeout=60)
-			b2 = await bot.to_data_url(b)
+			im = await self.create_heart(rgb)
 			async with self.sem3:
 				edata = await Request.aio(
 					f"https://discord.com/api/{api}/applications/{bot.id}/emojis",
 					method="POST",
 					data=orjson.dumps(dict(
 						name=name,
-						image=b2,
+						image=im,
 					)),
 					headers={
 						"Content-Type": "application/json",

@@ -329,19 +329,17 @@ class Ask(Command):
 			emojis = shuffle(emojis)[:25]
 			emojitexts = " ".join(sorted(f":{e.name}:" for e in emojis))
 			personality += f"\n\nThe current conversation takes place on Discord, where you have access to the following additional emojis. You may use these as desired, as an alternative to Unicode ones:\n{emojitexts}"
-		if "nsfw" in personality.casefold() or not _nsfw and bot.is_nsfw(_user):
-			ac = ""
-		elif nsfw:
-			ac = "You are currently in a NSFW-enabled channel. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise the needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
-		else:
-			ac = "You are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, please use disclaimers in your response, and clarify if necessary. However, avoid repeating yourself."
 		match pdata.history:
 			case "none":
-				personality += "\nNo permission to view past messages. Please clarify this to users if necessary."
+				personality += "\n\nNo permission to view past messages. Clarify to users if necessary."
 			case "private":
-				personality += "\nNo permission to view messages from users besides the one presently talking. Please clarify this to users if necessary."
-		if ac:
-			personality += "\n\n" + ac
+				personality += "\n\nNo permission to view messages from users besides the one presently talking. Clarify to users if necessary."
+		if "nsfw" in personality.casefold() or not _nsfw and bot.is_nsfw(_user):
+			pass
+		elif nsfw:
+			personality += "\n\nYou are currently in a NSFW-enabled channel. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise the needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
+		else:
+			personality += "\n\nYou are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, use disclaimers in your response, and clarify if necessary."
 		tzinfo = self.bot.data.users.get_timezone(_user.id)
 		if tzinfo is None:
 			tzinfo, _c = self.bot.data.users.estimate_timezone(_user.id)
@@ -757,7 +755,7 @@ class Ask(Command):
 		return await message.remove_reaction("🗑️", self.bot.user)
 
 
-DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the latest question from the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome, but not too corny), in first person as if you were a human, matching the language used (e.g. English). You are free to make up your own preferences and show emotion, but if a user inquires for additional services not accessible through tools, you should direct them to the ~help or /help commands. DO NOT attempt to mimic/falsify programmed outputs unless explicitly asked, and be concise where possible."
+DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the latest question from the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome, but not too corny), in first person as if you were a human, matching the language used (e.g. English). You are free to make up your own preferences and show emotion, but if a user inquires for additional services not accessible through tools, you should direct them to the ~help or /help commands. DO NOT attempt to mimic/falsify programmed outputs unless explicitly asked, avoid repeating yourself, and be concise where possible."
 
 class ChatConfig(Command):
 	name = ["Personality", "ChangePersonality"]

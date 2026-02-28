@@ -276,6 +276,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.discord_cache = AutoCache(f"{CACHE_PATH}/discord_api", stale=0, timeout=300, desync=0.05)
 		self.discord_data_cache = AutoCache(f"{CACHE_PATH}/discord_data", shards=7, stale=86400 * 3, timeout=86400 * 14, desync=0.5)
 		self.uptime_db = FileHashDict(path=f"{CACHE_PATH}/uptime")
+		self.guildfinder = FileHashDict(path=f"{CACHE_PATH}/guildfinder")
 		print(f"Loading main databases took {DynamicDT.now() - t}.")
 
 	def get_userbase(self, uid, path="", default=None):
@@ -1155,6 +1156,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.cache.usernames[member.name] = member._user
 		self.cache.channels.update(guild._threads)
 		self.cache.channels.update(guild._channels)
+		for k in guild._threads:
+			self.guildfinder[k] = guild.id
+		for k in guild._channels:
+			self.guildfinder[k] = guild.id
 		self.cache.users.update({k: getattr(v, "_user", v) for k, v in guild._members.items()})
 		self.cache.members.update(guild._members)
 		self.cache.roles.update(guild._roles)
@@ -3211,17 +3216,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	def update_cache_feed(self):
 		"Updates bot cache from the discord.py client cache, using automatic feeding to mitigate the need for slow dict.update() operations."
-		self.cache.emojis = collections.ChainMap({}, self._emojis)
-		self.cache.channels = collections.ChainMap({}, self._private_channels)
+		if isinstance(self.cache.emojis, dict):
+			self.cache.emojis = collections.ChainMap(self.cache.emojis, self._emojis)
+		if isinstance(self.cache.channels, dict):
+			self.cache.channels = collections.ChainMap(self.cache.channels, self._private_channels)
 
+	fetched_once = set()
 	async def update_subs(self):
 		if not hasattr(self, "guilds_ready") or not self.guilds_ready.done():
 			return
 		futs = []
 		for guild in self.guilds:
-			if len(guild._members) == guild.member_count:
+			if len(guild._members) == guild.member_count and guild.id in self.fetched_once:
 				continue
 			guild = await self.fetch_guild(guild.id)
+			self.fetched_once.add(guild.id)
 			if len(guild._members) == guild.member_count:
 				continue
 			print("Incorrect member count:", guild, len(guild._members), guild.member_count)
@@ -3438,13 +3447,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			except (PermissionError, AttributeError):
 				futs.append(self.with_retries(discord.Message.delete, m))
 			else:
-				c = collections.setdefault(m.channel.id, [])
+				c = collections.setdefault(m.channel, [])
 				if not c or len(c[-1]) >= 100:
 					c.append([])
 				c[-1].append(m)
-		for k, v in collections.items():
-			c = await self.fetch_channel(k)
-			for l100 in v:
+		for c, ms in collections.items():
+			for l100 in ms:
 				futs.append(self.with_retries(c.delete_messages, l100))
 		return await gather(*futs, max_concurrency=3)
 
@@ -4559,6 +4567,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				# Update databases
 				futs = []
 				for u in self.data.values():
+					if not getattr(u, "_semaphore", None):
+						continue
 					if not u._semaphore.busy:
 						async def call_into(u):
 							with MemoryTimer(f"{u}-call"):
@@ -6551,6 +6561,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						channel = bot.force_channel(data)
 					except Exception:
 						print_exc()
+				try:
+					data["guild_id"] = bot.guildfinder[data["channel_id"]]
+				except KeyError:
+					pass
 				message = discord.Message(channel=channel, data=copy.deepcopy(data), state=bot._state)
 				self = cls(message)
 				self._data = data
@@ -6902,6 +6916,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if self._channel:
 					return self._channel
 				d = self.__getattribute__("_data")
+				if d.get("channel_id"):
+					try:
+						d["guild_id"] = bot.guildfinder[d["channel_id"]]
+					except KeyError:
+						pass
 				try:
 					channel, _ = bot._get_guild_channel(d)
 					if channel is None:
@@ -7955,6 +7974,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		@self.event
 		async def on_message(message):
 			channel = message.channel
+			if message.guild:
+				await self.fetch_guild(message.guild.id)
 			if T(channel).get("guild") is None and T(channel).get("recipient") is None:
 				try:
 					channel = await self.fetch_channel(channel.id, force=True)

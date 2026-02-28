@@ -774,14 +774,14 @@ async def select_voice_channel(user, channel, find=True):
 	if find and getattr(user, "voice", None):
 		return user.voice.channel
 	if not user.guild:
-		raise DisconnectedChannelError("Unable to find voice channel.")
+		raise DisconnectedChannelError("Unable to find current voice server.")
 	user = await user.guild.fetch_member(user.id)
 	user.guild._members[user.id] = user
 	voice = user.voice
 	if voice:
 		return voice.channel
 	if not find:
-		raise DisconnectedChannelError("Unable to find voice channel.")
+		raise DisconnectedChannelError("Unable to find target voice channel.")
 	# Otherwise attempt to find closest voice channel to current text channel
 	catg = channel.category
 	if catg is not None:
@@ -796,7 +796,7 @@ async def select_voice_channel(user, channel, find=True):
 	if channels:
 		vc = channels[0]
 	else:
-		raise DisconnectedChannelError("Unable to find voice channel.")
+		raise DisconnectedChannelError("Unable to find suitable voice channel.")
 	return vc
 
 
@@ -1357,8 +1357,6 @@ def parse_colour(s, default=None):
 # A translator to stip all characters from mentions.
 __imap = {
 	"#": "",
-	"<": "",
-	">": "",
 	"@": "",
 	"!": "",
 	"&": "",
@@ -1370,9 +1368,20 @@ def verify_id(obj):
 	if isinstance(obj, int):
 		return obj
 	if isinstance(obj, str):
-		with suppress(ValueError):
-			return int(obj.rsplit(">", 1)[0].rsplit(":", 1)[-1].translate(__itrans))
-		return obj
+		temp = obj
+		if not temp:
+			return temp
+		if temp[0] == "<" and temp[-1] == ">":
+			temp = temp[1:-1]
+		if ":" in temp:
+			temp = temp.rsplit(":", 1)[-1]
+		if not temp:
+			return temp
+		temp = temp.translate(__itrans)
+		try:
+			return int(temp)
+		except ValueError:
+			return obj
 	with suppress(AttributeError):
 		return obj.recipient.id
 	with suppress(AttributeError):
