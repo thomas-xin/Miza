@@ -2257,7 +2257,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			casual="gemini-3.1-pro",
 			nsfw="grok-4",
 			backup="gpt-5.2",
-			retry="gpt-5.2-pro",
+			retry="claude-opus-4.6",
 			function="grok-4.1-fast",
 			vision="gemini-3.1-pro",
 			target="auto",
@@ -7624,6 +7624,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							guild_data = self.discord_data_cache[gid]
 						except KeyError:
 							continue
+						if not guild_data.get("_members"):
+							await self.fetch_guild(gid, force=True)
+							guild_data = self.discord_data_cache[gid]
 						if target == "member":
 							guild_data["_members"][uid] = sub
 						else:

@@ -18,7 +18,7 @@ from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment, discord_expired,
 	is_discord_attachment, url2fn, seq, getsize,
 	Request as MizaRequest, DOMAIN_CERT, PRIVATE_KEY, update_headers,
-	CACHE_PATH, RNGFile,
+	CACHE_PATH, VISUAL_FORMS, RNGFile,
 )
 from .caches import attachment_cache, colour_cache
 
@@ -110,7 +110,7 @@ class Server:
 		head=None,
 		response_headers={},
 		callback=None,
-		request: Request = None,
+		request: Optional[Request] = None,
 		mimetype: str = "application/octet-stream"
 	) -> StreamingResponse:
 		"""Dynamically serve content from multiple URLs with range support."""
@@ -388,7 +388,7 @@ async def chunked_proxy(path: str, request: Request):
 	try:
 		urls, chunksize = await attachment_cache.obtains(path.split("/", 1)[0])
 	except ConnectionError as ex:
-		raise HTTPException(status_code=ex.errno, detail=str(ex))
+		raise HTTPException(status_code=ex.errno or 500, detail=str(ex))
 	mimetype, size, firstsize, lastsize = await get_size_mime(urls[0], urls[-1], len(urls), chunksize)
 	new_urls = [f"{url}&S={firstsize if not i else lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
 	heads = fcdict(await attachment_cache.scan_headers(urls[0]))
@@ -402,10 +402,10 @@ async def chunked_proxy(path: str, request: Request):
 
 @app.get("/u/{path:path}")
 @app.get("/unproxy/{path:path}")
-async def unproxy(path: str, request: Request, url: Optional[str] = None, force: bool = False):
+async def unproxy(path: str, request: Request, url: Optional[str] = None, force: bool = False, download: bool = False):
 	"""Unproxy Discord attachments or redirect to direct URLs."""
 	if url:
-		return await proxy_if(url, request, force=force)
+		return await proxy_if(url, request, force=force, download=download)
 	try:
 		c_id, m_id, a_id, fn = decode_attachment(path)
 	except Exception as ex:
@@ -413,8 +413,8 @@ async def unproxy(path: str, request: Request, url: Optional[str] = None, force:
 	try:
 		resp = await attachment_cache.obtain(c_id, m_id, a_id, fn)
 	except ConnectionError as ex:
-		raise HTTPException(status_code=ex.errno, detail=str(ex))
-	return await proxy_if(resp, request, force=force)
+		raise HTTPException(status_code=ex.errno or 500, detail=str(ex))
+	return await proxy_if(resp, request, force=force, download=download)
 
 
 @app.post("/reupload")
@@ -448,24 +448,29 @@ async def reupload(
 	return await attachment_cache.create(seq(resp), filename=fn)
 
 
-async def proxy_if(url: str, request: Request, force=False):
+async def proxy_if(url: str, request: Request, force: bool = False, download: bool = False):
 	"""Proxy if needed, otherwise redirect."""
 	assert isinstance(url, str), url
 
 	def requires_proxy():
 		if "Cf-Worker" in request.headers:
 			return True
-		if "bot" in request.headers.get("User-Agent", ""):
+		ua = request.headers.get("User-Agent", "")
+		if "bot" in ua or "Bot" in ua:
+			return False
+		if download and is_discord_attachment(url):
+			if url.split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[-1] in VISUAL_FORMS:
+				return True
 			return False
 		return True
 
 	if force or requires_proxy():
-		return await proxy(url=url, request=request)
+		return await proxy(url=url, request=request, force=force, download=download)
 	return RedirectResponse(url=url, status_code=307)
 
 
 @app.api_route("/proxy", methods=["GET", "POST"])
-async def proxy(request: Request, url: Optional[str] = None):
+async def proxy(request: Request, url: Optional[str] = None, force: bool = False, download: bool = False):
 	"""Proxy any URL with optional body forwarding."""
 	if not url:
 		return "Expected proxy URL."
@@ -481,12 +486,22 @@ async def proxy(request: Request, url: Optional[str] = None):
 		try:
 			fp = await attachment_cache.download(url, read=True)
 		except ConnectionError as ex:
-			raise HTTPException(status_code=ex.errno, detail=str(ex))
+			raise HTTPException(status_code=ex.errno or 500, detail=str(ex))
 		heads = fcdict(await attachment_cache.scan_headers(url))
+
+		if not force and heads.get("content-type") == "text/markdown":
+			new_url = str(request.url.include_query_params(force="1"))
+			return Response(
+				"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6;max-width:800px;margin:0 auto;padding:20px;color:#333}#viewer blockquote{border-left:4px solid #ccc;margin-left:0;padding-left:16px;color:#666}#viewer code{background-color:#f4f4f4;padding:2px 4px;border-radius:4px}#viewer pre{background-color:#f4f4f4;padding:16px;border-radius:4px;overflow-x:auto}</style></head><body><div id="viewer"><p><em>Loading...</em></p></div><script>async function renderMarkdown(){try{const r=await fetch(URL);if(!r.ok)throw new Error(`HTTP error! status: ${r.status}`);const e=await r.text();viewer.innerHTML=marked.parse(e)}catch(r){viewer.innerHTML=`<p style="color: red;"><strong>Failed to load Markdown:</strong> ${r.message}</p>\n                                    <p><small>Note: The server hosting the file must allow Cross-Origin Resource Sharing (CORS).</small></p>`}}renderMarkdown();</script></body></html>""".replace("URL", json.dumps(new_url)),
+				headers=heads,
+				media_type="text/html",
+			)
+
 		response_headers = {}
 		filename = heads.get("attachment-filename") or heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0]
+		disposition = "attachment" if download else "inline"
 		if filename:
-			response_headers["Content-Disposition"] = f"inline; filename={filename}"
+			response_headers["Content-Disposition"] = f"{disposition}; filename={filename}"
 		return stream_fp(request, fp, response_headers)
 
 	headers = MizaRequest.header()
@@ -507,10 +522,10 @@ async def proxy(request: Request, url: Optional[str] = None):
 		response_headers.pop("Content-Disposition", None)
 		update_headers(response_headers, **CHEADERS)
 
-	ctype = resp.headers.get("Content-Type", "application/octet-stream")
+	ctype = resp.headers.get("Content-Type", "application/octet-stream").split(";", 1)[0]
 	it = await asubmit(resp.iter_content, 65536)
 
-	if ctype in ("text/html", "text/html; charset=utf-8", "application/octet-stream"):
+	if ctype in ("text/html", "application/octet-stream"):
 		b = await asubmit(next, it)
 		mime = magic.from_buffer(b)
 		if mime == "application/octet-stream":
