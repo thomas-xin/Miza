@@ -489,19 +489,20 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 			raise HTTPException(status_code=ex.errno or 500, detail=str(ex))
 		heads = fcdict(await attachment_cache.scan_headers(url))
 
-		if not force and heads.get("content-type").split(";", 1)[0] == "text/markdown":
-			new_url = str(request.url.include_query_params(force="1"))
-			return Response(
-				"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6;max-width:800px;margin:0 auto;padding:20px;color:#333}#viewer blockquote{border-left:4px solid #ccc;margin-left:0;padding-left:16px;color:#666}#viewer code{background-color:#f4f4f4;padding:2px 4px;border-radius:4px}#viewer pre{background-color:#f4f4f4;padding:16px;border-radius:4px;overflow-x:auto}</style></head><body><div id="viewer"><p><em>Loading...</em></p></div><script>async function renderMarkdown(){try{const r=await fetch(URL);if(!r.ok)throw new Error(`HTTP error! status: ${r.status}`);const e=await r.text();viewer.innerHTML=marked.parse(e)}catch(r){viewer.innerHTML=`<p style="color: red;"><strong>Failed to load Markdown:</strong> ${r.message}</p>\n                                    <p><small>Note: The server hosting the file must allow Cross-Origin Resource Sharing (CORS).</small></p>`}}renderMarkdown();</script></body></html>""".replace("URL", json.dumps(new_url)),
-				headers=heads,
-				media_type="text/html",
-			)
-
 		response_headers = {}
 		filename = heads.get("attachment-filename") or heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0]
 		disposition = "attachment" if download else "inline"
 		if filename:
 			response_headers["Content-Disposition"] = f"{disposition}; filename={filename}"
+
+		if not force and heads.get("content-type").split(";", 1)[0] == "text/markdown":
+			new_url = str(request.url.include_query_params(force="1"))
+			return Response(
+				"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6;max-width:800px;margin:0 auto;padding:20px;color:#333}#viewer blockquote{border-left:4px solid #ccc;margin-left:0;padding-left:16px;color:#666}#viewer code{background-color:#f4f4f4;padding:2px 4px;border-radius:4px}#viewer pre{background-color:#f4f4f4;padding:16px;border-radius:4px;overflow-x:auto}</style></head><body><div id="viewer"><p><em>Loading...</em></p></div><script>async function renderMarkdown(){try{const r=await fetch(URL);if(!r.ok)throw new Error(`HTTP error! status: ${r.status}`);const e=await r.text();viewer.innerHTML=marked.parse(e)}catch(r){viewer.innerHTML=`<p style="color: red;"><strong>Failed to load Markdown:</strong> ${r.message}</p>\n                                    <p><small>Note: The server hosting the file must allow Cross-Origin Resource Sharing (CORS).</small></p>`}}renderMarkdown();</script></body></html>""".replace("URL", json.dumps(new_url)),
+				headers=response_headers,
+				media_type="text/html",
+			)
+
 		return stream_fp(request, fp, response_headers)
 
 	headers = MizaRequest.header()
