@@ -636,75 +636,6 @@ class UpdateExec(Database):
 			return await channel.create_thread(name="backup")
 		raise NotImplementedError(size)
 
-	async def mproxy(self, b, fn=None, channel=None, minimise=False):
-		bot = self.bot
-		b = MemoryBytes(b)
-		groups = []
-		total_size = len(b)
-		if total_size > attachment_cache.max_size * 100:
-			chunksize = self.DEFAULT_LIMIT
-		else:
-			chunksize = attachment_cache.max_size
-		if chunksize <= attachment_cache.max_size:
-			if not channel:
-				channel = await bot.fetch_channel(choice(attachment_cache.channels))
-			private = True
-		else:
-			channel = await self.get_lfs_channel(self.DEFAULT_LIMIT)
-			if bot.owners.intersection(channel.guild._members) and none(m.id in bot.owners for m in channel.members):
-				with tracebacksuppressor:
-					await channel.add_user(bot.get_user(bot.owners[0]))
-			private = False
-		groupsize = min(10, 2 + int(total_size / chunksize))
-		start = 0
-		while start < total_size:
-			if not groups or len(groups[-1]) >= groupsize:
-				groups.append([])
-			if start == 0:
-				semi = ((total_size % chunksize) or chunksize)
-				if semi >= 2097152:
-					semi = semi + 1 >> 1
-				chunk = b[start:start + semi]
-				start += semi
-			else:
-				chunk = b[start:start + chunksize]
-				start += chunksize
-			groups[-1].append(chunk)
-		ofn = fn
-		n = 0
-		mids = []
-		futs = []
-		for group in groups:
-			files = []
-			embeds = []
-			for chunk in group:
-				b = bytes(chunk)
-				file = CompatFile(b, filename=fn or "c.b")
-				if not private:
-					member = choice(channel.guild.members)
-					try:
-						thumb = member.avatar.url
-					except Exception:
-						thumb = bot.discord_icon
-				ext = magic.from_buffer(b) if not n else ""
-				if private:
-					embed = None
-				elif ext.startswith("image/"):
-					embed = discord.Embed(colour=rand_colour()).set_author(name=member.name, icon_url=f"attachment://{fn}").set_thumbnail(url=thumb)
-				else:
-					embed = discord.Embed(colour=rand_colour()).set_image(url=f"attachment://{fn}")
-				files.append(file)
-				if embed:
-					embeds.append(embed)
-				fn = str(n)
-				n += 1
-			futs.append(csubmit(channel.send(files=files, embeds=embeds)))
-		for fut in futs:
-			message = await fut
-			assert not len(message.embeds) or len(message.embeds) == len(group), message.id
-			mids.append(message.id)
-		return shorten_chunks(chunksize // 1048576, channel.id, mids, ofn, mode="c", base="https://mizabot.xyz", minimise=minimise)
-
 	async def lproxy(self, url, filename=None, channel=None, minimise=False, allow_empty=True):
 		if isinstance(url, byte_like):
 			fn = filetransd(filename or "c.b")
@@ -720,9 +651,7 @@ class UpdateExec(Database):
 			b = url
 		if not allow_empty and not getsize(b):
 			raise EOFError(b)
-		if getsize(b) <= attachment_cache.max_size:
-			return await attachment_cache.create(b, filename=fn, channel=channel, minimise=minimise)
-		return await self.mproxy(b, fn, channel=channel, minimise=minimise)
+		return await attachment_cache.create_dynamic(b, filename=fn, channel=channel, minimise=minimise)
 
 	async def uproxy(self, *urls, collapse=True, mode="upload", filename=None, channel=None, optimise=False, **kwargs):
 		bot = self.bot

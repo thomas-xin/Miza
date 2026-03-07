@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>File Sharing Helper</title>
+	<style>
+		body { font-family: system-ui, -apple-system, sans-serif; background-color: #101010; color: #fff; display: flex; justify-content: center; padding: 2rem; }
+		.card { background: #080808; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 500px; width: 100%; }
+		.hidden { display: none !important; }
+		.form-group { margin-bottom: 1rem; }
+		.btn { background: #00ffff; color: #000; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+		.btn:hover { background: #007f7f; color: #fff; }
+		.btn-secondary { background: #bf7fff; }
+		.btn-secondary:hover { background: #8000ff; }
+		.btn-tertiary { background: #bfbfbf; }
+		.btn-tertiary:hover { background: #5f5f5f; }
+		progress { width: 100%; height: 20px; margin-top: 10px; }
+		.error { color: #ff0000; margin-top: 10px; font-size: 0.9em; }
+		.metadata-box { background: #000; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; font-family: monospace; }
+		.media-preview { margin-bottom: 1rem; text-align: center; }
+		.media-preview img, .media-preview video { max-width: 100%; border-radius: 4px; }
+		.media-preview audio { width: 100%; }
+		.actions { display: flex; gap: 10px; margin-top: 1rem; }
+	</style>
+</head>
+<body>
+
+<!-- UPLOAD SECTION -->
+<div id="upload-view" class="card hidden">
+	<h2 style="margin-top: 0">Upload a File</h2>
+	<div class="form-group">
+		<input type="file" id="file-input" required>
+	</div>
+	<div class="form-group">
+		<label>
+			<input type="checkbox" id="persistent-toggle">
+			Keep this file permanent
+		</label>
+	</div>
+	<button class="btn" id="upload-btn">Upload</button>
+	
+	<div id="progress-container" class="hidden">
+		<progress id="upload-progress" value="0" max="100"></progress>
+		<div id="progress-text">0%</div>
+	</div>
+	<div id="upload-error" class="error hidden"></div>
+</div>
+
+<!-- PREVIEW SECTION -->
+<div id="preview-view" class="card hidden">
+	<h2 style="margin-top: 0">File Preview</h2>
+	<div id="preview-error" class="error hidden"></div>
+	
+	<div id="preview-content" class="hidden">
+		<div class="metadata-box" id="metadata">
+			<!-- Populated via JS -->
+		</div>
+		
+		<div class="media-preview" id="media-preview">
+			<!-- Populated via JS if media file -->
+		</div>
+		
+		<div class="actions">
+			<a id="btn-view-raw" class="btn btn-secondary" target="_blank">View Raw</a>
+			<a id="btn-download" class="btn">Download</a>
+			<a id="btn-back" class="btn btn-tertiary" href="/files.html">Back</a>
+		</div>
+	</div>
+</div>
+
+<script>
+	// Utility functions to toggle views
+	const uploadView = document.getElementById('upload-view');
+	const previewView = document.getElementById('preview-view');
+	const urlParams = new URLSearchParams(window.location.search);
+	const targetUrl = urlParams.get('url');
+
+	// Routing Logic
+	if (targetUrl) {
+		previewView.classList.remove('hidden');
+		initPreview(targetUrl);
+	} else {
+		uploadView.classList.remove('hidden');
+		initUpload();
+	}
+
+	/* ===============================
+	   UPLOAD LOGIC
+	   =============================== */
+	    function initUpload() {
+        const fileInput = document.getElementById('file-input');
+        const persistentToggle = document.getElementById('persistent-toggle');
+        const uploadBtn = document.getElementById('upload-btn');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('upload-progress');
+        const progressText = document.getElementById('progress-text');
+        const errorDiv = document.getElementById('upload-error');
+
+        // NEW: Listen for paste events anywhere on the page
+        window.addEventListener('paste', (e) => {
+            // Ignore if we aren't currently on the upload screen
+            if (uploadView.classList.contains('hidden')) return;
+
+            const clipboardFiles = e.clipboardData?.files;
+            
+            // Check if there's actually a file in the clipboard (ignores text pastes)
+            if (clipboardFiles && clipboardFiles.length > 0) {
+                // Directly assign the clipboard FileList to our file input element
+                fileInput.files = clipboardFiles;
+                
+                // Clear any previous errors to show it was successful
+                errorDiv.classList.add('hidden');
+                
+                // Optional: You could automatically trigger the upload here by calling uploadBtn.click()
+            }
+        });
+
+		uploadBtn.addEventListener('click', () => {
+			const file = fileInput.files[0];
+			if (!file) {
+				showError(errorDiv, "Please select a file first.");
+				return;
+			}
+
+			// Reset UI
+			errorDiv.classList.add('hidden');
+			progressContainer.classList.remove('hidden');
+			uploadBtn.disabled = true;
+
+			const isPersistent = persistentToggle.checked ? 1 : 0;
+			const filename = encodeURIComponent(file.name);
+			const uploadUrl = `/upload?filename=${filename}&persistent=${isPersistent}`;
+
+			const formData = new FormData();
+			formData.append('file', file);
+
+			// Use XMLHttpRequest to track upload progress accurately
+			const xhr = new XMLHttpRequest();
+			
+			xhr.upload.addEventListener('progress', (e) => {
+				if (e.lengthComputable) {
+					const percent = Math.round((e.loaded / e.total) * 100);
+					progressBar.value = percent;
+					progressText.innerText = `${percent}%`;
+				}
+			});
+
+			xhr.addEventListener('load', () => {
+				if (xhr.status >= 200 && xhr.status < 300) {
+					// Success - redirect to preview page
+					const uploadedRawUrl = xhr.responseText.trim();
+					window.location.href = `?url=${encodeURIComponent(uploadedRawUrl)}`;
+				} else {
+					// HTTP connection succeeded, but returned an error status code
+					showError(errorDiv, `Upload failed: HTTP ${xhr.status} - ${xhr.statusText}`);
+					resetUploadState();
+				}
+			});
+
+			xhr.addEventListener('error', () => {
+				showError(errorDiv, "A network error occurred during upload.");
+				resetUploadState();
+			});
+
+			xhr.open('POST', uploadUrl, true);
+			xhr.send(formData);
+		});
+
+		function resetUploadState() {
+			uploadBtn.disabled = false;
+			progressContainer.classList.add('hidden');
+			progressBar.value = 0;
+		}
+	}
+
+	function getFilenameFromDisposition(disposition) {
+		if (!disposition) return null;
+
+		let filename = null;
+
+		// 1. Try to extract the RFC 5987/6266 encoded filename (handles special chars & UTF-8)
+		// Example: filename*=UTF-8''encoded%20string.jpg
+		const utf8Regex = /filename\*=UTF-8''([^;\n]+)/i;
+		const utf8Match = utf8Regex.exec(disposition);
+		
+		if (utf8Match && utf8Match[1]) {
+			try {
+				return decodeURIComponent(utf8Match[1]);
+			} catch (e) {
+				console.warn("Failed to decode UTF-8 filename", e);
+			}
+		}
+
+		// 2. Fall back to standard filename extraction
+		// Matches: filename="my file.txt" OR filename=myfile.txt
+		const asciiRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+		const matches = asciiRegex.exec(disposition);
+		
+		if (matches != null && matches[1]) {
+			// Strip the leading and trailing quotes if present
+			filename = matches[1].replace(/^['"]|['"]$/g, '');
+			
+			// Some servers mistakenly URL-encode the standard filename attribute
+			try {
+				filename = decodeURIComponent(filename);
+			} catch (e) {}
+		}
+
+		return filename;
+	}
+
+	/* ===============================
+	   PREVIEW LOGIC
+	   =============================== */
+	async function initPreview(rawUrl) {
+		const errorDiv = document.getElementById('preview-error');
+		const contentDiv = document.getElementById('preview-content');
+		const metadataDiv = document.getElementById('metadata');
+		const mediaContainer = document.getElementById('media-preview');
+		
+		try {
+			// 1. Validate the URL
+			const currentHost = window.location.hostname;
+			const parsedUrl = new URL(rawUrl, window.location.origin);
+			const targetHost = parsedUrl.hostname;
+
+			// Dynamically get the base domain (e.g., strips "www." so "www.example.com" becomes "example.com")
+			// Alternatively, hardcode this: const baseDomain = "example.com";
+			const baseDomain = "mizabot.xyz";
+
+			// Allow if it's the exact base domain, or a subdomain (e.g., ends with ".example.com")
+			const isAllowedDomain = targetHost === baseDomain || targetHost.endsWith('.' + baseDomain);
+
+			if (!isAllowedDomain) {
+				throw new Error("Security Error: Previewing files from unrecognized domains is disabled.");
+			}
+
+			// 2. Head request for metadata
+			const response = await fetch(parsedUrl.href, { method: 'GET' });
+			
+			if (!response.ok) {
+				throw new Error(`File not found or accessible. HTTP ${response.status}`);
+			}
+
+			const contentType = response.headers.get('Content-Type') || 'application/octet-stream';
+			const contentLength = response.headers.get('Content-Length') || '0';
+			const contentDisposition = response.headers.get('Content-Disposition') || '';
+
+			// Use the new helper, and fallback to the URL path if the header is missing 
+			let filename = getFilenameFromDisposition(contentDisposition);
+			if (!filename) {
+				filename = parsedUrl.pathname.split('/').pop() || 'Unknown File';
+			}
+
+			// Calculate human-readable size
+			const bytes = parseInt(contentLength, 10);
+			const sizeString = formatBytes(bytes);
+
+			// 3. Render Metadata
+			metadataDiv.innerHTML = `
+				<strong>Filename:</strong> ${filename}<br>
+				<strong>Mimetype:</strong> ${contentType}<br>
+				<strong>Size:</strong> ${sizeString} (${bytes} bytes)
+			`;
+
+			// 4. Render Media Preview If Applicable
+			if (contentType.startsWith('image/')) {
+				mediaContainer.innerHTML = `<img src="${parsedUrl.href}" alt="Preview">`;
+			} else if (contentType.startsWith('video/')) {
+				mediaContainer.innerHTML = `<video controls src="${parsedUrl.href}"></video>`;
+			} else if (contentType.startsWith('audio/')) {
+				mediaContainer.innerHTML = `<audio controls src="${parsedUrl.href}"></audio>`;
+			}
+
+			// 5. Setup Action Buttons
+			const btnRaw = document.getElementById('btn-view-raw');
+			const btnDownload = document.getElementById('btn-download');
+
+			btnRaw.href = parsedUrl.href;
+			
+			// Add ?download=1 or &download=1
+			const downloadUrl = new URL(parsedUrl.href);
+			downloadUrl.searchParams.set('download', '1');
+			btnDownload.href = downloadUrl.href;
+
+			contentDiv.classList.remove('hidden');
+
+		} catch (err) {
+			showError(errorDiv, err.message);
+			errorDiv.classList.remove('hidden');
+		}
+	}
+
+	function showError(element, message) {
+		element.innerText = message;
+		element.classList.remove('hidden');
+	}
+
+	// Byte conversion formula: $\text{Size} = \frac{\text{Bytes}}{1024^n}$
+	function formatBytes(bytes) {
+		if (bytes === 0) return '0 Bytes';
+		const k = 1024;
+		const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+		const i = Math.floor(Math.log(bytes) / Math.log(k));
+		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+	}
+</script>
+</body>
+</html>

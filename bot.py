@@ -2256,7 +2256,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			instructive="gemini-3.1-pro",
 			casual="gemini-3.1-pro",
 			nsfw="grok-4",
-			backup="gpt-5.2",
+			backup="gpt-5.4",
 			retry="claude-opus-4.6",
 			function="grok-4.1-fast",
 			vision="gemini-3.1-pro",

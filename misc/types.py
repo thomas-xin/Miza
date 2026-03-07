@@ -107,7 +107,7 @@ class MemoryBytes:
 		return self._b
 
 	@property
-	def view(self):
+	def view(self) -> memoryview:
 		return self._mv
 
 	def __int__(self):

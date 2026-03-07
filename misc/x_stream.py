@@ -41,6 +41,7 @@ HEADERS = {
 	"Access-Control-Allow-Headers": "*",
 	"Access-Control-Allow-Methods": "*",
 	"Access-Control-Allow-Origin": "*",
+	"Access-Control-Expose-Headers": "*",
 }
 
 CHEADERS = {"Cache-Control": "public, max-age=3600, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
@@ -58,12 +59,12 @@ def true_ip(request: Request) -> str:
 
 
 async def get_size_mime(head, tail, count, chunksize):
-	fut = csubmit(attachment_cache.download(tail, read=True))
+	fut = csubmit(attachment_cache.scan_headers(tail))
 	HEAD = await attachment_cache.download(head, read=True)
-	TAIL = await fut
+	TAIL_headers = await fut
 	firstsize = getsize(HEAD)
 	mimetype = filetype.guess_mime(HEAD)
-	lastsize = getsize(TAIL)
+	lastsize = int(fcdict(TAIL_headers).get("content-length") or 1)
 	if count >= 2:
 		size = firstsize + chunksize * (count - 2) + lastsize
 	else:
@@ -444,8 +445,8 @@ async def reupload(
 			headers["Range"] = request.headers["Range"]
 		resp = server.get_with_retries(url, headers=headers, timeout=3)
 
-	fn = filename or (url2fn(url) if url else None)
-	return await attachment_cache.create(seq(resp), filename=fn)
+	fn = filename or getattr(resp, "filename", None) or (url2fn(url) if url else None)
+	return await attachment_cache.create_dynamic(resp, filename=fn)
 
 
 async def proxy_if(url: str, request: Request, force: bool = False, download: bool = False):

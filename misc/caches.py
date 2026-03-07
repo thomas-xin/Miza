@@ -22,8 +22,8 @@ from misc.types import utc, as_str, byte_like, cdict, fcdict
 from misc.asyncs import asubmit, esubmit, wrap_future, await_fut, Future
 from misc.smath import get_closest_heart
 from misc.util import (
-    CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, read_file_a, download_file, header_test,
-    tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist,
+    CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, read_file_a, download_file, header_test, getsize,
+    tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist, shorten_chunks,
 	ungroup_attachments, is_discord_url, temporary_file, url2ext, is_discord_attachment, is_miza_url,
     snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt,
 )
@@ -129,7 +129,7 @@ class ColourCache(AutoCache):
 
 
 class AttachmentCache(AutoCache):
-	min_size = 262144
+	min_size = 1048576
 	max_size = CACHE_FILESIZE
 	attachment_count = 10
 	embed_count = 10
@@ -481,6 +481,58 @@ class AttachmentCache(AutoCache):
 		if len(out) == 1 and collapse:
 			return out[0]
 		return out
+
+	async def create_dynamic(self, data, filename=None, channel=None, editable=False, minimise=False):
+		size = getsize(data)
+		if size <= self.max_size:
+			return await self.create(data, filename=filename, channel=channel, editable=editable, minimise=minimise)
+		if not hasattr(data, "read"):
+			data = io.BytesIO(data)
+		chunks = [self.min_size]
+		remaining = size - self.min_size
+		while remaining > 0:
+			chunks.append(self.max_size)
+			remaining -= self.max_size
+		ac = self.attachment_count
+		self.sess = self.sess or aiohttp.ClientSession()
+		form_data = aiohttp.FormData(quote_fields=False)
+		filename = ofn = filename or "b"
+		cid = getattr(channel, "id", channel) if channel else choice(self.channels)
+		mids = []
+		while chunks:
+			temp, chunks = chunks[:ac], chunks[ac:]
+			payload = dict(
+				content=None,
+				attachments=[dict(
+					id=i,
+					filename=filename if not i else "b",
+				) for i in range(len(temp))],
+			)
+			form_data.add_field(name="payload_json", value=json_dumpstr(payload))
+			for i, n in enumerate(temp):
+				b = data.read(n)
+				form_data.add_field(
+					name=f"files[{i}]",
+					value=b,
+					filename=filename if not i else "b",
+					content_type="application/octet-stream",
+				)
+			url = f"https://discord.com/api/{api}/channels/{cid}/messages"
+			if editable:
+				heads = dict(self.headers)
+			else:
+				heads = dict(choice((self.headers, self.alt_headers)))
+			heads.pop("Content-Type")
+			resp = await self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
+			resp.raise_for_status()
+			message = await resp.json()
+			mid = int(message["id"])
+			for i, a in enumerate(message["attachments"]):
+				aid = i if editable else int(a["id"])
+				self[aid] = a["url"]
+			mids.append(mid)
+			filename = "b"
+		return shorten_chunks(self.max_size // 1048576, cid, mids, ofn, mode="c", base="https://mizabot.xyz", minimise=minimise)
 
 	async def edit(self, c_id, m_id, *data, url=None, filename=None, content="", collapse=True, minimise=False):
 		if url:

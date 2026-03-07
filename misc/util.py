@@ -2513,15 +2513,22 @@ class seq(io.BufferedRandom, collections.abc.Sequence, contextlib.AbstractContex
 		self.closer = T(obj).get("close")
 		self.high = 0
 		self.finished = False
+		self.limit = getattr(obj, "size", None)
+		if type(obj) is MemoryBytes:
+			obj = obj.view
 		if isinstance(obj, io.IOBase) or hasattr(obj, "read"):
 			if isinstance(obj, io.BytesIO):
 				self.data = obj
 				self.finished = True
+				self.limit = len(self.data.getbuffer())
 			elif hasattr(obj, "getbuffer"):
 				self.data = io.BytesIO(obj.getbuffer())
 				self.finished = True
+				self.limit = len(self.data.getbuffer())
 			else:
 				if hasattr(obj, "seek"):
+					if not self.limit:
+						self.limit = getsize(obj)
 					obj.seek(0)
 				def obj_iter(fp):
 					b = fp.read(self.BUF)
@@ -2530,22 +2537,27 @@ class seq(io.BufferedRandom, collections.abc.Sequence, contextlib.AbstractContex
 					yield b
 				self.iter = obj_iter(obj)
 				self.data = io.BytesIO()
-		elif isinstance(obj, bytes) or isinstance(obj, bytearray) or isinstance(obj, memoryview):
+		elif isinstance(obj, (bytes, bytearray, memoryview)):
 			self.data = io.BytesIO(obj)
 			self.high = len(obj)
 			self.finished = True
+			self.limit = len(obj)
 		elif isinstance(obj, collections.abc.Iterable):
 			self.iter = iter(obj)
 			self.data = io.BytesIO()
+			try:
+				self.limit = len(obj)
+			except Exception:
+				pass
 		elif T(obj).get("iter_content"):
 			self.iter = obj.iter_content(self.BUF)
 			self.data = io.BytesIO()
+			self.limit = int(obj.headers.get("Content-Length", 0)) or None
 		else:
 			raise TypeError(f"a bytes-like object is required, not '{type(obj)}'")
 		self.filename = filename
 		self.buffer = {}
 		self.pos = 0
-		self.limit = None
 
 	def __len__(self):
 		return self.limit or max(k + len(v) for k, v in self.buffer.items()) if self.buffer else 0
@@ -2650,7 +2662,7 @@ class seq(io.BufferedRandom, collections.abc.Sequence, contextlib.AbstractContex
 
 	close = lambda self: self.closer() if self.closer else None		# noqa: E731
 	__enter__ = lambda self: self									# noqa: E731
-	__exit__ = lambda self, *args: self.close()						# noqa: E731
+	__exit__ = lambda self, *args: self.close()				# noqa: E731
 
 	def load(self, k):
 		if self.finished:
@@ -2694,45 +2706,6 @@ class seq(io.BufferedRandom, collections.abc.Sequence, contextlib.AbstractContex
 			self.finished = True
 			return self.data.getbuffer()[k:k + self.BUF]
 		return self.buffer.get(k, b"")
-
-class Stream(io.IOBase):
-
-	BUF = 262144
-	resp = None
-
-	def __init__(self, url):
-		self.url = url
-		self.buflen = 0
-		self.buf = io.BytesIO()
-		self.reset()
-		self.refill()
-
-	def reset(self):
-		if self.resp:
-			with suppress(Exception):
-				self.resp.close()
-		self.resp = requests.get(self.url, stream=True)
-		self.iter = self.resp.iter_content(self.BUF)
-
-	def refill(self):
-		att = 0
-		while self.buflen < self.BUF * 4:
-			try:
-				b = next(self.iter)
-				self.buf.write(b)
-			except StopIteration:
-				with suppress(Exception):
-					self.resp.close()
-				return
-			except Exception:
-				if att > 16:
-					raise
-				att += 1
-				self.reset()
-			else:
-				self.buflen += len(b)
-		with suppress(Exception):
-			self.resp.close()
 
 
 class FileHashDict(collections.abc.MutableMapping):
@@ -5217,6 +5190,10 @@ def download_file(*urls, filename=None, timeout=12, return_headers=False):
 	return filename
 
 def getsize(fp):
+	if getattr(fp, "size", None):
+		return fp.size
+	if getattr(fp, "length", None):
+		return fp.length
 	if isinstance(fp, byte_like):
 		return len(fp)
 	if isinstance(fp, str):

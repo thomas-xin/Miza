@@ -27,8 +27,8 @@ from traceback import print_exc
 from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut
-from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, MemoryBytes
-from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url_unparse, url2fn, is_youtube_url, seq, Request, get_mime, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG
+from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
+from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url_unparse, url2fn, is_youtube_url, seq, Request, get_mime, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS
 from .caches import attachment_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -301,6 +301,7 @@ HEADERS = {
 	"Access-Control-Allow-Headers": "*",
 	"Access-Control-Allow-Methods": "*",
 	"Access-Control-Allow-Origin": "*",
+	"Access-Control-Expose-Headers": "*",
 }
 
 CHEADERS = {
@@ -573,29 +574,30 @@ class Server:
 	chunked_proxy._cp_config = {"response.stream": True}
 
 	@cp.expose(("u",))
-	def unproxy(self, *path, url=None, **query):
+	def unproxy(self, *path, url=None, force=False, download=False, **query):
 		if url:
-			return self.proxy_if(url)
+			return self.proxy_if(url, force=force, download=download)
 		rpath = "/".join(path)
 		if rpath:
 			rpath = "/" + rpath
 		rquery = cp.request.query_string and "?" + cp.request.query_string
 		if len(path) == 1 and path[0].count("~") == 2:
-			return self.proxy_if(await_fut(attachment_cache.obtain(*path[0].split(".", 1)[0].split("~", 2))))
+			return self.proxy_if(await_fut(attachment_cache.obtain(*path[0].split(".", 1)[0].split("~", 2))), force=force, download=download)
 		if len(path) == 2 and path[0].count("~") == 0:
 			c_id, m_id, a_id, fn = decode_attachment("/".join(path))
-			return self.proxy_if(await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn)))
+			return self.proxy_if(await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn)), force=force, download=download)
 		if hasattr(self, "state"):
 			url = f"{self.state['/']}/u{rpath}{rquery}"
 			raise cp.HTTPRedirect(url, 307)
 		raise FileNotFoundError(*path)
 	unproxy._cp_config = {"response.stream": True}
 
+	upload_cache = attachment_cache.secondary
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
-	def reupload(self, url=None, filename=None, **void):
+	def upload(self, url=None, filename=None, persistent=False, file=None, **void):
 		try:
-			fp = cp.request.body.fp
+			fp = getattr_chain(file, "file.file", None) or cp.request.body.fp
 		except Exception:
 			print_exc()
 			fp = None
@@ -604,26 +606,11 @@ class Server:
 				return "Expected input URL or data."
 			fp = await_fut(attachment_cache.download(url, read=True))
 		fn = filename or (url2fn(url) if url else None)
-		return await_fut(attachment_cache.create(fp, filename=fn))
-
-	upload_cache = diskcache.Cache(f"{CACHE_PATH}/uploads", size_limit=128 * 1073741824)
-
-	@cp.expose
-	@cp.tools.accept(media="multipart/form-data")
-	def upload(self, url=None, filename=None, **void):
-		try:
-			fp = cp.request.body.fp
-		except Exception:
-			print_exc()
-			fp = None
-		if not fp or int(cp.request.headers.get("Content-Length", 0)) < 1:
-			if not url:
-				return "Expected input URL or data."
-			fp = await_fut(attachment_cache.download(url, read=True))
-		fn = filename or (url2fn(url) if url else None)
+		if persistent not in (0, "0", ""):
+			return await_fut(attachment_cache.create_dynamic(fp, filename=fn))
 		ts = n2p(ts_us()).decode("ascii")
 		self.upload_cache.set(ts, fp, tag=fn, read=True)
-		fp, fn = self.upload_cache.get(ts, tag=True, read=True)
+		fp, fn = diskcache.FanoutCache.get(self.upload_cache, ts, tag=True, read=True)
 		mimetype = get_mime(fp)
 		ext = mime_into(mimetype)
 		url = API + f"/f/{ts}.{ext}"
@@ -632,7 +619,7 @@ class Server:
 	@cp.expose
 	def download(self, path):
 		ts = path.rsplit("/", 1)[-1].split(".", 1)[0]
-		fp, fn = self.upload_cache.get(ts, tag=True, read=True)
+		fp, fn = diskcache.FanoutCache.get(self.upload_cache, ts, tag=True, read=True)
 		if not fp:
 			raise FileNotFoundError(404, path)
 		mimetype = get_mime(fp)
@@ -640,33 +627,28 @@ class Server:
 		return cp.lib.static.serve_fileobj(fp, name=fn, content_type=mimetype, disposition="inline")
 	download._cp_config = {"response.stream": True}
 
-	def proxy_if(self, url):
+	def proxy_if(self, url, force=False, download=False):
 		assert isinstance(url, str), url
 
 		def requires_proxy():
-			if not is_discord_attachment(url):
-				return False
 			if "Cf-Worker" in cp.request.headers:
 				return True
-			if "bot" in cp.request.headers.get("User-Agent", ""):
+			ua = cp.request.headers.get("User-Agent", "")
+			if "bot" in ua or "Bot" in ua:
 				return False
-			if cp.request.headers.get("X-Real-Ip", "")[:3] in ("34.", "35."):
-				return True
-			if cp.request.headers.get("Sec-Fetch-Dest", "").casefold() == "document" and url.split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[-1] not in ("zip", "7z", "tar", "bin", "png", "gif", "webp", "jpg", "jpeg", "heic", "heif", "avif"):
-				return True
-			if (mode := cp.request.headers.get("Sec-Fetch-Mode")):
-				return mode.casefold() not in ("cors", "navigate") or cp.request.headers.get("Sec-Fetch-Site", "").casefold() not in ("none", "cross-site")
-			if cp.request.headers.get("Referer"):
-				return True
-			return False
+			if download and is_discord_attachment(url):
+				if url.split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[-1] in VISUAL_FORMS:
+					return True
+				return False
+			return True
 
 		if requires_proxy():
-			return self.proxy(url=url)
+			return self.proxy(url=url, force=force, download=download)
 		raise cp.HTTPRedirect(url, 307)
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
-	def proxy(self, url=None, **void):
+	def proxy(self, url=None, force=False, download=False, **void):
 		if not url:
 			return "Expected proxy URL."
 		try:
@@ -687,7 +669,8 @@ class Server:
 		cp.response.headers.pop("Server", None)
 		cp.response.headers.pop("Alt-Svc", None)
 		if is_discord_attachment(url):
-			cp.response.headers.pop("Content-Disposition", None)
+			if not download:
+				cp.response.headers.pop("Content-Disposition", None)
 			update_headers(cp.response.headers, **CHEADERS)
 		ctype = resp.headers.get("Content-Type", "application/octet-stream")
 		if ctype in ("text/html", "text/html; charset=utf-8", "application/octet-stream"):
@@ -940,48 +923,6 @@ class Server:
 		if "/preview/" in url:
 			raise cp.HTTPRedirect(url.replace("/preview/", "/file/"), status=307)
 		data, mime = fetch_static("index.html")
-		if url.split("//", 1)[-1].count("/") > 1:
-			meta = '<meta property="og:title" content="Miza"><meta property="og:description" content="A multipurpose Discord bot.">'
-			if "/file" in url or "/files" in url:
-				meta += '<meta property="og:image" content="/mizaleaf.png">'
-			else:
-				meta += '<meta property="og:image" content="/logo256.png">'
-			meta += '<meta property="og:site_name" content="Miza">'
-			if not random.randint(0, 1) and (dt := utc_dt()) and (dt.month, dt.day) in ((3, 31), (4, 1), (4, 2)):
-				meta += f'<meta http-equiv="refresh" content={random.randint(15, 31)};url=https://{cp.request.headers["Host"]}/teapot">'
-			if path:
-				info = self._fileinfo(path)
-				fn = info["filename"]
-				if fn.startswith(".forward$"):
-					info = self._fileinfo(f"@{path}")
-					attachment = info["filename"]
-				mim = info["mimetype"]
-				attachment = filename or fn
-				size = info["size"]
-				a2 = url_unparse(attachment).removeprefix(".temp$@")
-				f_url = info["raw"]
-				description = mim + f", {byte_scale(size)}B"
-				meta = '<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">'
-				if mim.startswith("image/") and mim.split("/", 1)[-1] in ("png", "jpg", "jpeg", "webp", "gif") and size < 1048576:
-					i_url = f_url
-					meta += f"""<meta name="twitter:image:src" content="{i_url}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{a2}"><meta property="twitter:url" content="{f_url}"><meta property="og:image" content="{i_url}"><meta property="og:image:type" content="{mim}"><meta property="og:url" content="{f_url}"><meta name="og:description" content="{description}">"""
-				elif mim.split("/", 1)[0] in ("image", "video", "audio"):
-					i_url = f_url.replace("/f/", "/i/") + ".png" if mim.startswith("video") else HOST + "/mizaleaf.png"
-					r_url = f_url.replace("/f/", "/r/") + ".webm" if mim.startswith("audio") else f_url + "." + mim.split("/", 1)[-1]
-					if mim.startswith("audio/"):
-						dims = '<meta property="og:video:width" content="640"><meta property="og:video:height" content="64">'
-					else:
-						dims = '<meta property="og:video:width" content="960"><meta property="og:video:height" content="540">'
-					meta += f"""<meta property="og:type" content="video.other"><meta property="twitter:player" content="{r_url}"><meta property="og:video:type" content="{mim}"><meta property="og:url" content="{f_url}">{dims}<meta name="twitter:image" content="{i_url}">"""
-			else:
-				a2 = "Miza"
-				description = "A multipurpose Discord bot."
-			i = data.index(b'</title>') + 8
-			s = """<!doctype html><html lang="en"><head>
-	<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
-	<meta charset="utf-8"/><link rel="icon" href="/logo256.png"/><meta charset="utf-8"><meta name="author" content="Miza"><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#694777"/><link rel="apple-touch-icon" href="/logo256.png"/><link rel="manifest" href="/manifest.json"/>""" + meta
-			t = f'<title>{a2}</title><meta name="description" content="{description}"/>'
-			data = s.encode("utf-8") + t.encode("utf-8") + data[i:]
 		update_headers(cp.response.headers, **CHEADERS)
 		cp.response.headers["Content-Type"] = mime
 		cp.response.headers["Content-Length"] = len(data)
