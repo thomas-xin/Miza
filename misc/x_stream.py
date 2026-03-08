@@ -487,7 +487,7 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 		try:
 			fp = await attachment_cache.download(url, read=True)
 		except ConnectionError as ex:
-			raise HTTPException(status_code=ex.errno or 500, detail=str(ex))
+			raise HTTPException(status_code=ex.errno or 500, detail=str(format_exc()))
 		heads = fcdict(await attachment_cache.scan_headers(url))
 
 		response_headers = {}
