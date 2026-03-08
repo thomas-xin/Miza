@@ -331,9 +331,9 @@ class Ask(Command):
 			personality += f"\n\nThe current conversation takes place on Discord, where you have access to the following additional emojis. You may use these as desired, as an alternative to Unicode ones:\n{emojitexts}"
 		match pdata.history:
 			case "none":
-				personality += "\n\nNo permission to view past messages. Clarify to users if necessary."
+				personality += "\n\nConversation history disabled. Clarify to users if necessary."
 			case "private":
-				personality += "\n\nNo permission to view messages from users besides the one presently talking. Clarify to users if necessary."
+				personality += "\n\nConversation history of external users disabled. Clarify to users if necessary."
 		if "nsfw" in personality.casefold() or not _nsfw and bot.is_nsfw(_user):
 			pass
 		elif nsfw:

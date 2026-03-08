@@ -414,6 +414,7 @@ async def unproxy(path: str, request: Request, url: Optional[str] = None, force:
 	try:
 		resp = await attachment_cache.obtain(c_id, m_id, a_id, fn)
 	except ConnectionError as ex:
+		print_exc()
 		raise HTTPException(status_code=ex.errno or 500, detail=str(ex))
 	return await proxy_if(resp, request, force=force, download=download)
 
