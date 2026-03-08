@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import time
-from traceback import print_exc
+from traceback import print_exc, format_exc
 from typing import Optional, AsyncIterator
 import filetype
 import niquests
@@ -414,8 +414,7 @@ async def unproxy(path: str, request: Request, url: Optional[str] = None, force:
 	try:
 		resp = await attachment_cache.obtain(c_id, m_id, a_id, fn)
 	except ConnectionError as ex:
-		print_exc()
-		raise HTTPException(status_code=ex.errno or 500, detail=str(ex))
+		raise HTTPException(status_code=ex.errno or 500, detail=str(format_exc()))
 	return await proxy_if(resp, request, force=force, download=download)
 
 
