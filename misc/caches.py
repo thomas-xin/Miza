@@ -309,7 +309,7 @@ class AttachmentCache(AutoCache):
 			early = 86400 - 60
 		resp = await self.aretrieve(key, self.get_attachment, c_id, m_id, a_id, fn)
 		try:
-			assert isinstance(resp, str) and not discord_expired(resp, early)
+			assert isinstance(resp, str) and not discord_expired(resp, early) and (not fn or fn == resp.split("?", 1)[0].rsplit("/", 1)[-1])
 		except AssertionError:
 			resp = await self._aretrieve(key, self.get_attachment, c_id, m_id, a_id, fn)
 		return resp

@@ -3522,8 +3522,9 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 			self.sync()
 
 	def sync(self):
-		self.update(self._unsafe_mut)
-		self._unsafe_mut.clear()
+		if self._unsafe_mut:
+			self.update(self._unsafe_mut)
+			self._unsafe_mut.clear()
 
 	def update(self, other):
 		t = utc()
