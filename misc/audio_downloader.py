@@ -216,7 +216,11 @@ class AudioDownloader:
 		return self.workers.next().run(s, timeout=timeout, priority=priority)
 
 	def extract_info(self, url, download=False, process=True):
-		resp = self.extract_cache.retrieve(url, self.run, f"extract_info({json_dumpstr(url)},download={download},process={process})")
+		try:
+			resp = self.extract_cache.retrieve(url, self.run, f"extract_info({json_dumpstr(url)},download={download},process={process})")
+		except Exception as ex:
+			print(repr(ex))
+			resp = self.extract_cache.retrieve(url, Request, f"https://mizabot.xyz/ytdl?query={quote_plus(url)}", json=True)
 		return resp
 
 	def get_thumbnail(self, entry, pos=0):
@@ -1075,7 +1079,7 @@ class AudioDownloader:
 			asap = not d or d > 3840
 		is_trim = start or end is not None
 		special_checked = False
-		if not fmt and asap or (not d or not isfinite(d)):
+		if not fmt and asap or not d or not isfinite(d) or not is_youtube_url(url):
 			# If format is not specified, try to stream the audio from URL if possible
 			with tracebacksuppressor:
 				stream, cdc, ac = get_best_audio(entry)
@@ -1154,7 +1158,12 @@ class AudioDownloader:
 			url2 = url.replace("https://youtu.be/", "https://www.youtube.com/watch?v=")
 		else:
 			url2 = url
-		self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).download({repr(url2)})")
+		try:
+			self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).download({repr(url2)})")
+		except Exception as ex:
+			print(repr(ex))
+			ydl_opts.pop("cookiesfrombrowser", None)
+			self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).download({repr(url2)})")
 		assert os.path.exists(fn) and os.path.getsize(fn), fn
 		return self.handle_path(fn, entry=None if is_trim else entry)
 

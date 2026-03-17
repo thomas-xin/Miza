@@ -289,7 +289,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=Fal
 		messages.insert(0, sm)
 	return messages
 
-async def summarise(q, min_length=384, max_length=16384, padding=128, best=True, prompt=None, premium_context=[]):
+async def summarise(q, min_length=384, max_length=24576, padding=128, best=True, prompt=None, premium_context=[]):
 	"Produces an AI-generated summary of input text. Model used is controlled by \"best\" parameter."
 	split_length = max_length - padding
 	summ_length = min(min_length, split_length - 1)
@@ -321,6 +321,7 @@ class ExtendedOpenAI(openai.AsyncOpenAI):
 		self.model = ""
 		self.pricing = (0, 0)
 		self.refresh = 0
+		self.disabled = False
 		super().__init__(*args, **kwargs)
 
 def find_model(oai):
@@ -451,7 +452,8 @@ Answer ONLY with the summary, do not answer the question itself!'''
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above!'
 			ml = round_random(max_length)
 			c = await tcount(prompt)
-			data = dict(prompt=prompt, temperature=0.6, max_tokens=ml, premium_context=premium_context)
+			model = None
+			data = dict(model=model, prompt=prompt, temperature=0.6, max_tokens=ml, premium_context=premium_context)
 			resp = await instruct(data)
 			print("Summary:", resp)
 			if resp and not decensor.search(resp):
@@ -646,7 +648,7 @@ async def _instruct(data, user=None, prune=True):
 	inputs.update(data)
 	model = inputs.get("model")
 	if not model:
-		if await asubmit(load_summarisation_model):
+		if await asubmit(load_summarisation_model) and not summarisation_model.disabled:
 			api = summarisation_model
 			model = api.model
 		else:

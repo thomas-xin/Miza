@@ -4090,6 +4090,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			for i, e in tuple(v.items()):
 				if t - e.get("time", 0) > 30:
 					v.pop(i)
+		if ai.summarisation_model:
+			ai.summarisation_model.disabled = np.mean([cpu["usage"] for cpu in miza.status_data.system.cpu.values()]) >= 0.75
 		self.status_data.update({
 			"discord": {
 				"Shard count": self.shard_count + bool(self.audio),
@@ -5991,7 +5993,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		c_id = verify_id(channel)
 		user = self.cache.users.get(c_id)
 		if user is not None:
-			print("Sending embeds directly due to specified user")
+			print(f"Sending embeds directly due to specified user {user}")
 			return csubmit(self._send_embeds(user, embeds, reacts, reference, exc=exc))
 		if not self.initialisation_complete:
 			embs, embeds = embeds[:10], embeds[10:]
@@ -7400,7 +7402,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				description=lim_str(description, 3000),
 			)
 			for field in fields:
-				embed.add_field(name=fields[0], value=fields[1])
+				if isinstance(field, dict):
+					embed.add_field(**field)
+				else:
+					embed.add_field(name=fields[0], value=fields[1])
 			return csubmit(self.send_with_react(
 				messageable,
 				embed=embed,

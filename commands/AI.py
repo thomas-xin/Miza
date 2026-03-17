@@ -1309,7 +1309,7 @@ class Imagine(Command):
 					"modalities": ["image", "text"],
 					"image_config": {
 						"aspect_ratio": selected_ar,
-					}
+					},
 				}
 				response = requests.post(url, headers=headers, json=payload, timeout=48)
 				try:
@@ -1318,15 +1318,18 @@ class Imagine(Command):
 					print(response.content)
 					raise
 				result = response.json()
-				usage = result["usage"]
-				cost = mpf(1.238 + 0.06 if image else 0.06) / 1000 + mpf(0.25 * usage["prompt_tokens"] + 1.5 * usage["completion_tokens"]) / 1000000
-				_premium.append(["mizabot", resp_model, cost])
-				if result.get("choices"):
-					message = result["choices"][0]["message"]
-					if message.get("images"):
-						for image in message["images"]:
-							image_url = image["image_url"]["url"]
-							return base64.b64decode(image_url.split("base64,", 1)[-1].encode("ascii"))
+				try:
+					usage = result["usage"]
+					cost = mpf(1.238 + 0.06 if image else 0.06) / 1000 + mpf(0.25 * usage["prompt_tokens"] + 1.5 * usage["completion_tokens"]) / 1000000
+					_premium.append(["mizabot", resp_model, cost])
+					if result.get("choices"):
+						message = result["choices"][0]["message"]
+						if message.get("images"):
+							for image in message["images"]:
+								image_url = image["image_url"]["url"]
+								return base64.b64decode(image_url.split("base64,", 1)[-1].encode("ascii"))
+				except KeyError:
+					image = None
 				if image:
 					raise RuntimeError("No image was produced!", f"LLM response: {repr(result)}")
 				print(result)

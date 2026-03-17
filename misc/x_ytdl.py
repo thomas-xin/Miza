@@ -258,7 +258,7 @@ def extract_info(url, download=False, process=True):
 		ts = ts2
 		ydl_opts = {
 			"quiet": 1,
-			"format": "bestvideo+bestaudio/best",
+			"format": "bestvideo+bestaudio/best*",
 			"overwrites": 1,
 			"nocheckcertificate": 1,
 			"no_call_home": 1,
@@ -272,7 +272,25 @@ def extract_info(url, download=False, process=True):
 			"cookiesfrombrowser": ["firefox"],
 		}
 		ytdl = ytd.YoutubeDL(ydl_opts)
-	resp = ytdl.extract_info(url, download=download, process=process)
+	try:
+		resp = ytdl.extract_info(url, download=download, process=process)
+	except ytd.utils.DownloadError:
+		ydl_opts = {
+			"quiet": 1,
+			"format": "bestvideo+bestaudio/best*",
+			"overwrites": 1,
+			"nocheckcertificate": 1,
+			"no_call_home": 1,
+			"nooverwrites": 1,
+			"noplaylist": 1,
+			"logtostderr": 0,
+			"ignoreerrors": 0,
+			"default_search": "auto",
+			"source_address": "0.0.0.0",
+			"remote_components": ["ejs:github"],
+		}
+		ytdl = ytd.YoutubeDL(ydl_opts)
+		resp = ytdl.extract_info(url, download=download, process=process)
 	if "entries" in resp:
 		entries = []
 		for entry in resp["entries"]:
