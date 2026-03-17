@@ -215,12 +215,16 @@ class AudioDownloader:
 			self.start_workers()
 		return self.workers.next().run(s, timeout=timeout, priority=priority)
 
-	def extract_info(self, url, download=False, process=True):
+	def extract_info(self, url, download=False, process=True, force=False):
+		retrieval = self.extract_cache._retrieve if force else self.extract_cache.retrieve
 		try:
-			resp = self.extract_cache.retrieve(url, self.run, f"extract_info({json_dumpstr(url)},download={download},process={process})")
-		except Exception as ex:
+			resp = retrieval(url, self.run, f"extract_info({json_dumpstr(url)},download={download},process={process})")
+		except RuntimeError as ex:
+			if download:
+				raise
 			print(repr(ex))
-			resp = self.extract_cache.retrieve(url, Request, f"https://mizabot.xyz/ytdl?query={quote_plus(url)}", json=True)
+			print("Retrying with remote...")
+			resp = retrieval(url, Request, f"https://mizabot.xyz/ytdl?query={quote_plus(url)}", timeout=16, json=True)
 		return resp
 
 	def get_thumbnail(self, entry, pos=0):
@@ -1082,6 +1086,16 @@ class AudioDownloader:
 		if not fmt and asap or not d or not isfinite(d) or not is_youtube_url(url):
 			# If format is not specified, try to stream the audio from URL if possible
 			with tracebacksuppressor:
+				if not entry.get("audio") or not entry["audio"][0]:
+					resp = self.extract_info(url, process=True, force=True)
+					entry.update({
+						"name": resp["title"],
+						"url": resp.get("webpage_url", url),
+						"duration": resp.get("duration"),
+						"audio": get_best_audio(resp),
+						"icon": get_best_icon(resp),
+						"video": get_best_video(resp),
+					})
 				stream, cdc, ac = get_best_audio(entry)
 				if entry.get("duration") and cdc and not expired(stream) and (d is not None or asap):
 					return stream, cdc, entry["duration"], ac
@@ -1160,7 +1174,7 @@ class AudioDownloader:
 			url2 = url
 		try:
 			self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).download({repr(url2)})")
-		except Exception as ex:
+		except RuntimeError as ex:
 			print(repr(ex))
 			ydl_opts.pop("cookiesfrombrowser", None)
 			self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).download({repr(url2)})")
@@ -1299,8 +1313,8 @@ class AudioDownloader:
 								temp = self.extract(entry["url"])[0]
 							elif "formats" in entry:
 								temp = cdict({
-									"name": resp["title"],
-									"url": resp.get("webpage_url", url),
+									"name": entry["title"],
+									"url": entry.get("webpage_url", url),
 									"duration": None,
 									"audio": get_best_audio(entry),
 									"icon": get_best_icon(entry),
