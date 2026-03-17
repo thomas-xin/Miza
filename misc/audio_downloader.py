@@ -224,7 +224,13 @@ class AudioDownloader:
 				raise
 			print(repr(ex))
 			print("Retrying with remote...")
-			resp = retrieval(url, Request, f"https://mizabot.xyz/ytdl?query={quote_plus(url)}", timeout=16, json=True)
+			try:
+				resp = retrieval(url, Request, f"https://mizabot.xyz/ytdl?query={quote_plus(url)}", timeout=16, json=True)
+			except Exception:
+				print_exc()
+			else:
+				return resp
+			raise
 		return resp
 
 	def get_thumbnail(self, entry, pos=0):

@@ -796,7 +796,9 @@ class Server:
 					# Separate video and audio formats
 					if is_audio:
 						fn2, _cdc, _dur, _ac = self.ydl.get_audio(entry, fmt=fmt, start=start, end=end)
-						if fn != fn2:
+						if is_url(fn2):
+							subprocess.run(["streamshatter", fn2, fn])
+						elif fn != fn2:
 							rename(fn2, fn)
 						title = entry["name"]
 					else:
