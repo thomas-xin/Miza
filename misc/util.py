@@ -1233,7 +1233,7 @@ IMAGE_FORMS = {
 def is_image(url):
 	"Checks whether a url or filename ends with an image file extension. Returns a ternary True/False/None value where True indicates a positive match, False indicates a possible match, and None indicates no match."
 	if url:
-		return IMAGE_FORMS.get(url2ext(url))
+		return IMAGE_FORMS.get(url2ext(url).casefold())
 
 VIDEO_FORMS = {
 	"auto": None,
@@ -1263,7 +1263,7 @@ VIDEO_FORMS = {
 def is_video(url):
 	"Checks whether a url or filename ends with a video file extension. Returns a ternary True/False/None value where True indicates a positive match, False indicates a possible match, and None indicates no match."
 	if url:
-		return VIDEO_FORMS.get(url2ext(url))
+		return VIDEO_FORMS.get(url2ext(url).casefold())
 
 AUDIO_FORMS = {
 	"auto": None,
@@ -1286,7 +1286,7 @@ AUDIO_FORMS = {
 def is_audio(url):
 	"Checks whether a url or filename ends with an audio file extension. Returns a ternary True/False/None value where True indicates a positive match, False indicates a possible match, and None indicates no match."
 	if url:
-		return AUDIO_FORMS.get(url2ext(url))
+		return AUDIO_FORMS.get(url2ext(url).casefold())
 
 VISUAL_FORMS = {
 	"auto": None,

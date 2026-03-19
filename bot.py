@@ -1678,10 +1678,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			urls = [verify_url(url)]
 		else:
 			urls = find_urls_ex(url)
-			emoji_tests = find_emojis_ex(url)
-			for i, u in enumerate(emoji_tests):
-				emoji_tests[i] = await fix_emoji_url(u)
-			urls.extend(emoji_tests)
+			if "emoji" in priority_order:
+				emoji_tests = find_emojis_ex(url)
+				for i, u in enumerate(emoji_tests):
+					emoji_tests[i] = await fix_emoji_url(u)
+				urls.extend(emoji_tests)
 			if limit is not None:
 				urls = urls[:limit]
 
@@ -2237,7 +2238,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			casual=None,
 			nsfw=None,
 			backup="deepseek-v3.2-speciale",
-			retry="gpt-5-mini",
+			retry="gpt-5.4-mini",
 			function=None,
 			vision="qwen3.5-27b",
 			target="auto",
@@ -2246,7 +2247,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			instructive="kimi-k2.5",
 			casual="gemini-3-flash",
 			nsfw="grok-4.1-fast",
-			backup="gpt-5-mini",
+			backup="gpt-5.4-mini",
 			retry="claude-haiku-4.5",
 			function="grok-4.1-fast",
 			vision="kimi-k2.5",
@@ -3073,7 +3074,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						else:
 							url = await self.data.exec.aproxy(url)
 						emb.url = url
-						# url = allow_gif(url)
 						emb.set_image(url=url)
 						if url != content:
 							emb.description = content
