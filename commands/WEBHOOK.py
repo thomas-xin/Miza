@@ -1031,7 +1031,7 @@ class UpdateWebhooks(Database):
 		d.send = w.send
 		d.edit = w.edit
 		d.display_avatar = d.avatar_url = d.avatar and f"https://cdn.discordapp.com/avatars/{d.id}/{d.avatar}.webp?size=1024"
-		d.channel = self.CID(id=c_id)
+		d.channel = self.bot.get_channel(c_id) or self.CID(id=c_id)
 		d.created_at = snowflake_time_3(w.id)
 		return self.add(d)
 

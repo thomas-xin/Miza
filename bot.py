@@ -4891,12 +4891,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if j < len(ws):
 				kwargs[k] = (kwargs[k] + ws[j]).strip()
 		if any_unavailable:
-			for k in kwargs:
-				for k2 in schema[k].get("excludes", ()):
-					if kwargs.get(k2) and kwargs.get(k2) != schema[k2].get("default"):
-						v = schema[k]
-						v2 = schema[k2]
-						raise ArgumentError(f"Argument `{k}` ({italics(v.description)}) is incompatible with `{k2}` ({italics(v2.description)}).")
+			for k, v in kwargs.items():
+				if v and v != schema[k].get("default"):
+					for k2 in schema[k].get("excludes", ()):
+						if kwargs.get(k2) and kwargs.get(k2) != schema[k2].get("default"):
+							v = schema[k]
+							v2 = schema[k2]
+							raise ArgumentError(f"Argument `{k}` ({italics(v.description)}) is incompatible with `{k2}` ({italics(v2.description)}).")
 		return await self.validate_schema(kwargs, schema, command_check=command_check, argv=argv, args=args, guild=guild)
 
 	async def validate_into(self, k, v, info, guild):
