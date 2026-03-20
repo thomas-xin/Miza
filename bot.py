@@ -8013,6 +8013,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if payload.cached_message:
 				before = payload.cached_message
 				after = await self.fetch_message(m_id, payload.channel_id)
+				if before is after:
+					before = copy.copy(before)
 			else:
 				try:
 					before = await self.fetch_message(m_id, old=True)
@@ -8042,8 +8044,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					try:
 						after = await discord.abc.Messageable.fetch_message(channel, before.id)
 					except LookupError:
-						after = copy.copy(before)
-						after._update(data)
+						before = copy.copy(before)
 					else:
 						before.author = after.author
 					if find_urls(after.content) and after.embeds or any(embed.image or embed.thumbnail or embed.video for embed in after.embeds) or any((fmt := url2ext(a.url)) in IMAGE_FORMS or fmt in VIDEO_FORMS for a in after.attachments):
@@ -8052,9 +8053,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					raw = True
 				else:
 					if type(before) is self.CachedMessage:
-						before = copy.copy(before)
-					after = copy.copy(before)
-					after._update(data)
+						after = copy.copy(before)
+					else:
+						after = before
+					before = copy.copy(before)
+			after._update(data)
 			with suppress(AttributeError):
 				before.deleted = True
 			if after.channel is None:
