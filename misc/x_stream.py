@@ -18,12 +18,12 @@ from .types import fcdict, byte_like, MemoryBytes
 from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment, discord_expired,
 	is_discord_attachment, url2fn, seq, getsize,
-	Request as MizaRequest, DOMAIN_CERT, PRIVATE_KEY, update_headers,
+	Request as RequestManager, DOMAIN_CERT, PRIVATE_KEY, update_headers,
 	CACHE_PATH, VISUAL_FORMS, RNGFile,
 )
 from .caches import attachment_cache, colour_cache
 
-csubmit(MizaRequest._init_())
+csubmit(RequestManager._init_())
 
 ADDRESS = "0.0.0.0"
 PORT = 443
@@ -121,7 +121,7 @@ class Server:
 			headers.pop("Remote-Addr", None)
 			headers.pop("Host", None)
 			headers.pop("Range", None)
-			update_headers(headers, **MizaRequest.header())
+			update_headers(headers, **RequestManager.header())
 			ranges = []
 			length = 0
 
@@ -417,6 +417,8 @@ async def chunked_proxy(path: str, request: Request):
 @app.get("/unproxy/{path:path}")
 async def unproxy(path: str, request: Request, url: Optional[str] = None, force: bool = False, download: bool = False):
 	"""Unproxy Discord attachments or redirect to direct URLs."""
+	if request.method.upper() == "HEAD":
+		force = True
 	if url:
 		return await proxy_if(url, request, force=force, download=download)
 	try:
@@ -451,7 +453,7 @@ async def upload(
 	if not resp or content_length < 1:
 		if not url:
 			return "Expected input URL or data."
-		headers = MizaRequest.header()
+		headers = RequestManager.header()
 		if request.headers.get("Range"):
 			headers["Range"] = request.headers["Range"]
 		resp = server.get_with_retries(url, headers=headers, timeout=3)
@@ -493,88 +495,26 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 		print_exc()
 		body = None
 
-	if request.method.lower() == "get" and not body:
-		print("get_download:", url)
-		try:
-			fp = await attachment_cache.download(url, read=True)
-		except ConnectionError as ex:
-			raise HTTPException(status_code=ex.errno or 500, detail=f"{url}: {ex}")
-		heads = fcdict(await attachment_cache.scan_headers(url))
+	try:
+		fp = await attachment_cache.download(url, read=True)
+	except ConnectionError as ex:
+		raise HTTPException(status_code=ex.errno or 500, detail=f"{url}: {ex}")
+	heads = fcdict(await attachment_cache.scan_headers(url))
 
-		response_headers = {}
-		filename = heads.get("attachment-filename") or heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0]
-		disposition = "attachment" if download else "inline"
-		if filename:
-			response_headers["Content-Disposition"] = f"{disposition}; filename={filename}"
+	response_headers = {}
+	filename = heads.get("attachment-filename") or heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0]
+	disposition = "attachment" if download else "inline"
+	if filename:
+		response_headers["Content-Disposition"] = f"{disposition}; filename={filename}"
 
-		if not force and heads.get("content-type").split(";", 1)[0] == "text/markdown":
-			new_url = str(request.url.include_query_params(force="1"))
-			return Response(
-				"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6;max-width:800px;margin:0 auto;padding:20px;color:#333}#viewer blockquote{border-left:4px solid #ccc;margin-left:0;padding-left:16px;color:#666}#viewer code{background-color:#f4f4f4;padding:2px 4px;border-radius:4px}#viewer pre{background-color:#f4f4f4;padding:16px;border-radius:4px;overflow-x:auto}</style></head><body><div id="viewer"><p><em>Loading...</em></p></div><script>async function renderMarkdown(){try{const r=await fetch(URL);if(!r.ok)throw new Error(`HTTP error! status: ${r.status}`);const e=await r.text();viewer.innerHTML=marked.parse(e)}catch(r){viewer.innerHTML=`<p style="color: red;"><strong>Failed to load Markdown:</strong> ${r.message}</p>\n                                    <p><small>Note: The server hosting the file must allow Cross-Origin Resource Sharing (CORS).</small></p>`}}renderMarkdown();</script></body></html>""".replace("URL", json.dumps(new_url)),
-				headers=response_headers,
-				media_type="text/html",
-			)
-
-		return stream_fp(request, fp, response_headers)
-
-	headers = MizaRequest.header()
-	if request.headers.get("Range"):
-		headers["Range"] = request.headers["Range"]
-
-	resp = server.get_with_retries(url, data=body, headers=headers, timeout=2)
-
-	response_headers = fcdict(resp.headers)
-	response_headers.pop("Connection", None)
-	response_headers.pop("Transfer-Encoding", None)
-	if response_headers.pop("Content-Encoding", None):
-		response_headers.pop("Content-Length", None)
-	response_headers.pop("Date", None)
-	response_headers.pop("Server", None)
-
-	if is_discord_attachment(url):
-		response_headers.pop("Content-Disposition", None)
-		update_headers(response_headers, **CHEADERS)
-
-	ctype = resp.headers.get("Content-Type", "application/octet-stream").split(";", 1)[0]
-	it = await asubmit(resp.iter_content, 65536)
-
-	if ctype in ("text/html", "application/octet-stream"):
-		b = await asubmit(next, it)
-		mime = magic.from_buffer(b)
-		if mime == "application/octet-stream":
-			a = MemoryBytes(b)[:128]
-			if sum(32 <= c < 128 for c in a) >= len(a) * 7 / 8:
-				mime = "text/plain"
-		response_headers["Content-Type"] = mime
-
-		async def content_generator():
-			yield b
-			try:
-				while True:
-					yield await asubmit(next, it)
-			except StopIteration:
-				pass
-
-		return StreamingResponse(
-			content_generator(),
-			status_code=resp.status_code,
+	if not force and heads.get("content-type").split(";", 1)[0] == "text/markdown":
+		new_url = str(request.url.include_query_params(force="1"))
+		return Response(
+			"""<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6;max-width:800px;margin:0 auto;padding:20px;color:#333}#viewer blockquote{border-left:4px solid #ccc;margin-left:0;padding-left:16px;color:#666}#viewer code{background-color:#f4f4f4;padding:2px 4px;border-radius:4px}#viewer pre{background-color:#f4f4f4;padding:16px;border-radius:4px;overflow-x:auto}</style></head><body><div id="viewer"><p><em>Loading...</em></p></div><script>async function renderMarkdown(){try{const r=await fetch(URL);if(!r.ok)throw new Error(`HTTP error! status: ${r.status}`);const e=await r.text();viewer.innerHTML=marked.parse(e)}catch(r){viewer.innerHTML=`<p style="color: red;"><strong>Failed to load Markdown:</strong> ${r.message}</p>\n                                    <p><small>Note: The server hosting the file must allow Cross-Origin Resource Sharing (CORS).</small></p>`}}renderMarkdown();</script></body></html>""".replace("URL", json.dumps(new_url)),
 			headers=response_headers,
-			media_type=mime,
+			media_type="text/html",
 		)
-
-	async def content_generator():
-		try:
-			while True:
-				yield await asubmit(next, it)
-		except StopIteration:
-			pass
-
-	return StreamingResponse(
-		content_generator(),
-		status_code=resp.status_code,
-		headers=response_headers,
-		media_type=ctype,
-	)
+	return stream_fp(request, fp, response_headers)
 
 
 @app.get("/ytdl")
