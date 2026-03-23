@@ -519,27 +519,30 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 	return stream_fp(request, fp, response_headers)
 
 
+ytdownloader = None
 @app.get("/ytdl")
 async def ytdl(query: Optional[str] = None):
+	global ytdownloader
 	if not query:
 		return
-	import yt_dlp as ytd
-	ydl_opts = {
-		"quiet": 1,
-		"format": "bestvideo+bestaudio/best*",
-		"overwrites": 1,
-		"nocheckcertificate": 1,
-		"no_call_home": 1,
-		"nooverwrites": 1,
-		"noplaylist": 1,
-		"logtostderr": 0,
-		"ignoreerrors": 0,
-		"default_search": "auto",
-		"source_address": "0.0.0.0",
-		"remote_components": ["ejs:github"],
-	}
-	ytdl = ytd.YoutubeDL(ydl_opts)
-	return ytdl.extract_info(query, download=False)
+	if not ytdownloader:
+		import yt_dlp as ytd
+		ydl_opts = {
+			"quiet": 1,
+			"format": "bestvideo+bestaudio/best*",
+			"overwrites": 1,
+			"nocheckcertificate": 1,
+			"no_call_home": 1,
+			"nooverwrites": 1,
+			"noplaylist": 1,
+			"logtostderr": 0,
+			"ignoreerrors": 0,
+			"default_search": "auto",
+			"source_address": "0.0.0.0",
+			"remote_components": ["ejs:github"],
+		}
+		ytdownloader = ytd.YoutubeDL(ydl_opts)
+	return await asubmit(ytdownloader.extract_info, query, download=False)
 
 @app.head("/ytdl")
 async def head_ytdl(response: Response):
