@@ -418,14 +418,13 @@ async def unproxy(path: str, request: Request, url: Optional[str] = None, force:
 	return await proxy_if(resp, request, force=force, download=download)
 
 
-@app.post("/reupload")
-async def reupload(
+@app.post("/upload")
+async def upload(
 	request: Request,
 	url: Optional[str] = Query(None),
 	filename: Optional[str] = Query(None),
 	file: Optional[UploadFile] = File(None)
 ):
-	"""Re-upload files to Discord storage."""
 	try:
 		if file:
 			resp = file.file

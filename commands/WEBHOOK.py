@@ -389,7 +389,7 @@ class EmojiList(Pagination, Command):
 					content = f"Successfully removed {sqr_md(len(removed))} emoji aliases for {sqr_md(_user)}."
 				else:
 					content = f"Successfully removed emoji alias {sqr_md(name)}: {sqr_md(removed[0])} for {sqr_md(_user)}."
-				bot.set_userbase(_user.id, "emojlilist", curr)
+				bot.set_userbase(_user.id, "emojilist", curr)
 				return cdict(
 					content=content,
 					prefix="```css\n",
@@ -404,7 +404,7 @@ class EmojiList(Pagination, Command):
 				if not regexp(r"[A-Za-z0-9\-~_]{1,32}").fullmatch(name):
 					raise ArgumentError("Emoji aliases may only contain 1~32 alphanumeric characters, dashes, tildes and underscores.")
 				curr[name] = emote
-				bot.set_userbase(_user.id, "emojlilist", curr)
+				bot.set_userbase(_user.id, "emojilist", curr)
 				return ini_md(f"Successfully added emoji alias {sqr_md(name)}: {sqr_md(emote)} for {sqr_md(_user)}.")
 		raise NotImplementedError(mode)
 
@@ -429,7 +429,7 @@ class EmojiList(Pagination, Command):
 					except LookupError:
 						curr = bot.get_userbase(uid, "emojilist", {})
 						curr.pop(k)
-						bot.set_userbase(uid, "emojlilist", curr)
+						bot.set_userbase(uid, "emojilist", curr)
 						return
 					return f"({v})` {me}"
 
@@ -443,7 +443,7 @@ class EmojiList(Pagination, Command):
 				mapping[f":{fut.k}:"] = info
 			return iter2str({k + " " * (32 - len(k)): v for k, v in mapping.items()}, left="`", right="").strip()
 
-		return await self.default_display("proxy emoji", uid, pos, bot.get_userbase(uid, "emojlisit", {}).items(), diridx, akey=akey)
+		return await self.default_display("proxy emoji", uid, pos, bot.get_userbase(uid, "emojilist", {}).items(), diridx, akey=akey)
 
 	async def _callback_(self, _user, index, data, **void):
 		pos, _ = decode_leb128(data)

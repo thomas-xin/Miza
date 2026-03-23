@@ -4411,9 +4411,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			await asyncio.sleep(0.2)
 		content = message.content
 		if not content and message.embeds:
-			content = str(message.embeds[0].footer.text or message.embeds[0].description)
+			footer = message.embeds[0].footer.text
+			if footer and not footer[0].isascii():
+				content = footer
+			else:
+				content = message.embeds[0].description
 		try:
-			name, uid, data = Pagination.decode(content)
+			name, uid, data = Pagination.decode(str(content))
 		except ValueError:
 			return
 		# Force a rate limit on the reaction processing for the message
@@ -4728,7 +4732,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					taken = True
 				elif not hs and v.type == "enum" and (full_prune(a) in v.validation.enum or full_prune(a) in v.validation.get("accepts", ())):
 					taken = True
-				elif v.type == "emoji" and (find_emojis_ex(a) or is_discord_emoji(a)):
+				elif v.type == "emoji" and (find_emojis_ex(a) or is_discord_emoji(a) or a.isnumeric() and len(a) >= 16):
 					taken = True
 				elif v.type in ("url", "image", "visual", "video", "audio", "media") and (is_url(a) or find_emojis_ex(a)):
 					taken = True
@@ -6279,10 +6283,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						await self.handle_update()
 
 	async def worker_heartbeat(self):
-		return
 		futs = []
 		key = AUTH.get("discord_secret") or ""
-		# uri = f"http://IP:{PORT}"
 		uri = self.raw_webserver
 		dc = pk = ""
 		if DOMAIN_CERT and PRIVATE_KEY:
@@ -6359,11 +6361,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			with Delay(8):
 				with tracebacksuppressor:
 					t = utc()
-					# at = asyncio.all_tasks(eloop)
-					# sat = set(at)
-					# sat.difference_update(seen)
-					# seen.update(sat)
-					# print(t, t - lt, len(seen), len(at), len(sat), sat)
 					if not fut or fut.done():
 						fut = csubmit(self.heartbeat())
 						lt = t

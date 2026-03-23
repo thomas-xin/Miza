@@ -130,7 +130,8 @@
 
 			const isPersistent = persistentToggle.checked ? 1 : 0;
 			const filename = encodeURIComponent(file.name);
-			const uploadUrl = `/upload?filename=${filename}&persistent=${isPersistent}`;
+			const uploadUrl = isPersistent ? `https://mizabot.xyz/upload?filename=${filename}` : `/upload?filename=${filename}`;
+			// &persistent=${isPersistent}`;
 
 			const formData = new FormData();
 			formData.append('file', file);
