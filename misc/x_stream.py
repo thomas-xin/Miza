@@ -367,9 +367,6 @@ async def authorised_heartbeat(request: Request, key: Optional[str] = None, uri:
 	body = await request.json()
 	data = orjson.loads(decrypt(base64.b64decode(body["data"].encode("ascii") + b"==")))
 
-	if data:
-		print("Authorised update:", data)
-
 	server.token = data.get("token") or server.token
 	server.alt_token = data.get("alt_token") or server.alt_token
 	domain_cert = data.get("domain_cert")
@@ -395,6 +392,7 @@ async def authorised_heartbeat(request: Request, key: Optional[str] = None, uri:
 	return {str(k): v for k, v in attachment_cache.items() if isinstance(k, int) and v and not discord_expired(v)}
 
 
+@app.head(path="/c/{path:path}")
 @app.get("/c/{path:path}")
 @app.get("/chunked-proxy/{path:path}")
 async def chunked_proxy(path: str, request: Request):
@@ -413,23 +411,8 @@ async def chunked_proxy(path: str, request: Request):
 	response = await server.dyn_serve(new_urls, size, request=request, mimetype=mimetype, response_headers=response_headers)
 	return response
 
-@app.head(path="/c/{path:path}")
-async def head_cproxy(path: str, response: Response):
-	try:
-		urls, chunksize = await attachment_cache.obtains(path.split("/", 1)[0])
-	except ConnectionError as ex:
-		raise HTTPException(status_code=ex.errno or 500, detail=str(ex))
-	mimetype, size, firstsize, lastsize = await get_size_mime(urls[0], urls[-1], len(urls), chunksize)
-	heads = fcdict(await attachment_cache.scan_headers(urls[0]))
-	response_headers = {}
-	filename = heads.get("attachment-filename") or heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or urls[0].rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0]
-	if filename:
-		response.headers["Content-Disposition"] = f"inline; filename={filename}"
-	response.headers["Content-Length"] = str(size)
-	response.headers["Content-Type"] = mimetype
-	return
 
-
+@app.head(path="/u/{path:path}")
 @app.get("/u/{path:path}")
 @app.get("/unproxy/{path:path}")
 async def unproxy(path: str, request: Request, url: Optional[str] = None, force: bool = False, download: bool = False):
@@ -445,23 +428,6 @@ async def unproxy(path: str, request: Request, url: Optional[str] = None, force:
 	except ConnectionError as ex:
 		raise HTTPException(status_code=ex.errno or 500, detail=f"{url}: {ex}")
 	return await proxy_if(resp, request, force=force, download=download)
-
-@app.head(path="/u/{path:path}")
-async def head_uproxy(path: str, response: Response, url: Optional[str] = None, force: bool = False, download: bool = False):
-	try:
-		c_id, m_id, a_id, fn = decode_attachment(path)
-	except Exception as ex:
-		raise HTTPException(status_code=400, detail=str(ex))
-	try:
-		resp = await attachment_cache.obtain(c_id, m_id, a_id, fn)
-	except ConnectionError as ex:
-		raise HTTPException(status_code=ex.errno or 500, detail=f"{url}: {ex}")
-	heads = await attachment_cache.scan_headers(resp, m_id)
-	if heads.get("Content-Disposition"):
-		response.headers["Content-Disposition"] = heads["Content-Disposition"]
-	response.headers["Content-Length"] = heads["Content-Length"]
-	response.headers["Content-Type"] = heads["Content-Type"]
-	return
 
 
 @app.post("/upload")
