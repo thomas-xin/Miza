@@ -12,6 +12,7 @@ import orjson
 import requests
 from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse, RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
 from .asyncs import asubmit, csubmit
 from .types import fcdict, byte_like, MemoryBytes
 from .util import (
@@ -38,9 +39,6 @@ HEADERS = {
 	"Server": "Miza",
 	"Vary": "Accept-Encoding",
 	"Accept-Ranges": "bytes",
-	"Access-Control-Allow-Headers": "*",
-	"Access-Control-Allow-Methods": "*",
-	"Access-Control-Allow-Origin": "*",
 	"Access-Control-Expose-Headers": "*",
 }
 
@@ -300,6 +298,13 @@ def stream_fp(request, fp, response_headers={}):
 
 # Create FastAPI app
 app = FastAPI(title="Miza Proxy Server", version="2.0")
+app.add_middleware(
+	CORSMiddleware,
+	allow_credentials=True,
+	allow_origins=["*"],
+	allow_methods=["*"],
+	allow_headers=["*"],
+)
 server = Server()
 
 
@@ -315,6 +320,7 @@ async def add_headers_middleware(request: Request, call_next):
 
 global_ip = "127.0.0.1"
 last_ip_check = 0
+@app.head(path="/ip")
 @app.get("/ip")
 async def ip(request: Request):
 	global global_ip, last_ip_check
@@ -326,6 +332,7 @@ async def ip(request: Request):
 	return dict(host=global_ip, remote=true_ip(request))
 
 
+@app.head(path="/random")
 @app.get("/random")
 async def prandom(request: Request, count: int = 1048576):
 	return stream_fp(request, RNGFile(count), {"Content-Disposition": "attachment; filename=random.bin"})
@@ -333,13 +340,19 @@ async def prandom(request: Request, count: int = 1048576):
 
 @app.get("/mean-color")
 @app.get("/mean-colour")
-async def mean_colour(request: Request, url: str = Query(...)):
+async def mean_colour(request: Request, url: Optional[str] = None):
 	resp = await colour_cache.obtain(url)
 	return list(resp)
 
+@app.head("/mean-color")
+@app.head("/mean-colour")
+async def head_mc(response: Response):
+	response.headers["Content-Type"] = "application/json"
+	return
+
 
 @app.post("/authorised-heartbeat")
-async def authorised_heartbeat(request: Request, key: str = Query(...), uri: str = Query("")):
+async def authorised_heartbeat(request: Request, key: Optional[str] = None, uri: Optional[str] = ""):
 	"""Receive configuration updates from Discord bot."""
 	if key != discord_secret:
 		raise HTTPException(status_code=403, detail="Invalid key")
@@ -400,6 +413,22 @@ async def chunked_proxy(path: str, request: Request):
 	response = await server.dyn_serve(new_urls, size, request=request, mimetype=mimetype, response_headers=response_headers)
 	return response
 
+@app.head(path="/c")
+async def head_cproxy(path: str, response: Response):
+	try:
+		urls, chunksize = await attachment_cache.obtains(path.split("/", 1)[0])
+	except ConnectionError as ex:
+		raise HTTPException(status_code=ex.errno or 500, detail=str(ex))
+	mimetype, size, firstsize, lastsize = await get_size_mime(urls[0], urls[-1], len(urls), chunksize)
+	heads = fcdict(await attachment_cache.scan_headers(urls[0]))
+	response_headers = {}
+	filename = heads.get("attachment-filename") or heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or urls[0].rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0]
+	if filename:
+		response.headers["Content-Disposition"] = f"inline; filename={filename}"
+	response.headers["Content-Length"] = size
+	response.headers["Content-Type"] = mimetype
+	return
+
 
 @app.get("/u/{path:path}")
 @app.get("/unproxy/{path:path}")
@@ -417,13 +446,30 @@ async def unproxy(path: str, request: Request, url: Optional[str] = None, force:
 		raise HTTPException(status_code=ex.errno or 500, detail=f"{url}: {ex}")
 	return await proxy_if(resp, request, force=force, download=download)
 
+@app.head(path="/u")
+async def head_uproxy(path: str, response: Response, url: Optional[str] = None, force: bool = False, download: bool = False):
+	try:
+		c_id, m_id, a_id, fn = decode_attachment(path)
+	except Exception as ex:
+		raise HTTPException(status_code=400, detail=str(ex))
+	try:
+		resp = await attachment_cache.obtain(c_id, m_id, a_id, fn)
+	except ConnectionError as ex:
+		raise HTTPException(status_code=ex.errno or 500, detail=f"{url}: {ex}")
+	heads = await attachment_cache.scan_headers(resp, m_id)
+	if heads.get("Content-Disposition"):
+		response.headers["Content-Disposition"] = heads["Content-Disposition"]
+	response.headers["Content-Length"] = heads["Content-Length"]
+	response.headers["Content-Type"] = heads["Content-Type"]
+	return
+
 
 @app.post("/upload")
 async def upload(
 	request: Request,
-	url: Optional[str] = Query(None),
-	filename: Optional[str] = Query(None),
-	file: Optional[UploadFile] = File(None)
+	url: Optional[str] = None,
+	filename: Optional[str] = None,
+	file: Optional[UploadFile] = None,
 ):
 	try:
 		if file:
@@ -566,7 +612,9 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 
 
 @app.get("/ytdl")
-async def ytdl(query: str = Query(default="")):
+async def ytdl(query: Optional[str] = None):
+	if not query:
+		return
 	import yt_dlp as ytd
 	ydl_opts = {
 		"quiet": 1,
@@ -584,6 +632,11 @@ async def ytdl(query: str = Query(default="")):
 	}
 	ytdl = ytd.YoutubeDL(ydl_opts)
 	return ytdl.extract_info(query, download=False)
+
+@app.head("/ytdl")
+async def head_ytdl(response: Response):
+	response.headers["Content-Type"] = "application/json"
+	return
 
 
 @app.get("/backend/{path:path}")
