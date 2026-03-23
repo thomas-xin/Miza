@@ -11,7 +11,7 @@ import niquests
 import orjson
 import requests
 from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File, Query
-from fastapi.responses import StreamingResponse, RedirectResponse
+from fastapi.responses import StreamingResponse, RedirectResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from .asyncs import asubmit, csubmit
 from .types import fcdict, byte_like, MemoryBytes
@@ -438,6 +438,7 @@ async def upload(
 	url: Optional[str] = None,
 	filename: Optional[str] = None,
 	file: Optional[UploadFile] = None,
+	response_class=PlainTextResponse,
 ):
 	try:
 		if file:
@@ -459,6 +460,7 @@ async def upload(
 		resp = server.get_with_retries(url, headers=headers, timeout=3)
 
 	fn = filename or getattr(resp, "filename", None) or (url2fn(url) if url else None)
+
 	return await attachment_cache.create_dynamic(resp, filename=fn)
 
 
