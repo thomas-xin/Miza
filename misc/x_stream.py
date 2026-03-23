@@ -413,7 +413,7 @@ async def chunked_proxy(path: str, request: Request):
 	response = await server.dyn_serve(new_urls, size, request=request, mimetype=mimetype, response_headers=response_headers)
 	return response
 
-@app.head(path="/c")
+@app.head(path="/c/{path:path}")
 async def head_cproxy(path: str, response: Response):
 	try:
 		urls, chunksize = await attachment_cache.obtains(path.split("/", 1)[0])
@@ -446,7 +446,7 @@ async def unproxy(path: str, request: Request, url: Optional[str] = None, force:
 		raise HTTPException(status_code=ex.errno or 500, detail=f"{url}: {ex}")
 	return await proxy_if(resp, request, force=force, download=download)
 
-@app.head(path="/u")
+@app.head(path="/u/{path:path}")
 async def head_uproxy(path: str, response: Response, url: Optional[str] = None, force: bool = False, download: bool = False):
 	try:
 		c_id, m_id, a_id, fn = decode_attachment(path)
