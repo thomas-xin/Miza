@@ -425,7 +425,7 @@ async def head_cproxy(path: str, response: Response):
 	filename = heads.get("attachment-filename") or heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or urls[0].rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0]
 	if filename:
 		response.headers["Content-Disposition"] = f"inline; filename={filename}"
-	response.headers["Content-Length"] = size
+	response.headers["Content-Length"] = str(size)
 	response.headers["Content-Type"] = mimetype
 	return
 
