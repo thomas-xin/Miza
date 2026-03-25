@@ -3526,6 +3526,12 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 			self.update(self._unsafe_mut)
 			self._unsafe_mut.clear()
 
+	def get(self, k, default=None):
+		try:
+			return self.__getitem__(k)
+		except KeyError:
+			return default
+
 	def update(self, other):
 		t = utc()
 		if hasattr(other, "items"):

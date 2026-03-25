@@ -279,6 +279,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.guildfinder = FileHashDict(path=f"{CACHE_PATH}/guildfinder")
 		print(f"Loading main databases took {DynamicDT.now() - t}.")
 
+	database_sems = {}
 	def get_userbase(self, uid, path="", default=None):
 		try:
 			temp = self.userbase[uid]
@@ -295,51 +296,54 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return cdict()
 		return default
 	def set_userbase(self, uid, path, value, delete_empty=True):
-		if delete_empty and not value:
-			self.pop_userbase(uid, path)
-			return
-		if path:
-			orig = temp = self.userbase.get(uid, cdict())
-			attrs = path.split(".")
-			last = attrs.pop(-1)
-			for k in attrs:
-				temp = temp.setdefault(k, cdict())
-			temp[last] = value
-			self.userbase[uid] = orig
-		else:
-			self.userbase[uid] = value
-	def add_userbase(self, uid, path, value):
-		if path:
-			orig = temp = self.userbase.get(uid, cdict())
-			attrs = path.split(".")
-			last = attrs.pop(-1)
-			for k in attrs:
-				temp = temp.setdefault(k, cdict())
-			try:
-				temp[last] += value
-			except LookupError:
+		with self.database_sems.setdefault(uid, threading.RLock()):
+			if delete_empty and not value:
+				self.pop_userbase(uid, path)
+				return
+			if path:
+				orig = temp = self.userbase.get(uid, cdict())
+				attrs = path.split(".")
+				last = attrs.pop(-1)
+				for k in attrs:
+					temp = temp.setdefault(k, cdict())
 				temp[last] = value
-			self.userbase[uid] = orig
-			return temp[last]
-		else:
-			data = self.get_userbase(uid)
-			add_dict(data, uid, value)
-			self.userbase[uid] = data
-			return data
-	def pop_userbase(self, uid, path):
-		if path:
-			orig = temp = self.userbase.get(uid, cdict())
-			attrs = path.split(".")
-			last = attrs.pop(-1)
-			for k in attrs:
-				temp = temp.setdefault(k, cdict())
-			value = temp.pop(last, None)
-			if not orig:
-				self.userbase.pop(uid, None)
-			else:
 				self.userbase[uid] = orig
-			return value
-		return self.userbase.pop(uid)
+			else:
+				self.userbase[uid] = value
+	def add_userbase(self, uid, path, value):
+		with self.database_sems.setdefault(uid, threading.RLock()):
+			if path:
+				orig = temp = self.userbase.get(uid, cdict())
+				attrs = path.split(".")
+				last = attrs.pop(-1)
+				for k in attrs:
+					temp = temp.setdefault(k, cdict())
+				try:
+					temp[last] += value
+				except LookupError:
+					temp[last] = value
+				self.userbase[uid] = orig
+				return temp[last]
+			else:
+				data = self.get_userbase(uid)
+				add_dict(data, uid, value)
+				self.userbase[uid] = data
+				return data
+	def pop_userbase(self, uid, path):
+		with self.database_sems.setdefault(uid, threading.RLock()):
+			if path:
+				orig = temp = self.userbase.get(uid, cdict())
+				attrs = path.split(".")
+				last = attrs.pop(-1)
+				for k in attrs:
+					temp = temp.setdefault(k, cdict())
+				value = temp.pop(last, None)
+				if not orig:
+					self.userbase.pop(uid, None)
+				else:
+					self.userbase[uid] = orig
+				return value
+			return self.userbase.pop(uid)
 
 	def get_guildbase(self, gid, path="", default=None):
 		try:
@@ -357,51 +361,54 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return cdict()
 		return default
 	def set_guildbase(self, gid, path, value, delete_empty=True):
-		if delete_empty and not value:
-			self.pop_guildbase(gid, path)
-			return
-		if path:
-			orig = temp = self.guildbase.get(gid, cdict())
-			attrs = path.split(".")
-			last = attrs.pop(-1)
-			for k in attrs:
-				temp = temp.setdefault(k, cdict())
-			temp[last] = value
-			self.guildbase[gid] = orig
-		else:
-			self.guildbase[gid] = value
-	def add_guildbase(self, gid, path, value):
-		if path:
-			orig = temp = self.guildbase.get(gid, cdict())
-			attrs = path.split(".")
-			last = attrs.pop(-1)
-			for k in attrs:
-				temp = temp.setdefault(k, cdict())
-			try:
-				temp[last] += value
-			except LookupError:
+		with self.database_sems.setdefault(gid, threading.RLock()):
+			if delete_empty and not value:
+				self.pop_guildbase(gid, path)
+				return
+			if path:
+				orig = temp = self.guildbase.get(gid, cdict())
+				attrs = path.split(".")
+				last = attrs.pop(-1)
+				for k in attrs:
+					temp = temp.setdefault(k, cdict())
 				temp[last] = value
-			self.guildbase[gid] = orig
-			return temp[last]
-		else:
-			data = self.get_guildbase(gid)
-			add_dict(data, gid, value)
-			self.guildbase[gid] = data
-			return data
-	def pop_guildbase(self, gid, path):
-		if path:
-			orig = temp = self.guildbase.get(gid, cdict())
-			attrs = path.split(".")
-			last = attrs.pop(-1)
-			for k in attrs:
-				temp = temp.setdefault(k, cdict())
-			value = temp.pop(last, None)
-			if not orig:
-				self.guildbase.pop(gid, None)
-			else:
 				self.guildbase[gid] = orig
-			return value
-		return self.guildbase.pop(gid)
+			else:
+				self.guildbase[gid] = value
+	def add_guildbase(self, gid, path, value):
+		with self.database_sems.setdefault(gid, threading.RLock()):
+			if path:
+				orig = temp = self.guildbase.get(gid, cdict())
+				attrs = path.split(".")
+				last = attrs.pop(-1)
+				for k in attrs:
+					temp = temp.setdefault(k, cdict())
+				try:
+					temp[last] += value
+				except LookupError:
+					temp[last] = value
+				self.guildbase[gid] = orig
+				return temp[last]
+			else:
+				data = self.get_guildbase(gid)
+				add_dict(data, gid, value)
+				self.guildbase[gid] = data
+				return data
+	def pop_guildbase(self, gid, path):
+		with self.database_sems.setdefault(gid, threading.RLock()):
+			if path:
+				orig = temp = self.guildbase.get(gid, cdict())
+				attrs = path.split(".")
+				last = attrs.pop(-1)
+				for k in attrs:
+					temp = temp.setdefault(k, cdict())
+				value = temp.pop(last, None)
+				if not orig:
+					self.guildbase.pop(gid, None)
+				else:
+					self.guildbase[gid] = orig
+				return value
+			return self.guildbase.pop(gid)
 
 	def command_options(self, command):
 		accepts_attachments = False
