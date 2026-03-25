@@ -3239,13 +3239,6 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			self.autoclear()
 		return v
 
-	def get(self, k, default=None):
-		try:
-			return self[k]
-		except KeyError:
-			pass
-		return default
-
 	def __setitem__(self, k, v, read=False):
 		if isinstance(v, memoryview):
 			v = bytes(v)
@@ -3274,6 +3267,13 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 	def sync(self):
 		self.update(self._unsafe_mut)
 		self._unsafe_mut.clear()
+
+	def get(self, k, default=None):
+		try:
+			return self[k]
+		except KeyError:
+			pass
+		return default
 
 	def update(self, other):
 		t = utc()

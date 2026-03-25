@@ -341,7 +341,7 @@ class EmojiList(Pagination, Command):
 		mode=cdict(
 			type="enum",
 			validation=cdict(
-				enum=("view", "add", "remove"),
+				enum=("view", "add", "search", "remove"),
 				accepts=dict(enable="add", disable="remove", create="add", delete="remove"),
 			),
 			description="Action to perform",
@@ -360,6 +360,7 @@ class EmojiList(Pagination, Command):
 		),
 	)
 	rate_limit = (4, 6)
+	slash = True
 
 	async def __call__(self, bot, _user, mode, name, emoji, **void):
 		curr = bot.get_userbase(_user.id, "emojilist", {})
@@ -368,6 +369,30 @@ class EmojiList(Pagination, Command):
 			case "view":
 				# Set callback message for scrollable list
 				return await self.display(_user.id, 0)
+			case "search":
+				if emoji:
+					results = [(1., emoji.name, emoji.id)]
+				else:
+					results = []
+				if name:
+					emojilist = bot.get_userbase(_user.id, "emojilist", {})
+					results.extend(sorted(((string_similarity(name, k), k, v) for k, v in emojilist.items()), reverse=True))
+				curr = [r[1:] for r in results if r[0] >= 0.25]
+				if not curr:
+					str_lookup(results, name, key=lambda r: r[1])
+					raise
+				colour = await self.bot.get_colour(_user)
+				emb = discord.Embed(
+					colour=colour,
+				).set_author(**get_author(_user))
+				s = "s" if len(curr) != 1 else ""
+				emb.title = f'{len(curr)} result{s} for "{name or emoji.id}":'
+				emb.description = await self.akey(curr, 0, 16, _user.id)
+				emb.url = await bot.emoji_to_url(curr[0][1])
+				emb.set_thumbnail(url=emb.url)
+				return cdict(
+					embed=emb,
+				)
 			case "remove":
 				removed = []
 				if emote:
@@ -408,42 +433,50 @@ class EmojiList(Pagination, Command):
 				return ini_md(f"Successfully added emoji alias {sqr_md(name)}: {sqr_md(emote)} for {sqr_md(_user)}.")
 		raise NotImplementedError(mode)
 
-	async def display(self, uid, pos, diridx=-1):
+	async def akey(self, curr, pos, page, uid=None):
 		bot = self.bot
+		mapping = {}
+		futs = []
+		for k, v in curr[pos:pos + page]:
 
-		async def akey(curr, pos, page):
-			mapping = {}
-			futs = []
-			for k, v in sorted(curr, key=lambda n: full_prune(n[0]))[pos:pos + page]:
-
-				async def check_emoji(k, v):
+			async def check_emoji(k, v):
+				try:
 					try:
-						try:
-							e = bot.cache.emojis[v]
-							if not e.is_usable():
-								raise LookupError
-							me = " " + str(e)
-						except KeyError:
-							await bot.is_animated(v)
-							me = ""
-					except LookupError:
+						e = bot.cache.emojis[v]
+						if not e.is_usable():
+							raise LookupError
+						me = " " + str(e)
+					except KeyError:
+						await bot.is_animated(v)
+						me = ""
+					except AttributeError:
+						await bot.is_animated(v)
+						me = ""
+				except LookupError:
+					if uid:
 						curr = bot.get_userbase(uid, "emojilist", {})
 						curr.pop(k)
 						bot.set_userbase(uid, "emojilist", curr)
-						return
-					return f"({v})` {me}"
+					return
+				return f"({v})` {me}"
 
-				fut = csubmit(check_emoji(k, v))
-				fut.k = k
-				futs.append(fut)
-			for fut in futs:
-				info = await fut
-				if not info:
-					continue
-				mapping[f":{fut.k}:"] = info
-			return iter2str({k + " " * (32 - len(k)): v for k, v in mapping.items()}, left="`", right="").strip()
+			fut = csubmit(check_emoji(k, v))
+			fut.k = k
+			futs.append(fut)
+		for fut in futs:
+			info = await fut
+			if not info:
+				continue
+			mapping[f":{fut.k}:" if fut.k else "?"] = info
+		return iter2str({k + " " * (32 - len(k)): v for k, v in mapping.items()}, left="`", right="").strip()
 
-		return await self.default_display("proxy emoji", uid, pos, bot.get_userbase(uid, "emojilist", {}).items(), diridx, akey=akey)
+	async def display(self, uid, pos, diridx=-1):
+		bot = self.bot
+		return await self.default_display(
+			"proxy emoji", uid, pos, 
+			sorted(bot.get_userbase(uid, "emojilist", {}).items(), key=lambda n: full_prune(n[0])),
+			diridx, akey=lambda curr, pos, page: self.akey(curr, pos, page, uid),
+		)
 
 	async def _callback_(self, _user, index, data, **void):
 		pos, _ = decode_leb128(data)

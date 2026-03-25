@@ -1386,6 +1386,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def fetch_emoji(self, e_id, guild=None, allow_external=True):
 		"Fetches an emoji from ID and guild, using the bot cache when possible."
 		if not isinstance(e_id, int):
+			if is_url(e_id):
+				e_id = e_id.split("/emojis/", 1)[-1].split(".", 1)[0].split("?", 1)[0]
 			try:
 				e_id = int(e_id)
 			except (ValueError, TypeError):
