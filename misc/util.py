@@ -2878,7 +2878,12 @@ class FileHashDict(collections.abc.MutableMapping):
 				self.deleted.add(k)
 				raise KeyError(k)
 			d = self.decode(s)
-			value = select_and_loads(d)
+			try:
+				value = select_and_loads(d)
+			except Exception:
+				print_exc()
+				self.pop(k, None)
+				raise KeyError(k)
 			self.data[k] = value
 			if self.automut and not isinstance(value, collections.abc.Hashable):
 				self.modified.add(k)
@@ -4127,7 +4132,7 @@ def str_lookup(objs, query, key=None, fuzzy=0, compare=string_similarity):
 		return closest[1]
 	err = f'No results for "{query}".'
 	if closest[0] > -inf:
-		err += f' Did you mean: "{closest[2]}"?'
+		err += f' Did you mean: {json.dumps(closest[2])}?'
 	raise LookupError(err)
 
 confusable_pairs = (
@@ -4643,11 +4648,19 @@ class EvalPipe:
 	def connect(cls, args, port, address="127.0.0.1", independent=True, glob=globals(), timeout=60):
 		addr = (address, port)
 		print(f"{DynamicDT.now()}: EvalPipe connecting to", addr)
+		server = None
+		try:
+			server = multiprocessing.connection.Listener(addr, authkey=cls.key)
+		except (OSError, PermissionError):
+			pass
+		else:
+			server.close()
 		try:
 			conn = multiprocessing.connection.Client(addr, authkey=cls.key)
 		except ConnectionRefusedError:
+			if not server:
+				raise
 			if independent:
-				script = None
 				if os.name == "nt":
 					argstr = " ".join(map(json_dumpstr, args)) + "\nexit /b"
 					script = temporary_file("bat")

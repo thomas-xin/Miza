@@ -77,6 +77,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	raw_webserver = AUTH.get("raw_webserver") or "https://api.mizabot.xyz"
 	notfound = "https://mizabot.xyz/notfound.png"
 	heartbeat_file = "heartbeat.tmp"
+	heartbeat_ack = "heartbeat_ack.tmp"
 	restart = "restart.tmp"
 	shutdown = "shutdown.tmp"
 	activity = 0
@@ -917,6 +918,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							s = data["username"] + "#" + data["discriminator"]
 						else:
 							s = data["username"]
+					data.setdefault("discriminator", 0)
 					self.cache.usernames[s] = users[u_id] = self._state.store_user(data)
 					return
 			csubmit(self.auser2cache(u_id))
@@ -938,7 +940,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		with suppress(KeyError):
 			return self.cache.users[u_id]
 		if u_id == self.deleted_user:
-			data = dict(username="Deleted User", discriminator=0, id=u_id, system=True, bot=True)
+			data = dict(username="Deleted User", discriminator=0, id=u_id, system=True, bot=True, avatar=self.discord_icon)
 			user = discord.User(data=data, state=self._state)
 		else:
 			try:
@@ -1312,6 +1314,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					m = None
 		if m:
 			return m
+		if old:
+			raise LookupError(m_id)
 		return await self._fetch_message(m_id, channel, fast=fast)
 
 	async def fetch_reference(self, message):
@@ -2253,12 +2257,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			target="auto",
 		),
 		1: cdict(
-			instructive="kimi-k2.5",
-			casual="gemini-3-flash",
+			instructive=None,
+			casual=None,
 			nsfw="grok-4.1-fast",
 			backup="gpt-5.4-mini",
 			retry="claude-haiku-4.5",
-			function="grok-4.1-fast",
+			function=None,
 			vision="kimi-k2.5",
 			target="auto",
 		),
@@ -4099,8 +4103,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			for i, e in tuple(v.items()):
 				if t - e.get("time", 0) > 30:
 					v.pop(i)
-		if ai.summarisation_model:
-			ai.summarisation_model.disabled = np.mean([cpu["usage"] for cpu in miza.status_data.system.cpu.values()]) >= 0.75
+		if ai.large_model:
+			if ai.large_model.model:
+				pass
+				# cpu_usage = np.mean([cpu["usage"] for cpu in miza.status_data.system.cpu.values()])
+				# ai.large_model.disabled = cpu_usage >= 0.8 or not ai.large_model.sem.active and cpu_usage >= 0.3
+			else:
+				ai.large_model.disabled = True
 		self.status_data.update({
 			"discord": {
 				"Shard count": self.shard_count + bool(self.audio),
@@ -6201,6 +6210,28 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			sent = True
 		return sent
 
+	async def send_multi_image_embeds(self, channel, images, colour=None, title=None, description=None, author=None, reference=None):
+		assert images, "Cannot send a multi-image embed with no image!"
+		i = 0
+		embed = discord.Embed(colour=colour, title=title, url=f"{self.webserver}?{i}", description=description)
+		if author:
+			embed.set_author(**author)
+		embed.set_image(url=images.pop(0))
+		embeds = [embed]
+		for im in images:
+			embed = discord.Embed(colour=colour, url=f"{self.webserver}?{i}").set_image(url=im)
+			embeds.append(embed)
+			if len(embeds) % 4 == 0:
+				i += 1
+		while embeds:
+			if len(embeds) <= 10:
+				await channel.send(embeds=embeds, reference=reference)
+				break
+			await channel.send(embeds=embeds[:8], reference=reference)
+			embeds = embeds[8:]
+			reference = None
+		return
+
 	def fast_loop(self):
 		"The fast update loop that runs twice per second. Used for events where timing is important."
 		while not self.closed:
@@ -6238,7 +6269,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if it not in cur:
 			cur[it] = copy.deepcopy(data)
 			uptimes[itd] = cur
-		for i in tuple(uptimes):
+		for i in sorted(uptimes):
 			if it // 86400 >= i + 7:
 				uptimes.pop(i)
 				continue
@@ -6355,10 +6386,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						await asubmit(self.update, priority=True)
 
 	async def heartbeat(self):
-		await asyncio.sleep(0.5)
+		await asyncio.sleep(8)
 		if self.closed:
 			return
-		await asubmit(pathlib.Path.touch, self.heartbeat_file)
+		if os.path.exists(self.heartbeat_file):
+			os.replace(self.heartbeat_file, self.heartbeat_ack)
 
 	def heartbeat_loop(self):
 		"Heartbeat loop: Repeatedly renames a file to inform the watchdog process that the bot's event loop is still running."
@@ -7541,11 +7573,25 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.initialisation_complete = True
 		print("Initialisation complete.")
 
-	async def flatten_into_cache(self, history):
+	flatten_sems = {}
+	async def flatten_into_cache(self, history, bucket):
+		try:
+			sem = self.flatten_sems[bucket]
+		except KeyError:
+			sem = self.flatten_sems[bucket] = Semaphore(1, 4, rate_limit=5)
 		data = {}
-		async for m in history:
-			data[m.id] = m
-		esubmit(self.cache.messages.update, data)
+		with tracebacksuppressor(SemaphoreOverflowError):
+			async with sem:
+				for att in itertools.count(1):
+					try:
+						async for m in history:
+							data[m.id] = m
+					except discord.HTTPException as ex:
+						print(repr(ex))
+						await asyncio.sleep(random.random() * 2 ** att)
+					else:
+						break
+			esubmit(self.cache.messages.update, data)
 		return data
 
 	def set_guilds(self):
@@ -8024,7 +8070,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				try:
 					before = await self.fetch_message(m_id, old=True)
-				except LookupError:
+				except (AttributeError, LookupError, discord.NotFound):
 					# If message was not in cache, create a ghost message object to represent old message.
 					c_id = data.get("channel_id")
 					if not c_id:
@@ -8165,7 +8211,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					message.author = await self.fetch_user(self.deleted_user)
 					message.author.name = "Unknown User"
 					history = discord.abc.Messageable.history(channel, limit=101, around=message)
-					csubmit(self.flatten_into_cache(history))
+					csubmit(self.flatten_into_cache(history, getattr_chain(channel, "guild.id", channel.id)))
 			try:
 				message.deleted = True
 			except AttributeError:

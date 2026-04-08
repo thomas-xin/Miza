@@ -546,6 +546,14 @@ class SkyShardReminder(Command):
 				return fix_md("Successfully subscribed to all Shards.")
 
 
+sky_shard_memories = {
+	0: "Jellyfish",
+	1: "Crab",
+	2: "Manta",
+	3: "Krill",
+	4: "Whale",
+	5: "Elder",
+}
 class UpdateSkyShardReminders(Database):
 	name = "skyshardreminders"
 
@@ -637,8 +645,31 @@ class UpdateSkyShardReminders(Database):
 						continue
 				else:
 					continue
+			dailies_map = None
+			override_reason = None
+			memory = None
+			try:
+				shardfig = await Request.aio("https://sky-shardfig.plutoy.top/all.json", json=True)
+				assert type(shardfig) is dict
+				dailies_map = shardfig.get("dailiesMap")
+			except Exception as ex:
+				print("SkyShard API Error:", repr(ex))
+			if dailies_map:
+				date = s.date
+				day_map = dailies_map.get(str(date.date()))
+				if day_map:
+					memory = day_map.get("memory")
+					if memory is not None:
+						memory = sky_shard_memories.get(memory, memory)
+					override = day_map.get("override")
+					if override:
+						s = shard.get_shard_info(date, override=override)
+						override_reason = day_map.get("overrideReason")
+						print("SkyShard Overridden:", override, override_reason)
 			print("SkyShard:", occurrence_number, s)
 			embed = discord.Embed().set_image(url=f"https://github.com/PlutoyDev/sky-shards/raw/refs/heads/production/public/infographics/data_gale/{s.map}.webp").set_thumbnail(url=f"https://github.com/PlutoyDev/sky-shards/raw/refs/heads/production/public/infographics/map_clement/{s.map}.webp")
+			if override_reason:
+				embed.description = ansi_md(colourise(str(override_reason).lstrip("! "), fg="r"))
 			url = f"https://sky-shards.pages.dev/en/{s.date.year}/{'%02d' % s.date.month}/{'%02d' % s.date.day}"
 			if s.is_red:
 				shard_bits = 2
@@ -663,6 +694,8 @@ class UpdateSkyShardReminders(Database):
 			embed.add_field(name="Status", value=f"**{timing}**", inline=True)
 			embed.add_field(name="Location", value=location, inline=True)
 			embed.add_field(name="Reward", value=reward, inline=True)
+			if memory:
+				embed.add_field(name="Memory", value=str(memory), inline=True)
 			embed.add_field(name="Landings", value=landings, inline=False)
 
 			async def notify_user(k, v):

@@ -1440,50 +1440,52 @@ if COMPUTE_LOAD:
 		print("Compute pool order:", COMPUTE_ORDER)
 
 async def start_proc(n, di=(), caps="image", it=0, wait=False, timeout=None):
-	if hasattr(n, "caps"):
-		n, di, caps, it = n.n, n.di, n.caps, it + 1
-	if n in PROCS:
-		proc = PROCS[n]
-		if is_strict_running(proc):
-			it = max(it, proc.it + 1)
-			proc.pipe.kill()
-		elif PROCS[n] is False:
-			return
+	with tracebacksuppressor:
+		if hasattr(n, "caps"):
+			n, di, caps, it = n.n, n.di, n.caps, it + 1
+		if n in PROCS:
+			proc = PROCS[n]
+			if is_strict_running(proc):
+				it = max(it, proc.it + 1)
+				proc.pipe.kill()
+			elif PROCS[n] is False:
+				return
+			for c in caps:
+				PROCS_BY_CAPS[c].remove(proc)
+			PROCS[n] = False
+		port = await asubmit(get_free_port)
+		args = proc_args
 		for c in caps:
-			PROCS_BY_CAPS[c].remove(proc)
-		PROCS[n] = False
-	port = await asubmit(get_free_port)
-	args = proc_args
-	for c in caps:
-		args = AUTH.get("cap_versions", {}).get(c) or args
-	args = list(args)
-	args.append(str(port))
-	args.append(",".join(map(str, di)))
-	args.append(",".join(caps))
-	args.append(json_dumps(COMPUTE_LOAD).decode("ascii"))
-	properties = [torch.cuda.get_device_properties(i) for i in range(DC)]
-	args.append(json_dumps([(p.major, p.minor) for p in properties]).decode("ascii"))
-	args.append(json_dumps(COMPUTE_ORDER).decode("ascii"))
-	args.append(str(it))
-	pipe = await asubmit(
-		EvalPipe.connect,
-		args,
-		port,
-		glob=globals(),
-		independent=False,
-	)
-	proc = pipe.proc
-	proc.n = n
-	proc.di = di
-	proc.caps = caps
-	proc.it = it
-	# proc.is_running = lambda: not proc.returncode
-	proc.sem = Semaphore(8, inf)
-	PROCS[n] = proc
-	proc.pipe = pipe
-	for c in caps:
-		PROCS_BY_CAPS.setdefault(c, []).append(proc)
-	return proc
+			args = AUTH.get("cap_versions", {}).get(c) or args
+		args = list(args)
+		args.append(str(port))
+		args.append(",".join(map(str, di)))
+		args.append(",".join(caps))
+		args.append(json_dumps(COMPUTE_LOAD).decode("ascii"))
+		properties = [torch.cuda.get_device_properties(i) for i in range(DC)]
+		args.append(json_dumps([(p.major, p.minor) for p in properties]).decode("ascii"))
+		args.append(json_dumps(COMPUTE_ORDER).decode("ascii"))
+		args.append(str(it))
+		pipe = await asubmit(
+			EvalPipe.connect,
+			args,
+			port,
+			glob=globals(),
+			independent=False,
+			timeout=30,
+		)
+		proc = pipe.proc
+		proc.n = n
+		proc.di = di
+		proc.caps = caps
+		proc.it = it
+		# proc.is_running = lambda: not proc.returncode
+		proc.sem = Semaphore(8, inf)
+		PROCS[n] = proc
+		proc.pipe = pipe
+		for c in caps:
+			PROCS_BY_CAPS.setdefault(c, []).append(proc)
+		return proc
 
 async def restart_workers():
 	futs = []

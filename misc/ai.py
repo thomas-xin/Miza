@@ -322,6 +322,7 @@ class ExtendedOpenAI(openai.AsyncOpenAI):
 		self.pricing = (0, 0)
 		self.refresh = 0
 		self.disabled = False
+		self.sem = Semaphore(16, 256)
 		super().__init__(*args, **kwargs)
 
 def find_model(oai):
@@ -329,49 +330,49 @@ def find_model(oai):
 	model = oai.models.list().data[0].id
 	return model
 
-summarisation_model = None
-def load_summarisation_model():
-	global summarisation_model
-	info = AUTH.get("summarisation_model")
-	if not info or getattr(summarisation_model, "refresh", 0) > utc():
-		return summarisation_model
+large_model = None
+def load_large_model():
+	global large_model
+	info = AUTH.get("large_model")
+	if not info or getattr(large_model, "refresh", 0) > utc():
+		return large_model
 	api_key = info.get("api_key", "x")
 	base_url = info.get("base_url", "x")
 	pricing = info.get("pricing", [0, 0])
-	summarisation_model = ExtendedOpenAI(api_key=api_key, base_url=base_url)
+	large_model = ExtendedOpenAI(api_key=api_key, base_url=base_url)
+	large_model.refresh = utc() + 3600
 	try:
-		model = find_model(summarisation_model)
+		model = find_model(large_model)
 	except Exception:
-		return summarisation_model
-	print(f"Loaded summarisation model API {base_url} with model {model}.")
-	summarisation_model.model = model
-	summarisation_model.pricing = tuple(pricing)
-	summarisation_model.refresh = utc() + 720
-	return summarisation_model
+		return large_model
+	print(f"Loaded large model API {base_url} with model {model}.")
+	large_model.model = model
+	large_model.pricing = tuple(pricing)
+	return large_model
 
-translation_model = None
-def load_translation_model():
-	global translation_model
-	info = AUTH.get("translation_model")
-	if not info or getattr(translation_model, "refresh", 0) > utc():
-		return translation_model
+small_model = None
+def load_small_model():
+	global small_model
+	info = AUTH.get("small_model")
+	if not info or getattr(small_model, "refresh", 0) > utc():
+		return small_model
 	api_key = info.get("api_key", "x")
 	base_url = info.get("base_url", "x")
+	small_model = ExtendedOpenAI(api_key=api_key, base_url=base_url)
+	small_model.refresh = utc() + 3600
 	try:
 		oai = openai.OpenAI(api_key=api_key, base_url=base_url)
 		model = oai.models.list().data[0].id
 		pricing = info.get("pricing", [0, 0])
 	except Exception:
-		return translation_model
-	translation_model = ExtendedOpenAI(api_key=api_key, base_url=base_url)
-	print(f"Loaded translation model API {base_url} with model {model}.")
-	translation_model.model = model
-	translation_model.pricing = tuple(pricing)
-	translation_model.refresh = utc() + 720
-	return translation_model
+		return small_model
+	print(f"Loaded small model API {base_url} with model {model}.")
+	small_model.model = model
+	small_model.pricing = tuple(pricing)
+	return small_model
 
 def model_name(model_id):
-	return model_id and model_id.rsplit("/", 1)[-1].replace("-preview", "")
+	return model_id and model_id.rsplit("/", 1)[-1].replace("-preview", "").replace("-customtools", "")
 
 openai_refresh = 0
 async def load_openrouter():
@@ -381,7 +382,7 @@ async def load_openrouter():
 	async def get_openrouter_models():
 		oai = get_oai(None, "openrouter")
 		models = await flatten(oai.models.list())
-		models.sort(key=lambda model: "-preview" not in model.id)
+		models.sort(key=lambda model: ("-preview" not in model.id, "-customtools" in model.id))
 		return models
 
 	models = await CACHE.aretrieve("openrouter-models", get_openrouter_models, _force=True)
@@ -416,7 +417,7 @@ async def load_openrouter():
 	globals()["openai_refresh"] = utc() + 86400
 
 with tracebacksuppressor:
-	fut = esubmit(load_summarisation_model)
+	fut = esubmit(load_large_model)
 	asyncio.run(load_openrouter())
 	fut.result()
 
@@ -475,7 +476,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 	kwa = kwargs
 	for i, (api, minfo) in enumerate(tries + tries):
 		if api is None and minfo is None:
-			api = await asubmit(load_summarisation_model)
+			api = await asubmit(load_large_model)
 		if api is None:
 			if not allow_alt:
 				break
@@ -486,8 +487,10 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 			sapi = as_str(api.base_url)
 		else:
 			sapi = api
-		if minfo is None and api is summarisation_model:
-			model, pricing = orig_model, tuple(summarisation_model.pricing)
+		sem = emptyctx
+		if minfo is None and api is large_model:
+			model, pricing = orig_model, tuple(large_model.pricing)
+			sem = large_model.sem
 		elif minfo is None:
 			if not allow_alt:
 				break
@@ -498,7 +501,6 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 		if (sapi, model) in api_blocked:
 			exc = api_blocked[(sapi, model)]
 			continue
-		sem = emptyctx
 		kwa = kwargs.copy()
 		body = cdict(kwargs.get("extra_body") or {})
 		if model_name(orig_model) in is_reasoning or minfo is None:
@@ -648,8 +650,11 @@ async def _instruct(data, user=None, prune=True):
 	inputs.update(data)
 	model = inputs.get("model")
 	if not model:
-		if await asubmit(load_summarisation_model) and not summarisation_model.disabled:
-			api = summarisation_model
+		if await asubmit(load_large_model) and not large_model.disabled:
+			api = large_model
+			model = api.model
+		elif await asubmit(load_small_model):
+			api = small_model
 			model = api.model
 		else:
 			api = None
@@ -686,7 +691,7 @@ async def _instruct(data, user=None, prune=True):
 f_browse = {
 	"type": "function", "function": {
 		"name": "browse",
-		"description": "Searches internet browser, or visits given website URL. Use for knowledge or advice to validate facts and up-to-date information. Note: Avoid using for media links from the user, as they will be loaded automatically by `directly_answer`",
+		"description": "Searches internet browser, or visits given website URL. Use to validate facts and up-to-date information. Note: Avoid using for media links from the user, as they will be loaded automatically by `directly_answer`",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {
@@ -699,7 +704,7 @@ f_browse = {
 f_wolfram_alpha = {
 	"type": "function", "function": {
 		"name": "wolfram_alpha",
-		"description": "Queries the Wolfram Alpha engine.",
+		"description": "Queries the Wolfram Alpha engine for mathematical solutions.",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {

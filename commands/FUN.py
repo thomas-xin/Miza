@@ -32,13 +32,6 @@ try:
 except KeyError:
 	alexflipnote_key = None
 	print("WARNING: alexflipnote_key not found. Unable to use API to generate images.")
-try:
-	giphy_key = AUTH["giphy_key"]
-	if not giphy_key:
-		raise
-except KeyError:
-	giphy_key = None
-	print("WARNING: giphy_key not found. Unable to use API to search images.")
 
 
 class GameOverError(OverflowError):
@@ -2760,119 +2753,83 @@ class Inspiro(ImagePool, Command):
 		return await Request.aio("https://inspirobot.me/api?generate=true", decode=True)
 
 
-class ImageSearch(ImagePool, Command):
-	name = ["🖼", "🧁", "ImgSearch", "Muffin", "Muffins"]
-	description = "Pulls a random image from a search on gettyimages.co.uk and unsplash.com, using tags."
-	example = ("imgsearch cat", "muffin")
-	threshold = 9
-	sem = Semaphore(5, 256, rate_limit=1)
-	rate_limit = (2, 4)
+class GIFSearch(Command):
+	name = ["Giphy", "Tenor", "Klipy", "GS"]
+	description = "Searches for animations on giphy, tenor and klipy."
+	schema = cdict(
+		query=cdict(
+			type="string",
+			description="Search query",
+			example="cute cats",
+			required=True,
+		),
+		count=cdict(
+			type="integer",
+			validation="[1, 100]",
+			description="Amount of results to display, split between 50% klipy, 25% tenor and 25% giphy",
+			default=16,
+		),
+	)
+	rate_limit = (4, 12)
+	cache = AutoCache(f"{CACHE_PATH}/gifs", stale=43200, timeout=86400 * 7)
+	slash = True
 
-	def img(self, tag=None, search_tag=None):
-		file = f"imgsearch~{tag}"
+	async def search_giphy(self, query):
+		if not (giphy_key := AUTH.get("giphy_key")):
+			print("WARNING: giphy_key not found. Unable to use API to search images.")
+			return []
+		resp = await Request.aio(f"https://api.giphy.com/v1/gifs/search?offset=0&type=gifs&sort=&explore=true&api_key={giphy_key}&q={query}", json=True)
+		assert isinstance(resp, dict)
+		return (resp.get("data") and list({entry["images"]["source"]["url"] for entry in resp["data"]})) or []
 
-		async def fetch(tag, search_tag):
-			if xrand(3):
-				s = await Request.aio(f"https://www.gettyimages.co.uk/photos/{tag}?page={random.randint(1, 100)}", decode=True)
-				url = "https://media.gettyimages.com/photos/"
-				spl = s.split(url)[1:]
-				imageset = {url + i.split('"', 1)[0].split("?", 1)[0] for i in spl}
+	async def search_tenor(self, query):
+		resp = await Request.aio(f"https://tenor.com/search/{query}", decode=True)
+		assert isinstance(resp, str)
+		spl = resp.split("UniversalGifListItem")
+		if len(spl) <= 1:
+			return []
+		results = []
+		spl.pop(0)
+		for result in spl:
+			a = result.split('<img src="', 1)[-1].split('"', 1)[0]
+			if not a.startswith("https://"):
+				a = "https://tenor.com/" + a.lstrip("/")
+			results.append(a)
+		return results
+
+	async def search_klipy(self, query, cid=0):
+		if not (klipy_key := AUTH.get("klipy_key")):
+			print
+			return []
+		resp = await Request.aio(f"https://api.klipy.com/api/v1/{klipy_key}/gifs/search?page=1&per_page=50&q={query}&customer_id={cid}&content_filter=off&format_filter=webp", json=True)
+		assert isinstance(resp, dict)
+		return (resp.get("data", {}).get("data") and list({entry["file"]["hd"]["webp"]["url"] for entry in resp["data"]["data"]})) or []
+
+	async def search_suggestions(self, query):
+		if not (klipy_key := AUTH.get("klipy_key")):
+			print("WARNING: giphy_key not found. Unable to use API to find related search.")
+			return
+		resp = await Request.aio(f"https://api.klipy.com/api/v1/{klipy_key}/search-suggestions/{query}?limit=1", json=True)
+		assert isinstance(resp, dict)
+		return (resp and resp.get("data") and resp["data"][0] or None)
+
+	async def __call__(self, bot, _channel, _message, _user, query, count, **void):
+		q = quote_plus(query)
+		giphy_results = await self.cache.aretrieve(f"giphy-{q}", self.search_giphy, q)
+		tenor_results = await self.cache.aretrieve(f"tenor-{q}", self.search_tenor, q)
+		klipy_results = await self.cache.aretrieve(f"klipy-{q}", self.search_klipy, q, hash(str(_user)))
+		c1 = ceil(count * 0.5)
+		c2 = ceil(count * 0.25)
+		results = klipy_results[:c1] + tenor_results[:c2] + giphy_results[:c2] + klipy_results[c1:] + tenor_results[c2:] + giphy_results[c2:]
+		results = results[:count]
+		if not results:
+			alt = await self.cache.aretrieve(f"suggestions-{q}", self.search_suggestions, q)
+			if alt:
+				dym = f' Did you mean: {json.dumps(alt)}?'
 			else:
-				d = await Request.aio(f"https://unsplash.com/napi/search/photos?query={tag}&per_page=30&page={random.randint(1, 19)}", json=True)
-				imageset = {result["urls"]["raw"] for result in d["results"]}
-			return imageset
-
-		async def fetchall(tag, search_tag):
-			await asyncio.sleep(1)
-			images = set()
-			for i in range(1, 100):
-				async with self.sem:
-					if xrand(3):
-						s = await Request.aio(f"https://www.gettyimages.co.uk/photos/{tag}?page={i}", decode=True)
-						url = "https://media.gettyimages.com/photos/"
-						spl = s.split(url)[1:]
-						imageset = [url + i.split('"', 1)[0].split("?", 1)[0] for i in spl]
-					else:
-						d = await Request.aio(f"https://unsplash.com/napi/search/photos?query={tag}&per_page=30&page={i}", json=True)
-						imageset = [result["urls"]["raw"] for result in d["results"]]
-				images.update(imageset)
-				if len(imageset) < 25:
-					break
-			data = set_dict(self.bot.data.imagepools, file, alist())
-			for url in images:
-				if url not in data:
-					data.add(url)
-			return images
-
-		if file not in self.bot.data.imagepools.finished:
-			csubmit(fetchall(tag, search_tag))
-		return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(tag, search_tag))
-	
-	async def __call__(self, bot, channel, flags, args, name, **void):
-		if not args:
-			if name == "muffin":
-				args = ["muffin"]
-			else:
-				raise ArgumentError("Input string is empty.")
-		args2 = ["".join(c for c in full_prune(w) if c.isalnum()) for w in args]
-		tag = "%20".join(sorted(args2))
-		search_tag = "%20".join(args2)
-		url = await self.img(tag, search_tag)
-		if "v" in flags:
-			return escape_roles(url)
-		self.bot.send_as_embeds(channel, image=url)
-
-
-class Giphy(ImagePool, Command):
-	name = ["GIFSearch"]
-	description = "Pulls a random image from a search on giphy.com using tags."
-	example = ("giphy cat",)
-	threshold = 4
-	sem = Semaphore(5, 256, rate_limit=1)
-	rate_limit = (2, 4)
-
-	def img(self, tag=None, search_tag=None):
-		file = f"giphy~{tag}"
-
-		async def fetch(tag, search_tag):
-			resp = await Request.aio(f"https://api.giphy.com/v1/gifs/search?offset=0&type=gifs&sort=&explore=true&api_key={giphy_key}&q={search_tag}", json=True)
-			images = {entry["images"]["source"]["url"].split("?", 1)[0] for entry in resp["data"]}
-			return images
-
-		async def fetchall(tag, search_tag):
-			await asyncio.sleep(1)
-			images = set()
-			for i in range(1, 100):
-				async with self.sem:
-					resp = await Request.aio(f"https://api.giphy.com/v1/gifs/search?offset={i * 25}&type=gifs&sort=&explore=true&api_key={giphy_key}&q={search_tag}", json=True)
-				data = resp["data"]
-				if not data:
-					break
-				for entry in data:
-					url = entry["images"]["source"]["url"].split("?", 1)[0]
-					images.add(url)
-				if len(data) < 25:
-					break
-			data = set_dict(self.bot.data.imagepools, file, alist())
-			for url in images:
-				if url not in data:
-					data.add(url)
-			return images
-
-		if file not in self.bot.data.imagepools.finished:
-			csubmit(fetchall(tag, search_tag))
-		return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(tag, search_tag))
-	
-	async def __call__(self, bot, channel, flags, args, **void):
-		if not args:
-			raise ArgumentError("Input string is empty.")
-		args2 = ["".join(c for c in full_prune(w) if c.isalnum()) for w in args]
-		tag = "%20".join(sorted(args2))
-		search_tag = "%20".join(args2)
-		url = await self.img(tag, search_tag)
-		if "v" in flags:
-			return escape_roles(url)
-		self.bot.send_as_embeds(channel, image=url)
+				dym = None
+			raise LookupError(f'No results for {json.dumps(query)}.{dym}')
+		return await bot.send_multi_image_embeds(_channel, images=results, reference=_message)
 
 
 class Rickroll(Command):

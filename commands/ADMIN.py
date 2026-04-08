@@ -2586,6 +2586,8 @@ class UpdateMessageLogs(Database):
 			m2 = await channel.send(msg, embed=emb, files=files)
 		message.attachments = [cdict(name=a.filename, id=a.id, url=attachment_cache.preserve(a.url, m2.id)) for a in m2.attachments]
 
+	raw_delete_sems = {}
+	last_inits = {}
 	# Delete events must attempt to find the user who deleted the message
 	async def _raw_delete_(self, message, bulk=False, **void):
 		cu_id = self.bot.id
@@ -2622,10 +2624,16 @@ class UpdateMessageLogs(Database):
 				# Attempt to find who deleted the message
 				if not guild.get_member(cu_id).guild_permissions.view_audit_log:
 					raise PermissionError
-				al = await flatten(guild.audit_logs(
-					limit=50,
-					action=action,
-				))
+				bucket = guild.id
+				try:
+					sem = self.raw_delete_sems[bucket]
+				except KeyError:
+					sem = self.raw_delete_sems[bucket] = Semaphore(2, 4, rate_limit=5)
+				async with sem:
+					al = await flatten(guild.audit_logs(
+						limit=50,
+						action=action,
+					))
 				al2 = self.bot.deletes.get(guild.id, [])
 				amap = {a.id: a for a in al2}
 				for e in reversed(al):
@@ -2641,7 +2649,10 @@ class UpdateMessageLogs(Database):
 				alid = sorted(amap.keys())
 				al3 = deque(map(amap.__getitem__, alid), maxlen=256)
 				self.bot.deletes[guild.id] = al3
-		except (PermissionError, discord.Forbidden, discord.HTTPException):
+				self.last_inits[channel.id] = init
+		except (SemaphoreOverflowError, discord.HTTPException):
+			init = self.last_inits.get(channel.id) or "[UNKNOWN USER]"
+		except (PermissionError, discord.Forbidden):
 			init = "[UNKNOWN USER]"
 		emb = await self.bot.as_embed(message, link=True)
 		emb.colour = discord.Colour(0xFF0000)
@@ -3021,10 +3032,7 @@ class UpdateRolePreservers(Database):
 			return
 		if not guild.me.guild_permissions.manage_roles:
 			return
-		if guild.id in self.bot.data.mutes and user.id in (x["u"] for x in self.bot.data.mutes[guild.id]):
-			return
 		roles = deque()
-		assigned = self.data[guild.id][user.id]
 		for r_id in assigned:
 			with tracebacksuppressor:
 				role = await self.bot.fetch_role(r_id, guild)

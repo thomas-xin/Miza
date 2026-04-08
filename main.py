@@ -24,6 +24,7 @@ AUTH = {
 	"rapidapi_secret": "",
 	"alexflipnote_key": "",
 	"giphy_key": "",
+	"klipy_key": "",
 	"huggingface_key": "",
 	"openai_key": "",
 	"openrouter_key": "",
@@ -146,14 +147,9 @@ def delete(f):
 sd = "shutdown.tmp"
 rs = "restart.tmp"
 hb = "heartbeat.tmp"
+hb_ack = "heartbeat_ack.tmp"
 
-hbp = pathlib.Path(hb)
-def check_hb(timeout=20):
-	if not hbp.exists():
-		return
-	mtime = hbp.stat().st_mtime
-	return (time.time() - mtime) < timeout
-
+hbp = pathlib.Path(hb_ack)
 delete(sd)
 
 
@@ -170,8 +166,11 @@ try:
 			alive = True
 			was_alive = True
 			if proc.is_running():
+				pathlib.Path(hb).touch()
 				print("\033[1;32;40mHeartbeat started\033[1;37;40m.")
 				while alive and proc.is_running():
+					if hbp.exists():
+						os.replace(hb_ack, hb)
 					print(
 						"\033[1;36;40m Heartbeat at "
 						+ str(datetime.datetime.now())
@@ -185,7 +184,7 @@ try:
 								alive = False
 								print("\033[1;31;40mSignal received! Exiting...\033[1;37;40m")
 								break
-					if alive and not check_hb():
+					if alive and not hbp.exists():
 						print("\033[1;31;40mHeartbeat missed! Exiting...\033[1;37;40m")
 						break
 				was_alive = proc.is_running()

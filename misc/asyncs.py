@@ -690,7 +690,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 							time.sleep(remaining)
 							continue
 						if len(self.rate_bin) >= self.limit:
-							time.sleep(0.005)
+							time.sleep(max(self.rate_limit / 5, 0.05))
 							continue
 					with self.cond:
 						self.cond.wait()
@@ -743,7 +743,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 							await asyncio.sleep(remaining)
 							continue
 						if len(self.rate_bin) >= self.limit:
-							await asyncio.sleep(0.005)
+							await asyncio.sleep(max(self.rate_limit / 5, 0.05))
 							continue
 					async with self.acond:
 						await self.acond.wait()

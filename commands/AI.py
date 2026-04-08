@@ -102,12 +102,12 @@ class Translate(Command):
 			return tr.text
 		async def llm_translate():
 			try:
-				translation_model = await asubmit(ai.load_translation_model)
+				small_model = await asubmit(ai.load_small_model)
 				cmpl = await ai.llm(
 					"chat.completions.create",
 					messages=messages,
-					model=translation_model.model,
-					api=translation_model,
+					model=small_model.model,
+					api=small_model,
 					max_completion_tokens=16384,
 					premium_context=premium,
 				)
@@ -144,7 +144,7 @@ class Translate(Command):
 					messages=messages,
 					temperature=0.01,
 					premium_context=premium,
-					max_completion_tokens=98304,
+					max_completion_tokens=32768,
 					reasoning_effort="medium",
 				),
 			)
@@ -997,8 +997,9 @@ class Instruct(Command):
 		kwargs["max_tokens"] = max_tokens
 		kwargs["reasoning_effort"] = reasoning_effort
 		if not model:
-			kwargs["api"] = await asubmit(ai.load_summarisation_model)
-			model = ai.summarisation_model.model
+			kwargs["api"] = large_model = await asubmit(ai.load_large_model)
+			if large_model.disabled:
+				kwargs["api"] = await asubmit(ai.load_small_model)
 		resp = await bot.force_completion(model=model, prompt=prompt, stream=True, timeout=1800, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, premium_context=_premium, allow_alt=True, **kwargs)
 		try:
 			_message.__dict__.setdefault("inits", []).append(resp)
