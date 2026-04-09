@@ -4103,13 +4103,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			for i, e in tuple(v.items()):
 				if t - e.get("time", 0) > 30:
 					v.pop(i)
-		if ai.large_model:
-			if ai.large_model.model:
-				pass
-				# cpu_usage = np.mean([cpu["usage"] for cpu in miza.status_data.system.cpu.values()])
-				# ai.large_model.disabled = cpu_usage >= 0.8 or not ai.large_model.sem.active and cpu_usage >= 0.3
-			else:
-				ai.large_model.disabled = True
 		self.status_data.update({
 			"discord": {
 				"Shard count": self.shard_count + bool(self.audio),
@@ -4429,7 +4422,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			await asyncio.sleep(0.2)
 		content = message.content
 		if not content and message.embeds:
-			footer = message.embeds[0].footer.text
+			footer = message.embeds[-1].footer.text
+			if not footer and len(message.embeds) >= 4:
+				footer = message.embeds[-4].footer.text
 			if footer and not footer[0].isascii():
 				content = footer
 			else:
@@ -4502,6 +4497,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							if not d:
 								csubmit(self.defer_interaction(message, mode="patch"))
 								await asyncio.sleep(self.eff_latency())
+						if resp.get("embed"):
+							resp["embed"] = resp["embed"].to_dict()
+						if resp.get("embeds"):
+							resp["embeds"] = [e.to_dict() for e in resp["embeds"]]
 						await interaction_patch(
 							bot=self,
 							message=message,

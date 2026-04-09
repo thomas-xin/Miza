@@ -2753,7 +2753,7 @@ class Inspiro(ImagePool, Command):
 		return await Request.aio("https://inspirobot.me/api?generate=true", decode=True)
 
 
-class GIFSearch(Command):
+class GIFSearch(Pagination, Command):
 	name = ["Giphy", "Tenor", "Klipy", "GS"]
 	description = "Searches for animations on giphy, tenor and klipy."
 	schema = cdict(
@@ -2765,9 +2765,9 @@ class GIFSearch(Command):
 		),
 		count=cdict(
 			type="integer",
-			validation="[1, 100]",
+			validation="[0, 100]",
 			description="Amount of results to display, split between 50% klipy, 25% tenor and 25% giphy",
-			default=16,
+			default=None,
 		),
 	)
 	rate_limit = (4, 12)
@@ -2778,9 +2778,9 @@ class GIFSearch(Command):
 		if not (giphy_key := AUTH.get("giphy_key")):
 			print("WARNING: giphy_key not found. Unable to use API to search images.")
 			return []
-		resp = await Request.aio(f"https://api.giphy.com/v1/gifs/search?offset=0&type=gifs&sort=&explore=true&api_key={giphy_key}&q={query}", json=True)
+		resp = await Request.aio(f"https://api.giphy.com/v1/gifs/search?offset=0&type=gifs&sort=&explore=true&api_key={giphy_key}&q={query}&limit=40", json=True)
 		assert isinstance(resp, dict)
-		return (resp.get("data") and list({entry["images"]["source"]["url"] for entry in resp["data"]})) or []
+		return (resp.get("data") and [entry["images"]["original"]["webp"] for entry in resp["data"]]) or []
 
 	async def search_tenor(self, query):
 		resp = await Request.aio(f"https://tenor.com/search/{query}", decode=True)
@@ -2803,7 +2803,7 @@ class GIFSearch(Command):
 			return []
 		resp = await Request.aio(f"https://api.klipy.com/api/v1/{klipy_key}/gifs/search?page=1&per_page=50&q={query}&customer_id={cid}&content_filter=off&format_filter=webp", json=True)
 		assert isinstance(resp, dict)
-		return (resp.get("data", {}).get("data") and list({entry["file"]["hd"]["webp"]["url"] for entry in resp["data"]["data"]})) or []
+		return (resp.get("data", {}).get("data") and [entry["file"]["hd"]["webp"]["url"] for entry in resp["data"]["data"]]) or []
 
 	async def search_suggestions(self, query):
 		if not (klipy_key := AUTH.get("klipy_key")):
@@ -2813,15 +2813,19 @@ class GIFSearch(Command):
 		assert isinstance(resp, dict)
 		return (resp and resp.get("data") and resp["data"][0] or None)
 
-	async def __call__(self, bot, _channel, _message, _user, query, count, **void):
+	async def aggregate_searches(self, query, count=100, cid=0):
 		q = quote_plus(query)
 		giphy_results = await self.cache.aretrieve(f"giphy-{q}", self.search_giphy, q)
 		tenor_results = await self.cache.aretrieve(f"tenor-{q}", self.search_tenor, q)
-		klipy_results = await self.cache.aretrieve(f"klipy-{q}", self.search_klipy, q, hash(str(_user)))
-		c1 = ceil(count * 0.5)
-		c2 = ceil(count * 0.25)
-		results = klipy_results[:c1] + tenor_results[:c2] + giphy_results[:c2] + klipy_results[c1:] + tenor_results[c2:] + giphy_results[c2:]
-		results = results[:count]
+		klipy_results = await self.cache.aretrieve(f"klipy-{q}", self.search_klipy, q, cid)
+		results = []
+		choices = [klipy_results, klipy_results, tenor_results, giphy_results]
+		for i in itertools.count(0):
+			curr = choices[i % len(choices)]
+			if curr:
+				results.append(curr.pop(0))
+			if len(results) >= count or not any(choices):
+				break
 		if not results:
 			alt = await self.cache.aretrieve(f"suggestions-{q}", self.search_suggestions, q)
 			if alt:
@@ -2829,7 +2833,23 @@ class GIFSearch(Command):
 			else:
 				dym = None
 			raise LookupError(f'No results for {json.dumps(query)}.{dym}')
-		return await bot.send_multi_image_embeds(_channel, images=results, reference=_message)
+		return results
+
+	async def display(self, uid, pos, query, diridx=-1):
+		results = await self.aggregate_searches(query, cid=abs(hash(uid)))
+		return await self.multi_display("search result", uid, pos, results, diridx, extra=as_bytes(query), page_size=8)
+
+	async def __call__(self, bot, _channel, _message, _user, query, count, **void):
+		if count:
+			results = await self.aggregate_searches(query, cid=abs(hash(str(_user))))
+			results = results[:count]
+			return await bot.send_multi_image_embeds(_channel, images=results, reference=_message)
+		return await self.display(_user.id, 0, query)
+
+	async def _callback_(self, _user, index, data, **void):
+		pos, more = decode_leb128(data)
+		query = as_str(more)
+		return await self.display(_user.id, pos, query, index)
 
 
 class Rickroll(Command):

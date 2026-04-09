@@ -2059,8 +2059,18 @@ class Pagination:
 	def construct(self, uid, data, content="", **kwargs):
 		if not content:
 			embed = kwargs.get("embed")
+			if not embed:
+				embeds = kwargs.get("embeds", ())
+				if embeds:
+					embed = embeds[-1]
+					if not embed.footer.text and len(embeds) >= 4 and embeds[-4].footer.text:
+						embed = embeds[-4]
 			if embed:
-				embed.description = self.encode(uid, data, embed.description or "")
+				footer = embed.footer.text
+				if footer:
+					embed.set_footer(text=self.encode(uid, data, footer))
+				else:
+					embed.description = self.encode(uid, data, embed.description or "")
 			else:
 				content = self.encode(uid, data, content)
 		else:
@@ -2094,11 +2104,39 @@ class Pagination:
 				emb.description = await akey(curr, pos, page)
 			else:
 				emb.description = key(curr, pos, page)
-		max_page = len(curr) // page + 1
-		if max_page > 1:
-			curr_page = min(max_page, ceil(pos / page)) + 1
-			emb.set_footer(text=f"Page {curr_page}/{max_page}")
+		max_page = ceil(len(curr) / page)
+		curr_page = min(max_page, ceil(pos / page)) + 1
+		emb.set_footer(text=f"Page {curr_page}/{max_page}")
 		return self.construct(uid, leb128(pos) + extra, embed=emb)
+
+	async def multi_display(self, name, uid, pos, curr, diridx=-1, extra=b"", page_size=8, plural=True):
+		bot = self.bot
+		user = await bot.fetch_user(uid)
+		page = page_size
+		pos = self.paginate(pos, len(curr), page, diridx)
+		colour = await self.bot.get_colour(user)
+		emb = discord.Embed(
+			colour=colour,
+		).set_author(**get_author(user))
+		embs = [emb]
+		s = "s" if plural and len(curr) != 1 else ""
+		if not curr:
+			emb.title = f"No {name}{s}."
+		else:
+			emb.url = "https://mizabot.xyz?0"
+			emb.title = f"{len(curr)} {name}{s}:"
+			items = curr[pos:pos + page]
+			if items:
+				emb.set_image(url=items.pop(0))
+				i = 0
+				for item in items:
+					embs.append(discord.Embed(colour=colour, url=f"https://mizabot.xyz?{i}").set_image(url=item))
+					if len(embs) & 3 == 0:
+						i += 1
+		max_page = ceil(len(curr) / page)
+		curr_page = min(max_page, ceil(pos / page)) + 1
+		embs[-4].set_footer(text=f"Page {curr_page}/{max_page}")
+		return self.construct(uid, leb128(pos) + extra, embeds=embs)
 
 	def paginate(self, pos, size, page, diridx=-1):
 		last = max(0, size - page)
