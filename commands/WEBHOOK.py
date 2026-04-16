@@ -36,7 +36,7 @@ class AutoEmoji(Pagination, Command):
 		return await self.display(_user.id, 0, _guild.id)
 
 	def react_perms(self, perm: int):
-		return False if perm < 2 else True
+		return None if perm < 2 else True
 
 	async def display(self, uid, pos, gid, diridx=-1):
 		bot = self.bot

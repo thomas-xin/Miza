@@ -1060,58 +1060,58 @@ class Barter(Command):
 # 		pass
 
 
-class UpdateOutbreaks(Command):
-	managed_limit = 32
-	pokemon_count = 0
-	single_sem = Semaphore(1, 0, rate_limit=60)
+# class UpdateOutbreaks(Command):
+# 	managed_limit = 32
+# 	pokemon_count = 0
+# 	single_sem = Semaphore(1, 0, rate_limit=60)
 
-	async def get_buffer(self, shiny=False):
-		curr = self.setdefault(None, [])
-		guilds, limits = self.bot.get_available_guild(animated=shiny, return_all=True)
-		if len(curr) + len(guilds) * 2 > self.managed_limit:
-			rems = len(curr) + len(guilds) * 2 - self.managed_limit
-			for i in range(rems):
-				eid = curr.pop(0)
-				emoji = self.bot.cache.emojis.get(eid)
-				if not emoji:
-					continue
-				with tracebacksuppressor:
-					await emoji.delete("Buffer expired")
-		futs = []
-		for guild, limit in zip(guilds, limits):
-			if not limit: continue
-			lim = min(2, limit)
-			for i in range(lim):
-				if not self.pokemon_count:
-					if self.single_sem.busy:
-						await self.single_sem.acquire()
-					else:
-						async with self.single_sem:
-							b = await attachment_cache.download("https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_by_National_Pok%C3%A9dex_number")
-							count = 0
-							while not count:
-								b, last = b.rsplit(b'<td rowspan="1" style="font-family:monospace,monospace">#', 1)
-								count = int(last.split(b'</td>', 1)[0])
-							self.pokemon_count = count
-				url = None
-				while not url:
-					pid = xrand(self.pokemon_count) + 1
-					if shiny:
-						u = f"https://archives.bulbagarden.net/wiki/File:HOME{pid}_s.png"
-						name = f"S-{pid}"
-					else:
-						u = f"https://archives.bulbagarden.net/wiki/File:HOME{pid}.png"
-						name = f"P-{pid}"
-					urls = await self.bot.follow_url(u)
-					if urls:
-						url = urls[0]
-				# futs.append(guild.create_custom_emoji(name=str(p), image=b))
+# 	async def get_buffer(self, shiny=False):
+# 		curr = self.setdefault(None, [])
+# 		guilds, limits = self.bot.get_available_guild(animated=shiny, return_all=True)
+# 		if len(curr) + len(guilds) * 2 > self.managed_limit:
+# 			rems = len(curr) + len(guilds) * 2 - self.managed_limit
+# 			for i in range(rems):
+# 				eid = curr.pop(0)
+# 				emoji = self.bot.cache.emojis.get(eid)
+# 				if not emoji:
+# 					continue
+# 				with tracebacksuppressor:
+# 					await emoji.delete("Buffer expired")
+# 		futs = []
+# 		for guild, limit in zip(guilds, limits):
+# 			if not limit: continue
+# 			lim = min(2, limit)
+# 			for i in range(lim):
+# 				if not self.pokemon_count:
+# 					if self.single_sem.busy:
+# 						await self.single_sem.acquire()
+# 					else:
+# 						async with self.single_sem:
+# 							b = await attachment_cache.download("https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_by_National_Pok%C3%A9dex_number")
+# 							count = 0
+# 							while not count:
+# 								b, last = b.rsplit(b'<td rowspan="1" style="font-family:monospace,monospace">#', 1)
+# 								count = int(last.split(b'</td>', 1)[0])
+# 							self.pokemon_count = count
+# 				url = None
+# 				while not url:
+# 					pid = xrand(self.pokemon_count) + 1
+# 					if shiny:
+# 						u = f"https://archives.bulbagarden.net/wiki/File:HOME{pid}_s.png"
+# 						name = f"S-{pid}"
+# 					else:
+# 						u = f"https://archives.bulbagarden.net/wiki/File:HOME{pid}.png"
+# 						name = f"P-{pid}"
+# 					urls = await self.bot.follow_url(u)
+# 					if urls:
+# 						url = urls[0]
+# 				# futs.append(guild.create_custom_emoji(name=str(p), image=b))
 
-	async def grab(self, guild, shiny=False):
-		reached = self.get(guild.id)
-		curr = self.get(None)
-		if not curr or reached == curr[-1]:
-			buff = await self.get_buffer(shiny=shiny)
+# 	async def grab(self, guild, shiny=False):
+# 		reached = self.get(guild.id)
+# 		curr = self.get(None)
+# 		if not curr or reached == curr[-1]:
+# 			buff = await self.get_buffer(shiny=shiny)
 
 
 class Uno(Command):
@@ -1913,7 +1913,7 @@ class React(Pagination, Command):
 		return s
 
 	def react_perms(self, perm: int):
-		return False if perm < 2 else True
+		return None if perm < 2 else True
 
 	async def display(self, uid, pos, gid, diridx=-1):
 		bot = self.bot
@@ -2831,7 +2831,7 @@ class GIFSearch(Pagination, Command):
 			if alt:
 				dym = f' Did you mean: {json.dumps(alt)}?'
 			else:
-				dym = None
+				dym = ""
 			raise LookupError(f'No results for {json.dumps(query)}.{dym}')
 		return results
 
@@ -2852,81 +2852,81 @@ class GIFSearch(Pagination, Command):
 		return await self.display(_user.id, pos, query, index)
 
 
-class Rickroll(Command):
-	name = ["Thumbnail", "FakeThumbnail", "FakeVideo"]
-	description = "Generates a link that embeds a thumbnail, but redirects to a separate YouTube video once played."
-	usage = "<thumbnail>? <video>?"
-	example = ("rickroll https://i.ytimg.com/kJQP7kiw5Fk/maxresdefault.jpg", "rickroll https://i.ytimg.com/kJQP7kiw5Fk/maxresdefault.jpg https://www.youtube.com/watch?v=wDgQdr8ZkTw")
-	rate_limit = (6, 9)
-	ephemeral = True
-	maintenance = True
+# class Rickroll(Command):
+# 	name = ["Thumbnail", "FakeThumbnail", "FakeVideo"]
+# 	description = "Generates a link that embeds a thumbnail, but redirects to a separate YouTube video once played."
+# 	usage = "<thumbnail>? <video>?"
+# 	example = ("rickroll https://i.ytimg.com/kJQP7kiw5Fk/maxresdefault.jpg", "rickroll https://i.ytimg.com/kJQP7kiw5Fk/maxresdefault.jpg https://www.youtube.com/watch?v=wDgQdr8ZkTw")
+# 	rate_limit = (6, 9)
+# 	ephemeral = True
+# 	maintenance = True
 
-	async def __call__(self, bot, args, message, channel, **void):
-		if message.attachments:
-			args = [best_url(a) for a in message.attachments] + args
-		if not args:
-			return "https://mizabot.xyz/view/!247184721262411780"
-		if len(args) < 2:
-			args.append("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-		url, video = args[:2]
-		video = video.strip("<>")
-		urls = await bot.follow_url(url, best=True, allow=True, limit=1)
-		if not urls:
-			url = await bot.get_last_image(message.channel)
-		else:
-			url = urls[0]
-		if "exec" in bot.data:
-			async with discord.context_managers.Typing(channel):
-				mime = await asubmit(bot.detect_mime, url)
-				data = None
-				if "image/png" not in mime:
-					if "image/jpg" not in mime:
-						if "image/jpeg" not in mime:
-							resp = await process_image(url, "resize_mult", ["-nogif", 1, 1, "auto"], timeout=60)
-							data = await read_file_a(resp)
-							url = await bot.data.exec.uproxy(data, force=True)
-							ext = "png"
-						else:
-							ext = "jpeg"
-					else:
-						ext = "jpg"
-				else:
-					ext = "png"
-		fn = await attachment_cache.download(url, read=True)
-		from PIL import Image
-		with Image.open(fn) as im:
-			w, h = im.size
-		vid = None
-		mime = "text/html"
-		if video.startswith("https://www.youtube.com/watch?v") and "=" in video:
-			vid = video.split("=", 1)[-1].split("&", 1)[0].split("#", 1)[0]
-		elif video.startswith("http://youtu.be/"):
-			vid = video.split("e/", 1)[-1].split("?", 1)[0]
-		elif video.startswith("http://youtube.com/v/"):
-			vid = video.split("v/", 1)[-1].split("?", 1)[0]
-		else:
-			urls = await bot.follow_url(video, best=True, allow=True, limit=1)
-			if urls:
-				video = urls[0]
-			mime = await asubmit(bot.detect_mime, video)
-			mime = mime[0]
-		if vid:
-			embed = f"https://www.youtube.com/embed/{vid}"
-			video = f"https://www.youtube.com/watch?v={vid}"
-		else:
-			embed = video
-		s = f"""<!DOCTYPE html>
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<meta property="og:type" content="video.other">
-<meta property="twitter:player" content="{embed}">
-<meta property="og:video:type" content="{mime}">
-<meta property="og:video:width" content="{w}">
-<meta property="og:video:height" content="{h}">
-<meta name="twitter:image" content="{url}">
-<meta http-equiv="refresh" content="0;url={video}">
-</head><body></body></html>"""
-		urls = await asubmit(bot._globals["as_file"], s.encode("utf-8"))
-		return urls[0].replace("/p/", "/f/", 1)
+# 	async def __call__(self, bot, args, message, channel, **void):
+# 		if message.attachments:
+# 			args = [best_url(a) for a in message.attachments] + args
+# 		if not args:
+# 			return "https://mizabot.xyz/view/!247184721262411780"
+# 		if len(args) < 2:
+# 			args.append("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+# 		url, video = args[:2]
+# 		video = video.strip("<>")
+# 		urls = await bot.follow_url(url, best=True, allow=True, limit=1)
+# 		if not urls:
+# 			url = await bot.get_last_image(message.channel)
+# 		else:
+# 			url = urls[0]
+# 		if "exec" in bot.data:
+# 			async with discord.context_managers.Typing(channel):
+# 				mime = await asubmit(bot.detect_mime, url)
+# 				data = None
+# 				if "image/png" not in mime:
+# 					if "image/jpg" not in mime:
+# 						if "image/jpeg" not in mime:
+# 							resp = await process_image(url, "resize_mult", ["-nogif", 1, 1, "auto"], timeout=60)
+# 							data = await read_file_a(resp)
+# 							url = await bot.data.exec.uproxy(data, force=True)
+# 							ext = "png"
+# 						else:
+# 							ext = "jpeg"
+# 					else:
+# 						ext = "jpg"
+# 				else:
+# 					ext = "png"
+# 		fn = await attachment_cache.download(url, read=True)
+# 		from PIL import Image
+# 		with Image.open(fn) as im:
+# 			w, h = im.size
+# 		vid = None
+# 		mime = "text/html"
+# 		if video.startswith("https://www.youtube.com/watch?v") and "=" in video:
+# 			vid = video.split("=", 1)[-1].split("&", 1)[0].split("#", 1)[0]
+# 		elif video.startswith("http://youtu.be/"):
+# 			vid = video.split("e/", 1)[-1].split("?", 1)[0]
+# 		elif video.startswith("http://youtube.com/v/"):
+# 			vid = video.split("v/", 1)[-1].split("?", 1)[0]
+# 		else:
+# 			urls = await bot.follow_url(video, best=True, allow=True, limit=1)
+# 			if urls:
+# 				video = urls[0]
+# 			mime = await asubmit(bot.detect_mime, video)
+# 			mime = mime[0]
+# 		if vid:
+# 			embed = f"https://www.youtube.com/embed/{vid}"
+# 			video = f"https://www.youtube.com/watch?v={vid}"
+# 		else:
+# 			embed = video
+# 		s = f"""<!DOCTYPE html>
+# <html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+# <meta property="og:type" content="video.other">
+# <meta property="twitter:player" content="{embed}">
+# <meta property="og:video:type" content="{mime}">
+# <meta property="og:video:width" content="{w}">
+# <meta property="og:video:height" content="{h}">
+# <meta name="twitter:image" content="{url}">
+# <meta http-equiv="refresh" content="0;url={video}">
+# </head><body></body></html>"""
+# 		urls = await asubmit(bot._globals["as_file"], s.encode("utf-8"))
+# 		return urls[0].replace("/p/", "/f/", 1)
 
 
 class RPS(Command):
@@ -3073,170 +3073,170 @@ class HOW(Command):
 		self.bot.send_as_embeds(_channel, image="https://mizabot.xyz/u/nuHH3sBNGJ5wxO3_A_-J3G5wKte7/how_full.webp", reference=_message)
 
 
-HEADERS = {
-	"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-	"Accept-Encoding": "gzip, deflate",
-	"Accept-Language": "en-US,en;q=0.9",
-	"User-Agent": USER_AGENT,
-	"x-requested-with": "XMLHttpRequest",
-}
+# HEADERS = {
+# 	"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+# 	"Accept-Encoding": "gzip, deflate",
+# 	"Accept-Language": "en-US,en;q=0.9",
+# 	"User-Agent": USER_AGENT,
+# 	"x-requested-with": "XMLHttpRequest",
+# }
 
 
-class Akinator(Command):
-	name = ["Aki"]
-	description = "Think about a real or fictional character. I will try to guess who it is!"
-	schema = cdict(
-		language=cdict(
-			type="enum",
-			validation=cdict(
-				enum=("en", "ar", "cn", "de", "es", "fr", "il", "it", "jp", "kr", "nl", "pl", "pt", "ru", "tr", "id", "vi"),
-			),
-			description="Language used by Akinator",
-			default="en",
-		),
-		child_friendly=cdict(
-			type="bool",
-			description="Whether to enable child-friendly mode. Defaults to the current channel's age restriction state.",
-			example="true",
-		),
-	)
-	slash = True
-	rate_limit = (12, 16)
-	maintenance = True
+# class Akinator(Command):
+# 	name = ["Aki"]
+# 	description = "Think about a real or fictional character. I will try to guess who it is!"
+# 	schema = cdict(
+# 		language=cdict(
+# 			type="enum",
+# 			validation=cdict(
+# 				enum=("en", "ar", "cn", "de", "es", "fr", "il", "it", "jp", "kr", "nl", "pl", "pt", "ru", "tr", "id", "vi"),
+# 			),
+# 			description="Language used by Akinator",
+# 			default="en",
+# 		),
+# 		child_friendly=cdict(
+# 			type="bool",
+# 			description="Whether to enable child-friendly mode. Defaults to the current channel's age restriction state.",
+# 			example="true",
+# 		),
+# 	)
+# 	slash = True
+# 	rate_limit = (12, 16)
+# 	maintenance = True
 
-	async def compatible_akinator(self, language, child_mode=False):
-		aki = AsyncAkinator()
-		await aki.start_game(language=language, child_mode=child_mode)
-		aki.timestamp = utc()
-		return aki
+# 	async def compatible_akinator(self, language, child_mode=False):
+# 		aki = AsyncAkinator()
+# 		await aki.start_game(language=language, child_mode=child_mode)
+# 		aki.timestamp = utc()
+# 		return aki
 
-	buttons = [
-		cdict(emoji="👍", name="Yes", style=1),
-		cdict(emoji="🙂", name="Probably", style=1),
-		cdict(emoji="❓", name="Don't know", style=1),
-		cdict(emoji="🙁", name="Probably not", style=1),
-		cdict(emoji="👎", name="No", style=1),
-		cdict(emoji="↩️", name="Undo", style=1),
-		cdict(emoji="🔃", name="Restart", style=1),
-		cdict(emoji="⏏️", name="End", style=1),
-	]
+# 	buttons = [
+# 		cdict(emoji="👍", name="Yes", style=1),
+# 		cdict(emoji="🙂", name="Probably", style=1),
+# 		cdict(emoji="❓", name="Don't know", style=1),
+# 		cdict(emoji="🙁", name="Probably not", style=1),
+# 		cdict(emoji="👎", name="No", style=1),
+# 		cdict(emoji="↩️", name="Undo", style=1),
+# 		cdict(emoji="🔃", name="Restart", style=1),
+# 		cdict(emoji="⏏️", name="End", style=1),
+# 	]
 
-	button_equiv = {
-		"Yes": 0,
-		"No": 1,
-		"Don't know": 2,
-		"Probably": 3,
-		"Probably not": 4,
-		"Undo": "undo",
-		"Restart": "restart",
-		"End": "end",
-	}
+# 	button_equiv = {
+# 		"Yes": 0,
+# 		"No": 1,
+# 		"Don't know": 2,
+# 		"Probably": 3,
+# 		"Probably not": 4,
+# 		"Undo": "undo",
+# 		"Restart": "restart",
+# 		"End": "end",
+# 	}
 
-	def get_sig(self, aki):
-		return e64(base64.b64decode(aki.signature)).decode("ascii").replace("-", "+")
+# 	def get_sig(self, aki):
+# 		return e64(base64.b64decode(aki.signature)).decode("ascii").replace("-", "+")
 
-	async def __call__(self, bot, _user, _nsfw, language, child_friendly, **void):
-		if child_friendly is None:
-			child_friendly = not _nsfw
-		aki = await self.compatible_akinator(language=language, child_mode=child_friendly)
-		sig = self.get_sig(aki)
-		bot.data.akinators[sig] = aki
+# 	async def __call__(self, bot, _user, _nsfw, language, child_friendly, **void):
+# 		if child_friendly is None:
+# 			child_friendly = not _nsfw
+# 		aki = await self.compatible_akinator(language=language, child_mode=child_friendly)
+# 		sig = self.get_sig(aki)
+# 		bot.data.akinators[sig] = aki
 
-		colour = await bot.get_colour(aki.akitude_url)
-		emb = discord.Embed(colour=colour)
-		emb.title = f"Akinator: Question {int(aki.step) + 1}"
-		bar = await bot.create_progress_bar(18, aki.confidence)
-		emb.description = (
-			f"*```callback-fun-akinator-{_user.id}_{sig}-\n"
-			+ f"{str(aki)}```*"
-			+ bar
-		)
-		emb.set_thumbnail(url=aki.akitude_url)
-		emb.set_author(**get_author(_user))
-		return cdict(
-			embed=emb,
-			buttons=self.buttons,
-		)
+# 		colour = await bot.get_colour(aki.akitude_url)
+# 		emb = discord.Embed(colour=colour)
+# 		emb.title = f"Akinator: Question {int(aki.step) + 1}"
+# 		bar = await bot.create_progress_bar(18, aki.confidence)
+# 		emb.description = (
+# 			f"*```callback-fun-akinator-{_user.id}_{sig}-\n"
+# 			+ f"{str(aki)}```*"
+# 			+ bar
+# 		)
+# 		emb.set_thumbnail(url=aki.akitude_url)
+# 		emb.set_author(**get_author(_user))
+# 		return cdict(
+# 			embed=emb,
+# 			buttons=self.buttons,
+# 		)
 
-	async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
-		u_id, sig = vals.split("_", 1)
-		u_id = int(u_id)
-		if u_id != user.id and u_id != 0 and perm < 3:
-			return
-		r = as_str(reaction)
-		try:
-			ans = self.button_equiv[r]
-		except KeyError:
-			return
+# 	async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
+# 		u_id, sig = vals.split("_", 1)
+# 		u_id = int(u_id)
+# 		if u_id != user.id and u_id != 0 and perm < 3:
+# 			return
+# 		r = as_str(reaction)
+# 		try:
+# 			ans = self.button_equiv[r]
+# 		except KeyError:
+# 			return
 
-		aki = bot.data.akinators.get(sig)
-		if not aki:
-			print("Akinator not found, restarting:", sig)
-			ans = "restart"
-		csubmit(bot.defer_interaction(message, mode="patch"))
+# 		aki = bot.data.akinators.get(sig)
+# 		if not aki:
+# 			print("Akinator not found, restarting:", sig)
+# 			ans = "restart"
+# 		csubmit(bot.defer_interaction(message, mode="patch"))
 
-		callback = "callback"
+# 		callback = "callback"
 
-		if isinstance(ans, int):
-			await aki.answer(ans)
-		elif ans == "undo":
-			await aki.back()
-		elif ans == "restart":
-			bot.data.akinators.pop(sig, None)
-			lang = T(aki).get("language") or "en"
-			child = T(aki).get("child_mode") or not bot.is_nsfw(message.channel)
-			aki = await self.compatible_akinator(language=lang, child_mode=child)
-			sig = self.get_sig(aki)
-			bot.data.akinators[sig] = aki
-		elif ans == "end":
-			aki.finished = True
-			aki.win = False
-			aki.question = "Game exited. Thanks for playing!"
-		else:
-			raise RuntimeError(f"Unexpected input: {ans}")
-		print(ans, aki)
+# 		if isinstance(ans, int):
+# 			await aki.answer(ans)
+# 		elif ans == "undo":
+# 			await aki.back()
+# 		elif ans == "restart":
+# 			bot.data.akinators.pop(sig, None)
+# 			lang = T(aki).get("language") or "en"
+# 			child = T(aki).get("child_mode") or not bot.is_nsfw(message.channel)
+# 			aki = await self.compatible_akinator(language=lang, child_mode=child)
+# 			sig = self.get_sig(aki)
+# 			bot.data.akinators[sig] = aki
+# 		elif ans == "end":
+# 			aki.finished = True
+# 			aki.win = False
+# 			aki.question = "Game exited. Thanks for playing!"
+# 		else:
+# 			raise RuntimeError(f"Unexpected input: {ans}")
+# 		print(ans, aki)
 
-		photo = aki.photo if aki.win else aki.akitude_url
-		colour = await bot.get_colour(photo)
-		emb = discord.Embed(colour=colour)
+# 		photo = aki.photo if aki.win else aki.akitude_url
+# 		colour = await bot.get_colour(photo)
+# 		emb = discord.Embed(colour=colour)
 
-		desc = ""
-		if aki.finished:
-			desc = str(aki)
-			buttons = (self.buttons[-2],)
-			if aki.win:
-				emb.title = f"Akinator: {aki.name_proposition} ({aki.description_proposition})"
-				emb.set_image(url=photo)
-			else:
-				emb.title = "Akinator: Game ended"
-				emb.set_thumbnail(url=photo)
-		else:
-			desc = str(aki)
-			emb.title = f"Akinator: Question {int(aki.step) + 1}"
-			emb.set_thumbnail(url=photo)
-			if aki.win:
-				buttons = [self.buttons[0], *self.buttons[4:]]
-			else:
-				buttons = self.buttons
-		if desc:
-			desc += "\n"
+# 		desc = ""
+# 		if aki.finished:
+# 			desc = str(aki)
+# 			buttons = (self.buttons[-2],)
+# 			if aki.win:
+# 				emb.title = f"Akinator: {aki.name_proposition} ({aki.description_proposition})"
+# 				emb.set_image(url=photo)
+# 			else:
+# 				emb.title = "Akinator: Game ended"
+# 				emb.set_thumbnail(url=photo)
+# 		else:
+# 			desc = str(aki)
+# 			emb.title = f"Akinator: Question {int(aki.step) + 1}"
+# 			emb.set_thumbnail(url=photo)
+# 			if aki.win:
+# 				buttons = [self.buttons[0], *self.buttons[4:]]
+# 			else:
+# 				buttons = self.buttons
+# 		if desc:
+# 			desc += "\n"
 
-		bar = await bot.create_progress_bar(18, aki.confidence)
-		sig = self.get_sig(aki)
-		emb.description = (
-			f"*```{callback}-fun-akinator-{user.id}_{sig}-\n"
-			+ f"{desc}```*"
-			+ bar
-		)
-		emb.set_author(**get_author(user))
-		return await interaction_patch(
-			bot=bot,
-			message=message,
-			embed=emb,
-			buttons=buttons,
-		)
+# 		bar = await bot.create_progress_bar(18, aki.confidence)
+# 		sig = self.get_sig(aki)
+# 		emb.description = (
+# 			f"*```{callback}-fun-akinator-{user.id}_{sig}-\n"
+# 			+ f"{desc}```*"
+# 			+ bar
+# 		)
+# 		emb.set_author(**get_author(user))
+# 		return await interaction_patch(
+# 			bot=bot,
+# 			message=message,
+# 			embed=emb,
+# 			buttons=buttons,
+# 		)
 
 
-class UpdateAkinators(Database):
-	name = "akinators"
-	no_file = True
+# class UpdateAkinators(Database):
+# 	name = "akinators"
+# 	no_file = True

@@ -102,12 +102,10 @@ class Translate(Command):
 			return tr.text
 		async def llm_translate():
 			try:
-				small_model = await asubmit(ai.load_small_model)
 				cmpl = await ai.llm(
 					"chat.completions.create",
 					messages=messages,
-					model=small_model.model,
-					api=small_model,
+					model="translation",
 					max_completion_tokens=16384,
 					premium_context=premium,
 				)
@@ -140,7 +138,7 @@ class Translate(Command):
 		try:
 			translated = await ai._instruct(
 				data=dict(
-					model=None,
+					model="small",
 					messages=messages,
 					temperature=0.01,
 					premium_context=premium,
@@ -909,21 +907,21 @@ class Instruct(Command):
 			validation="[0, 10]",
 			description="Temperature to influence alignment",
 			example="1.2",
-			default=0.8,
+			default=None,
 		),
 		frequency_penalty=cdict(
 			type="number",
 			validation="[-1, 2]",
 			description="Amount to penalise tokens based on frequency",
 			example="1.1",
-			default=0.7,
+			default=None,
 		),
 		presence_penalty=cdict(
 			type="number",
 			validation="[-1, 2]",
 			description="Amount to penalise tokens based on presence",
 			example="1.1",
-			default=0.5,
+			default=None,
 		),
 		reasoning_effort=cdict(
 			type="enum",
@@ -997,9 +995,7 @@ class Instruct(Command):
 		kwargs["max_tokens"] = max_tokens
 		kwargs["reasoning_effort"] = reasoning_effort
 		if not model:
-			kwargs["api"] = large_model = await asubmit(ai.load_large_model)
-			if large_model.disabled:
-				kwargs["api"] = await asubmit(ai.load_small_model)
+			model = "large"
 		resp = await bot.force_completion(model=model, prompt=prompt, stream=True, timeout=1800, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, premium_context=_premium, allow_alt=True, **kwargs)
 		try:
 			_message.__dict__.setdefault("inits", []).append(resp)
@@ -1220,6 +1216,7 @@ class Imagine(Command):
 				for i in range(max(1, dups - 1)):
 					fut = csubmit(ai.instruct(
 						dict(
+							model="small",
 							prompt=prompt,
 							temperature=1,
 							max_tokens=200,

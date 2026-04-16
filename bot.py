@@ -767,7 +767,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.setshutdown()
 
 	async def _retrieve_api(self, path):
-		return await Request.aio(f"https://discord.com/api/{api}/{path}", authorise=True, json=True)
+		while True:
+			data = await Request.aio(
+				f"https://discord.com/api/{api}/{path}",
+				authorise=True,
+				json=True,
+				ignore_error=True,
+			)
+			if isinstance(data, dict) and "message" in data and "retry_after" in data:
+				await asyncio.sleep(float(data["retry_after"]) + 1)
+			else:
+				return data
 	async def retrieve_api(self, path):
 		return await self.discord_cache.aretrieve(path, self._retrieve_api, path)
 
@@ -2152,7 +2162,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def caption_into(self, _messages, model=None, backup_model=None, premium_context=[]):
 		# print("Resolving Images:", model, backup_model, lim_str(_messages, 1024))
-		context = ai.contexts.get(model, 4096)
+		context = ai.contexts.get(model, 24576)
 		messages = [cdict(m) for m in _messages]
 		follows = [None] * len(messages)
 		for j, m in enumerate(reversed(messages)):
@@ -2247,22 +2257,22 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	model_levels = {
 		0: cdict(
-			instructive=None,
-			casual=None,
-			nsfw=None,
+			instructive="small",
+			casual="small",
+			nsfw="small",
 			backup="deepseek-v3.2-speciale",
 			retry="gpt-5.4-mini",
-			function=None,
+			function="small",
 			vision="qwen3.5-27b",
 			target="auto",
 		),
 		1: cdict(
-			instructive=None,
-			casual=None,
+			instructive="gemini-3-flash",
+			casual="large",
 			nsfw="grok-4.1-fast",
 			backup="gpt-5.4-mini",
-			retry="claude-haiku-4.5",
-			function=None,
+			retry="gemini-3.1-flash-lite",
+			function="gemma-4-26b-a4b-it",
 			vision="kimi-k2.5",
 			target="auto",
 		),
@@ -6359,7 +6369,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				)
 			fut = csubmit(external_heartbeat())
 			futs.append(fut)
-		resps: Unknown = await gather(*futs)
+		resps = await gather(*futs)
 		for data in resps:
 			if not data:
 				continue
@@ -7577,7 +7587,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		try:
 			sem = self.flatten_sems[bucket]
 		except KeyError:
-			sem = self.flatten_sems[bucket] = Semaphore(1, 4, rate_limit=5)
+			sem = self.flatten_sems[bucket] = Semaphore(1, 4, rate_limit=2)
 		data = {}
 		with tracebacksuppressor(SemaphoreOverflowError):
 			async with sem:
@@ -7590,6 +7600,54 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						await asyncio.sleep(random.random() * 2 ** att)
 					else:
 						break
+			esubmit(self.cache.messages.update, data)
+		return data
+	async def flatten_search(self, guild_id, limit=200, target_id=0, channel_id=None, author_id=None, **kwargs):
+		bucket = guild_id
+		try:
+			sem = self.flatten_sems[bucket]
+		except KeyError:
+			sem = self.flatten_sems[bucket] = Semaphore(1, 4, rate_limit=2)
+		data = {}
+		with tracebacksuppressor(SemaphoreOverflowError):
+			async with sem:
+				temp_sem = Semaphore(1, 1, rate_limit=1)
+				for pos in range(0, limit * 3 // 4, 25):
+					path = f"guilds/{guild_id}/messages/search"
+					query = f"?include_nsfw=1&limit=25&offset={pos}"
+					if target_id:
+						query += f"&max_id={target_id}"
+					if channel_id:
+						query += f"&channel_id={channel_id}"
+					if author_id:
+						query += f"&author_id={author_id}"
+					for k, v in kwargs:
+						query += f"&{k}={v}"
+					async with temp_sem:
+						resp = await self.retrieve_api(f"{path}{query}")
+					for raw_message in resp["messages"]:
+						if isinstance(raw_message, list):
+							raw_message = raw_message[0]
+						message = self.CachedMessage(raw_message)
+						data[message.id] = message
+				for pos in range(0, limit // 4, 25):
+					path = f"guilds/{guild_id}/messages/search"
+					query = f"?include_nsfw=1&limit=25&offset={pos}"
+					if target_id:
+						query += f"&min_id={target_id}"
+					if channel_id:
+						query += f"&channel_id={channel_id}"
+					if author_id:
+						query += f"&author_id={author_id}"
+					for k, v in kwargs:
+						query += f"&{k}={v}"
+					async with temp_sem:
+						resp = await self.retrieve_api(f"{path}{query}")
+					for raw_message in resp["messages"]:
+						if isinstance(raw_message, list):
+							raw_message = raw_message[0]
+						message = self.CachedMessage(raw_message)
+						data[message.id] = message
 			esubmit(self.cache.messages.update, data)
 		return data
 
@@ -8061,11 +8119,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			data = payload.data
 			m_id = int(data["id"])
 			raw = False
+			had_before = False
 			if payload.cached_message:
 				before = payload.cached_message
 				after = await self.fetch_message(m_id, payload.channel_id)
 				if before is after:
 					before = copy.copy(before)
+				else:
+					had_before = True
 			else:
 				try:
 					before = await self.fetch_message(m_id, old=True)
@@ -8103,6 +8164,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						return
 					raw = True
 				else:
+					had_before = True
 					if type(before) is self.CachedMessage:
 						after = copy.copy(before)
 					else:
@@ -8113,15 +8175,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				before.deleted = True
 			if after.channel is None:
 				after.channel = self.force_channel(payload.channel_id)
-			sem = T(before).get("sem")
-			if not sem and after.edited_at and (utc_ddt() - after.created_at).total_seconds() >= 3590:
-				try:
-					after.sem = Semaphore(3, 1, rate_limit=20.09)
-					after.sem.delay_for(20)
-				except AttributeError:
-					after = self.ExtendedMessage(after)
-					after.sem = Semaphore(3, 1, rate_limit=20.09)
-					after.sem.delay_for(20)
+			if after.guild and not after.author.bot and "logM" in self.data and after.guild.id in self.data.logM:
+				if utc() - after.created_at.timestamp() > 86400 * 14 or not had_before:
+					found = await self.flatten_search(after.guild.id, limit=200, target_id=after.id, author_id=after.author.id)
+					print(f"Edit: Retrieved {len(found)} messages from user {after.author}")
 			with tracebacksuppressor:
 				inits = T(before).get("inits")
 				if inits:
@@ -8188,16 +8245,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					await fut
 
 		async def _on_raw_message_delete(payload):
+			had_before = False
 			try:
 				message = payload.cached_message
 				if not message:
 					raise LookupError
+				had_before = True
 			except (AttributeError, LookupError):
 				channel = await self.fetch_channel(payload.channel_id)
 				try:
 					message = await self.fetch_message(payload.message_id, channel, old=True)
 					if message is None:
 						raise LookupError
+					had_before = True
 				except (AttributeError, LookupError, discord.NotFound):
 					# If message was not in cache, create a ghost message object to represent old message.
 					message = self.GhostMessage()
@@ -8211,6 +8271,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					message.author.name = "Unknown User"
 					history = discord.abc.Messageable.history(channel, limit=101, around=message)
 					csubmit(self.flatten_into_cache(history, getattr_chain(channel, "guild.id", channel.id)))
+			if had_before and message.guild and not message.author.bot and "logM" in self.data and message.guild.id in self.data.logM and utc() - message.created_at.timestamp() > 86400 * 14:
+				found = await self.flatten_search(message.guild.id, limit=200, target_id=message.id, author_id=message.author.id)
+				print(f"Delete: Retrieved {len(found)} messages from user {message.author}")
 			try:
 				message.deleted = True
 			except AttributeError:

@@ -438,7 +438,6 @@ async def upload(
 	url: Optional[str] = None,
 	filename: Optional[str] = None,
 	file: Optional[UploadFile] = None,
-	response_class=PlainTextResponse,
 ):
 	try:
 		if file:
@@ -453,7 +452,10 @@ async def upload(
 
 	if not resp or content_length < 1:
 		if not url:
-			return "Expected input URL or data."
+			return Response(
+				content="Expected input URL or data.",
+				media_type="text/plain",
+			)
 		headers = RequestManager.header()
 		if request.headers.get("Range"):
 			headers["Range"] = request.headers["Range"]
@@ -461,7 +463,11 @@ async def upload(
 
 	fn = filename or getattr(resp, "filename", None) or (url2fn(url) if url else None)
 
-	return await attachment_cache.create_dynamic(resp, filename=fn)
+	url = await attachment_cache.create_dynamic(resp, filename=fn)
+	return Response(
+		content=url,
+		media_type="text/plain",
+	)
 
 
 async def proxy_if(url: str, request: Request, force: bool = False, download: bool = False):
@@ -489,7 +495,11 @@ async def proxy_if(url: str, request: Request, force: bool = False, download: bo
 async def proxy(request: Request, url: Optional[str] = None, force: bool = False, download: bool = False):
 	"""Proxy any URL with optional body forwarding."""
 	if not url:
-		return "Expected proxy URL."
+		return Response(
+			content=url,
+			status_code=400,
+			media_type="Expected proxy URL.",
+		)
 
 	try:
 		body = await request.body()

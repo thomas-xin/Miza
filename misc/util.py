@@ -5043,7 +5043,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		self.ts = utc()
 		return self
 
-	async def aio(self, url, headers=None, files=None, data=None, method="GET", decode=False, json=False, bypass=True, session=None, ssl=None, timeout=24, authorise=False) -> bytes | str | json_like:
+	async def aio(self, url, headers=None, files=None, data=None, method="GET", decode=False, json=False, bypass=True, session=None, ssl=None, ignore_error=False, timeout=24, authorise=False) -> bytes | str | json_like:
 		if headers is None:
 			headers = {}
 		if authorise:
@@ -5065,7 +5065,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		verify = True if ssl is not False else False
 		if not self.ts:
 			await self._init_()
-		if 1 or isinstance(data, aiohttp.FormData):
+		if isinstance(data, aiohttp.FormData):
 			session = self.sessions.next()
 		elif not session:
 			async with niquests.AsyncSession() as asession:
@@ -5075,7 +5075,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 					if ssl is not None:
 						raise
 					resp = await asession.request(method, url, headers=headers, files=files, data=data, timeout=timeout, verify=False)
-				if resp.status_code >= 400:
+				if not ignore_error and resp.status_code >= 400:
 					raise ConnectionError(resp.status_code, (url, as_str(resp.content)))
 				if json:
 					return resp.json()
@@ -5086,7 +5086,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 			req = session or (self.sessions.next() if ssl else self.nossl)
 			resp = await req.request(method, url, headers=headers, data=data, timeout=timeout)
 			status = T(resp).get("status_code") or getattr(resp, "status", 400)
-			if status >= 400:
+			if not ignore_error and status >= 400:
 				try:
 					data = await resp.read()
 				except (TypeError, AttributeError):
@@ -5110,7 +5110,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				return as_str(data)
 			return data
 
-	def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, session=None, ssl=None, authorise=False) -> bytes | str | json_like:
+	def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, session=None, ssl=None, ignore_error=False, authorise=False) -> bytes | str | json_like:
 		"Creates and executes a HTTP request, returning the body in bytes, string or JSON format. Raises an exception if status code is below 200 or above 399"
 		if headers is None:
 			headers = {}
@@ -5139,7 +5139,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				if ssl is not None:
 					raise
 				resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout, verify=False)
-			if resp.status_code >= 400:
+			if not ignore_error and resp.status_code >= 400:
 				if not resp.content or magic.from_buffer(resp.content).startswith("text/"):
 					raise ConnectionError(resp.status_code, (url, resp.text))
 			if json:

@@ -1075,21 +1075,24 @@ class Rate(Command):
 
 
 class WordCount(Command):
-	name = ["Lc", "Wc", "Cc", "Character_Count", "Line_Count"]
+	name = ["Lc", "Wc", "Cc", "Count"]
 	description = "Simple command that returns the word and character count of a supplied message. message.txt files work too!"
-	usage = "<string>"
-	example = ("wordcount two words", "wc Lorem ipsum dolor sit amet.")
+	schema = cdict(
+		string=cdict(
+			type="string",
+			description="Text to count words from",
+			example="Lorem ipsum dolor sit amet.",
+		),
+	)
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, argv, **void):
-		if not argv:
+	async def __call__(self, string, **void):
+		if not string:
 			raise ArgumentError("Input string is empty.")
-		if is_url(argv):
-			argv = await self.bot.follow_url(argv, images=False)
-		lc = argv.count("\n") + 1
-		wc = len(argv.split())
-		cc = len(argv)
+		lc = string.count("\n") + 1
+		wc = len(string.split())
+		cc = len(string)
 		return f"Line count: `{lc}`\nWord count: `{wc}`\nCharacter count: `{cc}`"
 
 

@@ -1394,291 +1394,291 @@ class Radio(Pagination, Command):
 		return await self.display(_user.id, pos, countrycode, query, index)
 
 
-class Player(Command):
-	server_only = True
-	buttons = demap({
-		b'\xe2\x8f\xaf\xef\xb8\x8f': 0,
-		b'\xf0\x9f\x94\x81': 1,
-		b'\xf0\x9f\x94\x80': 2,
-		b'\xe2\x8f\xae': 3,
-		b'\xe2\x8f\xad': 4,
-		b'\xf0\x9f\x94\x8a': 5,
-		b'\xf0\x9f\xa5\x81': 6,
-		b'\xf0\x9f\x93\x89': 7,
-		b'\xf0\x9f\x93\x8a': 8,
-		b'\xe2\x99\xbb': 9,
-		# b'\xe2\x8f\xaa': 10,
-		# b'\xe2\x8f\xa9': 11,
-		# b'\xe2\x8f\xab': 12,
-		# b'\xe2\x8f\xac': 13,
-		b'\xe2\x8f\x8f': 14,
-		b'\xe2\x9c\x96': 15,
-	})
-	barsize = 24
-	name = ["NP", "NowPlaying", "Playing"]
-	min_display = "0~3"
-	description = "Creates an auto-updating virtual audio player for the current server."
-	usage = "<mode(enable|disable)>?"
-	example = ("player", "np -d")
-	flags = "adez"
-	rate_limit = (6, 9)
-	maintenance = True
+# class Player(Command):
+# 	server_only = True
+# 	buttons = demap({
+# 		b'\xe2\x8f\xaf\xef\xb8\x8f': 0,
+# 		b'\xf0\x9f\x94\x81': 1,
+# 		b'\xf0\x9f\x94\x80': 2,
+# 		b'\xe2\x8f\xae': 3,
+# 		b'\xe2\x8f\xad': 4,
+# 		b'\xf0\x9f\x94\x8a': 5,
+# 		b'\xf0\x9f\xa5\x81': 6,
+# 		b'\xf0\x9f\x93\x89': 7,
+# 		b'\xf0\x9f\x93\x8a': 8,
+# 		b'\xe2\x99\xbb': 9,
+# 		# b'\xe2\x8f\xaa': 10,
+# 		# b'\xe2\x8f\xa9': 11,
+# 		# b'\xe2\x8f\xab': 12,
+# 		# b'\xe2\x8f\xac': 13,
+# 		b'\xe2\x8f\x8f': 14,
+# 		b'\xe2\x9c\x96': 15,
+# 	})
+# 	barsize = 24
+# 	name = ["NP", "NowPlaying", "Playing"]
+# 	min_display = "0~3"
+# 	description = "Creates an auto-updating virtual audio player for the current server."
+# 	usage = "<mode(enable|disable)>?"
+# 	example = ("player", "np -d")
+# 	flags = "adez"
+# 	rate_limit = (6, 9)
+# 	maintenance = True
 
-	async def show(self, auds):
-		q = auds.queue
-		if q:
-			s = q[0].skips
-			if s is not None:
-				skips = len(s)
-			else:
-				skips = 0
-			output = "Playing " + str(len(q)) + " item" + "s" * (len(q) != 1) + " "
-			output += skips * "🚫"
-		else:
-			output = "Queue is currently empty. "
-		if auds.settings.repeat:
-			output += "🔂"
-		else:
-			if auds.settings.loop:
-				output += "🔁"
-			if auds.settings.shuffle:
-				output += "🔀"
-		if auds.settings.quiet:
-			output += "🔕"
-		if q:
-			p = auds.epos
-		else:
-			p = [0, 1]
-		output += "```"
-		output += await self.bot.create_progress_bar(18, p[0] / p[1])
-		if q:
-			output += "\n[`" + no_links(q[0].name) + "`](" + ensure_url(q[0].url) + ")"
-		output += "\n`"
-		if auds.paused or not auds.settings.speed:
-			output += "⏸️"
-		elif auds.settings.speed > 0:
-			output += "▶️"
-		else:
-			output += "◀️"
-		if q:
-			p = auds.epos
-		else:
-			p = [0, 0.25]
-		output += uni_str(f" ({time_disp(p[0])}/{time_disp(p[1])})`\n")
-		if auds.has_options():
-			v = abs(auds.settings.volume)
-			if v == 0:
-				output += "🔇"
-			if v <= 0.5:
-				output += "🔉"
-			elif v <= 1.5:
-				output += "🔊"
-			elif v <= 5:
-				output += "📢"
-			else:
-				output += "🌪️"
-			b = auds.settings.bassboost
-			if abs(b) > 1 / 6:
-				if abs(b) > 5:
-					output += "💥"
-				elif b > 0:
-					output += "🥁"
-				else:
-					output += "🎻"
-			r = auds.settings.reverb
-			if r:
-				if abs(r) >= 1:
-					output += "📈"
-				else:
-					output += "📉"
-			u = auds.settings.chorus
-			if u:
-				output += "📊"
-			c = auds.settings.compressor
-			if c:
-				output += "🗜️"
-			e = auds.settings.pan
-			if abs(e - 1) > 0.25:
-				output += "♒"
-			s = auds.settings.speed * 2 ** (auds.settings.resample / 12)
-			if s < 0:
-				output += "⏪"
-			elif s > 1:
-				output += "⏩"
-			elif s > 0 and s < 1:
-				output += "🐌"
-			p = auds.settings.pitch + auds.settings.resample
-			if p > 0:
-				output += "⏫"
-			elif p < 0:
-				output += "⏬"
-		return output
+# 	async def show(self, auds):
+# 		q = auds.queue
+# 		if q:
+# 			s = q[0].skips
+# 			if s is not None:
+# 				skips = len(s)
+# 			else:
+# 				skips = 0
+# 			output = "Playing " + str(len(q)) + " item" + "s" * (len(q) != 1) + " "
+# 			output += skips * "🚫"
+# 		else:
+# 			output = "Queue is currently empty. "
+# 		if auds.settings.repeat:
+# 			output += "🔂"
+# 		else:
+# 			if auds.settings.loop:
+# 				output += "🔁"
+# 			if auds.settings.shuffle:
+# 				output += "🔀"
+# 		if auds.settings.quiet:
+# 			output += "🔕"
+# 		if q:
+# 			p = auds.epos
+# 		else:
+# 			p = [0, 1]
+# 		output += "```"
+# 		output += await self.bot.create_progress_bar(18, p[0] / p[1])
+# 		if q:
+# 			output += "\n[`" + no_links(q[0].name) + "`](" + ensure_url(q[0].url) + ")"
+# 		output += "\n`"
+# 		if auds.paused or not auds.settings.speed:
+# 			output += "⏸️"
+# 		elif auds.settings.speed > 0:
+# 			output += "▶️"
+# 		else:
+# 			output += "◀️"
+# 		if q:
+# 			p = auds.epos
+# 		else:
+# 			p = [0, 0.25]
+# 		output += uni_str(f" ({time_disp(p[0])}/{time_disp(p[1])})`\n")
+# 		if auds.has_options():
+# 			v = abs(auds.settings.volume)
+# 			if v == 0:
+# 				output += "🔇"
+# 			if v <= 0.5:
+# 				output += "🔉"
+# 			elif v <= 1.5:
+# 				output += "🔊"
+# 			elif v <= 5:
+# 				output += "📢"
+# 			else:
+# 				output += "🌪️"
+# 			b = auds.settings.bassboost
+# 			if abs(b) > 1 / 6:
+# 				if abs(b) > 5:
+# 					output += "💥"
+# 				elif b > 0:
+# 					output += "🥁"
+# 				else:
+# 					output += "🎻"
+# 			r = auds.settings.reverb
+# 			if r:
+# 				if abs(r) >= 1:
+# 					output += "📈"
+# 				else:
+# 					output += "📉"
+# 			u = auds.settings.chorus
+# 			if u:
+# 				output += "📊"
+# 			c = auds.settings.compressor
+# 			if c:
+# 				output += "🗜️"
+# 			e = auds.settings.pan
+# 			if abs(e - 1) > 0.25:
+# 				output += "♒"
+# 			s = auds.settings.speed * 2 ** (auds.settings.resample / 12)
+# 			if s < 0:
+# 				output += "⏪"
+# 			elif s > 1:
+# 				output += "⏩"
+# 			elif s > 0 and s < 1:
+# 				output += "🐌"
+# 			p = auds.settings.pitch + auds.settings.resample
+# 			if p > 0:
+# 				output += "⏫"
+# 			elif p < 0:
+# 				output += "⏬"
+# 		return output
 
-	async def _callback_(self, message, guild, channel, reaction, bot, perm, **void):
-		if not guild.id in bot.data.audio.players:
-			return
-		auds = bot.data.audio.players[guild.id]
-		if reaction is None:
-			return
-		elif reaction == 0:
-			auds.player.time = inf
-		elif auds.player is None or auds.player.message.id != message.id:
-			return
-		if perm < 1:
-			return
-		if not message:
-			content = "```callback-voice-player-\n"
-		elif message.content:
-			content = message.content
-		else:
-			content = message.embeds[0].description
-		orig = content.split("\n", 1)[0] + "\n"
-		if reaction:
-			if type(reaction) is bytes:
-				emoji = reaction
-			else:
-				try:
-					emoji = reaction.emoji
-				except:
-					emoji = str(reaction)
-			if type(emoji) is str:
-				emoji = reaction.encode("utf-8")
-			if emoji in self.buttons:
-				if hasattr(message, "int_token"):
-					csubmit(bot.ignore_interaction(message))
-				i = self.buttons[emoji]
-				if i == 0:
-					await asubmit(auds.pause, unpause=True)
-				elif i == 1:
-					if auds.settings.loop:
-						auds.settings.loop = False
-						auds.settings.repeat = True
-					elif auds.settings.repeat:
-						auds.settings.loop = False
-						auds.settings.repeat = False
-					else:
-						auds.settings.loop = True
-						auds.settings.repeat = False
-				elif i == 2:
-					auds.settings.shuffle = bool(auds.settings.shuffle ^ 1)
-				elif i == 3 or i == 4:
-					if i == 3:
-						auds.seek(0)
-					else:
-						auds.queue.pop(0)
-						auds.clear_source()
-						await asubmit(auds.reset)
-					return
-				elif i == 5:
-					v = abs(auds.settings.volume)
-					if v < 0.25 or v >= 2:
-						v = 1 / 3
-					elif v < 1:
-						v = 1
-					else:
-						v = 2
-					auds.settings.volume = v
-					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
-				elif i == 6:
-					b = auds.settings.bassboost
-					if abs(b) < 1 / 3:
-						b = 1
-					elif b < 0:
-						b = 0
-					else:
-						b = -1
-					auds.settings.bassboost = b
-					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
-				elif i == 7:
-					r = auds.settings.reverb
-					if r >= 1:
-						r = 0
-					elif r < 0.5:
-						r = 0.5
-					else:
-						r = 1
-					auds.settings.reverb = r
-					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
-				elif i == 8:
-					c = abs(auds.settings.chorus)
-					if c:
-						c = 0
-					else:
-						c = 1 / 3
-					auds.settings.chorus = c
-					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
-				elif i == 9:
-					pos = auds.pos
-					auds.settings = cdict(auds.defaults)
-					auds.settings.quiet = True
-					await asubmit(auds.play, auds.source, pos, timeout=18)
-				elif i == 10 or i == 11:
-					s = 0.25 if i == 11 else -0.25
-					auds.settings.speed = round(auds.settings.speed + s, 5)
-					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
-				elif i == 12 or i == 13:
-					p = 1 if i == 13 else -1
-					auds.settings.pitch -= p
-					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
-				elif i == 14:
-					await asubmit(auds.kill)
-					await bot.autodelete(message)
-					return
-				else:
-					auds.player = None
-					await bot.autodelete(message)
-					return
-		other = await self.show(auds)
-		text = lim_str(orig + other, 4096)
-		last = await self.bot.get_last_message(channel)
-		emb = discord.Embed(
-			description=text,
-			colour=rand_colour(),
-			timestamp=utc_dt(),
-		).set_author(**get_author(self.bot.user))
-		if message and last and message.id == last.id:
-			await bot.edit_message(
-				message,
-				embed=emb,
-			)
-		else:
-			buttons = [[] for _ in loop(3)]
-			for s, i in self.buttons.a.items():
-				s = as_str(s)
-				if i < 5:
-					buttons[0].append(cdict(emoji=s, custom_id=s, style=3))
-				elif i < 14:
-					j = 1 if len(buttons[1]) < 5 else 2
-					buttons[j].append(cdict(emoji=s, custom_id=s, style=1))
-				else:
-					buttons[-1].append(cdict(emoji=s, custom_id=s, style=4))
-			auds.player.time = inf
-			temp = message
-			message = await send_with_reply(
-				channel,
-				reference=None,
-				embed=emb,
-				buttons=buttons,
-			)
-			auds.player.message = message
-			await bot.autodelete(temp)
-		if auds.queue and not auds.paused & 1:
-			p = auds.epos
-			maxdel = p[1] - p[0] + 2
-			delay = min(maxdel, p[1] / self.barsize / 2 / auds.speed)
-			if delay > 10:
-				delay = 10
-			elif delay < 5:
-				delay = 5
-		else:
-			delay = inf
-		auds.player.time = utc() + delay
-		auds.settings.quiet = True
+# 	async def _callback_(self, message, guild, channel, reaction, bot, perm, **void):
+# 		if not guild.id in bot.data.audio.players:
+# 			return
+# 		auds = bot.data.audio.players[guild.id]
+# 		if reaction is None:
+# 			return
+# 		elif reaction == 0:
+# 			auds.player.time = inf
+# 		elif auds.player is None or auds.player.message.id != message.id:
+# 			return
+# 		if perm < 1:
+# 			return
+# 		if not message:
+# 			content = "```callback-voice-player-\n"
+# 		elif message.content:
+# 			content = message.content
+# 		else:
+# 			content = message.embeds[0].description
+# 		orig = content.split("\n", 1)[0] + "\n"
+# 		if reaction:
+# 			if type(reaction) is bytes:
+# 				emoji = reaction
+# 			else:
+# 				try:
+# 					emoji = reaction.emoji
+# 				except:
+# 					emoji = str(reaction)
+# 			if type(emoji) is str:
+# 				emoji = reaction.encode("utf-8")
+# 			if emoji in self.buttons:
+# 				if hasattr(message, "int_token"):
+# 					csubmit(bot.ignore_interaction(message))
+# 				i = self.buttons[emoji]
+# 				if i == 0:
+# 					await asubmit(auds.pause, unpause=True)
+# 				elif i == 1:
+# 					if auds.settings.loop:
+# 						auds.settings.loop = False
+# 						auds.settings.repeat = True
+# 					elif auds.settings.repeat:
+# 						auds.settings.loop = False
+# 						auds.settings.repeat = False
+# 					else:
+# 						auds.settings.loop = True
+# 						auds.settings.repeat = False
+# 				elif i == 2:
+# 					auds.settings.shuffle = bool(auds.settings.shuffle ^ 1)
+# 				elif i == 3 or i == 4:
+# 					if i == 3:
+# 						auds.seek(0)
+# 					else:
+# 						auds.queue.pop(0)
+# 						auds.clear_source()
+# 						await asubmit(auds.reset)
+# 					return
+# 				elif i == 5:
+# 					v = abs(auds.settings.volume)
+# 					if v < 0.25 or v >= 2:
+# 						v = 1 / 3
+# 					elif v < 1:
+# 						v = 1
+# 					else:
+# 						v = 2
+# 					auds.settings.volume = v
+# 					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
+# 				elif i == 6:
+# 					b = auds.settings.bassboost
+# 					if abs(b) < 1 / 3:
+# 						b = 1
+# 					elif b < 0:
+# 						b = 0
+# 					else:
+# 						b = -1
+# 					auds.settings.bassboost = b
+# 					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
+# 				elif i == 7:
+# 					r = auds.settings.reverb
+# 					if r >= 1:
+# 						r = 0
+# 					elif r < 0.5:
+# 						r = 0.5
+# 					else:
+# 						r = 1
+# 					auds.settings.reverb = r
+# 					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
+# 				elif i == 8:
+# 					c = abs(auds.settings.chorus)
+# 					if c:
+# 						c = 0
+# 					else:
+# 						c = 1 / 3
+# 					auds.settings.chorus = c
+# 					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
+# 				elif i == 9:
+# 					pos = auds.pos
+# 					auds.settings = cdict(auds.defaults)
+# 					auds.settings.quiet = True
+# 					await asubmit(auds.play, auds.source, pos, timeout=18)
+# 				elif i == 10 or i == 11:
+# 					s = 0.25 if i == 11 else -0.25
+# 					auds.settings.speed = round(auds.settings.speed + s, 5)
+# 					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
+# 				elif i == 12 or i == 13:
+# 					p = 1 if i == 13 else -1
+# 					auds.settings.pitch -= p
+# 					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
+# 				elif i == 14:
+# 					await asubmit(auds.kill)
+# 					await bot.autodelete(message)
+# 					return
+# 				else:
+# 					auds.player = None
+# 					await bot.autodelete(message)
+# 					return
+# 		other = await self.show(auds)
+# 		text = lim_str(orig + other, 4096)
+# 		last = await self.bot.get_last_message(channel)
+# 		emb = discord.Embed(
+# 			description=text,
+# 			colour=rand_colour(),
+# 			timestamp=utc_dt(),
+# 		).set_author(**get_author(self.bot.user))
+# 		if message and last and message.id == last.id:
+# 			await bot.edit_message(
+# 				message,
+# 				embed=emb,
+# 			)
+# 		else:
+# 			buttons = [[] for _ in loop(3)]
+# 			for s, i in self.buttons.a.items():
+# 				s = as_str(s)
+# 				if i < 5:
+# 					buttons[0].append(cdict(emoji=s, custom_id=s, style=3))
+# 				elif i < 14:
+# 					j = 1 if len(buttons[1]) < 5 else 2
+# 					buttons[j].append(cdict(emoji=s, custom_id=s, style=1))
+# 				else:
+# 					buttons[-1].append(cdict(emoji=s, custom_id=s, style=4))
+# 			auds.player.time = inf
+# 			temp = message
+# 			message = await send_with_reply(
+# 				channel,
+# 				reference=None,
+# 				embed=emb,
+# 				buttons=buttons,
+# 			)
+# 			auds.player.message = message
+# 			await bot.autodelete(temp)
+# 		if auds.queue and not auds.paused & 1:
+# 			p = auds.epos
+# 			maxdel = p[1] - p[0] + 2
+# 			delay = min(maxdel, p[1] / self.barsize / 2 / auds.speed)
+# 			if delay > 10:
+# 				delay = 10
+# 			elif delay < 5:
+# 				delay = 5
+# 		else:
+# 			delay = inf
+# 		auds.player.time = utc() + delay
+# 		auds.settings.quiet = True
 
-	async def __call__(self, guild, channel, user, bot, flags, perm, **void):
-		auds = await auto_join(channel.guild, channel, user, bot)
-		auds.player = cdict(time=0, message=None)
-		esubmit(auds.update)
+# 	async def __call__(self, guild, channel, user, bot, flags, perm, **void):
+# 		auds = await auto_join(channel.guild, channel, user, bot)
+# 		auds.player = cdict(time=0, message=None)
+# 		esubmit(auds.update)
 
 
 # Small helper function to fetch song lyrics from json data, because sometimes genius.com refuses to include it in the HTML

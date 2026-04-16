@@ -4,6 +4,7 @@ from collections import deque
 import decimal
 from math import ceil, inf
 import orjson
+import random
 import re
 from traceback import format_exc, print_exc
 from mpmath import mpf
@@ -315,61 +316,64 @@ async def summarise(q, min_length=384, max_length=24576, padding=128, best=True,
 cache = CACHE = AutoCache(f"{CACHE_PATH}/ai", stale=86400, timeout=86400 * 14)
 
 class ExtendedOpenAI(openai.AsyncOpenAI):
-	__slots__ = ("model", "pricing", "refresh")
+	__slots__ = ("model", "pricing", "capabilities", "disabled", "sem")
 
 	def __init__(self, *args, **kwargs):
 		self.model = ""
 		self.pricing = (0, 0)
-		self.refresh = 0
+		self.capabilities = []
 		self.disabled = False
 		self.sem = Semaphore(16, 256)
 		super().__init__(*args, **kwargs)
+
+	def __bool__(self):
+		return bool(self.model and not self.disabled)
 
 def find_model(oai):
 	oai = openai.OpenAI(api_key=oai.api_key, base_url=oai.base_url)
 	model = oai.models.list().data[0].id
 	return model
 
-large_model = None
-def load_large_model():
-	global large_model
-	info = AUTH.get("large_model")
-	if not info or getattr(large_model, "refresh", 0) > utc():
-		return large_model
-	api_key = info.get("api_key", "x")
-	base_url = info.get("base_url", "x")
-	pricing = info.get("pricing", [0, 0])
-	large_model = ExtendedOpenAI(api_key=api_key, base_url=base_url)
-	large_model.refresh = utc() + 3600
-	try:
-		model = find_model(large_model)
-	except Exception:
-		return large_model
-	print(f"Loaded large model API {base_url} with model {model}.")
-	large_model.model = model
-	large_model.pricing = tuple(pricing)
-	return large_model
-
-small_model = None
-def load_small_model():
-	global small_model
-	info = AUTH.get("small_model")
-	if not info or getattr(small_model, "refresh", 0) > utc():
-		return small_model
-	api_key = info.get("api_key", "x")
-	base_url = info.get("base_url", "x")
-	small_model = ExtendedOpenAI(api_key=api_key, base_url=base_url)
-	small_model.refresh = utc() + 3600
-	try:
-		oai = openai.OpenAI(api_key=api_key, base_url=base_url)
-		model = oai.models.list().data[0].id
-		pricing = info.get("pricing", [0, 0])
-	except Exception:
-		return small_model
-	print(f"Loaded small model API {base_url} with model {model}.")
-	small_model.model = model
-	small_model.pricing = tuple(pricing)
-	return small_model
+local_models = cdict()
+local_refresh = 0
+async def load_local():
+	if local_refresh > utc():
+		return
+	local_models.clear()
+	globals()["local_refresh"] = utc() + 3600
+	for name, info in AUTH.get("local_llms", {}).items():
+		api_key = info.get("api_key", "x")
+		base_urls = info.get("base_urls", "x")
+		pricing = tuple(info.get("pricing", (0, 0)))
+		capabilities = info.get("capabilities", [])
+		models = []
+		if isinstance(base_urls, str):
+			base_urls = [base_urls]
+		for base_url in base_urls:
+			model = ExtendedOpenAI(api_key=api_key, base_url=base_url)
+			try:
+				mname = find_model(model)
+			except Exception:
+				continue
+			model.capabilities = capabilities
+			model.model = mname
+			model.pricing = pricing
+			models.append(model)
+			print(f"Loaded local model API {base_url} with model {mname}.")
+		local_models[name] = models
+		available.setdefault(name, {})[""] = (name, pricing)
+		if "image" in capabilities:
+			is_vision.add(name)
+		else:
+			is_vision.discard(name)
+		if "tools" in capabilities:
+			is_function.add(name)
+		else:
+			is_function.discard(name)
+		if "reasoning" in capabilities:
+			is_reasoning.add(name)
+		else:
+			is_reasoning.discard(name)
 
 def model_name(model_id):
 	return model_id and model_id.rsplit("/", 1)[-1].replace("-preview", "").replace("-customtools", "")
@@ -414,12 +418,12 @@ async def load_openrouter():
 			is_reasoning.discard(name)
 		count += 1
 	print(f"Openrouter: Loaded {count} models")
+	await load_local()
+	print(f"Loaded {len(local_models)} local models")
 	globals()["openai_refresh"] = utc() + 86400
 
 with tracebacksuppressor:
-	fut = esubmit(load_large_model)
 	asyncio.run(load_openrouter())
-	fut.result()
 
 async def _summarise(s, max_length, best=False, prompt=None, premium_context=[]):
 	if len(s) <= max_length:
@@ -453,7 +457,7 @@ Answer ONLY with the summary, do not answer the question itself!'''
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above!'
 			ml = round_random(max_length)
 			c = await tcount(prompt)
-			model = None
+			model = "small"
 			data = dict(model=model, prompt=prompt, temperature=0.6, max_tokens=ml, premium_context=premium_context)
 			resp = await instruct(data)
 			print("Summary:", resp)
@@ -476,7 +480,11 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 	kwa = kwargs
 	for i, (api, minfo) in enumerate(tries + tries):
 		if api is None and minfo is None:
-			api = await asubmit(load_large_model)
+			try:
+				api = random.choice(next(iter(local_models.values())))
+			except StopIteration:
+				api = "openrouter"
+				minfo = available["grok-4.1-fast"]
 		if api is None:
 			if not allow_alt:
 				break
@@ -488,10 +496,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 		else:
 			sapi = api
 		sem = emptyctx
-		if minfo is None and api is large_model:
-			model, pricing = orig_model, tuple(large_model.pricing)
-			sem = large_model.sem
-		elif minfo is None:
+		if minfo is None:
 			if not allow_alt:
 				break
 			print("No pricing schematic found for:", orig_model, sapi, minfo)
@@ -503,25 +508,34 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 			continue
 		kwa = kwargs.copy()
 		body = cdict(kwargs.get("extra_body") or {})
-		if model_name(orig_model) in is_reasoning or minfo is None:
+		if model_name(orig_model) in is_reasoning or isinstance(api, ExtendedOpenAI) and "reasoning" in api.capabilities:
 			mt = kwa.pop("max_tokens", 0) or 0
 			if not kwa.get("max_completion_tokens"):
 				kwa["max_completion_tokens"] = mt * 3 // 2
 			kwa.pop("presence_penalty", None)
 			kwa.pop("frequency_penalty", None)
-			if sapi == "openrouter":
-				reasoning = dict(
-					effort=kwa.pop("reasoning_effort", "low"),
-					summary="detailed",
-				)
-				reasoning_2 = body.pop("reasoning", None) or kwa.pop("reasoning", None)
-				if reasoning_2:
-					reasoning.update(reasoning_2)
-				body["reasoning"] = reasoning
-			elif not kwa.get("reasoning_effort"):
-				kwa["reasoning_effort"] = "low"
+			reasoning = dict(
+				effort=kwa.pop("reasoning_effort", "low"),
+				summary="detailed",
+			)
+			reasoning_2 = body.pop("reasoning", None) or kwa.pop("reasoning", None)
+			if reasoning_2:
+				reasoning.update(reasoning_2)
+			body["reasoning"] = reasoning
+			match reasoning["effort"]:
+				case "minimal":
+					body["thinking_token_budget"] = 80
+				case "low":
+					body["thinking_token_budget"] = 240
+				case "medium":
+					body["thinking_token_budget"] = 720
+				case "high":
+					body["thinking_token_budget"] = 2160
 		elif "reasoning_effort" in kwa:
 			kwa.pop("reasoning_effort")
+		if not api:
+			api = random.choice(local_models[model])
+			model = api.model
 		kwa["model"] = model
 		if isinstance(api, str):
 			caller = get_oai(func, api=api)
@@ -537,9 +551,14 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 					messages = [cdict(role="user", content=messages)]
 				kwa["messages"] = messages
 			if "messages" in kwa:
+				system = []
 				messages = []
 				for m in kwa["messages"]:
 					m2 = cdict(m)
+					if m.get("role") == "system":
+						if m.get("content"):
+							system.append(m["content"])
+						continue
 					if m.get("name"):
 						name = m2.pop("name")
 						name2 = name.replace(" ", "-")
@@ -558,6 +577,11 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 					if not m.get("content"):
 						m.content = "."
 					messages.append(m)
+				if system:
+					messages.insert(0, cdict(
+						role="system",
+						content="\n\n".join(system)
+					))
 				tcid = set()
 				i = 0
 				while i < len(messages):
@@ -636,7 +660,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 	raise (exc or RuntimeError("Unknown error occured."))
 
 async def instruct(data, prune=True, cache=True, user=None):
-	key = shash(str((data.get("prompt") or data.get("messages"), data.get("model", "grok-4.1-fast"), data.get("temperature", 0.75), data.get("max_tokens", 256))))
+	key = shash(str((data.get("prompt") or data.get("messages"), data.get("model", "small"), data.get("temperature", 0.75), data.get("max_tokens", 256))))
 	if cache:
 		return await CACHE.aretrieve(key, _instruct, data, prune=prune, user=user)
 	return await CACHE._aretrieve(key, _instruct, data, prune=prune, user=user)
@@ -648,21 +672,6 @@ async def _instruct(data, user=None, prune=True):
 		user=user,
 	)
 	inputs.update(data)
-	model = inputs.get("model")
-	if not model:
-		if await asubmit(load_large_model) and not large_model.disabled:
-			api = large_model
-			model = api.model
-		elif await asubmit(load_small_model):
-			api = small_model
-			model = api.model
-		else:
-			api = None
-			model = "grok-4.1-fast"
-		inputs.update(dict(
-			model=model,
-			api=api,
-		))
 	if not inputs.get("reasoning_effort"):
 		inputs["reasoning_effort"] = "low"
 	if inputs["model"] not in is_completion:
