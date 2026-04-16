@@ -6,6 +6,7 @@ import os
 import time
 from traceback import print_exc
 from typing import Optional, AsyncIterator
+from urllib.parse import quote, unquote
 import filetype
 import niquests
 import orjson
@@ -405,9 +406,9 @@ async def chunked_proxy(path: str, request: Request):
 	new_urls = [f"{url}&S={firstsize if not i else lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
 	heads = fcdict(await attachment_cache.scan_headers(urls[0]))
 	response_headers = {}
-	filename = heads.get("attachment-filename") or heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or urls[0].rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0]
+	filename = heads.get("attachment-filename") or unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or urls[0].rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
 	if filename:
-		response_headers["Content-Disposition"] = f"inline; filename={filename}"
+		response_headers["Content-Disposition"] = f"inline; filename={quote(filename)}"
 	response = await server.dyn_serve(new_urls, size, request=request, mimetype=mimetype, response_headers=response_headers)
 	return response
 
@@ -508,10 +509,10 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 	heads = fcdict(await attachment_cache.scan_headers(url))
 
 	response_headers = {}
-	filename = heads.get("attachment-filename") or heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0]
+	filename = heads.get("attachment-filename") or unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
 	disposition = "attachment" if download else "inline"
 	if filename:
-		response_headers["Content-Disposition"] = f"{disposition}; filename={filename}"
+		response_headers["Content-Disposition"] = f"{disposition}; filename={quote(filename)}"
 
 	if not force and heads.get("content-type").split(";", 1)[0] == "text/markdown":
 		new_url = str(request.url.include_query_params(force="1"))
