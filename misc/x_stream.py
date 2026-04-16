@@ -496,16 +496,10 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 	"""Proxy any URL with optional body forwarding."""
 	if not url:
 		return Response(
-			content=url,
+			content="Expected proxy URL.",
 			status_code=400,
-			media_type="Expected proxy URL.",
+			media_type="text/plain",
 		)
-
-	try:
-		body = await request.body()
-	except Exception:
-		print_exc()
-		body = None
 
 	try:
 		fp = await attachment_cache.download(url, read=True)
