@@ -728,6 +728,27 @@ class Info(Command):
 		bot.send_embeds(channel, embeds=embs, reference=message)
 
 
+class Top(Command):
+	name = ["Ranking", "Rankings"]
+	description = "Ranks the users in the current server by total messages sent"
+	schema = cdict()
+	rate_limit = (4, 6)
+	slash = True
+
+	async def __call__(self, bot, _guild, **void):
+		data = await bot.message_counts(_guild)
+		colour = await bot.get_colour(_guild)
+		emb = discord.Embed(colour=colour)
+		emb.set_author(**get_author(_guild))
+		emb.title = "Top members"
+		emb.description = ""
+		for user, count in data.top:
+			emb.description += f"{user.mention}: {count}\n"
+		emb.description = emb.description.strip()
+		emb.set_footer(text=f"Total messages: {data.total}")
+		return cdict(embed=emb)
+
+
 class Profile(Command):
 	name = ["User", "UserProfile"]
 	description = "Shows or edits a user profile on ⟨BOT⟩."
@@ -1768,10 +1789,14 @@ class UpdateUsers(Database):
 	def _send_(self, message, **void):
 		user = message.author
 		bot = self.bot
+		if message.guild:
+			csubmit(bot.index_member(message.guild.id, 0, 1))
 		if user.id == bot.id or bot.get_perms(user, message.guild) <= -inf:
 			return
 		if bot.is_optout(user):
 			return
+		if message.guild:
+			csubmit(bot.index_member(message.guild.id, message.author.id, 1))
 		if not bot.get_enabled(message.channel):
 			return
 		size = get_message_length(message)

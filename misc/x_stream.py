@@ -10,7 +10,6 @@ from urllib.parse import quote, unquote
 import filetype
 import niquests
 import orjson
-import requests
 from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse, RedirectResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -92,7 +91,7 @@ class Server:
 		"""HTTP GET with automatic retries."""
 		for i in range(retries):
 			try:
-				session = self.session if url.startswith("https://") and not is_discord_attachment(url) and i == 0 else requests
+				session = self.session if url.startswith("https://") and not is_discord_attachment(url) and i == 0 else niquests
 				resp = session.get(url, headers=headers, data=data, verify=i <= 1, timeout=timeout + i ** 2)
 				resp.raise_for_status()
 			except Exception:
@@ -190,7 +189,7 @@ class Server:
 						u, ns = u.replace("?S=", "&S=").split("&S=", 1)
 						ns = int(ns)
 					else:
-						resp = await asubmit(requests.head, u, timeout=3)
+						resp = await asubmit(niquests.head, u, timeout=3)
 						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 
 					if pos + ns <= start:

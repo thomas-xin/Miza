@@ -19,7 +19,6 @@ sys.modules["audioop"] = sys
 import discord, discord.utils, discord.file  # noqa: E402
 
 import invisicode
-
 from misc.asyncs import *
 
 openai = None
@@ -432,7 +431,6 @@ class CompatFile(discord.File):
 
 REPLY_SEM = cdict()
 EDIT_SEM = cdict()
-# noreply = discord.AllowedMentions(replied_user=False)
 
 async def send_with_reply(channel, reference=None, content="", embed=None, embeds=None, tts=None, file=None, files=None, buttons=None, mention=False, ephemeral=False):
 	if not channel:
@@ -1557,52 +1555,6 @@ def spec2cap(skip=False):
 		caps = [[i]]
 		if c > 100000 and vrams[i] > 1 * g and ffmpeg and w > 64 * 1048576:
 			caps.append("video")
-			caps.append("ecdc")
-		if c > 400000 and v >= 7 * g and v < 13 * g and w < 256 * 1048576:
-			caps.append("sdxl")
-			v -= 11 * g
-		elif c > 400000 and v > 11 * g and (v <= 19 * g or "scc" not in done):
-			# if "sdxl" not in done or c <= 600000:
-			caps.append("scc")
-			done.append("scc")
-			v -= 11 * g
-		elif c > 400000 and v > 9 * g:
-			caps.append("sdxl")
-			if v > 19 * g:
-				caps.append("scc")
-				done.append("scc")
-				caps.append("sd")
-				v -= 19 * g
-			else:
-				v -= 9 * g
-		# elif c > 400000 and IS_MAIN and vrams[i] > 15 * g:
-		# 	caps.append("sdxl")
-		# 	if vrams[i] > 19 * g:
-		# 		caps.append("scc")
-		# 	caps.append("nvram")
-		# 	v -= 15 * g
-		# elif c > 400000 and IS_MAIN and "scc" not in done and vrams[i] > 11 * g:
-		# 	caps.append("scc")
-		# 	caps.append("nvram")
-		# 	done.append("scc")
-		# 	v -= 11 * g
-		# if c > 200000 and v > 6 * g:
-		# 	if "whisper" not in done or c <= 600000:
-		# 		caps.append("whisper")
-		# 		done.append("whisper")
-		# 		v -= 6 * g
-		if c > 200000 and v > 5 * g:
-			if "sd" not in done or c <= 600000:
-				caps.append("sd")
-				done.append("sd")
-				v -= 5 * g
-		# if c > 200000 and vrams[i] > 4 * g and rrams[i] > g:
-		# 	caps.append("summ")
-		# 	done.append("summ")
-			# v -= 1 * g
-		# if v <= 4 * g:
-			# v = 0
-		# vrams[i] = v
 		if len(caps) > 1:
 			yield caps
 

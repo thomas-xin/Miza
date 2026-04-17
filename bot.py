@@ -280,13 +280,50 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.guildfinder = FileHashDict(path=f"{CACHE_PATH}/guildfinder")
 		print(f"Loading main databases took {DynamicDT.now() - t}.")
 
+	@staticmethod
+	def get_database(temp, path):
+		is_int = False
+		while path:
+			match = re.search("[.:]", path)
+			if not match:
+				break
+			k = path[:match.start()]
+			if is_int:
+				k = int(k)
+				is_int = False
+			if match.group() == ":":
+				is_int = True
+			temp = temp[k]
+			path = path[match.end():]
+		if is_int:
+			path = int(path)
+		return temp, path
+
+	@staticmethod
+	def set_database(temp, path):
+		is_int = False
+		while path:
+			match = re.search("[.:]", path)
+			if not match:
+				break
+			k = path[:match.start()]
+			if is_int:
+				k = int(k)
+				is_int = False
+			if match.group() == ":":
+				is_int = True
+			temp = temp.setdefault(k, {} if is_int else cdict())
+			path = path[match.end():]
+		if is_int:
+			path = int(path)
+		return temp, path
+
 	database_sems = {}
 	def get_userbase(self, uid, path="", default=None):
 		try:
 			temp = self.userbase[uid]
-			if path:
-				for k in path.split("."):
-					temp = temp[k]
+			temp, last = self.get_database(temp, path)
+			temp = temp[last]
 			if default is not None and default is not Dummy and not isinstance(temp, type(default)):
 				return type(default)(temp)
 			return temp
@@ -302,11 +339,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				self.pop_userbase(uid, path)
 				return
 			if path:
-				orig = temp = self.userbase.get(uid, cdict())
-				attrs = path.split(".")
-				last = attrs.pop(-1)
-				for k in attrs:
-					temp = temp.setdefault(k, cdict())
+				orig = self.userbase.get(uid, cdict())
+				temp, last = self.set_database(orig, path)
 				temp[last] = value
 				self.userbase[uid] = orig
 			else:
@@ -314,11 +348,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def add_userbase(self, uid, path, value):
 		with self.database_sems.setdefault(uid, threading.RLock()):
 			if path:
-				orig = temp = self.userbase.get(uid, cdict())
-				attrs = path.split(".")
-				last = attrs.pop(-1)
-				for k in attrs:
-					temp = temp.setdefault(k, cdict())
+				orig = self.userbase.get(uid, cdict())
+				temp, last = self.set_database(orig, path)
 				try:
 					temp[last] += value
 				except LookupError:
@@ -333,11 +364,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def pop_userbase(self, uid, path):
 		with self.database_sems.setdefault(uid, threading.RLock()):
 			if path:
-				orig = temp = self.userbase.get(uid, cdict())
-				attrs = path.split(".")
-				last = attrs.pop(-1)
-				for k in attrs:
-					temp = temp.setdefault(k, cdict())
+				orig = self.userbase.get(uid, cdict())
+				temp, last = self.set_database(orig, path)
 				value = temp.pop(last, None)
 				if not orig:
 					self.userbase.pop(uid, None)
@@ -349,9 +377,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def get_guildbase(self, gid, path="", default=None):
 		try:
 			temp = self.guildbase[gid]
-			if path:
-				for k in path.split("."):
-					temp = temp[k]
+			temp, last = self.get_database(temp, path)
+			temp = temp[last]
 			if default is not None and default is not Dummy and not isinstance(temp, type(default)):
 				return type(default)(temp)
 			return temp
@@ -367,11 +394,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				self.pop_guildbase(gid, path)
 				return
 			if path:
-				orig = temp = self.guildbase.get(gid, cdict())
-				attrs = path.split(".")
-				last = attrs.pop(-1)
-				for k in attrs:
-					temp = temp.setdefault(k, cdict())
+				orig = self.guildbase.get(gid, cdict())
+				temp, last = self.set_database(orig, path)
 				temp[last] = value
 				self.guildbase[gid] = orig
 			else:
@@ -379,11 +403,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def add_guildbase(self, gid, path, value):
 		with self.database_sems.setdefault(gid, threading.RLock()):
 			if path:
-				orig = temp = self.guildbase.get(gid, cdict())
-				attrs = path.split(".")
-				last = attrs.pop(-1)
-				for k in attrs:
-					temp = temp.setdefault(k, cdict())
+				orig = self.guildbase.get(gid, cdict())
+				temp, last = self.set_database(orig, path)
 				try:
 					temp[last] += value
 				except LookupError:
@@ -398,11 +419,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	def pop_guildbase(self, gid, path):
 		with self.database_sems.setdefault(gid, threading.RLock()):
 			if path:
-				orig = temp = self.guildbase.get(gid, cdict())
-				attrs = path.split(".")
-				last = attrs.pop(-1)
-				for k in attrs:
-					temp = temp.setdefault(k, cdict())
+				orig = self.guildbase.get(gid, cdict())
+				temp, last = self.set_database(orig, path)
 				value = temp.pop(last, None)
 				if not orig:
 					self.guildbase.pop(gid, None)
@@ -1813,8 +1831,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print_exc()
 				continue
 			if not emoji and not is_webhook and user:
-				orig.pop(name, None)
-				self.set_userbase(user.id, "emojilist", orig)
+				self.pop_userbase(user.id, f"emojilist.{name}")
 			elif emoji:
 				pops.add((str(name), emoji.id))
 				if len(msg) < lim:
@@ -1828,8 +1845,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				substitutes = (start, sub, start + len(s))
 				if T(emoji).get("name"):
 					if not is_webhook and user:
-						orig.setdefault(name, emoji.id)
-						self.set_userbase(user.id, "emojilist", orig)
+						self.set_userbase(user.id, f"emojilist.{name}", emoji.id)
 						self.emojinames[emoji.id] = name
 				replaceds.append(emoji)
 			if substitutes:
@@ -5666,7 +5682,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if total_length > msglen or tts:
 						if total_length > maxlen:
 							data = content.encode("utf-8")
-							file2 = CompatFile(data, filename="message.txt")
+							try:
+								orjson.loads(data)
+							except orjson.JSONDecodeError:
+								filename = "message.txt"
+							else:
+								filename = "message.json"
+							file2 = CompatFile(data, filename=filename)
 							if file:
 								response["files"] = [file, file2]
 								file = None
@@ -7614,7 +7636,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				temp_sem = Semaphore(1, 1, rate_limit=1)
 				for pos in range(0, limit * 3 // 4, 25):
 					path = f"guilds/{guild_id}/messages/search"
-					query = f"?include_nsfw=1&limit=25&offset={pos}"
+					query = f"?include_nsfw=1&sort_order=desc&limit=25&offset={pos}"
 					if target_id:
 						query += f"&max_id={target_id}"
 					if channel_id:
@@ -7630,9 +7652,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							raw_message = raw_message[0]
 						message = self.CachedMessage(raw_message)
 						data[message.id] = message
+					if pos + 25 >= resp.get("total_results", inf):
+						break
 				for pos in range(0, limit // 4, 25):
 					path = f"guilds/{guild_id}/messages/search"
-					query = f"?include_nsfw=1&limit=25&offset={pos}"
+					query = f"?include_nsfw=1&sort_order=desc&limit=25&offset={pos}"
 					if target_id:
 						query += f"&min_id={target_id}"
 					if channel_id:
@@ -7648,8 +7672,91 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							raw_message = raw_message[0]
 						message = self.CachedMessage(raw_message)
 						data[message.id] = message
+					if pos + 25 >= resp.get("total_results", inf):
+						break
 			esubmit(self.cache.messages.update, data)
 		return data
+
+	async def index_member(self, guild_id, author_id, add=0):
+		info = self.get_guildbase(guild_id, f"index:{author_id}", {})
+		ts = info.get("time", 0)
+		if utc() - ts <= 86400 * 60:
+			count = info.get("count", 0) + add
+			if add:
+				self.set_guildbase(guild_id, f"index:{author_id}.count", count)
+			return count
+		if not self.ready:
+			return 0
+		bucket = guild_id
+		try:
+			sem = self.flatten_sems[bucket]
+		except KeyError:
+			sem = self.flatten_sems[bucket] = Semaphore(1, 4, rate_limit=2)
+		self.set_guildbase(guild_id, f"index:{author_id}", cdict(time=utc(), count=0))
+		data = {}
+		with tracebacksuppressor(SemaphoreOverflowError):
+			path = f"guilds/{guild_id}/messages/search?include_nsfw=1&sort_order=asc&limit=25&offset=0"
+			if author_id:
+				path += f"&author_id={author_id}"
+			async with sem:
+				resp = await self.retrieve_api(path)
+			for raw_message in resp["messages"]:
+				if isinstance(raw_message, list):
+					raw_message = raw_message[0]
+				message = self.CachedMessage(raw_message)
+				data[message.id] = message
+			total = max(resp.get("total_results", 0) + self.get_guildbase(guild_id, f"index.{author_id}.count", 0), add)
+			print(f"{guild_id}: Indexed {total} message(s) from user {author_id}")
+			self.set_guildbase(guild_id, f"index:{author_id}", cdict(time=utc(), count=total))
+			esubmit(self.cache.messages.update, data)
+		return total
+
+	@staticmethod
+	def binary_tree_level_order(n):
+		result = []
+		for k in range(n):
+			start_index = (2 ** (n - k - 1)) - 1
+			step_size = 2 ** (n - k)
+			num_nodes_on_level = 2 ** k
+			for i in range(num_nodes_on_level):
+				index = start_index + (i * step_size)
+				result.append(index)
+		return result
+
+	async def message_counts(self, guild, limit=10):
+		guild_id = guild.id
+		curr = self.get_guildbase(guild_id, "index", {})
+		total = await self.index_member(guild_id, 0)
+		bucket = guild_id
+		try:
+			sem = self.flatten_sems[bucket]
+		except KeyError:
+			sem = self.flatten_sems[bucket] = Semaphore(1, 4, rate_limit=2)
+		base_id = time_snowflake(DynamicDT.utcnow())
+		data = {}
+		for n in self.binary_tree_level_order(6):
+			if sum(v.get("count", 0) for k, v in curr.items() if k) >= total * 3 / 4:
+				break
+			target = int(guild_id + (base_id - guild_id) * n / 63)
+			with tracebacksuppressor(SemaphoreOverflowError):
+				path = f"guilds/{guild_id}/messages/search?include_nsfw=1&sort_order=asc&limit=25&offset=0&min_id={target}"
+				async with sem:
+					resp = await self.retrieve_api(path)
+				for raw_message in resp["messages"]:
+					if isinstance(raw_message, list):
+						raw_message = raw_message[0]
+					message = self.CachedMessage(raw_message)
+					author_id = int(raw_message.get("author", {}).get("id", 0))
+					if author_id and author_id not in curr:
+						await self.index_member(guild_id, author_id)
+						curr = self.get_guildbase(guild_id, "index", {})
+					data[message.id] = message
+		esubmit(self.cache.messages.update, data)
+		top = sorted(curr, key=lambda k: curr[k].get("count", 0) if k else 0, reverse=True)[:limit]
+		return cdict(
+			total=total,
+			top=[(guild.get_member(k) or (await self.fetch_user(k)), curr[k].get("count", 0)) for k in top if k],
+		)
 
 	def set_guilds(self):
 		AUTH["guild_count"] = len(self._guilds)
@@ -8159,7 +8266,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						before = copy.copy(before)
 					else:
 						before.author = after.author
-					if find_urls(after.content) and after.embeds or any(embed.image or embed.thumbnail or embed.video for embed in after.embeds) or any((fmt := url2ext(a.url)) in IMAGE_FORMS or fmt in VIDEO_FORMS for a in after.attachments):
+					if after.embeds or after.attachments:
 						# print(f"Possible embed-only update on message {after.id}, ignoring...")
 						return
 					raw = True

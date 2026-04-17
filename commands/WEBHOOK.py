@@ -139,14 +139,10 @@ class UpdateAutoEmojis(Database):
 		if not message.webhook_id:
 			bot.emojinames[e_id] = name
 			if user:
-				elist = self.bot.get_userbase(user.id, "emojilist", {})
-				elist[name] = e_id
-				self.bot.set_userbase(user.id, "emojilist", elist)
+				self.bot.set_userbase(user.id, f"emojilist.{name}", e_id)
 			guild = message.guild
 			if guild:
-				elist = self.bot.get_guildbase(guild.id, "emojilist", {})
-				elist[name] = e_id
-				self.bot.set_guildbase(guild.id, "emojilist", elist)
+				self.bot.set_guildbase(guild.id, f"emojilist.{name}", e_id)
 
 	async def _nocommand_(self, message, recursive=True, **void):
 		if getattr(message, "simulated", None) or (utc_ddt() - message.created_at).total_seconds() > 3600:
@@ -169,14 +165,10 @@ class UpdateAutoEmojis(Database):
 			if not message.webhook_id:
 				bot.emojinames[e_id] = name
 				if user:
-					elist = bot.get_userbase(user.id, "emojilist", {})
-					elist[name] = e_id
-					bot.set_userbase(user.id, "emojilist", elist)
+					self.bot.set_userbase(user.id, f"emojilist.{name}", e_id)
 				guild = message.guild
 				if guild:
-					elist = bot.get_guildbase(guild.id, "emojilist", {})
-					elist[name] = e_id
-					bot.set_guildbase(guild.id, "emojilist", elist)
+					self.bot.set_guildbase(guild.id, f"emojilist.{name}", e_id)
 		if not message.guild or not message.guild.me:
 			return
 		guild = message.guild
@@ -428,8 +420,7 @@ class EmojiList(Pagination, Command):
 				name = name.strip(":")
 				if not regexp(r"[A-Za-z0-9\-~_]{1,32}").fullmatch(name):
 					raise ArgumentError("Emoji aliases may only contain 1~32 alphanumeric characters, dashes, tildes and underscores.")
-				curr[name] = emote
-				bot.set_userbase(_user.id, "emojilist", curr)
+				bot.set_userbase(_user.id, f"emojilist.{name}", emote)
 				return ini_md(f"Successfully added emoji alias {sqr_md(name)}: {sqr_md(emote)} for {sqr_md(_user)}.")
 		raise NotImplementedError(mode)
 
@@ -454,9 +445,7 @@ class EmojiList(Pagination, Command):
 						me = ""
 				except LookupError:
 					if uid:
-						curr = bot.get_userbase(uid, "emojilist", {})
-						curr.pop(k)
-						bot.set_userbase(uid, "emojilist", curr)
+						bot.pop_userbase(uid, f"emojilist.{k}")
 					return
 				return f"({v})` {me}"
 

@@ -37,7 +37,7 @@ import numpy as np
 from math import inf, floor, ceil, log2, log10
 from traceback import print_exc
 sys.path.append("misc")
-from .util import EvalPipe, new_playwright_page, CODECS, CODEC_FFMPEG, CODEC_PIX, temporary_file, is_url
+from .util import EvalPipe, PipedProcess, new_playwright_page, CODECS, CODEC_FFMPEG, CODEC_PIX, temporary_file, is_url
 
 if __name__ == "__main__":
 	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
@@ -98,7 +98,7 @@ else:
 	IT = 0
 
 
-if CAPS.intersection(("browse", "image", "caption", "video", "sd", "sdxl", "scc")):
+if CAPS.intersection(("browse", "image", "caption", "video")):
 	from math import *
 	import x_image
 	x_image.register_print_fn(print)
@@ -110,53 +110,6 @@ else:
 
 	if not hasattr(time, "time_ns"):
 		time.time_ns = lambda: int(time.time() * 1e9)
-
-
-def enumerate_with_next(iterable):
-	it1, it2 = itertools.tee(iterable)
-	next(it2, None)
-	for index, (current, next_val) in enumerate(zip(it1, it2)):
-		yield index, current, next_val
-	if it1 and it2:
-		for index, current in enumerate(it1, start=index + 1):
-			yield index, current, None
-
-
-def is_strict_running(proc):
-	"Detects if a process is truly running. Zombie processes are treated as dead."
-	if not proc:
-		return
-	try:
-		if getattr(proc, "returncode", None) is not None:
-			return False
-		if hasattr(proc, "poll") and proc.poll() is not None:
-			return False
-		if not proc.is_running():
-			return False
-		try:
-			if os.name != "nt" and proc.status() == "zombie":
-				proc.wait()
-				return
-		except (ProcessLookupError, psutil.NoSuchProcess):
-			return
-		return True
-	except AttributeError:
-		try:
-			proc = psutil.Process(proc.pid)
-		except (ProcessLookupError, psutil.NoSuchProcess):
-			return
-		except Exception:
-			print_exc()
-			return
-	if not proc.is_running():
-		return False
-	try:
-		if os.name != "nt" and proc.status() == "zombie":
-			proc.wait()
-			return
-	except (ProcessLookupError, psutil.NoSuchProcess):
-		return
-	return True
 
 
 if "video" in CAPS:
@@ -230,92 +183,7 @@ if "math" in CAPS:
 		with open(out, "rb") as f:
 			return f.read()
 
-	def rank_embeddings(embs, emb, temp=0.5):
-		btest = base64.b64decode(emb)
-		y = np.frombuffer(btest, dtype=np.float16)
-		blist = [base64.b64decode(line) for line in embs]
-		bt2 = b"".join(blist)
-		x = np.frombuffer(bt2, dtype=np.float16)
-		x = x.reshape((len(x) // len(y), len(y)))
-		y = y.reshape((1, len(y)))
-		norms = np.linalg.norm(x, axis=1) * np.linalg.norm(y, axis=1)
-		z = (x * y).sum(axis=1)
-		z /= norms
-		top = np.max(z)
-		return [i for i in np.argsort(z)[::-1] if z[i] - random.random() / 3 >= (top - temp * 2 / 3)]
-
 if "ecdc" in CAPS:
-	class PipedProcess:
-
-		procs = ()
-		stdin = stdout = stderr = None
-
-		def __init__(self, *args, stdin=None, stdout=None, stderr=None, cwd=".", bufsize=4096):
-			if not args:
-				return
-			self.exc = concurrent.futures.ThreadPoolExecutor(max_workers=len(args) - 1) if len(args) > 1 else None
-			self.procs = []
-			for i, arg in enumerate(args):
-				first = not i
-				last = i >= len(args) - 1
-				si = stdin if first else subprocess.PIPE
-				so = stdout if last else subprocess.PIPE
-				se = stderr if last else None
-				proc = psutil.Popen(arg, stdin=si, stdout=so, stderr=se, cwd=cwd, bufsize=bufsize * 256)
-				if first:
-					self.stdin = proc.stdin
-					self.args = arg
-				if last:
-					self.stdout = proc.stdout
-					self.stderr = proc.stderr
-				self.procs.append(proc)
-			for i in range(len(args) - 1):
-				self.exc.submit(self.pipe, i, bufsize=bufsize)
-			self.pid = self.procs[0].pid
-
-		def pipe(self, i, bufsize=4096):
-			try:
-				proc = self.procs[i]
-				proc2 = self.procs[i + 1]
-				si = 0
-				while proc.is_running() and proc2.is_running():
-					b = proc.stdout.read(si * (si + 1) * bufsize // 8 + bufsize)
-					if not b:
-						break
-					proc2.stdin.write(b)
-					proc2.stdin.flush()
-					si += 1
-				if proc2.is_running():
-					proc2.stdin.close()
-			except Exception:
-				import traceback
-				traceback.print_exc()
-				if not proc.is_running() or not proc2.is_running():
-					self.terminate()
-			if self.exc:
-				self.exc.shutdown(wait=False)
-
-		def is_running(self):
-			for proc in self.procs:
-				if proc.is_running():
-					return True
-			return False
-
-		def terminate(self):
-			for proc in self.procs:
-				proc.terminate()
-
-		def kill(self):
-			for proc in self.procs:
-				proc.kill()
-
-		def wait(self):
-			for proc in self.procs:
-				proc.wait()
-
-		def status(self):
-			return self.procs[-1].status()
-
 	def ecdc_encode(b, bitrate="24", name="", source="", thumbnail=""):
 		assert len(b)
 		fn = temporary_file()
@@ -345,149 +213,6 @@ if "ecdc" in CAPS:
 		PipedProcess(args1, args2).wait()
 		with open(fo, "rb") as f:
 			return f.read()
-
-
-CBOTS = {}
-def cb_exists(cid):
-	return cid in CBOTS
-
-mcache = {}
-def backup_model(cls, model, force=False, **kwargs):
-	kwargs.pop("resume_download", None)
-	t = (cls, model, str(kwargs))
-	try:
-		return mcache[t].result()
-	except KeyError:
-		mcache[t] = fut = concurrent.futures.Future()
-	if force:
-		try:
-			fut.set_result(cls(model, resume_download=True, **kwargs))
-			return fut.result()
-		except Exception as ex:
-			fut.set_exception(ex)
-			ex2 = ex
-	else:
-		try:
-			fut.set_result(cls(model, local_files_only=True, **kwargs))
-			return fut.result()
-		except Exception as ex:
-			fut.set_exception(ex)
-			mcache[t] = fut = exc.submit(cls, model, resume_download=True, **kwargs)
-			try:
-				return fut.result(timeout=24)
-			except Exception as ex:
-				ex2 = ex
-	if isinstance(ex2, concurrent.futures.TimeoutError):
-		try:
-			return fut.result(timeout=60)
-		except concurrent.futures.TimeoutError:
-			raise RuntimeError("Model is loading, please wait...")
-	raise ex2
-
-def determine_cuda(mem=1, priority=None, multi=False, major=0):
-	if not torch or not DEVICES or not torch.cuda.is_available():
-		if multi:
-			return [-1], torch.float32
-		return -1, torch.float32
-	n = torch.cuda.device_count()
-	if not n:
-		if multi:
-			return [-1], torch.float32
-		return -1, torch.float32
-	global pynvml
-	if not globals().get("pynvml"):
-		import pynvml
-		pynvml.nvmlInit()
-	dc = pynvml.nvmlDeviceGetCount()
-	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
-	gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
-	tinfo = [torch.cuda.get_device_properties(COMPUTE_ORDER.index(i)) if i in COMPUTE_ORDER else None for i in range(dc)]
-	COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * dc
-	high = max(COMPUTE_LOAD)
-	if priority == "full":
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, p.major, p.minor, p.multi_processor_count, p.total_memory)
-	elif priority:
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, COMPUTE_LOAD[i] < high * 0.9, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, i, p.multi_processor_count, p.total_memory)
-	elif priority is False:
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -mem // 1073741824, p.major, p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -gmems[i].free, p.multi_processor_count)
-	else:
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, p.major >= 7, -p.major, -p.minor, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -p.multi_processor_count, -gmems[i].free)
-	pcs = sorted(DEVICES, key=key, reverse=True)
-	if multi:
-		return [COMPUTE_ORDER.index(i) for i in pcs if gmems[i].free >= mem], torch.float16
-	return COMPUTE_ORDER.index(pcs[0]), torch.float16
-
-gcancel = concurrent.futures.Future()
-ot = 0
-def ensure_gc(t):
-	global ot, gcancel
-	try:
-		ot = max(ot, time.time() + t)
-		if gcancel.done():
-			gcancel = concurrent.futures.Future()
-		else:
-			try:
-				gcancel.set_result(None)
-			except concurrent.futures.InvalidStateError:
-				pass
-		try:
-			gcancel.result(timeout=t)
-		except concurrent.futures.TimeoutError:
-			pass
-		else:
-			gcancel = concurrent.futures.Future()
-			return
-		if ot and time.time() > ot:
-			with torch.no_grad():
-				torch.cuda.empty_cache()
-			ot = 0
-	except Exception:
-		traceback.print_exc()
-
-
-if "caption" in CAPS:
-	from misc.asyncs import esubmit
-	def load_caption_model():
-		from transformers import AutoModel, AutoTokenizer
-		import torch
-		model_name = "deepseek-ai/DeepSeek-OCR"
-		tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-		model = AutoModel.from_pretrained(model_name, _attn_implementation="flash_attention_2", trust_remote_code=True, use_safetensors=True)
-		model = model.eval().to(torch.bfloat16).cuda()
-		return model, tokenizer
-
-	caption_model_loading = None
-	def caption(im):
-		global caption_model_loading
-		if not caption_model_loading:
-			caption_model_loading = esubmit(load_caption_model)
-		model, tokenizer = caption_model_loading.result()
-		prompt = '<image>\n<|grounding|>Please transcribe all text in the image as accurately as possible. If there is no text present, respond with "N/A". '
-		image_file = temporary_file("webp")
-		im.save(image_file)
-		output_path = temporary_file().rsplit(".", 1)[0]
-		res = model.infer(
-			tokenizer,
-			prompt=prompt,
-			image_file=image_file,
-			output_path=output_path,
-			base_size=1024,
-			image_size=1024,
-			crop_mode=False,
-			save_results=True,
-			test_compress=True,
-		)
-		print(res)
-		raise RuntimeError(res)
-
-
-	def canny(im):
-		if "RGB" not in im.mode:
-			im = im.convert("RGBA")
-		a = np.asanyarray(im)
-		from cv2 import Canny
-		a2 = Canny(a, 100, 200)
-		return fromarray(a2)
 
 
 if "math" in CAPS:
@@ -541,56 +266,6 @@ if "browse" in CAPS:
 				if text and len(texts) >= 2:
 					return text
 			raise TimeoutError(q)
-
-if CAPS.intersection(("sd", "sdxl", "scc")):
-	EXT1 = None
-	def depth(im):
-		global EXT1, EXT2, DPT1, DPT2
-		if im.mode != "RGB":
-			im = im.convert("RGB")
-		im = resize_max(im, 1024)
-		import torch
-		torch.backends.cuda.matmul.allow_tf32 = True
-		from transformers import DPTImageProcessor, DPTForDepthEstimation, GLPNImageProcessor, GLPNForDepthEstimation
-		if not EXT1:
-			EXT1 = backup_model(DPTImageProcessor.from_pretrained, "Intel/dpt-hybrid-midas", torch_dtype=torch.float16, device=0)
-			DPT1 = backup_model(DPTForDepthEstimation.from_pretrained, "Intel/dpt-hybrid-midas", torch_dtype=torch.float16).to(0)
-			EXT2 = backup_model(GLPNImageProcessor.from_pretrained, "whoismikha/room-3d-scene-estimation", torch_dtype=torch.float16, device=0)
-			DPT2 = backup_model(GLPNForDepthEstimation.from_pretrained, "whoismikha/room-3d-scene-estimation", torch_dtype=torch.float16).to(0)
-		def process(im, ext, dpt):
-			inputs = ext(im, return_tensors="pt").to(dpt.dtype).to(dpt.device)
-			with torch.no_grad():
-				outputs = dpt(**inputs)
-				depth = outputs.predicted_depth
-			return torch.nn.functional.interpolate(
-				depth.unsqueeze(1),
-				size=im.size[::-1],
-				mode="bicubic",
-				align_corners=False,
-			)
-		fut = exc.submit(process, im, EXT1, DPT1)
-		pred2 = process(im, EXT2, DPT2)
-		pred1 = fut.result()
-		out1 = pred1.squeeze().cpu().numpy()
-		out2 = pred2.squeeze().cpu().numpy()
-
-		def normalise(a):
-			m, M = np.min(a), np.max(a)
-			a -= m
-			a *= 1 / (M - m)
-			return a
-
-		m = np.min(out1)
-		if m < 0:
-			out1 -= m
-		out1 = -np.sqrt(out1, out=out1)
-		out1 = -np.min(out1) - out1
-		out1 **= 2
-		out1 = -out1
-		formatted = normalise(out1)
-		formatted2 = normalise(out2)
-		formatted3 = normalise(formatted + formatted2) * 255
-		return fromarray(formatted3.astype("uint8"))
 
 
 def write_to(fn, data):

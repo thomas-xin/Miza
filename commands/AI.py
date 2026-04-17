@@ -1035,8 +1035,8 @@ class Imagine(Command):
 				enum=("preprocess", "raw", "caption", "inpaint", "controlnet", "canny"),
 			),
 			description='Transform mode; "preprocess" and "raw" affect text prompts, while the others affect image prompts',
-			example="raw",
-			default="preprocess",
+			example="preprocess",
+			default="raw",
 		),
 		url=cdict(
 			type="image",
@@ -1118,7 +1118,7 @@ class Imagine(Command):
 		"*Tip: By using generative AI, you are assumed to comply with the [ToS](<https://github.com/thomas-xin/Miza/wiki/Terms-of-Service>).*",
 		"*Tip: Use --ar or --aspect-ratio to control the proportions of the image.*",
 		"*Tip: Use -c or --count to control the amount of images generated; maximum 4 for regular users, 9 for premium.*",
-		'*Tip: Standalone text prompts that are short may be reinterpreted by the language model automatically. Use the ALT button on image outputs to see what was added (requires "With image descriptions" enabled in Discord chat settings)*',
+		# '*Tip: Standalone text prompts that are short may be reinterpreted by the language model automatically. Use the ALT button on image outputs to see what was added (requires "With image descriptions" enabled in Discord chat settings)*',
 	)
 	comfyui_json = "misc/comfyui-api.json"
 	comfyui_api = None
@@ -1207,9 +1207,9 @@ class Imagine(Command):
 		eprompts = alist()
 		dups = max(1, random.randint(amount >> 2, amount))
 		oprompt = prompt
-		if mode in ("caption", "preprocess") and not url and len(prompt.split()) < 32:
+		if mode in ("caption", "preprocess") and not url and len(prompt.split()) < 24:
 			temp = oprompt.replace('"""', "'''") or "[Art]"
-			prompt = f'### Instruction:\n"""\n{temp}\n"""\n\nImprove the above image caption as a description to send to txt2img image generation. Be as creative and detailed as possible in at least 2 sentences, but stay concise!\n\n### Response:'
+			prompt = f'"""\n{temp}\n"""\n\nImprove the above image caption as a description to send to txt2img image generation. Be as creative and detailed as possible in at least 2 sentences, but stay concise! Write ONE response only.'
 			resp = cdict(choices=[])
 			if len(resp.choices) < dups:
 				futi = []
@@ -1236,7 +1236,7 @@ class Imagine(Command):
 			if len(resp.choices) < max(1, dups - 1):
 				resp2 = await ai.llm(
 					"chat.completions.create",
-					model="gpt-4.1-mini",
+					model="gemini-3.1-flash-lite",
 					messages=[dict(role="user", content=prompt)],
 					temperature=1,
 					max_tokens=120,

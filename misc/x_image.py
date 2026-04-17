@@ -923,27 +923,6 @@ def gen_captcha(seed, width=640, font="Segoe Script", mult=2, mode="RGB"):
 
 	return dict(duration=8, count=maxframes, frames=captcha_iter())
 
-
-def detect_c2pa(url):
-	if is_url(url):
-		b, h = get_request(url, return_headers=True)
-		mime = h.get("content-type") or "png"
-		fmt = mime.split("/", 1)[-1]
-		fn = f"{time.time_ns()}.{fmt}"
-		with open(fn, "wb") as f:
-			f.write(b)
-	else:
-		fn = url
-	try:
-		import c2pa
-		resp = c2pa.read_file(fn, "cache")
-		if not resp:
-			raise StopIteration
-		resp = orjson.loads(resp)
-	except Exception:
-		return
-	return resp["manifests"][resp["active_manifest"]]["signature_info"]["issuer"]
-
 def fromarray(arr, mode="L"):
 	try:
 		return Image.fromarray(arr, mode=mode)
@@ -2024,6 +2003,12 @@ def to_circle(image):
 		draw.ellipse((0, 0, *image.size), outline=0, fill=(255,) * 4, width=0)
 		CIRCLE_CACHE[image.size] = image_map
 	return ImageChops.multiply(image, image_map)
+
+def canny(im):
+	im = remove_p(im)
+	a = np.asanyarray(im)
+	a2 = cv2.Canny(a, 100, 200)
+	return Image.fromarray(a2, mode="L")
 
 
 def split_rgba(image):
