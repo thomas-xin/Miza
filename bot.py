@@ -3176,8 +3176,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			emb.url = message_link(message)
 			emb.set_image(url=embedded_images[0])
 			if len(embedded_images) > 1:
-				for url in embedded_images[1:4]:
+				for url in embedded_images[1:]:
 					embeds.append(discord.Embed(url=emb.url).set_image(url=url))
+		try:
+			await gather(*(attachment_cache.scan_headers(url) for url in embedded_images))
+		except Exception:
+			print_exc()
 		if thumbnail:
 			emb.set_thumbnail(url=thumbnail)
 		for e in message.embeds:
@@ -3215,7 +3219,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				except Exception:
 					print_exc()
 			def as_link(url1, url2):
-				if image in (url1, url2) or thumbnail in (url1, url2):
+				if thumbnail in (url1, url2):
 					return
 				if url1 == url2:
 					return "(" + url2 + ")"
