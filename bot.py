@@ -783,10 +783,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		finally:
 			self.schedule_shutdown()
 
-	async def _retrieve_api(self, path):
+	async def _retrieve_api(self, path, method, data):
 		while True:
 			data = await Request.aio(
 				f"https://discord.com/api/{api}/{path}",
+				method=method,
+				data=data,
 				authorise=True,
 				json=True,
 				ignore_error=True,
@@ -795,8 +797,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				await asyncio.sleep(float(data["retry_after"]) + 1)
 			else:
 				return data
-	async def retrieve_api(self, path):
-		return await self.discord_cache.aretrieve(path, self._retrieve_api, path)
+	async def retrieve_api(self, path, method="GET", data=None):
+		key = f"{path} {method.casefold()} {repr(data)}"
+		return await self.discord_cache.aretrieve(key, self._retrieve_api, path, method, data)
 
 	def print(self, *args, sep=" ", end="\n"):
 		"A reimplementation of the print builtin function."
@@ -2296,10 +2299,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			instructive="small",
 			casual="small",
 			nsfw="small",
-			backup="deepseek-v3.2-speciale",
+			backup="gemma-4-26b-a4b-it",
 			retry="gpt-5.4-mini",
 			function="small",
-			vision="qwen3.5-27b",
+			vision="gemma-4-26b-a4b-it",
 			target="auto",
 		),
 		1: cdict(
@@ -2309,17 +2312,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			backup="gpt-5.4-mini",
 			retry="gemini-3.1-flash-lite",
 			function="gemma-4-26b-a4b-it",
-			vision="kimi-k2.5",
+			vision="gemini-3-flash",
 			target="auto",
 		),
 		2: cdict(
-			instructive="gemini-3.1-pro",
+			instructive="claude-opus-4.7",
 			casual="gemini-3.1-pro",
 			nsfw="grok-4",
 			backup="gpt-5.4",
-			retry="claude-opus-4.7",
+			retry="gpt-5.4",
 			function="grok-4.1-fast",
-			vision="gemini-3.1-pro",
+			vision="claude-opus-4.7",
 			target="auto",
 		),
 	}
@@ -3110,56 +3113,48 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				url = (await self.data.exec.uproxy(url, force=force, optimise=True)) or url
 		return url
 
-	async def as_embed(self, message, link=False, colour=False, refresh=True, proxy_images=True) -> discord.Embed:
+	async def as_embeds(self, message, link=False, colour=False, refresh=True, proxy_images=True) -> list[discord.Embed]:
 		if refresh:
 			message = await self.ensure_reactions(message)
 		emb = discord.Embed(description="").set_author(**get_author(message.author))
+		embeds = [emb]
 		if colour:
 			col = await self.get_colour(message.author)
 			emb.colour = col
 		content = message.content or message.system_content
+		image_limit = 4
+		embedded_images = []
+		excluded_images = []
+		thumbnail = None
 		if proxy_images and content:
 			urls = await self.follow_url(content, priority_order=("image",))
-			if urls:
+			for url in urls:
 				with tracebacksuppressor:
-					url = urls[0]
-					resp = await asubmit(reqs.next().head, url, headers=Request.header(), _timeout_=12, allow_redirects=True)
-					headers = fcdict(resp.headers)
-					if headers.get("Content-Type", "").split("/", 1)[0] == "image":
-						if float(headers.get("Content-Length", inf)) < CACHE_FILESIZE:
-							url = await self.data.exec.uproxy(url)
-						else:
-							url = await self.data.exec.aproxy(url)
-						emb.url = url
-						emb.set_image(url=url)
-						if url != content:
-							emb.description = content
-						if link:
-							link = message_link(message)
-							emb.description = lim_str(f"{emb.description}\n\n[View Message]({link})", 4096)
-							emb.timestamp = message.edited_at or message.created_at
-						return emb
+					headers = await attachment_cache.scan_headers(url, m_id=message.id)
+					if fcdict(headers).get("content-type", "").split("/", 1)[0] == "image":
+						embedded_images.append(url)
+						excluded_images.append(url)
+						for case in (" " + url, "\t" + url, "\n" + url, url):
+							if case in content:
+								content = content.replace(case, "", 1).strip()
+								break
+						if len(embedded_images) >= image_limit:
+							break
 		emb.description = content
-		image = None
-		thumbnail = None
 		for a in message.attachments:
 			url = a.url
 			if is_image(url) is not None:
-				if not image:
-					if proxy_images:
-						image = await self.data.exec.uproxy(url)
-					else:
-						image = url
-				else:
-					if proxy_images:
-						thumbnail = await self.data.exec.uproxy(url)
-					else:
-						thumbnail = url
+				image = url if not proxy_images else await self.data.exec.uproxy(url)
+				embedded_images.append(image)
+				excluded_images.append(url)
+			if len(embedded_images) >= image_limit:
+				break
 		for s in T(message).get("stickers", ()):
-			if not image:
-				image = s.url
-			else:
-				thumbnail = s.url
+			url = s.url
+			image = url if not proxy_images else await self.data.exec.uproxy(url)
+			embedded_images.append(image)
+			if len(embedded_images) >= image_limit:
+				break
 		for e in message.embeds:
 			if not content:
 				if e.description and e.description != EmptyEmbed:
@@ -3168,28 +3163,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if f:
 						emb.add_field(name=f["name"], value=f["value"], inline=f.get("inline", True))
 			if e.image:
-				if not image:
-					url = e.image.url
-					if proxy_images:
-						image = await self.data.exec.uproxy(url)
-					else:
-						image = url
-				else:
-					url = e.image.url
-					if proxy_images:
-						thumbnail = await self.data.exec.uproxy(url)
-					else:
-						thumbnail = url
-				break
+				url = e.image.url
+				image = url if not proxy_images else await self.data.exec.uproxy(url)
+				embedded_images.append(image)
+				excluded_images.append(url)
+				if len(embedded_images) >= image_limit:
+					break
 			if e.thumbnail:
 				url = e.thumbnail.url
-				if proxy_images:
-					thumbnail = await self.data.exec.uproxy(url)
-				else:
-					thumbnail = url
-		if image:
-			emb.url = image
-			emb.set_image(url=image)
+				thumbnail = url if not proxy_images else await self.data.exec.uproxy(url)
+		if embedded_images:
+			emb.url = message_link(message)
+			emb.set_image(url=embedded_images[0])
+			if len(embedded_images) > 1:
+				for url in embedded_images[1:4]:
+					embeds.append(discord.Embed(url=emb.url).set_image(url=url))
 		if thumbnail:
 			emb.set_thumbnail(url=thumbnail)
 		for e in message.embeds:
@@ -3199,7 +3187,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				title = e.title or ""
 				if title:
 					emb.title = title
-				emb.url = e.url or ""
+				if len(embeds) == 1:
+					emb.url = e.url or ""
 				description = e.description or e.url or ""
 				if description:
 					emb.description = description
@@ -3215,7 +3204,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				while len(emb) > 6000:
 					emb.remove_field(-1)
 				break
-		urls = [e.url for e in message.embeds if e.url] + [best_url(a) for a in message.attachments]
+		urls = [e.url for e in message.embeds if e.url] + [a.url for a in message.attachments]
+		urls = [url for url in urls if url not in excluded_images]
 		items = []
 		for i in range((len(urls) + 9) // 10):
 			temp2 = temp = urls[i * 10:i * 10 + 10]
@@ -3240,7 +3230,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			link = message_link(message)
 			emb.description = lim_str(f"{emb.description}\n\n[View Message]({link})", 4096)
 			emb.timestamp = message.edited_at or message.created_at
-		return emb
+		return embeds
 
 	async def coloured_embed(self, url):
 		colour = await self.get_colour(url)
@@ -5781,10 +5771,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				int_id, int_token = message.id, message.slash
 			else:
 				return
-			data = await Request.aio(
+			data = await self.retrieve_api(
 				f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
 				method="POST",
-				authorise=True,
 				data='{"type":5,"data":{"flags":64}}' if ephemeral else '{"type":5}' if mode == "post" else '{"type":6}',
 			)
 			print("Deferred:", message.id, data)

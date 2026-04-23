@@ -512,17 +512,17 @@ class UpdateExec(Database):
 				bot.data.dailies.progress_quests(user, "talk")
 			if v:
 				return
-			emb = await bot.as_embed(message)
-			col = await bot.get_colour(user)
-			emb.colour = discord.Colour(col)
-			url = await bot.get_proxy_url(user)
-			emb.set_author(name=f"{user} ({user.id})", icon_url=url)
-			emb.set_footer(text=str(message.id))
-			for c_id, flag in self.data.items():
-				if flag & 2:
-					channel = self.bot.cache.channels.get(c_id)
-					if channel is not None:
-						self.bot.send_embeds(channel, embed=emb)
+			# emb = await bot.as_embed(message)
+			# col = await bot.get_colour(user)
+			# emb.colour = discord.Colour(col)
+			# url = await bot.get_proxy_url(user)
+			# emb.set_author(name=f"{user} ({user.id})", icon_url=url)
+			# emb.set_footer(text=str(message.id))
+			# for c_id, flag in self.data.items():
+			# 	if flag & 2:
+			# 		channel = self.bot.cache.channels.get(c_id)
+			# 		if channel is not None:
+			# 			self.bot.send_embeds(channel, embed=emb)
 
 	def __load__(self, **void):
 		sendable = list(c_id for c_id, flag in self.data.items() if flag & 16)

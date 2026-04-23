@@ -782,12 +782,22 @@ class Snake(Command):
 		self.playing.pop(message.id, None)
 
 
-class SlotMachine(Command):
+class SlotMachine(Pagination, Command):
 	name = ["Slots"]
 	description = "Plays a slot machine game. Costs gold to play, can yield gold and diamonds."
-	usage = "<bet[50]>? <skip_animation(-s)>?"
-	example = ("slots 60", "slots -s 1000")
-	flags = "s"
+	schema = cdict(
+		bet=cdict(
+			type="number",
+			description="Amount of gold to bet",
+			example="60",
+			default=50,
+		),
+		skip=cdict(
+			type="bool",
+			description="Skip the turning animation",
+			default=False,
+		),
+	)
 	rate_limit = (7, 12)
 	emojis = {
 		"❤️": 20,
@@ -800,6 +810,7 @@ class SlotMachine(Command):
 		"🍌": 3,
 	}
 	slash = ("Slots",)
+	directions = ["⤵️".encode("utf-8")]
 
 	def select(self):
 		x = random.random()
@@ -831,74 +842,86 @@ class SlotMachine(Command):
 				out += item
 		return out
 
-	async def __call__(self, argv, user, flags, **void):
-		b1 = 50
-		if argv:
-			bet = await self.bot.eval_math(argv)
-			if bet < b1:
-				raise ValueError(f"Minimum bet is {b1} coins.")
-		else:
-			bet = b1
-		if not bet <= self.bot.get_userbase(user.id, "gold", 0):
-			raise OverflowError("Bet cannot be greater than your balance.")
-		self.bot.data.users.add_gold(user, -bet)
-		skip = int("s" in flags)
-		return f"*```callback-fun-slotmachine-{user.id}_{bet}_{skip}-\nLoading Slot Machine...```*"
+	def react_perms(self, perm: int):
+		return True
 
-	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-		spl = list(map(int, vals.split("_", 2)))
-		if len(spl) < 3:
-			spl.append(0)
-		u_id, bet, skip = spl
-		if reaction is None or as_str(reaction) == "⤵️":
-			if reaction is None:
-				csubmit(message.add_reaction("⤵️"))
-				user = await bot.fetch_user(u_id)
-			else:
-				if bet > self.bot.get_userbase(user.id, "gold", 0):
-					raise OverflowError("Bet cannot be greater than your balance.")
-				bot.data.users.add_gold(user, -bet)
+	async def display(self, message, user, bet, skip=False, roll=False):
+		bot = self.bot
+		colour = await bot.get_colour(user)
+		emb = discord.Embed(colour=colour).set_author(**get_author(user))
+		end = ""
+		if roll:
+			if bet > (bal := bot.get_userbase(user.id, "gold", 0)):
+				raise OverflowError(f"Bet ({bet}) cannot be greater than your balance ({bal}).")
 			rate = 0.5 - max(0, min(1, ((bet - 64) / 4032))) / 14
+			gold = diamonds = 0
 			wheel_true = self.generate(rate)
+			if wheel_true[0] == wheel_true[1] == wheel_true[2]:
+				gold = self.emojis[wheel_true[0]]
+				if gold is None:
+					diamonds = bet / 5
+				else:
+					gold *= bet
+			gold -= bet
+			bot.data.users.add_diamonds(user, diamonds)
+			bot.data.users.add_gold(user, gold)
+			rewards = await bot.as_rewards(diamonds, gold)
+			end = f"\nRewards:\n{rewards}\n"
 			wheel_display = [None] * 3 if not skip else wheel_true
 			wheel_order = deque(shuffle(range(3))) if not skip else deque((0, ))
-			colour = await bot.get_colour(user)
-			emb = discord.Embed(colour=colour).set_author(**get_author(user))
 			if not skip:
+				await bot.defer_interaction(message, mode="patch")
 				async with Delay(2):
 					emoj = await self.as_emojis(wheel_display)
-					gold = self.bot.get_userbase(user.id, "gold", 0)
 					bets = await bot.as_rewards(bet)
-					bals = await bot.as_rewards(gold)
-					emb.description = f"```css\n[Slot Machine]```{emoj}\nBet: {bets}\nBalance: {bals}"
-					await bot.edit_message(message, content=None, embed=emb)
-			ctx = Delay(1) if not skip else emptyctx
-			while wheel_order:
-				async with ctx:
-					i = wheel_order.popleft()
-					wheel_display[i] = wheel_true[i]
-					if not wheel_order:
-						gold = diamonds = 0
-						start = f"```callback-fun-slotmachine-{user.id}_{bet}-\n"
-						if wheel_true[0] == wheel_true[1] == wheel_true[2]:
-							gold = self.emojis[wheel_true[0]]
-							if gold is None:
-								diamonds = bet / 5
-							else:
-								gold *= bet
-						bot.data.users.add_diamonds(user, diamonds)
-						bot.data.users.add_gold(user, gold)
-						rewards = await bot.as_rewards(diamonds, gold)
-						end = f"\nRewards:\n{rewards}\n"
-					else:
-						start = "```ini\n"
-						end = ""
-					emoj = await self.as_emojis(wheel_display)
-					gold = self.bot.get_userbase(user.id, "gold", 0)
-					bets = await bot.as_rewards(bet)
-					bals = await bot.as_rewards(gold)
-					emb.description = f"{start}[Slot Machine]```{emoj}\nBet: {bets}\nBalance: {bals}{end}"
-					await bot.edit_message(message, embed=emb)
+					bals = await bot.as_rewards(bal)
+					emb.description = f"**Slot Machine**\n{emoj}\nBet: {bets}\nBalance: {bals}"
+					await interaction_patch(
+						bot=self,
+						message=message,
+						embeds=[emb],
+						buttons=[
+							cdict(emoji="⤵️", style=1, disabled=True),
+						]
+					)
+				while len(wheel_order) > 1:
+					async with Delay(1):
+						i = wheel_order.popleft()
+						wheel_display[i] = wheel_true[i]
+						emoj = await self.as_emojis(wheel_display)
+						bets = await bot.as_rewards(bet)
+						bals = await bot.as_rewards(bal)
+						emb.description = f"**Slot Machine**\n{emoj}\nBet: {bets}\nBalance: {bals}"
+						await interaction_patch(
+							bot=self,
+							message=message,
+							embeds=[emb],
+						)
+		else:
+			wheel_true = [choice(self.emojis) for i in range(3)]
+		emoj = await self.as_emojis(wheel_true)
+		gold = self.bot.get_userbase(user.id, "gold", 0)
+		bets = await bot.as_rewards(bet)
+		bals = await bot.as_rewards(gold)
+		emb.description = self.encode(user.id, leb128(bet) + bytes([skip]), f"**Slot Machine**\n{emoj}\nBet: {bets}\nBalance: {bals}{end}")
+		return cdict(
+			embeds=[emb],
+			buttons=[
+				cdict(emoji="⤵️", style=1),
+			]
+		)
+
+	async def __call__(self, _message, _user, bet, skip, **void):
+		if getattr(_message, "simulated", None):
+			skip = True
+		return await self.display(_message, _user, bet, skip, roll=False)
+
+	async def _callback_(self, _message, _user, _uid, index, data, **void):
+		if index < 0:
+			return
+		bet, more = decode_leb128(data)
+		skip = bool(more[0])
+		return await self.display(_message, _user, bet, skip)
 
 
 sparkle_odds = {
@@ -978,7 +1001,7 @@ class Barter(Command):
 			raise OverflowError(f"Barter amount cannot be greater than your balance ({amount} > {ingots}). See ~shop for more information.")
 		elif not amount >= 1:
 			raise ValueError("Please input a valid amount of ingots.")
-		bot.data.users.add_gold(user.id, -cost)
+		bot.data.users.add_gold(user, -cost)
 		if amount >= 18446744073709551616:
 			dtype = np.float80
 		elif amount >= 4294967296:

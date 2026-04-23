@@ -564,7 +564,7 @@ class RoleSelect(Pagination, Command):
 		emb.description = italics(f"{available} roles assignable") + "\n" + description
 		return self.construct(_user.id, leb128(limit or 0) + serialise_nums([role.id for _, role in rolelist]), embed=emb, buttons=buttons, reference=None)
 
-	def react_perms(self, perm):
+	def react_perms(self, perm: int):
 		return True
 
 	async def _callback_(self, bot, _message, _user, reaction, data, **void):
@@ -655,7 +655,7 @@ class Verifier(Pagination, Command):
 			reference=None,
 		)
 
-	def react_perms(self, perm):
+	def react_perms(self, perm: int):
 		return True
 
 	async def _callback_(self, bot, _user, _guild, index, data, **void):
@@ -1447,101 +1447,101 @@ class Publish(Command):
 #         pass
 
 
-class Relay(Command):
-	server_only = True
-	name = ["Forward"]
-	min_level = 4
-	description = "Causes ⟨BOT⟩ to send the target user(s) a DM that enables them to communicate through the current channel."
-	usage = "<user>* <disable(-d)>?"
-	example = ("relay @Miza Sorry, you have been banned from this server. Reply to this message to appeal!", "relay -d 201548633244565504")
-	flags = "aedf"
-	rate_limit = (16, 24)
+# class Relay(Command):
+# 	server_only = True
+# 	name = ["Forward"]
+# 	min_level = 4
+# 	description = "Causes ⟨BOT⟩ to send the target user(s) a DM that enables them to communicate through the current channel."
+# 	usage = "<user>* <disable(-d)>?"
+# 	example = ("relay @Miza Sorry, you have been banned from this server. Reply to this message to appeal!", "relay -d 201548633244565504")
+# 	flags = "aedf"
+# 	rate_limit = (16, 24)
 
-	async def __call__(self, bot, argv, args, argl, message, channel, guild, flags, user, **void):
-		if not argv:
-			raise ArgumentError("Input string is empty.")
-		users = await bot.find_users(argl, args, user, guild)
-		if not users:
-			raise LookupError(f"No results found for {argv}.")
-		if len(users) > 1 and "f" not in flags:
-			raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
-		msg = " ".join(args)
-		if not msg:
-			msg = "[SAMPLE MESSAGE]"
-			msg = bold(ini_md(msg))
-		csubmit(message.add_reaction("📧"))
-		fut = csubmit(send_with_reply(channel, message, "*```\nLoading DM relay...```*"))
-		colour = await bot.get_colour(user)
-		emb = discord.Embed(colour=colour, description=msg)
-		url = await bot.get_proxy_url(user)
-		emb.set_author(name=f"{user} ({user.id})", icon_url=url)
-		emb.timestamp = message.created_at
-		# emb.set_footer(text=str(message.id))
-		m = await fut
-		futs = deque()
-		for u in users:
-			fut = csubmit(u.send(f"*```callback-admin-relay-{m.channel.id}_{m.id}-\nThis is a relayed message. Use Discord reply to send a response.```*", embed=emb))
-			futs.append(fut)
-		mids = []
-		uids = []
-		for fut, u in zip(futs, users):
-			with bot.ExceptionSender(channel):
-				mes = await fut
-				mids.append(mes.id)
-				uids.append(u.id)
-		if not mids or not uids:
-			return
-		uidf = "x".join(map(str, uids))
-		midf = "x".join(map(str, mids))
-		unames = ", ".join(map(user_mention, uids))
-		await bot.edit_message(m, content=f"*```callback-admin-relay-{uidf}_{midf}-\nMessage successfully forwarded.```*\n> Received by {unames}. Use Discord reply to send additional messages.", embed=emb)
+# 	async def __call__(self, bot, argv, args, argl, message, channel, guild, flags, user, **void):
+# 		if not argv:
+# 			raise ArgumentError("Input string is empty.")
+# 		users = await bot.find_users(argl, args, user, guild)
+# 		if not users:
+# 			raise LookupError(f"No results found for {argv}.")
+# 		if len(users) > 1 and "f" not in flags:
+# 			raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
+# 		msg = " ".join(args)
+# 		if not msg:
+# 			msg = "[SAMPLE MESSAGE]"
+# 			msg = bold(ini_md(msg))
+# 		csubmit(message.add_reaction("📧"))
+# 		fut = csubmit(send_with_reply(channel, message, "*```\nLoading DM relay...```*"))
+# 		colour = await bot.get_colour(user)
+# 		emb = discord.Embed(colour=colour, description=msg)
+# 		url = await bot.get_proxy_url(user)
+# 		emb.set_author(name=f"{user} ({user.id})", icon_url=url)
+# 		emb.timestamp = message.created_at
+# 		# emb.set_footer(text=str(message.id))
+# 		m = await fut
+# 		futs = deque()
+# 		for u in users:
+# 			fut = csubmit(u.send(f"*```callback-admin-relay-{m.channel.id}_{m.id}-\nThis is a relayed message. Use Discord reply to send a response.```*", embed=emb))
+# 			futs.append(fut)
+# 		mids = []
+# 		uids = []
+# 		for fut, u in zip(futs, users):
+# 			with bot.ExceptionSender(channel):
+# 				mes = await fut
+# 				mids.append(mes.id)
+# 				uids.append(u.id)
+# 		if not mids or not uids:
+# 			return
+# 		uidf = "x".join(map(str, uids))
+# 		midf = "x".join(map(str, mids))
+# 		unames = ", ".join(map(user_mention, uids))
+# 		await bot.edit_message(m, content=f"*```callback-admin-relay-{uidf}_{midf}-\nMessage successfully forwarded.```*\n> Received by {unames}. Use Discord reply to send additional messages.", embed=emb)
 
-	_callback_ = _react_callback_ = async_nop
+# 	_callback_ = _react_callback_ = async_nop
 
 
-class UpdateRelays(Database):
-	name = "relays"
+# class UpdateRelays(Database):
+	# name = "relays"
 
-	async def _nocommand_(self, message, **void):
-		bot = self.bot
-		tup = None
-		try:
-			reference = await bot.fetch_reference(message)
-		except (LookupError, discord.NotFound):
-			pass
-		else:
-			if reference.author.id == bot.id and reference.content.startswith("*```callback-admin-relay-"):
-				tup = reference.content.removeprefix("*```callback-admin-relay-").split("\n", 1)[0].rstrip("-").split("_")
-		if not tup:
-			return
-		if len(tup) != 2:
-			print(reference.content)
-			raise ValueError(tup)
-		csubmit(message.add_reaction("📧"))
-		emb = await bot.as_embed(message)
-		user = message.author
-		channel = message.channel
-		col = await bot.get_colour(user)
-		emb.colour = discord.Colour(col)
-		url = await bot.get_proxy_url(user)
-		emb.set_author(name=f"{user} ({user.id})", icon_url=url)
-		emb.timestamp = message.created_at
-		# emb.set_footer(text=str(message.id))
-		sidf, midf = tup
-		sids, mids = sidf.split("x"), midf.split("x")
-		futs = deque()
-		for si, mi in zip(sids, mids):
-			with bot.ExceptionSender(channel):
-				sendable = await bot.fetch_messageable(si)
-				m = await bot.fetch_message(mi, sendable)
-				fut = csubmit(send_with_reply(sendable, m, f"*```callback-admin-relay-{message.channel.id}_{message.id}-\nThis is a relayed message. Use Discord reply to send a response.```*", embed=emb))
-				futs.append(fut)
-		msent = []
-		for fut in futs:
-			with bot.ExceptionSender(channel):
-				m = await fut
-				msent.append(m)
-		print(msent)
+	# async def _nocommand_(self, message, **void):
+	# 	bot = self.bot
+	# 	tup = None
+	# 	try:
+	# 		reference = await bot.fetch_reference(message)
+	# 	except (LookupError, discord.NotFound):
+	# 		pass
+	# 	else:
+	# 		if reference.author.id == bot.id and reference.content.startswith("*```callback-admin-relay-"):
+	# 			tup = reference.content.removeprefix("*```callback-admin-relay-").split("\n", 1)[0].rstrip("-").split("_")
+	# 	if not tup:
+	# 		return
+	# 	if len(tup) != 2:
+	# 		print(reference.content)
+	# 		raise ValueError(tup)
+	# 	csubmit(message.add_reaction("📧"))
+	# 	emb = await bot.as_embed(message)
+	# 	user = message.author
+	# 	channel = message.channel
+	# 	col = await bot.get_colour(user)
+	# 	emb.colour = discord.Colour(col)
+	# 	url = await bot.get_proxy_url(user)
+	# 	emb.set_author(name=f"{user} ({user.id})", icon_url=url)
+	# 	emb.timestamp = message.created_at
+	# 	# emb.set_footer(text=str(message.id))
+	# 	sidf, midf = tup
+	# 	sids, mids = sidf.split("x"), midf.split("x")
+	# 	futs = deque()
+	# 	for si, mi in zip(sids, mids):
+	# 		with bot.ExceptionSender(channel):
+	# 			sendable = await bot.fetch_messageable(si)
+	# 			m = await bot.fetch_message(mi, sendable)
+	# 			fut = csubmit(send_with_reply(sendable, m, f"*```callback-admin-relay-{message.channel.id}_{message.id}-\nThis is a relayed message. Use Discord reply to send a response.```*", embed=emb))
+	# 			futs.append(fut)
+	# 	msent = []
+	# 	for fut in futs:
+	# 		with bot.ExceptionSender(channel):
+	# 			m = await fut
+	# 			msent.append(m)
+	# 	print(msent)
 
 
 class UpdateBans(Database):
@@ -2488,8 +2488,10 @@ class UpdateMessageLogs(Database):
 		except (EOFError, discord.NotFound):
 			self.data.pop(guild.id)
 			return
-		emb = await self.bot.as_embed(after, proxy_images=False)
-		emb2 = await self.bot.as_embed(before, proxy_images=False, refresh=False)
+		embs = await self.bot.as_embeds(after, proxy_images=False)
+		embs2 = await self.bot.as_embeds(before, proxy_images=False, refresh=False)
+		emb = embs[0]
+		emb2 = embs2[0]
 		emb.colour = discord.Colour(0x0000FF)
 		action = f"**Message edited in** {channel_mention(after.channel.id)}:\n[View Message]({after.jump_url})"
 		emb.add_field(name="Before", value=lim_str(emb2.description, 1024))
@@ -2588,11 +2590,11 @@ class UpdateMessageLogs(Database):
 			init = self.last_inits.get(channel.id) or "[UNKNOWN USER]"
 		except (PermissionError, discord.Forbidden):
 			init = "[UNKNOWN USER]"
-		emb = await self.bot.as_embed(message, link=True)
-		emb.colour = discord.Colour(0xFF0000)
+		embs = await self.bot.as_embeds(message, link=True)
+		embs[0].colour = discord.Colour(0xFF0000)
 		action = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\n"
-		emb.description = lim_str(action + (emb.description or ""), 4096)
-		self.bot.send_embeds(channel, emb)
+		embs[0].description = lim_str(action + (embs[0].description or ""), 4096)
+		self.bot.send_embeds(channel, embs)
 
 	# Thanks to the embed sender feature, which allows this feature to send up to 10 logs in one message
 	async def _bulk_delete_(self, messages, **void):
@@ -2656,16 +2658,16 @@ class UpdateMessageLogs(Database):
 		#     if len(emb.description) + len(nextline) > 2048:
 		#         break
 		#     emb.description += nextline
-		embs = deque((emb,))
+		embeds = deque((emb,))
 		for message in messages:
 			try:
-				emb = await self.bot.as_embed(message, link=True)
+				embs = await self.bot.as_embeds(message, link=True)
 			except Exception:
 				print_exc()
 				continue
-			emb.colour = discord.Colour(0x7F007F)
-			embs.append(emb)
-		self.bot.send_embeds(channel, embs)
+			embs[0].colour = discord.Colour(0x7F007F)
+			embeds.extend(embs)
+		self.bot.send_embeds(channel, embeds)
 
 
 class UpdatePublishers(Database):
@@ -2818,13 +2820,13 @@ class UpdateStarboards(Database):
 					table[None].pop(message.id)
 			if message.id not in table.setdefault(None, {}):
 				if count >= req:# and count < req * 2 + 2:
-					embed = await self.bot.as_embed(message, link=True, colour=True)
-					text, link = embed.description.rsplit("\n\n", 1)
+					embeds = await self.bot.as_embeds(message, link=True, colour=True)
+					text, link = embeds[0].description.rsplit("\n\n", 1)
 					description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table or "SPARKLES" in table and getattr(r.emoji, "id", None) and r.emoji.id in self.sparkle_ids) + "   " + link
-					embed.description = lim_str(description, 4096)
+					embeds[0].description = lim_str(description, 4096)
 					try:
 						channel = await self.bot.fetch_channel(table[react][1])
-						m = await channel.send(embed=embed)
+						m = await channel.send(embeds=embeds)
 					except (discord.NotFound, discord.Forbidden):
 						table.pop(react)
 					else:
@@ -2836,11 +2838,11 @@ class UpdateStarboards(Database):
 				try:
 					channel = await self.bot.fetch_channel(table[react][1])
 					m = await self.bot.fetch_message(table[None][message.id], channel)
-					embed = await self.bot.as_embed(message, link=True, colour=True)
-					text, link = embed.description.rsplit("\n\n", 1)
+					embeds = await self.bot.as_embeds(message, link=True, colour=True)
+					text, link = embeds[0].description.rsplit("\n\n", 1)
 					description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table or "SPARKLES" in table and getattr(r.emoji, "id", None) and r.emoji.id in self.sparkle_ids) + "   " + link
-					embed.description = lim_str(description, 4096)
-					await self.bot.edit_message(m, content=None, embed=embed)
+					embeds[0].description = lim_str(description, 4096)
+					await self.bot.edit_message(m, content=None, embeds=embeds)
 				except (discord.NotFound, discord.Forbidden):
 					table[None].pop(message.id, None)
 				else:
@@ -2868,11 +2870,11 @@ class UpdateStarboards(Database):
 					react = "SPARKLES"
 				channel = await self.bot.fetch_channel(table[react][1])
 				m = await self.bot.fetch_message(table[None][message.id], channel)
-				embed = await self.bot.as_embed(message, link=True, colour=True)
-				text, link = embed.description.rsplit("\n\n", 1)
+				embeds = await self.bot.as_embeds(message, link=True, colour=True)
+				text, link = embeds[0].description.rsplit("\n\n", 1)
 				description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in reacts if str(r.emoji) in table or "SPARKLES" in table and getattr(r.emoji, "id", None) and r.emoji.id in self.sparkle_ids) + "   " + link
-				embed.description = lim_str(description, 4096)
-				await self.bot.edit_message(m, content=None, embed=embed)
+				embeds[0].description = lim_str(description, 4096)
+				await self.bot.edit_message(m, content=None, embeds=embeds)
 			except (discord.NotFound, discord.Forbidden):
 				table[None].pop(message.id, None)
 			else:

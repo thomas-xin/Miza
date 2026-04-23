@@ -465,6 +465,7 @@ class Info(Command):
 		fields = {}
 		bot = self.bot
 		u = user
+		guild = getattr(u, "guild", None)
 		is_bot = is_sys = False
 		if u.id == bot.id:
 			attributes.append("Myself 🙃")
@@ -518,7 +519,7 @@ class Info(Command):
 				attributes.append("Verified Bot Developer 🏆")
 		if u.bot and not is_bot:
 			attributes.append("Bot 🤖")
-		if u.guild and u.id == u.guild.owner_id:
+		if guild and u.id == u.guild.owner_id:
 			attributes.append("Server owner 👑")
 		seen = None
 		try:
@@ -535,7 +536,7 @@ class Info(Command):
 		joined = getattr(u, "joined_at", None)
 		count = None
 		true_joined = None
-		if u.guild:
+		if guild:
 			count = await bot.index_member(u.guild.id, u.id)
 			true_joined = bot.get_guildbase(u.guild.id, f"index:{u.id}.min")
 			if true_joined:

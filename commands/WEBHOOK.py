@@ -909,12 +909,12 @@ class UpdateMimics(Database):
 			except (LookupError, discord.NotFound):
 				bot.data.logM.pop(guild.id)
 				return
-			emb = await self.bot.as_embed(message, link=True)
-			emb.colour = discord.Colour(0x00FF00)
+			embs = await self.bot.as_embeds(message, link=True)
+			embs[0].colour = discord.Colour(0x00FF00)
 			action = f"**Proxy invoked from** {channel_mention(message.channel.id)}:\n"
-			emb.description = lim_str(action + emb.description, 4096)
-			emb.timestamp = message.created_at
-			self.bot.send_embeds(c, emb)
+			embs[0].description = lim_str(action + embs[0].description, 4096)
+			embs[0].timestamp = message.created_at
+			self.bot.send_embeds(c, embs)
 		mimic = await self.update_mimic(mimic, guild=guild)
 		name = mimic.name
 		url = mimic.url

@@ -375,7 +375,7 @@ def simplify_recurring(r, prec=100):
 		# sympy.n_order uses prime-factor descent on lambda(tq): O(Omega(n)*log n)
 		# modular exponentiations, vs. the previous O(d(n)) divisor enumeration.
 		digits = int(sympy.ntheory.residue_ntheory.n_order(10, tq))
-	except (ValueError, NotImplementedError):
+	except (ValueError, AttributeError, NotImplementedError):
 		return
 	if digits > prec * 16:
 		return

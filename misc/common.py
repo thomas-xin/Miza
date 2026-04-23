@@ -1979,7 +1979,7 @@ class Pagination:
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	dirmap = dict(zip(dirnames, map(as_str, directions)))
 
-	def encode(self, uid: int, data: bytes, s: str) -> str:
+	def encode(self, uid: int, data: byte_like, s: str) -> str:
 		s = s.strip()
 		code = invisicode.encode(self.__name__.encode("utf-8") + b"\x00" + leb128(uid) + as_bytes(data))
 		if (s.startswith("```") or s.startswith("*```")) and "\n" in s:
@@ -2004,9 +2004,6 @@ class Pagination:
 		code = invisicode.decode(s[:i])
 		name, code = code.split(b"\x00", 1)
 		return (as_str(name), *decode_leb128(code))
-
-	def react_perms(self, perm: int):
-		return None
 
 	def construct(self, uid, data, content="", **kwargs):
 		if not content:

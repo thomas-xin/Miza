@@ -672,17 +672,26 @@ class Skip(Command):
 				continue
 			vote = mode == "vote" or mode == "auto" and entry.get("u_id") not in (_user.id, bot.id)
 			if vote:
-				if _user.id in entry.get("skips", ()):
-					if len(entry.get("skips", ())) >= required:
+				existing_skips = entry.get("skips", ())
+				if _user.id in existing_skips:
+					if len(existing_skips) >= required:
 						skips.append(i)
 					else:
 						dups.append(i)
-				elif len(entry.get("skips", ())) + 1 >= required:
+				elif len(existing_skips) + 1 >= required:
 					skips.append(i)
 				else:
 					votes.append(i)
-			elif _perm < 1 and entry.get("u_id") not in (_user.id, bot.id) and {m.id for m in vc_.members}.difference([_user.id, bot.id]):
-				raise self.perm_error(_perm, 1, "to force-skip other users' entries")
+			elif (
+				_perm < 1
+				and entry.get("u_id") not in (_user.id, bot.id)
+				and {m.id for m in vc_.members}.difference([_user.id, bot.id])
+			):
+				existing_skips = entry.get("skips", ())
+				if len(existing_skips) >= required or len(existing_skips) + 1 == required and _user.id not in existing_skips:
+					skips.append(i)
+				else:
+					raise self.perm_error(_perm, 1, "to force-skip other users' entries")
 			else:
 				skips.append(i)
 		desc = []
