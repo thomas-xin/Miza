@@ -582,8 +582,8 @@ class Info(Command):
 		if desc := getattr(c, "topic", None) or getattr(c, "description", None):
 			attributes.append(desc)
 		fields.update({
-			"Channel": f"`{c.id}`",
-			"Creation time": time_repr(c.created_at),
+			"Channel ID": f"`{c.id}`",
+			"Creation time": time_repr(c.created_at or snowflake_time_3(c.id)),
 		})
 		fields["Type"] = getattr(c, "type", "text")
 		if getattr(c, "guild", None):
