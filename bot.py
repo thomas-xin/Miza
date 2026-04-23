@@ -3132,26 +3132,36 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				with tracebacksuppressor:
 					headers = await attachment_cache.scan_headers(url, m_id=message.id)
 					if fcdict(headers).get("content-type", "").split("/", 1)[0] == "image":
-						embedded_images.append(url)
 						excluded_images.append(url)
 						for case in (" " + url, "\t" + url, "\n" + url, url):
 							if case in content:
 								content = content.replace(case, "", 1).strip()
 								break
+						if proxy_images:
+							with tracebacksuppressor:
+								url = await self.data.exec.uproxy(url)
+						embedded_images.append(url)
 						if len(embedded_images) >= image_limit:
 							break
 		emb.description = content
 		for a in message.attachments:
 			url = a.url
 			if is_image(url) is not None:
-				image = url if not proxy_images else await self.data.exec.uproxy(url)
-				embedded_images.append(image)
 				excluded_images.append(url)
+				if proxy_images:
+					with tracebacksuppressor:
+						url = await self.data.exec.uproxy(url)
+				image = url
+				embedded_images.append(image)
 			if len(embedded_images) >= image_limit:
 				break
 		for s in T(message).get("stickers", ()):
 			url = s.url
-			image = url if not proxy_images else await self.data.exec.uproxy(url)
+			excluded_images.append(url)
+			if proxy_images:
+				with tracebacksuppressor:
+					url = await self.data.exec.uproxy(url)
+			image = url
 			embedded_images.append(image)
 			if len(embedded_images) >= image_limit:
 				break
@@ -3164,14 +3174,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						emb.add_field(name=f["name"], value=f["value"], inline=f.get("inline", True))
 			if e.image:
 				url = e.image.url
-				image = url if not proxy_images else await self.data.exec.uproxy(url)
-				embedded_images.append(image)
 				excluded_images.append(url)
+				if proxy_images:
+					with tracebacksuppressor:
+						url = await self.data.exec.uproxy(url)
+				image = url
+				embedded_images.append(image)
 				if len(embedded_images) >= image_limit:
 					break
 			if e.thumbnail:
 				url = e.thumbnail.url
-				thumbnail = url if not proxy_images else await self.data.exec.uproxy(url)
+				if proxy_images:
+					with tracebacksuppressor:
+						url = await self.data.exec.uproxy(url)
+				thumbnail = url
 		if embedded_images:
 			emb.url = message_link(message)
 			emb.set_image(url=embedded_images[0])

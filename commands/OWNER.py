@@ -712,7 +712,7 @@ class UpdateExec(Database):
 		url = attachment_cache.preserve(url, m_id)
 		bot.data.proxies[uhu] = url
 		return url
-	
+
 	def cproxy(self, url):
 		if url in self.temp:
 			return
