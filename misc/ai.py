@@ -362,6 +362,7 @@ async def load_local():
 			print(f"Loaded local model API {base_url} with model {mname}.")
 		local_models[name] = models
 		available.setdefault(name, {})[""] = (name, pricing)
+		contexts[name] = info.get("context", 24576)
 		if "image" in capabilities:
 			is_vision.add(name)
 		else:
@@ -748,36 +749,6 @@ f_myinfo = {
 				},
 			},
 }}}
-f_txt2img = {
-	"type": "function", "function": {
-		"name": "txt2img",
-		"description": "Generates an image of the input description, only use when asked to draw a picture. Please make it elaborate where possible!",
-		"parameters": {
-			"type": "object", "properties": {
-				"prompt": {
-					"type": "string",
-					"description": "Prompt, eg. Brilliant view of a futuristic city in an alien world, glowing spaceships, 8k fantasy art",
-				},
-				"count": {
-					"type": "integer",
-					"description": "Amount of images to produce.",
-				},
-			},
-			"required": ["prompt"],
-}}}
-f_img2txt = {
-	"type": "function", "function": {
-		"name": "img2txt",
-		"description": "Answers a question about the user's input image; only use for necessary information. Please be detailed!",
-		"parameters": {
-			"type": "object", "properties": {
-				"query": {
-					"type": "string",
-					"description": "Question, eg. What game is the screenshot from? Please transcribe all text.",
-				},
-			},
-			"required": ["query"],
-}}}
 f_reminder = {
 	"type": "function", "function": {
 		"name": "reminder",
@@ -880,12 +851,10 @@ TOOLS = {
 		f_wolfram_alpha,
 		f_deno,
 		f_myinfo,
-		f_txt2img,
 	],
 	"image_generation": [
 		f_browse,
 		f_myinfo,
-		f_txt2img,
 	],
 	"calculator": [
 		f_browse,

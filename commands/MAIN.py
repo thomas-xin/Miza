@@ -424,319 +424,383 @@ class Icon(Command):
 
 
 class Info(Command):
-	name = ["🔍", "🔎", "UserInfo", "ServerInfo", "WhoIs"]
-	description = "Shows information about the target user or server."
-	usage = "<user>* <verbose(-v)>?"
-	example = ("info 201548633244565504", "info")
-	flags = "v"
+	name = ["🔍", "🔎", "WhoIs"]
+	description = "Shows information about the target user, channel, role or server."
+	schema = cdict(
+		objects=cdict(
+			type="mentionable",
+			description="Target object to retrieve info about",
+			example="201548633244565504",
+			multiple=True,
+		),
+		mode=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("user", "channel", "server"),
+				accepts={"guild": "server"},
+			),
+			description="Default target if no other input specified",
+			default="user",
+		),
+	)
+	macros = cdict(
+		UserInfo=cdict(
+			mode="User",
+		),
+		ServerInfo=cdict(
+			mode="server",
+		),
+		ChannelInfo=cdict(
+			mode="channel",
+		),
+	)
 	rate_limit = (6, 9)
-	multi = True
 	slash = True
 	ephemeral = True
 	usercmd = True
 	exact = False
 
-	async def getGuildData(self, g, flags={}, is_current=False):
+	async def get_user_info(self, user):
+		attributes = []
+		fields = {}
 		bot = self.bot
-		url = await bot.get_proxy_url(g, force=True)
-		name = g.name
+		u = user
+		is_bot = is_sys = False
+		if u.id == bot.id:
+			attributes.append("Myself 🙃")
+		if bot.is_owner(u.id):
+			attributes.append("My owner ❤️")
+		if u.id == bot.deleted_user or bot.get_userbase(u.id, "deleted"):
+			attributes.append("Deleted User ⚠️")
+		if getattr(u, "system", False):
+			attributes.append("Discord System ⚙️")
+			is_sys = True
+		lv = bot.premium_level(u)
+		lv2 = bot.premium_level(u, absolute=True)
+		if not isfinite(lv2):
+			pass
+		elif lv2 > 0:
+			attributes.append(f"{bot.name} Premium Supporter Lv{lv2} " + "💎" * lv2)
+		elif lv > 0:
+			attributes.append(f"{bot.name} Trial Supporter Lv{lv} " + "💎" * lv)
+		uf = getattr(u, "public_flags", None)
+		if uf:
+			if uf.system and not is_sys:
+				attributes.append("Discord System ⚙️")
+			if uf.staff:
+				attributes.append("Discord Staff 👮")
+			if uf.partner:
+				attributes.append("Discord Partner 🎀")
+			if uf.bug_hunter_level_2:
+				attributes.append("Bug Hunter Lv.2 🕷️")
+			elif uf.bug_hunter:
+				attributes.append("Bug Hunter 🐛")
+			is_hype = False
+			if uf.hypesquad_bravery:
+				attributes.append("HypeSquad Bravery 🛡️")
+				is_hype = True
+			if uf.hypesquad_brilliance:
+				attributes.append("HypeSquad Brilliance 🌟")
+				is_hype = True
+			if uf.hypesquad_balance:
+				attributes.append("HypeSquad Balance 💠")
+				is_hype = True
+			if uf.hypesquad and not is_hype:
+				attributes.append("HypeSquad 👀")
+			if uf.early_supporter:
+				attributes.append("Discord Early Supporter 🌄")
+			if uf.team_user:
+				attributes.append("Discord Team User 🧑‍🤝‍🧑")
+			if uf.verified_bot:
+				attributes.append("Verified Bot 👾")
+				is_bot = True
+			if uf.verified_bot_developer:
+				attributes.append("Verified Bot Developer 🏆")
+		if u.bot and not is_bot:
+			attributes.append("Bot 🤖")
+		if u.guild and u.id == u.guild.owner_id:
+			attributes.append("Server owner 👑")
+		seen = None
 		try:
-			u = g.owner
-		except (AttributeError, KeyError):
-			u = None
-		colour = await self.bot.get_colour(g)
-		emb = discord.Embed(colour=colour).set_thumbnail(url=url).set_author(name=name, icon_url=url, url=url)
-		if u is not None:
-			d = user_mention(u.id)
-		else:
-			d = ""
+			ls = bot.get_userbase(u.id, "last_seen", Dummy)
+			la = bot.get_userbase(u.id, "last_action", Dummy)
+			if type(ls) is str:
+				seen = ls
+			else:
+				seen = time_repr(ls, mode="R")
+			if la:
+				seen = f"{la}, {seen}"
+		except LookupError:
+			pass
+		joined = getattr(u, "joined_at", None)
+		count = None
+		true_joined = None
+		if u.guild:
+			count = await bot.index_member(u.guild.id, u.id)
+			true_joined = bot.get_guildbase(u.guild.id, f"index:{u.id}.min")
+			if true_joined:
+				true_joined = snowflake_time_3(true_joined)
+				if not joined:
+					joined = true_joined
+				if true_joined >= joined:
+					true_joined = None
+		fields.update({
+			"User ID": f"`{u.id}`",
+			"Creation time": time_repr(u.created_at),
+		})
+		if joined:
+			fields["Join time"] = time_repr(joined)
+		if true_joined:
+			fields["Historical join time"] = time_repr(true_joined)
+		if seen:
+			fields["Last seen"] = str(seen)
+		fields["Username"] = u.name
+		if getattr(u, "global_name", None):
+			fields["Display Name"] = u.global_name
+		if getattr(u, "nick", None):
+			fields["Nickname"] = u.nick
+		tag = getattr_chain(u, "primary_guild.tag", None)
+		if tag:
+			fields["Server tag"] = tag
+		if count:
+			fields["Messages posted"] = str(count)
+		url = await self.bot.get_proxy_url(str(u.avatar), force=True)
+		url2 = await self.bot.get_proxy_url(u, force=True)
+		images = [url, url2]
+		return u, cdict(
+			type="user",
+			attributes=attributes,
+			fields=fields,
+			images=images,
+		)
+
+	async def get_channel_info(self, channel):
+		attributes = []
+		fields = {}
+		bot = self.bot
+		c = channel
+		if desc := getattr(c, "topic", None) or getattr(c, "description", None):
+			attributes.append(desc)
+		fields.update({
+			"Channel": f"`{c.id}`",
+			"Creation time": time_repr(c.created_at),
+		})
+		fields["Type"] = getattr(c, "type", "text")
+		if getattr(c, "guild", None):
+			fields["Server"] = str(c.guild)
+		if getattr(c, "parent", None):
+			fields["Parent"] = channel_mention(c.parent.id)
+		if getattr(c, "guild", None):
+			count = await bot.index_member(c.guild.id, channel_id=c.id)
+			fields["Messages posted"] = str(count)
+			url = await bot.get_proxy_url(c.guild, force=True)
+		elif getattr(c, "recipient", None):
+			url = await bot.get_proxy_url(c.recipient, force=True)
+		images = [url, None]
+		return c, cdict(
+			type="channel",
+			attributes=attributes,
+			fields=fields,
+			images=images,
+		)
+
+	async def get_guild_info(self, guild):
+		attributes = []
+		fields = {}
+		bot = self.bot
+		g = guild
 		if g.description:
-			d += code_md(g.description)
-		lv = bot.is_trusted(g)
-		if lv > 0:
-			d += f"\n{bot.name} Premium Upgraded Lv{lv} " + "💎" * lv
-			if lv < 2:
-				d += f"; Visit {bot.kofi_url} to upgrade!"
-		elif is_current:
-			d += f"\nNo {bot.name} Premium Upgrades! Visit {bot.kofi_url} for more info!"
-		emb.description = d
-		emb.add_field(name="Server ID", value=str(g.id), inline=0)
-		emb.add_field(name="Creation time", value=time_repr(g.created_at), inline=1)
-		if "v" in flags:
-			with suppress(AttributeError, KeyError):
-				emb.add_field(name="Region", value=str(g.region), inline=1)
-				emb.add_field(name="Nitro boosts", value=str(g.premium_subscription_count), inline=1)
-		with suppress(AttributeError):
-			x = len(g.channels)
-			t = len(g.text_channels)
-			t2 = len(g._threads)
-			v = len(voice_channels(g))
-			c = len(g.categories)
-			channelinfo = f"Text: {t}\nThread: {t2}\nVoice: {v}\nCategory: {c}"
-			if x > t + v + c:
-				channelinfo += f"\nOther: {x - (t + v + c)}"
-			emb.add_field(name=f"Channels ({x + t2})", value=channelinfo, inline=1)
-		try:
-			a = r = 0
-			m = len(g._members)
-			for member in g.members:
-				if member.guild_permissions.administrator:
-					a += 1
-				else:
-					r += bool(standard_roles(member))
-			memberinfo = f"Admins: {a}\nOther roles: {r}\nNo roles: {m - a - r}"
-			emb.add_field(name=f"Member count ({m})", value=memberinfo, inline=1)
-		except AttributeError:
-			if getattr(g, "member_count", None):
-				m = g.member_count
-				emb.add_field(name=f"Member count ({m})", value="N/A", inline=1)
-		with suppress(AttributeError):
-			r = len(g._roles)
-			a = sum(1 for r in g._roles.values() if r.permissions.administrator and not r.is_default())
-			roleinfo = f"Admins: {a}\nOther: {r - a}"
-			emb.add_field(name=f"Role count ({r})", value=roleinfo, inline=1)
-		with suppress(AttributeError):
-			c = len(g.emojis)
-			a = sum(getattr(e, "animated", False) for e in g.emojis)
-			emojiinfo = f"Animated: {a}\nRegular: {c - a}"
-			emb.add_field(name=f"Emoji count ({c})", value=emojiinfo, inline=1)
-		return emb
+			attributes.append(g.description)
+		fields.update({
+			"Server ID": f"`{g.id}`",
+			"Creation time": time_repr(g.created_at),
+		})
+		fields["Member count"] = str(g.member_count)
+		if getattr(g, "region", None):
+			fields["Voice region"] = g.region
+		if getattr(g, "premium_subscription_count", 0):
+			fields["Nitro boosts"] = g.premium_subscription_count
+		tag = None
+		if "GUILD_TAGS" in getattr(g, "features", ()):
+			for m in g.members:
+				pg = m.primary_guild
+				if pg and pg.id == g.id and pg.tag:
+					tag = pg.tag
+					break
+			for m in bot.cache.members.values():
+				if m.guild.id == g.id:
+					continue
+				pg = m.primary_guild
+				if pg and pg.id == g.id and pg.tag:
+					tag = pg.tag
+					break
+		if tag:
+			fields["Server tag"] = tag
+		count = await bot.index_member(guild.id)
+		fields["Messages posted"] = str(count)
+		url = await bot.get_proxy_url(g, force=True)
+		url2 = g.discovery_splash or g.splash or g.banner
+		if url2:
+			url2 = await bot.get_proxy_url(url2)
+		else:
+			url2 = url
+		images = [url, url2]
+		return g, cdict(
+			type="guild",
+			attributes=attributes,
+			fields=fields,
+			images=images,
+		)
 
-	async def getMimicData(self, p, flags={}):
-		url = best_url(p.url)
-		name = p.name
-		colour = await self.bot.get_colour(p)
-		emb = discord.Embed(colour=colour)
-		emb.set_thumbnail(url=url)
-		emb.set_author(name=name, icon_url=url, url=url)
-		d = f"{user_mention(p.uid)}{fix_md(p.id)}"
-		if p.description:
-			d += code_md(p.description)
-		emb.description = d
-		emb.add_field(name="Mimic ID", value=str(p.id), inline=0)
-		emb.add_field(name="Name", value=str(p.name), inline=0)
-		emb.add_field(name="Prefix", value=str(p.prefix), inline=1)
-		emb.add_field(name="Creation time", value=time_repr(p.created_at), inline=1)
-		if "v" in flags:
-			emb.add_field(name="Gender", value=str(p.gender), inline=1)
-			ctime = DynamicDT.utcfromtimestamp(p.birthday)
-			age = (DynamicDT.utcnow() - ctime).total_seconds() / TIMEUNITS["year"]
-			emb.add_field(name="Birthday", value=str(ctime), inline=1)
-			emb.add_field(name="Age", value=str(round_min(round(age, 1))), inline=1)
-		return emb
+	async def retrieve_info(self, guild, obj):
+		match type(obj):
+			case discord.User | discord.Member:
+				return await self.get_user_info(guild.get_member(obj.id) or obj)
+			case discord.Guild:
+				return await self.get_guild_info(guild)
+			case _ if getattr(obj, "type", None):
+				return await self.get_channel_info(obj)
+			case _:
+				raise NotImplementedError(type(obj))
 
-	async def __call__(self, argv, argl, name, guild, channel, bot, user, message, flags, **void):
-		iterator = argl if argl else (argv,)
-		embs = set()
-		for argv in iterator:
-			if argv.startswith("<") and argv[-1] == ">":
-				argv = argv[1:-1]
-			with self.bot.ExceptionSender(channel):
-				with suppress(StopIteration):
-					if argv:
-						if is_url(argv) or argv.startswith("discord.gg/"):
-							g = await bot.fetch_guild(argv)
-							emb = await self.getGuildData(g, flags, is_current=guild.id == g.id)
-							embs.add(emb)
-							raise StopIteration
-						uid = argv
-						with suppress():
-							uid = verify_id(uid)
-						u = guild.get_member(uid) if type(uid) is int else None
-						g = None
-						while u is None and g is None:
-							with suppress():
-								u = bot.get_member(uid, guild)
-								break
-							with suppress():
-								try:
-									u = bot.get_user(uid)
-								except:
-									if not bot.in_cache(uid):
-										u = await bot.fetch_user(uid)
-									else:
-										raise
-								break
-							if type(uid) is str and "@" in uid and ("everyone" in uid or "here" in uid):
-								g = guild
-								break
-							if "server" in name:
-								with suppress():
-									g = await bot.fetch_guild(uid)
-									break
-								with suppress():
-									role = await bot.fetch_role(uid, g)
-									g = role.guild
-									break
-								with suppress():
-									channel = await bot.fetch_channel(uid)
-									g = channel.guild
-									break
-							try:
-								p = bot.get_mimic(uid, user)
-								emb = await self.getMimicData(p, flags)
-								embs.add(emb)
-							except:
-								pass
-							else:
-								raise StopIteration
-							with suppress():
-								g = bot.cache.guilds[uid]
-								break
-							with suppress():
-								g = bot.cache.roles[uid].guild
-								break
-							with suppress():
-								g = bot.cache.channels[uid].guild
-							u = await bot.fetch_member_ex(uid, guild)
-							break
-						if g:
-							emb = await self.getGuildData(g, flags)
-							embs.add(emb)
-							raise StopIteration
-					elif "server" not in name:
-						u = user
-					else:
-						if not hasattr(guild, "ghost"):
-							emb = await self.getGuildData(guild, flags)
-							embs.add(emb)
-							raise StopIteration
-						else:
-							u = bot.user
-					u = await bot.fetch_user_member(u.id, guild)
-					member = guild.get_member(u.id)
-					name = getattr(u, "name", None) or str(u)
-					url = await bot.get_proxy_url(u, force=True)
-					st = deque()
-					if u.id == bot.id:
-						st.append("Myself 🙃")
-						is_self = True
-					else:
-						is_self = False
-					if bot.is_owner(u.id):
-						st.append("My owner ❤️")
-					deleted = bot.get_userbase(u.id, "deleted")
-					if deleted:
-						st.append("Deleted User ⚠️")
-					is_sys = False
-					if getattr(u, "system", None):
-						st.append("Discord System ⚙️")
-						is_sys = True
-					lv = bot.premium_level(u)
-					lv2 = bot.premium_level(u, absolute=True)
-					if not isfinite(lv2):
-						pass
-					elif lv2 > 0:
-						st.append(f"{bot.name} Premium Supporter Lv{lv2} " + "💎" * lv2)
-					elif lv > 0:
-						st.append(f"{bot.name} Trial Supporter Lv{lv} " + "💎" * lv)
-					uf = getattr(u, "public_flags", None)
-					is_bot = False
-					if uf:
-						if uf.system and not is_sys:
-							st.append("Discord System ⚙️")
-						if uf.staff:
-							st.append("Discord Staff 👮")
-						if uf.partner:
-							st.append("Discord Partner 🎀:")
-						if uf.bug_hunter_level_2:
-							st.append("Bug Hunter Lv.2 🕷️")
-						elif uf.bug_hunter:
-							st.append("Bug Hunter 🐛")
-						is_hype = False
-						if uf.hypesquad_bravery:
-							st.append("HypeSquad Bravery 🛡️")
-							is_hype = True
-						if uf.hypesquad_brilliance:
-							st.append("HypeSquad Brilliance 🌟")
-							is_hype = True
-						if uf.hypesquad_balance:
-							st.append("HypeSquad Balance 💠")
-							is_hype = True
-						if uf.hypesquad and not is_hype:
-							st.append("HypeSquad 👀")
-						if uf.early_supporter:
-							st.append("Discord Early Supporter 🌄")
-						if uf.team_user:
-							st.append("Discord Team User 🧑‍🤝‍🧑")
-						if uf.verified_bot:
-							st.append("Verified Bot 👾")
-							is_bot = True
-						if uf.verified_bot_developer:
-							st.append("Verified Bot Developer 🏆")
-					if u.bot and not is_bot:
-						st.append("Bot 🤖")
-					if u.id == guild.owner_id and not hasattr(guild, "ghost"):
-						st.append("Server owner 👑")
-					if member:
-						dname = getattr(member, "nick", None)
-						joined = getattr(u, "joined_at", None)
-					else:
-						dname = getattr(u, "simulated", None) and getattr(u, "nick", None)
-						joined = None
-					created = u.created_at
-					if member:
-						rolelist = [role_mention(i.id) for i in reversed(getattr(u, "roles", ())) if not i.is_default()]
-						role = ", ".join(rolelist)
-					else:
-						role = None
-					seen = None
-					zone = None
-					with suppress(LookupError):
-						ls = bot.get_userbase(u.id, "last_seen", Dummy)
-						la = bot.get_userbase(u.id, "last_action", Dummy)
-						if type(ls) is str:
-							seen = ls
-						else:
-							seen = time_repr(ls, mode="R")
-						if la:
-							seen = f"{la}, {seen}"
-					if is_self and bot.webserver:
-						url2 = bot.webserver
-					else:
-						url2 = url
+	async def __call__(self, bot, _guild, _channel, _user, objects, mode, **void):
+		embeds = []
+		if not objects:
+			match mode:
+				case "user":
+					objects = [_user]
+				case "channel":
+					objects = [_channel]
+				case "server":
+					objects = [_guild]
+				case _:
+					raise ArgumentError("Mode or objects must be specified.")
+		for obj in objects:
+			o, info = await self.retrieve_info(_guild, obj)
+			match info.get("type"):
+				case "user":
+					u = o
+					attributes = info.attributes
+					fields = info.fields
+					url, url2 = info.images
 					colour = await self.bot.get_colour(u)
 					emb = discord.Embed(colour=colour)
-					emb.set_thumbnail(url=url)
-					emb.set_author(name=name, icon_url=url, url=url2)
+					if url2:
+						emb.set_thumbnail(url=url2)
+					emb.set_author(name=u.name, icon_url=url, url=url)
 					d = user_mention(u.id)
-					if st:
+					if attributes:
 						if d[-1] == "*":
 							d += " "
-						d += " **```css\n"
-						if st:
-							d += "\n".join(st)
+						d += " **```\n"
+						if attributes:
+							d += "\n".join(attributes)
 						d += "```**"
 					emb.description = d
-					emb.add_field(name="User ID", value="`" + str(u.id) + "`", inline=0)
-					emb.add_field(name="Creation time", value=time_repr(created), inline=1)
-					if joined:
-						emb.add_field(name="Join time", value=time_repr(joined), inline=1)
-					if zone:
-						tn = "Estimated timezone" if estimated else "Timezone"
-						emb.add_field(name=tn, value=str(zone), inline=1)
-					if seen:
-						emb.add_field(name="Last seen", value=str(seen), inline=1)
-					if dname:
-						emb.add_field(name="Nickname", value=dname, inline=1)
-					tag = getattr_chain(u, "primary_guild.tag", None)
-					if tag:
-						emb.add_field(name="Server Tag", value=tag, inline=1)
-					if role:
-						emb.add_field(name=f"Roles ({len(rolelist)})", value=role, inline=0)
-					embs.add(emb)
-		bot.send_embeds(channel, embeds=embs, reference=message)
+					first_id = True
+					for k, v in fields.items():
+						emb.add_field(name=k, value=v, inline=not first_id)
+						first_id = False
+					rolelist = [role_mention(i.id) for i in reversed(getattr(u, "roles", ())) if not i.is_default()]
+					roles = ", ".join(rolelist)
+					if roles:
+						emb.add_field(name=f"Roles ({len(rolelist)})", value=roles, inline=False)
+					embeds.append(emb)
+				case "guild":
+					g = o
+					attributes = info.attributes
+					fields = info.fields
+					url, url2 = info.images
+					colour = await self.bot.get_colour(g)
+					emb = discord.Embed(colour=colour)
+					if url2:
+						emb.set_thumbnail(url=url2)
+					emb.set_author(name=g.name, icon_url=url, url=url)
+					d = ""
+					if attributes:
+						d += "**```\n"
+						if attributes:
+							d += "\n".join(attributes)
+						d += "```**"
+					emb.description = d
+					first_id = True
+					for k, v in fields.items():
+						emb.add_field(name=k, value=v, inline=not first_id)
+						first_id = False
+					if hasattr(g, "channels") and hasattr(g, "categories"):
+						x = len(g.channels)
+						t = len(g.text_channels)
+						t2 = len(getattr(g, "_threads", ()))
+						v = len(voice_channels(g))
+						c = len(g.categories)
+						channelinfo = f"Text: {t}\nThread: {t2}\nVoice: {v}\nCategory: {c}"
+						if x > t + v + c:
+							channelinfo += f"\nOther: {x - (t + v + c)}"
+						emb.add_field(name=f"Channels ({x + t2})", value=channelinfo, inline=True)
+					if hasattr(g, "_roles"):
+						r = len(g._roles)
+						na = [r for r in g._roles.values() if not r.permissions.administrator]
+						a = r - len(na)
+						nm = [r for r in na if bot.get_role_perms(r, g) < 3]
+						m = len(na) - len(nm)
+						roleinfo = f"Admins: {a}\nModerators: {m}\nOther: {len(nm)}"
+						emb.add_field(name=f"Roles ({r})", value=roleinfo, inline=True)
+					if hasattr(g, "emojis"):
+						c = len(g.emojis)
+						a = sum(getattr(e, "animated", False) for e in g.emojis)
+						emojiinfo = f"Animated: {a}\nRegular: {c - a}"
+						emb.add_field(name=f"Emojis ({c})", value=emojiinfo, inline=True)
+					if hasattr(g, "stickers"):
+						emb.add_field(name="Sticker count", value=str(len(g.stickers)), inline=True)
+					if hasattr(g, "soundboard_sounds"):
+						emb.add_field(name="Soundboard count", value=str(len(g.soundboard_sounds)), inline=True)
+					embeds.append(emb)
+				case "channel":
+					c = o
+					attributes = info.attributes
+					fields = info.fields
+					url, url2 = info.images
+					colour = await self.bot.get_colour(c)
+					emb = discord.Embed(colour=colour)
+					if url2:
+						emb.set_thumbnail(url=url2)
+					emb.set_author(name=c.name, icon_url=url, url=url)
+					d = ""
+					if attributes:
+						d += "**```\n"
+						if attributes:
+							d += "\n".join(attributes)
+						d += "```**"
+					emb.description = d
+					first_id = True
+					for k, v in fields.items():
+						emb.add_field(name=k, value=v, inline=not first_id)
+						first_id = False
+					embeds.append(emb)
+				case _:
+					raise NotImplementedError(info["type"])
+		return cdict(
+			embeds=embeds,
+		)
 
 
 class Top(Command):
 	name = ["Ranking", "Rankings"]
 	description = "Ranks the users in the current server by total messages sent"
-	schema = cdict()
+	schema = cdict(
+		amount=cdict(
+			type="integer",
+			validation="[1, 100]",
+			description="Maximum amount of users to display",
+			aliases=["n", "count"],
+			default=10,
+		),
+	)
 	rate_limit = (4, 6)
 	slash = True
 
-	async def __call__(self, bot, _guild, **void):
-		data = await bot.message_counts(_guild)
+	async def __call__(self, bot, _guild, amount, **void):
+		data = await bot.message_counts(_guild, amount)
 		colour = await bot.get_colour(_guild)
 		emb = discord.Embed(colour=colour)
 		emb.set_author(**get_author(_guild))
@@ -1790,13 +1854,15 @@ class UpdateUsers(Database):
 		user = message.author
 		bot = self.bot
 		if message.guild:
-			csubmit(bot.index_member(message.guild.id, 0, 1))
-		if user.id == bot.id or bot.get_perms(user, message.guild) <= -inf:
-			return
+			csubmit(bot.index_member(message.guild.id, 0, add=1))
+			if message.channel:
+				csubmit(bot.index_member(message.guild.id, channel_id=message.channel.id, add=1))
 		if bot.is_optout(user):
 			return
 		if message.guild:
-			csubmit(bot.index_member(message.guild.id, message.author.id, 1))
+			csubmit(bot.index_member(message.guild.id, message.author.id, add=1))
+		if user.id == bot.id or bot.get_perms(user, message.guild) <= -inf:
+			return
 		if not bot.get_enabled(message.channel):
 			return
 		size = get_message_length(message)
@@ -1895,33 +1961,6 @@ class UpdateUsers(Database):
 			return
 		channel = message.channel
 		guild = message.guild
-		if not getattr(message, "simulated", None):
-			bot.set_userbase(user.id, "last_channel", channel.id)
-			stored = bot.get_userbase(user.id, "stored", {})
-			if channel.id in stored and len(stored) < 5:
-				m_id = stored[channel.id]
-				try:
-					await bot.fetch_message(m_id, channel, fast=True)
-				except (discord.NotFound, LookupError):
-					stored[channel.id] = message.id
-				except:
-					print_exc()
-					stored[channel.id] = message.id
-			elif len(stored) >= 5:
-				m_id, c_id = choice(stored.items())
-				if c_id not in bot.cache.channels:
-					stored.pop(c_id, None)
-				else:
-					try:
-						m = await bot.fetch_message(m_id, c, fast=True)
-					except (discord.NotFound, LookupError):
-						stored.pop(c_id, None)
-					except:
-						print_exc()
-						stored.pop(c_id, None)
-			if channel.id in bot.cache.channels:
-				stored[channel.id] = message.id
-			bot.set_userbase(user.id, "stored", stored)
 		if not force and not bot.is_mentioned(message, bot, guild):
 			return
 		if user.bot:

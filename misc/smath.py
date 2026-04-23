@@ -1470,3 +1470,12 @@ def bxor(b1, b2):
 	x = np.frombuffer(b1, dtype=np.uint8)
 	y = np.frombuffer(b2, dtype=np.uint8)
 	return (x ^ y).tobytes()
+
+def binary_tree_level_order(n):
+	for k in range(n):
+		start_index = (2 ** (n - k - 1)) - 1
+		step_size = 2 ** (n - k)
+		num_nodes_on_level = 2 ** k
+		for i in range(num_nodes_on_level):
+			index = start_index + (i * step_size)
+			yield index

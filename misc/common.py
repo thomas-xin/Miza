@@ -221,7 +221,7 @@ async def interaction_response(bot, message, content=None, embed=None, embeds=()
 		else:
 			M = discord.Message
 		message = M(state=bot._state, channel=message.channel, data=eval_json(resp))
-		bot.add_message(message, files=False, force=True)
+		bot.add_message(message, force=True)
 	return message
 
 async def interaction_post(bot, message, content=None, embed=None, embeds=(), components=None, buttons=None, ephemeral=False):
@@ -255,7 +255,7 @@ async def interaction_post(bot, message, content=None, embed=None, embeds=(), co
 		else:
 			M = discord.Message
 		message = M(state=bot._state, channel=message.channel, data=eval_json(resp))
-		bot.add_message(message, files=False, force=True)
+		bot.add_message(message, force=True)
 	elif getattr(message, "simulated", False):
 		message.content = content or message.content
 		message.embeds = [discord.Embed.from_dict(embed)] if embed else message.embeds
@@ -294,7 +294,7 @@ async def interaction_patch(bot, message, content=None, embed=None, embeds=(), a
 		else:
 			M = discord.Message
 		message = M(state=bot._state, channel=message.channel, data=eval_json(resp))
-		bot.add_message(message, files=False, force=True)
+		bot.add_message(message, force=True)
 	elif getattr(message, "simulated", False):
 		message.content = content or message.content
 		message.embeds = [discord.Embed.from_dict(embed)] if embed else message.embeds

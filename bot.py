@@ -81,7 +81,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	restart = "restart.tmp"
 	shutdown = "shutdown.tmp"
 	activity = 0
-	caches = ("guilds", "channels", "users", "usernames", "roles", "emojis", "messages", "members", "attachments", "banned", "colours")
+	caches = ("guilds", "channels", "users", "usernames", "roles", "emojis", "messages", "members", "banned", "colours")
 	statuses = (discord.Status.online, discord.Status.idle, discord.Status.dnd, discord.Streaming, discord.Status.invisible)
 	# Default command prefix
 	prefix = AUTH.get("prefix", "~")
@@ -167,7 +167,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.token = AUTH["discord_token"]
 		except KeyError:
 			print("ERROR: discord_token not found. Unable to login.")
-			self.setshutdown(force=True)
+			self.schedule_shutdown(force=True)
 		try:
 			owner_id = AUTH["owner_id"]
 			if type(owner_id) not in (list, tuple):
@@ -259,7 +259,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return (g_id >> 22) % self.shard_count
 
 	# Waits an amount of seconds and shuts down.
-	def setshutdown(self, delay=None, force=False):
+	def schedule_shutdown(self, delay=None, force=False):
 		if delay:
 			time.sleep(delay)
 		if force:
@@ -274,7 +274,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.weekly_users = AutoCache(f"{CACHE_PATH}/weekly_users", shards=1, stale=0, timeout=86400 * 7)
 		self.channel_cache = AutoCache(f"{CACHE_PATH}/channel_cache", shards=32, stale=86400 * 7, timeout=86400 * 365, desync=0.25)
 		self.message_cache = AutoCache(f"{CACHE_PATH}/message_cache", shards=64, stale=86400 * 7, timeout=86400 * 14, desync=0.3)
-		self.discord_cache = AutoCache(f"{CACHE_PATH}/discord_api", stale=0, timeout=300, desync=0.05)
+		self.discord_cache = AutoCache(f"{CACHE_PATH}/discord_api", stale=0, timeout=3600, desync=0.05)
 		self.discord_data_cache = AutoCache(f"{CACHE_PATH}/discord_data", shards=7, stale=86400 * 3, timeout=86400 * 14, desync=0.5)
 		self.uptime_db = FileHashDict(path=f"{CACHE_PATH}/uptime")
 		self.guildfinder = FileHashDict(path=f"{CACHE_PATH}/guildfinder")
@@ -298,7 +298,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if is_int:
 			path = int(path)
 		return temp, path
-
 	@staticmethod
 	def set_database(temp, path):
 		is_int = False
@@ -782,7 +781,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					with tracebacksuppressor:
 						t.cancel()
 		finally:
-			self.setshutdown()
+			self.schedule_shutdown()
 
 	async def _retrieve_api(self, path):
 		while True:
@@ -914,7 +913,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			user = await super().fetch_user(u_id)
 			self.cache.users[u_id] = user
 			return user
-	def fetch_user(self, u_id):
+	def fetch_user(self, u_id, force=False):
 		with suppress(KeyError):
 			user = as_fut(self.get_user(u_id))
 			if user and T(user).get("_avatar") != self.discord_icon:
@@ -922,7 +921,25 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		u_id = verify_id(u_id)
 		if not isinstance(u_id, int):
 			raise TypeError(f"Invalid user identifier: {u_id}")
-		return self._fetch_user(u_id)
+		try:
+			return self._fetch_user(u_id)
+		except discord.NotFound:
+			if not force:
+				raise
+			user = discord.User(
+				state=self._state,
+				data=cdict(
+					username="Deleted User",
+					id=u_id,
+					discriminator=0,
+					system=True,
+					bot=True,
+					avatar=None,
+				),
+			)
+			self.cache.users[u_id] = user
+			self.set_userbase(u_id, "deleted", True)
+			return user
 
 	async def auser2cache(self, u_id):
 		with suppress(discord.NotFound):
@@ -965,11 +982,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				u_id = verify_id(u_id)
 				if not isinstance(u_id, int):
 					raise TypeError(f"Invalid user identifier: {u_id}")
-		with suppress(KeyError):
+		try:
 			return self.cache.users[u_id]
+		except KeyError:
+			pass
 		if u_id == self.deleted_user:
-			data = dict(username="Deleted User", discriminator=0, id=u_id, system=True, bot=True, avatar=self.discord_icon)
+			data = dict(username="Deleted User", discriminator=0, id=u_id, system=True, bot=True, avatar=None)
 			user = discord.User(data=data, state=self._state)
+			self.set_userbase(u_id, "deleted", True)
 		else:
 			try:
 				user = super().get_user(u_id)
@@ -1089,7 +1109,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			except KeyError:
 				pass
 			else:
-				return guild.get_member(user.id) or user
+				return (guild and guild.get_member(user.id)) or user
 			if member is None:
 				if not guild:
 					raise LookupError("No guild or unique identifier provided.")
@@ -1555,7 +1575,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				await self.data.channel_cache.splice(channel, hist)
 				self.hiscache[c_id] = len(hist)
 				for message in hist:
-					self.add_message(message, files=False, force=True)
+					self.add_message(message, force=True)
 					yield message
 				return
 			if "channel_cache" in self.data:
@@ -1578,7 +1598,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					continue
 				self.recently_deleted.pop(message.id, None)
 				self.hiscache.pop(c_id, None)
-				self.add_message(message, files=False, force=True)
+				self.add_message(message, force=True)
 				found.add(message.id)
 				yield message
 
@@ -2297,7 +2317,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			casual="gemini-3.1-pro",
 			nsfw="grok-4",
 			backup="gpt-5.4",
-			retry="claude-opus-4.6",
+			retry="claude-opus-4.7",
 			function="grok-4.1-fast",
 			vision="gemini-3.1-pro",
 			target="auto",
@@ -2959,8 +2979,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			fp.seek(0)
 			with suppress(AttributeError):
 				fp.clear()
-		# if reference and getattr(reference, "slash", None) or getattr(reference, "simulated", None):
-		#     reference = None
 		try:
 			if fsize > size:
 				if not f:
@@ -2994,27 +3012,38 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				await message.add_reaction(react)
 		return message
 
-	async def tag_message(self, message):
-		always_log = "logM" in self.data and message.guild is not None and message.guild.id in self.data.logM
-		for attachment in message.attachments:
-			if always_log or url2ext(attachment.url) in IMAGE_FORMS:
-				csubmit(self.add_and_test(message, attachment))
-		urls = [url for url in find_urls_ex(message.content) if message.content[message.content.index(url) - 1] != "<"]
-		urls = await self.renew_attachments(urls)
-		for url in urls:
-			if is_discord_attachment(url) and not discord_expired(url) or is_miza_attachment(url) and (always_log or url2ext(url) in IMAGE_FORMS):
-				if is_miza_attachment(url):
-					if "/c/" in url:
-						return
-					else:
-						_c_id, _m_id, a_id, *_ = expand_attachment(url)
-				else:
-					_c_id, _m_id, a_id, *_ = split_url(url, 0)
-				headers = await attachment_cache.scan_headers(url)
-				attachment = cdict(id=a_id, name=url2fn(url), url=url, size=int(fcdict(headers).get("Content-Length", 1)), read=lambda: attachment_cache.download(url))
-				csubmit(self.add_and_test(message, attachment))
+	async def store_backup_message(self, message):
+		user = message.author
+		channel = message.channel
+		self.set_userbase(user.id, "last_channel", channel.id)
+		stored = self.get_userbase(user.id, "stored", {})
+		if channel.id in stored and len(stored) < 5:
+			m_id = stored[channel.id]
+			try:
+				await self.fetch_message(m_id, channel, fast=True)
+			except (discord.NotFound, LookupError):
+				stored[channel.id] = message.id
+			except:
+				print_exc()
+				stored[channel.id] = message.id
+		elif len(stored) >= 5:
+			m_id, c_id = choice(stored.items())
+			if c_id not in self.cache.channels:
+				stored.pop(c_id, None)
+			else:
+				try:
+					await self.fetch_message(m_id, c, fast=True)
+				except (discord.NotFound, LookupError):
+					stored.pop(c_id, None)
+				except:
+					print_exc()
+					stored.pop(c_id, None)
+		if channel.id in self.cache.channels:
+			stored[channel.id] = message.id
+		self.set_userbase(user.id, "stored", stored)
+		return message
 
-	def add_message(self, message, files=True, cache=True, force=False):
+	def add_message(self, message, cache=True, force=False):
 		"Inserts a message into the bot cache, discarding existing ones if full."
 		if self.closed:
 			return message
@@ -3029,6 +3058,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						return m
 			if getattr(m, "slash", False):
 				message.slash = m.slash
+		if cache:
+			if not getattr(message, "simulated", None):
+				csubmit(self.store_backup_message(message))
 		if cache and not m or force:
 			for a in message.attachments:
 				attachment_cache.store(a.url)
@@ -3045,9 +3077,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							guild._members[author.id] = author
 					except KeyError:
 						pass
-			if files and (not message.author.bot or message.webhook_id):
-				if (utc_dt() - created_at).total_seconds() < 7200:
-					csubmit(self.tag_message(message))
 			self.cache.messages[message.id] = message
 			if (utc_dt() - created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
 				self.data.message_cache.store_message(message)
@@ -3055,18 +3084,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def add_attachment(self, attachment, message=None):
 		if int(attachment.size) <= 64 * 1048576:
-			return await attachment_cache.download(attachment.url, m_id=message.id, read=True)
-
-	async def add_and_test(self, message, attachment):
-		n = 0
-		fn = await self.add_attachment(attachment, message=message)
-		if fn and "prot" in self.data:
-			known = self.cache.attachments.get(attachment.id, None)
-			if get_mime(fn).startswith("image/"):
-				res, n = await self.data.prot.scan(message, fn, known=known)
-			else:
-				res = ""
-			self.cache.attachments[attachment.id] = res
+			return await attachment_cache.download(attachment.url, m_id=getattr(message, "id", None), read=True)
 
 	def get_colour(self, user) -> int:
 		if user is None:
@@ -3248,9 +3266,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	def cache_reduce(self):
 		self.limit_cache("messages")
-		self.limit_cache("attachments", 256)
 		self.limit_cache("emojis")
-		self.limit_cache("deleted", limit=16384)
+		self.limit_cache("deleted", limit=65536)
 		self.limit_cache("banned", 4096)
 
 	def update_cache_feed(self):
@@ -6460,7 +6477,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				except (LookupError, discord.NotFound):
 					pass
 				else:
-					self.add_message(message, files=False, force=True)
+					self.add_message(message, force=True)
 		return message
 
 	async def react_with(self, message, name):
@@ -7073,7 +7090,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if m is None or m is self or type(m) not in (discord.Message, bot.ExtendedMessage):
 					message = self.cached = self.__copy__()
 					if type(m) not in (discord.Message, bot.ExtendedMessage):
-						bot.add_message(message, files=False, force=True)
+						bot.add_message(message, force=True)
 					try:
 						return getattr(message, k)
 					except (AttributeError, KeyError):
@@ -7519,7 +7536,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				reaction = message._add_reaction(data, emoji, user.id)
 			message = await self.ensure_reactions(message)
 			self.dispatch("reaction_add", reaction, user)
-			self.add_message(message, files=False, force=True)
+			self.add_message(message, force=True)
 
 	async def reaction_remove(self, raw, data):
 		with tracebacksuppressor:
@@ -7544,7 +7561,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					reaction.count -= 1
 				reaction = message._remove_reaction(data, emoji, user.id)
 			self.dispatch("reaction_remove", reaction, user)
-			self.add_message(message, files=False, force=True)
+			self.add_message(message, force=True)
 	
 	async def reaction_clear(self, raw, data):
 		channel = await self.fetch_channel(raw.channel_id)
@@ -7552,7 +7569,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		old_reactions = message.reactions.copy()
 		message.reactions.clear()
 		self.dispatch("reaction_clear", message, old_reactions)
-		self.add_message(message, files=False, force=True)
+		self.add_message(message, force=True)
 
 	async def init_ready(self):
 		await asubmit(self.start_webserver)
@@ -7624,138 +7641,136 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						break
 			esubmit(self.cache.messages.update, data)
 		return data
+	async def search_messages(self, guild_id, limit=25, offset=0, **kwargs):
+		path = f"guilds/{guild_id}/messages/search"
+		query = f"?include_nsfw=1&limit={limit}&limit={offset}"
+		for k, v in kwargs.items():
+			if v is not None:
+				query += f"&{k}={v}"
+		resp = await self.retrieve_api(f"{path}{query}")
+		data = {}
+		for raw_message in resp["messages"]:
+			if isinstance(raw_message, list):
+				raw_message = raw_message[0]
+			message = self.CachedMessage(raw_message)
+			data[message.id] = message
+		esubmit(self.cache.messages.update, data)
+		return cdict(
+			messages=list(data.values()),
+			total_results=resp.get("total_results", 0),
+		)
 	async def flatten_search(self, guild_id, limit=200, target_id=0, channel_id=None, author_id=None, **kwargs):
 		bucket = guild_id
 		try:
 			sem = self.flatten_sems[bucket]
 		except KeyError:
 			sem = self.flatten_sems[bucket] = Semaphore(1, 4, rate_limit=2)
-		data = {}
 		with tracebacksuppressor(SemaphoreOverflowError):
 			async with sem:
 				temp_sem = Semaphore(1, 1, rate_limit=1)
 				for pos in range(0, limit * 3 // 4, 25):
-					path = f"guilds/{guild_id}/messages/search"
-					query = f"?include_nsfw=1&sort_order=desc&limit=25&offset={pos}"
-					if target_id:
-						query += f"&max_id={target_id}"
-					if channel_id:
-						query += f"&channel_id={channel_id}"
-					if author_id:
-						query += f"&author_id={author_id}"
-					for k, v in kwargs:
-						query += f"&{k}={v}"
 					async with temp_sem:
-						resp = await self.retrieve_api(f"{path}{query}")
-					for raw_message in resp["messages"]:
-						if isinstance(raw_message, list):
-							raw_message = raw_message[0]
-						message = self.CachedMessage(raw_message)
-						data[message.id] = message
-					if pos + 25 >= resp.get("total_results", inf):
+						resp = await self.search_messages(
+							guild_id=guild_id,
+							offset=pos,
+							max_id=target_id,
+							channel_id=channel_id,
+							author_id=author_id,
+							sort_order="desc",
+							**kwargs,
+						)
+					if pos + 25 >= resp.total_results:
 						break
-				for pos in range(0, limit // 4, 25):
-					path = f"guilds/{guild_id}/messages/search"
-					query = f"?include_nsfw=1&sort_order=desc&limit=25&offset={pos}"
-					if target_id:
-						query += f"&min_id={target_id}"
-					if channel_id:
-						query += f"&channel_id={channel_id}"
-					if author_id:
-						query += f"&author_id={author_id}"
-					for k, v in kwargs:
-						query += f"&{k}={v}"
-					async with temp_sem:
-						resp = await self.retrieve_api(f"{path}{query}")
-					for raw_message in resp["messages"]:
-						if isinstance(raw_message, list):
-							raw_message = raw_message[0]
-						message = self.CachedMessage(raw_message)
-						data[message.id] = message
-					if pos + 25 >= resp.get("total_results", inf):
-						break
-			esubmit(self.cache.messages.update, data)
-		return data
 
-	async def index_member(self, guild_id, author_id, add=0):
-		info = self.get_guildbase(guild_id, f"index:{author_id}", {})
+	async def index_member(self, guild_id, author_id=0, channel_id=0, add=0):
+		target = author_id or channel_id
+		info = self.get_guildbase(guild_id, f"index:{target}", {})
 		ts = info.get("time", 0)
-		if utc() - ts <= 86400 * 60:
+		if utc() - ts <= 86400 * 60 and info.get("min") is not None:
 			count = info.get("count", 0) + add
 			if add:
-				self.set_guildbase(guild_id, f"index:{author_id}.count", count)
+				self.set_guildbase(guild_id, f"index:{target}.count", count)
 			return count
-		if not self.ready:
-			return 0
 		bucket = guild_id
 		try:
 			sem = self.flatten_sems[bucket]
 		except KeyError:
 			sem = self.flatten_sems[bucket] = Semaphore(1, 4, rate_limit=2)
-		self.set_guildbase(guild_id, f"index:{author_id}", cdict(time=utc(), count=0))
-		data = {}
+		self.set_guildbase(guild_id, f"index:{target}", cdict(time=utc(), count=0))
+		total = 0
 		with tracebacksuppressor(SemaphoreOverflowError):
-			path = f"guilds/{guild_id}/messages/search?include_nsfw=1&sort_order=asc&limit=25&offset=0"
-			if author_id:
-				path += f"&author_id={author_id}"
 			async with sem:
-				resp = await self.retrieve_api(path)
-			for raw_message in resp["messages"]:
-				if isinstance(raw_message, list):
-					raw_message = raw_message[0]
-				message = self.CachedMessage(raw_message)
-				data[message.id] = message
-			total = max(resp.get("total_results", 0) + self.get_guildbase(guild_id, f"index.{author_id}.count", 0), add)
-			print(f"{guild_id}: Indexed {total} message(s) from user {author_id}")
-			self.set_guildbase(guild_id, f"index:{author_id}", cdict(time=utc(), count=total))
-			esubmit(self.cache.messages.update, data)
+				resp = await self.search_messages(
+					guild_id=guild_id,
+					sort_order="asc",
+					author_id=author_id or None,
+					channel_id=channel_id or None,
+				)
+			total = max(resp.total_results + self.get_guildbase(guild_id, f"index.{target}.count", 0), add)
+			if author_id:
+				print(f"{guild_id}: Indexed {total} message(s) from user {author_id}")
+			elif channel_id:
+				print(f"{guild_id}: Indexed {total} message(s) from channel {channel_id}")
+			else:
+				print(f"{guild_id}: Indexed {total} message(s)")
+			mids = [m.id for m in resp.messages]
+			if not mids or info.get("min"):
+				mids.append(info.get("min", 0))
+			self.set_guildbase(guild_id, f"index:{target}", cdict(time=utc(), count=total, min=min(mids)))
 		return total
-
-	@staticmethod
-	def binary_tree_level_order(n):
-		result = []
-		for k in range(n):
-			start_index = (2 ** (n - k - 1)) - 1
-			step_size = 2 ** (n - k)
-			num_nodes_on_level = 2 ** k
-			for i in range(num_nodes_on_level):
-				index = start_index + (i * step_size)
-				result.append(index)
-		return result
 
 	async def message_counts(self, guild, limit=10):
 		guild_id = guild.id
+		total = await self.index_member(guild_id)
+		await self.index_member(guild_id, self.deleted_user)
 		curr = self.get_guildbase(guild_id, "index", {})
-		total = await self.index_member(guild_id, 0)
 		bucket = guild_id
 		try:
 			sem = self.flatten_sems[bucket]
 		except KeyError:
 			sem = self.flatten_sems[bucket] = Semaphore(1, 4, rate_limit=2)
 		base_id = time_snowflake(DynamicDT.utcnow())
-		data = {}
-		for n in self.binary_tree_level_order(6):
-			if sum(v.get("count", 0) for k, v in curr.items() if k) >= total * 3 / 4:
-				break
+		for n in binary_tree_level_order(6):
+			top = sorted(curr, key=lambda k: curr[k].get("count", 0) if k else 0, reverse=True)[:limit]
+			if top:
+				remaining_possible = total - sum(v.get("count", 0) for k, v in curr.items() if k)
+				req = curr[top[-1]].count * max(1, (len(guild.members) - len(curr)) / 4)
+				if remaining_possible <= req:
+					break
 			target = int(guild_id + (base_id - guild_id) * n / 63)
 			with tracebacksuppressor(SemaphoreOverflowError):
-				path = f"guilds/{guild_id}/messages/search?include_nsfw=1&sort_order=asc&limit=25&offset=0&min_id={target}"
 				async with sem:
-					resp = await self.retrieve_api(path)
-				for raw_message in resp["messages"]:
-					if isinstance(raw_message, list):
-						raw_message = raw_message[0]
-					message = self.CachedMessage(raw_message)
-					author_id = int(raw_message.get("author", {}).get("id", 0))
-					if author_id and author_id not in curr:
-						await self.index_member(guild_id, author_id)
+					resp = await self.search_messages(
+						guild_id=guild_id,
+						sort_order="asc",
+						min_id=target,
+					)
+				for message in resp.messages:
+					if message.author.id not in curr:
+						await self.index_member(guild_id, message.author.id)
 						curr = self.get_guildbase(guild_id, "index", {})
-					data[message.id] = message
-		esubmit(self.cache.messages.update, data)
-		top = sorted(curr, key=lambda k: curr[k].get("count", 0) if k else 0, reverse=True)[:limit]
+		for m in sorted(guild._members):
+			if m not in curr:
+				if top:
+					remaining_possible = total - sum(v.get("count", 0) for k, v in curr.items() if k)
+					req = curr[top[-1]].count * max(1, (len(guild.members) - len(curr)) / 4)
+					if remaining_possible <= req:
+						break
+				await self.index_member(guild_id, m)
+				curr = self.get_guildbase(guild_id, "index", {})
+		top = sorted(curr, key=lambda k: curr[k].get("count", 0) if k else 0, reverse=True)[:limit * 2]
+		top_users = []
+		for k in top:
+			if k:
+				try:
+					m = guild.get_member(k) or await self.fetch_user(k, force=True)
+				except discord.NotFound:
+					pass
+				else:
+					top_users.append((m, curr[k].get("count", 0)))
 		return cdict(
 			total=total,
-			top=[(guild.get_member(k) or (await self.fetch_user(k)), curr[k].get("count", 0)) for k in top if k],
+			top=top_users[:limit],
 		)
 
 	def set_guilds(self):
@@ -8299,7 +8314,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 									fut.close()
 								except AttributeError:
 									force_kill(fut)
-			self.add_message(after, files=False, force=2)
+			self.add_message(after, force=2)
 			if before.author.id == self.deleted_user or after.author.id == self.deleted_user:
 				print("Deleted User RAW_MESSAGE_EDIT", after.channel, before.author, after.author, before, after, after.channel.id, after.id)
 			if raw or before.content != after.content:

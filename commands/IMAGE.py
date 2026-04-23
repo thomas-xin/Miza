@@ -1637,36 +1637,3 @@ class Blend(Command):
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
-
-
-# class Steganography(Command):
-# 	name = ["Ectoplasm", "Watermark", "Copyright", "Ownership", "©"]
-# 	description = "Reads an image's tagged information, or embeds a message into an image (input a user ID to tag as a Discord user). Aborts if image already has a known tag."
-# 	schema = cdict(
-# 		url=cdict(
-# 			type="image",
-# 			description="Image supplied by URL or attachment",
-# 			example="https://cdn.discordapp.com/embed/avatars/0.png",
-# 			aliases=["i"],
-# 			required=True,
-# 		),
-# 		data=cdict(
-# 			type="string",
-# 			description="Message to encode",
-# 			example="This image was produced by X in collaboration with Y",
-# 		),
-# 	)
-# 	rate_limit = (12, 15)
-# 	_timeout_ = 6
-
-# 	async def __call__(self, bot, _user, url, data, **void):
-# 		resp = await process_image("ectoplasm", "$", ["-nogif", url, data, "-f", "png"], cap="caption", priority=True, timeout=60)
-# 		if isinstance(resp, bytes):
-# 			msg = resp[1:]
-# 			emb = discord.Embed()
-# 			emb.set_title("Detected Tag")
-# 			emb.description = msg.decode("utf-8", "replace")
-# 			return cdict(embed=emb)
-# 		fn = url2fn(url)
-# 		name = replace_ext(fn, "png")
-# 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")

@@ -5043,7 +5043,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		self.ts = utc()
 		return self
 
-	async def aio(self, url, headers=None, files=None, data=None, method="GET", decode=False, json=False, bypass=True, session=None, ssl=None, ignore_error=False, timeout=24, authorise=False) -> bytes | str | json_like:
+	async def aio(self, url, headers=None, files=None, data=None, method="GET", decode=False, json=False, bypass=True, session=None, ssl=None, ignore_error=None, timeout=24, authorise=False) -> bytes | str | json_like:
 		if headers is None:
 			headers = {}
 		if authorise:
@@ -5110,7 +5110,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 				return as_str(data)
 			return data
 
-	def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, session=None, ssl=None, ignore_error=False, authorise=False) -> bytes | str | json_like:
+	def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, session=None, ssl=None, ignore_error=None, authorise=False) -> bytes | str | json_like:
 		"Creates and executes a HTTP request, returning the body in bytes, string or JSON format. Raises an exception if status code is below 200 or above 399"
 		if headers is None:
 			headers = {}
