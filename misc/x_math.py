@@ -28,8 +28,6 @@ if not hasattr(time, "time_ns"):
 
 deque = collections.deque
 
-getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
-
 def register_print_fn(f):
 	globals()["PRINT"] = globals()["print"] = f
 
@@ -356,7 +354,6 @@ def carmichael(n):
 
 def simplify_recurring(r, prec=100):
 	p, q = r.p, r.q
-	# print("SR:", p, q)
 	try:
 		temp = _factorint(q, timeout=2)
 	except subprocess.TimeoutExpired as ex:
@@ -364,25 +361,24 @@ def simplify_recurring(r, prec=100):
 		return
 	if all(i in (2, 5) for i in temp):
 		return
-	tq = np.prod([k ** v for k, v in temp.items() if k not in (2, 5)], dtype=object)
+	# tq is the part of q coprime to 10; the period of 1/q equals ord_{tq}(10).
+	tq = 1
+	for k, v in temp.items():
+		if k not in (2, 5):
+			tq *= k ** v
+	# Quick upper-bound check: the period cannot exceed tq - 1, and we need
+	# roughly `digits` decimal places of precision to display it. If tq itself
+	# is already too large to ever fit, bail out before the modpow work.
+	if l10(tq) > prec * 2:
+		return
 	try:
-		pr = sympy.ntheory.residue_ntheory.is_primitive_root(10, tq)
-	except ValueError:
-		pr = False
-	cq = carmichael(tq)
-	if pr:
-		digits = cq
-	else:
-		try:
-			facts = factors(cq, lim=prec ** 2)
-		except OverflowError:
-			return
-		digits = cq
-		for f in facts:
-			if f < prec * 16 and divisible(10 ** f - 1, tq):
-				digits = f
-				break
-	# print("SR:", digits, prec, cq, pr, tq)
+		# sympy.n_order uses prime-factor descent on lambda(tq): O(Omega(n)*log n)
+		# modular exponentiations, vs. the previous O(d(n)) divisor enumeration.
+		digits = int(sympy.ntheory.residue_ntheory.n_order(10, tq))
+	except (ValueError, NotImplementedError):
+		return
+	if digits > prec * 16:
+		return
 	start = max(1, l10(p) - l10(q)) + 2
 	if start + digits > prec * 2:
 		return
@@ -744,10 +740,10 @@ def factorize(*args, **kwargs):
 	temp = _factorint(*args, **kwargs)
 	return list(itertools.chain(*((k,) * v for k, v in sorted(temp.items()))))
 
-def factors(n, lim=1048576):
+def factors(n, limit=1048576):
 	temp = _factorint(n)
 	fcount = np.prod([x + 1 for x in temp.values()], dtype=object)
-	if fcount > lim:
+	if fcount > limit:
 		raise OverflowError("Too many factors to evaluate.")
 	pfact = list(itertools.chain(*((k,) * v for k, v in sorted(temp.items()))))
 	facts = set(temp.keys())

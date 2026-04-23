@@ -45,8 +45,6 @@ class Math(Command):
 	ephemeral = True
 
 	async def __call__(self, bot, _user, _premium, mode, query, precision, rationalise, **void):
-		if query == "69":
-			return py_md("69 = nice")
 		env = bot.get_userbase(_user.id, "variables", {})
 		if mode == "list_vars":
 			if not env:
