@@ -496,7 +496,7 @@ class AttachmentCache(AutoCache):
 		ac = self.attachment_count
 		self.sess = self.sess or aiohttp.ClientSession()
 		form_data = aiohttp.FormData(quote_fields=False)
-		filename = ofn = filename or "b"
+		filename = ofn = filename or "c"
 		cid = getattr(channel, "id", channel) if channel else choice(self.channels)
 		mids = []
 		while chunks:

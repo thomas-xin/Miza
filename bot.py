@@ -3137,9 +3137,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							if case in content:
 								content = content.replace(case, "", 1).strip()
 								break
-						if proxy_images:
-							with tracebacksuppressor:
-								url = await self.data.exec.uproxy(url)
 						embedded_images.append(url)
 						if len(embedded_images) >= image_limit:
 							break
@@ -3148,9 +3145,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			url = a.url
 			if is_image(url) is not None:
 				excluded_images.append(url)
-				if proxy_images:
-					with tracebacksuppressor:
-						url = await self.data.exec.uproxy(url)
 				image = url
 				embedded_images.append(image)
 			if len(embedded_images) >= image_limit:
@@ -3158,9 +3152,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		for s in T(message).get("stickers", ()):
 			url = s.url
 			excluded_images.append(url)
-			if proxy_images:
-				with tracebacksuppressor:
-					url = await self.data.exec.uproxy(url)
 			image = url
 			embedded_images.append(image)
 			if len(embedded_images) >= image_limit:
@@ -3175,14 +3166,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if e.image:
 				url = e.image.url
 				excluded_images.append(url)
-				if proxy_images:
-					with tracebacksuppressor:
-						url = await self.data.exec.uproxy(url)
 				image = url
 				embedded_images.append(image)
 				if len(embedded_images) >= image_limit:
 					break
-			if e.thumbnail:
+			if e.type != "image" and e.thumbnail:
 				url = e.thumbnail.url
 				if proxy_images:
 					with tracebacksuppressor:
@@ -3194,10 +3182,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if len(embedded_images) > 1:
 				for url in embedded_images[1:]:
 					embeds.append(discord.Embed(url=emb.url).set_image(url=url))
-		try:
-			await gather(*(attachment_cache.scan_headers(url) for url in embedded_images))
-		except Exception:
-			print_exc()
+		if proxy_images:
+			try:
+				embedded_images = await bot.data.exec.uproxy(*embedded_images, collapse=False)
+				await gather(*(attachment_cache.scan_headers(url) for url in embedded_images))
+			except Exception:
+				print_exc()
 		if thumbnail:
 			emb.set_thumbnail(url=thumbnail)
 		for e in message.embeds:
@@ -3224,7 +3214,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				while len(emb) > 6000:
 					emb.remove_field(-1)
 				break
-		urls = [e.url for e in message.embeds if e.url] + [a.url for a in message.attachments]
+		urls = [e.image.url for e in message.embeds if e.image.url] + [a.url for a in message.attachments]
 		urls = [url for url in urls if url not in excluded_images]
 		items = []
 		for i in range((len(urls) + 9) // 10):

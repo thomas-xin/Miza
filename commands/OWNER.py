@@ -638,7 +638,7 @@ class UpdateExec(Database):
 
 	async def lproxy(self, url, filename=None, channel=None, minimise=False, allow_empty=True):
 		if isinstance(url, byte_like):
-			fn = filetransd(filename or "c.b")
+			fn = filetransd(filename or "")
 			b = url
 		elif is_url(url):
 			fn = filetransd(filename or url2fn(url))
@@ -647,7 +647,7 @@ class UpdateExec(Database):
 			fn = filetransd((filename or url).replace("\\", "/").rsplit("/", 1)[-1])
 			b = open(url, "rb")
 		else:
-			fn = filetransd(filename or getattr(url, "name", None) or "c.b")
+			fn = filetransd(filename or getattr(url, "name", None) or "")
 			b = url
 		if not allow_empty and not getsize(b):
 			raise EOFError(b)
