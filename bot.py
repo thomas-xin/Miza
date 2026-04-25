@@ -707,6 +707,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				)
 				if command.schema:
 					c["schema"] = command.schema
+					c["ordered_args"] = list(command.schema)
 				else:
 					c["usage"] = command.usage
 				if getattr(command, "macros", None):
@@ -1927,9 +1928,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		11: "au-en",
 		12: "nz-en",	# New Zealand
 	}
-	ddgs = ddgs.DDGS()
-	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60, screenshot=False, include_hrefs=False, best=True):
-		"Browses the internet using DuckDuckGo or Microsoft Edge. Returns an image if screenshot is set to True."
+	ddgs = ddgs.DDGS(timeout=120)
+	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60):
+		"Browses the internet for a search query or URL."
 		if not region:
 			if timezone is None:
 				if "users" in self.data:
@@ -1937,46 +1938,47 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if timezone is not None:
 				timezone = round(get_offset(timezone) / 3600)
 			region = self.browse_locations.get(timezone, "wt-wt")
-		async def retrieval(argv, region="wt-wt", screenshot=False, best=False):
+		async def retrieval(argv, region="wt-wt"):
 			if not is_url(argv):
-				argv = verify_url(argv)
 				print("Browse query:", repr(argv))
-				with tracebacksuppressor:
-					data = None
-					if best:
-						try:
-							data = await asubmit(self.ddgs.text, argv, safesearch="off", region=region, max_results=20 if best else 10)
-						except ddgs.exceptions.DuckDuckGoSearchException:
-							print_exc()
-					if not data:
-						headers = Request.header()
-						headers.Referer = "https://duckduckgo.com"
-						headers.Accept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-						content = await Request.aio(
-							"https://lite.duckduckgo.com/lite/",
-							headers=headers,
-							data=dict(q=argv),
-							method="POST",
-						)
-						from bs4 import BeautifulSoup
-						data = BeautifulSoup(resp.content)
-						text = data.get_text()
-						text = re.sub("\n{2,}", "\n\n", text.split("Any Time\n", 1)[-1].split("Past Year\n", 1)[-1].strip())
-						return text
-					if include_hrefs:
-						return "\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).strip()
-					return "\n\n".join((e.get("title", "") + "\n" + e.get("body", "")).strip() for e in data).strip()
-			if url2ext(argv) in IMAGE_FORMS:
-				return await attachment_cache.download(argv)
-			headers = await attachment_cache.scan_headers(argv)
-			headers = fcdict(headers)
-			if headers.get("Content-Type").split("/", 1)[0] in ("image", "video"):
-				return await attachment_cache.download(argv)
-			return await process_image("browse", "$", [argv, not screenshot], cap="browse", timeout=timeout)
+				data = []
+				futs = []
+				backends = ["bing", "brave", "duckduckgo", "google", "mojeek", "yandex", "yahoo"]
+				backends = shuffle(backends)[:3]
+				for backend in (backends):
+					fut = asubmit(
+						self.ddgs.text,
+						argv,
+						safesearch="off",
+						region=region,
+						max_results=10,
+						backend=backend,
+						timeout=timeout,
+					)
+					futs.append(fut)
+				results = await gather(*futs, return_exceptions=True)
+				for res in results:
+					if isinstance(res, list):
+						data += res
+					else:
+						print(repr(res))
+				return "\n\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).strip()
+			result = await asubmit(
+				self.ddgs.extract,
+				verify_url(argv),
+				fmt="text_markdown",
+				timeout=timeout,
+			)
+			return argv + "\n" + result["content"]
 		urls = find_urls(argv)
-		if not urls:
+		for url in urls:
+			argv = argv.replace(url, "", 1).strip()
+		if argv:
 			urls.append(argv)
-		futs = [csubmit(ai.cache.aretrieve(shash((argv, screenshot, best)), retrieval, argv, region, screenshot, best)) for argv in urls]
+		futs = [csubmit(ai.cache.aretrieve(
+			f"browse-{argv}", retrieval,
+			argv, region,
+		)) for argv in urls]
 		resp = await gather(*futs)
 		return "\n\n\n".join(resp) if isinstance(resp[0], str) else b"\n\n\n".join(resp)
 
@@ -2296,33 +2298,33 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	model_levels = {
 		0: cdict(
-			instructive="small",
-			casual="small",
-			nsfw="small",
-			backup="gemma-4-26b-a4b-it",
-			retry="gpt-5.4-mini",
+			instructive="large",
+			casual="large",
+			nsfw="large",
+			backup="deepseek-v4-flash",
+			retry="minimax-m2.7",
 			function="small",
-			vision="gemma-4-26b-a4b-it",
+			vision="gemini-3-flash",
 			target="auto",
 		),
 		1: cdict(
-			instructive="gemini-3-flash",
-			casual="large",
-			nsfw="grok-4.1-fast",
-			backup="gpt-5.4-mini",
-			retry="gemini-3.1-flash-lite",
-			function="gemma-4-26b-a4b-it",
+			instructive="minimax-m2.7",
+			casual="deepseek-v4-flash",
+			nsfw="large",
+			backup="mimo-v2.5-pro",
+			retry="mimo-v2.5-pro",
+			function="grok-4.1-fast",
 			vision="gemini-3-flash",
 			target="auto",
 		),
 		2: cdict(
-			instructive="claude-opus-4.7",
-			casual="gemini-3.1-pro",
-			nsfw="grok-4",
-			backup="gpt-5.4",
-			retry="gpt-5.4",
-			function="grok-4.1-fast",
-			vision="claude-opus-4.7",
+			instructive="gpt-5.5",
+			casual="mimo-v2.5-pro",
+			nsfw="minimax-m2.7",
+			backup="claude-opus-4.7",
+			retry="claude-opus-4.7",
+			function="mimo-v2.5-pro",
+			vision="gpt-5.5",
 			target="auto",
 		),
 	}
@@ -2805,7 +2807,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			name = None
 		mime = magic.from_buffer(d)
 		if mime == "text/html" and screenshot:
-			d = await self.browse(url, best=True, timeout=timeout + 8, screenshot=True)
+			d = await self.browse(url, timeout=timeout + 8)
 			mime = magic.from_buffer(d)
 		return mime, name, d
 

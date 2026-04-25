@@ -1225,7 +1225,7 @@ class Browse(Pagination, Command):
 		ss = True if int(mode) == 0 else False
 		urls = await bot.follow_url(query, ytd=False)
 		argv = urls[0] if urls else query
-		s = await bot.browse(argv, uid=uid, screenshot=ss, best=True, include_hrefs=True)
+		s = await bot.browse(argv, uid=uid)
 		if isinstance(s, bytes):
 			return cdict(
 				file=CompatFile(s),

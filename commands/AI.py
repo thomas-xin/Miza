@@ -551,7 +551,7 @@ class Ask(Command):
 						s = f'\n> Browsing "{argv}"...'
 						text += s
 						yield s
-						fut = bot.browse(argv, uid=_user.id, screenshot=False)
+						fut = bot.browse(argv, uid=_user.id)
 						succ = await rag(name, tid, fut)
 					elif name == "deno":
 						argv = kwargs.get("query") or " ".join(kwargs.values())
@@ -1130,7 +1130,38 @@ class Vectorise(Command):
 
 
 voices = []
-openai_voices = """alloy
+voice_map = cdict(
+	google="""zephyr
+puck
+charon
+kore
+fenrir
+leda
+orus
+aoede
+callirrhoe
+autonoe
+enceladus
+iapetus
+umbriel
+algieba
+despina
+erinome
+algenib
+rasalgethi
+laomedeia
+achernar
+alnilam
+schedar
+gacrux
+pulcherrima
+achird
+zubenelgenubi
+vindemiatrix
+sadachbia
+sadaltager
+sulafat""".splitlines(),
+	openai="""alloy
 ash
 ballad
 coral
@@ -1139,9 +1170,8 @@ fable
 nova
 onyx
 sage
-shimmer""".splitlines()
-voices.extend(f"openai-{v}" for v in openai_voices)
-dectalk_voices = """paul
+shimmer""".splitlines(),
+	dectalk="""paul
 betty
 harry
 frank
@@ -1149,8 +1179,9 @@ kit
 rita
 ursula
 dennis
-wendy""".splitlines()
-voices.extend(f"dectalk-{v}" for v in dectalk_voices)
+wendy""".splitlines(),
+)
+voices.extend(f"{k}-{n}" for k, v in voice_map.items() for n in v)
 
 class TTS(Command):
 	description = "Produces synthesised speech from a text input."
@@ -1200,7 +1231,25 @@ class TTS(Command):
 		engine, mode = voice.split("-", 1)
 		fi = temporary_file()
 		desc = None
+		input_args = ()
 		match engine:
+			case "google":
+				_premium.require(2)
+				oai = get_oai(None, "openrouter")
+				model = "google/gemini-3.1-flash-tts-preview"
+				resp = await oai.audio.speech.create(
+					model=model,
+					voice=mode,
+					input=text,
+					response_format="pcm",
+					speed=1,
+				)
+				print(resp)
+				c = await tcount(text)
+				_premium.append(["openai", model, mpf("21") / 1000000 * c])
+				desc = _premium.apply()
+				resp.write_to_file(fi)
+				input_args = ("-f", "s16le", "-ac", "1", "-ar", "24k")
 			case "openai":
 				_premium.require(2)
 				oai = get_oai(None, "openai")
@@ -1217,29 +1266,24 @@ class TTS(Command):
 				_premium.append(["openai", model, mpf("12.6") / 1000000 * c])
 				desc = _premium.apply()
 				resp.write_to_file(fi)
-				fmt = format
 			case "dectalk":
 				args = ["say", "-w", fi, "-pre", f"[:name {mode}]", text]
 				print(args)
 				await asubmit(subprocess.run, args, cwd="misc/dectalk", stdout=subprocess.DEVNULL, shell=True)
-				assert os.path.exists(fi), "No output was captured!"
-				fmt = "wav"
 			case _:
 				raise NotImplementedError(engine)
-		if False:#fmt == format:
-			fo = fi
-		else:
-			fo = temporary_file(format)
-			args = ["ffmpeg", "-v", "error", "-hide_banner", "-vn", "-i", fi, "-af", "volume=2", "-b:a", "128k", "-vbr", "on", fo]
-			print(args)
-			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
-			try:
-				async with asyncio.timeout(3200):
-					await proc.wait()
-			except (T0, T1, T2):
-				with tracebacksuppressor:
-					force_kill(proc)
-				raise
+		assert os.path.exists(fi), "No output was captured!"
+		fo = temporary_file(format)
+		args = ["ffmpeg", "-v", "error", "-hide_banner", "-vn", *input_args, "-i", fi, "-af", "volume=2", "-b:a", "128k", "-vbr", "on", fo]
+		print(args)
+		proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
+		try:
+			async with asyncio.timeout(3200):
+				await proc.wait()
+		except (T0, T1, T2):
+			with tracebacksuppressor:
+				force_kill(proc)
+			raise
 		if autoplay:
 			await vc_fut
 			url = await bot.upload_temp(fo)
