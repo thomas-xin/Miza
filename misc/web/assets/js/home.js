@@ -154,7 +154,7 @@
 
 {
     async function loadGitStats() {
-        resp = await fetch("/git_stats");
+        resp = await fetch("https://api.mizabot.xyz/git_stats");
         data = await resp.json();
         document.getElementById('commit-count').innerText = data[0];
         document.getElementById('line-edits').innerText = data[1];
