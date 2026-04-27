@@ -686,7 +686,7 @@ if __name__ == "__main__":
 	# Configure Hypercorn
 	config = Config()
 	config.bind = config.quic_bind = [f"0.0.0.0:{PORT}"]
-	config.worker_class = "asyncio"
+	config.worker_class = "uvloop"
 	config.workers = 3
 	config.backlog = 1024
 	config.keep_alive_timeout = 10
