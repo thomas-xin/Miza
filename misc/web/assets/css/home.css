@@ -48,10 +48,7 @@ section.hero {
             box-shadow: 0 1px 20px 0 #ac1ba2ad;
         }
     }
-	&.above-view {
-		transform: translateX(-2.5ch);
-	}
-	&.below-view .holder {
+	&.above-view .below-view .holder {
 		transform: translateX(2.5ch);
 	}
     & .logo-right {

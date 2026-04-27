@@ -660,6 +660,12 @@ async def catch_all(path: str, request: Request):
 		return FileResponse("misc/web/index.html", media_type="text/html")
 	if p in ("favicon", "favicon.ico"):
 		return FileResponse("misc/web/assets/images/mizaleaf.webp", media_type="image/webp")
+	if p == "files":
+		return FileResponse("misc/web/files.html", media_type="text/html")
+	if p == "commands":
+		return FileResponse("misc/web/commands.html", media_type="text/html")
+	if first == "assets":
+		return FileResponse(f"misc/web/{p}")
 	if first in (".git", ".env", "admin", "private", "internal", "administrator"):
 		return RedirectResponse(url="https://www.youtube.com/watch?v=dQw4w9WgXcQ", status_code=308)
 	if first in alias:

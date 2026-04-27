@@ -18,7 +18,7 @@
 			}
 		}
 	}, {
-		threshold: [0, 0.45, 0.55, 1]
+		threshold: [0, 0.4, 0.6, 1]
 	})
 
 	for (let section of ALL_SECTIONS) {
