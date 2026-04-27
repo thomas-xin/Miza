@@ -294,13 +294,13 @@ class AttachmentCache(AutoCache):
 		if url:
 			url = self.store(url)
 			c_id, m_id, a_id, fn = split_url(url, m_id)
-		ac = self.attachment_count
 		if isinstance(c_id, str) and not c_id.isnumeric():
 			c_id = int.from_bytes(b64(c_id), "big")
 			m_id = int.from_bytes(b64(m_id), "big")
 			a_id = int.from_bytes(b64(a_id), "big")
 		if not a_id or a_id == m_id:
 			a_id = 0
+		ac = self.attachment_count
 		if a_id >= ac:
 			key = a_id
 			early = 43200 + 60
@@ -374,7 +374,9 @@ class AttachmentCache(AutoCache):
 				code, msg = ex.response.status_code, ex.response.reason
 				raise ConnectionError(code, msg)
 			self.tertiary[url] = head
-		except ConnectionError:
+		except ConnectionError as ex:
+			if ex.errno == "404":
+				self.remove_cached(url, m_id)
 			raise
 		except:
 			traceback.print_exc()
@@ -417,7 +419,12 @@ class AttachmentCache(AutoCache):
 			url = await self.obtain(url=url, m_id=m_id)
 		elif is_miza_attachment(url):
 			url = re.sub("^https?:\\/\\/(?:\\w+\\.)?mizabot.xyz\\/", f"https://{base}/", url)
-		headers = await asubmit(header_test, url)
+		try:
+			headers = await asubmit(header_test, url)
+		except ConnectionError as ex:
+			if ex.errno == "404":
+				self.remove_cached(url, m_id)
+			raise
 		return dict(headers)
 	async def scan_headers(self, url, m_id=None, base="api.mizabot.xyz", fc=False):
 		url = unyt(url)
@@ -427,6 +434,21 @@ class AttachmentCache(AutoCache):
 		if fc:
 			return fcdict(headers)
 		return headers
+
+	def remove_cached(self, url, m_id=None):
+		if is_miza_attachment(url):
+			c_id, m_id, a_id, fn = expand_attachment(url)
+		else:
+			c_id, m_id, a_id, fn = split_url(url, m_id)
+		if not a_id or a_id == m_id:
+			a_id = 0
+		ac = self.attachment_count
+		if a_id >= ac:
+			key = a_id
+		else:
+			key = m_id * ac + a_id
+		self.pop(key, None)
+		self.tertiary.pop(url, None)
 
 	async def delete(self, c_id, m_id, url=None):
 		if url:

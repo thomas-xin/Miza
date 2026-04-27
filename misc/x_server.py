@@ -374,6 +374,9 @@ class Server:
 				session = self.session if url.startswith("https://") and not is_discord_attachment(url) and i == 0 else niquests
 				resp = session.get(url, headers=headers, data=data, verify=i <= 1, timeout=timeout + i ** 2)
 				resp.raise_for_status()
+			except niquests.exceptions.HTTPError:
+				if resp.status_code in (400, 401, 402, 403, 404, 405):
+					raise
 			except Exception:
 				if i < retries - 1:
 					continue
@@ -525,9 +528,15 @@ class Server:
 		rquery = cp.request.query_string and "?" + cp.request.query_string
 		if len(path) == 1 and path[0].count("~") == 2:
 			return self.proxy_if(await_fut(attachment_cache.obtain(*path[0].split(".", 1)[0].split("~", 2))), force=force, download=download)
-		if len(path) == 2 and path[0].count("~") == 0:
+		if len(path) in (1, 2) and path[0].count("~") == 0:
 			c_id, m_id, a_id, fn = decode_attachment("/".join(path))
-			return self.proxy_if(await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn)), force=force, download=download)
+			try:
+				return self.proxy_if(await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn)), force=force, download=download)
+			except ConnectionError as ex:
+				if ex.errno == 404:
+					attachment_cache.remove_cached(cp.url())
+					return self.proxy_if(await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn)), force=force, download=download)
+				raise
 		if hasattr(self, "state"):
 			url = f"{self.state['/']}/u{rpath}{rquery}"
 			raise cp.HTTPRedirect(url, 307)

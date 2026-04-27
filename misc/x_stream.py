@@ -415,7 +415,14 @@ async def unproxy(path: str, request: Request, url: Optional[str] = None, force:
 		resp = await attachment_cache.obtain(c_id, m_id, a_id, fn)
 	except ConnectionError as ex:
 		raise HTTPException(status_code=ex.errno or 500, detail=f"{url}: {ex}")
-	return await proxy_if(resp, request, force=force, download=download)
+	try:
+		return await proxy_if(resp, request, force=force, download=download)
+	except ConnectionError as ex:
+		if ex.errno == 404:
+			attachment_cache.remove_cached(request.url)
+			resp = await attachment_cache.obtain(c_id, m_id, a_id, fn)
+			return await proxy_if(resp, request, force=force, download=download)
+		raise
 
 
 @app.post("/upload")
