@@ -1562,6 +1562,16 @@ def get_mime(path):
 				pass
 			else:
 				return "text/plain"
+	if mime.startswith("application/"):
+		match mime.split("/", 1)[-1]:
+			case "ogg":
+				return "audio/ogg"
+			case "opus":
+				return "audio/opus"
+			case "mp3" | "mpeg":
+				return "audio/mpeg"
+			case "wav" | "x-wav":
+				return "audio/wav"
 	if mime.startswith("text/plain"):
 		ext = path.rsplit("/", 1)[-1].rsplit(".", 1)[-1]
 		mime2 = MIMES.get(ext, "")

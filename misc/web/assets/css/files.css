@@ -217,7 +217,7 @@ section.file-preview {
             background: repeating-conic-gradient(#303030 0 25%, #545454 0 50%) 
                 50% / 20px 20px;
             
-            max-width: min(15rem, 90vw);
+            max-width: min(50rem, 90vw);
             max-height: min(50rem, 90vh);
 
             & :is(img, video, audio) {

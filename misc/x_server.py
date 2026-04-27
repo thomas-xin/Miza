@@ -547,6 +547,7 @@ class Server:
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	def upload(self, url=None, filename=None, persistent=False, file=None, **void):
+		update_headers(cp.response.headers, **HEADERS)
 		try:
 			fp = getattr_chain(file, "file.file", None) or cp.request.body.fp
 		except Exception:
@@ -569,6 +570,7 @@ class Server:
 
 	@cp.expose
 	def download(self, path, download=False):
+		update_headers(cp.response.headers, **HEADERS)
 		ts = path.rsplit("/", 1)[-1].split(".", 1)[0]
 		fp, fn = diskcache.FanoutCache.get(self.upload_cache, ts, tag=True, read=True)
 		if not fp:
