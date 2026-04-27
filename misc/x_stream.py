@@ -84,23 +84,9 @@ class Server:
 		state = {"/": f"https://api.mizabot.xyz:{webserver_port}"}
 
 	session = niquests.Session()
+	asession = niquests.AsyncSession()
 	statics = diskcache.Cache(directory=f"{CACHE_PATH}/statics", expiry=86400 * 30)
 	dynamics = diskcache.Cache(directory=f"{CACHE_PATH}/dynamics", expiry=86400 * 30)
-
-	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
-		"""HTTP GET with automatic retries."""
-		for i in range(retries):
-			try:
-				session = self.session if url.startswith("https://") and not is_discord_attachment(url) and i == 0 else niquests
-				resp = session.get(url, headers=headers, data=data, verify=i <= 1, timeout=timeout + i ** 2)
-				resp.raise_for_status()
-			except Exception:
-				if i < retries - 1:
-					continue
-				raise
-			else:
-				return resp
-		return resp
 
 	async def dyn_serve(
 		self,
@@ -459,7 +445,12 @@ async def upload(
 		headers = RequestManager.header()
 		if request.headers.get("Range"):
 			headers["Range"] = request.headers["Range"]
-		resp = server.get_with_retries(url, headers=headers, timeout=3)
+		resp = await server.asession.get(
+			url,
+			headers=RequestManager.header(),
+		)
+		filename = filename or unquote(resp.headers.get("content-disposition", "").split("filename=", 1)[-1])
+		resp = resp.content
 
 	fn = filename or getattr(resp, "filename", None) or (url2fn(url) if url else None)
 
@@ -576,8 +567,7 @@ async def backend(path: str, request: Request):
 
 	print("BACKEND:", url)
 
-	resp = await asubmit(
-		server.session.get,
+	resp = await server.asession.get(
 		url,
 		headers=headers,
 		stream=True,
@@ -686,7 +676,7 @@ if __name__ == "__main__":
 	# Configure Hypercorn
 	config = Config()
 	config.bind = config.quic_bind = [f"0.0.0.0:{PORT}"]
-	config.worker_class = "uvloop"
+	config.worker_class = "asyncio"
 	config.workers = 3
 	config.backlog = 1024
 	config.keep_alive_timeout = 10

@@ -5016,8 +5016,8 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 	session = niquests.Session()
 	compat_session = requests.Session()
 
-	@classmethod
-	def header(cls, base=(), **fields) -> cdict:
+	@staticmethod
+	def header(base=(), **fields) -> cdict:
 		"Creates a custom HTTP request header with randomised properties that spoof anti-scraping sites."
 		head = {
 			"User-Agent": USER_AGENT,
