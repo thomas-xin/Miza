@@ -48,7 +48,10 @@ section.hero {
             box-shadow: 0 1px 20px 0 #ac1ba2ad;
         }
     }
-	&.outside-view .holder {
+	&.above-view {
+		transform: translateX(-2.5ch);
+	}
+	&.below-view .holder {
 		transform: translateX(2.5ch);
 	}
     & .logo-right {
@@ -94,7 +97,7 @@ section.hero {
 			user-select: auto;
 		}
 	}
-	&.outside-view .porpoise {
+	&.above-view .below-view .porpoise {
 		& .normal, .goofy, .icon {
 			transition-delay: 0s;
 		}
@@ -211,7 +214,7 @@ section.hero {
 		
 	}
 
-	section.hero.outside-view .holder {
+	section.hero.above-view section.hero.below-view .holder {
 		transform: translateX(0);
 	}
 }
@@ -305,7 +308,11 @@ section.versatile {
 				opacity: 1;
 				transform: translateY(0) scale(1);
 			}
-			&.outside-view {
+			&.above-view {
+				opacity: 0.3;
+				transform: translateY(-2rem) scale(0.95);
+			}
+			&.below-view {
 				opacity: 0.3;
 				transform: translateY(2rem) scale(0.95);
 			}
@@ -666,7 +673,7 @@ section.maintained {
 	&.inside-view .server {
 		filter: drop-shadow(0 0 7.5rem #00464e) contrast(1.1);
 	}
-	&.outside-view {
+	&.above-view .below-view {
 		.particles-background {
 			opacity: 0.1;
 		}
@@ -758,7 +765,7 @@ section.links {
 	.leafblower, h3, h2, .big-links {
 		transition: opacity 150ms;
 	}
-	&.outside-view {
+	&.above-view .below-view {
 		.leafblower, h3, h2, .big-links {
 			opacity: 0.1;
 		}

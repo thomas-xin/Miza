@@ -1,262 +1,262 @@
 .swapping-sections-holder {
-    display: grid;
-    grid-template: 100% / 100%;
-    height: 100%;
-    flex-grow: 1;
+	display: grid;
+	grid-template: 100% / 100%;
+	height: 100%;
+	flex-grow: 1;
 }
 
 section.file-upload {
-    grid-area: 1/1;
+	grid-area: 1/1;
 
-    display: flex;
-    flex-flow: column nowrap;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
+	display: flex;
+	flex-flow: column nowrap;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
 
-    & h1 {
-        font-size: 2rem;
-        line-height: 1.5;
-    }
+	& h1 {
+		font-size: 2rem;
+		line-height: 1.5;
+	}
 
-    & form {
-        display: contents;
+	& form {
+		display: contents;
 
-        & .file-input {
-            display: flex;
-            flex-flow: row wrap;
-            gap: 0.25rem;
-            user-select: none;
+		& .file-input {
+			display: flex;
+			flex-flow: row wrap;
+			gap: 0.25rem;
+			user-select: none;
 
-            & .filename-text {
-                background-color: white;
-                color: #555;
-                border: .075rem solid #ddd;
-                border-radius: .25rem;
-                box-shadow: inset 0 .2rem .4rem rgba(0,0,0,.05);
-                padding: .5rem 1rem;
-                line-height: 1.5;
-                min-width: 12rem;
-                max-width: 100%;
-            }
+			& .filename-text {
+				background-color: white;
+				color: #555;
+				border: .075rem solid #ddd;
+				border-radius: .25rem;
+				box-shadow: inset 0 .2rem .4rem rgba(0,0,0,.05);
+				padding: .5rem 1rem;
+				line-height: 1.5;
+				min-width: 12rem;
+				max-width: 100%;
+			}
 
-            &.pulse .filename-text {
-                animation: border-pulse 0.7s;
-            }
+			&.pulse .filename-text {
+				animation: border-pulse 0.7s;
+			}
 
-            & .file-browse-button {
-                padding: .5rem 1rem;
-                line-height: 1.5;
-                color: #000;
-                background-color: #eee;
-                border: .075rem solid #ddd;
-                box-shadow: inset 0 .2rem .4rem rgba(0, 0, 0, 0.12);
-                border-radius: 0.25rem;
+			& .file-browse-button {
+				padding: .5rem 1rem;
+				line-height: 1.5;
+				color: #000;
+				background-color: #eee;
+				border: .075rem solid #ddd;
+				box-shadow: inset 0 .2rem .4rem rgba(0, 0, 0, 0.12);
+				border-radius: 0.25rem;
 
-                cursor: pointer;
-            }
-        }
+				cursor: pointer;
+			}
+		}
 
-        & .checkbox-label {
-            user-select: none;
-            cursor: pointer;
+		& .checkbox-label {
+			user-select: none;
+			cursor: pointer;
 
-            & input {
-                cursor: pointer;
-                vertical-align: middle;
-            }
-        }
+			& input {
+				cursor: pointer;
+				vertical-align: middle;
+			}
+		}
 
-        & button[type="submit"] {
-            display: block;
-            color: white;
-            border: solid 2px rgb(52, 0, 104);
-            background-color: rgb(82, 33, 133);
-            padding: 0.4rem 1rem;
-            cursor: pointer;
-        }
-    }
+		& button[type="submit"] {
+			display: block;
+			color: white;
+			border: solid 2px rgb(52, 0, 104);
+			background-color: rgb(82, 33, 133);
+			padding: 0.4rem 1rem;
+			cursor: pointer;
+		}
+	}
 
-    & .progress-element, & #uploadProgressH2 {
-        display: none;
-    }
+	& .progress-element, & #uploadProgressH2 {
+		display: none;
+	}
 
-    &.uploading {
-        position: relative;
-        overflow: hidden;
-        overflow: clip;
-        cursor: wait;
+	&.uploading {
+		position: relative;
+		overflow: hidden;
+		overflow: clip;
+		cursor: wait;
 
-        & .progress-element {
-            display: block;
-            position: absolute;
-            z-index: 2;
-            width: calc(100vw + 120px);
-            left: 0;
-            top: 0;
-            height: 110vh;
-            transform: translateY(calc(-108vh + (var(--progress, 0) * 1vh)));
-            transition: transform 550ms ease;
+		& .progress-element {
+			display: block;
+			position: absolute;
+			z-index: 2;
+			width: calc(100vw + 120px);
+			left: 0;
+			top: 0;
+			height: 110vh;
+			transform: translateY(calc(-108vh + (var(--progress, 0) * 1vh)));
+			transition: transform 550ms ease;
 
-            &::before {
-                display: block;
-                content: '';
-                width: 100%;
-                height: 100%;
-                
-                animation: wavemaxx infinite .5s linear;
+			&::before {
+				display: block;
+				content: '';
+				width: 100%;
+				height: 100%;
+				
+				animation: wavemaxx infinite .5s linear;
 
-                --mask:
-                    radial-gradient(67.08px at 50% calc(100% - 90px),#000 99%,#0000 101%) calc(50% - 60px) 0/120px 100%,
-                    radial-gradient(67.08px at 50% calc(100% + 60px),#0000 99%,#000 101%) 50% calc(100% - 30px)/120px 100% repeat-x;
-                -webkit-mask: var(--mask);
-                mask: var(--mask);
+				--mask:
+					radial-gradient(67.08px at 50% calc(100% - 90px),#000 99%,#0000 101%) calc(50% - 60px) 0/120px 100%,
+					radial-gradient(67.08px at 50% calc(100% + 60px),#0000 99%,#000 101%) 50% calc(100% - 30px)/120px 100% repeat-x;
+				-webkit-mask: var(--mask);
+				mask: var(--mask);
 
-                background-color: #0e1285;
-                background-image: linear-gradient(0deg, #850e79, #4c1b9c);
-            }
-        }
-        & #uploadProgressH2 {
-            display: block;
-            z-index: 3;
-        }
-        & > h1 {
-            z-index: 3;
-        }
-        & > form {
-            display: none;
-        }
-        & > form > * {
-            opacity: 0.7;
-            transition: opacity 150ms;
-            pointer-events: none;
-            z-index: 3;
-        }
-    }
+				background-color: #0e1285;
+				background-image: linear-gradient(0deg, #850e79, #4c1b9c);
+			}
+		}
+		& #uploadProgressH2 {
+			display: block;
+			z-index: 3;
+		}
+		& > h1 {
+			z-index: 3;
+		}
+		& > form {
+			display: none;
+		}
+		& > form > * {
+			opacity: 0.7;
+			transition: opacity 150ms;
+			pointer-events: none;
+			z-index: 3;
+		}
+	}
 
-    &.doneUploading {
-        & #uploadProgressH2 {
-            transition: opacity 0.5s 1s;
-            opacity: 0;
-        }
-    }
+	&.doneUploading {
+		& #uploadProgressH2 {
+			transition: opacity 0.5s 1s;
+			opacity: 0;
+		}
+	}
 }
 
 @keyframes border-pulse {
-    0% {
-        outline-style: solid;
-        outline-offset: 0;
-        outline-width: 4px;
-        background-color: #fff;
-        outline-color: transparent;
-    }
-    50% {
-        background-color: rgb(225, 247, 255);
-        outline-color: rgb(0, 191, 255);
-        outline-offset: 8px;
-        outline-width: 8px;
-    }
-    70% {
-        outline-color: rgba(0, 191, 255, 0.5);
-    }
-    90% {
-        outline-color: transparent;
-    }
-    100% {
-        outline-style: solid;
-        outline-offset: 15px;
-        outline-width: 0px;
-        background-color: #fff;
-    }
+	0% {
+		outline-style: solid;
+		outline-offset: 0;
+		outline-width: 4px;
+		background-color: #fff;
+		outline-color: transparent;
+	}
+	50% {
+		background-color: rgb(225, 247, 255);
+		outline-color: rgb(0, 191, 255);
+		outline-offset: 8px;
+		outline-width: 8px;
+	}
+	70% {
+		outline-color: rgba(0, 191, 255, 0.5);
+	}
+	90% {
+		outline-color: transparent;
+	}
+	100% {
+		outline-style: solid;
+		outline-offset: 15px;
+		outline-width: 0px;
+		background-color: #fff;
+	}
 }
 
 @keyframes wavemaxx {
-    0% {
-        transform: translateX(-120px);
-    }
-    100% {
-        transform: translateX(0);
-    }
+	0% {
+		transform: translateX(-120px);
+	}
+	100% {
+		transform: translateX(0);
+	}
 }
 
 section.file-preview {
-    display: none;
-    grid-area: 1/1;
-    z-index: 4;
+	display: none;
+	grid-area: 1/1;
+	z-index: 4;
 
 
-    background-color: #0b0e58;
-    background-image: linear-gradient(0deg, #4b0544, #20064b);
-    color: white;
+	background-color: #0b0e58;
+	background-image: linear-gradient(0deg, #4b0544, #20064b);
+	color: white;
 
-    flex-flow: column nowrap;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
+	flex-flow: column nowrap;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
 
-    &.visible {
-        display: flex;
-        animation: opacityIn 0.5s;
-    }
+	&.visible {
+		display: flex;
+		animation: opacityIn 0.5s;
+	}
 
-    & h1 {
-        font-size: 2rem;
-        line-height: 1;
-    }
+	& h1 {
+		font-size: 2rem;
+		line-height: 1;
+	}
 
-    .permalink {
-        font-size: 0.8rem;
-    }
+	.permalink {
+		font-size: 0.8rem;
+	}
 
-    .media-preview-holder {
-        display: none;
-        &:not(:empty) {
-            display: block;
-            border-radius: 0.2rem;
-            border: solid 2px white;
-            background: repeating-conic-gradient(#303030 0 25%, #545454 0 50%) 
-                50% / 20px 20px;
+	.media-preview-holder {
+		display: none;
+		&:not(:empty) {
+			display: block;
+			border-radius: 0.2rem;
+			border: solid 2px white;
+			background: repeating-conic-gradient(#303030 0 25%, #545454 0 50%) 
+				50% / 20px 20px;
 
-            width: 90%;
-            max-width: min(50rem, 90vw);
-            max-height: min(50rem, 90vh);
+			width: 90%;
+			max-width: min(50rem, 90vw);
+			max-height: min(50rem, 90vh);
 
-            & :is(img, video, audio) {
-                width: 100%;
-                display: block;
-            }
-        }
-    }
+			& :is(img, video, audio) {
+				width: 100%;
+				display: block;
+			}
+		}
+	}
 
-    .metadata {
-        font-size: 0.9rem;
-        font-style: italic;
-    }
+	.metadata {
+		font-size: 0.9rem;
+		font-style: italic;
+	}
 
-    .buttonsRow {
-        display: flex;
-        flex-flow: row wrap;
-        gap: 0.5rem;
-        & .linkButton {
-            display: block;
-            color: white;
-            border: solid 2px rgb(52, 0, 104);
-            background-color: rgb(82, 33, 133);
-            padding: 0.4rem 1rem;
-            cursor: pointer;
-        }
-    }
+	.buttonsRow {
+		display: flex;
+		flex-flow: row wrap;
+		gap: 0.5rem;
+		& .linkButton {
+			display: block;
+			color: white;
+			border: solid 2px rgb(52, 0, 104);
+			background-color: rgb(82, 33, 133);
+			padding: 0.4rem 1rem;
+			cursor: pointer;
+		}
+	}
 
 }
 
 @keyframes opacityIn {
-    0% {
-        opacity: 0;
-    }
-    50% {
-        opacity: 0;
-    }
-    100% {
-        opacity: 1;
-    }
+	0% {
+		opacity: 0;
+	}
+	50% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
 }

@@ -895,7 +895,7 @@ class Server:
 		return cp.lib.static.serve_file(backup, content_type="application/octet-stream", disposition="attachment")
 	backup._cp_config = {"response.stream": True}
 
-	git_cache = AutoCache(f"{CACHE_PATH}/git", stale=86400, timeout=86400 * 7)
+	git_cache = AutoCache(f"{CACHE_PATH}/git", stale=3600, timeout=86400 * 7)
 	@cp.expose
 	def git_stats(self):
 		def get_git():
