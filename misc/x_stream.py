@@ -687,8 +687,9 @@ if __name__ == "__main__":
 	config = Config()
 	config.bind = config.quic_bind = [f"0.0.0.0:{PORT}"]
 	config.worker_class = "asyncio"
-	config.workers = 1  # Single worker, uses async for concurrency
-	config.keep_alive_timeout = 65
+	config.workers = 3
+	config.backlog = 1024
+	config.keep_alive_timeout = 10
 	config.graceful_timeout = 30
 
 	# SSL Configuration

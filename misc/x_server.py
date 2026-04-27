@@ -20,7 +20,6 @@ import diskcache
 import niquests
 import orjson
 import psutil
-import requests
 from concurrent.futures import Future
 from traceback import print_exc
 from cheroot import errors
@@ -168,8 +167,8 @@ cp._cprequest.Request.process_headers = process_headers
 
 @functools.lru_cache(maxsize=256)
 def get_size_mime(head, tail, count, chunksize):
-	fut = esubmit(requests.head, head)
-	resp = requests.head(tail)
+	fut = esubmit(niquests.head, head)
+	resp = niquests.head(tail)
 	lastsize = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 	size = chunksize * (count - 1) + lastsize
 	resp = fut.result()
@@ -372,7 +371,7 @@ class Server:
 	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
 		for i in range(retries):
 			try:
-				session = self.session if url.startswith("https://") and not is_discord_attachment(url) and i == 0 else requests
+				session = self.session if url.startswith("https://") and not is_discord_attachment(url) and i == 0 else niquests
 				resp = session.get(url, headers=headers, data=data, verify=i <= 1, timeout=timeout + i ** 2)
 				resp.raise_for_status()
 			except Exception:
@@ -457,7 +456,7 @@ class Server:
 					elif u.startswith("https://cdn.discord"):
 						ns = 8388608
 					else:
-						resp = requests.head(u, timeout=3)
+						resp = niquests.head(u, timeout=3)
 						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 					if pos + ns <= start:
 						pos += ns
@@ -955,7 +954,7 @@ class Server:
 		return as_str(res)
 
 	rapidapi = 0
-	@cp.expose(alias=("commands",))
+	@cp.expose
 	def command(self, content="", input="", timeout=420, redirect=""):
 		ip = true_ip()
 		content = input or urllib.parse.unquote(cp.url(base="", qs=cp.request.query_string).rstrip("?").split("/", 1)[-1].removeprefix("api/").split("/", 1)[-1])
