@@ -610,11 +610,11 @@ async def static_backend(path: str, request: Request):
 		url += f"?{query_string}"
 
 	try:
-		headers, content = server.statics[url]
-	except LookupError:
+		headers, content, status_code = server.statics[url]
+	except (LookupError, ValueError):
 		pass
 	else:
-		return Response(content=content, headers=headers)
+		return Response(content=content, headers=headers, status_code=status_code)
 
 	headers = fcdict(request.headers)
 	headers.pop("Connection", None)
@@ -636,9 +636,8 @@ async def static_backend(path: str, request: Request):
 	response_headers.pop("Server", None)
 	print(resp, resp.headers, len(resp.content))
 
-	server.statics[url] = [response_headers, resp.content]
-
-	return Response(content=resp.content, headers=response_headers)
+	server.statics[url] = [response_headers, resp.content, resp.status_code]
+	return Response(content=resp.content, headers=response_headers, status_code=resp.status_code)
 
 
 alias = tuple([fn.split("/", 1)[0].rsplit(".", 1)[0] for fn in os.listdir("misc/web")])
