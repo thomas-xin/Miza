@@ -19,7 +19,7 @@ from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment, discord_expired,
 	is_discord_attachment, url2fn, getsize,
 	Request as RequestManager, DOMAIN_CERT, PRIVATE_KEY, update_headers,
-	CACHE_PATH, VISUAL_FORMS, RNGFile,
+	AutoCache, CACHE_PATH, VISUAL_FORMS, RNGFile,
 )
 from .caches import attachment_cache, colour_cache
 
@@ -85,7 +85,7 @@ class Server:
 
 	session = niquests.Session()
 	asession = niquests.AsyncSession()
-	statics = diskcache.Cache(directory=f"{CACHE_PATH}/statics", expiry=86400 * 30)
+	statics = AutoCache(directory=f"{CACHE_PATH}/statics", stale=300, timeout=86400 * 30)
 	dynamics = diskcache.Cache(directory=f"{CACHE_PATH}/dynamics", expiry=86400 * 30)
 
 	async def dyn_serve(
