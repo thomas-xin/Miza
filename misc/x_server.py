@@ -1,4 +1,3 @@
-from urllib.parse import quote_plus
 import datetime
 import functools
 import io
@@ -13,9 +12,9 @@ import ssl
 import subprocess
 import sys
 import time
-import urllib
+import urllib, urllib.parse
 import zipfile
-import cheroot
+import cheroot, cheroot.server
 import cherrypy
 import diskcache
 import niquests
@@ -28,7 +27,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut
 from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
-from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url_unparse, url2fn, is_youtube_url, seq, Request, get_mime, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS
+from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url_unparse, url2fn, is_youtube_url, seq, Request, get_mime, mime_from_file, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS
 from .caches import attachment_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -167,9 +166,6 @@ def process_headers(self):
 	self.base = '%s://%s' % (self.scheme, host)
 cp._cprequest.Request.process_headers = process_headers
 
-actually_static = set(os.listdir("misc/web"))
-mapped_static = {k[:-5]: k for k in actually_static if k.endswith(".html")}
-
 @functools.lru_cache(maxsize=256)
 def get_size_mime(head, tail, count, chunksize):
 	fut = esubmit(requests.head, head)
@@ -184,21 +180,20 @@ class EndpointRedirects(Dispatcher):
 
 	def __call__(self, path):
 		p = path.lstrip("/")
+		print(json.dumps(p))
+		if p.split("/", 1)[0] in (".git", ".env", "admin", "private", "internal", "administrator"):
+			return super().__call__("/rickroll")
 		while p:
 			if p == "ip":
 				p = "get_ip"
 			elif p.split("/", 1)[0] in ("f", "d"):
 				p = "download/" + p.split("/", 1)[-1]
-			elif p in actually_static:
-				p = "static/" + p
-			elif p in mapped_static:
-				p = "static/" + mapped_static[p]
 			else:
 				break
 		p = "/" + p
 		return super().__call__(p)
 
-error_map = {
+error_map: dict[type[BaseException], int] = {
 	SyntaxError: 400,
 	PermissionError: 401,
 	InterruptedError: 403,
@@ -209,7 +204,6 @@ error_map = {
 	OverflowError: 413,
 	TypeError: 415,
 	ValueError: 417,
-	IsADirectoryError: 418,
 	IOError: 422,
 	RuntimeError: 500,
 	ConnectionError: 502,
@@ -244,29 +238,9 @@ def error_handler(exc=None):
 			exception=str(exc.__class__),
 			message=str(exc),
 		))
-	if status == 418:
-		head = {}
-		vid = "dQw4w9WgXcQ"
-		url = f"https://http.cat/{status}"
-		mime = "text/html"
-		embed = f"https://www.youtube.com/embed/{vid}"
-		video = f"https://www.youtube.com/watch?v={vid}"
-		w = 1280
-		h = 720
-		body = f"""<!DOCTYPE html>
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<meta property="og:type" content="video.other">
-<meta property="twitter:player" content="{embed}">
-<meta property="og:video:type" content="{mime}">
-<meta property="og:video:width" content="{w}">
-<meta property="og:video:height" content="{h}">
-<meta name="twitter:image" content="{url}">
-<meta http-equiv="refresh" content=0;url={video}">
-</head><body></body></html>""".encode("utf-8")
-	else:
-		resp = errdata.get(status) or errdata.setdefault(status, niquests.get(f"https://http.cat/{status}", timeout=5))
-		head = resp.headers.copy()
-		body = resp.content
+	resp = errdata.get(status) or errdata.setdefault(status, niquests.get(f"https://http.cat/{status}", timeout=5))
+	head = resp.headers.copy()
+	body = resp.content
 	head["Content-Length"] = len(body)
 	update_headers(cp.response.headers, **head)
 	cp.response.headers.pop("Connection", None)
@@ -305,50 +279,50 @@ HEADERS = {
 }
 
 CHEADERS = {
-	"Cache-Control": "public,max-age=21600, stale-while-revalidate=1073741824, stale-if-error=1073741824",
+	"Cache-Control": "public,max-age=21600,stale-while-revalidate=1073741824,stale-if-error=1073741824",
 	"Accept-Ranges": "bytes",
 }
 SHEADERS = {
-	"Cache-Control": "public, max-age=60, stale-while-revalidate=1073741824, stale-if-error=1073741824",
+	"Cache-Control": "public, max-age=60,stale-while-revalidate=1073741824,stale-if-error=1073741824",
 	"Accept-Ranges": "bytes",
 }
 CHEADERS.update(HEADERS)
 SHEADERS.update(HEADERS)
 
 
-def fetch_static(path, ignore=False):
+def fetch_static(path):
 	while path.startswith("../"):
 		path = path[3:]
+	fn = "misc/web/" + path.lstrip("/")
+	for exists in (fn, fn + ".zip", fn + ".html"):
+		if os.path.exists(exists):
+			break
+	else:
+		raise FileNotFoundError(fn)
+	ts = os.path.getmtime(exists)
 	try:
-		fn = f"misc/web/{path}"
-		fn2 = fn + ".zip"
-		if os.path.exists(fn2):
-			ts = os.path.getmtime(fn2)
+		data, mime, ts2 = STATIC[path]
+		if ts2 < ts:
+			raise KeyError
+	except KeyError:
+		if zipfile.is_zipfile(exists):
+			with zipfile.ZipFile(exists) as z:
+				data = z.read(path.rsplit("/", 1)[-1])
 		else:
-			ts = os.path.getmtime(fn)
-		try:
-			data, ts2 = STATIC[path]
-			if ts2 < ts:
-				raise KeyError
-		except KeyError:
-			if os.path.exists(fn2) and zipfile.is_zipfile(fn2):
-				with zipfile.ZipFile(fn2, allowZip64=True, strict_timestamps=False) as z:
-					data = z.read(path.rsplit("/", 1)[-1])
-			else:
-				with open(fn, "rb") as f:
-					data = f.read()
-			STATIC[path] = (data, ts)
-		fmt = path.rsplit(".", 1)[-1].casefold()
-		try:
-			mime = MIMES[fmt]
-		except KeyError:
-			mime = "text/html"
-		return data, mime
-	except:
-		if not ignore:
-			print(path)
-			print_exc()
-		raise
+			with open(exists, "rb") as f:
+				data = f.read()
+		mime = mime_from_file(data)
+		if mime == "text/plain" and "." in exists:
+			fmt = exists.rsplit(".", 1)[-1]
+			match fmt:
+				case "js":
+					mime = "application/javascript"
+				case "svg":
+					mime = "image/svg+xml"
+				case _:
+					mime = "text/" + fmt
+		STATIC[path] = (data, mime, ts)
+	return data, mime
 
 ytdl = None
 
@@ -394,37 +368,6 @@ def true_ip(request=None):
 class Server:
 
 	session = niquests.Session()
-
-	@cp.expose(("0",))
-	def rickroll(self, *void1, **void2):
-		raise cp.HTTPRedirect(rickroll, status=301)
-
-	opipe = None
-	@cp.expose
-	@cp.tools.accept(media="multipart/form-data")
-	def detect(self, image=None):
-		if image is None:
-			from PIL import Image
-			image = Image.open(cp.request.body.fp)
-			image.load()
-		elif isinstance(image, (bytes, memoryview)):
-			from PIL import Image
-			image = Image.open(io.BytesIO(image))
-		elif isinstance(image, cherrypy._cpreqbody.Part):
-			from PIL import Image
-			image = Image.open(image.file)
-		if not isinstance(self.opipe, Future):
-			self.opipe = Future()
-			from transformers import pipeline
-			pipe = pipeline("object-detection", model="facebook/detr-resnet-50", device=0)
-			self.opipe.set_result(pipe)
-		image = image.rotate(-90)
-		image.save("test.png")
-		pipe = self.opipe.result()
-		data = pipe(image, threshold=1 / 3)
-		cp.response.headers["Content-Type"] = "application/json"
-		out = json_dumps(data)
-		return out
 
 	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
 		for i in range(retries):
@@ -562,7 +505,7 @@ class Server:
 				for fut in futs:
 					yield from fut.result()
 
-	@cp.expose(("c",))
+	@cp.expose(alias=("c",))
 	def chunked_proxy(self, path, *void):
 		with tracebacksuppressor:
 			urls, chunksize = await_fut(attachment_cache.obtains(path))
@@ -573,7 +516,7 @@ class Server:
 			return self.dyn_serve(new_urls, size)
 	chunked_proxy._cp_config = {"response.stream": True}
 
-	@cp.expose(("u",))
+	@cp.expose(alias=("u",))
 	def unproxy(self, *path, url=None, force=False, download=False, **query):
 		if url:
 			return self.proxy_if(url, force=force, download=download)
@@ -617,14 +560,14 @@ class Server:
 		return url
 
 	@cp.expose
-	def download(self, path):
+	def download(self, path, download=False):
 		ts = path.rsplit("/", 1)[-1].split(".", 1)[0]
 		fp, fn = diskcache.FanoutCache.get(self.upload_cache, ts, tag=True, read=True)
 		if not fp:
 			raise FileNotFoundError(404, path)
 		mimetype = get_mime(fp)
 		fp.seek(0)
-		return cp.lib.static.serve_fileobj(fp, name=fn, content_type=mimetype, disposition="inline")
+		return cp.lib.static.serve_fileobj(fp, name=fn, content_type=mimetype, disposition="attachment" if download else "inline")
 	download._cp_config = {"response.stream": True}
 
 	def proxy_if(self, url, force=False, download=False):
@@ -660,19 +603,21 @@ class Server:
 		if cp.request.headers.get("Range"):
 			headers["Range"] = cp.request.headers["Range"]
 		resp = self.get_with_retries(url, headers=headers, data=body, timeout=2)
+		heads = resp.headers
 		cp.response.status = resp.status_code
-		update_headers(cp.response.headers, **resp.headers)
+		update_headers(cp.response.headers, **heads)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
 		if cp.response.headers.pop("Content-Encoding", None):
 			cp.response.headers.pop("Content-Length", None)
 		cp.response.headers.pop("Server", None)
 		cp.response.headers.pop("Alt-Svc", None)
-		if is_discord_attachment(url):
-			if not download:
-				cp.response.headers.pop("Content-Disposition", None)
-			update_headers(cp.response.headers, **CHEADERS)
-		ctype = resp.headers.get("Content-Type", "application/octet-stream")
+		filename = heads.get("attachment-filename") or urllib.parse.unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
+		disposition = "attachment" if download else "inline"
+		cp.response.headers.pop("Content-Disposition", None)
+		if filename:
+			cp.response.headers["Content-Disposition"] = f"{disposition}; filename={urllib.parse.quote(filename)}"
+		ctype = heads.get("Content-Type", "application/octet-stream")
 		if ctype in ("text/html", "text/html; charset=utf-8", "application/octet-stream"):
 			it = resp.iter_content(262144)
 			b = next(it)
@@ -686,43 +631,6 @@ class Server:
 			return resume(b, it)
 		return resp.iter_content(262144)
 	proxy._cp_config = {"response.stream": True}
-
-	@cp.expose
-	def static(self, *filepath, **kwargs):
-		if not filepath:
-			if cp.request.remote.ip == "127.0.0.1":
-				STATIC.clear()
-				print("Webserver cache cleared.")
-				return b"\xf0\x9f\x92\x9c"
-			raise PermissionError
-		filename = "/".join(filepath)
-		data = None
-		try:
-			data, mime = fetch_static("static/" + filename, ignore=True)
-		except FileNotFoundError:
-			try:
-				data, mime = fetch_static(filename)
-			except FileNotFoundError as ex:
-				print(true_ip(), repr(ex))
-		if data is None:
-			raise FileNotFoundError(500, filepath)
-		if filename.strip("/") == "notfound.png":
-			cp.response.status = 404
-		update_headers(cp.response.headers, **CHEADERS)
-		cp.response.headers["Content-Type"] = mime
-		cp.response.headers["Content-Length"] = len(data)
-		cp.response.headers["ETag"] = create_etag(data)
-		return data
-
-	@cp.expose
-	def summarise(self, s, min_length=128, max_length=192):
-		v = interface.run(f"STRING.summarise({json.dumps(s)},min_length={min_length},max_length={max_length})", cache=60)
-		b = v.encode("utf-8")
-		update_headers(cp.response.headers, **CHEADERS)
-		cp.response.headers["Content-Type"] = "text/plain"
-		cp.response.headers["Content-Length"] = len(b)
-		cp.response.headers["ETag"] = create_etag(b)
-		return b
 
 	ydl_sems = {}
 	ydl = None
@@ -869,71 +777,70 @@ class Server:
 		return json_dumps(dict(colour=resp))
 
 	@cp.expose
-	def filelist(self, path=None):
-		update_headers(cp.response.headers, **HEADERS)
-		cp.response.headers["Content-Type"] = "application/json"
-		try:
-			sessid = int(cp.request.cookie["sessid"].value)
-		except (KeyError, ValueError):
-			return "[]"
-		else:
-			adata = cdict(interface.run(f"bot.data.sessions.get({repr(sessid)})"))
-		if not adata:
-			cp.response.cookie["sessid"] = ""
-			return "[]"
-		if "email" not in adata:
-			if "id" not in adata:
-				return "[]"
-			fdata = interface.run(f"bot.data.drives.get({adata.id},[])")
-		else:
-			if "id" in adata:
-				fdata = interface.run(
-					f"bot.data.drives.setdefault({repr(adata.email)},set()).update(bot.data.drives.pop({adata.id},[]))\n"
-					+ f"return bot.data.drives.get({repr(adata.email)},[])"
-				)
-			else:
-				fdata = interface.run(f"bot.data.drives.get({repr(adata.email)},[])")
-		if not path:
-			return json_dumps(fdata)
-		cpath = path.split("/")
-		while cpath:
-			fold = cpath.pop(0)
-			for e in fdata:
-				if isinstance(e, dict) and e.get("i") == fold:
-					fdata = e.get("f")
-					break
-			else:
-				raise FileNotFoundError(404, path, fold)
-		return json_dumps(fdata)
-
-	@cp.expose
-	def teapot(self, *args, **kwargs):
-		update_headers(cp.response.headers, **HEADERS)
-		raise IsADirectoryError("I'm a teapot.")
-
-	@cp.expose
 	def status(self):
 		cp.response.headers.update(SHEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
 		return orjson.dumps(interface.run("bot.status()"))
 
-	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
-	def index(self, path=None, filename=None, *args, code=None, **kwargs):
-		url = HOST + "/" + cp.url(qs=cp.request.query_string).rstrip("/").split("//", 1)[-1].split("/", 1)[-1]
-		if "/p/" in url:
-			raise cp.HTTPRedirect(url.replace("/p/", "/file/"), status=307)
-		if "/preview/" in url:
-			raise cp.HTTPRedirect(url.replace("/preview/", "/file/"), status=307)
-		data, mime = fetch_static("index.html")
+	alias = tuple([fn.split("/", 1)[0].rsplit(".", 1)[0] for fn in os.listdir("misc/web")])
+	print(alias)
+	@cp.expose(alias=alias)
+	def index(self, *args, **kwargs):
+		path_info = cp.request.path_info
+		if path_info == "/":
+			path_info = "index.html"
+		data, mime = fetch_static(path_info)
 		update_headers(cp.response.headers, **CHEADERS)
+		if "files" in path_info.split("/"):
+			url = kwargs.get("url")
+			print(url)
+			if url:
+				headers = await_fut(attachment_cache.scan_headers(url, fc=True))
+				_fn = urllib.parse.unquote(headers["content-disposition"].split("filename=", 1)[-1])
+				_size = byte_scale(headers["content-length"]) + "B"
+				_mime = headers.get("content-type", "application/octet-stream")
+				data = (
+					f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="description" content="Your local loyal multipurpose Discord bot.">
+
+	<!-- Open Graph Meta Tags -->
+	<meta property="og:url" content="https://mizabot.xyz">
+	<meta property="og:type" content="website">
+	<meta property="og:title" content="{_fn}">
+	<meta property="og:description" content="{_mime}, {_size}">
+	<meta property="og:image" content="{url}">
+
+	<!-- Twitter Meta Tags -->
+	<meta name="twitter:card" content="summary_large_image">
+	<meta property="twitter:domain" content="mizabot.xyz">
+	<meta property="twitter:url" content="https://mizabot.xyz">
+	<meta name="twitter:title" content="{_fn}">
+	<meta name="twitter:description" content="{_mime}, {_size}">
+	<meta name="twitter:image" content="{url}">
+
+	<link rel="icon" type="image/png" href="/assets/images/logo512.webp">
+	<link rel="stylesheet" href="/assets/css/global.css">
+	<script defer="defer" src="/assets/js/global.js"></script>
+
+	<!-- Page specific: -->
+	<title>Files: Miza</title>
+	<link rel="stylesheet" href="/assets/css/files.css">
+	<script defer="defer" src="/assets/js/files.js"></script>
+</head>
+""".encode("utf-8")
+					+ data.split(b"</head>", 1)[-1]
+				)
 		cp.response.headers["Content-Type"] = mime
 		cp.response.headers["Content-Length"] = len(data)
 		cp.response.headers["ETag"] = create_etag(data)
 		return data
 
-	@cp.expose(("favicon", "favicon.ico"))
+	@cp.expose(alias=("favicon", "favicon.ico"))
 	def favicon_ico(self, *args, **kwargs):
-		data, mime = fetch_static("icon.ico")
+		data, mime = fetch_static("assets/images/mizaleaf.webp")
 		update_headers(cp.response.headers, **CHEADERS)
 		cp.response.headers["Content-Type"] = mime
 		cp.response.headers["Content-Length"] = len(data)
@@ -978,7 +885,7 @@ class Server:
 		return cp.lib.static.serve_file(backup, content_type="application/octet-stream", disposition="attachment")
 	backup._cp_config = {"response.stream": True}
 
-	@cp.expose(("eval", "exec"))
+	@cp.expose(alias=("eval", "exec"))
 	def execute(self, token, *args, **kwargs):
 		if token != AUTH.get("discord_token"):
 			raise InterruptedError
@@ -1047,13 +954,8 @@ class Server:
 		print(res)
 		return as_str(res)
 
-	def delay_flush(self, delay):
-		time.sleep(delay)
-		if utc() < self.lastflush:
-			sys.__stdout__.flush()
-
 	rapidapi = 0
-	@cp.expose(("commands",))
+	@cp.expose(alias=("commands",))
 	def command(self, content="", input="", timeout=420, redirect=""):
 		ip = true_ip()
 		content = input or urllib.parse.unquote(cp.url(base="", qs=cp.request.query_string).rstrip("?").split("/", 1)[-1].removeprefix("api/").split("/", 1)[-1])
@@ -1080,21 +982,9 @@ class Server:
 			return json_dumps(dict(exception=ex.__class__.__name__, message=str(ex)))
 		return json_dumps(resp)
 
-	@cp.expose(("cat", "cats", "dog", "dogs", "neko", "nekos"))
-	def imagepool(self, tag="", refresh=60):
-		name = cp.url(base="").rsplit("/", 1)[-1]
-		command = name.rstrip("s")
-		info = interface.run(f"bot.commands.{command}[0](bot=bot,embed=False)")
-		if fcdict(cp.request.headers).get("Accept") == "application/json":
-			return info
-		url = info["url"]
-		if refresh:
-			refresh_url = f"{API}/{name}"
-			if tag:
-				refresh_url += f"/{tag}"
-			refresh_info = f'<meta http-equiv="refresh" content="{refresh};URL={refresh_url}">'
-		update_headers(cp.response.headers, **HEADERS)
-		return f"""<!DOCTYPE html><html><head><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script><meta property="og:image" content="{url}">{refresh_info}<meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="background-color:black;"><img src="{url}" style="margin:0;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);max-width:100%;max-height:100%"></body></html>"""
+	@cp.expose
+	def rickroll(self, *args, **kwargs):
+		raise cp.HTTPRedirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ", 308)
 
 
 def terminate():

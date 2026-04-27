@@ -1002,11 +1002,11 @@ class Describe(Command):
 	ephemeral = True
 
 	async def __call__(self, bot, _user, _premium, url, **void):
-		fut = csubmit(attachment_cache.scan_headers(url))
+		fut = csubmit(attachment_cache.scan_headers(url, fc=True))
 		cap = await self.bot.caption(url, best=1, premium_context=_premium, timeout=90)
 		s = "\n\n".join(filter(bool, cap)).strip()
 		headers = await fut
-		name = fcdict(headers).get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
+		name = headers.get("attachment-filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
 		return cdict(
 			embed=discord.Embed(description=s, title=name).set_author(**get_author(_user)),
 		)

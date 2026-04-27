@@ -11,13 +11,13 @@ import filetype
 import niquests
 import orjson
 from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File, Query
-from fastapi.responses import StreamingResponse, RedirectResponse, PlainTextResponse
+from fastapi.responses import StreamingResponse, RedirectResponse, PlainTextResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from .asyncs import asubmit, csubmit
 from .types import fcdict, byte_like, MemoryBytes
 from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment, discord_expired,
-	is_discord_attachment, url2fn, seq, getsize,
+	is_discord_attachment, url2fn, getsize,
 	Request as RequestManager, DOMAIN_CERT, PRIVATE_KEY, update_headers,
 	CACHE_PATH, VISUAL_FORMS, RNGFile,
 )
@@ -57,12 +57,12 @@ def true_ip(request: Request) -> str:
 
 
 async def get_size_mime(head, tail, count, chunksize):
-	fut = csubmit(attachment_cache.scan_headers(tail))
-	HEAD = await attachment_cache.download(head, read=True)
+	fut = csubmit(attachment_cache.scan_headers(tail, base="mizabot.xyz", fc=True))
+	HEAD = await attachment_cache.download(head, read=True, fc=True)
 	TAIL_headers = await fut
 	firstsize = getsize(HEAD)
 	mimetype = filetype.guess_mime(HEAD)
-	lastsize = int(fcdict(TAIL_headers).get("content-length") or 1)
+	lastsize = int(TAIL_headers.get("content-length") or 1)
 	if count >= 2:
 		size = firstsize + chunksize * (count - 2) + lastsize
 	else:
@@ -403,7 +403,7 @@ async def chunked_proxy(path: str, request: Request):
 		raise HTTPException(status_code=ex.errno or 500, detail=str(ex))
 	mimetype, size, firstsize, lastsize = await get_size_mime(urls[0], urls[-1], len(urls), chunksize)
 	new_urls = [f"{url}&S={firstsize if not i else lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
-	heads = fcdict(await attachment_cache.scan_headers(urls[0]))
+	heads = await attachment_cache.scan_headers(urls[0], base="mizabot.xyz", fc=True)
 	response_headers = {}
 	filename = heads.get("attachment-filename") or unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or urls[0].rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
 	if filename:
@@ -505,13 +505,14 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 		fp = await attachment_cache.download(url, read=True)
 	except ConnectionError as ex:
 		raise HTTPException(status_code=ex.errno or 500, detail=f"{url}: {ex}")
-	heads = fcdict(await attachment_cache.scan_headers(url))
+	heads = await attachment_cache.scan_headers(url, base="mizabot.xyz", fc=True)
 
 	response_headers = {}
 	filename = heads.get("attachment-filename") or unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
 	disposition = "attachment" if download else "inline"
 	if filename:
 		response_headers["Content-Disposition"] = f"{disposition}; filename={quote(filename)}"
+	response_headers["Cache-Control"] = "public,max-age=21600,stale-while-revalidate=1073741824,stale-if-error=1073741824"
 
 	if not force and heads.get("content-type").split(";", 1)[0] == "text/markdown":
 		new_url = str(request.url.include_query_params(force="1"))
@@ -650,6 +651,7 @@ async def static_backend(path: str, request: Request):
 	return Response(content=resp.content, headers=response_headers)
 
 
+alias = tuple([fn.split("/", 1)[0].rsplit(".", 1)[0] for fn in os.listdir("misc/web")])
 # Catch-all route for custom routing logic
 @app.get("/{path:path}")
 async def catch_all(path: str, request: Request):
@@ -657,21 +659,17 @@ async def catch_all(path: str, request: Request):
 	p = path.strip("/")
 	first = p.split("/", 1)[0] if p else ""
 
-	if not p or p == "dummy.html" or p == "index":
-		return await static_backend("index.html", request=request)
+	if not p or p in ("index", "dummy.html", "index.html"):
+		return FileResponse("misc/web/index.html", media_type="text/html")
+	if p in ("favicon", "favicon.ico"):
+		return FileResponse("misc/web/assets/images/mizaleaf.webp", media_type="image/webp")
+	if first in (".git", ".env", "admin", "private", "internal", "administrator"):
+		return RedirectResponse(url="https://www.youtube.com/watch?v=dQw4w9WgXcQ", status_code=308)
+	if first in alias:
+		return await static_backend(p, request=request)
 	elif first in ("favicon.ico", "logo256.png", "logo512.png", "home", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "static"):
 		return await static_backend(p, request=request)
-	elif first not in ("static_backend", "proxy", "c", "chunked-proxy", "u", "unproxy", "upload", "ip", "random", "authorised-heartbeat", "backend", "debug"):
-		return await backend(p, request=request)
 	return await globals()[first](request=request)
-
-	# Redirect to appropriate handler
-	query_string = str(request.url.query) if request.url.query else ""
-	redirect_url = f"/{p}"
-	if query_string:
-		redirect_url += f"?{query_string}"
-
-	return RedirectResponse(url=redirect_url, status_code=307)
 
 
 if __name__ == "__main__":

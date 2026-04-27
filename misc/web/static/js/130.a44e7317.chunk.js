@@ -1,2 +1,0 @@
-(this.webpackJsonpmizaweb2=this.webpackJsonpmizaweb2||[]).push([[130],{211:function(t,e){t.exports=function(t){return{name:"Plain text",aliases:["text","txt"],disableAutodetect:!0}}}}]);
-//# sourceMappingURL=130.a44e7317.chunk.js.map

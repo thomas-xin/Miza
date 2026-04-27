@@ -1,0 +1,258 @@
+body {
+	background-color: #240117;
+	background-image: linear-gradient(-45deg, #200949, #4e0814);
+	color: white;
+}
+
+nav {
+    position: static;
+}
+
+section.commands-index {
+    flex-grow: 1;
+    align-self: center;
+    padding-bottom: 2rem;
+    padding-inline: 1rem;
+    max-width: 100%;
+
+    & h1 {
+        font-size: 2rem;
+        font-weight: 700;
+    }
+
+    #categories {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+        grid-auto-rows: auto;
+        gap: 0.5rem;
+        width: min(85rem, 90vw);
+
+        li {
+            display: flex;
+            flex-flow: column nowrap;
+            border: solid 1px rgba(128, 128, 128, 0.4);
+            background-color: rgba(128, 128, 128, 0.2);
+
+            height: 100%;
+            padding: 0.2rem 0.5rem;
+            gap: 0.2rem;
+
+            text-decoration: none;
+
+            position: relative;
+
+            a.bg-href {
+                display: block;
+                position: absolute;
+                inset: 0;
+                z-index: 2;
+            }
+
+            &:hover span.cat-header {
+                font-weight: 700;
+            }
+
+            span.cat-header {
+                font-size: 1.1rem;
+                line-height: 2;
+                border-bottom: solid 1px rgba(128, 128, 128, 0.2);
+                margin-bottom: 0.5rem;
+            }
+            span.child-commands {
+                display: flex;
+                flex-flow: row wrap;
+                justify-content: start;
+                gap: 0.2rem;
+
+                a {
+                    background-color: rgba(255, 255, 255, 0.05);
+                    padding: 0.2rem 0.4rem;
+
+                    text-decoration: none;
+
+                    position: relative;
+                    z-index: 3;
+
+                    &:hover, &:focus {
+                        background-color: rgba(255, 255, 255, 0.2);
+                        text-decoration: underline;
+                    }
+                }
+            }
+        }
+    }
+}
+
+.command-body {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: start;
+    justify-content: start;
+    gap: 2rem;
+
+    .side {
+        max-width: 50rem;
+    }
+
+    .select {
+        user-select: all;
+        cursor: copy;
+    }
+
+    p.aka {
+        font-size: 0.8rem;
+    }
+
+    p {
+        margin-bottom: 0.5em;
+    }
+
+    .stats {
+        display: flex;
+        flex-flow: row wrap;
+        align-items: stretch;
+        gap: 1rem;
+
+        width: max-content;
+        max-width: 100%;
+
+        padding: 0.5rem 1rem;
+        background-color: rgba(128, 128, 128, 0.3);
+        border-radius: 0.5rem;
+        border: solid 1px rgba(128, 128, 128, 0.3);
+
+        dl {
+            display: flex;
+            flex-flow: column nowrap;
+            gap: 0.25rem;
+            &:not(:first-child) {
+                border-left: solid 1px white;
+                padding-left: 1rem;
+            }
+            dt {
+                font-size: 0.8rem;
+            }
+            dd {
+                font-size: 1.2rem;
+            }
+        }
+    }
+
+    ul.example-commands li {
+        list-style-type: none;
+    }
+
+    ol.arguments, ul.macros, ul.example-commands {
+        display: flex;
+        flex-flow: column wrap;
+        gap: 0.5rem;
+        max-width: max-content;
+
+        &:empty {
+            display: none;
+        }
+
+        & > li {
+            list-style-position: inside;
+            padding: 0.5rem 1rem;
+
+            align-self: start;
+
+            background-color: rgba(128, 128, 128, 0.3);
+            border: solid 1px rgba(128, 128, 128, 0.3);
+            border-radius: 0.5rem;
+
+            max-height: 13.5rem;
+            overflow: hidden;
+            overflow-y: auto;
+
+            &.note {
+                background: none;
+                border: none;
+                padding: 0;
+                margin-top: 1rem;
+            }
+
+            &::marker {
+                color: rgba(255, 255, 255, 0.5);
+                transition: color 150ms;
+            }
+            &:hover::marker, &:hover .type {
+                color: white;
+            }
+
+            label {
+                font-weight: 600;
+                text-transform: capitalize;
+            }
+
+            .type {
+                font-size: 0.8rem;
+                font-style: italic;
+                color: rgba(255, 255, 255, 0.5);
+                transition: color 150ms;
+
+                &:first-of-type {
+                    margin-left: 0.8rem;
+                }
+                &:nth-of-type(2) {
+                    margin-left: 1ch;
+                }
+            }
+
+            p {
+                max-width: 50ch;
+                line-height: 1.25;
+                margin-block-start: 0.25rem;
+                margin-block-end: 0.5rem;
+            }
+
+            .validation-label {
+                font-size: 0.9rem;
+                font-style: italic;
+                margin-bottom: 0;
+            }
+            .valid-enum-items {
+                display: flex;
+                flex-flow: row wrap;
+                gap: 0;
+                max-width: 50ch;
+
+                li {
+                    user-select: all;
+                    display: block;
+                    opacity: 0.5;
+                    padding: 0.2rem 0.25rem;
+
+                    &.default {
+                        &::before {
+                            content: '[';
+                        }
+                        &::after {
+                            content: ']';
+                        }
+                    }
+                    &:hover {
+                        opacity: 1;
+                    }
+                }
+            }
+        }
+
+
+    }
+
+    h2 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        line-height: 1.5;
+        margin-top: 0.5rem;
+    }
+
+    h3 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        line-height: 1.5;
+        margin-top: 0.8rem;
+    }
+}

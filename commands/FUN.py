@@ -1759,7 +1759,7 @@ class Matchmaking(Command):
 		shipname += users[-1][len(users[-1]) >> 1:]
 		shipname = shipname.strip().capitalize()
 
-		random.seed(time.time_ns())
+		random.seed(os.urandom(32))
 		heart = choice(HEARTS)
 		bar = await bot.create_progress_bar(21, percentage / 100)
 

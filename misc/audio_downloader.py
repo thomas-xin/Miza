@@ -922,7 +922,7 @@ class AudioDownloader:
 		return self.handle_path(fn2, entry)
 
 	def handle_special_multiple(self, url):
-		headers = fcdict(asyncio.run(attachment_cache.scan_headers(url)))
+		headers = asyncio.run(attachment_cache.scan_headers(url, fc=True))
 		match (ctype := headers.get("content-type")):
 			case "application/json":
 				b = asyncio.run(attachment_cache.download(url))

@@ -1599,6 +1599,7 @@ def stream_exists(url, fmt="opus"):
 __scales = ("", "k", "M", "G", "T", "P", "E", "Z", "Y")
 __uscales = [s.lower() for s in __scales]
 def byte_scale(n, ratio=1024):
+	n = float(n)
 	e = 0
 	while n >= ratio:
 		n /= ratio
@@ -1944,8 +1945,8 @@ def decrypt_stream(b):
 		yield enc_box.decrypt(s)
 
 
-DOMAIN_CERT = AUTH.get("domain_cert")
-PRIVATE_KEY = AUTH.get("private_key")
+DOMAIN_CERT: str = AUTH.get("domain_cert") or ""
+PRIVATE_KEY: str = AUTH.get("private_key") or ""
 
 
 def zip2bytes(data):
@@ -2133,6 +2134,7 @@ class RNGFile(io.IOBase):
 		self.pos = 0
 		self.count = count
 		assert isinstance(self.count, int)
+		random.seed(os.urandom(32))
 
 	def seek(self, offset=0, whence=0):
 		match whence:
@@ -2148,10 +2150,9 @@ class RNGFile(io.IOBase):
 
 	def read(self, count=-1):
 		if count < 0:
-			b = random.randbytes(self.count - self.pos)
-			self.pos = self.count
-			return b
-		n = min(count, self.count - self.pos)
+			n = self.count - self.pos
+		else:
+			n = min(count, self.count - self.pos)
 		self.pos += n
 		return random.randbytes(n)
 

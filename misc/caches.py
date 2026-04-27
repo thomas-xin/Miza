@@ -24,7 +24,7 @@ from misc.smath import get_closest_heart
 from misc.util import (
     CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, read_file_a, download_file, header_test, getsize,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist, shorten_chunks,
-	ungroup_attachments, is_discord_url, temporary_file, url2ext, is_discord_attachment, is_miza_url,
+	ungroup_attachments, is_discord_url, is_miza_attachment, temporary_file, url2ext, is_discord_attachment, is_miza_url,
     snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt,
 )
 
@@ -91,9 +91,9 @@ def parse_colour(s):
 class ColourCache(AutoCache):
 
 	async def _obtain(self, url):
-		headers = await attachment_cache.scan_headers(url)
+		headers = await attachment_cache.scan_headers(url, fc=True)
 		c = (0, 0, 0)
-		match (mime := fcdict(headers).get("content-type")):
+		match (mime := headers.get("content-type")):
 			case "text/html":
 				data = await attachment_cache.download(url)
 				s = as_str(data[:65536])
@@ -380,7 +380,7 @@ class AttachmentCache(AutoCache):
 			traceback.print_exc()
 			raise
 		return f
-	async def download(self, url, m_id=None, filename=None, read=False, return_headers=False, force=False):
+	async def download(self, url, m_id=None, filename=None, read=False, return_headers=False, force=False, fc=False):
 		url = unyt(url)
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
@@ -389,7 +389,7 @@ class AttachmentCache(AutoCache):
 		else:
 			fp = await self.secondary.aretrieve(url, self._download, url, m_id=m_id, timeout=16, _read=True)
 		if return_headers:
-			headers = await self.scan_headers(url, m_id=m_id)
+			headers = await self.scan_headers(url, m_id=m_id, fc=fc)
 		if filename:
 			try:
 				if isinstance(filename, bool):
@@ -412,16 +412,21 @@ class AttachmentCache(AutoCache):
 		finally:
 			fp.close()
 
-	async def _scan_headers(self, url, m_id=None):
+	async def _scan_headers(self, url, m_id=None, base="api.mizabot.xyz"):
 		if is_discord_attachment(url):
 			url = await self.obtain(url=url, m_id=m_id)
+		elif is_miza_attachment(url):
+			url = re.sub("^https?:\\/\\/(?:\\w+\\.)?mizabot.xyz\\/", f"https://{base}/", url)
 		headers = await asubmit(header_test, url)
 		return dict(headers)
-	async def scan_headers(self, url, m_id=None):
+	async def scan_headers(self, url, m_id=None, base="api.mizabot.xyz", fc=False):
 		url = unyt(url)
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
-		return await self.tertiary.aretrieve(url, self._scan_headers, url, m_id=m_id)
+		headers = await self.tertiary.aretrieve(url, self._scan_headers, url, m_id=m_id, base=base)
+		if fc:
+			return fcdict(headers)
+		return headers
 
 	async def delete(self, c_id, m_id, url=None):
 		if url:

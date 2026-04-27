@@ -62,7 +62,7 @@ except AttributeError:
 	np.float80 = np.float64
 deque = collections.deque
 
-random.seed(random.randint(0, (1 << 32) - 1) - time.time_ns())
+random.seed(os.urandom(32))
 mp = mpmath.mp
 mp.dps = 128
 mpf = mpmath.mpf

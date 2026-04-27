@@ -716,6 +716,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					with suppress(AttributeError):
 						c[attr] = command.attr
 		s = await asubmit(pretty_json, j)
+		os.makedirs("misc/web/static", exist_ok=True)
 		with open("misc/web/static/HELP.json", "w", encoding="utf-8") as f:
 			f.write(s)
 
@@ -1702,8 +1703,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				out.append(url)
 				continue
 			try:
-				headers = await attachment_cache.scan_headers(url)
-				headers = fcdict(headers)
+				headers = await attachment_cache.scan_headers(url, fc=True)
 				if headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html",):
 					pass
 				elif self.audio:
@@ -3132,8 +3132,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			urls = await self.follow_url(content, priority_order=("image",))
 			for url in urls:
 				with tracebacksuppressor:
-					headers = await attachment_cache.scan_headers(url, m_id=message.id)
-					if fcdict(headers).get("content-type", "").split("/", 1)[0] == "image":
+					headers = await attachment_cache.scan_headers(url, m_id=message.id, fc=True)
+					if headers.get("content-type", "").split("/", 1)[0] == "image":
 						excluded_images.append(url)
 						for case in (" " + url, "\t" + url, "\n" + url, url):
 							if case in content:

@@ -1180,7 +1180,7 @@ def evalSym(f, prec=64, r=False, variables=None):
 				line.clear()
 		return ["\n".join(lines)]
 	global BF_PREC
-	random.seed(time.time_ns())
+	random.seed(os.urandom(32))
 	BF_PREC = sympy.ceiling(prec * 1.25).p
 	mp.dps = BF_PREC
 	sys.set_int_max_str_digits(max(1024, min(2147483647, BF_PREC * 64)))

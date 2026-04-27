@@ -676,7 +676,7 @@ class UpdateExec(Database):
 					pass
 				else:
 					try:
-						await attachment_cache.scan_headers(url2.replace(bot.webserver, bot.raw_webserver, 1))
+						await attachment_cache.scan_headers(url2)
 					except ConnectionError as ex:
 						print(repr(ex))
 					else:
