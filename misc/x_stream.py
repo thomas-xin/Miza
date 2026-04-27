@@ -616,38 +616,36 @@ async def static_backend(path: str, request: Request):
 	if query_string:
 		url += f"?{query_string}"
 
+	async def backend_request(url):
+		headers = fcdict(request.headers)
+		headers.pop("Connection", None)
+		headers.pop("Transfer-Encoding", None)
+		headers.pop("Cache-Control", None)
+		headers.pop("If-Modified-Since", None)
+		headers.pop("If-None-Match", None)
+		headers["X-Real-Ip"] = true_ip(request)
+
+		print(url, headers)
+		resp = await asubmit(server.session.get, url, headers=dict(headers), verify=False, timeout=60)
+
+		response_headers = fcdict(resp.headers)
+		response_headers.pop("Connection", None)
+		response_headers.pop("Transfer-Encoding", None)
+		if response_headers.pop("Content-Encoding", None):
+			response_headers.pop("Content-Length", None)
+		response_headers.pop("Date", None)
+		response_headers.pop("Server", None)
+		print(resp, resp.headers, len(resp.content))
+
+		return [response_headers, resp.content, resp.status_code]
+
 	try:
-		headers, content, status_code = server.statics[url]
+		headers, content, status_code = await server.statics.aretrieve(url, backend_request, url)
 		if status_code not in range(200, 400):
 			raise ValueError(status_code)
 	except (LookupError, ValueError):
-		pass
-	else:
-		return Response(content=content, headers=headers, status_code=status_code)
-
-	headers = fcdict(request.headers)
-	headers.pop("Connection", None)
-	headers.pop("Transfer-Encoding", None)
-	headers.pop("Cache-Control", None)
-	headers.pop("If-Modified-Since", None)
-	headers.pop("If-None-Match", None)
-	headers["X-Real-Ip"] = true_ip(request)
-
-	print(url, headers)
-	resp = await asubmit(server.session.get, url, headers=dict(headers), verify=False, timeout=60)
-
-	response_headers = fcdict(resp.headers)
-	response_headers.pop("Connection", None)
-	response_headers.pop("Transfer-Encoding", None)
-	if response_headers.pop("Content-Encoding", None):
-		response_headers.pop("Content-Length", None)
-	response_headers.pop("Date", None)
-	response_headers.pop("Server", None)
-	print(resp, resp.headers, len(resp.content))
-
-	if resp.status_code in range(200, 400):
-		server.statics[url] = [response_headers, resp.content, resp.status_code]
-	return Response(content=resp.content, headers=response_headers, status_code=resp.status_code)
+		headers, content, status_code = await server.statics._aretrieve(url, backend_request, url)
+	return Response(content=content, headers=headers, status_code=status_code)
 
 
 alias = tuple([fn.split("/", 1)[0].rsplit(".", 1)[0] for fn in os.listdir("misc/web")])
