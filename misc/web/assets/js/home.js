@@ -208,6 +208,7 @@ function setupScene() {
 	scene.add(triangle2);
 }
 function resizeCanvas() {
+	shootingStars.length = 0;
 	if (renderer) {
 		const rect = starContainer.getBoundingClientRect();
 		const width = rect.width;
@@ -249,6 +250,7 @@ document.addEventListener('mouseleave', (event) => {
 const starExit = 200;
 function updateCanvas() {
 	if (!camera || !scene || !renderer || document.hidden) {
+		shootingStars.length = 0;
 		requestAnimationFrame(updateCanvas);
 		return;
 	};
