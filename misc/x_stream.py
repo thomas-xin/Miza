@@ -618,6 +618,8 @@ async def static_backend(path: str, request: Request):
 
 	try:
 		headers, content, status_code = server.statics[url]
+		if status_code not in range(200, 400):
+			raise ValueError(status_code)
 	except (LookupError, ValueError):
 		pass
 	else:
@@ -643,7 +645,8 @@ async def static_backend(path: str, request: Request):
 	response_headers.pop("Server", None)
 	print(resp, resp.headers, len(resp.content))
 
-	server.statics[url] = [response_headers, resp.content, resp.status_code]
+	if resp.status_code in range(200, 400):
+		server.statics[url] = [response_headers, resp.content, resp.status_code]
 	return Response(content=resp.content, headers=response_headers, status_code=resp.status_code)
 
 

@@ -1,5 +1,5 @@
 (() => {
-    
+
     function setupFileInput() {
         /** @type {HTMLInputElement} */
         const fileDropZone = document.querySelector('section.file-upload');
@@ -50,10 +50,8 @@
             dT.items.add(e.dataTransfer.files[0]);
             inputElem.files = dT.files;
 
-
             onChange();
         });
-
 
         fileDropZone.addEventListener("dragover", (e) => {
             const fileItems = [...e.dataTransfer.items].filter(
@@ -128,7 +126,6 @@
         downloadUrl.searchParams.set('download', '1');
         dlButton.href = downloadUrl.href;
 
-
         const previewUrl = new URL(window.location);
         previewUrl.searchParams.set('url', url);
 
@@ -148,7 +145,7 @@
 
             // Use XMLHttpRequest to track upload progress accurately
             const xhr = new XMLHttpRequest();
-            
+
             xhr.upload.addEventListener('progress', (e) => {
                 if (e.lengthComputable) {
                     const progress = Math.round((e.loaded / e.total) * 100);
@@ -296,7 +293,6 @@
 
             previewSection.classList.add('visible');
         }
-
 
     }
     

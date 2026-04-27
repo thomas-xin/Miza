@@ -26,7 +26,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut
 from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
-from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url_unparse, url2fn, is_youtube_url, seq, Request, get_mime, mime_from_file, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS
+from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url_unparse, url2fn, is_youtube_url, seq, Request, get_mime, mime_from_file, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS
 from .caches import attachment_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -894,6 +894,30 @@ class Server:
 		update_headers(cp.response.headers, **CHEADERS)
 		return cp.lib.static.serve_file(backup, content_type="application/octet-stream", disposition="attachment")
 	backup._cp_config = {"response.stream": True}
+
+	git_cache = AutoCache(f"{CACHE_PATH}/git", stale=86400, timeout=86400 * 7)
+	@cp.expose
+	def git_stats(self):
+		def get_git():
+			s = as_str(subprocess.check_output(["git", "log" , "--shortstat", "--format=oneline"]))
+			lines = s.splitlines()
+			commit_count = sum(bool(line and line[0].strip()) for line in lines)
+			changed = [line for line in lines if line and not line[0].strip()]
+			line_changes = 0
+			for line in changed:
+				args = line.split(", ", 3)
+				inserts = deletions = "0"
+				if len(args) > 1:
+					inserts = args[1]
+					if len(args) > 2:
+						deletions = args[2]
+				line_changes += int(inserts.split(None, 1)[0])
+				line_changes += int(deletions.split(None, 1)[0])
+			return commit_count, line_changes
+		commit_count, changed = self.git_cache.retrieve("shortstat", get_git)
+		update_headers(cp.response.headers, **SHEADERS)
+		cp.response.headers["content-type"] = "application/json"
+		return orjson.dumps([commit_count, changed])
 
 	@cp.expose(alias=("eval", "exec"))
 	def execute(self, token, *args, **kwargs):
