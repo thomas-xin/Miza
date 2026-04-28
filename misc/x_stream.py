@@ -381,7 +381,7 @@ async def authorised_heartbeat(request: Request, key: Optional[str] = None, uri:
 @app.head(path="/c/{path:path}")
 @app.get("/c/{path:path}")
 @app.get("/chunked-proxy/{path:path}")
-async def chunked_proxy(path: str, request: Request):
+async def chunked_proxy(request: Request, path: str):
 	"""Serve chunked/split files with range support."""
 	try:
 		urls, chunksize = await attachment_cache.obtains(path.split("/", 1)[0])
