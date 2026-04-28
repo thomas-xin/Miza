@@ -814,7 +814,7 @@ class Server:
 <html lang="en">
 <head>
 	<meta charset="utf-8">
-	<meta name="description" content="Your local loyal multipurpose Discord bot.">
+	<meta name="description" content="Your local loyal multipurpose Discord bot">
 
 	<!-- Open Graph Meta Tags -->
 	<meta property="og:url" content="https://mizabot.xyz">
@@ -831,7 +831,7 @@ class Server:
 	<meta name="twitter:description" content="{_mime}, {_size}">
 	<meta name="twitter:image" content="{url}">
 
-	<link rel="icon" type="image/png" href="/assets/images/logo512.webp">
+	<link rel="icon" type="image/webp" href="/assets/images/logo512.webp">
 	<link rel="stylesheet" href="/assets/css/global.css">
 	<script defer="defer" src="/assets/js/global.js"></script>
 
