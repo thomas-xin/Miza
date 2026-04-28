@@ -248,8 +248,9 @@ document.addEventListener('mouseleave', (event) => {
 });
 
 const starExit = 200;
+const linksElement = document.getElementsByClassName("links")[0];
 function updateCanvas() {
-	if (!camera || !scene || !renderer || document.hidden) {
+	if (!camera || !scene || !renderer || document.hidden || !linksElement.classList.contains("inside-view")) {
 		shootingStars.length = 0;
 		requestAnimationFrame(updateCanvas);
 		return;
