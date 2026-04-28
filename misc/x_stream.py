@@ -13,6 +13,7 @@ import orjson
 from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse, RedirectResponse, PlainTextResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from starlette_compress import CompressMiddleware
 from .asyncs import run_async, create_task
 from .types import fcdict, byte_like, MemoryBytes
 from .util import (
@@ -290,6 +291,10 @@ app.add_middleware(
 	allow_origins=["*"],
 	allow_methods=["*"],
 	allow_headers=["*"],
+)
+app.add_middleware(
+	CompressMiddleware,
+	minimum_size=1024,
 )
 server = Server()
 
