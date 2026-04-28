@@ -1,0 +1,509 @@
+//download.js v4.2, by dandavis; 2008-2017. [MIT] see http://danml.com/download.html for tests/usage
+;(function(r,l){"function"==typeof define&&define.amd?define([],l):"object"==typeof exports?module.exports=l():r.download=l()})(this,function(){return function l(a,e,k){function q(a){var h=a.split(/[:;,]/);a=h[1];var h=("base64"==h[2]?atob:decodeURIComponent)(h.pop()),d=h.length,b=0,c=new Uint8Array(d);for(b;b<d;++b)c[b]=h.charCodeAt(b);return new f([c],{type:a})}function m(a,b){if("download"in d)return d.href=a,d.setAttribute("download",n),d.className="download-js-link",d.innerHTML="downloading...",d.style.display="none",document.body.appendChild(d),setTimeout(function(){d.click(),document.body.removeChild(d),!0===b&&setTimeout(function(){g.URL.revokeObjectURL(d.href)},250)},66),!0;if(/(Version)\/(\d+)\.(\d+)(?:\.(\d+))?.*Safari\//.test(navigator.userAgent))return/^data:/.test(a)&&(a="data:"+a.replace(/^data:([\w\/\-\+]+)/,"application/octet-stream")),!window.open(a)&&confirm("Displaying New Document\n\nUse Save As... to download, then click back to return to this page.")&&(location.href=a),!0;var c=document.createElement("iframe");document.body.appendChild(c),!b&&/^data:/.test(a)&&(a="data:"+a.replace(/^data:([\w\/\-\+]+)/,"application/octet-stream")),c.src=a,setTimeout(function(){document.body.removeChild(c)},333)}var g=window,b=k||"application/octet-stream",c=!e&&!k&&a,d=document.createElement("a");k=function(a){return String(a)};var f=g.Blob||g.MozBlob||g.WebKitBlob||k,n=e||"download",f=f.call?f.bind(g):Blob;"true"===String(this)&&(a=[a,b],b=a[0],a=a[1]);if(c&&2048>c.length&&(n=c.split("/").pop().split("?")[0],d.href=c,-1!==d.href.indexOf(c))){var p=new XMLHttpRequest;return p.open("GET",c,!0),p.responseType="blob",p.onload=function(a){l(a.target.response,n,"application/octet-stream")},setTimeout(function(){p.send()},0),p}if(/^data:([\w+-]+\/[\w+.-]+)?[,;]/.test(a)){if(!(2096103.424<a.length&&f!==k))return navigator.msSaveBlob?navigator.msSaveBlob(q(a),n):m(a);a=q(a),b=a.type||"application/octet-stream"}else if(/([\x80-\xff])/.test(a)){e=0;var c=new Uint8Array(a.length),t=c.length;for(e;e<t;++e)c[e]=a.charCodeAt(e);a=new f([c],{type:b})}a=a instanceof f?a:new f([a],{type:b});if(navigator.msSaveBlob)return navigator.msSaveBlob(a,n);if(g.URL)m(g.URL.createObjectURL(a),!0);else{if("string"==typeof a||a.constructor===k)try{return m("data:"+b+";base64,"+g.btoa(a))}catch(h){return m("data:"+b+","+encodeURIComponent(a))}b=new FileReader,b.onload=function(a){m(this.result)},b.readAsDataURL(a)}return!0}});
+
+function timeDisp(s, rounded=false) {
+	"Returns a representation of a time interval using days:hours:minutes:seconds.";
+	if (!isFinite(s)) {
+		return String(s);
+	}
+	if (rounded) {
+		s = Math.round(s);
+	}
+	const v = s % 60;
+	const v2 = parseInt(v, 10);
+	let output = v == v2 ? v2 : v.toPrecision(2);
+	if (v < 10) {
+		output = "0" + output;
+	}
+	if (s >= 60) {
+		const v = Math.floor(s / 60) % 60;
+		let temp = String(v);
+		if (v < 10 && s >= 3600) {
+			temp = "0" + temp;
+		}
+		output = temp + ":" + output;
+		if (s >= 3600) {
+			const v = Math.floor(s / 3600) % 24;
+			temp = String(v);
+			if (v < 10 && s >= 86400) {
+				temp = "0" + temp;
+			}
+			output = temp + ":" + output;
+			if (s >= 86400) {
+				output = String(Math.floor(s / 86400)) + ":" + output;
+			}
+		}
+	} else {
+		output = "0:" + output;
+	}
+	return output;
+}
+
+function timeParse(s) {
+	"Returns the number of seconds represented by a time interval string.";
+	let parts = s.split(":");
+	let days = 0;
+	if (parts.length > 3) {
+		days = parseInt(parts[0], 10);
+		parts = parts.slice(1);
+	}
+	let output = 0;
+	for (let i = 0; i < parts.length; i++) {
+		let n;
+		if (i == parts.length - 1) {
+			n = parseFloat(parts[i]);
+		} else {
+			n = parseInt(parts[i], 10);
+		}
+		output += n * Math.pow(60, parts.length - i - 1);
+	}
+	output += days * 86400;
+	return output;
+}
+
+const colorCache = {};
+const tempCanvas = document.createElement('canvas');
+tempCanvas.width = 256;
+tempCanvas.height = 144;
+const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+function getMeanColour(element) {
+	if (!element.height) return [255, 255, 255];
+	const src = element.src;
+	if (element.animated == false) {
+		const color = colorCache[src];
+		if (color) {
+			return color;
+		}
+	}
+	tempCtx.drawImage(element, 0, 0, element.width / 2, element.height / 2);
+	const imageData = tempCtx.getImageData(0, 0, element.width / 2, element.height / 2);
+	const data = imageData.data;
+	let r = 0, g = 0, b = 0;
+	let pixelCount = 0;
+	for (let i = 0; i < data.length; i += 4) {
+		const a = data[i + 3] != null ? data[i + 3] : 1;
+		r += data[i] * a;
+		g += data[i + 1] * a;
+		b += data[i + 2] * a;
+		pixelCount += a;
+	}
+	r = Math.round(r / pixelCount);
+	g = Math.round(g / pixelCount);
+	b = Math.round(b / pixelCount);
+	const result = [r, g, b];
+	colorCache[src] = result;
+	return result;
+}
+
+function rgbToHsl(r, g, b) {
+	r /= 255;
+	g /= 255;
+	b /= 255;
+	const max = Math.max(r, g, b);
+	const min = Math.min(r, g, b);
+	let h, s, l = (max + min) / 2;
+	if (max === min) {
+		h = s = 0;
+	} else {
+		const d = max - min;
+		s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+		switch (max) {
+			case r:
+				h = (g - b) / d + (g < b ? 6 : 0);
+				break;
+			case g:
+				h = (b - r) / d + 2;
+				break;
+			case b:
+				h = (r - g) / d + 4;
+				break;
+		}
+		h /= 6;
+	}
+	return [h * 360, s * 100, l * 100];
+}
+
+function randomChoice(array) {
+	return array[Math.floor(Math.random() * array.length)];
+}
+
+function randomisePlaceholder() {
+	query = document.getElementById("query");
+	placeholders = [
+		"Shortest video on YouTube",
+		"https://youtu.be/dQw4w9WgXcQ",
+		"https://www.youtube.com/watch?v=rYEDA3JcQqw&list=PLIhpvUtDlwVRBWBxq8f1xds0d2cyXr-Mu",
+		"https://www.youtube.com/watch?v=xwH4oVnuIAs&list=PLyCPVqscXyJmPtGxea4DcfQfzI0cIZ4lx",
+	];
+	query.placeholder = randomChoice(placeholders);
+}
+
+function isLoaded(image) {
+	return image.complete && image.naturalHeight !== 0;
+}
+
+function debounce(func, delay) {
+	let timeoutId;
+	let lastSent = Date.now();
+	return function(...args) {
+		if (timeoutId) {
+			clearTimeout(timeoutId);
+		}
+		const currentTime = Date.now();
+		const delta = currentTime - lastSent;
+		lastSent = currentTime;
+		const usedDelay = Math.min(delta, delay) + delay;
+		timeoutId = setTimeout(() => {
+			func.apply(this, args);
+		}, usedDelay);
+	};
+}
+
+var lastSearch = "";
+function updateSearched() {
+	previews = document.getElementById("previews");
+	submit = document.getElementById("submit");
+	query = document.getElementById("query");
+	submit = document.getElementById("submit");
+	if (query.value == lastSearch) return;
+	submit.querySelector("span").textContent = "Download";
+	submit.disabled = false;
+	submit.error = false;
+	const progressBar = submit.querySelector(".progress-bar");
+	progressBar.style.width = "0%";
+	lastSearch = query.value;
+	previews.style.display = "none";
+	if (!query.value) return;
+	randomisePlaceholder();
+	previews.style.color = "#ffffff";
+	previews.textContent = "Loading...";
+	previews.style.display = "block";
+	component = encodeURIComponent(query.value);
+	fetch(`/ytdl?q=${component}`).then((response) => {
+		if (!response.ok) {
+			setError(response);
+			previews.textContent = "Error: " + response.statusText;
+			previews.style.color = "#ff0000";
+			return;
+		}
+		response.json().then((data) => {
+			if (!data) {
+				previews.textContent = "No results found.";
+				return;
+			}
+			previews.style.display = "none";
+			previews.textContent = "";
+			data.forEach((e, i) => {
+				const preview = createPreviewElement(e, i, query.value);
+				previews.appendChild(preview);
+			});
+			updateCount();
+			previews.style.display = data ? "flex" : "none";
+			submit.style.display = data ? "block" : "none";
+		});
+	});
+}
+const debouncedSearch = debounce(updateSearched, 500);
+document.getElementById("query").value = lastSearch;
+
+function updateCount() {
+	count = 0;
+	children = document.getElementById("previews").children;
+	Array.from(children).forEach((preview) => {
+		check = preview.children[0].children[0];
+		if (check.checked) count++;
+	});
+	document.getElementById("submit").querySelector("span").textContent = `Download (${count}/${children.length})`;
+}
+
+function setError(response) {
+	console.error(response.statusText);
+	submit.querySelector("span").textContent = `Error: ${response.statusText}`;
+	submit.error = true;
+	const progressBar = submit.querySelector(".progress-bar");
+	progressBar.style.width = "100%";
+	progressBar.style.background = "linear-gradient(135deg, #ff0000, #ff7f00)";
+}
+
+function downloadAll() {
+	submit = document.getElementById("submit");
+	submit.querySelector("span").textContent = "Processing...";
+	submit.querySelector(".progress-bar").style.width = "0%";
+	submit.disabled = true;
+	children = document.getElementById("previews").children;
+	let count = 0;
+	let delay = 1;
+	let successful = 0;
+	const progressBar = submit.querySelector(".progress-bar");
+	fmt = document.querySelector('input[name="output-format"]:checked').value;
+	Array.from(children).forEach((preview, i) => {
+		check = preview.children[0].children[0];
+		if (!check.checked) return;
+		count++;
+		let href = "/ytdl?d=" + encodeURIComponent(preview.url) + "&fmt=" + fmt;
+		if (Math.abs(preview.start) > 0.01) {
+			href += "&start=" + preview.start;
+		}
+		if (preview.end && Math.abs(preview.end - preview.duration) > 0.01) {
+			href += "&end=" + preview.end;
+		}
+		if (i == children.length - 1) {
+			submit.querySelector("span").textContent = `Downloading (0/${count})...`;
+		}
+		setTimeout(() => {
+			if (submit.error) return;
+			fetch(href).then((response) => {
+				if (!response.ok) {
+					setError(response);
+					return;
+				}
+				response.blob().then((blob) => {
+					download(blob, preview.name + "." + fmt);
+					successful++;
+					submit.querySelector("span").textContent = `Downloading (${successful}/${count})...`;
+					progressBar.style.background = "linear-gradient(135deg, #00bfff, #00ffff)";
+					progressBar.style.width = `${(successful / count) * 100}%`;
+					if (successful >= count) {
+						setTimeout(() => {
+							submit.disabled = false;
+							submit.querySelector("span").textContent = "Download (Complete)";
+						}, 1000);
+					}
+				});
+			});
+		}, delay);
+		delay += (preview.duration || 300) * 10;
+	});
+}
+
+function updateProgressFromInput(preview) {
+	const startInput = preview.querySelector('.start-time');
+	const endInput = preview.querySelector('.end-time');
+	let startTime = timeParse(startInput.value);
+	let endTime = timeParse(endInput.value);
+	if (startTime < 0) {
+		startTime = 0;
+	} else if (startTime > preview.duration) {
+		startTime = preview.duration;
+	}
+	preview.startP = (startTime / preview.duration) * 100;
+	preview.endP = (endTime / preview.duration) * 100;
+	preview.updateProgress(false);
+}
+
+function updateInputWidth(input) {
+	const text = input.value;
+	const measure = document.getElementById("text-measure");
+	measure.textContent = text;
+	const width = measure.offsetWidth;
+	input.style.width = `${width}px`;
+}
+
+function createPreviewElement(e, i, query) {
+	const preview = document.createElement("div");
+	preview.name = e.name;
+	preview.url = e.url;
+	preview.className = "entry";
+	title = document.createElement("p");
+	title.style.margin = "0";
+	const check = document.createElement("input");
+	check.type = "checkbox";
+	check.checked = !i || query.startsWith("https://");
+	check.addEventListener("change", updateCount);
+	title.appendChild(check);
+	const href = document.createElement("a");
+	href.classList.add("preview");
+	href.textContent = e.name;
+	href.href = e.url;
+	href.target = "_blank";
+	title.appendChild(href);
+	preview.appendChild(title);
+	const icon = document.createElement("img");
+	icon.style.maxWidth = "100%";
+	icon.setAttribute("loading", "lazy");
+	icon.addEventListener("click", () => {
+		check.checked = !check.checked;
+		updateCount();
+	});
+	icon.addEventListener("dblclick", () => {
+		href.click();
+	});
+	let dur;
+	if (e.duration) {
+		preview.duration = e.duration;
+		dur = document.createElement("span");
+		dur.style.lineHeight = "8px";
+
+		const startInput = document.createElement("input");
+		startInput.type = "text";
+		startInput.className = "time-input start-time";
+		startInput.value = "0:00";
+		startInput.addEventListener("change", () => updateProgressFromInput(preview));
+		updateInputWidth(startInput);
+		dur.appendChild(startInput);
+	
+		const dash = document.createElement("span");
+		dash.style.margin = "0";
+		dash.textContent = " - ";
+		dur.appendChild(dash);
+
+		const endInput = document.createElement("input");
+		endInput.type = "text";
+		endInput.className = "time-input end-time";
+		endInput.value = timeDisp(preview.duration);
+		endInput.addEventListener("change", () => updateProgressFromInput(preview));
+		updateInputWidth(endInput);
+		dur.appendChild(endInput);
+
+		const timeRange = document.createElement("span");
+		timeRange.textContent = "/" + timeDisp(preview.duration);
+		dur.appendChild(timeRange);
+	}
+	const component = encodeURIComponent(e.icon);
+	icon.onload = () => {
+		function updateEntry(preview, colour) {
+			[r, g, b] = colour;
+			[h, s, l] = rgbToHsl(r, g, b);
+			preview.animate(
+				[
+					{ background: "linear-gradient(135deg, #003f3f, #005f5f)", border: "solid 2px #00ff7f" },
+					{ background: `linear-gradient(135deg, hsl(${h},${s}%,25%), hsl(${h},${s}%,35%))`, border: `solid 2px hsl(${h},${s}%,50%)` }
+				],
+				{ duration: 500, easing: "linear", fill: "forwards" },
+			);
+			s2 = 100 - (100 - s) / 2;
+			if (!e["duration"]) return;
+			const progressContainer = document.createElement("div");
+			progressContainer.className = "progress-container";
+			progressContainer.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,12.5%), hsl(${h},${s2}%,22.5%))`;
+			const progressBar = document.createElement("div");
+			progressBar.className = "progress-bar";
+			progressBar.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,50%), hsl(${h},${s2}%,60%))`;
+			const progressStart = document.createElement("div");
+			progressStart.className = "progress-thumb";
+			progressStart.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
+			const progressEnd = document.createElement("div");
+			progressEnd.className = "progress-thumb";
+			progressEnd.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
+
+			preview.updateProgress = (rounded=true) => {
+				if (preview.startP > preview.endP) {
+					[preview.startP, preview.endP] = [preview.endP, preview.startP];
+				} else if (preview.startP > preview.endP) {
+					if (preview.endP >= 100) preview.startP -= 0.01;
+					else preview.endP += 0.01;
+				}
+				preview.start = preview.startP * preview.duration / 100;
+				preview.end = preview.endP * preview.duration / 100;
+				length = preview.endP - preview.startP;
+				progressStart.style.left = `${preview.startP}%`;
+				progressBar.style.left = `${preview.startP}%`;
+				progressBar.style.width = `${length}%`;
+				progressEnd.style.left = `${preview.endP}%`;
+				const startInput = preview.querySelector('.start-time');
+				const endInput = preview.querySelector('.end-time');
+				startInput.value = timeDisp(preview.start, rounded);
+				endInput.value = timeDisp(preview.end, rounded);
+				updateInputWidth(startInput);
+				updateInputWidth(endInput);
+			}
+			preview.startP = 0;
+			preview.endP = 100;
+
+			preview.calculateProgress = (event) => {
+				rect = progressContainer.getBoundingClientRect();
+				offsetX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+				progress = (offsetX / rect.width) * 100;
+				return progress;
+			}
+			progressContainer.addEventListener('mousedown', (event) => {
+				event.preventDefault();
+				progress = preview.calculateProgress(event);
+				if (Math.abs(progress - preview.startP) < Math.abs(progress - preview.endP)) {
+					const progressStartDrag = (event) => {
+						if (progressStart.dragging) {
+							const progress = preview.calculateProgress(event);
+							preview.startP = progress;
+							preview.updateProgress();
+						}
+					}
+					document.addEventListener('mousemove', progressStartDrag);
+					document.addEventListener('mouseup', () => {
+						progressStart.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
+						progressStart.dragging = false;
+						document.removeEventListener('mousemove', progressStartDrag);
+					}, { once: true });
+					progressStart.style.background = "#ffffff";
+					progressStart.dragging = true;
+					preview.startP = progress;
+					preview.updateProgress();
+				} else {
+					const progressEndDrag = (event) => {
+						if (progressEnd.dragging) {
+							const progress = preview.calculateProgress(event);
+							preview.endP = progress;
+							preview.updateProgress();
+						}
+					}
+					document.addEventListener('mousemove', progressEndDrag);
+					document.addEventListener('mouseup', () => {
+						progressEnd.style.background = `linear-gradient(135deg, hsl(${h},${s2}%,75%), hsl(${h},${s2}%,85%))`;
+						progressEnd.dragging = false;
+						document.removeEventListener('mousemove', progressEndDrag);
+					}, { once: true });
+					progressEnd.style.background = "#ffffff";
+					progressEnd.dragging = true;
+					preview.endP = progress;
+					preview.updateProgress();
+				}
+			});
+			progressContainer.appendChild(progressBar);
+			progressContainer.appendChild(progressStart);
+			progressContainer.appendChild(progressEnd);
+			preview.insertBefore(progressContainer, dur);
+
+			preview.updateProgress();
+		}
+		// updateEntry(preview, getMeanColour(icon));
+		fetch(`/mean_colour?url=${component}`).then((response) => response.json()).then((data) => {
+			updateEntry(preview, data.colour);
+		});
+	}
+	// icon.crossOrigin = "Anonymous";
+	icon.src = e.icon;
+	preview.appendChild(icon);
+	if (dur) preview.appendChild(dur);
+	return preview;
+}
+
+document.addEventListener("keydown", (event) => {
+	query = document.getElementById("query");
+	if (event.key == "Enter") {
+		updateSearched();
+	} else if (event.key == "Escape") {
+		query.value = "";
+		updateSearched();
+	} else if (event.key == "a" && (event.ctrlKey || event.metaKey) && document.activeElement != query) {
+		event.preventDefault();
+		children = document.getElementById("previews").children;
+		checkedAmount = 0;
+		Array.from(children).forEach((preview) => {
+			check = preview.children[0].children[0];
+			if (check.checked) checkedAmount++;
+		});
+		shouldCheck = checkedAmount <= children.length / 2;
+		Array.from(children).forEach((preview) => {
+			check = preview.children[0].children[0];
+			check.checked = shouldCheck;
+		});
+		updateCount();
+	} else if (event.key == "d" && (event.ctrlKey || event.metaKey) && document.activeElement != query) {
+		event.preventDefault();
+		downloadAll();
+	} else if (!query.value && event.key == "Tab") {
+		query.value = query.placeholder;
+		updateSearched();
+	}
+});
+
+randomisePlaceholder();
