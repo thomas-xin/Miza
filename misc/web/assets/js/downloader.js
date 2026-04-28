@@ -179,7 +179,7 @@ function updateSearched() {
 	previews.textContent = "Loading...";
 	previews.style.display = "block";
 	component = encodeURIComponent(query.value);
-	fetch(`/ytdl?q=${component}`).then((response) => {
+	fetch(`https://api.mizabot.xyz/ytdl?q=${component}`).then((response) => {
 		if (!response.ok) {
 			setError(response);
 			previews.textContent = "Error: " + response.statusText;
@@ -240,7 +240,7 @@ function downloadAll() {
 		check = preview.children[0].children[0];
 		if (!check.checked) return;
 		count++;
-		let href = "/ytdl?d=" + encodeURIComponent(preview.url) + "&fmt=" + fmt;
+		let href = "https://api.mizabot.xyz/ytdl?d=" + encodeURIComponent(preview.url) + "&fmt=" + fmt;
 		if (Math.abs(preview.start) > 0.01) {
 			href += "&start=" + preview.start;
 		}
