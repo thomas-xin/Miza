@@ -9,42 +9,42 @@
 	<!-- Open Graph Meta Tags -->
 	<meta property="og:url" content="https://mizabot.xyz">
 	<meta property="og:type" content="website">
-	<meta property="og:title" content="Miza">
-	<meta property="og:description" content="A multipurpose Discord bot.">
-	<meta property="og:image" content="https://mizabot.xyz/logo512.webp">
+	<meta property="og:title" content="Filehost">
+	<meta property="og:description" content="Backup and share files here!">
+	<meta property="og:image" content="https://mizabot.xyz/assets/images/mizaleaf.webp">
 
-	<!-- Twitter Meta Tags -->
-	<meta name="twitter:card" content="summary_large_image">
-	<meta property="twitter:domain" content="mizabot.xyz">
-	<meta property="twitter:url" content="https://mizabot.xyz">
-	<meta name="twitter:title" content="Miza">
-	<meta name="twitter:description" content="A multipurpose Discord bot.">
-	<meta name="twitter:image" content="https://mizabot.xyz/logo512.webp">
-
-	<link rel="icon" type="image/png" href="/assets/images/logo512.webp">
+	<link rel="icon" type="image/png" href="/assets/images/mizaleaf.webp">
 	<link rel="stylesheet" href="/assets/css/global.css">
 	<script defer="defer" src="/assets/js/global.js"></script>
 
 	<!-- Page specific: -->
 	<title>Files: Miza</title>
+	<meta content="#FF7FBF" data-react-helmet="true" name="theme-color">
 	<link rel="stylesheet" href="/assets/css/files.css">
 	<script defer="defer" src="/assets/js/files.js"></script>
 </head>
 <body>
 	<div id="root">
 		<nav id="navigation-links" class="hideext">
-			<a href="/">Home</a>
-			<a href="/commands">Commands</a>
-			<a href="/files">Files</a>
-			<a href="https://www.github.com/thomas-xin/miza" target="_blank" rel="noopener">Source</a>
-			<a href="https://discord.gg/cbKQKAr" target="_blank" rel="noopener">Support</a>
-			<a href="https://ko-fi.com/mizabot" target="_blank" rel="noopener">Premium</a>
-			<a href="https://github.com/thomas-xin/Miza/wiki/Terms-of-Service" target="_blank" rel="noopener">ToS</a>
+			<a class="nav-ref" href="/">Home</a>
+			<a class="nav-ref" href="/commands">Commands</a>
+			<span class="nav-dropdown">
+				Tools
+				<span></span>
+				<div>
+					❥ <a class="nav-ref" href="/files">Filehost</a><br />
+					❥ <a class="nav-ref" href="/downloader">Media Downloader</a>
+				</div>
+			</span>
+			<a class="nav-link" href="https://www.github.com/thomas-xin/miza" target="_blank" rel="noopener">Source</a>
+			<a class="nav-link" href="https://discord.gg/cbKQKAr" target="_blank" rel="noopener">Support</a>
+			<a class="nav-link" href="https://ko-fi.com/mizabot" target="_blank" rel="noopener">Premium</a>
+			<a class="nav-link" href="https://github.com/thomas-xin/Miza/wiki/Terms-of-Service" target="_blank" rel="noopener">ToS</a>
 		</nav>
 		<div class="swapping-sections-holder">
 			<section class="file-upload">
 				<div class="progress-element"></div>
-				<h1 id="uploadH1">File upload</h1>
+				<h1 id="uploadH1" style="color: #FCF430">File upload</h1>
 				<h2 id="uploadProgressH2">0% complete</h2>
 				<form>
 					<label class="file-input">
@@ -56,7 +56,7 @@
 							Browse
 						</span>
 					</label>
-					<label class="checkbox-label">
+					<label class="checkbox-label" style="color: #9C59D1">
 						<input type="checkbox" name="keep" value="true">
 						Store file permanently
 					</label>
@@ -66,14 +66,14 @@
 				</form>
 			</section>
 			<section class="file-preview">
-				<h1>File Preview</h1>
+				<h1 style="color: #FCC000">File Preview</h1>
 				<a class="permalink" target="_blank" rel="noreferrer noopener"></a>
 				<div class="media-preview-holder"></div>
 				<code class="metadata"></code>
 				<div class="buttonsRow hideext">
-					<a class="linkButton" id="view-raw">View raw</a>
-					<a class="linkButton" id="download" download>Download</a>
-					<a class="linkButton" href="/files">Upload another</a>
+					<a class="linkButton" id="view-raw" style="background-color: #00A0E4; border: 2px #005072">View raw</a>
+					<a class="linkButton" id="download" style="background-color: #E60050; border: 2px #730028" download>Download</a>
+					<a class="linkButton" href="/files" style="background-color: #310444; border: 2px #190222">Upload another</a>
 				</div>
 			</section>
 		</div>

@@ -39,9 +39,65 @@ a[href^=http]/* not relative */:not(.hideext)/* direct removal */:not(.hideext a
 a[href^=http]/* not relative */:not(.hideext):not(.hideext a):hover::after,
 	a[href^=http]/* not relative */:not(.hideext):not(.hideext a):focus::after,
 	a[href^=http]/* not relative */:not(.hideext):not(.hideext a):active::after {
-	transition-delay: .1s;
+	transition-duration: .1s;
 	opacity: 1;
 	transform: translateY(-1px);
+}
+
+.nav-link {
+	color: #FFFFFF !important;
+	transition-duration: .1s;
+}
+.nav-link:hover {
+	color: #55CDFC !important;
+	transition-duration: .1s;
+}
+.nav-ref {
+	color: #FFFFFF !important;
+	transition-duration: .1s;
+}
+.nav-ref:hover {
+	color: #F7A8B8 !important;
+	transition-duration: .1s;
+}
+
+.nav-dropdown {
+	display: inline-block;
+	font-size: 0.9em;
+	text-decoration: underline;
+	transform: translateY(-1px);
+	transition: transform 250ms ease, opacity 250ms;
+	position: relative;
+}
+.nav-dropdown:hover {
+	color: #FF9B55;
+}
+.nav-dropdown span {
+	display: block;
+	width: 100%;
+	height: 1rem;
+	position: absolute;
+}
+.nav-dropdown div {
+	color: #D461A6;
+	pointer-events: none;
+	background-color: transparent;
+	padding: 4px;
+	border-radius: 8px;
+	opacity: 0;
+	margin-top: 0.5rem;
+	margin-left: -1rem;
+	line-height: 1.2rem;
+	width: 10rem;
+	position: absolute;
+	transition-duration: .3s;
+}
+.nav-dropdown:hover div {
+	pointer-events: auto;
+	background-color: #000000C0;
+	opacity: 1;
+	position: absolute;
+	transition-duration: .3s;
 }
 
 #root {

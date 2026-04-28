@@ -208,7 +208,6 @@ function setupScene() {
 	scene.add(triangle2);
 }
 function resizeCanvas() {
-	shootingStars.length = 0;
 	if (renderer) {
 		const rect = starContainer.getBoundingClientRect();
 		const width = rect.width;
@@ -228,7 +227,9 @@ function resizeCanvas() {
 			const s = 1 / sceneResMult;
 			starContainer.style.transform = `scale(${s})`;
 		}
+		renderer.clear();
 	}
+	shootingStars.length = 0;
 }
 const debouncedResizeCanvas = debounce(resizeCanvas, 100);
 window.addEventListener('resize', debouncedResizeCanvas);
@@ -252,6 +253,7 @@ const linksElement = document.getElementsByClassName("links")[0];
 function updateCanvas() {
 	if (!camera || !scene || !renderer || document.hidden || !linksElement.classList.contains("inside-view")) {
 		shootingStars.length = 0;
+		if (renderer) renderer.clear();
 		requestAnimationFrame(updateCanvas);
 		return;
 	};
@@ -545,9 +547,9 @@ function generateStars() {
 			timestamp: timestamp,
 			prev: timestamp,
 			scale: scale,
-			x: Math.random() * rect.width + rect.x,
-			y: -150,
-			vx: (Math.random() * 15 - 120) * scale,
+			x: Math.random() * (rect.width + 128 / 340 * (rect.height + 60)),
+			y: -60,
+			vx: (Math.random() * 16 - 120) * scale,
 			vy: (Math.random() * 40 + 320) * scale,
 			flag: randomPrideFlag(),
 			eaten: 0,

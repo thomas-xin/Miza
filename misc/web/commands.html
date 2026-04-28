@@ -9,17 +9,9 @@
 	<!-- Open Graph Meta Tags -->
 	<meta property="og:url" content="https://mizabot.xyz">
 	<meta property="og:type" content="website">
-	<meta property="og:title" content="Miza">
-	<meta property="og:description" content="A multipurpose Discord bot.">
+	<meta property="og:title" content="Commands">
+	<meta property="og:description" content="Command syntax documentation and examples">
 	<meta property="og:image" content="https://mizabot.xyz/logo512.webp">
-
-	<!-- Twitter Meta Tags -->
-	<meta name="twitter:card" content="summary_large_image">
-	<meta property="twitter:domain" content="mizabot.xyz">
-	<meta property="twitter:url" content="https://mizabot.xyz">
-	<meta name="twitter:title" content="Miza">
-	<meta name="twitter:description" content="A multipurpose Discord bot.">
-	<meta name="twitter:image" content="https://mizabot.xyz/logo512.webp">
 
 	<link rel="icon" type="image/png" href="/assets/images/logo512.webp">
 	<link rel="stylesheet" href="/assets/css/global.css">
@@ -27,19 +19,27 @@
 
 	<!-- Page specific: -->
 	<title>Atlas: Miza</title>
+	<meta content="#FF7FBF" data-react-helmet="true" name="theme-color">
 	<link rel="stylesheet" href="/assets/css/commands.css">
 	<script defer="defer" src="/assets/js/commands.js"></script>
 </head>
 <body>
 	<div id="root">
 		<nav id="navigation-links" class="hideext">
-			<a href="/">Home</a>
-			<a href="/commands">Commands</a>
-			<a href="/files">Files</a>
-			<a href="https://www.github.com/thomas-xin/miza" target="_blank" rel="noopener">Source</a>
-			<a href="https://discord.gg/cbKQKAr" target="_blank" rel="noopener">Support</a>
-			<a href="https://ko-fi.com/mizabot" target="_blank" rel="noopener">Premium</a>
-			<a href="https://github.com/thomas-xin/Miza/wiki/Terms-of-Service" target="_blank" rel="noopener">ToS</a>
+			<a class="nav-ref" href="/">Home</a>
+			<a class="nav-ref" href="/commands">Commands</a>
+			<span class="nav-dropdown">
+				Tools
+				<span></span>
+				<div>
+					❥ <a class="nav-ref" href="/files">Filehost</a><br />
+					❥ <a class="nav-ref" href="/downloader">Media Downloader</a>
+				</div>
+			</span>
+			<a class="nav-link" href="https://www.github.com/thomas-xin/miza" target="_blank" rel="noopener">Source</a>
+			<a class="nav-link" href="https://discord.gg/cbKQKAr" target="_blank" rel="noopener">Support</a>
+			<a class="nav-link" href="https://ko-fi.com/mizabot" target="_blank" rel="noopener">Premium</a>
+			<a class="nav-link" href="https://github.com/thomas-xin/Miza/wiki/Terms-of-Service" target="_blank" rel="noopener">ToS</a>
 		</nav>
 		<template id="command-short-description">
 			<div class="command-body-short">

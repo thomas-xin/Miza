@@ -399,7 +399,9 @@ async def chunked_proxy(path: str, request: Request):
 
 
 @app.head(path="/u/{path:path}")
+@app.head(path="/u")
 @app.get("/u/{path:path}")
+@app.get("/u")
 @app.get("/unproxy/{path:path}")
 async def unproxy(path: str, request: Request, url: Optional[str] = None, force: bool = False, download: bool = False):
 	"""Unproxy Discord attachments or redirect to direct URLs."""

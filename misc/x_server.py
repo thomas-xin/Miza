@@ -257,7 +257,7 @@ config = {
 		"engine.autoreload_on": False,
 		"environment": "production",
 		"tools.gzip.on": True,
-		"tools.gzip.mime_types": ["text/plain", "text/html", "text/css", "text/csv", "text/xml", "text/md", "text/markdown", "text/javascript", "application/json", "application/javascript"],
+		"tools.gzip.mime_types": ["text/plain", "text/html", "text/css", "text/csv", "image/svg+xml", "text/xml", "text/md", "text/markdown", "text/javascript", "application/json", "application/javascript"],
 	},
 	"/": {
 		"request.dispatch": EndpointRedirects(),
@@ -793,7 +793,7 @@ class Server:
 		return orjson.dumps(interface.run("bot.status()"))
 
 	alias = tuple([fn.split("/", 1)[0].rsplit(".", 1)[0] for fn in os.listdir("misc/web")])
-	print(alias)
+	alias += tuple(a + ".html" for a in alias)
 	@cp.expose(alias=alias)
 	def index(self, *args, **kwargs):
 		path_info = cp.request.path_info
@@ -837,6 +837,7 @@ class Server:
 
 	<!-- Page specific: -->
 	<title>Files: Miza</title>
+	<meta content="#FF7FBF" data-react-helmet="true" name="theme-color">
 	<link rel="stylesheet" href="/assets/css/files.css">
 	<script defer="defer" src="/assets/js/files.js"></script>
 </head>

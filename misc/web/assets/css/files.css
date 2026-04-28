@@ -70,8 +70,8 @@ section.file-upload {
 		& button[type="submit"] {
 			display: block;
 			color: white;
-			border: solid 2px rgb(52, 0, 104);
-			background-color: rgb(82, 33, 133);
+			border: solid 2px #100020;
+			background-color: black;
 			padding: 0.4rem 1rem;
 			cursor: pointer;
 		}
@@ -217,13 +217,13 @@ section.file-preview {
 			background: repeating-conic-gradient(#303030 0 25%, #545454 0 50%) 
 				50% / 20px 20px;
 
-			width: 90%;
-			max-width: min(50rem, 90vw);
-			max-height: min(50rem, 90vh);
-
 			& :is(img, video, audio) {
-				width: 100%;
+				width: max(8rem, 90%);
+				max-width: min(50rem, max(8rem, 90vw));
+				max-height: min(50rem, max(8rem, calc(90vh - 12rem)));
 				display: block;
+				margin-left: auto;
+				margin-right: auto;
 			}
 		}
 	}
@@ -247,6 +247,11 @@ section.file-preview {
 		}
 	}
 
+}
+
+button:hover {
+	background-color: #059F2D !important;
+	border: solid 2px #034F17 !important;
 }
 
 @keyframes opacityIn {

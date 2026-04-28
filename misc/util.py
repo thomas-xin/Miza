@@ -1616,7 +1616,7 @@ def byte_scale(n, ratio=1024):
 		e += 1
 		if e >= len(__scales) - 1:
 			break
-	return f"{round(n, 4)} {__scales[e]}"
+	return f"{round_min(round(n, 4))} {__scales[e]}"
 def byte_unscale(s, ratio=1024):
 	num_part = regexp(r"^[\.0-9]+").findall(s)
 	if not num_part:
@@ -4837,7 +4837,7 @@ class EvalPipe:
 			return res
 		return self.submit(s, priority=priority).result(timeout=timeout)
 
-	async def run_async(self, s, priority=False):
+	async def asubmit(self, s, priority=False):
 		await self.a_ensure_writable()
 		return await wrap_future(self.submit(s, priority=priority))
 

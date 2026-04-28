@@ -27,20 +27,28 @@
 
 	<!-- Page specific: -->
 	<title>Miza: your local loyal multipurpose Discord bot</title>
+	<meta content="#FF7FBF" data-react-helmet="true" name="theme-color">
 	<link rel="stylesheet" href="/assets/css/home.css">
 	<script defer="defer" src="/assets/js/home.js"></script>
-	<script defer=""defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onload="setupTrails()"></script>
+	<script defer="defer" src="/u?url=https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onload="setupTrails()"></script>
 </head>
 <body>
 	<div id="root">
 		<nav id="navigation-links" class="hideext">
-			<a href="/">Home</a>
-			<a href="/commands">Commands</a>
-			<a href="/files">Files</a>
-			<a href="https://www.github.com/thomas-xin/miza" target="_blank" rel="noopener">Source</a>
-			<a href="https://discord.gg/cbKQKAr" target="_blank" rel="noopener">Support</a>
-			<a href="https://ko-fi.com/mizabot" target="_blank" rel="noopener">Premium</a>
-			<a href="https://github.com/thomas-xin/Miza/wiki/Terms-of-Service" target="_blank" rel="noopener">ToS</a>
+			<a class="nav-ref" href="/">Home</a>
+			<a class="nav-ref" href="/commands">Commands</a>
+			<span class="nav-dropdown">
+				Tools
+				<span></span>
+				<div>
+					❥ <a class="nav-ref" href="/files">Filehost</a><br />
+					❥ <a class="nav-ref" href="/downloader">Media Downloader</a>
+				</div>
+			</span>
+			<a class="nav-link" href="https://www.github.com/thomas-xin/miza" target="_blank" rel="noopener">Source</a>
+			<a class="nav-link" href="https://discord.gg/cbKQKAr" target="_blank" rel="noopener">Support</a>
+			<a class="nav-link" href="https://ko-fi.com/mizabot" target="_blank" rel="noopener">Premium</a>
+			<a class="nav-link" href="https://github.com/thomas-xin/Miza/wiki/Terms-of-Service" target="_blank" rel="noopener">ToS</a>
 		</nav>
 		<section class="hero observe-intersections inside-view">
 			<!--

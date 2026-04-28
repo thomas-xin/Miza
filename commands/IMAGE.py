@@ -1113,7 +1113,7 @@ class Tesseract(Command):
 		fn = temporary_file("tar")
 		page = new_playwright_page()
 		with page:
-			page.goto(f"https://api.mizabot.xyz/static/tesseract.html?size={size}&texture=:")
+			page.goto(f"https://api.mizabot.xyz/tesseract?size={size}&texture=:")
 			with page.expect_file_chooser() as fc_info:
 				page.locator("#inp").click()
 			file_chooser = fc_info.value
