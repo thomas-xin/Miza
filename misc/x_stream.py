@@ -13,7 +13,7 @@ import orjson
 from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse, RedirectResponse, PlainTextResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from .asyncs import run_async, csubmit
+from .asyncs import run_async, create_task
 from .types import fcdict, byte_like, MemoryBytes
 from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment, discord_expired,
@@ -23,7 +23,7 @@ from .util import (
 )
 from .caches import attachment_cache, colour_cache
 
-csubmit(RequestManager._init_())
+create_task(RequestManager._init_())
 
 ADDRESS = "0.0.0.0"
 PORT = 443
@@ -57,7 +57,7 @@ def true_ip(request: Request) -> str:
 
 
 async def get_size_mime(head, tail, count, chunksize):
-	fut = csubmit(attachment_cache.scan_headers(tail, base="mizabot.xyz", fc=True))
+	fut = create_task(attachment_cache.scan_headers(tail, base="mizabot.xyz", fc=True))
 	HEAD = await attachment_cache.download(head, read=True, fc=True)
 	TAIL_headers = await fut
 	firstsize = getsize(HEAD)

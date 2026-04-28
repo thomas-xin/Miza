@@ -18,7 +18,7 @@ import orjson
 import niquests
 import numpy as np
 import psutil
-from .asyncs import csubmit, submit_thread, run_async, wrap_future, eloop, Delay, format_async_stack, gather
+from .asyncs import create_task, submit_thread, run_async, wrap_future, eloop, Delay, format_async_stack, gather
 from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_str, astype, pretty_json
 from .smath import log2lin
 from .util import (
@@ -145,7 +145,7 @@ class AudioPlayer(discord.AudioSource):
 			self.channel = channel
 		self.refresh()
 		cls.waiting[gid] = Future()
-		cls.futs[gid] = csubmit(self.join_into(vcc, announce=announce))
+		cls.futs[gid] = create_task(self.join_into(vcc, announce=announce))
 		return self
 
 	async def join_into(self, vcc, announce=0):
@@ -181,11 +181,11 @@ class AudioPlayer(discord.AudioSource):
 			await self.ensure_speak(vcc)
 			if member and member.voice is not None and vcc.permissions_for(member).mute_members:
 				if member.voice.deaf or member.voice.self_deaf or member.voice.mute or member.voice.afk:
-					csubmit(member.edit(mute=False))
+					create_task(member.edit(mute=False))
 			if announce:
 				connected = "connected" if announce == 1 else "reconnected"
 				s = ansi_md(colourise_auto(f"$b<🎵> Successfully {connected} to $m<{self.channel.guild}>. $b<🎵>"))
-				csubmit(self.announce(s))
+				create_task(self.announce(s))
 			return self
 		finally:
 			self.waiting.pop(gid, None)
@@ -324,7 +324,7 @@ class AudioPlayer(discord.AudioSource):
 
 	async def leave(self, reason=None, dump=False):
 		if self.vcc and self.vcc.guild:
-			csubmit(self.disconnect(self.vcc.guild))
+			create_task(self.disconnect(self.vcc.guild))
 		if not self.channel:
 			return
 		r = f": $y<{reason}>" if reason else ""
@@ -573,7 +573,7 @@ class AudioPlayer(discord.AudioSource):
 			dump = None
 		message = await channel.send(lim_str(s, 2000), file=dump)
 		if channel.permissions_for(channel.guild.me).add_reactions:
-			csubmit(message.add_reaction("❎"))
+			create_task(message.add_reaction("❎"))
 		return message
 
 	def get_dump(self):
@@ -650,7 +650,7 @@ class AudioPlayer(discord.AudioSource):
 			# Handle special case of only deafened users; they are not counted as listeners but will still keep the bot in the channel, paused instead
 			listeners = sum(not m.bot and bool(m.voice) and not (m.voice.deaf or m.voice.self_deaf) for m in self.vcc.members)
 			if listeners == 0:
-				self.updating_activity = csubmit(self._updating_activity())
+				self.updating_activity = create_task(self._updating_activity())
 			elif not self.settings.pause:
 				self.resume()
 	async def _updating_activity(self):
@@ -680,7 +680,7 @@ class AudioPlayer(discord.AudioSource):
 			print_exc()
 			connected = False
 		if len(self.queue) == 0 and connected:
-			self.updating_streaming = csubmit(self._updating_streaming())
+			self.updating_streaming = create_task(self._updating_streaming())
 	async def _updating_streaming(self):
 		await asyncio.sleep(960)
 		if self is not self.players.get(self.vcc.guild.id):
@@ -722,7 +722,7 @@ class AudioPlayer(discord.AudioSource):
 			self.last_read = None
 			if out and new:
 				self.playing[0].new = False
-				csubmit(self.announce_play(self.queue[0]))
+				create_task(self.announce_play(self.queue[0]))
 			self.last_played = utc()
 		if (self.playing and self.queue) and (not out or self.playing[0].pos / 50 >= (self.queue[0].get("end") or inf)):
 			self.skip(0, loop=self.settings.loop, repeat=self.settings.repeat, shuffle=self.settings.shuffle)
@@ -850,7 +850,7 @@ class AudioPlayer(discord.AudioSource):
 						ENTRY=colourise_brackets(entry.name, 'red', 'green', 'magenta') + colourise(),
 						EXCEPTION=colourise_brackets(lim_str(repr(ex), 1024), 'red', 'magenta', 'yellow'),
 					)
-					csubmit(self.announce(s))
+					create_task(self.announce(s))
 					return self.skip()
 				if pos is not None:
 					source.new = False
@@ -895,7 +895,7 @@ class AudioPlayer(discord.AudioSource):
 						ENTRY=colourise_brackets(entry.name, 'red', 'green', 'magenta') + colourise(),
 						EXCEPTION=colourise_brackets(lim_str(repr(ex), 1024), 'red', 'magenta', 'yellow'),
 					)
-					csubmit(self.announce(s))
+					create_task(self.announce(s))
 					return self.skip(1)
 				if len(self.playing) == 1 and len(self.queue) > 1 and self.queue[1].url == source.af.url:
 					self.playing.append(source)
@@ -1477,7 +1477,7 @@ class AudioClient(discord.AutoShardedClient):
 			intents=self.intents,
 		)
 		with suppress(AttributeError):
-			csubmit(super()._async_setup_hook())
+			create_task(super()._async_setup_hook())
 		self._globals = globals()
 
 client = AudioClient()
@@ -1590,7 +1590,7 @@ async def on_connect():
 				print("Reloading players:", keys)
 				await asyncio.gather(*(reload_player(gid) for gid in keys))
 			await asyncio.gather(*(AP.force_disconnect(guild) for guild in client.guilds if guild.me and guild.me.voice is not None and guild.id not in keys))
-			csubmit(autosave_loop())
+			create_task(autosave_loop())
 		print("Audio client successfully connected.")
 
 @client.event

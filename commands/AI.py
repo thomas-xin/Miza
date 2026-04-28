@@ -717,10 +717,10 @@ class Ask(Command):
 			message = await self.bot.ensure_reactions(message)
 			for r in message.reactions:
 				if not r.me:
-					csubmit(message.clear_reaction("🔄"))
+					create_task(message.clear_reaction("🔄"))
 					return await message.clear_reaction("🗑️")
 			return await message.clear_reactions()
-		csubmit(message.remove_reaction("🔄", self.bot.user))
+		create_task(message.remove_reaction("🔄", self.bot.user))
 		return await message.remove_reaction("🗑️", self.bot.user)
 
 
@@ -1002,7 +1002,7 @@ class Describe(Command):
 	ephemeral = True
 
 	async def __call__(self, bot, _user, _premium, url, **void):
-		fut = csubmit(attachment_cache.scan_headers(url, fc=True))
+		fut = create_task(attachment_cache.scan_headers(url, fc=True))
 		cap = await self.bot.caption(url, best=1, premium_context=_premium, timeout=90)
 		s = "\n\n".join(filter(bool, cap)).strip()
 		headers = await fut
@@ -1059,7 +1059,7 @@ class AudioSeparator(Command):
 	_timeout_ = 3.5
 
 	async def __call__(self, bot, _channel, _message, url, format, **void):
-		fut = csubmit(send_with_reply(
+		fut = create_task(send_with_reply(
 			_channel,
 			reference=_message,
 			content=italics(ini_md(f"Downloading and converting {sqr_md(url)}...")),
@@ -1226,7 +1226,7 @@ class TTS(Command):
 			vc_ = await select_voice_channel(_user, _channel, find=False)
 			if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 				raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
-			vc_fut = csubmit(bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id})"))
+			vc_fut = create_task(bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id})"))
 		text = await bot.superclean_content(text)
 		engine, mode = voice.split("-", 1)
 		fi = temporary_file()

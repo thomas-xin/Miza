@@ -713,7 +713,7 @@ d(*⌒▽⌒*)b Happy
 		url = await self.bot.get_proxy_url(_user)
 		if _slash:
 			return cdict(content=msg)
-		fut = csubmit(bot.autodelete(_message))
+		fut = create_task(bot.autodelete(_message))
 		await bot.send_as_webhook(_channel, msg, username=_user.display_name, avatar_url=url)
 		await fut
 
@@ -1102,7 +1102,7 @@ class Topic(Command):
 	flags = "npr"
 
 	def __call__(self, bot, user, flags, channel, **void):
-		csubmit(bot.seen(user, event="misc", raw="Talking to me"))
+		create_task(bot.seen(user, event="misc", raw="Talking to me"))
 		if "r" in flags:
 			return "\u200b" + choice(bot.data.users.rquestions)
 		elif "p" in flags:
@@ -1121,7 +1121,7 @@ class Fact(Command):
 	description = "Provides a random fact."
 
 	async def __call__(self, bot, user, **void):
-		csubmit(bot.seen(user, event="misc", raw="Talking to me"))
+		create_task(bot.seen(user, event="misc", raw="Talking to me"))
 		fact = await bot.data.flavour.get(p=False, q=False)
 		return "\u200b" + fact
 

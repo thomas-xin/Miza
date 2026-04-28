@@ -16,7 +16,7 @@ import nekos
 # from collections import deque
 # from itertools import repeat
 # from random import choice
-# from misc.asyncs import Semaphore, csubmit
+# from misc.asyncs import Semaphore, create_task
 # from misc.smath import b642bytes, bytes2b64, xrand
 # from misc.types import demap, cdict, T, as_str
 # from misc.util import AUTH, Request
@@ -620,7 +620,7 @@ class Snake(Command):
 			raise OverflowError(f"Board size too large ({cells} > 199)")
 		elif cells < 2:
 			raise ValueError(f"Board size too small ({cells} < 2)")
-		csubmit(self.generate_snaek_game(message, size, flags))
+		create_task(self.generate_snaek_game(message, size, flags))
 
 	async def _callback_(self, bot, message, reaction, user, vals, perm, **void):
 		if message.id not in self.playing:
@@ -1224,7 +1224,7 @@ class Uno(Command):
 					description=f"Here is your deal hand. Please wait for {user_mention(players[0])} to begin the game!",
 				)
 
-				csubmit(interaction_response(
+				create_task(interaction_response(
 					bot=bot,
 					message=message,
 					content=s,
@@ -1296,7 +1296,7 @@ class Uno(Command):
 				for c in hand:
 					s += await bot.data.emojis.emoji_as(c + ".png")
 
-				csubmit(interaction_response(
+				create_task(interaction_response(
 					bot=bot,
 					message=message,
 					content=s,
@@ -1458,7 +1458,7 @@ class Uno(Command):
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
 
-				csubmit(bot.edit_message(message, content=content, embed=embed))
+				create_task(bot.edit_message(message, content=content, embed=embed))
 				return await interaction_response(
 					bot=bot,
 					message=message,
@@ -1495,7 +1495,7 @@ class Uno(Command):
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
 
-				csubmit(bot.edit_message(message, content=content, embed=embed))
+				create_task(bot.edit_message(message, content=content, embed=embed))
 				return await interaction_patch(
 					bot=bot,
 					message=message,
@@ -1531,7 +1531,7 @@ class Uno(Command):
 				t += await bot.data.emojis.emoji_as(card + ".png")
 			embed.clear_fields()
 			embed.add_field(name="Previous turn", value=t or "\xad")
-			csubmit(bot.edit_message(message, content=content, embed=embed))
+			create_task(bot.edit_message(message, content=content, embed=embed))
 			return await interaction_patch(
 				bot=bot,
 				message=message,
@@ -1576,7 +1576,7 @@ class Uno(Command):
 						t += await bot.data.emojis.emoji_as(card + ".png")
 					embed.clear_fields()
 					embed.add_field(name="Previous turn", value=t or "\xad")
-					csubmit(bot.edit_message(message, content=content, embed=embed))
+					create_task(bot.edit_message(message, content=content, embed=embed))
 					return await interaction_patch(
 						bot=bot,
 						message=message,
@@ -1631,7 +1631,7 @@ class Uno(Command):
 					embed.clear_fields()
 					embed.add_field(name="Previous turn", value=t or "\xad")
 
-					csubmit(bot.edit_message(message, content=content, embed=embed))
+					create_task(bot.edit_message(message, content=content, embed=embed))
 					return await interaction_patch(
 						bot=bot,
 						message=message,
@@ -1666,7 +1666,7 @@ class Uno(Command):
 					t += await bot.data.emojis.emoji_as(card + ".png")
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
-				csubmit(bot.edit_message(message, content=content, embed=embed))
+				create_task(bot.edit_message(message, content=content, embed=embed))
 				return await interaction_patch(
 					bot=bot,
 					message=message,
@@ -1692,7 +1692,7 @@ class Uno(Command):
 				embed.clear_fields()
 				embed.add_field(name="Previous turn", value=t or "\xad")
 
-				csubmit(bot.edit_message(message, content=content, embed=embed))
+				create_task(bot.edit_message(message, content=content, embed=embed))
 				return await interaction_patch(
 					bot=bot,
 					message=message,
@@ -1717,7 +1717,7 @@ class Uno(Command):
 			embed.clear_fields()
 			embed.add_field(name="Previous turn", value=t or "\xad")
 
-			csubmit(bot.edit_message(message, content=content, embed=embed))
+			create_task(bot.edit_message(message, content=content, embed=embed))
 			return await interaction_patch(
 				bot=bot,
 				message=message,
@@ -2125,14 +2125,14 @@ class UpdateDogpiles(Database):
 			self.times[message.guild.id] = utc()
 			if random.random() < 1 / 4096:
 				content = "https://mizabot.xyz/u/iJKEhAECGSG0UwWQiSWgQUEWEkE/secretsmall.gif"
-				csubmit(message.add_reaction("💎"))
+				create_task(message.add_reaction("💎"))
 				bot.data.users.add_diamonds(message.author, 1000)
 			else:
 				content = prediction
 			print("DOGPILE:", message.guild, message.channel, hist, content)
 			if content[0].isascii() and content[:2] != "<:" and not is_url(content):
 				content = lim_str("\u200b" + content, 2000)
-			csubmit(discord.abc.Messageable.send(message.channel, content, tts=message.tts))
+			create_task(discord.abc.Messageable.send(message.channel, content, tts=message.tts))
 			bot.data.users.add_xp(message.author, len(content) / 2 + 16)
 			bot.data.users.add_gold(message.author, len(content) / 4 + 32)
 
@@ -2225,7 +2225,7 @@ class UpdateDadjokes(Database):
 		if target:
 			v = random.random() * 100
 			if v < curr.get("response", curr.get("resp", 0)):
-				csubmit(send_with_reply(message.channel, message, f"Hi, {target}! {get_random_smiley()}"))
+				create_task(send_with_reply(message.channel, message, f"Hi, {target}! {get_random_smiley()}"))
 			if v < curr.get("nickname", curr.get("nick", 0)) and nick and nick != user.display_name:
 				await user.edit(nick=nick, reason="Pranked!")
 
@@ -2247,7 +2247,7 @@ class Daily(Command):
 			rewards = await bot.as_rewards(field.get("diamonds", None), field.get("gold", None))
 			emb.add_field(name=field.name, value=f"{bar} `{int(field.progress)}/{field.required}`\nRewards: {rewards}", inline=False)
 		message = await channel.send(embed=emb)
-		csubmit(message.add_reaction("✅"))
+		create_task(message.add_reaction("✅"))
 
 	async def _callback_(self, bot, user, reaction, message, perm, vals, **void):
 		if reaction is None:
@@ -3078,7 +3078,7 @@ class RPS(Command):
 			+ response
 		)
 		emb.set_author(**get_author(user))
-		csubmit(bot.edit_message(message, embed=emb))
+		create_task(bot.edit_message(message, embed=emb))
 		await bot.ignore_interaction(message)
 
 
@@ -3196,7 +3196,7 @@ class HOW(Command):
 # 		if not aki:
 # 			print("Akinator not found, restarting:", sig)
 # 			ans = "restart"
-# 		csubmit(bot.defer_interaction(message, mode="patch"))
+# 		create_task(bot.defer_interaction(message, mode="patch"))
 
 # 		callback = "callback"
 

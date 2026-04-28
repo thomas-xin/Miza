@@ -120,7 +120,7 @@ class Restart(Command):
 									m = await bot.edit_message(m, content=content)
 							await asyncio.sleep(1)
 			if m:
-				csubmit(bot.edit_message(m, content=f"*Waiting until idle (complete)*"))
+				create_task(bot.edit_message(m, content=f"*Waiting until idle (complete)*"))
 		delay = float(delay) - (utc() - t)
 		if delay > 0:
 			# Restart announcements for when a time input is specified
@@ -331,7 +331,7 @@ class Exec(Command):
 				execd[_channel.id] = num
 			# Test bitwise flags for enabled terminals
 			out = ", ".join(self.terminal_types.get(1 << i) for i in bits(execd[_channel.id]))
-			csubmit(_message.add_reaction("❗"))
+			create_task(_message.add_reaction("❗"))
 			attachment_cache["@channels"] = [k for k, v in execd.items() if v & 16]
 			return css_md(f"{sqr_md(out)} terminal now enabled in {sqr_md(_channel)}.")
 		if mode == "disable":
@@ -353,7 +353,7 @@ class Exec(Command):
 		if code:
 			proc = code.translate(execd.qtrans)
 			try:
-				csubmit(_message.add_reaction("❗"))
+				create_task(_message.add_reaction("❗"))
 				result = await execd.procFunc(_message, proc, bot, term=4)
 				output = str(result)
 				return cdict(content=output, prefix="```\n", suffix="```")
@@ -485,14 +485,14 @@ class UpdateExec(Database):
 				with suppress(KeyError):
 					# Write to input() listener if required
 					if self.listeners[channel.id]:
-						csubmit(message.add_reaction("👀"))
+						create_task(message.add_reaction("👀"))
 						self.listeners.pop(channel.id).set_result(proc)
 						return
 				if not proc:
 					return
 				proc = proc.translate(self.qtrans)
 				try:
-					csubmit(message.add_reaction("❗"))
+					create_task(message.add_reaction("❗"))
 					result = await self.procFunc(message, proc, bot, term=f)
 					output = str(result)
 					await bot.respond_with(cdict(content=output, prefix="```\n", suffix="```"), message=message)
@@ -546,7 +546,7 @@ class UpdateExec(Database):
 						b = msg.encode("utf-8")
 						if len(b) > 8388608:
 							b = b[:4194304] + b[-4194304:]
-						csubmit(self.logto(channel, CompatFile(b, filename="message.txt")))
+						create_task(self.logto(channel, CompatFile(b, filename="message.txt")))
 					else:
 						self.bot.send_as_embeds(channel, msg, md=ansi_md, bottleneck=True)
 			if self.bot.ready:
@@ -597,7 +597,7 @@ class UpdateExec(Database):
 		for cid in cids:
 			channel = await bot.fetch_channel(cid)
 			channels.append(channel)
-		csubmit(self._delete(channels, mids))
+		create_task(self._delete(channels, mids))
 
 	@tracebacksuppressor
 	async def _delete(self, channels, mids):
@@ -716,7 +716,7 @@ class UpdateExec(Database):
 	def cproxy(self, url):
 		if url in self.temp:
 			return
-		self.temp[url] = csubmit(self.uproxy(url))
+		self.temp[url] = create_task(self.uproxy(url))
 
 	async def _bot_ready_(self, **void):
 		with suppress(AttributeError):
@@ -1357,7 +1357,7 @@ class UpdateImagePools(Database):
 	async def get(self, key, func, threshold=1024, args=()):
 		if key not in self.loading:
 			self.loading.add(key)
-			csubmit(self.load_until(key, func, threshold, args=args))
+			create_task(self.load_until(key, func, threshold, args=args))
 		data = self.coercedefault(key, alist, alist())
 		if not data or key not in self.finished and (len(data) < threshold >> 1 or len(data) < threshold and xrand(2)):
 			out = await func(*args)
@@ -1371,7 +1371,7 @@ class UpdateImagePools(Database):
 					data.add(url)
 			return url
 		if not self.sem.is_busy():
-			csubmit(self.proc(key, func, args=args))
+			create_task(self.proc(key, func, args=args))
 		return choice(data)
 
 

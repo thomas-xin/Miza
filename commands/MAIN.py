@@ -249,7 +249,7 @@ class Loop(Command):
 					fut = futs.popleft()
 					await fut
 					done.append(fut)
-				fut = csubmit(bot.run_command(command, message=fake_message, argv=argv, command_check=command_check, respond=False, allow_recursion=False))
+				fut = create_task(bot.run_command(command, message=fake_message, argv=argv, command_check=command_check, respond=False, allow_recursion=False))
 				futs.append(fut)
 		response = None
 		t = 0
@@ -268,7 +268,7 @@ class Loop(Command):
 			done = i >= iterations - 1
 			t2 = utc()
 			if done or t2 - t > 1:
-				fut = csubmit(bot.respond_with(response, message=fake_message, manager=manager, done=done))
+				fut = create_task(bot.respond_with(response, message=fake_message, manager=manager, done=done))
 			continue
 		assert response, "No response was captured. (Make sure you inputted the command correctly!)"
 		if fut:
@@ -1023,12 +1023,12 @@ class Status(Command):
 				if message is None:
 					message = await aretry(channel.fetch_message, m_id, attempts=6, delay=2, exc=(discord.NotFound, discord.Forbidden))
 					if utc() - snowflake_time_2(message.id).timestamp() > 86400 * 14 - 60:
-						csubmit(bot.autodelete(message, keep_log=False))
+						create_task(bot.autodelete(message, keep_log=False))
 						raise StopIteration
 				if message.id != channel.last_message_id or getattr(message, "rated", False):
 					async for m in bot.data.channel_cache.grab(channel):
 						if message.id != m.id or utc() - snowflake_time_2(m.id).timestamp() > 86400 * 14 - 60 or getattr(m, "rated", False):
-							csubmit(bot.autodelete(m, keep_log=False))
+							create_task(bot.autodelete(m, keep_log=False))
 							raise StopIteration
 						break
 				func = lambda *args, **kwargs: bot.edit_message(message, *args, content=None, **kwargs)
@@ -1449,7 +1449,7 @@ class UpdateUrgentReminders(Database):
 			self.data["listed"]
 		except KeyError:
 			self.data["listed"] = alist()
-		# csubmit(self.update_urgents())
+		# create_task(self.update_urgents())
 
 	async def __call__(self, **void):
 		if self.db is None:
@@ -1489,7 +1489,7 @@ class UpdateUrgentReminders(Database):
 						content = p[5]
 					if len(p) > 6 and p[6]:
 						reference = await self.fetch_message(p[6], channel)
-					fut = csubmit(channel.send(content, embed=emb, reference=reference))
+					fut = create_task(channel.send(content, embed=emb, reference=reference))
 					await self.bot.autodelete(message)
 					message = await fut
 					await message.add_reaction("✅")
@@ -1586,9 +1586,9 @@ class UpdateReminders(Database):
 						content = fake_reply(reference)
 						reference = None
 			if not x.get("recur"):
-				csubmit(ch.send(content, embed=emb, reference=reference))
+				create_task(ch.send(content, embed=emb, reference=reference))
 			else:
-				csubmit(self.recurrent_message(ch, content, emb, t, x.get("recur", 60), reference=reference))
+				create_task(self.recurrent_message(ch, content, emb, t, x.get("recur", 60), reference=reference))
 
 
 class UpdateMessages(Database):
@@ -1619,7 +1619,7 @@ class UpdateMessages(Database):
 						for m_id, v in data.items():
 							if t - v.t >= 4:
 								v.t = t
-								csubmit(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_, channel=channel, m_id=m_id, colour=col))
+								create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_, channel=channel, m_id=m_id, colour=col))
 
 	async def _destroy_(self, **void):
 		self.closed = True
@@ -1855,13 +1855,13 @@ class UpdateUsers(Database):
 		user = message.author
 		bot = self.bot
 		if message.guild:
-			csubmit(bot.index_member(message.guild.id, 0, add=1))
+			create_task(bot.index_member(message.guild.id, 0, add=1))
 			if message.channel:
-				csubmit(bot.index_member(message.guild.id, channel_id=message.channel.id, add=1))
+				create_task(bot.index_member(message.guild.id, channel_id=message.channel.id, add=1))
 		if bot.is_optout(user):
 			return
 		if message.guild:
-			csubmit(bot.index_member(message.guild.id, message.author.id, add=1))
+			create_task(bot.index_member(message.guild.id, message.author.id, add=1))
 		if user.id == bot.id or bot.get_perms(user, message.guild) <= -inf:
 			return
 		if not bot.get_enabled(message.channel):
@@ -1886,7 +1886,7 @@ class UpdateUsers(Database):
 						self.add_diamonds(user, points * k / 1000)
 						bot.add_userbase(user.id, f"sparkles.{v}", 1)
 						sparkle_name = fun.sparkle_values[v]
-						csubmit(self.bot.react_with(message, sparkle_name + ".gif"))
+						create_task(self.bot.react_with(message, sparkle_name + ".gif"))
 						print(f"{user} has obtained {sparkle_name} in {message.guild}!")
 						break
 			points *= 1000
@@ -1894,7 +1894,7 @@ class UpdateUsers(Database):
 			self.add_gold(user, points)
 		self.add_xp(user, points)
 		if "dailies" in bot.data:
-			csubmit(bot.data.dailies.valid_message(message))
+			create_task(bot.data.dailies.valid_message(message))
 
 	def get_xp(self, user):
 		if self.bot.is_blacklisted(user.id):
@@ -1980,7 +1980,7 @@ class UpdateUsers(Database):
 			else:
 				if reference.author.id == bot.id and reference.content.startswith("*```callback-admin-relay-"):
 					return
-			csubmit(message.add_reaction("👀"))
+			create_task(message.add_reaction("👀"))
 			me = getattr(guild, "me", bot.user)
 			argv = message.clean_content.strip().removeprefix(f"@{me.display_name}").lstrip()
 			if "ask" in bot.commands and "ai" in bot.get_enabled(channel):

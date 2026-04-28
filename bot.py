@@ -44,7 +44,7 @@ if "common" not in globals():
 	import requests
 	from misc import ai
 	from misc.ai import nsfw_flagged, count_to, instruct_structure, m_str, f_default
-	from misc.asyncs import run_async, csubmit, submit_thread, create_thread, gather, flatten, eloop, get_event_loop, emptyctx, as_fut, await_fut, Semaphore, SemaphoreOverflowError, CloseableAsyncIterator, Delay
+	from misc.asyncs import run_async, create_task, submit_thread, create_thread, gather, flatten, eloop, get_event_loop, emptyctx, as_fut, await_fut, Semaphore, SemaphoreOverflowError, CloseableAsyncIterator, Delay
 	from misc.smath import xrand, sec2time, dtn, utc_dt
 	from misc.types import astype, as_str, cdict, fcdict, mdict, alist, azero, round_min, full_prune, suppress, tracebacksuppressor, ts_us, CE
 	from misc.util import AUTH, CACHE_PATH, TEMP_PATH, CACHE_FILESIZE, DEFAULT_FILESIZE, IMAGE_FORMS, PORT, PROC, EvalPipe, python, AutoCache, utc, T, lim_str, lim_tokens, regexp, Request, reqs, force_kill, json_dumps, discord_expired, is_miza_attachment, is_discord_attachment, is_discord_message_link, print_class, is_url, encode_attachment, choice, time_snowflake, magic, url2fn, url2ext, find_urls, find_urls_ex, shash, tcount, require_predicate, eval_json, get_image_size, split_url
@@ -192,7 +192,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Assign bot cache to global variables for convenience
 		globals().update(self.cache)
 		modload = self.get_modules()
-		self.modload = csubmit(gather(*modload))
+		self.modload = create_task(gather(*modload))
 		create_thread(self.heartbeat_loop)
 		self.init_main_databases()
 		data = shard_fut.result()
@@ -217,7 +217,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.shard_count = shards
 		self.set_client_events()
 		with suppress(AttributeError):
-			csubmit(super()._async_setup_hook())
+			create_task(super()._async_setup_hook())
 		globals()["messages"] = self.messages = self.MessageCache()
 
 	def __str__(self):
@@ -971,7 +971,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					data.setdefault("discriminator", 0)
 					self.cache.usernames[s] = users[u_id] = self._state.store_user(data)
 					return
-			csubmit(self.auser2cache(u_id))
+			create_task(self.auser2cache(u_id))
 
 	def get_user(self, u_id, replace=False):
 		"Gets a user from ID, using the bot cache."
@@ -1783,7 +1783,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if e <= 0 or e > time_snowflake(dtn(), high=True):
 				return
 			base = f"https://cdn.discordapp.com/emojis/{e}."
-			fut = csubmit(attachment_cache.scan_headers(base + "webp"))
+			fut = create_task(attachment_cache.scan_headers(base + "webp"))
 			try:
 				await attachment_cache.scan_headers(base + "gif")
 			except ConnectionError:
@@ -1975,7 +1975,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			argv = argv.replace(url, "", 1).strip()
 		if argv:
 			urls.append(argv)
-		futs = [csubmit(ai.cache.aretrieve(
+		futs = [create_task(ai.cache.aretrieve(
 			f"browse-{argv}", retrieval,
 			argv, region,
 		)) for argv in urls]
@@ -1997,7 +1997,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			models.remove(model)
 		models.insert(0, model)
 		model = models[0]
-		fut = csubmit(self.caption_into(kwargs["messages"], model=model, premium_context=kwargs.get("premium_context", [])))
+		fut = create_task(self.caption_into(kwargs["messages"], model=model, premium_context=kwargs.get("premium_context", [])))
 		kwargs["messages"], _model = await fut
 		exc = None
 		for model in models:
@@ -2228,7 +2228,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						raise TypeError(c["type"])
 				follows[i] = as_fut(urls)
 			elif sum(f is not None for f in follows) < 4 and m.get("url") and j < 8:
-				follows[i] = csubmit(self.follow_url(m.url, priority_order=("video", "image", "text")))
+				follows[i] = create_task(self.follow_url(m.url, priority_order=("video", "image", "text")))
 			m.pop("url", None)
 		for i, fut in enumerate(follows):
 			if not fut:
@@ -2253,17 +2253,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					m.content = m.content.replace(url, "", 1).strip()
 			if model in ai.is_vision and m.get("role") != "assistant":
 				futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
-				extracts[i] = csubmit(gather(*futs))
+				extracts[i] = create_task(gather(*futs))
 			elif m.get("new") and backup_model and backup_model in ai.is_vision and m.get("role") != "assistant":
 				futs = [self.to_data_url(url, small=False) for url in urls]
-				extracts[i] = csubmit(gather(*futs))
+				extracts[i] = create_task(gather(*futs))
 				if futs and extracts:
 					model = backup_model
 					print("Auto-Selecting:", backup_model, m, urls)
 			else:
 				best = 2 if model in ai.is_premium and m.get("new") else 0
 				futs = [self.caption(url, best=best, premium_context=premium_context) for url in urls]
-				extracts[i] = csubmit(gather(*futs, return_exceptions=True))
+				extracts[i] = create_task(gather(*futs, return_exceptions=True))
 		for i, (m, fut) in enumerate(zip(messages, extracts)):
 			if not fut:
 				continue
@@ -2930,7 +2930,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			emojis = find_emojis(url)
 		out = deque()
 		if users and follow:
-			futs = [csubmit(self.fetch_user(verify_id(u))) for u in users]
+			futs = [create_task(self.fetch_user(verify_id(u))) for u in users]
 			for fut in futs:
 				with suppress(LookupError):
 					res = await fut
@@ -3064,7 +3064,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				message.slash = m.slash
 		if cache:
 			if not getattr(message, "simulated", None):
-				csubmit(self.store_backup_message(message))
+				create_task(self.store_backup_message(message))
 		if cache and not m or force:
 			for a in message.attachments:
 				attachment_cache.store(a.url)
@@ -3845,7 +3845,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return
 		dias = round_min(amount * 300)
 		self.data.users.add_diamonds(user, dias, multiplier=False)
-		csubmit(channel.send(f"Thank you {user_mention(user.id)} for donating ${amount}! Your account has been credited 💎 {dias}!", embed=emb))
+		create_task(channel.send(f"Thank you {user_mention(user.id)} for donating ${amount}! Your account has been credited 💎 {dias}!", embed=emb))
 		await user.send(f"Thank you for donating ${amount}! Your account has been credited 💎 {dias}!")
 		return True
 
@@ -4032,7 +4032,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.ip = ip
 			# new_ip = f"https://{self.ip}:{PORT}"
 			# if self.raw_webserver != self.webserver and self.raw_webserver != new_ip:
-			#     csubmit(self.create_main_website())
+			#     create_task(self.create_main_website())
 			# self.raw_webserver = new_ip
 
 	def is_webserver_url(self, url):
@@ -4192,7 +4192,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def status(self, interval=None, simplified=False):
 		if not self.status_sem.busy:
 			async with self.status_sem:
-				self.status_fut = csubmit(self.get_system_stats())
+				self.status_fut = create_task(self.get_system_stats())
 				self.status_data = await self.status_fut
 		if interval:
 			ninter = self.ninter
@@ -4339,7 +4339,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			for f in files:
 				modload.append(submit_thread(self.get_module, f))
 			submit_thread(self.start_audio_client)
-			csubmit(self.create_main_website())
+			create_task(self.create_main_website())
 			return all(fut.result() for fut in modload)
 		return self.get_module(mod + ".py")
 
@@ -4503,7 +4503,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				except (ValueError, AttributeError):
 					index = -1
 				async with asyncio.timeout(timeout):
-					future = csubmit(f._callback_(
+					future = create_task(f._callback_(
 						bot=self,
 						_message=message,
 						_channel=message.channel,
@@ -4518,7 +4518,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					))
 					interaction = hasattr(message, "int_token")
 					if interaction:
-						fut = csubmit(delayed_callback(future, 2, self.defer_interaction, message, mode="patch", ephemeral=getattr(message, "ephemeral", False), exc=False))
+						fut = create_task(delayed_callback(future, 2, self.defer_interaction, message, mode="patch", ephemeral=getattr(message, "ephemeral", False), exc=False))
 					resp = await future
 				await self.send_event("_command_", user=user, command=f, loop=False, message=message)
 				if isinstance(resp, str):
@@ -4526,7 +4526,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if isinstance(resp, cdict):
 					if resp.get("embed") or resp.get("embeds"):
 						if resp.get("buttons") or resp.get("components"):
-							csubmit(self.edit_message(
+							create_task(self.edit_message(
 								message,
 								buttons=resp.pop("buttons", None),
 								components=resp.pop("components", None),
@@ -4534,12 +4534,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if interaction and not resp.get("file") and not resp.get("files"):
 						if not fut.done():
 							fut.cancel()
-							csubmit(self.defer_interaction(message, mode="patch"))
+							create_task(self.defer_interaction(message, mode="patch"))
 							await asyncio.sleep(self.eff_latency())
 						else:
 							r, d = await fut
 							if not d:
-								csubmit(self.defer_interaction(message, mode="patch"))
+								create_task(self.defer_interaction(message, mode="patch"))
 								await asyncio.sleep(self.eff_latency())
 						if resp.get("embed"):
 							resp["embed"] = resp["embed"].to_dict()
@@ -4554,7 +4554,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if interaction:
 						if not fut.done():
 							fut.cancel()
-						csubmit(self.ignore_interaction(message))
+						create_task(self.ignore_interaction(message))
 					await self.edit_message(
 						message,
 						**resp,
@@ -4608,7 +4608,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					audio_status = "await client.change_presence(status=discord.Status."
 					if status is None:
 						status = discord.Status.offline
-						csubmit(self.audio.asubmit(audio_status + "offline)"))
+						create_task(self.audio.asubmit(audio_status + "offline)"))
 					elif status == discord.Status.invisible:
 						status = discord.Status.idle
 						submit_thread(self.audio.submit(audio_status + "online)"))
@@ -5213,7 +5213,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if message:
 				if user:
 					print(f"{message.channel.id}: {user} ({user.id}) queued command {command_check} {kwargs or argv}")
-				soon_indicator = csubmit(message.add_reaction("🔜"))
+				soon_indicator = create_task(message.add_reaction("🔜"))
 				if slash or getattr(message, "slash", False):
 					await self.defer_interaction(message, ephemeral=getattr(message, "ephemeral", False))
 			await wrap_future(self.connect_ready)
@@ -5247,7 +5247,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			# Remove the "soon" indicator since the bot is now ready
 			await soon_indicator
 			assert message
-			csubmit(message.remove_reaction("🔜", self.user))
+			create_task(message.remove_reaction("🔜", self.user))
 		u_perm = max(min_perm, self.get_perms(user.id, guild)) if min_perm is not None else self.get_perms(user.id, guild)
 		if not isnan(u_perm):
 			enabled = self.get_enabled(channel)
@@ -5261,7 +5261,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			gid = self.data.blacklist.get(0)
 			if gid and gid != guild.id and not isnan(u_perm):
 				print("BOUNCED:", user, message.content)
-				csubmit(send_with_react(
+				create_task(send_with_react(
 					channel,
 					f"I am currently under maintenance, please [stay tuned](<{self.rcc_invite}>)!",
 					reacts="❎",
@@ -5270,7 +5270,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return
 			elif u_perm <= -inf:
 				print("REFUSED:", user, message.content)
-				csubmit(send_with_react(
+				create_task(send_with_react(
 					channel,
 					"Sorry, you are currently not permitted to request my services.",
 					reacts="❎",
@@ -5303,7 +5303,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		elif channel and guild.me and hasattr(guild.me, "timed_out") and (guild.me.timed_out or not channel.permissions_for(guild.me).send_messages):
 			raise PermissionError("Unable to send message.")
 		if getattr(sem, "busy", None):
-			csubmit(message.add_reaction("🌡️"))
+			create_task(message.add_reaction("🌡️"))
 		if command_check in command.macromap:
 			kv = command.macromap[command_check].copy()
 			if kwargs:
@@ -5323,7 +5323,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			# Automatically start typing if the command is time consuming
 			tc = getattr(command, "time_consuming", False)
 			if not loop and tc and not getattr(message, "simulated", False):
-				fut = csubmit(self._state.http.send_typing(channel.id))
+				fut = create_task(self._state.http.send_typing(channel.id))
 			# Get maximum time allowed for command to process
 			if isnan(u_perm):
 				timeout = None
@@ -5363,9 +5363,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.data.usage.add(command)
 			# Add a callback to typing in the channel if the command takes too long
 			if slash or getattr(message, "slash", None):
-				csubmit(delayed_callback(future, 1, self.defer_interaction, message, ephemeral=getattr(message, "ephemeral", False), exc=False))
+				create_task(delayed_callback(future, 1, self.defer_interaction, message, ephemeral=getattr(message, "ephemeral", False), exc=False))
 			elif fut is None and not hasattr(command, "typing") and channel and not getattr(message, "simulated", False):
-				csubmit(delayed_callback(future, 1, self._state.http.send_typing, channel.id, repeat=9, exc=True))
+				create_task(delayed_callback(future, 1, self._state.http.send_typing, channel.id, repeat=9, exc=True))
 			csem = emptyctx if isnan(command.min_level) else self.command_semaphore
 		async with csem:
 			response = await future
@@ -5374,7 +5374,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				response = cdict(content=response)
 			if not respond:
 				return response
-			fut = csubmit(self.respond_with(response, message=message))
+			fut = create_task(self.respond_with(response, message=message))
 			try:
 				message.__dict__.setdefault("inits", []).append(fut)
 			except Exception:
@@ -5615,7 +5615,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 									if d <= 0:
 										raise TimeoutError
 									if not task:
-										task = csubmit(anext(it))
+										task = create_task(anext(it))
 									wait = asyncio.shield(task) if utc() < start + timeout else task
 									resp = await asyncio.wait_for(wait, timeout=d)
 								except (T0, T1):
@@ -5629,7 +5629,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 										try:
 											new_content = add_content(old_content, content)
 											if len(new_content) >= 32 or "." in new_content:
-												fut = csubmit(manager.update(new_content, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), force=False, done=False))
+												fut = create_task(manager.update(new_content, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), force=False, done=False))
 										except OverflowError:
 											blocked = True
 										else:
@@ -5669,7 +5669,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					content = add_content(old_content, content)
 					if b_tts and message:
 						clean = await self.superclean_content(content)
-						tfut = csubmit(self.auto_tts(clean, message))
+						tfut = create_task(self.auto_tts(clean, message))
 					else:
 						tfut = None
 					try:
@@ -5677,7 +5677,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						await manager.update(new_content, embeds=embeds, files=files, buttons=buttons, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), reacts=reacts, done=done, force=force)
 					except (OverflowError, InterruptedError):
 						# If the StreamedMessage was interrupted or exceeded the maximum length, we wipe the original and force a new message. This ensures the list of messages stays contiguous, which improves readability.
-						csubmit(manager.delete())
+						create_task(manager.delete())
 						if tfut:
 							await tfut
 					else:
@@ -5727,7 +5727,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 									# If we've got more than one message in TTS mode, we automatically backup the bot's nickname and replace it with a backtick (silent character) to avoid it being read out alongside every message.
 									original_nickname = guild.me.nick or "" # The "" is crucial to differentiate between None and an empty string.
 									await guild.me.edit(nick="`")
-								fut = csubmit(send_with_react(channel, t, reference=reference, tts=tts))
+								fut = create_task(send_with_react(channel, t, reference=reference, tts=tts))
 								futs.append(fut)
 								reference = None
 								await asyncio.sleep(0.125)
@@ -6011,7 +6011,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							if not reference:
 								reference = r2
 							emb = discord.Embed.from_dict(emb)
-						fut = csubmit(send_with_react(sendable, embed=emb, reacts=reacts, reference=reference))
+						fut = create_task(send_with_react(sendable, embed=emb, reacts=reacts, reference=reference))
 						futs.append(fut)
 				return await gather(*futs)
 			if force:
@@ -6057,19 +6057,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if getattr(reference, "slash", False):
 				embs, embeds = embeds[:10], embeds[10:]
 				print("Sending embeds directly due to interaction token")
-				fut = csubmit(self._send_embeds(channel, embs, reacts, reference, exc=exc))
+				fut = create_task(self._send_embeds(channel, embs, reacts, reference, exc=exc))
 				if not embeds:
 					return fut
-			csubmit(self.ignore_interaction(reference, skip=True))
+			create_task(self.ignore_interaction(reference, skip=True))
 		c_id = verify_id(channel)
 		user = self.cache.users.get(c_id)
 		if user is not None:
 			print(f"Sending embeds directly due to specified user {user}")
-			return csubmit(self._send_embeds(user, embeds, reacts, reference, exc=exc))
+			return create_task(self._send_embeds(user, embeds, reacts, reference, exc=exc))
 		if not self.initialisation_complete:
 			embs, embeds = embeds[:10], embeds[10:]
 			print("Sending embeds directly due to incomplete initialisation")
-			fut = csubmit(self._send_embeds(channel, embs, reacts, reference, exc=exc))
+			fut = create_task(self._send_embeds(channel, embs, reacts, reference, exc=exc))
 			if not embeds:
 				return fut
 		if reacts or reference:
@@ -6108,7 +6108,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if not reference:
 				raise ValueError("Channel not specified.")
 			channel = reference.channel
-		return csubmit(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour, reacts, reference, exc=exc, bottleneck=bottleneck))
+		return create_task(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour, reacts, reference, exc=exc, bottleneck=bottleneck))
 
 	async def _send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None, exc=True, bottleneck=False):
 		fin_col = col = None
@@ -6204,7 +6204,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if images:
 			for i, img in enumerate(images):
 				if is_video(img):
-					csubmit(channel.send(escape_roles(img)))
+					create_task(channel.send(escape_roles(img)))
 				else:
 					if i >= len(embs):
 						emb = discord.Embed(colour=fin_col)
@@ -6254,7 +6254,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.embed_senders[s_id] = embeds = embeds[len(embs):]
 			if not embeds:
 				self.embed_senders.pop(s_id)
-			csubmit(self._send_embeds(s_id, embs, force=force, exc=False, reacts=reacts, reference=reference))
+			create_task(self._send_embeds(s_id, embs, force=force, exc=False, reacts=reacts, reference=reference))
 			sent = True
 		return sent
 
@@ -6347,7 +6347,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		while not self.closed:
 			async with self.slsem:
 				with tracebacksuppressor:
-					csubmit(self.update_status())
+					create_task(self.update_status())
 					with MemoryTimer("network_usage"):
 						fut = run_async(psutil.net_io_counters)
 						data = await self.status()
@@ -6406,7 +6406,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					json=True,
 					ssl=None,
 				)
-			fut = csubmit(external_heartbeat())
+			fut = create_task(external_heartbeat())
 			futs.append(fut)
 		resps = await gather(*futs)
 		for data in resps:
@@ -6451,7 +6451,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				with tracebacksuppressor:
 					t = utc()
 					if not fut or fut.done():
-						fut = csubmit(self.heartbeat())
+						fut = create_task(self.heartbeat())
 						lt = t
 					if t - lt > 30:
 						cf = sys._current_frames()
@@ -6530,7 +6530,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				else:
 					futs = deque()
 					for a in message.attachments:
-						futs.append(csubmit(attachment_cache.download(a.url)))
+						futs.append(create_task(attachment_cache.download(a.url)))
 					urls = set()
 					for e in message.embeds:
 						if e.image:
@@ -6543,7 +6543,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					urls.update(word for word in spl if is_url(word))
 					if futs:
 						datas = await gather(*futs)
-						fut = csubmit(self.edit_message(message, content="`LOADING...`", attachments=(), embeds=()))
+						fut = create_task(self.edit_message(message, content="`LOADING...`", attachments=(), embeds=()))
 						urli = await self.data.exec.uproxy(*(CompatFile(d, filename=url2fn(a.url)) for d, a in zip(datas, message.attachments)), collapse=False, keep=False)
 						urli.extend(urls)
 						urls = urli
@@ -6816,7 +6816,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if hasattr(message, "files"):
 						self.files = message.files
 					else:
-						futs = [csubmit(attachment_cache.download(a.url, read=True)) for a in message.attachments]
+						futs = [create_task(attachment_cache.download(a.url, read=True)) for a in message.attachments]
 						files = await gather(*futs)
 						self.files = [CompatFile(b, filename=a.filename) for a, b in zip(message.attachments, files)]
 				return self
@@ -6850,7 +6850,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				n = len(ms)
 				futs = []
 				if len(self.messages) > n:
-					futs.append(csubmit(bot.autodelete(*self.messages[n:], keep_log=False)))
+					futs.append(create_task(bot.autodelete(*self.messages[n:], keep_log=False)))
 					self.messages = self.messages[:n]
 				for i, s in enumerate(ms):
 					left = (i - len(ms)) * 10
@@ -6862,7 +6862,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					reac = reacts if done else "💬" if i == len(ms) - 1 else None
 					if i >= len(self.messages):
 						await self.assert_last(assertion=not force)
-						fut = csubmit(send_with_react(self.channel, s, reference=ref, embeds=embs, files=fils, buttons=buts, reacts=reac))
+						fut = create_task(send_with_react(self.channel, s, reference=ref, embeds=embs, files=fils, buttons=buts, reacts=reac))
 						futs.append(fut)
 						self.messages.append(fut)
 						await asyncio.sleep(0.25)
@@ -6875,11 +6875,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						continue
 					if i == len(self.messages) - 1:
 						if (not reac or "💬" not in reac) and m.id not in self.removed:
-							fut = csubmit(m.remove_reaction("💬", self.me))
+							fut = create_task(m.remove_reaction("💬", self.me))
 							self.removed.add(m.id)
 							futs.append(fut)
 					if s != m.content or embs or fils or buts:
-						fut = csubmit(bot.edit_message(m, content=s, embeds=embs, attachments=fils, buttons=buts))
+						fut = create_task(bot.edit_message(m, content=s, embeds=embs, attachments=fils, buttons=buts))
 						futs.append(fut)
 						self.messages[i] = fut
 				for fut in futs:
@@ -7360,7 +7360,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				raw.member = None
 
 			self.dispatch("raw_reaction_add", raw)
-			csubmit(bot.reaction_add(raw, data))
+			create_task(bot.reaction_add(raw, data))
 		discord.state.ConnectionState.parse_message_reaction_add = parse_message_reaction_add
 
 		def parse_message_reaction_remove(self, data):
@@ -7377,13 +7377,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				raw.member = None
 
 			self.dispatch("raw_reaction_remove", raw)
-			csubmit(bot.reaction_remove(raw, data))
+			create_task(bot.reaction_remove(raw, data))
 		discord.state.ConnectionState.parse_message_reaction_remove = parse_message_reaction_remove
 
 		def parse_message_reaction_remove_all(self, data):
 			raw = discord.RawReactionClearEvent(data)
 			self.dispatch("raw_reaction_clear", raw)
-			csubmit(bot.reaction_clear(raw, data))
+			create_task(bot.reaction_clear(raw, data))
 		discord.state.ConnectionState.parse_message_reaction_remove_all = parse_message_reaction_remove_all
 
 		def parse_message_create(self, data, *_):
@@ -7427,7 +7427,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				async with Delay(9):
 					await typing(channel.id)
 		async def __aenter__(self):
-			self.task = csubmit(self.do_typing())
+			self.task = create_task(self.do_typing())
 			self.task.add_done_callback(discord.context_managers._typing_done_callback)
 		discord.context_managers.Typing.do_typing = do_typing
 		discord.context_managers.Typing.__aenter__ = __aenter__
@@ -7469,14 +7469,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		else:
 			fields = (("Unexpected or confusing error?", f"Use {self.get_prefix(getattr(messageable, 'guild', None))}help for help, or consider joining the [support server]({self.rcc_invite}) for bug reports!"),)
 		if reference and isinstance(ex, discord.Forbidden) and reference.guild and not messageable.permissions_for(reference.guild.me).send_messages:
-			return csubmit(self.missing_perms(messageable, reference))
+			return create_task(self.missing_perms(messageable, reference))
 		title = f"⚠ {type(ex).__name__} ⚠"
 		description = "\n".join(as_str(i) for i in T(ex).get("args", ()))
 		if (guild := getattr(messageable, "guild", None)) and not messageable.permissions_for(guild.me).embed_links:
 			content = (title + "\n" + description).strip()
 			if fields:
 				content += "\n> " + "\n> ".join((t := ((f["name"], f["value"]) if isinstance(f, dict) else f)) and ("### " + t[0] + "\n" + t[1]) for f in fields if f)
-			return csubmit(send_with_react(
+			return create_task(send_with_react(
 				messageable,
 				lim_str(content, 2000),
 				reacts=reacts,
@@ -7493,7 +7493,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					embed.add_field(**field)
 				else:
 					embed.add_field(name=fields[0], value=fields[1])
-			return csubmit(self.send_with_react(
+			return create_task(self.send_with_react(
 				messageable,
 				embed=embed,
 				reacts=reacts,
@@ -7588,13 +7588,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						self.events.append(f, func)
 		print(f"Database event count: {sum(len(v) for v in self.events.values())}")
 		await self.fetch_user(self.deleted_user)
-		self.gl = csubmit(self.global_loop())
-		self.sl = csubmit(self.slow_loop())
+		self.gl = create_task(self.global_loop())
+		self.sl = create_task(self.slow_loop())
 		print("Update loops initiated.")
 		futs = alist()
 		if commands:
 			futs.add(run_async(self.update_slash_commands))
-		futs.add(csubmit(self.create_main_website(first=True)))
+		futs.add(create_task(self.create_main_website(first=True)))
 		futs.add(self.audio_client_start)
 		await self.wait_until_ready()
 		print("Bot ready.")
@@ -8048,7 +8048,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				self.mention = (user_mention(self.id), user_pc_mention(self.id))
 				if not self.started:
 					self.started = True
-					csubmit(self.init_ready())
+					create_task(self.init_ready())
 				else:
 					print("Reconnected.")
 			self.states[shard_id] = self.states[shard_id] or False
@@ -8062,7 +8062,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			print("All clients ready.")
 			if not self.full_ready.done():
 				self.full_ready.set_result(True)
-			csubmit(aretry(self.get_ip, delay=10))
+			create_task(aretry(self.get_ip, delay=10))
 			with tracebacksuppressor:
 				for guild in self.guilds:
 					if guild.unavailable:
@@ -8090,7 +8090,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			with tracebacksuppressor:
 				await self.handle_update(force=True)
 			if all(s is True for s in self.states):
-				self.guilds_ready = csubmit(gather(*self.guilds_loading))
+				self.guilds_ready = create_task(gather(*self.guilds_loading))
 				await on_full_ready()
 
 		# Server join message
@@ -8132,7 +8132,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					"I noticed you haven't given me administrator permissions here.\n"
 					+ "That's completely understandable if intentional, but please note that some features may not function well, or not at all, without the required permissions."
 				))
-			fut = csubmit(send_with_react(channel, embed=emb, reacts=["✅"]))
+			fut = create_task(send_with_react(channel, embed=emb, reacts=["✅"]))
 			await self.fetch_guild(guild.id)
 			await fut
 			for member in guild.members:
@@ -8226,11 +8226,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.add_message(message, force=True)
 			guild = message.guild
 			if guild:
-				csubmit(self.send_event("_send_", message=message))
+				create_task(self.send_event("_send_", message=message))
 			user = message.author
 			if user.id == self.deleted_user:
 				print("Deleted user MESSAGE", channel, user, message, channel.id, message.id)
-			fut = csubmit(self.seen(user, channel, guild, event="message", raw="Sending a message"))
+			fut = create_task(self.seen(user, channel, guild, event="message", raw="Sending a message"))
 			# await self.react_callback(message, None, user)
 			await fut
 			await self.handle_message(message)
@@ -8321,7 +8321,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if "users" in self.data:
 					self.data.users.add_xp(after.author, xrand(1, 4))
 				if T(after).get("guild"):
-					fut = csubmit(self.send_event("_edit_", before=before, after=after))
+					fut = create_task(self.send_event("_edit_", before=before, after=after))
 				else:
 					fut = None
 				await self.seen(after.author, after.channel, after.guild, event="message", raw="Editing a message")
@@ -8356,13 +8356,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			# print("DELETE:", payload)
 			with tracebacksuppressor:
 				fut = self.delete_waits.setdefault(payload.guild_id, Future())
-				fut2 = csubmit(_on_raw_message_delete(payload))
+				fut2 = create_task(_on_raw_message_delete(payload))
 				with suppress(T1, T2):
 					await asyncio.wait_for(wrap_future(fut), timeout=1)
 				message = await fut2
 				guild = message.guild
 				if guild:
-					fut = csubmit(self.send_event("_delete_", message=message))
+					fut = create_task(self.send_event("_delete_", message=message))
 					await self.send_event("_raw_delete_", message=message)
 					await fut
 
@@ -8392,7 +8392,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					message.author = await self.fetch_user(self.deleted_user)
 					message.author.name = "Unknown User"
 					history = discord.abc.Messageable.history(channel, limit=101, around=message)
-					csubmit(self.flatten_into_cache(history, getattr_chain(channel, "guild.id", channel.id)))
+					create_task(self.flatten_into_cache(history, getattr_chain(channel, "guild.id", channel.id)))
 			if had_before and message.guild and not message.author.bot and "logM" in self.data and message.guild.id in self.data.logM and utc() - message.created_at.timestamp() > 86400 * 14:
 				found = await self.flatten_search(message.guild.id, limit=200, target_id=message.id, author_id=message.author.id)
 				print(f"Delete: Retrieved {len(found)} messages from user {message.author}")
@@ -8423,7 +8423,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			# print("BULK_DELETE:", payload)
 			with tracebacksuppressor:
 				fut = self.delete_waits.setdefault(payload.guild_id, Future())
-				fut2 = csubmit(_on_raw_bulk_message_delete(payload))
+				fut2 = create_task(_on_raw_bulk_message_delete(payload))
 				with suppress(T1, T2):
 					await asyncio.wait_for(wrap_future(fut), timeout=1)
 				messages = await fut2
@@ -8795,9 +8795,5 @@ if __name__ == "__main__":
 
 			sys.__stdout__.write("MAIN PROCESS EXITING...")
 			common.MEM_LOCK.close()
-			asyncs.athreads.shutdown(wait=False)
-			asyncs.bthreads.shutdown(wait=False)
-			asyncs.pthreads.shutdown(wait=False)
-			asyncs.mthreads.shutdown(wait=False)
 	print = _print
 	sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__

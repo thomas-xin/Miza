@@ -141,7 +141,7 @@ class CS_hex2xml(Command):
 		)
 		b = output.encode("utf-8")
 		f = CompatFile(b, filename="patch.xml")
-		csubmit(bot.send_with_file(channel, "Patch successfully converted!", f, reference=message))
+		create_task(bot.send_with_file(channel, "Patch successfully converted!", f, reference=message))
 
 
 async def periwinkle_variables_txt():
@@ -724,7 +724,7 @@ class UpdateSkyShardReminders(Database):
 						if message.embeds and message.embeds[0].footer.text and occurrence_number not in (pinged_occurrences := self.parse_pings(message.embeds[0].footer.text)):
 							ping = False
 						if ping:
-							csubmit(bot.autodelete(message))
+							create_task(bot.autodelete(message))
 				embed.set_footer(text=f"Pings for landings: {', '.join(map(str, pinged_occurrences)) or 'none'}", icon_url="https://cdn.discordapp.com/emojis/695800620682313740.webp" if pinged_occurrences else "https://cdn.discordapp.com/emojis/695800875150475294.webp")
 				if ping or not message:
 					message = await send_with_react(user, embed=embed, reacts=["✅"] + [number_emojis[n] for n in all_occurrences])
@@ -741,6 +741,6 @@ class UpdateSkyShardReminders(Database):
 					continue
 				if not v.subscription & shard_bits:
 					continue
-				fut = csubmit(notify_user(k, v))
+				fut = create_task(notify_user(k, v))
 				futs.append(fut)
 			await gather(*futs)

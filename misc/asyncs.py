@@ -131,9 +131,12 @@ def create_thread(func, *args, **kwargs) -> Future:
 
 async def _run_async(f, *args, timeout=None, **kwargs):
 	async with asyncio.timeout(timeout):
-		if callable(f) and not inspect.iscoroutinefunction(f):
-			f = await asyncio.to_thread(f, *args, **kwargs)
-		if awaitable(f):
+		if callable(f):
+			if inspect.iscoroutinefunction(f):
+				f = f(*args, **kwargs)
+			else:
+				f = await asyncio.to_thread(f, *args, **kwargs)
+		while awaitable(f):
 			return await f
 		return f
 run_async = lambda f, *args, **kwargs: create_task(_run_async(f, *args, **kwargs))
@@ -155,7 +158,6 @@ def create_task(fut, *args, loop=None, **kwargs) -> asyncio.Future:
 	except TypeError:
 		print(type(fut), fut)
 		raise
-csubmit = create_task
 
 def pipe_fut(src, dest):
 	try:
@@ -185,9 +187,9 @@ async def _gather(*futs, return_exceptions=False, max_concurrency=None):
 			pass
 		elif not is_main_thread() and asyncio.iscoroutine(fut):
 			temp = asyncio.run_coroutine_threadsafe(fut, loop=get_event_loop())
-			fut = csubmit(wrap_future(fut))
+			fut = create_task(wrap_future(fut))
 		else:
-			fut = csubmit(fut)
+			fut = create_task(fut)
 		out_futs.append(fut)
 	remainder = await asyncio.gather(*out_futs, return_exceptions=return_exceptions)
 	outs.extend(remainder)
@@ -227,7 +229,7 @@ def convert_fut(fut):
 		ret = asyncio.run_coroutine_threadsafe(fut, loop=loop)
 	except Exception:
 		ret = Future()
-		csubmit(_await_fut(fut, ret), loop=eloop)
+		create_task(_await_fut(fut, ret), loop=eloop)
 	return ret
 
 async def flatten(ait) -> list:
@@ -335,7 +337,7 @@ def format_async_stack(coro, limit=64):
 	return frames
 
 def trace(fut, *args):
-	return csubmit(traceback_coro(fut, *args))
+	return create_task(traceback_coro(fut, *args))
 
 def throw(exc):
 	raise exc
@@ -374,7 +376,7 @@ class CloseableAsyncIterator:
 	def close(self):
 		out = self.fclose
 		out = out() if callable(out) else out
-		out = csubmit(out) if awaitable(out) else as_fut(out)
+		out = create_task(out) if awaitable(out) else as_fut(out)
 		return out
 
 	def __del__(self):

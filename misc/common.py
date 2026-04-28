@@ -349,9 +349,9 @@ async def recursive_coro(item):
 	for i, obj in enumerate(item):
 		if awaitable(obj):
 			if not issubclass(type(obj), asyncio.Task):
-				item[i] = csubmit(obj)
+				item[i] = create_task(obj)
 		elif issubclass(type(obj), collections.abc.MutableSequence):
-			item[i] = csubmit(recursive_coro(obj))
+			item[i] = create_task(recursive_coro(obj))
 	for i, obj in enumerate(item):
 		if hasattr(obj, "__await__"):
 			with suppress():
@@ -743,7 +743,7 @@ async def add_reacts(message, reacts):
 				with tracebacksuppressor:
 					await message.add_reaction(react)
 				# async with Delay(0.25):
-				# 	fut = csubmit(aretry(message.add_reaction, react))
+				# 	fut = create_task(aretry(message.add_reaction, react))
 				# 	futs.append(fut)
 	for fut in futs:
 		await fut
@@ -799,7 +799,7 @@ async def select_voice_channel(user, channel, find=True):
 
 
 # Creates and starts a coroutine for typing in a channel.
-typing = lambda self: csubmit(self.trigger_typing())
+typing = lambda self: create_task(self.trigger_typing())
 
 
 # Gets the string representation of a url object with the maximum allowed image size for discord, replacing png with webp format when possible.
@@ -1582,7 +1582,7 @@ def proc_start():
 		CAPS = globals()["SCAP"] = list(spec2cap())
 	print("CAPS:", CAPS)
 	for n, (di, *caps) in enumerate(tuple(CAPS)):
-		csubmit(start_proc(n, di, caps))
+		create_task(start_proc(n, di, caps))
 		time.sleep(2)
 		if "load" in caps:
 			CAPS.pop(n)
@@ -1607,7 +1607,7 @@ async def proc_eval(s, caps=["math"], priority=False, timeout=12):
 		return await asyncio.wait_for(fut, timeout=timeout)
 	except (T0, T1, T2):
 		print(f"Process {p} timed out, restarting!")
-		csubmit(start_proc(p))
+		create_task(start_proc(p))
 		raise
 
 def process_math(expr, prec=64, rational=False, timeout=12, variables=None):

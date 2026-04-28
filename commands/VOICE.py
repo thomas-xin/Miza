@@ -175,7 +175,7 @@ async def search_one(bot, query):
 		if len(urls) == 1:
 			query = urls[0]
 		else:
-			out = [csubmit(bot.audio.asubmit(f"ytdl.search({repr(url)})")) for url in urls]
+			out = [create_task(bot.audio.asubmit(f"ytdl.search({repr(url)})")) for url in urls]
 	if out is None:
 		resp = await bot.audio.asubmit(f"ytdl.search({repr(query)})")
 	else:
@@ -250,7 +250,7 @@ class Queue(Pagination, Command):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
 		# Start typing event asynchronously to avoid delays
 		async with discord.context_managers.Typing(_channel):
-			fut = csubmit(bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id})"))
+			fut = create_task(bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id})"))
 			if not query:
 				await fut
 				q, paused = await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).queue,a.settings.pause")
@@ -439,7 +439,7 @@ class Queue(Pagination, Command):
 		if curr:
 			if curr[0].get("has_storyboard") or diridx != -1:
 				try:
-					fut = csubmit(bot.audio.asubmit(f"ytdl.get_thumbnail({json_dumpstr(curr[0])},pos={elapsed})"))
+					fut = create_task(bot.audio.asubmit(f"ytdl.get_thumbnail({json_dumpstr(curr[0])},pos={elapsed})"))
 					icon = await asyncio.wait_for(asyncio.shield(fut), timeout=0.5)
 				except asyncio.TimeoutError:
 					pass
@@ -1218,7 +1218,7 @@ class UnmuteAll(Command):
 			for user in vc.members:
 				if user.voice is not None:
 					if user.voice.deaf or user.voice.mute or user.voice.afk:
-						csubmit(user.edit(mute=False, deafen=False))
+						create_task(user.edit(mute=False, deafen=False))
 		return italics(css_md(f"Successfully unmuted all users in voice channels in {sqr_md(guild)}.")), 1
 
 
@@ -1554,7 +1554,7 @@ class Radio(Pagination, Command):
 # 				emoji = reaction.encode("utf-8")
 # 			if emoji in self.buttons:
 # 				if hasattr(message, "int_token"):
-# 					csubmit(bot.ignore_interaction(message))
+# 					create_task(bot.ignore_interaction(message))
 # 				i = self.buttons[emoji]
 # 				if i == 0:
 # 					await run_async(auds.pause, unpause=True)

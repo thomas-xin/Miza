@@ -282,7 +282,7 @@ class UpdateAutoEmojis(Database):
 		for a in message.attachments:
 			fn = await attachment_cache.download(a.url, m_id=message.id, filename=True)
 			files.append(discord.File(fn, filename=a.filename))
-		csubmit(bot.autodelete(message))
+		create_task(bot.autodelete(message))
 		url = await bot.get_proxy_url(user)
 		m = await bot.send_as_webhook(message.channel, msg, files=files, username=user.display_name, avatar_url=url, reference=ref)
 		await bot.send_event("_command_", user=user, command=bot.commands.autoemoji[0], loop=False, message=message)
@@ -449,7 +449,7 @@ class EmojiList(Pagination, Command):
 					return
 				return f"({v})` {me}"
 
-			fut = csubmit(check_emoji(k, v))
+			fut = create_task(check_emoji(k, v))
 			fut.k = k
 			futs.append(fut)
 		for fut in futs:
@@ -656,7 +656,7 @@ class Proxy(Command):
 		more = len(mimics) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		csubmit(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+		create_task(bot.edit_message(message, content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
 		if hasattr(message, "int_token"):
 			await bot.ignore_interaction(message)
 
@@ -787,7 +787,7 @@ class ProxySend(Command):
 			raise PermissionError("Not permitted to send into target channel.")
 		if not admin and ("ai" not in enabled and invoking):
 			raise PermissionError("AI is not enabled in target channel.")
-		csubmit(_message.add_reaction("👀"))
+		create_task(_message.add_reaction("👀"))
 		await bot.data.mimics.invoke_mimic(_message, mimic, channel, message, invoking)
 
 
@@ -854,7 +854,7 @@ class UpdateMimics(Database):
 				mimic = self.data[info.m_id]
 				invoke = info.get("invoke")
 				if not invoke:
-					csubmit(bot.autodelete(message))
+					create_task(bot.autodelete(message))
 				elif not mimic.get("personality"):
 					raise ValueError(f"Character must have a personality assigned to chat! Please see {bot.get_prefix(guild)}ProxyConfig for more info.")
 				await self.invoke_mimic(message, mimic, channel, info["msg"], invoke=invoke)
@@ -1031,7 +1031,7 @@ class UpdateMimics(Database):
 					# If we've got more than one message in TTS mode, we automatically backup the bot's nickname and replace it with a backtick (silent character) to avoid it being read out alongside every message.
 					original_nickname = guild.me.nick or "" # The "" is crucial to differentiate between None and an empty string.
 					await guild.me.edit(nick="`")
-				fut = csubmit(bot.send_as_webhook(channel, t, username=name, avatar_url=url, tts=tts))
+				fut = create_task(bot.send_as_webhook(channel, t, username=name, avatar_url=url, tts=tts))
 				futs.append(fut)
 				await asyncio.sleep(0.125)
 			await gather(*futs)
