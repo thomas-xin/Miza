@@ -262,7 +262,7 @@ function updateCanvas() {
 	const removed = [];
 	const rect = starContainer.getBoundingClientRect();
 	const radius = 0;
-	const gravity = 500000;
+	const gravity = 5000000;
 	const x = mouseX;
 	const y = mouseY;
 	shootingStars.forEach((star) => {
