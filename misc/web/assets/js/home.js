@@ -261,7 +261,7 @@ function updateCanvas() {
 	const cols2 = [];
 	const removed = [];
 	const rect = starContainer.getBoundingClientRect();
-	const radius = 1;
+	const radius = 0;
 	const gravity = 500000;
 	const x = mouseX;
 	const y = mouseY;
@@ -288,6 +288,7 @@ function updateCanvas() {
 							y: star.y,
 							vx: Math.cos(z) * 4 + star.vx * vmult,
 							vy: Math.sin(z) * 4 + star.vy * vmult,
+							flag: randomPrideFlag(),
 							eaten: 0,
 							trail: [],
 							times: []
@@ -307,8 +308,6 @@ function updateCanvas() {
 			let steps = 0;
 			while (rem > 0) {
 				let dd = rem;
-				// Verlet integration for smooth gravity simulation
-				// Mouse cursor is arbitrarily given a gravity of 1 million units
 				let ax;
 				let ay;
 				{
@@ -321,7 +320,6 @@ function updateCanvas() {
 					}
 
 					const v2 = 1 + star.vx * star.vx + star.vy * star.vy;
-					// Adaptive timestep
 					dd = Math.min(dd, Math.max(shootingStars.length / 4194304, Math.sqrt(r2) / Math.sqrt(v2) * 16 / Math.sqrt(gravity)));
 
 					ax = gravity * Math.cos(z) / r2;
@@ -381,8 +379,6 @@ function updateCanvas() {
 		}
 		const speed = Math.sqrt(star.vx * star.vx + star.vy * star.vy);
 
-		// Terraria Rainbow Rod effect; create a pentagon at the head, trapezoids at each body, and triangle at the tail
-		// Trail effect has a layered glow for 1/3 of the length
 		const skip = Math.max(1, trail.length / 32);
 		const width = star.scale / 1024 * sceneResMult;
 		const glow = Math.min(24, Math.sqrt(speed + 4)) / star.scale / 8;
@@ -416,8 +412,18 @@ function updateCanvas() {
 			const t_ry = ty + Math.sin(z + angle) * tailSize;
 			const t_lx = tx + Math.cos(z - angle) * tailSize;
 			const t_ly = ty + Math.sin(z - angle) * tailSize;
-			const headColour = hsvToRgb((elapsed + headIndex / trail.length) % 1, (trail.length - headIndex - 1) / trail.length, 1);
-			const tailColour = hsvToRgb((elapsed + tailIndex / trail.length) % 1, (trail.length - tailIndex - 1) / trail.length, 1);
+			const headColour = interpolateFlag(
+				star.flag,
+				(elapsed + headIndex / trail.length) % 1,
+				Math.pow(1 - (trail.length - headIndex - 1) / trail.length, 6) * 100,
+				1,
+			)
+			const tailColour = interpolateFlag(
+				star.flag,
+				(elapsed + tailIndex / trail.length) % 1,
+				Math.pow(1 - (trail.length - tailIndex - 1) / trail.length, 6) * 100,
+				1,
+			)
 
 			if (inFront) {
 				verts.push(hx, hy, hz);
@@ -542,6 +548,7 @@ function generateStars() {
 			y: -150,
 			vx: (Math.random() * 15 - 120) * scale,
 			vy: (Math.random() * 40 + 320) * scale,
+			flag: randomPrideFlag(),
 			eaten: 0,
 			trail: [],
 			times: []

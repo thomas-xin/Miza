@@ -7665,6 +7665,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			sem = self.flatten_sems[bucket]
 		except KeyError:
 			sem = self.flatten_sems[bucket] = Semaphore(1, 4, rate_limit=2)
+		data = []
 		with tracebacksuppressor(SemaphoreOverflowError):
 			async with sem:
 				temp_sem = Semaphore(1, 1, rate_limit=1)
@@ -7679,8 +7680,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							sort_order="desc",
 							**kwargs,
 						)
+						data.extend(resp)
 					if pos + 25 >= resp.total_results:
 						break
+		return data
 
 	async def index_member(self, guild_id, author_id=0, channel_id=0, add=0):
 		target = author_id or channel_id
