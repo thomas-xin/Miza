@@ -403,12 +403,14 @@ async def chunked_proxy(path: str, request: Request):
 @app.get("/u/{path:path}")
 @app.get("/u")
 @app.get("/unproxy/{path:path}")
-async def unproxy(path: str, request: Request, url: Optional[str] = None, force: bool = False, download: bool = False):
+async def unproxy(path: Optional[str] = None, request: Request, url: Optional[str] = None, force: bool = False, download: bool = False):
 	"""Unproxy Discord attachments or redirect to direct URLs."""
 	if request.method.upper() == "HEAD":
 		force = True
 	if url:
 		return await proxy_if(url, request, force=force, download=download)
+	if not path:
+		raise HTTPException(status_code=400, detail="Must provide path or URL.")
 	try:
 		c_id, m_id, a_id, fn = decode_attachment(path)
 	except Exception as ex:
