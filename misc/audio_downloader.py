@@ -19,7 +19,7 @@ import yt_dlp as ytd
 assert hasattr(ytd.extractor, "youtube")
 from .types import alist, as_str, cdict, fcdict, full_prune, json_dumps, round_min, to_alphanumeric, tracebacksuppressor
 from .smath import time_parse
-from .asyncs import esubmit
+from .asyncs import submit_thread
 from .util import (
 	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, url2ext, discord_expired, expired, shorten_attachment, unyt, html_decode,
@@ -179,7 +179,7 @@ class AudioDownloader:
 		self.thumbnail_cache = AutoCache(f"{CACHE_PATH}/ytdl.thumbnail", stale=300, timeout=86400 * 7, desync=0.05)
 		self.extract_cache = AutoCache(f"{CACHE_PATH}/ytdl.extract", stale=60, timeout=120, desync=0.05, safe=True)
 		self.futs = [
-			esubmit(self.set_cookie),
+			submit_thread(self.set_cookie),
 		]
 		self.worker_count = workers
 		self.workers = alist()
@@ -198,7 +198,7 @@ class AudioDownloader:
 
 	def restart(self):
 		self.futs = [
-			esubmit(self.set_cookie),
+			submit_thread(self.set_cookie),
 		]
 		for worker in self.workers:
 			worker.kill()
@@ -398,7 +398,7 @@ class AudioDownloader:
 			if not token:
 				token = self.produce_continuation(p_id, 1)
 			for page in range(1, ceil(count / 100)):
-				fut = esubmit(self.get_youtube_continuation, token, context)
+				fut = submit_thread(self.get_youtube_continuation, token, context)
 				futs.append(fut)
 				token = self.produce_continuation(p_id, page + 1)
 			for i, fut in enumerate(futs):
@@ -531,7 +531,7 @@ class AudioDownloader:
 					url = p["permalink_url"]
 					if len(futs) >= 12:
 						futs.pop(0).result()
-					fut = esubmit(self.get_soundcloud_playlist, url)
+					fut = submit_thread(self.get_soundcloud_playlist, url)
 					futs.append(fut)
 					entries.append(fut)
 				else:
@@ -643,7 +643,7 @@ class AudioDownloader:
 			futs = deque()
 			for curr in range(page, count, page):
 				search = f"{url}&offset={curr}&limit={page}"
-				fut = esubmit(self.get_spotify_part, search)
+				fut = submit_thread(self.get_spotify_part, search)
 				futs.append(fut)
 				time.sleep(0.0625)
 			while futs:
@@ -1250,11 +1250,11 @@ class AudioDownloader:
 				check, search = url.split(":", 1)
 				for mode in ("ytsearch", "scsearch", "spsearch", "bcsearch"):
 					if check == mode:
-						fut = esubmit(getattr(self, mode), search, count=count)
+						fut = submit_thread(getattr(self, mode), search, count=count)
 						futs.append(fut)
 						break
 					elif check.startswith(mode) and check[len(mode):].isnumeric():
-						fut = esubmit(getattr(self, mode), search, count=int(check[len(mode):]))
+						fut = submit_thread(getattr(self, mode), search, count=int(check[len(mode):]))
 						futs.append(fut)
 						break
 			output.extend(itertools.chain.from_iterable(f.result() for f in futs))

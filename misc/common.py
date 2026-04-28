@@ -1451,7 +1451,7 @@ async def start_proc(n, di=(), caps="image", it=0, wait=False, timeout=None):
 			for c in caps:
 				PROCS_BY_CAPS[c].remove(proc)
 			PROCS[n] = False
-		port = await asubmit(get_free_port)
+		port = await run_async(get_free_port)
 		args = proc_args
 		for c in caps:
 			args = AUTH.get("cap_versions", {}).get(c) or args
@@ -1464,7 +1464,7 @@ async def start_proc(n, di=(), caps="image", it=0, wait=False, timeout=None):
 		args.append(json_dumps([(p.major, p.minor) for p in properties]).decode("ascii"))
 		args.append(json_dumps(COMPUTE_ORDER).decode("ascii"))
 		args.append(str(it))
-		pipe = await asubmit(
+		pipe = await run_async(
 			EvalPipe.connect,
 			args,
 			port,
@@ -2224,7 +2224,7 @@ class Database(Importable, collections.abc.MutableMapping):
 		bot = self.bot
 		func = getattr(self, "_destroy_", None)
 		if callable(func):
-			await_fut(asubmit(func, priority=True))
+			await_fut(run_async(func))
 		for f in dir(self):
 			if f.startswith("_") and f[-1] == "_" and f[1] != "_":
 				func = getattr(self, f, None)
@@ -2260,7 +2260,7 @@ def get_wmem(mused=0):
 	t = utc()
 	if t - WMT > 60:
 		try:
-			f1 = esubmit(subprocess.check_output, "wmic OS get TotalVirtualMemorySize /Value")
+			f1 = submit_thread(subprocess.check_output, "wmic OS get TotalVirtualMemorySize /Value")
 			fvms = subprocess.check_output("wmic OS get FreeVirtualMemory /Value")
 			tvms = f1.result()
 			tvms = int(tvms.strip().decode("ascii").removeprefix("TotalVirtualMemorySize="))
@@ -2402,7 +2402,7 @@ if __name__ != "__mp_main__":
 			self.strbuff = []
 
 		def start(self):
-			self.thread = tsubmit(self.update_print)
+			self.thread = create_thread(self.update_print)
 			self.closed = False
 
 		def file_print(self, fn, b):

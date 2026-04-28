@@ -47,36 +47,12 @@ def as_fut(obj):
 	if obj is None:
 		return emptyfut
 	fut = asyncio.Future(loop=eloop)
-	cst(fut.set_result, obj)
+	eloop.call_soon_threadsafe(fut.set_result, obj)
 	return fut
 
-mthreads = ThreadPoolExecutor(7, initializer=__setloop__)
-lim = 8
-bthreads = ThreadPoolExecutor(max_workers=lim, initializer=__setloop__)
-athreads = ThreadPoolExecutor(max_workers=lim * 4, initializer=__setloop__)
-pthreads = bthreads
-
-def get_executor(priority):
-	if priority not in range(0, 2):
-		raise NotImplementedError(priority)
-	return (athreads, bthreads)[priority]
-
-def initialise_ppe():
-	global athreads, bthreads, pthreads, get_executor
-	athreads.shutdown(wait=False)
-	bthreads.shutdown(wait=False)
-	lim = 32
-	bthreads = ThreadPoolExecutor(max_workers=lim, initializer=__setloop__)
-	athreads = ThreadPoolExecutor(max_workers=lim * 4, initializer=__setloop__)
-
-	from concurrent.futures import ProcessPoolExecutor
-	pthreads = ProcessPoolExecutor(max_workers=2)
-
-	def get_executor(priority):
-		if priority not in range(0, 4):
-			raise NotImplementedError(priority)
-		return (athreads, bthreads, pthreads, mthreads)[priority]
-
+main_executor = ThreadPoolExecutor(96, initializer=__setloop__)
+eloop.set_default_executor(main_executor)
+submit_thread = main_executor.submit
 
 # Checks if an object can be used in "await" operations.
 def awaitable(obj) -> bool:
@@ -133,10 +109,6 @@ def wrap_future(fut, loop=None, shield=False, thread_safe=True) -> asyncio.Futur
 		wrapper = asyncio.shield(wrapper)
 	return wrapper
 
-def shutdown_thread_after(thread, fut):
-	fut.result()
-	return thread.shutdown(wait=True)
-
 def create_thread(func, *args, **kwargs) -> Future:
 	fut = Future()
 	def target():
@@ -156,57 +128,15 @@ def create_thread(func, *args, **kwargs) -> Future:
 	)
 	t.start()
 	return fut
-tsubmit = create_thread
 
-def create_future_ex(func, *args, timeout=None, priority=False, **kwargs) -> Future:
-	"Runs a function call in a parallel thread, returning a future object waiting on the output."
-	try:
-		kwargs["timeout"] = kwargs.pop("_timeout_")
-	except KeyError:
-		pass
-	executor = get_executor(priority)
-	if executor is None:
-		# print(f"Creating thread {priority}: {func} {args} {kwargs}")
-		return tsubmit(func, *args, **kwargs)
-	fut = executor.submit(func, *args, **kwargs)
-	if timeout is not None:
-		fut = executor.submit(fut.result, timeout=timeout)
-	return fut
-esubmit = create_future_ex
-
-def create_future(obj, *args, loop=None, timeout=None, priority=False, thread_safe=True, **kwargs) -> asyncio.Future:
-	"High level future asyncio creation function that accepts both sync and async functions, as well as coroutines directly."
-	if loop is None:
-		loop = get_event_loop()
-	if loop.is_closed():
-		return emptyfut
-	if callable(obj) and asyncio.iscoroutinefunction(obj):
-		obj = obj(*args, **kwargs)
-	if hasattr(obj, "__call__"):
-		if asyncio.iscoroutinefunction(obj.__call__) or priority is None:
-			obj = obj.__call__(*args, **kwargs)
-		else:
-			executor = get_executor(priority)
-			if executor is not None:
-				if kwargs:
-					try:
-						kwargs["timeout"] = kwargs.pop("_timeout_")
-					except KeyError:
-						pass
-					obj = functools.partial(obj, *args, **kwargs)
-					args = ()
-				obj = loop.run_in_executor(executor, obj, *args)
-			else:
-				obj = wrap_future(esubmit(obj, *args, timeout=timeout, priority=priority, **kwargs), loop=loop, thread_safe=thread_safe)
-	if obj is None:
-		return emptyfut
-	if not isinstance(obj, asyncio.Future):
-		try:
-			return loop.create_task(obj)
-		except RuntimeError:
-			return create_task(obj, name=f"Task-{utc()}-{obj}-{lim_str(str((args, kwargs)), 256)}")
-	return obj
-asubmit = create_future
+async def _run_async(f, *args, timeout=None, **kwargs):
+	async with asyncio.timeout(timeout):
+		if callable(f) and not inspect.iscoroutinefunction(f):
+			f = await asyncio.to_thread(f, *args, **kwargs)
+		if awaitable(f):
+			return await f
+		return f
+run_async = lambda f, *args, **kwargs: create_task(_run_async(f, *args, **kwargs))
 
 def create_task(fut, *args, loop=None, **kwargs) -> asyncio.Future:
 	"Creates an asyncio Task object from an awaitable object."
@@ -225,15 +155,7 @@ def create_task(fut, *args, loop=None, **kwargs) -> asyncio.Future:
 	except TypeError:
 		print(type(fut), fut)
 		raise
-fsubmit = csubmit = create_task
-
-def cst(fut, *args, **kwargs):
-	loop = get_event_loop()
-	if loop.is_closed():
-		return
-	if not loop.is_running():
-		return fut(*args, **kwargs)
-	return loop.call_soon_threadsafe(fut, *args, **kwargs)
+csubmit = create_task
 
 def pipe_fut(src, dest):
 	try:
@@ -317,7 +239,7 @@ async def flatten(ait) -> list:
 async def unflatten(it):
 	try:
 		while True:
-			yield await asubmit(next, it)
+			yield await run_async(next, it)
 	except StopIteration:
 		pass
 
@@ -633,7 +555,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 			time.sleep(seconds)
 			self.paused = False
 			self.mutex.release()
-		func = esubmit if seconds < 60 else tsubmit
+		func = submit_thread if seconds < 60 else create_thread
 		return func(undelay)
 
 	def enter(self):

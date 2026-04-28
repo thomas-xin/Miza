@@ -36,7 +36,7 @@ Transform = getattr(Image, "Transform", Image)
 Image.MAX_IMAGE_PIXELS = 4294967296
 GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_DIFFERENT_PALETTE_ONLY
 from misc.types import ts_us
-from misc.asyncs import esubmit, await_fut  # noqa: E402
+from misc.asyncs import submit_thread, await_fut  # noqa: E402
 from misc.util import get_image_size, temporary_file, archive_mimes, extract_archive, is_url
 
 DC = 0
@@ -691,7 +691,7 @@ def load_mimes():
 				mimesplitter[len(data)] = {}
 				mimesplitter[len(data)][data] = (ext, mime)
 
-esubmit(load_mimes)
+submit_thread(load_mimes)
 
 def simple_mimes(b, mime=True):
 	mimesplitter = globals()["mimesplitter"]
@@ -1659,7 +1659,7 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 				yield Image.frombuffer("RGB" if fmt == "rgb24" else "RGBA", (w, h), b)
 			if b is None:
 				raise RuntimeError(as_str(proc.stderr.read()))
-		esubmit(writer)
+		submit_thread(writer)
 		buf = resize_bufferer()
 		if prog < 0:
 			buf = reversed(list(buf))

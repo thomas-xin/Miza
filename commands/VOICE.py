@@ -1312,11 +1312,11 @@ class RadioCache:
 	async def _search(cls, countrycode, query):
 		if not countrycode:
 			if not query:
-				rf = await asubmit(pyradios.RadioFacets, RB)
+				rf = await run_async(pyradios.RadioFacets, RB)
 				results = cls.filter_results(rf.result)
 				results.sort(key=lambda radio: radio["name"])
 				return results
-			results = await asubmit(RB.search, name=query, name_exact=False)
+			results = await run_async(RB.search, name=query, name_exact=False)
 			if not results:
 				facets = await cls.search()
 				results = [str_lookup(
@@ -1330,7 +1330,7 @@ class RadioCache:
 		if not query:
 			facets = await cls.search()
 			return [r for r in facets if r["countrycode"] == countrycode]
-		results = await asubmit(RB.search, name=query, name_exact=False, countrycode=countrycode)
+		results = await run_async(RB.search, name=query, name_exact=False, countrycode=countrycode)
 		if not results:
 			country_results = await cls.search(countrycode=countrycode)
 			results = [str_lookup(
@@ -1557,7 +1557,7 @@ class Radio(Pagination, Command):
 # 					csubmit(bot.ignore_interaction(message))
 # 				i = self.buttons[emoji]
 # 				if i == 0:
-# 					await asubmit(auds.pause, unpause=True)
+# 					await run_async(auds.pause, unpause=True)
 # 				elif i == 1:
 # 					if auds.settings.loop:
 # 						auds.settings.loop = False
@@ -1576,7 +1576,7 @@ class Radio(Pagination, Command):
 # 					else:
 # 						auds.queue.pop(0)
 # 						auds.clear_source()
-# 						await asubmit(auds.reset)
+# 						await run_async(auds.reset)
 # 					return
 # 				elif i == 5:
 # 					v = abs(auds.settings.volume)
@@ -1587,7 +1587,7 @@ class Radio(Pagination, Command):
 # 					else:
 # 						v = 2
 # 					auds.settings.volume = v
-# 					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
+# 					await run_async(auds.play, auds.source, auds.pos, timeout=18)
 # 				elif i == 6:
 # 					b = auds.settings.bassboost
 # 					if abs(b) < 1 / 3:
@@ -1597,7 +1597,7 @@ class Radio(Pagination, Command):
 # 					else:
 # 						b = -1
 # 					auds.settings.bassboost = b
-# 					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
+# 					await run_async(auds.play, auds.source, auds.pos, timeout=18)
 # 				elif i == 7:
 # 					r = auds.settings.reverb
 # 					if r >= 1:
@@ -1607,7 +1607,7 @@ class Radio(Pagination, Command):
 # 					else:
 # 						r = 1
 # 					auds.settings.reverb = r
-# 					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
+# 					await run_async(auds.play, auds.source, auds.pos, timeout=18)
 # 				elif i == 8:
 # 					c = abs(auds.settings.chorus)
 # 					if c:
@@ -1615,22 +1615,22 @@ class Radio(Pagination, Command):
 # 					else:
 # 						c = 1 / 3
 # 					auds.settings.chorus = c
-# 					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
+# 					await run_async(auds.play, auds.source, auds.pos, timeout=18)
 # 				elif i == 9:
 # 					pos = auds.pos
 # 					auds.settings = cdict(auds.defaults)
 # 					auds.settings.quiet = True
-# 					await asubmit(auds.play, auds.source, pos, timeout=18)
+# 					await run_async(auds.play, auds.source, pos, timeout=18)
 # 				elif i == 10 or i == 11:
 # 					s = 0.25 if i == 11 else -0.25
 # 					auds.settings.speed = round(auds.settings.speed + s, 5)
-# 					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
+# 					await run_async(auds.play, auds.source, auds.pos, timeout=18)
 # 				elif i == 12 or i == 13:
 # 					p = 1 if i == 13 else -1
 # 					auds.settings.pitch -= p
-# 					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
+# 					await run_async(auds.play, auds.source, auds.pos, timeout=18)
 # 				elif i == 14:
-# 					await asubmit(auds.kill)
+# 					await run_async(auds.kill)
 # 					await bot.autodelete(message)
 # 					return
 # 				else:
@@ -1687,7 +1687,7 @@ class Radio(Pagination, Command):
 # 	async def __call__(self, guild, channel, user, bot, flags, perm, **void):
 # 		auds = await auto_join(channel.guild, channel, user, bot)
 # 		auds.player = cdict(time=0, message=None)
-# 		esubmit(auds.update)
+# 		submit_thread(auds.update)
 
 
 # Small helper function to fetch song lyrics from json data, because sometimes genius.com refuses to include it in the HTML
@@ -1788,7 +1788,7 @@ async def get_lyrics(item, url=None):
 			s = "https://genius.com" + path
 			page = await Request.aio(s, decode=True)
 			text = page
-			html = await asubmit(BeautifulSoup, text, "html.parser", timeout=18)
+			html = await run_async(BeautifulSoup, text, "html.parser", timeout=18)
 			lyricobj = html.find('div', class_='lyrics')
 			if lyricobj is not None:
 				lyrics = lyricobj.get_text().strip()

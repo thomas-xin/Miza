@@ -957,7 +957,7 @@ class Activity(Command):
 	slash = True
 
 	async def __call__(self, bot, _user, _timeout, **void):
-		data = await asubmit(bot.data.users.fetch_events, _user.id, interval=900, timeout=_timeout)
+		data = await run_async(bot.data.users.fetch_events, _user.id, interval=900, timeout=_timeout)
 		resp = await process_image("plt_special", "&", (data, str(_user)), cap="math")
 		fn = resp
 		f = CompatFile(fn, filename=f"{_user}.png")

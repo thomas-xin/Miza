@@ -1126,7 +1126,7 @@ class Tesseract(Command):
 
 	async def __call__(self, _timeout, url, size, duration, speed, fps, filesize, format, **void):
 		data = await process_image(url, "resize_max", ["-nogif", size, 0, "auto", "-f", "png"], timeout=60)
-		resp = await asubmit(self.tesseract, data, size, timeout=_timeout)
+		resp = await run_async(self.tesseract, data, size, timeout=_timeout)
 		resp = await process_image(resp, "resize_map", [[], float(duration) if duration is not None else None, fps, "mult", 1, 1, "nearest", None, "-fs", filesize, "-f", format], cap="image", timeout=_timeout)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))

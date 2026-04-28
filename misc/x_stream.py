@@ -13,7 +13,7 @@ import orjson
 from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse, RedirectResponse, PlainTextResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from .asyncs import asubmit, csubmit
+from .asyncs import run_async, csubmit
 from .types import fcdict, byte_like, MemoryBytes
 from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment, discord_expired,
@@ -175,7 +175,7 @@ class Server:
 						u, ns = u.replace("?S=", "&S=").split("&S=", 1)
 						ns = int(ns)
 					else:
-						resp = await asubmit(niquests.head, u, timeout=3)
+						resp = await run_async(niquests.head, u, timeout=3)
 						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 
 					if pos + ns <= start:
@@ -204,7 +204,7 @@ class Server:
 							yield chunk
 						counter += 1
 
-					fut = asubmit(get_chunk, u, headers, start, end, pos, ns)
+					fut = run_async(get_chunk, u, headers, start, end, pos, ns)
 					futs.append(fut)
 					pos = 0
 					start = 0
@@ -545,7 +545,7 @@ async def ytdl(query: Optional[str] = None):
 			"remote_components": ["ejs:github"],
 		}
 		ytdownloader = ytd.YoutubeDL(ydl_opts)
-	return await asubmit(ytdownloader.extract_info, query, download=False)
+	return await run_async(ytdownloader.extract_info, query, download=False)
 
 @app.head("/ytdl")
 async def head_ytdl(response: Response):
@@ -626,7 +626,7 @@ async def static_backend(path: str, request: Request):
 		headers["X-Real-Ip"] = true_ip(request)
 
 		print(url, headers)
-		resp = await asubmit(server.session.get, url, headers=dict(headers), verify=False, timeout=60)
+		resp = await run_async(server.session.get, url, headers=dict(headers), verify=False, timeout=60)
 
 		response_headers = fcdict(resp.headers)
 		response_headers.pop("Connection", None)

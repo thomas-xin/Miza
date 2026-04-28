@@ -18,7 +18,7 @@ import orjson
 import niquests
 import numpy as np
 import psutil
-from .asyncs import csubmit, esubmit, asubmit, wrap_future, cst, eloop, Delay, format_async_stack, gather
+from .asyncs import csubmit, submit_thread, run_async, wrap_future, eloop, Delay, format_async_stack, gather
 from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_str, astype, pretty_json
 from .smath import log2lin
 from .util import (
@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
 ytdl = None
 client_fut = Future()
-ytdl_fut = esubmit(AudioDownloader, workers=1)
+ytdl_fut = submit_thread(AudioDownloader, workers=1)
 
 class AudioPlayer(discord.AudioSource):
 
@@ -164,7 +164,7 @@ class AudioPlayer(discord.AudioSource):
 					self.vc = await vcc.connect(timeout=VC_TIMEOUT, reconnect=True)
 		except Exception as ex:
 			try:
-				cst(self.waiting[gid].set_exception, ex)
+				self.waiting[gid].set_exception(ex)
 			except KeyError:
 				pass
 			self.fut.set_exception(ex)
@@ -174,7 +174,7 @@ class AudioPlayer(discord.AudioSource):
 			self.last_played = utc()
 			self.players[gid] = self
 			try:
-				cst(self.waiting[gid].set_result, self)
+				self.waiting[gid].set_result(self)
 			except KeyError:
 				pass
 			self.fut.set_result(None)
@@ -626,9 +626,9 @@ class AudioPlayer(discord.AudioSource):
 		else:
 			self.queue.fill(map(cdict, d["queue"]))
 		if pos is not None:
-			esubmit(self.seek, pos)
+			submit_thread(self.seek, pos)
 		else:
-			esubmit(self.ensure_play, 2)
+			submit_thread(self.ensure_play, 2)
 		return list(self.queue)
 
 	updating_activity = None
@@ -709,7 +709,7 @@ class AudioPlayer(discord.AudioSource):
 			if not self.queue or not self.playing:
 				raise IndexError
 			new = self.playing[0].new
-			self.last_read = self.last_read or esubmit(self.playing[0].read)
+			self.last_read = self.last_read or submit_thread(self.playing[0].read)
 			out = self.last_read.result(timeout=0.05)
 		except concurrent.futures.TimeoutError:
 			pass
@@ -775,7 +775,7 @@ class AudioPlayer(discord.AudioSource):
 					self.queue.fill(temp)
 				self.queue.rotate(rotpos)
 		self.last_played = utc()
-		esubmit(self.ensure_play)
+		submit_thread(self.ensure_play)
 		return len(self.queue) - count
 
 	shuffler = 0
@@ -805,7 +805,7 @@ class AudioPlayer(discord.AudioSource):
 					e.pop("start", None)
 					e.pop("end", None)
 				self.queue.extend(resp)
-		esubmit(self.ensure_play)
+		submit_thread(self.ensure_play)
 		return resp
 
 	def seek(self, pos=0):
@@ -864,7 +864,7 @@ class AudioPlayer(discord.AudioSource):
 			elif self.settings.pause and self.vc.is_playing():
 				self.vc.pause()
 			if not self.ensuring or self.ensuring.done():
-				self.ensuring = esubmit(self.ensure_next)
+				self.ensuring = submit_thread(self.ensure_next)
 		if not self.queue:
 			self.update_streaming()
 		else:
@@ -1305,7 +1305,7 @@ class BufferedAudioReader(discord.AudioSource):
 			self.pos += self.speed
 			return b
 		try:
-			fut = esubmit(next, self.packet_iter, b"")
+			fut = submit_thread(next, self.packet_iter, b"")
 			try:
 				out = fut.result(timeout=60)
 			except concurrent.futures.TimeoutError:
@@ -1337,7 +1337,7 @@ class BufferedAudioReader(discord.AudioSource):
 	@tracebacksuppressor
 	def start(self):
 		# Run loading loop in parallel thread obviously
-		esubmit(self.run, timeout=86400)
+		submit_thread(self.run, timeout=86400)
 		self.buffer = None
 		self.buffer = self.read()
 		return self
@@ -1362,7 +1362,7 @@ class LiveAudioReader(discord.AudioSource):
 		self.args = args
 		self.resp = None
 		self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=192000)
-		self.gen = esubmit(self.generate, file.stream, self.proc)
+		self.gen = submit_thread(self.generate, file.stream, self.proc)
 		self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
 		self.af = file
 		self.file = file
@@ -1375,12 +1375,12 @@ class LiveAudioReader(discord.AudioSource):
 				self.resp = niquests.get(stream, headers=Request.header(), stream=True, timeout=24)
 				it = self.resp.iter_content(8192)
 				b = next(it)
-				fut = esubmit(next, it)
+				fut = submit_thread(next, it)
 				proc.stdin.write(b)
 				proc.stdin.flush()
 				try:
 					while True:
-						b, fut = fut.result(), esubmit(next, it)
+						b, fut = fut.result(), submit_thread(next, it)
 						proc.stdin.write(b)
 						proc.stdin.flush()
 				except StopIteration:
@@ -1603,7 +1603,7 @@ async def on_voice_state_update(member, before, after):
 		return
 	guild = member.guild
 	try:
-		a = await asubmit(AP.from_guild, guild.id)
+		a = await run_async(AP.from_guild, guild.id)
 	except KeyError:
 		return
 	if member.bot:
@@ -1613,7 +1613,7 @@ async def on_voice_state_update(member, before, after):
 async def terminate():
 	# Unload all audio players and preserve their state in our cache on disk
 	await asyncio.gather(*(unload_player(gid) for gid in AP.players.keys()))
-	await asubmit(ytdl_fut.result().close)
+	await run_async(ytdl_fut.result().close)
 	return await client.close()
 
 

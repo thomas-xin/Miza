@@ -481,7 +481,7 @@ class SpectralPulse(Command):
 						force_kill(proc)
 					raise
 				for ext in ("pcm", "riff"):
-					await asubmit(os.remove, f"{dest}.{ext}")
+					await run_async(os.remove, f"{dest}.{ext}")
 		await bot.send_with_file(channel, "", fn1, filename=n1, reference=message)
 		if kwargs.get("-image") in ("true", "True"):
 			await bot.send_with_file(channel, "", fn2, filename=n2, reference=message)

@@ -30,7 +30,7 @@ class Reload(Command):
 		if unload:
 			unload = unload.upper()
 			message = await send_with_reply(_channel, content=f"Unloading {unload}...", reference=_message)
-			succ = await asubmit(bot.unload, unload, priority=1)
+			succ = await run_async(bot.unload, unload)
 			if succ:
 				await message.edit(content=f"Successfully unloaded {unload}.")
 			else:
@@ -38,7 +38,7 @@ class Reload(Command):
 		if reload:
 			reload = reload.upper()
 			message = await send_with_reply(_channel, content=f"Reloading {reload}...", reference=_message)
-			succ = await asubmit(bot.reload, reload, priority=True)
+			succ = await run_async(bot.reload, reload)
 			if succ:
 				await message.edit(f"Successfully reloaded {reload}.")
 			else:
@@ -91,16 +91,16 @@ class Restart(Command):
 			return
 		if mode == "audio":
 			m = await send_with_reply(_channel, content="Restarting audio client...", reference=_message)
-			await asubmit(bot.start_audio_client)
+			await run_async(bot.start_audio_client)
 			await m.edit("Audio client restarted successfully.")
 			return
 		if mode == "server":
 			m = await send_with_reply(_channel, content="Restarting webserver...", reference=_message)
-			await asubmit(bot.start_webserver)
+			await run_async(bot.start_webserver)
 			await m.edit("Webserver restarted successfully.")
 			return
 		if mode == "update":
-			resp = await asubmit(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			resp = await run_async(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			print(resp.stdout)
 			print(resp.stderr)
 		if mode == "maintain":
@@ -152,11 +152,11 @@ class Restart(Command):
 				with tracebacksuppressor:
 					await bot.send_event("_destroy_", shutdown=mode == "shutdown")
 				with tracebacksuppressor:
-					await asubmit(bot.handle_update, force=True, priority=True)
+					await run_async(bot.handle_update, force=True)
 				# Save any database that has not already been autosaved
 				print("Saving all databases...")
 				with tracebacksuppressor:
-					await asubmit(bot.update, force=True, priority=True)
+					await run_async(bot.update, force=True)
 				# Send the bot "offline"
 				bot.closed = True
 				print("Going offline...")
@@ -434,10 +434,10 @@ class UpdateExec(Database):
 				glob["_"] = output
 			return output
 		if self.psem.busy:
-			output = await asubmit(aeval, proc, glob, priority=0)
+			output = await run_async(aeval, proc, glob)
 		else:
 			async with self.psem:
-				output = await asubmit(aeval, proc, glob, priority=3)
+				output = await run_async(aeval, proc, glob)
 		# Output sent to "_" variable if used
 		if output is not None:
 			glob["_"] = output
@@ -662,7 +662,7 @@ class UpdateExec(Database):
 			if isinstance(url, byte_like):
 				data = url
 			elif isinstance(url, CompatFile):
-				data = await asubmit(url.fp.read)
+				data = await run_async(url.fp.read)
 				filename = filename or url.filename
 			elif not is_url(url):
 				raise TypeError(url)
@@ -982,7 +982,7 @@ class UpdateMessageCache(Database):
 			async for message in channel.history(after=last, limit=None, oldest_first=True):
 				messages.append(message)
 		if messages:
-			await asubmit(self.store_messages, messages)
+			await run_async(self.store_messages, messages)
 			self.loader[channel.id] = message.id
 
 	def store_messages(self, messages):

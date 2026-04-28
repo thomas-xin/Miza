@@ -480,7 +480,7 @@ class Invisicode(Command):
 					return invisicode.detect_and_decode(as_str(data))
 			return []
 
-		blocks = await asubmit(_invisicode, mode, data)
+		blocks = await run_async(_invisicode, mode, data)
 		blocks = list(filter(bool, (block.strip() for block in blocks)))
 		if not blocks:
 			raise EOFError("Output was empty.")
@@ -827,7 +827,7 @@ class Identify(Command):
 		for _ in loop(2):
 			try:
 				proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-				fut = esubmit(proc.communicate, timeout=12)
+				fut = submit_thread(proc.communicate, timeout=12)
 				res = fut.result(timeout=12)
 				resp = b"\n".join(res)
 				break
@@ -958,7 +958,7 @@ class Identify(Command):
 					break
 		urls = set(urls)
 		names = [url.rsplit("/", 1)[-1].rsplit("?", 1)[0] for url in urls]
-		futs = [asubmit(self.identify, url) for url in urls]
+		futs = [run_async(self.identify, url) for url in urls]
 		fields = deque()
 		for name, fut in zip(names, futs):
 			resp = await fut
@@ -1013,7 +1013,7 @@ class Match(Command):
 		else:
 			regex = args.pop(0)
 		if regex:
-			temp = await asubmit(re.findall, regex, " ".join(args), priority=2)
+			temp = await run_async(re.findall, regex, " ".join(args))
 			match = "\n".join(sqr_md(i) for i in temp)
 		else:
 			search = args.pop(0)

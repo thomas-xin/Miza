@@ -49,7 +49,7 @@ import niquests
 import requests
 from misc.smath import predict_next, display_to_precision, unicode_prune, full_prune
 from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, mdict, fcdict, as_bytes, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, pretty_json, MultiEncoder # noqa: F401
-from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, asubmit, csubmit, esubmit, tsubmit, Future, Semaphore
+from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, run_async, csubmit, submit_thread, create_thread, Future, Semaphore
 
 print("UTIL:", __name__)
 
@@ -102,7 +102,7 @@ def save_file(data, fn):
 async def save_file_a(data, fn):
 	async with aiofiles.open(fn, "wb") as f:
 		if hasattr(data, "read"):
-			data = await asubmit(data.read)
+			data = await run_async(data.read)
 		await f.write(data)
 
 async def read_file_a(fn):
@@ -339,12 +339,12 @@ def lim_tokens(s, maxlen=10, mode="centre", encoding="cl100k_im") -> str:
 
 async def tik_encode_a(s, encoding="cl100k_im") -> list:
 	if len(s) > 1024:
-		return await asubmit(tik_encode, s, encoding=encoding, priority=2)
+		return await run_async(tik_encode, s, encoding=encoding)
 	return tik_encode(s, encoding=encoding)
 
 async def tik_decode_a(t, encoding="cl100k_im") -> str:
 	if len(t) > 256:
-		return await asubmit(tik_decode, t, encoding=encoding, priority=2)
+		return await run_async(tik_decode, t, encoding=encoding)
 	return tik_decode(t, encoding=encoding)
 
 @functools.lru_cache(maxsize=65536)
@@ -1415,7 +1415,7 @@ def load_mimes():
 				mimesplitter[len(data)] = {}
 				mimesplitter[len(data)][data] = (ext, mime)
 
-mime_wait = esubmit(load_mimes)
+mime_wait = submit_thread(load_mimes)
 
 def simple_mimes(b, mime=True):
 	"Low-latency function that detects mimetype from first few bytes. Less accurate than mime_from_file."
@@ -2003,7 +2003,7 @@ def eval_json(s):
 		if cond:
 			try:
 				if len(s) > 1048576:
-					return esubmit(safe_eval, s, priority=2).result()
+					return submit_thread(safe_eval, s).result()
 				return safe_eval(s)
 			except Exception:
 				pass
@@ -2832,7 +2832,7 @@ class FileHashDict(collections.abc.MutableMapping):
 			try:
 				out[k] = self.data[k]
 			except KeyError:
-				out[k] = esubmit(self.__getitem__, k)
+				out[k] = submit_thread(self.__getitem__, k)
 				waits.add(k)
 		for k in waits:
 			out[k] = out[k].result()
@@ -2978,8 +2978,6 @@ class FileHashDict(collections.abc.MutableMapping):
 		return self
 
 	def parallel(self, func, *args, **kwargs):
-		if os.environ.get("IS_BOT"):
-			return esubmit(func, *args, priority=2, **kwargs)
 		return self.tp.submit(func, *args, **kwargs)
 
 	def update(self, other):
@@ -3373,7 +3371,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 				except Exception:
 					pass
 			elif delay > self._stale:
-				esubmit(self._retrieve, k, func, *args, read=_read, **kwargs)
+				submit_thread(self._retrieve, k, func, *args, read=_read, **kwargs)
 			elif isinstance(v, Exception):
 				raise v
 		else:
@@ -3381,11 +3379,11 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		return v
 
 	async def _aretrieve(self, k, func, *args, read=False, **kwargs):
-		await asubmit(self.base_init)
+		await run_async(self.base_init)
 		try:
 			self._retrieving[k] = fut = concurrent.futures.Future()
-			v = await asubmit(func, *args, **kwargs)
-			await asubmit(self.__setitem__, k, v, read=read)
+			v = await run_async(func, *args, **kwargs)
+			await run_async(self.__setitem__, k, v, read=read)
 		except Exception as ex:
 			fut.set_exception(ex)
 			raise
@@ -3395,7 +3393,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			self._retrieving.pop(k, None)
 		return v
 	async def aretrieve(self, k, func, *args, _read=False, _force=False, **kwargs):
-		await asubmit(self.base_init)
+		await run_async(self.base_init)
 		if (fut := self._retrieving.get(k)):
 			resp = await wrap_future(fut)
 			if _read and hasattr(resp, "name") and os.path.exists(resp.name):
@@ -3405,7 +3403,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			v, t = super().get(k, read=_read, tag=True)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
 			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
-			await asubmit(self.base_init, force=True)
+			await run_async(self.base_init, force=True)
 			v, t = super().get(k, read=_read, tag=True)
 		except TypeError:
 			t = None
@@ -3621,8 +3619,8 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 	async def _aretrieve(self, k, func, *args, read=False, **kwargs):
 		try:
 			self._retrieving[k] = fut = concurrent.futures.Future()
-			v = await asubmit(func, *args, **kwargs)
-			await asubmit(self.__setitem__, k, v, read=read)
+			v = await run_async(func, *args, **kwargs)
+			await run_async(self.__setitem__, k, v, read=read)
 		except Exception as ex:
 			fut.set_exception(ex)
 			raise
@@ -3984,7 +3982,7 @@ def aexec(s, glob=None, filename="<aexec>"):
 		try:
 			fut = __eval__(end, glob)
 			if awaitable(fut):
-				fut = await_fut(asubmit(fut))
+				fut = await_fut(run_async(fut))
 		except Exception as ex:
 			raise PropagateTraceback.cast(ex, format_exc())
 		return fut
@@ -4437,7 +4435,7 @@ def receive_bytes(receiver, unlink):
 		return mem.buf[:size].tobytes()
 	finally:
 		mem.unlink()
-		esubmit(unlink, name)
+		submit_thread(unlink, name)
 
 
 class PipeableIterator(collections.abc.Iterator):
@@ -4785,7 +4783,7 @@ class EvalPipe:
 			return self.thread
 		if not background:
 			return self.communicating()
-		self.thread = tsubmit(self.communicating)
+		self.thread = create_thread(self.communicating)
 		return self.thread
 
 	def ensure_writable(self, timeout=12):
@@ -4820,7 +4818,7 @@ class EvalPipe:
 		if isinstance(s, str):
 			s = s.encode("utf-8")
 		b = f"~>{i}:".encode("ascii") + s
-		esubmit(self.send, b)
+		submit_thread(self.send, b)
 		return fut
 
 	def run(self, s, timeout=30, cache=None, priority=False):
@@ -4839,7 +4837,7 @@ class EvalPipe:
 			return res
 		return self.submit(s, priority=priority).result(timeout=timeout)
 
-	async def asubmit(self, s, priority=False):
+	async def run_async(self, s, priority=False):
 		await self.a_ensure_writable()
 		return await wrap_future(self.submit(s, priority=priority))
 
@@ -4914,7 +4912,7 @@ class EvalPipe:
 						if i < 0:
 							self.compute(i, s)
 						else:
-							esubmit(self.compute, i, s, priority=1)
+							submit_thread(self.compute, i, s)
 						continue
 					if b.startswith(b"<~"):
 						b = b[2:]

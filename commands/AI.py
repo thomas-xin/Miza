@@ -77,7 +77,7 @@ class Translate(Command):
 		return cdict(embeds=embeds)
 
 	async def det(self, input):
-		resp = await asubmit(detector.detect, input, model="auto")
+		resp = await run_async(detector.detect, input, model="auto")
 		return str_lookup(googletrans.LANGUAGES, resp[0]["lang"], fuzzy=0.5).split("-", 1)[0]
 
 	async def llm_translate(self, input, dest, premium):
@@ -1269,7 +1269,7 @@ class TTS(Command):
 			case "dectalk":
 				args = ["say", "-w", fi, "-pre", f"[:name {mode}]", text]
 				print(args)
-				await asubmit(subprocess.run, args, cwd="misc/dectalk", stdout=subprocess.DEVNULL, shell=True)
+				await run_async(subprocess.run, args, cwd="misc/dectalk", stdout=subprocess.DEVNULL, shell=True)
 			case _:
 				raise NotImplementedError(engine)
 		assert os.path.exists(fi), "No output was captured!"

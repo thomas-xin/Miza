@@ -238,7 +238,7 @@ def trial_download(self, filename, info_dict):
 	return real_download(self, filename, info_dict)
 ytd.downloader.http.HttpFD.real_download = trial_download
 from .types import list_like, utc
-from .util import Request, EvalPipe, esubmit, python, new_playwright_page
+from .util import Request, EvalPipe, submit_thread, python, new_playwright_page
 
 ts = 0
 ytdl = None
@@ -356,7 +356,7 @@ def get_full_storyboard(info):
 		fragments = storyboard["fragments"]
 		last_duration = duration - sum(frag["duration"] for frag in fragments[:-1])
 		last_count = round(last_duration / fragments[0]["duration"])
-		futs = [esubmit(
+		futs = [submit_thread(
 			niquests.get,
 			frag["url"],
 			headers=storyboard.get("http_headers") or Request.header(),

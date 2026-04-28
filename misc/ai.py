@@ -13,7 +13,7 @@ import openai
 assert hasattr(openai, "AsyncOpenAI"), "OpenAI library has incorrect version installed!"
 from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, tracebacksuppressor, utc, T, string_like, getattr_chain
 from misc.util import AUTH, CACHE_PATH, AutoCache, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across
-from misc.asyncs import flatten, asubmit, esubmit, csubmit, emptyctx, gather, Semaphore, CloseableAsyncIterator
+from misc.asyncs import flatten, run_async, submit_thread, csubmit, emptyctx, gather, Semaphore, CloseableAsyncIterator
 
 print("AI:", __name__)
 
@@ -234,7 +234,7 @@ def _count_to(messages, model):
 	return num_tokens + 3
 async def count_to(messages, model="cl100k_im"):
 	"""Return the number of tokens used by a list of messages."""
-	return await asubmit(_count_to, messages, model, priority=2)
+	return await run_async(_count_to, messages, model)
 
 async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=False, prompt=None, premium_context=[]):
 	if not messages:
@@ -279,7 +279,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=Fal
 	if best:
 		s2 = await summarise(s, min_length=ml, best=best, prompt=prompt, premium_context=premium_context)
 	else:
-		s2 = await asubmit(lim_tokens, s, ml, mode="right", priority=2)
+		s2 = await run_async(lim_tokens, s, ml, mode="right")
 	summ += s2
 	messages = mes[::-1]
 	messages.insert(0, cdict(
@@ -300,7 +300,7 @@ async def summarise(q, min_length=384, max_length=24576, padding=128, best=True,
 		return q
 	if c <= summ_length:
 		q = await _summarise(q, summ_length, best=best, prompt=prompt, premium_context=premium_context)
-	splits = await asubmit(split_across, q, lim=split_length, mode="tlen", priority=2)
+	splits = await run_async(split_across, q, lim=split_length, mode="tlen")
 	futs = []
 	for s in splits:
 		fut = csubmit(_summarise(s, ceil(2 * summ_length / len(splits)), best=best, prompt=prompt, premium_context=premium_context))

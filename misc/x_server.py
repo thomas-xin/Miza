@@ -24,13 +24,13 @@ from concurrent.futures import Future
 from traceback import print_exc
 from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
-from .asyncs import Semaphore, SemaphoreOverflowError, eloop, esubmit, tsubmit, csubmit, await_fut
+from .asyncs import Semaphore, SemaphoreOverflowError, eloop, submit_thread, create_thread, csubmit, await_fut
 from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
 from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url_unparse, url2fn, is_youtube_url, seq, Request, get_mime, mime_from_file, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS
 from .caches import attachment_cache, colour_cache
 from .audio_downloader import AudioDownloader, get_best_icon
 
-ytdl_fut = esubmit(AudioDownloader, workers=1)
+ytdl_fut = submit_thread(AudioDownloader, workers=1)
 
 try:
 	RAPIDAPI_SECRET = AUTH["rapidapi_secret"]
@@ -49,7 +49,7 @@ IND = "\x7f"
 
 
 csubmit(Request._init_())
-tsubmit(eloop.run_forever)
+create_thread(eloop.run_forever)
 if __name__ == "__main__":
 	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
 	print = interface.print
@@ -167,7 +167,7 @@ cp._cprequest.Request.process_headers = process_headers
 
 @functools.lru_cache(maxsize=256)
 def get_size_mime(head, tail, count, chunksize):
-	fut = esubmit(niquests.head, head)
+	fut = submit_thread(niquests.head, head)
 	resp = niquests.head(tail)
 	lastsize = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 	size = chunksize * (count - 1) + lastsize
@@ -498,7 +498,7 @@ class Server:
 
 					if len(futs) > i + 1:
 						yield from futs.pop(0).result()
-					fut = esubmit(get_chunk, u, headers, start, end, pos, ns, big)
+					fut = submit_thread(get_chunk, u, headers, start, end, pos, ns, big)
 					futs.append(fut)
 					pos = 0
 					start = 0
@@ -869,7 +869,7 @@ class Server:
 
 	@cp.expose
 	def get_ip(self, *args, **kwargs):
-		esubmit(app.get_ip_ex)
+		submit_thread(app.get_ip_ex)
 		data = json_dumps(dict(
 			remote=true_ip(),
 			host=T(self).get("ip", "127.0.0.1"),
@@ -1036,7 +1036,7 @@ if __name__ == "__main__":
 	parent = psutil.Process(ppid)
 	app = Server()
 	self = server = cp.Application(app, "/", config)
-	esubmit(app.get_ip_ex)
+	submit_thread(app.get_ip_ex)
 	interface.start()
 	ytdl = ytdl_fut.result()
 	cp.quickstart(server, "/", config)

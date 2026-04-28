@@ -1089,7 +1089,7 @@ class Archive(Command):
 			while proc.is_running():
 				line = bytearray()
 				while not line or line[-1] != 10:
-					b = await asubmit(proc.stdout.read, 1)
+					b = await run_async(proc.stdout.read, 1)
 					if not b:
 						break
 					line.append(b[0])
@@ -1946,7 +1946,7 @@ class CreateSound(Command):
 			emoji = await bot.fetch_emoji(emoji, _guild)
 			assert emoji.guild.id == _guild.id, "Emoji must be from the current server."
 		name = name or getattr(emoji, "name", None) or url2fn(url).rsplit(".", 1)[0]
-		info = await asubmit(audio_meta, url)
+		info = await run_async(audio_meta, url)
 		i = ts_us()
 		if info.duration <= 5.5:
 			fn = f"{TEMP_PATH}/{i}.ogg"
@@ -2004,7 +2004,7 @@ class CreateSound(Command):
 					f.write(data)
 				return data
 
-			data = await asubmit(write_to)
+			data = await run_async(write_to)
 		await _guild.create_soundboard_sound(name=name, emoji=emoji, sound=data)
 		return cdict(
 			content=f"Successfully created soundboard {sqr_md(name)} for {sqr_md(_guild)}.",
@@ -2093,14 +2093,14 @@ class ScanEmoji(Command):
 		async with discord.context_managers.Typing(channel):
 			for emoji in sorted(guild.emojis, key=lambda e: e.id):
 				url = str(emoji.url)
-				resp = await asubmit(subprocess.run, self.ffprobe_start + (url,), stdout=subprocess.PIPE)
+				resp = await run_async(subprocess.run, self.ffprobe_start + (url,), stdout=subprocess.PIPE)
 				width, height = map(int, resp.stdout.splitlines())
 				if width < 256 or height < 256:
 					found += 1
 					w, h = width, height
 					while w < 256 or h < 256:
 						w, h = w << 1, h << 1
-					colour = await asubmit(bot.get_colour, url)
+					colour = await run_async(bot.get_colour, url)
 					bot.send_as_embeds(
 						channel,
 						description=f"{emoji} is {width}×{height}, which is below the recommended discord emoji size, and may appear blurry when scaled by Discord. Scaling the image using {p}resize, with filters `nearest`, `scale2x` or `lanczos` is advised.",
