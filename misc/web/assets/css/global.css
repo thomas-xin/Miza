@@ -45,6 +45,7 @@ a[href^=http]/* not relative */:not(.hideext):not(.hideext a):hover::after,
 }
 
 .nav-link {
+	font-size: 1em;
 	color: #FFFFFF !important;
 	transition-duration: .1s;
 }
@@ -53,6 +54,7 @@ a[href^=http]/* not relative */:not(.hideext):not(.hideext a):hover::after,
 	transition-duration: .1s;
 }
 .nav-ref {
+	font-size: 1em;
 	color: #FFFFFF !important;
 	transition-duration: .1s;
 }
@@ -63,9 +65,8 @@ a[href^=http]/* not relative */:not(.hideext):not(.hideext a):hover::after,
 
 .nav-dropdown {
 	display: inline-block;
-	font-size: 0.9em;
+	font-size: 1em;
 	text-decoration: underline;
-	transform: translateY(-1px);
 	transition: transform 250ms ease, opacity 250ms;
 	position: relative;
 }
