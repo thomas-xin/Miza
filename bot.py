@@ -49,7 +49,7 @@ if "common" not in globals():
 	from misc.types import astype, as_str, cdict, fcdict, mdict, alist, azero, round_min, full_prune, suppress, tracebacksuppressor, ts_us, CE
 	from misc.util import AUTH, CACHE_PATH, TEMP_PATH, CACHE_FILESIZE, DEFAULT_FILESIZE, IMAGE_FORMS, PORT, PROC, EvalPipe, python, AutoCache, utc, T, lim_str, lim_tokens, regexp, Request, reqs, force_kill, json_dumps, discord_expired, is_miza_attachment, is_discord_attachment, is_discord_message_link, print_class, is_url, encode_attachment, choice, time_snowflake, magic, url2fn, url2ext, find_urls, find_urls_ex, shash, tcount, require_predicate, eval_json, get_image_size, split_url
 	from misc.caches import download_binary_dependencies, attachment_cache
-	from misc.common import api, load_colour_list, load_emojis, str_lookup, verify_id, manual_edit, BASE_LOGO, MemoryTimer, is_channel, get_last_image, best_url, worst_url, translate_emojis, message_repr, message_link, min_emoji, process_image, find_emojis, find_emojis_ex, find_users, replace_emojis, send_with_react, send_with_reply, CompatFile
+	from misc.common import api, load_colour_list, load_emojis, str_lookup, verify_id, manual_edit, BASE_LOGO, MemoryTimer, is_channel, get_last_image, best_url, worst_url, translate_emojis, message_repr, message_link, min_emoji, proc_eval, process_image, find_emojis, find_emojis_ex, find_users, replace_emojis, send_with_react, send_with_reply, CompatFile
 
 
 ADDRESS = AUTH.get("webserver_address") or "0.0.0.0"
@@ -2887,7 +2887,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return out
 
 	async def ocr(self, url):
-		# resp = await process_image(url, "caption", ["-nogif"], cap="caption", timeout=3600)
 		data = await self.to_data_url(url)
 		mistral_key = AUTH.get("mistral_key")
 		s = None
@@ -4104,7 +4103,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	lll = inf
 	llc = 0
 	async def get_system_stats(self):
-		fut = run_async(get_current_stats, self.up_bps, self.down_bps, timeout=8)
+		fut = create_task(proc_eval(f"get_current_stats({self.up_bps},{self.down_bps})", caps=["host"], timeout=8))
 		t = utc()
 		latency = self.latency
 		if latency != self.lll and isfinite(latency):

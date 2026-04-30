@@ -672,15 +672,13 @@ async def catch_all(path: str, request: Request):
 		return FileResponse("misc/web/assets/images/mizaleaf.webp", media_type="image/webp")
 	if p == "files":
 		return FileResponse("misc/web/files.html", media_type="text/html")
-	if p == "commands":
+	if p in ("commands", "atlas", "mizatlas"):
 		return FileResponse("misc/web/commands.html", media_type="text/html")
 	if first == "assets":
 		return FileResponse(f"misc/web/{p}")
 	if first in (".git", ".env", "admin", "private", "internal", "administrator"):
 		return RedirectResponse(url="https://www.youtube.com/watch?v=dQw4w9WgXcQ", status_code=308)
 	if first in alias:
-		return await static_backend(p, request=request)
-	elif first in ("favicon.ico", "logo256.png", "logo512.png", "home", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "static"):
 		return await static_backend(p, request=request)
 	return await globals()[first](request=request)
 

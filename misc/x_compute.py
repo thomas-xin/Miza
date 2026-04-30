@@ -215,6 +215,153 @@ if "ecdc" in CAPS:
 			return f.read()
 
 
+def get_nvml():
+	import pynvml
+	pynvml.nvmlInit()
+	dc = pynvml.nvmlDeviceGetCount()
+	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
+	gname = [pynvml.nvmlDeviceGetName(d) for d in handles]
+	gcore = [pynvml.nvmlDeviceGetNumGpuCores(d) for d in handles]
+	gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
+	gutil = [pynvml.nvmlDeviceGetUtilizationRates(d) for d in handles]
+	gpowa = [pynvml.nvmlDeviceGetPowerUsage(d) for d in handles]
+	gpowb = [pynvml.nvmlDeviceGetEnforcedPowerLimit(d) for d in handles]
+	gtempa = [pynvml.nvmlDeviceGetTemperature(d, 0) for d in handles]
+	gtempb = [pynvml.nvmlDeviceGetTemperatureThreshold(d, 0) for d in handles]
+	return gname, gcore, gmems, gutil, gpowa, gpowb, gtempa, gtempb
+
+WMT = 0
+WMV = 0
+def get_wmem(mused=0):
+	global WMT, WMV
+	t = utc()
+	if t - WMT > 60:
+		try:
+			f1 = exc.submit(subprocess.check_output, "wmic OS get TotalVirtualMemorySize /Value")
+			fvms = subprocess.check_output("wmic OS get FreeVirtualMemory /Value")
+			tvms = f1.result()
+			tvms = int(tvms.strip().decode("ascii").removeprefix("TotalVirtualMemorySize="))
+			fvms = int(fvms.strip().decode("ascii").removeprefix("FreeVirtualMemory="))
+			WMV = (tvms - fvms) * 1024 - mused
+		except Exception:
+			WMV = 0
+		WMT = utc()
+	return WMV
+
+_cpuinfo = _diskinfo = None
+_ctime = _dtime = 0
+def get_current_stats(up_bps, down_bps):
+	global WMI, _cpuinfo, _ctime, _diskinfo, _dtime
+	import psutil
+	t = utc()
+	cinfo = _cpuinfo
+	if t - _ctime > 3600:
+		_ctime = t
+		import cpuinfo
+		cinfo = _cpuinfo = cpuinfo.get_cpu_info()
+	f1 = psutil.cpu_percent()
+	f2 = psutil.virtual_memory()
+	f3 = psutil.swap_memory()
+	try:
+		gname, gcore, gmems, gutil, gpowa, gpowb, gtempa, gtempb = get_nvml()
+	except Exception:
+		gname = []
+	dinfo = _diskinfo
+	if t - _dtime > 60:
+		_dtime = t
+		dinfo = _diskinfo = {}
+		for p in psutil.disk_partitions(all=False):
+			try:
+				dinfo[p.mountpoint] = psutil.disk_usage(p.mountpoint)
+			except OSError:
+				pass
+	cpercent, minfo, sinfo = f1, f2, f3
+	ip = "127.0.0.1"
+	if os.name == "nt":
+		cswap = get_wmem(minfo.used)
+		if cswap > sinfo.used:
+			class mtemp:
+				def __init__(self, used, total):
+					self.used, self.total = used, total
+			sinfo = mtemp(used=cswap, total=sinfo.total)
+	ram_name = globals().get("RAM_NAME") or "RAM"
+	if os.name == "nt" and not globals().get("WMI"):
+		try:
+			import wmi
+			globals()["WMI"] = WMI = wmi.WMI()
+		except Exception:
+			traceback.print_exc()
+			globals()["WMI"] = False
+	if globals().get("WMI") is not False:
+		if ram_name == "RAM":
+			if not globals().get("wRAM"):  
+				ram = globals()["wRAM"] = WMI.Win32_PhysicalMemory()[0]
+			else:
+				ram = globals()["wRAM"]
+			ram_speed = ram.ConfiguredClockSpeed
+			ram_type = ram.SMBIOSMemoryType
+			try:
+				ram_class = {
+					2: "DRAM",
+					5: "EDO",
+					9: "RAM",
+					10: "ROM",
+					20: "DDR1",
+					21: "DDR2",
+					24: "DDR3",
+					26: "DDR4",
+					34: "DDR5",
+					35: "DDR5",
+				}[ram_type]
+			except KeyError:
+				ram_class = "DDR" + str(max(1, ceil(log2(ram_speed / 250))))
+			ram_name = globals()["RAM_NAME"] = f"{ram_class}-{ram_speed}"
+	return dict(
+		cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
+		gpu={f"{ip}-{i}": dict(
+			name=name,
+			count=gcore[i],
+			usage=gutil[i].gpu / 100,
+			max=1,
+			time=t,
+		) for i, name in enumerate(gname)},
+		memory={
+			f"{ip}-v": dict(name=ram_name, count=1, usage=minfo.used, max=minfo.total, time=t),
+			f"{ip}-s": dict(name="Swap", count=1, usage=sinfo.used, max=sinfo.total, time=t),
+			**{f"{ip}-{i}": dict(
+				name=name,
+				count=1,
+				usage=gmems[i].used,
+				max=gmems[i].total,
+				time=t,
+			) for i, name in enumerate(gname)},
+		},
+		disk={f"{ip}-{k}": dict(name=k, count=1, usage=v.used, max=v.total, time=t) for k, v in dinfo.items()},
+		network={
+			f"{ip}-u": dict(name="Upstream", count=1, usage=up_bps, max=-1, time=t),
+			f"{ip}-d": dict(name="Downstream", count=1, usage=down_bps, max=-1, time=t),
+		},
+		power={
+			**{f"{ip}-{i}": dict(
+				name=name,
+				count=1,
+				usage=gpowa[i] / 1000,
+				max=gpowb[i] / 1000,
+				time=t,
+			) for i, name in enumerate(gname)},
+		},
+		temperature={
+			**{f"{ip}-{i}": dict(
+				name=name,
+				count=1,
+				usage=gtempa[i],
+				max=gtempb[i],
+				time=t,
+			) for i, name in enumerate(gname)},
+		},
+	)
+
+
 if "math" in CAPS:
 	import x_math
 	x_math.register_print_fn(print)
@@ -486,7 +633,7 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 		is_avif = fmt == "avif" and im.mode == "RGBA"
 		if is_avif:
 			fmt = "y4m"
-		opts, env, fmt = ffmpeg_opts({}, iter([im]), 1, im.mode, im, fmt, fs * (r or 1), *size, 1, opt)
+		opts, env, fmt = ffmpeg_opts({}, iter([im]), 1, im.mode, im, fmt, fs * (r or 1), size[0], size[1], 1, opt)
 		args.extend(opts)
 		print(im, len(b))
 		if fmt in ("png", "jpg", "webp"):
