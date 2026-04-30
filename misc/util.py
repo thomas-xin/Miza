@@ -3256,13 +3256,14 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 	def __setitem__(self, k, v, read=False):
 		if isinstance(v, memoryview):
 			v = bytes(v)
-		if self._unsafe is not None:
-			self._unsafe[k] = v
+		self._unsafe[k] = v
+		if self._unsafe is not None and not read:
 			self._unsafe_mut[k] = v
 			self.autoclear()
 			if not self._autosave or self._autosave.done():
 				self._autosave = self._autosave_thread.submit(self.autosave)
 			return
+		self._unsafe_mut.pop(k, None)
 		super().set(k, v, expire=self.expire_offset, tag=utc(), read=read)
 
 	def autoclear(self, n=65536):
@@ -3519,16 +3520,22 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 			return super().__getitem__(k)
 
 	def __setitem__(self, k, v, read=False):
+		if isinstance(v, memoryview):
+			v = bytes(v)
 		self._unsafe[k] = v
-		self._unsafe_mut[k] = v
-		if len(self._unsafe) > 65536:
-			try:
-				k2 = next(iter(self._unsafe))
-				self._unsafe.pop(k2)
-			except (KeyError, RuntimeError, StopIteration):
-				pass
-		if not self._autosave or self._autosave.done():
-			self._autosave = self._autosave_thread.submit(self.autosave)
+		if not read:
+			self._unsafe_mut[k] = v
+			if len(self._unsafe) > 65536:
+				try:
+					k2 = next(iter(self._unsafe))
+					self._unsafe.pop(k2)
+				except (KeyError, RuntimeError, StopIteration):
+					pass
+			if not self._autosave or self._autosave.done():
+				self._autosave = self._autosave_thread.submit(self.autosave)
+			return
+		self._unsafe_mut.pop(k, None)
+		super().set(k, v)
 
 	def autosave(self):
 		with tracebacksuppressor:
