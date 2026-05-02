@@ -7647,6 +7647,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if v is not None:
 				query += f"&{k}={v}"
 		resp = await self.retrieve_api(f"{path}{query}")
+		if "messages" not in resp:
+			print(resp)
+			raise KeyError("messages")
 		data = {}
 		for raw_message in resp["messages"]:
 			if isinstance(raw_message, list):

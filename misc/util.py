@@ -1958,28 +1958,32 @@ def decrypt_stream(b):
 DOMAIN_CERT: str = AUTH.get("domain_cert") or ""
 PRIVATE_KEY: str = AUTH.get("private_key") or ""
 
+import lzma
+import zlib
+try:
+	import compression.zstd as zstd
+except ImportError:
+	zstd = None
 
 def zip2bytes(data):
+	if data[:1] == b"=":
+		return data[1:]
+	if data[:1] == b"+":
+		return zstd.decompress(memoryview(data)[1:])
 	if data[:1] == b"~":
-		import lzma
 		return lzma.decompress(memoryview(data)[1:])
 	if data[:1] == b"!":
-		import zlib
 		return zlib.decompress(memoryview(data)[1:])
 	if not hasattr(data, "read"):
 		data = io.BytesIO(data)
 	with zipfile.ZipFile(data, allowZip64=True, strict_timestamps=False) as z:
 		return z.read(z.namelist()[0])
 
-def bytes2zip(data, lzma=True):
-	import zlib
-	if lzma:
-		a = b"!" + zlib.compress(data)
-		import lzma
-		b = b"~" + lzma.compress(data)
-		if len(b) < len(a):
-			return b
-		return a
+def bytes2zip(data, heavy=True):
+	if heavy:
+		if zstd:
+			return b"+" + zstd.compress(data, level=6)
+		return b"~" + lzma.compress(data)
 	return b"!" + zlib.compress(data)
 
 def eval_json(s):
@@ -2051,7 +2055,7 @@ def select_and_loads(s, encrypted=False, size=None, safe=False):
 			raise
 	if s[0] == 128 and not safe:
 		return pickle.loads(s)
-	if s[:1] in (b"~", b"!") or zipfile.is_zipfile(io.BytesIO(s)):
+	if s[:1] in b"=+~!" or zipfile.is_zipfile(io.BytesIO(s)):
 		s = zip2bytes(s)
 	data = None
 	if not s:
@@ -2077,7 +2081,7 @@ def select_and_dumps(data, safe=True, compress=True):
 	if not safe:
 		s = pickle.dumps(data)
 		if len(s) > 32768 and compress:
-			t = bytes2zip(s, lzma=len(s) > 16777216)
+			t = bytes2zip(s, heavy=len(s) > 16777216)
 			if len(t) < len(s) * 0.9:
 				s = t
 		return s
@@ -2086,7 +2090,7 @@ def select_and_dumps(data, safe=True, compress=True):
 	except (TypeError, orjson.JSONEncodeError):
 		s = None
 	if len(s) > 262144:
-		t = bytes2zip(s, lzma=False)
+		t = bytes2zip(s, heavy=False)
 		if len(t) < len(s) * 0.9:
 			s = t
 	return s
@@ -3579,15 +3583,8 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 		return v
 
 	def setdefault(self, k, v):
-		if (fut := self._retrieving.get(k)):
-			return fut.result()
-		if self._unsafe:
-			try:
-				return self._unsafe[k]
-			except KeyError:
-				pass
 		try:
-			return super().__getitem__(k)
+			return self[k]
 		except KeyError:
 			self[k] = v
 		return v

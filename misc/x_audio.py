@@ -643,6 +643,8 @@ class AudioPlayer(discord.AudioSource):
 			return
 		try:
 			connected = self.vcc.guild.me.voice or interface.run(f"bool((guild := client.get_channel({self.vcc.id}).guild) and guild.me.voice)")
+		except AttributeError:
+			self.verify_or_destroy()
 		except Exception:
 			print_exc()
 			connected = False
@@ -676,6 +678,8 @@ class AudioPlayer(discord.AudioSource):
 			return
 		try:
 			connected = self.vcc.guild.me.voice or interface.run(f"bool((guild := client.get_channel({self.vcc.id}).guild) and guild.me.voice)")
+		except AttributeError:
+			self.verify_or_destroy()
 		except Exception:
 			print_exc()
 			connected = False
@@ -692,6 +696,10 @@ class AudioPlayer(discord.AudioSource):
 			connected = False
 		if len(self.queue) == 0 and connected:
 			await self.leave("Queue empty")
+
+	def verify_or_destroy(self):
+		if interface.run("bool(bot.ready)"):
+			create_task(self.force_disconnect(self.vcc.guild))
 
 	def read(self):
 		"""Overrides discord.AudioSource read method to read audio data from the current playing source. Handles EOF, seamlessly skipping songs that have ended, and removing the need for a new play() call."""

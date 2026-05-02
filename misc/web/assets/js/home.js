@@ -51,6 +51,7 @@
 	let speed = 100;
 
 	let canvas = document.querySelector('.particles-background');
+	let maintained = document.querySelector('.maintained');
 	let W = parseFloat(getComputedStyle(canvas).width.replace('px', ''));
 	let H = parseFloat(getComputedStyle(canvas).height.replace('px', ''));
 	canvas.width = W;
@@ -138,13 +139,15 @@
 
 	let then = Date.now();
 	function animateParticles() {
-		let now = Date.now();
-		deltaTime = (now - then) / 1000;
-		then = now;
-		ctx.clearRect(0, 0, W, H);
-		for (let p of particles) {
-			p.move();
-			p.draw();
+		if (canvas && !document.hidden && maintained.classList.contains("inside-view")) {
+			let now = Date.now();
+			deltaTime = Math.min(1 / 12, (now - then) / 1000);
+			then = now;
+			ctx.clearRect(0, 0, W, H);
+			for (let p of particles) {
+				p.move();
+				p.draw();
+			}
 		}
 		requestAnimationFrame(animateParticles);
 	}
