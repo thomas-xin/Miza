@@ -7,7 +7,6 @@ import time
 from traceback import print_exc
 from typing import Optional, AsyncIterator
 from urllib.parse import quote, unquote
-import filetype
 import niquests
 import orjson
 from fastapi import FastAPI, Request, Response, HTTPException, UploadFile, File, Query
@@ -18,7 +17,7 @@ from .asyncs import run_async, create_task
 from .types import fcdict, byte_like, MemoryBytes
 from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment, discord_expired,
-	is_discord_attachment, url2fn, getsize,
+	is_discord_attachment, url2fn, getsize, mime_from_file,
 	Request as RequestManager, DOMAIN_CERT, PRIVATE_KEY, update_headers,
 	AutoCache, CACHE_PATH, VISUAL_FORMS, RNGFile,
 )
@@ -62,7 +61,7 @@ async def get_size_mime(head, tail, count, chunksize):
 	HEAD = await attachment_cache.download(head, read=True, fc=True)
 	TAIL_headers = await fut
 	firstsize = getsize(HEAD)
-	mimetype = filetype.guess_mime(HEAD)
+	mimetype = mime_from_file(HEAD)
 	lastsize = int(TAIL_headers.get("content-length") or 1)
 	if count >= 2:
 		size = firstsize + chunksize * (count - 2) + lastsize
@@ -260,7 +259,7 @@ def stream_fp(request, fp, response_headers={}):
 			for i in range(r[0], r[1], chunksize):
 				yield fp.read(min(chunksize, r[1] - i))
 
-	mime = filetype.guess_mime(fp)
+	mime = mime_from_file(fp)
 	if not mime:
 		fp.seek(0)
 		b = fp.read(65536)

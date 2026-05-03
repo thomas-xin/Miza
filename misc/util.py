@@ -1525,8 +1525,22 @@ def mime_from_file(path, filename=None, mime=True):
 				return "image/heic"
 			if data[8:12] in (b"mif1", "msf1"):
 				return "image/heif"
-	if out == "text/plain" and data.startswith(b"#EXTM3U"):
-		return "video/m3u8"
+	if data and out == "text/plain":
+		if data.startswith(b"#EXTM3U"):
+			return "video/m3u8"
+		if data[:15].lower() == b"<!doctype html>":
+			return "text/html"
+		if data[:5].lower() == "<svg ":
+			return "image/svg+xml"
+		if data[0] in b'"[{':
+			try:
+				orjson.loads(data[:256])
+			except orjson.JSONDecodeError as ex:
+				msg = str(ex)
+				if "unexpected end of data" in msg:
+					return "application/json"
+				return out
+			return "application/json"
 	return out
 
 magic = cdict(

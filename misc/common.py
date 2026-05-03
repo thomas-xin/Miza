@@ -12,7 +12,7 @@ if __name__ != "__mp_main__":
 	from misc.smath import *
 	from misc.caches import *
 
-import psutil, subprocess, weakref, zipfile, urllib, asyncio, json, pickle, functools, orjson, aiohttp, threading, shutil, filetype, inspect, sqlite3, argparse, bisect, httpx
+import psutil, subprocess, weakref, zipfile, urllib, asyncio, json, pickle, functools, orjson, aiohttp, threading, shutil, inspect, sqlite3, argparse, bisect, httpx
 
 # VERY HACKY removes deprecated audioop dependency for discord.py; this would cause volume transformations to fail but Miza uses FFmpeg for them anyway
 sys.modules["audioop"] = sys

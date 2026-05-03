@@ -316,8 +316,6 @@ def fetch_static(path):
 			match fmt:
 				case "js":
 					mime = "application/javascript"
-				case "svg":
-					mime = "image/svg+xml"
 				case _:
 					mime = "text/" + fmt
 		STATIC[path] = (data, mime, ts)
@@ -628,7 +626,7 @@ class Server:
 		if filename:
 			cp.response.headers["Content-Disposition"] = f"{disposition}; filename={urllib.parse.quote(filename)}"
 		ctype = heads.get("Content-Type", "application/octet-stream")
-		if ctype in ("text/html", "text/html; charset=utf-8", "application/octet-stream"):
+		if ctype.split(";", 1)[0] in ("text/html", "text/plain", "application/octet-stream"):
 			it = resp.iter_content(262144)
 			b = next(it)
 			mime = get_mime(b)

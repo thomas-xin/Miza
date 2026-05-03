@@ -15,7 +15,6 @@ import time
 from traceback import print_exc
 import zipfile
 import cv2
-import filetype
 import numpy as np
 import orjson
 import psutil
@@ -37,7 +36,7 @@ Image.MAX_IMAGE_PIXELS = 4294967296
 GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_DIFFERENT_PALETTE_ONLY
 from misc.types import ts_us
 from misc.asyncs import submit_thread, await_fut  # noqa: E402
-from misc.util import get_image_size, temporary_file, archive_mimes, extract_archive, is_url
+from misc.util import get_image_size, temporary_file, archive_mimes, mime_from_file, extract_archive, is_url
 
 DC = 0
 torch = None
@@ -309,7 +308,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 		pass
 	else:
 		pillow_heif.register_heif_opener()
-	mime = magic.from_buffer(data)
+	mime = mime_from_file(data)
 	if mime in archive_mimes:
 		fn = temporary_file()
 		with open(fn, "wb") as f:
@@ -704,33 +703,6 @@ def simple_mimes(b, mime=True):
 	except UnicodeDecodeError:
 		return "application/octet-stream" if mime else "bin"
 	return "text/plain" if mime else "txt"
-
-def from_file(path, mime=True):
-	"Detects mimetype of file or buffer. Includes custom .jar, .ecdc, .m3u8 detection."
-	path = filetype.get_bytes(path)
-	if mime:
-		out = filetype.guess_mime(path)
-	else:
-		out = filetype.guess_extension(path)
-	if out and out.split("/", 1)[-1] == "zip" and isinstance(path, str) and path.endswith(".jar"):
-		return "application/java-archive"
-	if not out:
-		if not isinstance(path, bytes):
-			if isinstance(path, str):
-				raise TypeError(path)
-			path = bytes(path)
-		out = simple_mimes(path, mime)
-	if out == "application/octet-stream" and path.startswith(b'ECDC'):
-		return "audio/ecdc"
-	if out == "application/octet-stream" and path.startswith(b'\x00\x00\x00,ftypavis'):
-		return "image/avif"
-	if out == "text/plain" and path.startswith(b"#EXTM3U"):
-		return "video/m3u8"
-	return out
-
-class magic:
-	from_file = from_file
-	from_buffer = from_file
 
 # Converts a time interval represented using days:hours:minutes:seconds, to a value in seconds.
 def time_parse(ts):
