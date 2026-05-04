@@ -723,7 +723,35 @@ if __name__ == "__main__":
 	logger.info(f"Starting Miza Proxy Server on {config.bind}")
 	logger.info("Press Ctrl+C to stop")
 
+	import ssl
+	def ssl_error_filtering_handler(loop, context):
+		exception = context.get("exception")
+		if isinstance(exception, ssl.SSLError):
+			# Optionally log at a lower level instead of ignoring entirely
+			logger.debug("Suppressed SSL teardown error: %s", exception)
+			return
+		loop.default_exception_handler(context)
+
+	import asyncio
+	from hypercorn.asyncio.tcp_server import TCPServer
+	_original_close = TCPServer._close
+
+	async def _patched_close(self):
+		try:
+			return await asyncio.wait_for(_original_close(self), timeout=5)
+		except (ssl.SSLError, TimeoutError, OSError) as e:
+			# Swallow all SSL teardown errors
+			pass
+		except Exception:
+			# If there's a writer, force-close it regardless
+			if self.writer and not self.writer.is_closing():
+				self.writer.close()
+			raise
+
+	TCPServer._close = _patched_close
+
 	from .asyncs import eloop
+	eloop.set_exception_handler(ssl_error_filtering_handler)
 	# Run the server
 	try:
 		eloop.run_until_complete(serve(app, config))
