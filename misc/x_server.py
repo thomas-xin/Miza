@@ -790,6 +790,15 @@ class Server:
 		cp.response.headers["Content-Type"] = "application/json"
 		return orjson.dumps(interface.run("bot.status()"))
 
+	@cp.expose(alias=("robots.txt",))
+	def robots(self, *args, **kwargs):
+		data, mime = fetch_static("robots.txt")
+		update_headers(cp.response.headers, **CHEADERS)
+		cp.response.headers["Content-Type"] = mime
+		cp.response.headers["Content-Length"] = len(data)
+		cp.response.headers["ETag"] = create_etag(data)
+		return data
+
 	alias = tuple([fn.split("/", 1)[0].rsplit(".", 1)[0] for fn in os.listdir("misc/web")])
 	alias += tuple(a + ".html" for a in alias)
 	@cp.expose(alias=alias)

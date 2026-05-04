@@ -667,6 +667,8 @@ async def catch_all(path: str, request: Request):
 
 	if not p or p in ("home", "index", "dummy.html", "index.html"):
 		return FileResponse("misc/web/index.html", media_type="text/html")
+	if p in ("robots", "robots.txt"):
+		return FileResponse("misc/web/robots.txt", media_type="text/plain")
 	if p in ("favicon", "favicon.ico"):
 		return FileResponse("misc/web/assets/images/mizaleaf.webp", media_type="image/webp")
 	if p == "files":
@@ -679,7 +681,9 @@ async def catch_all(path: str, request: Request):
 		return RedirectResponse(url="https://www.youtube.com/watch?v=dQw4w9WgXcQ", status_code=308)
 	if first in alias:
 		return await static_backend(p, request=request)
-	return await globals()[first](request=request)
+	return Response(
+		status_code=404,
+	)
 
 
 if __name__ == "__main__":

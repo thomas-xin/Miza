@@ -1534,7 +1534,7 @@ def mime_from_file(path, filename=None, mime=True):
 			return "image/svg+xml"
 		if data[0] in b'"[{':
 			try:
-				orjson.loads(data[:256])
+				orjson.loads(data[:4096])
 			except orjson.JSONDecodeError as ex:
 				msg = str(ex)
 				if "unexpected end of data" in msg:
