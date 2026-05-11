@@ -4676,7 +4676,7 @@ class EvalPipe:
 	@classmethod
 	def connect(cls, args, port, address="127.0.0.1", independent=True, glob=globals(), timeout=60):
 		addr = (address, port)
-		print(f"{DynamicDT.now()}: EvalPipe connecting to", addr)
+		print(f"{DynamicDT.now()}: EvalPipe connecting to", ":".join(map(str, addr)))
 		server = None
 		try:
 			server = multiprocessing.connection.Listener(addr, authkey=cls.key)
@@ -4751,7 +4751,7 @@ class EvalPipe:
 				raise
 			else:
 				break
-		print(f"{DynamicDT.now()}: EvalPipe listening on", server.address)
+		print(f"{DynamicDT.now()}: EvalPipe listening on", ":".join(map(str, server.address)))
 		return cls(
 			lambda: True,
 			None,
@@ -4940,36 +4940,37 @@ class EvalPipe:
 						i, ind, s = int(b[:sep]), chr(b[sep + 1]), b[sep + 3:]
 						if i not in self.responses and i not in self.iterators:
 							continue
-						if ind == "#":
-							cur = eval_json(s)
-							with self.rlock:
-								try:
-									self.iterators[i].append(cur)
-								except KeyError:
-									res = PipeableIterator([cur])
+						match ind:
+							case "#":
+								cur = eval_json(s)
+								with self.rlock:
+									try:
+										self.iterators[i].append(cur)
+									except KeyError:
+										res = PipeableIterator([cur])
+										self.responses.pop(i).set_result(res)
+										self.iterators[i] = res
+							case "@":
+								res = eval_json(s)
+								with self.rlock:
 									self.responses.pop(i).set_result(res)
-									self.iterators[i] = res
-						elif ind == "@":
-							res = eval_json(s)
-							with self.rlock:
-								self.responses.pop(i).set_result(res)
-						elif ind == "!":
-							ex = evalex(s)
-							with self.rlock:
-								if i in self.responses:
-									self.responses.pop(i).set_exception(ex)
-								elif i in self.iterators:
-									self.iterators.pop(i).terminate()
-								else:
-									raise KeyError("Uncaught error", ex)
-						elif ind == "$":
-							with self.rlock:
-								try:
-									self.iterators.pop(i).terminate()
-								except KeyError:
-									self.responses.pop(i).set_result(PipeableIterator([]).terminate())
-						else:
-							raise NotImplementedError("Unrecognised output", lim_str(s, 262144))
+							case "!":
+								ex = evalex(s)
+								with self.rlock:
+									if i in self.responses:
+										self.responses.pop(i).set_exception(ex)
+									elif i in self.iterators:
+										self.iterators.pop(i).terminate()
+									else:
+										raise KeyError("Uncaught error", ex)
+							case "$":
+								with self.rlock:
+									try:
+										self.iterators.pop(i).terminate()
+									except KeyError:
+										self.responses.pop(i).set_result(PipeableIterator([]).terminate())
+							case _:
+								raise NotImplementedError("Unrecognised output", lim_str(s, 262144))
 						continue
 					b = b.removeprefix(b"\x00")
 					if b.startswith(b"INFO:"):
@@ -5077,6 +5078,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 			headers = {}
 		if authorise:
 			token = AUTH["discord_token"]
+			headers["User-Agent"] = "DiscordBot (https://mizabot.xyz, 1.0.0)"
 			headers["Authorization"] = f"Bot {token}"
 			if data:
 				if not isinstance(data, aiohttp.FormData):

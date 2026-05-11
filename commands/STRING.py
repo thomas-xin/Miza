@@ -4,6 +4,9 @@ if "common" not in globals():
 	from misc.common import *
 print = PRINT
 
+from dynamic_dt import TIMEZONES, get_timezone
+import pytz
+
 
 class Math(Command):
 	_timeout_ = 4
@@ -720,12 +723,13 @@ d(*⌒▽⌒*)b Happy
 
 class Time(Command):
 	name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T"]
-	description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user."
+	description = "Shows the current time at a certain GMT/UTC offset, the current time for a user, or the closest timezone(s) to a given current time."
 	schema = cdict(
 		mode=cdict(
 			type="enum",
+			description="Whether to retrieve all time formats, simple formats, or the closest timezones",
 			validation=cdict(
-				enum=("full", "relative", "absolute"),
+				enum=("full", "relative", "absolute", "timezone"),
 			),
 			default="full",
 		),
@@ -758,6 +762,9 @@ class Time(Command):
 		Timestamp=cdict(
 			mode="relative",
 		),
+		TimeZone=cdict(
+			mode="timezone",
+		),
 		EstimateTime=cdict(
 			estimate=True,
 		),
@@ -768,6 +775,8 @@ class Time(Command):
 	rate_limit = (3, 5)
 	slash = True
 	ephemeral = True
+	tzcache = AutoCache(f"{CACHE_PATH}/timezones", shards=1, stale=86400, timeout=86400 * 30)
+	tzlist = {str(tz) if isinstance(tz, pytz.BaseTzInfo) else k.upper(): tz for k, tz in TIMEZONES.items() if not k.startswith("etc/")}
 
 	async def __call__(self, _user, mode, input, user, estimate, timezone, **void):
 		target = user or _user
@@ -781,6 +790,46 @@ class Time(Command):
 		dt2 = DynamicDT.now(tz=tzinfo)
 		dt = DynamicDT.parse(input, timestamp=dt2.timestamp_exact(), timezone=get_name(tzinfo))
 		match mode:
+			case "timezone":
+
+				def offset_repr(hours):
+					if hours > 12:
+						hours -= 24
+					sym = "+"
+					if hours < 0:
+						sym = "-"
+						hours = -hours
+					seconds = hours * 3600
+					disp = time_disp(seconds)
+					while disp.endswith(":00"):
+						disp = disp[:-3]
+					return sym + disp
+
+				central = dt2.cast(get_timezone("utc"))
+				new = dt.replace(tzinfo=get_timezone("utc"))
+				offset = (new - central).total_seconds() / 3600 % 24
+				colour = await self.bot.get_colour(target)
+				emb = discord.Embed(colour=colour)
+				emb.add_field(name="Parsed As", value="`" + ", ".join(dt.parsed_as) + "`")
+				emb.add_field(name="GMT/UTC Offset", value=f"`{offset_repr(offset)}`")
+
+				def retrieval():
+					data = mdict()
+					now = datetime.datetime.now(tz=datetime.timezone.utc).replace(tzinfo=None)
+					for k, tz in self.tzlist.items():
+						data.append(round_min(tz.utcoffset(now).total_seconds() / 3600), (k, tz))
+					return data
+
+				data = await self.tzcache.aretrieve("offsets", retrieval)
+				match_list = sorted((min((offset - delta) ** 2, (offset - delta - 24) ** 2), delta, k, tz) for delta, v in data.items() for k, tz in v)
+				matches = []
+				while len(matches) < 20 and match_list and (not matches or match_list[0][0] <= 0.25):
+					hyp, delta, k, tz = match_list.pop(0)
+					matches.append(f"*{k}* **({offset_repr(delta)})**: `{dt2.cast(tz).time()}`")
+				emb.add_field(name="Closest Matches", value="\n".join(matches), inline=False)
+				with tracebacksuppressor:
+					emb.timestamp = datetime.datetime.fromtimestamp(dt.timestamp(), tz=datetime.timezone.utc)
+				return cdict(embed=emb)
 			case "relative":
 				return dt.as_rel_discord()
 			case "absolute":

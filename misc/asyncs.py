@@ -281,20 +281,22 @@ async def delayed_callback(fut, delay, func, *args, repeat=False, exc=False, **k
 		await asyncio.sleep(delay / 2)
 	try:
 		return fut.result(), False
-	except Exception as ex:
-		if exc and not isinstance(ex, asyncio.exceptions.InvalidStateError):
-			raise
-		while not fut.done():
-			async with Delay(repeat):
-				if hasattr(func, "__call__"):
-					res = func(*args, **kwargs)
-				else:
-					res = func
-				if awaitable(res):
-					await res
-			if not repeat:
-				break
-		return await fut, True
+	except asyncio.exceptions.InvalidStateError:
+		if not exc:
+			while not fut.done():
+				async with Delay(repeat):
+					if hasattr(func, "__call__"):
+						res = func(*args, **kwargs)
+					else:
+						res = func
+					if awaitable(res):
+						await res
+				if not repeat:
+					break
+			return await fut, True
+	except Exception:
+		if not exc:
+			pass
 
 async def check_output_async(args):
 	proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

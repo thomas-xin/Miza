@@ -4034,11 +4034,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			#     create_task(self.create_main_website())
 			# self.raw_webserver = new_ip
 
-	def is_webserver_url(self, url):
-		if url.startswith(self.webserver) or url.startswith(self.raw_webserver) or url.startswith("https://" + self.raw_webserver.split("//", 1)[-1]):
-			return (url,)
-		return regexp("^https?:\\/\\/(?:[A-Za-z]+\\.)?mizabot\\.xyz").findall(url)
-
 	ip_sem = Semaphore(1, 1, rate_limit=60)
 	async def get_ip(self):
 		"Gets the external IP address from api.ipify.org"
@@ -4046,57 +4041,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			async with self.ip_sem:
 				self.ip = await Request.aio("https://api.ipify.org", bypass=False, decode=True, timeout=3)
 		return self.ip
-
-	caps = set()
-	capfrom = AutoCache(stale=0, timeout=60)
-	last_pings = {}
-	compute_queue = {}
-	compute_wait = {}
-	def distribute(self, caps, stat=None, resp=None, ip="127.0.0.1"):
-		self.last_pings[ip] = utc()
-		if stat:
-			for k, v in stat.items():
-				self.status_data.system[k].update(v)
-		if resp:
-			for k, v in resp.items():
-				k = int(k)
-				# print("END TASK:", k, bot.compute_wait, lim_str(str(v), 64), frand())
-				if k not in self.compute_wait:
-					if not isinstance(v, BaseException):
-						print("MISSING:", k, lim_str(str(v), 256))
-					continue
-				task = self.compute_wait.pop(k)
-				if isinstance(v, BaseException):
-					print(repr(v), ip, k)
-					# v2 = v.__class__(*v.args, ip, k)
-					task.set_exception(v)
-				else:
-					task.set_result(v)
-				# print("TASK:", k, task, v)
-		tasks = []
-		for cap in caps:
-			self.capfrom[(cap, ip)] = None
-			misc = self.compute_queue.get(cap)
-			if not misc:
-				continue
-			task = misc.pop()
-			if not task:
-				continue
-			tasks.append(task)
-		prompts = []
-		for task in tasks:
-			i = ts_us() + id(task)
-			while i in self.compute_wait:
-				i += 1
-			task.ts = i
-			self.compute_wait[i] = task
-			prompt = [i, task.cap, task.command, task.timeout]
-			prompts.append(prompt)
-		self.caps = set(c for c, i in self.capfrom)
-		return prompts
-
-	def worker_count(self, cap="image"):
-		return sum(c == cap for c, i in self.capfrom)
 
 	_cpuinfo = None
 	api_latency = inf
@@ -4129,15 +4073,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			audio_players, playing_players = await asyncio.wait_for(self.audio.asubmit("len(AP.players),sum(bool(p.vc) and bool(p.queue) and p.is_playing() for p in AP.players.values())"), timeout=2)
 		except (AssertionError, AttributeError, asyncio.TimeoutError):
 			audio_players = playing_players = "N/A"
-		files = os.listdir("misc")
-		for f in files:
-			path = "misc/" + f
-			if is_code(path):
-				self.size2[f] = line_count(path)
-		size = (
-			np.sum(list(self.size.values()), dtype=np.uint32, axis=0)
-			+ np.sum(list(self.size2.values()), dtype=np.uint32, axis=0)
-		)
+
+		def count_size():
+			if not self.size2:
+				files = os.listdir("misc")
+				for f in files:
+					path = "misc/" + f
+					if is_code(path):
+						self.size2[f] = line_count(path)
+			size = (
+				np.sum(list(self.size.values()), dtype=np.uint32, axis=0)
+				+ np.sum(list(self.size2.values()), dtype=np.uint32, axis=0)
+			)
+			return size
+		size = await run_async(count_size)
+
 		with tracebacksuppressor:
 			system = await fut
 			for k, v in system.items():
@@ -4328,7 +4278,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				database.unload()
 			self.categories.pop(mod)
 			self.dbitems.pop(mod)
-			self.size.pop(mod)
+			with tracebacksuppressor:
+				self.size.pop(mod)
 		return True
 
 	def reload(self, mod=None):
@@ -4342,8 +4293,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return all(fut.result() for fut in modload)
 		return self.get_module(mod + ".py")
 
-	size = fcdict()
-	size2 = fcdict()
+	size = cdict()
+	size2 = cdict()
 	def get_modules(self):
 		"Loads all modules in the commands folder and initializes bot commands and databases."
 		files = [i for i in os.listdir("commands") if is_code(i) and i.rsplit(".", 1)[0] in self.active_categories]
@@ -4418,14 +4369,17 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		backup = AUTH.get("backup_path") or "backup"
 		fn = f"{backup}/saves.{DynamicDT.utcnow().date()}.tar"
 		day = not os.path.exists(fn)
+		futs = []
 		if day:
-			await_fut(self.send_event("_day_"))
+			fut = create_task(self.worker_heartbeat())
+			futs.append(fut)
+			fut = self.send_event("_day_")
+			futs.append(fut)
 			self.users_updated = True
-		if force or day:
-			print("Forcing save event...")
-			# fut = self.send_event("_save_")
-			# await_fut(fut)
 		if day:
+			for fut in futs:
+				with tracebacksuppressor:
+					await_fut(fut)
 			self.backup()
 
 	async def as_rewards(self, diamonds, gold=Dummy):
@@ -5786,7 +5740,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				method="POST",
 				data='{"type":5,"data":{"flags":64}}' if ephemeral else '{"type":5}' if mode == "post" else '{"type":6}',
 			)
-			print("Deferred:", message.id, data)
+			print("Deferred:", message.id, int_id, int_token, data)
 			self.inter_cache[int_id] = int_token
 			self.inter_cache[message.id] = int_token
 			message.deferred = int_token
@@ -6371,6 +6325,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def worker_heartbeat(self):
 		futs = []
+		if AUTH.get("ssl_generator"):
+			await run_async(subprocess.run, AUTH["ssl_generator"])
 		key = AUTH.get("discord_secret") or ""
 		uri = self.raw_webserver
 		dc = pk = ""
@@ -6422,8 +6378,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		while not self.closed:
 			async with Delay(720):
 				with tracebacksuppressor:
-					await self.worker_heartbeat()
-					await asyncio.sleep(1)
 					with MemoryTimer("update_subs"):
 						await self.update_subs()
 					await asyncio.sleep(1)
@@ -6471,12 +6425,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def ensure_reactions(self, message):
 		if not message.reactions or isinstance(message, self.CachedMessage) or isinstance(message.author, cdict):
 			if self.permissions_in(message.channel).read_message_history:
-				try:
-					message = await discord.abc.Messageable.fetch_message(message.channel, message.id)
-				except (LookupError, discord.NotFound):
-					pass
-				else:
-					self.add_message(message, force=True)
+				message = await self._fetch_message(message.id, message.channel, fast=True)
 		return message
 
 	async def react_with(self, message, name):
@@ -7641,6 +7590,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			submit_thread(self.cache.messages.update, data)
 		return data
 	async def search_messages(self, guild_id, limit=25, offset=0, **kwargs):
+		if guild_id not in self.cache.guilds:
+			return cdict(messages=[], total_results=0)
+		perm = self.permissions_in(self.cache.guilds[guild_id])
+		if not perm.view_channel or not perm.read_message_history:
+			return cdict(messages=[], total_results=0)
 		path = f"guilds/{guild_id}/messages/search"
 		query = f"?include_nsfw=1&limit={limit}&limit={offset}"
 		for k, v in kwargs.items():
@@ -7682,7 +7636,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							sort_order="desc",
 							**kwargs,
 						)
-						data.extend(resp)
+						data.extend(resp.messages)
 					if pos + 25 >= resp.total_results:
 						break
 		return data
@@ -7902,9 +7856,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			print_exc()
 
 	async def interaction_create(self, data):
-		message = self.GhostMessage()
-		message.id = int(data["id"])
-		message.slash = data["token"]
+		m = self.GhostMessage()
+		m.id = int(data["id"])
+		m.slash = data["token"]
 		cdata = data.get("data")
 		match data["type"]:
 			case 2:
@@ -7934,7 +7888,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				else:
 					mdata = mdata.get("user")
 				author = self._state.store_user(mdata)
-				message.author = author
+				m.author = author
 				channel = None
 				if cdata.get("type") == 3 and "resolved" in cdata:
 					res = cdata.get("resolved", {})
@@ -7943,46 +7897,46 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					for mdata in res.get("messages", {}).values():
 						msg = self.ExtendedMessage.new(mdata)
 						self.add_message(msg, force=True)
-						message.channel = channel = msg.channel or message.channel
+						m.channel = channel = msg.channel or m.channel
 				try:
 					channel = self.force_channel(data["channel_id"])
 					try:
 						guild = await self.fetch_guild(data["guild_id"])
 					except (LookupError, discord.NotFound):
 						raise KeyError
-					message.guild = guild
+					m.guild = guild
 					author = guild.get_member(author.id)
 					if author:
-						message.author = author
+						m.author = author
 				except KeyError:
 					if author is None:
 						raise
 					if channel is None:
 						channel = await self.get_dm(author)
 					guild = T(channel).get("guild")
-				if not T(message).get("guild"):
-					message.guild = guild
-				message.content = f"/{name} " + " ".join(map(json.dumps, kwargs.values()))
-				message.channel = channel
-				message.noref = True
-				message.deleted = False
-				message.ephemeral = kwargs.pop("ephemeral", False) and getattr(command, "ephemeral", False)
+				if not T(m).get("guild"):
+					m.guild = guild
+				m.content = f"/{name} " + " ".join(map(json.dumps, kwargs.values()))
+				m.channel = channel
+				m.noref = True
+				m.deleted = False
+				m.ephemeral = kwargs.pop("ephemeral", False) and getattr(command, "ephemeral", False)
 				try:
-					await self.run_command(command, kwargs, message=message, slash=True, respond=True)
+					await self.run_command(command, kwargs, message=m, slash=True, respond=True)
 				except Exception as ex:
-					if not getattr(message, "deferred", False):
-						await self.defer_interaction(message)
-					resp = await self.send_exception(channel, ex, reference=message, comm=command)
+					if not getattr(m, "deferred", False):
+						await self.defer_interaction(m)
+					resp = await self.send_exception(channel, ex, reference=m, comm=command)
 					print("SC:", resp)
 				finally:
-					message.deleted = True
+					m.deleted = True
 			case 3 | 5:
 				# Interaction buttons
 				custom_id = cdata.get("custom_id", "")
 				if "?" in custom_id:
 					custom_id = custom_id.rsplit("?", 1)[0]
 				if not custom_id or custom_id.startswith("▪️"):
-					return await self.ignore_interaction(message)
+					return await self.ignore_interaction(m)
 				mdata = data.get("member")
 				if not mdata:
 					mdata = data.get("user")
@@ -8003,7 +7957,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						raise
 					if channel is None:
 						channel = await self.get_dm(user)
-				message.channel = channel
+				m.channel = channel
 				if custom_id.startswith("\x7f"):
 					custom_id = cdata.get("values") or custom_id
 					if isinstance(custom_id, list_like):
@@ -8013,23 +7967,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					custom_id = "~" + custom_id
 				else:
 					m_id = data["message"]["id"]
-				m = await self.fetch_message(m_id, channel, fast=True)
-				if getattr(m, "method", None):
-					del m.method
-				add = False
-				if type(m) is not self.ExtendedMessage:
-					m = await channel.fetch_message(m_id)
-					add = True
-				if add:
-					self.add_message(m, force=True)
-				m.int_id = message.id
-				m.int_token = message.slash
-				await self.react_callback(m, custom_id, user)
+				message = await self.fetch_message(m_id, channel, fast=True)
+				if getattr(message, "method", None):
+					del message.method
+				if type(message) is not self.ExtendedMessage:
+					message = await self._fetch_message(m_id, channel, fast=True)
+				message.int_id = int(data["id"])
+				message.int_token = data["token"]
+				print(data)
+				await self.react_callback(message, custom_id, user)
 			case _:
 				print("Unknown interaction:\n" + str(data))
 		for attr in ("slash", "int_id", "int_token"):
 			try:
-				delattr(message, attr)
+				delattr(m, attr)
 			except AttributeError:
 				pass
 
