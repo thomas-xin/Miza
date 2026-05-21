@@ -24,7 +24,7 @@ from .smath import log2lin
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, colourise_auto, maybe_json, select_and_loads,
-	is_url, unyt, url2fn, CachingTeeFile,
+	is_url, unyt, equiv_url, url2fn, CachingTeeFile,
 	get_ext, rename, uhash, expired, is_youtube_stream, b64,  # noqa: F401
 )
 from .caches import audio_meta
@@ -379,6 +379,15 @@ class AudioPlayer(discord.AudioSource):
 		return min(p, d), d
 
 	@property
+	def remaining_duration(self):
+		if not self.playing or not self.playing[0]:
+			return 0
+		cpos = self.playing[0].pos / 50
+		if not self.reverse:
+			cpos = self.playing[0].af.duration - cpos
+		return cpos
+
+	@property
 	def reverse(self):
 		return self.settings.speed < 0
 
@@ -645,6 +654,7 @@ class AudioPlayer(discord.AudioSource):
 			connected = self.vcc.guild.me.voice or interface.run(f"bool((guild := client.get_channel({self.vcc.id}).guild) and guild.me.voice)")
 		except AttributeError:
 			self.verify_or_destroy()
+			connected = False
 		except Exception:
 			print_exc()
 			connected = False
@@ -756,6 +766,8 @@ class AudioPlayer(discord.AudioSource):
 			items = astype(items, (list, alist))[:MAX_QUEUE - len(items)]
 		if items:
 			items = list(astype(e, cdict) for e in items)
+			for e in items:
+				e.url = unyt(e.url)
 			if stride == 1 and (start == -1 or start > len(self.queue) or not self.queue):
 				self.queue.extend(items)
 			else:
@@ -841,9 +853,9 @@ class AudioPlayer(discord.AudioSource):
 			pos = None
 			if len(self.queue) > MAX_QUEUE:
 				self.queue = self.queue[:MAX_QUEUE]
-			if len(self.playing) > 1 and (force or (len(self.queue) > 1 and self.playing[1].af.url != self.queue[1].url)):
+			if len(self.playing) > 1 and (force or (len(self.queue) > 1 and not equiv_url(self.playing[1].af.url, self.queue[1].url))):
 				self.playing.pop().close()
-			if self.playing and (force or self.queue and self.playing[0].af.url != self.queue[0].url):
+			if self.playing and (force or self.queue and not equiv_url(self.playing[0].af.url, self.queue[0].url)):
 				temp = self.playing.popleft().close()
 				if force == 1 and temp.af.url == self.queue[0].url:
 					pos = temp.pos / 50
@@ -892,7 +904,7 @@ class AudioPlayer(discord.AudioSource):
 					if not entry.get("duration"):
 						entry.pop("duration", None)
 						return
-				if not (entry.get("duration") or 3840) < 3840:
+				if not (entry.get("duration") or 3840) < self.remaining_duration * 3:
 					return
 				try:
 					source = AF.load(entry, asap=False).create_reader(self, pos=entry.get("start", 0))
@@ -1010,9 +1022,10 @@ class AudioFile:
 					entry.update(results[0])
 			name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
 			self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
-			if entry.get("duration") and os.path.exists(self.path) and os.path.getsize(self.path):
+			if not AUTH.get("audio_cache_disabled") and entry.get("duration") and os.path.exists(self.path) and os.path.getsize(self.path):
 				self.stream = self.path
 				self.duration = audio_meta(self.stream).duration
+				# Sanity check - make sure audio is close enough to correct length
 				if abs(entry["duration"] - self.duration) < 1:
 					entry["duration"] = self.duration
 					return self

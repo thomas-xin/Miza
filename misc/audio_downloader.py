@@ -1086,7 +1086,7 @@ class AudioDownloader:
 		fn = temporary_file(ext)
 		d = entry.get("duration")
 		if asap is None:
-			asap = not d or d > 3840
+			asap = not d or d > 720
 		is_trim = start or end is not None
 		special_checked = False
 		if not fmt and asap or not d or not isfinite(d) or not is_youtube_url(url):

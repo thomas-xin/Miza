@@ -1901,7 +1901,7 @@ class CreateEmoji(Command):
 	async def __call__(self, bot, _guild, _message, _perm, _name, name, url, **void):
 		if _perm < 2:
 			raise self.perm_error(_perm, 2, "for command " + _name)
-		name = name or url2fn(url).rsplit(".", 1)[0]
+		name = name or url2fn(url).rsplit(".", 1)[0][:32]
 		image = await bot.optimise_image(url, fsize=262144, csize=160, fmt="webp", opt=False)
 		emoji = await _guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
 		# This reaction indicates the emoji was created successfully
@@ -1945,7 +1945,7 @@ class CreateSound(Command):
 		if emoji and emoji.isnumeric():
 			emoji = await bot.fetch_emoji(emoji, _guild)
 			assert emoji.guild.id == _guild.id, "Emoji must be from the current server."
-		name = name or getattr(emoji, "name", None) or url2fn(url).rsplit(".", 1)[0]
+		name = name or getattr(emoji, "name", None) or url2fn(url).rsplit(".", 1)[0][:32]
 		info = await run_async(audio_meta, url)
 		i = ts_us()
 		if info.duration <= 5.5:
@@ -2039,8 +2039,7 @@ class CreateSticker(Command):
 	slash = ("Sticker",)
 
 	async def __call__(self, bot, _guild, name, emoji, url, **void):
-		if not name:
-			name = "sticker_" + str(len(guild.stickers))
+		name = name or url2fn(url).rsplit(".", 1)[0][:32]
 		image = await bot.optimise_image(url, fsize=512000, csize=320, fmt="apng", duration=5, opt=False)
 		if emoji and emoji.isnumeric():
 			emoji = await bot.fetch_emoji(emoji, _guild)

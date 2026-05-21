@@ -485,7 +485,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 				api = random.choice(next(iter(local_models.values())))
 			except StopIteration:
 				api = "openrouter"
-				minfo = available["grok-4.1-fast"]
+				minfo = available["mimo-v2.5"]
 		if api is None:
 			if not allow_alt:
 				break

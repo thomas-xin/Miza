@@ -640,7 +640,7 @@ def _audio_meta(path, _timeout=12) -> dict:
 		sample_rate=int(info.get("sample_rate") or info.get("TAG:icy-samplerate") or 0),
 	)
 def audio_meta(path, _timeout=12) -> cdict:
-	return cdict(audio_meta_cache.retrieve(path, _audio_meta, path, _timeout=_timeout))
+	return cdict(audio_meta_cache.retrieve(path, _audio_meta, path, _timeout=_timeout, _cache=lambda e: e["sample_rate"]))
 
 colour_cache = ColourCache(
 	f"{CACHE_PATH}/colour",

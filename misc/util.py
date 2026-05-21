@@ -58,6 +58,9 @@ python = sys.executable
 
 with open("auth.json", "rb") as f:
 	AUTH = cdict(eval(f.read(), dict(true=True, false=False, null=None)))
+def reload_auth():
+	with open("auth.json", "rb") as f:
+		AUTH.update(eval(f.read(), dict(true=True, false=False, null=None)))
 cachedir = AUTH.get("cache_path") or None
 if cachedir:
 	# print(f"Setting model cache {cachedir}...")
@@ -1010,6 +1013,8 @@ def unyt(s):
 	if is_youtube_url(s):
 		return _unyt(s)
 	return s
+def equiv_url(u1, u2):
+	return u1 == u2 or unyt(u1) == unyt(u2)
 def is_discord_message_link(url) -> bool:
 	"Detects whether a Discord link represents a channel or message link."
 	check = url[:64]
@@ -3357,11 +3362,12 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			self[k] = v
 		return v
 
-	def _retrieve(self, k, func, *args, read=False, **kwargs):
+	def _retrieve(self, k, func, *args, read=False, _cache=lambda _: True, **kwargs):
 		try:
 			self._retrieving[k] = fut = concurrent.futures.Future()
 			v = func(*args, **kwargs)
-			self.__setitem__(k, v, read=read)
+			if _cache(v):
+				self.__setitem__(k, v, read=read)
 		except Exception as ex:
 			fut.set_exception(ex)
 			raise
@@ -3399,12 +3405,13 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			return self._retrieve(k, func, *args, read=_read, **kwargs)
 		return v
 
-	async def _aretrieve(self, k, func, *args, read=False, **kwargs):
+	async def _aretrieve(self, k, func, *args, read=False, _cache=lambda _: True, **kwargs):
 		await run_async(self.base_init)
 		try:
 			self._retrieving[k] = fut = concurrent.futures.Future()
 			v = await run_async(func, *args, **kwargs)
-			await run_async(self.__setitem__, k, v, read=read)
+			if _cache(v):
+				await run_async(self.__setitem__, k, v, read=read)
 		except Exception as ex:
 			fut.set_exception(ex)
 			raise

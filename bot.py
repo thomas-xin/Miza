@@ -1943,7 +1943,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print("Browse query:", repr(argv))
 				data = []
 				futs = []
-				backends = ["bing", "brave", "duckduckgo", "google", "mojeek", "yandex", "yahoo"]
+				backends = ["bing", "brave", "duckduckgo", "mojeek", "yandex", "yahoo"]
 				backends = shuffle(backends)[:3]
 				for backend in (backends):
 					fut = run_async(
@@ -1982,17 +1982,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		resp = await gather(*futs)
 		return "\n\n\n".join(resp) if isinstance(resp[0], str) else b"\n\n\n".join(resp)
 
-	async def function_call(self, *args, is_nsfw=None, backup_models=True, assistant_name=None, stream=False, models=[], model=None, **kwargs):
+	async def function_call(self, *args, is_nsfw=None, assistant_name=None, stream=False, models=[], model=None, **kwargs):
 		h = shash((args, kwargs))
 		if not stream:
 			try:
 				return ai.cache[h]
 			except KeyError:
 				pass
-		if backup_models:
-			models.extend((
-				"grok-4.1-fast",
-			))
 		if model in models:
 			models.remove(model)
 		models.insert(0, model)
@@ -2296,38 +2292,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			m.pop("new", None)
 		return messages, model
 
-	model_levels = {
-		0: cdict(
-			instructive="large",
-			casual="large",
-			nsfw="large",
-			backup="deepseek-v4-flash",
-			retry="minimax-m2.7",
-			function="small",
-			vision="gemini-3-flash",
-			target="auto",
-		),
-		1: cdict(
-			instructive="minimax-m2.7",
-			casual="deepseek-v4-flash",
-			nsfw="large",
-			backup="mimo-v2.5",
-			retry="mimo-v2.5",
-			function="grok-4.1-fast",
-			vision="gemini-3-flash",
-			target="auto",
-		),
-		2: cdict(
-			instructive="claude-opus-4.7",
-			casual="mimo-v2.5-pro",
-			nsfw="minimax-m2.7",
-			backup="gpt-5.5",
-			retry="gpt-5.5",
-			function="mimo-v2.5-pro",
-			vision="gemini-3.1-pro",
-			target="auto",
-		),
-	}
+	model_levels = dict(enumerate(AUTH.get("model_levels", [])))
 	async def chat_completion(self, messages, model="miza-1", system=None, max_tokens=256, temperature=0.8, tools=None, tool_choice=None, model_router=None, tool_router=None, user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
 		"OpenAI-compatible Chat Completion function. Autoselects model using a function call, then routes to tools and target model as required."
 		await require_predicate(predicate)
@@ -2868,7 +2833,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
-		model = model or ("gemini-3.1-pro" if best else "gemini-3-flash")
+		model = model or ("gemini-3.1-pro" if best else "gemini-3.1-flash-lite")
 		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
@@ -4279,7 +4244,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.categories.pop(mod)
 			self.dbitems.pop(mod)
 			with tracebacksuppressor:
-				self.size.pop(mod)
+				self.size.pop(mod.upper())
 		return True
 
 	def reload(self, mod=None):
@@ -8055,7 +8020,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.guilds_updated = True
 			self.users_updated = True
 			print(f"New server: {guild}")
-			guild = await self.fetch_guild(guild.id)
+			guild = await self.fetch_guild(guild.id, force=True)
 			self.cache.guilds[guild.id] = guild
 			m = guild.me
 			await self.send_event("_join_", user=m, guild=guild)
@@ -8171,7 +8136,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		async def on_message(message):
 			channel = message.channel
 			if message.guild:
-				await self.fetch_guild(message.guild.id)
+				guild = await self.fetch_guild(message.guild.id)
+				if not message.author.guild:
+					message.author.guild = guild
 			if T(channel).get("guild") is None and T(channel).get("recipient") is None:
 				try:
 					channel = await self.fetch_channel(channel.id, force=True)

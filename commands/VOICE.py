@@ -1243,6 +1243,7 @@ class VoiceNuke(Command):
 					if user.voice is not None:
 						connected.add(user)
 		await disconnect_members(self.bot, _guild, connected)
+		await bot.audio.asubmit(f"AP.disconnect({_guild.id},announce=0,clear=1)")
 		return italics(css_md(f"Successfully removed all users from voice channels in {sqr_md(_guild)}.")), 1
 
 
