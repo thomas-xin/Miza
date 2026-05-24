@@ -2589,7 +2589,7 @@ class UpdateMessageLogs(Database):
 			init = self.last_inits.get(channel.id) or "[UNKNOWN USER]"
 		except (PermissionError, discord.Forbidden):
 			init = "[UNKNOWN USER]"
-		embs = await self.bot.as_embeds(message, link=True)
+		embs = await self.bot.as_embeds(message, refresh=False, link=True)
 		embs[0].colour = discord.Colour(0xFF0000)
 		action = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\n"
 		embs[0].description = lim_str(action + (embs[0].description or ""), 4096)
@@ -2660,7 +2660,7 @@ class UpdateMessageLogs(Database):
 		embeds = deque((emb,))
 		for message in messages:
 			try:
-				embs = await self.bot.as_embeds(message, link=True)
+				embs = await self.bot.as_embeds(message, refresh=False, link=True)
 			except Exception:
 				print_exc()
 				continue

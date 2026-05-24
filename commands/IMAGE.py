@@ -1213,6 +1213,9 @@ class Resize(Command):
 		Jumbo=cdict(
 			mode="nearest",
 		),
+		PNG=cdict(
+			format="png",
+		),
 		GIF=cdict(
 			format="gif",
 		),

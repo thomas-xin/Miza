@@ -1215,7 +1215,7 @@ def extract_archive(archive_path, format=None, excludes=()):
 			z.extractall(path=path)
 	else:
 		shutil.unpack_archive(archive_path, extract_dir=path, format=format or get_ext(archive_path))
-	return [f"{path}/{fn}" for fn in os.listdir(path) if fn.rsplit(".", 1)[-1] not in excludes]
+	return list(filter(os.path.isfile, (f"{path}/{fn}" for fn in os.listdir(path) if fn.rsplit(".", 1)[-1] not in excludes)))
 
 IMAGE_FORMS = {
 	"auto": None,
@@ -1371,7 +1371,7 @@ CODECS = {
 	"vp8": "webm",
 	"vp9": "webm",
 	"av1": "mp4",
-	"quicktime": "qt",
+	"quicktime": "mov",
 	"mpegts": "ts",
 	"libopus": "opus",
 	"matroska": "mkv",
@@ -1403,6 +1403,7 @@ MIMES = cdict(
 	wav="audio/x-wav",
 	mp4="video/mp4",
 	mkv="video/x-matroska",
+	mov="video/quicktime",
 	tar="application/tar",
 	zip="application/zip",
 )
@@ -1449,6 +1450,7 @@ special_mimes = {
 	"svg": "svg+xml",
 	"tar": "tar",
 	"qt": "quicktime",
+	"mov": "quicktime",
 	"ts": "mp2t",
 	"txt": "plain",
 	"7z": "x-7z-compressed",

@@ -202,7 +202,9 @@ def _real_extract(self, url):
 		'_type': 'url_transparent',
 		'url': video_url,
 	}
-ytd.extractor.reddit.RedditIE._real_extract = _real_extract
+# ytd.extractor.reddit.RedditIE._real_extract = _real_extract
+
+cms = {}
 
 real_download = ytd.downloader.http.HttpFD.real_download
 def trial_download(self, filename, info_dict):
@@ -214,7 +216,9 @@ def trial_download(self, filename, info_dict):
 			raise ValueError
 		print(url)
 		t = time.time()
-		streamshatter.ChunkManager(url, headers=info_dict.get("http_headers", {}), concurrent_limit=16, timeout=12, max_attempts=7, filename=filename).run(close=True)
+		cm = streamshatter.ChunkManager(url, headers=info_dict.get("http_headers", {}), concurrent_limit=16, timeout=12, max_attempts=7, filename=filename, multiplexed=False)
+		cms[url] = cm
+		cm.run(close=True)
 		elapsed = time.time() - t
 		assert os.path.exists(filename) and os.path.getsize(filename)
 	except ValueError:
@@ -224,6 +228,7 @@ def trial_download(self, filename, info_dict):
 		if proc and proc.is_running():
 			proc.terminate()
 	else:
+		cms.pop(url, None)
 		sys.stdout.write("\n")
 		byte_counter = os.path.getsize(filename)
 		self._hook_progress({

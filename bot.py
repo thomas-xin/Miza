@@ -2292,7 +2292,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			m.pop("new", None)
 		return messages, model
 
-	model_levels = dict(enumerate(AUTH.get("model_levels", [])))
+	model_levels = dict(enumerate(map(cdict, AUTH.get("model_levels", []))))
 	async def chat_completion(self, messages, model="miza-1", system=None, max_tokens=256, temperature=0.8, tools=None, tool_choice=None, model_router=None, tool_router=None, user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
 		"OpenAI-compatible Chat Completion function. Autoselects model using a function call, then routes to tools and target model as required."
 		await require_predicate(predicate)
@@ -7405,8 +7405,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if isinstance(field, dict):
 					embed.add_field(**field)
 				else:
-					embed.add_field(name=fields[0], value=fields[1])
-			return create_task(self.send_with_react(
+					try:
+						value = fields[1]
+					except IndexError:
+						value = "\xad"
+					embed.add_field(name=fields[0], value=value)
+			return create_task(send_with_react(
 				messageable,
 				embed=embed,
 				reacts=reacts,
