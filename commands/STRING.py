@@ -1080,9 +1080,10 @@ class Random(Command):
 	description = "Randomly chooses from a list of words."
 	schema = cdict(
 		args=cdict(
-			type="string",
+			type="word",
 			description="List of possible choices, separated by newline or space.",
 			example="one two three",
+			multiple=True,
 		),
 	)
 	slash = True

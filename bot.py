@@ -2298,6 +2298,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		await require_predicate(predicate)
 		reasoning = []
 		modlvl = ["miza-1", "miza-2", "miza-3"].index(model.rsplit("/", 1)[-1])
+		self.model_levels = dict(enumerate(map(cdict, AUTH.get("model_levels", []))))
 		modelist = self.model_levels[modlvl]
 		messages = [cdict(m) for m in messages]
 		if system:
