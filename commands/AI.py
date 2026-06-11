@@ -329,9 +329,9 @@ class Ask(Command):
 			personality += f"\n\nThe current conversation takes place on Discord, where you have access to the following additional emojis. You may use these as desired, as an alternative to Unicode ones:\n{emojitexts}"
 		match pdata.history:
 			case "none":
-				personality += "\n\nConversation history disabled. Clarify to users if necessary."
+				personality += "\n\nConversation history disabled. Clarify if necessary (staff members may enable for all users using `~chatconfig --history shared`)."
 			case "private":
-				personality += "\n\nConversation history of external users disabled. Clarify to users if necessary."
+				personality += "\n\nConversation history of external users disabled. Clarify if necessary (staff members may enable for all users using `~chatconfig --history shared`)."
 		if "nsfw" in personality.casefold() or not _nsfw and bot.is_nsfw(_user):
 			pass
 		elif nsfw:
@@ -340,9 +340,9 @@ class Ask(Command):
 			personality += "\n\nYou are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, use disclaimers in your response, and clarify if necessary."
 		tzinfo = self.bot.data.users.get_timezone(_user.id)
 		if tzinfo is None:
-			tzinfo, _c = self.bot.data.users.estimate_timezone(_user.id)
+			tzinfo = datetime.timezone.utc
 		dt = DynamicDT.now(tz=tzinfo)
-		personality += f"\nCurrent Time: {dt.as_full()}"
+		personality += f"\nCurrent Time: {dt.as_full()} {dt.tzinfo}"
 		system_message = cdict(
 			role="system",
 			content=personality,

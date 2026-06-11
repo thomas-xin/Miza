@@ -23,7 +23,7 @@ from misc.asyncs import run_async, submit_thread, wrap_future, await_fut, Future
 from misc.smath import get_closest_heart
 from misc.util import (
     CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, read_file_a, download_file, header_test, getsize,
-    tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist, shorten_chunks,
+    tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist, shorten_chunks, expand_chunks,
 	ungroup_attachments, is_discord_url, is_miza_attachment, temporary_file, url2ext, is_discord_attachment, is_miza_url,
     snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt,
 )
@@ -708,6 +708,21 @@ def _enumerate_os_fonts():
 def enumerate_os_fonts():
 	return font_cache.retrieve("map", _enumerate_os_fonts)
 
+
+def minimise_url(url, kvs={}, minimise=True):
+	if is_miza_attachment(url):
+		if "/c/" in url:
+			args = expand_chunks(url)
+			return shorten_chunks(*args, minimise=minimise)
+		else:
+			c_id, m_id, a_id, fn = expand_attachment(url)
+			m_id = kvs.get(a_id, m_id)
+			return shorten_attachment(c_id, m_id, a_id, fn, minimise=minimise and bool(m_id))
+	if is_discord_attachment(url):
+		a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+		m_id = kvs.get(a_id, 0)
+		return attachment_cache.preserve(url, m_id, minimise=minimise and bool(m_id))
+	raise ValueError(url)
 
 def acquire_from_archive(url, arcnames, filenames):
 	with tracebacksuppressor:

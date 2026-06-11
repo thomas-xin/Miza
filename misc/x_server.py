@@ -27,7 +27,7 @@ from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, submit_thread, create_thread, create_task, await_fut
 from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
 from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url_unparse, url2fn, is_youtube_url, seq, Request, get_mime, mime_from_file, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS
-from .caches import attachment_cache, colour_cache
+from .caches import attachment_cache, colour_cache, minimise_url
 from .audio_downloader import AudioDownloader, get_best_icon
 
 ytdl_fut = submit_thread(AudioDownloader, workers=1)
@@ -639,6 +639,16 @@ class Server:
 			return resume(b, it)
 		return resp.iter_content(262144)
 	proxy._cp_config = {"response.stream": True}
+
+	@cp.expose(("minimize",))
+	def minimise(self, url):
+		try:
+			assert is_miza_attachment(url)
+			assert "/u/" in url or "/c/" in url
+			update_headers(cp.response.headers, **HEADERS)
+			return minimise_url(url)
+		except AssertionError:
+			raise FileNotFoundError(url)
 
 	ydl_sems = {}
 	ydl = None

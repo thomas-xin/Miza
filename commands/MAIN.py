@@ -1104,33 +1104,31 @@ class Preserve(Command):
 	ephemeral = True
 
 	async def __call__(self, bot, _channel, _message, minimise, urls, **void):
+		targets = [_message]
+		try:
+			reference = await bot.fetch_reference(_message)
+		except (LookupError, discord.NotFound):
+			pass
+		else:
+			targets.append(reference)
+		for url in find_urls(_message.content):
+			if is_discord_message_link(url):
+				with tracebacksuppressor:
+					m = await bot.fetch_message(url)
+					targets.append(m)
+		kvs = {}
+		for m in targets:
+			for a in m.attachments:
+				kvs[a.id] = m.id
+		print(kvs)
 		futs = deque()
 		for url in urls:
-			if is_miza_attachment(url):
-				if "/c/" in url:
-					args = expand_chunks(url)
-					futs.append(as_fut(shorten_chunks(*args, minimise=minimise)))
-				else:
-					args = expand_attachment(url)
-					if len(args) < 2 or not args[1]:
-						minimise = False
-					futs.append(as_fut(shorten_attachment(*args, minimise=minimise)))
-				continue
-			if is_discord_attachment(url):
-				a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-				found = None
-				for attachment in _message.attachments:
-					if attachment.id == a_id:
-						found = attachment
-						break
-				if found:
-					futs.append(as_fut(attachment_cache.preserve(url, _message.id, minimise=minimise)))
-					continue
-				minimise = False
-				futs.append(as_fut(attachment_cache.preserve(url, 0, minimise=minimise)))
-				continue
-			futs.append(bot.data.exec.lproxy(url, channel=_channel, minimise=minimise))
-			await asyncio.sleep(0.1)
+			try:
+				futs.append(as_fut(minimise_url(url, kvs=kvs, minimise=minimise)))
+			except Exception:
+				print_exc()
+				futs.append(bot.data.exec.lproxy(url, channel=_channel, minimise=minimise))
+				await asyncio.sleep(0.1)
 		out = await gather(*futs)
 		print(urls)
 		print(out)

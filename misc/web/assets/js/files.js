@@ -80,7 +80,7 @@
 		});
 	}
 
-	function populatePreviewSection(filename, url, mime, size) {
+	async function populatePreviewSection(filename, url, mime, size) {
 
 		function formatBytes(bytes) {
 			if (bytes <= 0) return '0 Bytes';
@@ -98,11 +98,16 @@
 		let viewRawBtn = previewSection.querySelector('#view-raw');
 		let dlButton = previewSection.querySelector('#download');
 
+		let short = url;
+		if (url.startsWith('https://mizabot.xyz/u/')) {
+			const resp = await fetch('https://api.mizabot.xyz/minimise?url=' + url);
+			short = await resp.text();
+		}
 		h1.innerText = '“' + filename + '”';
-		permalink.href = url;
-		permalink.innerText = url;
+		permalink.href = short;
+		permalink.innerText = short;
 
-		if (mime.startsWith('image/')) {
+		if (mime.startsWith('image/')) { 
 			let previewImg = document.createElement('img');
 			previewImg.src = url;
 			previewImg.alt = filename;
