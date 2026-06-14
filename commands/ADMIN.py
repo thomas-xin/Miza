@@ -2169,6 +2169,13 @@ class UpdateUserLogs(Database):
 			)
 			change = True
 			colour[0] += 255
+		if getattr(before, "global_name", None) != getattr(after, "global_name", None):
+			emb.add_field(
+				name="Display Name",
+				value=escape_markdown(getattr(before, "global_name", str(before))) + " ➡️ " + escape_markdown(getattr(after, "global_name", str(after))),
+			)
+			change = True
+			colour[0] += 255
 		if hasattr(before, "guild") and hasattr(after, "guild"):
 			if before.display_name != after.display_name:
 				emb.add_field(

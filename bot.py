@@ -322,7 +322,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		try:
 			temp = self.userbase[uid]
 			temp, last = self.get_database(temp, path)
-			temp = temp[last]
+			if last != "":
+				temp = temp[last]
 			if default is not None and default is not Dummy and not isinstance(temp, type(default)):
 				return type(default)(temp)
 			return temp
@@ -377,7 +378,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		try:
 			temp = self.guildbase[gid]
 			temp, last = self.get_database(temp, path)
-			temp = temp[last]
+			if last != "":
+				temp = temp[last]
 			if default is not None and default is not Dummy and not isinstance(temp, type(default)):
 				return type(default)(temp)
 			return temp
@@ -2834,7 +2836,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
 			]),
 		]
-		model = model or ("gemini-3.1-pro" if best else "gemini-3.1-flash-lite")
+		model = model or self.model_levels[2 if best else 1]["vision"]
 		messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
 		data = cdict(
 			model=model,
@@ -4366,7 +4368,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			out.append(f"{coin} {gold}")
 		if out:
 			return " ".join(out)
-		return
+		return ""
 
 	async def react_callback(self, message, reaction, user):
 		"Operates on reactions on special messages, calling the _callback_ methods of commands when necessary."
@@ -6309,7 +6311,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				domain_cert=dc,
 				private_key=pk,
 				channels=channels,
-				encryption_key=AUTH["encryption_key"],
 				token=self.token,
 				alt_token=AUTH.get("alt_token") or self.token,
 				attachment_cache=ac,

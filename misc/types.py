@@ -11,7 +11,7 @@ import fractions
 import functools
 import io
 from itertools import chain, repeat # noqa: F401
-from math import ceil, floor, inf, nan
+from math import ceil, floor, inf, nan, isfinite
 import json
 import random
 import re
@@ -1427,7 +1427,7 @@ def round_min(x) -> number:
 		return x
 	if isinstance(x, int):
 		return x
-	if isinstance(x, str):
+	if isinstance(x, str | byte_like):
 		if not x:
 			return nan
 		if "/" in x:
@@ -1443,6 +1443,11 @@ def round_min(x) -> number:
 	if isinstance(x, np.number):
 		x = x.item()
 	if not hasattr(x, "is_integer"):
+		try:
+			if not isfinite(x):
+				return x
+		except TypeError:
+			return x
 		return int(x) if x == int(x) else x
 	elif x.is_integer():
 		return int(x)

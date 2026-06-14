@@ -151,7 +151,7 @@ class Translate(Command):
 			print_exc()
 			translated = await ai._instruct(
 				data=dict(
-					model="grok-4.1-fast",
+					model="mimo-v2.5",
 					messages=messages,
 					temperature=0.01,
 					premium_context=premium,

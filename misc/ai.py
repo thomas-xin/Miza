@@ -359,7 +359,7 @@ async def load_local():
 			model.model = mname
 			model.pricing = pricing
 			models.append(model)
-			print(f"Loaded local model API {base_url} with model {mname}.")
+			print(f"Loaded local API {base_url} with model {mname}.")
 		local_models[name] = models
 		available.setdefault(name, {})[""] = (name, pricing)
 		contexts[name] = info.get("context", 24576)
@@ -483,7 +483,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 		if api is None and minfo is None:
 			try:
 				api = random.choice(next(iter(local_models.values())))
-			except StopIteration:
+			except (IndexError, StopIteration):
 				api = "openrouter"
 				minfo = available["mimo-v2.5"]
 		if api is None:

@@ -2515,11 +2515,11 @@ class Stats(Command):
 		bar = await bot.create_progress_bar(18, ratio)
 		xp = floor(xp) if isfinite(xp) else xp
 		bal = await bot.as_rewards(diamonds, gold)
-		description = f"{bar}\n`Lv {level}`\n`XP {xp}/{xp_next}`\n{bal}"
-		ingots = data.get("ingots", 0)
-		if ingots:
-			ingot = await bot.data.emojis.emoji_as("gold_ingot.gif")
-			description += f" {ingot} {ingots}"
+		description = f"{bar}\n`Lv {level}`\n`XP {xp}/{xp_next}`\n{bal}" if mode == "wallet" else ""
+		# ingots = data.get("ingots", 0)
+		# if ingots:
+		# 	ingot = await bot.data.emojis.emoji_as("gold_ingot.gif")
+		# 	description += f" {ingot} {ingots}"
 		if mode == "premium":
 			lv = bot.premium_level(user)
 			lv2 = bot.premium_level(user, absolute=True)
@@ -2560,25 +2560,26 @@ class Stats(Command):
 					s = ""
 				description += f"\nPremium credit remaining: `{q}` (`${c}`){s}"
 			description += f"{nc}Premium logging mode: `{data.get('logging', 'auto')}`"
-		sparkles = data.get("sparkles", 0)
-		if sparkles:
-			items = deque()
-			for i in ("secret", "legendary", "rare", "normal"):
-				c = sparkles.get(i)
-				if not c:
-					continue
-				s = await bot.data.emojis.emoji_as(sparkle_values[i] + ".gif", full=True)
-				s += f" {c}"
-				items.append(s)
-			description += "\n" + " ".join(items)
-		minecraft = data.get("minecraft", 0)
-		if minecraft:
-			items = deque()
-			for i, c in sorted(minecraft.items()):
-				s = await bot.data.emojis.emoji_as(barter_values[i] + ".gif")
-				s += f" {c}"
-				items.append(s)
-			description += "\n" + " ".join(items)
+		if mode == "wallet":
+			sparkles = data.get("sparkles", 0)
+			if sparkles:
+				items = deque()
+				for i in ("secret", "legendary", "rare", "normal"):
+					c = sparkles.get(i)
+					if not c:
+						continue
+					s = await bot.data.emojis.emoji_as(sparkle_values[i] + ".gif", full=True)
+					s += f" {c}"
+					items.append(s)
+				description += "\n" + " ".join(items)
+			minecraft = data.get("minecraft", 0)
+			if minecraft:
+				items = deque()
+				for i, c in sorted(minecraft.items()):
+					s = await bot.data.emojis.emoji_as(barter_values[i] + ".gif")
+					s += f" {c}"
+					items.append(s)
+				description += "\n" + " ".join(items)
 		url = await self.bot.get_proxy_url(user)
 		bot.send_as_embeds(_channel, description, thumbnail=url, author=get_author(user), reference=_message)
 
