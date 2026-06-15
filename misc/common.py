@@ -1634,6 +1634,31 @@ def process_image(image, operation="$", args=[], cap="image", priority=False, ti
 	argi = "[" + ",".join(map(as_arg, args)) + "]"
 	return proc_eval(f"evaluate_image([{repr(image)},{repr(operation)},{argi}])", caps=[cap], priority=priority, timeout=timeout)
 
+async def parse_latex(s):
+	outs = []
+	futs = []
+	r1 = re.compile(r"\$[^$]+\$")
+	r2 = re.compile(r"\$\$[^$]+\$\$")
+	n = 0
+	while True:
+		m1 = r1.search(s, n)
+		m2 = r2.search(s, n)
+		if not m1:
+			if not m2:
+				break
+			m = m2
+		else:
+			if not m2:
+				m = m1
+			else:
+				m = m1 if m1.start() < m2.start() else m2
+		expr = m.group().strip("$")
+		outs.append(s[n:m.start()])
+		n = m.end()
+		futs.append(process_math(expr, prec=32, rational=True))
+	results = await gather(*futs, return_exceptions=True)
+	return "".join(f"{a}`{b[-1] if not isinstance(b, BaseException) else ''}`" for a, b in zip(outs, results)) + s[n:]
+
 
 @tracebacksuppressor
 def exec_tb(s, *args, **kwargs):

@@ -5583,7 +5583,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							reacts=reacts,
 							buttons=buttons,
 						))
-					total_length = len(get_prefix()) + len(content) + len(get_suffix())
+					# total_length = len(get_prefix()) + len(content) + len(get_suffix())
 					if fut:
 						with tracebacksuppressor:
 							await fut
@@ -5594,7 +5594,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					else:
 						tfut = None
 					try:
-						new_content = await self.proxy_emojis(content, guild=message.guild)
+						temp_content = await self.proxy_emojis(content, guild=guild)
+						new_content = await parse_latex(temp_content)
 						await manager.update(new_content, embeds=embeds, files=files, buttons=buttons, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), reacts=reacts, done=done, force=force)
 					except (OverflowError, InterruptedError):
 						# If the StreamedMessage was interrupted or exceeded the maximum length, we wipe the original and force a new message. This ensures the list of messages stays contiguous, which improves readability.

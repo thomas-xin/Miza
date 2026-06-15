@@ -1210,8 +1210,11 @@ def evalSym(f, prec=64, r=False, variables=None):
 				f = latex.parse_latex(f)
 			except Exception:
 				pass
-		if not f:
-			raise
+		try:
+			if not f:
+				raise ValueError(f)
+		except TypeError:
+			pass
 	else:
 		# Required blacklist for underscore-encapsulated attributes as sympy reintroduced the ability to obtain them in parse_expr, causing possible arbitrary code execution exploits, e.g. `sqrt.__builtins__["eval"]('1 + 1')`. To prevent this, we borrow ast.NodeTransformer to remove any attributes that start or end with an underscore.
 		a = ast.parse(s, mode="eval")

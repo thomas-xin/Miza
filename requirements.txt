@@ -1,5 +1,5 @@
 aiofiles>=25.1.0
-antlr4-python3-runtime>=4.13.2
+antlr4-python3-runtime==4.11
 audioptic>=1.0.0
 asyncio>=4.0.0
 async-timeout>=5.0.1
