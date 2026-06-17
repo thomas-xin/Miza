@@ -54,17 +54,13 @@ def get_best_icon(entry):
 			entry["icon"] = f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg"
 			return entry["icon"]
 		if is_miza_url(url):
-			return "https://mizabot.xyz/static/mizaleaf.png"
+			return "https://mizabot.xyz/assets/images/mizaleaf.webp"
 		return ""
 	return sorted(
 		thumbnails,
 		key=lambda x: float(x.get("width", x.get("preference", 0) * 4096)),
 		reverse=True,
 	)[0]["url"]
-
-async def disconnect_members(bot, guild, members, channel=None):
-	futs = [member.move_to(None) for member in members]
-	await gather(*futs)
 
 async def force_dc(bot, guild):
 	if bot.permissions_in(guild).move_members:
@@ -540,7 +536,7 @@ class Connect(Command):
 	rate_limit = (3, 4)
 	slash = ("Connect", "Leave")
 
-	async def __call__(self, bot, _user, _channel, _message=None, _perm=0, channel=None, mode="connect", vc=None, **void):
+	async def __call__(self, bot, _user, _channel, _perm=0, channel=None, mode="connect", vc=None, **void):
 		force = bool(channel)
 		if mode == "disconnect":
 			vc_ = None
@@ -548,10 +544,7 @@ class Connect(Command):
 			vc_ = channel
 		else:
 			# If voice channel is already selected, use that
-			if vc is not None:
-				vc_ = vc
-			else:
-				vc_ = await select_voice_channel(_user, _channel)
+			vc_ = vc or await select_voice_channel(_user, _channel)
 		# target guild may be different from source guild
 		if vc_ is None:
 			guild = _channel.guild
@@ -748,9 +741,8 @@ class AudioState(Command):
 			example="shuffle",
 		),
 		value=cdict(
-			type="bool",
+			type="ternary",
 			description="Specify a state (toggles by default)",
-			example="false",
 		),
 	)
 	macros = {
@@ -1206,45 +1198,84 @@ class Dedup(Command):
 		)
 
 
-class UnmuteAll(Command):
+class Migrate(Command):
 	server_only = True
-	time_consuming = True
-	min_level = 3
-	description = "Disables server mute/deafen for all members."
-	rate_limit = 10
-
-	async def __call__(self, guild, **void):
-		for vc in guild.voice_channels:
-			for user in vc.members:
-				if user.voice is not None:
-					if user.voice.deaf or user.voice.mute or user.voice.afk:
-						create_task(user.edit(mute=False, deafen=False))
-		return italics(css_md(f"Successfully unmuted all users in voice channels in {sqr_md(guild)}.")), 1
-
-
-class VoiceNuke(Command):
-	server_only = True
-	min_level = 0
-	min_display = "2?"
-	name = ["☢️"]
+	min_level = 2
+	name = ["MoveAll"]
 	description = "Removes all users from voice channels in the current server."
-	schema = cdict()
+	schema = cdict(
+		channel=cdict(
+			type="channel",
+			description="Target voice channel to move users to",
+		),
+		mute=cdict(
+			type="ternary",
+			description="Whether to add/remove server mute affected members",
+		),
+		deafen=cdict(
+			type="ternary",
+			description="Whether to add/remove server deafen affected members",
+		),
+		all=cdict(
+			type="bool",
+			description="Whether to apply to all active voice channels",
+		),
+	)
+	macros = {
+		"VoiceNuke": cdict(
+			channel=None,
+		),
+		"☢️": cdict(
+			channel=None,
+		),
+		"UnMute": cdict(
+			mute=False,
+		),
+		"UnDeafen": cdict(
+			deafen=False,
+		),
+		"UnMuteDeafen": cdict(
+			mute=False,
+			deafen=False,
+		),
+	}
 	rate_limit = 10
 	ephemeral = True
 
-	async def __call__(self, _guild, _user, _perm, **void):
-		if _perm < 2:
-			await _user.move_to(None)
-			return italics(css_md(f"Successfully removed {_user} from voice channels in {sqr_md(_guild)}.")), 1
-		connected = set()
-		for vc in voice_channels(_guild):
+	async def __call__(self, _guild, _user, _channel, _perm, channel, mute, deafen, all, **void):
+		if all:
+			vcs = voice_channels(_guild)
+		else:
+			vc = await select_voice_channel(_user, _channel)
+			vcs = [vc]
+		futs = []
+		mutedeafen = cdict()
+		if mute is not None:
+			mutedeafen.mute = mute
+		if deafen is not None:
+			mutedeafen.deafen = deafen
+		self_included = False
+		for vc in vcs:
 			for user in vc.members:
 				if user.id != self.bot.id:
-					if user.voice is not None:
-						connected.add(user)
-		await disconnect_members(self.bot, _guild, connected)
-		await bot.audio.asubmit(f"AP.disconnect({_guild.id},announce=0,clear=1)")
-		return italics(css_md(f"Successfully removed all users from voice channels in {sqr_md(_guild)}.")), 1
+					fut = user.edit(voice_channel=channel, **mutedeafen)
+					futs.append(fut)
+				else:
+					self_included = True
+		await gather(*futs)
+		if not channel:
+			if self_included:
+				await bot.audio.asubmit(f"AP.disconnect({_guild.id},announce=0,clear=1)")
+			return italics(css_md(f"Successfully removed all users from voice in {sqr_md(_guild)}.")), 1
+		if self_included:
+			await bot.commands.connect[0](
+				bot=bot,
+				_user=_user,
+				_channel=_channel,
+				_perm=2,
+				channel=channel,
+			)
+		return italics(css_md(f"Successfully moved all users from voice to {sqr_md(channel)}.")), 1
 
 
 class RefreshRegion(Command):

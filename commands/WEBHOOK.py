@@ -764,11 +764,11 @@ class ProxySend(Command):
 			required=True,
 			greedy=False,
 		),
-		invoke=cdict(
-			type="bool",
-			description="Whether to invoke the proxy's AI, if applicable",
-			default=True,
-		),
+		# invoke=cdict(
+		# 	type="bool",
+		# 	description="Whether to invoke the proxy's AI, if applicable",
+		# 	default=True,
+		# ),
 	)
 
 	async def __call__(self, bot, _user, _message, proxy, channel, message, invoke, **void):

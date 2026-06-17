@@ -958,7 +958,7 @@ class Activity(Command):
 
 	async def __call__(self, bot, _user, _timeout, **void):
 		data = await run_async(bot.data.users.fetch_events, _user.id, interval=900, timeout=_timeout)
-		resp = await process_image("plt_special", "&", (data, str(_user)), cap="math")
+		resp = await process_image("plt_special", "&", (data, str(_user)), cap="math", priority=True)
 		fn = resp
 		f = CompatFile(fn, filename=f"{_user}.png")
 		return dict(file=f, filename=fn, best=True)
@@ -1075,7 +1075,6 @@ class Preserve(Command):
 		minimise=cdict(
 			type="bool",
 			description="Whether to produce the shortest possible alias",
-			default=False,
 		),
 		urls=cdict(
 			type="url",

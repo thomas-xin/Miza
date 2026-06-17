@@ -465,6 +465,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						arg.max_value = Mx
 				elif v.type == "bool":
 					arg.type = 5
+				elif v.type == "ternary":
+					arg.type = 5
 				elif v.type == "user":
 					arg.type = 6
 				elif v.type == "channel":
@@ -4612,7 +4614,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					names.append(shortened)
 					chars.remove(k[0])
 				used.update(names)
-				if v.get("type") == "bool":
+				if v.get("type") in ("bool", "ternary"):
 					parser.add_argument(*names, action=argparse.BooleanOptionalAction)
 					continue
 				action = "append" if v.get("multiple") else "store"
@@ -4710,7 +4712,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					continue
 				hs = parser.has_string
 				taken = False
-				if not hs and v.type == "bool" and full_prune(a) in ("true", "false", "t", "f", "1", "0"):
+				if not hs and v.type in ("bool", "ternary") and full_prune(a) in ("yes", "no", "y", "n", "true", "false", "t", "f", "1", "0", "-", "null", "none"):
 					taken = True
 				elif not hs and v.type == "enum" and (full_prune(a) in v.validation.enum or full_prune(a) in v.validation.get("accepts", ())):
 					taken = True
@@ -4996,10 +4998,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		elif info.type == "bool":
 			if not isinstance(v, bool):
 				v = full_prune(v)
-				if v in ("true", "t", "1"):
+				if v in ("yes", "y", "true", "t", "1"):
 					v = True
-				elif v in ("false", "f", "0"):
+				elif v in ("no", "n", "false", "f", "0", "-", "null", "none"):
 					v = False
+				else:
+					raise err(TypeError, k, v)
+		elif info.type == "ternary":
+			if not isinstance(v, bool):
+				v = full_prune(v)
+				if v in ("yes", "y", "true", "t", "1"):
+					v = True
+				elif v in ("no", "n", "false", "f", "0"):
+					v = False
+				elif v in ("-", "null", "none"):
+					v = None
 				else:
 					raise err(TypeError, k, v)
 		elif info.type in ("number", "integer"):
@@ -5137,7 +5150,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				soon_indicator = create_task(message.add_reaction("🔜"))
 				if slash or getattr(message, "slash", False):
 					await self.defer_interaction(message, ephemeral=getattr(message, "ephemeral", False))
-			await wrap_future(self.connect_ready)
+			fut = wrap_future(self.connect_ready)
+			try:
+				message.__dict__.setdefault("inits", []).append(fut)
+			except Exception:
+				pass
+			await fut
 		channel = channel or (message.channel if message else None)
 		guild = guild or getattr(channel, "guild", None)
 		if user and user.id == self.id:
@@ -7546,7 +7564,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		try:
 			sem = self.flatten_sems[bucket]
 		except KeyError:
-			sem = self.flatten_sems[bucket] = Semaphore(1, 4, rate_limit=2)
+			sem = self.flatten_sems[bucket] = Semaphore(5, 10, rate_limit=60)
 		data = {}
 		with tracebacksuppressor(SemaphoreOverflowError):
 			async with sem:
@@ -7588,11 +7606,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			total_results=resp.get("total_results", 0),
 		)
 	async def flatten_search(self, guild_id, limit=200, target_id=0, channel_id=None, author_id=None, **kwargs):
-		bucket = guild_id
+		bucket = f"{guild_id}/{target_id}"
 		try:
 			sem = self.flatten_sems[bucket]
 		except KeyError:
-			sem = self.flatten_sems[bucket] = Semaphore(1, 4, rate_limit=2)
+			sem = self.flatten_sems[bucket] = Semaphore(5, 10, rate_limit=60)
 		data = []
 		with tracebacksuppressor(SemaphoreOverflowError):
 			async with sem:
@@ -7622,11 +7640,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if add:
 				self.set_guildbase(guild_id, f"index:{target}.count", count)
 			return count
-		bucket = guild_id
+		bucket = f"{guild_id}/{author_id}"
 		try:
 			sem = self.flatten_sems[bucket]
 		except KeyError:
-			sem = self.flatten_sems[bucket] = Semaphore(1, 4, rate_limit=2)
+			sem = self.flatten_sems[bucket] = Semaphore(5, 10, rate_limit=60)
 		self.set_guildbase(guild_id, f"index:{target}", cdict(time=utc(), count=0))
 		total = 0
 		with tracebacksuppressor(SemaphoreOverflowError):
@@ -7655,11 +7673,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		total = await self.index_member(guild_id)
 		await self.index_member(guild_id, self.deleted_user)
 		curr = self.get_guildbase(guild_id, "index", {})
-		bucket = guild_id
+		bucket = f"{guild_id}/0"
 		try:
 			sem = self.flatten_sems[bucket]
 		except KeyError:
-			sem = self.flatten_sems[bucket] = Semaphore(1, 4, rate_limit=2)
+			sem = self.flatten_sems[bucket] = Semaphore(5, 10, rate_limit=60)
 		base_id = time_snowflake(DynamicDT.utcnow())
 		for n in binary_tree_level_order(6):
 			top = sorted(curr, key=lambda k: curr[k].get("count", 0) if k else 0, reverse=True)[:limit]
@@ -8232,7 +8250,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					found = await self.flatten_search(after.guild.id, limit=200, target_id=after.id, author_id=after.author.id)
 					print(f"Edit: Retrieved {len(found)} messages from user {after.author}")
 			with tracebacksuppressor:
-				inits = T(before).get("inits")
+				inits = T(before).get("inits") or T(after).get("inits")
 				if inits:
 					print("Cancel:", inits)
 					for fut in inits:
@@ -8322,7 +8340,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					message.author = await self.fetch_user(self.deleted_user)
 					message.author.name = "Unknown User"
 					history = discord.abc.Messageable.history(channel, limit=101, around=message)
-					create_task(self.flatten_into_cache(history, getattr_chain(channel, "guild.id", channel.id)))
+					bucket = str(getattr_chain(channel, "guild.id", channel.id)) + "/-1"
+					create_task(self.flatten_into_cache(history, bucket))
 			if had_before and message.guild and not message.author.bot and "logM" in self.data and message.guild.id in self.data.logM and utc() - message.created_at.timestamp() > 86400 * 14:
 				found = await self.flatten_search(message.guild.id, limit=200, target_id=message.id, author_id=message.author.id)
 				print(f"Delete: Retrieved {len(found)} messages from user {message.author}")

@@ -843,7 +843,6 @@ class Spin(Command):
 		circle=cdict(
 			type="bool",
 			description="Indicates whether to crop the image to a circle",
-			example="False",
 			default=True,
 		),
 		duration=cdict(
@@ -1363,7 +1362,6 @@ class Adjust(Command):
 		clip=cdict(
 			type="bool",
 			description="Clips out-of-bound values. Wraps values if not set",
-			example="False",
 			default=True,
 		),
 		filesize=cdict(

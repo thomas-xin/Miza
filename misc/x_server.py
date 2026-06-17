@@ -752,7 +752,19 @@ class Server:
 							cookiesfrombrowser=["firefox"],
 							postprocessors=postprocessors,
 						)
-						title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True)['title']", timeout=3600)
+						try:
+							title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True)['title']", timeout=3600)
+						except RuntimeError as ex:
+							print(ex)
+							ydl_opts.pop("cookiesfrombrowser", None)
+						if not os.path.exists(fn):
+							try:
+								title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True)['title']", timeout=3600)
+							except RuntimeError as ex:
+								print(ex)
+								ydl_opts.pop("remote_components", None)
+						if not os.path.exists(fn):
+							title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True)['title']", timeout=3600)
 					assert os.path.exists(fn), f"Download unsuccessful: {fn}."
 			else:
 				entry = self.ydl.search(q)[0]

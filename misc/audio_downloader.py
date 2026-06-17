@@ -59,7 +59,7 @@ def get_best_icon(entry):
 			entry["icon"] = f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg"
 			return entry["icon"]
 		if is_miza_url(url):
-			return "https://mizabot.xyz/static/mizaleaf.png"
+			return "https://mizabot.xyz/assets/images/mizaleaf.webp"
 		return ""
 	return sorted(
 		thumbnails,

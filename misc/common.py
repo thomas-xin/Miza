@@ -1939,12 +1939,18 @@ class Command(Importable):
 		for k, v in reversed(schema.items()):
 			val = v.get("example") or v.get("default")
 			if not val:
-				if v.get("type") not in ("bool", "enum"):
+				if v.get("type") not in ("bool", "ternary", "enum"):
 					continue
 				if v["type"] == "enum":
 					val = v["validation"]["enum"][-1]
 			k2 = k[0]
 			if v.get("type") == "bool":
+				if v.get("default"):
+					values.append(f"{colourise('--no-' + k, fg='blue')}")
+				else:
+					values.append(f"{colourise('--' + k, fg='blue')}")
+				u.add(k2)
+			elif v.get("type") == "ternary":
 				if v.get("default"):
 					values.append(f"{colourise('--no-' + k, fg='blue')}")
 				else:

@@ -128,7 +128,7 @@ def ImageOpIterator(image, step=1, operation=None, ts=0, args=()):
 		else:
 			yield temp
 
-class ImageSequence(Image.Image):
+class ImageSequence(Image.Image, collections.abc.Sequence):
 
 	frameprops = None
 	it = None
@@ -238,21 +238,28 @@ class ImageSequence(Image.Image):
 			raise EOFError
 		self._position = position
 
+	def __getitem__(self, index):
+		return self.ensure(index)
+
+	def ensure(self, position):
+		if self.it:
+			try:
+				while len(self._images) <= position:
+					self._images.append(next(self.it))
+					if len(self._images) >= len(self):
+						if self.close:
+							self.close()
+						break
+			except StopIteration:
+				raise StopIteration(len(self._images), position, len(self))
+		im = self._images[position]
+		return im
+
 	def __getattr__(self, key):
 		try:
 			return self.__getattribute__(key)
 		except AttributeError:
-			if self.it:
-				try:
-					while len(self._images) <= self._position:
-						self._images.append(next(self.it))
-						if len(self._images) >= len(self):
-							if self.close:
-								self.close()
-							break
-				except StopIteration:
-					raise StopIteration(len(self._images), self._position, len(self))
-			im = self._images[self._position]
+			im = self.ensure(self._position)
 			try:
 				if not im.im:
 					raise ValueError
@@ -1593,7 +1600,7 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 	if area:
 		w, h = max_size(w, h, maxsize=sqrt(area), force=True)
 	w, h = round(w), round(h)
-	if (w, h) == image.size:
+	if (w, h) == image.size and fps == prop[2]:
 		return image
 	if mode == "auto":
 		mode = "area" if image.width * image.height > w * h else "nearest" if image.width * image.height <= 16384 else "cubic" if w * h > 1048576 else "lanczos"
@@ -1613,7 +1620,7 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 			vf = f"crop={w}:{h}:(in_w-{w})/2:(in_h-{h})/2"
 		else:
 			vf = f"scale={w}:{h}:flags={mode}"
-		cmd3 = ["ffmpeg", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-f", "rawvideo", "-video_size", "x".join(map(str, image.size)), "-pix_fmt", fmt, "-i", "-", "-vf", vf, "-f", "rawvideo", "-pix_fmt", fmt, "-"]
+		cmd3 = ["ffmpeg", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-f", "rawvideo", "-video_size", "x".join(map(str, image.size)), "-pix_fmt", fmt, "-i", "-", "-r", str(fps), "-vf", vf, "-f", "rawvideo", "-pix_fmt", fmt, "-"]
 		print(cmd3)
 		proc = psutil.Popen(cmd3, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
 		def writer():
@@ -1635,10 +1642,16 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 		buf = resize_bufferer()
 		if prog < 0:
 			buf = reversed(list(buf))
-		return dict(duration=duration, count=prop[0], frames=buf)
+		return dict(duration=duration, count=floor(prop[0] * prop[2] / fps), frames=buf)
 
 	func = resize_mult if operation == "mult" else resize_to
-	return dict(duration=duration, count=prop[0], frames=map(func, ImageSequence.cast(image), [x] * prop[0], [y] * prop[0], [mode] * prop[0]))
+	im = ImageSequence.cast(image)
+	fcount = round(fps * duration)
+	frames = (
+		func(im[round(i / fcount * len(im))], x, y, mode)
+		for i in range(fcount)
+	)
+	return dict(duration=duration, count=fcount, frames=frames)
 
 def orbit_map(image, extras, duration, fps, count):
 	symmetry = count or (1 if extras else 5)

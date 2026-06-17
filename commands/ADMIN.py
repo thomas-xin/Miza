@@ -1727,7 +1727,6 @@ class EnabledCommands(Command):
 		apply_all=cdict(
 			type="bool",
 			description="Whether to apply to server (will affect all non-assigned channels)",
-			example="true",
 			default=False,
 			excludes=("target",),
 		),
