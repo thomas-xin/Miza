@@ -49,7 +49,7 @@ async function loadArchive(url) {
 
 	/* 2. Fetch bytes */
 	showLoader('Fetching archive…');
-	const res = await fetch(url);
+	const res = await fetch(url, { cache: 'force-cache' });
 	if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
 	const buffer = await res.arrayBuffer();
 	if (buffer.byteLength === 0) throw new Error('Received empty body — likely a CORS or redirect issue.');

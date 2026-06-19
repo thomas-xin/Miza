@@ -55,7 +55,7 @@ async function prepareIndex() {
 	})
 
 	withElement('.commands-index > h1', heading => {
-		heading.innerText = 'Commands';
+		heading.innerText = '🖥️ Commands';
 	});
 	withElement('#command', commandHolder => {
 		commandHolder.replaceChildren();
