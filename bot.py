@@ -811,41 +811,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"User-Agent": "DiscordBot (https://mizabot.xyz, 1.0.0)",
 		"Authorization": f"Bot {AUTH['discord_token']}",
 	}
-	async def _retrieve_api(self, path, method, data):
-		for attempt in range(16):
-			delay = (1 << attempt) * (random.random() + 1)
-			try:
-				resp = await Request.asession.request(
-					method,
-					f"https://discord.com/api/{api}/{path}",
-					data=data,
-					headers=self.auth_headers,
-				)
-			except (
-				niquests.ConnectionError,
-				niquests.ConnectTimeout,
-				niquests.ReadTimeout,
-				niquests.Timeout,
-				niquests.exceptions.ChunkedEncodingError,
-			):
-				await asyncio.sleep(delay)
-				continue
-			if resp.status_code in (202, 429, 502, 503):
-				try:
-					msg = resp.json()
-				except Exception:
-					await asyncio.sleep(delay)
-				else:
-					if isinstance(msg, dict) and "message" in msg and "retry_after" in msg:
-						await asyncio.sleep(float(msg["retry_after"]) + delay / 6)
-					else:
-						await asyncio.sleep(delay)
-			else:
-				return resp.json()
-		raise RuntimeError("Maximum request attempts exceeded.")
 	async def retrieve_api(self, path, method="GET", data=None):
 		key = f"{path} {method.casefold()} {repr(data)}"
-		return await self.discord_cache.aretrieve(key, self._retrieve_api, path, method, data)
+		return await self.discord_cache.aretrieve(key, retrieve_api, path, method, self.auth_headers, data)
 
 	def print(self, *args, sep=" ", end="\n"):
 		"A reimplementation of the print builtin function."

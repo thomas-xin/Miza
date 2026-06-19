@@ -5272,6 +5272,46 @@ def download_file(*urls, filename=None, timeout=12, return_headers=False):
 		return filename, resp.headers
 	return filename
 
+async def retrieve_api(path, method="GET", headers={}, data=None):
+	url = f"https://discord.com/api/v10/{path}"
+	exception = RuntimeError("Maximum request attempts exceeded.")
+	for attempt in range(16):
+		delay = (1 << attempt) * (random.random() + 1)
+		try:
+			resp = await Request.asession.request(
+				method,
+				url,
+				data=data,
+				headers=headers,
+			)
+		except (
+			niquests.ConnectionError,
+			niquests.ConnectTimeout,
+			niquests.ReadTimeout,
+			niquests.Timeout,
+			niquests.exceptions.ChunkedEncodingError,
+		) as ex:
+			await asyncio.sleep(delay)
+			exception = ex
+			continue
+		if resp.status_code in (202, 429, 502, 503):
+			try:
+				msg = resp.json()
+			except Exception:
+				await asyncio.sleep(delay)
+			else:
+				if isinstance(msg, dict) and "message" in msg and "retry_after" in msg:
+					await asyncio.sleep(float(msg["retry_after"]) + delay / 6)
+				else:
+					await asyncio.sleep(delay)
+			try:
+				resp.raise_for_status()
+			except Exception as ex:
+				exception = ex
+		else:
+			return resp.json()
+	raise exception
+
 def getsize(fp):
 	if getattr(fp, "size", None):
 		return fp.size

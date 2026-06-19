@@ -11,7 +11,7 @@ import niquests
 from dynamic_dt import DynamicDT
 from .types import pretty_json, lim_str
 from .asyncs import run_async, gather, Semaphore
-from .util import Request, temporary_file, unyt, time_snowflake, snowflake_time_3, is_discord_message_link
+from .util import Request, temporary_file, unyt, time_snowflake, snowflake_time_3, is_discord_message_link, retrieve_api
 from .caches import attachment_cache
 
 
@@ -56,44 +56,8 @@ async def verify_token(token):
 	headers.update({"Authorization": token, "Content-Type": "application/json", "Accept": "application/json"})
 	return headers
 
-async def retrieve_api(path, method="GET", data=None):
-	url = f"https://discord.com/api/v10/{path}"
-	for attempt in range(16):
-		delay = (1 << attempt) * (random.random() + 1)
-		try:
-			resp = await Request.asession.request(
-				method,
-				url,
-				data=data,
-				headers=headers,
-			)
-		except (
-			niquests.ConnectionError,
-			niquests.ConnectTimeout,
-			niquests.ReadTimeout,
-			niquests.Timeout,
-			niquests.exceptions.ChunkedEncodingError,
-		):
-			await asyncio.sleep(delay)
-			continue
-		if resp.status_code in (202, 429, 502, 503):
-			try:
-				msg = resp.json()
-			except Exception:
-				await asyncio.sleep(delay)
-			else:
-				if isinstance(msg, dict) and "message" in msg and "retry_after" in msg:
-					await asyncio.sleep(float(msg["retry_after"]) + delay / 6)
-				else:
-					await asyncio.sleep(delay)
-		else:
-			try:
-				resp.raise_for_status()
-				return resp.json()
-			except Exception as ex:
-				print(resp, url, repr(ex), headers, resp.text)
-				raise
-	raise RuntimeError("Maximum request attempts exceeded.")
+async def retrieve_api_a(path, method="GET", data=None):
+	return await retrieve_api(path, method=method, headers=headers, data=data)
 
 
 async def run():
@@ -113,7 +77,7 @@ async def run():
 	async def extract_channels(guild_ids, channel_ids):
 		guild_ids = set(guild_ids)
 		async with get_sem():
-			resp = await retrieve_api(
+			resp = await retrieve_api_a(
 				"users/@me/guilds",
 			)
 		servers = {int(data["id"]): data for data in resp}
@@ -121,7 +85,7 @@ async def run():
 
 		async def get_channels_from(gid, index):
 			async with get_sem(gid):
-				resp = await retrieve_api(
+				resp = await retrieve_api_a(
 					f"guilds/{gid}/channels",
 				)
 			channels.update({int(data["id"]): data for data in resp})
@@ -131,7 +95,7 @@ async def run():
 
 		async def get_channel(cid, index):
 			async with get_sem(cid):
-				resp = await retrieve_api(
+				resp = await retrieve_api_a(
 					f"channels/{cid}",
 				)
 			channels[cid] = resp
@@ -155,7 +119,7 @@ async def run():
 			for i, gid in enumerate(guild_ids):
 				if gid not in servers:
 					async with get_sem(gid):
-						resp = await retrieve_api(
+						resp = await retrieve_api_a(
 							f"guilds/{gid}",
 						)
 					servers[gid] = resp
@@ -178,7 +142,7 @@ async def run():
 	ereg = re.compile("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>")
 	async def get_emojis(gid):
 		async with get_sem(gid):
-			resp = await retrieve_api(
+			resp = await retrieve_api_a(
 				f"guilds/{gid}/emojis",
 			)
 		for e in resp:
@@ -189,7 +153,7 @@ async def run():
 			files["emojis"][eid] = [e["name"] + ".webp", url]
 
 		async with get_sem(gid):
-			resp = await retrieve_api(
+			resp = await retrieve_api_a(
 				f"guilds/{gid}/stickers",
 			)
 		for s in resp:
@@ -201,7 +165,7 @@ async def run():
 			files["stickers"][sid] = [s["name"] + "." + url.rsplit(".", 1)[-1], url]
 
 		async with get_sem(gid):
-			resp = await retrieve_api(
+			resp = await retrieve_api_a(
 				f"guilds/{gid}/soundboard-sounds",
 			)
 		for s in resp.get("items", ()):
@@ -390,7 +354,7 @@ async def run():
 						query = f"?include_nsfw=true&channel_id={cid}&limit=25&offset={offset}&max_id={Mid}&min_id={mid}&sort_by=timestamp&sort_order=asc"
 						query += "".join(f"&author_id={u}" for u in user_ids)
 						async with get_sem(gid):
-							resp = await retrieve_api(f"{path}{query}")
+							resp = await retrieve_api_a(f"{path}{query}")
 						if not resp.get("messages"):
 							raise StopIteration
 						for m in resp["messages"]:
@@ -411,11 +375,11 @@ async def run():
 						path = f"guilds/{gid}/messages/search"
 						query = f"?include_nsfw=true&channel_id={cid}&limit=25&max_id={Mid}&min_id={mid}&sort_by=timestamp&sort_order=asc"
 						async with get_sem(gid):
-							resp = await retrieve_api(f"{path}{query}")
+							resp = await retrieve_api_a(f"{path}{query}")
 						resp = resp["messages"]
 					else:
 						async with get_sem(cid):
-							resp = await retrieve_api(
+							resp = await retrieve_api_a(
 								f"channels/{cid}/messages?limit=100&after={mid}",
 							)
 					if not resp:
@@ -442,7 +406,7 @@ async def run():
 		for mode in ("public", "private"):
 			async with get_sem(cid):
 				try:
-					resp = await retrieve_api(
+					resp = await retrieve_api_a(
 						f"channels/{cid}/threads/archived/{mode}",
 					)
 				except niquests.exceptions.HTTPError:

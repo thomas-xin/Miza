@@ -457,7 +457,7 @@ def avifsicle(out, q=100, s=6):
 	subprocess.run(args, stdin=subprocess.DEVNULL)
 	return out2
 
-def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, vf=""):
+def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, vf="", allow_lossless=True):
 	env = os.environ.copy()
 	anim = count > 1
 	command = ["-i", "-"]
@@ -511,7 +511,6 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 				command.extend(("-loop", "0"))
 		command.extend(("-f", fmt))
 	elif fmt == "y4m":
-		lossless = not anim and not opt
 		if not anim:
 			command.extend(("-vframes", "1", "-r", "1"))
 		if (w, h) != first.size:
@@ -525,7 +524,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 		else:
 			command.extend(("-pix_fmt", "yuv444p"))
 	elif fmt == "webp":
-		lossless = not anim and not opt
+		lossless = not anim and not opt and not allow_lossless
 		if not anim:
 			command.extend(("-vframes", "1", "-r", "1"))
 		if (w, h) != first.size:
@@ -633,7 +632,7 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 		is_avif = fmt == "avif" and im.mode == "RGBA"
 		if is_avif:
 			fmt = "y4m"
-		opts, env, fmt = ffmpeg_opts({}, iter([im]), 1, im.mode, im, fmt, fs * (r or 1), size[0], size[1], 1, opt)
+		opts, env, fmt = ffmpeg_opts({}, iter([im]), 1, im.mode, im, fmt, fs * (r or 1), size[0], size[1], 1, opt, allow_lossless=not heavy)
 		args.extend(opts)
 		print(im, len(b))
 		if fmt in ("png", "jpg", "webp"):
@@ -796,7 +795,6 @@ def evalImg(url, operation, args):
 			else:
 				print("Output stat:", new, prop)
 	if isinstance(new, dict) and "frames" in new:
-		# print(nogif, oz, new)
 		frames = optimise(new["frames"])
 		if not frames:
 			raise EOFError("No image output detected.")
@@ -809,7 +807,7 @@ def evalImg(url, operation, args):
 			if not video:
 				new["frames"] = [temp]
 			else:
-				duration = dur = 3600000
+				new["duration"] = dur = 3600000
 				new["count"] = 16
 				new["frames"] = [temp] * new["count"]
 		elif oz:
@@ -833,15 +831,17 @@ def evalImg(url, operation, args):
 			video = True
 		duration = new["duration"]
 		count = new.get("count", 1)
+		assert isinstance(count, int)
+		assert isinstance(duration, float | int)
 		if dur:
-			dur *= new["count"] / (new["count"] + 1)
+			dur *= count / (count + 1)
 			if duration > dur:
 				duration = dur
 		if video:
 			if fmt in statics:
 				fmt, cdc = "zip", fmt
-			print("DURATION:", duration, new["count"])
-			fps = new["count"] / duration
+			print("DURATION:", duration, count)
+			fps = count / duration
 			if round(fps, 2) == round(fps):
 				fps = round(fps)
 			else:
@@ -856,7 +856,7 @@ def evalImg(url, operation, args):
 				frames = resume(first, it)
 			size = first.size
 			if fmt == "auto":
-				if getattr(first, "audio", None) or new["count"] * np.prod(size) > 1073741824:
+				if getattr(first, "audio", None) or count * np.prod(size) > 1073741824:
 					fmt = "mp4"
 					cdc = "av1_nvenc"
 				else:
@@ -923,20 +923,20 @@ def evalImg(url, operation, args):
 							i3 = Image.alpha_composite(i2, frame)
 							frame = i3.convert("RGB")
 						if archive:
-							b = save_into(frame, frame.size, cdc, inf)
+							b = save_into(frame, frame.size, cdc, inf, r=1 if count > 10 else 0)
 						else:
 							b = np.asanyarray(frame, dtype=np.uint8).data
 					elif type(frame) is io.BytesIO:
 						frame.seek(0)
 						im = Image.open(frame)
 						if archive:
-							b = save_into(im, im.size, cdc, inf)
+							b = save_into(im, im.size, cdc, inf, r=1 if count > 10 else 0)
 						else:
 							b = frame.read()
 					else:
 						im = Image.open(io.BytesIO(frame))
 						if archive:
-							b = save_into(im, im.size, cdc, inf)
+							b = save_into(im, im.size, cdc, inf, r=1 if count > 10 else 0)
 						else:
 							b = frame
 					if not real_frames or fmt in ("gif", "webp", "apng", "avif"):
