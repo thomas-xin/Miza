@@ -19,7 +19,7 @@ from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment, discord_expired,
 	is_discord_attachment, url2fn, getsize, mime_from_file,
 	Request as RequestManager, DOMAIN_CERT, PRIVATE_KEY, update_headers,
-	AutoCache, CACHE_PATH, VISUAL_FORMS, RNGFile,
+	AutoCache, CACHE_PATH, VISUAL_FORMS, RNGFile, create_etag,
 )
 from .caches import attachment_cache, colour_cache
 
@@ -135,6 +135,7 @@ class Server:
 				ranges.append((0, size))
 				length = size
 			response_headers.update(CHEADERS)
+			response_headers["Etag"] = create_etag("".join(urls).encode("utf-8"), size)
 			if ranges == [(0, size)]:
 				response_headers["Content-Length"] = str(length)
 			if brange:
@@ -247,6 +248,10 @@ def stream_fp(request, fp, response_headers={}, filename="untitled.bin", cache=F
 		ranges.append((0, size))
 		length = size
 	response_headers.update(CHEADERS if cache else HEADERS)
+	b = None
+	if cache:
+		b = fp.read(65536)
+		response_headers["Etag"] = create_etag(b, size=size)
 	if ranges == [(0, size)]:
 		response_headers["Content-Length"] = str(length)
 	if brange:
@@ -261,8 +266,9 @@ def stream_fp(request, fp, response_headers={}, filename="untitled.bin", cache=F
 
 	mime = mime_from_file(fp, url2fn(filename))
 	if not mime:
-		fp.seek(0)
-		b = fp.read(65536)
+		if not b:
+			fp.seek(0)
+			b = fp.read(65536)
 		try:
 			s = b.decode("utf-8")
 		except Exception:

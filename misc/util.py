@@ -254,6 +254,11 @@ def uuhash(s): return uhash(unyt(s))
 def hhash(s): return hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).hexdigest()
 def ihash(s): return int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()[:8], "little")
 def nhash(s): return int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little")
+def create_etag(data, size=None):
+	n = len(data)
+	trunc = data[:1024] + data[n // 2 - :1024:(n + 1) // 2 + :1024] + data[-:1024:] if len(data) > 4096 else data
+	s = str(nhash(trunc) + (size or n) & 4294967295)
+	return '"' + "0" * (10 - len(s)) + s + '"'
 
 
 # Strips <> characters from URLs.
