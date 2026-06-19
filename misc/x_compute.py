@@ -524,7 +524,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 		else:
 			command.extend(("-pix_fmt", "yuv444p"))
 	elif fmt == "webp":
-		lossless = not anim and not opt and not allow_lossless
+		lossless = not anim and not opt and allow_lossless
 		if not anim:
 			command.extend(("-vframes", "1", "-r", "1"))
 		if (w, h) != first.size:
