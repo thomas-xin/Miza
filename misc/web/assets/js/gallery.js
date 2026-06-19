@@ -17,6 +17,8 @@ async function ensureLibarchive() {
 /* --------------- state --------------- */
 let allFiles = [];
 let activeFilter = 'all';
+let originalArchiveBlob = null;
+let originalArchiveName = 'archive';
 
 /* --------------- DOM refs --------------- */
 const form = document.getElementById('urlForm');
@@ -30,6 +32,21 @@ const filtersEl = document.getElementById('filters');
 const galleryEl = document.getElementById('gallery');
 
 const submitBtn = form.querySelector('button');
+
+const downloadArchiveBar = document.getElementById('downloadArchiveBar');
+const downloadArchiveBtn = document.getElementById('downloadArchiveBtn');
+
+downloadArchiveBtn.addEventListener('click', () => {
+	if (!originalArchiveBlob) return;
+	const url = URL.createObjectURL(originalArchiveBlob);
+	const a = document.createElement('a');
+	a.href = url;
+	a.download = originalArchiveName;
+	document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
+	URL.revokeObjectURL(url);
+});
 
 form.addEventListener('submit', async (e) => {
 	e.preventDefault();
@@ -53,6 +70,10 @@ async function loadArchive(url) {
 	if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
 	const buffer = await res.arrayBuffer();
 	if (buffer.byteLength === 0) throw new Error('Received empty body — likely a CORS or redirect issue.');
+	
+	// Save original archive for download
+	originalArchiveBlob = new Blob([buffer]);
+	originalArchiveName = url.split('/').pop() || 'archive';
 
 	/* 3. Open + extract via libarchive */
 	showLoader('Extracting archive…');
@@ -68,6 +89,7 @@ async function loadArchive(url) {
 	allFiles = entries;
 	activeFilter = 'all';
 	renderStats(); renderFilters(); renderGallery();
+	downloadArchiveBar.style.display = 'flex';
 	hideLoader(); showResults();
 	} catch (err) {
 	console.error(err);
@@ -257,9 +279,9 @@ function escapeHtml(s) {
 function showLoader(text) { loaderText.textContent = text; loader.classList.add('active'); }
 function hideLoader() { loader.classList.remove('active'); }
 function showError(msg) { errorEl.textContent = msg; errorEl.style.display = 'block'; }
-function hideError()  { errorEl.style.display = 'none'; }
+function hideError()  { errorEl.style.display = 'none'; downloadArchiveBar.style.display = 'none'; }
 function showResults() { results.style.display = 'block'; }
-function hideResults() { results.style.display = 'none'; }
+function hideResults() { results.style.display = 'none'; downloadArchiveBar.style.display = 'none'; }
 
 /* ---------- lightbox ---------- */
 const lightbox = document.getElementById('lightbox');

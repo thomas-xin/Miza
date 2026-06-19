@@ -40,6 +40,19 @@ main { padding: 1.5rem; width: 100%; margin: 0 auto; }
 }
 .stats span { padding: 0.25rem 0.6rem; background: #400040; border-radius: 4px; }
 
+.download-archive-bar {
+	display: none;
+	justify-content: center;
+	margin-top: 0.5rem;
+}
+.download-archive-btn {
+	padding: 0.55rem 1.1rem; background: #55CDFC; color: #400040;
+	border: none; border-radius: 8px; font-size: 0.9rem;
+	font-weight: 600; cursor: pointer; transition: background 0.15s;
+	font-family: inherit;
+}
+.download-archive-btn:hover { background: #F7A8B8; }
+
 .filters { display: flex; gap: 0.4rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
 .filter-btn {
 	padding: 0.45rem 0.9rem; background: #400040; color: #bf7fff;
