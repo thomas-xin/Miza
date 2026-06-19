@@ -256,7 +256,7 @@ def ihash(s): return int.from_bytes(hashlib.md5(s if type(s) is bytes else as_st
 def nhash(s): return int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little")
 def create_etag(data, size=None):
 	n = len(data)
-	trunc = data[:1024] + data[n // 2 - :1024:(n + 1) // 2 + :1024] + data[-:1024:] if len(data) > 4096 else data
+	trunc = data[:1024] + data[n // 2 - 1024:(n + 1) // 2 + 1024] + data[-1024:] if len(data) > 4096 else data
 	s = str(nhash(trunc) + (size or n) & 4294967295)
 	return '"' + "0" * (10 - len(s)) + s + '"'
 
