@@ -134,7 +134,7 @@ class Server:
 			if not ranges:
 				ranges.append((0, size))
 				length = size
-			response_headers.update(HEADERS)
+			response_headers.update(CHEADERS)
 			if ranges == [(0, size)]:
 				response_headers["Content-Length"] = str(length)
 			if brange:
@@ -217,7 +217,7 @@ class Server:
 					counter += 1
 
 
-def stream_fp(request, fp, response_headers={}, filename="untitled.bin"):
+def stream_fp(request, fp, response_headers={}, filename="untitled.bin", cache=False):
 	brange = request.headers.get("Range", "").removeprefix("bytes=") if request else ""
 	size = getsize(fp)
 	ranges = []
@@ -246,7 +246,7 @@ def stream_fp(request, fp, response_headers={}, filename="untitled.bin"):
 	if not ranges:
 		ranges.append((0, size))
 		length = size
-	response_headers.update(HEADERS)
+	response_headers.update(CHEADERS if cache else HEADERS)
 	if ranges == [(0, size)]:
 		response_headers["Content-Length"] = str(length)
 	if brange:
@@ -528,7 +528,7 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 			headers=response_headers,
 			media_type="text/html",
 		)
-	return stream_fp(request, fp, response_headers, url)
+	return stream_fp(request, fp, response_headers, url, cache=not force)
 
 
 ytdownloader = None

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<!-- PROPOSE: A multipurpose Discord bot -->
+
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<meta name="description" content="Your local loyal multipurpose Discord bot">
+
+	<!-- Open Graph Meta Tags -->
+	<meta property="og:url" content="https://mizabot.xyz">
+	<meta property="og:type" content="website">
+	<meta property="og:title" content="Archive Gallery">
+	<meta property="og:description" content="File folder previewer">
+	<meta property="og:image" content="https://mizabot.xyz/assets/images/mizaleaf.webp">
+
+	<link rel="icon" type="image/webp" href="/assets/images/mizaleaf.webp">
+	<link rel="stylesheet" href="/assets/css/global.css">
+	<script defer="defer" src="/assets/js/global.js"></script>
+
+	<!-- Page specific: -->
+	<title>Gallery: Miza</title>
+	<meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
+	<link rel="stylesheet" href="/assets/css/gallery.css">
+	<link href='https://fonts.googleapis.com/css?family=Agbalumo' rel='stylesheet'>
+	<script defer="defer" src="/assets/js/gallery.js"></script>
+</head>
+<body>
+<div id="root">
+	<nav id="navigation-links" class="hideext">
+		<a class="nav-ref" href="/">Home</a>
+		<a class="nav-ref" href="/commands">Commands</a>
+		<span class="nav-dropdown">
+			Tools
+			<span></span>
+			<div>
+				❥ <a class="nav-ref" href="/files">Filehost</a><br />
+				❥ <a class="nav-ref" href="/downloader">Media Downloader</a><br />
+				❥ <a class="nav-ref" href="/gallery">Archive Gallery</a>
+			</div>
+		</span>
+		<a class="nav-link" href="https://www.github.com/thomas-xin/miza" target="_blank" rel="noopener">Source</a>
+		<a class="nav-link" href="https://discord.gg/cbKQKAr" target="_blank" rel="noopener">Support</a>
+		<a class="nav-link" href="https://ko-fi.com/mizabot" target="_blank" rel="noopener">Premium</a>
+		<a class="nav-link" href="https://github.com/thomas-xin/Miza/wiki/Terms-of-Service" target="_blank" rel="noopener">ToS</a>
+	</nav>
+
+	<header>
+	<h1>📦 Archive Gallery</h1>
+	<form class="url-form" id="urlForm">
+		<input type="url" id="urlInput"
+			placeholder="https://example.com/my-archive.zip"
+			value="https://example.com/my-archive.zip" />
+		<button type="submit">Load Archive</button>
+	</form>
+	<p class="note">
+		Supported: <code>.zip</code>, <code>.tar</code>, <code>.tar.gz</code>,
+		<code>.tar.bz2</code>, <code>.tar.xz</code>, <code>.rar</code>,
+		<code>.7z</code>, <code>.cab</code>, <code>.ar</code>, and more
+		(whatever libarchive opens). The archive server must send permissive
+		CORS headers.
+	</p>
+	</header>
+
+	<main>
+	<div class="loader" id="loader">
+		<div class="spinner"></div>
+		<div id="loaderText">Loading libarchive engine…</div>
+	</div>
+	<div id="error" class="error" style="display:none"></div>
+	<div id="results" style="display:none">
+		<div class="stats" id="stats"></div>
+		<div class="filters" id="filters"></div>
+		<div class="gallery" id="gallery"></div>
+	</div>
+	</main>
+
+	<!-- Lightbox overlay -->
+	<div class="lightbox" id="lightbox">
+		<div class="lightbox-backdrop" id="lbBackdrop"></div>
+		<span class="lightbox-counter" id="lbCounter"></span>
+		<button class="lightbox-close" id="lbClose" title="Close (Esc)">✕</button>
+		<button class="lightbox-nav prev" id="lbPrev" title="Previous (←)">‹</button>
+		<button class="lightbox-nav next" id="lbNext" title="Next (→)">›</button>
+		<div class="lightbox-stage" id="lbStage"></div>
+		<div class="lightbox-info">
+			<div class="lb-filename" id="lbFilename"></div>
+			<div class="lb-meta" id="lbMeta"></div>
+		</div>
+	</div>
+</div>
+</body>
+</html>

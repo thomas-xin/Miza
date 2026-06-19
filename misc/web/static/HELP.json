@@ -1051,46 +1051,6 @@
 			},
 			"ordered_args": ["force"]
 		},
-		"Archive": {
-			"aliases": ["Archive", "ArchiveServer", "DownloadServer"],
-			"description": "Archives all messages, attachments and users into a .zip folder. Defaults to entire server if no channel specified, requires server permission level 3 as well as a Lv2 or above Miza subscription to perform, and may take a significant amount of time.",
-			"level": "3",
-			"rate_limit": "3600",
-			"example": [],
-			"timeout": "86400",
-			"schema": {
-				"servers": {
-					"type": "guild",
-					"description": "One or more Discord servers to archive",
-					"multiple": true
-				},
-				"channels": {
-					"type": "channel",
-					"description": "One or more Discord channels to archive messages from",
-					"multiple": true
-				},
-				"users": {
-					"type": "user",
-					"description": "One or more Discord users to archive messages from",
-					"multiple": true
-				},
-				"start": {
-					"type": "integer",
-					"description": "Minimum snowflake ID to retrieve",
-					"default": 0
-				},
-				"end": {
-					"type": "integer",
-					"description": "Maximum snowflake ID to retrieve",
-					"default": 0
-				},
-				"token": {
-					"type": "word",
-					"description": "A Discord token to use for retrieval of servers not shared with me. Not stored for any other purposes; please be careful of exposing to others!"
-				}
-			},
-			"ordered_args": ["servers", "channels", "users", "start", "end", "token"]
-		},
 		"StaffLog": {
 			"aliases": ["StaffLog", "UserLog", "MemberLog", "ServerLog", "MessageLog"],
 			"description": "Causes Miza to log message and file events from the server, in the current channel.",

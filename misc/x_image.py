@@ -13,7 +13,6 @@ import subprocess
 import tarfile
 import time
 from traceback import print_exc
-import zipfile
 import cv2
 import numpy as np
 import orjson

@@ -3250,10 +3250,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			link = message_link(message)
 			emb.description = lim_str(f"{emb.description}\n\n[View Message]({link})", 4096)
 			emb.timestamp = message.edited_at or message.created_at
-		if reactions and message.reactions:
-			text, link = embeds[0].description.rsplit("\n\n", 1)
-			description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in message.reactions) + "   " + link
-			embeds[0].description = lim_str(description, 4096)
+			if reactions and message.reactions:
+				text, link = embeds[0].description.rsplit("\n\n", 1)
+				description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in message.reactions) + "   " + link
+				embeds[0].description = lim_str(description, 4096)
 		return embeds
 
 	async def coloured_embed(self, url):

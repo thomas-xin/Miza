@@ -867,7 +867,7 @@ def evalImg(url, operation, args):
 				raise RuntimeError("Unexpected P mode image")
 			if fmt == "gif" and "A" in mode:
 				frames = clamp_transparency(frames)
-			archive = False
+			archive = None
 			is_avif = False
 			if fmt == "zip":
 				import zipfile
@@ -1036,10 +1036,10 @@ def evalImg(url, operation, args):
 						else:
 							lower_bound = scale
 					print("F:", w, h, scale, len(out), r)
-			if isinstance(out, str):
-				assert os.path.exists(out) and os.path.getsize(out), f"Expected output file {out}"
-				with open(out, "rb") as f:
-					return f.read()
+			# if isinstance(out, str):
+			# 	assert os.path.exists(out) and os.path.getsize(out), f"Expected output file {out}"
+			# 	with open(out, "rb") as f:
+			# 		return f.read()
 			return out
 		else:
 			new = next(iter(new["frames"]))

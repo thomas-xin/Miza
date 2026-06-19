@@ -528,12 +528,12 @@ class AttachmentCache(AutoCache):
 			remaining -= self.max_size
 		ac = self.attachment_count
 		self.sess = self.sess or aiohttp.ClientSession()
-		form_data = aiohttp.FormData(quote_fields=False)
 		filename = ofn = filename or "c"
 		cid = getattr(channel, "id", channel) if channel else choice(self.channels)
 		mids = []
 		while chunks:
 			temp, chunks = chunks[:ac], chunks[ac:]
+			form_data = aiohttp.FormData(quote_fields=False)
 			payload = dict(
 				content=None,
 				attachments=[dict(
