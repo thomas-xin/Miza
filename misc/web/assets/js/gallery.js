@@ -1,5 +1,5 @@
 /* --------------- libarchive bootstrap --------------- */
-const CDN = `https://api.mizabot.xyz/static`;
+const CDN = '/static';
 
 let ArchiveLib = null;
 async function ensureLibarchive() {
