@@ -217,7 +217,7 @@ class Server:
 					counter += 1
 
 
-def stream_fp(request, fp, response_headers={}):
+def stream_fp(request, fp, response_headers={}, filename="untitled.bin"):
 	brange = request.headers.get("Range", "").removeprefix("bytes=") if request else ""
 	size = getsize(fp)
 	ranges = []
@@ -259,7 +259,7 @@ def stream_fp(request, fp, response_headers={}):
 			for i in range(r[0], r[1], chunksize):
 				yield fp.read(min(chunksize, r[1] - i))
 
-	mime = mime_from_file(fp)
+	mime = mime_from_file(fp, url2fn(filename))
 	if not mime:
 		fp.seek(0)
 		b = fp.read(65536)
@@ -528,7 +528,7 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 			headers=response_headers,
 			media_type="text/html",
 		)
-	return stream_fp(request, fp, response_headers)
+	return stream_fp(request, fp, response_headers, url)
 
 
 ytdownloader = None
