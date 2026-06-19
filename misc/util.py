@@ -1509,7 +1509,7 @@ def mime_from_file(path, filename=None, mime=True):
 		out = filetype.guess_mime(data)
 	else:
 		out = filetype.guess_extension(data)
-	filename = filename or (path if isinstance(path, str) else "")
+	filename = filename or (path if isinstance(path, str) else getattr(path, "filename", "") or getattr(path, "name", ""))
 	if out and out.split("/", 1)[-1] == "zip" and isinstance(filename, str) and filename.endswith(".jar"):
 		return "application/java-archive"
 	if not out:
