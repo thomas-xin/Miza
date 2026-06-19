@@ -725,24 +725,41 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			f.write(s)
 
 	server = None
-	server_start_sem = Semaphore(1, 0, rate_limit=5)
 	def start_webserver(self, shutdown=False):
-		with self.server_start_sem:
-			if self.server:
-				try:
-					self.server.run("terminate()", timeout=8)
-				except Exception:
-					print_exc()
-				self.server.terminate()
-			if not shutdown and os.path.exists("misc/x_server.py") and PORT:
-				print("Starting webserver...")
-				self.server = EvalPipe.connect(
-					[python, "-m", "misc.x_server", "6562"],
-					6562,
-					glob=globals(),
-				)
+		if self.server:
+			try:
+				self.server.run("terminate()", timeout=8)
+			except Exception:
+				print_exc()
+			self.server.terminate()
+		if not shutdown and os.path.exists("misc/x_server.py") and PORT:
+			print("Starting webserver...")
+			self.server = EvalPipe.connect(
+				[python, "-m", "misc.x_server", "6562"],
+				6562,
+				glob=globals(),
+			)
+		else:
+			self.server = None
+
+	archive_server = None
+	def start_archive_server(self, shutdown=False):
+		if self.archive_server:
+			self.archive_server.terminate()
+		if not shutdown and os.path.exists("misc/archive/serve.py") and (ap := AUTH.get("archive_port")):
+			print("Starting archive server...")
+			try:
+				Request(f"https://127.0.0.1:{ap}/")
+			except Exception:
+				archive_path = AUTH.get("archive_path", "archive").replace("\\", "/").rstrip("/")
+				os.makedirs(archive_path, exist_ok=True)
+				for fn in os.listdir("misc/archive"):
+					shutil.copyfile(f"misc/archive/{fn}", f"{archive_path}/{fn}")
+				args = ["hypercorn", "serve:app", "--bind", f"0.0.0.0:{ap}", "-w", "12"]
+				print(args)
+				self.archive_server = psutil.Popen(args, cwd=archive_path)
 			else:
-				self.server = None
+				pass
 
 	def start_audio_client(self, shutdown=False):
 		if self.audio:
@@ -777,6 +794,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		print("Logging in...")
 		try:
 			self.audio_client_start = run_async(self.start_audio_client)
+			self.archive_client_start = run_async(self.start_archive_server)
 			loop = get_event_loop()
 			with contextlib.closing(loop):
 				with tracebacksuppressor:
@@ -789,20 +807,42 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		finally:
 			self.schedule_shutdown()
 
+	auth_headers = {
+		"User-Agent": "DiscordBot (https://mizabot.xyz, 1.0.0)",
+		"Authorization": f"Bot {AUTH['discord_token']}",
+	}
 	async def _retrieve_api(self, path, method, data):
-		while True:
-			data = await Request.aio(
-				f"https://discord.com/api/{api}/{path}",
-				method=method,
-				data=data,
-				authorise=True,
-				json=True,
-				ignore_error=True,
-			)
-			if isinstance(data, dict) and "message" in data and "retry_after" in data:
-				await asyncio.sleep(float(data["retry_after"]) + 1)
+		for attempt in range(16):
+			delay = (1 << attempt) * (random.random() + 1)
+			try:
+				resp = await Request.asession.request(
+					method,
+					f"https://discord.com/api/{api}/{path}",
+					data=data,
+					headers=self.auth_headers,
+				)
+			except (
+				niquests.ConnectionError,
+				niquests.ConnectTimeout,
+				niquests.ReadTimeout,
+				niquests.Timeout,
+				niquests.exceptions.ChunkedEncodingError,
+			):
+				await asyncio.sleep(delay)
+				continue
+			if resp.status_code in (202, 429, 502, 503):
+				try:
+					msg = resp.json()
+				except Exception:
+					await asyncio.sleep(delay)
+				else:
+					if isinstance(msg, dict) and "message" in msg and "retry_after" in msg:
+						await asyncio.sleep(float(msg["retry_after"]) + delay / 6)
+					else:
+						await asyncio.sleep(delay)
 			else:
-				return data
+				return resp.json()
+		raise RuntimeError("Maximum request attempts exceeded.")
 	async def retrieve_api(self, path, method="GET", data=None):
 		key = f"{path} {method.casefold()} {repr(data)}"
 		return await self.discord_cache.aretrieve(key, self._retrieve_api, path, method, data)
@@ -3083,7 +3123,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				url = (await self.data.exec.uproxy(url, force=force, optimise=True)) or url
 		return url
 
-	async def as_embeds(self, message, link=False, colour=False, refresh=True, proxy_images=True) -> list[discord.Embed]:
+	async def as_embeds(self, message, link=False, colour=False, refresh=True, proxy_images=True, reactions=False) -> list[discord.Embed]:
 		if refresh:
 			message = await self.ensure_reactions(message)
 		emb = discord.Embed(description="").set_author(**get_author(message.author))
@@ -3210,6 +3250,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			link = message_link(message)
 			emb.description = lim_str(f"{emb.description}\n\n[View Message]({link})", 4096)
 			emb.timestamp = message.edited_at or message.created_at
+		if reactions and message.reactions:
+			text, link = embeds[0].description.rsplit("\n\n", 1)
+			description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in message.reactions) + "   " + link
+			embeds[0].description = lim_str(description, 4096)
 		return embeds
 
 	async def coloured_embed(self, url):
@@ -3827,7 +3871,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return (self.data.blacklist.get(u_id) or 0) > 1
 		return True
 
-	dangerous_command = bold(ansi_md(colourise(uni_str('[WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. REPEAT COMMAND WITH "?f" FLAG TO CONFIRM.]'), fg="red")))
+	dangerous_command = bold(ansi_md(colourise(uni_str('[WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. REPEAT COMMAND WITH --FORCE FLAG TO CONFIRM.]'), fg="red")))
 
 	mmap = {
 		"“": '"',
@@ -4293,7 +4337,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				for k in ("", "audio"):
 					atts = os.listdir(f"{path}/{k}")
 					if len(atts) > limit:
-						atts = sorted((f"{path}/{k}/{a}" for a in atts), key=lambda p: (t - os.path.getatime(p)) * os.path.getsize(p), reverse=True)
+						atts = sorted(
+							(f"{path}/{k}/{a}" for a in atts),
+							key=lambda p: (
+								-bool(os.path.getsize(p)),
+								(t - os.path.getatime(p)) * os.path.getsize(p),
+							),
+							reverse=True,
+						)
 						for p in atts[:-limit]:
 							with tracebacksuppressor(PermissionError):
 								os.remove(p)
@@ -5020,7 +5071,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				try:
 					v = await self.eval_math(full_prune(v))
 					if info.type == "integer" and isfinite(v):
-						v = int(v)
+						v = int(round(v))
 				except Exception as ex:
 					raise err(ex.__class__, k, v)
 		elif info.type == "datetime":
@@ -5196,7 +5247,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				raise NotImplementedError("This command is disabled due to pending or ongoing maintenance, sorry!")
 			if not allow_recursion and T(command).get("recursive", False):
 				raise PermissionError("Nested recursive commands are not permitted.")
-			min_perm = None
 			gid = self.data.blacklist.get(0)
 			if gid and gid != guild.id and not isnan(u_perm):
 				print("BOUNCED:", user, message.content)
@@ -5261,7 +5311,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		async with sem:
 			# Automatically start typing if the command is time consuming
 			tc = getattr(command, "time_consuming", False)
-			if not loop and tc and not getattr(message, "simulated", False):
+			if tc and not getattr(message, "simulated", False):
 				fut = create_task(self._state.http.send_typing(channel.id))
 			# Get maximum time allowed for command to process
 			if isnan(u_perm):
@@ -5289,10 +5339,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				_name=command_check,			# alias the command was called as
 				_comment=comment,
 				_slash=slash,
-				_looped=loop,					# whether this command was invoked as part of a loop
-				_timeout=timeout,				# timeout delay assigned to the command
+				_looped=False,					# whether this command was invoked as part of a loop
+				_time_limit=timeout,			# timeout assigned to the command
 				**kwargs,						# Keyword arguments for schema-specified commands
-				timeout=timeout and timeout + 1,# timeout delay for the whole function
+				timeout=timeout and timeout + 1,# timeout for the whole function
 			)
 			if not T(command).get("no_cancel"):
 				try:
@@ -5345,6 +5395,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		for k, v in schema.items():
 			if v.get("required", 0) > 1 and len(kwargs[k]) < v.required:
 				raise ArgumentError(f'{k} requires a minimum amount of {v.required} inputs.')
+		fmt_reg = re.compile(r"%[0-9.,_<>=\^+\-# bcdeEfFgGnosxXz%]+[\[\(][+-]?[0-9]*,[+-]?[0-9]+[\]\)]")
 		for k, info in schema.items():
 			if k not in kwargs or kwargs[k] == "-":
 				if k == next(iter(schema)) and info.type == "enum" and (command_check in info.validation.get("enum", ()) or command_check in info.validation.get("accepts", ())):
@@ -5358,6 +5409,33 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				kwargs[k] = None
 				continue
 			if info.get("multiple"):
+				if info.get("type") in ("url", "image", "visual", "video", "audio", "media"):
+					# Accept "gallery/index" url sequences e.g. `https://base%03d(6,123].png` where %03d(6,123] represents integers 007 to 123
+					n = 0
+					while n < len(v):
+						a = v[n]
+						match = fmt_reg.search(a)
+						if match:
+							x, y = a[:match.start()], a[match.end():]
+							ext = match.group()
+							m2 = re.search(r"[\[\(]", ext)
+							fmt, rng = ext[1:m2.start()], ext[m2.start():]
+							left, right = rng[1:-1].split(",", 1)
+							if not left.strip("+-"):
+								left = 0
+							left, right = map(int, (left, right))
+							if rng[0] == "(":
+								left += 1
+							if rng[-1] == "]":
+								right += 1
+							v.pop(n)
+							r = range(left, right)
+							for i in reversed(r):
+								extra = x + format(i, fmt) + y
+								v.insert(n, extra)
+							n += len(r) - 1
+							continue
+						n += 1
 				futs = [self.validate_into(k, a, info=info, guild=guild) for a in v]
 				kwargs[k] = await gather(*futs)
 				continue
@@ -7586,7 +7664,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not perm.view_channel or not perm.read_message_history:
 			return cdict(messages=[], total_results=0)
 		path = f"guilds/{guild_id}/messages/search"
-		query = f"?include_nsfw=1&limit={limit}&limit={offset}"
+		query = f"?include_nsfw=1&limit={limit}&offset={offset}"
 		for k, v in kwargs.items():
 			if v is not None:
 				query += f"&{k}={v}"

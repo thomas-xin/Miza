@@ -129,9 +129,11 @@ def create_thread(func, *args, **kwargs) -> Future:
 	t.start()
 	return fut
 
-async def _run_async(f, *args, timeout=None, **kwargs):
+async def _run_async(f, *args, timeout=None, _timeout=None, **kwargs):
 	async with asyncio.timeout(timeout):
 		if callable(f):
+			if _timeout is not None:
+				kwargs["timeout"] = _timeout
 			if inspect.iscoroutinefunction(f):
 				f = f(*args, **kwargs)
 			else:

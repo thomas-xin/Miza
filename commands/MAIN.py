@@ -956,8 +956,8 @@ class Activity(Command):
 	rate_limit = (8, 11)
 	slash = True
 
-	async def __call__(self, bot, _user, _timeout, **void):
-		data = await run_async(bot.data.users.fetch_events, _user.id, interval=900, timeout=_timeout)
+	async def __call__(self, bot, _user, _time_limit, **void):
+		data = await run_async(bot.data.users.fetch_events, _user.id, interval=900, timeout=_time_limit)
 		resp = await process_image("plt_special", "&", (data, str(_user)), cap="math", priority=True)
 		fn = resp
 		f = CompatFile(fn, filename=f"{_user}.png")

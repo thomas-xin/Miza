@@ -626,7 +626,7 @@ def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", k
 			- 'frames' (generator): Generator yielding the mapped frames.
 	"""
 	if retrieve:
-		sources = [get_image(url) for url in images]
+		sources = list(exc.map(get_image, images))
 	else:
 		sources = images
 	if keep_fps == "exact":
@@ -1563,7 +1563,7 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 	"""
 	if extras:
 		image = ImageSequence.cast(image)
-		images = list(image) + list(map(get_image, extras))
+		images = list(image) + list(exc.map(get_image, extras))
 		image, extras = ImageSequence(*images), ()
 	prop = properties(image, default_duration=duration , default_fps=fps)
 	duration, fps, prog = sync_fps([prop], duration, fps)
@@ -1655,7 +1655,7 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 
 def orbit_map(image, extras, duration, fps, count):
 	symmetry = count or (1 if extras else 5)
-	sources = [image, *(get_image(url) for url in extras)]
+	sources = [image, *exc.map(get_image, extras)]
 	orbitals = sources * symmetry
 	orbital_count = len(orbitals)
 	props = [properties(im) for im in sources]

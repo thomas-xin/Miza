@@ -962,7 +962,11 @@ class Lockdown(Command):
 	name = ["🔒", "☣️"]
 	min_level = inf
 	description = "Completely locks down the server by removing send message permissions for all users, revoking all invites, and archiving all threads."
-	flags = "f"
+	schema = cdict(
+		force=cdict(
+			type="bool",
+		),
+	)
 	rate_limit = (30, 40)
 
 	async def roleLock(self, role, channel):
@@ -980,204 +984,135 @@ class Lockdown(Command):
 		with self.bot.ExceptionSender(channel):
 			await thread.edit(archived=True, locked=True)
 
-	async def __call__(self, guild, channel, flags, **void):
-		if "f" not in flags:
+	async def __call__(self, _guild, _channel, force, **void):
+		if not force:
 			raise InterruptedError(self.bot.dangerous_command)
 		u_id = self.bot.id
-		for role in guild.roles:
-			if len(role.members) != 1 or role.members[-1].id not in (u_id, guild.owner_id):
-				create_task(self.roleLock(role, channel))
-		for thread in guild.threads:
-			create_task(self.threadLock(thread, channel))
-		invites = await guild.invites()
+		for role in _guild.roles:
+			if len(role.members) != 1 or role.members[-1].id not in (u_id, _guild.owner_id):
+				create_task(self.roleLock(role, _channel))
+		for thread in _guild.threads:
+			create_task(self.threadLock(thread, _channel))
+		invites = await _guild.invites()
 		for inv in invites:
-			create_task(self.invLock(inv, channel))
+			create_task(self.invLock(inv, _channel))
 		return bold(css_md(sqr_md(uni_str("LOCKDOWN REQUESTED.")), force=True))
 
 
-class Archive(Command):
-	time_consuming = 1
-	_timeout_ = 3600
-	name = ["ArchiveServer", "DownloadServer"]
-	min_level = 3
-	description = "Archives all messages, attachments and users into a .zip folder. Defaults to entire server if no channel specified, requires server permission level 3 as well as a Lv2 or above ⟨BOT⟩ subscription to perform, and may take a significant amount of time."
-	usage = "<server|channel>? <start-id>? <end-id>? <token>?"
-	flags = "f"
-	rate_limit = 172800
+# class Archive(Command):
+# 	time_consuming = 1
+# 	_timeout_ = 3600
+# 	name = ["ArchiveServer", "DownloadServer"]
+# 	min_level = 3
+# 	description = "Archives all messages, attachments and users into a .zip folder. Defaults to entire server if no channel specified, requires server permission level 3 as well as a Lv2 or above ⟨BOT⟩ subscription to perform, and may take a significant amount of time."
+# 	schema = cdict(
+# 		servers=cdict(
+# 			type="guild",
+# 			description="One or more Discord servers to archive",
+# 			multiple=True,
+# 		),
+# 		channels=cdict(
+# 			type="channel",
+# 			description="One or more Discord channels to archive messages from",
+# 			multiple=True,
+# 		),
+# 		users=cdict(
+# 			type="user",
+# 			description="One or more Discord users to archive messages from",
+# 			multiple=True,
+# 		),
+# 		start=cdict(
+# 			type="integer",
+# 			description="Minimum snowflake ID to retrieve",
+# 			default=0,
+# 		),
+# 		end=cdict(
+# 			type="integer",
+# 			description="Maximum snowflake ID to retrieve",
+# 			default=0,
+# 		),
+# 		token=cdict(
+# 			type="word",
+# 			description="A Discord token to use for retrieval of servers not shared with me. Not stored for any other purposes; please be careful of exposing to others!"
+# 		),
+# 	)
+# 	rate_limit = 3600
 
-	async def __call__(self, bot, message, guild, user, channel, args, flags, **void):
-		target = guild.id
-		tarname = guild.name
-		token = bot.token
-		if args:
-			if len(args) > 1:
-				token = regexp(r"[\w.-]{22,}").fullmatch(args[-1])
-				if token:
-					token = args.pop(-1)
-					if token.startswith("Bot "):
-						resp = None
-					else:
-						headers = {"Authorization": "Bot " + token, "Content-Type": "application/json"}
-						resp = await create_future(
-							requests.get,
-							"https://discord.com/api/v10/users/@me",
-							headers=headers,
-						)
-					if not resp or resp.status_code == 401:
-						headers = {"Authorization": token, "Content-Type": "application/json"}
-						resp = await create_future(
-							requests.get,
-							"https://discord.com/api/v10/users/@me",
-							headers=headers,
-						)
-					else:
-						token = "Bot " + token
-					resp.raise_for_status()
-			oid = verify_id(args.pop(0))
-			if oid in bot.cache.channels:
-				c = await bot.fetch_channel(oid)
-				tarname = c.name
-				target = str(c.id) + ","
-			elif oid in bot.cache.guilds:
-				g = await bot.fetch_guild(oid)
-				tarname = g.name
-				target = str(g.id)
-			else:
-				headers = {"Authorization": token, "Content-Type": "application/json"}
-				try:
-					data = await create_future(
-						Request.aio,
-						f"https://discord.com/api/v10/channels/{oid}",
-						headers=headers,
-						json=True,
-						bypass=False,
-					)
-					c = cdict(data)
-					tarname = c.name
-					target = str(c.id) + ","
-				except ConnectionError:
-					data = await create_future(
-						Request.aio,
-						f"https://discord.com/api/v10/guilds/{oid}",
-						headers=headers,
-						json=True,
-						bypass=False,
-					)
-					target = cdict(data)
-					tarname = g.name
-					target = str(g.id)
-		if bot.get_perms(user, guild) < 3:
-			raise PermissionError("You must be in the target server and have a permission level of minimum 3.")
-		if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
-			raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}!")
-		if "f" not in flags:
-			raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: SERVER DOWNLOAD REQUESTED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
-		fn = temporary_file("zip")
-		args = [
-			sys.executable,
-			"misc/server-dump.py",
-			"~" + token,
-			target,
-			fn,
-		]
-		info = ini_md("Archive Started!")
-		m = await send_with_reply(channel, message, info)
-		async with discord.context_managers.Typing(channel):
-			print(args)
-			proc = psutil.Popen(args, stdout=subprocess.PIPE)
-			t = utc()
-			while proc.is_running():
-				line = bytearray()
-				while not line or line[-1] != 10:
-					b = await run_async(proc.stdout.read, 1)
-					if not b:
-						break
-					line.append(b[0])
-				line = line.decode("utf-8").strip()
-				if utc() - t >= 2:
-					t = utc()
-					if ": " in line:
-						p, q = line.split(": ", 1)
-					else:
-						p = "Progress"
-						q = line
-					info = ini_md(f"Archive {p}: {sqr_md(q)}")
-					await bot.edit_message(m, content=info)
-		if not fn:
-			raise FileNotFoundError("The requested file was not found. If this issue persists, please report it in the support server.")
-		if not tarname.endswith(".zip"):
-			tarname += ".zip"
-		await bot.send_with_file(channel, file=CompatFile(fn, filename=tarname), reference=message)
-		info = ini_md("Archive Complete!")
-		await bot.edit_message(m, content=info)
+# 	async def __call__(self, bot, _guild, _user, servers, channels, users, start, end, token=None, **void):
+# 		if token:
+# 			assert regexp(r"[\w.-]{22,}").fullmatch(token), "Invalid token supplied!"
+# 		servers = servers or [_guild]
+# 		allow = False
+# 		for guild in servers:
+# 			if bot.get_perms(_user, guild) < 3:
+# 				raise PermissionError("You must be in the target server and have a permission level of minimum 3.")
+# 			if max(bot.is_trusted(guild), bot.premium_level(_user) * 2) >= 2:
+# 				allow = True
+# 		if not allow and not token:
+# 			raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or alternatively, provide a custom Discord token with access to the target!")
+# 		if not token:
+# 			token = bot.token
 
 
-class UserLog(Command):
+class StaffLog(Command):
 	server_only = True
-	name = ["MemberLog"]
-	min_level = 3
-	description = "Causes ⟨BOT⟩ to log user and member events from the server, in the current channel."
-	schema = cdict(
-		mode=cdict(
-			type="enum",
-			validation=cdict(
-				enum=("view", "enable", "disable"),
-			),
-			description="Action to perform",
-			example="enable",
-			default="view"
-		),
-	)
-	rate_limit = 1
-
-	async def __call__(self, bot, _channel, _guild, _name, mode, **void):
-		data = bot.data.logU
-		if mode == "enable":
-			data[_guild.id] = _channel.id
-			return italics(css_md(f"Enabled user event logging in {sqr_md(_channel)} for {sqr_md(_guild)}."))
-		elif mode == "disable":
-			if _guild.id in data:
-				data.pop(_guild.id)
-			return italics(css_md(f"Disabled user event logging for {sqr_md(_guild)}."))
-		if _guild.id in data:
-			c_id = data[_guild.id]
-			channel = await bot.fetch_channel(c_id)
-			return ini_md(f"User event logging for {sqr_md(_guild)} is currently enabled in {sqr_md(channel)}.")
-		return ini_md(f'User event logging is currently disabled in {sqr_md(_guild)}. Use "{bot.get_prefix(_guild)}{_name} enable" to enable.')
-
-
-class MessageLog(Command):
-	server_only = True
-	name = ["MemberLog"]
 	min_level = 3
 	description = "Causes ⟨BOT⟩ to log message and file events from the server, in the current channel."
 	schema = cdict(
+		kind=cdict(
+			type="enum",
+			validation=cdict(
+				enum=("message", "user", "server"),
+			),
+			required=True,
+		),
 		mode=cdict(
 			type="enum",
 			validation=cdict(
-				enum=("view", "enable", "disable"),
+				enum=("enable", "disable", "view"),
 			),
 			description="Action to perform",
-			example="enable",
-			default="view"
+			default="view",
+		),
+	)
+	macros = cdict(
+		UserLog=cdict(
+			kind="user",
+		),
+		MemberLog=cdict(
+			kind="user",
+		),
+		ServerLog=cdict(
+			kind="server",
+		),
+		MessageLog=cdict(
+			kind="message",
 		),
 	)
 	rate_limit = 1
 
-	async def __call__(self, bot, _channel, _guild, _name, mode, **void):
-		data = bot.data.logM
-		if mode == "enable":
-			data[_guild.id] = _channel.id
-			return italics(css_md(f"Enabled message event logging in {sqr_md(_channel)} for {sqr_md(_guild)}."))
-		elif mode == "disable":
-			if _guild.id in data:
-				data.pop(_guild.id)
-			return italics(css_md(f"Disabled message event logging for {sqr_md(_guild)}."))
-		if _guild.id in data:
-			c_id = data[_guild.id]
-			channel = await bot.fetch_channel(c_id)
-			return ini_md(f"Message event logging for {sqr_md(_guild)} is currently enabled in {sqr_md(channel)}.")
-		return ini_md(f'Message event logging is currently disabled in {sqr_md(_guild)}. Use "{bot.get_prefix(_guild)}{_name} enable" to enable.')
+	async def __call__(self, bot, _channel, _guild, _name, _prefix, kind, mode, **void):
+		match mode:
+			case "enable":
+				bot.set_guildbase(_guild.id, f"logs.{kind}", _channel.id)
+				return italics(css_md(f"Enabled {kind} event logging in {sqr_md(_channel)} for {sqr_md(_guild)}."))
+			case "disable":
+				bot.pop_guildbase(_guild.id, f"logs.{kind}")
+				return italics(css_md(f"Disabled {kind} event logging for {sqr_md(_guild)}."))
+			case _:
+				c_id = bot.get_guildbase(_guild.id, f"logs.{kind}")
+				try:
+					if not c_id:
+						raise ValueError
+					channel = await bot.fetch_channel(c_id)
+				except ValueError:
+					pass
+				except Exception:
+					print_exc()
+					bot.pop_guildbase(_guild.id, f"logs.{kind}")
+				else:
+					return ini_md(f"{kind.capitalize()} event logging for {sqr_md(_guild)} is currently enabled in {sqr_md(channel)}.")
+				return ini_md(f'{kind.capitalize()} event logging is currently disabled in {sqr_md(_guild)}. Use "{_prefix}{_name} enable" to enable.')
 
 
 class StarBoard(Pagination, Command):
@@ -1678,7 +1613,7 @@ class ServerProtector(Database):
 				if cnt[u_id] > 2:
 					if self.bot.is_trusted(guild.id) or u_id == self.bot.user.id:
 						create_task(self.targetWarn(u_id, guild, f"channel deletions `({cnt[u_id]})`"))
-		if guild.id in self.bot.data.logU:
+		if self.bot.get_guildbase(guild.id, "logs.user"):
 			await self.bot.data.logU._channel_delete_2_(channel, guild, user)
 
 	async def _ban_(self, user, guild, **void):
@@ -2112,26 +2047,122 @@ class ScanEmoji(Command):
 			return css_md(f"No emoji issues found for {guild}.")
 
 
+class UpdateServerLogs(Database):
+	name = "logS"
+	no_file = True
+
+	async def _channel_update_(self, before, after, guild, **void):
+		bot = self.bot
+		c_id = bot.get_guildbase(guild.id, "logs.server")
+		if not c_id:
+			return
+		try:
+			channel = await bot.fetch_channel(c_id)
+		except (EOFError, discord.NotFound):
+			bot.pop_guildbase(guild.id, "logs.server")
+			return
+		emb = discord.Embed(colour=8323072)
+		mlist = bot.channel_cache.get(after.id)
+		count = f" ({len(mlist)}+)" if mlist else ""
+		if before.name != after.name:
+			emb.add_field(
+				name="Name",
+				value=escape_markdown(before.name) + " ➡️ " + escape_markdown(after.name),
+			)
+		elif before.position != after.position:
+			emb.add_field(
+				name="Position",
+				value=str(before.position) + " ➡️ " + str(after.position),
+			)
+		emb.description = f"{channel_mention(after.id)}{count} has been updated:"	
+		bot.send_embeds(channel, emb)
+
+	async def _channel_delete_2_(self, ch, guild, user, **void):
+		bot = self.bot
+		c_id = bot.get_guildbase(guild.id, "logs.server")
+		if not c_id:
+			return
+		try:
+			channel = await bot.fetch_channel(c_id)
+		except (EOFError, discord.NotFound):
+			bot.pop_guildbase(guild.id, "logs.server")
+			return
+		emb = discord.Embed(colour=8323072)
+		mlist = bot.channel_cache.get(ch.id)
+		count = max(len(mlist) if mlist else 0, getattr(ch, "message_count", 0))
+		mcount = f" ({count}+)" if count else ""
+		if user:
+			emb.set_author(**get_author(user))
+			emb.description = f"#{ch.name}{mcount}: {ch.id} was deleted by {user_mention(user.id)}."
+		else:
+			emb.description = f"#{ch.name}{mcount}: {ch.id} has been deleted."	
+		bot.send_embeds(channel, emb)
+
+	async def _guild_update_(self, before, after, **void):
+		bot = self.bot
+		c_id = bot.get_guildbase(after.id, "logs.server")
+		if not c_id:
+			return
+		try:
+			channel = await bot.fetch_channel(c_id)
+		except (EOFError, discord.NotFound):
+			bot.pop_guildbase(after.id, "logs.server")
+			return
+		colour = await bot.get_colour(after)
+		emb = discord.Embed(colour=colour)
+		emb.description = f"{after} has been updated:"
+		change = False
+		if str(before) != str(after):
+			emb.add_field(
+				name="Name",
+				value=escape_markdown(str(before)) + " ➡️ " + escape_markdown(str(after)),
+			)
+			change = True
+		if before.icon != after.icon:
+			b_url = best_url(before)
+			a_url = best_url(after)
+			if "exec" in bot.data:
+				urls = ()
+				with tracebacksuppressor:
+					urls = await bot.data.exec.uproxy(b_url, a_url, collapse=False)
+				for i, url in enumerate(urls):
+					if url:
+						if i:
+							a_url = url
+						else:
+							b_url = url
+			emb.add_field(
+				name="Icon",
+				value=f"[Before]({b_url}) ➡️ [After]({a_url})",
+			)
+			emb.set_thumbnail(url=a_url)
+			change = True
+		if before.owner_id != after.owner_id:
+			emb.add_field(
+				name="Owner",
+				value=f"{user_mention(before.owner_id)} ➡️ {user_mention(after.owner_id)}",
+			)
+			change = True
+		if not change:
+			return
+		b_url = await bot.get_proxy_url(before)
+		a_url = await bot.get_proxy_url(after)
+		emb.set_author(name=str(after), icon_url=a_url, url=a_url)
+		bot.send_embeds(channel, emb)
+
+
 class UpdateUserLogs(Database):
 	name = "logU"
+	no_file = True
 
 	# Send a member update globally for all user updates
 	async def _user_update_(self, before, after, **void):
-		found = False
-		for g_id in self.data:
-			try:
-				guild = self.bot.cache.guilds[g_id]
-			except KeyError:
-				continue
-			if guild.get_member(after.id):
-				found = True
-				break
-		if not found:
-			return
-		for g_id in self.data:
-			guild = self.bot.cache.guilds.get(g_id)
-			if guild:
-				create_task(self._member_update_(before, after, guild))
+		futs = []
+		for guild in set(before.mutual_guilds).union(after.mutual_guilds):
+			if self.bot.get_guildbase(guild.id, "logs.user"):
+				fut = self._member_update_(before, after, guild)
+				futs.append(fut)
+		await gather(*futs)
 
 	async def _member_update_(self, before, after, guild=None):
 		bot = self.bot
@@ -2147,13 +2178,13 @@ class UpdateUserLogs(Database):
 		except:
 			print_exc()
 			return
-		if guild.id not in self.data:
+		c_id = bot.get_guildbase(guild.id, "logs.user")
+		if not c_id:
 			return
-		c_id = self.data[guild.id]
 		try:
-			channel = await self.bot.fetch_channel(c_id)
+			channel = await bot.fetch_channel(c_id)
 		except (EOFError, discord.NotFound):
-			self.data.pop(guild.id)
+			bot.pop_guildbase(guild.id, "logs.user")
 			return
 		emb = discord.Embed()
 		files = []
@@ -2171,7 +2202,7 @@ class UpdateUserLogs(Database):
 		if getattr(before, "global_name", None) != getattr(after, "global_name", None):
 			emb.add_field(
 				name="Display Name",
-				value=escape_markdown(getattr(before, "global_name", str(before))) + " ➡️ " + escape_markdown(getattr(after, "global_name", str(after))),
+				value=escape_markdown(getattr(before, "global_name", None) or str(before)) + " ➡️ " + escape_markdown(getattr(after, "global_name", None) or str(after)),
 			)
 			change = True
 			colour[0] += 255
@@ -2267,111 +2298,18 @@ class UpdateUserLogs(Database):
 					emb.set_author(name=str(after), icon_url=ub, url=b_url)
 					await message.edit(embed=emb)
 
-	async def _channel_update_(self, before, after, guild, **void):
-		if guild.id not in self.data:
-			return
-		c_id = self.data[guild.id]
-		try:
-			channel = await self.bot._fetch_channel(c_id)
-		except (EOFError, discord.NotFound):
-			self.data.pop(guild.id)
-			return
-		emb = discord.Embed(colour=8323072)
-		mlist = self.bot.channel_cache.get(after.id)
-		count = f" ({len(mlist)}+)" if mlist else ""
-		if before.name != after.name:
-			emb.add_field(
-				name="Name",
-				value=escape_markdown(before.name) + " ➡️ " + escape_markdown(after.name),
-			)
-		elif before.position != after.position:
-			emb.add_field(
-				name="Position",
-				value=str(before.position) + " ➡️ " + str(after.position),
-			)
-		emb.description = f"{channel_mention(after.id)}{count} has been updated:"	
-		self.bot.send_embeds(channel, emb)
-
-	async def _channel_delete_2_(self, ch, guild, user, **void):
-		if guild.id not in self.data:
-			return
-		c_id = self.data[guild.id]
-		try:
-			channel = await self.bot._fetch_channel(c_id)
-		except (EOFError, discord.NotFound):
-			self.data.pop(guild.id)
-			return
-		emb = discord.Embed(colour=8323072)
-		mlist = self.bot.channel_cache.get(ch.id)
-		count = max(len(mlist) if mlist else 0, getattr(ch, "message_count", 0))
-		mcount = f" ({count}+)" if count else ""
-		if user:
-			emb.set_author(**get_author(user))
-			emb.description = f"#{ch.name}{mcount}: {ch.id} was deleted by {user_mention(user.id)}."
-		else:
-			emb.description = f"#{ch.name}{mcount}: {ch.id} has been deleted."	
-		self.bot.send_embeds(channel, emb)
-
-	async def _guild_update_(self, before, after, **void):
-		if after.id not in self.data:
-			return
-		c_id = self.data[after.id]
-		try:
-			channel = await self.bot.fetch_channel(c_id)
-		except (EOFError, discord.NotFound):
-			self.data.pop(after.id)
-			return
-		colour = await self.bot.get_colour(after)
-		emb = discord.Embed(colour=colour)
-		emb.description = f"{after} has been updated:"
-		change = False
-		if str(before) != str(after):
-			emb.add_field(
-				name="Name",
-				value=escape_markdown(str(before)) + " ➡️ " + escape_markdown(str(after)),
-			)
-			change = True
-		if before.icon != after.icon:
-			b_url = best_url(before)
-			a_url = best_url(after)
-			if "exec" in self.bot.data:
-				urls = ()
-				with tracebacksuppressor:
-					urls = await self.bot.data.exec.uproxy(b_url, a_url, collapse=False)
-				for i, url in enumerate(urls):
-					if url:
-						if i:
-							a_url = url
-						else:
-							b_url = url
-			emb.add_field(
-				name="Icon",
-				value=f"[Before]({b_url}) ➡️ [After]({a_url})",
-			)
-			emb.set_thumbnail(url=a_url)
-			change = True
-		if before.owner_id != after.owner_id:
-			emb.add_field(
-				name="Owner",
-				value=f"{user_mention(before.owner_id)} ➡️ {user_mention(after.owner_id)}",
-			)
-			change = True
-		if not change:
-			return
-		b_url = await self.bot.get_proxy_url(before)
-		a_url = await self.bot.get_proxy_url(after)
-		emb.set_author(name=str(after), icon_url=a_url, url=a_url)
-		self.bot.send_embeds(channel, emb)
-
 	async def _join_(self, user, **void):
 		guild = T(user).get("guild")
-		if guild is None or guild.id not in self.data:
+		if guild is None:
 			return
-		c_id = self.data[guild.id]
+		bot = self.bot
+		c_id = bot.get_guildbase(guild.id, "logs.user")
+		if not c_id:
+			return
 		try:
-			channel = await self.bot.fetch_channel(c_id)
+			channel = await bot.fetch_channel(c_id)
 		except (EOFError, discord.NotFound):
-			self.data.pop(guild.id)
+			bot.pop_guildbase(guild.id, "logs.user")
 			return
 		# Colour: White
 		emb = discord.Embed(colour=16777214)
@@ -2380,24 +2318,26 @@ class UpdateUserLogs(Database):
 		age = DynamicDT.now() - user.created_at
 		if age < 86400 * 7:
 			emb.description += f"\n⚠️ Account is {age} old. ⚠️"
-		self.bot.send_embeds(channel, emb)
+		bot.send_embeds(channel, emb)
 
 	async def _leave_(self, user, **void):
 		guild = T(user).get("guild")
-		if guild is None or guild.id not in self.data:
+		if guild is None:
 			return
-		c_id = self.data[guild.id]
+		bot = self.bot
+		c_id = bot.get_guildbase(guild.id, "logs.user")
+		if not c_id:
+			return
 		try:
-			channel = await self.bot.fetch_channel(c_id)
+			channel = await bot.fetch_channel(c_id)
 		except (EOFError, discord.NotFound):
-			self.data.pop(guild.id)
+			bot.pop_guildbase(guild.id, "logs.user")
 			return
 		await asyncio.sleep(1)
 		deleted = None
 		prune = None
 		kick = None
 		ban = None
-		bot = self.bot
 		try:
 			stored = bot.get_userbase(user.id, "stored")
 		except LookupError:
@@ -2474,7 +2414,7 @@ class UpdateUserLogs(Database):
 		rchange = escape_markdown(", ".join(role_mention(r.id) for r in standard_roles(user)))
 		if rchange:
 			emb.add_field(name="Roles", value=rchange)
-		self.bot.send_embeds(channel, emb)
+		bot.send_embeds(channel, emb)
 
 
 class UpdateMessageLogs(Database):
@@ -2485,16 +2425,19 @@ class UpdateMessageLogs(Database):
 		if after.author.bot and not force:
 			return
 		guild = before.guild
-		if not guild or guild.id not in self.data:
+		if not guild:
 			return
-		c_id = self.data[guild.id]
+		bot = self.bot
+		c_id = bot.get_guildbase(guild.id, "logs.message")
+		if not c_id:
+			return
 		try:
-			channel = await self.bot.fetch_channel(c_id)
+			channel = await bot.fetch_channel(c_id)
 		except (EOFError, discord.NotFound):
-			self.data.pop(guild.id)
+			bot.pop_guildbase(guild.id, "logs.message")
 			return
-		embs = await self.bot.as_embeds(after, proxy_images=False)
-		embs2 = await self.bot.as_embeds(before, proxy_images=False, refresh=False)
+		embs = await bot.as_embeds(after, proxy_images=False)
+		embs2 = await self.bot.as_embeds(before, proxy_images=False, refresh=False, reactions=True)
 		emb = embs[0]
 		emb2 = embs2[0]
 		emb.colour = discord.Colour(0x0000FF)
@@ -2503,7 +2446,7 @@ class UpdateMessageLogs(Database):
 		emb.add_field(name="After", value=lim_str(emb.description, 1024))
 		emb.description = action
 		emb.timestamp = before.edited_at or after.created_at
-		self.bot.send_embeds(channel, emb)
+		bot.send_embeds(channel, emb)
 
 	async def reattachments(self, channel, message):
 		if not message.attachments:
@@ -2535,31 +2478,34 @@ class UpdateMessageLogs(Database):
 		if bulk:
 			return
 		guild = message.guild
-		if not guild or guild.id not in self.data:
+		if not guild:
 			return
 		if message.author.bot:
 			return
-		c_id = self.data[guild.id]
+		bot = self.bot
+		c_id = bot.get_guildbase(guild.id, "logs.message")
+		if not c_id:
+			return
 		try:
-			channel = await self.bot.fetch_channel(c_id)
+			channel = await bot.fetch_channel(c_id)
 		except (EOFError, discord.NotFound):
-			self.data.pop(guild.id)
+			bot.pop_guildbase(guild.id, "logs.message")
 			return
 		now = utc()
 		if not message.author.bot:
 			await self.reattachments(channel, message)
 		u = message.author
 		name_id = str(u)
-		url = await self.bot.get_proxy_url(u)
+		url = await bot.get_proxy_url(u)
 		action = discord.AuditLogAction.message_delete
 		try:
 			t = u
 			init = user_mention(t.id)
-			d_level = self.bot.recently_deleted.get(message.id)
+			d_level = bot.recently_deleted.get(message.id)
 			if d_level is False:
 				return
 			if d_level:
-				t = self.bot.user
+				t = bot.user
 				init = user_mention(t.id)
 			else:
 				# Attempt to find who deleted the message
@@ -2575,7 +2521,7 @@ class UpdateMessageLogs(Database):
 						limit=50,
 						action=action,
 					))
-				al2 = self.bot.deletes.get(guild.id, [])
+				al2 = bot.deletes.get(guild.id, [])
 				amap = {a.id: a for a in al2}
 				for e in reversed(al):
 					try:
@@ -2589,33 +2535,34 @@ class UpdateMessageLogs(Database):
 						amap[e.id] = e
 				alid = sorted(amap.keys())
 				al3 = deque(map(amap.__getitem__, alid), maxlen=256)
-				self.bot.deletes[guild.id] = al3
+				bot.deletes[guild.id] = al3
 				self.last_inits[channel.id] = init
 		except (SemaphoreOverflowError, discord.HTTPException):
 			init = self.last_inits.get(channel.id) or "[UNKNOWN USER]"
 		except (PermissionError, discord.Forbidden):
 			init = "[UNKNOWN USER]"
-		embs = await self.bot.as_embeds(message, refresh=False, link=True)
+		embs = await bot.as_embeds(message, refresh=False, link=True, reactions=True)
 		embs[0].colour = discord.Colour(0xFF0000)
 		action = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\n"
 		embs[0].description = lim_str(action + (embs[0].description or ""), 4096)
-		self.bot.send_embeds(channel, embs)
+		bot.send_embeds(channel, embs)
 
 	# Thanks to the embed sender feature, which allows this feature to send up to 10 logs in one message
 	async def _bulk_delete_(self, messages, **void):
 		cu = self.bot.user
 		cu_id = cu.id
 		guild = messages[0].guild
-		if guild.id not in self.data:
-			return
 		messages = [m for m in messages if not m.author.bot]
 		if not messages:
 			return
-		c_id = self.data[guild.id]
+		bot = self.bot
+		c_id = bot.get_guildbase(guild.id, "logs.message")
+		if not c_id:
+			return
 		try:
-			channel = await self.bot.fetch_channel(c_id)
+			channel = await bot.fetch_channel(c_id)
 		except (EOFError, discord.NotFound):
-			self.data.pop(guild.id)
+			bot.pop_guildbase(guild.id, "logs.message")
 			return
 		message = messages[-1]
 		now = utc()
@@ -2624,11 +2571,11 @@ class UpdateMessageLogs(Database):
 		action = discord.AuditLogAction.message_bulk_delete
 		try:
 			init = "[UNKNOWN USER]"
-			d_level = self.bot.recently_deleted.get(message.id)
+			d_level = bot.recently_deleted.get(message.id)
 			if d_level is False:
 				return
 			if d_level:
-				t = self.bot.user
+				t = bot.user
 				init = user_mention(t.id)
 			else:
 				# Attempt to find who deleted the messages
@@ -2638,7 +2585,7 @@ class UpdateMessageLogs(Database):
 					limit=50,
 					action=action,
 				))
-				al2 = self.bot.bulk_deletes.get(guild.id, [])
+				al2 = bot.bulk_deletes.get(guild.id, [])
 				amap = {a.id: a for a in al2}
 				for e in al:
 					try:
@@ -2653,7 +2600,7 @@ class UpdateMessageLogs(Database):
 						amap[e.id] = e
 				alid = sorted(amap.keys())
 				al3 = deque(map(amap.__getitem__, alid), maxlen=256)
-				self.bot.bulk_deletes[guild.id] = al3
+				bot.bulk_deletes[guild.id] = al3
 		except (PermissionError, discord.Forbidden, discord.HTTPException):
 			init = "[UNKNOWN USER]"
 		emb = discord.Embed(colour=0xFF00FF)
@@ -2666,13 +2613,13 @@ class UpdateMessageLogs(Database):
 		embeds = deque((emb,))
 		for message in messages:
 			try:
-				embs = await self.bot.as_embeds(message, refresh=False, link=True)
+				embs = await bot.as_embeds(message, refresh=False, link=True, reactions=True)
 			except Exception:
 				print_exc()
 				continue
 			embs[0].colour = discord.Colour(0x7F007F)
 			embeds.extend(embs)
-		self.bot.send_embeds(channel, embeds)
+		bot.send_embeds(channel, embeds)
 
 
 class UpdatePublishers(Database):
@@ -2825,10 +2772,7 @@ class UpdateStarboards(Database):
 					table[None].pop(message.id)
 			if message.id not in table.setdefault(None, {}):
 				if count >= req:# and count < req * 2 + 2:
-					embeds = await self.bot.as_embeds(message, link=True, colour=True)
-					text, link = embeds[0].description.rsplit("\n\n", 1)
-					description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table or "SPARKLES" in table and getattr(r.emoji, "id", None) and r.emoji.id in self.sparkle_ids) + "   " + link
-					embeds[0].description = lim_str(description, 4096)
+					embeds = await self.bot.as_embeds(message, link=True, colour=True, reactions=True)
 					try:
 						channel = await self.bot.fetch_channel(table[react][1])
 						m = await channel.send(embeds=embeds)
@@ -2843,10 +2787,7 @@ class UpdateStarboards(Database):
 				try:
 					channel = await self.bot.fetch_channel(table[react][1])
 					m = await self.bot.fetch_message(table[None][message.id], channel)
-					embeds = await self.bot.as_embeds(message, link=True, colour=True)
-					text, link = embeds[0].description.rsplit("\n\n", 1)
-					description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table or "SPARKLES" in table and getattr(r.emoji, "id", None) and r.emoji.id in self.sparkle_ids) + "   " + link
-					embeds[0].description = lim_str(description, 4096)
+					embeds = await self.bot.as_embeds(message, link=True, colour=True, reactions=True)
 					await self.bot.edit_message(m, content=None, embeds=embeds)
 				except (discord.NotFound, discord.Forbidden):
 					table[None].pop(message.id, None)
@@ -2875,10 +2816,7 @@ class UpdateStarboards(Database):
 					react = "SPARKLES"
 				channel = await self.bot.fetch_channel(table[react][1])
 				m = await self.bot.fetch_message(table[None][message.id], channel)
-				embeds = await self.bot.as_embeds(message, link=True, colour=True)
-				text, link = embeds[0].description.rsplit("\n\n", 1)
-				description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in reacts if str(r.emoji) in table or "SPARKLES" in table and getattr(r.emoji, "id", None) and r.emoji.id in self.sparkle_ids) + "   " + link
-				embeds[0].description = lim_str(description, 4096)
+				embeds = await self.bot.as_embeds(message, link=True, colour=True, reactions=True)
 				await self.bot.edit_message(m, content=None, embeds=embeds)
 			except (discord.NotFound, discord.Forbidden):
 				table[None].pop(message.id, None)

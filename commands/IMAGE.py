@@ -59,8 +59,8 @@ class ColourDeficiency(Command):
 	rate_limit = (6, 10)
 	_timeout_ = 3.5
 
-	async def __call__(self, _timeout, mode, url, strength, filesize, format, **void):
-		resp = await process_image(url, "colour_deficiency", [mode, strength, "-fs", filesize, "-f", format], timeout=_timeout)
+	async def __call__(self, _time_limit, mode, url, strength, filesize, format, **void):
+		resp = await process_image(url, "colour_deficiency", [mode, strength, "-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -121,7 +121,7 @@ class EdgeDetect(Command):
 	rate_limit = (5, 7)
 	_timeout_ = 3
 
-	async def __call__(self, _timeout, mode, url, filesize, format, **void):
+	async def __call__(self, _time_limit, mode, url, filesize, format, **void):
 		func = "canny"
 		cap = "caption"
 		if mode in ("depth", "depthmap"):
@@ -130,7 +130,7 @@ class EdgeDetect(Command):
 		elif mode == "laplacian":
 			func = "laplacian"
 			cap = "image"
-		resp = await process_image(url, func, ["-fs", filesize, "-f", format], cap=cap, timeout=_timeout)
+		resp = await process_image(url, func, ["-fs", filesize, "-f", format], cap=cap, timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -188,8 +188,8 @@ class Blur(Command):
 	rate_limit = (5, 7)
 	_timeout_ = 3
 
-	async def __call__(self, _timeout, mode, strength, url, filesize, format, **void):
-		resp = await process_image(url, "blur_map", [[], None, None, mode, strength, "-fs", filesize, "-f", format], cap="image", timeout=_timeout)
+	async def __call__(self, _time_limit, mode, strength, url, filesize, format, **void):
+		resp = await process_image(url, "blur_map", [[], None, None, mode, strength, "-fs", filesize, "-f", format], cap="image", timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -246,8 +246,8 @@ class ColourSpace(Command):
 	rate_limit = (7, 11)
 	_timeout_ = 4
 
-	async def __call__(self, _timeout, url, source, dest, filesize, format, **void):
-		resp = await process_image(url, "colourspace", [source, dest, "-fs", filesize, "-f", format], timeout=_timeout)
+	async def __call__(self, _time_limit, url, source, dest, filesize, format, **void):
+		resp = await process_image(url, "colourspace", [source, dest, "-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -330,8 +330,8 @@ class GMagik(Command):
 	rate_limit = (8, 12)
 	_timeout_ = 7
 
-	async def __call__(self, _timeout, url, intensity, cells, duration, speed, fps, filesize, format, **void):
-		resp = await process_image(url, "magik_map", [[], float(duration) / speed, fps, intensity, cells], timeout=_timeout)
+	async def __call__(self, _time_limit, url, intensity, cells, duration, speed, fps, filesize, format, **void):
+		resp = await process_image(url, "magik_map", [[], float(duration) / speed, fps, intensity, cells], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -416,8 +416,8 @@ class Gradient(Command):
 	rate_limit = (4, 6)
 	slash = True
 
-	async def __call__(self, _timeout, mode, colour, background, repetitions, size, colourspace, filesize, format, **void):
-		resp = await process_image("from_gradient", "$", [mode, colour, background, repetitions, size, colourspace, "-fs", filesize, "-f", format], timeout=_timeout)
+	async def __call__(self, _time_limit, mode, colour, background, repetitions, size, colourspace, filesize, format, **void):
+		resp = await process_image("from_gradient", "$", [mode, colour, background, repetitions, size, colourspace, "-fs", filesize, "-f", format], timeout=_time_limit)
 		name = "Gradient." + get_ext(resp)
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
@@ -673,9 +673,9 @@ class QR(Command):
 	_timeout_ = 4
 	slash = True
 
-	async def __call__(self, _timeout, mode, text, arms, duration, speed, fps, filesize, format, **void):
+	async def __call__(self, _time_limit, mode, text, arms, duration, speed, fps, filesize, format, **void):
 		duration = duration if mode != "normal" else 0
-		resp = await process_image("to_qr", "$", [text, arms, float(duration) / speed, fps, "-fs", filesize, "-f", format], timeout=_timeout)
+		resp = await process_image("to_qr", "$", [text, arms, float(duration) / speed, fps, "-fs", filesize, "-f", format], timeout=_time_limit)
 		name = "QR." + get_ext(resp)
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
@@ -744,8 +744,8 @@ class Rainbow(Command):
 	_timeout_ = 4
 	slash = True
 
-	async def __call__(self, _timeout, url, mode, duration, speed, fps, filesize, format, **void):
-		resp = await process_image(url, "rainbow_map", [[], float(duration) / speed, fps, mode, "-fs", filesize, "-f", format], timeout=_timeout)
+	async def __call__(self, _time_limit, url, mode, duration, speed, fps, filesize, format, **void):
+		resp = await process_image(url, "rainbow_map", [[], float(duration) / speed, fps, mode, "-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -816,8 +816,8 @@ class Scroll(Command):
 	_timeout_ = 4
 	slash = True
 
-	async def __call__(self, _timeout, url, direction, duration, speed, fps, filesize, format, **void):
-		resp = await process_image(url, "scroll_map", [[], float(duration) / speed, fps, direction, "-fs", filesize, "-f", format], timeout=_timeout)
+	async def __call__(self, _time_limit, url, direction, duration, speed, fps, filesize, format, **void):
+		resp = await process_image(url, "scroll_map", [[], float(duration) / speed, fps, direction, "-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -895,8 +895,8 @@ class Spin(Command):
 	_timeout_ = 4
 	slash = True
 
-	async def __call__(self, _timeout, url, angle, circle, duration, speed, fps, filesize, format, **void):
-		resp = await process_image(url, "spin_map", [[], float(duration) / speed, fps, angle, circle, "-fs", filesize, "-f", format], timeout=_timeout)
+	async def __call__(self, _time_limit, url, angle, circle, duration, speed, fps, filesize, format, **void):
+		resp = await process_image(url, "spin_map", [[], float(duration) / speed, fps, angle, circle, "-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -963,9 +963,9 @@ class Orbit(Command):
 	rate_limit = (16, 22)
 	_timeout_ = 13
 
-	async def __call__(self, _timeout, urls, count, duration, speed, fps, filesize, format, **void):
+	async def __call__(self, _time_limit, urls, count, duration, speed, fps, filesize, format, **void):
 		url = urls.pop(0)
-		resp = await process_image(url, "orbit_map", [urls, float(duration) / speed, fps, count, "-fs", filesize, "-f", format], timeout=_timeout)
+		resp = await process_image(url, "orbit_map", [urls, float(duration) / speed, fps, count, "-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -1033,8 +1033,8 @@ class Pet(Command):
 	_timeout_ = 5
 	slash = True
 
-	async def __call__(self, _timeout, url, squish, duration, speed, fps, filesize, format, **void):
-		resp = await process_image(url, "pet_map", [[], float(duration) / speed, fps, squish, "-fs", filesize, "-f", format], timeout=_timeout)
+	async def __call__(self, _time_limit, url, squish, duration, speed, fps, filesize, format, **void):
+		resp = await process_image(url, "pet_map", [[], float(duration) / speed, fps, squish, "-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -1123,10 +1123,10 @@ class Tesseract(Command):
 			download.save_as(fn)
 		return fn
 
-	async def __call__(self, _timeout, url, size, duration, speed, fps, filesize, format, **void):
+	async def __call__(self, _time_limit, url, size, duration, speed, fps, filesize, format, **void):
 		data = await process_image(url, "resize_max", ["-nogif", size, 0, "auto", "-f", "png"], timeout=60)
-		resp = await run_async(self.tesseract, data, size, timeout=_timeout)
-		resp = await process_image(resp, "resize_map", [[], float(duration) if duration is not None else None, fps, "mult", 1, 1, "nearest", None, "-fs", filesize, "-f", format], cap="image", timeout=_timeout)
+		resp = await run_async(self.tesseract, data, size, timeout=_time_limit)
+		resp = await process_image(resp, "resize_map", [[], float(duration) if duration is not None else None, fps, "mult", 1, 1, "nearest", None, "-fs", filesize, "-f", format], cap="image", timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -1229,7 +1229,7 @@ class Resize(Command):
 	_timeout_ = 4
 	slash = True
 
-	async def __call__(self, bot, _timeout, mode, urls, resolution, multiplier, area, duration, fps, filesize, format, **void):
+	async def __call__(self, bot, _time_limit, mode, urls, resolution, multiplier, area, duration, fps, filesize, format, **void):
 		if resolution:
 			if len(resolution) == 1:
 				x = y = resolution[0]
@@ -1244,7 +1244,7 @@ class Resize(Command):
 			func = "mult"
 		resp = urls[0]
 		if len(urls) > 1 or func != "mult" or not x == y == 1 or area or duration is not None or fps is not None:
-			resp = await process_image(resp, "resize_map", [urls[1:], float(duration) if duration is not None else None, fps, func, x, y, mode, area, "-fs", filesize, "-f", format], cap="image", timeout=_timeout)
+			resp = await process_image(resp, "resize_map", [urls[1:], float(duration) if duration is not None else None, fps, func, x, y, mode, area, "-fs", filesize, "-f", format], cap="image", timeout=_time_limit)
 		else:
 			resp = await bot.optimise_image(resp, fsize=filesize, fmt=format)
 		fn = url2fn(urls[0])
@@ -1314,8 +1314,8 @@ class Crop(Command):
 	_timeout_ = 4
 	slash = True
 
-	async def __call__(self, _timeout, url, left, top, right, bottom, filesize, format, **void):
-		resp = await process_image(url, "crop_map", [[], None, None, left, top, right, bottom, "-fs", filesize, "-f", format], timeout=_timeout)
+	async def __call__(self, _time_limit, url, left, top, right, bottom, filesize, format, **void):
+		resp = await process_image(url, "crop_map", [[], None, None, left, top, right, bottom, "-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -1426,8 +1426,8 @@ class Adjust(Command):
 	rate_limit = (7, 10)
 	_timeout_ = 4
 
-	async def __call__(self, _timeout, url, channels, operation, value, clip, filesize, format, **void):
-		resp = await process_image(url, "adjust_map", [[], None, None, operation, value, channels, clip, "-fs", filesize, "-f", format], timeout=_timeout)
+	async def __call__(self, _time_limit, url, channels, operation, value, clip, filesize, format, **void):
+		resp = await process_image(url, "adjust_map", [[], None, None, operation, value, channels, clip, "-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -1466,8 +1466,8 @@ class Cut2Loop(Command):
 	rate_limit = (8, 15)
 	_timeout_ = 4
 
-	async def __call__(self, _timeout, url, filesize, format, **void):
-		resp = await process_image(url, "cut_to_loop", ["-fs", filesize, "-f", format], timeout=_timeout)
+	async def __call__(self, _time_limit, url, filesize, format, **void):
+		resp = await process_image(url, "cut_to_loop", ["-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
@@ -1489,9 +1489,9 @@ class ImageCompare(Command):
 	rate_limit = (6, 8)
 	_timeout_ = 2
 
-	async def __call__(self, _timeout, urls, **void):
+	async def __call__(self, _time_limit, urls, **void):
 		url = urls.pop(0)
-		resp = await process_image(url, "psnr", [urls], timeout=_timeout)
+		resp = await process_image(url, "psnr", [urls], timeout=_time_limit)
 		return py_md(resp)
 
 
@@ -1632,9 +1632,9 @@ class Blend(Command):
 	_timeout_ = 7
 	maintenance = True
 
-	async def __call__(self, _timeout, urls, operation, opacity, filesize, format, **void):
+	async def __call__(self, _time_limit, urls, operation, opacity, filesize, format, **void):
 		url = urls.pop(0)
-		resp = await process_image(url, "blend_map", [urls, None, None, operation, opacity, "-fs", filesize, "-f", format], timeout=_timeout)
+		resp = await process_image(url, "blend_map", [urls, None, None, operation, opacity, "-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")

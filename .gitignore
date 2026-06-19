@@ -3,6 +3,7 @@ __pycache__
 *.tmp
 *.pem
 backup
+archive
 cache
 saves
 auth.json

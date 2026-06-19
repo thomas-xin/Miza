@@ -1181,8 +1181,15 @@ class AudioDownloader:
 		try:
 			self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).download({repr(url2)})")
 		except RuntimeError as ex:
-			print(repr(ex))
+			print(ex)
+		if not os.path.exists(fn):
 			ydl_opts.pop("cookiesfrombrowser", None)
+			try:
+				self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).download({repr(url2)})")
+			except RuntimeError as ex:
+				print(ex)
+		if not os.path.exists(fn):
+			ydl_opts.pop("remote_components", None)
 			self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).download({repr(url2)})")
 		assert os.path.exists(fn) and os.path.getsize(fn), fn
 		return self.handle_path(fn, entry=None if is_trim else entry)

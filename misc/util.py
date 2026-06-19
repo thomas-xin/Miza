@@ -1533,6 +1533,11 @@ def mime_from_file(path, filename=None, mime=True):
 			if data[8:12] in (b"mif1", "msf1"):
 				return "image/heif"
 	if data and out == "text/plain":
+		if filename:
+			if filename.endswith(".css"):
+				return "text/css"
+			if filename.endswith(".js"):
+				return "application/javascript"
 		if data.startswith(b"#EXTM3U"):
 			return "video/m3u8"
 		if data[:15].lower() == b"<!doctype html>":
@@ -3307,8 +3312,9 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			self.sync()
 
 	def sync(self):
-		self.update(self._unsafe_mut)
-		self._unsafe_mut.clear()
+		if self._unsafe_mut:
+			self.update(self._unsafe_mut)
+			self._unsafe_mut.clear()
 
 	def get(self, k, default=None):
 		try:
@@ -5052,6 +5058,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 	semaphore = Semaphore(512, 256)
 	sessions = ()
 	session = niquests.Session()
+	asession = niquests.AsyncSession()
 	compat_session = requests.Session()
 
 	@staticmethod
@@ -5108,20 +5115,19 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		if isinstance(data, aiohttp.FormData):
 			session = self.sessions.next()
 		elif not session:
-			async with niquests.AsyncSession() as asession:
-				try:
-					resp = await asession.request(method, url, headers=headers, files=files, data=data, timeout=timeout, verify=verify)
-				except niquests.exceptions.SSLError:
-					if ssl is not None:
-						raise
-					resp = await asession.request(method, url, headers=headers, files=files, data=data, timeout=timeout, verify=False)
-				if not ignore_error and resp.status_code >= 400:
-					raise ConnectionError(resp.status_code, (url, as_str(resp.content)))
-				if json:
-					return resp.json()
-				if decode:
-					return resp.text
-				return resp.content
+			try:
+				resp = await self.asession.request(method, url, headers=headers, files=files, data=data, timeout=timeout, verify=verify)
+			except niquests.exceptions.SSLError:
+				if ssl is not None:
+					raise
+				resp = await self.asession.request(method, url, headers=headers, files=files, data=data, timeout=timeout, verify=False)
+			if not ignore_error and resp.status_code >= 400:
+				raise ConnectionError(resp.status_code, (url, as_str(resp.content)))
+			if json:
+				return resp.json()
+			if decode:
+				return resp.text
+			return resp.content
 		async with self.semaphore:
 			req = session or (self.sessions.next() if ssl else self.nossl)
 			resp = await req.request(method, url, headers=headers, data=data, timeout=timeout)
@@ -5228,18 +5234,30 @@ def download_file(*urls, filename=None, timeout=12, return_headers=False):
 		file = io.BytesIO()
 	else:
 		file = open(filename, "wb")
-	headers = {}
-	for url in urls:
-		req = urllib.request.Request(url, method="GET", headers=Request.header())
-		try:
-			resp = urllib.request.urlopen(req, timeout=timeout)
-		except urllib.error.HTTPError as ex:
-			raise ConnectionError(ex.getcode(), ex.msg)
-		else:
-			if not headers:
-				headers = dict(resp.headers)
-		shutil.copyfileobj(resp, file, 65536)
-		resp.close()
+	try:
+		headers = {}
+		for url in urls:
+			req = urllib.request.Request(url, method="GET", headers=Request.header())
+			try:
+				resp = urllib.request.urlopen(req, timeout=timeout)
+			except urllib.error.HTTPError as ex:
+				raise ConnectionError(ex.getcode(), ex.msg)
+			else:
+				if not headers:
+					headers = dict(resp.headers)
+			shutil.copyfileobj(resp, file, 65536)
+			resp.close()
+		if filename is not None:
+			assert os.path.exists(filename) and os.path.getsize(filename)
+	except Exception as ex:
+		if filename is None:
+			raise
+		print(repr(ex))
+		file.close()
+		args = ["curl", urls[0], "-s", "-o", filename]
+		print(args)
+		subprocess.run(args)
+		assert os.path.exists(filename) and os.path.getsize(filename)
 	if filename is None:
 		if return_headers:
 			return file.getbuffer(), resp.headers

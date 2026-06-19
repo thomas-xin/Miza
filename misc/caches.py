@@ -355,17 +355,21 @@ class AttachmentCache(AutoCache):
 				if "/u/" in url:
 					c_id, m_id2, a_id, fn = expand_attachment(url)
 					target = await self.obtain(c_id, m_id2 or m_id, a_id, fn)
-					fn, head = await run_async(download_file, target, filename=raw_fn, timeout=timeout, return_headers=True)
+					fn, head = await run_async(download_file, target, filename=raw_fn, _timeout=timeout, return_headers=True)
 					self.tertiary[url] = head
 					return open(fn, "rb")
 				elif "/c/" in url:
 					path = url.split("/c/", 1)[-1].split("/", 1)[0]
 					urls, csize = await self.obtains(path)
-					fn, head = await run_async(download_file, *urls, filename=raw_fn, timeout=timeout, return_headers=True)
+					fn, head = await run_async(download_file, *urls, filename=raw_fn, _timeout=timeout, return_headers=True)
 					self.tertiary[url] = head
 					return open(fn, "rb")
 			if is_discord_url(target):
-				fn, head = await run_async(download_file, target, filename=raw_fn, timeout=timeout, return_headers=True)
+				try:
+					fn, head = await run_async(download_file, target, filename=raw_fn, _timeout=timeout, return_headers=True)
+				except (ConnectionError, TimeoutError):
+					await asyncio.sleep(1)
+					fn, head = await run_async(download_file, target, filename=raw_fn, _timeout=timeout, return_headers=True)
 				self.tertiary[url] = head
 				return open(fn, "rb")
 			try:
@@ -387,9 +391,11 @@ class AttachmentCache(AutoCache):
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
 		if force:
-			fp = await self.secondary._aretrieve(url, self._download, url, m_id=m_id, timeout=16, read=True)
+			fp = await self.secondary._aretrieve(url, self._download, url, m_id=m_id, _timeout=16, read=True)
 		else:
-			fp = await self.secondary.aretrieve(url, self._download, url, m_id=m_id, timeout=16, _read=True)
+			fp = await self.secondary.aretrieve(url, self._download, url, m_id=m_id, _timeout=16, _read=True)
+			if not getsize(fp):
+				fp = await self.secondary._aretrieve(url, self._download, url, m_id=m_id, _timeout=16, read=True)
 		if return_headers:
 			headers = await self.scan_headers(url, m_id=m_id, fc=fc)
 		if filename:
