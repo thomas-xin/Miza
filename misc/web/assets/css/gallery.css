@@ -159,7 +159,7 @@ main { padding: 1.5rem; width: 100%; margin: 0 auto; }
 .lightbox-info {
 	position: fixed; bottom: 0; left: 0; right: 0; z-index: 1002;
 	background: linear-gradient(transparent, rgba(0,0,0,0.7));
-	color: #ddd; padding: 0.5; text-align: center;
+	color: #ddd; padding: 0.5rem; text-align: center;
 	font-size: 0.88rem; pointer-events: none;
 }
 .lightbox-info .lb-filename {
