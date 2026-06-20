@@ -5239,6 +5239,7 @@ def download_file(*urls, filename=None, timeout=12, return_headers=False):
 		file = io.BytesIO()
 	else:
 		file = open(filename, "wb")
+	resp = None
 	try:
 		headers = {}
 		for url in urls:
@@ -5253,6 +5254,7 @@ def download_file(*urls, filename=None, timeout=12, return_headers=False):
 			shutil.copyfileobj(resp, file, 65536)
 			resp.close()
 		if filename is not None:
+			file.close()
 			assert os.path.exists(filename) and os.path.getsize(filename)
 	except Exception as ex:
 		if filename is None:
@@ -5265,11 +5267,11 @@ def download_file(*urls, filename=None, timeout=12, return_headers=False):
 		assert os.path.exists(filename) and os.path.getsize(filename)
 	if filename is None:
 		if return_headers:
-			return file.getbuffer(), resp.headers
+			return file.getbuffer(), resp.headers if resp else {}
 		return file.getbuffer()
 	file.close()
 	if return_headers:
-		return filename, resp.headers
+		return filename, resp.headers if resp else {}
 	return filename
 
 async def retrieve_api(path, method="GET", headers={}, data=None):
@@ -5285,6 +5287,9 @@ async def retrieve_api(path, method="GET", headers={}, data=None):
 				headers=headers,
 			)
 		except (
+			AttributeError,
+			TimeoutError,
+			asyncio.TimeoutError,
 			niquests.ConnectionError,
 			niquests.ConnectTimeout,
 			niquests.ReadTimeout,
@@ -5294,7 +5299,7 @@ async def retrieve_api(path, method="GET", headers={}, data=None):
 			await asyncio.sleep(delay)
 			exception = ex
 			continue
-		if resp.status_code in (202, 429, 502, 503):
+		if resp.status_code in (202, 429, 500, 502, 503):
 			try:
 				msg = resp.json()
 			except Exception:
