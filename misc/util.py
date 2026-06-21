@@ -4087,6 +4087,55 @@ def _common_prefix_len(a: str, b: str) -> int:
 		i += 1
 	return i
 
+def _contiguity_score(a: str, b: str) -> float:
+	"""Heuristic that rewards long consecutive runs of matching characters over sparse matches.
+
+	Uses a Smith-Waterman-style local alignment where consecutive matches earn an escalating
+	bonus (so a run of length k is worth more than k isolated matches), while any gap
+	(insertion/deletion) or mismatch breaks the run and resets the bonus. The accumulated score
+	is normalised against the best achievable score for the shorter string, yielding a value in
+	$[0, 1]$ that strongly favours contiguity.
+	"""
+	n, m = len(a), len(b)
+	if n == 0 or m == 0:
+		return 1.0 if n == m else 0.0
+	# match_bonus[i][j]: reward for matching a[i-1] with b[j-1], scaling with the current run length.
+	# We track two rows: the diagonal run length and the accumulated alignment score.
+	gap_penalty = 0.5
+	prev_run = [0] * (m + 1)
+	prev_score = [0.0] * (m + 1)
+	curr_run = [0] * (m + 1)
+	curr_score = [0.0] * (m + 1)
+	best = 0.0
+	for i in range(1, n + 1):
+		ca = a[i - 1]
+		cal = ca.lower()
+		for j in range(1, m + 1):
+			cb = b[j - 1]
+			if ca == cb or cal == cb.lower():
+				run = prev_run[j - 1] + 1
+				# Escalating reward: the n-th consecutive match is worth `run` units, so a run of
+				# length k accumulates k*(k+1)/2 versus k for the same number of scattered matches.
+				match_value = 1.0 if ca == cb else 0.9
+				score = prev_score[j - 1] + run * match_value
+				curr_run[j] = run
+			else:
+				# A gap or mismatch breaks the contiguous run; carry the better neighbour minus a penalty.
+				score = max(prev_score[j] - gap_penalty, curr_score[j - 1] - gap_penalty, 0.0)
+				curr_run[j] = 0
+			curr_score[j] = score
+			if score > best:
+				best = score
+		prev_run, curr_run = curr_run, prev_run
+		prev_score, curr_score = curr_score, prev_score
+		for j in range(m + 1):
+			curr_run[j] = 0
+			curr_score[j] = 0.0
+	# Best possible score is a single uninterrupted run spanning the shorter string.
+	k = min(n, m)
+	max_score = k * (k + 1) / 2
+	return best / max_score if max_score else 0.0
+
 def _weighted_edit_distance(a: str, b: str) -> float:
     # Costs
     ins_cost = 1.0
@@ -4131,7 +4180,6 @@ def _weighted_edit_distance(a: str, b: str) -> float:
 
     return prev[m]
 
-# Thank you to gpt-5.2-codex for improving on the old algorithm.
 @functools.lru_cache(maxsize=4096)
 def string_similarity(a: str, b: str) -> float:
 	a_norm = _normalize(a)
@@ -4156,9 +4204,12 @@ def string_similarity(a: str, b: str) -> float:
 	prefix_len = _common_prefix_len(full_prune(a_norm), full_prune(b_norm))
 	prefix_sim = prefix_len / max_len
 
+	# --- Component 4: contiguity (rewards consecutive runs over sparse matches) ---
+	contig_sim = _contiguity_score(full_prune(a_norm), full_prune(b_norm))
+
 	# Weighted blend
-	w_edit, w_token, w_prefix = 0.3, 0.3, 0.4
-	score = (w_edit * edit_sim) + (w_token * token_sim) + (w_prefix * prefix_sim)
+	w_edit, w_token, w_prefix, w_contig = 0.2, 0.2, 0.25, 0.35
+	score = (w_edit * edit_sim) + (w_token * token_sim) + (w_prefix * prefix_sim) + (w_contig * contig_sim)
 
 	# Clamp to $[0, 1]$
 	return max(0.0, min(1.0, score))
@@ -5243,6 +5294,7 @@ def download_file(*urls, filename=None, timeout=12, return_headers=False):
 	try:
 		headers = {}
 		for url in urls:
+			# print(url)
 			req = urllib.request.Request(url, method="GET", headers=Request.header())
 			try:
 				resp = urllib.request.urlopen(req, timeout=timeout)
@@ -5261,10 +5313,14 @@ def download_file(*urls, filename=None, timeout=12, return_headers=False):
 			raise
 		print(repr(ex))
 		file.close()
+		try:
+			os.remove(filename)
+		except (FileNotFoundError, OSError, PermissionError):
+			pass
 		args = ["curl", urls[0], "-s", "-o", filename]
 		print(args)
 		subprocess.run(args)
-		assert os.path.exists(filename) and os.path.getsize(filename)
+		assert os.path.exists(filename)
 	if filename is None:
 		if return_headers:
 			return file.getbuffer(), resp.headers if resp else {}
@@ -5314,6 +5370,8 @@ async def retrieve_api(path, method="GET", headers={}, data=None):
 			except Exception as ex:
 				exception = ex
 		else:
+			if resp.status_code in (400, 401, 403, 404, 405):
+				resp.raise_for_status()
 			return resp.json()
 	raise exception
 

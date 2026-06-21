@@ -211,11 +211,11 @@ sheet_searchables = {
 	"Id (dec) (CMU)": False,
 	"Entity Name": True,
 	"Function Address": False,
-	"Type": False,
-	"PXE/TSC Compatibility": False,
+	"Type": None,
+	"PXE/TSC Compatibility": None,
 	"Other notes": True,
 	"Function Pointer": False,
-	"Default Sprite Sheet": False,
+	"Default Sprite Sheet": None,
 	"Bullet Name": True,
 	"Effect Name": True,
 	"Official Music Name": True,
@@ -223,8 +223,8 @@ sheet_searchables = {
 	"Memory Offset": False,
 	"Description": True,
 	"Address": False,
-	"Size (bytes)": False,
-	"Data Type": False,
+	"Size (bytes)": None,
+	"Data Type": None,
 }
 sheet_keys = {
 	"Entity Name",
@@ -260,6 +260,7 @@ async def sheet_structure(sheet_id):
 	data = await sheet_pull(*cs_sheets[sheet_id])
 	sheet = cdict(
 		data=data,
+		primary={},
 		ids={},
 		fcids={},
 		searchables=[],
@@ -268,7 +269,10 @@ async def sheet_structure(sheet_id):
 		for k, v in entry.items():
 			if not v or v == "-":
 				continue
-			if sheet_searchables.get(k):
+			searchable = sheet_searchables.get(k)
+			if searchable is False:
+				sheet.primary.setdefault(v, []).append(i)
+			elif searchable:
 				sheet.searchables.append((v, i))
 			else:
 				sheet.ids.setdefault(v, []).append(i)
@@ -278,15 +282,18 @@ async def sheet_structure(sheet_id):
 async def sheet_search(sheet_id, query, n=25):
 	result_ids = alist()
 	sheet = await cs_cache.aretrieve(sheet_id, sheet_structure, sheet_id)
-	result_ids.extend(sheet.ids.get(query, ()))
-	result_ids.extend(sheet.fcids.get(query, ()))
-	result_ids.dedup(sort=False)
-	if len(result_ids) < n:
-		other_results = [(string_similarity(query, k), i, v) for i, (k, v) in enumerate(sheet.searchables)]
-		other_ids = [k for k in sorted(other_results, reverse=True) if k[0] >= 0.15]
-		result_ids.extend(t[-1] for t in other_ids)
-	if not result_ids:
-		result_ids = alist([str_lookup(sheet.searchables, query, key=lambda t: t[0], fuzzy=0)[1]])
+	if (primary_results := sheet.primary.get(query, ())):
+		result_ids.extend(primary_results)
+	else:
+		result_ids.extend(sheet.ids.get(query, ()))
+		result_ids.extend(sheet.fcids.get(query, ()))
+		result_ids.dedup(sort=False)
+		if len(result_ids) < n:
+			other_results = [(string_similarity(query, k), i, v) for i, (k, v) in enumerate(sheet.searchables)]
+			other_ids = [k for k in sorted(other_results, reverse=True) if k[0] >= 0.4]
+			result_ids.extend(t[-1] for t in other_ids)
+		if not result_ids:
+			result_ids = alist([str_lookup(sheet.searchables, query, key=lambda t: t[0], fuzzy=0)[1]])
 	result_ids.dedup(sort=False)
 	embed = discord.Embed(colour=colour2raw(0, 127, 255), title=f'Search results for {json.dumps(query)}:')
 	for entry in map(sheet.data.__getitem__, result_ids[:n]):

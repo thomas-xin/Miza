@@ -387,13 +387,21 @@ async def run():
 		message_map.setdefault(cur_cid, {})[cur_id] = m
 		return cur_id
 
-	async def scan_channel(channel, path, index):
+	async def scan_channel(channel, index):
 		gid = channel.get("guild_id", 0)
 		cid = channel["id"]
 		s = pretty_json(channel)
+		if gid:
+			if channel.get("type") in (10, 11, 12) and (pid := channel.get("parent_id")):
+				path = f"guilds/{gid}/channels/{pid}/threads/{cid}"
+			else:
+				path = f"guilds/{gid}/channels/{cid}"
+		else:
+			path = f"channels/{cid}"
 		cur_path = base_path + "/" + path
 		channel_map[cid] = cur_path
 		os.makedirs(cur_path, exist_ok=True)
+		# print(cid, f"{cur_path}/info.json")
 		with open(f"{cur_path}/info.json", "w", encoding="utf-8") as f:
 			f.write(s)
 		mid, Mid = min_id, max_id
@@ -475,7 +483,6 @@ async def run():
 					channels_by_name[name] = tid
 				fut = scan_channel(
 					thread,
-					f"guilds/{gid}/channels/{cid}/threads/{tid}",
 					len(progress),
 				)
 				progress.append(0)
@@ -492,24 +499,15 @@ async def run():
 			ambiguous_channel_names.add(name)
 		else:
 			channels_by_name[name] = cid
-		gid = int(channel.get("guild_id", 0))
 		if channel["type"] not in (1, 2, 3, 10, 11, 12, 15):
 			fut = scan_threads(
 				cid,
 			)
 			futs.append(fut)
-		if channel["type"] in (1, 3):
-			fut = scan_channel(
-				channel,
-				f"guilds/0/channels/{cid}",
-				len(progress),
-			)
-		else:
-			fut = scan_channel(
-				channel,
-				f"guilds/{gid}/channels/{cid}",
-				len(progress),
-			)
+		fut = scan_channel(
+			channel,
+			len(progress),
+		)
 		progress.append(0)
 		if int(cid) in log_ids:
 			futs2.append(fut)
@@ -538,7 +536,11 @@ async def run():
 
 		async def download_single(url, fn):
 			nonlocal c
-			await attachment_cache.download(url, filename=fn)
+			try:
+				await attachment_cache.download(url, filename=fn)
+			except Exception:
+				print_exc()
+				return
 			c += 1
 			progress[index] = c / len(data)
 			print_progress("Files")
@@ -556,7 +558,8 @@ async def run():
 		progress[index] = 1
 		print_progress("Files")
 
-	if os.path.exists(f"{base_path}/0"):
+	dm_path = f"{base_path}/guilds/0"
+	if os.path.exists(dm_path):
 		dms = dict(
 			id=0,
 			name="Direct Messages",
@@ -564,7 +567,7 @@ async def run():
 			icon=None,
 		)
 		s = pretty_json(dms)
-		with open(f"{base_path}/0/info.json", "w") as f:
+		with open(f"{dm_path}/info.json", "w") as f:
 			f.write(s)
 	progress.extend([0] * len(files))
 	futs = []
