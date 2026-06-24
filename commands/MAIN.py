@@ -1848,6 +1848,18 @@ class UpdateUsers(Database):
 		if not loop:
 			self.add_xp(user, getattr(command, "xp", xrand(6, 14)))
 
+	def _delete_(self, message, **void):
+		user = message.author
+		bot = self.bot
+		if message.guild:
+			create_task(bot.index_member(message.guild.id, 0, add=-1))
+			if message.channel:
+				create_task(bot.index_member(message.guild.id, channel_id=message.channel.id, add=-1))
+		if bot.is_optout(user):
+			return
+		if message.guild:
+			create_task(bot.index_member(message.guild.id, message.author.id, add=-1))
+
 	def _send_(self, message, **void):
 		user = message.author
 		bot = self.bot

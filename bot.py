@@ -745,7 +745,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	archive_server = None
 	def start_archive_server(self, shutdown=False):
 		if self.archive_server:
-			self.archive_server.terminate()
+			force_kill(self.archive_server)
 		if not shutdown and os.path.exists("misc/archive/serve.py") and (ap := AUTH.get("archive_port")):
 			print("Starting archive server...")
 			try:

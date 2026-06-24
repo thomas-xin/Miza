@@ -200,7 +200,7 @@ def is_strict_running(proc):
 
 @tracebacksuppressor(psutil.NoSuchProcess)
 def force_kill(proc):
-	"Force kills a process, trying all available methods. Does not error if process does not exist."
+	"Force kills a process and its children, trying all available methods. Does not error if process does not exist."
 	if not proc:
 		return
 	if T(proc).get("fut") and not proc.fut.done():

@@ -197,13 +197,18 @@ async def run():
 	def process_miza_log(m, e):
 		desc = e["description"]
 		content, url = desc.rsplit("\n\n", 1)
-		content = content.split("\n", 1)[1].strip()
-		author_id = desc.split(None, 1)[0].strip("<@!> ")
 		reacts, url = url.strip().split("[View Message]", 1)
 		if not is_discord_message_link(url):
 			raise StopIteration
-		*_, _gid, _cid, _mid = url.rstrip(")").rsplit("/", 3)
+		content = content.split("\n", 1)[1].strip()
 		author = e.get("author", {})
+		try:
+			a_url = author["url"]
+			assert a_url.startswith("https://cdn.discordapp.com/avatars/")
+			author_id = a_url.removeprefix("https://cdn.discordapp.com/avatars/").split("/", 1)[0]
+		except (KeyError, AssertionError):
+			author_id = desc.split(None, 1)[0].strip("<@!> ")
+		*_, _gid, _cid, _mid = url.rstrip(")").rsplit("/", 3)
 		m2 = dict(
 			type=-1,
 			content=content,
@@ -247,7 +252,7 @@ async def run():
 				image=e.get("image"),
 				thumbnail=e.get("thumbnail"),
 			))
-		for e in embeds[1:]:
+		for e in m["embeds"][1:]:
 			if not e.get("image") and not e.get("thumbnail"):
 				continue
 			e2 = dict(
@@ -301,6 +306,12 @@ async def run():
 		if not _mid.isnumeric():
 			raise StopIteration
 		author = e.get("author", {})
+		try:
+			a_url = author["url"]
+			assert a_url.startswith("https://cdn.discordapp.com/avatars/")
+			author_id = a_url.removeprefix("https://cdn.discordapp.com/avatars/").split("/", 1)[0]
+		except (KeyError, AssertionError):
+			author_id = e.get("footer", {}).get("text", "").split(": ", 1)[-1].strip() or "0"
 		m2 = dict(
 			type=-1,
 			content=e["description"].rsplit("\n\n", 1)[0].strip(),
@@ -313,7 +324,7 @@ async def run():
 			flags=0,
 			components=[],
 			author=dict(
-				id=e.get("footer", {}).get("text", "").split(": ", 1)[-1].strip() or "0",
+				id=author_id,
 				username=author.get("name"),
 				avatar=author["icon_url"].rsplit("/", 1)[-1].split(".", 1)[0] if author.get("icon_url") else "0",
 				avatar_url=author["icon_url"],
@@ -344,11 +355,8 @@ async def run():
 			else:
 				url = f"https://media.discordapp.net/stickers/{sid}.png"
 			files["stickers"][sid] = [s["name"] + "." + url.rsplit(".", 1)[-1], url]
-		try:
-			if m.get("bot") and int(cur_cid) in log_ids:
-				embeds = m.get("embeds", ())
-				if not embeds:
-					raise StopIteration
+		if m.get("author", {}).get("bot") and int(cur_cid) in log_ids and (embeds := m.get("embeds")):
+			try:
 				e = embeds[0]
 				if e.get("type") != "rich":
 					raise StopIteration
@@ -360,8 +368,8 @@ async def run():
 				else:
 					raise StopIteration # TODO: Implement other popular Discord bot message log formats
 				process_message(m2, m2.get("channel_id", cid))
-		except StopIteration:
-			pass
+			except StopIteration:
+				pass
 		for r in m.get("reactions", ()):
 			e = r.get("emoji")
 			if not e or not e.get("id"):

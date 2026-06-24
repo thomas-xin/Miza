@@ -847,7 +847,7 @@ worst_url = lambda obj: get_url(obj, auto_url_ex) or getattr(obj, "url", None) o
 allow_gif = lambda url: url + ".gif" if "." not in url.rsplit("/", 1)[-1] and "?" not in url else url
 
 def get_author(user, uid=None):
-	url = best_url(user)
+	url = o_url = best_url(user)
 	bot = BOT[0]
 	if bot and "proxies" in bot.data:
 		url2 = bot.data.proxies.get(uuhash(url))
@@ -858,7 +858,7 @@ def get_author(user, uid=None):
 	name = getattr(user, "display_name", None) or user.name
 	if uid:
 		name = f"{name} ({user.id})"
-	return cdict(name=name, icon_url=url, url=url)
+	return cdict(name=name, icon_url=url, url=o_url)
 
 # Finds emojis and user mentions in a string.
 find_emojis = lambda s: regexp(r"<a?:[A-Za-z0-9\-~_]+:[0-9]+>").findall(s)
