@@ -341,9 +341,9 @@ class Queue(Pagination, Command):
 		cache_level = bot.audio.run(f"ytdl.in_cache({repr(items[0].url)})")
 		print(items[0].url, cache_level)
 		if not cache_level:
-			delay = 5
+			delay = 8
 		elif cache_level == 1:
-			delay = 1
+			delay = 3
 		total_duration = max(delay, estimated / abs(settings.speed))
 		qstride = 1
 		if len(index) > 1:
@@ -1344,11 +1344,11 @@ class RadioCache:
 	async def _search(cls, countrycode, query):
 		if not countrycode:
 			if not query:
-				rf = await run_async(pyradios.RadioFacets, RB)
+				rf = await _run_async(pyradios.RadioFacets, RB)
 				results = cls.filter_results(rf.result)
 				results.sort(key=lambda radio: radio["name"])
 				return results
-			results = await run_async(RB.search, name=query, name_exact=False)
+			results = await _run_async(RB.search, name=query, name_exact=False)
 			if not results:
 				facets = await cls.search()
 				results = [str_lookup(
@@ -1362,7 +1362,7 @@ class RadioCache:
 		if not query:
 			facets = await cls.search()
 			return [r for r in facets if r["countrycode"] == countrycode]
-		results = await run_async(RB.search, name=query, name_exact=False, countrycode=countrycode)
+		results = await _run_async(RB.search, name=query, name_exact=False, countrycode=countrycode)
 		if not results:
 			country_results = await cls.search(countrycode=countrycode)
 			results = [str_lookup(
@@ -1820,7 +1820,7 @@ async def get_lyrics(item, url=None):
 			s = "https://genius.com" + path
 			page = await Request.aio(s, decode=True)
 			text = page
-			html = await run_async(BeautifulSoup, text, "html.parser", timeout=18)
+			html = await _run_async(BeautifulSoup, text, "html.parser", timeout=18)
 			lyricobj = html.find('div', class_='lyrics')
 			if lyricobj is not None:
 				lyrics = lyricobj.get_text().strip()

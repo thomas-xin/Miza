@@ -20,6 +20,7 @@ import discord, discord.utils, discord.file  # noqa: E402
 
 import invisicode
 from misc.asyncs import *
+from misc.asyncs import _run_async
 
 openai = None
 if os.environ.get("IS_BOT") and os.environ.get("AI_FEATURES", True):
@@ -1451,7 +1452,7 @@ async def start_proc(n, di=(), caps="image", it=0, wait=False, timeout=None):
 			for c in caps:
 				PROCS_BY_CAPS[c].remove(proc)
 			PROCS[n] = False
-		port = await run_async(get_free_port)
+		port = await _run_async(get_free_port)
 		args = proc_args
 		for c in caps:
 			args = AUTH.get("cap_versions", {}).get(c) or args
@@ -1464,7 +1465,7 @@ async def start_proc(n, di=(), caps="image", it=0, wait=False, timeout=None):
 		args.append(json_dumps([(p.major, p.minor) for p in properties]).decode("ascii"))
 		args.append(json_dumps(COMPUTE_ORDER).decode("ascii"))
 		args.append(str(it))
-		pipe = await run_async(
+		pipe = await _run_async(
 			EvalPipe.connect,
 			args,
 			port,

@@ -11,6 +11,7 @@ import re
 import subprocess
 import sys
 import threading
+import time
 from traceback import print_exc
 from urllib.parse import quote_plus, unquote_plus
 import zipfile
@@ -20,7 +21,7 @@ import numpy as np
 import psutil
 from .asyncs import create_task, submit_thread, run_async, wrap_future, eloop, Delay, format_async_stack, gather
 from .types import utc, as_str, alist, cdict, suppress, round_min, cast_id, lim_str, astype, pretty_json
-from .smath import log2lin
+from .smath import log2lin, sec2time
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, colourise_auto, maybe_json, select_and_loads,
@@ -1057,6 +1058,13 @@ class AudioFile:
 				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "copy", "-"]
 			if is_url(stream):
 				cmd = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + cmd[1:]
+			if is_youtube_stream(stream):
+				met = stream.split("&met=", 1)[-1].split("&", 1)[0].split("%", 1)[0]
+				if met and met.isnumeric():
+					wait = int(met) - utc() + 8
+					if wait > 0:
+						print(f"Waiting {sec2time(wait)}...")
+						time.sleep(wait)
 			print(cmd)
 			proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			assert proc.is_running(), "FFmpeg process failed to start"

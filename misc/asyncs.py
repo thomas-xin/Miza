@@ -243,7 +243,7 @@ async def flatten(ait) -> list:
 async def unflatten(it):
 	try:
 		while True:
-			yield await run_async(next, it)
+			yield await _run_async(next, it)
 	except StopIteration:
 		pass
 

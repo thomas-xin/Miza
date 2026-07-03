@@ -8,6 +8,7 @@ import os
 if __name__ != "__mp_main__":
 	os.environ["IS_BOT"] = "1"
 from misc import common, asyncs
+from misc.asyncs import _run_async
 from misc.common import * # noqa: F403
 import ddgs
 import pathlib
@@ -719,7 +720,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				for attr in ("flags", "server_only", "slash"):
 					with suppress(AttributeError):
 						c[attr] = command.attr
-		s = await run_async(pretty_json, j)
+		s = await _run_async(pretty_json, j)
 		os.makedirs("misc/web/static", exist_ok=True)
 		with open("misc/web/static/HELP.json", "w", encoding="utf-8") as f:
 			f.write(s)
@@ -834,7 +835,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			events = self.events.get(ev, ())
 			if len(events) == 1:
 				with ctx:
-					return await run_async(events[0](*args, **kwargs))
+					return await _run_async(events[0](*args, **kwargs))
 				return
 			futs = []
 			async with asyncio.TaskGroup() as group:
@@ -1142,7 +1143,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	def fetch_member(self, u_id, guild=None, find_others=False):
 		"Fetches the first seen instance of the target user as a member in any shared server."
-		return run_async(self.get_member, u_id, guild, find_others)
+		return _run_async(self.get_member, u_id, guild, find_others)
 
 	def get_member(self, u_id, guild=None, find_others=True):
 		if not isinstance(u_id, int):
@@ -1367,7 +1368,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			m = self.cache.messages[m_id]
 		if not m and "message_cache" in self.data:
 			with suppress(KeyError):
-				m = await run_async(self.data.message_cache.load_message, m_id)
+				m = await _run_async(self.data.message_cache.load_message, m_id)
 		if m and not old:
 			if m.attachments:
 				if any(discord_expired(str(a.url)) for a in m.attachments):
@@ -1958,7 +1959,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				backends = ["bing", "brave", "duckduckgo", "mojeek", "yandex", "yahoo"]
 				backends = shuffle(backends)[:3]
 				for backend in (backends):
-					fut = run_async(
+					fut = _run_async(
 						self.ddgs.text,
 						argv,
 						safesearch="off",
@@ -1975,13 +1976,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					else:
 						print(repr(res))
 				return "\n\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).strip()
-			result = await run_async(
+			result = await _run_async(
 				self.ddgs.extract,
 				verify_url(argv),
 				fmt="text_markdown",
 				timeout=timeout,
 			)
-			return argv + "\n" + result["content"]
+			return argv + "\n" + lim_str(result["content"], 1048576)
 		urls = find_urls(argv)
 		for url in urls:
 			argv = argv.replace(url, "", 1).strip()
@@ -2068,7 +2069,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 				reason = getattr(delta, "reasoning", None)
 				if not reason and getattr(delta, "reasoning_details", None):
-					rdetails = [r["text"] for r in delta.reasoning_details if r["type"] == "reasoning.text"]
+					rdetails = [r.get("text", "") for r in delta.reasoning_details if r["type"] == "reasoning.text"]
 					if rdetails:
 						reason = str(rdetails[0])
 					else:
@@ -2308,6 +2309,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def chat_completion(self, messages, model="miza-1", system=None, max_tokens=256, temperature=0.8, tools=None, tool_choice=None, model_router=None, tool_router=None, user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
 		"OpenAI-compatible Chat Completion function. Autoselects model using a function call, then routes to tools and target model as required."
 		await require_predicate(predicate)
+		await ai.load_openrouter()
 		reasoning = []
 		modlvl = ["miza-1", "miza-2", "miza-3"].index(model.rsplit("/", 1)[-1])
 		self.model_levels = dict(enumerate(map(cdict, AUTH.get("model_levels", []))))
@@ -2403,7 +2405,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print("SCAN:", cargs, toolmodel, message)
 				reason = getattr(message, "reasoning", None)
 				if not reason and getattr(message, "reasoning_details", None):
-					rdetails = [r["text"] for r in message.reasoning_details if r["type"] == "reasoning.text"]
+					rdetails = [r.get("text", "") for r in message.reasoning_details if r["type"] == "reasoning.text"]
 					if rdetails:
 						reason = str(rdetails[0])
 					else:
@@ -2593,7 +2595,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						if getattr(delta, "reasoning", None):
 							reason += delta.reasoning
 						elif not reason and getattr(delta, "reasoning_details", None):
-							rdetails = [r["text"] for r in delta.reasoning_details if r["type"] == "reasoning.text"]
+							rdetails = [r.get("text", "") for r in delta.reasoning_details if r["type"] == "reasoning.text"]
 							if rdetails:
 								reason += str(rdetails[0])
 							else:
@@ -2816,7 +2818,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		mime = magic.from_buffer(d)
 
 		lim = 5 * 1048576 * 3 / 4
-		if mime not in ("image/jpg", "image/jpeg", "image/png") or len(d) > lim or np.prod(await run_async(get_image_size, d)) > sizelim:
+		if mime not in ("image/jpg", "image/jpeg", "image/png") or len(d) > lim or np.prod(await _run_async(get_image_size, d)) > sizelim:
 			name = url.replace("\\", "/").rsplit("/", 1) if isinstance(url, str) else "data"
 			if mime.split("/", 1)[0] not in ("image", "video"):
 				if len(d) > 288 and mime not in ("text/plain", "text/html"):
@@ -4068,7 +4070,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				+ np.sum(list(self.size2.values()), dtype=np.uint32, axis=0)
 			)
 			return size
-		size = await run_async(count_size)
+		size = await _run_async(count_size)
 
 		with tracebacksuppressor:
 			system = await fut
@@ -4237,7 +4239,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				for e in ("_bot_ready_", "_ready_"):
 					func = getattr(db, e, None)
 					if callable(func):
-						fut = run_async(func, bot=self)
+						fut = _run_async(func, bot=self)
 						futs.append(fut)
 			print("...")
 			await_fut(gather(*futs))
@@ -4581,7 +4583,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if not u._semaphore.busy:
 						async def call_into(u):
 							with MemoryTimer(f"{u}-call"):
-								return await run_async(u)
+								return await _run_async(u)
 						fut = call_into(u)
 						futs.append(fut)
 				await gather(*futs)
@@ -6282,7 +6284,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		elif isinstance(b, byte_like):
 			pass
 		else:
-			b = await run_async(b.read)
+			b = await _run_async(b.read)
 		url = f"{self.raw_webserver}/upload"
 		if filename:
 			url += f"?filename={filename}"
@@ -6335,9 +6337,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				with tracebacksuppressor:
 					create_task(self.update_status())
 					with MemoryTimer("network_usage"):
-						fut = run_async(psutil.net_io_counters)
+						fut = _run_async(psutil.net_io_counters)
 						data = await self.status()
-						await run_async(self.update_uptime, data)
+						await _run_async(self.update_uptime, data)
 						resp = await fut
 						sent, recv = resp.bytes_sent, resp.bytes_recv
 						if not hasattr(self, "up_bytes"):
@@ -6359,7 +6361,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def worker_heartbeat(self):
 		futs = []
 		if AUTH.get("ssl_generator"):
-			await run_async(subprocess.run, AUTH["ssl_generator"])
+			await _run_async(subprocess.run, AUTH["ssl_generator"])
 		key = AUTH.get("discord_secret") or ""
 		uri = self.raw_webserver
 		dc = pk = ""
@@ -6416,7 +6418,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					await self.send_event("_minute_loop_")
 					submit_thread(self.cache_reduce)
 					with MemoryTimer("update"):
-						await run_async(self.update)
+						await _run_async(self.update)
 
 	async def heartbeat(self):
 		await asyncio.sleep(8)
@@ -7556,7 +7558,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.add_message(message, force=True)
 
 	async def init_ready(self):
-		await run_async(self.start_webserver)
+		await _run_async(self.start_webserver)
 		await self.modload
 		print(f"Mapped command count: {len(self.commands)}")
 		commands = set()
@@ -8026,7 +8028,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.states = [None] * self.shard_count
 
 		async def on_full_connect():
-			await run_async(self.set_guilds)
+			await _run_async(self.set_guilds)
 			print("Successfully connected as " + str(self.user))
 
 		@self.event
@@ -8130,7 +8132,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			for member in guild.members:
 				name = str(member)
 				self.cache.usernames[name] = member._user
-			await run_async(self.set_guilds)
+			await _run_async(self.set_guilds)
 
 		# Guild destroy event: Remove guild from bot cache.
 		@self.event
@@ -8138,7 +8140,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.guilds_updated = True
 			self.users_updated = True
 			self.cache.guilds.pop(guild.id, None)
-			await run_async(self.set_guilds)
+			await _run_async(self.set_guilds)
 			print("Server lost:", guild, "removed.")
 
 		# Reaction add event: uses raw payloads rather than discord.py message cache. calls _seen_ bot database event.
@@ -8295,23 +8297,23 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if utc() - after.created_at.timestamp() > 86400 * 14 or not had_before:
 					found = await self.flatten_search(after.guild.id, limit=200, target_id=after.id, author_id=after.author.id)
 					print(f"Edit: Retrieved {len(found)} messages from user {after.author}")
-			with tracebacksuppressor:
-				inits = T(before).get("inits") or T(after).get("inits")
-				if inits:
-					print("Cancel:", inits)
-					for fut in inits:
-						with tracebacksuppressor:
-							try:
-								fut.cancel()
-							except AttributeError:
-								try:
-									fut.close()
-								except AttributeError:
-									force_kill(fut)
 			self.add_message(after, force=2)
 			if before.author.id == self.deleted_user or after.author.id == self.deleted_user:
 				print("Deleted User RAW_MESSAGE_EDIT", after.channel, before.author, after.author, before, after, after.channel.id, after.id)
 			if raw or before.content != after.content:
+				with tracebacksuppressor:
+					inits = T(before).get("inits") or T(after).get("inits")
+					if inits:
+						print("Cancel:", inits)
+						for fut in inits:
+							with tracebacksuppressor:
+								try:
+									fut.cancel()
+								except AttributeError:
+									try:
+										fut.close()
+									except AttributeError:
+										force_kill(fut)
 				if "users" in self.data:
 					self.data.users.add_xp(after.author, xrand(1, 4))
 				if T(after).get("guild"):
@@ -8666,7 +8668,7 @@ class SimulatedMessage:
 		else:
 			ofiles = []
 			for file in files:
-				f = await run_async(self.as_file, file)
+				f = await _run_async(self.as_file, file)
 				ofiles.append(f)
 			kwargs["files"] = ofiles
 		self.response.append(kwargs)

@@ -1062,7 +1062,7 @@ class StaffLog(Command):
 		kind=cdict(
 			type="enum",
 			validation=cdict(
-				enum=("message", "user", "server"),
+				enum=("message", "user", "join", "server"),
 			),
 			required=True,
 		),
@@ -1081,6 +1081,9 @@ class StaffLog(Command):
 		),
 		MemberLog=cdict(
 			kind="user",
+		),
+		JoinLog=cdict(
+			kind="join",
 		),
 		ServerLog=cdict(
 			kind="server",
@@ -1592,7 +1595,7 @@ class ServerProtector(Database):
 		if not isinstance(channel, discord.Thread) and channel.permissions_for(guild.me).view_audit_log:
 			ts = utc()
 			cnt = {}
-			audits = guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete)
+			audits = guild.audit_logs(limit=100, action=discord.AuditLogAction.channel_delete)
 			async for log in audits:
 				if ts - utc_ts(log.created_at) < 120:
 					add_dict(cnt, {log.user.id: 1})
@@ -1601,7 +1604,7 @@ class ServerProtector(Database):
 				else:
 					break
 			else:
-				audits = guild.audit_logs(limit=5, action=discord.AuditLogAction.thread_delete)
+				audits = guild.audit_logs(limit=100, action=discord.AuditLogAction.thread_delete)
 				async for log in audits:
 					if ts - utc_ts(log.created_at) < 120:
 						add_dict(cnt, {log.user.id: 1})
@@ -1621,7 +1624,7 @@ class ServerProtector(Database):
 			return
 		if not self.bot.is_trusted(guild.id) or not guild.me.guild_permissions.view_audit_log:
 			return
-		audits = guild.audit_logs(limit=13, action=discord.AuditLogAction.ban)
+		audits = guild.audit_logs(limit=100, action=discord.AuditLogAction.ban)
 		ts = utc()
 		cnt = {}
 		async for log in audits:
@@ -1876,11 +1879,10 @@ class CreateSound(Command):
 	async def __call__(self, bot, _guild, _perm, _name, name, emoji, url, **void):
 		if _perm < 2:
 			raise self.perm_error(_perm, 2, "for command " + _name)
-		if emoji and emoji.isnumeric():
-			emoji = await bot.fetch_emoji(emoji, _guild)
+		if emoji:
 			assert emoji.guild.id == _guild.id, "Emoji must be from the current server."
 		name = name or getattr(emoji, "name", None) or url2fn(url).rsplit(".", 1)[0][:32]
-		info = await run_async(audio_meta, url)
+		info = await _run_async(audio_meta, url)
 		i = ts_us()
 		if info.duration <= 5.5:
 			fn = f"{TEMP_PATH}/{i}.ogg"
@@ -1938,7 +1940,7 @@ class CreateSound(Command):
 					f.write(data)
 				return data
 
-			data = await run_async(write_to)
+			data = await _run_async(write_to)
 		await _guild.create_soundboard_sound(name=name, emoji=emoji, sound=data)
 		return cdict(
 			content=f"Successfully created soundboard {sqr_md(name)} for {sqr_md(_guild)}.",
@@ -2026,14 +2028,14 @@ class ScanEmoji(Command):
 		async with discord.context_managers.Typing(channel):
 			for emoji in sorted(guild.emojis, key=lambda e: e.id):
 				url = str(emoji.url)
-				resp = await run_async(subprocess.run, self.ffprobe_start + (url,), stdout=subprocess.PIPE)
+				resp = await _run_async(subprocess.run, self.ffprobe_start + (url,), stdout=subprocess.PIPE)
 				width, height = map(int, resp.stdout.splitlines())
 				if width < 256 or height < 256:
 					found += 1
 					w, h = width, height
 					while w < 256 or h < 256:
 						w, h = w << 1, h << 1
-					colour = await run_async(bot.get_colour, url)
+					colour = await _run_async(bot.get_colour, url)
 					bot.send_as_embeds(
 						channel,
 						description=f"{emoji} is {width}×{height}, which is below the recommended discord emoji size, and may appear blurry when scaled by Discord. Scaling the image using {p}resize, with filters `nearest`, `scale2x` or `lanczos` is advised.",
@@ -2148,6 +2150,129 @@ class UpdateServerLogs(Database):
 		b_url = await bot.get_proxy_url(before)
 		a_url = await bot.get_proxy_url(after)
 		emb.set_author(name=str(after), icon_url=a_url, url=a_url)
+		bot.send_embeds(channel, emb)
+
+
+class UpdateJoinLogs(Database):
+	name = "logJ"
+	no_file = True
+
+	async def _join_(self, user, **void):
+		guild = T(user).get("guild")
+		if guild is None:
+			return
+		bot = self.bot
+		c_id = bot.get_guildbase(guild.id, "logs.join")
+		if not c_id:
+			return
+		try:
+			channel = await bot.fetch_channel(c_id)
+		except (EOFError, discord.NotFound):
+			bot.pop_guildbase(guild.id, "logs.join")
+			return
+		# Colour: White
+		emb = discord.Embed(colour=16777214)
+		emb.set_author(**get_author(user))
+		emb.description = f"{user_mention(user.id)} has joined the server."
+		age = DynamicDT.now() - user.created_at
+		if age < 86400 * 7:
+			emb.description += f"\n⚠️ Account is {age} old. ⚠️"
+		bot.send_embeds(channel, emb)
+
+	async def _leave_(self, user, **void):
+		guild = T(user).get("guild")
+		if guild is None:
+			return
+		bot = self.bot
+		c_id = bot.get_guildbase(guild.id, "logs.join")
+		if not c_id:
+			return
+		try:
+			channel = await bot.fetch_channel(c_id)
+		except (EOFError, discord.NotFound):
+			bot.pop_guildbase(guild.id, "logs.join")
+			return
+		await asyncio.sleep(5)
+		deleted = None
+		prune = None
+		kick = None
+		ban = None
+		try:
+			stored = bot.get_userbase(user.id, "stored")
+		except LookupError:
+			pass
+		else:
+			for c_id, m_id in tuple(stored.items()):
+				try:
+					c = bot.cache.channels[c_id]
+				except KeyError:
+					stored.pop(c_id)
+					continue
+				try:
+					m = await c.fetch_message(m_id)
+				except:
+					print_exc()
+					stored.pop(c_id, None)
+					continue
+				print("Remaining author:", m.author, m.author.id, guild)
+				if m.author.id == bot.deleted_user:
+					print(user, user.id, "deleted!!")
+					bot.set_userbase(user.id, "deleted", True)
+					deleted = True
+				break
+		# Colour: Black
+		emb = discord.Embed(colour=1)
+		emb.set_author(**get_author(user))
+		if not bot.get_userbase(user.id, "deleted"):
+			if bot.permissions_in(guild).view_audit_log:
+				# Check audit log to find whether user left or was kicked/banned
+				with tracebacksuppressor(StopIteration):
+					ts = utc()
+					futs = [create_task(flatten(guild.audit_logs(limit=100, action=getattr(discord.AuditLogAction, action)))) for action in ("ban", "kick", "member_prune")]
+					bans = kicks = prunes = ()
+					with tracebacksuppressor:
+						bans = await futs[0]
+						kicks = await futs[1]
+						prunes = await futs[2]
+					for log in bans:
+						if ts - utc_ts(log.created_at) < 10:
+							if log.target.id == user.id:
+								ban = cdict(id=log.user.id, reason=log.reason)
+								raise StopIteration
+					for log in kicks:
+						if ts - utc_ts(log.created_at) < 10:
+							if log.target.id == user.id:
+								kick = cdict(id=log.user.id, reason=log.reason)
+								raise StopIteration
+					for log in prunes:
+						if ts - utc_ts(log.created_at) < 10:
+							try:
+								reason = f"{log.extra.delete_member_days} days of inactivity"
+							except AttributeError:
+								reason = None
+							prune = cdict(id=log.user.id, reason=reason)
+							raise StopIteration
+		else:
+			deleted = True
+		if deleted is not None:
+			emb.description = f"{user_mention(user.id)} has been deleted."
+		elif ban is not None:
+			emb.description = f"{user_mention(user.id)} has been banned by {user_mention(ban.id)}."
+			if ban.reason:
+				emb.description += f"\nReason: *`{no_md(ban.reason)}`*"
+		elif kick is not None:
+			emb.description = f"{user_mention(user.id)} has been kicked by {user_mention(kick.id)}."
+			if kick.reason:
+				emb.description += f"\nReason: *`{no_md(kick.reason)}`*"
+		elif prune is not None:
+			emb.description = f"{user_mention(user.id)} has been pruned by {user_mention(prune.id)}."
+			if prune.reason:
+				emb.description += f"\nReason: *`{no_md(prune.reason)}`*"
+		else:
+			emb.description = f"{user_mention(user.id)} has left the server."
+		rchange = escape_markdown(", ".join(role_mention(r.id) for r in standard_roles(user)))
+		if rchange:
+			emb.add_field(name="Roles", value=rchange)
 		bot.send_embeds(channel, emb)
 
 
@@ -2298,124 +2423,6 @@ class UpdateUserLogs(Database):
 					emb.set_author(name=str(after), icon_url=ub, url=b_url)
 					await message.edit(embed=emb)
 
-	async def _join_(self, user, **void):
-		guild = T(user).get("guild")
-		if guild is None:
-			return
-		bot = self.bot
-		c_id = bot.get_guildbase(guild.id, "logs.user")
-		if not c_id:
-			return
-		try:
-			channel = await bot.fetch_channel(c_id)
-		except (EOFError, discord.NotFound):
-			bot.pop_guildbase(guild.id, "logs.user")
-			return
-		# Colour: White
-		emb = discord.Embed(colour=16777214)
-		emb.set_author(**get_author(user))
-		emb.description = f"{user_mention(user.id)} has joined the server."
-		age = DynamicDT.now() - user.created_at
-		if age < 86400 * 7:
-			emb.description += f"\n⚠️ Account is {age} old. ⚠️"
-		bot.send_embeds(channel, emb)
-
-	async def _leave_(self, user, **void):
-		guild = T(user).get("guild")
-		if guild is None:
-			return
-		bot = self.bot
-		c_id = bot.get_guildbase(guild.id, "logs.user")
-		if not c_id:
-			return
-		try:
-			channel = await bot.fetch_channel(c_id)
-		except (EOFError, discord.NotFound):
-			bot.pop_guildbase(guild.id, "logs.user")
-			return
-		await asyncio.sleep(1)
-		deleted = None
-		prune = None
-		kick = None
-		ban = None
-		try:
-			stored = bot.get_userbase(user.id, "stored")
-		except LookupError:
-			pass
-		else:
-			for c_id, m_id in tuple(stored.items()):
-				try:
-					c = bot.cache.channels[c_id]
-				except KeyError:
-					stored.pop(c_id)
-					continue
-				try:
-					m = await c.fetch_message(m_id)
-				except:
-					print_exc()
-					stored.pop(c_id, None)
-					continue
-				print("Remaining author:", m.author, m.author.id, guild)
-				if m.author.id == bot.deleted_user:
-					print(user, user.id, "deleted!!")
-					bot.set_userbase(user.id, "deleted", True)
-				break
-		# Colour: Black
-		emb = discord.Embed(colour=1)
-		emb.set_author(**get_author(user))
-		if not bot.permissions_in(guild).view_audit_log:
-			pass
-		elif not bot.get_userbase(user.id, "deleted", False):
-			# Check audit log to find whether user left or was kicked/banned
-			with tracebacksuppressor(StopIteration):
-				ts = utc()
-				futs = [create_task(flatten(guild.audit_logs(limit=4, action=getattr(discord.AuditLogAction, action)))) for action in ("ban", "kick", "member_prune")]
-				bans = kicks = prunes = ()
-				with tracebacksuppressor:
-					bans = await futs[0]
-					kicks = await futs[1]
-					prunes = await futs[2]
-				for log in bans:
-					if ts - utc_ts(log.created_at) < 3:
-						if log.target.id == user.id:
-							ban = cdict(id=log.user.id, reason=log.reason)
-							raise StopIteration
-				for log in kicks:
-					if ts - utc_ts(log.created_at) < 3:
-						if log.target.id == user.id:
-							kick = cdict(id=log.user.id, reason=log.reason)
-							raise StopIteration
-				for log in prunes:
-					if ts - utc_ts(log.created_at) < 3:
-						try:
-							reason = f"{log.extra.delete_member_days} days of inactivity"
-						except AttributeError:
-							reason = None
-						prune = cdict(id=log.user.id, reason=reason)
-						raise StopIteration
-		else:
-			deleted = True
-		if deleted is not None:
-			emb.description = f"{user_mention(user.id)} has been deleted."
-		elif ban is not None:
-			emb.description = f"{user_mention(user.id)} has been banned by {user_mention(ban.id)}."
-			if ban.reason:
-				emb.description += f"\nReason: *`{no_md(ban.reason)}`*"
-		elif kick is not None:
-			emb.description = f"{user_mention(user.id)} has been kicked by {user_mention(kick.id)}."
-			if kick.reason:
-				emb.description += f"\nReason: *`{no_md(kick.reason)}`*"
-		elif prune is not None:
-			emb.description = f"{user_mention(user.id)} has been pruned by {user_mention(prune.id)}."
-			if prune.reason:
-				emb.description += f"\nReason: *`{no_md(prune.reason)}`*"
-		else:
-			emb.description = f"{user_mention(user.id)} has left the server."
-		rchange = escape_markdown(", ".join(role_mention(r.id) for r in standard_roles(user)))
-		if rchange:
-			emb.add_field(name="Roles", value=rchange)
-		bot.send_embeds(channel, emb)
-
 
 class UpdateMessageLogs(Database):
 	name = "logM"
@@ -2518,7 +2525,7 @@ class UpdateMessageLogs(Database):
 					sem = self.raw_delete_sems[bucket] = Semaphore(2, 4, rate_limit=5)
 				async with sem:
 					al = await flatten(guild.audit_logs(
-						limit=50,
+						limit=100,
 						action=action,
 					))
 				al2 = bot.deletes.get(guild.id, [])
@@ -2582,7 +2589,7 @@ class UpdateMessageLogs(Database):
 				if not guild.get_member(cu_id).guild_permissions.view_audit_log:
 					raise PermissionError
 				al = await flatten(guild.audit_logs(
-					limit=50,
+					limit=100,
 					action=action,
 				))
 				al2 = bot.bulk_deletes.get(guild.id, [])

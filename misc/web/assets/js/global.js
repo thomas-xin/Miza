@@ -194,6 +194,7 @@ for (const k of Object.keys(prideFlags)) {
 	for (const hex of prideFlags[k]) {
 		const rgb = hex.replace(/^#/, '').match(/.{2}/g).map(x => parseInt(x, 16));
 		const hsl = rgbToHsl(...rgb);
+		if (hsl[2] < 20) hsl[2] = 20;
 		temp2.push(hsl);
 		temp2.push(hsl);
 	}

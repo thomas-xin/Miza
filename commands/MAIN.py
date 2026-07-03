@@ -658,7 +658,7 @@ class Info(Command):
 			case discord.User | discord.Member:
 				return await self.get_user_info(guild.get_member(obj.id) or obj)
 			case discord.Guild:
-				return await self.get_guild_info(guild)
+				return await self.get_guild_info(obj)
 			case _ if getattr(obj, "type", None):
 				return await self.get_channel_info(obj)
 			case _:
@@ -957,7 +957,7 @@ class Activity(Command):
 	slash = True
 
 	async def __call__(self, bot, _user, _time_limit, **void):
-		data = await run_async(bot.data.users.fetch_events, _user.id, interval=900, timeout=_time_limit)
+		data = await _run_async(bot.data.users.fetch_events, _user.id, interval=900, timeout=_time_limit)
 		resp = await process_image("plt_special", "&", (data, str(_user)), cap="math", priority=True)
 		fn = resp
 		f = CompatFile(fn, filename=f"{_user}.png")

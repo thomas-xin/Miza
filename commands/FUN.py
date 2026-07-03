@@ -1015,11 +1015,11 @@ class Barter(Command):
 		if amount > 16777216:
 			for i in range(16):
 				count = 1048576
-				seeds = await run_async(rand.integers, 0, len(barter_seeding), size=count, dtype=itype)
+				seeds = await _run_async(rand.integers, 0, len(barter_seeding), size=count, dtype=itype)
 				ids = barter_seeding[seeds]
-				counts = await run_async(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
+				counts = await _run_async(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
 				counts = counts.astype(dtype)
-				await run_async(np.add.at, totals, ids, counts)
+				await _run_async(np.add.at, totals, ids, counts)
 			mult, amount = divmod(amount, 16777216)
 			if not isfinite(amount):
 				amount = 0
@@ -1029,11 +1029,11 @@ class Barter(Command):
 			mult = 1
 		for i in range(amount + 1048575 >> 20):
 			count = min(1048576, amount - i * 1048576)
-			seeds = await run_async(rand.integers, 0, len(barter_seeding), size=count, dtype=itype)
+			seeds = await _run_async(rand.integers, 0, len(barter_seeding), size=count, dtype=itype)
 			ids = barter_seeding[seeds]
-			counts = await run_async(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
+			counts = await _run_async(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
 			counts = counts.astype(dtype)
-			await run_async(np.add.at, totals, ids, counts)
+			await _run_async(np.add.at, totals, ids, counts)
 		rewards = deque()
 		minecraft = bot.get_userbase(user.id, "minecraft", cdict())
 		for i, c in enumerate(totals):
@@ -1479,7 +1479,7 @@ class Uno(Command):
 				playable = [c + last[-1] for c in "RYGB"]
 				buttons = []
 				for c in playable:
-					emoji = await run_async(bot.data.emojis.grab, c + ".png")
+					emoji = await _run_async(bot.data.emojis.grab, c + ".png")
 					button = cdict(emoji=emoji, custom_id=f"~{message.id}~{c}", style=3)
 					buttons.append(button)
 
@@ -2633,7 +2633,7 @@ class Cat(ImagePool, Command):
 		if random.random() > 2 / 3:
 			if random.random() > 2 / 3:
 				x = 0
-				url = await run_async(nekos.cat, timeout=8)
+				url = await _run_async(nekos.cat, timeout=8)
 			else:
 				x = 1
 		else:
@@ -2667,7 +2667,7 @@ class Dog(ImagePool, Command):
 		if random.random() > 2 / 3:
 			if random.random() > 2 / 3:
 				x = 0
-				url = await run_async(nekos.img, "woof", timeout=8)
+				url = await _run_async(nekos.img, "woof", timeout=8)
 			else:
 				x = 1
 		else:

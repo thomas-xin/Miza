@@ -1801,6 +1801,10 @@ def crop_map(images, x1, y1, x2, y2, **kwargs):
 			y2 = image.height + v
 		else:
 			y2 = v
+	if x2 < 0:
+		x2 += image.width
+	if y2 < 0:
+		y2 += image.height
 	if x1 == y1 == 0 and x2 == image.width and y2 == image.height:
 		return image
 	if x1 >= 0 and y1 >= 0 and x2 <= image.width and y2 <= image.height:

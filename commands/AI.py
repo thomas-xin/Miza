@@ -77,7 +77,7 @@ class Translate(Command):
 		return cdict(embeds=embeds)
 
 	async def det(self, input):
-		resp = await run_async(detector.detect, input, model="auto")
+		resp = await _run_async(detector.detect, input, model="auto")
 		return str_lookup(googletrans.LANGUAGES, resp[0]["lang"], fuzzy=0.5).split("-", 1)[0]
 
 	async def llm_translate(self, input, dest, premium):
@@ -856,12 +856,9 @@ class Instruct(Command):
 	description = "Similar to ~ask, but functions as instruct rather than chat."
 	schema = cdict(
 		model=cdict(
-			type="enum",
-			validation=cdict(
-				enum=list(ai.available),
-			),
+			type="word",
 			description="Target LLM to invoke",
-			example="deepseek",
+			example="deepseek-v4",
 		),
 		prompt=cdict(
 			type="string",
@@ -909,36 +906,14 @@ class Instruct(Command):
 			default=65536,
 		),
 	)
-	macros = cdict(
-		GPT5=cdict(
-			model="gpt-5.1",
-		),
-		GPT4=cdict(
-			model="gpt-4.1",
-		),
-		R1=cdict(
-			model="deepseek-r1",
-		),
-		Grok=cdict(
-			model="grok-4",
-		),
-		Gemini=cdict(
-			model="gemini-3-pro",
-		),
-		Deepseek=cdict(
-			model="deepseek-v3.2",
-		),
-		Claude=cdict(
-			model="claude-4.5-sonnet",
-		),
-	)
 	rate_limit = (12, 16)
 	slash = True
 	ephemeral = True
 	cache = AutoCache(stale=360, timeout=720)
 
 	async def __call__(self, bot, _message, _premium, model, prompt, api, temperature, frequency_penalty, presence_penalty, reasoning_effort, max_tokens, **void):
-		# assert model in ai.available, f"{model} does not exist or is not supported."
+		if model not in ai.available:
+			model = str_lookup(ai.available, model)
 		kwargs = {}
 		if api:
 			key = model = None
@@ -1269,7 +1244,7 @@ class TTS(Command):
 			case "dectalk":
 				args = ["say", "-w", fi, "-pre", f"[:name {mode}]", text]
 				print(args)
-				await run_async(subprocess.run, args, cwd="misc/dectalk", stdout=subprocess.DEVNULL, shell=True)
+				await _run_async(subprocess.run, args, cwd="misc/dectalk", stdout=subprocess.DEVNULL, shell=True)
 			case _:
 				raise NotImplementedError(engine)
 		assert os.path.exists(fi), "No output was captured!"

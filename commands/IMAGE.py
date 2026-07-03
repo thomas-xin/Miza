@@ -1125,7 +1125,7 @@ class Tesseract(Command):
 
 	async def __call__(self, _time_limit, url, size, duration, speed, fps, filesize, format, **void):
 		data = await process_image(url, "resize_max", ["-nogif", size, 0, "auto", "-f", "png"], timeout=60)
-		resp = await run_async(self.tesseract, data, size, timeout=_time_limit)
+		resp = await _run_async(self.tesseract, data, size, timeout=_time_limit)
 		resp = await process_image(resp, "resize_map", [[], float(duration) if duration is not None else None, fps, "mult", 1, 1, "nearest", None, "-fs", filesize, "-f", format], cap="image", timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
@@ -1279,14 +1279,14 @@ class Crop(Command):
 		),
 		right=cdict(
 			type="integer",
-			validation="[0, 32768]",
+			validation="[-16384, 32768]",
 			description="Right edge of crop in pixels, absolute",
 			example="20",
 			default="-",
 		),
 		bottom=cdict(
 			type="integer",
-			validation="[0, 32768]",
+			validation="[-16384, 32768]",
 			description="Bottom edge of crop in pixels, absolute",
 			example="15",
 			default="-",

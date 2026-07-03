@@ -49,7 +49,7 @@ import niquests
 import requests
 from misc.smath import predict_next, display_to_precision, unicode_prune, full_prune
 from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, mdict, fcdict, as_bytes, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, pretty_json, MultiEncoder # noqa: F401
-from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, run_async, create_task, submit_thread, create_thread, Future, Semaphore
+from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, _run_async, run_async, create_task, submit_thread, create_thread, Future, Semaphore
 
 print("UTIL:", __name__)
 
@@ -93,7 +93,7 @@ if PORT:
 IND = "\x7f"
 
 compat_python = AUTH.get("compat_python") or python
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0 AppleWebKit/537.36 Chrome/134.0.0.0 Safari/537.36 Edg/134.0.3124.85"
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
 
 @tracebacksuppressor
 def save_file(data, fn):
@@ -105,7 +105,7 @@ def save_file(data, fn):
 async def save_file_a(data, fn):
 	async with aiofiles.open(fn, "wb") as f:
 		if hasattr(data, "read"):
-			data = await run_async(data.read)
+			data = await _run_async(data.read)
 		await f.write(data)
 
 async def read_file_a(fn):
@@ -347,12 +347,12 @@ def lim_tokens(s, maxlen=10, mode="centre", encoding="cl100k_im") -> str:
 
 async def tik_encode_a(s, encoding="cl100k_im") -> list:
 	if len(s) > 1024:
-		return await run_async(tik_encode, s, encoding=encoding)
+		return await _run_async(tik_encode, s, encoding=encoding)
 	return tik_encode(s, encoding=encoding)
 
 async def tik_decode_a(t, encoding="cl100k_im") -> str:
 	if len(t) > 256:
-		return await run_async(tik_decode, t, encoding=encoding)
+		return await _run_async(tik_decode, t, encoding=encoding)
 	return tik_decode(t, encoding=encoding)
 
 @functools.lru_cache(maxsize=65536)
@@ -3419,12 +3419,12 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		return v
 
 	async def _aretrieve(self, k, func, *args, read=False, _cache=lambda _: True, **kwargs):
-		await run_async(self.base_init)
+		await _run_async(self.base_init)
 		try:
 			self._retrieving[k] = fut = concurrent.futures.Future()
-			v = await run_async(func, *args, **kwargs)
+			v = await _run_async(func, *args, **kwargs)
 			if _cache(v):
-				await run_async(self.__setitem__, k, v, read=read)
+				await _run_async(self.__setitem__, k, v, read=read)
 		except Exception as ex:
 			fut.set_exception(ex)
 			raise
@@ -3434,7 +3434,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			self._retrieving.pop(k, None)
 		return v
 	async def aretrieve(self, k, func, *args, _read=False, _force=False, **kwargs):
-		await run_async(self.base_init)
+		await _run_async(self.base_init)
 		if (fut := self._retrieving.get(k)):
 			resp = await wrap_future(fut)
 			if _read and hasattr(resp, "name") and os.path.exists(resp.name):
@@ -3444,7 +3444,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			v, t = super().get(k, read=_read, tag=True)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
 			super().__init__(self._path, shards=len(self._shards), **self._kwargs)
-			await run_async(self.base_init, force=True)
+			await _run_async(self.base_init, force=True)
 			v, t = super().get(k, read=_read, tag=True)
 		except TypeError:
 			t = None
@@ -3659,8 +3659,8 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 	async def _aretrieve(self, k, func, *args, read=False, **kwargs):
 		try:
 			self._retrieving[k] = fut = concurrent.futures.Future()
-			v = await run_async(func, *args, **kwargs)
-			await run_async(self.__setitem__, k, v, read=read)
+			v = await _run_async(func, *args, **kwargs)
+			await _run_async(self.__setitem__, k, v, read=read)
 		except Exception as ex:
 			fut.set_exception(ex)
 			raise
@@ -5370,7 +5370,7 @@ async def retrieve_api(path, method="GET", headers={}, data=None):
 			except Exception as ex:
 				exception = ex
 		else:
-			if resp.status_code in (400, 401, 403, 404, 405):
+			if resp.status_code in range(400, 600):
 				resp.raise_for_status()
 			return resp.json()
 	raise exception

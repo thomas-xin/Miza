@@ -483,7 +483,7 @@ class Invisicode(Command):
 					return invisicode.detect_and_decode(as_str(data))
 			return []
 
-		blocks = await run_async(_invisicode, mode, data)
+		blocks = await _run_async(_invisicode, mode, data)
 		blocks = list(filter(bool, (block.strip() for block in blocks)))
 		if not blocks:
 			raise EOFError("Output was empty.")
@@ -1062,7 +1062,7 @@ class Match(Command):
 		else:
 			regex = args.pop(0)
 		if regex:
-			temp = await run_async(re.findall, regex, " ".join(args))
+			temp = await _run_async(re.findall, regex, " ".join(args))
 			match = "\n".join(sqr_md(i) for i in temp)
 		else:
 			search = args.pop(0)

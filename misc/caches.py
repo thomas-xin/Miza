@@ -19,7 +19,7 @@ import psutil
 import requests
 import streamshatter
 from misc.types import utc, as_str, byte_like, cdict, fcdict
-from misc.asyncs import run_async, submit_thread, wrap_future, await_fut, Future
+from misc.asyncs import _run_async, run_async, submit_thread, wrap_future, await_fut, Future
 from misc.smath import get_closest_heart
 from misc.util import (
     CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, read_file_a, download_file, header_test, getsize,
@@ -106,8 +106,8 @@ class ColourCache(AutoCache):
 					c = parse_colour(bc)
 			case _ if mime.startswith("image"):
 				fp = await attachment_cache.download(url, read=True)
-				im = await run_async(Image.open, fp)
-				c = await run_async(get_colour, im)
+				im = await _run_async(Image.open, fp)
+				c = await _run_async(get_colour, im)
 		print("GC:", url, c)
 		return c[:3]
 
@@ -355,23 +355,23 @@ class AttachmentCache(AutoCache):
 				if "/u/" in url:
 					c_id, m_id2, a_id, fn = expand_attachment(url)
 					target = await self.obtain(c_id, m_id2 or m_id, a_id, fn)
-					fn, head = await run_async(download_file, target, filename=raw_fn, _timeout=timeout, return_headers=True)
+					fn, head = await _run_async(download_file, target, filename=raw_fn, _timeout=timeout, return_headers=True)
 					self.tertiary[url] = head
 					return open(fn, "rb")
 				elif "/c/" in url:
 					path = url.split("/c/", 1)[-1].split("/", 1)[0]
 					urls, csize = await self.obtains(path)
-					fn, head = await run_async(download_file, *urls, filename=raw_fn, _timeout=timeout, return_headers=True)
+					fn, head = await _run_async(download_file, *urls, filename=raw_fn, _timeout=timeout, return_headers=True)
 					self.tertiary[url] = head
 					return open(fn, "rb")
-			if is_discord_url(target):
-				try:
-					fn, head = await run_async(download_file, target, filename=raw_fn, _timeout=timeout, return_headers=True)
-				except (ConnectionError, TimeoutError):
-					await asyncio.sleep(1)
-					fn, head = await run_async(download_file, target, filename=raw_fn, _timeout=timeout, return_headers=True)
-				self.tertiary[url] = head
-				return open(fn, "rb")
+			# if is_discord_url(target):
+			# 	try:
+			# 		fn, head = await run_async(download_file, target, filename=raw_fn, _timeout=timeout, return_headers=True)
+			# 	except (ConnectionError, TimeoutError):
+			# 		await asyncio.sleep(1)
+			# 		fn, head = await run_async(download_file, target, filename=raw_fn, _timeout=timeout, return_headers=True)
+			# 	self.tertiary[url] = head
+			# 	return open(fn, "rb")
 			try:
 				f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, timeout=timeout, max_attempts=3, return_headers=True)
 			except niquests.exceptions.HTTPError as ex:
@@ -405,7 +405,7 @@ class AttachmentCache(AutoCache):
 						return (fp.name, headers) if return_headers else fp.name
 					filename = temporary_file(url2ext(url))
 				with open(filename, "wb") as f2:
-					await run_async(shutil.copyfileobj, fp, f2, 262144)
+					await _run_async(shutil.copyfileobj, fp, f2, 262144)
 				return (filename, headers) if return_headers else filename
 			finally:
 				fp.close()
@@ -415,7 +415,7 @@ class AttachmentCache(AutoCache):
 			if hasattr(fp, "name") and os.path.exists(fp.name):
 				data = await read_file_a(fp.name)
 				return (data, headers) if return_headers else data
-			data = await run_async(fp.read)
+			data = await _run_async(fp.read)
 			return (data, headers) if return_headers else data
 		finally:
 			fp.close()
@@ -426,7 +426,7 @@ class AttachmentCache(AutoCache):
 		elif is_miza_attachment(url):
 			url = re.sub("^https?:\\/\\/(?:\\w+\\.)?mizabot.xyz\\/", f"https://{base}/", url)
 		try:
-			headers = await run_async(header_test, url)
+			headers = await _run_async(header_test, url)
 		except ConnectionError as ex:
 			if ex.errno == "404":
 				self.remove_cached(url, m_id)

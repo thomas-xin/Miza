@@ -10,7 +10,7 @@ import niquests
 
 from dynamic_dt import DynamicDT
 from .types import pretty_json, lim_str
-from .asyncs import run_async, gather, Semaphore
+from .asyncs import gather, Semaphore
 from .util import Request, temporary_file, unyt, time_snowflake, snowflake_time_3, is_discord_message_link, retrieve_api
 from .caches import attachment_cache
 

@@ -20,7 +20,6 @@ cms = {}
 
 real_download = ytd.downloader.http.HttpFD.real_download
 def trial_download(self, filename, info_dict):
-	proc = None
 	try:
 		url = info_dict["url"]
 		name = url.split("?", 1)[0]
@@ -37,8 +36,6 @@ def trial_download(self, filename, info_dict):
 		pass
 	except Exception as ex:
 		sys.stderr.write(f"{repr(ex)}\n")
-		if proc and proc.is_running():
-			proc.terminate()
 	else:
 		cms.pop(url, None)
 		sys.stdout.write("\n")
