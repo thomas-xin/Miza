@@ -410,7 +410,7 @@ class CompatFile(discord.File):
 				self.filename = "SPOILER_" + "UNKNOWN"
 		elif self.filename and self.filename.startswith("SPOILER_"):
 			self.filename = self.filename[8:]
-		if self.filename and url2ext(self.filename) in VISUAL_FORMS:
+		if self.filename and url2ext(self.filename) in ("apng",):
 			self.filename += ".binx"
 		self.name = self.filename
 		self.clear = getattr(self.fp, "clear", lambda self: None)

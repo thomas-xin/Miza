@@ -2972,6 +2972,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				message = await send_with_reply(channel, reference, (msg + ("" if msg.endswith("```") else "\n") + url).strip(), embed=embed, tts=tts)
 			else:
 				message = await send_with_reply(channel, reference, msg, embed=embed, file=file, tts=tts)
+				await asyncio.sleep(0.5)
 				if filename is not None:
 					if hasattr(filename, "filename"):
 						filename = filename.filename
@@ -2986,7 +2987,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print(filename, os.path.getsize(filename))
 			raise
 		if not getattr(reference, "slash", None) and message.attachments:
-			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join(attachment_cache.preserve(a.url, message.id) for a in message.attachments)
+			def fatt(url):
+				if ".webx" not in url:
+					return f"<{url}>"
+				return url
+			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join(fatt(attachment_cache.preserve(a.url, message.id)) for a in message.attachments)
+			# kwargs = {}
+			# if not message.embeds:
+			# 	kwargs["embeds"] = [discord.Embed().set_image(url="attachment://" + a.filename) for a in message.attachments]
 			message = await bot.edit_message(message, content=content.strip())
 		if not message:
 			print("No message detected.")
@@ -4310,8 +4318,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						atts = sorted(
 							(f"{path}/{k}/{a}" for a in atts),
 							key=lambda p: (
-								-bool(os.path.getsize(p)),
-								(t - os.path.getatime(p)) * os.path.getsize(p),
+								(t - os.path.getatime(p)) * log2(os.path.getsize(p) + 2),
 							),
 							reverse=True,
 						)

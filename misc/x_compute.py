@@ -468,41 +468,42 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			vf += f"scale={w}:{h}:flags=area,"
 			if mode == "RGBA":
 				vf += "format=rgba,"
-		vf += "split[s0][s1];[s0]palettegen="
-		if mode == "RGBA":
-			vf += "reserve_transparent=1:"
-		else:
-			vf += "reserve_transparent=0:"
-		if opt and first.width * first.height <= 16384:
-			frames = list(frames)
-			new["frames"] = frames
-			fr = frames.copy()
-			first = fr.pop(0)
-			last = fr.pop(-1)
-			cols = set()
-			cols.add((0, 0, 0))
-			random.shuffle(fr)
-			fr = [first, last, *fr]
-			c = min(len(fr), max(5, floor(sqrt(len(fr)))))
-			for i, f in enumerate(fr[:c]):
-				if isinstance(f, Image.Image):
-					im = f.resize((7, 7), resample=Resampling.NEAREST)
-					R, G, B = np.asanyarray(im).T[:3]
-					for r, g, b in zip(R.ravel(), G.ravel(), B.ravel()):
-						l = max(r, g, b)
-						if l < 1:
-							continue
-						t = tuple(min(255, round(log2(x / l * 255 + 1) * 8) * 4) for x in (r, g, b))
-						if t not in cols:
-							cols.add(t)
-			mc = min(128, max(4, 2 ** ceil(log2(len(cols)) + 1)))
-			vf += f"max_colors={mc}:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra3:diff_mode=rectangle"
-		elif count > 4096:
-			vf += "max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle"
-		else:
-			vf += "stats_mode=diff[p];[s1][p]paletteuse=dither=sierra3:diff_mode=rectangle"
-		if "A" in mode:
-			vf += ":alpha_threshold=128"
+		if fmt == "gif":
+			vf += "split[s0][s1];[s0]palettegen="
+			if mode == "RGBA":
+				vf += "reserve_transparent=1:"
+			else:
+				vf += "reserve_transparent=0:"
+			if opt and first.width * first.height <= 16384:
+				frames = list(frames)
+				new["frames"] = frames
+				fr = frames.copy()
+				first = fr.pop(0)
+				last = fr.pop(-1)
+				cols = set()
+				cols.add((0, 0, 0))
+				random.shuffle(fr)
+				fr = [first, last, *fr]
+				c = min(len(fr), max(5, floor(sqrt(len(fr)))))
+				for i, f in enumerate(fr[:c]):
+					if isinstance(f, Image.Image):
+						im = f.resize((7, 7), resample=Resampling.NEAREST)
+						R, G, B = np.asanyarray(im).T[:3]
+						for r, g, b in zip(R.ravel(), G.ravel(), B.ravel()):
+							l = max(r, g, b)
+							if l < 1:
+								continue
+							t = tuple(min(255, round(log2(x / l * 255 + 1) * 8) * 4) for x in (r, g, b))
+							if t not in cols:
+								cols.add(t)
+				mc = min(128, max(4, 2 ** ceil(log2(len(cols)) + 1)))
+				vf += f"max_colors={mc}:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra3:diff_mode=rectangle"
+			elif count > 4096:
+				vf += "max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle"
+			else:
+				vf += "stats_mode=diff[p];[s1][p]paletteuse=dither=sierra3:diff_mode=rectangle"
+			if "A" in mode:
+				vf += ":alpha_threshold=128"
 		if vf:
 			command.extend(("-vf", vf))
 		if anim:
