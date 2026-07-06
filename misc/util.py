@@ -3221,6 +3221,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 
 	def __init__(self, directory=None, shards=6, stale=60, timeout=86400, desync=0, safe=False, **kwargs):
 		kwargs.setdefault("min_file_size", 65536)
+		kwargs.setdefault("size_limit", 1073741824)
 		self._path = directory or None
 		self._shardcount = shards
 		self._stale = stale or inf

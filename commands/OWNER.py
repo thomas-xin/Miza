@@ -1068,21 +1068,64 @@ class UpdateMessageCache(Database):
 		for k in ("type", "attachments", "embeds", "components", "reactions", "channel_type", "edited_timestamp", "flags", "pinned", "mentions", "mention_roles", "mention_everyone", "tts", "deaf"):
 			if not m.get(k):
 				m.pop(k, None)
-		data = orjson.dumps(m)
+		bot.data.channel_cache.add(message.channel.id, message.id)
+
+		gr_id = self.get_group(message.id)
+		with self.get_sem(gr_id):
+			try:
+				group = self.load_message_group(gr_id, message.id)
+			except KeyError:
+				group = []
+			groupd = {int(msg["id"]): msg for msg in group}
+			groupd[m["id"]] = m
+			self.save_message_group(gr_id, groupd.values())
+		return m
+
+	@staticmethod
+	def get_group(m_id):
+		return str(m_id)[:-12]
+
+	gr_sems = {}
+	@classmethod
+	def get_sem(cls, gr_id):
+		try:
+			return cls.gr_sems[gr_id]
+		except KeyError:
+			cls.gr_sems[gr_id] = sem = Semaphore(1, inf)
+		return sem
+
+	def load_message(self, m_id):
+		bot = self.bot
+		group = self.load_message_group(self.get_group(m_id), m_id)
+		msg = group[bisect.bisect_left(group, m_id, key=lambda d: int(d.get("id", 0)))] if len(group) > 1 else group[0]
+		if int(msg["id"]) != m_id:
+			raise KeyError(m_id)
+		return bot.CachedMessage(msg)
+
+	def load_message_group(self, gr_id, m_id=0):
+		bot = self.bot
+		try:
+			data = decrypt(bot.message_cache[gr_id])
+		except KeyError:
+			if not m_id:
+				raise
+			data = decrypt(bot.message_cache[m_id])
+			if data.startswith(b"\x80"):
+				data = compression.zstd.decompress(data[1:])
+			return [orjson.loads(data)]
+		if data.startswith(b"\x80"):
+			data = compression.zstd.decompress(data[1:])
+		return decode_jsonl(data)
+
+	def save_message_group(self, gr_id, group):
+		bot = self.bot
+		data = encode_jsonl(group)
 		if compression and len(data) > 1024:
 			data2 = compression.zstd.compress(data, 10)
 			if len(data2) < len(data) - 1:
 				data = b"\x80" + data2
-		bot.message_cache[m["id"]] = encrypt(data)
-		bot.data.channel_cache.add(message.channel.id, message.id)
-		return m
-
-	def load_message(self, m_id):
-		bot = self.bot
-		data = decrypt(bot.message_cache[m_id])
-		if data.startswith(b"\x80"):
-			data = compression.zstd.decompress(data[1:])
-		return bot.CachedMessage(orjson.loads(data))
+		bot.message_cache[gr_id] = encrypt(data)
+		return gr_id
 
 
 class Maintenance(Command):

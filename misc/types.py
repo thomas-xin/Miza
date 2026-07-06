@@ -1381,12 +1381,14 @@ prettyjsonencoder = PrettyJSONEncoder(indent="\t")
 pretty_json = lambda obj: prettyjsonencoder.encode(obj)
 
 def encode_jsonl(data):
-	assert isinstance(data, collections.abc.Sequence)
+	assert isinstance(data, collections.abc.Iterable)
 	b = io.BytesIO()
 	for e in data:
 		b.write(orjson.dumps(e))
 		b.write(b"\n")
-	return b.getbuffer()
+	return b.getbuffer().tobytes()
+def decode_jsonl(data):
+	return [orjson.loads(s) for s in data.strip().splitlines()]
 
 def require_hashable(k) -> collections.abc.Hashable:
 	if isinstance(k, list_like):

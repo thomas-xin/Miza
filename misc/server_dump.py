@@ -556,7 +556,7 @@ async def run():
 		for oid, (name, url) in data.items():
 			path = f"{base_path}/{kind}/{oid}"
 			os.makedirs(path, exist_ok=True)
-			name = lim_str(re.sub(invalid_pattern, replacement, name), 128)
+			name = lim_str(re.sub(invalid_pattern, replacement, name).strip(), 128)
 			fn = f"{path}/{name}"
 			if os.path.exists(fn) and os.path.getsize(fn):
 				continue

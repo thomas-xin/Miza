@@ -269,12 +269,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				os.remove(self.heartbeat_file)
 
 	def init_main_databases(self):
+		message_lim = 64 * 1073741824
 		t = DynamicDT.now()
 		self.userbase = AutoDatabase("saves/userbase", shards=64)
 		self.guildbase = AutoDatabase("saves/guildbase", shards=16)
 		self.weekly_users = AutoCache(f"{CACHE_PATH}/weekly_users", shards=1, stale=0, timeout=86400 * 7)
-		self.channel_cache = AutoCache(f"{CACHE_PATH}/channel_cache", shards=32, stale=86400 * 7, timeout=86400 * 365, desync=0.25)
-		self.message_cache = AutoCache(f"{CACHE_PATH}/message_cache", shards=64, stale=86400 * 7, timeout=86400 * 14, desync=0.3)
+		self.channel_cache = AutoCache(f"{CACHE_PATH}/channel_cache", size_limit=message_lim // 256, shards=32, stale=86400 * 7, timeout=86400 * 365, desync=0.25)
+		self.message_cache = AutoCache(f"{CACHE_PATH}/message_cache", size_limit=message_lim, shards=64, stale=86400 * 7, timeout=86400 * 14, desync=0.3) # Messages are saved for 2 weeks, encrypted on disk (see COMMANDS/OWNER.py:UpdateMessageCache)
 		self.discord_cache = AutoCache(f"{CACHE_PATH}/discord_api", stale=0, timeout=3600, desync=0.05)
 		self.discord_data_cache = AutoCache(f"{CACHE_PATH}/discord_data", shards=7, stale=86400 * 3, timeout=86400 * 14, desync=0.5)
 		self.uptime_db = FileHashDict(path=f"{CACHE_PATH}/uptime")
