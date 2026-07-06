@@ -2986,7 +2986,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print(filename, os.path.getsize(filename))
 			raise
 		if not getattr(reference, "slash", None) and message.attachments:
-			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join("<" + attachment_cache.preserve(a.url, message.id) + ">" for a in message.attachments)
+			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join(attachment_cache.preserve(a.url, message.id) for a in message.attachments)
 			message = await bot.edit_message(message, content=content.strip())
 		if not message:
 			print("No message detected.")

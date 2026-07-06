@@ -17,9 +17,9 @@ from .asyncs import _run_async, create_task
 from .types import fcdict, byte_like, MemoryBytes
 from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment, discord_expired,
-	is_discord_attachment, url2fn, getsize, mime_from_file,
+	is_discord_attachment, url2fn, url2ext, getsize, mime_from_file,
 	Request as RequestManager, DOMAIN_CERT, PRIVATE_KEY, update_headers,
-	AutoCache, CACHE_PATH, VISUAL_FORMS, RNGFile, create_etag,
+	AutoCache, CACHE_PATH, VISUAL_FORMS, IMAGE_FORMS, RNGFile, create_etag,
 )
 from .caches import attachment_cache, colour_cache
 
@@ -492,9 +492,9 @@ async def proxy_if(url: str, request: Request, force: bool = False, download: bo
 			return True
 		ua = request.headers.get("User-Agent", "")
 		if "bot" in ua or "Bot" in ua:
-			return False
+			return is_discord_attachment(url) and url2ext(url) in IMAGE_FORMS
 		if download and is_discord_attachment(url):
-			if url.split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[-1] in VISUAL_FORMS:
+			if url2ext(url) in VISUAL_FORMS:
 				return True
 			return False
 		return True

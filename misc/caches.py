@@ -25,7 +25,7 @@ from misc.util import (
     CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, read_file_a, download_file, header_test, getsize,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist, shorten_chunks, expand_chunks,
 	ungroup_attachments, is_discord_url, is_miza_attachment, temporary_file, url2ext, is_discord_attachment, is_miza_url,
-    snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt,
+    snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt, VISUAL_FORMS,
 )
 
 def has_transparency(image):
@@ -373,7 +373,7 @@ class AttachmentCache(AutoCache):
 			# 	self.tertiary[url] = head
 			# 	return open(fn, "rb")
 			try:
-				f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, timeout=timeout, max_attempts=3, return_headers=True)
+				f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, timeout=timeout, max_attempts=6, return_headers=True)
 			except niquests.exceptions.HTTPError as ex:
 				code, msg = ex.response.status_code, ex.response.reason
 				raise ConnectionError(code, msg)
@@ -516,6 +516,8 @@ class AttachmentCache(AutoCache):
 		return out
 
 	async def create_dynamic(self, data, filename=None, channel=None, editable=False, minimise=False):
+		if filename and url2ext(filename) in VISUAL_FORMS:
+			filename += ".binx"
 		size = getsize(data)
 		if size <= self.max_size:
 			return await self.create(data, filename=filename, channel=channel, editable=editable, minimise=minimise)

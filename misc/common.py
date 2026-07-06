@@ -410,6 +410,8 @@ class CompatFile(discord.File):
 				self.filename = "SPOILER_" + "UNKNOWN"
 		elif self.filename and self.filename.startswith("SPOILER_"):
 			self.filename = self.filename[8:]
+		if self.filename and url2ext(self.filename) in VISUAL_FORMS:
+			self.filename += ".binx"
 		self.name = self.filename
 		self.clear = getattr(self.fp, "clear", lambda self: None)
 
@@ -1602,7 +1604,12 @@ async def proc_eval(s, caps=["math"], priority=False, timeout=12):
 		if not set(caps).difference(p.caps):
 			break
 	else:
-		raise RuntimeError("No suitable worker process for task.")
+		await asyncio.sleep(5)
+		for p in procs:
+			if not set(caps).difference(p.caps):
+				break
+		else:
+			raise RuntimeError("No suitable worker process for task.")
 	try:
 		fut = p.pipe.asubmit(s, priority=priority)
 		return await asyncio.wait_for(fut, timeout=timeout)

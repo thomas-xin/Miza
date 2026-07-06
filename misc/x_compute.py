@@ -436,7 +436,7 @@ def gifsicle(out, info=None, heavy=False):
 		out2 = out + "~2"
 	args = ["binaries/gifsicle"]
 	if heavy:
-		args.extend(("-O3", "--lossy=90", "--colors=64"))
+		args.extend(("-O3", "--lossy=90", "--colors=96"))
 	else:
 		args.extend(("-O", "--lossy=50"))
 	args.extend(("--dither", "--careful", "--loopcount=forever", "-o", out2, out))
@@ -458,6 +458,7 @@ def avifsicle(out, q=100, s=6):
 	return out2
 
 def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, vf="", allow_lossless=True):
+	mode = mode.upper()
 	env = os.environ.copy()
 	anim = count > 1
 	command = ["-i", "-"]
@@ -465,7 +466,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 		command.extend(("-gifflags", "-offsetting"))
 		if (w, h) != first.size:
 			vf += f"scale={w}:{h}:flags=area,"
-			if mode == "rgba":
+			if mode == "RGBA":
 				vf += "format=rgba,"
 		vf += "split[s0][s1];[s0]palettegen="
 		if mode == "RGBA":
@@ -515,7 +516,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			command.extend(("-vframes", "1", "-r", "1"))
 		if (w, h) != first.size:
 			vf += f"scale={w}:{h}:flags=area,"
-			if mode == "rgba":
+			if mode == "RGBA":
 				vf += "format=rgba"
 			command.extend(("-vf", vf))
 		command.extend(("-strict", "-1", "-f", "yuv4mpegpipe"))
@@ -529,7 +530,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			command.extend(("-vframes", "1", "-r", "1"))
 		if (w, h) != first.size:
 			vf += f"scale={w}:{h}:flags=area,"
-			if mode == "rgba":
+			if mode == "RGBA":
 				vf += "format=rgba"
 			command.extend(("-vf", vf))
 		pix = ("rgba" if lossless else "yuva444p") if mode == "RGBA" else ("rgb24" if lossless else "yuv444p")
@@ -560,7 +561,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 		command.extend(("-vframes", "1"))
 		if (w, h) != first.size:
 			vf += f"scale={w}:{h}:flags=area,"
-			if mode == "rgba":
+			if mode == "RGBA":
 				vf += "format=rgba"
 			command.extend(("-vf", vf))
 		if mode == "RGBA":
@@ -581,7 +582,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 	else:
 		if (w, h) != first.size:
 			vf += f"scale={w}:{h}:flags=area,"
-			if mode == "rgba":
+			if mode == "RGBA":
 				vf += "format=rgba"
 			command.extend(("-vf", vf))
 		if getattr(first, "audio", None):
@@ -605,7 +606,10 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 		cdc = CODEC_FFMPEG.get(fmt, "av1_nvenc")
 		fmt = CODECS.get(fmt, fmt)
 		pix_fmt = CODEC_PIX.get(cdc, "yuv420p")
-		if cdc == "av1_nvenc":
+		if cdc in ("libvpx", "libvpx-vp9") and mode == "RGBA":
+			pix_fmt = "yuva420p"
+			command.extend(("-auto-alt-ref", "0"))
+		elif cdc == "av1_nvenc":
 			if w < 144 or h < 144:
 				cdc = "libaom-av1"
 				pix_fmt = "yuv444p"
@@ -628,7 +632,7 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 	if fmt not in ("bmp", "ico", "jp2") and ("RGB" in im.mode and np.prod(size) > 65536 or fmt not in ("png", "jpg", "webp", "gif")):
 		b = np.asanyarray(im, dtype=np.uint8).data
 		pix = "rgb24" if im.mode == "RGB" else "rgba"
-		args = ["ffmpeg", "-hide_banner", "-v", "error", "-f", "rawvideo", "-pix_fmt", pix, "-video_size", "x".join(map(str, im.size))]
+		args = ["ffmpeg", "-hide_banner", "-v", "error", "-f", "rawvideo", "-pix_fmt", pix, "-video_size", "x".join(map(str, im.size)), "-strict", "experimental"]
 		is_avif = fmt == "avif" and im.mode == "RGBA"
 		if is_avif:
 			fmt = "y4m"
@@ -679,7 +683,7 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 
 def anim_into(out, new, first, size, fmt, fs, r=0, opt=False):
 	assert size[0] and size[1], f"Expected non-zero size, got {size}"
-	command = ["ffmpeg", "-nostdin", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel]
+	command = ["ffmpeg", "-nostdin", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel, "-strict", "experimental"]
 	mode = new["mode"]
 	command.extend((
 		"-f", "rawvideo", "-framerate", str(new["fps"]), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
@@ -881,7 +885,7 @@ def evalImg(url, operation, args):
 					tarinfo.size = len(data)
 					return resp.addfile(tarinfo, io.BytesIO(data))
 			else:
-				command = ["ffmpeg", "-nostdin", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel]
+				command = ["ffmpeg", "-nostdin", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel, "-strict", "experimental"]
 				# if hwaccel == "cuda":
 				# 	if COMPUTE_CAPS:
 				# 		try:

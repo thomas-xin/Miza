@@ -1060,11 +1060,29 @@ def expired(stream):
 		if "expires=" not in stream or int(stream.replace("/", "=").split("expires=", 1)[-1].split("=", 1)[0].split("&", 1)[0]) < utc() + 30:
 			return True
 
-def url2fn(url) -> str:
-	return url.split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1].translate(filetrans)
+def revert_suffix(fn):
+	if fn.count(".") > 1 and ".binx" in fn:
+		fn2, ext = fn.rsplit(".", 1)
+		if fn2.endswith(".binx"):
+			fn2 = fn2.removesuffix(".binx")
+			return f"{fn2}.{ext}.binx"
+	return fn
+def url2fn(url, removesuffix=True) -> str:
+	fn = url.split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1].translate(filetrans)
+	if removesuffix:
+		return fn.removesuffix(".binx")
+	if fn.endswith(".binx") and fn.count(".") > 1:
+		fn, ext = fn.removesuffix(".binx").rsplit(".", 1)
+		return f"{fn}.binx.{ext}"
+	return fn
 def url2ext(url) -> str:
 	fn = url2fn(url)
-	return fn.rsplit(".", 1)[-1] if "." in fn else "bin"
+	*fns, ext = fn.rsplit(".", 2)
+	if not fns:
+		return "bin"
+	if ext in ("bin", "binx") and len(fns) > 1:
+		return fns[1]
+	return ext
 
 def replace_ext(fn, ext="") -> str:
 	if "." not in fn:
@@ -1328,6 +1346,9 @@ VISUAL_FORMS = {
 	"wmv": True,
 	"mp4": True,
 	"m4v": True,
+	"y4m": True,
+	"vp8": True,
+	"vp9": True,
 	"av1": True,
 	"h266": True,
 	"h265": True,
@@ -1351,12 +1372,17 @@ CODEC_FFMPEG = {
 	"h265": "hevc_nvenc",
 	"hevc": "hevc_nvenc",
 	"mkv": "hevc_nvenc",
+	"mov": "hevc_nvenc",
+	"vp8": "libvpx",
+	"vp9": "libvpx-vp9",
 	"x266": "libvvenc",
 	"h266": "libvvenc",
 	"vvc": "libvvenc",
 	"av1": "av1_nvenc",
 }
 CODEC_PIX = {
+	"libvpx": "yuv444p",
+	"libvpx-vp9": "yuv444p",
 	"h264_nvenc": "nv12",
 	"h265_nvenc": "nv12",
 	"av1_nvenc": "nv12",
@@ -1373,9 +1399,10 @@ CODECS = {
 	"x266": "mp4",
 	"h266": "mp4",
 	"vvc": "mp4",
+	"av1": "mp4",
 	"vp8": "webm",
 	"vp9": "webm",
-	"av1": "mp4",
+	"y4m": "webm",
 	"quicktime": "mov",
 	"mpegts": "ts",
 	"libopus": "opus",
@@ -1860,8 +1887,7 @@ def deserialise_nums(b: bytearray) -> list:
 
 @split_attachment
 def encode_attachment(cid, mid, aid, fn, minimise=False):
-	if is_url(fn):
-		fn = url2fn(fn)
+	fn = url2fn(fn, removesuffix=False)
 	if minimise:
 		aid = 0
 	if aid == 0:
@@ -1875,7 +1901,7 @@ def decode_attachment(encoded):
 	ids = list(decode_snowflake(data, 3))
 	while len(ids) < 3:
 		ids.append(0)
-	ids.extend(fn)
+	ids.extend(map(revert_suffix, fn))
 	if len(ids) < 4:
 		ids.append("")
 	return ids

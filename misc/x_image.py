@@ -169,17 +169,23 @@ class ImageSequence(Image.Image, collections.abc.Sequence):
 	def cast(cls, image, **kwargs):
 		if isinstance(image, cls):
 			return image
+		if isinstance(image, Image.Image):
+			return cls.open(image, **kwargs)
 		if isinstance(image, dict):
 			if not isinstance(image["frames"], (tuple, list)):
 				return cls.fromiter(image["frames"], frameprops=(image["count"], image["duration"], image["count"] / image["duration"]), **kwargs)
 			return cls.fromiter(image["frames"], frameprops=(len(image["frames"]), image["duration"], len(image["frames"]) / image["duration"]), **kwargs)
 		if isinstance(image, (tuple, list)):
 			return cls(*image, **kwargs)
+		if isinstance(image, collections.abc.Iterable):
+			return cls.fromiter(image, **kwargs)
+		print("Direct cast:", image, kwargs)
 		return cls(image, **kwargs)
 
 	@classmethod
-	def open(cls, *images, copy=False, func=None, args=()):
+	def open(cls, *images, copy=True, func=None, args=()):
 		if len(images) == 1:
+			print("Direct sequence:", images[0])
 			simages = []
 			im = images[0]
 			im.load()
@@ -187,7 +193,7 @@ class ImageSequence(Image.Image, collections.abc.Sequence):
 			try:
 				for i in range(prop[0]):
 					im.seek(i)
-					if i == prop[0] - 1:
+					if i == prop[0] - 1 and not copy:
 						im2 = im
 					else:
 						im2 = im.copy()
@@ -199,8 +205,6 @@ class ImageSequence(Image.Image, collections.abc.Sequence):
 				im = images[0]
 				if func:
 					return func(im, *args)
-				if copy:
-					return im.copy()
 				return im
 			copy = False
 		return cls(*images, copy=copy, func=func, args=args)
@@ -304,7 +308,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 			pages = pdf2image.convert_from_bytes(b, poppler_path="misc/poppler", use_pdftocairo=True)
 		else:
 			pages = pdf2image.convert_from_bytes(b, use_pdftocairo=True)
-		return ImageSequence.open(*pages, copy=True)
+		return ImageSequence.open(*pages)
 	else:
 		data = b
 		out = io.BytesIO(b) if type(b) is bytes else b
@@ -321,17 +325,12 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 			f.write(b)
 		filenames = extract_archive(fn)
 		return ImageSequence.fromiter((Image.open(fn) for fn in filenames), count=len(filenames))
-	try:
-		import wand
-		import wand.api, wand.color, wand.image, wand.sequence
-	except ImportError:
-		wand = None
 	dur = None
 	fcount = None
 	proc = None
 	try:
 		left, right = mime.split("/", 1)[0], mime.split("/", 1)[-1]
-		if left == "image" and right in "avif blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal wmf xbm".split():
+		if left == "image" and right in "avif blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal wmf webp xbm".split():
 			try:
 				im = Image.open(out)
 			except PIL.UnidentifiedImageError:
@@ -339,12 +338,14 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 					raise FileNotFoundError("image file not found")
 				out.seek(0)
 			else:
+				multi = False
 				try:
 					im.seek(1)
 				except EOFError:
 					im.seek(0)
 				else:
 					im.seek(0)
+					multi = True
 					if not im.info.get("duration"):
 						ts = time.time_ns() // 1000
 						if mime == "video/m3u8" and orig:
@@ -386,6 +387,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 									im.seek(0)
 									im.info["total_duration"] = i / fps
 									# print("TD:", im.info["total_duration"])
+				# print("PIL:", multi)
 				return im
 		if left in ("image", "video") and right != "webp":
 			fmt = "rgba" if left == "image" else "rgb24"
@@ -397,18 +399,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 				with open(fn, "wb") as f:
 					f.write(data)
 			cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-count_frames", "-show_streams", fn)
-			# print(cmd)
 			p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-			cmd2 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y"]
-			if nogif:
-				cmd2.extend(("-to", "1"))
-			cmd2 += ["-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0"]
-			if nogif:
-				cmd2.extend(("-vframes", "1"))
-			cmd2.append("-")
-			print(cmd2)
-			proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
-			mode = "RGBA" if fmt == "rgba" else "RGB"
 			try:
 				lines = as_str(p.stdout.read()).splitlines()
 				if not lines:
@@ -417,7 +408,23 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 			except:
 				print(as_str(p.stderr.read()), end="")
 				raise
-			# print("Image info:", info)
+			cmd2 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y"]
+			if nogif:
+				cmd2.extend(("-to", "1"))
+			if info.get("TAG:alpha_mode"):
+				fmt = "rgba"
+				match info.get("codec_name"):
+					case "vp8" | "libvpx" | "vp8_vaapi":
+						cmd2 += ["-c:v", "libvpx"]
+					case "vp9" | "libvpx-vp9" | "vp9_vaapi":
+						cmd2 += ["-c:v", "libvpx-vp9"]
+			cmd2 += ["-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0"]
+			if nogif:
+				cmd2.extend(("-vframes", "1"))
+			cmd2.append("-")
+			print(cmd2)
+			proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
+			mode = "RGBA" if fmt == "rgba" else "RGB"
 			size = (int(info.get("width") or info.get("coded_width")), int(info.get("height") or info.get("coded_height")))
 			fps = float(fractions.Fraction(info.get("avg_frame_rate") or info.get("r_frame_rate") or 30))
 			fcount = int(info.get("nb_frames") or info.get("nb_read_frames") or 1)
@@ -470,7 +477,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 					images.append(img)
 				if images:
 					proc.wait(timeout=2)
-					return ImageSequence.open(*images)
+					return ImageSequence(*images)
 				raise RuntimeError(as_str(proc.stderr.read()))
 			# print("Decoding lazily:", proc, mode, size, (fcount, dur, fps))
 			return ImageSequence.pipe(proc.stdout, mode, size, (fcount, dur, fps), close=proc.terminate)
@@ -481,9 +488,13 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 			proc.terminate()
 	else:
 		exc = TypeError(f'Filetype "{mime}" is not supported.')
+	try:
+		import wand
+		import wand.api, wand.color, wand.image, wand.sequence
+	except ImportError:
+		wand = None
 	if not wand or right in ("ico", "x-icon"):
-		ib = io.BytesIO(b)
-		return Image.open(ib)
+		return Image.open(out)
 	def wand_iter():
 		nonlocal exc
 		with wand.image.Image() as img:
@@ -521,7 +532,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 	if fcount and dur:
 		frameprops = (fcount, dur, fcount / dur)
 		return ImageSequence.fromiter(wand_iter(), frameprops=frameprops)
-	return ImageSequence.open(*wand_iter())
+	return ImageSequence.open(*wand_iter(), copy=False)
 
 def round_random(x):
 	try:
@@ -601,7 +612,7 @@ def sync_fps(props, duration=None, fps=None):
 		fps = -fps
 		prog = -prog
 	seconds = d * ceil(duration / d) if duration is not None else d
-	fps = fps if fps is not None else max(t[2] for t in props)
+	fps = fps if fps is not None else max((t[2] for t in props if t[0] > 1), default=0) or max(t[2] for t in props)
 	print("SYNC:", props, seconds, fps, prog)
 	return seconds, fps, prog
 
@@ -643,18 +654,19 @@ def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", k
 	seed = time.time_ns() // 1000
 
 	if keep_size == "exact":
-		others = [ImageSequence.cast(resize_map(im, (), duration, fps, "set", sources[0].width, sources[0].height, mode="auto")) for im in sources[1:]]
+		others = [ImageSequence.cast(resize_map(im, (), prop[1], prop[2], "set", sources[0].width, sources[0].height, mode="auto")) for prop, im in zip(props[1:], sources[1:])]
 	elif keep_size == "approx":
 		width = max(source.width for source in sources)
 		height = max(source.height for source in sources)
 		diameter = sqrt(width * height)
-		others = [ImageSequence.cast(resize_map(im, (), duration, fps, "set", *max_size(im.width, im.height, maxsize=diameter, force=True), mode="auto")) for im in sources[1:]]
+		others = [ImageSequence.cast(resize_map(im, (), prop[1], prop[2], "set", *max_size(im.width, im.height, maxsize=diameter, force=True), mode="auto")) for prop, im in zip(props[1:], sources[1:])]
 	elif keep_size:
 		raise NotImplementedError(keep_size)
 	else:
 		others = sources[1:]
 	mapped_sources = (sources[0], *others)
 	def map_iter():
+		print("Mapping:", f"{images},\n{sources},\n{props},\n{mapped_sources}")
 		for i in range(count):
 			ims = []
 			for im, prop in zip(mapped_sources, props):
@@ -664,8 +676,7 @@ def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", k
 				try:
 					im.seek(n % maxframes)
 				except Exception:
-					print(f"Seek error: {n}, {n % maxframes}, {maxframes}")
-					print(f"Current frame: {i}, {props}, {mapped_sources}")
+					print(f"Seek error: {i}/{count}, {n}:{n % maxframes}/{maxframes}, {im}")
 					raise
 				ims.append(im)
 			yield func(ims, *args, props=props, progress=prog * i / count % 1 if count > 1 else 1, count=count, seed=seed, **kwargs)
