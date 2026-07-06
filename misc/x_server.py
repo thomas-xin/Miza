@@ -26,7 +26,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, submit_thread, create_thread, create_task, await_fut
 from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
-from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url_unparse, url2fn, url2ext, is_youtube_url, seq, Request, get_mime, mime_from_file, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag
+from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url_unparse, url2fn, url2ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag
 from .caches import attachment_cache, colour_cache, minimise_url
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -545,14 +545,17 @@ class Server:
 		except Exception:
 			print_exc()
 			fp = None
-		if not fp or int(cp.request.headers.get("Content-Length", 0)) < 1:
+		if not fp or (size := int(cp.request.headers.get("Content-Length", 0))) < 1:
 			if not url:
 				return "Expected input URL or data."
-			fp = await_fut(attachment_cache.download(url, read=True))
+			fp = await_fut(attachment_cache.download(url))
+			size = getsize(fp)
 		fn = filename or (url2fn(url) if url else None)
 		if persistent not in (0, "0", ""):
 			return await_fut(attachment_cache.create_dynamic(fp, filename=fn))
 		ts = n2p(ts_us()).decode("ascii")
+		if size < 65536 and not isinstance(fp, byte_like):
+			fp = fp.read()
 		self.upload_cache.set(ts, fp, tag=fn, read=True)
 		fp, fn = diskcache.FanoutCache.get(self.upload_cache, ts, tag=True, read=True)
 		mimetype = get_mime(fp)
