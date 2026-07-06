@@ -937,8 +937,7 @@ class AudioDownloader:
 					q = d["queue"][:262144]
 				return [cdict(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
 			case _ if ctype in archive_mimes:
-				fp = asyncio.run(attachment_cache.download(url, read=True))
-				path = fp.name
+				path = asyncio.run(attachment_cache.download(url, filename=True))
 				assert os.path.exists(path), path
 				files = extract_archive(path)
 				output = []

@@ -1911,7 +1911,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			args += ["-d", duration]
 		args += ["-fs", fsize, "-f", fmt]
 		if isinstance(image, str) and is_url(image):
-			image = await attachment_cache.download(verify_url(image), filename=True, read=False)
+			image = await attachment_cache.download(verify_url(image), filename=True)
 		return await process_image(image, "resize_map", args, timeout=timeout)
 
 	# Map of search engine locations for browsing the internet. As we do not have access to the user's IP address, we estimate their timezone and use that to approximate their location.
@@ -6541,7 +6541,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if futs:
 						await fut
 				# before = copy.copy(message)
-				message = await self.edit_message(message, content=content, attachments=(), embeds=())
+				await self.edit_message(message, content=content, attachments=(), embeds=())
 				# await self.send_event("_edit_", before=before, after=message, force=True)
 			else:
 				await self.autodelete(message)

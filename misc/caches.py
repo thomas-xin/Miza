@@ -404,8 +404,6 @@ class AttachmentCache(AutoCache):
 				fp = await self.secondary._aretrieve(url, self._download, url, m_id=m_id, _timeout=16, read=True)
 		if return_headers:
 			headers = await self.scan_headers(url, m_id=m_id, fc=fc)
-		if not filename and read and isinstance(fp, byte_like):
-			filename = True
 		if filename:
 			try:
 				if isinstance(filename, bool):
@@ -422,6 +420,8 @@ class AttachmentCache(AutoCache):
 				if getattr(fp, "close", None):
 					fp.close()
 		if read is not False:
+			if isinstance(fp, byte_like):
+				fp = io.BytesIO(fp)
 			return (fp, headers) if return_headers else fp
 		try:
 			if isinstance(fp, byte_like):
