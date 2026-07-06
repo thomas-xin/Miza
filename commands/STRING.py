@@ -471,7 +471,7 @@ class Invisicode(Command):
 		if not text and not url:
 			raise ArgumentError("Please input text or a URL to encode/decode.")
 		if url:
-			data = await attachment_cache.download(url)
+			data = await attachment_cache.download(url, read=False)
 		else:
 			data = text
 

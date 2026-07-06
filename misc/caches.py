@@ -95,7 +95,7 @@ class ColourCache(AutoCache):
 		c = (0, 0, 0)
 		match (mime := headers.get("content-type")):
 			case "text/html":
-				data = await attachment_cache.download(url)
+				data = await attachment_cache.download(url, read=False)
 				s = as_str(data[:65536])
 				try:
 					bc = s.split("background-color:", 1)[1]
@@ -151,7 +151,7 @@ class AttachmentCache(AutoCache):
 		self.channels.clear()
 		self.channels.update(AUTH.get("proxy_channels", ()))
 		if secondary:
-			self.secondary = AutoCache(secondary, size_limit=128 * 1073741824, stale=86400 * 7, timeout=86400 * 30, safe=True)
+			self.secondary = AutoCache(secondary, size_limit=AUTH.get("cache_space", 128) * 1073741824, stale=86400 * 7, timeout=86400 * 30, safe=True)
 		if tertiary:
 			self.tertiary = AutoCache(tertiary, size_limit=1073741824, stale=86400 * 7, timeout=86400 * 30)
 		return self.channels
@@ -344,6 +344,12 @@ class AttachmentCache(AutoCache):
 			resp = await self._aretrieve(path, self.get_attachments, path)
 		return resp
 
+	@staticmethod
+	def cast_fp(f):
+		if getsize(f) < 65536:
+			f.seek(0)
+			return f.read()
+		return f
 	async def _download(self, url, m_id=None, timeout=12):
 		try:
 			target = url
@@ -357,13 +363,13 @@ class AttachmentCache(AutoCache):
 					target = await self.obtain(c_id, m_id2 or m_id, a_id, fn)
 					fn, head = await _run_async(download_file, target, filename=raw_fn, _timeout=timeout, return_headers=True)
 					self.tertiary[url] = head
-					return open(fn, "rb")
+					return self.cast_fp(open(fn, "rb"))
 				elif "/c/" in url:
 					path = url.split("/c/", 1)[-1].split("/", 1)[0]
 					urls, csize = await self.obtains(path)
 					fn, head = await _run_async(download_file, *urls, filename=raw_fn, _timeout=timeout, return_headers=True)
 					self.tertiary[url] = head
-					return open(fn, "rb")
+					return self.cast_fp(open(fn, "rb"))
 			# if is_discord_url(target):
 			# 	try:
 			# 		fn, head = await run_async(download_file, target, filename=raw_fn, _timeout=timeout, return_headers=True)
@@ -385,8 +391,8 @@ class AttachmentCache(AutoCache):
 		except:
 			traceback.print_exc()
 			raise
-		return f
-	async def download(self, url, m_id=None, filename=None, read=False, return_headers=False, force=False, fc=False):
+		return self.cast_fp(f)
+	async def download(self, url, m_id=None, filename=None, read=None, return_headers=False, force=False, fc=False):
 		url = unyt(url)
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
@@ -398,6 +404,8 @@ class AttachmentCache(AutoCache):
 				fp = await self.secondary._aretrieve(url, self._download, url, m_id=m_id, _timeout=16, read=True)
 		if return_headers:
 			headers = await self.scan_headers(url, m_id=m_id, fc=fc)
+		if not filename and read and isinstance(fp, byte_like):
+			filename = True
 		if filename:
 			try:
 				if isinstance(filename, bool):
@@ -405,20 +413,28 @@ class AttachmentCache(AutoCache):
 						return (fp.name, headers) if return_headers else fp.name
 					filename = temporary_file(url2ext(url))
 				with open(filename, "wb") as f2:
-					await _run_async(shutil.copyfileobj, fp, f2, 262144)
+					if isinstance(fp, byte_like):
+						await _run_async(f2.write, fp)
+					else:
+						await _run_async(shutil.copyfileobj, fp, f2, 262144)
 				return (filename, headers) if return_headers else filename
 			finally:
-				fp.close()
-		if read:
+				if getattr(fp, "close", None):
+					fp.close()
+		if read is not False:
 			return (fp, headers) if return_headers else fp
 		try:
-			if hasattr(fp, "name") and os.path.exists(fp.name):
-				data = await read_file_a(fp.name)
-				return (data, headers) if return_headers else data
-			data = await _run_async(fp.read)
+			if isinstance(fp, byte_like):
+				data = fp
+			else:
+				if hasattr(fp, "name") and os.path.exists(fp.name):
+					data = await read_file_a(fp.name)
+					return (data, headers) if return_headers else data
+				data = await _run_async(fp.read)
 			return (data, headers) if return_headers else data
 		finally:
-			fp.close()
+			if getattr(fp, "close", None):
+				fp.close()
 
 	async def _scan_headers(self, url, m_id=None, base="api.mizabot.xyz"):
 		if is_discord_attachment(url):

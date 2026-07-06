@@ -2462,7 +2462,7 @@ class UpdateMessageLogs(Database):
 		files = []
 		for a in message.attachments:
 			try:
-				fn = await attachment_cache.download(a.url, read=True)
+				fn = await attachment_cache.download(a.url)
 				fil = CompatFile(fn, filename=a.filename.removeprefix("SPOILER_"))
 				files.append(fil)
 			except:
@@ -2720,7 +2720,7 @@ class UpdateCrossposts(Database):
 			embeds.append(embed)
 		files = deque()
 		for a in message.attachments:
-			fn = await attachment_cache.download(a.url, read=True)
+			fn = await attachment_cache.download(a.url)
 			files.append(CompatFile(fn, filename=a.filename.removeprefix("SPOILER_")))
 		for c_id in tuple(self.data[message.channel.id]):
 			try:

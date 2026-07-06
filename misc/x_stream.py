@@ -1,5 +1,6 @@
 import base64
 import diskcache
+import io
 import json
 import logging
 import os
@@ -58,7 +59,7 @@ def true_ip(request: Request) -> str:
 
 async def get_size_mime(head, tail, count, chunksize):
 	fut = create_task(attachment_cache.scan_headers(tail, base="mizabot.xyz", fc=True))
-	HEAD = await attachment_cache.download(head, read=True, fc=True)
+	HEAD = await attachment_cache.download(head, fc=True)
 	TAIL_headers = await fut
 	firstsize = getsize(HEAD)
 	mimetype = mime_from_file(HEAD)
@@ -189,9 +190,12 @@ class Server:
 						s = start - pos
 						e = end - pos
 						print("get_chunk:", u)
-						fp = await attachment_cache.download(u, read=True)
+						fp = await attachment_cache.download(u)
 
 						async def content_generator():
+							if isinstance(fp, byte_like):
+								yield fp
+								return
 							chunksize = 262144 if counter else 65536
 							fp.seek(s)
 							for i in range(s, e, chunksize):
@@ -219,6 +223,8 @@ class Server:
 
 
 def stream_fp(request, fp, response_headers={}, filename="untitled.bin", cache=False):
+	if isinstance(fp, byte_like):
+		fp = io.BytesIO(fp)
 	brange = request.headers.get("Range", "").removeprefix("bytes=") if request else ""
 	size = getsize(fp)
 	ranges = []
@@ -492,7 +498,7 @@ async def proxy_if(url: str, request: Request, force: bool = False, download: bo
 			return True
 		ua = request.headers.get("User-Agent", "")
 		if "bot" in ua or "Bot" in ua:
-			return is_discord_attachment(url) and url2ext(url) in IMAGE_FORMS
+			return is_discord_attachment(url) and ".binx" in url
 		if download and is_discord_attachment(url):
 			if url2ext(url) in VISUAL_FORMS:
 				return True
@@ -515,7 +521,7 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 		)
 
 	try:
-		fp = await attachment_cache.download(url, read=True)
+		fp = await attachment_cache.download(url)
 	except ConnectionError as ex:
 		raise HTTPException(status_code=ex.errno or 500, detail=f"{url}: {ex}")
 	heads = await attachment_cache.scan_headers(url, base="mizabot.xyz", fc=True)

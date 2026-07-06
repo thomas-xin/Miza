@@ -92,7 +92,7 @@ def get_request(url, return_headers=False):
 	else:
 		import asyncio
 		from misc.caches import attachment_cache
-		return asyncio.run(attachment_cache.download(url, return_headers=return_headers))
+		return asyncio.run(attachment_cache.download(url, return_headers=return_headers, read=False))
 	return (data, headers) if return_headers else data
 
 

@@ -1911,7 +1911,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			args += ["-d", duration]
 		args += ["-fs", fsize, "-f", fmt]
 		if isinstance(image, str) and is_url(image):
-			image = await attachment_cache.download(verify_url(image), filename=True)
+			image = await attachment_cache.download(verify_url(image), filename=True, read=False)
 		return await process_image(image, "resize_map", args, timeout=timeout)
 
 	# Map of search engine locations for browsing the internet. As we do not have access to the user's IP address, we estimate their timezone and use that to approximate their location.
@@ -2780,7 +2780,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				durl = url.split("base64,", 1)[-1].encode("ascii")
 				d = base64.b64decode(durl + b"==")
 			else:
-				d = await attachment_cache.download(url)
+				d = await attachment_cache.download(url, read=False)
 			name = url.rsplit("/", 1)[-1].split("?", 1)[0]
 		else:
 			d = url
@@ -3075,7 +3075,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def add_attachment(self, attachment, message=None):
 		if int(attachment.size) <= 64 * 1048576:
-			return await attachment_cache.download(attachment.url, m_id=getattr(message, "id", None), read=True)
+			return await attachment_cache.download(attachment.url, m_id=getattr(message, "id", None))
 
 	def get_colour(self, user) -> int:
 		if user is None:
@@ -6552,7 +6552,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if message.author.id != self.user.id:
 			for i, a in enumerate(message.attachments):
 				if a.filename == "message.txt":
-					b = await attachment_cache.download(a.url, m_id=message.id)
+					b = await attachment_cache.download(a.url, m_id=message.id, read=False)
 					if message.content:
 						message.content += " "
 					message.content += as_str(b)
@@ -6805,7 +6805,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if hasattr(message, "files"):
 						self.files = message.files
 					else:
-						futs = [create_task(attachment_cache.download(a.url, read=True)) for a in message.attachments]
+						futs = [create_task(attachment_cache.download(a.url)) for a in message.attachments]
 						files = await gather(*futs)
 						self.files = [CompatFile(b, filename=a.filename) for a, b in zip(message.attachments, files)]
 				return self

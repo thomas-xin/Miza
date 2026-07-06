@@ -925,7 +925,7 @@ class AudioDownloader:
 		headers = asyncio.run(attachment_cache.scan_headers(url, fc=True))
 		match (ctype := headers.get("content-type")):
 			case "application/json":
-				b = asyncio.run(attachment_cache.download(url))
+				b = asyncio.run(attachment_cache.download(url, read=False))
 				try:
 					d = select_and_loads(b, safe=True)
 				except orjson.JSONDecodeError:

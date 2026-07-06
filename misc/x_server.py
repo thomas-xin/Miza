@@ -568,6 +568,8 @@ class Server:
 		if not fp:
 			raise FileNotFoundError(404, path)
 		mimetype = get_mime(fp)
+		if isinstance(fp, byte_like):
+			fp = io.BytesIO(fp)
 		fp.seek(0)
 		return cp.lib.static.serve_fileobj(fp, name=fn, content_type=mimetype, disposition="attachment" if download else "inline")
 	download._cp_config = {"response.stream": True}
@@ -580,7 +582,7 @@ class Server:
 				return True
 			ua = cp.request.headers.get("User-Agent", "")
 			if "bot" in ua or "Bot" in ua:
-				return is_discord_attachment(url) and url2ext(url) in IMAGE_FORMS
+				return is_discord_attachment(url) and ".binx" in url
 			if download and is_discord_attachment(url):
 				if url2ext(url) in VISUAL_FORMS:
 					return True

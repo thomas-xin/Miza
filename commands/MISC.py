@@ -146,7 +146,7 @@ class CS_hex2xml(Command):
 
 async def periwinkle_variables_txt():
 	url = "https://github.com/periwinkle9/CSMemoryMap/raw/refs/heads/main/cs%20global%20and%20static%20variables.txt"
-	b = await attachment_cache.download(url, force=True)
+	b = await attachment_cache.download(url, read=False, force=True)
 	s = as_str(b.strip())
 	lines = [line.rstrip() for line in s.splitlines()]
 	assert lines[7] == "Address (bytes)  Data Type               Description", "Header not found!"
@@ -243,7 +243,7 @@ async def sheet_pull(*urls, delimiter="\t"):
 			data.extend(sheet)
 			continue
 		assert isinstance(url, str) and is_url(url)
-		b = await attachment_cache.download(url, force=True)
+		b = await attachment_cache.download(url, read=False, force=True)
 		reader = csv.reader(as_str(b).splitlines(), delimiter=delimiter)
 		sheet = list(reader)
 		header = [h.removeprefix("Default ") for h in sheet.pop(0)]

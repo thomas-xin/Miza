@@ -643,7 +643,7 @@ class UpdateExec(Database):
 			b = url
 		elif is_url(url):
 			fn = filetransd(filename or url2fn(url))
-			b = await attachment_cache.download(url, read=True)
+			b = await attachment_cache.download(url)
 		elif isinstance(url, str):
 			fn = filetransd((filename or url).replace("\\", "/").rsplit("/", 1)[-1])
 			b = open(url, "rb")

@@ -1069,7 +1069,7 @@ class Dump(Command):
 						break
 				if not url:
 					raise LookupError("No valid dump file provided or found.")
-			b = await attachment_cache.download(url)
+			b = await attachment_cache.download(url, read=False)
 			queue = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).load_dump({maybe_json(b).decode('ascii')},{_user.id},universal={mode == 'load'},append={mode == 'append'})")
 			count = len(queue)
 			return cdict(
