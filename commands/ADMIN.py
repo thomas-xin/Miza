@@ -2407,7 +2407,11 @@ class UpdateUserLogs(Database):
 		ua, ub = a_url, b_url
 		emb.set_author(name=str(after), icon_url=b_url, url=b_url if is_url(b_url) else None)
 		emb.colour = colour2raw(colour)
-		message = await channel.send(embed=emb, files=files)
+		try:
+			message = await channel.send(embed=emb, files=files)
+		except Exception:
+			print(emb.to_dict(), files)
+			raise
 		if "exec" in bot.data:
 			with tracebacksuppressor:
 				ub2 = message.embeds[0].author.icon_url
@@ -2477,17 +2481,12 @@ class UpdateMessageLogs(Database):
 			m2 = await channel.send(msg, embed=emb, files=files)
 		message.attachments = [cdict(name=a.filename, id=a.id, url=attachment_cache.preserve(a.url, m2.id)) for a in m2.attachments]
 
-	raw_delete_sems = {}
-	last_inits = {}
 	# Delete events must attempt to find the user who deleted the message
-	async def _raw_delete_(self, message, bulk=False, **void):
-		cu_id = self.bot.id
-		if bulk:
-			return
+	async def _audited_delete_(self, message, user=None, **void):
 		guild = message.guild
 		if not guild:
 			return
-		if message.author.bot:
+		if message.author.bot and not user or user.bot:
 			return
 		bot = self.bot
 		c_id = bot.get_guildbase(guild.id, "logs.message")
@@ -2498,59 +2497,14 @@ class UpdateMessageLogs(Database):
 		except (EOFError, discord.NotFound):
 			bot.pop_guildbase(guild.id, "logs.message")
 			return
-		now = utc()
-		if not message.author.bot:
-			await self.reattachments(channel, message)
-		u = message.author
-		name_id = str(u)
-		url = await bot.get_proxy_url(u)
-		action = discord.AuditLogAction.message_delete
-		try:
-			t = u
-			init = user_mention(t.id)
-			d_level = bot.recently_deleted.get(message.id)
-			if d_level is False:
-				return
-			if d_level:
-				t = bot.user
-				init = user_mention(t.id)
-			else:
-				# Attempt to find who deleted the message
-				if not guild.get_member(cu_id).guild_permissions.view_audit_log:
-					raise PermissionError
-				bucket = guild.id
-				try:
-					sem = self.raw_delete_sems[bucket]
-				except KeyError:
-					sem = self.raw_delete_sems[bucket] = Semaphore(2, 4, rate_limit=5)
-				async with sem:
-					al = await flatten(guild.audit_logs(
-						limit=100,
-						action=action,
-					))
-				al2 = bot.deletes.get(guild.id, [])
-				amap = {a.id: a for a in al2}
-				for e in reversed(al):
-					try:
-						if now - e.created_at.timestamp() > 3:
-							if e.id not in amap and now - e.created_at.timestamp() > 3600 or amap.get(e.id) and T(amap.get(e.id).extra).get("count", 1) >= T(e.extra).get("count", 1):
-								continue
-						if e.target and e.target.id != message.author.id:
-							continue
-						init = user_mention(e.user.id)
-					finally:
-						amap[e.id] = e
-				alid = sorted(amap.keys())
-				al3 = deque(map(amap.__getitem__, alid), maxlen=256)
-				bot.deletes[guild.id] = al3
-				self.last_inits[channel.id] = init
-		except (SemaphoreOverflowError, discord.HTTPException):
-			init = self.last_inits.get(channel.id) or "[UNKNOWN USER]"
-		except (PermissionError, discord.Forbidden):
-			init = "[UNKNOWN USER]"
+		await self.reattachments(channel, message)
 		embs = await bot.as_embeds(message, refresh=False, link=True, reactions=True)
 		embs[0].colour = discord.Colour(0xFF0000)
-		action = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\n"
+		if user:
+			action = f"{user_mention(user.id)} **deleted message from**"
+		else:
+			action = "**message deleted from**"
+		action = f"{action} {channel_mention(message.channel.id)}:\n"
 		embs[0].description = lim_str(action + (embs[0].description or ""), 4096)
 		bot.send_embeds(channel, embs)
 

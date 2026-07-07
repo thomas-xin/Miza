@@ -1599,12 +1599,13 @@ def device_cap(i, resolve=False):
 
 
 async def proc_eval(s, caps=["math"], priority=False, timeout=12):
-	procs = PROCS_BY_CAPS[caps[0]]
+	procs = PROCS_BY_CAPS.get(caps[0], ())
 	for p in procs:
 		if not set(caps).difference(p.caps):
 			break
 	else:
 		await asyncio.sleep(5)
+		procs = PROCS_BY_CAPS.get(caps[0], ())
 		for p in procs:
 			if not set(caps).difference(p.caps):
 				break

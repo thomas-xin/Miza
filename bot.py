@@ -1977,6 +1977,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					else:
 						print(repr(res))
 				return "\n\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).strip()
+			if is_discord_attachment(argv) or is_miza_attachment(argv):
+				if url2ext(argv) in VISUAL_FORMS:
+					return "<data>"
 			result = await _run_async(
 				self.ddgs.extract,
 				verify_url(argv),
@@ -3071,7 +3074,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						pass
 			self.cache.messages[message.id] = message
 			if (utc_dt() - created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
-				self.data.message_cache.store_message(message)
+				self.data.message_cache.save_message(message)
 		return message
 
 	async def add_attachment(self, attachment, message=None):
@@ -8334,41 +8337,90 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						await fut
 				await self.handle_message(after, before=before)
 
-		self.deletes = {}
-		self.bulk_deletes = {}
-		self.delete_waits = {}
+		self.delete_audits = AutoCache(f"{CACHE_PATH}/emojinames", shards=1, stale=0, timeout=300)
+		self.audit_cache = AutoCache(f"{CACHE_PATH}/emojinames", shards=1, stale=0, timeout=60)
 		@self.event
 		async def on_audit_log_entry_create(data):
 			# print("AUDIT:", data)
 			with tracebacksuppressor:
-				if data.action is discord.AuditLogAction.message_delete:
-					# print("Audited delete:", data)
-					guild = data.guild
-					T(self.delete_waits.get(guild.id)).if_instance(Future, lambda t: t.obj.set_result(None))
-					self.deletes.setdefault(guild.id, deque(maxlen=256)).append(data)
-					self.delete_waits.pop(guild.id, None)
-				elif data.action is discord.AuditLogAction.message_bulk_delete:
-					# print("Audited bulk delete:", data)
-					guild = data.guild
-					T(self.delete_waits.get(guild.id)).if_instance(Future, lambda t: t.obj.set_result(None))
-					self.bulk_deletes.setdefault(guild.id, deque(maxlen=256)).append(data)
-					self.delete_waits.pop(guild.id, None)
+				match data.action:
+					case discord.AuditLogAction.kick:
+						print("Audited kick:")
+					case discord.AuditLogAction.member_prune:
+						print("Audited prune:")
+					case discord.AuditLogAction.ban:
+						print("Audited ban:")
+					case discord.AuditLogAction.unban:
+						print("Audited unban:")
+					case discord.AuditLogAction.message_delete:
+						print("Audited delete:")
+						t = (data.target.id, data.extra.channel.id)
+						audits = self.delete_audits.setdefault(t, {})
+						audits[data.id] = cdict(
+							uid=data.user.id,
+							count=data.extra.count,
+							cons=0,
+						)
+					case discord.AuditLogAction.message_bulk_delete:
+						print("Audited bulk delete:")
+				print(data, data.user, data.guild, data.target, data.extra)
 
 		# Message delete event: uses raw payloads rather than discord.py message cache. calls _delete_ bot database event.
 		@self.event
 		async def on_raw_message_delete(payload):
 			# print("DELETE:", payload)
 			with tracebacksuppressor:
-				fut = self.delete_waits.setdefault(payload.guild_id, Future())
-				fut2 = create_task(_on_raw_message_delete(payload))
-				with suppress(T1, T2):
-					await asyncio.wait_for(wrap_future(fut), timeout=1)
-				message = await fut2
+				start = utc()
+				message = await _on_raw_message_delete(payload)
 				guild = message.guild
 				if guild:
 					fut = create_task(self.send_event("_delete_", message=message))
 					await self.send_event("_raw_delete_", message=message)
 					await fut
+					user = None
+					if guild.me.guild_permissions.view_audit_log and not getattr(message, "ghost", None):
+						delay = 1 - (utc() - start)
+						await asyncio.sleep(delay)
+						t = (message.author.id, message.channel.id)
+						audits = self.delete_audits.setdefault(t, {})
+						for e in audits.values():
+							if e.cons < e.count:
+								e.cons += 1
+								self.delete_audits[t] = audits
+								user = guild.get_member(e.uid) or await self.fetch_user(e.uid)
+								break
+						else:
+							async for e2 in guild.audit_logs(
+								limit=None,
+								after=datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(seconds=300),
+								action=discord.AuditLogAction.message_delete,
+								oldest_first=False,
+							):
+								if e2.target.id != message.author.id or e2.extra.channel.id != message.channel.id:
+									continue
+								try:
+									e = audits[e2.id]
+								except KeyError:
+									e = cdict(
+										uid=e2.user.id,
+										count=e2.extra.count,
+										cons=0,
+									)
+								else:
+									e.count = e2.extra.count
+								audits[e2.id] = e
+								if e.cons < e.count:
+									e.cons += 1
+									self.delete_audits[t] = audits
+									user = guild.get_member(e.uid) or await self.fetch_user(e.uid)
+									break
+								self.delete_audits[t] = audits
+							else:
+								user = message.author
+						print(audits)
+					print("Audited Delete:", message, user)
+					await self.send_event("_audited_delete_", message=message, user=user)
+
 
 		async def _on_raw_message_delete(payload):
 			had_before = False
@@ -8427,10 +8479,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		async def on_raw_bulk_message_delete(payload):
 			# print("BULK_DELETE:", payload)
 			with tracebacksuppressor:
-				fut = self.delete_waits.setdefault(payload.guild_id, Future())
+				# fut = self.delete_waits.setdefault(payload.guild_id, Future())
 				fut2 = create_task(_on_raw_bulk_message_delete(payload))
-				with suppress(T1, T2):
-					await asyncio.wait_for(wrap_future(fut), timeout=1)
+				# with suppress(T1, T2):/meout=1)
 				messages = await fut2
 				await self.send_event("_bulk_delete_", messages=messages)
 				for message in messages:

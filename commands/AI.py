@@ -548,11 +548,14 @@ class Ask(Command):
 					argv = None
 					if name == "browse":
 						argv = kwargs.get("query") or " ".join(kwargs.values())
-						s = f'\n> Browsing "{argv}"...'
-						text += s
-						yield s
-						fut = bot.browse(argv, uid=_user.id)
-						succ = await rag(name, tid, fut)
+						if is_discord_attachment(argv) or is_miza_attachment(argv):
+							pass
+						else:
+							s = f'\n> Browsing "{argv}"...'
+							text += s
+							yield s
+							fut = bot.browse(argv, uid=_user.id)
+							succ = await rag(name, tid, fut)
 					elif name == "deno":
 						argv = kwargs.get("query") or " ".join(kwargs.values())
 						prec = float(kwargs.get("precision") or 128)

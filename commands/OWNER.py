@@ -687,7 +687,7 @@ class UpdateExec(Database):
 				if mode == "raise":
 					raise FileNotFoundError(url)
 				elif mode == "download":
-					return await attachment_cache.download(url)
+					return await attachment_cache.download(url, read=False)
 				elif mode == "upload":
 					pass
 				else:
@@ -963,7 +963,7 @@ class UpdateMessageCache(Database):
 	checked = set()
 	loader = FileHashDict(path=f"{CACHE_PATH}/message_cache_loader")
 
-	async def load_messages(self, channel):
+	async def load_messages(self, channel, duration=14 * 86400):
 		if channel.id in self.checked:
 			return
 		bot = self.bot
@@ -975,7 +975,7 @@ class UpdateMessageCache(Database):
 		self.checked.add(channel.id)
 		m_id = self.loader.get(channel.id, 0)
 		last = max(
-			time_snowflake(datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=14)),
+			time_snowflake(datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(seconds=duration)),
 			m_id,
 		)
 		async with bot.guild_semaphore:
@@ -983,17 +983,14 @@ class UpdateMessageCache(Database):
 			async for message in channel.history(after=last, limit=None, oldest_first=True):
 				messages.append(message)
 		if messages:
-			await _run_async(self.store_messages, messages)
+			await _run_async(self.store_messages, map(self.serialise_message, messages))
 			self.loader[channel.id] = message.id
-
-	def store_messages(self, messages):
-		return [self.store_message(message) for message in messages]
 
 	async def _send_(self, message, **void):
 		return await self.load_messages(message.channel)
 
-	def store_message(self, message):
-		bot = self.bot
+	@staticmethod
+	def serialise_message(message):
 		m = getattr(message, "_data", None)
 		if m:
 			if "author" not in m:
@@ -1059,6 +1056,7 @@ class UpdateMessageCache(Database):
 			m["id"] = int(m["id"])
 		except (KeyError, ValueError):
 			m["id"] = message.id
+		m["channel_id"] = int(m["channel_id"])
 		if not message.webhook_id:
 			m.pop("member", None)
 		m.pop("nonce", None)
@@ -1068,18 +1066,37 @@ class UpdateMessageCache(Database):
 		for k in ("type", "attachments", "embeds", "components", "reactions", "channel_type", "edited_timestamp", "flags", "pinned", "mentions", "mention_roles", "mention_everyone", "tts", "deaf"):
 			if not m.get(k):
 				m.pop(k, None)
-		bot.data.channel_cache.add(message.channel.id, message.id)
-
-		gr_id = self.get_group(message.id)
-		with self.get_sem(gr_id):
-			try:
-				group = self.load_message_group(gr_id, message.id)
-			except KeyError:
-				group = []
-			groupd = {int(msg["id"]): msg for msg in group}
-			groupd[m["id"]] = m
-			self.save_message_group(gr_id, groupd.values())
 		return m
+
+	held_messages = {}
+
+	def store_message(self, m):
+		m_id = m["id"]
+		self.bot.data.channel_cache.add(m["channel_id"], m_id)
+
+		gr_id = self.get_group(m_id)
+		with self.get_sem(gr_id):
+			groupd = self.load_message_map(gr_id)
+			groupd[m_id] = m
+			self.save_message_map(gr_id, groupd)
+		return m
+
+	def store_messages(self, ms):
+		groups = {}
+		for m in ms:
+			gr_id = self.get_group(m["id"])
+			group = groups.setdefault(gr_id, {})
+			group[m["id"]] = m
+
+		for gr_id, group in groups.items():
+			with self.get_sem(gr_id):
+				groupd = self.load_message_map(gr_id)
+				groupd.update(group)
+				self.save_message_map(gr_id, groupd)
+		return ms
+
+	def save_message(self, message):
+		return self.store_message(self.serialise_message(message))
 
 	@staticmethod
 	def get_group(m_id):
@@ -1095,12 +1112,8 @@ class UpdateMessageCache(Database):
 		return sem
 
 	def load_message(self, m_id):
-		bot = self.bot
-		group = self.load_message_group(self.get_group(m_id), m_id)
-		msg = group[bisect.bisect_left(group, m_id, key=lambda d: int(d.get("id", 0)))] if len(group) > 1 else group[0]
-		if int(msg["id"]) != m_id:
-			raise KeyError(m_id)
-		return bot.CachedMessage(msg)
+		groupd = self.load_message_map(self.get_group(m_id))
+		return self.bot.CachedMessage(groupd[m_id])
 
 	def load_message_group(self, gr_id, m_id=0):
 		bot = self.bot
@@ -1117,15 +1130,36 @@ class UpdateMessageCache(Database):
 			data = compression.zstd.decompress(data[1:])
 		return decode_jsonl(data)
 
+	def load_message_map(self, gr_id):
+		try:
+			return self.held_messages[gr_id]
+		except KeyError:
+			pass
+		try:
+			group = self.load_message_group(gr_id)
+		except KeyError:
+			group = []
+		return {int(msg["id"]): msg for msg in group}
+
 	def save_message_group(self, gr_id, group):
-		bot = self.bot
+		self.held_messages.pop(gr_id, None)
 		data = encode_jsonl(group)
 		if compression and len(data) > 1024:
-			data2 = compression.zstd.compress(data, 10)
+			data2 = compression.zstd.compress(data, level=10)
 			if len(data2) < len(data) - 1:
 				data = b"\x80" + data2
-		bot.message_cache[gr_id] = encrypt(data)
+		self.bot.message_cache[gr_id] = encrypt(data)
 		return gr_id
+
+	def save_message_map(self, gr_id, groupd):
+		result = self.save_message_group(gr_id, groupd.values())
+		while len(self.held_messages) >= 64:
+			try:
+				self.held_messages.pop(next(iter(self.held_messages)))
+			except (KeyError, RuntimeError):
+				pass
+		self.held_messages[gr_id] = groupd
+		return result
 
 
 class Maintenance(Command):

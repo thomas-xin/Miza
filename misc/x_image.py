@@ -1573,7 +1573,7 @@ def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=
 	"""
 	if extras:
 		image = ImageSequence.cast(image)
-		images = list(image) + list(exc.map(get_image, extras))
+		images = list([image] if isinstance(image, Image.Image) else image) + list(exc.map(get_image, extras))
 		image, extras = ImageSequence(*images), ()
 	prop = properties(image, default_duration=duration , default_fps=fps)
 	duration, fps, prog = sync_fps([prop], duration, fps)
