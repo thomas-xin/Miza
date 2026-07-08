@@ -86,6 +86,7 @@ def wrap_future(fut, loop=None, shield=False, thread_safe=True) -> asyncio.Futur
 		def set_suppress(res, is_exception=False):
 			try:
 				if is_exception:
+					# Do not propagate StopIteration as this is ambiguous within futures
 					if isinstance(res, StopIteration):
 						res = RuntimeError(res)
 					wrapper.set_exception(res)
@@ -110,6 +111,7 @@ def wrap_future(fut, loop=None, shield=False, thread_safe=True) -> asyncio.Futur
 	return wrapper
 
 def create_thread(func, *args, **kwargs) -> Future:
+	# Runs routine in a new thread, without holding up any thread pools
 	fut = Future()
 	def target():
 		try:
@@ -132,6 +134,7 @@ def create_thread(func, *args, **kwargs) -> Future:
 async def _run_async(f, *args, timeout=None, _timeout=None, **kwargs):
 	async with asyncio.timeout(timeout):
 		if callable(f):
+			# Propagate _timeout argument as timeout for inner function
 			if _timeout is not None:
 				kwargs["timeout"] = _timeout
 			if inspect.iscoroutinefunction(f):
@@ -188,7 +191,7 @@ async def _gather(*futs, return_exceptions=False, max_concurrency=None):
 		if not max_concurrency or isinstance(fut, asyncio.Task):
 			pass
 		elif not is_main_thread() and asyncio.iscoroutine(fut):
-			temp = asyncio.run_coroutine_threadsafe(fut, loop=get_event_loop())
+			_ = asyncio.run_coroutine_threadsafe(fut, loop=get_event_loop())
 			fut = create_task(wrap_future(fut))
 		else:
 			fut = create_task(fut)
@@ -214,7 +217,7 @@ async def _await_fut(fut, ret) -> Future:
 	return ret
 
 def await_fut(fut, timeout=None):
-	"Blocking call that waits for a single asyncio future to complete."
+	"Blocking call that waits for a single asyncio future to complete. Runs in the main thread if passed from a different one."
 	if is_main_thread():
 		if timeout:
 			fut = asyncio.wait_for(fut, timeout=timeout)

@@ -2106,7 +2106,7 @@ class UpdateServerLogs(Database):
 
 	async def _guild_update_(self, before, after, **void):
 		bot = self.bot
-		channel = await self.ensure_log_channel(after.guild)
+		channel = await self.ensure_log_channel(after)
 		if not channel:
 			return
 		colour = await bot.get_colour(after)

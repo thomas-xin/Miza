@@ -1310,7 +1310,7 @@ class UpdateEmojis(Database):
 	async def grab(self, name):
 		bot = self.bot
 		while not bot.ready:
-			await asyncio.sleep(2)
+			await asyncio.sleep(1)
 
 		ename = name.rsplit(".", 1)[0]
 		animated = name.endswith(".gif")

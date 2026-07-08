@@ -5202,12 +5202,13 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 		if isinstance(data, aiohttp.FormData):
 			session = self.sessions.next()
 		elif not session:
-			try:
-				resp = await self.asession.request(method, url, headers=headers, files=files, data=data, timeout=timeout, verify=verify)
-			except niquests.exceptions.SSLError:
-				if ssl is not None:
-					raise
-				resp = await self.asession.request(method, url, headers=headers, files=files, data=data, timeout=timeout, verify=False)
+			async with niquests.AsyncSession() as asession:
+				try:
+					resp = await asession.request(method, url, headers=headers, files=files, data=data, timeout=timeout, verify=verify)
+				except niquests.exceptions.SSLError:
+					if ssl is not None:
+						raise
+					resp = await self.asession.request(method, url, headers=headers, files=files, data=data, timeout=timeout, verify=False)
 			if not ignore_error and resp.status_code >= 400:
 				raise ConnectionError(resp.status_code, (url, as_str(resp.content)))
 			if json:

@@ -447,15 +447,10 @@ class Text2048(Interactable, Command):
 					emb.description += "+" + rew
 			emb.set_footer(text=f"Score: {fscore}")
 			# Clear buttons and announce game over message
-			return await Request.aio(
-				f"https://discord.com/api/{api}/channels/{_message.channel.id}/messages/{_message.id}",
-				data=dict(
-					content="**```\n2048: GAME OVER```**",
-					embeds=[emb.to_dict()],
-					components=None,
-				),
-				method="PATCH",
-				authorise=True,
+			return cdict(
+				content="**```\n2048: GAME OVER```**",
+				embeds=[emb],
+				components=[],
 			)
 		if serialised is not None:
 			# Update message if gamestate has been changed
@@ -487,7 +482,7 @@ class Text2048(Interactable, Command):
 			rew = await bot.as_rewards(xp)
 			if rew:
 				emb.description += "+" + rew
-		emb.set_footer(text=self.encode(user.id, g.serialise(), f"Score: {fscore}"))
+		emb.set_footer(text=self.encode(user.id, serialised, f"Score: {fscore}"))
 		dims = max(2, len(g.shape))
 		buttons = copy.deepcopy(self.buttons[dims])
 		vm = g.valid_moves()
@@ -2808,7 +2803,7 @@ class GIFSearch(Pagination, Interactable, Command):
 			return []
 		resp = await Request.aio(f"https://api.giphy.com/v1/gifs/search?offset=0&type=gifs&sort=&explore=true&api_key={giphy_key}&q={query}&limit=40", json=True)
 		assert isinstance(resp, dict)
-		return (resp.get("data") and [entry["images"]["original"]["webp"] for entry in resp["data"]]) or []
+		return tuple((resp.get("data") and [entry["images"]["original"]["webp"] for entry in resp["data"]]) or ())
 
 	async def search_tenor(self, query):
 		resp = await Request.aio(f"https://tenor.com/search/{query}", decode=True)
@@ -2823,15 +2818,16 @@ class GIFSearch(Pagination, Interactable, Command):
 			if not a.startswith("https://"):
 				a = "https://tenor.com/" + a.lstrip("/")
 			results.append(a)
-		return results
+		return tuple(results)
 
-	async def search_klipy(self, query, cid=0):
+	async def search_klipy(self, query, cid=0, nsfw=False):
 		if not (klipy_key := AUTH.get("klipy_key")):
 			print
 			return []
-		resp = await Request.aio(f"https://api.klipy.com/api/v1/{klipy_key}/gifs/search?page=1&per_page=50&q={query}&customer_id={cid}&content_filter=off&format_filter=webp", json=True)
+		cf = "off" if nsfw else "on"
+		resp = await Request.aio(f"https://api.klipy.com/api/v1/{klipy_key}/gifs/search?page=1&per_page=50&q={query}&customer_id={cid}&content_filter={cf}&format_filter=webp", json=True)
 		assert isinstance(resp, dict)
-		return (resp.get("data", {}).get("data") and [entry["file"]["hd"]["webp"]["url"] for entry in resp["data"]["data"]]) or []
+		return tuple((resp.get("data", {}).get("data") and [entry["file"]["hd"]["webp"]["url"] for entry in resp["data"]["data"]]) or ())
 
 	async def search_suggestions(self, query):
 		if not (klipy_key := AUTH.get("klipy_key")):
@@ -2841,11 +2837,11 @@ class GIFSearch(Pagination, Interactable, Command):
 		assert isinstance(resp, dict)
 		return (resp and resp.get("data") and resp["data"][0] or None)
 
-	async def aggregate_searches(self, query, count=100, cid=0):
+	async def aggregate_searches(self, query, count=100, cid=0, nsfw=False):
 		q = quote_plus(query)
-		giphy_results = await self.cache.aretrieve(f"giphy-{q}", self.search_giphy, q)
-		tenor_results = await self.cache.aretrieve(f"tenor-{q}", self.search_tenor, q)
-		klipy_results = await self.cache.aretrieve(f"klipy-{q}", self.search_klipy, q, cid)
+		giphy_results = list(await self.cache.aretrieve(f"giphy-{q}", self.search_giphy, q))
+		tenor_results = list(await self.cache.aretrieve(f"tenor-{q}", self.search_tenor, q))
+		klipy_results = list(await self.cache.aretrieve(f"klipy-{q}", self.search_klipy, q, cid, nsfw=nsfw))
 		results = []
 		choices = [klipy_results, klipy_results, tenor_results, giphy_results]
 		for i in itertools.count(0):
@@ -2863,21 +2859,21 @@ class GIFSearch(Pagination, Interactable, Command):
 			raise LookupError(f'No results for {json.dumps(query)}.{dym}')
 		return results
 
-	async def display(self, uid, pos, query, diridx=-1):
-		results = await self.aggregate_searches(query, cid=abs(hash(uid)))
+	async def display(self, uid, pos, query, diridx=-1, nsfw=False):
+		results = await self.aggregate_searches(query, cid=abs(hash(uid)), nsfw=nsfw)
 		return await self.multi_display("search result", uid, pos, results, diridx, extra=as_bytes(query))
 
-	async def __call__(self, bot, _channel, _message, _user, query, count, page, **void):
+	async def __call__(self, bot, _channel, _message, _user, _nsfw, query, count, page, **void):
 		if count:
 			results = await self.aggregate_searches(query, cid=abs(hash(str(_user))))
 			results = results[:count]
 			return await bot.send_multi_image_embeds(_channel, images=results, reference=_message)
-		return await self.display(_user.id, page * self.page_size, query)
+		return await self.display(_user.id, page * self.page_size, query, nsfw=_nsfw)
 
-	async def _callback_(self, _user, index, data, **void):
+	async def _callback_(self, _user, _channel, index, data, **void):
 		pos, more = decode_leb128(data)
 		query = as_str(more)
-		return await self.display(_user.id, pos, query, index)
+		return await self.display(_user.id, pos, query, index, nsfw=self.bot.is_nsfw(_channel))
 
 
 # class Rickroll(Command):

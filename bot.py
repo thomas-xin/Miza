@@ -426,8 +426,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if v.get("validation") and isinstance(v.validation, str):
 						lx, rx = v.validation.split(",")
 						mx, Mx = round_min(lx[1:]), round_min(rx[:-1])
-						arg.min_value = mx
-						arg.max_value = Mx
+						if isfinite(mx):
+							arg.min_value = mx
+						if isfinite(Mx):
+							arg.max_value = Mx
 				elif v.type == "bool":
 					arg.type = 5
 				elif v.type == "ternary":
@@ -445,8 +447,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if v.get("validation") and isinstance(v.validation, str):
 						lx, rx = v.validation.split(",")
 						mx, Mx = round_min(lx[1:]), round_min(rx[:-1])
-						arg.min_value = mx
-						arg.max_value = Mx
+						if isfinite(mx):
+							arg.min_value = mx
+						if isfinite(Mx):
+							arg.max_value = Mx
 				out.append(arg)
 				if v.get("multiple"):
 					for i in range(5):
@@ -4460,33 +4464,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if isinstance(resp, str):
 					resp = cdict(content=resp, embeds=[], attachments=[])
 				if isinstance(resp, cdict):
-					# if resp.get("embed") or resp.get("embeds"):
-					# 	if resp.get("buttons") or resp.get("components"):
-					# 		create_task(self.edit_message(
-					# 			message,
-					# 			buttons=resp.pop("buttons", None),
-					# 			components=resp.pop("components", None),
-					# 		))
-					# if interaction and not resp.get("file") and not resp.get("files"):
-					# 	if not fut.done():
-					# 		fut.cancel()
-					# 		create_task(self.defer_interaction(message, mode="patch"))
-					# 		await asyncio.sleep(self.eff_latency())
-					# 	else:
-					# 		r, d = await fut
-					# 		if not d:
-					# 			create_task(self.defer_interaction(message, mode="patch"))
-					# 			await asyncio.sleep(self.eff_latency())
-					# 	if resp.get("embed"):
-					# 		resp["embed"] = resp["embed"].to_dict()
-					# 	if resp.get("embeds"):
-					# 		resp["embeds"] = [e.to_dict() for e in resp["embeds"]]
-					# 	await interaction_patch(
-					# 		bot=self,
-					# 		message=message,
-					# 		**resp,
-					# 	)
-					# 	break
 					if interaction:
 						if not fut.done():
 							fut.cancel()

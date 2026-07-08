@@ -181,7 +181,7 @@ def restructure_buttons(buttons):
 			if "style" not in button:
 				button["style"] = 1
 			if button.get("emoji"):
-				if button["emoji"].get("label") == "▪️":
+				if button["emoji"].get("name") == "▪️":
 					button["disabled"] = True
 			button.pop("id", None)
 	return [dict(type=1, components=row) for row in buttons]
@@ -656,26 +656,27 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 	raise exc
 
 async def manual_edit(message, **fields):
-	if not fields.get("buttons"):
+	if (
+		message.components and fields.get("buttons") is None and fields.get("components") is None
+		or not message.components and (not fields.get("buttons") and not fields.get("components"))
+	):
 		fields.pop("buttons", None)
 		return await message.edit(**fields)
-	if fields.get("embeds"):
+	if fields.get("embeds") is not None:
 		fields["embeds"] = [embed.to_dict() for embed in fields["embeds"]]
-		if fields.get("embed"):
-			fields["embeds"].insert(0, fields["embed"].to_dict())
-	elif fields.get("embed"):
-		fields["embed"] = fields["embed"].to_dict()
-	if fields.get("buttons"):
+	if fields.get("embed") is not None:
+		fields.setdefault("embeds", []).insert(0, fields.pop("embed").to_dict())
+	if fields.get("buttons") is not None:
 		fields["components"] = restructure_buttons(fields.pop("buttons"))
-	if fields.get("files"):
+	if fields.get("files") is not None:
 		files = fields.pop("files")
 		if fields.get("file"):
 			files.insert(0, fields.pop("file"))
-	elif fields.get("file"):
+	elif fields.get("file") is not None:
 		files = [fields.pop("file")]
 	else:
 		files = None
-	if fields.get("allowed_mentions"):
+	if fields.get("allowed_mentions") is not None:
 		mentions = fields["allowed_mentions"]
 		parse = []
 		if mentions.users:
