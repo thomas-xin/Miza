@@ -24,13 +24,6 @@ class ColourDeficiency(Visual, Command):
 			example="tritanopia",
 			default="deuteranomaly",
 		),
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
-		),
 		strength=cdict(
 			type="number",
 			validation="[0, 2]",
@@ -59,13 +52,6 @@ class EdgeDetect(Visual, Command):
 			description="The algorithm to apply",
 			example="depth",
 			default="canny",
-		),
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
 		),
 	)
 	macros = cdict(
@@ -118,13 +104,6 @@ class Blur(Visual, Command):
 			example="8",
 			default=6,
 		),
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
-		),
 	)
 	macros = cdict(
 		Gaussian=cdict(
@@ -145,13 +124,6 @@ class ColourSpace(Visual, Command):
 	name = ["ColorSpace"]
 	description = "Changes the colour space of the supplied image."
 	schema = cdict(
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
-		),
 		source=cdict(
 			type="enum",
 			validation=cdict(
@@ -184,13 +156,6 @@ class ColourSpace(Visual, Command):
 class GMagik(Visual, Command):
 	description = "Applies the Magik image filter to supplied image."
 	schema = cdict(
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			# aliases=["i"],
-			required=True,
-		),
 		intensity=cdict(
 			type="number",
 			validation="[0, 256]",
@@ -404,15 +369,7 @@ class Text(Visual, Command):
 class Average(Visual, Command):
 	name = ["AverageColour"]
 	description = "Computes the average pixel colour in RGB for the supplied image."
-	schema = cdict(
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
-		),
-	)
+	schema = cdict()
 	rate_limit = (5, 7)
 	_timeout_ = 2
 
@@ -504,13 +461,6 @@ class Rainbow(Visual, Command):
 	name = ["Gay"]
 	description = "Creates an animation from repeatedly hueshifting supplied image."
 	schema = cdict(
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
-		),
 		mode=cdict(
 			type="enum",
 			validation=cdict(
@@ -557,13 +507,6 @@ class Scroll(Visual, Command):
 	name = ["Parallax"]
 	description = "Creates an animation from repeatedly shifting supplied image in a specified direction."
 	schema = cdict(
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
-		),
 		direction=cdict(
 			type="enum",
 			validation=cdict(
@@ -610,13 +553,6 @@ class Scroll(Visual, Command):
 class Spin(Visual, Command):
 	description = "Creates an animation from repeatedly rotating supplied image."
 	schema = cdict(
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
-		),
 		angle=cdict(
 			type="number",
 			validation="[0, 360)",
@@ -723,13 +659,6 @@ class Pet(Visual, Command):
 	name = ["PetPet", "Attack", "Pat"]
 	description = "Creates an animation from applying the Petpet generator to the supplied image."
 	schema = cdict(
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
-		),
 		squish=cdict(
 			type="number",
 			validation="[-0.5, 0.5]",
@@ -774,13 +703,6 @@ class Tesseract(Visual, Command):
 	name = ["4D", "Octachoron", "Hypercube"]
 	description = "Creates an animation from applying the image as a tesseract texture and rotating."
 	schema = cdict(
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
-		),
 		size=cdict(
 			type="integer",
 			validation="[64, 1024]",
@@ -938,13 +860,6 @@ class Crop(Visual, Command):
 	name = ["Cut"]
 	description = "Crops the supplied image to a given size, expanding if necessary. Use \"-\" to omit measurements."
 	schema = cdict(
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
-		),
 		left=cdict(
 			type="integer",
 			validation="[-16384, 16384]",
@@ -988,13 +903,6 @@ class Crop(Visual, Command):
 class Adjust(Visual, Command):
 	description = "Adjusts an optional amount of channels in the target image with a given operation and optional value."
 	schema = cdict(
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
-		),
 		channels=cdict(
 			type="enum",
 			validation=cdict(
@@ -1082,15 +990,7 @@ class Adjust(Visual, Command):
 class Cut2Loop(Visual, Command):
 	name = ["C2L", "T2L", "Trim2Loop"]
 	description = "Autodetects an appropriate loop position for an animation lasting more than one full loop, and performs a trim."
-	schema = cdict(
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
-		),
-	)
+	schema = cdict()
 	rate_limit = (8, 15)
 	_timeout_ = 4
 
@@ -1127,13 +1027,6 @@ class Caption(Visual, Command):
 	name = ["Title"]
 	description = "Renders text onto an image or animation, using an optional font."
 	schema = cdict(
-		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
-		),
 		top_text=cdict(
 			type="word",
 			description="The text to draw",

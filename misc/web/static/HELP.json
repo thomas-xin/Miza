@@ -1917,35 +1917,12 @@
 			"example": [],
 			"timeout": "84.0",
 			"schema": {
-				"duration": {
-					"type": "timedelta",
-					"validation": "[-3600, 3600]",
-					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
-				},
-				"fps": {
-					"type": "number",
-					"validation": "(0, 256]",
-					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
-				},
-				"filesize": {
-					"type": "filesize",
-					"validation": "[1024, 1073741824]",
-					"description": "The maximum filesize in bytes",
-					"example": "10kb",
-					"default": 52428800,
-					"aliases": ["fs"]
-				},
-				"format": {
-					"type": "enum",
-					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
-						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
-					},
-					"description": "The file format or codec of the output",
-					"example": "mp4",
-					"default": "auto"
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"required": true
 				},
 				"mode": {
 					"type": "enum",
@@ -1962,30 +1939,12 @@
 					"example": "tritanopia",
 					"default": "deuteranomaly"
 				},
-				"url": {
-					"type": "visual",
-					"description": "Image, animation or video, supplied by URL or attachment",
-					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
-					"aliases": ["i"],
-					"required": true
-				},
 				"strength": {
 					"type": "number",
 					"validation": "[0, 2]",
 					"description": "The filter strength",
 					"example": "0.9"
-				}
-			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "mode", "url", "strength"]
-		},
-		"EdgeDetect": {
-			"aliases": ["EdgeDetect", "Laplacian", "Canny", "Depth", "DepthMap"],
-			"description": "Applies an edge or depth detection algorithm to the image.",
-			"level": "0",
-			"rate_limit": "(5, 7)",
-			"example": [],
-			"timeout": "72",
-			"schema": {
+				},
 				"duration": {
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
@@ -2015,6 +1974,24 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
+				}
+			},
+			"ordered_args": ["url", "mode", "strength", "duration", "fps", "filesize", "format"]
+		},
+		"EdgeDetect": {
+			"aliases": ["EdgeDetect", "Laplacian", "Canny", "Depth", "DepthMap"],
+			"description": "Applies an edge or depth detection algorithm to the image.",
+			"level": "0",
+			"rate_limit": "(5, 7)",
+			"example": [],
+			"timeout": "72",
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"required": true
 				},
 				"mode": {
 					"type": "enum",
@@ -2025,15 +2002,38 @@
 					"example": "depth",
 					"default": "canny"
 				},
-				"url": {
-					"type": "visual",
-					"description": "Image, animation or video, supplied by URL or attachment",
-					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
-					"aliases": ["i"],
-					"required": true
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3"
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7"
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": ["fs"]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
 				}
 			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "mode", "url"],
+			"ordered_args": ["url", "mode", "duration", "fps", "filesize", "format"],
 			"macros": {
 				"Laplacian": {"mode": "laplacian"},
 				"Canny": {"mode": "canny"},
@@ -2049,35 +2049,12 @@
 			"example": [],
 			"timeout": "72",
 			"schema": {
-				"duration": {
-					"type": "timedelta",
-					"validation": "[-3600, 3600]",
-					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
-				},
-				"fps": {
-					"type": "number",
-					"validation": "(0, 256]",
-					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
-				},
-				"filesize": {
-					"type": "filesize",
-					"validation": "[1024, 1073741824]",
-					"description": "The maximum filesize in bytes",
-					"example": "10kb",
-					"default": 52428800,
-					"aliases": ["fs"]
-				},
-				"format": {
-					"type": "enum",
-					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
-						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
-					},
-					"description": "The file format or codec of the output",
-					"example": "mp4",
-					"default": "auto"
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"required": true
 				},
 				"mode": {
 					"type": "enum",
@@ -2094,27 +2071,6 @@
 					"example": "8",
 					"default": 6
 				},
-				"url": {
-					"type": "visual",
-					"description": "Image, animation or video, supplied by URL or attachment",
-					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
-					"aliases": ["i"],
-					"required": true
-				}
-			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "mode", "strength", "url"],
-			"macros": {
-				"Gaussian": {"mode": "gaussian"}
-			}
-		},
-		"ColourSpace": {
-			"aliases": ["ColourSpace", "ColorSpace"],
-			"description": "Changes the colour space of the supplied image.",
-			"level": "0",
-			"rate_limit": "(7, 11)",
-			"example": [],
-			"timeout": "96",
-			"schema": {
 				"duration": {
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
@@ -2144,7 +2100,21 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
-				},
+				}
+			},
+			"ordered_args": ["url", "mode", "strength", "duration", "fps", "filesize", "format"],
+			"macros": {
+				"Gaussian": {"mode": "gaussian"}
+			}
+		},
+		"ColourSpace": {
+			"aliases": ["ColourSpace", "ColorSpace"],
+			"description": "Changes the colour space of the supplied image.",
+			"level": "0",
+			"rate_limit": "(7, 11)",
+			"example": [],
+			"timeout": "96",
+			"schema": {
 				"url": {
 					"type": "visual",
 					"description": "Image, animation or video, supplied by URL or attachment",
@@ -2169,9 +2139,39 @@
 					"description": "The colourspace which should be treated as the image's new space",
 					"example": "rgb",
 					"default": "hsv"
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3"
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7"
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": ["fs"]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
 				}
 			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "url", "source", "dest"]
+			"ordered_args": ["url", "source", "dest", "duration", "fps", "filesize", "format"]
 		},
 		"GMagik": {
 			"aliases": ["GMagik", "Magik", "Liquefy"],
@@ -2181,12 +2181,40 @@
 			"example": [],
 			"timeout": "168",
 			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"required": true
+				},
+				"intensity": {
+					"type": "number",
+					"validation": "[0, 256]",
+					"description": "Distortion distance, relative to cell size",
+					"example": "0.75",
+					"default": 7
+				},
+				"cells": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "How many transform cells should tile each edge of the image",
+					"example": "13.75",
+					"default": 7
+				},
 				"duration": {
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
 					"example": "1:26.3",
 					"default": 2
+				},
+				"speed": {
+					"type": "number",
+					"validation": "[-60, 60]",
+					"description": "Inverse of duration; higher values reduce the duration",
+					"example": "3.[3]",
+					"default": 1
 				},
 				"fps": {
 					"type": "number",
@@ -2212,36 +2240,9 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
-				},
-				"url": {
-					"type": "visual",
-					"description": "Image, animation or video, supplied by URL or attachment",
-					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
-					"required": true
-				},
-				"intensity": {
-					"type": "number",
-					"validation": "[0, 256]",
-					"description": "Distortion distance, relative to cell size",
-					"example": "0.75",
-					"default": 7
-				},
-				"cells": {
-					"type": "number",
-					"validation": "(0, 256]",
-					"description": "How many transform cells should tile each edge of the image",
-					"example": "13.75",
-					"default": 7
-				},
-				"speed": {
-					"type": "number",
-					"validation": "[-60, 60]",
-					"description": "Inverse of duration; higher values reduce the duration",
-					"example": "3.[3]",
-					"default": 1
 				}
 			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "url", "intensity", "cells", "speed"],
+			"ordered_args": ["url", "intensity", "cells", "duration", "speed", "fps", "filesize", "format"],
 			"macros": {
 				"Magik": {
 					"intensity": 1,
@@ -2261,35 +2262,12 @@
 			"example": [],
 			"timeout": "24",
 			"schema": {
-				"duration": {
-					"type": "timedelta",
-					"validation": "[-3600, 3600]",
-					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
-				},
-				"fps": {
-					"type": "number",
-					"validation": "(0, 256]",
-					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
-				},
-				"filesize": {
-					"type": "filesize",
-					"validation": "[1024, 1073741824]",
-					"description": "The maximum filesize in bytes",
-					"example": "10kb",
-					"default": 52428800,
-					"aliases": ["fs"]
-				},
-				"format": {
-					"type": "enum",
-					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
-						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
-					},
-					"description": "The file format or codec of the output",
-					"example": "mp4",
-					"default": "auto"
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"required": true
 				},
 				"mode": {
 					"type": "enum",
@@ -2337,9 +2315,39 @@
 					"example": "hsv",
 					"default": "rgb",
 					"aliases": ["space"]
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3"
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7"
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": ["fs"]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
 				}
 			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "mode", "colour", "background", "repetitions", "size", "colourspace"],
+			"ordered_args": ["url", "mode", "colour", "background", "repetitions", "size", "colourspace", "duration", "fps", "filesize", "format"],
 			"macros": {
 				"RainbowGradient": {
 					"colour": [0, 255, 255],
@@ -2356,6 +2364,20 @@
 			"example": [],
 			"timeout": "24",
 			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"required": true
+				},
+				"colour": {
+					"type": "colour",
+					"description": "The colour of the gradient on one side",
+					"example": "#BF7FFF",
+					"default": [255, 255, 255],
+					"aliases": ["color"]
+				},
 				"duration": {
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
@@ -2385,16 +2407,9 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
-				},
-				"colour": {
-					"type": "colour",
-					"description": "The colour of the gradient on one side",
-					"example": "#BF7FFF",
-					"default": [255, 255, 255],
-					"aliases": ["color"]
 				}
 			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "colour"]
+			"ordered_args": ["url", "colour", "duration", "fps", "filesize", "format"]
 		},
 		"Text": {
 			"aliases": ["Text", "Font"],
@@ -2404,35 +2419,12 @@
 			"example": [],
 			"timeout": "24",
 			"schema": {
-				"duration": {
-					"type": "timedelta",
-					"validation": "[-3600, 3600]",
-					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
-				},
-				"fps": {
-					"type": "number",
-					"validation": "(0, 256]",
-					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
-				},
-				"filesize": {
-					"type": "filesize",
-					"validation": "[1024, 1073741824]",
-					"description": "The maximum filesize in bytes",
-					"example": "10kb",
-					"default": 52428800,
-					"aliases": ["fs"]
-				},
-				"format": {
-					"type": "enum",
-					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
-						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
-					},
-					"description": "The file format or codec of the output",
-					"example": "mp4",
-					"default": "auto"
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"required": true
 				},
 				"text": {
 					"type": "string",
@@ -2472,18 +2464,7 @@
 					"description": "The colour of the outline",
 					"example": "#FF7FBF",
 					"default": [0, 0, 0]
-				}
-			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "text", "font", "size", "colour", "width", "outline"]
-		},
-		"Average": {
-			"aliases": ["Average", "AverageColour"],
-			"description": "Computes the average pixel colour in RGB for the supplied image.",
-			"level": "0",
-			"rate_limit": "(5, 7)",
-			"example": [],
-			"timeout": "48",
-			"schema": {
+				},
 				"duration": {
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
@@ -2513,16 +2494,18 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
-				},
-				"url": {
-					"type": "visual",
-					"description": "Image, animation or video, supplied by URL or attachment",
-					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
-					"aliases": ["i"],
-					"required": true
 				}
 			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "url"]
+			"ordered_args": ["url", "text", "font", "size", "colour", "width", "outline", "duration", "fps", "filesize", "format"]
+		},
+		"Average": {
+			"aliases": ["Average", "AverageColour"],
+			"description": "Computes the average pixel colour in RGB for the supplied image.",
+			"level": "0",
+			"rate_limit": "(5, 7)",
+			"example": [],
+			"timeout": "48",
+			"usage": ""
 		},
 		"QR": {
 			"aliases": ["QR", "RainbowQR"],
@@ -2532,37 +2515,12 @@
 			"example": [],
 			"timeout": "96",
 			"schema": {
-				"duration": {
-					"type": "timedelta",
-					"validation": "[-3600, 3600]",
-					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3",
-					"default": 2
-				},
-				"fps": {
-					"type": "number",
-					"validation": "(0, 256]",
-					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7",
-					"default": 30
-				},
-				"filesize": {
-					"type": "filesize",
-					"validation": "[1024, 1073741824]",
-					"description": "The maximum filesize in bytes",
-					"example": "10kb",
-					"default": 52428800,
-					"aliases": ["fs"]
-				},
-				"format": {
-					"type": "enum",
-					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
-						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
-					},
-					"description": "The file format or codec of the output",
-					"example": "mp4",
-					"default": "auto"
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"required": true
 				},
 				"mode": {
 					"type": "enum",
@@ -2586,33 +2544,19 @@
 					"example": "5",
 					"default": 2
 				},
-				"speed": {
-					"type": "number",
-					"validation": "[-60, 60]",
-					"description": "Inverse of duration; higher values reduce the duration",
-					"example": "3.[3]",
-					"default": 1
-				}
-			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "mode", "text", "arms", "speed"],
-			"macros": {
-				"RainbowQR": {"mode": "rainbow"}
-			}
-		},
-		"Rainbow": {
-			"aliases": ["Rainbow", "Gay"],
-			"description": "Creates an animation from repeatedly hueshifting supplied image.",
-			"level": "0",
-			"rate_limit": "(10, 13)",
-			"example": [],
-			"timeout": "96",
-			"schema": {
 				"duration": {
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
 					"example": "1:26.3",
 					"default": 2
+				},
+				"speed": {
+					"type": "number",
+					"validation": "[-60, 60]",
+					"description": "Inverse of duration; higher values reduce the duration",
+					"example": "3.[3]",
+					"default": 1
 				},
 				"fps": {
 					"type": "number",
@@ -2638,7 +2582,21 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
-				},
+				}
+			},
+			"ordered_args": ["url", "mode", "text", "arms", "duration", "speed", "fps", "filesize", "format"],
+			"macros": {
+				"RainbowQR": {"mode": "rainbow"}
+			}
+		},
+		"Rainbow": {
+			"aliases": ["Rainbow", "Gay"],
+			"description": "Creates an animation from repeatedly hueshifting supplied image.",
+			"level": "0",
+			"rate_limit": "(10, 13)",
+			"example": [],
+			"timeout": "96",
+			"schema": {
 				"url": {
 					"type": "visual",
 					"description": "Image, animation or video, supplied by URL or attachment",
@@ -2655,30 +2613,19 @@
 					"example": "hcl",
 					"default": "hsv"
 				},
-				"speed": {
-					"type": "number",
-					"validation": "[-60, 60]",
-					"description": "Inverse of duration; higher values reduce the duration",
-					"example": "3.[3]",
-					"default": 1
-				}
-			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "url", "mode", "speed"]
-		},
-		"Scroll": {
-			"aliases": ["Scroll", "Parallax"],
-			"description": "Creates an animation from repeatedly shifting supplied image in a specified direction.",
-			"level": "0",
-			"rate_limit": "(10, 13)",
-			"example": [],
-			"timeout": "96",
-			"schema": {
 				"duration": {
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
 					"example": "1:26.3",
 					"default": 2
+				},
+				"speed": {
+					"type": "number",
+					"validation": "[-60, 60]",
+					"description": "Inverse of duration; higher values reduce the duration",
+					"example": "3.[3]",
+					"default": 1
 				},
 				"fps": {
 					"type": "number",
@@ -2704,7 +2651,18 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
-				},
+				}
+			},
+			"ordered_args": ["url", "mode", "duration", "speed", "fps", "filesize", "format"]
+		},
+		"Scroll": {
+			"aliases": ["Scroll", "Parallax"],
+			"description": "Creates an animation from repeatedly shifting supplied image in a specified direction.",
+			"level": "0",
+			"rate_limit": "(10, 13)",
+			"example": [],
+			"timeout": "96",
+			"schema": {
 				"url": {
 					"type": "visual",
 					"description": "Image, animation or video, supplied by URL or attachment",
@@ -2722,30 +2680,19 @@
 					"example": "down",
 					"default": "left"
 				},
-				"speed": {
-					"type": "number",
-					"validation": "[-60, 60]",
-					"description": "Inverse of duration; higher values reduce the duration",
-					"example": "3.[3]",
-					"default": 1
-				}
-			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "url", "direction", "speed"]
-		},
-		"Spin": {
-			"aliases": ["Spin", "Rotate"],
-			"description": "Creates an animation from repeatedly rotating supplied image.",
-			"level": "0",
-			"rate_limit": "(10, 13)",
-			"example": [],
-			"timeout": "96",
-			"schema": {
 				"duration": {
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
 					"example": "1:26.3",
 					"default": 2
+				},
+				"speed": {
+					"type": "number",
+					"validation": "[-60, 60]",
+					"description": "Inverse of duration; higher values reduce the duration",
+					"example": "3.[3]",
+					"default": 1
 				},
 				"fps": {
 					"type": "number",
@@ -2771,7 +2718,18 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
-				},
+				}
+			},
+			"ordered_args": ["url", "direction", "duration", "speed", "fps", "filesize", "format"]
+		},
+		"Spin": {
+			"aliases": ["Spin", "Rotate"],
+			"description": "Creates an animation from repeatedly rotating supplied image.",
+			"level": "0",
+			"rate_limit": "(10, 13)",
+			"example": [],
+			"timeout": "96",
+			"schema": {
 				"url": {
 					"type": "visual",
 					"description": "Image, animation or video, supplied by URL or attachment",
@@ -2791,15 +2749,47 @@
 					"description": "Indicates whether to crop the image to a circle",
 					"default": true
 				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"default": 2
+				},
 				"speed": {
 					"type": "number",
 					"validation": "[-60, 60]",
 					"description": "Inverse of duration; higher values reduce the duration",
 					"example": "3.[3]",
 					"default": 1
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7",
+					"default": 30
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": ["fs"]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
 				}
 			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "url", "angle", "circle", "speed"],
+			"ordered_args": ["url", "angle", "circle", "duration", "speed", "fps", "filesize", "format"],
 			"macros": {
 				"Rotate": {
 					"duration": 0,
@@ -2815,38 +2805,6 @@
 			"example": [],
 			"timeout": "312",
 			"schema": {
-				"duration": {
-					"type": "timedelta",
-					"validation": "[-3600, 3600]",
-					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3",
-					"default": 2
-				},
-				"fps": {
-					"type": "number",
-					"validation": "(0, 256]",
-					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7",
-					"default": 30
-				},
-				"filesize": {
-					"type": "filesize",
-					"validation": "[1024, 1073741824]",
-					"description": "The maximum filesize in bytes",
-					"example": "10kb",
-					"default": 52428800,
-					"aliases": ["fs"]
-				},
-				"format": {
-					"type": "enum",
-					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
-						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
-					},
-					"description": "The file format or codec of the output",
-					"example": "mp4",
-					"default": "auto"
-				},
 				"urls": {
 					"type": "visual",
 					"description": "Image, animation or video, supplied by URL or attachment",
@@ -2861,30 +2819,19 @@
 					"description": "The amount of each image to include in the ring",
 					"example": "5"
 				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"default": 2
+				},
 				"speed": {
 					"type": "number",
 					"validation": "[-60, 60]",
 					"description": "Inverse of duration; higher values reduce the duration",
 					"example": "3.[3]",
 					"default": 1
-				}
-			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "urls", "count", "speed"]
-		},
-		"Pet": {
-			"aliases": ["Pet", "PetPet", "Attack", "Pat"],
-			"description": "Creates an animation from applying the Petpet generator to the supplied image.",
-			"level": "0",
-			"rate_limit": "(10, 13)",
-			"example": [],
-			"timeout": "120",
-			"schema": {
-				"duration": {
-					"type": "timedelta",
-					"validation": "[-3600, 3600]",
-					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3",
-					"default": 0.25
 				},
 				"fps": {
 					"type": "number",
@@ -2910,7 +2857,18 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
-				},
+				}
+			},
+			"ordered_args": ["urls", "count", "duration", "speed", "fps", "filesize", "format"]
+		},
+		"Pet": {
+			"aliases": ["Pet", "PetPet", "Attack", "Pat"],
+			"description": "Creates an animation from applying the Petpet generator to the supplied image.",
+			"level": "0",
+			"rate_limit": "(10, 13)",
+			"example": [],
+			"timeout": "120",
+			"schema": {
 				"url": {
 					"type": "visual",
 					"description": "Image, animation or video, supplied by URL or attachment",
@@ -2925,30 +2883,19 @@
 					"example": "1/7",
 					"default": 0.1
 				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"default": 0.25
+				},
 				"speed": {
 					"type": "number",
 					"validation": "[-60, 60]",
 					"description": "Inverse of duration; higher values reduce the duration",
 					"example": "3.[3]",
 					"default": 1
-				}
-			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "url", "squish", "speed"]
-		},
-		"Tesseract": {
-			"aliases": ["Tesseract", "4D", "Octachoron", "Hypercube"],
-			"description": "Creates an animation from applying the image as a tesseract texture and rotating.",
-			"level": "0",
-			"rate_limit": "(10, 13)",
-			"example": [],
-			"timeout": "120",
-			"schema": {
-				"duration": {
-					"type": "timedelta",
-					"validation": "[-3600, 3600]",
-					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3",
-					"default": 20
 				},
 				"fps": {
 					"type": "number",
@@ -2974,7 +2921,18 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
-				},
+				}
+			},
+			"ordered_args": ["url", "squish", "duration", "speed", "fps", "filesize", "format"]
+		},
+		"Tesseract": {
+			"aliases": ["Tesseract", "4D", "Octachoron", "Hypercube"],
+			"description": "Creates an animation from applying the image as a tesseract texture and rotating.",
+			"level": "0",
+			"rate_limit": "(10, 13)",
+			"example": [],
+			"timeout": "120",
+			"schema": {
 				"url": {
 					"type": "visual",
 					"description": "Image, animation or video, supplied by URL or attachment",
@@ -2989,35 +2947,26 @@
 					"example": "256",
 					"default": 512
 				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"default": 20
+				},
 				"speed": {
 					"type": "number",
 					"validation": "[-60, 60]",
 					"description": "Inverse of duration; higher values reduce the duration",
 					"example": "3.[3]",
 					"default": 1
-				}
-			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "url", "size", "speed"]
-		},
-		"Resize": {
-			"aliases": ["Resize", "Scale", "Rescale", "Scale2x", "Jumbo", "PNG", "GIF", "WebP", "AVIF"],
-			"description": "Changes size of supplied image, using an optional scaling operation.",
-			"level": "0",
-			"rate_limit": "(7, 13)",
-			"example": [],
-			"timeout": "96",
-			"schema": {
-				"duration": {
-					"type": "timedelta",
-					"validation": "[-3600, 3600]",
-					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
 				},
 				"fps": {
 					"type": "number",
 					"validation": "(0, 256]",
 					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
+					"example": "120/7",
+					"default": 30
 				},
 				"filesize": {
 					"type": "filesize",
@@ -3036,7 +2985,18 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
-				},
+				}
+			},
+			"ordered_args": ["url", "size", "duration", "speed", "fps", "filesize", "format"]
+		},
+		"Resize": {
+			"aliases": ["Resize", "Scale", "Rescale", "Scale2x", "Jumbo", "PNG", "GIF", "WebP", "AVIF"],
+			"description": "Changes size of supplied image, using an optional scaling operation.",
+			"level": "0",
+			"rate_limit": "(7, 13)",
+			"example": [],
+			"timeout": "96",
+			"schema": {
 				"mode": {
 					"type": "enum",
 					"validation": {
@@ -3074,26 +3034,7 @@
 					"validation": "(0, 4294967296]",
 					"description": "Desired area in square pixels; will automatically scale current aspect ratio",
 					"example": "2073600"
-				}
-			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "mode", "urls", "resolution", "multiplier", "area"],
-			"macros": {
-				"Scale2x": {"mode": "scale2x"},
-				"Jumbo": {"mode": "nearest"},
-				"PNG": {"format": "png"},
-				"GIF": {"format": "gif"},
-				"WebP": {"format": "webp"},
-				"AVIF": {"format": "avif"}
-			}
-		},
-		"Crop": {
-			"aliases": ["Crop", "Cut"],
-			"description": "Crops the supplied image to a given size, expanding if necessary. Use \"-\" to omit measurements.",
-			"level": "0",
-			"rate_limit": "(4, 9)",
-			"example": [],
-			"timeout": "96",
-			"schema": {
+				},
 				"duration": {
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
@@ -3123,7 +3064,26 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
-				},
+				}
+			},
+			"ordered_args": ["mode", "urls", "resolution", "multiplier", "area", "duration", "fps", "filesize", "format"],
+			"macros": {
+				"Scale2x": {"mode": "scale2x"},
+				"Jumbo": {"mode": "nearest"},
+				"PNG": {"format": "png"},
+				"GIF": {"format": "gif"},
+				"WebP": {"format": "webp"},
+				"AVIF": {"format": "avif"}
+			}
+		},
+		"Crop": {
+			"aliases": ["Crop", "Cut"],
+			"description": "Crops the supplied image to a given size, expanding if necessary. Use \"-\" to omit measurements.",
+			"level": "0",
+			"rate_limit": "(4, 9)",
+			"example": [],
+			"timeout": "96",
+			"schema": {
 				"url": {
 					"type": "visual",
 					"description": "Image, animation or video, supplied by URL or attachment",
@@ -3158,18 +3118,7 @@
 					"description": "Bottom edge of crop in pixels, absolute",
 					"example": "15",
 					"default": "-"
-				}
-			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "url", "left", "top", "right", "bottom"]
-		},
-		"Adjust": {
-			"aliases": ["Adjust", "Fill", "HueShift", "Invert", "GreyScale", "Lightness", "Lighten", "Luma", "Brightness", "Brighten"],
-			"description": "Adjusts an optional amount of channels in the target image with a given operation and optional value.",
-			"level": "0",
-			"rate_limit": "(7, 10)",
-			"example": [],
-			"timeout": "96",
-			"schema": {
+				},
 				"duration": {
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
@@ -3199,7 +3148,18 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
-				},
+				}
+			},
+			"ordered_args": ["url", "left", "top", "right", "bottom", "duration", "fps", "filesize", "format"]
+		},
+		"Adjust": {
+			"aliases": ["Adjust", "Fill", "HueShift", "Invert", "GreyScale", "Lightness", "Lighten", "Luma", "Brightness", "Brighten"],
+			"description": "Adjusts an optional amount of channels in the target image with a given operation and optional value.",
+			"level": "0",
+			"rate_limit": "(7, 10)",
+			"example": [],
+			"timeout": "96",
+			"schema": {
 				"url": {
 					"type": "visual",
 					"description": "Image, animation or video, supplied by URL or attachment",
@@ -3239,37 +3199,7 @@
 					"type": "bool",
 					"description": "Clips out-of-bound values. Wraps values if not set",
 					"default": true
-				}
-			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "url", "channels", "operation", "value", "clip"],
-			"macros": {
-				"Fill": {"operation": "="},
-				"HueShift": {
-					"operation": "+",
-					"channels": "h",
-					"clip": false
 				},
-				"Invert": {"operation": "^", "channels": "rgb", "value": "1"},
-				"GreyScale": {
-					"operation": "=",
-					"channels": "c",
-					"value": 0
-				},
-				"Lightness": {"operation": "+", "channels": "l"},
-				"Lighten": {"operation": "+", "channels": "l"},
-				"Luma": {"operation": "+", "channels": "y"},
-				"Brightness": {"operation": "+", "channels": "y"},
-				"Brighten": {"operation": "+", "channels": "y"}
-			}
-		},
-		"Cut2Loop": {
-			"aliases": ["Cut2Loop", "C2L", "T2L", "Trim2Loop"],
-			"description": "Autodetects an appropriate loop position for an animation lasting more than one full loop, and performs a trim.",
-			"level": "0",
-			"rate_limit": "(8, 15)",
-			"example": [],
-			"timeout": "96",
-			"schema": {
 				"duration": {
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
@@ -3299,16 +3229,37 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
-				},
-				"url": {
-					"type": "visual",
-					"description": "Image, animation or video, supplied by URL or attachment",
-					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
-					"aliases": ["i"],
-					"required": true
 				}
 			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "url"]
+			"ordered_args": ["url", "channels", "operation", "value", "clip", "duration", "fps", "filesize", "format"],
+			"macros": {
+				"Fill": {"operation": "="},
+				"HueShift": {
+					"operation": "+",
+					"channels": "h",
+					"clip": false
+				},
+				"Invert": {"operation": "^", "channels": "rgb", "value": "1"},
+				"GreyScale": {
+					"operation": "=",
+					"channels": "c",
+					"value": 0
+				},
+				"Lightness": {"operation": "+", "channels": "l"},
+				"Lighten": {"operation": "+", "channels": "l"},
+				"Luma": {"operation": "+", "channels": "y"},
+				"Brightness": {"operation": "+", "channels": "y"},
+				"Brighten": {"operation": "+", "channels": "y"}
+			}
+		},
+		"Cut2Loop": {
+			"aliases": ["Cut2Loop", "C2L", "T2L", "Trim2Loop"],
+			"description": "Autodetects an appropriate loop position for an animation lasting more than one full loop, and performs a trim.",
+			"level": "0",
+			"rate_limit": "(8, 15)",
+			"example": [],
+			"timeout": "96",
+			"usage": ""
 		},
 		"ImageCompare": {
 			"aliases": ["ImageCompare", "PSNR"],
@@ -3337,36 +3288,6 @@
 			"example": [],
 			"timeout": "24",
 			"schema": {
-				"duration": {
-					"type": "timedelta",
-					"validation": "[-3600, 3600]",
-					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
-				},
-				"fps": {
-					"type": "number",
-					"validation": "(0, 256]",
-					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
-				},
-				"filesize": {
-					"type": "filesize",
-					"validation": "[1024, 1073741824]",
-					"description": "The maximum filesize in bytes",
-					"example": "10kb",
-					"default": 52428800,
-					"aliases": ["fs"]
-				},
-				"format": {
-					"type": "enum",
-					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
-						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
-					},
-					"description": "The file format or codec of the output",
-					"example": "mp4",
-					"default": "auto"
-				},
 				"url": {
 					"type": "visual",
 					"description": "Image, animation or video, supplied by URL or attachment",
@@ -3416,18 +3337,7 @@
 					"description": "The colour of the outline",
 					"example": "#FF7FBF",
 					"default": [0, 0, 0]
-				}
-			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "url", "top_text", "bottom_text", "font", "size", "colour", "width", "outline"]
-		},
-		"Blend": {
-			"aliases": ["Blend"],
-			"description": "Combines the two supplied images, using an optional blend operation.",
-			"level": "0",
-			"rate_limit": "(13, 17)",
-			"example": [],
-			"timeout": "168",
-			"schema": {
+				},
 				"duration": {
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
@@ -3457,7 +3367,18 @@
 					"description": "The file format or codec of the output",
 					"example": "mp4",
 					"default": "auto"
-				},
+				}
+			},
+			"ordered_args": ["url", "top_text", "bottom_text", "font", "size", "colour", "width", "outline", "duration", "fps", "filesize", "format"]
+		},
+		"Blend": {
+			"aliases": ["Blend"],
+			"description": "Combines the two supplied images, using an optional blend operation.",
+			"level": "0",
+			"rate_limit": "(13, 17)",
+			"example": [],
+			"timeout": "168",
+			"schema": {
 				"urls": {
 					"type": "visual",
 					"description": "Image, animation or video, supplied by URL or attachment",
@@ -3482,9 +3403,39 @@
 					"description": "Opacity of the second image",
 					"example": "0.75",
 					"default": 0.5
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3"
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7"
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": ["fs"]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": ["auto", "gif", "png", "apng", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
 				}
 			},
-			"ordered_args": ["duration", "fps", "filesize", "format", "urls", "operation", "opacity"]
+			"ordered_args": ["urls", "operation", "opacity", "duration", "fps", "filesize", "format"]
 		}
 	},
 	"FUN": {

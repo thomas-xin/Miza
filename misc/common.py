@@ -2165,7 +2165,7 @@ class Visual:
 
 	def __init__(self, *args, **kwargs):
 		if self.schema:
-			schema = cdict(
+			schema = dict(
 				duration=cdict(
 					type="timedelta",
 					validation="[-3600, 3600]",
@@ -2197,8 +2197,21 @@ class Visual:
 					default="auto",
 				),
 			)
-			schema.update(self.schema)
-			self.schema = schema
+			for k, v in schema.items():
+				if k not in self.schema:
+					self.schema.__setitem__(k, v)
+			if "url" not in self.schema and "urls" not in self.schema:
+				schema = cdict(
+					url=cdict(
+						type="visual",
+						description="Image, animation or video, supplied by URL or attachment",
+						example="https://cdn.discordapp.com/embed/avatars/0.png",
+						aliases=["i"],
+						required=True,
+					),
+				)
+				schema.update(self.schema)
+				self.schema = schema
 		return super().__init__(*args, **kwargs)
 
 
