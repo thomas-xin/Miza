@@ -8415,43 +8415,45 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							user = guild.get_member(e.uid) or await self.fetch_user(e.uid)
 							break
 					else:
-						async for e2 in guild.audit_logs(
-							limit=None,
-							after=dtnu() - datetime.timedelta(seconds=self.deletion_log_stacking),
-							action=discord.AuditLogAction.message_delete,
-							oldest_first=False,
-						):
-							if e2.target.id != message.author.id or e2.extra.channel.id != message.channel.id:
-								continue
+						user = None
+						t = (message.author.id, message.guild.id)
+						if t in self.leave_audits and self.leave_audits[t] == "ban":
+							uid = self.leave_audits[t].uid
 							try:
-								e = audits[e2.id]
-							except KeyError:
-								e = cdict(
-									uid=e2.user.id,
-									count=e2.extra.count,
-									cons=0,
-								)
-							else:
-								e.count = e2.extra.count
-							audits[e2.id] = e
-							if e.cons + 1 <= e.count:
-								e.cons += 1
-								self.delete_audits[t] = audits
-								user = guild.get_member(e.uid) or await self.fetch_user(e.uid)
-								break
-							self.delete_audits[t] = audits
-						else:
-							user = message.author
-							t = (user.id, message.guild.id)
-							if t in self.leave_audits and self.leave_audits[t] == "ban":
-								uid = self.leave_audits[t].uid
+								user = await self.fetch_user_member(uid, guild=message.guild)
+							except Exception:
+								print_exc()
+						if not user:
+							async for e2 in guild.audit_logs(
+								limit=None,
+								after=dtnu() - datetime.timedelta(seconds=self.deletion_log_stacking),
+								action=discord.AuditLogAction.message_delete,
+								oldest_first=False,
+							):
+								if e2.target.id != message.author.id or e2.extra.channel.id != message.channel.id:
+									continue
 								try:
-									user = await self.fetch_user_member(uid, guild=message.guild)
-								except Exception:
-									print_exc()
+									e = audits[e2.id]
+								except KeyError:
+									e = cdict(
+										uid=e2.user.id,
+										count=e2.extra.count,
+										cons=0,
+									)
+								else:
+									e.count = e2.extra.count
+								audits[e2.id] = e
+								if e.cons + 1 <= e.count:
+									e.cons += 1
+									self.delete_audits[t] = audits
+									user = guild.get_member(e.uid) or await self.fetch_user(e.uid)
+									break
+								self.delete_audits[t] = audits
+							else:
+								user = message.author
 					print(audits)
 					print("Audited Delete:", message, user)
-				await self.send_event("_audited_delete_", message=message, user=user)
+				await self.send_event("_audited_delete_", message=message, requestor=user)
 
 		async def _on_raw_message_delete(payload):
 			had_before = False
@@ -8562,7 +8564,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							user = message.author
 					print(audits)
 					print("Audited Bulk Delete:", message, user)
-				await self.send_event("_bulk_delete_", messages=messages, user=user)
+				await self.send_event("_bulk_delete_", messages=messages, requestor=user)
 
 		async def _on_raw_bulk_message_delete(payload):
 			try:

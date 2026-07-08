@@ -2460,7 +2460,8 @@ class UpdateMessageLogs(Database):
 		bot.send_embeds(channel, emb)
 
 	# Delete events must attempt to find the user who deleted the message
-	async def _audited_delete_(self, message, user=None, **void):
+	async def _audited_delete_(self, message, requestor=None, **void):
+		user = requestor
 		if message.author.bot and (not user or user.bot):
 			return
 		bot = self.bot
@@ -2479,7 +2480,7 @@ class UpdateMessageLogs(Database):
 		bot.send_embeds(channel, embs)
 
 	# Thanks to the embed sender feature, which allows this feature to send up to 10 logs in one message
-	async def _bulk_delete_(self, messages, user=None, **void):
+	async def _bulk_delete_(self, messages, requestor=None, **void):
 		if not messages:
 			return
 		if all(m.author.bot for m in messages):
@@ -2491,8 +2492,8 @@ class UpdateMessageLogs(Database):
 		futs = [self.reattachments(channel, m) for m in messages if not m.author.bot]
 		await gather(*futs, max_concurrency=5)
 		emb = discord.Embed(colour=0xFF00FF)
-		if user:
-			action = f"{user_mention(user.id)} **deleted {len(messages)} message{'s' if len(messages) != 1 else ''} from**"
+		if requestor:
+			action = f"{user_mention(requestor.id)} **deleted {len(messages)} message{'s' if len(messages) != 1 else ''} from**"
 		else:
 			action = f"**{len(messages)} message{'s' if len(messages) != 1 else ''} deleted from**"
 		emb.description = f"{action} {channel_mention(messages[-1].channel.id)}:\n"
