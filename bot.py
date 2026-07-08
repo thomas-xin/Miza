@@ -4460,33 +4460,33 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if isinstance(resp, str):
 					resp = cdict(content=resp, embeds=[], attachments=[])
 				if isinstance(resp, cdict):
-					if resp.get("embed") or resp.get("embeds"):
-						if resp.get("buttons") or resp.get("components"):
-							create_task(self.edit_message(
-								message,
-								buttons=resp.pop("buttons", None),
-								components=resp.pop("components", None),
-							))
-					if interaction and not resp.get("file") and not resp.get("files"):
-						if not fut.done():
-							fut.cancel()
-							create_task(self.defer_interaction(message, mode="patch"))
-							await asyncio.sleep(self.eff_latency())
-						else:
-							r, d = await fut
-							if not d:
-								create_task(self.defer_interaction(message, mode="patch"))
-								await asyncio.sleep(self.eff_latency())
-						if resp.get("embed"):
-							resp["embed"] = resp["embed"].to_dict()
-						if resp.get("embeds"):
-							resp["embeds"] = [e.to_dict() for e in resp["embeds"]]
-						await interaction_patch(
-							bot=self,
-							message=message,
-							**resp,
-						)
-						break
+					# if resp.get("embed") or resp.get("embeds"):
+					# 	if resp.get("buttons") or resp.get("components"):
+					# 		create_task(self.edit_message(
+					# 			message,
+					# 			buttons=resp.pop("buttons", None),
+					# 			components=resp.pop("components", None),
+					# 		))
+					# if interaction and not resp.get("file") and not resp.get("files"):
+					# 	if not fut.done():
+					# 		fut.cancel()
+					# 		create_task(self.defer_interaction(message, mode="patch"))
+					# 		await asyncio.sleep(self.eff_latency())
+					# 	else:
+					# 		r, d = await fut
+					# 		if not d:
+					# 			create_task(self.defer_interaction(message, mode="patch"))
+					# 			await asyncio.sleep(self.eff_latency())
+					# 	if resp.get("embed"):
+					# 		resp["embed"] = resp["embed"].to_dict()
+					# 	if resp.get("embeds"):
+					# 		resp["embeds"] = [e.to_dict() for e in resp["embeds"]]
+					# 	await interaction_patch(
+					# 		bot=self,
+					# 		message=message,
+					# 		**resp,
+					# 	)
+					# 	break
 					if interaction:
 						if not fut.done():
 							fut.cancel()
@@ -8004,7 +8004,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					message = await self._fetch_message(m_id, channel, fast=True)
 				message.int_id = int(data["id"])
 				message.int_token = data["token"]
-				print(data)
 				await self.react_callback(message, custom_id, user)
 			case _:
 				print("Unknown interaction:\n" + str(data))

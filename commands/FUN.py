@@ -1883,8 +1883,8 @@ class React(Pagination, Command):
 			except Exception:
 				if mode != "remove":
 					raise
-		json_repr = self.react_repr(maybe_json, preprocess, keyword, emote)
-		sqr_repr = self.react_repr(sqr_md, preprocess, keyword, emote)
+		json_repr = self.react_repr(maybe_json, preprocess, keyword, emote, split=False)
+		sqr_repr = self.react_repr(sqr_md, preprocess, keyword, emote, split=False)
 		if mode == "remove":
 			pops = set()
 			for i, tup in enumerate(reacts):
@@ -1919,14 +1919,17 @@ class React(Pagination, Command):
 		bot.set_guildbase(_guild.id, "reacts", reacts)
 		return css_md(f"Added {sqr_repr} to the auto react list for {sqr_md(_guild)}.")
 
-	def react_repr(self, func, preprocess, keyword, emote):
+	def react_repr(self, func, preprocess, keyword, emote, split=True):
 		s = ""
 		if preprocess and preprocess != self.default_preprocess:
 			s += as_str(func(preprocess))
 		if keyword:
 			if s:
 				s += " 🔀 "
-			s += "`" + "`:`".join(as_str(func(keyword)).split(":")) + "`"
+			kw = as_str(func(keyword))
+			if split:
+				kw = "`:`".join(kw.split(":"))
+			s += f"`{kw}`"
 		if emote:
 			if s:
 				s += " ➡️ "
