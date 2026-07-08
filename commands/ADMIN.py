@@ -2484,9 +2484,7 @@ class UpdateMessageLogs(Database):
 	# Delete events must attempt to find the user who deleted the message
 	async def _audited_delete_(self, message, user=None, **void):
 		guild = message.guild
-		if not guild:
-			return
-		if message.author.bot and not user or user.bot:
+		if message.author.bot and (not user or user.bot):
 			return
 		bot = self.bot
 		c_id = bot.get_guildbase(guild.id, "logs.message")
@@ -2503,18 +2501,17 @@ class UpdateMessageLogs(Database):
 		if user:
 			action = f"{user_mention(user.id)} **deleted message from**"
 		else:
-			action = "**message deleted from**"
+			action = "**Message deleted from**"
 		action = f"{action} {channel_mention(message.channel.id)}:\n"
 		embs[0].description = lim_str(action + (embs[0].description or ""), 4096)
 		bot.send_embeds(channel, embs)
 
 	# Thanks to the embed sender feature, which allows this feature to send up to 10 logs in one message
-	async def _bulk_delete_(self, messages, **void):
-		cu = self.bot.user
-		cu_id = cu.id
+	async def _bulk_delete_(self, messages, user=None, **void):
 		guild = messages[0].guild
-		messages = [m for m in messages if not m.author.bot]
 		if not messages:
+			return
+		if all(m.author.bot for m in messages):
 			return
 		bot = self.bot
 		c_id = bot.get_guildbase(guild.id, "logs.message")
@@ -2525,61 +2522,25 @@ class UpdateMessageLogs(Database):
 		except (EOFError, discord.NotFound):
 			bot.pop_guildbase(guild.id, "logs.message")
 			return
-		message = messages[-1]
-		now = utc()
 		futs = [self.reattachments(channel, m) for m in messages if not m.author.bot]
-		await gather(*futs)
-		action = discord.AuditLogAction.message_bulk_delete
-		try:
-			init = "[UNKNOWN USER]"
-			d_level = bot.recently_deleted.get(message.id)
-			if d_level is False:
-				return
-			if d_level:
-				t = bot.user
-				init = user_mention(t.id)
-			else:
-				# Attempt to find who deleted the messages
-				if not guild.get_member(cu_id).guild_permissions.view_audit_log:
-					raise PermissionError
-				al = await flatten(guild.audit_logs(
-					limit=100,
-					action=action,
-				))
-				al2 = bot.bulk_deletes.get(guild.id, [])
-				amap = {a.id: a for a in al2}
-				for e in al:
-					try:
-						if now - e.created_at.timestamp() > 3:
-							if e.id not in amap and now - e.created_at.timestamp() > 3600 or amap.get(e.id) and T(amap.get(e.id).extra).get("count", 1) >= T(e.extra).get("count", 1):
-								continue
-						if e.target and e.target.id != message.channel.id:
-							continue
-						init = user_mention(e.user.id)
-						break
-					finally:
-						amap[e.id] = e
-				alid = sorted(amap.keys())
-				al3 = deque(map(amap.__getitem__, alid), maxlen=256)
-				bot.bulk_deletes[guild.id] = al3
-		except (PermissionError, discord.Forbidden, discord.HTTPException):
-			init = "[UNKNOWN USER]"
+		await gather(*futs, max_concurrency=5)
 		emb = discord.Embed(colour=0xFF00FF)
-		emb.description = f"{init} **deleted {len(messages)} message{'s' if len(messages) != 1 else ''} from** {channel_mention(messages[-1].channel.id)}:\n"
-		# for message in messages:
-		#     nextline = f"\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}"
-		#     if len(emb.description) + len(nextline) > 2048:
-		#         break
-		#     emb.description += nextline
-		embeds = deque((emb,))
-		for message in messages:
-			try:
-				embs = await bot.as_embeds(message, refresh=False, link=True, reactions=True)
-			except Exception:
-				print_exc()
-				continue
-			embs[0].colour = discord.Colour(0x7F007F)
-			embeds.extend(embs)
+		if user:
+			action = f"{user_mention(user.id)} **deleted {len(messages)} message{'s' if len(messages) != 1 else ''} from**"
+		else:
+			action = f"**{len(messages)} message{'s' if len(messages) != 1 else ''} deleted from**"
+		emb.description = f"{action} {channel_mention(messages[-1].channel.id)}:\n"
+		futs = [bot.as_embeds(m, refresh=False, link=True, reactions=True) for m in messages]
+		extracted = await gather(*futs, return_exceptions=True, max_concurrency=5)
+		embeds = []
+		for es in extracted:
+			if not isinstance(es, BaseException):
+				embeds.extend(es)
+			else:
+				print(repr(es))
+		for e in embeds:
+			e.colour = discord.Colour(0x7F007F)
+		embeds.insert(0, emb)
 		bot.send_embeds(channel, embeds)
 
 

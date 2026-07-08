@@ -3772,13 +3772,16 @@ def snowflake_time_2(id):
 def snowflake_time_3(id):
 	return datetime.datetime.fromtimestamp(id2ts(id), tz=datetime.timezone.utc)
 
-def time_snowflake(dt, high=None):
+def time_snowflake(dt, high=False):
 	if getattr(dt, "id", None) is not None:
 		return dt.id
 	if not isinstance(dt, (int, float)):
 		discord_millis = int(dt.timestamp() * 1000 - DISCORD_EPOCH)
 		return (discord_millis << 22) + (2**22 - 1 if high else 0)
 	return dt
+
+def current_snowflake():
+	return time_snowflake(datetime.datetime.now(tz=datetime.timezone.utc), high=True)
 
 def ip2int(ip):
 	return int.from_bytes(b"\x00" + bytes(int(i) for i in ip.split(".")), "big")
