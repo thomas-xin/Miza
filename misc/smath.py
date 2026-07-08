@@ -37,6 +37,7 @@ except ImportError:
 from dynamic_dt import DynamicDT, TimeDelta, time_parse, time_disp, get_timezone, get_offset, get_name
 
 dtn = lambda: datetime.datetime.now()
+dtnu = lambda: datetime.datetime.now(tz=datetime.timezone.utc)
 utc_ft = lambda s: datetime.datetime.fromtimestamp(s, tz=datetime.timezone.utc).replace(tzinfo=None)
 utc_dt = lambda: datetime.datetime.now(tz=datetime.timezone.utc).replace(tzinfo=None)
 utc_ddt = lambda: DynamicDT.utcnow()

@@ -52,7 +52,7 @@ escape_mentions = utils.escape_mentions
 escape_everyone = lambda s: s#s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere")
 escape_roles = lambda s: s#escape_everyone(s).replace("<@&", "<@\xad&")
 
-standard_roles = lambda member: [role for role in member.roles if not role.is_default()]
+standard_roles = lambda member: [role for role in getattr(member, "roles", ()) if not role.is_default()]
 
 
 class MemoryTimer(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
@@ -823,7 +823,7 @@ def auto_url_ex(url):
 	return url
 
 BASE_LOGO = "https://cdn.discordapp.com/embed/avatars/0.png"
-def get_url(obj: str, f=auto_url) -> str:
+def get_url(obj, f=auto_url) -> str:
 	if isinstance(obj, str):
 		return obj and f(obj)
 	found = False
@@ -839,11 +839,12 @@ def get_url(obj: str, f=auto_url) -> str:
 			return f(url)
 	if found:
 		return BASE_LOGO
+	return ""
 
 # Finds the best URL for a Discord object's icon, prioritizing proxy_url for images if applicable.
 proxy_url = lambda obj: get_url(obj) or (obj.proxy_url if is_image(obj.proxy_url) else obj.url)
 # Finds the best URL for a Discord object's icon.
-best_url = lambda obj: get_url(obj) or auto_url(getattr(obj, "url", None)) or BASE_LOGO
+best_url = lambda obj: get_url(obj) or auto_url(getattr(obj, "url", None) or BASE_LOGO)
 # Finds the worst URL for a Discord object's icon.
 worst_url = lambda obj: get_url(obj, auto_url_ex) or getattr(obj, "url", None) or BASE_LOGO
 
@@ -858,7 +859,7 @@ def get_author(user, uid=None):
 			url = url2
 		else:
 			bot.data.exec.cproxy(url)
-	name = getattr(user, "display_name", None) or user.name
+	name = getattr(user, "display_name", None) or getattr(user, "name", None) or "Unknown User"
 	if uid:
 		name = f"{name} ({user.id})"
 	return cdict(name=name, icon_url=url, url=o_url)

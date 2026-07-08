@@ -2053,7 +2053,9 @@ class UpdateServerLogs(Database):
 	name = "logS"
 	no_file = True
 
-	async def _channel_update_(self, before, after, guild, **void):
+	async def ensure_log_channel(self, guild):
+		if not guild:
+			return
 		bot = self.bot
 		c_id = bot.get_guildbase(guild.id, "logs.server")
 		if not c_id:
@@ -2062,6 +2064,13 @@ class UpdateServerLogs(Database):
 			channel = await bot.fetch_channel(c_id)
 		except (EOFError, discord.NotFound):
 			bot.pop_guildbase(guild.id, "logs.server")
+			return
+		return channel
+
+	async def _channel_update_(self, before, after, guild, **void):
+		bot = self.bot
+		channel = await self.ensure_log_channel(guild)
+		if not channel:
 			return
 		emb = discord.Embed(colour=8323072)
 		mlist = bot.channel_cache.get(after.id)
@@ -2081,13 +2090,8 @@ class UpdateServerLogs(Database):
 
 	async def _channel_delete_2_(self, ch, guild, user, **void):
 		bot = self.bot
-		c_id = bot.get_guildbase(guild.id, "logs.server")
-		if not c_id:
-			return
-		try:
-			channel = await bot.fetch_channel(c_id)
-		except (EOFError, discord.NotFound):
-			bot.pop_guildbase(guild.id, "logs.server")
+		channel = await self.ensure_log_channel(guild)
+		if not channel:
 			return
 		emb = discord.Embed(colour=8323072)
 		mlist = bot.channel_cache.get(ch.id)
@@ -2102,13 +2106,8 @@ class UpdateServerLogs(Database):
 
 	async def _guild_update_(self, before, after, **void):
 		bot = self.bot
-		c_id = bot.get_guildbase(after.id, "logs.server")
-		if not c_id:
-			return
-		try:
-			channel = await bot.fetch_channel(c_id)
-		except (EOFError, discord.NotFound):
-			bot.pop_guildbase(after.id, "logs.server")
+		channel = await self.ensure_log_channel(after.guild)
+		if not channel:
 			return
 		colour = await bot.get_colour(after)
 		emb = discord.Embed(colour=colour)
@@ -2157,9 +2156,8 @@ class UpdateJoinLogs(Database):
 	name = "logJ"
 	no_file = True
 
-	async def _join_(self, user, **void):
-		guild = T(user).get("guild")
-		if guild is None:
+	async def ensure_log_channel(self, guild):
+		if not guild:
 			return
 		bot = self.bot
 		c_id = bot.get_guildbase(guild.id, "logs.join")
@@ -2169,6 +2167,14 @@ class UpdateJoinLogs(Database):
 			channel = await bot.fetch_channel(c_id)
 		except (EOFError, discord.NotFound):
 			bot.pop_guildbase(guild.id, "logs.join")
+			return
+		return channel
+
+	async def _join_(self, user, **void):
+		guild = T(user).get("guild")
+		bot = self.bot
+		channel = await self.ensure_log_channel(guild)
+		if not channel:
 			return
 		# Colour: White
 		emb = discord.Embed(colour=16777214)
@@ -2179,97 +2185,55 @@ class UpdateJoinLogs(Database):
 			emb.description += f"\n⚠️ Account is {age} old. ⚠️"
 		bot.send_embeds(channel, emb)
 
-	async def _leave_(self, user, **void):
-		guild = T(user).get("guild")
-		if guild is None:
-			return
+	async def _unban_(self, user, requestor=None, **void):
+		guild = T(requestor).get("guild")
 		bot = self.bot
-		c_id = bot.get_guildbase(guild.id, "logs.join")
-		if not c_id:
+		channel = await self.ensure_log_channel(guild)
+		if not channel:
 			return
-		try:
-			channel = await bot.fetch_channel(c_id)
-		except (EOFError, discord.NotFound):
-			bot.pop_guildbase(guild.id, "logs.join")
-			return
-		await asyncio.sleep(5)
-		deleted = None
-		prune = None
-		kick = None
-		ban = None
-		try:
-			stored = bot.get_userbase(user.id, "stored")
-		except LookupError:
-			pass
+		# Colour: Light Grey
+		emb = discord.Embed(colour=12632256)
+		emb.set_author(**get_author(user))
+		if requestor:
+			emb.description = f"{user_mention(user.id)} has been unbanned by {user_mention(requestor.id)}."
 		else:
-			for c_id, m_id in tuple(stored.items()):
-				try:
-					c = bot.cache.channels[c_id]
-				except KeyError:
-					stored.pop(c_id)
-					continue
-				try:
-					m = await c.fetch_message(m_id)
-				except:
-					print_exc()
-					stored.pop(c_id, None)
-					continue
-				print("Remaining author:", m.author, m.author.id, guild)
-				if m.author.id == bot.deleted_user:
-					print(user, user.id, "deleted!!")
-					bot.set_userbase(user.id, "deleted", True)
-					deleted = True
-				break
+			emb.description = f"{user_mention(user.id)} has been unbanned."
+		bot.send_embeds(channel, emb)
+
+	async def _remove_(self, user, guild, requestor=None, kind="leave", reason=None, **void):
+		bot = self.bot
+		channel = await self.ensure_log_channel(guild)
+		if not channel:
+			return
 		# Colour: Black
 		emb = discord.Embed(colour=1)
 		emb.set_author(**get_author(user))
-		if not bot.get_userbase(user.id, "deleted"):
-			if bot.permissions_in(guild).view_audit_log:
-				# Check audit log to find whether user left or was kicked/banned
-				with tracebacksuppressor(StopIteration):
-					ts = utc()
-					futs = [create_task(flatten(guild.audit_logs(limit=100, action=getattr(discord.AuditLogAction, action)))) for action in ("ban", "kick", "member_prune")]
-					bans = kicks = prunes = ()
-					with tracebacksuppressor:
-						bans = await futs[0]
-						kicks = await futs[1]
-						prunes = await futs[2]
-					for log in bans:
-						if ts - utc_ts(log.created_at) < 10:
-							if log.target.id == user.id:
-								ban = cdict(id=log.user.id, reason=log.reason)
-								raise StopIteration
-					for log in kicks:
-						if ts - utc_ts(log.created_at) < 10:
-							if log.target.id == user.id:
-								kick = cdict(id=log.user.id, reason=log.reason)
-								raise StopIteration
-					for log in prunes:
-						if ts - utc_ts(log.created_at) < 10:
-							try:
-								reason = f"{log.extra.delete_member_days} days of inactivity"
-							except AttributeError:
-								reason = None
-							prune = cdict(id=log.user.id, reason=reason)
-							raise StopIteration
-		else:
-			deleted = True
-		if deleted is not None:
-			emb.description = f"{user_mention(user.id)} has been deleted."
-		elif ban is not None:
-			emb.description = f"{user_mention(user.id)} has been banned by {user_mention(ban.id)}."
-			if ban.reason:
-				emb.description += f"\nReason: *`{no_md(ban.reason)}`*"
-		elif kick is not None:
-			emb.description = f"{user_mention(user.id)} has been kicked by {user_mention(kick.id)}."
-			if kick.reason:
-				emb.description += f"\nReason: *`{no_md(kick.reason)}`*"
-		elif prune is not None:
-			emb.description = f"{user_mention(user.id)} has been pruned by {user_mention(prune.id)}."
-			if prune.reason:
-				emb.description += f"\nReason: *`{no_md(prune.reason)}`*"
-		else:
-			emb.description = f"{user_mention(user.id)} has left the server."
+		match kind:
+			case "delete":
+				emb.description = f"{user_mention(user.id)} has been deleted."
+			case "ban":
+				if requestor:
+					emb.description = f"{user_mention(user.id)} has been banned by {user_mention(requestor.id)}."
+				else:
+					emb.description = f"{user_mention(user.id)} has been banned."
+				if reason:
+					emb.description += f"\nReason: *`{no_md(reason)}`*"
+			case "kick":
+				if requestor:
+					emb.description = f"{user_mention(user.id)} has been kicked by {user_mention(requestor.id)}."
+				else:
+					emb.description = f"{user_mention(user.id)} has been kicked."
+				if reason:
+					emb.description += f"\nReason: *`{no_md(reason)}`*"
+			case "prune":
+				if requestor:
+					emb.description = f"{user_mention(user.id)} has been pruned by {user_mention(requestor.id)}."
+				else:
+					emb.description = f"{user_mention(user.id)} has been pruned."
+				if reason:
+					emb.description += f"\nReason: *`{no_md(reason)}`*"
+			case _:
+				emb.description = f"{user_mention(user.id)} has left the server."
 		rchange = escape_markdown(", ".join(role_mention(r.id) for r in standard_roles(user)))
 		if rchange:
 			emb.add_field(name="Roles", value=rchange)
@@ -2279,6 +2243,20 @@ class UpdateJoinLogs(Database):
 class UpdateUserLogs(Database):
 	name = "logU"
 	no_file = True
+
+	async def ensure_log_channel(self, guild):
+		if not guild:
+			return
+		bot = self.bot
+		c_id = bot.get_guildbase(guild.id, "logs.user")
+		if not c_id:
+			return
+		try:
+			channel = await bot.fetch_channel(c_id)
+		except (EOFError, discord.NotFound):
+			bot.pop_guildbase(guild.id, "logs.user")
+			return
+		return channel
 
 	# Send a member update globally for all user updates
 	async def _user_update_(self, before, after, **void):
@@ -2291,8 +2269,7 @@ class UpdateUserLogs(Database):
 
 	async def _member_update_(self, before, after, guild=None):
 		bot = self.bot
-		if guild is None:
-			guild = after.guild
+		guild = guild or after.guild
 		# Make sure user is in guild
 		try:
 			memb = guild.get_member(after.id)
@@ -2303,13 +2280,8 @@ class UpdateUserLogs(Database):
 		except:
 			print_exc()
 			return
-		c_id = bot.get_guildbase(guild.id, "logs.user")
-		if not c_id:
-			return
-		try:
-			channel = await bot.fetch_channel(c_id)
-		except (EOFError, discord.NotFound):
-			bot.pop_guildbase(guild.id, "logs.user")
+		channel = await self.ensure_log_channel(guild)
+		if not channel:
 			return
 		emb = discord.Embed()
 		files = []
@@ -2431,11 +2403,7 @@ class UpdateUserLogs(Database):
 class UpdateMessageLogs(Database):
 	name = "logM"
 
-	# Edit events are rather straightforward to log
-	async def _edit_(self, before, after, force=False, **void):
-		if after.author.bot and not force:
-			return
-		guild = before.guild
+	async def ensure_log_channel(self, guild):
 		if not guild:
 			return
 		bot = self.bot
@@ -2446,6 +2414,39 @@ class UpdateMessageLogs(Database):
 			channel = await bot.fetch_channel(c_id)
 		except (EOFError, discord.NotFound):
 			bot.pop_guildbase(guild.id, "logs.message")
+			return
+		return channel
+
+	async def reattachments(self, channel, message):
+		if not message.attachments:
+			return
+		bot = self.bot
+		msg = deque()
+		files = []
+		for a in message.attachments:
+			try:
+				fn = await attachment_cache.download(a.url)
+				fil = CompatFile(fn, filename=a.filename.removeprefix("SPOILER_"))
+				files.append(fil)
+			except:
+				msg.append(proxy_url(a))
+		colour = await bot.get_colour(message.author)
+		emb = discord.Embed(colour=colour)
+		emb.description = f"File{'s' if len(files) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"
+		msg = "\n".join(msg) if msg else None
+		if len(files) == 1:
+			m2 = await bot.send_with_file(channel, msg, embed=emb, file=files[0])
+		else:
+			m2 = await channel.send(msg, embed=emb, files=files)
+		message.attachments = [cdict(name=a.filename, id=a.id, url=attachment_cache.preserve(a.url, m2.id)) for a in m2.attachments]
+
+	# Edit events are rather straightforward to log
+	async def _edit_(self, before, after, force=False, **void):
+		if after.author.bot and not force:
+			return
+		bot = self.bot
+		channel = await self.ensure_log_channel(after.guild)
+		if not channel:
 			return
 		embs = await bot.as_embeds(after, proxy_images=False)
 		embs2 = await self.bot.as_embeds(before, proxy_images=False, refresh=False, reactions=True)
@@ -2459,41 +2460,13 @@ class UpdateMessageLogs(Database):
 		emb.timestamp = before.edited_at or after.created_at
 		bot.send_embeds(channel, emb)
 
-	async def reattachments(self, channel, message):
-		if not message.attachments:
-			return
-		msg = deque()
-		files = []
-		for a in message.attachments:
-			try:
-				fn = await attachment_cache.download(a.url)
-				fil = CompatFile(fn, filename=a.filename.removeprefix("SPOILER_"))
-				files.append(fil)
-			except:
-				msg.append(proxy_url(a))
-		colour = await self.bot.get_colour(message.author)
-		emb = discord.Embed(colour=colour)
-		emb.description = f"File{'s' if len(files) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"
-		msg = "\n".join(msg) if msg else None
-		if len(files) == 1:
-			m2 = await self.bot.send_with_file(channel, msg, embed=emb, file=files[0])
-		else:
-			m2 = await channel.send(msg, embed=emb, files=files)
-		message.attachments = [cdict(name=a.filename, id=a.id, url=attachment_cache.preserve(a.url, m2.id)) for a in m2.attachments]
-
 	# Delete events must attempt to find the user who deleted the message
 	async def _audited_delete_(self, message, user=None, **void):
-		guild = message.guild
 		if message.author.bot and (not user or user.bot):
 			return
 		bot = self.bot
-		c_id = bot.get_guildbase(guild.id, "logs.message")
-		if not c_id:
-			return
-		try:
-			channel = await bot.fetch_channel(c_id)
-		except (EOFError, discord.NotFound):
-			bot.pop_guildbase(guild.id, "logs.message")
+		channel = await self.ensure_log_channel(message.guild)
+		if not channel:
 			return
 		await self.reattachments(channel, message)
 		embs = await bot.as_embeds(message, refresh=False, link=True, reactions=True)
@@ -2508,19 +2481,13 @@ class UpdateMessageLogs(Database):
 
 	# Thanks to the embed sender feature, which allows this feature to send up to 10 logs in one message
 	async def _bulk_delete_(self, messages, user=None, **void):
-		guild = messages[0].guild
 		if not messages:
 			return
 		if all(m.author.bot for m in messages):
 			return
 		bot = self.bot
-		c_id = bot.get_guildbase(guild.id, "logs.message")
-		if not c_id:
-			return
-		try:
-			channel = await bot.fetch_channel(c_id)
-		except (EOFError, discord.NotFound):
-			bot.pop_guildbase(guild.id, "logs.message")
+		channel = await self.ensure_log_channel(messages[0].guild)
+		if not channel:
 			return
 		futs = [self.reattachments(channel, m) for m in messages if not m.author.bot]
 		await gather(*futs, max_concurrency=5)

@@ -8321,20 +8321,54 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						await fut
 				await self.handle_message(after, before=before)
 
-		self.delete_audits = AutoCache(f"{CACHE_PATH}/delete_audits", shards=1, stale=0, timeout=300)
+		self.deletion_log_stacking = 300
+		self.delete_audits = AutoCache(f"{CACHE_PATH}/delete_audits", shards=1, stale=0, timeout=self.deletion_log_stacking)
+		self.leave_log_stacking = 20
+		self.leave_audits = AutoCache(f"{CACHE_PATH}/leave_audits", shards=1, stale=0, timeout=self.leave_log_stacking)
 		@self.event
 		async def on_audit_log_entry_create(data):
 			# print("AUDIT:", data)
 			with tracebacksuppressor:
 				match data.action:
 					case discord.AuditLogAction.kick:
-						print("Audited kick:")
+						t = (data.target.id, data.guild.id)
+						self.leave_audits[t] = cdict(
+							uid=data.user.id,
+							kind="kick",
+							t=utc(),
+							reason=data.reason,
+						)
 					case discord.AuditLogAction.member_prune:
-						print("Audited prune:")
+						t = (0, data.guild.id)
+						self.leave_audits[t] = cdict(
+							uid=data.user.id,
+							kind="prune",
+							t=utc(),
+							count=data.extra.members_removed,
+							cons=0,
+							reason=data.reason,
+						)
 					case discord.AuditLogAction.ban:
-						print("Audited ban:")
+						t = (data.target.id, data.guild.id)
+						self.leave_audits[t] = cdict(
+							uid=data.user.id,
+							kind="ban",
+							t=utc(),
+							reason=data.reason,
+						)
+						await asyncio.sleep(3)
+						if t in self.leave_audits:
+							try:
+								user = await self.fetch_user_member(data.target.id, guild=data.guild)
+							except Exception:
+								user = data.target
+							await self.send_event("_remove_", user=user, guild=data.guild, requestor=data.user, kind="ban", reason=data.reason)
 					case discord.AuditLogAction.unban:
-						print("Audited unban:")
+						try:
+							user = await self.fetch_user_member(data.target.id, guild=data.guild)
+						except Exception:
+							user = data.target
+						await self.send_event("_unban_", user=user, requestor=data.user, reason=data.reason)
 					case discord.AuditLogAction.message_delete:
 						t = (data.target.id, data.extra.channel.id)
 						audits = self.delete_audits.setdefault(t, {})
@@ -8353,7 +8387,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							cons=0,
 						)
 						self.delete_audits[t] = audits
-				print(data, data.user, data.guild, data.target, data.extra)
+				# print(data, data.user, data.guild, data.target, data.extra)
 
 		# Message delete event: uses raw payloads rather than discord.py message cache. calls _delete_ bot database event.
 		@self.event
@@ -8374,7 +8408,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					await asyncio.sleep(delay)
 					t = (message.author.id, message.channel.id)
 					audits = self.delete_audits.setdefault(t, {})
-					for e in audits.values():
+					min_id = time_snowflake(dtn() - datetime.timedelta(seconds=self.deletion_log_stacking))
+					for k, e in audits.items():
+						if k < min_id:
+							continue
 						if e.cons + 1 <= e.count:
 							e.cons += 1
 							self.delete_audits[t] = audits
@@ -8383,7 +8420,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					else:
 						async for e2 in guild.audit_logs(
 							limit=None,
-							after=datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(seconds=300),
+							after=dtnu() - datetime.timedelta(seconds=self.deletion_log_stacking),
 							action=discord.AuditLogAction.message_delete,
 							oldest_first=False,
 						):
@@ -8483,7 +8520,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					await asyncio.sleep(delay)
 					t = (0, message.channel.id)
 					audits = self.delete_audits.setdefault(t, {})
-					for e in audits.values():
+					min_id = time_snowflake(dtn() - datetime.timedelta(seconds=self.deletion_log_stacking))
+					for k, e in audits.items():
+						if k < min_id:
+							continue
 						if e.cons + count <= e.count:
 							e.cons += count
 							self.delete_audits[t] = audits
@@ -8492,7 +8532,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					else:
 						async for e2 in guild.audit_logs(
 							limit=None,
-							after=datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(seconds=300),
+							after=dtnu() - datetime.timedelta(seconds=self.deletion_log_stacking),
 							action=discord.AuditLogAction.message_bulk_delete,
 							oldest_first=False,
 						):
@@ -8611,6 +8651,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Member leave event: calls _leave_ bot database event.
 		@self.event
 		async def on_member_remove(before):
+			start = utc()
 			after = self.cache.users[before.id] = await self._fetch_user(before.id)
 			b = str(before)
 			a = str(after)
@@ -8627,6 +8668,48 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				before.guild._members.pop(after.id, None)
 				before.guild._member_count = len(before.guild._members)
 			await self.send_event("_leave_", user=before, guild=before.guild)
+			delay = 1 - (utc() - start)
+			await asyncio.sleep(delay)
+			try:
+				t = (before.id, before.guild.id)
+				last_audit = self.leave_audits[t]
+			except KeyError:
+				t = (0, before.guild.id)
+				last_audit = self.leave_audits.get(t)
+			else:
+				self.leave_audits.pop(t, None)
+			if last_audit and utc() - last_audit.t > self.leave_log_stacking:
+				last_audit = None
+			if not last_audit:
+				await asyncio.sleep(5)
+				if bot.get_userbase(before.id, "deleted"):
+					last_audit = cdict(kind="delete")
+				else:
+					last_audit = cdict(kind="leave")
+					stored = bot.get_userbase(before.id, "stored", {})
+					for c_id, m_id in tuple(stored.items()):
+						try:
+							c = bot.cache.channels[c_id]
+						except KeyError:
+							stored.pop(c_id)
+							continue
+						try:
+							m = await c.fetch_message(m_id)
+						except:
+							print_exc()
+							stored.pop(c_id, None)
+							continue
+						print("Remaining author:", m.author, m.author.id, before.guild)
+						if m.author.id == bot.deleted_user:
+							print("USER DELETED:", before, before.id)
+							bot.set_userbase(before.id, "deleted", True)
+						last_audit = cdict(kind="delete")
+						break
+			try:
+				requestor = await self.fetch_member(last_audit.uid, guild=before.guild)
+			except Exception:
+				requestor = None
+			await self.send_event("_remove_", user=before, guild=before.guild, requestor=requestor, kind=last_audit.kind, reason=last_audit.get("reason"))
 
 		# Channel create event: calls _channel_create_ bot database event.
 		@self.event
