@@ -8404,7 +8404,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					delay = 1 - (utc() - start)
 					await asyncio.sleep(delay)
 					t = (message.author.id, message.channel.id)
-					audits = self.delete_audits.setdefault(t, {})
+					audits = self.delete_audits.get(t, {})
 					min_id = time_snowflake(dtn() - datetime.timedelta(seconds=self.deletion_log_stacking))
 					for k, e in audits.items():
 						if k < min_id:
@@ -8424,33 +8424,33 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							except Exception:
 								print_exc()
 						if not user:
-							async for e2 in guild.audit_logs(
-								limit=None,
-								after=dtnu() - datetime.timedelta(seconds=self.deletion_log_stacking),
-								action=discord.AuditLogAction.message_delete,
-								oldest_first=False,
-							):
-								if e2.target.id != message.author.id or e2.extra.channel.id != message.channel.id:
-									continue
-								try:
-									e = audits[e2.id]
-								except KeyError:
-									e = cdict(
-										uid=e2.user.id,
-										count=e2.extra.count,
-										cons=0,
-									)
-								else:
-									e.count = e2.extra.count
-								audits[e2.id] = e
-								if e.cons + 1 <= e.count:
-									e.cons += 1
+							user = message.author
+							if audits:
+								async for e2 in guild.audit_logs(
+									limit=None,
+									after=dtnu() - datetime.timedelta(seconds=self.deletion_log_stacking),
+									action=discord.AuditLogAction.message_delete,
+									oldest_first=False,
+								):
+									if e2.target.id != message.author.id or e2.extra.channel.id != message.channel.id:
+										continue
+									try:
+										e = audits[e2.id]
+									except KeyError:
+										e = cdict(
+											uid=e2.user.id,
+											count=e2.extra.count,
+											cons=0,
+										)
+									else:
+										e.count = e2.extra.count
+									audits[e2.id] = e
+									if e.cons + 1 <= e.count:
+										e.cons += 1
+										self.delete_audits[t] = audits
+										user = await self.fetch_user_member(e.uid, guild)
+										break
 									self.delete_audits[t] = audits
-									user = guild.get_member(e.uid) or await self.fetch_user(e.uid)
-									break
-								self.delete_audits[t] = audits
-							else:
-								user = message.author
 					print(audits)
 					print("Audited Delete:", message, user)
 				await self.send_event("_audited_delete_", message=message, requestor=user)
@@ -8524,7 +8524,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					delay = 1 - (utc() - start)
 					await asyncio.sleep(delay)
 					t = (0, message.channel.id)
-					audits = self.delete_audits.setdefault(t, {})
+					audits = self.delete_audits.get(t, {})
 					min_id = time_snowflake(dtn() - datetime.timedelta(seconds=self.deletion_log_stacking))
 					for k, e in audits.items():
 						if k < min_id:
@@ -8535,33 +8535,33 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							user = guild.get_member(e.uid) or await self.fetch_user(e.uid)
 							break
 					else:
-						async for e2 in guild.audit_logs(
-							limit=None,
-							after=dtnu() - datetime.timedelta(seconds=self.deletion_log_stacking),
-							action=discord.AuditLogAction.message_bulk_delete,
-							oldest_first=False,
-						):
-							if e2.target.id != message.channel.id:
-								continue
-							try:
-								e = audits[e2.id]
-							except KeyError:
-								e = cdict(
-									uid=e2.user.id,
-									count=e2.extra.count,
-									cons=0,
-								)
-							else:
-								e.count = e2.extra.count
-							audits[e2.id] = e
-							if e.cons + count <= e.count:
-								e.cons += count
+						user = message.author
+						if audits:
+							async for e2 in guild.audit_logs(
+								limit=None,
+								after=dtnu() - datetime.timedelta(seconds=self.deletion_log_stacking),
+								action=discord.AuditLogAction.message_bulk_delete,
+								oldest_first=False,
+							):
+								if e2.target.id != message.channel.id:
+									continue
+								try:
+									e = audits[e2.id]
+								except KeyError:
+									e = cdict(
+										uid=e2.user.id,
+										count=e2.extra.count,
+										cons=0,
+									)
+								else:
+									e.count = e2.extra.count
+								audits[e2.id] = e
+								if e.cons + count <= e.count:
+									e.cons += count
+									self.delete_audits[t] = audits
+									user = await self.fetch_user_member(e.uid, guild)
+									break
 								self.delete_audits[t] = audits
-								user = guild.get_member(e.uid) or await self.fetch_user(e.uid)
-								break
-							self.delete_audits[t] = audits
-						else:
-							user = message.author
 					print(audits)
 					print("Audited Bulk Delete:", message, user)
 				await self.send_event("_bulk_delete_", messages=messages, requestor=user)
