@@ -1616,7 +1616,7 @@ class ServerProtector(Database):
 				if cnt[u_id] > 2:
 					if self.bot.is_trusted(guild.id) or u_id == self.bot.user.id:
 						create_task(self.targetWarn(u_id, guild, f"channel deletions `({cnt[u_id]})`"))
-		if self.bot.get_guildbase(guild.id, "logs.user"):
+		if self.bot.get_guildbase(guild.id, "logs.server"):
 			await self.bot.data.logU._channel_delete_2_(channel, guild, user)
 
 	async def _ban_(self, user, guild, **void):
@@ -2146,7 +2146,6 @@ class UpdateServerLogs(Database):
 			change = True
 		if not change:
 			return
-		b_url = await bot.get_proxy_url(before)
 		a_url = await bot.get_proxy_url(after)
 		emb.set_author(name=str(after), icon_url=a_url, url=a_url)
 		bot.send_embeds(channel, emb)

@@ -8327,7 +8327,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.leave_audits = AutoCache(f"{CACHE_PATH}/leave_audits", shards=1, stale=0, timeout=self.leave_log_stacking)
 		@self.event
 		async def on_audit_log_entry_create(data):
-			# print("AUDIT:", data)
 			with tracebacksuppressor:
 				match data.action:
 					case discord.AuditLogAction.kick:
@@ -8357,7 +8356,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							reason=data.reason,
 						)
 						await asyncio.sleep(3)
-						if t in self.leave_audits:
+						if t in self.leave_audits and self.leave_audits[t].kind == "ban":
 							try:
 								user = await self.fetch_user_member(data.target.id, guild=data.guild)
 							except Exception:
@@ -8387,12 +8386,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							cons=0,
 						)
 						self.delete_audits[t] = audits
-				# print(data, data.user, data.guild, data.target, data.extra)
 
 		# Message delete event: uses raw payloads rather than discord.py message cache. calls _delete_ bot database event.
 		@self.event
 		async def on_raw_message_delete(payload):
-			# print("DELETE:", payload)
 			with tracebacksuppressor:
 				start = utc()
 				message = await _on_raw_message_delete(payload)
@@ -8445,8 +8442,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							self.delete_audits[t] = audits
 						else:
 							user = message.author
+							t = (user.id, message.guild.id)
+							if t in self.leave_audits and self.leave_audits[t] == "ban":
+								uid = self.leave_audits[t].uid
+								try:
+									user = await self.fetch_user_member(uid, guild=message.guild)
+								except Exception:
+									print_exc()
 					print(audits)
-				print("Audited Delete:", message, user)
+					print("Audited Delete:", message, user)
 				await self.send_event("_audited_delete_", message=message, user=user)
 
 		async def _on_raw_message_delete(payload):
@@ -8504,7 +8508,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Message bulk delete event: uses raw payloads rather than discord.py message cache. calls _bulk_delete_ and _delete_ bot database events.
 		@self.event
 		async def on_raw_bulk_message_delete(payload):
-			# print("BULK_DELETE:", payload)
 			with tracebacksuppressor:
 				start = utc()
 				messages = await _on_raw_bulk_message_delete(payload)
@@ -8558,7 +8561,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						else:
 							user = message.author
 					print(audits)
-				print("Audited Bulk Delete:", message, user)
+					print("Audited Bulk Delete:", message, user)
 				await self.send_event("_bulk_delete_", messages=messages, user=user)
 
 		async def _on_raw_bulk_message_delete(payload):
