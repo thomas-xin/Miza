@@ -1240,7 +1240,7 @@ class Urban(Command):
 		self.bot.send_as_embeds(_channel, title=title, fields=fields, author=get_author(_user), reference=_message)
 
 
-class Browse(Pagination, Command):
+class Browse(Pagination, Interactable, Command):
 	name = ["🦆", "🌐", "Google", "Browser"]
 	description = "Searches the web, and displays as text or image."
 	schema = cdict(
@@ -1263,11 +1263,12 @@ class Browse(Pagination, Command):
 	rate_limit = (10, 16)
 	slash = True
 	ephemeral = True
+	page_size = 7
 
-	async def __call__(self, _user, mode, query, **void):
+	async def __call__(self, _user, mode, query, page, **void):
 		m = 0 if mode == "auto" else 1
 		# Set callback message for scrollable list
-		return await self.display(_user.id, 0, m, query)
+		return await self.display(_user.id, page * self.page_size, m, query)
 
 	async def display(self, uid, pos, mode, query, diridx=-1):
 		bot = self.bot
@@ -1285,7 +1286,7 @@ class Browse(Pagination, Command):
 				content=s,
 				prefix="\xad",
 			)
-		return await self.default_display("search result", uid, pos, s.split("\n\n"), diridx, extra=leb128(mode) + as_bytes(query), page_size=7)
+		return await self.default_display("search result", uid, pos, s.split("\n\n"), diridx, extra=leb128(mode) + as_bytes(query))
 
 	async def _callback_(self, _user, index, data, **void):
 		pos, more = decode_leb128(data)

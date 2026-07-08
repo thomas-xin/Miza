@@ -437,7 +437,7 @@ class Ban(Command):
 			await bot.ignore_interaction(message)
 
 
-class RoleSelect(Pagination, Command):
+class RoleSelect(Interactable, Command):
 	server_only = True
 	name = ["ReactionRoles", "RoleButtons", "RoleSelection", "RoleSelector"]
 	min_level = 3
@@ -621,7 +621,7 @@ class RoleSelect(Pagination, Command):
 			await interaction_response(bot, _message, text, ephemeral=True)
 
 
-class Verifier(Pagination, Command):
+class Verifier(Interactable, Command):
 	server_only = True
 	name = ["Captcha", "Verification"]
 	description = "Sends a verification trigger in the current channel, intended to filter out bots."
@@ -1118,7 +1118,7 @@ class StaffLog(Command):
 				return ini_md(f'{kind.capitalize()} event logging is currently disabled in {sqr_md(_guild)}. Use "{_prefix}{_name} enable" to enable.')
 
 
-class StarBoard(Pagination, Command):
+class StarBoard(Pagination, Interactable, Command):
 	server_only = True
 	min_level = 2
 	description = "Causes ⟨BOT⟩ to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel."
@@ -1162,7 +1162,7 @@ class StarBoard(Pagination, Command):
 	)
 	rate_limit = 1
 
-	async def __call__(self, bot, _message, _channel, _guild, _user, mode, emoji, special, count, channel, **void):
+	async def __call__(self, bot, _message, _channel, _guild, _user, mode, emoji, special, count, channel, page, **void):
 		data = bot.data.starboards
 		if mode in ("add", "remove"):
 			selected = []
@@ -1214,7 +1214,7 @@ class StarBoard(Pagination, Command):
 			return italics(css_md(f"{now} excluding {sqr_md(channel)} from starboard {triggers}."))
 		if not emoji and not special:
 			# Set callback message for scrollable list
-			return await self.display(_user.id, 0, _guild.id)
+			return await self.display(_user.id, page * self.page_size, _guild.id)
 		channel = channel or _channel
 		emote = special if special else str(emoji)
 		boards = data.setdefault(_guild.id, {})

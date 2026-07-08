@@ -184,7 +184,7 @@ async def search_one(bot, query):
 	return resp
 
 
-class Queue(Pagination, Command):
+class Queue(Pagination, Interactable, Command):
 	server_only = True
 	name = ["▶️", "P", "Q", "Play", "PlayNow", "PlayNext", "Enqueue", "Search&Play"]
 	alias = name + ["LS"]
@@ -239,8 +239,9 @@ class Queue(Pagination, Command):
 	slash = ("Play", "Queue")
 	msgcmd = ("Search & Play",)
 	exact = False
+	page_size = 10
 
-	async def __call__(self, bot, _user, _perm, _message, _channel, _guild, _name, _comment, mode="all", query=None, index=-1, start=None, end=None, **void):
+	async def __call__(self, bot, _user, _perm, _message, _channel, _guild, _name, _comment, mode="all", query=None, index=-1, start=None, end=None, page=0, **void):
 		vc_ = await select_voice_channel(_user, _channel)
 		if query and _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
@@ -258,7 +259,7 @@ class Queue(Pagination, Command):
 						reacts="❎",
 					)
 				# Set callback message for scrollable list
-				return await self.display(_user.id, 0, _guild.id)
+				return await self.display(_user.id, page * self.page_size, _guild.id)
 			if mode == "now":
 				index = [0]
 			elif mode == "next":
@@ -393,7 +394,7 @@ class Queue(Pagination, Command):
 		user = await bot.fetch_user(uid)
 		curr, settings, paused, reverse, (elapsed, length) = await bot.audio.asubmit(f"(a:=AP.from_guild({gid})).queue,a.settings,a.settings.pause,a.reverse,a.epos")
 		settings = astype(settings, cdict)
-		page = 10
+		page = self.page_size
 		pos = self.paginate(pos, len(curr), page, diridx)
 		start_time = 0
 		if not curr:
@@ -1374,7 +1375,7 @@ class RadioCache:
 		results = cls.filter_results(results)
 		return results
 
-class Radio(Pagination, Command):
+class Radio(Pagination, Interactable, Command):
 	name = ["Radios", "RadioBrowser"]
 	description = "Searches for a radio station livestream on https://api.radio-browser.info that can be played in voice."
 	schema = cdict(
@@ -1396,8 +1397,9 @@ class Radio(Pagination, Command):
 	rate_limit = (6, 8)
 	slash = True
 	ephemeral = True
+	page_size = 32
 
-	async def __call__(self, _user, country, query, **void):
+	async def __call__(self, _user, country, query, page, **void):
 		query = query or ""
 		if country:
 			try:
@@ -1410,9 +1412,9 @@ class Radio(Pagination, Command):
 				)
 				countrycode = RadioCache.countries[country]
 			# Set callback message for scrollable list
-			return await self.display(_user.id, 0, countrycode, query)
+			return await self.display(_user.id, page * self.page_size, countrycode, query)
 		# Set callback message for scrollable list
-		return await self.display(_user.id, 0, "", query)
+		return await self.display(_user.id, page * self.page_size, "", query)
 
 	async def display(self, uid, pos, countrycode, query, diridx=-1):
 		curr = await RadioCache.search(countrycode, query)

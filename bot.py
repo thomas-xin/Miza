@@ -4410,13 +4410,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				content = message.embeds[0].description
 		try:
-			name, uid, data = Pagination.decode(str(content))
+			name, uid, data = Interactable.decode(str(content))
 		except ValueError:
 			return
 		# Force a rate limit on the reaction processing for the message
 		self.react_sem[message.id] = max(utc(), self.react_sem.get(message.id, 0) + 1)
 		for f in self.commands[name]:
-			if not isinstance(f, Pagination):
+			if not isinstance(f, Interactable):
 				continue
 			if not isnan(u_perm):
 				match f.react_perms(u_perm):
@@ -4532,7 +4532,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						text += "!"
 				# Status iterates through 5 possible choices
 				status = self.statuses[self.status_iter]
-				if 0:
+				if getattr(self, "invisible", False):
 					status = None
 					activity = discord.Game(name=text)
 				elif status is discord.Streaming:

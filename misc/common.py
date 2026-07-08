@@ -2015,7 +2015,8 @@ def default_pagination_key(curr, pos=0, page=16):
 		offset=pos,
 	).strip()
 
-class Pagination:
+class Interactable:
+	page_size = 16
 	directions = [b'\xe2\x8f\xaa', b'\xe2\x97\x80', b'\xe2\x96\xb6', b'\xe2\x8f\xa9', b'\xf0\x9f\x94\x84']
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	dirmap = dict(zip(dirnames, map(as_str, directions)))
@@ -2076,10 +2077,10 @@ class Pagination:
 	async def _callback_(self, _user, **void):
 		return self.construct(_user.id, b"", "`PLACEHOLDER`")
 
-	async def default_display(self, name, uid, pos, curr, diridx=-1, extra=b"", key=default_pagination_key, akey=None, page_size=16, plural=True):
+	async def default_display(self, name, uid, pos, curr, diridx=-1, extra=b"", key=default_pagination_key, akey=None, page_size=None, plural=True):
 		bot = self.bot
 		user = await bot.fetch_user(uid)
-		page = page_size
+		page = page_size or self.page_size
 		pos = self.paginate(pos, len(curr), page, diridx)
 		colour = await self.bot.get_colour(user)
 		emb = discord.Embed(
@@ -2099,10 +2100,10 @@ class Pagination:
 		emb.set_footer(text=f"Page {curr_page}/{max_page}")
 		return self.construct(uid, leb128(pos) + extra, embed=emb)
 
-	async def multi_display(self, name, uid, pos, curr, diridx=-1, extra=b"", page_size=8, plural=True):
+	async def multi_display(self, name, uid, pos, curr, diridx=-1, extra=b"", page_size=None, plural=True):
 		bot = self.bot
 		user = await bot.fetch_user(uid)
-		page = page_size
+		page = page_size or self.page_size
 		pos = self.paginate(pos, len(curr), page, diridx)
 		colour = await self.bot.get_colour(user)
 		emb = discord.Embed(
@@ -2141,16 +2142,79 @@ class Pagination:
 				pos = last
 		return pos
 
+
+class Pagination:
+	schema = None
+	page_size = 16
+
+	def __init__(self, *args, **kwargs):
+		if self.schema and "page" not in self.schema:
+			self.schema.page = cdict(
+				type="integer",
+				validation="[0,)",
+				description="Page number to jump to (zero-indexed)",
+				example="2",
+				default=0,
+			)
+		return super().__init__(*args, **kwargs)
+
+
+class Visual:
+	schema = None
+	page_size = 16
+
+	def __init__(self, *args, **kwargs):
+		if self.schema:
+			schema = cdict(
+				duration=cdict(
+					type="timedelta",
+					validation="[-3600, 3600]",
+					description="The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					example="1:26.3",
+				),
+				fps=cdict(
+					type="number",
+					validation="(0, 256]",
+					description="The framerate of the animation (does not affect duration)",
+					example="120/7",
+				),
+				filesize=cdict(
+					type="filesize",
+					validation="[1024, 1073741824]",
+					description="The maximum filesize in bytes",
+					example="10kb",
+					default=DEFAULT_FILESIZE,
+					aliases=["fs"],
+				),
+				format=cdict(
+					type="enum",
+					validation=cdict(
+						enum=tuple(VISUAL_FORMS),
+						accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
+					),
+					description="The file format or codec of the output",
+					example="mp4",
+					default="auto",
+				),
+			)
+			schema.update(self.schema)
+			self.schema = schema
+		return super().__init__(*args, **kwargs)
+
+
 class ImagePool:
-	schema = cdict(
-		embed=cdict(
-			type="bool",
-			description="Whether to send the message as an embed",
-			default=True,
-		),
-	)
+	schema = None
 	rate_limit = (0.05, 0.25)
 	threshold = 1024
+
+	def __init__(self, *args, **kwargs):
+		if self.schema and "embed" not in self.schema:
+			self.schema.embed = cdict(
+				type="bool",
+				description="Whether to send the message as an embed",
+				default=True,
+			)
+		return super().__init__(*args, **kwargs)
 
 	async def __call__(self, bot, embed=True, **void):
 		url = await bot.data.imagepools.get(self.database, self.fetch_one, self.threshold)

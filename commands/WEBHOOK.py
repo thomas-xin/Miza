@@ -5,7 +5,7 @@ if "common" not in globals():
 print = PRINT
 
 
-class AutoEmoji(Pagination, Command):
+class AutoEmoji(Pagination, Interactable, Command):
 	server_only = True
 	name = ["NQN", "Emojis"]
 	min_level = 0
@@ -24,7 +24,7 @@ class AutoEmoji(Pagination, Command):
 	rate_limit = (4, 6)
 	slash = True
 
-	async def __call__(self, bot, _user, _guild, mode, **void):
+	async def __call__(self, bot, _user, _guild, mode, page, **void):
 		data = bot.data.autoemojis
 		if mode == "enable":
 			data[_guild.id] = True
@@ -33,7 +33,7 @@ class AutoEmoji(Pagination, Command):
 			data[_guild.id] = False
 			return italics(css_md(f"Disabled automatic emoji substitution for {sqr_md(_guild)}."))
 		# Set callback message for scrollable list
-		return await self.display(_user.id, 0, _guild.id)
+		return await self.display(_user.id, page * self.page_size, _guild.id)
 
 	def react_perms(self, perm: int):
 		return None if perm < 2 else True
@@ -326,7 +326,7 @@ class UpdateAutoEmojis(Database):
 					bot.data.webhooks.temp.pop(m.channel.id, None)
 
 
-class EmojiList(Pagination, Command):
+class EmojiList(Pagination, Interactable, Command):
 	name = ["CustomEmoji", "ProxyEmoji"]
 	description = "Sets a custom alias for an emoji, usable by ~autoemoji. Accepts emojis, emoji IDs, emoji URLs, and message links containing emojis or reactions."
 	schema = cdict(
@@ -354,13 +354,13 @@ class EmojiList(Pagination, Command):
 	rate_limit = (4, 6)
 	slash = True
 
-	async def __call__(self, bot, _user, mode, name, emoji, **void):
+	async def __call__(self, bot, _user, mode, name, emoji, page, **void):
 		curr = bot.get_userbase(_user.id, "emojilist", {})
 		emote = getattr(emoji, "id", emoji)
 		match mode:
 			case "view":
 				# Set callback message for scrollable list
-				return await self.display(_user.id, 0)
+				return await self.display(_user.id, page * self.page_size)
 			case "search":
 				if emoji:
 					results = [(1., emoji.name, emoji.id)]

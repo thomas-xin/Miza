@@ -48,7 +48,7 @@ help_descriptions = fcdict((
 	("misc", "Miscellaneous, mostly not relevant to Discord and restricted to trusted servers"),
 ))
 
-class Help(Pagination, Command):
+class Help(Interactable, Command):
 	name = ["❓", "❔", "?", "Halp"]
 	description = "Shows a list of usable commands, or gives a detailed description of a command."
 	cats = [c for c in sorted(standard_commands)]
@@ -1134,7 +1134,7 @@ class Preserve(Command):
 		return "\n".join("<" + u + ">" for u in out)
 
 
-class Reminder(Pagination, Command):
+class Reminder(Pagination, Interactable, Command):
 	name = ["RemindMe", "Reminders", "Remind"]
 	description = "Sets a reminder for a certain date and time in the future."
 	schema = cdict(
@@ -1196,7 +1196,7 @@ class Reminder(Pagination, Command):
 	rate_limit = (8, 13)
 	slash = True
 
-	async def __call__(self, bot, _message, _comment, _channel, _user, mode, message, icon, time, every, edit, delete, **void):
+	async def __call__(self, bot, _message, _comment, _channel, _user, mode, message, icon, time, every, edit, delete, page, **void):
 		sendable = _channel if mode == "announce" else _user
 		rems = bot.data.reminders.get(sendable.id, [])
 		for r in rems:
@@ -1204,7 +1204,7 @@ class Reminder(Pagination, Command):
 				r.t = DynamicDT.utcfromtimestamp(r.t)
 		if all_none(message, icon, time, edit, delete):
 			# Set callback message for scrollable list
-			return await self.display(_user.id, 0, sendable.id)
+			return await self.display(_user.id, page * self.page_size, sendable.id)
 
 		if edit is not None:
 			if not len(rems):
@@ -1367,7 +1367,7 @@ class Reminder(Pagination, Command):
 		return await self.display(_user.id, pos, sid, index)
 
 
-class Note(Pagination, Command):
+class Note(Pagination, Interactable, Command):
 	name = ["Notes"]
 	description = "Takes note of a given string and allows you to view and edit a to-do list!"
 	schema = cdict(
@@ -1392,11 +1392,11 @@ class Note(Pagination, Command):
 	)
 	rate_limit = (6, 10)
 
-	async def __call__(self, bot, _user, message, edit, delete, **void):
+	async def __call__(self, bot, _user, message, edit, delete, page, **void):
 		notes = bot.get_userbase(_user.id, "notes", [])
 		if all_none(message, edit, delete):
 			# Set callback message for scrollable list
-			return await self.display(_user.id, 0)
+			return await self.display(_user.id, page * self.page_size)
 
 		if edit:
 			targets = RangeSet.parse([edit], len(notes))

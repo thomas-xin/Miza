@@ -9,7 +9,7 @@ from PIL import Image
 spaces = ("rgb", "bgr", "cmy", "xyz", "hsv", "hsl", "hsi", "hcl", "hcy", "lab", "luv", "yuv")
 
 
-class ColourDeficiency(Command):
+class ColourDeficiency(Visual, Command):
 	name = ["ColorBlind", "ColourBlind", "ColorBlindness", "ColourBlindness", "ColorDeficiency"]
 	alias = name + ["Protanopia", "Protanomaly", "Deuteranopia", "Deuteranomaly", "Tritanopia", "Tritanomaly", "Achromatopsia", "Achromatonomaly"]
 	description = "Applies a colourblindness filter to the target image."
@@ -37,24 +37,6 @@ class ColourDeficiency(Command):
 			description="The filter strength",
 			example="0.9",
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	rate_limit = (6, 10)
 	_timeout_ = 3.5
@@ -66,7 +48,7 @@ class ColourDeficiency(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class EdgeDetect(Command):
+class EdgeDetect(Visual, Command):
 	description = "Applies an edge or depth detection algorithm to the image."
 	schema = cdict(
 		mode=cdict(
@@ -84,24 +66,6 @@ class EdgeDetect(Command):
 			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
-		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
 		),
 	)
 	macros = cdict(
@@ -136,7 +100,7 @@ class EdgeDetect(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Blur(Command):
+class Blur(Visual, Command):
 	description = "Applies a blur algorithm to the image."
 	schema = cdict(
 		mode=cdict(
@@ -161,24 +125,6 @@ class Blur(Command):
 			aliases=["i"],
 			required=True,
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	macros = cdict(
 		Gaussian=cdict(
@@ -188,14 +134,14 @@ class Blur(Command):
 	rate_limit = (5, 7)
 	_timeout_ = 3
 
-	async def __call__(self, _time_limit, mode, strength, url, filesize, format, **void):
-		resp = await process_image(url, "blur_map", [[], None, None, mode, strength, "-fs", filesize, "-f", format], cap="image", timeout=_time_limit)
+	async def __call__(self, _time_limit, mode, strength, url, duration, fps, filesize, format, **void):
+		resp = await process_image(url, "blur_map", [[], float(duration) if duration is not None else None, fps, mode, strength, "-fs", filesize, "-f", format], cap="image", timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class ColourSpace(Command):
+class ColourSpace(Visual, Command):
 	name = ["ColorSpace"]
 	description = "Changes the colour space of the supplied image."
 	schema = cdict(
@@ -224,24 +170,6 @@ class ColourSpace(Command):
 			example="rgb",
 			default="hsv",
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	rate_limit = (7, 11)
 	_timeout_ = 4
@@ -253,7 +181,7 @@ class ColourSpace(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class GMagik(Command):
+class GMagik(Visual, Command):
 	description = "Applies the Magik image filter to supplied image."
 	schema = cdict(
 		url=cdict(
@@ -298,24 +226,6 @@ class GMagik(Command):
 			example="120/7",
 			default=30,
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	macros = cdict(
 		Magik=cdict(
@@ -337,7 +247,7 @@ class GMagik(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Gradient(Command):
+class Gradient(Visual, Command):
 	description = "Generates a gradient with a specific shape."
 	schema = cdict(
 		mode=cdict(
@@ -387,24 +297,6 @@ class Gradient(Command):
 			default="rgb",
 			aliases=["space"],
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(IMAGE_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	macros = cdict(
 		RainbowGradient=cdict(
@@ -422,7 +314,7 @@ class Gradient(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Colour(Command):
+class Colour(Visual, Command):
 	name = ["RGB", "HSV", "HSL", "CMY", "LAB", "LUV", "XYZ", "Color"]
 	description = "Creates a 128x128 image filled with the target colour."
 	schema = cdict(
@@ -432,24 +324,6 @@ class Colour(Command):
 			example="#BF7FFF",
 			default=(255, 255, 255),
 			aliases=["color"],
-		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(IMAGE_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
 		),
 	)
 	rate_limit = (3, 5)
@@ -474,7 +348,7 @@ class Colour(Command):
 		return cdict(content=msg, prefix="```ini\n", suffix="```", file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Text(Command):
+class Text(Visual, Command):
 	name = ["Font"]
 	description = "Renders text using an optional font."
 	schema = cdict(
@@ -517,24 +391,6 @@ class Text(Command):
 			example="#FF7FBF",
 			default=(0, 0, 0),
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(IMAGE_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	rate_limit = (3, 5)
 	slash = True
@@ -545,7 +401,7 @@ class Text(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Average(Command):
+class Average(Visual, Command):
 	name = ["AverageColour"]
 	description = "Computes the average pixel colour in RGB for the supplied image."
 	schema = cdict(
@@ -555,24 +411,6 @@ class Average(Command):
 			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
-		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(IMAGE_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
 		),
 	)
 	rate_limit = (5, 7)
@@ -599,7 +437,7 @@ class Average(Command):
 		return cdict(content=msg, prefix="```ini\n", suffix="```", file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class QR(Command):
+class QR(Visual, Command):
 	description = "Creates a QR code image from an input string, optionally adding a rainbow swirl effect."
 	schema = cdict(
 		mode=cdict(
@@ -645,24 +483,6 @@ class QR(Command):
 			example="120/7",
 			default=30,
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	macros = cdict(
 		RainbowQR=cdict(
@@ -680,7 +500,7 @@ class QR(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Rainbow(Command):
+class Rainbow(Visual, Command):
 	name = ["Gay"]
 	description = "Creates an animation from repeatedly hueshifting supplied image."
 	schema = cdict(
@@ -721,24 +541,6 @@ class Rainbow(Command):
 			example="120/7",
 			default=30,
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	rate_limit = (10, 13)
 	_timeout_ = 4
@@ -751,7 +553,7 @@ class Rainbow(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Scroll(Command):
+class Scroll(Visual, Command):
 	name = ["Parallax"]
 	description = "Creates an animation from repeatedly shifting supplied image in a specified direction."
 	schema = cdict(
@@ -793,24 +595,6 @@ class Scroll(Command):
 			example="120/7",
 			default=30,
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	rate_limit = (10, 13)
 	_timeout_ = 4
@@ -823,7 +607,7 @@ class Scroll(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Spin(Command):
+class Spin(Visual, Command):
 	description = "Creates an animation from repeatedly rotating supplied image."
 	schema = cdict(
 		url=cdict(
@@ -866,24 +650,6 @@ class Spin(Command):
 			example="120/7",
 			default=30,
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	macros = cdict(
 		Rotate=cdict(
@@ -902,7 +668,7 @@ class Spin(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Orbit(Command):
+class Orbit(Visual, Command):
 	name = ["Orbital", "Orbitals"]
 	description = "Renders a ring of orbiting sprites of the supplied image."
 	schema = cdict(
@@ -941,24 +707,6 @@ class Orbit(Command):
 			example="120/7",
 			default=30,
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	rate_limit = (16, 22)
 	_timeout_ = 13
@@ -971,7 +719,7 @@ class Orbit(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Pet(Command):
+class Pet(Visual, Command):
 	name = ["PetPet", "Attack", "Pat"]
 	description = "Creates an animation from applying the Petpet generator to the supplied image."
 	schema = cdict(
@@ -1010,24 +758,6 @@ class Pet(Command):
 			example="120/7",
 			default=30,
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	rate_limit = (10, 13)
 	_timeout_ = 5
@@ -1040,7 +770,7 @@ class Pet(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Tesseract(Command):
+class Tesseract(Visual, Command):
 	name = ["4D", "Octachoron", "Hypercube"]
 	description = "Creates an animation from applying the image as a tesseract texture and rotating."
 	schema = cdict(
@@ -1079,24 +809,6 @@ class Tesseract(Command):
 			example="120/7",
 			default=30,
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	rate_limit = (10, 13)
 	_timeout_ = 5
@@ -1132,7 +844,7 @@ class Tesseract(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Resize(Command):
+class Resize(Visual, Command):
 	name = ["Scale", "Rescale"]
 	description = "Changes size of supplied image, using an optional scaling operation."
 	schema = cdict(
@@ -1173,36 +885,6 @@ class Resize(Command):
 			validation="(0, 4294967296]",
 			description="Desired area in square pixels; will automatically scale current aspect ratio",
 			example="2073600",
-		),
-		duration=cdict(
-			type="timedelta",
-			validation="[-3600, 3600]",
-			description="The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-			example="1:26.3",
-		),
-		fps=cdict(
-			type="number",
-			validation="(0, 256]",
-			description="The framerate of the animation (does not affect duration)",
-			example="120/7",
-		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
 		),
 	)
 	macros = cdict(
@@ -1252,7 +934,7 @@ class Resize(Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Crop(Command):
+class Crop(Visual, Command):
 	name = ["Cut"]
 	description = "Crops the supplied image to a given size, expanding if necessary. Use \"-\" to omit measurements."
 	schema = cdict(
@@ -1291,37 +973,19 @@ class Crop(Command):
 			example="15",
 			default="-",
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	rate_limit = (4, 9)
 	_timeout_ = 4
 	slash = True
 
-	async def __call__(self, _time_limit, url, left, top, right, bottom, filesize, format, **void):
-		resp = await process_image(url, "crop_map", [[], None, None, left, top, right, bottom, "-fs", filesize, "-f", format], timeout=_time_limit)
+	async def __call__(self, _time_limit, url, left, top, right, bottom, duration, fps, filesize, format, **void):
+		resp = await process_image(url, "crop_map", [[], float(duration) if duration is not None else None, fps, left, top, right, bottom, "-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Adjust(Command):
+class Adjust(Visual, Command):
 	description = "Adjusts an optional amount of channels in the target image with a given operation and optional value."
 	schema = cdict(
 		url=cdict(
@@ -1363,24 +1027,6 @@ class Adjust(Command):
 			type="bool",
 			description="Clips out-of-bound values. Wraps values if not set",
 			default=True,
-		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
 		),
 	)
 	macros = cdict(
@@ -1426,14 +1072,14 @@ class Adjust(Command):
 	rate_limit = (7, 10)
 	_timeout_ = 4
 
-	async def __call__(self, _time_limit, url, channels, operation, value, clip, filesize, format, **void):
-		resp = await process_image(url, "adjust_map", [[], None, None, operation, value, channels, clip, "-fs", filesize, "-f", format], timeout=_time_limit)
+	async def __call__(self, _time_limit, url, channels, operation, value, clip, duration, fps, filesize, format, **void):
+		resp = await process_image(url, "adjust_map", [[], float(duration) if duration is not None else None, fps, operation, value, channels, clip, "-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Cut2Loop(Command):
+class Cut2Loop(Visual, Command):
 	name = ["C2L", "T2L", "Trim2Loop"]
 	description = "Autodetects an appropriate loop position for an animation lasting more than one full loop, and performs a trim."
 	schema = cdict(
@@ -1443,24 +1089,6 @@ class Cut2Loop(Command):
 			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
-		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
 		),
 	)
 	rate_limit = (8, 15)
@@ -1495,7 +1123,7 @@ class ImageCompare(Command):
 		return py_md(resp)
 
 
-class Caption(Command):
+class Caption(Visual, Command):
 	name = ["Title"]
 	description = "Renders text onto an image or animation, using an optional font."
 	schema = cdict(
@@ -1549,38 +1177,20 @@ class Caption(Command):
 			example="#FF7FBF",
 			default=(0, 0, 0),
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(IMAGE_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	rate_limit = (7, 13)
 	slash = True
 
-	async def __call__(self, bot, url, top_text, bottom_text, font, size, colour, width, outline, filesize, format, **void):
+	async def __call__(self, bot, url, top_text, bottom_text, font, size, colour, width, outline, duration, fps, filesize, format, **void):
 		if not top_text and not bottom_text:
 			raise ArgumentError("At least one of top_text or bottom_text is required.")
-		resp = await process_image(url, "caption_map", [[], None, 30, top_text, bottom_text, font, size, width, colour, outline, "-fs", filesize, "-f", format])
+		resp = await process_image(url, "caption_map", [[], float(duration) if duration is not None else None, fps, top_text, bottom_text, font, size, width, colour, outline, "-fs", filesize, "-f", format])
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
-class Blend(Command):
+class Blend(Visual, Command):
 	description = "Combines the two supplied images, using an optional blend operation."
 	schema = cdict(
 		urls=cdict(
@@ -1608,33 +1218,15 @@ class Blend(Command):
 			example="0.75",
 			default=0.5,
 		),
-		filesize=cdict(
-			type="filesize",
-			validation="[1024, 1073741824]",
-			description="The maximum filesize in bytes",
-			example="10kb",
-			default=DEFAULT_FILESIZE,
-			aliases=["fs"],
-		),
-		format=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(VISUAL_FORMS),
-				accepts={k: v for k, v in CODECS.items() if v in VISUAL_FORMS},
-			),
-			description="The file format or codec of the output",
-			example="mp4",
-			default="auto",
-		),
 	)
 	rate_limit = (13, 17)
 	flags = "l"
 	_timeout_ = 7
 	maintenance = True
 
-	async def __call__(self, _time_limit, urls, operation, opacity, filesize, format, **void):
+	async def __call__(self, _time_limit, urls, operation, opacity, duration, fps, filesize, format, **void):
 		url = urls.pop(0)
-		resp = await process_image(url, "blend_map", [urls, None, None, operation, opacity, "-fs", filesize, "-f", format], timeout=_time_limit)
+		resp = await process_image(url, "blend_map", [urls, float(duration) if duration is not None else None, fps, operation, opacity, "-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")

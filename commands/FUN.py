@@ -280,7 +280,7 @@ class ND2048(collections.abc.MutableSequence):
 	render = lambda self: self.__str__()
 
 
-class Text2048(Pagination, Command):
+class Text2048(Interactable, Command):
 	time_consuming = True
 	name = ["2048", "🎮"]
 	description = "Plays a game of 2048 using buttons. Gained points are rewarded as gold."
@@ -782,7 +782,7 @@ class Snake(Command):
 		self.playing.pop(message.id, None)
 
 
-class SlotMachine(Pagination, Command):
+class SlotMachine(Interactable, Command):
 	name = ["Slots"]
 	description = "Plays a slot machine game. Costs gold to play, can yield gold and diamonds."
 	schema = cdict(
@@ -1813,7 +1813,7 @@ class Pay(Command):
 		return css_md(f"{sqr_md(user)} has paid {sqr_md(amount)} {currency} to {sqr_md(target)}.")
 
 
-class React(Pagination, Command):
+class React(Pagination, Interactable, Command):
 	server_only = True
 	name = ["AutoReact"]
 	min_level = 0
@@ -1857,11 +1857,11 @@ class React(Pagination, Command):
 				out.extend([preprocess, values, emoji] for emoji in emojis)
 		return out
 
-	async def __call__(self, bot, _guild, _user, _message, _name, _perm, mode, keyword, emoji, preprocess, **void):
+	async def __call__(self, bot, _guild, _user, _message, _name, _perm, mode, keyword, emoji, preprocess, page, **void):
 		reacts = bot.get_guildbase(_guild.id, "reacts", [])
 		if not keyword and not emoji and mode != "remove":
 			# Set callback message for scrollable list
-			return await self.display(_user.id, 0, _guild.id)
+			return await self.display(_user.id, page * self.page_size, _guild.id)
 
 		if keyword:
 			if len(keyword) > 2 and keyword[0] == keyword[-1] == "/":
@@ -2780,7 +2780,7 @@ class Inspiro(ImagePool, Command):
 		return await Request.aio("https://inspirobot.me/api?generate=true", decode=True)
 
 
-class GIFSearch(Pagination, Command):
+class GIFSearch(Pagination, Interactable, Command):
 	name = ["Giphy", "Tenor", "Klipy", "GS"]
 	description = "Searches for animations on giphy, tenor and klipy."
 	schema = cdict(
@@ -2800,6 +2800,7 @@ class GIFSearch(Pagination, Command):
 	rate_limit = (4, 12)
 	cache = AutoCache(f"{CACHE_PATH}/gifs", stale=43200, timeout=86400 * 7)
 	slash = True
+	page_size = 8
 
 	async def search_giphy(self, query):
 		if not (giphy_key := AUTH.get("giphy_key")):
@@ -2864,14 +2865,14 @@ class GIFSearch(Pagination, Command):
 
 	async def display(self, uid, pos, query, diridx=-1):
 		results = await self.aggregate_searches(query, cid=abs(hash(uid)))
-		return await self.multi_display("search result", uid, pos, results, diridx, extra=as_bytes(query), page_size=8)
+		return await self.multi_display("search result", uid, pos, results, diridx, extra=as_bytes(query))
 
-	async def __call__(self, bot, _channel, _message, _user, query, count, **void):
+	async def __call__(self, bot, _channel, _message, _user, query, count, page, **void):
 		if count:
 			results = await self.aggregate_searches(query, cid=abs(hash(str(_user))))
 			results = results[:count]
 			return await bot.send_multi_image_embeds(_channel, images=results, reference=_message)
-		return await self.display(_user.id, 0, query)
+		return await self.display(_user.id, page * self.page_size, query)
 
 	async def _callback_(self, _user, index, data, **void):
 		pos, more = decode_leb128(data)
