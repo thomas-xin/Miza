@@ -2831,7 +2831,8 @@ class UpdateRolePreservers(Database):
 					except Exception:
 						print_exc()
 						print(f"RolePreserver: Failed to grant role: {role.id}, {role}")
-					granted.append(role)
+					else:
+						granted.append(role)
 		self.data[guild.id].pop(user.id, None)
 		print(f"RolePreserver: Granted {granted} to {user} in {guild}.")
 
