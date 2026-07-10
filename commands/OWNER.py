@@ -1332,7 +1332,7 @@ class UpdateEmojis(Database):
 					return emoji
 		if emojidata is not None and len(emojidata["items"]) < 2000:
 			b = await read_file_a(f"misc/emojis/{name}")
-			b2 = await bot.to_data_url(b)
+			b2 = "data:" + get_mime(b) + ";base64," + base64.b64encode(b).decode("ascii")
 			async with self.sem3:
 				edata = await Request.aio(
 					f"https://discord.com/api/{api}/applications/{bot.id}/emojis",

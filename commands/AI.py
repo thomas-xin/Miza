@@ -45,22 +45,42 @@ class Translate(Command):
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, bot, _premium, engine, dst_languages, input, **void):
+	async def __call__(self, bot, _message, _premium, engine, dst_languages, input, force=True, **void):
 		input = await bot.superclean_content(input)
 		if not input:
 			raise ArgumentError("Input string is empty.")
-		embeds = []
 		assert isinstance(dst_languages, list_like)
-		src_language = await self.det(input)
+		if not force:
+			src_language = await self.det(input)
+		translations = []
+		sim = T(_message).get("simulated", None)
+		if not sim:
+			emoji = await bot.data.emojis.grab("loading.gif")
+			loading = min_emoji(emoji, full=True)
+		embeds = []
 		for dest in dst_languages:
-			if dest.split("-", 1)[0] == src_language:
+			if not force and dest.split("-", 1)[0] == src_language:
 				continue
+			dst_language = googletrans.LANGUAGES.get(dest, dest).capitalize()
 			match engine:
 				case "auto" | "llm":
-					out = await self.llm_translate(input, dest, premium=_premium)
+					gen = self.llm_translate(input, dest, premium=_premium)
 				case _:
 					raise NotImplementedError(engine)
-			dst_language = googletrans.LANGUAGES.get(dest, dest).capitalize()
+			draft = await anext(gen)
+			translations.append([dst_language, gen])
+			emb = discord.Embed(
+				colour=rand_colour(),
+				title=f"{dst_language} (Draft)...",
+				description=lim_str(draft.translated + " " + loading, 4096),
+			)
+			embeds.append(emb)
+		target = None
+		if embeds and not sim:
+			target = await _message.reply(embeds=embeds)
+		embeds = []
+		for dst_language, gen in translations:
+			out = await anext(gen)
 			emb = discord.Embed(
 				colour=rand_colour(),
 				title=dst_language,
@@ -74,7 +94,11 @@ class Translate(Command):
 		if desc:
 			embeds.append(discord.Embed(description=desc))
 			print(">", desc)
-		return cdict(embeds=embeds)
+		if target:
+			await bot.edit_message(target, embeds=embeds)
+			return
+		if embeds:
+			return cdict(embeds=embeds)
 
 	async def det(self, input):
 		resp = await _run_async(detector.detect, input, model="auto")
@@ -99,8 +123,8 @@ class Translate(Command):
 			except Exception:
 				print_exc()
 				return
-			return tr.text
-		async def llm_translate():
+			return tr.text.strip()
+		async def chat_translate():
 			try:
 				cmpl = await ai.llm(
 					"chat.completions.create",
@@ -109,16 +133,23 @@ class Translate(Command):
 					max_completion_tokens=16384,
 					premium_context=premium,
 				)
-				return cmpl.choices[0].message.content
+				return cmpl.choices[0].message.content.strip()
 			except Exception:
 				print_exc()
 
 		c = await tcount(input)
+		tasks = [chat_translate()]
 		if c > 1:
-			translations = await gather(google_translate(), llm_translate())
-		else:
-			translations = [await llm_translate()]
-		translations = list(filter(bool, translations))
+			tasks.append(google_translate())
+		translations = []
+		async for task in asyncio.as_completed(tasks):
+			result = await task
+			if result:
+				if not translations:
+					yield cdict(
+						translated=result,
+					)
+				translations.append(result)
 		if translations:
 			messages = [
 				dict(
@@ -134,7 +165,6 @@ class Translate(Command):
 					content=text,
 				) for text in translations),
 			]
-		print(messages)
 		try:
 			translated = await ai._instruct(
 				data=dict(
@@ -151,7 +181,7 @@ class Translate(Command):
 			print_exc()
 			translated = await ai._instruct(
 				data=dict(
-					model="mimo-v2.5",
+					model="hy3",
 					messages=messages,
 					temperature=0.01,
 					premium_context=premium,
@@ -159,7 +189,6 @@ class Translate(Command):
 					reasoning_effort="medium",
 				),
 			)
-		print(translated)
 		tr = None
 		pronunciation = None
 		if dest != "en":
@@ -170,7 +199,7 @@ class Translate(Command):
 				pronunciation = tr.extra_data["translation"][-1][3]
 			except (AttributeError, LookupError):
 				pass
-		return cdict(
+		yield cdict(
 			translated=translated,
 			pronunciation=pronunciation,
 		)
@@ -240,11 +269,13 @@ class UpdateTranslators(Database):
 		if bot.is_optout(user):
 			return
 		channel = message.channel
-		guild = message.guild
-		tr = bot.commands.translate[0]
-		content = message.clean_content.strip()
 		with bot.ExceptionSender(channel, reference=message):
-			await bot.run_command(bot.commands.tr[0], dict(**curr, input=message.clean_content.strip()), message=message, respond=True)
+			await bot.run_command(
+				bot.commands.translate[0],
+				dict(**curr, input=message.clean_content.strip(), force=False),
+				message=message,
+				respond=True,
+			)
 
 
 _ntrans = "".maketrans({"-": "", " ": "", "_": ""})
