@@ -201,11 +201,6 @@ class ImageSequence(Image.Image, collections.abc.Sequence):
 			except EOFError:
 				pass
 			images = simages
-			if len(images) == 1:
-				im = images[0]
-				if func:
-					return func(im, *args)
-				return im
 			copy = False
 		return cls(*images, copy=copy, func=func, args=args)
 

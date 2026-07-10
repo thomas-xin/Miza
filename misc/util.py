@@ -3403,14 +3403,17 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			self[k] = v
 		return v
 
-	def _retrieve(self, k, func, *args, read=False, _cache=lambda _: True, **kwargs):
+	def _retrieve(self, k, func, *args, read=False, _cache=lambda _: True, default=Dummy, **kwargs):
 		try:
 			self._retrieving[k] = fut = concurrent.futures.Future()
 			v = func(*args, **kwargs)
 			if _cache(v):
 				self.__setitem__(k, v, read=read)
 		except Exception as ex:
-			fut.set_exception(ex)
+			if default is Dummy:
+				fut.set_exception(ex)
+			else:
+				fut.set_result(v)
 			raise
 		else:
 			fut.set_result(v)
@@ -3435,18 +3438,18 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			delay = utc() - t
 			if delay > self._stimeout or _force and delay > self._stale:
 				try:
-					v = self._retrieve(k, func, *args, read=_read, **kwargs)
+					v = self._retrieve(k, func, *args, read=_read, default=v, **kwargs)
 				except Exception:
 					pass
 			elif delay > self._stale:
-				submit_thread(self._retrieve, k, func, *args, read=_read, **kwargs)
+				submit_thread(self._retrieve, k, func, *args, read=_read, default=v, **kwargs)
 			elif isinstance(v, Exception):
 				raise v
 		else:
 			return self._retrieve(k, func, *args, read=_read, **kwargs)
 		return v
 
-	async def _aretrieve(self, k, func, *args, read=False, _cache=lambda _: True, **kwargs):
+	async def _aretrieve(self, k, func, *args, read=False, _cache=lambda _: True, default=Dummy, **kwargs):
 		await _run_async(self.base_init)
 		try:
 			self._retrieving[k] = fut = concurrent.futures.Future()
@@ -3454,7 +3457,10 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			if _cache(v):
 				await _run_async(self.__setitem__, k, v, read=read)
 		except Exception as ex:
-			fut.set_exception(ex)
+			if default is Dummy:
+				fut.set_exception(ex)
+			else:
+				fut.set_result(v)
 			raise
 		else:
 			fut.set_result(v)
@@ -3480,11 +3486,11 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			delay = utc() - t
 			if delay > self._stimeout or _force and delay > self._stale:
 				try:
-					v = await self._aretrieve(k, func, *args, read=_read, **kwargs)
+					v = await self._aretrieve(k, func, *args, read=_read, default=v, **kwargs)
 				except Exception:
 					pass
 			elif delay > self._stale:
-				create_task(self._aretrieve(k, func, *args, read=_read, **kwargs))
+				create_task(self._aretrieve(k, func, *args, read=_read, default=v, **kwargs))
 			elif isinstance(v, Exception):
 				raise v
 		else:
@@ -4823,7 +4829,7 @@ class EvalPipe:
 			proc.is_running,
 			(lambda b: share_bytes(conn.send_bytes, b)) if address == "127.0.0.1" else conn.send_bytes,
 			None,
-			proc.terminate,
+			lambda: force_kill(proc),
 			proc.wait,
 			glob=glob,
 			id=port,

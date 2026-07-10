@@ -19,6 +19,6 @@ pynacl>=1.6.2
 python-multipart>=0.0.22
 requests>=2.33.1
 starlette-compress>=1.7.0
-streamshatter>=1.1.12
+streamshatter>=1.2.1
 urllib3-future>=2.20.905
 yt-dlp>=2026.5.16.233954.dev0

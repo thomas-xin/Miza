@@ -851,11 +851,6 @@ TOOLS = {
 		f_browse,
 		f_wolfram_alpha,
 		f_deno,
-		f_myinfo,
-	],
-	"image_generation": [
-		f_browse,
-		f_myinfo,
 	],
 	"calculator": [
 		f_browse,

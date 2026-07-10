@@ -558,7 +558,6 @@ class Ask(Command):
 							succ = await rag(name, tid, fut)
 					elif name == "deno":
 						argv = kwargs.get("query") or " ".join(kwargs.values())
-						prec = float(kwargs.get("precision") or 128)
 						s = f'\n> Evaluating "{argv}"...'
 						text += s
 						yield s
@@ -581,38 +580,6 @@ class Ask(Command):
 						text += s
 						yield s
 						fut = process_image("wolframalpha", "$", [argv], cap="browse", timeout=60)
-						succ = await rag(name, tid, fut)
-					elif name == "myinfo":
-						async def myinfo(argv):
-							u2 = None
-							if argv.strip("-"):
-								if not _guild and getattr(_channel, "recipient", None):
-									u2 = bot.query_members([_channel.recipient, bot.user], argv)
-								else:
-									u2 = await bot.fetch_user_member(argv, _guild)
-							if not u2:
-								u2 = bot
-							if u2.id == bot.id:
-								if pdata.description == DEFPER and bot_name == bot.user.display_name and bot.id == 668999031359537205:
-									res = "- You are `Miza`, a multipurpose, multimodal bot that operates on social platforms such as Discord.\n- Your appearance is based on the witch-girl `Misery` from `Cave Story`.\n- Your creator is <@201548633244565504>, and you have a website at https://mizabot.xyz which a guide on your capabilities!"
-								else:
-									cap = await self.bot.caption(best_url(u2), best=2 if premium.value_approx >= 4 else 0, timeout=24)
-									s = "\n\n".join(filter(bool, cap)).strip()
-									res = f"- You are `{u2.name}`, a multipurpose, multimodal bot that operates on social platforms such as Discord.\n- Your appearance is based on `{s}`."
-									if bot.owners:
-										i = next(iter(bot.owners))
-										um = user_mention(i)
-										res += f"\n-Your owner is {um}."
-							else:
-								cap = await self.bot.caption(best_url(u2), best=2 if premium.value_approx >= 4 else 0, timeout=24)
-								s = "\n\n".join(filter(bool, cap)).strip()
-								res = f"- Search results: `{u2.name}` has the appearance of `{s}`."
-							return res
-						argv = kwargs.get("user") or " ".join(kwargs.values())
-						s = f'\n> Querying "{argv}"...'
-						text += s
-						yield s
-						fut = myinfo(argv)
 						succ = await rag(name, tid, fut)
 					elif name == "reminder":
 						message = kwargs.get("message") or kwargs.get("content") or ""

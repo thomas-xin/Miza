@@ -8684,7 +8684,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						if m.author.id == bot.deleted_user:
 							print("USER DELETED:", before, before.id)
 							bot.set_userbase(before.id, "deleted", True)
-						last_audit = cdict(kind="delete")
+							last_audit = cdict(kind="delete")
 						break
 			try:
 				requestor = await self.fetch_member(last_audit.uid, guild=before.guild)
