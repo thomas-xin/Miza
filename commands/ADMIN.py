@@ -2331,6 +2331,7 @@ class UpdateUserLogs(Database):
 					emb.add_field(name="Roles", value=rchange)
 					change = True
 					colour[1] += 255
+		requires_edit = False
 		bk, ak = before.avatar, after.avatar
 		if hasattr(bk, "key"):
 			bk = bk.key
@@ -2353,7 +2354,6 @@ class UpdateUserLogs(Database):
 						b_url = "attachment://" + fn
 					else:
 						b_url = bf
-		requires_edit = False
 		if bk != ak:
 			a_url = best_url(after)
 			if "exec" in bot.data:
@@ -2375,7 +2375,7 @@ class UpdateUserLogs(Database):
 			colour[2] += 255
 		if not change:
 			return
-		ua, ub = a_url, b_url
+		_ua, ub = a_url, b_url
 		emb.set_author(name=str(after), icon_url=b_url, url=b_url if is_url(b_url) else None)
 		emb.colour = colour2raw(colour)
 		try:

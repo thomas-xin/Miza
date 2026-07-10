@@ -39,6 +39,7 @@ class Translate(Command):
 			type="string",
 			description="Text to translate",
 			example="bonjour, comment-t'appelles-tu?",
+			greedy=False,
 		),
 	)
 	rate_limit = (6, 9)
@@ -86,7 +87,13 @@ class Translate(Command):
 				title=dst_language,
 				description=lim_str(out.translated, 4096),
 			)
-			pronunciation = getattr(out, "pronunciation", None)
+			orig_pronunciation = getattr(out, "orig_pronunciation") or ""
+			pronunciation = getattr(out, "pronunciation", "")
+			if orig_pronunciation:
+				if not pronunciation:
+					pronunciation = orig_pronunciation
+				else:
+					pronunciation = orig_pronunciation + " ➡️ " + pronunciation
 			if pronunciation:
 				emb.set_footer(text=lim_str(pronunciation, 1024))
 			embeds.append(emb)
@@ -117,12 +124,18 @@ class Translate(Command):
 			),
 		]
 
+		orig_pronunciation = None
 		async def google_translate():
+			nonlocal orig_pronunciation
 			try:
 				tr = await translator.translate(input, dest=dest)
 			except Exception:
 				print_exc()
 				return
+			try:
+				orig_pronunciation = tr.extra_data["translation"][-1][3]
+			except (AttributeError, LookupError):
+				pass
 			return tr.text.strip()
 		async def chat_translate():
 			try:
@@ -201,6 +214,7 @@ class Translate(Command):
 				pass
 		yield cdict(
 			translated=translated,
+			orig_pronunciation=orig_pronunciation,
 			pronunciation=pronunciation,
 		)
 
@@ -691,7 +705,7 @@ class Ask(Command):
 			tips = [
 				"*Tip: By using generative AI, you are assumed to comply with the [ToS](<https://github.com/thomas-xin/Miza/wiki/Terms-of-Service>).*",
 				"*Tip: The chatbot feature is designed to incorporate multiple SOTA models in addition to internet-based interactions. For direct interaction with the raw LLMs, check out ~instruct.*",
-				"*Tip: My personality prompt and message streaming are among several parameters that may be modified. Check out ~help personality for more info. Note that an improperly constructed prompt may be detrimental to response quality, and that giving me a nickname may also have an effect.*",
+				"*Tip: My personality prompt and message streaming are among several parameters that may be modified. Check out ~help chatconfig for more info. Note that an improperly constructed prompt may be detrimental to response quality, and that giving me a nickname may also have an effect.*",
 				"*Tip: Remember that anything a chatbot says may be fictional or otherwise made-up. Always fact-check from reputable sources before making serious assumptions, and don't take the AI's words too seriously.*",
 				"*Tip: At any point in time, you can delete your command message to stop generation.*",
 			]

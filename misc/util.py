@@ -93,7 +93,7 @@ if PORT:
 IND = "\x7f"
 
 compat_python = AUTH.get("compat_python") or python
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
 
 @tracebacksuppressor
 def save_file(data, fn):
@@ -981,21 +981,21 @@ def verify_url(url):
 				return url[1:-1]
 			return url
 	return url
-def is_discord_url(url): return url and regexp("^https?:\\/\\/(?:\\w{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/").findall(url) + regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").findall(url)
-def is_discord_attachment(url): return url and regexp("^https?:\\/\\/(?:\\w{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/attachments\\/").search(str(url))
-def is_discord_emoji(url): return url and regexp("^https?:\\/\\/(?:\\w{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/emojis\\/").search(str(url))
-def is_tenor_url(url): return url and regexp("^https?:\\/\\/tenor.com(?:\\/view)?/[\\w\\-]+-[0-9]+").findall(url)
-def is_imgur_url(url): return url and regexp("^https?:\\/\\/(?:\\w\\.)?imgur.com/[\\w\\-]+").findall(url)
-def is_giphy_url(url): return url and regexp("^https?:\\/\\/giphy.com/gifs/[\\w\\-]+").findall(url)
-def is_miza_url(url): return url and regexp("^https?:\\/\\/(?:\\w+\\.)?mizabot.xyz(?:\\:[0-9]+)?").findall(url)
-def is_miza_attachment(url): return url and regexp("^https?:\\/\\/(?:\\w+\\.)?mizabot.xyz(?:\\:[0-9]+)?\\/\\w\\/").findall(url)
-def is_youtube_url(url): return url and regexp("^https?:\\/\\/(?:\\w{1,5}\\.)?youtu(?:\\.be|be\\.com)\\/[^\\s<>`|\"']+").findall(url)
-def is_youtube_stream(url): return url and regexp("^https?:\\/\\/r+[0-9]+---.{2}-[\\w\\-]{4,}\\.googlevideo\\.com").findall(url)
-def is_soundcloud_stream(url): return url and regexp("^https?:\\/\\/(?:[\\w\\-]*)?media\\.sndcdn\\.com\\/[^\\s<>`|\"']+").findall(url)
-def is_deviantart_url(url): return url and regexp("^https?:\\/\\/(?:www\\.)?deviantart\\.com\\/[^\\\\s<>`|\"']+").findall(url)
-def is_reddit_url(url): return url and regexp("^https?:\\/\\/(?:\\w{2,3}\\.)?reddit.com\\/r\\/[^/\\W]+\\/").findall(url)
+def is_discord_url(url): return url and regexp(r"^https?:\/\/(?:\w{3,8}\.)?discord(?:app)?\.(?:com|net)\/").findall(url) + regexp(r"https:\/\/images-ext-[0-9]+\.discordapp\.net\/external\/").findall(url)
+def is_discord_attachment(url): return url and regexp(r"^https?:\/\/(?:\w{3,8}\.)?discord(?:app)?\.(?:com|net)\/attachments\/[0-9]+\/[0-9]+\/[^?\s]+").match(str(url))
+def is_discord_message_link(url): return url and regexp(r"^https?:\/\/(?:\w{3,8}\.)?discord(?:app)?\.(?:com|net)\/channels\/(?:[0-9]+|@me)\/[0-9]+(?:\/[0-9]+)?$").fullmatch(str(url))
+def is_discord_emoji(url): return url and regexp(r"^https?:\/\/(?:\w{3,8}\.)?discord(?:app)?\.(?:com|net)\/emojis\/[0-9]+").match(str(url))
+def is_tenor_url(url): return url and regexp(r"^https?:\/\/tenor.com(?:\/view)?\/[\w\-]+-[0-9]+").findall(url)
+def is_imgur_url(url): return url and regexp(r"^https?:\/\/(?:\w\.)?imgur.com\/[\w\-]+").findall(url)
+def is_giphy_url(url): return url and regexp(r"^https?:\/\/giphy.com\/gifs\/[\w\-]+").findall(url)
+def is_miza_url(url): return url and regexp(r"^https?:\/\/(?:\w+\.)?mizabot.xyz(?:\:[0-9]+)?").findall(url)
+def is_miza_attachment(url): return url and regexp(r"^https?:\/\/(?:\w+\.)?mizabot.xyz(?:\:[0-9]+)?\/\w\/").findall(url)
+def is_youtube_url(url): return url and regexp(r"^https?:\/\/(?:\w{1,5}\.)?youtu(?:\.be|be\.com)\/[^\s<>`|" '"' "']+").findall(url)
+def is_youtube_stream(url): return url and regexp(r"^https?:\/\/r+[0-9]+---.{2}-[\w\-]{4,}\.googlevideo\.com").findall(url)
+def is_soundcloud_stream(url): return url and regexp(r"^https?:\/\/(?:[\w\-]*)?media\.sndcdn\.com\/[^\s<>`|" '"' "']+").findall(url)
+def is_reddit_url(url): return url and regexp(r"^https?:\/\/(?:\w{2,3}\.)?reddit.com\/r\/[^/\W]+\/").findall(url)
 def is_emoji_url(url): return url and url.startswith("https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/")
-def is_spotify_url(url): return url and regexp("^https?:\\/\\/(?:play|open|api)\\.spotify\\.com\\/").findall(url)
+def is_spotify_url(url): return url and regexp(r"^https?:\/\/(?:play|open|api)\.spotify\.com\/").findall(url)
 def _unyt(s):
 	s = re.sub(r"[\?&]pp=[\w\-]+", "", re.sub(r"[\?&]si=[\w\-]+", "", s))
 	return re.sub(r"https?:\/\/(?:\w{1,5}\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)", "https://youtu.be/", s)
@@ -1020,10 +1020,6 @@ def unyt(s):
 	return s
 def equiv_url(u1, u2):
 	return u1 == u2 or unyt(u1) == unyt(u2)
-def is_discord_message_link(url) -> bool:
-	"Detects whether a Discord link represents a channel or message link."
-	check = url[:64]
-	return "channels/" in check and "discord" in check
 def discord_expired(url, early=21600 + 60):
 	if is_discord_attachment(url):
 		if "?ex=" not in url and "&ex=" not in url:
@@ -1905,6 +1901,41 @@ def decode_attachment(encoded):
 	if len(ids) < 4:
 		ids.append("")
 	return ids
+
+def split_message_link(url):
+	assert is_discord_message_link(url), url
+	path = url.split("/channels/", 1)[-1].replace("@me", "0")
+	out = tuple(map(int, path.split("/", 2)))
+	if len(out) <= 2:
+		return out + (9223372036854775807,)
+	return out
+
+def parse_custom_ref(content):
+	resp = cdict()
+	if not content.startswith("-# ⮣ [**"):
+		return
+	ref, mcontent = content.split("\n", 1)
+	if ref.count("**") < 2 or "(" not in ref:
+		return
+	start, link = ref.removesuffix(")").rsplit("(", 1)
+	if not is_discord_message_link(link):
+		return
+	rgid, rcid, rmid = split_message_link(link)
+	_e, aname, rcontent = start.split("**", 2)
+	rcontent = rcontent.removeprefix("] ")
+	resp.message_reference = dict(
+		guild_id=rgid,
+		channel_id=rcid,
+		message_id=rmid,
+		referenced_message=dict(
+			author=dict(
+				display_name=aname,
+			),
+			content=rcontent,
+		),
+	)
+	resp.content = mcontent
+	return resp
 
 @split_attachment
 def shorten_attachment(cid, mid, aid, fn, mode="u", size=0, base="https://mizabot.xyz", minimise=False):

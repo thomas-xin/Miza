@@ -724,7 +724,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				os.makedirs(archive_path, exist_ok=True)
 				for fn in os.listdir("misc/archive"):
 					shutil.copyfile(f"misc/archive/{fn}", f"{archive_path}/{fn}")
-				args = ["hypercorn", "serve:app", "--bind", f"0.0.0.0:{ap}", "-w", "12"]
+				args = ["hypercorn", "serve:app", "--bind", f"0.0.0.0:{ap}", "-w", "6"]
 				print(args)
 				self.archive_server = psutil.Popen(args, cwd=archive_path)
 			else:
@@ -1322,11 +1322,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return data[m_id]
 	async def fetch_message(self, m_id, channel=None, old=False, fast=False):
 		if not isinstance(m_id, int):
-			if is_discord_url(m_id) and "/channels/" in m_id:
-				url = m_id
-				spl = url[url.index("/channels/") + 10:].replace("?", "/").split("/", 2)
-				channel = await self.fetch_channel(spl[1])
-				m_id = spl[2]
+			if is_discord_message_link(m_id):
+				g_id, c_id, m_id = split_message_link(m_id)
+				channel = await self.fetch_channel(c_id)
 			try:
 				m_id = int(m_id)
 			except (ValueError, TypeError):
@@ -3048,7 +3046,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if int(attachment.size) <= 64 * 1048576:
 			return await attachment_cache.download(attachment.url, m_id=getattr(message, "id", None))
 
-	def get_colour(self, user) -> int:
+	def get_colour(self, user) -> asyncio.Future[int]:
 		if user is None:
 			return as_fut(16777214)
 		if hasattr(user, "icon_url"):
@@ -3099,6 +3097,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						embedded_images.append(url)
 						if len(embedded_images) >= image_limit:
 							break
+		if not content.startswith("-# ⮣ ") and getattr(message, "reference", None):
+			reference = await self.fetch_reference(message)
+			content = (fake_reply(reference) + "\n" + (content or "")).strip()
 		emb.description = content
 		for a in message.attachments:
 			url = a.url
@@ -5861,8 +5862,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			args = list(args)
 			content = args.pop(0) if args else kwargs.get("content")
 			if kwargs.get("reference"):
-				content = fake_reply(kwargs.pop("reference")) + "\n" + (content or "")
-				content = content.strip()
+				content = (fake_reply(kwargs.pop("reference")) + "\n" + (content or "")).strip()
 			else:
 				kwargs.pop("reference", None)
 			try:

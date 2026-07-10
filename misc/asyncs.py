@@ -182,7 +182,7 @@ async def _gather(*futs, return_exceptions=False, max_concurrency=None):
 			fut2 = out_futs.popleft()
 			try:
 				res = await fut2
-			except Exception as ex:
+			except BaseException as ex:
 				if not return_exceptions:
 					raise
 				outs.append(ex)

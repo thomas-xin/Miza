@@ -1,22 +1,30 @@
-import sys
+if __name__ == "__main__":
+	import argparse
+	parser = argparse.ArgumentParser(
+		prog="server-dump",
+		description="Discord Server Archiver",
+	)
+	parser.add_argument("-t", "--token", type=str, required=True)
+	parser.add_argument("-g", "--guild-id", type=str, default="")
+	parser.add_argument("-u", "--user-id", type=str, default="")
+	parser.add_argument("-c", "--channel-id", type=str, default="")
+	parser.add_argument("-l", "--log-id", type=str, default="")
+	parser.add_argument("-m", "--min-id", type=int, default=None)
+	parser.add_argument("-M", "--max-id", type=int, default=None)
+	parser.add_argument("-p", "--filepath", type=str, required=True)
+	parser.add_argument("-a", "--append", action=argparse.BooleanOptionalAction, default=True)
+	ctx = parser.parse_args()
 
-if len(sys.argv) < 9:
-	print(f"Usage: python {sys.argv[0]} <token> <guild-id> <user-ids> <channel-ids> <logs-to-parse> <min-id> <max-id> <filepath>")
-	sys.exit(1)
-
-import os, json, time, asyncio, re, random, datetime, concurrent.futures
+import os, json, time, asyncio, re, random, fractions, datetime, concurrent.futures
 from traceback import print_exc
 import niquests
 
 from dynamic_dt import DynamicDT
-from .types import pretty_json, lim_str
+from .types import pretty_json, lim_str, encode_jsonl, decode_jsonl
 from .asyncs import gather, Semaphore
-from .util import Request, temporary_file, unyt, time_snowflake, snowflake_time_3, is_discord_message_link, retrieve_api
+from .util import Request, temporary_file, unyt, url2ext, time_snowflake, snowflake_time_3, is_discord_message_link, split_message_link, parse_custom_ref, retrieve_api
 from .caches import attachment_cache
 
-
-base_path = " ".join(sys.argv[8:])
-os.makedirs(base_path, exist_ok=True)
 
 main_sem = Semaphore(10, float("inf"), 1)
 bucket_sems = {}
@@ -60,19 +68,25 @@ async def retrieve_api_a(path, method="GET", data=None):
 	return await retrieve_api(path, method=method, headers=headers, data=data)
 
 
-async def run():
-	await verify_token(sys.argv[1])
-	guild_ids = list(map(int, sys.argv[2].split(","))) if sys.argv[2] else []
-	channel_ids = list(map(int, sys.argv[3].split(","))) if sys.argv[3] else []
-	user_ids = list(map(int, sys.argv[4].split(","))) if sys.argv[4] else []
-	log_ids = set(map(int, sys.argv[5].split(","))) if sys.argv[5] else []
-	min_id, max_id = sorted(map(int, sys.argv[6:8]))
+async def run(ctx):
+	base_path = ctx.filepath
+	os.makedirs(base_path, exist_ok=True)
+
+	await verify_token(ctx.token)
+	guild_ids = list(map(int, ctx.guild_id.split(","))) if ctx.guild_id else []
+	channel_ids = list(map(int, ctx.channel_id.split(","))) if ctx.channel_id else []
+	user_ids = list(map(int, ctx.user_id.split(","))) if ctx.user_id else []
+	log_ids = set(map(int, ctx.log_id.split(","))) if ctx.log_id else []
+	min_id, max_id = ctx.min_id, ctx.max_id
+	if not min_id:
+		min_id = 0
 	if not max_id:
 		max_id = time_snowflake(datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(days=1))
+	append = ctx.append
 
-	progress: list[float] = []
+	progress: list[list[float]] = []
 	def print_progress(mode="Progress"):
-		print(f"{mode}: {'%.3f' % (sum(progress) / len(progress) * 100)}%", end="\r")
+		print(f"{mode}: {'%.3f' % (sum(p[0] for p in progress) / sum(p[1] for p in progress) * 100)}%", end="\r")
 
 	async def extract_channels(guild_ids, channel_ids):
 		guild_ids = set(guild_ids)
@@ -95,7 +109,7 @@ async def run():
 				)
 			channels.update({int(data["id"]): data for data in resp["threads"]})
 
-			progress[index] = 1
+			progress[index][0] = 1
 			print_progress("Guilds")
 
 		async def get_channel(cid, index):
@@ -107,18 +121,18 @@ async def run():
 			if "guild_id" in resp:
 				guild_ids.add(int(resp["guild_id"]))
 
-			progress[index] = 1
+			progress[index][0] = 1
 			print_progress("Channels")
 
 		if channel_ids:
-			progress.extend([0] * len(channel_ids))
+			progress.extend([[0, 1]] * len(channel_ids))
 			print_progress("Channels")
 
 			futs = [get_channel(cid, i) for i, cid in enumerate(channel_ids)]
 			await gather(*futs)
 			progress.clear()
 		if guild_ids:
-			progress.extend([0] * len(guild_ids))
+			progress.extend([[0, 1]] * len(guild_ids))
 			print_progress("Guilds")
 
 			futs = []
@@ -143,6 +157,7 @@ async def run():
 		stickers={},
 		emojis={},
 		attachments={},
+		users={},
 	)
 
 	ereg = re.compile("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>")
@@ -168,7 +183,7 @@ async def run():
 				url = f"https://discord.com/stickers/{sid}.json"
 			else:
 				url = f"https://media.discordapp.net/stickers/{sid}.png"
-			files["stickers"][sid] = [s["name"] + "." + url.rsplit(".", 1)[-1], url]
+			files["stickers"][sid] = [s["name"] + f".{url2ext(url)}", url]
 
 		async with get_sem(gid):
 			resp = await retrieve_api_a(
@@ -202,13 +217,15 @@ async def run():
 			raise StopIteration
 		content = content.split("\n", 1)[1].strip()
 		author = e.get("author", {})
+		avatar_url = author.get("icon_url")
 		try:
 			a_url = author["url"]
 			assert a_url.startswith("https://cdn.discordapp.com/avatars/")
 			author_id = a_url.removeprefix("https://cdn.discordapp.com/avatars/").split("/", 1)[0]
+			avatar_url = None
 		except (KeyError, AssertionError):
 			author_id = desc.split(None, 1)[0].strip("<@!> ")
-		*_, _gid, _cid, _mid = url.rstrip(")").rsplit("/", 3)
+		_gid, _cid, _mid = split_message_link(url.removesuffix(")"))
 		m2 = dict(
 			type=-1,
 			content=content,
@@ -222,9 +239,9 @@ async def run():
 			components=[],
 			author=dict(
 				id=author_id,
-				username=author.get("name"),
+				username=author.get("name", "Unknown User"),
 				avatar=author["icon_url"].rsplit("/", 1)[-1].split(".", 1)[0] if author.get("icon_url") else "0",
-				avatar_url=author["icon_url"],
+				avatar_url=avatar_url,
 				discriminator="0",
 				public_flags=65536,
 				flags=65536,
@@ -236,6 +253,9 @@ async def run():
 			embeds=[],
 			reactions=[],
 		)
+		if not avatar_url and author.get("icon_url") and (author_id := int(author_id)):
+			url = author["icon_url"]
+			files["users"][author_id] = [str(m2["author"]["username"]) + f".{url2ext(url)}", url]
 		for field in e.get("fields", ()):
 			e2 = dict(
 				type="rich",
@@ -306,10 +326,12 @@ async def run():
 		if not _mid.isnumeric():
 			raise StopIteration
 		author = e.get("author", {})
+		avatar_url = author.get("icon_url")
 		try:
 			a_url = author["url"]
 			assert a_url.startswith("https://cdn.discordapp.com/avatars/")
 			author_id = a_url.removeprefix("https://cdn.discordapp.com/avatars/").split("/", 1)[0]
+			avatar_url = None
 		except (KeyError, AssertionError):
 			author_id = e.get("footer", {}).get("text", "").split(": ", 1)[-1].strip() or "0"
 		m2 = dict(
@@ -325,9 +347,9 @@ async def run():
 			components=[],
 			author=dict(
 				id=author_id,
-				username=author.get("name"),
+				username=author.get("name", "Unknown User"),
 				avatar=author["icon_url"].rsplit("/", 1)[-1].split(".", 1)[0] if author.get("icon_url") else "0",
-				avatar_url=author["icon_url"],
+				avatar_url=avatar_url,
 				discriminator="0",
 				public_flags=65536,
 				flags=65536,
@@ -339,6 +361,9 @@ async def run():
 			embeds=[],
 			reactions=[],
 		)
+		if not avatar_url and author.get("icon_url") and (author_id := int(author_id)):
+			url = author["icon_url"]
+			files["users"][author_id] = [str(m2["author"]["username"]) + f".{url2ext(url)}", url]
 		return m2
 
 	def process_message(m, cid):
@@ -355,7 +380,8 @@ async def run():
 			else:
 				url = f"https://media.discordapp.net/stickers/{sid}.png"
 			files["stickers"][sid] = [s["name"] + "." + url.rsplit(".", 1)[-1], url]
-		if m.get("author", {}).get("bot") and int(cur_cid) in log_ids and (embeds := m.get("embeds")):
+		author = m.get("author", {})
+		if author.get("bot") and int(cur_cid) in log_ids and (embeds := m.get("embeds")):
 			try:
 				e = embeds[0]
 				if e.get("type") != "rich":
@@ -363,13 +389,24 @@ async def run():
 				desc = e.get("description", "")
 				if e.get("title", "").startswith("Message deleted in "):
 					m2 = process_carlbot_log(m, e)
-				elif "**deleted message from**" in desc and "[View Message]" in desc:
+				elif " from**" in desc and "[View Message]" in desc:
 					m2 = process_miza_log(m, e)
+				elif desc.endswith(" has been updated:") and e.get("thumbnail") and any(field["name"] == "Avatar" for field in e.get("fields", ())) and e.get("author"):
+					aid = int(desc.split(None, 1)[0].strip("<@!>"))
+					url = e["thumbnail"]["url"]
+					files["users"][aid] = [str(e["author"].get("name", "Unknown User")) + f".{url2ext(url)}", url]
+					m2 = m
 				else:
 					raise StopIteration # TODO: Implement other popular Discord bot message log formats
 				process_message(m2, m2.get("channel_id", cid))
 			except StopIteration:
 				pass
+		elif author.get("avatar") and not author.get("bot"):
+			ext = "gif" if author["avatar"].startswith("a_") else "png"
+			url = f"https://cdn.discordapp.com/avatars/{author['id']}/{author['avatar']}.{ext}"
+			aid = int(author["id"])
+			if aid not in files["users"]:
+				files["users"][aid] = [str(author["username"]) + f".{url2ext(url)}", url]
 		for r in m.get("reactions", ()):
 			e = r.get("emoji")
 			if not e or not e.get("id"):
@@ -392,6 +429,9 @@ async def run():
 				if animated:
 					url += "?animated=true"
 				files["emojis"].setdefault(eid, [name + ".webp", url])
+		info = parse_custom_ref(m.get("content", ""))
+		if info:
+			m.update(info)
 		message_map.setdefault(cur_cid, {})[cur_id] = m
 		return cur_id
 
@@ -416,6 +456,7 @@ async def run():
 		messages = message_map.setdefault(cid, {})
 
 		try:
+			n = 1
 			if user_ids and gid:
 				while True:
 					last_id = mid
@@ -436,15 +477,27 @@ async def run():
 						offset += len(resp["messages"])
 						if offset >= resp["total_results"]:
 							raise StopIteration
-						progress[index] = (last_id - min_id) / (max_id - min_id)
+						progress[index][1] = resp["total_results"]
+						progress[index][0] += len(resp["messages"])
 						print_progress("Messages")
+						await asyncio.sleep(len(progress) / n)
+						n += 1
 					mid = max(last_id, mid)
 			else:
+				first = bool(gid)
 				while True:
 					async with get_sem(cid):
-						resp = await retrieve_api_a(
-							f"channels/{cid}/messages?limit=100&after={mid}",
-						)
+						if first:
+							path = f"guilds/{gid}/messages/search"
+							query = f"?include_nsfw=true&channel_id={cid}&limit=25&offset=0&max_id={Mid}&min_id={mid}&sort_by=timestamp&sort_order=asc"
+							resp = await retrieve_api_a(f"{path}{query}")
+							first = False
+							progress[index][1] = resp["total_results"]
+							resp = resp["messages"]
+						else:
+							resp = await retrieve_api_a(
+								f"channels/{cid}/messages?limit=100&after={mid}",
+							)
 					if not resp:
 						raise StopIteration
 					assert isinstance(resp, list), str(resp)
@@ -458,15 +511,21 @@ async def run():
 							messages.pop(cur_id, None)
 							raise StopIteration
 						mid = max(mid, cur_id)
-					progress[index] = (mid - min_id) / (max_id - min_id)
+					if not gid:
+						progress[index][1] = max_id - min_id
+						progress[index][0] = mid - min_id
+					else:
+						progress[index][0] += len(resp)
 					print_progress("Messages")
+					await asyncio.sleep(len(progress) / n)
+					n += 1
 		except StopIteration:
 			pass
 		except niquests.exceptions.HTTPError:
 			pass
 		except Exception:
 			print_exc()
-		progress[index] = 0.99
+		progress[index][0] = 0.99 * progress[index][1]
 
 	channels_by_name = {}
 	ambiguous_channel_names = set()
@@ -493,7 +552,7 @@ async def run():
 					thread,
 					len(progress),
 				)
-				progress.append(0)
+				progress.append([0, max_id - max(min_id, int(tid))])
 				if tid in log_ids:
 					futs2.append(fut)
 				else:
@@ -516,7 +575,7 @@ async def run():
 			channel,
 			len(progress),
 		)
-		progress.append(0)
+		progress.append([0, max_id - max(min_id, int(cid))])
 		if int(cid) in log_ids:
 			futs2.append(fut)
 		else:
@@ -529,42 +588,21 @@ async def run():
 			cur_path = channel_map[cid]
 		except KeyError:
 			continue
-		s = pretty_json([messages[i] for i in sorted(messages)])
-		with open(f"{cur_path}/messages.json", "w", encoding="utf-8") as f:
-			f.write(s)
-		progress[index] = 1
+		target = f"{cur_path}/messages.jsonl"
+		if append and os.path.exists(target) and os.path.getsize(target):
+			with open(target, "rb") as f:
+				b = f.read()
+			mlist2 = decode_jsonl(b)
+			ms2 = {int(m["id"]): m for m in mlist2}
+			ms2.update(messages)
+			messages = ms2
+		b = encode_jsonl(messages[i] for i in sorted(messages))
+		with open(target, "wb") as f:
+			f.write(b)
+		if index in range(len(progress)):
+			progress[index][0] = progress[index][1]
 		print_progress("Messages")
 	progress.clear()
-
-	async def load_file_type(kind, data, index):
-		invalid_pattern = r'[<>:"/\\|?*\x00-\x1F]'
-		replacement = "_"
-		c = 0
-		futs = []
-
-		async def download_single(url, fn):
-			nonlocal c
-			try:
-				await attachment_cache.download(url, filename=fn)
-			except Exception:
-				print_exc()
-				return
-			c += 1
-			progress[index] = c / len(data)
-			print_progress("Files")
-
-		for oid, (name, url) in data.items():
-			path = f"{base_path}/{kind}/{oid}"
-			os.makedirs(path, exist_ok=True)
-			name = lim_str(re.sub(invalid_pattern, replacement, name).strip(), 128)
-			fn = f"{path}/{name}"
-			if os.path.exists(fn) and os.path.getsize(fn):
-				continue
-			fut = download_single(url, fn)
-			futs.append(fut)
-		await gather(*futs, max_concurrency=24)
-		progress[index] = 1
-		print_progress("Files")
 
 	dm_path = f"{base_path}/guilds/0"
 	if os.path.exists(dm_path):
@@ -577,15 +615,46 @@ async def run():
 		s = pretty_json(dms)
 		with open(f"{dm_path}/info.json", "w") as f:
 			f.write(s)
-	progress.extend([0] * len(files))
+
+	progress.append([0, 1])
 	futs = []
-	for index, (kind, data) in enumerate(files.items()):
-		fut = load_file_type(kind, data, index)
-		futs.append(fut)
-	await gather(*futs)
-	progress = [1]
+
+	def load_file_type(kind, data):
+		base_fold = f"{base_path}/{kind}"
+		if os.path.exists(base_fold):
+			t = time.time()
+			os.utime(base_fold, (t, t))
+		invalid_pattern = r'[<>:"/\\|?*\x00-\x1F]'
+		replacement = "_"
+
+		async def download_single(url, fn):
+			try:
+				await attachment_cache.download(url, filename=fn)
+			except Exception:
+				print_exc()
+				return
+			progress[0][0] += 1
+			print_progress("Files")
+
+		for oid, (name, url) in data.items():
+			path = f"{base_fold}/{oid}"
+			os.makedirs(path, exist_ok=True)
+			name = lim_str(re.sub(invalid_pattern, replacement, name).strip(), 128)
+			fn = f"{path}/{name}"
+			if append and os.path.exists(fn) and os.path.getsize(fn):
+				continue
+			fut = download_single(url, fn)
+			yield fut
+
+	for kind, data in files.items():
+		futs.extend(load_file_type(kind, data))
+	random.shuffle(futs)
+	progress[0][1] = len(futs)
+	await gather(*futs, return_exceptions=True, max_concurrency=32)
+	progress[0][0] = progress[0][1]
 	print_progress("Files")
 
 
-eloop = asyncio.get_event_loop()
-eloop.run_until_complete(run())
+if __name__ == "__main__":
+	eloop = asyncio.get_event_loop()
+	eloop.run_until_complete(run(ctx))

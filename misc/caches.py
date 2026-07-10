@@ -366,7 +366,7 @@ class AttachmentCache(AutoCache):
 					return self.cast_fp(open(fn, "rb"))
 				elif "/c/" in url:
 					path = url.split("/c/", 1)[-1].split("/", 1)[0]
-					urls, csize = await self.obtains(path)
+					urls, _csize = await self.obtains(path)
 					fn, head = await _run_async(download_file, *urls, filename=raw_fn, _timeout=timeout, return_headers=True)
 					self.tertiary[url] = head
 					return self.cast_fp(open(fn, "rb"))
@@ -414,6 +414,8 @@ class AttachmentCache(AutoCache):
 					if isinstance(fp, byte_like):
 						await _run_async(f2.write, fp)
 					else:
+						fp.flush()
+						fp.seek(0)
 						await _run_async(shutil.copyfileobj, fp, f2, 262144)
 				return (filename, headers) if return_headers else filename
 			finally:
