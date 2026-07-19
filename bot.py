@@ -2957,7 +2957,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			raise
 		if not getattr(reference, "slash", None) and message.attachments:
 			def fatt(url):
-				if ".webx" not in url:
+				if ".binx" not in url:
 					return f"<{url}>"
 				return url
 			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join(fatt(attachment_cache.preserve(a.url, message.id)) for a in message.attachments)
@@ -5740,11 +5740,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				int_id, int_token = message.id, message.slash
 			else:
 				return
-			data = await self._retrieve_api(
-				f"interactions/{int_id}/{int_token}/callback",
-				method="POST",
-				data=b'{"type":5,"data":{"flags":64}}' if ephemeral else b'{"type":5}' if mode == "post" else b'{"type":6}',
-			)
+			try:
+				data = await self._retrieve_api(
+					f"interactions/{int_id}/{int_token}/callback",
+					method="POST",
+					data=b'{"type":5,"data":{"flags":64}}' if ephemeral else b'{"type":5}' if mode == "post" else b'{"type":6}',
+				)
+			except niquests.exceptions.HTTPError:
+				return
 			print("Deferred:", message.id, int_id, int_token, data)
 			self.inter_cache[int_id] = int_token
 			self.inter_cache[message.id] = int_token
@@ -5770,18 +5773,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				int_id, int_token = message.id, message.slash
 			else:
 				return
-			try:
-				if skip:
-					raise ConnectionError(400)
-				await self._retrieve_api(
-					f"interactions/{int_id}/{int_token}/callback",
-					method="POST",
-					data=b'{"type":6}',
-				)
-			except ConnectionError:
-				raise
-			else:
-				message.method = "patch"
+			if skip:
+				raise ConnectionError(400)
+			await self._retrieve_api(
+				f"interactions/{int_id}/{int_token}/callback",
+				method="POST",
+				data=b'{"type":6}',
+			)
+			message.method = "patch"
 
 	def add_webhook(self, w):
 		"Inserts a webhook into the bot's user and webhook cache."

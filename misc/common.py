@@ -200,8 +200,9 @@ async def interaction_response(bot, message, content=None, embed=None, embeds=()
 	if not getattr(message, "int_token", None):
 		message.int_token = message.slash
 	ephemeral = ephemeral and 64
-	resp = await Request.aio(
-		f"https://discord.com/api/{api}/interactions/{message.int_id}/{message.int_token}/callback",
+	resp = await retrieve_api(
+		f"interactions/{message.int_id}/{message.int_token}/callback",
+		headers=bot.auth_headers,
 		data=json_dumps(dict(
 			type=4,
 			data=dict(
@@ -212,7 +213,6 @@ async def interaction_response(bot, message, content=None, embed=None, embeds=()
 			),
 		)),
 		method="POST",
-		authorise=True,
 	)
 	# print("INTERACTION_RESPONSE", resp)
 	bot = BOT[0]
@@ -221,7 +221,7 @@ async def interaction_response(bot, message, content=None, embed=None, embeds=()
 			M = bot.ExtendedMessage.new
 		else:
 			M = discord.Message
-		message = M(state=bot._state, channel=message.channel, data=eval_json(resp))
+		message = M(state=bot._state, channel=message.channel, data=resp)
 		bot.add_message(message, force=True)
 	return message
 
@@ -237,8 +237,9 @@ async def interaction_post(bot, message, content=None, embed=None, embeds=(), co
 	if not getattr(message, "int_token", None):
 		message.int_token = message.slash
 	ephemeral = ephemeral and 64
-	resp = await Request.aio(
-		f"https://discord.com/api/{api}/webhooks/{bot.id}/{message.int_token}",
+	resp = await retrieve_api(
+		f"webhooks/{bot.id}/{message.int_token}",
+		headers=bot.auth_headers,
 		data=json_dumps(dict(
 			flags=ephemeral,
 			content=content,
@@ -246,7 +247,6 @@ async def interaction_post(bot, message, content=None, embed=None, embeds=(), co
 			components=components or restructure_buttons(buttons),
 		)),
 		method="POST",
-		authorise=True,
 	)
 	# print("INTERACTION_POST", resp)
 	bot = BOT[0]
@@ -255,7 +255,7 @@ async def interaction_post(bot, message, content=None, embed=None, embeds=(), co
 			M = bot.ExtendedMessage.new
 		else:
 			M = discord.Message
-		message = M(state=bot._state, channel=message.channel, data=eval_json(resp))
+		message = M(state=bot._state, channel=message.channel, data=resp)
 		bot.add_message(message, force=True)
 	elif getattr(message, "simulated", False):
 		message.content = content or message.content
@@ -277,15 +277,15 @@ async def interaction_patch(bot, message, content=None, embed=None, embeds=(), a
 	extra = {} if attachments is None else dict(attachments=attachments)
 	if components or buttons:
 		extra["components"] = components or restructure_buttons(buttons)
-	resp = await Request.aio(
-		f"https://discord.com/api/{api}/webhooks/{bot.id}/{message.int_token}/messages/{mid}",
+	resp = await retrieve_api(
+		f"webhooks/{bot.id}/{message.int_token}/messages/{mid}",
+		headers=bot.auth_headers,
 		data=json_dumps(dict(
 			content=content,
 			embeds=embeds,
 			**extra,
 		)),
 		method="PATCH",
-		authorise=True,
 	)
 	# print("INTERACTION_PATCH", resp)
 	bot = BOT[0]
@@ -294,7 +294,7 @@ async def interaction_patch(bot, message, content=None, embed=None, embeds=(), a
 			M = bot.ExtendedMessage.new
 		else:
 			M = discord.Message
-		message = M(state=bot._state, channel=message.channel, data=eval_json(resp))
+		message = M(state=bot._state, channel=message.channel, data=resp)
 		bot.add_message(message, force=True)
 	elif getattr(message, "simulated", False):
 		message.content = content or message.content
@@ -1648,22 +1648,23 @@ def process_image(image, operation="$", args=[], cap="image", priority=False, ti
 async def parse_latex(s):
 	outs = []
 	futs = []
-	r1 = re.compile(r"\$[^$]+\$")
-	r2 = re.compile(r"\$\$[^$]+\$\$")
+	regs = [
+		re.compile(r"\$[^$]+\$"),
+		re.compile(r"\$\$[^$]+\$\$"),
+		re.compile(r"\s\[+\s?[^\]]*\\[^\]]+\s?\]+\s"),
+	]
 	n = 0
 	while True:
-		m1 = r1.search(s, n)
-		m2 = r2.search(s, n)
-		if not m1:
-			if not m2:
-				break
-			m = m2
-		else:
-			if not m2:
-				m = m1
-			else:
-				m = m1 if m1.start() < m2.start() else m2
-		expr = m.group().strip("$")
+		matches = [r.search(s, n) for r in regs]
+		matches = list(filter(bool, matches))
+		m = min(matches, key=lambda m: m.start(), default=None)
+		if not m:
+			break
+		expr = m.group().strip()
+		if expr[0] == expr[-1] == "$":
+			expr = expr.strip("$")
+		elif expr[0] == "[" and expr[-1] == "]":
+			expr = expr.strip("[]")
 		outs.append(s[n:m.start()])
 		n = m.end()
 		futs.append(process_math(expr, prec=32, rational=True))

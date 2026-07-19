@@ -849,12 +849,12 @@ f_default = {
 TOOLS = {
 	"knowledge_internet": [
 		f_browse,
-		f_wolfram_alpha,
+		# f_wolfram_alpha,
 		f_deno,
 	],
 	"calculator": [
 		f_browse,
-		f_wolfram_alpha,
+		# f_wolfram_alpha,
 		f_deno,
 	],
 	"calendar": [

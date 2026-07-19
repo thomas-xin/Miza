@@ -1972,6 +1972,7 @@ def shorten_chunks(size_mb, cid, mids, fn, mode="c", base="https://mizabot.xyz",
 	encoded = group_attachments(size_mb, cid, mids, minimise=minimise)
 	url = f"{base}/{mode}/{encoded}"
 	if not minimise:
+		fn = url2fn(fn, removesuffix=False)
 		url += f"/{fn}"
 	return url
 def expand_chunks(url):
@@ -1980,7 +1981,7 @@ def expand_chunks(url):
 		path += "/"
 	path, fn = path.split("/", 1)
 	size_mb, cid, mids = ungroup_attachments(path)
-	return size_mb, cid, mids, fn
+	return size_mb, cid, mids, revert_suffix(fn)
 
 def p2n(b):
 	"Converts a urlsafe-base64 string to big-endian integer."
