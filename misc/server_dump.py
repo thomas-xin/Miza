@@ -15,7 +15,7 @@ if __name__ == "__main__":
 	parser.add_argument("-a", "--append", action=argparse.BooleanOptionalAction, default=True)
 	ctx = parser.parse_args()
 
-import os, json, time, asyncio, re, random, fractions, datetime, concurrent.futures
+import os, json, time, asyncio, re, random, fractions, datetime, math, concurrent.futures
 from traceback import print_exc
 import niquests
 
@@ -82,11 +82,13 @@ async def run(ctx):
 		min_id = 0
 	if not max_id:
 		max_id = time_snowflake(datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(days=1))
+	int_max = 18446744073709551615
 	append = ctx.append
 
 	progress: list[list[float]] = []
 	def print_progress(mode="Progress"):
-		print(f"{mode}: {'%.3f' % (sum(p[0] for p in progress) / sum(p[1] for p in progress) * 100)}%", end="\r")
+		cur, tot = sum(p[0] for p in progress), max(1, sum(p[1] for p in progress))
+		print(f"\033[2K\r{mode}: {'%.3f' % (cur / tot * 100)}%, {cur}/{tot}", end="")
 
 	async def extract_channels(guild_ids, channel_ids):
 		guild_ids = set(guild_ids)
@@ -481,7 +483,8 @@ async def run(ctx):
 						progress[index][0] += len(resp["messages"])
 						print_progress("Messages")
 						await asyncio.sleep(len(progress) / n)
-						n += 1
+						if not any(p[1] == int_max for p in progress):
+							n += 1
 					mid = max(last_id, mid)
 			else:
 				first = bool(gid)
@@ -518,14 +521,15 @@ async def run(ctx):
 						progress[index][0] += len(resp)
 					print_progress("Messages")
 					await asyncio.sleep(len(progress) / n)
-					n += 1
+					if not any(p[1] == int_max for p in progress):
+						n += 1
 		except StopIteration:
 			pass
 		except niquests.exceptions.HTTPError:
 			pass
 		except Exception:
 			print_exc()
-		progress[index][0] = 0.99 * progress[index][1]
+		progress[index][0] = math.ceil(0.99 * progress[index][1])
 
 	channels_by_name = {}
 	ambiguous_channel_names = set()
@@ -552,7 +556,7 @@ async def run(ctx):
 					thread,
 					len(progress),
 				)
-				progress.append([0, max_id - max(min_id, int(tid))])
+				progress.append([0, int_max])
 				if tid in log_ids:
 					futs2.append(fut)
 				else:
@@ -575,7 +579,7 @@ async def run(ctx):
 			channel,
 			len(progress),
 		)
-		progress.append([0, max_id - max(min_id, int(cid))])
+		progress.append([0, int_max])
 		if int(cid) in log_ids:
 			futs2.append(fut)
 		else:

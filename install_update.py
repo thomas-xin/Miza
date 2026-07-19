@@ -116,6 +116,6 @@ except Exception:
 if installing:
 	subprocess.run([python, "-m", "pip", "install", "-r", "requirements.txt"])
 
-subprocess.run([python, "-m", "pip", "install", "--upgrade", "--pre", "yt-dlp"])
+subprocess.run([python, "-m", "pip", "install", "--upgrade", "--pre", "yt-dlp", "niquests", "urllib3-future"])
 
 print("Installer terminated.")

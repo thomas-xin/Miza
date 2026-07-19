@@ -3841,7 +3841,8 @@
 				"input": {
 					"type": "string",
 					"description": "Text to translate",
-					"example": "bonjour, comment-t'appelles-tu?"
+					"example": "bonjour, comment-t'appelles-tu?",
+					"greedy": false
 				}
 			},
 			"ordered_args": ["engine", "dst_languages", "input"]

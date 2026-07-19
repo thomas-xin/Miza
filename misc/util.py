@@ -2588,11 +2588,8 @@ class PipedProcess:
 
 	def terminate(self):
 		for proc in self.procs:
-			proc.terminate()
-
-	def kill(self):
-		for proc in self.procs:
-			proc.kill()
+			force_kill(proc)
+	kill = terminate
 
 	def wait(self):
 		for proc in self.procs:
@@ -5437,11 +5434,15 @@ async def retrieve_api(path, method="GET", headers={}, data=None):
 			try:
 				resp.raise_for_status()
 			except Exception as ex:
-				exception = ex
+				exception = ConnectionError(resp.status_code, ex, resp.text)
 		else:
 			if resp.status_code in range(400, 600):
+				print(resp.text)
 				resp.raise_for_status()
-			return resp.json()
+			try:
+				return resp.json()
+			except niquests.exceptions.JSONDecodeError:
+				return resp.text
 	raise exception
 
 def getsize(fp):

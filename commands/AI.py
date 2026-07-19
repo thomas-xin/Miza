@@ -496,7 +496,7 @@ class Ask(Command):
 					messagelist.extend(tool_responses)
 				m = None
 				modelist = None
-				async for resp in bot.chat_completion(messagelist, model=model, max_tokens=16384, tool_choice=None, tools=TOOLS, user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
+				async for resp in bot.chat_completion(messagelist, model=model, max_tokens=16384, tools=TOOLS, user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
 					if isinstance(resp, dict):
 						if resp.get("reasoning"):
 							reasonings.extend(resp["reasoning"])

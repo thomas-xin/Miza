@@ -779,7 +779,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	auth_headers = {
 		"User-Agent": "DiscordBot (https://mizabot.xyz, 1.0.0)",
 		"Authorization": f"Bot {AUTH['discord_token']}",
+		"Content-Type": "application/json",
 	}
+	async def _retrieve_api(self, path, method="GET", data=None):
+		return await retrieve_api(path, method, self.auth_headers, data)
 	async def retrieve_api(self, path, method="GET", data=None):
 		key = f"{path} {method.casefold()} {repr(data)}"
 		return await self.discord_cache.aretrieve(key, retrieve_api, path, method, self.auth_headers, data)
@@ -2275,7 +2278,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return messages, model
 
 	model_levels = dict(enumerate(map(cdict, AUTH.get("model_levels", []))))
-	async def chat_completion(self, messages, model="miza-1", system=None, max_tokens=256, temperature=0.8, tools=None, tool_choice=None, model_router=None, tool_router=None, user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
+	async def chat_completion(self, messages, model="miza-1", system=None, max_tokens=256, temperature=0.8, tools=None, model_router=None, tool_router=None, user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
 		"OpenAI-compatible Chat Completion function. Autoselects model using a function call, then routes to tools and target model as required."
 		await require_predicate(predicate)
 		await ai.load_openrouter()
@@ -2302,9 +2305,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			minlim = 500
 			snip = 240
 			best = 0
-		messages = await ai.cut_to(messages, maxlim, minlim, best=best, prompt=prompt, premium_context=premium_context)
-		length = await count_to(messages)
-		length = ceil(length * 1.1) + 4 * len(messages)
 		tmp = temperature
 		def force_ua(r):
 			if r == "assistant":
@@ -2315,8 +2315,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		sniplen = await count_to(snippet)
 		text = ""
 		ustr = str(hash(str(user) or self.user.name))
-		if tool_choice == "auto":
-			tool_choice = None
 		cid = hex(ts_us()).removeprefix("0x") + "-Miza"
 		if not props:
 			props = {}
@@ -2327,7 +2325,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		mod = None
 		label = cargs.get("mode")
 		if not cargs:
-			content = messages[-1].content
 			mod = await ai.moderate(messages[max(1, len(messages) - 3):], premium_context=premium_context)
 			cargs["nsfw"] = is_nsfw = nsfw_flagged(mod)
 			toolscan = tools
@@ -2484,6 +2481,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			cargs=cargs,
 		)
 		ex = None
+		messages = await ai.cut_to(messages, maxlim, minlim, best=best, prompt=prompt, premium_context=premium_context)
+		length = await count_to(messages)
+		length = ceil(length * 1.1) + 4 * len(messages)
 		print("Chat completions:", model, ai.overview(messages), cargs, sep="\n")
 		tmpcut = None
 		tmplen = 0
@@ -4042,7 +4042,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				await Request.sessions.next().head(f"https://discord.com/api/{api}/users/@me", timeout=5)
 				if self.api_latency >= 300:
 					print(f"API latency {self.api_latency} exceeded 300s, restarting...")
-					await self.start_audio_client(shutdown=True)
+					await run_async(self.start_audio_client, shutdown=True)
 					return await self.commands.shutdown[0].confirm_shutdown()
 				self.api_latency = self.api_latency * 2 / 3 + (utc() - t) / 3
 			except Exception as ex:
@@ -4459,7 +4459,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					))
 					interaction = hasattr(message, "int_token")
 					if interaction:
-						fut = create_task(delayed_callback(future, 2, self.defer_interaction, message, mode="patch", ephemeral=getattr(message, "ephemeral", False), exc=False))
+						fut = create_task(delayed_callback(future, 1, self.defer_interaction, message, mode="patch", ephemeral=getattr(message, "ephemeral", False), exc=False))
 					resp = await future
 				await self.send_event("_command_", user=user, command=f, loop=False, message=message)
 				if isinstance(resp, str):
@@ -5740,10 +5740,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				int_id, int_token = message.id, message.slash
 			else:
 				return
-			data = await self.retrieve_api(
-				f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
+			data = await self._retrieve_api(
+				f"interactions/{int_id}/{int_token}/callback",
 				method="POST",
-				data='{"type":5,"data":{"flags":64}}' if ephemeral else '{"type":5}' if mode == "post" else '{"type":6}',
+				data=b'{"type":5,"data":{"flags":64}}' if ephemeral else b'{"type":5}' if mode == "post" else b'{"type":6}',
 			)
 			print("Deferred:", message.id, int_id, int_token, data)
 			self.inter_cache[int_id] = int_token
@@ -5770,23 +5770,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				int_id, int_token = message.id, message.slash
 			else:
 				return
-			m = None
 			try:
 				if skip:
 					raise ConnectionError(400)
-				m = await Request.aio(
-					f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
+				await self._retrieve_api(
+					f"interactions/{int_id}/{int_token}/callback",
 					method="POST",
-					authorise=True,
-					data='{"type":6}',
+					data=b'{"type":6}',
 				)
 			except ConnectionError:
 				raise
-				m = await interaction_response(self, message, "\xad")
-				# m = await send_with_reply(getattr(message, "channel", None), message, "\xad", ephemeral=False)
-				print("Ignored:", m)
-				if m and not getattr(m, "ephemeral", False):
-					await self.autodelete(m, keep_log=False)
 			else:
 				message.method = "patch"
 
@@ -5802,7 +5795,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def ensure_webhook(self, channel, force=False, bypass=False, fill=False):
 		"Gets a valid webhook for the target channel, creating a new one when necessary."
 		wlist = await self.load_channel_webhooks(channel, force=force, bypass=bypass)
-		data = self.avatar_data
+		# data = self.avatar_data
 		try:
 			if fill:
 				while len(wlist) < fill:
