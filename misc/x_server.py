@@ -1,3 +1,4 @@
+import collections.abc
 import datetime
 import functools
 import io
@@ -158,6 +159,18 @@ def process_headers(self):
 		host = self.local.name or self.local.ip
 	self.base = '%s://%s' % (self.scheme, host)
 cp._cprequest.Request.process_headers = process_headers
+
+def requires_proxy(url: str, headers: collections.abc.Mapping, download: bool = False):
+	if "Cf-Worker" in headers:
+		return True
+	ua = headers.get("User-Agent", "")
+	if "bot" in ua or "Bot" in ua:
+		return is_discord_attachment(url) and ".binx" in url
+	if download and is_discord_attachment(url):
+		if url2ext(url) in VISUAL_FORMS:
+			return True
+		return False
+	return True
 
 @functools.lru_cache(maxsize=256)
 def get_size_mime(head, tail, count, chunksize):
@@ -517,7 +530,7 @@ class Server:
 		try:
 			c_id, m_id, a_id, fn = decode_attachment("/".join(path))
 			url, _mid = merge_url(c_id, m_id, a_id, fn)
-			priority = self.requires_proxy(url, download)
+			priority = requires_proxy(url, cp.request.headers, download)
 			try:
 				return self.proxy_if(await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn, priority=priority)), force=force, download=download)
 			except ConnectionError as ex:
@@ -571,21 +584,9 @@ class Server:
 		return cp.lib.static.serve_fileobj(fp, name=fn, content_type=mimetype, disposition="attachment" if download else "inline")
 	download._cp_config = {"response.stream": True}
 
-	def requires_proxy(self, url, download):
-		if "Cf-Worker" in cp.request.headers:
-			return True
-		ua = cp.request.headers.get("User-Agent", "")
-		if "bot" in ua or "Bot" in ua:
-			return is_discord_attachment(url) and ".binx" in url
-		if download and is_discord_attachment(url):
-			if url2ext(url) in VISUAL_FORMS:
-				return True
-			return False
-		return True
-
 	def proxy_if(self, url, force=False, download=False):
 		assert isinstance(url, str), url
-		if self.requires_proxy(url, download):
+		if requires_proxy(url, cp.request.headers, download):
 			return self.proxy(url=url, force=force, download=download)
 		raise cp.HTTPRedirect(url, 307)
 

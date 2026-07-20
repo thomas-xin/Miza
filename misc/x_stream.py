@@ -1,4 +1,5 @@
 import base64
+import collections.abc
 import diskcache
 import io
 import json
@@ -433,7 +434,7 @@ async def unproxy(request: Request, path: Optional[str] = None, url: Optional[st
 	except Exception as ex:
 		raise HTTPException(status_code=400, detail=str(ex))
 	url, _mid = merge_url(c_id, m_id, a_id, fn)
-	priority = requires_proxy(url, request, download)
+	priority = requires_proxy(url, request.headers, download)
 	try:
 		resp = await attachment_cache.obtain(c_id, m_id, a_id, fn, priority=priority)
 	except ConnectionError as ex:
@@ -491,10 +492,10 @@ async def upload(
 	)
 
 
-def requires_proxy(url: str, request: Request, download: bool = False):
-	if "Cf-Worker" in request.headers:
+def requires_proxy(url: str, headers: collections.abc.Mapping, download: bool = False):
+	if "Cf-Worker" in headers:
 		return True
-	ua = request.headers.get("User-Agent", "")
+	ua = headers.get("User-Agent", "")
 	if "bot" in ua or "Bot" in ua:
 		return is_discord_attachment(url) and ".binx" in url
 	if download and is_discord_attachment(url):
@@ -506,7 +507,7 @@ def requires_proxy(url: str, request: Request, download: bool = False):
 async def proxy_if(url: str, request: Request, force: bool = False, download: bool = False):
 	"""Proxy if needed, otherwise redirect."""
 	assert isinstance(url, str), url
-	if force or requires_proxy(url, request, download):
+	if force or requires_proxy(url, request.headers, download):
 		return await proxy(url=url, request=request, force=force, download=download)
 	return RedirectResponse(url=url, status_code=307)
 
