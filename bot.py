@@ -8478,6 +8478,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Message bulk delete event: uses raw payloads rather than discord.py message cache. calls _bulk_delete_ and _delete_ bot database events.
 		@self.event
 		async def on_raw_bulk_message_delete(payload):
+			user = None
 			with tracebacksuppressor:
 				start = utc()
 				messages = await _on_raw_bulk_message_delete(payload)

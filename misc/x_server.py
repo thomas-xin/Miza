@@ -26,7 +26,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, submit_thread, create_thread, create_task, await_fut
 from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
-from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url_unparse, url2fn, url2ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag
+from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url_unparse, url2fn, url2ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag
 from .caches import attachment_cache, colour_cache, minimise_url
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -514,25 +514,19 @@ class Server:
 	def unproxy(self, *path, url=None, force=False, download=False, **query):
 		if url:
 			return self.proxy_if(url, force=force, download=download)
-		rpath = "/".join(path)
-		if rpath:
-			rpath = "/" + rpath
-		rquery = cp.request.query_string and "?" + cp.request.query_string
-		if len(path) == 1 and path[0].count("~") == 2:
-			return self.proxy_if(await_fut(attachment_cache.obtain(*path[0].split(".", 1)[0].split("~", 2))), force=force, download=download)
-		if len(path) in (1, 2) and path[0].count("~") == 0:
+		try:
 			c_id, m_id, a_id, fn = decode_attachment("/".join(path))
+			url, _mid = merge_url(c_id, m_id, a_id, fn)
+			priority = self.requires_proxy(url, download)
 			try:
-				return self.proxy_if(await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn)), force=force, download=download)
+				return self.proxy_if(await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn, priority=priority)), force=force, download=download)
 			except ConnectionError as ex:
 				if ex.errno == 404:
 					attachment_cache.remove_cached(cp.url())
-					return self.proxy_if(await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn)), force=force, download=download)
+					return self.proxy_if(await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn, priority=True)), force=force, download=download)
 				raise
-		if hasattr(self, "state"):
-			url = f"{self.state['/']}/u{rpath}{rquery}"
-			raise cp.HTTPRedirect(url, 307)
-		raise FileNotFoundError(*path)
+		except Exception:
+			raise FileNotFoundError(*path)
 	unproxy._cp_config = {"response.stream": True}
 
 	upload_cache = attachment_cache.secondary
@@ -577,22 +571,21 @@ class Server:
 		return cp.lib.static.serve_fileobj(fp, name=fn, content_type=mimetype, disposition="attachment" if download else "inline")
 	download._cp_config = {"response.stream": True}
 
+	def requires_proxy(self, url, download):
+		if "Cf-Worker" in cp.request.headers:
+			return True
+		ua = cp.request.headers.get("User-Agent", "")
+		if "bot" in ua or "Bot" in ua:
+			return is_discord_attachment(url) and ".binx" in url
+		if download and is_discord_attachment(url):
+			if url2ext(url) in VISUAL_FORMS:
+				return True
+			return False
+		return True
+
 	def proxy_if(self, url, force=False, download=False):
 		assert isinstance(url, str), url
-
-		def requires_proxy():
-			if "Cf-Worker" in cp.request.headers:
-				return True
-			ua = cp.request.headers.get("User-Agent", "")
-			if "bot" in ua or "Bot" in ua:
-				return is_discord_attachment(url) and ".binx" in url
-			if download and is_discord_attachment(url):
-				if url2ext(url) in VISUAL_FORMS:
-					return True
-				return False
-			return True
-
-		if requires_proxy():
+		if self.requires_proxy(url, download):
 			return self.proxy(url=url, force=force, download=download)
 		raise cp.HTTPRedirect(url, 307)
 

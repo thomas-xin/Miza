@@ -269,7 +269,7 @@ class AttachmentCache(AutoCache):
 				return a["url"].rstrip("&")
 		raise ConnectionError(404, a_id)
 
-	async def get_attachment(self, c_id, m_id, a_id, fn):
+	async def get_attachment(self, c_id, m_id, a_id, fn, priority=False):
 		ac = self.attachment_count
 		if not self.channels or not fn or a_id < ac:
 			if not m_id:
@@ -281,6 +281,11 @@ class AttachmentCache(AutoCache):
 		self.queue.append(task)
 		if self.fut is None or self.fut.done() or len(self.queue) > ac:
 			self.fut = self.exc.submit(self.update_queue)
+		if priority and m_id:
+			try:
+				return await self.get_direct(c_id, m_id, a_id)
+			except ConnectionError:
+				pass
 		try:
 			return await asyncio.wait_for(wrap_future(fut), timeout=8)
 		except asyncio.TimeoutError:
@@ -290,7 +295,7 @@ class AttachmentCache(AutoCache):
 				return await asyncio.wait_for(wrap_future(fut), timeout=8)
 		return await self.get_direct(c_id, m_id, a_id)
 
-	async def obtain(self, c_id=None, m_id=None, a_id=None, fn=None, url=None):
+	async def obtain(self, c_id=None, m_id=None, a_id=None, fn=None, url=None, priority=False):
 		if url:
 			url = self.store(url)
 			c_id, m_id, a_id, fn = split_url(url, m_id)
@@ -307,11 +312,11 @@ class AttachmentCache(AutoCache):
 		else:
 			key = m_id * ac + a_id
 			early = 86400 - 60
-		resp = await self.aretrieve(key, self.get_attachment, c_id, m_id, a_id, fn)
+		resp = await self.aretrieve(key, self.get_attachment, c_id, m_id, a_id, fn, priority=priority)
 		try:
 			assert isinstance(resp, str) and not discord_expired(resp, early) and (not fn or fn == resp.split("?", 1)[0].rsplit("/", 1)[-1])
 		except AssertionError:
-			resp = await self._aretrieve(key, self.get_attachment, c_id, m_id, a_id, fn)
+			resp = await self._aretrieve(key, self.get_attachment, c_id, m_id, a_id, fn, priority=priority)
 		return resp
 
 	async def get_attachments(self, path):
@@ -533,8 +538,8 @@ class AttachmentCache(AutoCache):
 			return out[0]
 		return out
 
-	async def create_dynamic(self, data, filename=None, channel=None, editable=False, minimise=False):
-		if filename and url2ext(filename) in VISUAL_FORMS:
+	async def create_dynamic(self, data, filename="", channel=None, editable=False, minimise=False):
+		if filename and (ext := url2ext(filename)) in VISUAL_FORMS or ext == "exe":
 			filename += ".binx"
 		size = getsize(data)
 		if size <= self.max_size:

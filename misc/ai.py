@@ -340,7 +340,7 @@ async def load_local():
 	if local_refresh > utc():
 		return
 	local_models.clear()
-	globals()["local_refresh"] = utc() + 3600
+	globals()["local_refresh"] = utc() + 720
 	for name, info in AUTH.get("local_llms", {}).items():
 		api_key = info.get("api_key", "x")
 		base_urls = info.get("base_urls", "x")
@@ -512,7 +512,13 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 		if model_name(orig_model) in is_reasoning or isinstance(api, ExtendedOpenAI) and "reasoning" in api.capabilities:
 			mt = kwa.pop("max_tokens", 0) or 0
 			if not kwa.get("max_completion_tokens"):
-				kwa["max_completion_tokens"] = mt * 3 // 2
+				mt2 = mt * 3 // 2
+				ctx = 65536
+				if orig_model in contexts:
+					prompt, _stopn = instruct_structure(kwa["messages"])
+					ctx = contexts[orig_model] - (await tcount(prompt)) * 3 // 2
+				mt2 = min(mt2, ctx)
+				kwa["max_completion_tokens"] = mt2
 			kwa.pop("presence_penalty", None)
 			kwa.pop("frequency_penalty", None)
 			reasoning = dict(
@@ -525,13 +531,15 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 			body["reasoning"] = reasoning
 			match reasoning["effort"]:
 				case "minimal":
-					body["thinking_token_budget"] = 80
+					body["thinking_token_budget"] = 128
 				case "low":
-					body["thinking_token_budget"] = 240
+					body["thinking_token_budget"] = 512
 				case "medium":
-					body["thinking_token_budget"] = 720
+					body["thinking_token_budget"] = 2048
 				case "high":
-					body["thinking_token_budget"] = 2160
+					body["thinking_token_budget"] = 8192
+				case "xhigh":
+					body["thinking_token_budget"] = 65536
 		elif "reasoning_effort" in kwa:
 			kwa.pop("reasoning_effort")
 		if not api:
@@ -1037,7 +1045,7 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 					break
 		print("aiter pricing:", self.tokens, self.costs)
 
-def instruct_structure(messages, exclude_first=True, fmt="alpaca", assistant=None):
+def instruct_structure(messages, exclude_first=True, fmt="chatml", assistant=None):
 	messages = list(map(unimage, messages))
 	if fmt == "mistral":
 		ins = tuple(map(mistral, messages))
@@ -1143,7 +1151,7 @@ async def collect_stream(resp):
 
 async def moderate(text="", image="", input="", premium_context=[]):
 	if isinstance(text, (tuple, list)):
-		text = instruct_structure(text, fmt="chatml")
+		text = instruct_structure(text)
 	text = lim_tokens(as_str(text), 24576)
 	async def moderate_into(text, image):
 		if not image:
