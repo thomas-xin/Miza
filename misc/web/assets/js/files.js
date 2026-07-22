@@ -109,7 +109,8 @@
 
 		if (mime.startsWith('image/')) { 
 			let previewImg = document.createElement('img');
-			previewImg.src = 'https://api.mizabot.xyz/preview.webp?url=' + url;
+			previewImg.src = ['png', 'apng', 'webp', 'svg', 'jpg', 'gif', 'avif', 'heif', 'heic', 'bmp']
+				.includes(mime.split('/', 2)[1]) ? url : 'https://api.mizabot.xyz/preview.webp?url=' + url;
 			previewImg.alt = filename;
 			mediaPreviewHolder.appendChild(previewImg);
 		} else if (mime.startsWith('video/')) {
