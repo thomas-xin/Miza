@@ -951,7 +951,7 @@ class Server:
 				f'process_image({repr(url)},"resize_map",[[],None,None,"rel",4096,"-","auto","-o","-f","webp"],timeout=24)',
 			)
 			return self.serve_binary(data)
-		raise cp.HTTPRedirect(url, 307)
+		return self.proxy_if(url, force=False, download=False)
 
 	@cp.expose(alias=("eval", "exec"))
 	def execute(self, token, *args, **kwargs):

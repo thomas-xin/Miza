@@ -1968,7 +1968,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -2025,7 +2025,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -2094,7 +2094,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -2163,7 +2163,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -2234,7 +2234,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -2339,7 +2339,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -2401,7 +2401,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -2488,7 +2488,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -2576,7 +2576,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -2645,7 +2645,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -2712,7 +2712,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -2781,7 +2781,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -2851,7 +2851,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -2915,7 +2915,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -2979,7 +2979,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -3058,7 +3058,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -3142,7 +3142,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -3223,7 +3223,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -3361,7 +3361,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
@@ -3427,7 +3427,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
 						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
 					},
 					"description": "The file format or codec of the output",
