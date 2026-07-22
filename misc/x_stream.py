@@ -410,7 +410,7 @@ async def chunked_proxy(request: Request, path: str):
 	response_headers = {}
 	filename = heads.get("attachment-filename") or unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or urls[0].rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
 	if filename:
-		response_headers["Content-Disposition"] = f"inline; filename={quote(filename)}"
+		response_headers["Content-Disposition"] = f"inline; filename={quote(url2fn(filename))}"
 	response = await server.dyn_serve(new_urls, size, request=request, mimetype=mimetype, response_headers=response_headers)
 	return response
 
@@ -532,7 +532,7 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 	filename = heads.get("attachment-filename") or unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
 	disposition = "attachment" if download else "inline"
 	if filename:
-		response_headers["Content-Disposition"] = f"{disposition}; filename={quote(filename)}"
+		response_headers["Content-Disposition"] = f"{disposition}; filename={quote(url2fn(filename))}"
 	response_headers["Cache-Control"] = "public,max-age=21600,stale-while-revalidate=1073741824,stale-if-error=1073741824"
 
 	if not force and heads.get("content-type").split(";", 1)[0] == "text/markdown":

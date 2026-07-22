@@ -2938,6 +2938,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if not isinstance(f, str):
 					f = as_str(f)
 				url = await self.data.exec.lproxy(file._fp if getattr(file, "_fp", None) else f, filename=filename)
+				ext = url2ext(url)
+				if IMAGE_FORMS.get(ext) == False or AUDIO_FORMS.get(ext):
+					try:
+						await attachment_cache.scan_headers(f"https://api.mizabot.xyz/preview?url={quote_plus(url)}")
+					except TimeoutError:
+						pass
+					except Exception:
+						print_exc()
+				url = f"https://mizabot.xyz/files?url={quote_plus(url)}"
 				message = await send_with_reply(channel, reference, (msg + ("" if msg.endswith("```") else "\n") + url).strip(), embed=embed, tts=tts)
 			else:
 				message = await send_with_reply(channel, reference, msg, embed=embed, file=file, tts=tts)
@@ -2961,9 +2970,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					return f"<{url}>"
 				return url
 			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join(fatt(attachment_cache.preserve(a.url, message.id)) for a in message.attachments)
-			# kwargs = {}
-			# if not message.embeds:
-			# 	kwargs["embeds"] = [discord.Embed().set_image(url="attachment://" + a.filename) for a in message.attachments]
 			message = await bot.edit_message(message, content=content.strip())
 		if not message:
 			print("No message detected.")

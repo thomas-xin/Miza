@@ -102,9 +102,9 @@ class Restart(Command):
 			return
 		if mode in ("update", "all"):
 			resps = await gather(*(
-				*([_run_async(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)] if mode == "all" else ()),
-				bot.start_audio_client(shutdown=True),
-				bot.start_webserver(shutdown=True),
+				*([_run_async(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)] if mode == "update" else ()),
+				_run_async(bot.start_audio_client, shutdown=True),
+				_run_async(bot.start_webserver, shutdown=True),
 				restart_workers(shutdown=True),
 			), return_exceptions=True)
 			resp = resps[0]

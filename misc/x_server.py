@@ -176,12 +176,17 @@ def requires_proxy(url: str, headers: collections.abc.Mapping, download: bool = 
 
 @functools.lru_cache(maxsize=256)
 def get_size_mime(head, tail, count, chunksize):
-	fut = submit_thread(niquests.head, head)
-	resp = niquests.head(tail)
+	h = Request.header()
+	fut = submit_thread(niquests.head, tail, headers=h)
+	with niquests.get(head, headers=h, stream=True) as resp:
+		it = resp.iter_content(262144)
+		b = next(it)
+	mimetype = get_mime(b)
+	if mimetype == "application/octet-stream":
+		mimetype = resp.headers.get("Content-Type", "application/octet-stream")
+	resp = fut.result()
 	lastsize = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 	size = chunksize * (count - 1) + lastsize
-	resp = fut.result()
-	mimetype = resp.headers.get("Content-Type", "application/octet-stream")
 	return mimetype, size, lastsize
 
 class EndpointRedirects(Dispatcher):
@@ -522,18 +527,28 @@ class Server:
 					yield from fut.result()
 
 	@cp.expose(alias=("c",))
-	def chunked_proxy(self, path, *void):
+	def chunked_proxy(self, path, *args, download="", **kwargs):
 		with tracebacksuppressor:
 			urls, chunksize = await_fut(attachment_cache.obtains(path))
 			mimetype, size, lastsize = get_size_mime(urls[0], urls[-1], len(urls), chunksize)
 			update_headers(cp.response.headers, **CHEADERS)
 			cp.response.headers["Content-Type"] = mimetype
+			try:
+				url = urls[0]
+				heads = await_fut(attachment_cache.scan_headers(url))
+				filename = heads.get("attachment-filename") or urllib.parse.unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
+				disposition = "attachment" if download else "inline"
+				cp.response.headers.pop("Content-Disposition", None)
+				if filename:
+					cp.response.headers["Content-Disposition"] = f"{disposition}; filename={urllib.parse.quote(url2fn(filename))}"
+			except Exception:
+				print_exc()
 			new_urls = [f"{url}&S={lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
 			return self.dyn_serve(new_urls, size)
 	chunked_proxy._cp_config = {"response.stream": True}
 
 	@cp.expose(alias=("u",))
-	def unproxy(self, *path, url=None, force=False, download=False, **query):
+	def unproxy(self, *path, url=None, force=False, download=False, **void):
 		if url:
 			return self.proxy_if(url, force=force, download=download)
 		try:
@@ -626,7 +641,7 @@ class Server:
 		disposition = "attachment" if download else "inline"
 		cp.response.headers.pop("Content-Disposition", None)
 		if filename:
-			cp.response.headers["Content-Disposition"] = f"{disposition}; filename={urllib.parse.quote(filename)}"
+			cp.response.headers["Content-Disposition"] = f"{disposition}; filename={urllib.parse.quote(url2fn(filename))}"
 		ctype = heads.get("Content-Type", "application/octet-stream")
 		if ctype.split(";", 1)[0] in ("text/html", "text/plain", "application/octet-stream"):
 			it = resp.iter_content(262144)
@@ -833,7 +848,10 @@ class Server:
 			print(url)
 			if url:
 				headers = await_fut(attachment_cache.scan_headers(url, fc=True))
-				_fn = urllib.parse.unquote(headers["content-disposition"].split("filename=", 1)[-1])
+				try:
+					_fn = urllib.parse.unquote(headers["content-disposition"].split("filename=", 1)[-1])
+				except LookupError:
+					_fn = url2fn(url)
 				_size = byte_scale(headers["content-length"]) + "B"
 				_mime = headers.get("content-type", "application/octet-stream")
 				p_url = url

@@ -989,7 +989,7 @@ def is_tenor_url(url): return url and regexp(r"^https?:\/\/tenor.com(?:\/view)?\
 def is_imgur_url(url): return url and regexp(r"^https?:\/\/(?:\w\.)?imgur.com\/[\w\-]+").findall(url)
 def is_giphy_url(url): return url and regexp(r"^https?:\/\/giphy.com\/gifs\/[\w\-]+").findall(url)
 def is_miza_url(url): return url and regexp(r"^https?:\/\/(?:\w+\.)?mizabot.xyz(?:\:[0-9]+)?").findall(url)
-def is_miza_attachment(url): return url and regexp(r"^https?:\/\/(?:\w+\.)?mizabot.xyz(?:\:[0-9]+)?\/\w\/").findall(url)
+def is_miza_attachment(url): return url and regexp(r"^https?:\/\/(?:\w+\.)?mizabot.xyz(?:\:[0-9]+)?\/[cu]\/").findall(url)
 def is_youtube_url(url): return url and regexp(r"^https?:\/\/(?:\w{1,5}\.)?youtu(?:\.be|be\.com)\/[^\s<>`|" '"' "']+").findall(url)
 def is_youtube_stream(url): return url and regexp(r"^https?:\/\/r+[0-9]+---.{2}-[\w\-]{4,}\.googlevideo\.com").findall(url)
 def is_soundcloud_stream(url): return url and regexp(r"^https?:\/\/(?:[\w\-]*)?media\.sndcdn\.com\/[^\s<>`|" '"' "']+").findall(url)
