@@ -381,15 +381,19 @@ class Server:
 		cp.response.headers["ETag"] = create_etag(data)
 		return data
 
-	@staticmethod
-	def serve_predetermined(func, path="", content_type="application/octet-stream"):
+	def serve_predetermined(self, cache, path, *args, content_type="application/octet-stream"):
 		update_headers(cp.response.headers, **CHEADERS)
 		print("CTYPE:", content_type)
 		cp.response.headers["Content-Type"] = content_type
 		cp.response.headers["ETag"] = create_etag(path)
-		def gen():
-			yield func()
-		return gen()
+		try:
+			data = cache[path]
+		except KeyError:
+			def gen():
+				yield cache.retrieve(path, *args)
+			return gen()
+		else:
+			return self.dyn_serve([data], size=len(data))
 
 	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
 		for i in range(retries):
@@ -990,12 +994,10 @@ class Server:
 		fmt = mime_into(ctype)
 		if IMAGE_FORMS.get(fmt) == False:
 			return self.serve_predetermined(
-				lambda: self.preview_cache.retrieve(
-					unyt(url),
-					interface.run,
-					f'process_image({repr(url)},"resize_map",[[],None,None,"rel",4096,"-","auto","-o","-f","webp"],timeout=24)',
-				),
-				path=unyt(url),
+				self.preview_cache,
+				unyt(url),
+				interface.run,
+				f'process_image({repr(url)},"resize_map",[[],None,None,"rel",4096,"-","auto","-o","-f","webp"],timeout=24)',
 				content_type="image/webp",
 			)
 		if ctype.startswith("audio/"):
@@ -1011,12 +1013,9 @@ class Server:
 					return f.read()
 
 			return self.serve_predetermined(
-				lambda: self.preview_cache.retrieve(
-					unyt(url),
-					preview_audio,
-					url,
-				),
-				path=unyt(url),
+				self.preview_cache,
+				url,
+				preview_audio,
 				content_type="video/webm",
 			)
 		return self.proxy_if(url, force=False, download=False)
