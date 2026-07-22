@@ -1993,7 +1993,7 @@ def expand_chunks(url):
 	size_mb, cid, mids = ungroup_attachments(path)
 	return size_mb, cid, mids, revert_suffix(fn)
 
-def preview_url(url, base="https://mizabot.xyz"):
+def preview_url(url, base="https://mizabot.xyz/files"):
 	if "?url=" in url:
 		url = unquote(url.split("?url=", 1)[-1])
 	path = re.split(r"^https?:\/\/(?:\w+\.)?mizabot.xyz(?:\:[0-9]+)?\/", url, 1)[-1]

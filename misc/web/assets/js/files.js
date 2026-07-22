@@ -168,7 +168,7 @@
 				if (xhr.status >= 200 && xhr.status < 300) {
 					// Success - redirect to preview page and request a cache of the preview element
 					let url = xhr.responseText.trim();
-					if (persistent) {
+					if (persistent && url.startsWith("https://")) {
 						const temp = url.split("//", 2)[1].split("/");
 						temp.shift();
 						url = temp.join("/");

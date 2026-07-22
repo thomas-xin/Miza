@@ -28,7 +28,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, submit_thread, create_thread, create_task, await_fut
 from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
-from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag
+from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag, preview_url
 from .caches import attachment_cache, colour_cache, minimise_url
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -864,12 +864,12 @@ class Server:
 						p_url = url
 						mime2 = _mime
 					else:
-						p_url = f"{API}/preview.webp?url=" + urllib.parse.quote(url, safe=())
+						p_url = preview_url(url, base=f"{API}/preview.webp")
 						mime2 = "image/webp"
 					og = f'<meta property="og:image" content="{p_url}"><meta property="og:image:type" content="{mime2}">'
 					tw = f'<meta name="twitter:image" content="{p_url}">'
 				elif _mime.startswith("audio/"):
-					p_url = f"{API}/preview.webm?url=" + urllib.parse.quote(url, safe=())
+					p_url = preview_url(url, base=f"{API}/preview.webm")
 					og = f'<meta property="og:video" content="{p_url}"><meta property="og:video:type" content="video/webm"><meta property="og:audio" content="{url}"><meta property="og:audio:type" content="{_mime}">'
 				elif _mime.startswith("video/"):
 					og = f'<meta property="og:video" content="{p_url}"><meta property="og:video:type" content="{_mime}">'
