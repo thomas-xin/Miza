@@ -1707,6 +1707,8 @@ def b64(b):
 
 def b64_or_uni(b):
 	b = b.strip()
+	if type(b) is str and "%" in b or type(b) is not str and 37 in b:
+		b = unquote_plus(as_str(b))
 	if b.isascii():
 		try:
 			return b64(b)

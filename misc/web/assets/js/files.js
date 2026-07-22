@@ -100,7 +100,7 @@
 
 		let short = url;
 		if (url.startsWith('https://mizabot.xyz/u/')) {
-			const resp = await fetch('https://api.mizabot.xyz/minimise?url=' + url);
+			const resp = await fetch('https://api.mizabot.xyz/minimise?url=' + encodeURIComponent(url));
 			short = await resp.text();
 		}
 		h1.innerText = '“' + filename + '”';
@@ -110,7 +110,7 @@
 		if (mime.startsWith('image/')) { 
 			let previewImg = document.createElement('img');
 			previewImg.src = ['png', 'apng', 'webp', 'svg', 'jpg', 'gif', 'avif', 'heif', 'heic', 'bmp']
-				.includes(mime.split('/', 2)[1]) ? url : 'https://api.mizabot.xyz/preview.webp?url=' + url;
+				.includes(mime.split('/', 2)[1]) ? url : 'https://api.mizabot.xyz/preview.webp?url=' + encodeURIComponent(url);
 			previewImg.alt = filename;
 			mediaPreviewHolder.appendChild(previewImg);
 		} else if (mime.startsWith('video/')) {

@@ -836,6 +836,9 @@ class Server:
 				_fn = urllib.parse.unquote(headers["content-disposition"].split("filename=", 1)[-1])
 				_size = byte_scale(headers["content-length"]) + "B"
 				_mime = headers.get("content-type", "application/octet-stream")
+				p_url = url
+				if _mime.startswith("image/"):
+					p_url = url if _mime.split("/", 1)[-1] in ['png', 'apng', 'webp', 'svg', 'jpg', 'gif', 'avif', 'heif', 'heic', 'bmp'] else 'https://api.mizabot.xyz/preview.webp?url=' + urllib.parse.quote_plus(url)
 				data = (
 					f"""<!DOCTYPE html>
 <html lang="en">
@@ -848,7 +851,7 @@ class Server:
 	<meta property="og:type" content="website">
 	<meta property="og:title" content="{_fn}">
 	<meta property="og:description" content="{_mime}, {_size}">
-	<meta property="og:image" content="{url}">
+	<meta property="og:image" content="{p_url}">
 
 	<!-- Twitter Meta Tags -->
 	<meta name="twitter:card" content="summary_large_image">
@@ -856,7 +859,7 @@ class Server:
 	<meta property="twitter:url" content="https://mizabot.xyz">
 	<meta name="twitter:title" content="{_fn}">
 	<meta name="twitter:description" content="{_mime}, {_size}">
-	<meta name="twitter:image" content="{url}">
+	<meta name="twitter:image" content="{p_url}">
 
 	<link rel="icon" type="image/webp" href="/assets/images/logo512.webp">
 	<link rel="stylesheet" href="/assets/css/global.css">
