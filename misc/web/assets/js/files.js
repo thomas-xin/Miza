@@ -173,7 +173,7 @@
 						temp.shift();
 						url = temp.join("/");
 					}
-					if (file.type.startsWith("image/") || file.type.startsWith("audio/")) {
+					if (file.type.startsWith("image/") || file.type.startsWith("audio/") || !file.type) {
 						fetch('https://api.mizabot.xyz/preview?url=' + encodeURI(url));
 					}
 					res(url);

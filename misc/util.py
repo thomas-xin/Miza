@@ -3552,6 +3552,10 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 
 	def clear(self):
 		self._retrieving.clear()
+		if self._unsafe:
+			self._unsafe.clear()
+		if self._unsafe_mut:
+			self._unsafe_mut.clear()
 		super().clear()
 		if self._path and os.path.exists(self._path) and os.path.isdir(self._path) and os.listdir(self._path):
 			self.close()

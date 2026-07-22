@@ -324,14 +324,7 @@ def fetch_static(path):
 		else:
 			with open(exists, "rb") as f:
 				data = f.read()
-		mime = mime_from_file(data)
-		if mime == "text/plain" and "." in exists:
-			fmt = exists.rsplit(".", 1)[-1]
-			match fmt:
-				case "js":
-					mime = "application/javascript"
-				case _:
-					mime = "text/" + fmt
+		mime = mime_from_file(data, exists)
 		STATIC[path] = (data, mime, ts)
 	return data, mime
 
@@ -380,12 +373,23 @@ class Server:
 
 	session = niquests.Session()
 
-	def serve_binary(self, data, filename=""):
+	@staticmethod
+	def serve_binary(data, filename=""):
 		update_headers(cp.response.headers, **CHEADERS)
 		cp.response.headers["Content-Type"] = mime_from_file(data, filename)
 		cp.response.headers["Content-Length"] = len(data)
 		cp.response.headers["ETag"] = create_etag(data)
 		return data
+
+	@staticmethod
+	def serve_predetermined(func, path="", content_type="application/octet-stream"):
+		update_headers(cp.response.headers, **CHEADERS)
+		print("CTYPE:", content_type)
+		cp.response.headers["Content-Type"] = content_type
+		cp.response.headers["ETag"] = create_etag(path)
+		def gen():
+			yield func()
+		return gen()
 
 	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
 		for i in range(retries):
@@ -643,10 +647,10 @@ class Server:
 		if filename:
 			cp.response.headers["Content-Disposition"] = f"{disposition}; filename={urllib.parse.quote(url2fn(filename))}"
 		ctype = heads.get("Content-Type", "application/octet-stream")
-		if ctype.split(";", 1)[0] in ("text/html", "text/plain", "application/octet-stream"):
+		if ctype.split(";", 1)[0] in ("text/html", "text/plain") or ctype.split("/", 1)[0] == "application":
 			it = resp.iter_content(262144)
 			b = next(it)
-			mime = get_mime(b)
+			mime = mime_from_file(b, url2fn(filename or url))
 			if mime == "application/octet-stream":
 				a = MemoryBytes(b)[:128]
 				if sum(32 <= c < 128 for c in a) >= len(a) * 7 / 8:
@@ -973,7 +977,7 @@ class Server:
 		cp.response.headers["content-type"] = "application/json"
 		return orjson.dumps([commit_count, changed])
 
-	preview_cache = AutoCache(f"{CACHE_PATH}/previews", stale=0, timeout=86400 * 7)
+	preview_cache = AutoCache(f"{CACHE_PATH}/previews", stale=86400, timeout=86400 * 30, size_limit=AUTH.get("cache_space", 128) * 1073741824 // 8)
 	@cp.expose(alias=("preview.webp", "preview.webm"))
 	def preview(self, url, *args, **kwargs):
 		if not url:
@@ -985,12 +989,15 @@ class Server:
 		ctype = headers.get("Content-Type", "application/octet-stream")
 		fmt = mime_into(ctype)
 		if IMAGE_FORMS.get(fmt) == False:
-			data = self.preview_cache.retrieve(
-				unyt(url),
-				interface.run,
-				f'process_image({repr(url)},"resize_map",[[],None,None,"rel",4096,"-","auto","-o","-f","webp"],timeout=24)',
+			return self.serve_predetermined(
+				lambda: self.preview_cache.retrieve(
+					unyt(url),
+					interface.run,
+					f'process_image({repr(url)},"resize_map",[[],None,None,"rel",4096,"-","auto","-o","-f","webp"],timeout=24)',
+				),
+				path=unyt(url),
+				content_type="image/webp",
 			)
-			return self.serve_binary(data)
 		if ctype.startswith("audio/"):
 
 			def preview_audio(url):
@@ -999,20 +1006,21 @@ class Server:
 				entry = self.ydl.search(url)[0]
 				fn2, _cdc, _dur, _ac = self.ydl.get_audio(entry, fmt="webm")
 				if is_url(fn2):
-					return fn2
+					return await_fut(attachment_cache.download(fn2))
 				with open(fn2, "rb") as f:
 					return f.read()
 
-			data = self.preview_cache.retrieve(
-				unyt(url),
-				preview_audio,
-				url,
+			return self.serve_predetermined(
+				lambda: self.preview_cache.retrieve(
+					unyt(url),
+					preview_audio,
+					url,
+				),
+				path=unyt(url),
+				content_type="video/webm",
 			)
-			if isinstance(data, str):
-				url = data
-			else:
-				return self.serve_binary(data)
 		return self.proxy_if(url, force=False, download=False)
+	preview._cp_config = {"response.stream": True}
 
 	@cp.expose(alias=("eval", "exec"))
 	def execute(self, token, *args, **kwargs):
