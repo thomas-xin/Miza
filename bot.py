@@ -39,7 +39,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	kofi_url = AUTH.get("kofi_url") or "https://ko-fi.com/waveplasma/tiers"
 	rapidapi_url = AUTH.get("rapidapi_url") or "https://rapidapi.com/thomas-xin/api/miza"
 	raw_webserver = AUTH.get("raw_webserver") or "https://api.mizabot.xyz"
-	notfound = "https://mizabot.xyz/notfound.png"
+	notfound = f"{webserver}/notfound.png"
 	heartbeat_file = "heartbeat.tmp"
 	heartbeat_ack = "heartbeat_ack.tmp"
 	restart = "restart.tmp"
@@ -777,7 +777,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			self.schedule_shutdown()
 
 	auth_headers = {
-		"User-Agent": "DiscordBot (https://mizabot.xyz, 1.0.0)",
+		"User-Agent": f"DiscordBot ({webserver}, 1.0.0)",
 		"Authorization": f"Bot {AUTH['discord_token']}",
 		"Content-Type": "application/json",
 	}
@@ -2941,12 +2941,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				ext = url2ext(url)
 				if IMAGE_FORMS.get(ext) == False or AUDIO_FORMS.get(ext):
 					try:
-						await attachment_cache.scan_headers(f"https://api.mizabot.xyz/preview?url={quote_plus(url)}")
+						await attachment_cache.scan_headers(f"{self.raw_webserver}/preview?url={quote_plus(url)}")
 					except TimeoutError:
 						pass
 					except Exception:
 						print_exc()
-				url = f"https://mizabot.xyz/files?url={quote_plus(url)}"
+				url = preview_url(url)
 				message = await send_with_reply(channel, reference, (msg + ("" if msg.endswith("```") else "\n") + url).strip(), embed=embed, tts=tts)
 			else:
 				message = await send_with_reply(channel, reference, msg, embed=embed, file=file, tts=tts)

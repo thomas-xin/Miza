@@ -32,8 +32,9 @@ import sys
 import threading
 import time
 from traceback import format_exc, print_exc
-from urllib.parse import quote_plus, unquote_plus
+from urllib.parse import quote_plus, unquote_plus, quote, unquote
 import urllib.request
+import urllib.error
 import zipfile
 import aiofiles
 import aiohttp
@@ -1546,8 +1547,8 @@ def mime_from_file(path, filename=None, mime=True):
 		out = filetype.guess_mime(data)
 	else:
 		out = filetype.guess_extension(data)
-	filename = filename or (path if isinstance(path, str) else getattr(path, "filename", "") or getattr(path, "name", ""))
-	if out and out.split("/", 1)[-1] == "zip" and isinstance(filename, str) and filename.endswith(".jar"):
+	filename = filename or as_str(path if isinstance(path, str) else getattr(path, "filename", "") or getattr(path, "name", ""))
+	if out and out.split("/", 1)[-1] == "zip" and filename.endswith(".jar"):
 		return "application/java-archive"
 	if not out:
 		if not isinstance(data, bytes):
@@ -1555,30 +1556,35 @@ def mime_from_file(path, filename=None, mime=True):
 				raise TypeError(data)
 			data = bytes(data)
 		out = simple_mimes(data, mime)
-	if out in ("application/octet-stream", "application/vnd.lotus-organizer"):
-		match data[:4]:
-			case b"ECDC":
-				return "audio/x-ecdc"
-			case b"MThd":
-				return "audio/midi"
-			case b"Org-":
-				return "audio/x-org"
-			case b"qoif":
-				return "image/qoi"
-		if data[4:8] == b"ftyp":
-			match data[8:12]:
-				case b"avis" | b"avif":
-					return "image/avif"
-				case b"heic" | b"heix" | b"hevc" | b"hevx":
-					return "image/heic"
-				case b"mif1" | b"msf1":
-					return "image/heif"
+	if out.startswith("application/"):
+		match out.split("/", 1)[-1]:
+			case "ogg":
+				return "audio/ogg"
+			case "opus":
+				return "audio/opus"
+			case "mp3" | "mpeg":
+				return "audio/mpeg"
+			case "wav" | "x-wav":
+				return "audio/wav"
+		if out in ("application/octet-stream", "application/vnd.lotus-organizer"):
+			match data[:4]:
+				case b"ECDC":
+					return "audio/x-ecdc"
+				case b"MThd":
+					return "audio/midi"
+				case b"Org-":
+					return "audio/x-org"
+				case b"qoif":
+					return "image/qoi"
+			if data[4:8] == b"ftyp":
+				match data[8:12]:
+					case b"avis" | b"avif":
+						return "image/avif"
+					case b"heic" | b"heix" | b"hevc" | b"hevx":
+						return "image/heic"
+					case b"mif1" | b"msf1":
+						return "image/heif"
 	elif data and out == "text/plain":
-		if filename:
-			if filename.endswith(".css"):
-				return "text/css"
-			if filename.endswith(".js"):
-				return "application/javascript"
 		if data.startswith(b"#EXTM3U"):
 			return "video/m3u8"
 		if data[:15].lower() == b"<!doctype html>":
@@ -1594,6 +1600,15 @@ def mime_from_file(path, filename=None, mime=True):
 					return "application/json"
 				return out
 			return "application/json"
+		if filename:
+			if filename.endswith(".css"):
+				return "text/css"
+			if filename.endswith(".js"):
+				return "application/javascript"
+			ext = filename.rsplit("/", 1)[-1].rsplit(".", 1)[-1]
+			mime2 = MIMES.get(ext, "")
+			if mime2:
+				return mime2
 	return out
 
 magic = cdict(
@@ -1629,23 +1644,6 @@ def get_mime(path):
 				pass
 			else:
 				return "text/plain"
-	if mime.startswith("application/"):
-		match mime.split("/", 1)[-1]:
-			case "ogg":
-				return "audio/ogg"
-			case "opus":
-				return "audio/opus"
-			case "mp3" | "mpeg":
-				return "audio/mpeg"
-			case "wav" | "x-wav":
-				return "audio/wav"
-	if mime.startswith("text/plain"):
-		ext = path.rsplit("/", 1)[-1].rsplit(".", 1)[-1]
-		mime2 = MIMES.get(ext, "")
-		if mime2:
-			return mime2
-	elif mime.split("/", 1)[-1] == "zip" and path.endswith(".jar"):
-		return "application/java-archive"
 	return mime
 
 def find_file(path, cwd="saves/filehost", ind="\x7f"):
@@ -1663,9 +1661,6 @@ def find_file(path, cwd="saves/filehost", ind="\x7f"):
 			if fi[-1] != ind and fi.rsplit(".", 1)[0].split("~", 1)[0] == fn:
 				return wd + "/" + fi
 	raise FileNotFoundError(404, path)
-
-url_parse = quote_plus
-url_unparse = unquote_plus
 
 def stream_exists(url, fmt="opus"):
 	url = unyt(url)
@@ -1997,6 +1992,12 @@ def expand_chunks(url):
 	path, fn = path.split("/", 1)
 	size_mb, cid, mids = ungroup_attachments(path)
 	return size_mb, cid, mids, revert_suffix(fn)
+
+def preview_url(url, base="https://mizabot.xyz"):
+	if "?url=" in url:
+		url = unquote(url.split("?url=", 1)[-1])
+	path = re.split(r"^https?:\/\/(?:\w+\.)?mizabot.xyz(?:\:[0-9]+)?\/", url, 1)[-1]
+	return f"{base}?url={quote(path)}"
 
 def p2n(b):
 	"Converts a urlsafe-base64 string to big-endian integer."
@@ -5337,17 +5338,18 @@ Request = RequestManager()
 get_request = Request.__call__
 
 def header_test(url, timeout=12):
-	req = urllib.request.Request(url, method="HEAD", headers=Request.header())
-	try:
-		resp = urllib.request.urlopen(req, timeout=timeout / 2)
-	except urllib.error.HTTPError as ex:
-		if ex.getcode() not in (400, 405):
-			raise ConnectionError(ex.getcode(), ex.msg)
-	except urllib.error.URLError:
-		pass
-	else:
-		resp.close()
-		return resp.headers
+	if url.isascii():
+		req = urllib.request.Request(url, method="HEAD", headers=Request.header())
+		try:
+			resp = urllib.request.urlopen(req, timeout=timeout / 2)
+		except urllib.error.HTTPError as ex:
+			if ex.getcode() not in (400, 405):
+				raise ConnectionError(ex.getcode(), ex.msg)
+		except urllib.error.URLError:
+			pass
+		else:
+			resp.close()
+			return resp.headers
 	with requests.get(url, headers=Request.header(), stream=True, verify=False, timeout=timeout) as resp:
 		try:
 			resp.raise_for_status()

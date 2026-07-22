@@ -1139,7 +1139,7 @@ class Preserve(Command):
 		print(urls)
 		print(out)
 		if preview:
-			return "\n".join(f"https://mizabot.xyz/files?url={urllib.parse.quote(u, safe=())}" for u in out)
+			return "\n".join(preview_url(u) for u in out)
 		return "\n".join(f"<{u}>" for u in out)
 
 

@@ -28,7 +28,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, submit_thread, create_thread, create_task, await_fut
 from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
-from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url_unparse, url2fn, url2ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag
+from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag
 from .caches import attachment_cache, colour_cache, minimise_url
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -380,9 +380,9 @@ class Server:
 
 	session = niquests.Session()
 
-	def serve_binary(self, data):
+	def serve_binary(self, data, filename=""):
 		update_headers(cp.response.headers, **CHEADERS)
-		cp.response.headers["Content-Type"] = get_mime(data)
+		cp.response.headers["Content-Type"] = mime_from_file(data, filename)
 		cp.response.headers["Content-Length"] = len(data)
 		cp.response.headers["ETag"] = create_etag(data)
 		return data
@@ -847,6 +847,8 @@ class Server:
 			url = kwargs.get("url")
 			print(url)
 			if url:
+				if "//" not in url:
+					url = f"{API}/{url.lstrip('/')}"
 				headers = await_fut(attachment_cache.scan_headers(url, fc=True))
 				try:
 					_fn = urllib.parse.unquote(headers["content-disposition"].split("filename=", 1)[-1])
@@ -862,12 +864,12 @@ class Server:
 						p_url = url
 						mime2 = _mime
 					else:
-						p_url = "https://api.mizabot.xyz/preview.webp?url=" + urllib.parse.quote(url, safe=())
+						p_url = f"{API}/preview.webp?url=" + urllib.parse.quote(url, safe=())
 						mime2 = "image/webp"
 					og = f'<meta property="og:image" content="{p_url}"><meta property="og:image:type" content="{mime2}">'
 					tw = f'<meta name="twitter:image" content="{p_url}">'
 				elif _mime.startswith("audio/"):
-					p_url = 'https://api.mizabot.xyz/preview.webm?url=' + urllib.parse.quote(url, safe=())
+					p_url = f"{API}/preview.webm?url=" + urllib.parse.quote(url, safe=())
 					og = f'<meta property="og:video" content="{p_url}"><meta property="og:video:type" content="video/webm"><meta property="og:audio" content="{url}"><meta property="og:audio:type" content="{_mime}">'
 				elif _mime.startswith("video/"):
 					og = f'<meta property="og:video" content="{p_url}"><meta property="og:video:type" content="{_mime}">'
@@ -879,7 +881,7 @@ class Server:
 	<meta name="description" content="Your local loyal multipurpose Discord bot">
 
 	<!-- Open Graph Meta Tags -->
-	<meta property="og:url" content="https://mizabot.xyz">
+	<meta property="og:url" content="{HOST}">
 	<meta property="og:type" content="website">
 	<meta property="og:title" content="{_fn}">
 	<meta property="og:description" content="{_mime}, {_size}">
@@ -887,8 +889,8 @@ class Server:
 
 	<!-- Twitter Meta Tags -->
 	<meta name="twitter:card" content="summary_large_image">
-	<meta property="twitter:domain" content="mizabot.xyz">
-	<meta property="twitter:url" content="https://mizabot.xyz">
+	<meta property="twitter:domain" content="{HOST}">
+	<meta property="twitter:url" content="{HOST}">
 	<meta name="twitter:title" content="{_fn}">
 	<meta name="twitter:description" content="{_mime}, {_size}">
 	{tw}
@@ -906,7 +908,7 @@ class Server:
 """.encode("utf-8")
 					+ data.split(b"</head>", 1)[-1]
 				)
-		return self.serve_binary(data)
+		return self.serve_binary(data, path_info)
 
 	@cp.expose(alias=("favicon", "favicon.ico"))
 	def favicon_ico(self, *args, **kwargs):
@@ -976,6 +978,9 @@ class Server:
 	def preview(self, url, *args, **kwargs):
 		if not url:
 			return "Expected proxy URL."
+		if "//" not in url:
+			url = f"{API}/{url.lstrip('/')}"
+		cp.request.headers.update(CHEADERS)
 		headers = await_fut(attachment_cache.scan_headers(url, fc=True))
 		ctype = headers.get("Content-Type", "application/octet-stream")
 		fmt = mime_into(ctype)

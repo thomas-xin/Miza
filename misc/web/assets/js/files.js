@@ -167,7 +167,12 @@
 			xhr.addEventListener('load', () => {
 				if (xhr.status >= 200 && xhr.status < 300) {
 					// Success - redirect to preview page and request a cache of the preview element
-					const url = xhr.responseText.trim();
+					let url = xhr.responseText.trim();
+					if (persistent) {
+						const temp = url.split("//", 2)[1].split("/");
+						temp.shift();
+						url = temp.join("/");
+					}
 					if (file.type.startsWith("image/") || file.type.startsWith("audio/")) {
 						fetch('https://api.mizabot.xyz/preview?url=' + encodeURI(url));
 					}

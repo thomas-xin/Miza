@@ -251,7 +251,7 @@
 			"usage": ""
 		},
 		"Preserve": {
-			"aliases": ["Preserve", "PreserveAttachmentLinks", "Shorten", "Minimise", "Minimize"],
+			"aliases": ["Preserve", "PreserveAttachmentLinks", "Shorten", "Minimise", "Minimize", "Preview"],
 			"description": "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to Miza's webserver's upload page: https://mizabot.xyz/files",
 			"level": "0",
 			"rate_limit": "(12, 17)",
@@ -262,6 +262,10 @@
 					"type": "bool",
 					"description": "Whether to produce the shortest possible alias"
 				},
+				"preview": {
+					"type": "bool",
+					"description": "Whether to produce the in-site media previews instead"
+				},
 				"urls": {
 					"type": "url",
 					"description": "URL or attachment to preserve",
@@ -271,7 +275,7 @@
 					"required": true
 				}
 			},
-			"ordered_args": ["minimise", "urls"],
+			"ordered_args": ["minimise", "preview", "urls"],
 			"macros": {
 				"Shorten": {
 					"minimise": true
@@ -281,6 +285,9 @@
 				},
 				"Minimize": {
 					"minimise": true
+				},
+				"Preview": {
+					"preview": true
 				}
 			}
 		},
