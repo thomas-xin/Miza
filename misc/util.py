@@ -3459,6 +3459,17 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			if _read and hasattr(resp, "name") and os.path.exists(resp.name):
 				return open(resp.name, "rb")
 			return resp
+		if self._unsafe_mut:
+			try:
+				v = self._unsafe_mut[k]
+			except KeyError:
+				pass
+			else:
+				if v is Dummy:
+					raise KeyError(k)
+				if _read and hasattr(v, "name") and os.path.exists(v.name):
+					return open(v.name, "rb")
+				return v
 		try:
 			v, t = super().get(k, read=_read, tag=True)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
@@ -3507,6 +3518,17 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			if _read and hasattr(resp, "name") and os.path.exists(resp.name):
 				return open(resp.name, "rb")
 			return resp
+		if self._unsafe_mut:
+			try:
+				v = self._unsafe_mut[k]
+			except KeyError:
+				pass
+			else:
+				if v is Dummy:
+					raise KeyError(k)
+				if _read and hasattr(v, "name") and os.path.exists(v.name):
+					return open(v.name, "rb")
+				return v
 		try:
 			v, t = super().get(k, read=_read, tag=True)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
@@ -3715,6 +3737,17 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 			if _read and hasattr(resp, "name") and os.path.exists(resp.name):
 				return open(resp.name, "rb")
 			return resp
+		if self._unsafe_mut:
+			try:
+				v = self._unsafe_mut[k]
+			except KeyError:
+				pass
+			else:
+				if v is Dummy:
+					raise KeyError(k)
+				if _read and hasattr(v, "name") and os.path.exists(v.name):
+					return open(v.name, "rb")
+				return v
 		try:
 			v = super().get(k, read=_read)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
@@ -3748,6 +3781,17 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 			if _read and hasattr(resp, "name") and os.path.exists(resp.name):
 				return open(resp.name, "rb")
 			return resp
+		if self._unsafe_mut:
+			try:
+				v = self._unsafe_mut[k]
+			except KeyError:
+				pass
+			else:
+				if v is Dummy:
+					raise KeyError(k)
+				if _read and hasattr(v, "name") and os.path.exists(v.name):
+					return open(v.name, "rb")
+				return v
 		try:
 			v = super().get(k, read=_read)
 		except (diskcache.core.Timeout, sqlite3.OperationalError):
