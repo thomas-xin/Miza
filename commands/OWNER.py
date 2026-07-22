@@ -105,7 +105,6 @@ class Restart(Command):
 				*([_run_async(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)] if mode == "update" else ()),
 				_run_async(bot.start_audio_client, shutdown=True),
 				_run_async(bot.start_webserver, shutdown=True),
-				restart_workers(shutdown=True),
 			), return_exceptions=True)
 			resp = resps[0]
 			print(resp.stdout)
@@ -160,6 +159,7 @@ class Restart(Command):
 					await bot.send_event("_destroy_", shutdown=mode == "shutdown")
 				with tracebacksuppressor:
 					await _run_async(bot.handle_update, force=True)
+				create_task(restart_workers(shutdown=True))
 				# Save any database that has not already been autosaved
 				print("Saving all databases...")
 				with tracebacksuppressor:

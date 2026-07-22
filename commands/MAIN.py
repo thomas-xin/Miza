@@ -1076,6 +1076,10 @@ class Preserve(Command):
 			type="bool",
 			description="Whether to produce the shortest possible alias",
 		),
+		preview=cdict(
+			type="bool",
+			description="Whether to produce the in-site media previews instead",
+		),
 		urls=cdict(
 			type="url",
 			description="URL or attachment to preserve",
@@ -1095,6 +1099,9 @@ class Preserve(Command):
 		Minimize=cdict(
 			minimise=True,
 		),
+		Preview=cdict(
+			preview=True,
+		)
 	)
 	rate_limit = (12, 17)
 	_timeout_ = 50
@@ -1102,7 +1109,7 @@ class Preserve(Command):
 	msgcmd = ("Preserve Attachment Links",)
 	ephemeral = True
 
-	async def __call__(self, bot, _channel, _message, minimise, urls, **void):
+	async def __call__(self, bot, _channel, _message, minimise, preview, urls, **void):
 		targets = [_message]
 		try:
 			reference = await bot.fetch_reference(_message)
@@ -1131,7 +1138,9 @@ class Preserve(Command):
 		out = await gather(*futs)
 		print(urls)
 		print(out)
-		return "\n".join("<" + u + ">" for u in out)
+		if preview:
+			return "\n".join(f"https://mizabot.xyz/files?url={urllib.parse.quote(u, safe=())}" for u in out)
+		return "\n".join(f"<{u}>" for u in out)
 
 
 class Reminder(Pagination, Interactable, Command):

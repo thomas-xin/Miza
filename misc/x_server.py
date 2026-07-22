@@ -858,12 +858,17 @@ class Server:
 				og = ""
 				tw = ""
 				if _mime.startswith("image/"):
-					p_url = url if _mime.split("/", 1)[-1] in ['png', 'apng', 'webp', 'svg', 'jpg', 'gif', 'avif', 'heif', 'heic', 'bmp'] else 'https://api.mizabot.xyz/preview.webp?url=' + urllib.parse.quote_plus(url)
-					og = f'<meta property="og:image" content="{p_url}"><meta property="og:image:type" content="{_mime}">'
+					if _mime.split("/", 1)[-1] in ['png', 'apng', 'webp', 'svg', 'jpg', 'gif', 'avif', 'heif', 'heic', 'bmp']:
+						p_url = url
+						mime2 = _mime
+					else:
+						p_url = "https://api.mizabot.xyz/preview.webp?url=" + urllib.parse.quote(url, safe=())
+						mime2 = "image/webp"
+					og = f'<meta property="og:image" content="{p_url}"><meta property="og:image:type" content="{mime2}">'
 					tw = f'<meta name="twitter:image" content="{p_url}">'
 				elif _mime.startswith("audio/"):
-					p_url = 'https://api.mizabot.xyz/preview.webm?url=' + urllib.parse.quote_plus(url)
-					og = f'<meta property="og:video" content="{p_url}"><meta property="og:video:type" content="{_mime}"><meta property="og:audio" content="{url}"><meta property="og:audio:type" content="{_mime}">'
+					p_url = 'https://api.mizabot.xyz/preview.webm?url=' + urllib.parse.quote(url, safe=())
+					og = f'<meta property="og:video" content="{p_url}"><meta property="og:video:type" content="video/webm"><meta property="og:audio" content="{url}"><meta property="og:audio:type" content="{_mime}">'
 				elif _mime.startswith("video/"):
 					og = f'<meta property="og:video" content="{p_url}"><meta property="og:video:type" content="{_mime}">'
 				data = (
