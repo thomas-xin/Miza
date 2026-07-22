@@ -226,7 +226,7 @@ def await_fut(fut, timeout=None):
 
 def convert_fut(fut):
 	if is_main_thread():
-		fut2 = concurrent.futures.Future()
+		fut2 = Future()
 		fut2.set_result(asyncio.run(fut))
 		return fut2
 	try:

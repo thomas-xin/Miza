@@ -1241,6 +1241,7 @@ IMAGE_FORMS = {
 	"gif": True,
 	"png": True,
 	"apng": True,
+	"qoi": False,
 	"bmp": False,
 	"jpg": True,
 	"jpeg": True,
@@ -1317,6 +1318,7 @@ VISUAL_FORMS = {
 	"gif": True,
 	"png": True,
 	"apng": True,
+	"qoi": False,
 	"bmp": False,
 	"jpg": True,
 	"jpeg": True,
@@ -1416,6 +1418,8 @@ MIMES = cdict(
 	svg="image/svg+xml",
 	ico="image/x-icon",
 	png="image/png",
+	bmp="image/bmp",
+	qoi="image/qoi",
 	jpg="image/jpeg",
 	gif="image/gif",
 	webp="image/webp",
@@ -1547,20 +1551,24 @@ def mime_from_file(path, filename=None, mime=True):
 			data = bytes(data)
 		out = simple_mimes(data, mime)
 	if out in ("application/octet-stream", "application/vnd.lotus-organizer"):
-		if data.startswith(b'ECDC'):
-			return "audio/x-ecdc"
-		if data.startswith(b"MThd"):
-			return "audio/midi"
-		if data.startswith(b"Org-"):
-			return "audio/x-org"
+		match data[:4]:
+			case b"ECDC":
+				return "audio/x-ecdc"
+			case b"MThd":
+				return "audio/midi"
+			case b"Org-":
+				return "audio/x-org"
+			case b"qoif":
+				return "image/qoi"
 		if data[4:8] == b"ftyp":
-			if data[8:12] in (b"avis", b"avif"):
-				return "image/avif"
-			if data[8:12] in (b"heic", "heix", "hevc", "hevx"):
-				return "image/heic"
-			if data[8:12] in (b"mif1", "msf1"):
-				return "image/heif"
-	if data and out == "text/plain":
+			match data[8:12]:
+				case b"avis" | b"avif":
+					return "image/avif"
+				case b"heic" | b"heix" | b"hevc" | b"hevx":
+					return "image/heic"
+				case b"mif1" | b"msf1":
+					return "image/heif"
+	elif data and out == "text/plain":
 		if filename:
 			if filename.endswith(".css"):
 				return "text/css"
@@ -2076,7 +2084,7 @@ def bytes2zip(data, heavy=True):
 	return b"!" + zlib.compress(data)
 
 def eval_json(s):
-	"Safer than raw eval, more powerful than json.loads. No global variables are provided."
+	"Permits loading of base64, JSON, or JSON5 data."
 	if not isinstance(s, str | bytes):
 		s = bytes(s)
 	if isinstance(s, byte_like) and s.startswith(b'b64("') and s.endswith(b'")'):
@@ -2087,20 +2095,8 @@ def eval_json(s):
 		else:
 			return json.loads(s)
 	except orjson.JSONDecodeError:
-		try:
-			import json5
-			return json5.loads(s)
-		except ValueError:
-			pass
-		cond = ("__" not in s or "." not in s) if isinstance(s, str) else (b"__" not in s or b"." not in s)
-		if cond:
-			try:
-				if len(s) > 1048576:
-					return submit_thread(safe_eval, s).result()
-				return safe_eval(s)
-			except Exception:
-				pass
-		raise
+		import json5
+		return json5.loads(s)
 
 bidict = __builtins__
 if not isinstance(bidict, dict):
@@ -3267,7 +3263,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 	def base_init(self, force=False):
 		if not force and self._initialised:
 			return self._initialised.result()
-		self._initialised = fut = concurrent.futures.Future()
+		self._initialised = fut = Future()
 		fut.set_result(super().__init__(self._path, shards=self._shardcount, **self._kwargs))
 		import atexit
 		atexit.register(self.sync)
@@ -3434,7 +3430,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 
 	def _retrieve(self, k, func, *args, read=False, _cache=lambda _: True, default=Dummy, **kwargs):
 		try:
-			self._retrieving[k] = fut = concurrent.futures.Future()
+			self._retrieving[k] = fut = Future()
 			v = func(*args, **kwargs)
 			if _cache(v):
 				self.__setitem__(k, v, read=read)
@@ -3481,7 +3477,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 	async def _aretrieve(self, k, func, *args, read=False, _cache=lambda _: True, default=Dummy, **kwargs):
 		await _run_async(self.base_init)
 		try:
-			self._retrieving[k] = fut = concurrent.futures.Future()
+			self._retrieving[k] = fut = Future()
 			v = await _run_async(func, *args, **kwargs)
 			if _cache(v):
 				await _run_async(self.__setitem__, k, v, read=read)
@@ -3688,7 +3684,7 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 
 	def _retrieve(self, k, func, *args, read=False, **kwargs):
 		try:
-			self._retrieving[k] = fut = concurrent.futures.Future()
+			self._retrieving[k] = fut = Future()
 			v = func(*args, **kwargs)
 			self.__setitem__(k, v, read=read)
 		except Exception as ex:
@@ -3721,7 +3717,7 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 
 	async def _aretrieve(self, k, func, *args, read=False, **kwargs):
 		try:
-			self._retrieving[k] = fut = concurrent.futures.Future()
+			self._retrieving[k] = fut = Future()
 			v = await _run_async(func, *args, **kwargs)
 			await _run_async(self.__setitem__, k, v, read=read)
 		except Exception as ex:

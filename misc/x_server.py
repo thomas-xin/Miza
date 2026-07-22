@@ -51,6 +51,7 @@ IND = "\x7f"
 
 create_task(Request._init_())
 create_thread(eloop.run_forever)
+_print = print
 if __name__ == "__main__":
 	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
 	print = interface.print
@@ -134,7 +135,7 @@ def access(self):
 	if T(request).get("no_log"):
 		return
 	url = cp.url(qs=request.query_string)
-	print(true_ip(), request.method, url, request.headers)
+	_print(true_ip(), request.method, url, request.headers)
 	return
 cp._cplogging.LogManager.access = access
 
@@ -724,7 +725,7 @@ class Server:
 						if fmt in ("avif", "webp", "gif"):
 							fstr = f"bestvideo[ext={fmt}]/bestvideo[acssodec=none]/bestvideo"
 						else:
-							fstr = f"bestvideo[ext={fmt}]+bestaudio[acodec=opus]/best[ext={fmt}]/best/bestvideo+bestaudio/bestvideo"
+							fstr = f"bestvideo[ext={fmt}]+bestaudio[acodec=opus][language=original]/best[ext={fmt}]/best/bestvideo+bestaudio/bestvideo"
 						postprocessors = [dict(
 							key="FFmpegCustomVideoConvertor",
 							format=fmt,

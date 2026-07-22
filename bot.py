@@ -1180,7 +1180,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		fut = self.temp_guilds.get(gid)
 		if fut:
 			return await wrap_future(fut)
-		self.temp_guilds[gid] = concurrent.futures.Future()
+		self.temp_guilds[gid] = Future()
 		try:
 			data["members"] = list(data.get("_members", {}).values()) or data.get("members", [])
 			guild = discord.Guild(data=data, state=self._state)
@@ -4766,6 +4766,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					taken = True
 				elif v.type in ("mentionable", "user", "channel", "guild", "role"):
 					taken = True
+				elif a and v.type in ("url", "image", "visual") and a[0] == "<" and a[-1] == ">":
+					taken = True
 				elif v.type == "colour":
 					taken = True
 				if not taken:
@@ -4974,7 +4976,27 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				priority_order = ("image", "video", "emoji", "audio", "text")
 			else:
 				priority_order = ("text", "video", "audio", "image", "emoji")
-			urls = await self.follow_url(v, priority_order=priority_order, limit=1)
+			if v and not is_url(v) and v[0] == "<" and v[-1] == ">":
+				m = verify_id(v)
+				if isinstance(m, int):
+					o = self.in_cache(m)
+				elif isinstance(m, int):
+					o = await self.fetch_messageable(m)
+				else:
+					o = None
+					if isinstance(m, int):
+						try:
+							o = await self.fetch_messageable(m)
+						except Exception:
+							pass
+					if o is None:
+						o = await self.fetch_member_ex(m, guild, fuzzy=0)
+				if o:
+					urls = [best_url(o)]
+				else:
+					urls = []
+			else:
+				urls = await self.follow_url(v, priority_order=priority_order, limit=1)
 			if not urls or is_discord_message_link(urls[0]):
 				raise err(TypeError, k, v)
 			v = urls[0]
@@ -5148,7 +5170,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				pass
 			await fut
 		channel = channel or (message.channel if message else None)
-		guild = guild or getattr(channel, "guild", None)
+		guild = guild or getattr(channel, "guild", None) or getattr(user, "guild", None)
+		if guild and hasattr(user, "guild"):
+			if not user.guild:
+				user.guild = guild
+			if user.id not in guild._members:
+				user = await guild.fetch_member(user.id)
+				guild._members[user.id] = user
+			if channel and not getattr(channel, "guild", None):
+				channel.guild = guild
 		if user and user.id == self.id:
 			prefix = self.prefix
 		else:

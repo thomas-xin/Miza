@@ -1442,7 +1442,7 @@ if COMPUTE_LOAD:
 		print("Compute load distribution:", COMPUTE_LOAD)
 		print("Compute pool order:", COMPUTE_ORDER)
 
-async def start_proc(n, di=(), caps="image", it=0, wait=False, timeout=None):
+async def start_proc(n, di=(), caps="image", it=0, shutdown=False):
 	with tracebacksuppressor:
 		if hasattr(n, "caps"):
 			n, di, caps, it = n.n, n.di, n.caps, it + 1
@@ -1456,6 +1456,8 @@ async def start_proc(n, di=(), caps="image", it=0, wait=False, timeout=None):
 			for c in caps:
 				PROCS_BY_CAPS[c].remove(proc)
 			PROCS[n] = False
+		if shutdown:
+			return
 		port = await _run_async(get_free_port)
 		args = proc_args
 		for c in caps:
@@ -1490,10 +1492,10 @@ async def start_proc(n, di=(), caps="image", it=0, wait=False, timeout=None):
 			PROCS_BY_CAPS.setdefault(c, []).append(proc)
 		return proc
 
-async def restart_workers():
+async def restart_workers(shutdown=False):
 	futs = []
 	for proc in PROCS.values():
-		futs.append(start_proc(proc))
+		futs.append(start_proc(proc, shutdown=shutdown))
 	return await gather(*futs)
 
 

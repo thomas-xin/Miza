@@ -1154,7 +1154,7 @@ class AudioDownloader:
 		# print("OUTTMPL:", fn)
 		ydl_opts = dict(
 			# Prefer selected codec, but fallback to best audio if not available
-			format=f"bestaudio[vcodec=none][acodec={codec}][audio_channels=2]/worst[abr>=96][audio_channels=2]/bestaudio[audio_channels=2]/bestaudio/worst[abr>=64]/worst[acodec!=none][tbr>=480]/best",
+			format=f"bestaudio[vcodec=none][acodec={codec}][audio_channels=2][language=original]/worst[abr>=96][audio_channels=2][language=original]/bestaudio[audio_channels=2][language=original]/bestaudio/worst[abr>=64]/worst[acodec!=none][tbr>=480]/best",
 			default_search="auto",
 			source_address="0.0.0.0",
 			remote_components=["ejs:github"],
@@ -1174,7 +1174,7 @@ class AudioDownloader:
 			)]
 		)
 		if url.startswith("https://youtu.be/"):
-			url2 = url.replace("https://youtu.be/", "https://www.youtube.com/watch?v=")
+			url2 = url.replace("https://youtu.be/", "https://music.youtube.com/watch?v=")
 		else:
 			url2 = url
 		try:
@@ -1286,7 +1286,7 @@ class AudioDownloader:
 			try:
 				if not resp:
 					if url.startswith("https://youtu.be/"):
-						url2 = url.replace("https://youtu.be/", "https://www.youtube.com/watch?v=")
+						url2 = url.replace("https://youtu.be/", "https://music.youtube.com/watch?v=")
 					else:
 						url2 = url
 					resp = self.extract_info(url2, process=False)

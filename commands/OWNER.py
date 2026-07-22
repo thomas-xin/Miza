@@ -54,7 +54,7 @@ class Restart(Command):
 		mode=cdict(
 			type="enum",
 			validation=cdict(
-				enum=("workers", "audio", "server", "maintain", "reboot", "shutdown", "update"),
+				enum=("workers", "audio", "server", "all", "maintain", "reboot", "shutdown", "update"),
 				accepts=dict(restart="reboot", wait="maintain"),
 			),
 			description="Image supplied by URL or attachment",
@@ -100,8 +100,14 @@ class Restart(Command):
 			await _run_async(bot.start_webserver)
 			await m.edit("Webserver restarted successfully.")
 			return
-		if mode == "update":
-			resp = await _run_async(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		if mode in ("update", "all"):
+			resps = await gather(*(
+				*([_run_async(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)] if mode == "all" else ()),
+				bot.start_audio_client(shutdown=True),
+				bot.start_webserver(shutdown=True),
+				restart_workers(shutdown=True),
+			), return_exceptions=True)
+			resp = resps[0]
 			print(resp.stdout)
 			print(resp.stderr)
 		if mode == "maintain":
