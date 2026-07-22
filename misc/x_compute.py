@@ -544,7 +544,7 @@ def ffmpeg_opts(new, frames, count, mode, first, fmt, fs, w, h, duration, opt, v
 			command.extend(("-c:v", "libwebp_anim" if anim else "libwebp", "-pix_fmt", pix, "-pred", "mixed"))
 		else:
 			command.extend(("-c:v", "libwebp_anim" if anim else "libwebp", "-pix_fmt", pix, "-pred", "mixed"))
-		command.extend(("-f", "webp", "-compression_level", "6" if lossless else "5"))
+		command.extend(("-f", "webp", "-compression_level", "6" if lossless and opt else "5"))
 		if anim:
 			if opt > 1:
 				command.extend(("-loop", "0", "-q:v", "0"))
@@ -1058,7 +1058,7 @@ def evalImg(url, operation, args):
 			i2 = gen_bg(new.size)
 			i3 = Image.alpha_composite(i2, new)
 			new = i3.convert("RGB")
-		out = save_into(new, new.size, fmt, fs)
+		out = save_into(new, new.size, fmt, fs, opt=opt)
 		if len(out) > fs:
 			w, h = cw, ch = new.width, new.height
 			scale = 1

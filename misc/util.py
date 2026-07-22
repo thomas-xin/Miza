@@ -3470,7 +3470,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 					v = self._retrieve(k, func, *args, read=_read, default=v, **kwargs)
 				except Exception:
 					pass
-			elif delay > self._stale:
+			elif self._stale and delay > self._stale:
 				submit_thread(self._retrieve, k, func, *args, read=_read, default=v, **kwargs)
 			elif isinstance(v, Exception):
 				raise v
@@ -3518,7 +3518,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 					v = await self._aretrieve(k, func, *args, read=_read, default=v, **kwargs)
 				except Exception:
 					pass
-			elif delay > self._stale:
+			elif self._stale and delay > self._stale:
 				create_task(self._aretrieve(k, func, *args, read=_read, default=v, **kwargs))
 			elif isinstance(v, Exception):
 				raise v

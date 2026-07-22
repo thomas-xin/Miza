@@ -1,3 +1,4 @@
+from dns.win32util import _
 import collections.abc
 import datetime
 import functools
@@ -373,6 +374,13 @@ def true_ip(request=None):
 class Server:
 
 	session = niquests.Session()
+
+	def serve_binary(self, data):
+		update_headers(cp.response.headers, **CHEADERS)
+		cp.response.headers["Content-Type"] = get_mime(data)
+		cp.response.headers["Content-Length"] = len(data)
+		cp.response.headers["ETag"] = create_etag(data)
+		return data
 
 	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
 		for i in range(retries):
@@ -808,12 +816,8 @@ class Server:
 
 	@cp.expose(alias=("robots.txt",))
 	def robots(self, *args, **kwargs):
-		data, mime = fetch_static("robots.txt")
-		update_headers(cp.response.headers, **CHEADERS)
-		cp.response.headers["Content-Type"] = mime
-		cp.response.headers["Content-Length"] = len(data)
-		cp.response.headers["ETag"] = create_etag(data)
-		return data
+		data, _mime = fetch_static("robots.txt")
+		return self.serve_binary(data)
 
 	alias = tuple([fn.split("/", 1)[0].rsplit(".", 1)[0] for fn in os.listdir("misc/web")])
 	alias += tuple(a + ".html" for a in alias)
@@ -822,7 +826,7 @@ class Server:
 		path_info = cp.request.path_info
 		if path_info == "/":
 			path_info = "index.html"
-		data, mime = fetch_static(path_info)
+		data, _mime = fetch_static(path_info)
 		update_headers(cp.response.headers, **CHEADERS)
 		if "files" in path_info.split("/"):
 			url = kwargs.get("url")
@@ -867,19 +871,12 @@ class Server:
 """.encode("utf-8")
 					+ data.split(b"</head>", 1)[-1]
 				)
-		cp.response.headers["Content-Type"] = mime
-		cp.response.headers["Content-Length"] = len(data)
-		cp.response.headers["ETag"] = create_etag(data)
-		return data
+		return self.serve_binary(data)
 
 	@cp.expose(alias=("favicon", "favicon.ico"))
 	def favicon_ico(self, *args, **kwargs):
-		data, mime = fetch_static("assets/images/mizaleaf.webp")
-		update_headers(cp.response.headers, **CHEADERS)
-		cp.response.headers["Content-Type"] = mime
-		cp.response.headers["Content-Length"] = len(data)
-		cp.response.headers["ETag"] = create_etag(data)
-		return data
+		data, _mime = fetch_static("assets/images/mizaleaf.webp")
+		return self.serve_binary(data)
 
 	ip_sem = Semaphore(1, 0, rate_limit=150)
 
@@ -898,11 +895,7 @@ class Server:
 			remote=true_ip(),
 			host=T(self).get("ip", "127.0.0.1"),
 		))
-		update_headers(cp.response.headers, **SHEADERS)
-		cp.response.headers["Content-Type"] = "application/json"
-		cp.response.headers["Content-Length"] = len(data)
-		cp.response.headers["ETag"] = create_etag(data)
-		return data
+		return self.serve_binary(data)
 
 	@cp.expose
 	def error(self, code=400):
@@ -942,6 +935,23 @@ class Server:
 		update_headers(cp.response.headers, **SHEADERS)
 		cp.response.headers["content-type"] = "application/json"
 		return orjson.dumps([commit_count, changed])
+
+	preview_cache = AutoCache(f"{CACHE_PATH}/previews", stale=0, timeout=86400 * 7)
+	@cp.expose(alias=("preview.webp"))
+	def preview(self, url, *args, **kwargs):
+		if not url:
+			return "Expected proxy URL."
+		headers = await_fut(attachment_cache.scan_headers(url, fc=True))
+		ctype = headers.get("Content-Type", "application/octet-stream")
+		fmt = mime_into(ctype)
+		if IMAGE_FORMS.get(fmt) == False:
+			data = self.preview_cache.retrieve(
+				unyt(url),
+				interface.run,
+				f'process_image({repr(url)},"resize_map",[[],None,None,"rel",4096,"-","auto","-o","-f","webp"],timeout=24)',
+			)
+			return self.serve_binary(data)
+		raise cp.HTTPRedirect(url, 307)
 
 	@cp.expose(alias=("eval", "exec"))
 	def execute(self, token, *args, **kwargs):

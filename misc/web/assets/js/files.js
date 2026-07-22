@@ -109,7 +109,7 @@
 
 		if (mime.startsWith('image/')) { 
 			let previewImg = document.createElement('img');
-			previewImg.src = url;
+			previewImg.src = 'https://api.mizabot.xyz/preview.webp?url=' + url;
 			previewImg.alt = filename;
 			mediaPreviewHolder.appendChild(previewImg);
 		} else if (mime.startsWith('video/')) {
