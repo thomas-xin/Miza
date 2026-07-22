@@ -20,7 +20,7 @@ from .types import fcdict, byte_like, MemoryBytes
 from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment, discord_expired,
 	merge_url, is_discord_attachment, url2fn, url2ext, getsize, mime_from_file,
-	Request as RequestManager, DOMAIN_CERT, PRIVATE_KEY, update_headers,
+	Request as RequestManager, DOMAIN_CERT, PRIVATE_KEY, update_headers, is_local_url,
 	AutoCache, CACHE_PATH, VISUAL_FORMS, IMAGE_FORMS, RNGFile, create_etag,
 )
 from .caches import attachment_cache, colour_cache
@@ -507,6 +507,8 @@ def requires_proxy(url: str, headers: collections.abc.Mapping, download: bool = 
 async def proxy_if(url: str, request: Request, force: bool = False, download: bool = False):
 	"""Proxy if needed, otherwise redirect."""
 	assert isinstance(url, str), url
+	if is_local_url(url):
+		raise HTTPException(status_code=403, detail=url)
 	if force or requires_proxy(url, request.headers, download):
 		return await proxy(url=url, request=request, force=force, download=download)
 	return RedirectResponse(url=url, status_code=307)
@@ -521,6 +523,8 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 			status_code=400,
 			media_type="text/plain",
 		)
+	if is_local_url(url):
+		raise HTTPException(status_code=403, detail=url)
 
 	try:
 		fp = await attachment_cache.download(url)

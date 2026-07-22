@@ -33,8 +33,9 @@ import threading
 import time
 from traceback import format_exc, print_exc
 from urllib.parse import quote_plus, unquote_plus, quote, unquote
-import urllib.request
 import urllib.error
+import urllib.parse
+import urllib.request
 import zipfile
 import aiofiles
 import aiohttp
@@ -1056,6 +1057,20 @@ def expired(stream):
 	elif is_soundcloud_stream(stream):
 		if "expires=" not in stream or int(stream.replace("/", "=").split("expires=", 1)[-1].split("=", 1)[0].split("&", 1)[0]) < utc() + 30:
 			return True
+
+def is_local_url(url: str) -> bool:
+	parsed = urllib.parse.urlparse(url)
+	hostname = parsed.hostname
+	if not hostname:
+		return False
+	if hostname.casefold() == "localhost":
+		return True
+	import ipaddress
+	try:
+		ip = ipaddress.ip_address(hostname)
+	except ValueError:
+		return False
+	return ip.is_private or ip.is_loopback or ip.is_link_local
 
 def revert_suffix(fn):
 	if fn.count(".") > 1 and ".binx" in fn:
@@ -5386,6 +5401,7 @@ Request = RequestManager()
 get_request = Request.__call__
 
 def header_test(url, timeout=12):
+	assert not is_local_url(url), url
 	if url.isascii():
 		req = urllib.request.Request(url, method="HEAD", headers=Request.header())
 		try:
@@ -5414,7 +5430,7 @@ def download_file(*urls, filename=None, timeout=12, return_headers=False):
 	try:
 		headers = {}
 		for url in urls:
-			# print(url)
+			assert not is_local_url(url), url
 			req = urllib.request.Request(url, method="GET", headers=Request.header())
 			try:
 				resp = urllib.request.urlopen(req, timeout=timeout)

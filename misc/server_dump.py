@@ -88,7 +88,7 @@ async def run(ctx):
 	progress: list[list[float]] = []
 	def print_progress(mode="Progress"):
 		cur, tot = sum(p[0] for p in progress), max(1, sum(p[1] for p in progress))
-		print(f"\033[2K\r{mode}: {'%.3f' % (cur / tot * 100)}%, {cur}/{tot}", end="")
+		print(f"\033[K\r{mode}: {'%.3f' % (cur / tot * 100)}%, {cur}/{tot}", end="")
 
 	async def extract_channels(guild_ids, channel_ids):
 		guild_ids = set(guild_ids)

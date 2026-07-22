@@ -28,7 +28,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, submit_thread, create_thread, create_task, await_fut
 from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
-from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag, preview_url
+from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag, preview_url, is_local_url
 from .caches import attachment_cache, colour_cache, minimise_url
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -189,12 +189,18 @@ def get_size_mime(head, tail, count, chunksize):
 	size = chunksize * (count - 1) + lastsize
 	return mimetype, size, lastsize
 
+banned_ips = AutoCache(f"{CACHE_PATH}/banned_ips", shards=1, stale=0, timeout=86400 * 7)
+
 class EndpointRedirects(Dispatcher):
 
 	def __call__(self, path):
 		p = path.lstrip("/")
+		ip = true_ip()
 		print(json.dumps(p))
-		if p.split("/", 1)[0] in (".git", ".env", "admin", "private", "internal", "administrator"):
+		if p.split("/", 1)[0] in (".git", ".env", "admin", "private", "internal", "administrator") or ip in banned_ips:
+			if ip not in banned_ips:
+				banned_ips[ip] = True
+				print("Banned IP:", ip)
 			return super().__call__("/rickroll")
 		while p:
 			if p == "ip":
@@ -618,6 +624,8 @@ class Server:
 
 	def proxy_if(self, url, force=False, download=False):
 		assert isinstance(url, str), url
+		if is_local_url(url):
+			raise InterruptedError(url)
 		if requires_proxy(url, cp.request.headers, download):
 			return self.proxy(url=url, force=force, download=download)
 		raise cp.HTTPRedirect(url, 307)
@@ -627,6 +635,8 @@ class Server:
 	def proxy(self, url=None, force=False, download=False, **void):
 		if not url:
 			return "Expected proxy URL."
+		if is_local_url(url):
+			raise InterruptedError(url)
 		try:
 			body = cp.request.body.fp.read()
 		except Exception:
