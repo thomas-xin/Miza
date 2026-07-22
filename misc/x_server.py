@@ -837,8 +837,17 @@ class Server:
 				_size = byte_scale(headers["content-length"]) + "B"
 				_mime = headers.get("content-type", "application/octet-stream")
 				p_url = url
+				og = ""
+				tw = ""
 				if _mime.startswith("image/"):
 					p_url = url if _mime.split("/", 1)[-1] in ['png', 'apng', 'webp', 'svg', 'jpg', 'gif', 'avif', 'heif', 'heic', 'bmp'] else 'https://api.mizabot.xyz/preview.webp?url=' + urllib.parse.quote_plus(url)
+					og = f'<meta property="og:image" content="{p_url}"><meta property="og:image:type" content="{_mime}">'
+					tw = f'<meta name="twitter:image" content="{p_url}">'
+				elif _mime.startswith("audio/"):
+					p_url = 'https://api.mizabot.xyz/preview.webm?url=' + urllib.parse.quote_plus(url)
+					og = f'<meta property="og:video" content="{p_url}"><meta property="og:video:type" content="{_mime}"><meta property="og:audio" content="{url}"><meta property="og:audio:type" content="{_mime}">'
+				elif _mime.startswith("video/"):
+					og = f'<meta property="og:video" content="{p_url}"><meta property="og:video:type" content="{_mime}">'
 				data = (
 					f"""<!DOCTYPE html>
 <html lang="en">
@@ -851,7 +860,7 @@ class Server:
 	<meta property="og:type" content="website">
 	<meta property="og:title" content="{_fn}">
 	<meta property="og:description" content="{_mime}, {_size}">
-	<meta property="og:image" content="{p_url}">
+	{og}
 
 	<!-- Twitter Meta Tags -->
 	<meta name="twitter:card" content="summary_large_image">
@@ -859,7 +868,7 @@ class Server:
 	<meta property="twitter:url" content="https://mizabot.xyz">
 	<meta name="twitter:title" content="{_fn}">
 	<meta name="twitter:description" content="{_mime}, {_size}">
-	<meta name="twitter:image" content="{p_url}">
+	{tw}
 
 	<link rel="icon" type="image/webp" href="/assets/images/logo512.webp">
 	<link rel="stylesheet" href="/assets/css/global.css">
@@ -915,7 +924,7 @@ class Server:
 		return cp.lib.static.serve_file(backup, content_type="application/octet-stream", disposition="attachment")
 	backup._cp_config = {"response.stream": True}
 
-	git_cache = AutoCache(f"{CACHE_PATH}/git", stale=3600, timeout=86400 * 7)
+	git_cache = AutoCache(f"{CACHE_PATH}/git", shards=1, stale=3600, timeout=86400 * 7)
 	@cp.expose
 	def git_stats(self):
 		def get_git():
@@ -940,7 +949,7 @@ class Server:
 		return orjson.dumps([commit_count, changed])
 
 	preview_cache = AutoCache(f"{CACHE_PATH}/previews", stale=0, timeout=86400 * 7)
-	@cp.expose(alias=("preview.webp"))
+	@cp.expose(alias=("preview.webp", "preview.webm"))
 	def preview(self, url, *args, **kwargs):
 		if not url:
 			return "Expected proxy URL."
@@ -954,6 +963,27 @@ class Server:
 				f'process_image({repr(url)},"resize_map",[[],None,None,"rel",4096,"-","auto","-o","-f","webp"],timeout=24)',
 			)
 			return self.serve_binary(data)
+		if ctype.startswith("audio/"):
+
+			def preview_audio(url):
+				if not self.ydl:
+					self.ydl = globals()["ytdl"]
+				entry = self.ydl.search(url)[0]
+				fn2, _cdc, _dur, _ac = self.ydl.get_audio(entry, fmt="webm")
+				if is_url(fn2):
+					return fn2
+				with open(fn2, "rb") as f:
+					return f.read()
+
+			data = self.preview_cache.retrieve(
+				unyt(url),
+				preview_audio,
+				url,
+			)
+			if isinstance(data, str):
+				url = data
+			else:
+				return self.serve_binary(data)
 		return self.proxy_if(url, force=False, download=False)
 
 	@cp.expose(alias=("eval", "exec"))

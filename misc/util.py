@@ -1492,6 +1492,7 @@ special_mimes = {
 	"7z": "x-7z-compressed",
 }
 inv_mimes = {v: k for k, v in special_mimes.items()}
+inv_mimes["mpeg"] = "mp3"
 
 def mime_into(mime: str) -> str:
 	ext = mime.split("/", 1)[-1]
@@ -3451,7 +3452,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		finally:
 			self._retrieving.pop(k, None)
 		return v
-	def retrieve(self, k, func, *args, _read=False, _force=False, **kwargs):
+	def retrieve(self, k, func, *args, _read=False, _force=False, _stimeout=None, **kwargs):
 		if (fut := self._retrieving.get(k)):
 			resp = fut.result()
 			if _read and hasattr(resp, "name") and os.path.exists(resp.name):
@@ -3467,12 +3468,12 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			t = None
 		if t is not None and v is not Dummy:
 			delay = utc() - t
-			if delay > self._stimeout or _force and delay > self._stale:
+			if delay > (_stimeout or self._stimeout) or _force and delay > self._stale:
 				try:
 					v = self._retrieve(k, func, *args, read=_read, default=v, **kwargs)
 				except Exception:
 					pass
-			elif self._stale and delay > self._stale:
+			elif delay > self._stale:
 				submit_thread(self._retrieve, k, func, *args, read=_read, default=v, **kwargs)
 			elif isinstance(v, Exception):
 				raise v
@@ -3498,7 +3499,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		finally:
 			self._retrieving.pop(k, None)
 		return v
-	async def aretrieve(self, k, func, *args, _read=False, _force=False, **kwargs):
+	async def aretrieve(self, k, func, *args, _read=False, _force=False, _stimeout=None, **kwargs):
 		await _run_async(self.base_init)
 		if (fut := self._retrieving.get(k)):
 			resp = await wrap_future(fut)
@@ -3515,12 +3516,12 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			t = None
 		if t is not None and v is not Dummy:
 			delay = utc() - t
-			if delay > self._stimeout or _force and delay > self._stale:
+			if delay > (_stimeout or self._stimeout) or _force and delay > self._stale:
 				try:
 					v = await self._aretrieve(k, func, *args, read=_read, default=v, **kwargs)
 				except Exception:
 					pass
-			elif self._stale and delay > self._stale:
+			elif delay > self._stale:
 				create_task(self._aretrieve(k, func, *args, read=_read, default=v, **kwargs))
 			elif isinstance(v, Exception):
 				raise v

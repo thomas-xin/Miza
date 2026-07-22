@@ -117,11 +117,13 @@
 			let previewVideo = document.createElement('video');
 			previewVideo.src = url;
 			previewVideo.controls = true;
+			previewVideo.loop = true;
 			mediaPreviewHolder.appendChild(previewVideo);
 		} else if (mime.startsWith('audio/')) {
 			let previewVideo = document.createElement('audio');
 			previewVideo.src = url;
 			previewVideo.controls = true;
+			previewVideo.loop = true;
 			mediaPreviewHolder.appendChild(previewVideo);
 		}
 
@@ -164,8 +166,12 @@
 
 			xhr.addEventListener('load', () => {
 				if (xhr.status >= 200 && xhr.status < 300) {
-					// Success - redirect to preview page
-					res(xhr.responseText.trim());
+					// Success - redirect to preview page and request a cache of the preview element
+					const url = xhr.responseText.trim();
+					if (file.type.startsWith("image/") || file.type.startsWith("audio/")) {
+						fetch('https://api.mizabot.xyz/preview?url=' + encodeURI(url));
+					}
+					res(url);
 				} else {
 					// HTTP connection succeeded, but returned an error status code
 					rej(`Upload failed: HTTP ${xhr.status} - ${xhr.statusText}`)

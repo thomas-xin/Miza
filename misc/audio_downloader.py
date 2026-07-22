@@ -22,11 +22,11 @@ from .smath import time_parse
 from .asyncs import submit_thread
 from .util import (
 	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
-	find_urls, url2fn, url2ext, discord_expired, expired, shorten_attachment, unyt, html_decode,
+	find_urls, url2fn, url2ext, discord_expired, expired, shorten_attachment, unyt, html_decode, mime_into,
 	is_image, is_url, is_discord_attachment, is_miza_url, is_miza_attachment, is_youtube_url, is_spotify_url, AUDIO_FORMS,
 	EvalPipe, PipedProcess, AutoCache, Request, Semaphore, TEMP_PATH, CACHE_PATH, magic, rename, temporary_file, replace_ext, select_and_loads, extract_archive, archive_mimes,
 )
-from .caches import audio_meta, attachment_cache
+from .caches import audio_meta, attachment_cache, audio_meta_cache
 
 # Gets the best icon/thumbnail for a queue entry.
 def get_best_icon(entry):
@@ -1033,27 +1033,26 @@ class AudioDownloader:
 				res = PipedProcess(args1, args2, stderr=subprocess.PIPE).wait()
 				if not os.path.exists(fn) or not os.path.getsize(fn):
 					raise RuntimeError(as_str(res.stderr.read()) or "Unable to locate converted file.")
+				entry.temp = fn
 				return self.handle_path(fn, entry)
 			if ct in ("audio/x-org", "audio/org"):
 				r_org = temporary_file("org")
-				r_opus = replace_ext(r_org, "opus")
 				copy_to_file(r_org)
-				args = ["hyperchoron", "-i", r_org, "-f", "opus", "-o", r_opus]
+				args = ["hyperchoron", "-i", r_org, "-f", "opus", "-o", fn]
 				print(args)
 				res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
-				if not os.path.exists(r_opus) or not os.path.getsize(r_opus):
+				if not os.path.exists(path=fn) or not os.path.getsize(fn):
 					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
-				return self.handle_path(r_opus, entry)
+				return self.handle_path(fn, entry)
 			if ct in ("audio/x-midi", "audio/midi", "audio/sp-midi"):
 				r_mid = temporary_file("mid")
-				r_opus = replace_ext(r_mid, "opus")
 				copy_to_file(r_mid)
-				args = ["hyperchoron", "-i", r_mid, "-f", "opus", "-o", r_opus]
+				args = ["hyperchoron", "-i", r_mid, "-f", "opus", "-o", fn]
 				print(args)
 				res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
-				if not os.path.exists(r_opus) or not os.path.getsize(r_opus):
+				if not os.path.exists(fn) or not os.path.getsize(fn):
 					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
-				return self.handle_path(r_opus, entry)
+				return self.handle_path(fn, entry)
 			if ct in ("audio/x-scpls", "audio/pls", "audio/scpls"):
 				entries = []
 				lines = as_str(b).splitlines()
@@ -1073,8 +1072,19 @@ class AudioDownloader:
 						f.write("\n".join(f"file '{url}'" for url in entries))
 					return self.handle_path(entries[0], entry)
 			if left == "audio" or right in AUDIO_FORMS:
+				path = url
+				if float(head.get("Content-Length", inf)) < 67108864:
+					path = fn
+					if os.path.exists(fn) and os.path.getsize(fn) == head["Content-Length"]:
+						pass
+					else:
+						try:
+							copy_to_file(path)
+						except Exception:
+							path = url
+							print_exc()
 				try:
-					return self.handle_path(url, entry)
+					return self.handle_path(path, entry)
 				except Exception:
 					return
 
@@ -1088,7 +1098,7 @@ class AudioDownloader:
 			asap = not d or d > 720
 		is_trim = start or end is not None
 		special_checked = False
-		if not fmt and asap or not d or not isfinite(d) or not is_youtube_url(url):
+		if not fmt and (asap or not d or not isfinite(d) or not is_youtube_url(url)):
 			# If format is not specified, try to stream the audio from URL if possible
 			with tracebacksuppressor:
 				if not entry.get("audio") or not entry["audio"][0]:
@@ -1135,7 +1145,18 @@ class AudioDownloader:
 					args.extend(["-ss", str(start)])
 				if end:
 					args.extend(["-to", str(end)])
-				args.extend(["-i", url, "-b:a", "160k", "-vbr", "on", fn2])
+				if fmt == "webm":
+					filt = (
+						"-filter_complex", "[0:a]showwaves=s=320x120:mode=p2p:colors=#BF7FFF,scale=600x240:flags=neighbor[v]",
+						"-map", "[v]", "-map", "0:a", "-c:v", "av1_nvenc", "-b:v", "352k", "-c:a", "libopus", "-usage", "realtime",
+					)
+				elif fmt == "weba":
+					filt = ("-f", "webm", "-c:a", "libopus")
+				elif fmt == "ogg":
+					filt = ("-c:a", "libopus")
+				else:
+					filt = ()
+				args.extend(["-i", url, *filt, "-b:a", "160k", "-vbr", "on", fn2])
 				print(args)
 				res = subprocess.run(args, stderr=subprocess.PIPE)
 				if not os.path.exists(fn2) or not os.path.getsize(fn2):

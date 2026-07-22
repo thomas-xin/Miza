@@ -634,7 +634,7 @@ class AttachmentCache(AutoCache):
 		return out
 
 
-audio_meta_cache = AutoCache(f"{CACHE_PATH}/audio_meta", stale=0, timeout=300)
+audio_meta_cache = AutoCache(f"{CACHE_PATH}/audio_meta", stale=86400, timeout=86400 * 30)
 def _audio_meta(path, _timeout=12) -> dict:
 	command = (
 		"ffprobe",
@@ -671,7 +671,10 @@ def _audio_meta(path, _timeout=12) -> dict:
 		sample_rate=int(info.get("sample_rate") or info.get("TAG:icy-samplerate") or 0),
 	)
 def audio_meta(path, _timeout=12) -> cdict:
-	return cdict(audio_meta_cache.retrieve(path, _audio_meta, path, _timeout=_timeout, _cache=lambda e: e["sample_rate"]))
+	meta = cdict(audio_meta_cache.retrieve(path, _audio_meta, path, _timeout=_timeout, _cache=lambda e: e["sample_rate"]))
+	if meta.get("name"):
+		return cdict(audio_meta_cache.retrieve(path, _audio_meta, path, _timeout=_timeout, _cache=lambda e: e["sample_rate"], _stimeout=300))
+	return meta
 
 colour_cache = ColourCache(
 	f"{CACHE_PATH}/colour",
