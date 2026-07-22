@@ -878,7 +878,7 @@ class Server:
 					tw = f'<meta name="twitter:image" content="{p_url}">'
 				elif _mime.startswith("audio/"):
 					p_url = preview_url(url, base=f"{API}/preview.webm")
-					og = f'<meta property="og:video" content="{p_url}"><meta property="og:video:type" content="video/webm"><meta property="og:audio" content="{url}"><meta property="og:audio:type" content="{_mime}">'
+					og = f'<meta property="og:video" content="{p_url}"><meta property="og:video:type" content="video/webm">'
 				elif _mime.startswith("video/"):
 					og = f'<meta property="og:video" content="{p_url}"><meta property="og:video:type" content="{_mime}">'
 				data = (
