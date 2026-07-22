@@ -685,8 +685,16 @@ async def catch_all(path: str, request: Request):
 		return FileResponse("misc/web/robots.txt", media_type="text/plain")
 	if p in ("favicon", "favicon.ico"):
 		return FileResponse("misc/web/assets/images/mizaleaf.webp", media_type="image/webp")
-	if p == "files":
-		return FileResponse("misc/web/files.html", media_type="text/html")
+	if not request.url.query:
+		match p:
+			case "files":
+				return FileResponse("misc/web/files.html", media_type="text/html")
+			case "downloader":
+				return FileResponse("misc/web/downloader.html", media_type="text/html")
+			case "gallery":
+				return FileResponse("misc/web/gallery.html", media_type="text/html")
+			case "tesseract":
+				return FileResponse("misc/web/tesseract.html", media_type="text/html")
 	if p in ("commands", "atlas", "mizatlas"):
 		return FileResponse("misc/web/commands.html", media_type="text/html")
 	if first == "assets":
