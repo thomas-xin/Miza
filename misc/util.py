@@ -1236,6 +1236,7 @@ def extract_archive(archive_path, format=None, excludes=()):
 		shutil.unpack_archive(archive_path, extract_dir=path, format=format or get_ext(archive_path))
 	return list(filter(os.path.isfile, (f"{path}/{fn}" for fn in os.listdir(path) if fn.rsplit(".", 1)[-1] not in excludes)))
 
+# Formats always stored alongside a boolean determining whether the image is treated as displayable in web browsers
 IMAGE_FORMS = {
 	"auto": None,
 	"gif": True,
@@ -1254,6 +1255,7 @@ IMAGE_FORMS = {
 	"heif": True,
 	"avif": True,
 	"ico": False,
+	"icns": False,
 }
 def is_image(url):
 	"Checks whether a url or filename ends with an image file extension. Returns a ternary True/False/None value where True indicates a positive match, False indicates a possible match, and None indicates no match."
@@ -1329,6 +1331,7 @@ VISUAL_FORMS = {
 	"webp": True,
 	"heic": False,
 	"ico": False,
+	"icns": False,
 	"ts": True,
 	"webm": True,
 	"mkv": True,
@@ -1417,6 +1420,7 @@ MIMES = cdict(
 	html="text/html",
 	svg="image/svg+xml",
 	ico="image/x-icon",
+	icns="image/x-icns",
 	png="image/png",
 	bmp="image/bmp",
 	qoi="image/qoi",
@@ -1491,7 +1495,7 @@ inv_mimes = {v: k for k, v in special_mimes.items()}
 
 def mime_into(mime: str) -> str:
 	ext = mime.split("/", 1)[-1]
-	return inv_mimes.get(ext) or ext.rsplit("/", 1)[-1]
+	return inv_mimes.get(ext) or ext.rsplit("/", 1)[-1].removeprefix("x-")
 
 def mime_equiv(a, b):
 	"Checks if a mimetype matches a given file extension. Required as some do not match."

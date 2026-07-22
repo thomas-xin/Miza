@@ -630,7 +630,7 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 	assert size[0] and size[1], f"Expected non-zero size, got {size}"
 	thresh = 0.984375
 	heavy = r > thresh or np.prod(size) <= 1048576
-	if fmt not in ("bmp", "ico", "jp2") and ("RGB" in im.mode and np.prod(size) > 65536 or fmt not in ("png", "jpg", "webp", "gif")):
+	if fmt not in ("qoi", "bmp", "ico", "icns", "jp2") and ("RGB" in im.mode and np.prod(size) > 65536 or fmt not in ("png", "jpg", "webp", "gif")):
 		b = np.asanyarray(im, dtype=np.uint8).data
 		pix = "rgb24" if im.mode == "RGB" else "rgba"
 		args = ["ffmpeg", "-hide_banner", "-v", "error", "-f", "rawvideo", "-pix_fmt", pix, "-video_size", "x".join(map(str, im.size)), "-strict", "experimental"]
@@ -667,7 +667,7 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 			if r > thresh:
 				out = io.BytesIO()
 				im.save(out, format="webp", lossless=True, quality=100, method=6)
-	elif fmt in ("png", "ico"):
+	elif fmt in ("png", "ico", "icns"):
 		if heavy:
 			im.save(out, format="png", optimize=True, compress_level=9)
 		else:
@@ -722,7 +722,7 @@ def anim_into(out, new, first, size, fmt, fs, r=0, opt=False):
 		return f.read()
 
 
-statics = ("png", "bmp", "jpg", "heic", "ico", "icns", "j2k", "tga", "tiff", "pdf")
+statics = ("png", "bmp", "qoi", "jpg", "heic", "ico", "icns", "j2k", "tga", "tiff", "pdf")
 # Main image operation function
 def evalImg(url, operation, args):
 	ts = time.time_ns() // 1000
