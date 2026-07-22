@@ -23,7 +23,7 @@ from misc.asyncs import _run_async, run_async, submit_thread, wrap_future, await
 from misc.smath import get_closest_heart
 from misc.util import (
     CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, read_file_a, download_file, header_test, getsize,
-    tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist, shorten_chunks, expand_chunks,
+    tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist, shorten_chunks, expand_chunks, url2fn,
 	ungroup_attachments, is_discord_url, is_miza_attachment, temporary_file, url2ext, is_discord_attachment, is_miza_url,
     snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt, VISUAL_FORMS,
 )
@@ -590,7 +590,7 @@ class AttachmentCache(AutoCache):
 				self[aid] = a["url"]
 			mids.append(mid)
 			filename = "b"
-		return shorten_chunks(self.max_size // 1048576, cid, mids, ofn, mode="c", base="https://mizabot.xyz", minimise=minimise)
+		return shorten_chunks(self.max_size // 1048576, cid, mids, url2fn(ofn), mode="c", base="https://mizabot.xyz", minimise=minimise)
 
 	async def edit(self, c_id, m_id, *data, url=None, filename=None, content="", collapse=True, minimise=False):
 		if url:
