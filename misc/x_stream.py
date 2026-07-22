@@ -672,6 +672,7 @@ async def static_backend(path: str, request: Request):
 
 
 alias = tuple([fn.split("/", 1)[0].rsplit(".", 1)[0] for fn in os.listdir("misc/web")])
+alias += ("preview,")
 # Catch-all route for custom routing logic
 @app.get("/{path:path}")
 async def catch_all(path: str, request: Request):
