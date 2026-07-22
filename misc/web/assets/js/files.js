@@ -120,7 +120,7 @@
 			previewVideo.loop = true;
 			mediaPreviewHolder.appendChild(previewVideo);
 		} else if (mime.startsWith('audio/')) {
-			let previewVideo = document.createElement('audio');
+			let previewVideo = document.createElement('video');
 			previewVideo.src = 'https://api.mizabot.xyz/preview.webm?url=' + encodeURIComponent(url);
 			previewVideo.controls = true;
 			previewVideo.loop = true;
