@@ -2021,7 +2021,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			messages, _vision_model = await self.caption_into(messages, model=model, backup_model=None, premium_context=kwargs.get("premium_context", []))
 		if model in ai.is_completion:
 			prompt = "\n\n\n".join(m["content"][0].text for m in messages if m.content and m.content[0].get("type") == "text")
-			count = await tcount(prompt)
+			count = tcount(prompt)
 			max_tokens = min(max_tokens, ctx - count * 3 // 2 - 64)
 			if "max_completion_tokens" not in kwargs:
 				kwargs["max_tokens"] = max_tokens
@@ -2038,7 +2038,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					yield s
 				return
 			return CloseableAsyncIterator(_completion(resp, strip), resp.close)
-		count = await count_to(messages)
+		count = count_to(messages)
 		max_tokens = min(max_tokens, ctx - count * 3 // 2 - 64)
 		if "max_completion_tokens" not in kwargs:
 			kwargs["max_tokens"] = kwargs["max_completion_tokens"] = max_tokens
@@ -2079,7 +2079,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		ctx = ai.contexts.get(model, 4096)
 		messages, vision_model = await self.caption_into(messages, model=model, backup_model=vision_model, premium_context=kwargs.get("premium_context", []))
 		if vision_model not in is_completion:
-			count = await count_to(messages)
+			count = count_to(messages)
 			max_tokens = min(max_tokens, ctx - count - 64)
 			if "max_completion_tokens" not in kwargs:
 				kwargs["max_tokens"] = max_tokens
@@ -2107,7 +2107,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			**kwargs,
 		)
 		print("CC:", data)
-		count = await tcount(prompt)
+		count = tcount(prompt)
 		max_tokens = min(max_tokens, ctx - count - 64)
 		if "max_completion_tokens" not in kwargs:
 			kwargs["max_tokens"] = max_tokens
@@ -2116,7 +2116,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			async def stream_iter(resp):
 				name = None
 				found = deque()
-				nt = await tcount(assistant_name)
+				nt = tcount(assistant_name)
 				async for chunk in resp:
 					if not chunk.choices:
 						if getattr(chunk, "error_message"):
@@ -2292,7 +2292,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return messages, model
 
 	model_levels = dict(enumerate(map(cdict, AUTH.get("model_levels", []))))
-	async def chat_completion(self, messages, model="miza-1", system=None, max_tokens=256, temperature=0.8, tools=None, model_router=None, tool_router=None, user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
+	async def chat_completion(self, messages, model="miza-1", system=None, max_tokens=256, temperature=0.8, tools=None, tool_router=None, user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
 		"OpenAI-compatible Chat Completion function. Autoselects model using a function call, then routes to tools and target model as required."
 		await require_predicate(predicate)
 		await ai.load_openrouter()
@@ -2326,9 +2326,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return "user"
 		raws = [cdict(role=force_ua(m.get("role")), content=m.content) for m in messages]
 		snippet = await ai.cut_to(raws, snip, snip, best=False)
-		sniplen = await count_to(snippet)
+		sniplen = count_to(snippet)
 		text = ""
-		ustr = str(hash(str(user) or self.user.name))
+		ustr = str(hash(str(user) or self.user.name) & 4294967295)
 		cid = hex(ts_us()).removeprefix("0x") + "-Miza"
 		if not props:
 			props = {}
@@ -2382,7 +2382,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				except Exception:
 					print_exc()
 					message = None
-				print("SCAN:", cargs, toolmodel, message)
 				reason = getattr(message, "reasoning", None)
 				if not reason and getattr(message, "reasoning_details", None):
 					rdetails = [r.get("text", "") for r in message.reasoning_details if r["type"] == "reasoning.text"]
@@ -2422,8 +2421,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if not directly_answer and message.tool_calls:
 				print("Immediate call:", message)
 				choice = resp.choices[0]
-				st = await count_to(messages)
-				ct = await tcount(message.content)
+				st = count_to(messages)
+				ct = tcount(message.content)
 				if is_nsfw:
 					label = "nsfw"
 				cargs["mode"] = mode = label
@@ -2455,7 +2454,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				)
 				return
 			if mode:
-				model_router = None
 				label = mode
 				cargs["mode"] = label
 			if tool_router:
@@ -2496,7 +2494,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		)
 		ex = None
 		messages = await ai.cut_to(messages, maxlim, minlim, best=best, prompt=prompt, premium_context=premium_context)
-		length = await count_to(messages)
+		length = count_to(messages)
 		length = ceil(length * 1.1) + 4 * len(messages)
 		print("Chat completions:", model, ai.overview(messages), cargs, sep="\n")
 		tmpcut = None
@@ -2521,7 +2519,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					tlen = tmplen
 				else:
 					temp = tmpcut = await ai.cut_to(messages, 65536, ctx // 3, best=True, premium_context=premium_context)
-					tmplen = await count_to(tmpcut)
+					tmplen = count_to(tmpcut)
 					tlen = tmplen = ceil(tmplen * 1.1) + 4 * len(tmpcut)
 			else:
 				temp = messages
@@ -2646,7 +2644,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if getattr(message, "tool_calls", None):
 						print("Output call:", message)
 						st = tlen
-						ct = await tcount(text)
+						ct = tcount(text)
 						yield cdict(
 							id=cid,
 							choices=[cdict(
@@ -2686,8 +2684,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if insufficient or refusal:
 				print("Evaluation:", attempts, lim_str(text, 128), eval2, insufficient, refusal)
 			if not insufficient and not refusal and passable:
-				text = (text or "").rstrip().removesuffix("### End").removesuffix("### Response").removesuffix("<|im_end|>").rstrip().removesuffix("###").rstrip()
-				ct = await tcount(text)
+				text = (text or "").rstrip().removesuffix("### End").removesuffix("### Response").removesuffix("<|endoftext|>").removesuffix("<|im_end|>").rstrip().removesuffix("###").rstrip()
+				ct = tcount(text)
 				usage = resp.usage if attempts == 0 else cdict(
 					completion_tokens=ct,
 					prompt_tokens=length,
@@ -2714,30 +2712,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				result.choices[0].delta.content = "\r" + text
 				yield result
 				return
-			if refusal:
+			if refusal or insufficient:
 				if attempts < 1 and mA > 2:
 					mode = "instructive" if mode == "casual" else "backup"
 				else:
-					mode = "backup"
-				text = "\r"
-			elif insufficient:
-				if attempts < 1 and mA > 2:
-					mode = "retry" if mode == "instructive" else "instructive"
-				else:
 					mode = "backup" if mode == "retry" else "retry"
-				if text and mode in ("instructive", "casual", "retry"):
-					content = f"### Instruction:\nThe above assistant's response was deemed insufficient. Please rewrite the message, ensuring to answer in a more accurate and helpful way. Remember to stay in character as {assistant_name}, and to use the same language the user last spoke in, unless directed otherwise!\n\n### Response:"
-					if draft:
-						draft.content = text
-						monologue.content = content
-					else:
-						draft = cdict(role="assistant", content=text)
-						messages.append(draft)
-						monologue = cdict(role="user", content=content)
-						messages.append(monologue)
-					tmpcut = None
-					length = await count_to(messages)
-					length = ceil(length * 1.1) + 4 * len(messages)
 				text = "\r"
 			else:
 				mode = "target"
@@ -2752,7 +2731,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						monologue = cdict(role="user", content=content)
 						messages.append(monologue)
 					tmpcut = None
-					length = await count_to(messages)
+					length = count_to(messages)
 					length = ceil(length * 1.1) + 4 * len(messages)
 				text = "\r"
 		raise ex or RuntimeError("Maximum inference attempts exceeded (model likely encountered an infinite loop).")
@@ -2841,7 +2820,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			messages=messages,
 			temperature=0.5,
 			max_tokens=2048,
-			user=str(hash(self.name)),
+			user=str(hash(self.name) & 4294967295),
 		)
 		print("Vision Input:", lim_str(data, 1024))
 		async with asyncio.timeout(timeout):

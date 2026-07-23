@@ -150,7 +150,7 @@ class Translate(Command):
 			except Exception:
 				print_exc()
 
-		c = await tcount(input)
+		c = tcount(input)
 		tasks = [chat_translate()]
 		if c > 1:
 			tasks.append(google_translate())
@@ -178,20 +178,24 @@ class Translate(Command):
 					content=text,
 				) for text in translations),
 			]
-		try:
-			translated = await ai._instruct(
-				data=dict(
-					model="small",
-					messages=messages,
-					temperature=0.01,
-					premium_context=premium,
-					max_completion_tokens=32768,
-					reasoning_effort="medium",
-				),
-			)
-			assert translated, "No output was captured!"
-		except Exception:
-			print_exc()
+		translated = None
+		m = "large"
+		if (count := count_to(messages)) < ai.contexts[m] / 2:
+			try:
+				translated = await ai._instruct(
+					data=dict(
+						model=m,
+						messages=messages,
+						temperature=0.01,
+						premium_context=premium,
+						max_completion_tokens=ai.contexts[m] - count * 3 // 2,
+						reasoning_effort="medium",
+					),
+				)
+				assert translated, "No output was captured!"
+			except Exception:
+				print_exc()
+		if not translated:
 			translated = await ai._instruct(
 				data=dict(
 					model="hy3",
@@ -579,7 +583,7 @@ class Ask(Command):
 						elif succ and isinstance(res, dict):
 							res = res.get("content", "")
 						elif succ:
-							c = await tcount(res)
+							c = tcount(res)
 							ra = 1 if premium.value < 2 else 1.5 if premium.value < 5 else 2
 							if c > round(4000 * ra):
 								res = await ai.summarise(res, max_length=round(19600 * ra), min_length=round(3200 * ra), best=2 if premium.value >= 2 else 1, prompt=prompt)
@@ -1242,7 +1246,7 @@ class TTS(Command):
 					speed=1,
 				)
 				print(resp)
-				c = await tcount(text)
+				c = tcount(text)
 				_premium.append(["openai", model, mpf("21") / 1000000 * c])
 				desc = _premium.apply()
 				resp.write_to_file(fi)
@@ -1259,7 +1263,7 @@ class TTS(Command):
 					response_format=format,
 					speed=1,
 				)
-				c = await tcount(text)
+				c = tcount(text)
 				_premium.append(["openai", model, mpf("12.6") / 1000000 * c])
 				desc = _premium.apply()
 				resp.write_to_file(fi)

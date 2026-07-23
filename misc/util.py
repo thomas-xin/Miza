@@ -277,54 +277,35 @@ def verify_search(f):
 	return unyt(strip_acc(single_space(f.strip().translate(__strans))))
 COMM = "\\#$%"
 
-
 @functools.lru_cache(maxsize=64)
-def get_encoding(e):
-	global tiktoken, cl100k_base, cl100k_im
-	import tiktoken
-	cl100k_base = tiktoken.get_encoding("cl100k_base")
-	cl100k_im = tiktoken.Encoding(
-		name="cl100k_im",
-		pat_str=cl100k_base._pat_str,
-		mergeable_ranks=cl100k_base._mergeable_ranks,
-		special_tokens={
-			**cl100k_base._special_tokens,
-			"<|im_start|>": 100264,
-			"<|im_end|>": 100265,
-		},
-	)
-	if e == "cl100k_im":
-		return cl100k_im
-	try:
-		return tiktoken.get_encoding(e)
-	except (KeyError, ValueError):
-		pass
-	return tiktoken.encoding_for_model(e)
+def get_encoding(e=None, tk=True):
+	import gigatoken as gt
+	e = e or "Qwen/Qwen3.6-27B"
+	enc = gt.Tokenizer(e)
+	return enc.as_tiktoken() if tk else enc
+submit_thread(get_encoding)
 
-@functools.lru_cache(maxsize=1024)
-def encode_to(s, enc) -> tuple:
-	try:
-		special_tokens = enc._special_tokens
-	except AttributeError:
-		return tuple(enc.encode(s))
-	return tuple(enc.encode(s, allowed_special=set(special_tokens)))
-
-def tik_encode(s, encoding="cl100k_im", allowed=65536) -> list:
+def tik_encode(s, encoding=None) -> list:
+	if len(s) > 1048576 * 16:
+		fn = temporary_file("txt")
+		with open(fn, "w", encoding="utf-8") as f:
+			f.write(s)
+		enc = get_encoding(encoding, tk=False)
+		import gigatoken as gt
+		file = gt.TextFileSource([fn], separator=b"<|endoftext|>")
+		return enc.encode_files(file)
 	enc = get_encoding(encoding)
-	out = []
-	while s:
-		temp, s = s[:allowed], s[allowed:]
-		tokens = encode_to(temp, enc)
-		out.extend(tokens)
-	return out
+	if isinstance(s, (tuple, list)):
+		return enc.encode_batch(s, allowed_special="all")
+	return enc.encode(s, allowed_special="all")
 
-def tik_decode(t, encoding="cl100k_im") -> str:
+def tik_decode(t, encoding=None) -> str:
 	enc = get_encoding(encoding)
 	return enc.decode(t)
 
 @hashable_args
 @functools.lru_cache(maxsize=64)
-def lim_tokens(s, maxlen=10, mode="centre", encoding="cl100k_im") -> str:
+def lim_tokens(s, maxlen=10, mode="centre", encoding=None) -> str:
 	"Limits a string to a maximum amount of tokens, cutting from the middle and replacing with \"..\" when possible."
 	if maxlen is None:
 		return s
@@ -347,36 +328,8 @@ def lim_tokens(s, maxlen=10, mode="centre", encoding="cl100k_im") -> str:
 			s = enc.decode(tokens[:maxlen - 1]) + "..."
 	return s.strip()
 
-async def tik_encode_a(s, encoding="cl100k_im") -> list:
-	if len(s) > 1024:
-		return await _run_async(tik_encode, s, encoding=encoding)
-	return tik_encode(s, encoding=encoding)
-
-async def tik_decode_a(t, encoding="cl100k_im") -> str:
-	if len(t) > 256:
-		return await _run_async(tik_decode, t, encoding=encoding)
-	return tik_decode(t, encoding=encoding)
-
-@functools.lru_cache(maxsize=65536)
-def _tlen(s, model="cl100k_im") -> int:
-	if not s:
-		return 0
-	return len(tik_encode(s, encoding=model))
-
-async def tcount(s, model="cl100k_im") -> int:
-	if not s:
-		return 0
-	if len(s) <= 65536:
-		return _tlen(s)
-	tokens = await tik_encode_a(s, encoding=model)
-	return len(tokens)
-
-def tlen(s, model="cl100k_im") -> int:
-	if not s:
-		return 0
-	if len(s) <= 65536:
-		return _tlen(s)
-	return len(tik_encode(s, encoding=model))
+def tcount(s, encoding=None) -> int:
+	return len(tik_encode(s, encoding))
 
 # Escapes syntax in code highlighting markdown.
 ESCAPE_T = {
@@ -600,7 +553,7 @@ def split_across(s, lim=2000, prefix="", suffix="", mode="len", bypass=((), ()),
 		@functools.lru_cache(maxsize=64)
 		def raw_len(s):
 			# Borrows the tiktoken encoding for token length calculation
-			return tlen(s)
+			return tcount(s)
 	else:
 		raise NotImplementedError(f"split_across: Unsupported mode {mode}")
 	def required_len(s):

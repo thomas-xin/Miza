@@ -15,6 +15,7 @@ dynamic-datetime>=0.1.23
 ectoplasm-steganography>=0.0.12
 fast-langdetect>=1.0.0
 filetype>=1.2.0
+gigatoken>=0.9.0
 gmpy2>=2.3.0
 googletrans==4.0.2
 httpx>=0.28.1
@@ -43,7 +44,6 @@ python-dateutil>=2.9.0
 requests>=2.33.1
 streamshatter>=1.2.3
 sympy>=1.14.0
-tiktoken>=0.12.0
 traceback_with_variables>=2.2.1
 tsc_utils>=0.2.5
 typing_extensions>=4.15.0

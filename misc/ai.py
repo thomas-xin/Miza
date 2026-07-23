@@ -202,8 +202,8 @@ def m_name(m):
 def overview(messages):
 	return "\n\n".join(lim_str(m_str(m), 4096) for m in messages if m.content)
 
-def _count_to(messages, model):
-	encoding = get_encoding(model)
+def count_to(messages, encoding=None):
+	substrings = []
 	tokens_per_message = 4
 	num_tokens = 0
 	for message in messages:
@@ -212,29 +212,24 @@ def _count_to(messages, model):
 			if value is None or isinstance(value, bool):
 				continue
 			if isinstance(value, str):
-				num_tokens += len(encoding.encode(value, allowed_special=encoding.special_tokens_set))
+				substrings.append(value)
 			elif isinstance(value, dict):
-				num_tokens += len(encoding.encode(json_dumpstr(value), allowed_special=encoding.special_tokens_set))
+				substrings.append(json_dumpstr(value))
 			elif isinstance(value, (tuple, list)):
 				if key == "content":
 					for part in value:
 						if part.get("type") == "text":
-							num_tokens += len(encoding.encode(part["text"], allowed_special=encoding.special_tokens_set))
+							substrings.append(part["text"])
 							continue
 						if part.get("type") == "image_url":
-							if model == "cl100k_im" and part["image_url"].get("detail", "auto") == "low" or is_url(part["image_url"]):
+							if part["image_url"].get("detail", "auto") == "low" or is_url(part["image_url"]):
 								num_tokens += 128
 							else:
 								b = base64.b64decode(part["image_url"]["url"].encode("ascii").split(b",", 1)[-1])
 								num_tokens += np.prod(get_image_size(b)) / 768 + 128
 							continue
 						raise RuntimeError(f"Unexpected object {json_dumpstr(part)} in message.")
-				# else:
-				# 	num_tokens += len(encoding.encode(json_dumpstr(value), allowed_special=encoding.special_tokens_set))
-	return num_tokens + 3
-async def count_to(messages, model="cl100k_im"):
-	"""Return the number of tokens used by a list of messages."""
-	return await _run_async(_count_to, messages, model)
+	return tcount(substrings, encoding) + num_tokens + 3
 
 async def cut_to(messages, limit=1024, softlim=384, exclude_first=3, best=False, prompt=None, premium_context=[]):
 	if not messages:
@@ -247,15 +242,15 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=3, best=False,
 	count = 0
 	i = -1
 	for i, m in reversed(tuple(enumerate(messages))):
-		c = await tcount(m_repr(m))
+		c = tcount(m_repr(m))
 		if c + count > softlim * 0.8 and not m.get("tool_calls") and m.get("role") != "tool":
 			break
 		mes.append(m)
-		count = await count_to(mes)
+		count = count_to(mes)
 	basics = [m for m in messages if m.get("role") != "tool" and m.get("content")]
 	if basics and (m := basics[-1]) not in mes:
 		mes.append(m)
-		count = await count_to(mes)
+		count = count_to(mes)
 	if softlim >= limit:
 		if not mes and messages:
 			m = cdict(messages[-1])
@@ -271,8 +266,8 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=3, best=False,
 	summ = "Summary of chat history (include this if asked to summarise!):\n"
 	s = overview(messages[:i + 1] if i > 0 else messages)
 	s = s.removeprefix(summ).removeprefix("system:").strip()
-	c = await tcount(summ + s)
-	c2 = await count_to(messages)
+	c = tcount(summ + s)
+	c2 = count_to(messages)
 	if c2 <= softlim * 1.2:
 		if exclude_first:
 			messages = sm + messages
@@ -299,7 +294,7 @@ async def summarise(q, min_length=384, max_length=24576, padding=128, best=True,
 	split_length = max_length - padding
 	summ_length = min(min_length, split_length - 1)
 	q = lim_tokens(q, 1048576)
-	c = await tcount(q)
+	c = tcount(q)
 	if c <= min_length:
 		return q
 	if c <= summ_length:
@@ -312,7 +307,7 @@ async def summarise(q, min_length=384, max_length=24576, padding=128, best=True,
 	outs = await gather(*futs)
 	q = "\n\n".join(outs)
 	q = lim_tokens(q, summ_length * 2)
-	c = await tcount(q)
+	c = tcount(q)
 	if c <= min_length:
 		return q
 	return await _summarise(q, summ_length, best=best, prompt=prompt, premium_context=premium_context)
@@ -461,7 +456,7 @@ Answer ONLY with the summary, do not answer the question itself!'''
 			else:
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above!'
 			ml = round_random(max_length)
-			c = await tcount(prompt)
+			c = tcount(prompt)
 			model = "small"
 			data = dict(model=model, prompt=prompt, temperature=0.6, max_tokens=ml, premium_context=premium_context)
 			resp = await instruct(data)
@@ -519,7 +514,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 				mt2 = mt * 3 // 2
 				ctx = 65536
 				if orig_model in contexts:
-					ctx = contexts[orig_model] - (await count_to(kwa["messages"])) * 3 // 2
+					ctx = contexts[orig_model] - count_to(kwa["messages"]) * 3 // 2
 				mt2 = min(mt2, ctx)
 				kwa["max_completion_tokens"] = mt2
 			kwa.pop("presence_penalty", None)
@@ -955,7 +950,7 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 		self.costs = [utc(), api, model, "0"]
 		self.true_cost = None
 		self.pricing = pricing or (m_input, m_output)
-		self.tokeniser = "cl100k_im"
+		self.tokeniser = None
 		self.terminated = False
 
 	@property
@@ -1001,17 +996,17 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 			self.output += s
 		if not self.tokens[0]:
 			if isinstance(self.input, str):
-				self.tokens[0] = await tcount(self.input)
+				self.tokens[0] = tcount(self.input)
 			elif isinstance(self.input, tuple):
-				ii = await count_to(self.input[0])
+				ii = count_to(self.input[0])
 				if self.input[1]:
-					ti = await tcount(str(self.input[1]))
+					ti = tcount(str(self.input[1]))
 				else:
 					ti = 0
 				self.tokens[0] = ii + ti
 			else:
-				self.tokens[0] = await count_to(self.input)
-		self.tokens[1] = await tcount(self.output)
+				self.tokens[0] = count_to(self.input)
+		self.tokens[1] = tcount(self.output)
 		self.update_cost()
 		if not self.applied:
 			self.premium_context.append(self.costs)
