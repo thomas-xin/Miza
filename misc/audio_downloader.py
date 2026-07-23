@@ -22,7 +22,7 @@ from .smath import time_parse
 from .asyncs import submit_thread
 from .util import (
 	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
-	find_urls, url2fn, url2ext, discord_expired, expired, shorten_attachment, unyt, html_decode, mime_into,
+	find_urls, url2fn, url2ext, discord_expired, expired, shorten_attachment, unyt, html_decode, mime_into, is_local_url,
 	is_image, is_url, is_discord_attachment, is_miza_url, is_miza_attachment, is_youtube_url, is_spotify_url, AUDIO_FORMS,
 	EvalPipe, PipedProcess, AutoCache, Request, Semaphore, TEMP_PATH, CACHE_PATH, magic, rename, temporary_file, replace_ext, select_and_loads, extract_archive, archive_mimes,
 )
@@ -216,6 +216,7 @@ class AudioDownloader:
 		return self.workers.next().run(s, timeout=timeout, priority=priority)
 
 	def extract_info(self, url, download=False, process=True, force=False):
+		assert not is_local_url(url), url
 		retrieval = self.extract_cache._retrieve if force else self.extract_cache.retrieve
 		try:
 			resp = retrieval(url, self.run, f"extract_info({json_dumpstr(url)},download={download},process={process})")
@@ -922,6 +923,7 @@ class AudioDownloader:
 		return self.handle_path(fn2, entry)
 
 	def handle_special_multiple(self, url):
+		assert not is_local_url(url), url
 		headers = asyncio.run(attachment_cache.scan_headers(url, fc=True))
 		match (ctype := headers.get("content-type")):
 			case "application/json":
@@ -962,6 +964,7 @@ class AudioDownloader:
 			return self.handle_spotify(entry, url, fn)
 		if is_youtube_url(url):
 			return
+		assert not is_local_url(url), url
 		header = Request.header()
 		header["User-Agent"] = "Lavf/100.0.0"
 		header["Accept"] = "audio/*, */*"
@@ -1091,6 +1094,7 @@ class AudioDownloader:
 	def get_audio(self, entry, asap=None, fmt=None, start=None, end=None, research=True):
 		"""Gets a valid audio stream (URL or file) from a given entry, with optional trimming. In ASAP (as soon as possible) mode, prefer URLs."""
 		url = entry.get("orig") or entry["url"]
+		assert not is_local_url(url), url
 		ext = fmt or "opus"
 		fn = temporary_file(ext)
 		d = entry.get("duration")
@@ -1289,7 +1293,9 @@ class AudioDownloader:
 
 	# Main extract function, able to extract from youtube playlists much faster than youtube-dl using youtube API, as well as ability to follow spotify links.
 	def extract(self, url, mode=None, count=1):
+		assert not is_local_url(url), url
 		output, url = self.preprocess(url, mode=mode, count=count)
+		assert not is_local_url(url), url
 		# Only proceed if no items have already been found (from playlists in this case)
 		if not len(output):
 			if is_miza_attachment(url):

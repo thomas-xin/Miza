@@ -402,6 +402,7 @@ class Server:
 			return self.dyn_serve([data], size=len(data))
 
 	def get_with_retries(self, url, headers={}, data=None, timeout=3, retries=5):
+		assert not is_local_url(url), url
 		for i in range(retries):
 			try:
 				session = self.session if url.startswith("https://") and not is_discord_attachment(url) and i == 0 else niquests

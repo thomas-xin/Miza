@@ -1634,6 +1634,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if not is_url(url):
 				print("_follow_url:", url)
 				continue
+			assert not is_local_url(url), url
 			if is_miza_url(url):
 				out.append(url)
 				continue
@@ -1672,6 +1673,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 								found.append(u)
 				found.uniq(sort=False)
 				for url in found:
+					assert not is_local_url(url), url
 					if is_discord_attachment(url):
 						out.append(attachment_cache.preserve(url))
 					elif is_discord_message_link(url) and url not in seen:
@@ -2868,6 +2870,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Follows a message link, replacing emojis and user mentions with their icon URLs."
 		temp = find_urls(url)
 		if temp:
+			assert none(map(is_local_url, temp)), temp
 			return temp
 		users = find_users(url)
 		if follow:
@@ -5006,6 +5009,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if not urls or is_discord_message_link(urls[0]):
 				raise err(TypeError, k, v)
 			v = urls[0]
+			assert not is_local_url(v), v
 		elif info.type == "message":
 			v = await self.fetch_message(v)
 		elif info.type == "filesize":
