@@ -5149,8 +5149,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				else:
 					dym = f' Did you mean: "{alt}"?'
 				if enum and accepts:
-					raise EnumError(f'{k} value "{v}" must be one of `{"`, `".join(sorted(enum))}` or aliases `{"`, `".join(sorted(accepts))}`.{dym}')
-				raise EnumError(f'{k} value "{v}" must be one of `{"`, `".join(sorted(enum.union(accepts)))}`.{dym}')
+					e1 = lim_str("`, `".join(sorted(enum)), 384)
+					e2 = lim_str("`, `".join(sorted(accepts)), 384)
+					raise EnumError(f'{k} value "{v}" must be one of `{e1}` or aliases `{e2}`.{dym}')
+				e3 = lim_str("`, `".join(sorted(enum.union(accepts))), 512)
+				raise EnumError(f'{k} value "{v}" must be one of `{e3}`.{dym}')
 			if v not in enum:
 				return validation.accepts[v]
 		return v
@@ -6600,6 +6603,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					return "https://discord.com/channels/-1/-1/-1"
 				return f"https://discord.com/channels/{self.guild.id}/{self.channel.id}/{self.id}"
 
+			def reply(self, content=None, embed=None, embeds=None, tts=False, file=None, files=None, buttons=None, mention=False, ephemeral=False):
+				return send_with_reply(self.channel, reference=self, content=content, embed=embed, embeds=embeds, tts=tts, file=file, files=files, buttons=buttons, mention=mention, ephemeral=ephemeral)
+
 			edit = delete
 			publish = delete
 			pin = delete
@@ -7470,10 +7476,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					embed.add_field(**field)
 				else:
 					try:
-						value = fields[1]
+						value = field[1]
 					except IndexError:
 						value = "\xad"
-					embed.add_field(name=fields[0], value=value)
+					embed.add_field(name=field[0], value=value)
 			return create_task(send_with_react(
 				messageable,
 				embed=embed,
@@ -7915,6 +7921,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 									argl.append(kwargs.pop(f"{k}-{i + 2}"))
 								except KeyError:
 									pass
+							kwargs[k] = argl
 				mdata = data.get("member")
 				if not mdata:
 					mdata = data.get("user")

@@ -329,7 +329,10 @@ def lim_tokens(s, maxlen=10, mode="centre", encoding=None) -> str:
 	return s.strip()
 
 def tcount(s, encoding=None) -> int:
-	return len(tik_encode(s, encoding))
+	tks = tik_encode(s, encoding)
+	if type(s) is str:
+		return len(tks)
+	return sum(map(len, s))
 
 # Escapes syntax in code highlighting markdown.
 ESCAPE_T = {
