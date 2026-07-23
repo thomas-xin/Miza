@@ -1674,8 +1674,7 @@ def b64(b):
 
 def b64_or_uni(b):
 	b = b.strip()
-	s = as_str(b)
-	if "%" in s:
+	if type(b) is str and "%" in b or type(b) is not str and 37 in b:
 		b = unquote_plus(as_str(b))
 	if b.isascii():
 		try:
@@ -1879,7 +1878,7 @@ def encode_attachment(cid, mid, aid, fn, minimise=False):
 def decode_attachment(encoded):
 	data, *fn = encoded.split("/", 1)
 	assert len(data) < 40, f"{len(data)} path too long!"
-	ids = list(decode_snowflake(data, 3))
+	ids = list(decode_snowflake(data))
 	while len(ids) < 3:
 		ids.append(0)
 	ids.extend(map(revert_suffix, fn))
