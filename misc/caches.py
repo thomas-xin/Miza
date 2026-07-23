@@ -397,10 +397,13 @@ class AttachmentCache(AutoCache):
 			traceback.print_exc()
 			raise
 		return self.cast_fp(f)
-	async def download(self, url, m_id=None, filename=None, read=None, return_headers=False, force=False, fc=False):
+	async def download(self, url, m_id=None, filename=None, read=None, return_headers=False, force=False, fc=False, max_size=None):
 		url = unyt(url)
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
+		if max_size:
+			headers = await self.scan_headers(url, m_id=m_id, fc=fc)
+			assert (size := float(headers.get("Content-Length", 0))) <= max_size, f"{round(size)} file too large!"
 		if force:
 			fp = await self.secondary._aretrieve(url, self._download, url, m_id=m_id, _timeout=16, read=True)
 		else:
@@ -538,10 +541,11 @@ class AttachmentCache(AutoCache):
 			return out[0]
 		return out
 
-	async def create_dynamic(self, data, filename="", channel=None, editable=False, minimise=False):
+	async def create_dynamic(self, data, filename="", channel=None, editable=False, minimise=False, size=0):
 		if filename and (ext := url2ext(filename)) in VISUAL_FORMS or ext == "exe":
 			filename += ".binx"
-		size = getsize(data)
+		size = size or getsize(data)
+		assert size < 1073741824 * 16, f"File size {size} too large!"
 		if size <= self.max_size:
 			return await self.create(data, filename=filename, channel=channel, editable=editable, minimise=minimise)
 		if not hasattr(data, "read"):

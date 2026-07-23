@@ -1850,12 +1850,14 @@ def encode_snowflake(*args, store_count=False, minimise=False):
 	if minimise:
 		return base65536.encode(encoded)
 	return e64(encoded, out=str)
-def decode_snowflake(data, n=1):
+def decode_snowflake(data, n=0):
 	decoded = b64_or_uni(data)
 	if 1 < decoded[0] < 127:
-		n, decoded = decoded[0], decoded[1:]
+		_n, decoded = decoded[0], decoded[1:]
+		n = n or _n
 	elif decoded[0] == 127:
 		decoded = decoded[1:]
+	n = max(n, 1)
 	z2, b = decode_leb128(decoded)
 	timestamp = b2n(b)
 	z1, increment = iszudzik(z2)
@@ -1919,6 +1921,7 @@ def encode_attachment(cid, mid, aid, fn, minimise=False):
 	return encode_snowflake(*map(int, (cid, mid, aid))) + f"/{fn}"
 def decode_attachment(encoded):
 	data, *fn = encoded.split("/", 1)
+	assert len(data) < 40, f"{len(data)} path too long!"
 	ids = list(decode_snowflake(data, 3))
 	while len(ids) < 3:
 		ids.append(0)
@@ -2005,6 +2008,7 @@ def expand_chunks(url):
 	if "/" not in path:
 		path += "/"
 	path, fn = path.split("/", 1)
+	assert len(path) <= 1024, f"{len(path)} path too long!"
 	size_mb, cid, mids = ungroup_attachments(path)
 	return size_mb, cid, mids, revert_suffix(fn)
 

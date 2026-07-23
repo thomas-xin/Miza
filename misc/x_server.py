@@ -593,11 +593,12 @@ class Server:
 		if not fp or (size := int(cp.request.headers.get("Content-Length", 0))) < 1:
 			if not url:
 				return "Expected input URL or data."
-			fp = await_fut(attachment_cache.download(url))
+			fp = await_fut(attachment_cache.download(url, max_size=1073741824 * 16))
 			size = getsize(fp)
+		assert size < 1073741824 * 16, "Max upload size is 16GB."
 		fn = filename or (url2fn(url) if url else None)
 		if persistent not in (0, "0", ""):
-			return await_fut(attachment_cache.create_dynamic(fp, filename=fn))
+			return await_fut(attachment_cache.create_dynamic(fp, filename=fn, size=size))
 		ts = n2p(ts_us()).decode("ascii")
 		if size < 65536 and not isinstance(fp, byte_like):
 			fp = fp.read()
@@ -1018,7 +1019,7 @@ class Server:
 				entry = self.ydl.search(url)[0]
 				fn2, _cdc, _dur, _ac = self.ydl.get_audio(entry, fmt="webm")
 				if is_url(fn2):
-					return await_fut(attachment_cache.download(fn2))
+					return await_fut(attachment_cache.download(fn2, max_size=1073741824 * 16))
 				with open(fn2, "rb") as f:
 					return f.read()
 

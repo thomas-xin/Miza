@@ -465,9 +465,9 @@ async def upload(
 		print_exc()
 		resp = None
 
-	content_length = int(request.headers.get("Content-Length", 0))
+	size = int(request.headers.get("Content-Length", 0))
 
-	if not resp or content_length < 1:
+	if not resp or size < 1:
 		if not url:
 			return Response(
 				content="Expected input URL or data.",
@@ -481,11 +481,13 @@ async def upload(
 			headers=RequestManager.header(),
 		)
 		filename = filename or unquote(resp.headers.get("content-disposition", "").split("filename=", 1)[-1])
-		resp = resp.content
+		resp = resp.content or b""
+		size = len(resp)
 
+	assert size < 1073741824 * 16, "Max upload size is 16GB."
 	fn = filename or getattr(resp, "filename", None) or (url2fn(url) if url else None)
 
-	url = await attachment_cache.create_dynamic(resp, filename=fn)
+	url = await attachment_cache.create_dynamic(resp, filename=fn, size=size)
 	return Response(
 		content=url,
 		media_type="text/plain",
@@ -527,7 +529,7 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 		raise HTTPException(status_code=403, detail=url)
 
 	try:
-		fp = await attachment_cache.download(url)
+		fp = await attachment_cache.download(url, max_size=1073741824 * 16)
 	except ConnectionError as ex:
 		raise HTTPException(status_code=ex.errno or 500, detail=f"{url}: {ex}")
 	heads = await attachment_cache.scan_headers(url, base="mizabot.xyz", fc=True)
