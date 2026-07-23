@@ -1809,8 +1809,7 @@ def encode_snowflake(*args, store_count=False, minimise=False):
 def decode_snowflake(data, n=0):
 	decoded = b64_or_uni(data)
 	if 1 < decoded[0] < 127:
-		_n, decoded = decoded[0], decoded[1:]
-		n = n or _n
+		n, decoded = decoded[0], decoded[1:]
 	elif decoded[0] == 127:
 		decoded = decoded[1:]
 	n = max(n, 1)
@@ -1878,7 +1877,7 @@ def encode_attachment(cid, mid, aid, fn, minimise=False):
 def decode_attachment(encoded):
 	data, *fn = encoded.split("/", 1)
 	assert len(data) < 40, f"{len(data)} path too long!"
-	ids = list(decode_snowflake(data))
+	ids = list(decode_snowflake(data, n=3))
 	while len(ids) < 3:
 		ids.append(0)
 	ids.extend(map(revert_suffix, fn))
