@@ -734,7 +734,7 @@ f_wolfram_alpha = {
 f_deno = {
 	"type": "function", "function": {
 		"name": "deno",
-		"description": "Queries the Deno JavaScript interpreter.",
+		"description": "Queries the Deno JavaScript interpreter. Not for other languages!",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {

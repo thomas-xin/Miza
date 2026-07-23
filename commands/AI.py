@@ -481,13 +481,14 @@ class Ask(Command):
 			premium.require(2)
 		model = ["miza-1", "miza-2", "miza-3"][("small", "medium", "large").index(_model)]
 		usage = [0, 0]
+		rsep = chr(invisicode.STRINGPREFIX)
+		loading = None
 		try:
 			ex = RuntimeError("Maximum inference attempts exceeded (model likely encountered an infinite loop).")
+			reasoning_sum = 0
+			reasoning_temp = 0
 			content = ""
 			for att in range(6):
-				await bot.require_integrity(_message)
-				if content:
-					yield "\n\n"
 				text = ""
 				messagelist = [messages[k] for k in sorted(messages) if not reference or k != reference.id]
 				messagelist.insert(0, system_message)
@@ -500,15 +501,38 @@ class Ask(Command):
 					messagelist.extend(tool_responses)
 				m = None
 				modelist = None
+				await bot.require_integrity(_message)
+				if bot.ready:
+					if not loading:
+						emoji = await bot.data.emojis.grab("loading.gif")
+						loading = min_emoji(emoji, full=True)
+					rtotal = reasoning_sum + reasoning_temp
+					rsize = f" ({byte_scale(rtotal)}B)" if rtotal else ""
+					begin = f"> Thinking{rsize}... {loading}\n{rsep}"
+					content = begin + content.split(rsep, 1)[-1]
+					yield "\r" + content
 				async for resp in bot.chat_completion(messagelist, model=model, max_tokens=16384, tools=TOOLS, user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
 					if isinstance(resp, dict):
 						if resp.get("reasoning"):
 							reasonings.extend(resp["reasoning"])
+							reasoning_sum = sum(len(r) + 3 for r in reasonings)
+						if resp.get("reasoning_temp"):
+							reasoning_temp = resp["reasoning_temp"]
+							if not loading:
+								emoji = await bot.data.emojis.grab("loading.gif")
+								loading = min_emoji(emoji, full=True)
+							rtotal = reasoning_sum + reasoning_temp
+							rsize = f" ({byte_scale(rtotal)}B)" if rtotal else ""
+							begin = f"> Thinking{rsize}... {loading}\n{rsep}"
+							content = begin + content.split(rsep, 1)[-1]
+							yield "\r" + content
 						if resp.get("cargs"):
 							props.cargs = resp["cargs"]
 						if resp.get("usage"):
 							usage[0] = T(resp.usage).get("prompt_tokens", 0)
 							usage[1] = T(resp.usage).get("completion_tokens", 0)
+						if not getattr(resp, "choices", None):
+							continue
 						m = resp.choices[0].delta
 						temp = m.content or ""
 						if temp:
@@ -682,16 +706,19 @@ class Ask(Command):
 				content += "\n\n" * bool(content) + text
 				if text and not tc:
 					raise StopIteration
+				await bot.require_integrity(_message)
 			else:
 				raise ex
 		except StopIteration:
 			pass
 		print("Usage:", usage)
+		content = content.split(rsep, 1)[-1].strip()
 		if reasonings:
 			reasoning = "\n\n\n".join(reasonings).encode("utf-8")
 			try:
 				url = await bot.upload_temp(reasoning, filename="reasoning.txt")
-				content = (f"> [Reasoning: {byte_scale(len(reasoning))}B (click to view)]({url})\n" + content).strip()
+				rsize = f"{byte_scale(len(reasoning))}B"
+				content = (f"> [Reasoning: {rsize} (click to view)]({url})\n" + content).strip()
 			except Exception:
 				print_exc()
 		response.content = "\r" + content

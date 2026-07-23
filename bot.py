@@ -2497,6 +2497,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		length = count_to(messages)
 		length = ceil(length * 1.1) + 4 * len(messages)
 		print("Chat completions:", model, ai.overview(messages), cargs, sep="\n")
+		reasoning_thresh = 0
 		tmpcut = None
 		tmplen = 0
 		for attempts in range(mA):
@@ -2572,7 +2573,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							continue
 						finish_reason = chunk.choices[0].finish_reason or finish_reason
 						delta = chunk.choices[0].delta
-						# print(delta)
 						if getattr(delta, "reasoning", None):
 							reason += delta.reasoning
 						elif not reason and getattr(delta, "reasoning_details", None):
@@ -2608,6 +2608,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						if T(delta).get("refusal") or text and attempts < mA - 1 and decensor and len(text) < 512 and ai.decensor.search(text) or text.rstrip(": \n") == assistant_name:
 							refusal = True
 							break
+						rlength = sum(len(r) + 3 for r in reasoning)
+						if reason:
+							rlength += 3 + len(reason)
+						if rlength - reasoning_thresh >= 50:
+							yield cdict(reasoning_temp=rlength)
+							reasoning_thresh = rlength
 						if delta.content and not message.tool_calls:
 							choice = result.choices[0]
 							result.update(chunk)
@@ -2665,6 +2671,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							usage=result.get("usage"),
 							cargs=cargs,
 							reasoning=reasoning,
+							reasoning_temp=0,
 						)
 						return
 			eval2 = None
