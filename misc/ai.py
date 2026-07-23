@@ -12,7 +12,7 @@ import numpy as np
 import openai
 assert hasattr(openai, "AsyncOpenAI"), "OpenAI library has incorrect version installed!"
 from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, tracebacksuppressor, utc, T, string_like, getattr_chain
-from misc.util import AUTH, CACHE_PATH, AutoCache, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across
+from misc.util import AUTH, CACHE_PATH, AutoCache, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across, is_url
 from misc.asyncs import flatten, _run_async, submit_thread, create_task, emptyctx, gather, Semaphore, CloseableAsyncIterator
 
 print("AI:", __name__)
@@ -222,8 +222,8 @@ def _count_to(messages, model):
 							num_tokens += len(encoding.encode(part["text"], allowed_special=encoding.special_tokens_set))
 							continue
 						if part.get("type") == "image_url":
-							if model == "cl100k_im" and part["image_url"].get("detail", "auto") == "low":
-								num_tokens += 85
+							if model == "cl100k_im" and part["image_url"].get("detail", "auto") == "low" or is_url(part["image_url"]):
+								num_tokens += 128
 							else:
 								b = base64.b64decode(part["image_url"]["url"].encode("ascii").split(b",", 1)[-1])
 								num_tokens += np.prod(get_image_size(b)) / 768 + 128
@@ -236,12 +236,13 @@ async def count_to(messages, model="cl100k_im"):
 	"""Return the number of tokens used by a list of messages."""
 	return await _run_async(_count_to, messages, model)
 
-async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=False, prompt=None, premium_context=[]):
+async def cut_to(messages, limit=1024, softlim=384, exclude_first=3, best=False, prompt=None, premium_context=[]):
 	if not messages:
 		return messages
 	messages = list(messages)
-	if exclude_first:
-		sm = messages.pop(0)
+	fm = messages.pop(0)
+	if exclude_first and messages:
+		sm, messages = messages[:exclude_first], messages[exclude_first:]
 	mes = []
 	count = 0
 	i = -1
@@ -256,7 +257,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=Fal
 		mes.append(m)
 		count = await count_to(mes)
 	if softlim >= limit:
-		if not mes:
+		if not mes and messages:
 			m = cdict(messages[-1])
 			if isinstance(m.content, list):
 				m.content = "\n".join(c["text"] for c in m.content if c.get("type") == "text")
@@ -264,7 +265,8 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=Fal
 			mes = [m]
 		messages = mes[::-1]
 		if exclude_first:
-			messages.insert(0, sm)
+			messages = sm + messages
+		messages.insert(0, fm)
 		return messages
 	summ = "Summary of chat history (include this if asked to summarise!):\n"
 	s = overview(messages[:i + 1] if i > 0 else messages)
@@ -273,7 +275,8 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=Fal
 	c2 = await count_to(messages)
 	if c2 <= softlim * 1.2:
 		if exclude_first:
-			messages.insert(0, sm)
+			messages = sm + messages
+		messages.insert(0, fm)
 		return messages
 	ml = max(1024, round_random(softlim - count))
 	if best:
@@ -287,7 +290,8 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=True, best=Fal
 		content=summ,
 	))
 	if exclude_first:
-		messages.insert(0, sm)
+		messages = sm + messages
+	messages.insert(0, fm)
 	return messages
 
 async def summarise(q, min_length=384, max_length=24576, padding=128, best=True, prompt=None, premium_context=[]):
@@ -363,7 +367,7 @@ async def load_local():
 		local_models[name] = models
 		available.setdefault(name, {})[""] = (name, pricing)
 		contexts[name] = info.get("context", 24576)
-		if "image" in capabilities:
+		if "vision" in capabilities:
 			is_vision.add(name)
 		else:
 			is_vision.discard(name)
@@ -515,8 +519,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 				mt2 = mt * 3 // 2
 				ctx = 65536
 				if orig_model in contexts:
-					prompt, _stopn = instruct_structure(kwa["messages"])
-					ctx = contexts[orig_model] - (await tcount(prompt)) * 3 // 2
+					ctx = contexts[orig_model] - (await count_to(kwa["messages"])) * 3 // 2
 				mt2 = min(mt2, ctx)
 				kwa["max_completion_tokens"] = mt2
 			kwa.pop("presence_penalty", None)
@@ -677,7 +680,7 @@ async def instruct(data, prune=True, cache=True, user=None):
 async def _instruct(data, user=None, prune=True):
 	inputs = dict(
 		temperature=0.75,
-		max_tokens=4096,
+		max_tokens=65536,
 		user=user,
 	)
 	inputs.update(data)

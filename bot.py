@@ -1645,23 +1645,24 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				m = await self.fetch_message(url)
 				found = alist(attachment_cache.preserve(a.url, m.id) for a in m.attachments)
 				for p in priority_order:
+					curr = [attachment_cache.preserve(url) for url in find_urls_ex(m.content)]
 					match p:
 						case "video":
-							found.extend(url for url in find_urls_ex(m.content) if url2ext(url) in VIDEO_FORMS)
+							found.extend(url for url in curr if url2ext(url) in VIDEO_FORMS)
 						case "audio":
-							found.extend(url for url in find_urls_ex(m.content) if url2ext(url) in AUDIO_FORMS)
+							found.extend(url for url in curr if url2ext(url) in AUDIO_FORMS)
 						case "image":
-							found.extend(url for url in find_urls_ex(m.content) if url2ext(url) in IMAGE_FORMS)
+							found.extend(url for url in curr if url2ext(url) in IMAGE_FORMS)
 							found.extend(s.url for s in m.stickers)
 							for e in m.embeds:
 								for attr in ("video", "image", "thumbnail"):
 									url = getattr_chain(e, f"{attr}.url", None)
 									if url:
-										found.append(url)
+										found.append(attachment_cache.preserve(url))
 						case "text":
 							if allow_text:
 								found.append(m.content)
-							found.extend(find_urls_ex(m.content))
+							found.extend(curr)
 						case "emoji":
 							emoji_tests = find_emojis_ex(m.content)
 							for i, u in enumerate(emoji_tests):
@@ -1674,9 +1675,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				found.uniq(sort=False)
 				for url in found:
 					assert not is_local_url(url), url
-					if is_discord_attachment(url):
-						out.append(attachment_cache.preserve(url))
-					elif is_discord_message_link(url) and url not in seen:
+					if is_discord_message_link(url) and url not in seen:
 						seen.add(url)
 						urls = await self._follow_url([url], priority_order=priority_order, allow_text=allow_text, seen=seen)
 						out.extend(urls)
@@ -1950,6 +1949,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if is_discord_attachment(argv) or is_miza_attachment(argv):
 				if url2ext(argv) in VISUAL_FORMS:
 					return "<data>"
+			assert not is_local_url(argv), argv
 			result = await _run_async(
 				self.ddgs.extract,
 				verify_url(argv),
@@ -2009,11 +2009,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return resp
 		raise (exc or RuntimeError("Unknown error occured."))
 
-	async def force_completion(self, model, prompt=None, stream=True, max_tokens=1024, strip=True, **kwargs):
-		ctx = ai.contexts.get(model, 4096)
-		if prompt and model in ai.is_completion:
+	async def force_completion(self, model, prompt=None, images=(), stream=True, max_tokens=1024, strip=True, **kwargs):
+		ctx = ai.contexts.get(model, 65536)
+		messages = kwargs.pop("messages", None) or [cdict(role="user", content=prompt)]
+		if images:
+			messages = [cdict(role="user", content=[])]
+			messages[-1] = astype(messages[-1], cdict)
+			if isinstance(messages[-1].content, str):
+				messages[-1].content = [cdict(type="text", text=messages[-1].content)]
+			messages[-1].content.extend(cdict(type="image_url", image_url=cdict(url=im)) for im in images)
+			messages, _vision_model = await self.caption_into(messages, model=model, backup_model=None, premium_context=kwargs.get("premium_context", []))
+		if model in ai.is_completion:
+			prompt = "\n\n\n".join(m["content"][0].text for m in messages if m.content and m.content[0].get("type") == "text")
 			count = await tcount(prompt)
-			max_tokens = min(max_tokens, ctx - count - 64)
+			max_tokens = min(max_tokens, ctx - count * 3 // 2 - 64)
 			if "max_completion_tokens" not in kwargs:
 				kwargs["max_tokens"] = max_tokens
 			resp = await ai.llm("completions.create", model=model, prompt=prompt, stream=True, **kwargs)
@@ -2029,11 +2038,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					yield s
 				return
 			return CloseableAsyncIterator(_completion(resp, strip), resp.close)
-		messages = kwargs.pop("messages", None) or [cdict(role="user", content=prompt)]
 		count = await count_to(messages)
-		max_tokens = min(max_tokens, ctx - count - 64)
+		max_tokens = min(max_tokens, ctx - count * 3 // 2 - 64)
 		if "max_completion_tokens" not in kwargs:
-			kwargs["max_tokens"] = max_tokens
+			kwargs["max_tokens"] = kwargs["max_completion_tokens"] = max_tokens
 		resp = await ai.llm("chat.completions.create", model=model, messages=messages, stream=True, **kwargs)
 		async def _completion(resp, strip):
 			stopped_reasoning = None
@@ -2226,14 +2234,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				continue
 			follows[i] = urls
 		extracts = [None] * len(messages)
-		for i, (m, urls) in enumerate(zip(messages, follows)):
-			if not urls:
-				continue
-			if m.get("url"):
-				for url in list(urls) + [m["url"]]:
+		for i, (m, urls) in tuple(enumerate(zip(messages, follows)))[::-1]:
+			if isinstance(m.content, str):
+				for url in set(find_urls_ex(m.content)):
+					url2 = attachment_cache.preserve(url)
+					if url != url2:
+						m.content = m.content.replace(url, url2)
+				for url in list(urls or ()):
 					if not url:
 						continue
 					m.content = m.content.replace(url, "", 1).strip()
+			if not urls:
+				continue
 			if model in ai.is_vision and m.get("role") != "assistant":
 				futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
 				extracts[i] = create_task(gather(*futs))
@@ -2772,9 +2784,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	caption_prompt = "Please describe this image in detail; be descriptive but concise!"
 	description_prompt = "Please describe this <IMAGE> in detail:\n- The image may be a collage of frames representing a video, in which case it should be analysed as if it were one\n- Transcribe text if present, but do not mention there not being text\n- Note details especially for people/characters if present\n- Be descriptive but concise!"
 
-	async def to_data_url(self, url, small=False, fmt="jpg", timeout=8):
+	async def _to_data_url(self, url, small=False, fmt="jpg", timeout=8):
 		sizelim = 82944 if small else 1638400
-		dimlim = 256 if small else 1024
+		dimlim = 384 if small else 1536
 		if isinstance(url, str):
 			if url.startswith("data:"):
 				return url
@@ -2797,9 +2809,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				s = as_str(d)
 				return f'<file name="{name}">' + s + "</file>"
 			assert isinstance(d, (str, bytes)), d
-			d = await process_image(d, "resize_map", [[], None, None, "rel", dimlim, "-", "auto", "-bg", "-oz", "-fs", lim, "-f", fmt], timeout=24)
+			d = await process_image(d, "resize_map", [[], None, None, "rel", dimlim, "-", "auto", "-bg", "-oz", "-dl", dimlim, "-fs", lim, "-f", fmt], timeout=24)
 			mime = magic.from_buffer(d)
 		return "data:" + mime + ";base64," + base64.b64encode(d).decode("ascii")
+	async def to_data_url(self, url, small=False, fmt="jpg", timeout=8):
+		tup = shash((url, small, fmt))
+		return await ai.cache.aretrieve(tup, self._to_data_url, url, small, fmt, timeout)
 
 	async def vision(self, url, name=None, best=True, model=None, question=None, premium_context=[], timeout=12):
 		"Requests an image description from a vision-supporting LLM."

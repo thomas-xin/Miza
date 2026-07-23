@@ -880,6 +880,13 @@ class Instruct(Command):
 			description="Input text for completion",
 			example="Once upon a time, there was",
 		),
+		images=cdict(
+			type="visual",
+			description="Image, animation or video, supplied by URL or attachment",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
+			aliases=["i"],
+			multiple=True,
+		),
 		api=cdict(
 			type="string",
 			description="Custom OpenAI-compatible API url, optionally followed by API key and then model, all separated with \"#\"",
@@ -911,7 +918,7 @@ class Instruct(Command):
 			validation=cdict(
 				enum=("minimal", "low", "medium", "high"),
 			),
-			default="low",
+			default="medium",
 		),
 		max_tokens=cdict(
 			type="integer",
@@ -926,7 +933,9 @@ class Instruct(Command):
 	ephemeral = True
 	cache = AutoCache(stale=360, timeout=720)
 
-	async def __call__(self, bot, _message, _premium, model, prompt, api, temperature, frequency_penalty, presence_penalty, reasoning_effort, max_tokens, **void):
+	async def __call__(self, bot, _message, _premium, model, prompt, images, api, temperature, frequency_penalty, presence_penalty, reasoning_effort, max_tokens, **void):
+		if not model:
+			model = "large"
 		if model not in ai.available:
 			model = str_lookup(ai.available, model)
 		kwargs = {}
@@ -955,9 +964,7 @@ class Instruct(Command):
 			kwargs["api"] = oai
 		kwargs["max_tokens"] = max_tokens
 		kwargs["reasoning_effort"] = reasoning_effort
-		if not model:
-			model = "large"
-		resp = await bot.force_completion(model=model, prompt=prompt, stream=True, timeout=1800, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, premium_context=_premium, allow_alt=True, **kwargs)
+		resp = await bot.force_completion(model=model, prompt=prompt, images=images, stream=True, timeout=1800, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, premium_context=_premium, allow_alt=True, **kwargs)
 		try:
 			_message.__dict__.setdefault("inits", []).append(resp)
 		except Exception:

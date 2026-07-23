@@ -648,6 +648,7 @@ class UpdateExec(Database):
 			fn = filetransd(filename or "")
 			b = url
 		elif is_url(url):
+			assert not is_local_url(url), url
 			fn = filetransd(filename or url2fn(url))
 			b = await attachment_cache.download(url)
 		elif isinstance(url, str):
@@ -676,6 +677,7 @@ class UpdateExec(Database):
 			elif url.startswith(bot.webserver + "/u/") or url.startswith(bot.raw_webserver + "/u/") or url.startswith("https://cdn.discordapp.com/embed/avatars/"):
 				return url
 			else:
+				assert not is_local_url(url), url
 				uhu = uuhash(url)
 				try:
 					url2 = bot.data.proxies[uhu]

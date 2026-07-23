@@ -413,7 +413,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 						cmd2 += ["-c:v", "libvpx"]
 					case "vp9" | "libvpx-vp9" | "vp9_vaapi":
 						cmd2 += ["-c:v", "libvpx-vp9"]
-			cmd2 += ["-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0"]
+			cmd2 += ["-i", fn, "-f", "rawvideo", "-pix_fmt", fmt]
 			if nogif:
 				cmd2.extend(("-vframes", "1"))
 			cmd2.append("-")
@@ -433,7 +433,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 				fcount = floor(maxframes / dur / fps * fcount)
 				fps = maxframes / dur
 				framedur = 1 / fps
-				cmd3 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps}", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
+				cmd3 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps}", "-f", "rawvideo", "-pix_fmt", fmt, "-"]
 				print(cmd3)
 				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
 			elif dur > 1 and msize and size[0] * size[1] > msize ** 2:
@@ -441,7 +441,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 				w, h = max_size(*size, maxsize=msize)
 				w = round(w / 2) * 2
 				h = round(h / 2) * 2
-				cmd3 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"scale={w}:{h}:flags=lanczos", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
+				cmd3 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"scale={w}:{h}:flags=lanczos", "-f", "rawvideo", "-pix_fmt", fmt, "-"]
 				print(cmd3)
 				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
 			elif not nogif and bytecount > 32 * 1073741824:
@@ -454,7 +454,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 				framedur = 1 / fps
 				bcount = 4 if fmt == "rgba" else 3
 				bcount *= int(np.prod(size))
-				cmd3 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps},scale={w}:{h}:flags=bicublin", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
+				cmd3 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps},scale={w}:{h}:flags=bicublin", "-f", "rawvideo", "-pix_fmt", fmt, "-"]
 				print(cmd3)
 				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
 			if nogif:

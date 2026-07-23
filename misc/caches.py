@@ -252,6 +252,8 @@ class AttachmentCache(AutoCache):
 		return url
 
 	def preserve(self, url, mid=0, minimise=False):
+		if not is_discord_attachment(url):
+			return url
 		return shorten_attachment(self.store(url), mid, minimise=minimise)
 
 	async def get_direct(self, c_id, m_id, a_id=None):

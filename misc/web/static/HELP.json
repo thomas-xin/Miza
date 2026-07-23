@@ -3978,6 +3978,13 @@
 					"description": "Input text for completion",
 					"example": "Once upon a time, there was"
 				},
+				"images": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"multiple": true
+				},
 				"api": {
 					"type": "string",
 					"description": "Custom OpenAI-compatible API url, optionally followed by API key and then model, all separated with \"#\"",
@@ -4009,7 +4016,7 @@
 					"validation": {
 						"enum": ["minimal", "low", "medium", "high"]
 					},
-					"default": "low"
+					"default": "medium"
 				},
 				"max_tokens": {
 					"type": "integer",
@@ -4019,7 +4026,7 @@
 					"default": 98304
 				}
 			},
-			"ordered_args": ["model", "prompt", "api", "temperature", "frequency_penalty", "presence_penalty", "reasoning_effort", "max_tokens"]
+			"ordered_args": ["model", "prompt", "images", "api", "temperature", "frequency_penalty", "presence_penalty", "reasoning_effort", "max_tokens"]
 		},
 		"Describe": {
 			"aliases": ["Describe", "Description", "Image2Text", "Clip"],

@@ -732,6 +732,7 @@ def evalImg(url, operation, args):
 	fs = inf
 	dur = None
 	maxframes = inf
+	dl = 0
 	nogif = False
 	oz = False
 	if len(args) > 1 and args[-2] == "-f":
@@ -739,6 +740,9 @@ def evalImg(url, operation, args):
 		args.pop(-1)
 	if len(args) > 1 and args[-2] == "-fs":
 		fs = floor(float(args.pop(-1)))
+		args.pop(-1)
+	if len(args) > 1 and args[-2] == "-dl":
+		dl = floor(float(args.pop(-1)))
 		args.pop(-1)
 	if len(args) > 1 and args[-2] == "-d":
 		dur = args.pop(-1)
@@ -832,6 +836,8 @@ def evalImg(url, operation, args):
 			new["frames"] = [im]
 			new["count"] = 1
 			new["duration"] = 1
+			if dl:
+				im = resize_max(im, dl)
 		else:
 			video = True
 		duration = new["duration"]
@@ -1049,6 +1055,8 @@ def evalImg(url, operation, args):
 		else:
 			new = next(iter(new["frames"]))
 	if Image and isinstance(new, Image.Image):
+		if dl:
+			new = resize_max(new, dl)
 		if fmt == "auto":
 			fmt = "webp"
 		new = optimise(new, keep_rgb=False)
