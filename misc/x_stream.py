@@ -406,7 +406,7 @@ async def chunked_proxy(request: Request, path: str):
 		new_urls = [f"{url}&S={firstsize if not i else lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
 		heads = await attachment_cache.scan_headers(urls[0], base="mizabot.xyz", fc=True)
 	except ConnectionError as ex:
-		raise HTTPException(status_code=ex.errno or 500, detail=str(ex))
+		raise HTTPException(status_code=ex.args[0] if ex.args else ex.errno or 500, detail="\n".join(map(str, ex.args[1:])))
 	response_headers = {}
 	filename = heads.get("attachment-filename") or unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or urls[0].rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
 	if filename:
@@ -446,8 +446,7 @@ async def unproxy(request: Request, path: Optional[str] = None, url: Optional[st
 				return await proxy_if(resp, request, force=force, download=download)
 			raise
 	except ConnectionError as ex:
-		if ex.args[0] == 404:
-			raise HTTPException(status_code=404, detail="\n".join(map(str, ex.args[1:])))
+		raise HTTPException(status_code=ex.args[0] if ex.args else ex.errno or 500, detail="\n".join(map(str, ex.args[1:])))
 
 
 @app.post("/upload")
