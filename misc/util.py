@@ -4324,7 +4324,7 @@ def str_lookup(objs, query, key=None, fuzzy=0, compare=string_similarity):
 		return closest[1]
 	err = f'No results for "{query}".'
 	if closest[0] > -inf:
-		err += f' Did you mean: {json.dumps(closest[2])}?'
+		err += f' Did you mean: {json_dumpstr(closest[2])}?'
 	raise LookupError(err)
 
 confusable_pairs = (

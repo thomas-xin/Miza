@@ -2853,7 +2853,7 @@ class GIFSearch(Pagination, Interactable, Command):
 		if not results:
 			alt = await self.cache.aretrieve(f"suggestions-{q}", self.search_suggestions, q)
 			if alt:
-				dym = f' Did you mean: {json.dumps(alt)}?'
+				dym = f' Did you mean: {json_dumpstr(alt)}?'
 			else:
 				dym = ""
 			raise LookupError(f'No results for {json.dumps(query)}.{dym}')

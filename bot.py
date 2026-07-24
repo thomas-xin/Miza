@@ -4909,12 +4909,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			m = verify_id(v)
 			fuzzy = 0 if info.get("strict", False) else 0.25
 			if info.type == "mentionable":
+				v = None
 				if isinstance(m, int):
 					v = self.in_cache(m)
-				elif isinstance(m, int):
-					v = await self.fetch_messageable(m)
-				else:
-					v = None
+				if v is None:
 					if isinstance(m, int):
 						try:
 							v = await self.fetch_messageable(m)
@@ -4934,45 +4932,38 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if v is None:
 					v = await self.fetch_member_ex(m, guild, fuzzy=fuzzy)
 			elif info.type == "channel":
+				v = None
 				if isinstance(m, int):
-					v = await self.fetch_channel(m)
+					try:
+						v = await self.fetch_channel(m)
+					except Exception:
+						v = None
 				elif not guild:
 					raise TypeError("Channels must be specified by ID outside of servers.")
-				else:
-					v = None
-					if isinstance(m, int):
-						try:
-							v = await self.fetch_channel(m)
-						except Exception:
-							pass
-					if v is None:
-						v = str_lookup(
-							guild.channels,
-							m,
-							key=lambda channel: channel.name,
-							fuzzy=fuzzy,
-						)
+				if v is None:
+					v = str_lookup(
+						guild.channels,
+						m,
+						key=lambda channel: channel.name,
+						fuzzy=fuzzy,
+					)
 			elif info.type == "guild":
 				v = await self.fetch_guild(m)
 			elif info.type == "role":
 				if isinstance(m, int):
-					v = await self.fetch_role(m, guild)
+					try:
+						v = await self.fetch_role(m, guild)
+					except Exception:
+						v = None
 				elif not guild:
 					raise TypeError("Roles must be specified by ID outside of servers.")
-				else:
-					v = None
-					if isinstance(m, int):
-						try:
-							v = await self.fetch_role(m, guild)
-						except Exception:
-							pass
-					if v is None:
-						v = str_lookup(
-							guild.roles,
-							m,
-							key=lambda role: role.name,
-							fuzzy=fuzzy,
-						)
+				if v is None:
+					v = str_lookup(
+						guild.roles,
+						m,
+						key=lambda role: role.name,
+						fuzzy=fuzzy,
+					)
 		elif info.type == "emoji":
 			v = await self.resolve_emoji(v, guild=guild)
 		elif info.type in ("url", "image", "visual", "video", "audio", "media"):
@@ -5154,7 +5145,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				except LookupError:
 					dym = ""
 				else:
-					dym = f' Did you mean: "{alt}"?'
+					dym = f' Did you mean: {json_dumpstr(alt)}?'
 				if enum and accepts:
 					e1 = lim_str("`, `".join(sorted(enum)), 384)
 					e2 = lim_str("`, `".join(sorted(accepts)), 384)
