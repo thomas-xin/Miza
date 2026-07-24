@@ -293,7 +293,7 @@ class AttachmentCache(AutoCache):
 		if not m_id and not fn:
 			raise LookupError("Insufficient information to retrieve attachment.")
 		heads = self.headers if c_id not in self.channels else self.alt_headers
-		if fn:
+		if fn and (not m_id or random.randint(0, 1)):
 			url = f"https://cdn.discordapp.com/attachments/{c_id}/{a_id}/{fn}"
 			data = await retrieve_api(
 				"attachments/refresh-urls",
@@ -418,14 +418,6 @@ class AttachmentCache(AutoCache):
 					fn, head = await _run_async(download_file, *urls, filename=raw_fn, _timeout=timeout, return_headers=True)
 					self.tertiary[url] = head
 					return self.cast_fp(open(fn, "rb"))
-			# if is_discord_url(target):
-			# 	try:
-			# 		fn, head = await run_async(download_file, target, filename=raw_fn, _timeout=timeout, return_headers=True)
-			# 	except (ConnectionError, TimeoutError):
-			# 		await asyncio.sleep(1)
-			# 		fn, head = await run_async(download_file, target, filename=raw_fn, _timeout=timeout, return_headers=True)
-			# 	self.tertiary[url] = head
-			# 	return open(fn, "rb")
 			try:
 				f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, timeout=timeout, max_attempts=6, return_headers=True)
 			except niquests.exceptions.HTTPError as ex:
