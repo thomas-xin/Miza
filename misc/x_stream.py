@@ -402,11 +402,11 @@ async def chunked_proxy(request: Request, path: str):
 	"""Serve chunked/split files with range support."""
 	try:
 		urls, chunksize = await attachment_cache.obtains(path.split("/", 1)[0])
+		mimetype, size, firstsize, lastsize = await get_size_mime(urls[0], urls[-1], len(urls), chunksize)
+		new_urls = [f"{url}&S={firstsize if not i else lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
+		heads = await attachment_cache.scan_headers(urls[0], base="mizabot.xyz", fc=True)
 	except ConnectionError as ex:
 		raise HTTPException(status_code=ex.errno or 500, detail=str(ex))
-	mimetype, size, firstsize, lastsize = await get_size_mime(urls[0], urls[-1], len(urls), chunksize)
-	new_urls = [f"{url}&S={firstsize if not i else lastsize if i >= len(urls) - 1 else chunksize}" for i, url in enumerate(urls)]
-	heads = await attachment_cache.scan_headers(urls[0], base="mizabot.xyz", fc=True)
 	response_headers = {}
 	filename = heads.get("attachment-filename") or unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or urls[0].rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
 	if filename:
@@ -425,28 +425,29 @@ async def unproxy(request: Request, path: Optional[str] = None, url: Optional[st
 	assert request is not None
 	if request.method.upper() == "HEAD":
 		force = True
-	if url:
-		return await proxy_if(url, request, force=force, download=download)
-	if not path:
-		raise HTTPException(status_code=400, detail="Must provide path or URL.")
 	try:
-		c_id, m_id, a_id, fn = decode_attachment(path)
-	except Exception as ex:
-		raise HTTPException(status_code=400, detail=str(ex))
-	url, _mid = merge_url(c_id, m_id, a_id, fn)
-	priority = requires_proxy(url, request.headers, download)
-	try:
+		if url:
+			return await proxy_if(url, request, force=force, download=download)
+		if not path:
+			raise HTTPException(status_code=400, detail="Must provide path or URL.")
+		try:
+			c_id, m_id, a_id, fn = decode_attachment(path)
+		except Exception as ex:
+			raise HTTPException(status_code=400, detail=str(ex))
+		url, _mid = merge_url(c_id, m_id, a_id, fn)
+		priority = requires_proxy(url, request.headers, download)
 		resp = await attachment_cache.obtain(c_id, m_id, a_id, fn, priority=priority)
-	except ConnectionError as ex:
-		raise HTTPException(status_code=ex.errno or 500, detail=f"{url}: {ex}")
-	try:
-		return await proxy_if(resp, request, force=force, download=download)
-	except ConnectionError as ex:
-		if ex.errno == 404:
-			attachment_cache.remove_cached(request.url)
-			resp = await attachment_cache.obtain(c_id, m_id, a_id, fn, priority=True)
+		try:
 			return await proxy_if(resp, request, force=force, download=download)
-		raise
+		except ConnectionError as ex:
+			if ex.errno == 404:
+				attachment_cache.remove_cached(request.url)
+				resp = await attachment_cache.obtain(c_id, m_id, a_id, fn, priority=True)
+				return await proxy_if(resp, request, force=force, download=download)
+			raise
+	except ConnectionError as ex:
+		if ex.args[0] == 404:
+			raise HTTPException(status_code=404, detail="\n".join(map(str, ex.args[1:])))
 
 
 @app.post("/upload")
