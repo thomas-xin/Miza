@@ -19,7 +19,7 @@ from .asyncs import _run_async, create_task
 from .types import fcdict, byte_like, MemoryBytes
 from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment, discord_expired,
-	merge_url, is_discord_attachment, url2fn, url2ext, getsize, mime_from_file,
+	merge_url, is_discord_attachment, url2fn, url2ext, getsize, mime_from_file, zip2bytes,
 	Request as RequestManager, DOMAIN_CERT, PRIVATE_KEY, update_headers, is_local_url,
 	AutoCache, CACHE_PATH, VISUAL_FORMS, IMAGE_FORMS, RNGFile, create_etag,
 )
@@ -358,6 +358,7 @@ async def head_mc(response: Response):
 async def authorised_heartbeat(request: Request, key: Optional[str] = None, uri: Optional[str] = ""):
 	"""Receive configuration updates from Discord bot."""
 	if key != discord_secret:
+		banned_ips.append(true_ip(request))
 		raise HTTPException(status_code=403, detail="Invalid key")
 
 	uri = uri or f"https://{true_ip(request)}:{webserver_port}"
@@ -368,7 +369,7 @@ async def authorised_heartbeat(request: Request, key: Optional[str] = None, uri:
 			json.dump(server.state, f)
 
 	body = await request.json()
-	data = orjson.loads(decrypt(base64.b64decode(body["data"].encode("ascii") + b"==")))
+	data = orjson.loads(zip2bytes(decrypt(base64.b64decode(body["data"].encode("ascii") + b"=="))))
 
 	server.token = data.get("token") or server.token
 	server.alt_token = data.get("alt_token") or server.alt_token
@@ -380,6 +381,9 @@ async def authorised_heartbeat(request: Request, key: Optional[str] = None, uri:
 	AUTH["alt_token"] = server.alt_token
 	AUTH["proxy_channels"] = server.channels
 	save_auth(AUTH)
+
+	bans = data.get("banned_ips", ())
+	banned_ips[:] = bans
 
 	if domain_cert and private_key:
 		with open(DOMAIN_CERT, "w") as f:
@@ -677,6 +681,9 @@ async def static_backend(path: str, request: Request):
 	return Response(content=content, headers=headers, status_code=status_code)
 
 
+banned_paths = (".aws", ".docker", ".env", ".git", ".gradle", "actuator", "admin", "administrator", "cgi-bin", "internal", "private", "sdk")
+banned_ips = []
+
 alias = tuple([fn.split("/", 1)[0].rsplit(".", 1)[0] for fn in os.listdir("misc/web")])
 alias += ("preview",)
 # Catch-all route for custom routing logic
@@ -686,6 +693,8 @@ async def catch_all(path: str, request: Request):
 	p = path.strip("/")
 	first = p.split("/", 1)[0] if p else ""
 
+	if true_ip(request) in banned_ips or first in banned_paths:
+		return RedirectResponse(url="https://www.youtube.com/watch?v=dQw4w9WgXcQ", status_code=308)
 	if not p or p in ("home", "index", "dummy.html", "index.html"):
 		return FileResponse("misc/web/index.html", media_type="text/html")
 	if p in ("robots", "robots.txt"):
@@ -706,8 +715,6 @@ async def catch_all(path: str, request: Request):
 		return FileResponse("misc/web/commands.html", media_type="text/html")
 	if first == "assets":
 		return FileResponse(f"misc/web/{p}")
-	if first in (".git", ".env", "admin", "private", "internal", "administrator"):
-		return RedirectResponse(url="https://www.youtube.com/watch?v=dQw4w9WgXcQ", status_code=308)
 	if first in alias:
 		return await static_backend(p, request=request)
 	return Response(

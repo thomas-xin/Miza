@@ -192,6 +192,7 @@ def get_size_mime(head, tail, count, chunksize):
 banned_ips = AutoCache(f"{CACHE_PATH}/banned_ips", shards=1, stale=0, timeout=86400 * 7)
 for ip in AUTH.get("remote_servers", ()):
 	banned_ips[ip] = False
+banned_paths = (".aws", ".docker", ".env", ".git", ".gradle", "actuator", "admin", "administrator", "cgi-bin", "internal", "private", "sdk")
 
 class EndpointRedirects(Dispatcher):
 
@@ -202,11 +203,11 @@ class EndpointRedirects(Dispatcher):
 		first = p.split("/", 1)[0]
 		if first == "unban":
 			banned_ips.pop(ip, None)
-		elif first in (".aws", ".docker", ".env", ".git", ".gradle", "actuator", "admin", "administrator", "cgi-bin", "internal", "private", "sdk") or banned_ips.get(ip):
+		elif first in banned_paths or banned_ips.get(ip):
 			if ip not in banned_ips:
 				banned_ips[ip] = True
 				print("Banned IP:", ip)
-			return super().__call__("/rickroll")
+			raise cp.HTTPRedirect(rickroll, 308)
 		elif p == "ip":
 			p = "get_ip"
 		elif first in ("f", "d"):
@@ -1133,7 +1134,7 @@ class Server:
 
 	@cp.expose
 	def rickroll(self, *args, **kwargs):
-		raise cp.HTTPRedirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ", 308)
+		raise cp.HTTPRedirect(rickroll, 308)
 
 
 def terminate():

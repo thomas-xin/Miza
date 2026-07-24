@@ -2059,9 +2059,9 @@ def zip2bytes(data):
 		return z.read(z.namelist()[0])
 
 def bytes2zip(data, heavy=True):
+	if zstd:
+		return b"+" + zstd.compress(data, level=6)
 	if heavy:
-		if zstd:
-			return b"+" + zstd.compress(data, level=6)
 		return b"~" + lzma.compress(data)
 	return b"!" + zlib.compress(data)
 
