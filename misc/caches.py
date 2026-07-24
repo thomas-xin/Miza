@@ -188,12 +188,13 @@ class AttachmentCache(AutoCache):
 						break
 			except Exception as ex:
 				if data is not None:
-					print(data)
+					print(tasks, data)
 				for task in tasks:
 					task[0].set_exception(ex)
 				continue
+			print(tasks, data)
 			for task in tasks:
-				task[0].set_exception(ConnectionError(404, "Missing attachment embed!"))
+				task[0].set_exception(ConnectionError(404, "Missing attachment refresh!"))
 
 	@tracebacksuppressor
 	def update_queue(self):
@@ -239,7 +240,7 @@ class AttachmentCache(AutoCache):
 				mid = message["id"]
 			except Exception as ex:
 				if resp is not None:
-					print(resp.content)
+					print(tasks, resp.text)
 				for task in tasks:
 					task[0].set_exception(ex)
 				continue
@@ -249,6 +250,7 @@ class AttachmentCache(AutoCache):
 				tasks.pop(0)[0].set_result(url)
 				if not tasks:
 					break
+			print(tasks, resp.text)
 			for task in tasks:
 				task[0].set_exception(ConnectionError(404, "Missing attachment embed!"))
 		self.fut = None
@@ -294,7 +296,7 @@ class AttachmentCache(AutoCache):
 		if not m_id and not fn:
 			raise LookupError("Insufficient information to retrieve attachment.")
 		heads = self.headers if c_id not in self.channels else self.alt_headers
-		if fn and (not m_id or random.randint(0, 1)):
+		if fn and a_id and (not m_id or random.randint(0, 1)):
 			url = f"https://cdn.discordapp.com/attachments/{c_id}/{a_id}/{fn}"
 			data = await retrieve_api(
 				"attachments/refresh-urls",
@@ -344,7 +346,7 @@ class AttachmentCache(AutoCache):
 	async def obtain(self, c_id=None, m_id=None, a_id=None, fn=None, url=None, priority=False):
 		if url:
 			url = self.store(url)
-			c_id, m_id, a_id, fn = split_url(url, m_id)
+			c_id, m_id, a_id, fn = expand_attachment(url) if is_miza_attachment(url) else split_url(url, m_id)
 		if isinstance(c_id, str) and not c_id.isnumeric():
 			c_id = int.from_bytes(b64(c_id), "big")
 			m_id = int.from_bytes(b64(m_id), "big")

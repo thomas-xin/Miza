@@ -201,7 +201,7 @@ class EndpointRedirects(Dispatcher):
 		if first == "unban":
 			banned_ips.pop(ip, None)
 		elif first in (".git", ".env", ".aws", "admin", "private", "internal", "administrator") or ip in banned_ips:
-			if ip not in banned_ips:
+			if ip not in banned_ips and ip != T(server).get("ip", "127.0.0.1"):
 				banned_ips[ip] = True
 				print("Banned IP:", ip)
 			return super().__call__("/rickroll")
