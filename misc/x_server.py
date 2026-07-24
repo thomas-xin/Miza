@@ -190,6 +190,8 @@ def get_size_mime(head, tail, count, chunksize):
 	return mimetype, size, lastsize
 
 banned_ips = AutoCache(f"{CACHE_PATH}/banned_ips", shards=1, stale=0, timeout=86400 * 7)
+for ip in AUTH.get("remote_servers", ()):
+	banned_ips[ip] = False
 
 class EndpointRedirects(Dispatcher):
 
@@ -200,18 +202,15 @@ class EndpointRedirects(Dispatcher):
 		first = p.split("/", 1)[0]
 		if first == "unban":
 			banned_ips.pop(ip, None)
-		elif first in (".git", ".env", ".aws", "admin", "private", "internal", "administrator") or ip in banned_ips:
-			if ip not in banned_ips and ip != T(server).get("ip", "127.0.0.1"):
+		elif first in (".aws", ".docker", ".env", ".git", ".gradle", "actuator", "admin", "administrator", "cgi-bin", "internal", "private", "sdk") or banned_ips.get(ip):
+			if ip not in banned_ips:
 				banned_ips[ip] = True
 				print("Banned IP:", ip)
 			return super().__call__("/rickroll")
-		while p:
-			if p == "ip":
-				p = "get_ip"
-			elif first in ("f", "d"):
-				p = "download/" + p.split("/", 1)[-1]
-			else:
-				break
+		elif p == "ip":
+			p = "get_ip"
+		elif first in ("f", "d"):
+			p = "download/" + p.split("/", 1)[-1]
 		p = "/" + p
 		return super().__call__(p)
 
@@ -313,8 +312,7 @@ SHEADERS.update(HEADERS)
 
 
 def fetch_static(path):
-	while path.startswith("../"):
-		path = path[3:]
+	path = path.replace("\\", "/").replace("../", "./")
 	fn = "misc/web/" + path.lstrip("/")
 	for exists in (fn, fn + ".zip", fn + ".html"):
 		if os.path.exists(exists):
@@ -939,13 +937,13 @@ class Server:
 		return self.serve_binary(data)
 
 	ip_sem = Semaphore(1, 0, rate_limit=150)
-
 	def get_ip_ex(self):
 		with suppress(SemaphoreOverflowError):
 			with self.ip_sem:
 				resp = Request("https://api.ipify.org", bypass=False, decode=True)
 				if resp:
 					self.ip = resp
+				banned_ips[self.ip] = False
 				return resp
 
 	@cp.expose

@@ -169,13 +169,12 @@ class AttachmentCache(AutoCache):
 		while self.queue:
 			tasks, self.queue = self.queue[:ec], self.queue[ec:]
 			urls = [task[1].split("?url=", 1)[-1].replace("?", "&").replace("%", "&").split("&", 1)[0] for task in tasks]
-			heads = self.headers
 			data = None
 			try:
 				data = Request(
 					f"https://discord.com/api/{api}/attachments/refresh-urls",
 					method="POST",
-					headers=heads,
+					headers=self.alt_headers,
 					data=orjson.dumps(dict(
 						attachment_urls=urls,
 					)),
@@ -193,7 +192,8 @@ class AttachmentCache(AutoCache):
 				for task in tasks:
 					task[0].set_exception(ex)
 				continue
-			print(urls, data)
+			if tasks:
+				print(urls, data)
 			for task in tasks:
 				task[0].set_exception(ConnectionError(404, "Missing attachment refresh!"))
 
@@ -301,7 +301,7 @@ class AttachmentCache(AutoCache):
 			data = await retrieve_api(
 				"attachments/refresh-urls",
 				method="POST",
-				headers=self.alt_headers,
+				headers=self.headers,
 				data=orjson.dumps(dict(
 					attachment_urls=[url],
 				)),
