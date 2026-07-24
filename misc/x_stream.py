@@ -5,6 +5,7 @@ import io
 import json
 import logging
 import os
+from pathlib import Path
 import time
 from traceback import print_exc
 from typing import Optional, AsyncIterator
@@ -714,6 +715,7 @@ async def catch_all(path: str, request: Request):
 	if p in ("commands", "atlas", "mizatlas"):
 		return FileResponse("misc/web/commands.html", media_type="text/html")
 	if first == "assets":
+		p = Path("misc/web", p).resolve().relative_to(os.path.abspath("misc/web"))
 		return FileResponse(f"misc/web/{p}")
 	if first in alias:
 		return await static_backend(p, request=request)

@@ -6358,7 +6358,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		futs = []
 		fut = None
 		if self.server:
-			fut = self.server.asubmit("list(banned_ips)")
+			fut = self.server.asubmit("list(filter(bool,banned_ips))")
 		if AUTH.get("ssl_generator"):
 			await _run_async(subprocess.run, AUTH["ssl_generator"])
 		key = AUTH.get("discord_secret") or ""

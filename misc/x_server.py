@@ -7,6 +7,7 @@ import itertools
 import json
 import logging
 import os
+from pathlib import Path
 import random
 import shutil
 import socket
@@ -313,7 +314,7 @@ SHEADERS.update(HEADERS)
 
 
 def fetch_static(path):
-	path = path.replace("\\", "/").replace("../", "./")
+	path = Path("misc/web", path).resolve().relative_to(os.path.abspath("misc/web"))
 	fn = "misc/web/" + path.lstrip("/")
 	for exists in (fn, fn + ".zip", fn + ".html"):
 		if os.path.exists(exists):
