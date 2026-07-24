@@ -15,6 +15,7 @@ import aiohttp
 import niquests
 import numpy as np
 from PIL import Image
+import orjson
 import psutil
 import requests
 import streamshatter
@@ -22,7 +23,7 @@ from misc.types import utc, as_str, byte_like, cdict, fcdict
 from misc.asyncs import _run_async, run_async, submit_thread, wrap_future, await_fut, Future
 from misc.smath import get_closest_heart
 from misc.util import (
-    CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, read_file_a, download_file, header_test, getsize,
+    CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, read_file_a, download_file, header_test, getsize, retrieve_api,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist, shorten_chunks, expand_chunks, url2fn,
 	ungroup_attachments, is_discord_url, is_miza_attachment, temporary_file, url2ext, is_discord_attachment, is_miza_url,
     snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt, VISUAL_FORMS,
@@ -163,15 +164,47 @@ class AttachmentCache(AutoCache):
 	def last(self, value):
 		self["__last__"] = value
 
+	async def a_update_queue(self):
+		ec = 50
+		while self.queue:
+			tasks, self.queue = self.queue[:ec], self.queue[ec:]
+			urls = [task[1].split("?url=", 1)[-1].replace("?", "&").replace("%", "&").split("&", 1)[0] for task in tasks]
+			heads = self.alt_headers if random.randint(0, 1) else self.headers
+			data = None
+			try:
+				data = await retrieve_api(
+					"attachments/refresh-urls",
+					method="POST",
+					headers=heads,
+					data=orjson.dumps(dict(
+						attachment_urls=urls,
+					)),
+				)
+				for item in data.get("refreshed_urls", ()):
+					url = item["refreshed"].rstrip("&")
+					tasks.pop(0)[0].set_result(url)
+					if not tasks:
+						break
+			except Exception as ex:
+				if data is not None:
+					print(data)
+				for task in tasks:
+					task[0].set_exception(ex)
+				continue
+			for task in tasks:
+				task[0].set_exception(ConnectionError(404, "Missing attachment embed!"))
+
 	@tracebacksuppressor
 	def update_queue(self):
+		with tracebacksuppressor:
+			await_fut(self.a_update_queue())
 		ec = self.embed_count
+		n = 0
 		while self.queue:
 			tasks, self.queue = self.queue[:ec], self.queue[ec:]
 			urls = [task[1].split("?url=", 1)[-1].replace("?", "&").replace("%", "&").split("&", 1)[0] for task in tasks]
 			embeds = [dict(image=dict(url=url)) for url in urls]
 			last = self.last
-			n = 0
 			resp = None
 			try:
 				if last:
@@ -256,15 +289,27 @@ class AttachmentCache(AutoCache):
 			return url
 		return shorten_attachment(self.store(url), mid, minimise=minimise)
 
-	async def get_direct(self, c_id, m_id, a_id=None):
-		if not m_id:
+	async def get_direct(self, c_id, m_id, a_id=None, fn=None):
+		if not m_id and not fn:
 			raise LookupError("Insufficient information to retrieve attachment.")
 		heads = self.headers if c_id not in self.channels else self.alt_headers
-		data = await Request.aio(
-			f"https://discord.com/api/{api}/channels/{c_id}/messages/{m_id}",
+		if fn:
+			url = f"https://cdn.discordapp.com/attachments/{c_id}/{a_id}/{fn}"
+			data = await retrieve_api(
+				"attachments/refresh-urls",
+				method="POST",
+				headers=heads,
+				data=orjson.dumps(dict(
+					attachment_urls=[url],
+				)),
+			)
+			try:
+				return data["refreshed_urls"][0]["refreshed"]
+			except LookupError:
+				pass
+		data = await retrieve_api(
+			f"channels/{c_id}/messages/{m_id}",
 			headers=heads,
-			bypass=False,
-			json=True,
 		)
 		for i, a in enumerate(data["attachments"]):
 			if a_id in (None, m_id, i, int(a["id"])):
@@ -274,9 +319,7 @@ class AttachmentCache(AutoCache):
 	async def get_attachment(self, c_id, m_id, a_id, fn, priority=False):
 		ac = self.attachment_count
 		if not self.channels or not fn or a_id < ac:
-			if not m_id:
-				raise LookupError("Insufficient information to retrieve attachment.")
-			return await self.get_direct(c_id, m_id, a_id)
+			return await self.get_direct(c_id, m_id, a_id, fn)
 		fut = Future()
 		url, _ = merge_url(c_id, m_id, a_id, fn)
 		task = [fut, url]
@@ -285,7 +328,7 @@ class AttachmentCache(AutoCache):
 			self.fut = self.exc.submit(self.update_queue)
 		if priority and m_id:
 			try:
-				return await self.get_direct(c_id, m_id, a_id)
+				return await self.get_direct(c_id, m_id, a_id, fn)
 			except ConnectionError:
 				pass
 		try:
@@ -295,7 +338,7 @@ class AttachmentCache(AutoCache):
 				if self.fut is None or self.fut.done() or len(self.queue) > ac:
 					self.fut = self.exc.submit(self.update_queue)
 				return await asyncio.wait_for(wrap_future(fut), timeout=8)
-		return await self.get_direct(c_id, m_id, a_id)
+		return await self.get_direct(c_id, m_id, a_id, fn)
 
 	async def obtain(self, c_id=None, m_id=None, a_id=None, fn=None, url=None, priority=False):
 		if url:
@@ -325,11 +368,9 @@ class AttachmentCache(AutoCache):
 		size_mb, c_id, m_ids = ungroup_attachments(path)
 		urls = []
 		for m_id in m_ids:
-			data = await Request.aio(
-				f"https://discord.com/api/{api}/channels/{c_id}/messages/{m_id}",
+			data = await retrieve_api(
+				f"channels/{c_id}/messages/{m_id}",
 				headers=self.headers,
-				bypass=False,
-				json=True,
 			)
 			if data.get("attachments"):
 				for a in data["attachments"]:

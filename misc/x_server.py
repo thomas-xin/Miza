@@ -197,7 +197,10 @@ class EndpointRedirects(Dispatcher):
 		p = path.lstrip("/")
 		ip = true_ip()
 		print(json.dumps(p))
-		if p.split("/", 1)[0] in (".git", ".env", "admin", "private", "internal", "administrator") or ip in banned_ips:
+		first = p.split("/", 1)[0]
+		if first == "unban":
+			banned_ips.pop(ip, None)
+		elif first in (".git", ".env", ".aws", "admin", "private", "internal", "administrator") or ip in banned_ips:
 			if ip not in banned_ips:
 				banned_ips[ip] = True
 				print("Banned IP:", ip)
@@ -205,7 +208,7 @@ class EndpointRedirects(Dispatcher):
 		while p:
 			if p == "ip":
 				p = "get_ip"
-			elif p.split("/", 1)[0] in ("f", "d"):
+			elif first in ("f", "d"):
 				p = "download/" + p.split("/", 1)[-1]
 			else:
 				break
