@@ -169,7 +169,7 @@ class AttachmentCache(AutoCache):
 		while self.queue:
 			tasks, self.queue = self.queue[:ec], self.queue[ec:]
 			urls = [task[1].split("?url=", 1)[-1].replace("?", "&").replace("%", "&").split("&", 1)[0] for task in tasks]
-			heads = self.alt_headers if random.randint(0, 1) else self.headers
+			heads = self.headers
 			data = None
 			try:
 				data = Request(
@@ -188,11 +188,11 @@ class AttachmentCache(AutoCache):
 						break
 			except Exception as ex:
 				if data is not None:
-					print(tasks, data)
+					print(urls, data)
 				for task in tasks:
 					task[0].set_exception(ex)
 				continue
-			print(tasks, data)
+			print(urls, data)
 			for task in tasks:
 				task[0].set_exception(ConnectionError(404, "Missing attachment refresh!"))
 
@@ -295,13 +295,12 @@ class AttachmentCache(AutoCache):
 	async def get_direct(self, c_id, m_id, a_id=None, fn=None):
 		if not m_id and not fn:
 			raise LookupError("Insufficient information to retrieve attachment.")
-		heads = self.headers if c_id not in self.channels else self.alt_headers
 		if fn and a_id and (not m_id or random.randint(0, 1)):
 			url = f"https://cdn.discordapp.com/attachments/{c_id}/{a_id}/{fn}"
 			data = await retrieve_api(
 				"attachments/refresh-urls",
 				method="POST",
-				headers=heads,
+				headers=self.alt_headers,
 				data=orjson.dumps(dict(
 					attachment_urls=[url],
 				)),
@@ -309,7 +308,9 @@ class AttachmentCache(AutoCache):
 			try:
 				return data["refreshed_urls"][0]["refreshed"]
 			except LookupError:
+				print(url, data)
 				pass
+		heads = self.headers if c_id not in self.channels else self.alt_headers
 		data = await retrieve_api(
 			f"channels/{c_id}/messages/{m_id}",
 			headers=heads,
