@@ -89,7 +89,6 @@ class Server:
 	session = niquests.Session()
 	asession = niquests.AsyncSession()
 	statics = AutoCache(directory=f"{CACHE_PATH}/statics", stale=300, timeout=86400 * 30)
-	dynamics = diskcache.Cache(directory=f"{CACHE_PATH}/dynamics", expiry=86400 * 30)
 
 	async def dyn_serve(
 		self,

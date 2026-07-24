@@ -6357,8 +6357,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def worker_heartbeat(self):
 		futs = []
 		fut = None
+		banned_ips = []
 		if self.server:
-			fut = self.server.asubmit("list(filter(bool,banned_ips))")
+			fut = self.server.asubmit("[k for k, v in banned_ips.items() if v]")
 		if AUTH.get("ssl_generator"):
 			await _run_async(subprocess.run, AUTH["ssl_generator"])
 		key = AUTH.get("discord_secret") or ""
@@ -6370,7 +6371,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			async with aiofiles.open(PRIVATE_KEY, "r") as f:
 				pk = await f.read()
 		ac = {str(k): v for k, v in attachment_cache.items() if isinstance(k, int) and v and not discord_expired(v)}
-		banned_ips = await fut
+		if self.server:
+			banned_ips = await fut
 		for addr in AUTH.get("remote_servers", ()):
 			token = AUTH.get("alt_token") or self.token
 			channels = [k for k, v in self.data.exec.items() if v & 16] if "exec" in self.data else None
@@ -6382,7 +6384,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				alt_token=AUTH.get("alt_token") or self.token,
 				attachment_cache=ac,
 				banned_ips=banned_ips,
-			)))
+			)), mode="lzma")
 			encoded = base64.b64encode(encrypt(data)).rstrip(b"=").decode("ascii")
 			async def external_heartbeat():
 				if not Request.sessions:

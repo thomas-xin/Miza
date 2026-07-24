@@ -2058,11 +2058,12 @@ def zip2bytes(data):
 	with zipfile.ZipFile(data, allowZip64=True, strict_timestamps=False) as z:
 		return z.read(z.namelist()[0])
 
-def bytes2zip(data, heavy=True):
-	if zstd:
-		return b"+" + zstd.compress(data, level=6)
-	if heavy:
-		return b"~" + lzma.compress(data)
+def bytes2zip(data, mode="zstd"):
+	match mode:
+		case "zstd":
+			return b"+" + zstd.compress(data, level=6)
+		case "lzma":
+			return b"~" + lzma.compress(data)
 	return b"!" + zlib.compress(data)
 
 def eval_json(s):
@@ -2148,7 +2149,7 @@ def select_and_dumps(data, safe=True, compress=True):
 	if not safe:
 		s = pickle.dumps(data)
 		if len(s) > 32768 and compress:
-			t = bytes2zip(s, heavy=len(s) > 16777216)
+			t = bytes2zip(s)
 			if len(t) < len(s) * 0.9:
 				s = t
 		return s
@@ -2157,7 +2158,7 @@ def select_and_dumps(data, safe=True, compress=True):
 	except (TypeError, orjson.JSONEncodeError):
 		s = None
 	if len(s) > 262144:
-		t = bytes2zip(s, heavy=False)
+		t = bytes2zip(s)
 		if len(t) < len(s) * 0.9:
 			s = t
 	return s
