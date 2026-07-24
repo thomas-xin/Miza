@@ -180,6 +180,7 @@ class AttachmentCache(AutoCache):
 						attachment_urls=urls,
 					)),
 					json=True,
+					bypass=False,
 				)
 				for item in data.get("refreshed_urls", ()):
 					url = item["refreshed"].rstrip("&")
