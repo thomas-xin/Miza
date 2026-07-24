@@ -1,5 +1,6 @@
 User-agent: *
 Disallow: /private/
 Disallow: /upload/
+Disallow: /admin/
 Crawl-delay: 5
 Content-Signal: ai-train=no, search=yes, ai-input=yes

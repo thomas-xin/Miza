@@ -315,7 +315,7 @@ SHEADERS.update(HEADERS)
 
 def fetch_static(path):
 	path = Path("misc/web", path).resolve().relative_to(os.path.abspath("misc/web"))
-	fn = "misc/web/" + path.lstrip("/")
+	fn = f"misc/web/{path}"
 	for exists in (fn, fn + ".zip", fn + ".html"):
 		if os.path.exists(exists):
 			break
