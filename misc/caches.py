@@ -179,6 +179,7 @@ class AttachmentCache(AutoCache):
 					data=orjson.dumps(dict(
 						attachment_urls=urls,
 					)),
+					json=True,
 				)
 				for item in data.get("refreshed_urls", ()):
 					url = item["refreshed"].rstrip("&")
