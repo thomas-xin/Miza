@@ -5453,13 +5453,14 @@ async def retrieve_api(path, method="GET", headers={}, data=None):
 		if resp.status_code in (202, 429, 500, 502, 503):
 			try:
 				msg = resp.json()
-			except Exception:
+			except Exception as ex:
+				print(path, repr(ex), delay)
 				await asyncio.sleep(delay)
 			else:
+				d = delay
 				if isinstance(msg, dict) and "message" in msg and "retry_after" in msg:
-					await asyncio.sleep(float(msg["retry_after"]) + delay / 6)
-				else:
-					await asyncio.sleep(delay)
+					d = float(msg["retry_after"]) + delay / 6
+				print(path, msg, d)
 			try:
 				resp.raise_for_status()
 			except Exception as ex:

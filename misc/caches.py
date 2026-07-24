@@ -164,7 +164,7 @@ class AttachmentCache(AutoCache):
 	def last(self, value):
 		self["__last__"] = value
 
-	async def a_update_queue(self):
+	def _update_queue(self):
 		ec = 50
 		while self.queue:
 			tasks, self.queue = self.queue[:ec], self.queue[ec:]
@@ -172,8 +172,8 @@ class AttachmentCache(AutoCache):
 			heads = self.alt_headers if random.randint(0, 1) else self.headers
 			data = None
 			try:
-				data = await retrieve_api(
-					"attachments/refresh-urls",
+				data = Request(
+					f"https://discord.com/api/{api}/attachments/refresh-urls",
 					method="POST",
 					headers=heads,
 					data=orjson.dumps(dict(
@@ -197,7 +197,7 @@ class AttachmentCache(AutoCache):
 	@tracebacksuppressor
 	def update_queue(self):
 		with tracebacksuppressor:
-			await_fut(self.a_update_queue())
+			self._update_queue()
 		ec = self.embed_count
 		n = 0
 		while self.queue:
