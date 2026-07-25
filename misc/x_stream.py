@@ -22,7 +22,7 @@ from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment, discord_expired,
 	merge_url, is_discord_attachment, url2fn, url2ext, getsize, mime_from_file, zip2bytes,
 	Request as RequestManager, DOMAIN_CERT, PRIVATE_KEY, update_headers, is_local_url,
-	AutoCache, CACHE_PATH, VISUAL_FORMS, IMAGE_FORMS, RNGFile, create_etag,
+	AutoCache, CACHE_PATH, VISUAL_FORMS, IMAGE_FORMS, RNGFile, create_etag, banned_paths,
 )
 from .caches import attachment_cache, colour_cache
 
@@ -681,7 +681,6 @@ async def static_backend(path: str, request: Request):
 	return Response(content=content, headers=headers, status_code=status_code)
 
 
-banned_paths = (".aws", ".docker", ".env", ".git", ".gradle", "actuator", "admin", "administrator", "cgi-bin", "internal", "private", "sdk")
 banned_ips = []
 
 alias = tuple([fn.split("/", 1)[0].rsplit(".", 1)[0] for fn in os.listdir("misc/web")])
@@ -714,7 +713,7 @@ async def catch_all(path: str, request: Request):
 	if p in ("commands", "atlas", "mizatlas"):
 		return FileResponse("misc/web/commands.html", media_type="text/html")
 	if first == "assets":
-		p = Path("misc/web", p).resolve().relative_to(os.path.abspath("misc/web"))
+		p = Path("misc/web", p.lstrip("/")).resolve().relative_to(os.path.abspath("misc/web"))
 		return FileResponse(f"misc/web/{p}")
 	if first in alias:
 		return await static_backend(p, request=request)

@@ -832,6 +832,10 @@ section.links {
 	}
 }
 
+.root {
+	display: none;
+}
+
 #star-container {
 	width: 100%;
 	height: 100%;

@@ -29,7 +29,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, submit_thread, create_thread, create_task, await_fut
 from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
-from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag, preview_url, is_local_url
+from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag, preview_url, is_local_url, banned_paths
 from .caches import attachment_cache, colour_cache, minimise_url
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -193,7 +193,6 @@ def get_size_mime(head, tail, count, chunksize):
 banned_ips = AutoCache(f"{CACHE_PATH}/banned_ips", shards=1, stale=0, timeout=86400 * 7)
 for ip in AUTH.get("remote_servers", ()):
 	banned_ips[ip] = False
-banned_paths = (".aws", ".docker", ".env", ".git", ".gradle", "actuator", "admin", "administrator", "cgi-bin", "internal", "private", "sdk")
 
 class EndpointRedirects(Dispatcher):
 
@@ -314,7 +313,7 @@ SHEADERS.update(HEADERS)
 
 
 def fetch_static(path):
-	path = Path("misc/web", path).resolve().relative_to(os.path.abspath("misc/web"))
+	path = Path("misc/web", path.lstrip("/")).resolve().relative_to(os.path.abspath("misc/web"))
 	fn = f"misc/web/{path}"
 	for exists in (fn, fn + ".zip", fn + ".html"):
 		if os.path.exists(exists):
