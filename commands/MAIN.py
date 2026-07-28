@@ -129,7 +129,7 @@ class Help(Interactable, Command):
 				"Yo! Use the menu below to select from my command list!",
 				f"Alternatively, visit [`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\n",
 				"**Command help information**:",
-				f"- All commands may be run via prefix, such as `{prefix}help`. Most are also accessible through slash commands; i.e. `/help.`",
+				f"- All commands may be run via prefix, such as `{bot.get_prefix(guild)}help`. Most are also accessible through slash commands; i.e. `/help.`",
 				"- Inputs are documented as `<name:type>`, where *name* represents the argument's name, and *type* represents expected [data type](<https://wikipedia.org/wiki/Data_type>). Where possible, commands are interpreted case-insensitive.",
 				"- Commands automatically infer by *type* where possible, with *name* keywords for disambiguation if necessary; input order only matters if two or more match the same data type.",
 				"- See the [wiki page](https://github.com/thomas-xin/Miza/wiki/Command-Inputs) for more information on how the input systems work!",

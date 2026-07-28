@@ -1017,19 +1017,24 @@ class Server:
 		if ctype.startswith("audio/"):
 
 			def preview_audio(url):
-				if not self.ydl:
-					self.ydl = globals()["ytdl"]
-				entry = self.ydl.search(url)[0]
-				fn2, _cdc, _dur, _ac = self.ydl.get_audio(entry, fmt="webm")
-				if is_url(fn2):
-					return await_fut(attachment_cache.download(fn2, max_size=1073741824 * 16))
-				with open(fn2, "rb") as f:
-					return f.read()
+				try:
+					if not self.ydl:
+						self.ydl = globals()["ytdl"]
+					entry = self.ydl.search(url)[0]
+					fn2, _cdc, _dur, _ac = self.ydl.get_audio(entry, fmt="webm")
+					if is_url(fn2):
+						return await_fut(attachment_cache.download(fn2, max_size=1073741824 * 16))
+					with open(fn2, "rb") as f:
+						return f.read()
+				except Exception:
+					print_exc()
+					raise
 
 			return self.serve_predetermined(
 				self.preview_cache,
 				url,
 				preview_audio,
+				url,
 				content_type="video/webm",
 			)
 		return self.proxy_if(url, force=False, download=False)

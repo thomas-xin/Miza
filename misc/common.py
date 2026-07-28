@@ -2146,6 +2146,9 @@ class Interactable:
 				pos = last
 		return pos
 
+	def react_perms(self, perm: int):
+		return False
+
 
 class Pagination:
 	schema = None

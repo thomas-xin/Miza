@@ -644,10 +644,10 @@ class AudioPlayer(discord.AudioSource):
 	updating_activity = None
 	def update_activity(self):
 		"""Updates whether there are people listening; timeout after 6 minutes of inactivity."""
-		if self.updating_activity:
-			self.updating_activity.cancel()
-			self.updating_activity = None
 		if self.settings.stay:
+			if self.updating_activity:
+				self.updating_activity.cancel()
+				self.updating_activity = None
 			return
 		if not self.vc and not self.fut.done():
 			return
@@ -663,9 +663,13 @@ class AudioPlayer(discord.AudioSource):
 			# Handle special case of only deafened users; they are not counted as listeners but will still keep the bot in the channel, paused instead
 			listeners = sum(not m.bot and bool(m.voice) and not (m.voice.deaf or m.voice.self_deaf) for m in self.vcc.members)
 			if listeners == 0:
-				self.updating_activity = create_task(self._updating_activity())
+				if not self.updating_activity:
+					self.updating_activity = create_task(self._updating_activity())
 			elif not self.settings.pause:
 				self.resume()
+			elif self.updating_activity:
+				self.updating_activity.cancel()
+				self.updating_activity = None
 	async def _updating_activity(self):
 		self.pause()
 		await asyncio.sleep(360)
@@ -680,10 +684,10 @@ class AudioPlayer(discord.AudioSource):
 	updating_streaming = None
 	def update_streaming(self):
 		"""Updates whether we're streaming audio; timeout after 16 minutes of inactivity."""
-		if self.updating_streaming:
-			self.updating_streaming.cancel()
-			self.updating_streaming = None
 		if self.settings.stay:
+			if self.updating_streaming:
+				self.updating_streaming.cancel()
+				self.updating_streaming = None
 			return
 		if not self.vc and not self.fut.done():
 			return
@@ -695,7 +699,11 @@ class AudioPlayer(discord.AudioSource):
 			print_exc()
 			connected = False
 		if len(self.queue) == 0 and connected:
-			self.updating_streaming = create_task(self._updating_streaming())
+			if not self.updating_streaming:
+				self.updating_streaming = create_task(self._updating_streaming())
+		elif self.updating_streaming:
+			self.updating_streaming.cancel()
+			self.updating_streaming = None
 	async def _updating_streaming(self):
 		await asyncio.sleep(960)
 		if self is not self.players.get(self.vcc.guild.id):
@@ -886,10 +894,8 @@ class AudioPlayer(discord.AudioSource):
 				self.vc.pause()
 			if not self.ensuring or self.ensuring.done():
 				self.ensuring = submit_thread(self.ensure_next)
-		if not self.queue:
-			self.update_streaming()
-		else:
-			self.update_activity()
+		self.update_streaming()
+		self.update_activity()
 
 	ensuring = None
 	def ensure_next(self):

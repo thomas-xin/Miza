@@ -12,6 +12,7 @@ import fractions
 import functools
 import hashlib
 import html
+import http.client
 import io
 import itertools
 import json
@@ -5375,7 +5376,7 @@ def header_test(url, timeout=12):
 		except urllib.error.HTTPError as ex:
 			if ex.getcode() not in (400, 405):
 				raise ConnectionError(ex.getcode(), ex.msg)
-		except urllib.error.URLError:
+		except (urllib.error.URLError, http.client.InvalidURL):
 			pass
 		else:
 			resp.close()

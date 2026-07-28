@@ -1,4 +1,5 @@
 # Make linter shut up lol
+import bot
 if "common" not in globals():
 	import misc.common as common
 	from misc.common import *
@@ -378,9 +379,9 @@ class Ask(Command):
 			personality += f"\n\nThe current conversation takes place on Discord, where you have access to the following additional emojis. You may use these as desired, as an alternative to Unicode ones:\n{emojitexts}"
 		match pdata.history:
 			case "none":
-				personality += "\n\nConversation history disabled. Clarify if necessary (staff members may enable for all users using `~chatconfig --history shared`)."
+				personality += "\n\nConversation history currently disabled. Clarify if necessary."
 			case "private":
-				personality += "\n\nConversation history of external users disabled. Clarify if necessary (staff members may enable for all users using `~chatconfig --history shared`)."
+				personality += "\n\nConversation history of external users currently disabled. Clarify if necessary."
 		if "nsfw" in personality.casefold() or not _nsfw and bot.is_nsfw(_user):
 			pass
 		elif nsfw:
@@ -439,7 +440,7 @@ class Ask(Command):
 				messages[m.id] = message
 		await bot.require_integrity(_message)
 		print("ASK:", _channel.id, input_message)
-		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, model, nsfw, simulated)
+		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, model, nsfw, _prefix, simulated)
 		if pdata.stream and pdata.tts != "discord" and not simulated:
 			return cdict(
 				content=fut,
@@ -457,7 +458,7 @@ class Ask(Command):
 			return resp
 		raise RuntimeError(temp)
 
-	async def ask_iterator(self, bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, premium, _model, nsfw, simulated):
+	async def ask_iterator(self, bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, premium, _model, nsfw, prefix, simulated):
 		function_message = None
 		tool_responses = []
 		props = cdict(name=bot_name)
@@ -732,21 +733,23 @@ class Ask(Command):
 			desc = "-# " + "\n-# ".join(desc.splitlines())
 			response.content += "\n" + desc
 			print(">", desc)
-		if not xrand(20):
-			tips = [
-				"*Tip: By using generative AI, you are assumed to comply with the [ToS](<https://github.com/thomas-xin/Miza/wiki/Terms-of-Service>).*",
-				"*Tip: The chatbot feature is designed to incorporate multiple SOTA models in addition to internet-based interactions. For direct interaction with the raw LLMs, check out ~instruct.*",
-				"*Tip: My personality prompt and message streaming are among several parameters that may be modified. Check out ~help chatconfig for more info. Note that an improperly constructed prompt may be detrimental to response quality, and that giving me a nickname may also have an effect.*",
-				"*Tip: Remember that anything a chatbot says may be fictional or otherwise made-up. Always fact-check from reputable sources before making serious assumptions, and don't take the AI's words too seriously.*",
-				"*Tip: At any point in time, you can delete your command message to stop generation.*",
-			]
-			if premium.value < 3:
-				tips.append("*Tip: Many of my capabilities are not readily available due to cost reasons. You can gain access by donating through one of the premium subscriptions available, which serves to approximately fund individual usage.*")
-			if not nsfw:
-				tips.append("*Tip: I automatically try to correct inaccurate responses when possible. However, this is not foolproof; if you would like this feature more actively applied to counteract censorship, please move to a NSFW channel or use ~verify if in DMs.*")
-			if pdata.history != "shared":
-				tips.append("*Tip: For privacy reasons, conversation histories (allowing referencing previous messages in the same channel) is disabled by default. If you would like to enable this, use `~chatconfig --history private`, or `~chatconfig --history shared` if you would also like the bot to be able to read multi-user conversations. This enables me to read up to 192 previous messages from the current channel. No messages from other channels are included.*")
-			note = "-# " + choice(tips)
+		tips = [
+			"*Tip: By using generative AI, you are assumed to comply with the [ToS](<https://github.com/thomas-xin/Miza/wiki/Terms-of-Service>).*",
+			f"*Tip: The chatbot feature is designed to incorporate multiple SOTA models in addition to internet-based interactions. For direct interaction with the raw LLMs, check out {prefix}instruct.*",
+			f"*Tip: My personality prompt and message streaming are among several parameters that may be modified. Check out {prefix}help chatconfig for more info. Note that an improperly constructed prompt may be detrimental to response quality, and that giving me a nickname may also have an effect.*",
+			"*Tip: Remember that anything a chatbot says may be fictional or otherwise made-up. Always fact-check from reputable sources before making serious assumptions, and don't take the AI's words too seriously.*",
+			"*Tip: At any point in time, you may delete your command message to stop generation.*",
+		] if not xrand(10) else []
+		if premium.value < 3:
+			tips.insert(0, "*Tip: Many of my capabilities are not readily available due to cost reasons. You can gain access by donating through one of the premium subscriptions available, which serves to approximately fund individual usage.*")
+		if not nsfw:
+			tips.insert(0, f"*Tip: I automatically try to correct inaccurate responses when possible. However, this is not foolproof; if you would like this feature more actively applied to counteract censorship, please move to a NSFW channel or use {prefix}verify if in DMs.*")
+		if pdata.history != "shared":
+			tips.insert(0, f"*Tip: For privacy reasons, conversation histories (allowing referencing previous messages in the same channel) is disabled by default. If you would like to enable this, use `{prefix}chatconfig --history private`, or `{prefix}chatconfig --history shared` if you would also like the bot to be able to read multi-user conversations. This enables me to read up to 192 previous messages from the current channel. No messages from other channels are included.*")
+		already_used = bot.get_userbase(_channel.id, "ai_tips.chat", 0)
+		if already_used < len(tips):
+			note = "-# " + tips[already_used]
+			bot.add_userbase(_channel.id, "ai_tips.chat", 1)
 			embs.append(discord.Embed(
 				colour=rand_colour(),
 				description=note
