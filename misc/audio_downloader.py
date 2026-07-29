@@ -221,7 +221,7 @@ class AudioDownloader:
 		try:
 			resp = retrieval(url, self.run, f"extract_info({json_dumpstr(url)},download={download},process={process})")
 		except RuntimeError as ex:
-			if download or is_reddit_url(url) or is_klipy_url(url):
+			if download:
 				raise
 			print(repr(ex))
 			print("Retrying with remote...")

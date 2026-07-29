@@ -7637,6 +7637,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	sem_counters = {}
 	flatten_sems = collections.defaultdict(lambda: Semaphore(1, 10, rate_limit=2))
+	search_sem = Semaphore(6, 120, rate_limit=6)
 	async def flatten_into_cache(self, history, bucket):
 		sem = self.flatten_sems[bucket]
 		data = {}
@@ -7666,8 +7667,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				query += f"&{k}={v}"
 		bucket = str(guild_id)
 		sem = self.flatten_sems[bucket]
-		async with sem:
-			resp = await self.retrieve_api(f"{path}{query}")
+		async with self.search_sem:
+			async with sem:
+				resp = await self.retrieve_api(f"{path}{query}")
 		if "messages" not in resp:
 			print(resp)
 			raise KeyError("messages")

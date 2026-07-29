@@ -467,7 +467,7 @@ async def run(ctx):
 						path = f"guilds/{gid}/messages/search"
 						query = f"?include_nsfw=true&channel_id={cid}&limit=25&offset={offset}&max_id={Mid}&min_id={mid}&sort_by=timestamp&sort_order=asc"
 						query += "".join(f"&author_id={u}" for u in user_ids)
-						async with get_sem(gid):
+						async with get_sem(0):
 							resp = await retrieve_api_a(f"{path}{query}")
 						if not resp.get("messages"):
 							raise StopIteration
@@ -489,15 +489,16 @@ async def run(ctx):
 			else:
 				first = bool(gid)
 				while True:
-					async with get_sem(cid):
-						if first:
-							path = f"guilds/{gid}/messages/search"
-							query = f"?include_nsfw=true&channel_id={cid}&limit=25&offset=0&max_id={Mid}&min_id={mid}&sort_by=timestamp&sort_order=asc"
+					if first:
+						path = f"guilds/{gid}/messages/search"
+						query = f"?include_nsfw=true&channel_id={cid}&limit=25&offset=0&max_id={Mid}&min_id={mid}&sort_by=timestamp&sort_order=asc"
+						async with get_sem(0):
 							resp = await retrieve_api_a(f"{path}{query}")
-							first = False
-							progress[index][1] = resp["total_results"]
-							resp = resp["messages"]
-						else:
+						first = False
+						progress[index][1] = resp["total_results"]
+						resp = resp["messages"]
+					else:
+						async with get_sem(cid):
 							resp = await retrieve_api_a(
 								f"channels/{cid}/messages?limit=100&after={mid}",
 							)
