@@ -1,3 +1,5 @@
+import ast
+import inspect
 import io
 import json
 import os
@@ -5,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import textwrap
 import time
 from traceback import print_exc
 import urllib
@@ -15,6 +18,41 @@ import streamshatter
 from .util import is_url, temporary_file, CODEC_FFMPEG, CODEC_PIX
 from .caches import audio_meta
 import yt_dlp as ytd
+
+# Because yt-dlp didn't accept https://github.com/yt-dlp/yt-dlp/pull/12075
+func = ytd.extractor.reddit.RedditIE._real_extract
+src = textwrap.dedent(inspect.getsource(func))
+PATCH = """# Hosted on reddit as an image (most likely gif)
+if parsed_url.netloc == 'i.redd.it':
+	formats = [{
+		'url': video_url,
+		'acodec': 'none',
+		'ext': video_url.rsplit('.', 1)[-1],
+		'format_id': video_url.rsplit('.', 1)[-1],
+		# Must GET only accepting raw file content
+		'http_headers': {'Accept': 'video/*,image/*'},
+	}]
+	return {
+		**info,
+		'id': parsed_url.path.split('/')[1],
+		'display_id': video_id,
+		'formats': formats,
+	}"""
+
+src = textwrap.dedent(inspect.getsource(func))
+fdef = ast.parse(src).body[0]
+fdef.decorator_list = []
+idx = tuple(
+	i for i, s in reversed(tuple(enumerate(fdef.body)))
+	if isinstance(s, ast.Return)
+)[-1]
+stmt = ast.parse(PATCH).body[0]
+fdef.body.insert(idx, stmt)
+
+ast.fix_missing_locations(fdef)
+module_code = compile(ast.Module(body=[fdef], type_ignores=[]), "<patched>", "exec")
+new_code = next(c for c in module_code.co_consts if isinstance(c, type(func.__code__)) and c.co_name == func.__name__)
+func.__code__ = new_code
 
 cms = {}
 

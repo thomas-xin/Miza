@@ -970,8 +970,9 @@ class UpdateMessageCache(Database):
 	no_file = True
 	checked = set()
 	loader = FileHashDict(path=f"{CACHE_PATH}/message_cache_loader")
+	loading = None
 
-	async def load_messages(self, channel, duration=14 * 86400):
+	async def load_channel(self, channel, duration=60):
 		if channel.id in self.checked:
 			return
 		bot = self.bot
@@ -980,22 +981,65 @@ class UpdateMessageCache(Database):
 			pass
 		else:
 			return
-		self.checked.add(channel.id)
-		m_id = self.loader.get(channel.id, 0)
-		last = max(
-			time_snowflake(datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(seconds=duration)),
-			m_id,
-		)
-		async with bot.guild_semaphore:
-			messages = []
-			async for message in channel.history(after=last, limit=None, oldest_first=True):
-				messages.append(message)
-		if messages:
-			await _run_async(self.store_messages, map(self.serialise_message, messages))
-			self.loader[channel.id] = message.id
+		with tracebacksuppressor:
+			self.checked.add(channel.id)
+			m_id = self.loader.get(channel.id, 0)
+			last = max(
+				time_snowflake(dtnu() - datetime.timedelta(seconds=duration)),
+				m_id,
+			)
+			async with bot.guild_semaphore:
+				messages = []
+				async for message in channel.history(after=last, limit=None, oldest_first=True):
+					messages.append(message)
+			curr_id = current_snowflake()
+			if messages:
+				print(f"C{channel.id}: Stored {len(messages)}")
+				await _run_async(self.save_messages, messages)
+		self.loader[channel.id] = curr_id
 
-	async def _send_(self, message, **void):
-		return await self.load_messages(message.channel)
+	async def load_guild(self, guild, duration=60):
+		if guild.id in self.checked:
+			return
+		bot = self.bot
+		if bot.permissions_in(guild).read_messages and bot.permissions_in(guild).read_message_history:
+			pass
+		else:
+			return
+		with tracebacksuppressor:
+			self.checked.add(guild.id)
+			channels = list(guild.text_channels) + list(guild.voice_channels) + list(guild.threads)
+			m_id = min((self.loader.get(c.id, 0) for c in channels), default=0)
+			last = max(
+				time_snowflake(dtnu() - datetime.timedelta(seconds=duration)),
+				m_id,
+			)
+			lim = 250
+			softlim = 25
+			messages, extra = await bot.flatten_search(guild_id=guild.id, min_id=last + 1, limit=lim, break_after=softlim, return_extra=True, sort_order="asc")
+			curr_id = current_snowflake()
+			if messages:
+				await _run_async(self.save_messages, messages)
+				p = "+" if extra else ""
+				print(f"G{guild.id}: Stored {len(messages)}{p}")
+			if extra:
+				duration = min(duration, (dtnu() - messages[-1].created_at).total_seconds())
+				await gather(*(self.load_channel(c, duration=duration) for c in channels), max_concurrency=20)
+			else:
+				for channel in channels:
+					self.loader[channel.id] = curr_id
+
+	async def load_all(self, duration=14 * 86400):
+		await gather(*(self.load_guild(guild, duration=duration) for guild in self.bot.guilds), return_exceptions=True, max_concurrency=10)
+
+	def _bot_ready_(self, **void):
+		if self.loading:
+			self.loading.cancel()
+		self.loading = create_task(self.load_all())
+
+	def _destroy_(self, **void):
+		if self.loading:
+			self.loading.cancel()
 
 	@staticmethod
 	def serialise_message(message):
@@ -1105,6 +1149,9 @@ class UpdateMessageCache(Database):
 
 	def save_message(self, message):
 		return self.store_message(self.serialise_message(message))
+
+	def save_messages(self, messages):
+		return self.store_messages(map(self.serialise_message, messages))
 
 	@staticmethod
 	def get_group(m_id):

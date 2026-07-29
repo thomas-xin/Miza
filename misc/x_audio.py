@@ -26,7 +26,7 @@ from .util import (
 	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, colourise_auto, maybe_json, select_and_loads,
 	is_url, unyt, equiv_url, url2fn, CachingTeeFile,
-	get_ext, rename, uhash, expired, is_youtube_stream, b64,  # noqa: F401
+	get_ext, rename, uhash, expired, is_youtube_stream, b64,
 )
 from .caches import audio_meta
 from .audio_downloader import AudioDownloader
@@ -147,6 +147,8 @@ class AudioPlayer(discord.AudioSource):
 		self.refresh()
 		cls.waiting[gid] = Future()
 		cls.futs[gid] = create_task(self.join_into(vcc, announce=announce))
+		self.update_streaming()
+		self.update_activity()
 		return self
 
 	async def join_into(self, vcc, announce=0):
@@ -641,13 +643,12 @@ class AudioPlayer(discord.AudioSource):
 			submit_thread(self.ensure_play, 2)
 		return list(self.queue)
 
-	updating_activity = None
+	updating_activity = asyncio.Future()
+	updating_activity.set_result(None)
 	def update_activity(self):
 		"""Updates whether there are people listening; timeout after 6 minutes of inactivity."""
 		if self.settings.stay:
-			if self.updating_activity:
-				self.updating_activity.cancel()
-				self.updating_activity = None
+			self.updating_activity.cancel()
 			return
 		if not self.vc and not self.fut.done():
 			return
@@ -663,13 +664,12 @@ class AudioPlayer(discord.AudioSource):
 			# Handle special case of only deafened users; they are not counted as listeners but will still keep the bot in the channel, paused instead
 			listeners = sum(not m.bot and bool(m.voice) and not (m.voice.deaf or m.voice.self_deaf) for m in self.vcc.members)
 			if listeners == 0:
-				if not self.updating_activity:
-					self.updating_activity = create_task(self._updating_activity())
+				self.updating_activity.cancel()
+				self.updating_activity = create_task(self._updating_activity())
 			elif not self.settings.pause:
 				self.resume()
 			elif self.updating_activity:
 				self.updating_activity.cancel()
-				self.updating_activity = None
 	async def _updating_activity(self):
 		self.pause()
 		await asyncio.sleep(360)
@@ -681,13 +681,12 @@ class AudioPlayer(discord.AudioSource):
 			if listeners == 0:
 				await self.leave("Channel empty", dump=True)
 
-	updating_streaming = None
+	updating_streaming = asyncio.Future()
+	updating_streaming.set_result(None)
 	def update_streaming(self):
 		"""Updates whether we're streaming audio; timeout after 16 minutes of inactivity."""
 		if self.settings.stay:
-			if self.updating_streaming:
-				self.updating_streaming.cancel()
-				self.updating_streaming = None
+			self.updating_streaming.cancel()
 			return
 		if not self.vc and not self.fut.done():
 			return
@@ -699,11 +698,10 @@ class AudioPlayer(discord.AudioSource):
 			print_exc()
 			connected = False
 		if len(self.queue) == 0 and connected:
-			if not self.updating_streaming:
-				self.updating_streaming = create_task(self._updating_streaming())
+			self.updating_streaming.cancel()
+			self.updating_streaming = create_task(self._updating_streaming())
 		elif self.updating_streaming:
 			self.updating_streaming.cancel()
-			self.updating_streaming = None
 	async def _updating_streaming(self):
 		await asyncio.sleep(960)
 		if self is not self.players.get(self.vcc.guild.id):
@@ -1607,10 +1605,6 @@ async def autosave_loop(start=True):
 						AP.cache.pop(guild.id, None)
 						continue
 					a.backup()
-					if a.updating_activity is None:
-						a.update_activity()
-					if a.updating_streaming is None:
-						a.update_streaming()
 		await asyncio.sleep(1)
 	print("Exiting...")
 
@@ -1643,6 +1637,7 @@ async def on_voice_state_update(member, before, after):
 		return
 	if member.bot:
 		return
+	a.update_streaming()
 	a.update_activity()
 
 async def terminate():

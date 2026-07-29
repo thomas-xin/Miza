@@ -952,6 +952,7 @@ def is_youtube_url(url): return url and regexp(r"^https?:\/\/(?:\w{1,5}\.)?youtu
 def is_youtube_stream(url): return url and regexp(r"^https?:\/\/r+[0-9]+---.{2}-[\w\-]{4,}\.googlevideo\.com").findall(url)
 def is_soundcloud_stream(url): return url and regexp(r"^https?:\/\/(?:[\w\-]*)?media\.sndcdn\.com\/[^\s<>`|" '"' "']+").findall(url)
 def is_reddit_url(url): return url and regexp(r"^https?:\/\/(?:\w{2,3}\.)?reddit.com\/r\/[^/\W]+\/").findall(url)
+def is_klipy_url(url): return url and regexp(r"^https?:\/\/klipy\.com\/gifs\/[\w\-]+").findall(url)
 def is_emoji_url(url): return url and url.startswith("https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/")
 def is_spotify_url(url): return url and regexp(r"^https?:\/\/(?:play|open|api)\.spotify\.com\/").findall(url)
 def _unyt(s):
@@ -2798,10 +2799,10 @@ class FileHashDict(collections.abc.MutableMapping):
 	"A dictionary-compatible object that represents a mapping to SQL tables stored on disk."
 
 	sem = Semaphore(64, 128, 0.3, 1)
-	db_sems = {}
+	max_concurrency = 8
+	db_sems = collections.defaultdict(lambda: Semaphore(FileHashDict.max_concurrency, inf))
 	cache_size = 65536
 	encoder = [None, None]
-	max_concurrency = 8
 
 	def __init__(self, *args, path="", encode=None, decode=None, automut=True, autosave=60, safe=True, **kwargs):
 		if not kwargs and len(args) == 1:
@@ -2822,8 +2823,9 @@ class FileHashDict(collections.abc.MutableMapping):
 			os.rename(path + "/~~", self.path)
 			shutil.rmtree(path)
 		self.load_cursor()
-		self.db.commit()
-		self.db_sem = self.db_sems.setdefault(path, Semaphore(self.max_concurrency, inf))
+		if self.db:
+			self.db.commit()
+		self.db_sem = self.db_sems[path]
 		self.c_updated = False
 		self.modifying = None
 		self.automut = automut
@@ -3095,7 +3097,8 @@ class FileHashDict(collections.abc.MutableMapping):
 			except (PermissionError, FileNotFoundError):
 				pass
 			self.load_cursor()
-			self.db.commit()
+			if self.db:
+				self.db.commit()
 		finally:
 			self.db_sem.resume()
 		return self.modify()
@@ -3161,7 +3164,8 @@ class FileHashDict(collections.abc.MutableMapping):
 			self.c_updated = False
 			self.db_sem.pause()
 			try:
-				self.db.commit()
+				if self.db:
+					self.db.commit()
 				self.codb = set(try_int(r[0]) for r in self.cur.next().execute(f"SELECT key FROM '{self.internal}'") if r)
 			finally:
 				self.db_sem.resume()
@@ -3178,8 +3182,9 @@ class FileHashDict(collections.abc.MutableMapping):
 	def unload(self):
 		self.db_sem.pause()
 		try:
-			self.db.commit()
-			self.db.close()
+			if self.db:
+				self.db.commit()
+				self.db.close()
 		finally:
 			self.db_sem.resume()
 
@@ -5366,10 +5371,11 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 Request = RequestManager()
 get_request = Request.__call__
 
-def header_test(url, timeout=12):
+def header_test(url, input_headers=None, timeout=12):
 	assert not is_local_url(url), url
+	input_headers = input_headers or Request.header()
 	if url.isascii():
-		req = urllib.request.Request(url, method="HEAD", headers=Request.header())
+		req = urllib.request.Request(url, method="HEAD", headers=input_headers)
 		try:
 			resp = urllib.request.urlopen(req, timeout=timeout / 2)
 		except urllib.error.HTTPError as ex:
@@ -5380,24 +5386,25 @@ def header_test(url, timeout=12):
 		else:
 			resp.close()
 			return resp.headers
-	with requests.get(url, headers=Request.header(), stream=True, verify=False, timeout=timeout) as resp:
+	with requests.get(url, headers=input_headers, stream=True, verify=False, timeout=timeout) as resp:
 		try:
 			resp.raise_for_status()
 		except requests.exceptions.HTTPError as ex:
 			raise ConnectionError(ex.response.status_code, ex.response.reason)
 		return resp.headers
 
-def download_file(*urls, filename=None, timeout=12, return_headers=False):
+def download_file(*urls, filename=None, timeout=12, input_headers=None, return_headers=False):
 	if filename is None:
 		file = io.BytesIO()
 	else:
 		file = open(filename, "wb")
 	resp = None
+	input_headers = input_headers or Request.header()
 	try:
 		headers = {}
 		for url in urls:
 			assert not is_local_url(url), url
-			req = urllib.request.Request(url, method="GET", headers=Request.header())
+			req = urllib.request.Request(url, method="GET", headers=input_headers)
 			try:
 				resp = urllib.request.urlopen(req, timeout=timeout)
 			except urllib.error.HTTPError as ex:
@@ -5432,18 +5439,20 @@ def download_file(*urls, filename=None, timeout=12, return_headers=False):
 		return filename, resp.headers if resp else {}
 	return filename
 
+global_rl = Semaphore(50, inf, rate_limit=1, sync=True)
 async def retrieve_api(path, method="GET", headers={}, data=None):
 	url = f"https://discord.com/api/v10/{path}"
 	exception = RuntimeError("Maximum request attempts exceeded.")
 	for attempt in range(16):
 		delay = (1 << attempt) * (random.random() + 1)
 		try:
-			resp = await Request.asession.request(
-				method,
-				url,
-				data=data,
-				headers=headers,
-			)
+			async with global_rl:
+				resp = await Request.asession.request(
+					method,
+					url,
+					data=data,
+					headers=headers,
+				)
 		except (
 			AttributeError,
 			TimeoutError,
@@ -5468,6 +5477,7 @@ async def retrieve_api(path, method="GET", headers={}, data=None):
 				if isinstance(msg, dict) and "message" in msg and "retry_after" in msg:
 					d = float(msg["retry_after"]) + delay / 6
 				print(path, msg, d)
+				await asyncio.sleep(d)
 			try:
 				resp.raise_for_status()
 			except Exception as ex:

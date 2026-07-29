@@ -29,7 +29,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, submit_thread, create_thread, create_task, await_fut
 from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
-from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag, preview_url, is_local_url, banned_paths
+from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag, preview_url, is_local_url, banned_paths, force_kill
 from .caches import attachment_cache, colour_cache, minimise_url
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -797,11 +797,6 @@ class Server:
 							print(ex)
 						if not os.path.exists(fn):
 							ydl_opts.pop("cookiesfrombrowser", None)
-							try:
-								title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True)['title']", timeout=3600)
-							except RuntimeError as ex:
-								print(ex)
-						if not os.path.exists(fn):
 							ydl_opts.pop("remote_components", None)
 							title = self.ydl.run(f"ytd.YoutubeDL({repr(ydl_opts)}).extract_info({repr(url)},download=True)['title']", timeout=3600)
 					assert os.path.exists(fn), f"Download unsuccessful: {fn}."
@@ -1141,6 +1136,25 @@ class Server:
 	def rickroll(self, *args, **kwargs):
 		raise cp.HTTPRedirect(rickroll, 308)
 
+	archive_server = None
+	def start_archive_server(self, shutdown=False):
+		if self.archive_server:
+			force_kill(self.archive_server)
+		if not shutdown and os.path.exists("misc/archive/serve.py") and (ap := AUTH.get("archive_port")):
+			print("Starting archive server...")
+			try:
+				Request(f"https://127.0.0.1:{ap}/")
+			except Exception:
+				archive_path = AUTH.get("archive_path", "archive").replace("\\", "/").rstrip("/")
+				os.makedirs(archive_path, exist_ok=True)
+				for fn in os.listdir("misc/archive"):
+					shutil.copyfile(f"misc/archive/{fn}", f"{archive_path}/{fn}")
+				args = ["hypercorn", "serve:app", "--bind", f"0.0.0.0:{ap}", "-w", "6"]
+				print(args)
+				self.archive_server = psutil.Popen(args, cwd=archive_path)
+			else:
+				pass
+
 
 def terminate():
 	if ytdl:
@@ -1157,6 +1171,7 @@ if __name__ == "__main__":
 	parent = psutil.Process(ppid)
 	app = Server()
 	self = server = cp.Application(app, "/", config)
+	submit_thread(app.start_archive_server)
 	submit_thread(app.get_ip_ex)
 	interface.start()
 	ytdl = ytdl_fut.result()

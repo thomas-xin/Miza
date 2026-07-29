@@ -282,7 +282,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			path = int(path)
 		return temp, path
 
-	database_sems = {}
+	database_sems = collections.defaultdict(threading.RLock)
 	def get_userbase(self, uid, path="", default=None):
 		try:
 			temp = self.userbase[uid]
@@ -299,7 +299,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return cdict()
 		return default
 	def set_userbase(self, uid, path, value, delete_empty=True):
-		with self.database_sems.setdefault(uid, threading.RLock()):
+		with self.database_sems[uid]:
 			if delete_empty and not value:
 				self.pop_userbase(uid, path)
 				return
@@ -311,7 +311,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				self.userbase[uid] = value
 	def add_userbase(self, uid, path, value):
-		with self.database_sems.setdefault(uid, threading.RLock()):
+		with self.database_sems[uid]:
 			if path:
 				orig = self.userbase.get(uid, cdict())
 				temp, last = self.set_database(orig, path)
@@ -327,7 +327,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				self.userbase[uid] = data
 				return data
 	def pop_userbase(self, uid, path):
-		with self.database_sems.setdefault(uid, threading.RLock()):
+		with self.database_sems[uid]:
 			if path:
 				orig = self.userbase.get(uid, cdict())
 				temp, last = self.set_database(orig, path)
@@ -355,7 +355,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return cdict()
 		return default
 	def set_guildbase(self, gid, path, value, delete_empty=True):
-		with self.database_sems.setdefault(gid, threading.RLock()):
+		with self.database_sems[gid]:
 			if delete_empty and not value:
 				self.pop_guildbase(gid, path)
 				return
@@ -367,7 +367,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				self.guildbase[gid] = value
 	def add_guildbase(self, gid, path, value):
-		with self.database_sems.setdefault(gid, threading.RLock()):
+		with self.database_sems[gid]:
 			if path:
 				orig = self.guildbase.get(gid, cdict())
 				temp, last = self.set_database(orig, path)
@@ -383,7 +383,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				self.guildbase[gid] = data
 				return data
 	def pop_guildbase(self, gid, path):
-		with self.database_sems.setdefault(gid, threading.RLock()):
+		with self.database_sems[gid]:
 			if path:
 				orig = self.guildbase.get(gid, cdict())
 				temp, last = self.set_database(orig, path)
@@ -711,24 +711,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		else:
 			self.server = None
 
-	archive_server = None
 	def start_archive_server(self, shutdown=False):
-		if self.archive_server:
-			force_kill(self.archive_server)
-		if not shutdown and os.path.exists("misc/archive/serve.py") and (ap := AUTH.get("archive_port")):
-			print("Starting archive server...")
-			try:
-				Request(f"https://127.0.0.1:{ap}/")
-			except Exception:
-				archive_path = AUTH.get("archive_path", "archive").replace("\\", "/").rstrip("/")
-				os.makedirs(archive_path, exist_ok=True)
-				for fn in os.listdir("misc/archive"):
-					shutil.copyfile(f"misc/archive/{fn}", f"{archive_path}/{fn}")
-				args = ["hypercorn", "serve:app", "--bind", f"0.0.0.0:{ap}", "-w", "6"]
-				print(args)
-				self.archive_server = psutil.Popen(args, cwd=archive_path)
-			else:
-				pass
+		if not self.server:
+			return
+		return self.server.run(f"app.start_archive_server({shutdown})")
 
 	def start_audio_client(self, shutdown=False):
 		if self.audio:
@@ -763,7 +749,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		print("Logging in...")
 		try:
 			self.audio_client_start = run_async(self.start_audio_client)
-			self.archive_client_start = run_async(self.start_archive_server)
 			loop = get_event_loop()
 			with contextlib.closing(loop):
 				with tracebacksuppressor:
@@ -1321,7 +1306,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if max_id != m_id:
 			right = await flatten(discord.abc.Messageable.history(channel, limit=100, after=cdict(id=max_id)))
 			data.update({m.id: m for m in right})
-		self.cache.messages.update(data)
+		submit_thread(self.data.message_cache.save_messages, data.values())
 		return data[m_id]
 	async def fetch_message(self, m_id, channel=None, old=False, fast=False):
 		if not isinstance(m_id, int):
@@ -1689,8 +1674,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				out.append(url)
 				continue
 			try:
-				headers = await attachment_cache.scan_headers(url, fc=True)
-				if headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html",):
+				headers = {}
+				bypass = is_reddit_url(url) or is_youtube_url(url) or is_klipy_url(url) or is_tenor_url(url) or is_imgur_url(url) or is_giphy_url(url)
+				if not bypass:
+					headers = await attachment_cache.scan_headers(url, fc=True)
+				if not bypass and headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html",):
 					pass
 				elif self.server:
 					resp = await self.server.asubmit(f"ytdl.search({repr(url)})")
@@ -1885,7 +1873,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			args += ["-d", duration]
 		args += ["-fs", fsize, "-f", fmt]
 		if isinstance(image, str) and is_url(image):
-			image = await attachment_cache.download(verify_url(image), filename=True, max_size=1073741824 * 64)
+			headers = Request.header()
+			headers["Referer"] = "https://www.reddit.com/"
+			headers["Accept"] = "video/webm,video/ogg,video/*;q=1,application/ogg;q=0.7,image/*;q=0.6,*/*;q=0.5"
+			image = await attachment_cache.download(verify_url(image), filename=True, input_headers=headers, max_size=1073741824 * 64)
 		return await process_image(image, "resize_map", args, timeout=timeout)
 
 	# Map of search engine locations for browsing the internet. As we do not have access to the user's IP address, we estimate their timezone and use that to approximate their location.
@@ -2296,6 +2287,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return messages, model
 
 	model_levels = dict(enumerate(map(cdict, AUTH.get("model_levels", []))))
+	if not model_levels:
+		model_levels = dict(enumerate([cdict(
+			**{k: "qwen-3.7-flash" for k in ("instructive", "casual", "nsfw", "backup", "retry", "function", "vision")},
+			target="auto",
+		)] * 3))
 	async def chat_completion(self, messages, model="miza-1", system=None, max_tokens=256, temperature=0.8, tools=None, tool_router=None, user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
 		"OpenAI-compatible Chat Completion function. Autoselects model using a function call, then routes to tools and target model as required."
 		await require_predicate(predicate)
@@ -5369,10 +5365,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				ks = kwargs[k]
 				if len(ks) == 1 and not v.get("required") and ks[0] is None:
 					kwargs[k] = None
-		# if len(kwargs) == 1:
-		# 	k = next(iter(kwargs))
-		# 	if argv and schema[k].type in ("string",) and not schema[k].get("multiple"):
-		# 		kwargs[k] = argv
 		for k, v in schema.items():
 			if v.get("required", 0) > 1 and len(kwargs[k]) < v.required:
 				raise ArgumentError(f'{k} requires a minimum amount of {v.required} inputs.')
@@ -7435,7 +7427,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			raise ValueError('Unsupported audio type given')
 		discord.utils._get_mime_type_for_audio = _get_mime_type_for_audio
 
-	exception_locks = diskcache.Cache(f"{TEMP_PATH}/exception_locks")
+	exception_locks = collections.defaultdict(float)
 	def send_exception(self, messageable, ex, reference=None, op=None, comm=None):
 		if self.maintenance and not (reference and self.is_owner(reference.author)):
 			print(reference)
@@ -7449,28 +7441,28 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		guild = getattr(messageable, "guild", None)
 		prefix = self.get_prefix(guild)
 		if isinstance(ex, UserError):
-			if self.exception_locks.get(messageable.id):
+			if utc() - self.exception_locks[messageable.id] < 60:
 				pass
 			else:
-				self.exception_locks.set(messageable.id, utc(), expire=60)
+				self.exception_locks[messageable.id] = utc()
 				fields = (("Unsure how to use the command?", f"Try {prefix}help or check out the [wiki page](https://github.com/thomas-xin/Miza/wiki/Command-Inputs) for help on command inputs!"))
 		elif isinstance(ex, TooManyRequests):
-			if self.exception_locks.get(messageable.id):
+			if utc() - self.exception_locks[messageable.id] < 300:
 				pass
 			else:
-				self.exception_locks.set(messageable.id, utc(), expire=300)
+				self.exception_locks[messageable.id] = utc()
 				fields = (("Running into the rate limit often?", f"Consider donating using one of the subscriptions from my [ko-fi]({self.kofi_url}), which will grant shorter rate limits amongst many feature improvements!"),)
 		elif isinstance(ex, discord.Forbidden):
-			if self.exception_locks.get(messageable.id):
+			if utc() - self.exception_locks[messageable.id] < 120:
 				pass
 			else:
-				self.exception_locks.set(messageable.id, utc(), expire=30)
+				self.exception_locks[messageable.id] = utc()
 				fields = (("403", "This error usually indicates that I am missing one or more necessary Discord permissions to perform this command!"),)
 		elif isinstance(ex, (discord.DiscordServerError, discord.HTTPException, ConnectionError)):
-			if self.exception_locks.get(messageable.id):
+			if utc() - self.exception_locks[messageable.id] < 120:
 				pass
 			else:
-				self.exception_locks.set(messageable.id, utc(), expire=30)
+				self.exception_locks[messageable.id] = utc()
 				fields = ((lim_str(str(ex.args[0]).split(None, 1)[0], 1024), "This error usually indicates that the remote server (possibly Discord) is rejecting the response. Please double check your inputs, or try again later!"),)
 		elif isinstance(ex, (CE, CE2)):
 			fields = (("Response disconnected.", "If this error occurs during a command, it is likely due to maintenance!"),)
@@ -7481,16 +7473,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		elif comm and (not comm.schema or getattr(comm, "maintenance", False)):
 			fields = (("Unexpected or confusing error?", f"This command may currently be under maintenance. Consider joining the [support server]({self.rcc_invite}) for bug reports!"),)
 		else:
-			if self.exception_locks.get(messageable.id):
+			if utc() - self.exception_locks[messageable.id] < 30:
 				pass
 			else:
-				self.exception_locks.set(messageable.id, utc(), expire=30)
+				self.exception_locks[messageable.id] = utc()
 				fields = (("Unexpected or confusing error?", f"Use {prefix}help for help, or consider joining the [support server]({self.rcc_invite}) for bug reports!"),)
 		if reference and isinstance(ex, discord.Forbidden) and reference.guild and not messageable.permissions_for(reference.guild.me).send_messages:
 			return create_task(self.missing_perms(messageable, reference))
 		title = f"⚠ {type(ex).__name__} ⚠"
 		description = "\n".join(as_str(i) for i in T(ex).get("args", ()))
-		if not messageable.permissions_for(guild.me).embed_links:
+		if guild and not messageable.permissions_for(guild.me).embed_links:
 			content = (title + "\n" + description).strip()
 			if fields:
 				content += "\n> " + "\n> ".join((t := ((f["name"], f["value"]) if isinstance(f, dict) else f)) and ("### " + t[0] + "\n" + t[1]) for f in fields if f)
@@ -7643,12 +7635,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.initialisation_complete = True
 		print("Initialisation complete.")
 
-	flatten_sems = {}
+	sem_counters = {}
+	flatten_sems = collections.defaultdict(lambda: Semaphore(1, 10, rate_limit=2))
 	async def flatten_into_cache(self, history, bucket):
-		try:
-			sem = self.flatten_sems[bucket]
-		except KeyError:
-			sem = self.flatten_sems[bucket] = Semaphore(5, 10, rate_limit=60)
+		sem = self.flatten_sems[bucket]
 		data = {}
 		with tracebacksuppressor(SemaphoreOverflowError):
 			async with sem:
@@ -7661,7 +7651,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						await asyncio.sleep(random.random() * 2 ** att)
 					else:
 						break
-			submit_thread(self.cache.messages.update, data)
+			submit_thread(self.data.message_cache.save_messages, data.values())
 		return data
 	async def search_messages(self, guild_id, limit=25, offset=0, **kwargs):
 		if guild_id not in self.cache.guilds:
@@ -7674,7 +7664,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		for k, v in kwargs.items():
 			if v is not None:
 				query += f"&{k}={v}"
-		resp = await self.retrieve_api(f"{path}{query}")
+		bucket = str(guild_id)
+		sem = self.flatten_sems[bucket]
+		async with sem:
+			resp = await self.retrieve_api(f"{path}{query}")
 		if "messages" not in resp:
 			print(resp)
 			raise KeyError("messages")
@@ -7684,35 +7677,27 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				raw_message = raw_message[0]
 			message = self.CachedMessage(raw_message)
 			data[message.id] = message
-		submit_thread(self.cache.messages.update, data)
+		submit_thread(self.data.message_cache.save_messages, data.values())
 		return cdict(
 			messages=list(data.values()),
 			total_results=resp.get("total_results", 0),
 		)
-	async def flatten_search(self, guild_id, limit=200, target_id=0, channel_id=None, author_id=None, **kwargs):
-		bucket = f"{guild_id}/{target_id}"
-		try:
-			sem = self.flatten_sems[bucket]
-		except KeyError:
-			sem = self.flatten_sems[bucket] = Semaphore(5, 10, rate_limit=60)
+	async def flatten_search(self, guild_id, limit=200, break_after=200, return_extra=False, sort_order="desc", **kwargs):
+		total = 0
 		data = []
-		with tracebacksuppressor(SemaphoreOverflowError):
-			async with sem:
-				temp_sem = Semaphore(1, 1, rate_limit=1)
-				for pos in range(0, limit * 3 // 4, 25):
-					async with temp_sem:
-						resp = await self.search_messages(
-							guild_id=guild_id,
-							offset=pos,
-							max_id=target_id,
-							channel_id=channel_id,
-							author_id=author_id,
-							sort_order="desc",
-							**kwargs,
-						)
-						data.extend(resp.messages)
-					if pos + 25 >= resp.total_results:
-						break
+		for pos in range(0, limit - 1, 25):
+			resp = await self.search_messages(
+				guild_id=guild_id,
+				offset=pos,
+				sort_order=sort_order,
+				**kwargs,
+			)
+			data.extend(resp.messages)
+			total = max(total, resp.total_results)
+			if pos + 25 >= resp.total_results or resp.total_results >= limit and pos + 25 >= break_after:
+				break
+		if return_extra:
+			return data, total > len(data)
 		return data
 
 	async def index_member(self, guild_id, author_id=0, channel_id=0, add=0):
@@ -7724,32 +7709,24 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if add:
 				self.set_guildbase(guild_id, f"index:{target}.count", count)
 			return count
-		bucket = f"{guild_id}/{author_id}"
-		try:
-			sem = self.flatten_sems[bucket]
-		except KeyError:
-			sem = self.flatten_sems[bucket] = Semaphore(5, 10, rate_limit=60)
 		self.set_guildbase(guild_id, f"index:{target}", cdict(time=utc(), count=0))
-		total = 0
-		with tracebacksuppressor(SemaphoreOverflowError):
-			async with sem:
-				resp = await self.search_messages(
-					guild_id=guild_id,
-					sort_order="asc",
-					author_id=author_id or None,
-					channel_id=channel_id or None,
-				)
-			total = max(resp.total_results + self.get_guildbase(guild_id, f"index.{target}.count", 0), add)
-			if author_id:
-				print(f"{guild_id}: Indexed {total} message(s) from user {author_id}")
-			elif channel_id:
-				print(f"{guild_id}: Indexed {total} message(s) from channel {channel_id}")
-			else:
-				print(f"{guild_id}: Indexed {total} message(s)")
-			mids = [m.id for m in resp.messages]
-			if not mids or info.get("min"):
-				mids.append(info.get("min", 0))
-			self.set_guildbase(guild_id, f"index:{target}", cdict(time=utc(), count=total, min=min(mids)))
+		resp = await self.search_messages(
+			guild_id=guild_id,
+			sort_order="asc",
+			author_id=author_id or None,
+			channel_id=channel_id or None,
+		)
+		total = max(resp.total_results + self.get_guildbase(guild_id, f"index.{target}.count", 0), add)
+		if author_id:
+			print(f"{guild_id}: Indexed {total} message(s) from user {author_id}")
+		elif channel_id:
+			print(f"{guild_id}: Indexed {total} message(s) from channel {channel_id}")
+		else:
+			print(f"{guild_id}: Indexed {total} message(s)")
+		mids = [m.id for m in resp.messages]
+		if not mids or info.get("min"):
+			mids.append(info.get("min", 0))
+		self.set_guildbase(guild_id, f"index:{target}", cdict(time=utc(), count=total, min=min(mids)))
 		return total
 
 	async def message_counts(self, guild, limit=10):
@@ -7757,11 +7734,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		total = await self.index_member(guild_id)
 		await self.index_member(guild_id, self.deleted_user)
 		curr = self.get_guildbase(guild_id, "index", {})
-		bucket = f"{guild_id}/0"
-		try:
-			sem = self.flatten_sems[bucket]
-		except KeyError:
-			sem = self.flatten_sems[bucket] = Semaphore(5, 10, rate_limit=60)
 		base_id = current_snowflake()
 		for n in binary_tree_level_order(6):
 			top = sorted(curr, key=lambda k: curr[k].get("count", 0) if k else 0, reverse=True)[:limit]
@@ -7771,17 +7743,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if remaining_possible <= req:
 					break
 			target = int(guild_id + (base_id - guild_id) * n / 63)
-			with tracebacksuppressor(SemaphoreOverflowError):
-				async with sem:
-					resp = await self.search_messages(
-						guild_id=guild_id,
-						sort_order="asc",
-						min_id=target,
-					)
-				for message in resp.messages:
-					if message.author.id not in curr:
-						await self.index_member(guild_id, message.author.id)
-						curr = self.get_guildbase(guild_id, "index", {})
+			resp = await self.search_messages(
+				guild_id=guild_id,
+				sort_order="asc",
+				min_id=target,
+			)
+			for message in resp.messages:
+				if message.author.id not in curr:
+					await self.index_member(guild_id, message.author.id)
+					curr = self.get_guildbase(guild_id, "index", {})
 		for m in sorted(guild._members):
 			if m not in curr:
 				if top:
@@ -8331,8 +8301,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if after.channel is None:
 				after.channel = self.force_channel(payload.channel_id)
 			if after.guild and not after.author.bot and "logM" in self.data and after.guild.id in self.data.logM:
-				if utc() - after.created_at.timestamp() > 86400 * 14 or not had_before:
-					found = await self.flatten_search(after.guild.id, limit=200, target_id=after.id, author_id=after.author.id)
+				if utc() - after.created_at.timestamp() > 86400 * 14 and utc() > self.sem_counters.get(after.id, 0) + 60 or not had_before:
+					self.sem_counters[after.id] = utc()
+					found = await self.flatten_search(after.guild.id, limit=200, max_id=after.id, author_id=after.author.id)
 					print(f"Edit: Retrieved {len(found)} messages from user {after.author}")
 			self.add_message(after, force=2)
 			if before.author.id == self.deleted_user or after.author.id == self.deleted_user:
@@ -8523,10 +8494,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					message.author = await self.fetch_user(self.deleted_user)
 					message.author.name = "Unknown User"
 					history = discord.abc.Messageable.history(channel, limit=101, around=message)
-					bucket = str(getattr_chain(channel, "guild.id", channel.id)) + "/-1"
+					bucket = str(channel.id)
 					create_task(self.flatten_into_cache(history, bucket))
-			if had_before and message.guild and not message.author.bot and "logM" in self.data and message.guild.id in self.data.logM and utc() - message.created_at.timestamp() > 86400 * 14:
-				found = await self.flatten_search(message.guild.id, limit=200, target_id=message.id, author_id=message.author.id)
+			if had_before and message.guild and not message.author.bot and "logM" in self.data and message.guild.id in self.data.logM and utc() - message.created_at.timestamp() > 86400 * 14 and utc() > self.sem_counters.get(message.author.id, 0) + 60:
+				self.sem_counters[message.author.id] = utc()
+				found = await self.flatten_search(message.guild.id, limit=200, max_id=message.id, author_id=message.author.id)
 				print(f"Delete: Retrieved {len(found)} messages from user {message.author}")
 			try:
 				message.deleted = True

@@ -35,7 +35,7 @@ Image.MAX_IMAGE_PIXELS = 4294967296
 GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_DIFFERENT_PALETTE_ONLY
 from misc.types import ts_us
 from misc.asyncs import submit_thread, await_fut  # noqa: E402
-from misc.util import get_image_size, temporary_file, archive_mimes, mime_from_file, extract_archive, is_url, TEMP_PATH
+from misc.util import get_image_size, temporary_file, archive_mimes, mime_from_file, extract_archive, is_url, Request, TEMP_PATH
 
 DC = 0
 torch = None
@@ -92,7 +92,10 @@ def get_request(url, return_headers=False):
 	else:
 		import asyncio
 		from misc.caches import attachment_cache
-		return asyncio.run(attachment_cache.download(url, return_headers=return_headers, read=False))
+		headers = Request.header()
+		headers["Referer"] = "https://www.reddit.com/"
+		headers["Accept"] = "video/webm,video/ogg,video/*;q=1,application/ogg;q=0.7,image/*;q=0.6,*/*;q=0.5"
+		return asyncio.run(attachment_cache.download(url, input_headers=headers, return_headers=return_headers, read=False))
 	return (data, headers) if return_headers else data
 
 

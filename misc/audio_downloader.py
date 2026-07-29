@@ -23,8 +23,8 @@ from .asyncs import submit_thread
 from .util import (
 	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, url2ext, discord_expired, expired, shorten_attachment, unyt, html_decode, mime_into, is_local_url,
-	is_image, is_url, is_discord_attachment, is_miza_url, is_miza_attachment, is_youtube_url, is_spotify_url, AUDIO_FORMS,
-	EvalPipe, PipedProcess, AutoCache, Request, Semaphore, TEMP_PATH, CACHE_PATH, magic, rename, temporary_file, replace_ext, select_and_loads, extract_archive, archive_mimes,
+	is_image, is_url, is_discord_attachment, is_miza_url, is_miza_attachment, is_youtube_url, is_spotify_url, is_reddit_url, is_klipy_url, AUDIO_FORMS,
+	EvalPipe, PipedProcess, AutoCache, Request, Semaphore, TEMP_PATH, CACHE_PATH, magic, rename, temporary_file, replace_ext, select_and_loads, extract_archive, archive_mimes, AUTH,
 )
 from .caches import audio_meta, attachment_cache, audio_meta_cache
 
@@ -221,7 +221,7 @@ class AudioDownloader:
 		try:
 			resp = retrieval(url, self.run, f"extract_info({json_dumpstr(url)},download={download},process={process})")
 		except RuntimeError as ex:
-			if download:
+			if download or is_reddit_url(url) or is_klipy_url(url):
 				raise
 			print(repr(ex))
 			print("Retrying with remote...")
@@ -1208,11 +1208,6 @@ class AudioDownloader:
 			print(ex)
 		if not os.path.exists(fn):
 			ydl_opts.pop("cookiesfrombrowser", None)
-			try:
-				self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).download({repr(url2)})")
-			except RuntimeError as ex:
-				print(ex)
-		if not os.path.exists(fn):
 			ydl_opts.pop("remote_components", None)
 			self.run(f"ytd.YoutubeDL({repr(ydl_opts)}).download({repr(url2)})")
 		assert os.path.exists(fn) and os.path.getsize(fn), fn
@@ -1221,7 +1216,17 @@ class AudioDownloader:
 	def preprocess(self, url, mode, count):
 		output = deque()
 		if is_url(url):
-			if is_discord_attachment(url):
+			if is_miza_attachment(url):
+				resp2 = self.handle_special_multiple(url)
+				if resp2:
+					return resp2
+				output.append(cdict(
+					name=url2fn(url),
+					url=url,
+					audio=url,
+					video=[url, None],
+				))
+			elif is_discord_attachment(url):
 				if discord_expired(url):
 					# For expired Discord attachments, shorten the URL using our reverse proxy and try that instead
 					url = shorten_attachment(url, 0)
@@ -1263,6 +1268,24 @@ class AudioDownloader:
 				raise NotImplementedError(url, "Spotify is currently unsupported!")
 				# with tracebacksuppressor:
 				# 	output.extend(self.get_spotify_playlist(url))
+			elif is_klipy_url(url):
+				slug = url.split("/gifs/", 1)[-1]
+				resp = Request(
+					f"https://api.klipy.com/api/v1/{AUTH['klipy_key']}/gifs/items?slugs={slug}",
+					json=True,
+				)
+				try:
+					stream = resp["data"]["data"][0]["file"]["hd"]["webm"]["url"]
+					fmt = "webm"
+				except KeyError:
+					stream = resp["data"]["data"][0]["file"]["hd"]["mp4"]["url"]
+					fmt = "mp4"
+				output.append(cdict(
+					name=slug,
+					url=stream,
+					audio=stream,
+					video=[stream, fmt],
+				))
 		else:
 			urls = []
 			if ":" not in url:
@@ -1298,16 +1321,6 @@ class AudioDownloader:
 		assert not is_local_url(url), url
 		# Only proceed if no items have already been found (from playlists in this case)
 		if not len(output):
-			if is_miza_attachment(url):
-				resp2 = self.handle_special_multiple(url)
-				if resp2:
-					return resp2
-				return [cdict(
-					name=url2fn(url),
-					url=url,
-					audio=url,
-					video=url,
-				)]
 			resp = None
 			# Otherwise call automatic extract_info function
 			try:

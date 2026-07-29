@@ -402,8 +402,9 @@ class AttachmentCache(AutoCache):
 			f.seek(0)
 			return f.read()
 		return f
-	async def _download(self, url, m_id=None, timeout=12):
+	async def _download(self, url, m_id=None, input_headers=None, timeout=12):
 		try:
+			input_headers = input_headers or Request.header()
 			target = url
 			raw_fn = temporary_file(url2ext(url))
 			if is_discord_url(url):
@@ -413,17 +414,17 @@ class AttachmentCache(AutoCache):
 				if "/u/" in url:
 					c_id, m_id2, a_id, fn = expand_attachment(url)
 					target = await self.obtain(c_id, m_id2 or m_id, a_id, fn)
-					fn, head = await _run_async(download_file, target, filename=raw_fn, _timeout=timeout, return_headers=True)
+					fn, head = await _run_async(download_file, target, filename=raw_fn, _timeout=timeout, input_headers=input_headers, return_headers=True)
 					self.tertiary[url] = head
 					return self.cast_fp(open(fn, "rb"))
 				elif "/c/" in url:
 					path = url.split("/c/", 1)[-1].split("/", 1)[0]
 					urls, _csize = await self.obtains(path)
-					fn, head = await _run_async(download_file, *urls, filename=raw_fn, _timeout=timeout, return_headers=True)
+					fn, head = await _run_async(download_file, *urls, filename=raw_fn, _timeout=timeout, input_headers=input_headers, return_headers=True)
 					self.tertiary[url] = head
 					return self.cast_fp(open(fn, "rb"))
 			try:
-				f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, timeout=timeout, max_attempts=6, return_headers=True)
+				f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, timeout=timeout, max_attempts=6, headers=input_headers, return_headers=True)
 			except niquests.exceptions.HTTPError as ex:
 				code, msg = ex.response.status_code, ex.response.reason
 				raise ConnectionError(code, msg)
@@ -436,21 +437,21 @@ class AttachmentCache(AutoCache):
 			traceback.print_exc()
 			raise
 		return self.cast_fp(f)
-	async def download(self, url, m_id=None, filename=None, read=None, return_headers=False, force=False, fc=False, max_size=None):
+	async def download(self, url, m_id=None, filename=None, read=None, input_headers=None, return_headers=False, force=False, fc=False, max_size=None):
 		url = unyt(url)
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
 		if max_size:
-			headers = await self.scan_headers(url, m_id=m_id, fc=fc)
+			headers = await self.scan_headers(url, m_id=m_id, input_headers=input_headers, fc=fc)
 			assert (size := float(headers.get("Content-Length", 0))) <= max_size, f"{round(size)} file too large!"
 		if force:
-			fp = await self.secondary._aretrieve(url, self._download, url, m_id=m_id, _timeout=16, read=True)
+			fp = await self.secondary._aretrieve(url, self._download, url, m_id=m_id, input_headers=input_headers, _timeout=16, read=True)
 		else:
-			fp = await self.secondary.aretrieve(url, self._download, url, m_id=m_id, _timeout=16, _read=True)
+			fp = await self.secondary.aretrieve(url, self._download, url, m_id=m_id, input_headers=input_headers, _timeout=16, _read=True)
 			if not getsize(fp):
-				fp = await self.secondary._aretrieve(url, self._download, url, m_id=m_id, _timeout=16, read=True)
+				fp = await self.secondary._aretrieve(url, self._download, url, m_id=m_id, input_headers=input_headers, _timeout=16, read=True)
 		if return_headers:
-			headers = await self.scan_headers(url, m_id=m_id, fc=fc)
+			headers = await self.scan_headers(url, m_id=m_id, input_headers=input_headers, fc=fc)
 		if filename:
 			try:
 				if isinstance(filename, bool):
@@ -485,23 +486,23 @@ class AttachmentCache(AutoCache):
 			if getattr(fp, "close", None):
 				fp.close()
 
-	async def _scan_headers(self, url, m_id=None, base="api.mizabot.xyz"):
+	async def _scan_headers(self, url, m_id=None, base="api.mizabot.xyz", input_headers=None):
 		if is_discord_attachment(url):
 			url = await self.obtain(url=url, m_id=m_id)
 		elif is_miza_attachment(url):
 			url = re.sub("^https?:\\/\\/(?:\\w+\\.)?mizabot.xyz\\/", f"https://{base}/", url)
 		try:
-			headers = await _run_async(header_test, url)
+			headers = await _run_async(header_test, url, input_headers=input_headers)
 		except ConnectionError as ex:
 			if ex.errno == "404":
 				self.remove_cached(url, m_id)
 			raise
 		return dict(headers)
-	async def scan_headers(self, url, m_id=None, base="api.mizabot.xyz", fc=False):
+	async def scan_headers(self, url, m_id=None, base="api.mizabot.xyz", input_headers=None, fc=False):
 		url = unyt(url)
 		if (match := scraper_blacklist.search(url)):
 			raise InterruptedError(match)
-		headers = await self.tertiary.aretrieve(url, self._scan_headers, url, m_id=m_id, base=base)
+		headers = await self.tertiary.aretrieve(url, self._scan_headers, url, m_id=m_id, base=base, input_headers=input_headers)
 		if fc:
 			return fcdict(headers)
 		return headers

@@ -423,7 +423,7 @@ async def load_openrouter():
 	globals()["openai_refresh"] = utc() + 86400
 
 with tracebacksuppressor:
-	asyncio.run(load_openrouter())
+	submit_thread(asyncio.run, load_openrouter())
 
 async def _summarise(s, max_length, best=False, prompt=None, premium_context=[]):
 	if len(s) <= max_length:
