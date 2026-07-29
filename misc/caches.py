@@ -323,19 +323,18 @@ class AttachmentCache(AutoCache):
 
 	async def get_attachment(self, c_id, m_id, a_id, fn, priority=False):
 		ac = self.attachment_count
-		if not self.channels or not fn or a_id < ac:
-			return await self.get_direct(c_id, m_id, a_id, fn)
+		if not self.channels or not fn or a_id < ac or priority and m_id:
+			try:
+				return await self.get_direct(c_id, m_id, a_id, fn)
+			except ConnectionError:
+				if not fn or a_id < ac:
+					raise
 		fut = Future()
 		url, _ = merge_url(c_id, m_id, a_id, fn)
 		task = [fut, url]
 		self.queue.append(task)
 		if self.fut is None or self.fut.done() or len(self.queue) > ac:
 			self.fut = self.exc.submit(self.update_queue)
-		if priority and m_id:
-			try:
-				return await self.get_direct(c_id, m_id, a_id, fn)
-			except ConnectionError:
-				pass
 		try:
 			return await asyncio.wait_for(wrap_future(fut), timeout=8)
 		except asyncio.TimeoutError:
@@ -366,7 +365,7 @@ class AttachmentCache(AutoCache):
 		try:
 			assert isinstance(resp, str) and not discord_expired(resp, early) and (not fn or fn == resp.split("?", 1)[0].rsplit("/", 1)[-1])
 		except AssertionError:
-			resp = await self._aretrieve(key, self.get_attachment, c_id, m_id, a_id, fn, priority=priority)
+			resp = await self._aretrieve(key, self.get_attachment, c_id, m_id, a_id, fn, priority=True)
 		return resp
 
 	async def get_attachments(self, path):

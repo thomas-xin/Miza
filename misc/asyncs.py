@@ -43,11 +43,12 @@ newfut.set_result(None)
 
 collections.__dict__.update(collections.abc.__dict__)
 
-def as_fut(obj):
-	if obj is None:
+def as_fut(obj, loop=None):
+	if obj is None and loop is eloop:
 		return emptyfut
-	fut = asyncio.Future(loop=eloop)
-	eloop.call_soon_threadsafe(fut.set_result, obj)
+	loop = loop or get_event_loop()
+	fut = asyncio.Future(loop=loop)
+	loop.call_soon_threadsafe(fut.set_result, obj)
 	return fut
 
 main_executor = ThreadPoolExecutor(96, initializer=__setloop__)

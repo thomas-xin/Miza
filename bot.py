@@ -1327,7 +1327,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not isinstance(m_id, int):
 			if is_discord_message_link(m_id):
 				g_id, c_id, m_id = split_message_link(m_id)
-				channel = await self.fetch_channel(c_id)
+				try:
+					channel = await self.fetch_channel(c_id)
+				except Exception:
+					channel = None
 			try:
 				m_id = int(m_id)
 			except (ValueError, TypeError):
@@ -1525,7 +1528,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					return obj.permissions_in(guild)
 				except (AttributeError, discord.errors.ClientException):
 					pass
-		if hasattr(obj, "recipient") or hasattr(obj, "dm_channel"):
+		if getattr(obj, "recipient", None) or hasattr(obj, "dm_channel"):
 			return discord.Permissions(2147483647)
 		return discord.Permissions(0)
 
@@ -1689,7 +1692,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				headers = await attachment_cache.scan_headers(url, fc=True)
 				if headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html",):
 					pass
-				elif self.audio:
+				elif self.server:
 					resp = await self.server.asubmit(f"ytdl.search({repr(url)})")
 					if not resp:
 						raise EOFError(url)
@@ -1720,7 +1723,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Finds URLs in a string, following any discord message links found."
 		if not url:
 			return []
-		if not isinstance(url, str) and hasattr(url, "channel"):
+		if not isinstance(url, str) and hasattr(url, "channel") and hasattr(url, "id"):
+			self.cache.messages.setdefault(url.id, url)
 			url = message_link(url)
 		if is_url(url):
 			urls = [verify_url(url)]
@@ -2978,8 +2982,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not message:
 			print("No message detected.")
 		elif reacts:
-			for react in reacts:
-				await message.add_reaction(react)
+			await add_reacts(message, reacts)
 		return message
 
 	async def store_backup_message(self, message):
@@ -4823,22 +4826,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					continue
 				r = None
 				if v.type in ("url", "image", "visual", "video", "audio", "media"):
-					url = None
-					if getattr(message, "reference", None):
-						info = v
-						if info.type in ("visual", "video"):
-							priority_order = ("video", "image", "emoji", "audio", "text")
-						elif info.type in ("media",):
-							priority_order = ("video", "audio", "image", "emoji", "text")
-						elif info.type in ("audio",):
-							priority_order = ("audio", "video", "image", "emoji", "text")
-						elif info.type in ("image",):
-							priority_order = ("image", "video", "emoji", "audio", "text")
-						else:
-							priority_order = ("text", "video", "audio", "image", "emoji")
-						urls = await self.follow_url(message, priority_order=priority_order, limit=1)
-						if urls and not is_discord_message_link(urls[0]):
-							url = urls[0]
+					info = v
+					if info.type in ("visual", "video"):
+						priority_order = ("video", "image", "emoji", "audio", "text")
+					elif info.type in ("media",):
+						priority_order = ("video", "audio", "image", "emoji", "text")
+					elif info.type in ("audio",):
+						priority_order = ("audio", "video", "image", "emoji", "text")
+					elif info.type in ("image",):
+						priority_order = ("image", "video", "emoji", "audio", "text")
+					else:
+						priority_order = ("text", "video", "audio", "image", "emoji")
+					urls = await self.follow_url(message, priority_order=priority_order, limit=1)
+					if urls and not is_discord_message_link(urls[0]):
+						url = urls[0]
 					if not url:
 						try:
 							url = await bot.get_last_image(message.channel)
@@ -4977,7 +4978,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				priority_order = ("image", "video", "emoji", "audio", "text")
 			else:
 				priority_order = ("text", "video", "audio", "image", "emoji")
-			if v and not is_url(v) and v[0] == "<" and v[-1] == ">":
+			urls = []
+			if v and not is_url(v) and v[0] == "<" and v[-1] == ">" and ":" not in v:
 				m = verify_id(v)
 				if isinstance(m, int):
 					o = self.in_cache(m)
@@ -4996,7 +4998,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					urls = [best_url(o)]
 				else:
 					urls = []
-			else:
+			if not urls:
 				urls = await self.follow_url(v, priority_order=priority_order, limit=1)
 			if not urls or is_discord_message_link(urls[0]):
 				raise err(TypeError, k, v)
@@ -7140,10 +7142,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							bot.send_exception(self.sendable, exc_value, reference=self.reference)
 							return True
 					bot.send_exception(self.sendable, exc_value, reference=self.reference)
-					with tracebacksuppressor:
-						raise exc_value
+					return False
 				return True
-			
+
 			__aexit__ = lambda self, *args: as_fut(self.__exit__(*args))
 			__call__ = lambda self, *args, **kwargs: self.__class__(*args, **kwargs)
 
@@ -7969,10 +7970,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				try:
 					await self.run_command(command, kwargs, message=m, slash=True, respond=True)
 				except Exception as ex:
-					if not getattr(m, "deferred", False):
-						await self.defer_interaction(m)
+					print_exc()
 					resp = await self.send_exception(channel, ex, reference=m, comm=command)
-					print("SC:", resp)
 				finally:
 					m.deleted = True
 			case 3 | 5:

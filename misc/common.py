@@ -739,6 +739,8 @@ async def manual_edit(message, **fields):
 async def add_reacts(message, reacts):
 	if not reacts or not getattr_chain(message, "guild.me.guild_permissions.add_reactions", True):
 		return message
+	if getattr_chain(message, "channel.recipient", False) is None:
+		return message
 	futs = []
 	if reacts and not getattr(message, "ephemeral", False):
 		tempsem = Semaphore(5, inf, rate_limit=5)
@@ -746,9 +748,6 @@ async def add_reacts(message, reacts):
 			async with tempsem:
 				with tracebacksuppressor:
 					await message.add_reaction(react)
-				# async with Delay(0.25):
-				# 	fut = create_task(aretry(message.add_reaction, react))
-				# 	futs.append(fut)
 	for fut in futs:
 		await fut
 	return message

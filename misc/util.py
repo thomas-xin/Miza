@@ -287,7 +287,7 @@ def get_encoding(e=None, tk=True):
 submit_thread(get_encoding)
 
 def tik_encode(s, encoding=None) -> list:
-	if len(s) > 1048576 * 16:
+	if s and len(s) > 1048576 * 16:
 		fn = temporary_file("txt")
 		with open(fn, "w", encoding="utf-8") as f:
 			f.write(s)
@@ -296,9 +296,10 @@ def tik_encode(s, encoding=None) -> list:
 		file = gt.TextFileSource([fn], separator=b"<|endoftext|>")
 		return enc.encode_files(file)
 	enc = get_encoding(encoding)
+	s = s or ""
 	if isinstance(s, (tuple, list)):
 		return enc.encode_batch(s, allowed_special="all")
-	return enc.encode(s, allowed_special="all")
+	return enc.encode(str(s), allowed_special="all")
 
 def tik_decode(t, encoding=None) -> str:
 	enc = get_encoding(encoding)
@@ -333,7 +334,7 @@ def tcount(s, encoding=None) -> int:
 	tks = tik_encode(s, encoding)
 	if type(s) is str:
 		return len(tks)
-	return sum(map(len, s))
+	return sum(map(len, tks))
 
 # Escapes syntax in code highlighting markdown.
 ESCAPE_T = {

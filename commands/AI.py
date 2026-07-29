@@ -82,6 +82,8 @@ class Translate(Command):
 			target = await _message.reply(embeds=embeds)
 		embeds = []
 		for dst_language, gen in translations:
+			if target:
+				await bot.require_integrity(target)
 			out = await anext(gen)
 			emb = discord.Embed(
 				colour=rand_colour(),
