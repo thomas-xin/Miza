@@ -35,7 +35,7 @@ Image.MAX_IMAGE_PIXELS = 4294967296
 GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_DIFFERENT_PALETTE_ONLY
 from misc.types import ts_us
 from misc.asyncs import submit_thread, await_fut  # noqa: E402
-from misc.util import get_image_size, temporary_file, archive_mimes, mime_from_file, extract_archive, is_url
+from misc.util import get_image_size, temporary_file, archive_mimes, mime_from_file, extract_archive, is_url, TEMP_PATH
 
 DC = 0
 torch = None
@@ -346,7 +346,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 						if mime == "video/m3u8" and orig:
 							fn = orig
 						else:
-							fn = "cache/" + str(ts)
+							fn = f"{TEMP_PATH}/{ts}"
 							with open(fn, "wb") as f:
 								f.write(data)
 						cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=avg_frame_rate,duration", "-show_entries", "format=duration", "-of", "csv=s=x:p=0", fn)
@@ -390,7 +390,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 			if mime == "video/m3u8" and orig:
 				fn = orig
 			else:
-				fn = "cache/" + str(ts)
+				fn = f"{TEMP_PATH}/{ts}"
 				with open(fn, "wb") as f:
 					f.write(data)
 			cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-count_frames", "-show_streams", fn)
@@ -731,8 +731,6 @@ def time_parse(ts):
 		elif len(data):
 			raise TypeError("Too many time arguments.")
 	return t
-
-fcache = "cache" if os.path.exists("cache") else "../cache"
 
 
 def replace_colour(image, colour):

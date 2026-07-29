@@ -79,6 +79,7 @@ class Translate(Command):
 			embeds.append(emb)
 		target = None
 		if embeds and not sim:
+			await bot.require_integrity(_message)
 			target = await _message.reply(embeds=embeds)
 		embeds = []
 		for dst_language, gen in translations:

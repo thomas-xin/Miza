@@ -1590,17 +1590,19 @@ TE = subprocess.TimeoutExpired
 CPE = subprocess.CalledProcessError
 
 
-class ArgumentError(LookupError):
+class UserError(Exception):
+	pass
+class ArgumentError(UserError, LookupError):
 	pass
 class DomainError(ArgumentError, OverflowError):
 	pass
 class EnumError(ArgumentError):
 	pass
-class TooManyRequests(PermissionError):
+class TooManyRequests(UserError, PermissionError):
 	pass
-class CommandCancelledError(Exception):
+class CommandCancelledError(UserError):
 	pass
-class DisconnectedChannelError(LookupError):
+class DisconnectedChannelError(UserError, LookupError):
 	pass
 
 AE = ArgumentError

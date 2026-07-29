@@ -78,12 +78,10 @@ else:
 
 CACHE_PATH = cachedir + "/cache"
 os.makedirs(CACHE_PATH, exist_ok=True)
-TEMP_PATH = AUTH.get("temp_path")
-if not TEMP_PATH or not os.path.exists(TEMP_PATH):
-	TEMP_PATH = os.path.abspath("cache")
-	os.makedirs(TEMP_PATH, exist_ok=True)
-assert isinstance(CACHE_PATH, str)
-assert isinstance(TEMP_PATH, str)
+assert isinstance(CACHE_PATH, str) and os.path.exists(CACHE_PATH)
+TEMP_PATH = AUTH.get("temp_path") or os.path.abspath("cache")
+os.makedirs(TEMP_PATH, exist_ok=True)
+assert isinstance(TEMP_PATH, str) and os.path.exists(TEMP_PATH)
 
 persistdir = AUTH.get("persist_path") or cachedir
 ecdc_dir = persistdir + "/ecdc/"
@@ -1204,8 +1202,8 @@ def unpack_xz(filename, extract_dir):
 shutil.register_unpack_format("xz", [".xz"], unpack_xz)
 
 def extract_archive(archive_path, format=None, excludes=()):
-	path = f"{TEMP_PATH}/{ts_us()}"
-	os.mkdir(path)
+	path = f"{TEMP_PATH}/archives/{ts_us()}"
+	os.makedirs(path, exist_ok=True)
 	with open(archive_path, "rb") as f:
 		b = f.read(6)
 	if b == b'7z\xbc\xaf\x27\x1c':

@@ -4333,6 +4333,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				c = len(os.listdir("misc/cache"))
 				shutil.rmtree("misc/cache")
 				i += c + 1
+			with tracebacksuppressor(FileNotFoundError):
+				c = len(os.listdir(f"{TEMP_PATH}/archive"))
+				shutil.rmtree(f"{TEMP_PATH}/archive")
+				i += c + 1
 			if i > 1:
 				print(f"{i} cached files flagged for deletion.")
 			return i
@@ -5494,7 +5498,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			out_fut = None
 			try:
 				await self.run_command(command, kwargs, message=message, argv=argv, command_check=command_check, min_perm=min_perm, respond=True)
-			except (T0, T1, T2, ArgumentError, TooManyRequests) as ex:
+			except (T0, T1, T2, UserError) as ex:
 				# Represents any timeout error that occurs
 				out_fut = self.send_exception(channel, ex, reference=message, comm=command)
 				return
@@ -7431,6 +7435,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			raise ValueError('Unsupported audio type given')
 		discord.utils._get_mime_type_for_audio = _get_mime_type_for_audio
 
+	exception_locks = diskcache.Cache(f"{TEMP_PATH}/exception_locks")
 	def send_exception(self, messageable, ex, reference=None, op=None, comm=None):
 		if self.maintenance and not (reference and self.is_owner(reference.author)):
 			print(reference)
@@ -7441,12 +7446,32 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		else:
 			reacts="❎"
 		fields = None
-		if isinstance(ex, TooManyRequests):
-			fields = (("Running into the rate limit often?", f"Consider donating using one of the subscriptions from my [ko-fi]({self.kofi_url}), which will grant shorter rate limits amongst many feature improvements!"),)
+		guild = getattr(messageable, "guild", None)
+		prefix = self.get_prefix(guild)
+		if isinstance(ex, UserError):
+			if self.exception_locks.get(messageable.id):
+				pass
+			else:
+				self.exception_locks.set(messageable.id, utc(), expire=60)
+				fields = (("Unsure how to use the command?", f"Try {prefix}help or check out the [wiki page](https://github.com/thomas-xin/Miza/wiki/Command-Inputs) for help on command inputs!"))
+		elif isinstance(ex, TooManyRequests):
+			if self.exception_locks.get(messageable.id):
+				pass
+			else:
+				self.exception_locks.set(messageable.id, utc(), expire=300)
+				fields = (("Running into the rate limit often?", f"Consider donating using one of the subscriptions from my [ko-fi]({self.kofi_url}), which will grant shorter rate limits amongst many feature improvements!"),)
 		elif isinstance(ex, discord.Forbidden):
-			fields = (("403", "This error usually indicates that I am missing one or more necessary Discord permissions to perform this command!"),)
+			if self.exception_locks.get(messageable.id):
+				pass
+			else:
+				self.exception_locks.set(messageable.id, utc(), expire=30)
+				fields = (("403", "This error usually indicates that I am missing one or more necessary Discord permissions to perform this command!"),)
 		elif isinstance(ex, (discord.DiscordServerError, discord.HTTPException, ConnectionError)):
-			fields = ((lim_str(str(ex.args[0]).split(None, 1)[0], 1024), "This error usually indicates that the remote server (possibly Discord) is rejecting the response. Please double check your inputs, or try again later!"),)
+			if self.exception_locks.get(messageable.id):
+				pass
+			else:
+				self.exception_locks.set(messageable.id, utc(), expire=30)
+				fields = ((lim_str(str(ex.args[0]).split(None, 1)[0], 1024), "This error usually indicates that the remote server (possibly Discord) is rejecting the response. Please double check your inputs, or try again later!"),)
 		elif isinstance(ex, (CE, CE2)):
 			fields = (("Response disconnected.", "If this error occurs during a command, it is likely due to maintenance!"),)
 		elif hasattr(ex, "footer"):
@@ -7456,12 +7481,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		elif comm and (not comm.schema or getattr(comm, "maintenance", False)):
 			fields = (("Unexpected or confusing error?", f"This command may currently be under maintenance. Consider joining the [support server]({self.rcc_invite}) for bug reports!"),)
 		else:
-			fields = (("Unexpected or confusing error?", f"Use {self.get_prefix(getattr(messageable, 'guild', None))}help for help, or consider joining the [support server]({self.rcc_invite}) for bug reports!"),)
+			if self.exception_locks.get(messageable.id):
+				pass
+			else:
+				self.exception_locks.set(messageable.id, utc(), expire=30)
+				fields = (("Unexpected or confusing error?", f"Use {prefix}help for help, or consider joining the [support server]({self.rcc_invite}) for bug reports!"),)
 		if reference and isinstance(ex, discord.Forbidden) and reference.guild and not messageable.permissions_for(reference.guild.me).send_messages:
 			return create_task(self.missing_perms(messageable, reference))
 		title = f"⚠ {type(ex).__name__} ⚠"
 		description = "\n".join(as_str(i) for i in T(ex).get("args", ()))
-		if (guild := getattr(messageable, "guild", None)) and not messageable.permissions_for(guild.me).embed_links:
+		if not messageable.permissions_for(guild.me).embed_links:
 			content = (title + "\n" + description).strip()
 			if fields:
 				content += "\n> " + "\n> ".join((t := ((f["name"], f["value"]) if isinstance(f, dict) else f)) and ("### " + t[0] + "\n" + t[1]) for f in fields if f)
