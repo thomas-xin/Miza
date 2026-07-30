@@ -5439,7 +5439,7 @@ def download_file(*urls, filename=None, timeout=12, input_headers=None, return_h
 		return filename, resp.headers if resp else {}
 	return filename
 
-global_rl = Semaphore(50, inf, rate_limit=1, sync=True)
+global_rl = Semaphore(50, inf, rate_limit=1, sync=False)
 async def retrieve_api(path, method="GET", headers={}, data=None):
 	url = f"https://discord.com/api/v10/{path}"
 	exception = RuntimeError("Maximum request attempts exceeded.")
@@ -5482,10 +5482,10 @@ async def retrieve_api(path, method="GET", headers={}, data=None):
 				resp.raise_for_status()
 			except Exception as ex:
 				exception = ConnectionError(resp.status_code, ex, resp.text)
+		elif resp.status_code in range(400, 600):
+			print(resp.text)
+			resp.raise_for_status()
 		else:
-			if resp.status_code in range(400, 600):
-				print(resp.text)
-				resp.raise_for_status()
 			try:
 				return resp.json()
 			except niquests.exceptions.JSONDecodeError:

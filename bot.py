@@ -2996,17 +2996,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print_exc()
 				stored[channel.id] = message.id
 		elif len(stored) >= 5:
-			m_id, c_id = choice(stored.items())
-			if c_id not in self.cache.channels:
-				stored.pop(c_id, None)
-			else:
-				try:
-					await self.fetch_message(m_id, c, fast=True)
-				except (discord.NotFound, LookupError):
+			while len(stored) >= 10:
+				c_id, m_id = choice(stored.items())
+				if c_id not in self.cache.channels:
 					stored.pop(c_id, None)
-				except:
-					print_exc()
-					stored.pop(c_id, None)
+				else:
+					try:
+						await self.fetch_message(m_id, channels[c_id], fast=True)
+					except (discord.NotFound, LookupError):
+						stored.pop(c_id, None)
+					except:
+						print_exc()
+						stored.pop(c_id, None)
 		if channel.id in self.cache.channels:
 			stored[channel.id] = message.id
 		self.set_userbase(user.id, "stored", stored)
@@ -7637,7 +7638,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	sem_counters = {}
 	flatten_sems = collections.defaultdict(lambda: Semaphore(1, 10, rate_limit=2))
-	search_sem = Semaphore(6, 120, rate_limit=6)
+	search_sem = Semaphore(5, 120, rate_limit=6)
 	async def flatten_into_cache(self, history, bucket):
 		sem = self.flatten_sems[bucket]
 		data = {}
