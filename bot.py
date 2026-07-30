@@ -2996,18 +2996,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print_exc()
 				stored[channel.id] = message.id
 		elif len(stored) >= 5:
-			while len(stored) >= 10:
+			for i in range(10):
 				c_id, m_id = choice(stored.items())
 				if c_id not in self.cache.channels:
 					stored.pop(c_id, None)
 				else:
 					try:
-						await self.fetch_message(m_id, channels[c_id], fast=True)
+						await self.fetch_message(m_id, None, fast=True)
 					except (discord.NotFound, LookupError):
 						stored.pop(c_id, None)
 					except:
 						print_exc()
 						stored.pop(c_id, None)
+				if len(stored) < 10:
+					break
 		if channel.id in self.cache.channels:
 			stored[channel.id] = message.id
 		self.set_userbase(user.id, "stored", stored)
