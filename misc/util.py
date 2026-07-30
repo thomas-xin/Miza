@@ -5439,14 +5439,14 @@ def download_file(*urls, filename=None, timeout=12, input_headers=None, return_h
 		return filename, resp.headers if resp else {}
 	return filename
 
-global_rl = Semaphore(50, inf, rate_limit=1, sync=False)
-async def retrieve_api(path, method="GET", headers={}, data=None):
+global_rl = Semaphore(25, inf, rate_limit=1, sync=False)
+async def retrieve_api(path, method="GET", headers={}, data=None, sem=None):
 	url = f"https://discord.com/api/v10/{path}"
 	exception = RuntimeError("Maximum request attempts exceeded.")
 	for attempt in range(16):
 		delay = (1 << attempt) * (random.random() + 1)
 		try:
-			async with global_rl:
+			async with sem or global_rl:
 				resp = await Request.asession.request(
 					method,
 					url,

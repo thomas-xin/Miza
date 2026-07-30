@@ -766,11 +766,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Authorization": f"Bot {AUTH['discord_token']}",
 		"Content-Type": "application/json",
 	}
-	async def _retrieve_api(self, path, method="GET", data=None):
-		return await retrieve_api(path, method, self.auth_headers, data)
-	async def retrieve_api(self, path, method="GET", data=None):
+	async def _retrieve_api(self, path, method="GET", data=None, sem=None):
+		return await retrieve_api(path, method, self.auth_headers, data, sem)
+	async def retrieve_api(self, path, method="GET", data=None, sem=None):
 		key = f"{path} {method.casefold()} {repr(data)}"
-		return await self.discord_cache.aretrieve(key, retrieve_api, path, method, self.auth_headers, data)
+		return await self.discord_cache.aretrieve(key, retrieve_api, path, method, self.auth_headers, data, sem)
 
 	def print(self, *args, sep=" ", end="\n"):
 		"A reimplementation of the print builtin function."
@@ -7661,9 +7661,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				query += f"&{k}={v}"
 		bucket = str(guild_id)
 		sem = self.flatten_sems[bucket]
-		async with self.search_sem:
-			async with sem:
-				resp = await self.retrieve_api(f"{path}{query}")
+		async with sem:
+			resp = await self.retrieve_api(f"{path}{query}", sem=self.search_sem)
 		if "messages" not in resp:
 			print(resp)
 			raise KeyError("messages")

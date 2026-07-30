@@ -64,8 +64,8 @@ async def verify_token(token):
 	headers.update({"Authorization": token, "Content-Type": "application/json", "Accept": "application/json"})
 	return headers
 
-async def retrieve_api_a(path, method="GET", data=None):
-	return await retrieve_api(path, method=method, headers=headers, data=data)
+async def retrieve_api_a(path, method="GET", data=None, sem=None):
+	return await retrieve_api(path, method=method, headers=headers, data=data, sem=sem)
 
 
 async def run(ctx):
@@ -92,33 +92,33 @@ async def run(ctx):
 
 	async def extract_channels(guild_ids, channel_ids):
 		guild_ids = set(guild_ids)
-		async with get_sem():
-			resp = await retrieve_api_a(
-				"users/@me/guilds",
-			)
+		resp = await retrieve_api_a(
+			"users/@me/guilds",
+			sem=get_sem(),
+		)
 		servers = {int(data["id"]): data for data in resp}
 		channels = {}
 
 		async def get_channels_from(gid, index):
-			async with get_sem(gid):
-				resp = await retrieve_api_a(
-					f"guilds/{gid}/channels",
-				)
+			resp = await retrieve_api_a(
+				f"guilds/{gid}/channels",
+				sem=get_sem(gid),
+			)
 			channels.update({int(data["id"]): data for data in resp})
-			async with get_sem(gid):
-				resp = await retrieve_api_a(
-					f"/guilds/{gid}/threads/active",
-				)
+			resp = await retrieve_api_a(
+				f"/guilds/{gid}/threads/active",
+				sem=get_sem(gid),
+			)
 			channels.update({int(data["id"]): data for data in resp["threads"]})
 
 			progress[index][0] = 1
 			print_progress("Guilds")
 
 		async def get_channel(cid, index):
-			async with get_sem(cid):
-				resp = await retrieve_api_a(
-					f"channels/{cid}",
-				)
+			resp = await retrieve_api_a(
+				f"channels/{cid}",
+				sem=get_sem(cid),
+			)
 			channels[cid] = resp
 			if "guild_id" in resp:
 				guild_ids.add(int(resp["guild_id"]))
@@ -140,10 +140,10 @@ async def run(ctx):
 			futs = []
 			for i, gid in enumerate(guild_ids):
 				if gid not in servers:
-					async with get_sem(gid):
-						resp = await retrieve_api_a(
-							f"guilds/{gid}",
-						)
+					resp = await retrieve_api_a(
+						f"guilds/{gid}",
+						sem=get_sem(gid),
+					)
 					servers[gid] = resp
 				if not channel_ids:
 					fut = get_channels_from(gid, i)
@@ -164,10 +164,10 @@ async def run(ctx):
 
 	ereg = re.compile("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>")
 	async def get_emojis(gid):
-		async with get_sem(gid):
-			resp = await retrieve_api_a(
-				f"guilds/{gid}/emojis",
-			)
+		resp = await retrieve_api_a(
+			f"guilds/{gid}/emojis",
+			sem=get_sem(gid),
+		)
 		for e in resp:
 			eid = e["id"]
 			url = f"https://cdn.discordapp.com/emojis/{eid}.webp"
@@ -175,10 +175,10 @@ async def run(ctx):
 				url += "?animated=true"
 			files["emojis"][eid] = [e["name"] + ".webp", url]
 
-		async with get_sem(gid):
-			resp = await retrieve_api_a(
-				f"guilds/{gid}/stickers",
-			)
+		resp = await retrieve_api_a(
+			f"guilds/{gid}/stickers",
+			sem=get_sem(gid),
+		)
 		for s in resp:
 			sid = s["id"]
 			if s.get("format_type") == 3:
@@ -187,10 +187,10 @@ async def run(ctx):
 				url = f"https://media.discordapp.net/stickers/{sid}.png"
 			files["stickers"][sid] = [s["name"] + f".{url2ext(url)}", url]
 
-		async with get_sem(gid):
-			resp = await retrieve_api_a(
-				f"guilds/{gid}/soundboard-sounds",
-			)
+		resp = await retrieve_api_a(
+			f"guilds/{gid}/soundboard-sounds",
+			sem=get_sem(gid),
+		)
 		for s in resp.get("items", ()):
 			sid = s["sound_id"]
 			url = f"https://cdn.discordapp.com/soundboard-sounds/{sid}"
@@ -467,8 +467,7 @@ async def run(ctx):
 						path = f"guilds/{gid}/messages/search"
 						query = f"?include_nsfw=true&channel_id={cid}&limit=25&offset={offset}&max_id={Mid}&min_id={mid}&sort_by=timestamp&sort_order=asc"
 						query += "".join(f"&author_id={u}" for u in user_ids)
-						async with get_sem(0):
-							resp = await retrieve_api_a(f"{path}{query}")
+						resp = await retrieve_api_a(f"{path}{query}", sem=get_sem())
 						if not resp.get("messages"):
 							raise StopIteration
 						for m in resp["messages"]:
@@ -492,16 +491,15 @@ async def run(ctx):
 					if first:
 						path = f"guilds/{gid}/messages/search"
 						query = f"?include_nsfw=true&channel_id={cid}&limit=25&offset=0&max_id={Mid}&min_id={mid}&sort_by=timestamp&sort_order=asc"
-						async with get_sem(0):
-							resp = await retrieve_api_a(f"{path}{query}")
+						resp = await retrieve_api_a(f"{path}{query}", sem=get_sem())
 						first = False
 						progress[index][1] = resp["total_results"]
 						resp = resp["messages"]
 					else:
-						async with get_sem(cid):
-							resp = await retrieve_api_a(
-								f"channels/{cid}/messages?limit=100&after={mid}",
-							)
+						resp = await retrieve_api_a(
+							f"channels/{cid}/messages?limit=100&after={mid}",
+							sem=get_sem(cid),
+						)
 					if not resp:
 						raise StopIteration
 					assert isinstance(resp, list), str(resp)
@@ -539,13 +537,13 @@ async def run(ctx):
 
 	async def scan_threads(cid):
 		for mode in ("public", "private"):
-			async with get_sem(cid):
-				try:
-					resp = await retrieve_api_a(
-						f"channels/{cid}/threads/archived/{mode}",
-					)
-				except niquests.exceptions.HTTPError:
-					break
+			try:
+				resp = await retrieve_api_a(
+					f"channels/{cid}/threads/archived/{mode}",
+					sem=get_sem(cid),
+				)
+			except niquests.exceptions.HTTPError:
+				break
 			for thread in resp.get("threads", ()):
 				tid = thread["id"]
 				name = thread.get("name", "")
