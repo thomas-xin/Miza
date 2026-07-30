@@ -183,7 +183,7 @@ class Translate(Command):
 				) for text in translations),
 			]
 		translated = None
-		m = self.bot.model_levels[0].instruct
+		m = self.bot.model_levels[0].instructive
 		if (count := count_to(messages)) < ai.contexts[m] / 2:
 			try:
 				translated = await ai._instruct(
