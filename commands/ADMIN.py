@@ -2416,29 +2416,6 @@ class UpdateMessageLogs(Database):
 			return
 		return channel
 
-	async def reattachments(self, channel, message):
-		if not message.attachments:
-			return
-		bot = self.bot
-		msg = deque()
-		files = []
-		for a in message.attachments:
-			try:
-				fn = await attachment_cache.download(a.url)
-				fil = CompatFile(fn, filename=a.filename.removeprefix("SPOILER_"))
-				files.append(fil)
-			except:
-				msg.append(proxy_url(a))
-		colour = await bot.get_colour(message.author)
-		emb = discord.Embed(colour=colour)
-		emb.description = f"File{'s' if len(files) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"
-		msg = "\n".join(msg) if msg else None
-		if len(files) == 1:
-			m2 = await bot.send_with_file(channel, msg, embed=emb, file=files[0])
-		else:
-			m2 = await channel.send(msg, embed=emb, files=files)
-		message.attachments = [cdict(name=a.filename, id=a.id, url=attachment_cache.preserve(a.url, m2.id)) for a in m2.attachments]
-
 	# Edit events are rather straightforward to log
 	async def _edit_(self, before, after, force=False, **void):
 		if after.author.bot and not force:
@@ -2447,8 +2424,8 @@ class UpdateMessageLogs(Database):
 		channel = await self.ensure_log_channel(after.guild)
 		if not channel:
 			return
-		embs = await bot.as_embeds(after, proxy_images=False)
-		embs2 = await self.bot.as_embeds(before, proxy_images=False, refresh=False, reactions=True)
+		embs = await bot.as_embeds(after)
+		embs2 = await bot.as_embeds(before, refresh=False, reactions=True)
 		emb = embs[0]
 		emb2 = embs2[0]
 		emb.colour = discord.Colour(0x0000FF)
@@ -2457,7 +2434,9 @@ class UpdateMessageLogs(Database):
 		emb.add_field(name="After", value=lim_str(emb.description, 1024))
 		emb.description = action
 		emb.timestamp = before.edited_at or after.created_at
-		bot.send_embeds(channel, emb)
+		embs[0] = emb
+		attachments = await bot.prepare_embeds(embs, m_id=after.id)
+		await channel.send(embeds=embs, files=attachments)
 
 	# Delete events must attempt to find the user who deleted the message
 	async def _audited_delete_(self, message, requestor=None, **void):
@@ -2468,7 +2447,6 @@ class UpdateMessageLogs(Database):
 		channel = await self.ensure_log_channel(message.guild)
 		if not channel:
 			return
-		await self.reattachments(channel, message)
 		embs = await bot.as_embeds(message, refresh=False, link=True, reactions=True)
 		embs[0].colour = discord.Colour(0xFF0000)
 		if user:
@@ -2477,7 +2455,8 @@ class UpdateMessageLogs(Database):
 			action = "**Message deleted from**"
 		action = f"{action} {channel_mention(message.channel.id)}:\n"
 		embs[0].description = lim_str(action + (embs[0].description or ""), 4096)
-		bot.send_embeds(channel, embs)
+		attachments = await bot.prepare_embeds(embs, m_id=message.id)
+		await channel.send(embeds=embs, files=attachments)
 
 	# Thanks to the embed sender feature, which allows this feature to send up to 10 logs in one message
 	async def _bulk_delete_(self, messages, requestor=None, **void):
@@ -2489,8 +2468,6 @@ class UpdateMessageLogs(Database):
 		channel = await self.ensure_log_channel(messages[0].guild)
 		if not channel:
 			return
-		futs = [self.reattachments(channel, m) for m in messages if not m.author.bot]
-		await gather(*futs, max_concurrency=5)
 		emb = discord.Embed(colour=0xFF00FF)
 		if requestor:
 			action = f"{user_mention(requestor.id)} **deleted {len(messages)} message{'s' if len(messages) != 1 else ''} from**"
@@ -2508,7 +2485,10 @@ class UpdateMessageLogs(Database):
 		for e in embeds:
 			e.colour = discord.Colour(0x7F007F)
 		embeds.insert(0, emb)
-		bot.send_embeds(channel, embeds)
+		for i in range(0, len(embeds), 10):
+			embs = embeds[i:i + 10]
+			attachments = await bot.prepare_embeds(embs)
+			await channel.send(embeds=embs, files=attachments)
 
 
 class UpdatePublishers(Database):
@@ -2645,45 +2625,54 @@ class UpdateStarboards(Database):
 		req = table[react][0]
 		if not req < inf:
 			return
-		message = await self.bot.ensure_reactions(message)
+		bot = self.bot
+		message = await bot.ensure_reactions(message)
 		count = sum(r.count for r in message.reactions if str(r.emoji) == react) if react != "SPARKLES" else sum(r.count for r in message.reactions if getattr(r.emoji, "id", None) and r.emoji.id in self.sparkle_ids)
 		sem = self.sems.setdefault(message.guild.id, Semaphore(1, inf))
 		async with sem:
 			if message.id in table.get(None, ()):
-				channel = await self.bot.fetch_channel(table[react][1])
+				channel = await bot.fetch_channel(table[react][1])
 				try:
-					m = await self.bot.fetch_message(table[None][message.id], channel)
-					res = await self.bot.verify_integrity(m)
+					m = await bot.fetch_message(table[None][message.id], channel)
+					res = await bot.verify_integrity(m)
 					if not res:
 						table[None].pop(message.id)
 				except:
 					print_exc()
 					table[None].pop(message.id)
 			if message.id not in table.setdefault(None, {}):
-				if count >= req:# and count < req * 2 + 2:
-					embeds = await self.bot.as_embeds(message, link=True, colour=True, reactions=True)
+				if count >= req:
+					embeds = await bot.as_embeds(message, link=True, colour=True, reactions=True)
 					try:
-						channel = await self.bot.fetch_channel(table[react][1])
-						m = await channel.send(embeds=embeds)
+						channel = await bot.fetch_channel(table[react][1])
+						attachments = await bot.prepare_embeds(embeds, m_id=message.id)
+						m = await channel.send(embeds=embeds, files=attachments)
 					except (discord.NotFound, discord.Forbidden):
+						print_exc()
 						table.pop(react)
 					else:
 						table[None][message.id] = m.id
 						with tracebacksuppressor(RuntimeError, KeyError):
-							while len(table[None]) > 32768:
+							while len(table[None]) > 262144:
 								table[None].pop(next(iter(table[None])))
 			else:
 				try:
-					channel = await self.bot.fetch_channel(table[react][1])
-					m = await self.bot.fetch_message(table[None][message.id], channel)
-					embeds = await self.bot.as_embeds(message, link=True, colour=True, reactions=True)
-					await self.bot.edit_message(m, content=None, embeds=embeds)
+					channel = await bot.fetch_channel(table[react][1])
+					m = await bot.fetch_message(table[None][message.id], channel)
+					embeds = await bot.as_embeds(message, link=True, colour=True, reactions=True)
+					attachments = await bot.prepare_embeds(embeds, m_id=message.id)
+					requires_reupload = max(e.image.description or "" for e in m.embeds) != f"{len(attachments) - 1}.webp"
+					if requires_reupload:
+						await bot.edit_message(m, embeds=embeds, files=attachments)
+					else:
+						await bot.edit_message(m, embeds=embeds)
 				except (discord.NotFound, discord.Forbidden):
+					print_exc()
 					table[None].pop(message.id, None)
 				else:
 					table[None][message.id] = m.id
 					with tracebacksuppressor(RuntimeError, KeyError):
-						while len(table[None]) > 32768:
+						while len(table[None]) > 262144:
 							table[None].pop(next(iter(table[None])))
 
 	async def _edit_(self, after, **void):
@@ -2694,6 +2683,7 @@ class UpdateStarboards(Database):
 			return
 		if message.id not in table.get(None, {}):
 			return
+		bot = self.bot
 		sem = self.sems.setdefault(message.guild.id, Semaphore(1, inf))
 		async with sem:
 			try:
@@ -2703,16 +2693,22 @@ class UpdateStarboards(Database):
 				react = str(reacts[0].emoji)
 				if verify_id(react) in self.sparkle_ids:
 					react = "SPARKLES"
-				channel = await self.bot.fetch_channel(table[react][1])
-				m = await self.bot.fetch_message(table[None][message.id], channel)
-				embeds = await self.bot.as_embeds(message, link=True, colour=True, reactions=True)
-				await self.bot.edit_message(m, content=None, embeds=embeds)
+				channel = await bot.fetch_channel(table[react][1])
+				m = await bot.fetch_message(table[None][message.id], channel)
+				embeds = await bot.as_embeds(message, link=True, colour=True, reactions=True)
+				attachments = await bot.prepare_embeds(embeds, m_id=message.id)
+				requires_reupload = max(e.image.description or "" for e in m.embeds) != f"{len(attachments) - 1}.webp"
+				if requires_reupload:
+					await bot.edit_message(m, embeds=embeds, files=attachments)
+				else:
+					await bot.edit_message(m, embeds=embeds)
 			except (discord.NotFound, discord.Forbidden):
+				print_exc()
 				table[None].pop(message.id, None)
 			else:
 				table[None][message.id] = m.id
 				with tracebacksuppressor(RuntimeError, KeyError):
-					while len(table[None]) > 16384:
+					while len(table[None]) > 262144:
 						table[None].pop(next(iter(table[None])))
 
 

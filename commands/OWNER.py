@@ -970,7 +970,7 @@ class UpdateMessageCache(Database):
 	no_file = True
 	checked = set()
 	loader = FileHashDict(path=f"{CACHE_PATH}/message_cache_loader")
-	loading = None
+	loadings = {}
 
 	async def load_channel(self, channel, duration=60):
 		if channel.id in self.checked:
@@ -1000,15 +1000,12 @@ class UpdateMessageCache(Database):
 		self.loader[channel.id] = curr_id
 
 	async def load_guild(self, guild, duration=60):
-		if guild.id in self.checked:
-			return
 		bot = self.bot
 		if bot.permissions_in(guild).read_messages and bot.permissions_in(guild).read_message_history:
 			pass
 		else:
 			return
 		with tracebacksuppressor:
-			self.checked.add(guild.id)
 			channels = list(guild.text_channels) + list(guild.voice_channels) + list(guild.threads)
 			if guild.member_count < 100:
 				m_id = min((self.loader.get(c.id, 0) for c in channels), default=0)
@@ -1033,17 +1030,15 @@ class UpdateMessageCache(Database):
 				for channel in channels:
 					self.loader[channel.id] = curr_id
 
-	async def load_all(self, duration=14 * 86400):
-		await gather(*(self.load_guild(guild, duration=duration) for guild in sorted(self.bot.guilds, key=lambda g: g.id, reverse=True)), return_exceptions=True, max_concurrency=10)
-
-	def _bot_ready_(self, **void):
-		if self.loading:
-			self.loading.cancel()
-		self.loading = create_task(self.load_all())
-
 	def _destroy_(self, **void):
-		if self.loading:
-			self.loading.cancel()
+		for task in self.loadings.values():
+			task.cancel()
+
+	async def _send_(self, message, **void):
+		if not message.guild or message.guild.id in self.loadings:
+			return
+		self.loadings[message.guild.id] = create_task(self.load_guild(message.guild, 14 * 86400))
+	_delete_ = _send_
 
 	@staticmethod
 	def serialise_message(message):

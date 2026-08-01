@@ -3135,9 +3135,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					break
 			if e.type != "image" and e.thumbnail:
 				url = e.thumbnail.url
-				if proxy_images:
-					with tracebacksuppressor:
-						url = await self.data.exec.uproxy(url)
 				thumbnail = url
 		if embedded_images:
 			emb.url = message_link(message)
@@ -3145,12 +3142,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if len(embedded_images) > 1:
 				for url in embedded_images[1:]:
 					embeds.append(discord.Embed(url=emb.url).set_image(url=url))
-		if proxy_images:
-			try:
-				embedded_images = await bot.data.exec.uproxy(*embedded_images, collapse=False)
-				await gather(*(attachment_cache.scan_headers(url) for url in embedded_images))
-			except Exception:
-				print_exc()
 		if thumbnail:
 			emb.set_thumbnail(url=thumbnail)
 		for e in message.embeds:
@@ -3182,11 +3173,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		items = []
 		for i in range((len(urls) + 9) // 10):
 			temp2 = temp = urls[i * 10:i * 10 + 10]
-			if proxy_images:
-				try:
-					temp2 = await self.data.exec.uproxy(*temp, collapse=False)
-				except Exception:
-					print_exc()
 			def as_link(url1, url2):
 				if thumbnail in (url1, url2):
 					return
@@ -3208,6 +3194,32 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in message.reactions) + "   " + link
 				embeds[0].description = lim_str(description, 4096)
 		return embeds
+
+	async def prepare_embeds(self, embeds, m_id=None):
+		cache = {}
+		attachments = []
+		for e in embeds:
+			if e.image and e.image.url and is_discord_attachment(e.image.url):
+				p = attachment_cache.preserve(e.image.url, m_id)
+				try:
+					fn2 = cache[p]
+				except KeyError:
+					fn = await attachment_cache.download(e.image.url, m_id, filename=True)
+					fn2 = f"{len(attachments)}.webp"
+					attachments.append(CompatFile(fn, filename=fn2))
+					cache[p] = fn2
+				e.set_image(url=f"attachment://{fn2}")
+			if e.thumbnail and e.thumbnail.url and is_discord_attachment(e.thumbnail.url):
+				p = attachment_cache.preserve(e.thumbnail.url, m_id)
+				try:
+					fn2 = cache[p]
+				except KeyError:
+					fn = await attachment_cache.download(e.thumbnail.url, m_id, filename=True)
+					fn2 = f"{len(attachments)}.webp"
+					attachments.append(CompatFile(fn, filename=fn2))
+					cache[p] = fn2
+				e.set_thumbnail(url=f"attachment://{fn2}")
+		return attachments
 
 	async def coloured_embed(self, url):
 		colour = await self.get_colour(url)
@@ -7680,7 +7692,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def flatten_search(self, guild_id, limit=200, break_after=200, return_extra=False, sort_order="desc", **kwargs):
 		total = 0
 		data = []
-		for pos in range(0, limit - 1, 25):
+		for pos in range(0, limit, 25):
 			resp = await self.search_messages(
 				guild_id=guild_id,
 				offset=pos,

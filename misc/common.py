@@ -657,8 +657,8 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 
 async def manual_edit(message, **fields):
 	if (
-		message.components and fields.get("buttons") is None and fields.get("components") is None
-		or not message.components and (not fields.get("buttons") and not fields.get("components"))
+		getattr(message, "components", None) and fields.get("buttons") is None and fields.get("components") is None
+		or not getattr(message, "components", None) and (not fields.get("buttons") and not fields.get("components"))
 	):
 		fields.pop("buttons", None)
 		return await message.edit(**fields)
@@ -718,8 +718,6 @@ async def manual_edit(message, **fields):
 				content_type=magic.from_buffer(b),
 			)
 			f.reset()
-			# if "data" in data:
-			#     data["data"].setdefault("attachments", []).append(dict(id=i, description=".", filename=f.filename))
 		form.add_field(
 			name="payload_json",
 			value=json_dumps(data).decode("utf-8", "replace"),
