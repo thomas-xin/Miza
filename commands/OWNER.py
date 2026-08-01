@@ -981,6 +981,7 @@ class UpdateMessageCache(Database):
 			pass
 		else:
 			return
+		curr_id = current_snowflake()
 		with tracebacksuppressor:
 			self.checked.add(channel.id)
 			m_id = self.loader.get(channel.id, 0)
@@ -1009,28 +1010,31 @@ class UpdateMessageCache(Database):
 		with tracebacksuppressor:
 			self.checked.add(guild.id)
 			channels = list(guild.text_channels) + list(guild.voice_channels) + list(guild.threads)
-			m_id = min((self.loader.get(c.id, 0) for c in channels), default=0)
-			last = max(
-				time_snowflake(dtnu() - datetime.timedelta(seconds=duration)),
-				m_id,
-			)
-			lim = 250
-			softlim = 25
-			messages, extra = await bot.flatten_search(guild_id=guild.id, min_id=last + 1, limit=lim, break_after=softlim, return_extra=True, sort_order="asc")
+			if guild.member_count < 100:
+				m_id = min((self.loader.get(c.id, 0) for c in channels), default=0)
+				last = max(
+					time_snowflake(dtnu() - datetime.timedelta(seconds=duration)),
+					m_id,
+				)
+				lim = 250
+				softlim = 25
+				messages, extra = await bot.flatten_search(guild_id=guild.id, min_id=last + 1, limit=lim, break_after=softlim, return_extra=True, sort_order="asc")
+			else:
+				messages, extra = [], True
 			curr_id = current_snowflake()
 			if messages:
 				await _run_async(self.save_messages, messages)
 				p = "+" if extra else ""
 				print(f"G{guild.id}: Stored {len(messages)}{p}")
 			if extra:
-				duration = min(duration, (dtnu() - messages[-1].created_at).total_seconds())
+				duration = min(duration, (dtnu() - messages[-1].created_at).total_seconds() if messages else inf)
 				await gather(*(self.load_channel(c, duration=duration) for c in channels), max_concurrency=20)
 			else:
 				for channel in channels:
 					self.loader[channel.id] = curr_id
 
 	async def load_all(self, duration=14 * 86400):
-		await gather(*(self.load_guild(guild, duration=duration) for guild in self.bot.guilds), return_exceptions=True, max_concurrency=10)
+		await gather(*(self.load_guild(guild, duration=duration) for guild in sorted(self.bot.guilds, key=lambda g: g.id, reverse=True)), return_exceptions=True, max_concurrency=10)
 
 	def _bot_ready_(self, **void):
 		if self.loading:

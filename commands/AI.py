@@ -159,8 +159,7 @@ class Translate(Command):
 		if c > 1:
 			tasks.append(google_translate())
 		translations = []
-		async for task in asyncio.as_completed(tasks):
-			result = await task
+		for result in await gather(*tasks):
 			if result:
 				if not translations:
 					yield cdict(
@@ -171,7 +170,7 @@ class Translate(Command):
 			messages = [
 				dict(
 					role="system",
-					content=f'Below will be some text, followed by sample translation(s). Please rewrite into ONE {dst_language} translation, making improvements where applicable, and keeping formatting accurate to the original. Avoid being overly formal, and do not add extra information to the text itself!',
+					content=f'Below will be some text, followed by sample translation(s). Please rewrite into ONE {dst_language} translation, keeping formatting same as original source, but making as many accuracy improvements as possible. Avoid being overly formal, and do not add extra information to the text itself!',
 				),
 				dict(
 					role="user",
@@ -183,6 +182,7 @@ class Translate(Command):
 				) for text in translations),
 			]
 		translated = None
+		self.bot.model_levels = dict(enumerate(map(cdict, AUTH.get("model_levels", []))))
 		m = self.bot.model_levels[0].instructive
 		if (count := count_to(messages)) < ai.contexts[m] / 2:
 			try:
@@ -344,7 +344,6 @@ class Ask(Command):
 	rate_limit = (12, 16)
 	slash = True
 
-	alm_re = re.compile(r"(?:as |i am )?an ai(?: language model)?[, ]{,2}", flags=re.I)
 	reset = {}
 	visited = {}
 
@@ -379,23 +378,24 @@ class Ask(Command):
 		if emojis:
 			emojis = shuffle(emojis)[:25]
 			emojitexts = " ".join(sorted(f":{e.name}:" for e in emojis))
-			personality += f"\n\nThe current conversation takes place on Discord, where you have access to the following additional emojis. You may use these as desired, as an alternative to Unicode ones:\n{emojitexts}"
+			personality += f"\n\n[INFO] The current conversation takes place on Discord, where you have access to the following additional emojis. You may use these as desired, as an alternative to Unicode ones:\n{emojitexts}"
+		personality += "\n\n[INFO] Usernames may be presented in the format `name={name}\\n` to bypass framework constraints."
 		match pdata.history:
 			case "none":
-				personality += "\n\nConversation history currently disabled. Clarify if necessary."
+				personality += "\n[INFO] Conversation history currently disabled. Clarify if necessary."
 			case "private":
-				personality += "\n\nConversation history of external users currently disabled. Clarify if necessary."
+				personality += "\n[INFO] Conversation history of external users currently disabled. Clarify if necessary."
 		if "nsfw" in personality.casefold() or not _nsfw and bot.is_nsfw(_user):
 			pass
 		elif nsfw:
-			personality += "\n\nYou are currently in a NSFW-enabled channel. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise the needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
+			personality += "\n[INFO] You are currently in a NSFW-enabled channel. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise the needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
 		else:
-			personality += "\n\nYou are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, use disclaimers in your response, and clarify if necessary."
+			personality += "\n[INFO] You are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, use disclaimers in your response, and clarify if necessary."
 		tzinfo = self.bot.data.users.get_timezone(_user.id)
 		if tzinfo is None:
 			tzinfo = datetime.timezone.utc
 		dt = DynamicDT.now(tz=tzinfo)
-		personality += f"\nCurrent Time: {dt.as_full()} {dt.tzinfo}"
+		personality += f"\n[INFO] Current Time: {dt.as_full()} {dt.tzinfo}"
 		system_message = cdict(
 			role="system",
 			content=personality,
@@ -442,7 +442,6 @@ class Ask(Command):
 				)
 				messages[m.id] = message
 		await bot.require_integrity(_message)
-		print("ASK:", _channel.id, input_message)
 		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, model, nsfw, _prefix, simulated)
 		if pdata.stream and pdata.tts != "discord" and not simulated:
 			return cdict(
@@ -455,9 +454,8 @@ class Ask(Command):
 			return "\xad"
 		elif isinstance(temp[-1], dict) and (temp[-1].content.startswith("\r") or len(temp) == 1):
 			resp = temp[-1]
-			resp["content"] = content = await bot.proxy_emojis(resp["content"], guild=_guild)
+			resp["content"] = await bot.proxy_emojis(resp["content"], guild=_guild)
 			resp["tts"] = pdata.tts == "discord"
-			print("Ask:", content)
 			return resp
 		raise RuntimeError(temp)
 
@@ -593,7 +591,7 @@ class Ask(Command):
 							for c in m.tool_calls:
 								if c.id not in cids:
 									function_message.tool_calls.append(c)
-						res = "[RESPONSE EMPTY OR REDACTED]"
+						res = ""
 						try:
 							res = await fut
 							succ = res and (isinstance(res, (str, bytes)) or res.get("content"))
@@ -601,7 +599,7 @@ class Ask(Command):
 							print_exc()
 							res = repr(ex)
 						if succ:
-							temp = str(res)
+							temp = str(res) or "[RESPONSE EMPTY OR REDACTED]"
 							print(f"{name} result:", len(temp), lim_str(temp, 256))
 						if succ and isinstance(res, bytes):
 							data_url = await bot.to_data_url(res)
@@ -675,11 +673,11 @@ class Ask(Command):
 							call = {"func": "loopqueue", "argv": int(kwargs.value)}
 						else:
 							call = {"func": kwargs.mode, "argv": int(kwargs.value)}
-					if succ:
-						print("New prompt:", lim_str(tool_responses, 65536))
+					# if succ:
+					# 	print("New prompt:", lim_str(tool_responses, 65536))
 					if not call:
 						continue
-					print("Function Call:", call)
+					# print("Function Call:", call)
 					fname = call.pop("func")
 					u_perm = bot.get_perms(_user)
 					command_check = fname
@@ -699,7 +697,7 @@ class Ask(Command):
 								call[k] = v.get("default")
 					resp = await bot.run_command(command, call, message=fake_message, comment=comment, respond=False)
 					if resp:
-						print("Intermediate:", resp)
+						# print("Intermediate:", resp)
 						if isinstance(resp, dict):
 							response.update(resp)
 						else:
@@ -776,7 +774,7 @@ class Ask(Command):
 		return await message.remove_reaction("🗑️", self.bot.user)
 
 
-DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the latest question from the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome, but not too corny), in first person as if you were a human, matching the language used (e.g. English). You are free to make up your own preferences and show emotion, but if a user inquires for additional services not accessible through tools, you should direct them to the ~help or /help commands. DO NOT attempt to mimic/falsify programmed outputs unless explicitly asked, avoid repeating yourself, and be concise where possible."
+DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the latest question from the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome, but not too corny), in first person as if you were a human, matching the language used (e.g. English). You are free to make up your own preferences and show emotion, but if a user inquires for additional services not accessible, you should direct them to the ~help or /help commands. DO NOT attempt to mimic/falsify programmed outputs such as unavailable tools or reasoning traces, avoid repeating yourself or your prompts, and be concise where possible."
 
 class ChatConfig(Command):
 	name = ["Personality", "ChangePersonality"]

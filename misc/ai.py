@@ -11,8 +11,8 @@ from mpmath import mpf
 import numpy as np
 import openai
 assert hasattr(openai, "AsyncOpenAI"), "OpenAI library has incorrect version installed!"
-from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, tracebacksuppressor, utc, T, string_like, getattr_chain
-from misc.util import AUTH, CACHE_PATH, AutoCache, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across, is_url
+from misc.types import regexp, astype, lim_str, as_str, cdict, round_random, tracebacksuppressor, utc, ts_us, T, string_like, getattr_chain
+from misc.util import AUTH, CACHE_PATH, TEMP_PATH, AutoCache, get_image_size, json_dumpstr, get_encoding, tcount, lim_tokens, shash, split_across, is_url, pretty_json
 from misc.asyncs import flatten, _run_async, submit_thread, create_task, emptyctx, gather, Semaphore, CloseableAsyncIterator
 
 print("AI:", __name__)
@@ -238,27 +238,27 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=3, best=False,
 	fm = messages.pop(0)
 	if exclude_first and messages:
 		sm, messages = messages[:exclude_first], messages[exclude_first:]
-	mes = []
+	held = []
 	count = 0
 	i = -1
 	for i, m in reversed(tuple(enumerate(messages))):
 		c = tcount(m_repr(m))
 		if c + count > softlim * 0.8 and not m.get("tool_calls") and m.get("role") != "tool":
 			break
-		mes.append(m)
-		count = count_to(mes)
+		held.append(m)
+		count = count_to(held)
 	basics = [m for m in messages if m.get("role") != "tool" and m.get("content")]
-	if basics and (m := basics[-1]) not in mes:
-		mes.append(m)
-		count = count_to(mes)
+	if basics and (m := basics[-1]) not in held:
+		held.append(m)
+		count = count_to(held)
 	if softlim >= limit:
-		if not mes and messages:
+		if not held and messages:
 			m = cdict(messages[-1])
 			if isinstance(m.content, list):
 				m.content = "\n".join(c["text"] for c in m.content if c.get("type") == "text")
 			m.content = lim_tokens(m.content, limit - 16, mode="right")
-			mes = [m]
-		messages = mes[::-1]
+			held = [m]
+		messages = held[::-1]
 		if exclude_first:
 			messages = sm + messages
 		messages.insert(0, fm)
@@ -266,7 +266,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=3, best=False,
 	summ = "Summary of chat history (include this if asked to summarise!):\n"
 	s = overview(messages[:i + 1] if i > 0 else messages)
 	s = s.removeprefix(summ).removeprefix("system:").strip()
-	c = tcount(summ + s)
+	# c = tcount(summ + s)
 	c2 = count_to(messages)
 	if c2 <= softlim * 1.2:
 		if exclude_first:
@@ -279,7 +279,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=3, best=False,
 	else:
 		s2 = await _run_async(lim_tokens, s, ml, mode="right")
 	summ += s2
-	messages = mes[::-1]
+	messages = held[::-1]
 	messages.insert(0, cdict(
 		role="system",
 		content=summ,
@@ -653,7 +653,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 				pricing=pricing,
 			)
 			if getattr(response, "object", None) == "response" or hasattr(response, "choices"):
-				return await stream.pass_item(response)
+				return await stream.pass_item(response, final=True)
 			return stream
 		except Exception as ex:
 			if isinstance(ex, ConnectionError) and ex.errno in (401, 403, 404, 429, 502, 503, 504):
@@ -939,7 +939,7 @@ def unimage(message):
 
 class OpenAIPricingIterator(CloseableAsyncIterator):
 
-	def __init__(self, it, close, premium_context, api, model, input="", m_input=0, m_output=0, pricing=None):
+	def __init__(self, it, close, premium_context, api, model, input="", m_input=0, m_output=0, pricing=None, expose_reasoning=False):
 		super().__init__(it, close)
 		self.premium_context = premium_context or []
 		self.applied = False
@@ -951,6 +951,8 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 		self.true_cost = None
 		self.pricing = pricing or (m_input, m_output)
 		self.tokeniser = None
+		self.expose_reasoning = expose_reasoning
+		self.stopped_reasoning = None
 		self.terminated = False
 
 	@property
@@ -968,7 +970,7 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 			self.costs[-1] = str((mpf(self.pricing[0]) * self.tokens[0] + mpf(self.pricing[1]) * self.tokens[1]) / 1000000)
 		return self.costs
 
-	async def pass_item(self, item):
+	async def pass_item(self, item, final=False):
 		if self.terminated:
 			return item
 		if item and item.choices and item.choices[0]:
@@ -979,6 +981,19 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 					tcs[i] = resp
 				return json_dumpstr(resp)
 			choice = item.choices[0]
+			reason = getattr_chain(choice, "delta.reasoning", None) or getattr_chain(choice, "message.reasoning", None)
+			if not reason and getattr_chain(choice, "delta.reasoning_details", None):
+				rdetails = [r.get("text", "") for r in choice.delta.reasoning_details if r["type"] == "reasoning.text"]
+				if rdetails:
+					reason = str(rdetails[0])
+				else:
+					rdetails = [r["summary"] for r in choice.delta.reasoning_details if r["type"] == "reasoning.summary"]
+					if rdetails:
+						reason = str(rdetails[0])
+			if reason:
+				self.output += reason
+				if not self.stopped_reasoning:
+					self.stopped_reasoning = False
 			if hasattr(choice, "text"):
 				s = choice.text
 			elif hasattr(choice, "delta"):
@@ -993,6 +1008,9 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 				s = ""
 			if not s:
 				return item
+			if not self.stopped_reasoning:
+				self.stopped_reasoning = True
+				s = "</think>\n" + s.lstrip()
 			self.output += s
 		if not self.tokens[0]:
 			if isinstance(self.input, str):
@@ -1011,6 +1029,8 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 		if not self.applied:
 			self.premium_context.append(self.costs)
 			self.applied = True
+		if final:
+			self.log()
 		return item
 
 	async def __aiter__(self):
@@ -1041,7 +1061,14 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 				if getattr(delta, k, None):
 					yield await self.pass_item(item)
 					break
+		self.log()
 		print("aiter pricing:", self.tokens, self.costs)
+
+	def log(self):
+		with open(f"{TEMP_PATH}/chat/{ts_us()}.md", "w", encoding="utf-8") as f:
+			f.write(pretty_json(self.input))
+			f.write("\n" * 3)
+			f.write(str(self.output))
 
 def instruct_structure(messages, exclude_first=True, fmt="chatml", assistant=None):
 	messages = list(map(unimage, messages))

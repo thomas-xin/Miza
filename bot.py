@@ -122,7 +122,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		directory = frozenset(os.listdir())
 		if "saves" not in directory:
 			os.mkdir("saves")
-		for k in ("attachments", "audio", "filehost"):
+		self.sub_caches = ("audio", "chat")
+		for k in self.sub_caches:
 			if not os.path.exists(f"{CACHE_PATH}/{k}"):
 				os.mkdir(f"{CACHE_PATH}/{k}")
 			if not os.path.exists(f"{TEMP_PATH}/{k}"):
@@ -1918,7 +1919,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			region = self.browse_locations.get(timezone, "wt-wt")
 		async def retrieval(argv, region="wt-wt"):
 			if not is_url(argv):
-				print("Browse query:", repr(argv))
+				# print("Browse query:", repr(argv))
 				data = []
 				futs = []
 				backends = ["bing", "brave", "duckduckgo", "mojeek", "yandex", "yahoo"]
@@ -2101,7 +2102,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			prompt=prompt,
 			**kwargs,
 		)
-		print("CC:", data)
 		count = tcount(prompt)
 		max_tokens = min(max_tokens, ctx - count - 64)
 		if "max_completion_tokens" not in kwargs:
@@ -2358,7 +2358,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						users += 1
 						if users > 1:
 							break
-				toolcheck.append(messages[0])
+				# toolcheck.append(messages[0])
 				toolcheck.reverse()
 				vision_alt = modelist.vision if modelist.function not in ai.is_vision else modelist.function
 				toolcheck, toolmodel = await self.caption_into(toolcheck, model=modelist.function, backup_model=vision_alt, premium_context=premium_context)
@@ -2404,7 +2404,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						print(tc.function.arguments)
 						print_exc()
 						args = {}
-					print(args)
+					# print(args)
 					if args.get("format"):
 						mode = args["format"]
 					if args.get("reasoning_effort"):
@@ -2419,7 +2419,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				directly_answer = True
 				reasoning_effort = "medium"
 			if not directly_answer and message.tool_calls:
-				print("Immediate call:", message)
+				# print("Immediate call:", message)
 				choice = resp.choices[0]
 				st = count_to(messages)
 				ct = tcount(message.content)
@@ -2496,7 +2496,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		messages = await ai.cut_to(messages, maxlim, minlim, best=best, prompt=prompt, premium_context=premium_context)
 		length = count_to(messages)
 		length = ceil(length * 1.1) + 4 * len(messages)
-		print("Chat completions:", model, ai.overview(messages), cargs, sep="\n")
+		# print("Chat completions:", model, ai.overview(messages), cargs, sep="\n")
 		reasoning_thresh = 0
 		tmpcut = None
 		tmplen = 0
@@ -2560,7 +2560,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				refusal = True
 			else:
 				reason = ""
-				print("Response chosen:", T(resp).get("model", assistant), tlen, resp)
+				# print("Response chosen:", T(resp).get("model", assistant), tlen, resp)
 				message = None
 				written = False
 				try:
@@ -2648,7 +2648,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					reasoning.append(reason)
 				if message:
 					if getattr(message, "tool_calls", None):
-						print("Output call:", message)
+						# print("Output call:", message)
 						st = tlen
 						ct = tcount(text)
 						yield cdict(
@@ -2829,13 +2829,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			max_tokens=2048,
 			user=str(hash(self.name) & 4294967295),
 		)
-		print("Vision Input:", lim_str(data, 1024))
+		# print("Vision Input:", lim_str(data, 1024))
 		async with asyncio.timeout(timeout):
 			response = await ai.llm("chat.completions.create", premium_context=premium_context, **data, timeout=timeout)
 		out = response.choices[0].message.content.strip()
 		if ai.decensor.search(out):
 			raise ValueError(f"Failed or censored response: {repr(out)}.")
-		print("Vision Response:", out)
+		# print("Vision Response:", out)
 		return out
 
 	async def ocr(self, url):
@@ -2854,7 +2854,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				)),
 				json=True,
 			)
-			print(resp)
+			# print(resp)
 			s = "\n\n".join(page["markdown"] for page in resp["pages"]).strip()
 			if s == "![img-0.jpeg](img-0.jpeg)":
 				s = None
@@ -4305,7 +4305,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			i = 0
 			t = utc()
 			for path, limit in zip((CACHE_PATH, TEMP_PATH), (16384, 1024)):
-				for k in ("", "audio"):
+				for k in ("",) + self.sub_caches:
 					atts = os.listdir(f"{path}/{k}")
 					if len(atts) > limit:
 						atts = sorted(
@@ -4515,7 +4515,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						text += f", from {belongs(uni_str(n))} place!"
 					else:
 						text += "!"
-				# Status iterates through 5 possible choices
+				# Status iterates through 5 possible choices: Online, Idle, DND, Online (Mobile), Streaming
 				status = self.statuses[self.status_iter]
 				if getattr(self, "invisible", False):
 					status = None
@@ -4526,15 +4526,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				else:
 					activity = discord.Game(name=text)
 				if self.audio:
-					audio_status = "await client.change_presence(status=discord.Status."
+					audio_status = "await client.change_presence(status=discord.Status.{})"
 					if status is None:
 						status = discord.Status.offline
-						create_task(self.audio.asubmit(audio_status + "offline)"))
+						submit_thread(self.audio.submit(audio_status.format("offline")))
 					elif status == discord.Status.invisible:
 						status = discord.Status.idle
-						submit_thread(self.audio.submit(audio_status + "online)"))
+						submit_thread(self.audio.submit(audio_status.format("online")))
 					else:
-						submit_thread(self.audio.submit(audio_status + "dnd)"))
+						submit_thread(self.audio.submit(audio_status.format("dnd")))
 				elif status is None:
 					status = discord.Status.offline
 				elif status == discord.Status.invisible:
@@ -4868,7 +4868,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if r:
 					kwargs[k] = [r] if v.get("multiple") else r
 					continue
-				print(kwargs)
+				# print(kwargs)
 				if v:
 					raise ArgumentError(f"Argument `{k}` ({italics(v.description)}) is required.")
 				raise ArgumentError(f"Argument `{k}` (`{italics(v.type)}`) is required.")
@@ -5775,7 +5775,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				)
 			except niquests.exceptions.HTTPError:
 				return
-			print("Deferred:", message.id, int_id, int_token, data)
+			# print("Deferred:", message.id, int_id, int_token, data)
 			self.inter_cache[int_id] = int_token
 			self.inter_cache[message.id] = int_token
 			message.deferred = int_token
@@ -5912,7 +5912,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 									json=True,
 								)
 							except Exception:
-								print("Errored:", kwargs, data)
+								print("Errored webhook:", kwargs, data)
 								raise
 							message = self.ExtendedMessage.new(resp)
 					else:
@@ -6475,7 +6475,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			pass
 		else:
 			return
-		print(message, reaction, user)
+		# print(message, reaction, user)
 		with tracebacksuppressor(discord.NotFound):
 			u_perm = self.get_perms(user.id, message.guild)
 			check = False
@@ -7384,7 +7384,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			try:
 				data["channel_id"] = channel.id
 			except Exception:
-				print("CREATE_MESSAGE:", data)
+				print("Error in CREATE_MESSAGE:", data)
 				raise
 			return bot.ExtendedMessage.new(data)
 		discord.state.ConnectionState.create_message = create_message
@@ -7486,7 +7486,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				reacts=reacts,
 				reference=reference,
 			))
-		print(reference)
+		# print(reference)
 		if getattr(reference, "slash", None):
 			embed = discord.Embed(
 				title=title,
@@ -7630,8 +7630,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		print("Initialisation complete.")
 
 	sem_counters = {}
-	flatten_sems = collections.defaultdict(lambda: Semaphore(1, 10, rate_limit=2))
-	search_sem = Semaphore(5, 120, rate_limit=6)
+	flatten_sems = collections.defaultdict(lambda: Semaphore(1, 120, rate_limit=6))
+	search_sem = Semaphore(1, 120, rate_limit=3)
 	async def flatten_into_cache(self, history, bucket):
 		sem = self.flatten_sems[bucket]
 		data = {}
@@ -8014,7 +8014,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				message.int_token = data["token"]
 				await self.react_callback(message, custom_id, user)
 			case _:
-				print("Unknown interaction:\n" + str(data))
+				print(f"Unknown interaction:\n{data}")
 		for attr in ("slash", "int_id", "int_token"):
 			try:
 				delattr(m, attr)
@@ -8459,8 +8459,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 										user = await self.fetch_user_member(e.uid, guild)
 										break
 									self.delete_audits[t] = audits
-					print(audits)
-					print("Audited Delete:", message, user)
+					# print(audits)
+					# print("Audited Delete:", message, user)
 				await self.send_event("_audited_delete_", message=message, requestor=user)
 
 		async def _on_raw_message_delete(payload):
@@ -8572,8 +8572,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 									user = await self.fetch_user_member(e.uid, guild)
 									break
 								self.delete_audits[t] = audits
-					print(audits)
-					print("Audited Bulk Delete:", message, user)
+					# print(audits)
+					# print("Audited Bulk Delete:", message, user)
 				await self.send_event("_bulk_delete_", messages=messages, requestor=user)
 
 		async def _on_raw_bulk_message_delete(payload):
