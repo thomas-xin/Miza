@@ -1,4 +1,5 @@
 import asyncio
+from bs4 import BeautifulSoup
 from collections import deque
 from concurrent.futures import Future
 from contextlib import suppress
@@ -23,7 +24,7 @@ from .asyncs import submit_thread
 from .util import (
 	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
 	find_urls, url2fn, url2ext, discord_expired, expired, shorten_attachment, unyt, html_decode, mime_into, is_local_url,
-	is_image, is_url, is_discord_attachment, is_miza_url, is_miza_attachment, is_youtube_url, is_spotify_url, is_reddit_url, is_klipy_url, AUDIO_FORMS,
+	is_image, is_url, is_discord_attachment, is_miza_url, is_miza_attachment, is_youtube_url, is_spotify_url, is_reddit_url, is_twitter_url, is_klipy_url, AUDIO_FORMS,
 	EvalPipe, PipedProcess, AutoCache, Request, Semaphore, TEMP_PATH, CACHE_PATH, magic, rename, temporary_file, replace_ext, select_and_loads, extract_archive, archive_mimes, AUTH,
 )
 from .caches import audio_meta, attachment_cache, audio_meta_cache
@@ -1095,6 +1096,8 @@ class AudioDownloader:
 		"""Gets a valid audio stream (URL or file) from a given entry, with optional trimming. In ASAP (as soon as possible) mode, prefer URLs."""
 		url = entry.get("orig") or entry["url"]
 		assert not is_local_url(url), url
+		if is_twitter_url(url) and entry.get("video"):
+			return *entry["video"], entry.get("duration"), 2
 		ext = fmt or "opus"
 		fn = temporary_file(ext)
 		d = entry.get("duration")
@@ -1286,6 +1289,48 @@ class AudioDownloader:
 					audio=stream,
 					video=[stream, fmt],
 				))
+			elif is_reddit_url(url):
+				url = re.sub(r"(?:\w{2,3}\.)?(?:fxreddit|vxreddit|rxddit|reddit).com", "www.reddit.com", url, 1)
+			elif is_twitter_url(url):
+				twr = r"(?:\w{2,3}\.)?(?:x|fixupx|twitter|vxtwitter|fxtwitter|stupidpenisx).com"
+				url = re.sub(twr, "vxtwitter.com", url, 1)
+				s = Request(
+					url,
+					decode=True,
+					headers={"User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)"},
+				)
+				soup = BeautifulSoup(s, "html.parser")
+				metas = soup.find_all("meta")
+				e = cdict()
+				fmt = None
+				for t in metas:
+					key = t.attrs.get("property") or t.attrs.get("name")
+					value = t.attrs.get("content") or t.attrs.get("value")
+					if not key or not value:
+						continue
+					match key:
+						case "og:title":
+							e.name = value
+						case "og:url":
+							e.url = re.sub(twr, "x.com", value)
+						case "og:video" | "twitter:video":
+							if e.get("video"):
+								e.video[0] = value
+							else:
+								e.video = [value, None]
+							e.setdefault("audio", value)
+						case "og:video:type":
+							fmt = mime_into(value)
+						case "og:audio":
+							e.audio = value
+						case "og:image" | "twitter:image":
+							e.setdefault("video", [value, None])
+							e.icon = value
+				if fmt and e.video:
+					e.video[1] = fmt
+				e.setdefault("name", url2fn(url))
+				e.setdefault("url", url)
+				output.append(e)
 		else:
 			urls = []
 			if ":" not in url:

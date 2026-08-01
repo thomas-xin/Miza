@@ -1676,7 +1676,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				continue
 			try:
 				headers = {}
-				bypass = is_reddit_url(url) or is_youtube_url(url) or is_klipy_url(url) or is_tenor_url(url) or is_imgur_url(url) or is_giphy_url(url)
+				bypass = is_reddit_url(url) or is_twitter_url(url) or is_youtube_url(url) or is_klipy_url(url) or is_tenor_url(url) or is_imgur_url(url) or is_giphy_url(url)
 				if not bypass:
 					headers = await attachment_cache.scan_headers(url, fc=True)
 				if not bypass and headers.get("Content-Type", "").split(";", 1)[0] not in ("text/html",):
