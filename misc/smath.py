@@ -797,6 +797,7 @@ hue2colour = lambda a, offset=0: adj_colour(colorsys.hsv_to_rgb((a / 1536) % 1, 
 def colour2raw(*c):
 	while isinstance(c, (bytes, tuple, list)) and len(c) == 1:
 		c = c[0]
+	c = [max(0, min(255, round(x))) for x in c]
 	if len(c) == 3:
 		return (c[0] << 16) + (c[1] << 8) + c[2]
 	return (c[0] << 16) + (c[1] << 8) + c[2] + (c[3] << 24)

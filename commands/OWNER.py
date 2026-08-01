@@ -703,9 +703,9 @@ class UpdateExec(Database):
 			if optimise:
 				if not data and is_url(url):
 					data = await attachment_cache.download(url, filename=True)
-				if data and getsize(data) > 1048576 and magic.from_file(data).split("/", 1)[0] in ("image", "video"):
-					data = await bot.optimise_image(data, fsize=1048576, fmt="avif")
-					filename = replace_ext(filename or "Untitled", "avif")
+				if data and getsize(data) > 4000000 and magic.from_file(data).split("/", 1)[0] in ("image", "video"):
+					data = await bot.optimise_image(data, fsize=4000000, fmt="webp")
+					filename = replace_ext(filename or "Untitled", "webp")
 			url2 = await self.lproxy(data or url, filename=filename, channel=channel, allow_empty=False)
 			# print("UPROXY:", urls, filename, url2)
 			if uhu:
@@ -730,18 +730,22 @@ class UpdateExec(Database):
 	async def _bot_ready_(self, **void):
 		with suppress(AttributeError):
 			PRINT.funcs.append(self._log_)
-		for c_id, flag in self.data.items():
-			if not flag & 24:
-				continue
-			channel = self.bot.cache.channels.get(c_id)
-			if not channel:
-				continue
-			mchannel = None
-			if not mchannel:
-				mchannel = channel.parent if hasattr(channel, "thread") or isinstance(channel, discord.Thread) else channel
-			if not mchannel:
-				continue
-			await self.bot.ensure_webhook(mchannel, force=True)
+		create_task(self.ensure)
+
+	async def ensure(self):
+		with tracebacksuppressor:
+			for c_id, flag in self.data.items():
+				if not flag & 24:
+					continue
+				channel = self.bot.cache.channels.get(c_id)
+				if not channel:
+					continue
+				mchannel = None
+				if not mchannel:
+					mchannel = channel.parent if hasattr(channel, "thread") or isinstance(channel, discord.Thread) else channel
+				if not mchannel:
+					continue
+				await self.bot.ensure_webhook(mchannel, force=True)
 
 	def _destroy_(self, **void):
 		with suppress(LookupError, AttributeError):
@@ -750,7 +754,7 @@ class UpdateExec(Database):
 
 class UpdateProxies(Database):
 	name = "proxies"
-	limit = 65536
+	limit = 1048576
 
 
 class SetAvatar(Command):
@@ -766,7 +770,7 @@ class SetAvatar(Command):
 	)
 
 	async def __call__(self, bot, url, **void):
-		data = await bot.optimise_image(url, msize=10485760, fmt="gif")
+		data = await bot.optimise_image(url, fsize=83886080, fmt="gif")
 		await bot.edit(avatar=data)
 		return cdict(
 			content=f"✅ Succesfully Changed {bot.user.name}'s avatar!",
@@ -991,8 +995,12 @@ class UpdateMessageCache(Database):
 			)
 			async with bot.guild_semaphore:
 				messages = []
-				async for message in channel.history(after=last, limit=None, oldest_first=True):
-					messages.append(message)
+				try:
+					async for message in channel.history(after=last, limit=None, oldest_first=True):
+						messages.append(message)
+				except discord.Forbidden as ex:
+					print(channel.id, repr(ex))
+					return
 			curr_id = current_snowflake()
 			if messages:
 				print(f"C{channel.id}: Stored {len(messages)}")
@@ -1006,7 +1014,7 @@ class UpdateMessageCache(Database):
 		else:
 			return
 		with tracebacksuppressor:
-			channels = list(guild.text_channels) + list(guild.voice_channels) + list(guild.threads)
+			channels = list(guild.text_channels) + list(guild.threads)
 			if guild.member_count < 100:
 				m_id = min((self.loader.get(c.id, 0) for c in channels), default=0)
 				last = max(
@@ -1015,7 +1023,11 @@ class UpdateMessageCache(Database):
 				)
 				lim = 250
 				softlim = 25
-				messages, extra = await bot.flatten_search(guild_id=guild.id, min_id=last + 1, limit=lim, break_after=softlim, return_extra=True, sort_order="asc")
+				try:
+					messages, extra = await bot.flatten_search(guild_id=guild.id, min_id=last + 1, limit=lim, break_after=softlim, return_extra=True, sort_order="asc")
+				except ConnectionError as ex:
+					print(guild.id, repr(ex))
+					return
 			else:
 				messages, extra = [], True
 			curr_id = current_snowflake()

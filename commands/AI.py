@@ -374,12 +374,7 @@ class Ask(Command):
 		else:
 			name_repr = bot_name
 		personality = pdata.description.replace("{{user}}", _user.display_name).replace("{{char}}", name_repr)
-		emojis = not simulated and _guild and [emoji for emoji in _guild.emojis if emoji.is_usable()]
-		if emojis:
-			emojis = shuffle(emojis)[:25]
-			emojitexts = " ".join(sorted(f":{e.name}:" for e in emojis))
-			personality += f"\n\n[INFO] The current conversation takes place on Discord, where you have access to the following additional emojis. You may use these as desired, as an alternative to Unicode ones:\n{emojitexts}"
-		personality += "\n\n[INFO] Usernames may be presented in the format `name={name}\\n` to bypass framework constraints."
+		personality += "\n\n[INFO] Usernames may be presented in the format `name={name}\\n` to bypass unicode constraints."
 		match pdata.history:
 			case "none":
 				personality += "\n[INFO] Conversation history currently disabled. Clarify if necessary."
@@ -390,7 +385,12 @@ class Ask(Command):
 		elif nsfw:
 			personality += "\n[INFO] You are currently in a NSFW-enabled channel. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise the needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
 		else:
-			personality += "\n[INFO] You are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, use disclaimers in your response, and clarify if necessary."
+			personality += "\n[INFO] You are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, use disclaimers in your response."
+		emojis = not simulated and _guild and [emoji for emoji in _guild.emojis if emoji.is_usable()]
+		if emojis:
+			emojis = shuffle(emojis)[:25]
+			emojitexts = " ".join(sorted(f":{e.name}:" for e in emojis))
+			personality += f"\n[INFO] The current conversation takes place on Discord, where you have access to the following additional emojis. You may use these as desired, as an alternative to Unicode ones:\n{emojitexts}"
 		tzinfo = self.bot.data.users.get_timezone(_user.id)
 		if tzinfo is None:
 			tzinfo = datetime.timezone.utc
@@ -424,11 +424,17 @@ class Ask(Command):
 		else:
 			reference = None
 		hislim = 384 if _premium.value >= 4 else 192 if _premium.value >= 2 else 64
+		passthrough = set()
 		if not simulated and pdata.history != "none":
 			async for m in bot.history(_channel, limit=hislim):
 				if m.id in messages or m.id == _message.id:
 					continue
-				if pdata.history != "shared" and (m.author.id != _user.id and not m.author.bot and
+				if m.author.bot:
+					if m.reference:
+						passthrough.add(m.reference.message_id)
+				elif m.id in passthrough:
+					pass
+				elif pdata.history != "shared" and (m.author.id != _user.id and not m.author.bot and
 					bot.commands.chatconfig[0].retrieve(m.author).history != "shared"
 				):
 					continue
@@ -441,6 +447,7 @@ class Ask(Command):
 					url=message_link(m),
 				)
 				messages[m.id] = message
+		print(passthrough)
 		await bot.require_integrity(_message)
 		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, model, nsfw, _prefix, simulated)
 		if pdata.stream and pdata.tts != "discord" and not simulated:
@@ -746,7 +753,7 @@ class Ask(Command):
 		if not nsfw:
 			tips.insert(0, f"*Tip: I automatically try to correct inaccurate responses when possible. However, this is not foolproof; if you would like this feature more actively applied to counteract censorship, please move to a NSFW channel or use {prefix}verify if in DMs.*")
 		if pdata.history != "shared":
-			tips.insert(0, f"*Tip: For privacy reasons, conversation histories (allowing referencing previous messages in the same channel) is disabled by default. If you would like to enable this, use `{prefix}chatconfig --history private`, or `{prefix}chatconfig --history shared` if you would also like the bot to be able to read multi-user conversations. This enables me to read up to 192 previous messages from the current channel. No messages from other channels are included.*")
+			tips.insert(0, f"*Tip: For privacy reasons, conversation histories (allowing referencing previous messages in the same channel) are disabled by default, except for bot commands. If you would like to change this, use `{prefix}chatconfig --history none` to disable history altogether, or `{prefix}chatconfig --history shared` if you would also like the bot to be able to read multi-user conversations. This enables me to read up to 192 previous messages from the current channel. No messages from other channels are included.*")
 		already_used = bot.get_userbase(_channel.id, "ai_tips.chat", 0)
 		if already_used < len(tips):
 			note = "-# " + tips[already_used]
@@ -810,9 +817,9 @@ class ChatConfig(Command):
 		history=cdict(
 			type="enum",
 			validation=cdict(
-				enum=("none", "private", "shared"),
+				enum=("none", "command", "private", "shared"),
 			),
-			description="Whether chat history is enabled, and if so, whether the conversation is shared (including messages from different users)",
+			description="Whether chat history is enabled, and if so, whether the conversation is shared (including messages from different users), private, or bot-commands only",
 		),
 		apply_all=cdict(
 			type="bool",
@@ -830,7 +837,7 @@ class ChatConfig(Command):
 			description=DEFPER,
 			stream=True,
 			tts="none",
-			history="none",
+			history="default",
 		) if update else cdict()
 		p = self.bot.get_guildbase(get_guild_id(channel), "chatconfig", {}).get(channel.id)
 		if p:

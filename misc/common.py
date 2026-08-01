@@ -372,7 +372,7 @@ def is_nsfw(channel):
 class CompatFile(discord.File):
 	"A discord.File implementation that is compatible with files, bytes, memoryview, and buffer objects."
 
-	def __init__(self, fp, filename=None, description=None, spoiler=False):
+	def __init__(self, fp, filename=None, description=None, spoiler=False, source=None):
 		if type(fp) in (bytes, memoryview):
 			fp = io.BytesIO(fp)
 		self.fp = self._fp = fp
@@ -414,6 +414,7 @@ class CompatFile(discord.File):
 			self.filename += ".binx"
 		self.name = self.filename
 		self.clear = getattr(self.fp, "clear", lambda self: None)
+		self.source = source
 
 	def reset(self, seek=True):
 		if seek:

@@ -660,13 +660,13 @@ def save_into(im, size, fmt, fs, r=0, opt=False):
 	out = io.BytesIO()
 	if fmt in ("webp", "jp2"):
 		if heavy:
-			im.save(out, format="webp", lossless=True, quality=80, method=6)
+			im.save(out, format=fmt, lossless=not opt, quality=80, method=6)
 		else:
-			im.save(out, format="webp", lossless=True, quality=80, method=3)
+			im.save(out, format=fmt, lossless=not opt, quality=80, method=3)
 			r = fs / out.tell()
 			if r > thresh:
 				out = io.BytesIO()
-				im.save(out, format="webp", lossless=True, quality=100, method=6)
+				im.save(out, format=fmt, lossless=not opt, quality=100, method=6)
 	elif fmt in ("png", "ico", "icns"):
 		if heavy:
 			im.save(out, format="png", optimize=True, compress_level=9)
@@ -1038,7 +1038,7 @@ def evalImg(url, operation, args):
 								opt = 2
 							elif rat < 1 / 4:
 								opt = 1
-							out = anim_into(orig, new, first, (w, h), fmt, fs, r=r, opt=opt)
+							out = anim_into(orig, new, first, (w, h), fmt, fs, r=r, opt=opt + 1)
 							r = fs / len(out)
 							print("RB:", w, h, scale, len(out), r)
 							seen[(w, h)] = out, r
@@ -1047,10 +1047,6 @@ def evalImg(url, operation, args):
 						else:
 							lower_bound = scale
 					print("F:", w, h, scale, len(out), r)
-			# if isinstance(out, str):
-			# 	assert os.path.exists(out) and os.path.getsize(out), f"Expected output file {out}"
-			# 	with open(out, "rb") as f:
-			# 		return f.read()
 			return out
 		else:
 			new = next(iter(new["frames"]))

@@ -237,6 +237,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		t = DynamicDT.now()
 		self.userbase = AutoDatabase("saves/userbase", shards=64)
 		self.guildbase = AutoDatabase("saves/guildbase", shards=16)
+		self.proxied = AutoDatabase("saves/proxied", shards=8)
 		self.weekly_users = AutoCache(f"{CACHE_PATH}/weekly_users", shards=1, stale=0, timeout=86400 * 7)
 		self.channel_cache = AutoCache(f"{CACHE_PATH}/channel_cache", size_limit=message_lim // 256, shards=32, stale=86400 * 7, timeout=86400 * 365, desync=0.25)
 		self.message_cache = AutoCache(f"{CACHE_PATH}/message_cache", size_limit=message_lim, shards=64, stale=86400 * 7, timeout=86400 * 14, desync=0.3) # Messages are saved for 2 weeks, encrypted on disk (see COMMANDS/OWNER.py:UpdateMessageCache)
@@ -1860,7 +1861,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		emoji = await self.resolve_emoji(e, guild=guild)
 		return emoji.url
 
-	async def optimise_image(self, image, fsize=DEFAULT_FILESIZE, msize=None, csize=None, fmt="auto", duration=None, anim=True, opt=True, timeout=3600):
+	async def optimise_image(self, image, fsize=DEFAULT_FILESIZE, msize=None, csize=None, fmt="auto", duration=None, anim=True, opt=False, timeout=3600):
 		"Optimises the target image or video file to fit within the \"fsize\" size, or \"msize\" resolution. Optional format and duration parameters."
 		if csize:
 			args = [[], None, None, "clamp", csize, None]
@@ -2324,7 +2325,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if r == "assistant":
 				return r
 			return "user"
-		raws = [cdict(role=force_ua(m.get("role")), content=m.content) for m in messages]
+		raws = [cdict(role=force_ua(m.get("role")), content=m.content) if i else m for i, m in enumerate(messages)]
 		snippet = await ai.cut_to(raws, snip, snip, best=False)
 		sniplen = count_to(snippet)
 		text = ""
@@ -2986,7 +2987,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		channel = message.channel
 		self.set_userbase(user.id, "last_channel", channel.id)
 		stored = self.get_userbase(user.id, "stored", {})
-		if channel.id in stored and len(stored) < 5:
+		if channel.id in stored and len(stored) < 50:
 			m_id = stored[channel.id]
 			try:
 				await self.fetch_message(m_id, channel, fast=True)
@@ -2995,11 +2996,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			except:
 				print_exc()
 				stored[channel.id] = message.id
-		elif len(stored) >= 5:
+		elif len(stored) >= 50:
 			for i in range(10):
-				c_id, m_id = choice(stored.items())
+				c_id = choice(stored.keys())
 				stored.pop(c_id, None)
-				if len(stored) < 10:
+				if len(stored) < 50:
 					break
 		if channel.id in self.cache.channels:
 			stored[channel.id] = message.id
@@ -3195,31 +3196,84 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				embeds[0].description = lim_str(description, 4096)
 		return embeds
 
-	async def prepare_embeds(self, embeds, m_id=None):
-		cache = {}
+	async def prepare_embeds(self, embeds, m_id=None, g_id=None):
+
+		async def reproxy(g_id, raw):
+			p = (g_id, attachment_cache.preserve(raw))
+			try:
+				url2 = self.proxied[p]
+			except KeyError:
+				fn = await attachment_cache.download(raw, m_id=m_id, filename=True)
+				if os.path.getsize(fn) > 4000000:
+					fn = await self.optimise_image(fn, 4000000, csize=16384, fmt="webp")
+				name = url2fn(raw)
+				fn2 = f"{len(attachments)}-{name}"
+				url2 = f"attachment://{fn2}"
+				attachments.append(CompatFile(fn, filename=fn2, source=raw))
+			return url2
+
 		attachments = []
 		for e in embeds:
-			if e.image and e.image.url and is_discord_attachment(e.image.url):
-				p = attachment_cache.preserve(e.image.url, m_id)
-				try:
-					fn2 = cache[p]
-				except KeyError:
-					fn = await attachment_cache.download(e.image.url, m_id, filename=True)
-					fn2 = f"{len(attachments)}.webp"
-					attachments.append(CompatFile(fn, filename=fn2))
-					cache[p] = fn2
-				e.set_image(url=f"attachment://{fn2}")
-			if e.thumbnail and e.thumbnail.url and is_discord_attachment(e.thumbnail.url):
-				p = attachment_cache.preserve(e.thumbnail.url, m_id)
-				try:
-					fn2 = cache[p]
-				except KeyError:
-					fn = await attachment_cache.download(e.thumbnail.url, m_id, filename=True)
-					fn2 = f"{len(attachments)}.webp"
-					attachments.append(CompatFile(fn, filename=fn2))
-					cache[p] = fn2
-				e.set_thumbnail(url=f"attachment://{fn2}")
+			if e.author and e.author.icon_url and is_discord_ephemeral(e.author.icon_url):
+				raw = e.author.icon_url
+				url2 = await reproxy(g_id, raw)
+				e.set_author(name=e.author.name, url=e.author.url, icon_url=url2)
+			if e.image and e.image.url and is_discord_ephemeral(e.image.url):
+				raw = e.image.url
+				url2 = await reproxy(g_id, raw)
+				e.set_image(url=url2)
+			if e.thumbnail and e.thumbnail.url and is_discord_ephemeral(e.thumbnail.url):
+				raw = e.thumbnail.url
+				url2 = await reproxy(g_id, raw)
+				e.set_thumbnail(url=url2)
+			extra = find_braced_attachments(e.description)
+			for url in extra:
+				raw = url.strip("()")
+				url2 = await reproxy(g_id, raw)
+				e.description = e.description.replace(raw, url2, 1)
 		return attachments
+
+	async def finalise_embeds(self, message, embeds, attachments, g_id=None):
+		requires_edit = False
+		amap = {a.filename: a.source for a in attachments}
+		for a in message.attachments:
+			if not a.url:
+				continue
+			fn = url2fn(a.url)
+			try:
+				raw = amap[fn]
+			except KeyError:
+				continue
+			p = (g_id, attachment_cache.preserve(raw))
+			self.proxied[p] = attachment_cache.preserve(a.url, message.id)
+		for e in message.embeds:
+			for a in (e.image, e.thumbnail):
+				if not a.url:
+					continue
+				fn = url2fn(a.url)
+				try:
+					raw = amap[fn]
+				except KeyError:
+					continue
+				p = (g_id, attachment_cache.preserve(raw))
+				self.proxied[p] = attachment_cache.preserve(a.url, message.id)
+		for e in embeds:
+			for u in find_braced_uploads(e.description):
+				orig = u.strip("()")
+				fn = orig.split("://", 1)[-1]
+				try:
+					raw = amap[fn]
+				except KeyError:
+					continue
+				p = (g_id, attachment_cache.preserve(raw))
+				try:
+					preserved = self.proxied[p]
+				except KeyError:
+					continue
+				e.description = e.description.replace(orig, preserved, 1)
+				requires_edit = True
+		if requires_edit:
+			await self.edit_message(message, embeds=embeds)
 
 	async def coloured_embed(self, url):
 		colour = await self.get_colour(url)
@@ -4880,8 +4934,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if r:
 					kwargs[k] = [r] if v.get("multiple") else r
 					continue
-				# print(kwargs)
-				if v:
+				if v and v.get("description"):
 					raise ArgumentError(f"Argument `{k}` ({italics(v.description)}) is required.")
 				raise ArgumentError(f"Argument `{k}` (`{italics(v.type)}`) is required.")
 		if append_lws:
@@ -4895,7 +4948,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						if kwargs.get(k2) and kwargs.get(k2) != schema[k2].get("default"):
 							v = schema[k]
 							v2 = schema[k2]
-							raise ArgumentError(f"Argument `{k}` ({italics(v.description)}) is incompatible with `{k2}` ({italics(v2.description)}).")
+							raise ArgumentError(f"Argument `{k}` ({italics(v.get('description') or v.type)}) is incompatible with `{k2}` ({italics(v2.get('description') or v2.type)}).")
 		return await self.validate_schema(kwargs, schema, command_check=command_check, argv=argv, args=args, guild=guild)
 
 	async def validate_into(self, k, v, info, guild):
@@ -5837,12 +5890,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		try:
 			if fill:
 				while len(wlist) < fill:
-					# data = self.avatar_data = data or await self.optimise_image(get_author(self.user).url, 1048576)
 					w = await channel.create_webhook(name=self.name, avatar=None, reason="Auto Webhook")
 					w = self.add_webhook(w)
 					wlist.append(w)
 			if not wlist:
-				# data = self.avatar_data = data or await self.optimise_image(get_author(self.user).url, 1048576)
 				w = await channel.create_webhook(name=self.name, avatar=None, reason="Auto Webhook")
 				w = self.add_webhook(w)
 			else:
@@ -5854,9 +5905,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				wlist = await self.load_channel_webhooks(channel, force=True, bypass=bypass)
 				wlist.sort(key=lambda w: (getattr(w, "user", None) != self.user, random.random()), reverse=True)
 				w = wlist[0]
-		# if not w.avatar or str(w.avatar) == "https://cdn.discordapp.com/embed/avatars/0.png":
-		# 	data = self.avatar_data = data or await self.optimise_image(get_author(self.user).url, 1048576, fmt="webp", anim=False)
-		# 	return await w.edit(name=self.name, avatar=data)
 		return w
 
 	async def send_as_webhook(self, channel, *args, recurse=True, **kwargs):
@@ -8416,6 +8464,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				guild = message.guild
 				if not guild:
 					return
+				if self.get_userbase(message.author.id, f"stored:{message.channel.id}"):
+					self.pop_userbase(message.author.id, f"stored:{message.channel.id}")
 				fut = create_task(self.send_event("_delete_", message=message))
 				await self.send_event("_raw_delete_", message=message)
 				await fut

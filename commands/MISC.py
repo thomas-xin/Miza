@@ -367,10 +367,9 @@ class CSsearch(Command):
 		)
 
 
-class Wav2Png(Command):
-	name = ["Image2Audio", "Audio2Image", "Webp2Flac", "Flac2Webp", "Png2Wav"]
+class Audioptic(Command):
 	_timeout_ = 15
-	description = "Runs wav2png on the input URL. See https://github.com/thomas-xin/audioptic for more info, or to run it yourself!"
+	description = "Runs audioptic on the input URL. See https://github.com/thomas-xin/audioptic for more info, or to run it yourself!"
 	schema = cdict(
 		url=cdict(
 			type="media",
@@ -387,6 +386,20 @@ class Wav2Png(Command):
 			description="The file format or codec of the output",
 		),
 	)
+	macros = cdict(
+		Wav2Png=cdict(
+			fmt="png",
+		),
+		Png2Wav=cdict(
+			fmt="wav",
+		),
+		Flac2Png=cdict(
+			fmt="png",
+		),
+		Png2Flac=cdict(
+			fmt="flac",
+		),
+	)
 	rate_limit = (15, 25)
 
 	async def __call__(self, bot, url, fmt, **void):
@@ -394,7 +407,7 @@ class Wav2Png(Command):
 		ext = url2ext(url)
 		was_image = ext in IMAGE_FORMS
 		if not fmt:
-			fmt = "opus" if was_image else "webp"
+			fmt = "opus" if was_image else "png"
 		dest = temporary_file(fmt)
 		args = ["audioptic", url, dest]
 		print(args)

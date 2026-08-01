@@ -1062,7 +1062,7 @@ class StaffLog(Command):
 		kind=cdict(
 			type="enum",
 			validation=cdict(
-				enum=("message", "user", "join", "server"),
+				enum=("all", "message", "user", "join", "server"),
 			),
 			required=True,
 		),
@@ -1097,12 +1097,17 @@ class StaffLog(Command):
 	async def __call__(self, bot, _channel, _guild, _name, _prefix, kind, mode, **void):
 		match mode:
 			case "enable":
-				bot.set_guildbase(_guild.id, f"logs.{kind}", _channel.id)
+				kinds = ("message", "user", "join", "server") if kind == "all" else [kind]
+				for k in kinds:
+					bot.set_guildbase(_guild.id, f"logs.{k}", _channel.id)
 				return italics(css_md(f"Enabled {kind} event logging in {sqr_md(_channel)} for {sqr_md(_guild)}."))
 			case "disable":
-				bot.pop_guildbase(_guild.id, f"logs.{kind}")
+				kinds = ("message", "user", "join", "server") if kind == "all" else [kind]
+				for k in kinds:
+					bot.pop_guildbase(_guild.id, f"logs.{k}")
 				return italics(css_md(f"Disabled {kind} event logging for {sqr_md(_guild)}."))
 			case _:
+				assert kind != "all"
 				c_id = bot.get_guildbase(_guild.id, f"logs.{kind}")
 				try:
 					if not c_id:
@@ -1839,7 +1844,7 @@ class CreateEmoji(Command):
 		if _perm < 2:
 			raise self.perm_error(_perm, 2, "for command " + _name)
 		name = name or url2fn(url).rsplit(".", 1)[0][:32]
-		image = await bot.optimise_image(url, fsize=262144, csize=160, fmt="webp", opt=False)
+		image = await bot.optimise_image(url, fsize=262144, csize=160, fmt="webp")
 		emoji = await _guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
 		# This reaction indicates the emoji was created successfully
 		with suppress(discord.Forbidden):
@@ -1976,7 +1981,7 @@ class CreateSticker(Command):
 
 	async def __call__(self, bot, _guild, name, emoji, url, **void):
 		name = name or url2fn(url).rsplit(".", 1)[0][:32]
-		image = await bot.optimise_image(url, fsize=512000, csize=320, fmt="apng", duration=5, opt=False)
+		image = await bot.optimise_image(url, fsize=512000, csize=320, fmt="apng", duration=5)
 		if emoji and emoji.isnumeric():
 			emoji = await bot.fetch_emoji(emoji, _guild)
 			assert emoji.guild.id == _guild.id, "Emoji must be from the current server."
@@ -2119,25 +2124,25 @@ class UpdateServerLogs(Database):
 				value=escape_markdown(str(before)) + " ➡️ " + escape_markdown(str(after)),
 			)
 			change = True
-		if before.icon != after.icon:
-			b_url = best_url(before)
+
+		bk, ak = before.icon, after.icon
+		if hasattr(bk, "key"):
+			bk = bk.key
+		if hasattr(ak, "key"):
+			ak = ak.key
+		a_url = None
+		b_url = best_url(before)
+		if bk != ak:
 			a_url = best_url(after)
-			if "exec" in bot.data:
-				urls = ()
-				with tracebacksuppressor:
-					urls = await bot.data.exec.uproxy(b_url, a_url, collapse=False)
-				for i, url in enumerate(urls):
-					if url:
-						if i:
-							a_url = url
-						else:
-							b_url = url
 			emb.add_field(
 				name="Icon",
 				value=f"[Before]({b_url}) ➡️ [After]({a_url})",
 			)
 			emb.set_thumbnail(url=a_url)
 			change = True
+			colour[2] += 255
+		emb.set_author(name=str(after), icon_url=b_url, url=b_url if is_url(b_url) else None)
+
 		if before.owner_id != after.owner_id:
 			emb.add_field(
 				name="Owner",
@@ -2146,8 +2151,6 @@ class UpdateServerLogs(Database):
 			change = True
 		if not change:
 			return
-		a_url = await bot.get_proxy_url(after)
-		emb.set_author(name=str(after), icon_url=a_url, url=a_url)
 		bot.send_embeds(channel, emb)
 
 
@@ -2283,7 +2286,6 @@ class UpdateUserLogs(Database):
 		if not channel:
 			return
 		emb = discord.Embed()
-		files = []
 		emb.description = f"{user_mention(after.id)} has been updated:"
 		colour = [0] * 3
 		# Add fields for every update to the member data
@@ -2331,7 +2333,7 @@ class UpdateUserLogs(Database):
 					emb.add_field(name="Roles", value=rchange)
 					change = True
 					colour[1] += 255
-		requires_edit = False
+
 		bk, ak = before.avatar, after.avatar
 		if hasattr(bk, "key"):
 			bk = bk.key
@@ -2339,64 +2341,41 @@ class UpdateUserLogs(Database):
 			ak = ak.key
 		a_url = None
 		b_url = best_url(before)
-		if "exec" in bot.data:
-			with tracebacksuppressor:
-				try:
-					bf = await bot.data.exec.uproxy(b_url, collapse=True, mode="download")
-				except ConnectionError as ex:
-					if ex.errno != 404:
-						raise
-					print(repr(ex))
-				else:
-					if isinstance(bf, byte_like):
-						fn = b_url.split("?", 1)[0].rsplit("/", 1)[-1]
-						files.append(CompatFile(bf, filename=fn))
-						b_url = "attachment://" + fn
-					else:
-						b_url = bf
 		if bk != ak:
 			a_url = best_url(after)
-			if "exec" in bot.data:
-				with tracebacksuppressor:
-					af = await bot.data.exec.uproxy(a_url, collapse=True, mode="download")
-					if isinstance(af, byte_like):
-						fn = a_url.split("?", 1)[0].rsplit("/", 1)[-1]
-						files.append(CompatFile(af, filename=fn))
-						a_url = "attachment://" + fn
-					else:
-						a_url = af
 			emb.add_field(
 				name="Avatar",
 				value=f"[Before]({b_url}) ➡️ [After]({a_url})",
 			)
-			requires_edit = not is_url(b_url) or not is_url(a_url)
 			emb.set_thumbnail(url=a_url)
 			change = True
 			colour[2] += 255
+		emb.set_author(name=str(after), icon_url=b_url, url=b_url if is_url(b_url) else None)
+
+		bk, ak = before.display_avatar or before.avatar, after.display_avatar or after.avatar
+		if hasattr(bk, "key"):
+			bk = bk.key
+		if hasattr(ak, "key"):
+			ak = ak.key
+		a_url = None
+		b_url = best_url(before.display_avatar)
+		if bk != ak and best_url(after) != best_url(after.display_avatar):
+			a_url = best_url(after.display_avatar)
+			emb.add_field(
+				name="Display Avatar",
+				value=f"[Before]({b_url}) ➡️ [After]({a_url})",
+			)
+			emb.set_thumbnail(url=a_url)
+			change = True
+			colour[2] += 255
+
 		if not change:
 			return
-		_ua, ub = a_url, b_url
-		emb.set_author(name=str(after), icon_url=b_url, url=b_url if is_url(b_url) else None)
 		emb.colour = colour2raw(colour)
-		try:
-			message = await channel.send(embed=emb, files=files)
-		except Exception:
-			print(emb.to_dict(), files)
-			raise
-		if "exec" in bot.data:
-			with tracebacksuppressor:
-				ub2 = message.embeds[0].author.icon_url
-				if is_discord_attachment(ub2):
-					b_url = bot.data.exec.uregister(best_url(before), ub2, message.id)
-				ua2 = message.embeds[0].thumbnail and message.embeds[0].thumbnail.url
-				if is_discord_attachment(ua2):
-					a_url = bot.data.exec.uregister(best_url(after), ua2, message.id)
-				if not is_url(a_url) and is_url(ua2):
-					a_url = ua2
-				if requires_edit:
-					emb._fields[-1]["value"] = f"[Before]({b_url}) ➡️ [After]({a_url})"
-					emb.set_author(name=str(after), icon_url=ub, url=b_url)
-					await message.edit(embed=emb)
+		embs = [emb]
+		attachments = await bot.prepare_embeds(embs, g_id=guild.id)
+		m = await channel.send(embeds=embs, files=attachments)
+		await bot.finalise_embeds(m, embs, attachments, g_id=guild.id)
 
 
 class UpdateMessageLogs(Database):
@@ -2435,8 +2414,9 @@ class UpdateMessageLogs(Database):
 		emb.description = action
 		emb.timestamp = before.edited_at or after.created_at
 		embs[0] = emb
-		attachments = await bot.prepare_embeds(embs, m_id=after.id)
-		await channel.send(embeds=embs, files=attachments)
+		attachments = await bot.prepare_embeds(embs, m_id=after.id, g_id=after.guild.id)
+		m = await channel.send(embeds=embs, files=attachments)
+		await bot.finalise_embeds(m, embs, attachments, g_id=after.guild.id)
 
 	# Delete events must attempt to find the user who deleted the message
 	async def _audited_delete_(self, message, requestor=None, **void):
@@ -2455,8 +2435,9 @@ class UpdateMessageLogs(Database):
 			action = "**Message deleted from**"
 		action = f"{action} {channel_mention(message.channel.id)}:\n"
 		embs[0].description = lim_str(action + (embs[0].description or ""), 4096)
-		attachments = await bot.prepare_embeds(embs, m_id=message.id)
-		await channel.send(embeds=embs, files=attachments)
+		attachments = await bot.prepare_embeds(embs, m_id=message.id, g_id=message.guild.id)
+		m = await channel.send(embeds=embs, files=attachments)
+		await bot.finalise_embeds(m, embs, attachments, g_id=message.guild.id)
 
 	# Thanks to the embed sender feature, which allows this feature to send up to 10 logs in one message
 	async def _bulk_delete_(self, messages, requestor=None, **void):
@@ -2473,7 +2454,7 @@ class UpdateMessageLogs(Database):
 			action = f"{user_mention(requestor.id)} **deleted {len(messages)} message{'s' if len(messages) != 1 else ''} from**"
 		else:
 			action = f"**{len(messages)} message{'s' if len(messages) != 1 else ''} deleted from**"
-		emb.description = f"{action} {channel_mention(messages[-1].channel.id)}:\n"
+		emb.description = f"{action} {channel_mention(messages[0].channel.id)}:\n"
 		futs = [bot.as_embeds(m, refresh=False, link=True, reactions=True) for m in messages]
 		extracted = await gather(*futs, return_exceptions=True, max_concurrency=5)
 		embeds = []
@@ -2487,8 +2468,9 @@ class UpdateMessageLogs(Database):
 		embeds.insert(0, emb)
 		for i in range(0, len(embeds), 10):
 			embs = embeds[i:i + 10]
-			attachments = await bot.prepare_embeds(embs)
-			await channel.send(embeds=embs, files=attachments)
+			attachments = await bot.prepare_embeds(embs, g_id=messages[0].guild.id)
+			m = await channel.send(embeds=embs, files=attachments)
+			await bot.finalise_embeds(m, embs, attachments, g_id=messages[0].guild.id)
 
 
 class UpdatePublishers(Database):
@@ -2645,8 +2627,9 @@ class UpdateStarboards(Database):
 					embeds = await bot.as_embeds(message, link=True, colour=True, reactions=True)
 					try:
 						channel = await bot.fetch_channel(table[react][1])
-						attachments = await bot.prepare_embeds(embeds, m_id=message.id)
+						attachments = await bot.prepare_embeds(embeds, m_id=message.id, g_id=message.guild.id)
 						m = await channel.send(embeds=embeds, files=attachments)
+						await bot.finalise_embeds(m, embeds, attachments, g_id=message.guild.id)
 					except (discord.NotFound, discord.Forbidden):
 						print_exc()
 						table.pop(react)
@@ -2660,12 +2643,11 @@ class UpdateStarboards(Database):
 					channel = await bot.fetch_channel(table[react][1])
 					m = await bot.fetch_message(table[None][message.id], channel)
 					embeds = await bot.as_embeds(message, link=True, colour=True, reactions=True)
-					attachments = await bot.prepare_embeds(embeds, m_id=message.id)
-					requires_reupload = max(e.image.description or "" for e in m.embeds) != f"{len(attachments) - 1}.webp"
+					attachments = await bot.prepare_embeds(embeds, m_id=message.id, g_id=message.guild.id)
+					requires_reupload = max(e.image.description or "" for e in m.embeds).split(".", 1)[0].split("-", 1)[0] != str(len(attachments) - 1)
 					if requires_reupload:
-						await bot.edit_message(m, embeds=embeds, files=attachments)
-					else:
-						await bot.edit_message(m, embeds=embeds)
+						m = await bot.edit_message(m, embeds=embeds, files=attachments)
+					await bot.finalise_embeds(m, embeds, attachments, g_id=message.guild.id)
 				except (discord.NotFound, discord.Forbidden):
 					print_exc()
 					table[None].pop(message.id, None)
@@ -2696,12 +2678,11 @@ class UpdateStarboards(Database):
 				channel = await bot.fetch_channel(table[react][1])
 				m = await bot.fetch_message(table[None][message.id], channel)
 				embeds = await bot.as_embeds(message, link=True, colour=True, reactions=True)
-				attachments = await bot.prepare_embeds(embeds, m_id=message.id)
-				requires_reupload = max(e.image.description or "" for e in m.embeds) != f"{len(attachments) - 1}.webp"
+				attachments = await bot.prepare_embeds(embeds, m_id=message.id, g_id=message.guild.id)
+				requires_reupload = max(e.image.description or "" for e in m.embeds).split(".", 1)[0].split("-", 1)[0] != str(len(attachments) - 1)
 				if requires_reupload:
-					await bot.edit_message(m, embeds=embeds, files=attachments)
-				else:
-					await bot.edit_message(m, embeds=embeds)
+					m = await bot.edit_message(m, embeds=embeds, files=attachments)
+				await bot.finalise_embeds(m, embeds, attachments, g_id=message.guild.id)
 			except (discord.NotFound, discord.Forbidden):
 				print_exc()
 				table[None].pop(message.id, None)

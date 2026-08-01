@@ -1090,7 +1090,7 @@
 				"kind": {
 					"type": "enum",
 					"validation": {
-						"enum": ["message", "user", "join", "server"]
+						"enum": ["all", "message", "user", "join", "server"]
 					},
 					"required": true
 				},
@@ -3948,9 +3948,9 @@
 				"history": {
 					"type": "enum",
 					"validation": {
-						"enum": ["none", "private", "shared"]
+						"enum": ["none", "command", "private", "shared"]
 					},
-					"description": "Whether chat history is enabled, and if so, whether the conversation is shared (including messages from different users)"
+					"description": "Whether chat history is enabled, and if so, whether the conversation is shared (including messages from different users), private, or bot-commands only"
 				},
 				"apply_all": {
 					"type": "bool",
@@ -4261,9 +4261,9 @@
 				"CSvar": {"mode": "variable"}
 			}
 		},
-		"Wav2Png": {
-			"aliases": ["Wav2Png", "Image2Audio", "Audio2Image", "Webp2Flac", "Flac2Webp", "Png2Wav"],
-			"description": "Runs wav2png on the input URL. See https://github.com/thomas-xin/audioptic for more info, or to run it yourself!",
+		"Audioptic": {
+			"aliases": ["Audioptic", "Wav2Png", "Png2Wav", "Flac2Png", "Png2Flac"],
+			"description": "Runs audioptic on the input URL. See https://github.com/thomas-xin/audioptic for more info, or to run it yourself!",
 			"level": "0",
 			"rate_limit": "(15, 25)",
 			"example": [],
@@ -4284,7 +4284,13 @@
 					"description": "The file format or codec of the output"
 				}
 			},
-			"ordered_args": ["url", "fmt"]
+			"ordered_args": ["url", "fmt"],
+			"macros": {
+				"Wav2Png": {"fmt": "png"},
+				"Png2Wav": {"fmt": "wav"},
+				"Flac2Png": {"fmt": "png"},
+				"Png2Flac": {"fmt": "flac"}
+			}
 		},
 		"SpectralPulse": {
 			"aliases": ["SpectralPulse"],

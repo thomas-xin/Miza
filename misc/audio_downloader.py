@@ -1294,42 +1294,7 @@ class AudioDownloader:
 			elif is_twitter_url(url):
 				twr = r"(?:\w{2,3}\.)?(?:x|fixupx|twitter|vxtwitter|fxtwitter|stupidpenisx).com"
 				url = re.sub(twr, "vxtwitter.com", url, 1)
-				s = Request(
-					url,
-					decode=True,
-					headers={"User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)"},
-				)
-				soup = BeautifulSoup(s, "html.parser")
-				metas = soup.find_all("meta")
-				e = cdict()
-				fmt = None
-				for t in metas:
-					key = t.attrs.get("property") or t.attrs.get("name")
-					value = t.attrs.get("content") or t.attrs.get("value")
-					if not key or not value:
-						continue
-					match key:
-						case "og:title":
-							e.name = value
-						case "og:url":
-							e.url = re.sub(twr, "x.com", value)
-						case "og:video" | "twitter:video":
-							if e.get("video"):
-								e.video[0] = value
-							else:
-								e.video = [value, None]
-							e.setdefault("audio", value)
-						case "og:video:type":
-							fmt = mime_into(value)
-						case "og:audio":
-							e.audio = value
-						case "og:image" | "twitter:image":
-							e.setdefault("video", [value, None])
-							e.icon = value
-				if fmt and e.video:
-					e.video[1] = fmt
-				e.setdefault("name", url2fn(url))
-				e.setdefault("url", url)
+				e = self.process_html(url)
 				output.append(e)
 		else:
 			urls = []
@@ -1358,6 +1323,46 @@ class AudioDownloader:
 						break
 			output.extend(itertools.chain.from_iterable(f.result() for f in futs))
 		return list(output), url
+
+	@staticmethod
+	def process_html(url):
+		s = Request(
+			url,
+			decode=True,
+			headers={"User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)"},
+		)
+		soup = BeautifulSoup(s, "html.parser")
+		metas = soup.find_all("meta")
+		e = cdict()
+		fmt = None
+		for t in metas:
+			key = t.attrs.get("property") or t.attrs.get("name")
+			value = t.attrs.get("content") or t.attrs.get("value")
+			if not key or not value:
+				continue
+			match key:
+				case "og:title":
+					e.name = value
+				case "og:url":
+					e.url = value
+				case "og:video" | "twitter:video":
+					if e.get("video"):
+						e.video[0] = value
+					else:
+						e.video = [value, None]
+					e.setdefault("audio", value)
+				case "og:video:type":
+					fmt = mime_into(str(value))
+				case "og:audio":
+					e.audio = value
+				case "og:image" | "twitter:image":
+					e.setdefault("video", [value, None])
+					e.icon = value
+		if fmt and e.video:
+			e.video[1] = fmt
+		e.setdefault("name", url2fn(url))
+		e.setdefault("url", url)
+		return e
 
 	# Main extract function, able to extract from youtube playlists much faster than youtube-dl using youtube API, as well as ability to follow spotify links.
 	def extract(self, url, mode=None, count=1):

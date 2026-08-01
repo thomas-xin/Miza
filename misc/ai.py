@@ -231,13 +231,16 @@ def count_to(messages, encoding=None):
 						raise RuntimeError(f"Unexpected object {json_dumpstr(part)} in message.")
 	return tcount(substrings, encoding) + num_tokens + 3
 
-async def cut_to(messages, limit=1024, softlim=384, exclude_first=3, best=False, prompt=None, premium_context=[]):
+async def cut_to(messages, limit=1024, softlim=384, exclude_last=3, best=False, prompt=None, premium_context=[]):
 	if not messages:
 		return messages
 	messages = list(messages)
 	fm = messages.pop(0)
-	if exclude_first and messages:
-		sm, messages = messages[:exclude_first], messages[exclude_first:]
+	if exclude_last:
+		if len(messages) > exclude_last:
+			messages, sm = messages[:-exclude_last], messages[-exclude_last:]
+		else:
+			messages, sm = [], messages
 	held = []
 	count = 0
 	i = -1
@@ -259,8 +262,8 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=3, best=False,
 			m.content = lim_tokens(m.content, limit - 16, mode="right")
 			held = [m]
 		messages = held[::-1]
-		if exclude_first:
-			messages = sm + messages
+		if exclude_last:
+			messages.extend(sm)
 		messages.insert(0, fm)
 		return messages
 	summ = "Summary of chat history (include this if asked to summarise!):\n"
@@ -269,8 +272,8 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=3, best=False,
 	# c = tcount(summ + s)
 	c2 = count_to(messages)
 	if c2 <= softlim * 1.2:
-		if exclude_first:
-			messages = sm + messages
+		if exclude_last:
+			messages.extend(sm)
 		messages.insert(0, fm)
 		return messages
 	ml = max(1024, round_random(softlim - count))
@@ -284,8 +287,8 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_first=3, best=False,
 		role="system",
 		content=summ,
 	))
-	if exclude_first:
-		messages = sm + messages
+	if exclude_last:
+		messages.extend(sm)
 	messages.insert(0, fm)
 	return messages
 
@@ -579,7 +582,6 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 					if mname in is_function:
 						m = fix_tool(m2)
 					else:
-						print("Untool:", mname)
 						m = untool(m2)
 					if not m.get("content"):
 						m.content = "."
@@ -894,13 +896,13 @@ def untool(message):
 		else:
 			message.role = "user"
 			name = message.get("name") or "tool"
-			content = name + ":\n" + "```\n" + content + "\n```"
+			content = f"[{name}]\n" + "```\n" + content + "\n```"
 	if message.get("tool_calls") is not None:
 		tcs = message.pop("tool_calls")
 		content += "\n"
 		for tc in tcs:
 			fn = tc.function
-			content += f"\n> Used {fn.name} {fn.arguments}"
+			content += f"\n> Used [{fn.name}] {fn.arguments}"
 	message.content = content.strip() if isinstance(content, string_like) else content
 	return message
 

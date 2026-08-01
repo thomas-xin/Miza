@@ -941,6 +941,9 @@ def verify_url(url):
 	return url
 def is_discord_url(url): return url and regexp(r"^https?:\/\/(?:\w{3,8}\.)?discord(?:app)?\.(?:com|net)\/").findall(url) + regexp(r"https:\/\/images-ext-[0-9]+\.discordapp\.net\/external\/").findall(url)
 def is_discord_attachment(url): return url and regexp(r"^https?:\/\/(?:\w{3,8}\.)?discord(?:app)?\.(?:com|net)\/attachments\/[0-9]+\/[0-9]+\/[^?\s]+").match(str(url))
+def is_discord_ephemeral(url): return url and (is_discord_attachment(url) or regexp(r"^https?:\/\/(?:\w{3,8}\.)?discord(?:app)?\.(?:com|net)\/avatars\/[0-9]+\/[^?\s\/]+").match(str(url)))
+def find_braced_attachments(url): return regexp(r"\(https?:\/\/(?:\w{3,8}\.)?discord(?:app)?\.(?:com|net)\/attachments\/[0-9]+\/[0-9]+\/[^\)\s\/]+\)").findall(str(url)) + regexp(r"\(https?:\/\/(?:\w{3,8}\.)?discord(?:app)?\.(?:com|net)\/avatars\/[0-9]+\/[^\)\s\/]+\)").findall(str(url))
+def find_braced_uploads(url): return regexp(r"\(attachment:\/\/[^\)\s\/]+\)").findall(str(url))
 def is_discord_message_link(url): return url and regexp(r"^https?:\/\/(?:\w{3,8}\.)?discord(?:app)?\.(?:com|net)\/channels\/(?:[0-9]+|@me)\/[0-9]+(?:\/[0-9]+)?$").fullmatch(str(url))
 def is_discord_emoji(url): return url and regexp(r"^https?:\/\/(?:\w{3,8}\.)?discord(?:app)?\.(?:com|net)\/emojis\/[0-9]+").match(str(url))
 def is_tenor_url(url): return url and regexp(r"^https?:\/\/tenor.com(?:\/view)?\/[\w\-]+-[0-9]+").findall(url)
