@@ -1366,7 +1366,8 @@ class PrettyJSONEncoder(json.JSONEncoder):
 				return "[" + ", ".join(json_dumpstr(x) for x in obj) + "]"
 			items = [self.encode(x, level=level + 1) for x in obj]
 			return "[\n" + next_indent + f",\n{next_indent}".join(item for item in items) + f"\n{curr_indent}" + "]"
-		elif isinstance(obj, dict):
+		elif isinstance(obj, collections.abc.Mapping):
+			obj = astype(obj, dict)
 			if all(type(x) is str and len(x) <= max(10, len(obj)) for x in obj.values()) and all(type(x) is str and len(x) <= max(10, len(obj)) for x in obj.keys()):
 				return json.dumps(obj)
 			items = [f"{json_dumpstr(k)}: {self.encode(v, level=level + 1)}" for k, v in obj.items()]

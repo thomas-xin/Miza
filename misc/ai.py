@@ -27,7 +27,6 @@ endpoints = cdict(
 	fireworks="https://api.fireworks.ai/inference/v1",
 	deepinfra="https://api.deepinfra.com/v1/openai",
 	mistral="https://api.mistral.ai/v1/",
-	mizabot="https://api.mizabot.xyz/inference/v1",
 )
 
 def cast_rp(fp, pp, model=None):
@@ -292,7 +291,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_last=3, best=False, 
 	messages.insert(0, fm)
 	return messages
 
-async def summarise(q, min_length=384, max_length=24576, padding=128, best=True, prompt=None, premium_context=[]):
+async def summarise(q, min_length=384, max_length=8192, padding=128, best=True, prompt=None, premium_context=[]):
 	"Produces an AI-generated summary of input text. Model used is controlled by \"best\" parameter."
 	split_length = max_length - padding
 	summ_length = min(min_length, split_length - 1)
@@ -431,7 +430,7 @@ with tracebacksuppressor:
 async def _summarise(s, max_length, best=False, prompt=None, premium_context=[]):
 	if len(s) <= max_length:
 		return s
-	s = lim_tokens(s, 98304, mode="right")
+	s = lim_tokens(s, 49152, mode="right")
 	if best:
 		with tracebacksuppressor:
 			s2 = s
@@ -461,7 +460,7 @@ Answer ONLY with the summary, do not answer the question itself!'''
 			ml = round_random(max_length)
 			c = tcount(prompt)
 			model = "small"
-			data = dict(model=model, prompt=prompt, temperature=0.6, max_tokens=ml, premium_context=premium_context)
+			data = dict(model=model, prompt=prompt, temperature=0.6, max_tokens=ml, premium_context=premium_context, reasoning_effort="minimal")
 			resp = await instruct(data)
 			print("Summary:", resp)
 			if resp and not decensor.search(resp):

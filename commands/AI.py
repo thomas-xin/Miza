@@ -1,9 +1,12 @@
 # Make linter shut up lol
-import bot
 if "common" not in globals():
 	import misc.common as common
 	from misc.common import *
 print = PRINT
+
+with open("misc/global_ai.py", "r", encoding="utf-8") as f:
+	s = f.read()
+exec(s, BOT[0]._globals)
 
 from fast_langdetect import LangDetectConfig, LangDetector
 flcache = CACHE_PATH + "/fast-langdetect"
@@ -383,9 +386,9 @@ class Ask(Command):
 		if "nsfw" in personality.casefold() or not _nsfw and bot.is_nsfw(_user):
 			pass
 		elif nsfw:
-			personality += "\n[INFO] You are currently in a NSFW-enabled channel. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise the needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
+			personality += f"\n[INFO] You are currently in a NSFW-enabled channel #{_channel.name}. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise the needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
 		else:
-			personality += "\n[INFO] You are currently not in a NSFW-enabled channel. If the conversation involves mature, sexual, or dangerous topics, use disclaimers in your response."
+			personality += f"\n[INFO] You are currently not in a NSFW-enabled channel #{_channel.name}. If the conversation involves mature, sexual, or dangerous topics, use disclaimers in your response."
 		emojis = not simulated and _guild and [emoji for emoji in _guild.emojis if emoji.is_usable()]
 		if emojis:
 			emojis = shuffle(emojis)[:25]
@@ -447,7 +450,6 @@ class Ask(Command):
 					url=message_link(m),
 				)
 				messages[m.id] = message
-		print(passthrough)
 		await bot.require_integrity(_message)
 		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, model, nsfw, _prefix, simulated)
 		if pdata.stream and pdata.tts != "discord" and not simulated:
@@ -680,8 +682,6 @@ class Ask(Command):
 							call = {"func": "loopqueue", "argv": int(kwargs.value)}
 						else:
 							call = {"func": kwargs.mode, "argv": int(kwargs.value)}
-					# if succ:
-					# 	print("New prompt:", lim_str(tool_responses, 65536))
 					if not call:
 						continue
 					# print("Function Call:", call)
