@@ -4,7 +4,7 @@ audioptic>=1.0.3
 asyncio>=4.0.0
 async-timeout>=5.0.1
 base65536>=0.1.1
-beautifulsoup4>=4.14.3
+beautifulsoup4>=4.15.0
 bs4>=0.0.2
 CherryPy>=18.10.0
 colormath>=3.0.0
@@ -15,7 +15,7 @@ dynamic-datetime>=0.1.23
 ectoplasm-steganography>=0.0.12
 fast-langdetect>=1.0.0
 filetype>=1.2.0
-gigatoken>=0.9.0
+gigatoken>=0.10.0
 gmpy2>=2.3.0
 googletrans==4.0.2
 httpx>=0.28.1

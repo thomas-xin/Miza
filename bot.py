@@ -3196,12 +3196,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				embeds[0].description = lim_str(description, 4096)
 		return embeds
 
+	
 	async def prepare_embeds(self, embeds, m_id=None, g_id=None):
+		temp_proxied = {}
 
 		async def reproxy(g_id, raw):
-			p = (g_id, attachment_cache.preserve(raw))
+			p = (g_id, attachment_cache.preserve(raw).split("?", 1)[0])
+			print(p)
 			try:
-				url2 = self.proxied[p]
+				try:
+					url2 = temp_proxied[p]
+				except KeyError:
+					url2 = self.proxied[p]
 			except KeyError:
 				fn = await attachment_cache.download(raw, m_id=m_id, filename=True)
 				if os.path.getsize(fn) > 4000000:
@@ -3209,15 +3215,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				name = url2fn(raw)
 				fn2 = f"{len(attachments)}-{name}"
 				url2 = f"attachment://{fn2}"
+				temp_proxied[p] = url2
 				attachments.append(CompatFile(fn, filename=fn2, source=raw))
 			return url2
 
 		attachments = []
 		for e in embeds:
-			if e.author and e.author.icon_url and is_discord_ephemeral(e.author.icon_url):
-				raw = e.author.icon_url
-				url2 = await reproxy(g_id, raw)
-				e.set_author(name=e.author.name, url=e.author.url, icon_url=url2)
 			if e.image and e.image.url and is_discord_ephemeral(e.image.url):
 				raw = e.image.url
 				url2 = await reproxy(g_id, raw)
@@ -3226,15 +3229,35 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				raw = e.thumbnail.url
 				url2 = await reproxy(g_id, raw)
 				e.set_thumbnail(url=url2)
+			if e.author and e.author.icon_url and is_discord_ephemeral(e.author.icon_url):
+				raw = e.author.icon_url
+				url2 = await reproxy(g_id, raw)
+				e.set_author(name=e.author.name, url=e.author.url, icon_url=url2)
+			if e.footer and e.footer.icon_url and is_discord_ephemeral(e.footer.icon_url):
+				raw = e.footer.icon_url
+				url2 = await reproxy(g_id, raw)
+				e.set_footer(text=e.footer.text, icon_url=url2)
+
 			extra = find_braced_attachments(e.description)
 			for url in extra:
 				raw = url.strip("()")
 				url2 = await reproxy(g_id, raw)
 				e.description = e.description.replace(raw, url2, 1)
+
+			for i, field in enumerate(e.fields):
+				description = field.value or ""
+				extra = find_braced_attachments(description)
+				for url in extra:
+					raw = url.strip("()")
+					url2 = await reproxy(g_id, raw)
+					description = description.replace(raw, url2, 1)
+				e.set_field_at(i, name=field.name, value=description, inline=field.inline)
+
 		return attachments
 
 	async def finalise_embeds(self, message, embeds, attachments, g_id=None):
 		requires_edit = False
+		await asyncio.sleep(0.5)
 		amap = {a.filename: a.source for a in attachments}
 		for a in message.attachments:
 			if not a.url:
@@ -3244,8 +3267,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				raw = amap[fn]
 			except KeyError:
 				continue
-			p = (g_id, attachment_cache.preserve(raw))
-			self.proxied[p] = attachment_cache.preserve(a.url, message.id)
+			p = (g_id, attachment_cache.preserve(raw).split("?", 1)[0])
+			self.proxied[p] = new = attachment_cache.preserve(a.url, message.id)
+			self.proxied[message.id] = self.proxied.get(message.id, []) + [p]
+
 		for e in message.embeds:
 			for a in (e.image, e.thumbnail):
 				if not a.url:
@@ -3255,8 +3280,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					raw = amap[fn]
 				except KeyError:
 					continue
-				p = (g_id, attachment_cache.preserve(raw))
-				self.proxied[p] = attachment_cache.preserve(a.url, message.id)
+				p = (g_id, attachment_cache.preserve(raw).split("?", 1)[0])
+				self.proxied[p] = new = attachment_cache.preserve(a.url, message.id)
+				self.proxied[message.id] = self.proxied.get(message.id, []) + [p]
+			for a in (e.author, e.footer):
+				if not a.icon_url:
+					continue
+				fn = url2fn(a.icon_url)
+				try:
+					raw = amap[fn]
+				except KeyError:
+					continue
+				p = (g_id, attachment_cache.preserve(raw).split("?", 1)[0])
+				self.proxied[p] = new = attachment_cache.preserve(a.icon_url, message.id)
+				self.proxied[message.id] = self.proxied.get(message.id, []) + [p]
+
 		for e in embeds:
 			for u in find_braced_uploads(e.description):
 				orig = u.strip("()")
@@ -3265,15 +3303,37 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					raw = amap[fn]
 				except KeyError:
 					continue
-				p = (g_id, attachment_cache.preserve(raw))
+				p = (g_id, attachment_cache.preserve(raw).split("?", 1)[0])
 				try:
 					preserved = self.proxied[p]
 				except KeyError:
 					continue
 				e.description = e.description.replace(orig, preserved, 1)
 				requires_edit = True
+			for i, field in enumerate(e.fields):
+				description = field.value or ""
+				for u in find_braced_uploads(description):
+					orig = u.strip("()")
+					fn = orig.split("://", 1)[-1]
+					try:
+						raw = amap[fn]
+					except KeyError:
+						continue
+					p = (g_id, attachment_cache.preserve(raw).split("?", 1)[0])
+					try:
+						preserved = self.proxied[p]
+					except KeyError:
+						continue
+					description = description.replace(orig, preserved, 1)
+					requires_edit = True
+				e.set_field_at(i, name=field.name, value=description, inline=field.inline)
 		if requires_edit:
 			await self.edit_message(message, embeds=embeds)
+
+	async def send_and_finalise(self, channel, content=None, embeds=[]):
+		attachments = await self.prepare_embeds(embeds, g_id=channel.guild.id)
+		m = await channel.send(content, embeds=embeds, files=attachments)
+		await self.finalise_embeds(m, embeds, attachments, g_id=channel.guild.id)
 
 	async def coloured_embed(self, url):
 		colour = await self.get_colour(url)

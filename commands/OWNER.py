@@ -1028,6 +1028,8 @@ class UpdateMessageCache(Database):
 				except ConnectionError as ex:
 					print(guild.id, repr(ex))
 					return
+				if len(messages) not in (lim, softlim):
+					extra = False
 			else:
 				messages, extra = [], True
 			curr_id = current_snowflake()
@@ -1050,7 +1052,15 @@ class UpdateMessageCache(Database):
 		if not message.guild or message.guild.id in self.loadings:
 			return
 		self.loadings[message.guild.id] = create_task(self.load_guild(message.guild, 14 * 86400))
-	_delete_ = _send_
+
+	async def _delete_(self, message, **void):
+		bot = self.bot
+		try:
+			p = bot.proxied.pop(message.id)
+			bot.proxied.pop(p)
+		except KeyError:
+			pass
+		return await self._send_(message)
 
 	@staticmethod
 	def serialise_message(message):

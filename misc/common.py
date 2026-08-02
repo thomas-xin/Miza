@@ -851,13 +851,6 @@ allow_gif = lambda url: url + ".gif" if "." not in url.rsplit("/", 1)[-1] and "?
 
 def get_author(user, uid=None):
 	url = o_url = best_url(user)
-	bot = BOT[0]
-	if bot and "proxies" in bot.data:
-		url2 = bot.data.proxies.get(uuhash(url))
-		if url2:
-			url = url2
-		else:
-			bot.data.exec.cproxy(url)
 	name = getattr(user, "display_name", None) or getattr(user, "name", None) or "Unknown User"
 	if uid:
 		name = f"{name} ({user.id})"

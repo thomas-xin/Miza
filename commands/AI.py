@@ -120,7 +120,7 @@ class Translate(Command):
 		messages = [
 			dict(
 				role="system",
-				content=f'Please translate the following text into {dst_language}, keeping formatting as accurate as possible. Avoid being overly formal, and do not add extra information to the text itself!',
+				content=f'Please translate the message below into {dst_language}, keeping formatting as accurate as possible. Avoid being overly formal, and do not add extra information to the text itself!',
 			),
 			dict(
 				role="user",
@@ -193,7 +193,7 @@ class Translate(Command):
 						temperature=0.01,
 						premium_context=premium,
 						max_completion_tokens=ai.contexts[m] - count * 3 // 2,
-						reasoning_effort="medium",
+						reasoning_effort="low",
 					),
 				)
 				assert translated, "No output was captured!"
@@ -207,7 +207,7 @@ class Translate(Command):
 					temperature=0.01,
 					premium_context=premium,
 					max_completion_tokens=98304,
-					reasoning_effort="medium",
+					reasoning_effort="low",
 				),
 			)
 		tr = None

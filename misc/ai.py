@@ -523,6 +523,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 			kwa.pop("presence_penalty", None)
 			kwa.pop("frequency_penalty", None)
 			reasoning = dict(
+				enabled=True,
 				effort=kwa.pop("reasoning_effort", "low"),
 				summary="detailed",
 			)
@@ -532,15 +533,18 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 			body["reasoning"] = reasoning
 			match reasoning["effort"]:
 				case "minimal":
-					body["thinking_token_budget"] = 128
+					body["thinking_token_budget"] = 256
 				case "low":
-					body["thinking_token_budget"] = 512
+					body["thinking_token_budget"] = 1024
 				case "medium":
-					body["thinking_token_budget"] = 2048
+					body["thinking_token_budget"] = 4096
 				case "high":
-					body["thinking_token_budget"] = 8192
+					body["thinking_token_budget"] = 16384
 				case "xhigh":
 					body["thinking_token_budget"] = 65536
+				case _:
+					body["thinking_token_budget"] = 512
+			# reasoning["max_tokens"] = body["thinking_token_budget"]
 		elif "reasoning_effort" in kwa:
 			kwa.pop("reasoning_effort")
 		if not api:

@@ -2091,7 +2091,7 @@ class UpdateServerLogs(Database):
 				value=str(before.position) + " ➡️ " + str(after.position),
 			)
 		emb.description = f"{channel_mention(after.id)}{count} has been updated:"	
-		bot.send_embeds(channel, emb)
+		await bot.send_and_finalise(channel, embeds=[emb])
 
 	async def _channel_delete_2_(self, ch, guild, user, **void):
 		bot = self.bot
@@ -2106,8 +2106,8 @@ class UpdateServerLogs(Database):
 			emb.set_author(**get_author(user))
 			emb.description = f"#{ch.name}{mcount}: {ch.id} was deleted by {user_mention(user.id)}."
 		else:
-			emb.description = f"#{ch.name}{mcount}: {ch.id} has been deleted."	
-		bot.send_embeds(channel, emb)
+			emb.description = f"#{ch.name}{mcount}: {ch.id} has been deleted."
+		await bot.send_and_finalise(channel, embeds=[emb])
 
 	async def _guild_update_(self, before, after, **void):
 		bot = self.bot
@@ -2130,10 +2130,9 @@ class UpdateServerLogs(Database):
 			bk = bk.key
 		if hasattr(ak, "key"):
 			ak = ak.key
-		a_url = None
+		a_url = best_url(after)
 		b_url = best_url(before)
 		if bk != ak:
-			a_url = best_url(after)
 			emb.add_field(
 				name="Icon",
 				value=f"[Before]({b_url}) ➡️ [After]({a_url})",
@@ -2151,7 +2150,7 @@ class UpdateServerLogs(Database):
 			change = True
 		if not change:
 			return
-		bot.send_embeds(channel, emb)
+		await bot.send_and_finalise(channel, embeds=[emb])
 
 
 class UpdateJoinLogs(Database):
@@ -2185,7 +2184,7 @@ class UpdateJoinLogs(Database):
 		age = DynamicDT.now() - user.created_at
 		if age < 86400 * 7:
 			emb.description += f"\n⚠️ Account is {age} old. ⚠️"
-		bot.send_embeds(channel, emb)
+		await bot.send_and_finalise(channel, embeds=[emb])
 
 	async def _unban_(self, user, requestor=None, **void):
 		guild = T(requestor).get("guild")
@@ -2200,7 +2199,7 @@ class UpdateJoinLogs(Database):
 			emb.description = f"{user_mention(user.id)} has been unbanned by {user_mention(requestor.id)}."
 		else:
 			emb.description = f"{user_mention(user.id)} has been unbanned."
-		bot.send_embeds(channel, emb)
+		await bot.send_and_finalise(channel, embeds=[emb])
 
 	async def _remove_(self, user, guild, requestor=None, kind="leave", reason=None, **void):
 		bot = self.bot
@@ -2239,7 +2238,7 @@ class UpdateJoinLogs(Database):
 		rchange = escape_markdown(", ".join(role_mention(r.id) for r in standard_roles(user)))
 		if rchange:
 			emb.add_field(name="Roles", value=rchange)
-		bot.send_embeds(channel, emb)
+		await bot.send_and_finalise(channel, embeds=[emb])
 
 
 class UpdateUserLogs(Database):
@@ -2339,10 +2338,9 @@ class UpdateUserLogs(Database):
 			bk = bk.key
 		if hasattr(ak, "key"):
 			ak = ak.key
-		a_url = None
+		a_url = best_url(after)
 		b_url = best_url(before)
 		if bk != ak:
-			a_url = best_url(after)
 			emb.add_field(
 				name="Avatar",
 				value=f"[Before]({b_url}) ➡️ [After]({a_url})",
@@ -2352,15 +2350,14 @@ class UpdateUserLogs(Database):
 			colour[2] += 255
 		emb.set_author(name=str(after), icon_url=b_url, url=b_url if is_url(b_url) else None)
 
-		bk, ak = before.display_avatar or before.avatar, after.display_avatar or after.avatar
+		bk, ak = before.display_avatar, after.display_avatar
 		if hasattr(bk, "key"):
 			bk = bk.key
 		if hasattr(ak, "key"):
 			ak = ak.key
-		a_url = None
+		a_url = best_url(after.display_avatar)
 		b_url = best_url(before.display_avatar)
-		if bk != ak and best_url(after) != best_url(after.display_avatar):
-			a_url = best_url(after.display_avatar)
+		if bk != ak and (best_url(before) != b_url or best_url(after) != a_url):
 			emb.add_field(
 				name="Display Avatar",
 				value=f"[Before]({b_url}) ➡️ [After]({a_url})",
@@ -2372,10 +2369,7 @@ class UpdateUserLogs(Database):
 		if not change:
 			return
 		emb.colour = colour2raw(colour)
-		embs = [emb]
-		attachments = await bot.prepare_embeds(embs, g_id=guild.id)
-		m = await channel.send(embeds=embs, files=attachments)
-		await bot.finalise_embeds(m, embs, attachments, g_id=guild.id)
+		await bot.send_and_finalise(channel, embeds=[emb])
 
 
 class UpdateMessageLogs(Database):
@@ -2414,9 +2408,7 @@ class UpdateMessageLogs(Database):
 		emb.description = action
 		emb.timestamp = before.edited_at or after.created_at
 		embs[0] = emb
-		attachments = await bot.prepare_embeds(embs, m_id=after.id, g_id=after.guild.id)
-		m = await channel.send(embeds=embs, files=attachments)
-		await bot.finalise_embeds(m, embs, attachments, g_id=after.guild.id)
+		await bot.send_and_finalise(channel, embeds=embs)
 
 	# Delete events must attempt to find the user who deleted the message
 	async def _audited_delete_(self, message, requestor=None, **void):
@@ -2435,9 +2427,7 @@ class UpdateMessageLogs(Database):
 			action = "**Message deleted from**"
 		action = f"{action} {channel_mention(message.channel.id)}:\n"
 		embs[0].description = lim_str(action + (embs[0].description or ""), 4096)
-		attachments = await bot.prepare_embeds(embs, m_id=message.id, g_id=message.guild.id)
-		m = await channel.send(embeds=embs, files=attachments)
-		await bot.finalise_embeds(m, embs, attachments, g_id=message.guild.id)
+		await bot.send_and_finalise(channel, embeds=embs)
 
 	# Thanks to the embed sender feature, which allows this feature to send up to 10 logs in one message
 	async def _bulk_delete_(self, messages, requestor=None, **void):
@@ -2468,9 +2458,7 @@ class UpdateMessageLogs(Database):
 		embeds.insert(0, emb)
 		for i in range(0, len(embeds), 10):
 			embs = embeds[i:i + 10]
-			attachments = await bot.prepare_embeds(embs, g_id=messages[0].guild.id)
-			m = await channel.send(embeds=embs, files=attachments)
-			await bot.finalise_embeds(m, embs, attachments, g_id=messages[0].guild.id)
+			await bot.send_and_finalise(channel, embeds=embs)
 
 
 class UpdatePublishers(Database):
@@ -2627,9 +2615,7 @@ class UpdateStarboards(Database):
 					embeds = await bot.as_embeds(message, link=True, colour=True, reactions=True)
 					try:
 						channel = await bot.fetch_channel(table[react][1])
-						attachments = await bot.prepare_embeds(embeds, m_id=message.id, g_id=message.guild.id)
-						m = await channel.send(embeds=embeds, files=attachments)
-						await bot.finalise_embeds(m, embeds, attachments, g_id=message.guild.id)
+						await bot.send_and_finalise(channel, embeds=embeds)
 					except (discord.NotFound, discord.Forbidden):
 						print_exc()
 						table.pop(react)
