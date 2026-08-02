@@ -692,8 +692,10 @@ async def catch_all(path: str, request: Request):
 	p = path.strip("/")
 	first = p.split("/", 1)[0] if p else ""
 
-	if true_ip(request) in banned_ips or first in banned_paths:
+	if true_ip(request) in banned_ips:
 		return RedirectResponse(url="https://www.youtube.com/watch?v=dQw4w9WgXcQ", status_code=308)
+	if first in banned_paths:
+		return RedirectResponse(url=f"{server.state['/']}/{p}", status_code=308)
 	if not p or p in ("home", "index", "dummy.html", "index.html"):
 		return FileResponse("misc/web/index.html", media_type="text/html")
 	if p in ("robots", "robots.txt"):
