@@ -2349,16 +2349,24 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 		async def reproxy(g_id, raw):
 			p = (g_id, attachment_cache.preserve(raw).split("?", 1)[0])
-			print(p)
 			try:
 				try:
 					url2 = temp_proxied[p]
 				except KeyError:
 					url2 = self.proxied[p]
 			except KeyError:
-				fn = await attachment_cache.download(raw, m_id=m_id, filename=True)
-				if os.path.getsize(fn) > 4000000:
-					fn = await self.optimise_image(fn, 4000000, csize=16384, fmt="webp")
+				print(p)
+				fn = None
+				try:
+					fn = await attachment_cache.download(raw, m_id=m_id, filename=True)
+					if os.path.getsize(fn) > 4000000:
+						fn = await self.optimise_image(fn, 4000000, csize=16384, fmt="webp")
+				except Exception as ex:
+					print(repr(ex))
+					if not fn:
+						return p[-1]
+				if getsize(fn) > 10485760:
+					return p[-1]
 				name = url2fn(raw)
 				fn2 = f"{len(attachments)}-{name}"
 				url2 = f"attachment://{fn2}"
