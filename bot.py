@@ -2346,6 +2346,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	
 	async def prepare_embeds(self, embeds, m_id=None, g_id=None):
 		temp_proxied = {}
+		used_names = collections.Counter()
 
 		async def reproxy(g_id, raw):
 			p = (g_id, attachment_cache.preserve(raw).split("?", 1)[0])
@@ -2368,10 +2369,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if getsize(fn) > 10485760:
 					return p[-1]
 				name = url2fn(raw)
-				fn2 = f"{len(attachments)}-{name}"
+				fn2 = f"{name}-{used_names[name]}" if used_names[name] else name
 				url2 = f"attachment://{fn2}"
 				temp_proxied[p] = url2
 				attachments.append(CompatFile(fn, filename=fn2, source=raw))
+				used_names[name] += 1
 			return url2
 
 		attachments = []

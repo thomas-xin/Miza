@@ -2630,8 +2630,7 @@ class UpdateStarboards(Database):
 					m = await bot.fetch_message(table[None][message.id], channel)
 					embeds = await bot.as_embeds(message, link=True, colour=True, reactions=True)
 					attachments = await bot.prepare_embeds(embeds, m_id=message.id, g_id=message.guild.id)
-					requires_reupload = max(e.image.description or "" for e in m.embeds).split(".", 1)[0].split("-", 1)[0] != str(len(attachments) - 1)
-					if requires_reupload:
+					if attachments:
 						m = await bot.edit_message(m, embeds=embeds, files=attachments)
 					await bot.finalise_embeds(m, embeds, attachments, g_id=message.guild.id)
 				except (discord.NotFound, discord.Forbidden):
@@ -2665,8 +2664,7 @@ class UpdateStarboards(Database):
 				m = await bot.fetch_message(table[None][message.id], channel)
 				embeds = await bot.as_embeds(message, link=True, colour=True, reactions=True)
 				attachments = await bot.prepare_embeds(embeds, m_id=message.id, g_id=message.guild.id)
-				requires_reupload = max(e.image.description or "" for e in m.embeds).split(".", 1)[0].split("-", 1)[0] != str(len(attachments) - 1)
-				if requires_reupload:
+				if attachments:
 					m = await bot.edit_message(m, embeds=embeds, files=attachments)
 				await bot.finalise_embeds(m, embeds, attachments, g_id=message.guild.id)
 			except (discord.NotFound, discord.Forbidden):
