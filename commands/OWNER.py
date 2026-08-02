@@ -1042,9 +1042,19 @@ class UpdateMessageCache(Database):
 				await gather(*(self.load_channel(c, duration=duration) for c in channels), max_concurrency=20)
 			else:
 				for channel in channels:
+					self.checked.add(channel.id)
+					self.loader[channel.id] = curr_id
+
+	def pause(self):
+		for guild in self.bot.guilds:
+			channels = list(guild.text_channels) + list(guild.threads)
+			curr_id = current_snowflake()
+			for channel in channels:
+				if channel.id in self.checked:
 					self.loader[channel.id] = curr_id
 
 	def _destroy_(self, **void):
+		self.pause()
 		for task in self.loadings.values():
 			task.cancel()
 

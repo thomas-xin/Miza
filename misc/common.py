@@ -1805,7 +1805,8 @@ class SimulatedEmoji(cdict):
 		return f"https://cdn.discordapp.com/emojis/{self.id}.{'gif' if self.animated else 'png'}"
 
 
-readstring = lambda s: deobfuscate(zwremove(s))
+rsep = chr(invisicode.STRINGPREFIX)
+readstring = lambda s: deobfuscate(zwremove(s.split(rsep, 1)[-1]))
 
 
 # Default and standard command categories to enable.

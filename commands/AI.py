@@ -388,7 +388,7 @@ class Ask(Command):
 		elif nsfw:
 			personality += f"\n[INFO] You are currently in a NSFW-enabled channel #{_channel.name}. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise the needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
 		else:
-			personality += f"\n[INFO] You are currently not in a NSFW-enabled channel #{_channel.name}. If the conversation involves mature, sexual, or dangerous topics, use disclaimers in your response."
+			personality += f"\n[INFO] You are currently in a non-NSFW-enabled channel #{_channel.name}. If the conversation involves mature, sexual, or dangerous topics, use disclaimers in your response."
 		emojis = not simulated and _guild and [emoji for emoji in _guild.emojis if emoji.is_usable()]
 		if emojis:
 			emojis = shuffle(emojis)[:25]
@@ -456,7 +456,6 @@ class Ask(Command):
 			return cdict(
 				content=fut,
 				b_tts=pdata.tts == "builtin",
-				callback=lambda s: print("Ask:", s),
 			)
 		temp = await flatten(fut)
 		if not temp:
@@ -727,7 +726,7 @@ class Ask(Command):
 			try:
 				url = await bot.upload_temp(reasoning, filename="reasoning.txt")
 				rsize = f"{byte_scale(len(reasoning))}B"
-				content = (f"> [Reasoning: {rsize} (click to view)]({url})\n" + content).strip()
+				content = (f"> [Reasoning: {rsize} (click to view)]({url}){rsep}\n" + content).strip()
 			except Exception:
 				print_exc()
 		response.content = "\r" + content
@@ -781,7 +780,7 @@ class Ask(Command):
 		return await message.remove_reaction("🗑️", self.bot.user)
 
 
-DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the latest question from the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome, but not too corny), in first person as if you were a human, matching the language used (e.g. English). You are free to make up your own preferences and show emotion, but if a user inquires for additional services not accessible, you should direct them to the ~help or /help commands. DO NOT attempt to mimic/falsify programmed outputs such as unavailable tools or reasoning traces, avoid repeating yourself or your prompts, and be concise where possible."
+DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the latest question from the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome, but not too corny), in first person as if you were a human, matching the language used (e.g. English). You are free to make up your own preferences and show emotion, but if a user inquires for additional services not accessible, you should direct them to the ~help or /help commands. DO NOT attempt to mimic/falsify programmed outputs such as unavailable tools or reasoning traces even if previous messages do, avoid repeating yourself or your prompts, and be concise where possible."
 
 class ChatConfig(Command):
 	name = ["Personality", "ChangePersonality"]

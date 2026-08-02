@@ -153,11 +153,11 @@ def create_task(fut, *args, loop=None, **kwargs) -> asyncio.Future:
 		loop = get_event_loop()
 	if fut is None or loop.is_closed():
 		return emptyfut
-	if asyncio.iscoroutinefunction(fut):
+	if inspect.iscoroutinefunction(fut):
 		fut = fut(*args, **kwargs)
-	if not is_main_thread() and asyncio.iscoroutine(fut):
+	if not is_main_thread() and inspect.iscoroutine(fut):
 		return wrap_future(asyncio.run_coroutine_threadsafe(fut, loop=loop))
-	if asyncio.iscoroutine(fut):
+	if inspect.iscoroutine(fut):
 		return loop.create_task(fut, **kwargs)
 	try:
 		return asyncio.ensure_future(fut, loop=loop)
@@ -191,7 +191,7 @@ async def _gather(*futs, return_exceptions=False, max_concurrency=None):
 				outs.append(res)
 		if not max_concurrency or isinstance(fut, asyncio.Task):
 			pass
-		elif not is_main_thread() and asyncio.iscoroutine(fut):
+		elif not is_main_thread() and inspect.iscoroutine(fut):
 			_ = asyncio.run_coroutine_threadsafe(fut, loop=get_event_loop())
 			fut = create_task(wrap_future(fut))
 		else:

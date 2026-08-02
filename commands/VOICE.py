@@ -1946,10 +1946,14 @@ class Download(Command):
 			raise IndexError("Please input a search term or URL.")
 		if query and not url:
 			query = verify_search(query)
-			res = await Request.aio(
-				f"https://api.mizabot.xyz/ytdl?q={quote_plus(query)}",
-				json=True,
-			)
+			try:
+				res = await Request.aio(
+					f"https://api.mizabot.xyz/ytdl?q={quote_plus(query)}",
+					json=True,
+				)
+			except ConnectionError as ex:
+				print_exc()
+				raise ConnectionError(ex.args[0] if ex.args else None)
 			if not res:
 				raise LookupError(f"No results found for {query}.")
 			if len(res) == 1:

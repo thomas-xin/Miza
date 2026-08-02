@@ -330,7 +330,7 @@ Bot.caption_into = caption_into
 model_levels = dict(enumerate(map(cdict, AUTH.get("model_levels", []))))
 if not model_levels:
 	model_levels = dict(enumerate([cdict(
-		**{k: "qwen-3.7-flash" for k in ("instructive", "casual", "nsfw", "backup", "retry", "function", "vision")},
+		**{k: "qwen-3.7-flash" for k in ("instructive", "casual", "nsfw", "backup", "function", "vision", "summary")},
 		target="auto",
 	)] * 3))
 Bot.model_levels = model_levels
@@ -367,7 +367,7 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 			return r
 		return "user"
 	raws = [cdict(role=force_ua(m.get("role")), content=m.content) if i else m for i, m in enumerate(messages)]
-	snippet = await ai.cut_to(raws, snip, snip, best=False)
+	snippet = await ai.cut_to(raws, snip, snip, best=False, premium_context=premium_context, model=modelist.summary)
 	sniplen = count_to(snippet)
 	text = ""
 	ustr = str(hash(str(user) or self.user.name) & 4294967295)
@@ -532,7 +532,7 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 		cargs=cargs,
 	)
 	ex = None
-	messages = await ai.cut_to(messages, maxlim, minlim, best=best, prompt=prompt, premium_context=premium_context)
+	messages = await ai.cut_to(messages, maxlim, minlim, best=best, prompt=prompt, premium_context=premium_context, model=modelist.summary)
 	length = count_to(messages)
 	length = ceil(length * 1.1) + 4 * len(messages)
 	reasoning_thresh = 0
@@ -557,7 +557,7 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 				temp = tmpcut
 				tlen = tmplen
 			else:
-				temp = tmpcut = await ai.cut_to(messages, 65536, ctx // 3, best=True, premium_context=premium_context)
+				temp = tmpcut = await ai.cut_to(messages, 65536, ctx // 3, best=True, premium_context=premium_context, model=modelist.summary)
 				tmplen = count_to(tmpcut)
 				tlen = tmplen = ceil(tmplen * 1.1) + 4 * len(tmpcut)
 		else:
@@ -759,7 +759,7 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 			if attempts < 1 and mA > 2:
 				mode = "instructive" if mode == "casual" else "backup"
 			else:
-				mode = "backup" if mode == "retry" else "retry"
+				mode = "backup"
 			text = "\r"
 		else:
 			mode = "target"

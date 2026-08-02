@@ -230,7 +230,7 @@ def count_to(messages, encoding=None):
 						raise RuntimeError(f"Unexpected object {json_dumpstr(part)} in message.")
 	return tcount(substrings, encoding) + num_tokens + 3
 
-async def cut_to(messages, limit=1024, softlim=384, exclude_last=3, best=False, prompt=None, premium_context=[]):
+async def cut_to(messages, limit=1024, softlim=384, exclude_last=3, best=False, prompt=None, premium_context=[], model="small"):
 	if not messages:
 		return messages
 	messages = list(messages)
@@ -275,11 +275,11 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_last=3, best=False, 
 			messages.extend(sm)
 		messages.insert(0, fm)
 		return messages
-	ml = max(1024, round_random(softlim - count))
+	ml = max(1024, round_random(softlim * 1.2 - count))
 	if best:
-		s2 = await summarise(s, min_length=ml, best=best, prompt=prompt, premium_context=premium_context)
+		s2 = await summarise(s, min_length=ml, best=best, prompt=prompt, premium_context=premium_context, model=model)
 	else:
-		s2 = await _run_async(lim_tokens, s, ml, mode="right")
+		s2 = lim_tokens(s, ml, mode="right")
 	summ += s2
 	messages = held[::-1]
 	messages.insert(0, cdict(
@@ -291,7 +291,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_last=3, best=False, 
 	messages.insert(0, fm)
 	return messages
 
-async def summarise(q, min_length=384, max_length=8192, padding=128, best=True, prompt=None, premium_context=[]):
+async def summarise(q, min_length=384, max_length=16384, padding=128, best=True, prompt=None, premium_context=[], model="small"):
 	"Produces an AI-generated summary of input text. Model used is controlled by \"best\" parameter."
 	split_length = max_length - padding
 	summ_length = min(min_length, split_length - 1)
@@ -300,11 +300,11 @@ async def summarise(q, min_length=384, max_length=8192, padding=128, best=True, 
 	if c <= min_length:
 		return q
 	if c <= summ_length:
-		q = await _summarise(q, summ_length, best=best, prompt=prompt, premium_context=premium_context)
+		q = await _summarise(q, summ_length, best=best, prompt=prompt, premium_context=premium_context, model=model)
 	splits = await _run_async(split_across, q, lim=split_length, mode="tlen")
 	futs = []
 	for s in splits:
-		fut = create_task(_summarise(s, ceil(2 * summ_length / len(splits)), best=best, prompt=prompt, premium_context=premium_context))
+		fut = create_task(_summarise(s, ceil(2 * summ_length / len(splits)), best=best, prompt=prompt, premium_context=premium_context, model=model))
 		futs.append(fut)
 	outs = await gather(*futs)
 	q = "\n\n".join(outs)
@@ -312,7 +312,7 @@ async def summarise(q, min_length=384, max_length=8192, padding=128, best=True, 
 	c = tcount(q)
 	if c <= min_length:
 		return q
-	return await _summarise(q, summ_length, best=best, prompt=prompt, premium_context=premium_context)
+	return await _summarise(q, summ_length, best=best, prompt=prompt, premium_context=premium_context, model=model)
 
 cache = CACHE = AutoCache(f"{CACHE_PATH}/ai", stale=86400, timeout=86400 * 14)
 
@@ -427,7 +427,7 @@ async def load_openrouter():
 with tracebacksuppressor:
 	submit_thread(asyncio.run, load_openrouter())
 
-async def _summarise(s, max_length, best=False, prompt=None, premium_context=[]):
+async def _summarise(s, max_length, best=False, prompt=None, premium_context=[], model="small"):
 	if len(s) <= max_length:
 		return s
 	s = lim_tokens(s, 49152, mode="right")
@@ -459,7 +459,6 @@ Answer ONLY with the summary, do not answer the question itself!'''
 				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above!'
 			ml = round_random(max_length)
 			c = tcount(prompt)
-			model = "small"
 			data = dict(model=model, prompt=prompt, temperature=0.6, max_tokens=ml, premium_context=premium_context, reasoning_effort="minimal")
 			resp = await instruct(data)
 			print("Summary:", resp)
@@ -655,6 +654,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 				api=sapi,
 				model=model,
 				input=inputs,
+				kwargs=kwa,
 				pricing=pricing,
 			)
 			if getattr(response, "object", None) == "response" or hasattr(response, "choices"):
@@ -944,11 +944,12 @@ def unimage(message):
 
 class OpenAIPricingIterator(CloseableAsyncIterator):
 
-	def __init__(self, it, close, premium_context, api, model, input="", m_input=0, m_output=0, pricing=None, expose_reasoning=False):
+	def __init__(self, it, close, premium_context, api, model, input="", kwargs={}, m_input=0, m_output=0, pricing=None, expose_reasoning=False):
 		super().__init__(it, close)
 		self.premium_context = premium_context or []
 		self.applied = False
 		self.input = input
+		self.kwargs = kwargs
 		self.output = ""
 		self.tokens = [0, 0]
 		self.model = model
@@ -989,11 +990,11 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 			reason = getattr_chain(choice, "delta.reasoning", None) or getattr_chain(choice, "message.reasoning", None)
 			if not reason and getattr_chain(choice, "delta.reasoning_details", None):
 				rdetails = [r.get("text", "") for r in choice.delta.reasoning_details if r["type"] == "reasoning.text"]
-				if rdetails:
+				if rdetails and rdetails[0]:
 					reason = str(rdetails[0])
 				else:
 					rdetails = [r["summary"] for r in choice.delta.reasoning_details if r["type"] == "reasoning.summary"]
-					if rdetails:
+					if rdetails and rdetails[0]:
 						reason = str(rdetails[0])
 			if reason:
 				self.output += reason
@@ -1069,11 +1070,13 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 		self.log()
 		print("aiter pricing:", self.tokens, self.costs)
 
-	def log(self):
+	def log(self) -> None:
 		with open(f"{TEMP_PATH}/chat/{ts_us()}.md", "w", encoding="utf-8") as f:
-			f.write(pretty_json(self.input))
+			f.write(pretty_json(self.kwargs))
 			f.write("\n" * 3)
 			f.write(str(self.output))
+	if not AUTH.get("chat-logging", False):
+		log = lambda self: None
 
 def instruct_structure(messages, exclude_first=True, fmt="chatml", assistant=None):
 	messages = list(map(unimage, messages))

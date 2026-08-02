@@ -6029,7 +6029,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				"Updates the StreamedMessage object with new content, embeds, files, and buttons. If force is True, the message will be sent even if it exceeds the maximum length, as a file."
 				if not done and self.content and not content.strip() and not self.content.endswith(" <<<"):
 					content = self.content + " <<<"
-				content = readstring(content).strip()
+				content = content.strip()
 				if not done and content == readstring(self.content):
 					return as_fut(self)
 				if self.obfuscate:
@@ -6635,7 +6635,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		discord.context_managers.Typing.do_typing = do_typing
 		discord.context_managers.Typing.__aenter__ = __aenter__
 
-		discord.Embed.__hash__ = lambda self: len(self)
+		discord.Embed.__hash__ = lambda self: len(self) + hash(self.description)
 
 		def _get_mime_type_for_audio(data: bytes):
 			if data.startswith(b'\x49\x44\x33') or data.startswith(b'\xff\xfb'):
