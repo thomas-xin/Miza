@@ -3436,7 +3436,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			if default is Dummy:
 				fut.set_exception(ex)
 			else:
-				fut.set_result(v)
+				fut.set_result(default)
 			raise
 		else:
 			fut.set_result(v)
@@ -3494,7 +3494,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 			if default is Dummy:
 				fut.set_exception(ex)
 			else:
-				fut.set_result(v)
+				fut.set_result(default)
 			raise
 		else:
 			fut.set_result(v)
