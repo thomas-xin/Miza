@@ -1429,7 +1429,7 @@ class Radio(Pagination, Interactable, Command):
 
 		search = f" for ({countrycode.upper()}, {query})" if countrycode and query else f" for ({countrycode.upper() or query})" if countrycode or query else ""
 		s = "s" if len(curr) != 1 else ""
-		return await self.default_display(f"result{s}{search}", uid, pos, curr, diridx, extra=as_bytes(countrycode) + b"\xad" + as_bytes(query), key=key, page_size=32, plural=False)
+		return await self.default_display(f"result{s}{search}", uid, pos, curr, diridx, extra=as_bytes(countrycode) + b"\xad" + as_bytes(query), key=key, page_size=24, plural=False)
 
 	async def _callback_(self, _user, index, data, **void):
 		pos, more = decode_leb128(data)

@@ -693,8 +693,7 @@ def _audio_meta(path, _timeout=12) -> dict:
 	lines = ()
 	try:
 		proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
-		fut = submit_thread(proc.wait, timeout=_timeout)
-		_res = fut.result(timeout=_timeout)
+		proc.wait(timeout=_timeout)
 		lines = [line for line in reversed(proc.stdout.read().decode("utf-8").splitlines()) if "=" in line]
 	except Exception:
 		try:

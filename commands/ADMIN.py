@@ -2571,7 +2571,7 @@ class UpdateCrossposts(Database):
 
 class UpdateStarboards(Database):
 	name = "starboards"
-	sems = {}
+	sems = collections.defaultdict(lambda: Semaphore(1, inf))
 	sparkle_ids = {}
 
 	async def _ready_(self, bot, **void):
@@ -2598,7 +2598,10 @@ class UpdateStarboards(Database):
 		bot = self.bot
 		message = await bot.ensure_reactions(message)
 		count = sum(r.count for r in message.reactions if str(r.emoji) == react) if react != "SPARKLES" else sum(r.count for r in message.reactions if getattr(r.emoji, "id", None) and r.emoji.id in self.sparkle_ids)
-		sem = self.sems.setdefault(message.guild.id, Semaphore(1, inf))
+		if count < req:
+			return
+		sem = self.sems[message.guild.id]
+		print(count, req, sem)
 		async with sem:
 			if message.id in table.get(None, ()):
 				channel = await bot.fetch_channel(table[react][1])
@@ -2610,29 +2613,26 @@ class UpdateStarboards(Database):
 				except:
 					print_exc()
 					table[None].pop(message.id)
+			embeds = await bot.as_embeds(message, link=True, colour=True, reactions=True)
+			# print([e.to_dict() for e in embeds])
+			channel = await bot.fetch_channel(table[react][1])
 			if message.id not in table.setdefault(None, {}):
-				if count >= req:
-					embeds = await bot.as_embeds(message, link=True, colour=True, reactions=True)
-					try:
-						channel = await bot.fetch_channel(table[react][1])
-						await bot.send_and_finalise(channel, embeds=embeds)
-					except (discord.NotFound, discord.Forbidden):
-						print_exc()
-						table.pop(react)
-					else:
-						table[None][message.id] = m.id
-						with tracebacksuppressor(RuntimeError, KeyError):
-							while len(table[None]) > 262144:
-								table[None].pop(next(iter(table[None])))
+				try:
+					m = await bot.send_and_finalise(channel, embeds=embeds)
+				except (discord.NotFound, discord.Forbidden):
+					print_exc()
+					table.pop(react)
+				else:
+					table[None][message.id] = m.id
+					with tracebacksuppressor(RuntimeError, KeyError):
+						while len(table[None]) > 262144:
+							table[None].pop(next(iter(table[None])))
 			else:
 				try:
-					channel = await bot.fetch_channel(table[react][1])
-					m = await bot.fetch_message(table[None][message.id], channel)
-					embeds = await bot.as_embeds(message, link=True, colour=True, reactions=True)
 					attachments = await bot.prepare_embeds(embeds, m_id=message.id, g_id=message.guild.id)
 					if attachments:
 						m = await bot.edit_message(m, embeds=embeds, files=attachments)
-					await bot.finalise_embeds(m, embeds, attachments, g_id=message.guild.id)
+					await bot.finalise_embeds(m, embeds, attachments, g_id=message.guild.id, requires_edit=True)
 				except (discord.NotFound, discord.Forbidden):
 					print_exc()
 					table[None].pop(message.id, None)
@@ -2651,7 +2651,7 @@ class UpdateStarboards(Database):
 		if message.id not in table.get(None, {}):
 			return
 		bot = self.bot
-		sem = self.sems.setdefault(message.guild.id, Semaphore(1, inf))
+		sem = self.sems[message.guild.id]
 		async with sem:
 			try:
 				reacts = sorted(message.reactions, key=lambda r: -r.count)
@@ -2666,7 +2666,7 @@ class UpdateStarboards(Database):
 				attachments = await bot.prepare_embeds(embeds, m_id=message.id, g_id=message.guild.id)
 				if attachments:
 					m = await bot.edit_message(m, embeds=embeds, files=attachments)
-				await bot.finalise_embeds(m, embeds, attachments, g_id=message.guild.id)
+				await bot.finalise_embeds(m, embeds, attachments, g_id=message.guild.id, requires_edit=True)
 			except (discord.NotFound, discord.Forbidden):
 				print_exc()
 				table[None].pop(message.id, None)

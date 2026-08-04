@@ -2412,8 +2412,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 		return attachments
 
-	async def finalise_embeds(self, message, embeds, attachments, g_id=None):
-		requires_edit = False
+	async def finalise_embeds(self, message, embeds, attachments, g_id=None, requires_edit=False):
 		await asyncio.sleep(0.5)
 		amap = {a.filename: a.source for a in attachments}
 		for a in message.attachments:
@@ -2491,6 +2490,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		attachments = await self.prepare_embeds(embeds, g_id=channel.guild.id)
 		m = await channel.send(content, embeds=embeds, files=attachments)
 		await self.finalise_embeds(m, embeds, attachments, g_id=channel.guild.id)
+		return m
 
 	async def coloured_embed(self, url):
 		colour = await self.get_colour(url)
@@ -5495,22 +5495,28 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					self.update_embeds(utc() % 1 < 0.5)
 					await_fut(self.send_event("_call_"))
 
+	upload_cache = attachment_cache.secondary
 	async def upload_temp(self, b, filename=None):
 		if isinstance(b, str):
-			b = await read_file_a(b)
-		elif isinstance(b, byte_like):
-			pass
+			fp = open(b, "rb")
 		else:
-			b = await _run_async(b.read)
-		url = f"{self.raw_webserver}/upload"
-		if filename:
-			url += f"?filename={filename}"
-		return await Request.aio(
-			url,
-			data=b,
-			method="POST",
-			decode=True,
-		)
+			fp = b
+		size = getsize(fp)
+		if size < 65536 and not isinstance(fp, byte_like):
+			fp = fp.read()
+		ts = n2p(ts_us()).decode("ascii")
+		ext = get_ext(fp)
+		self.upload_cache.set(ts, fp, tag=filename or f"f.{ext}", read=True)
+		return f"{self.raw_webserver}/f/{ts}.{ext}"
+		# url = f"{self.raw_webserver}/upload"
+		# if filename:
+		# 	url += f"?filename={filename}"
+		# return await Request.aio(
+		# 	url,
+		# 	data=b,
+		# 	method="POST",
+		# 	decode=True,
+		# )
 
 	def update_uptime(self, data):
 		uptimes = self.uptime_db

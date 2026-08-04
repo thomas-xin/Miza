@@ -1067,7 +1067,7 @@ class UpdateMessageCache(Database):
 		bot = self.bot
 		try:
 			p = bot.proxied.pop(message.id)
-			bot.proxied.pop(p)
+			bot.proxied.pop(tuple(p))
 		except KeyError:
 			pass
 		return await self._send_(message)
