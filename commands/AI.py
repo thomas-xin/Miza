@@ -437,9 +437,11 @@ class Ask(Command):
 						passthrough.add(m.reference.message_id)
 				elif m.id in passthrough:
 					pass
-				elif pdata.history != "shared" and (
-					bot.commands.chatconfig[0].retrieve(m.author).history != "shared"
-					or bot.commands.chatconfig[0].retrieve(m.author).history == "private" and m.author.id == _user.id
+				elif pdata.history == "shared" or bot.commands.chatconfig[0].retrieve(m.author).history == "shared":
+					pass
+				elif (
+					m.author.id == _user.id
+					and pdata.history == "private" or bot.commands.chatconfig[0].retrieve(m.author).history == "private"
 				):
 					continue
 				if bot.is_optout(m.author.id):
