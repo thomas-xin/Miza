@@ -73,11 +73,12 @@ def nsfw_flagged(resp):
 	cat = resp.categories
 	flagged = ("harassment", "hate", "sexual", "self_harm", "violence_graphic", "illicit_violent")
 	found = []
-	for flag in flagged:
-		if getattr(cat, flag):
-			score = getattr(resp.category_scores, flag)
-			if score >= 0.5:
-				found.append((score, flag + f"({round(score * 100)}%)"))
+	with tracebacksuppressor:
+		for flag in flagged:
+			if (isinstance(cat, dict) and cat.get(flag)) or (not isinstance(cat, dict) and getattr(cat, flag, False)):
+				score = getattr(resp.category_scores, flag)
+				if score >= 0.5:
+					found.append((score, flag + f"({round(score * 100)}%)"))
 	if not found:
 		# if resp.flagged:
 		# 	flag, score = max(dict(resp.category_scores).items(), key=lambda t: t[1])
@@ -268,7 +269,6 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_last=3, best=False, 
 	summ = "Summary of chat history (include this if asked to summarise!):\n"
 	s = overview(messages[:i + 1] if i > 0 else messages)
 	s = s.removeprefix(summ).removeprefix("system:").strip()
-	# c = tcount(summ + s)
 	c2 = count_to(messages)
 	if c2 <= softlim * 1.2:
 		if exclude_last:
@@ -586,7 +586,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 					else:
 						m = untool(m2)
 					if not m.get("content"):
-						m.content = "."
+						m.content = ""
 					messages.append(m)
 				if system:
 					messages.insert(0, cdict(
@@ -1205,20 +1205,21 @@ async def moderate(text="", image="", input="", premium_context=[]):
 				results=[
 					cdict(
 						flagged=False,
-						categories={
+						categories=cdict({
 							"sexual": False,
 							"hate": False,
 							"harassment": False,
-							"self-harm": False,
-							"sexual/minors": False,
-							"hate/threatening": False,
-							"violence/graphic": False,
-							"self-harm/intent": False,
-							"self-harm/instructions": False,
-							"harassment/threatening": False,
+							"self_harm": False,
+							"sexual_minors": False,
+							"hate_threatening": False,
+							"violence_graphic": False,
+							"self_harm_intent": False,
+							"self_harm_instructions": False,
+							"harassment_threatening": False,
 							"violence": False,
-						},
-						category_scores={
+							"illicit_violent": False,
+						}),
+						category_scores=cdict({
 							"sexual": 0,
 							"hate": 0,
 							"harassment": 0,
@@ -1230,7 +1231,8 @@ async def moderate(text="", image="", input="", premium_context=[]):
 							"self-harm/instructions": 0,
 							"harassment/threatening": 0,
 							"violence": 0,
-						},
+							"illicit-violent": 0,
+						}),
 					)
 				]
 			)

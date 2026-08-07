@@ -1,17 +1,15 @@
 import asyncio
-import collections
-import concurrent.futures
+import collections; from collections import deque
+import concurrent.futures; from concurrent.futures import ThreadPoolExecutor, thread
 import contextlib
 import functools
 import inspect
 import subprocess
 import threading
-import time
+import time; from time import time as utc
 import traceback
 import types
-from collections import deque
-from concurrent.futures import ThreadPoolExecutor, thread
-from time import time as utc
+
 from misc.types import lim_str, as_str
 
 print("ASYNCS:", __name__)

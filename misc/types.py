@@ -1,8 +1,7 @@
 import ast
 import asyncio
 import bisect
-import collections.abc
-from collections import deque
+import collections.abc; from collections import deque
 import concurrent.futures
 import contextlib
 import copy
@@ -23,6 +22,7 @@ except AttributeError:
 	pass
 import time
 from traceback import print_exc
+
 import numpy as np
 import orjson
 from misc.ring_vector import RingVector

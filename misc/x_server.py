@@ -1,4 +1,3 @@
-from dns.win32util import _
 import collections.abc
 import datetime
 import functools
@@ -18,7 +17,7 @@ import time
 import urllib, urllib.parse
 import zipfile
 import cheroot, cheroot.server
-import cherrypy
+import cherrypy as cp
 import diskcache
 import niquests
 import orjson
@@ -29,9 +28,12 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, submit_thread, create_thread, create_task, await_fut
 from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
-from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, get_ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag, preview_url, is_local_url, banned_paths, force_kill
+from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, get_ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag, preview_url, is_local_url, banned_paths, force_kill, patch_before_return
 from .caches import attachment_cache, colour_cache, minimise_url
 from .audio_downloader import AudioDownloader, get_best_icon
+
+# Monkey-patch as cherrypy is effectively no longer maintained
+patch_before_return(cp.lib.static.serve_fileobj, "content_length=content_length or (fileobj.seek(0,os.SEEK_END),fileobj.seek(0))[0]")
 
 ytdl_fut = submit_thread(AudioDownloader, workers=1)
 
@@ -70,8 +72,6 @@ def utc_dt():
 prev_date = utc_dt().date()
 zfailed = set()
 
-
-cp = cherrypy
 httputil = cp.lib.httputil
 errors.SSLEOFError = ssl.SSLEOFError
 
@@ -803,8 +803,8 @@ class Server:
 				entry = self.ydl.search(q)[0]
 				title = entry["name"]
 			update_headers(cp.response.headers, **CHEADERS)
-			f = open(fn, "rb")
-			return cp.lib.static.serve_fileobj(f, name=f"{title}.{fmt}", content_type=MIMES[fmt], disposition="inline")
+			mime = get_mime(fn)
+			return cp.lib.static.serve_file(fn, name=f"{title}.{mime_into(mime)}", content_type=mime, disposition="inline")
 		sem = self.ydl_sems.setdefault(ip, Semaphore(64, 256, rate_limit=8))
 		with sem:
 			entries = self.ydl.search(q, count=12)

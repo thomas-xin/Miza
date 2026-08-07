@@ -761,6 +761,6 @@ class UpdateSkyShardReminders(Database):
 					continue
 				if not v.subscription & shard_bits:
 					continue
-				fut = create_task(notify_user(k, v))
+				fut = notify_user(k, v)
 				futs.append(fut)
 			await gather(*futs)

@@ -453,10 +453,15 @@ class Ask(Command):
 		await bot.require_integrity(_message)
 		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, model, nsfw, _prefix, simulated)
 		if pdata.stream and pdata.tts != "discord" and not simulated:
-			return cdict(
-				content=fut,
-				b_tts=pdata.tts == "builtin",
-			)
+			try:
+				_premium.require(2)
+			except PermissionError:
+				pass
+			else:
+				return cdict(
+					content=fut,
+					b_tts=pdata.tts == "builtin",
+				)
 		temp = await flatten(fut)
 		if not temp:
 			return "\xad"
@@ -850,7 +855,7 @@ class ChatConfig(Command):
 		return per
 
 	async def __call__(self, bot, _nsfw, _guild, _channel, _user, _premium, _perm, description, model, stream, tts, history, apply_all, **void):
-		if hasattr(_channel, "recipient"):
+		if getattr(_channel, "recipient"):
 			targets = [_channel.recipient]
 			gid = targets[0].id
 			personal = True

@@ -342,9 +342,9 @@ class Queue(Pagination, Interactable, Command):
 		cache_level = bot.audio.run(f"ytdl.in_cache({repr(items[0].url)})")
 		print(items[0].url, cache_level)
 		if not cache_level:
-			delay = 8
+			delay = 9
 		elif cache_level == 1:
-			delay = 3
+			delay = 6
 		total_duration = max(delay, estimated / abs(settings.speed))
 		qstride = 1
 		if len(index) > 1:

@@ -100,15 +100,16 @@ class Restart(Command):
 			await _run_async(bot.start_webserver)
 			await m.edit("Webserver restarted successfully.")
 			return
-		if mode in ("update", "all"):
+		if mode in ("update", "all", "shutdown"):
 			resps = await gather(*(
 				*([_run_async(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)] if mode == "update" else ()),
 				_run_async(bot.start_audio_client, shutdown=True),
 				_run_async(bot.start_webserver, shutdown=True),
 			), return_exceptions=True)
 			resp = resps[0]
-			print(resp.stdout)
-			print(resp.stderr)
+			if resp:
+				print(resp.stdout)
+				print(resp.stderr)
 		if mode == "maintain":
 			m = None
 			busy = -inf

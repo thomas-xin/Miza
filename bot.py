@@ -3254,7 +3254,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			#     create_task(self.create_main_website())
 			# self.raw_webserver = new_ip
 
-	ip_sem = Semaphore(1, 1, rate_limit=60)
+	ip_sem = Semaphore(1, 1, rate_limit=720)
 	async def get_ip(self):
 		"Gets the external IP address from api.ipify.org"
 		if not self.ip_sem.busy:
@@ -5560,7 +5560,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				with tracebacksuppressor:
 					create_task(self.update_status())
 					with MemoryTimer("network_usage"):
-						fut = _run_async(psutil.net_io_counters)
+						fut = run_async(psutil.net_io_counters)
 						data = await self.status()
 						await _run_async(self.update_uptime, data)
 						resp = await fut
@@ -6077,7 +6077,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						fut = create_task(send_with_react(self.channel, s, reference=ref, embeds=embs, files=fils, buttons=buts, reacts=reac))
 						futs.append(fut)
 						self.messages.append(fut)
-						await asyncio.sleep(0.25)
+						await asyncio.sleep(bot.latency + 0.125)
 						continue
 					m = self.messages[i]
 					if isinstance(m, (asyncio.Future, asyncio.Task)):
@@ -6928,6 +6928,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		return data
 
 	async def index_member(self, guild_id, author_id=0, channel_id=0, add=0):
+		if guild_id not in self.cache.guilds or channel_id and (channel_id not in self.cache.channels or not self.permissions_in(self.cache.channels[channel_id]).read_message_history):
+			return 0
 		target = author_id or channel_id
 		info = self.get_guildbase(guild_id, f"index:{target}", {})
 		ts = info.get("time", 0)

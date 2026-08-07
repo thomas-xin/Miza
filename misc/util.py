@@ -2,8 +2,7 @@ import ast
 import asyncio
 import base64
 import base65536
-import collections
-from collections import deque, defaultdict
+import collections; from collections import deque, defaultdict
 import concurrent.futures
 import contextlib
 import datetime
@@ -13,12 +12,12 @@ import functools
 import hashlib
 import html
 import http.client
+import inspect
 import io
 import itertools
 import json
 from math import ceil, comb, inf, isfinite, isqrt, log10
-import multiprocessing.connection
-import multiprocessing.shared_memory
+import multiprocessing.connection, multiprocessing.shared_memory
 import os
 os.environ["PYTHONUTF8"] = "1"
 import pickle
@@ -30,13 +29,12 @@ import socket
 import sqlite3
 import subprocess
 import sys
+import textwrap
 import threading
 import time
 from traceback import format_exc, print_exc
-from urllib.parse import quote_plus, unquote_plus, quote, unquote
-import urllib.error
-import urllib.parse
-import urllib.request
+import types
+import urllib.request, urllib.error, urllib.parse; from urllib.parse import quote_plus, unquote_plus, quote, unquote
 import zipfile
 import aiofiles
 import aiohttp
@@ -4005,6 +4003,24 @@ class Flush(io.IOBase):
 
 	def __exit__(self, exc_type, exc_value, traceback):
 		return
+
+
+def patch_before_return(func: types.FunctionType, patch: str) -> types.FunctionType:
+	src = textwrap.dedent(inspect.getsource(func))
+	fdef = ast.parse(src).body[0]
+	fdef.decorator_list = []
+	idx = tuple(
+		i for i, s in reversed(tuple(enumerate(fdef.body)))
+		if isinstance(s, ast.Return)
+	)[-1]
+	stmt = ast.parse(patch).body[0]
+	fdef.body.insert(idx, stmt)
+
+	ast.fix_missing_locations(fdef)
+	module_code = compile(ast.Module(body=[fdef], type_ignores=[]), "<patched>", "exec")
+	new_code = next(c for c in module_code.co_consts if isinstance(c, type(func.__code__)) and c.co_name == func.__name__)
+	func.__code__ = new_code
+	return func
 
 
 # Repeatedly retries a synchronous operation, with optional break exceptions.

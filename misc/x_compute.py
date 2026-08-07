@@ -259,9 +259,7 @@ def get_current_stats(up_bps, down_bps):
 		_ctime = t
 		import cpuinfo
 		cinfo = _cpuinfo = cpuinfo.get_cpu_info()
-	f1 = psutil.cpu_percent()
-	f2 = psutil.virtual_memory()
-	f3 = psutil.swap_memory()
+	f1, f2, f3 = exc.map(lambda f: f(), (psutil.cpu_percent, psutil.virtual_memory, psutil.swap_memory))
 	try:
 		gname, gcore, gmems, gutil, gpowa, gpowb, gtempa, gtempb = get_nvml()
 	except Exception:

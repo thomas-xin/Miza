@@ -1,6 +1,5 @@
 import bisect
-import collections.abc
-from collections import deque
+import collections.abc; from collections import deque
 import copy
 from itertools import chain
 from math import ceil, floor, log2, sqrt

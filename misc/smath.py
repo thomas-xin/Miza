@@ -11,7 +11,6 @@ import sys
 import collections
 import time
 import traceback
-import numpy as np
 import datetime
 import colormath
 import functools
@@ -25,6 +24,8 @@ import re
 import hashlib
 import base64
 import itertools
+
+import numpy as np
 
 from misc.types import Dummy, astype, as_str, nested_tuple, alist, arange, afull, azero, aempty, cdict, demap, universal_set, exclusive_range, exclusive_set, ZeroEnc, is_zero_enc, zwencode, zwdecode, zwremove, UNIFMTS, unfont, DIACRITICS, zalgo_array, zalgo_map, uni_str, unicode_prune, full_prune, fcdict, mdict, msdict, regexp, suppress, nop, nofunc, none, literal_eval, lim_str, utc, ts_us, round_random, try_int, safe_eval, round_min #noqa: E402 F401
 

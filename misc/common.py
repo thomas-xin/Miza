@@ -12,7 +12,7 @@ if __name__ != "__mp_main__":
 	from misc.smath import *
 	from misc.caches import *
 
-import psutil, subprocess, weakref, zipfile, urllib, asyncio, json, pickle, functools, orjson, aiohttp, threading, shutil, inspect, sqlite3, argparse, bisect, httpx
+import psutil, subprocess, weakref, zipfile, urllib, asyncio, json, pickle, functools, orjson, aiohttp, threading, shutil, sqlite3, argparse, bisect, httpx
 
 # VERY HACKY removes deprecated audioop dependency for discord.py; this would cause volume transformations to fail but Miza uses FFmpeg for them anyway
 sys.modules["audioop"] = sys
@@ -62,7 +62,7 @@ class MemoryTimer(contextlib.AbstractContextManager, contextlib.AbstractAsyncCon
 
 	@classmethod
 	def list(cls):
-		return "\n".join(str(name) + ": " + str(duration) for duration, name in sorted(((mean(v), k) for k, v in cls.timers.items()), reverse=True))
+		return "\n".join(f"{name}: {count} -> {'%.3f' % avg}: {'%.3f' % high}" for high, avg, name, count in sorted(((max(v), mean(v), k, len(v)) for k, v in cls.timers.items()), reverse=True))
 
 	def __init__(self, name=None):
 		self.name = name
