@@ -4008,6 +4008,7 @@ class Flush(io.IOBase):
 def patch_before_return(func: types.FunctionType, patch: str) -> types.FunctionType:
 	src = textwrap.dedent(inspect.getsource(func))
 	fdef = ast.parse(src).body[0]
+
 	fdef.decorator_list = []
 	idx = tuple(
 		i for i, s in reversed(tuple(enumerate(fdef.body)))

@@ -437,8 +437,9 @@ class Ask(Command):
 						passthrough.add(m.reference.message_id)
 				elif m.id in passthrough:
 					pass
-				elif pdata.history != "shared" and (m.author.id != _user.id and not m.author.bot and
+				elif pdata.history != "shared" and (
 					bot.commands.chatconfig[0].retrieve(m.author).history != "shared"
+					or bot.commands.chatconfig[0].retrieve(m.author).history == "private" and m.author.id == _user.id
 				):
 					continue
 				if bot.is_optout(m.author.id):
@@ -855,7 +856,7 @@ class ChatConfig(Command):
 		return per
 
 	async def __call__(self, bot, _nsfw, _guild, _channel, _user, _premium, _perm, description, model, stream, tts, history, apply_all, **void):
-		if getattr(_channel, "recipient"):
+		if getattr(_channel, "recipient", None):
 			targets = [_channel.recipient]
 			gid = targets[0].id
 			personal = True
