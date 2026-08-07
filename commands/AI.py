@@ -148,8 +148,9 @@ class Translate(Command):
 			try:
 				cmpl = await ai.llm(
 					"chat.completions.create",
-					messages=messages,
 					model="translation",
+					messages=messages,
+					temperature=0.01,
 					max_completion_tokens=16384,
 					premium_context=premium,
 				)
@@ -189,30 +190,30 @@ class Translate(Command):
 		m = self.bot.model_levels[0].instructive
 		if (count := count_to(messages)) < ai.contexts[m] / 2:
 			try:
-				translated = await ai._instruct(
-					data=dict(
-						model=m,
-						messages=messages,
-						temperature=0.01,
-						premium_context=premium,
-						max_completion_tokens=ai.contexts[m] - count * 3 // 2,
-						reasoning_effort="low",
-					),
+				cmpl = await ai.llm(
+					"chat.completions.create",
+					model=m,
+					messages=messages,
+					temperature=0.01,
+					reasoning_effort="low",
+					max_completion_tokens=ai.contexts[m] - count * 3 // 2,
+					premium_context=premium,
 				)
+				translated = cmpl.choices[0].message.content.strip()
 				assert translated, "No output was captured!"
 			except Exception:
 				print_exc()
 		if not translated:
-			translated = await ai._instruct(
-				data=dict(
-					model="hy3",
-					messages=messages,
-					temperature=0.01,
-					premium_context=premium,
-					max_completion_tokens=98304,
-					reasoning_effort="low",
-				),
+			cmpl = await ai.llm(
+				"chat.completions.create",
+				model="hy3",
+				messages=messages,
+				temperature=0.01,
+				reasoning_effort="low",
+				max_completion_tokens=ai.contexts[m] - count * 3 // 2,
+				premium_context=premium,
 			)
+			translated = cmpl.choices[0].message.content.strip()
 		tr = None
 		pronunciation = None
 		if dest != "en":
