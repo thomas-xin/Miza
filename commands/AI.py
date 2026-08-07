@@ -443,6 +443,8 @@ class Ask(Command):
 					m.author.id == _user.id
 					and pdata.history == "private" or bot.commands.chatconfig[0].retrieve(m.author).history == "private"
 				):
+					pass
+				else:
 					continue
 				if bot.is_optout(m.author.id):
 					continue
@@ -748,28 +750,29 @@ class Ask(Command):
 			desc = "-# " + "\n-# ".join(desc.splitlines())
 			response.content += "\n" + desc
 			print(">", desc)
-		tips = [
-			"*Tip: By using generative AI, you are assumed to comply with the [ToS](<https://github.com/thomas-xin/Miza/wiki/Terms-of-Service>).*",
-			f"*Tip: The chatbot feature is designed to incorporate multiple SOTA models in addition to internet-based interactions. For direct interaction with the raw LLMs, check out {prefix}instruct.*",
-			f"*Tip: My personality prompt and message streaming are among several parameters that may be modified. Check out {prefix}help chatconfig for more info. Note that an improperly constructed prompt may be detrimental to response quality, and that giving me a nickname may also have an effect.*",
-			"*Tip: Remember that anything a chatbot says may be fictional or otherwise made-up. Always fact-check from reputable sources before making serious assumptions, and don't take the AI's words too seriously.*",
-			"*Tip: At any point in time, you may delete your command message to stop generation.*",
-		] if not xrand(10) else []
-		if premium.value < 3:
-			tips.insert(0, "*Tip: Many of my capabilities are not readily available due to cost reasons. You can gain access by donating through one of the premium subscriptions available, which serves to approximately fund individual usage.*")
-		if not nsfw:
-			tips.insert(0, f"*Tip: I automatically try to correct inaccurate responses when possible. However, this is not foolproof; if you would like this feature more actively applied to counteract censorship, please move to a NSFW channel or use {prefix}verify if in DMs.*")
-		if pdata.history != "shared":
-			tips.insert(0, f"*Tip: For privacy reasons, conversation histories (allowing referencing previous messages in the same channel) are disabled by default, except for bot commands. If you would like to change this, use `{prefix}chatconfig --history none` to disable history altogether, or `{prefix}chatconfig --history shared` if you would also like the bot to be able to read multi-user conversations. This enables me to read up to 192 previous messages from the current channel. No messages from other channels are included.*")
-		already_used = bot.get_userbase(_channel.id, "ai_tips.chat", 0)
-		if already_used < len(tips):
-			note = "-# " + tips[already_used]
-			bot.add_userbase(_channel.id, "ai_tips.chat", 1)
-			embs.append(discord.Embed(
-				colour=rand_colour(),
-				description=note
-			))
-			print(">", note)
+		if not bot.get_guildbase(_channel.id, "chatconfig"):
+			tips = [
+				"*Tip: By using generative AI, you are assumed to comply with the [ToS](<https://github.com/thomas-xin/Miza/wiki/Terms-of-Service>).*",
+				f"*Tip: The chatbot feature is designed to incorporate multiple SOTA models in addition to internet-based interactions. For direct interaction with the raw LLMs, check out {prefix}instruct.*",
+				f"*Tip: My personality prompt and message streaming are among several parameters that may be modified. Check out {prefix}help chatconfig for more info. Note that an improperly constructed prompt may be detrimental to response quality, and that giving me a nickname may also have an effect.*",
+				"*Tip: Remember that anything a chatbot says may be fictional or otherwise made-up. Always fact-check from reputable sources before making serious assumptions, and don't take the AI's words too seriously.*",
+				"*Tip: At any point in time, you may delete your command message to stop generation.*",
+			] if not xrand(10) else []
+			if premium.value < 3:
+				tips.insert(0, "*Tip: Many of my capabilities are not readily available due to cost reasons. You can gain access by donating through one of the premium subscriptions available, which serves to approximately fund individual usage.*")
+			if not nsfw:
+				tips.insert(0, f"*Tip: I automatically try to correct inaccurate responses when possible. However, this is not foolproof; if you would like this feature more actively applied to counteract censorship, please move to a NSFW channel or use {prefix}verify if in DMs.*")
+			if pdata.history != "shared":
+				tips.insert(0, f"*Tip: For privacy reasons, conversation histories (allowing referencing previous messages in the same channel) are disabled by default, except for bot commands. Check out `{prefix}help chatconfig for more info. No messages from other channels are included in any chat history, and all context is routed either to locally hosted servers or zero-data-retention providers.*")
+			already_used = bot.get_userbase(_channel.id, "ai_tips.chat", 0)
+			if already_used < len(tips):
+				note = "-# " + tips[already_used]
+				bot.add_userbase(_channel.id, "ai_tips.chat", 1)
+				embs.append(discord.Embed(
+					colour=rand_colour(),
+					description=note
+				))
+				print(">", note)
 		response.embeds = embs
 		response.reacts = tuple(response.get("reacts", ())) + tuple(reacts)
 		yield response
@@ -826,7 +829,7 @@ class ChatConfig(Command):
 			validation=cdict(
 				enum=("none", "command", "private", "shared"),
 			),
-			description="Whether chat history is enabled, and if so, whether the conversation is shared (including messages from different users), private, or bot-commands only",
+			description="Whether chat history is enabled, and if so, whether the conversation is shared (including messages from different users), private (same-user only), or default (bot-commands only). Context length is limited by model tier, up to 192 messages or 196608 tokens",
 		),
 		apply_all=cdict(
 			type="bool",

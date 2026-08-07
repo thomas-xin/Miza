@@ -5502,14 +5502,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		else:
 			fp = b
 		size = getsize(fp)
+		ext = get_ext(fp)
 		if size < 65536 and not isinstance(fp, byte_like):
 			fp = fp.read()
 		ts = n2p(ts_us()).decode("ascii")
 		return await _run_async(self.put_webserver, ts, fp, filename or f"f.{ext}")
-	def put_webserver(ts, fp, tag):
-		ext = get_ext(fp)
+	def put_webserver(self, ts, fp, tag):
 		self.upload_cache.set(ts, fp, tag=tag, read=True)
-		return f"{self.raw_webserver}/f/{ts}.{ext}"
+		return f"{self.raw_webserver}/f/{ts}.{url2ext(tag)}"
 
 	def update_uptime(self, data):
 		uptimes = self.uptime_db

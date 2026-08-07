@@ -3950,7 +3950,7 @@
 					"validation": {
 						"enum": ["none", "command", "private", "shared"]
 					},
-					"description": "Whether chat history is enabled, and if so, whether the conversation is shared (including messages from different users), private, or bot-commands only"
+					"description": "Whether chat history is enabled, and if so, whether the conversation is shared (including messages from different users), private (same-user only), or default (bot-commands only). Context length is limited by model tier, up to 192 messages or 196608 tokens"
 				},
 				"apply_all": {
 					"type": "bool",
