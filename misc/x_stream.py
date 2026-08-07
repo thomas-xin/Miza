@@ -355,36 +355,36 @@ async def head_mc(response: Response):
 
 
 @app.post("/authorised-heartbeat")
-async def authorised_heartbeat(request: Request, key: Optional[str] = None, uri: Optional[str] = ""):
+async def authorised_heartbeat(request: Request):
 	"""Receive configuration updates from Discord bot."""
-	if key != discord_secret:
+	body = await request.json()
+
+	if body.get("key") != discord_secret:
 		banned_ips.append(true_ip(request))
 		raise HTTPException(status_code=403, detail="Invalid key")
 
-	uri = uri or f"https://{true_ip(request)}:{webserver_port}"
+	uri = body.get("uri") or f"https://{true_ip(request)}:{webserver_port}"
 
 	if server.state["/"] != uri:
 		server.state["/"] = uri
 		with open("temp.json", "w") as f:
 			json.dump(server.state, f)
 
-	body = await request.json()
 	data = orjson.loads(zip2bytes(decrypt(base64.b64decode(body["data"].encode("ascii") + b"=="))))
+
+	bans = data.get("banned_ips", ())
+	banned_ips[:] = bans
 
 	server.token = data.get("token") or server.token
 	server.alt_token = data.get("alt_token") or server.alt_token
-	domain_cert = data.get("domain_cert")
-	private_key = data.get("private_key")
 	server.channels = data.get("channels") or server.channels
-
 	AUTH["discord_token"] = server.token
 	AUTH["alt_token"] = server.alt_token
 	AUTH["proxy_channels"] = server.channels
 	save_auth(AUTH)
 
-	bans = data.get("banned_ips", ())
-	banned_ips[:] = bans
-
+	domain_cert = data.get("domain_cert")
+	private_key = data.get("private_key")
 	if domain_cert and private_key:
 		with open(DOMAIN_CERT, "w") as f:
 			f.write(domain_cert)

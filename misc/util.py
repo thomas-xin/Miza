@@ -126,7 +126,7 @@ try:
 	DC = pynvml.nvmlDeviceGetCount()
 except Exception:
 	print_exc()
-hwaccel = "cuda" if DC else "d3d11va" if os.name == "nt" else "auto"
+hwaccel = "auto"
 
 
 api = "v10"

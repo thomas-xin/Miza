@@ -83,7 +83,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	}
 	active_categories = set(AUTH.setdefault("active_categories", ["MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "WEBHOOK", "FUN"]))
 
-	def __init__(self, cache_size=65536, timeout=24):
+	def __init__(self, cache_size=262144, timeout=24):
 		"Initializes client (first in __mro__ of class inheritance)"
 		self.start_time = utc()
 		shard_fut = submit_thread(
@@ -2464,6 +2464,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					preserved = self.proxied[p]
 				except KeyError:
 					continue
+				if orig == preserved:
+					continue
 				e.description = e.description.replace(orig, preserved, 1)
 				requires_edit = True
 			for i, field in enumerate(e.fields):
@@ -2479,6 +2481,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					try:
 						preserved = self.proxied[p]
 					except KeyError:
+						continue
+					if orig == preserved:
 						continue
 					description = description.replace(orig, preserved, 1)
 					requires_edit = True
@@ -2516,9 +2520,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	def cache_reduce(self):
 		self.limit_cache("messages")
-		self.limit_cache("emojis")
-		self.limit_cache("deleted", limit=65536)
-		self.limit_cache("banned", 4096)
+		self.limit_cache("colours")
 
 	def update_cache_feed(self):
 		"Updates bot cache from the discord.py client cache, using automatic feeding to mitigate the need for slow dict.update() operations."
@@ -3601,12 +3603,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		day = not os.path.exists(fn)
 		futs = []
 		if day:
-			fut = create_task(self.worker_heartbeat())
+			fut = create_task(self.worker_heartbeat(True))
 			futs.append(fut)
 			fut = self.send_event("_day_")
 			futs.append(fut)
 			self.users_updated = True
-		if day:
 			for fut in futs:
 				with tracebacksuppressor:
 					await_fut(fut)
@@ -5338,7 +5339,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				fin_col = colour2raw(hue2colour(colour * 1536 / 12))
 			else:
 				col = colour if not issubclass(type(colour), collections.abc.Sequence) else colour[0]
-				# off = 128 if not issubclass(type(colour), collections.abc.Sequence) else colour[1]
 				fin_col = colour2raw(hue2colour(col))
 		embs = deque()
 		emb = discord.Embed(colour=fin_col)
@@ -5505,18 +5505,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if size < 65536 and not isinstance(fp, byte_like):
 			fp = fp.read()
 		ts = n2p(ts_us()).decode("ascii")
+		return await _run_async(self.put_webserver, ts, fp, filename or f"f.{ext}")
+	def put_webserver(ts, fp, tag):
 		ext = get_ext(fp)
-		self.upload_cache.set(ts, fp, tag=filename or f"f.{ext}", read=True)
+		self.upload_cache.set(ts, fp, tag=tag, read=True)
 		return f"{self.raw_webserver}/f/{ts}.{ext}"
-		# url = f"{self.raw_webserver}/upload"
-		# if filename:
-		# 	url += f"?filename={filename}"
-		# return await Request.aio(
-		# 	url,
-		# 	data=b,
-		# 	method="POST",
-		# 	decode=True,
-		# )
 
 	def update_uptime(self, data):
 		uptimes = self.uptime_db
@@ -5581,56 +5574,58 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					with MemoryTimer("handle_update"):
 						await self.handle_update()
 
-	async def worker_heartbeat(self):
+	async def worker_heartbeat(self, sync_ssl=False):
+		key = AUTH.get("discord_secret") or ""
+		uri = self.raw_webserver
+
 		banned_ips = []
 		if self.server:
 			fut = self.server.asubmit("[k for k, v in banned_ips.items() if v]")
 		if AUTH.get("ssl_generator"):
 			await _run_async(subprocess.run, AUTH["ssl_generator"])
-		key = AUTH.get("discord_secret") or ""
-		uri = self.raw_webserver
-		dc = pk = ""
-		if DOMAIN_CERT and PRIVATE_KEY:
-			async with aiofiles.open(DOMAIN_CERT, "r") as f:
-				dc = await f.read()
-			async with aiofiles.open(PRIVATE_KEY, "r") as f:
-				pk = await f.read()
-		ac = {str(k): v for k, v in attachment_cache.items() if isinstance(k, int) and v and not discord_expired(v)}
 		if self.server:
 			banned_ips = await fut
+		ac = {str(k): v for k, v in attachment_cache.items() if isinstance(k, int) and v and not discord_expired(v)}
+		data = cdict(
+			attachment_cache=ac,
+			banned_ips=banned_ips,
+		)
+		if sync_ssl:
+			data.token = self.token
+			data.alt_token = AUTH.get("alt_token") or self.token
+			if "exec" in self.data:
+				data.channels = [k for k, v in self.data.exec.items() if v & 16]
+			if DOMAIN_CERT and PRIVATE_KEY:
+				async with aiofiles.open(DOMAIN_CERT, "r") as f:
+					data.domain_cert = await f.read()
+				async with aiofiles.open(PRIVATE_KEY, "r") as f:
+					data.private_key = await f.read()
+
+		data = bytes2zip(orjson.dumps(data), mode="lzma")
+		encoded = base64.b64encode(encrypt(data)).rstrip(b"=").decode("ascii")
+		async def external_heartbeat(addr):
+			if not Request.sessions:
+				return
+			return await Request.aio(
+				f"https://{addr}/authorised-heartbeat",
+				method="POST",
+				headers={"content-type": "application/json"},
+				data=orjson.dumps(dict(key=key, uri=uri, data=encoded)),
+				timeout=5,
+				json=True,
+				ssl=True,
+			)
+
 		futs = []
 		for addr in AUTH.get("remote_servers", ()):
-			token = AUTH.get("alt_token") or self.token
-			channels = [k for k, v in self.data.exec.items() if v & 16] if "exec" in self.data else None
-			data = bytes2zip(orjson.dumps(dict(
-				domain_cert=dc,
-				private_key=pk,
-				channels=channels,
-				token=self.token,
-				alt_token=token,
-				attachment_cache=ac,
-				banned_ips=banned_ips,
-			)), mode="lzma")
-			encoded = base64.b64encode(encrypt(data)).rstrip(b"=").decode("ascii")
-			async def external_heartbeat():
-				if not Request.sessions:
-					return
-				return await Request.aio(
-					f"https://{addr}/authorised-heartbeat?key={quote_plus(key)}&uri={quote_plus(uri)}",
-					method="POST",
-					headers={"content-type": "application/json"},
-					data=orjson.dumps(dict(data=encoded)),
-					timeout=5,
-					json=True,
-					ssl=None,
-				)
-			fut = create_task(external_heartbeat())
+			fut = external_heartbeat(addr)
 			futs.append(fut)
+
 		resps = await gather(*futs)
-		for data in resps:
-			if not data:
+		for resp in resps:
+			if not resp:
 				continue
-			ac = data.get("attachment_cache")
+			ac = resp.get("attachment_cache")
 			if ac:
 				for k, v in ac.items():
 					attachment_cache.store(v)
@@ -5641,11 +5636,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		while not self.closed:
 			async with Delay(720):
 				with tracebacksuppressor:
+					submit_thread(self.cache_reduce)
 					with MemoryTimer("update_subs"):
 						await self.update_subs()
 					await asyncio.sleep(1)
-					await self.send_event("_minute_loop_")
-					submit_thread(self.cache_reduce)
+					await self.send_event("_global_loop_")
 					with MemoryTimer("update"):
 						await _run_async(self.update)
 

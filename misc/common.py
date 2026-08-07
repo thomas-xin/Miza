@@ -44,7 +44,7 @@ try:
 		import torch
 except Exception:
 	print_exc()
-hwaccel = "cuda" if DC else "d3d11va" if os.name == "nt" else "auto"
+hwaccel = "auto"
 
 utils = discord.utils
 escape_markdown = utils.escape_markdown
