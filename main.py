@@ -6,6 +6,11 @@ try:
 	sys.stdout.reconfigure(encoding="utf-8")
 except AttributeError:
 	pass
+
+# Loads the install_update module, which makes sure all required libraries are installed to their required versions.
+import install_update
+from install_update import python, traceback
+
 from misc.types import pretty_json
 
 
@@ -57,14 +62,8 @@ if set(AUTH).difference(orig):
 			raise SystemExit
 		AUTH["discord_token"] = token
 	print("auth.json updated. Make sure to check empty fields!")
-
-
 if not AUTH.get("ai_features"):
 	os.environ["AI_FEATURES"] = ""
-
-# Loads the install_update module, which makes sure all required libraries are installed to their required versions.
-import install_update
-from install_update import python, traceback
 
 import time
 import datetime
