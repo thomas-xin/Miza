@@ -21,4 +21,4 @@ requests>=2.34.2
 starlette-compress>=1.7.0
 streamshatter>=1.2.3
 urllib3-future>=2.24.900
-yt-dlp>=2026.7.23.234303
+yt-dlp>=2026.8.4.234419.dev0
