@@ -917,12 +917,11 @@ class Profile(Command):
 		if icon:
 			emb.set_thumbnail(url=icon)
 		c = 1
+		estimated = False
 		tzinfo = self.bot.data.users.get_timezone(target.id)
-		if tzinfo is None:
-			tzinfo, c = self.bot.data.users.estimate_timezone(target.id)
-			estimated = True
-		else:
-			estimated = False
+		# if tzinfo is None:
+		# 	tzinfo, c = self.bot.data.users.estimate_timezone(target.id)
+		# 	estimated = True
 		t = DynamicDT.unix()
 		if tzinfo:
 			ts = f"`{DynamicDT.fromtimestamp(t, tz=tzinfo)}`"

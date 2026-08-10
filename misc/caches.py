@@ -433,9 +433,9 @@ class AttachmentCache(AutoCache):
 			if ex.errno == "404":
 				self.remove_cached(url, m_id)
 			raise
-		except:
-			traceback.print_exc()
-			raise
+		# except:
+		# 	traceback.print_exc()
+		# 	raise
 		return self.cast_fp(f)
 	async def download(self, url, m_id=None, filename=None, read=None, input_headers=None, return_headers=False, force=False, fc=False, max_size=None):
 		url = unyt(url)

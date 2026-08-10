@@ -410,7 +410,6 @@ class QR(Visual, Command):
 			type="string",
 			description="Text to encode",
 			example="You found the funny!",
-			aliases=["i"],
 			required=True,
 		),
 		arms=cdict(

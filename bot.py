@@ -2356,6 +2356,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				except KeyError:
 					url2 = self.proxied[p]
 			except KeyError:
+				url2 = None
+			if not url2:
 				print(p)
 				fn = None
 				try:
@@ -3363,8 +3365,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def status(self, interval=None, simplified=False):
 		if not self.status_sem.busy:
 			async with self.status_sem:
-				self.status_fut = create_task(self.get_system_stats())
-				self.status_data = await self.status_fut
+				self.status_data = await self.get_system_stats()
 		if interval:
 			ninter = self.ninter
 			it = int(utc() // ninter) * ninter
@@ -6719,15 +6720,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				title=title,
 				description=lim_str(description, 3000),
 			)
-			for field in fields:
-				if isinstance(field, dict):
-					embed.add_field(**field)
-				else:
-					try:
-						value = field[1]
-					except IndexError:
-						value = "\xad"
-					embed.add_field(name=field[0], value=value)
+			if fields:
+				for field in fields:
+					if isinstance(field, dict):
+						embed.add_field(**field)
+					else:
+						try:
+							value = field[1]
+						except IndexError:
+							value = "\xad"
+						embed.add_field(name=field[0], value=value)
 			return create_task(send_with_react(
 				messageable,
 				embed=embed,
@@ -6757,39 +6759,38 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def reaction_add(self, raw, data):
 		with tracebacksuppressor:
-			channel = await self.fetch_channel(raw.channel_id)
 			user = await self.fetch_user(raw.user_id)
 			emoji = self._upgrade_partial_emoji(raw.emoji)
 			try:
 				message = await self.fetch_message(raw.message_id)
 			except LookupError:
+				message = None
+			else:
+				reaction = message._add_reaction(data, emoji, user.id)
+			if not message:
+				channel = await self.fetch_channel(raw.channel_id)
 				message = await discord.abc.Messageable.fetch_message(channel, raw.message_id)
 				reaction = message._add_reaction(data, emoji, user.id)
 				if reaction.count > 1:
 					reaction.count -= 1
-			else:
-				reaction = message._add_reaction(data, emoji, user.id)
 			message = await self.ensure_reactions(message)
 			self.dispatch("reaction_add", reaction, user)
 			self.add_message(message, force=True)
 
 	async def reaction_remove(self, raw, data):
 		with tracebacksuppressor:
-			channel = await self.fetch_channel(raw.channel_id)
 			user = await self.fetch_user(raw.user_id)
 			emoji = self._upgrade_partial_emoji(raw.emoji)
 			reaction = None
 			try:
 				message = await self.fetch_message(raw.message_id)
 			except LookupError:
-				message = await discord.abc.Messageable.fetch_message(channel, raw.message_id)
-				reaction = message._add_reaction(data, emoji, user.id)
-				if reaction.count > 1:
-					reaction.count -= 1
+				pass
 			else:
 				with tracebacksuppressor(ValueError):
 					reaction = message._remove_reaction(data, emoji, user.id)
 			if not reaction:
+				channel = await self.fetch_channel(raw.channel_id)
 				message = await discord.abc.Messageable.fetch_message(channel, raw.message_id)
 				reaction = message._add_reaction(data, emoji, user.id)
 				if reaction.count > 1:

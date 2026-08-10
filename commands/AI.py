@@ -89,6 +89,7 @@ class Translate(Command):
 			if target:
 				await bot.require_integrity(target)
 			out = await anext(gen)
+			print(out)
 			emb = discord.Embed(
 				colour=rand_colour(),
 				title=dst_language,
@@ -107,7 +108,6 @@ class Translate(Command):
 		desc = _premium.apply()
 		if desc:
 			embeds.append(discord.Embed(description=desc))
-			print(">", desc)
 		if target:
 			await bot.edit_message(target, embeds=embeds)
 			return
@@ -148,22 +148,24 @@ class Translate(Command):
 			try:
 				cmpl = await ai.llm(
 					"chat.completions.create",
-					model="translation",
+					model="tiny",
 					messages=messages,
 					temperature=0.01,
+					reasoning_effort="minimal",
 					max_completion_tokens=16384,
 					premium_context=premium,
 				)
-				return cmpl.choices[0].message.content.strip()
+				return cmpl.choices[0].message.content.strip().rsplit("</think>", 1)[-1]
 			except Exception:
 				print_exc()
 
 		c = tcount(input)
 		tasks = [chat_translate()]
 		if c > 1:
-			tasks.append(google_translate())
+			tasks.insert(0, google_translate())
 		translations = []
-		for result in await gather(*tasks):
+		async for fut in asyncio.as_completed(tasks):
+			result = await fut
 			if result:
 				if not translations:
 					yield cdict(
@@ -178,6 +180,7 @@ class Translate(Command):
 				),
 				dict(
 					role="user",
+					name="source",
 					content=input,
 				),
 				*(dict(

@@ -1,6 +1,7 @@
 import asyncio
 import base64
 from collections import deque
+import datetime
 import decimal
 from math import ceil, inf
 import orjson
@@ -330,9 +331,9 @@ class ExtendedOpenAI(openai.AsyncOpenAI):
 	def __bool__(self):
 		return bool(self.model and not self.disabled)
 
-def find_model(oai):
-	oai = openai.OpenAI(api_key=oai.api_key, base_url=oai.base_url)
-	model = oai.models.list().data[0].id
+async def find_model_a(oai):
+	l = await oai.models.list()
+	model = l.data[0].id
 	return model
 
 local_models = cdict()
@@ -353,8 +354,9 @@ async def load_local():
 		for base_url in base_urls:
 			model = ExtendedOpenAI(api_key=api_key, base_url=base_url)
 			try:
-				mname = find_model(model)
-			except Exception:
+				mname = await find_model_a(model)
+			except Exception as ex:
+				print(f"Error loading local model {name}: {repr(ex)}")
 				continue
 			model.capabilities = capabilities
 			model.model = mname
@@ -378,7 +380,7 @@ async def load_local():
 			is_reasoning.discard(name)
 
 def model_name(model_id):
-	return model_id and model_id.rsplit("/", 1)[-1].replace("-preview", "").replace("-customtools", "")
+	return model_id and model_id.rsplit("/", 1)[-1].replace("-preview", "")
 
 openai_refresh = 0
 async def load_openrouter():
@@ -388,7 +390,7 @@ async def load_openrouter():
 	async def get_openrouter_models():
 		oai = get_oai(None, "openrouter")
 		models = await flatten(oai.models.list())
-		models.sort(key=lambda model: ("-preview" not in model.id, "-customtools" in model.id))
+		models.sort(key=lambda model: "-preview" not in model.id)
 		return models
 
 	models = await CACHE.aretrieve("openrouter-models", get_openrouter_models, _force=True)
@@ -430,38 +432,45 @@ with tracebacksuppressor:
 async def _summarise(s, max_length, best=False, prompt=None, premium_context=[], model="small"):
 	if len(s) <= max_length:
 		return s
+	ml = round_random(max_length)
 	s = lim_tokens(s, 49152, mode="right")
 	if best:
 		with tracebacksuppressor:
-			s2 = s
 			if prompt:
-				s2 += "\n\n" + prompt
-			if prompt:
-				prompt = f'''### Input:
-"""
-{s}
-"""
-
-### Instruction:
-Please provide a comprehensive but concise summary of the text above. Make sure to include all information relevant to the following question if available:
-"""
-{prompt}
-"""
+				p = f"`{prompt}`" if "`" not in prompt and "\n" not in prompt else f'\n"""\n{prompt}\n"""'
+				system = f'''### Instruction:
+Please provide a comprehensive but concise summary of the message(s) below. Make sure to include all information relevant to the following question if available:
+{p}
 
 e.g If the user asks about:
 - the next number in a sequence: include all previously occurring numbers
-- a user's gender: include any mentions of gender or pronouns of each user
-- a chess game: include all chess moves
+- a user's gender: include any mentions of gender or pronouns of each person
+- a chess game in progress: include all chess moves
 - nonspecific: provide a general summary
 
 Answer ONLY with the summary, do not answer the question itself!'''
 			else:
-				prompt = f'### Input:\n"""\n{s}\n"""\n\n### Instruction:\nPlease provide a comprehensive but concise summary of the text above!'
-			ml = round_random(max_length)
-			c = tcount(prompt)
-			data = dict(model=model, prompt=prompt, temperature=0.6, max_tokens=ml, premium_context=premium_context, reasoning_effort="minimal")
-			resp = await instruct(data)
-			print("Summary:", resp)
+				system = f'### Instruction:\nPlease provide a comprehensive but concise summary of the message(s) below!'
+			messages = [
+				dict(
+					role="system",
+					content=system,
+				),
+				dict(
+					role="user",
+					content=s,
+				),
+			]
+			cmpl = await llm(
+				"chat.completions.create",
+				model=model,
+				messages=messages,
+				temperature=0.01,
+				reasoning_effort="minimal",
+				max_tokens=ml,
+				premium_context=premium_context,
+			)
+			resp = cmpl.choices[0].message.content.strip()
 			if resp and not decensor.search(resp):
 				return resp
 	return lim_tokens(s, round_random(max_length * 2 / 3))
@@ -671,44 +680,6 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 		print("ERRORED:", model, lim_str(kwa, 16384))
 	raise (exc or RuntimeError("Unknown error occured."))
 
-async def instruct(data, prune=True, cache=True, user=None):
-	key = shash(str((data.get("prompt") or data.get("messages"), data.get("model", "small"), data.get("temperature", 0.75), data.get("max_tokens", 256))))
-	if cache:
-		return await CACHE.aretrieve(key, _instruct, data, prune=prune, user=user)
-	return await CACHE._aretrieve(key, _instruct, data, prune=prune, user=user)
-
-async def _instruct(data, user=None, prune=True):
-	inputs = dict(
-		temperature=0.75,
-		max_tokens=65536,
-		user=user,
-	)
-	inputs.update(data)
-	if not inputs.get("reasoning_effort"):
-		inputs["reasoning_effort"] = "low"
-	await load_local()
-	if inputs["model"] not in is_completion:
-		if "messages" not in inputs:
-			prompt = inputs.pop("prompt")
-			inputs["messages"] = [cdict(role="user", content=prompt)]
-		async with asyncio.timeout(120):
-			response = await llm("chat.completions.create", **inputs, timeout=60)
-		resp = response.choices[0].message.content
-	else:
-		async with asyncio.timeout(180):
-			response = await llm("completions.create", **inputs, timeout=90)
-		resp = response.choices[0].text
-	if prune:
-		resp = (resp or "").strip()
-		resp2 = regexp(r"### (?:Input|Instruction):?").split(resp, 1)[0].strip().split("### Response:", 1)[-1].strip()
-		if resp != resp2:
-			print("PRUNED:", resp, resp2, sep="::")
-			resp = resp2
-		resp2 = resp.split("</think>", 1)[-1].strip()
-		if resp2:
-			resp = resp2.replace("<think>", "").replace("</think>", "").strip()
-	return resp.strip()
-
 
 f_browse = {
 	"type": "function", "function": {
@@ -718,7 +689,7 @@ f_browse = {
 			"type": "object", "properties": {
 				"query": {
 					"type": "string",
-					"description": 'Query, eg. "Who won the 2026 world cup?", "https://youtu.be/dQw4w9WgXcQ", "Weather in San Francisco"',
+					"description": f'Query, eg. "Who won the {datetime.datetime.now().year + 1} world cup?", "https://youtu.be/dQw4w9WgXcQ", "Weather in San Francisco"',
 				},
 			},
 			"required": ["query"],
@@ -846,15 +817,15 @@ f_default = {
 				"format": {
 					"type": "string",
 					"enum": ["instructive", "casual"],
-					"description": """The conversation format/tone; "instructive" for academic, knowledge or advice responses, "casual" for banter, roleplay, or very simple questions.""",
+					"description": 'The conversation format/tone; "instructive" for academic, knowledge or advice responses, "casual" for banter, roleplay, or very simple questions.',
 				},
 				"reasoning_effort": {
 					"type": "string",
 					"enum": ["low", "medium", "high"],
-					"description": """Amount of further reasoning applied. Adjust based on complexity of the user's questions; defaults to "low".""",
+					"description": "Amount of further reasoning applied. Adjust based on complexity of the user's questions.",
 				},
 			},
-			"required": ["format"],
+			"required": ["format", "reasoning_effort"],
 }}}
 
 TOOLS = {

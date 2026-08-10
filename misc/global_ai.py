@@ -330,7 +330,7 @@ Bot.caption_into = caption_into
 model_levels = dict(enumerate(map(cdict, AUTH.get("model_levels", []))))
 if not model_levels:
 	model_levels = dict(enumerate([cdict(
-		**{k: "qwen-3.7-flash" for k in ("instructive", "casual", "nsfw", "backup", "function", "vision", "summary")},
+		**{k: "mimo-v2.5" for k in ("instructive", "casual", "nsfw", "backup", "function", "vision", "summary")},
 		target="auto",
 	)] * 3))
 Bot.model_levels = model_levels
@@ -353,13 +353,13 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 		best = 2
 	elif modlvl >= 1:
 		maxlim = 98304
-		minlim = 1200
-		snip = 320
+		minlim = 1600
+		snip = 400
 		best = 1
 	else:
 		maxlim = 3000
-		minlim = 600
-		snip = 240
+		minlim = 1200
+		snip = 300
 		best = 0
 	tmp = temperature
 	def force_ua(r):
@@ -392,18 +392,18 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 						temp.append(tc)
 			toolscan = temp
 		if toolscan or modelist.instructive != modelist.casual:
-			users = 0
-			toolcheck = []
-			for m in reversed(snippet):
-				toolcheck.append(m)
-				if m.get("role") == "user":
-					users += 1
-					if users > 1:
-						break
-			# toolcheck.append(messages[0])
-			toolcheck.reverse()
+			# users = 0
+			# toolcheck = []
+			# for m in reversed(snippet):
+			# 	toolcheck.append(m)
+			# 	if m.get("role") == "user":
+			# 		users += 1
+			# 		if users > 1 and len(toolcheck) > :
+			# 			break
+			# # toolcheck.append(messages[0])
+			# toolcheck.reverse()
 			vision_alt = modelist.vision if modelist.function not in ai.is_vision else modelist.function
-			toolcheck, toolmodel = await self.caption_into(toolcheck, model=modelist.function, backup_model=vision_alt, premium_context=premium_context)
+			toolcheck, toolmodel = await self.caption_into(snippet, model=modelist.function, backup_model=vision_alt, premium_context=premium_context)
 			mode = None
 			label = "instructive"
 			try:
@@ -435,11 +435,12 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 						reason = str(rdetails[0])
 			if reason and (reason := reason.strip()):
 				reasoning.append(reason)
-	reasoning_effort = "low"
+	reasoning_effort = "medium"
 	if message:
 		directly_answer = None
 		for tc in tuple(message.tool_calls or ()):
 			if tc.function.name == "directly_answer":
+				directly_answer = True
 				try:
 					args = cdict(eval_json(tc.function.arguments))
 				except Exception:
@@ -450,7 +451,7 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 					mode = args["format"]
 				if args.get("reasoning_effort"):
 					reasoning_effort = args["reasoning_effort"]
-					if reasoning_effort not in ("minimal", "low", "medium", "high"):
+					if reasoning_effort not in ("minimal", "low", "medium", "high", "xhigh"):
 						reasoning_effort = "low"
 				message.tool_calls.remove(tc)
 				break
