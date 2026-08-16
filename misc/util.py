@@ -1692,6 +1692,19 @@ def b64_or_uni(b):
 			pass
 	return base65536.decode(as_str(b))
 
+e75map = b"!$*,-.0123456789:;=@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_abcdefghijklmnopqrstuvwxyz~"
+def e75(b, out=bytes):
+	b = as_bytes(b)
+	d = base64.a85encode(b)
+	e = d.translate(e85trans)
+	if out is str:
+		e = e.decode("ascii")
+	return e
+def b85(b):
+	b = as_bytes(b)
+	d = b.translate(d85trans)
+	return base64.a85decode(d)
+
 def cantor(*x):
 	n = len(x)
 	p = 0

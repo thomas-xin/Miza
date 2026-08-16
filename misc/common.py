@@ -809,14 +809,14 @@ def auto_url(url):
 	if not isinstance(url, str):
 		url = str(url)
 	if url.startswith("https://media.discordapp.net/embed/avatars/"):
-		return url.replace("/media.discordapp.net/", "/cdn.discordapp.com/").replace(".webp", ".png")
+		return url.replace("/media.discordapp.net/", "/cdn.discordapp.com/")
 	return url
 
 def auto_url_ex(url):
 	if not isinstance(url, str):
 		url = str(url)
 	if url.startswith("https://cdn.discordapp.com/embed/avatars/"):
-		return url.replace("/cdn.discordapp.com/", "/media.discordapp.net/").replace(".webp", ".png")
+		return url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
 	if url.endswith("?size=1024") or url.endswith("?size=4096"):
 		url = url[:-10] + "?size=256"
 	return url

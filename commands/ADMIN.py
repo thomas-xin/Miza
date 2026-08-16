@@ -1551,95 +1551,95 @@ class UpdateBans(Database):
 
 
 # Triggers upon 3 channel deletions in 2 minutes or 6 bans in 10 seconds
-class ServerProtector(Database):
-	name = "prot"
+# class ServerProtector(Database):
+# 	name = "prot"
 
-	async def kickWarn(self, u_id, guild, owner, msg):
-		user = await self.bot.fetch_user(u_id)
-		try:
-			await guild.kick(user, reason="Triggered automated server protection response for excessive " + msg + ".")
-			await owner.send(
-				f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
-				+ f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
-				+ "and has been removed from the server to prevent any potential further attacks."
-			)
-		except discord.Forbidden:
-			await owner.send(
-				f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
-				+ f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
-				+ "and were unable to be automatically removed from the server; please watch them carefully to prevent any potential further attacks."
-			)
+# 	async def kickWarn(self, u_id, guild, owner, msg):
+# 		user = await self.bot.fetch_user(u_id)
+# 		try:
+# 			await guild.kick(user, reason="Triggered automated server protection response for excessive " + msg + ".")
+# 			await owner.send(
+# 				f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
+# 				+ f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
+# 				+ "and has been removed from the server to prevent any potential further attacks."
+# 			)
+# 		except discord.Forbidden:
+# 			await owner.send(
+# 				f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
+# 				+ f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
+# 				+ "and were unable to be automatically removed from the server; please watch them carefully to prevent any potential further attacks."
+# 			)
 
-	async def targetWarn(self, u_id, guild, msg):
-		print(f"Channel Deletion warning by {user_mention(u_id)} in {guild}.")
-		user = self.bot.user
-		owner = guild.owner
-		if owner.id == user.id:
-			owner = await self.bot.fetch_user(next(iter(self.bot.owners)))
-		if u_id == guild.owner.id:
-			if u_id == user.id:
-				return
-			user = guild.owner
-			await owner.send(
-				f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
-				+ f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
-				+ "If this was intentional, please ignore this message."
-			)
-		elif u_id == user.id:
-			create_task(guild.leave())
-			await owner.send(
-				f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
-				+ f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
-				+ "and will promptly leave the server to prevent any potential further attacks."
-			)
-		else:
-			await self.kickWarn(u_id, guild, owner, msg)
+# 	async def targetWarn(self, u_id, guild, msg):
+# 		print(f"Channel Deletion warning by {user_mention(u_id)} in {guild}.")
+# 		user = self.bot.user
+# 		owner = guild.owner
+# 		if owner.id == user.id:
+# 			owner = await self.bot.fetch_user(next(iter(self.bot.owners)))
+# 		if u_id == guild.owner.id:
+# 			if u_id == user.id:
+# 				return
+# 			user = guild.owner
+# 			await owner.send(
+# 				f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
+# 				+ f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
+# 				+ "If this was intentional, please ignore this message."
+# 			)
+# 		elif u_id == user.id:
+# 			create_task(guild.leave())
+# 			await owner.send(
+# 				f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
+# 				+ f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
+# 				+ "and will promptly leave the server to prevent any potential further attacks."
+# 			)
+# 		else:
+# 			await self.kickWarn(u_id, guild, owner, msg)
 
-	async def _channel_delete_(self, channel, guild, **void):
-		user = None
-		if not isinstance(channel, discord.Thread) and channel.permissions_for(guild.me).view_audit_log:
-			ts = utc()
-			cnt = {}
-			audits = guild.audit_logs(limit=100, action=discord.AuditLogAction.channel_delete)
-			async for log in audits:
-				if ts - utc_ts(log.created_at) < 120:
-					add_dict(cnt, {log.user.id: 1})
-					if user is None and log.target.id == channel.id:
-						user = log.user
-				else:
-					break
-			else:
-				audits = guild.audit_logs(limit=100, action=discord.AuditLogAction.thread_delete)
-				async for log in audits:
-					if ts - utc_ts(log.created_at) < 120:
-						add_dict(cnt, {log.user.id: 1})
-						if user is None and log.target.id == channel.id:
-							user = log.user
-					else:
-						break
-			for u_id in cnt:
-				if cnt[u_id] > 2:
-					if self.bot.is_trusted(guild.id) or u_id == self.bot.user.id:
-						create_task(self.targetWarn(u_id, guild, f"channel deletions `({cnt[u_id]})`"))
-		if self.bot.get_guildbase(guild.id, "logs.server"):
-			await self.bot.data.logU._channel_delete_2_(channel, guild, user)
+# 	async def _channel_delete_(self, channel, guild, **void):
+# 		user = None
+# 		if not isinstance(channel, discord.Thread) and channel.permissions_for(guild.me).view_audit_log:
+# 			ts = utc()
+# 			cnt = {}
+# 			audits = guild.audit_logs(limit=100, action=discord.AuditLogAction.channel_delete)
+# 			async for log in audits:
+# 				if ts - utc_ts(log.created_at) < 120:
+# 					add_dict(cnt, {log.user.id: 1})
+# 					if user is None and log.target.id == channel.id:
+# 						user = log.user
+# 				else:
+# 					break
+# 			else:
+# 				audits = guild.audit_logs(limit=100, action=discord.AuditLogAction.thread_delete)
+# 				async for log in audits:
+# 					if ts - utc_ts(log.created_at) < 120:
+# 						add_dict(cnt, {log.user.id: 1})
+# 						if user is None and log.target.id == channel.id:
+# 							user = log.user
+# 					else:
+# 						break
+# 			for u_id in cnt:
+# 				if cnt[u_id] > 2:
+# 					if self.bot.is_trusted(guild.id) or u_id == self.bot.user.id:
+# 						create_task(self.targetWarn(u_id, guild, f"channel deletions `({cnt[u_id]})`"))
+# 		if self.bot.get_guildbase(guild.id, "logs.server"):
+# 			await self.bot.data.logU._channel_delete_2_(channel, guild, user)
 
-	async def _ban_(self, user, guild, **void):
-		if self.bot.recently_banned(user, guild):
-			return
-		if not self.bot.is_trusted(guild.id) or not guild.me.guild_permissions.view_audit_log:
-			return
-		audits = guild.audit_logs(limit=100, action=discord.AuditLogAction.ban)
-		ts = utc()
-		cnt = {}
-		async for log in audits:
-			if ts - utc_ts(log.created_at) < 10:
-				add_dict(cnt, {log.user.id: 1})
-			else:
-				break
-		for u_id in cnt:
-			if cnt[u_id] > 5:
-				create_task(self.targetWarn(u_id, guild, f"banning `({cnt[u_id]})`"))
+# 	async def _ban_(self, user, guild, **void):
+# 		if self.bot.recently_banned(user, guild):
+# 			return
+# 		if not self.bot.is_trusted(guild.id) or not guild.me.guild_permissions.view_audit_log:
+# 			return
+# 		audits = guild.audit_logs(limit=100, action=discord.AuditLogAction.ban)
+# 		ts = utc()
+# 		cnt = {}
+# 		async for log in audits:
+# 			if ts - utc_ts(log.created_at) < 10:
+# 				add_dict(cnt, {log.user.id: 1})
+# 			else:
+# 				break
+# 		for u_id in cnt:
+# 			if cnt[u_id] > 5:
+# 				create_task(self.targetWarn(u_id, guild, f"banning `({cnt[u_id]})`"))
 
 
 class EnabledCommands(Command):
@@ -2601,7 +2601,7 @@ class UpdateStarboards(Database):
 		if count < req:
 			return
 		sem = self.sems[message.guild.id]
-		print(count, req, sem)
+		# print(count, req, sem, message.reactions)
 		async with sem:
 			if message.id in table.get(None, ()):
 				channel = await bot.fetch_channel(table[react][1])
@@ -2614,7 +2614,6 @@ class UpdateStarboards(Database):
 					print_exc()
 					table[None].pop(message.id)
 			embeds = await bot.as_embeds(message, link=True, colour=True, reactions=True)
-			# print([e.to_dict() for e in embeds])
 			channel = await bot.fetch_channel(table[react][1])
 			if message.id not in table.setdefault(None, {}):
 				try:

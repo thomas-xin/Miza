@@ -740,7 +740,7 @@ class Ask(Command):
 			try:
 				url = await bot.upload_temp(reasoning, filename="reasoning.txt")
 				rsize = f"{byte_scale(len(reasoning))}B"
-				content = (f"> [Reasoning: {rsize} (click to view)]({url}){rsep}\n" + content).strip()
+				content = (f"> [Reasoning: {rsize} (click to view)](<{url}>){rsep}\n" + content).strip()
 			except Exception:
 				print_exc()
 		response.content = "\r" + content

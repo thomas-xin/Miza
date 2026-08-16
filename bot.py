@@ -2208,7 +2208,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			url = worst_url(user)
 		return self.data.colours.get(url)
 
-	async def get_proxy_url(self, user, force=False) -> str:
+	async def get_proxy_url(self, user, g_id=None, force=False) -> str:
 		if hasattr(user, "webhook"):
 			url = user.webhook.avatar_url_as(format="webp", size=4096)
 		else:
@@ -2216,6 +2216,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				url = best_url(user)
 		if not url:
 			return self.discord_icon
+		if g_id:
+			p = (g_id, attachment_cache.preserve(url).split("?", 1)[0])
+			try:
+				return self.proxied[p]
+			except KeyError:
+				pass
 		if "proxies" in self.data:
 			with tracebacksuppressor:
 				url = (await self.data.exec.uproxy(url, force=force, optimise=True)) or url
@@ -2343,7 +2349,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				embeds[0].description = lim_str(description, 4096)
 		return embeds
 
-	
 	async def prepare_embeds(self, embeds, m_id=None, g_id=None):
 		temp_proxied = {}
 		used_names = collections.Counter()
@@ -4181,6 +4186,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			elif info.type == "guild":
 				v = await self.fetch_guild(m)
 			elif info.type == "role":
+				v = None
 				if isinstance(m, int):
 					try:
 						v = await self.fetch_role(m, guild)
@@ -4640,7 +4646,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							continue
 						n += 1
 				futs = [self.validate_into(k, a, info=info, guild=guild) for a in v]
-				kwargs[k] = await gather(*futs)
+				kwargs[k] = await gather(*futs, max_concurrency=8)
 				continue
 			kwargs[k] = await self.validate_into(k, v, info=info, guild=guild)
 		return kwargs
@@ -4920,13 +4926,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					total_length = len(get_prefix()) + len(content) + len(get_suffix())
 					if total_length > msglen or tts:
 						if total_length > maxlen:
-							data = content.encode("utf-8")
+							data = (get_prefix() + content + get_suffix()).encode("utf-8")
 							try:
-								orjson.loads(data)
+								orjson.loads(content)
 							except orjson.JSONDecodeError:
-								filename = "message.txt"
+								filename = "message.md"
 							else:
 								filename = "message.json"
+								data = content.encode("utf-8")
 							file2 = CompatFile(data, filename=filename)
 							if file:
 								response["files"] = [file, file2]
@@ -5683,7 +5690,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	async def ensure_reactions(self, message):
 		if not message.reactions or isinstance(message, self.CachedMessage) or isinstance(message.author, cdict):
-			if self.permissions_in(message.channel).read_message_history:
+			if not getattr(message, "ghost", False) and self.permissions_in(message.channel).read_message_history:
 				message = await self._fetch_message(message.id, message.channel, fast=True)
 		return message
 
@@ -5769,7 +5776,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Handles a new sent message, calls process_message and sends an error if an exception occurs."
 		if message.author.id != self.user.id:
 			for i, a in enumerate(message.attachments):
-				if a.filename == "message.txt":
+				if a.filename in ("message.txt", "message.md"):
 					b = await attachment_cache.download(a.url, m_id=message.id, read=False)
 					if message.content:
 						message.content += " "
@@ -6041,7 +6048,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				size = len(prefix) + len(content) + len(suffix)
 				if size > self.maxlen:
 					if force:
-						file = CompatFile(content.encode("utf-8"), filename="message.txt")
+						file = CompatFile(content.encode("utf-8"), filename="message.md")
 						files.append(file)
 						content = ""
 					else:

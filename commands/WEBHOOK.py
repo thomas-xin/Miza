@@ -283,7 +283,7 @@ class UpdateAutoEmojis(Database):
 			fn = await attachment_cache.download(a.url, m_id=message.id, filename=True)
 			files.append(discord.File(fn, filename=a.filename))
 		create_task(bot.autodelete(message))
-		url = await bot.get_proxy_url(user)
+		url = await bot.get_proxy_url(user.display_avatar, g_id=message.guild.id)
 		m = await bot.send_as_webhook(message.channel, msg, files=files, username=user.display_name, avatar_url=url, reference=ref)
 		await bot.send_event("_command_", user=user, command=bot.commands.autoemoji[0], loop=False, message=message)
 		regex = regexp(r"(?:^|^[^<\\`]|[^<][^\\`]|.[^a\\`\[])(:[A-Za-z0-9\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>\]`])")

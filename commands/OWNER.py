@@ -1053,6 +1053,7 @@ class UpdateMessageCache(Database):
 			for channel in channels:
 				if channel.id in self.checked:
 					self.loader[channel.id] = curr_id
+		self.loader.sync()
 
 	def _destroy_(self, **void):
 		self.pause()

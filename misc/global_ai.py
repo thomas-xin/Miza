@@ -308,8 +308,6 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 			if isinstance(caption, BaseException):
 				print("Caption Error:", m.get("url"), repr(caption))
 				continue
-			if isinstance(caption, tuple):
-				caption = "<" + ":".join(caption) + ">"
 			if not caption.startswith("data:"):
 				if not m.get("new"):
 					caption = lim_tokens(caption, 256)
@@ -785,7 +783,7 @@ async def caption(self, url, best=False, screenshot=False, timeout=24, premium_c
 	"Produces an AI-generated caption for an image. Model used is determined by \"best\" argument."
 	h = shash((url, best))
 	s = await self.extract_cache.aretrieve(h, self.vision, url, best=best, timeout=timeout)
-	return ("Image", s)
+	return f"<{s[0]}>{s[1]}</{s[0]}>"
 Bot.caption = caption
 
 async def vision(self, url, name=None, best=True, model=None, question=None, premium_context=[], timeout=12):
@@ -798,7 +796,7 @@ async def vision(self, url, name=None, best=True, model=None, question=None, pre
 		iname = "image"
 	data_url = await self.to_data_url(url, timeout=timeout)
 	if not data_url.startswith("data:"):
-		return data_url
+		return ("txt", data_url)
 	description_prompt = "Please describe this <IMAGE> in detail:\n- The image may be a collage of frames representing a video, in which case it should be analysed as if it were one\n- Transcribe text if present, but do not mention there not being text\n- Note details especially for people/characters if present\n- Be descriptive but concise!"
 	content = (question or description_prompt).replace("<IMAGE>", iname)
 	messages = [
@@ -821,7 +819,7 @@ async def vision(self, url, name=None, best=True, model=None, question=None, pre
 	out = response.choices[0].message.content.strip()
 	if ai.decensor.search(out):
 		raise ValueError(f"Failed or censored response: {repr(out)}.")
-	return out
+	return ("img", out)
 Bot.vision = vision
 
 async def ocr(self, url):

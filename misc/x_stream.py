@@ -360,7 +360,7 @@ async def authorised_heartbeat(request: Request):
 	body = await request.json()
 
 	if body.get("key") != discord_secret:
-		banned_ips.append(true_ip(request))
+		banned_ips.add(true_ip(request))
 		raise HTTPException(status_code=403, detail="Invalid key")
 
 	uri = body.get("uri") or f"https://{true_ip(request)}:{webserver_port}"
@@ -373,7 +373,8 @@ async def authorised_heartbeat(request: Request):
 	data = orjson.loads(zip2bytes(decrypt(base64.b64decode(body["data"].encode("ascii") + b"=="))))
 
 	bans = data.get("banned_ips", ())
-	banned_ips[:] = bans
+	banned_ips.clear()
+	banned_ips.update(bans)
 
 	server.token = data.get("token") or server.token
 	server.alt_token = data.get("alt_token") or server.alt_token
@@ -681,7 +682,7 @@ async def static_backend(path: str, request: Request):
 	return Response(content=content, headers=headers, status_code=status_code)
 
 
-banned_ips = []
+banned_ips = set()
 
 alias = tuple([fn.split("/", 1)[0].rsplit(".", 1)[0] for fn in os.listdir("misc/web")])
 alias += ("preview",)
@@ -692,9 +693,11 @@ async def catch_all(path: str, request: Request):
 	p = path.strip("/")
 	first = p.split("/", 1)[0] if p else ""
 
-	if true_ip(request) in banned_ips:
+	ip = true_ip(request)
+	if ip in banned_ips:
 		return RedirectResponse(url="https://www.youtube.com/watch?v=dQw4w9WgXcQ", status_code=308)
 	if first in banned_paths:
+		banned_ips.add(ip)
 		return RedirectResponse(url=f"{server.state['/']}/{p}", status_code=308)
 	if not p or p in ("home", "index", "dummy.html", "index.html"):
 		return FileResponse("misc/web/index.html", media_type="text/html")
