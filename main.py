@@ -39,7 +39,7 @@ AUTH = {
 	"default_personality": "",
 	"ai_features": False,
 	"log_path": "log.txt",
-	"log_store": "log.zip",
+	"log_store": "log",
 }
 modified = False
 # Makes sure an authentication file exists.

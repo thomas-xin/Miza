@@ -196,7 +196,7 @@ class Queue(Pagination, Interactable, Command):
 				enum=("all", "first", "random", "last", "now", "next"),
 				accepts=dict(force="now", budge="next"),
 			),
-			description="Determines which song(s) to add if the link resolves to a playlist",
+			description='Determines which song(s) to add (playlist), or whether to insert into the beginning (single)',
 			example="next",
 			default="all",
 		),
@@ -207,7 +207,7 @@ class Queue(Pagination, Interactable, Command):
 		),
 		index=cdict(
 			type="index",
-			description="Position to insert song(s)",
+			description="Position to insert song(s). Currently playing song is index 0, and will save its position if replaced",
 			example="4",
 			default=[-1],
 		),
@@ -233,7 +233,7 @@ class Queue(Pagination, Interactable, Command):
 			mode="next",
 		),
 	)
-	_timeout_ = 2
+	_timeout_ = 4
 	rate_limit = (3.5, 5)
 	typing = True
 	slash = ("Play", "Queue")
@@ -1050,6 +1050,7 @@ class Dump(Command):
 			mode="load",
 		),
 	)
+	_timeout_ = 3
 	rate_limit = (1, 2)
 	slash = True
 
@@ -1095,6 +1096,7 @@ class Seek(Command):
 			default="0",
 		),
 	)
+	_timeout_ = 2
 	rate_limit = (0.5, 3)
 	slash = True
 
@@ -1129,11 +1131,16 @@ class Jump(Command):
 			example="-3",
 			default="0",
 		),
+		keep=cdict(
+			type="bool",
+			description="Whether to save current song's position",
+		),
 	)
+	_timeout_ = 2
 	rate_limit = (0.5, 3)
 	slash = True
 
-	async def __call__(self, bot, _guild, _user, _perm, position, **void):
+	async def __call__(self, bot, _guild, _user, _perm, position, keep=False, **void):
 		try:
 			cid = await bot.audio.asubmit(f"AP.from_guild({_guild.id}).vcc.id")
 		except KeyError:
@@ -1141,6 +1148,8 @@ class Jump(Command):
 		vc_ = await bot.fetch_channel(cid)
 		if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 			raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
+		if keep:
+			await bot.audio.asubmit(f"self=AP.from_guild({_guild.id});self.queue[0].start=self.epos[0]")
 		await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).queue.rotate({-position}),a.ensure_play(2)")
 		return cdict(
 			content=italics(css_md(f"Successfully rotated queue {sqr_md(position)} step{'s' if abs(position) != 1 else ''}.")),
@@ -1154,6 +1163,7 @@ class Shuffle(Command):
 	min_display = "0~1"
 	description = "Immediately shuffles the queue. See ~autoshuffle for an automatic, non-disruptive version"
 	schema = cdict()
+	_timeout_ = 2
 	rate_limit = (0.5, 3)
 	slash = True
 
@@ -1394,6 +1404,7 @@ class Radio(Pagination, Interactable, Command):
 			greedy=False,
 		),
 	)
+	_timeout_ = 2
 	rate_limit = (6, 8)
 	slash = True
 	ephemeral = True

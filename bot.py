@@ -2001,12 +2001,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 		lim = 5 * 1048576 * 3 / 4
 		if mime not in ("image/jpg", "image/jpeg", "image/png") or len(d) > lim or np.prod(await _run_async(get_image_size, d)) > sizelim:
-			name = url.replace("\\", "/").rsplit("/", 1) if isinstance(url, str) else "data"
+			# name = url.replace("\\", "/").rsplit("/", 1) if isinstance(url, str) else "data"
 			if mime.split("/", 1)[0] not in ("image", "video"):
 				if len(d) > 288 and mime not in ("text/plain", "text/html"):
 					d = d[:128] + b".." + d[-128:]
 				s = as_str(d)
-				return f'<file name="{name}">' + s + "</file>"
+				return f'<txt>' + s + "</txt>"
 			assert isinstance(d, (str, bytes)), d
 			d = await process_image(d, "resize_map", [[], None, None, "rel", dimlim, "-", "auto", "-bg", "-oz", "-dl", dimlim, "-fs", lim, "-f", fmt], timeout=24)
 			mime = magic.from_buffer(d)
@@ -2205,7 +2205,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if isinstance(user, (str, byte_like)):
 			url = user
 		else:
-			url = worst_url(user)
+			url = best_url(user)
 		return self.data.colours.get(url)
 
 	async def get_proxy_url(self, user, g_id=None, force=False) -> str:
@@ -2370,7 +2370,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if os.path.getsize(fn) > 4000000:
 						fn = await self.optimise_image(fn, 4000000, csize=16384, fmt="webp")
 				except Exception as ex:
-					print(repr(ex))
+					print(raw, repr(ex))
 					if not fn:
 						return p[-1]
 				if getsize(fn) > 10485760:
@@ -4074,6 +4074,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					else:
 						priority_order = ("text", "video", "audio", "image", "emoji")
 					urls = await self.follow_url(message, priority_order=priority_order, limit=1)
+					url = None
 					if urls and not is_discord_message_link(urls[0]):
 						url = urls[0]
 					if not url:

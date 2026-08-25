@@ -1355,7 +1355,7 @@
 			"level": "0",
 			"rate_limit": "(3.5, 5)",
 			"example": [],
-			"timeout": "48",
+			"timeout": "96",
 			"schema": {
 				"mode": {
 					"type": "enum",
@@ -1363,7 +1363,7 @@
 						"enum": ["all", "first", "random", "last", "now", "next"],
 						"accepts": {"force": "now", "budge": "next"}
 					},
-					"description": "Determines which song(s) to add if the link resolves to a playlist",
+					"description": "Determines which song(s) to add (playlist), or whether to insert into the beginning (single)",
 					"example": "next",
 					"default": "all"
 				},
@@ -1374,7 +1374,7 @@
 				},
 				"index": {
 					"type": "index",
-					"description": "Position to insert song(s)",
+					"description": "Position to insert song(s). Currently playing song is index 0, and will save its position if replaced",
 					"example": "4",
 					"default": [-1]
 				},
@@ -1661,7 +1661,7 @@
 			"level": "0",
 			"rate_limit": "(1, 2)",
 			"example": [],
-			"timeout": "24",
+			"timeout": "72",
 			"schema": {
 				"mode": {
 					"type": "enum",
@@ -1691,7 +1691,7 @@
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
-			"timeout": "24",
+			"timeout": "48",
 			"schema": {
 				"position": {
 					"type": "timedelta",
@@ -1708,16 +1708,20 @@
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
-			"timeout": "24",
+			"timeout": "48",
 			"schema": {
 				"position": {
 					"type": "integer",
 					"description": "Jump position",
 					"example": "-3",
 					"default": "0"
+				},
+				"keep": {
+					"type": "bool",
+					"description": "Whether to save current song's position"
 				}
 			},
-			"ordered_args": ["position"]
+			"ordered_args": ["position", "keep"]
 		},
 		"Shuffle": {
 			"aliases": ["Shuffle", "🔀", "Scramble"],
@@ -1725,7 +1729,7 @@
 			"level": "0",
 			"rate_limit": "(0.5, 3)",
 			"example": [],
-			"timeout": "24",
+			"timeout": "48",
 			"usage": ""
 		},
 		"Dedup": {
@@ -1805,7 +1809,7 @@
 			"level": "0",
 			"rate_limit": "(6, 8)",
 			"example": [],
-			"timeout": "24",
+			"timeout": "48",
 			"schema": {
 				"country": {
 					"type": "enum",
@@ -3824,7 +3828,7 @@
 			"level": "0",
 			"rate_limit": "(6, 9)",
 			"example": [],
-			"timeout": "24",
+			"timeout": "120",
 			"schema": {
 				"engine": {
 					"type": "enum",

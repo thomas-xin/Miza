@@ -804,22 +804,12 @@ async def select_voice_channel(user, channel, find=True):
 typing = lambda self: create_task(self.trigger_typing())
 
 
-# Gets the string representation of a url object with the maximum allowed image size for discord, replacing png with webp format when possible.
 def auto_url(url):
 	if not isinstance(url, str):
 		url = str(url)
 	if url.startswith("https://media.discordapp.net/embed/avatars/"):
 		return url.replace("/media.discordapp.net/", "/cdn.discordapp.com/")
-	return url
-
-def auto_url_ex(url):
-	if not isinstance(url, str):
-		url = str(url)
-	if url.startswith("https://cdn.discordapp.com/embed/avatars/"):
-		return url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
-	if url.endswith("?size=1024") or url.endswith("?size=4096"):
-		url = url[:-10] + "?size=256"
-	return url
+	return url.split("?", 1)[0]
 
 BASE_LOGO = "https://cdn.discordapp.com/embed/avatars/0.png"
 def get_url(obj, f=auto_url) -> str:
@@ -841,11 +831,9 @@ def get_url(obj, f=auto_url) -> str:
 	return ""
 
 # Finds the best URL for a Discord object's icon, prioritizing proxy_url for images if applicable.
-proxy_url = lambda obj: get_url(obj) or (obj.proxy_url if is_image(obj.proxy_url) else obj.url)
+proxy_url = lambda obj: get_url(obj) or (obj.proxy_url if is_image(obj.proxy_url) else getattr(obj, "url", None)) or BASE_LOGO
 # Finds the best URL for a Discord object's icon.
 best_url = lambda obj: get_url(obj) or auto_url(getattr(obj, "url", None) or BASE_LOGO)
-# Finds the worst URL for a Discord object's icon.
-worst_url = lambda obj: get_url(obj, auto_url_ex) or getattr(obj, "url", None) or BASE_LOGO
 
 allow_gif = lambda url: url + ".gif" if "." not in url.rsplit("/", 1)[-1] and "?" not in url else url
 
@@ -2382,12 +2370,19 @@ if __name__ != "__mp_main__":
 					b = ("" if isinstance(b, str) else b"").join(b)
 				if self.archive and isinstance(fn, str) and os.path.exists(fn) and os.path.getsize(fn) >= self.archive_size:
 					arcname = str(datetime.datetime.now()).replace(" ", "_", 1).rsplit(".", 1)[0].replace(":", ".", 2) + ".log"
-					with zipfile.ZipFile(self.archive, "a", compression=zipfile.ZIP_LZMA) as z:
-						if arcname in z.namelist():
+					if self.archive.endswith(".zip"):
+						with zipfile.ZipFile(self.archive, "a", compression=zipfile.ZIP_LZMA) as z:
+							if arcname in z.namelist():
+								pass
+							else:
+								z.write(fn, arcname)
+								trunc = True
+					else:
+						path = self.archive + "/" + arcname
+						if os.path.exists(path):
 							pass
 						else:
-							z.write(fn, arcname)
-							trunc = True
+							os.replace(fn, path)
 				if not isinstance(fn, (str, bytes)):
 					f = fn
 				elif isinstance(b, byte_like):

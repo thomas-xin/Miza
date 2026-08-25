@@ -1,6 +1,7 @@
-import sys, requests
+import sys
 from sympy import sympify
 from math import *
+from .util import Request
 
 
 if __name__ == "__main__":
@@ -13,9 +14,7 @@ else:
 COSTS = {}
 
 def get_tower_data():
-	resp = requests.get("https://bloons.fandom.com/wiki/Module:PricesBTD6/data?action=edit")
-	resp.raise_for_status()
-	s = resp.text
+	s = Request("https://bloons.fandom.com/wiki/Module:PricesBTD6/data?action=edit", decode=True)
 	s = s.split("--&lt;nowiki>", 1)[1]
 	s = s.split("--&lt;/nowiki>", 1)[-2]
 	lines = s.splitlines()

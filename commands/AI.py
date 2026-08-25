@@ -47,6 +47,7 @@ class Translate(Command):
 		),
 	)
 	rate_limit = (6, 9)
+	_timeout_ = 5
 	slash = True
 	ephemeral = True
 
@@ -330,7 +331,6 @@ def to_msg(k, v, n=None, t=None):
 
 
 class Ask(Command):
-	_timeout_ = 24
 	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. The chatbot will automatically choose one of multiple language models to conjure a response based on premium level. Less censorship is imposed when invoked within NSFW channels."
 	schema = cdict(
 		prompt=cdict(
@@ -349,6 +349,7 @@ class Ask(Command):
 		),
 	)
 	rate_limit = (12, 16)
+	_timeout_ = 24
 	slash = True
 
 	reset = {}
@@ -735,6 +736,14 @@ class Ask(Command):
 			pass
 		print("Usage:", usage)
 		content = content.split(rsep, 1)[-1].strip()
+		if "</txt>" in content:
+			if content.endswith("</txt"):
+				content, r = content.rsplit("<txt>", 1)
+				r = r.removesuffix("</txt>")
+			else:
+				r, content = content.split("</txt>", 1)
+				r = r.removeprefix("<txt>")
+			reasonings.append(r)
 		if reasonings:
 			reasoning = "\n\n\n".join(reasonings).encode("utf-8")
 			try:

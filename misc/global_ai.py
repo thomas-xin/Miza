@@ -255,7 +255,7 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 		elif sum(f is not None for f in follows) < 4 and m.get("url") and j < 8:
 			follows[i] = create_task(self.follow_url(m.url, priority_order=("video", "image", "text")))
 		elif not m.get("content"):
-			m.content = "[MEDIA]"
+			m.content = "[MEDIA OUT-OF-FOCUS]"
 		m.pop("url", None)
 	for i, fut in enumerate(follows):
 		if not fut:
@@ -313,7 +313,7 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 					caption = lim_tokens(caption, 256)
 				else:
 					caption = await ai.summarise(caption, min_length=context / 3, best=True, premium_context=premium_context)
-				m.content += "\n\n" + caption
+				m.content = (caption + "\n\n" + m.content).strip()
 			else:
 				im = cdict(type="image_url", image_url=cdict(url=caption, detail="auto" if best else "low"))
 				images.append(im)
@@ -795,8 +795,8 @@ async def vision(self, url, name=None, best=True, model=None, question=None, pre
 	else:
 		iname = "image"
 	data_url = await self.to_data_url(url, timeout=timeout)
-	if not data_url.startswith("data:"):
-		return ("txt", data_url)
+	if data_url.startswith("<txt>"):
+		return ("txt", data_url.removeprefix("<txt>").removesuffix("</txt>"))
 	description_prompt = "Please describe this <IMAGE> in detail:\n- The image may be a collage of frames representing a video, in which case it should be analysed as if it were one\n- Transcribe text if present, but do not mention there not being text\n- Note details especially for people/characters if present\n- Be descriptive but concise!"
 	content = (question or description_prompt).replace("<IMAGE>", iname)
 	messages = [

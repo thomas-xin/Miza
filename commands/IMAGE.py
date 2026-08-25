@@ -899,6 +899,49 @@ class Crop(Visual, Command):
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
 
 
+class ChromaKey(Visual, Command):
+	name = ["RemoveColour", "RemoveMatte"]
+	description = "Applies chroma keying to remove a given colour from the image."
+	schema = cdict(
+		key=cdict(
+			type="colour",
+			description="Colour to key out, defaults to average of 4 corner pixels",
+		),
+		tolerance=cdict(
+			type="number",
+			validation="[0, 1]",
+			description="Distance in colour space below which a pixel is fully removed",
+			default=0.35,
+		),
+		softness=cdict(
+			type="number",
+			validation="[0, 1]",
+			description="Width of the transition band for partial transparency (anti-fringing)",
+			default=0.15,
+		),
+		spill_suppression=cdict(
+			type="number",
+			validation="[0, 1]",
+			description="Removal of colour from edge/foreground pixels",
+			default=1,
+		),
+	)
+	macros = cdict(
+		GreenScreen=cdict(
+			key=(0, 255, 0),
+		),
+	)
+	rate_limit = (4, 9)
+	_timeout_ = 4
+	slash = True
+
+	async def __call__(self, _time_limit, url, key, tolerance, softness, spill_suppression, filesize, format, **void):
+		resp = await process_image(url, "remove_colour", [key, tolerance, softness, spill_suppression, "-fs", filesize, "-f", format], timeout=_time_limit)
+		fn = url2fn(url)
+		name = replace_ext(fn, get_ext(resp))
+		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
+
+
 class Adjust(Visual, Command):
 	description = "Adjusts an optional amount of channels in the target image with a given operation and optional value."
 	schema = cdict(

@@ -2,6 +2,7 @@ import collections
 import concurrent.futures
 import contextlib
 import fractions
+import functools
 import io
 import itertools
 from math import ceil, floor, inf, sqrt, tau, log2, sin, cos, pi, isfinite
@@ -539,6 +540,7 @@ discord_emoji = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/
 def is_discord_emoji(url):
 	return discord_emoji.search(url)
 
+@functools.lru_cache(maxsize=256)
 def get_image(url, out=None, nodel=False, nogif=False, maxframes=inf, msize=None):
 	if isinstance(url, Image.Image):
 		return url
@@ -736,7 +738,7 @@ def replace_colour(image, colour):
 def from_colour(colour, size=128, key=None):
 	return Image.new("RGB" + "A" * (len(colour) > 3), (size, size), tuple(colour))
 
-def from_gradient(shape, colour, background, repetitions=1, size=960, colourspace="rgb", output="pil"):
+def from_gradient(shape, colour, background, repetitions=1, size=960, colourspace="rgb", output="pil") -> Image.Image:
 	"Generates an image from a gradient."
 	if len(colour) > 3 or len(background) > 3:
 		if len(colour) < 4:
@@ -809,11 +811,11 @@ def from_gradient(shape, colour, background, repetitions=1, size=960, colourspac
 	if colourspace.casefold() != "rgb":
 		data = convert_colour(data, colourspace, "rgb")
 	data *= 255
-	grad = quantise_into(data)
+	grad = quantise_into(data, in_place=True)
 	im = fromarray(grad, mode="RGBA" if dim == 4 else "RGB")
 	return im
 
-def gen_bg(size):
+def gen_bg(size) -> Image.Image:
 	rb = np.zeros(size[::-1], dtype=np.uint8)
 	rb[::2, ::2] = 255
 	rb[1::2, 1::2] = 255
@@ -822,7 +824,7 @@ def gen_bg(size):
 	a = Image.new("L", size, color=255)
 	return Image.merge("RGBA", (r, g, b, a))
 
-def quantise_into(a, clip=None, in_place=False, checkerboard=True, dtype=np.uint8):
+def quantise_into(a, clip=None, in_place=False, checkerboard=True, dtype=np.uint8) -> np.ndarray:
 	if issubclass(a.dtype.type, np.integer):
 		return a
 	if checkerboard:
@@ -852,7 +854,7 @@ def gen_noise(size, mult=1, mode="L") -> Image.Image:
 		return im.resize((size[0] * mult, size[1] * mult), Resampling.NEAREST)
 	return im
 
-def gen_captcha(seed, width=640, font="Segoe Script", mult=2, mode="RGB"):
+def gen_captcha(seed, width=640, font="Segoe Script", mult=2, mode="RGB") -> dict:
 	size = (width, round(width / 3 * 1))
 	fg = gen_noise(size, mult, mode)
 	bg = gen_noise(size, mult, mode)
@@ -899,7 +901,7 @@ def gen_captcha(seed, width=640, font="Segoe Script", mult=2, mode="RGB"):
 
 	return dict(duration=8, count=maxframes, frames=captcha_iter())
 
-def fromarray(arr, mode="L"):
+def fromarray(arr, mode="L") -> Image.Image:
 	try:
 		return Image.fromarray(arr, mode=mode)
 	except TypeError:
@@ -918,7 +920,7 @@ def resume(im, *its):
 	for it in its:
 		yield from it
 
-def has_transparency(image):
+def has_transparency(image) -> bool:
 	"Checks if a palette image has transparency. We assume that an image has transparency if it has a transparency index, or an even number of channels (indicating modes LA or RGBA)."
 	assert image.mode == "P", "Expected a palette image."
 	transparent = image.info.get("transparency", -1)
@@ -931,9 +933,9 @@ def has_transparency(image):
 			if alpha < 254:
 				return True
 	return False
-def target_p(image):
+def target_p(image) -> str:
 	return ("RGBA" if has_transparency(image) else "RGB") if image.mode == "P" else image.mode
-def remove_p(image):
+def remove_p(image) -> Image.Image:
 	"Removes the palette from an image, accounting for transparency."
 	if image.mode == "P":
 		mode = "RGBA" if has_transparency(image) else "RGB"
@@ -1069,7 +1071,7 @@ def optimise(im, keep_rgb=True, recurse=True, max_frames=60):
 			print("OP:", original, im.mode)
 
 # Autodetect max image size, keeping aspect ratio
-def max_size(w, h, maxsize, force=False):
+def max_size(w, h, maxsize, force=False) -> tuple[int, int]:
 	s = w * h
 	m = maxsize * maxsize
 	if s > m or force:
@@ -1078,7 +1080,7 @@ def max_size(w, h, maxsize, force=False):
 		h = round(h * r)
 	return w, h
 
-def clamp_size(w, h, maxsize, force=False):
+def clamp_size(w, h, maxsize, force=False) -> tuple[int, int]:
 	if not force and w <= maxsize and h <= maxsize:
 		return w, h
 	if w == h:
@@ -1087,8 +1089,7 @@ def clamp_size(w, h, maxsize, force=False):
 		return maxsize, round(h / w * maxsize)
 	return round(w / h * maxsize), maxsize
 
-def resize_max(image, maxsize, force=False, resample=Resampling.LANCZOS, box=None, reducing_gap=None):
-	# print("RM:", image, maxsize, force, resample, box, reducing_gap)
+def resize_max(image, maxsize, force=False, resample=Resampling.LANCZOS, box=None, reducing_gap=None) -> Image.Image:
 	w, h = max_size(image.width, image.height, maxsize, force=force)
 	if w != image.width or h != image.height:
 		if type(resample) is str:
@@ -1099,7 +1100,7 @@ def resize_max(image, maxsize, force=False, resample=Resampling.LANCZOS, box=Non
 		return image.copy()
 	return image
 
-def downsample(im, lenience=5, maxsize=16384, minsize=48, keep_alpha=True):
+def downsample(im, lenience=5, maxsize=16384, minsize=48, keep_alpha=True) -> Image.Image:
 	if im.width <= minsize or im.height <= minsize:
 		return im
 	cache = {}
@@ -1173,10 +1174,9 @@ def downsample(im, lenience=5, maxsize=16384, minsize=48, keep_alpha=True):
 		if A.size != out.size:
 			A = A.resize(out.size, resample=Image.Resampling.LANCZOS)
 		out.putalpha(A)
-	print(im, out)
 	return out
 
-def image_to(im, mode="RGB", size=None):
+def image_to(im, mode="RGB", size=None) -> Image.Image:
 	im = im if im.mode == mode else im.convert(mode)
 	if size and size != im.size:
 		im = im.resize(size, resample=Image.Resampling.LANCZOS)
@@ -1196,10 +1196,9 @@ resizers = dict(
 	area="area",
 	crop="crop",
 	padding="crop",
-	sdxl=Resampling.LANCZOS,
 )
 
-def resize_mult(image, x, y, mode="auto"):
+def resize_mult(image, x, y, mode="auto") -> Image.Image:
 	if y == "-":
 		y = x
 	if x == y == 1:
@@ -1208,7 +1207,7 @@ def resize_mult(image, x, y, mode="auto"):
 	h = round(image.height * y)
 	return resize_to(image, w, h, mode)
 
-def resize_to(image, w, h, mode="auto"):
+def resize_to(image, w, h, mode="auto") -> Image.Image:
 	if isinstance(image, list):
 		print(image)
 	if w == "-":
@@ -1292,7 +1291,7 @@ def resize_to(image, w, h, mode="auto"):
 			return Image.fromarray(a, image.mode)
 	return image.resize([w, h], filt)
 
-def rotate_to(image, angle, expand=True, fill=False):
+def rotate_to(image, angle, expand=True, fill=False) -> Image.Image:
 	angle %= 360
 	if not angle % 90:
 		if angle == 90:
@@ -1356,7 +1355,7 @@ def to_qr(s, repetitions=3, duration=4.8, fps=30):
 				bg[mask] = fg[mask]
 				data = convert_colour(bg, "hsl", "rgb", in_place=False)
 				data *= 255
-				grad = quantise_into(data)
+				grad = quantise_into(data, in_place=True)
 				yield fromarray(grad, mode="RGB")
 
 		return dict(duration=duration, count=count, frames=qr_iterator(im))
@@ -1397,7 +1396,7 @@ def render_text(text, font="Calibri", size=48, width=None, colour=(0, 0, 0), out
 
 
 @sync_animations
-def caption_map(images, top_text, bottom_text, font="Impact", size=64, width=None, colour=(0, 0, 0), outline=(255, 255, 255), progress=0, **kwargs):
+def caption_map(images, top_text, bottom_text, font="Impact", size=64, width=None, colour=(0, 0, 0), outline=(255, 255, 255), progress=0, **kwargs) -> Image.Image:
 	im = images[0].convert("RGBA")
 	if isinstance(font, str):
 		from misc.caches import enumerate_os_fonts
@@ -1468,7 +1467,7 @@ def clamp_transparency(frames):
 
 
 @sync_animations
-def spin_map(images, angle, circle, progress=0, **kwargs):
+def spin_map(images, angle, circle, progress=0, **kwargs) -> Image.Image:
 	image = images[0]
 	z = progress * 360 + angle % 360
 	if z:
@@ -1478,7 +1477,7 @@ def spin_map(images, angle, circle, progress=0, **kwargs):
 	return to_circle(image)
 
 @sync_animations
-def rainbow_map(images, mode, progress=0, **kwargs):
+def rainbow_map(images, mode, progress=0, **kwargs) -> Image.Image:
 	image = images[0]
 	progress %= 1
 	if not progress:
@@ -1495,7 +1494,7 @@ def rainbow_map(images, mode, progress=0, **kwargs):
 	return join_rgba(im, A)
 
 @sync_animations
-def pet_map(images, squeeze, progress=0, **kwargs):
+def pet_map(images, squeeze, progress=0, **kwargs) -> Image.Image:
 	image = images[0]
 	pet = get_image("https://api.mizabot.xyz/u/2omMy8VUGJ5GOH3AIJxw3wJ5yQrU/EBjYrqCEUDw.zip")
 	w, h = image.width * 2.5, image.height * 2.5
@@ -1516,7 +1515,7 @@ def pet_map(images, squeeze, progress=0, **kwargs):
 	return im.resize((round(w / 2), round(h / 2)), resample=Resampling.LANCZOS)
 
 @sync_animations
-def scroll_map(images, direction, progress=0, **kwargs):
+def scroll_map(images, direction, progress=0, **kwargs) -> Image.Image:
 	image = images[0]
 	progress %= 1
 	if not progress:
@@ -1539,7 +1538,7 @@ def scroll_map(images, direction, progress=0, **kwargs):
 	ym = round(y * image.width * progress)
 	return ImageChops.offset(image, xm, ym)
 
-def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=None, **kwargs):
+def resize_map(image, extras, duration, fps, operation, x, y, mode="auto", area=None, **kwargs) -> dict:
 	"""
 	Resize an image or a sequence of images based on the specified parameters.
 	Parameters:
@@ -1689,7 +1688,7 @@ def orbit_map(image, extras, duration, fps, count):
 		return im
 	return map_sync(orbitals, func=orbit_iterator, duration=duration, fps=fps, keep_size=None, keep_fps="approx")
 
-def quad_as_rect(quad):
+def quad_as_rect(quad) -> bool:
 	if quad[0] != quad[2]:
 		return False
 	if quad[1] != quad[7]:
@@ -1699,14 +1698,14 @@ def quad_as_rect(quad):
 	if quad[3] != quad[5]:
 		return False
 	return True
-def quad_to_rect(quad):
+def quad_to_rect(quad) -> tuple:
 	assert(len(quad) == 8)
 	assert(quad_as_rect(quad))
 	return (quad[0], quad[1], quad[4], quad[3])
-def rect_to_quad(rect):
+def rect_to_quad(rect) -> tuple:
 	assert(len(rect) == 4)
 	return (rect[0], rect[1], rect[0], rect[3], rect[2], rect[3], rect[2], rect[1])
-def shape_to_rect(shape):
+def shape_to_rect(shape) -> tuple:
 	assert(len(shape) == 2)
 	return (0, 0, shape[0], shape[1])
 def griddify(rect, w_div, h_div):
@@ -1737,7 +1736,7 @@ def distort_grid(org_grid, max_shift):
 	new_grid[:, :, 0] = np.minimum(x_max, new_grid[:, :, 0])
 	new_grid[:, :, 1] = np.minimum(y_max, new_grid[:, :, 1])
 	return new_grid
-def grid_to_mesh(src_grid, dst_grid):
+def grid_to_mesh(src_grid, dst_grid) -> list:
 	assert(src_grid.shape == dst_grid.shape)
 	mesh = deque()
 	for i in range(src_grid.shape[0] - 1):
@@ -1759,7 +1758,7 @@ def grid_to_mesh(src_grid, dst_grid):
 	return list(mesh)
 
 @sync_animations
-def magik_map(images, intensity, cell_count, progress=0, count=1, seed=0, **kwargs):
+def magik_map(images, intensity, cell_count, progress=0, count=1, seed=0, **kwargs) -> Image.Image:
 	image = images[0]
 	total_distance = sqrt(np.prod(image.size)) / cell_count * intensity
 	grid_distance = max(1, round(sqrt(total_distance)))
@@ -1773,7 +1772,7 @@ def magik_map(images, intensity, cell_count, progress=0, count=1, seed=0, **kwar
 	return image
 
 @sync_animations
-def crop_map(images, x1, y1, x2, y2, **kwargs):
+def crop_map(images, x1, y1, x2, y2, **kwargs) -> Image.Image:
 	image = images[0]
 	if x1 == "-":
 		x1 = 0
@@ -1813,7 +1812,7 @@ def crop_map(images, x1, y1, x2, y2, **kwargs):
 	return im
 
 @sync_animations
-def adjust_map(images, operation, value, channels, clip, **kwargs):
+def adjust_map(images, operation, value, channels, clip, **kwargs) -> Image.Image:
 	image = images[0]
 	channels = set(channels)
 	chans = channels.difference("rgbcmyhscvliy")
@@ -1904,7 +1903,7 @@ def adjust_map(images, operation, value, channels, clip, **kwargs):
 	return im
 
 # TODO: Support all operations: `("blend", "replace", "add", "sub", "mul", "div", "mod", "and", "or", "xor", "nand", "nor", "xnor", "difference", "overlay", "screen", "soft", "hard", "lighten", "darken", "plusdarken", "overflow", "lighting", "burn", "linearburn", "dodge", "hue", "saturation", "lightness", "lum", "value", "colour", "extract", "merge", "alpha")`
-def blend_single(i1, a1, i2, a2, opacity, operation):
+def blend_single(i1, a1, i2, a2, opacity, operation) -> tuple[np.ndarray, np.ndarray]:
 	if opacity == 0:
 		return i1, a1
 	if operation == "blit":
@@ -1927,7 +1926,7 @@ def blend_single(i1, a1, i2, a2, opacity, operation):
 	else:
 		raise NotImplementedError(operation, "is not currently supported.")
 
-def _blend_map(images, operation, opacity, props=(), **kwargs):
+def _blend_map(images, operation, opacity, props=(), **kwargs) -> Image.Image:
 	dtype = np.float32
 	image = images[0]
 	im, A = split_rgba(image)
@@ -1965,7 +1964,7 @@ def _blend_map(images, operation, opacity, props=(), **kwargs):
 blend_map = sync_animations(_blend_map, keep_size="exact")
 
 
-def to_square(image):
+def to_square(image) -> Image.Image:
 	w, h = image.size
 	d = w - h
 	if not d:
@@ -1975,7 +1974,7 @@ def to_square(image):
 	return image.crop((0, -d >> 1, w, h - (1 - d >> 1)))
 
 CIRCLE_CACHE = {}
-def to_circle(image):
+def to_circle(image) -> Image.Image:
 	global CIRCLE_CACHE
 	if image.mode != "RGBA":
 		image = to_square(image).convert("RGBA")
@@ -1990,14 +1989,14 @@ def to_circle(image):
 		CIRCLE_CACHE[image.size] = image_map
 	return ImageChops.multiply(image, image_map)
 
-def canny(im):
+def canny(im) -> Image.Image:
 	im = remove_p(im)
 	a = np.asanyarray(im)
 	a2 = cv2.Canny(a, 100, 200)
 	return Image.fromarray(a2, mode="L")
 
 
-def split_rgba(image):
+def split_rgba(image) -> tuple[Image.Image, Image.Image | None]:
 	image = remove_p(image)
 	if image.mode == "RGBA":
 		a = np.asanyarray(image, dtype=np.uint8)
@@ -2011,7 +2010,7 @@ def split_rgba(image):
 		A = None
 	return image, A
 
-def join_rgba(image, A=None):
+def join_rgba(image, A=None) -> Image.Image:
 	if A is not None and np.min(A) < 254:
 		image.putalpha(A)
 	return image
@@ -2021,7 +2020,7 @@ range_hcl = ((-np.pi, np.pi), (0, np.sqrt(2)), (0, 1))
 range_luv = ((0, 100), (-83.07753, 175.01505), (-134.1030, 107.3985))
 range_hcy = ((-np.pi, np.pi), (0, 1 / np.sqrt(2)), (0, 1))
 
-def rgb_to_hsi(rgb_image):
+def rgb_to_hsi(rgb_image) -> np.ndarray:
 	m = np.min(rgb_image, -1).T
 	I = np.mean(rgb_image, -1).T # noqa: E741
 	hls_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2HLS, dst=rgb_image)
@@ -2032,7 +2031,7 @@ def rgb_to_hsi(rgb_image):
 	S[:] = I
 	return hls_image
 
-def hsi_to_rgb(hsi_image):
+def hsi_to_rgb(hsi_image) -> np.ndarray:
 	H, S, I = np.swapaxes(hsi_image, 0, 2) # noqa: E741
 	H *= 2 * np.pi
 	R = np.zeros_like(I)
@@ -2060,7 +2059,7 @@ def hsi_to_rgb(hsi_image):
 	H[:], S[:], I[:] = R, G, B
 	return hsi_image
 
-def luv_to_hcl(luv_image):
+def luv_to_hcl(luv_image) -> np.ndarray:
 	L, U, V = np.swapaxes(luv_image, 0, 2)
 	H = np.arctan2(V, U)
 	C = np.hypot(U, V)
@@ -2071,7 +2070,7 @@ def luv_to_hcl(luv_image):
 	L[:], U[:] = H, C
 	return luv_image
 
-def hcl_to_luv(hcl_image):
+def hcl_to_luv(hcl_image) -> np.ndarray:
 	H, C, L = np.swapaxes(hcl_image, 0, 2)
 	H *= range_hcl[0][1] - range_hcl[0][0]
 	C *= range_hcl[1][1]
@@ -2081,7 +2080,7 @@ def hcl_to_luv(hcl_image):
 	C[:], L[:] = U, V
 	return hcl_image
 
-def ycc_to_hcy(yvu_image):
+def ycc_to_hcy(yvu_image) -> np.ndarray:
 	Y, V, U = np.swapaxes(yvu_image, 0, 2)
 	U -= 0.5
 	V -= 0.5
@@ -2094,7 +2093,7 @@ def ycc_to_hcy(yvu_image):
 	Y[:], V[:] = H, C
 	return yvu_image
 
-def hcy_to_ycc(hcy_image):
+def hcy_to_ycc(hcy_image) -> np.ndarray:
 	H, C, Y = np.swapaxes(hcy_image, 0, 2)
 	H *= range_hcy[0][1] - range_hcy[0][0]
 	C *= range_hcy[1][1]
@@ -2111,7 +2110,7 @@ blurs = {
 	"gaussian": ImageFilter.GaussianBlur,
 }
 @sync_animations
-def blur_map(images, filt, radius=6, **kwargs):
+def blur_map(images, filt, radius=6, **kwargs) -> Image.Image:
 	image = images[0]
 	rgb, A = split_rgba(image)
 	if A:
@@ -2127,13 +2126,13 @@ def blur_map(images, filt, radius=6, **kwargs):
 	return images[0].filter(blurs[filt](radius))
 
 
-def invert(image):
+def invert(image) -> Image.Image:
 	image, A = split_rgba(image)
 	image = ImageOps.invert(image)
 	image = join_rgba(image, A)
 	return image
 
-def greyscale(image):
+def greyscale(image) -> Image.Image:
 	image, A = split_rgba(image)
 	image = ImageOps.grayscale(image)
 	image = join_rgba(image, A)
@@ -2144,13 +2143,13 @@ laplacian_kernel = [
 	-1,  8, -1,
 	-1, -1, -1
 ]
-def laplacian(image):
+def laplacian(image) -> Image.Image:
 	image = remove_p(image)
 	return image.filter(ImageFilter.Kernel((3, 3), laplacian_kernel, 1, 0))
 
 cv2_swaps = {k: v for k, v in cv2.__dict__.items() if k.startswith("COLOR_")}
 # supported formats: RGB, BGR, CMY, XYZ, HSV, HSI, HSL, HCL, HCY, LAB, LUV, YUV
-def convert_colour(im, source, dest, in_place=True):
+def convert_colour(im, source, dest, in_place=True) -> np.ndarray:
 	if not in_place:
 		im = np.array(im, dtype=np.float32)
 	from_cv2 = dict(
@@ -2267,7 +2266,7 @@ def convert_colour(im, source, dest, in_place=True):
 		raise NotImplementedError(dest)
 	return im
 
-def colourspace(image, source, dest):
+def colourspace(image, source, dest) -> Image.Image:
 	image, A = split_rgba(image)
 	im = np.array(image, dtype=np.float32)
 	im *= 1 / 255
@@ -2278,7 +2277,7 @@ def colourspace(image, source, dest):
 	image = join_rgba(image, A)
 	return image
 
-def get_colour(image):
+def get_colour(image) -> list[float]:
 	rgb, A = split_rgba(image)
 	if A:
 		a = np.array(A, dtype=np.float32)
@@ -2289,7 +2288,7 @@ def get_colour(image):
 		return [np.sum(np.multiply(c.T, a)) / sumA for c in np.asanyarray(rgb, dtype=np.uint8).T]
 	return [np.mean(c) for c in np.asanyarray(rgb, dtype=np.uint8).T]
 
-def get_average_frame(image):
+def get_average_frame(image) -> np.ndarray:
 	arr = np.asanyarray(image).astype(np.float64)
 	i = 0
 	try:
@@ -2302,12 +2301,12 @@ def get_average_frame(image):
 		arr *= 1 / (i + 1)
 	return np.clip(arr, 0, 255, out=arr).astype(np.uint8)
 
-def psnr(image, extras):
+def psnr(image, extras) -> float:
 	assert len(extras) == 1, "Only 2 images are currently accepted."
 	image2 = get_image(extras[0])
 	return cv2.PSNR(get_average_frame(image), get_average_frame(image2))
 
-def cut_to_loop(image):
+def cut_to_loop(image) -> dict:
 	frames, duration, fps = properties(image)
 	# image = ImageSequence.fromiter(optimise(image), frameprops=(frames, duration, fps))
 	first = np.asanyarray(image, dtype=np.uint8)
@@ -2414,7 +2413,7 @@ colour_normal_map = (
 	(0, 0, 1),
 )
 
-def colour_deficiency(image, operation, value=None):
+def colour_deficiency(image, operation, value=None) -> Image.Image:
 	if value is None:
 		if operation == "protanopia":
 			operation = "protan"
@@ -2459,24 +2458,11 @@ def colour_deficiency(image, operation, value=None):
 	image, A = split_rgba(image)
 	image = image.convert(image.mode, colourmatrix)
 	return join_rgba(image, A)
-	# channels = list(image.split())
-	# out = [None] * len(channels)
-	# if len(out) == 4:
-	#	 out[-1] = channels[-1]
-	# for i_ratio, ratio in enumerate(ratios):
-	#	 for i_colour in range(3):
-	#		 if ratio[i_colour]:
-	#			 im = channels[i_colour].point(lambda x: x * ratio[i_colour])
-	#			 if out[i_ratio] is None:
-	#				 out[i_ratio] = im
-	#			 else:
-	#				 out[i_ratio] = ImageChops.add(out[i_ratio], im)
-	# return Image.merge(image.mode, out)
 
-def Enhance(image, operation, value):
+def Enhance(image, operation, value) -> Image.Image:
 	return getattr(ImageEnhance, operation)(image).enhance(value)
 
-def get_mask(image):
+def get_mask(image) -> Image.Image:
 	if image.mode != "LA":
 		image = image.convert("LA")
 	if image.size != (512, 512):
@@ -2517,7 +2503,7 @@ def get_mask(image):
 	mask = Image.fromarray(L, mode="L")
 	return expand_mask(mask, radius=4)
 
-def inpaint(image, url):
+def inpaint(image, url) -> Image.Image:
 	image2 = get_image(url, nodel=True)
 	if image2.mode == "LA":
 		image2 = image2.getchannel("L")
@@ -2574,7 +2560,7 @@ def inpaint(image, url):
 	a[mask] = a2[mask]
 	return Image.fromarray(a, mode="RGB")
 
-def expand_mask(image2, radius=4):
+def expand_mask(image2, radius=4) -> Image.Image:
 	if not radius:
 		return image2
 	if radius > image2.width:
@@ -2611,3 +2597,41 @@ def expand_mask(image2, radius=4):
 			outmask |= temp
 	outim = Image.fromarray(outmask, mode="L")
 	return outim
+
+def remove_colour(image: Image.Image, key_colour=None, tolerance=0.35, softness=0.15, spill_strength=1) -> Image.Image:
+	img = image.convert("RGBA")
+	arr = np.asanyarray(img).astype(np.float32)
+	arr *= 1 / 255
+
+	rgb = arr[..., :3]
+	src_alpha = arr[..., 3]
+
+	if key_colour is None:
+		key_colour = (arr[0][0] + arr[0][-1] + arr[-1][0] + arr[-1][-1]) * (255 / 4)
+	key = np.asanyarray(key_colour, dtype=np.float32)[:3]
+	key *= 1 / 255
+
+	dist = np.linalg.norm(rgb - key, axis=-1)
+
+	denom = max(softness, 1 / 1048576)
+	key_alpha = np.clip((dist - tolerance) / denom, 0, 1)
+
+	if spill_strength > 0:
+		r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+		dominant = int(np.argmax(key))
+
+		channels = [r, g, b]
+		dom = channels[dominant]
+		others = [channels[i] for i in range(len(channels)) if i != dominant]
+		limit = np.minimum(*others)
+
+		excess = np.clip(dom - limit, 0, 1)
+		channels[dominant] = dom - excess * spill_strength
+
+		rgb = np.stack(channels, axis=-1)
+	out_alpha = src_alpha * key_alpha
+
+	out = np.concatenate([rgb, out_alpha[..., None]], axis=-1)
+	out *= 255
+	a = quantise_into(out, clip=(0, 255), in_place=True)
+	return Image.fromarray(a, "RGBA")

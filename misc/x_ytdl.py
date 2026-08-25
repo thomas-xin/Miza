@@ -108,6 +108,8 @@ def extract_info(url, download=False, process=True):
 	try:
 		resp = ytdl.extract_info(url, download=download, process=process)
 	except ytd.utils.DownloadError:
+		resp = None
+	if not resp:
 		ydl_opts = {
 			"quiet": 1,
 			"format": "bestvideo+bestaudio/best*",

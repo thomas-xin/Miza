@@ -489,10 +489,12 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 	tries = tuple(apis.items())
 	kwa = kwargs
 	for i, (api, minfo) in enumerate(tries + tries):
+		group = None
 		if api is None and minfo is None:
 			try:
-				api = random.choice(next(iter(local_models.values())))
-			except (IndexError, StopIteration):
+				group = next(iter(local_models.values()))
+				api = group[i % len(group)]
+			except (LookupError, StopIteration):
 				api = "openrouter"
 				minfo = available["mimo-v2.5"]
 		if api is None:
@@ -555,7 +557,8 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 		elif "reasoning_effort" in kwa:
 			kwa.pop("reasoning_effort")
 		if not api:
-			api = random.choice(local_models[model])
+			group = local_models[model]
+			api = group[i % len(group)]
 			model = api.model
 		kwa["model"] = model
 		if isinstance(api, str):
@@ -670,7 +673,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 				return await stream.pass_item(response, final=True)
 			return stream
 		except Exception as ex:
-			if isinstance(ex, ConnectionError) and ex.errno in (401, 403, 404, 429, 502, 503, 504):
+			if isinstance(ex, ConnectionError) and ex.errno in (401, 403, 404, 429, 502, 503, 504) or isinstance(ex, openai.APIConnectionError):
 				api_blocked[(sapi, model)] = ex
 			if not exc:
 				exc = ex
