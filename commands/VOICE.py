@@ -2083,7 +2083,7 @@ class UpdateAudio(Database):
 	async def _day_(self, **void):
 		import importlib
 		old_version = importlib.metadata.version("yt-dlp")
-		args = [python, "-m", "pip", "install", "--upgrade", "--pre", "yt-dlp"]
+		args = [python, "-m", "pip", "install", "--upgrade", "--pre", "yt-dlp", "niquests", "urllib3-future", "ddgs", "googletrans"]
 		print(args)
 		proc = await asyncio.create_subprocess_exec(*args)
 		await proc.wait()

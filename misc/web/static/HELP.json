@@ -3162,6 +3162,81 @@
 			},
 			"ordered_args": ["url", "left", "top", "right", "bottom", "duration", "fps", "filesize", "format"]
 		},
+		"ChromaKey": {
+			"aliases": ["ChromaKey", "RemoveColour", "RemoveMatte", "GreenScreen"],
+			"description": "Applies chroma keying to remove a given colour from the image.",
+			"level": "0",
+			"rate_limit": "(4, 9)",
+			"example": [],
+			"timeout": "96",
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"required": true
+				},
+				"key": {
+					"type": "colour",
+					"description": "Colour to key out, defaults to average of 4 corner pixels"
+				},
+				"tolerance": {
+					"type": "number",
+					"validation": "[0, 1]",
+					"description": "Distance in colour space below which a pixel is fully removed",
+					"default": 0.35
+				},
+				"softness": {
+					"type": "number",
+					"validation": "[0, 1]",
+					"description": "Width of the transition band for partial transparency (anti-fringing)",
+					"default": 0.15
+				},
+				"spill_suppression": {
+					"type": "number",
+					"validation": "[0, 1]",
+					"description": "Removal of colour from edge/foreground pixels",
+					"default": 1
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3"
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7"
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": ["fs"]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			},
+			"ordered_args": ["url", "key", "tolerance", "softness", "spill_suppression", "duration", "fps", "filesize", "format"],
+			"macros": {
+				"GreenScreen": {
+					"key": [0, 255, 0]
+				}
+			}
+		},
 		"Adjust": {
 			"aliases": ["Adjust", "Fill", "HueShift", "Invert", "GreyScale", "Lightness", "Lighten", "Luma", "Brightness", "Brighten"],
 			"description": "Adjusts an optional amount of channels in the target image with a given operation and optional value.",

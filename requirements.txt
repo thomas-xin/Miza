@@ -17,7 +17,7 @@ fast-langdetect>=1.0.0
 filetype>=1.2.0
 gigatoken>=0.10.0
 gmpy2>=2.3.0
-googletrans==4.0.2
+googletrans>=4.0.2
 httpx>=0.28.1
 h11>=0.16.0
 h2>=4.3.0

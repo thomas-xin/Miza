@@ -27,6 +27,7 @@ from misc.util import (
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist, shorten_chunks, expand_chunks, url2fn,
 	ungroup_attachments, is_discord_url, is_miza_attachment, temporary_file, url2ext, is_discord_attachment, is_miza_url,
     snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt, VISUAL_FORMS,
+	raise_aiohttp_safe,
 )
 
 def has_transparency(image):
@@ -567,7 +568,7 @@ class AttachmentCache(AutoCache):
 				heads = dict(choice((self.headers, self.alt_headers)))
 			heads.pop("Content-Type")
 			resp = await self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
-			resp.raise_for_status()
+			await raise_aiohttp_safe(resp)
 			message = await resp.json()
 			cid = int(message["channel_id"])
 			mid = int(message["id"])
@@ -626,7 +627,7 @@ class AttachmentCache(AutoCache):
 				heads = dict(choice((self.headers, self.alt_headers)))
 			heads.pop("Content-Type")
 			resp = await self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
-			resp.raise_for_status()
+			await raise_aiohttp_safe(resp)
 			message = await resp.json()
 			mid = int(message["id"])
 			for i, a in enumerate(message["attachments"]):

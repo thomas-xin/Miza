@@ -5543,6 +5543,11 @@ def getsize(fp):
 			fp.seek(p)
 	raise NotImplementedError(fp)
 
+async def raise_aiohttp_safe(resp: aiohttp.ClientResponse) -> aiohttp.ClientResponse:
+	if resp.status not in range(200, 400):
+		raise ConnectionError(resp.status, await resp.text())
+	return resp
+
 def update_headers(headers, **fields):
 	"Updates a dictionary of HTTP headers with new fields. Case-insensitive."
 	lowers = {k.lower(): k for k in headers}
