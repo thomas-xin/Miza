@@ -503,7 +503,10 @@ class UpdateExec(Database):
 					create_task(message.add_reaction("❗"))
 					result = await self.procFunc(message, proc, bot, term=f)
 					output = str(result)
-					await bot.respond_with(cdict(content=output, prefix="```\n", suffix="```"), message=message)
+					if len(output) <= 1992:
+						await bot.base_send(channel, f"```\n{output}\n```", reference=message)
+					else:
+						await bot.respond_with(cdict(content=output, prefix="```\n", suffix="```"), message=message)
 				except BaseException as ex:
 					tb = T(ex).get("original_traceback") or traceback.format_exc()
 					await send_with_react(channel, self.prepare_string(tb), reacts="❎", reference=message)

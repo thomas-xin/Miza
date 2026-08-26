@@ -6561,6 +6561,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					break
 		discord.abc.Messageable.history = history
 
+		self.base_send = base_send = discord.abc.Messageable.send
+		async def send(self, *args, **kwargs):
+			if args:
+				args = list(map(redact, args))
+			if kwargs.get("embeds"):
+				kwargs["embeds"] = [discord.Embed.from_dict(redact(e.to_dict())) for e in kwargs["embeds"]]
+			return await base_send(self, *args, **kwargs)
+		discord.abc.Messageable.send = send
+
 		def parse_message_reaction_add(self, data):
 			emoji = data["emoji"]
 			emoji_id = utils._get_as_snowflake(emoji, "id")

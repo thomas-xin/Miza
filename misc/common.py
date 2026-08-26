@@ -191,9 +191,9 @@ async def interaction_response(bot, message, content=None, embed=None, embeds=()
 	if getattr(message, "deferred", False):
 		return await interaction_post(bot, message, content=content, embed=embed, embeds=embeds, components=components, buttons=buttons, ephemeral=ephemeral)
 	if hasattr(embed, "to_dict"):
-		embed = embed.to_dict()
+		embed = redact(embed.to_dict())
 	if embed:
-		embeds = astype(embeds, list)
+		embeds = astype(redact(embeds), list)
 		embeds.append(embed)
 	if not getattr(message, "int_id", None):
 		message.int_id = message.id
@@ -207,7 +207,7 @@ async def interaction_response(bot, message, content=None, embed=None, embeds=()
 			type=4,
 			data=dict(
 				flags=ephemeral,
-				content=content,
+				content=redact(content),
 				embeds=embeds,
 				components=components or restructure_buttons(buttons),
 			),
@@ -228,9 +228,9 @@ async def interaction_response(bot, message, content=None, embed=None, embeds=()
 async def interaction_post(bot, message, content=None, embed=None, embeds=(), components=None, buttons=None, ephemeral=False):
 	"Uses the raw Discord HTTP API to post/send a deferred interaction message."
 	if hasattr(embed, "to_dict"):
-		embed = embed.to_dict()
+		embed = redact(embed.to_dict())
 	if embed:
-		embeds = astype(embeds, list)
+		embeds = astype(redact(embeds), list)
 		embeds.append(embed)
 	if not getattr(message, "int_id", None):
 		message.int_id = message.id
@@ -242,7 +242,7 @@ async def interaction_post(bot, message, content=None, embed=None, embeds=(), co
 		headers=bot.auth_headers,
 		data=json_dumps(dict(
 			flags=ephemeral,
-			content=content,
+			content=redact(content),
 			embeds=embeds,
 			components=components or restructure_buttons(buttons),
 		)),
@@ -265,9 +265,9 @@ async def interaction_post(bot, message, content=None, embed=None, embeds=(), co
 async def interaction_patch(bot, message, content=None, embed=None, embeds=(), attachments=None, components=None, buttons=None, ephemeral=False):
 	"Uses the raw Discord HTTP API to patch/edit an interaction message."
 	if hasattr(embed, "to_dict"):
-		embed = embed.to_dict()
+		embed = redact(embed.to_dict())
 	if embed:
-		embeds = astype(embeds, list)
+		embeds = astype(redact(embeds), list)
 		embeds.append(embed)
 	if not getattr(message, "int_id", None):
 		message.int_id = message.id
@@ -281,7 +281,7 @@ async def interaction_patch(bot, message, content=None, embed=None, embeds=(), a
 		f"webhooks/{bot.id}/{message.int_token}/messages/{mid}",
 		headers=bot.auth_headers,
 		data=json_dumps(dict(
-			content=content,
+			content=redact(content),
 			embeds=embeds,
 			**extra,
 		)),
@@ -451,6 +451,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 	guild = getattr(channel, "guild", None)
 	if guild and guild.me and not getattr(reference, "simulated", None) and not channel.permissions_for(guild.me).read_message_history:
 		reference = None
+	content = redact(content)
 	if getattr(reference, "slash", None):
 		ephemeral = ephemeral and 64
 		sem = emptyctx
@@ -468,14 +469,14 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 		if content:
 			data["data"]["content"] = content
 		if embeds:
-			data["data"]["embeds"] = [embed.to_dict() for embed in embeds]
+			data["data"]["embeds"] = [redact(embed.to_dict()) for embed in embeds]
 		if components:
 			data["data"]["components"] = components
 	else:
 		ephemeral = False
 		fields = {}
 		if embeds:
-			fields["embeds"] = [embed.to_dict() for embed in embeds]
+			fields["embeds"] = [redact(embed.to_dict()) for embed in embeds]
 		if tts:
 			fields["tts"] = tts
 		if not (not reference or getattr(reference, "noref", None) or getattr(bot.messages.get(verify_id(reference)), "deleted", None) or getattr(channel, "simulated", None)): 
@@ -533,7 +534,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 		elif getattr(channel, "send", None) and getattr(channel, "guild", None) and channel.guild.me and not channel.permissions_for(channel.guild.me).read_message_history:
 			fields = {}
 			if embeds:
-				fields["embeds"] = [embed.to_dict() for embed in embeds]
+				fields["embeds"] = [redact(embed.to_dict()) for embed in embeds]
 			if tts:
 				fields["tts"] = tts
 			return await channel.send(content, **fields)
@@ -546,7 +547,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 		if components:
 			data["components"] = components
 		if embeds:
-			data["embeds"] = [embed.to_dict() for embed in embeds]
+			data["embeds"] = [redact(embed.to_dict()) for embed in embeds]
 		if tts is not None:
 			data["tts"] = tts
 		if getattr(channel, "simulated", False):
@@ -663,10 +664,12 @@ async def manual_edit(message, **fields):
 	):
 		fields.pop("buttons", None)
 		return await message.edit(**fields)
+	if fields.get("content"):
+		fields["content"] = redact(fields["content"])
 	if fields.get("embeds") is not None:
-		fields["embeds"] = [embed.to_dict() for embed in fields["embeds"]]
+		fields["embeds"] = [redact(embed.to_dict()) for embed in fields["embeds"]]
 	if fields.get("embed") is not None:
-		fields.setdefault("embeds", []).insert(0, fields.pop("embed").to_dict())
+		fields.setdefault("embeds", []).insert(0, redact(fields.pop("embed").to_dict()))
 	if fields.get("buttons") is not None:
 		fields["components"] = restructure_buttons(fields.pop("buttons"))
 	if fields.get("files") is not None:
