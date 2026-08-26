@@ -3687,7 +3687,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					timeout = None
 				elif self.is_trusted(message.guild):
 					timeout *= 3
-				self.data.usage.add(f)
+				if "usage" in self.data:
+					self.data.usage.add(f)
 				try:
 					index = f.directions.index(reacode) if hasattr(f.directions, "index") else f.directions[reacode]
 				except (ValueError, AttributeError):
@@ -4563,7 +4564,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					message.__dict__.setdefault("inits", []).append(future)
 				except Exception:
 					pass
-			self.data.usage.add(command)
+			if "usage" in self.data:
+				self.data.usage.add(command)
 			# Add a callback to typing in the channel if the command takes too long
 			if slash or getattr(message, "slash", None):
 				create_task(delayed_callback(future, 1, self.defer_interaction, message, ephemeral=getattr(message, "ephemeral", False), exc=False))

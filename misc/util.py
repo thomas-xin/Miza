@@ -59,13 +59,13 @@ python = sys.executable
 
 with open("auth.json", "rb") as f:
 	AUTH: dict[str, str | list | dict] = cdict(eval(f.read(), dict(true=True, false=False, null=None)))
-AUTH_SECRETS: set[str] = set(v for k, v in AUTH.items() if k.rsplit("_", 1)[-1] in ("key", "secret", "token"))
+AUTH_SECRETS: list[str] = sorted(set(v for k, v in AUTH.items() if k.rsplit("_", 1)[-1] in ("key", "secret", "token")), key=len, reverse=True)
 AUTH_SECRET_RE = re.compile("|".join(map(re.escape, AUTH_SECRETS)))
 def reload_auth():
 	global AUTH_SECRET_RE
 	with open("auth.json", "rb") as f:
 		AUTH.update(eval(f.read(), dict(true=True, false=False, null=None)))
-	AUTH_SECRETS.update(v for k, v in AUTH.items() if k.rsplit("_", 1)[-1] in ("key", "secret", "token"))
+	AUTH_SECRETS[:] = sorted(set(v for k, v in AUTH.items() if k.rsplit("_", 1)[-1] in ("key", "secret", "token")), key=len, reverse=True)
 	AUTH_SECRET_RE = re.compile("|".join(map(re.escape, AUTH_SECRETS)))
 cachedir = AUTH.get("cache_path") or None
 if cachedir:

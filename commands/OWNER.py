@@ -1,5 +1,4 @@
 # Make linter shut up lol
-from packaging.utils import _
 if "common" not in globals():
 	import misc.common as common
 	from misc.common import *
