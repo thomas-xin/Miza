@@ -961,7 +961,7 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 					tcs[i] = resp
 				return json_dumpstr(resp)
 			choice = item.choices[0]
-			reason = getattr_chain(choice, "delta.reasoning", None) or getattr_chain(choice, "message.reasoning", None)
+			reason = getattr_chain(choice, "delta.reasoning", None) or getattr_chain(choice, "message.reasoning", None) or getattr(choice, "delta.reasoning_content", None) or getattr(choice, "message.reasoning_content", None)
 			if not reason and getattr_chain(choice, "delta.reasoning_details", None):
 				rdetails = [r.get("text", "") for r in choice.delta.reasoning_details if r["type"] == "reasoning.text"]
 				if rdetails and rdetails[0]:
@@ -1037,7 +1037,7 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 			delta = getattr(choice, "delta", None)
 			if not delta:
 				continue
-			for k in ("tool_calls", "content", "reasoning", "reasoning_details"):
+			for k in ("tool_calls", "content", "reasoning", "reasoning_content", "reasoning_details"):
 				if getattr(delta, k, None):
 					yield await self.pass_item(item)
 					break

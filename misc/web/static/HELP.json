@@ -3381,12 +3381,12 @@
 					"required": true
 				},
 				"top_text": {
-					"type": "word",
+					"type": "string",
 					"description": "The text to draw",
 					"example": "Hello World!"
 				},
 				"bottom_text": {
-					"type": "word",
+					"type": "string",
 					"description": "Bottom text to draw",
 					"example": "World!"
 				},

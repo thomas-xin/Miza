@@ -5562,6 +5562,8 @@ def getsize(fp):
 			return fp.seek(0, os.SEEK_END)
 		finally:
 			fp.seek(p)
+	if hasattr(fp, "fp"):
+		return getsize(fp.fp)
 	raise NotImplementedError(fp)
 
 async def raise_aiohttp_safe(resp: aiohttp.ClientResponse) -> aiohttp.ClientResponse:

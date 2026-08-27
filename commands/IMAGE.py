@@ -1070,12 +1070,12 @@ class Caption(Visual, Command):
 	description = "Renders text onto an image or animation, using an optional font."
 	schema = cdict(
 		top_text=cdict(
-			type="word",
+			type="string",
 			description="The text to draw",
 			example="Hello World!",
 		),
 		bottom_text=cdict(
-			type="word",
+			type="string",
 			description="Bottom text to draw",
 			example="World!",
 		),

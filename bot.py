@@ -3860,8 +3860,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				flags=flags,
 			)
 		oargs = tuple(args)
+		extra_args = []
 		if message and message.attachments:
-			args = [attachment_cache.preserve(a.url, mid=message.id) for a in message.attachments] + args
+			extra_args = [attachment_cache.preserve(a.url, mid=message.id) for a in message.attachments]
 		tz = None
 		parser = getattr(command, "parser", None)
 		if not parser:
@@ -4084,7 +4085,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					break
 		if not args:
 			for k, v in schema.items():
-				if k in kwargs or not v.get("required") and not v.get("autoresolve"):
+				if k in kwargs:
+					continue
+				if extra_args and v.type in ("url", "image", "visual", "video", "audio", "media"):
+					r = extra_args.pop(0)
+					kwargs[k] = [r] if v.get("multiple") else r
+					continue
+				if not v.get("required") and not v.get("autoresolve"):
 					continue
 				r = None
 				if v.type in ("url", "image", "visual", "video", "audio", "media"):
@@ -4140,6 +4147,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if v and v.get("description"):
 					raise ArgumentError(f"Argument `{k}` ({italics(v.description)}) is required.")
 				raise ArgumentError(f"Argument `{k}` (`{italics(v.type)}`) is required.")
+		if extra_args:
+			for k, v in schema.items():
+				if k in kwargs:
+					continue
+				kwargs[k] = extra_args.pop(0)
+				if not extra_args:
+					break
 		if append_lws:
 			k, j = append_lws
 			if j < len(ws):
@@ -5807,7 +5821,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if a.filename in ("message.txt", "message.md"):
 					b = await attachment_cache.download(a.url, m_id=message.id, read=False)
 					if message.content:
-						message.content += " "
+						message.content += "\n\n"
 					message.content += as_str(b)
 		await self.process_message(message, before=before)
 

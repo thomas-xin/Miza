@@ -83,7 +83,7 @@ async def force_completion(self, model, prompt=None, images=(), stream=True, max
 			if not r.choices or not (delta := r.choices[0].delta):
 				continue
 
-			reason = getattr(delta, "reasoning", None)
+			reason = getattr(delta, "reasoning", None) or getattr(delta, "reasoning_content", None)
 			if not reason and getattr(delta, "reasoning_details", None):
 				rdetails = [r.get("text", "") for r in delta.reasoning_details if r["type"] == "reasoning.text"]
 				if rdetails:
@@ -422,7 +422,7 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 			except Exception:
 				print_exc()
 				message = None
-			reason = getattr(message, "reasoning", None)
+			reason = getattr(message, "reasoning", None) or getattr(message, "reasoning_content", None)
 			if not reason and getattr(message, "reasoning_details", None):
 				rdetails = [r.get("text", "") for r in message.reasoning_details if r["type"] == "reasoning.text"]
 				if rdetails:
@@ -611,8 +611,8 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 						continue
 					finish_reason = chunk.choices[0].finish_reason or finish_reason
 					delta = chunk.choices[0].delta
-					if getattr(delta, "reasoning", None):
-						reason += delta.reasoning
+					if (r := getattr(delta, "reasoning", None) or getattr(message, "reasoning_content", None)):
+						reason += r
 					elif not reason and getattr(delta, "reasoning_details", None):
 						rdetails = [r.get("text", "") for r in delta.reasoning_details if r["type"] == "reasoning.text"]
 						if rdetails:

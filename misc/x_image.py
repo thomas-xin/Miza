@@ -541,16 +541,18 @@ def is_discord_emoji(url):
 	return discord_emoji.search(url)
 
 @functools.lru_cache(maxsize=256)
+def from_cached_image(url, nogif, maxframes, msize):
+	data = get_request(url)
+	if len(data) > 8589934592:
+		raise OverflowError("Max file size to load is 8GB.")
+	return image_from_bytes(data, nogif=nogif, maxframes=maxframes, orig=url, msize=msize)
 def get_image(url, out=None, nodel=False, nogif=False, maxframes=inf, msize=None):
 	if isinstance(url, Image.Image):
 		return url
 	out = out or url
 	if type(url) not in (bytes, bytearray, io.BytesIO):
 		if is_url(url):
-			data = get_request(url)
-			if len(data) > 8589934592:
-				raise OverflowError("Max file size to load is 8GB.")
-			image = image_from_bytes(data, nogif=nogif, maxframes=maxframes, orig=url, msize=msize)
+			image = from_cached_image(url, nogif, maxframes, msize)
 		else:
 			if os.path.getsize(url) > 8589934592:
 				raise OverflowError("Max file size to load is 8GB.")
