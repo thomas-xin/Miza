@@ -1269,6 +1269,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if channel is None:
 			raise LookupError("Message data not found.")
 		with suppress(TypeError):
+			if not getattr(channel, "guild", None) and not getattr(channel, "recipient", None):
+				channel = channel.id
 			int(channel)
 			channel = await self.fetch_channel(channel)
 		if fast:
