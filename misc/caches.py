@@ -491,10 +491,11 @@ class AttachmentCache(AutoCache):
 		if is_discord_attachment(url):
 			url = await self.obtain(url=url, m_id=m_id)
 		elif is_miza_attachment(url):
-			url = re.sub("^https?:\\/\\/(?:\\w+\\.)?mizabot.xyz\\/", f"https://{base}/", url)
-			if not input_headers:
-				input_headers = Request.header()
-			input_headers["User-Agent"] = f"DiscordBot (mizabot.xyz, 1.0.0)"
+			# url = re.sub("^https?:\\/\\/(?:\\w+\\.)?mizabot.xyz\\/", f"https://{base}/", url)
+			url = await self.obtain(url=url)
+			# if not input_headers:
+			# 	input_headers = Request.header()
+			# input_headers["User-Agent"] = f"DiscordBot (mizabot.xyz, 1.0.0)"
 		try:
 			headers = await _run_async(header_test, url, input_headers=input_headers)
 		except ConnectionError as ex:
@@ -590,15 +591,18 @@ class AttachmentCache(AutoCache):
 			filename += ".binx"
 		size = size or getsize(data)
 		assert size < 1073741824 * 16, f"File size {size} too large!"
-		if size <= self.max_size:
+		Ms = self.max_size
+		if getattr(channel, "guild", None):
+			Ms = channel.guild.filesize_limit
+		if size <= Ms:
 			return await self.create(data, filename=filename, channel=channel, editable=editable, minimise=minimise)
 		if not hasattr(data, "read"):
 			data = io.BytesIO(data)
 		chunks = [self.min_size]
 		remaining = size - self.min_size
 		while remaining > 0:
-			chunks.append(self.max_size)
-			remaining -= self.max_size
+			chunks.append(Ms)
+			remaining -= Ms
 		ac = self.attachment_count
 		self.sess = self.sess or aiohttp.ClientSession()
 		filename = ofn = filename or "c"

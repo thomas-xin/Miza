@@ -2328,7 +2328,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				embeds[0].description = lim_str(description, 4096)
 		return embeds
 
-	async def prepare_embeds(self, embeds, m_id=None, g_id=None, allow_from=None):
+	async def prepare_embeds(self, embeds, m_id=None, c_id=None, g_id=None, allow_from=None):
 		temp_proxied = {}
 		used_names = collections.Counter()
 
@@ -2345,20 +2345,56 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print("Prepared Reupload:", p)
 				fn = None
 				try:
-					fn = await attachment_cache.download(raw, m_id=m_id, filename=True)
 					if url2fn(raw) in IMAGE_FORMS:
-						fmt = "avif"
 						target = 4000000
+						fn = await attachment_cache.download(raw, m_id=m_id, filename=True)
+						if os.path.getsize(fn) > target:
+							fn = await self.optimise_image(fn, target, csize=16384, fmt="avif")
+					elif url2fn(raw) in VIDEO_FORMS:
+						target = 0
+						if g_id:
+							guild = await self.fetch_guild(g_id)
+							target = guild.filesize_limit
+						headers = await attachment_cache.scan_headers(raw, m_id=m_id, fc=True)
+						if float(headers.get("Content-Length", inf)) > target:
+							meta = await _run_async(audio_meta, raw)
+							duration = float(meta.get("duration", 60))
+							bitrate = floor(target / duration * 7.5)
+							ba = floor(min(float(meta.get("bitrate", 128000)), bitrate / 4))
+							bv = bitrate - ba
+							fn2 = temporary_file("mp4")
+							cmd = ["ffmpeg", "-hide_banner", "-v", "error", "-i", raw, "-c:v", "av1_nvenc", "-c:a", "libopus", "-b:v", str(bv), "-b:a", str(ba), "-vbr", "on", fn2]
+							print(cmd)
+							proc = await asyncio.create_subprocess_exec(*cmd, stdout=subprocess.DEVNULL)
+							try:
+								async with asyncio.timeout(3200):
+									await proc.wait()
+							except (T0, T1, T2):
+								with tracebacksuppressor:
+									force_kill(proc)
+								raise
+							assert os.path.exists(fn2) and os.path.getsize(fn2)
+							fn = fn2
+						else:
+							fn = await attachment_cache.download(raw, m_id=m_id, filename=True)
 					else:
-						fmt = "mp4"
-						target = 10000000
-					if os.path.getsize(fn) > target:
-						fn = await self.optimise_image(fn, target, csize=16384, fmt=fmt)
+						target = 0
+						if g_id:
+							guild = await self.fetch_guild(g_id)
+							target = guild.filesize_limit
+						fn = await attachment_cache.download(raw, m_id=m_id, filename=True)
+						if os.path.getsize(fn) > target:
+							if getsize(fn) > 1048576 * 50:
+								return p[-1]
+							channel = await self.fetch_channel(c_id) if c_id else None
+							url2 = await attachment_cache.create_dynamic(fn, filename=url2fn(raw), channel=channel)
+							self.proxied[p] = new = url2
+							return url2
 				except Exception as ex:
 					print(raw, repr(ex))
 					if not fn:
 						return p[-1]
-				if getsize(fn) > 10485760:
+				if getsize(fn) > 1048576 * 50:
 					return p[-1]
 				name = url2fn(raw)
 				fn2 = f"{name}-{used_names[name]}" if used_names[name] else name
@@ -2487,7 +2523,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			await self.edit_message(message, embeds=embeds)
 
 	async def send_and_finalise(self, channel, content=None, embeds=[]):
-		attachments = await self.prepare_embeds(embeds, g_id=channel.guild.id)
+		attachments = await self.prepare_embeds(embeds, c_id=channel.id, g_id=channel.guild.id)
 		m = await channel.send(content, embeds=embeds, files=attachments)
 		await self.finalise_embeds(m, embeds, attachments, g_id=channel.guild.id)
 		return m
