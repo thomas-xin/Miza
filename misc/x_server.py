@@ -579,6 +579,8 @@ class Server:
 					attachment_cache.remove_cached(cp.url())
 					return self.proxy_if(await_fut(attachment_cache.obtain(c_id, m_id, a_id, fn, priority=True)), force=force, download=download)
 				raise
+		except cp.HTTPRedirect:
+			raise
 		except Exception:
 			raise FileNotFoundError(*path)
 	unproxy._cp_config = {"response.stream": True}

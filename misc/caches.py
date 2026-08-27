@@ -492,6 +492,9 @@ class AttachmentCache(AutoCache):
 			url = await self.obtain(url=url, m_id=m_id)
 		elif is_miza_attachment(url):
 			url = re.sub("^https?:\\/\\/(?:\\w+\\.)?mizabot.xyz\\/", f"https://{base}/", url)
+			if not input_headers:
+				input_headers = Request.header()
+			input_headers["User-Agent"] = f"DiscordBot (mizabot.xyz, 1.0.0)"
 		try:
 			headers = await _run_async(header_test, url, input_headers=input_headers)
 		except ConnectionError as ex:
@@ -681,6 +684,8 @@ class AttachmentCache(AutoCache):
 
 audio_meta_cache = AutoCache(f"{CACHE_PATH}/audio_meta", stale=86400, timeout=86400 * 30)
 def _audio_meta(path, _timeout=12) -> dict:
+	if is_miza_attachment(path):
+		path = await_fut(attachment_cache.obtain(url=path))
 	command = (
 		"ffprobe",
 		"-v",
