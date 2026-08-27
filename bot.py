@@ -529,33 +529,21 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	slash_sem = Semaphore(5, 256, rate_limit=5)
 	@tracebacksuppressor
-	def create_command(self, data):
+	async def create_command(self, data):
 		with self.slash_sem:
-			attempts = 16
-			for i in range(attempts):
-				resp = reqs.next().post(
-					f"https://discord.com/api/{api}/applications/{self.id}/commands",
-					headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
-					data=json_dumps(data),
-					timeout=30,
-				)
-				if resp.status_code == 429 and i < attempts - 1:
-					time.sleep(2 ** (i + 4))
-					continue
-				resp.raise_for_status()
-				print("SLASH CREATE:", resp.text)
-				return
+			resp = await self.retrieve_api(
+				f"applications/{self.id}/commands",
+				method="POST",
+				data=json_dumps(data),
+			)
 
-	def update_slash_commands(self):
+	async def update_slash_commands(self):
 		print("Updating global slash commands...")
 		with tracebacksuppressor:
-			resp = reqs.next().get(
-				f"https://discord.com/api/{api}/applications/{self.id}/commands",
-				headers=dict(Authorization="Bot " + self.token),
-				timeout=30,
+			data = await self.retrieve_api(
+				f"applications/{self.id}/commands",
 			)
-			resp.raise_for_status()
-			commands = dict((int(c["id"]), c) for c in resp.json() if str(c.get("application_id")) == str(self.id))
+			commands = dict((int(c["id"]), c) for c in data if str(c.get("application_id")) == str(self.id))
 			if commands:
 				print(f"Successfully loaded {len(commands)} application command{'s' if len(commands) != 1 else ''}.")
 
@@ -597,7 +585,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							if not found:
 								print(f"creating new message command {command_data['name']}...")
 								print(command_data)
-								submit_thread(self.create_command, command_data)
+								create_task(self.create_command(command_data))
 					if T(command).get("usercmd"):
 						aliases = command.usercmd if type(command.usercmd) is tuple else (command.parse_name(),)
 						for name in aliases:
@@ -611,7 +599,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							if not found:
 								print(f"creating new user command {command_data['name']}...")
 								print(command_data)
-								submit_thread(self.create_command, command_data)
+								create_task(self.create_command(command_data))
 					if T(command).get("slash"):
 						aliases = command.slash if type(command.slash) is tuple else (command.parse_name(),)
 						for name in (full_prune(i) for i in aliases):
@@ -633,18 +621,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 										print(curr)
 										print(f"{curr['name']}'s slash command does not match, removing...")
 										with self.slash_sem:
-											attempts = 16
-											for j in range(attempts):
-												resp = reqs.next().delete(
-													f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}",
-													headers=dict(Authorization="Bot " + self.token),
-													timeout=30,
-												)
-												if resp.status_code == 429 and j < attempts - 1:
-													time.sleep(2 ** (j + 4))
-													continue
-												resp.raise_for_status()
-												break
+											await self.retrieve_api(
+												f"applications/{self.id}/commands/{curr['id']}",
+												method="DELETE",
+											)
 									else:
 										found = True
 									commands.pop(i, None)
@@ -652,19 +632,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							if not found:
 								print(f"creating new slash command {command_data['name']}...")
 								print(command_data)
-								submit_thread(self.create_command, command_data)
-		with self.slash_sem:
-			time.sleep(1)
+								create_task(self.create_command(command_data))
 		for curr in commands.values():
 			with tracebacksuppressor:
 				print(curr)
 				print(f"{curr['name']}'s application command does not exist, removing...")
-				resp = reqs.next().delete(
-					f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}",
-					headers=dict(Authorization="Bot " + self.token),
-					timeout=30,
-				)
-				resp.raise_for_status()
+				with self.slash_sem:
+					await self.retrieve_api(
+						f"applications/{self.id}/commands/{curr['id']}",
+						method="DELETE",
+					)
 
 	async def create_main_website(self, first=False):
 		if not first:
@@ -2349,11 +2326,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				embeds[0].description = lim_str(description, 4096)
 		return embeds
 
-	async def prepare_embeds(self, embeds, m_id=None, g_id=None):
+	async def prepare_embeds(self, embeds, m_id=None, g_id=None, allow_from=None):
 		temp_proxied = {}
 		used_names = collections.Counter()
 
-		async def reproxy(g_id, raw):
+		async def reproxy(g_id, raw, allow_same=True, in_embed=True):
 			p = (g_id, attachment_cache.preserve(raw).split("?", 1)[0])
 			try:
 				try:
@@ -2363,12 +2340,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			except KeyError:
 				url2 = None
 			if not url2:
-				print(p)
+				print("Prepared Reupload:", p)
 				fn = None
 				try:
 					fn = await attachment_cache.download(raw, m_id=m_id, filename=True)
-					if os.path.getsize(fn) > 4000000:
-						fn = await self.optimise_image(fn, 4000000, csize=16384, fmt="webp")
+					if url2fn(raw) in IMAGE_FORMS:
+						fmt = "avif"
+						target = 4000000
+					else:
+						fmt = "mp4"
+						target = 10000000
+					if os.path.getsize(fn) > target:
+						fn = await self.optimise_image(fn, target, csize=16384, fmt=fmt)
 				except Exception as ex:
 					print(raw, repr(ex))
 					if not fn:
@@ -2381,31 +2364,35 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				temp_proxied[p] = url2
 				attachments.append(CompatFile(fn, filename=fn2, source=raw))
 				used_names[name] += 1
+			elif allow_same:
+				cid, mid, aid, fn = expand_attachment(url2)
+				if mid == allow_from:
+					url2 = f"attachment://{fn}"
 			return url2
 
 		attachments = []
 		for e in embeds:
 			if e.image and e.image.url and is_discord_ephemeral(e.image.url):
 				raw = e.image.url
-				url2 = await reproxy(g_id, raw)
+				url2 = await reproxy(g_id, raw, allow_same=allow_from)
 				e.set_image(url=url2)
 			if e.thumbnail and e.thumbnail.url and is_discord_ephemeral(e.thumbnail.url):
 				raw = e.thumbnail.url
-				url2 = await reproxy(g_id, raw)
+				url2 = await reproxy(g_id, raw, allow_same=allow_from)
 				e.set_thumbnail(url=url2)
 			if e.author and e.author.icon_url and is_discord_ephemeral(e.author.icon_url):
 				raw = e.author.icon_url
-				url2 = await reproxy(g_id, raw)
+				url2 = await reproxy(g_id, raw, allow_same=allow_from)
 				e.set_author(name=e.author.name, url=e.author.url, icon_url=url2)
 			if e.footer and e.footer.icon_url and is_discord_ephemeral(e.footer.icon_url):
 				raw = e.footer.icon_url
-				url2 = await reproxy(g_id, raw)
+				url2 = await reproxy(g_id, raw, allow_same=allow_from)
 				e.set_footer(text=e.footer.text, icon_url=url2)
 
 			extra = find_braced_attachments(e.description)
 			for url in extra:
 				raw = url.strip("()")
-				url2 = await reproxy(g_id, raw)
+				url2 = await reproxy(g_id, raw, allow_same=None)
 				e.description = e.description.replace(raw, url2, 1)
 
 			for i, field in enumerate(e.fields):
@@ -2413,7 +2400,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				extra = find_braced_attachments(description)
 				for url in extra:
 					raw = url.strip("()")
-					url2 = await reproxy(g_id, raw)
+					url2 = await reproxy(g_id, raw, allow_same=None)
 					description = description.replace(raw, url2, 1)
 				e.set_field_at(i, name=field.name, value=description, inline=field.inline)
 
@@ -6848,7 +6835,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		print("Update loops initiated.")
 		futs = alist()
 		if commands:
-			futs.add(run_async(self.update_slash_commands))
+			futs.add(self.update_slash_commands())
 		futs.add(create_task(self.create_main_website(first=True)))
 		futs.add(self.audio_client_start)
 		await self.wait_until_ready()
@@ -8144,11 +8131,11 @@ async def desktop_identify(self):
 				'browser': 'Discord Client',
 				'device': 'Miza',
 				'referrer': '',
-				'referring_domain': ''
+				'referring_domain': '',
 			},
 			'compress': True,
 			'large_threshold': 250,
-			'v': 3
+			'v': 3,
 		}
 	}
 
@@ -8161,7 +8148,7 @@ async def desktop_identify(self):
 			'status': state._status,
 			'game': state._activity,
 			'since': 0,
-			'afk': False
+			'afk': False,
 		}
 
 	if state._intents is not None:

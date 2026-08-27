@@ -124,7 +124,7 @@ class Translate(Command):
 		messages = [
 			dict(
 				role="system",
-				content=f'Please translate the message below into {dst_language}, keeping formatting as accurate as possible. Avoid being overly formal, and do not add extra information to the text itself!',
+				content=f'Please translate the message below into {dst_language}, keeping formatting/tone as accurate as possible. Do not add extra information to the text itself!',
 			),
 			dict(
 				role="user",
@@ -135,6 +135,7 @@ class Translate(Command):
 		orig_pronunciation = None
 		async def google_translate():
 			nonlocal orig_pronunciation
+			print(input, dest)
 			try:
 				tr = await translator.translate(input, dest=dest)
 			except Exception:
@@ -177,7 +178,7 @@ class Translate(Command):
 			messages = [
 				dict(
 					role="system",
-					content=f'Below will be some text, followed by sample translation(s). Please rewrite into ONE {dst_language} translation, keeping formatting same as original source, but making as many accuracy improvements as possible. Avoid being overly formal, and do not add extra information to the text itself!',
+					content=f'Below will be some text, followed by sample translation(s). Please rewrite into ONE {dst_language} translation, keeping formatting/tone same as original source, but making as many accuracy improvements as possible. Do not add extra information to the text itself!',
 				),
 				dict(
 					role="user",
@@ -199,7 +200,7 @@ class Translate(Command):
 					model=m,
 					messages=messages,
 					temperature=0.01,
-					reasoning_effort="low",
+					reasoning_effort="medium",
 					max_completion_tokens=ai.contexts[m] - count * 3 // 2,
 					premium_context=premium,
 				)

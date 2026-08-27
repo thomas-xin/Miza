@@ -773,11 +773,11 @@ f_audio = {
 			"type": "object", "properties": {
 				"mode": {
 					"type": "string",
-					"enum": ["volume", "reverb", "pitch", "speed", "pan", "bassboost", "compressor", "chorus", "nightcore", "bitrate"],
+					"enum": ["volume", "reverb", "pitch", "speed", "pan", "bassboost", "compressor", "chorus", "bitrate"],
 				},
 				"value": {
 					"type": "number",
-					"description": "New value as percentage, eg. 300",
+					"description": "New value as percentage/cents, eg. 300",
 				},
 			},
 			"required": ["mode", "value"],

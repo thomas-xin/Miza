@@ -2628,9 +2628,9 @@ class UpdateStarboards(Database):
 							table[None].pop(next(iter(table[None])))
 			else:
 				try:
-					attachments = await bot.prepare_embeds(embeds, m_id=message.id, g_id=message.guild.id)
+					attachments = await bot.prepare_embeds(embeds, m_id=message.id, g_id=message.guild.id, allow_from=m.id)
 					if attachments:
-						m = await bot.edit_message(m, embeds=embeds, files=attachments)
+						m = await bot.edit_message(m, embeds=embeds, attachments=attachments)
 					await bot.finalise_embeds(m, embeds, attachments, g_id=message.guild.id, requires_edit=True)
 				except (discord.NotFound, discord.Forbidden):
 					print_exc()
@@ -2662,9 +2662,9 @@ class UpdateStarboards(Database):
 				channel = await bot.fetch_channel(table[react][1])
 				m = await bot.fetch_message(table[None][message.id], channel)
 				embeds = await bot.as_embeds(message, link=True, colour=True, reactions=True)
-				attachments = await bot.prepare_embeds(embeds, m_id=message.id, g_id=message.guild.id)
+				attachments = await bot.prepare_embeds(embeds, m_id=message.id, g_id=message.guild.id, allow_from=m.id)
 				if attachments:
-					m = await bot.edit_message(m, embeds=embeds, files=attachments)
+					m = await bot.edit_message(m, embeds=embeds, attachments=attachments)
 				await bot.finalise_embeds(m, embeds, attachments, g_id=message.guild.id, requires_edit=True)
 			except (discord.NotFound, discord.Forbidden):
 				print_exc()

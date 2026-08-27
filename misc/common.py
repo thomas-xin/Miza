@@ -1886,7 +1886,8 @@ class Command(Importable):
 
 	__hash__ = lambda self: hash(self.parse_name()) ^ hash(self.category)
 	__str__ = lambda self: f"Command <{self.parse_name()}>"
-	__call__ = lambda self, **void: None
+	def __call__(self, **void) -> None | str | bytes | tuple[str, bool] | dict | asyncio._CoroutineLike:
+		return
 
 	parse_name = lambda self: self.__name__.strip("_")
 	parse_description = lambda self: self.description.replace('⟨BOT⟩', self.bot.user.name).replace('⟨WEBSERVER⟩', self.bot.webserver)

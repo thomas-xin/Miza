@@ -389,7 +389,7 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 					if tc not in temp:
 						temp.append(tc)
 			toolscan = temp
-		if toolscan or modelist.instructive != modelist.casual:
+		if modelist.instructive != modelist.casual:
 			# users = 0
 			# toolcheck = []
 			# for m in reversed(snippet):
@@ -433,6 +433,8 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 						reason = str(rdetails[0])
 			if reason and (reason := reason.strip()):
 				reasoning.append(reason)
+		else:
+			cargs["tools"] = toolscan
 	reasoning_effort = "medium"
 	if message:
 		directly_answer = None
@@ -511,7 +513,7 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 	if label:
 		cargs["mode"] = label
 	decensor = not is_nsfw or allow_nsfw
-	tools = cargs.get("tools")
+	tools = [t for t in cargs.get("tools", ()) if t["function"]["name"] != "directly_anser"]
 	mode = cargs.get("mode", "casual")
 	if mode not in ("instructive", "casual", "nsfw"):
 		mode = "instructive"
