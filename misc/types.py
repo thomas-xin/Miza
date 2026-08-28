@@ -1373,6 +1373,15 @@ class PrettyJSONEncoder(json.JSONEncoder):
 			items = [f"{json_dumpstr(k)}: {self.encode(v, level=level + 1)}" for k, v in obj.items()]
 			# items.sort()
 			return "{\n" + next_indent + f",\n{next_indent}".join(item for item in items) + f"\n{curr_indent}" + "}"
+		elif getattr(obj, "to_dict", None):
+			return self.encode(obj.to_dict())
+		elif isinstance(obj, BaseException):
+			if obj.args:
+				obj = dict(error=obj.__class__.__name__, message=str(obj))
+			else:
+				obj = dict(error=obj.__class__.__name__)
+		elif isinstance(obj, type) and issubclass(obj, BaseException):
+			obj = dict(error=obj.__name__)
 		return json_dumpstr(obj)
 
 	def default(self, obj):

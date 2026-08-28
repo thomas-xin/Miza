@@ -4192,7 +4192,7 @@
 			"level": "0",
 			"rate_limit": "(10, 15)",
 			"example": [],
-			"timeout": "288",
+			"timeout": "96",
 			"schema": {
 				"voice": {
 					"type": "enum",

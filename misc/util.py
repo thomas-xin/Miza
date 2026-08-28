@@ -3897,7 +3897,7 @@ def choice(*args):
 			return next(it)
 	return random.choice(it)
 
-def shuffle(it) -> collections.abc.Iterable:
+def shuffle(it) -> collections.abc.MutableSequence:
 	"Shuffles an iterable, in-place if possible, returning it."
 	if type(it) is list:
 		random.shuffle(it)

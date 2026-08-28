@@ -1889,7 +1889,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		12: "nz-en",	# New Zealand
 	}
 	ddgs = ddgs.DDGS(timeout=120)
-	async def browse(self, argv, uid=0, timezone=None, region=None, timeout=60):
+	async def browse(self, argv, uid=0, timezone=None, region=None, n=3, timeout=60):
 		"Browses the internet for a search query or URL."
 		if not region:
 			if timezone is None:
@@ -1903,7 +1903,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				data = []
 				futs = []
 				backends = ["bing", "brave", "duckduckgo", "mojeek", "yandex", "yahoo"]
-				backends = shuffle(backends)[:3]
+				backends = shuffle(backends)[:n]
 				for backend in (backends):
 					fut = _run_async(
 						self.ddgs.text,
@@ -1924,7 +1924,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return "\n\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).strip()
 			if is_discord_attachment(argv) or is_miza_attachment(argv):
 				if url2ext(argv) in VISUAL_FORMS:
-					return "<data>"
+					return "[MEDIA OUT-OF-FOCUS]"
 			assert not is_local_url(argv), argv
 			result = await _run_async(
 				self.ddgs.extract,
@@ -4456,7 +4456,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				return validation.accepts[v]
 		return v
 
-	async def run_command(self, command, kwargs=None, message=None, argv=None, comment=None, slash=False, command_check=None, user=None, channel=None, guild=None, min_perm=None, respond=False, allow_recursion=True):
+	async def run_command(self, command, kwargs={}, message=None, argv=None, comment=None, slash=False, command_check=None, user=None, channel=None, guild=None, min_perm=None, respond=False, allow_recursion=True):
 		command_check = command_check or command.name[0].casefold()
 		user = user or (message.author if message else None)
 		soon_indicator = None

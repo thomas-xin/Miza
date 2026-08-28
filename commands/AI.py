@@ -383,7 +383,7 @@ class Ask(Command):
 		else:
 			name_repr = bot_name
 		personality = pdata.description.replace("{{user}}", _user.display_name).replace("{{char}}", name_repr)
-		personality += "\n\n[INFO] Usernames may be presented in the format `name={name}\\n` to bypass unicode constraints."
+		personality += "\n\n[INFO] Usernames may be presented in the read-only format `name={name}\\n` to bypass format constraints."
 		match pdata.history:
 			case "none":
 				personality += "\n[INFO] Conversation history currently disabled. Clarify if necessary."
@@ -399,7 +399,7 @@ class Ask(Command):
 		if emojis:
 			emojis = shuffle(emojis)[:25]
 			emojitexts = " ".join(sorted(f":{e.name}:" for e in emojis))
-			personality += f"\n[INFO] The current conversation takes place on Discord, where you have access to the following additional emojis. You may use these as desired, as an alternative to Unicode ones:\n{emojitexts}"
+			personality += f"\n[INFO] The current conversation takes place on Discord, where you have access to the following emojis. You may use these as alternatives to Unicode, but must not invent new ones not already here or in conversation.\n{emojitexts}"
 		tzinfo = self.bot.data.users.get_timezone(_user.id)
 		if tzinfo is None:
 			tzinfo = datetime.timezone.utc
@@ -484,8 +484,7 @@ class Ask(Command):
 		raise RuntimeError(temp)
 
 	async def ask_iterator(self, bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, premium, _model, nsfw, prefix, simulated):
-		function_message = None
-		tool_responses = []
+		extra_messages = []
 		props = cdict(name=bot_name)
 		response = cdict()
 		reasonings = []
@@ -510,11 +509,11 @@ class Ask(Command):
 		rsep = chr(invisicode.STRINGPREFIX)
 		loading = None
 		try:
-			ex = RuntimeError("Maximum inference attempts exceeded (model likely encountered an infinite loop).")
+			ex = RuntimeError("Maximum inference attempts (10) exceeded (model likely encountered an infinite loop).")
 			reasoning_sum = 0
 			reasoning_temp = 0
 			content = ""
-			for att in range(6):
+			for att in range(10):
 				text = ""
 				messagelist = [messages[k] for k in sorted(messages) if not reference or k != reference.id]
 				messagelist.insert(0, system_message)
@@ -522,9 +521,6 @@ class Ask(Command):
 					messagelist.append(reply_message)
 				if input_message:
 					messagelist.append(input_message)
-				if function_message:
-					messagelist.append(function_message)
-					messagelist.extend(tool_responses)
 				m = None
 				modelist = None
 				await bot.require_integrity(_message)
@@ -537,7 +533,7 @@ class Ask(Command):
 					begin = f"> Thinking{rsize}... {loading}\n{rsep}"
 					content = begin + content.split(rsep, 1)[-1]
 					yield "\r" + content
-				async for resp in bot.chat_completion(messagelist, model=model, max_tokens=16384, tools=TOOLS, user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
+				async for resp in bot.chat_completion(messagelist, extra_messages=extra_messages, model=model, max_tokens=24576, tools=ai.TOOLS, user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
 					if isinstance(resp, dict):
 						if resp.get("reasoning"):
 							reasonings.extend(resp["reasoning"])
@@ -551,7 +547,7 @@ class Ask(Command):
 							rsize = f" ({byte_scale(rtotal)}B)" if rtotal else ""
 							begin = f"> Thinking{rsize}... {loading}\n{rsep}"
 							content = begin + content.split(rsep, 1)[-1]
-							yield "\r" + content
+							yield "\r" + content.strip() + ("\n\n" * bool(content)) + text.strip()
 						if resp.get("cargs"):
 							props.cargs = resp["cargs"]
 						if resp.get("usage"):
@@ -574,161 +570,54 @@ class Ask(Command):
 							text = resp[1:]
 						else:
 							text += resp 
-					yield "\r" + content + ("\n\n" * bool(content)) + text
+					yield "\r" + content.strip() + ("\n\n" * bool(content)) + text.strip()
 				await bot.require_integrity(_message)
 				text = text.strip()
 				if not m:
 					m = cdict(content=text)
-				tc = getattr(m, "tool_calls", None) or ()
-				if tc:
-					tc = [cdict(id=t.id, type="function", function=cdict(t.function)) for t in tc]
-				if tc:
-					m.tool_calls = tc
-				for n, fc in enumerate(tuple(tc)):
-					if n >= 8:
-						break
-					name = fc.function.name
-					if function_message and fc.function in (t.function for t in function_message.tool_calls):
-						if tc:
-							tc.remove(fc)
-						continue
-					tid = fc.id
-					fc.id = tid
-					try:
-						kwargs = cdict(eval_json(fc.function.arguments))
-					except Exception:
-						print("Tool Call Error:", fc.function.arguments)
-						print_exc()
-						continue
-					kwargs.pop("description", None)
-					kwargs.pop("required", None)
-					call = None
-
-					async def rag(name, tid, fut):
-						nonlocal function_message
-						print(f"{name} query:", argv)
-						succ = False
-						if not function_message:
-							function_message = cdict(m)
-						else:
-							cids = {c.id for c in function_message.tool_calls}
-							for c in m.tool_calls:
-								if c.id not in cids:
-									function_message.tool_calls.append(c)
-						res = ""
-						try:
-							res = await fut
-							succ = res and (isinstance(res, (str, bytes)) or res.get("content"))
-						except Exception as ex:
-							print_exc()
-							res = repr(ex)
-						if succ:
-							temp = str(res) or "[RESPONSE EMPTY OR REDACTED]"
-							print(f"{name} result:", len(temp), lim_str(temp, 256))
-						if succ and isinstance(res, bytes):
-							data_url = await bot.to_data_url(res)
-							res = [cdict(type="image_url", image_url=cdict(url=data_url, detail="auto"))]
-							# # bytes indicates an image, use vision to describe it
-							# res = await bot.vision(url=res, premium_context=premium)
-						elif succ and isinstance(res, dict):
-							res = res.get("content", "")
-						elif succ:
-							c = tcount(res)
-							ra = 1 if premium.value < 2 else 1.5 if premium.value < 5 else 2
-							if c > round(4000 * ra):
-								res = await ai.summarise(res, max_length=round(19600 * ra), min_length=round(3200 * ra), best=2 if premium.value >= 2 else 1, prompt=prompt)
-								res = res.replace("\n", ". ").replace(": ", " -")
-							res = res.strip()
-						rs_msg = cdict(role="tool", name=name, content=res, tool_call_id=tid)
-						tool_responses.append(rs_msg)
-						return succ
-
-					succ = None
-					argv = None
-					if name == "browse":
-						argv = kwargs.get("query") or " ".join(kwargs.values())
-						if is_discord_attachment(argv) or is_miza_attachment(argv):
-							pass
-						else:
-							s = f'\n> Browsing "{argv}"...'
-							text += s
-							yield s
-							fut = bot.browse(argv, uid=_user.id)
-							succ = await rag(name, tid, fut)
-					elif name == "deno":
-						argv = kwargs.get("query") or " ".join(kwargs.values())
-						s = f'\n> Evaluating "{argv}"...'
-						text += s
-						yield s
-						args = ["deno", "eval"]
-						argv = argv.strip()
-						if ";" in argv.rstrip(";"):
-							start, end = argv.rstrip(";").rsplit(";", 1)
-							end = end.strip()
-							if not end.startswith("console.log"):
-								argv = start + f"; console.log({end});"
-						else:
-							args.append("-p")
-						args.append(argv)
-						print(args)
-						fut = check_output_async(args)
-						succ = await rag(name, tid, fut)
-					elif name == "wolfram_alpha":
-						argv = kwargs.get("query") or " ".join(kwargs.values())
-						s = f'\n> Solving "{argv}"...'
-						text += s
-						yield s
-						fut = process_image("wolframalpha", "$", [argv], cap="browse", timeout=60)
-						succ = await rag(name, tid, fut)
-					elif name == "reminder":
-						message = kwargs.get("message") or kwargs.get("content") or ""
-						argv = str(message) + " -t " + str(kwargs.time)
-						call = {"func": "remind", "message": message, "time": kwargs.time, "comment": text}
-					elif name == "play":
-						call = {"func": "play", "query": kwargs.query, "comment": text}
-					elif name == "audio":
-						call = {"func": kwargs.mode, "value": kwargs.value}
-					elif name == "audiostate":
-						if kwargs.mode == "quit":
-							call = {"func": "disconnect"}
-						elif kwargs.mode == "pause":
-							call = {"func": ("pause" if kwargs.value else "resume")}
-						elif kwargs.mode == "loop":
-							call = {"func": "loopqueue", "argv": int(kwargs.value)}
-						else:
-							call = {"func": kwargs.mode, "argv": int(kwargs.value)}
-					if not call:
-						continue
-					# print("Function Call:", call)
-					fname = call.pop("func")
-					u_perm = bot.get_perms(_user)
-					command_check = fname
-					loop = False
-					timeout = 240
-					command = bot.commands[fname][0]
-					fake_message = copy.copy(_message)
-					if getattr(command, "schema", None):
-						fake_message.content = f"{bot.get_prefix(_guild)}{fname} " + " ".join(('"' + v + '"' if " " in v else v) for v in map(str, kwargs.values()))
-					else:
-						fake_message.content = f"{bot.get_prefix(_guild)}{fname} {argv or ''}".rstrip()
-					fake_message.attachments = []
-					comment = (call.pop("comment", "") or "") + f"\n> Used `{fake_message.content}`"
-					if command.schema:
-						for k, v in command.schema.items():
-							if k not in call:
-								call[k] = v.get("default")
-					resp = await bot.run_command(command, call, message=fake_message, comment=comment, respond=False)
-					if resp:
-						# print("Intermediate:", resp)
-						if isinstance(resp, dict):
-							response.update(resp)
-						else:
-							response.content = resp
-						rtext = response.get("content", "")
-						text = ("\r" + rtext).strip()
-						tc = None
-				content += "\n\n" * bool(content) + text
-				if text and not tc:
+				tool_calls = getattr(m, "tool_calls", None) or ()
+				if tool_calls:
+					tool_calls = [cdict(id=t.id, type="function", function=cdict(t.function)) for t in tool_calls]
+					reasonings.append(pretty_json(tool_calls))
+					reasoning_sum = sum(len(r) + 3 for r in reasonings)
+					tool_gens = []
+					for tc in tuple(tool_calls):
+						gen = bot.tool_call(tc, uid=_user.id, effort="high" if len(tc) < 3 else "low", premium_context=premium)
+						tool_gens.append(gen)
+					infos = await gather(*(anext(gen) for gen in tool_gens), return_exceptions=True)
+					if infos:
+						for info in infos:
+							if type(info) is StopAsyncIteration:
+								continue
+							elif isinstance(info, BaseException):
+								content += "\n> *Malformed tool usage*"
+							else:
+								content += f"\n> {info}..."
+						yield "\r" + content.strip() + ("\n\n" * bool(content)) + text.strip()
+						resps = await gather(*(
+							as_fut(info) if isinstance(info, BaseException) else anext(gen)
+							for info, gen in zip(infos, tool_gens)
+						), max_concurrency=5, return_exceptions=True)
+						pairs = [(tc, resp) for tc, info, resp in zip(tool_calls, infos, resps) if resp and type(info) is not StopAsyncIteration]
+						tool_calls = [pair[0] for pair in pairs]
+						if pairs:
+							extra_messages.append(cdict(
+								role="assistant",
+								content=text,
+								tool_calls=tool_calls,
+							))
+							for pair in pairs:
+								extra_messages.append(cdict(
+									role="tool",
+									tool_call_id=pair[0].id,
+									name=pair[0].function.name,
+									content=pair[1],
+								))
+							reasonings.append(pretty_json([pair[1] for pair in pairs]))
+							reasoning_sum = sum(len(r) + 3 for r in reasonings)
+				if text:
+					content += "\n\n" * bool(content) + text
+				if text and not tool_calls:
 					raise StopIteration
 				await bot.require_integrity(_message)
 			else:
@@ -1310,9 +1199,9 @@ class TTS(Command):
 			else:
 				text = tail
 		text = re.sub(r"[\x00-\x1F\x7F]", " ", text)
-		text = re.sub("  +", " ", text)
-		text = re.sub("[\r\n\f]{2,}", "\n", text)
+		text = re.sub("[ \t]{2,}", "\t", text)
 		segments = split_across(text, lim=128, mode="tlen")
+		segments = [re.sub("[\r\n\f]{2,}", "\n", segment).strip() + "." for segment in segments]
 		print(len(text), len(segments), lim_str(text, 128))
 		engine, mode = voice.split("-", 1)
 		futs = []
@@ -1338,7 +1227,7 @@ class TTS(Command):
 					except openai.InternalServerError as ex:
 						if retry:
 							print(repr(ex))
-							return await tts_into(segment, "openai", "coral", False)
+							return await tts_into(segment, "openai", "nova", False)
 						print_exc()
 						return
 					c = tcount(segment)
@@ -1347,7 +1236,7 @@ class TTS(Command):
 					await resp.aclose()
 					input_args = ("-f", "s16le", "-ac", "1", "-ar", "24k")
 				case "openai":
-					fi = temporary_file(format)
+					fi = temporary_file("pcm")
 					_premium.require(2)
 					oai = get_oai(None, "openai")
 					model = "gpt-4o-mini-tts"
@@ -1357,7 +1246,7 @@ class TTS(Command):
 							voice=voice,
 							input=segment,
 							instructions="Gentle and soothing, but steady voice",
-							response_format=format,
+							response_format="pcm",
 							speed=1,
 						)
 					except openai.InternalServerError as ex:
@@ -1369,6 +1258,8 @@ class TTS(Command):
 					c = tcount(segment)
 					_premium.append(["openai", model, mpf("12.6") / 1000000 * c])
 					resp.write_to_file(fi)
+					await resp.aclose()
+					input_args = ("-f", "s16le", "-ac", "1", "-ar", "24k")
 				case "dectalk":
 					fi = temporary_file("wav")
 					args = [os.path.abspath("misc/dectalk/say"), "-w", fi, "-pre", f"[:name {voice}]", segment]

@@ -339,7 +339,7 @@ if not model_levels:
 		target="auto",
 	)] * 3))
 Bot.model_levels = model_levels
-async def chat_completion(self, messages, model="miza-1", system=None, max_tokens=256, temperature=0.8, tools=None, tool_router=None, user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
+async def chat_completion(self, messages, extra_messages=(), model="miza-2", system=None, max_tokens=256, temperature=0.8, tools=None, tool_router=None, user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
 	"OpenAI-compatible Chat Completion function. Autoselects model using a function call, then routes to tools and target model as required."
 	await require_predicate(predicate)
 	await ai.load_openrouter()
@@ -347,10 +347,6 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 	modlvl = ["miza-1", "miza-2", "miza-3"].index(model.rsplit("/", 1)[-1])
 	self.model_levels = dict(enumerate(map(cdict, AUTH.get("model_levels", []))))
 	modelist = self.model_levels[modlvl]
-	messages = [cdict(m) for m in messages]
-	if system:
-		messages.insert(0, cdict(role="system", content=system))
-	prompt = [m.content for m in messages if m.get("role") == "user"][-1]
 	if modlvl >= 2:
 		maxlim = 196608
 		minlim = 2400
@@ -371,16 +367,24 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 		if r == "assistant":
 			return r
 		return "user"
+	if not props:
+		props = {}
+	cargs = props.get("cargs") or {}
+	if cargs and cargs.get("cut_messages"):
+		messages = cargs["cut_messages"]
+		print("Short-circuited:", len(messages), "messages")
+	messages.extend(extra_messages)
+	messages = [cdict(m) for m in messages]
+	if system:
+		messages.insert(0, cdict(role="system", content=system))
+	prompt = [m.content for m in messages if m.get("role") == "user"][-1]
 	raws = [cdict(role=force_ua(m.get("role")), content=m.content) if i else m for i, m in enumerate(messages)]
 	snippet = await ai.cut_to(raws, snip, snip, best=False, premium_context=premium_context, model=modelist.summary)
 	sniplen = count_to(snippet)
 	text = ""
 	ustr = str(hash(str(user) or self.user.name) & 4294967295)
 	cid = hex(ts_us()).removeprefix("0x") + "-Miza"
-	if not props:
-		props = {}
-	assistant_name = props.get("name")
-	cargs = props.get("cargs") or {}
+	assistant_name = props.get("name") or "assistant"
 	is_nsfw = cargs.get("nsfw")
 	message = None
 	mod = None
@@ -520,7 +524,7 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 	if label:
 		cargs["mode"] = label
 	decensor = not is_nsfw or allow_nsfw
-	tools = [t for t in cargs.get("tools", ()) if t["function"]["name"] != "directly_anser"]
+	tools = [t for t in cargs.get("tools") or () if t["function"]["name"] != "directly_anser"]
 	mode = cargs.get("mode", "casual")
 	if mode not in ("instructive", "casual", "nsfw"):
 		mode = "instructive"
@@ -558,29 +562,30 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 		ctx = ai.contexts.get(assistant, 4096)
 		passable = not modelist.target or assistant == modelist.target or modelist.target == "auto" or attempts >= mA - 1
 		if not passable:
-			temp = snippet
+			cut_messages = snippet
 			tlen = sniplen
 		elif length >= ctx * 2 / 3:
 			if tmpcut:
-				temp = tmpcut
+				cut_messages = tmpcut
 				tlen = tmplen
 			else:
-				temp = tmpcut = await ai.cut_to(messages, 65536, ctx // 3, best=True, premium_context=premium_context, model=modelist.summary)
+				cut_messages = tmpcut = await ai.cut_to(messages, 65536, ctx // 3, best=True, premium_context=premium_context, model=modelist.summary)
 				tmplen = count_to(tmpcut)
 				tlen = tmplen = ceil(tmplen * 1.1) + 4 * len(tmpcut)
 		else:
-			temp = messages
+			cut_messages = messages
 			tlen = length
 		ml = min(max(256, min(8192, ctx - tlen)), max_tokens)
 		data = dict(
 			model=assistant,
 			vision_model=modelist.vision,
-			messages=temp,
+			messages=cut_messages,
 			assistant_name=assistant_name,
 			temperature=tmp,
 			max_tokens=ml,
 			user=ustr,
 		)
+		cargs["cut_messages"] = cut_messages
 		if tools and assistant in ai.is_function:
 			data["tools"] = tools
 			if text:
@@ -618,7 +623,7 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 						continue
 					finish_reason = chunk.choices[0].finish_reason or finish_reason
 					delta = chunk.choices[0].delta
-					if (r := getattr(delta, "reasoning", None) or getattr(message, "reasoning_content", None)):
+					if (r := (getattr(delta, "reasoning", None) or getattr(delta, "reasoning_content", None))):
 						reason += r
 					elif not reason and getattr(delta, "reasoning_details", None):
 						rdetails = [r.get("text", "") for r in delta.reasoning_details if r["type"] == "reasoning.text"]
@@ -677,7 +682,9 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 							result.choices[0].delta.content = text
 							result.choices[0].delta.name = naming.split("=", 1)[-1].rstrip()
 						if passable:
-							yield result
+							result2 = cdict(result)
+							result2.choices = copy.deepcopy(result.choices)
+							yield result2
 						written = True
 					elif written and message.tool_calls:
 						if passable:
@@ -763,28 +770,11 @@ async def chat_completion(self, messages, model="miza-1", system=None, max_token
 			result.choices[0].delta.content = "\r" + text
 			yield result
 			return
-		if refusal or insufficient:
-			if attempts < 1 and mA > 2:
-				mode = "instructive" if mode == "casual" else "backup"
-			else:
-				mode = "backup"
-			text = "\r"
+		if attempts < 1 and mA > 2:
+			mode = "instructive" if mode == "casual" else "backup"
 		else:
-			mode = "target"
-			if text:
-				content = f"### Instruction:\nAbove is a sample response from another automated assistant. Please rewrite the message, ensuring to better stay in character as {assistant_name}. Remember to use the same language the user last spoke in, unless directed otherwise!\n\n### Response:"
-				if draft:
-					draft.content = text
-					monologue.content = content
-				else:
-					draft = cdict(role="assistant", content=text)
-					messages.append(draft)
-					monologue = cdict(role="user", content=content)
-					messages.append(monologue)
-				tmpcut = None
-				length = count_to(messages)
-				length = ceil(length * 1.1) + 4 * len(messages)
-			text = "\r"
+			mode = "backup"
+		text = "\r"
 	raise ex or RuntimeError("Maximum inference attempts exceeded (model likely encountered an infinite loop).")
 Bot.chat_completion = chat_completion
 
@@ -859,5 +849,75 @@ async def ocr(self, url):
 		)
 	return s
 Bot.ocr = ocr
+
+def view(text):
+	return json_dumpstr(lim_str(text.split("\n", 1)[0], 32, mode="left"))
+async def tool_call(self, call, uid, effort="high", premium_context=None):
+	func = call.function
+	kwargs = cdict(eval_json(func.arguments))
+
+	match func.name:
+		case "browse":
+			query = kwargs.get("query") or " ".join(kwargs.values())
+			if is_discord_attachment(query) or is_miza_attachment(query):
+				pass
+			else:
+				yield f'Browsing {view(query)}'
+				resp = await self.browse(query, uid=uid, n=3 if effort == "high" else 1)
+				yield await ai.summarise(resp, prompt=query, premium_context=premium_context)
+		case "deno":
+			query = kwargs.get("query") or " ".join(kwargs.values())
+			yield f'Evaluating {view(query)}'
+			args = ["deno", "eval"]
+			argv = query.strip()
+			if ";" in argv.rstrip(";"):
+				start, end = argv.rstrip(";").rsplit(";", 1)
+				end = end.strip()
+				if not end.startswith("console.log"):
+					argv = start + f"; console.log({end});"
+			else:
+				args.append("-p")
+			args.append(argv)
+			print(args)
+			yield await check_output_async(args)
+		case "reminder":
+			message = kwargs.get("message") or kwargs.get("content") or ""
+			yield f'Reminding {view(message)}'
+			resp = await self.run_command(
+				self.commands.remind[0],
+				dict(message=message, time=kwargs.get("time", "")),
+			)
+			yield pretty_json(resp)
+		case "play":
+			query = kwargs.get("query") or " ".join(kwargs.values())
+			yield f'Playing {view(query)}'
+			resp = await self.run_command(
+				self.commands.remind[0],
+				dict(query=query),
+			)
+			yield pretty_json(resp)
+		case "audio":
+			yield f'Adjusting {kwargs.mode} to {kwargs.value}'
+			resp = await self.run_command(
+				self.commands.audiosettings[0],
+				dict(mode=kwargs.mode, value=kwargs.get("value")),
+			)
+			yield pretty_json(resp)
+		case "astate":
+			yield f'Toggling {kwargs.mode}'
+			resp = await self.run_command(
+				self.commands.audiostate[0],
+				dict(mode=kwargs.mode, value=kwargs.get("value")),
+			)
+			yield pretty_json(resp)
+		case "askip":
+			entries = kwargs.get("entries") or " ".join(kwargs.values())
+			yield f'Skipping {view(entries)}'
+			resp = await self.run_command(
+				self.commands.skip[0],
+				dict(slices=entries),
+			)
+			yield pretty_json(resp)
+Bot.tool_call = tool_call
 
 print("Loaded global_ai.py injection")

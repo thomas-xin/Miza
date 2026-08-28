@@ -519,6 +519,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 			exc = api_blocked[(sapi, model)]
 			continue
 		kwa = kwargs.copy()
+		kwa["stream"] = bool(kwargs.get("stream"))
 		body = cdict(kwargs.get("extra_body") or {})
 		if model_name(orig_model) in is_reasoning or isinstance(api, ExtendedOpenAI) and "reasoning" in api.capabilities:
 			mt = kwa.pop("max_tokens", 0) or 0
@@ -687,7 +688,7 @@ async def llm(func, *args, api=None, timeout=120, premium_context=None, require_
 f_browse = {
 	"type": "function", "function": {
 		"name": "browse",
-		"description": "Searches internet browser, or visits given website URL. Use to validate facts and up-to-date information. Note: Avoid using for media links from the user, as they will be loaded automatically by `directly_answer`",
+		"description": "Searches internet browser, or visits given website URL. Use to validate facts and up-to-date information. You may follow links from search results if necessary",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {
@@ -768,7 +769,7 @@ f_play = {
 f_audio = {
 	"type": "function", "function": {
 		"name": "audio",
-		"description": "Adjusts audio settings for current music player.",
+		"description": "Gets or adjusts audio settings for current music player.",
 		"parameters": {
 			"type": "object", "properties": {
 				"mode": {
@@ -780,7 +781,7 @@ f_audio = {
 					"description": "New value as percentage/cents, eg. 300",
 				},
 			},
-			"required": ["mode", "value"],
+			"required": ["mode"],
 }}}
 f_astate = {
 	"type": "function", "function": {
@@ -796,7 +797,7 @@ f_astate = {
 					"type": "boolean",
 				},
 			},
-			"required": ["mode", "value"],
+			"required": ["mode"],
 }}}
 f_askip = {
 	"type": "function", "function": {
@@ -804,12 +805,12 @@ f_askip = {
 		"description": "Skips music player songs.",
 		"parameters": {
 			"type": "object", "properties": {
-				"range": {
+				"entries": {
 					"type": "boolean",
 					"description": "Python indexing syntax, eg. 0 or 1:6",
 				},
 			},
-			"required": ["range"],
+			"required": ["entries"],
 }}}
 f_default = {
 	"type": "function", "function": {
@@ -834,12 +835,10 @@ f_default = {
 TOOLS = {
 	"knowledge_internet": [
 		f_browse,
-		# f_wolfram_alpha,
 		f_deno,
 	],
 	"calculator": [
 		f_browse,
-		# f_wolfram_alpha,
 		f_deno,
 	],
 	"calendar": [
