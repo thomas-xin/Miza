@@ -1007,6 +1007,8 @@ class Instruct(Command):
 		kwargs = {}
 		if api:
 			key = model = None
+			is_completion = api.endswith("#")
+			api = api.rstrip("#")
 			spl = api.split("##", 1)
 			if len(spl) > 1:
 				api, model = spl
@@ -1027,6 +1029,8 @@ class Instruct(Command):
 				model = models[0]
 			key = key or "x"
 			oai = openai.AsyncOpenAI(api_key=key, base_url=api)
+			if is_completion:
+				oai.completion = True
 			kwargs["api"] = oai
 		kwargs["max_tokens"] = max_tokens
 		kwargs["reasoning_effort"] = reasoning_effort
@@ -1261,7 +1265,10 @@ class TTS(Command):
 		text=cdict(
 			type="string",
 			description="The text to render",
-			required=True,
+		),
+		url=cdict(
+			type="url",
+			description="Optional text file input",
 		),
 		format=cdict(
 			type="enum",
@@ -1279,10 +1286,11 @@ class TTS(Command):
 		),
 	)
 	rate_limit = (10, 15)
+	_timeout_ = 4
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, bot, _guild, _channel, _user, _perm, _premium, voice, text, format, autoplay, **void):
+	async def __call__(self, bot, _guild, _channel, _user, _perm, _premium, voice, text, url, format, autoplay, **void):
 		if autoplay:
 			assert format == "opus", "Only opus format can be played in voice."
 			assert bot.audio and "voice" in bot.get_enabled(_channel), "Voice commands must be enabled for autoplay."
@@ -1290,54 +1298,110 @@ class TTS(Command):
 			if _perm < 1 and not getattr(_user, "voice", None) and {m.id for m in vc_.members}.difference([bot.id]):
 				raise self.perm_error(_perm, 1, f"to remotely operate audio player for {_guild} without joining voice")
 			vc_fut = create_task(bot.audio.asubmit(f"AP.join({vc_.id},{_channel.id},{_user.id})"))
-		text = await bot.superclean_content(text)
+		if text:
+			text = await bot.superclean_content(text)
+		if not text and not url:
+			raise ArgumentError("Either `text` or `url` must be supplied.")
+		if url:
+			tail = await attachment_cache.download(url, read=False)
+			tail = as_str(tail)
+			if text:
+				text += "\n\n\n" + tail
+			else:
+				text = tail
+		text = re.sub(r"[\x00-\x1F\x7F]", " ", text)
+		text = re.sub("  +", " ", text)
+		text = re.sub("[\r\n\f]{2,}", "\n", text)
+		segments = split_across(text, lim=128, mode="tlen")
+		print(len(text), len(segments), lim_str(text, 128))
 		engine, mode = voice.split("-", 1)
-		fi = temporary_file()
-		desc = None
+		futs = []
 		input_args = ()
-		match engine:
-			case "google":
-				_premium.require(2)
-				oai = get_oai(None, "openrouter")
-				model = "google/gemini-3.1-flash-tts-preview"
-				resp = await oai.audio.speech.create(
-					model=model,
-					voice=mode,
-					input=text,
-					response_format="pcm",
-					speed=1,
-				)
-				print(resp)
-				c = tcount(text)
-				_premium.append(["openai", model, mpf("21") / 1000000 * c])
-				desc = _premium.apply()
-				resp.write_to_file(fi)
-				input_args = ("-f", "s16le", "-ac", "1", "-ar", "24k")
-			case "openai":
-				_premium.require(2)
-				oai = get_oai(None, "openai")
-				model = "gpt-4o-mini-tts"
-				resp = await oai.audio.speech.create(
-					model=model,
-					voice=mode,
-					input=text,
-					instructions="Gentle and soothing, but steady voice",
-					response_format=format,
-					speed=1,
-				)
-				c = tcount(text)
-				_premium.append(["openai", model, mpf("12.6") / 1000000 * c])
-				desc = _premium.apply()
-				resp.write_to_file(fi)
-			case "dectalk":
-				args = ["say", "-w", fi, "-pre", f"[:name {mode}]", text]
-				print(args)
-				await _run_async(subprocess.run, args, cwd="misc/dectalk", stdout=subprocess.DEVNULL, shell=True)
-			case _:
-				raise NotImplementedError(engine)
-		assert os.path.exists(fi), "No output was captured!"
+		desc = None
+
+		async def tts_into(segment, engine, voice, retry=True):
+			nonlocal input_args
+			match engine:
+				case "google":
+					fi = temporary_file("pcm")
+					_premium.require(2)
+					oai = get_oai(None, "openrouter")
+					model = "google/gemini-3.1-flash-tts-preview"
+					try:
+						resp = await oai.audio.speech.create(
+							model=model,
+							voice=voice,
+							input=segment,
+							response_format="pcm",
+							speed=1,
+						)
+					except openai.InternalServerError as ex:
+						if retry:
+							print(repr(ex))
+							return await tts_into(segment, "openai", "coral", False)
+						print_exc()
+						return
+					c = tcount(segment)
+					_premium.append(["openai", model, mpf("21") / 1000000 * c])
+					resp.write_to_file(fi)
+					await resp.aclose()
+					input_args = ("-f", "s16le", "-ac", "1", "-ar", "24k")
+				case "openai":
+					fi = temporary_file(format)
+					_premium.require(2)
+					oai = get_oai(None, "openai")
+					model = "gpt-4o-mini-tts"
+					try:
+						resp = await oai.audio.speech.create(
+							model=model,
+							voice=voice,
+							input=segment,
+							instructions="Gentle and soothing, but steady voice",
+							response_format=format,
+							speed=1,
+						)
+					except openai.InternalServerError as ex:
+						if retry:
+							print(repr(ex))
+							return await tts_into(segment, "google", "zephyr", False)
+						print_exc()
+						return
+					c = tcount(segment)
+					_premium.append(["openai", model, mpf("12.6") / 1000000 * c])
+					resp.write_to_file(fi)
+				case "dectalk":
+					fi = temporary_file("wav")
+					args = [os.path.abspath("misc/dectalk/say"), "-w", fi, "-pre", f"[:name {voice}]", segment]
+					print(args)
+					await _run_async(subprocess.run, args, cwd="misc/dectalk", stdout=subprocess.DEVNULL)
+				case _:
+					raise NotImplementedError(engine)
+			if os.path.exists(fi):
+				return fi
+
+		for segment in segments:
+			futs.append(tts_into(segment, engine, mode))
+		files = []
+		for fi in await gather(*futs):
+			if not fi:
+				continue
+			files.append(fi)
+		desc = _premium.apply()
+		assert files, "No output was captured!"
+		if input_args:
+			concat = temporary_file("pcm")
+			with open(concat, "wb") as f:
+				for fi in files:
+					with open(fi, "rb") as g:
+						f.write(g.read())
+		else:
+			concat = temporary_file("txt")
+			with open(concat, "w") as f:
+				for fi in files:
+					f.write(f"file '{fi}'\n")
+			input_args = ("-safe", "0", "-f", "concat")
 		fo = temporary_file(format)
-		args = ["ffmpeg", "-v", "error", "-hide_banner", "-vn", *input_args, "-i", fi, "-af", "volume=2", "-b:a", "128k", "-vbr", "on", fo]
+		args = ["ffmpeg", "-v", "error", "-hide_banner", "-vn", *input_args, "-i", concat, "-af", "volume=2", "-b:a", "96k", "-vbr", "on", fo]
 		print(args)
 		proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
 		try:

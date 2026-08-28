@@ -175,7 +175,7 @@ def pipe_fut(src, dest):
 
 async def _gather(*futs, return_exceptions=False, max_concurrency=None):
 	outs = []
-	out_futs = deque()
+	out_futs: deque[asyncio.Future] = deque()
 	for fut in futs:
 		while max_concurrency and len(out_futs) >= max_concurrency:
 			fut2 = out_futs.popleft()
@@ -183,6 +183,9 @@ async def _gather(*futs, return_exceptions=False, max_concurrency=None):
 				res = await fut2
 			except BaseException as ex:
 				if not return_exceptions:
+					for fut in out_futs:
+						if not fut.done():
+							fut.cancel(repr(ex))
 					raise
 				outs.append(ex)
 			else:

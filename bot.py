@@ -4076,6 +4076,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						break
 					continue
 		args.pops(pops)
+		pops.clear()
 		if args:
 			for k, v in schema.items():
 				if k in kwargs:
@@ -4147,6 +4148,26 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if v and v.get("description"):
 					raise ArgumentError(f"Argument `{k}` ({italics(v.description)}) is required.")
 				raise ArgumentError(f"Argument `{k}` (`{italics(v.type)}`) is required.")
+		for i, a in enumerate(extra_args):
+			for k, v in schema.items():
+				if k in kwargs and not v.get("multiple"):
+					if v.type in ("word", "text", "string"):
+						if a in oargs:
+							j = oargs.index(a, oj)
+							oj = j
+							kwargs[k] = (kwargs.get(k) or "") + ws[j] + a
+							append_lws = (k, j + 1)
+							pops.append(i)
+						else:
+							kwargs[k] = (kwargs.get(k) or "") + " " + a
+							pops.append(i)
+						break
+					continue
+				if v.type in ("string", "text", "word", "guild"):
+					pops.append(i)
+					kwargs[k] = [a] if v.get("multiple") else a
+		extra_args = alist(extra_args)
+		extra_args.pops(pops)
 		if extra_args:
 			for k, v in schema.items():
 				if k in kwargs:

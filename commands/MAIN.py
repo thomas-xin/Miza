@@ -786,6 +786,7 @@ class Info(Command):
 
 
 class Top(Command):
+	server_only = True
 	name = ["Ranking", "Rankings"]
 	description = "Ranks the users in the current server by total messages sent"
 	schema = cdict(

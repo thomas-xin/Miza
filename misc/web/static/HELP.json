@@ -4192,7 +4192,7 @@
 			"level": "0",
 			"rate_limit": "(10, 15)",
 			"example": [],
-			"timeout": "24",
+			"timeout": "288",
 			"schema": {
 				"voice": {
 					"type": "enum",
@@ -4205,8 +4205,11 @@
 				},
 				"text": {
 					"type": "string",
-					"description": "The text to render",
-					"required": true
+					"description": "The text to render"
+				},
+				"url": {
+					"type": "url",
+					"description": "Optional text file input"
 				},
 				"format": {
 					"type": "enum",
@@ -4223,7 +4226,7 @@
 					"excludes": ["format"]
 				}
 			},
-			"ordered_args": ["voice", "text", "format", "autoplay"]
+			"ordered_args": ["voice", "text", "url", "format", "autoplay"]
 		}
 	},
 	"NSFW": {

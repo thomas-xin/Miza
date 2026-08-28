@@ -1274,7 +1274,7 @@ class Browse(Pagination, Interactable, Command):
 		bot = self.bot
 
 		ss = True if int(mode) == 0 else False
-		urls = await bot.follow_url(query, ytd=False)
+		urls = await bot.follow_url(query)
 		argv = urls[0] if urls else query
 		s = await bot.browse(argv, uid=uid)
 		if isinstance(s, bytes):

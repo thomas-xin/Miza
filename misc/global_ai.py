@@ -53,8 +53,15 @@ async def force_completion(self, model, prompt=None, images=(), stream=True, max
 			messages[-1].content = [cdict(type="text", text=messages[-1].content)]
 		messages[-1].content.extend(cdict(type="image_url", image_url=cdict(url=im)) for im in images)
 		messages, _vision_model = await self.caption_into(messages, model=model, backup_model=None, premium_context=kwargs.get("premium_context", []))
-	if model in ai.is_completion:
-		prompt = "\n\n\n".join(m["content"][0].text for m in messages if m.content and m.content[0].get("type") == "text")
+	if model in ai.is_completion or kwargs.get("api") and getattr(kwargs["api"], "completion", False):
+		prompt = []
+		for m in messages:
+			if m.content:
+				if isinstance(m.content, list_like) and m.content[0].get("type") == "text":
+					prompt.append(m.content[0].text)
+				elif isinstance(m.content, str):
+					prompt.append(m.content)
+		prompt = "\n\n\n".join(prompt)
 		count = tcount(prompt)
 		max_tokens = min(max_tokens, ctx - count * 3 // 2 - 64)
 		if "max_completion_tokens" not in kwargs:
