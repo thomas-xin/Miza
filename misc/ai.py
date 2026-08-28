@@ -724,10 +724,10 @@ f_deno = {
 			},
 			"required": ["query"],
 }}}
-f_myinfo = {
+f_userinfo = {
 	"type": "function", "function": {
-		"name": "myinfo",
-		"description": "Retrieves basic information about yourself and your creators/owners (default) or another user and their profile. Only needs to be used once!",
+		"name": "userinfo",
+		"description": "Retrieves basic information about a user.",
 		"parameters": {
 			"type": "object", "properties": {
 				"user": {
@@ -833,19 +833,16 @@ f_default = {
 }}}
 
 TOOLS = {
-	"knowledge_internet": [
+	"default": [
 		f_browse,
 		f_deno,
-	],
-	"calculator": [
-		f_browse,
-		f_deno,
-	],
-	"calendar": [
 		f_reminder,
 	],
-	"audio_music": [
+	"server_only": [
 		f_play,
+		f_userinfo,
+	],
+	"voice_only": [
 		f_audio,
 		f_astate,
 		f_askip,

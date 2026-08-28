@@ -1901,26 +1901,27 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		async def retrieval(argv, region="wt-wt"):
 			if not is_url(argv):
 				data = []
-				futs = []
-				backends = ["bing", "brave", "duckduckgo", "mojeek", "yandex", "yahoo"]
-				backends = shuffle(backends)[:n]
-				for backend in (backends):
-					fut = _run_async(
-						self.ddgs.text,
-						argv,
-						safesearch="off",
-						region=region,
-						max_results=10,
-						backend=backend,
-						timeout=timeout,
-					)
-					futs.append(fut)
-				results = await gather(*futs, return_exceptions=True)
-				for res in results:
-					if isinstance(res, list):
-						data += res
-					else:
-						print(repr(res))
+				backends = shuffle(["bing", "brave", "duckduckgo", "mojeek", "yandex", "yahoo"])
+				while backends and not data:
+					futs = []
+					for backend in backends[:n]:
+						fut = _run_async(
+							self.ddgs.text,
+							argv,
+							safesearch="off",
+							region=region,
+							max_results=10,
+							backend=backend,
+							timeout=timeout,
+						)
+						futs.append(fut)
+					backends = backends[n:]
+					results = await gather(*futs, return_exceptions=True)
+					for b, res in zip(backends, results):
+						if isinstance(res, list):
+							data += res
+						else:
+							print(b, repr(res))
 				return "\n\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).strip()
 			if is_discord_attachment(argv) or is_miza_attachment(argv):
 				if url2ext(argv) in VISUAL_FORMS:

@@ -850,9 +850,9 @@ async def ocr(self, url):
 	return s
 Bot.ocr = ocr
 
-def view(text):
-	return json_dumpstr(lim_str(text.split("\n", 1)[0], 32, mode="left"))
-async def tool_call(self, call, uid, effort="high", premium_context=None):
+def view(text, limit=48):
+	return "`" + lim_str(text.split("\n", 1)[0], limit, mode="left").replace("`", "'") + "`"
+async def tool_call(self, call, uid, message=None, effort="high", premium_context=None):
 	func = call.function
 	kwargs = cdict(eval_json(func.arguments))
 
@@ -864,7 +864,8 @@ async def tool_call(self, call, uid, effort="high", premium_context=None):
 			else:
 				yield f'Browsing {view(query)}'
 				resp = await self.browse(query, uid=uid, n=3 if effort == "high" else 1)
-				yield await ai.summarise(resp, prompt=query, premium_context=premium_context)
+				prompt = None if is_url(query) else query
+				yield await ai.summarise(resp, 8192, 32768, prompt=prompt, premium_context=premium_context)
 		case "deno":
 			query = kwargs.get("query") or " ".join(kwargs.values())
 			yield f'Evaluating {view(query)}'
@@ -879,13 +880,24 @@ async def tool_call(self, call, uid, effort="high", premium_context=None):
 				args.append("-p")
 			args.append(argv)
 			print(args)
-			yield await check_output_async(args)
+			resp = await check_output_async(args)
+			yield await ai.summarise(resp, 16384, 65536, prompt=query, premium_context=premium_context)
+		case "userinfo":
+			query = kwargs.get("user") or " ".join(kwargs.values())
+			yield f'Viewing {view(query)}'
+			resp = await self.run_command(
+				self.commands.info[0],
+				dict(objects=[query]),
+				message=message,
+			)
+			yield pretty_json(resp)
 		case "reminder":
-			message = kwargs.get("message") or kwargs.get("content") or ""
-			yield f'Reminding {view(message)}'
+			msg = kwargs.get("message") or kwargs.get("content") or ""
+			yield f'Reminding {view(msg)}'
 			resp = await self.run_command(
 				self.commands.remind[0],
-				dict(message=message, time=kwargs.get("time", "")),
+				dict(message=msg, time=kwargs.get("time", "")),
+				message=message,
 			)
 			yield pretty_json(resp)
 		case "play":
@@ -894,6 +906,7 @@ async def tool_call(self, call, uid, effort="high", premium_context=None):
 			resp = await self.run_command(
 				self.commands.remind[0],
 				dict(query=query),
+				message=message,
 			)
 			yield pretty_json(resp)
 		case "audio":
@@ -901,6 +914,7 @@ async def tool_call(self, call, uid, effort="high", premium_context=None):
 			resp = await self.run_command(
 				self.commands.audiosettings[0],
 				dict(mode=kwargs.mode, value=kwargs.get("value")),
+				message=message,
 			)
 			yield pretty_json(resp)
 		case "astate":
@@ -908,6 +922,7 @@ async def tool_call(self, call, uid, effort="high", premium_context=None):
 			resp = await self.run_command(
 				self.commands.audiostate[0],
 				dict(mode=kwargs.mode, value=kwargs.get("value")),
+				message=message,
 			)
 			yield pretty_json(resp)
 		case "askip":
@@ -916,6 +931,7 @@ async def tool_call(self, call, uid, effort="high", premium_context=None):
 			resp = await self.run_command(
 				self.commands.skip[0],
 				dict(slices=entries),
+				message=message,
 			)
 			yield pretty_json(resp)
 Bot.tool_call = tool_call

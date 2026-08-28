@@ -513,6 +513,11 @@ class Ask(Command):
 			reasoning_sum = 0
 			reasoning_temp = 0
 			content = ""
+			visible_tools = cdict(ai.TOOLS)
+			if not _guild or not getattr(_user, "voice", None):
+				visible_tools.pop("voice_only")
+				if not _guild:
+					visible_tools.pop("server_only")
 			for att in range(10):
 				text = ""
 				messagelist = [messages[k] for k in sorted(messages) if not reference or k != reference.id]
@@ -533,7 +538,7 @@ class Ask(Command):
 					begin = f"> Thinking{rsize}... {loading}\n{rsep}"
 					content = begin + content.split(rsep, 1)[-1]
 					yield "\r" + content
-				async for resp in bot.chat_completion(messagelist, extra_messages=extra_messages, model=model, max_tokens=24576, tools=ai.TOOLS, user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
+				async for resp in bot.chat_completion(messagelist, extra_messages=extra_messages, model=model, max_tokens=24576, tools=visible_tools, user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
 					if isinstance(resp, dict):
 						if resp.get("reasoning"):
 							reasonings.extend(resp["reasoning"])
@@ -582,7 +587,7 @@ class Ask(Command):
 					reasoning_sum = sum(len(r) + 3 for r in reasonings)
 					tool_gens = []
 					for tc in tuple(tool_calls):
-						gen = bot.tool_call(tc, uid=_user.id, effort="high" if len(tc) < 3 else "low", premium_context=premium)
+						gen = bot.tool_call(tc, uid=_user.id, message=_message, effort="high" if len(tc) < 3 else "low", premium_context=premium)
 						tool_gens.append(gen)
 					infos = await gather(*(anext(gen) for gen in tool_gens), return_exceptions=True)
 					if infos:
@@ -592,13 +597,16 @@ class Ask(Command):
 							elif isinstance(info, BaseException):
 								content += "\n> *Malformed tool usage*"
 							else:
-								content += f"\n> {info}..."
+								content += f"\n> {info}"
 						yield "\r" + content.strip() + ("\n\n" * bool(content)) + text.strip()
 						resps = await gather(*(
 							as_fut(info) if isinstance(info, BaseException) else anext(gen)
 							for info, gen in zip(infos, tool_gens)
 						), max_concurrency=5, return_exceptions=True)
-						pairs = [(tc, resp) for tc, info, resp in zip(tool_calls, infos, resps) if resp and type(info) is not StopAsyncIteration]
+						pairs = [
+							(tc, (resp if not isinstance(info, BaseException) else pretty_json(info) if type(info) is not StopAsyncIteration else "[MALFORMED TOOL USAGE]") or "[RESPONSE EMPTY OR REDACTED")
+							for tc, info, resp in zip(tool_calls, infos, resps)
+						]
 						tool_calls = [pair[0] for pair in pairs]
 						if pairs:
 							extra_messages.append(cdict(
@@ -607,12 +615,13 @@ class Ask(Command):
 								tool_calls=tool_calls,
 							))
 							for pair in pairs:
-								extra_messages.append(cdict(
+								rs_msg = cdict(
 									role="tool",
 									tool_call_id=pair[0].id,
 									name=pair[0].function.name,
 									content=pair[1],
-								))
+								)
+								extra_messages.append(rs_msg)
 							reasonings.append(pretty_json([pair[1] for pair in pairs]))
 							reasoning_sum = sum(len(r) + 3 for r in reasonings)
 				if text:

@@ -1339,6 +1339,15 @@ def json_default(obj):
 		return obj.item()
 	if isinstance(obj, (set, frozenset, alist, deque, np.ndarray)):
 		return list(obj)
+	if getattr(obj, "to_dict", None):
+		return obj.to_dict()
+	if isinstance(obj, BaseException):
+		if obj.args:
+			return dict(error=obj.__class__.__name__, message=str(obj))
+		else:
+			return dict(error=obj.__class__.__name__)
+	elif type(obj) is type and issubclass(obj, BaseException):
+		return dict(error=obj.__name__)
 	raise TypeError(obj)
 
 class MultiEncoder(json.JSONEncoder):
@@ -1374,14 +1383,7 @@ class PrettyJSONEncoder(json.JSONEncoder):
 			# items.sort()
 			return "{\n" + next_indent + f",\n{next_indent}".join(item for item in items) + f"\n{curr_indent}" + "}"
 		elif getattr(obj, "to_dict", None):
-			return self.encode(obj.to_dict())
-		elif isinstance(obj, BaseException):
-			if obj.args:
-				obj = dict(error=obj.__class__.__name__, message=str(obj))
-			else:
-				obj = dict(error=obj.__class__.__name__)
-		elif isinstance(obj, type) and issubclass(obj, BaseException):
-			obj = dict(error=obj.__name__)
+			return self.encode(obj.to_dict(), level=level + 1)
 		return json_dumpstr(obj)
 
 	def default(self, obj):
