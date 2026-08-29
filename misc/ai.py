@@ -840,6 +840,8 @@ TOOLS = {
 	],
 	"server_only": [
 		f_play,
+	],
+	"sensitive": [
 		f_userinfo,
 	],
 	"voice_only": [

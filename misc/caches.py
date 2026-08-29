@@ -20,7 +20,7 @@ import psutil
 import requests
 import streamshatter
 from misc.types import utc, as_str, byte_like, cdict, fcdict
-from misc.asyncs import _run_async, run_async, submit_thread, wrap_future, await_fut, Future
+from misc.asyncs import _run_async, run_async, submit_thread, wrap_future, await_fut, gather, Future
 from misc.smath import get_closest_heart
 from misc.util import (
     CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, read_file_a, download_file, header_test, getsize, retrieve_api,
@@ -130,8 +130,9 @@ class ColourCache(AutoCache):
 		return get_closest_heart(rgb)
 
 
+BASE_URL = "https://mizabot.xyz"
+
 class AttachmentCache(AutoCache):
-	min_size = 1048576
 	max_size = CACHE_FILESIZE
 	attachment_count = 10
 	embed_count = 10
@@ -207,7 +208,7 @@ class AttachmentCache(AutoCache):
 		while self.queue:
 			tasks, self.queue = self.queue[:ec], self.queue[ec:]
 			urls = [task[1].split("?url=", 1)[-1].replace("?", "&").replace("%", "&").split("&", 1)[0] for task in tasks]
-			embeds = [dict(image=dict(url=url)) for url in urls]
+			embeds = [dict(url=BASE_URL, image=dict(url=url)) for url in urls]
 			last = self.last
 			resp = None
 			try:
@@ -383,10 +384,15 @@ class AttachmentCache(AutoCache):
 			else:
 				for e in data["embeds"]:
 					try:
-						url = e["author"]["icon_url"]
-					except KeyError:
 						url = e["image"]["url"]
-					urls.append(url.rstrip("&"))
+						urls.append(url.rstrip("&"))
+					except KeyError:
+						pass
+					try:
+						url = e["thumbnail"]["url"]
+						urls.append(url.rstrip("&"))
+					except KeyError:
+						pass
 		return urls, size_mb * 1048576
 
 	async def obtains(self, path):
@@ -491,11 +497,12 @@ class AttachmentCache(AutoCache):
 		if is_discord_attachment(url):
 			url = await self.obtain(url=url, m_id=m_id)
 		elif is_miza_attachment(url):
-			# url = re.sub("^https?:\\/\\/(?:\\w+\\.)?mizabot.xyz\\/", f"https://{base}/", url)
-			url = await self.obtain(url=url)
-			# if not input_headers:
-			# 	input_headers = Request.header()
-			# input_headers["User-Agent"] = f"DiscordBot (mizabot.xyz, 1.0.0)"
+			if "/c/" in url:
+				path = url.split("/c/", 1)[-1].split("/", 1)[0]
+				urls, _csize = await self.obtains(path=path)
+				url = urls[0]
+			elif "/u/" in url:
+				url = await self.obtain(url=url)
 		try:
 			headers = await _run_async(header_test, url, input_headers=input_headers)
 		except ConnectionError as ex:
@@ -566,7 +573,7 @@ class AttachmentCache(AutoCache):
 				)
 			cid = getattr(channel, "id", channel) if channel else choice(self.channels)
 			url = f"https://discord.com/api/{api}/channels/{cid}/messages"
-			if editable:
+			if editable or channel:
 				heads = dict(self.headers)
 			else:
 				heads = dict(choice((self.headers, self.alt_headers)))
@@ -598,42 +605,69 @@ class AttachmentCache(AutoCache):
 			return await self.create(data, filename=filename, channel=channel, editable=editable, minimise=minimise)
 		if not hasattr(data, "read"):
 			data = io.BytesIO(data)
-		chunks = [self.min_size]
-		remaining = size - self.min_size
+		chunks = []
+		remaining = size
 		while remaining > 0:
 			chunks.append(Ms)
 			remaining -= Ms
+		chunks.reverse()
 		ac = self.attachment_count
 		self.sess = self.sess or aiohttp.ClientSession()
 		filename = ofn = filename or "c"
 		cid = getattr(channel, "id", channel) if channel else choice(self.channels)
-		mids = []
+		futs = []
 		while chunks:
+			names = []
 			temp, chunks = chunks[:ac], chunks[ac:]
 			form_data = aiohttp.FormData(quote_fields=False)
-			payload = dict(
+			payload: dict = dict(
 				content=None,
 				attachments=[dict(
 					id=i,
-					filename=filename if not i else "b",
+					filename=filename if not i else f"b{i}",
 				) for i in range(len(temp))],
 			)
-			form_data.add_field(name="payload_json", value=json_dumpstr(payload))
 			for i, n in enumerate(temp):
 				b = data.read(n)
+				fn = filename if not i else f"b{i}"
 				form_data.add_field(
 					name=f"files[{i}]",
 					value=b,
-					filename=filename if not i else "b",
+					filename=fn,
 					content_type="application/octet-stream",
 				)
+				names.append(fn)
+			if len(names) & 1:
+				names.append(None)
+			embeds = []
+			for n1, n2 in zip(names[::2], names[1::2]):
+				embeds.append(dict(
+					url=BASE_URL,
+					image=dict(
+						url=f"attachment://{n1}",
+					),
+					flags=0,
+					type="rich",
+				))
+				if n2:
+					embeds[-1]["thumbnail"] = dict(
+						url=f"attachment://{n2}",
+					)
+			if embeds:
+				print("AC-Create:", embeds)
+				payload["embeds"] = embeds
+			form_data.add_field(name="payload_json", value=json_dumpstr(payload))
 			url = f"https://discord.com/api/{api}/channels/{cid}/messages"
-			if editable:
+			if editable or channel:
 				heads = dict(self.headers)
 			else:
 				heads = dict(choice((self.headers, self.alt_headers)))
 			heads.pop("Content-Type")
-			resp = await self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
+			fut = self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
+			futs.append(fut)
+		mids = []
+		resps = await gather(*futs, max_concurrency=2)
+		for resp in resps:
 			await raise_aiohttp_safe(resp)
 			message = await resp.json()
 			mid = int(message["id"])
@@ -641,7 +675,6 @@ class AttachmentCache(AutoCache):
 				aid = i if editable else int(a["id"])
 				self[aid] = a["url"]
 			mids.append(mid)
-			filename = "b"
 		return shorten_chunks(self.max_size // 1048576, cid, mids, url2fn(ofn), mode="c", base="https://mizabot.xyz", minimise=minimise)
 
 	async def edit(self, c_id, m_id, *data, url=None, filename=None, content="", collapse=True, minimise=False):

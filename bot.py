@@ -2025,7 +2025,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			out = [url.rstrip() for url in find_urls(translate_emojis(replace_emojis(url)))]
 		return out
 
-	async def send_with_file(self, channel, msg=None, file=None, filename=None, embed=None, best=False, rename=True, reference=None, reacts="", tts=False):
+	async def send_with_file(self, channel, msg=None, file=None, filename=None, embed=None, reference=None, reacts="", tts=False):
 		"Sends a message to a channel, then edits to add links to all attached files. Automatically transfers excessively large files to filehost."
 		if not msg:
 			msg = ""
@@ -2069,7 +2069,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					f = filename if filename and not hasattr(file, "fp") else getattr(file, "_fp", None) or data
 				if not isinstance(f, str):
 					f = as_str(f)
-				url = await self.data.exec.lproxy(file._fp if getattr(file, "_fp", None) else f, filename=filename)
+				url = await self.data.exec.lproxy(file._fp if getattr(file, "_fp", None) else f, filename=filename, channel=channel)
 				ext = url2ext(url)
 				if IMAGE_FORMS.get(ext) == False or AUDIO_FORMS.get(ext):
 					try:
@@ -2083,11 +2083,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				message = await send_with_reply(channel, reference, msg, embed=embed, file=file, tts=tts)
 				await asyncio.sleep(0.5)
-				if filename is not None:
-					if hasattr(filename, "filename"):
-						filename = filename.filename
-					# with suppress():
-					# 	os.remove(filename)
 		except Exception:
 			if filename is not None:
 				if not isinstance(filename, str):

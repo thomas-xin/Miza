@@ -141,7 +141,10 @@ class CS_hex2xml(Command):
 		)
 		b = output.encode("utf-8")
 		f = CompatFile(b, filename="patch.xml")
-		create_task(bot.send_with_file(channel, "Patch successfully converted!", f, reference=message))
+		return cdict(
+			content="Patch successfully converted!",
+			file=CompatFile(f),
+		)
 
 
 async def periwinkle_variables_txt():

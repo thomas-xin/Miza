@@ -383,7 +383,7 @@ class Ask(Command):
 		else:
 			name_repr = bot_name
 		personality = pdata.description.replace("{{user}}", _user.display_name).replace("{{char}}", name_repr)
-		personality += "\n\n[INFO] Usernames may be presented in the read-only format `name={name}\\n` to bypass format constraints."
+		personality += "\n\n[INFO] Usernames may be presented in read-only format `name={name}\\n` to bypass format constraints."
 		match pdata.history:
 			case "none":
 				personality += "\n[INFO] Conversation history currently disabled. Clarify if necessary."
@@ -392,14 +392,14 @@ class Ask(Command):
 		if "nsfw" in personality.casefold() or not _nsfw and bot.is_nsfw(_user):
 			pass
 		elif nsfw:
-			personality += f"\n[INFO] You are currently in a NSFW-enabled channel #{_channel.name}. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise the needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
+			personality += f"\n[INFO] You are currently in a NSFW-enabled channel #{_channel.name}. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
 		else:
-			personality += f"\n[INFO] You are currently in a non-NSFW-enabled channel #{_channel.name}. If the conversation involves mature, sexual, or dangerous topics, use disclaimers in your response."
+			personality += f"\n[INFO] You are currently in a non-NSFW-enabled channel #{_channel.name}. If conversation involves mature, sexual, or dangerous topics, use disclaimers in your response."
 		emojis = not simulated and _guild and [emoji for emoji in _guild.emojis if emoji.is_usable()]
 		if emojis:
 			emojis = shuffle(emojis)[:25]
 			emojitexts = " ".join(sorted(f":{e.name}:" for e in emojis))
-			personality += f"\n[INFO] The current conversation takes place on Discord, where you have access to the following emojis. You may use these as alternatives to Unicode, but must not invent new ones not already here or in conversation.\n{emojitexts}"
+			personality += f"\n[INFO] Current conversation takes place on Discord, where you have access to the following emojis. You may use these as alternatives to Unicode, but must not invent new ones not already here or in conversation.\n{emojitexts}"
 		tzinfo = self.bot.data.users.get_timezone(_user.id)
 		if tzinfo is None:
 			tzinfo = datetime.timezone.utc
@@ -518,6 +518,8 @@ class Ask(Command):
 				visible_tools.pop("voice_only")
 				if not _guild:
 					visible_tools.pop("server_only")
+			if pdata.history == "none":
+				visible_tools.pop("sensitive")
 			for att in range(10):
 				text = ""
 				messagelist = [messages[k] for k in sorted(messages) if not reference or k != reference.id]
@@ -622,7 +624,7 @@ class Ask(Command):
 									content=pair[1].strip(),
 								)
 								extra_messages.append(rs_msg)
-							reasonings.append("[\n\t" + "\n\t".join(str(pair[1]).replace("\n", "\n\t").strip() for pair in pairs) + "\n]")
+							reasonings.append("\n".join(code_md(pair[1].strip()) for pair in pairs))
 							reasoning_sum = sum(len(r) + 3 for r in reasonings)
 				if text:
 					content += "\n\n" * bool(content) + text
@@ -687,7 +689,6 @@ class Ask(Command):
 				print(">", note)
 		response.embeds = embs
 		response.reacts = tuple(response.get("reacts", ())) + tuple(reacts)
-		await asyncio.sleep(bot.latency)
 		yield response
 
 	@tracebacksuppressor
