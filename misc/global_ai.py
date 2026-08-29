@@ -851,89 +851,93 @@ async def ocr(self, url):
 Bot.ocr = ocr
 
 def view(text, limit=48):
-	return "`" + lim_str(text.split("\n", 1)[0], limit, mode="left").replace("`", "'") + "`"
+	return "`" + lim_str(as_str(text).split("\n", 1)[0], limit, mode="left").replace("`", "'") + "`"
 async def tool_call(self, call, uid, message=None, effort="high", premium_context=None):
-	func = call.function
-	kwargs = cdict(eval_json(func.arguments))
+	try:
+		func = call.function
+		kwargs = cdict(eval_json(func.arguments))
 
-	match func.name:
-		case "browse":
-			query = kwargs.get("query") or " ".join(kwargs.values())
-			if is_discord_attachment(query) or is_miza_attachment(query):
-				pass
-			else:
-				yield f'Browsing {view(query)}'
-				resp = await self.browse(query, uid=uid, n=3 if effort == "high" else 1)
-				prompt = None if is_url(query) else query
-				yield await ai.summarise(resp, 8192, 32768, prompt=prompt, premium_context=premium_context)
-		case "deno":
-			query = kwargs.get("query") or " ".join(kwargs.values())
-			yield f'Evaluating {view(query)}'
-			args = ["deno", "eval"]
-			argv = query.strip()
-			if ";" in argv.rstrip(";"):
-				start, end = argv.rstrip(";").rsplit(";", 1)
-				end = end.strip()
-				if not end.startswith("console.log"):
-					argv = start + f"; console.log({end});"
-			else:
-				args.append("-p")
-			args.append(argv)
-			print(args)
-			resp = await check_output_async(args)
-			yield await ai.summarise(resp, 16384, 65536, prompt=query, premium_context=premium_context)
-		case "userinfo":
-			query = kwargs.get("user") or " ".join(kwargs.values())
-			yield f'Viewing {view(query)}'
-			resp = await self.run_command(
-				self.commands.info[0],
-				dict(objects=[query]),
-				message=message,
-			)
-			yield pretty_json(resp)
-		case "reminder":
-			msg = kwargs.get("message") or kwargs.get("content") or ""
-			yield f'Reminding {view(msg)}'
-			resp = await self.run_command(
-				self.commands.remind[0],
-				dict(message=msg, time=kwargs.get("time", "")),
-				message=message,
-			)
-			yield pretty_json(resp)
-		case "play":
-			query = kwargs.get("query") or " ".join(kwargs.values())
-			yield f'Playing {view(query)}'
-			resp = await self.run_command(
-				self.commands.remind[0],
-				dict(query=query),
-				message=message,
-			)
-			yield pretty_json(resp)
-		case "audio":
-			yield f'Adjusting {kwargs.mode} to {kwargs.value}'
-			resp = await self.run_command(
-				self.commands.audiosettings[0],
-				dict(mode=kwargs.mode, value=kwargs.get("value")),
-				message=message,
-			)
-			yield pretty_json(resp)
-		case "astate":
-			yield f'Toggling {kwargs.mode}'
-			resp = await self.run_command(
-				self.commands.audiostate[0],
-				dict(mode=kwargs.mode, value=kwargs.get("value")),
-				message=message,
-			)
-			yield pretty_json(resp)
-		case "askip":
-			entries = kwargs.get("entries") or " ".join(kwargs.values())
-			yield f'Skipping {view(entries)}'
-			resp = await self.run_command(
-				self.commands.skip[0],
-				dict(slices=entries),
-				message=message,
-			)
-			yield pretty_json(resp)
+		match func.name:
+			case "browse":
+				query = kwargs.get("query") or " ".join(kwargs.values())
+				if is_discord_attachment(query) or is_miza_attachment(query):
+					pass
+				else:
+					yield f'Browsing {view(query)}'
+					resp = await self.browse(query, uid=uid, n=3 if effort == "high" else 1)
+					prompt = None if is_url(query) else query
+					yield await ai.summarise(resp, 8192, 32768, prompt=prompt, premium_context=premium_context)
+			case "deno":
+				query = kwargs.get("query") or " ".join(kwargs.values())
+				yield f'Evaluating {view(query)}'
+				args = ["deno", "eval"]
+				argv = query.strip()
+				if ";" in argv.rstrip(";"):
+					start, end = argv.rstrip(";").rsplit(";", 1)
+					end = end.strip()
+					if not end.startswith("console.log"):
+						argv = start + f"; console.log({end});"
+				else:
+					args.append("-p")
+				args.append(argv)
+				print(args)
+				resp = await check_output_async(args)
+				yield await ai.summarise(resp, 16384, 65536, prompt=query, premium_context=premium_context)
+			case "userinfo":
+				user = kwargs.get("user") or " ".join(kwargs.values())
+				yield f'Viewing {view(user)}'
+				resp = await self.run_command(
+					self.commands.info[0],
+					dict(objects=[str(user)]),
+					message=message,
+				)
+				yield pretty_json(resp)
+			case "reminder":
+				msg = kwargs.get("message") or kwargs.get("content") or ""
+				yield f'Reminding {view(msg)}'
+				resp = await self.run_command(
+					self.commands.remind[0],
+					dict(message=msg, time=kwargs.get("time", "")),
+					message=message,
+				)
+				yield pretty_json(resp)
+			case "play":
+				query = kwargs.get("query") or " ".join(kwargs.values())
+				yield f'Playing {view(query)}'
+				resp = await self.run_command(
+					self.commands.remind[0],
+					dict(query=query),
+					message=message,
+				)
+				yield pretty_json(resp)
+			case "audio":
+				yield f'Adjusting {kwargs.mode} to {kwargs.value}'
+				resp = await self.run_command(
+					self.commands.audiosettings[0],
+					dict(mode=kwargs.mode, value=kwargs.get("value")),
+					message=message,
+				)
+				yield pretty_json(resp)
+			case "astate":
+				yield f'Toggling {kwargs.mode}'
+				resp = await self.run_command(
+					self.commands.audiostate[0],
+					dict(mode=kwargs.mode, value=kwargs.get("value")),
+					message=message,
+				)
+				yield pretty_json(resp)
+			case "askip":
+				entries = kwargs.get("entries") or " ".join(kwargs.values())
+				yield f'Skipping {view(entries)}'
+				resp = await self.run_command(
+					self.commands.skip[0],
+					dict(slices=entries),
+					message=message,
+				)
+				yield pretty_json(resp)
+	except Exception:
+		print_exc()
+		raise
 Bot.tool_call = tool_call
 
 print("Loaded global_ai.py injection")

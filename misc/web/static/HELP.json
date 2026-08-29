@@ -903,7 +903,7 @@
 			"level": "3",
 			"rate_limit": "(7, 12)",
 			"example": [],
-			"timeout": "384",
+			"timeout": "120",
 			"schema": {
 				"user": {
 					"type": "user",

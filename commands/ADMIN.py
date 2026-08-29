@@ -162,6 +162,7 @@ class Purge(Command):
 		),
 	)
 	no_cancel = True
+	_timeout_ = 5
 	rate_limit = (7, 12)
 	multi = True
 	slash = True
@@ -196,7 +197,8 @@ class Purge(Command):
 			found.add(_message.id)
 			count += 1
 		async with bot.guild_semaphore:
-			async for m in bot.history(_channel, limit=count, after=left, before=right, full=False):
+			full = bool(bot.get_guildbase(_guild.id, "logs.message"))
+			async for m in bot.history(_channel, limit=count, after=left, before=right, full=full):
 				if len(found) >= count:
 					break
 				if user and m.author.id != user.id:
@@ -205,7 +207,7 @@ class Purge(Command):
 					continue
 				deleting.append(m)
 				found.add(m.id)
-			await bot.autodelete(*deleting)
+			await bot.autodelete(*deleting, channel=_channel)
 		s = italics(css_md(f"Deleted {sqr_md(len(deleting))} message{'s' if len(deleting) != 1 else ''}!", force=True))
 		return cdict(content=s, reacts="❎")
 

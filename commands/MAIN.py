@@ -470,7 +470,7 @@ class Info(Command):
 		if u.id == bot.id:
 			attributes.append("Myself 🙃")
 		if bot.is_owner(u.id):
-			attributes.append("My owner ❤️")
+			attributes.append(f"{bot.name} owner ❤️")
 		if u.id == bot.deleted_user or bot.get_userbase(u.id, "deleted"):
 			attributes.append("Deleted User ⚠️")
 		if getattr(u, "system", False):

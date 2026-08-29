@@ -619,10 +619,10 @@ class Ask(Command):
 									role="tool",
 									tool_call_id=pair[0].id,
 									name=pair[0].function.name,
-									content=pair[1],
+									content=pair[1].strip(),
 								)
 								extra_messages.append(rs_msg)
-							reasonings.append(pretty_json([pair[1] for pair in pairs]))
+							reasonings.append("[\n\t" + "\n\t".join(str(pair[1]).replace("\n", "\n\t").strip() for pair in pairs) + "\n]")
 							reasoning_sum = sum(len(r) + 3 for r in reasonings)
 				if text:
 					content += "\n\n" * bool(content) + text
@@ -687,6 +687,7 @@ class Ask(Command):
 				print(">", note)
 		response.embeds = embs
 		response.reacts = tuple(response.get("reacts", ())) + tuple(reacts)
+		await asyncio.sleep(bot.latency)
 		yield response
 
 	@tracebacksuppressor

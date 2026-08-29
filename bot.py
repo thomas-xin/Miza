@@ -237,7 +237,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		t = DynamicDT.now()
 		self.userbase = AutoDatabase("saves/userbase", shards=64)
 		self.guildbase = AutoDatabase("saves/guildbase", shards=16)
-		self.extract_cache = AutoCache(f"{CACHE_PATH}/bot.extract", stale=86400, timeout=86400 * 30)
+		self.extract_cache = AutoCache(f"{CACHE_PATH}/bot.extract", stale=3600, timeout=86400 * 30)
 		self.proxied = AutoDatabase("saves/proxied", shards=8)
 		self.followed = AutoCache(f"{CACHE_PATH}/follow", stale=7200, timeout=86400 * 14, desync=0.05)
 		self.emojinames = AutoCache(f"{CACHE_PATH}/emojinames", stale=3600, timeout=86400, desync=0.05)
@@ -530,7 +530,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	slash_sem = Semaphore(5, 256, rate_limit=5)
 	@tracebacksuppressor
 	async def create_command(self, data):
-		with self.slash_sem:
+		async with self.slash_sem:
 			resp = await self.retrieve_api(
 				f"applications/{self.id}/commands",
 				method="POST",
@@ -620,7 +620,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 										print(command_data)
 										print(curr)
 										print(f"{curr['name']}'s slash command does not match, removing...")
-										with self.slash_sem:
+										async with self.slash_sem:
 											await self.retrieve_api(
 												f"applications/{self.id}/commands/{curr['id']}",
 												method="DELETE",
@@ -637,7 +637,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			with tracebacksuppressor:
 				print(curr)
 				print(f"{curr['name']}'s application command does not exist, removing...")
-				with self.slash_sem:
+				async with self.slash_sem:
 					await self.retrieve_api(
 						f"applications/{self.id}/commands/{curr['id']}",
 						method="DELETE",
@@ -2776,6 +2776,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		for m in messages:
 			if isinstance(m, int):
 				m = await self.fetch_message(m, channel=channel)
+			guild = getattr(m, "guild", None) or getattr(channel, "guild", None)
 			if not keep_log:
 				self.recently_deleted[m.id] = False
 			else:
@@ -2783,19 +2784,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			try:
 				if dt - snowflake_time_2(m.id) >= 14 * 86400 - 60:
 					raise PermissionError
-				if not m.channel or not getattr(m.channel, "delete_messages") or not m.guild or not m.guild.me.guild_permissions.manage_messages:
-					raise PermissionError
+				if not channel:
+					if not m.channel or not getattr(m.channel, "delete_messages") or not m.guild or not m.guild.me.guild_permissions.manage_messages:
+						raise PermissionError
 			except (PermissionError, AttributeError):
-				futs.append(self.with_retries(self.delete_single, m))
+				futs.append(self.with_retries(self.delete_single, m, guild=guild))
 			else:
-				c = collections.setdefault(m.channel, [])
+				c = collections.setdefault(channel or m.channel, [])
 				if not c or len(c[-1]) >= 100:
 					c.append([])
 				c[-1].append(m)
 		for c, ms in collections.items():
 			for l100 in ms:
 				if len(l100) == 1:
-					futs.append(self.with_retries(self.delete_single, l100[0]))
+					futs.append(self.with_retries(self.delete_single, l100[0], guild=guild))
 				elif l100:
 					futs.append(self.with_retries(c.delete_messages, l100))
 		return await gather(*futs, max_concurrency=3)
@@ -2813,10 +2815,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					continue
 				raise
 
-	async def delete_single(self, message):
+	async def delete_single(self, message, guild=None):
 		result = await discord.Message.delete(message)
-		guild = message.guild
-		if guild and self.get_guildbase(guild.id, "logs.message"):
+		guild = getattr(message, "guild", None) or guild
+		if guild and self.get_guildbase(guild.id, "logs.message") and getattr(message, "channel", None):
 			aid = current_snowflake()
 			t = (message.author.id, message.channel.id)
 			audits = self.delete_audits.setdefault(t, {})
