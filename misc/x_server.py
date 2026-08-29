@@ -659,6 +659,7 @@ class Server:
 		heads = resp.headers
 		cp.response.status = resp.status_code
 		update_headers(cp.response.headers, **heads)
+		update_headers(cp.response.headers, **CHEADERS)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
 		if cp.response.headers.pop("Content-Encoding", None):
@@ -1007,7 +1008,6 @@ class Server:
 			return "Expected proxy URL."
 		if "//" not in url:
 			url = f"{API}/{url.lstrip('/')}"
-		cp.request.headers.update(CHEADERS)
 		headers = await_fut(attachment_cache.scan_headers(url, fc=True))
 		ctype = headers.get("Content-Type", "application/octet-stream")
 		fmt = mime_into(ctype)
