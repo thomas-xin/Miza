@@ -1222,6 +1222,8 @@ def extract_archive(archive_path, format=None, excludes=()):
 		shutil.unpack_archive(archive_path, extract_dir=path, format=format or get_ext(archive_path))
 	return list(filter(os.path.isfile, (f"{path}/{fn}" for fn in os.listdir(path) if fn.rsplit(".", 1)[-1] not in excludes)))
 
+MARKDOWN_VIEWER = """<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script><style>:root{--c0:#fff;--c1:#111;--c2:#eee;--c3:#333}._dt{--c0:#111;--c1:#fff;--c2:#333;--c3:#eee}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6;max-width:800px;margin:0 auto;padding:20px;color:var(--c1);background-color:var(--c0)}#viewer blockquote{border-left:4px solid #ccc;margin-left:0;padding-left:16px;color:var(--c3)}#viewer code{padding:2px 4px;border-radius:4px;background-color:var(--c2)}#viewer pre{padding:16px;border-radius:4px;overflow-x:hidden;background-color:var(--c2);white-space:pre-wrap;overflow-wrap:break-word}</style></head><body><div id="viewer"><p><em>Loading...</em></p></div><script>async function renderMarkdown() {if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {document.body.classList.add('_dt');}try {const r = await fetch(URL);if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);const e = await r.text();viewer.innerHTML = marked.parse(e);} catch (r) {viewer.innerHTML = `<p style="color: red;"><strong>Failed to load Markdown:</strong> ${r.message}</p>\n<p><small>Note: The server hosting the file must allow Cross-Origin Resource Sharing (CORS).</small></p>`;}}renderMarkdown();</script></body></html>"""
+
 # Formats always stored alongside a boolean determining whether the image is treated as displayable in web browsers
 IMAGE_FORMS = {
 	"auto": None,
@@ -1404,6 +1406,7 @@ MIMES = cdict(
 	js="application/javascript",
 	txt="text/plain",
 	html="text/html",
+	md="text/markdown",
 	svg="image/svg+xml",
 	ico="image/x-icon",
 	icns="image/x-icns",
@@ -1586,10 +1589,6 @@ def mime_from_file(path, filename=None, mime=True):
 				return out
 			return "application/json"
 		if filename:
-			if filename.endswith(".css"):
-				return "text/css"
-			if filename.endswith(".js"):
-				return "application/javascript"
 			ext = filename.rsplit("/", 1)[-1].rsplit(".", 1)[-1]
 			mime2 = MIMES.get(ext, "")
 			if mime2:

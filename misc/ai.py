@@ -475,7 +475,7 @@ Answer ONLY with the summary, do not answer the question itself!'''
 				return resp
 	return lim_tokens(s, round_random(max_length * 2 / 3))
 
-async def llm(func, *args, api=None, timeout=120, premium_context=None, require_message=True, allow_alt=True, **kwargs):
+async def llm(func, *args, api=None, timeout=300, premium_context=None, require_message=True, allow_alt=True, **kwargs):
 	if isinstance(api, str) or not api:
 		await load_openrouter()
 		if "model" in kwargs:

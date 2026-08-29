@@ -1,3 +1,4 @@
+from rich.box import MARKDOWN
 import collections.abc
 import datetime
 import functools
@@ -28,7 +29,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, submit_thread, create_thread, create_task, await_fut
 from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
-from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, get_ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag, preview_url, is_local_url, banned_paths, force_kill, patch_before_return
+from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, get_ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag, preview_url, is_local_url, banned_paths, force_kill, patch_before_return, as_bytes, MARKDOWN_VIEWER
 from .caches import attachment_cache, colour_cache, minimise_url
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -610,17 +611,21 @@ class Server:
 		self.upload_cache.set(ts, fp, tag=fn, read=True)
 		fp, _fn = diskcache.FanoutCache.get(self.upload_cache, ts, tag=True, read=True)
 		ext = get_ext(fp)
-		url = API + f"/f/{ts}.{ext}"
+		url = f"{API}/f/{ts}.{ext}"
 		return url
 
 	@cp.expose
-	def download(self, path, download=False):
+	def download(self, path, download=False, force=False):
 		update_headers(cp.response.headers, **HEADERS)
 		ts = path.rsplit("/", 1)[-1].split(".", 1)[0]
 		fp, fn = diskcache.FanoutCache.get(self.upload_cache, ts, tag=True, read=True)
 		if not fp:
 			raise FileNotFoundError(404, path)
-		mimetype = get_mime(fp)
+		mimetype = mime_from_file(fp, fn)
+		if not force and mimetype == "text/markdown":
+			new_url = f"{API}/f/{path}?force=1"
+			cp.response.headers["Content-Type"] = "text/html"
+			return as_bytes(MARKDOWN_VIEWER.replace("URL", json.dumps(new_url)))
 		if isinstance(fp, byte_like):
 			fp = io.BytesIO(fp)
 		fp.seek(0)
@@ -666,7 +671,7 @@ class Server:
 		if filename:
 			cp.response.headers["Content-Disposition"] = f"{disposition}; filename={urllib.parse.quote(url2fn(filename))}"
 		ctype = heads.get("Content-Type", "application/octet-stream")
-		if ctype.split(";", 1)[0] in ("text/html", "text/plain") or ctype.split("/", 1)[0] == "application":
+		if ctype.split(";", 1)[0] in ("text/html", "text/plain", "text/markdown") or ctype.split("/", 1)[0] == "application":
 			it = resp.iter_content(262144)
 			b = next(it)
 			mime = mime_from_file(b, url2fn(filename or url))
@@ -674,6 +679,10 @@ class Server:
 				a = MemoryBytes(b)[:128]
 				if sum(32 <= c < 128 for c in a) >= len(a) * 7 / 8:
 					mime = "text/plain"
+			elif not force and mime == "text/markdown":
+				new_url = f"{API}/u?url={urllib.parse.quote(url)}&force=1"
+				cp.response.headers["Content-Type"] = "text/html"
+				return as_bytes(MARKDOWN_VIEWER.replace("URL", json.dumps(new_url)))
 			cp.response.headers.pop("Content-Type", None)
 			cp.response.headers["Content-Type"] = mime
 			return resume(b, it)

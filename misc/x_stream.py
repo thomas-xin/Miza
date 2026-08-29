@@ -23,6 +23,7 @@ from .util import (
 	merge_url, is_discord_attachment, url2fn, url2ext, getsize, mime_from_file, zip2bytes,
 	Request as RequestManager, DOMAIN_CERT, PRIVATE_KEY, update_headers, is_local_url,
 	AutoCache, CACHE_PATH, VISUAL_FORMS, IMAGE_FORMS, RNGFile, create_etag, banned_paths,
+	MARKDOWN_VIEWER,
 )
 from .caches import attachment_cache, colour_cache
 
@@ -549,7 +550,7 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 	if not force and heads.get("content-type").split(";", 1)[0] == "text/markdown":
 		new_url = str(request.url.include_query_params(force="1"))
 		return Response(
-			"""<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script><style>:root{--c0:#fff;--c1:#111;--c2:#eee;--c3:#333}._dt{--c0:#111;--c1:#fff;--c2:#333;--c3:#eee}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6;max-width:800px;margin:0 auto;padding:20px;color:var(--c1);background-color:var(--c0)}#viewer blockquote{border-left:4px solid #ccc;margin-left:0;padding-left:16px;color:var(--c3)}#viewer code{padding:2px 4px;border-radius:4px;background-color:var(--c2)}#viewer pre{padding:16px;border-radius:4px;overflow-x:hidden;background-color:var(--c2);white-space:pre-wrap;overflow-wrap:break-word}</style></head><body><div id="viewer"><p><em>Loading...</em></p></div><script>async function renderMarkdown() {if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {document.body.classList.add('_dt');}try {const r = await fetch(URL);if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);const e = await r.text();viewer.innerHTML = marked.parse(e);} catch (r) {viewer.innerHTML = `<p style="color: red;"><strong>Failed to load Markdown:</strong> ${r.message}</p>\n<p><small>Note: The server hosting the file must allow Cross-Origin Resource Sharing (CORS).</small></p>`;}}renderMarkdown();</script></body></html>""".replace("URL", json.dumps(new_url)),
+			MARKDOWN_VIEWER.replace("URL", json.dumps(new_url)),
 			headers=response_headers,
 			media_type="text/html",
 		)

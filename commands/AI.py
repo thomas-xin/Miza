@@ -147,10 +147,11 @@ class Translate(Command):
 				pass
 			return tr.text.strip()
 		async def chat_translate():
+			model = "translation" if "translation" in ai.local_models else "tiny"
 			try:
 				cmpl = await ai.llm(
 					"chat.completions.create",
-					model="tiny",
+					model=model,
 					messages=messages,
 					temperature=0.01,
 					reasoning_effort="minimal",
@@ -648,7 +649,7 @@ class Ask(Command):
 		if reasonings:
 			reasoning = "\n\n\n".join(reasonings).encode("utf-8")
 			try:
-				url = await bot.upload_temp(reasoning, filename="reasoning.txt")
+				url = await bot.upload_temp(reasoning, filename="reasoning.md")
 				rsize = f"{byte_scale(len(reasoning))}B"
 				content = (f"> [Reasoning: {rsize} (click to view)](<{url}>){rsep}\n" + content).strip()
 			except Exception:
