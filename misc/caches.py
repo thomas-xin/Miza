@@ -135,7 +135,8 @@ BASE_URL = "https://mizabot.xyz"
 class AttachmentCache(AutoCache):
 	max_size = CACHE_FILESIZE
 	attachment_count = 10
-	embed_count = 10
+	embed_count = 20
+	refresh_count = 50
 	discord_token = AUTH["discord_token"]
 	alt_token = AUTH.get("alt_token", discord_token)
 	headers = {"Content-Type": "application/json", "Authorization": "Bot " + discord_token}
@@ -167,7 +168,7 @@ class AttachmentCache(AutoCache):
 		self["__last__"] = value
 
 	def _update_queue(self):
-		ec = 50
+		ec = self.refresh_count
 		while self.queue:
 			tasks, self.queue = self.queue[:ec], self.queue[ec:]
 			urls = [task[1].split("?url=", 1)[-1].replace("?", "&").replace("%", "&").split("&", 1)[0] for task in tasks]
@@ -200,15 +201,25 @@ class AttachmentCache(AutoCache):
 				task[0].set_exception(ConnectionError(404, "Missing attachment refresh!"))
 
 	@tracebacksuppressor
-	def update_queue(self):
-		with tracebacksuppressor:
-			self._update_queue()
+	def update_queue(self, allow=True):
+		if allow:
+			with tracebacksuppressor:
+				self._update_queue()
 		ec = self.embed_count
 		n = 0
 		while self.queue:
 			tasks, self.queue = self.queue[:ec], self.queue[ec:]
 			urls = [task[1].split("?url=", 1)[-1].replace("?", "&").replace("%", "&").split("&", 1)[0] for task in tasks]
-			embeds = [dict(url=BASE_URL, image=dict(url=url)) for url in urls]
+			embeds = []
+			if len(urls) & 1:
+				urls.append(None)
+			for url1, url2 in zip(urls[::2], urls[1::2]):
+				embeds.append(dict(
+					url=BASE_URL,
+					image=dict(url=url1),
+				))
+				if url2:
+					embeds[-1]["thumbnail"] = dict(url=url2)
 			last = self.last
 			resp = None
 			try:
@@ -250,6 +261,10 @@ class AttachmentCache(AutoCache):
 			submit_thread(self.clear_last, (cid, mid, n))
 			for emb in message["embeds"]:
 				url = emb["image"]["url"].rstrip("&")
+				tasks.pop(0)[0].set_result(url)
+				if not tasks:
+					break
+				url = emb["thumbnail"]["url"].rstrip("&")
 				tasks.pop(0)[0].set_result(url)
 				if not tasks:
 					break
@@ -335,14 +350,14 @@ class AttachmentCache(AutoCache):
 		url, _ = merge_url(c_id, m_id, a_id, fn)
 		task = [fut, url]
 		self.queue.append(task)
-		if self.fut is None or self.fut.done() or len(self.queue) > ac:
-			self.fut = self.exc.submit(self.update_queue)
+		if self.fut is None or self.fut.done() or len(self.queue) > self.refresh_count:
+			self.fut = self.exc.submit(self.update_queue, allow=False)
 		try:
 			return await asyncio.wait_for(wrap_future(fut), timeout=8)
 		except asyncio.TimeoutError:
 			if task in self.queue:
-				if self.fut is None or self.fut.done() or len(self.queue) > ac:
-					self.fut = self.exc.submit(self.update_queue)
+				if self.fut is None or self.fut.done() or len(self.queue) > self.refresh_count:
+					self.fut = self.exc.submit(self.update_queue, allow=False)
 				return await asyncio.wait_for(wrap_future(fut), timeout=8)
 		return await self.get_direct(c_id, m_id, a_id, fn)
 
