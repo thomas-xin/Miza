@@ -20,7 +20,7 @@ import psutil
 import requests
 import streamshatter
 from misc.types import utc, as_str, byte_like, cdict, fcdict
-from misc.asyncs import _run_async, run_async, submit_thread, wrap_future, await_fut, gather, Future
+from misc.asyncs import _run_async, run_async, submit_thread, wrap_future, await_fut, create_task, gather, Future
 from misc.smath import get_closest_heart
 from misc.util import (
     CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, read_file_a, download_file, header_test, getsize, retrieve_api,
@@ -664,6 +664,8 @@ class AttachmentCache(AutoCache):
 				heads = dict(choice((self.headers, self.alt_headers)))
 			heads.pop("Content-Type")
 			fut = self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
+			if sum(isinstance(fut, asyncio.Future) and not fut.done() for fut in futs) < 2:
+				fut = create_task(fut)
 			futs.append(fut)
 		mids = []
 		resps = await gather(*futs, max_concurrency=2)
