@@ -1694,7 +1694,7 @@ def decode_auto(b):
 		b = unquote_plus(as_str(b))
 	if b.isascii():
 		s = as_str(b)
-		if not re.fullmatch(r"[A-Za-z0-9-_]+", s):
+		if not re.fullmatch(r"[A-Za-z0-9\-_]+", s):
 			try:
 				return base75.decode(s)
 			except Exception:
@@ -1829,7 +1829,7 @@ def encode_snowflake(*args, store_count=False, minimise=False):
 		return base65536.encode(encoded)
 	e1 = e64(encoded, out=str)
 	e2 = base75.encode(encoded)
-	if len(e2) >= len(e1) or re.fullmatch(r"[A-Za-z0-9-_]+", e2):
+	if len(e2) >= len(e1) or re.fullmatch(r"[A-Za-z0-9\-_]+", e2):
 		return e1
 	return e2
 def decode_snowflake(data, n=0):
