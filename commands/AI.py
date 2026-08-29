@@ -586,7 +586,7 @@ class Ask(Command):
 				tool_calls = getattr(m, "tool_calls", None) or ()
 				if tool_calls:
 					tool_calls = [cdict(id=t.id, type="function", function=cdict(t.function)) for t in tool_calls]
-					reasonings.append(pretty_json(tool_calls))
+					reasonings.append(code_md(pretty_json(tool_calls), fmt="json"))
 					reasoning_sum = sum(len(r) + 3 for r in reasonings)
 					tool_gens = []
 					for tc in tuple(tool_calls):

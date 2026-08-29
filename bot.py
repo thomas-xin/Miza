@@ -1625,11 +1625,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						case "image":
 							found.extend(url for url in curr if url2ext(url) in IMAGE_FORMS)
 							found.extend(s.url for s in m.stickers)
-							for e in m.embeds:
-								for attr in ("video", "image", "thumbnail"):
-									url = getattr_chain(e, f"{attr}.url", None)
-									if url:
-										found.append(attachment_cache.preserve(url))
+							if allow_text:
+								for e in m.embeds:
+									for attr in ("video", "image", "thumbnail"):
+										url = getattr_chain(e, f"{attr}.url", None)
+										if url:
+											found.append(attachment_cache.preserve(url))
 						case "text":
 							if allow_text:
 								found.append(m.content)
@@ -1960,6 +1961,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		mime = magic.from_buffer(d)
 		if mime == "text/html" and screenshot:
 			d = await self.browse(url, timeout=timeout + 8)
+			if isinstance(d, str):
+				return mime, name, as_bytes(d)
 			mime = magic.from_buffer(d)
 		return mime, name, d
 

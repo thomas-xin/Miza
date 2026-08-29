@@ -260,7 +260,7 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 					raise TypeError(c["type"])
 			follows[i] = as_fut(urls)
 		elif sum(f is not None for f in follows) < 4 and m.get("url") and j < 8:
-			follows[i] = create_task(self.follow_url(m.url, priority_order=("video", "image", "text")))
+			follows[i] = create_task(self.follow_url(m.url, priority_order=("video", "image", "text"), allow_text=False))
 		elif not m.get("content"):
 			m.content = "[MEDIA OUT-OF-FOCUS]"
 		m.pop("url", None)

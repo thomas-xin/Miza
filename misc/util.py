@@ -2,6 +2,7 @@ import ast
 import asyncio
 import base64
 import base65536
+from misc import base75
 import collections; from collections import deque, defaultdict
 import concurrent.futures
 import contextlib
@@ -388,17 +389,19 @@ def bold(s):
 	return s
 
 def single_md(s):
+	s = s.replace("`", "'")
 	return f"`{s}`"
-def code_md(s):
-	return f"```\n{s}```" if s else "``` ```"
+def code_md(s, fmt="", strict=True):
+	s2 = "\n" if strict else ""
+	return f"```{fmt}\n{s.replace('```', '``')}{s2}```" if s else f"``` {s2}```"
 def py_md(s):
-	return f"```py\n{s}```" if s else "``` ```"
+	return f"```py\n{s.replace('```', '``')}```" if s else "``` ```"
 def ini_md(s):
-	return f"```ini\n{s}```" if s else "``` ```"
+	return f"```ini\n{s.replace('```', '``')}```" if s else "``` ```"
 def css_md(s, force=False):
-	return (f"```css\n{s}```".replace("'", "’").replace('"', "”") if force else ini_md(s)) if s else "``` ```"
+	return (f"```css\n{s.replace('```', '``')}```".replace("'", "’").replace('"', "”") if force else ini_md(s.replace('```', '``'))) if s else "``` ```"
 def fix_md(s):
-	return f"```fix\n{s}```" if s else "``` ```"
+	return f"```fix\n{s.replace('```', '``')}```" if s else "``` ```"
 def ansi_md(s, max_length=4096):
 	if not s:
 		return "``` ```"
@@ -1685,29 +1688,22 @@ def b64(b):
 		b += b"=="
 	return base64.urlsafe_b64decode(b)
 
-def b64_or_uni(b):
+def decode_auto(b):
 	b = b.strip()
 	if type(b) is str and "%" in b or type(b) is not str and 37 in b:
 		b = unquote_plus(as_str(b))
 	if b.isascii():
+		s = as_str(b)
+		if not re.fullmatch(r"[A-Za-z0-9-_]+", s):
+			try:
+				return base75.decode(s)
+			except Exception:
+				pass
 		try:
 			return b64(b)
 		except Exception:
 			pass
 	return base65536.decode(as_str(b))
-
-e75map = b"!$*,-.0123456789:;=@ABCDEFGHIJKLMNOPQRSTUVWXYZ^_abcdefghijklmnopqrstuvwxyz~"
-def e75(b, out=bytes):
-	b = as_bytes(b)
-	d = base64.a85encode(b)
-	e = d.translate(e85trans)
-	if out is str:
-		e = e.decode("ascii")
-	return e
-def b85(b):
-	b = as_bytes(b)
-	d = b.translate(d85trans)
-	return base64.a85decode(d)
 
 def cantor(*x):
 	n = len(x)
@@ -1831,9 +1827,13 @@ def encode_snowflake(*args, store_count=False, minimise=False):
 		encoded = b"\x7f" + encoded
 	if minimise:
 		return base65536.encode(encoded)
-	return e64(encoded, out=str)
+	e1 = e64(encoded, out=str)
+	e2 = base75.encode(encoded)
+	if len(e2) >= len(e1) or re.fullmatch(r"[A-Za-z0-9-_]+", e2):
+		return e1
+	return e2
 def decode_snowflake(data, n=0):
-	decoded = b64_or_uni(data)
+	decoded = decode_auto(data)
 	if 1 < decoded[0] < 127:
 		n, decoded = decoded[0], decoded[1:]
 	elif decoded[0] == 127:
@@ -1967,7 +1967,7 @@ def group_attachments(size_mb, cid, mids, minimise=False):
 		b += leb128(m)
 	return base65536.encode(b) if minimise else e64(b, out=str)
 def ungroup_attachments(b):
-	b = MemoryBytes(b64_or_uni(b))
+	b = MemoryBytes(decode_auto(b))
 	size_mb, b = decode_leb128(b)
 	i, b = decode_leb128(b)
 	ids = [i]
