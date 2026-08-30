@@ -1682,13 +1682,13 @@ def e64(b, out=bytes):
 	if out is str:
 		e = e.decode("ascii")
 	return e
-def b64(b):
+def b64(b) -> bytes:
 	b = as_bytes(b)
 	if len(b) & 3:
 		b += b"=="
 	return base64.urlsafe_b64decode(b)
 
-def decode_auto(b):
+def decode_auto(b) -> bytes:
 	b = b.strip()
 	if type(b) is str and "%" in b or type(b) is not str and 37 in b:
 		b = unquote_plus(as_str(b))
@@ -1696,23 +1696,29 @@ def decode_auto(b):
 		s = as_str(b)
 		if not re.fullmatch(r"[A-Za-z0-9\-_]+", s):
 			try:
-				return base75.decode(s)
+				return base75.decode(s[::-1])
 			except Exception:
 				pass
-		try:
-			return b64(b)
-		except Exception:
-			pass
+		x = b64(b)
+		if e64(x, out=str) != s.rstrip("="):
+			return base75.decode(s[::-1])
+		return x
 	return base65536.decode(as_str(b))
+def encode_auto(s) -> str:
+	e1 = e64(s, out=str)
+	e2 = base75.encode(s)[::-1]
+	if len(e2) >= len(e1) or re.fullmatch(r"[A-Za-z0-9\-_]+", e2) and e64(b64(e2), out=str) == e2:
+		return e1
+	return e2
 
-def cantor(*x):
+def cantor(*x: int) -> int:
 	n = len(x)
 	p = 0
 	for k in range(n):
 		q = k + sum(x[j] for j in range(k))
 		p += comb(q, k + 1)
 	return p
-def icantor(z):
+def icantor(z: int) -> tuple[int, int]:
 	w = isqrt(8 * z + 1) - 1 >> 1
 	t = w * w + w >> 1
 	y = z - t
@@ -1766,12 +1772,12 @@ def decode_leb128(data: byte_like) -> tuple[int, byte_like]:
 			shift += 7
 	return n, data[i + 1:]
 
-def szudzik(x, y):
+def szudzik(x: int, y: int) -> int:
 	"Szudzik's pairing function."
 	if x < y:
 		return y * y + x
 	return x * x + x + y
-def iszudzik(z):
+def iszudzik(z: int) -> tuple[int, int]:
 	"Inverse of Szudzik's pairing function."
 	w = isqrt(z)
 	t = z - w * w
@@ -1779,7 +1785,7 @@ def iszudzik(z):
 		return t, w
 	return w, t - w
 
-def interleave(*X):
+def interleave(*X: int) -> int:
 	"Bit interleaves a list of integers."
 	m = max(x.bit_length() for x in X)
 	z = 0
@@ -1791,7 +1797,7 @@ def interleave(*X):
 			X2[i] >>= 1
 			z |= b << e * n + i
 	return z
-def deinterleave(z, n=1):
+def deinterleave(z: int, n: int = 1) -> list[int]:
 	"Unpacks a bit interleaved integer into a list of integers."
 	m = z.bit_length()
 	X = [0] * n
@@ -1827,11 +1833,7 @@ def encode_snowflake(*args, store_count=False, minimise=False):
 		encoded = b"\x7f" + encoded
 	if minimise:
 		return base65536.encode(encoded)
-	e1 = e64(encoded, out=str)
-	e2 = base75.encode(encoded)
-	if len(e2) >= len(e1) or re.fullmatch(r"[A-Za-z0-9\-_]+", e2):
-		return e1
-	return e2
+	return encode_auto(encoded)
 def decode_snowflake(data, n=0):
 	decoded = decode_auto(data)
 	if 1 < decoded[0] < 127:
@@ -1965,7 +1967,7 @@ def group_attachments(size_mb, cid, mids, minimise=False):
 	for m in mids:
 		m, i = m ^ i, m
 		b += leb128(m)
-	return base65536.encode(b) if minimise else e64(b, out=str)
+	return base65536.encode(b) if minimise else encode_auto(b)
 def ungroup_attachments(b):
 	b = MemoryBytes(decode_auto(b))
 	size_mb, b = decode_leb128(b)

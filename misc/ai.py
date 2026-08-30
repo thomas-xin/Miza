@@ -688,7 +688,7 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 f_browse = {
 	"type": "function", "function": {
 		"name": "browse",
-		"description": "Searches internet browser, or visits given website URL. Use to validate facts and up-to-date information. You may follow links from search results if necessary",
+		"description": "Text-only internet browser. Use to validate facts and up-to-date information. Can also open URLs including from search results",
 		"parameters": {
 			"type": "object", "properties": {
 				"query": {

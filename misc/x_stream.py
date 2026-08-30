@@ -324,7 +324,7 @@ async def add_headers_middleware(request: Request, call_next):
 
 global_ip = "127.0.0.1"
 last_ip_check = 0
-@app.head(path="/ip")
+@app.head("/ip")
 @app.get("/ip")
 async def ip(request: Request):
 	global global_ip, last_ip_check
@@ -336,7 +336,7 @@ async def ip(request: Request):
 	return dict(host=global_ip, remote=true_ip(request))
 
 
-@app.head(path="/random")
+@app.head("/random")
 @app.get("/random")
 async def prandom(request: Request, count: int = 1048576):
 	return stream_fp(request, RNGFile(count), {"Content-Disposition": "attachment; filename=random.bin"})
@@ -401,7 +401,7 @@ async def authorised_heartbeat(request: Request):
 	return {str(k): v for k, v in attachment_cache.items() if isinstance(k, int) and v and not discord_expired(v)}
 
 
-@app.head(path="/c/{path:path}")
+@app.head("/c/{path:path}")
 @app.get("/c/{path:path}")
 @app.get("/chunked-proxy/{path:path}")
 async def chunked_proxy(request: Request, path: str):
@@ -421,8 +421,8 @@ async def chunked_proxy(request: Request, path: str):
 	return response
 
 
-@app.head(path="/u/{path:path}")
-@app.head(path="/u")
+@app.head("/u/{path:path}")
+@app.head("/u")
 @app.get("/u/{path:path}")
 @app.get("/u")
 @app.get("/unproxy/{path:path}")
@@ -619,7 +619,7 @@ async def backend(path: str, request: Request):
 	)
 
 	if resp.status_code in range(300, 400):
-		return RedirectResponse(url=resp.headers.get("Location") or url, status_code=resp.status_code)
+		return RedirectResponse(url=resp.headers.get("Location") or url, status_code=resp.status_code or 307)
 
 	response_headers = fcdict(resp.headers)
 	response_headers.pop("Connection", None)
@@ -632,13 +632,13 @@ async def backend(path: str, request: Request):
 	if int(resp.headers.get("Content-Length") or 0) <= 262144:
 		return Response(
 			content=resp.content,
-			status_code=resp.status_code,
+			status_code=resp.status_code or 200,
 			headers=response_headers
 		)
 
 	return StreamingResponse(
 		resp.iter_content(65536),
-		status_code=resp.status_code,
+		status_code=resp.status_code or 200,
 		headers=response_headers
 	)
 
