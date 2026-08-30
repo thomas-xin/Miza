@@ -627,58 +627,72 @@ class AttachmentCache(AutoCache):
 			remaining -= Ms
 		chunks.reverse()
 		ac = self.attachment_count
+		ac = min(ac, 500000000 // Ms)
 		self.sess = self.sess or aiohttp.ClientSession()
 		filename = ofn = filename or "c"
 		cid = getattr(channel, "id", channel) if channel else choice(self.channels)
 		futs = []
 		while chunks:
-			names = []
 			temp, chunks = chunks[:ac], chunks[ac:]
-			form_data = aiohttp.FormData(quote_fields=False)
-			payload: dict = dict(
-				content=None,
-				attachments=[dict(
-					id=i,
-					filename=filename if not i else f"b{i}",
-				) for i in range(len(temp))],
-			)
-			for i, n in enumerate(temp):
-				b = data.read(n)
-				fn = filename if not i else f"b{i}"
-				form_data.add_field(
-					name=f"files[{i}]",
-					value=b,
-					filename=fn,
-					content_type="application/octet-stream",
-				)
-				names.append(fn)
-			if len(names) & 1:
-				names.append(None)
-			embeds = []
-			for n1, n2 in zip(names[::2], names[1::2]):
-				embeds.append(dict(
-					url=BASE_URL,
-					image=dict(
-						url=f"attachment://{n1}",
-					),
-					flags=0,
-					type="rich",
-				))
-				if n2:
-					embeds[-1]["thumbnail"] = dict(
-						url=f"attachment://{n2}",
+			datas = []
+			for n in temp:
+				b = await _run_async(data.read, n)
+				datas.append(b)
+
+			async def upload_section(datas):
+				for att in range(16):
+					names = []
+					form_data = aiohttp.FormData(quote_fields=False)
+					payload: dict = dict(
+						content=None,
+						attachments=[dict(
+							id=i,
+							filename=filename if not i else f"b{i}",
+						) for i in range(len(temp))],
 					)
-			if embeds:
-				print("AC-Create:", embeds)
-				payload["embeds"] = embeds
-			form_data.add_field(name="payload_json", value=json_dumpstr(payload))
-			url = f"https://discord.com/api/{api}/channels/{cid}/messages"
-			if editable or channel:
-				heads = dict(self.headers)
-			else:
-				heads = dict(choice((self.headers, self.alt_headers)))
-			heads.pop("Content-Type")
-			fut = self.sess.request("POST", url, headers=heads, data=form_data, timeout=120)
+					for i, b in enumerate(datas):
+						fn = filename if not i else f"b{i}"
+						form_data.add_field(
+							name=f"files[{i}]",
+							value=b,
+							filename=fn,
+							content_type="application/octet-stream",
+						)
+						names.append(fn)
+					if len(names) & 1:
+						names.append(None)
+					embeds = []
+					for n1, n2 in zip(names[::2], names[1::2]):
+						embeds.append(dict(
+							url=BASE_URL,
+							image=dict(
+								url=f"attachment://{n1}",
+							),
+							flags=0,
+							type="rich",
+						))
+						if n2:
+							embeds[-1]["thumbnail"] = dict(
+								url=f"attachment://{n2}",
+							)
+					if embeds:
+						print("AC-Create:", embeds)
+						payload["embeds"] = embeds
+					form_data.add_field(name="payload_json", value=json_dumpstr(payload))
+					url = f"https://discord.com/api/{api}/channels/{cid}/messages"
+					if editable or channel:
+						heads = dict(self.headers)
+					else:
+						heads = dict(choice((self.headers, self.alt_headers)))
+					heads.pop("Content-Type")
+					resp = await self.sess.request("POST", url, headers=heads, data=form_data, timeout=720)
+					if resp.status == 429 or resp.status >= 500:
+						print(resp, await resp.text())
+						await asyncio.sleep(len(datas) << i)
+						continue
+					return resp
+
+			fut = upload_section(datas)
 			if sum(isinstance(fut, asyncio.Future) and not fut.done() for fut in futs) < 2:
 				fut = create_task(fut)
 			futs.append(fut)
@@ -687,6 +701,7 @@ class AttachmentCache(AutoCache):
 		for resp in resps:
 			await raise_aiohttp_safe(resp)
 			message = await resp.json()
+			print("Chunk:", message)
 			mid = int(message["id"])
 			for i, a in enumerate(message["attachments"]):
 				aid = i if editable else int(a["id"])

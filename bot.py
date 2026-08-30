@@ -3863,7 +3863,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		oargs = tuple(args)
 		extra_args = []
 		if message and message.attachments:
-			extra_args = [attachment_cache.preserve(a.url, mid=message.id) for a in message.attachments]
+			extra_args = [attachment_cache.preserve(a.url, mid=message.id) for a in message.attachments if not self.is_inline_attachment(a.filename)]
 		tz = None
 		parser = getattr(command, "parser", None)
 		if not parser:
@@ -5836,11 +5836,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				await self.autodelete(message)
 				await self.send_event("_delete_", message=message)
 
+	@staticmethod
+	def is_inline_attachment(fn):
+		return fn in ("message.txt", "message.md")
+
 	async def handle_message(self, message, before=None):
 		"Handles a new sent message, calls process_message and sends an error if an exception occurs."
 		if message.author.id != self.user.id:
 			for i, a in enumerate(message.attachments):
-				if a.filename in ("message.txt", "message.md"):
+				if self.is_inline_attachment(a.filename):
 					b = await attachment_cache.download(a.url, m_id=message.id, read=False)
 					if message.content:
 						message.content += "\n\n"

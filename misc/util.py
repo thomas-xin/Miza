@@ -1696,17 +1696,17 @@ def decode_auto(b) -> bytes:
 		s = as_str(b)
 		if not re.fullmatch(r"[A-Za-z0-9\-_]+", s):
 			try:
-				return base75.decode(s[::-1])
+				return base75.decode(s)
 			except Exception:
 				pass
 		x = b64(b)
 		if e64(x, out=str) != s.rstrip("="):
-			return base75.decode(s[::-1])
+			return base75.decode(s)
 		return x
 	return base65536.decode(as_str(b))
 def encode_auto(s) -> str:
 	e1 = e64(s, out=str)
-	e2 = base75.encode(s)[::-1]
+	e2 = base75.encode(s)
 	if len(e2) >= len(e1) or re.fullmatch(r"[A-Za-z0-9\-_]+", e2) and e64(b64(e2), out=str) == e2:
 		return e1
 	return e2

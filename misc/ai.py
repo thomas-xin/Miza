@@ -292,6 +292,52 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_last=3, best=False, 
 	messages.insert(0, fm)
 	return messages
 
+async def _summarise(s, max_length, best=False, prompt=None, premium_context=[], model="small"):
+	if len(s) <= max_length:
+		return s
+	ml = round_random(max_length)
+	s = lim_tokens(s, 49152, mode="right")
+	if best:
+		with tracebacksuppressor:
+			if prompt:
+				p = f"`{prompt}`" if "`" not in prompt and "\n" not in prompt else f'\n"""\n{prompt}\n"""'
+				system = f'''### Instruction:
+Please provide a comprehensive but concise summary of the message(s) below. Make sure to include all information relevant to the following question if available:
+{p}
+
+e.g If the user asks about:
+- the next number in a sequence: include all previously occurring numbers
+- a user's gender: include any mentions of gender or pronouns of each person
+- a chess game in progress: include all chess moves
+- nonspecific: provide a general summary
+
+Answer ONLY with the summary, do not answer the question itself!'''
+			else:
+				system = f'### Instruction:\nPlease provide a comprehensive but concise summary of the message(s) below!'
+			messages = [
+				dict(
+					role="system",
+					content=system,
+				),
+				dict(
+					role="user",
+					content=s,
+				),
+			]
+			cmpl = await llm(
+				"chat.completions.create",
+				model=model,
+				messages=messages,
+				temperature=0.01,
+				reasoning_effort="minimal",
+				max_tokens=ml,
+				premium_context=premium_context,
+			)
+			resp = cmpl.choices[0].message.content.strip()
+			if resp and not decensor.search(resp):
+				return resp
+	return lim_tokens(s, round_random(max_length * 2 / 3))
+
 async def summarise(q, min_length=384, max_length=16384, padding=128, best=True, prompt=None, premium_context=[], model="small"):
 	"Produces an AI-generated summary of input text. Model used is controlled by \"best\" parameter."
 	split_length = max_length - padding
@@ -366,18 +412,22 @@ async def load_local():
 		local_models[name] = models
 		available.setdefault(name, {})[""] = (name, pricing)
 		contexts[name] = info.get("context", 24576)
-		if "vision" in capabilities:
-			is_vision.add(name)
-		else:
-			is_vision.discard(name)
-		if "tools" in capabilities:
-			is_function.add(name)
-		else:
-			is_function.discard(name)
-		if "reasoning" in capabilities:
-			is_reasoning.add(name)
-		else:
-			is_reasoning.discard(name)
+		if capabilities:
+			if "vision" in capabilities:
+				is_vision.add(name)
+			else:
+				is_vision.discard(name)
+			if "tools" in capabilities:
+				is_function.add(name)
+			else:
+				is_function.discard(name)
+			if "reasoning" in capabilities:
+				is_reasoning.add(name)
+			else:
+				is_reasoning.discard(name)
+		elif capabilities is None:
+			model.capabilities = []
+			is_completion.add(name)
 
 def model_name(model_id):
 	return model_id and model_id.rsplit("/", 1)[-1].replace("-preview", "")
@@ -428,52 +478,6 @@ async def load_openrouter():
 
 with tracebacksuppressor:
 	submit_thread(asyncio.run, load_openrouter())
-
-async def _summarise(s, max_length, best=False, prompt=None, premium_context=[], model="small"):
-	if len(s) <= max_length:
-		return s
-	ml = round_random(max_length)
-	s = lim_tokens(s, 49152, mode="right")
-	if best:
-		with tracebacksuppressor:
-			if prompt:
-				p = f"`{prompt}`" if "`" not in prompt and "\n" not in prompt else f'\n"""\n{prompt}\n"""'
-				system = f'''### Instruction:
-Please provide a comprehensive but concise summary of the message(s) below. Make sure to include all information relevant to the following question if available:
-{p}
-
-e.g If the user asks about:
-- the next number in a sequence: include all previously occurring numbers
-- a user's gender: include any mentions of gender or pronouns of each person
-- a chess game in progress: include all chess moves
-- nonspecific: provide a general summary
-
-Answer ONLY with the summary, do not answer the question itself!'''
-			else:
-				system = f'### Instruction:\nPlease provide a comprehensive but concise summary of the message(s) below!'
-			messages = [
-				dict(
-					role="system",
-					content=system,
-				),
-				dict(
-					role="user",
-					content=s,
-				),
-			]
-			cmpl = await llm(
-				"chat.completions.create",
-				model=model,
-				messages=messages,
-				temperature=0.01,
-				reasoning_effort="minimal",
-				max_tokens=ml,
-				premium_context=premium_context,
-			)
-			resp = cmpl.choices[0].message.content.strip()
-			if resp and not decensor.search(resp):
-				return resp
-	return lim_tokens(s, round_random(max_length * 2 / 3))
 
 async def llm(func, *args, api=None, timeout=300, premium_context=None, require_message=True, allow_alt=True, **kwargs):
 	if isinstance(api, str) or not api:
@@ -527,9 +531,15 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 				mt2 = mt * 3 // 2
 				ctx = 65536
 				if orig_model in contexts:
-					ctx = contexts[orig_model] - count_to(kwa["messages"]) * 3 // 2
+					if "messages" in kwa:
+						ctx = contexts[orig_model] - count_to(kwa["messages"]) * 3 // 2
+					else:
+						ctx = contexts[orig_model] - tcount(kwa["prompt"]) * 3 // 2
 				mt2 = min(mt2, ctx)
-				kwa["max_completion_tokens"] = mt2
+				if "messages" in kwa:
+					kwa["max_completion_tokens"] = mt2
+				else:
+					kwa["max_tokens"] = mt2
 			kwa.pop("presence_penalty", None)
 			kwa.pop("frequency_penalty", None)
 			reasoning = dict(

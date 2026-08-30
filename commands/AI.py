@@ -341,13 +341,18 @@ class Ask(Command):
 			example="Can I please have a hug?",
 			required_slash=True,
 		),
-		model=cdict(
+		agent=cdict(
 			type="enum",
 			validation=cdict(
 				enum=("auto", "small", "medium", "large"),
 			),
 			description="Model size hint. Larger size increases intelligence, at the cost of higher quota usage",
 			example="small",
+		),
+		model=cdict(
+			type="word",
+			description="Target LLM to invoke (overrides agent)",
+			example="deepseek-v4",
 		),
 	)
 	rate_limit = (12, 16)
@@ -357,8 +362,11 @@ class Ask(Command):
 	reset = {}
 	visited = {}
 
-	async def __call__(self, bot, _message, _guild, _channel, _user, _nsfw, _prefix, _premium, prompt, model, **void):
+	async def __call__(self, bot, _message, _guild, _channel, _user, _nsfw, _prefix, _premium, prompt, agent, model, **void):
 		await bot.require_integrity(_message)
+		if model:
+			if model not in ai.available:
+				model = str_lookup(ai.available, model)
 		self.description = f"Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. See {bot.kofi_url} for premium tier chatbot specifications; check using ~serverinfo, or apply it with ~premium!"
 		await bot.seen(_user, event="misc", raw="Talking to me")
 		embs = []
@@ -463,7 +471,7 @@ class Ask(Command):
 				)
 				messages[m.id] = message
 		await bot.require_integrity(_message)
-		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, model, nsfw, _prefix, simulated)
+		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, agent, model, nsfw, _prefix, simulated)
 		if pdata.stream and pdata.tts != "discord" and not simulated:
 			try:
 				_premium.require(2)
@@ -484,28 +492,28 @@ class Ask(Command):
 			return resp
 		raise RuntimeError(temp)
 
-	async def ask_iterator(self, bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, premium, _model, nsfw, prefix, simulated):
+	async def ask_iterator(self, bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, premium, agent, model, nsfw, prefix, simulated):
 		extra_messages = []
 		props = cdict(name=bot_name)
 		response = cdict()
 		reasonings = []
 		reacts = []
-		if not _model or _model == "auto":
-			_model = pdata.model
-			if not _model or _model == "auto":
+		if not agent or agent == "auto":
+			agent = pdata.agent
+			if not agent or agent == "auto":
 				try:
 					if simulated:
 						raise PermissionError
 					premium.require(2)
 				except PermissionError:
-					_model = "small"
+					agent = "small"
 				else:
-					_model = "large" if premium.value_approx >= 3 else "medium"
-		if _model == "large":
+					agent = "large" if premium.value_approx >= 3 else "medium"
+		if agent == "large":
 			premium.require(3)
-		elif _model == "medium":
+		elif agent == "medium":
 			premium.require(2)
-		model = ["miza-1", "miza-2", "miza-3"][("small", "medium", "large").index(_model)]
+		target = ["miza-1", "miza-2", "miza-3"][("small", "medium", "large").index(agent)]
 		usage = [0, 0]
 		rsep = chr(invisicode.STRINGPREFIX)
 		loading = None
@@ -541,7 +549,7 @@ class Ask(Command):
 					begin = f"> Thinking{rsize}... {loading}\n{rsep}"
 					content = begin + content.split(rsep, 1)[-1]
 					yield "\r" + content
-				async for resp in bot.chat_completion(messagelist, extra_messages=extra_messages, model=model, max_tokens=24576, tools=visible_tools, user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
+				async for resp in bot.chat_completion(messagelist, extra_messages=extra_messages, agent=target, model=model, max_tokens=24576, tools=visible_tools, user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
 					if isinstance(resp, dict):
 						if resp.get("reasoning"):
 							reasonings.extend(resp["reasoning"])
@@ -719,13 +727,18 @@ class ChatConfig(Command):
 			description='Personality description; enter "DEFAULT" to reset',
 			example="Your name is Miza, you are dry, sarcastic and snarky. Be creative with your responses and attempt to annoy the user.",
 		),
-		model=cdict(
+		agent=cdict(
 			type="enum",
 			validation=cdict(
 				enum=("auto", "small", "medium", "large"),
 			),
 			description="Model size hint. Larger size increases intelligence, at the cost of higher quota usage",
 			example="small",
+		),
+		model=cdict(
+			type="word",
+			description="Target LLM to invoke (overrides agent)",
+			example="deepseek-v4",
 		),
 		stream=cdict(
 			type="bool",
@@ -758,7 +771,8 @@ class ChatConfig(Command):
 
 	def retrieve(self, channel, user=None, update=True):
 		per = cdict(
-			model="auto",
+			agent="auto",
+			model=None,
 			description=DEFPER,
 			stream=True,
 			tts="none",
@@ -775,7 +789,7 @@ class ChatConfig(Command):
 				per.update(p)
 		return per
 
-	async def __call__(self, bot, _nsfw, _guild, _channel, _user, _premium, _perm, description, model, stream, tts, history, apply_all, **void):
+	async def __call__(self, bot, _nsfw, _guild, _channel, _user, _premium, _perm, description, agent, model, stream, tts, history, apply_all, **void):
 		if getattr(_channel, "recipient", None):
 			targets = [_channel.recipient]
 			gid = targets[0].id
@@ -795,7 +809,7 @@ class ChatConfig(Command):
 				pers.pop(target.id, None)
 				s += css_md(f"Chat settings for {sqr_md(target)} have been reset.")
 				continue
-			if not description and model is None and stream is None and tts is None and history is None:
+			if not description and agent is None and model is None and stream is None and tts is None and history is None:
 				p = self.retrieve(target)
 				s += ini_md(f"Current chat settings for {sqr_md(target)}:{iter2str(p)}")
 				if _perm < req:
@@ -819,7 +833,11 @@ class ChatConfig(Command):
 			p = pers.get(target.id) or cdict()
 			if description:
 				p.description = description
+			if agent is not None:
+				p.agent = agent
 			if model is not None:
+				if model not in ai.available:
+					model = str_lookup(ai.available, model)
 				p.model = model
 			if tts is not None:
 				p.tts = tts

@@ -339,14 +339,17 @@ if not model_levels:
 		target="auto",
 	)] * 3))
 Bot.model_levels = model_levels
-async def chat_completion(self, messages, extra_messages=(), model="miza-2", system=None, max_tokens=256, temperature=0.8, tools=None, tool_router=None, user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
+async def chat_completion(self, messages, extra_messages=(), agent="miza-2", model=None, system=None, max_tokens=256, temperature=0.8, tools=None, tool_router=None, user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
 	"OpenAI-compatible Chat Completion function. Autoselects model using a function call, then routes to tools and target model as required."
 	await require_predicate(predicate)
 	await ai.load_openrouter()
 	reasoning = []
-	modlvl = ["miza-1", "miza-2", "miza-3"].index(model.rsplit("/", 1)[-1])
+	modlvl = ["miza-1", "miza-2", "miza-3"].index(agent.rsplit("/", 1)[-1])
 	self.model_levels = dict(enumerate(map(cdict, AUTH.get("model_levels", []))))
 	modelist = self.model_levels[modlvl]
+	if model:
+		modelist = cdict(modelist)
+		modelist.instructive = modelist.casual = modelist.nsfw = modelist.function = modelist.vision = model
 	if modlvl >= 2:
 		maxlim = 196608
 		minlim = 2400
@@ -391,7 +394,7 @@ async def chat_completion(self, messages, extra_messages=(), model="miza-2", sys
 	label = cargs.get("mode")
 	if not cargs:
 		mod = await ai.moderate(messages[max(1, len(messages) - 3):], premium_context=premium_context)
-		cargs["nsfw"] = is_nsfw = nsfw_flagged(mod)
+		cargs["nsfw"] = is_nsfw = nsfw_flagged(mod) if modelist.nsfw != modelist.casual else False
 		toolscan = tools
 		if isinstance(toolscan, dict):
 			temp = []
@@ -401,16 +404,6 @@ async def chat_completion(self, messages, extra_messages=(), model="miza-2", sys
 						temp.append(tc)
 			toolscan = temp
 		if modelist.instructive != modelist.casual:
-			# users = 0
-			# toolcheck = []
-			# for m in reversed(snippet):
-			# 	toolcheck.append(m)
-			# 	if m.get("role") == "user":
-			# 		users += 1
-			# 		if users > 1 and len(toolcheck) > :
-			# 			break
-			# # toolcheck.append(messages[0])
-			# toolcheck.reverse()
 			vision_alt = modelist.vision if modelist.function not in ai.is_vision else modelist.function
 			toolcheck, toolmodel = await self.caption_into(snippet, model=modelist.function, backup_model=vision_alt, premium_context=premium_context)
 			mode = None
@@ -492,8 +485,8 @@ async def chat_completion(self, messages, extra_messages=(), model="miza-2", sys
 					)
 				)],
 				created=getattr(resp, "created", None) or floor(utc()),
-				source_model=getattr(resp, "model", None) or model,
-				model=f"Miza/{model}",
+				source_model=getattr(resp, "model", None) or model or agent,
+				model=f"Miza/{agent}",
 				object="chat.completion.chunk",
 				usage=cdict(
 					completion_tokens=ct,
@@ -528,7 +521,7 @@ async def chat_completion(self, messages, extra_messages=(), model="miza-2", sys
 	mode = cargs.get("mode", "casual")
 	if mode not in ("instructive", "casual", "nsfw"):
 		mode = "instructive"
-	mA = 4 if not allow_nsfw else 6 if model == "miza-3" else 5
+	mA = 4 if not allow_nsfw else 6 if agent == "miza-3" else 5
 	draft = monologue = None
 	last_successful = None
 	finish_reason = "end"
@@ -716,8 +709,8 @@ async def chat_completion(self, messages, extra_messages=(), model="miza-2", sys
 							)
 						)],
 						created=getattr(resp, "created", None) or floor(utc()),
-						source_model=getattr(resp, "model", None) or model,
-						model=f"Miza/{model}",
+						source_model=getattr(resp, "model", None) or model or agent,
+						model=f"Miza/{agent}",
 						object="chat.completion.chunk",
 						usage=result.get("usage"),
 						cargs=cargs,
@@ -744,7 +737,8 @@ async def chat_completion(self, messages, extra_messages=(), model="miza-2", sys
 		if not insufficient and not refusal and passable:
 			text = (text or "").rstrip().removesuffix("### End").removesuffix("### Response").removesuffix("<|endoftext|>").removesuffix("<|im_end|>").rstrip().removesuffix("###").rstrip()
 			ct = tcount(text)
-			usage = resp.usage if attempts == 0 else cdict(
+			usage = getattr(resp, "usage", None) if attempts == 0 else None
+			usage = usage or cdict(
 				completion_tokens=ct,
 				prompt_tokens=length,
 				total_tokens=ct + length,
@@ -762,8 +756,8 @@ async def chat_completion(self, messages, extra_messages=(), model="miza-2", sys
 					),
 				)],
 				created=getattr(result, "created", None) or floor(utc()),
-				source_model=getattr(result, "model", None) or model,
-				model=f"Miza/{model}",
+				source_model=getattr(result, "model", None) or model or agent,
+				model=f"Miza/{agent}",
 				usage=usage,
 				reasoning=reasoning,
 			))
