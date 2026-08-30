@@ -709,7 +709,7 @@ class AttachmentCache(AutoCache):
 				aid = i if editable else int(a["id"])
 				self[aid] = a["url"]
 			mids.append(mid)
-		return shorten_chunks(self.max_size // 1048576, cid, mids, url2fn(ofn), mode="c", base="https://mizabot.xyz", minimise=minimise)
+		return shorten_chunks(Ms // 1048576, cid, mids, url2fn(ofn), mode="c", base="https://mizabot.xyz", minimise=minimise)
 
 	async def edit(self, c_id, m_id, *data, url=None, filename=None, content="", collapse=True, minimise=False):
 		if url:
