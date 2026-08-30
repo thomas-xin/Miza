@@ -627,7 +627,7 @@ class AttachmentCache(AutoCache):
 			remaining -= Ms
 		chunks.reverse()
 		ac = self.attachment_count
-		ac = min(ac, 500000000 // Ms)
+		ac = min(ac, 256 * 1048576 // Ms)
 		self.sess = self.sess or aiohttp.ClientSession()
 		filename = ofn = filename or "c"
 		cid = getattr(channel, "id", channel) if channel else choice(self.channels)
@@ -639,7 +639,7 @@ class AttachmentCache(AutoCache):
 				b = await _run_async(data.read, n)
 				datas.append(b)
 
-			async def upload_section(datas):
+			async def upload_section(datas, filename):
 				for att in range(16):
 					names = []
 					form_data = aiohttp.FormData(quote_fields=False)
@@ -687,13 +687,15 @@ class AttachmentCache(AutoCache):
 					heads.pop("Content-Type")
 					resp = await self.sess.request("POST", url, headers=heads, data=form_data, timeout=720)
 					if resp.status == 429 or resp.status >= 500:
-						print(resp, await resp.text())
+						print(resp, i, await resp.text())
 						await asyncio.sleep(len(datas) << i)
 						continue
 					return resp
+				raise RuntimeError("Maximum upload attempts exceeded.")
 
-			fut = upload_section(datas)
-			if sum(isinstance(fut, asyncio.Future) and not fut.done() for fut in futs) < 2:
+			fut = upload_section(datas, filename)
+			filename = "b0"
+			if sum(isinstance(fut, asyncio.Future) and not fut.done() for fut in futs) < 1:
 				fut = create_task(fut)
 			futs.append(fut)
 		mids = []
