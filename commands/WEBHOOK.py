@@ -102,7 +102,7 @@ class UpdateAutoEmojis(Database):
 					else:
 						n = t[0] + "-1"
 				emojis[n] = e
-		if not user and guild:
+		if guild:
 			elist = self.bot.get_guildbase(guild.id, "emojilist", {})
 			for n, e_id in sorted(elist.items(), key=lambda t: t[1]):
 				while n in emojis:
@@ -250,10 +250,9 @@ class UpdateAutoEmojis(Database):
 					return
 		if message.content.count(":") < 2:
 			return
-		cbreg = regexp("`[^`]*`")
 		selected, deselected = [], []
 		while msg:
-			cb = cbreg.search(msg)
+			cb = re.search(r"`[^`]*`", msg)
 			if not cb:
 				selected.append(msg)
 				break

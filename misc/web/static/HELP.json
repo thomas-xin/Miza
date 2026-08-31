@@ -266,6 +266,11 @@
 					"type": "bool",
 					"description": "Whether to produce the in-site media previews instead"
 				},
+				"concatenate": {
+					"type": "bool",
+					"description": "Whether to treat links as an attachment chain (messages are from same channel, all segments except head and tail have same size divisible by 1MB)",
+					"aliases": ["concat"]
+				},
 				"urls": {
 					"type": "url",
 					"description": "URL or attachment to preserve",
@@ -275,7 +280,7 @@
 					"required": true
 				}
 			},
-			"ordered_args": ["minimise", "preview", "urls"],
+			"ordered_args": ["minimise", "preview", "concatenate", "urls"],
 			"macros": {
 				"Shorten": {
 					"minimise": true

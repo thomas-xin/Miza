@@ -1,4 +1,5 @@
 # Make linter shut up lol
+from fontTools.voltLib.voltToFea import Lookup
 from sympy.abc import m
 if "common" not in globals():
 	import misc.common as common
@@ -665,7 +666,7 @@ class Info(Command):
 			case _:
 				raise NotImplementedError(type(obj))
 
-	async def __call__(self, bot, _guild, _channel, _user, objects, mode, **void):
+	async def __call__(self, bot, _guild, _channel, _user, objects, mode, sensitive=False, **void):
 		embeds = []
 		if not objects:
 			match mode:
@@ -682,6 +683,8 @@ class Info(Command):
 			match info.get("type"):
 				case "user":
 					u = o
+					if sensitive and bot.is_optout(u):
+						continue
 					attributes = info.attributes
 					fields = info.fields
 					url, url2 = info.images
@@ -781,6 +784,8 @@ class Info(Command):
 					embeds.append(emb)
 				case _:
 					raise NotImplementedError(info["type"])
+		if not embeds:
+			raise LookupError("No results found.")
 		return cdict(
 			embeds=embeds,
 		)

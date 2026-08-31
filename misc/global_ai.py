@@ -882,7 +882,7 @@ async def tool_call(self, call, uid, message=None, effort="high", premium_contex
 				yield f'Viewing {view(user)}'
 				resp = await self.run_command(
 					self.commands.info[0],
-					dict(objects=[str(user)]),
+					dict(objects=[str(user)], sensitive=True),
 					message=message,
 				)
 				yield pretty_json(resp)

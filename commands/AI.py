@@ -640,6 +640,11 @@ class Ask(Command):
 				if text and not tool_calls:
 					raise StopIteration
 				await bot.require_integrity(_message)
+				if reasonings and extra_messages and extra_messages[0].role == "assistant":
+					reasoning = "\n\n\n".join(reasonings).encode("utf-8")
+					extra_messages[0].reasoning = cdict(
+						content=reasoning,
+					)
 			else:
 				raise ex
 		except StopIteration:
