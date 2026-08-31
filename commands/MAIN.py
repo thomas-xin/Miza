@@ -1,4 +1,5 @@
 # Make linter shut up lol
+from sympy.abc import m
 if "common" not in globals():
 	import misc.common as common
 	from misc.common import *
@@ -1080,6 +1081,11 @@ class Preserve(Command):
 			type="bool",
 			description="Whether to produce the in-site media previews instead",
 		),
+		concatenate=cdict(
+			type="bool",
+			description="Whether to treat links as an attachment chain (messages are from same channel, all segments except head and tail have same size divisible by 1MB)",
+			aliases=["concat"],
+		),
 		urls=cdict(
 			type="url",
 			description="URL or attachment to preserve",
@@ -1109,8 +1115,8 @@ class Preserve(Command):
 	msgcmd = ("Preserve Attachment Links",)
 	ephemeral = True
 
-	async def __call__(self, bot, _channel, _message, minimise, preview, urls, **void):
-		targets = [_message]
+	async def __call__(self, bot, _channel, _message, minimise, preview, concatenate, urls, **void):
+		targets = [] if concatenate else [_message]
 		try:
 			reference = await bot.fetch_reference(_message)
 		except (LookupError, discord.NotFound):
@@ -1121,7 +1127,31 @@ class Preserve(Command):
 			if is_discord_message_link(url):
 				with tracebacksuppressor:
 					m = await bot.fetch_message(url)
-					targets.append(m)
+					if m.attachments:
+						targets.append(m)
+
+		if concatenate and targets:
+			cid = targets[0].channel.id
+			Ms = 0
+			mismatch = False
+			is_head = True
+			for m in targets:
+				if mismatch:
+					raise DomainError("Size mismatch! Only head and tail segments may have differing filesize")
+				if m.channel.id != cid:
+					raise DomainError(f"Channel mismatch! {m.channel.id} != {cid}")
+				for a in m.attachments:
+					if not is_head:
+						if Ms and a.size != Ms:
+							mismatch = True
+						else:
+							Ms = a.size
+							if Ms % 1048576:
+								raise ValueError(f"Middle segment filesize ({Ms}) must be divisible by 1048576 (1MB)")
+					is_head = False
+			mids = [m.id for m in targets]
+			return shorten_chunks(Ms // 1048576, cid, mids, targets[0].attachments[0].filename, mode="c", base="https://mizabot.xyz", minimise=minimise)
+
 		kvs = {}
 		for m in targets:
 			for a in m.attachments:
@@ -1135,7 +1165,7 @@ class Preserve(Command):
 				print_exc()
 				futs.append(bot.data.exec.lproxy(url, channel=_channel, minimise=minimise))
 				await asyncio.sleep(0.1)
-		out = await gather(*futs)
+		out = await gather(*futs, max_concurrency=2)
 		print(urls)
 		print(out)
 		if preview:

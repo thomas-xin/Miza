@@ -400,12 +400,14 @@ class AttachmentCache(AutoCache):
 				for e in data["embeds"]:
 					try:
 						url = e["image"]["url"]
-						urls.append(url.rstrip("&"))
+						if is_discord_attachment(url):
+							urls.append(url.rstrip("&"))
 					except KeyError:
 						pass
 					try:
 						url = e["thumbnail"]["url"]
-						urls.append(url.rstrip("&"))
+						if is_discord_attachment(url):
+							urls.append(url.rstrip("&"))
 					except KeyError:
 						pass
 		return urls, size_mb * 1048576
