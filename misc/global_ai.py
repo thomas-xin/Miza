@@ -869,7 +869,7 @@ async def tool_call(self, call, uid, message=None, effort="high", premium_contex
 				if ";" in argv.rstrip(";"):
 					start, end = argv.rstrip(";").rsplit(";", 1)
 					end = end.strip()
-					if not end.startswith("console.log"):
+					if end and "console.log" not in end and end[0] not in "}])>":
 						argv = start + f"; console.log({end});"
 				else:
 					args.append("-p")

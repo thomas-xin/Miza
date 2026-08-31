@@ -1356,9 +1356,9 @@ class MultiEncoder(json.JSONEncoder):
 		return json_default(obj)
 
 def json_dumps(obj, *args, **kwargs):
-	return orjson.dumps(obj, *args, default=json_default, **kwargs)
+	return orjson.dumps(obj, *args, default=json_default, option=orjson.OPT_NON_STR_KEYS, **kwargs)
 def json_dumpstr(obj, *args, **kwargs):
-	return orjson.dumps(obj, *args, default=json_default, **kwargs).decode("utf-8", "replace")
+	return orjson.dumps(obj, *args, default=json_default, option=orjson.OPT_NON_STR_KEYS, **kwargs).decode("utf-8", "replace")
 
 class PrettyJSONEncoder(json.JSONEncoder):
 
@@ -1396,7 +1396,7 @@ def encode_jsonl(data):
 	assert isinstance(data, collections.abc.Iterable)
 	b = io.BytesIO()
 	for e in data:
-		b.write(orjson.dumps(e))
+		b.write(orjson.dumps(e, option=orjson.OPT_NON_STR_KEYS))
 		b.write(b"\n")
 	return b.getbuffer().tobytes()
 def decode_jsonl(data):

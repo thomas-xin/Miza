@@ -610,12 +610,19 @@ class Ask(Command):
 							else:
 								content += f"\n> {info}"
 						yield "\r" + content.strip() + ("\n\n" * bool(content)) + text.strip()
+						def try_json(s):
+							if isinstance(s, str):
+								return s
+							try:
+								return pretty_json(s)
+							except Exception:
+								return repr(s)
 						resps = await gather(*(
 							as_fut(info) if isinstance(info, BaseException) else anext(gen)
 							for info, gen in zip(infos, tool_gens)
 						), max_concurrency=5, return_exceptions=True)
 						pairs = [
-							(tc, (resp if not isinstance(info, BaseException) else pretty_json(info) if type(info) is not StopAsyncIteration else "[MALFORMED TOOL USAGE]") or "[RESPONSE EMPTY OR REDACTED")
+							(tc, (try_json(resp) if type(info) is not StopAsyncIteration else "[MALFORMED TOOL USAGE]") or "[RESPONSE EMPTY OR REDACTED")
 							for tc, info, resp in zip(tool_calls, infos, resps)
 						]
 						tool_calls = [pair[0] for pair in pairs]
@@ -641,7 +648,7 @@ class Ask(Command):
 					raise StopIteration
 				await bot.require_integrity(_message)
 				if reasonings and extra_messages and extra_messages[0].role == "assistant":
-					reasoning = "\n\n\n".join(reasonings).encode("utf-8")
+					reasoning = "\n\n\n".join(reasonings)
 					extra_messages[0].reasoning = cdict(
 						content=reasoning,
 					)

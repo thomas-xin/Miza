@@ -232,7 +232,7 @@ def count_to(messages, encoding=None):
 						raise RuntimeError(f"Unexpected object {json_dumpstr(part)} in message.")
 	return tcount(substrings, encoding) + num_tokens + 3
 
-async def cut_to(messages, limit=1024, softlim=384, exclude_last=3, best=False, prompt=None, premium_context=[], model="small"):
+async def cut_to(messages, limit=1024, softlim=384, exclude_last=3, best=False, prompt=None, premium_context=[], model="small", require_user=True):
 	if not messages:
 		return messages
 	messages = list(messages)
@@ -247,8 +247,10 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_last=3, best=False, 
 	i = -1
 	for i, m in reversed(tuple(enumerate(messages))):
 		c = tcount(m_repr(m))
-		if c + count > softlim * 0.8 and not m.get("tool_calls") and m.get("role") != "tool":
+		if not require_user and c + count > softlim * 0.8 and not m.get("tool_calls") and m.get("role") != "tool":
 			break
+		if m.role == "user":
+			require_user = False
 		held.append(m)
 		count = count_to(held)
 	basics = [m for m in messages if m.get("role") != "tool" and m.get("content")]
