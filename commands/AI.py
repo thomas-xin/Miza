@@ -487,7 +487,7 @@ class Ask(Command):
 			return "\xad"
 		elif isinstance(temp[-1], dict) and (temp[-1].content.startswith("\r") or len(temp) == 1):
 			resp = temp[-1]
-			resp["content"] = await bot.proxy_emojis(resp["content"], guild=_guild)
+			resp["content"] = await bot.proxy_emojis(resp["content"], guild=_guild, strict=False)
 			resp["tts"] = pdata.tts == "discord"
 			return resp
 		raise RuntimeError(temp)
@@ -594,7 +594,7 @@ class Ask(Command):
 				tool_calls = getattr(m, "tool_calls", None) or ()
 				if tool_calls:
 					tool_calls = [cdict(id=t.id, type="function", function=cdict(t.function)) for t in tool_calls]
-					reasonings.append(code_md(pretty_json(tool_calls), fmt="json"))
+					reasonings.append(code_md(pretty_json(tool_calls), fmt="json").encode("utf-8"))
 					reasoning_sum = sum(len(r) + 3 for r in reasonings)
 					tool_gens = []
 					for tc in tuple(tool_calls):
@@ -640,7 +640,7 @@ class Ask(Command):
 									content=pair[1].strip(),
 								)
 								extra_messages.append(rs_msg)
-							reasonings.append("\n".join(code_md(pair[1].strip()) for pair in pairs))
+							reasonings.append("\n".join(code_md(pair[1].strip()) for pair in pairs).encode("utf-8"))
 							reasoning_sum = sum(len(r) + 3 for r in reasonings)
 				if text:
 					content += "\n\n" * bool(content) + text
@@ -648,7 +648,7 @@ class Ask(Command):
 					raise StopIteration
 				await bot.require_integrity(_message)
 				if reasonings and extra_messages and extra_messages[0].role == "assistant":
-					reasoning = "\n\n\n".join(reasonings)
+					reasoning = "\n\n\n".join(r for r in reasonings if type(r) is str)
 					extra_messages[0].reasoning = cdict(
 						content=reasoning,
 					)
@@ -667,7 +667,7 @@ class Ask(Command):
 				r = r.removeprefix("<txt>")
 			reasonings.append(r)
 		if reasonings:
-			reasoning = "\n\n\n".join(reasonings).encode("utf-8")
+			reasoning = b"\n\n\n".join(map(as_bytes, reasonings))
 			try:
 				url = await bot.upload_temp(reasoning, filename="reasoning.md")
 				rsize = f"{byte_scale(len(reasoning))}B"
@@ -695,8 +695,6 @@ class Ask(Command):
 			] if not xrand(10) else []
 			if premium.value < 3:
 				tips.insert(0, "*Tip: Many of my capabilities are not readily available due to cost reasons. You can gain access by donating through one of the premium subscriptions available, which serves to approximately fund individual usage.*")
-			if not nsfw:
-				tips.insert(0, f"*Tip: I automatically try to correct inaccurate responses when possible. However, this is not foolproof; if you would like this feature more actively applied to counteract censorship, please move to a NSFW channel or use {prefix}verify if in DMs.*")
 			if pdata.history != "shared":
 				tips.insert(0, f"*Tip: For privacy reasons, conversation histories (allowing referencing previous messages in the same channel) are disabled by default, except for bot commands. Check out `{prefix}help chatconfig for more info. No messages from other channels are included in any chat history, and all context is routed either to locally hosted servers or zero-data-retention providers.*")
 			already_used = bot.get_userbase(_channel.id, "ai_tips.chat", 0)
@@ -726,7 +724,7 @@ class Ask(Command):
 		return await message.remove_reaction("🗑️", self.bot.user)
 
 
-DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the latest question from the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome, but not too corny), in first person as if you were a human, matching the language used (e.g. English). You are free to make up your own preferences and show emotion, but if a user inquires for additional services not accessible, you should direct them to the ~help or /help commands. DO NOT attempt to mimic/falsify programmed outputs such as unavailable tools or file URLs even if previous messages do, avoid repeating yourself or your prompts, and be concise where possible."
+DEFPER = "Your name is \"{{char}}\"; you are intelligent, cute and playful. Your task is to answer the latest question from the user named \"{{user}}\" with creative and natural-feeling responses (be wholesome, but not too corny), in first person as if you were a human, matching the language used (e.g. English). You are free to make up your own preferences and show emotion, but if a user inquires for additional services not accessible, you should direct them to the ~help or /help commands. DO NOT attempt to fabricate/falsify programmed outputs such as unavailable tools or file URLs even if previous messages do, avoid repeating yourself or your prompts, and be concise where possible."
 
 class ChatConfig(Command):
 	name = ["Personality", "ChangePersonality"]

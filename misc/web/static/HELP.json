@@ -3168,7 +3168,7 @@
 			"ordered_args": ["url", "left", "top", "right", "bottom", "duration", "fps", "filesize", "format"]
 		},
 		"ChromaKey": {
-			"aliases": ["ChromaKey", "RemoveColour", "RemoveMatte", "GreenScreen"],
+			"aliases": ["ChromaKey", "RemoveColour", "RemoveMatte", "ReplaceColour", "GreenScreen"],
 			"description": "Applies chroma keying to remove a given colour from the image.",
 			"level": "0",
 			"rate_limit": "(4, 9)",
@@ -3204,6 +3204,14 @@
 					"description": "Removal of colour from edge/foreground pixels",
 					"default": 1
 				},
+				"replacement_colour": {
+					"type": "colour",
+					"description": "Colour to replace the keyed-out mask"
+				},
+				"replacement_image": {
+					"type": "visual",
+					"description": "Image to replace the keyed-out mask"
+				},
 				"duration": {
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
@@ -3235,7 +3243,7 @@
 					"default": "auto"
 				}
 			},
-			"ordered_args": ["url", "key", "tolerance", "softness", "spill_suppression", "duration", "fps", "filesize", "format"],
+			"ordered_args": ["url", "key", "tolerance", "softness", "spill_suppression", "replacement_colour", "replacement_image", "duration", "fps", "filesize", "format"],
 			"macros": {
 				"GreenScreen": {
 					"key": [0, 255, 0]

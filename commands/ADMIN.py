@@ -2410,7 +2410,7 @@ class UpdateMessageLogs(Database):
 		emb.description = action
 		emb.timestamp = before.edited_at or after.created_at
 		embs[0] = emb
-		await bot.send_and_finalise(channel, embeds=embs)
+		await bot.send_and_finalise(channel, embeds=embs, upload=False)
 
 	# Delete events must attempt to find the user who deleted the message
 	async def _audited_delete_(self, message, requestor=None, **void):

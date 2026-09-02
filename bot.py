@@ -1761,11 +1761,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			emoji = e
 		return emoji.animated
 
-	async def proxy_emojis(self, msg, guild=None, user=None, is_webhook=False, return_pops=False, lim=400):
+	async def proxy_emojis(self, msg, guild=None, user=None, is_webhook=False, return_pops=False, lim=400, strict=True):
 		"Retrieves and maps user's emoji list on target string. Used for ~AutoEmoji and compatibility with other commands."
 		orig = self.get_userbase(user.id, "emojilist", {}) if user else {}
 		emojis = emoji = None
-		regex = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^at\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
+		regex = (
+			regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^at\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])") if strict
+			else regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^at\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:?)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
+		)
 		pops = set()
 		offs = 0
 		replaceds = []
@@ -1780,7 +1783,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			while s and not regexp(":[A-Za-z0-9\\-~_]").fullmatch(s[:2]):
 				s = s[1:]
 				start += 1
-			while s and not regexp("[A-Za-z0-9\\-~_]:").fullmatch(s[-2:]):
+			while s and not regexp("[A-Za-z0-9\\-~_]:?").fullmatch(s[-2:]):
 				s = s[:-1]
 			offs = start = offs + start
 			offs += len(s)
@@ -1925,8 +1928,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							print(b, repr(res))
 				return "\n\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).strip()
 			if is_discord_attachment(argv) or is_miza_attachment(argv):
-				if url2ext(argv) in VISUAL_FORMS:
-					return "[MEDIA OUT-OF-FOCUS]"
+				return attachment_cache.preserve(argv)
 			assert not is_local_url(argv), argv
 			result = await _run_async(
 				self.ddgs.extract,
@@ -2327,7 +2329,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				embeds[0].description = lim_str(description, 4096)
 		return embeds
 
-	async def prepare_embeds(self, embeds, m_id=None, c_id=None, g_id=None, allow_from=None):
+	async def prepare_embeds(self, embeds, m_id=None, c_id=None, g_id=None, allow_from=None, upload=True):
 		temp_proxied = {}
 		used_names = collections.Counter()
 
@@ -2341,6 +2343,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			except KeyError:
 				url2 = None
 			if not url2:
+				if not upload:
+					return p[-1]
 				print("Prepared Reupload:", p)
 				fn = None
 				try:
@@ -2386,7 +2390,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							if getsize(fn) > 1048576 * 50:
 								return p[-1]
 							channel = await self.fetch_channel(c_id) if c_id else None
-							url2 = await attachment_cache.create_dynamic(fn, filename=url2fn(raw), channel=channel)
+							f = open(fn, "rb") if isinstance(fn, str) else fn
+							with f:
+								url2 = await attachment_cache.create_dynamic(fn, filename=url2fn(raw), channel=channel)
 							self.proxied[p] = new = url2
 							return url2
 				except Exception as ex:
@@ -2521,8 +2527,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if requires_edit:
 			await self.edit_message(message, embeds=embeds)
 
-	async def send_and_finalise(self, channel, content=None, embeds=[]):
-		attachments = await self.prepare_embeds(embeds, c_id=channel.id, g_id=channel.guild.id)
+	async def send_and_finalise(self, channel, content=None, embeds=[], upload=True):
+		attachments = await self.prepare_embeds(embeds, c_id=channel.id, g_id=channel.guild.id, upload=upload)
 		m = await channel.send(content, embeds=embeds, files=attachments)
 		await self.finalise_embeds(m, embeds, attachments, g_id=channel.guild.id)
 		return m

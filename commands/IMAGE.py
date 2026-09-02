@@ -900,7 +900,7 @@ class Crop(Visual, Command):
 
 
 class ChromaKey(Visual, Command):
-	name = ["RemoveColour", "RemoveMatte"]
+	name = ["RemoveColour", "RemoveMatte", "ReplaceColour"]
 	description = "Applies chroma keying to remove a given colour from the image."
 	schema = cdict(
 		key=cdict(
@@ -925,6 +925,16 @@ class ChromaKey(Visual, Command):
 			description="Removal of colour from edge/foreground pixels",
 			default=1,
 		),
+		replacement_colour=cdict(
+			type="colour",
+			description="Colour to replace the keyed-out mask",
+			aliases=["replacement_color"],
+		),
+		replacement_image=cdict(
+			type="visual",
+			description="Image to replace the keyed-out mask",
+			aliases=["bg", "background"],
+		),
 	)
 	macros = cdict(
 		GreenScreen=cdict(
@@ -935,8 +945,9 @@ class ChromaKey(Visual, Command):
 	_timeout_ = 4
 	slash = True
 
-	async def __call__(self, _time_limit, url, key, tolerance, softness, spill_suppression, filesize, format, **void):
-		resp = await process_image(url, "remove_colour", [key, tolerance, softness, spill_suppression, "-fs", filesize, "-f", format], timeout=_time_limit)
+	async def __call__(self, _time_limit, url, key, tolerance, softness, spill_suppression, replacement_colour, replacement_image, duration, fps, filesize, format, **void):
+		extras = [replacement_image] if replacement_image else []
+		resp = await process_image(url, "chromakey_map", [extras, float(duration) if duration is not None else None, fps, key, tolerance, softness, spill_suppression, replacement_colour, "-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")

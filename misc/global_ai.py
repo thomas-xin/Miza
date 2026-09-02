@@ -262,7 +262,7 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 		elif sum(f is not None for f in follows) < 4 and m.get("url") and j < 8:
 			follows[i] = create_task(self.follow_url(m.url, priority_order=("video", "image", "text"), allow_text=False))
 		elif not m.get("content"):
-			m.content = "[MEDIA OUT-OF-FOCUS]"
+			m.content = ""
 		m.pop("url", None)
 	for i, fut in enumerate(follows):
 		if not fut:
@@ -845,7 +845,10 @@ async def ocr(self, url):
 Bot.ocr = ocr
 
 def view(text, limit=48):
-	return "`" + lim_str(as_str(text).split("\n", 1)[0], limit, mode="left").replace("`", "'") + "`"
+	text = text.replace("\f", "\n")
+	if "\n" in text:
+		text = text.split("\n", 1)[0] + "..."
+	return "`" + lim_str(as_str(text), limit, mode="left").replace("`", "'") + "`"
 async def tool_call(self, call, uid, message=None, effort="high", premium_context=None):
 	try:
 		func = call.function

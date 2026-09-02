@@ -1,6 +1,7 @@
 import collections
 import concurrent.futures
 import contextlib
+import copy
 import fractions
 import functools
 import io
@@ -252,7 +253,11 @@ class ImageSequence(Image.Image, collections.abc.Sequence):
 		try:
 			return self.__getattribute__(key)
 		except AttributeError:
-			im = self.ensure(self._position)
+			try:
+				pos = self.__getattribute__("_position")
+			except AttributeError:
+				pos = 0
+			im = self.ensure(pos)
 			try:
 				if not im.im:
 					raise ValueError
@@ -320,7 +325,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 	proc = None
 	try:
 		left, right = mime.split("/", 1)[0], mime.split("/", 1)[-1]
-		if left == "image" and right in "avif blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd qoi sgi sun spider tga tiff wal wmf webp xbm".split():
+		if left == "image" and right in "avif blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd qoi sgi sun spider tga tiff wal wmf xbm".split():
 			try:
 				im = Image.open(out)
 			except PIL.UnidentifiedImageError:
@@ -379,7 +384,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 									# print("TD:", im.info["total_duration"])
 				# print("PIL:", multi)
 				return im
-		if left in ("image", "video") and right != "webp":
+		if left in ("image", "video"):
 			fmt = "rgba" if left == "image" else "rgb24"
 			ts = time.time_ns() // 1000
 			if mime == "video/m3u8" and orig:
@@ -552,7 +557,7 @@ def get_image(url, out=None, nodel=False, nogif=False, maxframes=inf, msize=None
 	out = out or url
 	if type(url) not in (bytes, bytearray, io.BytesIO):
 		if is_url(url):
-			image = from_cached_image(url, nogif, maxframes, msize)
+			image = copy.deepcopy(from_cached_image(url, nogif, maxframes, msize))
 		else:
 			if os.path.getsize(url) > 8589934592:
 				raise OverflowError("Max file size to load is 8GB.")
@@ -813,7 +818,7 @@ def from_gradient(shape, colour, background, repetitions=1, size=960, colourspac
 	if colourspace.casefold() != "rgb":
 		data = convert_colour(data, colourspace, "rgb")
 	data *= 255
-	grad = quantise_into(data, in_place=True)
+	grad = quantise_into(data)
 	im = fromarray(grad, mode="RGBA" if dim == 4 else "RGB")
 	return im
 
@@ -826,7 +831,7 @@ def gen_bg(size) -> Image.Image:
 	a = Image.new("L", size, color=255)
 	return Image.merge("RGBA", (r, g, b, a))
 
-def quantise_into(a, clip=None, in_place=False, checkerboard=True, dtype=np.uint8) -> np.ndarray:
+def quantise_into(a, clip=None, in_place=True, checkerboard=True, dtype=np.uint8) -> np.ndarray:
 	if issubclass(a.dtype.type, np.integer):
 		return a
 	if checkerboard:
@@ -995,10 +1000,10 @@ def optimise(im, keep_rgb=True, recurse=True, max_frames=60):
 		changed = False
 		try:
 			count = len(im)
-		except Exception:
+		except TypeError:
 			try:
 				count = properties(im)[0]
-			except Exception:
+			except AttributeError:
 				im = list(resume(i0, out, it))
 				count = len(im)
 				it = iter(im[1:])
@@ -1265,7 +1270,7 @@ def resize_to(image, w, h, mode="auto") -> Image.Image:
 		else:
 			a = np.array(image, dtype=np.float32)
 			a = cv2.resize(a, (w, h), interpolation=cv2.INTER_LANCZOS4)
-			a = quantise_into(a, clip=(0, 255), in_place=True)
+			a = quantise_into(a, clip=(0, 255))
 			return Image.fromarray(a, image.mode)
 	if filt == "area":
 		if max(w * h, np.prod(image.size)) > 1048576:
@@ -1273,7 +1278,7 @@ def resize_to(image, w, h, mode="auto") -> Image.Image:
 		else:
 			a = np.array(image, dtype=np.float32)
 			a = cv2.resize(a, (w, h), interpolation=cv2.INTER_AREA)
-			a = quantise_into(a, in_place=True)
+			a = quantise_into(a)
 			return Image.fromarray(a, image.mode)
 	if filt == "cubic":
 		if max(w * h, np.prod(image.size)) > 1048576:
@@ -1281,7 +1286,7 @@ def resize_to(image, w, h, mode="auto") -> Image.Image:
 		else:
 			a = np.array(image, dtype=np.float32)
 			a = cv2.resize(a, (w, h), interpolation=cv2.INTER_CUBIC)
-			a = quantise_into(a, clip=(0, 255), in_place=True)
+			a = quantise_into(a, clip=(0, 255))
 			return Image.fromarray(a, image.mode)
 	if filt == "linear":
 		if max(w * h, np.prod(image.size)) > 1048576:
@@ -1289,7 +1294,7 @@ def resize_to(image, w, h, mode="auto") -> Image.Image:
 		else:
 			a = np.array(image, dtype=np.float32)
 			a = cv2.resize(a, (w, h), interpolation=cv2.INTER_LINEAR)
-			a = quantise_into(a, in_place=True)
+			a = quantise_into(a)
 			return Image.fromarray(a, image.mode)
 	return image.resize([w, h], filt)
 
@@ -1309,7 +1314,7 @@ def rotate_to(image, angle, expand=True, fill=False) -> Image.Image:
 	if fill and im.mode == "RGBA":
 		colour = get_colour(image)
 		a = np.tile(np.float32(colour), (im.height, im.width, 1))
-		a = quantise_into(a, in_place=True)
+		a = quantise_into(a)
 		image = Image.fromarray(a, "RGB").convert("RGBA")
 		return Image.alpha_composite(image, im)
 	return im
@@ -1357,7 +1362,7 @@ def to_qr(s, repetitions=3, duration=4.8, fps=30):
 				bg[mask] = fg[mask]
 				data = convert_colour(bg, "hsl", "rgb", in_place=False)
 				data *= 255
-				grad = quantise_into(data, in_place=True)
+				grad = quantise_into(data)
 				yield fromarray(grad, mode="RGB")
 
 		return dict(duration=duration, count=count, frames=qr_iterator(im))
@@ -1491,7 +1496,7 @@ def rainbow_map(images, mode, progress=0, **kwargs) -> Image.Image:
 	space.T[0] += progress
 	rgb = convert_colour(space, mode, "rgb")
 	rgb *= 255
-	rgb = quantise_into(rgb, in_place=True)
+	rgb = quantise_into(rgb)
 	im = fromarray(rgb, "RGB")
 	return join_rgba(im, A)
 
@@ -1891,7 +1896,7 @@ def adjust_map(images, operation, value, channels, clip, **kwargs) -> Image.Imag
 		else:
 			bounds = None
 			a %= 256
-		a = quantise_into(a, clip=bounds, in_place=True)
+		a = quantise_into(a, clip=bounds)
 		A = fromarray(a, "L")
 	rgb *= 255
 	if clip:
@@ -1899,7 +1904,7 @@ def adjust_map(images, operation, value, channels, clip, **kwargs) -> Image.Imag
 	else:
 		bounds = None
 		rgb %= 256
-	rgb = quantise_into(rgb, clip=bounds, in_place=True)
+	rgb = quantise_into(rgb, clip=bounds)
 	im = fromarray(rgb, "RGB")
 	im = join_rgba(im, A)
 	return im
@@ -1957,10 +1962,10 @@ def _blend_map(images, operation, opacity, props=(), **kwargs) -> Image.Image:
 		np.nan_to_num(a1, copy=False)
 
 	a1 *= 255
-	a1 = quantise_into(a1, clip=(0, 255), in_place=True).reshape(a1.shape[:2])
+	a1 = quantise_into(a1, clip=(0, 255)).reshape(a1.shape[:2])
 	A = fromarray(a1, "L")
 	rgb *= 255
-	rgb = quantise_into(rgb, clip=(0, 255), in_place=True)
+	rgb = quantise_into(rgb, clip=(0, 255))
 	im = fromarray(rgb, "RGB")
 	return join_rgba(im, A)
 blend_map = sync_animations(_blend_map, keep_size="exact")
@@ -2274,7 +2279,7 @@ def colourspace(image, source, dest) -> Image.Image:
 	im *= 1 / 255
 	im = convert_colour(im, source, dest)
 	im *= 255
-	im = quantise_into(im, in_place=True)
+	im = quantise_into(im)
 	image = fromarray(im, "RGB")
 	image = join_rgba(image, A)
 	return image
@@ -2291,7 +2296,7 @@ def get_colour(image) -> list[float]:
 	return [np.mean(c) for c in np.asanyarray(rgb, dtype=np.uint8).T]
 
 def get_average_frame(image) -> np.ndarray:
-	arr = np.asanyarray(image).astype(np.float64)
+	arr = np.asanyarray(image, dtype=np.float32)
 	i = 0
 	try:
 		for i in range(1, 2147483648):
@@ -2301,7 +2306,7 @@ def get_average_frame(image) -> np.ndarray:
 		pass
 	if i:
 		arr *= 1 / (i + 1)
-	return np.clip(arr, 0, 255, out=arr).astype(np.uint8)
+	return quantise_into(arr, clip=(0, 255))
 
 def psnr(image, extras) -> float:
 	assert len(extras) == 1, "Only 2 images are currently accepted."
@@ -2600,9 +2605,56 @@ def expand_mask(image2, radius=4) -> Image.Image:
 	outim = Image.fromarray(outmask, mode="L")
 	return outim
 
-def remove_colour(image: Image.Image, key_colour=None, tolerance=0.35, softness=0.15, spill_strength=1) -> Image.Image:
-	img = image.convert("RGBA")
-	arr = np.asanyarray(img).astype(np.float32)
+from typing import Optional, Sequence, Union
+
+ColourLike = Union[Sequence[float], np.ndarray]
+ImageLike = Union[Image.Image, np.ndarray]
+
+def split_colour(colour: ColourLike) -> tuple[np.ndarray, float]:
+	"""(r, g, b) in 0..1 plus alpha in 0..1, from an 0..255 RGB(A) colour."""
+	c = np.asanyarray(colour, dtype=np.float32).reshape(-1)
+	if c.size < 3:
+		raise ValueError("replacement_colour needs at least 3 components")
+	rgb = np.clip(c[:3] * (1 / 255), 0, 1)
+	alpha = np.clip(c[3] * (1 / 255), 0, 1) if c.size > 3 else 1
+	return rgb, alpha
+
+def composite(
+	top_rgb: np.ndarray, top_a: np.ndarray,
+	bot_rgb: np.ndarray, bot_a: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+	"""Unpremultiplied Porter-Duff `top OVER bot`."""
+	ta = top_a[..., None]
+	ba = bot_a[..., None]
+
+	out_a = top_a + bot_a * (1 - top_a)
+	num = top_rgb * ta + bot_rgb * ba * (1 - ta)
+	den = out_a[..., None]
+
+	base = top_rgb.copy()
+	out_rgb = np.divide(num, den, out=base, where=den > 0)
+	return out_rgb, out_a
+
+def chromakey(
+	images: list[Image.Image],
+	key_colour: Optional[ColourLike] = None,
+	tolerance: float = 0.35,
+	softness: float = 0.15,
+	spill_strength: float = 1,
+	replacement_colour: Optional[ColourLike] = None,
+	**kwargs,
+) -> Image.Image:
+	"""Key `key_colour` out of `image`, optionally filling the keyed-out region.
+
+	If `replacement_colour` (RGB or RGBA, 0..255) and/or `replacement_image`
+	are given, they are composited *behind* the surviving foreground, but only
+	within the coverage the key actually removed. Pixels that were already
+	transparent in the source stay transparent, and the alpha of both the
+	source and the replacement is respected. If both are given, the image is
+	composited over the colour first, and the result is used as the fill.
+	"""
+	img = images[0].convert("RGBA")
+	arr = np.asanyarray(img, dtype=np.float32)
 	arr *= 1 / 255
 
 	rgb = arr[..., :3]
@@ -2614,7 +2666,6 @@ def remove_colour(image: Image.Image, key_colour=None, tolerance=0.35, softness=
 	key *= 1 / 255
 
 	dist = np.linalg.norm(rgb - key, axis=-1)
-
 	denom = max(softness, 1 / 1048576)
 	key_alpha = np.clip((dist - tolerance) / denom, 0, 1)
 
@@ -2628,12 +2679,37 @@ def remove_colour(image: Image.Image, key_colour=None, tolerance=0.35, softness=
 		limit = np.minimum(*others)
 
 		excess = np.clip(dom - limit, 0, 1)
-		channels[dominant] = dom - excess * spill_strength
+		spill_mask = np.clip(1 - (dist - tolerance) / (denom * 3), 0, 1)
+		channels[dominant] = dom - excess * spill_strength * spill_mask
 
 		rgb = np.stack(channels, axis=-1)
+
 	out_alpha = src_alpha * key_alpha
+	removed = np.clip(src_alpha - out_alpha, 0, 1)
+	fill_rgb: Optional[np.ndarray] = None
+	fill_alpha: Optional[np.ndarray] = None
+
+	if replacement_colour is not None:
+		crgb, ca = split_colour(replacement_colour)
+		fill_rgb = np.broadcast_to(crgb, rgb.shape).astype(np.float32)
+		fill_alpha = np.full(removed.shape, ca, dtype=np.float32)
+
+	if len(images) > 1:
+		larr = np.asanyarray(images[1].convert("RGBA"), dtype=np.float32)
+		larr *= (1 / 255)
+		lrgb, lalpha = larr[..., :3], larr[..., 3]
+
+		if fill_rgb is None or fill_alpha is None:
+			fill_rgb, fill_alpha = lrgb, lalpha
+		else:
+			fill_rgb, fill_alpha = composite(lrgb, lalpha, fill_rgb, fill_alpha)
+
+	if fill_rgb is not None and fill_alpha is not None:
+		# blend the replacement's own alpha into the keyed-out coverage
+		rgb, out_alpha = composite(rgb, out_alpha, fill_rgb, removed * fill_alpha)
 
 	out = np.concatenate([rgb, out_alpha[..., None]], axis=-1)
 	out *= 255
-	a = quantise_into(out, clip=(0, 255), in_place=True)
+	a = quantise_into(out, clip=(0, 255))
 	return Image.fromarray(a, "RGBA")
+chromakey_map = sync_animations(chromakey, keep_size="exact")
