@@ -489,6 +489,7 @@ class Ask(Command):
 				return cdict(
 					content=fut,
 					b_tts=pdata.tts == "builtin",
+					strict=False,
 				)
 		temp = await flatten(fut)
 		if not temp:

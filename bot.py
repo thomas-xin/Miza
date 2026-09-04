@@ -1792,7 +1792,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			offs = start = offs + start
 			offs += len(s)
 			if not s:
-				break
+				if not start:
+					break
+				continue
 			name = s[1:-1]
 			if emojis is None:
 				emojis = self.data.autoemojis.guild_emoji_map(guild, user, dict(orig))
@@ -4977,7 +4979,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					else:
 						tfut = None
 					try:
-						temp_content = await self.proxy_emojis(content, guild=guild)
+						temp_content = await self.proxy_emojis(content, guild=guild, strict=response.get("strict", True))
 						new_content = await parse_latex(temp_content)
 						await manager.update(new_content, embeds=embeds, files=files, buttons=buttons, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), reacts=reacts, done=done, force=force)
 					except (OverflowError, InterruptedError):
