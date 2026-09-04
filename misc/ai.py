@@ -552,21 +552,20 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 			reasoning_2 = body.pop("reasoning", None) or kwa.pop("reasoning", None)
 			if reasoning_2:
 				reasoning.update(reasoning_2)
-			body["reasoning"] = reasoning
 			match reasoning["effort"]:
 				case "minimal":
-					body["thinking_token_budget"] = 256
+					reasoning["max_tokens"] = 256
 				case "low":
-					body["thinking_token_budget"] = 1024
+					reasoning["max_tokens"] = 1024
 				case "medium":
-					body["thinking_token_budget"] = 4096
+					reasoning["max_tokens"] = 4096
 				case "high":
-					body["thinking_token_budget"] = 16384
+					reasoning["max_tokens"] = 16384
 				case "xhigh":
-					body["thinking_token_budget"] = 65536
+					reasoning["max_tokens"] = 65536
 				case _:
-					body["thinking_token_budget"] = 512
-			# reasoning["max_tokens"] = body["thinking_token_budget"]
+					reasoning["max_tokens"] = 512
+			body["reasoning"] = reasoning
 		elif "reasoning_effort" in kwa:
 			kwa.pop("reasoning_effort")
 		if not api:
@@ -598,10 +597,7 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 						continue
 					if m.get("name"):
 						name = m2.pop("name")
-						name2 = name.replace(" ", "-")
-						if oai_name.search(name2):
-							m2.name = name2
-						elif isinstance(m2.content, list):
+						if isinstance(m2.content, list):
 							m2.content = [cdict(type="text", text=f"name={name}\n\n{c.text}") if c.get("type") == "text" else c for c in m2.content]
 						else:
 							m2.content = f"name={name}\n\n{m2.content}"

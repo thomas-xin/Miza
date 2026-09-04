@@ -3206,11 +3206,13 @@
 				},
 				"replacement_colour": {
 					"type": "colour",
-					"description": "Colour to replace the keyed-out mask"
+					"description": "Colour to replace the keyed-out mask",
+					"aliases": ["replacement_color"]
 				},
 				"replacement_image": {
 					"type": "visual",
-					"description": "Image to replace the keyed-out mask"
+					"description": "Image to replace the keyed-out mask",
+					"aliases": ["bg", "background"]
 				},
 				"duration": {
 					"type": "timedelta",

@@ -392,7 +392,7 @@ class Ask(Command):
 		else:
 			name_repr = bot_name
 		personality = pdata.description.replace("{{user}}", _user.display_name).replace("{{char}}", name_repr)
-		personality += "\n\n[INFO] Usernames may be presented in read-only format `name={name}\\n` to bypass format constraints."
+		personality += "\n\n[INFO] Usernames may be presented in READ-ONLY format `name={name}\\n` to bypass format constraints."
 		match pdata.history:
 			case "none":
 				personality += "\n[INFO] Conversation history currently disabled. Clarify if necessary."
@@ -403,12 +403,12 @@ class Ask(Command):
 		elif nsfw:
 			personality += f"\n[INFO] You are currently in a NSFW-enabled channel #{_channel.name}. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
 		else:
-			personality += f"\n[INFO] You are currently in a non-NSFW-enabled channel #{_channel.name}. If conversation involves mature, sexual, or dangerous topics, use disclaimers in your response."
+			personality += f"\n[INFO] You are currently in a non-NSFW-enabled channel #{_channel.name}. If conversation involves mature, sexual, or dangerous topics, use disclaimers instead."
 		emojis = not simulated and _guild and [emoji for emoji in _guild.emojis if emoji.is_usable()]
 		if emojis:
 			emojis = shuffle(emojis)[:25]
 			emojitexts = " ".join(sorted(f":{e.name}:" for e in emojis))
-			personality += f"\n[INFO] Current conversation takes place on Discord, where you have access to the following emojis. You may use these as alternatives to Unicode, but must not invent new ones not already here or in conversation.\n{emojitexts}"
+			personality += f"\n[INFO] Current conversation takes place on Discord, where you have access to the following emojis. You may use these as alternatives to Unicode; DO NOT invent new ones not present here or in conversation.\n{emojitexts}"
 		tzinfo = self.bot.data.users.get_timezone(_user.id)
 		if tzinfo is None:
 			tzinfo = datetime.timezone.utc
@@ -422,7 +422,7 @@ class Ask(Command):
 			role="user",
 			name=_user.display_name,
 			content=prompt.strip(),
-			url=message_link(_message),
+			message=_message,
 			new=True,
 		)
 		if getattr(_message, "simulated", False):
@@ -436,7 +436,7 @@ class Ask(Command):
 				role="assistant" if r.author.bot else "user",
 				name=r.author.display_name,
 				content=await bot.superclean_content(r),
-				url=message_link(r),
+				message=r,
 				new=True,
 			)
 		else:
@@ -467,7 +467,7 @@ class Ask(Command):
 					role="assistant" if m.author.bot else "user",
 					name=m.author.display_name,
 					content=await bot.superclean_content(m),
-					url=message_link(m),
+					message=m,
 				)
 				messages[m.id] = message
 		await bot.require_integrity(_message)

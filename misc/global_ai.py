@@ -259,11 +259,11 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 				else:
 					raise TypeError(c["type"])
 			follows[i] = as_fut(urls)
-		elif sum(f is not None for f in follows) < 4 and m.get("url") and j < 8:
-			follows[i] = create_task(self.follow_url(m.url, priority_order=("video", "image", "text"), allow_text=False))
+		elif sum(f is not None for f in follows) < 6 and m.get("message") and j < 12:
+			follows[i] = create_task(self.follow_url(m.message, priority_order=("video", "image", "text"), allow_text=False))
 		elif not m.get("content"):
 			m.content = ""
-		m.pop("url", None)
+		m.pop("message", None)
 	for i, fut in enumerate(follows):
 		if not fut:
 			continue
@@ -279,11 +279,15 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 	extracts = [None] * len(messages)
 	for i, (m, urls) in tuple(enumerate(zip(messages, follows)))[::-1]:
 		if isinstance(m.content, str):
+			for url in (urls or ()):
+				if not url:
+					continue
+				m.content = m.content.replace(url, "", 1).strip()
 			for url in set(find_urls_ex(m.content)):
 				url2 = attachment_cache.preserve(url)
 				if url != url2:
 					m.content = m.content.replace(url, url2)
-			for url in list(urls or ()):
+			for url in (urls or ()):
 				if not url:
 					continue
 				m.content = m.content.replace(url, "", 1).strip()
@@ -293,7 +297,7 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 			futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
 			extracts[i] = create_task(gather(*futs))
 		elif m.get("new") and backup_model and backup_model in ai.is_vision and m.get("role") != "assistant":
-			futs = [self.to_data_url(url, small=False) for url in urls]
+			futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
 			extracts[i] = create_task(gather(*futs))
 			if futs and extracts:
 				model = backup_model
@@ -304,7 +308,6 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 	for i, (m, fut) in enumerate(zip(messages, extracts)):
 		if not fut:
 			continue
-		best = 2 if model in ai.is_premium and m.get("new") else 0
 		try:
 			captions = await fut
 		except Exception as ex:
@@ -322,7 +325,7 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 					caption = await ai.summarise(caption, min_length=context / 3, best=True, premium_context=premium_context)
 				m.content = (caption + "\n\n" + m.content).strip()
 			else:
-				im = cdict(type="image_url", image_url=cdict(url=caption, detail="auto" if best else "low"))
+				im = cdict(type="image_url", image_url=cdict(url=caption, detail="auto"))
 				images.append(im)
 		if images:
 			m.content = [cdict(type="text", text=m.content)]
@@ -357,13 +360,13 @@ async def chat_completion(self, messages, extra_messages=(), agent="miza-2", mod
 		best = 2
 	elif modlvl >= 1:
 		maxlim = 98304
-		minlim = 1600
-		snip = 400
+		minlim = 2400
+		snip = 800
 		best = 1
 	else:
-		maxlim = 3000
+		maxlim = 6144
 		minlim = 1200
-		snip = 300
+		snip = 400
 		best = 0
 	tmp = temperature
 	def force_ua(r):
@@ -376,8 +379,7 @@ async def chat_completion(self, messages, extra_messages=(), agent="miza-2", mod
 	if cargs and cargs.get("cut_messages"):
 		messages = cargs["cut_messages"]
 		print("Short-circuited:", len(messages), "messages")
-	messages.extend(extra_messages)
-	messages = [cdict(m) for m in messages]
+	messages = [cdict(m) for m in messages] + [cdict(m) for m in extra_messages]
 	if system:
 		messages.insert(0, cdict(role="system", content=system))
 	prompt = [m.content for m in messages if m.get("role") == "user"][-1]
@@ -795,7 +797,7 @@ async def vision(self, url, name=None, best=True, model=None, question=None, pre
 	messages = [
 		cdict(role="user", content=[
 			cdict(type="text", text=content),
-			cdict(type="image_url", image_url=cdict(url=data_url, detail="auto" if best else "low")),
+			cdict(type="image_url", image_url=cdict(url=data_url, detail="auto")),
 		]),
 	]
 	model = model or self.model_levels[2 if best else 1]["vision"]
@@ -874,7 +876,7 @@ async def tool_call(self, call, uid, message=None, effort="high", premium_contex
 					end = end.strip()
 					if end and "console.log" not in end and end[0] not in "}])>":
 						argv = start + f"; console.log({end});"
-				else:
+				elif ";" not in argv:
 					args.append("-p")
 				args.append(argv)
 				print(args)

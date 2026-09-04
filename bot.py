@@ -859,7 +859,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return self.cache.channels[s_id]
 		try:
 			user = await self._fetch_user(s_id)
-		except (LookupError, discord.NotFound):
+		except (LookupError, discord.NotFound, discord.Forbidden):
 			channel = await self._fetch_channel(s_id)
 			return channel
 		return user
@@ -880,7 +880,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			raise TypeError(f"Invalid user identifier: {u_id}")
 		try:
 			return self._fetch_user(u_id)
-		except discord.NotFound:
+		except (discord.NotFound, discord.Forbidden):
 			if not force:
 				raise
 			user = discord.User(
@@ -899,7 +899,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return user
 
 	async def auser2cache(self, u_id):
-		with suppress(discord.NotFound):
+		with suppress(discord.NotFound, discord.Forbidden):
 			self.cache.users[u_id] = await super().fetch_user(u_id)
 
 	def user2cache(self, data):
@@ -1000,7 +1000,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			except KeyError:
 				try:
 					user = await self.fetch_user(u_id)
-				except discord.NotFound:
+				except (discord.NotFound, discord.Forbidden):
 					if guild and "webhooks" in self.data:
 						for channel in guild.text_channels:
 							webhooks = await self.data.webhooks.get(channel)
@@ -1059,7 +1059,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if guild:
 						member = await self.fetch_member(u_id, guild)
 				if member is None:
-					with suppress(LookupError, discord.NotFound):
+					with suppress(LookupError, discord.NotFound, discord.Forbidden):
 						member = await self.fetch_user(u_id)
 			try:
 				user = self.cache.usernames[u_id]
@@ -1130,7 +1130,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					code = gid.split("?", 1)[0].rsplit("/", 1)[-1]
 					data = await self.retrieve_api(f"invites/{code}")
 					return discord.Guild(data=data["guild"], state=self._state)
-				except (discord.NotFound, discord.HTTPException) as ex:
+				except (RuntimeError, ConnectionError, niquests.exceptions.HTTPError) as ex:
 					raise LookupError(str(ex))
 			raise TypeError(f"Invalid server identifier: {gid}")
 		if not force:
@@ -1185,8 +1185,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			print("Retrieving guild:", gid)
 			try:
 				data = await self.retrieve_api(f"guilds/{gid}")
-			except ConnectionError:
-				data = await self.retrieve_api(f"guilds/{gid}/preview")
+			except (RuntimeError, ConnectionError, niquests.exceptions.HTTPError) as ex:
+				try:
+					data = await self.retrieve_api(f"guilds/{gid}/preview")
+				except (RuntimeError, ConnectionError, niquests.exceptions.HTTPError):
+					raise LookupError from ex
 			else:
 				members = []
 				x = 0
@@ -1412,7 +1415,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if guild is not None:
 			try:
 				emoji = await guild.fetch_emoji(e_id)
-			except discord.NotFound:
+			except (discord.NotFound, discord.Forbidden):
 				pass
 			else:
 				self.cache.emojis[emoji.id] = emoji
@@ -1566,7 +1569,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if m_id:
 			try:
 				return await self.fetch_message(m_id, channel)
-			except (LookupError, discord.NotFound):
+			except (LookupError, discord.NotFound, discord.Forbidden):
 				pass
 		if key:
 			async for message in self.history(channel):
@@ -2118,7 +2121,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			m_id = stored[channel.id]
 			try:
 				await self.fetch_message(m_id, channel, fast=True)
-			except (discord.NotFound, LookupError):
+			except (LookupError, discord.NotFound, discord.Forbidden):
 				stored[channel.id] = message.id
 			except:
 				print_exc()
@@ -4490,7 +4493,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				user = await guild.fetch_member(user.id)
 				guild._members[user.id] = user
 			if channel and not getattr(channel, "guild", None):
-				channel.guild = guild
+				try:
+					channel = await self._fetch_channel(channel.id)
+				except (LookupError, discord.NotFound, discord.Forbidden):
+					channel.guild = guild
 		if user and user.id == self.id:
 			prefix = self.prefix
 		else:
@@ -4780,7 +4786,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if self.id in (member.id for member in message.mentions) and not isinstance(before, self.GhostMessage):
 			try:
 				m = await self.fetch_reference(message)
-			except (LookupError, discord.NotFound):
+			except (LookupError, discord.NotFound, discord.Forbidden):
 				pass
 			else:
 				truemention = m.author.id != self.id and all(s not in message.content for s in self.mention)
@@ -5783,7 +5789,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		else:
 			return
 		# print(message, reaction, user)
-		with tracebacksuppressor(discord.NotFound):
+		with tracebacksuppressor(discord.NotFound, discord.Forbidden):
 			u_perm = self.get_perms(user.id, message.guild)
 			check = False
 			if not u_perm < 3:
@@ -5798,7 +5804,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						message2 = temp
 				try:
 					reference = await self.fetch_reference(message2)
-				except (LookupError, discord.NotFound):
+				except (LookupError, discord.NotFound, discord.Forbidden):
 					for react in message.reactions:
 						if str(reaction) == str(react) and react.me:
 							check = True
@@ -6085,7 +6091,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				channel = message.channel
 				try:
 					reference = await bot.fetch_reference(message)
-				except (LookupError, discord.NotFound):
+				except (LookupError, discord.NotFound, discord.Forbidden):
 					reference = None
 				self = cls(channel, reference=reference, **kwargs)
 				self.messages.append(message)
@@ -7082,7 +7088,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if k:
 				try:
 					m = guild.get_member(k) or await self.fetch_user(k, force=True)
-				except discord.NotFound:
+				except (discord.NotFound, discord.Forbidden):
 					pass
 				else:
 					top_users.append((m, curr[k].get("count", 0)))
@@ -7262,7 +7268,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					channel = self.force_channel(data["channel_id"])
 					try:
 						guild = await self.fetch_guild(data["guild_id"])
-					except (LookupError, discord.NotFound):
+					except (LookupError, discord.NotFound, discord.Forbidden):
 						raise KeyError
 					m.guild = guild
 					author = guild.get_member(author.id)
@@ -7307,7 +7313,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					channel = self.force_channel(data["channel_id"])
 					try:
 						guild = await self.fetch_guild(data["guild_id"])
-					except (LookupError, discord.NotFound):
+					except (LookupError, discord.NotFound, discord.Forbidden):
 						raise KeyError
 					user = (guild.get_member(user.id) if guild else None) or user
 				except KeyError:
@@ -7537,7 +7543,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if T(channel).get("guild") is None and T(channel).get("recipient") is None:
 				try:
 					channel = await self.fetch_channel(channel.id, force=True)
-				except discord.NotFound:
+				except (discord.NotFound, discord.Forbidden):
 					print(f"Channel {channel.id} not found.")
 				else:
 					message.channel = channel
@@ -7570,7 +7576,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			else:
 				try:
 					before = await self.fetch_message(m_id, old=True)
-				except (AttributeError, LookupError, discord.NotFound):
+				except (AttributeError, LookupError, discord.NotFound, discord.Forbidden):
 					# If message was not in cache, create a ghost message object to represent old message.
 					c_id = data.get("channel_id")
 					if not c_id:
@@ -7797,7 +7803,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					if message is None:
 						raise LookupError
 					had_before = True
-				except (AttributeError, LookupError, discord.NotFound):
+				except (AttributeError, LookupError, discord.NotFound, discord.Forbidden):
 					# If message was not in cache, create a ghost message object to represent old message.
 					message = self.GhostMessage()
 					message.channel = channel
@@ -7909,7 +7915,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						message = await self.fetch_message(m_id, channel)
 						if message is None:
 							raise LookupError
-					except (AttributeError, LookupError, discord.NotFound):
+					except (AttributeError, LookupError, discord.NotFound, discord.Forbidden):
 						# If message was not in cache, create a ghost message object to represent old message.
 						message = self.GhostMessage()
 						message.channel = channel

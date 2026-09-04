@@ -435,6 +435,8 @@ class AttachmentCache(AutoCache):
 				if is_discord_attachment(url):
 					target = await self.obtain(url=url, m_id=m_id)
 			elif is_miza_url(url):
+				if "?" not in url:
+					url += "?force=1"
 				if "/u/" in url:
 					c_id, m_id2, a_id, fn = expand_attachment(url)
 					target = await self.obtain(c_id, m_id2 or m_id, a_id, fn)
@@ -447,6 +449,7 @@ class AttachmentCache(AutoCache):
 					fn, head = await _run_async(download_file, *urls, filename=raw_fn, _timeout=timeout, input_headers=input_headers, return_headers=True)
 					self.tertiary[url] = head
 					return self.cast_fp(open(fn, "rb"))
+				target = url
 			try:
 				f, head = await streamshatter.shatter_request(target, filename=raw_fn, log_progress=False, timeout=timeout, max_attempts=6, headers=input_headers, return_headers=True)
 			except niquests.exceptions.HTTPError as ex:
