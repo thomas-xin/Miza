@@ -4006,9 +4006,15 @@
 					"type": "word",
 					"description": "Target LLM to invoke (overrides agent)",
 					"example": "deepseek-v4"
+				},
+				"max_attempts": {
+					"type": "integer",
+					"validation": "[1, 64]",
+					"description": "Amount of agent inference attempts (consumed by tools and errors)",
+					"default": 10
 				}
 			},
-			"ordered_args": ["prompt", "agent", "model"]
+			"ordered_args": ["prompt", "agent", "model", "max_attempts"]
 		},
 		"ChatConfig": {
 			"aliases": ["ChatConfig", "Personality", "ChangePersonality"],

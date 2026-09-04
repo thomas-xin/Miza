@@ -315,7 +315,7 @@ e.g If the user asks about:
 
 Answer ONLY with the summary, do not answer the question itself!'''
 			else:
-				system = f'### Instruction:\nPlease provide a comprehensive but concise summary of the message(s) below!'
+				system = f'### Instruction:\nPlease provide a comprehensive summary of the message(s) below!'
 			messages = [
 				dict(
 					role="system",

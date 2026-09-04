@@ -260,7 +260,8 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 					raise TypeError(c["type"])
 			follows[i] = as_fut(urls)
 		elif sum(f is not None for f in follows) < 6 and m.get("message") and j < 12:
-			follows[i] = create_task(self.follow_url(m.message, priority_order=("video", "image", "text"), allow_text=False))
+			finding = ("video", "image", "text") if j < 1 else ("video", "image")
+			follows[i] = create_task(self.follow_url(m.message, priority_order=finding, allow_text=False))
 		elif not m.get("content"):
 			m.content = ""
 		m.pop("message", None)

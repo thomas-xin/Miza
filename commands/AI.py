@@ -354,6 +354,12 @@ class Ask(Command):
 			description="Target LLM to invoke (overrides agent)",
 			example="deepseek-v4",
 		),
+		max_attempts=cdict(
+			type="integer",
+			validation="[1, 64]",
+			description="Amount of agent inference attempts (consumed by tools and errors)",
+			default=10,
+		)
 	)
 	rate_limit = (12, 16)
 	_timeout_ = 24
@@ -362,7 +368,7 @@ class Ask(Command):
 	reset = {}
 	visited = {}
 
-	async def __call__(self, bot, _message, _guild, _channel, _user, _nsfw, _prefix, _premium, prompt, agent, model, **void):
+	async def __call__(self, bot, _message, _guild, _channel, _user, _nsfw, _prefix, _premium, prompt, agent, model, max_attempts, **void):
 		await bot.require_integrity(_message)
 		if model:
 			if model not in ai.available:
@@ -392,7 +398,7 @@ class Ask(Command):
 		else:
 			name_repr = bot_name
 		personality = pdata.description.replace("{{user}}", _user.display_name).replace("{{char}}", name_repr)
-		personality += "\n\n[INFO] Usernames may be presented in READ-ONLY format `name={name}\\n` to bypass format constraints."
+		personality += "\n\n[INFO] Usernames may be in `name={name}\\n` format to bypass format constraints (DO NOT COPY)."
 		match pdata.history:
 			case "none":
 				personality += "\n[INFO] Conversation history currently disabled. Clarify if necessary."
@@ -443,6 +449,7 @@ class Ask(Command):
 			reference = None
 		hislim = 384 if _premium.value >= 4 else 192 if _premium.value >= 2 else 64
 		passthrough = set()
+		rsep = chr(invisicode.STRINGPREFIX)
 		if not simulated and pdata.history != "none":
 			async for m in bot.history(_channel, limit=hislim):
 				if m.id in messages or m.id == _message.id:
@@ -463,15 +470,16 @@ class Ask(Command):
 					continue
 				if bot.is_optout(m.author.id):
 					continue
+				content = await bot.superclean_content(m)
 				message = cdict(
 					role="assistant" if m.author.bot else "user",
 					name=m.author.display_name,
-					content=await bot.superclean_content(m),
+					content=content.split(rsep, 1)[-1].strip(),
 					message=m,
 				)
 				messages[m.id] = message
 		await bot.require_integrity(_message)
-		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, agent, model, nsfw, _prefix, simulated)
+		fut = self.ask_iterator(bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, _premium, agent, model, max_attempts, nsfw, _prefix, simulated)
 		if pdata.stream and pdata.tts != "discord" and not simulated:
 			try:
 				_premium.require(2)
@@ -492,7 +500,7 @@ class Ask(Command):
 			return resp
 		raise RuntimeError(temp)
 
-	async def ask_iterator(self, bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, premium, agent, model, nsfw, prefix, simulated):
+	async def ask_iterator(self, bot, _message, _channel, _guild, _user, reference, messages, system_message, input_message, reply_message, bot_name, embs, pdata, prompt, premium, agent, model, max_attempts, nsfw, prefix, simulated):
 		extra_messages = []
 		props = cdict(name=bot_name)
 		response = cdict()
@@ -518,7 +526,7 @@ class Ask(Command):
 		rsep = chr(invisicode.STRINGPREFIX)
 		loading = None
 		try:
-			ex = RuntimeError("Maximum inference attempts (10) exceeded (model likely encountered an infinite loop).")
+			ex = RuntimeError(f"Maximum inference attempts ({max_attempts}) exceeded (model may have encountered an infinite loop; increase --max-attempts to retry).")
 			reasoning_sum = 0
 			reasoning_temp = 0
 			content = ""
@@ -529,7 +537,7 @@ class Ask(Command):
 					visible_tools.pop("server_only")
 			if pdata.history == "none":
 				visible_tools.pop("sensitive")
-			for att in range(10):
+			for att in range(max_attempts):
 				text = ""
 				messagelist = [messages[k] for k in sorted(messages) if not reference or k != reference.id]
 				messagelist.insert(0, system_message)
@@ -545,10 +553,10 @@ class Ask(Command):
 						emoji = await bot.data.emojis.grab("loading.gif")
 						loading = min_emoji(emoji, full=True)
 					rtotal = reasoning_sum + reasoning_temp
-					rsize = f" ({byte_scale(rtotal)}B)" if rtotal else ""
-					begin = f"> Thinking{rsize}... {loading}\n{rsep}"
+					rsize = f"Thinking ({byte_scale(rtotal)}B)" if rtotal else "Reading"
+					begin = f"> {rsize}... {loading}\n{rsep}"
 					content = begin + content.split(rsep, 1)[-1]
-					yield "\r" + content
+					yield "\r" + content.rstrip()
 				async for resp in bot.chat_completion(messagelist, extra_messages=extra_messages, agent=target, model=model, max_tokens=24576, tools=visible_tools, user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
 					if isinstance(resp, dict):
 						if resp.get("reasoning"):
@@ -563,7 +571,7 @@ class Ask(Command):
 							rsize = f" ({byte_scale(rtotal)}B)" if rtotal else ""
 							begin = f"> Thinking{rsize}... {loading}\n{rsep}"
 							content = begin + content.split(rsep, 1)[-1]
-							yield "\r" + content.strip() + ("\n\n" * bool(content)) + text.strip()
+							yield "\r" + content.rstrip() + ("\n\n" * bool(content)) + text.strip()
 						if resp.get("cargs"):
 							props.cargs = resp["cargs"]
 						if resp.get("usage"):
@@ -666,6 +674,9 @@ class Ask(Command):
 				r, content = content.split("</txt>", 1)
 				r = r.removeprefix("<txt>")
 			reasonings.append(r)
+		content = content.strip()
+		if content.startswith("name=") and "\n" in content:
+			content = content.split("\n", 1)[-1].lstrip()
 		if reasonings:
 			reasoning = b"\n\n\n".join(map(as_bytes, reasonings))
 			try:

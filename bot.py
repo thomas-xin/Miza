@@ -1770,12 +1770,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		emojis = emoji = None
 		regex = (
 			regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^at\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])") if strict
-			else regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^at\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:?)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
+			else regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^at\\\\`])(:[A-Za-z0-9\\-~_]{1,32}[:\\s])(?:(?![^0-9]).)*(?:$|[^0-9>`])")
 		)
 		pops = set()
 		offs = 0
 		replaceds = []
-		msg = msg.strip()
+		suffix = chr(invisicode.STRINGPREFIX)
+		msg = msg.strip() + " " + suffix
 		while offs < len(msg):
 			matched = regex.search(msg[offs:])
 			if not matched:
@@ -1786,12 +1787,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			while s and not regexp(":[A-Za-z0-9\\-~_]").fullmatch(s[:2]):
 				s = s[1:]
 				start += 1
-			while s and not regexp("[A-Za-z0-9\\-~_]:?").fullmatch(s[-2:]):
+			while s and not regexp("[A-Za-z0-9\\-~_][:\\s]").fullmatch(s[-2:]):
 				s = s[:-1]
 			offs = start = offs + start
 			offs += len(s)
 			if not s:
-				continue
+				break
 			name = s[1:-1]
 			if emojis is None:
 				emojis = self.data.autoemojis.guild_emoji_map(guild, user, dict(orig))
@@ -1838,6 +1839,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				replaceds.append(emoji)
 			if substitutes:
 				msg = msg[:substitutes[0]] + substitutes[1] + msg[substitutes[2]:]
+		msg = msg.removesuffix(suffix).rstrip()
 		if return_pops:
 			return msg, pops, replaceds
 		return msg
