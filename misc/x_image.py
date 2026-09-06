@@ -246,7 +246,7 @@ class ImageSequence(Image.Image, collections.abc.Sequence):
 						break
 			except StopIteration:
 				raise StopIteration(len(self._images), position, len(self))
-		im = self._images[position]
+		im = self.__getattribute__("_images")[position]
 		return im
 
 	def __getattr__(self, key):
@@ -545,7 +545,7 @@ discord_emoji = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/
 def is_discord_emoji(url):
 	return discord_emoji.search(url)
 
-@functools.lru_cache(maxsize=256)
+# @functools.lru_cache(maxsize=256)
 def from_cached_image(url, nogif, maxframes, msize):
 	data = get_request(url)
 	if len(data) > 8589934592:
@@ -557,7 +557,7 @@ def get_image(url, out=None, nodel=False, nogif=False, maxframes=inf, msize=None
 	out = out or url
 	if type(url) not in (bytes, bytearray, io.BytesIO):
 		if is_url(url):
-			image = copy.deepcopy(from_cached_image(url, nogif, maxframes, msize))
+			image = from_cached_image(url, nogif, maxframes, msize)
 		else:
 			if os.path.getsize(url) > 8589934592:
 				raise OverflowError("Max file size to load is 8GB.")

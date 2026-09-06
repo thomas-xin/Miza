@@ -1789,6 +1789,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				start += 1
 			while s and not regexp("[A-Za-z0-9\\-~_][:\\s]").fullmatch(s[-2:]):
 				s = s[:-1]
+			s = s.strip()
 			offs = start = offs + start
 			offs += len(s)
 			if not s:
@@ -4864,213 +4865,221 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			guild = (manager.guild if manager else message.guild if hasattr(message, "guild") else response.get("guild")) or getattr(channel, "guild", None)
 			# Process response to command if there is one
 			if response and isinstance(response, dict):
-				bypass_prefix = response.pop("bypass_prefix", None)
-				bypass_suffix = response.pop("bypass_suffix", None)
-				prefix = response.pop("prefix", None) or ""
-				suffix = response.pop("suffix", None) or ""
-				content = response.pop("content", None) or ""
-				tts = response.pop("tts", False) or False
-				b_tts = response.pop("b_tts", False) or False
-				callback = response.pop("callback", None)
-				def get_prefix():
-					return prefix if not bypass_prefix or none(content.startswith(b) for b in bypass_prefix) else ""
-				def get_suffix():
-					return suffix if not bypass_suffix or none(content.endswith(b) for b in bypass_suffix) else ""
-				reference = response["reference"] if "reference" in response else message or response.get("message")
-				file = response.get("file")
-				if manager or not getattr(reference, "simulated", False) and not isinstance(content, (str, bytes)):
-					if manager:
-						old_content = manager.content
-					else:
-						manager = self.StreamedMessage(channel, reference=reference, msglen=msglen, maxlen=maxlen)
-						old_content = ""
+				pass
+			else:
+				return response
+			bypass_prefix = response.pop("bypass_prefix", None)
+			bypass_suffix = response.pop("bypass_suffix", None)
+			prefix = response.pop("prefix", None) or ""
+			suffix = response.pop("suffix", None) or ""
+			content = response.pop("content", None) or ""
+			tts = response.pop("tts", False) or False
+			b_tts = response.pop("b_tts", False) or False
+			callback = response.pop("callback", None)
+			def get_prefix():
+				return prefix if not bypass_prefix or none(content.startswith(b) for b in bypass_prefix) else ""
+			def get_suffix():
+				return suffix if not bypass_suffix or none(content.endswith(b) for b in bypass_suffix) else ""
+			reference = response["reference"] if "reference" in response else message or response.get("message")
+			file = response.get("file")
+			exc = None
+			if manager or not getattr(reference, "simulated", False) and not isinstance(content, (str, bytes)):
+				if manager:
+					old_content = manager.content
+				else:
+					manager = self.StreamedMessage(channel, reference=reference, msglen=msglen, maxlen=maxlen)
+					old_content = ""
 
-					def add_content(old_content, content):
-						if not old_content:
-							return content
-						elif old_content.endswith("```") or content.startswith("```"):
-							return old_content + content
-						return old_content + "\n" + content
+				def add_content(old_content, content):
+					if not old_content:
+						return content
+					elif old_content.endswith("```") or content.startswith("```"):
+						return old_content + content
+					return old_content + "\n" + content
 
-					if isinstance(content, collections.abc.AsyncIterator):
-						it = content
-					elif isinstance(content, str | dict):
-						async def iterator():
-							yield content
-						it = iterator()
-					else:
-						raise NotImplementedError(content)
-					start = utc()
-					ct = start + 1
-					async with discord.context_managers.Typing(channel):
-						content = await anext(it)
-						if isinstance(content, dict):
-							response.update(content)
-							content = response.pop("content", "")
-						task = None
-						blocked = False
-						edit = True
-						fut = None
-						resp = None
-						try:
-							while True:
-								if reference:
-									await self.require_integrity(reference)
-								try:
-									d = ct - utc() + 1
-									if d <= 0:
-										raise TimeoutError
-									if not task:
-										task = create_task(anext(it))
-									wait = asyncio.shield(task) if utc() < start + timeout else task
-									resp = await asyncio.wait_for(wait, timeout=d)
-								except (T0, T1):
-									if not blocked and edit and (not fut or fut.done()):
-										if fut:
-											try:
-												await fut
-											except (InterruptedError, discord.DiscordServerError, discord.HTTPException):
-												# If the StreamedMessage is interrupted, it is most likely from another user sending a new message. We block the current stream and buffer all other content until we have the full message.
-												blocked = True
-										try:
-											new_content = add_content(old_content, content)
-											if len(new_content) >= 32 or "." in new_content:
-												fut = create_task(manager.update(new_content, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), force=False, done=False))
-										except OverflowError:
-											blocked = True
-										else:
-											edit = False
-									ct = utc()
-								else:
-									if isinstance(resp, dict):
-										response.update(resp)
-										resp = response.pop("content", "")
-									if "\r" in content:
-										content = content.rsplit("\r", 1)[-1]
-									if resp.startswith("\r"):
-										content = resp.lstrip("\r")
-									elif resp:
-										content += resp
-									edit = True
-									task = None
-						except StopAsyncIteration:
-							pass
-					content = content.strip()
-					embeds = manager.embeds + (response.get("embeds") or ([response["embed"]] if response.get("embed") else None) or [])
-					files = manager.files + (response.get("files") or ([response["file"]] if response.get("file") else None) or [])
-					reacts = response.get("reacts")
-					buttons = manager.buttons + (response.get("buttons") or [])
-					if callback:
-						callback(cdict(
-							content=content,
-							embeds=embeds,
-							files=files,
-							reacts=reacts,
-							buttons=buttons,
-						))
-					# total_length = len(get_prefix()) + len(content) + len(get_suffix())
-					if fut:
-						with tracebacksuppressor:
-							await fut
-					content = add_content(old_content, content)
-					if b_tts and message:
-						clean = await self.superclean_content(content)
-						tfut = create_task(self.auto_tts(clean, message))
-					else:
-						tfut = None
-					try:
-						temp_content = await self.proxy_emojis(content, guild=guild, strict=response.get("strict", True))
-						new_content = await parse_latex(temp_content)
-						await manager.update(new_content, embeds=embeds, files=files, buttons=buttons, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), reacts=reacts, done=done, force=force)
-					except (OverflowError, InterruptedError):
-						# If the StreamedMessage was interrupted or exceeded the maximum length, we wipe the original and force a new message. This ensures the list of messages stays contiguous, which improves readability.
-						create_task(manager.delete())
-						if tfut:
-							await tfut
-					else:
-						messages = await manager.collect()
-						for m in messages:
-							self.add_message(m, force=2)
-						if tfut:
-							await tfut
-						return manager
 				if isinstance(content, collections.abc.AsyncIterator):
-					async for cc in content:
-						if isinstance(cc, dict):
-							response.update(cc)
+					it = content
+				elif isinstance(content, str | dict):
+					async def iterator():
+						yield content
+					it = iterator()
+				else:
+					raise NotImplementedError(content)
+				start = utc()
+				ct = start + 1
+				async with discord.context_managers.Typing(channel):
+					content = await anext(it)
+					if isinstance(content, dict):
+						response.update(content)
+						content = response.pop("content", "")
+					task = None
+					blocked = False
+					edit = True
+					fut = None
+					resp = None
+					while True:
+						if reference:
+							await self.require_integrity(reference)
+						try:
+							d = ct - utc() + 1
+							if d <= 0:
+								raise TimeoutError
+							if not task:
+								task = create_task(anext(it))
+							wait = asyncio.shield(task) if utc() < start + timeout else task
+							resp = await asyncio.wait_for(wait, timeout=d)
+						except (T0, T1):
+							if not blocked and edit and (not fut or fut.done()):
+								if fut:
+									try:
+										await fut
+									except (InterruptedError, discord.DiscordServerError, discord.HTTPException):
+										# If the StreamedMessage is interrupted, it is most likely from another user sending a new message. We block the current stream and buffer all other content until we have the full message.
+										blocked = True
+								try:
+									new_content = add_content(old_content, content)
+									if len(new_content) >= 32 or "." in new_content:
+										fut = create_task(manager.update(new_content, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), force=False, done=False))
+								except OverflowError:
+									blocked = True
+								else:
+									edit = False
+							ct = utc()
+						except StopAsyncIteration:
+							break
+						except Exception as ex:
+							print_exc()
+							exc = ex
+							break
 						else:
-							response["content"] = cc
-					content = (response.pop("content", None) or "").lstrip("\r")
-				original_nickname = None
-				try:
-					total_length = len(get_prefix()) + len(content) + len(get_suffix())
-					if total_length > msglen or tts:
-						if total_length > maxlen:
-							data = (get_prefix() + content + get_suffix()).encode("utf-8")
-							try:
-								orjson.loads(content)
-							except orjson.JSONDecodeError:
-								filename = "message.md"
-							else:
-								filename = "message.json"
-								data = content.encode("utf-8")
-							file2 = CompatFile(data, filename=filename)
-							if file:
-								response["files"] = [file, file2]
-								file = None
-							else:
-								response.pop("files", None)
-								file = file2
-							content = "Response too long for message."
-						else:
-							if tts:
-								# For TTS mode, we split the message into smaller chunks to ensure the message is read out correctly. Unlike the regular limit of 2000 characters which is known, the TTS limit is not well documented and may vary between clients. We impose an arbitrary limit of 150 characters instead, which should be safe for most clients.
-								ms = split_text(content, prefix=prefix, suffix=suffix, max_length=150)
-							else:
-								ms = split_text(content, prefix=prefix, suffix=suffix, max_length=msglen)
-							content = ms[-1] if ms else "\xad"
-							futs = []
-							for i, t in enumerate(ms[:-1]):
-								if tts and i == 1 and channel and guild and guild.me.guild_permissions.change_nickname:
-									# If we've got more than one message in TTS mode, we automatically backup the bot's nickname and replace it with a backtick (silent character) to avoid it being read out alongside every message.
-									original_nickname = guild.me.nick or "" # The "" is crucial to differentiate between None and an empty string.
-									await guild.me.edit(nick="`")
-								fut = create_task(send_with_react(channel, t, reference=reference, tts=tts))
-								futs.append(fut)
-								reference = None
-								await asyncio.sleep(0.125)
-							await gather(*futs)
-					else:
-						content = get_prefix() + content + get_suffix() or None
-					if file and not response.get("files") and not response.get("buttons"):
-						return await self.send_with_file(
-							response.get("channel") or channel,
-							msg=content,
-							file=file,
-							filename=getattr(file, "filename", None),
-							embed=response.get("embed"),
-							reference=reference,
-							reacts=response.get("reacts"),
-							tts=tts,
-						)
-					return await send_with_react(
-						response.get("channel") or channel,
+							if isinstance(resp, dict):
+								response.update(resp)
+								resp = response.pop("content", "")
+							if "\r" in content:
+								content = content.rsplit("\r", 1)[-1]
+							if resp.startswith("\r"):
+								content = resp.lstrip("\r")
+							elif resp:
+								content += resp
+							edit = True
+							task = None
+				content = content.strip()
+				embeds = manager.embeds + (response.get("embeds") or ([response["embed"]] if response.get("embed") else None) or [])
+				files = manager.files + (response.get("files") or ([response["file"]] if response.get("file") else None) or [])
+				reacts = response.get("reacts")
+				buttons = manager.buttons + (response.get("buttons") or [])
+				if callback:
+					callback(cdict(
 						content=content,
+						embeds=embeds,
+						files=files,
+						reacts=reacts,
+						buttons=buttons,
+					))
+				# total_length = len(get_prefix()) + len(content) + len(get_suffix())
+				if fut:
+					with tracebacksuppressor:
+						await fut
+				content = add_content(old_content, content)
+				if b_tts and message:
+					clean = await self.superclean_content(content)
+					tfut = create_task(self.auto_tts(clean, message))
+				else:
+					tfut = None
+				try:
+					temp_content = await self.proxy_emojis(content, guild=guild, strict=response.get("strict", True))
+					new_content = await parse_latex(temp_content)
+					await manager.update(new_content, embeds=embeds, files=files, buttons=buttons, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), reacts=reacts, done=done, force=force)
+				except (OverflowError, InterruptedError):
+					# If the StreamedMessage was interrupted or exceeded the maximum length, we wipe the original and force a new message. This ensures the list of messages stays contiguous, which improves readability.
+					create_task(manager.delete())
+					if tfut:
+						await tfut
+				else:
+					messages = await manager.collect()
+					for m in messages:
+						self.add_message(m, force=2)
+					if tfut:
+						await tfut
+					return manager
+			if isinstance(content, collections.abc.AsyncIterator):
+				async for cc in content:
+					if isinstance(cc, dict):
+						response.update(cc)
+					else:
+						response["content"] = cc
+				content = (response.pop("content", None) or "").lstrip("\r")
+			original_nickname = None
+			try:
+				total_length = len(get_prefix()) + len(content) + len(get_suffix())
+				if total_length > msglen or tts:
+					if total_length > maxlen:
+						data = (get_prefix() + content + get_suffix()).encode("utf-8")
+						try:
+							orjson.loads(content)
+						except orjson.JSONDecodeError:
+							filename = "message.md"
+						else:
+							filename = "message.json"
+							data = content.encode("utf-8")
+						file2 = CompatFile(data, filename=filename)
+						if file:
+							response["files"] = [file, file2]
+							file = None
+						else:
+							response.pop("files", None)
+							file = file2
+						content = "Response too long for message."
+					else:
+						if tts:
+							# For TTS mode, we split the message into smaller chunks to ensure the message is read out correctly. Unlike the regular limit of 2000 characters which is known, the TTS limit is not well documented and may vary between clients. We impose an arbitrary limit of 150 characters instead, which should be safe for most clients.
+							ms = split_text(content, prefix=prefix, suffix=suffix, max_length=150)
+						else:
+							ms = split_text(content, prefix=prefix, suffix=suffix, max_length=msglen)
+						content = ms[-1] if ms else "\xad"
+						futs = []
+						for i, t in enumerate(ms[:-1]):
+							if tts and i == 1 and channel and guild and guild.me.guild_permissions.change_nickname:
+								# If we've got more than one message in TTS mode, we automatically backup the bot's nickname and replace it with a backtick (silent character) to avoid it being read out alongside every message.
+								original_nickname = guild.me.nick or "" # The "" is crucial to differentiate between None and an empty string.
+								await guild.me.edit(nick="`")
+							fut = create_task(send_with_react(channel, t, reference=reference, tts=tts))
+							futs.append(fut)
+							reference = None
+							await asyncio.sleep(0.125)
+						await gather(*futs)
+				else:
+					content = get_prefix() + content + get_suffix() or None
+				if file and not response.get("files") and not response.get("buttons"):
+					return await self.send_with_file(
+						response.get("channel") or channel,
+						msg=content,
 						file=file,
-						files=response.get("files"),
+						filename=getattr(file, "filename", None),
 						embed=response.get("embed"),
-						embeds=response.get("embeds"),
 						reference=reference,
-						buttons=response.get("buttons"),
 						reacts=response.get("reacts"),
-						ephemeral=getattr(message, "ephemeral", False),
 						tts=tts,
 					)
-				finally:
-					if original_nickname is not None:
-						# If we've changed the bot's nickname, we restore it to its original state.
-						await guild.me.edit(nick=original_nickname)
-			return response
+				return await send_with_react(
+					response.get("channel") or channel,
+					content=content,
+					file=file,
+					files=response.get("files"),
+					embed=response.get("embed"),
+					embeds=response.get("embeds"),
+					reference=reference,
+					buttons=response.get("buttons"),
+					reacts=response.get("reacts"),
+					ephemeral=getattr(message, "ephemeral", False),
+					tts=tts,
+				)
+			finally:
+				if guild and original_nickname is not None:
+					# If we've changed the bot's nickname, we restore it to its original state.
+					await guild.me.edit(nick=original_nickname)
+				if exc:
+					raise exc
 
 	async def run_simulate(self, ip, command):
 		message = SimulatedMessage(self, command, utc(), ip, "user")

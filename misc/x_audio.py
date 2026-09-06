@@ -1083,8 +1083,8 @@ class AudioFile:
 					except Exception:
 						pass
 
-			stream = self.stream = CachingTeeFile(proc.stdout, self.path, callback=callback)
-			if not stream.open().read(1024):
+			stream = self.stream = CachingTeeFile(proc.stdout, self.path, 4096, callback=callback)
+			if not stream.open().read(stream.chunk_size):
 				proc.terminate()
 				ex = RuntimeError(as_str(err.read()))
 				strex = str(ex)

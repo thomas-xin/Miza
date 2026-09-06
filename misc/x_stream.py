@@ -224,78 +224,6 @@ class Server:
 					counter += 1
 
 
-def stream_fp(request, fp, response_headers={}, filename="untitled.bin", cache=False):
-	if isinstance(fp, byte_like):
-		fp = io.BytesIO(fp)
-	brange = request.headers.get("Range", "").removeprefix("bytes=") if request else ""
-	size = getsize(fp)
-	ranges = []
-	length = 0
-
-	if brange:
-		try:
-			branges = brange.split(",")
-			for s in branges:
-				start, end = s.split("-", 1)
-				if not start:
-					if not end:
-						continue
-					start = size - int(end)
-					end = size - 1
-				elif not end:
-					end = size - 1
-				start = int(start)
-				end = int(end) + 1
-				length += end - start
-				ranges.append((start, end))
-		except Exception:
-			pass
-
-	status_code = 206 if ranges else 200
-	if not ranges:
-		ranges.append((0, size))
-		length = size
-	response_headers.update(CHEADERS if cache else HEADERS)
-	b = None
-	if cache:
-		b = fp.read(65536)
-		response_headers["Etag"] = create_etag(b, size=size)
-	if ranges == [(0, size)]:
-		response_headers["Content-Length"] = str(length)
-	if brange:
-		cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size or '*'}" for start, end in ranges)
-		response_headers["Content-Range"] = cr
-
-	async def content_generator(chunksize=262144 if length > 64 * 1048576 else 65536):
-		for r in ranges:
-			fp.seek(r[0])
-			for i in range(r[0], r[1], chunksize):
-				yield fp.read(min(chunksize, r[1] - i))
-
-	mime = mime_from_file(fp, url2fn(filename))
-	if not mime:
-		if not b:
-			fp.seek(0)
-			b = fp.read(65536)
-		try:
-			s = b.decode("utf-8")
-		except Exception:
-			mime = "application/octet-stream"
-		else:
-			mime = (
-				"text/html" if s.lower().startswith("<!doctype html>")
-				else "image/svg+xml" if s.lower().startswith("<svg ")
-				else "text/plain"
-			)
-
-	return StreamingResponse(
-		content_generator(),
-		status_code=status_code,
-		headers=response_headers,
-		media_type=mime,
-	)
-
-
 # Create FastAPI app
 app = FastAPI(title="Miza Proxy Server", version="2.0")
 app.add_middleware(
@@ -339,7 +267,18 @@ async def ip(request: Request):
 @app.head("/random")
 @app.get("/random")
 async def prandom(request: Request, count: int = 1048576):
-	return stream_fp(request, RNGFile(count), {"Content-Disposition": "attachment; filename=random.bin"})
+	async def rng_chunks(count):
+		rng = RNGFile(count)
+		while True:
+			b = rng.read(1048576)
+			if not b:
+				break
+			yield b
+	return StreamingResponse(
+		rng_chunks(count),
+		headers={"Content-Disposition": "attachment; filename=random.bin", "Content-Length": str(count)},
+		media_type="application/octet-stream",
+	)
 
 
 @app.get("/mean-color")
@@ -524,7 +463,6 @@ async def proxy_if(url: str, request: Request, force: bool = False, download: bo
 
 @app.api_route("/proxy", methods=["GET", "POST"])
 async def proxy(request: Request, url: Optional[str] = None, force: bool = False, download: bool = False):
-	"""Proxy any URL with optional body forwarding."""
 	if not url:
 		return Response(
 			content="Expected proxy URL.",
@@ -535,16 +473,13 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 		raise HTTPException(status_code=403, detail=url)
 
 	try:
-		fp = await attachment_cache.download(url, max_size=1073741824 * 16)
+		path = await attachment_cache.download(url, max_size=1073741824 * 16, filename=True)
 	except ConnectionError as ex:
 		raise HTTPException(status_code=ex.errno or 500, detail=f"{url}: {ex}")
 	heads = await attachment_cache.scan_headers(url, base="mizabot.xyz", fc=True)
 
 	response_headers = {}
 	filename = heads.get("attachment-filename") or unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
-	disposition = "attachment" if download else "inline"
-	if filename:
-		response_headers["Content-Disposition"] = f"{disposition}; filename={quote(url2fn(filename))}"
 	response_headers["Cache-Control"] = "public,max-age=21600,stale-while-revalidate=1073741824,stale-if-error=1073741824"
 
 	if not force and heads.get("content-type").split(";", 1)[0] == "text/markdown":
@@ -554,8 +489,14 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 			headers=response_headers,
 			media_type="text/html",
 		)
-	return stream_fp(request, fp, response_headers, url, cache=not force)
-
+	mime = mime_from_file(path, url2fn(filename)) if filename else None
+	return FileResponse(
+		path,
+		headers=response_headers,
+		media_type=mime,
+		filename=filename,
+		content_disposition_type="attachment" if download else "inline",
+	)
 
 ytdownloader = None
 @app.get("/ytdl")

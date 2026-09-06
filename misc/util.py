@@ -30,6 +30,7 @@ import socket
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import textwrap
 import threading
 import time
@@ -2337,7 +2338,6 @@ class _TeeReader(io.RawIOBase):
 			self.pos += len(data)
 			return data
 
-
 class CachingTeeFile:
 	def __init__(self, src, cache_path=None, chunk_size=1024, callback=None):
 		self.src = src
@@ -2474,7 +2474,6 @@ class _CachingReader(io.RawIOBase):
 	def close(self):
 		self.file.close()
 
-
 class FileStreamer(io.BufferedRandom, contextlib.AbstractContextManager):
 	"A buffer-compatible file object that treats multiple files or buffers as a single concatenated one."
 
@@ -2609,211 +2608,87 @@ class PipedProcess:
 		except psutil.NoSuchProcess:
 			return "terminated"
 
-class seq(io.BufferedRandom, collections.abc.Sequence, contextlib.AbstractContextManager):
-	"A Sequence implementation that attempts to turn buffer objects into indexable array-like objects."
+class LazyFile(io.RawIOBase, collections.abc.Sequence):
+	"""
+	Wraps an iterator of bytes into a seekable file-like object.
+	Data is streamed into a temporary file on disk as needed.
+	"""
+	def __init__(self, byte_iter, size=None):
+		if not hasattr(byte_iter, '__iter__'):
+			raise TypeError("byte_iter must be an iterable yielding bytes")
+		self._iter = iter(byte_iter)
+		self._tmpfile = tempfile.TemporaryFile(mode="w+b")
+		self._eof = False
+		self._size = size
 
-	BUF = 262144
-	iter = None
+	def __getitem__(self, idx):
+		if idx is None:
+			self.seek(0)
+			return self.read()
+		if isinstance(idx, slice):
+			self.seek(idx.start)
+			b = self.read(idx.stop)
+			return b[::idx.step] if idx.step not in (None, 1) else b
+		self.seek(idx)
+		return self.read(1)
 
-	def __init__(self, obj, filename=None, buffer_size=None):
-		if buffer_size:
-			self.BUF = buffer_size
-		self.closer = T(obj).get("close")
-		self.high = 0
-		self.finished = False
-		self.limit = getattr(obj, "size", None)
-		if type(obj) is MemoryBytes:
-			obj = obj.view
-		if isinstance(obj, io.IOBase) or hasattr(obj, "read"):
-			if isinstance(obj, io.BytesIO):
-				self.data = obj
-				self.finished = True
-				self.limit = len(self.data.getbuffer())
-			elif hasattr(obj, "getbuffer"):
-				self.data = io.BytesIO(obj.getbuffer())
-				self.finished = True
-				self.limit = len(self.data.getbuffer())
-			else:
-				if hasattr(obj, "seek"):
-					if not self.limit:
-						self.limit = getsize(obj)
-					obj.seek(0)
-				def obj_iter(fp):
-					b = fp.read(self.BUF)
-					if not b:
-						raise StopIteration
-					yield b
-				self.iter = obj_iter(obj)
-				self.data = io.BytesIO()
-		elif isinstance(obj, (bytes, bytearray, memoryview)):
-			self.data = io.BytesIO(obj)
-			self.high = len(obj)
-			self.finished = True
-			self.limit = len(obj)
-		elif isinstance(obj, collections.abc.Iterable):
-			self.iter = iter(obj)
-			self.data = io.BytesIO()
+	def _fill_to(self, position):
+		"""Ensure the temp file has at least `position` bytes."""
+		if self._eof:
+			return
+		self._tmpfile.seek(0, os.SEEK_END)
+		while self._tmpfile.tell() < position:
 			try:
-				self.limit = len(obj)
-			except Exception:
-				pass
-		elif T(obj).get("iter_content"):
-			self.iter = obj.iter_content(self.BUF)
-			self.data = io.BytesIO()
-			self.limit = int(obj.headers.get("Content-Length", 0)) or None
-		else:
-			raise TypeError(f"a bytes-like object is required, not '{type(obj)}'")
-		self.filename = filename
-		self.buffer = {}
-		self.pos = 0
-
-	def __len__(self):
-		return self.limit or max(k + len(v) for k, v in self.buffer.items()) if self.buffer else 0
-
-	seekable = lambda self: True	# noqa: E731
-	readable = lambda self: True	# noqa: E731
-	writable = lambda self: False	# noqa: E731
-	isatty = lambda self: False		# noqa: E731
-	flush = lambda self: None		# noqa: E731
-	tell = lambda self: self.pos	# noqa: E731
-
-	def seek(self, pos=0):
-		self.pos = pos
-		return self.pos
-
-	def read(self, size=None):
-		out = self.peek(size)
-		self.pos += len(out)
-		return out
-
-	def peek(self, size=None):
-		if not size:
-			if self.limit is not None:
-				return self[self.pos:self.limit]
-			return self[self.pos:]
-		if self.limit is not None:
-			return self[self.pos:min(self.pos + size, self.limit)]
-		return self[self.pos:self.pos + size]
-
-	def truncate(self, limit=None):
-		self.limit = limit
-
-	def fileno(self):
-		raise OSError
-
-	def __getitem__(self, k):
-		if self.finished:
-			return self.data.getbuffer()[k]
-		if type(k) is slice:
-			start = k.start or 0
-			stop = k.stop or inf
-			step = k.step or 1
-			rev = step < 0
-			if rev:
-				start, stop, step = stop + 1, start + 1, -step
-			curr = start // self.BUF * self.BUF
-			out = deque()
-			out.append(self.load(curr))
-			curr += self.BUF
-			while curr < stop:
-				temp = self.load(curr)
-				if not temp:
-					break
-				out.append(temp)
-				curr += self.BUF
-			b = memoryview(b"".join(out))
-			b = b[start % self.BUF:]
-			if isfinite(stop):
-				b = b[:stop - start]
-			if step != 1:
-				b = b[::step]
-			if rev:
-				b = b[::-1]
-			return b
-		base = k // self.BUF
-		with suppress(Exception):
-			return self.load(base)[k % self.BUF]
-		raise IndexError("seq index out of range")
-
-	def __str__(self):
-		if self.filename is None:
-			return str(self.data)
-		if self.filename:
-			return f"<seq name='{self.filename}'>"
-		return f"<seq object at {hex(id(self))}"
-
-	def __iter__(self):
-		i = 0
-		while True:
-			try:
-				x = self[i]
-			except IndexError:
+				chunk = next(self._iter)
+			except StopIteration:
+				self._eof = True
 				break
-			if x:
-				yield x
-			else:
-				break
-			i += 1
+			if not isinstance(chunk, byte_like):
+				raise TypeError("Iterator must yield bytes-like objects")
+			self._tmpfile.write(chunk)
 
-	def __getattribute__(self, k):
-		if k in ("name", "filename"):
-			try:
-				return object.__getattribute__(self, "filename")
-			except AttributeError:
-				k = "name"
+	def read(self, size=-1):
+		"""Read up to `size` bytes from the current position."""
+		if size is None or size < 0:
+			# Fill until EOF
+			self._fill_to(float('inf'))
 		else:
-			try:
-				return object.__getattribute__(self, k)
-			except AttributeError:
-				pass
-		return object.__getattribute__(self.data, k)
+			self._fill_to(self.tell() + size)
+		return self._tmpfile.read(size)
 
-	close = lambda self: self.closer() if self.closer else None		# noqa: E731
-	__enter__ = lambda self: self									# noqa: E731
-	__exit__ = lambda self, *args: self.close()				# noqa: E731
+	def seek(self, offset, whence=os.SEEK_SET):
+		"""Seek to a position in the file."""
+		if whence == os.SEEK_SET:
+			target = offset
+		elif whence == os.SEEK_CUR:
+			target = self.tell() + offset
+		elif whence == os.SEEK_END:
+			if self._size is None:
+				self._fill_to(float('inf'))
+			self._size = self._tmpfile.seek(0, os.SEEK_END)
+			target = self._tmpfile.tell() + offset
+		else:
+			raise ValueError("Invalid whence value")
 
-	def load(self, k):
-		if self.finished:
-			return self.data.getbuffer()[k:k + self.BUF]
+		if target < 0:
+			raise ValueError("Negative seek position")
+		self._fill_to(target)
+		return self._tmpfile.seek(target, os.SEEK_SET)
+
+	def tell(self):
+		return self._tmpfile.tell()
+
+	def close(self):
 		try:
-			return self.buffer[k]
-		except KeyError:
-			pass
-		seek = T(self.data).get("seek")
-		if seek:
-			if self.iter is not None and k + self.BUF >= self.high:
-				out = deque()
-				try:
-					while k + self.BUF >= self.high:
-						temp = next(self.iter)
-						if not temp:
-							raise StopIteration
-						out.append(temp)
-						self.high += len(temp)
-				except StopIteration:
-					out.appendleft(self.data.getbuffer())
-					self.data = io.BytesIO(b"".join(out))
-					self.finished = True
-					return self.data.getbuffer()[k:k + self.BUF]
-				out.appendleft(self.data.getbuffer())
-				self.data = io.BytesIO(b"".join(out))
-			self.buffer[k] = b = self.data.getbuffer()[k:k + self.BUF]
-			return b
-		try:
-			while self.high < k:
-				temp = next(self.data)
-				if not temp:
-					raise StopIteration
-				if self.high in self.buffer:
-					self.buffer[self.high] += temp
-				else:
-					self.buffer[self.high] = temp
-				self.high += self.BUF
-		except StopIteration:
-			self.data = io.BytesIO(b"".join(self.buffer.values()))
-			self.finished = True
-			return self.data.getbuffer()[k:k + self.BUF]
-		return self.buffer.get(k, b"")
+			self._tmpfile.close()
+		finally:
+			super().close()
+
+	def readable(self):
+		return True
+
+	def seekable(self):
+		return True
 
 
 class FileHashDict(collections.abc.MutableMapping):
@@ -4671,7 +4546,6 @@ def receive_bytes(receiver, unlink):
 	finally:
 		mem.unlink()
 		submit_thread(unlink, name)
-
 
 class PipeableIterator(collections.abc.Iterator):
 	"""A threaded iterator class that allows for dynamic item appending and termination.

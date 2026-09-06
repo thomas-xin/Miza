@@ -343,7 +343,7 @@ if not model_levels:
 		target="auto",
 	)] * 3))
 Bot.model_levels = model_levels
-async def chat_completion(self, messages, extra_messages=(), agent="miza-2", model=None, system=None, max_tokens=256, temperature=0.8, tools=None, tool_router=None, user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
+async def chat_completion(self, messages, extra_messages=(), agent="miza-2", model=None, system=None, max_tokens=256, temperature=0.9, frequency_penalty=None, tools=None, tool_router=None, user=None, props=None, stream=True, tinfo=None, allow_nsfw=False, predicate=None, premium_context=[], **void):
 	"OpenAI-compatible Chat Completion function. Autoselects model using a function call, then routes to tools and target model as required."
 	await require_predicate(predicate)
 	await ai.load_openrouter()
@@ -416,6 +416,7 @@ async def chat_completion(self, messages, extra_messages=(), agent="miza-2", mod
 					model=toolmodel,
 					messages=toolcheck,
 					temperature=tmp,
+					frequency_penalty=frequency_penalty,
 					tools=list(toolscan) + [f_default],
 					tool_choice="required" if toolmodel else "auto",
 					require_message=False,
@@ -578,6 +579,7 @@ async def chat_completion(self, messages, extra_messages=(), agent="miza-2", mod
 			messages=cut_messages,
 			assistant_name=assistant_name,
 			temperature=tmp,
+			frequency_penalty=frequency_penalty,
 			max_tokens=ml,
 			user=ustr,
 		)

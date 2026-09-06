@@ -18,7 +18,7 @@ import time
 import urllib, urllib.parse
 import zipfile
 import cheroot, cheroot.server
-import cherrypy as cp
+import cherrypy as cp, cherrypy.lib.static
 import diskcache
 import niquests
 import orjson
@@ -29,7 +29,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, submit_thread, create_thread, create_task, await_fut
 from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
-from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, get_ext, is_youtube_url, seq, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag, preview_url, is_local_url, banned_paths, force_kill, patch_before_return, as_bytes, MARKDOWN_VIEWER
+from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, get_ext, is_youtube_url, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag, preview_url, is_local_url, banned_paths, force_kill, patch_before_return, as_bytes, MARKDOWN_VIEWER
 from .caches import attachment_cache, colour_cache, minimise_url
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -641,54 +641,35 @@ class Server:
 		raise cp.HTTPRedirect(url, 307)
 
 	@cp.expose
-	@cp.tools.accept(media="multipart/form-data")
 	def proxy(self, url=None, force=False, download=False, **void):
 		if not url:
-			return "Expected proxy URL."
+			raise cp.HTTPError(400, "Expected proxy URL")
 		if is_local_url(url):
-			raise InterruptedError(url)
+			raise cp.HTTPError(403, url)
+
 		try:
-			body = cp.request.body.fp.read()
-		except Exception:
-			print_exc()
-			body = None
-		headers = Request.header()
-		if cp.request.headers.get("Range"):
-			headers["Range"] = cp.request.headers["Range"]
-		resp = self.get_with_retries(url, headers=headers, data=body, timeout=2)
-		heads = resp.headers
-		cp.response.status = resp.status_code
-		update_headers(cp.response.headers, **heads)
-		update_headers(cp.response.headers, **CHEADERS)
-		cp.response.headers.pop("Connection", None)
-		cp.response.headers.pop("Transfer-Encoding", None)
-		if cp.response.headers.pop("Content-Encoding", None):
-			cp.response.headers.pop("Content-Length", None)
-		cp.response.headers.pop("Server", None)
-		cp.response.headers.pop("Alt-Svc", None)
+			path = await_fut(attachment_cache.download(url, max_size=1073741824 * 16, filename=True))
+		except ConnectionError as ex:
+			raise cp.HTTPError(ex.errno or 500, f"{url}: {ex}")
+		heads = await_fut(attachment_cache.scan_headers(url, base="mizabot.xyz", fc=True))
+
+		response_headers = {}
 		filename = heads.get("attachment-filename") or urllib.parse.unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
+		response_headers["Cache-Control"] = "public,max-age=21600,stale-while-revalidate=1073741824,stale-if-error=1073741824"
+
+		if not force and heads.get("content-type").split(";", 1)[0] == "text/markdown":
+			new_url = f"{API}/u?url={urllib.parse.quote(url)}&force=1"
+			response_headers["Content-Type"] = "text/html"
+			update_headers(cp.response.headers, **response_headers)
+			return as_bytes(MARKDOWN_VIEWER.replace("URL", json.dumps(new_url)))
+		mime = mime_from_file(path, url2fn(filename)) if filename else None
 		disposition = "attachment" if download else "inline"
-		cp.response.headers.pop("Content-Disposition", None)
-		if filename:
-			cp.response.headers["Content-Disposition"] = f"{disposition}; filename={urllib.parse.quote(url2fn(filename))}"
-		ctype = heads.get("Content-Type", "application/octet-stream")
-		if ctype.split(";", 1)[0] in ("text/html", "text/plain", "text/markdown") or ctype.split("/", 1)[0] == "application":
-			it = resp.iter_content(262144)
-			b = next(it)
-			mime = mime_from_file(b, url2fn(filename or url))
-			if mime == "application/octet-stream":
-				a = MemoryBytes(b)[:128]
-				if sum(32 <= c < 128 for c in a) >= len(a) * 7 / 8:
-					mime = "text/plain"
-			elif not force and mime == "text/markdown":
-				new_url = f"{API}/u?url={urllib.parse.quote(url)}&force=1"
-				cp.response.headers["Content-Type"] = "text/html"
-				return as_bytes(MARKDOWN_VIEWER.replace("URL", json.dumps(new_url)))
-			cp.response.headers.pop("Content-Type", None)
-			cp.response.headers["Content-Type"] = mime
-			return resume(b, it)
-		return resp.iter_content(262144)
-	proxy._cp_config = {"response.stream": True}
+		return cp.lib.static.serve_file(
+			path,
+			content_type=mime,
+			disposition=f"{disposition}; filename={urllib.parse.quote(url2fn(filename))}",
+		)
+	# proxy._cp_config = {"response.stream": True}
 
 	@cp.expose(("minimize",))
 	def minimise(self, url):

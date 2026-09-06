@@ -499,6 +499,9 @@ class AttachmentCache(AutoCache):
 		if read is not False:
 			if isinstance(fp, byte_like):
 				fp = io.BytesIO(fp)
+			elif hasattr(fp, "name") and os.path.exists(fp.name):
+				fp.close()
+				fp = open(fp.name, "rb")
 			return (fp, headers) if return_headers else fp
 		try:
 			if isinstance(fp, byte_like):

@@ -554,7 +554,7 @@ class Ask(Command):
 						emoji = await bot.data.emojis.grab("loading.gif")
 						loading = min_emoji(emoji, full=True)
 					rtotal = reasoning_sum + reasoning_temp
-					rsize = f"Thinking ({byte_scale(rtotal)}B)" if rtotal else "Reading"
+					rsize = f"Thinking ({byte_scale(rtotal)}B)" if rtotal else "Thinking" if text else "Reading"
 					begin = f"> {rsize}... {loading}\n{rsep}"
 					content = begin + content.split(rsep, 1)[-1]
 					yield "\r" + content.rstrip()
@@ -904,7 +904,7 @@ class Instruct(Command):
 			validation="[0, 10]",
 			description="Temperature to influence alignment",
 			example="1.2",
-			default=None,
+			default=0.9,
 		),
 		frequency_penalty=cdict(
 			type="number",
@@ -1227,7 +1227,7 @@ class TTS(Command):
 		),
 	)
 	rate_limit = (10, 15)
-	_timeout_ = 4
+	_timeout_ = 12
 	slash = True
 	ephemeral = True
 

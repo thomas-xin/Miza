@@ -269,7 +269,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_last=3, best=False, 
 			messages.extend(sm)
 		messages.insert(0, fm)
 		return messages
-	summ = "Summary of chat history (include this if asked to summarise!):\n"
+	summ = "Summary of chat history:\n"
 	s = overview(messages[:i + 1] if i > 0 else messages)
 	s = s.removeprefix(summ).removeprefix("system:").strip()
 	c2 = count_to(messages)
@@ -294,7 +294,7 @@ async def cut_to(messages, limit=1024, softlim=384, exclude_last=3, best=False, 
 	messages.insert(0, fm)
 	return messages
 
-async def _summarise(s, max_length, best=False, prompt=None, premium_context=[], model="small"):
+async def _summarise(s, max_length, padding=128, best=False, prompt=None, premium_context=[], model="small"):
 	if len(s) <= max_length:
 		return s
 	ml = round_random(max_length)
@@ -331,18 +331,19 @@ Answer ONLY with the summary, do not answer the question itself!'''
 				model=model,
 				messages=messages,
 				temperature=0.01,
+				frequency_penalty=0.1,
 				reasoning_effort="minimal",
 				max_tokens=ml,
 				premium_context=premium_context,
 			)
-			resp = cmpl.choices[0].message.content.strip()
-			if resp and not decensor.search(resp):
-				return resp
+			resp = cmpl.choices[0].message.content
+			if (resp := resp.strip()) and not decensor.search(resp):
+				return lim_tokens(s, padding, mode="right") + "\n\n" + resp
 	return lim_tokens(s, round_random(max_length * 2 / 3))
 
 async def summarise(q, min_length=384, max_length=16384, padding=128, best=True, prompt=None, premium_context=[], model="small"):
 	"Produces an AI-generated summary of input text. Model used is controlled by \"best\" parameter."
-	split_length = max_length - padding
+	split_length = max_length - padding * 2
 	summ_length = min(min_length, split_length - 1)
 	q = lim_tokens(q, 1048576)
 	c = tcount(q)
@@ -361,7 +362,7 @@ async def summarise(q, min_length=384, max_length=16384, padding=128, best=True,
 	c = tcount(q)
 	if c <= min_length:
 		return q
-	return await _summarise(q, summ_length, best=best, prompt=prompt, premium_context=premium_context, model=model)
+	return await _summarise(q, summ_length, padding=padding, best=best, prompt=prompt, premium_context=premium_context, model=model)
 
 cache = CACHE = AutoCache(f"{CACHE_PATH}/ai", stale=86400, timeout=86400 * 14)
 
@@ -379,9 +380,11 @@ class ExtendedOpenAI(openai.AsyncOpenAI):
 	def __bool__(self):
 		return bool(self.model and not self.disabled)
 
-async def find_model_a(oai):
-	l = await oai.models.list()
-	model = l.data[0].id
+async def find_model_a(oai, default=None):
+	info = await oai.models.list()
+	l = info.data
+	l = [m for m in l if m.id == default] or l
+	model = l[0].id
 	return model
 
 local_models = cdict()
@@ -402,7 +405,7 @@ async def load_local():
 		for base_url in base_urls:
 			model = ExtendedOpenAI(api_key=api_key, base_url=base_url)
 			try:
-				mname = await find_model_a(model)
+				mname = await find_model_a(model, default=info.get("model"))
 			except Exception as ex:
 				print(f"Error loading local model {name}: {repr(ex)}")
 				continue
@@ -542,8 +545,6 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 					kwa["max_completion_tokens"] = mt2
 				else:
 					kwa["max_tokens"] = mt2
-			kwa.pop("presence_penalty", None)
-			kwa.pop("frequency_penalty", None)
 			reasoning = dict(
 				enabled=True,
 				effort=kwa.pop("reasoning_effort", "low"),
@@ -552,19 +553,19 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 			reasoning_2 = body.pop("reasoning", None) or kwa.pop("reasoning", None)
 			if reasoning_2:
 				reasoning.update(reasoning_2)
-			match reasoning["effort"]:
-				case "minimal":
-					reasoning["max_tokens"] = 256
-				case "low":
-					reasoning["max_tokens"] = 1024
-				case "medium":
-					reasoning["max_tokens"] = 4096
-				case "high":
-					reasoning["max_tokens"] = 16384
-				case "xhigh":
-					reasoning["max_tokens"] = 65536
-				case _:
-					reasoning["max_tokens"] = 512
+			# match reasoning["effort"]:
+			# 	case "minimal":
+			# 		reasoning["max_tokens"] = 256
+			# 	case "low":
+			# 		reasoning["max_tokens"] = 1024
+			# 	case "medium":
+			# 		reasoning["max_tokens"] = 4096
+			# 	case "high":
+			# 		reasoning["max_tokens"] = 16384
+			# 	case "xhigh":
+			# 		reasoning["max_tokens"] = 65536
+			# 	case _:
+			# 		reasoning["max_tokens"] = 512
 			body["reasoning"] = reasoning
 		elif "reasoning_effort" in kwa:
 			kwa.pop("reasoning_effort")

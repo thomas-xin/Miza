@@ -4104,7 +4104,7 @@
 					"validation": "[0, 10]",
 					"description": "Temperature to influence alignment",
 					"example": "1.2",
-					"default": null
+					"default": 0.9
 				},
 				"frequency_penalty": {
 					"type": "number",
@@ -4223,7 +4223,7 @@
 			"level": "0",
 			"rate_limit": "(10, 15)",
 			"example": [],
-			"timeout": "96",
+			"timeout": "288",
 			"schema": {
 				"voice": {
 					"type": "enum",
