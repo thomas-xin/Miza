@@ -337,7 +337,7 @@ Answer ONLY with the summary, do not answer the question itself!'''
 				premium_context=premium_context,
 			)
 			resp = cmpl.choices[0].message.content
-			if (resp := resp.strip()) and not decensor.search(resp):
+			if resp and resp.strip() and not decensor.search(resp):
 				return lim_tokens(s, padding, mode="right") + "\n\n" + resp
 	return lim_tokens(s, round_random(max_length * 2 / 3))
 

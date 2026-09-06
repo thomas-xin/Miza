@@ -1061,7 +1061,7 @@ class AudioFile:
 			if ba == "160k" and codec == "opus" and channels == 2:
 				cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "copy", "-"]
 			if is_url(stream):
-				cmd = [ffmpeg, "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + cmd[1:]
+				cmd = [ffmpeg, "-seekable", "0", "-multiple_requests", "1", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "240"] + cmd[1:]
 			if is_youtube_stream(stream):
 				met = stream.split("&met=", 1)[-1].split("&", 1)[0].split("%", 1)[0]
 				if met and met.isnumeric():
@@ -1191,7 +1191,9 @@ class AudioFile:
 			if isinstance(self.stream, str):
 				if pos > 60 or not self.live or not is_youtube_stream(source):
 					if is_url(source):
-						args = ["ffmpeg", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "250"] + args[1:]
+						args = ["ffmpeg", "-multiple_requests", "1", "-reconnect", "1", "-reconnect_at_eof", "0", "-reconnect_streamed", "1", "-reconnect_delay_max", "250"] + args[1:]
+						if self.live:
+							args = ["ffmpeg", "-seekable", "0"] + args[1:]
 					args.insert(1, "-nostdin")
 					args.append(source)
 				else:
