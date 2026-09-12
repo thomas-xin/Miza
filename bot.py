@@ -777,13 +777,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					return await _run_async(events[0](*args, **kwargs))
 				return
 			futs = []
-			async with asyncio.TaskGroup() as group:
-				for func in filter(bool, events):
-					fut = func(*args, **kwargs)
-					if not fut:
-						continue
-					futs.append(group.create_task(fut))
-				return await gather(*futs)
+			for func in filter(bool, events):
+				fut = func(*args, **kwargs)
+				if not fut:
+					continue
+				futs.append(create_task(fut))
+			return await gather(*futs)
 
 	async def get_full_invites(self, guild):
 		"Gets the full list of invites from a guild, if applicable."
@@ -2045,9 +2044,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		f = None
 		fsize = 0
 		size = CACHE_FILESIZE
-		with suppress(AttributeError):
-			if channel.guild.filesize_limit > 26214400:
-				size = channel.guild.filesize_limit
+		if channel and getattr(channel, "guild", None):
+			size = max(channel.guild.filesize_limit, CACHE_FILESIZE)
 		if getattr(channel, "simulated", None) or getattr(channel, "guild", None) and not channel.permissions_for(channel.guild.me).attach_files:
 			size = -1
 		data = file
@@ -3757,6 +3755,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if isinstance(resp, cdict):
 					if interaction:
 						if not fut.done():
+							print("React cancel:", fut)
 							fut.cancel()
 						create_task(self.ignore_interaction(message))
 					await self.edit_message(
@@ -3789,7 +3788,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				elif not self.ready:
 					text = "Currently loading, please wait..."
 				elif AUTH.get("status"):
-					text = AUTH["status"]
+					text: str = AUTH["status"]
 				else:
 					text = f"{self.webserver}, to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}"
 					if self.owners:
@@ -4541,8 +4540,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if not allow_recursion and T(command).get("recursive", False):
 				raise PermissionError("Nested recursive commands are not permitted.")
 			gid = self.data.blacklist.get(0)
-			if gid and gid != guild.id and not isnan(u_perm):
-				print("BOUNCED:", user, message.content)
+			content = message.content if message else None
+			if gid and (not guild or gid != guild.id) and not isnan(u_perm):
+				print("Bounced for maintenance:", user, content)
 				create_task(send_with_react(
 					channel,
 					f"I am currently under maintenance, please [stay tuned](<{self.rcc_invite}>)!",
@@ -4551,7 +4551,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				))
 				return
 			elif u_perm <= -inf:
-				print("REFUSED:", user, message.content)
+				print("Refused request:", user, content)
 				create_task(send_with_react(
 					channel,
 					"Sorry, you are currently not permitted to request my services.",
@@ -4584,27 +4584,28 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			)
 		elif channel and guild.me and hasattr(guild.me, "timed_out") and (guild.me.timed_out or not channel.permissions_for(guild.me).send_messages):
 			raise PermissionError("Unable to send message.")
-		if getattr(sem, "busy", None):
+		if getattr(sem, "busy", None) and message:
 			create_task(message.add_reaction("🌡️"))
 		if command_check in command.macromap:
 			kv = command.macromap[command_check].copy()
 			if kwargs:
 				kv.update(kwargs)
 			kwargs = kv
+		cid = channel.id if channel else None
 		try:
 			kwargs = await self.extract_kwargs(argv, command, u_perm, user, message, channel, guild, command_check, kwargs)
 		except Exception:
 			if not soon_indicator and message and user:
-				print(f"{channel.id}: {user} ({user.id}) queued command {command_check} {kwargs or argv}")
+				print(f"{cid}: {user} ({user.id}) queued command {command_check} {kwargs or argv}")
 			raise
 		if message and user:
-			print(f"{channel.id}: {user} ({user.id}) executing command {command_check} {kwargs or argv}")
+			print(f"{cid}: {user} ({user.id}) executing command {command_check} {kwargs or argv}")
 		comment = comment or ""
 		fut = None
 		async with sem:
 			# Automatically start typing if the command is time consuming
 			tc = getattr(command, "time_consuming", False)
-			if tc and not getattr(message, "simulated", False):
+			if tc and not getattr(message, "simulated", False) and channel:
 				fut = create_task(self._state.http.send_typing(channel.id))
 			# Get maximum time allowed for command to process
 			if isnan(u_perm):
@@ -6760,9 +6761,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 	exception_locks = collections.defaultdict(float)
 	def send_exception(self, messageable, ex, reference=None, op=None, comm=None):
+		print(reference)
+		print_exc()
 		if self.maintenance and not (reference and self.is_owner(reference.author)):
-			print(reference)
-			print_exc()
 			return fut_nop
 		if getattr(ex, "no_react", None):
 			reacts = ""
@@ -7646,7 +7647,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				with tracebacksuppressor:
 					inits = T(before).get("inits") or T(after).get("inits")
 					if inits:
-						print("Cancel:", inits)
+						print("Edit cancel:", inits)
 						for fut in inits:
 							with tracebacksuppressor:
 								try:
@@ -7843,7 +7844,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			with tracebacksuppressor:
 				inits = T(message).get("inits")
 				if inits:
-					print("Cancel:", inits)
+					print("Delete cancel:", inits)
 					for fut in inits:
 						with tracebacksuppressor:
 							try:

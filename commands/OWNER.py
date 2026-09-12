@@ -401,7 +401,7 @@ class UpdateExec(Database):
 	_print = lambda self, *args, sep=" ", end="\n", prefix="", channel=None, **void: self.bot.send_as_embeds(channel, "```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```")
 	def _input(self, *args, channel=None, **kwargs):
 		self._print(*args, channel=channel, **kwargs)
-		self.listeners[channel.id] = fut = Future()
+		self.listeners[channel.id] = fut = concurrent.futures.Future()
 		return fut.result(timeout=86400)
 
 	psem = Semaphore(1, 64)
@@ -625,26 +625,6 @@ class UpdateExec(Database):
 		deli = [m.id for m in deleted]
 		print("Deleted:", deli)
 		return deli
-
-	DEFAULT_LIMIT = 48 * 1048576
-	async def get_lfs_channel(self, size=DEFAULT_LIMIT):
-		bot = self.bot
-		log_channels = set(getattr(c, "parent", c) for c in list(filter(bool, (bot.get_channel(cid) for cid in bot.data.logM.values()))) + list(filter(bool, (bot.get_channel(cid) for cid in bot.data.logU.values()))) if c.guild.filesize_limit >= size and bot.permissions_in(c).create_private_threads and bot.permissions_in(c).embed_links)
-		log_channels2 = [c for c in log_channels if bot.owners[0] in c.guild._members and c.permissions_for(c.guild.get_member(bot.owners[0])).read_messages]
-		log_channels = log_channels2 or log_channels
-		if log_channels:
-			channel = choice(log_channels)
-			for thread in channel.threads:
-				if thread.owner_id == bot.id:
-					return thread
-			try:
-				async for thread in channel.archived_threads(private=True):
-					if thread.owner_id == bot.id:
-						return thread
-			except discord.Forbidden:
-				pass
-			return await channel.create_thread(name="backup")
-		raise NotImplementedError(size)
 
 	async def lproxy(self, url, filename=None, channel=None, minimise=False, allow_empty=True):
 		if isinstance(url, byte_like):

@@ -331,6 +331,11 @@ def to_msg(k, v, n=None, t=None):
 		m.content = [cdict(type="text", text=v)] if v else []
 	return m
 
+def no_name(s):
+	if s.startswith("name=") and "\n" in s:
+		s = s.split("\n", 1)[-1].lstrip()
+	return s
+
 
 class Ask(Command):
 	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. The chatbot will automatically choose one of multiple language models to conjure a response based on premium level. Less censorship is imposed when invoked within NSFW channels."
@@ -357,7 +362,7 @@ class Ask(Command):
 		max_attempts=cdict(
 			type="integer",
 			validation="[1, 64]",
-			description="Amount of agent inference attempts (consumed by tools and errors)",
+			description="Amount of agent inference attempts (tools consume 1, errors 2)",
 			default=10,
 		)
 	)
@@ -398,18 +403,23 @@ class Ask(Command):
 		else:
 			name_repr = bot_name
 		personality = pdata.description.replace("{{user}}", _user.display_name).replace("{{char}}", name_repr)
-		personality += "\n\n[INFO] Usernames may be in `name={name}\\n` format to bypass format constraints (DO NOT COPY)."
+		personality += "\n\n[INFO] Usernames are given as `name={name}\\n`; input only (do not emit this)."
 		match pdata.history:
 			case "none":
 				personality += "\n[INFO] Conversation history currently disabled. Clarify if necessary."
 			case "private":
 				personality += "\n[INFO] Conversation history of external users currently disabled. Clarify if necessary."
+		channel_name = getattr(_channel, "name", None)
+		if channel_name:
+			channel_repr = " #" + channel_name
+		else:
+			channel_repr = ""
 		if "nsfw" in personality.casefold() or not _nsfw and bot.is_nsfw(_user):
 			pass
 		elif nsfw:
-			personality += f"\n[INFO] You are currently in a NSFW-enabled channel #{_channel.name}. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
+			personality += f"\n[INFO] You are currently in a NSFW-enabled channel{channel_repr}. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
 		else:
-			personality += f"\n[INFO] You are currently in a non-NSFW-enabled channel #{_channel.name}. If conversation involves mature, sexual, or dangerous topics, use disclaimers instead."
+			personality += f"\n[INFO] You are currently in a non-NSFW-enabled channel{channel_repr}. If conversation involves mature, sexual, or dangerous topics, use disclaimers instead."
 		emojis = not simulated and _guild and [emoji for emoji in _guild.emojis if emoji.is_usable()]
 		if emojis:
 			emojis = shuffle(emojis)[:25]
@@ -450,7 +460,8 @@ class Ask(Command):
 		hislim = 384 if _premium.value >= 4 else 192 if _premium.value >= 2 else 64
 		passthrough = set()
 		rsep = chr(invisicode.STRINGPREFIX)
-		if not simulated and pdata.history != "none":
+		adata = bot.commands.chatconfig[0].retrieve(_user)
+		if not simulated and pdata.history != "none" and adata.history != "none":
 			async for m in bot.history(_channel, limit=hislim):
 				if m.id in messages or m.id == _message.id:
 					continue
@@ -538,7 +549,8 @@ class Ask(Command):
 					visible_tools.pop("server_only")
 			if pdata.history == "none":
 				visible_tools.pop("sensitive")
-			for att in range(max_attempts):
+			att = 0
+			while att < max_attempts:
 				text = ""
 				messagelist = [messages[k] for k in sorted(messages) if not reference or k != reference.id]
 				messagelist.insert(0, system_message)
@@ -557,7 +569,7 @@ class Ask(Command):
 					rsize = f"Thinking ({byte_scale(rtotal)}B)" if rtotal else "Thinking" if text else "Reading"
 					begin = f"> {rsize}... {loading}\n{rsep}"
 					content = begin + content.split(rsep, 1)[-1]
-					yield "\r" + content.rstrip()
+					yield "\r" + no_name(content.rstrip())
 				async for resp in bot.chat_completion(messagelist, extra_messages=extra_messages, agent=target, model=model, max_tokens=24576, tools=visible_tools, user=_user, props=props, stream=True, allow_nsfw=nsfw, predicate=lambda: bot.verify_integrity(_message), premium_context=premium):
 					if isinstance(resp, dict):
 						if resp.get("reasoning"):
@@ -572,7 +584,8 @@ class Ask(Command):
 							rsize = f" ({byte_scale(rtotal)}B)" if rtotal else ""
 							begin = f"> Thinking{rsize}... {loading}\n{rsep}"
 							content = begin + content.split(rsep, 1)[-1]
-							yield "\r" + content.rstrip() + ("\n\n" * bool(content)) + text.strip()
+							content = no_name(content.rstrip())
+							yield "\r" + content + ("\n\n" * bool(content)) + text.strip()
 						if resp.get("cargs"):
 							props.cargs = resp["cargs"]
 						if resp.get("usage"):
@@ -594,10 +607,11 @@ class Ask(Command):
 						if resp.startswith("\r"):
 							text = resp[1:]
 						else:
-							text += resp 
-					yield "\r" + content.strip() + ("\n\n" * bool(content)) + text.strip()
+							text += resp
+					content = no_name(content.strip())
+					yield "\r" + content + ("\n\n" * bool(content)) + text.strip()
 				await bot.require_integrity(_message)
-				text = text.strip()
+				text = no_name(text.strip())
 				if not m:
 					m = cdict(content=text)
 				tool_calls = getattr(m, "tool_calls", None) or ()
@@ -661,6 +675,9 @@ class Ask(Command):
 					extra_messages[0].reasoning = cdict(
 						content=reasoning,
 					)
+				if not tool_calls:
+					att += 1
+				att += 1
 			else:
 				raise ex
 		except StopIteration:
@@ -675,9 +692,7 @@ class Ask(Command):
 				r, content = content.split("</txt>", 1)
 				r = r.removeprefix("<txt>")
 			reasonings.append(r)
-		content = content.strip()
-		if content.startswith("name=") and "\n" in content:
-			content = content.split("\n", 1)[-1].lstrip()
+		content = no_name(content.strip())
 		if reasonings:
 			reasoning = b"\n\n\n".join(map(as_bytes, reasonings))
 			try:
@@ -802,10 +817,11 @@ class ChatConfig(Command):
 		) if update else cdict()
 		p = self.bot.get_guildbase(get_guild_id(channel), "chatconfig", {}).get(channel.id)
 		if p:
-			per.update(p)
+			per.update(copy.deepcopy(p))
 		if user:
 			p = self.bot.get_guildbase(user.id, "chatconfig", {}).get(user.id)
 			if p:
+				p = copy.deepcopy(p)
 				p.pop("tts", None)
 				p.pop("history", None)
 				per.update(p)
@@ -835,7 +851,8 @@ class ChatConfig(Command):
 				p = self.retrieve(target)
 				s += ini_md(f"Current chat settings for {sqr_md(target)}:{iter2str(p)}")
 				if _perm < req:
-					s += f"\n(Use {bot.get_prefix(_guild)}chatconfig DEFAULT to reset; case-sensitive)."
+					extra = "; settings in DM apply globally" if personal else ""
+					s += f"\n(Use {bot.get_prefix(_guild)}chatconfig DEFAULT to reset, case-sensitive{extra})."
 				continue
 			if _perm < req:
 				reason = f"to modify chat config for {channel_repr(target)}"
@@ -868,7 +885,8 @@ class ChatConfig(Command):
 			pers[target.id] = p
 			bot.set_guildbase(gid, "chatconfig", pers)
 			p = self.retrieve(target, _user)
-			s += css_md(f"Chat settings for {sqr_md(target)} have been changed to {iter2str(p)}\n(Use {bot.get_prefix(_guild)}chatconfig DEFAULT to reset).")
+			extra = "; settings in DM apply globally" if personal else ""
+			s += css_md(f"Chat settings for {sqr_md(target)} have been changed to {iter2str(p)}\n(Use {bot.get_prefix(_guild)}chatconfig DEFAULT to reset{extra}).")
 		bot.set_guildbase(gid, "chatconfig", pers)
 		return s
 
@@ -1137,75 +1155,31 @@ class Vectorise(Command):
 		)
 
 
-voices = []
-voice_map = cdict(
-	google="""zephyr
-puck
-charon
-kore
-fenrir
-leda
-orus
-aoede
-callirrhoe
-autonoe
-enceladus
-iapetus
-umbriel
-algieba
-despina
-erinome
-algenib
-rasalgethi
-laomedeia
-achernar
-alnilam
-schedar
-gacrux
-pulcherrima
-achird
-zubenelgenubi
-vindemiatrix
-sadachbia
-sadaltager
-sulafat""".splitlines(),
-	openai="""alloy
-ash
-ballad
-coral
-echo
-fable
-nova
-onyx
-sage
-shimmer""".splitlines(),
-	dectalk="""paul
-betty
-harry
-frank
-kit
-rita
-ursula
-dennis
-wendy""".splitlines(),
-)
-voices.extend(f"{k}-{n}" for k, v in voice_map.items() for n in v)
-
 class TTS(Command):
 	description = "Produces synthesised speech from a text input."
 	schema = cdict(
-		voice=cdict(
+		engine=cdict(
 			type="enum",
 			validation=cdict(
-				enum=tuple(voices),
+				enum=("dectalk", "breeze", "openai", "google"),
 			),
-			description="The engine and voice to apply",
-			default="dectalk-paul",
-			example="openai-coral",
+			description="The API provider to use",
+			default="breeze",
+			example="openai",
 		),
 		text=cdict(
-			type="string",
+			type="text",
 			description="The text to render",
+		),
+		voice=cdict(
+			type="word",
+			description="The voice name to apply",
+			example="coral",
+		),
+		instructions=cdict(
+			type="word",
+			description="Extra prompt instructions for model",
+			example="Warm bright playful young female voice, high timbre",
 		),
 		url=cdict(
 			type="url",
@@ -1231,7 +1205,7 @@ class TTS(Command):
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, bot, _guild, _channel, _user, _perm, _premium, voice, text, url, format, autoplay, **void):
+	async def __call__(self, bot, _guild, _channel, _message, _user, _perm, _premium, engine, voice, text, instructions, url, format, autoplay, **void):
 		if autoplay:
 			assert format == "opus", "Only opus format can be played in voice."
 			assert bot.audio and "voice" in bot.get_enabled(_channel), "Voice commands must be enabled for autoplay."
@@ -1254,15 +1228,49 @@ class TTS(Command):
 		text = re.sub("[ \t]{2,}", "\t", text)
 		segments = split_across(text, lim=128, mode="tlen")
 		segments = [re.sub("[\r\n\f]{2,}", "\n", segment).strip() + "." for segment in segments]
-		print(len(text), len(segments), lim_str(text, 128))
-		engine, mode = voice.split("-", 1)
+		instructions = instructions or ""
+		voice = voice or ""
+		print(_user, instructions, len(text), len(segments), lim_str(text, 128))
 		futs = []
 		input_args = ()
 		desc = None
 
-		async def tts_into(segment, engine, voice, retry=True):
+		async def tts_into(segment, retry=True):
 			nonlocal input_args
+			await bot.require_integrity(_message)
 			match engine:
+				case "breeze":
+					fi = temporary_file("pcm")
+					_premium.require(1)
+					info = AUTH["local_llms"]["tts"]
+					oai = get_oai(None, choice(info["base_urls"]))
+					model = info["model"]
+					try:
+						resp = await oai.audio.speech.create(
+							model=model,
+							voice=voice,
+							input=segment,
+							instructions=instructions,
+							response_format="pcm",
+							speed=1,
+						)
+					except openai.InternalServerError as ex:
+						if retry:
+							print(repr(ex))
+						print_exc()
+						return
+					c = tcount(segment)
+					_premium.append(["openai", model, mpf("21") / 1000000 * c])
+					resp.write_to_file(fi)
+					await resp.aclose()
+				case "dectalk":
+					fi = temporary_file("wav")
+					if voice or instructions:
+						args = [os.path.abspath("misc/dectalk/say"), "-w", fi, "-pre", f"[:name {voice}]" + instructions, segment]
+					else:
+						args = [os.path.abspath("misc/dectalk/say"), "-w", fi, segment]
+					print(args)
+					await _run_async(subprocess.run, args, cwd="misc/dectalk", stdout=subprocess.DEVNULL)
 				case "google":
 					fi = temporary_file("pcm")
 					_premium.require(2)
@@ -1273,13 +1281,13 @@ class TTS(Command):
 							model=model,
 							voice=voice,
 							input=segment,
+							instructions=instructions,
 							response_format="pcm",
 							speed=1,
 						)
 					except openai.InternalServerError as ex:
 						if retry:
 							print(repr(ex))
-							return await tts_into(segment, "openai", "nova", False)
 						print_exc()
 						return
 					c = tcount(segment)
@@ -1297,14 +1305,13 @@ class TTS(Command):
 							model=model,
 							voice=voice,
 							input=segment,
-							instructions="Gentle and soothing, but steady voice",
+							instructions=instructions,
 							response_format="pcm",
 							speed=1,
 						)
 					except openai.InternalServerError as ex:
 						if retry:
 							print(repr(ex))
-							return await tts_into(segment, "google", "zephyr", False)
 						print_exc()
 						return
 					c = tcount(segment)
@@ -1312,18 +1319,13 @@ class TTS(Command):
 					resp.write_to_file(fi)
 					await resp.aclose()
 					input_args = ("-f", "s16le", "-ac", "1", "-ar", "24k")
-				case "dectalk":
-					fi = temporary_file("wav")
-					args = [os.path.abspath("misc/dectalk/say"), "-w", fi, "-pre", f"[:name {voice}]", segment]
-					print(args)
-					await _run_async(subprocess.run, args, cwd="misc/dectalk", stdout=subprocess.DEVNULL)
 				case _:
 					raise NotImplementedError(engine)
 			if os.path.exists(fi):
 				return fi
 
 		for segment in segments:
-			futs.append(tts_into(segment, engine, mode))
+			futs.append(tts_into(segment))
 		files = []
 		for fi in await gather(*futs):
 			if not fi:

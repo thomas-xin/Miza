@@ -1601,7 +1601,7 @@ async def proc_eval(s, caps=["math"], priority=False, timeout=12):
 		fut = p.pipe.asubmit(s, priority=priority)
 		return await asyncio.wait_for(fut, timeout=timeout)
 	except (T0, T1, T2):
-		print(f"Process {p} timed out, restarting!")
+		print(f"Process {p} timed out on instruction `{s}`, restarting!")
 		create_task(start_proc(p))
 		raise
 

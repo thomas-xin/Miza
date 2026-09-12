@@ -4010,7 +4010,7 @@
 				"max_attempts": {
 					"type": "integer",
 					"validation": "[1, 64]",
-					"description": "Amount of agent inference attempts (consumed by tools and errors)",
+					"description": "Amount of agent inference attempts (tools consume 1, errors 2)",
 					"default": 10
 				}
 			},
@@ -4225,18 +4225,28 @@
 			"example": [],
 			"timeout": "288",
 			"schema": {
-				"voice": {
+				"engine": {
 					"type": "enum",
 					"validation": {
-						"enum": ["google-zephyr", "google-puck", "google-charon", "google-kore", "google-fenrir", "google-leda", "google-orus", "google-aoede", "google-callirrhoe", "google-autonoe", "google-enceladus", "google-iapetus", "google-umbriel", "google-algieba", "google-despina", "google-erinome", "google-algenib", "google-rasalgethi", "google-laomedeia", "google-achernar", "google-alnilam", "google-schedar", "google-gacrux", "google-pulcherrima", "google-achird", "google-zubenelgenubi", "google-vindemiatrix", "google-sadachbia", "google-sadaltager", "google-sulafat", "openai-alloy", "openai-ash", "openai-ballad", "openai-coral", "openai-echo", "openai-fable", "openai-nova", "openai-onyx", "openai-sage", "openai-shimmer", "dectalk-paul", "dectalk-betty", "dectalk-harry", "dectalk-frank", "dectalk-kit", "dectalk-rita", "dectalk-ursula", "dectalk-dennis", "dectalk-wendy"]
+						"enum": ["dectalk", "breeze", "openai", "google"]
 					},
-					"description": "The engine and voice to apply",
-					"default": "dectalk-paul",
-					"example": "openai-coral"
+					"description": "The API provider to use",
+					"default": "breeze",
+					"example": "openai"
 				},
 				"text": {
-					"type": "string",
+					"type": "text",
 					"description": "The text to render"
+				},
+				"voice": {
+					"type": "word",
+					"description": "The voice name to apply",
+					"example": "coral"
+				},
+				"instructions": {
+					"type": "word",
+					"description": "Extra prompt instructions for model",
+					"example": "Warm bright playful young female voice, high timbre"
 				},
 				"url": {
 					"type": "url",
@@ -4257,7 +4267,7 @@
 					"excludes": ["format"]
 				}
 			},
-			"ordered_args": ["voice", "text", "url", "format", "autoplay"]
+			"ordered_args": ["engine", "text", "voice", "instructions", "url", "format", "autoplay"]
 		}
 	},
 	"NSFW": {

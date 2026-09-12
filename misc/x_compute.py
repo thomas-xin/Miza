@@ -255,7 +255,7 @@ def get_current_stats(up_bps, down_bps):
 	import psutil
 	t = utc()
 	cinfo = _cpuinfo
-	if t - _ctime > 3600:
+	if t - _ctime > 86400:
 		_ctime = t
 		import cpuinfo
 		cinfo = _cpuinfo = cpuinfo.get_cpu_info()
@@ -265,7 +265,7 @@ def get_current_stats(up_bps, down_bps):
 	except Exception:
 		gname = []
 	dinfo = _diskinfo
-	if t - _dtime > 60:
+	if t - _dtime > 720:
 		_dtime = t
 		dinfo = _diskinfo = {}
 		for p in psutil.disk_partitions(all=False):
@@ -808,6 +808,12 @@ def evalImg(url, operation, args):
 		video = False
 		if nogif:
 			new["frames"] = [next(iter(frames))]
+		elif fmt == "gif" and (new["count"] == 1 or not new.get("duration")):
+			temp = next(iter(frames))
+			video = True
+			new["frames"] = [temp] * 2
+			new["duration"] = 1
+			new["count"] = 2
 		elif new["count"] == 1 or not new.get("duration"):
 			temp = next(iter(frames))
 			video = getattr(temp, "audio", None)

@@ -1080,6 +1080,7 @@ scraper_blacklist = re.compile("|".join(map(re.escape, (
 	"spotify.com",
 	"artfight.net",
 	"discord.com/invite",
+	"docs.google.com",
 ))))
 
 def bytes2hex(b, space=True) -> str:
@@ -5481,7 +5482,7 @@ def new_playwright_page(browser="firefox", viewport=dict(width=480, height=320),
 	return context.new_page()
 
 
-CACHE_FILESIZE = 10 * 1048576
+CACHE_FILESIZE = 20 * 1048576
 DEFAULT_FILESIZE = 50 * 1048576
 
 mime_wait.result(timeout=8)

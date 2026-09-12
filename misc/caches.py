@@ -623,7 +623,7 @@ class AttachmentCache(AutoCache):
 		assert size < 1073741824 * 16, f"File size {size} too large!"
 		Ms = self.max_size
 		if getattr(channel, "guild", None):
-			Ms = channel.guild.filesize_limit
+			Ms = max(self.max_size, channel.guild.filesize_limit)
 		if size <= Ms:
 			return await self.create(data, filename=filename, channel=channel, editable=editable, minimise=minimise)
 		if not hasattr(data, "read"):

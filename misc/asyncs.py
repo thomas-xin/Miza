@@ -41,12 +41,17 @@ newfut.set_result(None)
 
 collections.__dict__.update(collections.abc.__dict__)
 
+def attempt_set_result(fut, res):
+	try:
+		fut.set_result(res)
+	except asyncio.InvalidStateError:
+		raise RuntimeError(fut, res)
 def as_fut(obj, loop=None):
 	if obj is None and loop is eloop:
 		return emptyfut
 	loop = loop or get_event_loop()
 	fut = asyncio.Future(loop=loop)
-	loop.call_soon_threadsafe(fut.set_result, obj)
+	loop.call_soon_threadsafe(attempt_set_result, fut, obj)
 	return fut
 
 main_executor = ThreadPoolExecutor(96, initializer=__setloop__)
