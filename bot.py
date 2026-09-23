@@ -1999,11 +1999,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		lim = 5 * 1048576 * 3 / 4
 		if mime not in ("image/jpg", "image/jpeg", "image/png") or len(d) > lim or np.prod(await _run_async(get_image_size, d)) > sizelim:
 			# name = url.replace("\\", "/").rsplit("/", 1) if isinstance(url, str) else "data"
+			d = d.strip()
 			if mime.split("/", 1)[0] not in ("image", "video"):
-				if len(d) > 288 and mime not in ("text/plain", "text/html"):
-					d = d[:128] + b".." + d[-128:]
-				s = as_str(d)
-				return f'<txt>' + s + "</txt>"
+				if len(d) > 1024 and mime not in ("text/plain", "text/html"):
+					d = d[:512] + b".." + d[-512:]
+				return "text:" + as_str(d)
 			assert isinstance(d, (str, bytes)), d
 			d = await process_image(d, "resize_map", [[], None, None, "rel", dimlim, "-", "auto", "-bg", "-oz", "-dl", dimlim, "-fs", lim, "-f", fmt], timeout=24)
 			mime = magic.from_buffer(d)

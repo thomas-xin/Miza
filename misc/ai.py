@@ -501,7 +501,7 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 	exc = None
 	tries = tuple(apis.items())
 	kwa = kwargs
-	for i, (api, minfo) in enumerate(tries + tries):
+	for i, (api, minfo) in enumerate(tries):
 		group = None
 		if api is None and minfo is None:
 			try:
@@ -532,25 +532,27 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 			exc = api_blocked[(sapi, model)]
 			continue
 		kwa = kwargs.copy()
-		kwa["stream"] = bool(kwargs.get("stream"))
+		if kwargs.get("stream"):
+			kwa["stream"] = True
 		body = cdict(kwargs.get("extra_body") or {})
 		if model_name(orig_model) in is_reasoning or isinstance(api, ExtendedOpenAI) and "reasoning" in api.capabilities:
 			mt = kwa.pop("max_tokens", 0) or 0
-			if not kwa.get("max_completion_tokens"):
-				mt2 = mt * 3 // 2
-				ctx = 65536
-				if orig_model in contexts:
+			if mt:
+				if not kwa.get("max_completion_tokens"):
+					mt2 = mt * 3 // 2
+					ctx = 65536
+					if orig_model in contexts:
+						if "messages" in kwa:
+							ctx = contexts[orig_model] - count_to(kwa["messages"]) * 3 // 2
+						elif "input" in kwa:
+							ctx = contexts[orig_model] - count_to(kwa["input"]) * 3 // 2
+						else:
+							ctx = contexts[orig_model] - tcount(kwa["prompt"]) * 3 // 2
+					mt2 = min(mt2, ctx)
 					if "messages" in kwa:
-						ctx = contexts[orig_model] - count_to(kwa["messages"]) * 3 // 2
-					elif "input" in kwa:
-						ctx = contexts[orig_model] - count_to(kwa["input"]) * 3 // 2
-					else:
-						ctx = contexts[orig_model] - tcount(kwa["prompt"]) * 3 // 2
-				mt2 = min(mt2, ctx)
-				if "messages" in kwa:
-					kwa["max_completion_tokens"] = mt2
-				elif "input" not in kwa:
-					kwa["max_tokens"] = mt2
+						kwa["max_completion_tokens"] = mt2
+					elif "input" not in kwa:
+						kwa["max_tokens"] = mt2
 			reasoning = dict(
 				enabled=True,
 				effort=kwa.pop("reasoning_effort", "low"),
@@ -559,19 +561,6 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 			reasoning_2 = body.pop("reasoning", None) or kwa.pop("reasoning", None)
 			if reasoning_2:
 				reasoning.update(reasoning_2)
-			# match reasoning["effort"]:
-			# 	case "minimal":
-			# 		reasoning["max_tokens"] = 256
-			# 	case "low":
-			# 		reasoning["max_tokens"] = 1024
-			# 	case "medium":
-			# 		reasoning["max_tokens"] = 4096
-			# 	case "high":
-			# 		reasoning["max_tokens"] = 16384
-			# 	case "xhigh":
-			# 		reasoning["max_tokens"] = 65536
-			# 	case _:
-			# 		reasoning["max_tokens"] = 512
 			body["reasoning"] = reasoning
 		elif "reasoning_effort" in kwa:
 			kwa.pop("reasoning_effort")

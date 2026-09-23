@@ -4122,12 +4122,12 @@
 			"ordered_args": ["model", "prompt", "images", "api", "temperature", "frequency_penalty", "presence_penalty", "reasoning_effort", "max_tokens"]
 		},
 		"Describe": {
-			"aliases": ["Describe", "Description", "Image2Text", "Clip"],
-			"description": "Describes the input image.",
+			"aliases": ["Describe", "Description", "Image2Text", "OCR"],
+			"description": "Describes the input image/video, or reads text within.",
 			"level": "0",
 			"rate_limit": "(4, 5)",
 			"example": [],
-			"timeout": "24",
+			"timeout": "96",
 			"schema": {
 				"url": {
 					"type": "visual",
@@ -4135,27 +4135,18 @@
 					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
 					"aliases": ["i"],
 					"required": true
+				},
+				"text_only": {
+					"type": "bool",
+					"description": "Transcribe text only"
 				}
 			},
-			"ordered_args": ["url"]
-		},
-		"OCR": {
-			"aliases": ["OCR", "Read", "Image2Text"],
-			"description": "Attempts to read text in an image using Optical Character Recognition AI.",
-			"level": "0",
-			"rate_limit": "(10, 15)",
-			"example": [],
-			"timeout": "24",
-			"schema": {
-				"url": {
-					"type": "image",
-					"description": "Image supplied by URL or attachment",
-					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
-					"aliases": ["i"],
-					"required": true
+			"ordered_args": ["url", "text_only"],
+			"macros": {
+				"OCR": {
+					"text_only": true
 				}
-			},
-			"ordered_args": ["url"]
+			}
 		},
 		"AudioSeparator": {
 			"aliases": ["AudioSeparator", "Extract", "Separate"],

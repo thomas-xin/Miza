@@ -259,7 +259,8 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 				else:
 					raise TypeError(c["type"])
 			follows[i] = as_fut(urls)
-		elif sum(f is not None for f in follows) < 6 and m.get("message") and j < 12:
+		elif sum(f is not None for f in follows) < 8 and m.get("message") and j < 16:
+			# Only read the last 8 images in the last 16 messages
 			finding = ("video", "image", "text") if j < 1 else ("video", "image")
 			follows[i] = create_task(self.follow_url(m.message, priority_order=finding, allow_text=False))
 		elif not m.get("content"):
@@ -304,7 +305,7 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 				model = backup_model
 		else:
 			best = 2 if model in ai.is_premium and m.get("new") else 0
-			futs = [self.caption(url, best=best, premium_context=premium_context) for url in urls]
+			futs = [self.vision(url, best=best, premium_context=premium_context) for url in urls]
 			extracts[i] = create_task(gather(*futs, return_exceptions=True))
 	for i, (m, fut) in enumerate(zip(messages, extracts)):
 		if not fut:
@@ -319,12 +320,10 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 			if isinstance(caption, BaseException):
 				print("Caption Error:", m.get("url"), repr(caption))
 				continue
-			if not caption.startswith("data:"):
-				if not m.get("new"):
-					caption = lim_tokens(caption, 256)
-				else:
-					caption = await ai.summarise(caption, min_length=context / 3, best=True, premium_context=premium_context)
-				m.content = (caption + "\n\n" + m.content).strip()
+			if isinstance(caption, dict):
+				m.content = pretty_json(caption)
+			elif not is_url(caption) and not caption.startswith("data:"):
+				m.content = caption
 			else:
 				im = cdict(type="image_url", image_url=cdict(url=caption, detail="auto"))
 				images.append(im)
@@ -777,14 +776,15 @@ async def chat_completion(self, messages, extra_messages=(), agent="miza-2", mod
 	raise ex or RuntimeError("Maximum inference attempts exceeded (model likely encountered an infinite loop).")
 Bot.chat_completion = chat_completion
 
-async def caption(self, url, best=False, screenshot=False, timeout=24, premium_context=[]):
-	"Produces an AI-generated caption for an image. Model used is determined by \"best\" argument."
-	h = shash((url, best))
-	s = await self.extract_cache.aretrieve(h, self.vision, url, best=best, timeout=timeout)
-	return f"<{s[0]}>{s[1]}</{s[0]}>"
-Bot.caption = caption
-
-async def vision(self, url, name=None, best=True, model=None, question=None, premium_context=[], timeout=12):
+vision_prompt = """Please describe this <IMAGE> in detail:
+- If the image is a collage of animation frames, describe it as if it were a single video.
+- If present, transcribe text from the image, otherwise leave the text field blank.
+- Do not answer questions in the image."""
+from pydantic import BaseModel
+class VisionResponse(BaseModel):
+	description: str
+	text: str
+async def _vision(self, url, name=None, model=None, question=None, premium_context=None, timeout=12):
 	"Requests an image description from a vision-supporting LLM."
 	if name:
 		iname = f'image "{name}"'
@@ -793,61 +793,41 @@ async def vision(self, url, name=None, best=True, model=None, question=None, pre
 	else:
 		iname = "image"
 	data_url = await self.to_data_url(url, timeout=timeout)
-	if data_url.startswith("<txt>"):
-		return ("txt", data_url.removeprefix("<txt>").removesuffix("</txt>"))
-	description_prompt = "Please describe this <IMAGE> in detail:\n- The image may be a collage of frames representing a video, in which case it should be analysed as if it were one\n- Transcribe text if present, but do not mention there not being text\n- Note details especially for people/characters if present\n- Be descriptive but concise!"
-	content = (question or description_prompt).replace("<IMAGE>", iname)
+	if data_url.startswith("text:"):
+		return cdict(
+			type="text",
+			description="",
+			text=data_url.removeprefix("text:").strip(),
+		)
+	content = (question or vision_prompt).replace("<IMAGE>", iname)
 	messages = [
 		cdict(role="user", content=[
 			cdict(type="text", text=content),
 			cdict(type="image_url", image_url=cdict(url=data_url, detail="auto")),
 		]),
 	]
-	model = model or self.model_levels[2 if best else 1]["vision"]
-	messages, _model = await self.caption_into(messages, model=model, premium_context=premium_context)
-	data = cdict(
+	model = model or self.model_levels[1]["vision"]
+	cmpl = await ai.llm(
+		"chat.completions.parse",
 		model=model,
 		messages=messages,
-		temperature=0.5,
-		max_tokens=2048,
-		user=str(hash(self.name) & 4294967295),
+		response_format=VisionResponse,
+		temperature=0.01,
+		reasoning_effort="low",
+		premium_context=premium_context,
 	)
-	async with asyncio.timeout(timeout):
-		response = await ai.llm("chat.completions.create", premium_context=premium_context, **data, timeout=timeout)
-	out = response.choices[0].message.content.strip()
-	if ai.decensor.search(out):
-		raise ValueError(f"Failed or censored response: {repr(out)}.")
-	return ("img", out)
+	resp = cmpl.choices[0].message.parsed
+	return cdict(
+		type="image",
+		description=resp.description.strip(),
+		text=resp.text.strip(),
+	)
+Bot._vision = _vision
+async def vision(self, url, timeout=24, premium_context=None):
+	"Produces an AI-generated caption for an image. Model used is determined by \"best\" argument."
+	info = await self.extract_cache.aretrieve(unyt(url), self._vision, url, timeout=timeout, premium_context=premium_context)
+	return cdict(info)
 Bot.vision = vision
-
-async def ocr(self, url):
-	data = await self.to_data_url(url)
-	mistral_key = AUTH.get("mistral_key")
-	s = None
-	if mistral_key:
-		mistral_headers = {"Content-Type": "application/json", "Authorization": f"Bearer {mistral_key}"}
-		resp = await Request.aio(
-			"https://api.mistral.ai/v1/ocr",
-			method="POST",
-			headers=mistral_headers,
-			data=orjson.dumps(dict(
-				model="mistral-ocr-latest",
-				document=dict(type="image_url", image_url=data)
-			)),
-			json=True,
-		)
-		s = "\n\n".join(page["markdown"] for page in resp["pages"]).strip()
-		if s == "![img-0.jpeg](img-0.jpeg)":
-			s = None
-	if not s:
-		s = await self.vision(
-			data,
-			name=url2fn(url),
-			question="Please transcribe all text within this <IMAGE>, as accurately as possible. Leave all text in their original language, using unicode if necessary, and do NOT attempt to describe any other elements within the picture.",
-			model="mistral-24b",
-		)
-	return s
-Bot.ocr = ocr
 
 def view(text, limit=48):
 	text = text.replace("\f", "\n")

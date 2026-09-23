@@ -16,7 +16,7 @@ import psutil, subprocess, weakref, zipfile, urllib, asyncio, json, pickle, func
 
 # VERY HACKY removes deprecated audioop dependency for discord.py; this would cause volume transformations to fail but Miza uses FFmpeg for them anyway
 sys.modules["audioop"] = sys
-import discord, discord.utils, discord.file  # noqa: E402
+import discord, discord.utils, discord.file, discord.context_managers  # noqa: E402
 
 import invisicode
 from misc.asyncs import *

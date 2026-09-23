@@ -566,7 +566,7 @@ class Ask(Command):
 						emoji = await bot.data.emojis.grab("loading.gif")
 						loading = min_emoji(emoji, full=True)
 					rtotal = reasoning_sum + reasoning_temp
-					rsize = f"Thinking ({byte_scale(rtotal)}B)" if rtotal else "Thinking" if text else "Reading"
+					rsize = f"Thinking ({byte_scale(rtotal)}B)" if rtotal else "Thinking" if content else "Reading"
 					begin = f"> {rsize}... {loading}\n{rsep}"
 					content = begin + content.split(rsep, 1)[-1]
 					yield "\r" + no_name(content.rstrip())
@@ -1017,8 +1017,8 @@ class Instruct(Command):
 
 
 class Describe(Command):
-	name = ["Description", "Image2Text", "Clip"]
-	description = "Describes the input image."
+	name = ["Description", "Image2Text"]
+	description = "Describes the input image/video, or reads text within."
 	schema = cdict(
 		url=cdict(
 			type="visual",
@@ -1027,43 +1027,32 @@ class Describe(Command):
 			aliases=["i"],
 			required=True,
 		),
-	)
-	rate_limit = (4, 5)
-	slash = True
-	ephemeral = True
-
-	async def __call__(self, bot, _user, _premium, url, **void):
-		fut = create_task(attachment_cache.scan_headers(url, fc=True))
-		cap = await self.bot.caption(url, best=1, premium_context=_premium, timeout=90)
-		s = "\n\n".join(filter(bool, cap)).strip()
-		headers = await fut
-		name = headers.get("attachment-filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
-		return cdict(
-			embed=discord.Embed(description=s, title=name).set_author(**get_author(_user)),
-		)
-
-
-class OCR(Command):
-	name = ["Read", "Image2Text"]
-	description = "Attempts to read text in an image using Optical Character Recognition AI."
-	schema = cdict(
-		url=cdict(
-			type="image",
-			description="Image supplied by URL or attachment",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			required=True,
+		text_only=cdict(
+			type="bool",
+			description="Transcribe text only",
 		),
 	)
-	rate_limit = (10, 15)
-	slash = True
+	macros = cdict(
+		OCR=cdict(
+			text_only=True,
+		),
+	)
+	rate_limit = (4, 5)
+	_timeout_ = 4
+	slash = ("Describe", "OCR")
 	ephemeral = True
 
-	async def __call__(self, bot, _user, url, **void):
-		s = await bot.ocr(url)
-		return cdict(
-			embed=discord.Embed(description=s, title="Detected text").set_author(**get_author(_user)),
-		)
+	async def __call__(self, bot, _user, _premium, url, text_only, **void):
+		info = await self.bot.vision(url, premium_context=_premium, timeout=90)
+		if text_only:
+			assert info.text, "Unable to find text."
+			return info.text
+		out = []
+		if info.description:
+			out.append(f"[Description]\n{info.description}")
+		if info.text:
+			out.append(f"[Text]\n{info.text}")
+		return ini_md("\n\n".join(out))
 
 
 class AudioSeparator(Command):
@@ -1412,7 +1401,7 @@ Who cares if one more light goes out?
 Well, I do
 
 (...)"""
-async def extract_lyrics(song, text, premium_context):
+async def extract_lyrics(bot, song, text, premium_context):
 	messages = [
 		cdict(
 			role="system",
@@ -1441,7 +1430,7 @@ Linkin Park - One More Light
 
 	cmpl = await ai.llm(
 		"responses.parse",
-		model="large",
+		model=bot.model_levels[1]["instructive"],
 		input=messages,
 		text_format=LyricsResponse,
 		temperature=0.01,
@@ -1485,7 +1474,7 @@ async def _fetch_lyrics(bot, song, premium_context):
 							descriptions.append(lyrics)
 			text = "\n\n".join(content).strip()
 			if text:
-				resp = await extract_lyrics(song_name, text, premium_context)
+				resp = await extract_lyrics(bot, song_name, text, premium_context)
 				search_q = resp.title.strip() or search_q
 				if resp.success:
 					return search_q, resp.text.strip()
@@ -1509,12 +1498,11 @@ async def _fetch_lyrics(bot, song, premium_context):
 	err = f"No results found for {json_dumpstr(song_name)}."
 	description = "\n\n\n".join(lim_tokens(url_re.sub("", d).strip(), 4096) for d in descriptions)
 	assert description, err
-	resp = await extract_lyrics(song_name, description, premium_context)
+	resp = await extract_lyrics(bot, song_name, description, premium_context)
 	assert resp.success and resp.text, err
 	return resp.title, resp.text
 async def fetch_lyrics(bot, song, premium_context=None):
 	return await lyrics_cache.aretrieve(unyt(song), _fetch_lyrics, bot, song, premium_context)
-
 
 class Lyrics(Command):
 	time_consuming = True
