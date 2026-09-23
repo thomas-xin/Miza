@@ -183,7 +183,6 @@ class Translate(Command):
 				),
 				dict(
 					role="user",
-					name="source",
 					content=input,
 				),
 				*(dict(
@@ -403,7 +402,7 @@ class Ask(Command):
 		else:
 			name_repr = bot_name
 		personality = pdata.description.replace("{{user}}", _user.display_name).replace("{{char}}", name_repr)
-		personality += "\n\n[INFO] Usernames are given as `name={name}\\n`; input only (do not emit this)."
+		personality += "\n\n[INFO] Usernames are given as `name={name}\\n`; read only (do not emit this)."
 		match pdata.history:
 			case "none":
 				personality += "\n[INFO] Conversation history currently disabled. Clarify if necessary."
@@ -537,6 +536,7 @@ class Ask(Command):
 		usage = [0, 0]
 		rsep = chr(invisicode.STRINGPREFIX)
 		loading = None
+		error = None
 		try:
 			ex = RuntimeError(f"Maximum inference attempts ({max_attempts}) exceeded (model may have encountered an infinite loop; increase --max-attempts to retry).")
 			reasoning_sum = 0
@@ -682,6 +682,9 @@ class Ask(Command):
 				raise ex
 		except StopIteration:
 			pass
+		except Exception as ex:
+			error = ex
+			print_exc()
 		print("Usage:", usage)
 		content = content.split(rsep, 1)[-1].strip()
 		if "</txt>" in content:
@@ -712,7 +715,7 @@ class Ask(Command):
 			desc = "-# " + "\n-# ".join(desc.splitlines())
 			response.content += "\n" + desc
 			print(">", desc)
-		if not bot.get_guildbase(_channel.id, "chatconfig"):
+		if not error and not bot.get_guildbase(_channel.id, "chatconfig"):
 			tips = [
 				"*Tip: By using generative AI, you are assumed to comply with the [ToS](<https://github.com/thomas-xin/Miza/wiki/Terms-of-Service>).*",
 				f"*Tip: The chatbot feature is designed to incorporate multiple SOTA models in addition to internet-based interactions. For direct interaction with the raw LLMs, check out {prefix}instruct.*",
@@ -736,6 +739,8 @@ class Ask(Command):
 		response.embeds = embs
 		response.reacts = tuple(response.get("reacts", ())) + tuple(reacts)
 		yield response
+		if error:
+			raise error
 
 	@tracebacksuppressor
 	async def remove_reacts(self, message):
@@ -1370,3 +1375,174 @@ class TTS(Command):
 			content=desc,
 			file=CompatFile(fo, filename=text[:48] + "." + format),
 		)
+
+
+lyrics_cache = AutoCache(f"{CACHE_PATH}/lyrics", stale=86400, timeout=86400 * 7)
+# This messy regex helps identify and remove certain words in song titles
+title_cleaner = re.compile(
+	(
+		"[([]+"
+		"(((official|full|demo|original|extended) *)?"
+		"((version|ver.?) *)?"
+		"((w\\/)?"
+		"(lyrics?|vocals?|music|ost|instrumental|acoustic|studio|hd|hq|english) *)?"
+		"((album|video|audio|cover|remix) *)?"
+		"(upload|reupload|version|ver.?)?"
+		"|(feat|ft)"
+		".+)"
+		"[)\\]]+"
+	),
+	flags=re.I,
+)
+sample_lyrics = """[Verse 1]
+Should've stayed, were there signs I ignored?
+Can I help you not to hurt anymore?
+We saw brilliance when the world was asleep
+There are things that we can have but can't keep
+
+[Chorus]
+If they say
+Who cares if one more light goes out?
+In the sky of a million stars
+It flickers, flickers
+Who cares when someone's time runs out?
+If a moment is all we are
+Or quicker, quicker
+Who cares if one more light goes out?
+Well, I do
+
+(...)"""
+async def extract_lyrics(song, text, premium_context):
+	messages = [
+		cdict(
+			role="system",
+			content=f"""Your task is to locate and transcribe lyrics for the song {json_dumpstr(song)} within the following message.
+- You may correct typos and punctuation errors if applicable.
+- If not found, please emit success: false; DO NOT make up lyrics.
+- Do not include phrases such as (Official Music Video) in the title.
+
+# Example of correctly formatted song title:
+Linkin Park - One More Light
+
+# Example of correctly formatted lyrics:
+{sample_lyrics}"""
+		),
+		cdict(
+			role="user",
+			content=text,
+		),
+	]
+
+	from pydantic import BaseModel
+	class LyricsResponse(BaseModel):
+		success: bool
+		title: str
+		text: str
+
+	cmpl = await ai.llm(
+		"responses.parse",
+		model="large",
+		input=messages,
+		text_format=LyricsResponse,
+		temperature=0.01,
+		reasoning_effort="low",
+		premium_context=premium_context,
+	)
+	return cmpl.output_parsed
+async def _fetch_lyrics(bot, song, premium_context):
+	descriptions = []
+	song_name = search_q = song
+	if is_url(verify_url(song)):
+		song = verify_url(song)
+		data = await bot.audio.asubmit(f"ytdl.extract_info({repr(song)})")
+		if isinstance(data, dict):
+			content = []
+			if data.get("title"):
+				song_name = search_q = data["title"]
+				content.append(song_name)
+			if isinstance(data, dict) and data.get("description"):
+				content.append(data["description"])
+			if data.get("automatic_captions"):
+				lang = "en"
+				if "formats" in data:
+					lang = None
+					for fmt in data["formats"]:
+						if fmt.get("language"):
+							lang = fmt["language"]
+							break
+				if lang in data["automatic_captions"]:
+					for cap in shuffle(data["automatic_captions"][lang]):
+						if "json" in cap["ext"]:
+							break
+					with tracebacksuppressor:
+						d2 = await Request.aio(cap["url"], json=True)
+						lyr = []
+						for event in d2["events"]:
+							para = "".join(seg.get("utf8", "") for seg in event.get("segs", ()))
+							lyr.append(para)
+						lyrics = "".join(lyr).strip()
+						if lyrics:
+							descriptions.append(lyrics)
+			text = "\n\n".join(content).strip()
+			if text:
+				resp = await extract_lyrics(song_name, text, premium_context)
+				search_q = resp.title.strip() or search_q
+				if resp.success:
+					return search_q, resp.text.strip()
+	search_q = " ".join(re.findall(r"[A-Za-z0-9]+", title_cleaner.sub("", search_q).strip()))
+	search = f"https://genius.com/api/search/multi?q={urllib.parse.quote_plus(search_q)}"
+	print(search)
+	resp = await Request.aio(search, json=True)
+	try:
+		sections = resp["response"]["sections"]
+		results = [s["hits"][0]["result"] for s in sections if s.get("type") in ("song", "lyric", "video") and s.get("hits")]
+		results = [result for result in results if result.get("url") and result.get("full_title")][:3]
+		urls = [result["url"] for result in results]
+		names = [result["full_title"] for result in results]
+		futs = [bot.browse(url, sources=False) for url in urls]
+		resps = await gather(*futs, return_exceptions=True, max_concurrency=2)
+		for name, resp in zip(names, resps):
+			if resp and isinstance(resp, str):
+				descriptions.append(f"[[{name}]]\n\n{resp}")
+	except Exception as ex:
+		print(song, repr(ex))
+	err = f"No results found for {json_dumpstr(song_name)}."
+	description = "\n\n\n".join(lim_tokens(url_re.sub("", d).strip(), 4096) for d in descriptions)
+	assert description, err
+	resp = await extract_lyrics(song_name, description, premium_context)
+	assert resp.success and resp.text, err
+	return resp.title, resp.text
+async def fetch_lyrics(bot, song, premium_context=None):
+	return await lyrics_cache.aretrieve(unyt(song), _fetch_lyrics, bot, song, premium_context)
+
+
+class Lyrics(Command):
+	time_consuming = True
+	name = ["SongLyrics"]
+	description = "Searches genius.com for lyrics of a song."
+	schema = cdict(
+		query=cdict(
+			type="string",
+			description="Song by name or URL",
+			example="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+		),
+	)
+	rate_limit = (7, 12)
+	typing = True
+	slash = True
+
+	async def __call__(self, bot, _guild, _channel, _message, _premium, query, **void):
+		if not query:
+			try:
+				entry = await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).queue[0]")
+				query = entry["url"]
+			except LookupError:
+				raise IndexError("Queue not found. Please input a search term, URL, or file.")
+		async with discord.context_managers.Typing(_channel):
+			name, lyrics = await fetch_lyrics(bot, query, premium_context=_premium)
+		# Escape colour markdown because that will interfere with the colours we want
+		text = clr_md(lyrics.strip()).replace("#", "♯")
+		title = f"Lyrics for {name}:"
+		if len(text) > 54000:
+			return (title + "\n\n" + text).strip()
+		bot.send_as_embeds(_channel, text, author=dict(name=title), colour=(1024, 128), md=ini_md, reference=_message)

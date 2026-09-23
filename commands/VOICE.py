@@ -67,23 +67,6 @@ async def force_dc(bot, guild):
 		await guild.me.move_to(None)
 	return await guild.change_voice_state(channel=None)
 
-# This messy regex helps identify and remove certain words in song titles
-lyric_trans = re.compile(
-	(
-		"[([]+"
-		"(((official|full|demo|original|extended) *)?"
-		"((version|ver.?) *)?"
-		"((w\\/)?"
-		"(lyrics?|vocals?|music|ost|instrumental|acoustic|studio|hd|hq|english) *)?"
-		"((album|video|audio|cover|remix) *)?"
-		"(upload|reupload|version|ver.?)?"
-		"|(feat|ft)"
-		".+)"
-		"[)\\]]+"
-	),
-	flags=re.I,
-)
-
 # Gets estimated duration from duration stored in queue entry
 def e_dur(d):
 	return float(d) if type(d) is str else d if d is not None else 300
@@ -693,7 +676,7 @@ class Skip(Command):
 			desc.append(f"Entry {dups[0]} (`{q[dups[0]]['name']}`) has already been voted for, `{len(q[dups[0]]['skips'])}/{required}`." if len(dups) == 1 else f"{len(dups)} entries have already been voted for.")
 		if votes:
 			await bot.audio.asubmit(f"[e.setdefault('skips',set()).add({_user.id}) for e in AP.from_guild({_guild.id}).queue]")
-			desc.append(f"Voted to skip entry {votes[0]} (`{q[votes[0]]['name']}`), `{len(q[votes[0]]['skips'])}/{required}`." if len(votes) == 1 else f"Voted to skip {len(votes)} entries.")
+			desc.append(f"Voted to skip entry {votes[0]} (`{q[votes[0]]['name']}`), `{1 + len(q[votes[0]].get('skips', ()))}/{required}`." if len(votes) == 1 else f"Voted to skip {len(votes)} entries.")
 		if skips:
 			if after is None:
 				if mode != "force":
@@ -1733,186 +1716,6 @@ class Radio(Pagination, Interactable, Command):
 # 		auds = await auto_join(channel.guild, channel, user, bot)
 # 		auds.player = cdict(time=0, message=None)
 # 		submit_thread(auds.update)
-
-
-# Small helper function to fetch song lyrics from json data, because sometimes genius.com refuses to include it in the HTML
-def extract_lyrics(s):
-	s = s[s.index("JSON.parse(") + len("JSON.parse("):]
-	s = s[:s.index("</script>")]
-	if "window.__" in s:
-		s = s[:s.index("window.__")]
-	s = s[:s.rindex(");")]
-	data = literal_eval(s)
-	d = eval_json(data)
-	lyrics = d["songPage"]["lyricsData"]["body"]["children"][0]["children"]
-	newline = True
-	output = ""
-	while lyrics:
-		line = lyrics.pop(0)
-		if type(line) is str:
-			if line:
-				if line.startswith("["):
-					output += "\n"
-					newline = False
-				if "]" in line:
-					if line == "]":
-						if output.endswith(" ") or output.endswith("\n"):
-							output = output[:-1]
-					newline = True
-				output += line + ("\n" if newline else (" " if not line.endswith(" ") else ""))
-		elif type(line) is dict:
-			if "children" in line:
-				# This is a mess, the children objects may or may not represent single lines
-				lyrics = line["children"] + lyrics
-	return output
-
-
-# Main helper function to fetch song lyrics from genius.com searches
-async def get_lyrics(item, url=None):
-	name = None
-	description = None
-	if is_url(url):
-		resp = await bot.audio.asubmit(f"ytdl.extract_info({repr(url)})")
-		name = resp.get("title") or resp["webpage_url"].rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
-		if "description" in resp:
-			description = resp["description"]
-			lyr = []
-			spl = resp["description"].splitlines()
-			for i, line in enumerate(spl):
-				if to_alphanumeric(full_prune(line)).strip() == "lyrics":
-					para = []
-					for j, line in enumerate(spl[i + 1:]):
-						line = line.strip()
-						if line and not to_alphanumeric(line).strip():
-							break
-						if find_urls(line):
-							if para and para[-1].endswith(":") or para[-1].startswith("#"):
-								para.pop(-1)
-							break
-						para.append(line)
-					if len(para) >= 3:
-						lyr.extend(para)
-			lyrics = "\n".join(lyr).strip()
-			if lyrics:
-				print("lyrics_raw", lyrics)
-				return name, lyrics
-		if resp.get("automatic_captions"):
-			lang = "en"
-			if "formats" in resp:
-				lang = None
-				for fmt in resp["formats"]:
-					if fmt.get("language"):
-						lang = fmt["language"]
-						break
-			if lang in resp["automatic_captions"]:
-				for cap in shuffle(resp["automatic_captions"][lang]):
-					if "json" in cap["ext"]:
-						break
-				with tracebacksuppressor:
-					data = await Request.aio(cap["url"], json=True, timeout=18)
-					lyr = []
-					for event in data["events"]:
-						para = "".join(seg.get("utf8", "") for seg in event.get("segs", ()))
-						lyr.append(para)
-					lyrics = "".join(lyr).strip()
-					if lyrics:
-						print("lyrics_captions", lyrics)
-						return name, lyrics
-	url = f"https://genius.com/api/search/multi?q={item}"
-	for i in range(2):
-		data = {"q": item}
-		rdata = await Request.aio(url, data=data, json=True, timeout=18)
-		hits = chain.from_iterable(sect["hits"] for sect in rdata["response"]["sections"])
-		path = None
-		for h in hits:
-			with tracebacksuppressor:
-				name = h["result"]["title"] or name
-				path = h["result"]["api_path"]
-				break
-		if path:
-			s = "https://genius.com" + path
-			page = await Request.aio(s, decode=True)
-			text = page
-			html = await _run_async(BeautifulSoup, text, "html.parser", timeout=18)
-			lyricobj = html.find('div', class_='lyrics')
-			if lyricobj is not None:
-				lyrics = lyricobj.get_text().strip()
-				print("lyrics_html", s)
-				return name, lyrics
-			try:
-				lyrics = extract_lyrics(text).strip()
-				print("lyrics_json", s)
-				return name, lyrics
-			except Exception:
-				if i:
-					raise
-				print_exc()
-				print(s)
-				print(text)
-	if description:
-		print("lyrics_description", description)
-		return name, description
-	raise LookupError(f"No results for {item}.")
-
-
-class Lyrics(Command):
-	time_consuming = True
-	name = ["SongLyrics"]
-	description = "Searches genius.com for lyrics of a song."
-	schema = cdict(
-		query=cdict(
-			type="string",
-			description="Song by name or URL",
-			example="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-		),
-	)
-	rate_limit = (7, 12)
-	typing = True
-	slash = True
-	maintenance = True
-
-	async def __call__(self, bot, _guild, _channel, _message, query, **void):
-		if not query:
-			try:
-				entry = await bot.audio.asubmit(f"(a:=AP.from_guild({_guild.id})).queue[0]")
-				query = entry["url"]
-			except LookupError:
-				raise IndexError("Queue not found. Please input a search term, URL, or file.")
-		async with discord.context_managers.Typing(_channel):
-			# Extract song name if input is a URL, otherwise search song name directly
-			url = None
-			urls = await bot.follow_url(query, priority_order=("text", "video", "audio"))
-			if urls:
-				resp = await search_one(bot, query)
-				search = resp[0]["name"]
-			else:
-				search = query
-			search = search.translate(self.bot.mtrans)
-			# Attempt to find best query based on the song name
-			item = verify_search(to_alphanumeric(lyric_trans.sub("", search)))
-			ic = item.casefold()
-			if ic.endswith(" with lyrics"):
-				item = item[:-len(" with lyrics")]
-			elif ic.endswith(" lyrics"):
-				item = item[:-len(" lyrics")]
-			elif ic.endswith(" acoustic"):
-				item = item[:-len(" acoustic")]
-			item = item.rsplit(" ft ", 1)[0].strip()
-			if not item:
-				item = verify_search(to_alphanumeric(search))
-				if not item:
-					item = search
-			try:
-				name, lyrics = await get_lyrics(item, url=url)
-			except KeyError:
-				print_exc()
-				raise KeyError(f"Invalid response from genius.com for {item}")
-		# Escape colour markdown because that will interfere with the colours we want
-		text = clr_md(lyrics.strip()).replace("#", "♯")
-		title = f"Lyrics for {name}:"
-		if len(text) > 54000:
-			return (title + "\n\n" + text).strip()
-		bot.send_as_embeds(_channel, text, author=dict(name=title), colour=(1024, 128), md=ini_md, reference=_message)
 
 
 class Download(Command):

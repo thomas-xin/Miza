@@ -204,6 +204,10 @@ def overview(messages):
 	return "\n\n".join(lim_str(m_str(m), 4096) for m in messages if m.content)
 
 def count_to(messages, encoding=None):
+	if messages is None:
+		return None
+	if isinstance(messages, str):
+		return tcount(messages)
 	substrings = []
 	tokens_per_message = 4
 	num_tokens = 0
@@ -538,12 +542,14 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 				if orig_model in contexts:
 					if "messages" in kwa:
 						ctx = contexts[orig_model] - count_to(kwa["messages"]) * 3 // 2
+					elif "input" in kwa:
+						ctx = contexts[orig_model] - count_to(kwa["input"]) * 3 // 2
 					else:
 						ctx = contexts[orig_model] - tcount(kwa["prompt"]) * 3 // 2
 				mt2 = min(mt2, ctx)
 				if "messages" in kwa:
 					kwa["max_completion_tokens"] = mt2
-				else:
+				elif "input" not in kwa:
 					kwa["max_tokens"] = mt2
 			reasoning = dict(
 				enabled=True,
@@ -581,12 +587,6 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 		if body:
 			kwa["extra_body"] = body
 		try:
-			was_input = "input" in kwa
-			if was_input:
-				messages = kwa.pop("input")
-				if isinstance(messages, str):
-					messages = [cdict(role="user", content=messages)]
-				kwa["messages"] = messages
 			if "messages" in kwa:
 				system = []
 				messages = []
@@ -596,7 +596,7 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 						if m.get("content"):
 							system.append(m["content"])
 						continue
-					if m.get("name"):
+					if m.get("name") and m.get("role") != "tool":
 						name = m2.pop("name")
 						if isinstance(m2.content, list):
 							m2.content = [cdict(type="text", text=f"name={name}\n\n{c.text}") if c.get("type") == "text" else c for c in m2.content]
@@ -658,8 +658,6 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 								tcid.add(tc.id)
 					finally:
 						i += 1
-				if was_input:
-					kwa["input"] = messages if len(messages) > 1 else messages[0].content
 				else:
 					kwa["messages"] = messages
 			if kwa.get("user"):
@@ -668,7 +666,8 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 				kwa.pop("user", None)
 			async with sem:
 				response = await asyncio.wait_for(caller(*args, timeout=timeout, **kwa), timeout=timeout)
-			inputs = (kwa["messages"], kwa.get("tools")) if "messages" in kwa else kwa.get("prompt")
+			inputs = (kwa["messages"], kwa.get("tools")) if "messages" in kwa else kwa.get("input")
+			inputs = inputs or kwa.get("prompt")
 			stream = OpenAIPricingIterator(
 				response,
 				getattr(response, "close", None),
@@ -960,7 +959,7 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 	async def pass_item(self, item, final=False):
 		if self.terminated:
 			return item
-		if item and item.choices and item.choices[0]:
+		if item and getattr(item, "choices", None) and item.choices[0]:
 			def dump_calls(tcs):
 				for i, tc in enumerate(tcs):
 					resp = astype(tc, cdict)
@@ -999,6 +998,16 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 				self.stopped_reasoning = True
 				s = "</think>\n" + s.lstrip()
 			self.output += s
+		elif getattr(item, "output_text", None):
+			s = ""
+			if item.output and item.output[0].type == "reasoning":
+				s = item.output[0].content
+				if isinstance(s, list):
+					s = s[0].text
+				s = s.rstrip()
+				s += "</think>\n"
+			s += str(item.output_text)
+			self.output = s
 		if not self.tokens[0]:
 			if isinstance(self.input, str):
 				self.tokens[0] = tcount(self.input)
@@ -1053,7 +1062,7 @@ class OpenAIPricingIterator(CloseableAsyncIterator):
 
 	def log(self) -> None:
 		with open(f"{TEMP_PATH}/chat/{ts_us()}.md", "w", encoding="utf-8") as f:
-			f.write(pretty_json(self.kwargs))
+			f.write(pretty_json(self.kwargs, strict=False))
 			f.write("\n" * 3)
 			f.write(str(self.output))
 	if not AUTH.get("chat-logging", False):

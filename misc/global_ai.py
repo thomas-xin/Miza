@@ -866,7 +866,7 @@ async def tool_call(self, call, uid, message=None, effort="high", premium_contex
 					pass
 				else:
 					yield f'Browsing {view(query)}'
-					resp = await self.browse(query, uid=uid, n=3 if effort == "high" else 1)
+					resp = await self.browse(query, uid=uid, n=3 if effort == "high" else 1, sources=True)
 					prompt = None if is_url(query) else query
 					yield await ai.summarise(resp, 8192, 32768, prompt=prompt, premium_context=premium_context)
 			case "deno":

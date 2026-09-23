@@ -1840,22 +1840,6 @@
 			},
 			"ordered_args": ["country", "query", "page"]
 		},
-		"Lyrics": {
-			"aliases": ["Lyrics", "SongLyrics"],
-			"description": "Searches genius.com for lyrics of a song.",
-			"level": "0",
-			"rate_limit": "(7, 12)",
-			"example": [],
-			"timeout": "24",
-			"schema": {
-				"query": {
-					"type": "string",
-					"description": "Song by name or URL",
-					"example": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-				}
-			},
-			"ordered_args": ["query"]
-		},
 		"Download": {
 			"aliases": ["Download", "📥", "Search", "YTDL", "Convert", "Trim", "ConvertOrg"],
 			"description": "Searches and/or downloads a song from a YouTube/SoundCloud query or stream link.",
@@ -4268,6 +4252,22 @@
 				}
 			},
 			"ordered_args": ["engine", "text", "voice", "instructions", "url", "format", "autoplay"]
+		},
+		"Lyrics": {
+			"aliases": ["Lyrics", "SongLyrics"],
+			"description": "Searches genius.com for lyrics of a song.",
+			"level": "0",
+			"rate_limit": "(7, 12)",
+			"example": [],
+			"timeout": "24",
+			"schema": {
+				"query": {
+					"type": "string",
+					"description": "Song by name or URL",
+					"example": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+				}
+			},
+			"ordered_args": ["query"]
 		}
 	},
 	"NSFW": {

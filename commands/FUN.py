@@ -2867,7 +2867,7 @@ class GIFSearch(Pagination, Interactable, Command):
 		if count:
 			results = await self.aggregate_searches(query, cid=abs(hash(str(_user))))
 			results = results[:count]
-			return await bot.send_multi_image_embeds(_channel, images=results, reference=_message)
+			return await bot.send_multi_image_embeds(_channel, image_urls=results, reference=_message)
 		return await self.display(_user.id, page * self.page_size, query, nsfw=_nsfw)
 
 	async def _callback_(self, _user, _channel, index, data, **void):

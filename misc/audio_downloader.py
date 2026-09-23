@@ -1183,7 +1183,7 @@ class AudioDownloader:
 		# print("OUTTMPL:", fn)
 		ydl_opts = dict(
 			# Prefer selected codec, but fallback to best audio if not available
-			format=f"bestaudio[vcodec=none][acodec={codec}][audio_channels=2][language=original]/worst[abr>=96][audio_channels=2][language=original]/bestaudio[audio_channels=2][language=original]/bestaudio/worst[abr>=64]/worst[acodec!=none][tbr>=480]/best",
+			format=f"bestaudio[vcodec=none][acodec={codec}][audio_channels=2][language=original]/best[abr>=96][audio_channels=2][language=original]/bestaudio[audio_channels=2][language=original]/bestaudio/worst[abr>=64]/worst[acodec!=none][tbr>=480]/best",
 			default_search="auto",
 			source_address="0.0.0.0",
 			remote_components=["ejs:github"],
@@ -1192,6 +1192,8 @@ class AudioDownloader:
 			outtmpl=target,
 			windowsfilenames=True,
 			cookiesfrombrowser=["firefox"],
+			writesubtitles=True,
+			subtitlesformat="srt",
 			postprocessors=[dict(
 				# Use our custom FFmpeg audio convertor to ensure consistent audio codec, and allow trimming if necessary
 				key="FFmpegCustomAudioConvertor",

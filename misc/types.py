@@ -1366,31 +1366,36 @@ class PrettyJSONEncoder(json.JSONEncoder):
 		self.indent = kwargs.get("indent") or "\t"
 		super().__init__(*args, **kwargs)
 
-	def encode(self, obj, level=0):
+	def encode(self, obj, level=0, strict=True):
 		indent = " " * self.indent if type(self.indent) is int else self.indent
 		curr_indent = indent * level
 		next_indent = indent * (level + 1)
 		if isinstance(obj, (list, tuple)):
 			if all(not isinstance(x, (tuple, list, dict)) or len(json_dumps(x)) < 10 for x in obj):
 				return "[" + ", ".join(json_dumpstr(x) for x in obj) + "]"
-			items = [self.encode(x, level=level + 1) for x in obj]
+			items = [self.encode(x, level=level + 1, strict=strict) for x in obj]
 			return "[\n" + next_indent + f",\n{next_indent}".join(item for item in items) + f"\n{curr_indent}" + "]"
 		elif isinstance(obj, collections.abc.Mapping):
 			obj = astype(obj, dict)
 			if all(type(x) is str and len(x) <= max(10, len(obj)) for x in obj.values()) and all(type(x) is str and len(x) <= max(10, len(obj)) for x in obj.keys()):
 				return json.dumps(obj)
-			items = [f"{json_dumpstr(k)}: {self.encode(v, level=level + 1)}" for k, v in obj.items()]
+			items = [f"{json_dumpstr(k)}: {self.encode(v, level=level + 1, strict=strict)}" for k, v in obj.items()]
 			# items.sort()
 			return "{\n" + next_indent + f",\n{next_indent}".join(item for item in items) + f"\n{curr_indent}" + "}"
 		elif getattr(obj, "to_dict", None):
-			return self.encode(obj.to_dict(), level=level + 1)
-		return json_dumpstr(obj)
+			return self.encode(obj.to_dict(), level=level + 1, strict=strict)
+		if strict:
+			return orjson.dumps(obj).decode("utf-8", "replace")
+		try:
+			return json_dumpstr(obj)
+		except (TypeError, orjson.JSONEncodeError):
+			return repr(obj)
 
 	def default(self, obj):
 		return json_default(obj)
 
 prettyjsonencoder = PrettyJSONEncoder(indent="\t")
-pretty_json = lambda obj: prettyjsonencoder.encode(obj)
+pretty_json = lambda obj, strict=True: prettyjsonencoder.encode(obj, strict=strict)
 
 def encode_jsonl(data):
 	assert isinstance(data, collections.abc.Iterable)

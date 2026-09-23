@@ -1114,8 +1114,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				break
 		if member is None:
 			raise LookupError("Unable to find member data.")
-		if find_others:
-			self.cache.members[u_id] = member
 		return member
 
 	async def fetch_guild(self, gid, follow_invites=True, force=False):
@@ -1168,15 +1166,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		for member in guild.members:
 			self.cache.usernames[member.name] = member._user
 		self.cache.channels.update(guild._threads)
-		self.cache.channels.update(guild._channels)
 		for k in guild._threads:
 			self.guildfinder[k] = guild.id
 		for k in guild._channels:
 			self.guildfinder[k] = guild.id
-		self.cache.users.update({k: getattr(v, "_user", v) for k, v in guild._members.items()})
-		self.cache.members.update(guild._members)
-		self.cache.roles.update(guild._roles)
-		self.cache.guilds[guild.id] = guild
+		self.update_cache_feed()
 		return guild
 	temp_guilds = {}
 	async def retrieve_guild(self, gid):
@@ -1900,7 +1894,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		12: "nz-en",	# New Zealand
 	}
 	ddgs = ddgs.DDGS(timeout=120)
-	async def browse(self, argv, uid=0, timezone=None, region=None, n=3, timeout=60):
+	async def browse(self, argv, uid=0, timezone=None, region=None, n=3, sources=False, timeout=60):
 		"Browses the internet for a search query or URL."
 		if not region:
 			if timezone is None:
@@ -1937,13 +1931,24 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if is_discord_attachment(argv) or is_miza_attachment(argv):
 				return attachment_cache.preserve(argv)
 			assert not is_local_url(argv), argv
-			result = await _run_async(
-				self.ddgs.extract,
-				verify_url(argv),
-				fmt="text_markdown",
-				timeout=timeout,
-			)
-			return argv + "\n" + lim_str(result["content"], 1048576)
+			try:
+				result = await _run_async(
+					self.ddgs.extract,
+					verify_url(argv),
+					fmt="text_markdown" if sources else "text_rich",
+					timeout=timeout,
+				)
+				s = result["content"].strip()
+				assert s, "Empty response"
+			except Exception as ex:
+				print(argv, repr(ex))
+				b = await Request.aio(
+					verify_url(argv),
+				)
+				from bs4 import BeautifulSoup
+				b = BeautifulSoup(b, "html.parser")
+				s = b.get_text("\n").strip()
+			return argv + "\n" + lim_str(s, 1048576)
 		urls = find_urls(argv)
 		for url in urls:
 			argv = argv.replace(url, "", 1).strip()
@@ -2569,8 +2574,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Updates bot cache from the discord.py client cache, using automatic feeding to mitigate the need for slow dict.update() operations."
 		if isinstance(self.cache.emojis, dict):
 			self.cache.emojis = collections.ChainMap(self.cache.emojis, self._emojis)
-		if isinstance(self.cache.channels, dict):
-			self.cache.channels = collections.ChainMap(self.cache.channels, self._private_channels)
+		if isinstance(self.cache.users, dict):
+			self.cache.users = collections.ChainMap(self.cache.users, self._users)
+		self.cache.guilds.update(self._guilds)
+		self.cache.channels = collections.ChainMap(self._private_channels, *(guild._channels for guild in self.guilds))
+		self.cache.roles = collections.ChainMap(*(guild._roles for guild in self.guilds))
+		self.cache.members = collections.ChainMap(*(guild._members for guild in self.guilds))
 
 	fetched_once = set()
 	async def update_subs(self):
@@ -5150,11 +5159,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		"Loads all webhooks in the target channel."
 		return self.data.webhooks.get(channel, force=force, bypass=bypass)
 
-	avatar_data = None
 	async def ensure_webhook(self, channel, force=False, bypass=False, fill=False):
 		"Gets a valid webhook for the target channel, creating a new one when necessary."
 		wlist = await self.load_channel_webhooks(channel, force=force, bypass=bypass)
-		# data = self.avatar_data
 		try:
 			if fill:
 				while len(wlist) < fill:
@@ -5561,15 +5568,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			sent = True
 		return sent
 
-	async def send_multi_image_embeds(self, channel, images, colour=None, title=None, description=None, author=None, reference=None):
-		assert images, "Cannot send a multi-image embed with no image!"
+	async def send_multi_image_embeds(self, channel, image_urls, colour=None, title=None, description=None, author=None, reference=None):
+		assert image_urls, "Cannot send a multi-image embed with no image!"
+		image_urls = list(image_urls)
 		i = 0
 		embed = discord.Embed(colour=colour, title=title, url=f"{self.webserver}?{i}", description=description)
 		if author:
 			embed.set_author(**author)
-		embed.set_image(url=images.pop(0))
+		embed.set_image(url=image_urls.pop(0))
 		embeds = [embed]
-		for im in images:
+		for im in image_urls:
 			embed = discord.Embed(colour=colour, url=f"{self.webserver}?{i}").set_image(url=im)
 			embeds.append(embed)
 			if len(embeds) % 4 == 0:
@@ -8069,7 +8077,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Channel create event: calls _channel_create_ bot database event.
 		@self.event
 		async def on_guild_channel_create(channel):
-			self.cache.channels[channel.id] = channel
 			guild = channel.guild
 			if guild:
 				await self.send_event("_channel_create_", channel=channel, guild=guild)
@@ -8077,7 +8084,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Channel update event: calls _channel_update_ bot database event.
 		@self.event
 		async def on_guild_channel_update(before, after):
-			self.cache.channels[after.id] = after
 			guild = after.guild
 			if guild and (before.name != after.name or before.position != after.position):
 				await self.send_event("_channel_update_", before=before, after=after, guild=guild)
@@ -8085,7 +8091,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Channel delete event: calls _channel_delete_ bot database event.
 		@self.event
 		async def on_guild_channel_delete(channel):
-			self.cache.channels.pop(channel.id, None)
 			guild = channel.guild
 			if guild:
 				await self.send_event("_channel_delete_", channel=channel, guild=guild)
@@ -8093,7 +8098,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		# Thread delete event: calls _channel_delete_ bot database event.
 		@self.event
 		async def on_thread_delete(channel):
-			self.cache.channels.pop(channel.id, None)
 			guild = channel.guild
 			if guild:
 				await self.send_event("_channel_delete_", channel=channel, guild=guild)

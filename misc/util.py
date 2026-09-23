@@ -5178,6 +5178,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 			if data and (isinstance(data, (list, dict)) or (data[:1] in '[{"') if isinstance(data, str) else (data[:1] in b'[{"' if isinstance(data, (bytes, memoryview)) else False)):
 				headers["Content-Type"] = "application/json"
 			session = None
+			ssl = True
 		elif bypass:
 			if "user-agent" not in headers and "User-Agent" not in headers:
 				headers["User-Agent"] = USER_AGENT

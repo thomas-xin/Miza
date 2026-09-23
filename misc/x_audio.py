@@ -639,8 +639,8 @@ class AudioPlayer(discord.AudioSource):
 			self.queue.fill(map(cdict, d["queue"]))
 		if pos is not None:
 			submit_thread(self.seek, pos)
-		else:
-			submit_thread(self.ensure_play, 2)
+		elif not append:
+			submit_thread(self.ensure_play, 1)
 		return list(self.queue)
 
 	updating_activity = asyncio.Future()

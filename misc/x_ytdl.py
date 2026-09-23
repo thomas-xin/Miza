@@ -103,6 +103,8 @@ def extract_info(url, download=False, process=True):
 			"source_address": "0.0.0.0",
 			"remote_components": ["ejs:github"],
 			"cookiesfrombrowser": ["firefox"],
+			"writesubtitles": True,
+			"subtitlesformat": "srt",
 		}
 		ytdl = ytd.YoutubeDL(ydl_opts)
 	try:
