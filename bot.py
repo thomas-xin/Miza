@@ -1651,7 +1651,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						allow_text=allow_text,
 						seen=seen,
 					)
-					out.extend(urls)
+					found.extend(urls)
 				found.uniq(sort=False)
 				for url in found:
 					assert not is_local_url(url), url
@@ -7303,6 +7303,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						msg = self.ExtendedMessage.new(mdata)
 						self.add_message(msg, force=True)
 						m.channel = channel = msg.channel or m.channel
+						m.reference = msg
 				try:
 					channel = self.force_channel(data["channel_id"])
 					try:

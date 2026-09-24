@@ -880,9 +880,10 @@ class Inspect(Command):
 	async def identify(self, url):
 		info = cdict(file=dict())
 		heads = await attachment_cache.scan_headers(url, fc=True)
-		mimetype = info.file["Mimetype"] = heads.get("Content-Type", "application/octet-stream")
-		fmt  = info.file["Format"] = mime_into(mimetype)
 		info.file["Name"] = try_header_filename(heads, url)
+		mimetype = heads.get("Content-Type", "application/octet-stream")
+		fmt  = info.file["Format"] = mime_into(mimetype)
+		info.file["Mimetype"] = mimetype
 		size = heads.get("Content-Length")
 		if not size or int(size) <= 10 * 1048576:
 			path = await attachment_cache.download(url, filename=True)
@@ -891,65 +892,73 @@ class Inspect(Command):
 			path = url
 		info.file["Size"] = byte_scale(size) + "B"
 		if fmt in AUDIO_FORMS or fmt in VIDEO_FORMS:
-			meta = await _run_async(audio_meta, path)
-			if meta.sample_rate:
-				info.audio = dict()
-				if meta.name:
-					info.audio["Track Name"] = meta.name
-				if meta.format:
-					info.audio["Format"] = meta.format
-				if meta.codec != "auto":
-					info.audio["Codec"] = meta.codec
-				if meta.duration:
-					info.audio["Duration"] = round(meta.duration, 4)
-				if meta.channels:
-					info.audio["Channels"] = meta.channels
-				if meta.bitrate:
-					info.audio["Bitrate"] = round(meta.bitrate)
-				if meta.sample_rate:
-					info.audio["Sample Rate"] = meta.sample_rate
-		if fmt in MEDIA_FORMS:
-			meta = await _run_async(video_meta, path)
-			if meta.format not in IMAGE_FORMS:
-				info.video = dict()
-				if meta.format:
-					info.video["Format"] = meta.format
-				if meta.codec != "auto":
-					info.video["Codec"] = meta.codec
-				if meta.duration:
-					info.video["Duration"] = round(meta.duration, 4)
-				if meta.fps:
-					info.video["FPS"] = round(meta.fps, 4)
-				if meta.bitrate:
-					info.video["Bitrate"] = byte_scale(round(meta.bitrate)) + "bps"
-				if meta.pixel_format:
-					info.video["Pixel Format"] = meta.pixel_format
-				if meta.frame_count:
-					info.video["Frame Count"] = meta.frame_count
-				if meta.width:
-					info.video["Width"] = meta.width
-				if meta.height:
-					info.video["Height"] = meta.height
+			try:
+				meta = await _run_async(audio_meta, path)
+			except Exception as ex:
+				print(repr(ex))
 			else:
-				info.image = dict()
-				if meta.format:
-					info.image["Format"] = meta.format
-				if meta.codec != "auto":
-					info.image["Codec"] = meta.codec
-				if meta.duration:
-					info.image["Duration"] = round(meta.duration, 4)
-				if meta.fps:
-					info.image["FPS"] = round(meta.fps, 4)
-				if meta.bitrate:
-					info.image["Bitrate"] = byte_scale(round(meta.bitrate)) + "bps"
-				if meta.pixel_format:
-					info.image["Pixel Format"] = meta.pixel_format
-				if meta.frame_count:
-					info.image["Frame Count"] = meta.frame_count
-				if meta.width:
-					info.image["Width"] = meta.width
-				if meta.height:
-					info.image["Height"] = meta.height
+				if meta.sample_rate:
+					info.audio = dict()
+					if meta.name:
+						info.audio["Track Name"] = meta.name
+					if meta.format:
+						info.audio["Format"] = meta.format
+					if meta.codec != "auto":
+						info.audio["Codec"] = meta.codec
+					if meta.duration:
+						info.audio["Duration"] = round(meta.duration, 4)
+					if meta.channels:
+						info.audio["Channels"] = meta.channels
+					if meta.bitrate:
+						info.audio["Bitrate"] = round(meta.bitrate)
+					if meta.sample_rate:
+						info.audio["Sample Rate"] = meta.sample_rate
+		if fmt in MEDIA_FORMS:
+			try:
+				meta = await _run_async(video_meta, path)
+			except Exception as ex:
+				print(repr(ex))
+			else:
+				if meta.format not in IMAGE_FORMS:
+					info.video = dict()
+					if meta.format:
+						info.video["Format"] = meta.format
+					if meta.codec != "auto":
+						info.video["Codec"] = meta.codec
+					if meta.duration:
+						info.video["Duration"] = round(meta.duration, 4)
+					if meta.fps:
+						info.video["FPS"] = round(meta.fps, 4)
+					if meta.bitrate:
+						info.video["Bitrate"] = byte_scale(round(meta.bitrate)) + "bps"
+					if meta.pixel_format:
+						info.video["Pixel Format"] = meta.pixel_format
+					if meta.frame_count:
+						info.video["Frame Count"] = meta.frame_count
+					if meta.width:
+						info.video["Width"] = meta.width
+					if meta.height:
+						info.video["Height"] = meta.height
+				else:
+					info.image = dict()
+					if meta.format:
+						info.image["Format"] = meta.format
+					if meta.codec != "auto":
+						info.image["Codec"] = meta.codec
+					if meta.duration:
+						info.image["Duration"] = round(meta.duration, 4)
+					if meta.fps:
+						info.image["FPS"] = round(meta.fps, 4)
+					if meta.bitrate:
+						info.image["Bitrate"] = byte_scale(round(meta.bitrate)) + "bps"
+					if meta.pixel_format:
+						info.image["Pixel Format"] = meta.pixel_format
+					if meta.frame_count:
+						info.image["Frame Count"] = meta.frame_count
+					if meta.width:
+						info.image["Width"] = meta.width
+					if meta.height:
+						info.image["Height"] = meta.height
 		return info
 
 	async def __call__(self, bot, urls, **void):
