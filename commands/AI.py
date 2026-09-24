@@ -309,35 +309,13 @@ class UpdateTranslators(Database):
 			)
 
 
-_ntrans = "".maketrans({"-": "", " ": "", "_": ""})
-def to_msg(k, v, n=None, t=None):
-	if k == n:
-		role = "assistant"
-		k = n
-	elif k == "<|system|>":
-		role = "system"
-	else:
-		role = "user"
-	m = cdict(role=role)
-	if not k.isascii() or not k.isalnum():
-		v = f"name={k.strip()}\n{v}"
-		k = ""
-	if k:
-		m.name = lim_str(k, 48)
-	v = v.strip() if v else ""
-	m.content = v
-	if t and t[0]:
-		m.content = [cdict(type="text", text=v)] if v else []
-	return m
-
 def no_name(s):
 	if s.startswith("name=") and "\n" in s:
 		s = s.split("\n", 1)[-1].lstrip()
 	return s
 
-
 class Ask(Command):
-	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. The chatbot will automatically choose one of multiple language models to conjure a response based on premium level. Less censorship is imposed when invoked within NSFW channels."
+	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. The chatbot will automatically choose one of multiple language models to conjure a response based on premium level."
 	schema = cdict(
 		prompt=cdict(
 			type="string",

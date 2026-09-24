@@ -887,7 +887,7 @@ async def tool_call(self, call, uid, message=None, effort="high", premium_contex
 				query = kwargs.get("query") or " ".join(kwargs.values())
 				yield f'Playing {view(query)}'
 				resp = await self.run_command(
-					self.commands.remind[0],
+					self.commands.play[0],
 					dict(query=query),
 					message=message,
 				)

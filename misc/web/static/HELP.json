@@ -699,14 +699,24 @@
 				}
 			}
 		},
-		"Identify": {
-			"aliases": ["Identify", "📂", "Magic", "Mime", "MimeType", "FileType", "FileInfo", "IdentifyFiles"],
+		"Inspect": {
+			"aliases": ["Inspect", "📂", "Magic", "Mime", "MimeType", "FileType", "FileInfo", "Identify", "Inspect", "InspectFiles"],
 			"description": "Detects the type, mime, and optionally details of an input file.",
 			"level": "0",
 			"rate_limit": "(12, 16)",
-			"example": ["identify https://raw.githubusercontent.com/thomas-xin/Image-Test/master/title-rainbow.webp"],
+			"example": [],
 			"timeout": "24",
-			"usage": "<url>*"
+			"schema": {
+				"urls": {
+					"type": "url",
+					"description": "URL or attachment to inspect",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"multiple": true,
+					"required": true
+				}
+			},
+			"ordered_args": ["urls"]
 		},
 		"Follow": {
 			"aliases": ["Follow", "🚶"],
@@ -3966,7 +3976,7 @@
 		},
 		"Ask": {
 			"aliases": ["Ask"],
-			"description": "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. The chatbot will automatically choose one of multiple language models to conjure a response based on premium level. Less censorship is imposed when invoked within NSFW channels.",
+			"description": "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. The chatbot will automatically choose one of multiple language models to conjure a response based on premium level.",
 			"level": "0",
 			"rate_limit": "(12, 16)",
 			"example": [],

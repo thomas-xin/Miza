@@ -17,13 +17,13 @@ from fastapi.responses import StreamingResponse, RedirectResponse, PlainTextResp
 from fastapi.middleware.cors import CORSMiddleware
 from starlette_compress import CompressMiddleware
 from .asyncs import _run_async, create_task
-from .types import fcdict, byte_like, MemoryBytes
+from .types import ts_us, fcdict, byte_like, MemoryBytes
 from .util import (
 	AUTH, tracebacksuppressor, magic, decrypt, save_auth, decode_attachment, discord_expired,
 	merge_url, is_discord_attachment, url2fn, url2ext, getsize, mime_from_file, zip2bytes,
 	Request as RequestManager, DOMAIN_CERT, PRIVATE_KEY, update_headers, is_local_url,
 	AutoCache, CACHE_PATH, VISUAL_FORMS, IMAGE_FORMS, RNGFile, create_etag, banned_paths,
-	MARKDOWN_VIEWER,
+	MARKDOWN_VIEWER, try_header_filename,
 )
 from .caches import attachment_cache, colour_cache
 
@@ -353,7 +353,7 @@ async def chunked_proxy(request: Request, path: str):
 	except ConnectionError as ex:
 		raise HTTPException(status_code=ex.args[0] if ex.args else ex.errno or 500, detail="\n".join(map(str, ex.args[1:])))
 	response_headers = {}
-	filename = heads.get("attachment-filename") or unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or urls[0].rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
+	filename = try_header_filename(heads, url)
 	if filename:
 		response_headers["Content-Disposition"] = f"inline; filename={quote(url2fn(filename))}"
 	response = await server.dyn_serve(new_urls, size, request=request, mimetype=mimetype, response_headers=response_headers)
@@ -425,7 +425,7 @@ async def upload(
 			url,
 			headers=RequestManager.header(),
 		)
-		filename = filename or unquote(resp.headers.get("content-disposition", "").split("filename=", 1)[-1])
+		filename = filename or try_header_filename(resp.headers, url)
 		resp = resp.content or b""
 		size = len(resp)
 
@@ -479,7 +479,7 @@ async def proxy(request: Request, url: Optional[str] = None, force: bool = False
 	heads = await attachment_cache.scan_headers(url, base="mizabot.xyz", fc=True)
 
 	response_headers = {}
-	filename = heads.get("attachment-filename") or unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
+	filename = try_header_filename(heads, url)
 	response_headers["Cache-Control"] = "public,max-age=21600,stale-while-revalidate=1073741824,stale-if-error=1073741824"
 
 	if not force and heads.get("content-type").split(";", 1)[0] == "text/markdown":
@@ -521,7 +521,15 @@ async def ytdl(query: Optional[str] = None):
 			"remote_components": ["ejs:github"],
 		}
 		ytdownloader = ytd.YoutubeDL(ydl_opts)
-	return await _run_async(ytdownloader.extract_info, query, download=False)
+	try:
+		return await _run_async(ytdownloader.extract_info, query, download=False)
+	except Exception as ex:
+		print_exc()
+		return Response(
+			repr(ex),
+			status_code=502,
+			media_type="text/plain",
+		)
 
 @app.head("/ytdl")
 async def head_ytdl(response: Response):
@@ -637,7 +645,7 @@ async def catch_all(path: str, request: Request):
 
 	ip = true_ip(request)
 	if ip in banned_ips:
-		return RedirectResponse(url="https://www.youtube.com/watch?v=dQw4w9WgXcQ", status_code=308)
+		return RedirectResponse(url=f"https://www.youtube.com/watch?{ts_us() // 1000 % 1000}&v=dQw4w9WgXcQ", status_code=308)
 	if first in banned_paths:
 		banned_ips.add(ip)
 		return RedirectResponse(url=f"{server.state['/']}/{p}", status_code=308)

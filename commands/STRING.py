@@ -859,163 +859,119 @@ class Time(Command):
 		return cdict(embed=emb)
 
 
-class Identify(Command):
-	name = ["📂", "Magic", "Mime", "MimeType", "FileType", "FileInfo", "IdentifyFiles"]
+class Inspect(Command):
+	name = ["📂", "Magic", "Mime", "MimeType", "FileType", "FileInfo", "Identify", "Inspect", "InspectFiles"]
 	description = "Detects the type, mime, and optionally details of an input file."
-	usage = "<url>*"
-	example = ("identify https://raw.githubusercontent.com/thomas-xin/Image-Test/master/title-rainbow.webp",)
+	schema = cdict(
+		urls=cdict(
+			type="url",
+			description="URL or attachment to inspect",
+			example="https://cdn.discordapp.com/embed/avatars/0.png",
+			aliases=["i"],
+			multiple=True,
+			required=True,
+		),
+	)
 	rate_limit = (12, 16)
-	mime = magic.Magic(mime=True, mime_encoding=True)
 	slash = True
 	ephemeral = True
-	msgcmd = ("Identify Files",)
+	msgcmd = ("Inspect Files",)
 
-	def probe(self, url):
-		command = ["ffprobe", "-hide_banner", url]
-		resp = None
-		for _ in loop(2):
-			try:
-				proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-				fut = submit_thread(proc.communicate, timeout=12)
-				res = fut.result(timeout=12)
-				resp = b"\n".join(res)
-				break
-			except Exception:
-				with suppress():
-					force_kill(proc)
-				print_exc()
-		if not resp:
-			raise RuntimeError(proc)
-		return as_str(resp)
-
-	def identify(self, url):
-		out = deque()
-		with reqs.next().get(url, headers=Request.header(), stream=True) as resp:
-			head = fcdict(resp.headers)
-			it = resp.iter_content(262144)
-			data = next(it)
-		out.append(code_md(magic.from_buffer(data)))
-		mimedata = self.mime.from_buffer(data).replace("; ", "\n")
-		mime = mimedata.split("\n", 1)[0].split("/", 1)
-		if mime == ["text", "plain"]:
-			if "Content-Type" in head:
-				ctype = head["Content-Type"]
-				spl = ctype.split("/")
-				if spl[-1].casefold() != "octet-stream":
-					mimedata = ctype + "\n" + mimedata.split("\n", 1)[-1]
-					mime = spl
-		mimedata = "mimetype: " + mimedata
-		if "Content-Length" in head:
-			fs = head['Content-Length']
-		elif len(data) < 131072:
-			fs = len(data)
+	async def identify(self, url):
+		info = cdict(file=dict())
+		heads = await attachment_cache.scan_headers(url, fc=True)
+		mimetype = info.file["Mimetype"] = heads.get("Content-Type", "application/octet-stream")
+		fmt  = info.file["Format"] = mime_into(mimetype)
+		info.file["Name"] = try_header_filename(heads, url)
+		size = heads.get("Content-Length")
+		if not size or int(size) <= 10 * 1048576:
+			path = await attachment_cache.download(url, filename=True)
+			size = os.path.getsize(path)
 		else:
-			fs = None
-		if fs is not None:
-			mimedata = f"filesize: {byte_scale(int(fs))}B\n" + mimedata
-		out.append(fix_md(mimedata))
-		with tracebacksuppressor:
-			resp = self.probe(url)
-			if mime[0] == "image" and mime[1] != "gif":
-				search = "Video:"
-				spl = regexp(r"\([^)]+\)").sub("", resp[resp.index(search) + len(search):].split("\n", 1)[0].strip()).strip().split(", ")
-				out.append(code_md(f"Codec: {spl[1]}\nSize: {spl[2].split(None, 1)[0]}"))
-			elif mime[0] == "video" or mime[1] == "gif":
-				search = "Duration:"
-				resp = resp[resp.index(search) + len(search):]
-				dur = time_disp(time_parse(resp[:resp.index(",")]), False)
-				search = "bitrate:"
-				resp = resp[resp.index(search) + len(search):]
-				bps = resp.split("\n", 1)[0].strip().rstrip("b/s").casefold()
-				mult = 1
-				if bps.endswith("k"):
-					mult = 10 ** 3
-				elif bps.endswith("m"):
-					mult = 10 ** 6
-				elif bps.endswith("g"):
-					mult = 10 ** 9
-				bps = byte_scale(int(bps.split(None, 1)[0]) * mult, ratio=1000) + "bps"
-				s = f"Duration: {dur}\nBitrate: {bps}"
-				search = "Video:"
-				try:
-					resp = resp[resp.index(search) + len(search):]
-				except ValueError:
-					pass
-				else:
-					spl = regexp(r"\([^)]+\)").sub("", resp.split("\n", 1)[0].strip()).strip().split(", ")
-					s += f"\nCodec: {spl[1]}\nSize: {spl[2].split(None, 1)[0]}"
-					for i in spl[3:]:
-						if i.endswith(" fps"):
-							s += f"\nFPS: {i[:-4]}"
-							break
-				out.append(code_md(s))
-				search = "Audio:"
-				try:
-					resp = resp[resp.index(search) + len(search):]
-				except ValueError:
-					pass
-				else:
-					spl = regexp(r"\([^)]+\)").sub("", resp.split("\n", 1)[0].strip()).strip().split(", ")
-					fmt = spl[0]
-					sr = spl[1].split(None, 1)[0]
-					s = f"Audio format: {fmt}\nAudio sample rate: {sr}"
-					if len(spl) > 2:
-						s += f"\nAudio channel: {spl[2]}"
-						if len(spl) > 4:
-							bps = spl[4].rstrip("b/s").casefold()
-							mult = 1
-							if bps.endswith("k"):
-								mult = 10 ** 3
-							elif bps.endswith("m"):
-								mult = 10 ** 6
-							elif bps.endswith("g"):
-								mult = 10 ** 9
-							bps = byte_scale(int(bps.split(None, 1)[0]) * mult, ratio=1000) + "bps"
-							s += f"\nAudio bitrate: {bps}"
-					out.append(code_md(s))
-			elif mime[0] == "audio":
-				search = "Duration:"
-				resp = resp[resp.index(search) + len(search):]
-				dur = time_disp(time_parse(resp[:resp.index(",")]), False)
-				search = "Audio:"
-				spl = regexp(r"\([^)]+\)").sub("", resp[resp.index(search) + len(search):].split("\n", 1)[0].strip()).strip().split(", ")
-				s = f"Duration: {dur}\nFormat: {spl[0]}\nSample rate: {spl[1].split(None, 1)[0]}"
-				if len(spl) > 2:
-					s += f"\nChannel: {spl[2]}"
-					if len(spl) > 4:
-						bps = spl[4].rstrip("b/s").casefold()
-						mult = 1
-						if bps.endswith("k"):
-							mult = 10 ** 3
-						elif bps.endswith("m"):
-							mult = 10 ** 6
-						elif bps.endswith("g"):
-							mult = 10 ** 9
-						bps = byte_scale(int(bps.split(None, 1)[0]) * mult, ratio=1000) + "bps"
-						s += f"\nBitrate: {bps}"
-				out.append(code_md(s))
-		return "".join(out)
+			path = url
+		info.file["Size"] = byte_scale(size) + "B"
+		if fmt in AUDIO_FORMS or fmt in VIDEO_FORMS:
+			meta = await _run_async(audio_meta, path)
+			if meta.sample_rate:
+				info.audio = dict()
+				if meta.name:
+					info.audio["Track Name"] = meta.name
+				if meta.format:
+					info.audio["Format"] = meta.format
+				if meta.codec != "auto":
+					info.audio["Codec"] = meta.codec
+				if meta.duration:
+					info.audio["Duration"] = round(meta.duration, 4)
+				if meta.channels:
+					info.audio["Channels"] = meta.channels
+				if meta.bitrate:
+					info.audio["Bitrate"] = round(meta.bitrate)
+				if meta.sample_rate:
+					info.audio["Sample Rate"] = meta.sample_rate
+		if fmt in MEDIA_FORMS:
+			meta = await _run_async(video_meta, path)
+			if meta.format not in IMAGE_FORMS:
+				info.video = dict()
+				if meta.format:
+					info.video["Format"] = meta.format
+				if meta.codec != "auto":
+					info.video["Codec"] = meta.codec
+				if meta.duration:
+					info.video["Duration"] = round(meta.duration, 4)
+				if meta.fps:
+					info.video["FPS"] = round(meta.fps, 4)
+				if meta.bitrate:
+					info.video["Bitrate"] = byte_scale(round(meta.bitrate)) + "bps"
+				if meta.pixel_format:
+					info.video["Pixel Format"] = meta.pixel_format
+				if meta.frame_count:
+					info.video["Frame Count"] = meta.frame_count
+				if meta.width:
+					info.video["Width"] = meta.width
+				if meta.height:
+					info.video["Height"] = meta.height
+			else:
+				info.image = dict()
+				if meta.format:
+					info.image["Format"] = meta.format
+				if meta.codec != "auto":
+					info.image["Codec"] = meta.codec
+				if meta.duration:
+					info.image["Duration"] = round(meta.duration, 4)
+				if meta.fps:
+					info.image["FPS"] = round(meta.fps, 4)
+				if meta.bitrate:
+					info.image["Bitrate"] = byte_scale(round(meta.bitrate)) + "bps"
+				if meta.pixel_format:
+					info.image["Pixel Format"] = meta.pixel_format
+				if meta.frame_count:
+					info.image["Frame Count"] = meta.frame_count
+				if meta.width:
+					info.image["Width"] = meta.width
+				if meta.height:
+					info.image["Height"] = meta.height
+		return info
 
-	async def __call__(self, bot, channel, argv, user, message, **void):
-		argv += " ".join(best_url(a) for a in message.attachments)
-		urls = await bot.follow_url(argv, allow=True, images=False)
+	async def __call__(self, bot, urls, **void):
+		urls = await gather(*(bot.follow_url(url) for url in urls), max_concurrency=3)
+		urls = list(itertools.chain(*urls))
 		if not urls:
-			async for m2 in self.bot.history(message.channel, limit=5, before=message.id):
-				argv = m2.content + " ".join(best_url(a) for a in m2.attachments)
-				urls = await bot.follow_url(argv, allow=True, images=False)
-				if urls:
-					break
-		urls = set(urls)
-		names = [url.rsplit("/", 1)[-1].rsplit("?", 1)[0] for url in urls]
-		futs = [run_async(self.identify, url) for url in urls]
-		fields = deque()
-		for name, fut in zip(names, futs):
-			resp = await fut
-			fields.append((escape_markdown(name), resp))
-		if not fields:
 			raise FileNotFoundError("Please input a file by URL or attachment.")
-		title = f"{len(fields)} file{'s' if len(fields) != 1 else ''} identified"
-		await bot.send_as_embeds(channel, title=title, author=get_author(user), fields=sorted(fields), reference=message)
+		futs = []
+		for url in urls:
+			futs.append(create_task(self.identify(url)))
+		colours = await gather(*(bot.get_colour(url) for url in urls), max_concurrency=3, return_exceptions=True)
+		embeds = []
+		for url, fut, c in zip(urls, futs, colours):
+			info = await fut
+			emb = discord.Embed(title=url2fn(url), url=url)
+			if not isinstance(c, BaseException):
+				emb.colour = c
+			for k, v in info.items():
+				v2 = iter2str(v).strip()
+				emb.add_field(name=k.capitalize(), value=ini_md(v2), inline=False)
+			embeds.append(emb)
+		return cdict(embeds=embeds)
 
 
 class Follow(Command):

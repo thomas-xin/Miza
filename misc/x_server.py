@@ -29,7 +29,7 @@ from cheroot import errors
 from cherrypy._cpdispatch import Dispatcher
 from .asyncs import Semaphore, SemaphoreOverflowError, eloop, submit_thread, create_thread, create_task, await_fut
 from .types import ts_us, byte_like, as_str, cdict, suppress, round_min, regexp, json_dumps, resume, getattr_chain, MemoryBytes
-from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, get_ext, is_youtube_url, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag, preview_url, is_local_url, banned_paths, force_kill, patch_before_return, as_bytes, MARKDOWN_VIEWER
+from .util import fcdict, nhash, uhash, EvalPipe, AUTH, TEMP_PATH, MIMES, tracebacksuppressor, utc, is_url, p2n, n2p, mime_into, rename, url2fn, url2ext, get_ext, is_youtube_url, Request, getsize, get_mime, mime_from_file, merge_url, is_discord_attachment, is_miza_attachment, unyt, CACHE_PATH, AutoCache, T, byte_scale, decode_attachment, update_headers, CODEC_FFMPEG, VISUAL_FORMS, IMAGE_FORMS, create_etag, preview_url, is_local_url, banned_paths, force_kill, patch_before_return, as_bytes, MARKDOWN_VIEWER, try_header_filename
 from .caches import attachment_cache, colour_cache, minimise_url
 from .audio_downloader import AudioDownloader, get_best_icon
 
@@ -60,8 +60,6 @@ _print = print
 if __name__ == "__main__":
 	interface = EvalPipe.listen(int(sys.argv[1]), glob=globals())
 	print = interface.print
-
-rickroll = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 SEMAPHORES = {}
 STATIC = {}
@@ -208,7 +206,7 @@ class EndpointRedirects(Dispatcher):
 			if ip not in banned_ips:
 				banned_ips[ip] = True
 				print("Banned IP:", ip)
-			raise cp.HTTPRedirect(rickroll, 308)
+			raise cp.HTTPRedirect(f"https://www.youtube.com/watch?{ts_us() // 1000 % 1000}&v=dQw4w9WgXcQ", 308)
 		elif p == "ip":
 			p = "get_ip"
 		elif first in ("f", "d"):
@@ -554,7 +552,7 @@ class Server:
 			try:
 				url = urls[0]
 				heads = await_fut(attachment_cache.scan_headers(url))
-				filename = heads.get("attachment-filename") or urllib.parse.unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
+				filename = try_header_filename(heads, url)
 				disposition = "attachment" if download else "inline"
 				cp.response.headers.pop("Content-Disposition", None)
 				if filename:
@@ -654,7 +652,7 @@ class Server:
 		heads = await_fut(attachment_cache.scan_headers(url, base="mizabot.xyz", fc=True))
 
 		response_headers = {}
-		filename = heads.get("attachment-filename") or urllib.parse.unquote(heads.get("content-disposition", "").split("filename=", 1)[-1].lstrip('"').split('"', 1)[0].strip().strip('"').strip("'") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0])
+		filename = try_header_filename(heads, url)
 		response_headers["Cache-Control"] = "public,max-age=21600,stale-while-revalidate=1073741824,stale-if-error=1073741824"
 
 		if not force and heads.get("content-type").split(";", 1)[0] == "text/markdown":
@@ -859,10 +857,7 @@ class Server:
 				if "//" not in url:
 					url = f"{API}/{url.lstrip('/')}"
 				headers = await_fut(attachment_cache.scan_headers(url, fc=True))
-				try:
-					_fn = urllib.parse.unquote(headers["content-disposition"].split("filename=", 1)[-1])
-				except LookupError:
-					_fn = url2fn(url)
+				_fn = try_header_filename(headers, url)
 				_size = byte_scale(headers["content-length"]) + "B"
 				_mime = headers.get("content-type", "application/octet-stream")
 				p_url = url
@@ -1125,7 +1120,7 @@ class Server:
 
 	@cp.expose
 	def rickroll(self, *args, **kwargs):
-		raise cp.HTTPRedirect(rickroll, 308)
+		raise cp.HTTPRedirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ", 308)
 
 	archive_server = None
 	def start_archive_server(self, shutdown=False):

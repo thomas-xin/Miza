@@ -19,7 +19,7 @@ import orjson
 import psutil
 import requests
 import streamshatter
-from misc.types import utc, as_str, byte_like, cdict, fcdict
+from misc.types import utc, as_str, byte_like, round_min, cdict, fcdict
 from misc.asyncs import _run_async, run_async, submit_thread, wrap_future, await_fut, create_task, gather, Future
 from misc.smath import get_closest_heart
 from misc.util import (
@@ -27,7 +27,7 @@ from misc.util import (
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist, shorten_chunks, expand_chunks, url2fn,
 	ungroup_attachments, is_discord_url, is_miza_attachment, temporary_file, url2ext, is_discord_attachment, is_miza_url,
     snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt, VISUAL_FORMS,
-	raise_aiohttp_safe,
+	raise_aiohttp_safe, image_from_bytes, ImageSequence, image_properties, is_url,
 )
 
 def has_transparency(image):
@@ -170,35 +170,36 @@ class AttachmentCache(AutoCache):
 	def _update_queue(self):
 		ec = self.refresh_count
 		while self.queue:
-			tasks, self.queue = self.queue[:ec], self.queue[ec:]
-			urls = [task[1].split("?url=", 1)[-1].replace("?", "&").replace("%", "&").split("&", 1)[0] for task in tasks]
-			data = None
-			try:
-				data = Request(
-					f"https://discord.com/api/{api}/attachments/refresh-urls",
-					method="POST",
-					headers=self.alt_headers,
-					data=orjson.dumps(dict(
-						attachment_urls=urls,
-					)),
-					json=True,
-					bypass=False,
-				)
-				for item in data.get("refreshed_urls", ()):
-					url = item["refreshed"].rstrip("&")
-					tasks.pop(0)[0].set_result(url)
-					if not tasks:
-						break
-			except Exception as ex:
-				if data is not None:
+			with Delay(1):
+				tasks, self.queue = self.queue[:ec], self.queue[ec:]
+				urls = [task[1].split("?url=", 1)[-1].replace("?", "&").replace("%", "&").split("&", 1)[0] for task in tasks]
+				data = None
+				try:
+					data = Request(
+						f"https://discord.com/api/{api}/attachments/refresh-urls",
+						method="POST",
+						headers=self.alt_headers,
+						data=orjson.dumps(dict(
+							attachment_urls=urls,
+						)),
+						json=True,
+						bypass=False,
+					)
+					for item in data.get("refreshed_urls", ()):
+						url = item["refreshed"].rstrip("&")
+						tasks.pop(0)[0].set_result(url)
+						if not tasks:
+							break
+				except Exception as ex:
+					if data is not None:
+						print(urls, data)
+					for task in tasks:
+						task[0].set_exception(ex)
+					continue
+				if tasks:
 					print(urls, data)
 				for task in tasks:
-					task[0].set_exception(ex)
-				continue
-			if tasks:
-				print(urls, data)
-			for task in tasks:
-				task[0].set_exception(ConnectionError(404, "Missing attachment refresh!"))
+					task[0].set_exception(ConnectionError(404, "Missing attachment refresh!"))
 
 	@tracebacksuppressor
 	def update_queue(self, allow=True):
@@ -208,69 +209,70 @@ class AttachmentCache(AutoCache):
 		ec = self.embed_count
 		n = 0
 		while self.queue:
-			tasks, self.queue = self.queue[:ec], self.queue[ec:]
-			urls = [task[1].split("?url=", 1)[-1].replace("?", "&").replace("%", "&").split("&", 1)[0] for task in tasks]
-			embeds = []
-			if len(urls) & 1:
-				urls.append(None)
-			for url1, url2 in zip(urls[::2], urls[1::2]):
-				embeds.append(dict(
-					url=BASE_URL,
-					image=dict(url=url1),
-				))
-				if url2:
-					embeds[-1]["thumbnail"] = dict(url=url2)
-			last = self.last
-			resp = None
-			try:
-				if last:
-					tup = choice(last)
-					cid, mid, n = tup
-					last.discard(tup)
-					heads = self.alt_headers if n else self.headers
-					try:
-						resp = requests.patch(
-							f"https://discord.com/api/{api}/channels/{cid}/messages/{mid}",
+			with Delay(1):
+				tasks, self.queue = self.queue[:ec], self.queue[ec:]
+				urls = [task[1].split("?url=", 1)[-1].replace("?", "&").replace("%", "&").split("&", 1)[0] for task in tasks]
+				embeds = []
+				if len(urls) & 1:
+					urls.append(None)
+				for url1, url2 in zip(urls[::2], urls[1::2]):
+					embeds.append(dict(
+						url=BASE_URL,
+						image=dict(url=url1),
+					))
+					if url2:
+						embeds[-1]["thumbnail"] = dict(url=url2)
+				last = self.last
+				resp = None
+				try:
+					if last:
+						tup = choice(last)
+						cid, mid, n = tup
+						last.discard(tup)
+						heads = self.alt_headers if n else self.headers
+						try:
+							resp = requests.patch(
+								f"https://discord.com/api/{api}/channels/{cid}/messages/{mid}",
+								data=json_dumps(dict(embeds=embeds)),
+								headers=heads,
+								timeout=3,
+							)
+						except Exception as ex:
+							print(repr(ex))
+							last.add(tup)
+							self.last = last
+					if not resp:
+						cid = choice(self.channels)
+						n = random.randint(0, 2)
+						heads = self.alt_headers if n else self.headers
+						resp = requests.post(
+							f"https://discord.com/api/{api}/channels/{cid}/messages",
 							data=json_dumps(dict(embeds=embeds)),
 							headers=heads,
-							timeout=3,
+							timeout=4.5,
 						)
-					except Exception as ex:
-						print(repr(ex))
-						last.add(tup)
-						self.last = last
-				if not resp:
-					cid = choice(self.channels)
-					n = random.randint(0, 2)
-					heads = self.alt_headers if n else self.headers
-					resp = requests.post(
-						f"https://discord.com/api/{api}/channels/{cid}/messages",
-						data=json_dumps(dict(embeds=embeds)),
-						headers=heads,
-						timeout=4.5,
-					)
-				resp.raise_for_status()
-				message = resp.json()
-				mid = message["id"]
-			except Exception as ex:
-				if resp is not None:
-					print(tasks, resp.text)
+					resp.raise_for_status()
+					message = resp.json()
+					mid = message["id"]
+				except Exception as ex:
+					if resp is not None:
+						print(tasks, resp.text)
+					for task in tasks:
+						task[0].set_exception(ex)
+					continue
+				submit_thread(self.clear_last, (cid, mid, n))
+				for emb in message["embeds"]:
+					url = emb["image"]["url"].rstrip("&")
+					tasks.pop(0)[0].set_result(url)
+					if not tasks:
+						break
+					url = emb["thumbnail"]["url"].rstrip("&")
+					tasks.pop(0)[0].set_result(url)
+					if not tasks:
+						break
+				print(tasks, resp.text)
 				for task in tasks:
-					task[0].set_exception(ex)
-				continue
-			submit_thread(self.clear_last, (cid, mid, n))
-			for emb in message["embeds"]:
-				url = emb["image"]["url"].rstrip("&")
-				tasks.pop(0)[0].set_result(url)
-				if not tasks:
-					break
-				url = emb["thumbnail"]["url"].rstrip("&")
-				tasks.pop(0)[0].set_result(url)
-				if not tasks:
-					break
-			print(tasks, resp.text)
-			for task in tasks:
-				task[0].set_exception(ConnectionError(404, "Missing attachment embed!"))
+					task[0].set_exception(ConnectionError(404, "Missing attachment embed!"))
 		self.fut = None
 
 	def clear_last(self, tup=None):
@@ -460,9 +462,6 @@ class AttachmentCache(AutoCache):
 			if ex.errno == "404":
 				self.remove_cached(url, m_id)
 			raise
-		# except:
-		# 	traceback.print_exc()
-		# 	raise
 		return self.cast_fp(f)
 	async def download(self, url, m_id=None, filename=None, read=None, input_headers=None, return_headers=False, force=False, fc=False, max_size=None):
 		url = unyt(url)
@@ -789,10 +788,14 @@ def _audio_meta(path, _timeout=12) -> dict:
 	info = {(t := line.split("=", 1))[0]: t[1] for line in lines if "=" in line and line.rsplit("=", 1)[-1] not in ("N/A", "0/0")}
 	name = info.get("TAG:album") or info.get("TAG:icy-name")
 	title = info.get("TAG:title") or info.get("TAG:StreamTitle")
+	fmts = (info.get("format_name") or url2ext(info.get("filename") or path)).split(",")
+	for fmt in reversed(fmts):
+		if fmt == url2ext(path):
+			break
 	return dict(
 		name=f"{name}: {title}" if name and title else None,
 		duration=(dur := float(info.get("duration") or int(info.get("duration_ts") or 0) * fractions.Fraction(info.get("time_base") or 0))) or None,
-		format=info.get("format_name") or url2ext(info.get("filename") or path),
+		format=fmt.split("_", 1)[0],
 		codec=info.get("codec_name", "auto"),
 		channels=int(info.get("channels") or 1),
 		bitrate=float(info.get("bit_rate") or float(info.get("size", 0)) * 8 / (dur or 1) or 0),
@@ -802,6 +805,76 @@ def audio_meta(path, _timeout=12) -> cdict:
 	meta = cdict(audio_meta_cache.retrieve(path, _audio_meta, path, _timeout=_timeout, _cache=lambda e: e["sample_rate"]))
 	if meta.get("name"):
 		return cdict(audio_meta_cache.retrieve(path, _audio_meta, path, _timeout=_timeout, _cache=lambda e: e["sample_rate"], _stimeout=300))
+	return meta
+
+video_meta_cache = AutoCache(f"{CACHE_PATH}/video_meta", stale=86400, timeout=86400 * 30)
+def _video_meta(path, _timeout=12) -> dict:
+	if is_miza_attachment(path):
+		path = await_fut(attachment_cache.obtain(url=path))
+	command = (
+		"ffprobe",
+		"-v",
+		"error",
+		"-select_streams",
+		"v:0",
+		"-show_streams",
+		"-show_format",
+		path,
+	)
+	lines = ()
+	try:
+		proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+		proc.wait(timeout=_timeout)
+		lines = [line for line in reversed(proc.stdout.read().decode("utf-8").splitlines()) if "=" in line]
+	except Exception:
+		try:
+			proc.terminate()
+		except Exception:
+			pass
+		traceback.print_exc()
+	info = {(t := line.split("=", 1))[0]: t[1] for line in lines if "=" in line and line.rsplit("=", 1)[-1] not in ("N/A", "0/0")}
+	if info.get("duration_ts", "1") == "1" or info.get("nb_frames", "1") == "1":
+		if is_url(path):
+			path = await_fut(attachment_cache.download(path, filename=True))
+		with open(path, "rb") as f:
+			b = f.read()
+		seq = image_from_bytes(b)
+		frames, duration, fps = image_properties(seq)
+		try:
+			im = Image.open(io.BytesIO(b))
+			fmt = im.format.lower()
+		except Exception:
+			fmt = seq.format or url2ext(path)
+		return dict(
+			duration=duration,
+			format=fmt,
+			codec=info.get("codec_name", "auto"),
+			pixel_format=info.get("pix_fmt", "rgb24"),
+			fps=fps,
+			bitrate=len(b) / frames,
+			frame_count=frames,
+			width=seq.width,
+			height=seq.height,
+		)
+	fmts = (info.get("format_name") or url2ext(info.get("filename") or path)).split(",")
+	for fmt in reversed(fmts):
+		if fmt == url2ext(path):
+			break
+	return dict(
+		duration=(dur := float(info.get("duration") or int(info.get("duration_ts") or 0) * fractions.Fraction(info.get("time_base") or 0))) or None,
+		format=fmt.split("_", 1)[0],
+		codec=info.get("codec_name", "auto"),
+		pixel_format=info.get("pix_fmt", "rgb24"),
+		fps=round_min(float(fractions.Fraction(info.get("avg_frame_rate", 0)))),
+		bitrate=float(info.get("bit_rate") or float(info.get("size", 0)) * 8 / (dur or 1) or 0),
+		frame_count=int(info.get("nb_frames", 1)),
+		width=int(info.get("width", 0)),
+		height=int(info.get("height", 0)),
+	)
+def video_meta(path, _timeout=12) -> cdict:
+	meta = cdict(video_meta_cache.retrieve(path, _video_meta, path, _timeout=_timeout, _cache=lambda e: e["height"]))
+	if meta.get("name"):
+		return cdict(video_meta_cache.retrieve(path, _video_meta, path, _timeout=_timeout, _cache=lambda e: e["height"], _stimeout=300))
 	return meta
 
 colour_cache = ColourCache(
