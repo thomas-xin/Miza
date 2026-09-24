@@ -1640,12 +1640,29 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							for r in m.reactions:
 								u = await self.emoji_to_url(r.emoji, guild=m.guild)
 								found.append(u)
+				if getattr(m, "reference", None):
+					ref = await self.fetch_reference(m)
+					self.cache.messages.setdefault(ref.id, ref)
+					url = ref.jump_url
+					seen.add(url)
+					urls = await self._follow_url(
+						[url],
+						priority_order=priority_order,
+						allow_text=allow_text,
+						seen=seen,
+					)
+					out.extend(urls)
 				found.uniq(sort=False)
 				for url in found:
 					assert not is_local_url(url), url
 					if is_discord_message_link(url) and url not in seen:
 						seen.add(url)
-						urls = await self._follow_url([url], priority_order=priority_order, allow_text=allow_text, seen=seen)
+						urls = await self._follow_url(
+							[url],
+							priority_order=priority_order,
+							allow_text=allow_text,
+							seen=seen,
+						)
 						out.extend(urls)
 					else:
 						out.append(url)
