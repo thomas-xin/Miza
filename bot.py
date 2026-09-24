@@ -5952,9 +5952,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			def jump_url(self):
 				channel = getattr(self, "channel", None)
 				guild = getattr(self, "guild", None) or getattr(channel, "guild", None)
-				if not guild or not channel:
-					return "https://discord.com/channels/-1/-1/-1"
-				return f"https://discord.com/channels/{self.guild.id}/{self.channel.id}/{self.id}"
+				if not guild and not channel:
+					return f"https://discord.com/channels/-1/-1/{self.id}"
+				assert channel
+				if not guild:
+					return f"https://discord.com/channels/@me/{channel.id}/{self.id}"
+				return f"https://discord.com/channels/{guild.id}/{channel.id}/{self.id}"
 
 			def reply(self, content=None, embed=None, embeds=None, tts=False, file=None, files=None, buttons=None, mention=False, ephemeral=False):
 				return send_with_reply(self.channel, reference=self, content=content, embed=embed, embeds=embeds, tts=tts, file=file, files=files, buttons=buttons, mention=mention, ephemeral=ephemeral)

@@ -298,14 +298,13 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 		if model in ai.is_vision and m.get("role") != "assistant":
 			futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
 			extracts[i] = create_task(gather(*futs))
-		elif m.get("new") and backup_model and backup_model in ai.is_vision and m.get("role") != "assistant":
+		elif backup_model and backup_model in ai.is_vision and m.get("role") != "assistant":
 			futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
 			extracts[i] = create_task(gather(*futs))
 			if futs and extracts:
 				model = backup_model
 		else:
-			best = 2 if model in ai.is_premium and m.get("new") else 0
-			futs = [self.vision(url, best=best, premium_context=premium_context) for url in urls]
+			futs = [self.vision(url, premium_context=premium_context) for url in urls]
 			extracts[i] = create_task(gather(*futs, return_exceptions=True))
 	for i, (m, fut) in enumerate(zip(messages, extracts)):
 		if not fut:
