@@ -20,7 +20,7 @@ import psutil
 import requests
 import streamshatter
 from misc.types import utc, as_str, byte_like, round_min, cdict, fcdict
-from misc.asyncs import _run_async, run_async, submit_thread, wrap_future, await_fut, create_task, gather, Future
+from misc.asyncs import _run_async, run_async, submit_thread, wrap_future, await_fut, create_task, gather, Future, Delay
 from misc.smath import get_closest_heart
 from misc.util import (
     CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, read_file_a, download_file, header_test, getsize, retrieve_api,
