@@ -11,7 +11,7 @@
 				"category": {
 					"type": "enum",
 					"validation": {
-						"enum": ["admin", "ai", "fun", "image", "main", "string", "voice", "webhook"],
+						"enum": ["admin", "ai", "fun", "image", "main", "string", "url", "voice", "webhook"],
 						"accepts": {"owner": "owner", "misc": "misc", "nsfw": "nsfw"}
 					},
 					"description": "Command category to search",
@@ -240,61 +240,6 @@
 			"example": ["status", "status enable"],
 			"timeout": "24",
 			"usage": "<mode(enable|disable)>?"
-		},
-		"Invite": {
-			"aliases": ["Invite", "Website", "BotInfo", "InviteLink"],
-			"description": "Sends a link to Miza's homepage, github and invite code, as well as an invite link to the current server if applicable.",
-			"level": "0",
-			"rate_limit": "(9, 13)",
-			"example": ["invite"],
-			"timeout": "24",
-			"usage": ""
-		},
-		"Preserve": {
-			"aliases": ["Preserve", "PreserveAttachmentLinks", "Shorten", "Minimise", "Minimize", "Preview"],
-			"description": "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to Miza's webserver's upload page: https://mizabot.xyz/files",
-			"level": "0",
-			"rate_limit": "(12, 17)",
-			"example": [],
-			"timeout": "1200",
-			"schema": {
-				"minimise": {
-					"type": "bool",
-					"description": "Whether to produce the shortest possible alias"
-				},
-				"preview": {
-					"type": "bool",
-					"description": "Whether to produce the in-site media previews instead"
-				},
-				"concatenate": {
-					"type": "bool",
-					"description": "Whether to treat links as an attachment chain (messages are from same channel, all segments except head and tail have same size divisible by 1MB)",
-					"aliases": ["concat"]
-				},
-				"urls": {
-					"type": "url",
-					"description": "URL or attachment to preserve",
-					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
-					"aliases": ["i"],
-					"multiple": true,
-					"required": true
-				}
-			},
-			"ordered_args": ["minimise", "preview", "concatenate", "urls"],
-			"macros": {
-				"Shorten": {
-					"minimise": true
-				},
-				"Minimise": {
-					"minimise": true
-				},
-				"Minimize": {
-					"minimise": true
-				},
-				"Preview": {
-					"preview": true
-				}
-			}
 		},
 		"Reminder": {
 			"aliases": ["Reminder", "RemindMe", "Reminders", "Remind", "Announce", "Announcement", "Announcements"],
@@ -699,40 +644,6 @@
 				}
 			}
 		},
-		"Inspect": {
-			"aliases": ["Inspect", "📂", "Magic", "Mime", "MimeType", "FileType", "FileInfo", "Identify", "Inspect", "InspectFiles"],
-			"description": "Detects the type, mime, and optionally details of an input file.",
-			"level": "0",
-			"rate_limit": "(12, 16)",
-			"example": [],
-			"timeout": "24",
-			"schema": {
-				"urls": {
-					"type": "url",
-					"description": "URL or attachment to inspect",
-					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
-					"aliases": ["i"],
-					"multiple": true,
-					"required": true
-				}
-			},
-			"ordered_args": ["urls"]
-		},
-		"Follow": {
-			"aliases": ["Follow", "🚶"],
-			"description": "Follows a discord message link and/or finds URLs in a string.",
-			"level": "0",
-			"rate_limit": "(7, 10)",
-			"example": [],
-			"timeout": "24",
-			"schema": {
-				"urls": {
-					"type": "string",
-					"description": "Text containing one or more URLs to search"
-				}
-			},
-			"ordered_args": ["urls"]
-		},
 		"Match": {
 			"aliases": ["Match", "RE", "RegEx", "RexExp", "GREP"],
 			"description": "matches two strings using Linux-style RegExp, or computes the match ratio of two strings.",
@@ -819,6 +730,113 @@
 				}
 			},
 			"ordered_args": ["size"]
+		}
+	},
+	"URL": {
+		"Invite": {
+			"aliases": ["Invite", "Server", "Website", "Github", "InviteBot"],
+			"description": "Sends a link to Miza's homepage, github and invite code, as well as an invite link to the current server if applicable.",
+			"level": "0",
+			"rate_limit": "(9, 13)",
+			"example": [],
+			"timeout": "24",
+			"schema": {
+				"mode": {
+					"type": "enum",
+					"validation": {
+						"enum": ["server", "website", "github", "bot", "all"]
+					},
+					"example": "server",
+					"default": "all"
+				}
+			},
+			"ordered_args": ["mode"],
+			"macros": {
+				"Server": {"mode": "server"},
+				"Website": {"mode": "website"},
+				"Github": {"mode": "github"},
+				"InviteBot": {"mode": "bot"}
+			}
+		},
+		"Preserve": {
+			"aliases": ["Preserve", "PreserveAttachmentLinks", "Shorten", "Minimise", "Minimize", "Preview"],
+			"description": "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to Miza's webserver's upload page: https://mizabot.xyz/files",
+			"level": "0",
+			"rate_limit": "(12, 17)",
+			"example": [],
+			"timeout": "1200",
+			"schema": {
+				"minimise": {
+					"type": "bool",
+					"description": "Whether to produce the shortest possible alias"
+				},
+				"preview": {
+					"type": "bool",
+					"description": "Whether to produce the in-site media previews instead"
+				},
+				"concatenate": {
+					"type": "bool",
+					"description": "Whether to treat links as an attachment chain (messages are from same channel, all segments except head and tail have same size divisible by 1MB)",
+					"aliases": ["concat"]
+				},
+				"urls": {
+					"type": "url",
+					"description": "URL or attachment to preserve",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"multiple": true,
+					"required": true
+				}
+			},
+			"ordered_args": ["minimise", "preview", "concatenate", "urls"],
+			"macros": {
+				"Shorten": {
+					"minimise": true
+				},
+				"Minimise": {
+					"minimise": true
+				},
+				"Minimize": {
+					"minimise": true
+				},
+				"Preview": {
+					"preview": true
+				}
+			}
+		},
+		"Inspect": {
+			"aliases": ["Inspect", "📂", "Magic", "Mime", "MimeType", "FileType", "FileInfo", "Identify", "Inspect", "InspectFiles"],
+			"description": "Detects the type, mime, and optionally details of an input file.",
+			"level": "0",
+			"rate_limit": "(12, 16)",
+			"example": [],
+			"timeout": "24",
+			"schema": {
+				"urls": {
+					"type": "url",
+					"description": "URL or attachment to inspect",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"multiple": true,
+					"required": true
+				}
+			},
+			"ordered_args": ["urls"]
+		},
+		"Follow": {
+			"aliases": ["Follow", "🚶"],
+			"description": "Follows a discord message link and/or finds URLs in a string.",
+			"level": "0",
+			"rate_limit": "(7, 10)",
+			"example": [],
+			"timeout": "24",
+			"schema": {
+				"urls": {
+					"type": "string",
+					"description": "Text containing one or more URLs to search"
+				}
+			},
+			"ordered_args": ["urls"]
 		},
 		"Urban": {
 			"aliases": ["Urban", "📖", "UrbanDictionary"],
@@ -1218,7 +1236,7 @@
 				"category": {
 					"type": "enum",
 					"validation": {
-						"enum": ["admin", "ai", "fun", "image", "main", "string", "voice", "webhook"],
+						"enum": ["admin", "ai", "fun", "image", "main", "string", "url", "voice", "webhook"],
 						"accepts": {
 							"owner": "owner",
 							"misc": "misc",

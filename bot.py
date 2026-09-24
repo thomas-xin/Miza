@@ -81,7 +81,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		1052645761638215761: 2,
 		1052647823188967444: 3,
 	}
-	active_categories = set(AUTH.setdefault("active_categories", ["MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "WEBHOOK", "FUN"]))
+	active_categories = set(AUTH.setdefault("active_categories", ["MAIN", "STRING", "URL", "ADMIN", "VOICE", "IMAGE", "WEBHOOK", "FUN"]))
 
 	def __init__(self, cache_size=262144, timeout=24):
 		"Initializes client (first in __mro__ of class inheritance)"
@@ -648,7 +648,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			return
 		print("Generating command json...")
 		j = {}
-		for category in ("MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "FUN", "AI", "NSFW", "MISC", "OWNER"):
+		for category in ("MAIN", "STRING", "URL", "ADMIN", "VOICE", "IMAGE", "FUN", "AI", "NSFW", "MISC", "OWNER"):
 			k = j[category] = {}
 			if category not in self.categories:
 				continue

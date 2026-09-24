@@ -11,6 +11,7 @@ help_colours = fcdict({
 	None: 0xfffffe,
 	"main": 0xff0000,
 	"string": 0x00ff00,
+	"url": 0xc0c0c0,
 	"admin": 0x0000ff,
 	"voice": 0xff00ff,
 	"image": 0xffff00,
@@ -25,6 +26,7 @@ help_emojis = fcdict((
 	(None, "♾"),
 	("main", "🌐"),
 	("string", "🔢"),
+	("url", "🔗"),
 	("admin", "🕵️‍♀️"),
 	("voice", "🎼"),
 	("image", "🖼"),
@@ -39,6 +41,7 @@ help_descriptions = fcdict((
 	(None, "N/A"),
 	("main", "General commands, mostly involves individual users"),
 	("string", "Text-based commands, usually helper tools"),
+	("url", "Tools related to URLs or files"),
 	("admin", "Moderation-based, used to help staffing servers"),
 	("voice", "Play, convert, or download songs through VC"),
 	("image", "Create or edit images, animations, and videos"),
@@ -1046,136 +1049,6 @@ class Status(Command):
 			raise
 		if m_id is not None and message is not None:
 			bot.data.messages[channel.id] = {message.id: cdict(t=utc(), command="bot.commands.status[0]")}
-
-
-class Invite(Command):
-	name = ["Website", "BotInfo", "InviteLink"]
-	description = "Sends a link to ⟨BOT⟩'s homepage, github and invite code, as well as an invite link to the current server if applicable."
-	example = ("invite",)
-	rate_limit = (9, 13)
-	slash = True
-	ephemeral = True
-
-	async def __call__(self, channel, message, **void):
-		emb = discord.Embed(colour=rand_colour()).set_author(**get_author(self.bot.user))
-		emb.description = f"[**`My Github`**]({self.bot.github}) [**`My Website`**]({self.bot.webserver}) [**`My Invite`**]({self.bot.invite})"
-		if message.guild:
-			with tracebacksuppressor:
-				member = message.guild.get_member(self.bot.id)
-				if member.guild_permissions.create_instant_invite:
-					invites = await member.guild.invites()
-					invites = sorted(invites, key=lambda invite: (invite.max_age == 0, -abs(invite.max_uses - invite.uses), len(invite.url)))
-					if not invites:
-						c = self.bot.get_first_sendable(member.guild, member)
-						invite = await c.create_invite(reason="Invite command")
-					else:
-						invite = invites[0]
-					emb.description += f" [**`Server Invite`**]({invite.url})"
-		self.bot.send_embeds(channel, embed=emb, reference=message)
-
-
-class Preserve(Command):
-	name = ["PreserveAttachmentLinks"]
-	description = "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to ⟨BOT⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
-	schema = cdict(
-		minimise=cdict(
-			type="bool",
-			description="Whether to produce the shortest possible alias",
-		),
-		preview=cdict(
-			type="bool",
-			description="Whether to produce the in-site media previews instead",
-		),
-		concatenate=cdict(
-			type="bool",
-			description="Whether to treat links as an attachment chain (messages are from same channel, all segments except head and tail have same size divisible by 1MB)",
-			aliases=["concat"],
-		),
-		urls=cdict(
-			type="url",
-			description="URL or attachment to preserve",
-			example="https://cdn.discordapp.com/embed/avatars/0.png",
-			aliases=["i"],
-			multiple=True,
-			required=True,
-		),
-	)
-	macros = cdict(
-		Shorten=cdict(
-			minimise=True,
-		),
-		Minimise=cdict(
-			minimise=True,
-		),
-		Minimize=cdict(
-			minimise=True,
-		),
-		Preview=cdict(
-			preview=True,
-		)
-	)
-	rate_limit = (12, 17)
-	_timeout_ = 50
-	slash = ("Preserve",)
-	msgcmd = ("Preserve Attachment Links",)
-	ephemeral = True
-
-	async def __call__(self, bot, _channel, _message, minimise, preview, concatenate, urls, **void):
-		targets = [] if concatenate else [_message]
-		try:
-			reference = await bot.fetch_reference(_message)
-		except (LookupError, discord.NotFound):
-			pass
-		else:
-			targets.append(reference)
-		for url in find_urls(_message.content):
-			if is_discord_message_link(url):
-				with tracebacksuppressor:
-					m = await bot.fetch_message(url)
-					if m.attachments:
-						targets.append(m)
-
-		if concatenate and targets:
-			cid = targets[0].channel.id
-			Ms = 0
-			mismatch = False
-			is_head = True
-			for m in targets:
-				if mismatch:
-					raise DomainError("Size mismatch! Only head and tail segments may have differing filesize")
-				if m.channel.id != cid:
-					raise DomainError(f"Channel mismatch! {m.channel.id} != {cid}")
-				for a in m.attachments:
-					if not is_head:
-						if Ms and a.size != Ms:
-							mismatch = True
-						else:
-							Ms = a.size
-							if Ms % 1048576:
-								raise ValueError(f"Middle segment filesize ({Ms}) must be divisible by 1048576 (1MB)")
-					is_head = False
-			mids = [m.id for m in targets]
-			return shorten_chunks(Ms // 1048576, cid, mids, targets[0].attachments[0].filename, mode="c", base="https://mizabot.xyz", minimise=minimise)
-
-		kvs = {}
-		for m in targets:
-			for a in m.attachments:
-				kvs[a.id] = m.id
-		print(kvs)
-		futs = deque()
-		for url in urls:
-			try:
-				futs.append(as_fut(minimise_url(url, kvs=kvs, minimise=minimise)))
-			except Exception:
-				print_exc()
-				futs.append(bot.data.exec.lproxy(url, channel=_channel, minimise=minimise))
-				await asyncio.sleep(0.1)
-		out = await gather(*futs, max_concurrency=2)
-		print(urls)
-		print(out)
-		if preview:
-			return "\n".join(preview_url(u) for u in out)
-		return "\n".join(f"<{u}>" for u in out)
 
 
 class Reminder(Pagination, Interactable, Command):

@@ -1801,7 +1801,7 @@ readstring = lambda s: deobfuscate(zwremove(s.split(rsep, 1)[-1]))
 
 
 # Default and standard command categories to enable.
-basic_commands = frozenset(("main", "string", "admin"))
+basic_commands = frozenset(("main", "string", "url", "admin"))
 standard_commands = default_commands = basic_commands.union(("voice", "image", "webhook", "fun", "ai"))
 visible_commands = default_commands.union(("nsfw",))
 
