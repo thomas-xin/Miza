@@ -655,7 +655,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if category not in self.categories:
 				continue
 			for command in self.categories[category]:
-				c = c[command.parse_name()] = dict(
+				c1 = c[command.parse_name()] = dict(
 					aliases=[n.strip("_") for n in command.alias],
 					description=command.parse_description(),
 					level=str(command.min_level),
@@ -663,8 +663,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					timeout=str(T(command).get("_timeout_", 1) * self.timeout),
 				)
 				if command.schema:
-					c["schema"] = command.schema
-					c["ordered_args"] = list(command.schema)
+					c1["schema"] = command.schema
+					c1["ordered_args"] = list(command.schema)
 					min_schema = copy.deepcopy(command.schema)
 					for k, v in min_schema.items():
 						if v.get("type") == "enum":
@@ -678,12 +678,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						c2["macros"] = command.macros
 					help_data_min.setdefault(category, {}).setdefault(command.parse_name(), c2)
 				else:
-					c["usage"] = command.usage
+					c1["usage"] = command.usage
 				if getattr(command, "macros", None):
-					c["macros"] = command.macros
+					c1["macros"] = command.macros
 				for attr in ("flags", "server_only", "slash"):
 					with suppress(AttributeError):
-						c[attr] = command.attr
+						c1[attr] = command.attr
 		self.help_json = pretty_json(help_data)
 		self.help_min = pretty_json(help_data_min)
 		os.makedirs("misc/web/static", exist_ok=True)
