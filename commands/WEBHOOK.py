@@ -52,7 +52,6 @@ class AutoEmoji(Pagination, Interactable, Command):
 		)
 
 	async def _callback_(self, _user, index, data, **void):
-		print(data)
 		pos, more = decode_leb128(data)
 		gid, _ = decode_leb128(more)
 		return await self.display(_user.id, pos, gid, index)

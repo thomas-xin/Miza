@@ -1475,7 +1475,6 @@ class UpdateReminders(Database):
 				# Insert next listed item into schedule
 				self.listed.insort((temp[0].t if isinstance(temp[0].t, number) else temp[0].t.timestamp_exact(), uid), key=lambda x: x[0])
 				self[uid] = temp
-			# print(self.listed)
 			# Send reminder to target user/channel
 			ch = await self.bot.fetch_messageable(uid)
 			if not self.bot.permissions_in(ch).send_messages:

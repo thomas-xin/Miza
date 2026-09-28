@@ -155,7 +155,6 @@ class Preserve(Command):
 		for m in targets:
 			for a in m.attachments:
 				kvs[a.id] = m.id
-		print(kvs)
 		futs = deque()
 		for url in urls:
 			try:
@@ -165,8 +164,6 @@ class Preserve(Command):
 				futs.append(bot.data.exec.lproxy(url, channel=_channel, minimise=minimise))
 				await asyncio.sleep(0.1)
 		out = await gather(*futs, max_concurrency=2)
-		print(urls)
-		print(out)
 		if preview:
 			return "\n".join(preview_url(u) for u in out)
 		return "\n".join(f"<{u}>" for u in out)

@@ -643,27 +643,40 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						method="DELETE",
 					)
 
+	help_json = ""
 	async def create_main_website(self, first=False):
 		if not first:
 			return
 		print("Generating command json...")
-		j = {}
+		help_data = {}
+		help_data_min = {}
 		for category in ("MAIN", "STRING", "URL", "ADMIN", "VOICE", "IMAGE", "FUN", "AI", "NSFW", "MISC", "OWNER"):
-			k = j[category] = {}
+			c = help_data[category] = {}
 			if category not in self.categories:
 				continue
 			for command in self.categories[category]:
-				c = k[command.parse_name()] = dict(
+				c = c[command.parse_name()] = dict(
 					aliases=[n.strip("_") for n in command.alias],
 					description=command.parse_description(),
 					level=str(command.min_level),
 					rate_limit=str(command.rate_limit),
-					example=T(command).get("example", []),
 					timeout=str(T(command).get("_timeout_", 1) * self.timeout),
 				)
 				if command.schema:
 					c["schema"] = command.schema
 					c["ordered_args"] = list(command.schema)
+					min_schema = copy.deepcopy(command.schema)
+					for k, v in min_schema.items():
+						if v.get("type") == "enum":
+							v["validation"] = lim_str(" ".join(v["validation"]["enum"]), 384)
+					c2 = dict(
+						description=command.parse_description(),
+						level=str(command.min_level),
+						schema=min_schema,
+					)
+					if command.macros:
+						c2["macros"] = command.macros
+					help_data_min.setdefault(category, {}).setdefault(command.parse_name(), c2)
 				else:
 					c["usage"] = command.usage
 				if getattr(command, "macros", None):
@@ -671,10 +684,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				for attr in ("flags", "server_only", "slash"):
 					with suppress(AttributeError):
 						c[attr] = command.attr
-		s = await _run_async(pretty_json, j)
+		self.help_json = pretty_json(help_data)
+		self.help_min = pretty_json(help_data_min)
 		os.makedirs("misc/web/static", exist_ok=True)
 		with open("misc/web/static/HELP.json", "w", encoding="utf-8") as f:
-			f.write(s)
+			f.write(self.help_json)
 
 	server = None
 	def start_webserver(self, shutdown=False):
@@ -1593,7 +1607,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				content = content.replace(e, f":{emoji.name}:")
 		return content
 
-	async def _follow_url(self, urls, priority_order, allow_text, seen=None):
+	async def _follow_url(self, urls, priority_order, allow_text, allow_replies, seen=None):
 		seen = seen or set()
 		out = deque()
 		for url in urls:
@@ -1640,7 +1654,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							for r in m.reactions:
 								u = await self.emoji_to_url(r.emoji, guild=m.guild)
 								found.append(u)
-				if getattr(m, "reference", None):
+				if allow_replies and getattr(m, "reference", None):
 					ref = await self.fetch_reference(m)
 					self.cache.messages.setdefault(ref.id, ref)
 					url = ref.jump_url
@@ -1649,6 +1663,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						[url],
 						priority_order=priority_order,
 						allow_text=allow_text,
+						allow_replies=allow_replies,
 						seen=seen,
 					)
 					found.extend(urls)
@@ -1661,6 +1676,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							[url],
 							priority_order=priority_order,
 							allow_text=allow_text,
+							allow_replies=allow_replies,
 							seen=seen,
 						)
 						out.extend(urls)
@@ -1704,7 +1720,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if not out:
 			out = urls
 		return tuple(out)
-	async def follow_url(self, url, priority_order=("video", "audio", "image", "text"), allow_text=False, limit=None) -> list:
+	async def follow_url(self, url, priority_order=("video", "audio", "image", "text"), allow_text=False, allow_replies=True, limit=None) -> list:
 		"Finds URLs in a string, following any discord message links found."
 		if not url:
 			return []
@@ -1726,11 +1742,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		urls = tuple(urls)
 		priority_order = tuple(priority_order)
 		allow_text = bool(allow_text)
-		tup = (urls, priority_order, allow_text)
+		tup = (urls, priority_order, allow_text, allow_replies)
 
 		out = await self.followed.aretrieve(
 			tup, self._follow_url,
-			urls, priority_order=priority_order, allow_text=allow_text,
+			urls, priority_order=priority_order, allow_text=allow_text, allow_replies=allow_replies,
 		)
 		if limit is not None:
 			out = out[:limit]
@@ -5381,10 +5397,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		elif not embeds:
 			return fut_nop
 		if reference:
-			# print(reference, reference.__dict__)
 			if getattr(reference, "slash", False):
 				embs, embeds = embeds[:10], embeds[10:]
-				print("Sending embeds directly due to interaction token")
 				fut = create_task(self._send_embeds(channel, embs, reacts, reference, exc=exc))
 				if not embeds:
 					return fut
@@ -5392,11 +5406,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		c_id = verify_id(channel)
 		user = self.cache.users.get(c_id)
 		if user is not None:
-			print(f"Sending embeds directly due to specified user {user}")
 			return create_task(self._send_embeds(user, embeds, reacts, reference, exc=exc))
 		if not self.initialisation_complete:
 			embs, embeds = embeds[:10], embeds[10:]
-			print("Sending embeds directly due to incomplete initialisation")
 			fut = create_task(self._send_embeds(channel, embs, reacts, reference, exc=exc))
 			if not embeds:
 				return fut
@@ -6004,15 +6016,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				if "files" in kwargs:
 					kwargs["attachments"] = kwargs.pop("files")
 				if not self.webhook_id:
-					try:
-						if args:
-							kwargs["content"] = " ".join(args)
-						return await discord.Message.edit(self, **kwargs)
-					except discord.HTTPException:
-						print(self)
-						print(args)
-						print(kwargs)
-						raise
+					if args:
+						kwargs["content"] = " ".join(args)
+					return await discord.Message.edit(self, **kwargs)
 				if self.webhook_id == bot.id:
 					if args:
 						kwargs["content"] = " ".join(args)
@@ -7553,9 +7559,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if member.id == self.id:
 				after = member.voice
 				if after is not None:
-					if (after.mute or after.deaf) and member.permissions_in(after.channel).deafen_members:
-						# print("Unmuted self in " + member.guild.name)
-						await member.edit(mute=False, deafen=False)
+					if after.mute and member.permissions_in(after.channel).mute_members:
+						await member.edit(mute=False)
 					await self.handle_update()
 			# Check for users with a voice state.
 			if after is not None and not after.afk:
@@ -7941,8 +7946,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 									user = await self.fetch_user_member(e.uid, guild)
 									break
 								self.delete_audits[t] = audits
-					# print(audits)
-					# print("Audited Bulk Delete:", message, user)
 				await self.send_event("_bulk_delete_", messages=messages, requestor=user)
 
 		async def _on_raw_bulk_message_delete(payload):

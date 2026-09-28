@@ -262,7 +262,7 @@ async def caption_into(self, _messages, model=None, backup_model=None, premium_c
 		elif sum(f is not None for f in follows) < 8 and m.get("message") and j < 16:
 			# Only read the last 8 images in the last 16 messages
 			finding = ("video", "image", "text") if j < 1 else ("video", "image")
-			follows[i] = create_task(self.follow_url(m.message, priority_order=finding, allow_text=False))
+			follows[i] = create_task(self.follow_url(m.message, priority_order=finding, allow_text=False, allow_replies=False))
 		elif not m.get("content"):
 			m.content = ""
 		m.pop("message", None)
@@ -337,7 +337,7 @@ Bot.caption_into = caption_into
 model_levels = dict(enumerate(map(cdict, AUTH.get("model_levels", []))))
 if not model_levels:
 	model_levels = dict(enumerate([cdict(
-		**{k: "mimo-v2.5" for k in ("instructive", "casual", "nsfw", "backup", "function", "vision", "summary")},
+		**{k: "mimo-v2.6-flash" for k in ("instructive", "casual", "nsfw", "backup", "function", "vision", "summary")},
 		target="auto",
 	)] * 3))
 Bot.model_levels = model_levels
@@ -839,6 +839,9 @@ async def tool_call(self, call, uid, message=None, effort="high", premium_contex
 		kwargs = cdict(eval_json(func.arguments))
 
 		match func.name:
+			case "help":
+				yield 'Viewing help menu'
+				yield self.help_min
 			case "browse":
 				query = kwargs.get("query") or " ".join(kwargs.values())
 				if is_discord_attachment(query) or is_miza_attachment(query):

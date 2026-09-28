@@ -1910,7 +1910,7 @@ class Command(Importable):
 					else:
 						seqs = v.validation.enum or v.validation.accepts
 						if len(seqs) > 64 or sum(map(len, seqs)) > 512:
-							valid = ", ".join(seqs)
+							valid = " ".join(seqs)
 						else:
 							valid = (colourise(",") + colourise(" ", fg="cyan")).join(seqs)
 					desc.append(f"{colourise('Allowed', fg='red')}{colourise(':', fg='white')} {colourise(valid, fg='cyan')}")

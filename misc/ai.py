@@ -509,7 +509,7 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 				api = group[i % len(group)]
 			except (LookupError, StopIteration):
 				api = "openrouter"
-				minfo = available["mimo-v2.5"]
+				minfo = available["mimo-v2.6-flash"]
 		if api is None:
 			if not allow_alt:
 				break
@@ -539,15 +539,15 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 			mt = kwa.pop("max_tokens", 0) or 0
 			if mt:
 				if not kwa.get("max_completion_tokens"):
-					mt2 = mt * 3 // 2
+					mt2 = mt * 1.125
 					ctx = 65536
 					if orig_model in contexts:
 						if "messages" in kwa:
-							ctx = contexts[orig_model] - count_to(kwa["messages"]) * 3 // 2
+							ctx = contexts[orig_model] * 15 / 16 - count_to(kwa["messages"]) * 1.125
 						elif "input" in kwa:
-							ctx = contexts[orig_model] - count_to(kwa["input"]) * 3 // 2
+							ctx = contexts[orig_model] * 15 / 16 - count_to(kwa["input"]) * 1.125
 						else:
-							ctx = contexts[orig_model] - tcount(kwa["prompt"]) * 3 // 2
+							ctx = contexts[orig_model] * 15 / 16 - tcount(kwa["prompt"]) * 1.125
 					mt2 = min(mt2, ctx)
 					if "messages" in kwa:
 						kwa["max_completion_tokens"] = mt2
@@ -682,6 +682,14 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 	raise (exc or RuntimeError("Unknown error occured."))
 
 
+f_help = {
+	"type": "function", "function": {
+		"name": "help",
+		"description": "Lists available bot commands. Use if helping users with command syntax; not applicable to LLM tools",
+		"parameters": {
+			"type": "object", "properties": {},
+			"required": [],
+}}}
 f_browse = {
 	"type": "function", "function": {
 		"name": "browse",
@@ -834,6 +842,7 @@ TOOLS = {
 		f_browse,
 		f_deno,
 		f_reminder,
+		f_help,
 	],
 	"server_only": [
 		f_play,

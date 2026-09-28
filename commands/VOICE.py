@@ -446,7 +446,6 @@ class Queue(Pagination, Interactable, Command):
 			try:
 				e = cdict(curr[i])
 			except ValueError:
-				print(i, curr[i])
 				i += 1
 				continue
 			space = l10 - int(math.log10(max(1, i)))

@@ -212,233 +212,6 @@ class Purge(Command):
 		return cdict(content=s, reacts="❎")
 
 
-class Ban(Command):
-	server_only = True
-	_timeout_ = 16
-	name = ["🔨", "Bans", "Unban"]
-	min_level = 3
-	min_display = "3+"
-	description = "Bans a user for a certain amount of time, with an optional reason."
-	usage = "<0:user>* <1:time>? <2:reason>?"
-	example = ("ban @Miza 30m for being naughty",)
-	flags = "fhz"
-	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
-	rate_limit = (9, 16)
-	multi = True
-	slash = True
-	maintenance = True
-
-	async def __call__(self, bot, argv, args, argl, message, channel, guild, flags, perm, user, name, **void):
-		if not args and not argl:
-			# Set callback message for scrollable list
-			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-			await send_with_reply(
-				None,
-				message,
-				"*```" + "\n" * ("z" in flags) + "callback-admin-ban-"
-				+ str(user.id) + "_0"
-				+ "-\nLoading ban list...```*",
-				buttons=buttons,
-			)
-			return
-		ts = utc()
-		banlist = bot.data.bans.get(guild.id, alist())
-		if type(banlist) is not alist:
-			banlist = bot.data.bans[guild.id] = alist(banlist)
-		async with discord.context_managers.Typing(channel):
-			bans, glob = await self.getBans(guild)
-			users = await bot.find_users(argl, args, user, guild)
-		if not users:
-			raise LookupError(f"No results found for {argv}.")
-		if len(users) > 1 and "f" not in flags:
-			raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
-		if not args or name == "unban":
-			for user in users:
-				try:
-					ban = bans[user.id]
-				except LookupError:
-					create_task(channel.send(ini_md(f"{sqr_md(user)} is currently not banned from {sqr_md(guild)}. Specify a duration for temporary bans, or `inf` for permanent bans.")))
-					continue
-				if name == "unban":
-					await guild.unban(user)
-					try:
-						ind = banlist.search(user.id, key=lambda b: b["u"])
-					except LookupError:
-						pass
-					else:
-						banlist.pops(ind)["u"]
-						if 0 in ind:
-							with suppress(ValueError):
-								bot.data.bans.listed.remove(guild.id, key=lambda x: x[-1])
-							if banlist:
-								bot.data.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
-					create_task(channel.send(css_md(f"Successfully unbanned {sqr_md(user)} from {sqr_md(guild)}.")))
-					continue
-				create_task(channel.send(italics(ini_md(f"Current ban for {sqr_md(user)} from {sqr_md(guild)}: {sqr_md(time_until(ban['t']))}."))))
-			return
-		# This parser is a mess too
-		bantype = " ".join(args)
-		if bantype.startswith("for "):
-			bantype = bantype[4:]
-		if "for " in bantype:
-			i = bantype.index("for ")
-			expr = bantype[:i].strip()
-			msg = bantype[i + 4:].strip()
-		if "with reason " in bantype:
-			i = bantype.index("with reason ")
-			expr = bantype[:i].strip()
-			msg = bantype[i + 12:].strip()
-		elif "reason " in bantype:
-			i = bantype.index("reason ")
-			expr = bantype[:i].strip()
-			msg = bantype[i + 7:].strip()
-		elif '"' in argv and len(args) == 2:
-			expr, msg = args
-		else:
-			expr = bantype
-			msg = None
-		msg = msg or None
-		_op = None
-		for op, at in bot.op.items():
-			if expr.startswith(op):
-				expr = expr[len(op):].strip()
-				_op = at
-		num = await bot.eval_time(expr, op=False)
-		create_task(message.add_reaction("❗"))
-		for user in users:
-			p = bot.get_perms(user, guild)
-			if not p < 0 and not isfinite(p):
-				ex = PermissionError(f"{user} has administrator permission level, and cannot be banned from this server.")
-				bot.send_exception(channel, ex)
-				continue
-			elif not p + 1 <= perm and not isnan(perm):
-				reason = "to ban " + str(user) + " from " + guild.name
-				ex = self.perm_error(perm, p + 1, reason)
-				bot.send_exception(channel, ex)
-				continue
-			if _op is not None:
-				try:
-					ban = bans[user.id]
-					orig = ban["t"] - ts
-				except LookupError:
-					orig = 0
-				new = getattr(float(orig), _op)(num)
-			else:
-				new = num
-			create_task(self.createBan(guild, user, reason=msg, length=new, channel=channel, bans=bans, glob=glob))
-
-	async def getBans(self, guild):
-		loc = self.bot.data.bans.get(guild.id)
-		# This API call could potentially be replaced with a single init call and a well maintained cache of banned users
-		glob = []
-		async for ban in guild.bans():
-			glob.append(ban)
-		bans = {ban.user.id: {"u": ban.user.id, "r": ban.reason, "t": inf} for ban in glob}
-		if loc:
-			for b in tuple(loc):
-				if b["u"] not in bans:
-					loc.pop(b["u"])
-					continue
-				bans[b["u"]]["t"] = b["t"]
-				bans[b["u"]]["c"] = b["c"]
-		return bans, glob
-
-	async def createBan(self, guild, user, reason, length, channel, bans, glob):
-		ts = utc()
-		bot = self.bot
-		banlist = set_dict(bot.data.bans, guild.id, alist())
-		update = bot.data.bans.update
-		for b in glob:
-			u = b.user
-			if user.id == u.id:
-				with bot.ExceptionSender(channel):
-					ban = bans[u.id]
-					# Remove from global schedule, then sort and re-add
-					with suppress(ValueError):
-						banlist.remove(user.id, key=lambda x: x["u"])
-					with suppress(ValueError):
-						bot.data.bans.listed.remove(guild.id, key=lambda x: x[-1])
-					if length < inf:
-						banlist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": ban.get("r")}, key=lambda x: x["t"])
-						bot.data.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
-					print(banlist)
-					print(bot.data.bans.listed)
-					msg = css_md(f"Updated ban for {sqr_md(user)} from {sqr_md(time_until(ban['t']))} to {sqr_md(time_until(ts + length))}.")
-					await channel.send(msg)
-				return
-		with bot.ExceptionSender(channel):
-			await bot.verified_ban(user, guild, reason)
-			with suppress(ValueError):
-				banlist.remove(user.id, key=lambda x: x["u"])
-			with suppress(ValueError):
-				bot.data.bans.listed.remove(guild.id, key=lambda x: x[-1])
-			if length < inf:
-				banlist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": reason}, key=lambda x: x["t"])
-				bot.data.bans.listed.insort((banlist[0]["t"], guild.id), key=lambda x: x[0])
-			print(banlist)
-			print(bot.data.bans.listed)
-			msg = css_md(f"{sqr_md(user)} has been banned from {sqr_md(guild)} for {sqr_md(time_until(ts + length))}. Reason: {sqr_md(reason)}")
-			await channel.send(msg)
-
-	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-		u_id, pos = list(map(int, vals.split("_", 1)))
-		if reaction not in (None, self.directions[-1]) and perm < 3:
-			return
-		if reaction not in self.directions and reaction is not None:
-			return
-		guild = message.guild
-		user = await bot.fetch_user(u_id)
-		update = self.bot.data.bans.update
-		ts = utc()
-		banlist = bot.data.bans.get(guild.id, [])
-		bans, glob = await self.getBans(guild)
-		page = 25
-		last = max(0, len(bans) - page)
-		if reaction is not None:
-			i = self.directions.index(reaction)
-			if i == 0:
-				new = 0
-			elif i == 1:
-				new = max(0, pos - page)
-			elif i == 2:
-				new = min(last, pos + page)
-			elif i == 3:
-				new = last
-			else:
-				new = pos
-			pos = new
-		content = message.content
-		if not content:
-			content = message.embeds[0].description
-		i = content.index("callback")
-		content = "*```" + "\n" * ("\n" in content[:i]) + (
-			"callback-admin-ban-"
-			+ str(u_id) + "_" + str(pos)
-			+ "-\n"
-		)
-		if not bans:
-			content += f"Ban list for {str(guild).replace('`', '')} is currently empty.```*"
-		else:
-			content += f"{len(bans)} user(s) currently banned from {str(guild).replace('`', '')}:```*"
-		emb = discord.Embed(colour=discord.Colour(1))
-		emb.description = content
-		emb.set_author(**get_author(guild))
-		for i, ban in enumerate(sorted(bans.values(), key=lambda x: x["t"])[pos:pos + page]):
-			with tracebacksuppressor:
-				user = await bot.fetch_user(ban["u"])
-				emb.add_field(
-					name=f"{user} ({user.id})",
-					value=f"Duration {italics(single_md(time_until(ban['t'])))}\nReason: {italics(single_md(escape_markdown(str(ban['r']))))}"
-				)
-		more = len(bans) - pos - page
-		if more > 0:
-			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-		create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-		if hasattr(message, "int_token"):
-			await bot.ignore_interaction(message)
-
-
 class RoleSelect(Interactable, Command):
 	server_only = True
 	name = ["ReactionRoles", "RoleButtons", "RoleSelection", "RoleSelector"]
@@ -1489,161 +1262,6 @@ class Publish(Command):
 	# 	print(msent)
 
 
-class UpdateBans(Database):
-	name = "bans"
-
-	def __load__(self):
-		d = self.data
-		for i in tuple(d):
-			try:
-				assert d[i][0]["t"]
-			except:
-				print_exc()
-				d.pop(i, None)
-		gen = ((block[0]["t"], i) for i, block in d.items() if block and isinstance(block[0], dict) and block[0].get("t") is not None)
-		self.listed = alist(sorted(gen, key=lambda x: x[0]))
-
-	async def _call_(self):
-		t = utc()
-		while self.listed:
-			p = self.listed[0]
-			if t < p[0]:
-				break
-			self.listed.popleft()
-			g_id = p[1]
-			temp = self.data[g_id]
-			if not temp:
-				self.data.pop(g_id)
-				continue
-			x = temp[0]
-			if t < x["t"]:
-				self.listed.insort((x["t"], g_id), key=lambda x: x[0])
-				print(self.listed)
-				continue
-			x = cdict(temp.pop(0))
-			if not temp:
-				self.data.pop(g_id)
-			else:
-				z = temp[0]["t"]
-				self.listed.insort((z, g_id), key=lambda x: x[0])
-			print(self.listed)
-			with tracebacksuppressor:
-				guild = await self.bot.fetch_guild(g_id)
-				user = await self.bot.fetch_user(x.u)
-				m = guild.me
-				try:
-					channel = await self.bot.fetch_channel(x.c)
-					if not channel.permissions_for(m).send_messages:
-						raise LookupError
-				except (LookupError, discord.Forbidden, discord.NotFound):
-					channel = self.bot.get_first_sendable(guild, m)
-				try:
-					await guild.unban(user, reason="Temporary ban expired.")
-					text = italics(css_md(f"{sqr_md(user)} has been unbanned from {sqr_md(guild)}."))
-				except:
-					text = italics(css_md(f"Unable to unban {sqr_md(user)} from {sqr_md(guild)}."))
-					print_exc()
-				await channel.send(text)
-
-	async def _join_(self, user, guild, **void):
-		if guild.id in self.data:
-			for x in self.data[guild.id]:
-				if x["u"] == user.id:
-					return await guild.ban(user, reason="Sticky ban")
-
-
-# Triggers upon 3 channel deletions in 2 minutes or 6 bans in 10 seconds
-# class ServerProtector(Database):
-# 	name = "prot"
-
-# 	async def kickWarn(self, u_id, guild, owner, msg):
-# 		user = await self.bot.fetch_user(u_id)
-# 		try:
-# 			await guild.kick(user, reason="Triggered automated server protection response for excessive " + msg + ".")
-# 			await owner.send(
-# 				f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
-# 				+ f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
-# 				+ "and has been removed from the server to prevent any potential further attacks."
-# 			)
-# 		except discord.Forbidden:
-# 			await owner.send(
-# 				f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
-# 				+ f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
-# 				+ "and were unable to be automatically removed from the server; please watch them carefully to prevent any potential further attacks."
-# 			)
-
-# 	async def targetWarn(self, u_id, guild, msg):
-# 		print(f"Channel Deletion warning by {user_mention(u_id)} in {guild}.")
-# 		user = self.bot.user
-# 		owner = guild.owner
-# 		if owner.id == user.id:
-# 			owner = await self.bot.fetch_user(next(iter(self.bot.owners)))
-# 		if u_id == guild.owner.id:
-# 			if u_id == user.id:
-# 				return
-# 			user = guild.owner
-# 			await owner.send(
-# 				f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
-# 				+ f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
-# 				+ "If this was intentional, please ignore this message."
-# 			)
-# 		elif u_id == user.id:
-# 			create_task(guild.leave())
-# 			await owner.send(
-# 				f"Apologies for the inconvenience, but {user_mention(user.id)} `({user.id})` has triggered an "
-# 				+ f"automated server protection response due to exessive {msg} in `{no_md(guild)}` `({guild.id})`, "
-# 				+ "and will promptly leave the server to prevent any potential further attacks."
-# 			)
-# 		else:
-# 			await self.kickWarn(u_id, guild, owner, msg)
-
-# 	async def _channel_delete_(self, channel, guild, **void):
-# 		user = None
-# 		if not isinstance(channel, discord.Thread) and channel.permissions_for(guild.me).view_audit_log:
-# 			ts = utc()
-# 			cnt = {}
-# 			audits = guild.audit_logs(limit=100, action=discord.AuditLogAction.channel_delete)
-# 			async for log in audits:
-# 				if ts - utc_ts(log.created_at) < 120:
-# 					add_dict(cnt, {log.user.id: 1})
-# 					if user is None and log.target.id == channel.id:
-# 						user = log.user
-# 				else:
-# 					break
-# 			else:
-# 				audits = guild.audit_logs(limit=100, action=discord.AuditLogAction.thread_delete)
-# 				async for log in audits:
-# 					if ts - utc_ts(log.created_at) < 120:
-# 						add_dict(cnt, {log.user.id: 1})
-# 						if user is None and log.target.id == channel.id:
-# 							user = log.user
-# 					else:
-# 						break
-# 			for u_id in cnt:
-# 				if cnt[u_id] > 2:
-# 					if self.bot.is_trusted(guild.id) or u_id == self.bot.user.id:
-# 						create_task(self.targetWarn(u_id, guild, f"channel deletions `({cnt[u_id]})`"))
-# 		if self.bot.get_guildbase(guild.id, "logs.server"):
-# 			await self.bot.data.logU._channel_delete_2_(channel, guild, user)
-
-# 	async def _ban_(self, user, guild, **void):
-# 		if self.bot.recently_banned(user, guild):
-# 			return
-# 		if not self.bot.is_trusted(guild.id) or not guild.me.guild_permissions.view_audit_log:
-# 			return
-# 		audits = guild.audit_logs(limit=100, action=discord.AuditLogAction.ban)
-# 		ts = utc()
-# 		cnt = {}
-# 		async for log in audits:
-# 			if ts - utc_ts(log.created_at) < 10:
-# 				add_dict(cnt, {log.user.id: 1})
-# 			else:
-# 				break
-# 		for u_id in cnt:
-# 			if cnt[u_id] > 5:
-# 				create_task(self.targetWarn(u_id, guild, f"banning `({cnt[u_id]})`"))
-
-
 class EnabledCommands(Command):
 	server_only = True
 	name = ["EC", "Enable", "Disable"]
@@ -1837,17 +1455,26 @@ class CreateEmoji(Command):
 			description="The image to use (will automatically be resized to <256kb if larger)",
 			required=True,
 		),
+		create=cdict(
+			type="bool",
+			description="If false, returns the raw file instead",
+			default=True,
+		),
 	)
 	rate_limit = (8, 12)
 	_timeout_ = 6
 	slash = ("Emoji",)
 
-	async def __call__(self, bot, _guild, _message, _perm, _name, name, url, **void):
+	async def __call__(self, bot, _guild, _message, _perm, _name, name, url, create, **void):
 		if _perm < 2:
 			raise self.perm_error(_perm, 2, "for command " + _name)
 		name = name or url2fn(url).rsplit(".", 1)[0][:32]
-		image = await bot.optimise_image(url, fsize=262144, csize=160, fmt="webp")
-		emoji = await _guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
+		data = await bot.optimise_image(url, fsize=262144, csize=160, fmt="webp")
+		if not create:
+			return cdict(
+				file=CompatFile(data, filename=f"{name}.{mime_into(get_mime(data))}"),
+			)
+		emoji = await _guild.create_custom_emoji(image=data, name=name, reason="CreateEmoji command")
 		# This reaction indicates the emoji was created successfully
 		with suppress(discord.Forbidden):
 			await _message.add_reaction(emoji)
@@ -1878,12 +1505,17 @@ class CreateSound(Command):
 			description="The audio to use (will automatically be cut to <10s if longer)",
 			required=True,
 		),
+		create=cdict(
+			type="bool",
+			description="If false, returns the raw file instead",
+			default=True,
+		),
 	)
 	rate_limit = (8, 12)
 	_timeout_ = 6
 	slash = ("Soundboard",)
 
-	async def __call__(self, bot, _guild, _perm, _name, name, emoji, url, **void):
+	async def __call__(self, bot, _guild, _perm, _name, name, emoji, url, create, **void):
 		if _perm < 2:
 			raise self.perm_error(_perm, 2, "for command " + _name)
 		if emoji:
@@ -1908,10 +1540,10 @@ class CreateSound(Command):
 			fn1 = f"{TEMP_PATH}/{i}~1.mp3"
 			fn2 = f"{TEMP_PATH}/{i}~2.mp3"
 			args1 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-ar", "48000", "-to", "1.175", "-c:a", "libmp3lame", "-b:a", "144k", fn1]
-			if info.duration <= 11:
-				args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-i", "misc/10s-soundboard-template.ogg", "-filter_complex", "amix=inputs=2:duration=longest", "-ss", "1.175", "-to", "11", "-ar", "48000", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
+			if info.duration <= 10.5:
+				args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-i", "misc/10s-soundboard-template.ogg", "-filter_complex", "amix=inputs=2:duration=longest", "-ss", "1.175", "-to", "10.5", "-ar", "48000", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
 			else:
-				args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-ss", "1.175", "-to", "11", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
+				args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-ss", "1.175", "-to", "10.5", "-ar", "48000", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
 			print(args1)
 			print(args2)
 			proc1 = await asyncio.create_subprocess_exec(*args1, stdout=subprocess.DEVNULL)
@@ -1927,7 +1559,7 @@ class CreateSound(Command):
 					force_kill(proc2)
 				raise
 			fn3 = f"{TEMP_PATH}/{i}~3.mp3"
-			args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", fn1, "-c:a", "libmp3lame", "-b:a", "320k", fn3]
+			args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", fn1, "-ar", "48000", "-c:a", "libmp3lame", "-b:a", "320k", fn3]
 			print(args)
 			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
 			try:
@@ -1948,6 +1580,10 @@ class CreateSound(Command):
 				return data
 
 			data = await _run_async(write_to)
+		if not create:
+			return cdict(
+				file=CompatFile(data, filename=f"{name}.{mime_into(get_mime(data))}"),
+			)
 		await _guild.create_soundboard_sound(name=name, emoji=emoji, sound=data)
 		return cdict(
 			content=f"Successfully created soundboard {sqr_md(name)} for {sqr_md(_guild)}.",
@@ -1976,20 +1612,29 @@ class CreateSticker(Command):
 			description="The image to use (will automatically be resized to <256kb if larger)",
 			required=True,
 		),
+		create=cdict(
+			type="bool",
+			description="If false, returns the raw file instead",
+			default=True,
+		),
 	)
 	rate_limit = (8, 12)
 	_timeout_ = 8
 	slash = ("Sticker",)
 
-	async def __call__(self, bot, _guild, name, emoji, url, **void):
+	async def __call__(self, bot, _guild, name, emoji, url, create, **void):
 		name = name or url2fn(url).rsplit(".", 1)[0][:32]
-		image = await bot.optimise_image(url, fsize=512000, csize=320, fmt="apng", duration=5)
+		data = await bot.optimise_image(url, fsize=512000, csize=320, fmt="apng", duration=5)
 		if emoji and emoji.isnumeric():
 			emoji = await bot.fetch_emoji(emoji, _guild)
 			assert emoji.guild.id == _guild.id, "Emoji must be from the current server."
 		if not emoji:
 			emoji = await colour_cache.obtain_heart(url)
-		sticker = await _guild.create_sticker(name=name, emoji=emoji, description="", file=CompatFile(image))
+		if not create:
+			return cdict(
+				file=CompatFile(data, filename=f"{name}.{mime_into(get_mime(data))}"),
+			)
+		sticker = await _guild.create_sticker(name=name, emoji=emoji, description="", file=CompatFile(data))
 		colour = await bot.get_colour(sticker.url)
 		embed = discord.Embed(colour=colour)
 		embed.set_image(url=sticker.url)

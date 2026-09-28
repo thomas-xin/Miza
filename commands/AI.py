@@ -1205,7 +1205,6 @@ class TTS(Command):
 		print(_user, instructions, len(text), len(segments), lim_str(text, 128))
 		futs = []
 		input_args = ()
-		desc = None
 
 		async def tts_into(segment, retry=True):
 			nonlocal input_args
@@ -1457,9 +1456,9 @@ async def _fetch_lyrics(bot, song, premium_context):
 				if resp.success:
 					return search_q, resp.text.strip()
 	search_q = " ".join(re.findall(r"[A-Za-z0-9]+", title_cleaner.sub("", search_q).strip()))
-	search = f"https://genius.com/api/search/multi?q={urllib.parse.quote_plus(search_q)}"
-	print(search)
-	resp = await Request.aio(search, json=True)
+	search_url = f"https://genius.com/api/search/multi?q={urllib.parse.quote_plus(search_q)}"
+	print(search_url)
+	resp = await Request.aio(search_url, json=True)
 	try:
 		sections = resp["response"]["sections"]
 		results = [s["hits"][0]["result"] for s in sections if s.get("type") in ("song", "lyric", "video") and s.get("hits")]

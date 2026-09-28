@@ -690,7 +690,6 @@ class UpdateExec(Database):
 					data = await bot.optimise_image(data, fsize=4000000, fmt="webp")
 					filename = replace_ext(filename or "Untitled", "webp")
 			url2 = await self.lproxy(data or url, filename=filename, channel=channel, allow_empty=False)
-			# print("UPROXY:", urls, filename, url2)
 			if uhu:
 				bot.data.proxies[uhu] = url2
 			return url2
