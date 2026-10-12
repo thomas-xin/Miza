@@ -1024,16 +1024,18 @@ class TextGradient(Command):
 	description = "Produces a text gradient using ANSI colour codes."
 	schema = cdict(
 		gradient=cdict(
-			type="enum",
-			validation=cdict(
-				enum=tuple(pride_flags),
-			),
-			excludes="colours",
-		),
-		colours=cdict(
 			type="word",
 			description="Space-separated list of colours",
 			example="#bf7fff red (0,255,255)",
+			excludes="pride_flag",
+		),
+		pride_flag=cdict(
+			type="enum",
+			description="Follow the set colours of a pride flag",
+			validation=cdict(
+				enum=tuple(pride_flags),
+				accepts=dict(rainbow="gay", bisexual="bi", nonbinary="enby", pansexual="pan", transgender="trans"),
+			),
 			excludes="gradient",
 		),
 		text=cdict(
@@ -1055,15 +1057,15 @@ class TextGradient(Command):
 	slash = True
 	ephemeral = True
 
-	async def __call__(self, gradient, colours, text, by_word, keyframes, **void):
-		if gradient:
-			colours = pride_flags[gradient]
+	async def __call__(self, gradient, pride_flag, text, by_word, keyframes, **void):
+		if pride_flag:
+			colours = pride_flags[pride_flag]
 			if keyframes is None:
 				keyframes = True
-		elif colours:
-			colours = tuple(colour2raw(parse_colour(full_prune(c))) for c in colours.split())
+		elif gradient:
+			colours = tuple(colour2raw(parse_colour(full_prune(c))) for c in gradient.split())
 		else:
-			colours = (0xff0000, 0xffff00, 0x00ff00, 0x00ffff, 0x0000ff, 0xff00ff)
+			colours = (0xff0000, 0xffff00, 0x00ff00, 0x00ffff, 0x0000ff, 0xff00ff, 0xff0000)
 		if keyframes:
 			colours = tuple(itertools.chain(*((x, x) for x in colours)))
 		if by_word:
