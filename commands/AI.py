@@ -147,7 +147,7 @@ class Translate(Command):
 				pass
 			return tr.text.strip()
 		async def chat_translate():
-			model = "translation" if "translation" in ai.local_models else "tiny"
+			model = "translation" if "translation" in ai.local_models else "small"
 			try:
 				cmpl = await ai.llm(
 					"chat.completions.create",
@@ -201,7 +201,7 @@ class Translate(Command):
 					messages=messages,
 					temperature=0.01,
 					reasoning_effort="medium",
-					max_completion_tokens=ai.contexts[m] - count * 3 // 2,
+					max_completion_tokens=round(ai.contexts[m] * 15 / 16 - count * 1.125),
 					premium_context=premium,
 				)
 				translated = cmpl.choices[0].message.content.strip()
@@ -215,7 +215,7 @@ class Translate(Command):
 				messages=messages,
 				temperature=0.01,
 				reasoning_effort="low",
-				max_completion_tokens=ai.contexts[m] - count * 3 // 2,
+				max_completion_tokens=round(ai.contexts[m] * 15 / 16 - count * 1.125),
 				premium_context=premium,
 			)
 			translated = cmpl.choices[0].message.content.strip()

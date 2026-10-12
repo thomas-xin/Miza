@@ -805,6 +805,8 @@ def colour2raw(*c):
 
 # Converts an integer to a colour tuple.
 def raw2colour(x):
+	if isinstance(x, str):
+		x = int(x, 16)
 	if x > 1 << 24:
 		return verify_colour(((x >> 16) & 255, (x >> 8) & 255, x & 255, (x >> 24) & 255))
 	return verify_colour(((x >> 16) & 255, (x >> 8) & 255, x & 255))

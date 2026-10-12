@@ -1017,3 +1017,56 @@ class BubbleWrap(Command):
 		boos = np.random.randint(0, 1000, size=size)
 		bubbles[boos == 0] = "||boo!||"
 		return cdict(content="".join(bubbles))
+
+
+class TextGradient(Command):
+	name = ["ANSIGradient"]
+	description = "Produces a text gradient using ANSI colour codes."
+	schema = cdict(
+		gradient=cdict(
+			type="enum",
+			validation=cdict(
+				enum=tuple(pride_flags),
+			),
+			excludes="colours",
+		),
+		colours=cdict(
+			type="word",
+			description="Space-separated list of colours",
+			example="#bf7fff red (0,255,255)",
+			excludes="gradient",
+		),
+		text=cdict(
+			type="string",
+			description="Text to add colour to",
+			example="meowmeowmeowmeowmeowmeowmeowmeowmeowmeow",
+		),
+		by_word=cdict(
+			type="bool",
+			description="Group characters by words rather than characters",
+			default=False,
+		),
+		keyframes=cdict(
+			type="bool",
+			description="Force individual keyframes to be included",
+		),
+	)
+	rate_limit = (3, 5)
+	slash = True
+	ephemeral = True
+
+	async def __call__(self, gradient, colours, text, by_word, keyframes, **void):
+		if gradient:
+			colours = pride_flags[gradient]
+			if keyframes is None:
+				keyframes = True
+		elif colours:
+			colours = tuple(colour2raw(parse_colour(full_prune(c))) for c in colours.split())
+		else:
+			colours = (0xff0000, 0xffff00, 0x00ff00, 0x00ffff, 0x0000ff, 0xff00ff)
+		if keyframes:
+			colours = tuple(itertools.chain(*((x, x) for x in colours)))
+		if by_word:
+			words = text.split()
+			return "```ansi\n" + text_gradient(words, " ", colours, tolerance=round(log(len(words), 2) * 4)) + "```"
+		return "```ansi\n" + text_gradient(text, "", colours, tolerance=round(log(len(text), 2) * 4)) + "```"

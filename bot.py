@@ -1613,7 +1613,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		for url in urls:
 			url = T(url).get("url", url)
 			if not is_url(url):
-				print("_follow_url:", url)
 				continue
 			assert not is_local_url(url), url
 			if is_miza_url(url):
@@ -1715,7 +1714,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					out.extend(filter(bool, found))
 					continue
 			except Exception as ex:
-				print("_follow_url:", repr(ex))
+				print("_follow_url:", url, repr(ex))
 			out.append(url)
 		if not out:
 			out = urls
@@ -1960,7 +1959,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							data += res
 						else:
 							print(b, repr(res))
-				return "\n\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).strip()
+				return "\n\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).replace("[]()", "").strip()
 			if is_discord_attachment(argv) or is_miza_attachment(argv):
 				return attachment_cache.preserve(argv)
 			assert not is_local_url(argv), argv
@@ -4891,7 +4890,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if "tts" not in self.commands:
 			return
 		try:
-			return await self.run_command(self.commands.tts[0], dict(voice="openai-coral", text=content, autoplay=True), message=message, respond=False)
+			return await self.run_command(self.commands.tts[0], dict(engine="openai", voice="coral", text=content, autoplay=True), message=message, respond=False)
 		except DisconnectedChannelError as ex:
 			print(repr(ex))
 		except Exception:
@@ -6811,7 +6810,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				pass
 			else:
 				self.exception_locks[messageable.id] = utc()
-				fields = (("Unsure how to use the command?", f"Try {prefix}help or check out the [wiki page](https://github.com/thomas-xin/Miza/wiki/Command-Inputs) for help on command inputs!"))
+				fields = (("Unsure how to use the command?", f"Try {prefix}help or check out the [wiki page](https://github.com/thomas-xin/Miza/wiki/Command-Inputs) for help on command inputs!"),)
 		elif isinstance(ex, TooManyRequests):
 			if utc() - self.exception_locks[messageable.id] < 300:
 				pass

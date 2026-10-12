@@ -1235,7 +1235,7 @@ class Migrate(Command):
 	rate_limit = 10
 	ephemeral = True
 
-	async def __call__(self, _guild, _user, _channel, _perm, channel, mute, deafen, all, **void):
+	async def __call__(self, _guild, _user, _channel, _perm, channel, _name, mute, deafen, all, **void):
 		if all:
 			vcs = voice_channels(_guild)
 		else:
@@ -1259,7 +1259,23 @@ class Migrate(Command):
 		if not channel:
 			if self_included:
 				await bot.audio.asubmit(f"AP.disconnect({_guild.id},announce=0,clear=1)")
-			return italics(css_md(f"Successfully removed all users from voice in {sqr_md(_guild)}.")), 1
+			print(_name)
+			if _name == "☢":
+				url = (
+					"https://media.tenor.com/jxmGfM-U-q0AAAAM/cat-cats.gif",
+					"https://media.tenor.com/-TydtP_dIy8AAAAM/cat-gato.gif",
+					"https://media.tenor.com/1znHJRbQxkkAAAAM/cat-fall.gif",
+					"https://media.tenor.com/n0A3c_iyR8IAAAAM/explode-cute.gif",
+					"https://media.tenor.com/YtxirAHPxrgAAAA1/boom-boom-cat-boom.webp",
+					"https://media.tenor.com/KjBDmSPafckAAAAM/catnuke.gif",
+					"https://media.tenor.com/_yKUvfwwrGwAAAAM/cat-nuclear.gif",
+				)[DynamicDT.utcnow().weekday()]
+				emb = await bot.random_embed(url)
+				return cdict(embed=emb)
+			return cdict(
+				content=italics(css_md(f"Successfully removed all users from voice in {sqr_md(_guild)}.")),
+				reacts="❎",
+			)
 		if self_included:
 			await bot.commands.connect[0](
 				bot=bot,
@@ -1268,7 +1284,10 @@ class Migrate(Command):
 				_perm=2,
 				channel=channel,
 			)
-		return italics(css_md(f"Successfully moved all users from voice to {sqr_md(channel)}.")), 1
+		return cdict(
+			content=italics(css_md(f"Successfully moved all users from voice to {sqr_md(channel)}.")),
+			reacts="❎",
+		)
 
 
 class RefreshRegion(Command):
@@ -1293,7 +1312,10 @@ class RefreshRegion(Command):
 			await vc.edit(rtc_region="rotterdam")
 			await asyncio.sleep(1)
 		await vc.edit(rtc_region=region)
-		return italics(css_md(f"Successfully refreshed voice region for {sqr_md(vc)} ({sqr_md(region)}).")), 1
+		return cdict(
+			content=italics(css_md(f"Successfully refreshed voice region for {sqr_md(vc)} ({sqr_md(region)}).")),
+			reacts="❎",
+		)
 
 
 RB = pyradios.RadioBrowser()

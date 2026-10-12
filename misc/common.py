@@ -1898,27 +1898,24 @@ class Command(Importable):
 			return f"{self.parse_name()} {self.usage}"
 		s = self.parse_name()
 		for k, v in schema.items():
-			s += f"\n{colourise('<', fg='white')}{colourise(k, fg='yellow')}{colourise(':', fg='white')}{colourise(v.type, fg='magenta')}{colourise('>', fg='white')}"
+			s += f"\n{colourise('<')}{colourise(k, fg=0xffff00)}{colourise(':', fg='white')}{colourise(v.type, fg=0xff7f00)}{colourise('>')}"
 			desc = []
 			if v.get("required"):
-				desc.append(colourise("Required", fg="red"))
+				desc.append(colourise("Required", fg=0xff0000))
 			if v.get("description"):
-				desc.append(colourise(v.description))
+				desc.append(colourise(v.description, fg="white"))
 				if v.get("validation"):
 					if isinstance(v.validation, str):
-						valid = v.validation
+						valid = colourise(v.validation, fg=0x55cdfc)
 					else:
 						seqs = v.validation.enum or v.validation.accepts
-						if len(seqs) > 64 or sum(map(len, seqs)) > 512:
-							valid = " ".join(seqs)
-						else:
-							valid = (colourise(",") + colourise(" ", fg="cyan")).join(seqs)
-					desc.append(f"{colourise('Allowed', fg='red')}{colourise(':', fg='white')} {colourise(valid, fg='cyan')}")
+						valid = text_gradient(seqs, " ", pride_flags.gay, luma=0.25, tolerance=round(log(len(seqs), 2) * 4))
+					desc.append(f"{colourise('Allowed', fg=0x00ff00)}{colourise(':', fg='white')} {colourise(valid, fg=0x00ffff)}")
 				elif v.get("default"):
-					desc.append(f"{colourise('Default', fg='red')}{colourise(':', fg='white')} {colourise(json_if(v.default), fg='cyan')}")
+					desc.append(f"{colourise('Default', fg=0x00ff00)}{colourise(':', fg='white')} {colourise(json_if(v.default), fg=0x00ffff)}")
 			if desc:
-				d = colourise("; ", fg="white").join(desc)
-				s += " " + "\n".join(split_text(f"{colourise('(', fg='blue')}{d}{colourise(')', fg='blue')}", max_length=936))
+				d = colourise("; ").join(desc)
+				s += " " + "\n".join(split_text(d, max_length=936))
 		return s
 
 	def parse_example(self):
@@ -1944,27 +1941,24 @@ class Command(Importable):
 			k2 = k[0]
 			if v.get("type") == "bool":
 				if v.get("default"):
-					values.append(f"{colourise('--no-' + k, fg='blue')}")
+					values.append(f"{colourise('--no-' + k, fg=0xf7a8b8)}")
 				else:
-					values.append(f"{colourise('--' + k, fg='blue')}")
+					values.append(f"{colourise('--' + k, fg=0x55cdfc)}")
 				u.add(k2)
 			elif v.get("type") == "ternary":
 				if v.get("default"):
-					values.append(f"{colourise('--no-' + k, fg='blue')}")
+					values.append(f"{colourise('--no-' + k, fg=0xf7a8b8)}")
 				else:
-					values.append(f"{colourise('--' + k, fg='blue')}")
+					values.append(f"{colourise('--' + k, fg=0x55cdfc)}")
 				u.add(k2)
 			elif v.get("type") == "enum":
-				values.append(f"{colourise('--' + val if hgs else val, fg='blue' if hgs else 'magenta')}")
+				values.append(f"{colourise('--' + val if hgs else val, fg=0xd60270 if hgs else 0x0038a8)}")
 				u.add(k2)
 			elif not has_string and v.get("type") in ("url", "image", "visual", "video", "audio", "media", "filesize", "resolution", "index", "text", "string"):
-				values.append(f"{colourise(json_if(val))}")
+				values.append(f"{colourise(json_if(val), fg=0xbf7fff)}")
 				u.add(k2)
-			# elif k2 not in u:
-			# 	values.append(f"{colourise('-' + k2, fg='cyan')} {colourise(val)}")
-			# 	u.add(k2)
 			else:
-				values.append(f"{colourise('--' + k, fg='cyan')} {colourise(json_if(val))}")
+				values.append(f"{colourise('--' + k, fg=0xffff00)} {colourise(json_if(val), fg='white')}")
 		values.append(s)
 		return " ".join(reversed(values))
 

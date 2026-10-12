@@ -925,6 +925,7 @@ class AudioDownloader:
 
 	def handle_special_multiple(self, url):
 		assert not is_local_url(url), url
+		headers = {}
 		with tracebacksuppressor:
 			headers = asyncio.run(attachment_cache.scan_headers(url, fc=True))
 		match (ctype := headers.get("content-type")):

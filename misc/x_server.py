@@ -198,16 +198,18 @@ class EndpointRedirects(Dispatcher):
 	def __call__(self, path):
 		p = path.lstrip("/")
 		ip = true_ip()
-		print(json.dumps(p))
 		first = p.split("/", 1)[0]
 		if first == "unban":
+			print(ip, json.dumps(p))
 			banned_ips.pop(ip, None)
+			raise FileNotFoundError(p)
 		elif first in banned_paths or banned_ips.get(ip):
 			if ip not in banned_ips:
 				banned_ips[ip] = True
-				print("Banned IP:", ip)
+				print("Banned IP:", ip, json.dumps(p))
 			raise cp.HTTPRedirect(f"https://www.youtube.com/watch?{ts_us() // 1000 % 1000}&v=dQw4w9WgXcQ", 308)
-		elif p == "ip":
+		print(ip, json.dumps(p))
+		if p == "ip":
 			p = "get_ip"
 		elif first in ("f", "d"):
 			p = "download/" + p.split("/", 1)[-1]

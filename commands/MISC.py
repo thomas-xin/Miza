@@ -296,7 +296,7 @@ async def sheet_search(sheet_id, query, n=25):
 			other_ids = [k for k in sorted(other_results, reverse=True) if k[0] >= 0.4]
 			result_ids.extend(t[-1] for t in other_ids)
 		if not result_ids:
-			result_ids = alist([str_lookup(sheet.searchables, query, key=lambda t: t[0], fuzzy=0)[1]])
+			result_ids = alist([str_lookup(sheet.searchables, query, key=lambda t: t[0], fuzzy=0.75)[1]])
 	result_ids.dedup(sort=False)
 	embed = discord.Embed(colour=colour2raw(0, 127, 255), title=f'Search results for {json.dumps(query)}:')
 	for entry in map(sheet.data.__getitem__, result_ids[:n]):

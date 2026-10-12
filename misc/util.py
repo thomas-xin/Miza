@@ -17,7 +17,7 @@ import inspect
 import io
 import itertools
 import json
-from math import ceil, comb, inf, isfinite, isqrt, log10
+from math import ceil, comb, floor, inf, isfinite, isqrt, log10
 import multiprocessing.connection, multiprocessing.shared_memory
 import os
 os.environ["PYTHONUTF8"] = "1"
@@ -51,7 +51,7 @@ import pynvml
 import niquests
 import requests
 from PIL import Image
-from misc.smath import predict_next, display_to_precision, unicode_prune, full_prune
+from misc.smath import predict_next, display_to_precision, unicode_prune, full_prune, raw2colour, colour2raw, rgb_to_hsl, hsl_to_rgb
 from misc.types import ISE, CCE, Dummy, PropagateTraceback, is_exception, alist, cdict, mdict, fcdict, as_bytes, as_str, lim_str, single_space, try_int, round_min, regexp, suppress, loop, safe_eval, number, byte_like, json_like, hashable_args, always_copy, astype, MemoryBytes, ts_us, utc, tracebacksuppressor, T, coerce, coercedefault, updatedefault, json_dumps, json_dumpstr, pretty_json, MultiEncoder # noqa: F401
 from misc.asyncs import await_fut, wrap_future, awaitable, reflatten, _run_async, run_async, create_task, submit_thread, create_thread, Future, Semaphore
 
@@ -391,29 +391,117 @@ def bold(s):
 	return s
 
 def single_md(s):
-	s = s.replace("`", "'")
+	s = as_str(s).replace("`", "'")
 	return f"`{s}`"
 def code_md(s, fmt="", strict=True):
 	s2 = "\n" if strict else ""
-	return f"```{fmt}\n{s.replace('```', '``')}{s2}```" if s else f"``` {s2}```"
+	return f"```{fmt}\n{as_str(s).replace('```', '``')}{s2}```" if s else f"``` {s2}```"
 def py_md(s):
-	return f"```py\n{s.replace('```', '``')}```" if s else "``` ```"
+	return f"```py\n{as_str(s).replace('```', '``')}```" if s else "``` ```"
 def ini_md(s):
-	return f"```ini\n{s.replace('```', '``')}```" if s else "``` ```"
+	return f"```ini\n{as_str(s).replace('```', '``')}```" if s else "``` ```"
 def css_md(s, force=False):
-	return (f"```css\n{s.replace('```', '``')}```".replace("'", "’").replace('"', "”") if force else ini_md(s.replace('```', '``'))) if s else "``` ```"
+	return (f"```css\n{as_str(s).replace('```', '``')}```".replace("'", "’").replace('"', "”") if force else ini_md(s.replace('```', '``'))) if s else "``` ```"
 def fix_md(s):
-	return f"```fix\n{s.replace('```', '``')}```" if s else "``` ```"
+	return f"```fix\n{as_str(s).replace('```', '``')}```" if s else "``` ```"
 def ansi_md(s, max_length=4096):
 	if not s:
 		return "``` ```"
-	s2 = s.replace("[[", colourise("[", fg="cyan") + colourise("", fg="blue")).replace("]]", colourise("]", fg="cyan") + colourise())
+	s2 = s.replace("[[", colourise("[", fg=0x00ffff) + colourise("", fg=0x5f87ff)).replace("]]", colourise("]", fg=0x00ffff) + colourise())
 	if len(s2) <= max_length:
 		s = s2
 	else:
 		s = decolourise(s.replace("[[", "[").replace("]]", "]"))
 	return f"```ansi\n{s}```"
 
+pride_flags = cdict((k, tuple(v)) for k, v in {
+	"gay": [
+		"E50000",
+		"FF9900",
+		"FFFE13",
+		"059F2D",
+		"014FE8",
+		"9101A1",
+	],
+	"trans": [
+		"55CDFC",
+		"F7A8B8",
+		"FFFFFF",
+		"F7A8B8",
+		"55CDFC",
+	],
+	"bi": [
+		"D60270",
+		"9B4F96",
+		"0038A8",
+	],
+	"pan": [
+		"FF1C8D",
+		"FFD700",
+		"1AB3FF",
+	],
+	"enby": [
+		"FCF430",
+		"FFFFFF",
+		"9C59D1",
+		"000000",
+	],
+	"lesbian": [
+		"D62900",
+		"EF7627",
+		"FF9B55",
+		"FFFFFF",
+		"D461A6",
+		"B55690",
+		"A50062",
+	],
+	"agender": [
+		"000000",
+		"BABABA",
+		"FFFFFF",
+		"BAF484",
+		"FFFFFF",
+		"BABABA",
+		"000000",
+	],
+	"asexual": [
+		"000000",
+		"A4A4A4",
+		"FFFFFF",
+		"810081",
+	],
+	"queer": [
+		"AD7AD8",
+		"FFFFFF",
+		"6A853A",
+	],
+	"genderfluid": [
+		"FF76A3",
+		"FFFFFF",
+		"BF11D7",
+		"000000",
+		"303CBE",
+	],
+	"intersex": [
+		"7902AA",
+		"FFD800",
+		"FFD800",
+	],
+	"aromantic": [
+		"3BA740",
+		"A8D47A",
+		"FFFFFF",
+		"ABABAB",
+		"000000",
+	],
+	"polyamory": [
+		"00A0E4",
+		"E60050",
+		"310444",
+		"FFFFFF",
+		"FCC000",
+	],
+}.items())
 fgmap = cdict(
 	black=30,
 	red=31,
@@ -444,9 +532,76 @@ autocolours = dict(
 	k="black",
 	w="white",
 )
-def colourise(s=None, fg=None, bg=None):
-	fg = autocolours.get(fg, fg)
-	bg = autocolours.get(bg, bg)
+# Credit: https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
+colour_8bit = {}
+for code in range(0, 16):
+	if code > 8:
+		level = 255
+	elif code == 7:
+		level = 229
+	else:
+		level = 205
+	r = 127 if code == 8 else level if (code & 1) != 0 else 92 if code == 12 else 0
+	g = 127 if code == 8 else level if (code & 2) != 0 else 92 if code == 12 else 0
+	b = 127 if code == 8 else 238 if code == 4 else level if (code & 4) != 0 else 0
+	colour_8bit[r, g, b] = code
+for red in range(0, 6):
+	for green in range(0, 6):
+		for blue in range(0, 6):
+			code = 16 + (red * 36) + (green * 6) + blue
+			r = red   * 40 + 55 if red   != 0 else 0
+			g = green * 40 + 55 if green != 0 else 0
+			b = blue  * 40 + 55 if blue  != 0 else 0
+			colour_8bit[r, g, b] = code
+for gray in range(0, 24):
+	level = gray * 10 + 8
+	code = 232 + gray
+	colour_8bit[level, level, level] = code
+possible_8bit = [0, 95, 135, 175, 215, 255]
+@functools.lru_cache(maxsize=4096)
+def search_colour(colour, tolerance):
+	rgb = list(colour)
+	for i, x in enumerate(rgb):
+		if x in possible_8bit:
+			continue
+		closest = None
+		for y in possible_8bit:
+			if abs(y - x) <= tolerance:
+				closest = y
+		if closest is not None:
+			rgb[i] = closest
+		else:
+			break
+	else:
+		rgb = tuple(rgb)
+		if rgb in colour_8bit:
+			colour = rgb
+	return colour
+def colourise(s=None, fg=None, bg=None, tolerance=16):
+	if isinstance(fg, int):
+		r, g, b = raw2colour(fg)
+		if tolerance:
+			r, g, b = search_colour((r, g, b), tolerance)
+		try:
+			code = colour_8bit[r, g, b]
+		except KeyError:
+			fg = f"38;2;{r};{g};{b}"
+		else:
+			fg = f"38;5;{code}"
+	else:
+		fg = autocolours.get(fg, fg)
+	if isinstance(bg, int):
+		r, g, b = raw2colour(bg)
+		if tolerance:
+			r, g, b = search_colour((r, g, b), tolerance)
+		try:
+			code = colour_8bit[r, g, b]
+		except KeyError:
+			bg = f"48;2;{r};{g};{b}"
+		else:
+			bg = f"48;5;{code}"
+	else:
+		bg = autocolours.get(bg, bg)
 	s = as_str(s) if s is not None else ""
 	if not bg:
 		if not fg:
@@ -494,6 +649,40 @@ def colourise_auto(s):
 			kwargs[target] = c.lower()
 		s = left + colourise(mid, **kwargs) + colourise() + right
 	return s
+@functools.lru_cache(maxsize=4096)
+def interpolate_gradient(gradient, n, luma):
+	i = n * (len(gradient) - 1)
+	left = min(len(gradient) - 1, floor(i))
+	right = 0 if left == len(gradient) - 1 else left + 1
+	h1, s1, l1 = rgb_to_hsl([x / 255 for x in raw2colour(gradient[left])])
+	h2, s2, l2 = rgb_to_hsl([x / 255 for x in raw2colour(gradient[right])])
+	ratio = i - left
+	h3 = h2
+	diff = abs(h3 - h1)
+	if abs(h3 - h1 + 1) < diff:
+		h3 += 1
+	elif abs(h3 - h1 - 1) < diff:
+		h3 -= 1
+	h3 *= ratio
+	s2 *= ratio
+	l2 *= ratio
+	h1 *= 1 - ratio
+	s1 *= 1 - ratio
+	l1 *= 1 - ratio
+	rgb = hsl_to_rgb([(h1 + h3) % 1, s1 + s2, min(1, l1 + l2 + luma)])
+	return tuple(round(x * 255) for x in rgb)
+def text_gradient(seq, sep, gradient, luma=0, tolerance=8):
+	last_colour = None
+	out = []
+	for i, s in enumerate(seq):
+		fg = colour2raw(interpolate_gradient(gradient, i / (len(seq) - 1) if len(seq) > 1 else 0, luma))
+		c = colourise("", fg=fg, tolerance=tolerance)
+		if c != last_colour:
+			last_colour = c
+			out.append(c + s)
+		else:
+			out.append(s)
+	return sep.join(out)
 
 # Discord object mention formatting
 def user_mention(uid):

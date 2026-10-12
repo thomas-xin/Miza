@@ -548,7 +548,7 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 							ctx = contexts[orig_model] * 15 / 16 - count_to(kwa["input"]) * 1.125
 						else:
 							ctx = contexts[orig_model] * 15 / 16 - tcount(kwa["prompt"]) * 1.125
-					mt2 = min(mt2, ctx)
+					mt2 = round(min(mt2, ctx))
 					if "messages" in kwa:
 						kwa["max_completion_tokens"] = mt2
 					elif "input" not in kwa:

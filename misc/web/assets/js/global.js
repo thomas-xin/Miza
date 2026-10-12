@@ -214,10 +214,10 @@ function interpolateFlag(flag, n, luma, max) {
 	let diff = Math.abs(h3 - h1);
 	if (Math.abs(h3 - h1 + 360) < diff) {
 		h3 += 360;
-		diff = Math.abs(h3 - h1);
+		// diff = Math.abs(h3 - h1);
 	} else if (Math.abs(h3 - h1 - 360) < diff) {
 		h3 -= 360;
-		diff = Math.abs(h3 - h1);
+		// diff = Math.abs(h3 - h1);
 	}
 	h3 *= ratio;
 	s2 *= ratio;

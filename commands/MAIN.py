@@ -113,10 +113,10 @@ class Help(Interactable, Command):
 				category = com.catg
 			a = ", ".join(n.strip("_") for n in com.name) or "[none]"
 			content = (
-				f"[[Category]] {colourise(category_repr(com.category), fg='white')}\n"
-				+ f"[[Aliases]] {a}\n"
+				f"[[Category]] {colourise(category_repr(com.category), fg=0xffffff)}\n"
+				+ f"[[Aliases]] {colourise(a, fg=0xd7d7ff)}\n"
 				+ f"[[Description]] {colourise(com.parse_description(), fg='white')}\n"
-				+ f"[[Usage]] {colourise(prefix, fg='white')}{com.parse_usage()}\n"
+				+ f"[[Usage]] {colourise(prefix, fg=0xffffff)}{com.parse_usage()}\n"
 				+ f"[[Level]] {colourise(com.min_display)}"
 			)
 			rl = com.rate_limit
@@ -124,10 +124,10 @@ class Help(Interactable, Command):
 				rl = rl[bool(bot.is_trusted(guild))] if isinstance(rl, (tuple, list)) else rl
 				pm = bot.premium_multiplier(bot.premium_level(user))
 				rl /= pm
-				content += f"\n[[Rate Limit]] {colourise(sec2time(rl), fg='yellow')}"
-			content += f"\n[[Example]] {colourise(prefix, fg='white')}{com.parse_example()}"
+				content += f"\n[[Rate Limit]] {colourise(sec2time(rl), fg=0x00ffff)}"
+			content += f"\n[[Example]] {colourise(prefix)}{com.parse_example()}"
 			if not com.schema or getattr(com, "maintenance", False):
-				content += colourise("\nNote: This command may currently be under maintenance. Full functionality is not guaranteed!", fg='red')
+				content += colourise("\nNote: This command may currently be under maintenance. Full functionality is not guaranteed!", fg=0xff0000, bg=0x000000)
 			content = ansi_md(content)
 		else:
 			content = "\n".join((
@@ -292,6 +292,7 @@ class Edit(Command):
 			type="message",
 			description="Target message; must be visible to the bot, and must use full message links if older than 2 weeks.",
 			example="https://discord.com/channels/247184721262411776/247184721262411776/803501099633737758",
+			required=True,
 		),
 		command=cdict(
 			type="string",
