@@ -708,16 +708,24 @@
 			"timeout": "24",
 			"schema": {
 				"gradient": {
-					"type": "enum",
-					"validation": {
-						"enum": ["gay", "trans", "bi", "pan", "enby", "lesbian", "agender", "asexual", "queer", "genderfluid", "intersex", "aromantic", "polyamory"]
-					},
-					"excludes": "colours"
-				},
-				"colours": {
 					"type": "word",
 					"description": "Space-separated list of colours",
 					"example": "#bf7fff red (0,255,255)",
+					"excludes": "pride_flag"
+				},
+				"pride_flag": {
+					"type": "enum",
+					"description": "Follow the set colours of a pride flag",
+					"validation": {
+						"enum": ["gay", "trans", "bi", "pan", "enby", "lesbian", "agender", "asexual", "queer", "genderfluid", "intersex", "aromantic", "polyamory"],
+						"accepts": {
+							"rainbow": "gay",
+							"bisexual": "bi",
+							"nonbinary": "enby",
+							"pansexual": "pan",
+							"transgender": "trans"
+						}
+					},
 					"excludes": "gradient"
 				},
 				"text": {
@@ -735,7 +743,7 @@
 					"description": "Force individual keyframes to be included"
 				}
 			},
-			"ordered_args": ["gradient", "colours", "text", "by_word", "keyframes"]
+			"ordered_args": ["gradient", "pride_flag", "text", "by_word", "keyframes"]
 		}
 	},
 	"URL": {

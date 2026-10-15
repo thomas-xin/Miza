@@ -1042,6 +1042,7 @@ class TextGradient(Command):
 			type="string",
 			description="Text to add colour to",
 			example="meowmeowmeowmeowmeowmeowmeowmeowmeowmeow",
+			required=True,
 		),
 		by_word=cdict(
 			type="bool",

@@ -353,7 +353,7 @@ async def chunked_proxy(request: Request, path: str):
 	except ConnectionError as ex:
 		raise HTTPException(status_code=ex.args[0] if ex.args else ex.errno or 500, detail="\n".join(map(str, ex.args[1:])))
 	response_headers = {}
-	filename = try_header_filename(heads, url)
+	filename = try_header_filename(heads, urls[0])
 	if filename:
 		response_headers["Content-Disposition"] = f"inline; filename={quote(url2fn(filename))}"
 	response = await server.dyn_serve(new_urls, size, request=request, mimetype=mimetype, response_headers=response_headers)
