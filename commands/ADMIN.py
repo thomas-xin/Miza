@@ -944,9 +944,9 @@ class StarBoard(Pagination, Interactable, Command):
 
 	async def __call__(self, bot, _message, _channel, _guild, _user, mode, emoji, special, count, channel, page, **void):
 		data = bot.data.starboards
-		if mode in ("add", "remove"):
+		if mode == "remove":
 			selected = []
-			if data.get(_guild.id):
+			if data.setdefault(_guild.id, {}):
 				for k, t in data[_guild.id].items():
 					if k and (not channel or t[1] == channel.id):
 						selected.append(k)
@@ -2223,7 +2223,7 @@ class UpdateStarboards(Database):
 
 	async def _ready_(self, bot, **void):
 		if (fun := bot._globals.get("FUN")) is not None:
-			sparkle_emojis = await gather(*(bot.data.emojis.grab(t[1] + ".gif") for t in fun.sparkle_values))
+			sparkle_emojis = await gather(*(bot.data.emojis.grab(v + ".gif") for v in fun.sparkle_values.values()))
 			self.sparkle_ids = {e.id: e.name for e in sparkle_emojis}
 			print("Sparkle IDs:", self.sparkle_ids)
 

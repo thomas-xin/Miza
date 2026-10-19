@@ -731,7 +731,8 @@
 				"text": {
 					"type": "string",
 					"description": "Text to add colour to",
-					"example": "meowmeowmeowmeowmeowmeowmeowmeowmeowmeow"
+					"example": "meowmeowmeowmeowmeowmeowmeowmeowmeowmeow",
+					"required": true
 				},
 				"by_word": {
 					"type": "bool",
@@ -1757,7 +1758,7 @@
 			"usage": ""
 		},
 		"Migrate": {
-			"aliases": ["Migrate", "MoveAll", "VoiceNuke", "☢️", "UnMute", "UnDeafen", "UnMuteDeafen"],
+			"aliases": ["Migrate", "MoveAll", "VoiceNuke", "☢️", "🧱", "UnMute", "UnDeafen", "UnMuteDeafen"],
 			"description": "Removes all users from voice channels in the current server.",
 			"level": "2",
 			"rate_limit": "10",
@@ -1786,6 +1787,9 @@
 					"channel": null
 				},
 				"☢️": {
+					"channel": null
+				},
+				"🧱": {
 					"channel": null
 				},
 				"UnMute": {
@@ -2185,7 +2189,7 @@
 					"type": "visual",
 					"description": "Image, animation or video, supplied by URL or attachment",
 					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
-					"aliases": ["i"],
+					"aliases": [],
 					"required": true
 				},
 				"intensity": {

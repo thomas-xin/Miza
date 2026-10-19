@@ -1349,7 +1349,7 @@ class Note(Pagination, Interactable, Command):
 
 	async def display(self, uid, pos, diridx=-1):
 		bot = self.bot
-		return await self.default_display("note", uid, pos, bot.get_userbase(uid, "notes"), diridx)
+		return await self.default_display("note", uid, pos, bot.get_userbase(uid, "notes", []), diridx)
 
 	async def _callback_(self, _user, index, data, **void):
 		pos, _ = decode_leb128(data)

@@ -700,6 +700,10 @@ class demap(collections.abc.Mapping):
 			return (k, temp)
 		return v
 
+	def keys(self):
+		return tuple(self.a.keys()) + tuple(self.b.keys())
+	values = keys
+
 	clear = lambda self: (self.a.clear(), self.b.clear()) # noqa: E731
 	__bool__ = lambda self: bool(self.a) # noqa: E731
 	__iter__ = lambda self: iter(self.a.items()) # noqa: E731
@@ -708,8 +712,8 @@ class demap(collections.abc.Mapping):
 	__str__ = lambda self: self.a.__str__() # noqa: E731
 	__repr__ = lambda self: f"{self.__class__.__name__}({self.a.__repr__() if bool(self.b) else ''})" # noqa: E731
 	__contains__ = lambda self, k: k in self.a or k in self.b # noqa: E731
-			
-			
+
+
 class UniversalSet(collections.abc.Set):
 	"""The Universal Set. Contains everything."""
 
@@ -1370,8 +1374,8 @@ class PrettyJSONEncoder(json.JSONEncoder):
 		indent = " " * self.indent if type(self.indent) is int else self.indent
 		curr_indent = indent * level
 		next_indent = indent * (level + 1)
-		if isinstance(obj, (list, tuple)):
-			if all(not isinstance(x, (tuple, list, dict)) or len(json_dumps(x)) < 10 for x in obj):
+		if isinstance(obj, (list, tuple, set)):
+			if all(not isinstance(x, (tuple, list, set, dict)) or len(json_dumps(x)) < 10 for x in obj):
 				return "[" + ", ".join(json_dumpstr(x) for x in obj) + "]"
 			items = [self.encode(x, level=level + 1, strict=strict) for x in obj]
 			return "[\n" + next_indent + f",\n{next_indent}".join(item for item in items) + f"\n{curr_indent}" + "]"

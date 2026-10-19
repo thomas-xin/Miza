@@ -2106,7 +2106,7 @@ class Interactable:
 					embs.append(discord.Embed(colour=colour, url=f"https://mizabot.xyz?{i}").set_image(url=item))
 					if len(embs) & 3 == 0:
 						i += 1
-		max_page = ceil(len(curr) / page)
+		max_page = max(1, ceil(len(curr) / page))
 		curr_page = min(max_page, ceil(pos / page)) + 1
 		embs[-4].set_footer(text=f"Page {curr_page}/{max_page}")
 		return self.construct(uid, leb128(pos) + extra, embeds=embs)
@@ -2186,12 +2186,13 @@ class Visual:
 				if k not in self.schema:
 					self.schema.__setitem__(k, v)
 			if "url" not in self.schema and "urls" not in self.schema:
+				aliases = [] if any(k.lower().startswith("i") for k in self.schema) else ["i"]
 				schema = cdict(
 					url=cdict(
 						type="visual",
 						description="Image, animation or video, supplied by URL or attachment",
 						example="https://cdn.discordapp.com/embed/avatars/0.png",
-						aliases=["i"],
+						aliases=aliases,
 						required=True,
 					),
 				)

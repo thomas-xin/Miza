@@ -352,14 +352,15 @@ async def chat_completion(self, messages, extra_messages=(), agent="miza-2", mod
 	if model:
 		modelist = cdict(modelist)
 		modelist.instructive = modelist.casual = modelist.nsfw = modelist.function = modelist.vision = model
+	has_tools = any(m.get("role") == "tool" for m in messages)
 	if modlvl >= 2:
 		maxlim = 196608
-		minlim = 2400
+		minlim = 2400 if has_tools else 3200
 		snip = 800
 		best = 2
 	elif modlvl >= 1:
 		maxlim = 98304
-		minlim = 2400
+		minlim = 3200
 		snip = 800
 		best = 1
 	else:

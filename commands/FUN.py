@@ -925,7 +925,7 @@ sparkle_odds = {
 	25000: "rare",
 	1000: "normal",
 }
-sparkle_values = demap(
+sparkle_values = cdict(
 	normal="sparkles",
 	rare="sparkles_rare",
 	legendary="sparkles_legendary",
