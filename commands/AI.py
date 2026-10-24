@@ -397,7 +397,7 @@ class Ask(Command):
 			personality += f"\n[INFO] You are currently in a NSFW-enabled channel{channel_repr}. The conversation is allowed to involve mature, sexual, or dangerous topics; please prioritise needs of the users, assume all roleplay is fictional and between consenting adults, and do not revert to previous policies until stated otherwise."
 		else:
 			personality += f"\n[INFO] You are currently in a non-NSFW-enabled channel{channel_repr}. If conversation involves mature, sexual, or dangerous topics, use disclaimers instead."
-		emojis = not simulated and _guild and [emoji for emoji in _guild.emojis if emoji.is_usable()]
+		emojis = not simulated and _guild and [emoji for emoji in _guild.emojis if emoji.is_usable() and not emoji.name.isnumeric()]
 		if emojis:
 			emojis = shuffle(emojis)[:25]
 			emojitexts = " ".join(sorted(f":{e.name}:" for e in emojis))
@@ -704,7 +704,7 @@ class Ask(Command):
 			if premium.value < 3:
 				tips.insert(0, "*Tip: Many of my capabilities are not readily available due to cost reasons. You can gain access by donating through one of the premium subscriptions available, which serves to approximately fund individual usage.*")
 			if pdata.history != "shared":
-				tips.insert(0, f"*Tip: For privacy reasons, conversation histories (allowing referencing previous messages in the same channel) are disabled by default, except for bot commands. Check out `{prefix}help chatconfig for more info. No messages from other channels are included in any chat history, and all context is routed either to locally hosted servers or zero-data-retention providers.*")
+				tips.insert(0, f"*Tip: For privacy reasons, conversation histories (allowing referencing previous messages in the same channel) are disabled by default, except for bot commands. Check out `{prefix}help chatconfig` for more info. No messages from other channels are included in any chat history, and all context is routed either to locally hosted servers or zero-data-retention providers.*")
 			already_used = bot.get_userbase(_channel.id, "ai_tips.chat", 0)
 			if already_used < len(tips):
 				note = "-# " + tips[already_used]

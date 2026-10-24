@@ -58,7 +58,7 @@ async def force_completion(self, model, prompt=None, medias=(), stream=True, max
 				case "image":
 					messages[-1].content.append(cdict(type="image_url", image_url=cdict(url=url)))
 				case "audio":
-					messages[-1].content.append(cdict(type="input_audio", input_audio=cdict(url=url)))
+					messages[-1].content.append(cdict(type="audio_url", audio_url=cdict(url=url)))
 		messages, _model = await self.caption_into(messages, model=model, premium_context=kwargs.get("premium_context", []))
 	if model in ai.is_completion or kwargs.get("api") and getattr(kwargs["api"], "completion", False):
 		prompt = []
@@ -258,8 +258,12 @@ async def follow_message(self, m, allow_text=False):
 			elif c.get("type") == "image_url":
 				url = c["image_url"]["url"]
 				urls.append(url)
+			elif c.get("type") == "audio_url":
+				url = c["audio_url"]["url"]
+				urls.append(url)
 			elif c.get("type") == "input_audio":
-				url = c["input_audio"]["url"]
+				mime = url2mime(c.get("format", "mp3"))
+				url = f"data:{mime};base64," + c["input_audio"]["data"]
 				urls.append(url)
 			else:
 				raise TypeError(c["type"])
