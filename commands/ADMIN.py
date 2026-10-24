@@ -2275,7 +2275,7 @@ class UpdateStarboards(Database):
 							table[None].pop(next(iter(table[None])))
 			else:
 				try:
-					attachments = await bot.prepare_embeds(embeds, m_id=message.id, c_id=message.channel.id, g_id=message.guild.id, allow_from=m.id)
+					attachments = await bot.prepare_embeds(embeds, m_id=message.id, c_id=channel.id, g_id=message.guild.id, allow_from=m.id)
 					if attachments:
 						m = await bot.edit_message(m, embeds=embeds, attachments=attachments)
 					await bot.finalise_embeds(m, embeds, attachments, g_id=message.guild.id, requires_edit=True)
@@ -2309,7 +2309,7 @@ class UpdateStarboards(Database):
 				channel = await bot.fetch_channel(table[react][1])
 				m = await bot.fetch_message(table[None][message.id], channel)
 				embeds = await bot.as_embeds(message, link=True, colour=True, reactions=True)
-				attachments = await bot.prepare_embeds(embeds, m_id=message.id, c_id=message.channel.id, g_id=message.guild.id, allow_from=m.id)
+				attachments = await bot.prepare_embeds(embeds, m_id=message.id, c_id=channel.id, g_id=message.guild.id, allow_from=m.id)
 				if attachments:
 					m = await bot.edit_message(m, embeds=embeds, attachments=attachments)
 				await bot.finalise_embeds(m, embeds, attachments, g_id=message.guild.id, requires_edit=True)

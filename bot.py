@@ -1940,10 +1940,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		async def retrieval(argv, region="wt-wt"):
 			if not is_url(argv):
 				data = []
-				backends = shuffle(["bing", "brave", "duckduckgo", "mojeek", "yandex", "yahoo"])
+				backends = shuffle(["bing", "brave", "duckduckgo", "mojeek", "yandex", "yahoo"])[:n]
+				if ":" in argv:
+					backends.insert(0, "auto")
+				else:
+					backends.append("auto")
 				while backends and not data:
 					futs = []
-					for backend in backends[:n]:
+					for backend in backends:
 						fut = _run_async(
 							self.ddgs.text,
 							argv,
@@ -1960,7 +1964,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						if isinstance(res, list):
 							data += res
 						else:
-							print(b, repr(res))
+							print(b, argv, repr(res))
 				return "\n\n\n".join("[" + (e.get("title", "") + "](" + e.get("href", "") + ")\n" + e.get("body", "")).strip() for e in data).replace("[]()", "").strip()
 			if is_discord_attachment(argv) or is_miza_attachment(argv):
 				return attachment_cache.preserve(argv)
@@ -2406,12 +2410,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				print("Prepared Reupload:", p)
 				fn = None
 				try:
-					if url2fn(raw) in IMAGE_FORMS:
+					if url2ext(raw).lower() in IMAGE_FORMS:
 						target = 4000000
 						fn = await attachment_cache.download(raw, m_id=m_id, filename=True)
 						if os.path.getsize(fn) > target:
 							fn = await self.optimise_image(fn, target, csize=16384, fmt="avif")
-					elif url2fn(raw) in VIDEO_FORMS:
+					elif url2ext(raw).lower() in VIDEO_FORMS:
 						target = 0
 						if g_id:
 							guild = await self.fetch_guild(g_id)

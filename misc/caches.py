@@ -573,6 +573,10 @@ class AttachmentCache(AutoCache):
 		form_data = aiohttp.FormData(quote_fields=False)
 		filename = filename or "b"
 		out = []
+		data = list(data)
+		for i, fp in enumerate(data):
+			if isinstance(fp, str):
+				data[i] = open(fp, "rb")
 		while data:
 			temp, data = data[:ac], data[ac:]
 			for fp in temp:
@@ -625,6 +629,8 @@ class AttachmentCache(AutoCache):
 			Ms = max(self.max_size, channel.guild.filesize_limit)
 		if size <= Ms:
 			return await self.create(data, filename=filename, channel=channel, editable=editable, minimise=minimise)
+		if isinstance(data, str):
+			data = open(data, "rb")
 		if not hasattr(data, "read"):
 			data = io.BytesIO(data)
 		chunks = []

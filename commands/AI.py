@@ -696,15 +696,15 @@ class Ask(Command):
 		if not error and not bot.get_guildbase(_channel.id, "chatconfig"):
 			tips = [
 				"*Tip: By using generative AI, you are assumed to comply with the [ToS](<https://github.com/thomas-xin/Miza/wiki/Terms-of-Service>).*",
-				f"*Tip: The chatbot feature is designed to incorporate multiple SOTA models in addition to internet-based interactions. For direct interaction with the raw LLMs, check out {prefix}instruct.*",
-				f"*Tip: My personality prompt and message streaming are among several parameters that may be modified. Check out {prefix}help chatconfig for more info. Note that an improperly constructed prompt may be detrimental to response quality, and that giving me a nickname may also have an effect.*",
+				f"*Tip: The chatbot feature is designed to incorporate multiple SOTA models in addition to internet-based interactions. For direct interaction with the raw LLMs, check out `{prefix}instruct.`*",
+				f"*Tip: My personality prompt and message streaming are among several parameters that may be modified. Check out `{prefix}help chatconfig` for more info. Note that an improperly constructed prompt may be detrimental to response quality, and that giving me a nickname may also have an effect.*",
 				"*Tip: Remember that anything a chatbot says may be fictional or otherwise made-up. Always fact-check from reputable sources before making serious assumptions, and don't take the AI's words too seriously.*",
 				"*Tip: At any point in time, you may delete your command message to stop generation.*",
 			] if not xrand(10) else []
 			if premium.value < 3:
 				tips.insert(0, "*Tip: Many of my capabilities are not readily available due to cost reasons. You can gain access by donating through one of the premium subscriptions available, which serves to approximately fund individual usage.*")
 			if pdata.history != "shared":
-				tips.insert(0, f"*Tip: For privacy reasons, conversation histories (allowing referencing previous messages in the same channel) are disabled by default, except for bot commands. Check out `{prefix}help chatconfig` for more info. No messages from other channels are included in any chat history, and all context is routed either to locally hosted servers or zero-data-retention providers.*")
+				tips.insert(0, f"*Tip: For privacy reasons, conversation histories (allowing referencing previous messages in the same channel) are disabled by default, except for bot commands. Check out `{prefix}help chatconfig` for more info. No messages from other channels are included in any chat history, and all context is routed either to locally hosted servers (preferred), or zero-data-retention providers.*")
 			already_used = bot.get_userbase(_channel.id, "ai_tips.chat", 0)
 			if already_used < len(tips):
 				note = "-# " + tips[already_used]
