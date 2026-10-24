@@ -1680,7 +1680,7 @@ def request_emojis():
 				variables=dict(
 					lang="EN",
 					slug="twitter",
-					version="twemoji-15.0.3",
+					version="2026-01-09-update",
 				),
 			)),
 			headers={"Content-Type": "application/json"},
@@ -1688,7 +1688,23 @@ def request_emojis():
 			json=True,
 			timeout=None,
 		)
-		for category in data["data"]["vendorHistoricEmoji_v1"]["items"]:
+		data2 = Request(
+			"https://emojipedia.org/api/graphql",
+			data=json_dumps(dict(
+				operationName="vendorHistoricEmojiV1",
+				query=_eop,
+				variables=dict(
+					lang="EN",
+					slug="discord",
+					version="17.0.1",
+				),
+			)),
+			headers={"Content-Type": "application/json"},
+			method="POST",
+			json=True,
+			timeout=None,
+		)
+		for category in data["data"]["vendorHistoricEmoji_v1"]["items"] + data2["data"]["vendorHistoricEmoji_v1"]["items"]:
 			for emoji in category["images"]:
 				name = emoji["slug"]
 				source = emoji["image"]["source"]

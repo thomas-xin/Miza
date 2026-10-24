@@ -1244,6 +1244,9 @@ def revert_suffix(fn):
 			return f"{fn2}.{ext}.binx"
 	return fn
 def url2fn(url, removesuffix=True) -> str:
+	if url.startswith("data:"):
+		mime = url.removeprefix("data:").split(";", 1)[0]
+		return f"data.{mime_into(mime)}"
 	fn = url.split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1].translate(filetrans)
 	if removesuffix:
 		return fn.removesuffix(".binx")
@@ -1259,6 +1262,22 @@ def url2ext(url) -> str:
 	if ext in ("bin", "binx") and len(fns) > 1:
 		return fns[1]
 	return ext
+def url2mime(url) -> str:
+	if url.startswith("data:"):
+		return url.removeprefix("data:").split(";", 1)[0]
+	ext = url2ext(url)
+	try:
+		return MIMES[ext]
+	except KeyError:
+		pass
+	mime = special_mimes.get(ext, ext)
+	if ext in VIDEO_FORMS:
+		return f"video/{mime}"
+	if ext in IMAGE_FORMS:
+		return f"image/{mime}"
+	if ext in AUDIO_FORMS:
+		return f"audio/{mime}"
+	return "application/octet-stream"
 
 def replace_ext(fn, ext="") -> str:
 	if "." not in fn:
@@ -2227,6 +2246,8 @@ magic = cdict(
 )
 
 def get_mime(path):
+	if isinstance(path, str) and path.startswith("data:"):
+		return path.removeprefix("data:").split(";", 1)[0]
 	if not isinstance(path, str) or os.path.getsize(path) < 1048576:
 		try:
 			mime = magic.from_file(path, mime=True)

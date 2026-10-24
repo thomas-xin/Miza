@@ -4030,12 +4030,12 @@
 					"description": "Input text for completion",
 					"example": "Once upon a time, there was"
 				},
-				"images": {
-					"type": "visual",
-					"description": "Image, animation or video, supplied by URL or attachment",
+				"medias": {
+					"type": "media",
+					"description": "Image, animation, video or audio, supplied by URL or attachment",
 					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
 					"aliases": ["i"],
-					"multiple": true
+					"required": true
 				},
 				"api": {
 					"type": "string",
@@ -4078,18 +4078,18 @@
 					"default": 98304
 				}
 			},
-			"ordered_args": ["model", "prompt", "images", "api", "temperature", "frequency_penalty", "presence_penalty", "reasoning_effort", "max_tokens"]
+			"ordered_args": ["model", "prompt", "medias", "api", "temperature", "frequency_penalty", "presence_penalty", "reasoning_effort", "max_tokens"]
 		},
 		"Describe": {
-			"aliases": ["Describe", "Description", "Image2Text", "OCR"],
-			"description": "Describes the input image/video, or reads text within.",
+			"aliases": ["Describe", "Description", "Image2Text", "Audio2Text", "OCR"],
+			"description": "Describes the input image/video/audio, including any text within.",
 			"level": "0",
 			"rate_limit": "(4, 5)",
 			"timeout": "96",
 			"schema": {
 				"url": {
-					"type": "visual",
-					"description": "Image, animation or video, supplied by URL or attachment",
+					"type": "media",
+					"description": "Image, animation, video or audio, supplied by URL or attachment",
 					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
 					"aliases": ["i"],
 					"required": true

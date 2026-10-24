@@ -1263,7 +1263,7 @@ class Migrate(Command):
 			if self_included:
 				await bot.audio.asubmit(f"AP.disconnect({_guild.id},announce=0,clear=1)")
 			print(_name)
-			if not _name.isascii():
+			if not _name.isalpha():
 				url = (
 					"https://media.tenor.com/jxmGfM-U-q0AAAAM/cat-cats.gif",
 					"https://media.tenor.com/-TydtP_dIy8AAAAM/cat-gato.gif",

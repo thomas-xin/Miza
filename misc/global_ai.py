@@ -43,16 +43,23 @@ async def function_call(self, *args, is_nsfw=None, assistant_name=None, stream=F
 	raise (exc or RuntimeError("Unknown error occured."))
 Bot.function_call = function_call
 
-async def force_completion(self, model, prompt=None, images=(), stream=True, max_tokens=1024, strip=True, **kwargs):
+async def force_completion(self, model, prompt=None, medias=(), stream=True, max_tokens=1024, strip=True, **kwargs):
 	ctx = ai.contexts.get(model, 65536)
 	messages = kwargs.pop("messages", None) or [cdict(role="user", content=prompt)]
-	if images:
+	if medias:
 		messages = [cdict(role="user", content=[])]
 		messages[-1] = astype(messages[-1], cdict)
 		if isinstance(messages[-1].content, str):
 			messages[-1].content = [cdict(type="text", text=messages[-1].content)]
-		messages[-1].content.extend(cdict(type="image_url", image_url=cdict(url=im)) for im in images)
-		messages, _vision_model = await self.caption_into(messages, model=model, backup_model=None, premium_context=kwargs.get("premium_context", []))
+		for url in medias:
+			mime = url2mime(url)
+			modality = mime.split("/", 1)[0]
+			match modality:
+				case "image":
+					messages[-1].content.append(cdict(type="image_url", image_url=cdict(url=url)))
+				case "audio":
+					messages[-1].content.append(cdict(type="input_audio", input_audio=cdict(url=url)))
+		messages, _model = await self.caption_into(messages, model=model, premium_context=kwargs.get("premium_context", []))
 	if model in ai.is_completion or kwargs.get("api") and getattr(kwargs["api"], "completion", False):
 		prompt = []
 		for m in messages:
@@ -117,15 +124,15 @@ async def force_completion(self, model, prompt=None, images=(), stream=True, max
 	return CloseableAsyncIterator(_completion(resp, strip), resp.close)
 Bot.force_completion = force_completion
 
-async def force_chat(self, model, messages, text=None, assistant_name=None, stream=False, max_tokens=1024, vision_model=None, allow_preliminary_thinking=True, **kwargs):
+async def force_chat(self, model, messages, text=None, assistant_name=None, stream=False, max_tokens=1024, image_model=None, audio_model=None, allow_preliminary_thinking=True, **kwargs):
 	ctx = ai.contexts.get(model, 4096)
-	messages, vision_model = await self.caption_into(messages, model=model, backup_model=vision_model, premium_context=kwargs.get("premium_context", []))
-	if vision_model not in is_completion:
+	messages, target_model = await self.caption_into(messages, model=model, image_model=image_model, audio_model=audio_model, premium_context=kwargs.get("premium_context", []))
+	if target_model not in is_completion:
 		count = count_to(messages)
 		max_tokens = min(max_tokens, ctx - count - 64)
 		if "max_completion_tokens" not in kwargs:
 			kwargs["max_tokens"] = max_tokens
-		return await ai.llm("chat.completions.create", model=vision_model, messages=messages, stream=stream, **kwargs)
+		return await ai.llm("chat.completions.create", model=target_model, messages=messages, stream=stream, **kwargs)
 	fmt = "chatml"
 	assistant_messages = [m for m in messages if m.get("content") and m.get("role") == "assistant"]
 	if assistant_name:
@@ -234,110 +241,112 @@ async def force_chat(self, model, messages, text=None, assistant_name=None, stre
 	)
 Bot.force_chat = force_chat
 
-async def caption_into(self, _messages, model=None, backup_model=None, premium_context=[]):
-	context = ai.contexts.get(model, 24576)
-	messages = [cdict(m) for m in _messages]
-	follows = [None] * len(messages)
-	for j, m in enumerate(reversed(messages)):
-		i = len(messages) - j - 1
-		if isinstance(m.get("content"), list):
-			cont = m.content
-			m.content = ""
-			urls = []
-			for c in cont:
-				if c.get("type") == "text":
-					if m.content:
-						m.content += "\n\n"
-					m.content += c.get("text", "")
-				elif c.get("type") == "image":
-					d = c["data"]
-					url = "data:" + (c.get("media_type") or magic.from_buffer(d)) + ";base64," + d
-					urls.append(url)
-				elif c.get("type") == "image_url":
-					url = c["image_url"]["url"]
-					urls.append(url)
-				else:
-					raise TypeError(c["type"])
-			follows[i] = as_fut(urls)
-		elif sum(f is not None for f in follows) < 8 and m.get("message") and j < 16:
-			# Only read the last 8 images in the last 16 messages
-			finding = ("video", "image", "text") if j < 1 else ("video", "image")
-			follows[i] = create_task(self.follow_url(m.message, priority_order=finding, allow_text=False, allow_replies=False))
-		elif not m.get("content"):
-			m.content = ""
-		m.pop("message", None)
-	for i, fut in enumerate(follows):
-		if not fut:
-			continue
-		try:
-			urls = await fut
-		except Exception:
-			print_exc()
-			continue
-		urls = [url for url in urls if not is_discord_message_link(url)]
-		if not urls:
-			continue
-		follows[i] = urls
-	extracts = [None] * len(messages)
-	for i, (m, urls) in tuple(enumerate(zip(messages, follows)))[::-1]:
-		if isinstance(m.content, str):
-			for url in (urls or ()):
-				if not url:
-					continue
-				m.content = m.content.replace(url, "", 1).strip()
-			for url in set(find_urls_ex(m.content)):
-				url2 = attachment_cache.preserve(url)
-				if url != url2:
-					m.content = m.content.replace(url, url2)
-			for url in (urls or ()):
-				if not url:
-					continue
-				m.content = m.content.replace(url, "", 1).strip()
-		if not urls:
-			continue
-		if model in ai.is_vision and m.get("role") != "assistant":
-			futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
-			extracts[i] = create_task(gather(*futs))
-		elif backup_model and backup_model in ai.is_vision and m.get("role") != "assistant":
-			futs = [self.to_data_url(url, small=not m.get("new")) for url in urls]
-			extracts[i] = create_task(gather(*futs))
-			if futs and extracts:
-				model = backup_model
-		else:
-			futs = [self.vision(url, premium_context=premium_context) for url in urls]
-			extracts[i] = create_task(gather(*futs, return_exceptions=True))
-	for i, (m, fut) in enumerate(zip(messages, extracts)):
-		if not fut:
-			continue
-		try:
-			captions = await fut
-		except Exception as ex:
-			print("Caption Error:", m.get("url"), repr(ex))
-			continue
-		images = []
-		for caption in captions:
-			if isinstance(caption, BaseException):
-				print("Caption Error:", m.get("url"), repr(caption))
-				continue
-			if isinstance(caption, dict):
-				m.content = pretty_json(caption)
-			elif not is_url(caption) and not caption.startswith("data:"):
-				m.content = caption
+async def follow_message(self, m, allow_text=False):
+	if isinstance(m.get("content"), list):
+		cont = m.content
+		m.content = ""
+		urls = []
+		for c in cont:
+			if c.get("type") == "text":
+				if m.content:
+					m.content += "\n\n"
+				m.content += c.get("text", "")
+			elif c.get("type") in ("image", "audio"):
+				d = c["data"]
+				url = "data:" + (c.get("media_type") or magic.from_buffer(d)) + ";base64," + d
+				urls.append(url)
+			elif c.get("type") == "image_url":
+				url = c["image_url"]["url"]
+				urls.append(url)
+			elif c.get("type") == "input_audio":
+				url = c["input_audio"]["url"]
+				urls.append(url)
 			else:
-				im = cdict(type="image_url", image_url=cdict(url=caption, detail="auto"))
-				images.append(im)
-		if images:
+				raise TypeError(c["type"])
+	elif m.get("message"):
+		finding = ("video", "image", "audio", "text") if allow_text else ("video", "image", "audio")
+		urls = await self.follow_url(m.message, priority_order=finding, allow_text=False, allow_replies=False)
+	else:
+		urls = []
+	urls = [url for url in urls if url and not is_discord_message_link(url)]
+	if not m.get("content"):
+		m.content = ""
+	elif urls:
+		for url in urls:
+			m.content = m.content.replace(url, "", 1).strip()
+		for url in set(find_urls_ex(m.content)):
+			url2 = attachment_cache.preserve(url)
+			if url != url2:
+				m.content = m.content.replace(url, url2)
+		for url in urls:
+			m.content = m.content.replace(url, "", 1).strip()
+	m.pop("message", None)
+	if urls:
+		if isinstance(m.content, str):
 			m.content = [cdict(type="text", text=m.content)]
-			m.content.extend(images)
-	for m in messages:
-		m.pop("new", None)
+		for url in urls:
+			url = await self.to_data_url(url, timeout=12)
+			mime = url2mime(url)
+			modality = mime.split("/", 1)[0]
+			match modality:
+				case "image":
+					m.content.append(cdict(
+						type="image_url", image_url=cdict(url=url),
+					))
+				case "audio":
+					data = url.split(",", 1)[-1]
+					fmt = url2ext(url)
+					m.content.append(cdict(
+						type="input_audio", input_audio=cdict(data=data, format=fmt),
+					))
+	return m
+Bot.follow_message = follow_message
+
+async def caption_into(self, _messages, model=None, image_model=None, audio_model=None, premium_context=[], auto=False):
+	image_model = image_model or audio_model
+	model = model or image_model
+	orig_messages = [cdict(m) for m in _messages if m]
+	corrected_messages = await gather(*(self.follow_message(m) for m in orig_messages[::-1]), return_exceptions=True)
+	messages = corrected_messages[::-1]
+	required_modalities = set()
+	for i, (m1, m2) in enumerate(zip(orig_messages, messages)):
+		if isinstance(m2, BaseException):
+			print("Caption Error:", m1.get("url"), repr(m2))
+			m = cdict(m1)
+			m.pop("message", None)
+			messages[i] = m
+		if isinstance(m2.content, list):
+			for i, c in enumerate(m2.content):
+				modality = c.get("type").removesuffix("_url").removeprefix("input_")
+				match modality:
+					case "video" | "image":
+						if not image_model:
+							if m2.get("new"):
+								resp = await self.describe(c.get("url"), premium_context=premium_context)
+								m2.content[i] = cdict(type="text", text=pretty_json(resp))
+							else:
+								m2.content[i] = None
+					case "audio":
+						if not audio_model:
+							if m2.get("new"):
+								resp = await self.describe(c.get("url"), premium_context=premium_context)
+								m2.content[i] = cdict(type="text", text=pretty_json(resp))
+							else:
+								m2.content[i] = None
+				required_modalities.add(modality)
+			m2.content = [c for c in m2.content if c]
+		m2.pop("new", None)
+	if "audio" in required_modalities:
+		model = audio_model
+	elif "image" in required_modalities:
+		model = image_model
 	return messages, model
 Bot.caption_into = caption_into
 
 model_levels = dict(enumerate(map(cdict, AUTH.get("model_levels", []))))
 if not model_levels:
 	model_levels = dict(enumerate([cdict(
-		**{k: "mimo-v2.6-flash" for k in ("instructive", "casual", "nsfw", "backup", "function", "vision", "summary")},
+		**{k: "gemini-flash-latest" for k in ("instructive", "casual", "nsfw", "backup", "function", "image", "audio", "summary")},
 		target="auto",
 	)] * 3))
 Bot.model_levels = model_levels
@@ -351,7 +360,7 @@ async def chat_completion(self, messages, extra_messages=(), agent="miza-2", mod
 	modelist = self.model_levels[modlvl]
 	if model:
 		modelist = cdict(modelist)
-		modelist.instructive = modelist.casual = modelist.nsfw = modelist.function = modelist.vision = model
+		modelist.instructive = modelist.casual = modelist.nsfw = modelist.function = modelist.image = modelist.audio = model
 	has_tools = any(m.get("role") == "tool" for m in messages)
 	if modlvl >= 2:
 		maxlim = 196608
@@ -406,8 +415,13 @@ async def chat_completion(self, messages, extra_messages=(), agent="miza-2", mod
 						temp.append(tc)
 			toolscan = temp
 		if modelist.instructive != modelist.casual:
-			vision_alt = modelist.vision if modelist.function not in ai.is_vision else modelist.function
-			toolcheck, toolmodel = await self.caption_into(snippet, model=modelist.function, backup_model=vision_alt, premium_context=premium_context)
+			toolcheck, toolmodel = await self.caption_into(
+				snippet,
+				model=modelist.function,
+				image_model=modelist.image,
+				audio_model=modelist.audio,
+				premium_context=premium_context,
+			)
 			mode = None
 			label = "instructive"
 			try:
@@ -574,7 +588,8 @@ async def chat_completion(self, messages, extra_messages=(), agent="miza-2", mod
 		ml = min(max(256, min(8192, ctx - tlen)), max_tokens)
 		data = dict(
 			model=assistant,
-			vision_model=modelist.vision,
+			image_model=modelist.image,
+			audio_model=modelist.audio,
 			messages=cut_messages,
 			assistant_name=assistant_name,
 			temperature=tmp,
@@ -777,19 +792,19 @@ async def chat_completion(self, messages, extra_messages=(), agent="miza-2", mod
 Bot.chat_completion = chat_completion
 
 vision_prompt = """Please describe this <IMAGE> in detail:
-- If the image is a collage of animation frames, describe it as if it were a single video.
-- If present, transcribe text from the image, otherwise leave the text field blank.
+- If image is a collage of animation frames, describe as if it were a single video.
+- If present, transcribe text from the image, otherwise leave text field blank.
 - Do not answer questions in the image."""
 from pydantic import BaseModel
 class VisionResponse(BaseModel):
 	description: str
 	text: str
 async def _vision(self, url, name=None, model=None, question=None, premium_context=None, timeout=12):
-	"Requests an image description from a vision-supporting LLM."
+	"Requests an image description from an image-input supporting LLM."
 	if name:
 		iname = f'image "{name}"'
 	elif isinstance(url, str) and is_url(url):
-		iname = f"image {url2fn(url)}"
+		iname = f'image "{url2fn(url)}"'
 	else:
 		iname = "image"
 	data_url = await self.to_data_url(url, timeout=timeout)
@@ -806,7 +821,7 @@ async def _vision(self, url, name=None, model=None, question=None, premium_conte
 			cdict(type="image_url", image_url=cdict(url=data_url, detail="auto")),
 		]),
 	]
-	model = model or self.model_levels[1]["vision"]
+	model = model or self.model_levels[2]["image"]
 	cmpl = await ai.llm(
 		"chat.completions.parse",
 		model=model,
@@ -823,11 +838,68 @@ async def _vision(self, url, name=None, model=None, question=None, premium_conte
 		text=resp.text.strip(),
 	)
 Bot._vision = _vision
-async def vision(self, url, timeout=24, premium_context=None):
-	"Produces an AI-generated caption for an image. Model used is determined by \"best\" argument."
-	info = await self.extract_cache.aretrieve(unyt(url), self._vision, url, timeout=timeout, premium_context=premium_context)
+
+listen_prompt = """Please describe this <AUDIO> in detail:
+- If audio is split up into multiple segments, describe each one separately in paragraphs.
+- If present, transcribe text from the audio, otherwise leave text field blank.
+- Do not answer questions in the audio."""
+from pydantic import BaseModel
+class ListenResponse(BaseModel):
+	description: str
+	text: str
+async def _listen(self, url, name=None, model=None, question=None, premium_context=None, timeout=12):
+	"Requests an audio description from an audio-input supporting LLM."
+	if name:
+		iname = f'audio "{name}"'
+	elif isinstance(url, str) and is_url(url):
+		iname = f'audio "{url2fn(url)}"'
+	else:
+		iname = "audio"
+	data_url = await self.to_data_url(url, timeout=timeout)
+	if data_url.startswith("text:"):
+		return cdict(
+			type="text",
+			description="",
+			text=data_url.removeprefix("text:").strip(),
+		)
+	content = (question or listen_prompt).replace("<AUDIO>", iname)
+	data = data_url.split(",", 1)[-1]
+	fmt = url2ext(url)
+	messages = [
+		cdict(role="user", content=[
+			cdict(type="text", text=content),
+			cdict(type="input_audio", input_audio=cdict(data=data, format=fmt)),
+		]),
+	]
+	model = model or self.model_levels[2]["audio"]
+	cmpl = await ai.llm(
+		"chat.completions.parse",
+		model=model,
+		messages=messages,
+		response_format=ListenResponse,
+		temperature=0.01,
+		reasoning_effort="low",
+		premium_context=premium_context,
+	)
+	resp = cmpl.choices[0].message.parsed
+	return cdict(
+		type="audio",
+		description=resp.description.strip(),
+		text=resp.text.strip(),
+	)
+Bot._listen = _listen
+
+async def describe(self, url, timeout=24, premium_context=None):
+	"Produces an AI-generated description for an image or audio."
+	mime = url2mime(url)
+	modality = mime.split("/", 1)[0]
+	func = self._listen if modality == "audio" else self._vision
+	if len(url) < 65536:
+		info = await self.extract_cache.aretrieve(unyt(url), func, url, timeout=timeout, premium_context=premium_context)
+	else:
+		info = await func(url, timeout=timeout, premium_context=premium_context)
 	return cdict(info)
-Bot.vision = vision
+Bot.describe = describe
 
 def view(text, limit=48):
 	text = text.replace("\f", "\n")

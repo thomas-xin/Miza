@@ -45,6 +45,7 @@ is_completion = set()
 is_reasoning = set()
 is_function = set()
 is_vision = set()
+is_audio = set()
 is_premium = set()
 contexts = {}
 
@@ -225,6 +226,9 @@ def count_to(messages, encoding=None):
 					for part in value:
 						if part.get("type") == "text":
 							substrings.append(part["text"])
+							continue
+						if part.get("type") == "input_audio":
+							num_tokens += 600
 							continue
 						if part.get("type") == "image_url":
 							if part["image_url"].get("detail", "auto") == "low" or is_url(part["image_url"]):
@@ -426,6 +430,10 @@ async def load_local():
 				is_vision.add(name)
 			else:
 				is_vision.discard(name)
+			if "vision" in capabilities:
+				is_audio.add(name)
+			else:
+				is_audio.discard(name)
 			if "tools" in capabilities:
 				is_function.add(name)
 			else:
@@ -471,6 +479,10 @@ async def load_openrouter():
 			is_vision.add(name)
 		else:
 			is_vision.discard(name)
+		if "audio" in model.architecture.get("input_modalities", ()):
+			is_audio.add(name)
+		else:
+			is_audio.discard(name)
 		if "tools" in model.supported_parameters:
 			is_function.add(name)
 		else:

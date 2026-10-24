@@ -1789,7 +1789,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			emoji = e
 		return emoji.animated
 
-	async def proxy_emojis(self, msg, guild=None, user=None, is_webhook=False, return_pops=False, lim=400, strict=True):
+	async def proxy_emojis(self, msg, guild=None, user=None, is_webhook=False, return_pops=False, lim=400, strict=True, allow_numeric=True):
 		"Retrieves and maps user's emoji list on target string. Used for ~AutoEmoji and compatibility with other commands."
 		orig = self.get_userbase(user.id, "emojilist", {}) if user else {}
 		emojis = emoji = None
@@ -1822,6 +1822,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					break
 				continue
 			name = s[1:-1]
+			if not allow_numeric and name.isnumeric():
+				continue
 			if emojis is None:
 				emojis = self.data.autoemojis.guild_emoji_map(guild, user, dict(orig))
 			emoji = emojis.get(name)
@@ -2004,19 +2006,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		else:
 			d = url
 			name = None
-		mime = magic.from_buffer(d)
+		mime = mime_from_file(d)
 		if mime == "text/html" and screenshot:
 			d = await self.browse(url, timeout=timeout + 8)
 			if isinstance(d, str):
 				return mime, name, as_bytes(d)
-			mime = magic.from_buffer(d)
+			mime = mime_from_file(d)
 		return mime, name, d
 
 	async def _to_data_url(self, url, small=False, fmt="jpg", timeout=8):
 		sizelim = 82944 if small else 1638400
 		dimlim = 384 if small else 1536
 		if isinstance(url, str):
-			if url.startswith("data:"):
+			if url.startswith("data:") or url.startswith("text:"):
 				return url
 			if not is_url(url):
 				if not os.path.exists(url):
@@ -2026,19 +2028,32 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				mime, name, d = await self.req_data(url, timeout=timeout, screenshot=True)
 		else:
 			d = url
-		mime = magic.from_buffer(d)
+		mime = mime_from_file(d)
 
 		lim = 5 * 1048576 * 3 / 4
 		if mime not in ("image/jpg", "image/jpeg", "image/png") or len(d) > lim or np.prod(await _run_async(get_image_size, d)) > sizelim:
 			# name = url.replace("\\", "/").rsplit("/", 1) if isinstance(url, str) else "data"
 			d = d.strip()
-			if mime.split("/", 1)[0] not in ("image", "video"):
+			modality = mime.split("/", 1)[0]
+			if modality == "audio":
+				if mime.split("/", 1)[-1] not in ("mp3", "mpeg"):
+					args = ["ffmpeg", "-hide_banner", "-v", "error", "-i", "-", "-f", "mp3", "-c:a", "libmp3lame", "-b:a", "224k", "-vbr", "on", "-ar", "44100", "-"]
+					print(args)
+					proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+					d2, err = await _run_async(proc.communicate, d)
+					if d2:
+						d = d2
+						mime = mime_from_file(d)
+					elif err:
+						print(as_str(err))
+				return "data:" + mime + ";base64," + base64.b64encode(d).decode("ascii")
+			if modality not in ("image", "video"):
 				if len(d) > 1024 and mime not in ("text/plain", "text/html"):
 					d = d[:512] + b".." + d[-512:]
 				return "text:" + as_str(d)
 			assert isinstance(d, (str, bytes)), d
 			d = await process_image(d, "resize_map", [[], None, None, "rel", dimlim, "-", "auto", "-bg", "-oz", "-dl", dimlim, "-fs", lim, "-f", fmt], timeout=24)
-			mime = magic.from_buffer(d)
+			mime = mime_from_file(d)
 		return "data:" + mime + ";base64," + base64.b64encode(d).decode("ascii")
 	async def to_data_url(self, url, small=False, fmt="jpg", timeout=8):
 		tup = shash((url, small, fmt))
@@ -3275,8 +3290,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				num = getattr(mpf(default), _op)(num)
 			return num
 		f = expr.strip()
+		div = 1
+		if f.endswith("%"):
+			f = f[:-1].rstrip()
+			div = 100
+		elif f.endswith("‰"):
+			f = f[:-1].rstrip()
+			div = 1000
 		if re.fullmatch(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?(?:\/\d*\.?\d+)?", f):
-			return round_min(f)
+			return round_min(float(f) / div)
 		try:
 			if not f:
 				return 0
@@ -3288,13 +3310,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					return False
 				else:
 					try:
-						return round_min(f)
+						return round_min(float(f) / div)
 					except Exception:
-						try:
-							return orjson.loads(f)
-						except orjson.JSONDecodeError:
-							return eval_json(f)
-		except (ValueError, TypeError, SyntaxError):
+						return round_min(float(eval_json(f)) / div)
+		except (ValueError, TypeError, SyntaxError, json.decoder.JSONDecodeError, orjson.JSONDecodeError):
 			r = await self.solve_math(f, 128, 0, variables=self.consts)
 		x = r[0]
 		if x and isinstance(x, str):
@@ -3304,27 +3323,29 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				except Exception:
 					print_exc()
 				else:
-					return x
+					return round_min(x / div)
 			if x.isnumeric():
-				return int(x)
+				return round_min(float(x) / div)
 		if isinstance(x, (int, float, np.number)):
-			return round_min(x)
+			return round_min(x / div)
 		if x in (None, "None"):
 			return
 		try:
 			if "/" in x:
 				raise ValueError
-			x = round_min(x)
+			x = round_min(float(x) / div)
 		except ValueError:
 			try:
-				x = round_min(eval_json(x))
+				x = round_min(float(eval_json(x)) / div)
 			except Exception:
 				x = None
 		if x is None:
 			raise ValueError(f'Could not evaluate expression "{expr}" as number.')
 		if not isinstance(x, int) and len(str(x)) <= 16:
-			return round_min(float(x))
-		return x
+			return round_min(float(x) / div)
+		if isinstance(x, fractions.Fraction):
+			return x / div
+		return int(x) // div
 
 	async def solve_math(self, f, prec=128, r=False, timeout=16, variables=None, nlp=False):
 		"Evaluates a math formula to a list of answers, using a math process from the subprocess pool when necessary."
@@ -3365,7 +3386,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			pass
 		elif Request.sessions:
 			try:
-				await Request.sessions.next().head(f"https://discord.com/api/{api}/users/@me", timeout=5)
+				await Request.asession.head(f"https://discord.com/api/{api}/users/@me", timeout=5)
 				if self.api_latency >= 300:
 					print(f"API latency {self.api_latency} exceeded 300s, restarting...")
 					await run_async(self.start_audio_client, shutdown=True)
@@ -5029,7 +5050,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				else:
 					tfut = None
 				try:
-					temp_content = await self.proxy_emojis(content, guild=guild, strict=response.get("strict", True))
+					temp_content = await self.proxy_emojis(content, guild=guild, strict=response.get("strict", True), allow_numeric=False)
 					new_content = await parse_latex(temp_content)
 					await manager.update(new_content, embeds=embeds, files=files, buttons=buttons, prefix=prefix, suffix=suffix, bypass=(bypass_prefix, bypass_suffix), reacts=reacts, done=done, force=force)
 				except (OverflowError, InterruptedError):

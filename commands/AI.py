@@ -401,7 +401,7 @@ class Ask(Command):
 		if emojis:
 			emojis = shuffle(emojis)[:25]
 			emojitexts = " ".join(sorted(f":{e.name}:" for e in emojis))
-			personality += f"\n[INFO] Current conversation takes place on Discord, where you have access to the following emojis. You may use these as alternatives to Unicode; DO NOT invent new ones not present here or in conversation.\n{emojitexts}"
+			personality += f"\n[INFO] Current conversation takes place on Discord, where you have access to the following emojis; DO NOT invent new ones not present here or in conversation. You may still use Unicode emojis.\n{emojitexts}"
 		tzinfo = self.bot.data.users.get_timezone(_user.id)
 		if tzinfo is None:
 			tzinfo = datetime.timezone.utc
@@ -888,12 +888,12 @@ class Instruct(Command):
 			description="Input text for completion",
 			example="Once upon a time, there was",
 		),
-		images=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
+		medias=cdict(
+			type="media",
+			description="Image, animation, video or audio, supplied by URL or attachment",
 			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
-			multiple=True,
+			required=True,
 		),
 		api=cdict(
 			type="string",
@@ -941,7 +941,7 @@ class Instruct(Command):
 	ephemeral = True
 	cache = AutoCache(stale=360, timeout=720)
 
-	async def __call__(self, bot, _message, _premium, model, prompt, images, api, temperature, frequency_penalty, presence_penalty, reasoning_effort, max_tokens, **void):
+	async def __call__(self, bot, _message, _premium, model, prompt, medias, api, temperature, frequency_penalty, presence_penalty, reasoning_effort, max_tokens, **void):
 		if not model:
 			model = "large"
 		if model not in ai.available:
@@ -976,7 +976,7 @@ class Instruct(Command):
 			kwargs["api"] = oai
 		kwargs["max_tokens"] = max_tokens
 		kwargs["reasoning_effort"] = reasoning_effort
-		resp = await bot.force_completion(model=model, prompt=prompt, images=images, stream=True, timeout=1800, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, premium_context=_premium, allow_alt=True, **kwargs)
+		resp = await bot.force_completion(model=model, prompt=prompt, medias=medias, stream=True, timeout=1800, temperature=temperature, frequency_penalty=frequency_penalty, presence_penalty=presence_penalty, premium_context=_premium, allow_alt=True, **kwargs)
 		try:
 			_message.__dict__.setdefault("inits", []).append(resp)
 		except Exception:
@@ -995,12 +995,12 @@ class Instruct(Command):
 
 
 class Describe(Command):
-	name = ["Description", "Image2Text"]
-	description = "Describes the input image/video, or reads text within."
+	name = ["Description", "Image2Text", "Audio2Text"]
+	description = "Describes the input image/video/audio, including any text within."
 	schema = cdict(
 		url=cdict(
-			type="visual",
-			description="Image, animation or video, supplied by URL or attachment",
+			type="media",
+			description="Image, animation, video or audio, supplied by URL or attachment",
 			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
 			required=True,
@@ -1021,7 +1021,7 @@ class Describe(Command):
 	ephemeral = True
 
 	async def __call__(self, bot, _user, _premium, url, text_only, **void):
-		info = await self.bot.vision(url, premium_context=_premium, timeout=90)
+		info = await self.bot.describe(url, premium_context=_premium, timeout=90)
 		if text_only:
 			assert info.text, "Unable to find text."
 			return info.text
