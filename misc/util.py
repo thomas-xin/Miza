@@ -685,9 +685,9 @@ def text_gradient(seq, sep, gradient, luma=0, tolerance=8):
 	return sep.join(out)
 
 def print_process_log(*args):
-	s = f"({colourise(json_dumpstr(args[0]), fg=0xff9f00)}"
+	s = f"{colourise(json_dumpstr(args[0]), fg=0xff9f00)}"
 	if len(args) > 1:
-		s += f", {colourise(fg=0xffff00)}{', '.join(map(json_dumpstr, args[1:]))}){colourise()}"
+		s = f"({s}, {colourise(fg=0xffff00)}{', '.join(map(json_dumpstr, args[1:]))}){colourise()}"
 	print(s)
 	return s
 
@@ -4630,9 +4630,9 @@ def aexec(s, glob=None, filename="<aexec>"):
 	glob = glob or globals()
 	s = as_str(s)
 	if s.startswith("!"):
-		print_process_log(*s[1:])
+		print_process_log(s[1:])
 		proc = subprocess.run(s[1:], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		output = (as_str(proc.stdout) + "\n" + as_str(proc.stderr)).strip()
+		output = (as_str(proc.stdout.strip()) + "\n" + as_str(proc.stderr).strip())
 		if output:
 			glob["_"] = output
 		return output or None

@@ -437,7 +437,9 @@ class UpdateExec(Database):
 			proc = await asyncio.create_subprocess_shell(proc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, limit=65536)
 			out = await proc.stdout.read()
 			err = await proc.stderr.read()
-			output = (as_str(out) + "\n" + as_str(err)).strip()
+			output = out.strip()
+			if err:
+				output += "\n" + colourise(err.strip(), 0xff0000)
 			if output:
 				glob["_"] = output
 			return output
