@@ -101,7 +101,7 @@ class Restart(Command):
 			return
 		if mode in ("update", "all", "shutdown"):
 			resps = await gather(*(
-				*([_run_async(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)] if mode == "update" else ()),
+				*([check_output_async(["git", "pull"])] if mode == "update" else ()),
 				_run_async(bot.start_audio_client, shutdown=True),
 				_run_async(bot.start_webserver, shutdown=True),
 			), return_exceptions=True)
@@ -154,23 +154,23 @@ class Restart(Command):
 		async with Delay(1):
 			async with ctx:
 				# Call _destroy_ bot event to indicate to all databases the imminent shutdown
-				print("Destroying database memory...")
+				print(colourise("Destroying database memory...", 0xffff00))
 				with tracebacksuppressor:
 					await bot.send_event("_destroy_", shutdown=mode == "shutdown")
 				with tracebacksuppressor:
 					await _run_async(bot.handle_update, force=True)
 				create_task(restart_workers(shutdown=True))
 				# Save any database that has not already been autosaved
-				print("Saving all databases...")
+				print(colourise("Saving all databases...", 0xff9f00))
 				with tracebacksuppressor:
 					await _run_async(bot.update, force=True)
 				# Send the bot "offline"
 				bot.closed = True
-				print("Going offline...")
+				print(colourise("Going offline...", 0xff5f00))
 				with tracebacksuppressor:
 					async with asyncio.timeout(3):
 						await bot.change_presence(status=discord.Status.invisible)
-				print("Goodbye.")
+				print(colourise("Goodbye.", 0xff0000))
 				with suppress(NameError, AttributeError):
 					PRINT.flush()
 					PRINT.close(force=True)
@@ -433,6 +433,7 @@ class UpdateExec(Database):
 			except (AttributeError, KeyError):
 				pass
 		if term & 32:
+			print_process_log(*proc)
 			proc = await asyncio.create_subprocess_shell(proc, stdout=subprocess.PIPE, stderr=subprocess.PIPE, limit=65536)
 			out = await proc.stdout.read()
 			err = await proc.stderr.read()
@@ -985,7 +986,7 @@ class UpdateMessageCache(Database):
 					return
 			curr_id = current_snowflake()
 			if messages:
-				print(f"C{channel.id}: Stored {len(messages)}")
+				print(colourise(f"C{colourise(channel.id, 0xffff00)}{colourise(fg=0xffffff)}: Stored {colourise(len(messages), 0xff7f7f)}{colourise()}", 0xffffff))
 				await _run_async(self.save_messages, messages)
 		self.loader[channel.id] = curr_id
 
@@ -1018,7 +1019,7 @@ class UpdateMessageCache(Database):
 			if messages:
 				await _run_async(self.save_messages, messages)
 				p = "+" if extra else ""
-				print(f"G{guild.id}: Stored {len(messages)}{p}")
+				print(colourise(f"G{colourise(guild.id, 0xffff00)}{colourise(fg=0xffffff)}: Stored {colourise(len(messages), 0xff7f7f)}{p}{colourise()}", 0xffffff))
 			if extra:
 				duration = min(duration, (dtnu() - messages[-1].created_at).total_seconds() if messages else inf)
 				await gather(*(self.load_channel(c, duration=duration) for c in channels), max_concurrency=20)

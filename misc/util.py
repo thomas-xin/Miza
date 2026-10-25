@@ -224,7 +224,7 @@ def force_kill(proc):
 			killed.append(child)
 			print(child, "killed.")
 	proc.terminate()
-	print(proc, "killed.")
+	print(colourise(repr(proc), fg=0xff9f00), colourise("killed.", fg=0xff0000) + colourise())
 	with tracebacksuppressor:
 		_, alive = psutil.wait_procs(killed, timeout=2)
 	for child in alive:
@@ -683,6 +683,13 @@ def text_gradient(seq, sep, gradient, luma=0, tolerance=8):
 		else:
 			out.append(s)
 	return sep.join(out)
+
+def print_process_log(*args):
+	s = f"({colourise(json_dumpstr(args[0]), fg=0xff9f00)}"
+	if len(args) > 1:
+		s += f", {colourise(fg=0xffff00)}{', '.join(map(json_dumpstr, args[1:]))}){colourise()}"
+	print(s)
+	return s
 
 # Discord object mention formatting
 def user_mention(uid):
@@ -1367,7 +1374,7 @@ def get_image_size(b):
 		input.seek(0)
 		save_file(input, temp)
 		cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", temp)
-		print(cmd)
+		print_process_log(*cmd)
 		try:
 			out = subprocess.check_output(cmd)
 		finally:
@@ -1631,7 +1638,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 							with open(fn, "wb") as f:
 								f.write(data)
 						cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=avg_frame_rate,duration", "-show_entries", "format=duration", "-of", "csv=s=x:p=0", fn)
-						print(cmd)
+						print_process_log(*cmd)
 						p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
 						res = as_str(p.stdout.read()).strip()
 						if res:
@@ -1671,6 +1678,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 				with open(fn, "wb") as f:
 					f.write(data)
 			cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-count_frames", "-show_streams", fn)
+			print_process_log(*cmd)
 			p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			try:
 				lines = as_str(p.stdout.read()).splitlines()
@@ -1694,7 +1702,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 			if nogif:
 				cmd2.extend(("-vframes", "1"))
 			cmd2.append("-")
-			print(cmd2)
+			print_process_log(*cmd2)
 			proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
 			mode = "RGBA" if fmt == "rgba" else "RGB"
 			size = (int(info.get("width") or info.get("coded_width")), int(info.get("height") or info.get("coded_height")))
@@ -1711,7 +1719,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 				fps = maxframes / dur
 				framedur = 1 / fps
 				cmd3 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps}", "-f", "rawvideo", "-pix_fmt", fmt, "-"]
-				print(cmd3)
+				print_process_log(*cmd3)
 				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
 			elif dur > 1 and msize and size[0] * size[1] > msize ** 2:
 				proc.terminate()
@@ -1719,7 +1727,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 				w = round(w / 2) * 2
 				h = round(h / 2) * 2
 				cmd3 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"scale={w}:{h}:flags=lanczos", "-f", "rawvideo", "-pix_fmt", fmt, "-"]
-				print(cmd3)
+				print_process_log(*cmd3)
 				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
 			elif not nogif and bytecount > 32 * 1073741824:
 				proc.terminate()
@@ -1732,7 +1740,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 				bcount = 4 if fmt == "rgba" else 3
 				bcount *= int(np.prod(size))
 				cmd3 = ["ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps},scale={w}:{h}:flags=bicublin", "-f", "rawvideo", "-pix_fmt", fmt, "-"]
-				print(cmd3)
+				print_process_log(*cmd3)
 				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=None, bufsize=64 * 1048576)
 			if nogif:
 				fcount = dur = fps = 1
@@ -3729,7 +3737,7 @@ class FileHashDict(collections.abc.MutableMapping):
 		self.db_sem.pause()
 		try:
 			args = [python, "misc/vacuum.py", self.path]
-			print(args)
+			print_process_log(*args)
 			subprocess.run(args)
 			return self.load_cursor()
 		finally:
@@ -3796,7 +3804,7 @@ class AutoCache(cachecls, collections.abc.MutableMapping):
 		fut.set_result(super().__init__(self._path, shards=self._shardcount, **self._kwargs))
 		import atexit
 		atexit.register(self.sync)
-		print("Loaded Cache:", self._path, len(self), self._stale, self._stimeout, self._kwargs)
+		print(colourise("Loaded Cache:", fg=0x00ff00) + colourise(fg=0x7fffbf), self._path, len(self), self._stale, self._stimeout, self._kwargs, colourise())
 
 	def __getattr__(self, k):
 		if k not in ("base_init", "__class__", "__slots__", *self.__slots__):
@@ -4128,7 +4136,7 @@ class AutoDatabase(cachecls, collections.abc.MutableMapping):
 		super().__init__(self._path, shards=self._shardcount, **self._kwargs)
 		import atexit
 		atexit.register(self.sync)
-		print("Loaded Database:", self._path, len(self), self._kwargs)
+		print(colourise("Loaded Database:", fg=0x00ff00) + colourise(fg=0x7fffbf), self._path, len(self), self._kwargs, colourise())
 
 	def __getattr__(self, k):
 		try:
@@ -4622,6 +4630,7 @@ def aexec(s, glob=None, filename="<aexec>"):
 	glob = glob or globals()
 	s = as_str(s)
 	if s.startswith("!"):
+		print_process_log(*s[1:])
 		proc = subprocess.run(s[1:], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		output = (as_str(proc.stdout) + "\n" + as_str(proc.stderr)).strip()
 		if output:
@@ -5404,7 +5413,7 @@ class EvalPipe:
 	@classmethod
 	def connect(cls, args, port, address="127.0.0.1", independent=True, glob=globals(), timeout=60):
 		addr = (address, port)
-		print(f"{DynamicDT.now()}: EvalPipe connecting to", ":".join(map(str, addr)))
+		print(f"{colourise(DynamicDT.now(), fg=0x00ffff)}{colourise()}: {colourise(fg=0xbfbfff)}EvalPipe connecting to{colourise(fg=0xbf7fff)}", ":".join(map(str, addr)) + colourise())
 		server = None
 		try:
 			server = multiprocessing.connection.Listener(addr, authkey=cls.key)
@@ -5427,7 +5436,7 @@ class EvalPipe:
 				else:
 					argstr = " ".join(map(json_dumpstr, args))
 					args = ["xterm", "-e", argstr]
-			print(args)
+			print_process_log(*args)
 			subprocess.Popen(args, shell=isinstance(args, str), stdin=subprocess.DEVNULL, stdout=None, stderr=None)
 			t = utc()
 			for i in range(timeout):
@@ -5441,7 +5450,7 @@ class EvalPipe:
 					break
 			else:
 				raise
-		print(f"{DynamicDT.now()}: Connection established:", conn)
+		print(f"{colourise(DynamicDT.now(), fg=0x00ffff)}{colourise()}: {colourise(fg=0x00ff00)}Connection established:", colourise(conn, fg=0xff7fbf) + colourise())
 		assert conn.readable and conn.writable, "Connection must be readable and writable."
 		pid = conn.recv()
 		proc = psutil.Process(pid)
@@ -5479,7 +5488,7 @@ class EvalPipe:
 				raise
 			else:
 				break
-		print(f"{DynamicDT.now()}: EvalPipe listening on", ":".join(map(str, server.address)))
+		print(f"{colourise(DynamicDT.now(), fg=0x00ffff)}{colourise()}: {colourise(fg=0xbfbfff)}EvalPipe listening on{colourise(fg=0xbf7fff)}", ":".join(map(str, server.address)) + colourise())
 		return cls(
 			lambda: True,
 			None,
@@ -5499,7 +5508,7 @@ class EvalPipe:
 	@classmethod
 	def from_proc(cls, proc, glob=globals()):
 		flushin = Flush(proc.stdin)
-		print(f"{DynamicDT.now()}: EvalPipe connecting on", proc.pid)
+		print(f"{colourise(DynamicDT.now(), fg=0x00ffff)}{colourise()}: {colourise(fg=0xbfbfff)}EvalPipe connecting on{colourise(fg=0xbf7fff)}", str(proc.pid) + colourise())
 		return cls(
 			proc.is_running,
 			lambda b: flushin.write(b.rstrip(b"\n") + b"\n"),
@@ -5514,7 +5523,7 @@ class EvalPipe:
 	@classmethod
 	def from_stdin(cls, start=False, glob=globals()):
 		flushout = Flush(sys.__stdout__.buffer, flush=sys.__stdout__.flush)
-		print(f"{DynamicDT.now()}: EvalPipe listening from", os.getpid())
+		print(f"{colourise(DynamicDT.now(), fg=0x00ffff)}{colourise()}: {colourise(fg=0xbfbfff)}EvalPipe listening from{colourise(fg=0xbf7fff)}", str(os.getpid()) + colourise())
 		return cls(
 			lambda: not sys.__stdin__.closed,
 			lambda b: flushout.write(b.rstrip(b"\n") + b"\n"),
@@ -5638,7 +5647,7 @@ class EvalPipe:
 					self.writable = False
 					self.p_in = self.p_out = self.p_kill = self.p_join = None
 					conn = self.server.accept()
-					print("Connection established:", conn)
+					print(f"{colourise(DynamicDT.now(), fg=0x00ffff)}{colourise()}: {colourise(fg=0x00ff00)}Connection established:", colourise(conn, fg=0xff7fbf) + colourise())
 					conn.send(os.getpid())
 					self.p_in = (lambda b: share_bytes(conn.send_bytes, b)) if self.address == "127.0.0.1" else conn.send_bytes
 					self.p_out = (lambda: receive_bytes(conn.recv_bytes, unlink=lambda name: self.run(f"EvalPipe.MEMS.pop({repr(name)}).close()"))) if self.address == "127.0.0.1" else conn.recv_bytes
@@ -5988,7 +5997,7 @@ def download_file(*urls, filename=None, timeout=12, input_headers=None, return_h
 		except (FileNotFoundError, OSError, PermissionError):
 			pass
 		args = ["curl", urls[0], "-s", "-o", filename]
-		print(args)
+		print_process_log(*args)
 		subprocess.run(args)
 		assert os.path.exists(filename)
 	if filename is None:

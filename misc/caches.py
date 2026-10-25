@@ -21,13 +21,13 @@ import requests
 import streamshatter
 from misc.types import utc, as_str, byte_like, round_min, cdict, fcdict
 from misc.asyncs import _run_async, run_async, submit_thread, wrap_future, await_fut, create_task, gather, Future, Delay
-from misc.smath import get_closest_heart
+from misc.smath import get_closest_heart, colour2raw
 from misc.util import (
     CACHE_FILESIZE, CACHE_PATH, AUTH, Request, api, AutoCache, read_file_a, download_file, header_test, getsize, retrieve_api,
     tracebacksuppressor, choice, json_dumps, json_dumpstr, b64, scraper_blacklist, shorten_chunks, expand_chunks, url2fn,
 	ungroup_attachments, is_discord_url, is_miza_attachment, temporary_file, url2ext, is_discord_attachment, is_miza_url,
     snowflake_time_2, shorten_attachment, expand_attachment, merge_url, split_url, discord_expired, unyt, VISUAL_FORMS,
-	raise_aiohttp_safe, image_from_bytes, ImageSequence, image_properties, is_url,
+	raise_aiohttp_safe, image_from_bytes, ImageSequence, image_properties, is_url, print_process_log, colourise,
 )
 
 def has_transparency(image):
@@ -110,7 +110,7 @@ class ColourCache(AutoCache):
 				fp = await attachment_cache.download(url, read=True)
 				im = await _run_async(Image.open, fp)
 				c = await _run_async(get_colour, im)
-		print("GC:", url, c)
+		print("GC:", colourise(url, colour2raw(c)), c, colourise())
 		return c[:3]
 
 	async def obtain(self, url):
@@ -781,6 +781,7 @@ def _audio_meta(path, _timeout=12) -> dict:
 		path,
 	)
 	lines = ()
+	print_process_log(*command)
 	try:
 		proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
 		proc.wait(timeout=_timeout)
@@ -828,6 +829,7 @@ def _video_meta(path, _timeout=12) -> dict:
 		path,
 	)
 	lines = ()
+	print_process_log(*command)
 	try:
 		proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
 		proc.wait(timeout=_timeout)
@@ -970,6 +972,7 @@ def acquire_from_archive(url, arcnames, filenames):
 		try:
 			for fn in filenames:
 				args = [fn, "--version"]
+				print_process_log(*args)
 				subprocess.run(args)
 		except FileNotFoundError:
 			fn = await_fut(attachment_cache.download(url, filename=True))

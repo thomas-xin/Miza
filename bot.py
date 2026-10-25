@@ -545,7 +545,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			)
 			commands = dict((int(c["id"]), c) for c in data if str(c.get("application_id")) == str(self.id))
 			if commands:
-				print(f"Successfully loaded {len(commands)} application command{'s' if len(commands) != 1 else ''}.")
+				print(colourise(f"Successfully loaded {len(commands)} application command{'s' if len(commands) != 1 else ''}.{colourise()}", 0x00ff00))
 
 		def recursively_equal(opt1, opt2):
 			for k, v in opt1.items():
@@ -1900,54 +1900,20 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			image = await attachment_cache.download(verify_url(image), filename=True, input_headers=headers, max_size=1073741824 * 64)
 		return await process_image(image, "resize_map", args, timeout=timeout)
 
-	# Map of search engine locations for browsing the internet. As we do not have access to the user's IP address, we estimate their timezone and use that to approximate their location.
-	browse_locations = {
-		-11: "nz-en",	# New Zealand
-		-10: "nz-en",
-		-9: "us-en",	# United States
-		-8: "us-en",
-		-7: "us-en",
-		-6: "us-en",
-		-5: "ca-en",	# Canada
-		-4: "ca-en",
-		-3: "ca-en",
-		-2: "uk-en",	# United Kingdom
-		-1: "uk-en",
-		0: "uk-en",
-		1: "uk-en",
-		2: "za-en",		# South Africa
-		3: "xa-en",		# Arabia
-		4: "xa-en",
-		5: "in-en",		# India
-		6: "in-en",
-		7: "id-en",		# Indonesia
-		8: "sg-en",		# Singapore
-		9: "au-en",		# Australia
-		10: "au-en",
-		11: "au-en",
-		12: "nz-en",	# New Zealand
-	}
 	ddgs = ddgs.DDGS(timeout=120)
 	async def browse(self, argv, uid=0, timezone=None, region=None, n=3, sources=False, timeout=60):
 		"Browses the internet for a search query or URL."
-		if not region:
-			if timezone is None:
-				if "users" in self.data:
-					timezone = self.data.users.any_timezone(uid)
-			if timezone is not None:
-				timezone = round(get_offset(timezone) / 3600)
-			region = self.browse_locations.get(timezone, "wt-wt")
-		async def retrieval(argv, region="wt-wt"):
+		async def retrieval(argv, region="us-en"):
 			if not is_url(argv):
 				data = []
-				backends = shuffle(["bing", "brave", "duckduckgo", "mojeek", "yandex", "yahoo"])[:n]
+				backends = shuffle(["bing", "brave", "duckduckgo", "google", "mojeek", "yahoo"])
 				if ":" in argv:
 					backends.insert(0, "auto")
 				else:
 					backends.append("auto")
 				while backends and not data:
 					futs = []
-					for backend in backends:
+					for backend in backends[:n]:
 						fut = _run_async(
 							self.ddgs.text,
 							argv,
@@ -1994,7 +1960,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			urls.append(argv)
 		futs = [create_task(self.extract_cache.aretrieve(
 			f"browse-{argv}", retrieval,
-			argv, region,
+			argv, region or "us-en",
 		)) for argv in urls]
 		resp = await gather(*futs)
 		return "\n\n\n".join(resp) if isinstance(resp[0], str) else b"\n\n\n".join(resp)
@@ -2042,7 +2008,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			if modality == "audio":
 				if mime.split("/", 1)[-1] not in ("mp3", "mpeg"):
 					args = ["ffmpeg", "-hide_banner", "-v", "error", "-i", "-", "-f", "mp3", "-c:a", "libmp3lame", "-b:a", "224k", "-vbr", "on", "-ar", "44100", "-"]
-					print(args)
+					print_process_log(*args)
 					proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 					d2, err = await _run_async(proc.communicate, d)
 					if d2:
@@ -2429,15 +2395,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							bv = bitrate - ba
 							fn2 = temporary_file("mp4")
 							cmd = ["ffmpeg", "-hide_banner", "-v", "error", "-i", raw, "-c:v", "av1_nvenc", "-c:a", "libopus", "-b:v", str(bv), "-b:a", str(ba), "-vbr", "on", fn2]
-							print(cmd)
-							proc = await asyncio.create_subprocess_exec(*cmd, stdout=subprocess.DEVNULL)
-							try:
-								async with asyncio.timeout(3200):
-									await proc.wait()
-							except (T0, T1, T2):
-								with tracebacksuppressor:
-									force_kill(proc)
-								raise
+							print_process_log(*cmd)
+							await check_output_async(cmd)
 							assert os.path.exists(fn2) and os.path.getsize(fn2)
 							fn = fn2
 						else:
@@ -3533,11 +3492,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		reloaded = False
 		if module in self._globals:
 			reloaded = True
-			print(f"Reloading module {module}...")
+			print(colourise(f"Reloading module {colourise(module, 0xff7fbf)}{colourise(fg=0xffff00)}...", 0xffff00) + colourise())
 			if module in self.categories:
 				self.unload(module)
 		else:
-			print(f"Loading module {module}...")
+			print(colourise(f"Loading module {colourise(module, 0xff7fbf)}{colourise(fg=0xffff00)}...", 0xffff00) + colourise())
 			new = True
 		if not new:
 			mod = self._globals.pop(module, {})
@@ -3549,7 +3508,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			b = f.read()
 		code = compile(b, fn, "exec")
 		exec(code, mod)
-		print(f"Evaluated module {module}...")
+		print(colourise(f"Evaluated module {colourise(module, 0xff7fbf)}{colourise(fg=0x00ff00)}...", 0x00ff00) + colourise())
 		self._globals[module] = mod
 		commands = deque()
 		dataitems = deque()
@@ -3569,16 +3528,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.dbitems[module] = dataitems
 		self.size[module] = line_count("commands/" + path)
 		if commands:
-			print(f"{module}: Successfully loaded {len(commands)} command{'s' if len(commands) != 1 else ''}.")
+			print(f"{colourise(module, 0xff7fbf)}{colourise()}: {colourise(fg=0x7fffbf)}Successfully loaded {len(commands)} command{'s' if len(commands) != 1 else ''}.{colourise()}")
 		if dataitems:
-			print(f"{module}: Successfully loaded {len(dataitems)} database{'s' if len(dataitems) != 1 else ''}.")
+			print(f"{colourise(module, 0xff7fbf)}{colourise()}: {colourise(fg=0x7fffbf)}Successfully loaded {len(dataitems)} database{'s' if len(dataitems) != 1 else ''}.{colourise()}")
 		if reloaded:
 			while not self.ready:
 				time.sleep(0.5)
-			print(f"Resending _ready_ event to module {module}...")
+			print(colourise(f"Resending _ready_ event to module {colourise(module, 0xff7fbf)}{colourise(fg=0xff0000)}...", 0xffff00) + colourise())
 			futs = []
 			for db in dataitems:
-				print(f"- {db}")
+				print(colourise(f"- {colourise(db, 0xbf7fff)}", fg=0xff7fbf) + colourise())
 				for f in dir(db):
 					if f.startswith("_") and f[-1] == "_" and f[1] != "_":
 						func = getattr(db, f, None)
@@ -3591,7 +3550,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						futs.append(fut)
 			print("...")
 			await_fut(gather(*futs))
-		print(f"Successfully loaded module {module}.")
+		print(colourise(f"Successfully loaded module {colourise(module, 0xff7fbf)}{colourise(fg=0x00ff00)}.", 0x00ff00) + colourise())
 		return True
 
 	@tracebacksuppressor
@@ -3697,6 +3656,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				continue
 			break
 		args = ["tar", "-cvf", fn, "saves"]
+		print_process_log(*args)
 		subprocess.run(args)
 		if os.path.exists(fn):
 			print("Backup database created in", fn)
@@ -4662,10 +4622,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			kwargs = await self.extract_kwargs(argv, command, u_perm, user, message, channel, guild, command_check, kwargs)
 		except Exception:
 			if not soon_indicator and message and user:
-				print(f"{cid}: {user} ({user.id}) queued command {command_check} {kwargs or argv}")
+				print(f"{colourise(cid, 0xff00ff)}{colourise()}: {colourise(user, 0xbf7fff)} {colourise()}({colourise(user.id, 0xff7fbf)}{colourise()}) queued command {colourise(command_check, 0x7f7fff)} {colourise(kwargs or argv, 0xbfbfff)}{colourise()}")
 			raise
 		if message and user:
-			print(f"{cid}: {user} ({user.id}) executing command {command_check} {kwargs or argv}")
+			print(f"{colourise(cid, 0xff00ff)}{colourise()}: {colourise(user, 0xbf7fff)} {colourise()}({colourise(user.id, 0xff7fbf)}{colourise()}) executed command {colourise(command_check, 0x7f7fff)} {colourise(kwargs or argv, 0xbfbfff)}{colourise()}")
 		comment = comment or ""
 		fut = None
 		async with sem:
@@ -5741,7 +5701,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if self.server:
 			fut = self.server.asubmit("[k for k, v in banned_ips.items() if v]")
 		if AUTH.get("ssl_generator"):
-			await _run_async(subprocess.run, AUTH["ssl_generator"])
+			print_process_log(*AUTH["ssl_generator"])
+			await check_output_async(AUTH["ssl_generator"])
 		if self.server:
 			banned_ips = await fut
 		ac = {str(k): v for k, v in attachment_cache.items() if isinstance(k, int) and v and not discord_expired(v)}
@@ -7111,11 +7072,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		)
 		total = max(resp.total_results + self.get_guildbase(guild_id, f"index.{target}.count", 0), add)
 		if author_id:
-			print(f"{guild_id}: Indexed {total} message(s) from user {author_id}")
+			print(f"{colourise(guild_id, 0xbfbfff)}{colourise()}: Indexed {colourise(total, 0x00ff00)} message(s) from user {colourise(author_id, 0x00ffff)}{colourise()}")
 		elif channel_id:
-			print(f"{guild_id}: Indexed {total} message(s) from channel {channel_id}")
+			print(f"{colourise(guild_id, 0xbfbfff)}{colourise()}: Indexed {colourise(total, 0x00ff00)} message(s) from channel {colourise(channel_id, 0x00ffff)}{colourise()}")
 		else:
-			print(f"{guild_id}: Indexed {total} message(s)")
+			print(f"{colourise(guild_id, 0xbfbfff)}{colourise()}: Indexed {colourise(total, 0x00ff00)} total message(s){colourise()}")
 		mids = [m.id for m in resp.messages]
 		if not mids or info.get("min"):
 			mids.append(info.get("min", 0))
@@ -7178,7 +7139,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 	async def socket_response(self, data):
 		if data.get("op") or "d" not in data:
 			return
-		sys.__stdout__.write(f"Total socket inputs: {self.sockets_count}\r")
+		sys.__stdout__.write(colourise(f"Total socket inputs: {colourise(self.sockets_count)}\r", 0x7f7f7f))
 		self.sockets_count += 1
 		try:
 			ptype = data.get("t") or ""
@@ -7427,7 +7388,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 		async def on_full_connect():
 			await _run_async(self.set_guilds)
-			print("Successfully connected as " + str(self.user))
+			print(colourise(f"Successfully connected as {colourise(self.user, 0xbf7fff)}{colourise()}", 0x00ff00))
 
 		@self.event
 		async def on_shard_connect(shard_id):
@@ -8336,10 +8297,13 @@ if __name__ == "__main__":
 				loop = asyncio.get_event_loop()
 				for task in asyncio.all_tasks(loop):
 					if task.get_name() == task_name:
-						print(f"\n[Slow task detected] {task}")
+						s = "\n" + colourise(f"[Slow task detected] {colourise(task, fg=0xff9f00)}", fg=0xff0000)
+						s += "\n"
+						s += colourise("", fg=0xffff00)
 						for line in format_async_stack(task.get_coro()):
-							print(line.strip())
-						print("[End slow task dump]\n")
+							s += line.strip() + "\n"
+						s += colourise("[End slow task dump]", fg=0xff0000) + colourise() + "\n"
+						print(s)
 
 			# Monkey-patch
 			asyncio.base_events.logger.warning = custom_warning
@@ -8348,11 +8312,11 @@ if __name__ == "__main__":
 
 			PRINT.start()
 			sys.stdout = sys.stderr = print = PRINT
-			print("Logging started.")
+			print(colourise("Logging started.", 0x00ff00))
 
 			profiling = 1 if len(sys.argv) > 1 and sys.argv[1] == "1" else 0
 			if profiling:
-				print("Profiling is ON.")
+				print(colourise("Profiling is ON.", 0xffff00))
 				import yappi
 				yappi.start()
 			try:
@@ -8371,7 +8335,7 @@ if __name__ == "__main__":
 					func_stats = yappi.get_func_stats()
 					func_stats.save("profile.prof", type="pstat")
 
-			sys.__stdout__.write("MAIN PROCESS EXITING...")
+			sys.__stdout__.write(colourise("MAIN PROCESS EXITING...", 0xff0000))
 			common.MEM_LOCK.close()
 	print = _print
 	sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__

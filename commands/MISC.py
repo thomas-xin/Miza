@@ -413,15 +413,8 @@ class Audioptic(Command):
 			fmt = "opus" if was_image else "png"
 		dest = temporary_file(fmt)
 		args = ["audioptic", url, dest]
-		print(args)
-		proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
-		try:
-			async with asyncio.timeout(3200):
-				await proc.wait()
-		except (T0, T1, T2):
-			with tracebacksuppressor:
-				force_kill(proc)
-			raise
+		print_process_log(*args)
+		await check_output_async(args)
 		name = replace_ext(fn, fmt)
 		return cdict(file=CompatFile(dest, filename=name))
 
@@ -492,7 +485,7 @@ class SpectralPulse(Command):
 			if self.spec_sem.is_busy() and not getattr(message, "simulated", False):
 				await send_with_react(channel, italics(ini_md(f"SpectralPulse: {sqr_md(url)} enqueued in position {sqr_md(self.spec_sem.passive + 1)}.")), reacts="❎", reference=message)
 			async with self.spec_sem:
-				print(args)
+				print_process_log(*args)
 				proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd(), stdout=subprocess.DEVNULL)
 				with suppress():
 					message.__dict__.setdefault("inits", []).append(proc)

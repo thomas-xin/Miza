@@ -325,7 +325,9 @@ is_code = lambda fn: str(fn).endswith(".py") or str(fn).endswith(".pyw")
 
 if os.name == "nt":
 	def get_folder_size(path="."):
-		s = subprocess.check_output(f'dir /a /w /s "{path}"', shell=True)
+		cmd = f'dir /a /w /s "{path}"'
+		print_process_log(cmd)
+		s = subprocess.check_output(cmd, shell=True)
 		spl = s.splitlines()
 		finfo = spl[-2].strip().decode("ascii")
 		# print(finfo)
@@ -1501,6 +1503,7 @@ def spec2cap(skip=False):
 	mc = cc + 1 >> 1
 	ram = psutil.virtual_memory().total
 	try:
+		print_process_log("ffmpeg")
 		subprocess.run("ffmpeg")
 	except FileNotFoundError:
 		ffmpeg = False
@@ -2409,31 +2412,23 @@ if __name__ != "__mp_main__":
 				with contextlib.closing(f):
 					if trunc:
 						f.truncate(0)
-					try:
-						f.write(b)
-					except TypeError:
-						try:
-							f.write(as_str(b))
-						except ValueError:
-							pass
+					f.write(decolourise(as_str(b)))
 			except Exception:
 				sys.__stdout__.write(traceback.format_exc())
 
 		def flush(self):
 			outfunc = lambda s: self.file_print(self.file, s)
-			enc = lambda x: x.encode("utf-8")
 			try:
 				for f, v in tuple(self.data.items()):
 					s = "".join(v)
 					v.clear()
 					out = lim_str(s, 65536)
-					data = enc(s)
 					if self.funcs and out.strip():
 						[func(out) for func in self.funcs]
 					if f == self.file:
-						outfunc(data)
+						outfunc(s)
 					else:
-						self.file_print(f, data)
+						self.file_print(f, s)
 			except Exception:
 				sys.__stdout__.write(traceback.format_exc())
 

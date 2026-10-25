@@ -623,7 +623,7 @@ class Ask(Command):
 							for info, gen in zip(infos, tool_gens)
 						), max_concurrency=5, return_exceptions=True)
 						pairs = [
-							(tc, (try_json(resp) if type(info) is not StopAsyncIteration else "[MALFORMED TOOL USAGE]") or "[RESPONSE EMPTY OR REDACTED")
+							(tc, (try_json(resp) if type(info) is not StopAsyncIteration else "[MALFORMED TOOL USAGE]") or "[RESPONSE EMPTY OR REDACTED]")
 							for tc, info, resp in zip(tool_calls, infos, resps)
 						]
 						tool_calls = [pair[0] for pair in pairs]
@@ -1064,17 +1064,10 @@ class AudioSeparator(Command):
 		))
 		fn = await attachment_cache.download(url, filename=True)
 		args = ["audio-separator", os.path.abspath(fn), "--output_format", format]
-		proc = await asyncio.create_subprocess_exec(*args, cwd=TEMP_PATH)
-		try:
-			async with asyncio.timeout(3200):
-				await proc.wait()
-		except (T0, T1, T2):
-			with tracebacksuppressor:
-				force_kill(proc)
-			raise
+		print_process_log(*args)
+		await check_output_async(args, cwd=TEMP_PATH)
 		outputs = []
 		tmpl = fn.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-		# The cache is littered with arbitrary files, but we can rely on bot.get_file's filename to contain a unique identifier which will always carry over to the output files
 		for f2 in os.listdir(TEMP_PATH):
 			if f2.startswith(tmpl) and f2.endswith(format):
 				outputs.append(f2)
@@ -1240,8 +1233,8 @@ class TTS(Command):
 						args = [os.path.abspath("misc/dectalk/say"), "-w", fi, "-pre", f"[:name {voice}]" + instructions, segment]
 					else:
 						args = [os.path.abspath("misc/dectalk/say"), "-w", fi, segment]
-					print(args)
-					await _run_async(subprocess.run, args, cwd="misc/dectalk", stdout=subprocess.DEVNULL)
+					print_process_log(*args)
+					await check_output_async(args, cwd="misc/dectalk")
 				case "google":
 					fi = temporary_file("pcm")
 					_premium.require(2)
@@ -1318,15 +1311,8 @@ class TTS(Command):
 			input_args = ("-safe", "0", "-f", "concat")
 		fo = temporary_file(format)
 		args = ["ffmpeg", "-v", "error", "-hide_banner", "-vn", *input_args, "-i", concat, "-af", "volume=2", "-b:a", "96k", "-vbr", "on", fo]
-		print(args)
-		proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
-		try:
-			async with asyncio.timeout(3200):
-				await proc.wait()
-		except (T0, T1, T2):
-			with tracebacksuppressor:
-				force_kill(proc)
-			raise
+		print_process_log(*args)
+		await check_output_async(args)
 		if autoplay:
 			await vc_fut
 			url = await bot.upload_temp(fo)

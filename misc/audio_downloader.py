@@ -22,7 +22,7 @@ from .types import alist, as_str, cdict, fcdict, full_prune, json_dumps, round_m
 from .smath import time_parse
 from .asyncs import submit_thread
 from .util import (
-	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port,
+	python, compat_python, shuffle, utc, leb128, string_similarity, verify_search, json_dumpstr, get_free_port, print_process_log,
 	find_urls, url2fn, url2ext, discord_expired, expired, shorten_attachment, unyt, html_decode, mime_into, is_local_url,
 	is_image, is_url, is_discord_attachment, is_miza_url, is_miza_attachment, is_youtube_url, is_spotify_url, is_reddit_url, is_twitter_url, is_klipy_url, AUDIO_FORMS,
 	EvalPipe, PipedProcess, AutoCache, Request, Semaphore, TEMP_PATH, CACHE_PATH, magic, rename, temporary_file, replace_ext, select_and_loads, extract_archive, archive_mimes, AUTH,
@@ -1025,7 +1025,7 @@ class AudioDownloader:
 				r_im = temporary_file(right)
 				copy_to_file(r_im)
 				args = [python, "png2wav.py", r_im, fn]
-				print(args)
+				print_process_log(*args)
 				res = subprocess.run(args, cwd="misc", stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 				if not os.path.exists(fn) or not os.path.getsize(fn):
 					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
@@ -1035,7 +1035,8 @@ class AudioDownloader:
 				copy_to_file(r_ecdc)
 				args1 = [compat_python, "misc/ecdc_stream.py", "-b", "0", "-d", r_ecdc]
 				args2 = ["ffmpeg", "-v", "error", "-hide_banner", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "96k", "-vbr", "on", fn]
-				print(args1, args2)
+				print_process_log(*args1)
+				print_process_log(*args2)
 				res = PipedProcess(args1, args2, stderr=subprocess.PIPE).wait()
 				if not os.path.exists(fn) or not os.path.getsize(fn):
 					raise RuntimeError(as_str(res.stderr.read()) or "Unable to locate converted file.")
@@ -1045,7 +1046,7 @@ class AudioDownloader:
 				r_org = temporary_file("org")
 				copy_to_file(r_org)
 				args = ["hyperchoron", "-i", r_org, "-f", "opus", "-o", fn]
-				print(args)
+				print_process_log(*args)
 				res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 				if not os.path.exists(path=fn) or not os.path.getsize(fn):
 					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
@@ -1054,7 +1055,7 @@ class AudioDownloader:
 				r_mid = temporary_file("mid")
 				copy_to_file(r_mid)
 				args = ["hyperchoron", "-i", r_mid, "-f", "opus", "-o", fn]
-				print(args)
+				print_process_log(*args)
 				res = subprocess.run(args, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 				if not os.path.exists(fn) or not os.path.getsize(fn):
 					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")
@@ -1166,7 +1167,7 @@ class AudioDownloader:
 				else:
 					filt = ()
 				args.extend(["-i", url, *filt, "-b:a", "160k", "-vbr", "on", fn2])
-				print(args)
+				print_process_log(*args)
 				res = subprocess.run(args, stderr=subprocess.PIPE)
 				if not os.path.exists(fn2) or not os.path.getsize(fn2):
 					raise RuntimeError(as_str(res.stderr) or "Unable to locate converted file.")

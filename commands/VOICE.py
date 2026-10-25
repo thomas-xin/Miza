@@ -95,7 +95,7 @@ def png2wav(png):
 	args = [sys.executable, "png2wav.py", r_png, r_wav]
 	with open(r_png, "wb") as f:
 		f.write(png)
-	print(args)
+	print_process_log(*args)
 	subprocess.run(args, cwd="misc", stderr=subprocess.PIPE)
 	return r_wav
 
@@ -1858,20 +1858,9 @@ class Hyperchoron(Command):
 		default_archive = "zip"
 		fo = os.path.abspath(TEMP_PATH + "/" + replace_ext(url2fn(url), default_archive))
 		args = ["hyperchoron", "-i", url, *unicode_prune(kwargs or "").split(), "-f", format.casefold(), "-o", fo]
-		print(args)
-		proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-		try:
-			async with asyncio.timeout(3200):
-				stdout, stderr = await proc.communicate()
-		except (T0, T1, T2):
-			with tracebacksuppressor:
-				force_kill(proc)
-			raise
+		print_process_log(*args)
+		await check_output_async(*args, cwd=os.getcwd() + "/misc")
 		if not os.path.exists(fo) or not os.path.getsize(fo):
-			if proc.returncode != 0:
-				stderr = as_str(stderr).strip()
-				print(stderr)
-				raise RuntimeError(stderr.rsplit("\n", 1)[-1].strip())
 			raise FileNotFoundError("No valid output detected!")
 		b = fo
 		z = zipfile.ZipFile(fo, "r")
@@ -1908,12 +1897,11 @@ class UpdateAudio(Database):
 					bot.data.dailies.progress_quests(member, "music", td)
 
 	async def _day_(self, **void):
-		import importlib
+		import importlib, importlib.metadata
 		old_version = importlib.metadata.version("yt-dlp")
 		args = [python, "-m", "pip", "install", "--upgrade", "--pre", "yt-dlp", "niquests", "urllib3-future", "ddgs", "googletrans"]
-		print(args)
-		proc = await asyncio.create_subprocess_exec(*args)
-		await proc.wait()
+		print_process_log(*args)
+		await check_output_async(args)
 		new_version = importlib.metadata.version("yt-dlp")
 		if old_version != new_version:
 			print("yt-dlp updated! Reloading dependencies...")
@@ -1926,8 +1914,8 @@ class UpdateAudio(Database):
 		globals()["bot"] = bot
 		try:
 			args = ["ffmpeg"]
-			proc = await asyncio.create_subprocess_exec(*args)
-			await proc.wait()
+			print_process_log(*args)
+			await check_output_async(args)
 		except FileNotFoundError:
 			print("WARNING: FFmpeg not found. Unable to convert and play audio.")
 

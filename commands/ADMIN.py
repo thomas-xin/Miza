@@ -1526,15 +1526,8 @@ class CreateSound(Command):
 		if info.duration <= 5.5:
 			fn = f"{TEMP_PATH}/{i}.ogg"
 			args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-to", "5.1875", "-c:a", "libopus", "-b:a", "160k", fn]
-			print(args)
-			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
-			try:
-				async with asyncio.timeout(3200):
-					await proc.wait()
-			except (T0, T1, T2):
-				with tracebacksuppressor:
-					force_kill(proc)
-				raise
+			print_process_log(*args)
+			await check_output_async(args)
 			data = await read_file_a(fn)
 		else:
 			fn1 = f"{TEMP_PATH}/{i}~1.mp3"
@@ -1544,8 +1537,8 @@ class CreateSound(Command):
 				args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-i", "misc/10s-soundboard-template.ogg", "-filter_complex", "amix=inputs=2:duration=longest", "-ss", "1.175", "-to", "10.5", "-ar", "48000", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
 			else:
 				args2 = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", url, "-ss", "1.175", "-to", "10.5", "-ar", "48000", "-c:a", "libmp3lame", "-b:a", "144k", fn2]
-			print(args1)
-			print(args2)
+			print_process_log(*args1)
+			print_process_log(*args2)
 			proc1 = await asyncio.create_subprocess_exec(*args1, stdout=subprocess.DEVNULL)
 			proc2 = await asyncio.create_subprocess_exec(*args2, stdout=subprocess.DEVNULL)
 			try:
@@ -1560,15 +1553,8 @@ class CreateSound(Command):
 				raise
 			fn3 = f"{TEMP_PATH}/{i}~3.mp3"
 			args = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-v", "error", "-vn", "-i", fn1, "-ar", "48000", "-c:a", "libmp3lame", "-b:a", "320k", fn3]
-			print(args)
-			proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.DEVNULL)
-			try:
-				async with asyncio.timeout(3200):
-					await proc.wait()
-			except (T0, T1, T2):
-				with tracebacksuppressor:
-					force_kill(proc)
-				raise
+			print_process_log(*args)
+			await check_output_async(args)
 
 			def write_to():
 				with open(fn3, "rb") as f3:
@@ -1680,8 +1666,10 @@ class ScanEmoji(Command):
 		async with discord.context_managers.Typing(channel):
 			for emoji in sorted(guild.emojis, key=lambda e: e.id):
 				url = str(emoji.url)
-				resp = await _run_async(subprocess.run, self.ffprobe_start + (url,), stdout=subprocess.PIPE)
-				width, height = map(int, resp.stdout.splitlines())
+				cmd = self.ffprobe_start + (url,)
+				print_process_log(*cmd)
+				resp = await check_output_async(cmd)
+				width, height = map(int, resp.splitlines())
 				if width < 256 or height < 256:
 					found += 1
 					w, h = width, height

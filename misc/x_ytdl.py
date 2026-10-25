@@ -13,7 +13,7 @@ import zipfile
 import niquests
 from PIL import Image
 import streamshatter
-from .util import patch_before_return, is_url, temporary_file, CODEC_FFMPEG, CODEC_PIX
+from .util import patch_before_return, is_url, temporary_file, CODEC_FFMPEG, CODEC_PIX, print_process_log
 from .caches import audio_meta
 import yt_dlp as ytd
 
@@ -305,7 +305,7 @@ class FFmpegCustomVideoConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 			start = str(self.start) if self.start is not None else "0"
 			end = str(self.end) if self.end is not None else "86400"
 			args = [python, "misc/lightning.py", temp_path, start, end, self.final]
-			print(args)
+			print_process_log(*args)
 			subprocess.run(args)
 			return [temp_path], info
 		return [], info

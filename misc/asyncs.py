@@ -10,7 +10,7 @@ import time; from time import time as utc
 import traceback
 import types
 
-from misc.types import lim_str, as_str
+from misc.types import lim_str, as_str, T0, T1, T2
 
 print("ASYNCS:", __name__)
 
@@ -310,14 +310,16 @@ async def delayed_callback(fut, delay, func, *args, repeat=False, exc=False, **k
 		if not exc:
 			pass
 
-async def check_output_async(args):
-	proc = await asyncio.create_subprocess_exec(*args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+async def check_output_async(args, **kwargs) -> str:
+	proc = await asyncio.create_subprocess_exec(*args, **kwargs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	try:
 		async with asyncio.timeout(60):
 			stdout, stderr = await proc.communicate()
 	except (T0, T1, T2):
-		with tracebacksuppressor:
-			force_kill(proc)
+		try:
+			proc.terminate()
+		except Exception:
+			traceback.print_exc()
 		raise
 	if stderr:
 		raise RuntimeError(as_str(stderr))
