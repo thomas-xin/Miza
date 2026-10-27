@@ -401,7 +401,8 @@ class UpdateExec(Database):
 	_print = lambda self, *args, sep=" ", end="\n", prefix="", channel=None, **void: self.bot.send_as_embeds(channel, "```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```")
 	def _input(self, *args, channel=None, **kwargs):
 		self._print(*args, channel=channel, **kwargs)
-		self.listeners[channel.id] = fut = concurrent.futures.Future()
+		if channel:
+			self.listeners[channel.id] = fut = concurrent.futures.Future()
 		return fut.result(timeout=86400)
 
 	psem = Semaphore(1, 64)

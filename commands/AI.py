@@ -893,7 +893,6 @@ class Instruct(Command):
 			description="Image, animation, video or audio, supplied by URL or attachment",
 			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			aliases=["i"],
-			required=True,
 		),
 		api=cdict(
 			type="string",
