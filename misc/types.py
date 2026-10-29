@@ -1641,6 +1641,40 @@ def getattr_chain(obj, attrs, default=Dummy):
 	if obj is Dummy:
 		raise AttributeError(attrs)
 	return obj
+def getitem_chain(obj, attrs, default=Dummy):
+	if not attrs:
+		return obj
+	search = r"\.|:"
+	last = "."
+	if attrs.startswith(":"):
+		last = ":"
+	attrs = attrs.lstrip(":.")
+	try:
+		while True:
+			match = re.search(search, attrs)
+			if not match:
+				left = attrs
+				right = ""
+			else:
+				left, right = attrs[:match.start()], attrs[match.end():]
+				_last = match.group()
+			if last == ":":
+				left = int(left)
+				obj = obj[left]
+			else:
+				try:
+					obj = getattr(obj, left)
+				except AttributeError:
+					obj = obj[left]
+			if not right:
+				break
+			attrs = right
+			last = _last
+	except LookupError:
+		if default is Dummy:
+			raise
+		return default
+	return obj
 def all_none(*args):
 	for obj in args:
 		if obj is not None:

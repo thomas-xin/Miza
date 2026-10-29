@@ -988,14 +988,14 @@ class Status(Command):
 		if "d" in flags:
 			if perm < 2:
 				raise PermissionError("Permission level 2 or higher required to unset auto-updating status.")
-			bot.data.messages.pop(channel.id)
+			bot.data.autorun.pop(channel.id)
 			return fix_md("Successfully disabled status updates.")
 		elif "a" not in flags and "e" not in flags:
 			return await self._callback2_(channel)
 		if perm < 2:
 			raise PermissionError("Permission level 2 or higher required to set auto-updating status.")
 		message = await channel.send(italics(code_md("Loading bot status...")))
-		set_dict(bot.data.messages, channel.id, {})[message.id] = cdict(t=0, command="bot.commands.status[0]")
+		set_dict(bot.data.autorun, channel.id, {})[message.id] = cdict(t=0, command="status:0")
 
 	async def _callback2_(self, channel, m_id=None, msg=None, colour=None, **void):
 		bot = self.bot
@@ -1049,7 +1049,7 @@ class Status(Command):
 				message.rated = True
 			raise
 		if m_id is not None and message is not None:
-			bot.data.messages[channel.id] = {message.id: cdict(t=utc(), command="bot.commands.status[0]")}
+			bot.data.autorun[channel.id] = {message.id: cdict(t=utc(), command="status:0")}
 
 
 class Reminder(Pagination, Interactable, Command):
@@ -1505,8 +1505,8 @@ class UpdateReminders(Database):
 				create_task(self.recurrent_message(ch, content, emb, t, x.get("recur", 60), reference=reference))
 
 
-class UpdateMessages(Database):
-	name = "messages"
+class UpdateAutorun(Database):
+	name = "autorun"
 	semaphore = Semaphore(8, 1, rate_limit=3)
 	closed = False
 	hue = 0
@@ -1533,7 +1533,8 @@ class UpdateMessages(Database):
 						for m_id, v in data.items():
 							if t - v.t >= 4:
 								v.t = t
-								create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_, channel=channel, m_id=m_id, colour=col))
+								command = getitem_chain(self.bot.commands, v.command)
+								create_task(self.wrap_semaphore(command._callback2_, channel=channel, m_id=m_id, colour=col))
 
 	async def _destroy_(self, **void):
 		self.closed = True
