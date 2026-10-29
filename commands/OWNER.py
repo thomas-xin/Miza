@@ -101,7 +101,7 @@ class Restart(Command):
 			return
 		if mode in ("update", "all", "shutdown"):
 			resps = await gather(*(
-				*([check_output_async(["git", "pull"])] if mode == "update" else ()),
+				*([check_output_async(["git", "pull"], ignore_err=True)] if mode == "update" else ()),
 				_run_async(bot.start_audio_client, shutdown=True),
 				_run_async(bot.start_webserver, shutdown=True),
 			), return_exceptions=True)
@@ -989,7 +989,7 @@ class UpdateMessageCache(Database):
 					return
 			curr_id = current_snowflake()
 			if messages:
-				print(colourise(f"C{colourise(channel.id, 0xffff00)}{colourise(fg=0xffffff)}: Stored {colourise(len(messages), 0xff7f7f)}{colourise()}", 0xffffff))
+				print(colourise(f"C{colourise(channel.id, 0xffff00)}{colourise(fg=0xffffff)}: Stored {colourise(len(messages), 0xff7f7f)}", 0xffffff, r=1))
 				await _run_async(self.save_messages, messages)
 		self.loader[channel.id] = curr_id
 
@@ -1022,7 +1022,7 @@ class UpdateMessageCache(Database):
 			if messages:
 				await _run_async(self.save_messages, messages)
 				p = "+" if extra else ""
-				print(colourise(f"G{colourise(guild.id, 0xffff00)}{colourise(fg=0xffffff)}: Stored {colourise(len(messages), 0xff7f7f)}{p}{colourise()}", 0xffffff))
+				print(colourise(f"G{colourise(guild.id, 0xffff00)}{colourise(fg=0xffffff)}: Stored {colourise(len(messages), 0xff7f7f)}{p}", 0xffffff, r=1))
 			if extra:
 				duration = min(duration, (dtnu() - messages[-1].created_at).total_seconds() if messages else inf)
 				await gather(*(self.load_channel(c, duration=duration) for c in channels), max_concurrency=20)

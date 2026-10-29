@@ -545,7 +545,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			)
 			commands = dict((int(c["id"]), c) for c in data if str(c.get("application_id")) == str(self.id))
 			if commands:
-				print(colourise(f"Successfully loaded {len(commands)} application command{'s' if len(commands) != 1 else ''}.{colourise()}", 0x00ff00))
+				print(colourise(f"Successfully loaded {len(commands)} application command{'s' if len(commands) != 1 else ''}.", 0x00ff00, r=1))
 
 		def recursively_equal(opt1, opt2):
 			for k, v in opt1.items():
@@ -3342,7 +3342,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		fut = create_task(proc_eval(f"get_current_stats({self.up_bps},{self.down_bps})", caps=["host"], timeout=8))
 		t = utc()
 		latency = self.latency
-		if latency != self.lll and isfinite(latency):
+		if latency and latency != self.lll and isfinite(latency):
 			self.api_latency = self.lll = latency
 			self.llc = t
 		elif t - self.llc < 5:
@@ -3492,11 +3492,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		reloaded = False
 		if module in self._globals:
 			reloaded = True
-			print(colourise(f"Reloading module {colourise(module, 0xff7fbf)}{colourise(fg=0xffff00)}...", 0xffff00) + colourise())
+			print(colourise(f"Reloading module {colourise(module, 0xff7fbf)}{colourise(fg=0xffff00)}...", 0xffff00, r=1))
 			if module in self.categories:
 				self.unload(module)
 		else:
-			print(colourise(f"Loading module {colourise(module, 0xff7fbf)}{colourise(fg=0xffff00)}...", 0xffff00) + colourise())
+			print(colourise(f"Loading module {colourise(module, 0xff7fbf)}{colourise(fg=0xffff00)}...", 0xffff00, r=1))
 			new = True
 		if not new:
 			mod = self._globals.pop(module, {})
@@ -3508,7 +3508,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			b = f.read()
 		code = compile(b, fn, "exec")
 		exec(code, mod)
-		print(colourise(f"Evaluated module {colourise(module, 0xff7fbf)}{colourise(fg=0x00ff00)}...", 0x00ff00) + colourise())
+		print(colourise(f"Evaluated module {colourise(module, 0xff7fbf)}{colourise(fg=0x00ff00)}...", 0x00ff00, r=1))
 		self._globals[module] = mod
 		commands = deque()
 		dataitems = deque()
@@ -3528,16 +3528,16 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.dbitems[module] = dataitems
 		self.size[module] = line_count("commands/" + path)
 		if commands:
-			print(f"{colourise(module, 0xff7fbf)}{colourise()}: {colourise(fg=0x7fffbf)}Successfully loaded {len(commands)} command{'s' if len(commands) != 1 else ''}.{colourise()}")
+			print(f"{colourise(module, 0xff7fbf, r=1)}: {colourise(fg=0x7fffbf)}Successfully loaded {len(commands)} command{'s' if len(commands) != 1 else ''}.{colourise()}")
 		if dataitems:
-			print(f"{colourise(module, 0xff7fbf)}{colourise()}: {colourise(fg=0x7fffbf)}Successfully loaded {len(dataitems)} database{'s' if len(dataitems) != 1 else ''}.{colourise()}")
+			print(f"{colourise(module, 0xff7fbf, r=1)}: {colourise(fg=0x7fffbf)}Successfully loaded {len(dataitems)} database{'s' if len(dataitems) != 1 else ''}.{colourise()}")
 		if reloaded:
 			while not self.ready:
 				time.sleep(0.5)
-			print(colourise(f"Resending _ready_ event to module {colourise(module, 0xff7fbf)}{colourise(fg=0xff0000)}...", 0xffff00) + colourise())
+			print(colourise(f"Resending _ready_ event to module {colourise(module, 0xff7fbf)}{colourise(fg=0xff0000)}...", 0xffff00, r=1))
 			futs = []
 			for db in dataitems:
-				print(colourise(f"- {colourise(db, 0xbf7fff)}", fg=0xff7fbf) + colourise())
+				print(colourise(f"- {colourise(db, 0xbf7fff)}", fg=0xff7fbf, r=1))
 				for f in dir(db):
 					if f.startswith("_") and f[-1] == "_" and f[1] != "_":
 						func = getattr(db, f, None)
@@ -3550,7 +3550,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						futs.append(fut)
 			print("...")
 			await_fut(gather(*futs))
-		print(colourise(f"Successfully loaded module {colourise(module, 0xff7fbf)}{colourise(fg=0x00ff00)}.", 0x00ff00) + colourise())
+		print(colourise(f"Successfully loaded module {colourise(module, 0xff7fbf)}{colourise(fg=0x00ff00)}.", 0x00ff00, r=1))
 		return True
 
 	@tracebacksuppressor
@@ -4622,10 +4622,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			kwargs = await self.extract_kwargs(argv, command, u_perm, user, message, channel, guild, command_check, kwargs)
 		except Exception:
 			if not soon_indicator and message and user:
-				print(f"{colourise(cid, 0xff00ff)}{colourise()}: {colourise(user, 0xbf7fff)} {colourise()}({colourise(user.id, 0xff7fbf)}{colourise()}) queued command {colourise(command_check, 0x7f7fff)} {colourise(kwargs or argv, 0xbfbfff)}{colourise()}")
+				print(f"{colourise(cid, 0xff00ff, r=1)}: {colourise(user, 0xbf7fff, r=1)} ({colourise(user.id, 0xff7fbf, r=1)}) queued command {colourise(command_check, 0x7f7fff)} {colourise(kwargs or argv, 0xbfbfff, r=1)}")
 			raise
 		if message and user:
-			print(f"{colourise(cid, 0xff00ff)}{colourise()}: {colourise(user, 0xbf7fff)} {colourise()}({colourise(user.id, 0xff7fbf)}{colourise()}) executed command {colourise(command_check, 0x7f7fff)} {colourise(kwargs or argv, 0xbfbfff)}{colourise()}")
+			print(f"{colourise(cid, 0xff00ff, r=1)}: {colourise(user, 0xbf7fff, r=1)} ({colourise(user.id, 0xff7fbf, r=1)}) executed command {colourise(command_check, 0x7f7fff)} {colourise(kwargs or argv, 0xbfbfff, r=1)}")
 		comment = comment or ""
 		fut = None
 		async with sem:
@@ -5613,6 +5613,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				with Delay(0.5):
 					self.update_embeds(utc() % 1 < 0.5)
 					await_fut(self.send_event("_call_"))
+		print(colourise("FAST LOOP EXITED", 0xff0000))
 
 	upload_cache = attachment_cache.secondary
 	async def upload_temp(self, b, filename=None):
@@ -5692,6 +5693,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						self.total_bytes = up_bytes + down_bytes
 					with MemoryTimer("handle_update"):
 						await self.handle_update()
+		print(colourise("SLOW LOOP EXITED", 0xff0000))
 
 	async def worker_heartbeat(self, sync_ssl=False):
 		key = AUTH.get("discord_secret") or ""
@@ -5763,6 +5765,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					await self.send_event("_global_loop_")
 					with MemoryTimer("update"):
 						await _run_async(self.update)
+		print(colourise("GLOBAL LOOP EXITED", 0xff0000))
 
 	async def heartbeat(self):
 		await asyncio.sleep(8)
@@ -5793,6 +5796,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 						out.write(f"CRASHED AT {t}: {t - self.start_time}: {t - lt}\n")
 						# pdb.set_trace()
 						break
+		print(colourise("HEARTBEAT LOOP EXITED", 0xff0000))
 
 	async def seen(self, *args, delay=0, event=None, **kwargs):
 		"User seen event"
@@ -7072,11 +7076,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		)
 		total = max(resp.total_results + self.get_guildbase(guild_id, f"index.{target}.count", 0), add)
 		if author_id:
-			print(f"{colourise(guild_id, 0xbfbfff)}{colourise()}: Indexed {colourise(total, 0x00ff00)} message(s) from user {colourise(author_id, 0x00ffff)}{colourise()}")
+			print(f"{colourise(guild_id, 0xbfbfff, r=1)}: Indexed {colourise(total, 0x00ff00)} message(s) from user {colourise(author_id, 0x00ffff, r=1)}")
 		elif channel_id:
-			print(f"{colourise(guild_id, 0xbfbfff)}{colourise()}: Indexed {colourise(total, 0x00ff00)} message(s) from channel {colourise(channel_id, 0x00ffff)}{colourise()}")
+			print(f"{colourise(guild_id, 0xbfbfff, r=1)}: Indexed {colourise(total, 0x00ff00)} message(s) from channel {colourise(channel_id, 0x00ffff, r=1)}")
 		else:
-			print(f"{colourise(guild_id, 0xbfbfff)}{colourise()}: Indexed {colourise(total, 0x00ff00)} total message(s){colourise()}")
+			print(f"{colourise(guild_id, 0xbfbfff, r=1)}: Indexed {colourise(total, 0x00ff00)} total message(s){colourise()}")
 		mids = [m.id for m in resp.messages]
 		if not mids or info.get("min"):
 			mids.append(info.get("min", 0))
@@ -7388,7 +7392,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 		async def on_full_connect():
 			await _run_async(self.set_guilds)
-			print(colourise(f"Successfully connected as {colourise(self.user, 0xbf7fff)}{colourise()}", 0x00ff00))
+			print(colourise(f"Successfully connected as {colourise(self.user, 0xbf7fff, r=1)}", 0x00ff00))
 
 		@self.event
 		async def on_shard_connect(shard_id):
@@ -8302,7 +8306,7 @@ if __name__ == "__main__":
 						s += colourise("", fg=0xffff00)
 						for line in format_async_stack(task.get_coro()):
 							s += line.strip() + "\n"
-						s += colourise("[End slow task dump]", fg=0xff0000) + colourise() + "\n"
+						s += colourise("[End slow task dump]", fg=0xff0000, r=1) + "\n"
 						print(s)
 
 			# Monkey-patch

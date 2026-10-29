@@ -1901,7 +1901,7 @@ class UpdateAudio(Database):
 		old_version = importlib.metadata.version("yt-dlp")
 		args = [python, "-m", "pip", "install", "--upgrade", "--pre", "yt-dlp", "niquests", "urllib3-future", "ddgs", "googletrans"]
 		print_process_log(*args)
-		await check_output_async(args)
+		await check_output_async(args, ignore_err=True)
 		new_version = importlib.metadata.version("yt-dlp")
 		if old_version != new_version:
 			print("yt-dlp updated! Reloading dependencies...")
@@ -1915,7 +1915,7 @@ class UpdateAudio(Database):
 		try:
 			args = ["ffmpeg"]
 			print_process_log(*args)
-			await check_output_async(args)
+			await check_output_async(args, ignore_err=True)
 		except FileNotFoundError:
 			print("WARNING: FFmpeg not found. Unable to convert and play audio.")
 

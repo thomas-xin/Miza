@@ -224,7 +224,7 @@ def force_kill(proc):
 			killed.append(child)
 			print(child, "killed.")
 	proc.terminate()
-	print(colourise(repr(proc), fg=0xff9f00), colourise("killed.", fg=0xff0000) + colourise())
+	print(colourise(repr(proc), fg=0xff9f00), colourise("killed.", fg=0xff0000, r=1))
 	with tracebacksuppressor:
 		_, alive = psutil.wait_procs(killed, timeout=2)
 	for child in alive:
@@ -407,7 +407,7 @@ def fix_md(s):
 def ansi_md(s, max_length=4096):
 	if not s:
 		return "``` ```"
-	s2 = s.replace("[[", colourise("[", fg=0x00ffff) + colourise("", fg=0x5f87ff)).replace("]]", colourise("]", fg=0x00ffff) + colourise())
+	s2 = s.replace("[[", colourise("[", fg=0x00ffff) + colourise("", fg=0x5f87ff)).replace("]]", colourise("]", fg=0x00ffff, r=1))
 	if len(s2) <= max_length:
 		s = s2
 	else:
@@ -577,7 +577,7 @@ def search_colour(colour, tolerance):
 		if rgb in colour_8bit:
 			colour = rgb
 	return colour
-def colourise(s=None, fg=None, bg=None, tolerance=16):
+def colourise(s=None, fg=None, bg=None, r=False, tolerance=16):
 	if isinstance(fg, int):
 		r, g, b = raw2colour(fg)
 		if tolerance:
@@ -603,6 +603,8 @@ def colourise(s=None, fg=None, bg=None, tolerance=16):
 	else:
 		bg = autocolours.get(bg, bg)
 	s = as_str(s) if s is not None else ""
+	if r:
+		s += "\033[0m"
 	if not bg:
 		if not fg:
 			return "\033[0m" + s
@@ -632,7 +634,7 @@ def colourise_brackets(s=None, a=None, b=None, c=None):
 		closing = s[match.end() - 1]
 		out += colourise(closing, fg=b if closing in colourised_quotes else (c or b))
 		s = s[match.end():]
-	return out + colourise(s, fg=a)
+	return out + colourise(s, fg=a, r=1)
 def colourise_auto(s):
 	while s:
 		match = re.search(r"\$[rgbcmykwRGBCMYKW]*<[^\$]*>", s)
@@ -647,7 +649,7 @@ def colourise_auto(s):
 		for c in code:
 			target = "fg" if c.islower() else "bg"
 			kwargs[target] = c.lower()
-		s = left + colourise(mid, **kwargs) + colourise() + right
+		s = left + colourise(mid, **kwargs, r=1) + right
 	return s
 @functools.lru_cache(maxsize=4096)
 def interpolate_gradient(gradient, n, luma):
@@ -5413,7 +5415,7 @@ class EvalPipe:
 	@classmethod
 	def connect(cls, args, port, address="127.0.0.1", independent=True, glob=globals(), timeout=60):
 		addr = (address, port)
-		print(f"{colourise(DynamicDT.now(), fg=0x00ffff)}{colourise()}: {colourise(fg=0xbfbfff)}EvalPipe connecting to{colourise(fg=0xbf7fff)}", ":".join(map(str, addr)) + colourise())
+		print(f"{colourise(DynamicDT.now(), fg=0x00ffff, r=1)}: {colourise(fg=0xbfbfff)}EvalPipe connecting to{colourise(fg=0xbf7fff)}", ":".join(map(str, addr)) + colourise())
 		server = None
 		try:
 			server = multiprocessing.connection.Listener(addr, authkey=cls.key)
@@ -5450,7 +5452,7 @@ class EvalPipe:
 					break
 			else:
 				raise
-		print(f"{colourise(DynamicDT.now(), fg=0x00ffff)}{colourise()}: {colourise(fg=0x00ff00)}Connection established:", colourise(conn, fg=0xff7fbf) + colourise())
+		print(f"{colourise(DynamicDT.now(), fg=0x00ffff, r=1)}: {colourise(fg=0x00ff00)}Connection established:", colourise(conn, fg=0xff7fbf, r=1))
 		assert conn.readable and conn.writable, "Connection must be readable and writable."
 		pid = conn.recv()
 		proc = psutil.Process(pid)
@@ -5488,7 +5490,7 @@ class EvalPipe:
 				raise
 			else:
 				break
-		print(f"{colourise(DynamicDT.now(), fg=0x00ffff)}{colourise()}: {colourise(fg=0xbfbfff)}EvalPipe listening on{colourise(fg=0xbf7fff)}", ":".join(map(str, server.address)) + colourise())
+		print(f"{colourise(DynamicDT.now(), fg=0x00ffff, r=1)}: {colourise(fg=0xbfbfff)}EvalPipe listening on{colourise(fg=0xbf7fff)}", ":".join(map(str, server.address)) + colourise())
 		return cls(
 			lambda: True,
 			None,
@@ -5508,7 +5510,7 @@ class EvalPipe:
 	@classmethod
 	def from_proc(cls, proc, glob=globals()):
 		flushin = Flush(proc.stdin)
-		print(f"{colourise(DynamicDT.now(), fg=0x00ffff)}{colourise()}: {colourise(fg=0xbfbfff)}EvalPipe connecting on{colourise(fg=0xbf7fff)}", str(proc.pid) + colourise())
+		print(f"{colourise(DynamicDT.now(), fg=0x00ffff, r=1)}: {colourise(fg=0xbfbfff)}EvalPipe connecting on{colourise(fg=0xbf7fff)}", str(proc.pid) + colourise())
 		return cls(
 			proc.is_running,
 			lambda b: flushin.write(b.rstrip(b"\n") + b"\n"),
@@ -5523,7 +5525,7 @@ class EvalPipe:
 	@classmethod
 	def from_stdin(cls, start=False, glob=globals()):
 		flushout = Flush(sys.__stdout__.buffer, flush=sys.__stdout__.flush)
-		print(f"{colourise(DynamicDT.now(), fg=0x00ffff)}{colourise()}: {colourise(fg=0xbfbfff)}EvalPipe listening from{colourise(fg=0xbf7fff)}", str(os.getpid()) + colourise())
+		print(f"{colourise(DynamicDT.now(), fg=0x00ffff, r=1)}: {colourise(fg=0xbfbfff)}EvalPipe listening from{colourise(fg=0xbf7fff)}", str(os.getpid()) + colourise())
 		return cls(
 			lambda: not sys.__stdin__.closed,
 			lambda b: flushout.write(b.rstrip(b"\n") + b"\n"),
@@ -5647,7 +5649,7 @@ class EvalPipe:
 					self.writable = False
 					self.p_in = self.p_out = self.p_kill = self.p_join = None
 					conn = self.server.accept()
-					print(f"{colourise(DynamicDT.now(), fg=0x00ffff)}{colourise()}: {colourise(fg=0x00ff00)}Connection established:", colourise(conn, fg=0xff7fbf) + colourise())
+					print(f"{colourise(DynamicDT.now(), fg=0x00ffff, r=1)}: {colourise(fg=0x00ff00)}Connection established:", colourise(conn, fg=0xff7fbf, r=1))
 					conn.send(os.getpid())
 					self.p_in = (lambda b: share_bytes(conn.send_bytes, b)) if self.address == "127.0.0.1" else conn.send_bytes
 					self.p_out = (lambda: receive_bytes(conn.recv_bytes, unlink=lambda name: self.run(f"EvalPipe.MEMS.pop({repr(name)}).close()"))) if self.address == "127.0.0.1" else conn.recv_bytes

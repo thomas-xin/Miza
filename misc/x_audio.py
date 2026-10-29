@@ -567,7 +567,7 @@ class AudioPlayer(discord.AudioSource):
 			name = "Unknown User"
 		s = italics(ansi_md(colourise_auto("$b<🎶> Now playing {ENTRY}, added by $b<{NAME}>! $b<🎶>")))
 		s = s.format(
-			ENTRY=colourise_brackets(entry.name, 'red', 'green', 'magenta') + colourise(),
+			ENTRY=colourise_brackets(entry.name, 'red', 'green', 'magenta'),
 			NAME=name,
 		)
 		return await self.announce(s)
@@ -874,7 +874,7 @@ class AudioPlayer(discord.AudioSource):
 					print_exc()
 					s = italics(ansi_md(colourise_auto("$r<❗> An error occured while loading {ENTRY}, and it has been removed automatically. $r<❗>\nException: {EXCEPTION}")))
 					s = s.format(
-						ENTRY=colourise_brackets(entry.name, 'red', 'green', 'magenta') + colourise(),
+						ENTRY=colourise_brackets(entry.name, 'red', 'green', 'magenta'),
 						EXCEPTION=colourise_brackets(lim_str(repr(ex), 1024), 'red', 'magenta', 'yellow'),
 					)
 					create_task(self.announce(s))
@@ -917,7 +917,7 @@ class AudioPlayer(discord.AudioSource):
 					print_exc()
 					s = italics(ansi_md(colourise_auto("$r<❗> An error occured while loading {ENTRY}, and it has been removed automatically. $r<❗>\nException: {EXCEPTION}")))
 					s = s.format(
-						ENTRY=colourise_brackets(entry.name, 'red', 'green', 'magenta') + colourise(),
+						ENTRY=colourise_brackets(entry.name, 'red', 'green', 'magenta'),
 						EXCEPTION=colourise_brackets(lim_str(repr(ex), 1024), 'red', 'magenta', 'yellow'),
 					)
 					create_task(self.announce(s))

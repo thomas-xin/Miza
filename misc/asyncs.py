@@ -310,7 +310,7 @@ async def delayed_callback(fut, delay, func, *args, repeat=False, exc=False, **k
 		if not exc:
 			pass
 
-async def check_output_async(args, **kwargs) -> str:
+async def check_output_async(args, ignore_err=False, **kwargs) -> str:
 	proc = await asyncio.create_subprocess_exec(*args, **kwargs, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	try:
 		async with asyncio.timeout(60):
@@ -322,8 +322,14 @@ async def check_output_async(args, **kwargs) -> str:
 			traceback.print_exc()
 		raise
 	if stderr:
-		raise RuntimeError(as_str(stderr))
-	return as_str(stdout)
+		if ignore_err:
+			s = as_str(stderr.strip())
+			print(s)
+			if stdout:
+				return as_str(stdout.strip()) + "\n" + s
+			return s
+		raise RuntimeError(as_str(stderr.strip()))
+	return as_str(stdout.strip())
 
 async def traceback_coro(fut, *args):
 	try:
