@@ -685,7 +685,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 					with suppress(AttributeError):
 						c1[attr] = command.attr
 		self.help_json = pretty_json(help_data)
-		self.help_min = pretty_json(help_data_min)
+		self.help_min = fcdict(help_data_min)
 		os.makedirs("misc/web/static", exist_ok=True)
 		with open("misc/web/static/HELP.json", "w", encoding="utf-8") as f:
 			f.write(self.help_json)

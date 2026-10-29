@@ -578,6 +578,7 @@ def search_colour(colour, tolerance):
 			colour = rgb
 	return colour
 def colourise(s=None, fg=None, bg=None, r=False, tolerance=16):
+	_r = r
 	if isinstance(fg, int):
 		r, g, b = raw2colour(fg)
 		if tolerance:
@@ -603,7 +604,7 @@ def colourise(s=None, fg=None, bg=None, r=False, tolerance=16):
 	else:
 		bg = autocolours.get(bg, bg)
 	s = as_str(s) if s is not None else ""
-	if r:
+	if _r:
 		s += "\033[0m"
 	if not bg:
 		if not fg:

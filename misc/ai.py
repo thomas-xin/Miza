@@ -699,8 +699,14 @@ f_help = {
 		"name": "help",
 		"description": "Lists available bot commands. Use if helping users with command syntax; not applicable to LLM tools",
 		"parameters": {
-			"type": "object", "properties": {},
-			"required": [],
+			"type": "object", "properties": {
+				"category": {
+					"type": "string",
+					"description": "Command category",
+					"enum": ["ADMIN", "AI", "FUN", "IMAGE", "MAIN", "MISC", "NSFW", "OWNER", "STRING", "URL", "VOICE", "WEBHOOK"],
+				},
+			},
+			"required": ["category"],
 }}}
 f_browse = {
 	"type": "function", "function": {

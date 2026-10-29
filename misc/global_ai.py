@@ -306,12 +306,12 @@ async def follow_message(self, m, allow_text=False):
 	return m
 Bot.follow_message = follow_message
 
-async def caption_into(self, _messages, model=None, image_model=None, audio_model=None, premium_context=[], auto=False):
+async def caption_into(self, _messages, model=None, image_model=None, audio_model=None, premium_context=[], max_consider=8):
 	image_model = image_model or audio_model
 	model = model or image_model
-	orig_messages = [cdict(m) for m in _messages if m]
-	corrected_messages = await gather(*(self.follow_message(m) for m in orig_messages[::-1]), return_exceptions=True)
-	messages = corrected_messages[::-1]
+	orig_messages = [cdict(m) for m in _messages if m][::-1]
+	corrected_messages = await gather(*(self.follow_message(m) for m in orig_messages), return_exceptions=True)
+	messages = corrected_messages
 	required_modalities = set()
 	for i, (m1, m2) in enumerate(zip(orig_messages, messages)):
 		if isinstance(m2, BaseException):
@@ -320,23 +320,27 @@ async def caption_into(self, _messages, model=None, image_model=None, audio_mode
 			m.pop("message", None)
 			messages[i] = m
 		if isinstance(m2.content, list):
-			for i, c in enumerate(m2.content):
+			for j, c in enumerate(m2.content):
 				modality = c.get("type").removesuffix("_url").removeprefix("input_")
 				match modality:
 					case "video" | "image":
-						if not image_model:
+						if model == image_model:
+							pass
+						elif not image_model or "audio" not in required_modalities and i >= max_consider:
 							if m2.get("new"):
 								resp = await self.describe(c.get("url"), premium_context=premium_context)
-								m2.content[i] = cdict(type="text", text=pretty_json(resp))
+								m2.content[j] = cdict(type="text", text=pretty_json(resp))
 							else:
-								m2.content[i] = None
+								m2.content[j] = None
 					case "audio":
-						if not audio_model:
+						if model == audio_model:
+							pass
+						elif not audio_model or "audio" not in required_modalities and i >= max_consider:
 							if m2.get("new"):
 								resp = await self.describe(c.get("url"), premium_context=premium_context)
-								m2.content[i] = cdict(type="text", text=pretty_json(resp))
+								m2.content[j] = cdict(type="text", text=pretty_json(resp))
 							else:
-								m2.content[i] = None
+								m2.content[j] = None
 				required_modalities.add(modality)
 			m2.content = [c for c in m2.content if c]
 		m2.pop("new", None)
@@ -344,7 +348,7 @@ async def caption_into(self, _messages, model=None, image_model=None, audio_mode
 		model = audio_model
 	elif "image" in required_modalities:
 		model = image_model
-	return messages, model
+	return messages[::-1], model
 Bot.caption_into = caption_into
 
 model_levels = dict(enumerate(map(cdict, AUTH.get("model_levels", []))))
@@ -917,8 +921,9 @@ async def tool_call(self, call, uid, message=None, effort="high", premium_contex
 
 		match func.name:
 			case "help":
+				cat = kwargs.get("category")
 				yield 'Viewing help menu'
-				yield self.help_min
+				yield pretty_json(self.help_min[cat])
 			case "browse":
 				query = kwargs.get("query") or " ".join(kwargs.values())
 				if is_discord_attachment(query) or is_miza_attachment(query):
