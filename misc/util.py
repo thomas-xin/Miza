@@ -5436,10 +5436,11 @@ class EvalPipe:
 					with open(script, "w") as f:
 						f.write(argstr)
 					args = f"wt -w 0 -d %cd% cmd /s/c {script}"
+					print_process_log(args)
 				else:
 					argstr = " ".join(map(json_dumpstr, args))
 					args = ["xterm", "-e", argstr]
-			print_process_log(*args)
+					print_process_log(*args)
 			subprocess.Popen(args, shell=isinstance(args, str), stdin=subprocess.DEVNULL, stdout=None, stderr=None)
 			t = utc()
 			for i in range(timeout):

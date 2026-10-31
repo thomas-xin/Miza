@@ -107,8 +107,7 @@ class Restart(Command):
 			), return_exceptions=True)
 			resp = resps[0]
 			if resp:
-				print(resp.stdout)
-				print(resp.stderr)
+				print(resp)
 		if mode == "maintain":
 			m = None
 			busy = -inf
