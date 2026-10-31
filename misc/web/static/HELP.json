@@ -1902,7 +1902,7 @@
 				"format": {
 					"type": "enum",
 					"validation": {
-						"enum": ["aac", "csv", "deltarune", "flac", "genshinsheet", "hpc", "litematic", "m4a", "mcfunction", "mid", "midi", "moai", "mp3", "nbs", "nbt", "ogg", "opus", "org", "raw", "schem", "schematic", "skysheet", "wav", "weba", "webm", "🗿"]
+						"enum": []
 					},
 					"default": "nbs"
 				},

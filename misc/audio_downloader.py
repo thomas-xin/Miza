@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from collections import deque
 from concurrent.futures import Future
 from contextlib import suppress
+from dynamic_dt import DynamicDT
 import io
 import itertools
 from math import ceil, inf, isfinite
@@ -271,30 +272,44 @@ class AudioDownloader:
 		token = None
 		out = []
 		for data in items:
-			try:
-				video = data["playlistVideoRenderer"]
-			except KeyError:
+			if "metadata" in data:
+				meta = data["metadata"]
+				v_id = data["contentId"]
+				lockup = meta["lockupMetadataViewModel"]
+				name = lockup["title"]["content"]
 				try:
-					continuation_endpoint = data["continuationItemRenderer"]["continuationEndpoint"]
-					try:
-						token = continuation_endpoint["commandExecutorCommand"]["commands"][-1]["continuationCommand"]["token"]
-					except LookupError:
-						token = continuation_endpoint["continuationCommand"]["token"]
-				except LookupError:
-					print(data)
-				continue
-			v_id = video['videoId']
-			try:
-				dur = round_min(float(video["lengthSeconds"]))
-			except (KeyError, ValueError):
-				try:
-					dur = time_parse(video["lengthText"]["simpleText"])
-				except KeyError:
+					label = data["rendererContext"]["accessibilityContext"]["label"]
+					duration_str = label.lower().removeprefix(name.lower())
+					td, rem = DynamicDT.parse_delta(duration_str, return_remainder=True)
+					dur = td.total_seconds()
+				except Exception:
+					print_exc()
 					dur = None
-			try:
-				name = video["title"]["runs"][0]["text"]
-			except LookupError:
-				name = v_id
+			else:
+				try:
+					video = data["playlistVideoRenderer"]
+				except KeyError:
+					try:
+						continuation_endpoint = data["continuationItemRenderer"]["continuationEndpoint"]
+						try:
+							token = continuation_endpoint["commandExecutorCommand"]["commands"][-1]["continuationCommand"]["token"]
+						except LookupError:
+							token = continuation_endpoint["continuationCommand"]["token"]
+					except LookupError:
+						print(data)
+					continue
+				v_id = video['videoId']
+				try:
+					dur = round_min(float(video["lengthSeconds"]))
+				except (KeyError, ValueError):
+					try:
+						dur = time_parse(video["lengthText"]["simpleText"])
+					except KeyError:
+						dur = None
+				try:
+					name = video["title"]["runs"][0]["text"]
+				except LookupError:
+					name = v_id
 			temp = cdict(
 				name=name,
 				url=f"https://youtu.be/{v_id}",
@@ -303,8 +318,8 @@ class AudioDownloader:
 			out.append(temp)
 		return out, token
 	yt_client = dict(name="WEB", version="2.20251017", clientName="WEB", clientVersion="2.20251017.01.00")
-	yt_session = niquests.Session(multiplexed=True)
-	yt_asession = niquests.AsyncSession(multiplexed=True)
+	yt_session = niquests.Session(multiplexed=False)
+	yt_asession = niquests.AsyncSession(multiplexed=False)
 	# Returns a subsequent page of a youtube playlist from a page token.
 	def get_youtube_continuation(self, token, ctx=None):
 		resp = self.yt_session.post(
@@ -393,7 +408,11 @@ class AudioDownloader:
 			raise
 		context = dict(client=client)
 		count = int(data["sidebar"]["playlistSidebarRenderer"]["items"][0]["playlistSidebarPrimaryInfoRenderer"]["stats"][0]["runs"][0]["text"].replace(",", ""))
-		items = data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"]
+		contents = data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"]
+		try:
+			items = contents[0]["playlistVideoListRenderer"]["contents"]
+		except KeyError:
+			items = [e["lockupViewModel"] for e in contents]
 		entries, token = self.extract_playlist_items(items)
 		if count > 100:
 			futs = deque()
