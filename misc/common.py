@@ -815,7 +815,11 @@ def auto_url(url):
 		url = str(url)
 	if url.startswith("https://media.discordapp.net/embed/avatars/"):
 		return url.replace("/media.discordapp.net/", "/cdn.discordapp.com/")
-	return url.split("?", 1)[0]
+	if "?" in url:
+		if "?size=" in url:
+			return url.split("?", 1)[0] + "?size=4096"
+		return url.split("?", 1)[0]
+	return url
 
 BASE_LOGO = "https://cdn.discordapp.com/embed/avatars/0.png"
 def get_url(obj, f=auto_url) -> str:

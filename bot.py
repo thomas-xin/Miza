@@ -2590,6 +2590,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		self.cache.channels = collections.ChainMap(self._private_channels, *(guild._channels for guild in self.guilds))
 		self.cache.roles = collections.ChainMap(*(guild._roles for guild in self.guilds))
 		self.cache.members = collections.ChainMap(*(guild._members for guild in self.guilds))
+		self._globals.update(self.cache)
 
 	fetched_once = set()
 	async def update_subs(self):

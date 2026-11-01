@@ -687,10 +687,10 @@ async def llm(func, *args, api=None, timeout=300, premium_context=None, require_
 				api_blocked[(sapi, model)] = ex
 			if not exc:
 				exc = ex
-			print(str(sapi) + ": " + str(kwa.get("model")) + ":", kwa, format_exc())
+			print(str(sapi) + ": " + str(kwa.get("model")) + ":", lim_str(kwa, 65536), format_exc())
 			continue
 	if not exc:
-		print("ERRORED:", model, lim_str(kwa, 16384))
+		print("Unknown Error:", model, lim_str(kwa, 65536))
 	raise (exc or RuntimeError("Unknown error occured."))
 
 
