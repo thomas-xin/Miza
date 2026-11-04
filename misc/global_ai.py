@@ -547,7 +547,6 @@ async def chat_completion(self, messages, extra_messages=(), agent="miza-2", mod
 	if mode not in ("instructive", "casual", "nsfw"):
 		mode = "instructive"
 	mA = 4 if not allow_nsfw else 6 if agent == "miza-3" else 5
-	draft = monologue = None
 	last_successful = None
 	finish_reason = "end"
 	result = cdict(
@@ -710,7 +709,7 @@ async def chat_completion(self, messages, extra_messages=(), agent="miza-2", mod
 						if passable:
 							yield "\r"
 						written = False
-			except (httpx.RemoteProtocolError, ConnectionError, openai.APIError):
+			except (httpx.RemoteProtocolError, ConnectionError, openai.APIError, openai.BadRequestError):
 				print_exc()
 				insufficient = True
 			finally:
@@ -757,7 +756,7 @@ async def chat_completion(self, messages, extra_messages=(), agent="miza-2", mod
 				last_successful = text
 		elif not text and last_successful:
 			finish_reason = "attempts"
-			text = draft.content if draft else last_successful
+			text = last_successful
 			insufficient = refusal = False
 		if insufficient or refusal:
 			print("Evaluation:", attempts, lim_str(text, 128), eval2, insufficient, refusal)

@@ -998,7 +998,7 @@ def message_link(message):
 
 def fake_reply(message):
 	"Simulates the appearance of a reply to a message. Required as Discord does not support replies for webhook messages, or messages from different channels."
-	content = message.content
+	content = message.clean_content
 	if content.startswith("-# ⮣ ") and "\n" in content:
 		content = content.split("\n", 1)[-1]
 	if len(content) >= 100:
@@ -1641,9 +1641,9 @@ async def parse_latex(s):
 	outs = []
 	futs = []
 	regs = [
-		re.compile(r"\$[^$]+\$"),
-		re.compile(r"\$\$[^$]+\$\$"),
-		re.compile(r"\s\[+\s?[^\]]*\\[^\]]+\s?\]+\s"),
+		re.compile(r"\$[^$\n]+\$"),
+		re.compile(r"\$\$[^$\n]+\$\$"),
+		re.compile(r"\s\[+\s?[^\n\]]*\\[^\n\]]+\s?\]+\s"),
 	]
 	n = 0
 	while True:

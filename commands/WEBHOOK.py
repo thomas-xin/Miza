@@ -82,8 +82,9 @@ class UpdateAutoEmojis(Database):
 					if emojis[n] == e_id:
 						break
 					t = n.rsplit("-", 1)
-					if t[-1].isnumeric():
-						n = t[0] + "-" + str(int(t[-1]) + 1)
+					name = t[-1]
+					if name.isnumeric():
+						n = t[0] + "-" + str(int(name) + 1)
 					else:
 						n = t[0] + "-1"
 				emojis[n] = e_id
@@ -96,8 +97,9 @@ class UpdateAutoEmojis(Database):
 					if emojis[n] == e.id:
 						break
 					t = n.rsplit("-", 1)
-					if t[-1].isnumeric():
-						n = t[0] + "-" + str(int(t[-1]) + 1)
+					name = t[-1]
+					if name.isnumeric():
+						n = t[0] + "-" + str(int(name) + 1)
 					else:
 						n = t[0] + "-1"
 				emojis[n] = e
@@ -108,8 +110,9 @@ class UpdateAutoEmojis(Database):
 					if emojis[n] == e_id:
 						break
 					t = n.rsplit("-", 1)
-					if t[-1].isnumeric():
-						n = t[0] + "-" + str(int(t[-1]) + 1)
+					name = t[-1]
+					if name.isnumeric():
+						n = t[0] + "-" + str(int(name) + 1)
 					else:
 						n = t[0] + "-1"
 				emojis[n] = e_id
@@ -221,7 +224,7 @@ class UpdateAutoEmojis(Database):
 					if not emoji:
 						r1 = regexp(r"^[A-Za-z0-9\-~_]{1,32}$")
 						if r1.fullmatch(name):
-							if name.isnumeric():
+							if name.isnumeric() and len(name) >= 18:
 								emoji = int(name)
 							else:
 								t = name[::-1].replace("~", "-", 1)[::-1].rsplit("-", 1)

@@ -1242,6 +1242,7 @@ class AudioDownloader:
 
 	def preprocess(self, url, mode, count):
 		output = deque()
+		v_id = None
 		if is_url(url):
 			if is_miza_attachment(url):
 				resp2 = self.handle_special_multiple(url)
@@ -1270,7 +1271,6 @@ class AudioDownloader:
 						p_id = p_id.split("&", 1)[0]
 						break
 				if p_id:
-					v_id = None
 					for x in ("?v=", "&v="):
 						if x in url:
 							v_id = url[url.index(x) + len(x):]
@@ -1282,12 +1282,6 @@ class AudioDownloader:
 						raise PermissionError(url, "Sorry, this endpoint is intentionally blocked for privacy/performance.")
 					with tracebacksuppressor:
 						output.extend(self.get_youtube_playlist(p_id))
-						# Scroll to highlighted entry if possible
-						if v_id:
-							for i, e in enumerate(output):
-								if v_id in e.url:
-									output.rotate(-i)
-									break
 			elif re.match(r"^https:\/\/soundcloud\.com\/[A-Za-z0-9]+\/sets\/", url) or re.match(r"^https:\/\/soundcloud\.com\/[A-Za-z0-9]+\/likes", url) or re.match(r"^https:\/\/api-v2\.soundcloud\.com\/users\/[0-9]+\/likes", url):
 				with tracebacksuppressor:
 					output.extend(self.get_soundcloud_playlist(url))
@@ -1346,6 +1340,12 @@ class AudioDownloader:
 						futs.append(fut)
 						break
 			output.extend(itertools.chain.from_iterable(f.result() for f in futs))
+		# Scroll to highlighted entry if possible
+		if v_id:
+			for i, e in enumerate(output):
+				if v_id in e.url:
+					output.rotate(-i)
+					break
 		return list(output), url
 
 	@staticmethod

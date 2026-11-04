@@ -1809,10 +1809,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			substitutes = None
 			s = matched.group()
 			start = matched.start()
-			while s and not regexp(":[A-Za-z0-9\\-~_]").fullmatch(s[:2]):
+			while len(s) >= 2 and not regexp(":[A-Za-z0-9\\-~_]").fullmatch(s[:2]):
 				s = s[1:]
 				start += 1
-			while s and not regexp("[A-Za-z0-9\\-~_][:\\s]").fullmatch(s[-2:]):
+			while len(s) >= 2 and not regexp("[A-Za-z0-9\\-~_][:\\s]").fullmatch(s[-2:]):
 				s = s[:-1]
 			s = s.strip()
 			offs = start = offs + start
@@ -1828,7 +1828,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				emojis = self.data.autoemojis.guild_emoji_map(guild, user, dict(orig))
 			emoji = emojis.get(name)
 			if not emoji:
-				if name.isnumeric():
+				if name.isnumeric() and len(name) >= 18:
 					emoji = int(name)
 				else:
 					t = name[::-1].replace("~", "-", 1)[::-1].rsplit("-", 1)
@@ -2232,7 +2232,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				pass
 		if "proxies" in self.data:
 			with tracebacksuppressor:
-				url = (await self.data.exec.uproxy(url, force=force, optimise=True)) or url
+				temp = await self.data.exec.uproxy(url, force=force, optimise=True)
+				if temp:
+					url = self.proxied[p] = temp
 		return url
 
 	async def as_embeds(self, message, link=False, colour=False, refresh=True, proxy_images=True, reactions=False) -> list[discord.Embed]:
@@ -4246,7 +4248,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
 		if info.type in ("mentionable", "user", "channel", "guild", "role"):
 			m = verify_id(v)
-			fuzzy = 0 if info.get("strict", False) else 0.25
+			fuzzy = 0 if info.get("strict", False) else 0.5
 			if info.type == "mentionable":
 				v = None
 				if isinstance(m, int):
