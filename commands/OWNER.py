@@ -311,18 +311,21 @@ class Exec(Command):
 			description="Code to evaluate directly in the main process",
 			example="1 + 1",
 			excludes=("mode", "type", "audio", "server"),
+			keyword_only=True,
 		),
 		audio=cdict(
 			type="string",
 			description="Code to evaluate directly in the audio process",
 			example="1 + 2",
 			excludes=("mode", "type", "code", "server"),
+			keyword_only=True,
 		),
 		server=cdict(
 			type="string",
 			description="Code to evaluate directly in the server process",
 			example="2 + 2",
 			excludes=("mode", "type", "audio", "code"),
+			keyword_only=True,
 		),
 	)
 

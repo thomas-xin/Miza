@@ -1839,6 +1839,7 @@ class React(Pagination, Interactable, Command):
 			description='Preprocess the message, allowing customisation of rules based on USERNAME, NICKNAME, CONTENT and ID; for example, to replicate the conditions for sparkle react, use `--preprocess "{ID}"` and `--keyword "/0{3}$/"`',
 			example="{NICKNAME} {ID}",
 			default="{CONTENT}",
+			keyword_only=True,
 		),
 	)
 	rate_limit = (4, 6)

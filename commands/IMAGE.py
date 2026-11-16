@@ -251,6 +251,7 @@ class Gradient(Visual, Command):
 			description="Width of the output image",
 			example="1536",
 			default=1024,
+			keyword_only=True,
 		),
 		colourspace=cdict(
 			type="enum",
@@ -261,6 +262,7 @@ class Gradient(Visual, Command):
 			example="hsv",
 			default="rgb",
 			aliases=["space"],
+			keyword_only=True,
 		),
 	)
 	macros = cdict(
@@ -337,6 +339,7 @@ class Text(Visual, Command):
 			validation="(0, 1024]",
 			description="The size of the font (usually in pixels width/height)",
 			default=48,
+			keyword_only=True,
 		),
 		colour=cdict(
 			type="colour",
@@ -344,17 +347,20 @@ class Text(Visual, Command):
 			example="#BF7FFF",
 			default=(255, 255, 255),
 			aliases=["color"],
+			keyword_only=True,
 		),
 		width=cdict(
 			type="number",
 			validation="(0, 256]",
 			description="The stroke width",
+			keyword_only=True,
 		),
 		outline=cdict(
 			type="colour",
 			description="The colour of the outline",
 			example="#FF7FBF",
 			default=(0, 0, 0),
+			keyword_only=True,
 		),
 	)
 	rate_limit = (3, 5)
@@ -1175,4 +1181,17 @@ class Blend(Visual, Command):
 		resp = await process_image(url, "blend_map", [urls, float(duration) if duration is not None else None, fps, operation, opacity, "-fs", filesize, "-f", format], timeout=_time_limit)
 		fn = url2fn(url)
 		name = replace_ext(fn, get_ext(resp))
+		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")
+
+
+class Stampify(Visual, Command):
+	name = ["Stamp"]
+	description = "Creates a stamp out of a given image"
+	schema = cdict()
+	rate_limit = (6, 8)
+	_timeout_ = 2
+
+	async def __call__(self, _time_limit, url, duration, fps, filesize, format, **void):
+		resp = await process_image(url, "stamp_map", [[], float(duration) if duration is not None else None, fps, "-fs", filesize, "-f", format])
+		name = "Stamp." + get_ext(resp)
 		return cdict(file=CompatFile(resp, filename=name), reacts="🔳")

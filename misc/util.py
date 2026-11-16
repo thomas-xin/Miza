@@ -60,8 +60,11 @@ print("UTIL:", __name__)
 
 python = sys.executable
 
-with open("auth.json", "rb") as f:
-	AUTH: dict[str, str | list | dict] = cdict(eval(f.read(), dict(true=True, false=False, null=None)))
+try:
+	with open("auth.json", "rb") as f:
+		AUTH: dict[str, str | list | dict] = cdict(eval(f.read(), dict(true=True, false=False, null=None)))
+except FileNotFoundError:
+	AUTH: dict[str, str | list | dict] = cdict()
 AUTH_SECRETS: list[str] = sorted(set(v for k, v in AUTH.items() if k.rsplit("_", 1)[-1] in ("key", "secret", "token")), key=len, reverse=True)
 AUTH_SECRET_RE = re.compile("|".join(map(re.escape, AUTH_SECRETS)))
 def reload_auth():
@@ -1257,6 +1260,8 @@ def url2fn(url, removesuffix=True) -> str:
 	if url.startswith("data:"):
 		mime = url.removeprefix("data:").split(";", 1)[0]
 		return f"data.{mime_into(mime)}"
+	if "?NAME=" in url:
+		return url.split("?NAME=", 1)[-1].split("&", 1)[0]
 	fn = url.split("?", 1)[0].rstrip("/").rsplit("/", 1)[-1].translate(filetrans)
 	if removesuffix:
 		return fn.removesuffix(".binx")
@@ -1671,7 +1676,7 @@ def image_from_bytes(b, nogif=False, maxframes=inf, orig=None, msize=None):
 									im.seek(0)
 									im.info["total_duration"] = i / fps
 				return im
-		if left in ("image", "video") and right != "webp":
+		if left in ("image", "video") and right not in ("webp", "gif"):
 			fmt = "rgba" if left == "image" else "rgb24"
 			ts = time.time_ns() // 1000
 			if mime == "video/m3u8" and orig:
@@ -2665,7 +2670,7 @@ with tracebacksuppressor:
 	enc_key = AUTH["encryption_key"]
 
 if not enc_key:
-	enc_key = (AUTH.get("discord_secret") or AUTH.get("discord_token") or e64(randbytes(32), out=str)).replace(".", "A").replace("_", "a").replace("-", "a")[:43]
+	enc_key = (AUTH.get("discord_secret") or AUTH.get("discord_token") or e64(random.randbytes(32), out=str)).replace(".", "A").replace("_", "a").replace("-", "a")[:43]
 	while len(enc_key) < 43:
 		enc_key += "A"
 	AUTH["encryption_key"] = enc_key 
@@ -5938,7 +5943,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 Request = RequestManager()
 get_request = Request.__call__
 
-def header_test(url, input_headers=None, timeout=12):
+def header_test(url, input_headers=None, timeout=24):
 	assert not is_local_url(url), url
 	input_headers = input_headers or Request.header()
 	if url.isascii():

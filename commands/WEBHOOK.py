@@ -505,6 +505,7 @@ class Proxy(Command):
 			type="word",
 			description='Prefix or ID of proxy to delete. Enter "-" to delete all',
 			example="%test",
+			keyword_only=True,
 		),
 	)
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -693,12 +694,6 @@ class ProxyConfig(Command):
 			description="New user account to clone, for mimic mode. Overrides both name and icon when applied",
 			example="668999031359537205",
 		),
-		personality=cdict(
-			type="string",
-			description="New personality of the character, to be used in the chatbot. Invoke using {PREFIX}+",
-			example="Your name is {{char}}, and you are an easily-annoyed dog who always barks at humans.",
-			greedy=False,
-		),
 		gender=cdict(
 			type="string",
 			description="New gender of the character, only affects viewing by info",
@@ -713,7 +708,7 @@ class ProxyConfig(Command):
 	)
 	rate_limit = (4, 5)
 
-	async def __call__(self, bot, _guild, _user, _perm, proxy, prefix, name, icon, user, personality, gender, birthday, **void):
+	async def __call__(self, bot, _guild, _user, _perm, proxy, prefix, name, icon, user, gender, birthday, **void):
 		mimics = bot.data.mimics.get(_user, {})
 		mimic = bot.get_mimic(proxy, _user)
 		mimic = await bot.data.mimics.update_mimic(mimic, _guild)
@@ -732,9 +727,6 @@ class ProxyConfig(Command):
 			mimic.url = icon
 		if user is not None:
 			mimic.clone = user
-		if personality is not None:
-			assert len(personality) < 2000, "Personality must be 2000 or fewer in length."
-			mimic.personality = personality
 		if gender is not None:
 			mimic.gender = gender
 		if birthday is not None:
@@ -765,11 +757,6 @@ class ProxySend(Command):
 			required=True,
 			greedy=False,
 		),
-		# invoke=cdict(
-		# 	type="bool",
-		# 	description="Whether to invoke the proxy's AI, if applicable",
-		# 	default=True,
-		# ),
 	)
 
 	async def __call__(self, bot, _user, _message, proxy, channel, message, invoke, **void):
@@ -782,14 +769,11 @@ class ProxySend(Command):
 			enabled = bot.data.enabled[channel.id]
 		except KeyError:
 			enabled = bot.data.enabled.get(guild.id, ())
-		invoking = invoke and mimic.personality
 		# Because this command operates across channels and servers, we need to make sure these cannot be sent to channels without this command enabled
 		if not admin and ("webhook" not in enabled or perm < 1):
 			raise PermissionError("Not permitted to send into target channel.")
-		if not admin and ("ai" not in enabled and invoking):
-			raise PermissionError("AI is not enabled in target channel.")
 		create_task(_message.add_reaction("👀"))
-		await bot.data.mimics.invoke_mimic(_message, mimic, channel, message, invoking)
+		await bot.data.mimics.invoke_mimic(_message, mimic, channel, message)
 
 
 class UpdateMimics(Database):
@@ -856,8 +840,6 @@ class UpdateMimics(Database):
 				invoke = info.get("invoke")
 				if not invoke:
 					create_task(bot.autodelete(message))
-				elif not mimic.get("personality"):
-					raise ValueError(f"Character must have a personality assigned to chat! Please see {bot.get_prefix(guild)}ProxyConfig for more info.")
 				await self.invoke_mimic(message, mimic, channel, info["msg"], invoke=invoke)
 
 	async def update_mimic(self, mimic, guild=None, it=None):
@@ -866,8 +848,6 @@ class UpdateMimics(Database):
 			mimic = self[i] = cdict(mimic)
 		if "auto" in mimic:
 			mimic.clone = mimic.pop("auto")
-		if "description" in mimic:
-			mimic.personality = mimic.pop("description") or mimic.get("personality")
 		if mimic.get("clone"):
 			bot = self.bot
 			mim = 0

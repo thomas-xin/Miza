@@ -1170,10 +1170,6 @@ class AudioDownloader:
 					return self.handle_path(fn, entry=None if is_trim else entry)
 				fn2 = f"{tmpl}~.{fmt}"
 				args = ["ffmpeg", "-v", "error", "-hide_banner", "-vn"]
-				if start:
-					args.extend(["-ss", str(start)])
-				if end:
-					args.extend(["-to", str(end)])
 				if fmt == "webm":
 					filt = (
 						"-filter_complex", "[0:a]showwaves=s=320x120:mode=p2p:colors=#BF7FFF,scale=600x240:flags=neighbor[v]",
@@ -1185,7 +1181,12 @@ class AudioDownloader:
 					filt = ("-c:a", "libopus")
 				else:
 					filt = ()
-				args.extend(["-i", url, *filt, "-b:a", "160k", "-vbr", "on", fn2])
+				args.extend(("-i", url))
+				if start:
+					args.extend(["-ss", str(start)])
+				if end:
+					args.extend(["-to", str(end)])
+				args.extend([*filt, "-b:a", "160k", "-vbr", "on", fn2])
 				print_process_log(*args)
 				res = subprocess.run(args, stderr=subprocess.PIPE)
 				if not os.path.exists(fn2) or not os.path.getsize(fn2):

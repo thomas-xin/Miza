@@ -25,7 +25,7 @@ from .smath import log2lin, sec2time
 from .util import (
 	tracebacksuppressor, force_kill, AUTH, CACHE_PATH, EvalPipe, Request, api,
 	italics, ansi_md, colourise, colourise_brackets, colourise_auto, maybe_json, select_and_loads,
-	is_url, unyt, equiv_url, url2fn, CachingTeeFile,
+	is_url, unyt, equiv_url, url2fn, CachingTeeFile, shash,
 	get_ext, rename, uhash, expired, is_youtube_stream, b64,
 )
 from .caches import audio_meta
@@ -984,11 +984,18 @@ class AudioFile:
 	temporary = None
 	duration = None
 	cached = {}
+	url = ""
+	path = "."
 
 	def __str__(self):
 		classname = str(self.__class__).replace("'>", "")
 		classname = classname[classname.index("'") + 1:]
 		return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}, linked to {self.path}>"
+
+	def name_hash(self, entry):
+		name = entry.get("name") or url2fn(self.url)
+		name2 = shash(name)
+		return min(name, name2, key=len)
 
 	@classmethod
 	def load(cls, entry, asap=None):
@@ -1025,7 +1032,7 @@ class AudioFile:
 				results = ytdl_fut.result().search(entry["url"])
 				if results:
 					entry.update(results[0])
-			name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
+			name = self.name_hash(entry)
 			self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
 			if not AUTH.get("audio_cache_disabled") and entry.get("duration") and os.path.exists(self.path) and os.path.getsize(self.path):
 				self.stream = self.path
@@ -1035,7 +1042,7 @@ class AudioFile:
 					entry["duration"] = self.duration
 					return self
 			stream, codec, duration, channels = ytdl_fut.result().get_audio(entry, asap=asap)
-			name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
+			name = self.name_hash(entry)
 			self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
 			if duration:
 				self.duration = entry["duration"] = duration
@@ -1090,7 +1097,7 @@ class AudioFile:
 				strex = str(ex)
 				if asap and "Server returned 403 Forbidden (access denied)" in strex or "HTTP error 403 Forbidden" in strex:
 					stream, codec, duration, channels = ytdl_fut.result().get_audio(entry, asap=False)
-					name = lim_str(quote_plus(entry.get("name") or url2fn(url)), 80)
+					name = self.name_hash(entry)
 					self.path = f"{CACHE_PATH}/audio/{name} {uhash(url)}.opus"
 					print("DL:", self.path)
 					assert not is_url(stream) and codec == "opus" and channels == 2, f"Unexpected stream format: {stream} {codec} {channels}"

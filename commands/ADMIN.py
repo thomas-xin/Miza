@@ -108,7 +108,7 @@ class Timeout(Command):
 			type="string",
 			description="Timeout reason (will show up in Audit Log)",
 			example="Being naughty >:(",
-			greedy=False,
+			keyword_only=True,
 		),
 	)
 	rate_limit = (5, 10)
@@ -248,6 +248,7 @@ class RoleSelect(Interactable, Command):
 			description="Newline-separated emoji-role pairs",
 			example="- 🐱 @Cat Lovers",
 			excludes=("roles",),
+			keyword_only=True,
 		),
 	)
 	rate_limit = (9, 12)

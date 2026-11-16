@@ -36,6 +36,7 @@ class Math(Command):
 			description="Floating point calculation precision. Also affects accuracy of scientific notation and recurring decimals",
 			example="8000",
 			default=1024,
+			keyword_only=True,
 		),
 		rationalise=cdict(
 			type="bool",
@@ -753,6 +754,7 @@ class Time(Command):
 			type="word",
 			description="Target timezone to display input after conversion",
 			example="Europe/Stockholm",
+			keyword_only=True,
 		),
 	)
 	macros = cdict(

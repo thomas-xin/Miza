@@ -846,24 +846,28 @@ class Profile(Command):
 			description="Optional field denoting a redirect when the profile is clicked on",
 			example="https://mizabot.xyz",
 			excludes=("user",),
+			keyword_only=True,
 		),
 		icon=cdict(
 			type="visual",
 			description="Thumbnail to display on corner of embeds",
 			example="https://cdn.discordapp.com/embed/avatars/0.png",
 			excludes=("user",),
+			keyword_only=True,
 		),
 		timezone=cdict(
 			type="text",
 			description='Timezone. Used in datetime calculations where applicable; supports both city/state names (e.g. "London") and abbreviations (e.g. "AET"). Daylight savings is automatically calculated for non-fixed timezones',
 			example="US/Eastern",
 			excludes=("user",),
+			keyword_only=True,
 		),
 		birthday=cdict(
 			type="datetime",
 			description="Birthday date; affected by the timezone parameter",
 			example="february 29th",
 			excludes=("user",),
+			keyword_only=True,
 		),
 		optout=cdict(
 			type="bool",
@@ -1076,6 +1080,7 @@ class Reminder(Pagination, Interactable, Command):
 			type="visual",
 			description="Thumbnail to display on corner of embed",
 			example="https://cdn.discordapp.com/embed/avatars/0.png",
+			keyword_only=True,
 		),
 		time=cdict(
 			type="datetime",
@@ -1086,18 +1091,21 @@ class Reminder(Pagination, Interactable, Command):
 			type="timedelta",
 			description="Turn the reminder into a recurring one that will resend itself after a given amount of time. Note: Must be removed manually!",
 			example="One hundred thousand thirty seconds",
+			keyword_only=True,
 		),
 		edit=cdict(
 			type="index",
 			description="Index of reminder(s) to edit",
 			example="3..7",
 			excludes=("delete",),
+			keyword_only=True,
 		),
 		delete=cdict(
 			type="index",
 			description="Index of reminder(s) to delete",
 			example="3..7",
 			excludes=("edit", "message"),
+			keyword_only=True,
 		),
 	)
 	macros = cdict(
@@ -1300,12 +1308,14 @@ class Note(Pagination, Interactable, Command):
 			description="Index of reminder(s) to edit",
 			example="3..7",
 			excludes=("delete",),
+			keyword_only=True,
 		),
 		delete=cdict(
 			type="index",
 			description="Index of reminder(s) to delete",
 			example="3..7",
 			excludes=("edit", "message"),
+			keyword_only=True,
 		),
 	)
 	rate_limit = (6, 10)

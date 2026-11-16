@@ -334,13 +334,15 @@ class Ask(Command):
 		model=cdict(
 			type="word",
 			description="Target LLM to invoke (overrides agent)",
-			example="deepseek-v4",
+			example="deepseek-v4-pro",
+			keyword_only=True,
 		),
 		max_attempts=cdict(
 			type="integer",
 			validation="[1, 64]",
 			description="Amount of agent inference attempts (tools consume 1, errors 2)",
 			default=10,
+			keyword_only=True,
 		)
 	)
 	rate_limit = (12, 16)
@@ -758,7 +760,8 @@ class ChatConfig(Command):
 		model=cdict(
 			type="word",
 			description="Target LLM to invoke (overrides agent)",
-			example="deepseek-v4",
+			example="deepseek-v4-pro",
+			keyword_only=True,
 		),
 		stream=cdict(
 			type="bool",
@@ -771,6 +774,7 @@ class ChatConfig(Command):
 				enum=("none", "discord", "builtin"),
 			),
 			description="""Whether the output should include automatic text-to-speech audio. "discord" mode uses Discord's builtin TTS feature, while "builtin" mode will play the output in the voice channel when available""",
+			keyword_only=True,
 		),
 		history=cdict(
 			type="enum",
@@ -778,6 +782,7 @@ class ChatConfig(Command):
 				enum=("none", "command", "private", "shared"),
 			),
 			description="Whether chat history is enabled, and if so, whether the conversation is shared (including messages from different users), private (same-user only), or default (bot-commands only). Context length is limited by model tier, up to 192 messages or 196608 tokens",
+			keyword_only=True,
 		),
 		apply_all=cdict(
 			type="bool",
@@ -881,7 +886,7 @@ class Instruct(Command):
 		model=cdict(
 			type="word",
 			description="Target LLM to invoke",
-			example="deepseek-v4",
+			example="deepseek-v4-pro",
 		),
 		prompt=cdict(
 			type="string",
@@ -898,6 +903,7 @@ class Instruct(Command):
 			type="string",
 			description="Custom OpenAI-compatible API url, optionally followed by API key and then model, all separated with \"#\"",
 			example="https://api.deepinfra.com/v1/openai#your-api-key-here#gpt-3.5-turbo",
+			keyword_only=True,
 		),
 		temperature=cdict(
 			type="number",
@@ -905,6 +911,7 @@ class Instruct(Command):
 			description="Temperature to influence alignment",
 			example="1.2",
 			default=0.9,
+			keyword_only=True,
 		),
 		frequency_penalty=cdict(
 			type="number",
@@ -912,6 +919,7 @@ class Instruct(Command):
 			description="Amount to penalise tokens based on frequency",
 			example="1.1",
 			default=None,
+			keyword_only=True,
 		),
 		presence_penalty=cdict(
 			type="number",
@@ -919,6 +927,7 @@ class Instruct(Command):
 			description="Amount to penalise tokens based on presence",
 			example="1.1",
 			default=None,
+			keyword_only=True,
 		),
 		reasoning_effort=cdict(
 			type="enum",
@@ -933,6 +942,7 @@ class Instruct(Command):
 			description="Maximum tokens to generate",
 			example="262144",
 			default=98304,
+			keyword_only=True,
 		),
 	)
 	rate_limit = (12, 16)
@@ -1139,11 +1149,13 @@ class TTS(Command):
 			type="word",
 			description="The voice name to apply",
 			example="coral",
+			keyword_only=True,
 		),
 		instructions=cdict(
 			type="word",
 			description="Extra prompt instructions for model",
 			example="Warm bright playful young female voice, high timbre",
+			keyword_only=True,
 		),
 		url=cdict(
 			type="url",

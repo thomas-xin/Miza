@@ -180,7 +180,7 @@ def sync_fps(props, duration=None, fps=None):
 	print("SYNC:", props, seconds, fps, prog)
 	return seconds, fps, prog
 
-def map_sync(images, *args, func, duration=None, fps=None, keep_size="approx", keep_fps="exact", retrieve=False, **kwargs):
+def map_sync(images: list[Image.Image], *args, func, duration=None, fps=None, keep_size="approx", keep_fps="exact", retrieve=False, **kwargs):
 	"""
 	Synchronizes and maps a function over a sequence of images.
 	The images may be static (repeated if necessary), or animated, in which case a heuristically determined set of frames will be used.
@@ -969,7 +969,7 @@ def render_text(text, font="Calibri", size=48, width=None, colour=(0, 0, 0), out
 
 
 @sync_animations
-def caption_map(images, top_text, bottom_text, font="Impact", size=64, width=None, colour=(0, 0, 0), outline=(255, 255, 255), progress=0, **kwargs) -> Image.Image:
+def caption_map(images: list[Image.Image], top_text, bottom_text, font="Impact", size=64, width=None, colour=(0, 0, 0), outline=(255, 255, 255), progress=0, **kwargs) -> Image.Image:
 	im = images[0].convert("RGBA")
 	if isinstance(font, str):
 		from misc.caches import enumerate_os_fonts
@@ -1040,7 +1040,7 @@ def clamp_transparency(frames):
 
 
 @sync_animations
-def spin_map(images, angle, circle, progress=0, **kwargs) -> Image.Image:
+def spin_map(images: list[Image.Image], angle, circle, progress=0, **kwargs) -> Image.Image:
 	image = images[0]
 	z = progress * 360 + angle % 360
 	if z:
@@ -1050,7 +1050,7 @@ def spin_map(images, angle, circle, progress=0, **kwargs) -> Image.Image:
 	return to_circle(image)
 
 @sync_animations
-def rainbow_map(images, mode, progress=0, **kwargs) -> Image.Image:
+def rainbow_map(images: list[Image.Image], mode, progress=0, **kwargs) -> Image.Image:
 	image = images[0]
 	progress %= 1
 	if not progress:
@@ -1067,7 +1067,7 @@ def rainbow_map(images, mode, progress=0, **kwargs) -> Image.Image:
 	return join_rgba(im, A)
 
 @sync_animations
-def pet_map(images, squeeze, progress=0, **kwargs) -> Image.Image:
+def pet_map(images: list[Image.Image], squeeze, progress=0, **kwargs) -> Image.Image:
 	image = images[0]
 	pet = get_image("https://api.mizabot.xyz/u/2omMy8VUGJ5GOH3AIJxw3wJ5yQrU/EBjYrqCEUDw.zip")
 	w, h = image.width * 2.5, image.height * 2.5
@@ -1088,7 +1088,7 @@ def pet_map(images, squeeze, progress=0, **kwargs) -> Image.Image:
 	return im.resize((round(w / 2), round(h / 2)), resample=Resampling.LANCZOS)
 
 @sync_animations
-def scroll_map(images, direction, progress=0, **kwargs) -> Image.Image:
+def scroll_map(images: list[Image.Image], direction, progress=0, **kwargs) -> Image.Image:
 	image = images[0]
 	progress %= 1
 	if not progress:
@@ -1237,7 +1237,7 @@ def orbit_map(image, extras, duration, fps, count):
 	size = (round(diameter * scale),) * 2
 
 	# Repeatedly rotate image and return copies
-	def orbit_iterator(images, progress=0, **kwargs):
+	def orbit_iterator(images: list[Image.Image], progress=0, **kwargs):
 		im = Image.new("RGBA", size, (0,) * 4)
 		if orbital_count > 1:
 			im2 = Image.new("RGBA", size, (0,) * 4)
@@ -1331,7 +1331,7 @@ def grid_to_mesh(src_grid, dst_grid) -> list:
 	return list(mesh)
 
 @sync_animations
-def magik_map(images, intensity, cell_count, progress=0, count=1, seed=0, **kwargs) -> Image.Image:
+def magik_map(images: list[Image.Image], intensity, cell_count, progress=0, count=1, seed=0, **kwargs) -> Image.Image:
 	image = images[0]
 	total_distance = sqrt(np.prod(image.size)) / cell_count * intensity
 	grid_distance = max(1, round(sqrt(total_distance)))
@@ -1345,7 +1345,7 @@ def magik_map(images, intensity, cell_count, progress=0, count=1, seed=0, **kwar
 	return image
 
 @sync_animations
-def crop_map(images, x1, y1, x2, y2, **kwargs) -> Image.Image:
+def crop_map(images: list[Image.Image], x1, y1, x2, y2, **kwargs) -> Image.Image:
 	image = images[0]
 	if x1 == "-":
 		x1 = 0
@@ -1385,7 +1385,7 @@ def crop_map(images, x1, y1, x2, y2, **kwargs) -> Image.Image:
 	return im
 
 @sync_animations
-def adjust_map(images, operation, value, channels, clip, **kwargs) -> Image.Image:
+def adjust_map(images: list[Image.Image], operation, value, channels, clip, **kwargs) -> Image.Image:
 	image = images[0]
 	channels = set(channels)
 	chans = channels.difference("rgbcmyhscvliy")
@@ -1482,24 +1482,32 @@ def blend_single(i1, a1, i2, a2, opacity, operation) -> tuple[np.ndarray, np.nda
 	if operation == "blit":
 		return i1 * (1 - a2) + i2 * a2, np.maximum(a1, a2)
 	elif operation == "blend":
-		o1, o2 = min(1, opacity * 2), min(1, (1 - opacity) * 2)
+		o1, o2 = min(1, (1 - opacity) * 2), min(1, opacity * 2)
 		return (i1 * a1 * o1 + i2 * a2 * o2) / (a1 + a2), np.maximum(a1, a2)
 	elif operation == "replace":
-		return i1 * opacity + i2 * (1 - opacity), (a1 + a2) / 2
+		return i1 * (1 - opacity) + i2 * opacity, (a1 + a2) / 2
 	elif operation == "add":
-		return i1 * opacity * 2 + i2 * (1 - opacity) * 2, a1 + a2
+		return i1 * (1 - opacity) * 2 + i2 * opacity * 2, a1 + a2
 	elif operation == "mul":
-		return i1 ** (opacity * 2) * i2 ** ((1 - opacity) * 2), a1 * a2
+		return i1 ** ((1 - opacity) * 2) * i2 ** (opacity * 2), a1 * a2
 	elif operation == "sub":
-		return i1 * opacity - i2 * (1 - opacity), np.maximum(a1, a2)
+		return i1 * (1 - opacity) - i2 * opacity, np.maximum(a1, a2)
 	elif operation == "div":
-		return i1 ** (opacity * 2) / i2 ** ((1 - opacity) * 2), a1 / a2
+		alpha = a1 / a2
+		alpha[~np.isfinite(alpha)] = 1
+		return i1 ** ((1 - opacity) * 2) / i2 ** (opacity * 2), alpha
 	elif operation == "mod":
-		return i1 % i2, a1 % a2
+		alpha = a1 % a2
+		alpha[alpha == 0 | ~np.isfinite(alpha)] = 1
+		return i1 % i2, alpha
+	elif operation == "and":
+		alpha = a1 % a2
+		alpha[alpha == 0 | ~np.isfinite(alpha)] = 1
+		return i1 % i2, alpha
 	else:
 		raise NotImplementedError(operation, "is not currently supported.")
 
-def _blend_map(images, operation, opacity, props=(), **kwargs) -> Image.Image:
+def _blend_map(images: list[Image.Image], operation, opacity, props=(), **kwargs) -> Image.Image:
 	dtype = np.float32
 	image = images[0]
 	im, A = split_rgba(image)
@@ -1524,8 +1532,8 @@ def _blend_map(images, operation, opacity, props=(), **kwargs) -> Image.Image:
 			a2 = np.ones((im.height, im.width), dtype=dtype)
 		a2 = a2.reshape((im2.height, im2.width, 1))
 		rgb, a1 = blend_single(rgb, a1, rgb2, a2, opacity, operation)
-		np.nan_to_num(rgb, copy=False)
-		np.nan_to_num(a1, copy=False)
+		rgb = np.nan_to_num(rgb, copy=False)
+		a1 = np.nan_to_num(a1, copy=False)
 
 	a1 *= 255
 	a1 = quantise_into(a1, clip=(0, 255)).reshape(a1.shape[:2])
@@ -1683,7 +1691,7 @@ blurs = {
 	"gaussian": ImageFilter.GaussianBlur,
 }
 @sync_animations
-def blur_map(images, filt, radius=6, **kwargs) -> Image.Image:
+def blur_map(images: list[Image.Image], filt, radius=6, **kwargs) -> Image.Image:
 	image = images[0]
 	rgb, A = split_rgba(image)
 	if A:
@@ -2279,3 +2287,30 @@ def chromakey(
 	a = quantise_into(out, clip=(0, 255))
 	return Image.fromarray(a, "RGBA")
 chromakey_map = sync_animations(chromakey, keep_size="exact")
+
+@sync_animations
+def stamp_map(images: list[Image.Image], **kwargs) -> Image.Image:
+	image = images[0]
+	rgb, A = split_rgba(image)
+	if A:
+		a = np.asanyarray(A, dtype=np.float32)
+		left = np.mean(a[0])
+		top = np.mean(a[:, 0])
+		right = np.mean(a[-1])
+		bottom = np.mean(a[:, -1])
+		avg = np.mean([left, top, right, bottom])
+		if avg < 0.99 * 255:
+			return image.copy()
+	paste = image.resize((89, 49), Resampling.LANCZOS).convert("RGBA")
+	mmap = image.resize((5, 5), resample=Resampling.LANCZOS).convert("RGB")
+	tmpl = Image.open("misc/stamp.png").convert("RGBA")
+	Mmap = mmap.resize(tmpl.size).convert("RGBA")
+	amap = np.asanyarray(Mmap, dtype=np.uint8)
+	tmpl_a = np.array(tmpl, dtype=np.uint8)
+	non_empty = tmpl_a[:, :, 3] > 127
+	black = tmpl_a[:, :, 0] <= 127
+	to_replace = np.logical_and(non_empty, black)
+	tmpl_a[to_replace] = amap[to_replace]
+	gradient_border = Image.fromarray(tmpl_a, "RGBA")
+	gradient_border.paste(paste, (4, 4))
+	return gradient_border

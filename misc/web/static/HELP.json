@@ -179,25 +179,29 @@
 					"type": "url",
 					"description": "Optional field denoting a redirect when the profile is clicked on",
 					"example": "https://mizabot.xyz",
-					"excludes": ["user"]
+					"excludes": ["user"],
+					"keyword_only": true
 				},
 				"icon": {
 					"type": "visual",
 					"description": "Thumbnail to display on corner of embeds",
 					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
-					"excludes": ["user"]
+					"excludes": ["user"],
+					"keyword_only": true
 				},
 				"timezone": {
 					"type": "text",
 					"description": "Timezone. Used in datetime calculations where applicable; supports both city/state names (e.g. \"London\") and abbreviations (e.g. \"AET\"). Daylight savings is automatically calculated for non-fixed timezones",
 					"example": "US/Eastern",
-					"excludes": ["user"]
+					"excludes": ["user"],
+					"keyword_only": true
 				},
 				"birthday": {
 					"type": "datetime",
 					"description": "Birthday date; affected by the timezone parameter",
 					"example": "february 29th",
-					"excludes": ["user"]
+					"excludes": ["user"],
+					"keyword_only": true
 				},
 				"optout": {
 					"type": "bool",
@@ -261,7 +265,8 @@
 				"icon": {
 					"type": "visual",
 					"description": "Thumbnail to display on corner of embed",
-					"example": "https://cdn.discordapp.com/embed/avatars/0.png"
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"keyword_only": true
 				},
 				"time": {
 					"type": "datetime",
@@ -271,26 +276,30 @@
 				"every": {
 					"type": "timedelta",
 					"description": "Turn the reminder into a recurring one that will resend itself after a given amount of time. Note: Must be removed manually!",
-					"example": "One hundred thousand thirty seconds"
+					"example": "One hundred thousand thirty seconds",
+					"keyword_only": true
 				},
 				"edit": {
 					"type": "index",
 					"description": "Index of reminder(s) to edit",
 					"example": "3..7",
-					"excludes": ["delete"]
+					"excludes": ["delete"],
+					"keyword_only": true
 				},
 				"delete": {
 					"type": "index",
 					"description": "Index of reminder(s) to delete",
 					"example": "3..7",
-					"excludes": ["edit", "message"]
+					"excludes": ["edit", "message"],
+					"keyword_only": true
 				},
 				"page": {
 					"type": "integer",
 					"validation": "[0,)",
 					"description": "Page number to jump to (zero-indexed)",
 					"example": "2",
-					"default": 0
+					"default": 0,
+					"keyword_only": true
 				}
 			},
 			"ordered_args": ["mode", "message", "icon", "time", "every", "edit", "delete", "page"],
@@ -323,20 +332,23 @@
 					"type": "index",
 					"description": "Index of reminder(s) to edit",
 					"example": "3..7",
-					"excludes": ["delete"]
+					"excludes": ["delete"],
+					"keyword_only": true
 				},
 				"delete": {
 					"type": "index",
 					"description": "Index of reminder(s) to delete",
 					"example": "3..7",
-					"excludes": ["edit", "message"]
+					"excludes": ["edit", "message"],
+					"keyword_only": true
 				},
 				"page": {
 					"type": "integer",
 					"validation": "[0,)",
 					"description": "Page number to jump to (zero-indexed)",
 					"example": "2",
-					"default": 0
+					"default": 0,
+					"keyword_only": true
 				}
 			},
 			"ordered_args": ["message", "edit", "delete", "page"]
@@ -371,7 +383,8 @@
 					"validation": "(0, 1073741824]",
 					"description": "Floating point calculation precision. Also affects accuracy of scientific notation and recurring decimals",
 					"example": "8000",
-					"default": 1024
+					"default": 1024,
+					"keyword_only": true
 				},
 				"rationalise": {
 					"type": "bool",
@@ -604,7 +617,8 @@
 				"timezone": {
 					"type": "word",
 					"description": "Target timezone to display input after conversion",
-					"example": "Europe/Stockholm"
+					"example": "Europe/Stockholm",
+					"keyword_only": true
 				}
 			},
 			"ordered_args": ["mode", "input", "user", "estimate", "timezone"],
@@ -892,7 +906,8 @@
 					"validation": "[0,)",
 					"description": "Page number to jump to (zero-indexed)",
 					"example": "2",
-					"default": 0
+					"default": 0,
+					"keyword_only": true
 				}
 			},
 			"ordered_args": ["mode", "query", "page"]
@@ -932,7 +947,7 @@
 					"type": "string",
 					"description": "Timeout reason (will show up in Audit Log)",
 					"example": "Being naughty >:(",
-					"greedy": false
+					"keyword_only": true
 				}
 			},
 			"ordered_args": ["users", "duration", "reason"]
@@ -1001,7 +1016,8 @@
 					"type": "text",
 					"description": "Newline-separated emoji-role pairs",
 					"example": "- 🐱 @Cat Lovers",
-					"excludes": ["roles"]
+					"excludes": ["roles"],
+					"keyword_only": true
 				}
 			},
 			"ordered_args": ["roles", "limit", "title", "description", "custom"]
@@ -1181,7 +1197,8 @@
 					"validation": "[0,)",
 					"description": "Page number to jump to (zero-indexed)",
 					"example": "2",
-					"default": 0
+					"default": 0,
+					"keyword_only": true
 				}
 			},
 			"ordered_args": ["mode", "emoji", "special", "count", "channel", "page"]
@@ -1401,24 +1418,26 @@
 					"type": "index",
 					"description": "Position to insert song(s). Currently playing song is index 0, and will save its position if replaced",
 					"example": "4",
-					"default": [-1]
+					"default": [-1],
+					"keyword_only": true
 				},
 				"start": {
 					"type": "timedelta",
 					"description": "start position; automatically seeks when played",
-					"greedy": false
+					"keyword_only": true
 				},
 				"end": {
 					"type": "timedelta",
 					"description": "end position; subsequent audio skipped automatically",
-					"greedy": false
+					"keyword_only": true
 				},
 				"page": {
 					"type": "integer",
 					"validation": "[0,)",
 					"description": "Page number to jump to (zero-indexed)",
 					"example": "2",
-					"default": 0
+					"default": 0,
+					"keyword_only": true
 				}
 			},
 			"ordered_args": ["mode", "query", "index", "start", "end", "page"],
@@ -1488,7 +1507,7 @@
 				"after": {
 					"type": "timedelta",
 					"description": "Skips the song(s) after the provided timestamp rather than immediately; requires trusted priviledge level for other users' songs",
-					"greedy": false
+					"keyword_only": true
 				}
 			},
 			"ordered_args": ["mode", "slices", "after"],
@@ -1830,8 +1849,8 @@
 				"country": {
 					"type": "enum",
 					"validation": {
-						"enum": ["AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ", "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BM", "BN", "BO", "BQ", "BR", "BS", "BT", "BW", "BY", "BZ", "CA", "CC", "CD", "CF", "CG", "CH", "CI", "CL", "CM", "CN", "CO", "CR", "CU", "CV", "CW", "CX", "CY", "CZ", "DE", "DK", "DM", "DO", "DZ", "EC", "EE", "EG", "ER", "ES", "ET", "FI", "FJ", "FK", "FO", "FR", "GA", "GB", "GD", "GE", "GF", "GG", "GH", "GI", "GL", "GN", "GP", "GR", "GT", "GU", "GW", "GY", "HK", "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT", "JE", "JM", "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC", "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MF", "MG", "MH", "MK", "ML", "MM", "MN", "MO", "MQ", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA", "NC", "NE", "NG", "NI", "NL", "NO", "NP", "NU", "NZ", "OM", "PA", "PE", "PF", "PG", "PH", "PK", "PL", "PM", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS", "RU", "RW", "SA", "SC", "SD", "SE", "SG", "SH", "SI", "SK", "SL", "SM", "SN", "SO", "SR", "SS", "SV", "SX", "SY", "TD", "TF", "TG", "TH", "TM", "TN", "TO", "TR", "TT", "TW", "TZ", "UA", "UG", "UM", "UN", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI", "VN", "VU", "WF", "XK", "XX", "YE", "YT", "ZA", "ZM", "ZW"],
-						"accepts": {"andorra": "AD", "ad": "AD", "the united arab emirates": "AE", "ae": "AE", "afghanistan": "AF", "af": "AF", "antigua and barbuda": "AG", "ag": "AG", "anguilla": "AI", "ai": "AI", "albania": "AL", "al": "AL", "armenia": "AM", "am": "AM", "angola": "AO", "ao": "AO", "antarctica": "AQ", "aq": "AQ", "argentina": "AR", "ar": "AR", "american samoa": "AS", "as": "AS", "austria": "AT", "at": "AT", "australia": "AU", "au": "AU", "aruba": "AW", "aw": "AW", "aland islands": "AX", "ax": "AX", "azerbaijan": "AZ", "az": "AZ", "bosnia and herzegovina": "BA", "ba": "BA", "barbados": "BB", "bb": "BB", "bangladesh": "BD", "bd": "BD", "belgium": "BE", "be": "BE", "burkina faso": "BF", "bf": "BF", "bulgaria": "BG", "bg": "BG", "bahrain": "BH", "bh": "BH", "burundi": "BI", "bi": "BI", "benin": "BJ", "bj": "BJ", "bermuda": "BM", "bm": "BM", "brunei darussalam": "BN", "bn": "BN", "bolivia": "BO", "bo": "BO", "bonaire": "BQ", "bq": "BQ", "brazil": "BR", "br": "BR", "the bahamas": "BS", "bs": "BS", "bhutan": "BT", "bt": "BT", "botswana": "BW", "bw": "BW", "belarus": "BY", "by": "BY", "belize": "BZ", "bz": "BZ", "canada": "CA", "ca": "CA", "the cocos keeling islands": "CC", "cc": "CC", "the democratic republic of the congo": "CD", "cd": "CD", "the central african republic": "CF", "cf": "CF", "the congo": "CG", "cg": "CG", "switzerland": "CH", "ch": "CH", "coted ivoire": "CI", "ci": "CI", "chile": "CL", "cl": "CL", "cameroon": "CM", "cm": "CM", "china": "CN", "cn": "CN", "colombia": "CO", "co": "CO", "costa rica": "CR", "cr": "CR", "cuba": "CU", "cu": "CU", "cabo verde": "CV", "cv": "CV", "curacao": "CW", "cw": "CW", "christmas island": "CX", "cx": "CX", "cyprus": "CY", "cy": "CY", "czechia": "CZ", "cz": "CZ", "germany": "DE", "de": "DE", "denmark": "DK", "dk": "DK", "dominica": "DM", "dm": "DM", "the dominican republic": "DO", "do": "DO", "algeria": "DZ", "dz": "DZ", "ecuador": "EC", "ec": "EC", "estonia": "EE", "ee": "EE", "egypt": "EG", "eg": "EG", "eritrea": "ER", "er": "ER", "spain": "ES", "es": "ES", "ethiopia": "ET", "et": "ET", "finland": "FI", "fi": "FI", "fiji": "FJ", "fj": "FJ", "the falkland islands malvinas": "FK", "fk": "FK", "the faroe islands": "FO", "fo": "FO", "france": "FR", "fr": "FR", "gabon": "GA", "ga": "GA", "the united kingdom of great britain and northern ireland": "GB", "gb": "GB", "grenada": "GD", "gd": "GD", "georgia": "GE", "ge": "GE", "french guiana": "GF", "gf": "GF", "guernsey": "GG", "gg": "GG", "ghana": "GH", "gh": "GH", "gibraltar": "GI", "gi": "GI", "greenland": "GL", "gl": "GL", "guinea": "GN", "gn": "GN", "guadeloupe": "GP", "gp": "GP", "greece": "GR", "gr": "GR", "guatemala": "GT", "gt": "GT", "guam": "GU", "gu": "GU", "guinea bissau": "GW", "gw": "GW", "guyana": "GY", "gy": "GY", "hong kong": "HK", "hk": "HK", "honduras": "HN", "hn": "HN", "croatia": "HR", "hr": "HR", "haiti": "HT", "ht": "HT", "hungary": "HU", "hu": "HU", "indonesia": "ID", "id": "ID", "ireland": "IE", "ie": "IE", "israel": "IL", "il": "IL", "isle of man": "IM", "im": "IM", "india": "IN", "in": "IN", "british indian ocean territory": "IO", "io": "IO", "iraq": "IQ", "iq": "IQ", "islamic republic of iran": "IR", "ir": "IR", "iceland": "IS", "is": "IS", "italy": "IT", "it": "IT", "jersey": "JE", "je": "JE", "jamaica": "JM", "jm": "JM", "jordan": "JO", "jo": "JO", "japan": "JP", "jp": "JP", "kenya": "KE", "ke": "KE", "kyrgyzstan": "KG", "kg": "KG", "cambodia": "KH", "kh": "KH", "kiribati": "KI", "ki": "KI", "the comoros": "KM", "km": "KM", "saint kitts and nevis": "KN", "kn": "KN", "the democratic peoples republic of korea": "KP", "kp": "KP", "the republic of korea": "KR", "kr": "KR", "kuwait": "KW", "kw": "KW", "the cayman islands": "KY", "ky": "KY", "kazakhstan": "KZ", "kz": "KZ", "the lao peoples democratic republic": "LA", "la": "LA", "lebanon": "LB", "lb": "LB", "saint lucia": "LC", "lc": "LC", "liechtenstein": "LI", "li": "LI", "sri lanka": "LK", "lk": "LK", "liberia": "LR", "lr": "LR", "lesotho": "LS", "ls": "LS", "lithuania": "LT", "lt": "LT", "luxembourg": "LU", "lu": "LU", "latvia": "LV", "lv": "LV", "libya": "LY", "ly": "LY", "morocco": "MA", "ma": "MA", "monaco": "MC", "mc": "MC", "the republic of moldova": "MD", "md": "MD", "montenegro": "ME", "me": "ME", "french part saint martin": "MF", "mf": "MF", "madagascar": "MG", "mg": "MG", "the marshall islands": "MH", "mh": "MH", "republic of north macedonia": "MK", "mk": "MK", "mali": "ML", "ml": "ML", "myanmar": "MM", "mm": "MM", "mongolia": "MN", "mn": "MN", "macao": "MO", "mo": "MO", "martinique": "MQ", "mq": "MQ", "montserrat": "MS", "ms": "MS", "malta": "MT", "mt": "MT", "mauritius": "MU", "mu": "MU", "maldives": "MV", "mv": "MV", "malawi": "MW", "mw": "MW", "mexico": "MX", "mx": "MX", "malaysia": "MY", "my": "MY", "mozambique": "MZ", "mz": "MZ", "namibia": "NA", "na": "NA", "new caledonia": "NC", "nc": "NC", "the niger": "NE", "ne": "NE", "nigeria": "NG", "ng": "NG", "nicaragua": "NI", "ni": "NI", "the netherlands": "NL", "nl": "NL", "norway": "NO", "no": "NO", "nepal": "NP", "np": "NP", "niue": "NU", "nu": "NU", "new zealand": "NZ", "nz": "NZ", "oman": "OM", "om": "OM", "panama": "PA", "pa": "PA", "peru": "PE", "pe": "PE", "french polynesia": "PF", "pf": "PF", "papua new guinea": "PG", "pg": "PG", "the philippines": "PH", "ph": "PH", "pakistan": "PK", "pk": "PK", "poland": "PL", "pl": "PL", "saint pierre and miquelon": "PM", "pm": "PM", "puerto rico": "PR", "pr": "PR", "state of palestine": "PS", "ps": "PS", "portugal": "PT", "pt": "PT", "palau": "PW", "pw": "PW", "paraguay": "PY", "py": "PY", "qatar": "QA", "qa": "QA", "reunion": "RE", "re": "RE", "romania": "RO", "ro": "RO", "serbia": "RS", "rs": "RS", "the russian federation": "RU", "ru": "RU", "rwanda": "RW", "rw": "RW", "saudi arabia": "SA", "sa": "SA", "seychelles": "SC", "sc": "SC", "the sudan": "SD", "sd": "SD", "sweden": "SE", "se": "SE", "singapore": "SG", "sg": "SG", "ascension and tristan da cunha saint helena": "SH", "sh": "SH", "slovenia": "SI", "si": "SI", "slovakia": "SK", "sk": "SK", "sierra leone": "SL", "sl": "SL", "san marino": "SM", "sm": "SM", "senegal": "SN", "sn": "SN", "somalia": "SO", "so": "SO", "suriname": "SR", "sr": "SR", "south sudan": "SS", "ss": "SS", "el salvador": "SV", "sv": "SV", "dutch part sint maarten": "SX", "sx": "SX", "syrian arab republic": "SY", "sy": "SY", "chad": "TD", "td": "TD", "the french southern territories": "TF", "tf": "TF", "togo": "TG", "tg": "TG", "thailand": "TH", "th": "TH", "turkmenistan": "TM", "tm": "TM", "tunisia": "TN", "tn": "TN", "tonga": "TO", "to": "TO", "turkiye": "TR", "tr": "TR", "trinidad and tobago": "TT", "tt": "TT", "taiwan, republic of china": "TW", "tw": "TW", "united republic of tanzania": "TZ", "tz": "TZ", "ukraine": "UA", "ua": "UA", "uganda": "UG", "ug": "UG", "the united states minor outlying islands": "UM", "um": "UM", "": "XX", "un": "UN", "the united states of america": "US", "us": "US", "uruguay": "UY", "uy": "UY", "uzbekistan": "UZ", "uz": "UZ", "the holy see": "VA", "va": "VA", "saint vincent and the grenadines": "VC", "vc": "VC", "bolivarian republic of venezuela": "VE", "ve": "VE", "british virgin islands": "VG", "vg": "VG", "us virgin islands": "VI", "vi": "VI", "vietnam": "VN", "vn": "VN", "vanuatu": "VU", "vu": "VU", "wallis and futuna": "WF", "wf": "WF", "kosovo": "XK", "xk": "XK", "xx": "XX", "yemen": "YE", "ye": "YE", "mayotte": "YT", "yt": "YT", "south africa": "ZA", "za": "ZA", "zambia": "ZM", "zm": "ZM", "zimbabwe": "ZW", "zw": "ZW"}
+						"enum": ["AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AZ", "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BM", "BN", "BO", "BQ", "BR", "BS", "BT", "BW", "BY", "BZ", "CA", "CC", "CD", "CF", "CG", "CH", "CI", "CL", "CM", "CN", "CO", "CR", "CU", "CV", "CW", "CX", "CY", "CZ", "DE", "DK", "DM", "DO", "DZ", "EC", "EE", "EG", "ER", "ES", "ET", "FI", "FJ", "FK", "FO", "FR", "GA", "GB", "GD", "GE", "GF", "GG", "GH", "GI", "GL", "GN", "GP", "GR", "GT", "GU", "GW", "GY", "HK", "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT", "JE", "JM", "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC", "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MG", "MH", "MK", "ML", "MM", "MN", "MO", "MQ", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA", "NC", "NE", "NG", "NI", "NL", "NO", "NP", "NU", "NZ", "OM", "PA", "PE", "PF", "PG", "PH", "PK", "PL", "PM", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS", "RU", "RW", "SA", "SC", "SD", "SE", "SG", "SH", "SI", "SK", "SL", "SM", "SN", "SO", "SR", "SS", "SV", "SX", "SY", "TD", "TF", "TG", "TH", "TM", "TN", "TO", "TR", "TT", "TW", "TZ", "UA", "UG", "UM", "UN", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI", "VN", "VU", "WF", "XK", "YE", "YT", "ZA", "ZM", "ZW", "ZZ"],
+						"accepts": {"andorra": "AD", "ad": "AD", "the united arab emirates": "AE", "ae": "AE", "afghanistan": "AF", "af": "AF", "antigua and barbuda": "AG", "ag": "AG", "anguilla": "AI", "ai": "AI", "albania": "AL", "al": "AL", "armenia": "AM", "am": "AM", "angola": "AO", "ao": "AO", "antarctica": "AQ", "aq": "AQ", "argentina": "AR", "ar": "AR", "american samoa": "AS", "as": "AS", "austria": "AT", "at": "AT", "australia": "AU", "au": "AU", "aruba": "AW", "aw": "AW", "azerbaijan": "AZ", "az": "AZ", "bosnia and herzegovina": "BA", "ba": "BA", "barbados": "BB", "bb": "BB", "bangladesh": "BD", "bd": "BD", "belgium": "BE", "be": "BE", "burkina faso": "BF", "bf": "BF", "bulgaria": "BG", "bg": "BG", "bahrain": "BH", "bh": "BH", "burundi": "BI", "bi": "BI", "benin": "BJ", "bj": "BJ", "bermuda": "BM", "bm": "BM", "brunei darussalam": "BN", "bn": "BN", "bolivia": "BO", "bo": "BO", "bonaire": "BQ", "bq": "BQ", "brazil": "BR", "br": "BR", "the bahamas": "BS", "bs": "BS", "bhutan": "BT", "bt": "BT", "botswana": "BW", "bw": "BW", "belarus": "BY", "by": "BY", "belize": "BZ", "bz": "BZ", "canada": "CA", "ca": "CA", "the cocos keeling islands": "CC", "cc": "CC", "the democratic republic of the congo": "CD", "cd": "CD", "the central african republic": "CF", "cf": "CF", "the congo": "CG", "cg": "CG", "switzerland": "CH", "ch": "CH", "coted ivoire": "CI", "ci": "CI", "chile": "CL", "cl": "CL", "cameroon": "CM", "cm": "CM", "china": "CN", "cn": "CN", "colombia": "CO", "co": "CO", "costa rica": "CR", "cr": "CR", "cuba": "CU", "cu": "CU", "cabo verde": "CV", "cv": "CV", "curacao": "CW", "cw": "CW", "christmas island": "CX", "cx": "CX", "cyprus": "CY", "cy": "CY", "czechia": "CZ", "cz": "CZ", "germany": "DE", "de": "DE", "denmark": "DK", "dk": "DK", "dominica": "DM", "dm": "DM", "the dominican republic": "DO", "do": "DO", "algeria": "DZ", "dz": "DZ", "ecuador": "EC", "ec": "EC", "estonia": "EE", "ee": "EE", "egypt": "EG", "eg": "EG", "eritrea": "ER", "er": "ER", "spain": "ES", "es": "ES", "ethiopia": "ET", "et": "ET", "finland": "FI", "fi": "FI", "fiji": "FJ", "fj": "FJ", "the falkland islands malvinas": "FK", "fk": "FK", "the faroe islands": "FO", "fo": "FO", "france": "FR", "fr": "FR", "gabon": "GA", "ga": "GA", "the united kingdom of great britain and northern ireland": "GB", "gb": "GB", "grenada": "GD", "gd": "GD", "georgia": "GE", "ge": "GE", "french guiana": "GF", "gf": "GF", "guernsey": "GG", "gg": "GG", "ghana": "GH", "gh": "GH", "gibraltar": "GI", "gi": "GI", "greenland": "GL", "gl": "GL", "guinea": "GN", "gn": "GN", "guadeloupe": "GP", "gp": "GP", "greece": "GR", "gr": "GR", "guatemala": "GT", "gt": "GT", "guam": "GU", "gu": "GU", "guinea bissau": "GW", "gw": "GW", "guyana": "GY", "gy": "GY", "hong kong": "HK", "hk": "HK", "honduras": "HN", "hn": "HN", "croatia": "HR", "hr": "HR", "haiti": "HT", "ht": "HT", "hungary": "HU", "hu": "HU", "indonesia": "ID", "id": "ID", "ireland": "IE", "ie": "IE", "israel": "IL", "il": "IL", "isle of man": "IM", "im": "IM", "india": "IN", "in": "IN", "british indian ocean territory": "IO", "io": "IO", "iraq": "IQ", "iq": "IQ", "islamic republic of iran": "IR", "ir": "IR", "iceland": "IS", "is": "IS", "italy": "IT", "it": "IT", "jersey": "JE", "je": "JE", "jamaica": "JM", "jm": "JM", "jordan": "JO", "jo": "JO", "japan": "JP", "jp": "JP", "kenya": "KE", "ke": "KE", "kyrgyzstan": "KG", "kg": "KG", "cambodia": "KH", "kh": "KH", "kiribati": "KI", "ki": "KI", "the comoros": "KM", "km": "KM", "saint kitts and nevis": "KN", "kn": "KN", "the democratic peoples republic of korea": "KP", "kp": "KP", "the republic of korea": "KR", "kr": "KR", "kuwait": "KW", "kw": "KW", "the cayman islands": "KY", "ky": "KY", "kazakhstan": "KZ", "kz": "KZ", "the lao peoples democratic republic": "LA", "la": "LA", "lebanon": "LB", "lb": "LB", "saint lucia": "LC", "lc": "LC", "liechtenstein": "LI", "li": "LI", "sri lanka": "LK", "lk": "LK", "liberia": "LR", "lr": "LR", "lesotho": "LS", "ls": "LS", "lithuania": "LT", "lt": "LT", "luxembourg": "LU", "lu": "LU", "latvia": "LV", "lv": "LV", "libya": "LY", "ly": "LY", "morocco": "MA", "ma": "MA", "monaco": "MC", "mc": "MC", "the republic of moldova": "MD", "md": "MD", "montenegro": "ME", "me": "ME", "madagascar": "MG", "mg": "MG", "the marshall islands": "MH", "mh": "MH", "republic of north macedonia": "MK", "mk": "MK", "mali": "ML", "ml": "ML", "myanmar": "MM", "mm": "MM", "mongolia": "MN", "mn": "MN", "macao": "MO", "mo": "MO", "martinique": "MQ", "mq": "MQ", "montserrat": "MS", "ms": "MS", "malta": "MT", "mt": "MT", "mauritius": "MU", "mu": "MU", "maldives": "MV", "mv": "MV", "malawi": "MW", "mw": "MW", "mexico": "MX", "mx": "MX", "malaysia": "MY", "my": "MY", "mozambique": "MZ", "mz": "MZ", "namibia": "NA", "na": "NA", "new caledonia": "NC", "nc": "NC", "the niger": "NE", "ne": "NE", "nigeria": "NG", "ng": "NG", "nicaragua": "NI", "ni": "NI", "the netherlands": "NL", "nl": "NL", "norway": "NO", "no": "NO", "nepal": "NP", "np": "NP", "niue": "NU", "nu": "NU", "new zealand": "NZ", "nz": "NZ", "oman": "OM", "om": "OM", "panama": "PA", "pa": "PA", "peru": "PE", "pe": "PE", "french polynesia": "PF", "pf": "PF", "papua new guinea": "PG", "pg": "PG", "the philippines": "PH", "ph": "PH", "pakistan": "PK", "pk": "PK", "poland": "PL", "pl": "PL", "saint pierre and miquelon": "PM", "pm": "PM", "puerto rico": "PR", "pr": "PR", "state of palestine": "PS", "ps": "PS", "portugal": "PT", "pt": "PT", "palau": "PW", "pw": "PW", "paraguay": "PY", "py": "PY", "qatar": "QA", "qa": "QA", "reunion": "RE", "re": "RE", "romania": "RO", "ro": "RO", "serbia": "RS", "rs": "RS", "the russian federation": "RU", "ru": "RU", "rwanda": "RW", "rw": "RW", "saudi arabia": "SA", "sa": "SA", "seychelles": "SC", "sc": "SC", "the sudan": "SD", "sd": "SD", "sweden": "SE", "se": "SE", "singapore": "SG", "sg": "SG", "ascension and tristan da cunha saint helena": "SH", "sh": "SH", "slovenia": "SI", "si": "SI", "slovakia": "SK", "sk": "SK", "sierra leone": "SL", "sl": "SL", "san marino": "SM", "sm": "SM", "senegal": "SN", "sn": "SN", "somalia": "SO", "so": "SO", "suriname": "SR", "sr": "SR", "south sudan": "SS", "ss": "SS", "el salvador": "SV", "sv": "SV", "dutch part sint maarten": "SX", "sx": "SX", "syrian arab republic": "SY", "sy": "SY", "chad": "TD", "td": "TD", "the french southern territories": "TF", "tf": "TF", "togo": "TG", "tg": "TG", "thailand": "TH", "th": "TH", "turkmenistan": "TM", "tm": "TM", "tunisia": "TN", "tn": "TN", "tonga": "TO", "to": "TO", "turkiye": "TR", "tr": "TR", "trinidad and tobago": "TT", "tt": "TT", "taiwan, republic of china": "TW", "tw": "TW", "united republic of tanzania": "TZ", "tz": "TZ", "ukraine": "UA", "ua": "UA", "uganda": "UG", "ug": "UG", "the united states minor outlying islands": "UM", "um": "UM", "": "ZZ", "un": "UN", "the united states of america": "US", "us": "US", "uruguay": "UY", "uy": "UY", "uzbekistan": "UZ", "uz": "UZ", "the holy see": "VA", "va": "VA", "saint vincent and the grenadines": "VC", "vc": "VC", "bolivarian republic of venezuela": "VE", "ve": "VE", "british virgin islands": "VG", "vg": "VG", "us virgin islands": "VI", "vi": "VI", "vietnam": "VN", "vn": "VN", "vanuatu": "VU", "vu": "VU", "wallis and futuna": "WF", "wf": "WF", "kosovo": "XK", "xk": "XK", "yemen": "YE", "ye": "YE", "mayotte": "YT", "yt": "YT", "south africa": "ZA", "za": "ZA", "zambia": "ZM", "zm": "ZM", "zimbabwe": "ZW", "zw": "ZW", "zz": "ZZ"}
 					},
 					"description": "Radio station by country"
 				},
@@ -1846,7 +1865,8 @@
 					"validation": "[0,)",
 					"description": "Page number to jump to (zero-indexed)",
 					"example": "2",
-					"default": 0
+					"default": 0,
+					"keyword_only": true
 				}
 			},
 			"ordered_args": ["country", "query", "page"]
@@ -1957,13 +1977,15 @@
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
+					"example": "1:26.3",
+					"keyword_only": true
 				},
 				"fps": {
 					"type": "number",
 					"validation": "(0, 256]",
 					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
+					"example": "120/7",
+					"keyword_only": true
 				},
 				"filesize": {
 					"type": "filesize",
@@ -2013,13 +2035,15 @@
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
+					"example": "1:26.3",
+					"keyword_only": true
 				},
 				"fps": {
 					"type": "number",
 					"validation": "(0, 256]",
 					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
+					"example": "120/7",
+					"keyword_only": true
 				},
 				"filesize": {
 					"type": "filesize",
@@ -2081,13 +2105,15 @@
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
+					"example": "1:26.3",
+					"keyword_only": true
 				},
 				"fps": {
 					"type": "number",
 					"validation": "(0, 256]",
 					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
+					"example": "120/7",
+					"keyword_only": true
 				},
 				"filesize": {
 					"type": "filesize",
@@ -2149,13 +2175,15 @@
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
+					"example": "1:26.3",
+					"keyword_only": true
 				},
 				"fps": {
 					"type": "number",
 					"validation": "(0, 256]",
 					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
+					"example": "120/7",
+					"keyword_only": true
 				},
 				"filesize": {
 					"type": "filesize",
@@ -2307,7 +2335,8 @@
 					"validation": "[1, 65536]",
 					"description": "Width of the output image",
 					"example": "1536",
-					"default": 1024
+					"default": 1024,
+					"keyword_only": true
 				},
 				"colourspace": {
 					"type": "enum",
@@ -2317,19 +2346,22 @@
 					"description": "The colourspace used to produce the image",
 					"example": "hsv",
 					"default": "rgb",
-					"aliases": ["space"]
+					"aliases": ["space"],
+					"keyword_only": true
 				},
 				"duration": {
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
+					"example": "1:26.3",
+					"keyword_only": true
 				},
 				"fps": {
 					"type": "number",
 					"validation": "(0, 256]",
 					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
+					"example": "120/7",
+					"keyword_only": true
 				},
 				"filesize": {
 					"type": "filesize",
@@ -2384,13 +2416,15 @@
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
+					"example": "1:26.3",
+					"keyword_only": true
 				},
 				"fps": {
 					"type": "number",
 					"validation": "(0, 256]",
 					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
+					"example": "120/7",
+					"keyword_only": true
 				},
 				"filesize": {
 					"type": "filesize",
@@ -2446,37 +2480,43 @@
 					"type": "number",
 					"validation": "(0, 1024]",
 					"description": "The size of the font (usually in pixels width/height)",
-					"default": 48
+					"default": 48,
+					"keyword_only": true
 				},
 				"colour": {
 					"type": "colour",
 					"description": "The colour of the gradient on one side",
 					"example": "#BF7FFF",
 					"default": [255, 255, 255],
-					"aliases": ["color"]
+					"aliases": ["color"],
+					"keyword_only": true
 				},
 				"width": {
 					"type": "number",
 					"validation": "(0, 256]",
-					"description": "The stroke width"
+					"description": "The stroke width",
+					"keyword_only": true
 				},
 				"outline": {
 					"type": "colour",
 					"description": "The colour of the outline",
 					"example": "#FF7FBF",
-					"default": [0, 0, 0]
+					"default": [0, 0, 0],
+					"keyword_only": true
 				},
 				"duration": {
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
+					"example": "1:26.3",
+					"keyword_only": true
 				},
 				"fps": {
 					"type": "number",
 					"validation": "(0, 256]",
 					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
+					"example": "120/7",
+					"keyword_only": true
 				},
 				"filesize": {
 					"type": "filesize",
@@ -2505,7 +2545,48 @@
 			"level": "0",
 			"rate_limit": "(5, 7)",
 			"timeout": "48",
-			"usage": ""
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"required": true
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"keyword_only": true
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7",
+					"keyword_only": true
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": ["fs"]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			},
+			"ordered_args": ["url", "duration", "fps", "filesize", "format"]
 		},
 		"QR": {
 			"aliases": ["QR", "RainbowQR"],
@@ -3030,13 +3111,15 @@
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
+					"example": "1:26.3",
+					"keyword_only": true
 				},
 				"fps": {
 					"type": "number",
 					"validation": "(0, 256]",
 					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
+					"example": "120/7",
+					"keyword_only": true
 				},
 				"filesize": {
 					"type": "filesize",
@@ -3113,13 +3196,15 @@
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
+					"example": "1:26.3",
+					"keyword_only": true
 				},
 				"fps": {
 					"type": "number",
 					"validation": "(0, 256]",
 					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
+					"example": "120/7",
+					"keyword_only": true
 				},
 				"filesize": {
 					"type": "filesize",
@@ -3192,13 +3277,15 @@
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
+					"example": "1:26.3",
+					"keyword_only": true
 				},
 				"fps": {
 					"type": "number",
 					"validation": "(0, 256]",
 					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
+					"example": "120/7",
+					"keyword_only": true
 				},
 				"filesize": {
 					"type": "filesize",
@@ -3277,13 +3364,15 @@
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
+					"example": "1:26.3",
+					"keyword_only": true
 				},
 				"fps": {
 					"type": "number",
 					"validation": "(0, 256]",
 					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
+					"example": "120/7",
+					"keyword_only": true
 				},
 				"filesize": {
 					"type": "filesize",
@@ -3331,7 +3420,48 @@
 			"level": "0",
 			"rate_limit": "(8, 15)",
 			"timeout": "96",
-			"usage": ""
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"required": true
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"keyword_only": true
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7",
+					"keyword_only": true
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": ["fs"]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			},
+			"ordered_args": ["url", "duration", "fps", "filesize", "format"]
 		},
 		"ImageCompare": {
 			"aliases": ["ImageCompare", "PSNR"],
@@ -3412,13 +3542,15 @@
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
+					"example": "1:26.3",
+					"keyword_only": true
 				},
 				"fps": {
 					"type": "number",
 					"validation": "(0, 256]",
 					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
+					"example": "120/7",
+					"keyword_only": true
 				},
 				"filesize": {
 					"type": "filesize",
@@ -3477,13 +3609,15 @@
 					"type": "timedelta",
 					"validation": "[-3600, 3600]",
 					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
-					"example": "1:26.3"
+					"example": "1:26.3",
+					"keyword_only": true
 				},
 				"fps": {
 					"type": "number",
 					"validation": "(0, 256]",
 					"description": "The framerate of the animation (does not affect duration)",
-					"example": "120/7"
+					"example": "120/7",
+					"keyword_only": true
 				},
 				"filesize": {
 					"type": "filesize",
@@ -3505,6 +3639,55 @@
 				}
 			},
 			"ordered_args": ["urls", "operation", "opacity", "duration", "fps", "filesize", "format"]
+		},
+		"Stampify": {
+			"aliases": ["Stampify", "Stamp"],
+			"description": "Creates a stamp out of a given image",
+			"level": "0",
+			"rate_limit": "(6, 8)",
+			"timeout": "48",
+			"schema": {
+				"url": {
+					"type": "visual",
+					"description": "Image, animation or video, supplied by URL or attachment",
+					"example": "https://cdn.discordapp.com/embed/avatars/0.png",
+					"aliases": ["i"],
+					"required": true
+				},
+				"duration": {
+					"type": "timedelta",
+					"validation": "[-3600, 3600]",
+					"description": "The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
+					"example": "1:26.3",
+					"keyword_only": true
+				},
+				"fps": {
+					"type": "number",
+					"validation": "(0, 256]",
+					"description": "The framerate of the animation (does not affect duration)",
+					"example": "120/7",
+					"keyword_only": true
+				},
+				"filesize": {
+					"type": "filesize",
+					"validation": "[1024, 1073741824]",
+					"description": "The maximum filesize in bytes",
+					"example": "10kb",
+					"default": 52428800,
+					"aliases": ["fs"]
+				},
+				"format": {
+					"type": "enum",
+					"validation": {
+						"enum": ["auto", "gif", "png", "apng", "qoi", "bmp", "jpg", "jpeg", "jp2", "jpx", "jxl", "tiff", "webp", "heic", "ico", "icns", "ts", "webm", "mkv", "f4v", "flv", "ogv", "ogg", "gifv", "avi", "avif", "mov", "qt", "wmv", "mp4", "m4v", "y4m", "vp8", "vp9", "av1", "h266", "h265", "h264", "mpg", "mpeg", "mpv", "m3u8", "7z", "zip", "tar", "gz", "bz", "xz"],
+						"accepts": {"auto": "auto", "x264": "mp4", "h264": "mp4", "avc": "mp4", "x265": "mp4", "h265": "mp4", "hevc": "mp4", "x266": "mp4", "h266": "mp4", "vvc": "mp4", "av1": "mp4", "vp8": "webm", "vp9": "webm", "y4m": "webm", "quicktime": "mov", "mpegts": "ts", "matroska": "mkv"}
+					},
+					"description": "The file format or codec of the output",
+					"example": "mp4",
+					"default": "auto"
+				}
+			},
+			"ordered_args": ["url", "duration", "fps", "filesize", "format"]
 		}
 	},
 	"FUN": {
@@ -3636,14 +3819,16 @@
 					"type": "word",
 					"description": "Preprocess the message, allowing customisation of rules based on USERNAME, NICKNAME, CONTENT and ID; for example, to replicate the conditions for sparkle react, use `--preprocess \"{ID}\"` and `--keyword \"/0{3}$/\"`",
 					"example": "{NICKNAME} {ID}",
-					"default": "{CONTENT}"
+					"default": "{CONTENT}",
+					"keyword_only": true
 				},
 				"page": {
 					"type": "integer",
 					"validation": "[0,)",
 					"description": "Page number to jump to (zero-indexed)",
 					"example": "2",
-					"default": 0
+					"default": 0,
+					"keyword_only": true
 				}
 			},
 			"ordered_args": ["mode", "keyword", "emoji", "preprocess", "page"]
@@ -3837,7 +4022,8 @@
 					"validation": "[0,)",
 					"description": "Page number to jump to (zero-indexed)",
 					"example": "2",
-					"default": 0
+					"default": 0,
+					"keyword_only": true
 				}
 			},
 			"ordered_args": ["query", "count", "page"]
@@ -3950,13 +4136,15 @@
 				"model": {
 					"type": "word",
 					"description": "Target LLM to invoke (overrides agent)",
-					"example": "deepseek-v4"
+					"example": "deepseek-v4-pro",
+					"keyword_only": true
 				},
 				"max_attempts": {
 					"type": "integer",
 					"validation": "[1, 64]",
 					"description": "Amount of agent inference attempts (tools consume 1, errors 2)",
-					"default": 10
+					"default": 10,
+					"keyword_only": true
 				}
 			},
 			"ordered_args": ["prompt", "agent", "model", "max_attempts"]
@@ -3984,7 +4172,8 @@
 				"model": {
 					"type": "word",
 					"description": "Target LLM to invoke (overrides agent)",
-					"example": "deepseek-v4"
+					"example": "deepseek-v4-pro",
+					"keyword_only": true
 				},
 				"stream": {
 					"type": "bool",
@@ -3996,14 +4185,16 @@
 					"validation": {
 						"enum": ["none", "discord", "builtin"]
 					},
-					"description": "Whether the output should include automatic text-to-speech audio. \"discord\" mode uses Discord's builtin TTS feature, while \"builtin\" mode will play the output in the voice channel when available"
+					"description": "Whether the output should include automatic text-to-speech audio. \"discord\" mode uses Discord's builtin TTS feature, while \"builtin\" mode will play the output in the voice channel when available",
+					"keyword_only": true
 				},
 				"history": {
 					"type": "enum",
 					"validation": {
 						"enum": ["none", "command", "private", "shared"]
 					},
-					"description": "Whether chat history is enabled, and if so, whether the conversation is shared (including messages from different users), private (same-user only), or default (bot-commands only). Context length is limited by model tier, up to 192 messages or 196608 tokens"
+					"description": "Whether chat history is enabled, and if so, whether the conversation is shared (including messages from different users), private (same-user only), or default (bot-commands only). Context length is limited by model tier, up to 192 messages or 196608 tokens",
+					"keyword_only": true
 				},
 				"apply_all": {
 					"type": "bool",
@@ -4023,7 +4214,7 @@
 				"model": {
 					"type": "word",
 					"description": "Target LLM to invoke",
-					"example": "deepseek-v4"
+					"example": "deepseek-v4-pro"
 				},
 				"prompt": {
 					"type": "string",
@@ -4039,28 +4230,32 @@
 				"api": {
 					"type": "string",
 					"description": "Custom OpenAI-compatible API url, optionally followed by API key and then model, all separated with \"#\"",
-					"example": "https://api.deepinfra.com/v1/openai#your-api-key-here#gpt-3.5-turbo"
+					"example": "https://api.deepinfra.com/v1/openai#your-api-key-here#gpt-3.5-turbo",
+					"keyword_only": true
 				},
 				"temperature": {
 					"type": "number",
 					"validation": "[0, 10]",
 					"description": "Temperature to influence alignment",
 					"example": "1.2",
-					"default": 0.9
+					"default": 0.9,
+					"keyword_only": true
 				},
 				"frequency_penalty": {
 					"type": "number",
 					"validation": "[-1, 2]",
 					"description": "Amount to penalise tokens based on frequency",
 					"example": "1.1",
-					"default": null
+					"default": null,
+					"keyword_only": true
 				},
 				"presence_penalty": {
 					"type": "number",
 					"validation": "[-1, 2]",
 					"description": "Amount to penalise tokens based on presence",
 					"example": "1.1",
-					"default": null
+					"default": null,
+					"keyword_only": true
 				},
 				"reasoning_effort": {
 					"type": "enum",
@@ -4074,7 +4269,8 @@
 					"validation": "[1, 1048576]",
 					"description": "Maximum tokens to generate",
 					"example": "262144",
-					"default": 98304
+					"default": 98304,
+					"keyword_only": true
 				}
 			},
 			"ordered_args": ["model", "prompt", "medias", "api", "temperature", "frequency_penalty", "presence_penalty", "reasoning_effort", "max_tokens"]
@@ -4170,12 +4366,14 @@
 				"voice": {
 					"type": "word",
 					"description": "The voice name to apply",
-					"example": "coral"
+					"example": "coral",
+					"keyword_only": true
 				},
 				"instructions": {
 					"type": "word",
 					"description": "Extra prompt instructions for model",
-					"example": "Warm bright playful young female voice, high timbre"
+					"example": "Warm bright playful young female voice, high timbre",
+					"keyword_only": true
 				},
 				"url": {
 					"type": "url",
@@ -4487,19 +4685,22 @@
 					"type": "string",
 					"description": "Code to evaluate directly in the main process",
 					"example": "1 + 1",
-					"excludes": ["mode", "type", "audio", "server"]
+					"excludes": ["mode", "type", "audio", "server"],
+					"keyword_only": true
 				},
 				"audio": {
 					"type": "string",
 					"description": "Code to evaluate directly in the audio process",
 					"example": "1 + 2",
-					"excludes": ["mode", "type", "code", "server"]
+					"excludes": ["mode", "type", "code", "server"],
+					"keyword_only": true
 				},
 				"server": {
 					"type": "string",
 					"description": "Code to evaluate directly in the server process",
 					"example": "2 + 2",
-					"excludes": ["mode", "type", "audio", "code"]
+					"excludes": ["mode", "type", "audio", "code"],
+					"keyword_only": true
 				}
 			},
 			"ordered_args": ["mode", "type", "code", "audio", "server"]

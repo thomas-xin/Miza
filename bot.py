@@ -2231,6 +2231,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			except KeyError:
 				pass
 		if "proxies" in self.data:
+			p = (g_id, attachment_cache.preserve(url).split("?", 1)[0])
 			with tracebacksuppressor:
 				temp = await self.data.exec.uproxy(url, force=force, optimise=True)
 				if temp:
@@ -3931,7 +3932,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 				parser.add_argument(*names, action=action)
 			parser.has_string = []
 			for k, v in schema.items():
-				if v.get("type") == "string" and v.get("greedy", True):
+				if v.get("type") == "string" and v.get("greedy", True) and not v.get("keyword_only"):
 					parser.has_string.append(k)
 				if v.get("type") == "enum":
 					for e in v.validation.enum:
@@ -3963,6 +3964,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 			for k in available:
 				v = schema[k]
 				if k in kwargs or not v.get("greedy", True):
+					continue
+				if v.get("keyword_only"):
 					continue
 				r = None
 				# Datetime and timedelta are greedy arguments that attempt to match as many contiguous words as possible; e.g. "2021 12 31" turns into a single datetime object
@@ -4020,6 +4023,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							pops.append(i)
 						break
 					continue
+				if v.get("keyword_only"):
+					continue
 				hs = parser.has_string
 				taken = False
 				if not hs and v.type in ("bool", "ternary") and full_prune(a) in ("yes", "no", "y", "n", "true", "false", "t", "f", "1", "0", "-", "null", "none"):
@@ -4074,6 +4079,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 							pops.append(i)
 						break
 					continue
+				if v.get("keyword_only"):
+					continue
 				taken = False
 				if v.type in ("word", "string"):
 					taken = True
@@ -4123,6 +4130,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 		if args:
 			for k, v in schema.items():
 				if k in kwargs:
+					continue
+				if v.get("keyword_only"):
 					continue
 				kwargs[k] = args.pop(0)
 				if not args:

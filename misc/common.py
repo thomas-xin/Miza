@@ -1787,6 +1787,9 @@ def find_emojis_ex(s, cast_urls=True):
 			eid = verify_id(e)
 			fmt = "gif" if e.startswith("<a:") else "webp"
 			url = f"https://cdn.discordapp.com/emojis/{eid}.{fmt}"
+			if e.count(":") >= 2:
+				name = e.split(":", 2)[1]
+				url += "?NAME=" + name
 			out[i] = url
 			continue
 		out.setdefault(i, e)
@@ -1800,7 +1803,11 @@ async def fix_emoji_url(url):
 			if ex.errno != 415:
 				raise
 			attachment_cache.tertiary[unyt(url)] = ex
-			return url.replace(".gif", ".webp?animated=true")
+			if "?" in url:
+				url += "&animated=true"
+			else:
+				url += "?animated=true"
+			return url.replace(".gif", ".webp")
 	return url
 
 HEARTS = ["❤️", "🧡", "💛", "💚", "🩵", "💙", "💜", "🩷", "🤍", "🩶", "🖤", "🤎", "💗", "💓", "💘", "💞", "❣️", "💕", "💖", "💝", "❤️‍🔥"]
@@ -2164,6 +2171,7 @@ class Pagination:
 				description="Page number to jump to (zero-indexed)",
 				example="2",
 				default=0,
+				keyword_only=True,
 			)
 		return super().__init__(*args, **kwargs)
 
@@ -2173,19 +2181,21 @@ class Visual:
 	page_size = 16
 
 	def __init__(self, *args, **kwargs):
-		if self.schema:
+		if self.schema is not None:
 			schema = dict(
 				duration=cdict(
 					type="timedelta",
 					validation="[-3600, 3600]",
 					description="The duration of the animation (auto-syncs if the input is animated, negative values reverse the animation)",
 					example="1:26.3",
+					keyword_only=True,
 				),
 				fps=cdict(
 					type="number",
 					validation="(0, 256]",
 					description="The framerate of the animation (does not affect duration)",
 					example="120/7",
+					keyword_only=True,
 				),
 				filesize=cdict(
 					type="filesize",

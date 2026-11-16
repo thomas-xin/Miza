@@ -17,7 +17,7 @@ from .util import patch_before_return, is_url, temporary_file, CODEC_FFMPEG, COD
 from .caches import audio_meta
 import yt_dlp as ytd
 
-# Monkey-patch because yt-dlp didn't accept https://github.com/yt-dlp/yt-dlp/pull/12075
+# Monkey-patch because yt-dlp never accepted https://github.com/yt-dlp/yt-dlp/pull/12075
 patch_before_return(ytd.extractor.reddit.RedditIE._real_extract, """# Hosted on reddit as an image (most likely gif)
 if parsed_url.netloc == 'i.redd.it':
 	formats = [{
@@ -345,9 +345,9 @@ class FFmpegCustomAudioConvertorPP(ytd.postprocessor.FFmpegPostProcessor):
 		input_args = ["-vn"]
 		output_args = []
 		if self.start is not None:
-			input_args.extend(["-ss", str(self.start)])
+			output_args.extend(["-ss", str(self.start)])
 		if self.end is not None:
-			input_args.extend(["-to", str(self.end)])
+			output_args.extend(["-to", str(self.end)])
 		if source_codec == self.codec and meta.bitrate and meta.bitrate / 1000 <= mbr or isinstance(source_codec, str) and source_codec.startswith("pcm_") and self.codec == "wav":
 			output_args.extend(["-c", "copy"])
 		else:

@@ -193,16 +193,17 @@ class Queue(Pagination, Interactable, Command):
 			description="Position to insert song(s). Currently playing song is index 0, and will save its position if replaced",
 			example="4",
 			default=[-1],
+			keyword_only=True,
 		),
 		start=cdict(
 			type="timedelta",
 			description="start position; automatically seeks when played",
-			greedy=False,
+			keyword_only=True,
 		),
 		end=cdict(
 			type="timedelta",
 			description="end position; subsequent audio skipped automatically",
-			greedy=False,
+			keyword_only=True,
 		),
 	)
 	macros = cdict(
@@ -578,7 +579,7 @@ class Skip(Command):
 		after=cdict(
 			type="timedelta",
 			description="Skips the song(s) after the provided timestamp rather than immediately; requires trusted priviledge level for other users' songs",
-			greedy=False,
+			keyword_only=True,
 		),
 	)
 	macros = cdict(
@@ -1812,8 +1813,9 @@ class Download(Command):
 				resp.raise_for_status()
 			except Exception as ex:
 				raise RuntimeError([repr(ex), lim_str(as_str(resp.content), 1024)])
+			filename = re.split(r"filename\*?=(?:UTF-8)?", resp.headers["Content-Disposition"], 2)[-1].strip('"')
 			return cdict(
-				file = CompatFile(resp.content, resp.headers["Content-Disposition"].split("=", 1)[-1].strip('"')),
+				file = CompatFile(resp.content, filename),
 			)
 		# If multiple results are found, display them for selection
 		# TODO: Implement selection
